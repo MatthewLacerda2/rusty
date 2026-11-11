@@ -14,6 +14,11 @@
 #   `ATTEMPTS` times `PAUSE` seconds apart; then installs from what it fetched
 #   with `--no-download`. The directory then holds exactly the `.deb`s this
 #   image lacked, which `action.yml` saves.
+# - After a failed attempt the image's Azure mirror is swapped for Ubuntu's own
+#   archive in `APT_SOURCES` (the runner's mirror list and sources files): on
+#   this PR's first CI run, 2026-11-11 15:33 UTC, `azure.archive.ubuntu.com`
+#   timed out on every index for ten minutes, so retrying it alone could not
+#   pass. Timeouts are short so a dead mirror costs minutes, not a quarter-hour.
 # - Either way it ends by asking dpkg whether every package asked for is
 #   installed, and fails naming the ones that are not: a mirror that answers
 #   `update` with warnings only (apt exits 0 on a failed fetch) or a half-done
@@ -24,8 +29,10 @@ dir=$1 hit=$2
 shift 2
 packages=("$@")
 attempts=${ATTEMPTS:-3}
-pause=${PAUSE:-30}
-apt=(apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o "Dir::Cache::archives=$dir")
+pause=${PAUSE:-20}
+apt=(apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=20 -o "Dir::Cache::archives=$dir")
+# shellcheck disable=SC2206 # a glob list, split on purpose
+sources=(${APT_SOURCES:-/etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/*})
 
 mkdir -p "$dir/partial"
 
@@ -39,16 +46,25 @@ from_cache() {
   sudo dpkg -i "${debs[@]}"
 }
 
+to_ubuntu_archive() {
+  local file
+  for file in "${sources[@]}"; do
+    [ -f "$file" ] && sudo sed -i 's#azure\.archive\.ubuntu\.com#archive.ubuntu.com#g' "$file"
+  done
+  return 0
+}
+
 from_mirror() {
   local try
   for try in $(seq 1 "$attempts"); do
-    if sudo timeout 300 "${apt[@]}" update \
-      && sudo timeout 900 "${apt[@]}" install -y --download-only "${packages[@]}"; then
+    if sudo timeout 180 "${apt[@]}" update \
+      && sudo timeout 600 "${apt[@]}" install -y --download-only "${packages[@]}"; then
       sudo "${apt[@]}" install -y --no-download "${packages[@]}"
       return 0
     fi
     if [ "$try" -lt "$attempts" ]; then
-      echo "system-libs: the mirror failed (attempt $try of $attempts); again in ${pause} s"
+      echo "system-libs: the mirror failed (attempt $try of $attempts); again in ${pause} s from archive.ubuntu.com"
+      to_ubuntu_archive
       sleep "$pause"
     fi
   done
