@@ -17,6 +17,7 @@ local LOOK = 0.12   -- degrees of turn per pixel of mouse motion
 local THROW = 8.0   -- metres ahead the smoke lands
 
 function Shooter.Start(id)
+    Combat.start()
     Shooter.health = Combat.HEALTH
     Shooter.gun = Combat.gun({ rate = 0.1, spread = 0.004, kick = 0.01, recover = 0.15 })
     Shooter.smokes = 1

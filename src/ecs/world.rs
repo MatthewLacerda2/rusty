@@ -6,7 +6,7 @@
 //! `Vec<ScriptComponent>`, and every optional first-class component attached
 //! only when present. hecs itself enforces one-per-type storage. This wrapper
 //! layers the engine's stable `u32` ids — the surface Lua scripts, the editor,
-//! and the scene file all speak — plus a name lookup.
+//! and the scene file all speak — plus a name lookup (`names.rs`).
 //!
 //! `spawn(name)` always attaches a Transform (via `Entity::new`): Transform is
 //! the one mandatory component. Iteration is in insertion order so the former
@@ -30,6 +30,7 @@ use super::changes::ChangeLogs;
 use super::despawn::RefIndex;
 use super::handles::Handles;
 use super::journal::Journal;
+use super::names::Names;
 use super::world_space::{BoundsQueue, WorldStore};
 
 pub(in crate::ecs) use hecs::{Ref, RefMut};
@@ -61,6 +62,8 @@ pub struct World {
     pub(super) refs: Option<RefIndex>,
     /// Absent parent id -> the children placed naming it (`ecs::placement`, #1805).
     pub(super) awaited: BTreeMap<u32, BTreeSet<u32>>,
+    /// Name -> the ids carrying it, derived from the name channel (`ecs::names`, #2089).
+    pub(super) names: Names,
 }
 
 impl Default for World {
@@ -84,6 +87,7 @@ impl World {
             journal: Journal::default(),
             refs: None,
             awaited: BTreeMap::new(),
+            names: Names::default(),
         }
     }
 
@@ -183,15 +187,6 @@ impl World {
 
     pub fn contains(&self, id: u32) -> bool {
         self.handles.get(id).is_some()
-    }
-
-    /// Find the first entity with this name that is active in the hierarchy
-    /// (Unity's `GameObject.Find`), returning its stable id.
-    pub fn find_by_name(&self, name: &str) -> Option<u32> {
-        self.order.iter().copied().find(|&id| {
-            self.component::<String>(id).is_some_and(|n| *n == *name)
-                && self.is_active_in_hierarchy(id)
-        })
     }
 
     /// The stable ids in insertion order.

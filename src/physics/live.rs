@@ -27,6 +27,11 @@
 //!   and hooks swapped onto the same collider: its handle, joints and contacts
 //!   survive, and the mass sync after it re-spreads the body's mass.
 //!
+//! - **Mesh shape.** A mesh collider built from a library mesh (#2059) whose
+//!   triangles changed (`Mesh.Create` replaced it) is rebuilt the same way, in
+//!   place, by `watch::mesh_keys`; rapier wakes what loses a contact, so what
+//!   rested on a plank that was halved falls.
+//!
 //! All walk the sorted plan, or the bodies the change log named (`watch`; a
 //! step's changes reach only the body-state pass, `sync`), and touch a collider
 //! only when it differs.

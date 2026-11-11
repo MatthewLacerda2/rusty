@@ -18,6 +18,8 @@ fn a_missing_part_is_flagged_by_name() {
     l.docs = l.docs.replace("`Graphics.bloom.threshold`", "");
     l.docs = l.docs.replace("`Graphics.taa.mip_bias`", "");
     l.settings.push("lens_dirt".into());
+    l.history.retain(|(n, _)| n != "ssil");
+    l.history.iter_mut().find(|(n, _)| n == "bloom").unwrap().1 = Some(" ");
     let problems = check(&l).join("\n");
     for needle in [
         "`bloom` has no Graphics.* registrar",
@@ -26,6 +28,8 @@ fn a_missing_part_is_flagged_by_name() {
         "`Graphics.bloom.threshold` is not in docs",
         "`Graphics.taa.mip_bias` is not in docs",
         "PostProcessingComponent lists `lens_dirt`",
+        "`ssil` has no history declaration",
+        "`bloom` has no reason it reads no history",
     ] {
         assert!(
             problems.contains(needle),

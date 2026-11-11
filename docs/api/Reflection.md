@@ -100,19 +100,22 @@ scene that names none leaves the scene without one. A file naming two keeps the 
 
 **Scene defaults** live in the lighting settings (`Lighting.GetSettings()` /
 `SetSettings{ reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }`): the resolution a probe
-without its own bakes at (**512**), the **memory budget** of resident cubes
-(**256 MB**) and the most probes `Lighting.Generate()` places (**512**). Each frame keeps the baked probes whose volumes are nearest the camera (a
+without its own bakes at (**128**, Unreal's default (`r.ReflectionCaptureResolution`)
+and the resolution Unity's Reflection Probe Inspector starts at; a Dust2-sized
+level's 250 probes write about 31 MiB of cubes at it, 500 MiB at 512), the **memory budget** of resident cubes
+(**256 MiB**) and the most probes `Lighting.Generate()` places (**512**). Each frame keeps the baked probes whose volumes are nearest the camera (a
 volume the camera stands in counts as distance zero; ties go to the lower index), at most
 32, while the cubes stay within the budget: a cube that would pass it is skipped and
 farther ones that fit are still taken; the nearest is always kept, and so is the
 fallback probe (above). They share one
-texture whose face is the largest resident cube's, so a 512 cube costs 2 MB there
-(BC6H, a byte a texel, with its mips; 16 MB of half floats on a GPU without BC
-compression, where cubes are decoded when they load) and a smaller cube rides in its
+texture whose face is the largest resident cube's, so a 128 cube costs 128 KiB there and a 512 one 2 MiB
+(BC6H, a byte a texel, with its mips; 1 MiB and 16 MiB of half floats on a GPU without BC
+compression, where cubes are decoded when they load; `Debug.Stats().reflection_bytes`
+is what the texture takes) and a smaller cube rides in its
 lower mips. That
 texture is the only copy of a resident cube (a file is read, copied in and dropped), and
 it keeps two spare cubes inside the budget for the ones that just left range, so a
-256 MB budget shades with 32 512 cubes, the cap (14 on a GPU without BC), and pacing back and forth across its
+256 MiB budget shades with 32 cubes, the cap, at 128 or at 512 (14 of 512 on a GPU without BC), and pacing back and forth across its
 edge reads nothing from disk. A cube is judged by
 its file header before it is read, and once the budget is full no file is read at
 all. A cubemap whose size is not a power of two up to 2048 is skipped with

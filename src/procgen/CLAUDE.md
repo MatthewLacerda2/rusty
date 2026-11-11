@@ -3,7 +3,7 @@
 Area rules for `src/procgen/`. Project-wide rules stay in the root `CLAUDE.md`.
 
 ## Adding an op
-An op is **one file plus one row** (#1751), the way a post effect is a module in
+An op is **one file plus one row**, the way a post effect is a module in
 every layer (`src/render/CLAUDE.md`, *Adding a post effect*). It edits no shared
 `match`, enum body or table. The test-only `dummy`
 (`catalog/color/dummy.rs`) is the worked example: grep `dummy` for its file and
@@ -17,7 +17,7 @@ its rows.
   - the **params struct** (serde `Serialize`/`Deserialize`; the recipe's fields,
     with `#[serde(default = "…")]` for an optional one and a private default fn in
     the same file). An op without params is a unit struct (`pub struct Invert;`).
-    A socketable param (one a link may drive, #1494) is a `Param`;
+    A socketable param (one a link may drive) is a `Param`;
   - its **enums**, declared in the same file, `pub`, with
     `#[serde(rename_all = "snake_case")]` and a `#[default]` variant when it has a
     default. Anything else names one by its catalog path,
@@ -68,29 +68,25 @@ its rows.
   `seed_tests`: say so in that test's `settings`, rather than writing a fixture.
   Its own behaviour gets its own tests beside its math.
 
-## Where the planned ops go
-The families as #1739–#1743 fill them, so no branch clusters a folder another is
-adding to. `dir-size` counts a folder's `.rs` files except its `mod.rs` and test files,
-and fails past 12; an allow for a folder under the cap is itself refused
-(`dir_size::check_dir`), so a full folder is clustered, never excused.
+## Which folder
+`dir-size` counts a folder's `.rs` files except its `mod.rs` and test files, and
+fails past 12; an allow for a folder under the cap is itself refused
+(`dir_size::check_dir`), so a full folder is clustered, never excused. Before
+adding, count the folder; today:
 
-- `color/` (10 with `dummy`): `histogram_scan`, `levels` (#1743, landed): tone
-  adjustments beside `auto_levels` and `gamma`.
-- `filter/blurs/`: `directional_blur`, `slope_blur` (#1739, landed); `highpass`, `sharpen`
-  (#1743, landed): a kernel's smear, or the difference from one.
-- `filter/flood/` (#1741, landed): `flood_fill`, `flood_random`, `flood_gradient`,
-  `flood_bbox` (as `fill.rs`, …), their math in `ops/flood.rs` (the islands of a mask, on the torus).
-- `filter/mask/`: `edge_detect` (#1743, landed), beside `distance`.
-- `filter/relief/`: `ambient_occlusion` (#1743, landed), beside `cavity` and
-  `curvature`. A filter's tests share `filter/test_probe.rs` (run one op on one
-  image, roll it to show the op wraps).
-- `generators/` (12, full): `anisotropic_noise` (#1740, landed), `coordinates`
-  (#2002, landed); the rest of #1740 was params on existing generators. The next
-  generator clusters the folder first. A generator's op enum that is new (`WaveProfile`,
-  `ShapeProfile`) lives in its op file, as the rule above says.
-- `vector/` (9): `directional_warp` (#1739, landed), beside `warp`; `sample_at`
-  (#2002, landed), its mip chain in `ops/sample.rs`; #1742 is params and inputs on
-  `tile`.
+- `color/` (10 with `dummy`): tone and colour adjustments (`levels`,
+  `histogram_scan`, `auto_levels`, `gamma`, …).
+- `filter/blurs/`: a kernel's smear, or the difference from one (`blur`,
+  `directional_blur`, `slope_blur`, `highpass`, `sharpen`).
+- `filter/flood/`: the islands of a mask, on the torus (`flood_fill`, `flood_random`,
+  `flood_gradient`, `flood_bbox`, as `fill.rs`, …), their math in `ops/flood.rs`.
+- `filter/mask/`: `edge_detect`, `distance`.
+- `filter/relief/`: `ambient_occlusion`, `cavity`, `curvature`. A filter's tests share
+  `filter/test_probe.rs` (run one op on one image, roll it to show the op wraps).
+- `generators/` (12, full): the next generator clusters the folder first. A new
+  generator enum (`WaveProfile`, `ShapeProfile`) lives in its op file, as above.
+- `vector/` (9): `warp`, `directional_warp`, `sample_at` (its mip chain in
+  `ops/sample.rs`), `tile`, ….
 
 A two-input op with an optional mask and an output mode is `dummy`'s shape:
 `arity(2, 3)`, `cx.input(0)` and `cx.input(1)` read directly, `cx.optional(2)` for
@@ -105,7 +101,7 @@ Some(Lit::Text("…")), ..choice("output", &[…]) }`.
   (`ops::generators::count`), and a neighbourhood op wraps, so every map tiles.
 - **Resolution-free units.** A reach is in tile units (`cx.px` turns it into
   pixels per axis), so a recipe looks the same at any resolution and aspect.
-- **Graphs are expanded before anything runs** (#1744). `op = "graph"` is an
+- **Graphs are expanded before anything runs**. `op = "graph"` is an
   `OpKind` variant outside `catalog!` and `OPS`; `graph::expand` pastes its nodes
   into one flat recipe, and the runner refuses an instance left in one. A caller
   that evaluates a recipe goes through `scene::authoring::material::load_recipe`

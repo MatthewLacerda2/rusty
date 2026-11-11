@@ -56,6 +56,7 @@ mod perception;
 mod physics;
 mod plane_subdivisions;
 mod prefab_api;
+mod process_order;
 mod procgen;
 mod proptest;
 mod ragdoll;

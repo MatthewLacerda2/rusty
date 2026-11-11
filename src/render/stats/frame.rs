@@ -62,6 +62,7 @@ impl Renderer {
             .chain(self.texture_fallbacks.values());
         c.texture_bytes = textures.map(|t| gpu_bytes(&t.texture)).sum();
         c.lightmap_bytes = self.lightmaps.gpu_bytes();
+        c.reflection_bytes = self.reflection_probes.gpu_bytes();
     }
 }
 

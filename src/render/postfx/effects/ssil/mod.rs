@@ -70,7 +70,7 @@ pub(crate) fn forward_group(post_fx: &crate::render::postfx::PostFx) -> Option<&
 
 use glam::{Mat4, Vec3};
 
-use super::{Owner, PostEffect};
+use super::{History, Owner, PostEffect};
 use crate::components::Ssil;
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::quality::{SsilQuality, MAX_RESOLUTION_DIVISOR};
@@ -83,6 +83,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "ssil",
     owner: Owner::Volume,
     gate: Gate::option(GraphicsOption::Ssil),
+    history: History::Reads(|cx| cx.shared.ssil.is_some()),
     module: None,
     composite: &[],
     grade: &[],

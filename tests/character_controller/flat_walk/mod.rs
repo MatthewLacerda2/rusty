@@ -31,16 +31,18 @@ const STICKS: [f32; 2] = [0.0, -0.02];
 const SLACK: f32 = 0.01;
 
 /// A floor: its name, primitive, scale, centre height (every top face at
-/// y = 0) and whether it is marked static.
-pub(super) type Floor = (&'static str, Primitive, Vec3, f32, bool);
+/// y = 0), whether it is marked static, and a plane's subdivisions (its
+/// collider's triangle seams, #2075).
+pub(super) type Floor = (&'static str, Primitive, Vec3, f32, bool, u32);
 
-const FLOORS: [Floor; 5] = [
+const BOXES: [Floor; 4] = [
     (
         "box",
         Primitive::Box,
         Vec3::new(52.0, 1.0, LENGTH),
         -0.5,
         false,
+        1,
     ),
     (
         "tall box",
@@ -48,6 +50,7 @@ const FLOORS: [Floor; 5] = [
         Vec3::new(52.0, 4.0, LENGTH),
         -2.0,
         false,
+        1,
     ),
     (
         "thin box",
@@ -55,6 +58,7 @@ const FLOORS: [Floor; 5] = [
         Vec3::new(52.0, 0.1, LENGTH),
         -0.05,
         false,
+        1,
     ),
     (
         "static box",
@@ -62,16 +66,16 @@ const FLOORS: [Floor; 5] = [
         Vec3::new(52.0, 1.0, LENGTH),
         -0.5,
         true,
-    ),
-    // The primitive plane is 15 m square.
-    (
-        "plane",
-        Primitive::Plane,
-        Vec3::new(52.0 / 15.0, 1.0, LENGTH / 15.0),
-        0.0,
-        false,
+        1,
     ),
 ];
+
+/// The primitive plane (15 m square) stretched over the lanes, cut into
+/// `subdivisions` × `subdivisions` quads.
+fn plane(name: &'static str, subdivisions: u32) -> Floor {
+    let scale = Vec3::new(52.0 / 15.0, 1.0, LENGTH / 15.0);
+    (name, Primitive::Plane, scale, 0.0, false, subdivisions)
+}
 
 /// Every lane, 3 m apart on `floor`, walks `TICKS` ticks, each covering its
 /// stride.
@@ -112,8 +116,25 @@ fn walk_floor(floor: Floor) {
 }
 
 #[test]
-fn a_walk_across_flat_ground_covers_every_stride() {
-    for floor in FLOORS {
+fn a_walk_across_flat_boxes_covers_every_stride() {
+    for floor in BOXES {
         walk_floor(floor);
     }
+}
+
+// Each mesh floor runs in its own test, so its own process (nextest).
+
+#[test]
+fn a_walk_across_a_mesh_plane_covers_every_stride() {
+    walk_floor(plane("plane", 1));
+}
+
+#[test]
+fn a_walk_across_a_plane_of_7_subdivisions_covers_every_stride() {
+    walk_floor(plane("plane, 7 subdivisions", 7));
+}
+
+#[test]
+fn a_walk_across_a_plane_of_32_subdivisions_covers_every_stride() {
+    walk_floor(plane("plane, 32 subdivisions", 32));
 }

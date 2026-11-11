@@ -178,6 +178,7 @@ sphere and ray-traced refraction, order-independent transparency).
 | `Material.SetThickness` / `GetThickness` | `(id, metres)` [`thickness`] — how thick the surface is, in `[0, 10]` (default 1), as HDRP's *Thickness*: a `Planar` refraction's slab depth (a `Thin` one is always 5 mm), and the depth an absorbing surface absorbs over where only the sky is behind it, whatever its refraction model |
 | `Material.SetTransmittanceColor` / `GetTransmittanceColor` | `(id, {r, g, b})` [`transmittance_color`] — HDRP's *Transmittance Color*: the colour light keeps after `absorption_distance` metres through the surface (Beer-Lambert), each channel in `[0, 1]`. White, the default, absorbs nothing; any other colour tints and darkens what is behind by how far it is behind the surface, so shallow water stays clear and the deep end takes the colour |
 | `Material.SetAbsorptionDistance` / `GetAbsorptionDistance` | `(id, metres)` [`absorption_distance`] — HDRP's *Absorption Distance*, where light has kept exactly `transmittance_color`, in `[0.01, 100]` (default 1) |
+| `Material.SetSortingPriority` / `GetSortingPriority` | `(id, priority)` [`sorting_priority`] — HDRP's *Sorting Priority*, an integer in `[-50, 50]` (default 0; a fraction rounds, a value past the range is clamped, a scene file's too): where a `Transparent` surface draws among the others. Translucent draws are ordered by it first, a lower one drawing earlier and a higher one on top whatever their depths (HDRP adds it to the material's render queue, which Unity sorts before depth), then back to front. It is how one object's slots are ordered (all of them share its bounds' centre depth, *Rendering modes* below): a bottle's refracting liquid at -1 draws before its glass shell at 0, so the glass draws over it rather than the liquid erasing it. Mesh particles with a `Transparent` material take it too |
 | `Material.SetDepthPostpass` / `GetDepthPostpass` | `(id, on)` [`depth_postpass`] — HDRP's *Transparent Depth Postpass*, off by default: after the translucents drew, the surface writes its depth, so depth of field focuses on it and motion blur moves it rather than what is behind it, and soft particles and world canvases meet it. Fog needs none: each surface is fogged where it is drawn. SSR reflections on it are `receive_ssr`'s (below), which needs no postpass |
 | `Material.SetWritesMotion` / `GetWritesMotion` | `(id, on)` [`writes_motion`] — HDRP's *Transparent Writes Motion Vectors*, off by default: after the translucents drew, the surface writes its own motion and view depth into the velocity target (not into the depth buffer, unless `depth_postpass` is on too), so TAA, motion blur and depth of field move it as a solid rather than as what is behind it. For solid-looking translucents (a plasma ball, a glass bottle thrown across the room). Only in a view that has a velocity target (TAA, motion blur, depth of field or SSR on) |
 | `Material.SetReactive` / `GetReactive` | `(id, name)` [`reactive`] — how reactive a `Transparent` surface is under TAA (FSR2's *reactive mask*, `Graphics.md` → *TAA*): `"Auto"` (the default: its alpha, or what it adds or multiplies), `"Off"` (the history smooths it as an opaque surface: a large still window), `"Full"` (0.9, FSR2's maximum: a fast effect). Only in a view running TAA |
@@ -382,7 +383,14 @@ visible fallback.
 >   Unity sorts renderers; never its origin), with depth
 >   testing on but depth writes off — so overlapping translucent surfaces all blend
 >   correctly regardless of draw order. (Per-object sort only; intersecting translucent
->   surfaces within one mesh are a known limitation, as in Unity's default.)
+>   surfaces within one mesh are a known limitation, as in Unity's default.) A
+>   material's `sorting_priority` orders the pass first (#2039): a lower priority
+>   draws before a higher one whatever their depths, and only at equal priority does
+>   depth decide. Every transparent slot of one object sorts at that object's one
+>   depth, so at equal priority **an object's slots draw in slot order** (the order
+>   of `MaterialComponent.materials`, which is the mesh's material order); set
+>   priorities to order them otherwise. Ties keep the order the objects were added
+>   in, so the same scene draws the same frame every time.
 >
 > The current `render_mode`/`alpha`/`alpha_cutoff` are readable back via the scene
 > snapshot's per-entity `material` block.

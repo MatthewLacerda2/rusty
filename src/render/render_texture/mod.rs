@@ -91,7 +91,13 @@ impl Renderer {
             let Some(slot) = view.render_textures.slots.get_mut(&path) else {
                 continue;
             };
-            if !shown.contains(&path) || !slot.is_due(frame, cam.target.update_every) {
+            if !shown.contains(&path) {
+                continue;
+            }
+            // A shown picture is kept from a draw (#2092): between `update_every`
+            // draws an earlier one's, and a camera seeing a monitor reads last frame's.
+            self.frame_counters.history_passes += 1;
+            if !slot.is_due(frame, cam.target.update_every) {
                 continue;
             }
             let Some(target) = slot.view.color_target_view() else {

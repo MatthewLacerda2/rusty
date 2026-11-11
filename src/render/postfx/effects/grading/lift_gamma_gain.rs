@@ -4,7 +4,7 @@
 use crate::render::postfx::params::Gate;
 use glam::Vec3;
 
-use super::super::{Grade, GradeCx, Owner, PostEffect};
+use super::super::{Grade, GradeCx, History, Owner, PostEffect};
 use super::bounded;
 use crate::components::{ColorWheel, LiftGammaGain, Wheel};
 use crate::core::color::luminance;
@@ -13,6 +13,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "lift_gamma_gain",
     owner: Owner::Volume,
     gate: Gate::NONE,
+    history: History::None("a grade of this frame's colour"),
     module: Some("postfx/effects/lift_gamma_gain.wgsl"),
     composite: &[],
     grade: &[Grade {

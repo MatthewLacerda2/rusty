@@ -6,15 +6,16 @@ description: Run a set of issues from board to merged — how many branches at o
 # Working a batch of issues
 
 The user writes many issues and asks for them in batches, leaving how many and in
-what order to you. CLAUDE.md already holds the rules a batch runs on (the limits
-per kind of agent, one worktree per branch, stage labels, branch names, draft on
-the first commit, ≈3 attempts then hand back); `ci-merge` holds the merge queue.
-This skill is how the orchestrator runs a batch on top of them.
+what order to you. CLAUDE.md holds the rules a batch runs on (the limits per kind
+of agent, one worktree per branch, stage labels, branch names, draft on the first
+commit, ≈3 attempts then hand back); `cloud-brief.md` holds what every coder
+follows; `ci-merge` holds the merge queue. This skill is how the orchestrator runs
+a batch on top of them.
 
 ## What runs together: file collision, not count
 
 Merging is serialized, one tested tree at a time, but the queue tests up to four
-pull requests together on one tree (a merge train, #1785, `ci-merge`): a branch that
+pull requests together on one tree (a merge train, `ci-merge`): a branch that
 merges cleanly onto `main` and the others rides without being touched. One that
 conflicts with a branch merged ahead of it is not: it pays an update (a merge of
 `main` into it) and its own CI round alone. Over separate files that never happens;
@@ -25,18 +26,17 @@ navigation, audio, CI) at once; within one module, run one branch at a time.
 The files every feature appends to, where two branches at once is the case to
 avoid:
 
-- `src/components/entity/mod.rs` (the document struct, its imports and
-  `Entity::new`);
-- `src/scene/authoring/components.rs` (`ComponentKind`) and
-  `src/scene/authoring/dependency/dispatch.rs` (`set_default`, `has_kind`, `clear_one`:
-  two component branches together push these past clippy's 50-line cap; split
-  by group, never trim);
+- `src/components/registry.rs`'s `first_class!` rows: one sorted line per
+  component, from which `Entity`, the `World` accessors, `ComponentKind`, the
+  dependency dispatch, `KINDS`, the snapshot and the Add Component menu are
+  generated, so two component branches touch different lines; what still
+  collides is each one's hand-written rows (`inspect!`, `snapshot!`,
+  `AddEntry`) when they share an area file;
 - `src/scene/serialize.rs`'s `apply` and `src/scene/undo/level.rs`'s list: every
   saved `Scene` field adds a line to both, so two such branches pass clippy's
-  50-line cap in `apply` (#1645 with #1640); the level list's check test asks the
+  50-line cap in `apply`; the level list's check test asks the
   second to land for its field;
-- `src/api/mod.rs`, `src/scripting/callbacks.rs`,
-  `src/editor/inspector/components/add/`;
+- `src/api/mod.rs`, `src/scripting/callbacks.rs`;
 - `src/app/registry.rs`'s `build()`, where order *is* execution order, so a merge
   that reorders it changes behaviour silently;
 - `docs/api/index.md`, `docs/api/Scene.md`'s component list,
@@ -44,13 +44,13 @@ avoid:
   markers, so two rules land on different lines);
 - `Cargo.toml` / `Cargo.lock`: one owner per wave. Name the owner in every
   sibling's brief ("stay out of `Cargo.toml`"); the watch holds a second one
-  anyway (#969).
+  anyway.
 
 Where order means nothing, a list is kept sorted under a `// sorted: <why>` marker
-(the `sorted` rule, #911), so parallel entries land on different lines; reach for
+(the `sorted` rule), so parallel entries land on different lines; reach for
 the marker when a new append-only list appears.
 
-**Many instances of one kind: a registry first** (#1467). Pairwise, an issue
+**Many instances of one kind: a registry first.** Pairwise, an issue
 that adds one more effect, component, lint rule or namespace is "one more row";
 six of them are a serial chain of conflicts. So before briefing, group the
 batch's issues by what they add. When three or more add an instance of one kind,
@@ -67,56 +67,47 @@ the code*, not merely listable.
 
 ## Where a branch runs
 
-**Cloud by default** (#924). Lavapipe runs the GPU tests in the container (#826),
-so only the machine-bound work stays local: a real GPU (Metal, performance, driver
-races), the display, the speakers, the operator's files or keys, or a
-measurement. Once the local-only proof is in the PR, the rest of the branch can go
-to the cloud. Local builds: check `free -g` and `df -h` first, and give each heavy
-build half the cores (`CARGO_BUILD_JOBS`) when another may overlap it. Never run
-`cargo mutants` locally during a batch. A local coder gets the same `Brief` and
-`cloud-brief.md`, and puts its issue number in every scratch filename: siblings
-share the scratchpad.
+**Cloud by default** (CLAUDE.md, *Worktrees are cheap*). Once the local-only proof
+is in the PR, the rest of the branch can go to the cloud. Local builds: check
+`free -g` and `df -h` first, and give each heavy build half the cores
+(`CARGO_BUILD_JOBS`) when another may overlap it. Never run `cargo mutants`
+locally during a batch. A local coder gets the same `Brief` and `cloud-brief.md`,
+and puts its issue number in every scratch filename: siblings share the
+scratchpad.
 
-**Launching a cloud coder: post the `Brief`, then `make coder ISSUE=N`** (#1569).
+**Launching a cloud coder: post the `Brief`, then `make coder ISSUE=N`.**
 It reads the newest `Brief` comment on #N and creates the one-off routine that
 starts the cloud session a minute or two later; it prints the routine's link,
 where its run links the session. Running it again for the same issue is the
 re-brief launch: a new routine whose prompt names the new `Brief`.
 `ARGS=--dry-run` prints the routine and creates nothing. Never assemble a
-`RemoteTrigger` body by hand; what the script keeps, and why
-(`.github/scripts/dispatch/routine.py` has the detail):
+`RemoteTrigger` body by hand; `.github/scripts/dispatch/routine.py` has what the
+script keeps, and why:
 
 - **Environment: `anthropic_cloud`**, never a `bridge` one (`archlinux:…` is this
-  machine). That choice is what makes it remote. Not the `Agent` tool's
-  `isolation: "remote"`, which fell back to a local worktree here (#504). The API
-  cannot list environments, so the script takes the one the newest `rusty #…`
-  routine ran in; `RUSTY_CLOUD_ENV` names it on an account with none yet.
-- **What it refuses:** a closed issue, a `planning` or `human` one, a brief
-  by someone who cannot push, and a sixth coder (CLAUDE.md's limit, #1856): it
-  counts each issue's newest `rusty #…` routine not yet fired, or fired with its
-  PR still a draft (or no PR yet, the issue open, within 2 hours of the fire) and
-  no newer `Brief`, or fired with its PR ready but no review record on it yet (no
-  `Independent review` or `No review:` comment by someone who can push: its re-brief
-  needs the slot, #2017), and names them, the last ones `in review`; a coder whose PR merged or closed after the
-  fire has ended though a `Refs` PR leaves the issue open (#1913); a fire with no
-  PR past 2 hours is said and not counted (a coder that stood down or stalled). The API cannot tell a working coder from a finished one (a coder waiting
-  on a background command reads `SUCCEEDED`, #1866), so a fired one is placed from
-  GitHub. A re-brief is never counted against its own issue; `ARGS=--over-limit`
-  launches anyway (a stalled draft counts until dealt with). It cannot place a
-  fired routine with no fire time listed, nor see one pushed off the API's 20
-  newest, and says which it could not place (`dispatch/running.py`).
+  machine). That choice is what makes it remote; the `Agent` tool's
+  `isolation: "remote"` falls back to a local worktree here. The API cannot list
+  environments, so the script takes the one the newest `rusty #…` routine ran in;
+  `RUSTY_CLOUD_ENV` names it on an account with none yet.
+- **What it refuses:** a closed issue, a `planning` or `human` one, a brief by
+  someone who cannot push, and a coder past CLAUDE.md's limit. Its refusal names
+  every coder it counted; how a fired routine is placed (a ready PR holds its slot
+  until its review record exists, so its re-brief has one) is
+  `dispatch/running.py`'s docstring. A re-brief is never counted against its own
+  issue; `ARGS=--over-limit` launches anyway (a stalled draft counts until dealt
+  with).
 - `run_once_at` computed, `allowed_tools` with `ToolSearch` (the GitHub MCP tools
   load through it without being listed), and the prompt below.
 - **The prompt names the brief's URL**, the exact comment the script checked,
   never "the newest `Brief`": the repository is public and the routine fires
-  minutes later (28 late on 2026-10-29), so a comment posted in between would
-  otherwise be what a coder with push access follows (PR #1572's review).
+  minutes later, so a comment posted in between would otherwise be what a coder
+  with push access follows.
 - It calls `RemoteTrigger` through `claude mcp serve`, so it needs the `claude`
   CLI signed in to claude.ai, as this machine is; the token never leaves
   `claude`. `claude --cloud` cannot do it: it starts a session only from an
   interactive terminal, and an orchestrator's shell has none.
 
-**The brief is a comment on the issue** (#910), first line `Brief`. The prompt is
+**The brief is a comment on the issue**, first line `Brief`. The prompt is
 echoed back about three times by `RemoteTrigger`, so it stays a pointer, and
 the comment is durable for a relaunch or a later reader. Standing rules for every
 coder live in [`cloud-brief.md`](cloud-brief.md); change them there, once.
@@ -133,37 +124,26 @@ Decisions: <anything already settled, or "none">.
 Add to it when it applies: a shared file a merge left near the 300-line cap, the
 `Cargo.lock` owner.
 
-**A `Decisions` line states facts, so check each one first.** In the 2026-10-22
-batch, four briefs carried a premise nobody had checked, and each cost a review
-round:
-- "Play never imports" assumed Unity's import-on-add, which rusty lacks;
-- "the player ships its caches" assumed an export step that didn't exist;
-- "leave transparent runs out" forgot the renderer still samples their lightmap;
-- "a path can't hold `::`" is false on Linux and macOS.
-
-So, before writing a brief:
-- before citing Unity, check that rusty has the machinery that makes Unity's way safe,
-  and read Unity's source for the claim (a URP shader or C# file): #1479's brief got
-  URP's contrast space wrong, and its coder "corrected" it to a second wrong one;
+**A `Decisions` line states facts, so check each one first.** An unchecked
+premise costs a review round. Before writing a brief:
+- before citing Unity, check that rusty has the machinery that makes Unity's way
+  safe (an import step, an export step), and read Unity's source for the claim (a
+  URP shader or C# file);
 - a decision that sets an edge behaviour Unity already has (what a removal, an
   out-of-range lookup or a re-import does) names Unity's behaviour after checking
-  it: #1665's "stamp every node no member claims" brought deleted parts back
-  (Unity records a removed-GameObject override), and #1672's "fall back outside
-  the volume" seamed skinned meshes (Unity clamps); each cost a review round;
-- a brief that offers alternatives names the invariant each must keep: #1486's
-  "fix the doc, or walk every node" was met by reordering bakes and losing #1485's
-  freeing;
-- when a decision removes data or a capability, grep its consumers;
+  it;
+- a brief that offers alternatives names the invariant each must keep;
+- when a decision removes data or a capability, grep its consumers (a renderer
+  path that still samples it, say);
 - a brief for work that records, replays or digests the sim names every input
-  the sim reads, the frame's `dt` included: #1581's first brief said "what
-  `begin_tick` publishes" and left out the wall-clock `dt` the editor ticks with;
-- verify any claim about a platform or a tool in one command.
+  the sim reads, the frame's `dt` included;
+- verify any claim about a platform or a tool in one command (what a path may
+  hold, say);
 - write "Builds on PR #N merged" only after `gh pr view N --json state` says
-  `MERGED`: a coder that finds the groundwork missing stands down (2026-10-24, #1387);
+  `MERGED`: a coder that finds the groundwork missing stands down;
 - put no closing keyword in a routine prompt for an issue already closed: the
-  queue hands back a PR that closes a closed issue (#1422);
-- file an issue first and cite the number it got, never the one you expect: two
-  briefs named the wrong issue in one batch.
+  queue hands back a PR that closes a closed issue;
+- file an issue first and cite the number it got, never the one you expect.
 
 The routine prompt, which `make coder` writes (`dispatch/routine.py`'s `PROMPT`):
 
@@ -175,23 +155,18 @@ Issue(s): #N. Your brief is the comment at <the brief's URL>; read it there, not
 A re-brief (a conflict, a fix, a new sibling) is a new `Brief` comment on the
 issue with a `Round:` line under `Brief` naming why it happened, `Round: review |
 ci | conflict | other` (a review sent it back, CI went red, it conflicts, anything
-else; `make rebriefs` counts them), and that says **add commits on top, merge `origin/main` in only if the PR
-conflicts, never rebase** (the queue merges `main` in at merge time; a rebase's
-force-push was refused twice on 2026-10-28 and cost a `-v2` PR each, #1568), so
-no brief needs to authorise a force-push, and the PR turned back to draft. **Then `make coder ISSUE=N` again
-right away**: a new routine whose prompt names the new `Brief`. Don't wait for the old
-session: it is subscribed to the PR, not the issue. In the 2026-10-22 batch,
-sessions woke on the draft flip, read only the PR, found no instruction and
-stood down, by design (`cloud-brief.md`: once ready, the branch is the
-queue's). That looked like "half never wake", and it is also why they never
-race the fresh session. So never put the re-brief, or a pointer to it, on the PR: every session
-subscribed to it would act on it, and a PR re-briefed twice has two. **Take the
-`queue` label off when you re-brief**, and before you push to a queued PR
-yourself, and put it back only after reading the fix (#1645, 2026-10-31). With
-the label off the push is safe: a head that moves during the watch's CI wait
-goes back in line, remembered against nothing (#1799), and waits there for the
-label, then its own CI. A re-briefed PR that keeps the label is merged as soon as its coder readies
-it, unread (#1255, 2026-10-23).
+else; `make rebriefs` counts them), and that says **add commits on top, merge
+`origin/main` in only if the PR conflicts, never rebase**, so no brief needs to
+authorise a force-push, and the PR turned back to draft. **Then `make coder
+ISSUE=N` again right away**: a new routine whose prompt names the new `Brief`.
+Don't wait for the old session: a readied session ends for good (`cloud-brief.md`),
+so it never races the fresh one. So never put the re-brief, or a pointer to it,
+on the PR: every session subscribed to it would act on it. **Take the `queue`
+label off when you re-brief**, and before you push to a queued PR yourself, and
+put it back only after reading the fix: a re-briefed PR that keeps the label is
+merged as soon as its coder readies it, unread. With the label off the push is
+safe: a head that moves during the watch's CI wait goes back in line and waits
+there for the label, then its own CI.
 
 **The pull request is the report.** A cloud coder cannot message back; it opens a
 draft, pushes often, readies when its gates are green and ends. Watch the PR, not
@@ -206,61 +181,60 @@ briefs coders, reads diffs and labels. GitHub is the batch's state: open PRs,
 their comments and `RemoteTrigger list` resume a batch from nothing, so nothing
 lives only in the scratchpad.
 
-**Start the queue once a draft exists, under its supervisor** (#908):
+**Start the queue once a draft exists, under its supervisor**:
 `make queue-daemon ARGS="--no-check --since <batch start>"`, from a worktree under
-`.claude/worktrees/` (`merge-queue`). From the main working tree it refuses (status 10)
-and prints the command to run instead: it would detach your checkout onto `origin/main`,
-and git cannot lock the main tree (#1983). It detaches (a background command dies at two hours), logs
-to `.git/merge-queue/queue.log`, moves its worktree to `origin/main` before each
-watch, and restarts the watch by itself on every planned exit: the deadline at
-once, "nothing left" after ten minutes (an exit with a hand-back, status 1, is timed
-by which of the two ended it), `relaunch:` (status 5, the
-queue's own code changed, #967) at once, the machine or GitHub failing with a
-backoff, five times in a row at most. It locks its worktree (`git worktree lock`,
-reason `merge-queue supervisor pid <pid>`) so `make reclaim` leaves it alone; a
-lock left by a dead supervisor shows in `reclaim` as stale, with its PID (#1450).
-`make queue-daemon` prints "supervisor started" only once the child was seen holding
-its lock and still runs a few seconds in; a child that exited prints the log's last
-lines and exits non-zero, and one never seen holding it says *unconfirmed*. A stop
-request left for a supervisor that is gone is removed at a fresh start (not when the
-supervisor restarts itself on a change to its own code, which keeps it).
-The supervisor's own endings are status 7 (`supervisor: worktree <path> is gone;
-stopped.`), 8 (`supervisor: crashed: <error>; stopped.`) and 11 (`supervisor: could not
-lock …; stopped.`: it never runs without its worktree lock, which `make queue-status` reads). **Watch it with `make queue-events`**, the one `Monitor` command (#1876), never a
-hand-typed `tail | grep`: it replays the log from 30 lines back (a re-arm from the
-end drops what the log said while no `Monitor` ran; two PRs sat ready and unread for
-an hour that way on 2026-10-31), passes hand-backs, merges (each once, a train's members as they land), every
-supervisor line that ends its run, the watch's stops, a held
-Dependabot PR and every PR turning ready, opening ready, going back to draft or
-closing unmerged, plus coders' `STANDING DOWN #N` comments (a coder that stops says so
-on its issue, not on a PR), and **exits 1 when the supervisor is not running**, so a
-dead queue is an event. Put the `Monitor` on it, never on the watch itself (a `Monitor`
-dies at 30 minutes and takes its command with it); re-arm it the same way.
-**Ask `make queue-status` whether the queue runs** (at a batch start, a resume, after a
-reboot): it reads the supervisor's worktree lock's PID and checks it alive (exit 0
-running, 1 not), and prints the log's last line and its age, and a `STRANDED #N` line for
-each ready, labelled pull request passed over for over an hour on a green head (#1951). Never `pgrep -f`: after a
-reboot on 2026-11-07 it matched the checking shell's own command line, and a dead
-supervisor was reported running for an hour. **Stop it with `make queue-stop`**, between pull requests; never by
-pattern: `pkill -f` kills scorsese's watch too. Never `pkill -f` a pattern your own
-command line contains either: it kills the shell running it. Run bare (`make queue ARGS="--watch
---no-check --for 70"` in the background), the watch needs relaunching by hand on
-each exit: its last line is `watch: resume: <command>`.
+`.claude/worktrees/` (`merge-queue`); from the main working tree it refuses and
+prints the command to run instead. `--no-check` keeps the engine build off this
+machine: no updated head or train tree is compiled before CI judges it, only
+`tools/lint`'s build-free passes run (`ci-merge`, step 2), so merging costs `git`,
+GitHub calls and a small lint build. Prefer it whenever the machine has other
+work; the price is that an update broken by a merge ahead (rare) is caught by CI
+a round later, not before the push. It detaches (a background command dies at two
+hours), logs to `.git/merge-queue/queue.log`, moves its worktree to `origin/main`
+before each watch, and restarts the watch by itself on every planned exit (the
+deadline, "nothing left", a hand-back, `relaunch:`, the machine or GitHub failing,
+with a backoff, five times in a row at most). It locks its worktree so `make
+reclaim` leaves it alone; a lock left by a dead supervisor shows in `reclaim` as
+stale, with its PID. `make queue-daemon` prints "supervisor started" only once
+the child was seen holding its lock; otherwise it prints the log's last lines and
+exits non-zero, or says *unconfirmed*. Its exit statuses are in `ci-merge`.
+
+- **Watch it with `make queue-events`**, the one `Monitor` command, never a
+  hand-typed `tail | grep`: it replays the log from 30 lines back (a re-arm from
+  the end drops what the log said while no `Monitor` ran), passes hand-backs,
+  merges, the supervisor's and the watch's stops, a held Dependabot PR, every PR
+  turning ready, going back to draft or closing unmerged, and coders' `Standing
+  down` comments on their issues, and **exits 1 when the supervisor is not
+  running**, so a dead queue is an event. Put the `Monitor` on it, never on the
+  watch itself (a `Monitor` dies at 30 minutes and takes its command with it);
+  re-arm it the same way.
+- **Ask `make queue-status` whether the queue runs** (at a batch start, a resume,
+  after a reboot): it checks the supervisor's lock PID alive (exit 0 running, 1
+  not), prints the log's last line and its age, and a `STRANDED #N` line for each
+  ready, labelled pull request passed over for over an hour on a green head.
+  Never `pgrep -f`: it matches the checking shell's own command line.
+- **Stop it with `make queue-stop`**, between pull requests; never by pattern:
+  `pkill -f` kills scorsese's watch too, and a pattern your own command line
+  contains kills the shell running it.
+- Run bare (`make queue ARGS="--watch --no-check --for 70"` in the background),
+  the watch needs relaunching by hand on each exit: its last line is `watch:
+  resume: <command>`.
+
 `ci-merge` has everything else about the queue.
 
 Per pull request:
 
-1. **Read the description and the diff, then add the `queue` label** (#925).
+1. **Read the description and the diff, then add the `queue` label.**
    Check its decisions against the issue. Engine mechanism, a stored format,
    determinism, CI or the merge path, or a refactor gets the
    `independent-review` skill first; any other code PR gets a `No review: <why>`
-   comment (a Markdown-only PR CI counts as non-code, and a Dependabot cargo
-   bump, need neither), since the queue takes neither without its record (`independent-review`,
-   *Answering the findings*, step 2). What the read turns up goes back to the
-   coder unlabelled; removing the label pulls a PR out of line. File its
-   "follow-up" notes as issues now. If it asked for a scoped mutation run (a
-   `Mutation:` line, which the queue dispatches after the merge), read the
-   report when it lands on the merged PR (`ci-merge`, *Triaging a survivor*).
+   comment (`independent-review`, *Answering the findings*, step 2, says which
+   PRs need neither); the queue hands back a PR without its record. What the read
+   turns up goes back to the coder unlabelled; removing the label pulls a PR out
+   of line. File its "follow-up" notes as issues now. If it asked for a scoped
+   mutation run (a `Mutation:` line, which the queue dispatches after the merge),
+   read the report when it lands on the merged PR (`ci-merge`, *Triaging a
+   survivor*).
 2. **A hand-back** skips that PR and the watch carries on. A one-line fix is
    yours: under `--no-check` nothing compiles it before CI, so grep every use of
    what either side moved and check the 300-line and 50-line caps first; the
@@ -287,15 +261,13 @@ priority (`ci-merge` has the Actions-bump hold).
 
 ## Filing a bug
 
-From 2026-10-19 to 21 the same kind of bug got about twelve separate patches,
-each one's review finding the next, before anyone filed the root fix (#1170).
-So whoever files a bug (orchestrator, coder or reviewer) first:
+The same kind of bug patched one instance at a time, each review finding the
+next, is what this prevents. So whoever files a bug (orchestrator, coder or
+reviewer) first:
 
 0. **Checks it is worth an issue** (CLAUDE.md, *Issues are for what matters*): it
    already caused a problem, or leaving it costs more than fixing it, or it is a
-   crack in the structure or the tooling. In the 2026-10-24 batch, reviews filed
-   about as many issues as the batch closed, mostly for edges nobody had hit; the
-   operator closed them unbuilt.
+   crack in the structure or the tooling. An edge nobody hit is not filed.
 1. **Looks for earlier cases** of its kind, open and closed, by symbol, module
    and wording. `gh search issues` answers 403 in a cloud session; there, page
    `gh api 'repos/MatthewLacerda2/rusty/issues?state=all&per_page=100&page=N'` and
@@ -322,8 +294,8 @@ Every bug issue carries one line, `Kind:`, exactly one of:
 `make board` lists an open `bug` issue (not `planning`) without the line, with
 more than one, or with a form not listed above; a `case` that names no search;
 a `Kind: #N` whose sub-issue parent is not N; and a `case` or `root` that has a
-sub-issue parent. It reads the line past list, quote, bold and backtick markup,
-and ignores one inside a fenced code block.
+sub-issue parent. It reads the line past list, quote, bold and
+backtick markup, and ignores one inside a fenced code block.
 
 ## Hand-backs and human checks
 
@@ -361,7 +333,7 @@ The batch is done when the main checkout runs what merged, once nothing is
 compiling:
 
 1. `make reclaim` for what is left. It deletes the finished local branches too,
-   reviewers' `prNNNN` included (#1482), and names each branch it keeps with
+   reviewers' `prNNNN` included, and names each branch it keeps with
    its reason; a kept branch with unmerged work is the user's to delete.
 2. `git pull --ff-only` on `main`.
 3. `cargo build --features dev --bin session-mcp --bin rusty` in the main
@@ -371,10 +343,10 @@ compiling:
 
 **The report opens with `make checks SINCE=<batch start>`**: the unticked human
 checks and the `planning`+`human` issues. Then `make rebriefs ARGS="--since <batch
-start>"` (#1724): briefs per issue, issues that took one brief, and re-briefs by `Round:`.
-Over half the launches of 2026-10-29 to 11-02 were re-briefs; a cause that
-dominates is what the next infrastructure issue attacks (CLAUDE.md, *Once is a
-case; twice is an issue*), and `unstated` means a re-brief left its line out. Then the result, what surprised you
-(not only what went wrong), and the lessons mapped to their changes. Two things
-are raised even mid-batch, while they can still be overruled: a change to the
-user's files outside the repo, and a decision reversed from what the issue said.
+start>"`: briefs per issue, issues that took one brief, and re-briefs by `Round:`.
+A cause that dominates is what the next infrastructure issue attacks (CLAUDE.md,
+*Once is a case; twice is an issue*), and `unstated` means a re-brief left its
+line out. Then the result, what surprised you (not only what went wrong), and the
+lessons mapped to their changes. Two things are raised even mid-batch, while they
+can still be overruled: a change to the user's files outside the repo, and a
+decision reversed from what the issue said.

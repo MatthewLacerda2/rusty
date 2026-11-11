@@ -164,8 +164,9 @@ fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lua
     // Screenshot(path [, { width =, height =, gizmos =, settle = }]) -> bool. Renders
     // the current scene/camera offscreen to a PNG, at the run's size or the one given
     // (#1583), with the colliders and Debug.Draw lines over it when `gizmos` (#1882),
-    // after `settle` frames drawn with no sim step (#2003, default 0) so TAA
-    // converges. Returns false (no error) when no GPU/software adapter is available.
+    // after up to `settle` frames drawn with no sim step (#2003, default 0) so TAA
+    // converges: none when nothing on the view reads history (#2092). Returns
+    // false (no error) when no GPU/software adapter is available.
     let h = Rc::clone(harness);
     t.set(
         "Screenshot",
@@ -176,10 +177,7 @@ fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lua
                 None => ShotOptions::default(),
             };
             let size = shot.size.unwrap_or_else(|| h.size());
-            if !h.settle(size, shot.settle) {
-                return Ok(false);
-            }
-            Ok(h.screenshot_with(path, size, shot.gizmos))
+            Ok(h.screenshot_settled(path, size, (shot.gizmos, shot.settle)))
         })?,
     )?;
 
@@ -217,7 +215,8 @@ struct ShotOptions {
     size: Option<(u32, u32)>,
     /// Draw the gizmos over the frame (default false).
     gizmos: bool,
-    /// Frames drawn before the shot, with no sim step (default 0).
+    /// Frames drawn before the shot, with no sim step (default 0), when the view
+    /// reads history (`Harness::screenshot_settled`).
     settle: u32,
 }
 

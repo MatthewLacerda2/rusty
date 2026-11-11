@@ -3,7 +3,7 @@
 use crate::render::postfx::params::Gate;
 use glam::{Mat3, Vec3};
 
-use super::super::{Grade, GradeCx, Owner, PostEffect};
+use super::super::{Grade, GradeCx, History, Owner, PostEffect};
 use super::bounded;
 use crate::components::WhiteBalance;
 
@@ -11,6 +11,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "white_balance",
     owner: Owner::Volume,
     gate: Gate::NONE,
+    history: History::None("a grade of this frame's colour"),
     module: Some("postfx/effects/white_balance.wgsl"),
     composite: &[],
     grade: &[Grade {
