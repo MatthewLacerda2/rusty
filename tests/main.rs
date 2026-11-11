@@ -56,6 +56,7 @@ mod perception;
 mod physics;
 mod plane_subdivisions;
 mod prefab_api;
+mod process_order;
 mod procgen;
 mod proptest;
 mod ragdoll;
@@ -111,7 +112,6 @@ mod mcp_bench_embed;
 mod mcp_bridge;
 #[cfg(feature = "dev")]
 mod pause_step;
-mod play_order;
 #[cfg(feature = "dev")]
 mod play_project;
 #[cfg(feature = "dev")]
