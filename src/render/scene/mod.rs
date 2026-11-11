@@ -83,6 +83,8 @@ mod interpolate_gpu_tests;
 mod library_gpu_tests;
 mod object;
 mod occlusion;
+#[cfg(test)]
+mod priority_gpu_tests;
 pub(crate) mod records;
 #[cfg(test)]
 mod records_gpu_tests;

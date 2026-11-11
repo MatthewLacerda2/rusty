@@ -93,7 +93,8 @@ pub(super) fn opaque_copy(r: &mut Renderer, view: &mut RenderView, ctx: &mut Cam
     r.copy_opaque(view, &ctx.solids.draws.transparent, ctx.traces);
 }
 
-/// Translucent solids (#242), back-to-front over the opaque ones.
+/// Translucent solids (#242) over the opaque ones, by sorting priority, then
+/// back-to-front (#2039).
 pub(super) fn transparent(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
     r.draw_transparent(view, &ctx.solids.draws.transparent);
 }

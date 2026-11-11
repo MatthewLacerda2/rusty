@@ -1010,6 +1010,7 @@ scene.materials{}.shader_params{}[]: f32
 scene.materials{}.shader_textures: map
 scene.materials{}.shader_textures{key}: string
 scene.materials{}.shader_textures{}: string
+scene.materials{}.sorting_priority: i32
 scene.materials{}.specular: f32
 scene.materials{}.specular_color: tuple(3)
 scene.materials{}.specular_color[]: f32

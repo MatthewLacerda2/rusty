@@ -75,7 +75,8 @@
 //! params (a colour, a scalar: `records::rekeys` false) rewrites its records in the
 //! material table and its param buffer, and re-derives only its users with
 //! overrides (whose buffers merge its params); any other edit, an add or a removal
-//! re-derives the objects naming it (`RenderScene::by_material`), no others. Records
+//! re-derives the objects naming it (`RenderScene::by_material`), no others (a
+//! Sorting Priority is one: each slot keeps it, `SlotDraw::priority`). Records
 //! and param buffers are keyed by scene and name, so two kept scenes holding a
 //! same-named material each draw their own values.
 //!
