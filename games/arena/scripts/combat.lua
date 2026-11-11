@@ -83,6 +83,7 @@ function Combat.smoke(x, y, z)
     Particles.SetSpeed(cloud, 0.1, 0.4)
     Particles.SetSize(cloud, 1.2, 2.0)
     Particles.SetColor(cloud, 0.75, 0.75, 0.75, 0.6)
+    Component.Set(cloud, "Particles", { texture = "assets/textures/puff.png" })
     Scene.AddScript(cloud, "assets/scripts/smoke.lua")
     return cloud
 end

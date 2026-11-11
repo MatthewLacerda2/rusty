@@ -5,5 +5,5 @@
 return {
     { name = "floors", position = { -4, 22, -4 }, target = { 13, 0, 13 } },
     { name = "upper", position = { 14, 9, 2 }, target = { 21, 3, 6 } },
-    { name = "stairs", position = { 12.6, 1.4, 1.4 }, target = { 18, 3, 1.4 } },
+    { name = "stairs", position = { 13.2, 2.4, 6.5 }, target = { 16.5, 1.2, 1.4 } },
 }

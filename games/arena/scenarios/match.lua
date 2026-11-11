@@ -28,11 +28,11 @@ while not match.over and ticks < (limit + 5) * 60 do
             local bx, by, bz = Transform.GetPosition(near)
             local dx, dz = bx - sx, bz - sz
             local len = math.sqrt(dx * dx + dz * dz)
-            Camera.SetPosition(bx + dx / len * 3, by + 1.8, bz + dz / len * 3)
+            Camera.SetPosition(bx + dx / len * 6, by + 2.2, bz + dz / len * 6)
             Camera.SetYaw(math.deg(math.atan(-dz, -dx)))
             Camera.SetPitch(-8)
             Camera.ResetHistory()
-            if not Harness.Screenshot("fight.png", { settle = 4 }) then
+            if not Harness.Screenshot("cache/test/shots/fight.png", { settle = 4 }) then
                 Harness.Log("shot skipped (no GPU adapter): fight")
             end
         end

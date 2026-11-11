@@ -161,6 +161,17 @@ Sound.Bake({
     amp = { a = 0.001, d = 0.08, s = 0.0, r = 0.04 },
 }, "C4", "assets/sounds/shot.wav", { duration = 0.15, seed = p.seed })
 
+-- The particles' sprite: a soft white disc (an emitter with no texture draws
+-- the renderer's checker). combat.lua's smoke wears it too.
+local puff = Texture.Bake({
+    resolution = 64, seed = p.seed, output = "puff",
+    nodes = {
+        { id = "white", op = "constant", color = { 1, 1, 1, 1 } },
+        { id = "disc", op = "shape", kind = "circle", size = { 0.9, 0.9 }, softness = 0.45 },
+        { id = "puff", op = "combine_rgb", inputs = { "white", "white", "white", "disc" } },
+    },
+}, "assets/textures/puff.png", "base_color")
+
 -- The effects every gun shares: one emitter each for the muzzle flash and the
 -- impact sparks, moved to where they fire (scripts/combat.lua).
 local function emitter(name, r, g, b, size, life, speed)
@@ -172,6 +183,7 @@ local function emitter(name, r, g, b, size, life, speed)
     Particles.SetSpeed(id, speed / 2, speed)
     Particles.SetSize(id, size / 2, size)
     Particles.SetColor(id, r, g, b, 1)
+    Component.Set(id, "Particles", { texture = puff })
     return id
 end
 emitter("Flash", 1.0, 0.85, 0.4, 0.25, 0.06, 0.5)
