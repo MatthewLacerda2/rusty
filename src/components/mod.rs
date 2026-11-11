@@ -69,8 +69,8 @@ pub use physics::joint::{JointComponent, JointKind};
 pub use physics::rigidbody::{CollisionDetection, RigidBodyComponent, DEFAULT_ANGULAR_DRAG};
 pub use registry::FirstClass;
 pub use rendering::camera::{
-    is_render_texture, CameraComponent, ClearFlags, Projection, RenderTarget, TaaQuality,
-    RENDER_TEXTURE_PREFIX,
+    horizontal_to_vertical_fov, is_render_texture, vertical_to_horizontal_fov, CameraComponent,
+    ClearFlags, FovAxis, Projection, RenderTarget, TaaQuality, RENDER_TEXTURE_PREFIX,
 };
 pub use rendering::light::{
     falloff, falloff_near, falloff_window, falloff_window_sq, spot_cone, LightComponent, LightMode,

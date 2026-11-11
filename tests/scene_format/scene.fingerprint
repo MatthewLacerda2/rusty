@@ -167,6 +167,7 @@ scene.entities[].camera.clear_flags: enum Skybox|SolidColor|DepthOnly
 scene.entities[].camera.culling_mask: u32
 scene.entities[].camera.far: f32
 scene.entities[].camera.fov: f32
+scene.entities[].camera.fov_axis: enum Vertical|Horizontal
 scene.entities[].camera.fxaa_active: bool
 scene.entities[].camera.motion_blur_active: bool
 scene.entities[].camera.motion_blur_intensity: f32

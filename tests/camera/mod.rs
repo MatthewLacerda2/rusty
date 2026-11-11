@@ -3,6 +3,7 @@
 //! lens and stacking functions (`stack_api`, #1341), render-texture targets
 //! (`target_api`, #430) and history cuts (`reset_history`, #2003).
 
+mod fov_axis;
 mod main_view;
 mod reset_history;
 mod same_frame;
