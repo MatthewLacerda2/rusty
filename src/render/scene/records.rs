@@ -235,6 +235,11 @@ fn record_free(m: &MaterialAsset) -> MaterialAsset {
         uv_mapping: d.uv_mapping,
         world_size: d.world_size,
         blend_sharpness: d.blend_sharpness,
+        // The detail map binds in the material's group; the rest is record values.
+        detail: m
+            .detail
+            .as_ref()
+            .and_then(crate::components::DetailLayer::map_only),
         alpha: d.alpha,
         alpha_cutoff: d.alpha_cutoff,
         blend_mode: d.blend_mode,

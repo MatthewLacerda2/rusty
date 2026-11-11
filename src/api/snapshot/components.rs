@@ -124,6 +124,7 @@ pub(crate) fn camera_component_value(c: &CameraComponent) -> Value {
     json!({
         "active": c.active,
         "fov": c.fov,
+        "fov_axis": c.fov_axis.name(),
         "near": c.near,
         "far": c.far,
         "culling_mask": c.culling_mask,

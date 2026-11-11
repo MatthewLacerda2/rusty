@@ -18,6 +18,7 @@
 //! Pure: no wall-clock, no RNG.
 
 mod coordinates;
+mod detail;
 mod face;
 mod field;
 mod graphs;
@@ -36,6 +37,7 @@ pub use crate::components::material::entity_material_key;
 pub use coordinates::{
     BLEND_SHARPNESS_RANGE, COORDINATE_FIELDS, MAP_COORD_RANGE, WORLD_SIZE_RANGE,
 };
+pub use detail::{clamp_detail, set_detail_map, DETAIL_FIELDS, DETAIL_SCALE_RANGE};
 pub use face::FACE_FIELDS;
 pub use field::{
     material_fields, set_surface, surface_field, SurfaceField, SurfaceKind, SurfaceValue,
@@ -179,6 +181,7 @@ pub fn fit_map_slots(asset: &MaterialAsset) {
     fit_normal_slot(asset.normal_map.as_ref());
     fit_data_slot(asset.metallic_map.as_ref());
     fit_data_slot(asset.roughness_map.as_ref());
+    fit_data_slot(asset.detail.as_ref().and_then(|d| d.map.as_ref()));
 }
 
 /// [`crate::asset::sidecar::fit_normal_slot`] for the image a normal slot names.
