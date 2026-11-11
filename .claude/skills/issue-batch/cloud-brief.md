@@ -223,6 +223,11 @@ Beyond what changed, why, the effect and the decisions:
   or two sentences. Say what you did *not* check (motion, Metal, cost, taste):
   those stay under *For a human*. Your look catches broken; the operator judges
   good. The independent review treats a missing line as a finding.
+- **A change that is visible or plays differently is proved on the test game
+  that covers it** (`make game-test NAME=<game>`, `docs/testing.md`, *Test
+  games*), and the `Looked at` line names the game and its shots. If no game
+  covers it, say so; adding one is adding a `games/<name>/` folder plus its line
+  in `tests/gpu/test_games/mod.rs`.
 - **A `For a human` heading** for what only the operator can check (a real
   window, speakers, a repository setting, a branch to delete), each one a
   `- [ ]` item. The heading must *start* with "For a human": `make checks`

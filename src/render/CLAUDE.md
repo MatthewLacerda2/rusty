@@ -190,6 +190,9 @@ every file and row.
 - **Gate** — its `PostEffect::gate`: the player option, when it is player-facing.
   It asks through `EffectCx::runs(EFFECT.gate, on)`; no shared `match` names it. No
   quality preset gates an effect.
+- **History** — its `PostEffect::history`: `History::Reads(runs)` when it keeps
+  per-view state a later frame reads (TAA, SSIL, the fog), else
+  `History::None("<why>")`; the completeness gate requires one.
 - **Quality** — an effect with a cost knob carries an `EffectQuality` selector and its
   `Custom` values on its settings, and its row in `core::settings::quality::QualityValues`
   (three `Levels`); its render code picks with `quality.pick(&graphics.quality.<row>, custom)`.
