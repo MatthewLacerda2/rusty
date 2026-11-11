@@ -10,8 +10,17 @@
 -- grid of blocks, 120 m a side, Dust2's footprint, run on request.
 -- `bots` snowman bots (scripts/snowman.lua) and the player (scripts/shooter.lua)
 -- fight everyone against everyone; scripts/match.lua keeps the score.
+--
+-- The navmesh is baked and saved with the scene (`<scene>.navmesh`), as a real
+-- game ships it, so Play restores it instead of baking on its first tick.
+-- `bake = true` also runs Generate Lighting (lightmaps, probes, reflections,
+-- occlusion) at the lowest settings the showroom uses. Even those are slow on a
+-- software adapter: about a minute and a half per generation at the default
+-- size (a debug build, 158 light probes and 10 reflection probes), and minutes
+-- more at `size = "dust2"`, most of it the probe captures (#2086). Off by
+-- default, so CI never runs it.
 
-local p = { size = "default", seed = 1, bots = 4, kills = 10, time = 120 }
+local p = { size = "default", seed = 1, bots = 4, kills = 10, time = 120, bake = false }
 for key, value in pairs(... or {}) do
     if p[key] == nil then error("arena: unknown parameter '" .. key .. "'") end
     p[key] = value
@@ -247,5 +256,14 @@ local camera = Scene.CreateEntity("Camera")
 Scene.AddComponent(camera, "Camera")
 Transform.SetPosition(camera, 3, 1.6, 3)
 
-Scene.Save("assets/scenes/arena.scene")
-Application.SetStartupScene("assets/scenes/arena.scene")
+local SCENE = "assets/scenes/arena.scene"
+Scene.Save(SCENE)
+-- The bakes need a saved scene: each writes its files beside it.
+Navigation.Bake()
+if p.bake then
+    Lighting.SetSettings({ texelsPerUnit = 1, samples = 8, bounces = 1,
+        denoiser = "None", prioritizeView = false })
+    Lighting.Generate()
+end
+Scene.Save(SCENE)
+Application.SetStartupScene(SCENE)
