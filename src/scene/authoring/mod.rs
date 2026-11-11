@@ -3,7 +3,8 @@
 //! The one place the engine knows how to change scene *structure*: create an
 //! entity (optionally as one of the hierarchy toolbar's primitives), attach or
 //! detach a first-class component with the inspector's "Add Component" defaults,
-//! and the primitive-mesh geometry shared with serialization's rehydrate path.
+//! and the primitives the Create menu offers (`primitive`: their mesh, light and
+//! collider, and the geometry shared with serialization's rehydrate path).
 //!
 //! BOTH callers route through here so editor and API can never drift: the editor
 //! (`hierarchy.rs` create, `inspector/components/add/` add-menu) and the API surface
