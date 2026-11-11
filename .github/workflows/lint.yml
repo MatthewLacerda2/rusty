@@ -100,7 +100,9 @@ jobs:
       # test there holds the order).
       - name: System libs for winit/wgpu builds
         if: needs.changes.outputs.code != 'false'
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
+        uses: ./.github/actions/system-libs
+        with:
+          packages: pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       # Not guarded on `code` (#973): a Markdown-only PR is exactly where a stale
       # path, make verb or namespace slips in. Stdlib Python, no build:
       # it needs none of the setup above, and runs after it only for the order.

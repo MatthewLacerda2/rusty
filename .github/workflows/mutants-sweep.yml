@@ -256,14 +256,18 @@ jobs:
           shared-key: mutants
           save-if: ${{ github.ref == 'refs/heads/main' && matrix.shard == 0 }}
       - name: System libs for winit/wgpu builds
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
+        uses: ./.github/actions/system-libs
+        with:
+          packages: pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       # Mesa's software Vulkan driver, as in `ci.yml` (#489, #785). Without it
       # wgpu finds no adapter, every GPU test skips, and every mutant in code
       # only the GPU tests reach (render, captures) reports MISSED however well
       # it is tested. `RUSTY_REQUIRE_GPU` (job env) turns a lost driver into a
       # failed baseline instead of that silence.
       - name: Software Vulkan driver (lavapipe)
-        run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
+        uses: ./.github/actions/system-libs
+        with:
+          packages: mesa-vulkan-drivers libvulkan1
       # nextest too: mutants run under it (`--test-tool nextest`, below).
       - name: Install cargo-mutants and cargo-nextest
         uses: ./.github/actions/install-tool
