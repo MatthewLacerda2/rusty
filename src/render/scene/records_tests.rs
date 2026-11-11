@@ -64,8 +64,9 @@ fn a_value_edit_rewrites_and_a_key_edit_rekeys() {
     for f in values {
         assert!(!rekeys(&base, &with(f)), "{:?}", with(f));
     }
-    let keys: [fn(&mut MaterialAsset); 4] = [
+    let keys: [fn(&mut MaterialAsset); 5] = [
         |m| m.render_mode = RenderMode::Transparent,
+        |m| m.sorting_priority = -1, // the slot's sort, kept on its object (#2039)
         |m| m.render_face = RenderFace::Both,
         |m| m.shader = Some("dissolve".into()),
         |m| m.base_color_map = Some("a.png".into()),

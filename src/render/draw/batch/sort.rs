@@ -29,6 +29,29 @@ pub(crate) fn back_to_front<T>(items: &mut [(T, f32)]) {
     items.sort_by(|a, b| b.1.total_cmp(&a.1));
 }
 
+/// Where a translucent solid draws in the sorted pass (#2039): its material's
+/// HDRP *Sorting Priority*, then its [`view_depth`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct TransparentOrder {
+    pub priority: i32,
+    pub depth: f32,
+}
+
+/// Order translucent `items` as HDRP's transparent queue does: by priority, a
+/// lower one first (HDRP adds it to the material's render queue, which Unity
+/// sorts before depth), so a higher one draws on top whatever its depth; then
+/// farthest first ([`back_to_front`]). Stable, so equal keys keep the order they
+/// were pushed in (objects in `World::ids_with_mesh` order, an object's slots in
+/// slot order, at one shared depth): a fixed input draws the same frame each time.
+pub(crate) fn transparent_order<T>(items: &mut [(T, TransparentOrder)]) {
+    items.sort_by(|a, b| {
+        let (a, b) = (a.1, b.1);
+        a.priority
+            .cmp(&b.priority)
+            .then(b.depth.total_cmp(&a.depth))
+    });
+}
+
 /// Buckets per doubling of depth: each spans about 19% of its distance, so the
 /// order is finer near the camera, where a surface covers the most pixels.
 const BUCKETS_PER_OCTAVE: f32 = 4.0;
@@ -83,5 +106,42 @@ mod tests {
         back_to_front(&mut items);
         let order: Vec<_> = items.iter().map(|i| i.0).collect();
         assert_eq!(order, ["far", "mid", "near"]);
+    }
+
+    fn order(items: &[(&'static str, TransparentOrder)]) -> Vec<&'static str> {
+        let mut items = items.to_vec();
+        transparent_order(&mut items);
+        items.iter().map(|i| i.0).collect()
+    }
+
+    fn at(priority: i32, depth: f32) -> TransparentOrder {
+        TransparentOrder { priority, depth }
+    }
+
+    #[test]
+    fn priority_orders_before_depth() {
+        // A near pane at a lower priority draws before a far one (#2039), so the
+        // far one lands on top; at equal priority, farthest first.
+        let items = [
+            ("near", at(-1, 2.0)),
+            ("far", at(0, 9.0)),
+            ("mid", at(0, 4.0)),
+        ];
+        assert_eq!(order(&items), ["near", "far", "mid"]);
+        let items = [("high", at(50, 9.0)), ("low", at(-50, 1.0))];
+        assert_eq!(order(&items), ["low", "high"]);
+    }
+
+    #[test]
+    fn equal_keys_keep_the_order_they_came_in() {
+        // One object's slots share its depth: at equal priority, slot order holds.
+        let items = [
+            ("glass", at(0, 5.0)),
+            ("liquid", at(0, 5.0)),
+            ("cork", at(0, 5.0)),
+        ];
+        assert_eq!(order(&items), ["glass", "liquid", "cork"]);
+        let items = [("liquid", at(0, 5.0)), ("glass", at(0, 5.0))];
+        assert_eq!(order(&items), ["liquid", "glass"]);
     }
 }

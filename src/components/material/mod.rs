@@ -30,6 +30,10 @@ use surface::{default_ior, default_one, white};
 pub use surface::{BlendMode, RefractionModel, RenderFace, RenderMode};
 pub use temporal::{TaaReactive, MAX_REACTIVE};
 
+/// How far a material's [`MaterialAsset::sorting_priority`] reaches either way:
+/// HDRP's `HDRenderQueue.sortingPriorityRange`.
+pub const SORTING_PRIORITY_RANGE: i32 = 50;
+
 fn default_base_color() -> [f32; 3] {
     [1.0, 1.0, 1.0]
 }
@@ -141,6 +145,13 @@ pub struct MaterialAsset {
     /// normal map included.
     #[serde(default)]
     pub refraction_model: RefractionModel,
+    /// HDRP's *Sorting Priority* (#2039): where a `Transparent` surface draws among
+    /// the others. Its draws are ordered by it first, a lower one drawing earlier
+    /// and a higher one landing on top whatever their depths, then back to front;
+    /// in `[-SORTING_PRIORITY_RANGE, SORTING_PRIORITY_RANGE]`, 0 by default
+    /// ([`MaterialAsset::sort_priority`]).
+    #[serde(default)]
+    pub sorting_priority: i32,
     /// The index of refraction (water 1.33, glass 1.5, the default): HDRP's *Index
     /// of Refraction* for a refracting surface's bend, and glTF's
     /// `KHR_materials_ior` for every dielectric's reflectance (#1998,
@@ -243,6 +254,13 @@ impl MaterialAsset {
     /// pass; only `Transparent` defers to the sorted pass.
     pub fn is_transparent(&self) -> bool {
         self.render_mode == RenderMode::Transparent
+    }
+
+    /// Its [`MaterialAsset::sorting_priority`] clamped into HDRP's range, as the
+    /// transparent sort reads it: a scene file's out-of-range value is held there.
+    pub fn sort_priority(&self) -> i32 {
+        let range = SORTING_PRIORITY_RANGE;
+        self.sorting_priority.clamp(-range, range)
     }
 
     /// Whether the surface takes SSR: its `receive_ssr`, or unset, HDRP's default
