@@ -14,8 +14,9 @@
 //! It is refused where the button is (Play, a bake already running, an unsaved
 //! scene) and in a host with no frame loop to step the job (a headless session),
 //! which names `Lighting.Generate()` instead. Play counts from the moment it is
-//! requested (`Application::play_heading`). A request belongs to the scene and
-//! mode it was made in: asking for Play, Play, Stop, File ▸ New and a load drop it
+//! requested (`Application::play_heading`); the other way round, Play is refused
+//! while a request waits or the job runs (`Scene::play_refusal`, #2042). A request
+//! belongs to the scene it was made in: File ▸ New and a load drop it
 //! (`Scene::drop_bake_request`).
 
 use mlua::Lua;
