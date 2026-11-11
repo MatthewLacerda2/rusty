@@ -2,7 +2,8 @@
 //! TAA ops and knob table in `taa`).
 //!
 //! The ONE place the engine knows how to mutate an entity's first-class
-//! `CameraComponent` field by field: the projection (`fov` / `near` / `far`), the
+//! `CameraComponent` field by field: the projection (`fov` / `near` / `far`, and
+//! the `fov_axis` it is shown along, #2038), the
 //! `culling_mask`, the camera-stack knobs (`render_order` / `clear_flags`), and the
 //! motion-blur fields, the projection and the render-texture target (#430).
 //!
@@ -23,7 +24,7 @@
 //!
 //! Pure.
 
-use crate::components::{CameraComponent, ClearFlags, Projection, RenderTarget};
+use crate::components::{CameraComponent, ClearFlags, FovAxis, Projection, RenderTarget};
 use crate::core::settings::quality::EffectQuality;
 use crate::scene::authoring::sanitize::{at_least, saturated};
 
@@ -50,6 +51,12 @@ pub const MIN_ORTHO_SIZE: f32 = 0.01;
 /// [`MIN_FOV`]..=[`MAX_FOV`]. A NaN takes [`MIN_FOV`] (`f32::clamp` would keep it).
 pub fn set_fov(c: &mut CameraComponent, fov: f32) {
     c.fov = saturated(fov, MIN_FOV, MAX_FOV);
+}
+
+/// Set which axis the Inspector shows and edits the field of view along (#2038).
+/// Display only, as Unity's *FOV Axis* is: the stored vertical `fov` is untouched.
+pub fn set_fov_axis(c: &mut CameraComponent, axis: FovAxis) {
+    c.fov_axis = axis;
 }
 
 /// Set both clip planes the way Unity holds them: `near` at least [`MIN_NEAR`],
