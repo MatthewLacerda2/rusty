@@ -96,10 +96,10 @@ impl Search {
         true
     }
 
-    #[cfg(test)]
-    /// The expansions this search has spent.
-    pub(crate) fn expanded(&self) -> u32 {
-        self.expanded
+    /// Whether the search spent its whole cap: a partial path it ends with stops
+    /// where the cap did, not at the reachable span nearest the goal.
+    pub(crate) fn capped(&self) -> bool {
+        self.expanded >= self.cap
     }
 }
 

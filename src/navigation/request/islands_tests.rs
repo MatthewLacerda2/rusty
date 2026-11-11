@@ -59,7 +59,7 @@ fn an_unreachable_goal_costs_at_most_the_node_cap() {
         .step_search(&mut search, &mut pool, &mut budget)
         .expect("ends");
     assert!(!complete && path.len() > 1, "a partial path");
-    assert_eq!(search.expanded(), MAX_SEARCH_NODES);
+    assert!(search.capped(), "spent the whole cap");
     assert!(
         g.spans.len() as u32 > MAX_SEARCH_NODES,
         "the cap, not the mesh, ended it"

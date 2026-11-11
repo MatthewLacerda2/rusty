@@ -1,6 +1,7 @@
 //! The path queue (#2087): a sliced search finds the synchronous path, a waiting
 //! agent follows its old one; `lifecycle` covers rebakes and determinism.
 
+mod anchored;
 mod lifecycle;
 mod links;
 mod pending;

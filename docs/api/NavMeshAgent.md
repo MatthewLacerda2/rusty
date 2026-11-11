@@ -100,22 +100,29 @@ following its old one (a new agent stands still) until the answer arrives; meanw
 node expansions on its requests, oldest first, resuming a search the last tick left
 unfinished, so a frame never pays for every agent at once. A search begins from where
 the agent stands *then*, toward its target *then*, and finds exactly the path
-`Navigation.CalculatePath` would from there. With few agents every request is answered
-in the tick it is made, as if planned on the spot; on the Dust2 arena with 32 bots none
-waits more than about half a second. `PathPending` is also `true` right after a
+`Navigation.CalculatePath` would from there. With few agents, a request whose search
+fits one tick's budget is answered in the tick it is made, as if planned on the spot; a
+longer one waits as many ticks as its search needs budgets (a single corner-to-corner
+search on the Dust2 arena, about 45 000 expansions, takes some 22 ticks at the default
+`2048`). On that arena with 32 bots none waits more than about half a second. `PathPending` is also `true` right after a
 `SetTarget`, or a rebake that changed cells its remaining path crosses (as above: a rebake
 elsewhere leaves it `false`), before the agent's next tick has asked: the Unity idiom
 `if not PathPending(id) and RemainingDistance(id) < r` reads the new path, not the old.
 When no path can be planned (no navmesh near the target, or the agent off it),
 `PathPending` turns `false` once that answer is in, with `GetPathStatus` `"invalid"`, as
-in Unity; the agent asks again when its target moves or a rebake comes. A delivered path
+in Unity; the agent asks again when its target moves or a rebake comes, and, when the
+answer failed because the agent stood off the navmesh, once it has moved more than half
+a metre (pushed, carried, or moved by its Transform). A **partial** path whose search
+ran out of expansions (see `Navigation`, *Paths and queries*) ends where the cap stopped it,
+not at the reachable point nearest the target: once the agent has walked it out, it asks
+again from there, and so on until a search ends where it stands. A delivered path
 skips the corners the agent walked past while it waited, so a chaser never turns back to
 touch one. A request is dropped, unsearched, when its agent is disabled (or inactive in
 the hierarchy) or is crossing an off-mesh link by the time it comes up: a disabled agent
 asks again once enabled, one on a link once it lands, if its path went stale meanwhile.
 A rebake mid-search does not restart it unless the change reaches what it searched, so a
-moving obstacle rebaking every few ticks never stalls the queue. `ResetPath` and `Warp`
-drop a waiting request.
+moving obstacle rebaking every few ticks never stalls the queue. `ResetPath`, `Warp` and
+`SetAreaMask` drop a waiting request (a new mask asks again, under that mask).
 
 ### Off-mesh links (#462)
 

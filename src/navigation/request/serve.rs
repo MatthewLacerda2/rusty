@@ -13,9 +13,10 @@ use crate::scene::{NavMeshAgentComponent, Scene};
 /// target and its area mask.
 type Ends = (Vec3, Vec3, u32);
 
-/// A finished request: its path, the target it was planned for, and where the
-/// agent's feet were when its search began.
-type Answer = (NavPath, Vec3, Vec3);
+/// A finished request: its path, the target it was planned for, where the agent's
+/// feet were when its search began, and whether the answer holds only from there
+/// (a capped search, or a start off the navmesh: the agent's `replan_from`).
+type Answer = (NavPath, Vec3, Vec3, bool);
 
 /// How the request at the head starts: answered at once, or a search to run.
 enum Begun {
@@ -71,13 +72,15 @@ impl NavigationGraph {
             if budget == 0 {
                 break;
             }
-            let Some((path, target, from)) = self.advance(&mut queue, ends, &mut budget) else {
+            let Some((path, target, from, anchored)) = self.advance(&mut queue, ends, &mut budget)
+            else {
                 break; // out of budget: the search resumes next tick
             };
             queue.pending.pop_front();
             let feet_now = scene.world.world_position(id);
             if let Some(mut agent) = scene.world.nav_agent_mut(id) {
                 self.install_path(&mut agent, path, target);
+                agent.replan_from = anchored.then_some(from);
                 let feet = agent.feet(feet_now);
                 self.skip_passed(&mut agent, from, feet);
             }
@@ -104,18 +107,22 @@ impl NavigationGraph {
         let (spans, complete) = self.step_search(&mut a.search, pool, budget)?;
         let a = active.take()?;
         let path = self.route_path((a.from, a.goal), &spans, complete, a.mask);
-        Some((path, a.target, a.from))
+        let capped = !complete && a.search.capped();
+        Some((path, a.target, a.from, capped))
     }
 
     /// Begin a search from the agent's feet toward the walkable point nearest its
     /// target (within [`TARGET_SAMPLE_DISTANCE`], #666): exactly the ends a
     /// synchronous `calculate_path_masked` would snap. With no walkable point near
-    /// either end the answer is no path, at once.
+    /// either end the answer is no path, at once; one that failed on the start holds
+    /// only where the agent stands.
     fn begin_request(&self, pool: &mut super::NodePool, (from, target, mask): Ends) -> Begun {
         let goal = self.sample_position(target, TARGET_SAMPLE_DISTANCE);
-        let ends = goal.and_then(|g| Some((self.snap(from)?, self.snap(g)?, g)));
+        let start = self.snap(from);
+        let ends = goal.and_then(|g| Some((start?, self.snap(g)?, g)));
         let Some((start, end, goal)) = ends else {
-            return Begun::Answered((NavPath::invalid(), target, from));
+            let answer = (NavPath::invalid(), target, from, start.is_none());
+            return Begun::Answered(answer);
         };
         pool.begin(self.spans.len());
         Begun::Searching(Active {

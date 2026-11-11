@@ -35,6 +35,8 @@ impl NavigationGraph {
     /// would change nothing (a partial path ends where the target can't be reached)
     /// and cost a full search each time. So does no path, once planned for this
     /// target on this bake (Unity's `PathInvalid`): asking again would answer the same.
+    /// The exception, an answer that held only where it was planned, is
+    /// [`outgrown`]'s, which needs where the agent stands.
     #[cfg(test)]
     fn path_cache_invalid(&self, agent: &NavMeshAgentComponent) -> bool {
         self.path_stale(agent, agent.path_generation == self.bake_generation)
@@ -77,7 +79,7 @@ impl NavigationGraph {
         agent.active
             && agent.off_mesh_link.is_none()
             && !(agent.cached_path.is_empty() && is_at_target(agent, position))
-            && self.path_stale(agent, current)
+            && (self.path_stale(agent, current) || outgrown(agent, position))
     }
 
     /// Store `path`, planned for `target`, on the agent: its corners, links and
@@ -98,6 +100,7 @@ impl NavigationGraph {
         agent.path_generation = self.bake_generation;
         agent.path_request = 0;
         agent.path_planned = true;
+        agent.replan_from = None;
     }
 
     /// Plan the agent's path at once, the way the path queue (`request`) does over
@@ -136,6 +139,20 @@ impl NavigationGraph {
             None => agent.cached_path.last().copied().unwrap_or(current_pos),
         }
     }
+}
+
+/// Whether `agent`, at `position`, is done with an answer that held only where it
+/// was planned (`replan_from`: a capped search, a start off the navmesh) and now
+/// stands past the epsilon from there (#2087, Detour's crowd re-asking at the end of
+/// a partial path). An agent still at that spot does not ask again: it would get the
+/// same answer, for a capped search's worth of expansions.
+fn outgrown(agent: &NavMeshAgentComponent, position: Vec3) -> bool {
+    let Some(from) = agent.replan_from else {
+        return false;
+    };
+    let done = agent.path_cursor >= agent.cached_path.len() || is_at_target(agent, position);
+    let feet = agent.feet(position);
+    done && feet.distance_squared(from) > REPLAN_TARGET_EPSILON_SQ
 }
 
 #[cfg(test)]

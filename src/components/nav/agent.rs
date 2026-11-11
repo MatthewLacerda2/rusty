@@ -114,6 +114,12 @@ pub struct NavMeshAgentComponent {
     /// (Unity's `PathInvalid`), not one still to ask for.
     #[serde(skip)]
     pub path_planned: bool,
+    /// Where the agent's feet were when its answer was planned, when that answer
+    /// holds only there (#2087): a search the node cap stopped short, or no path
+    /// because the start was off the navmesh. Once the agent is done with it and
+    /// stands farther away, it asks again.
+    #[serde(skip)]
+    pub replan_from: Option<Vec3>,
     /// Whether the cached path reaches the target (#458). A partial path ends on the
     /// reachable point nearest the target, and the agent stops there.
     #[serde(skip)]
@@ -187,6 +193,7 @@ impl Default for NavMeshAgentComponent {
             path_generation: 0,
             path_request: 0,
             path_planned: false,
+            replan_from: None,
             path_status: NavPathStatus::Invalid,
             path_links: Vec::new(),
             off_mesh_link: None,

@@ -6,13 +6,18 @@
 //! answer arrives. Each tick the queue spends a fixed count of A\* node expansions
 //! on its requests, oldest first (one tick's requests in ECS order), resuming the
 //! search the last tick left unfinished. A scene with few agents gets every answer
-//! in the tick it asked, as before.
+//! whose search fits one tick's budget in the tick it asked, as before; a longer
+//! search (a Dust2 cross-map one, ~45 000 expansions) spans as many ticks as it
+//! needs budgets.
 //!
 //! A request names only the agent. When its search begins, it reads where the agent
 //! stands, its target and its area mask *then*, so a request that waited plans from
 //! where the agent is now, to where it wants to go now. The agent holds the request's
 //! ticket (`path_request`); a request whose agent no longer holds it (a `ResetPath`,
-//! a `Warp`, a removed agent) is dropped when it comes up.
+//! a `Warp`, a new area mask, a removed agent) is dropped when it comes up. An
+//! answer that holds only where it was planned (a capped search, a start off the
+//! navmesh) records that spot, `replan_from`, and the agent asks again once done
+//! with it and elsewhere.
 //!
 //! Split: this file is the queue and its budget; `serve` runs it each tick and hands
 //! the paths to the agents; `islands` caps the search toward a goal nothing reaches;
