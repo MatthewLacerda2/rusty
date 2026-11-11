@@ -266,4 +266,6 @@ Beyond what changed, why, the effect and the decisions:
   independent review" means the orchestrator will run one.
 - ≈3 attempts at the same failure, or a decision that is genuinely the user's:
   leave the PR as draft with the reason in its description, comment on the
-  issue, and stop.
+  issue with first line `Standing down` (the one line `make queue-events`
+  passes to the orchestrator; a draft that stays a draft raises no event), and
+  stop.
