@@ -1,5 +1,6 @@
 //! src/api/nav/query.rs — the `Navigation` path queries (#458): `CalculatePath`,
-//! `SamplePosition`, `Raycast` and `GetPathLength`, plus the path table they share
+//! `SamplePosition`, `Raycast` and `GetPathLength`, the agents' search budget
+//! (`Set`/`GetPathfindingIterationsPerFrame`, #2087), plus the path table they share
 //! with `NavMeshAgent.GetPath`. The first three take an optional trailing area mask
 //! (#460, Unity's `areaMask`; every area when omitted).
 //!
@@ -96,5 +97,29 @@ pub(super) fn register(lua: &mlua::Lua, table: &Table, nav: ApiCell<NavigationGr
         table,
         "GetPathLength",
         lua.create_function(|_, path: Table| Ok(path_length(&corners_of(&path)?))),
+    )?;
+    register_budget(lua, table, nav)
+}
+
+/// The agents' path-search budget (#2087, Unity's `NavMesh.pathfindingIterationsPerFrame`):
+/// node expansions per tick, at least 1.
+fn register_budget(lua: &mlua::Lua, table: &Table, nav: ApiCell<NavigationGraph>) -> Reg {
+    put(
+        table,
+        "SetPathfindingIterationsPerFrame",
+        lua.create_function(move |lua, n: i64| {
+            let n = u32::try_from(n.max(1)).unwrap_or(u32::MAX);
+            nav.get(lua)?
+                .borrow()
+                .set_pathfinding_iterations_per_frame(n);
+            Ok(())
+        }),
+    )?;
+    put(
+        table,
+        "GetPathfindingIterationsPerFrame",
+        lua.create_function(move |lua, ()| {
+            Ok(nav.get(lua)?.borrow().pathfinding_iterations_per_frame())
+        }),
     )
 }

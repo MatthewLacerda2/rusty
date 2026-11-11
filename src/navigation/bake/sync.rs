@@ -70,6 +70,10 @@ impl NavigationGraph {
             self.bake_state = Some(st);
             return Rebake::Unchanged;
         }
+        let searched = self
+            .requests
+            .get_mut()
+            .cells_before_rebake(&self.cell_start);
         let mut changed = self.rebake_regions(scene, &mut st, dirty);
         self.offmesh.authored = self.resolve_authored(&st.inputs.link_keys());
         self.index_links();
@@ -78,6 +82,7 @@ impl NavigationGraph {
         self.bake_generation = self.bake_generation.wrapping_add(1);
         st.log.record(self.bake_generation, Some(changed.clone()));
         self.bake_state = Some(st);
+        self.carry_search(searched, &changed, &scene.nav_settings); // #2087
         Rebake::Incremental(changed)
     }
 

@@ -46,8 +46,9 @@ pub(crate) struct NodePool {
 }
 
 impl NodePool {
-    /// Start a new search over `spans` spans: every slot reads as unreached.
-    fn begin(&mut self, spans: usize) {
+    /// Start a new search over `spans` spans: every slot reads as unreached. The
+    /// path queue (#2087) keeps a pool of its own and begins it once per search.
+    pub(crate) fn begin(&mut self, spans: usize) {
         if self.slots.len() < spans {
             self.slots.resize(spans, UNREACHED);
         }
@@ -85,6 +86,34 @@ impl NodePool {
             g,
             from,
         };
+    }
+}
+
+impl NodePool {
+    /// Carry this search's slots onto a rebaked navmesh of `spans` spans (#2087,
+    /// `request::carry`), each span index renumbered by `remap`; `false`, changing
+    /// nothing, when `remap` refuses one.
+    pub(crate) fn remap(&mut self, spans: usize, remap: &dyn Fn(u32) -> Option<SpanRef>) -> bool {
+        let generation = self.generation;
+        let mut moved = Vec::new();
+        for (i, s) in self
+            .slots
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.stamp == generation)
+        {
+            let at = remap(i as u32).map(|r| r.index);
+            let from = s.from.map(|f| remap(f.index));
+            let (Some(at), None | Some(Some(_))) = (at, from) else {
+                return false;
+            };
+            moved.push((at, s.g, from.flatten()));
+        }
+        self.begin(spans);
+        for (at, g, from) in moved {
+            self.set(at, g, from);
+        }
+        true
     }
 }
 

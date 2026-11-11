@@ -16,31 +16,45 @@ use crate::scene::NavMeshAgentComponent;
 impl NavigationGraph {
     /// Restamp `agent`'s path to the current bake when no change since it was
     /// planned touches what is left of it.
-    pub(super) fn keep_path_if_untouched(&self, agent: &mut NavMeshAgentComponent, at: Vec3) {
-        if agent.path_generation == self.bake_generation
-            || agent.cached_path.is_empty()
-            || agent.path_status == NavPathStatus::Partial
-        {
-            return;
+    pub(in crate::navigation) fn keep_path_if_untouched(
+        &self,
+        agent: &mut NavMeshAgentComponent,
+        at: Vec3,
+    ) {
+        if agent.path_generation != self.bake_generation && self.path_untouched(agent, at) {
+            agent.path_generation = self.bake_generation;
+        }
+    }
+
+    /// Whether `agent`'s path, the agent standing at `at`, holds on the current
+    /// bake: planned on it, or no change since touches what is left of it. Read-only,
+    /// so `PathPending` asks it too (#2087).
+    pub(in crate::navigation) fn path_untouched(
+        &self,
+        agent: &NavMeshAgentComponent,
+        at: Vec3,
+    ) -> bool {
+        if agent.path_generation == self.bake_generation {
+            return true;
+        }
+        if agent.cached_path.is_empty() || agent.path_status == NavPathStatus::Partial {
+            return false;
         }
         let Some(changed) = self.changes_since(agent.path_generation) else {
-            return;
+            return false;
         };
         let ahead = agent.cached_path.get(agent.path_cursor..).unwrap_or(&[]);
         let points: Vec<Vec2> = std::iter::once(at)
             .chain(ahead.iter().copied())
             .map(|p| Vec2::new(p.x, p.z))
             .collect();
-        let touched = changed.iter().any(|r| {
+        !changed.iter().any(|r| {
             let (lo, hi) = r.world_box(self);
             let (lo, hi) = (Vec2::new(lo.x, lo.z), Vec2::new(hi.x, hi.z));
             points
                 .windows(2)
                 .any(|leg| segment_hits_box(leg[0], leg[1], lo, hi))
-        });
-        if !touched {
-            agent.path_generation = self.bake_generation;
-        }
+        })
     }
 }
 

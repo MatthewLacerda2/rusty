@@ -118,12 +118,14 @@ fn warp_moves_the_agent_and_plans_once() {
     );
     scene.world.set_nav_agent(id, Some(a));
     scene.world.transform_mut(id).expect("transform").position = landed;
+    let before = g.requests.borrow().issued();
     for _ in 0..10 {
         g.tick_nav_agents(&mut scene, DT);
     }
     let a = agent(&scene, id);
     assert_eq!(
-        a.frames_since_replan, 10,
+        g.requests.borrow().issued(),
+        before + 1,
         "one plan after the warp, then reused"
     );
     assert_eq!(

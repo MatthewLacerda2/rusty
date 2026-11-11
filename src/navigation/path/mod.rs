@@ -72,13 +72,29 @@ impl NavigationGraph {
             return NavPath::invalid();
         };
         let (spans, complete) = self.find_path_masked(start, goal, mask);
-        let first = self.point_on_span(from, start);
-        let last = match spans.last() {
-            Some(&end) if complete => self.point_on_span(to, end),
-            Some(&end) => self.span_world(end),
-            None => first,
+        self.route_path((from, to), &spans, complete, mask)
+    }
+
+    /// The [`NavPath`] for the span path `spans` an A\* search found from `from`'s
+    /// span toward `to`'s (`complete` when it reaches it): its ends placed on their
+    /// spans and its middle string-pulled into corners. The path queue (#2087) builds
+    /// a sliced search's path with it, the same way a synchronous one is built.
+    pub(crate) fn route_path(
+        &self,
+        (from, to): (Vec3, Vec3),
+        spans: &[SpanRef],
+        complete: bool,
+        mask: u32,
+    ) -> NavPath {
+        let (Some(&start), Some(&end)) = (spans.first(), spans.last()) else {
+            return NavPath::invalid();
         };
-        let (corners, links) = self.pull_route(&spans, (first, last), mask);
+        let first = self.point_on_span(from, start);
+        let last = match complete {
+            true => self.point_on_span(to, end),
+            false => self.span_world(end),
+        };
+        let (corners, links) = self.pull_route(spans, (first, last), mask);
         NavPath {
             status: if complete {
                 NavPathStatus::Complete
