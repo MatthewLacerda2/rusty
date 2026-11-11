@@ -15,6 +15,9 @@
 //! another's slots. A query that panics mid-way leaves stale stamps behind, which
 //! the next query's generation hides: the pool stays usable with no cleanup.
 //!
+//! The flood (#2088) keeps its costs past the call that ran it, so it takes the
+//! pool out with [`SearchScratch::take`] and hands it back when its answer drops.
+//!
 //! What a slot holds never decides a search's outcome (a stale slot reads exactly
 //! as a fresh array's would), so reusing the pool keeps paths byte-identical.
 
@@ -103,6 +106,29 @@ impl SearchScratch {
         match self.0.try_borrow_mut() {
             Ok(mut pool) => run(&mut pool),
             Err(_) => run(&mut NodePool::default()),
+        }
+    }
+
+    /// Take the shared pool out, begun for `spans` spans, for a search whose
+    /// answer outlives the call (the flood's, #2088): a fresh one when the shared
+    /// one is in use or already out. Hand it back with [`Self::restore`]; a search
+    /// that runs meanwhile works on the empty pool left in its place.
+    pub(crate) fn take(&self, spans: usize) -> NodePool {
+        let mut pool = match self.0.try_borrow_mut() {
+            Ok(mut shared) => std::mem::take(&mut *shared),
+            Err(_) => NodePool::default(),
+        };
+        pool.begin(spans);
+        pool
+    }
+
+    /// Put back a pool [`Self::take`] lent out, keeping whichever of it and the
+    /// one in its place has more slots, so nothing grown is lost.
+    pub(crate) fn restore(&self, pool: NodePool) {
+        if let Ok(mut shared) = self.0.try_borrow_mut() {
+            if shared.slots.len() < pool.slots.len() {
+                *shared = pool;
+            }
         }
     }
 }
