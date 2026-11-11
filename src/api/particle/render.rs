@@ -1,11 +1,12 @@
 //! src/api/particle/render.rs — the `Particles` render setters (#440): render mode,
-//! stretch, mesh, flipbook, soft and lit. Each is a field write routed through the
+//! stretch, mesh, texture (#2052), flipbook, soft and lit. Each is a field write routed through the
 //! shared `scene::authoring::particles` op the inspector's Render section calls.
 
 use super::with_emitter;
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use crate::api::{put, Reg};
+use crate::asset::MapRef;
 use crate::components::{Flipbook, ParticleRenderMode};
 use crate::scene::authoring::particles as particle_ops;
 use crate::scene::Scene;
@@ -13,7 +14,34 @@ use crate::scene::Scene;
 /// Register the render setters onto the `Particles` table.
 pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     register_shape(lua, table, scene)?;
+    register_texture(lua, table, scene)?;
     register_look(lua, table, scene)
+}
+
+/// `SetTexture(id, path?)` / `GetTexture(id)`: the sprite image; `nil` (or `""`)
+/// goes back to the default soft disc (#2052).
+fn register_texture(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
+    put(
+        table,
+        "SetTexture",
+        lua.create_function(move |lua, (id, path): (EntityArg, Option<String>)| {
+            let id = id.live("Particles", "SetTexture")?;
+            with_emitter(&*scene.get(lua)?, id, |p| {
+                particle_ops::set_texture(p, path.unwrap_or_default())
+            });
+            Ok(())
+        }),
+    )?;
+    put(
+        table,
+        "GetTexture",
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
+            let scene = scene.borrow();
+            let particles = scene.world.particles(id.read());
+            Ok(particles.and_then(|p| p.texture.as_ref().map(MapRef::to_string)))
+        }),
+    )
 }
 
 /// What each particle is drawn as: `SetRenderMode`, `GetRenderMode`, then

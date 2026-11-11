@@ -4,3 +4,4 @@ mod determinism;
 mod modules;
 mod parented;
 mod space;
+mod texture;
