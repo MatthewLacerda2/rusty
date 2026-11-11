@@ -247,7 +247,7 @@ impl PhysicsWorld {
         if let Some(h) = self.world_body.filter(|&h| self.bodies.contains(h)) {
             return h;
         }
-        let h = self.bodies.insert(RigidBodyBuilder::fixed().build());
+        let h = self.insert_body(RigidBodyBuilder::fixed().build());
         self.world_body = Some(h);
         h
     }

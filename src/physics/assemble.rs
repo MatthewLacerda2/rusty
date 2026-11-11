@@ -81,15 +81,7 @@ impl PhysicsWorld {
                 }
             }
         }
-        self.bodies.remove(
-            handle,
-            &mut self.islands,
-            &mut self.colliders,
-            &mut self.impulse_joints,
-            &mut self.multibody_joints,
-            &mut self.soft_bodies,
-            true,
-        );
+        self.remove_body(handle);
     }
 
     /// Build `owner`'s body with the colliders of `ids` attached. An owner none
@@ -124,7 +116,7 @@ impl PhysicsWorld {
         // kinematic body may opt in to be swept against dynamic bodies.
         .ccd_enabled(ccd_enabled(inp.collision_detection))
         .pose(to_pose(owner_pose.pos, owner_pose.rot));
-        let body_handle = self.bodies.insert(body_builder.build());
+        let body_handle = self.insert_body(body_builder.build());
         for (id, collider) in parts {
             let handle = self
                 .colliders
