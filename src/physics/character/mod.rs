@@ -34,6 +34,7 @@ mod bodies;
 mod body;
 mod hits;
 mod normals;
+mod parts;
 mod pass;
 mod sweep;
 mod view;
