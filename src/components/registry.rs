@@ -19,6 +19,20 @@
 //! menu entry, `AddEntry`, beside it), its API namespace, its field table, its
 //! snapshot value and its systems.
 //!
+//! ## Adding a component
+//!
+//! 1. Its type, in its category's folder (`pub mod` in that folder's `mod.rs`),
+//!    implementing [`FirstClass`] and, as its Add Component default, `Default`
+//!    (or an arm in `dispatch.rs`'s `added!` naming another default).
+//! 2. Its row below. The compiler then asks for the three traits the generated
+//!    lists need, each pointing at this file: `Inspect` (an `inspect!` row in
+//!    `scene::authoring::fields::kinds::<area>`), `Snapshot` (a `snapshot!` row in
+//!    `api::snapshot::<area>`) and `AddEntry` (beside its inspector card).
+//! 3. Its inspector card and API namespace, which the component gate
+//!    (`tools/lint -- --components`) asks for; its `docs/api/` page; and the
+//!    scene format's fingerprint (`tests/scene_format/scene.fingerprint`), which a
+//!    new stored field changes.
+//!
 //! A row reads `field: path::to::Type => Kind [get_mut has set take ids_with];`:
 //! the `Entity` field (also the scene key, the change channel's name and the
 //! getter), the type under `crate::components`, the `ComponentKind` variant, and

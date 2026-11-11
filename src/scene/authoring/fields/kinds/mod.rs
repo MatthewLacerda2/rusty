@@ -1,7 +1,7 @@
 //! src/scene/authoring/fields/kinds/mod.rs — every component `Component.*` reaches, by name.
 //!
-//! One [`Kind`] per first-class component (each of `Entity`'s `Option<…Component>`
-//! fields) plus the mandatory `Transform`; the field tables live beside, grouped
+//! One [`Kind`] per first-class component (each row of `components::registry`)
+//! plus the mandatory `Transform`; the field tables live beside, grouped
 //! by area.
 
 mod ai;

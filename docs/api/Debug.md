@@ -373,8 +373,11 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
 }
 ```
 
-Every per-component key is present only when the entity carries that component
-(absent ones serialize as `null`); `bounds` comes from the mesh when geometry is
+Every first-class component has its key, keyed by its saved name (the ones not
+shown above too: `post_processing`, `joint`, `trail`, …, each as the component's own
+fields); it holds a value only when the entity carries that component (absent ones
+serialize as `null`), and `components` lists the carried ones in the registry's
+order, then `Script`; `bounds` comes from the mesh when geometry is
 present, else the collider, else `null`. `ui_rect` is the element's computed UI
 layout (see `UI.GetRect`) — `null` unless it is a canvas or laid out under one —
 so the agent can reason about the UI without a screenshot. The shape is shared with the harness's
