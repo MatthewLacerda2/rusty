@@ -2,6 +2,7 @@
 
 use glam::Vec3;
 use rusty::components::{CharacterControllerComponent, ColliderShape};
+use rusty::scene::authoring::rendering::mesh::set_subdivisions;
 use rusty::scene::authoring::{add_component, create_entity, ComponentKind, Primitive};
 use rusty::scene::Scene;
 
@@ -49,7 +50,7 @@ pub(super) fn add_lane(
 }
 
 /// `floor` as the editor builds it, its top face at y = 0.
-pub(super) fn add_floor(scene: &mut Scene, (name, primitive, scale, y, is_static): Floor) {
+pub(super) fn add_floor(scene: &mut Scene, (name, primitive, scale, y, is_static, cuts): Floor) {
     let floor = create_entity(scene, name, Some(primitive));
     let mut t = scene.world.transform_mut(floor).unwrap();
     t.position = Vec3::new(0.0, y, START_Z + LENGTH * 0.5 - 10.0);
@@ -66,5 +67,7 @@ pub(super) fn add_floor(scene: &mut Scene, (name, primitive, scale, y, is_static
             local_max: Vec3::new(7.5, 0.0, 7.5),
         };
         scene.world.collider_mut(floor).unwrap().shape = shape;
+        let mut mesh = scene.world.mesh_mut(floor).unwrap();
+        set_subdivisions(&mut mesh, cuts).unwrap();
     }
 }
