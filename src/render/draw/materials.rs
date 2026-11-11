@@ -1,5 +1,5 @@
-//! src/render/draw/materials.rs — the material bind-group cache: a material's five
-//! maps resolved to resident textures and folded into one shared group-2 bind group
+//! src/render/draw/materials.rs — the material bind-group cache: a material's six
+//! maps (the detail map last, #1997) resolved to resident textures and folded into one shared group-2 bind group
 //! per distinct signature (#202, #207, #470). Used by the entity solids and by mesh
 //! particles (#440), so the same material always binds the same group. A material
 //! whose surface shader has runtime params (#399) gets its own group over its own
@@ -34,8 +34,8 @@ pub(crate) fn entity_params(scene: &Scene, id: u32, slot: usize) -> Option<Entit
 
 impl Renderer {
     /// The material cache index for `material` — `(library key, asset)` of scene
-    /// `scene`'s library — drawn with pipeline `pipeline`: its five maps (albedo, metallic, roughness, normal,
-    /// emissive), building the bind group on first use. The key is the *resolved*
+    /// `scene`'s library — drawn with pipeline `pipeline`: its six maps (albedo, metallic, roughness, normal,
+    /// emissive, detail), building the bind group on first use. The key is the *resolved*
     /// signature, so a late-loaded texture gets a fresh group (#207). When the
     /// pipeline's shader has runtime params, the material's values are packed into
     /// its own param buffer first (#399).
