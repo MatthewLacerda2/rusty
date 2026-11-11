@@ -7,17 +7,17 @@ use egui_phosphor::regular as icon;
 use crate::editor::EditorUi;
 use crate::scene::Scene;
 
-struct Rig {
+pub(super) struct Rig {
     ctx: egui::Context,
     editor: EditorUi,
-    scene: Scene,
-    playing: bool,
+    pub(super) scene: Scene,
+    pub(super) playing: bool,
     /// The buttons last drawn: label and centre.
     buttons: Vec<(String, Pos2)>,
 }
 
 impl Rig {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let ctx = egui::Context::default();
         ctx.enable_accesskit();
         let (editor, scene) = (EditorUi::new(Default::default()), Scene::new());
@@ -33,7 +33,7 @@ impl Rig {
     }
 
     /// One frame of the menu bar's tail with `events`, as the header lays it out.
-    fn frame(&mut self, events: Vec<Event>) {
+    pub(super) fn frame(&mut self, events: Vec<Event>) {
         let (editor, scene, playing) = (&mut self.editor, &mut self.scene, &mut self.playing);
         let input = egui::RawInput {
             events,
@@ -67,7 +67,7 @@ impl Rig {
             .collect()
     }
 
-    fn click(&mut self, glyph: &str) {
+    pub(super) fn click(&mut self, glyph: &str) {
         let (_, at) = *self
             .buttons
             .iter()
@@ -84,7 +84,7 @@ impl Rig {
         self.frame(vec![]);
     }
 
-    fn shortcut(&mut self) {
+    pub(super) fn shortcut(&mut self) {
         self.frame(vec![Event::Key {
             key: Key::P,
             physical_key: None,

@@ -11,7 +11,7 @@ Unity's `EditorApplication` doesn't exist in a player: there `EnterPlay` and
 
 | Function | Signature | Returns |
 |---|---|---|
-| `Editor.EnterPlay` | `()` | `true` when it asked to enter Play; `false` (a no-op) when already playing or already asked to (by a script, or the Play button this frame), or in a standalone run |
+| `Editor.EnterPlay` | `()` | `true` when it asked to enter Play; `false` (a no-op) when already playing or already asked to (by a script, or the Play button this frame), or in a standalone run. Errors while a background bake runs or is asked for (*Play*, below) |
 | `Editor.ExitPlay` | `()` | `true` when it asked to leave Play; `false` (a no-op) in edit mode or when already asked to, or in a standalone run |
 | `Editor.IsPlaying` | `()` | `true` while the world is in Play |
 | `Editor.OpenDemo` | `(path)` | `true` when it asked the editor to open the demo at `path` on the Game view's timeline; `false` (a no-op, warned) outside the editor window |
@@ -114,6 +114,19 @@ Requests made in one frame do not stack: a later one replaces an earlier one, so
 Stop does: edit-mode changes made before Play come back, play-mode ones are gone.
 A gameplay script may call `Editor.ExitPlay()` too (Unity allows it); Play ends after
 that frame.
+
+**A bake refuses Play, and Play refuses a bake: whichever was asked for first wins**
+(#2042). While the editor's Generate Lighting or Bake Occlusion runs, or a
+`Lighting.GenerateAsync()` waits to start it (`Lighting.IsRunning()` reads `true`),
+`Editor.EnterPlay()` errors with the line the greyed-out Play button's tooltip shows
+(`Editor.EnterPlay: Baking lighting: 42% — Cancel the bake to play`); cancel the
+bake or wait for `IsRunning()` to read `false` (a `GenerateAsync` not yet started
+has no Cancel: its line says to wait). `Editor.OpenDemo` is the exception: it is not
+refused, and the bake waits through the replay and resumes once the demo closes
+([*The demo timeline*](#the-demo-timeline)). Once Play is asked for,
+`Lighting.GenerateAsync()` errors instead. In one line the calls' order decides:
+`Lighting.GenerateAsync(); Editor.EnterPlay()` refuses the `EnterPlay`
+([`Lighting`](Lighting.md), *A bake and Play*).
 
 **Globals do not survive the switch.** Each Play and each Stop builds a fresh Lua VM
 ([`index.md`](index.md#driving-a-headless-session)), so the command after the switch
