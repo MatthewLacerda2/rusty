@@ -192,7 +192,7 @@ each kind's passes summed, under names that never change so two reports diff:
 | `ssil` | screen-space indirect lighting (#1750): its gather, blur, accumulate and upsample before the base camera's opaque pass, and the source it keeps after it; the depth prepass it draws on a camera without SSAO is under `ssao_prepass` |
 | `volumetric_fog` | volumetric fog (#1703): its froxels' scatter and integrate, before the base camera draws |
 | `forward` | the opaque scene pass: solids, decals folded in, skybox — every camera's, render-texture cameras included |
-| `ssr` | screen-space reflections (#1526): the march over the base camera's opaque image; the copy of that image it reads and its mip pyramid (#1736) are recorded before the timed pass, untimed, so they aren't counted |
+| `ssr` | screen-space reflections (#1526): from the march over the base camera's opaque image to the resolve that averages its hits and draws them (#2028), the hits' pyramids between them included; the copy of the opaque image the march reads and its mip pyramid (#1736) are recorded before, untimed, so they aren't counted |
 | `transparent` | translucent solids |
 | `ribbons` | trails and lines |
 | `particles` | particle systems |
