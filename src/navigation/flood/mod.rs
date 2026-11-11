@@ -49,7 +49,7 @@ impl Flood<'_> {
     pub fn length_to(&self, nav: &NavigationGraph, p: Vec3) -> Option<f32> {
         let span = nav.snap(p)?;
         let g = self.cost.g(span.index);
-        g.is_finite().then(|| g * self.spacing)
+        g.is_finite().then_some(g * self.spacing)
     }
 
     /// How many spans the flood reached.
