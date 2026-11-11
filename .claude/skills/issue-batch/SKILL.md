@@ -26,18 +26,17 @@ navigation, audio, CI) at once; within one module, run one branch at a time.
 The files every feature appends to, where two branches at once is the case to
 avoid:
 
-- `src/components/entity/mod.rs` (the document struct, its imports and
-  `Entity::new`);
-- `src/scene/authoring/components.rs` (`ComponentKind`) and
-  `src/scene/authoring/dependency/dispatch.rs` (`set_default`, `has_kind`, `clear_one`:
-  two component branches together push these past clippy's 50-line cap; split
-  by group, never trim);
+- `src/components/registry.rs`'s `first_class!` rows: one sorted line per
+  component, from which `Entity`, the `World` accessors, `ComponentKind`, the
+  dependency dispatch, `KINDS`, the snapshot and the Add Component menu are
+  generated, so two component branches touch different lines; what still
+  collides is each one's hand-written rows (`inspect!`, `snapshot!`,
+  `AddEntry`) when they share an area file;
 - `src/scene/serialize.rs`'s `apply` and `src/scene/undo/level.rs`'s list: every
   saved `Scene` field adds a line to both, so two such branches pass clippy's
   50-line cap in `apply`; the level list's check test asks the
   second to land for its field;
-- `src/api/mod.rs`, `src/scripting/callbacks.rs`,
-  `src/editor/inspector/components/add/`;
+- `src/api/mod.rs`, `src/scripting/callbacks.rs`;
 - `src/app/registry.rs`'s `build()`, where order *is* execution order, so a merge
   that reorders it changes behaviour silently;
 - `docs/api/index.md`, `docs/api/Scene.md`'s component list,

@@ -385,7 +385,8 @@ overrides and what hangs from a bone.
    (Lua MonoBehaviours), never in new first-class components. Script components are
    **not** first-class — even the ones shipped in the engine's own Lua — so the
    four-axis completeness gate never applies to them; it discovers first-class
-   components solely from `Entity`'s `Option<…Component>` fields. New first-class
+   components solely from the component registry's rows (`components::registry`),
+   from which `Entity`'s fields are generated. New first-class
    components are added in Rust, not script.
 3. **Systems** — per-frame logic, a plain `fn(&mut World, &mut Resources)`, grouped
    into ordered stages (`Startup` once, then each frame

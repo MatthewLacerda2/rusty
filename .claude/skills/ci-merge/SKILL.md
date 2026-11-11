@@ -299,12 +299,12 @@ failure, with the reason in the description.
 
 ## Updating a branch from `main`, and its conflicts
 
-Expect conflicts where every feature appends in an order that matters: `Entity`'s
-`Option<…Component>` fields, `ComponentKind`'s variants, `app/registry.rs`'s
-ordered `register` calls, the Add Component menu, `docs/api/index.md`'s
-namespace list, `scripting/callbacks.rs`. Lists under a `sorted` marker
-(`api/mod.rs`, the Lua surface, the lint rules) mostly merge clean; when two
-entries meet, keep both, in order.
+Expect conflicts where every feature appends in an order that matters:
+`app/registry.rs`'s ordered `register` calls, `docs/api/index.md`'s namespace
+list, `scripting/callbacks.rs`. Lists under a `sorted` marker (`api/mod.rs`, the
+Lua surface, the lint rules, `components/registry.rs`'s `first_class!` rows, from
+which `Entity`, `ComponentKind` and the Add Component menu are generated) mostly
+merge clean; when two entries meet, keep both, in order.
 
 **`make queue` resolves one kind by itself:** when every conflicted hunk of every
 conflicted file lies in a `sorted` list and both sides only added entries (none
