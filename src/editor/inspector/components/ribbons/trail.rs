@@ -54,3 +54,10 @@ pub fn draw_trail(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, dir
         remove_component(world, id, ComponentKind::Trail, dirty);
     }
 }
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::TrailComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Effects;
+    const LABEL: &'static str = "Trail Renderer";
+    const ICON: &'static str = egui_phosphor::regular::WIND;
+}

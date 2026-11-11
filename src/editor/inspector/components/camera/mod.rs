@@ -256,3 +256,9 @@ fn draw_stacking(
             });
     });
 }
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::CameraComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Rendering;
+    const LABEL: &'static str = "Camera Component";
+}

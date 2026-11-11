@@ -140,3 +140,10 @@ fn draw_placement(
     }
     true
 }
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::CanvasComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Ui;
+    const LABEL: &'static str = "Canvas";
+    const ICON: &'static str = egui_phosphor::regular::MONITOR;
+}
