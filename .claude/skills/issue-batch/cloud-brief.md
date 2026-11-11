@@ -1,13 +1,15 @@
 # Cloud brief: the standing rules
 
-Every cloud coder the batch launches reads this file (#568). Its routine prompt
-carries only a pointer here and the issue number; what is specific to the issue
-is a `Brief` comment on it (#910). When a lesson changes how cloud coders must
-work, change it **here**, once, not in the next prompt.
+Every cloud coder the batch launches reads this file. Its routine prompt carries
+only a pointer here and the issue number; what is specific to the issue is a
+`Brief` comment on it. When a lesson changes how cloud coders must work, change
+it **here**, once, not in the next prompt.
 
-**Nobody can talk to you; the pull request is your only report.** Never send the operator a push notification: a hand-back or a decision goes in the PR description and an issue comment, where the orchestrator reads it and decides. Use the GitHub
-MCP tools (`issue_read`, `create_pull_request`, `update_pull_request`,
-`add_issue_comment`); load them with ToolSearch.
+**Nobody can talk to you; the pull request is your only report.** Never send the
+operator a push notification: a hand-back or a decision goes in the PR
+description and an issue comment, where the orchestrator reads it and decides.
+Use the GitHub MCP tools (`issue_read`, `create_pull_request`,
+`update_pull_request`, `add_issue_comment`); load them with ToolSearch.
 
 **A finding is yours to deal with**: fold it in when it's in your way or costs a
 line; file it only when it passes CLAUDE.md's *Issues are for what matters* (it
@@ -15,12 +17,12 @@ already caused a problem, costs more to leave than to fix, or cracks the structu
 or tooling), with the `agent` label (`planning` when it fails the approval test);
 otherwise drop it.
 
-**A bug you file is classed first** (`issue-batch`, *Filing a bug*, #1173): look
-for earlier cases of its kind, open and closed (search answers 403 here, so page
-the REST issue list and grep it); class it a case or a symptom; for a symptom,
-file the fix that scales and make your finding its sub-issue; fold an instance of
-an open root issue into that issue as a comment. The issue carries one `Kind:`
-line: `Kind: #N`, `Kind: case — searched <terms>`, or `Kind: root`.
+**A bug you file is classed first** (`issue-batch`, *Filing a bug*): look for
+earlier cases of its kind, open and closed (search answers 403 here, so page the
+REST issue list and grep it); class it a case or a symptom; for a symptom, file
+the fix that scales and make your finding its sub-issue; fold an instance of an
+open root issue into that issue as a comment. The issue carries one `Kind:` line:
+`Kind: #N`, `Kind: case — searched <terms>`, or `Kind: root`.
 
 **Need a sibling's tool for your own proof? Patch it locally, don't commit it.**
 If your PR's captures or measurements need something another in-flight issue is
@@ -29,22 +31,25 @@ take them, and say so in the PR. A committed copy conflicts with the original.
 
 ## Check the issue's blockers yourself
 
-Before writing code, read the issue body for "Blocked by" and check each blocker's state on GitHub; a blocker written only in prose slips past the orchestrator. If one is still open, stand down (comment on the issue, its first line `Standing down`, which `make queue-events` passes to the orchestrator; no branch) and say which issue should go first.
+Before writing code, read the issue body for "Blocked by" and check each
+blocker's state on GitHub; a blocker written only in prose slips past the
+orchestrator. If one is still open, stand down (comment on the issue, its first
+line `Standing down`, which `make queue-events` passes to the orchestrator; no
+branch) and say which issue should go first.
 
 ## Read first
 
 `CLAUDE.md`, your issue(s), your brief, and `.claude/skills/ci-merge/SKILL.md`.
-**Your brief is the comment your prompt names** (#910; pinned by URL since
-PR #1572, so a comment posted after it is not what you follow): your branch
-name, what to build on, the siblings whose files to stay out of, and decisions
-already made. A re-brief is a new `Brief` and a new session with its own prompt.
-It may name more to read.
+**Your brief is the comment your prompt names** by URL, so a comment posted after
+it is not what you follow: your branch name, what to build on, the siblings whose
+files to stay out of, and decisions already made. A re-brief is a new `Brief` and
+a new session with its own prompt. It may name more to read.
 
 ## Your job ends at "ready"
 
 A coder's session ends when its pull request is **ready**. Everything after that
-(waiting on CI, updating the branch, merging, reading a mutation report) belongs to the
-orchestrator and the merge queue (#823). There is no check-in to schedule and
+(waiting on CI, updating the branch, merging, reading a mutation report) belongs
+to the orchestrator and the merge queue. There is no check-in to schedule and
 nothing to wait for.
 
 - Run builds, tests and `make gates` in the **foreground**, with long timeouts,
@@ -57,32 +62,28 @@ nothing to wait for.
 - Mark the PR ready **only when the branch is truly finished**: the orchestrator
   reads it, labels it `queue`, and the watch merges it the moment its CI is
   green. **Never add the `queue` label yourself**: it is the orchestrator's
-  go-ahead after reading your diff (#925).
+  go-ahead after reading your diff.
 - For a proof run on a draft, dispatch the workflow on the branch instead of
   readying: `gh workflow run ci.yml --ref <branch>` (without `gh`, the GitHub MCP
   `actions_run_trigger` does the same). It runs the gates and nothing else.
-  Never dispatch `mutants-sweep.yml`: that is the full sweep, up to ten
-  runners for a weekend the batch's gates need (#705).
+  Never dispatch `mutants-sweep.yml`: that is the full sweep, up to ten runners
+  the batch's gates need.
 - **A run you cite is one you read finished.** Its id, its conclusion, and every
   time or count you quote from it are copied from the completed run (`gh run view
   <id> --json status,conclusion,jobs`, its log), never expected or extrapolated,
-  and the PR is readied only after. On 2026-11-09 PR #1977 cited a dispatched run
-  as "success, macOS 14 min" with a slowest-tests table, while that run's macOS
-  job had not finished and two of the quoted test names exist nowhere in the
-  tree. A reviewer caught it; a figure nobody can trace is worse than no figure.
-  If the run is still going when you would end, say so in the description and
-  leave the PR a draft naming the run.
-- **A branch that adds mechanism asks for a scoped mutation run** (#750) with
-  a line of its own in the PR description: `Mutation: diff` (or path globs,
-  `Mutation: src/physics/**`). **Never dispatch `mutants-on-request.yml`
-  yourself** (#1934): on 2026-11-08 six coders' runs, dispatched at ready, held
-  a third of the account's runners and the gating CI that merges PRs waited
-  20-40 minutes behind them. The merge queue dispatches the run after it merges
-  your PR, on `main` at the squash commit, two at a time, and the report lands
-  as a comment on your merged PR; the orchestrator reads it there and launches
-  a follow-up only for survivors in code this branch wrote. The line is the
-  whole ask: write it, mark the PR ready and end. A branch that changed no Rust
-  gets no run even when it asks.
+  and the PR is readied only after. A figure nobody can trace is worse than no
+  figure. If the run is still going when you would end, say so in the
+  description and leave the PR a draft naming the run.
+- **A branch that adds mechanism asks for a scoped mutation run** with a line of
+  its own in the PR description: `Mutation: diff` (or path globs, `Mutation:
+  src/physics/**`). **Never dispatch `mutants-on-request.yml` yourself**: runs
+  dispatched at ready hold runners the gating CI that merges PRs waits behind.
+  The merge queue dispatches the run after it merges your PR, on `main` at the
+  squash commit, two at a time, and the report lands as a comment on your merged
+  PR; the orchestrator reads it there and launches a follow-up only for
+  survivors in code this branch wrote. The line is the whole ask: write it, mark
+  the PR ready and end. A branch that changed no Rust gets no run even when it
+  asks.
 - **Before readying, check your change at its edges**: zero, one and a
   Dust2-sized level (memory held, work per frame, the first frame after a load or
   bake) and a malformed input file (truncated, a value out of range, a NaN):
@@ -90,50 +91,45 @@ nothing to wait for.
 - **Before readying, list every path that reaches the state you changed**, and
   test the ones your diff doesn't show: pause and resume, a bake capture, undo, a
   scene load, Play/Stop, a recorded demo, a render-texture camera. Grep who writes
-  and who reads each field you touched. It is what independent reviews send back
-  most: on 2026-11-03 five of seven PRs passed their gates and broke on such a
-  path (a voice retuned while paused, a shadow fade inside a bake, a `require`
-  noted by the demo journal), because a test only covers what its author thought of.
-- **A PR that creates a seam tries it first** (a `Seam` section, below): write one
-  throwaway use of it as the next coder would, its awkward case included, and fix
-  what that shows before readying. Neither #1705's nor #1751's seam survived its
-  first outside read.
-- **Before readying, find every doc that restates what you changed** (#1650).
-  A fact is told in several places: a module doc, a `docs/api/` page,
-  `Debug.md`'s rows, `docs/testing.md`, a CLAUDE.md list, a skill,
-  `game_claude.md`. The gates catch a name that no longer exists, never a
-  sentence that is no longer true. So for each behaviour you altered, grep those
-  for its symbols and wording, and fix what now says otherwise. An absolute claim
-  you write ("never", "always", "costs nothing", "every frame", "atomic") needs a
-  test that holds it, or a softer word.
+  and who reads each field you touched. A branch can pass its gates and break on
+  such a path (a voice retuned while paused, a shadow fade inside a bake, a
+  `require` noted by the demo journal), because a test only covers what its
+  author thought of.
+- **A PR that creates a seam tries it first** (a `Seam` section, below): write
+  one throwaway use of it as the next coder would, its awkward case included, and
+  fix what that shows before readying.
+- **Before readying, find every doc that restates what you changed.** A fact is
+  told in several places: a module doc, a `docs/api/` page, `Debug.md`'s rows,
+  `docs/testing.md`, a CLAUDE.md list, a skill, `game_claude.md`. The gates catch
+  a name that no longer exists, never a sentence that is no longer true. So for
+  each behaviour you altered, grep those for its symbols and wording, and fix
+  what now says otherwise. An absolute claim you write ("never", "always", "costs
+  nothing", "every frame", "atomic") needs a test that holds it, or a softer
+  word.
 - **Once ready, the branch is the merge queue's. Never push to it again**, not
-  to update it from `main` and not to fix your own red CI: a red or conflicting ready PR comes
-  back to the orchestrator as a hand-back, and it briefs a fix. Anything you
-  notice after readying goes in a comment on the issue.
+  to update it from `main` and not to fix your own red CI: a red or conflicting
+  ready PR comes back to the orchestrator as a hand-back, and it briefs a fix.
+  Anything you notice after readying goes in a comment on the issue.
 - **Readying ends you for good.** A later draft flip, a review comment or a PR
   comment pointing at a new `Brief` is not yours to act on: the orchestrator
-  launches a fresh session for every re-brief. On 2026-10-26 a readied session
-  followed a review comment to the new `Brief` while the fresh one did the same,
-  and one force-push overwrote the other (a plain push, #1568, is refused
-  instead, but the rule stands).
+  launches a fresh session for every re-brief, and two sessions pushing to one
+  branch overwrite each other.
 
 ## The container
 
-Lessons from cloud coders' run logs (rusty's and scorsese's, #924). Each one cost
-a coder real time.
+What cloud coders' run logs taught; each one cost a coder real time.
 
 - **A tool call is moved to the background at ten minutes**, and you are woken
-  when it finishes (MatthewLacerda2/scorsese#1500). A cold `make gates` in the
-  container takes about 16, so split it anyway, one call each, so every result
-  comes back in the call that ran it:
-  1. `make quick-gates` (seconds): the self-checks and every gate in the Makefile's
-     `QUICK_GATES`. It is a Makefile fact, not a list copied here, so a gate added
-     to the Makefile is run; a hand-written list left `docrefs` out for PR #1177;
+  when it finishes. A cold `make gates` in the container takes longer than that,
+  so split it, one call each, so every result comes back in the call that ran it:
+  1. `make quick-gates` (seconds): the self-checks and every gate in the
+     Makefile's `QUICK_GATES`. It is a Makefile fact, not a list copied here, so a
+     gate added to the Makefile is run;
   2. `make clippy`;
   3. `make doc deny`;
   4. `cargo nextest run --locked --no-run` (warms the default test build);
   5. `cargo nextest run --locked --features dev --no-run` (warms the `dev` one);
-  6. `make test` (now only runs: about 3 minutes).
+  6. `make test` (now only runs: a few minutes).
   On a warm branch, after an edit, one call per gate is enough.
 - **Run each heavy gate once, into a log, then grep it**:
   `make test > target/test.log 2>&1; echo exit=$?`, then `grep` the log for what
@@ -144,27 +140,24 @@ a coder real time.
 - **GitHub GraphQL and search answer 403** in the container. `gh` works over REST
   (`gh api repos/...`, `gh workflow run`, `gh label create`), and so do the GitHub
   MCP tools; `gh pr` and `gh issue` subcommands that use GraphQL do not. The
-  repo's own scripts are REST-only (#970, `.github/scripts/ghrest.py`), so
-  `make blockers`, `make mergeable` and `make queue` run here too.
+  repo's own scripts are REST-only (`.github/scripts/ghrest.py`), so `make
+  blockers`, `make mergeable` and `make queue` run here too.
 - **The container cannot delete a branch** (neither `git push --delete` nor the
   REST refs API is allowed). A throwaway branch you pushed goes under the PR's
   *For a human* heading for the operator to delete.
 - **`git status --short --ignored` lists nothing you wrote** before readying: a
   `.gitignore` pattern can silently keep a source file out of a commit.
-- **Merge `main` in, never rebase a pushed branch** (#1568). A rebase rewrites
-  commits, so its push must be forced, and the container's permission check
-  refused that force-push again and again (four times on 2026-10-26, more on
-  2026-10-28), each refusal a superseding PR with its own CI run. `git merge
-  origin/main` rewrites nothing, pushes as a plain fast-forward, and resolves a
-  conflict once. PRs are squash-merged, so the merge commit never reaches
-  `main`, and the queue itself merges `main` in now: the PR #1458 trap (a
-  queue rebase replaying conflicts a merge had resolved) is gone. Rebasing
+- **Merge `main` in, never rebase a pushed branch.** A rebase rewrites commits,
+  so its push must be forced, and the container's permission check refuses that
+  force-push. `git merge origin/main` rewrites nothing, pushes as a plain
+  fast-forward, and resolves a conflict once. PRs are squash-merged, so the merge
+  commit never reaches `main`, and the queue itself merges `main` in. Rebasing
   local commits that were never pushed is fine.
-- **A refused push has one fallback**, and with no force-push it should no
-  longer happen (the queue's own push keeps a lease on the head it took, as a
-  compare-and-swap; that is the daemon's, never yours): don't work around it; push the same commits to `<branch>-v2`,
-  open a ready PR with the old one's description headed "Supersedes #N (<why>;
-  a push was refused)", and comment on #N. The orchestrator closes #N.
+- **A refused push has one fallback** (with no force-push it should not happen;
+  the queue's own leased push is the daemon's, never yours): don't work around
+  it; push the same commits to `<branch>-v2`, open a ready PR with the old one's
+  description headed "Supersedes #N (<why>; a push was refused)", and comment on
+  #N. The orchestrator closes #N.
 - **Update once, last.** After merging `main` in over unrelated merges, `cargo
   check`, the size gate and your own tests are enough; the whole gate list again
   is not. **On a re-brief of a pushed branch, don't update at all**: add commits
@@ -180,18 +173,18 @@ a coder real time.
   is a module under it. Test files are capped at **150 lines** (source at 300).
 - A test that renders is named `gpu_*` (in-crate) or lives under `tests/gpu/`
   (integration). They run on lavapipe, which the SessionStart hook installs
-  along with `cargo-nextest` and `cargo-deny` (#826). If its log
+  along with `cargo-nextest` and `cargo-deny`. If its log
   (`session-start: <step> FAIL`) shows a step failed, do what that line says
   before trusting a green run: without the driver, GPU tests skip silently.
-- **A branch that changes what is drawn renders it and looks** (#1483): the
-  renderer, `engine/shaders/`, materials, post effects, lighting, UI, editor
-  panels. Lighting includes what a bake writes (lightmaps, probes, reflection
-  captures): its texels are what lit surfaces show, so a bake change is looked
-  at even when only stored values move (#1690's review). Render a primitive scene that shows the change before (on `main`) and
-  after (on the branch): the feature off and on, and its knobs at the extremes
-  where those are part of the issue. Open every image with `Read`, and fix what
-  is plainly wrong (a black frame, a mirrored flare, a square bokeh) before
-  readying. The PR carries your word, not the pictures: a `Looked at` line
+- **A branch that changes what is drawn renders it and looks**: the renderer,
+  `engine/shaders/`, materials, post effects, lighting, UI, editor panels.
+  Lighting includes what a bake writes (lightmaps, probes, reflection captures):
+  its texels are what lit surfaces show, so a bake change is looked at even when
+  only stored values move. Render a primitive scene that shows the change before
+  (on `main`) and after (on the branch): the feature off and on, and its knobs at
+  the extremes where those are part of the issue. Open every image with `Read`,
+  and fix what is plainly wrong (a black frame, a mirrored flare, a square bokeh)
+  before readying. The PR carries your word, not the pictures: a `Looked at` line
   (below), and **no PNG on GitHub**, not committed, attached or hosted. Images
   stay in your scratchpad, named with the issue number, and die with the
   session. How to render a pair in one command, and the trap that renders an
@@ -199,15 +192,15 @@ a coder real time.
   rendered with `make editor-capture` (`ARGS="--select <entity>"` opens an
   inspector), the same way.
 - `make gates` (foreground, split as *The container* says) before readying.
-- **Prove the macOS leg on the draft** when a test asserts bytes or rests on driver
-  behaviour (a pixel-identical frame, a bake's exact bits, depth invariance):
-  `gh workflow run ci.yml --ref <branch>`, quoted in the PR. Lavapipe and x86_64
-  passed and macOS failed twice on 2026-10-28 (#1515's Metal frames, #1525;
-  #1520's aarch64 bake bits). Never commit a golden hash taken on one platform
-  (`docs/testing.md`).
-- **Windows runs on a branch only when asked** (#1395; it runs nightly on `main`): a branch that touches paths, separators,
-  process spawning or other platform code dispatches `gh workflow run windows.yml --ref
-  <branch>` and quotes the run in its PR. Nothing else runs Windows on a PR.
+- **Prove the macOS leg on the draft** when a test asserts bytes or rests on
+  driver behaviour (a pixel-identical frame, a bake's exact bits, depth
+  invariance): `gh workflow run ci.yml --ref <branch>`, quoted in the PR.
+  Lavapipe and x86_64 can pass where Metal or aarch64 fails. Never commit a
+  golden hash taken on one platform (`docs/testing.md`).
+- **Windows runs on a branch only when asked** (it runs nightly on `main`): a
+  branch that touches paths, separators, process spawning or other platform code
+  dispatches `gh workflow run windows.yml --ref <branch>` and quotes the run in
+  its PR. Nothing else runs Windows on a PR.
 - Never fall back to `cargo test`: CI runs nextest, and its per-test process
   isolation and the `gpu` test group are what the gate measures.
 - Don't run `cargo mutants` locally; ask for a scoped run (above).
@@ -224,7 +217,7 @@ Beyond what changed, why, the effect and the decisions:
 - **A `Gates` line:** what ran green, on which head commit, and what didn't run
   and why (no real GPU, a human check). After your own update from `main` it is
   re-run or marked stale; an update the merge queue pushes later dates it for
-  you (#968).
+  you.
 - **A `Looked at` line** on a branch that changes what is drawn (above): for
   each before/after pair, the scene, what was rendered and what you saw, in one
   or two sentences. Say what you did *not* check (motion, Metal, cost, taste):
@@ -234,8 +227,8 @@ Beyond what changed, why, the effect and the decisions:
   window, speakers, a repository setting, a branch to delete), each one a
   `- [ ]` item. The heading must *start* with "For a human": `make checks`
   gathers every unticked item under such headings from a batch's merged PRs for
-  the batch report (#929), and finds nothing under any other name. When nothing
-  needs a human, leave the heading out or write a sentence under it, never
+  the batch report, and finds nothing under any other name. When nothing needs a
+  human, leave the heading out or write a sentence under it, never
   `- [ ] Nothing needs a human`, which would be listed as a check.
 - **A `Seam` section** when the PR creates something later branches build on:
   the types, functions, files and invariants a sibling should use. The
@@ -244,28 +237,28 @@ Beyond what changed, why, the effect and the decisions:
 
 ## Protocol
 
-- Branch as the prompt names it, off the latest `origin/main`. The container's clone
-  can be a stale snapshot; the session-start hook fetches GitHub's `main` (its
-  `session-start: main` line). If that line says FAIL, `git fetch origin main` before
-  you branch.
+- Branch as the prompt names it, off the latest `origin/main`. The container's
+  clone can be a stale snapshot; the session-start hook fetches GitHub's `main`
+  (its `session-start: main` line). If that line says FAIL, `git fetch origin
+  main` before you branch.
 - Open a **draft** PR on the first commit. Title carries `(#N)`. Body: what
-  changed / why / effect / decisions, `Closes #N` (one line per issue), and it ends
-  with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
+  changed / why / effect / decisions, `Closes #N` (one line per issue), and it
+  ends with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
 - **A PR that leaves its issue open writes `Refs #N`**, and never puts a closing
   keyword next to a number it doesn't mean to close, even quoted or in backticks
   (CLAUDE.md, *The closing-keyword trap*). The merge path refuses a keyword not
-  alone on its line (#966), so write `Closes #N` on a line of its own.
+  alone on its line, so write `Closes #N` on a line of its own.
 - Commit messages end with a `Co-Authored-By:` line naming the model you run
   as, e.g. `Co-Authored-By: Claude <model> <noreply@anthropic.com>`.
 - Push often: a dead container takes its uncommitted work with it.
-- Green gates and a branch that holds the latest `main` → mark the PR **ready for review**, and end.
+- Green gates and a branch that holds the latest `main` → mark the PR **ready for
+  review**, and end.
 - **Do NOT merge, and do not review your own PR**, nor write its
   `Independent review` or `No review:` comment: the queue reads those as the
-  orchestrator's decision (#1764). The independent review is the
-  orchestrator's (`independent-review`): it dispatches a reviewer that never saw
-  your reasoning, which one you spawn cannot be. A brief that says the PR "gets an
-  independent review" means the orchestrator will run one. PR #1184's coder ran its
-  own, and it had to be done again.
+  orchestrator's decision. The independent review is the orchestrator's
+  (`independent-review`): it dispatches a reviewer that never saw your
+  reasoning, which one you spawn cannot be. A brief that says the PR "gets an
+  independent review" means the orchestrator will run one.
 - ≈3 attempts at the same failure, or a decision that is genuinely the user's:
-  leave the PR as draft with the reason in its description, comment on the issue,
-  and stop.
+  leave the PR as draft with the reason in its description, comment on the
+  issue, and stop.
