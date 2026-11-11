@@ -7,6 +7,27 @@ description: Take a finished branch through to merged — the gates, CI, verifyi
 
 The steps and the traps. `CLAUDE.md` says why merging is serialized; this is how.
 
+## Draft or ready
+
+- **Open the PR on the branch's first commit**, unasked, so no branch is a stray
+  with no documented purpose. Branch names: `{issue_number}-short-slug` for a PR
+  that closes an issue (`163-fix-coverage-scope`), a readable slug of the subject
+  for an issue-less one (`document-ai-parity`), lowercase-hyphenated.
+- **Draft** while the work is in progress, or whenever it is blocked or needs the
+  user: a decision you can't make, another PR or issue that must land first, human
+  or hardware help. Say why in the description. **Ready for review** once the work
+  is done and nothing more is needed from the user; flip between the two as the
+  work moves. CI's gating jobs skip drafts, so readying is when anything is checked.
+- **The description** says what changed, why it belongs in rusty (the project-level
+  value its label classifies, not how you got there; process only when the diff
+  needs it) and the effect, and carries the PR↔issue link. Check the number in a
+  closing keyword: a typo silently closes the wrong issue.
+- **Why one tree at a time:** two PRs can each be green alone and break `main`
+  together (a rename, a changed signature, a moved module) with no textual
+  conflict. A branch is updated by merging `main` in: nothing is rewritten, no push
+  is forced, a conflict is resolved once. PRs are squash-merged, so the branch's
+  own history never reaches `main`.
+
 ## Before marking a pull request ready
 
     make gates

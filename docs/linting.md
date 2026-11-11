@@ -4,6 +4,25 @@ Programmatic, no AI in the loop. `make gates` runs every check below; the commit
 hook runs the fast ones. `tools/lint` writes its result to `.lint/report.txt` so an
 agent can read exactly what failed.
 
+## The commit gate in brief
+`make gates` runs everything CI blocks on, fastest-failing first: run it before
+readying a PR. `make help` lists the verbs and `make check` is the fast edit loop.
+
+- **The hooks** (activated once per clone by `make setup`): the commit hook runs
+  formatting and the size gate only, so it stays under a second; the push hook runs
+  rustfmt on both crates, `tools/lint` included. Neither runs clippy or the tests
+  (*Where it runs*, below).
+- **What the gates hold:** files ≤ 300 lines and test/fixture files ≤ 150; rustfmt;
+  clippy with `-D warnings` on the default, `dev` and no-editor player builds (the
+  policy lives in `Cargo.toml`'s `[lints]`, not in flags); the layer table; the
+  determinism guard (clippy's `disallowed-*` bans, and only a platform module's root
+  may opt out); the direction guard (no sim module names `crate::render`,
+  `crate::editor`, `wgpu` or `egui`: the arrow is render/editor → sim).
+- **Nothing is grandfathered.** A file over its cap is split, not excused; no gate
+  reads a baseline file, and an exception a check needs is written inline with its
+  reason. The one committed list of numbers, `coverage-baseline.txt`'s floors, only
+  ratchets up: `make scripts` fails a floor lowered without an inline `# reason:`.
+
 ## What's enforced
 <!-- sorted: each check is one row, so two branches adding a rule land on different lines (#1409) -->
 | Check | Tool | Rule |
@@ -627,7 +646,8 @@ code use (*Test code*, below). The direction and determinism
   to the Lua surface does it through `api::extend`, as `dev` does for `Debug.*` and
   the bake verbs, so the edge runs down, not up.
 
-A new import between modules is one edit to the row, in the same PR. If the edge
+Read the table, not a file header, to answer "may X use Y?". A new import between
+modules is one edit to the row, in the same PR. If the edge
 breaks the order or leaves the sim, move the code down a layer instead.
 
 ### External crates (#938)
@@ -660,7 +680,11 @@ pass for a crate.
 
 ## Sim determinism (clippy + `--determinism`)
 The sim is a pure function of (seed, inputs, fixed dt), so a wall-clock read or an
-unseeded RNG in it breaks replay for every harness run. **Clippy holds the ban**
+unseeded RNG in it breaks replay for every harness run. Scripts run inside the sim
+too: the gameplay Lua VM has no `os`/`io`, `math.random` routes to the seeded
+`Random` resource (`core::random`), and a `require` / `dofile` / `loadfile` of a file
+outside the project is allowed but warns once in the console, since it is an input
+the seed doesn't cover. **Clippy holds the ban**
 (#757): `clippy.toml` lists `Instant`, `SystemTime`, their `now`/`elapsed`,
 `getrandom`'s entry points and `rand`'s global RNG under `disallowed-methods` /
 `disallowed-types`, each with the reason clippy prints, and `Cargo.toml`'s `[lints]`
