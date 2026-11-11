@@ -106,7 +106,10 @@ impl PhysicsWorld {
                 .linvel(inp.velocity)
                 .angvel(inp.angular_velocity)
                 // `use_gravity = false` exempts the body from world gravity (#209).
-                .gravity_scale(gravity_scale(inp.use_gravity)),
+                .gravity_scale(gravity_scale(inp.use_gravity))
+                // Unity's `drag` / `angularDrag` (#2062).
+                .linear_damping(inp.damping.linear)
+                .angular_damping(inp.damping.angular),
         }
         // Continuous mode switches on rapier's CCD sweep (anti-tunnelling, #321);
         // Discrete leaves it off. Honoured for every class — mainly dynamic, but a

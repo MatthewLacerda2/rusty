@@ -36,9 +36,10 @@ def pr(number: int, draft: bool) -> dict:
     return {"number": 100 + number, "draft": draft, "head": {"ref": f"{number}-slug"}}
 
 
-def hub(pulls=(), comments=None, closed=(), now=SOON, shut=()) -> running.GitHub:
-    """`closed` names closed issues; `shut` lists closed pull requests (any issue's)."""
-    return running.GitHub(pulls=list(pulls), comments=lambda n: (comments or {}).get(n, []),
+def hub(pulls=(), comments=None, closed=(), now=SOON, shut=(), blockers=None) -> running.GitHub:
+    """`closed` names closed issues; `shut` lists closed pull requests (any issue's); `blockers`
+    gives an issue's open blockers by number."""
+    return running.GitHub(pulls=list(pulls), blockers=lambda n: (blockers or {}).get(n, []), comments=lambda n: (comments or {}).get(n, []),
                           issue=lambda n: {"state": "closed" if n in closed else "open"}, now=now,
                           closed=lambda n: running.pulls_for(n, list(shut)))
 
@@ -96,12 +97,12 @@ class State(unittest.TestCase):
     def test_what_cannot_be_read_is_unknown(self):
         self.assertEqual(placed(NO_TIME, hub()), "unknown")
         opened = {"state": "open"}
-        blind = running.GitHub(pulls=[], comments=lambda n: None, issue=lambda n: opened, now=SOON,
+        blind = running.GitHub(pulls=[], blockers=lambda n: [], comments=lambda n: None, issue=lambda n: opened, now=SOON,
                                closed=lambda n: [])
         self.assertEqual(placed(FIRED, blind), "unknown")
-        gone = running.GitHub(pulls=[], comments=lambda n: [], issue=lambda n: None, now=SOON, closed=lambda n: [])
+        gone = running.GitHub(pulls=[], blockers=lambda n: [], comments=lambda n: [], issue=lambda n: None, now=SOON, closed=lambda n: [])
         self.assertEqual(placed(FIRED, gone), "unknown")
-        unlisted = running.GitHub(pulls=[], comments=lambda n: [], issue=lambda n: opened, now=SOON,
+        unlisted = running.GitHub(pulls=[], blockers=lambda n: [], comments=lambda n: [], issue=lambda n: opened, now=SOON,
                                   closed=lambda n: None)
         self.assertEqual(placed(FIRED, unlisted), "unknown")
 
