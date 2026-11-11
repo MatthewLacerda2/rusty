@@ -106,7 +106,8 @@ impl Renderer {
     /// resident and of Texture Type `SingleChannel` (#1574), BC4 or not yet: the
     /// shader then reads its red channel instead of glTF's packed blue and green,
     /// so the look does not change when the compressed copy lands. Its normal flag
-    /// is 2 where the bound normal map is BC5, its table in the record (#1702).
+    /// is 2 where the bound normal map is BC5, its table in the record (#1702), and
+    /// its detail flag 0 while the detail map is not resident (#1997).
     pub(crate) fn with_map_channels(
         &self,
         mut record: MaterialData,
@@ -130,6 +131,15 @@ impl Renderer {
         if let Some(table) = bound.and_then(|t| t.normal_variance) {
             record.use_normal_map = 2;
             record.normal_variance = pack_variance(table);
+        }
+        // A detail map not resident (missing, loading, an empty path) draws no
+        // detail, never the checker its slot binds meanwhile (#1997).
+        let detail = m.detail.as_ref().and_then(|d| d.map.as_ref());
+        if detail
+            .and_then(|p| self.texture_for(p, TextureKind::Data))
+            .is_none()
+        {
+            record.detail.use_detail_map = 0;
         }
         record
     }

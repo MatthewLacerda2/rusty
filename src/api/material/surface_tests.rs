@@ -111,3 +111,18 @@ fn map_coordinates_take_pairs_by_position_or_name() {
         ([8.0; 2], [1.0, 0.0], 2.0)
     );
 }
+
+#[test]
+fn a_nested_detail_table_refuses_a_typo_and_reads_back_clamped() {
+    let scene = Rc::new(RefCell::new(Scene::new()));
+    let typo = r#"Material.DefineAsset("rug", { detail = { tilling = {8, 8} } })"#;
+    let err = eval::<()>(&scene, typo).unwrap_err().to_string();
+    assert!(err.contains("tilling"), "{err}");
+    eval::<()>(
+        &scene,
+        r#"Material.DefineAsset("rug", { detail = { map = "d.png", albedo_scale = 9 } })"#,
+    )
+    .unwrap();
+    let detail = scene.borrow().materials["rug"].detail.clone().unwrap();
+    assert_eq!(detail.albedo_scale, 2.0, "the GPU's clamp, read back");
+}

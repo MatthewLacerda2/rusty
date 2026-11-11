@@ -37,7 +37,7 @@ pub use crate::components::material::entity_material_key;
 pub use coordinates::{
     BLEND_SHARPNESS_RANGE, COORDINATE_FIELDS, MAP_COORD_RANGE, WORLD_SIZE_RANGE,
 };
-pub use detail::{set_detail_map, DETAIL_FIELDS, DETAIL_SCALE_RANGE};
+pub use detail::{clamp_detail, set_detail_map, DETAIL_FIELDS, DETAIL_SCALE_RANGE};
 pub use face::FACE_FIELDS;
 pub use field::{
     material_fields, set_surface, surface_field, SurfaceField, SurfaceKind, SurfaceValue,

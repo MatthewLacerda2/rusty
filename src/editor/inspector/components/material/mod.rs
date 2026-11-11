@@ -11,6 +11,7 @@
 //! write and its validation live once in that shared module, which the Lua
 //! `Material.*` API calls too, so the panel and the binding are siblings over one op.
 
+mod detail;
 mod library;
 mod shader_params;
 mod slots;
@@ -31,7 +32,7 @@ use crate::editor::inspector::preview::{self, PreviewSubject};
 use crate::editor::EditorUi;
 use crate::scene::authoring::material::FACTOR_RANGE;
 use crate::scene::authoring::material::{
-    self as mat_ops, COORDINATE_FIELDS, DETAIL_FIELDS, FACE_FIELDS, SURFACE_FIELDS,
+    self as mat_ops, COORDINATE_FIELDS, FACE_FIELDS, SURFACE_FIELDS,
 };
 use crate::scene::{MaterialAsset, RenderMode};
 
@@ -98,8 +99,7 @@ fn draw_material(
         optional_map(ui, "Use Normal Map", materials, key, MapKind::Normal);
         optional_map(ui, "Use Emissive Map", materials, key, MapKind::Emissive);
         surface::draw_fields(ui, COORDINATE_FIELDS, materials, key, is_dirty);
-        optional_map(ui, "Use Detail Map", materials, key, MapKind::Detail);
-        surface::draw_fields(ui, DETAIL_FIELDS, materials, key, is_dirty);
+        detail::draw(ui, materials, key, is_dirty);
 
         draw_material_transparency(ui, materials, key, is_dirty);
         surface::draw_fields(ui, FACE_FIELDS, materials, key, is_dirty);
@@ -236,19 +236,16 @@ enum MapKind {
     Roughness,
     Normal,
     Emissive,
-    /// HDRP's packed detail map (#1997).
-    Detail,
 }
 
 impl MapKind {
     /// Read this map's current path from the asset.
-    fn get(self, m: &MaterialAsset) -> Option<&MapRef> {
+    fn get(self, m: &MaterialAsset) -> &Option<MapRef> {
         match self {
-            MapKind::Metallic => m.metallic_map.as_ref(),
-            MapKind::Roughness => m.roughness_map.as_ref(),
-            MapKind::Normal => m.normal_map.as_ref(),
-            MapKind::Emissive => m.emissive_map.as_ref(),
-            MapKind::Detail => m.detail.as_ref().and_then(|d| d.map.as_ref()),
+            MapKind::Metallic => &m.metallic_map,
+            MapKind::Roughness => &m.roughness_map,
+            MapKind::Normal => &m.normal_map,
+            MapKind::Emissive => &m.emissive_map,
         }
     }
 
@@ -259,7 +256,6 @@ impl MapKind {
             MapKind::Roughness => mat_ops::set_roughness_map(materials, key, path),
             MapKind::Normal => mat_ops::set_normal_map(materials, key, path),
             MapKind::Emissive => mat_ops::set_emissive_map(materials, key, path),
-            MapKind::Detail => mat_ops::set_detail_map(materials, key, path),
         }
     }
 }
@@ -274,11 +270,12 @@ fn optional_map(
     key: &str,
     kind: MapKind,
 ) {
-    let mut enabled = kind.get(&materials[key]).is_some();
+    let current = kind.get(&materials[key]).clone();
+    let mut enabled = current.is_some();
     if ui.checkbox(&mut enabled, label).changed() {
         kind.set(materials, key, enabled.then(String::new));
     }
-    if let Some(mut path) = kind.get(&materials[key]).map(MapRef::to_string) {
+    if let Some(mut path) = kind.get(&materials[key]).as_ref().map(MapRef::to_string) {
         ui.horizontal(|ui| {
             ui.label("  Path:");
             if ui.text_edit_singleline(&mut path).changed() {

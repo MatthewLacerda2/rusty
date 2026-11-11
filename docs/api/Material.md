@@ -132,12 +132,12 @@ Each field below is saved with the material in its `detail` table (absent until
 one is set), taken by `DefineAsset` either by the key in brackets or nested as
 `detail = { map = "d.png", tiling = {8, 8}, world_size = 0.5, albedo_scale = 1,
 normal_scale = 1, smoothness_scale = 1 }`, and shown in the Inspector's Material
-card under *Use Detail Map*. `Get` returns `nil` for an entity without a material
+card under *Detail Map* (a path field: empty is no map). `Get` returns `nil` for an entity without a material
 and the default for a material without a detail layer.
 
 | Function | Signature |
 |---|---|
-| `Material.SetDetailMap` | `(id, path)` — the packed detail map; `""` clears it (the layer's other fields are kept). No detail is drawn without one |
+| `Material.SetDetailMap` | `(id, path)` — the packed detail map; `""` clears it (the layer's other fields are kept; on a material with no layer it writes nothing). No detail is drawn without one, nor while its image is missing or still loading. A nested `detail` table in `DefineAsset` refuses a key it has no field for, naming it, and clamps each value to the range below |
 | `Material.SetDetailTiling` / `GetDetailTiling` | `(id, {x, y})` [`detail_tiling`] — repeats of the detail per repeat of the main maps under `UV0`, or across `detail_world_size` metres under a world mapping. Default `{1, 1}`; each lane clamped to `[-1000, 1000]` |
 | `Material.SetDetailOffset` / `GetDetailOffset` | `(id, {x, y})` [`detail_offset`] — in detail repeats, added after the detail tiling, with `SetOffset`'s sign under each mapping. Default `{0, 0}` |
 | `Material.SetDetailWorldSize` / `GetDetailWorldSize` | `(id, metres)` [`detail_world_size`] — how many metres one repeat of the detail covers under `Planar` and `Triplanar`, in `[0.01, 100]` (default 1). Ignored under `UV0` |

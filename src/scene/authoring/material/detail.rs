@@ -20,14 +20,35 @@ use crate::components::{DetailLayer, MaterialAsset, UvMapping};
 /// HDRP's range for the three detail scales (albedo, normal, smoothness).
 pub const DETAIL_SCALE_RANGE: RangeInclusive<f32> = 0.0..=2.0;
 
-/// Set (or, with `None`, clear) material `key`'s detail map. The layer's other
-/// fields are kept, so a map swapped back in reads as it did. An image still
-/// marked sRGB turns it off (`sidecar::fit_data_slot`): its texels are data.
+/// Set (or, with `None` or an empty path, clear) material `key`'s detail map: the
+/// one rule `Material.SetDetailMap` and the Inspector's path field share, so an
+/// empty path is never a map. The layer's other fields are kept, so a map swapped
+/// back in reads as it did, and clearing a material with no layer writes nothing
+/// (it saves as before). An image still marked sRGB turns it off
+/// (`sidecar::fit_data_slot`): its texels are data.
 pub fn set_detail_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
-    if let Some(m) = materials.get_mut(key) {
-        let map = path.map(MapRef::from);
-        fit_data_slot(map.as_ref());
-        layer_mut(m).map = map;
+    let Some(m) = materials.get_mut(key) else {
+        return;
+    };
+    let map = path.filter(|p| !p.is_empty()).map(MapRef::from);
+    if map.is_none() && m.detail.is_none() {
+        return;
+    }
+    fit_data_slot(map.as_ref());
+    layer_mut(m).map = map;
+}
+
+/// `m`'s detail layer, if any, with every field clamped as its row's `check`
+/// clamps a write (NaN to the range's floor): what a recipe's nested `detail`
+/// table is put through, so it reads back as the GPU draws it.
+pub fn clamp_detail(m: &mut MaterialAsset) {
+    if m.detail.is_none() {
+        return;
+    }
+    for row in DETAIL_FIELDS {
+        if let Ok(v) = row.check((row.get)(m)) {
+            (row.put)(m, v);
+        }
     }
 }
 
@@ -156,6 +177,35 @@ mod tests {
         set_detail_map(&mut materials, "k", None);
         let layer = materials["k"].detail.clone().unwrap();
         assert_eq!((layer.normal_scale, layer.map), (2.0, None), "kept");
+    }
+
+    #[test]
+    fn an_empty_path_is_no_map_and_clearing_nothing_writes_nothing() {
+        let mut materials = one();
+        set_detail_map(&mut materials, "k", Some(String::new()));
+        set_detail_map(&mut materials, "k", None);
+        assert_eq!(materials["k"].detail, None, "no layer created");
+    }
+
+    #[test]
+    fn clamp_detail_holds_a_hand_written_layer_to_its_rows() {
+        let mut m = MaterialAsset {
+            detail: Some(DetailLayer {
+                albedo_scale: 9.0,
+                normal_scale: f32::NAN,
+                world_size: 0.0,
+                tiling: [1e9, 8.0],
+                ..DetailLayer::default()
+            }),
+            ..MaterialAsset::default()
+        };
+        clamp_detail(&mut m);
+        let d = m.detail.unwrap();
+        assert_eq!((d.albedo_scale, d.normal_scale), (2.0, 0.0));
+        assert_eq!((d.world_size, d.tiling), (0.01, [1000.0, 8.0]));
+        let mut bare = MaterialAsset::default();
+        clamp_detail(&mut bare);
+        assert_eq!(bare.detail, None);
     }
 
     #[test]

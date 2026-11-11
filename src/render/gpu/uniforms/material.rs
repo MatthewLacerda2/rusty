@@ -205,8 +205,9 @@ impl Default for MappingUniform {
 }
 
 /// Where and how strongly a draw's detail map applies (#1997), packed from its
-/// material's `DetailLayer` (`draw::uniforms::detail_uniform`); all zero (off) for a
-/// material without one, or one without a map.
+/// material's `DetailLayer` (`render::draw::detail::detail_uniform`); all zero (off) for a
+/// material without one, or one without a map, and `use_detail_map` 0 while the map is
+/// not resident (`Renderer::with_map_channels`).
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct DetailUniform {

@@ -2,6 +2,7 @@
 //! constructors split out of `pipelines.rs` to keep each file under the size cap;
 //! `pipelines` consumes these to build the pipeline layouts (behavior unchanged).
 
+use crate::render::draw::materials::MAP_BINDINGS;
 use crate::render::passes::transparent::OpaqueViews;
 
 use super::layout_entries::{
@@ -21,43 +22,48 @@ use super::layout_entries::{
 /// shader samples their layers (parallax-corrected, roughness->mip) and the sky's
 /// cube for the weight they leave.
 pub(crate) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    use wgpu::TextureViewDimension::{Cube, CubeArray, D2Array, D3};
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Camera, Lighting, Skybox & Reflection Layout"),
-        entries: &[
-            uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT),
-            // Vertex-visible too: lit particles shade per vertex (#440).
-            uniform_entry(1, wgpu::ShaderStages::VERTEX_FRAGMENT),
-            // The sky's prefiltered reflection cube (#1553).
-            texture_entry(2, Cube),
-            sampler_entry(3),
-            texture_entry(4, CubeArray),
-            sampler_entry(5),
-            // Vertex-visible too, for lit particles (#440).
-            storage_entry(7, wgpu::ShaderStages::VERTEX_FRAGMENT),
-            storage_entry(8, wgpu::ShaderStages::VERTEX_FRAGMENT),
-            storage_entry(9, wgpu::ShaderStages::VERTEX_FRAGMENT),
-            storage_entry(10, wgpu::ShaderStages::FRAGMENT),
-            texture_entry(11, D2Array),
-            texture_entry(12, D2Array),
-            sampler_entry(13),
-            texture_entry(14, D2Array),
-            sampler_entry(15),
-            texture_entry(16, D2Array),
-            // The integrated volumetric fog (#1703); vertex-visible too: particles
-            // fog per vertex.
-            wgpu::BindGroupLayoutEntry {
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ..texture_entry(17, D3)
-            },
-            wgpu::BindGroupLayoutEntry {
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ..sampler_entry(18)
-            },
-            // The shadowmask pages (#1695), beside the lightmaps.
-            texture_entry(19, D2Array),
-        ],
+        entries: &camera_lighting_entries(),
     })
+}
+
+/// [`create_camera_lighting_layout`]'s entries.
+pub(crate) fn camera_lighting_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
+    use wgpu::TextureViewDimension::{Cube, CubeArray, D2Array, D3};
+    vec![
+        uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT),
+        // Vertex-visible too: lit particles shade per vertex (#440).
+        uniform_entry(1, wgpu::ShaderStages::VERTEX_FRAGMENT),
+        // The sky's prefiltered reflection cube (#1553).
+        texture_entry(2, Cube),
+        sampler_entry(3),
+        texture_entry(4, CubeArray),
+        sampler_entry(5),
+        // Vertex-visible too, for lit particles (#440).
+        storage_entry(7, wgpu::ShaderStages::VERTEX_FRAGMENT),
+        storage_entry(8, wgpu::ShaderStages::VERTEX_FRAGMENT),
+        storage_entry(9, wgpu::ShaderStages::VERTEX_FRAGMENT),
+        storage_entry(10, wgpu::ShaderStages::FRAGMENT),
+        texture_entry(11, D2Array),
+        texture_entry(12, D2Array),
+        sampler_entry(13),
+        texture_entry(14, D2Array),
+        sampler_entry(15),
+        texture_entry(16, D2Array),
+        // The integrated volumetric fog (#1703); vertex-visible too: particles
+        // fog per vertex.
+        wgpu::BindGroupLayoutEntry {
+            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+            ..texture_entry(17, D3)
+        },
+        wgpu::BindGroupLayoutEntry {
+            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+            ..sampler_entry(18)
+        },
+        // The shadowmask pages (#1695), beside the lightmaps.
+        texture_entry(19, D2Array),
+    ]
 }
 
 /// The scene depth target as a sampled texture (binding 0), for soft particles.
@@ -83,22 +89,27 @@ pub(crate) fn create_scene_depth_layout(device: &wgpu::Device) -> wgpu::BindGrou
 /// materials, proxies and objects here, the shadow tiles in group 3), the limit the
 /// renderer requests on every backend. The vertex stage binds 7.
 pub(crate) fn create_entity_bones_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    use crate::render::DrawUniform;
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Entity & Bones Layout"),
-        entries: &[
-            dynamic_uniform_entry(
-                0,
-                wgpu::ShaderStages::VERTEX_FRAGMENT,
-                std::mem::size_of::<DrawUniform>() as u64,
-            ),
-            storage_entry(1, wgpu::ShaderStages::VERTEX),
-            storage_entry(2, wgpu::ShaderStages::VERTEX),
-            storage_entry(4, wgpu::ShaderStages::VERTEX_FRAGMENT),
-            storage_entry(5, wgpu::ShaderStages::FRAGMENT),
-            storage_entry(6, wgpu::ShaderStages::VERTEX_FRAGMENT),
-        ],
+        entries: &entity_bones_entries(),
     })
+}
+
+/// [`create_entity_bones_layout`]'s entries.
+pub(crate) fn entity_bones_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
+    use crate::render::DrawUniform;
+    vec![
+        dynamic_uniform_entry(
+            0,
+            wgpu::ShaderStages::VERTEX_FRAGMENT,
+            std::mem::size_of::<DrawUniform>() as u64,
+        ),
+        storage_entry(1, wgpu::ShaderStages::VERTEX),
+        storage_entry(2, wgpu::ShaderStages::VERTEX),
+        storage_entry(4, wgpu::ShaderStages::VERTEX_FRAGMENT),
+        storage_entry(5, wgpu::ShaderStages::FRAGMENT),
+        storage_entry(6, wgpu::ShaderStages::VERTEX_FRAGMENT),
+    ]
 }
 
 /// Group 2 (single-texture): Texture (0) & Sampler (1). Kept for `GpuTexture`'s own
@@ -146,53 +157,61 @@ fn material_sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
     }
 }
 
-/// Group 2 (one per distinct material map set, #470): albedo (0) and its sampler
-/// (1), metallic map (2), roughness map (3), normal map (4), emissive map (5), and
-/// the detail map (15, #1997), the material's runtime shader params (6, #399) — a fixed `array<vec4<f32>, 16>`
-/// uniform only a surface variant with runtime params reads — then one texture per
-/// extra shader slot (7 = `mask`, #400), which only a variant with a block sampling
-/// it reads. Every
-/// texture but albedo has its own sampler at `textures::sampler_binding` (16 past
-/// it), the wrap and filter of its import settings (#1323). This is the layout the
-/// forward pass's group(2) is built against (#202, #207).
 /// The detail map's group-2 binding: `materials::MAP_BINDINGS`' last.
-const DETAIL_BINDING: u32 = crate::render::draw::materials::MAP_BINDINGS[5];
+const DETAIL_BINDING: u32 = MAP_BINDINGS[5];
 
+// Every extra shader slot binds below the detail map, and every texture below the
+// samplers' offset, so no two group-2 bindings meet.
+const _: () = {
+    let mut i = 0;
+    while i < crate::shadergen::textures::SLOTS.len() {
+        assert!(crate::shadergen::textures::SLOTS[i].binding < DETAIL_BINDING);
+        i += 1;
+    }
+    assert!(DETAIL_BINDING < crate::shadergen::textures::SAMPLER_OFFSET);
+};
+
+/// Group 2 (one per distinct material map set, #470): the maps at `MAP_BINDINGS`,
+/// albedo (0) and its sampler (1), metallic (2), roughness (3), normal (4) and
+/// emissive (5); the material's runtime shader params (6, #399), a fixed
+/// `array<vec4<f32>, 16>` uniform only a surface variant with runtime params reads;
+/// one texture per extra shader slot (7 = `mask`, #400), which only a variant with a
+/// block sampling it reads; and the detail map (15, #1997). Every texture but
+/// albedo has its own sampler at `textures::sampler_binding` (16 past it), the wrap
+/// and filter of its import settings (#1323). This is the layout the forward pass's
+/// group(2) is built against (#202, #207).
 pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    let mut entries = vec![
-        material_texture_entry(0),
-        material_sampler_entry(1),
-        material_texture_entry(2),
-        material_texture_entry(3),
-        material_texture_entry(4),
-        material_texture_entry(5),
-        material_texture_entry(DETAIL_BINDING),
-        wgpu::BindGroupLayoutEntry {
-            binding: crate::shadergen::params::PARAM_BINDING,
-            // The vertex stage too: a vertex block's runtime param (#1524).
-            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-            ty: wgpu::BindingType::Buffer {
-                ty: wgpu::BufferBindingType::Uniform,
-                has_dynamic_offset: false,
-                min_binding_size: wgpu::BufferSize::new(PARAMS_SIZE),
-            },
-            count: None,
-        },
-    ];
-    use crate::shadergen::textures::{sampler_binding, SLOTS};
-    entries.extend(
-        SLOTS
-            .iter()
-            .map(|slot| material_texture_entry(slot.binding)),
-    );
-    let paired = [2, 3, 4, 5, DETAIL_BINDING]
-        .into_iter()
-        .chain(SLOTS.iter().map(|s| s.binding));
-    entries.extend(paired.map(|b| material_sampler_entry(sampler_binding(b))));
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Material Layout"),
-        entries: &entries,
+        entries: &material_entries(),
     })
+}
+
+/// [`create_material_layout`]'s entries.
+pub(crate) fn material_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
+    use crate::shadergen::textures::{sampler_binding, SLOTS};
+    let params = wgpu::BindGroupLayoutEntry {
+        binding: crate::shadergen::params::PARAM_BINDING,
+        // The vertex stage too: a vertex block's runtime param (#1524).
+        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Uniform,
+            has_dynamic_offset: false,
+            min_binding_size: wgpu::BufferSize::new(PARAMS_SIZE),
+        },
+        count: None,
+    };
+    let textures = MAP_BINDINGS
+        .into_iter()
+        .chain(SLOTS.iter().map(|s| s.binding));
+    let mut entries = vec![material_sampler_entry(1), params];
+    for binding in textures {
+        entries.push(material_texture_entry(binding));
+        if binding != MAP_BINDINGS[0] {
+            entries.push(material_sampler_entry(sampler_binding(binding)));
+        }
+    }
+    entries
 }
 
 /// Main shadow bind group layout: the cascade uniform, the cascade depth array, the
@@ -201,25 +220,30 @@ pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLa
 /// or absorbing surface reads (#1523: colour and eye distance, and its sampler) — the
 /// forward pass's group 3, everything it reads that a per-frame pass produced.
 pub(crate) fn create_shadow_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    use wgpu::TextureViewDimension::{D2Array, D2};
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Main Shadow Bind Group Layout"),
-        entries: &[
-            uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT),
-            depth_entry(1, D2Array),
-            wgpu::BindGroupLayoutEntry {
-                binding: 2,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
-                count: None,
-            },
-            texture_entry(3, D2),
-            depth_entry(4, D2),
-            storage_entry(5, wgpu::ShaderStages::FRAGMENT),
-            texture_entry(6, D2),
-            sampler_entry(7),
-        ],
+        entries: &shadow_entries(),
     })
+}
+
+/// [`create_shadow_layout`]'s entries.
+pub(crate) fn shadow_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
+    use wgpu::TextureViewDimension::{D2Array, D2};
+    vec![
+        uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT),
+        depth_entry(1, D2Array),
+        wgpu::BindGroupLayoutEntry {
+            binding: 2,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
+            count: None,
+        },
+        texture_entry(3, D2),
+        depth_entry(4, D2),
+        storage_entry(5, wgpu::ShaderStages::FRAGMENT),
+        texture_entry(6, D2),
+        sampler_entry(7),
+    ]
 }
 
 /// The forward pass's group 3 over [`create_shadow_layout`]: the cascade `uniform`,

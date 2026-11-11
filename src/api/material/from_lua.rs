@@ -114,6 +114,7 @@ fn asset_from_json_value(
     let mut asset: MaterialAsset = decode(value)?;
     asset.maps_recipe = maps;
     asset.decal = asset.decal.clamped();
+    crate::scene::authoring::material::clamp_detail(&mut asset);
     Ok((asset, validated))
 }
 

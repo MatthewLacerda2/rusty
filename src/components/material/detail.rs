@@ -18,7 +18,11 @@ use super::surface::default_one;
 /// The detail layer's fields: its map, where it is read and how strongly each of
 /// its three channels applies. Absent from a material (`MaterialAsset::detail` is
 /// `None`) until one of them is set.
+///
+/// A key it has no field for is an error naming it (`deny_unknown_fields`, as
+/// `DecalBlend`), so a recipe's `tilling` is refused rather than dropped.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DetailLayer {
     /// The packed detail map (R albedo, G normal Y, B smoothness, A normal X; 0.5
     /// neutral), read raw (its import's sRGB off). `None` draws no detail.
@@ -26,8 +30,9 @@ pub struct DetailLayer {
     pub map: Option<MapRef>,
     /// HDRP's detail *Tiling*: under UV0 the detail UV is the main maps' tiled UV
     /// times this (HDRP's *Link Details with Base*), so (4, 4) repeats the detail
-    /// four times per repeat of the base. Ignored under a world mapping, where
-    /// `world_size` sets its size. (1, 1) by default.
+    /// four times per repeat of the base. Under a world mapping it tiles the
+    /// projection instead: (4, 4) repeats the detail four times across each
+    /// `world_size` metres. (1, 1) by default.
     #[serde(default = "default_tiling")]
     pub tiling: [f32; 2],
     /// HDRP's detail *Offset*, in detail repeats, added after `tiling` (under a

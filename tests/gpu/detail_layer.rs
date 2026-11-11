@@ -1,8 +1,7 @@
 //! A material's detail layer (#1997, HDRP's detail map), drawn: a layer without a
-//! map draws what no layer draws, byte for byte; a busy detail map changes a
-//! floor under each mapping and a neutral one (0.5 everywhere) does not; and on a
+//! map or with a missing one draws what no layer draws, byte for byte; a busy map
+//! changes a floor under each mapping and a neutral one (0.5) does not; and on a
 //! coloured metal a darkening detail scales its reflection without tinting it.
-//! No adapter: skip.
 
 use glam::Vec3;
 use rusty::components::{DetailLayer, MaterialAsset, MaterialComponent, UvMapping};
@@ -81,15 +80,16 @@ fn difference(a: &[[u8; 3]], b: &[[u8; 3]]) -> f64 {
 }
 
 #[test]
-fn a_layer_without_a_map_draws_what_no_layer_draws() {
+fn a_layer_without_a_map_or_a_missing_one_draws_what_no_layer_draws() {
     let base = MaterialAsset {
         base_color: [0.6, 0.4, 0.3],
         ..MaterialAsset::default()
     };
     let mut mapless = with_detail(&base, None);
     mapless.detail.as_mut().unwrap().albedo_scale = 2.0;
-    if let Some(f) = frames(&[base, mapless]) {
-        assert!(f[0] == f[1], "no map, no detail");
+    let missing = with_detail(&base, Some("rusty_1997_no_such_map.png".into()));
+    if let Some(f) = frames(&[base, mapless, missing]) {
+        assert!(f[0] == f[1] && f[0] == f[2], "no detail, no checker");
     }
 }
 

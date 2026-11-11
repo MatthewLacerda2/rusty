@@ -166,7 +166,7 @@ fn register_maps(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) ->
             mat_ops::set_emissive_map(m, k, Some(p))
         }),
         ("SetDetailMap", |m, k, p| {
-            mat_ops::set_detail_map(m, k, (!p.is_empty()).then_some(p))
+            mat_ops::set_detail_map(m, k, Some(p))
         }),
     ];
     for (verb, set) in maps {
