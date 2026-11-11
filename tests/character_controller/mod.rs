@@ -4,6 +4,7 @@
 //! and determinism across two runs.
 
 mod crouch;
+mod dynamic_steps;
 mod flags;
 mod flat_walk;
 mod hits;

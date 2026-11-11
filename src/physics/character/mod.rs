@@ -30,12 +30,15 @@
 //! Determinism: the controller is a pure query over the pipeline state at the
 //! fixed dt; no wall-clock or RNG.
 
+mod bodies;
 mod body;
 mod hits;
+mod normals;
 mod pass;
 mod sweep;
 mod view;
 
+pub(super) use bodies::ControllerBodies;
 pub(super) use body::{character_collider_inputs, upright_offset};
 pub use hits::ControllerHit;
 

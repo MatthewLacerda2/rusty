@@ -184,7 +184,7 @@ impl PhysicsWorld {
     ) -> Option<(Vec3, CharacterMove)> {
         let cap = capsule(scene, id, cc, cc.height)?;
         let live = |_: ColliderHandle, c: &Collider| is_live(&self.bodies, c);
-        let mut m = MoveCtx {
+        let m = MoveCtx {
             controller: controller(cc, cap.radius),
             shape: cap.shape(),
             start: Pose::from_translation(cap.center),
@@ -196,11 +196,6 @@ impl PhysicsWorld {
             filter: self.character_filter(scene, id, &live),
         };
         let mut pass = self.pass(&m, motion);
-        if m.controller.autostep.is_some() && self.climbed_dynamic(&m, motion, &pass) {
-            // Again, without autostep: a dynamic body blocks like a wall.
-            m.controller.autostep = None;
-            pass = self.pass(&m, motion).after(pass.collisions);
-        }
         if let Some(steep) = self.steep_climb(&m, motion, &pass) {
             // Again, without the push into the slope: it blocks like a wall.
             pass = self
@@ -227,7 +222,7 @@ impl PhysicsWorld {
 
 /// One move's fixed inputs: the configured controller, the capsule and where it
 /// starts, and what it may hit.
-pub(super) struct MoveCtx<'a> {
+struct MoveCtx<'a> {
     controller: KinematicCharacterController,
     shape: Capsule,
     start: Pose,
@@ -242,7 +237,7 @@ pub(super) struct MoveCtx<'a> {
 }
 
 impl MoveCtx<'_> {
-    pub(super) fn walkable(&self, normal: Vec3) -> bool {
+    fn walkable(&self, normal: Vec3) -> bool {
         normal.y >= self.slope_cos - 1e-4
     }
 }

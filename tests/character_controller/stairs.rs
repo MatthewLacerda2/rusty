@@ -55,36 +55,6 @@ fn is_blocked_by_a_step_over_the_step_offset() {
     assert!(feet_of(&scene, id).y < 0.2, "never climbed it");
 }
 
-/// A 0.2 m dynamic block is under the step offset too, but the controller never
-/// steps onto a dynamic body (`include_dynamic_bodies: false`): it blocks like a
-/// wall. The sweep applies the rule itself since #2061 hid rapier's body table.
-#[test]
-fn never_climbs_a_dynamic_block() {
-    let mut scene = Scene::new();
-    add_floor(&mut scene);
-    let size = Vec3::new(4.0, 0.2, 6.0);
-    let block = add_box(&mut scene, Vec3::new(4.0, 0.1, 0.0), size, Quat::IDENTITY);
-    scene.world.set_static(block, false);
-    let id = add_character(&mut scene, Vec3::ZERO);
-    let body = rusty::components::RigidBodyComponent {
-        mass: 1000.0,
-        ..rusty::scene::authoring::default_rigidbody()
-    };
-    scene.world.set_rigidbody(block, Some(body));
-    let mut physics = PhysicsWorld::from_scene(&scene);
-    walk_for(&mut physics, &mut scene, id, Vec3::X * 4.0, 75);
-    assert!(
-        feet_of(&scene, id).y < 0.1,
-        "climbed it: {}",
-        feet_of(&scene, id)
-    );
-    // Its face, wherever the walk nudged it; the capsule's rounded bottom
-    // stops on the block's edge, short of the face.
-    let face = pos_of(&scene, block).x - 2.0;
-    let x = pos_of(&scene, id).x;
-    assert!(x < face - 0.3, "on top of it, face at {face}: x={x}");
-}
-
 /// A ramp rising along +x at `degrees`, its surface through the origin's
 /// ground line at x = 1.
 pub(super) fn ramp_scene(degrees: f32) -> (Scene, u32) {
