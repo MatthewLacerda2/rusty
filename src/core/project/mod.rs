@@ -282,3 +282,7 @@ mod agent_tests;
 #[cfg(test)]
 #[path = "agent_mcp_tests.rs"]
 mod agent_mcp_tests;
+
+#[cfg(test)]
+#[path = "agent_binary_tests.rs"]
+mod agent_binary_tests;
