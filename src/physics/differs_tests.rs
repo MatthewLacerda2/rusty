@@ -11,6 +11,7 @@ use super::live::body_type;
 use super::material::{combine_rule, material_differs};
 use super::shape::build::{gravity_scale, EntityBodyState};
 use super::world::state_differs;
+use super::writes::Damping;
 use crate::components::{CombineMode, PhysicsMaterial};
 
 /// A dynamic snapshot, then `edit` applied to it.
@@ -24,6 +25,10 @@ fn snap(edit: impl FnOnce(&mut EntityBodyState)) -> EntityBodyState {
         is_static: false,
         use_gravity: true,
         ccd_enabled: false,
+        damping: Damping {
+            linear: 0.0,
+            angular: 0.05,
+        },
     };
     edit(&mut s);
     s
@@ -37,6 +42,8 @@ fn holding(s: &EntityBodyState) -> RigidBody {
         .angvel(s.angular_velocity)
         .gravity_scale(gravity_scale(s.use_gravity))
         .ccd_enabled(s.ccd_enabled)
+        .linear_damping(s.damping.linear)
+        .angular_damping(s.damping.angular)
         .build()
 }
 
@@ -54,7 +61,9 @@ fn each_body_field_alone_flips_state_differs() {
             "a body holding its snapshot"
         );
     }
-    let dynamic: [fn(&mut EntityBodyState); 6] = [
+    let dynamic: [fn(&mut EntityBodyState); 8] = [
+        |s| s.damping.linear = 1.0,
+        |s| s.damping.angular = 0.0,
         |s| s.vel = Vec3::Z,
         |s| s.angular_velocity = Vec3::Z,
         |s| s.use_gravity = false,

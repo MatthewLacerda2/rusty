@@ -66,7 +66,7 @@ pub use physics::collider::{
     ScaledShape, SharedMesh,
 };
 pub use physics::joint::{JointComponent, JointKind};
-pub use physics::rigidbody::{CollisionDetection, RigidBodyComponent};
+pub use physics::rigidbody::{CollisionDetection, RigidBodyComponent, DEFAULT_ANGULAR_DRAG};
 pub use registry::FirstClass;
 pub use rendering::camera::{
     is_render_texture, CameraComponent, ClearFlags, Projection, RenderTarget, TaaQuality,
