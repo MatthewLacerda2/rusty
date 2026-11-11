@@ -241,6 +241,7 @@ impl ShadowSlots {
     fn output(&self, frame: &Frame, kept: &[Kept], dropped: u32) -> AtlasPlan {
         let mut out = AtlasPlan {
             dropped,
+            resizing: kept.iter().any(|k| self.slots[&k.id].off_band > 0),
             ..AtlasPlan::default()
         };
         for k in kept {

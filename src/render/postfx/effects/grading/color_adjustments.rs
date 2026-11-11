@@ -2,7 +2,7 @@
 //! runs them (#1479): contrast right after white balance, then the hue shift and
 //! saturation after Lift / Gamma / Gain.
 
-use super::super::{Grade, GradeCx, Owner, PostEffect};
+use super::super::{Grade, GradeCx, History, Owner, PostEffect};
 use super::bounded;
 use crate::components::{ColorAdjustments, Tonemap};
 use crate::render::postfx::params::Gate;
@@ -11,6 +11,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "color_adjustments",
     owner: Owner::Volume,
     gate: Gate::NONE,
+    history: History::None("a grade of this frame's colour"),
     module: Some("postfx/effects/color_adjustments.wgsl"),
     composite: &[],
     grade: &[

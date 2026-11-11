@@ -1,7 +1,7 @@
 //! The exposure as a post effect (#1444): the meter, a scene pass after motion blur,
 //! and the composite's pre-grade scale, the fixed EV or the adapted one.
 
-use super::super::{Composite, EffectCx, Owner, Pass, PassCx, Phase, PostEffect};
+use super::super::{Composite, EffectCx, History, Owner, Pass, PassCx, Phase, PostEffect};
 use super::ExposureParams;
 use crate::components::{AutoExposure, ExposureMode};
 use crate::render::motion::HistoryKey;
@@ -14,6 +14,9 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     owner: Owner::Volume,
     // The player has no option for it: the exposure is the developer's look.
     gate: Gate::NONE,
+    history: History::None(
+        "it adapts on game time, which a redraw with no sim step does not advance",
+    ),
     module: Some("postfx/effects/exposure.wgsl"),
     composite: &[Composite {
         phase: Phase::Hdr,

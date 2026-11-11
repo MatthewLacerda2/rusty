@@ -2,7 +2,7 @@
 //! mode), its pass a scene pass after depth of field (10) and before motion blur
 //! (20), URP's order. Like FXAA it needs no volume.
 
-use super::super::{Owner, Pass, PassCx, PostEffect};
+use super::super::{History, Owner, Pass, PassCx, PostEffect};
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::GraphicsSettings;
 use crate::render::postfx::params::Gate;
@@ -13,6 +13,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "taa",
     owner: Owner::Camera,
     gate: Gate::option(GraphicsOption::Taa),
+    history: History::Reads(|cx| cx.taa),
     module: None,
     composite: &[],
     grade: &[],

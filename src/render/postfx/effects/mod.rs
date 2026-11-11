@@ -106,6 +106,8 @@ pub(crate) struct PostEffect {
     /// The player option that gates it, when it is player-facing (#1438): its own
     /// rule, asked through [`EffectCx::runs`]. No quality preset gates it (#1522).
     pub gate: Gate,
+    /// Whether its frame reads what an earlier frame of the view left (#2092).
+    pub history: History,
     /// Its WGSL module, under `engine/shaders`, when it has composite or grade
     /// functions. Its import path is the file's path (`postfx::effects::vignette`).
     pub module: Option<&'static str>,
@@ -113,6 +115,36 @@ pub(crate) struct PostEffect {
     pub grade: &'static [Grade],
     /// Its own GPU work, each pass placed by its own stage and order.
     pub passes: &'static [Pass],
+}
+
+/// Whether an effect's frame reads what an earlier frame of the same view left
+/// (#2092): if none does, drawing the frame again with no sim step gives the same
+/// image, so `Harness.Screenshot`'s `settle` draws nothing more.
+#[derive(Clone, Copy)]
+pub(crate) enum History {
+    /// It draws from this frame alone; why its state carries nothing over.
+    None(
+        #[cfg_attr(
+            not(test),
+            expect(dead_code, reason = "the completeness test reads the reason")
+        )]
+        &'static str,
+    ),
+    /// It keeps a history: whether it runs on this frame of the view.
+    Reads(fn(&HistoryCx) -> bool),
+}
+
+/// What [`History::Reads`] asks of a view's frame.
+pub(crate) struct HistoryCx<'a> {
+    pub effect: EffectCx<'a>,
+    pub shared: &'a crate::render::draw::camera::StackShared,
+    /// Whether TAA runs on the view this frame.
+    pub taa: bool,
+}
+
+/// Whether any effect reads history on this frame of the view.
+pub(crate) fn read_history(cx: &HistoryCx) -> bool {
+    (POST_EFFECTS.iter()).any(|e| matches!(e.history, History::Reads(runs) if runs(cx)))
 }
 
 /// Where an effect's settings live.
