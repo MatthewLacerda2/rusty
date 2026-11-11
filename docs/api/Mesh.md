@@ -67,7 +67,11 @@ shadows ([`Light`](Light.md#cast-shadows)), culled like the rest.
   mode its box refits, and in Play the collider's shape is rebuilt in place on
   the next physics step (once per replace, not per frame), so a crate resting on
   a plank that is halved falls. That holds for a collider keeping a copy of a
-  removed Mesh too. The simulation reads only this CPU data, never the GPU.
+  removed Mesh too. A collider that stops building from a scene mesh (the mesh
+  deleted, the entity pointed at a primitive, the mesh replaced with an empty one)
+  never keeps the old triangles: it is rebuilt from what the entity has now, and
+  with nothing to build from it has no shape until it has triangles again. The
+  simulation reads only this CPU data, never the GPU.
 - **A prefab instance** whose part was pointed at a scene mesh (an override)
   keeps drawing it when the instance is rebuilt from its source.
 - `SetSharedMesh` switches an entity between a primitive and a scene mesh; it keeps
@@ -102,7 +106,9 @@ A mesh still in use is **refused**: the error names every user (`entity 3
 "Plank"`, with `(instance of prefabs/crate.prefab)` for a prefab instance's
 entity), and nothing changes. With `{ force = true }` each user lets go of it: an
 entity drawing it loses its Mesh (Unity's *Mesh Filter* left with no mesh draws
-nothing), a collider's kept copy is dropped, and the console warns which. An
+nothing), a collider's kept copy is dropped, and the console warns which. A Mesh
+collider left with nothing to build from has an empty box (a pick or a box query
+no longer finds it) and, in Play, no shape. An
 absent `name` is an error. The renderer frees the mesh's GPU buffers on its next
 frame, so a game that makes one mesh per gib lets each go when the gib is gone.
 

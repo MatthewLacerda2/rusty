@@ -222,7 +222,7 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
     scene.meshes_read_at = crate::core::fs::written::written_since(u64::MAX).0;
 
     take_materials(scene, &mut data);
-    scene.meshes = std::mem::take(&mut data.meshes);
+    crate::scene::mesh_library::put_back(std::mem::take(&mut data.meshes), &mut scene.meshes);
 
     let bone_parents = crate::scene::skeleton::take_bone_parents(&mut data.entities);
     let bone_refs = crate::scene::skeleton::take_bone_refs(&mut data.entities);

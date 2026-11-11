@@ -27,15 +27,13 @@
 //!   survive, and the mass sync after it re-spreads the body's mass.
 //!
 //! - **Mesh shape.** A mesh collider built from a library mesh (#2059) whose
-//!   triangles changed (`Mesh.Create` replaced it, `watch::mesh_keys`) is rebuilt
-//!   the same way, in place; rapier wakes what loses a contact, so what rested on
-//!   a plank that was halved falls.
+//!   triangles changed (`Mesh.Create` replaced it) is rebuilt the same way, in
+//!   place, by `watch::mesh_keys`; rapier wakes what loses a contact, so what
+//!   rested on a plank that was halved falls.
 //!
 //! All walk the sorted plan, or the bodies the change log named (`watch`; a
 //! step's changes reach only the body-state pass, `sync`), and touch a collider
 //! only when it differs.
-
-use std::collections::BTreeSet;
 
 use rapier3d::prelude::*;
 
@@ -44,7 +42,6 @@ use super::shape::build::{
     class_of, collider_inputs, interaction_groups, BodyClass, EntityBodyState,
 };
 use super::shape::fit::{build_shape_for, fit_mark};
-use super::watch::mesh_keys::key_of;
 use super::watch::Owners;
 use super::world::{collider_to_write, PhysicsWorld};
 use crate::scene::Scene;
@@ -141,52 +138,6 @@ impl PhysicsWorld {
                     }
                     c.user_data = want;
                 }
-            }
-        }
-    }
-
-    /// Rebuild each mesh collider whose library-mesh triangles differ from the ones
-    /// its shape was built from (`watch::mesh_keys`): every collider in `only`, or
-    /// every one when `None`, in plan order. One with no fingerprint yet was built
-    /// before its triangles could be read for one (a full pass after Play's build),
-    /// so it is rebuilt too. Swapped onto the same collider, as a fit is.
-    pub(super) fn sync_mesh_shapes(&mut self, scene: &Scene, only: Option<&BTreeSet<u32>>) {
-        let owners = match only {
-            None => Owners::All,
-            Some(ids) => Owners::Only(
-                (ids.iter())
-                    .filter_map(|id| self.tracked.member_owner.get(id).copied())
-                    .collect(),
-            ),
-        };
-        let picked = owners
-            .pick(&self.plan)
-            .flat_map(|(&o, ids)| ids.iter().map(move |&id| (o, id)));
-        let picked: Vec<(u32, u32)> = picked
-            .filter(|(_, id)| only.is_none_or(|s| s.contains(id)))
-            .collect();
-        for (owner, id) in picked {
-            let Some(&handle) = self.id_to_collider.get(&id) else {
-                continue;
-            };
-            let Some(key) = key_of(scene, id) else {
-                self.tracked.mesh_keys.remove(&id);
-                continue;
-            };
-            if self.tracked.mesh_keys.insert(id, key) == Some(key) {
-                continue;
-            }
-            let dynamic = matches!(class_of(&scene.world, owner), BodyClass::Dynamic);
-            let Some(built) = refit(scene, id, dynamic) else {
-                continue;
-            };
-            let want = scene
-                .world
-                .collider(id)
-                .map_or(0, |c| fit_mark(&c.shape, dynamic));
-            if let Some(c) = collider_to_write(&mut self.colliders, handle, |_| true) {
-                c.set_shape(built.shared_shape().clone());
-                c.user_data = want;
             }
         }
     }

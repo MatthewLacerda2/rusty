@@ -8,10 +8,21 @@
 //! and rebuilds the shape where they moved. A change shows up on the Collider
 //! (a kept copy, #1657) or the Mesh channel, so the incremental sync looks only at
 //! the ids stamped there; the full pass looks at every collider.
+//!
+//! A collider whose recorded triangles are gone (its library mesh deleted, its
+//! Mesh pointed at a primitive) is rebuilt from what its entity has now, and one
+//! whose rebuild fails (an empty mesh, nothing left to build from) loses its
+//! shape: its rapier collider is removed, as a fresh build from nothing makes
+//! none, and comes back when its triangles do.
+
+use std::collections::BTreeSet;
 
 use crate::components::ColliderShape;
 use crate::core::collections::Map;
-use crate::physics::shape::build::collider_inputs;
+use crate::physics::compound::world_pose;
+use crate::physics::shape::build::{class_of, collider_inputs, BodyClass};
+use crate::physics::watch::Owners;
+use crate::physics::world::{collider_to_write, PhysicsWorld};
 use crate::scene::mesh_library::{kept_mesh_name, scene_mesh_name};
 use crate::scene::Scene;
 
@@ -59,4 +70,92 @@ fn fingerprint(positions: &[[f32; 3]], indices: &[u32]) -> u64 {
     words.fold(0xcbf2_9ce4_8422_2325, |hash, word| {
         (hash ^ u64::from(word)).wrapping_mul(0x0100_0000_01b3)
     })
+}
+
+impl PhysicsWorld {
+    /// Remember the triangles the colliders of the `built` owners were built from.
+    pub(in crate::physics) fn record_mesh_keys(&mut self, scene: &Scene, built: &[u32]) {
+        let plan = &self.plan;
+        let ids: Vec<u32> = built
+            .iter()
+            .filter_map(|o| plan.get(o))
+            .flatten()
+            .copied()
+            .collect();
+        record(&mut self.tracked.mesh_keys, scene, &ids);
+    }
+
+    /// Rebuild each mesh collider whose library-mesh triangles differ from the ones
+    /// its shape was built from: every collider in `only`, or every one when
+    /// `None`, in plan order. See the module docs.
+    pub(in crate::physics) fn sync_mesh_shapes(
+        &mut self,
+        scene: &Scene,
+        only: Option<&BTreeSet<u32>>,
+    ) {
+        let owners = match only {
+            None => Owners::All,
+            Some(ids) => Owners::Only(
+                (ids.iter())
+                    .filter_map(|id| self.tracked.member_owner.get(id).copied())
+                    .collect(),
+            ),
+        };
+        let picked = owners
+            .pick(&self.plan)
+            .flat_map(|(&o, ids)| ids.iter().map(move |&id| (o, id)));
+        let picked: Vec<(u32, u32)> = picked
+            .filter(|(_, id)| only.is_none_or(|s| s.contains(id)))
+            .collect();
+        for (owner, id) in picked {
+            let now = key_of(scene, id);
+            let was = match now {
+                Some(key) => self.tracked.mesh_keys.insert(id, key),
+                None => self.tracked.mesh_keys.remove(&id),
+            };
+            if now != was {
+                self.rebuild_mesh_shape(scene, owner, id);
+            }
+        }
+    }
+
+    /// Build collider `id` again from what its entity has now: its shape swapped
+    /// onto the same rapier collider, a collider that cannot be built removed, and
+    /// one removed before attached again to its owner's body. An owner with no
+    /// body (none of its colliders built) waits for the next replan.
+    fn rebuild_mesh_shape(&mut self, scene: &Scene, owner: u32, id: u32) {
+        let Some(&body) = self.id_to_body.get(&owner) else {
+            return;
+        };
+        let dynamic = matches!(class_of(&scene.world, owner), BodyClass::Dynamic);
+        let built = world_pose(scene, owner)
+            .and_then(|pose| self.build_collider(scene, &pose, id, dynamic));
+        match (built, self.id_to_collider.get(&id).copied()) {
+            (Some(built), Some(handle)) => {
+                if let Some(c) = collider_to_write(&mut self.colliders, handle, |_| true) {
+                    c.set_shape(built.shared_shape().clone());
+                    c.user_data = built.user_data;
+                }
+            }
+            (Some(built), None) => {
+                let handle = self
+                    .colliders
+                    .insert_with_parent(built, body, &mut self.bodies);
+                self.collider_to_id.insert(handle, id);
+                self.id_to_collider.insert(id, handle);
+            }
+            (None, Some(handle)) => {
+                self.colliders.remove(
+                    handle,
+                    &mut self.islands,
+                    &mut self.bodies,
+                    &mut self.soft_bodies,
+                    true,
+                );
+                self.collider_to_id.remove(&handle);
+                self.id_to_collider.remove(&id);
+            }
+            (None, None) => {}
+        }
+    }
 }

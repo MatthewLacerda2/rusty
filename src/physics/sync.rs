@@ -39,8 +39,7 @@ impl PhysicsWorld {
         let stepped = std::mem::take(&mut self.tracked.stepped);
         let (owners, reshaped) = match self.read_changes(scene) {
             None => {
-                let built = self.resync_topology(scene);
-                self.record_mesh_keys(scene, &built);
+                self.resync_topology(scene);
                 self.tracked.carriers = carriers(scene);
                 self.resync_joints_tracked(scene);
                 (Owners::All, None)
@@ -158,14 +157,11 @@ impl PhysicsWorld {
         changed: &Changed,
     ) -> (Owners, Option<BTreeSet<u32>>) {
         let mut owners = BTreeSet::new();
-        let mut reshaped: BTreeSet<u32> = changed.reshaped.iter().copied().collect();
+        let reshaped: BTreeSet<u32> = changed.reshaped.iter().copied().collect();
         let replan = self.plan_may_change(scene, changed);
         if replan {
-            let built = self.resync_topology(scene);
-            self.record_mesh_keys(scene, &built);
-            let parts = built.iter().filter_map(|o| self.plan.get(o)).flatten();
-            reshaped.extend(parts);
-            owners.extend(built);
+            // Its colliders' triangles were just recorded (`resync_topology`).
+            owners.extend(self.resync_topology(scene));
             self.tracked.carriers = carriers(scene);
         }
         let deps = &self.tracked.joint_deps;
@@ -179,17 +175,6 @@ impl PhysicsWorld {
             owners.extend(self.tracked.member_owner.get(&id));
         }
         (Owners::Only(owners), Some(reshaped))
-    }
-
-    /// Remember the triangles the colliders of the `built` owners were built from.
-    fn record_mesh_keys(&mut self, scene: &Scene, built: &[u32]) {
-        let ids: Vec<u32> = built
-            .iter()
-            .filter_map(|o| self.plan.get(o))
-            .flatten()
-            .copied()
-            .collect();
-        super::watch::mesh_keys::record(&mut self.tracked.mesh_keys, scene, &ids);
     }
 
     /// Whether a named id may have left, joined or moved between bodies: its

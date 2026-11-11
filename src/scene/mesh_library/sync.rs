@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 
 use super::{kept_mesh_name, scene_mesh_name, scene_mesh_users};
-use crate::components::mesh::{MeshRevision, SCENE_KIND};
+use crate::components::mesh::MeshRevision;
 use crate::components::ColliderShape;
 use crate::scene::rehydrate::{bounds_of, refit_collider, warn_once_of};
 use crate::scene::Scene;
@@ -23,7 +23,7 @@ pub(super) fn stale_entries(scene: &mut Scene) -> BTreeSet<String> {
             .collect();
         for name in names {
             let Some(entry) = scene.meshes.get_mut(&name) else {
-                warn_once_of(&format!("{SCENE_KIND}::{name}"), || {
+                warn_once_of(&super::missing_key(&name), || {
                     format!("entity {id} draws the mesh {name:?}, which this scene does not define")
                 });
                 continue;

@@ -7,7 +7,10 @@
 //! copy, so it builds from nothing. The console warns which. The renderer frees the
 //! mesh's GPU buffers on its next frame (`render::scene::extract`).
 
+use glam::Vec3;
+
 use super::{kept_mesh_name, scene_mesh_name, scene_mesh_users};
+use crate::components::ColliderShape;
 use crate::scene::Scene;
 
 impl Scene {
@@ -45,13 +48,36 @@ impl Scene {
                 if let Some(mut collider) = self.world.collider_mut(id) {
                     collider.shared_mesh = None;
                 }
-                self.world.refresh_collider_aabb(id);
             }
+            self.shrink_emptied_collider(id);
         }
         if !users.is_empty() {
             log::warn!("[Mesh] {name:?} deleted; it no longer draws on {named}");
         }
         Ok(users)
+    }
+
+    /// A Mesh collider on `id` left building from nothing (no Mesh, no kept copy,
+    /// no collision mesh) takes an empty box at its origin, as one made from
+    /// nothing has, so a pick or a box query no longer hits it at the deleted
+    /// mesh's bounds; then its world box follows.
+    fn shrink_emptied_collider(&mut self, id: u32) {
+        let own = self.world.mesh(id).is_some();
+        if let Some(mut collider) = self.world.collider_mut(id) {
+            let empty =
+                !own && collider.shared_mesh.is_none() && collider.built_collision_mesh().is_none();
+            if let ColliderShape::Mesh {
+                local_min,
+                local_max,
+                ..
+            } = &mut collider.shape
+            {
+                if empty {
+                    (*local_min, *local_max) = (Vec3::ZERO, Vec3::ZERO);
+                }
+            }
+        }
+        self.world.refresh_collider_aabb(id);
     }
 
     /// The entities using library mesh `name` (`scene_mesh_users`), ascending.

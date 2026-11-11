@@ -75,3 +75,20 @@ fn undo_of_a_forced_delete_brings_the_mesh_and_its_users_back() {
     assert!(scene.meshes.contains_key("plank"));
     assert_eq!(scene.world.mesh(drawn).unwrap().vertices.len(), 3);
 }
+
+#[test]
+fn a_forced_delete_empties_the_box_of_a_collider_left_with_nothing() {
+    let mut scene = Scene::new();
+    scene.define_mesh("plank", triangle()).unwrap();
+    let drawn = scene.add_entity("Plank".into());
+    let collider = ColliderComponent::from_mesh_bounds(false, Vec3::ZERO, Vec3::ZERO);
+    scene.world.set_collider(drawn, Some(collider));
+    scene.set_shared_mesh(drawn, "plank").unwrap();
+    assert_eq!(scene.world.collider(drawn).unwrap().aabb_max.x, 1.0);
+    scene.delete_mesh("plank", true).unwrap();
+    let collider = scene.world.collider(drawn).unwrap();
+    assert_eq!(
+        (collider.aabb_min, collider.aabb_max),
+        (Vec3::ZERO, Vec3::ZERO)
+    );
+}

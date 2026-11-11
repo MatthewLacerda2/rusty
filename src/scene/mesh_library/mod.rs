@@ -13,8 +13,9 @@
 //! (`render::MeshId`), so all of them share one buffer pair, uploaded once per
 //! change. [`Scene::sync_scene_meshes`] brings every entity to its entry's
 //! revision: after `Mesh.Create`, a load, a Play snapshot's put-back and an Undo.
-//! An entry going back to older data (an Undo) takes a fresh revision first, so
-//! the renderer never keeps the newer buffers.
+//! Revisions only move forward: an entry put back (an Undo, Stop's snapshot
+//! restore, [`put_back`]) takes a fresh revision, so the renderer, which keeps
+//! the newest upload for a name, never keeps the newer buffers.
 //!
 //! In Play an entry made or replaced is Play state: Stop's snapshot puts the edit
 //! library back. A prefab never holds one (`prefab::write_prefab_file` refuses).
@@ -150,7 +151,7 @@ pub fn checked(library: MeshLibrary) -> MeshLibrary {
             Ok(()) => {
                 kept.insert(name, mesh);
             }
-            Err(why) => crate::scene::rehydrate::warn_once_of(&invalid_key(&name), || {
+            Err(why) => crate::scene::rehydrate::warn_once_of(&missing_key(&name), || {
                 format!("the scene's mesh {name:?} is dropped: {why}")
             }),
         }
@@ -158,9 +159,27 @@ pub fn checked(library: MeshLibrary) -> MeshLibrary {
     kept
 }
 
-/// The once-only warning key of an invalid library entry `name`.
-pub(crate) fn invalid_key(name: &str) -> String {
-    format!("{SCENE_KIND}::invalid::{name}")
+/// The once-only warning key of a library mesh `name` an entity cannot draw: one
+/// key whether [`checked`] dropped it or no file ever defined it, so a dropped
+/// entry is warned of once, with its cause, and not again as missing.
+pub(crate) fn missing_key(name: &str) -> String {
+    format!("{SCENE_KIND}::{name}")
+}
+
+/// Put `library` back in `slot` (Undo's put-back, Stop's snapshot restore) with
+/// revisions that only move forward: an entry whose data is the live entry's
+/// (the same `Arc`) keeps the live revision, every other one takes a fresh one.
+/// A put-back entry's revision is older than what the renderer may hold for its
+/// name (an entity drew a newer replace since), and the renderer keeps the
+/// newest upload, so an old revision would draw the newer data.
+pub fn put_back(mut library: MeshLibrary, slot: &mut MeshLibrary) {
+    for (name, entry) in &mut library {
+        entry.revision = match slot.get(name) {
+            Some(live) if Arc::ptr_eq(&live.data, &entry.data) => live.revision,
+            _ => MeshRevision::next(),
+        };
+    }
+    *slot = library;
 }
 
 impl Scene {
@@ -233,6 +252,8 @@ mod sync;
 
 #[cfg(test)]
 mod delete_tests;
+#[cfg(test)]
+mod revision_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

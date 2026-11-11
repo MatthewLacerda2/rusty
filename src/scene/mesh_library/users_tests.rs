@@ -2,7 +2,7 @@
 //! entities sharing one build, a Mesh collider's kept copy, a prefab rebuild and
 //! `delete_mesh`.
 
-use super::{invalid_key, BUILDS};
+use super::{missing_key, BUILDS};
 use crate::components::mesh::MeshData;
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::{apply_scene_data, to_scene_data, Scene};
@@ -49,7 +49,7 @@ fn a_file_with_bad_entries_loads_without_a_panic_and_warns() {
     assert_eq!(loaded.meshes.keys().collect::<Vec<_>>(), ["good"]);
     for name in ["past", "short_normals", "short_uvs", "Box"] {
         assert!(
-            crate::scene::rehydrate::warned_of(&invalid_key(name)),
+            crate::scene::rehydrate::warned_of(&missing_key(name)),
             "{name}"
         );
     }

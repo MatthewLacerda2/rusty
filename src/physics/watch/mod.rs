@@ -80,6 +80,8 @@ pub(super) mod fixture_tests;
 #[cfg(test)]
 mod mesh_keys_tests;
 #[cfg(test)]
+mod mesh_shape_tests;
+#[cfg(test)]
 mod ops_tests;
 #[cfg(test)]
 mod sleep_tests;

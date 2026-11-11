@@ -9,10 +9,10 @@ use crate::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
 use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 
-const DT: f32 = 1.0 / 60.0;
+pub(super) const DT: f32 = 1.0 / 60.0;
 
 /// A flat quad at y = 0 from x = `x0` to `x1`, z from -2 to 2, facing up.
-fn plank(x0: f32, x1: f32) -> MeshData {
+pub(super) fn plank(x0: f32, x1: f32) -> MeshData {
     MeshData {
         positions: vec![
             [x0, 0.0, 2.0],
@@ -27,7 +27,7 @@ fn plank(x0: f32, x1: f32) -> MeshData {
 
 /// A static plank drawing the library mesh "plank" with a Mesh collider, and a
 /// dynamic half-metre box above its right half.
-fn scene() -> (Scene, u32) {
+pub(super) fn scene() -> (Scene, u32) {
     let mut scene = Scene::new();
     scene.define_mesh("plank", plank(-2.0, 2.0)).unwrap();
     let floor = scene.add_entity("Plank".into());
@@ -56,7 +56,7 @@ fn scene() -> (Scene, u32) {
     (scene, crate_)
 }
 
-fn y(scene: &Scene, id: u32) -> f32 {
+pub(super) fn y(scene: &Scene, id: u32) -> f32 {
     scene.world.transform(id).unwrap().position.y
 }
 

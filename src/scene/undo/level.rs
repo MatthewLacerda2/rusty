@@ -27,6 +27,7 @@ use serde::Serialize;
 
 use crate::scene::lighting::probe::ProbeVolume;
 use crate::scene::lighting::reflection_probe::ReflectionProbeSet;
+use crate::scene::mesh_library::put_back as put_meshes;
 use crate::scene::Scene;
 
 macro_rules! scene_level {
