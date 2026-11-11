@@ -7,7 +7,8 @@ use crate::components::{CameraComponent, FovAxis};
 use crate::scene::authoring::rendering::camera as camera_ops;
 
 /// The aspect (width / height) the card converts at: the camera's render
-/// texture's when it has one, else `view` (the Game view's), else 16:9.
+/// texture's when it has one, else `view` (the editor viewport's, which the Scene
+/// and Game tabs share), else 16:9 (no viewport drawn yet).
 pub(super) fn aspect(cam: &CameraComponent, view: f32) -> f32 {
     let target = cam.target_texture.as_ref();
     let aspect = target.map_or(view, |t| t.width as f32 / t.height.max(1) as f32);
@@ -59,7 +60,9 @@ pub(super) fn draw_fov(
             .changed()
         {
             if let Some(mut c) = world.camera_mut(id) {
-                camera_ops::set_fov_along(&mut c, axis, fov, aspect);
+                // Converted to the stored vertical angle, as `Camera.SetFieldOfView`
+                // takes it (`HorizontalToVerticalFov` first, for a script).
+                camera_ops::set_fov(&mut c, axis.store(fov, aspect));
             }
             *is_dirty = true;
         }

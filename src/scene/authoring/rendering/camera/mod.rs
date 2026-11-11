@@ -59,12 +59,6 @@ pub fn set_fov_axis(c: &mut CameraComponent, axis: FovAxis) {
     c.fov_axis = axis;
 }
 
-/// Set the field of view from `value` read along `axis` at `aspect` (the
-/// Inspector's edit in the camera's axis), held as [`set_fov`] holds it.
-pub fn set_fov_along(c: &mut CameraComponent, axis: FovAxis, value: f32, aspect: f32) {
-    set_fov(c, axis.store(value, aspect));
-}
-
 /// Set both clip planes the way Unity holds them: `near` at least [`MIN_NEAR`],
 /// `far` at least [`MIN_CLIP_GAP`] beyond it (a near plane past the far one pushes
 /// the far one out). A non-finite plane takes its lower bound, and the far plane

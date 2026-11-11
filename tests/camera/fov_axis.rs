@@ -54,9 +54,9 @@ fn flipping_the_axis_leaves_the_stored_fov() {
     camera_ops::set_fov_axis(&mut c, FovAxis::Vertical);
     assert_eq!(c.fov, 58.7);
     // An edit along the horizontal axis stores the vertical angle, held 1..179.
-    camera_ops::set_fov_along(&mut c, FovAxis::Horizontal, 90.0, WIDE);
+    camera_ops::set_fov(&mut c, FovAxis::Horizontal.store(90.0, WIDE));
     assert!((c.fov - 58.7155).abs() < 1e-3, "{}", c.fov);
-    camera_ops::set_fov_along(&mut c, FovAxis::Horizontal, f32::NAN, WIDE);
+    camera_ops::set_fov(&mut c, FovAxis::Horizontal.store(f32::NAN, WIDE));
     assert_eq!(c.fov, camera_ops::MIN_FOV);
 }
 

@@ -23,7 +23,7 @@ use crate::scene::{CameraComponent, ClearFlags};
 
 /// Camera Component panel. `named_layers` are the `(index, label)` slots offered in
 /// the culling-mask checklist (layer 0 + named user slots); `view_aspect` is the
-/// Game view's width / height, which the field of view converts at (#2038).
+/// editor viewport's width / height, which the field of view converts at (#2038).
 pub fn draw_camera(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
@@ -115,7 +115,7 @@ fn draw_fxaa(
 }
 
 /// The projection widgets (FOV and its axis, near/far clip), reading the snapshot
-/// and routing each write through the shared op. `view_aspect` is the Game view's.
+/// and routing each write through the shared op. `view_aspect` is the viewport's.
 fn draw_projection(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
