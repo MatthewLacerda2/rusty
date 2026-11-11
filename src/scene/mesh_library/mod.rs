@@ -18,6 +18,11 @@
 //!
 //! In Play an entry made or replaced is Play state: Stop's snapshot puts the edit
 //! library back. A prefab never holds one (`prefab::write_prefab_file` refuses).
+//!
+//! An entity **uses** an entry through its Mesh or a Mesh collider's kept copy
+//! (#1657); [`scene_mesh_users`] is the one test of that. A library read from a
+//! file is held to `Mesh.Create`'s rules ([`checked`]), and an entry is deleted by
+//! `delete` (`Mesh.DeleteAsset`).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, OnceLock};
