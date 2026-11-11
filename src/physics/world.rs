@@ -94,7 +94,7 @@ impl PhysicsWorld {
             physics_pipeline: PhysicsPipeline::new(),
             islands: IslandManager::new(),
             broad_phase: DefaultBroadPhase::new(),
-            narrow_phase: NarrowPhase::new(),
+            narrow_phase: super::contact::narrow_phase(),
             bodies: RigidBodySet::new(),
             colliders: ColliderSet::new(),
             impulse_joints: ImpulseJointSet::new(),

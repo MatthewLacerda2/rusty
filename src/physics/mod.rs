@@ -20,6 +20,7 @@ mod character;
 mod compound;
 #[cfg(test)]
 mod compound_tests;
+mod contact;
 mod convert;
 #[cfg(test)]
 mod degenerate_parent_tests;
