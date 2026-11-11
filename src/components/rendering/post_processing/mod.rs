@@ -13,6 +13,11 @@ use serde::{Deserialize, Serialize};
 mod bloom;
 mod custom_effects;
 mod depth_of_field;
+
+impl crate::components::FirstClass for PostProcessingComponent {
+    const NAME: &'static str = "PostProcessing";
+}
+
 #[cfg(test)]
 pub mod dummy;
 mod exposure;

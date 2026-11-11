@@ -275,3 +275,9 @@ fn draw_spot_cones(
         }
     });
 }
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::LightComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Rendering;
+    const LABEL: &'static str = "Light Component";
+}

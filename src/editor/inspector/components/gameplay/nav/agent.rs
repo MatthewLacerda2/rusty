@@ -194,3 +194,11 @@ fn clamped(
     })
     .inner
 }
+
+impl crate::editor::inspector::components::add::AddEntry
+    for crate::components::NavMeshAgentComponent
+{
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Navigation;
+    const LABEL: &'static str = "NavMesh Agent Component";
+}

@@ -193,6 +193,10 @@ impl AnimatorComponent {
     }
 }
 
+impl crate::components::FirstClass for AnimatorComponent {
+    const NAME: &'static str = "Animator";
+}
+
 #[cfg(test)]
 mod graph_state_tests;
 #[cfg(test)]

@@ -30,3 +30,7 @@ impl Default for CanvasGroupComponent {
         }
     }
 }
+
+impl crate::components::FirstClass for CanvasGroupComponent {
+    const NAME: &'static str = "CanvasGroup";
+}

@@ -109,3 +109,12 @@ fn draw_params(
         write(world, id, d, |z| ops::set_params(z, params));
     }
 }
+
+impl crate::editor::inspector::components::add::AddEntry
+    for crate::components::ReverbZoneComponent
+{
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Audio;
+    const LABEL: &'static str = "Audio Reverb Zone";
+    const ICON: &'static str = egui_phosphor::regular::WAVEFORM;
+}

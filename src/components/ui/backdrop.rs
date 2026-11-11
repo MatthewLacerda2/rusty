@@ -36,3 +36,8 @@ impl Default for BackdropFilterComponent {
         }
     }
 }
+
+impl crate::components::FirstClass for BackdropFilterComponent {
+    const NAME: &'static str = "BackdropFilter";
+    const ALIASES: &'static [&'static str] = &["backdrop"];
+}

@@ -164,6 +164,10 @@ impl EntityRefs for SelectableComponent {
     }
 }
 
+impl crate::components::FirstClass for SelectableComponent {
+    const NAME: &'static str = "Selectable";
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

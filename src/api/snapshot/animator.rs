@@ -51,3 +51,7 @@ fn montage_value(m: &ActiveMontage) -> Value {
 fn layer_value(l: &LayerState) -> Value {
     json!({ "name": l.name, "weight": l.weight, "node": l.playback.current_node })
 }
+
+super::fields::snapshot! {
+    AnimatorComponent => animator_value,
+}

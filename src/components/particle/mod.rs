@@ -234,3 +234,9 @@ impl EntityRefs for ParticleEmitterComponent {
         Self::default()
     }
 }
+
+impl crate::components::FirstClass for ParticleEmitterComponent {
+    const NAME: &'static str = "Particles";
+    const ALIASES: &'static [&'static str] = &["particlesystem"];
+    const INVENTORY: &'static str = "ParticleEmitter";
+}

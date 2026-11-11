@@ -86,6 +86,11 @@ impl OffMeshLinkComponent {
     }
 }
 
+impl crate::components::FirstClass for OffMeshLinkComponent {
+    const NAME: &'static str = "OffMeshLink";
+    const ALIASES: &'static [&'static str] = &["navmeshlink"];
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

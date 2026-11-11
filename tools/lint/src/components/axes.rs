@@ -11,9 +11,10 @@ const API_DIR: &str = "src/api";
 
 /// Axis 2: a standalone Add Component entry guards on absence via the #344
 /// accessor facade — `!world.has_<field>(id)`, or a table of entries each naming
-/// its `has_<field>` check (`|w, id| w.has_mask(id)`), or a `ComponentKind` table
-/// entry, which `kinds::with_kind_guards` resolves to that check. A component only added as a
-/// side-effect of another has no such guard and is reported until it gets its
+/// its `has_<field>` check (`|w, id| w.has_mask(id)`), or the menu generated from
+/// the registry (`first_class!(entries)`, whose `AddEntry` bound holds the axis at
+/// compile time), which `kinds::with_kind_guards` resolves to every row's check. A
+/// component only added as a side-effect of another has no such guard and is reported until it gets its
 /// own entry (#82).
 pub(super) fn has_add_menu(field: &str, add_src: &str) -> bool {
     add_src.contains(&format!(".has_{field}(id)"))

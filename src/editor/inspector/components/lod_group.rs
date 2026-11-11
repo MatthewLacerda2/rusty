@@ -136,3 +136,10 @@ fn add_renderer_row(ui: &mut egui::Ui, level: usize, renderers: &mut Vec<u32>) -
     }
     false
 }
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::LodGroupComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Rendering;
+    const LABEL: &'static str = "LOD Group";
+    const ICON: &'static str = egui_phosphor::regular::STACK_SIMPLE;
+}

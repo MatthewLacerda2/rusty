@@ -152,3 +152,12 @@ fn vec3_row(ui: &mut egui::Ui, label: &str, mut value: Vec3) -> Option<Vec3> {
         .inner;
     changed.then_some(value)
 }
+
+impl crate::editor::inspector::components::add::AddEntry
+    for crate::components::LightProbeProxyVolumeComponent
+{
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Rendering;
+    const LABEL: &'static str = "Light Probe Proxy Volume";
+    const ICON: &'static str = egui_phosphor::regular::CUBE_TRANSPARENT;
+}

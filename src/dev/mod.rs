@@ -27,6 +27,7 @@
 //!   stats       — frame stats: the schedule timing probe + render counters (#433)
 //!   bench       — the stress scene and report behind `make bench` (#835)
 //!   export      — ship a project: runtime files and the import cache, no sources (#1267)
+//!   game        — test games: a Lua recipe builds a small game project headless (#2029)
 //!   providers   — the boundary paid, networked calls live behind: key, budget, edit-mode only (#383)
 //!
 //! Status: harness + scenario runner implemented (issue #3); offscreen screenshot
@@ -47,6 +48,7 @@ pub mod command_channel;
 pub mod console;
 pub mod demo;
 pub mod export;
+pub mod game;
 pub mod harness;
 pub mod lua_surface;
 pub mod mcp;

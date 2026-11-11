@@ -40,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-explore test-one-process dead-pub editor-capture export launcher bench bless-converters
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-explore test-one-process dead-pub editor-capture game game-test export launcher bench bless-converters
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -381,6 +381,17 @@ dead-pub: ## Signal: pub items nothing uses, and items only tests use (tools/lin
 OUT ?= editor-capture.png
 editor-capture: ## Render the editor to a PNG headlessly. make editor-capture OUT=after.png ARGS="--select Player"
 	cargo run --quiet --features dev --bin editor-capture -- --out $(OUT) $(ARGS)
+
+# Test games (#2029): build games/<NAME>/ into a project, headless, from its Lua recipe.
+# Written to the worktree's target/games/<NAME>/; OUT=<dir> writes it elsewhere (e.g.
+# to open it with the editor's --project). OUT has a default above (editor-capture's),
+# so only one given on the command line or in the environment is passed on.
+GAME_OUT = $(if $(filter command line environment,$(origin OUT)),--out $(OUT))
+game: ## Generate a test game. make game NAME=smoke [OUT=<dir>] [ARGS="--param size=30"]
+	cargo run --quiet --locked --features dev --bin game -- $(NAME) $(GAME_OUT) $(ARGS)
+
+game-test: ## Generate a test game, check it is deterministic, run its scenarios and shots
+	cargo run --quiet --locked --features dev --bin game -- $(NAME) $(GAME_OUT) --test $(ARGS)
 
 # Rusty in the desktop's app search (#1315): the Linux app grid, Spotlight on macOS.
 # Builds the dev editor (the window the `rusty` MCP attaches to) and session-mcp, then

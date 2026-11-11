@@ -260,3 +260,9 @@ fn draw_parameters(ui: &mut egui::Ui, anim: &crate::components::AnimatorComponen
         ui.label(format!("    {name}: {value}"));
     }
 }
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::AnimatorComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Animation;
+    const LABEL: &'static str = "Animator Component";
+}
