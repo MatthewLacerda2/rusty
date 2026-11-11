@@ -22,7 +22,7 @@ mod record;
 pub(crate) mod surface;
 pub(crate) mod transparent;
 
-use super::{Owner, PostEffect};
+use super::{History, Owner, PostEffect};
 use crate::components::Ssr;
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::quality::SsrQuality;
@@ -36,6 +36,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "ssr",
     owner: Owner::Volume,
     gate: Gate::option(GraphicsOption::Ssr),
+    history: History::None("cone-traced from this frame's colour pyramid and depth"),
     module: None,
     composite: &[],
     grade: &[],

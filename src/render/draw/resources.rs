@@ -4,7 +4,7 @@
 //! `overlays` and its children. Each block returns owned resources that outlive the
 //! render pass.
 
-use super::batch::sort::back_to_front;
+use super::batch::sort::{transparent_order, TransparentOrder};
 use super::batch::{DrawItem, FrameDraws};
 use super::overlays::{BallResource, ColliderScope, OverlayBindings, OverlayDraws};
 use super::visibility::{CameraCulls, ViewCull};
@@ -20,7 +20,7 @@ use glam::Vec3;
 
 /// One camera's solids as instanced draws (#470), split into the two passes a frame
 /// draws (#242): `draws.opaque` (Opaque + Cutout; REPLACE, depth write on) and
-/// `draws.transparent` (back-to-front, alpha-blended). Both index the instance array
+/// `draws.transparent` (by sorting priority, then back-to-front; alpha-blended). Both index the instance array
 /// uploaded into `draw_buffers` by `precreate_solid_resources`.
 #[derive(Default)]
 pub(crate) struct SolidResources {
@@ -183,15 +183,15 @@ impl Renderer {
         }
     }
 
-    /// Sort the translucent items back to front, batch both lists into instanced
+    /// Sort the translucent items by priority, then back to front (#2039), batch both lists into instanced
     /// draws (#470) and upload the camera's packed draw data.
     fn upload_solids(
         &mut self,
         opaque: Vec<DrawItem>,
-        mut transparent: Vec<(DrawItem, f32)>,
+        mut transparent: Vec<(DrawItem, TransparentOrder)>,
         (joints, proxies): (&[JointMatrix], &[[f32; 4]]),
     ) -> FrameDraws {
-        back_to_front(&mut transparent);
+        transparent_order(&mut transparent);
         let transparent = transparent.into_iter().map(|(item, _)| item).collect();
         let records = &self.retained.records;
         let draws = FrameDraws::build((opaque, transparent), records, self.instancing);

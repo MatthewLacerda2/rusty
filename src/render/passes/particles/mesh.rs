@@ -13,7 +13,7 @@
 use glam::{Mat4, Quat, Vec3};
 
 use crate::components::{MaterialAsset, ParticleEmitterComponent, ParticleRenderMode};
-use crate::render::draw::batch::sort::view_depth;
+use crate::render::draw::batch::sort::{view_depth, TransparentOrder};
 use crate::render::draw::batch::{BatchKey, DrawItem};
 use crate::render::draw::materials::material_maps;
 use crate::render::draw::uniforms::{probe_occlusion_at, probe_sh_at};
@@ -25,8 +25,12 @@ use crate::scene::authoring::{primitive_mesh_component, Primitive};
 use crate::scene::serialize::asset_mesh_component;
 use crate::scene::{Camera, MeshComponent, Scene};
 
-/// The camera's opaque items and its (unsorted) translucent items with their depth.
-type SolidLists<'a> = (&'a mut Vec<DrawItem>, &'a mut Vec<(DrawItem, f32)>);
+/// The camera's opaque items and its (unsorted) translucent items with their
+/// priority and depth.
+type SolidLists<'a> = (
+    &'a mut Vec<DrawItem>,
+    &'a mut Vec<(DrawItem, TransparentOrder)>,
+);
 
 /// A mesh named by one string: a primitive (`"Box"`) or a model reference.
 pub(super) fn mesh_for_spec(spec: &str) -> MeshComponent {
@@ -89,11 +93,12 @@ impl Renderer {
                     depth: view_depth(p.position, cam.position, cam.forward()),
                     outline: false,
                 };
-                if glass {
-                    let depth = item.depth;
-                    transparent.push((item, depth));
-                } else {
-                    opaque.push(item);
+                match glass {
+                    Some(priority) => {
+                        let depth = item.depth;
+                        transparent.push((item, TransparentOrder { priority, depth }));
+                    }
+                    None => opaque.push(item),
                 }
             }
         }
@@ -102,13 +107,14 @@ impl Renderer {
 
     /// What every particle of a mesh emitter shares: the batch key (pipeline — the
     /// material's surface shader, #396 — mesh and its whole index run, material bind
-    /// group, per-draw uniform) and whether the material is translucent. `None` when
+    /// group, per-draw uniform) and, when the material is translucent, its sorting
+    /// priority (#2039). `None` when
     /// the mesh is unset or fails to load.
     fn mesh_emitter_key(
         &mut self,
         scene: &Scene,
         emitter: &ParticleEmitterComponent,
-    ) -> Option<(BatchKey, bool)> {
+    ) -> Option<(BatchKey, Option<i32>)> {
         let (mesh, num_indices) = self.particle_mesh(emitter)?;
         let entry = emitter
             .render
@@ -136,8 +142,8 @@ impl Renderer {
             traits,
             bone_base: 0,
         };
-        let glass = material.is_some_and(MaterialAsset::is_transparent);
-        Some((key, glass))
+        let glass = material.filter(|m| m.is_transparent());
+        Some((key, glass.map(MaterialAsset::sort_priority)))
     }
 }
 

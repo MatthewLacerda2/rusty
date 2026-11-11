@@ -72,7 +72,7 @@ pub(crate) use run::for_camera;
 pub(crate) use targets::VolumetricTargets;
 pub(crate) use volume::SharedVolume;
 
-use super::{Owner, PostEffect};
+use super::{History, Owner, PostEffect};
 use crate::components::VolumetricFog;
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::quality::VolumetricFogQuality;
@@ -85,6 +85,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "volumetric_fog",
     owner: Owner::Volume,
     gate: Gate::option(GraphicsOption::VolumetricFog),
+    history: History::Reads(|cx| cx.shared.volumetric.is_some()),
     module: None,
     composite: &[],
     grade: &[],

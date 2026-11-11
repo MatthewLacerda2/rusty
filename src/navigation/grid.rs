@@ -86,6 +86,10 @@ pub struct NavigationGraph {
     pub(super) search: super::pool::SearchScratch,
     /// What the flood keeps between queries for the current bake (#2088, `flood::cache`).
     pub(super) flood_cache: super::flood::FloodCache,
+    /// The agents' path requests and the search in progress (#2087, `request`).
+    pub(super) requests: std::cell::RefCell<super::request::PathQueue>,
+    /// Each bake's islands, for the search cap toward an unreachable goal (#2087).
+    pub(super) islands: super::request::islands::Islands,
 }
 
 impl NavigationGraph {
@@ -123,6 +127,8 @@ impl NavigationGraph {
             tracked_scene: None,
             search: Default::default(),
             flood_cache: Default::default(),
+            requests: Default::default(),
+            islands: Default::default(),
         }
     }
 

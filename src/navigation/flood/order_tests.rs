@@ -132,19 +132,18 @@ fn a_flood_held_while_another_runs_keeps_its_costs() {
 fn a_rebake_drops_the_islands_the_old_navmesh_proved() {
     let (mut scene, crate_box) = level();
     let mut nav = bake(&scene);
-    // Behind the wall: the long way round makes the goal overdue (islands asked).
     let from = Vec3::new(-1.5, 0.0, 10.0);
     let on_crate = |nav: &NavigationGraph, top: Vec3| {
         let f = nav.flood_to(from, &[top], 60.0, ALL_AREAS).expect("flood");
         f.length_to(nav, top)
     };
     assert_eq!(on_crate(&nav, TOP), None, "an island");
-    assert_eq!(nav.flood_cache.with(&nav, |c| c.islands.pieces.len()), 1);
     // Sink the crate to a 0.2 m step: its top is now walked onto.
     move_to(&mut scene, crate_box, Vec3::new(7.0, -0.8, 7.0));
     nav.bake(&scene);
     let low = Vec3::new(7.0, 0.2, 7.0);
-    assert!(on_crate(&nav, low).is_some(), "reached");
-    let pieces = nav.flood_cache.with(&nav, |c| c.islands.pieces.len());
-    assert_eq!(pieces, 0, "the old crate top's piece is forgotten");
+    assert!(
+        on_crate(&nav, low).is_some(),
+        "reached: the old island is forgotten"
+    );
 }

@@ -3,7 +3,9 @@
 //! Translucent solids (#242), particle emitters and the particles inside an
 //! alpha-blended emitter (#440) all order back to front by view depth — the distance
 //! along the camera's forward axis — so two passes can never disagree about what is
-//! in front. World-space UI canvases (#429) should sort with this key too.
+//! in front. Translucent solids sort by their material's Sorting Priority first
+//! ([`transparent_order`], #2039), as HDRP's transparent queue does; particles
+//! and ribbons have no priority and sort by depth alone. World-space UI canvases (#429) should sort with this key too.
 //!
 //! Opaque solids order roughly front to back instead (#1499), as Unity's
 //! `SortingCriteria.CommonOpaque` does (its `QuantizedFrontToBack`): the nearest
@@ -27,6 +29,29 @@ pub(crate) fn view_depth(pos: Vec3, cam_pos: Vec3, cam_fwd: Vec3) -> f32 {
 /// blended surfaces draw over farther ones. Stable: equal depths keep their order.
 pub(crate) fn back_to_front<T>(items: &mut [(T, f32)]) {
     items.sort_by(|a, b| b.1.total_cmp(&a.1));
+}
+
+/// Where a translucent solid draws in the sorted pass (#2039): its material's
+/// HDRP *Sorting Priority*, then its [`view_depth`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct TransparentOrder {
+    pub priority: i32,
+    pub depth: f32,
+}
+
+/// Order translucent `items` as HDRP's transparent queue does: by priority, a
+/// lower one first (HDRP adds it to the material's render queue, which Unity
+/// sorts before depth), so a higher one draws on top whatever its depth; then
+/// farthest first ([`back_to_front`]). Stable, so equal keys keep the order they
+/// were pushed in (objects in `World::ids_with_mesh` order, an object's slots in
+/// slot order, at one shared depth): a fixed input draws the same frame each time.
+pub(crate) fn transparent_order<T>(items: &mut [(T, TransparentOrder)]) {
+    items.sort_by(|a, b| {
+        let (a, b) = (a.1, b.1);
+        a.priority
+            .cmp(&b.priority)
+            .then(b.depth.total_cmp(&a.depth))
+    });
 }
 
 /// Buckets per doubling of depth: each spans about 19% of its distance, so the
@@ -83,5 +108,42 @@ mod tests {
         back_to_front(&mut items);
         let order: Vec<_> = items.iter().map(|i| i.0).collect();
         assert_eq!(order, ["far", "mid", "near"]);
+    }
+
+    fn order(items: &[(&'static str, TransparentOrder)]) -> Vec<&'static str> {
+        let mut items = items.to_vec();
+        transparent_order(&mut items);
+        items.iter().map(|i| i.0).collect()
+    }
+
+    fn at(priority: i32, depth: f32) -> TransparentOrder {
+        TransparentOrder { priority, depth }
+    }
+
+    #[test]
+    fn priority_orders_before_depth() {
+        // A near pane at a lower priority draws before a far one (#2039), so the
+        // far one lands on top; at equal priority, farthest first.
+        let items = [
+            ("near", at(-1, 2.0)),
+            ("far", at(0, 9.0)),
+            ("mid", at(0, 4.0)),
+        ];
+        assert_eq!(order(&items), ["near", "far", "mid"]);
+        let items = [("high", at(50, 9.0)), ("low", at(-50, 1.0))];
+        assert_eq!(order(&items), ["low", "high"]);
+    }
+
+    #[test]
+    fn equal_keys_keep_the_order_they_came_in() {
+        // One object's slots share its depth: at equal priority, slot order holds.
+        let items = [
+            ("glass", at(0, 5.0)),
+            ("liquid", at(0, 5.0)),
+            ("cork", at(0, 5.0)),
+        ];
+        assert_eq!(order(&items), ["glass", "liquid", "cork"]);
+        let items = [("liquid", at(0, 5.0)), ("glass", at(0, 5.0))];
+        assert_eq!(order(&items), ["liquid", "glass"]);
     }
 }

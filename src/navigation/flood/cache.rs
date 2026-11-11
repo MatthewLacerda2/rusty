@@ -1,11 +1,11 @@
 //! What the flood keeps on the graph between queries (#2088), valid for one
-//! bake: the island answers (`islands`) and which spans an off-mesh link leaves
-//! from. Both depend on the navmesh alone, so a query reuses them until the
-//! next bake (or area cost change) bumps `bake_generation`.
+//! bake: which spans an off-mesh link leaves from. It depends on the navmesh
+//! alone, so a query reuses it until the next bake (or area cost change) bumps
+//! `bake_generation`. The island answers live on the graph too, in
+//! `request::islands`, which A\*'s search cap shares.
 
 use std::cell::RefCell;
 
-use super::islands::Islands;
 use crate::navigation::NavigationGraph;
 
 /// The graph's per-bake flood state: a `RefCell` because the flood reaches the
@@ -17,7 +17,6 @@ pub(crate) struct FloodCache(RefCell<Option<BakeState>>);
 pub(super) struct BakeState {
     /// The bake it is for: `(bake_generation, span count)`.
     key: (u64, usize),
-    pub(super) islands: Islands,
     /// One bit per span: set when an off-mesh link may leave from it, so the
     /// flood looks a span's links up only where there are some.
     exits: Vec<u64>,
@@ -37,11 +36,7 @@ impl BakeState {
                 mark(nav.link_span(link.to));
             }
         }
-        Self {
-            key,
-            islands: Islands::new(nav),
-            exits,
-        }
+        Self { key, exits }
     }
 
     /// Whether an off-mesh link may leave from span `index`.

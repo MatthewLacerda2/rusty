@@ -307,8 +307,14 @@ its check and its command changed to match).
   a shot from a new spot ghosts the last one in. Call `Camera.ResetHistory()` after
   the jump, and add `{ settle = n }` (whole frames, 0 to 1024, default 0) for a
   converged image: the shot first draws `n` frames with no sim step, as `n`
-  `Harness.Render()` calls would. It goes beside `width`, `height` and `gizmos`;
-  `docs/api/Graphics.md`, *TAA*.
+  `Harness.Render()` calls would. It draws them only when they can change the
+  image (#2092). When the shot's first frame reads no history
+  (`Debug.Stats().history_passes` is `0`), that frame is the shot: one render
+  whatever `n` is (two with `gizmos`), the same bytes a full settle writes. A frame
+  reads history with TAA, SSIL, the volumetric fog or an authored effect on, with
+  motion vectors recorded on a frame that is not a cut (whether or not the camera
+  moved), with a render texture shown, or with a shadow tile resize still pending.
+  It goes beside `width`, `height` and `gizmos`; `docs/api/Graphics.md`, *TAA*.
 - **The test-fixture project** is `tests/fixtures/project/` (#829): the committed
   scenarios, the bot-player script and its `project.rusty`, opened like any other
   project — `cargo run --bin play --features dev -- --project tests/fixtures/project

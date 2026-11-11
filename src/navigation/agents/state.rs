@@ -48,8 +48,11 @@ pub fn remaining_distance(agent: &NavMeshAgentComponent, position: Vec3) -> f32 
     path_length(&remaining_corners(agent, position))
 }
 
-/// Forget the cached path, so the next tick plans afresh — once.
+/// Forget the cached path and any request for a new one (#2087), so the next tick
+/// plans afresh — once.
 fn drop_path(agent: &mut NavMeshAgentComponent) {
+    agent.path_request = 0;
+    agent.path_planned = false;
     agent.cached_path.clear();
     agent.path_links.clear();
     agent.path_cursor = 0;

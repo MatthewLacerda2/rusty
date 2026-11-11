@@ -6,21 +6,24 @@ use crate::navigation::{in_mask, NavSpan, NavigationGraph, SpanRef, MIN_AREA_COS
 /// A span a move reaches, with the cost it reaches it at.
 pub(super) type Move = (SpanRef, f32);
 
-/// A heap entry: a span and the cost it was reached at, packed so the heap
-/// compares one integer. A cost is never negative, so its bits order as the
-/// cost does; the span index below them breaks ties, as A\* breaks them.
+/// A heap entry: a span, the cost it was reached at, and its key (that cost
+/// plus the heuristic, `goals`), packed so the heap compares one integer. A key
+/// is never negative, so its bits order as the key does; the span index below
+/// them breaks ties, as A\* breaks them.
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub(super) struct Open {
     key: u64,
+    g: u32,
     gx: i32,
     gz: i32,
 }
 
 impl Open {
-    pub(super) fn new(node: SpanRef, g: f32) -> Self {
-        debug_assert!(g >= 0.0, "a flood cost is never negative");
+    pub(super) fn new(node: SpanRef, g: f32, f: f32) -> Self {
+        debug_assert!(g >= 0.0 && f >= 0.0, "a flood cost is never negative");
         Self {
-            key: (u64::from(g.to_bits()) << 32) | u64::from(node.index),
+            key: (u64::from(f.to_bits()) << 32) | u64::from(node.index),
+            g: g.to_bits(),
             gx: node.gx,
             gz: node.gz,
         }
@@ -35,13 +38,13 @@ impl Open {
     }
 
     pub(super) fn g(self) -> f32 {
-        f32::from_bits((self.key >> 32) as u32)
+        f32::from_bits(self.g)
     }
 }
 
 impl Ord for Open {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // Min-heap on cost; ties on the span index, so the pop order is fixed.
+        // Min-heap on the key; ties on the span index, so the pop order is fixed.
         other.key.cmp(&self.key)
     }
 }

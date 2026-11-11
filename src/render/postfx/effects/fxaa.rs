@@ -1,7 +1,7 @@
 //! FXAA (#360): a **camera** effect, the chain's finishing LDR pass
 //! (`postfx/fxaa.wgsl`), on the tonemapped image just before it reaches the target.
 
-use super::{EffectCx, LdrRun, Owner, Pass, PostEffect};
+use super::{EffectCx, History, LdrRun, Owner, Pass, PostEffect};
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::GraphicsSettings;
 use crate::render::postfx::params::Gate;
@@ -12,6 +12,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "fxaa",
     owner: Owner::Camera,
     gate: Gate::option(GraphicsOption::Fxaa),
+    history: History::None("a function of this frame's image"),
     module: None,
     composite: &[],
     grade: &[],

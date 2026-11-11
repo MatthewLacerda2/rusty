@@ -1,6 +1,7 @@
 //! Play starts from the scene's saved navmesh (#1887): a scene saved with one and
 //! loaded back enters Play without a bake, a stale one is baked instead, and a
-//! play-mode `Scene.Load` and Stop restore it too, each once.
+//! play-mode `Scene.Load` and Stop restore it too, each once. A path budget set in
+//! Play ends with it (#2087).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -117,4 +118,22 @@ fn boot_restores_the_saved_navmesh() {
     scene.load_from_file(&path).unwrap();
     let nav = NavigationGraph::from_scene(&scene);
     assert_eq!(nav.spans[0].y, MARK, "restored at boot");
+}
+
+#[test]
+fn a_play_mode_path_budget_ends_with_play() {
+    let mut gw = world(Scene::new());
+    let budget = |gw: &GameWorld| gw.nav().borrow().pathfinding_iterations_per_frame();
+    let set = |gw: &GameWorld| gw.nav().borrow().set_pathfinding_iterations_per_frame(64);
+    let default = crate::navigation::DEFAULT_ITERATIONS_PER_FRAME;
+    gw.set_playing(true);
+    gw.tick(DT);
+    set(&gw); // Play 1's script sets it
+    gw.set_playing(false);
+    gw.tick(DT);
+    assert_eq!(budget(&gw), default, "Stop reverts it");
+    set(&gw);
+    gw.set_playing(true);
+    gw.tick(DT);
+    assert_eq!(budget(&gw), default, "Play 2 starts at the default");
 }

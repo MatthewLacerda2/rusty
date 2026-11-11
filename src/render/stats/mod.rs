@@ -149,6 +149,13 @@ pub struct RenderCounters {
     /// camera that ran SSAO, `0` with AO off. A camera shading with a forward
     /// override of its own (the shader preview) is never primed, nor is any on Metal.
     pub primed_passes: u32,
+    /// Reasons this frame read history an earlier frame left (#2092), one per
+    /// reason, not per view: each view (a render-texture camera's too) running an
+    /// effect that keeps a history or motion vectors past a cut, each shown render
+    /// texture (its picture kept from a draw, whatever its `update_every`), and a
+    /// pending shadow tile resize. `0` means drawing the frame again with no sim
+    /// step gives the same image.
+    pub history_passes: u32,
     /// Opaque scene passes that wrote SSR's surface targets with the SSR pipelines
     /// (#1526): one per view whose base camera runs SSR. An overlay camera of the
     /// stack draws with the plain ones, so it never counts.
@@ -174,6 +181,9 @@ pub struct RenderCounters {
     /// direction arrays and any other page list cached, every mip. The resident
     /// total at the frame's end, not a per-frame count.
     pub lightmap_bytes: u64,
+    /// GPU bytes of the reflection probes' cube array (#2085): every allocated
+    /// layer, spares included, every mip. The resident total at the frame's end.
+    pub reflection_bytes: u64,
     /// Retained render objects re-derived whole this frame (#1706): every mesh entity
     /// on a rebuild (a first frame, a load, an Undo, a renderer-side input), else the
     /// ones whose mesh, material, activity, layer, static flag or overrides changed.
@@ -225,12 +235,14 @@ impl RenderCounters {
             ("render_texture_draws", self.render_texture_draws.into()),
             ("velocity_passes", self.velocity_passes.into()),
             ("primed_passes", self.primed_passes.into()),
+            ("history_passes", self.history_passes.into()),
             ("ssr_surface_passes", self.ssr_surface_passes.into()),
             ("grade_lut_bakes", self.grade_lut_bakes.into()),
             ("sky_reflection_bakes", self.sky_reflection_bakes.into()),
             ("opaque_copies", self.opaque_copies.into()),
             ("texture_bytes", self.texture_bytes),
             ("lightmap_bytes", self.lightmap_bytes),
+            ("reflection_bytes", self.reflection_bytes),
             ("render_extracted", self.render_extracted.into()),
             ("render_posed", self.render_posed.into()),
             ("render_extract_us", self.render_extract_us),

@@ -1010,6 +1010,7 @@ scene.materials{}.shader_params{}[]: f32
 scene.materials{}.shader_textures: map
 scene.materials{}.shader_textures{key}: string
 scene.materials{}.shader_textures{}: string
+scene.materials{}.sorting_priority: i32
 scene.materials{}.specular: f32
 scene.materials{}.specular_color: tuple(3)
 scene.materials{}.specular_color[]: f32
@@ -1024,6 +1025,19 @@ scene.materials{}.transmittance_color[]: f32
 scene.materials{}.uv_mapping: enum UV0|Planar|Triplanar
 scene.materials{}.world_size: f32
 scene.materials{}.writes_motion: bool
+scene.meshes: map
+scene.meshes{key}: string
+scene.meshes{}.indices: seq
+scene.meshes{}.indices[]: u32
+scene.meshes{}.normals: seq
+scene.meshes{}.normals[]: tuple(3)
+scene.meshes{}.normals[][]: f32
+scene.meshes{}.positions: seq
+scene.meshes{}.positions[]: tuple(3)
+scene.meshes{}.positions[][]: f32
+scene.meshes{}.uvs: seq
+scene.meshes{}.uvs[]: tuple(2)
+scene.meshes{}.uvs[][]: f32
 scene.nav_settings.agent_height: f32
 scene.nav_settings.agent_radius: f32
 scene.nav_settings.areas: seq

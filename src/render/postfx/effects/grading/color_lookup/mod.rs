@@ -7,13 +7,14 @@ mod user;
 pub(crate) use user::neutral;
 pub use user::{Lookup, UserLuts};
 
-use super::super::{Grade, GradeCx, Owner, PostEffect};
+use super::super::{Grade, GradeCx, History, Owner, PostEffect};
 use crate::render::postfx::params::Gate;
 
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "color_lookup",
     owner: Owner::Volume,
     gate: Gate::NONE,
+    history: History::None("a grade of this frame's colour"),
     module: Some("postfx/effects/color_lookup.wgsl"),
     composite: &[],
     grade: &[Grade {

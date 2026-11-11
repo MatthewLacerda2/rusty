@@ -37,6 +37,9 @@ mod handles;
 pub mod journal;
 #[cfg(test)]
 mod journal_tests;
+mod names;
+#[cfg(test)]
+mod names_tests;
 mod placement;
 #[cfg(test)]
 mod placement_tests;

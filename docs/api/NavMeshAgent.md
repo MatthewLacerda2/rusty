@@ -20,6 +20,7 @@ Per-entity navmesh agent control.
 | `NavMeshAgent.SetAvoidancePriority` | `(id, priority)` | — (0–99, clamped; lower = more important; NaN or `math.huge` keeps the current priority) |
 | `NavMeshAgent.SetAvoidanceEnabled` | `(id, enabled)` | — |
 | `NavMeshAgent.HasPath` | `(id)` | `bool` — the agent holds a planned path |
+| `NavMeshAgent.PathPending` | `(id)` | `bool` — the agent is waiting for a new path, or asks for one on its next tick (Unity's `pathPending`; see *Following a path*) |
 | `NavMeshAgent.RemainingDistance` | `(id)` | distance left along the path from where it stands; `math.huge` with no path |
 | `NavMeshAgent.GetPathStatus` | `(id)` | `"complete"`, `"partial"` or `"invalid"` (no path planned) |
 | `NavMeshAgent.GetPath` | `(id)` | a path table (see `Navigation`): the agent's position, then the corners still ahead |
@@ -76,8 +77,8 @@ An active agent plans a **smoothed path** to its target (the same one
 across open ground instead of zig-zagging over grid cells. It keeps that path, and only
 plans again when the target moves, a rebake changes cells its remaining path crosses
 (#456; a rebake elsewhere leaves it be, and a partial path re-plans on any rebake, since
-the way may have opened), the path ages out (60 fixed frames), or a corner ahead stops
-being walkable. When the target is unreachable the path
+the way may have opened), or a corner ahead stops being walkable: on a change, never on a
+timer (Unity's `autoRepath`). When the target is unreachable the path
 is **partial** and the agent stops at its end, the nearest reachable point, instead of
 pressing into the wall.
 
@@ -91,6 +92,37 @@ an agent whose body is centred on its origin sets `BaseOffset` to half its heigh
 stands on the floor instead of sinking into it. `Warp` drops the old path and stops the agent dead; it plans once
 from the new position on its next tick. `ResetPath` is Unity's: the agent slows to a stop
 where it is.
+
+**Paths are planned over several ticks when many are asked at once** (#2087, Unity's
+time-sliced requests). An agent that needs a new path queues a request and keeps
+following its old one (a new agent stands still) until the answer arrives; meanwhile
+`PathPending` is `true`. Each tick the queue spends `Navigation.GetPathfindingIterationsPerFrame()`
+node expansions on its requests, oldest first, resuming a search the last tick left
+unfinished, so a frame never pays for every agent at once. A search begins from where
+the agent stands *then*, toward its target *then*, and finds exactly the path
+`Navigation.CalculatePath` would from there. With few agents, a request whose search
+fits one tick's budget is answered in the tick it is made, as if planned on the spot; a
+longer one waits as many ticks as its search needs budgets (a single corner-to-corner
+search on the Dust2 arena, about 45 000 expansions, takes some 22 ticks at the default
+`2048`). On that arena with 32 bots none waits more than about half a second. `PathPending` is also `true` right after a
+`SetTarget`, or a rebake that changed cells its remaining path crosses (as above: a rebake
+elsewhere leaves it `false`), before the agent's next tick has asked: the Unity idiom
+`if not PathPending(id) and RemainingDistance(id) < r` reads the new path, not the old.
+When no path can be planned (no navmesh near the target, or the agent off it),
+`PathPending` turns `false` once that answer is in, with `GetPathStatus` `"invalid"`, as
+in Unity; the agent asks again when its target moves or a rebake comes, and, when the
+answer failed because the agent stood off the navmesh, once it has moved more than half
+a metre (pushed, carried, or moved by its Transform). A **partial** path whose search
+ran out of expansions (see `Navigation`, *Paths and queries*) ends where the cap stopped it,
+not at the reachable point nearest the target: once the agent has walked it out, it asks
+again from there, and so on until a search ends where it stands. A delivered path
+skips the corners the agent walked past while it waited, so a chaser never turns back to
+touch one. A request is dropped, unsearched, when its agent is disabled (or inactive in
+the hierarchy) or is crossing an off-mesh link by the time it comes up: a disabled agent
+asks again once enabled, one on a link once it lands, if its path went stale meanwhile.
+A rebake mid-search does not restart it unless the change reaches what it searched, so a
+moving obstacle rebaking every few ticks never stalls the queue. `ResetPath`, `Warp` and
+`SetAreaMask` drop a waiting request (a new mask asks again, under that mask).
 
 ### Off-mesh links (#462)
 
