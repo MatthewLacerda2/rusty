@@ -11,6 +11,11 @@
 //! building them costs one fullscreen pass per level, untimed (the timer's pairs are
 //! few). Built from the same opaque image the march read before, so no translucent or
 //! overlay gets in.
+//!
+//! The same downsample builds the trace's two pyramids the resolve reads (#2028,
+//! `super::pass`): its hits (`Rgba16Float`) and where it traced and how wide
+//! (`Rg16Float`), each [`PyramidPass`] building one format. At 1080p they add about
+//! 22 MB and 11 MB.
 
 use crate::render::gpu::bind_entry as entry;
 use crate::render::gpu::fullscreen::Fullscreen;
@@ -24,9 +29,10 @@ pub(crate) fn levels((w, h): (u32, u32)) -> u32 {
     u32::BITS - w.max(h).max(1).leading_zeros()
 }
 
-/// The downsample pipeline and the trilinear sampler the march reads the pyramid
-/// through, shared by every view.
+/// The downsample pipeline for one texture format and the trilinear sampler the
+/// march reads a pyramid through, shared by every view.
 pub(crate) struct PyramidPass {
+    format: wgpu::TextureFormat,
     layout: wgpu::BindGroupLayout,
     pipeline: LazyPipeline,
     /// Linear between texels and between levels, clamped at the screen's edge.
@@ -34,7 +40,17 @@ pub(crate) struct PyramidPass {
 }
 
 impl PyramidPass {
+    /// The colour pyramid's pass ([`HDR_FORMAT`]).
     pub(crate) fn new(device: &wgpu::Device, registry: &mut ShaderRegistry) -> Self {
+        Self::of(device, registry, HDR_FORMAT)
+    }
+
+    /// A pass building pyramids of `format`.
+    pub(crate) fn of(
+        device: &wgpu::Device,
+        registry: &mut ShaderRegistry,
+        format: wgpu::TextureFormat,
+    ) -> Self {
         let shader = registry.load(device, "postfx/ssr_pyramid.wgsl", "SSR Pyramid Shader");
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("SSR Pyramid Layout"),
@@ -47,7 +63,7 @@ impl PyramidPass {
         });
         let pipeline = LazyPipeline::new(device, move |device| {
             let target = wgpu::ColorTargetState {
-                format: HDR_FORMAT,
+                format,
                 blend: None,
                 write_mask: wgpu::ColorWrites::ALL,
             };
@@ -68,6 +84,7 @@ impl PyramidPass {
             ..Default::default()
         });
         Self {
+            format,
             layout,
             pipeline,
             trilinear,
@@ -80,11 +97,12 @@ impl PyramidPass {
 }
 
 /// One view's pyramid: the texture, a view of every level (what the march reads),
-/// and for each level below the first its target view and the group reading the
-/// level above it.
+/// one of its first level (what a pass draws it into), and for each level below the
+/// first its target view and the group reading the level above it.
 pub(crate) struct Pyramid {
     pub(crate) texture: wgpu::Texture,
     pub(crate) view: wgpu::TextureView,
+    pub(crate) top: wgpu::TextureView,
     steps: Vec<(wgpu::TextureView, wgpu::BindGroup)>,
 }
 
@@ -107,7 +125,7 @@ impl Pyramid {
             mip_level_count: count,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: HDR_FORMAT,
+            format: pass.format,
             usage: U::RENDER_ATTACHMENT | U::TEXTURE_BINDING | U::COPY_DST,
             view_formats: &[],
         });
@@ -133,6 +151,7 @@ impl Pyramid {
             .collect();
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         Self {
+            top: level(0),
             texture,
             view,
             steps,
