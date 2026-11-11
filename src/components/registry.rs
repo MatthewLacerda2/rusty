@@ -2,7 +2,7 @@
 //!
 //! A first-class component is declared once: its type, beside which it implements
 //! [`FirstClass`] (the names scripts and the snapshot know it by), and one row of
-//! [`first_class!`] here. Every list the engine keeps per component is generated
+//! `first_class!` here. Every list the engine keeps per component is generated
 //! from that row, by a consumer macro handed to `first_class!`, the way
 //! `entity::with_ref_components` feeds its own lists:
 //!
