@@ -5,11 +5,13 @@ session's proxy answers GraphQL with a 403 — while cloud sessions are the
 default coders (#924). So the scripts call `gh api repos/{o}/{r}/…` only, and
 `tests/test_rest_only.py` refuses a GraphQL subcommand coming back.
 
-Three things that GraphQL gave for free live here instead:
+Four things that GraphQL gave for free live here instead:
 
 - [`slug`]: the repository, from `git remote get-url origin` (`gh repo view`).
 - [`pages`]: every page of a list, asked for with an explicit `page=`, because
   `gh api --paginate` failed through the proxy too.
+- [`blocked_by`]: the path of an issue's recorded blockers, and
+  [`open_blockers`], the ones still open.
 - [`pull`]: a REST pull request in the field names the merge path was written
   against (`isDraft`, `headRefOid`, …), so its decisions did not change.
 
@@ -79,6 +81,18 @@ def pages(get: Callable[[str], object], path: str, key: str | None = None) -> li
         if len(batch) < PER_PAGE:
             return items
     return items
+
+
+def blocked_by(repo: str, number: int) -> str:
+    """The REST path of issue `number`'s recorded blockers, GitHub's native `Blocked by`
+    relationship (one page: an issue blocked by more than [`PER_PAGE`] is not one we file).
+    `blockers.py` and the coder count (`dispatch/running.py`, #2063) both read it here."""
+    return f"repos/{repo}/issues/{number}/dependencies/blocked_by?per_page={PER_PAGE}"
+
+
+def open_blockers(recorded: list[dict]) -> list[int]:
+    """The open issues among a [`blocked_by`] answer, by number: a closed blocker blocks nothing."""
+    return sorted(b["number"] for b in recorded if b.get("state") == "open")
 
 
 MERGEABLE = {True: "MERGEABLE", False: "CONFLICTING", None: "UNKNOWN"}
