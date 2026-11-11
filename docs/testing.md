@@ -676,9 +676,15 @@ often for a golden image to hold, so the shots are for looking. Without a GPU or
 lavapipe a shot is logged as skipped, as every GPU test skips. The same command runs
 locally, in a worktree and in a cloud session: every clone has `games/`, and each
 worktree writes its own `target/games/`. `gpu::test_games` runs `game --test` on
-every folder under `games/` in CI.
+every folder under `games/` in CI, one test per game so nextest runs them side by
+side (#2070).
 
-**Adding a game** is adding its folder; the test covers it from then on:
+**Each game has a 90 s budget** for `game --test` at its defaults (`BUDGET` in
+`tests/gpu/test_games.rs`): a game over it fails by name with its time, so the game
+whose defaults grew is the one made cheaper. Longer runs go behind a `--param`.
+
+**Adding a game** is adding its folder and its line in the sorted `games!` list of
+`tests/gpu/test_games.rs`; a folder with no line fails that file's check, naming it:
 
 ```text
 games/<name>/
