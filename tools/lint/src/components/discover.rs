@@ -22,7 +22,7 @@ const REPORT: &str = ".lint/report.txt";
 
 /// Discover components from the registry's `<field>: <path> => <Kind> [...];` rows.
 /// Shared with the parity gate (`parity.rs`), so both gates enumerate first-class
-/// components from the same source. Exits 1 (`NO_ENTITY` / `NO_COMPONENTS`) rather
+/// components from the same source. Exits 1 (`NO_REGISTRY` / `NO_COMPONENTS`) rather
 /// than ever returning an empty list.
 pub(crate) fn discover() -> Vec<String> {
     discover_in(Path::new(".")).unwrap_or_else(|e| {

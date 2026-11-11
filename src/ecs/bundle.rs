@@ -7,6 +7,8 @@
 //! O(k²) migration). The other way, [`World::entity_document`] assembles a live
 //! entity's columns back into a document (moved here from `core.rs`, #1900).
 
+use std::collections::BTreeMap;
+
 use crate::components::registry::first_class;
 use crate::components::{ColliderComponent, Entity, MaterialAsset, MeshComponent};
 
@@ -46,8 +48,8 @@ impl Core {
     }
 }
 
-/// Generates [`add_components`] and [`Documented::copy`] from the registry rows:
-/// each row's column into a bundle, and back out of a live entity.
+/// Generates [`add_components`] and [`Documented::entity`] from the registry
+/// rows: each row's column into a bundle, and back out of a live entity.
 macro_rules! bundle_rows {
     ($($field:ident: $ty:ty => $kind:ident [$($acc:ident)*];)*) => {
         /// Attach each first-class component `entity` carries to the builder; a
@@ -57,9 +59,29 @@ macro_rules! bundle_rows {
         }
 
         impl Documented<'_> {
-            /// Copy each first-class column of the entity into `doc`.
-            fn copy(&self, doc: &mut Entity) {
-                $(doc.$field = document_field!(self, $field);)*
+            /// The entity's document, as ONE struct literal: a field added to
+            /// `Entity` and not copied here is a compile error, not a value every
+            /// save, Play/Stop snapshot and prefab hold silently resets.
+            fn entity(&self) -> Option<Entity> {
+                let (world, id) = (self.world, self.id);
+                let core = world.component::<Core>(id)?;
+                Some(Entity {
+                    id: core.id,
+                    name: (*world.name(id)?).clone(),
+                    active: core.active,
+                    is_static: core.is_static,
+                    layer: core.layer,
+                    transform: (*world.transform(id)?).clone(),
+                    pending_material: world.component::<MaterialAsset>(id).map(|c| (*c).clone()),
+                    scripts: (*world.scripts(id)?).clone(),
+                    $($field: document_field!(self, $field),)*
+                    prefab_link: world.prefab_link(id).map(|c| (*c).clone()),
+                    parent_id: core.parent_id,
+                    // Document-only: a save fills them.
+                    parent_bone: Vec::new(),
+                    bone_refs: BTreeMap::new(),
+                    children: core.children.clone(),
+                })
             }
         }
     };
@@ -133,25 +155,12 @@ impl World {
         mesh: fn(&MeshComponent) -> MeshComponent,
         collider: fn(&ColliderComponent) -> ColliderComponent,
     ) -> Option<Entity> {
-        let core = self.component::<Core>(id)?;
-        let mut doc = Entity::new(core.id, (*self.name(id)?).clone());
-        doc.active = core.active;
-        doc.is_static = core.is_static;
-        doc.layer = core.layer;
-        doc.transform = (*self.transform(id)?).clone();
-        doc.pending_material = self.component::<MaterialAsset>(id).map(|c| (*c).clone());
-        doc.scripts = (*self.scripts(id)?).clone();
-        doc.prefab_link = self.prefab_link(id).map(|c| (*c).clone());
-        doc.parent_id = core.parent_id;
-        doc.children = core.children.clone();
-        // `parent_bone` and `bone_refs` are document-only: a save fills them.
-        let copy = Documented {
+        Documented {
             world: self,
             id,
             mesh,
             collider,
-        };
-        copy.copy(&mut doc);
-        Some(doc)
+        }
+        .entity()
     }
 }

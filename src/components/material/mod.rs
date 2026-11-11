@@ -247,7 +247,8 @@ impl MaterialAsset {
 }
 
 /// The entity's references to library materials — the first-class component. Holds
-/// only library keys; the data lives in `Scene.materials`.
+/// only library keys: the material data is a shared asset in `Scene.materials`, and
+/// this only points at it.
 ///
 /// One key per sub-mesh of the entity's mesh, in the mesh's range order (Unity's
 /// `Renderer.sharedMaterials`, #1285): a mesh imported with two materials draws its

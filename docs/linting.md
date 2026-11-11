@@ -706,7 +706,9 @@ deliberately live in non-dependent layers: a row in the component registry
 (`src/components/registry.rs`'s `first_class!`, #2023, which generates its `Entity`
 field), an Add Component entry (`inspector/components/add/`: a
 `!world.has_<field>(id)` gate, or the menu generated from the registry, which
-offers every row behind `authoring::has_kind`), an inspector card (some `inspector/components/*.rs`), and an API
+offers every row behind `authoring::has_kind`; there the `AddEntry` bound holds the
+axis at compile time, and the text check only confirms the menu's code, not a
+comment, expands `first_class!`), an inspector card (some `inspector/components/*.rs`), and an API
 namespace (`src/api/<x>.rs` registered in `api/mod.rs` and documented in
 `docs/api/`, as the field or its Lua spelling: `layout_group` is `LayoutGroup`). The
 gate discovers components from the registry's rows — so a new one can't slip

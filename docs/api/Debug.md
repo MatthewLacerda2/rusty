@@ -306,7 +306,7 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
 {
   "id": 1, "name": "Crate", "active": true, "active_in_hierarchy": true, "static": false, "layer": 0,
   "parent": null, "children": [],
-  "components": ["Mesh", "Material", "Collider"],   // optional-component inventory
+  "components": ["Collider", "Material", "Mesh"],   // optional-component inventory
   "transform": { "pos": [x,y,z], "rot": [x,y,z], "scale": [x,y,z] },  // rot = Euler°
   "bounds": { "min": [x,y,z], "max": [x,y,z] },     // world-space AABB, or null
   "scripts": ["assets/scripts/foo.lua"],
