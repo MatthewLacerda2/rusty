@@ -15,8 +15,14 @@ for key, value in pairs(... or {}) do
     if p[key] == nil then error("topple: unknown parameter '" .. key .. "'") end
     p[key] = value
 end
-if p.pile < 2 or p.pile > 16 then error("topple: pile is 2..16, not " .. tostring(p.pile)) end
-if p.start < 1 or p.start > 4 then error("topple: start is 1..4, not " .. tostring(p.start)) end
+local function whole(key, lo, hi)
+    local v = p[key]
+    if math.type(v) ~= "integer" or v < lo or v > hi then
+        error(string.format("topple: %s is a whole number %d..%d, not %s", key, lo, hi, tostring(v)))
+    end
+end
+whole("pile", 2, 16)
+whole("start", 1, 4)
 
 local TOP = 1.0   -- metres, the height of every platform's top
 local BOX = 0.5   -- metres, a box's side
