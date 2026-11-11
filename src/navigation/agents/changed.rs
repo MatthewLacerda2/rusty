@@ -16,7 +16,11 @@ use crate::scene::NavMeshAgentComponent;
 impl NavigationGraph {
     /// Restamp `agent`'s path to the current bake when no change since it was
     /// planned touches what is left of it.
-    pub(super) fn keep_path_if_untouched(&self, agent: &mut NavMeshAgentComponent, at: Vec3) {
+    pub(in crate::navigation) fn keep_path_if_untouched(
+        &self,
+        agent: &mut NavMeshAgentComponent,
+        at: Vec3,
+    ) {
         if agent.path_generation == self.bake_generation
             || agent.cached_path.is_empty()
             || agent.path_status == NavPathStatus::Partial

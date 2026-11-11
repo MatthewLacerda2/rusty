@@ -11,6 +11,13 @@
 //! in the query's mask is never entered (the start span is exempt, so an agent
 //! standing in a forbidden area can still walk out). Every cost is at least 1, so
 //! the heuristic stays admissible.
+//!
+//! A search is resumable (#2087): [`NavigationGraph::begin_search`] opens it and
+//! [`NavigationGraph::step_search`] spends a budget of node expansions on it, so the
+//! agents' path queue (`request`) can spread one search over several ticks. Every
+//! search, sliced or not, gives up after [`MAX_SEARCH_NODES`] expansions with the
+//! partial path to the nearest span it reached (Detour's `maxNodes`), so an
+//! unreachable goal costs a bounded amount instead of flooding the whole navmesh.
 
 use super::pool::NodePool;
 use super::{in_mask, NavSpan, NavigationGraph, SpanRef, ALL_AREAS, MIN_AREA_COST};
@@ -45,17 +52,43 @@ impl PartialOrd for NodeState {
     }
 }
 
-/// The mutable A\* working set: the open heap, and the graph's reusable
-/// [`NodePool`] for each span's best cost and parent (a span index is the node id),
-/// so a query starts in O(1) whatever the navmesh's size (#2083).
+/// Expansions after which a search stops and returns the partial path to the span
+/// nearest its goal (Detour's `maxNodes`, #2087). A corner-to-corner path across a
+/// Dust2-sized arena expands about MEASURED spans; the cap leaves room for twice
+/// that, and bounds what an unreachable goal costs to the same.
+pub const MAX_SEARCH_NODES: u32 = 65_536;
+
+/// The mutable A\* working set: the open heap, and the [`NodePool`] for each span's
+/// best cost and parent (a span index is the node id).
 struct Frontier<'p> {
-    open_set: BinaryHeap<NodeState>,
+    open_set: &'p mut BinaryHeap<NodeState>,
     pool: &'p mut NodePool,
 }
 
 impl Frontier<'_> {
     fn g_of(&self, index: u32) -> f32 {
         self.pool.g(index)
+    }
+}
+
+/// One A\* search in progress (#2087): its heap, the span nearest the goal so far,
+/// and how many expansions it spent. Its costs and parents live in the [`NodePool`]
+/// it was begun on, which must be handed back, untouched by any other search, to
+/// every [`NavigationGraph::step_search`].
+pub(crate) struct Search {
+    open_set: BinaryHeap<NodeState>,
+    /// (octile distance to the goal, cost, span) of the nearest span expanded.
+    closest: (f32, f32, SpanRef),
+    goal: SpanRef,
+    mask: u32,
+    expanded: u32,
+}
+
+#[cfg(test)]
+impl Search {
+    /// The expansions this search has spent.
+    pub(crate) fn expanded(&self) -> u32 {
+        self.expanded
     }
 }
 
@@ -90,59 +123,90 @@ impl NavigationGraph {
     }
 
     /// A\* from span `start` toward span `goal`, both ends included, entering only
-    /// the areas in `mask` (#460). When the goal is unreachable, the path ends on
-    /// the reached span nearest to it instead (Unity's `PathPartial`): least octile
-    /// distance, then least cost, then lowest index, so the choice is deterministic.
-    /// The flag says whether the path reaches `goal`.
+    /// the areas in `mask` (#460). When the goal is unreachable, or the search hits
+    /// [`MAX_SEARCH_NODES`], the path ends on the reached span nearest to it instead
+    /// (Unity's `PathPartial`): least octile distance, then least cost, then lowest
+    /// index, so the choice is deterministic. The flag says whether the path reaches
+    /// `goal`.
     pub fn find_path_masked(
         &self,
         start: SpanRef,
         goal: SpanRef,
         mask: u32,
     ) -> (Vec<SpanRef>, bool) {
-        if start == goal {
-            return (vec![start], true);
-        }
         self.search.with(self.spans.len(), |pool| {
-            let mut frontier = Frontier {
-                open_set: BinaryHeap::new(),
-                pool,
-            };
-            self.search_from(start, goal, mask, &mut frontier)
+            let mut search = self.begin_search(start, goal, mask, pool);
+            let mut unbounded = u32::MAX;
+            let found = self.step_search(&mut search, pool, &mut unbounded);
+            found.expect("an unbounded budget runs the search to its end")
         })
     }
 
-    /// The A\* loop of [`Self::find_path_masked`] on a freshly begun `frontier`.
-    fn search_from(
+    /// Open a search from `start` to `goal` on `pool`, which must be freshly begun
+    /// for this graph's spans (`NodePool::begin`).
+    pub(crate) fn begin_search(
         &self,
         start: SpanRef,
         goal: SpanRef,
         mask: u32,
-        frontier: &mut Frontier,
-    ) -> (Vec<SpanRef>, bool) {
-        frontier.pool.set(start.index, 0.0, None);
-        frontier.open_set.push(NodeState {
+        pool: &mut NodePool,
+    ) -> Search {
+        pool.set(start.index, 0.0, None);
+        let h = heuristic(start, goal);
+        let mut open_set = BinaryHeap::new();
+        open_set.push(NodeState {
             node: start,
             g_score: 0.0,
-            f_score: heuristic(start, goal),
+            f_score: h,
         });
-        let mut closest = (heuristic(start, goal), 0.0, start);
+        Search {
+            open_set,
+            closest: (h, 0.0, start),
+            goal,
+            mask,
+            expanded: 0,
+        }
+    }
 
-        while let Some(current) = frontier.open_set.pop() {
+    /// Run `search` for at most `budget` expansions, taking what it spends off
+    /// `budget`. `Some` with the span path and whether it reaches the goal once the
+    /// search ends; `None` when the budget ran out first, to be resumed later on the
+    /// same `pool`. Resuming pops the same heap in the same order, so a sliced search
+    /// finds exactly the path an unsliced one does.
+    pub(crate) fn step_search(
+        &self,
+        search: &mut Search,
+        pool: &mut NodePool,
+        budget: &mut u32,
+    ) -> Option<(Vec<SpanRef>, bool)> {
+        let (goal, mask) = (search.goal, search.mask);
+        let mut frontier = Frontier {
+            open_set: &mut search.open_set,
+            pool,
+        };
+        while search.expanded < MAX_SEARCH_NODES {
+            if *budget == 0 {
+                return None;
+            }
+            let Some(current) = frontier.open_set.pop() else {
+                break;
+            };
             if current.node == goal {
-                return (reconstruct_path(frontier.pool, goal), true);
+                return Some((reconstruct_path(frontier.pool, goal), true));
             }
             if current.g_score > frontier.g_of(current.node.index) {
                 continue; // a stale heap entry
             }
             let h = heuristic(current.node, goal);
-            let key = (h, current.g_score, current.node.index);
-            if key < (closest.0, closest.1, closest.2.index) {
-                closest = (h, current.g_score, current.node);
+            let c = search.closest;
+            if (h, current.g_score, current.node.index) < (c.0, c.1, c.2.index) {
+                search.closest = (h, current.g_score, current.node);
             }
-            self.expand(current, goal, mask, frontier);
+            self.expand(current, goal, mask, &mut frontier);
+            search.expanded += 1;
+            *budget -= 1;
         }
-        (reconstruct_path(frontier.pool, closest.2), false)
+        Some((reconstruct_path(frontier.pool, search.closest.2), false))
     }
 
     /// Relax every span `current` can move to. The cardinal links are found once and

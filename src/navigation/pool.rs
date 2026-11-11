@@ -46,8 +46,9 @@ pub(crate) struct NodePool {
 }
 
 impl NodePool {
-    /// Start a new search over `spans` spans: every slot reads as unreached.
-    fn begin(&mut self, spans: usize) {
+    /// Start a new search over `spans` spans: every slot reads as unreached. The
+    /// path queue (#2087) keeps a pool of its own and begins it once per search.
+    pub(crate) fn begin(&mut self, spans: usize) {
         if self.slots.len() < spans {
             self.slots.resize(spans, UNREACHED);
         }

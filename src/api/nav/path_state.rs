@@ -1,5 +1,5 @@
 //! src/api/nav/path_state.rs — `NavMeshAgent`'s path state (#458): `HasPath`,
-//! `RemainingDistance`, `GetPathStatus`, `GetPath`, `Warp` and `ResetPath`, read from
+//! `PathPending` (#2087), `RemainingDistance`, `GetPathStatus`, `GetPath`, `Warp` and `ResetPath`, read from
 //! and written to the agent's cached path (Unity's `NavMeshAgent` path members).
 
 use glam::Vec3;
@@ -18,8 +18,14 @@ fn position(scene: &Scene, id: u32) -> Vec3 {
     scene.world.world_position(id)
 }
 
-/// The read-only path state: `HasPath`, `RemainingDistance`, then [`register_path`].
-pub(super) fn register_reads(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
+/// The read-only path state: `HasPath`, `PathPending`, `RemainingDistance`, then
+/// [`register_path`].
+pub(super) fn register_reads(
+    lua: &mlua::Lua,
+    table: &Table,
+    scene: ApiCell<Scene>,
+    nav: ApiCell<NavigationGraph>,
+) -> Reg {
     put(
         table,
         "HasPath",
@@ -30,6 +36,21 @@ pub(super) fn register_reads(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scen
                 .world
                 .nav_agent(id.read())
                 .is_some_and(|a| !a.cached_path.is_empty()))
+        }),
+    )?;
+    put(
+        table,
+        "PathPending",
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
+            let (id, scene) = (id.read(), scene.borrow());
+            let at = position(&scene, id);
+            let nav = &*nav.get(lua)?;
+            let nav = nav.borrow();
+            Ok(scene
+                .world
+                .nav_agent(id)
+                .is_some_and(|a| nav.path_pending(&a, at)))
         }),
     )?;
     put(

@@ -78,6 +78,7 @@ impl NavigationGraph {
         g.bake_generation = self.bake_generation.wrapping_add(1);
         g.static_watch = self.static_watch.take();
         g.tracked_scene = self.tracked_scene;
+        g.requests = std::mem::take(&mut self.requests); // the agents' waits (#2087)
         let mut state = BakeState { raw, inputs, log };
         state.log.record(g.bake_generation, None);
         g.bake_state = Some(Box::new(state));

@@ -91,8 +91,8 @@ pub struct NavMeshAgentComponent {
     // bloat scene files nor break pre-existing saves. `#[serde(skip)]` omits them
     // on save and defaults them on load. `tick_nav_agents` plans an A* path once
     // and walks `path_cursor` along it, re-planning only when this cache is
-    // invalidated (target moved, navmesh rebaked, next waypoint blocked, path
-    // exhausted, or staleness) — instead of a full A* search every frame.
+    // invalidated (target moved, navmesh rebaked, next waypoint blocked, or no
+    // path), through the graph's path queue (#2087) — instead of a full A* search every frame.
     /// World-space waypoints the agent steers through (empty = no valid path).
     #[serde(skip)]
     pub cached_path: Vec<Vec3>,
@@ -105,10 +105,10 @@ pub struct NavMeshAgentComponent {
     /// Navmesh bake generation the path was planned against; a rebake re-plans.
     #[serde(skip)]
     pub path_generation: u64,
-    /// Frames since the last re-plan; a bounded counter forces periodic refresh
-    /// (frame-count based, never wall-clock, so the sim stays deterministic).
+    /// The ticket of the path request the agent waits on (#2087), 0 when none: while
+    /// one is queued it keeps following its old path (Unity's `pathPending`).
     #[serde(skip)]
-    pub frames_since_replan: u32,
+    pub path_request: u32,
     /// Whether the cached path reaches the target (#458). A partial path ends on the
     /// reachable point nearest the target, and the agent stops there.
     #[serde(skip)]
@@ -180,7 +180,7 @@ impl Default for NavMeshAgentComponent {
             path_cursor: 0,
             planned_target: Vec3::ZERO,
             path_generation: 0,
-            frames_since_replan: 0,
+            path_request: 0,
             path_status: NavPathStatus::Invalid,
             path_links: Vec::new(),
             off_mesh_link: None,

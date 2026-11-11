@@ -7,7 +7,7 @@
 //! reaches), `snap` (which span a world point means), `astar` (the span search),
 //! `areas` (per-span area ids, their costs and agent masks, #460), `offmesh` (drop, jump and authored links between spans, #462),
 //! `pool` (the search scratch A\* reuses, #2083), `path` (smoothed paths, `SamplePosition`, `Raycast`), `flood` (one bounded Dijkstra
-//! answering many reachability questions at once, #1892), `agents` (cached-path planning + the steering tick), and
+//! answering many reachability questions at once, #1892), `agents` (cached-path planning + the steering tick), `request` (the agents' time-sliced path queue, #2087), and
 //! `avoidance` (ORCA local avoidance between agents, #463) — all hanging off the
 //! single re-exported [`NavigationGraph`] type.
 
@@ -34,6 +34,7 @@ mod offmesh;
 mod path;
 mod pool;
 mod reach;
+mod request;
 mod snap;
 mod surface;
 #[cfg(test)]
@@ -56,6 +57,7 @@ pub use grid::{NavSpan, NavigationGraph, SpanRef, DEFAULT_MAX_SLOPE, DEFAULT_MAX
 pub use obstacle::{tick_obstacles, ObstacleVolume};
 pub use offmesh::{LinkEnd, OffMeshLink, OffMeshLinkData, OffMeshLinkKind};
 pub use path::{path_length, NavPath, NavPathStatus, NavRaycastHit};
+pub use request::DEFAULT_ITERATIONS_PER_FRAME;
 // The bake settings are scene data (#721): the scene saves them, navigation reads them.
 pub use crate::scene::nav_settings::{NavMeshSettings, DEFAULT_AGENT_HEIGHT};
 pub use snap::SNAP_RINGS;
