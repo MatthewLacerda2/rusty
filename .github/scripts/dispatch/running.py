@@ -37,6 +37,14 @@ its pull request is ready (`cloud-brief.md`). For each issue's newest
   who can push (`ghrest.can_push`) is newer than the fire. The orchestrator
   posts a re-brief, then launches, so a newer brief is a hand-back waiting for
   its relaunch, with no coder on it;
+- fired, N's pull request a draft, and N blocked by an open issue M on GitHub
+  (its native `Blocked by`, `ghrest.blocked_by`) → ended, and said
+  ([`BLOCKED`] `#M`, #2063): a coder that finished and parked its draft on a
+  blocker has stopped, and takes no review until M lands. On 2026-11-11 the
+  showroom coder (#2031) parked PR #2055 as "Draft: blocked by #2053" and kept
+  its slot, so two launches (#2053 itself, and #2054) were refused with four
+  coders really working and went out with `--over-limit`. A blocker that is
+  closed blocks nothing, and a draft with no open blocker still counts;
 - fired, no open pull request, the issue open, and a pull request for N
   merged or closed after the fire → ended (#1913). A PR that says `Refs #N`
   leaves its issue open: on 2026-11-08 #1684's PR #1903 merged at ≈05:40Z and
@@ -49,7 +57,7 @@ its pull request is ready (`cloud-brief.md`). For each issue's newest
   request is past the one page of closed ones read ([`GitHub.closed`]);
 - fired, no open pull request, and the issue closed (merged) → ended.
 
-A stalled coder (draft, no newer brief) counts until the orchestrator deals
+A stalled coder (draft, no newer brief, no open blocker) counts until the orchestrator deals
 with it, which is the right pressure; the refusal names every counted routine
 and when it fired, and `--over-limit` launches anyway. The routines list holds
 only the account's 20 newest routines (`routine.ENVIRONMENT_FROM`), so a coder
@@ -81,6 +89,8 @@ FIRST_PUSH = timedelta(hours=2)
 STALE = "no PR in 2 h: ended or stalled"
 #: Why a ready pull request with no review record still counts (#2017).
 REVIEWING = "in review"
+#: Why a fired coder's draft on a blocked issue is not counted (#2063); `#M…` follows.
+BLOCKED = "draft blocked by"
 
 ISSUE = re.compile(re.escape(routine.NAME_PREFIX) + r"(\d+)\b")
 BRANCH = re.compile(r"^(\d+)-")
@@ -94,6 +104,9 @@ class GitHub:
     caller may answer it from one page of the newest closed pull requests (#1913)."""
 
     pulls: list[dict]
+    #: An issue's open blockers by number (`ghrest.open_blockers`), `None` when unreadable;
+    #: read only for an issue whose pull request is a draft (#2063).
+    blockers: Callable[[int], list[int] | None]
     comments: Callable[[int], list | None]
     issue: Callable[[int], dict | None]
     now: datetime
@@ -172,6 +185,12 @@ def state(found: dict, github: GitHub) -> tuple[str, str]:
         return "unknown", f"could not read #{number}'s comments"
     if rebriefed(comments, since):
         return "ended", "a newer brief waits for its relaunch"
+    if mine:
+        blocked = github.blockers(number)
+        if blocked is None:
+            return "unknown", f"could not read #{number}'s blockers"
+        if blocked:
+            return "ended", f"{BLOCKED} " + ", ".join(f"#{b}" for b in blocked)
     return "running", "draft pull request" if mine else "no pull request yet"
 
 
@@ -202,14 +221,14 @@ def newest(routines: list[dict], launching: int) -> list[dict]:
 def coders(routines: list[dict], launching: int,
            github: GitHub) -> tuple[list[tuple[dict, str]], list[tuple[dict, str, str]]]:
     """The coder routines that count, as (routine, why), and the uncounted ones worth saying,
-    as (routine, placement, why): those that cannot be placed, and those [`STALE`] past
-    [`FIRST_PUSH`]."""
+    as (routine, placement, why): those that cannot be placed, those [`STALE`] past
+    [`FIRST_PUSH`], and drafts parked on an open blocker ([`BLOCKED`])."""
     counted, noted = [], []
     for found in newest(routines, launching):
         placed, why = state(found, github)
         if placed == "running":
             counted.append((found, why))
-        elif placed == "unknown" or why == STALE:
+        elif placed == "unknown" or why == STALE or why.startswith(BLOCKED):
             noted.append((found, placed, why))
     return counted, noted
 

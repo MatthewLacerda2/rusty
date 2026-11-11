@@ -26,8 +26,10 @@ class Fake:
     """GitHub and the routines API, answering from tables and noting the calls."""
 
     def __init__(self, issue: dict | None = None, comments: list | None = None, create=(200, None),
-                 routines: dict | None = None, pulls: list | None = None, threads: dict | None = None):
-        self.threads = threads or {}  # a pull request's conversation, by number (#2017)
+                 routines: dict | None = None, pulls: list | None = None, threads: dict | None = None,
+                 blockers: dict | None = None):
+        # a pull request's conversation (#2017) and an issue's recorded `blocked_by` (#2063), by number
+        self.threads, self.blockers = threads or {}, blockers or {}
         self.pulls = [] if pulls is None else pulls
         self.routines = ROUTINES if routines is None else routines
         self.issue = {"number": 9, "title": "Do it", "state": "open", "labels": []} if issue is None else issue
@@ -36,6 +38,8 @@ class Fake:
         self.calls: list[dict] = []
 
     def gh(self, path: str):
+        if "/dependencies/blocked_by" in path:
+            return self.blockers.get(int(path.split("/issues/")[1].split("/")[0]), [])
         if "/pulls" in path:
             return self.pulls if "page=1" in path else []
         if "/comments" in path:
