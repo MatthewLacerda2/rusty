@@ -3,6 +3,7 @@
 mod calls;
 mod controller;
 mod damage;
+mod warnings;
 
 use std::cell::RefCell;
 use std::rc::Rc;
