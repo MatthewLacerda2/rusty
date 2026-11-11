@@ -71,7 +71,9 @@ fn console_toggle(editor: &mut EditorUi, ui: &mut Ui, t: &Theme) {
 }
 
 /// Play outside Play, Stop (lit in the accent) during it; a click or the shortcut
-/// toggles. Stop always leaves Play and drops the selection.
+/// toggles. Stop always leaves Play and drops the selection. Play is greyed out,
+/// its shortcut ignored, while a bake runs, the tooltip saying why (#2042), as the
+/// bake buttons are greyed out during Play.
 fn transport(
     editor: &mut EditorUi,
     ui: &mut Ui,
@@ -79,7 +81,9 @@ fn transport(
     is_playing: &mut bool,
     t: &Theme,
 ) {
-    let toggled = ui.input_mut(|i| i.consume_shortcut(&PLAY_SHORTCUT));
+    // A running bake refuses Play (#2042); Stop is never refused.
+    let refusal = (!*is_playing).then(|| play_refusal(scene)).flatten();
+    let toggled = ui.input_mut(|i| i.consume_shortcut(&PLAY_SHORTCUT)) && refusal.is_none();
     let shortcut = ui.ctx().format_shortcut(&PLAY_SHORTCUT);
     let (glyph, verb) = if *is_playing {
         (icon::STOP, "Stop")
@@ -87,8 +91,9 @@ fn transport(
         (icon::PLAY, "Play")
     };
     let clicked = ui
-        .add(button(glyph, *is_playing, t))
+        .add_enabled(refusal.is_none(), button(glyph, *is_playing, t))
         .on_hover_text(format!("{verb} ({shortcut})"))
+        .on_disabled_hover_text(refusal.unwrap_or_default())
         .clicked();
     if clicked || toggled {
         if *is_playing {
@@ -99,6 +104,18 @@ fn transport(
     }
 }
 
+/// Why Play is refused now (`Scene::play_refusal`, #2042): only the dev build
+/// bakes, so only it refuses.
+fn play_refusal(scene: &Scene) -> Option<String> {
+    #[cfg(feature = "dev")]
+    return scene.play_refusal();
+    #[cfg(not(feature = "dev"))]
+    {
+        let _ = scene;
+        None
+    }
+}
+
 /// Leave Play, dropping a selection that names an entity of the play copy.
 fn stop(editor: &mut EditorUi, scene: &mut Scene, is_playing: &mut bool) {
     *is_playing = false;
@@ -106,6 +123,9 @@ fn stop(editor: &mut EditorUi, scene: &mut Scene, is_playing: &mut bool) {
     editor.selected_entity_id = None;
 }
 
+#[cfg(all(test, feature = "dev"))]
+#[path = "transport_bake_tests.rs"]
+mod bake_tests;
 #[cfg(test)]
 #[path = "transport_tests.rs"]
 mod tests;
