@@ -47,6 +47,8 @@ games! {
     // sorted: one game per line, so two branches adding a game land on different lines
     arena,
     fruit,
+    runner,
+    showroom,
     smoke,
     tetris,
     topple,
