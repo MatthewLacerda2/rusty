@@ -105,8 +105,12 @@ impl PhysicsWorld {
     /// `build_shape_for`) no longer matches its body's class: a body turned
     /// dynamic gets convex pieces and rolling cylinders and capsules, one turned
     /// static or kinematic the exact shapes. The stamp is compared before any mesh
-    /// is copied, so a moving body costs a lookup per collider. A collider whose
-    /// shape changed kind waits for the body rebuild, like every other shape edit.
+    /// is copied, so a moving body costs a lookup per collider. A shape edit
+    /// that changes kind is refit here only when it also changes the stamp (a
+    /// dynamic cylinder made a concave mesh: `ROLLING` to `DECOMPOSED`); one
+    /// that keeps it (cylinder to capsule, both `ROLLING`) waits for the body
+    /// rebuild, like every other shape edit. Either way the shape is the one a
+    /// load would build.
     /// A rebuild that fails keeps the old shape but takes the new stamp, so it
     /// warns once, not every step. Runs before [`Self::sync_masses`], which reads
     /// the new volume.

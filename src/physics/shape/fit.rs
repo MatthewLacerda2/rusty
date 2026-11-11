@@ -3,9 +3,9 @@
 //! Two shapes depend on their body. A concave mesh collider is the exact trimesh
 //! on a static or kinematic body and convex pieces on a dynamic one (#1886); a
 //! cylinder or capsule on a dynamic body is built to roll (`physics::contact`,
-//! #2071), and is the plain shape on any other. This builds a collider for an entity, logs why one was not built or not split,
-//! and stamps the fit it was built for, which the live sync reads when a body
-//! changes type in Play.
+//! #2071), and is the plain shape on any other. This builds a collider for an
+//! entity, logs why one was not built or not split, and stamps the fit it was
+//! built for, which the live sync reads when a body changes type in Play.
 
 use glam::Vec3;
 use rapier3d::prelude::*;

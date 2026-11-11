@@ -36,9 +36,14 @@
 //! platform) stays the exact `Cylinder`, so a body sliding round it meets a
 //! smooth side. The dispatcher sees shapes, never bodies, so a rolling cylinder
 //! is told apart by its shape: a `RoundCylinder` with no rounding, which the
-//! engine builds for nothing else. parry gives it the cylinder's contacts, mass
-//! and raycasts; only a point query (closest point) projects onto it by GJK,
-//! not in closed form.
+//! engine builds for nothing else. parry gives it the cylinder's contacts with
+//! polyhedral shapes, its mass and its raycasts; a point query (closest point),
+//! and so a contact with a ball, projects onto it by GJK (EPA when the point is
+//! inside), not in closed form, so a ball sunk deep into a cap can be pushed out
+//! along the centre-to-centre line. Capsules are the exception to "only on a
+//! dynamic body": every capsule gets fresh points ([`rolls`]), a static or
+//! kinematic one included, but only a dynamic one asks for the hook that keeps
+//! its pair out of rapier's recycling.
 //!
 //! **Fresh means every tick.** Besides parry's reuse inside a manifold, rapier
 //! recycles a whole pair (`IntegrationParameters::contact_recycling`) while its
