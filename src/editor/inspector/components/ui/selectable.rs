@@ -134,3 +134,12 @@ fn write_back(s: &mut SelectableComponent, edit: &SelectableComponent) {
         ops::set_select_on(s, dir, *target);
     }
 }
+
+impl crate::editor::inspector::components::add::AddEntry
+    for crate::components::SelectableComponent
+{
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Ui;
+    const LABEL: &'static str = "Selectable";
+    const ICON: &'static str = egui_phosphor::regular::CURSOR_CLICK;
+}

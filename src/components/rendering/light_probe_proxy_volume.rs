@@ -171,6 +171,11 @@ pub fn clamp_density(d: f32) -> f32 {
     }
 }
 
+impl crate::components::FirstClass for LightProbeProxyVolumeComponent {
+    const NAME: &'static str = "LightProbeProxyVolume";
+    const ALIASES: &'static [&'static str] = &["proxyvolume", "lppv"];
+}
+
 #[cfg(test)]
 #[path = "light_probe_proxy_volume_tests.rs"]
 mod tests;

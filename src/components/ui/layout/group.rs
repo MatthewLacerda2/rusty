@@ -124,3 +124,7 @@ impl LayoutGroupComponent {
         ][axis]
     }
 }
+
+impl crate::components::FirstClass for LayoutGroupComponent {
+    const NAME: &'static str = "LayoutGroup";
+}

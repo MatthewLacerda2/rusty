@@ -188,3 +188,8 @@ impl Default for NavMeshAgentComponent {
         }
     }
 }
+
+impl crate::components::FirstClass for NavMeshAgentComponent {
+    const NAME: &'static str = "NavMeshAgent";
+    const ALIASES: &'static [&'static str] = &["navagent"];
+}

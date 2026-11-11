@@ -6,7 +6,6 @@
 
 use serde_json::{json, Value};
 
-pub(crate) use super::mesh::mesh_value;
 use super::vec3;
 use crate::components::{
     CameraComponent, ColliderComponent, ColliderShape, LightComponent, MaterialAsset,
@@ -251,6 +250,27 @@ fn style_value(s: &RibbonStyle) -> Value {
         "texture_mode": s.texture_mode.name(),
         "blend": s.blend,
     })
+}
+
+/// A component whose snapshot is its saved form.
+fn serialized<T: serde::Serialize>(c: &T) -> Value {
+    serde_json::to_value(c).unwrap_or(Value::Null)
+}
+
+super::fields::snapshot! {
+    LightComponent => light_value,
+    ColliderComponent => collider_value,
+    RigidBodyComponent => rigidbody_value,
+    CameraComponent => camera_component_value,
+    NavMeshAgentComponent => nav_agent_value,
+    ParticleEmitterComponent => particle_value,
+    JointComponent => joint_value,
+    CharacterControllerComponent => character_controller_value,
+    LodGroupComponent => lod_group_value,
+    TrailComponent => trail_value,
+    LineComponent => line_value,
+    crate::components::LightProbeProxyVolumeComponent => serialized,
+    crate::components::PostProcessingComponent => serialized,
 }
 
 #[cfg(test)]

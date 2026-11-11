@@ -90,6 +90,10 @@ impl Default for AudioSourceComponent {
     }
 }
 
+impl crate::components::FirstClass for AudioSourceComponent {
+    const NAME: &'static str = "AudioSource";
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

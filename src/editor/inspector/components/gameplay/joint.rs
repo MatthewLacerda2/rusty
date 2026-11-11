@@ -248,3 +248,10 @@ fn draw_breaking(
         });
     }
 }
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::JointComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Physics;
+    const LABEL: &'static str = "Joint";
+    const ICON: &'static str = egui_phosphor::regular::LINK;
+}

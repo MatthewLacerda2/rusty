@@ -25,3 +25,7 @@ impl Default for MaskComponent {
         }
     }
 }
+
+impl crate::components::FirstClass for MaskComponent {
+    const NAME: &'static str = "Mask";
+}

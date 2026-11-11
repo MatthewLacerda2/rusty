@@ -21,6 +21,15 @@ use crate::scene::PostProcessingComponent;
 mod bloom;
 mod custom_effects;
 mod depth_of_field;
+
+impl crate::editor::inspector::components::add::AddEntry
+    for crate::components::PostProcessingComponent
+{
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Rendering;
+    const LABEL: &'static str = "Post Processing Component";
+}
+
 #[cfg(test)]
 mod dummy;
 mod exposure;

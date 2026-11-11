@@ -1,7 +1,7 @@
 //! src/scene/authoring/fields/kinds/mod.rs — every component `Component.*` reaches, by name.
 //!
-//! One [`Kind`] per first-class component (each of `Entity`'s `Option<…Component>`
-//! fields) plus the mandatory `Transform`; the field tables live beside, grouped
+//! One [`Kind`] per first-class component (each row of `components::registry`)
+//! plus the mandatory `Transform`; the field tables live beside, grouped
 //! by area.
 
 mod ai;
@@ -15,75 +15,30 @@ mod ui;
 use super::introspect::field_type;
 use super::table::{kind, Kind};
 use crate::components::animator::Playback;
+use crate::components::registry::first_class;
 use crate::components::*;
 use crate::scene::authoring::{ui::shader as ui_shader, ComponentKind as K};
 
 /// The reason on a field no inspector op writes yet; #1368 gates them in.
 const NO_OP: &str = "no inspector op writes it yet (#1368)";
 
-// Not sorted: Transform and Mesh first, then the Add Component menu's order.
-/// Every component, by the name `Component.*` answers to first.
-pub const KINDS: &[Kind] = &[
-    kind::<TransformComponent>("Transform", None, "transform"),
-    kind::<MeshComponent>("Mesh", Some(K::Mesh), "mesh"),
-    kind::<LightComponent>("Light", Some(K::Light), "light"),
-    Kind {
-        field_type: animator_field_type,
-        ..kind::<AnimatorComponent>("Animator", Some(K::Animator), "animator")
-    },
-    kind::<ColliderComponent>("Collider", Some(K::Collider), "collider"),
-    kind::<RigidBodyComponent>("RigidBody", Some(K::RigidBody), "rigidbody"),
-    kind::<MaterialComponent>("Material", Some(K::Texture), "material"),
-    kind::<NavMeshAgentComponent>("NavMeshAgent", Some(K::NavMeshAgent), "nav_agent"),
-    kind::<NavMeshObstacleComponent>("NavMeshObstacle", Some(K::NavMeshObstacle), "nav_obstacle"),
-    kind::<OffMeshLinkComponent>("OffMeshLink", Some(K::OffMeshLink), "offmesh_link"),
-    kind::<NavMeshModifierVolumeComponent>(
-        "NavMeshModifierVolume",
-        Some(K::NavMeshModifierVolume),
-        "nav_modifier",
-    ),
-    kind::<NavMeshModifierComponent>(
-        "NavMeshModifier",
-        Some(K::NavMeshModifier),
-        "nav_mesh_modifier",
-    ),
-    kind::<AIPerceptionComponent>("AIPerception", Some(K::AIPerception), "ai_perception"),
-    kind::<CameraComponent>("Camera", Some(K::Camera), "camera"),
-    kind::<ParticleEmitterComponent>("Particles", Some(K::Particles), "particles"),
-    kind::<PostProcessingComponent>("PostProcessing", Some(K::PostProcessing), "post_processing"),
-    kind::<AudioSourceComponent>("AudioSource", Some(K::Audio), "audio"),
-    kind::<ReverbZoneComponent>("AudioReverbZone", Some(K::ReverbZone), "reverb_zone"),
-    kind::<CanvasComponent>("Canvas", Some(K::Canvas), "canvas"),
-    kind::<RectTransformComponent>("RectTransform", Some(K::RectTransform), "rect_transform"),
-    kind::<ImageComponent>("Image", Some(K::Image), "image"),
-    kind::<CanvasGroupComponent>("CanvasGroup", Some(K::CanvasGroup), "canvas_group"),
-    kind::<RectMaskComponent>("RectMask", Some(K::RectMask), "rect_mask"),
-    kind::<MaskComponent>("Mask", Some(K::Mask), "mask"),
-    kind::<BackdropFilterComponent>("BackdropFilter", Some(K::BackdropFilter), "backdrop_filter"),
-    kind::<TextComponent>("Text", Some(K::Text), "text"),
-    kind::<SelectableComponent>("Selectable", Some(K::Selectable), "selectable"),
-    kind::<LayoutGroupComponent>("LayoutGroup", Some(K::LayoutGroup), "layout_group"),
-    kind::<LayoutElementComponent>("LayoutElement", Some(K::LayoutElement), "layout_element"),
-    kind::<JointComponent>("Joint", Some(K::Joint), "joint"),
-    kind::<CharacterControllerComponent>(
-        "CharacterController",
-        Some(K::CharacterController),
-        "character_controller",
-    ),
-    kind::<LodGroupComponent>("LODGroup", Some(K::LodGroup), "lod_group"),
-    kind::<LightProbeProxyVolumeComponent>(
-        "LightProbeProxyVolume",
-        Some(K::LightProbeProxyVolume),
-        "light_probe_proxy_volume",
-    ),
-    kind::<TrailComponent>("Trail", Some(K::Trail), "trail"),
-    kind::<LineComponent>("Line", Some(K::Line), "line"),
-    kind::<ShapeComponent>("Shape", Some(K::Shape), "shape"),
-];
+/// Declares [`KINDS`]: `Transform`, then each registry row (`components::registry`)
+/// under the name `Component.*` gives it ([`FirstClass::NAME`]).
+macro_rules! kinds {
+    ($($field:ident: $ty:ty => $kind:ident [$($acc:ident)*];)*) => {
+        /// Every component, by the name `Component.*` answers to first.
+        pub const KINDS: &[Kind] = &[
+            kind::<TransformComponent>("Transform", None, "transform"),
+            $(kind::<$ty>(<$ty as FirstClass>::NAME, Some(K::$kind), stringify!($field)),)*
+        ];
+    };
+}
+
+first_class!(kinds);
 
 /// An Animator field's type: its own derive's, else, for the fields it flattens
 /// from its `Playback` (which serde reads as a map, typeless), `Playback`'s.
-fn animator_field_type(name: &'static str) -> (bool, Option<&'static str>) {
+pub(super) fn animator_field_type(name: &'static str) -> (bool, Option<&'static str>) {
     match field_type::<AnimatorComponent>(name) {
         (false, None) => field_type::<Playback>(name),
         known => known,

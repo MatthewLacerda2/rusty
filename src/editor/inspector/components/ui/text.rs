@@ -133,3 +133,10 @@ fn write_back(t: &mut TextComponent, e: TextComponent) {
     ops::set_blend(t, e.blend);
     super::shader::write_back(&mut t.shader, e.shader);
 }
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::TextComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Ui;
+    const LABEL: &'static str = "Text";
+    const ICON: &'static str = egui_phosphor::regular::TEXT_T;
+}

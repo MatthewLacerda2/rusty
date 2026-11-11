@@ -185,3 +185,7 @@ impl ShapeGlow {
         self.size > 0.0 && self.color.w > 0.0 && self.intensity > 0.0
     }
 }
+
+impl crate::components::FirstClass for ShapeComponent {
+    const NAME: &'static str = "Shape";
+}

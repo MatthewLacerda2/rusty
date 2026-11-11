@@ -122,3 +122,10 @@ fn write_back(i: &mut ImageComponent, edit: ImageComponent) {
     image_ops::set_blend(i, edit.blend);
     super::shader::write_back(&mut i.shader, edit.shader);
 }
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::ImageComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Ui;
+    const LABEL: &'static str = "Image";
+    const ICON: &'static str = egui_phosphor::regular::IMAGE;
+}
