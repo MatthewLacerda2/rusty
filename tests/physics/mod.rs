@@ -5,6 +5,7 @@ mod contacts;
 mod gravity;
 mod live_edits;
 mod materials;
+mod primitive_colliders;
 mod queries;
 mod rapier;
 mod shape_casts;
