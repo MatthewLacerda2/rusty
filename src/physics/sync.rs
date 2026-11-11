@@ -61,8 +61,9 @@ impl PhysicsWorld {
         self.sync_sensors(scene, &owners);
         // Before the masses: a resized capsule changes its body's volume.
         self.sync_characters(scene, &owners);
-        // A body that changed type re-fits its concave meshes, before the masses.
-        self.sync_mesh_fits(scene, &owners);
+        // A body that changed type re-fits its meshes, cylinders and capsules,
+        // before the masses.
+        self.sync_fits(scene, &owners);
         self.sync_masses(scene, &owners);
         // The one pass a step's changes reach: pose, velocities, sleep.
         let owners = match owners {
