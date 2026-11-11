@@ -51,11 +51,15 @@ jobs:
           shared-key: coverage
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: System libs for winit/wgpu builds
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
+        uses: ./.github/actions/system-libs
+        with:
+          packages: pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       # Lavapipe here too (#489), so the whole-crate summary measures render code
       # the way build-test exercises it.
       - name: Software Vulkan driver (lavapipe)
-        run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
+        uses: ./.github/actions/system-libs
+        with:
+          packages: mesa-vulkan-drivers libvulkan1
       - name: Install cargo-llvm-cov and cargo-nextest
         uses: ./.github/actions/install-tool
         with:

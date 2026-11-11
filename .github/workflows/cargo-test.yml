@@ -50,9 +50,13 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: System libs for winit/wgpu builds
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
+        uses: ./.github/actions/system-libs
+        with:
+          packages: pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       - name: Software Vulkan driver (lavapipe)
-        run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
+        uses: ./.github/actions/system-libs
+        with:
+          packages: mesa-vulkan-drivers libvulkan1
       # Both feature sets. Each step keeps its log so the summary below can name the
       # failing tests instead of pointing at the raw log; `--no-fail-fast` runs every
       # binary, so every leak is named, not only the first binary's. The `dev` step is
@@ -108,7 +112,9 @@ jobs:
           shared-key: dead-pub
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: System libs for winit/wgpu builds
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
+        uses: ./.github/actions/system-libs
+        with:
+          packages: pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       - name: make dead-pub
         run: make dead-pub 2>&1 | tee dead-pub.log
         shell: bash -o pipefail {0}
