@@ -73,6 +73,24 @@ things follow:
   are refused for the whole run, before its first `Harness.Step` too (CLAUDE.md,
   *Provider calls are authoring, never gameplay*).
 
+**Asserting a clean run** (#2054). `Harness.Expect(cond, message)` records a
+pass or fail in `results.json`; `Harness.Warnings([after])` returns the run's
+console warnings and errors so far, oldest first, as `{ level = "warning" |
+"error", text }` tables, skipping the first `after` (default 0). It reads the
+console `console.log` is written from, engine warnings included (they join it
+after every tick, and when `Warnings` is called), and keeps every one of the run,
+past the 100 lines the console buffer holds; a repeat is one line, `text (×N)`, as
+the console folds it. So a scenario ends with
+
+```lua
+local w = Harness.Warnings()
+Harness.Expect(#w == 0, "no warnings: " .. (w[1] and w[1].text or "none"))
+```
+
+and one that provokes a warning on purpose counts first and reads past it
+(`local n = #Harness.Warnings()` … `Harness.Warnings(n)`). Nothing fails a run on
+a warning by itself: the scenario decides. `games/smoke` holds it.
+
 **Hearing a run** (#1579). `Harness.RecordAudio([path])` starts recording the
 game's final audio mix to a 48 kHz float WAV (`audio.wav` by default; a relative
 `path` is under the run's output folder) and returns its path; `Harness.StopAudio()`
@@ -656,6 +674,7 @@ recipe and scripts are committed; the project is regenerable output.
 | Game | What it is for |
 |---|---|
 | `arena` | The CS:GO yardstick in miniature: a two-floor deathmatch from primitives (a staircase, a ladder link, a drop, a crate to jump onto, a 10 cm wall bullets go through), snowman bots on `NavMeshAgent` + `AIPerception` + `EnvironmentQuery` fighting everyone, raycast guns with spread and recoil, a smoke grenade that blocks sight. Scenarios: `nav` (every spawn reaches every room and both floors), `match` (bots reach the kill limit, each scores and dies), `shot` (a wallbang hurts, a 40 cm wall stops it). `--param size=dust2` lays out 25 blocks, 120 m a side, for map-scale work (run on request). |
+| `showroom` | Lighting and reflections in one interior room: a polished floor (SSR from a minimum smoothness of 0.1), a mirror, a clear and a tinted glass pane, a drinking glass before the mirror, a lacquered pedestal (`ior`, `KHR_materials_specular`), an emissive sign, daylight through a window, a turned box and a sphere reflection probe, six light probes and a ball rolling through them with a proxy volume. Scenarios: `load`, `ball` (its probe light rises in the sun), `probes` (the volumes drawn as gizmos), `bake` (only with `--param bake=true`: a tiny Generate Lighting, applied on load). |
 | `smoke` | The generator's own proof: a floor, a crate with a Snyder texture, a looping zimmer blip and `mover.lua` sliding it along +X, a sun, a camera; one scenario asserting the crate moved, two shots. |
 
 ```sh

@@ -38,7 +38,7 @@ class InReview(unittest.TestCase):
         self.assertEqual(placed(FIRED, hub([pr(2, False)], {2: [note("Independent review", AT)]})), "running")
 
     def test_comments_that_cannot_be_read_are_unknown(self):
-        blind = running.GitHub(pulls=[pr(2, False)], comments=lambda n: None, issue=lambda n: {"state": "open"},
+        blind = running.GitHub(pulls=[pr(2, False)], blockers=lambda n: [], comments=lambda n: None, issue=lambda n: {"state": "open"},
                                now=running.when(AT), closed=lambda n: [])
         self.assertEqual(placed(FIRED, blind), "unknown")
 

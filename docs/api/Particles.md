@@ -26,6 +26,8 @@ actually spawned (the `max_particles` cap may swallow some).
 | `Particles.GetRenderMode` | `(id)` | mode name, or `nil` without an emitter |
 | `Particles.SetStretch` | `(id, length_scale, speed_scale?)` | — (each clamped ≥ 0) |
 | `Particles.SetMesh` | `(id, mesh?, material?)` | — (`nil` clears) |
+| `Particles.SetTexture` | `(id, path?)` | — (a project-relative image; `nil` or `""` goes back to the default soft disc) |
+| `Particles.GetTexture` | `(id)` | the sprite's image path, or `nil` (the default sprite, or no emitter) |
 | `Particles.SetFlipbook` | `(id, columns, rows, opts?)` | — |
 | `Particles.SetSoft` | `(id, distance)` | — (world units, clamped ≥ 0; 0 = off) |
 | `Particles.SetLit` | `(id, lit)` | — |
@@ -104,6 +106,13 @@ set by the emitter's `inherit_velocity`.
   colour and gradient do not apply — the material is the look. Casings, debris,
   glass (a Transparent material sorts with the glass).
 
+**Texture.** `SetTexture(id, path)` sets the sprite image (the inspector's
+*Texture* and `Component.Set(id, "Particles", { texture = … })` write the same
+field). An emitter with no texture draws Unity's default particle: a soft white
+disc whose alpha falls to 0 at its rim, tinted by the emitter's colour. A path
+that fails to load draws the renderer's missing-texture checker instead, so a
+typo shows. Mesh particles ignore it (the material is the look).
+
 **Flipbooks.** `SetFlipbook(id, columns, rows, opts)` treats the texture as a
 `columns × rows` sprite sheet read left-to-right, top-to-bottom; each particle
 plays it over its life. `opts`: `cycles` (plays per life, default 1) and
@@ -122,6 +131,7 @@ back to front among themselves.
 ```lua with=sparks,smoke,casings
 Particles.SetRenderMode(sparks, "stretched")
 Particles.SetStretch(sparks, 1, 0.05)
+Particles.SetTexture(smoke, "assets/textures/smoke_sheet.png")
 Particles.SetFlipbook(smoke, 4, 4, { random_start = true })
 Particles.SetSoft(smoke, 0.5)
 Particles.SetLit(smoke, true)
