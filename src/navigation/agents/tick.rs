@@ -122,8 +122,8 @@ impl NavigationGraph {
         current_pos: Vec3,
         delta_time: f32,
     ) -> Vec2 {
-        // Query the next waypoint from the agent's cached path,
-        // re-planning with A* only when the cache is invalid (#126).
+        // Query the next waypoint from the agent's cached path (#126), which the
+        // path queue re-plans when it goes stale (#2087).
         let feet = agent.feet(current_pos);
         let next_step = self.cached_next_step(agent, feet);
         if agent.off_mesh_link.is_some() {

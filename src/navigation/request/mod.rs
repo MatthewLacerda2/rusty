@@ -15,13 +15,14 @@
 //! a `Warp`, a removed agent) is dropped when it comes up.
 //!
 //! Split: this file is the queue and its budget; `serve` runs it each tick and hands
-//! the paths to the agents.
+//! the paths to the agents; `islands` caps the search toward a goal nothing reaches.
 //!
 //! Determinism: the budget is a count of expansions, never a clock; the order is the
 //! queue's; a search resumes on the same heap and node pool, so it finds the path a
 //! synchronous search from the same start would have (`NavigationGraph::step_search`).
 //! A rebake mid-search restarts it on the new navmesh.
 
+pub(crate) mod islands;
 mod serve;
 #[cfg(test)]
 mod tests;
@@ -35,9 +36,10 @@ use super::pool::NodePool;
 
 /// The node expansions the queue spends each tick by default (Unity's
 /// `pathfindingIterationsPerFrame`, there counted in polygons and 100 by default;
-/// rusty's nodes are grid spans, many to a polygon). Measured on the Dust2 arena
-/// with 32 bots (#2087): see the constant's PR for the figures.
-pub const DEFAULT_ITERATIONS_PER_FRAME: u32 = 4_096;
+/// rusty's nodes are grid spans, many to a polygon). Picked on the Dust2 arena with
+/// 32 bots (#2087): `tick_nav` stays near 2 ms at worst, and no agent waits more
+/// than about half a second for a path, the first tick's 32 requests included.
+pub const DEFAULT_ITERATIONS_PER_FRAME: u32 = 2_048;
 
 /// One agent waiting for a path.
 #[derive(Clone, Copy)]

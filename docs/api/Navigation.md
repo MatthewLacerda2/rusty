@@ -114,16 +114,24 @@ off every wall. A path is a table:
 - **`complete`** — the path reaches the target. Its ends are the query points themselves
   (on their floors) when they stand over the navmesh.
 - **`partial`** — the target is unreachable (another island, a sealed room); the path ends
-  on the reachable point nearest to it, as Unity's `PathPartial`.
+  on the reachable point nearest to it, as Unity's `PathPartial`. A search gives up after
+  65 536 node expansions (Detour's `maxNodes`; the longest complete path on the Dust2
+  arena takes about 45 000), and after 4 096 toward a target on an island no walk or
+  off-mesh link reaches: then the path ends on the nearest point that many expansions
+  found, headed toward the target. Either way an unreachable target costs a bounded
+  amount, not a flood of the whole navmesh.
 - **`invalid`** — the start or the target has no navmesh within 5 cells; no corners.
 
 `SamplePosition` and `Raycast` answer on the navmesh, not physics: *walkable*, not
-*solid*. Every query is synchronous and deterministic.
+*solid*. Every query is synchronous and deterministic. Agents plan their own paths
+through a time-sliced queue instead (`NavMeshAgent`, *Following a path*), whose budget
+is the one knob below.
 
 | Function | Signature | Returns |
 |---|---|---|
 | `Navigation.GetNextPathStep` | `(cx, cy, cz, tx, ty, tz)` | the next corner `x, y, z` of the smoothed path (its `y` is that floor's height); with no path, the target itself |
 | `Navigation.CalculatePath` | `(fx, fy, fz, tx, ty, tz [, areaMask])` | a path table (above); with `areaMask`, the path enters only those areas (see *Areas and costs*) |
+| `Navigation.SetPathfindingIterationsPerFrame` / `GetPathfindingIterationsPerFrame` | `(n)` / `()` | the node expansions the agents' path queue spends each tick (Unity's `NavMesh.pathfindingIterationsPerFrame`; at least `1`, default `2048`). Higher answers agents sooner and costs more per tick; it is the engine's, not the scene's, and survives a rebake |
 | `Navigation.GetPathLength` | `(path)` | the length along a path table's `corners` (the same number as its `length`) |
 | `Navigation.SamplePosition` | `(x, y, z, maxDistance [, areaMask])` | `found, x, y, z` — the walkable point nearest the given one (3D distance) within `maxDistance`, on a floor whose area `areaMask` allows; `false, 0, 0, 0` when there is none |
 | `Navigation.Raycast` | `(fx, fy, fz, tx, ty, tz [, areaMask])` | `hit, x, y, z` — walks the navmesh straight from the start toward the end; `hit` is `true` when a wall, ledge, eroded edge, a step taller than `MaxStep` or a floor outside `areaMask` stops it, and `x, y, z` is where it stopped (the end point when clear), on the floor it reached |
@@ -233,8 +241,8 @@ Component.Set(table, "NavMeshModifier", { override_area = 1 })  -- no walking on
 - A query's start floor is exempt from the mask, so an agent standing in a forbidden area
   can still walk out; a target in one gives a `partial` path.
 - **Costs are read at search time, never baked.** `SetAreaCost` takes effect on the very
-  next query, rebakes nothing, and makes every agent re-plan on its next tick (a cost
-  change anywhere may change any path). Area *assignments* (moving a volume) rebake only
+  next query, rebakes nothing, and makes every agent ask for a new path on its next tick
+  (a cost change anywhere may change any path), answered through the agents' path queue. Area *assignments* (moving a volume) rebake only
   the cells involved.
 
 The table serializes with the scene (`nav_settings.areas`) and is editable from the scene

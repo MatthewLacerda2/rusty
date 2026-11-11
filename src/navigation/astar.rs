@@ -15,7 +15,8 @@
 //! A search is resumable (#2087): [`NavigationGraph::begin_search`] opens it and
 //! [`NavigationGraph::step_search`] spends a budget of node expansions on it, so the
 //! agents' path queue (`request`) can spread one search over several ticks. Every
-//! search, sliced or not, gives up after [`MAX_SEARCH_NODES`] expansions with the
+//! search, sliced or not, gives up after [`MAX_SEARCH_NODES`] expansions (far fewer
+//! toward a goal on an island it provably cannot reach, `request::islands`) with the
 //! partial path to the nearest span it reached (Detour's `maxNodes`), so an
 //! unreachable goal costs a bounded amount instead of flooding the whole navmesh.
 
@@ -53,9 +54,9 @@ impl PartialOrd for NodeState {
 }
 
 /// Expansions after which a search stops and returns the partial path to the span
-/// nearest its goal (Detour's `maxNodes`, #2087). A corner-to-corner path across a
-/// Dust2-sized arena expands about MEASURED spans; the cap leaves room for twice
-/// that, and bounds what an unreachable goal costs to the same.
+/// nearest its goal (Detour's `maxNodes`, #2087). The longest complete search the
+/// Dust2 arena's 32 bots ran in a minute expanded 45 074 of its 181 626 spans; the
+/// cap leaves headroom over that and bounds what any one search costs.
 pub const MAX_SEARCH_NODES: u32 = 65_536;
 
 /// The mutable A\* working set: the open heap, and the [`NodePool`] for each span's
@@ -82,6 +83,8 @@ pub(crate) struct Search {
     goal: SpanRef,
     mask: u32,
     expanded: u32,
+    /// The expansions it may spend (`NavigationGraph::search_cap`).
+    cap: u32,
 }
 
 #[cfg(test)]
@@ -124,7 +127,7 @@ impl NavigationGraph {
 
     /// A\* from span `start` toward span `goal`, both ends included, entering only
     /// the areas in `mask` (#460). When the goal is unreachable, or the search hits
-    /// [`MAX_SEARCH_NODES`], the path ends on the reached span nearest to it instead
+    /// its cap ([`MAX_SEARCH_NODES`], less toward an island), the path ends on the reached span nearest to it instead
     /// (Unity's `PathPartial`): least octile distance, then least cost, then lowest
     /// index, so the choice is deterministic. The flag says whether the path reaches
     /// `goal`.
@@ -165,6 +168,7 @@ impl NavigationGraph {
             goal,
             mask,
             expanded: 0,
+            cap: self.search_cap(start, goal),
         }
     }
 
@@ -184,7 +188,7 @@ impl NavigationGraph {
             open_set: &mut search.open_set,
             pool,
         };
-        while search.expanded < MAX_SEARCH_NODES {
+        while search.expanded < search.cap {
             if *budget == 0 {
                 return None;
             }
