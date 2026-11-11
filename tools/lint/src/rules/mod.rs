@@ -15,6 +15,7 @@ mod active_self;
 mod api_parity;
 mod asset_write;
 mod atomic_write;
+mod body_table;
 mod converter_log;
 mod dir_size;
 mod drag_range;
@@ -71,6 +72,7 @@ const RULES: &[(Rule, Allow)] = &[
     (api_parity::run, Allow::Own),
     (asset_write::run, Allow::Inline),
     (atomic_write::run, Allow::Inline),
+    (body_table::run, Allow::Inline),
     (converter_log::run, Allow::Inline),
     (dir_size::run, Allow::Own),
     (drag_range::run, Allow::Inline),

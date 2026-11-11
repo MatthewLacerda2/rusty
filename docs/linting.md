@@ -42,6 +42,7 @@ agent can read exactly what failed.
 | One name table per enum | `tools/lint -- --rules` (`named-enum`) | **hard gate**: no file of `src/` hand-writes both a parse (`fn parse(_: &str) -> Option<Self>` in an `impl T`, or a free `fn parse_*(_: &str) -> Option<T>`) and a name (`fn name`/`fn as_str(self) -> &'static str`, or a free `fn *_name(_: T) -> &'static str`) for one type, nor a `const`/`static` table of `(T, &str)` pairs — a script-facing enum declares its names once with `core::named_enum!`, which writes `ALL`, `name`, a case-insensitive `parse`, `Display` and its serde (#1478); a parse that does more takes `// lint: allow(named-enum) <why>` (#1329) |
 | One world space | `tools/lint -- --rules` (`world-space`) | **hard gate**: outside `ecs::world_space` and `components::transform`, no engine code line decomposes a matrix (`to_scale_rotation_translation`), names the retired `compute_world_matrix` / `world_matrix(` / `parent_world_matrix`, or folds a Transform over `ancestors(` — world space is read from `ecs::World`'s world API; test code is not scanned, and converting file data takes `// lint: allow(world-space) <why>` (#1196) |
 | Order-free lists stay sorted | `tools/lint -- --rules` (`sorted`) | **hard gate**: a list under a `// sorted: <why>` (or `<!-- sorted: <why> -->`) marker stays in order up to its first blank line, so two branches adding entries touch different lines (#911) |
+| Physics body changes are counted | `tools/lint -- --rules` (`body-table`) | **hard gate**: a non-test line of `src/physics/` that calls `.set_body_type(`, or `.insert(` / `.remove(` on `bodies`, fails, since the character controller sweeps a cached copy of the body table remade only when its change counter moves; go through `PhysicsWorld::insert_body` / `remove_body` / `ControllerBodies::retype`, which bump it and carry `// lint: allow(body-table) <why>` (#2061) |
 | Physics sync borrows only to write | `tools/lint -- --rules` (`physics-borrow`) | **hard gate**: a non-test line of `src/physics/` that borrows a rapier body or collider mutably (`bodies`/`colliders` with `.get_mut(`, `.iter_mut(`, or an index under `&mut` or before a `.set_` call or an assignment) fails, since rapier marks whatever is borrowed modified, written or not, and the full and incremental syncs then step differently; borrow through `physics::writes::body_to_write` / `collider_to_write`, which compare first; the two helpers take `// lint: allow(physics-borrow) <why>` (#1798) |
 | Portable paths | `tools/lint -- --rules` | **hard gate** (`slash-join`): `src/` and `tests/` never join a `/`-separated path (literal, `format!` or constant) onto a path or make a path from one; they join one part per call or join `core::paths::native(…)`, and never `format!` a native path (`.to_string_lossy()`, `.display()`) before a `/`: that is `core::paths::to_slash` (#1332, #1371, #1428) |
 | Post effect completeness | `cargo test` (`render::postfx::effects::completeness`, #1467) | **hard gate**: every effect in `render::postfx::effects::POST_EFFECTS` has its settings (a `PostProcessingComponent` field, or a `CameraComponent` field named after it for a camera effect), its authoring row, its `Graphics.*` registrar, its Inspector section, a `<!-- effect: <name> -->` section in `docs/api/Graphics.md` naming each knob's tween path, and, when player-facing, a `GraphicsOption` of its name with a row in the doc's *Player options*; each composite texture it declares is bound in the assembled composite, at its place (#1473); and no layer lists an effect the renderer lacks. A must-flag test removes each part in turn |
@@ -258,6 +259,17 @@ new flag, gate, CI step or baseline.
   moves rather than writes (the import cache's staging swap, the seed's staged
   files) carries an inline allow. Comment text never counts;
   `tests/` and `tools/` are not scanned (`rules/atomic_write.rs`).
+- **`body-table`** (#2061) — the character controller's sweeps read a copy of
+  the physics world's body table with every kinematic body shown fixed
+  (`physics::character::bodies`), cached and remade only when an exact change
+  counter moves, so a move never walks every body. A body inserted, removed or
+  retyped without bumping it leaves the controller sweeping a stale table. So a
+  non-test line of `src/physics/` that calls `.set_body_type(`, or `.insert(` /
+  `.remove(` on `bodies` (also wrapped onto the line below its receiver), fails;
+  the change goes through `PhysicsWorld::insert_body`, `remove_body` or
+  `ControllerBodies::retype`, the three lines that carry
+  `// lint: allow(body-table) <why>`, besides the copy's own retype of its
+  kinematic bodies (`rules/body_table.rs`).
 - **`converter-log`** (#1172) — a converter that logs a failure and carries on
   returns `Ok`, and the import cache stamps a `.glb` missing a part as current
   (#1168); one that logs a skip is heard once, then never again from the cache. So

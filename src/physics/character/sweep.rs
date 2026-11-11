@@ -95,7 +95,8 @@ impl PhysicsWorld {
     /// flat).
     fn ground_below(&self, m: &MoveCtx, pos: &Pose) -> Option<Vec3> {
         let probe = ShapeCastOptions::with_max_time_of_impact(m.skin + GROUND_PROBE);
-        let hit = self
+        let view = self.controller_view();
+        let hit = view
             .queries(m.filter)
             .cast_shape(pos, -Vector::Y, &m.shape, probe);
         hit.and_then(|(_, h)| h.normal1.try_normalize())
@@ -119,9 +120,10 @@ impl PhysicsWorld {
         let mut ground = None;
         let mut flat_hit = false;
         let mut collisions = Vec::new();
+        let view = self.controller_view();
         let movement = m.controller.move_shape(
             FIXED_DELTA_TIME,
-            &self.queries(m.filter),
+            &view.queries(m.filter),
             &m.shape,
             &m.start,
             motion,
