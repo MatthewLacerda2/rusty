@@ -152,8 +152,8 @@ The window must be built with `--features dev` for its socket to exist.
 
 A game project needs no registering: a `dev` build's edit-open writes the project's
 `.mcp.json` (README § Game projects), which Claude Code offers the first time it starts
-in the folder. It registers two servers, both the checkout's built
-`<checkout>/target/debug/session-mcp`: `rusty` in attach mode (`--attach`, the editor
+in the folder. It registers two servers, both a built `session-mcp` of the checkout
+(`<checkout>/target/<profile>/session-mcp`): `rusty` in attach mode (`--attach`, the editor
 window) and `rusty-headless` in embed mode (`--project <root>`). They run the binary,
 not `cargo run`: from a game folder cargo would ignore the checkout's
 `rust-toolchain.toml` and `.cargo/config.toml` and cold-build the engine past Claude
@@ -162,7 +162,12 @@ session-mcp --bin rusty`, the editor beside it so the window `rusty` attaches to
 new as the server). Use one at a time: two worlds saving the same scene overwrite each
 other. The engine owns only those two entries under `mcpServers`, keeping any other
 server and key in the file; the paths are absolute, so each edit-open rewrites them to
-this machine's checkout.
+this machine's checkout. An entry whose `command` already names a `session-mcp` under
+this checkout's `target/` (say `target/release/session-mcp`, set by hand for faster
+bakes) keeps that `command`, and only its `args` are refreshed. Any other entry gets the
+`session-mcp` beside the binary doing the open (a release `rusty` writes
+`target/release/`), or, when that profile has none, the first of `target/debug/` and
+`target/release/` that does, else `target/debug/` (#2024).
 
 To register it by hand instead, build a dev binary once, then point Claude Code at it:
 
