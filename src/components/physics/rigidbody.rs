@@ -1,6 +1,6 @@
 //! src/components/physics/rigidbody.rs — Rigidbody component
 //!
-//! mass/velocity/gravity/kinematic. Unity: Rigidbody. Moved verbatim from the
+//! mass/velocity/gravity/kinematic/drag. Unity: Rigidbody. Moved verbatim from the
 //! former `core/scene.rs`.
 
 use glam::Vec3;
@@ -42,6 +42,23 @@ pub struct RigidBodyComponent {
     /// every existing scene document loads unchanged.
     #[serde(default)]
     pub collision_detection: CollisionDetection,
+    /// Linear damping, ≥ 0 (Unity: `Rigidbody.drag`, default `0`): rapier scales
+    /// the body's linear velocity by `1 / (1 + dt·drag)` each tick, so a falling
+    /// body reaches a terminal speed and thrown debris slows in the air.
+    #[serde(default)]
+    pub drag: f32,
+    /// Angular damping, ≥ 0 (Unity: `Rigidbody.angularDrag`, default `0.05`): the
+    /// same decay on the spin, so a ball rolling on the floor comes to rest (a rolling
+    /// `Cylinder` does not yet, #2071).
+    #[serde(default = "default_angular_drag")]
+    pub angular_drag: f32,
+}
+
+/// Unity's `Rigidbody.angularDrag` default.
+pub const DEFAULT_ANGULAR_DRAG: f32 = 0.05;
+
+fn default_angular_drag() -> f32 {
+    DEFAULT_ANGULAR_DRAG
 }
 
 impl crate::components::FirstClass for RigidBodyComponent {
