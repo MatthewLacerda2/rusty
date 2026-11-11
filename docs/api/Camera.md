@@ -9,7 +9,7 @@
 | `Camera.GetYaw` / `SetYaw` | `()` / `(yaw)` | degrees |
 | `Camera.GetPitch` / `SetPitch` | `()` / `(pitch)` | degrees (clamped ±89) |
 | `Camera.GetFov` / `SetFov` | `()` / `(fov)` | the **vertical** field of view, in degrees (clamped 1–179); the main camera entity's field of view when there is one (same as `SetFieldOfView` on it), else the free view camera's |
-| `Camera.VerticalToHorizontalFov` / `HorizontalToVerticalFov` | `(degrees, aspect)` | degrees: the same view's angle along the other axis at `aspect` (width / height), Unity's `VerticalToHorizontalFieldOfView` / `HorizontalToVerticalFieldOfView`. A 90° horizontal view at 16:9 is about 58.7° vertical |
+| `Camera.VerticalToHorizontalFov` / `HorizontalToVerticalFov` | `(degrees, aspect)` | degrees: the same view's angle along the other axis at `aspect` (width / height), Unity's `VerticalToHorizontalFieldOfView` / `HorizontalToVerticalFieldOfView`. A 90° horizontal view at 16:9 is about 58.7° vertical. As in Unity, neither checks its input (an aspect of 0 or a NaN passes through); `SetFieldOfView` holds the result to 1–179 |
 | `Camera.WorldToScreen` | `(x, y, z [, canvas])` | `sx, sy, depth, onScreen` — see below |
 | `Camera.ScreenToWorldRay` | `(x, y)` | `ox, oy, oz, dx, dy, dz` — the ray's origin (on the near plane) and unit direction |
 | `Camera.ResetHistory` | `([id])` | — the next frame of camera `id`'s view (the main camera when omitted or `nil`) starts every history over; see *Teleports* |

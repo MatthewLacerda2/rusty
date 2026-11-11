@@ -52,7 +52,10 @@ pub(super) fn draw_fov(
         FovAxis::Horizontal => ("horizontal", FovAxis::Vertical, "vertical"),
     };
     let range = axis.show(camera_ops::MIN_FOV, aspect)..=axis.show(camera_ops::MAX_FOV, aspect);
-    let mut fov = axis.show(cam.fov, aspect);
+    // The held angle, as the lens draws it: a hand-edited scene's out-of-range
+    // `fov` would convert to nonsense (tan past 90° is negative).
+    let held = cam.fov.clamp(camera_ops::MIN_FOV, camera_ops::MAX_FOV);
+    let mut fov = axis.show(held, aspect);
     ui.horizontal(|ui| {
         ui.label(format!("Field of View ({label}):"));
         if ui
@@ -67,6 +70,6 @@ pub(super) fn draw_fov(
             *is_dirty = true;
         }
     });
-    let equivalent = other.show(cam.fov, aspect);
+    let equivalent = other.show(axis.store(fov, aspect), aspect);
     ui.weak(format!("= {equivalent:.1}° {other_axis} at {aspect:.2}:1"));
 }
