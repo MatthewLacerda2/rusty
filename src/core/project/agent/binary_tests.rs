@@ -3,8 +3,8 @@
 
 use serde_json::json;
 
-use super::agent::{is_checkout_binary, merge, session_binary, SERVERS};
-use super::*;
+use super::super::*;
+use super::{is_checkout_binary, merge, session_binary, SERVERS};
 
 fn native(slashed: &str) -> PathBuf {
     PathBuf::from(crate::core::paths::native_string(slashed))

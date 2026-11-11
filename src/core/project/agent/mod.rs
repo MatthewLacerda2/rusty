@@ -1,4 +1,4 @@
-//! src/core/project/agent.rs — the files that make a project ready for an agent (#1313).
+//! src/core/project/agent/mod.rs — the files that make a project ready for an agent (#1313).
 //!
 //! A game is built by a Claude session started in its project folder, so an
 //! edit-open writes two files at the root:
@@ -35,7 +35,7 @@ pub const CLAUDE_FILE: &str = "CLAUDE.md";
 pub const MCP_FILE: &str = ".mcp.json";
 /// The server entries under `mcpServers` the engine owns: attach and embed mode.
 pub(super) const SERVERS: [&str; 2] = ["rusty", "rusty-headless"];
-const CLAUDE_TEMPLATE: &str = include_str!("game_claude.md");
+const CLAUDE_TEMPLATE: &str = include_str!("../game_claude.md");
 /// The bridge binary's file name, as cargo builds it into `target/<profile>/`.
 const SESSION_MCP: &str = "session-mcp";
 
@@ -209,3 +209,10 @@ pub(super) fn claude_md(root: &Path, engine: &Path) -> String {
         .replace("{name}", &name)
         .replace("{engine}", &engine.to_string_lossy())
 }
+
+#[cfg(test)]
+mod binary_tests;
+#[cfg(test)]
+mod mcp_tests;
+#[cfg(test)]
+mod tests;

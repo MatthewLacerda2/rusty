@@ -3,9 +3,9 @@
 
 use serde_json::{json, Value};
 
-use super::agent::{merge, write_for, SERVERS};
-use super::agent_tests::fresh;
-use super::*;
+use super::super::*;
+use super::tests::fresh;
+use super::{merge, write_for, SERVERS};
 
 const ENGINE: &str = "/engine";
 
