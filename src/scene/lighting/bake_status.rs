@@ -86,8 +86,12 @@ impl Scene {
         }
         let progress = match &self.lighting_bake_status {
             BakeStatus::Running(progress) => progress.clone(),
-            // A `GenerateAsync` the editor's next frame starts: its lightmaps.
-            _ => BakeProgress::starting("lighting"),
+            // A `GenerateAsync` the editor's next frame starts: nothing runs yet,
+            // so there is no Cancel to point at, only the wait.
+            _ => BakeProgress {
+                cancellable: false,
+                ..BakeProgress::starting("lighting")
+            },
         };
         let percent = progress
             .percent
@@ -106,8 +110,8 @@ impl Scene {
         self.lighting_bake_running || self.lighting_bake_requested
     }
 
-    /// Drop a pending `Lighting.GenerateAsync()` because `why` (Play asked for,
-    /// Stop, File ▸ New, a load): a request belongs to the scene and the mode it was made in, so it
+    /// Drop a pending `Lighting.GenerateAsync()` because `why` (Stop, File ▸ New,
+    /// a load): a request belongs to the scene and the mode it was made in, so it
     /// never bakes a scene the agent did not ask about. The status says so.
     pub fn drop_bake_request(&mut self, why: &str) {
         if std::mem::take(&mut self.lighting_bake_requested) {
@@ -144,7 +148,10 @@ mod tests {
         scene.lighting_bake_requested = true;
         scene.lighting_bake_status = BakeStatus::Requested;
         let asked = scene.play_refusal().expect("requested");
-        assert_eq!(asked, "Baking lighting — Cancel the bake to play");
+        assert_eq!(
+            asked,
+            "Baking lighting — wait for the bake to finish to play"
+        );
         scene.lighting_bake_requested = false;
         scene.lighting_bake_running = true;
         scene.lighting_bake_status = BakeStatus::Running(BakeProgress {

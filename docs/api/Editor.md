@@ -120,7 +120,10 @@ that frame.
 `Lighting.GenerateAsync()` waits to start it (`Lighting.IsRunning()` reads `true`),
 `Editor.EnterPlay()` errors with the line the greyed-out Play button's tooltip shows
 (`Editor.EnterPlay: Baking lighting: 42% — Cancel the bake to play`); cancel the
-bake or wait for `IsRunning()` to read `false`. Once Play is asked for,
+bake or wait for `IsRunning()` to read `false` (a `GenerateAsync` not yet started
+has no Cancel: its line says to wait). `Editor.OpenDemo` is the exception: it is not
+refused, and the bake waits through the replay and resumes once the demo closes
+([*The demo timeline*](#the-demo-timeline)). Once Play is asked for,
 `Lighting.GenerateAsync()` errors instead. In one line the calls' order decides:
 `Lighting.GenerateAsync(); Editor.EnterPlay()` refuses the `EnterPlay`
 ([`Lighting`](Lighting.md), *A bake and Play*).

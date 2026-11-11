@@ -29,7 +29,9 @@ const PROGRESS_REPAINT: Duration = Duration::from_millis(100);
 /// lighting. Starts the button's job when a script asked (`Lighting.GenerateAsync`,
 /// #1999). Runs whether or not the scene card is showing, and waits while the
 /// scene plays. Tells the scene whether a bake is running and how far, so a
-/// script's bake waits its turn and Play says why it waits (#2042).
+/// script's bake waits its turn and Play says why it waits (#2042). The frame a
+/// bake ends, is dropped or never starts repaints at once: the header read the
+/// refusal before this ran, and outside Play the window sleeps until asked.
 pub fn poll(
     editor: &mut EditorUi,
     ctx: &egui::Context,
@@ -37,12 +39,17 @@ pub fn poll(
     log: &mut ConsoleLogs,
     nav: &NavigationGraph,
 ) {
+    let was_busy = scene.bake_busy();
     super::take_request(editor, scene, log);
     drive(editor, ctx, scene, log, nav);
     scene.lighting_bake_running = editor.dev.lightmap_bake.is_some();
     if let Some(active) = &editor.dev.lightmap_bake {
         // How far it is, for the Play button's refusal (#2042).
         scene.lighting_bake_status = BakeStatus::Running(active.progress());
+    }
+    if was_busy && !scene.bake_busy() {
+        // Play is free again: draw it enabled without waiting for input (#2042).
+        ctx.request_repaint();
     }
 }
 

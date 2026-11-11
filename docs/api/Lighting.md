@@ -36,9 +36,12 @@ button is greyed out, its shortcut ignored, and its tooltip says why
 (`Baking lighting: 42% — Cancel the bake to play`; the step's share once it counts
 its work, `Baking lighting (probes)`, `(lightmap pages)` or `(occlusion)` for the
 later steps, `Baking occlusion` for Bake Occlusion, and "wait for the bake to finish
-to play" where the card has no Cancel), and
+to play" where the card has no Cancel, a `GenerateAsync` not yet started included), and
 [`Editor.EnterPlay()`](Editor.md#play) errors with the same line. Cancelling,
-finishing or failing the bake gives Play back. Within one frame the order is the
+finishing or failing the bake gives Play back. **Opening a demo is the exception**:
+[`Editor.OpenDemo`](Editor.md#the-demo-timeline) is not
+refused while a bake runs; the bake waits through the replay, as it waits through
+Play, and resumes once the demo closes and the edit scene is back. Within one frame the order is the
 order of the calls: `Lighting.GenerateAsync(); Editor.EnterPlay()` refuses the
 `EnterPlay`, and `Editor.EnterPlay(); Lighting.GenerateAsync()` refuses the bake.
 Against the Play button, the window's frame order decides: an attached agent's
