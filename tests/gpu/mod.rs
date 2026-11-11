@@ -85,6 +85,7 @@ mod sky_reflection_screenshot;
 mod specular_aa_screenshot;
 mod ssao_screenshot;
 mod taa_cut_screenshot;
+mod test_games;
 mod toksvig;
 mod transparent_sorting_screenshot;
 mod transparent_surfaces;

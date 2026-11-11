@@ -137,6 +137,9 @@ the game for you, and only open a window when you want to.
   harness on the project's startup scene (or `--scene`); writes `results.json` + `console.log` (and any screenshots) to `<out_dir>`.
 - `make editor-capture OUT=editor.png` — the editor over the default scene, headless,
   to a PNG (see [`docs/testing.md`](docs/testing.md) § Editor captures).
+- `make game NAME=smoke` / `make game-test NAME=smoke` — build a test game from its
+  Lua recipe in `games/`, headless, and play-test it (see
+  [`docs/testing.md`](docs/testing.md) § Test games).
 - `cargo run --bin session-mcp --features dev` — drive the live engine from Claude
   Code over MCP (see [`docs/mcp.md`](docs/mcp.md)).
 - `cargo doc --no-deps` — the Rust API reference.
