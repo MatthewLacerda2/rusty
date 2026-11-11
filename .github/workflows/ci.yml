@@ -171,13 +171,17 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: System libs for winit/wgpu builds
         if: needs.changes.outputs.code != 'false'
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
+        uses: ./.github/actions/system-libs
+        with:
+          packages: pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       # Mesa's software Vulkan driver (#489). The runner has no GPU, so without it
       # wgpu finds no adapter and every GPU test skips — Linux, a ship platform,
       # had no render coverage at all.
       - name: Software Vulkan driver (lavapipe)
         if: needs.changes.outputs.code != 'false'
-        run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
+        uses: ./.github/actions/system-libs
+        with:
+          packages: mesa-vulkan-drivers libvulkan1
       # lavapipe comes from the image's apt archive, so the driver under the GPU
       # tests can change with nothing in any diff (#930; compare #769's black
       # frames). The log names the one this run rendered with.
@@ -368,7 +372,9 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: System libs for winit/wgpu builds
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
+        uses: ./.github/actions/system-libs
+        with:
+          packages: pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       - name: Install cargo-nextest
         uses: ./.github/actions/install-tool
         with:
