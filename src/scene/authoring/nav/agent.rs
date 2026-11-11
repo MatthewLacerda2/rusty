@@ -100,6 +100,7 @@ pub fn set_area_mask(a: &mut NavMeshAgentComponent, mask: u32) {
     if a.area_mask != mask {
         a.area_mask = mask;
         a.cached_path.clear();
+        a.path_planned = false;
     }
 }
 

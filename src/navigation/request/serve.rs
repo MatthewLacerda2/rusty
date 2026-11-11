@@ -2,14 +2,24 @@
 //! ([`NavigationGraph::ask_paths`]), then the queue spends its budget answering
 //! them ([`NavigationGraph::serve_paths`]).
 
-use super::super::agents::TARGET_SAMPLE_DISTANCE;
+use glam::Vec3;
+
+use super::super::agents::{TARGET_SAMPLE_DISTANCE, WAYPOINT_REACHED_DISTANCE};
 use super::super::{NavPath, NavigationGraph};
 use super::{Active, PathQueue, Request};
 use crate::scene::{NavMeshAgentComponent, Scene};
 
+/// What a search reads off its agent when it begins: where its feet are, its raw
+/// target and its area mask.
+type Ends = (Vec3, Vec3, u32);
+
+/// A finished request: its path, the target it was planned for, and where the
+/// agent's feet were when its search began.
+type Answer = (NavPath, Vec3, Vec3);
+
 /// How the request at the head starts: answered at once, or a search to run.
 enum Begun {
-    Answered(NavPath, glam::Vec3),
+    Answered(Answer),
     Searching(Active),
 }
 
@@ -40,55 +50,53 @@ impl NavigationGraph {
     }
 
     /// Whether `agent`, standing at `position`, is waiting for a path or will ask
-    /// for one on its next tick (Unity's `pathPending`).
-    pub fn path_pending(&self, agent: &NavMeshAgentComponent, position: glam::Vec3) -> bool {
-        agent.path_request != 0 || self.needs_path(agent, position)
+    /// for one on its next tick (Unity's `pathPending`). Read-only: a rebake that
+    /// left its path untouched does not count, as [`Self::ask_paths`] would keep it.
+    pub fn path_pending(&self, agent: &NavMeshAgentComponent, position: Vec3) -> bool {
+        let current = self.path_untouched(agent, agent.feet(position));
+        agent.path_request != 0 || self.needs_path_on(agent, position, current)
     }
 
     /// Spend this tick's budget on the queue, head first, handing each finished path
-    /// to its agent. A request whose agent gave up its ticket is dropped unsearched.
+    /// to its agent. A request its agent can no longer use is dropped unsearched.
     pub(in crate::navigation) fn serve_paths(&self, scene: &mut Scene) {
         let mut queue = self.requests.borrow_mut();
         let mut budget = queue.iterations;
         while let Some(&Request { ticket, agent: id }) = queue.pending.front() {
-            let wanted = (scene.world.nav_agent(id)).is_some_and(|a| a.path_request == ticket);
-            if !wanted {
+            let Some(ends) = wanted(scene, id, ticket) else {
                 queue.pending.pop_front();
                 queue.active = None;
                 continue;
-            }
+            };
             if budget == 0 {
                 break;
             }
-            let Some((path, target)) = self.advance(&mut queue, scene, id, &mut budget) else {
+            let Some((path, target, from)) = self.advance(&mut queue, ends, &mut budget) else {
                 break; // out of budget: the search resumes next tick
             };
             queue.pending.pop_front();
+            let feet_now = scene.world.world_position(id);
             if let Some(mut agent) = scene.world.nav_agent_mut(id) {
                 self.install_path(&mut agent, path, target);
+                let feet = agent.feet(feet_now);
+                self.skip_passed(&mut agent, from, feet);
             }
         }
     }
 
-    /// Run the head request (agent `id`) on `budget`: its path and the target it
-    /// was planned for once found, `None` when the budget ran out first.
-    fn advance(
-        &self,
-        queue: &mut PathQueue,
-        scene: &Scene,
-        id: u32,
-        budget: &mut u32,
-    ) -> Option<(NavPath, glam::Vec3)> {
+    /// Run the head request on `budget`, beginning its search from `ends` if none
+    /// runs yet: its answer once found, `None` when the budget ran out first.
+    fn advance(&self, queue: &mut PathQueue, ends: Ends, budget: &mut u32) -> Option<Answer> {
         let PathQueue { active, pool, .. } = queue;
         if active
             .as_ref()
             .is_some_and(|a| a.generation != self.bake_generation)
         {
-            *active = None; // a rebake since it began: search the new navmesh
+            *active = None; // a rebake `carry` did not carry it over: search afresh
         }
         if active.is_none() {
-            match self.begin_request(pool, scene, id) {
-                Begun::Answered(path, target) => return Some((path, target)),
+            match self.begin_request(pool, ends) {
+                Begun::Answered(answer) => return Some(answer),
                 Begun::Searching(a) => *active = Some(a),
             }
         }
@@ -96,26 +104,18 @@ impl NavigationGraph {
         let (spans, complete) = self.step_search(&mut a.search, pool, budget)?;
         let a = active.take()?;
         let path = self.route_path((a.from, a.goal), &spans, complete, a.mask);
-        Some((path, a.target))
+        Some((path, a.target, a.from))
     }
 
-    /// Begin agent `id`'s search from where it stands now toward the walkable point
-    /// nearest its target now (within [`TARGET_SAMPLE_DISTANCE`], #666): exactly the
-    /// ends a synchronous `calculate_path_masked` would snap. With no walkable point
-    /// near either end the answer is no path, at once.
-    fn begin_request(&self, pool: &mut super::NodePool, scene: &Scene, id: u32) -> Begun {
-        let position = scene.world.world_position(id);
-        let Some((from, target, mask)) = scene
-            .world
-            .nav_agent(id)
-            .map(|a| (a.feet(position), a.target, a.area_mask))
-        else {
-            return Begun::Answered(NavPath::invalid(), position);
-        };
+    /// Begin a search from the agent's feet toward the walkable point nearest its
+    /// target (within [`TARGET_SAMPLE_DISTANCE`], #666): exactly the ends a
+    /// synchronous `calculate_path_masked` would snap. With no walkable point near
+    /// either end the answer is no path, at once.
+    fn begin_request(&self, pool: &mut super::NodePool, (from, target, mask): Ends) -> Begun {
         let goal = self.sample_position(target, TARGET_SAMPLE_DISTANCE);
         let ends = goal.and_then(|g| Some((self.snap(from)?, self.snap(g)?, g)));
         let Some((start, end, goal)) = ends else {
-            return Begun::Answered(NavPath::invalid(), target);
+            return Begun::Answered((NavPath::invalid(), target, from));
         };
         pool.begin(self.spans.len());
         Begun::Searching(Active {
@@ -127,4 +127,47 @@ impl NavigationGraph {
             generation: self.bake_generation,
         })
     }
+
+    /// Skip the waypoints at the head of a just-delivered path that the agent,
+    /// now at `feet`, walked past while it waited (it stood at `from` when the
+    /// search began), so a chaser does not turn back to touch a corner: while the
+    /// next waypoint lies no farther along the path than the agent has walked, no
+    /// off-mesh link comes before the one after it, and that one is in clear
+    /// navmesh sight.
+    fn skip_passed(&self, agent: &mut NavMeshAgentComponent, from: Vec3, feet: Vec3) {
+        let walked = from.distance(feet) + WAYPOINT_REACHED_DISTANCE;
+        let (mut along, mut prev) = (0.0, from);
+        while let [next, after, ..] = agent.cached_path[agent.path_cursor..] {
+            along += prev.distance(next);
+            prev = next;
+            let link = agent
+                .path_links
+                .iter()
+                .any(|&(w, _)| w <= agent.path_cursor + 1);
+            let seen = self.raycast_masked(feet, after, agent.area_mask);
+            if along > walked || link || !seen.is_some_and(|h| !h.hit) {
+                break;
+            }
+            agent.path_cursor += 1;
+        }
+    }
+}
+
+/// What the head request's search begins from, while agent `id` still holds
+/// `ticket` and can use a path: active, enabled in the hierarchy and not crossing
+/// an off-mesh link. Otherwise `None`, and the agent gives the ticket up, so it
+/// asks again once it can use one (a link's own landing re-plans only if its path
+/// went stale meanwhile).
+fn wanted(scene: &mut Scene, id: u32, ticket: u32) -> Option<Ends> {
+    let live = scene.world.is_active_in_hierarchy(id);
+    let position = scene.world.world_position(id);
+    let mut agent = scene.world.nav_agent_mut(id)?;
+    if agent.path_request != ticket {
+        return None;
+    }
+    if !(live && agent.active && agent.off_mesh_link.is_none()) {
+        agent.path_request = 0;
+        return None;
+    }
+    Some((agent.feet(position), agent.target, agent.area_mask))
 }

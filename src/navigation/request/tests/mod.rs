@@ -2,6 +2,8 @@
 //! agent follows its old one; `lifecycle` covers rebakes and determinism.
 
 mod lifecycle;
+mod links;
+mod pending;
 
 use glam::Vec3;
 
@@ -15,16 +17,21 @@ pub(super) const DT: f32 = 1.0 / 60.0;
 
 /// A 30 × 30 floor with a block in the middle, so paths bend around it.
 pub(super) fn level() -> NavigationGraph {
+    NavigationGraph::from_scene(&level_scene(30.0))
+}
+
+/// [`level`]'s scene, its floor `width` long in x.
+pub(super) fn level_scene(width: f32) -> Scene {
     let mut scene = Scene::new();
-    add_floor(&mut scene, -1.0, 31.0, -1.0, 31.0);
+    add_floor(&mut scene, -1.0, width + 1.0, -1.0, 31.0);
     add_box(
         &mut scene,
         Vec3::new(10.0, 0.0, 5.0),
         Vec3::new(20.0, 2.0, 25.0),
     );
-    scene.nav_settings.bounds = Some(NavBounds::new(0.0, 30.0, 0.0, 30.0));
+    scene.nav_settings.bounds = Some(NavBounds::new(0.0, width, 0.0, 30.0));
     scene.nav_settings.grid_spacing = 0.5;
-    NavigationGraph::from_scene(&scene)
+    scene
 }
 
 pub(super) fn spawn(scene: &mut Scene, at: Vec3, target: Vec3) -> u32 {
@@ -48,7 +55,7 @@ pub(super) fn agent(scene: &Scene, id: u32) -> NavMeshAgentComponent {
 }
 
 /// The path a synchronous plan from `from` toward `target` gives, start dropped.
-fn sync_path(g: &NavigationGraph, from: Vec3, target: Vec3) -> Vec<Vec3> {
+pub(super) fn sync_path(g: &NavigationGraph, from: Vec3, target: Vec3) -> Vec<Vec3> {
     let goal = g
         .sample_position(target, TARGET_SAMPLE_DISTANCE)
         .expect("goal");
@@ -75,6 +82,11 @@ fn a_sliced_search_delivers_the_synchronous_path() {
     }
     assert!(ticks > 10, "sliced over many ticks: {ticks}");
     assert_eq!(agent(&scene, id).cached_path, sync_path(&g, from, to));
+    assert_eq!(
+        agent(&scene, id).path_cursor,
+        0,
+        "nothing walked, nothing skipped"
+    );
     assert_eq!(agent(&scene, id).path_status, NavPathStatus::Complete);
 }
 

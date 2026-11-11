@@ -15,13 +15,16 @@
 //! a `Warp`, a removed agent) is dropped when it comes up.
 //!
 //! Split: this file is the queue and its budget; `serve` runs it each tick and hands
-//! the paths to the agents; `islands` caps the search toward a goal nothing reaches.
+//! the paths to the agents; `islands` caps the search toward a goal nothing reaches;
+//! `carry` keeps a search going across a rebake that does not reach it.
 //!
 //! Determinism: the budget is a count of expansions, never a clock; the order is the
 //! queue's; a search resumes on the same heap and node pool, so it finds the path a
 //! synchronous search from the same start would have (`NavigationGraph::step_search`).
-//! A rebake mid-search restarts it on the new navmesh.
+//! An incremental rebake mid-search carries it over, renumbered, unless the change
+//! reaches what it searched; then, and after a full bake, it restarts (`carry`).
 
+mod carry;
 pub(crate) mod islands;
 mod serve;
 #[cfg(test)]
@@ -58,7 +61,8 @@ struct Active {
     /// The agent's raw target then: its path's `planned_target`.
     target: Vec3,
     mask: u32,
-    /// The bake the search runs on; a rebake restarts it.
+    /// The bake the search runs on; a rebake that does not carry it (`carry`)
+    /// restarts it.
     generation: u64,
 }
 
@@ -117,6 +121,13 @@ impl super::NavigationGraph {
     /// always moves. It is the queue's, and survives a rebake.
     pub fn set_pathfinding_iterations_per_frame(&self, iterations: u32) {
         self.requests.borrow_mut().iterations = iterations.max(1);
+    }
+
+    /// Empty the queue and put its budget back to [`DEFAULT_ITERATIONS_PER_FRAME`]:
+    /// a budget a script set, and the waits, belong to one Play run (Unity reverts
+    /// play-mode changes), so the next run, or its replayed demo, starts the same.
+    pub fn reset_path_queue(&self) {
+        *self.requests.borrow_mut() = PathQueue::default();
     }
 
     /// How many agents are waiting for a path, the one being searched included.

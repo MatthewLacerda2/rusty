@@ -273,9 +273,10 @@ impl GameWorld {
     }
 
     /// Run on the project file as it stands (#1517, #1522, #1749, #1715): its decal
-    /// budgets, its quality presets' running values, its render-scale default and its
-    /// speed of sound. On entering Play, on Stop (Unity reverts play-mode changes) and
-    /// when the editor opens, so a hand edit to `project.rusty` reaches the next Play.
+    /// budgets, quality presets' running values, render-scale default and speed of
+    /// sound, and an empty nav path queue (#2087). On entering Play, on Stop (Unity
+    /// reverts play-mode changes) and when the editor opens, so a hand edit to
+    /// `project.rusty` reaches the next Play.
     pub fn apply_project_settings(&self) {
         let mut app = self.resources.application.borrow_mut();
         let limits = app.decal_limits();
@@ -286,6 +287,7 @@ impl GameWorld {
         let mut live = graphics.borrow_mut();
         live.quality = app.quality_values();
         live.render_scale.default = app.render_scale_default();
+        self.resources.nav.borrow().reset_path_queue(); // and its budget (#2087)
     }
 }
 

@@ -103,9 +103,19 @@ the agent stands *then*, toward its target *then*, and finds exactly the path
 `Navigation.CalculatePath` would from there. With few agents every request is answered
 in the tick it is made, as if planned on the spot; on the Dust2 arena with 32 bots none
 waits more than about half a second. `PathPending` is also `true` right after a
-`SetTarget` (or a rebake across its path), before the agent's next tick has asked: the
-Unity idiom `if not PathPending(id) and RemainingDistance(id) < r` reads the new path, not
-the old. `ResetPath` and `Warp` drop a waiting request.
+`SetTarget`, or a rebake that changed cells its remaining path crosses (as above: a rebake
+elsewhere leaves it `false`), before the agent's next tick has asked: the Unity idiom
+`if not PathPending(id) and RemainingDistance(id) < r` reads the new path, not the old.
+When no path can be planned (no navmesh near the target, or the agent off it),
+`PathPending` turns `false` once that answer is in, with `GetPathStatus` `"invalid"`, as
+in Unity; the agent asks again when its target moves or a rebake comes. A delivered path
+skips the corners the agent walked past while it waited, so a chaser never turns back to
+touch one. A request is dropped, unsearched, when its agent is disabled (or inactive in
+the hierarchy) or is crossing an off-mesh link by the time it comes up: a disabled agent
+asks again once enabled, one on a link once it lands, if its path went stale meanwhile.
+A rebake mid-search does not restart it unless the change reaches what it searched, so a
+moving obstacle rebaking every few ticks never stalls the queue. `ResetPath` and `Warp`
+drop a waiting request.
 
 ### Off-mesh links (#462)
 

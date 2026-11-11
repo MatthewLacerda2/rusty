@@ -24,21 +24,26 @@ const REPLAN_TARGET_EPSILON_SQ: f32 = 0.25;
 pub const TARGET_SAMPLE_DISTANCE: f32 = 8.0;
 /// How close (world units, XZ plane) the agent must get to a waypoint before
 /// the cursor advances to the next one.
-const WAYPOINT_REACHED_DISTANCE: f32 = 0.5;
+pub(super) const WAYPOINT_REACHED_DISTANCE: f32 = 0.5;
 
 impl NavigationGraph {
     /// Whether `agent`'s cached path must be discarded and re-planned. Re-plan
-    /// when there is no path, when a rebake since planning touched it (#456), when the
+    /// when none was planned, when a rebake since planning touched it (#456), when the
     /// target drifted past the epsilon, or when the next waypoint is no longer
     /// walkable: on a change, never on a timer (Unity's `autoRepath`, #2087). A path
     /// the agent has walked to the end of stays valid: re-planning it every frame
     /// would change nothing (a partial path ends where the target can't be reached)
-    /// and cost a full search each time.
+    /// and cost a full search each time. So does no path, once planned for this
+    /// target on this bake (Unity's `PathInvalid`): asking again would answer the same.
+    #[cfg(test)]
     fn path_cache_invalid(&self, agent: &NavMeshAgentComponent) -> bool {
-        if agent.cached_path.is_empty() {
-            return true;
-        }
-        if agent.path_generation != self.bake_generation {
+        self.path_stale(agent, agent.path_generation == self.bake_generation)
+    }
+
+    /// [`Self::path_cache_invalid`], `current` saying whether the bake the path was
+    /// planned on still holds for it: its own, or a rebake that left it untouched.
+    fn path_stale(&self, agent: &NavMeshAgentComponent, current: bool) -> bool {
+        if !agent.path_planned || !current {
             return true;
         }
         if (agent.target - agent.planned_target).length_squared() > REPLAN_TARGET_EPSILON_SQ {
@@ -58,10 +63,21 @@ impl NavigationGraph {
     /// nothing to plan: a `ResetPath` agent plans nothing until it gets a new
     /// target), and its cached path is stale.
     pub(super) fn needs_path(&self, agent: &NavMeshAgentComponent, position: Vec3) -> bool {
+        let current = agent.path_generation == self.bake_generation;
+        self.needs_path_on(agent, position, current)
+    }
+
+    /// [`Self::needs_path`], `current` as [`Self::path_stale`] takes it.
+    pub(super) fn needs_path_on(
+        &self,
+        agent: &NavMeshAgentComponent,
+        position: Vec3,
+        current: bool,
+    ) -> bool {
         agent.active
             && agent.off_mesh_link.is_none()
             && !(agent.cached_path.is_empty() && is_at_target(agent, position))
-            && self.path_cache_invalid(agent)
+            && self.path_stale(agent, current)
     }
 
     /// Store `path`, planned for `target`, on the agent: its corners, links and
@@ -81,6 +97,7 @@ impl NavigationGraph {
         agent.planned_target = target;
         agent.path_generation = self.bake_generation;
         agent.path_request = 0;
+        agent.path_planned = true;
     }
 
     /// Plan the agent's path at once, the way the path queue (`request`) does over

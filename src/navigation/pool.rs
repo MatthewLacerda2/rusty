@@ -89,6 +89,34 @@ impl NodePool {
     }
 }
 
+impl NodePool {
+    /// Carry this search's slots onto a rebaked navmesh of `spans` spans (#2087,
+    /// `request::carry`), each span index renumbered by `remap`; `false`, changing
+    /// nothing, when `remap` refuses one.
+    pub(crate) fn remap(&mut self, spans: usize, remap: &dyn Fn(u32) -> Option<SpanRef>) -> bool {
+        let generation = self.generation;
+        let mut moved = Vec::new();
+        for (i, s) in self
+            .slots
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.stamp == generation)
+        {
+            let at = remap(i as u32).map(|r| r.index);
+            let from = s.from.map(|f| remap(f.index));
+            let (Some(at), None | Some(Some(_))) = (at, from) else {
+                return false;
+            };
+            moved.push((at, s.g, from.flatten()));
+        }
+        self.begin(spans);
+        for (at, g, from) in moved {
+            self.set(at, g, from);
+        }
+        true
+    }
+}
+
 /// The graph's reusable [`NodePool`] (see the module doc for why a `RefCell`).
 #[derive(Default)]
 pub(crate) struct SearchScratch(RefCell<NodePool>);

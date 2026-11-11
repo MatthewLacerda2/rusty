@@ -109,6 +109,11 @@ pub struct NavMeshAgentComponent {
     /// one is queued it keeps following its old path (Unity's `pathPending`).
     #[serde(skip)]
     pub path_request: u32,
+    /// Whether `cached_path` is the answer planned for `planned_target` on
+    /// `path_generation` (#2087): an empty one then means no path can be planned
+    /// (Unity's `PathInvalid`), not one still to ask for.
+    #[serde(skip)]
+    pub path_planned: bool,
     /// Whether the cached path reaches the target (#458). A partial path ends on the
     /// reachable point nearest the target, and the agent stops there.
     #[serde(skip)]
@@ -181,6 +186,7 @@ impl Default for NavMeshAgentComponent {
             planned_target: Vec3::ZERO,
             path_generation: 0,
             path_request: 0,
+            path_planned: false,
             path_status: NavPathStatus::Invalid,
             path_links: Vec::new(),
             off_mesh_link: None,

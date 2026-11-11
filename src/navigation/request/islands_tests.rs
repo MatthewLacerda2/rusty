@@ -4,7 +4,7 @@
 use glam::Vec3;
 
 use super::super::super::astar::MAX_SEARCH_NODES;
-use super::super::super::test_support::{add_box, add_floor};
+use super::super::super::test_support::{add_box, add_floor, ground};
 use super::super::super::{NavBounds, NavigationGraph, ALL_AREAS};
 use super::super::NodePool;
 use super::UNREACHABLE_SEARCH_NODES;
@@ -64,4 +64,27 @@ fn an_unreachable_goal_costs_at_most_the_node_cap() {
         g.spans.len() as u32 > MAX_SEARCH_NODES,
         "the cap, not the mesh, ended it"
     );
+}
+
+/// A cell only a diagonal step reaches (#2087): its two cardinal cells stand
+/// `max_step` up, it lies sunk below, its other neighbours are gone. A\* steps
+/// into it, so the island map must not call it unreachable.
+#[test]
+fn a_cell_reached_only_diagonally_is_reachable() {
+    let mut g = NavigationGraph::new(0.0, 4.0, 0.0, 4.0, 1.0);
+    let s = g.max_step * 0.75;
+    for (gx, gz, y) in [(2, 1, s), (1, 2, s), (2, 2, -s)] {
+        let i = g.cell_start[g.index(gx, gz)] as usize;
+        g.spans[i].y = y;
+    }
+    for (gx, gz) in [(3, 2), (2, 3)] {
+        let hole = g.index(gx, gz);
+        g.spans.remove(g.cell_start[hole] as usize);
+        g.cell_start[hole + 1..].iter_mut().for_each(|s| *s -= 1);
+    }
+    let (start, sunk) = (g.snap(Vec3::ZERO).expect("floor"), ground(&g, 2, 2));
+    assert!(g.neighbour(sunk, -1, 0).is_none() && g.neighbour(sunk, 0, -1).is_none());
+    let (_, complete) = g.find_path_masked(start, sunk, ALL_AREAS);
+    assert!(complete, "A* steps in diagonally");
+    assert_eq!(g.search_cap(start, sunk), MAX_SEARCH_NODES);
 }

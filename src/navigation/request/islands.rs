@@ -4,9 +4,11 @@
 //! partial path: on the Dust2 arena that is the whole [`MAX_SEARCH_NODES`], sixty
 //! ticks of the path queue's budget, with every agent behind it waiting.
 //!
-//! So each bake's islands are worked out once, lazily: the walking areas
-//! (`NavigationGraph::walk_areas`, joined by grid steps, which go both ways) and the
-//! off-mesh links between them, followed one way. A goal whose area no chain of
+//! So each bake's islands are worked out once, lazily: the walking areas, joined
+//! by A\*'s own eight grid steps (`NavigationGraph::neighbour`: a diagonal into a
+//! sunken cell no cardinal step reaches still joins it), taken both ways, and the
+//! off-mesh links between them, followed one way. A diagonal step can be one-way;
+//! joining it both ways only merges areas, which errs toward the full cap. A goal whose area no chain of
 //! links leads to from the start's is unreachable for any area mask (masks only
 //! remove moves), and its search is capped at [`UNREACHABLE_SEARCH_NODES`]: the
 //! partial path still heads toward it, as far as that many expansions get (Detour's
@@ -83,8 +85,8 @@ impl NavigationGraph {
 
     /// The current bake's [`IslandMap`].
     fn island_map(&self) -> IslandMap {
-        let (area, sizes) = self.walk_areas();
-        let mut exits = vec![Vec::new(); sizes.len()];
+        let (area, count) = self.step_areas();
+        let mut exits = vec![Vec::new(); count];
         for here in self.span_refs() {
             let a = area[here.index as usize];
             for link in self.link_moves(here) {
@@ -100,7 +102,50 @@ impl NavigationGraph {
             exits,
         }
     }
+
+    /// Each span's walking area under A\*'s steps (see the module doc), numbered in
+    /// scan order, and how many there are.
+    fn step_areas(&self) -> (Vec<u32>, usize) {
+        let mut root: Vec<u32> = (0..self.spans.len() as u32).collect();
+        fn find(root: &mut [u32], mut i: u32) -> u32 {
+            while root[i as usize] != i {
+                root[i as usize] = root[root[i as usize] as usize];
+                i = root[i as usize];
+            }
+            i
+        }
+        for here in self.span_refs() {
+            for (dx, dz) in STEPS {
+                if let Some(next) = self.neighbour(here, dx, dz) {
+                    let (a, b) = (find(&mut root, here.index), find(&mut root, next.index));
+                    root[a.max(b) as usize] = a.min(b);
+                }
+            }
+        }
+        let mut area = vec![u32::MAX; root.len()];
+        let mut count = 0;
+        for i in 0..root.len() as u32 {
+            let r = find(&mut root, i) as usize;
+            if area[r] == u32::MAX {
+                (area[r], count) = (count as u32, count + 1);
+            }
+            area[i as usize] = area[r];
+        }
+        (area, count)
+    }
 }
+
+/// The eight grid steps A\* takes, every one tried: a diagonal may go one way only.
+const STEPS: [(i32, i32); 8] = [
+    (1, 0),
+    (-1, 0),
+    (0, 1),
+    (0, -1),
+    (1, 1),
+    (1, -1),
+    (-1, 1),
+    (-1, -1),
+];
 
 #[cfg(test)]
 #[path = "islands_tests.rs"]

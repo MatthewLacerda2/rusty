@@ -66,12 +66,6 @@ struct Frontier<'p> {
     pool: &'p mut NodePool,
 }
 
-impl Frontier<'_> {
-    fn g_of(&self, index: u32) -> f32 {
-        self.pool.g(index)
-    }
-}
-
 /// One A\* search in progress (#2087): its heap, the span nearest the goal so far,
 /// and how many expansions it spent. Its costs and parents live in the [`NodePool`]
 /// it was begun on, which must be handed back, untouched by any other search, to
@@ -87,8 +81,22 @@ pub(crate) struct Search {
     cap: u32,
 }
 
-#[cfg(test)]
 impl Search {
+    /// Renumber the spans this search holds after a rebake moved them (#2087,
+    /// `request::carry`); `false`, changing nothing, when `remap` refuses one.
+    pub(crate) fn remap(&mut self, remap: &dyn Fn(u32) -> Option<SpanRef>) -> bool {
+        let node = |n: &NodeState| remap(n.node.index).map(|node| NodeState { node, ..*n });
+        let moved: Option<Vec<_>> = self.open_set.iter().map(node).collect();
+        let (Some(moved), Some(goal), Some(near)) =
+            (moved, remap(self.goal.index), remap(self.closest.2.index))
+        else {
+            return false;
+        };
+        (self.open_set, self.goal, self.closest.2) = (moved.into(), goal, near);
+        true
+    }
+
+    #[cfg(test)]
     /// The expansions this search has spent.
     pub(crate) fn expanded(&self) -> u32 {
         self.expanded
@@ -198,7 +206,7 @@ impl NavigationGraph {
             if current.node == goal {
                 return Some((reconstruct_path(frontier.pool, goal), true));
             }
-            if current.g_score > frontier.g_of(current.node.index) {
+            if current.g_score > frontier.pool.g(current.node.index) {
                 continue; // a stale heap entry
             }
             let h = heuristic(current.node, goal);
@@ -260,7 +268,7 @@ impl NavigationGraph {
 
 /// Record `next` as reached from `here` at cost `g` when that beats its best so far.
 fn relax(frontier: &mut Frontier, here: SpanRef, next: SpanRef, g: f32, goal: SpanRef) {
-    if g < frontier.g_of(next.index) {
+    if g < frontier.pool.g(next.index) {
         frontier.pool.set(next.index, g, Some(here));
         frontier.open_set.push(NodeState {
             node: next,
