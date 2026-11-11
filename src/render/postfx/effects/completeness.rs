@@ -7,11 +7,14 @@
 //! `Graphics.*` registrar, its Inspector section, its section in
 //! `docs/api/Graphics.md` (`<!-- effect: <name> -->`) naming every knob's tween
 //! path, and, when it is player-facing, its `GraphicsOption` named after it with a
-//! row in the doc's *Player options* table. Each composite texture it declares is
-//! bound in the assembled composite and passed to its own function, at its place (#1473).
+//! row in the doc's *Player options* table. Each declares whether it reads history
+//! (#2092), with a reason when it reads none: `Harness.Screenshot`'s `settle`
+//! skips its frames when no effect does. Each composite texture it declares is
+//! bound in the assembled composite and passed to its own function, at its place
+//! (#1473).
 
 use super::textures::{composite_textures, PlacedTexture, GROUP};
-use super::{assemble, Owner, POST_EFFECTS};
+use super::{assemble, History, Owner, POST_EFFECTS};
 use crate::components::PostProcessingComponent;
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::scene::authoring::fields;
@@ -23,6 +26,9 @@ use crate::scene::authoring::rendering::post_processing as authoring;
 pub(super) struct Layers {
     /// The renderer's effects: name, owner, the name of the option that gates it.
     pub render: Vec<(String, Owner, Option<String>)>,
+    /// Each effect's history declaration (#2092): `None` when it reads one, else
+    /// its reason for reading none.
+    pub history: Vec<(String, Option<&'static str>)>,
     /// The volume's effect fields.
     pub settings: Vec<String>,
     /// The camera's serialized fields.
@@ -85,6 +91,12 @@ pub(super) fn engine() -> Layers {
                     e.owner,
                     e.gate.option.map(|o| o.name().into()),
                 )
+            })
+            .collect(),
+        history: (POST_EFFECTS.iter())
+            .map(|e| match e.history {
+                History::None(why) => (e.name.into(), Some(why)),
+                History::Reads(_) => (e.name.into(), None),
             })
             .collect(),
         settings: fields_of("PostProcessing")
@@ -230,6 +242,13 @@ fn missing(l: &Layers, name: &str, owner: Owner, option: Option<&str>) -> Vec<&'
     }
     if !has(&l.sections, name) {
         lacks.push("Inspector section");
+    }
+    match l.history.iter().find(|(n, _)| n == name) {
+        None => lacks.push("history declaration"),
+        Some((_, Some(why))) if why.trim().is_empty() => {
+            lacks.push("reason it reads no history (`History::None`)")
+        }
+        _ => {}
     }
     if !l.docs.contains(&format!("<!-- effect: {name} -->")) {
         lacks.push("section in the Graphics doc, marked `<!-- effect: <name> -->`");

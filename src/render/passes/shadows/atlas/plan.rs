@@ -68,6 +68,9 @@ pub(crate) struct AtlasPlan {
     pub shadows: Vec<(usize, u32)>,
     /// Lights that asked for a shadow and reach the view, but did not fit.
     pub dropped: u32,
+    /// Whether a kept light's wanted size is out of its band, so its tiles resize
+    /// on a later frame with no change to the scene (#2092, [`super::hysteresis`]).
+    pub resizing: bool,
 }
 
 impl AtlasPlan {

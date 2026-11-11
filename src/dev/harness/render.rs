@@ -1,9 +1,9 @@
 //! The harness's rendering verbs: `Screenshot` (a frame to a PNG, after up to
-//! `settle` frames drawn first, #2003: none when the view reads no history, #2092) and `Render` (a frame drawn only for what it costs,
-//! #835). Both draw through the run's one
-//! [`CaptureHost`](crate::dev::capture::CaptureHost) and fold the frame's cost —
-//! render counters, `renderer_ms`, GPU time where the adapter measures it — into
-//! the run's frame stats.
+//! `settle` frames drawn first, #2003: none when the view reads no history,
+//! #2092) and `Render` (a frame drawn only for what it costs, #835). Both draw
+//! through the run's one [`CaptureHost`](crate::dev::capture::CaptureHost) and
+//! fold the frame's cost (render counters, `renderer_ms`, GPU time where the
+//! adapter measures it) into the run's frame stats.
 //!
 //! **Size (#1583).** A run renders at its size, a Game view resolution: 1280x720
 //! unless `play --size WxH` set another ([`Harness::set_size`]), which the sim's UI

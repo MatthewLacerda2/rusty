@@ -5,7 +5,7 @@
 use crate::render::postfx::params::Gate;
 use std::collections::BTreeMap;
 
-use super::super::{EffectCx, Gpu, LdrRun, Owner, Pass, PostEffect};
+use super::super::{EffectCx, Gpu, History, LdrRun, Owner, Pass, PostEffect};
 use super::CustomChain;
 use crate::render::postfx::{PostFx, PostFxContext};
 use crate::render::timing::GpuPass;
@@ -14,6 +14,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "custom_effects",
     owner: Owner::Volume,
     gate: Gate::NONE,
+    history: History::Reads(|cx| reads_history(&cx.effect)),
     module: None,
     composite: &[],
     grade: &[],
@@ -38,7 +39,7 @@ fn chain<'a>(cx: &EffectCx<'a>) -> (&'a [String], &'a BTreeMap<String, Vec<f32>>
 
 /// Whether the view runs authored effects, each of which may read last frame's
 /// result (their history) (#2092): the volume names any.
-pub(crate) fn reads_history(cx: &EffectCx) -> bool {
+fn reads_history(cx: &EffectCx) -> bool {
     !chain(cx).0.is_empty()
 }
 

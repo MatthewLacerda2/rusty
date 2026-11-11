@@ -89,3 +89,15 @@ fn a_want_that_strays_leaves_and_returns_counts_over() {
     assert_eq!(hold(&mut slots, FAR, SETTLE_FRAMES - 1), MAX_TILE);
     assert_eq!(hold(&mut slots, FAR, 1), MIN_TILE);
 }
+
+#[test]
+fn a_plan_says_a_resize_is_pending_until_it_lands() {
+    let mut slots = ShadowSlots::default();
+    let at = |slots: &mut ShadowSlots, eye| step(slots, &[lamp()], &[1], eye).resizing;
+    assert!(!at(&mut slots, INSIDE), "a new lamp takes its size at once");
+    for frame in 1..SETTLE_FRAMES {
+        assert!(at(&mut slots, FAR), "frame {frame} still counts");
+    }
+    assert!(!at(&mut slots, FAR), "the resized tile is in band");
+    assert!(!at(&mut slots, FAR), "and stays so");
+}

@@ -165,7 +165,8 @@ fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lua
     // the current scene/camera offscreen to a PNG, at the run's size or the one given
     // (#1583), with the colliders and Debug.Draw lines over it when `gizmos` (#1882),
     // after up to `settle` frames drawn with no sim step (#2003, default 0) so TAA
-    // converges: none when nothing on the view reads history (#2092). Returns false (no error) when no GPU/software adapter is available.
+    // converges: none when nothing on the view reads history (#2092). Returns
+    // false (no error) when no GPU/software adapter is available.
     let h = Rc::clone(harness);
     t.set(
         "Screenshot",

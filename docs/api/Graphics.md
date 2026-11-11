@@ -906,10 +906,12 @@ blends 0.1 of its own frame into the history of the shots before it (upscaling,
 apart they were, so two shots of an unchanged scene can differ. `Harness.Step` renders nothing, so
 steps never settle it. A shot after a camera jump ghosts the last shot's view in
 unless the jump is cut (`Camera.ResetHistory()`); `Harness.Screenshot(path, { settle
-= n })` draws `n` frames with no sim step before the shot, so the history converges
-(only when the view reads history at all, #2092: with TAA, SSIL, the fog and the
-authored effects off, a settled shot after a cut is one render)
-(a still pixel keeps 0.9ⁿ of the old view: about 3% at 32, 0.1% at 64). A cut and a
+= n })` draws `n` frames with no sim step before the shot, so the history converges:
+a still pixel keeps 0.9ⁿ of the old view, about 3% at 32 and 0.1% at 64. It draws
+them only when the frame reads history at all (#2092, `Debug.Stats().history_passes`):
+TAA, SSIL, the volumetric fog, an authored effect, motion vectors on a frame that is
+not a cut, a shown render texture, or a shadow tile resize still pending. With none
+of those, a settled shot is one render. A cut and a
 settle give a player's settled image of the new view; a cut alone, the new view's
 first frame. To compare shots pixel for pixel, or to judge a scene's edges, turn TAA off
 for the capture (`Graphics.SetTaaActive(false)`: FXAA then runs, if it is on).

@@ -26,7 +26,9 @@ use chain::BloomParams;
 pub(crate) use chain::BloomTargets;
 pub(crate) use passes::BloomPasses;
 
-use super::{Composite, CompositeTexture, EffectCx, Owner, Pass, PassCx, Phase, PostEffect};
+use super::{
+    Composite, CompositeTexture, EffectCx, History, Owner, Pass, PassCx, Phase, PostEffect,
+};
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::quality::MAX_RESOLUTION_DIVISOR;
 use crate::render::postfx::params::Gate;
@@ -36,6 +38,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "bloom",
     owner: Owner::Volume,
     gate: Gate::option(GraphicsOption::Bloom),
+    history: History::None("its mip chain is rebuilt from this frame's scene"),
     module: Some("postfx/effects/bloom.wgsl"),
     composite: &[Composite {
         phase: Phase::Hdr,

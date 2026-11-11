@@ -5,7 +5,7 @@
 //! so neither `PostFx` nor the composite's shared bindings name it.
 
 use super::{
-    Composite, CompositeTexture, EffectCx, Owner, Pass, PassCx, Phase, PostEffect, Targets,
+    Composite, CompositeTexture, EffectCx, History, Owner, Pass, PassCx, Phase, PostEffect, Targets,
 };
 use crate::render::postfx::params::Gate;
 use crate::render::{RenderView, Renderer};
@@ -14,6 +14,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "dummy",
     owner: Owner::Volume,
     gate: Gate::NONE,
+    history: History::None("test-only: its frame count draws no pixel"),
     module: Some("postfx/effects/dummy.wgsl"),
     composite: &[Composite {
         phase: Phase::Hdr,

@@ -125,6 +125,9 @@ impl Renderer {
         c.shadow_lights_dropped = plan.dropped;
         c.shadow_atlas_tiles = plan.tiles.len() as u32;
         c.shadow_atlas_texels = plan.texels();
+        // A tile resize the hysteresis holds back is history: the frame drawn again
+        // counts another frame towards it (#2092).
+        c.history_passes += u32::from(plan.resizing);
         self.shadow_renderer.atlas.update(&self.queue, plan.tiles);
     }
 }
