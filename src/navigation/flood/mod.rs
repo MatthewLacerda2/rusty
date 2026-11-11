@@ -122,8 +122,11 @@ impl NavigationGraph {
                 self.moves(here, mask, cache.has_exit(node.index), &mut moves);
                 for &(next, g) in &moves {
                     let best = cost.g(next.index);
+                    if g >= best || g > bound {
+                        continue;
+                    }
                     let f = g + goals.h(next);
-                    if g < best && f <= bound {
+                    if f <= bound {
                         reached += usize::from(best == f32::INFINITY);
                         cost.set(next.index, g, None);
                         open.push(Open::new(next, g, f));
