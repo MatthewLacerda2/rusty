@@ -530,7 +530,8 @@ file writes, patch-path resolution).
   is proven at that scale.
 - **No machine state in repo docs.** Never write a machine's specs or a free-space or
   memory figure into a doc as the number to plan by; write "check the machine"
-  (`df -h`, free memory).
+  (`df -h`, free memory). A figure quoted in an issue or PR as evidence of a past
+  incident, dated, is history, not a limit.
 - **One format inside, glTF; everything else is converted at import.** The engine's
   loaders read glTF 2.0 (first-class) and `.obj` (static meshes only). Other sources
   are turned into a cached glTF when imported, the way Unity read only FBX and had
