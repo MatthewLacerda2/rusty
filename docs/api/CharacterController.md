@@ -6,7 +6,11 @@ the physics world. It moves **only** when a script calls `Move` with a
 displacement: the capsule stops at walls and slides along them, climbs steps up to
 the **step offset**, walks up slopes up to the **slope limit** and slides back off
 steeper ones. It keeps a **skin width** gap to what it touches. A move shorter than
-the **min move distance** does nothing.
+the **min move distance** does nothing. On flat ground a move covers its whole
+horizontal displacement, whatever the speed. It never steps onto a dynamic
+`Rigidbody` (one under the step offset blocks like a wall), and it rides
+nothing: a moving kinematic body under it carries it nowhere, as in Unity, so a
+lift that should carry its player adds its own motion to the `Move`.
 
 **`Move` applies no gravity.** Scripts own gravity, jumps and air control (the feel
 of the game lives in Lua): keep a vertical speed, add gravity to it each frame, and
