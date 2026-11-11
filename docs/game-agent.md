@@ -134,7 +134,8 @@ return M
 ## Play-testing headlessly
 
 A scenario is a Lua file under `scenarios/` that drives the game through the same
-API plus `Harness.*` (press keys, step ticks, assert); its `require` and `dofile` read
+API plus `Harness.*` (press keys, step ticks, assert, read the run's warnings with
+`Harness.Warnings()`); its `require` and `dofile` read
 the project as a gameplay script's do. Run it with the `play` binary from the engine checkout:
 
 ```sh

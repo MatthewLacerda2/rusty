@@ -73,6 +73,24 @@ things follow:
   are refused for the whole run, before its first `Harness.Step` too (CLAUDE.md,
   *Provider calls are authoring, never gameplay*).
 
+**Asserting a clean run** (#2054). `Harness.Expect(cond, message)` records a
+pass or fail in `results.json`; `Harness.Warnings([after])` returns the run's
+console warnings and errors so far, oldest first, as `{ level = "warning" |
+"error", text }` tables, skipping the first `after` (default 0). It reads the
+console `console.log` is written from, engine warnings included (they join it
+after every tick, and when `Warnings` is called), and keeps every one of the run,
+past the 100 lines the console buffer holds; a repeat is one line, `text (×N)`, as
+the console folds it. So a scenario ends with
+
+```lua
+local w = Harness.Warnings()
+Harness.Expect(#w == 0, "no warnings: " .. (w[1] and w[1].text or "none"))
+```
+
+and one that provokes a warning on purpose counts first and reads past it
+(`local n = #Harness.Warnings()` … `Harness.Warnings(n)`). Nothing fails a run on
+a warning by itself: the scenario decides. `games/smoke` holds it.
+
 **Hearing a run** (#1579). `Harness.RecordAudio([path])` starts recording the
 game's final audio mix to a 48 kHz float WAV (`audio.wav` by default; a relative
 `path` is under the run's output folder) and returns its path; `Harness.StopAudio()`
