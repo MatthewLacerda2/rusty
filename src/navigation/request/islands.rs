@@ -104,28 +104,34 @@ impl NavigationGraph {
     }
 
     /// Each span's walking area under A\*'s steps (see the module doc), numbered in
-    /// scan order, and how many there are.
+    /// scan order, and how many there are. The cardinal steps join first; a
+    /// diagonal is tried only into a cell holding a span of another area, so open
+    /// floor pays no more than the cardinals.
     fn step_areas(&self) -> (Vec<u32>, usize) {
-        let mut root: Vec<u32> = (0..self.spans.len() as u32).collect();
-        fn find(root: &mut [u32], mut i: u32) -> u32 {
-            while root[i as usize] != i {
-                root[i as usize] = root[root[i as usize] as usize];
-                i = root[i as usize];
-            }
-            i
-        }
+        let mut roots = Roots((0..self.spans.len() as u32).collect());
         for here in self.span_refs() {
-            for (dx, dz) in STEPS {
-                if let Some(next) = self.neighbour(here, dx, dz) {
-                    let (a, b) = (find(&mut root, here.index), find(&mut root, next.index));
-                    root[a.max(b) as usize] = a.min(b);
+            for (dx, dz) in CARDINAL {
+                if let Some(next) = self.link_to(here, here.gx + dx, here.gz + dz) {
+                    roots.join(here.index, next.index);
                 }
             }
         }
-        let mut area = vec![u32::MAX; root.len()];
+        for here in self.span_refs() {
+            for (dx, dz) in DIAGONAL {
+                let own = roots.find(here.index);
+                let cell = self.span_range(here.gx + dx, here.gz + dz);
+                if cell.clone().all(|i| roots.find(i as u32) == own) {
+                    continue;
+                }
+                if let Some(next) = self.neighbour(here, dx, dz) {
+                    roots.join(here.index, next.index);
+                }
+            }
+        }
+        let mut area = vec![u32::MAX; self.spans.len()];
         let mut count = 0;
-        for i in 0..root.len() as u32 {
-            let r = find(&mut root, i) as usize;
+        for i in 0..self.spans.len() as u32 {
+            let r = roots.find(i) as usize;
             if area[r] == u32::MAX {
                 (area[r], count) = (count as u32, count + 1);
             }
@@ -135,17 +141,29 @@ impl NavigationGraph {
     }
 }
 
-/// The eight grid steps A\* takes, every one tried: a diagonal may go one way only.
-const STEPS: [(i32, i32); 8] = [
-    (1, 0),
-    (-1, 0),
-    (0, 1),
-    (0, -1),
-    (1, 1),
-    (1, -1),
-    (-1, 1),
-    (-1, -1),
-];
+/// A union-find over span indices, each set rooted at its lowest index.
+struct Roots(Vec<u32>);
+
+impl Roots {
+    fn find(&mut self, mut i: u32) -> u32 {
+        while self.0[i as usize] != i {
+            self.0[i as usize] = self.0[self.0[i as usize] as usize];
+            i = self.0[i as usize];
+        }
+        i
+    }
+
+    fn join(&mut self, a: u32, b: u32) {
+        let (a, b) = (self.find(a), self.find(b));
+        self.0[a.max(b) as usize] = a.min(b);
+    }
+}
+
+/// The grid steps A\* takes. A step can go one way only (`link_to` picks the
+/// nearest floor, a diagonal needs its own two cardinals), so every span tries
+/// all eight of its own.
+const CARDINAL: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+const DIAGONAL: [(i32, i32); 4] = [(1, 1), (1, -1), (-1, 1), (-1, -1)];
 
 #[cfg(test)]
 #[path = "islands_tests.rs"]
