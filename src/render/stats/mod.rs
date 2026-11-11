@@ -181,6 +181,9 @@ pub struct RenderCounters {
     /// direction arrays and any other page list cached, every mip. The resident
     /// total at the frame's end, not a per-frame count.
     pub lightmap_bytes: u64,
+    /// GPU bytes of the reflection probes' cube array (#2085): every allocated
+    /// layer, spares included, every mip. The resident total at the frame's end.
+    pub reflection_bytes: u64,
     /// Retained render objects re-derived whole this frame (#1706): every mesh entity
     /// on a rebuild (a first frame, a load, an Undo, a renderer-side input), else the
     /// ones whose mesh, material, activity, layer, static flag or overrides changed.
@@ -239,6 +242,7 @@ impl RenderCounters {
             ("opaque_copies", self.opaque_copies.into()),
             ("texture_bytes", self.texture_bytes),
             ("lightmap_bytes", self.lightmap_bytes),
+            ("reflection_bytes", self.reflection_bytes),
             ("render_extracted", self.render_extracted.into()),
             ("render_posed", self.render_posed.into()),
             ("render_extract_us", self.render_extract_us),

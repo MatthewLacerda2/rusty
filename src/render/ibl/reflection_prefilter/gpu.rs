@@ -7,8 +7,8 @@
 //!
 //! The CPU `cpu::prefilter` (test-only) stays the reference: the shader is it
 //! texel for texel (the same face matrices, source chain, per-sample mip, nearest-texel
-//! lookup and sample count), and a GPU test holds the two within a written tolerance. At a probe's 512-texel
-//! default the CPU pass is ≈ 50 M samples on one core; here it is one compute pass.
+//! lookup and sample count), and a GPU test holds the two within a written tolerance. At 512 texels
+//! the CPU pass is ≈ 50 M samples on one core; here it is one compute pass.
 
 use glam::Vec3;
 

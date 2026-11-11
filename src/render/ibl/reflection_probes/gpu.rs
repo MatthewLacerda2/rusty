@@ -4,8 +4,20 @@
 use super::super::cubemap::CubemapTexture;
 use super::super::upload::block_extent;
 use super::ProbeArray;
+use crate::render::gpu::textures::compressed::gpu_bytes;
 
 impl ProbeArray {
+    /// The bytes the cube array takes on the GPU (#2085): every layer it is
+    /// allocated with, spare slots included, at every mip. The array is the only
+    /// copy of a resident cube, so this is all the probe memory there is; 0 while it
+    /// is the black stand-in no cube was ever copied into.
+    pub(crate) fn gpu_bytes(&self) -> u64 {
+        if (self.face, self.mips, self.cubes) == (1, 1, 1) && !self.table.holds_any() {
+            return 0;
+        }
+        gpu_bytes(&self.texture)
+    }
+
     /// With no cube resident (every one refused or re-written, #1609), shrink the
     /// array back to the black 1×1 stand-in [`ProbeArray::new`] starts with, so a
     /// refused large cube leaves nothing allocated; true when it was rebuilt.
@@ -114,3 +126,7 @@ pub(super) fn copy_into(
     }
     queue.submit([encoder.finish()]);
 }
+
+#[cfg(test)]
+#[path = "bytes_tests.rs"]
+mod bytes_tests;
