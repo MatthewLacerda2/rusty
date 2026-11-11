@@ -1,5 +1,5 @@
-//! Folder plumbing for the generator: clear an output it owns, copy a game's
-//! files in, and compare two generated trees file by file.
+//! Folder plumbing for the generator: clear or remove an output it owns, copy a
+//! game's files in, and compare two generated trees file by file.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -22,6 +22,38 @@ pub(super) fn clear(out: &Path) -> Result<(), String> {
         ));
     }
     std::fs::create_dir_all(out).map_err(shown)
+}
+
+/// The folder beside `out` named `<out's file name>.<suffix>`, built from the file
+/// name so `OUT=~/proj.v2` sets `~/proj.v2.first` aside, never `~/proj.first`.
+pub(super) fn beside(out: &Path, suffix: &str) -> Result<PathBuf, String> {
+    let name = out
+        .file_name()
+        .ok_or_else(|| format!("{} has no folder name to set a copy beside", out.display()))?;
+    let mut aside = name.to_os_string();
+    aside.push(format!(".{suffix}"));
+    Ok(out.with_file_name(aside))
+}
+
+/// Delete `dir` if a generation made it (it holds [`MARKER`]) or it is empty; a
+/// missing `dir` is fine. Refuses anything else, as [`clear`] does, so no folder a
+/// generation did not make is ever deleted.
+pub(super) fn remove(dir: &Path) -> Result<(), String> {
+    let shown = |e: std::io::Error| format!("{}: {e}", dir.display());
+    match std::fs::symlink_metadata(dir) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(shown(e)),
+        Ok(meta) if meta.is_dir() && dir.join(MARKER).is_file() => {
+            std::fs::remove_dir_all(dir).map_err(shown)
+        }
+        Ok(meta) if meta.is_dir() && dir.read_dir().is_ok_and(|mut d| d.next().is_none()) => {
+            std::fs::remove_dir(dir).map_err(shown)
+        }
+        Ok(_) => Err(format!(
+            "{} is in the way and is no generated game (it has no {MARKER}): refusing to delete it",
+            dir.display()
+        )),
+    }
 }
 
 /// Copy every file under `from` to the same relative path under `to`; a missing

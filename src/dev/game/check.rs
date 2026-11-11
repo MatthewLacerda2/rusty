@@ -68,17 +68,18 @@ pub fn check(game: &Game, out: &Path, params: &Params) -> Result<Report, String>
     Ok(report)
 }
 
-/// Generate into `out`, move it aside, generate again into the same path (the
-/// project's own path is written into some of its files) and compare.
+/// Generate into `out`, move it aside to `<out>.first`, generate again into the
+/// same path (the project's own path is written into some of its files) and
+/// compare. The aside folder is only ever deleted through [`tree::remove`].
 fn deterministic(game: &Game, out: &Path, params: &Params) -> Result<bool, String> {
     generate(game, out, params)?;
-    let first = out.with_extension("first");
-    let _ = std::fs::remove_dir_all(&first);
+    let first = tree::beside(out, "first")?;
+    tree::remove(&first)?;
     // lint: allow(atomic-write) moves the first generation aside whole; it writes nothing
     std::fs::rename(out, &first).map_err(|e| format!("{}: {e}", out.display()))?;
     generate(game, out, params)?;
     let differ = tree::differences(&first, out)?;
-    let _ = std::fs::remove_dir_all(&first);
+    tree::remove(&first)?;
     for path in &differ {
         eprintln!(
             "[Game] {}: a second generation wrote other bytes",

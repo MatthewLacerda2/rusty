@@ -59,3 +59,34 @@ fn differences_names_changed_missing_and_extra_files() {
         .collect();
     assert_eq!(names, ["changed", "only_a", "only_b"]);
 }
+
+#[test]
+fn beside_appends_to_the_file_name_and_keeps_its_extension() {
+    let aside = beside(Path::new("/home/me/proj.v2"), "first").unwrap();
+    assert_eq!(aside, Path::new("/home/me/proj.v2.first"));
+    assert!(beside(Path::new("/"), "first").is_err());
+}
+
+#[test]
+fn remove_refuses_a_folder_it_did_not_make() {
+    let out = scratch("aside").join("proj.v2");
+    let first = beside(&out, "first").unwrap();
+    write(&first.join("keep.txt"), "mine");
+    assert!(remove(&first).is_err());
+    assert!(first.join("keep.txt").is_file(), "nothing was deleted");
+}
+
+#[test]
+fn remove_deletes_a_marked_left_over_an_empty_and_a_missing_folder() {
+    let dir = scratch("left-over");
+    let marked = dir.join("proj.first");
+    write(&marked.join(MARKER), "smoke\n");
+    write(&marked.join("assets").join("old.scene"), "stale");
+    remove(&marked).unwrap();
+    assert!(!marked.exists());
+    let empty = dir.join("empty.first");
+    std::fs::create_dir_all(&empty).unwrap();
+    remove(&empty).unwrap();
+    assert!(!empty.exists());
+    remove(&dir.join("absent.first")).unwrap();
+}
