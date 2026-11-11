@@ -55,7 +55,8 @@ impl Scene {
     /// `survivors` across unchanged: same ids, same components, same order among
     /// themselves, appended after the incoming entities. A survivor whose parent does
     /// not survive becomes a root. The materials survivors reference come along
-    /// unless the incoming library already defines that name. Persistent decals
+    /// unless the incoming library already defines that name, and so do the library
+    /// meshes they draw (#2059). Persistent decals
     /// and the survivors' ragdoll state (#1895) come along (#1518,
     /// `scene::decal::persist`); the rest, and queued destroys
     /// of the outgoing scene, are dropped, and the scene takes a fresh
@@ -79,6 +80,7 @@ impl Scene {
             .filter_map(|key| Some((key.clone(), self.materials.get(key)?.clone())))
             .collect();
 
+        let meshes = carried_meshes(self, &carried);
         let decals = self.take_persistent_decals(survivors);
         let mut ragdolls = std::mem::take(&mut self.ragdolls);
         ragdolls.retain(|id| survivors.contains(&id));
@@ -97,6 +99,10 @@ impl Scene {
         for (name, material) in materials {
             self.materials.entry(name).or_insert(material);
         }
+        for (name, mesh) in meshes {
+            self.meshes.entry(name).or_insert(mesh);
+        }
+        self.sync_scene_meshes();
         self.persistent.retain(|id| survivors.contains(id));
         self.history_cuts.retain(|id| survivors.contains(&id));
         self.pending_destroy.retain(|id| survivors.contains(id));
@@ -125,6 +131,17 @@ impl Scene {
         }
         *self.occlusion = remapped.map(std::sync::Arc::new);
     }
+}
+
+/// The library meshes (#2059) `carried` use (a Mesh, or a Mesh collider's kept
+/// copy), to come along like their materials.
+fn carried_meshes(scene: &Scene, carried: &[Entity]) -> crate::scene::mesh_library::MeshLibrary {
+    use crate::scene::mesh_library::scene_mesh_users;
+    let names = carried
+        .iter()
+        .flat_map(|e| scene_mesh_users(e.mesh.as_ref(), e.collider.as_ref()));
+    let found = names.filter_map(|n| Some((n.to_string(), scene.meshes.get(n)?.clone())));
+    found.collect()
 }
 
 /// Move every incoming entity whose id is in `taken` to a fresh id past both the

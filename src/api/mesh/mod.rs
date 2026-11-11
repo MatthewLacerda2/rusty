@@ -1,6 +1,7 @@
-//! src/api/mesh.rs — `Mesh` namespace (#1714).
+//! src/api/mesh/ — `Mesh` namespace (#1714, #2059).
 //!
-//! The per-renderer settings of an entity's `MeshComponent` that have a verb of
+//! Meshes made from vertex data and which mesh an entity draws live in `library`
+//! (#2059). This file holds the per-renderer settings of an entity's `MeshComponent` that have a verb of
 //! their own: the small-object cull's max draw distance (Unreal's *Max Draw
 //! Distance*) and min screen size (Unity `LODGroup`'s relative height). Every
 //! setter routes through the shared `scene::authoring::rendering::mesh` ops the
@@ -10,6 +11,8 @@
 //! the sim never depends on it.
 
 use mlua::{Lua, Table};
+
+mod library;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
@@ -25,6 +28,7 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     register_pair(lua, &t, scene, "MaxDrawDistance", distance)?;
     let size: Pair = (|m| m.min_screen_size, ops::set_min_screen_size);
     register_pair(lua, &t, scene, "MinScreenSize", size)?;
+    library::register(lua, &t, scene)?;
     lua.globals().set("Mesh", t).map_err(|e| e.to_string())
 }
 

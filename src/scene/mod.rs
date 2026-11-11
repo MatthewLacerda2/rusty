@@ -26,6 +26,7 @@
 //!   model_instance — a whole model as its node tree, one child per node (#1083)
 //!   skeleton  — bones as GameObjects: spawn, save-strip, palette build (#453)
 //!   nav_settings — the per-scene navmesh bake settings (`navigation` reads them)
+//!   mesh_library — the meshes a script makes from vertex data (#2059)
 //!   physics_material — the shared physics material assets colliders name (#1878)
 //!   io        — save/load, path + extension, default-scene seeding
 //!   default_scene — the default scene's builder, materials and seeded assets
@@ -49,6 +50,7 @@ mod light_mode;
 pub mod lighting;
 pub mod lod_instance;
 mod material_lookup;
+pub mod mesh_library;
 pub mod model_instance;
 pub mod nav_settings;
 pub mod physics_material;
