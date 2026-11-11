@@ -7,8 +7,8 @@ description: Use before a rusty PR gets the `queue` label when it implements eng
 
 ## Why it exists
 
-The operator does not read the code (root `CLAUDE.md`, *Unity is the
-bar*), so besides the gates a PR gets one outside read: this one. A coder
+The operator does not read the code (root `CLAUDE.md`, *The agent builds the
+game; the developer directs*), so besides the gates a PR gets one outside read: this one. A coder
 reviewing its own diff reviews what it meant to write, not what it wrote, and
 the orchestrator who briefed it shares the brief's blind spots. The reviewer is
 a separate agent that reads the PR the way an outsider would, and it is never
@@ -18,8 +18,7 @@ of the reviewer.**
 The review itself is Claude Code's `code-review` skill. It ships with Claude
 Code and moves with every new model, so this skill only says when to run it,
 how to dispatch it without bias, and what to do with what it finds; it never
-restates how to review. (Adopted from the operator's `prototipo-atem` repo,
-2026-10-19.)
+restates how to review.
 
 ## When
 
@@ -54,14 +53,13 @@ And on demand: when the user asks for a PR to be reviewed, open or merged
   "general-purpose"`. **Never `"fork"`**: a fork inherits the orchestrator's
   context, and with it the bias this skill exists to avoid. **`isolation:
   "worktree"`**: `code-review` checks the PR out to read it, and in the shared
-  main checkout that moved other agents' branch and left `prNNNN` branches
-  behind (three times in the 2026-10-20 batch). Remove a reviewer's worktree
-  only after its report is in, by its own path, never by a pattern: a blanket
-  `agent-*` cleanup removed a running reviewer's checkout and lost its report
-  (2026-10-23). The harness locks it for the orchestrator's whole session, so
-  `make reclaim` leaves it as `PROTECTED` and a plain `git worktree remove`
-  refuses: once the report is in, `git worktree remove -f -f <its path>`
-  (2026-11-07 and 11-08).
+  main checkout that moves other agents' branches and leaves `prNNNN` branches
+  behind. Remove a reviewer's worktree only after its report is in, by its own
+  path, never by a pattern (an `agent-*` sweep removes a running reviewer's
+  checkout and loses its report). The harness locks it for the orchestrator's
+  whole session, so `make reclaim` leaves it as `PROTECTED` and a plain `git
+  worktree remove` refuses: once the report is in, `git worktree remove -f -f
+  <its path>`.
 - **Read-only, and no build.** It reads the PR, the repository and the issue,
   and runs read-only commands (`gh pr view`, `gh pr diff`, `gh issue view`,
   `git show`). It makes no edits, commits, pushes or comments, and it does not
@@ -78,8 +76,8 @@ And on demand: when the user asks for a PR to be reviewed, open or merged
 
 ### Level
 
-`code-review` takes an effort level; rusty uses only **`medium`** and **`high`**
-(operator, 2026-10-19). The rule follows what a miss would cost, not the size of
+`code-review` takes an effort level; rusty uses only **`medium`** and **`high`**.
+The rule follows what a miss would cost, not the size of
 the diff:
 
 - **`high`** when the diff touches a stored format (scene, prefab, save, asset
@@ -88,11 +86,11 @@ the diff:
   the sandbox, or a queue that merges the wrong thing for every PR behind it.
 - **`medium`** for everything else.
 
-**`make review-level PR=<n>` applies it** (#1569): it prints `high` or `medium`
+**`make review-level PR=<n>` applies it**: it prints `high` or `medium`
 on its first line, then the paths that decided it, read from the PR's own files
 on GitHub (what the PR really touches, not what its brief meant it to) against
 the table in `.github/scripts/dispatch/review_level.py` and the
-`//! stored-format:` markers modules carry (#1966: one in `mod.rs` covers its
+`//! stored-format:` markers modules carry (one in `mod.rs` covers its
 directory; `tools/lint`'s `stored-format` rule fails a serde file format without
 one). Pass both into the prompt. A path table cannot see everything (a stored format changed through a
 component's serde fields, say), so the reviewer may raise `medium` to `high`,
@@ -149,7 +147,7 @@ Paste every list whose trigger the PR hits.
   that should be per change; Unity's behaviour where the issue was silent.
 - **What is drawn** (the renderer, `engine/shaders/`, materials, post effects,
   lighting, UI, editor panels): the PR description carries a `Looked at` line
-  (`issue-batch/cloud-brief.md`, #1483) naming the scene, what was rendered
+  (`issue-batch/cloud-brief.md`) naming the scene, what was rendered
   before and after and what was seen. You do not build, so you do not
   re-render: check only that the line is there and covers what the diff
   changes. A missing line, or one that skips a change the diff makes visible,
@@ -175,9 +173,8 @@ Paste every list whose trigger the PR hits.
 ## Answering the findings
 
 **Wait for the whole report.** A reviewer that answers while its `code-review`
-pass still runs sends the rest as a late addendum (PR #1673, 2026-11-01: it came a
-minute after the re-brief, and the routine had to be cancelled and re-briefed).
-The template asks it to wait; if an addendum lands anyway after a re-brief whose
+pass still runs sends the rest as a late addendum, after the re-brief. The
+template asks it to wait; if an addendum lands anyway after a re-brief whose
 routine hasn't fired, disable that routine (`RemoteTrigger` `update` with
 `{"enabled": false}`) and post one combined `Brief`.
 
@@ -201,8 +198,8 @@ code first, then:
    became of it: fixed (with the commit), dropped (in a word), sent to the user,
    or filed as an issue when it lies outside the branch and passes *Issues are
    for what matters*. No findings is said too. It is the record that the review
-   happened. **The merge queue reads it** (#1764,
-   `.github/scripts/merging/verdict/reviewed.py`): it hands back, before any
+   happened. **The merge queue reads it**
+   (`.github/scripts/merging/verdict/reviewed.py`): it hands back, before any
    push, a code PR with no comment whose first line is `Independent review…`
    or `No review: <why>` (the written exemption for a PR under *No review*,
    its reason on the same line). Only a comment by someone who can push counts;
@@ -211,10 +208,10 @@ code first, then:
    do. **The queue does not read the outcomes**: any `Independent review`
    comment counts, open must-fix findings or not, so a record posted while the
    coder is still fixing needs the `queue` label off until the findings are
-   answered (#1753's record came 13 minutes before its fix). It reports, it never instructs: "sent back to the coder", never "fix
-   in this branch" or where the new `Brief` is. A readied session still
+   answered. It reports, it never instructs: "sent back to the coder", never
+   "fix in this branch" or where the new `Brief` is. A readied session still
    subscribed to the PR reads an instruction there as work, and races the fresh
-   session (2026-10-26, #1447).
+   session.
    **Before filing a pre-existing finding, class it** (`issue-batch`, *Filing a
    bug*): look for earlier cases of its kind; a case is filed with `Kind: case —
    searched <terms>`, a symptom gets the fix that scales as a root issue, with
@@ -243,13 +240,9 @@ links the fix.
   and the raise-to-`high` rule out of the prompt.
 - Letting `code-review` run without the PR number: it then reviews the
   checkout's local diff, some other change entirely.
-- Labelling `queue` before the `Independent review` (or `No review:`) comment
-  exists. The queue hands such a PR back now (#1764), so it costs a hand-back,
-  not a merge; it is no longer only prose that guards it. What the record
-  says is still prose's to guard: step 2.
-- A reviewer that checks the PR out into a named branch (`pr1316`,
-  `pr1403rev`, …): the worktree goes, the branch stays in the shared
-  repository. The Post Processing batch (#1446, 2026-10-26) ended with 39 local
-  branches, most of them reviewers', and sweeping them by hand was refused as
-  irreversible (#1482). The prompt says to read it detached; `make reclaim`
+- Labelling `queue` before the outcomes are answered: the queue checks only that
+  the record exists (step 2), never what it says.
+- A reviewer that checks the PR out into a named branch (`pr<n>`,
+  `pr<n>rev`, …): the worktree goes, the branch stays in the shared
+  repository. The prompt says to read it detached; `make reclaim`
   deletes the ones that slip through.
