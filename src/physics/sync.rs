@@ -37,12 +37,13 @@ impl PhysicsWorld {
     /// Returns the bodies whose state it synced.
     pub(super) fn sync_to_rapier(&mut self, scene: &mut Scene) -> Owners {
         let stepped = std::mem::take(&mut self.tracked.stepped);
-        let owners = match self.read_changes(scene) {
+        let (owners, reshaped) = match self.read_changes(scene) {
             None => {
-                self.resync_topology(scene);
+                let built = self.resync_topology(scene);
+                self.record_mesh_keys(scene, &built);
                 self.tracked.carriers = carriers(scene);
                 self.resync_joints_tracked(scene);
-                Owners::All
+                (Owners::All, None)
             }
             Some(changed) => self.resync_changed(scene, &changed),
         };
@@ -61,6 +62,8 @@ impl PhysicsWorld {
         self.sync_sensors(scene, &owners);
         // Before the masses: a resized capsule changes its body's volume.
         self.sync_characters(scene, &owners);
+        // A replaced library mesh re-shapes the colliders built from it (#2059).
+        self.sync_mesh_shapes(scene, reshaped.as_ref());
         // A body that changed type re-fits its concave meshes, before the masses.
         self.sync_mesh_fits(scene, &owners);
         self.sync_masses(scene, &owners);
@@ -148,12 +151,21 @@ impl PhysicsWorld {
 
     /// Rebuild what `changed` may have reshaped (the plan, the joints) and return
     /// the bodies to sync: every owner a named id is or belongs to, and every body
-    /// just built.
-    fn resync_changed(&mut self, scene: &Scene, changed: &Changed) -> Owners {
+    /// just built; and the colliders whose library-mesh triangles may have moved.
+    fn resync_changed(
+        &mut self,
+        scene: &Scene,
+        changed: &Changed,
+    ) -> (Owners, Option<BTreeSet<u32>>) {
         let mut owners = BTreeSet::new();
+        let mut reshaped: BTreeSet<u32> = changed.reshaped.iter().copied().collect();
         let replan = self.plan_may_change(scene, changed);
         if replan {
-            owners.extend(self.resync_topology(scene));
+            let built = self.resync_topology(scene);
+            self.record_mesh_keys(scene, &built);
+            let parts = built.iter().filter_map(|o| self.plan.get(o)).flatten();
+            reshaped.extend(parts);
+            owners.extend(built);
             self.tracked.carriers = carriers(scene);
         }
         let deps = &self.tracked.joint_deps;
@@ -166,7 +178,18 @@ impl PhysicsWorld {
             }
             owners.extend(self.tracked.member_owner.get(&id));
         }
-        Owners::Only(owners)
+        (Owners::Only(owners), Some(reshaped))
+    }
+
+    /// Remember the triangles the colliders of the `built` owners were built from.
+    fn record_mesh_keys(&mut self, scene: &Scene, built: &[u32]) {
+        let ids: Vec<u32> = built
+            .iter()
+            .filter_map(|o| self.plan.get(o))
+            .flatten()
+            .copied()
+            .collect();
+        super::watch::mesh_keys::record(&mut self.tracked.mesh_keys, scene, &ids);
     }
 
     /// Whether a named id may have left, joined or moved between bodies: its

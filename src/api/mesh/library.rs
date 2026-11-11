@@ -6,6 +6,9 @@
 //!   replaces the library mesh `name`; every entity drawing it redraws.
 //! - `Mesh.GetAsset(name)` gives the data back in the same flat form, `nil` when
 //!   absent; `Mesh.HasAsset(name)` says whether it exists.
+//! - `Mesh.DeleteAsset(name [, { force = true }])` takes it out of the library,
+//!   refused while in use unless forced (`scene::mesh_library::delete`); returns
+//!   the ids it took the mesh off.
 //! - `Mesh.SetSharedMesh(id, name)` makes entity `id` draw a library mesh or a
 //!   primitive; `Mesh.GetSharedMesh(id)` names what it draws.
 //!
@@ -41,6 +44,16 @@ pub fn register(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
         Ok(scene.get(lua)?.borrow().meshes.contains_key(&name))
     });
     put(t, "HasAsset", f)?;
+    let f = lua.create_function(move |lua, (name, opts): (String, Option<Table>)| {
+        let force = match opts {
+            Some(opts) => opts.get::<Option<bool>>("force")?.unwrap_or(false),
+            None => false,
+        };
+        let cell = scene.get(lua)?;
+        let deleted = cell.borrow_mut().delete_mesh(&name, force);
+        deleted.map_err(|e| refusal("DeleteAsset", &e))
+    });
+    put(t, "DeleteAsset", f)?;
     let f = lua.create_function(move |lua, id: EntityArg| {
         let cell = scene.get(lua)?;
         let s = cell.borrow();

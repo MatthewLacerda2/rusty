@@ -168,6 +168,8 @@ pub(super) fn rebuild_instance(
 /// collider is refreshed.
 pub(super) fn finish_rebuild(scene: &mut Scene) {
     scene.sync_skeletons();
+    // A rebuilt part drawing a library mesh (#2059, an override) takes its geometry.
+    scene.sync_scene_meshes();
     scene.update_all_colliders();
 }
 

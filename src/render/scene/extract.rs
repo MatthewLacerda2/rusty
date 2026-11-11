@@ -20,10 +20,28 @@ impl Renderer {
         let start = std::time::Instant::now();
         let mut retained = self.retained.take(scene.id());
         let last = self.update_objects(scene, &mut retained);
+        self.free_deleted_meshes(scene, &mut retained);
         self.keep_scene(scene.id(), retained);
         self.frame_counters.render_extracted += last.extracted;
         self.frame_counters.render_posed += last.posed;
         self.frame_counters.render_extract_us += start.elapsed().as_micros() as u64;
+    }
+
+    /// Free the GPU buffers of each library mesh (#2059) `scene` defined at its
+    /// last extract and no longer does (`Mesh.DeleteAsset`). One comparison of the
+    /// names per frame; a mesh made again under the name uploads afresh.
+    fn free_deleted_meshes(&mut self, scene: &Scene, rs: &mut RenderScene) {
+        if scene.meshes.keys().eq(rs.library_meshes.iter()) {
+            return;
+        }
+        for name in &rs.library_meshes {
+            if !scene.meshes.contains_key(name) {
+                let kind = crate::components::mesh::SCENE_KIND;
+                self.gpu_meshes
+                    .remove(&crate::render::MeshId(format!("{kind}|{name}")));
+            }
+        }
+        rs.library_meshes = scene.meshes.keys().cloned().collect();
     }
 
     /// The renderer-side inputs every object reads, as they are now.

@@ -43,7 +43,10 @@ pub fn draw_mesh(
     let mut lightmap_scale = None;
     component_card(ui, icon::CUBE, "Mesh Filter", Some(&mut remove), |ui| {
         if let Some(mesh) = world.mesh(id) {
-            ui.label(format!("Type: {} primitive", mesh.primitive_type));
+            match crate::scene::mesh_library::scene_mesh_name(&mesh) {
+                Some(name) => ui.label(format!("Scene mesh: {name}")),
+                None => ui.label(format!("Type: {} primitive", mesh.primitive_type)),
+            };
             if mesh.primitive_type == "Plane" {
                 subdivide = draw_subdivisions(ui, mesh.subdivisions);
             }

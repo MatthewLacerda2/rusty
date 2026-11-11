@@ -20,24 +20,49 @@
 //! library back. A prefab never holds one (`prefab::write_prefab_file` refuses).
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use serde::{Deserialize, Serialize};
 
-use crate::components::mesh::{BoneBinding, MeshData, MeshRevision, SCENE_KIND};
-use crate::components::MeshComponent;
+use crate::components::mesh::{BoneBinding, MeshData, MeshRevision, Vertex, SCENE_KIND};
+use crate::components::{ColliderComponent, MeshComponent};
 use crate::scene::authoring::{primitive_mesh_component, ComponentKind, Primitive};
 use crate::scene::Scene;
 
+/// What an entry draws: its vertices and indices, built from its data.
+pub type Geometry = (Vec<Vertex>, Vec<u32>);
+
 /// One library entry: the data as authored, shared (a Play snapshot or an Undo
-/// baseline clones the library, never the vertices), and the revision every entity
-/// drawing it carries. Two entries are equal when their data is: the revision is
-/// not an edit (Undo compares the library). Saved as its data alone.
+/// baseline clones the library, never the vertices), the geometry built from it
+/// once (on first use, so every entity drawing it copies one build), and the
+/// revision every entity drawing it carries. Two entries are equal when their data
+/// is: the revision is not an edit (Undo compares the library). Saved as its data
+/// alone.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(from = "MeshData", into = "MeshData")]
 pub struct SceneMesh {
     pub data: Arc<MeshData>,
     pub revision: MeshRevision,
+    built: Arc<OnceLock<Geometry>>,
+}
+
+impl SceneMesh {
+    /// The geometry its data builds (`MeshData::geometry`), built on the first call.
+    /// Call it on an entry that passed `MeshData::validate`, as every entry in a
+    /// scene's library has.
+    pub fn geometry(&self) -> &Geometry {
+        self.built.get_or_init(|| {
+            #[cfg(test)]
+            BUILDS.with(|n| n.set(n.get() + 1));
+            self.data.geometry()
+        })
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// How many geometries [`SceneMesh::geometry`] built on this thread.
+    pub(crate) static BUILDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 impl PartialEq for SceneMesh {
@@ -48,10 +73,10 @@ impl PartialEq for SceneMesh {
 
 impl From<MeshData> for SceneMesh {
     fn from(data: MeshData) -> Self {
-        let revision = MeshRevision::next();
         Self {
             data: Arc::new(data),
-            revision,
+            revision: MeshRevision::next(),
+            built: Arc::default(),
         }
     }
 }
@@ -90,6 +115,49 @@ pub fn scene_mesh_name(mesh: &MeshComponent) -> Option<&str> {
         .flatten()
 }
 
+/// The library entry a Mesh collider's kept copy (#1657) names, when it names one.
+pub fn kept_mesh_name(collider: &ColliderComponent) -> Option<&str> {
+    let kept = collider.shared_mesh.as_ref()?;
+    (kept.primitive_type == SCENE_KIND)
+        .then_some(kept.asset_ref.as_deref())
+        .flatten()
+}
+
+/// Every library entry an entity uses: the one its Mesh draws, then the one its
+/// Mesh collider's kept copy names. The one test of "uses a scene mesh" that the
+/// sync, a Play load's carried survivors, a prefab save and `Mesh.DeleteAsset`
+/// share.
+pub fn scene_mesh_users<'a>(
+    mesh: Option<&'a MeshComponent>,
+    collider: Option<&'a ColliderComponent>,
+) -> impl Iterator<Item = &'a str> {
+    let own = mesh.and_then(scene_mesh_name);
+    own.into_iter().chain(collider.and_then(kept_mesh_name))
+}
+
+/// `library` as a file brought it, each entry held to what `Mesh.Create` holds
+/// (its name and `MeshData::validate`): a bad entry is dropped with a warning
+/// naming it, and the entities drawing it draw nothing, as for a missing model.
+pub fn checked(library: MeshLibrary) -> MeshLibrary {
+    let mut kept = MeshLibrary::new();
+    for (name, mesh) in library {
+        match check_name(&name).and_then(|()| mesh.data.validate()) {
+            Ok(()) => {
+                kept.insert(name, mesh);
+            }
+            Err(why) => crate::scene::rehydrate::warn_once_of(&invalid_key(&name), || {
+                format!("the scene's mesh {name:?} is dropped: {why}")
+            }),
+        }
+    }
+    kept
+}
+
+/// The once-only warning key of an invalid library entry `name`.
+pub(crate) fn invalid_key(name: &str) -> String {
+    format!("{SCENE_KIND}::invalid::{name}")
+}
+
 impl Scene {
     /// Define (or replace) the library mesh `name` from `data`, and bring every
     /// entity drawing it up to date: Unity's shared mesh, edited in place.
@@ -112,10 +180,17 @@ impl Scene {
         let fresh = match Primitive::parse(reference) {
             Some(p) => primitive_mesh_component(p)
                 .ok_or_else(|| format!("{reference:?} is a light, not a mesh"))?,
-            None if self.meshes.contains_key(reference) => MeshComponent {
-                asset_ref: Some(reference.to_string()),
-                ..MeshComponent::new(SCENE_KIND, Vec::new(), Vec::new())
-            },
+            // The entry's own build and revision: the other entities drawing it
+            // stay as they are, and nothing is built again.
+            None if self.meshes.contains_key(reference) => {
+                let entry = &self.meshes[reference];
+                let (vertices, indices) = entry.geometry().clone();
+                MeshComponent {
+                    asset_ref: Some(reference.to_string()),
+                    revision: entry.revision,
+                    ..MeshComponent::new(SCENE_KIND, vertices, indices)
+                }
+            }
             None => {
                 return Err(format!(
                     "no mesh named {reference:?} (a primitive, or one made with Mesh.Create)"
@@ -135,7 +210,6 @@ impl Scene {
                 ..fresh
             };
         }
-        self.sync_scene_meshes();
         sync::refit(self, id);
         Ok(())
     }
@@ -149,7 +223,12 @@ impl Scene {
     }
 }
 
+mod delete;
 mod sync;
 
 #[cfg(test)]
+mod delete_tests;
+#[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod users_tests;

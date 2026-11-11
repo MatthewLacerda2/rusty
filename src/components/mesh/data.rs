@@ -86,9 +86,12 @@ impl MeshData {
     /// lightmap UV (a static one reads light probes, as a mesh without one does).
     /// Call it on data that passed [`Self::validate`].
     pub fn geometry(&self) -> (Vec<Vertex>, Vec<u32>) {
-        let normals = match self.normals.is_empty() {
+        // A zero normal is given its +Y fallback before the tangents read it.
+        let normals: Vec<[f32; 3]> = match self.normals.is_empty() {
             true => area_weighted_normals(&self.positions, &self.indices),
-            false => self.normals.clone(),
+            false => (self.normals.iter())
+                .map(|n| unit_or_up(Vec3::from_array(*n)))
+                .collect(),
         };
         let uvs = match self.uvs.is_empty() {
             true => vec![[0.0; 2]; self.positions.len()],
@@ -97,8 +100,7 @@ impl MeshData {
         let tangents = generate_tangents(&self.positions, &normals, &uvs, &self.indices);
         let vertices = (self.positions.iter().zip(&normals).zip(&uvs).zip(tangents))
             .map(|(((p, n), uv), t)| {
-                let normal = Vec3::from_array(*n).try_normalize().unwrap_or(Vec3::Y);
-                let mut v = Vertex::new(Vec3::from_array(*p), normal, *uv);
+                let mut v = Vertex::new(Vec3::from_array(*p), Vec3::from_array(*n), *uv);
                 v.tangent = t;
                 v
             })
@@ -123,9 +125,12 @@ pub fn area_weighted_normals(positions: &[[f32; 3]], indices: &[u32]) -> Vec<[f3
             sums[i as usize] += face;
         }
     }
-    sums.into_iter()
-        .map(|n| n.try_normalize().unwrap_or(Vec3::Y).to_array())
-        .collect()
+    sums.into_iter().map(unit_or_up).collect()
+}
+
+/// `n` normalised, or +Y when it has no length.
+fn unit_or_up(n: Vec3) -> [f32; 3] {
+    n.try_normalize().unwrap_or(Vec3::Y).to_array()
 }
 
 #[cfg(test)]

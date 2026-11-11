@@ -218,15 +218,10 @@ pub fn write_prefab_file(prefab: &PrefabData, path: &str) -> Result<(), String> 
 /// The first entity of `prefab` drawing a library mesh, by its Mesh or a Mesh
 /// collider's kept copy, with the mesh's name.
 fn scene_mesh_user(prefab: &PrefabData) -> Option<(&Entity, &str)> {
-    use crate::components::mesh::SCENE_KIND;
+    use crate::scene::mesh_library::scene_mesh_users;
     prefab.entities.iter().find_map(|e| {
-        let own = e
-            .mesh
-            .as_ref()
-            .and_then(crate::scene::mesh_library::scene_mesh_name);
-        let kept = e.collider.as_ref().and_then(|c| c.shared_mesh.as_ref());
-        let kept = kept.filter(|k| k.primitive_type == SCENE_KIND);
-        Some((e, own.or_else(|| kept?.asset_ref.as_deref())?))
+        let mut names = scene_mesh_users(e.mesh.as_ref(), e.collider.as_ref());
+        Some((e, names.next()?))
     })
 }
 

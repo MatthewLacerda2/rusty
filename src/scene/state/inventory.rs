@@ -36,7 +36,7 @@ macro_rules! authored_fields {
                 materials: crate::scene::revision::Revisioned<std::collections::BTreeMap<String, crate::scene::MaterialAsset>>
                     => eq_or_bytes, assign;
                 // Undo's put-back re-syncs the entities drawing one (`undo::restore`).
-                meshes: crate::scene::mesh_library::MeshLibrary => eq_or_bytes, assign;
+                meshes: crate::scene::mesh_library::MeshLibrary => eq, assign;
                 // Placement around bake output: compared and put back without the
                 // baked SH, which the sidecar saves and Stop's snapshot carries.
                 probes: crate::scene::lighting::probe::ProbeVolume => same_probes, put_probes;

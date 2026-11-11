@@ -267,6 +267,7 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
     // read the held shapes; prefab propagation holds what it rebuilds.
     if from_disk {
         crate::scene::authoring::fields::hold_world(&mut scene.world);
+        scene.meshes = crate::scene::mesh_library::checked(std::mem::take(&mut scene.meshes));
     }
 
     scene.update_all_colliders();

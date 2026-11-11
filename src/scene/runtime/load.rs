@@ -133,10 +133,13 @@ impl Scene {
     }
 }
 
-/// The library meshes (#2059) `carried` draw, to come along like their materials.
+/// The library meshes (#2059) `carried` use (a Mesh, or a Mesh collider's kept
+/// copy), to come along like their materials.
 fn carried_meshes(scene: &Scene, carried: &[Entity]) -> crate::scene::mesh_library::MeshLibrary {
-    let names = carried.iter().filter_map(|e| e.mesh.as_ref());
-    let names = names.filter_map(crate::scene::mesh_library::scene_mesh_name);
+    use crate::scene::mesh_library::scene_mesh_users;
+    let names = carried
+        .iter()
+        .flat_map(|e| scene_mesh_users(e.mesh.as_ref(), e.collider.as_ref()));
     let found = names.filter_map(|n| Some((n.to_string(), scene.meshes.get(n)?.clone())));
     found.collect()
 }

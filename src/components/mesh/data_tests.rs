@@ -103,3 +103,16 @@ fn given_normals_and_uvs_are_kept() {
     assert_eq!(vertices[3].normal, [0.0, 0.0, 1.0]);
     assert_eq!(vertices[3].tex_coords, [0.5, 0.25]);
 }
+
+#[test]
+fn a_zero_normal_points_up_before_the_tangents_read_it() {
+    let mut q = quad();
+    q.normals = vec![[0.0; 3]; 4];
+    q.uvs = vec![[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
+    let (vertices, _) = q.geometry();
+    for v in &vertices {
+        assert_eq!(v.normal, [0.0, 1.0, 0.0]);
+        let t = glam::Vec3::new(v.tangent[0], v.tangent[1], v.tangent[2]);
+        assert!(t.is_finite() && t.length() > 0.5, "a usable tangent: {t}");
+    }
+}

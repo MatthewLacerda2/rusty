@@ -79,6 +79,8 @@ mod idle_tests;
 mod inputs;
 #[cfg(test)]
 mod interpolate_gpu_tests;
+#[cfg(test)]
+mod library_gpu_tests;
 mod object;
 mod occlusion;
 pub(crate) mod records;
@@ -201,6 +203,8 @@ pub(crate) struct RenderScene {
     pub(crate) occlusion: OcclusionBinding,
     /// What its shadow sweeps gather through (#1874): the static objects' BVH.
     casters: casters::Gathering,
+    /// Its library meshes' names at the last extract (#2059): one gone frees its buffers.
+    library_meshes: Vec<String>,
 }
 
 impl RenderScene {

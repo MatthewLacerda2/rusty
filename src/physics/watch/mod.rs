@@ -19,14 +19,16 @@
 //! | `sync_layers` | the entity's layer, **and the scene's collision matrix** | `Layer`; the matrix is not an entity column, so it is compared to the copy kept here and a change re-runs the pass over every collider |
 //! | `sync_masses` | the Rigidbody's `mass`, each collider's volume and sensor flag (a crouch resizes a capsule) | `RigidBodyComponent`, `ColliderComponent`, `CharacterControllerComponent`, `WorldPose` (scale) |
 //! | `sync_mesh_fits` | the owner's body class (as body state reads it), each concave mesh collider's shape and geometry | `RigidBodyComponent`, `StaticSet`, `CharacterControllerComponent`, `ColliderComponent` |
+//! | `sync_mesh_shapes` | a mesh collider's library-mesh triangles (#2059, `mesh_keys`) | `ColliderComponent` (a kept copy), `MeshComponent` |
 //! | `sync_characters` | the CharacterController, the owner's and the capsule's world pose | `CharacterControllerComponent`, `WorldPose` |
 //! | body state (`apply_body_state`) | the owner's world pose, its Rigidbody (class, velocities, gravity, CCD), its static flag, a CharacterController's presence | `WorldPose`, `RigidBodyComponent`, `StaticSet`, `CharacterControllerComponent` |
 //! | compound parts | the owner's and each part's world pose | `WorldPose` |
 //!
 //! No pass reads a settings value, and the one asset a pass reads is a physics
 //! material (above): gravity is the world's own, and a mesh collider's triangles
-//! are read when its body is built, and again only when its body changes type
-//! (`sync_mesh_fits`, #1886), never synced otherwise.
+//! are read when its body is built, again when its body changes type
+//! (`sync_mesh_fits`, #1886), and when they come from a library mesh that was
+//! replaced (`sync_mesh_shapes`, #2059), never synced otherwise.
 //!
 //! **Rebuild.** A cursor reading [`Changes::Rebuild`] (the first step, a scene
 //! load, Play's restore, an Undo or Redo, a reader that fell behind) runs today's
@@ -60,11 +62,14 @@ use rapier3d::prelude::{Pose, RigidBodyHandle};
 
 use super::compound::{body_owner, BodyPlan};
 use crate::components::{
-    CharacterControllerComponent, ColliderComponent, JointComponent, RigidBodyComponent,
+    CharacterControllerComponent, ColliderComponent, JointComponent, MeshComponent,
+    RigidBodyComponent,
 };
 use crate::core::collections::Map;
 use crate::ecs::{Activity, Changes, Channel, Cursor, Layer, StaticSet, World, WorldPose};
 use crate::scene::{CollisionMatrix, Scene};
+
+pub(super) mod mesh_keys;
 
 #[cfg(test)]
 mod borrow_tests;
@@ -91,6 +96,7 @@ pub(super) struct Watch {
     activity: Cursor<Activity>,
     layer: Cursor<Layer>,
     statics: Cursor<StaticSet>,
+    mesh: Cursor<MeshComponent>,
 }
 
 /// What changed since the last read, when the log could say.
@@ -103,6 +109,9 @@ pub(super) struct Changed {
     pub carriers: Vec<u32>,
     /// A `Joint` was edited, attached, detached or broken.
     pub joints: bool,
+    /// The ids whose Collider or Mesh was stamped: a mesh collider's triangles may
+    /// have moved (`mesh_keys`). Ascending, each once.
+    pub reshaped: Vec<u32>,
 }
 
 /// Read `cursor` into `ids`; `false` when it reads `Rebuild`.
@@ -128,6 +137,7 @@ impl Watch {
             activity: world.change_cursor(),
             layer: world.change_cursor(),
             statics: world.change_cursor(),
+            mesh: world.change_cursor(),
         }
     }
 
@@ -137,11 +147,13 @@ impl Watch {
         let mut carriers = Vec::new();
         let mut joints = Vec::new();
         let mut rest = Vec::new();
+        let mut reshaped = Vec::new();
         let known = [
             take(world, &mut self.rigidbody, &mut carriers),
             take(world, &mut self.character, &mut carriers),
             take(world, &mut self.joint, &mut joints),
-            take(world, &mut self.collider, &mut rest),
+            take(world, &mut self.collider, &mut reshaped),
+            take(world, &mut self.mesh, &mut reshaped),
             take(world, &mut self.pose, &mut rest),
             take(world, &mut self.activity, &mut rest),
             take(world, &mut self.layer, &mut rest),
@@ -152,7 +164,10 @@ impl Watch {
         }
         carriers.sort_unstable();
         carriers.dedup();
+        reshaped.sort_unstable();
+        reshaped.dedup();
         let mut all = rest;
+        all.extend(&reshaped);
         all.extend(&carriers);
         all.extend(&joints);
         all.sort_unstable();
@@ -161,6 +176,7 @@ impl Watch {
             all,
             carriers,
             joints: !joints.is_empty(),
+            reshaped,
         })
     }
 }
@@ -215,6 +231,8 @@ pub(in crate::physics) struct Tracked {
     /// The physics material assets' generation the materials were last synced
     /// against (`scene::physics_material::generation`, #1878).
     pub material_assets: Option<u64>,
+    /// The library-mesh triangles each mesh collider's shape was built from.
+    pub mesh_keys: mesh_keys::MeshKeys,
     /// Ignore the log and run the full pass every step: the reference the
     /// equivalence tests compare against.
     #[cfg(test)]
