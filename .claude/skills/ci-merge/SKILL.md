@@ -220,7 +220,8 @@ runs are read like a PR's. The branch is deleted once they settle. Then:
 - **Red:** split in half, each half retested on the latest `main` before any new
   train; a green half lands, a half of one goes alone, so a PR red on its own is
   handed back with its run linked. A train that only **stalled** splits the same
-  way without marking anyone red.
+  way without marking anyone red, and one red only through a runner outage is re-run,
+  not split.
 
 A dry run prints the train it would form. A watch killed mid-train leaves a
 `merge-train/*` branch; the next watch deletes them all before its first take.
@@ -261,7 +262,7 @@ What `make mergeable` asks:
   `Refs #N`; an issue-less PR touching anything but Markdown (or a `CODE_DOCS`
   file) carries `bug` or is Dependabot's; no image (`png`, `jpg`, `hdr`, `exr`,
   `ktx2`) added outside `IMAGES_ALLOWED`. Each is fixed by editing the
-  description, a label or a relationship. No **Gates** line passes with a warning.
+  description, a label or a relationship, and an image by a commit that deletes it. No **Gates** line passes with a warning.
 - **Both workflows on the head SHA**, `ci-gate` and `lint-gate`.
 - **A gated job itself succeeded.** The gates pass over skipped jobs, so a draft's
   run is gate-green with nothing compiled; `changes` succeeding proves nothing.
