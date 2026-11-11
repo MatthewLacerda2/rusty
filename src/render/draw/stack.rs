@@ -5,6 +5,7 @@
 //! draw through here, so a picture-in-picture is the same frame as the screen's.
 
 use super::camera::{CameraCtx, StackShared, CAMERA_PASSES};
+use crate::core::settings::GraphicsSettings;
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::motion::{self, HistoryKey, Velocity};
 use crate::render::passes::ssao::SsaoPlan;
@@ -20,12 +21,21 @@ use crate::scene::{Camera, Scene};
 /// and the authored effects keep a history; motion vectors compare with last
 /// frame's poses unless this frame is a cut. (A shown render texture is counted
 /// where it is drawn, `render_texture`.)
-fn reads_history(view: &RenderView, effect: &EffectCx, taa: bool, shared: &StackShared) -> bool {
+fn reads_history(
+    view: &RenderView,
+    (pass, graphics, taa): (&StackPass, GraphicsSettings, bool),
+    shared: &StackShared,
+) -> bool {
+    let effect = EffectCx {
+        post: pass.post,
+        graphics,
+        full: pass.full_post_fx,
+    };
     let motion = &view.post_fx.motion;
     let moving = motion.active() && !motion.history.cut();
     taa || shared.ssil.is_some()
         || shared.volumetric.is_some()
-        || custom_effects::reads_history(effect)
+        || custom_effects::reads_history(&effect)
         || moving
 }
 
@@ -111,12 +121,7 @@ impl Renderer {
             ssil: ssil::begin(&mut view.post_fx, (&pass, graphics, key), keeps),
             volumetric: volumetric_fog::begin(&mut view.post_fx, (&pass, graphics, key), keeps),
         };
-        let effect = EffectCx {
-            post: pass.post,
-            graphics,
-            full: pass.full_post_fx,
-        };
-        let history = reads_history(view, &effect, taa_on, &shared);
+        let history = reads_history(view, (&pass, graphics, taa_on), &shared);
         self.frame_counters.history_passes += u32::from(history);
         for idx in 0..pass.stack.len() {
             let mut ctx = CameraCtx::new(scene, &pass, &shared, idx);
