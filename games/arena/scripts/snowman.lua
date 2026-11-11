@@ -35,6 +35,7 @@ local function spot_query()
 end
 
 function Snowman.Start(id)
+    Combat.start()
     Snowman.health = Combat.HEALTH
     Snowman.gun = Combat.gun({ rate = 0.15, spread = 0.035, kick = 0.012, recover = 0.12 })
     Snowman.smokes = 1
@@ -62,8 +63,8 @@ end
 
 local function roam(id)
     if NavMeshAgent.HasPath(id) and not NavMeshAgent.IsAtTarget(id) then return end
-    local places = Scene.GetChildren(Scene.FindEntityByName("Spawns"))
-    for _, w in ipairs(Scene.GetChildren(Scene.FindEntityByName("Waypoints"))) do
+    local places = Scene.GetChildren(Combat.named("Spawns"))
+    for _, w in ipairs(Scene.GetChildren(Combat.named("Waypoints"))) do
         places[#places + 1] = w
     end
     local x, y, z = Transform.GetPosition(places[Random.Range(1, #places + 1)])
