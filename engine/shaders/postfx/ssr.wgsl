@@ -37,6 +37,7 @@
 #import fullscreen
 #import lighting::ssr_surface
 #import lighting::ssr_march
+#import numeric
 
 struct SsrParams {
     inv_view_proj: mat4x4<f32>,
@@ -197,7 +198,8 @@ fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
     let missed = Traced(vec4<f32>(0.0), vec4<f32>(1.0, 0.0, 0.0, 0.0));
     // A normal map can tilt the ray below the surface itself (a rough floor seen at a
     // grazing angle): the march would hit the floor it left and show its own colour.
-    // Such a ray keeps the probe reflection, as a miss does.
+    // Such a ray is a miss: the resolve may fill it from the hits around it, within
+    // its own cone's spread, and where none reach it keeps the probe reflection.
     if (dot(r, geometric_normal(px, world, fwd, s.normal)) < 0.0) {
         return missed;
     }
@@ -207,7 +209,10 @@ fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
     // Read sharp: the resolve blurs the hits by the cone, colour and edge alike.
     let hit = ssr_march::trace_hit(f, t_velocity, t_color, s_color, origin, r, i32(params.march.x), params.march.y, c, 0.0);
     let w = hit.colour.w;
-    if (w <= 0.0) {
+    // The colour is read from the image's first level, which the pyramid's filter
+    // (`ssr_pyramid.wgsl`) never touches: an emissive past f16's range is `inf`
+    // there. Such a hit is a miss, as its texel is to the pyramid's levels.
+    if (w <= 0.0 || !numeric::finite4(hit.colour)) {
         return missed;
     }
     return Traced(vec4<f32>(hit.colour.rgb * w, w), vec4<f32>(1.0, spread(world, hit.dist, c, dim) * w, 0.0, 0.0));
@@ -219,9 +224,12 @@ fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
 // width; what the average adds is where rays stop hitting: a rough surface's
 // reflected silhouette fades across its blur, not at one pixel's hit or miss,
 // which drew it as a stepped outline. A miss takes the radius of the hits around
-// it, so an edge softens out as well as in. Only pixels on the same plane count,
-// and the average is over pixels that traced, so a surface's border or a
-// neighbouring surface neither fades nor bleeds into it.
+// it, so an edge softens out as well as in, capped by the widest its own cone
+// spreads (0 for a mirror, whose misses stay misses). Only taps whose centre lies on
+// the same plane count, and the average is over pixels that traced, so a
+// surface's border or a neighbouring surface mostly neither fades nor bleeds into
+// it: an approximation, since a tap reads a mip texel `radius / 2` wide that can
+// average in the surface beside it, so a band about that wide at a corner does.
 @group(1) @binding(0) var t_hits: texture_2d<f32>;
 @group(1) @binding(1) var t_spread: texture_2d<f32>;
 
@@ -257,17 +265,22 @@ fn fs_resolve(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     if (!takes(s, fade, v.z)) {
         discard;
     }
+    let fwd = view_forward();
+    let world = world_at(uv, v.z, fwd);
     var p = textureLoad(t_hits, px, 0);
     var radius = textureLoad(t_spread, px, 0).y / max(p.a, 1e-6);
     if (p.a <= 0.0) {
-        // A miss: the mean radius of the hits as far around as any blur reaches.
+        // A miss: the mean radius of the hits as far around as any blur reaches,
+        // but no wider than this pixel's own cone spreads a hit as far out as the
+        // march reaches. A mirror's miss beside a satin wall's hits stays a miss,
+        // where taking their radius smeared the mirror's sharp hits outward.
         let lod = log2(ssr_march::BLUR_FADE_END * min(dim.x, dim.y));
         let near = textureSampleLevel(t_hits, s_color, uv, lod).a;
-        radius = select(0.0, textureSampleLevel(t_spread, s_color, uv, lod).y / near, near > 1e-4);
+        let mean = select(0.0, textureSampleLevel(t_spread, s_color, uv, lod).y / near, near > 1e-4);
+        let reach = params.march.x * params.march.y;
+        radius = min(mean, spread(world, reach, cone(s.roughness), dim));
     }
     if (radius >= SHARP) {
-        let fwd = view_forward();
-        let world = world_at(uv, v.z, fwd);
         var g = geometric_normal(px, world, fwd, s.normal);
         g = select(s.normal, g, dot(g, g) > 0.0);
         let lod = max(log2(radius * 0.5), 0.0);

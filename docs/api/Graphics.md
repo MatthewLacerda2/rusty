@@ -472,18 +472,24 @@ HDRP's neighbour reuse made deterministic: the average reads mips of the hits), 
 satin floor shows a soft reflection of what stands on it and a mirror a sharp one,
 and a rough reflection's silhouette fades across its blur instead of stepping where
 one pixel's ray hits and its neighbour's misses (up to roughness 0.05 the hit is
-read sharp at any resolution, widening to the full lobe by 0.1). The average counts
-only pixels of the same surface (the same plane), so a reflection neither fades at a
-surface's border nor bleeds onto the surface beside it
+read sharp at any resolution, widening to the full lobe by 0.1). A pixel whose own
+ray missed takes the blur of the hits around it, but no wider than its own lobe
+spreads one, so a reflection's edge softens outwards too and a mirror's stays sharp
+beside a satin surface. The average counts only pixels on the same surface (the same
+plane), so a reflection mostly neither fades at a surface's border nor bleeds onto the
+surface beside it; it is an approximation, since each sample reads a mip texel half
+the blur's radius wide, and in a band about that wide at a corner it does
 (no history, so it is stable with no accumulation; the pyramid of the opaque image
 adds a third of an `Rgba16Float` frame to the copy SSR already held, and the hits'
 two pyramids at 1080p about 22 MB and 11 MB more). A `receive_ssr` transparent reads
 its hit sharp, with no such average. A hit fades by its
 confidence (the screen's edge, wider the blurrier it is, and the march's last fifth of
 reach) and a miss keeps the sky or probe reflection, so a weak hit falls back to it
-without a seam. A ray a normal map tilts below the surface's own geometry (a rough,
-bumpy floor seen at a grazing angle) keeps the probe reflection too, rather than
-reflecting the floor it leaves. The march (#2004) takes steps of at most `step_length`
+without a seam. A hit on something brighter than a half float holds (an emissive past
+65504) counts as a miss. A ray a normal map tilts below the surface's own geometry (a
+rough, bumpy floor seen at a grazing angle) is a miss too, rather than reflecting the
+floor it leaves: the hits around it may fill it, within its own lobe's blur, and where
+none reach it keeps the probe reflection. The march (#2004) takes steps of at most `step_length`
 and at most 1/64 of the screen's shorter side (1/`steps` of it for fewer than 64 steps,
 so any count can still cross the screen's height), so it sees anything on screen wider
 than that (a bottle, a pole) and spends its reach where the ray crosses the screen fast;

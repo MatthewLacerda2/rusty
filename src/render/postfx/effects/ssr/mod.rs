@@ -116,6 +116,9 @@ pub(crate) fn run(
 }
 
 #[cfg(test)]
+mod poison;
+
+#[cfg(test)]
 mod tests;
 
 #[cfg(test)]

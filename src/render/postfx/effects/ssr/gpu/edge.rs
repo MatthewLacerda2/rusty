@@ -52,27 +52,31 @@ fn gpu_a_rough_metal_floor_fades_the_cubes_reflection_without_a_hard_edge() {
 
 /// The largest share of the reflection's redness one pixel adds across its left
 /// side, in the row of the floor whose middle reflects the most: near 1 is a hard
-/// outline, a soft one spreads its rise over its blur.
-fn side_step(on: &[u8], off: &[u8]) -> f32 {
+/// outline, a soft one spreads its rise over its blur. With it, the redness the
+/// reflection adds at that row's middle.
+fn side_step(on: &[u8], off: &[u8]) -> (f32, i32) {
     let red = |f: &[u8], x: u32, y: u32| at(f, x, y)[0] - at(f, x, y)[2];
     let added = |y: u32, x: u32| red(on, x, y) - red(off, x, y);
     let row = (H / 2..H).max_by_key(|&y| added(y, W / 2)).unwrap();
-    let peak = added(row, W / 2).max(1) as f32;
-    (1..=W / 2)
+    let peak = added(row, W / 2).max(1);
+    let step = (1..=W / 2)
         .map(|x| added(row, x) - added(row, x - 1))
         .max()
-        .unwrap() as f32
-        / peak
+        .unwrap();
+    (step as f32 / peak as f32, peak)
 }
 
 /// The rough floor's scene, its cube lifted 0.6 m: a reflection a long ray away,
 /// as a shelf is from a soffit above it (#2028).
-fn lifted(on: bool, roughness: f32) -> crate::scene::Scene {
+pub(super) fn lifted(on: bool, roughness: f32) -> crate::scene::Scene {
     let mut s = base(on, (BRONZE, 1.0, roughness));
     let cube = s.find_entity_by_name("Cube").unwrap();
     s.world.transform_mut(cube).unwrap().position.y += 0.6;
     s
 }
+
+/// The least redness the roughness-0.35 floor's reflection adds at its middle.
+const SATIN_RED: i32 = 3;
 
 #[test]
 fn gpu_a_satin_metal_floor_reflects_a_lifted_cube_with_soft_sides() {
@@ -87,9 +91,10 @@ fn gpu_a_satin_metal_floor_reflects_a_lifted_cube_with_soft_sides() {
         );
         side_step(&on, &off)
     };
-    let (mirror, satin) = (step(0.04), step(0.35));
-    eprintln!("[ssr] the lifted cube's reflected side: at most {mirror:.2} of its redness in one pixel on a mirror, {satin:.2} at roughness 0.35");
+    let ((mirror, _), (satin, red)) = (step(0.04), step(0.35));
+    eprintln!("[ssr] the lifted cube's reflected side: at most {mirror:.2} of its redness in one pixel on a mirror, {satin:.2} at roughness 0.35, which adds {red} red at its middle");
     assert!(mirror >= 0.5, "a mirror reflects a sharp side");
+    assert!(red >= SATIN_RED, "a satin metal reflects the cube");
     assert!(
         satin <= 0.3,
         "a satin metal's reflection has no hard outline (#2028)"

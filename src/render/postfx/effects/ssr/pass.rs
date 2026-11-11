@@ -148,6 +148,9 @@ pub(crate) struct SsrTargets {
     hits: Pyramid,
     spread: Pyramid,
     params: wgpu::Buffer,
+    /// Test-only: overwrite the image's upper half with `inf` before tracing.
+    #[cfg(test)]
+    pub(super) poisoned: bool,
 }
 
 impl SsrTargets {
@@ -163,6 +166,8 @@ impl SsrTargets {
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             }),
+            #[cfg(test)]
+            poisoned: false,
         }
     }
 }
@@ -193,6 +198,8 @@ impl PostFx {
         let velocity = self.motion.target_view().expect("checked above");
         let [weight, applied] = surface::views(self).expect("checked above");
         queue.write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
+        #[cfg(test)]
+        super::poison::write(t.poisoned, queue, &self.scene_hdr.texture);
         let view = |v| wgpu::BindingResource::TextureView(v);
         let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("SSR Bind Group"),
