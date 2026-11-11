@@ -1,5 +1,5 @@
-// engine/shaders/postfx/ssr.wgsl — screen-space reflections (#1521, #1526): one
-// fullscreen pass over the base camera's opaque image, run right after its opaque
+// engine/shaders/postfx/ssr.wgsl — screen-space reflections (#1521, #1526): two
+// fullscreen passes over the base camera's opaque image, run right after its opaque
 // pass (`render::postfx::effects::ssr::pass`), before the translucents, the overlay
 // cameras and every post effect. High tier only; on every tier the forward pass
 // reflects the sky or a reflection probe (#718).
@@ -9,9 +9,11 @@
 // surface targets (`lighting/ssr_surface.wgsl`) for its shading normal, the weight a
 // hit gets, the environment reflection the forward pass applied and its roughness. A
 // surface smoother than the volume's *Minimum Smoothness* reflects, fading in over
-// `ssr_surface::SMOOTHNESS_FADE` (#1736), and reads its hit from the mip pyramid of
-// `t_color` at its GGX lobe's width (`ssr_march::trace`'s cone), so a rough surface
-// shows a soft reflection of what stands on it and a mirror a sharp one.
+// `ssr_surface::SMOOTHNESS_FADE` (#1736). The trace (`fs_trace`) marches its ray and
+// writes the hit, sharp, into a target of its own; the resolve (`fs_resolve`, #2028)
+// averages the hits over the disk its GGX lobe (`cone`) spreads a reflection across,
+// so a rough surface shows a soft reflection of what stands on it, its silhouette
+// faded across the blur, and a mirror a sharp one.
 //
 // An SSR hit **replaces** the environment reflection the forward pass applied, sky or
 // reflection probe alike, as HDRP's reflection hierarchy does: `pixel − applied +
@@ -24,7 +26,7 @@
 // and world canvases blend over the reflected image, so their coverage scales the
 // reflection like any other light under them; depth of field and motion blur blur
 // it; an overlay camera (a viewmodel) has not drawn yet, so it gets none and hides
-// nothing from the march. A pixel that gets no SSR is discarded: the pass loads the
+// nothing from the march. A pixel that gets no SSR is discarded: the resolve loads the
 // image and leaves it as it was.
 //
 // The march itself is `lighting/ssr_march.wgsl`, shared with a transparent surface
@@ -143,33 +145,148 @@ fn geometric_normal(px: vec2<i32>, world: vec3<f32>, fwd: vec3<f32>, n: vec3<f32
     return best;
 }
 
+// The radius, in pixels of `dim`, over which a hit `t` world units out is blurred on
+// the surface at `world` (#2028): the cone's disk there, `c × t` across, seen in
+// the mirror from `d0 + t` away (the reflected point's virtual image), so the
+// radius on the surface is `c × t × d0 / (d0 + t)` at the eye distance `d0`.
+fn spread(world: vec3<f32>, t: f32, c: f32, dim: vec2<f32>) -> f32 {
+    let eye = params.camera_pos.xyz;
+    let d0 = distance(world, eye);
+    var across = cross(world - eye, vec3<f32>(0.0, 1.0, 0.0));
+    if (dot(across, across) < 1e-10) {
+        across = cross(world - eye, vec3<f32>(1.0, 0.0, 0.0));
+    }
+    let f = ssr_march::Frame(params.view_proj, eye, vec3<f32>(0.0), vec4<f32>(0.0));
+    let a = ssr_march::project(f, world).xy;
+    let b = ssr_march::project(f, world + normalize(across) * (c * t * d0 / max(d0 + t, 1e-4))).xy;
+    return min(length((b - a) * dim), ssr_march::BLUR_FADE_END * min(dim.x, dim.y));
+}
+
+// What the trace writes per pixel for the resolve (#2028): `hit`, the hit colour
+// times its weight and the weight (premultiplied, so a level of its pyramid
+// averages hits and misses alike); `spread`, 1 for a pixel that traced (a miss
+// included) and the hit's `spread` radius times its weight.
+struct Traced {
+    @location(0) hit: vec4<f32>,
+    @location(1) spread: vec4<f32>,
+};
+
+// Whether pixel `px` takes SSR at all: its surface reflects, is smooth enough
+// (`fade` above 0) and is not the sky. Both passes ask the same.
+fn takes(s: ssr_surface::SsrSurface, fade: f32, depth: f32) -> bool {
+    return ssr_surface::reflects(s) && fade > 0.0 && depth < ssr_march::SKY_DEPTH;
+}
+
+// The trace (#2028's first half): marches each reflecting pixel's ray and writes
+// what it hit, unblended, for the resolve. A pixel that takes no SSR writes nothing.
 @fragment
-fn fs_ssr(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
+fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
     let px = vec2<i32>(pos.xy);
-    let uv = pos.xy / vec2<f32>(textureDimensions(t_color));
+    let dim = vec2<f32>(textureDimensions(t_color));
+    let uv = pos.xy / dim;
     let s = ssr_surface::decode(textureLoad(t_weight, px, 0), textureLoad(t_applied, px, 0));
     let v = textureLoad(t_velocity, px, 0);
     let fade = ssr_surface::smoothness_fade(s.roughness, params.surface.x, params.surface.y);
     // Rough, unlit or the sky: left as it is.
-    if (!ssr_surface::reflects(s) || fade <= 0.0 || v.z >= ssr_march::SKY_DEPTH) {
+    if (!takes(s, fade, v.z)) {
         discard;
     }
     let fwd = view_forward();
     let world = world_at(uv, v.z, fwd);
     let r = reflect(normalize(world - params.camera_pos.xyz), s.normal);
+    let missed = Traced(vec4<f32>(0.0), vec4<f32>(1.0, 0.0, 0.0, 0.0));
     // A normal map can tilt the ray below the surface itself (a rough floor seen at a
     // grazing angle): the march would hit the floor it left and show its own colour.
     // Such a ray keeps the probe reflection, as a miss does.
     if (dot(r, geometric_normal(px, world, fwd, s.normal)) < 0.0) {
-        discard;
+        return missed;
     }
     let origin = world + s.normal * 0.02;
     let f = ssr_march::Frame(params.view_proj, params.camera_pos.xyz, fwd, vec4<f32>(0.0, 0.0, 1.0, 0.0));
-    let hit = ssr_march::trace(f, t_velocity, t_color, s_color, origin, r, i32(params.march.x), params.march.y, cone(s.roughness));
-    let k = hit.w * fade;
-    if (k <= 0.0) {
+    let c = cone(s.roughness);
+    // Read sharp: the resolve blurs the hits by the cone, colour and edge alike.
+    let hit = ssr_march::trace_hit(f, t_velocity, t_color, s_color, origin, r, i32(params.march.x), params.march.y, c, 0.0);
+    let w = hit.colour.w;
+    if (w <= 0.0) {
+        return missed;
+    }
+    return Traced(vec4<f32>(hit.colour.rgb * w, w), vec4<f32>(1.0, spread(world, hit.dist, c, dim) * w, 0.0, 0.0));
+}
+
+// The resolve (#2028's second half, HDRP's PBR-accumulation neighbour reuse made
+// deterministic): each pixel averages the trace's hits over the disk its own
+// cone spreads a reflection across. A hit's colour was already read at the cone's
+// width; what the average adds is where rays stop hitting: a rough surface's
+// reflected silhouette fades across its blur, not at one pixel's hit or miss,
+// which drew it as a stepped outline. A miss takes the radius of the hits around
+// it, so an edge softens out as well as in. Only pixels on the same plane count,
+// and the average is over pixels that traced, so a surface's border or a
+// neighbouring surface neither fades nor bleeds into it.
+@group(1) @binding(0) var t_hits: texture_2d<f32>;
+@group(1) @binding(1) var t_spread: texture_2d<f32>;
+
+// The disk's taps (a Vogel spiral), each read at the level of the trace's
+// pyramids whose texels are as wide as the taps are apart, so the disk is covered
+// with no gap to show a tap's own copy of an edge.
+const TAPS: i32 = 12;
+const GOLDEN_ANGLE: f32 = 2.3999632;
+// Below this radius in pixels a reflection is read where it was traced (a mirror).
+const SHARP: f32 = 0.5;
+
+// Whether the surface at `q` lies on the plane through `world` facing `g`, within
+// the march's own slack: a pixel of the same surface, not one beside or behind it.
+fn on_plane(q: vec2<f32>, world: vec3<f32>, g: vec3<f32>, fwd: vec3<f32>) -> bool {
+    let dim = vec2<i32>(textureDimensions(t_velocity));
+    let p = clamp(vec2<i32>(q * vec2<f32>(dim)), vec2<i32>(0), dim - 1);
+    let depth = textureLoad(t_velocity, p, 0).z;
+    if (depth >= ssr_march::SKY_DEPTH) {
+        return false;
+    }
+    let there = world_px(p, fwd);
+    return abs(dot(g, there - world)) <= max(ssr_march::THICKNESS, depth * ssr_march::DEPTH_SLACK);
+}
+
+@fragment
+fn fs_resolve(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
+    let px = vec2<i32>(pos.xy);
+    let dim = vec2<f32>(textureDimensions(t_hits));
+    let uv = pos.xy / dim;
+    let s = ssr_surface::decode(textureLoad(t_weight, px, 0), textureLoad(t_applied, px, 0));
+    let v = textureLoad(t_velocity, px, 0);
+    let fade = ssr_surface::smoothness_fade(s.roughness, params.surface.x, params.surface.y);
+    if (!takes(s, fade, v.z)) {
+        discard;
+    }
+    var p = textureLoad(t_hits, px, 0);
+    var radius = textureLoad(t_spread, px, 0).y / max(p.a, 1e-6);
+    if (p.a <= 0.0) {
+        // A miss: the mean radius of the hits as far around as any blur reaches.
+        let lod = log2(ssr_march::BLUR_FADE_END * min(dim.x, dim.y));
+        let near = textureSampleLevel(t_hits, s_color, uv, lod).a;
+        radius = select(0.0, textureSampleLevel(t_spread, s_color, uv, lod).y / near, near > 1e-4);
+    }
+    if (radius >= SHARP) {
+        let fwd = view_forward();
+        let world = world_at(uv, v.z, fwd);
+        var g = geometric_normal(px, world, fwd, s.normal);
+        g = select(s.normal, g, dot(g, g) > 0.0);
+        let lod = max(log2(radius * 0.5), 0.0);
+        var sum = vec4<f32>(0.0);
+        var traced = 0.0;
+        for (var i = 0; i < TAPS; i = i + 1) {
+            let a = f32(i) * GOLDEN_ANGLE;
+            let q = uv + vec2<f32>(cos(a), sin(a)) * radius * sqrt((f32(i) + 0.5) / f32(TAPS)) / dim;
+            if (any(q < vec2<f32>(0.0)) || any(q > vec2<f32>(1.0)) || !on_plane(q, world, g, fwd)) {
+                continue;
+            }
+            sum = sum + textureSampleLevel(t_hits, s_color, q, lod);
+            traced = traced + textureSampleLevel(t_spread, s_color, q, lod).x;
+        }
+        p = sum / max(traced, 1e-4);
+    }
+    if (p.a * fade <= 0.0) {
         discard;
     }
     let c = textureLoad(t_color, px, 0);
-    return vec4<f32>(max(c.rgb + (s.weight * hit.rgb - s.applied) * k, vec3<f32>(0.0)), c.a);
+    return vec4<f32>(max(c.rgb + (s.weight * p.rgb - s.applied * p.a) * fade, vec3<f32>(0.0)), c.a);
 }

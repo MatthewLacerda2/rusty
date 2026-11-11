@@ -1,21 +1,28 @@
-//! The SSR pass (#1526): one fullscreen pass over the base camera's opaque image, run
-//! right after its opaque pass (`render::draw::camera`'s `ssr` stage), in
+//! The SSR pass (#1526): two fullscreen passes over the base camera's opaque image,
+//! run right after its opaque pass (`render::draw::camera`'s `ssr` stage), in
 //! `postfx/ssr.wgsl`. It copies the image into the first level of its colour pyramid
-//! ([`pyramid`](super::pyramid), #1736) and builds the rest, then draws over the image
-//! where a smooth enough surface's march hits, so the translucents, the overlay
-//! cameras and every post effect see the reflected scene, HDRP's order.
+//! ([`pyramid`](super::pyramid), #1736) and builds the rest. The trace (`fs_trace`)
+//! then marches each smooth enough pixel's ray and writes its hit into a target of
+//! its own, with where it traced and how wide its cone spreads it; their pyramids
+//! are built; and the resolve (`fs_resolve`, #2028) averages each pixel's hits over
+//! that spread and draws them over the image, so a rough surface's reflected
+//! silhouette fades across its blur instead of stepping at a pixel's hit or miss.
+//! The translucents, the overlay cameras and every post effect see the reflected
+//! scene, HDRP's order.
 //!
 //! The pipelines are the renderer's ([`SsrPasses`], built on first use and warmed
-//! with the rest); the pyramid and the params uniform are each view's
-//! ([`SsrTargets`]), held only while it runs SSR.
+//! with the rest); the pyramids and the params uniform are each view's
+//! ([`SsrTargets`]), held only while it runs SSR. The GPU timer's `ssr` pass spans
+//! the trace, the trace's pyramids and the resolve; the colour pyramid is untimed.
 
 use glam::{Mat4, Vec3};
 
 use super::pyramid::{Pyramid, PyramidPass};
+use super::record::{begin, opaque_target, pipeline_layout, split};
 use super::surface;
 use crate::core::settings::quality::SsrQuality;
 use crate::render::gpu::bind_entry as entry;
-use crate::render::gpu::fullscreen::{color_pass, Fullscreen};
+use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
@@ -53,11 +60,19 @@ impl SsrParams {
     }
 }
 
-/// The SSR pipeline and its pyramid's, shared by every view.
+/// The format of the trace's `spread` target (`postfx/ssr.wgsl`'s `Traced`): whether
+/// a pixel traced, and its hit's radius times its weight.
+const SPREAD_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg16Float;
+
+/// The SSR pipelines and their pyramids', shared by every view.
 pub(crate) struct SsrPasses {
     layout: wgpu::BindGroupLayout,
-    pipeline: LazyPipeline,
+    /// The resolve's second group: the trace's two pyramids.
+    traced: wgpu::BindGroupLayout,
+    trace: LazyPipeline,
+    resolve: LazyPipeline,
     pyramid: PyramidPass,
+    spread: PyramidPass,
 }
 
 impl SsrPasses {
@@ -75,45 +90,63 @@ impl SsrPasses {
                 texture_entry(5, d2),
             ],
         });
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("SSR Pipeline Layout"),
-            bind_group_layouts: &[Some(&layout)],
-            immediate_size: 0,
+        let traced = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("SSR Resolve Layout"),
+            entries: &[texture_entry(0, d2), texture_entry(1, d2)],
         });
-        let pipeline = LazyPipeline::new(device, move |device| {
-            let target = wgpu::ColorTargetState {
-                format: HDR_FORMAT,
-                blend: None,
-                write_mask: wgpu::ColorWrites::ALL,
-            };
+        let trace_layout = pipeline_layout(device, &[&layout]);
+        let resolve_layout = pipeline_layout(device, &[&layout, &traced]);
+        let shader2 = shader.clone();
+        let trace = LazyPipeline::new(device, move |device| {
+            let targets = [HDR_FORMAT, SPREAD_FORMAT].map(|f| Some(opaque_target(f)));
             Fullscreen {
-                label: "SSR Pipeline",
+                label: "SSR Trace Pipeline",
                 shader: &shader,
-                layout: &pipeline_layout,
+                layout: &trace_layout,
                 vs: "vs_fullscreen",
-                fs: "fs_ssr",
+                fs: "fs_trace",
             }
-            .colour(device, &[Some(target)])
+            .colour(device, &targets)
         });
-        let pyramid = PyramidPass::new(device, registry);
+        let resolve = LazyPipeline::new(device, move |device| {
+            Fullscreen {
+                label: "SSR Resolve Pipeline",
+                shader: &shader2,
+                layout: &resolve_layout,
+                vs: "vs_fullscreen",
+                fs: "fs_resolve",
+            }
+            .colour(device, &[Some(opaque_target(HDR_FORMAT))])
+        });
         Self {
             layout,
-            pipeline,
-            pyramid,
+            traced,
+            trace,
+            resolve,
+            pyramid: PyramidPass::new(device, registry),
+            spread: PyramidPass::of(device, registry, SPREAD_FORMAT),
         }
     }
 
     /// The pipelines, for warming (`Renderer::lazy_pipelines`).
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
-        [&self.pipeline, self.pyramid.lazy_pipeline()]
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 4] {
+        [
+            &self.trace,
+            &self.resolve,
+            self.pyramid.lazy_pipeline(),
+            self.spread.lazy_pipeline(),
+        ]
     }
 }
 
-/// One view's SSR state: the pyramid of the opaque image the march reads, and the
-/// params uniform, kept while the view's size holds.
+/// One view's SSR state: the pyramid of the opaque image the march reads, the
+/// trace's two pyramids the resolve reads, and the params uniform, kept while the
+/// view's size holds.
 pub(crate) struct SsrTargets {
     size: (u32, u32),
     pyramid: Pyramid,
+    hits: Pyramid,
+    spread: Pyramid,
     params: wgpu::Buffer,
 }
 
@@ -122,6 +155,8 @@ impl SsrTargets {
         Self {
             size,
             pyramid: Pyramid::new(device, &passes.pyramid, size),
+            hits: Pyramid::new(device, &passes.pyramid, size),
+            spread: Pyramid::new(device, &passes.spread, size),
             params: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("SSR Params"),
                 size: std::mem::size_of::<SsrParams>() as u64,
@@ -171,6 +206,11 @@ impl PostFx {
                 entry(5, view(applied)),
             ],
         });
+        let traced = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("SSR Resolve Bind Group"),
+            layout: &passes.traced,
+            entries: &[entry(0, view(&t.hits.view)), entry(1, view(&t.spread.view))],
+        });
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("SSR Encoder"),
@@ -179,13 +219,28 @@ impl PostFx {
         let (from, to) = (&self.scene_hdr.texture, &t.pyramid.texture);
         encoder.copy_texture_to_texture(from.as_image_copy(), to.as_image_copy(), extent);
         t.pyramid.build(&mut encoder, &passes.pyramid);
+        // The timer's `ssr` pair opens on the trace and closes on the resolve, so it
+        // counts the trace's pyramids too.
+        let timed = timer.writes(GpuPass::Ssr);
+        let (open, close) = split(timed);
+        {
+            // Cleared: a pixel that takes no SSR is discarded, so nothing traced.
+            let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
+            let targets = [(&t.hits.top, clear), (&t.spread.top, clear)];
+            let mut pass = begin(&mut encoder, "SSR Trace", &targets, open);
+            pass.set_pipeline(passes.trace.get());
+            pass.set_bind_group(0, &group, &[]);
+            pass.draw(0..3, 0..1);
+        }
+        t.hits.build(&mut encoder, &passes.pyramid);
+        t.spread.build(&mut encoder, &passes.spread);
         {
             // Loaded: a pixel that gets no SSR is discarded, left as it was.
-            let timed = ("SSR Pass", timer, GpuPass::Ssr);
-            let load = wgpu::LoadOp::Load;
-            let mut pass = color_pass(&mut encoder, timed, &self.scene_hdr.view, load);
-            pass.set_pipeline(passes.pipeline.get());
+            let targets = [(&self.scene_hdr.view, wgpu::LoadOp::Load)];
+            let mut pass = begin(&mut encoder, "SSR Resolve", &targets, close);
+            pass.set_pipeline(passes.resolve.get());
             pass.set_bind_group(0, &group, &[]);
+            pass.set_bind_group(1, &traced, &[]);
             pass.draw(0..3, 0..1);
         }
         queue.submit(std::iter::once(encoder.finish()));
