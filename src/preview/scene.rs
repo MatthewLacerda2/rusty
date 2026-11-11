@@ -143,9 +143,11 @@ fn add_key_light(scene: &mut Scene) {
 fn spawn_preview_mesh(scene: &mut Scene, mesh: PreviewMesh) -> u32 {
     match mesh {
         PreviewMesh::Sphere => {
-            authoring::create_entity(scene, "PreviewMesh", Some(Primitive::Sphere))
+            authoring::create_drawn_entity(scene, "PreviewMesh", Some(Primitive::Sphere))
         }
-        PreviewMesh::Cube => authoring::create_entity(scene, "PreviewMesh", Some(Primitive::Box)),
+        PreviewMesh::Cube => {
+            authoring::create_drawn_entity(scene, "PreviewMesh", Some(Primitive::Box))
+        }
         PreviewMesh::Suzanne => spawn_suzanne(scene),
     }
 }
@@ -155,8 +157,9 @@ fn spawn_preview_mesh(scene: &mut Scene, mesh: PreviewMesh) -> u32 {
 /// inspector's "Instantiate into Scene" button uses (#352 leans on existing plumbing
 /// rather than a bespoke embedded-mesh loader) — then fitted like a model subject.
 fn spawn_suzanne(scene: &mut Scene) -> u32 {
-    let fallback =
-        |scene: &mut Scene| authoring::create_entity(scene, "PreviewMesh", Some(Primitive::Sphere));
+    let fallback = |scene: &mut Scene| {
+        authoring::create_drawn_entity(scene, "PreviewMesh", Some(Primitive::Sphere))
+    };
     let Ok(asset) = asset::import_and_sync_sidecar(Path::new(&suzanne_path())) else {
         return fallback(scene);
     };

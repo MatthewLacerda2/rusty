@@ -92,6 +92,8 @@ impl Harness {
         let input = Rc::new(RefCell::new(InputState::new()));
         let nav = Rc::new(RefCell::new(nav));
         let console = Rc::new(RefCell::new(ConsoleLogs::new()));
+        // A scenario reads every warning of its run (`Harness.Warnings`, #2054).
+        console.borrow_mut().keep_warnings();
 
         crate::dev::lua_surface::install_api();
         let mut world = GameWorld::new(
