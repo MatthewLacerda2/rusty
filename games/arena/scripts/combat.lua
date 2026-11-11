@@ -29,8 +29,22 @@ function Combat.tick(gun, dt)
     gun.recoil = math.max(0, gun.recoil - gun.recover * dt)
 end
 
+-- The level's named entities (the effects, the match, the spawns), looked up
+-- once each and kept: `Combat.start` empties the cache from every fighter's
+-- Start, so a reloaded level is looked up afresh.
+local found = {}
+
+function Combat.start()
+    found = {}
+end
+
+function Combat.named(name)
+    if found[name] == nil then found[name] = Scene.FindEntityByName(name) end
+    return found[name]
+end
+
 local function burst(name, x, y, z, count)
-    local id = Scene.FindEntityByName(name)
+    local id = Combat.named(name)
     if id ~= nil then
         Transform.SetPosition(id, x, y, z)
         Particles.Emit(id, count)
@@ -90,14 +104,14 @@ end
 
 -- The match's score keeper (scripts/match.lua), or `nil` before it loads.
 function Combat.match()
-    return Scene.GetScript(Scene.FindEntityByName("Match"), "match")
+    return Scene.GetScript(Combat.named("Match"), "match")
 end
 
 -- The spawn point farthest from every other fighter: where a dead one comes back.
 local function spawn_point(self_id)
     local best, best_d = nil, -1
     local others = Combat.match() and Combat.match().fighters or {}
-    for _, spawn in ipairs(Scene.GetChildren(Scene.FindEntityByName("Spawns"))) do
+    for _, spawn in ipairs(Scene.GetChildren(Combat.named("Spawns"))) do
         local sx, sy, sz = Transform.GetPosition(spawn)
         local d = math.huge
         for _, other in ipairs(others) do

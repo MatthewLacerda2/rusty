@@ -7,7 +7,7 @@ it behaves identically to the editor and uses the same default values.
 
 | Function | Signature | Returns |
 |---|---|---|
-| `Scene.FindEntityByName` | `(name)` | `id` of the first entity so named that is active in the hierarchy, as Unity's `GameObject.Find` (or `nil` if none, as `null` there) |
+| `Scene.FindEntityByName` | `(name)` | `id` of the first entity so named that is active in the hierarchy, "first" in the scene's entity order, as Unity's `GameObject.Find` (or `nil` if none, as `null` there). Unlike Unity's it is cheap: the engine keeps a name index, so a call costs about the same on a map-sized level as on an empty one and calling it in `Update` is fine |
 | `Scene.CreateEntity` | `(name, [primitive])` | new entity `id` |
 | `Scene.Deactivate` | `(id)` | — |
 | `Scene.DestroyEntity` | `(id)` | `true` if an entity existed at `id` |
