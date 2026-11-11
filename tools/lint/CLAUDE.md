@@ -10,7 +10,7 @@ file is what a coder changing the tool must keep.
 - **Zero dependencies.** std only: `tools/lint/Cargo.lock` names one package, itself,
   and `tools/lint/src/rules/lockfile_tests.rs` fails on a second (`make test-lint`). A
   dependency is a decision with its own issue, not a drive-by.
-- **Clippy-gated like the engine** (#935): `make clippy` and CI run it with
+- **Clippy-gated like the engine**: `make clippy` and CI run it with
   `-D warnings`, and its own `[lints]` carries the nothing-temporary denies. The size
   gate scans it too (`tools/` is a scan root).
 - **A standalone crate** with its own `[workspace]`: never fold it into the engine.
@@ -22,13 +22,13 @@ file is what a coder changing the tool must keep.
   `// lint: allow(<rule>) <why>` on the flagged line or in the comment and attribute
   lines right above it (`tools/lint/src/rules/finding.rs`). An allow with no reason is
   itself a finding (`[allow]`). No baseline file, no exception list in a config,
-  nothing grandfathered (#926). A standing decision that is no single line's exception
+  nothing grandfathered. A standing decision that is no single line's exception
   (a component axis waived for good) is a row with its rationale, like `WAIVERS` in
   `tools/lint/src/components/waivers.rs`.
 - **A new rule is a module, not a flag.** It goes in `tools/lint/src/rules/<rule>.rs`
   with `pub fn run(&Scan) -> Vec<Finding>`, mounts its own `<rule>_tests.rs` with
   `#[path]`, and takes one line in `rules/mod.rs`'s sorted `mod` list and one row in
-  the sorted `RULES` table (#911), so parallel rule branches touch different lines:
+  the sorted `RULES` table, so parallel rule branches touch different lines:
   no new flag, gate, CI step or baseline. Its row says `Allow::Inline` when an inline
   allow may excuse it, `Allow::Never` when nothing may: `ignored` is the one, because
   its fix is the `.gitignore` pattern. `Allow::Own` is for a rule that reads its own
@@ -38,13 +38,13 @@ file is what a coder changing the tool must keep.
 - **Signals print and never fail.** What CLAUDE.md only says to *aim* for (≲10 files
   per directory) prints under `signal (not a failure)` after the findings and leaves
   the exit code alone. It becomes a finding only with the decision that makes it a
-  rule: `dir-size` (#1367) fails past 12, and the signal still prints the 11s and 12s.
+  rule: `dir-size` fails past 12, and the signal still prints the 11s and 12s.
 - **One report shape**: `path:line: [rule] message` on the terminal and in
   `.lint/report.txt`, exit 1 on any finding, so an agent reads exactly what failed.
 
 ## The layer table
 - **`tools/lint/src/layers/table.rs` is the one place module edges and external-crate
-  uses are declared** (#724, #938): one row per `src/<module>`, bottom-up, `sim` or
+  uses are declared**: one row per `src/<module>`, bottom-up, `sim` or
   platform, its crates in `.uses(&[…])`. What belongs to no single row (crates any
   module may name, crates confined to a subtree, dependencies no module names, and
   exceptions with their open issue) is in `tools/lint/src/layers/externs/policy.rs`.
