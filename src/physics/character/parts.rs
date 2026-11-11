@@ -44,14 +44,19 @@ pub(super) fn cast_parts(
         };
         msum.cast_local_ray(&ray, best, true).unwrap_or(Real::MAX)
     };
-    let part_hit = |id: u32, _| {
+    let part_hit = |id: u32, best: Real| {
+        // A part can win only by a hit before the best so far.
+        let options = ShapeCastOptions {
+            max_time_of_impact: best,
+            ..options
+        };
         let mut found = None;
         parts.map_part_at(id, &mut |pose, part, constraints| {
             let local = pose.map_or(*pos12, |p| p.inv_mul(pos12));
             let vel = pose.map_or(vel12, |p| p.rotation.inverse() * vel12);
             let hit = dispatcher.cast_shapes(&local, vel, part, g2, options);
             let hit = hit.ok().flatten();
-            let hit = hit.and_then(|h| constrained(h, constraints, &local, vel));
+            let hit = hit.and_then(|h| constrained(h, constraints, &local, vel, options));
             found = hit.map(|h| pose.map_or(h, |p| h.transform1_by(p)));
         });
         found
@@ -69,7 +74,8 @@ pub(super) fn cast_parts(
 /// or a correction they refuse, leave it as cast), or `None` when it no longer
 /// stands: a hit within [`NEAR_TOI`] is judged again the way parry judged it,
 /// by the corrected normal against `vel`, so a capsule moving along a seam's
-/// flat face goes on instead of stopping on the seam's edge. Correcting only
+/// flat face goes on instead of stopping on the seam's edge. A cast that
+/// stops at penetration (`ground_below`'s probe) keeps it, as parry does. Correcting only
 /// the reported normal and keeping the hit met the same edge on the next slide
 /// and stalled the walk for good (#2073).
 fn constrained(
@@ -77,6 +83,7 @@ fn constrained(
     constraints: Option<&dyn NormalConstraints>,
     pos12: &Pose,
     vel: Vector,
+    options: ShapeCastOptions,
 ) -> Option<ShapeCastHit> {
     let Some(constraints) = constraints else {
         return Some(hit);
@@ -85,7 +92,8 @@ fn constrained(
     if !constraints.project_local_normal_mut(&mut normal) {
         return Some(hit);
     }
-    if hit.time_of_impact < NEAR_TOI && normal.dot(vel) >= 0.0 {
+    let rejudged = !options.stop_at_penetration && hit.time_of_impact < NEAR_TOI;
+    if rejudged && normal.dot(vel) >= 0.0 {
         return None;
     }
     hit.normal1 = normal;
