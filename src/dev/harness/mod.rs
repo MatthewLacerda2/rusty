@@ -8,7 +8,7 @@
 //!                        the "skip ticks" primitive: run a whole match, observe ONCE.
 //!   Snapshot()           dump world state (entities, camera, play-state) as JSON.
 //!   Log / Expect         record observations + pass/fail assertions.
-//!   Warnings([after])    the run's console warnings and errors so far (#2054).
+//!   Warnings(after)      the run's console warnings and errors so far (#2054).
 //!
 //! Determinism contract: fixed timestep + frame-count timers (no wall-clock reads in
 //! the tick), so a scenario replays identically every run.
