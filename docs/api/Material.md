@@ -100,6 +100,59 @@ Material.SetWorldSize(id, 0.5)
 Material.SetTiling(id, {1, 1})
 ```
 
+### Detail layer: a second tiling
+
+A material can carry a **detail layer** (#1997), Unity HDRP Lit's *Detail Map*: one
+more texture, read at a tiling of its own over the main maps, so a 2048 px carpet
+can carry fine tufts at 0.5 m and a coarse base at 20 m without a repeat showing.
+It changes three surface inputs **before lighting**, the way HDRP does, so it never
+tints highlights or reflections (unlike the surface blocks `detail_overlay` and
+`triplanar_detail`, which multiply the lit colour): the albedo, the roughness and
+the shading normal. On a metal the albedo is also its reflectance, as in HDRP, and
+the detail map's albedo is grey, so it brightens or darkens a metal's reflection
+without changing its hue; set `detail_albedo_scale` to 0 to leave it untouched.
+
+The map is HDRP's packing, read raw (its import's *sRGB* is turned off when it is
+assigned): **R** the desaturated albedo, **G** the normal's Y, **B** the
+smoothness (1 − roughness), **A** the normal's X, each neutral at 0.5 (128). R and B
+push the albedo and smoothness toward black/white or 0/1 by their distance from
+0.5 times their scale (the albedo in HDRP's square-root space); G and A are a
+tangent-space normal bent onto the main shading normal (the main normal map's
+bumps included). There is no detail mask: rusty has no mask map, so the layer
+covers the whole surface. A file that is not loaded (or a path with no file) reads
+the default checker, as every map does.
+
+The layer shares the material's **UV Mapping**: under `UV0` it is read at the main
+maps' tiled UV times `detail_tiling` plus `detail_offset` (HDRP's *Link Details
+with Base*, with Unity's sign as `SetOffset`), so a Tiling of `{4, 4}` and a
+detail Tiling of `{8, 8}` repeats the detail 32 times across the mesh; under
+`Planar` and `Triplanar` it is projected from world space like the main maps, one
+repeat per `detail_world_size` metres, then tiled and offset by its own values.
+Each field below is saved with the material in its `detail` table (absent until
+one is set), taken by `DefineAsset` either by the key in brackets or nested as
+`detail = { map = "d.png", tiling = {8, 8}, world_size = 0.5, albedo_scale = 1,
+normal_scale = 1, smoothness_scale = 1 }`, and shown in the Inspector's Material
+card under *Detail Map* (a path field: empty is no map). `Get` returns `nil` for an entity without a material
+and the default for a material without a detail layer.
+
+| Function | Signature |
+|---|---|
+| `Material.SetDetailMap` | `(id, path)` — the packed detail map; `""` clears it (the layer's other fields are kept; on a material with no layer it writes nothing). No detail is drawn without one, nor while its image is missing or still loading. A nested `detail` table in `DefineAsset` refuses a key it has no field for, naming it, and clamps each value to the range below |
+| `Material.SetDetailTiling` / `GetDetailTiling` | `(id, {x, y})` [`detail_tiling`] — repeats of the detail per repeat of the main maps under `UV0`, or across `detail_world_size` metres under a world mapping. Default `{1, 1}`; each lane clamped to `[-1000, 1000]` |
+| `Material.SetDetailOffset` / `GetDetailOffset` | `(id, {x, y})` [`detail_offset`] — in detail repeats, added after the detail tiling, with `SetOffset`'s sign under each mapping. Default `{0, 0}` |
+| `Material.SetDetailWorldSize` / `GetDetailWorldSize` | `(id, metres)` [`detail_world_size`] — how many metres one repeat of the detail covers under `Planar` and `Triplanar`, in `[0.01, 100]` (default 1). Ignored under `UV0` |
+| `Material.SetDetailAlbedoScale` / `GetDetailAlbedoScale` | `(id, scale)` [`detail_albedo_scale`] — HDRP's *Detail Albedo Scale*, in `[0, 2]` (default 1): 0 leaves the albedo alone |
+| `Material.SetDetailNormalScale` / `GetDetailNormalScale` | `(id, scale)` [`detail_normal_scale`] — HDRP's *Detail Normal Scale*, in `[0, 2]` (default 1): 0 leaves the normal alone |
+| `Material.SetDetailSmoothnessScale` / `GetDetailSmoothnessScale` | `(id, scale)` [`detail_smoothness_scale`] — HDRP's *Detail Smoothness Scale*, in `[0, 2]` (default 1): 0 leaves the roughness alone |
+
+```lua with=id
+-- A carpet: a coarse base every 4 m, fine tufts every 0.5 m, both in world space.
+Material.SetUvMapping(id, "Planar")
+Material.SetWorldSize(id, 4)
+Material.SetDetailMap(id, "textures/carpet_detail.png")
+Material.SetDetailWorldSize(id, 0.5)
+```
+
 ### Transparent surfaces
 
 A `Transparent` material does more than fade by `alpha` (#1523). Each knob below is a

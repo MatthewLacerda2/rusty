@@ -40,6 +40,7 @@ mod bloom_screenshot;
 mod bounds_centre;
 mod cascaded_shadows_screenshot;
 mod custom_postfx_screenshot;
+mod detail_layer;
 mod diffuse_model_screenshot;
 mod directional_lightmap_screenshot;
 #[cfg(feature = "editor")]

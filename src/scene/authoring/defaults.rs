@@ -177,6 +177,7 @@ pub fn default_camera() -> CameraComponent {
         fov: crate::components::rendering::camera::DEFAULT_FOV,
         near: crate::components::rendering::camera::DEFAULT_NEAR,
         far: crate::components::rendering::camera::DEFAULT_FAR,
+        fov_axis: Default::default(),
         culling_mask: u32::MAX,
         render_order: 0,
         clear_flags: ClearFlags::Skybox,

@@ -35,7 +35,8 @@ use crate::core::paths::native;
 /// Runtime param slots per material: one `vec4` each, so 16 slots = 64 floats.
 pub const PARAM_SLOTS: usize = 16;
 
-/// The group-2 binding the param uniform sits at (after the five maps + sampler).
+/// The group-2 binding the param uniform sits at (after the main maps + albedo's
+/// sampler; the detail map sits at 15, below the samplers, #1997).
 pub const PARAM_BINDING: u32 = 6;
 
 /// A material's param uniform, as the GPU reads it.

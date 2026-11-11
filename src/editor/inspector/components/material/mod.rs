@@ -11,6 +11,7 @@
 //! write and its validation live once in that shared module, which the Lua
 //! `Material.*` API calls too, so the panel and the binding are siblings over one op.
 
+mod detail;
 mod library;
 mod shader_params;
 mod slots;
@@ -98,6 +99,7 @@ fn draw_material(
         optional_map(ui, "Use Normal Map", materials, key, MapKind::Normal);
         optional_map(ui, "Use Emissive Map", materials, key, MapKind::Emissive);
         surface::draw_fields(ui, COORDINATE_FIELDS, materials, key, is_dirty);
+        detail::draw(ui, materials, key, is_dirty);
 
         draw_material_transparency(ui, materials, key, is_dirty);
         surface::draw_fields(ui, FACE_FIELDS, materials, key, is_dirty);
