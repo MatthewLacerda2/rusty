@@ -18,16 +18,16 @@
 //! | `sync_materials`, `sync_sensors` | the Collider's material (inline, or its asset's) and `is_trigger`, a CharacterController's presence | `ColliderComponent`, `CharacterControllerComponent`; an asset is not an entity column, so a move of the assets' `generation` re-runs the material pass over every collider |
 //! | `sync_layers` | the entity's layer, **and the scene's collision matrix** | `Layer`; the matrix is not an entity column, so it is compared to the copy kept here and a change re-runs the pass over every collider |
 //! | `sync_masses` | the Rigidbody's `mass`, each collider's volume and sensor flag (a crouch resizes a capsule) | `RigidBodyComponent`, `ColliderComponent`, `CharacterControllerComponent`, `WorldPose` (scale) |
-//! | `sync_mesh_fits` | the owner's body class (as body state reads it), each concave mesh collider's shape and geometry | `RigidBodyComponent`, `StaticSet`, `CharacterControllerComponent`, `ColliderComponent` |
+//! | `sync_fits` | the owner's body class (as body state reads it), each concave mesh, cylinder and capsule collider's shape and geometry | `RigidBodyComponent`, `StaticSet`, `CharacterControllerComponent`, `ColliderComponent` |
 //! | `sync_mesh_shapes` | a mesh collider's library-mesh triangles (#2059, `mesh_keys`) | `ColliderComponent` (a kept copy), `MeshComponent` |
 //! | `sync_characters` | the CharacterController, the owner's and the capsule's world pose | `CharacterControllerComponent`, `WorldPose` |
-//! | body state (`apply_body_state`) | the owner's world pose, its Rigidbody (class, velocities, gravity, CCD), its static flag, a CharacterController's presence | `WorldPose`, `RigidBodyComponent`, `StaticSet`, `CharacterControllerComponent` |
+//! | body state (`apply_body_state`) | the owner's world pose, its Rigidbody (class, velocities, gravity, CCD, damping), its static flag, a CharacterController's presence | `WorldPose`, `RigidBodyComponent`, `StaticSet`, `CharacterControllerComponent` |
 //! | compound parts | the owner's and each part's world pose | `WorldPose` |
 //!
 //! No pass reads a settings value, and the one asset a pass reads is a physics
 //! material (above): gravity is the world's own, and a mesh collider's triangles
 //! are read when its body is built, again when its body changes type
-//! (`sync_mesh_fits`, #1886), and when they come from a library mesh that was
+//! (`sync_fits`, #1886), and when they come from a library mesh that was
 //! replaced (`sync_mesh_shapes`, #2059), never synced otherwise.
 //!
 //! **Rebuild.** A cursor reading [`Changes::Rebuild`] (the first step, a scene

@@ -25,6 +25,10 @@ every number after `hit` is `0` and the rest are `nil`.
 | `Physics.SetMass` | `(id, kg)` | — (clamped to `[0.01, 1000]`, as the inspector's field is; see [Mass](#mass-and-forces-at-a-point-466)) |
 | `Physics.GetUseGravity` | `(id)` | `bool` (`false` without a Rigidbody) |
 | `Physics.SetUseGravity` | `(id, on)` | — (Unity `Rigidbody.useGravity`) |
+| `Physics.GetDrag` | `(id)` | `number` — linear drag (`0` without a Rigidbody) |
+| `Physics.SetDrag` | `(id, drag)` | — (Unity `Rigidbody.drag`; floored at `0`, a NaN or infinity is `0`; see [Drag](#drag-and-angular-drag-2062)) |
+| `Physics.GetAngularDrag` | `(id)` | `number` — angular drag (`0` without a Rigidbody) |
+| `Physics.SetAngularDrag` | `(id, drag)` | — (Unity `Rigidbody.angularDrag`, default `0.05`; floored at `0` the same way) |
 | `Physics.IsTrigger` | `(id)` | `bool` (`false` without a Collider) |
 | `Physics.SetTrigger` | `(id, on)` | — (Unity `Collider.isTrigger`: a trigger reports overlaps and blocks nothing) |
 | `Physics.GetCollisionDetection` | `(id)` | `"Discrete"` \| `"Continuous"` |
@@ -291,6 +295,15 @@ A collider's **shape** is a table with a `kind` and that kind's extents — what
 | `"Capsule"` | `radius, height, axis` — `axis` is `"X"`, `"Y"` (default) or `"Z"`, case-insensitive |
 | `"Mesh"` | `convex` (default `false`), `mesh` — the collision mesh it builds from (below), `nil` for the entity's own `Mesh` |
 
+**Cylinder** is the barrel, can and gas-tank shape (Unity has no cylinder
+collider and gives a barrel a convex `MeshCollider`). Lying down, its curved
+side touches the world as a 64-facet hull, so a pushed barrel rolls a few turns,
+losing a little speed on each facet, and comes to rest; standing up, its flat
+cap is the exact circle, so it stands still. Only a cylinder on a dynamic
+Rigidbody rolls this way: on a static or kinematic body (a pillar, a moving
+platform) the side stays the exact, smooth cylinder. Raycasts, overlaps and
+shape casts see the exact cylinder.
+
 **Capsule** (Unity: `CapsuleCollider`) is the character and limb shape: a
 cylinder capped by two hemispheres. As in Unity, `height` is the **full**
 end-to-end length, caps included, so a `radius = 0.5, height = 2` capsule stands
@@ -540,6 +553,27 @@ it (`GetMass` reads it back), and changing it during Play takes effect on the
 next step. So do `SetKinematic` and an entity's layer: the body
 switches class in place (keeping its joints and contacts), and a collider follows
 its layer's Collision Matrix row.
+
+### Drag and angular drag (#2062)
+
+A Rigidbody's **drag** (default `0`) and **angular drag** (default `0.05`) are
+Unity's `Rigidbody.drag` and `angularDrag`: each tick the body's linear velocity
+is scaled by `1 / (1 + dt · drag)` and its spin by `1 / (1 + dt · angularDrag)`.
+Drag gives a falling body a terminal speed and slows debris in the air; the
+default angular drag is what brings a ball or a round prop rolling on the floor to rest,
+where `0` lets it roll for good. (A `Cylinder` collider rolling on its side is the
+exception today: the physics engine feeds it energy faster than the default drag
+takes it out, #2071, so give a barrel a box collider until that is fixed.) Both are floored at `0`, saved with the scene, shown in
+the inspector's Rigidbody card, and a change in Play takes effect on the next
+step. `Component.Set(id, "RigidBody", { drag =, angular_drag = })` writes them
+too.
+
+```lua with=crate:RigidBody
+Physics.SetDrag(crate, 0.5)
+Physics.SetAngularDrag(crate, -1)                 -- floored at 0
+assert(Physics.GetDrag(crate) == 0.5 and Physics.GetAngularDrag(crate) == 0)
+Component.Set(crate, "RigidBody", { angular_drag = 0.05 })
+```
 
 `AddImpulseAtPosition(id, jx, jy, jz, px, py, pz)` applies an impulse (N·s) at a
 world point — Unity's `AddForceAtPosition(…, ForceMode.Impulse)`. It changes the

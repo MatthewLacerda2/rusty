@@ -119,8 +119,9 @@ impl PhysicsWorld {
         }
     }
 
-    /// Build collider `id` again from what its entity has now: its shape swapped
-    /// onto the same rapier collider, a collider that cannot be built removed, and
+    /// Build collider `id` again from what its entity has now: its shape, hooks and
+    /// fit stamp swapped onto the same rapier collider (so `sync_fits` after it
+    /// finds the fit current), a collider that cannot be built removed, and
     /// one removed before attached again to its owner's body. An owner with no
     /// body (none of its colliders built) waits for the next replan.
     fn rebuild_mesh_shape(&mut self, scene: &Scene, owner: u32, id: u32) {
@@ -134,6 +135,7 @@ impl PhysicsWorld {
             (Some(built), Some(handle)) => {
                 if let Some(c) = collider_to_write(&mut self.colliders, handle, |_| true) {
                     c.set_shape(built.shared_shape().clone());
+                    c.set_active_hooks(built.active_hooks());
                     c.user_data = built.user_data;
                 }
             }

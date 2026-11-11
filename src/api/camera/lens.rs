@@ -1,6 +1,8 @@
 //! src/api/camera/lens.rs — the per-entity lens and stacking functions (#1341):
-//! field of view, clip planes, render order and clear flags, Unity's
-//! `fieldOfView`, `nearClipPlane` / `farClipPlane`, `depth` and `clearFlags`.
+//! field of view (always vertical) and the axis it is shown along (#2038), clip
+//! planes, render order and clear flags, Unity's `fieldOfView`,
+//! `nearClipPlane` / `farClipPlane`, `depth` and `clearFlags`; plus Unity's two
+//! pure FOV conversions, `VerticalToHorizontalFov` / `HorizontalToVerticalFov`.
 //! Registered by `component::register`, with its `read` / `write` contract: getters
 //! return `nil` without a camera, setters are then no-ops. The lens getters return
 //! the held lens the camera draws with (`scene::camera::held_lens`, #1359), as
@@ -10,13 +12,16 @@ use super::component::{read, write};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use crate::api::{put, Reg};
-use crate::components::ClearFlags;
+use crate::components::{
+    horizontal_to_vertical_fov, vertical_to_horizontal_fov, ClearFlags, FovAxis,
+};
 use crate::scene::authoring::rendering::camera as camera_ops;
 use crate::scene::camera::held_lens;
 use crate::scene::Scene;
 
-/// Register `Get/SetFieldOfView`, `Get/SetClipPlanes`, `Get/SetRenderOrder` and
-/// `Get/SetClearFlags` onto the `Camera` table.
+/// Register `Get/SetFieldOfView`, `Get/SetFovAxis`, the FOV conversions,
+/// `Get/SetClipPlanes`, `Get/SetRenderOrder` and `Get/SetClearFlags` onto the
+/// `Camera` table.
 pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -57,7 +62,49 @@ pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scen
             Ok(())
         }),
     )?;
+    register_axis(lua, table, scene)?;
     register_stacking(lua, table, scene)
+}
+
+/// `Get/SetFovAxis` by name (display only: the stored fov stays vertical; an
+/// unknown name is an error naming the choices) and Unity's two pure conversions.
+fn register_axis(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
+    put(
+        table,
+        "GetFovAxis",
+        lua.create_function(move |lua, id: EntityArg| {
+            Ok(read(&*scene.get(lua)?, id.read(), |c| c.fov_axis.name()))
+        }),
+    )?;
+    put(
+        table,
+        "SetFovAxis",
+        lua.create_function(move |lua, (id, name): (EntityArg, String)| {
+            let id = id.live("Camera", "SetFovAxis")?;
+            let axis = FovAxis::parse(&name).ok_or_else(|| {
+                mlua::Error::RuntimeError(format!(
+                    "SetFovAxis: unknown fov axis {name:?} (want one of {})",
+                    FovAxis::names()
+                ))
+            })?;
+            write(&*scene.get(lua)?, id, |c| camera_ops::set_fov_axis(c, axis));
+            Ok(())
+        }),
+    )?;
+    put(
+        table,
+        "VerticalToHorizontalFov",
+        lua.create_function(|_, (fov, aspect): (f32, f32)| {
+            Ok(vertical_to_horizontal_fov(fov, aspect))
+        }),
+    )?;
+    put(
+        table,
+        "HorizontalToVerticalFov",
+        lua.create_function(|_, (fov, aspect): (f32, f32)| {
+            Ok(horizontal_to_vertical_fov(fov, aspect))
+        }),
+    )
 }
 
 /// `Get/SetRenderOrder` (Unity's `depth`: higher draws later, on top) and

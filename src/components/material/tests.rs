@@ -97,3 +97,19 @@ fn receive_ssr_unset_follows_the_render_mode_and_a_set_value_stays() {
     let unset = serde_json::to_string(&MaterialAsset::default()).unwrap();
     assert!(!unset.contains("receive_ssr"), "unset is not written");
 }
+
+#[test]
+fn a_detail_layer_is_unwritten_until_set_and_its_absent_keys_default() {
+    let plain = serde_json::to_string(&MaterialAsset::default()).unwrap();
+    assert!(!plain.contains("detail"), "{plain}");
+    let json = r#"{ "detail": { "map": "d.png", "tiling": [8, 8] } }"#;
+    let m: MaterialAsset = serde_json::from_str(json).expect("the layer parses");
+    let d = m.detail.expect("a layer");
+    assert_eq!(d.map, Some("d.png".into()));
+    assert_eq!(
+        (d.tiling, d.offset, d.world_size),
+        ([8.0, 8.0], [0.0; 2], 1.0)
+    );
+    let scales = (d.albedo_scale, d.normal_scale, d.smoothness_scale);
+    assert_eq!(scales, (1.0, 1.0, 1.0), "HDRP's defaults");
+}

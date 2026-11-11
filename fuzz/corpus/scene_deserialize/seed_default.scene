@@ -159,7 +159,9 @@
           0.0
         ],
         "use_gravity": false,
-        "collision_detection": "Discrete"
+        "collision_detection": "Discrete",
+        "drag": 0.0,
+        "angular_drag": 0.05
       },
       "nav_agent": null,
       "nav_obstacle": null,
@@ -531,7 +533,9 @@
           0.0
         ],
         "use_gravity": false,
-        "collision_detection": "Discrete"
+        "collision_detection": "Discrete",
+        "drag": 0.0,
+        "angular_drag": 0.05
       },
       "nav_agent": null,
       "nav_obstacle": null,

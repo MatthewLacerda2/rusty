@@ -44,8 +44,8 @@ pub use entity::{
     PART_KEY, SIZE_TOKEN,
 };
 pub use material::{
-    BlendMode, DecalBlend, MaterialAsset, MaterialComponent, RefractionModel, RenderFace,
-    RenderMode, TaaReactive, UvMapping, MAX_REACTIVE,
+    BlendMode, DecalBlend, DetailLayer, MaterialAsset, MaterialComponent, RefractionModel,
+    RenderFace, RenderMode, TaaReactive, UvMapping, MAX_REACTIVE,
 };
 pub use mesh::{MeshComponent, MeshRevision, ShadowCasting};
 pub use nav::agent::{NavMeshAgentComponent, NavPathStatus, MAX_AVOIDANCE_PRIORITY};
@@ -66,11 +66,11 @@ pub use physics::collider::{
     ScaledShape, SharedMesh,
 };
 pub use physics::joint::{JointComponent, JointKind};
-pub use physics::rigidbody::{CollisionDetection, RigidBodyComponent};
+pub use physics::rigidbody::{CollisionDetection, RigidBodyComponent, DEFAULT_ANGULAR_DRAG};
 pub use registry::FirstClass;
 pub use rendering::camera::{
-    is_render_texture, CameraComponent, ClearFlags, Projection, RenderTarget, TaaQuality,
-    RENDER_TEXTURE_PREFIX,
+    horizontal_to_vertical_fov, is_render_texture, vertical_to_horizontal_fov, CameraComponent,
+    ClearFlags, FovAxis, Projection, RenderTarget, TaaQuality, RENDER_TEXTURE_PREFIX,
 };
 pub use rendering::light::{
     falloff, falloff_near, falloff_window, falloff_window_sq, spot_cone, LightComponent, LightMode,

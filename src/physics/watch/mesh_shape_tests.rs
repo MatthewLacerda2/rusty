@@ -4,6 +4,7 @@
 
 use super::mesh_keys_tests::{plank, scene, y, DT};
 use crate::components::mesh::MeshData;
+use crate::physics::shape::fit::DECOMPOSED;
 use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 
@@ -72,5 +73,56 @@ fn a_crate_falls_when_the_plank_is_replaced_with_an_empty_mesh() {
             s.define_mesh("plank", MeshData::default()).unwrap();
         });
         assert!(after < -1.0 && !shaped, "{after} ({always_full})");
+    }
+}
+
+/// A closed unit cube's triangles, centred on the origin.
+fn cube() -> MeshData {
+    let positions = (0..8u8)
+        .map(|i| [i & 1, i >> 1 & 1, i >> 2 & 1].map(|b| f32::from(b) - 0.5))
+        .collect();
+    let faces = [
+        [0, 2, 3, 1],
+        [4, 5, 7, 6],
+        [0, 1, 5, 4],
+        [2, 6, 7, 3],
+        [0, 4, 6, 2],
+        [1, 3, 7, 5],
+    ];
+    let indices = faces
+        .iter()
+        .flat_map(|[a, b, c, d]| [*a, *b, *c, *a, *c, *d])
+        .collect();
+    MeshData {
+        positions,
+        indices,
+        ..Default::default()
+    }
+}
+
+#[test]
+fn a_mesh_replaced_as_its_body_turns_dynamic_gets_convex_pieces() {
+    for always_full in [false, true] {
+        let (mut scene, _) = scene();
+        let floor = floor(&scene);
+        let mut world = PhysicsWorld::from_scene(&scene);
+        world.tracked.always_full = always_full;
+        world.step(&mut scene, DT);
+        // Both sync paths meet on one collider: a new mesh and a new body class.
+        scene.define_mesh("plank", cube()).unwrap();
+        scene.world.set_static(floor, false);
+        let rb = crate::scene::authoring::defaults::default_rigidbody();
+        let rb = crate::components::RigidBodyComponent {
+            is_kinematic: false,
+            ..rb
+        };
+        scene.world.set_rigidbody(floor, Some(rb));
+        world.step(&mut scene, DT);
+        let c = &world.colliders[world.id_to_collider[&floor]];
+        assert_eq!(c.user_data, DECOMPOSED, "{always_full}");
+        assert!(
+            c.shape().as_compound().is_some(),
+            "convex pieces ({always_full})"
+        );
     }
 }

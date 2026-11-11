@@ -325,9 +325,10 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
                  "material_asset": null },  // or "assets/materials/wood.physmat" (#1878),
                                             // whose values `material` then shows
   "rigidbody": { "active": true, "is_kinematic": false, "mass": .., "velocity": [x,y,z],
-                 "use_gravity": true },
+                 "angular_velocity": [x,y,z], "use_gravity": true,
+                 "collision_detection": "Discrete", "drag": 0.0, "angular_drag": 0.05 },
   "camera":    { "active": true, "fov": .., "near": .., "far": .., "culling_mask": ..,
-                 "render_order": 0, "projection": "Perspective",
+                 "render_order": 0, "projection": "Perspective", "fov_axis": "Vertical",
                  "target_texture": null },                      // or "rt:<name>" (#430)
   "nav_agent": { "active": true, "radius": .., "target": [x,y,z], "speed": .., .. },
   "ai_perception": { "sight_range": 20.0, "lose_sight_range": 25.0, "sight_angle": 60.0,

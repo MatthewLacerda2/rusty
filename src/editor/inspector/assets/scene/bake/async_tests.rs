@@ -83,14 +83,19 @@ pub(super) fn status(s: &Session) -> String {
 #[test]
 fn gpu_a_failed_bake_reads_failed_with_its_reason() {
     let (s, mut editor) = open_editor_in("generate_async_fails");
+    // The scene's folder is a file before the job starts (starting it touches no
+    // file), so every write the job makes beside the scene fails, the lighting
+    // included. Swapping it under a running job raced the job's preview writer,
+    // which recreates the folder (#2049).
+    let path = editor.current_scene_path().unwrap();
+    let folder = std::path::Path::new(&path).parent().unwrap();
+    std::fs::remove_dir_all(folder).unwrap();
+    std::fs::write(folder, "not a folder").unwrap();
     s.eval("Lighting.GenerateAsync()").unwrap();
     let scene = s.world().scene().clone();
     let mut console = ConsoleLogs::new();
     frame(&mut editor, &mut scene.borrow_mut(), &mut console);
     assert!(status(&s).starts_with("running"), "{}", status(&s));
-    // The scene's folder goes away under the job: writing the lighting fails.
-    let path = editor.current_scene_path().unwrap();
-    std::fs::remove_dir_all(std::path::Path::new(&path).parent().unwrap()).unwrap();
     run_out(&mut editor, &scene, &mut console);
     let st = status(&s);
     assert!(st.starts_with("failed Generate Lighting failed"), "{st}");

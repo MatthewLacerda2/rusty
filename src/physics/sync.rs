@@ -61,10 +61,12 @@ impl PhysicsWorld {
         self.sync_sensors(scene, &owners);
         // Before the masses: a resized capsule changes its body's volume.
         self.sync_characters(scene, &owners);
-        // A replaced library mesh re-shapes the colliders built from it (#2059).
+        // A replaced library mesh re-shapes the colliders built from it (#2059),
+        // fit to the body's class now, so the refit below finds it current.
         self.sync_mesh_shapes(scene, reshaped.as_ref());
-        // A body that changed type re-fits its concave meshes, before the masses.
-        self.sync_mesh_fits(scene, &owners);
+        // A body that changed type re-fits its meshes, cylinders and capsules,
+        // before the masses.
+        self.sync_fits(scene, &owners);
         self.sync_masses(scene, &owners);
         // The one pass a step's changes reach: pose, velocities, sleep.
         let owners = match owners {

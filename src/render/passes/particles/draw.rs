@@ -135,7 +135,7 @@ impl Renderer {
         for run in runs {
             let texture = match &run.texture {
                 Some(path) => self.load_texture(path),
-                None => Rc::clone(&self.default_texture),
+                None => Rc::clone(&self.particle_renderer.default_sprite),
             };
             let start = all.len() as u32;
             all.extend_from_slice(&run.instances);
@@ -235,3 +235,7 @@ fn collect_runs(scene: &Scene, culling_mask: u32, eye: Eye) -> Vec<EmitterRun> {
     back_to_front(&mut runs);
     runs.into_iter().map(|(run, _)| run).collect()
 }
+
+#[cfg(test)]
+#[path = "sprite_gpu_tests.rs"]
+mod sprite_gpu_tests;

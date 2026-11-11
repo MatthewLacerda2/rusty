@@ -20,6 +20,8 @@ inspect! {
         op!("angular_velocity", rb::set_angular_velocity),
         op!("use_gravity", rb::set_use_gravity),
         op!("collision_detection", rb::set_collision_detection),
+        op!("drag", rb::set_drag),
+        op!("angular_drag", rb::set_angular_drag),
     ];
     ColliderComponent => collider, collider_mut, &[
         op!("active", collider::set_active),

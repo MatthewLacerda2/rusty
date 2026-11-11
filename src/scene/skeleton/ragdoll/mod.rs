@@ -36,7 +36,7 @@ pub use runtime::{critical_damping, Drive, RagdollRuntime, REACT_DURATION, REACT
 use glam::Vec3;
 
 use super::HitboxOptions;
-use crate::components::{ColliderShape, CollisionDetection, JointComponent, RigidBodyComponent};
+use crate::components::{ColliderShape, JointComponent, RigidBodyComponent};
 use crate::scene::Scene;
 use preset::{preset_for, Bend, JointPreset};
 
@@ -92,13 +92,9 @@ impl Scene {
                 continue;
             };
             let body = RigidBodyComponent {
-                active: true,
                 is_kinematic: true,
                 mass: opts.mass * volume / total,
-                velocity: Vec3::ZERO,
-                angular_velocity: Vec3::ZERO,
-                use_gravity: true,
-                collision_detection: CollisionDetection::Discrete,
+                ..crate::scene::authoring::default_rigidbody()
             };
             self.world.set_rigidbody(bone, Some(body));
             let mut up = parents[slot];

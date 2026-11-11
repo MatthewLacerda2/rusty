@@ -240,7 +240,16 @@ fn draw_components(
     gameplay::draw_bodies(ui, world, id, &mut editor.is_dirty);
     gameplay::draw_navigation(ui, world, id, &mut editor.is_dirty);
 
-    camera::draw_camera(ui, world, id, named_layers, &mut editor.is_dirty);
+    let size = editor.viewport_image_size;
+    let view_aspect = size.x / size.y;
+    camera::draw_camera(
+        ui,
+        world,
+        id,
+        named_layers,
+        view_aspect,
+        &mut editor.is_dirty,
+    );
     camera::draw_post_processing(ui, world, id, &mut editor.is_dirty);
 
     particles::draw(ui, world, id, &mut editor.is_dirty);
