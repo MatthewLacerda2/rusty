@@ -19,11 +19,12 @@
 //!   and start reporting overlaps; the mass sync after it re-spreads the body's
 //!   mass, since a trigger carries none.
 //!
-//! - **Mesh fit.** A concave mesh collider is the exact trimesh on a static or
-//!   kinematic body and convex pieces on a dynamic one (#1886). A body that
-//!   changes type in Play (`SetKinematic`, a static flag cleared) changes in
-//!   place, so its concave colliders are rebuilt here, as the load would build
-//!   them, and swapped onto the same collider: its handle, joints and contacts
+//! - **Fit.** A concave mesh collider is the exact trimesh on a static or
+//!   kinematic body and convex pieces on a dynamic one (#1886), and a cylinder or
+//!   capsule rolls only on a dynamic one (#2071). A body that changes type in
+//!   Play (`SetKinematic`, a static flag cleared) changes in place, so those
+//!   colliders are rebuilt here, as the load would build them, and their shape
+//!   and hooks swapped onto the same collider: its handle, joints and contacts
 //!   survive, and the mass sync after it re-spreads the body's mass.
 //!
 //! All walk the sorted plan, or the bodies the change log named (`watch`; a
@@ -100,15 +101,16 @@ impl PhysicsWorld {
         }
     }
 
-    /// Rebuild each concave mesh collider whose fit (its `user_data`, stamped by
+    /// Rebuild each collider whose fit (its `user_data`, stamped by
     /// `build_shape_for`) no longer matches its body's class: a body turned
-    /// dynamic gets convex pieces, one turned static or kinematic the exact mesh.
-    /// The stamp is compared before any mesh is copied, so a moving body costs a
-    /// lookup per collider. A collider that is no longer a concave mesh waits for
-    /// the body rebuild, like every other shape edit. A rebuild that fails keeps
-    /// the old shape but takes the new stamp, so it warns once, not every step.
-    /// Runs before [`Self::sync_masses`], which reads the new volume.
-    pub(super) fn sync_mesh_fits(&mut self, scene: &Scene, owners: &Owners) {
+    /// dynamic gets convex pieces and rolling cylinders and capsules, one turned
+    /// static or kinematic the exact shapes. The stamp is compared before any mesh
+    /// is copied, so a moving body costs a lookup per collider. A collider whose
+    /// shape changed kind waits for the body rebuild, like every other shape edit.
+    /// A rebuild that fails keeps the old shape but takes the new stamp, so it
+    /// warns once, not every step. Runs before [`Self::sync_masses`], which reads
+    /// the new volume.
+    pub(super) fn sync_fits(&mut self, scene: &Scene, owners: &Owners) {
         for (&owner, ids) in owners.pick(&self.plan) {
             let dynamic = matches!(class_of(&scene.world, owner), BodyClass::Dynamic);
             for id in ids {
@@ -130,6 +132,7 @@ impl PhysicsWorld {
                 if let Some(c) = collider_to_write(&mut self.colliders, handle, differs) {
                     if let Some(built) = built {
                         c.set_shape(built.shared_shape().clone());
+                        c.set_active_hooks(built.active_hooks());
                     }
                     c.user_data = want;
                 }

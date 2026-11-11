@@ -12,20 +12,29 @@ use crate::scene::Scene;
 
 pub(super) const DT: f32 = 1.0 / 60.0;
 
-/// The two floors a level is built from: a `Box` collider (a cuboid) and the
-/// `Plane` primitive (a triangle-mesh collider), both topped at y = 0.
+/// The floors a level is built from, all topped at y = 0: a `Box` collider (a
+/// cuboid) 600 m across, the same box crate-sized (2 m across), and the `Plane`
+/// primitive (a triangle-mesh collider). The crate matters because rapier
+/// recycles a pair's contacts while its relative pose drifts less than a window
+/// scaled by the pair's size, and a 600 m floor makes that window tiny.
 #[derive(Clone, Copy, Debug)]
 pub(super) enum Floor {
     Box,
+    Crate,
     Plane,
 }
 
-/// A static floor of `kind`, 600 m across.
+/// A static floor of `kind`.
 pub(super) fn floor(scene: &mut Scene, kind: Floor) {
     let id = match kind {
-        Floor::Box => {
+        Floor::Box | Floor::Crate => {
             let id = scene.add_entity("Floor".to_string());
-            let size = Vec3::new(600.0, 1.0, 600.0);
+            let across = if matches!(kind, Floor::Box) {
+                600.0
+            } else {
+                2.0
+            };
+            let size = Vec3::new(across, 1.0, across);
             let collider = ColliderComponent {
                 shape: ColliderShape::Box { size },
                 ..default_collider()

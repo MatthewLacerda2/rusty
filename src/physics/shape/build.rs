@@ -16,6 +16,7 @@ use crate::scene::Scene;
 
 use super::mesh::{build_mesh_shape, MeshFit, Skip};
 use crate::physics::compound::world_pose;
+use crate::physics::contact;
 
 /// Body class derived from the entity flags. Mirrors the legacy solver's encoding:
 /// static (fixed), kinematic (position-driven), or dynamic (gravity + solver).
@@ -221,7 +222,10 @@ pub(in crate::physics) fn try_build_shape(
 }
 
 /// `try_build_shape` on a body that is `dynamic` or not: a concave mesh on a
-/// dynamic one is decomposed into convex pieces (`MeshFit`, #1886).
+/// dynamic one is decomposed into convex pieces (`MeshFit`, #1886), and a
+/// cylinder or capsule on a dynamic one is built to roll (`physics::contact`,
+/// #2071): the cylinder carries the mark the contact dispatcher hulls, and both
+/// keep their pairs out of rapier's contact recycling.
 pub(in crate::physics) fn try_build_body_shape(
     shape: &ColliderShape,
     scale: Vec3,
@@ -231,6 +235,10 @@ pub(in crate::physics) fn try_build_body_shape(
     let collider = match shape.scaled(scale) {
         ScaledShape::Cuboid { half } => ColliderBuilder::cuboid(half.x, half.y, half.z),
         ScaledShape::Ball { radius } => ColliderBuilder::ball(radius),
+        ScaledShape::Cylinder {
+            half_height,
+            radius,
+        } if dynamic => contact::rolling_cylinder(half_height, radius),
         ScaledShape::Cylinder {
             half_height,
             radius,
@@ -248,6 +256,15 @@ pub(in crate::physics) fn try_build_body_shape(
             let fit = MeshFit::of(convex, dynamic);
             return build_mesh_shape(fit, scale, mesh.ok_or(Skip::NoMesh)?);
         }
+    };
+    let rolls = matches!(
+        shape,
+        ColliderShape::Cylinder { .. } | ColliderShape::Capsule { .. }
+    );
+    let collider = if dynamic && rolls {
+        contact::never_recycled(collider)
+    } else {
+        collider
     };
     Ok(collider.build())
 }

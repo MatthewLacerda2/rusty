@@ -3,7 +3,7 @@
 
 use std::sync::{Arc, Mutex, PoisonError};
 
-use rapier3d::parry::shape::{ConvexPolyhedron, Cylinder};
+use rapier3d::parry::shape::{ConvexPolyhedron, Cylinder, Shape};
 use rapier3d::prelude::Vector;
 
 use super::Manifold;
@@ -18,8 +18,17 @@ pub(super) const SIDES: usize = 64;
 
 /// A contact whose normal is at least this close to the cylinder's axis
 /// (|cos| of the angle between them) is on a cap, which meets the world as the
-/// true cylinder: past 60° from the side, parry's own cylinder turns to its cap too.
+/// true cylinder: within 60° of the axis (30° or more from the side), where
+/// parry's own cylinder turns to its cap too.
 const CAP_COS: f32 = 0.5;
+
+/// The cylinder of `shape` when it is a rolling one: the `RoundCylinder` with no
+/// rounding that `contact::rolling_cylinder` builds for a dynamic body. Any
+/// other shape, an exact `Cylinder` included, is `None`.
+pub(super) fn rolling(shape: &dyn Shape) -> Option<&Cylinder> {
+    let round = shape.as_round_cylinder()?;
+    (round.border_radius == 0.0).then_some(&round.inner_shape)
+}
 
 /// Whether the cylinder (shape 1 of the pair, or shape 2 when `second`) last
 /// touched on its side: some manifold has points and none has a normal near its

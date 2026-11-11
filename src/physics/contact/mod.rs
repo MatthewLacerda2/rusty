@@ -19,8 +19,9 @@
 //!    every tick and the normal snapped to the box face, a cylinder on a box
 //!    still sped up, and stopped doing so only with warm-starting off.
 //!
-//! So every pair with a cylinder or capsule recomputes its points each tick, and
-//! a cylinder's side meets the world as a convex hull of [`side::SIDES`] facets,
+//! So every pair with a rolling cylinder or capsule recomputes its points each
+//! tick, and a rolling cylinder's side meets the world as a convex hull of
+//! [`side::SIDES`] facets,
 //! as a barrel's convex mesh collider does in Unity. A facet lies flat on the
 //! floor, so its normal and its points are exact, and each facet the hull rolls
 //! over takes a little energy: it rolls on and comes to rest. Its cap meets the
@@ -28,7 +29,28 @@
 //! first four corners only (a known gap in `ConvexPolyhedron`), which would stand
 //! a 64-gon cap on a sliver of its rim. Raycasts and every other query see the
 //! true shapes.
+//!
+//! **Only what rolls.** A cylinder or capsule rolls when it is on a dynamic body,
+//! and only then is it built to roll ([`rolling_cylinder`], [`never_recycled`],
+//! called from `shape::build`). A static or kinematic cylinder (a pillar, a
+//! moving platform) stays the exact `Cylinder`, so a body sliding round it
+//! meets a smooth side. The dispatcher sees shapes, never bodies, so a rolling
+//! cylinder is told apart by its shape: a `RoundCylinder` with no rounding,
+//! which parry treats as the same cylinder everywhere (contacts, mass, rays),
+//! and which the engine builds for nothing else.
+//!
+//! **Fresh means every tick.** Besides parry's reuse inside a manifold, rapier
+//! recycles a whole pair (`IntegrationParameters::contact_recycling`) while its
+//! relative pose drifts less than 5 cm, a window scaled by the pair's size: on a
+//! crate-sized floor a slow roll would keep frozen contacts for ticks at a time
+//! and gain energy as fault 1 does. rapier never recycles a pair with a user
+//! hook in it, so a rolling collider asks for one ([`never_recycled`]); the
+//! world steps with no hooks (`()`), so the hook does nothing.
 
+#[cfg(test)]
+mod exact_tests;
+#[cfg(test)]
+mod fit_tests;
 #[cfg(test)]
 mod fixture;
 #[cfg(test)]
@@ -43,7 +65,9 @@ use rapier3d::parry::query::{
     ShapeCastHit, ShapeCastOptions, ShapeDistance, ShapeIntersection, Unsupported,
 };
 use rapier3d::parry::shape::{Shape, ShapeType};
-use rapier3d::prelude::{ContactData, ContactManifoldData, NarrowPhase, Pose, Real, Vector};
+use rapier3d::prelude::{
+    ActiveHooks, ColliderBuilder, ContactData, ContactManifoldData, NarrowPhase, Pose, Real, Vector,
+};
 
 type Manifold = ContactManifold<ContactManifoldData, ContactData>;
 
@@ -51,6 +75,18 @@ type Manifold = ContactManifold<ContactManifoldData, ContactData>;
 /// default dispatcher, which answers everything `Rolling` leaves alone.
 pub(super) fn narrow_phase() -> NarrowPhase {
     NarrowPhase::with_query_dispatcher(Rolling::default().chain(DefaultQueryDispatcher))
+}
+
+/// The collider of a cylinder on a dynamic body: the same cylinder, as a
+/// `RoundCylinder` with no rounding, the mark [`Rolling`] gives a side hull.
+pub(in crate::physics) fn rolling_cylinder(half_height: Real, radius: Real) -> ColliderBuilder {
+    ColliderBuilder::round_cylinder(half_height, radius, 0.0)
+}
+
+/// `collider` with its pairs kept out of rapier's contact recycling, by asking
+/// for a solver-contact hook the world never acts on (the module doc says why).
+pub(in crate::physics) fn never_recycled(collider: ColliderBuilder) -> ColliderBuilder {
+    collider.active_hooks(ActiveHooks::MODIFY_SOLVER_CONTACTS)
 }
 
 /// The contact generator for pairs with a rolling shape in them (the module doc
@@ -61,9 +97,10 @@ struct Rolling {
     hulls: side::Hulls,
 }
 
-/// Whether `shape` rolls on a curved side, and so gets fresh points each tick.
+/// Whether `shape` rolls on a curved side, and so gets fresh points each tick:
+/// a rolling cylinder ([`side::rolling`]) or any capsule.
 fn rolls(shape: &dyn Shape) -> bool {
-    matches!(shape.shape_type(), ShapeType::Cylinder | ShapeType::Capsule)
+    shape.shape_type() == ShapeType::Capsule || side::rolling(shape).is_some()
 }
 
 impl PersistentQueryDispatcher<ContactManifoldData, ContactData> for Rolling {
@@ -80,8 +117,8 @@ impl PersistentQueryDispatcher<ContactManifoldData, ContactData> for Rolling {
             return Err(Unsupported);
         }
         // Decided from last tick's normals, before they are cleared.
-        let hull1 = g1.as_cylinder().filter(|_| side::on_side(manifolds, false));
-        let hull2 = g2.as_cylinder().filter(|_| side::on_side(manifolds, true));
+        let hull1 = side::rolling(g1).filter(|_| side::on_side(manifolds, false));
+        let hull2 = side::rolling(g2).filter(|_| side::on_side(manifolds, true));
         let (hull1, hull2) = (
             hull1.and_then(|c| self.hulls.of(c)),
             hull2.and_then(|c| self.hulls.of(c)),

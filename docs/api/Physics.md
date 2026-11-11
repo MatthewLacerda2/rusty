@@ -295,8 +295,10 @@ A collider's **shape** is a table with a `kind` and that kind's extents — what
 collider and gives a barrel a convex `MeshCollider`). Lying down, its curved
 side touches the world as a 64-facet hull, so a pushed barrel rolls a few turns,
 losing a little speed on each facet, and comes to rest; standing up, its flat
-cap is the exact circle, so it stands still. Raycasts, overlaps and shape casts
-see the exact cylinder.
+cap is the exact circle, so it stands still. Only a cylinder on a dynamic
+Rigidbody rolls this way: on a static or kinematic body (a pillar, a moving
+platform) the side stays the exact, smooth cylinder. Raycasts, overlaps and
+shape casts see the exact cylinder.
 
 **Capsule** (Unity: `CapsuleCollider`) is the character and limb shape: a
 cylinder capped by two hemispheres. As in Unity, `height` is the **full**
