@@ -82,7 +82,7 @@ from_mirror() {
 }
 
 if [ "$hit" = true ]; then
-  from_cache || { echo "::warning::system-libs: the cached .debs did not install; going to the mirror"; rm -f "$dir"/*.deb; from_mirror; }
+  from_cache || { echo "::warning::system-libs: the cached .debs did not install; going to the mirror"; sudo dpkg --configure -a || true; rm -f "$dir"/*.deb; from_mirror; }
 else
   from_mirror
 fi

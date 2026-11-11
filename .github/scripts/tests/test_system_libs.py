@@ -23,8 +23,9 @@ from pathlib import Path
 
 GITHUB = Path(__file__).resolve().parents[2]
 WORKFLOW_DIR = GITHUB / "workflows"
+ACTIONS_DIR = GITHUB / "actions"
 INSTALL = GITHUB / "actions" / "system-libs" / "install.sh"
-DIRECT = re.compile(r"^.*\bapt-get\b.*$", re.M)
+DIRECT = re.compile(r"^.*\bapt(-get)?\s+(-\S+\s+)*(update|install)\b.*$", re.M)
 ALLOW = re.compile(r"#\s*system-libs:\s*\S")
 
 # The fakes. `apt-get` logs every call; with MIRROR=down it fails `update`'s
@@ -86,12 +87,16 @@ def install(hit: bool, mirror: str = "up", dpkg: str = "ok", cached: tuple[str, 
 
 class Workflows(unittest.TestCase):
     def test_no_workflow_calls_apt_get_directly(self):
-        for path in sorted(WORKFLOW_DIR.glob("*.yml")):
-            with self.subTest(workflow=path.name):
+        # Workflows and every composite action but `system-libs` itself.
+        paths = sorted(WORKFLOW_DIR.glob("*.yml")) + sorted(
+            p for p in ACTIONS_DIR.glob("*/action.yml") if p.parent.name != "system-libs")
+        for path in paths:
+            with self.subTest(file=str(path.relative_to(GITHUB))):
                 self.assertEqual(direct_calls(path.read_text()), [])
 
     def test_a_direct_call_is_flagged_and_a_reasoned_one_passes(self):
         self.assertEqual(len(direct_calls("        run: sudo apt-get update && sudo apt-get install -y x\n")), 1)
+        self.assertEqual(len(direct_calls("        run: sudo apt update && sudo apt install -y x\n")), 1)
         self.assertEqual(direct_calls("        run: sudo apt-get install -y x  # system-libs: no cache here\n"), [])
         self.assertEqual(direct_calls("      # apt-get from the mirror\n"), [])
 

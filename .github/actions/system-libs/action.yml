@@ -7,7 +7,7 @@
 # queue handed back PRs #2094 and #2096 twice each in one hour, their code
 # green. The packages a runner image lacks are the same on every run of that
 # image, so after the first download they come from the cache and a mirror
-# outage no longer reaches a run that has run before.
+# outage no longer reaches a run on an image its ref (or `main`) has served.
 #
 # - The key is the sorted package list and a hash of every package dpkg
 #   already has installed (`dpkg-query -W`): the runner image, plus whatever
