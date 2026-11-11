@@ -645,6 +645,64 @@ cargo run --features dev --bin play -- --project tests/fixtures/project look_123
 Log the getter after a set (`Harness.Log(tostring(Graphics.Get…()))`) when the two
 images look alike: an effect that did not run and one that runs invisibly look the same.
 
+## Test games (#2029)
+
+A **test game** is a small, complete 3D game project that a Lua recipe builds from
+nothing in seconds, headless. Coders, reviewers and CI prove a change on one instead
+of rebuilding a scene from cubes each time, and a PR's `Looked at` line names the
+game and the shots it looked at. Each lives in a folder under `games/`, and only its
+recipe and scripts are committed; the project is regenerable output.
+
+| Game | What it is for |
+|---|---|
+| `smoke` | The generator's own proof: a floor, a crate with a Snyder texture, a looping zimmer blip and `mover.lua` sliding it along +X, a sun, a camera; one scenario asserting the crate moved, two shots. |
+
+```sh
+make game NAME=smoke                       # → target/games/smoke/ (this worktree's own)
+make game NAME=smoke ARGS="--param size=40"
+make game NAME=smoke OUT=~/games/smoke     # somewhere else, e.g. to open it:
+cargo run --bin rusty -- --project ~/games/smoke  # the editor on it
+make game-test NAME=smoke                  # generate, prove it deterministic, play, shoot
+```
+
+`make game-test` generates the game, moves it aside, generates it again at the same
+path and compares every file; then runs each `scenarios/*.lua` as `play` does, on
+the project's startup scene, and takes the shots. It prints one `ok`/`FAIL` line per
+step and exits 1 when one failed. Results go to the project's `cache/test/<scenario>/`
+(`results.json`, `console.log`) and the shots to `cache/test/shots/<name>.png`; open
+them with `Read`. A shot fails only when it is all one colour: rendering changes too
+often for a golden image to hold, so the shots are for looking. Without a GPU or
+lavapipe a shot is logged as skipped, as every GPU test skips. The same command runs
+locally, in a worktree and in a cloud session: every clone has `games/`, and each
+worktree writes its own `target/games/`. `gpu::test_games` runs `game --test` on
+every folder under `games/` in CI.
+
+**Adding a game** is adding its folder; the test covers it from then on:
+
+```text
+games/<name>/
+  recipe.lua       builds the project: scenes, materials, textures, sounds
+  scripts/         the game's behaviours, copied into assets/scripts/
+  scenarios/       headless play-tests, in play's scenario format
+  shots.lua        returns { { name =, position = {x, y, z}, target = {x, y, z} }, … }
+```
+
+- **The recipe is Lua on the one API surface** (`docs/api/`): `Scene.New`,
+  `Scene.CreateEntity`, components, `Texture.*`, `Sound.*`, then `Scene.Save` and
+  `Application.SetStartupScene`. It runs in edit mode, as one console command of a
+  `session` on the freshly made, seeded project (`dev::game::generate`). Something a
+  recipe cannot do is an API gap: file it, never work around it in the generator.
+- **Parameters** arrive as the chunk's argument (`...`), a table of the
+  `--param key=value` pairs: `true`/`false`, numbers (whole ones as integers) and
+  plain words. The recipe holds the defaults, which are what CI runs, and refuses a
+  key it does not know (`games/smoke/recipe.lua` shows the four lines).
+- **Deterministic**: the same recipe and parameters write the same bytes. Draw from
+  a `seed` parameter (`Texture`'s and `Sound`'s `seed`, `Random`), never a clock.
+- **Every test game is 3D**, and has no lightmap bake by default: a `bake`
+  parameter may offer a tiny, lowest-resolution one, off unless asked for.
+- The generator clears its output folder before writing, but only one it made
+  (it holds `.test-game`): `OUT` naming any other non-empty folder is refused.
+
 ## Performance budgets (frame stats, #433)
 A scenario can assert on performance the same way it asserts on behaviour. The harness
 records frame stats every tick (see `Debug.Stats` in `docs/api/Debug.md` for the

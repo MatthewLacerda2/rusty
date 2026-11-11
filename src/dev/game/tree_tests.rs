@@ -1,8 +1,7 @@
 use super::*;
 
 fn scratch(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("rusty-game-tree-{}-{name}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
+    let dir = crate::test_temp::dir().join(name);
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }

@@ -59,18 +59,17 @@ pub fn default_out(name: &str) -> PathBuf {
         .join(name)
 }
 
-/// The game called `name` under [`games_dir`].
-pub fn find(name: &str) -> Result<Game, String> {
-    let games = all()?;
+/// The game called `name` under `root` (normally [`games_dir`]).
+pub fn find(root: &Path, name: &str) -> Result<Game, String> {
+    let games = all(root)?;
     let names: Vec<&str> = games.iter().map(|g| g.name.as_str()).collect();
     let missing = format!("no test game '{name}' (games: {})", names.join(", "));
     games.into_iter().find(|g| g.name == name).ok_or(missing)
 }
 
-/// Every folder under [`games_dir`] holding a [`RECIPE`], by name.
-pub fn all() -> Result<Vec<Game>, String> {
-    let root = games_dir();
-    let entries = std::fs::read_dir(&root).map_err(|e| format!("{}: {e}", root.display()))?;
+/// Every folder under `root` (normally [`games_dir`]) holding a [`RECIPE`], by name.
+pub fn all(root: &Path) -> Result<Vec<Game>, String> {
+    let entries = std::fs::read_dir(root).map_err(|e| format!("{}: {e}", root.display()))?;
     let mut games: Vec<Game> = entries
         .filter_map(Result::ok)
         .map(|entry| entry.path())

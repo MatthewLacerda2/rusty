@@ -2,8 +2,8 @@
 //!
 //! ```text
 //! Usage:
-//!   cargo run --bin game --features dev -- <name> [--out <dir>] [--param key=value]... [--test]
-//!   cargo run --bin game --features dev -- --list
+//!   cargo run --bin game --features dev -- <name> [--out <dir>] [--param key=value]... [--test] [--games <dir>]
+//!   cargo run --bin game --features dev -- --list [--games <dir>]
 //! ```
 //!
 //! Builds the game `games/<name>/` describes into a project folder (default the
@@ -11,7 +11,8 @@
 //! `recipe.lua` in edit mode with the `--param`s (`dev::game::generate`). With
 //! `--test` it also proves the generation deterministic, runs every scenario and
 //! takes the shots (`dev::game::check`; `make game-test NAME=<name>`), printing one
-//! line per step and exiting 1 when one failed. `session` and `play` are the two
+//! line per step and exiting 1 when one failed. `--games <dir>` reads the games from
+//! another folder than the checkout's `games/`. `session` and `play` are the two
 //! halves of this, but neither runs a recipe file with parameters and reports its
 //! failure in an exit status, which a Makefile target and a test need.
 
@@ -20,14 +21,20 @@ use std::process::exit;
 
 use rusty::dev::game::{self, Params};
 
-const USAGE: &str = "usage: game <name> [--out <dir>] [--param key=value]... [--test]
-       game --list";
+const USAGE: &str =
+    "usage: game <name> [--out <dir>] [--param key=value]... [--test] [--games <dir>]
+       game --list [--games <dir>]";
 
 fn main() {
     rusty::logging::init();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
+    let games = rusty::core::project::take_value(&mut args, "--games")
+        .unwrap_or_else(|e| usage(&e))
+        .map_or_else(game::games_dir, |dir| {
+            std::path::absolute(dir).unwrap_or_default()
+        });
     if args == ["--list"] {
-        for found in game::all().unwrap_or_else(|e| fail(&e)) {
+        for found in game::all(&games).unwrap_or_else(|e| fail(&e)) {
             println!("{}", found.name);
         }
         return;
@@ -42,7 +49,7 @@ fn main() {
     }
     let [name] = args.as_slice() else { usage("") };
     let params = Params::parse(pairs.iter().map(String::as_str)).unwrap_or_else(|e| usage(&e));
-    let found = game::find(name).unwrap_or_else(|e| fail(&e));
+    let found = game::find(&games, name).unwrap_or_else(|e| fail(&e));
     let out = out.map_or_else(|| game::default_out(name), PathBuf::from);
 
     if !test {

@@ -165,3 +165,29 @@ fn one_colour(path: &Path) -> Result<bool, String> {
     let first = all.next().copied();
     Ok(all.all(|p| Some(*p) == first))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::one_colour;
+
+    fn png(name: &str, image: &image::RgbaImage) -> std::path::PathBuf {
+        let path = crate::test_temp::dir().join(name);
+        image.save(&path).unwrap();
+        path
+    }
+
+    #[test]
+    fn a_flat_image_is_one_colour_and_one_differing_pixel_is_not() {
+        let mut image = image::RgbaImage::from_pixel(8, 4, image::Rgba([0, 0, 0, 255]));
+        assert!(one_colour(&png("flat.png", &image)).unwrap());
+        image.put_pixel(7, 3, image::Rgba([0, 0, 1, 255]));
+        assert!(!one_colour(&png("dot.png", &image)).unwrap());
+    }
+
+    #[test]
+    fn a_file_that_is_no_png_is_an_error() {
+        let path = crate::test_temp::dir().join("broken.png");
+        std::fs::write(&path, b"not a png").unwrap();
+        assert!(one_colour(&path).is_err());
+    }
+}
