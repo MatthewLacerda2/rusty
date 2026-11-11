@@ -1,41 +1,7 @@
-//! Every test game under `games/` generates deterministically, passes its
-//! scenarios and takes its shots (#2029): adding a folder is what covers a game.
-//! Each runs the `game` binary as a child, since opening a project moves the
-//! working directory.
+//! The play-test fails when it should (#2029): a failing scenario exits 1, a recipe
+//! error exits 2 and names the recipe.
 
-use std::path::Path;
-use std::process::{Command, Output};
-
-/// `game --test` on `name`, generated under this test's temp dir, read from the
-/// `games` folder given (the checkout's when `None`).
-fn game_test(name: &str, games: Option<&Path>) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_game"));
-    command
-        .arg(name)
-        .arg("--test")
-        .arg("--out")
-        .arg(crate::temp::dir().join(name));
-    if let Some(games) = games {
-        command.arg("--games").arg(games);
-    }
-    command.output().expect("the game binary runs")
-}
-
-#[test]
-fn every_test_game_generates_deterministically_and_passes_its_play_test() {
-    let games = rusty::dev::game::all(&rusty::dev::game::games_dir()).unwrap();
-    assert!(
-        games.iter().any(|g| g.name == "smoke"),
-        "games/smoke is there"
-    );
-    for game in games {
-        let out = game_test(&game.name, None);
-        let stdout = String::from_utf8_lossy(&out.stdout);
-        let stderr = String::from_utf8_lossy(&out.stderr);
-        assert!(out.status.success(), "{}:\n{stdout}\n{stderr}", game.name);
-        assert!(stdout.contains("ok   generating twice writes the same files"));
-    }
-}
+use super::game_test;
 
 #[test]
 fn a_failing_scenario_fails_the_play_test() {

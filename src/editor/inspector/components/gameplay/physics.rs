@@ -62,6 +62,44 @@ fn draw_rb_mass(
     });
 }
 
+/// A Drag / Angular Drag row (≥ 0, Unity's `drag` / `angularDrag`), routed
+/// through the shared op (#2062).
+fn draw_rb_drag(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    (label, mut value): (&str, f32),
+    op: fn(&mut crate::scene::RigidBodyComponent, f32),
+    is_dirty: &mut bool,
+) {
+    ui.horizontal(|ui| {
+        ui.label(label);
+        let drag = egui::DragValue::new(&mut value)
+            .speed(0.01)
+            .ranged(0.0..=f32::MAX);
+        if ui.add(drag).changed() {
+            if let Some(mut r) = world.rigidbody_mut(id) {
+                op(&mut r, value);
+            }
+            *is_dirty = true;
+        }
+    });
+}
+
+/// The Drag and Angular Drag rows.
+fn draw_rb_drags(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    (drag, angular): (f32, f32),
+    is_dirty: &mut bool,
+) {
+    let set = rigidbody_ops::set_drag;
+    draw_rb_drag(ui, world, id, ("Drag:", drag), set, is_dirty);
+    let set = rigidbody_ops::set_angular_drag;
+    draw_rb_drag(ui, world, id, ("Angular Drag:", angular), set, is_dirty);
+}
+
 /// 3EG. RigidBody Component
 pub fn draw_rigidbody(
     ui: &mut egui::Ui,
@@ -102,6 +140,7 @@ pub fn draw_rigidbody(
             is_dirty,
         );
         draw_rb_mass(ui, world, id, rb.mass, is_dirty);
+        draw_rb_drags(ui, world, id, (rb.drag, rb.angular_drag), is_dirty);
         draw_rb_velocity(ui, world, id, rb.velocity, is_dirty);
         draw_rb_angular_velocity(ui, world, id, rb.angular_velocity, is_dirty);
         draw_rb_collision_detection(ui, world, id, rb.collision_detection, is_dirty);

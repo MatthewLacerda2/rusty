@@ -435,9 +435,11 @@ scene.entities[].mesh.skeleton.bodies{}.joint.swing_limit: f32
 scene.entities[].mesh.skeleton.bodies{}.joint.use_limits: bool
 scene.entities[].mesh.skeleton.bodies{}.joint: option
 scene.entities[].mesh.skeleton.bodies{}.rigidbody.active: bool
+scene.entities[].mesh.skeleton.bodies{}.rigidbody.angular_drag: f32
 scene.entities[].mesh.skeleton.bodies{}.rigidbody.angular_velocity: tuple(3)
 scene.entities[].mesh.skeleton.bodies{}.rigidbody.angular_velocity[]: f32
 scene.entities[].mesh.skeleton.bodies{}.rigidbody.collision_detection: enum Discrete|Continuous
+scene.entities[].mesh.skeleton.bodies{}.rigidbody.drag: f32
 scene.entities[].mesh.skeleton.bodies{}.rigidbody.is_kinematic: bool
 scene.entities[].mesh.skeleton.bodies{}.rigidbody.mass: f32
 scene.entities[].mesh.skeleton.bodies{}.rigidbody.use_gravity: bool
@@ -737,9 +739,11 @@ scene.entities[].reverb_zone.params.wet: f32
 scene.entities[].reverb_zone.preset: enum Off|Room|Hall|Tunnel|Outdoor|Custom
 scene.entities[].reverb_zone: option
 scene.entities[].rigidbody.active: bool
+scene.entities[].rigidbody.angular_drag: f32
 scene.entities[].rigidbody.angular_velocity: tuple(3)
 scene.entities[].rigidbody.angular_velocity[]: f32
 scene.entities[].rigidbody.collision_detection: enum Discrete|Continuous
+scene.entities[].rigidbody.drag: f32
 scene.entities[].rigidbody.is_kinematic: bool
 scene.entities[].rigidbody.mass: f32
 scene.entities[].rigidbody.use_gravity: bool

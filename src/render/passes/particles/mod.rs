@@ -21,6 +21,7 @@ mod mesh_cache;
 pub(crate) use mesh_cache::CachedMesh;
 
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use wgpu::util::DeviceExt;
 
@@ -28,6 +29,7 @@ use crate::components::particle::ParticleBlend;
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::passes::blended::{BlendPipelines, Globals};
+use crate::render::GpuTexture;
 use instance::{ParticleGlobals, ParticleInstance};
 
 /// The layouts the particle pipelines share with other passes: the single-texture
@@ -48,14 +50,20 @@ pub struct ParticleRenderer {
     /// Mesh-particle specs resolved to their GPU mesh, so a model is read from
     /// disk once, not every frame, yet follows a re-import (`mesh_cache`).
     pub(crate) meshes: HashMap<String, CachedMesh>,
+    /// What an emitter naming no texture draws: Unity's soft white disc
+    /// (`Renderer::create_soft_disc_texture`, #2052). A texture that fails to
+    /// load still draws the renderer's checker.
+    pub(crate) default_sprite: Rc<GpuTexture>,
 }
 
 impl ParticleRenderer {
     /// Build the pass: a globals bind group + two blend-variant pipelines over
-    /// groups globals (0), sprite (1), scene depth (2) and camera + lighting (3).
+    /// groups globals (0), sprite (1), scene depth (2) and camera + lighting (3);
+    /// `default_sprite` is what an emitter with no texture binds at group 1.
     pub(crate) fn new(
         device: &wgpu::Device,
         layouts: SharedLayouts,
+        default_sprite: Rc<GpuTexture>,
         registry: &mut ShaderRegistry,
     ) -> Self {
         let shader = registry.load(device, "particles.wgsl", "Particle Shader");
@@ -98,6 +106,7 @@ impl ParticleRenderer {
             globals_bind_group: globals.bind_group,
             index_buffer,
             meshes: HashMap::new(),
+            default_sprite,
         }
     }
 

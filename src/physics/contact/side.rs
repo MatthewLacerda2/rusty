@@ -23,7 +23,7 @@ pub(super) const SIDES: usize = 64;
 const CAP_COS: f32 = 0.5;
 
 /// The cylinder of `shape` when it is a rolling one: the `RoundCylinder` with no
-/// rounding that `contact::rolling_cylinder` builds for a dynamic body. Any
+/// rounding that `contact::cylinder` builds for a dynamic body. Any
 /// other shape, an exact `Cylinder` included, is `None`.
 pub(super) fn rolling(shape: &dyn Shape) -> Option<&Cylinder> {
     let round = shape.as_round_cylinder()?;

@@ -31,21 +31,22 @@
 //! true shapes.
 //!
 //! **Only what rolls.** A cylinder or capsule rolls when it is on a dynamic body,
-//! and only then is it built to roll ([`rolling_cylinder`], [`never_recycled`],
-//! called from `shape::build`). A static or kinematic cylinder (a pillar, a
-//! moving platform) stays the exact `Cylinder`, so a body sliding round it
-//! meets a smooth side. The dispatcher sees shapes, never bodies, so a rolling
-//! cylinder is told apart by its shape: a `RoundCylinder` with no rounding,
-//! which parry treats as the same cylinder everywhere (contacts, mass, rays),
-//! and which the engine builds for nothing else.
+//! and only then is it built to roll ([`cylinder`], [`rolling`], called from
+//! `shape::build`). A static or kinematic cylinder (a pillar, a moving
+//! platform) stays the exact `Cylinder`, so a body sliding round it meets a
+//! smooth side. The dispatcher sees shapes, never bodies, so a rolling cylinder
+//! is told apart by its shape: a `RoundCylinder` with no rounding, which the
+//! engine builds for nothing else. parry gives it the cylinder's contacts, mass
+//! and raycasts; only a point query (closest point) projects onto it by GJK,
+//! not in closed form.
 //!
 //! **Fresh means every tick.** Besides parry's reuse inside a manifold, rapier
 //! recycles a whole pair (`IntegrationParameters::contact_recycling`) while its
-//! relative pose drifts less than 5 cm, a window scaled by the pair's size: on a
-//! crate-sized floor a slow roll would keep frozen contacts for ticks at a time
-//! and gain energy as fault 1 does. rapier never recycles a pair with a user
-//! hook in it, so a rolling collider asks for one ([`never_recycled`]); the
-//! world steps with no hooks (`()`), so the hook does nothing.
+//! relative pose drifts less than 5 cm, a turn counted at the pair's size: on a
+//! crate-sized floor a slow roll keeps frozen contacts for several ticks at a
+//! time and gains energy as fault 1 does. rapier never recycles a pair with a
+//! user hook in it, so a rolling collider asks for one ([`rolling`]); the world
+//! steps with no hooks (`()`), so the hook does nothing.
 
 #[cfg(test)]
 mod exact_tests;
@@ -59,6 +60,7 @@ mod side;
 #[cfg(test)]
 mod stand_tests;
 
+use crate::components::ColliderShape;
 use rapier3d::parry::query::{
     details::NormalConstraints, ClosestPoints, Contact, ContactManifold, ContactManifoldsWorkspace,
     DefaultQueryDispatcher, NonlinearRigidMotion, PersistentQueryDispatcher, QueryDispatcher,
@@ -77,16 +79,39 @@ pub(super) fn narrow_phase() -> NarrowPhase {
     NarrowPhase::with_query_dispatcher(Rolling::default().chain(DefaultQueryDispatcher))
 }
 
-/// The collider of a cylinder on a dynamic body: the same cylinder, as a
-/// `RoundCylinder` with no rounding, the mark [`Rolling`] gives a side hull.
-pub(in crate::physics) fn rolling_cylinder(half_height: Real, radius: Real) -> ColliderBuilder {
-    ColliderBuilder::round_cylinder(half_height, radius, 0.0)
+/// A cylinder's collider. On a dynamic body it is the same cylinder as a
+/// `RoundCylinder` with no rounding, the mark [`Rolling`] gives a side hull; on
+/// a static or kinematic one it is the exact `Cylinder`.
+pub(in crate::physics) fn cylinder(
+    half_height: Real,
+    radius: Real,
+    dynamic: bool,
+) -> ColliderBuilder {
+    if dynamic {
+        ColliderBuilder::round_cylinder(half_height, radius, 0.0)
+    } else {
+        ColliderBuilder::cylinder(half_height, radius)
+    }
 }
 
-/// `collider` with its pairs kept out of rapier's contact recycling, by asking
-/// for a solver-contact hook the world never acts on (the module doc says why).
-pub(in crate::physics) fn never_recycled(collider: ColliderBuilder) -> ColliderBuilder {
-    collider.active_hooks(ActiveHooks::MODIFY_SOLVER_CONTACTS)
+/// `collider`, built for `shape` on a body that is `dynamic` or not, with its
+/// pairs kept out of rapier's contact recycling when it rolls (a cylinder or
+/// capsule on a dynamic body), by asking for a solver-contact hook the world
+/// never acts on (the module doc says why).
+pub(in crate::physics) fn rolling(
+    collider: ColliderBuilder,
+    shape: &ColliderShape,
+    dynamic: bool,
+) -> ColliderBuilder {
+    let rolls = matches!(
+        shape,
+        ColliderShape::Cylinder { .. } | ColliderShape::Capsule { .. }
+    );
+    if dynamic && rolls {
+        collider.active_hooks(ActiveHooks::MODIFY_SOLVER_CONTACTS)
+    } else {
+        collider
+    }
 }
 
 /// The contact generator for pairs with a rolling shape in them (the module doc

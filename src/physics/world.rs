@@ -162,6 +162,11 @@ impl PhysicsWorld {
             // it at runtime takes effect.
             body.set_linvel(snap.vel, true);
             body.set_angvel(snap.angular_velocity, true);
+            if !snap.damping.held_by(body) {
+                // Damping only scales the velocity the body has, so no wake.
+                body.set_linear_damping(snap.damping.linear);
+                body.set_angular_damping(snap.damping.angular);
+            }
             if body.gravity_scale() != scale {
                 // A full wake: rapier's setter only clears the sleep flag, so a
                 // body that slept while weightless would doze straight off again.
