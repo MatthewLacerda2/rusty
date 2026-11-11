@@ -51,7 +51,7 @@ impl NavigationGraph {
 
     /// Whether `agent`, standing at `position`, is waiting for a path or will ask
     /// for one on its next tick (Unity's `pathPending`). Read-only: a rebake that
-    /// left its path untouched does not count, as [`Self::ask_paths`] would keep it.
+    /// left its path untouched does not count, as the next tick would keep that path.
     pub fn path_pending(&self, agent: &NavMeshAgentComponent, position: Vec3) -> bool {
         let current = self.path_untouched(agent, agent.feet(position));
         agent.path_request != 0 || self.needs_path_on(agent, position, current)
@@ -145,7 +145,7 @@ impl NavigationGraph {
                 .iter()
                 .any(|&(w, _)| w <= agent.path_cursor + 1);
             let seen = self.raycast_masked(feet, after, agent.area_mask);
-            if along > walked || link || !seen.is_some_and(|h| !h.hit) {
+            if along > walked || link || seen.is_none_or(|h| h.hit) {
                 break;
             }
             agent.path_cursor += 1;
