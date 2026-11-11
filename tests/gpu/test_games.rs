@@ -3,6 +3,12 @@
 //! nextest runs them side by side and each gets its own [`BUDGET`]. Each runs the
 //! `game` binary as a child, since opening a project moves the working directory.
 
+#![allow(
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    reason = "the budget times the `game` child, not the sim, with the wall clock (#757)"
+)]
+
 use std::path::Path;
 use std::process::{Command, Output};
 use std::time::{Duration, Instant};
@@ -27,7 +33,7 @@ macro_rules! games {
         fn every_folder_under_games_has_a_test() {
             let listed = [$(stringify!($name)),*];
             let found = rusty::dev::game::all(&rusty::dev::game::games_dir()).unwrap();
-            let found: Vec<String> = found.into_iter().map(|g| g.name).collect();
+            let found: Vec<_> = found.into_iter().map(|g| g.name).collect();
             if let Some(mismatch) = mismatch(&found, &listed) {
                 panic!("{mismatch}");
             }
@@ -45,10 +51,9 @@ games! {
 
 /// The folders under `games/` with no line, and the lines with no folder, if any.
 fn mismatch(found: &[String], listed: &[&str]) -> Option<String> {
-    let unlisted: Vec<&str> = found
+    let unlisted: Vec<_> = found
         .iter()
-        .map(String::as_str)
-        .filter(|f| !listed.contains(f))
+        .filter(|f| !listed.contains(&f.as_str()))
         .collect();
     let gone: Vec<&&str> = listed
         .iter()
@@ -76,6 +81,7 @@ fn passes_within_budget(name: &str) {
     println!("{name}: game --test took {:.1} s", took.as_secs_f64());
 }
 
+/// Whether a run that `took` this long is inside [`BUDGET`].
 fn within_budget(took: Duration) -> bool {
     took <= BUDGET
 }
