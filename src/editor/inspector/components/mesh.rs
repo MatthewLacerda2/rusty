@@ -23,6 +23,15 @@ pub enum SkinTool {
     Ragdoll,
 }
 
+/// What the card names as the mesh's source: a scene mesh by its library name
+/// (#2059), anything else by its type.
+fn source_label(mesh: &crate::components::MeshComponent) -> String {
+    match crate::scene::mesh_library::scene_mesh_name(mesh) {
+        Some(name) => format!("Scene mesh: {name}"),
+        None => format!("Type: {} primitive", mesh.primitive_type),
+    }
+}
+
 /// 3B. Mesh details. A skinned mesh also offers *Generate Hitboxes* (#464) and
 /// *Build Ragdoll* (#466): the click is deferred into `skin_tool`, since both
 /// need the Scene.
@@ -43,7 +52,7 @@ pub fn draw_mesh(
     let mut lightmap_scale = None;
     component_card(ui, icon::CUBE, "Mesh Filter", Some(&mut remove), |ui| {
         if let Some(mesh) = world.mesh(id) {
-            ui.label(format!("Type: {} primitive", mesh.primitive_type));
+            ui.label(source_label(&mesh));
             if mesh.primitive_type == "Plane" {
                 subdivide = draw_subdivisions(ui, mesh.subdivisions);
             }
@@ -169,4 +178,11 @@ fn draw_subdivisions(ui: &mut egui::Ui, current: u32) -> Option<u32> {
     ui.data_mut(|d| d.remove::<u32>(held));
     let finished = r.drag_stopped() || r.changed();
     (finished && n != current).then_some(n)
+}
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::MeshComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Rendering;
+    const LABEL: &'static str = "Mesh";
+    const ICON: &'static str = egui_phosphor::regular::CUBE;
 }

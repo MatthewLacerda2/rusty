@@ -192,5 +192,9 @@ fn box_corners(n: Vec3, x: Vec3) -> [Vec3; 8] {
     ]
 }
 
+impl crate::components::FirstClass for ColliderComponent {
+    const NAME: &'static str = "Collider";
+}
+
 #[cfg(test)]
 mod tests;

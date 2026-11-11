@@ -153,3 +153,7 @@ impl EntityRefs for RectTransformComponent {
         }
     }
 }
+
+impl crate::components::FirstClass for RectTransformComponent {
+    const NAME: &'static str = "RectTransform";
+}

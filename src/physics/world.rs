@@ -25,6 +25,7 @@ use crate::core::collections::Map;
 
 use rapier3d::prelude::*;
 
+use super::character::ControllerBodies;
 use super::compound::{world_to_local, BodyPlan};
 use super::convert::{from_pose, to_pose};
 use super::events::collision::CollisionEvents;
@@ -82,6 +83,8 @@ pub struct PhysicsWorld {
     pub(super) tracked: Tracked,
     /// What the world remembers about its own steps (#1795, #1797, see `recover`).
     pub(super) recovery: Recovery,
+    /// The body table the character controller's sweeps read (`character::view`).
+    pub(super) controller_bodies: ControllerBodies,
 }
 
 impl PhysicsWorld {
@@ -94,7 +97,7 @@ impl PhysicsWorld {
             physics_pipeline: PhysicsPipeline::new(),
             islands: IslandManager::new(),
             broad_phase: DefaultBroadPhase::new(),
-            narrow_phase: NarrowPhase::new(),
+            narrow_phase: super::contact::narrow_phase(),
             bodies: RigidBodySet::new(),
             colliders: ColliderSet::new(),
             impulse_joints: ImpulseJointSet::new(),
@@ -113,6 +116,7 @@ impl PhysicsWorld {
             driven: Default::default(),
             tracked: Tracked::default(),
             recovery: Recovery::default(),
+            controller_bodies: ControllerBodies::default(),
         };
         world.build_bodies(scene);
         world.resync_joints(scene);
@@ -142,7 +146,7 @@ impl PhysicsWorld {
             // A Rigidbody switched class mid-play (`SetKinematic`, a ragdoll
             // handoff, #466): the body changes in place at the entity's current
             // pose, so its colliders, joints and contacts survive.
-            body.set_body_type(class, true);
+            self.controller_bodies.retype(body, class);
             body.set_position(pose, true);
         }
         // Write the CCD mode whenever it differs, so `Physics.SetCollisionDetection`
@@ -162,6 +166,11 @@ impl PhysicsWorld {
             // it at runtime takes effect.
             body.set_linvel(snap.vel, true);
             body.set_angvel(snap.angular_velocity, true);
+            if !snap.damping.held_by(body) {
+                // Damping only scales the velocity the body has, so no wake.
+                body.set_linear_damping(snap.damping.linear);
+                body.set_angular_damping(snap.damping.angular);
+            }
             if body.gravity_scale() != scale {
                 // A full wake: rapier's setter only clears the sleep flag, so a
                 // body that slept while weightless would doze straight off again.

@@ -1,7 +1,7 @@
 //! The material table's slots and the edit sort (#1706), adapter-free.
 
 use super::*;
-use crate::components::{RenderFace, RenderMode};
+use crate::components::{DetailLayer, RenderFace, RenderMode};
 
 fn tint(r: f32) -> MaterialData {
     MaterialData::flat([r, 0.0, 0.0, 1.0])
@@ -64,8 +64,9 @@ fn a_value_edit_rewrites_and_a_key_edit_rekeys() {
     for f in values {
         assert!(!rekeys(&base, &with(f)), "{:?}", with(f));
     }
-    let keys: [fn(&mut MaterialAsset); 4] = [
+    let keys: [fn(&mut MaterialAsset); 5] = [
         |m| m.render_mode = RenderMode::Transparent,
+        |m| m.sorting_priority = -1, // the slot's sort, kept on its object (#2039)
         |m| m.render_face = RenderFace::Both,
         |m| m.shader = Some("dissolve".into()),
         |m| m.base_color_map = Some("a.png".into()),
@@ -89,4 +90,30 @@ fn a_value_edit_rewrites_and_a_key_edit_rekeys() {
     assert!(!rekeys(&glass, &faded));
     faded.blend_mode = crate::components::BlendMode::Additive;
     assert!(rekeys(&glass, &faded));
+}
+
+#[test]
+fn a_detail_value_edit_rewrites_and_its_map_rekeys() {
+    let base = MaterialAsset::default();
+    let layer = |map: Option<&str>, albedo_scale| MaterialAsset {
+        detail: Some(DetailLayer {
+            map: map.map(Into::into),
+            albedo_scale,
+            ..DetailLayer::default()
+        }),
+        ..MaterialAsset::default()
+    };
+    assert!(
+        !rekeys(&base, &layer(None, 2.0)),
+        "a mapless layer binds nothing"
+    );
+    assert!(
+        rekeys(&base, &layer(Some("d.png"), 1.0)),
+        "its map binds (#1997)"
+    );
+    let mapped = layer(Some("d.png"), 1.0);
+    assert!(
+        !rekeys(&mapped, &layer(Some("d.png"), 0.5)),
+        "a scale is a value"
+    );
 }

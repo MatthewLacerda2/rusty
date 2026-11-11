@@ -100,6 +100,59 @@ Material.SetWorldSize(id, 0.5)
 Material.SetTiling(id, {1, 1})
 ```
 
+### Detail layer: a second tiling
+
+A material can carry a **detail layer** (#1997), Unity HDRP Lit's *Detail Map*: one
+more texture, read at a tiling of its own over the main maps, so a 2048 px carpet
+can carry fine tufts at 0.5 m and a coarse base at 20 m without a repeat showing.
+It changes three surface inputs **before lighting**, the way HDRP does, so it never
+tints highlights or reflections (unlike the surface blocks `detail_overlay` and
+`triplanar_detail`, which multiply the lit colour): the albedo, the roughness and
+the shading normal. On a metal the albedo is also its reflectance, as in HDRP, and
+the detail map's albedo is grey, so it brightens or darkens a metal's reflection
+without changing its hue; set `detail_albedo_scale` to 0 to leave it untouched.
+
+The map is HDRP's packing, read raw (its import's *sRGB* is turned off when it is
+assigned): **R** the desaturated albedo, **G** the normal's Y, **B** the
+smoothness (1 − roughness), **A** the normal's X, each neutral at 0.5 (128). R and B
+push the albedo and smoothness toward black/white or 0/1 by their distance from
+0.5 times their scale (the albedo in HDRP's square-root space); G and A are a
+tangent-space normal bent onto the main shading normal (the main normal map's
+bumps included). There is no detail mask: rusty has no mask map, so the layer
+covers the whole surface. A file that is not loaded (or a path with no file) reads
+the default checker, as every map does.
+
+The layer shares the material's **UV Mapping**: under `UV0` it is read at the main
+maps' tiled UV times `detail_tiling` plus `detail_offset` (HDRP's *Link Details
+with Base*, with Unity's sign as `SetOffset`), so a Tiling of `{4, 4}` and a
+detail Tiling of `{8, 8}` repeats the detail 32 times across the mesh; under
+`Planar` and `Triplanar` it is projected from world space like the main maps, one
+repeat per `detail_world_size` metres, then tiled and offset by its own values.
+Each field below is saved with the material in its `detail` table (absent until
+one is set), taken by `DefineAsset` either by the key in brackets or nested as
+`detail = { map = "d.png", tiling = {8, 8}, world_size = 0.5, albedo_scale = 1,
+normal_scale = 1, smoothness_scale = 1 }`, and shown in the Inspector's Material
+card under *Detail Map* (a path field: empty is no map). `Get` returns `nil` for an entity without a material
+and the default for a material without a detail layer.
+
+| Function | Signature |
+|---|---|
+| `Material.SetDetailMap` | `(id, path)` — the packed detail map; `""` clears it (the layer's other fields are kept; on a material with no layer it writes nothing). No detail is drawn without one, nor while its image is missing or still loading. A nested `detail` table in `DefineAsset` refuses a key it has no field for, naming it, and clamps each value to the range below |
+| `Material.SetDetailTiling` / `GetDetailTiling` | `(id, {x, y})` [`detail_tiling`] — repeats of the detail per repeat of the main maps under `UV0`, or across `detail_world_size` metres under a world mapping. Default `{1, 1}`; each lane clamped to `[-1000, 1000]` |
+| `Material.SetDetailOffset` / `GetDetailOffset` | `(id, {x, y})` [`detail_offset`] — in detail repeats, added after the detail tiling, with `SetOffset`'s sign under each mapping. Default `{0, 0}` |
+| `Material.SetDetailWorldSize` / `GetDetailWorldSize` | `(id, metres)` [`detail_world_size`] — how many metres one repeat of the detail covers under `Planar` and `Triplanar`, in `[0.01, 100]` (default 1). Ignored under `UV0` |
+| `Material.SetDetailAlbedoScale` / `GetDetailAlbedoScale` | `(id, scale)` [`detail_albedo_scale`] — HDRP's *Detail Albedo Scale*, in `[0, 2]` (default 1): 0 leaves the albedo alone |
+| `Material.SetDetailNormalScale` / `GetDetailNormalScale` | `(id, scale)` [`detail_normal_scale`] — HDRP's *Detail Normal Scale*, in `[0, 2]` (default 1): 0 leaves the normal alone |
+| `Material.SetDetailSmoothnessScale` / `GetDetailSmoothnessScale` | `(id, scale)` [`detail_smoothness_scale`] — HDRP's *Detail Smoothness Scale*, in `[0, 2]` (default 1): 0 leaves the roughness alone |
+
+```lua with=id
+-- A carpet: a coarse base every 4 m, fine tufts every 0.5 m, both in world space.
+Material.SetUvMapping(id, "Planar")
+Material.SetWorldSize(id, 4)
+Material.SetDetailMap(id, "textures/carpet_detail.png")
+Material.SetDetailWorldSize(id, 0.5)
+```
+
 ### Transparent surfaces
 
 A `Transparent` material does more than fade by `alpha` (#1523). Each knob below is a
@@ -125,6 +178,7 @@ sphere and ray-traced refraction, order-independent transparency).
 | `Material.SetThickness` / `GetThickness` | `(id, metres)` [`thickness`] — how thick the surface is, in `[0, 10]` (default 1), as HDRP's *Thickness*: a `Planar` refraction's slab depth (a `Thin` one is always 5 mm), and the depth an absorbing surface absorbs over where only the sky is behind it, whatever its refraction model |
 | `Material.SetTransmittanceColor` / `GetTransmittanceColor` | `(id, {r, g, b})` [`transmittance_color`] — HDRP's *Transmittance Color*: the colour light keeps after `absorption_distance` metres through the surface (Beer-Lambert), each channel in `[0, 1]`. White, the default, absorbs nothing; any other colour tints and darkens what is behind by how far it is behind the surface, so shallow water stays clear and the deep end takes the colour |
 | `Material.SetAbsorptionDistance` / `GetAbsorptionDistance` | `(id, metres)` [`absorption_distance`] — HDRP's *Absorption Distance*, where light has kept exactly `transmittance_color`, in `[0.01, 100]` (default 1) |
+| `Material.SetSortingPriority` / `GetSortingPriority` | `(id, priority)` [`sorting_priority`] — HDRP's *Sorting Priority*, an integer in `[-50, 50]` (default 0; a fraction rounds, a value past the range is clamped, a scene file's too): where a `Transparent` surface draws among the others. Translucent draws are ordered by it first, a lower one drawing earlier and a higher one on top whatever their depths (HDRP adds it to the material's render queue, which Unity sorts before depth), then back to front. It is how one object's slots are ordered (all of them share its bounds' centre depth, *Rendering modes* below): a bottle's refracting liquid at -1 draws before its glass shell at 0, so the glass draws over it rather than the liquid erasing it. Mesh particles with a `Transparent` material take it too |
 | `Material.SetDepthPostpass` / `GetDepthPostpass` | `(id, on)` [`depth_postpass`] — HDRP's *Transparent Depth Postpass*, off by default: after the translucents drew, the surface writes its depth, so depth of field focuses on it and motion blur moves it rather than what is behind it, and soft particles and world canvases meet it. Fog needs none: each surface is fogged where it is drawn. SSR reflections on it are `receive_ssr`'s (below), which needs no postpass |
 | `Material.SetWritesMotion` / `GetWritesMotion` | `(id, on)` [`writes_motion`] — HDRP's *Transparent Writes Motion Vectors*, off by default: after the translucents drew, the surface writes its own motion and view depth into the velocity target (not into the depth buffer, unless `depth_postpass` is on too), so TAA, motion blur and depth of field move it as a solid rather than as what is behind it. For solid-looking translucents (a plasma ball, a glass bottle thrown across the room). Only in a view that has a velocity target (TAA, motion blur, depth of field or SSR on) |
 | `Material.SetReactive` / `GetReactive` | `(id, name)` [`reactive`] — how reactive a `Transparent` surface is under TAA (FSR2's *reactive mask*, `Graphics.md` → *TAA*): `"Auto"` (the default: its alpha, or what it adds or multiplies), `"Off"` (the history smooths it as an opaque surface: a large still window), `"Full"` (0.9, FSR2's maximum: a fast effect). Only in a view running TAA |
@@ -329,7 +383,14 @@ visible fallback.
 >   Unity sorts renderers; never its origin), with depth
 >   testing on but depth writes off — so overlapping translucent surfaces all blend
 >   correctly regardless of draw order. (Per-object sort only; intersecting translucent
->   surfaces within one mesh are a known limitation, as in Unity's default.)
+>   surfaces within one mesh are a known limitation, as in Unity's default.) A
+>   material's `sorting_priority` orders the pass first (#2039): a lower priority
+>   draws before a higher one whatever their depths, and only at equal priority does
+>   depth decide. Every transparent slot of one object sorts at that object's one
+>   depth, so at equal priority **an object's slots draw in slot order** (the order
+>   of `MaterialComponent.materials`, which is the mesh's material order); set
+>   priorities to order them otherwise. Ties keep the order the objects were added
+>   in, so the same scene draws the same frame every time.
 >
 > The current `render_mode`/`alpha`/`alpha_cutoff` are readable back via the scene
 > snapshot's per-entity `material` block.

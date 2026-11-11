@@ -9,18 +9,20 @@
 //! runs ([`surface`]): the shading normal, the weight a hit gets and the environment
 //! reflection it replaces, with the roughness packed in. So a surface smoother than
 //! the volume's `min_smoothness` reflects, and a hit swaps the sky or probe
-//! reflection for what is on screen (never adding to it), read at its GGX lobe's
-//! width from a mip pyramid of the opaque image ([`pyramid`], #1736): glossy SSR, a
-//! rough floor showing a soft reflection. The volume's `quality` sets the march
+//! reflection for what is on screen (never adding to it), averaged over the disk its
+//! GGX lobe spreads a reflection across ([`pass`]'s resolve, #2028, reading mips
+//! of the hits, [`pyramid`], #1736): glossy SSR, a rough floor showing a soft
+//! reflection whose silhouette fades across its blur. The volume's `quality` sets the march
 //! ([`march`], #1521, #1522). A transparent surface that opts in traces its own
 //! reflection in the transparent pass ([`transparent`], #1570).
 
 pub(crate) mod pass;
 pub(crate) mod pyramid;
+mod record;
 pub(crate) mod surface;
 pub(crate) mod transparent;
 
-use super::{Owner, PostEffect};
+use super::{History, Owner, PostEffect};
 use crate::components::Ssr;
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::quality::SsrQuality;
@@ -34,6 +36,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "ssr",
     owner: Owner::Volume,
     gate: Gate::option(GraphicsOption::Ssr),
+    history: History::None("cone-traced from this frame's colour pyramid and depth"),
     module: None,
     composite: &[],
     grade: &[],
@@ -112,6 +115,9 @@ pub(crate) fn run(
     view.post_fx
         .run_ssr(gpu, &r.post_passes.ssr, params, &r.gpu_timer);
 }
+
+#[cfg(test)]
+mod poison;
 
 #[cfg(test)]
 mod tests;

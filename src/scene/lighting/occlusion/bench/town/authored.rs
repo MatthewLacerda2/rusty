@@ -6,7 +6,7 @@
 use glam::Vec3;
 
 use crate::components::mesh::{MeshRevision, Vertex};
-use crate::scene::authoring::{create_entity, Primitive};
+use crate::scene::authoring::{create_drawn_entity, Primitive};
 use crate::scene::Scene;
 
 /// The tessellation's spacing, metres.
@@ -81,7 +81,7 @@ pub fn entity(scene: &mut Scene, name: &str, quads: &[[Vec3; 4]]) -> u32 {
     let first = (0..quads.len() as u32).flat_map(|k| [4 * k, 4 * k + 1, 4 * k + 2]);
     let second = (0..quads.len() as u32).flat_map(|k| [4 * k, 4 * k + 2, 4 * k + 3]);
     let indices = first.chain(second).collect();
-    let id = create_entity(scene, name, Some(Primitive::Box));
+    let id = create_drawn_entity(scene, name, Some(Primitive::Box));
     let mut t = scene.world.transform_mut(id).expect("a new entity");
     (t.position, t.scale) = (Vec3::ZERO, Vec3::ONE);
     drop(t);

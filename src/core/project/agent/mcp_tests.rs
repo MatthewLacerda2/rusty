@@ -3,9 +3,9 @@
 
 use serde_json::{json, Value};
 
-use super::agent::{merge, write_for, SERVERS};
-use super::agent_tests::fresh;
-use super::*;
+use super::super::*;
+use super::tests::fresh;
+use super::{merge, write_for, SERVERS};
 
 const ENGINE: &str = "/engine";
 
@@ -16,9 +16,15 @@ fn read(root: &Path) -> Value {
 #[test]
 fn the_servers_run_the_checkouts_built_binary_in_attach_and_embed_mode() {
     let mut config = json!({});
-    merge(&mut config, "/games/horde", Path::new(ENGINE)).unwrap();
-    let servers = &config["mcpServers"];
     let binary = crate::core::paths::native_string("/engine/target/debug/session-mcp");
+    merge(
+        &mut config,
+        "/games/horde",
+        Path::new(ENGINE),
+        Path::new(&binary),
+    )
+    .unwrap();
+    let servers = &config["mcpServers"];
     assert_eq!(
         servers[SERVERS[0]],
         json!({ "command": binary, "args": ["--attach"] })

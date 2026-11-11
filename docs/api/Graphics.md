@@ -465,18 +465,31 @@ and all of it from 0.2 of smoothness above that (roughness 0.5 by default), or f
 of 0.8 fades in over 0.1); from 0.96, the smoothest any surface gets (roughness is at
 least 0.04), no surface reflects and the view runs no SSR at all. It is weighted
 by the material's Fresnel (its metallic and base colour) at the shading normal, its
-SSAO and its fog. A rough surface reflects a blur (#1736): the hit is read from a mip
-pyramid of the opaque image at the width of the surface's GGX lobe there, so a
-satin floor shows a soft reflection of what stands on it and a mirror a sharp one
-(up to roughness 0.05 the hit is read sharp at any resolution, widening to the full
-lobe by 0.1)
-(cone-traced SSR: no history, so it is stable with no accumulation; the pyramid adds
-a third of an `Rgba16Float` frame to the copy SSR already held). A hit fades by its
+SSAO and its fog. A rough surface reflects a blur (#1736, #2028): each pixel's hit is
+averaged with its neighbours' over the disk the surface's GGX lobe spreads a
+reflection across there (wider the further the reflected thing is from the surface,
+HDRP's neighbour reuse made deterministic: the average reads mips of the hits), so a
+satin floor shows a soft reflection of what stands on it and a mirror a sharp one,
+and a rough reflection's silhouette fades across its blur instead of stepping where
+one pixel's ray hits and its neighbour's misses (up to roughness 0.05 the hit is
+read sharp at any resolution, widening to the full lobe by 0.1). A pixel whose own
+ray missed takes the blur of the hits around it, but no wider than its own lobe
+spreads one, so a reflection's edge softens outwards too and a mirror's stays sharp
+beside a satin surface. The average counts only pixels on the same surface (the same
+plane), so a reflection mostly neither fades at a surface's border nor bleeds onto the
+surface beside it; it is an approximation, since each sample reads a mip texel half
+the blur's radius wide, and in a band about that wide at a corner it does
+(no history, so it is stable with no accumulation; the pyramid of the opaque image
+adds a third of an `Rgba16Float` frame to the copy SSR already held, and the hits'
+two pyramids at 1080p about 22 MB and 11 MB more). A `receive_ssr` transparent reads
+its hit sharp, with no such average. A hit fades by its
 confidence (the screen's edge, wider the blurrier it is, and the march's last fifth of
 reach) and a miss keeps the sky or probe reflection, so a weak hit falls back to it
-without a seam. A ray a normal map tilts below the surface's own geometry (a rough,
-bumpy floor seen at a grazing angle) keeps the probe reflection too, rather than
-reflecting the floor it leaves. The march (#2004) takes steps of at most `step_length`
+without a seam. A hit on something brighter than a half float holds (an emissive past
+65504) counts as a miss. A ray a normal map tilts below the surface's own geometry (a
+rough, bumpy floor seen at a grazing angle) is a miss too, rather than reflecting the
+floor it leaves: the hits around it may fill it, within its own lobe's blur, and where
+none reach it keeps the probe reflection. The march (#2004) takes steps of at most `step_length`
 and at most 1/64 of the screen's shorter side (1/`steps` of it for fewer than 64 steps,
 so any count can still cross the screen's height), so it sees anything on screen wider
 than that (a bottle, a pole) and spends its reach where the ray crosses the screen fast;
@@ -487,9 +500,8 @@ for a floor seen near grazing): the depth holds only front faces, so a ray that 
 an object's unseen back is taken to hit it, and one that passes further behind it
 marches on rather than smearing it. A hit whose blur on screen is wide (its cone's
 radius past 4% of the screen's shorter side, gone by 12%: a long ray from a rough
-surface) fades to the probe reflection, since the blur softens the hit's colour but
-not where the rays stop hitting, which would show as a hard-edged block; a contact
-reflection (a short ray) keeps it. A material with `receive_ssr` off keeps its probe
+surface) fades to the probe reflection, which an average over so wide a disk would
+only approximate; a contact reflection (a short ray) keeps it. A material with `receive_ssr` off keeps its probe
 reflection (see `Material.SetReceiveSsr`). It runs on the base camera's opaque image, right after its opaque
 pass (HDRP's order): translucent surfaces, particles, ribbons and world canvases blend
 over the reflection (a `Transparent` material with `receive_ssr` traces its own in
@@ -894,8 +906,12 @@ blends 0.1 of its own frame into the history of the shots before it (upscaling,
 apart they were, so two shots of an unchanged scene can differ. `Harness.Step` renders nothing, so
 steps never settle it. A shot after a camera jump ghosts the last shot's view in
 unless the jump is cut (`Camera.ResetHistory()`); `Harness.Screenshot(path, { settle
-= n })` draws `n` frames with no sim step before the shot, so the history converges
-(a still pixel keeps 0.9ⁿ of the old view: about 3% at 32, 0.1% at 64). A cut and a
+= n })` draws `n` frames with no sim step before the shot, so the history converges:
+a still pixel keeps 0.9ⁿ of the old view, about 3% at 32 and 0.1% at 64. It draws
+them only when the frame reads history at all (#2092, `Debug.Stats().history_passes`):
+TAA, SSIL, the volumetric fog, an authored effect, motion vectors on a frame that is
+not a cut, a shown render texture, or a shadow tile resize still pending. With none
+of those, a settled shot is one render. A cut and a
 settle give a player's settled image of the new view; a cut alone, the new view's
 first frame. To compare shots pixel for pixel, or to judge a scene's edges, turn TAA off
 for the capture (`Graphics.SetTaaActive(false)`: FXAA then runs, if it is on).

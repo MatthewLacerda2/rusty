@@ -38,7 +38,7 @@ use staged::{ReflectionSnapshot, StagedCubemaps};
 mod staged;
 
 /// Light probes captured per step: one light probe's six faces are a fraction of a
-/// reflection probe's at its 512-texel default.
+/// reflection probe's, even at its 128-texel default.
 const LIGHT_PROBES_PER_STEP: usize = 4;
 
 /// Where a probe bake is.

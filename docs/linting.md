@@ -42,6 +42,7 @@ agent can read exactly what failed.
 | One name table per enum | `tools/lint -- --rules` (`named-enum`) | **hard gate**: no file of `src/` hand-writes both a parse (`fn parse(_: &str) -> Option<Self>` in an `impl T`, or a free `fn parse_*(_: &str) -> Option<T>`) and a name (`fn name`/`fn as_str(self) -> &'static str`, or a free `fn *_name(_: T) -> &'static str`) for one type, nor a `const`/`static` table of `(T, &str)` pairs — a script-facing enum declares its names once with `core::named_enum!`, which writes `ALL`, `name`, a case-insensitive `parse`, `Display` and its serde (#1478); a parse that does more takes `// lint: allow(named-enum) <why>` (#1329) |
 | One world space | `tools/lint -- --rules` (`world-space`) | **hard gate**: outside `ecs::world_space` and `components::transform`, no engine code line decomposes a matrix (`to_scale_rotation_translation`), names the retired `compute_world_matrix` / `world_matrix(` / `parent_world_matrix`, or folds a Transform over `ancestors(` — world space is read from `ecs::World`'s world API; test code is not scanned, and converting file data takes `// lint: allow(world-space) <why>` (#1196) |
 | Order-free lists stay sorted | `tools/lint -- --rules` (`sorted`) | **hard gate**: a list under a `// sorted: <why>` (or `<!-- sorted: <why> -->`) marker stays in order up to its first blank line, so two branches adding entries touch different lines (#911) |
+| Physics body changes are counted | `tools/lint -- --rules` (`body-table`) | **hard gate**: a non-test line of `src/physics/` that calls `.set_body_type(`, or `.insert(` / `.remove(` on `bodies`, fails, since the character controller sweeps a cached copy of the body table remade only when its change counter moves; go through `PhysicsWorld::insert_body` / `remove_body` / `ControllerBodies::retype`, which bump it and carry `// lint: allow(body-table) <why>` (#2061) |
 | Physics sync borrows only to write | `tools/lint -- --rules` (`physics-borrow`) | **hard gate**: a non-test line of `src/physics/` that borrows a rapier body or collider mutably (`bodies`/`colliders` with `.get_mut(`, `.iter_mut(`, or an index under `&mut` or before a `.set_` call or an assignment) fails, since rapier marks whatever is borrowed modified, written or not, and the full and incremental syncs then step differently; borrow through `physics::writes::body_to_write` / `collider_to_write`, which compare first; the two helpers take `// lint: allow(physics-borrow) <why>` (#1798) |
 | Portable paths | `tools/lint -- --rules` | **hard gate** (`slash-join`): `src/` and `tests/` never join a `/`-separated path (literal, `format!` or constant) onto a path or make a path from one; they join one part per call or join `core::paths::native(…)`, and never `format!` a native path (`.to_string_lossy()`, `.display()`) before a `/`: that is `core::paths::to_slash` (#1332, #1371, #1428) |
 | Post effect completeness | `cargo test` (`render::postfx::effects::completeness`, #1467) | **hard gate**: every effect in `render::postfx::effects::POST_EFFECTS` has its settings (a `PostProcessingComponent` field, or a `CameraComponent` field named after it for a camera effect), its authoring row, its `Graphics.*` registrar, its Inspector section, a `<!-- effect: <name> -->` section in `docs/api/Graphics.md` naming each knob's tween path, and, when player-facing, a `GraphicsOption` of its name with a row in the doc's *Player options*; each composite texture it declares is bound in the assembled composite, at its place (#1473); and no layer lists an effect the renderer lacks. A must-flag test removes each part in turn |
@@ -258,6 +259,17 @@ new flag, gate, CI step or baseline.
   moves rather than writes (the import cache's staging swap, the seed's staged
   files) carries an inline allow. Comment text never counts;
   `tests/` and `tools/` are not scanned (`rules/atomic_write.rs`).
+- **`body-table`** (#2061) — the character controller's sweeps read a copy of
+  the physics world's body table with every kinematic body shown fixed
+  (`physics::character::bodies`), cached and remade only when an exact change
+  counter moves, so a move never walks every body. A body inserted, removed or
+  retyped without bumping it leaves the controller sweeping a stale table. So a
+  non-test line of `src/physics/` that calls `.set_body_type(`, or `.insert(` /
+  `.remove(` on `bodies` (also wrapped onto the line below its receiver), fails;
+  the change goes through `PhysicsWorld::insert_body`, `remove_body` or
+  `ControllerBodies::retype`, the three lines that carry
+  `// lint: allow(body-table) <why>`, besides the copy's own retype of its
+  kinematic bodies (`rules/body_table.rs`).
 - **`converter-log`** (#1172) — a converter that logs a failure and carries on
   returns `Ok`, and the import cache stamps a `.glb` missing a part as current
   (#1168); one that logs a skip is heard once, then never again from the cache. So
@@ -492,8 +504,8 @@ new flag, gate, CI step or baseline.
   that governs no entries (a blank line under it, or a first entry indented deeper
   than it) is itself a finding. Rust files and the tracked Markdown under `docs/`,
   `.claude/skills/` and the repo root are scanned. A list
-  whose order matters (`src/app/registry.rs`'s `build()`, the `Entity` fields,
-  `ComponentKind`, `docs/api/index.md`'s namespaces) gets a comment saying why instead of a marker
+  whose order matters (`src/app/registry.rs`'s `build()`, `docs/api/index.md`'s
+  namespaces) gets a comment saying why instead of a marker
   (`rules/sorted.rs`).
 - **`stored-format`** (#1966) — `make review-level` reviews a change to an on-disk
   format at `high`, and its hand-kept path table missed a new format three times in
@@ -702,16 +714,20 @@ zero violations (#494), and it is the groundwork the crate split (#495) needs.
 
 ## Component completeness (`--components`)
 A first-class component is only "done" when it appears on all four axes that
-deliberately live in non-dependent layers: a field on `Entity`, an Add Component
-entry (`inspector/components/add/`: a `!world.has_<field>(id)` gate, or a
-`ComponentKind` row, resolved to its field through `authoring::has_kind`'s arms), an inspector card (some `inspector/components/*.rs`), and an API
+deliberately live in non-dependent layers: a row in the component registry
+(`src/components/registry.rs`'s `first_class!`, #2023, which generates its `Entity`
+field), an Add Component entry (`inspector/components/add/`: a
+`!world.has_<field>(id)` gate, or the menu generated from the registry, which
+offers every row behind `authoring::has_kind`; there the `AddEntry` bound holds the
+axis at compile time, and the text check only confirms the menu's code, not a
+comment, expands `first_class!`), an inspector card (some `inspector/components/*.rs`), and an API
 namespace (`src/api/<x>.rs` registered in `api/mod.rs` and documented in
 `docs/api/`, as the field or its Lua spelling: `layout_group` is `LayoutGroup`). The
-gate discovers components from `Entity`'s `Option<…Component>` fields — so a new one
-can't slip through — and fails on any missing axis. It *finds* `pub struct Entity`
+gate discovers components from the registry's rows — so a new one can't slip
+through — and fails on any missing axis. It *finds* `macro_rules! first_class`
 under `src/components/` rather than reading a fixed path, and fails loudly
-(`NO_ENTITY` / `NO_COMPONENTS`) when it can't or when the struct yields no
-component fields: for weeks after `entity.rs` became `entity/mod.rs` both gates
+(`NO_REGISTRY` / `NO_COMPONENTS`) when it can't or when it yields no rows (the
+`full-literal` rule reads the same rows, with a real-tree test of its own): for weeks after `entity.rs` became `entity/mod.rs` both gates
 checked zero components and printed ok (#959). A test-lint test runs discovery on
 the real tree. Nothing is grandfathered: the burn-down list emptied under #82 (every
 gap closed or waived) and was retired in #926, so a missing axis is closed or waived.
@@ -751,7 +767,7 @@ route every change through `scene::authoring::material::*`, the same ops the
 `Material.*` Lua API calls.
 
 This gate keeps migrated cards honest. It discovers components the same way
-`--components` does — from `Entity`'s `Option<…Component>` fields — and, for each one
+`--components` does — from the component registry's rows — and, for each one
 that has an inspector card, classifies the card as:
 
 - **routed** — reads a snapshot immutably and routes every write through an

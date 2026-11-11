@@ -20,25 +20,8 @@
 
 use std::ops::{Deref, DerefMut};
 
-use crate::components::AIPerceptionComponent;
-use crate::components::NavMeshModifierComponent;
-use crate::components::NavMeshModifierVolumeComponent;
-use crate::components::ReverbZoneComponent;
-use crate::components::ShapeComponent;
-use crate::components::{
-    AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
-    CanvasGroupComponent, ImageComponent, LayoutElementComponent, LayoutGroupComponent,
-    LightComponent, MaterialComponent, MeshComponent, NavMeshAgentComponent,
-    ParticleEmitterComponent, PostProcessingComponent, PrefabLink, RectMaskComponent,
-    RectTransformComponent, RigidBodyComponent, SelectableComponent, TextComponent,
-};
-use crate::components::{
-    BackdropFilterComponent, MaskComponent, NavMeshObstacleComponent, OffMeshLinkComponent,
-};
-use crate::components::{CharacterControllerComponent, JointComponent};
-use crate::components::{
-    LightProbeProxyVolumeComponent, LineComponent, LodGroupComponent, TrailComponent,
-};
+use crate::components::registry::first_class;
+use crate::components::{ImageComponent, MeshComponent, PrefabLink};
 
 use super::world::{Ref, RefMut, World};
 
@@ -128,41 +111,33 @@ macro_rules! optional_component_accessors {
     };
 }
 
+/// One registry row's accessor family. The Collider writes its own
+/// (`world_space::collider`, which keeps its AABB set) but for `take`.
+macro_rules! row_accessors {
+    (collider: $ty:ty, $get_mut:ident $has:ident $set:ident $take:ident $ids_with:ident) => {
+        impl World {
+            /// Detach and return the collider (`None` when absent or the entity is
+            /// dead).
+            pub fn $take(&mut self, id: u32) -> Option<$ty> {
+                self.take_component::<$ty>(id)
+            }
+        }
+    };
+    ($get:ident: $ty:ty, $($acc:ident)*) => {
+        optional_component_accessors! { $ty => $get, $($acc),*; }
+    };
+}
+
+/// Every registry row's accessor family (`components::registry`).
+macro_rules! registry_accessors {
+    ($($field:ident: $ty:ty => $kind:ident [$($acc:ident)*];)*) => {
+        $(row_accessors! { $field: $ty, $($acc)* })*
+    };
+}
+
+first_class!(registry_accessors);
+
 optional_component_accessors! {
-    MeshComponent => mesh, mesh_mut, has_mesh, set_mesh, take_mesh, ids_with_mesh;
-    MaterialComponent => material, material_mut, has_material, set_material, take_material, ids_with_material;
-    AnimatorComponent => animator, animator_mut, has_animator, set_animator, take_animator, ids_with_animator;
-    LightComponent => light, light_mut, has_light, set_light, take_light, ids_with_light;
-    RigidBodyComponent => rigidbody, rigidbody_mut, has_rigidbody, set_rigidbody, take_rigidbody, ids_with_rigidbody;
-    NavMeshAgentComponent => nav_agent, nav_agent_mut, has_nav_agent, set_nav_agent, take_nav_agent, ids_with_nav_agent;
-    NavMeshObstacleComponent => nav_obstacle, nav_obstacle_mut, has_nav_obstacle, set_nav_obstacle, take_nav_obstacle, ids_with_nav_obstacle;
-    OffMeshLinkComponent => offmesh_link, offmesh_link_mut, has_offmesh_link, set_offmesh_link, take_offmesh_link, ids_with_offmesh_link;
-    NavMeshModifierVolumeComponent => nav_modifier, nav_modifier_mut, has_nav_modifier, set_nav_modifier, take_nav_modifier, ids_with_nav_modifier;
-    NavMeshModifierComponent => nav_mesh_modifier, nav_mesh_modifier_mut, has_nav_mesh_modifier, set_nav_mesh_modifier, take_nav_mesh_modifier, ids_with_nav_mesh_modifier;
-    AIPerceptionComponent => ai_perception, ai_perception_mut, has_ai_perception, set_ai_perception, take_ai_perception, ids_with_ai_perception;
-    CameraComponent => camera, camera_mut, has_camera, set_camera, take_camera, ids_with_camera;
-    PostProcessingComponent => post_processing, post_processing_mut, has_post_processing, set_post_processing, take_post_processing, ids_with_post_processing;
-    ParticleEmitterComponent => particles, particles_mut, has_particles, set_particles, take_particles, ids_with_particles;
-    AudioSourceComponent => audio, audio_mut, has_audio, set_audio, take_audio, ids_with_audio;
-    ReverbZoneComponent => reverb_zone, reverb_zone_mut, has_reverb_zone, set_reverb_zone, take_reverb_zone, ids_with_reverb_zone;
-    CanvasComponent => canvas, canvas_mut, has_canvas, set_canvas, take_canvas, ids_with_canvas;
-    RectTransformComponent => rect_transform, rect_transform_mut, has_rect_transform, set_rect_transform, take_rect_transform, ids_with_rect_transform;
-    ImageComponent => image, image_mut, has_image, set_image, take_image, ids_with_image;
-    CanvasGroupComponent => canvas_group, canvas_group_mut, has_canvas_group, set_canvas_group, take_canvas_group, ids_with_canvas_group;
-    RectMaskComponent => rect_mask, rect_mask_mut, has_rect_mask, set_rect_mask, take_rect_mask, ids_with_rect_mask;
-    MaskComponent => mask, mask_mut, has_mask, set_mask, take_mask, ids_with_mask;
-    BackdropFilterComponent => backdrop_filter, backdrop_filter_mut, has_backdrop_filter, set_backdrop_filter, take_backdrop_filter, ids_with_backdrop_filter;
-    TextComponent => text, text_mut, has_text, set_text, take_text, ids_with_text;
-    SelectableComponent => selectable, selectable_mut, has_selectable, set_selectable, take_selectable, ids_with_selectable;
-    LayoutGroupComponent => layout_group, layout_group_mut, has_layout_group, set_layout_group, take_layout_group, ids_with_layout_group;
-    LayoutElementComponent => layout_element, layout_element_mut, has_layout_element, set_layout_element, take_layout_element, ids_with_layout_element;
-    JointComponent => joint, joint_mut, has_joint, set_joint, take_joint, ids_with_joint;
-    CharacterControllerComponent => character_controller, character_controller_mut, has_character_controller, set_character_controller, take_character_controller, ids_with_character_controller;
-    LodGroupComponent => lod_group, lod_group_mut, has_lod_group, set_lod_group, take_lod_group, ids_with_lod_group;
-    LightProbeProxyVolumeComponent => light_probe_proxy_volume, light_probe_proxy_volume_mut, has_light_probe_proxy_volume, set_light_probe_proxy_volume, take_light_probe_proxy_volume, ids_with_light_probe_proxy_volume;
-    TrailComponent => trail, trail_mut, has_trail, set_trail, take_trail, ids_with_trail;
-    LineComponent => line, line_mut, has_line, set_line, take_line, ids_with_line;
-    ShapeComponent => shape, shape_mut, has_shape, set_shape, take_shape, ids_with_shape;
     PrefabLink => prefab_link, prefab_link_mut, has_prefab_link, set_prefab_link, take_prefab_link, ids_with_prefab_link;
 }
 

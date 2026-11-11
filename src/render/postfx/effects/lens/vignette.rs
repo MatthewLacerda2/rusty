@@ -1,6 +1,6 @@
 //! The vignette (#1439): a composite function on the graded image.
 
-use super::super::{Composite, EffectCx, Owner, Phase, PostEffect};
+use super::super::{Composite, EffectCx, History, Owner, Phase, PostEffect};
 use crate::components::Vignette;
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::render::postfx::params::Gate;
@@ -9,6 +9,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "vignette",
     owner: Owner::Volume,
     gate: Gate::option(GraphicsOption::Vignette),
+    history: History::None("a function of this frame's colour"),
     module: Some("postfx/effects/vignette.wgsl"),
     composite: &[Composite {
         phase: Phase::Display,

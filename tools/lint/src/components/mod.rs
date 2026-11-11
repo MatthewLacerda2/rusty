@@ -2,7 +2,8 @@
 //!
 //! Every first-class component must satisfy four axes that deliberately live in layers
 //! which don't depend on each other:
-//!   1. a field on `Entity` (located under `src/components/`) — the discovery source,
+//!   1. a row of the registry (`first_class!`, located under `src/components/`,
+//!      #2023) — the discovery source, from which `Entity`'s field is generated,
 //!   2. an Add Component entry (`src/editor/inspector/components/add/`),
 //!      guarding on absence through the #344 accessor facade,
 //!   3. an inspector card (some `src/editor/inspector/components/*.rs`) writing
@@ -10,7 +11,7 @@
 //!   4. an API namespace (`src/api/<x>.rs` + registration in `src/api/mod.rs`, and a
 //!      mention in `docs/api/`).
 //!
-//! Components are DISCOVERED from `Entity`'s `Option<…Component>` fields, so a new
+//! Components are DISCOVERED from the registry's rows, so a new
 //! component can't dodge the gate. Axis 1 is the discovery source (always present);
 //! the other three are checked here by scanning the source. Nothing is grandfathered
 //! (#926): the burn-down list of incomplete axes emptied under #82 and was retired, so
@@ -30,7 +31,7 @@
 //! deliberately served by a shared namespace that we will not re-implement
 //! standalone, never for an axis not closed yet.
 //!
-//! Layout: `discover` (the Entity-field scan), `axes` (the three checkable axes),
+//! Layout: `discover` (the registry-row scan), `kinds` (the generated menu's guards), `axes` (the three checkable axes),
 //! `waivers` (the deliberate-waiver table); this module runs them and reports.
 //!
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --components`
@@ -55,13 +56,15 @@ const API_MOD: &str = "src/api/mod.rs";
 const DOCS: &str = "docs/api";
 const REPORT: &str = ".lint/report.txt";
 
-/// The checkable axes (axis 1, the `Entity` field, is the discovery source).
+/// The checkable axes (axis 1, the registry row, is the discovery source).
 const AXES: &[&str] = &["add_menu", "inspector", "api"];
 
 /// Entry point: discover every component and fail on any unwaived missing axis.
 pub fn run() {
     let components = discover();
-    let add_src = kinds::with_kind_guards(&add_menu_src(), &read(kinds::HAS_KIND));
+    let registry = discover::registry_source(std::path::Path::new(discover::COMPONENTS_DIR))
+        .unwrap_or_default();
+    let add_src = kinds::with_kind_guards(&add_menu_src(), &registry);
     let editor_blob = editor_blob();
     let api_stems = api_stems();
     let api_mod = read(API_MOD);

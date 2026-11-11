@@ -134,7 +134,8 @@ return M
 ## Play-testing headlessly
 
 A scenario is a Lua file under `scenarios/` that drives the game through the same
-API plus `Harness.*` (press keys, step ticks, assert); its `require` and `dofile` read
+API plus `Harness.*` (press keys, step ticks, assert, read the run's warnings with
+`Harness.Warnings()`); its `require` and `dofile` read
 the project as a gameplay script's do. Run it with the `play` binary from the engine checkout:
 
 ```sh
@@ -171,13 +172,15 @@ The tools describe themselves; what they don't say:
   `Lighting.GenerateAsync()`, which returns at once, poll `Lighting.IsRunning()`
   every few minutes, then read `Lighting.GetBakeStatus()` (`done`, or `failed` /
   `refused` with why) and `Lighting.GetBakeReport(kind)` (`docs/api/Lighting.md`).
+  `Editor.EnterPlay()` errors until the bake ended.
   Headless, `Lighting.Generate()` is the only way; it sends progress to a client
   that asks for it (a progress token), which may or may not keep the call alive;
 - when the engine warned during a call, the result carries a second text block
   starting `engine warnings:`. Read it: a skipped asset or a dropped collider shows
   up there first;
-- `.mcp.json` registers two servers, each the checkout's built
-  `target/debug/session-mcp`. **Use one at a time**, and approve only the one this
+- `.mcp.json` registers two servers, each a built `session-mcp` of the checkout
+  (`target/<profile>/session-mcp`; one you point at another profile's build there
+  is kept). **Use one at a time**, and approve only the one this
   session will use. `rusty` attaches to the editor window the operator watches; open
   it first, from the checkout, with a `dev` build (a build without `dev` has no
   command socket): `cd <engine> && cargo run --bin rusty --features dev -- --project <game>`.

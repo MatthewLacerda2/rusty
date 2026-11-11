@@ -7,8 +7,10 @@
 //! sub-mesh of its mesh (#1285) — which IS a first-class component (an
 //! engine-provided per-entity type), while the data it points at is the shared asset.
 
+mod component;
 mod decal;
 mod defaults;
+mod detail;
 mod mapping;
 mod surface;
 mod temporal;
@@ -19,12 +21,18 @@ use serde::{Deserialize, Serialize};
 
 use crate::asset::MapRef;
 use crate::procgen::TextureRecipe;
+pub use component::{entity_material_key, MaterialComponent};
 pub use decal::DecalBlend;
+pub use detail::DetailLayer;
 pub use mapping::UvMapping;
 use mapping::{default_blend_sharpness, default_tiling};
 use surface::{default_ior, default_one, white};
 pub use surface::{BlendMode, RefractionModel, RenderFace, RenderMode};
 pub use temporal::{TaaReactive, MAX_REACTIVE};
+
+/// How far a material's [`MaterialAsset::sorting_priority`] reaches either way:
+/// HDRP's `HDRenderQueue.sortingPriorityRange`.
+pub const SORTING_PRIORITY_RANGE: i32 = 50;
 
 fn default_base_color() -> [f32; 3] {
     [1.0, 1.0, 1.0]
@@ -99,6 +107,9 @@ pub struct MaterialAsset {
     /// components are raised to this power before they weight the three. 4 by default.
     #[serde(default = "default_blend_sharpness")]
     pub blend_sharpness: f32,
+    /// HDRP Lit's detail map (#1997, [`DetailLayer`]); `None` by default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<DetailLayer>,
     /// Compositing mode (#242); `Opaque` when absent.
     #[serde(default)]
     pub render_mode: RenderMode,
@@ -134,6 +145,13 @@ pub struct MaterialAsset {
     /// normal map included.
     #[serde(default)]
     pub refraction_model: RefractionModel,
+    /// HDRP's *Sorting Priority* (#2039): where a `Transparent` surface draws among
+    /// the others. Its draws are ordered by it first, a lower one drawing earlier
+    /// and a higher one landing on top whatever their depths, then back to front;
+    /// in `[-SORTING_PRIORITY_RANGE, SORTING_PRIORITY_RANGE]`, 0 by default
+    /// ([`MaterialAsset::sort_priority`]).
+    #[serde(default)]
+    pub sorting_priority: i32,
     /// The index of refraction (water 1.33, glass 1.5, the default): HDRP's *Index
     /// of Refraction* for a refracting surface's bend, and glTF's
     /// `KHR_materials_ior` for every dielectric's reflectance (#1998,
@@ -238,52 +256,19 @@ impl MaterialAsset {
         self.render_mode == RenderMode::Transparent
     }
 
+    /// Its [`MaterialAsset::sorting_priority`] clamped into HDRP's range, as the
+    /// transparent sort reads it: a scene file's out-of-range value is held there.
+    pub fn sort_priority(&self) -> i32 {
+        let range = SORTING_PRIORITY_RANGE;
+        self.sorting_priority.clamp(-range, range)
+    }
+
     /// Whether the surface takes SSR: its `receive_ssr`, or unset, HDRP's default
     /// for its render mode (on unless `Transparent`, where a trace costs a march per
     /// pixel).
     pub fn receives_ssr(&self) -> bool {
         self.receive_ssr.unwrap_or(!self.is_transparent())
     }
-}
-
-/// The entity's references to library materials — the first-class component. Holds
-/// only library keys; the data lives in `Scene.materials`.
-///
-/// One key per sub-mesh of the entity's mesh, in the mesh's range order (Unity's
-/// `Renderer.sharedMaterials`, #1285): a mesh imported with two materials draws its
-/// first index range with `materials[0]` and its second with `materials[1]`. A
-/// one-range mesh has a one-entry list. As in Unity, a range past the end of the list
-/// is not drawn, and a material past the last range draws that range again over it.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct MaterialComponent {
-    pub materials: Vec<String>,
-}
-
-impl MaterialComponent {
-    /// A one-material reference to library key `key`.
-    pub fn new(key: impl Into<String>) -> Self {
-        Self {
-            materials: vec![key.into()],
-        }
-    }
-
-    /// The reference to entity `id`'s own library material, keyed
-    /// [`entity_material_key`] — what every "give this entity a material" path attaches.
-    pub fn for_entity(id: u32) -> Self {
-        Self::new(entity_material_key(id))
-    }
-
-    /// The first material's key (Unity's `Renderer.sharedMaterial`), or `""` for an
-    /// empty list, which no library entry has.
-    pub fn first(&self) -> &str {
-        self.materials.first().map_or("", String::as_str)
-    }
-}
-
-/// The library key of entity `id`'s own material (`entity_{id}_material`): the one
-/// spelling every surface that creates a per-entity material uses (#997).
-pub fn entity_material_key(id: u32) -> String {
-    format!("entity_{id}_material")
 }
 
 #[cfg(test)]

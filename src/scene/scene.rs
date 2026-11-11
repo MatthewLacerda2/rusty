@@ -16,8 +16,7 @@ use crate::scene::identity::SceneId;
 use crate::scene::layers::LayerRegistry;
 use crate::scene::nav_settings::NavMeshSettings;
 
-// Re-export the component types so the many existing `scene::…Component` paths
-// resolve. The structs themselves live in `crate::components`.
+// The component types, re-exported for the `scene::…Component` paths.
 pub use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
     ColliderShape, CollisionDetection, CollisionResponse, EmitMode, Entity, LightComponent,
@@ -72,12 +71,13 @@ pub struct Scene {
     /// Unity's Layer Collision Matrix: which layer collides with which. Drives
     /// rapier `InteractionGroups` on collider build (#91); serialized with the scene.
     pub collision_matrix: CollisionMatrix,
-    /// The per-World material library: reusable `MaterialAsset`s keyed by name.
-    /// Entities reference a material by name via their `MaterialComponent`; many
-    /// entities can share one entry. A `BTreeMap` (not `HashMap`) so serialization
-    /// order is deterministic (the repo has a determinism guard).
-    /// Every write moves its revision (`scene::revision`), which the renderer reads.
+    /// The per-World material library: reusable `MaterialAsset`s keyed by name, which
+    /// entities reference through their `MaterialComponent`; a `BTreeMap` so a save
+    /// writes them in order. Every write moves its revision (`scene::revision`).
     pub materials: crate::scene::revision::Revisioned<BTreeMap<String, MaterialAsset>>,
+    /// The meshes made from data (#2059, `Mesh.Create`), keyed by name; an entity
+    /// draws one through its Mesh (`scene::mesh_library`). Saved with the scene.
+    pub meshes: crate::scene::mesh_library::MeshLibrary,
     /// Runtime box-projector decals (bullet holes, scorch, blood splats): ephemeral
     /// *visual* state, NOT serialized, projected onto the surfaces they overlap
     /// each frame. Bounded per owner, world and total (the oldest of a
@@ -143,8 +143,8 @@ pub struct Scene {
     #[cfg(feature = "dev")]
     pub lighting_bake_running: bool,
     /// A script's `Lighting.GenerateAsync()` (#1999) waiting for the editor's next
-    /// frame to start the Generate Lighting button's job. Dropped by Play (from its
-    /// request), Stop, File ▸ New and any load (`Scene::drop_bake_request`).
+    /// frame to start the Generate Lighting button's job. Play is refused while it
+    /// waits (`Scene::play_refusal`, #2042); File ▸ New and loads drop it.
     #[cfg(feature = "dev")]
     pub lighting_bake_requested: bool,
     /// What became of the editor's last background bake (`Lighting.GetBakeStatus`).
@@ -187,6 +187,7 @@ impl Default for Scene {
             layers: LayerRegistry::default(),
             collision_matrix: CollisionMatrix::default(),
             materials: BTreeMap::new().into(),
+            meshes: BTreeMap::new(),
             decals: Default::default(),
             probes: crate::scene::lighting::probe::ProbeVolume::new(),
             reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet::new(),
@@ -239,7 +240,7 @@ impl Scene {
         self.world.ids().to_vec()
     }
 
-    /// Test seam for `tests/scene_roundtrip.rs`.
+    /// How many entities the World holds.
     pub fn entity_count(&self) -> usize {
         self.world.len()
     }
@@ -254,7 +255,6 @@ impl Scene {
             if entity_id == p_id {
                 return Err("An entity cannot be parented to itself.".to_string());
             }
-
             // Traverse up from parent_id to check if entity_id is an ancestor
             if self.world.ancestors(p_id).any(|a| a == entity_id) {
                 return Err("Circular parenting detected (ancestor loop).".to_string());

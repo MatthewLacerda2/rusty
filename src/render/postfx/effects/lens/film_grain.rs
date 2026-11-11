@@ -1,7 +1,7 @@
 //! Film grain (#1439): the composite's last function, on the graded image, seeded by
 //! the game clock (`PostParams::camera_pos.w`).
 
-use super::super::{Composite, EffectCx, Owner, Phase, PostEffect};
+use super::super::{Composite, EffectCx, History, Owner, Phase, PostEffect};
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::render::postfx::params::Gate;
 
@@ -9,6 +9,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "film_grain",
     owner: Owner::Volume,
     gate: Gate::option(GraphicsOption::FilmGrain),
+    history: History::None("its grain is seeded by the game clock, which no redraw advances"),
     module: Some("postfx/effects/film_grain.wgsl"),
     composite: &[Composite {
         phase: Phase::Display,

@@ -47,7 +47,7 @@ pub(super) fn r_op() -> impl Strategy<Value = R> {
         2 => (0u8..3).prop_map(R::Prop),
         3 => (at(), proptest::option::of(0u8..3), any::<bool>())
             .prop_map(|(i, m, two)| R::Material(i, m, two)),
-        3 => (0u8..9).prop_map(R::Library),
+        3 => (0u8..10).prop_map(R::Library),
         1 => (0u8..9).prop_map(R::Other),
         2 => (at(), any::<bool>()).prop_map(|(i, s)| R::Override(i, s)),
         1 => (at(), any::<bool>()).prop_map(|(i, l)| R::Light(i, l)),
@@ -129,13 +129,14 @@ fn between_ticks(r: &mut Renderer, scene: &Scene, op: &R) {
 }
 
 /// Edit the library: `red`'s colour or metallic, `glass`'s alpha (a record's
-/// alone), `red` turned Cutout or back or its cutoff (a key's), or add or remove
+/// alone) or sorting priority (a slot's), `red` turned Cutout or back or its cutoff (a key's), or add or remove
 /// `blue`, which objects may name while it is missing.
 pub(super) fn library(scene: &mut Scene, c: u8) {
     let m = &mut scene.materials;
     let Some(red) = m.get_mut("red").filter(|_| c <= 6 && c != 3) else {
         match c {
             3 => m.get_mut("glass").unwrap().alpha = 0.2,
+            9 => m.get_mut("glass").unwrap().sorting_priority ^= 1, // #2039
             _ if m.remove("blue").is_some() => {}
             _ => drop(m.insert("blue".into(), Default::default())),
         }

@@ -11,7 +11,9 @@
 //! While it doesn't run its target is dropped and the composite reads black; with
 //! no bright pixel the flare is exactly zero: either way the add changes nothing.
 
-use super::{bloom, Composite, CompositeTexture, EffectCx, Owner, Pass, PassCx, Phase, PostEffect};
+use super::{
+    bloom, Composite, CompositeTexture, EffectCx, History, Owner, Pass, PassCx, Phase, PostEffect,
+};
 use crate::components::rendering::post_processing::LensFlare;
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::render::gpu::bind_entry as entry;
@@ -28,6 +30,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "lens_flare",
     owner: Owner::Volume,
     gate: Gate::option(GraphicsOption::LensFlare),
+    history: History::None("drawn from this frame's bright pixels"),
     module: Some("postfx/effects/lens_flare.wgsl"),
     composite: &[Composite {
         phase: Phase::Hdr,

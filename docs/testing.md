@@ -73,6 +73,24 @@ things follow:
   are refused for the whole run, before its first `Harness.Step` too (CLAUDE.md,
   *Provider calls are authoring, never gameplay*).
 
+**Asserting a clean run** (#2054). `Harness.Expect(cond, message)` records a
+pass or fail in `results.json`; `Harness.Warnings([after])` returns the run's
+console warnings and errors so far, oldest first, as `{ level = "warning" |
+"error", text }` tables, skipping the first `after` (default 0). It reads the
+console `console.log` is written from, engine warnings included (they join it
+after every tick, and when `Warnings` is called), and keeps every one of the run,
+past the 100 lines the console buffer holds; a repeat is one line, `text (×N)`, as
+the console folds it. So a scenario ends with
+
+```lua
+local w = Harness.Warnings()
+Harness.Expect(#w == 0, "no warnings: " .. (w[1] and w[1].text or "none"))
+```
+
+and one that provokes a warning on purpose counts first and reads past it
+(`local n = #Harness.Warnings()` … `Harness.Warnings(n)`). Nothing fails a run on
+a warning by itself: the scenario decides. `games/smoke` holds it.
+
 **Hearing a run** (#1579). `Harness.RecordAudio([path])` starts recording the
 game's final audio mix to a 48 kHz float WAV (`audio.wav` by default; a relative
 `path` is under the run's output folder) and returns its path; `Harness.StopAudio()`
@@ -289,8 +307,14 @@ its check and its command changed to match).
   a shot from a new spot ghosts the last one in. Call `Camera.ResetHistory()` after
   the jump, and add `{ settle = n }` (whole frames, 0 to 1024, default 0) for a
   converged image: the shot first draws `n` frames with no sim step, as `n`
-  `Harness.Render()` calls would. It goes beside `width`, `height` and `gizmos`;
-  `docs/api/Graphics.md`, *TAA*.
+  `Harness.Render()` calls would. It draws them only when they can change the
+  image (#2092). When the shot's first frame reads no history
+  (`Debug.Stats().history_passes` is `0`), that frame is the shot: one render
+  whatever `n` is (two with `gizmos`), the same bytes a full settle writes. A frame
+  reads history with TAA, SSIL, the volumetric fog or an authored effect on, with
+  motion vectors recorded on a frame that is not a cut (whether or not the camera
+  moved), with a render texture shown, or with a shadow tile resize still pending.
+  It goes beside `width`, `height` and `gizmos`; `docs/api/Graphics.md`, *TAA*.
 - **The test-fixture project** is `tests/fixtures/project/` (#829): the committed
   scenarios, the bot-player script and its `project.rusty`, opened like any other
   project — `cargo run --bin play --features dev -- --project tests/fixtures/project
@@ -489,6 +513,10 @@ links it) and skip those tests. The bake's own denoiser logic is tested with moc
 **Running them on a GPU-less Linux box** (a container, a cloud session): install
 lavapipe — `sudo apt-get install -y mesa-vulkan-drivers libvulkan1` — and the same
 tests render there as in Linux CI. Set `RUSTY_REQUIRE_GPU=1` to be sure they did.
+CI installs the same packages through `.github/actions/system-libs`, which keeps
+the `.deb`s in the Actions cache per runner image and ref, so a mirror outage fails no
+run on an image that ref (or `main`, whose cache every ref reads) has already served
+(#2101).
 
 **Runner image.** The gating jobs run on pinned images, `ubuntu-24.04` and
 `macos-26`, never `-latest` (#930): lavapipe comes from the image's apt archive, so a
@@ -644,6 +672,78 @@ cargo run --features dev --bin play -- --project tests/fixtures/project look_123
 
 Log the getter after a set (`Harness.Log(tostring(Graphics.Get…()))`) when the two
 images look alike: an effect that did not run and one that runs invisibly look the same.
+
+## Test games (#2029)
+
+A **test game** is a small, complete 3D game project that a Lua recipe builds from
+nothing in seconds, headless. Coders, reviewers and CI prove a change on one instead
+of rebuilding a scene from cubes each time, and a PR's `Looked at` line names the
+game and the shots it looked at. Each lives in a folder under `games/`, and only its
+recipe and scripts are committed; the project is regenerable output.
+
+| Game | What it is for |
+|---|---|
+| `arena` | The CS:GO yardstick in miniature: a two-floor deathmatch from primitives (a staircase, a ladder link, a drop, a crate to jump onto, a 10 cm wall bullets go through), snowman bots on `NavMeshAgent` + `AIPerception` + `EnvironmentQuery` fighting everyone, raycast guns with spread and recoil, a smoke grenade that blocks sight. Scenarios: `nav` (every spawn reaches every room and both floors), `match` (bots reach the kill limit, each scores and dies), `shot` (a wallbang hurts, a 40 cm wall stops it). The recipe bakes the navmesh and saves it with the scene, so Play restores it instead of baking on its first tick. `--param size=dust2` lays out 25 blocks, 120 m a side, for map-scale work, and `--param bake=true` adds a Generate Lighting at the showroom's lowest settings (lightmaps, probes, reflections, occlusion; about a minute and a half per generation at the default size on a software adapter); both run on request. |
+| `fruit` | A slice-the-fruit arcade game in 3D: rigidbody fruit and bombs thrown in bursts on a no-collision layer, a mouse swipe hit-tested on screen against the moving bodies, a cut splitting a fruit into two halves with a juice burst, lives, score, combo, a game-over banner and zimmer sounds; scenarios `slice` (injected swipe), `bomb`, `miss`, `waves`. |
+| `runner` | An endless runner: a kinematic runner at rising speed in three lanes (jump, slide, lane change), a following camera, seeded chunks built ahead and destroyed behind (the entity count stays flat), crates and barrels dropped as rigidbodies that settle the same way every load, dust, sparks and a trail, a crash on any hit, a distance counter; a dodging bot (`runner/bot.lua`) drives four scenarios and two in-run shots. |
+| `showroom` | Lighting and reflections in one interior room: a polished floor (SSR from a minimum smoothness of 0.1), a mirror, a clear and a tinted glass pane, a drinking glass before the mirror, a lacquered pedestal (`ior`, `KHR_materials_specular`), an emissive sign, daylight through a window, a turned box and a sphere reflection probe, six light probes and a ball rolling through them with a proxy volume. Scenarios: `load`, `ball` (its probe light rises in the sun), `probes` (the volumes drawn as gizmos), `bake` (only with `--param bake=true`: a tiny Generate Lighting, applied on load). |
+| `smoke` | The generator's own proof: a floor, a crate with a Snyder texture, a looping zimmer blip and `mover.lua` sliding it along +X, a sun, a camera; one scenario asserting the crate moved, two shots. |
+| `tetris` | A 3D falling-blocks puzzle: held/tapped input with repeat timing on the fixed tick, a HUD with layout groups (stats column, 4×4 next-piece grid), many small lit cubes spawned and moved every few ticks, cleared lines bursting as rigidbodies then despawning, a pulse light, zimmer one-shots and a loop; scenarios clear a line, play to game over, and replay one seed twice for the same board. |
+| `topple` | Physics at scale and its determinism: four levels of box and plank stacks, jointed box figures (powered joints that go limp into ragdolls on a hard hit) and explosive barrels (`Damage.ApplyRadial` with impulse) that the player topples with thrown balls; scenarios prove the levels settle, a throw clears a level, a blast reaches exactly its radius, and a replay is bit-identical. `pile=16` is a 1,498-body pile. |
+
+```sh
+make game NAME=smoke                       # → target/games/smoke/ (this worktree's own)
+make game NAME=smoke ARGS="--param size=40"
+make game NAME=smoke OUT=~/games/smoke     # somewhere else, e.g. to open it:
+cargo run --bin rusty -- --project ~/games/smoke  # the editor on it
+make game-test NAME=smoke                  # generate, prove it deterministic, play, shoot
+```
+
+`make game-test` generates the game, moves it aside, generates it again at the same
+path and compares every file; then runs each `scenarios/*.lua` as `play` does, on
+the project's startup scene, and takes the shots. It prints one `ok`/`FAIL` line per
+step and exits 1 when one failed. Results go to the project's `cache/test/<scenario>/`
+(`results.json`, `console.log`) and the shots to `cache/test/shots/<name>.png`; open
+them with `Read`. A shot fails only when it is all one colour: rendering changes too
+often for a golden image to hold, so the shots are for looking. Without a GPU or
+lavapipe a shot is logged as skipped, as every GPU test skips. The same command runs
+locally, in a worktree and in a cloud session: every clone has `games/`, and each
+worktree writes its own `target/games/`. `gpu::test_games` runs `game --test` on
+every folder under `games/` in CI, one test per game so nextest runs them side by
+side (#2070).
+
+**Each game has a 90 s budget** for `game --test` at its defaults (`BUDGET` in
+`tests/gpu/test_games/mod.rs`): a game over it fails by name with its time, so the game
+whose defaults grew is the one made cheaper. Longer runs go behind a `--param`.
+
+**Adding a game** is adding its folder and its line in the sorted `games!` list of
+`tests/gpu/test_games/mod.rs`; a folder with no line fails that file's check, naming it:
+
+```text
+games/<name>/
+  recipe.lua       builds the project: scenes, materials, textures, sounds
+  scripts/         the game's behaviours, copied into assets/scripts/
+  scenarios/       headless play-tests, in play's scenario format
+  shots.lua        returns { { name =, position = {x, y, z}, target = {x, y, z} }, … }
+```
+
+- **The recipe is Lua on the one API surface** (`docs/api/`): `Scene.New`,
+  `Scene.CreateEntity`, components, `Texture.*`, `Sound.*`, then `Scene.Save` and
+  `Application.SetStartupScene`. It runs in edit mode, as one console command of a
+  `session` on the freshly made, seeded project (`dev::game::generate`). Something a
+  recipe cannot do is an API gap: file it, never work around it in the generator.
+- **Parameters** arrive as the chunk's argument (`...`), a table of the
+  `--param key=value` pairs: `true`/`false`, numbers (whole ones as integers) and
+  plain words. The recipe holds the defaults, which are what CI runs, and refuses a
+  key it does not know (`games/smoke/recipe.lua` shows the four lines).
+- **Deterministic**: the same recipe and parameters write the same bytes. Draw from
+  a `seed` parameter (`Texture`'s and `Sound`'s `seed`, `Random`), never a clock.
+  The check leaves a scene's bake reports (`<scene>.bake/`) out: they record when
+  and how long a bake ran, by design, while the baked data they describe is compared.
+- **Every test game is 3D**, and has no lightmap bake by default: a `bake`
+  parameter may offer a tiny, lowest-resolution one, off unless asked for.
+- The generator clears its output folder before writing, but only one it made
+  (it holds `.test-game`): `OUT` naming any other non-empty folder is refused.
 
 ## Performance budgets (frame stats, #433)
 A scenario can assert on performance the same way it asserts on behaviour. The harness

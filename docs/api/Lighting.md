@@ -24,10 +24,30 @@ scene never saved. Only the editor window steps the job, so a host without one (
 headless `session` and `session-mcp` without `--attach`, the player, `play`) refuses
 it with an error naming `Lighting.Generate()`, which bakes in the one call there.
 The call only asks: the window's next frame starts the job. The request belongs to
-the scene and mode it was made in, so asking for Play (`Editor.EnterPlay()` later in
-the same line too), Stop, `Scene.New()` / File ▸ New or a load before that frame drops it
-and the status reads `refused` with why; it never bakes a scene you didn't ask about. It has no cancel; the card's Cancel button
+the scene it was made in, so `Scene.New()` / File ▸ New or a load before that frame
+drops it and the status reads `refused` with why; it never bakes a scene you didn't ask about. It has no cancel; the card's Cancel button
 stops the lightmap step.
+
+**A bake and Play: whichever was asked for first wins** (#2042), and the other is
+refused with a reason. Once Play is asked for, a bake is refused (above). While a
+bake runs, or a `GenerateAsync` waits to start it (whenever `Lighting.IsRunning()`
+reads `true`: Generate Lighting and Bake Occlusion alike), Play is refused: the Play
+button is greyed out, its shortcut ignored, and its tooltip says why
+(`Baking lighting: 42% — Cancel the bake to play`; the step's share once it counts
+its work, `Baking lighting (probes)`, `(lightmap pages)` or `(occlusion)` for the
+later steps, `Baking occlusion` for Bake Occlusion, and "wait for the bake to finish
+to play" where the card has no Cancel, a `GenerateAsync` not yet started included), and
+[`Editor.EnterPlay()`](Editor.md#play) errors with the same line. Cancelling,
+finishing or failing the bake gives Play back. **Opening a demo is the exception**:
+[`Editor.OpenDemo`](Editor.md#the-demo-timeline) is not
+refused while a bake runs; the bake waits through the replay, as it waits through
+Play, and resumes once the demo closes and the edit scene is back. Within one frame the order is the
+order of the calls: `Lighting.GenerateAsync(); Editor.EnterPlay()` refuses the
+`EnterPlay`, and `Editor.EnterPlay(); Lighting.GenerateAsync()` refuses the bake.
+Against the Play button, the window's frame order decides: an attached agent's
+command (`session-mcp --attach`) runs before the window draws, so a bake it asked
+for greys out the button that frame; a line typed in the editor's console runs
+after the draw, so a Play pressed that frame refuses its bake.
 The two individual verbs stay for a script that wants only one of them. On a
 `Shadowmask` scene (#1695) the lightmap bake records each masked light's channel and
 only a probe bake writes the probes' occlusion on it, reading those channels from the
@@ -63,7 +83,7 @@ first.
   the default `8` (a NaN or infinite tolerance its default `0.9`), and
   a file's out-of-range value is held the same way when the scene loads); the editor's card edits the
   same fields under the button. The reflection probes' defaults sit beside them:
-  `reflectionResolution` (default `512`, a power of two in 16–2048) and
+  `reflectionResolution` (default `128`, Unreal's `r.ReflectionCaptureResolution` and the resolution Unity's Reflection Probe Inspector starts at, a power of two in 16–2048) and
   `reflectionBudgetMB` (default `256`, `8`–`2048`) and `reflectionMaxProbes` (default
   `512`, `1`–`4096`, the most probes auto-placement makes), edited in the scene Inspector's
   *Reflection Probes* section (see `Reflection.md`). A scene whose settings are all

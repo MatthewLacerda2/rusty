@@ -148,10 +148,10 @@ fn register_scalars(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>)
 }
 
 /// Texture-map paths: `SetMetallicMap` / `SetRoughnessMap` / `SetTexture` /
-/// `SetNormalMap` / `SetEmissiveMap`.
+/// `SetNormalMap` / `SetEmissiveMap` / `SetDetailMap` (#1997, `""` clears it).
 fn register_maps(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     type SetMap = fn(&mut mat_ops::MaterialLibrary, &str, String);
-    let maps: [(&str, SetMap); 5] = [
+    let maps: [(&str, SetMap); 6] = [
         ("SetMetallicMap", |m, k, p| {
             mat_ops::set_metallic_map(m, k, Some(p))
         }),
@@ -164,6 +164,9 @@ fn register_maps(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) ->
         }),
         ("SetEmissiveMap", |m, k, p| {
             mat_ops::set_emissive_map(m, k, Some(p))
+        }),
+        ("SetDetailMap", |m, k, p| {
+            mat_ops::set_detail_map(m, k, Some(p))
         }),
     ];
     for (verb, set) in maps {

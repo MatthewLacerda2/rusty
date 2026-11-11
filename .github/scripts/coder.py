@@ -15,7 +15,8 @@ It refuses, and starts nothing, when the issue is closed, is labelled
 (`dispatch/brief.py`), and when [`running.LIMIT`] coders on other issues are
 already waiting to fire or running (#1856; a fired one is placed from its pull
 request and briefs on GitHub, #1866, `dispatch/running.py` says why; a ready pull
-request with no review record yet still holds its slot, named `in review`, #2017): a re-brief of an issue is never counted against
+request with no review record yet still holds its slot, named `in review`, #2017, and a draft whose issue has an open
+recorded blocker frees it, named `draft blocked by #M`, #2063): a re-brief of an issue is never counted against
 itself, and `--over-limit` launches anyway.
 
 The operator asked on 2026-10-29 for a script that starts the coder for an
@@ -79,8 +80,9 @@ def environment_id(env: dict, listed: list[dict]) -> str:
 
 def github(gh, repository: str, now: datetime) -> running.GitHub:
     """What placing a fired coder reads from GitHub, over REST (#1866): one listing of open
-    pull requests, and per issue its comments and, when it has no open pull request, itself
-    and its closed pull requests. Those come from one page of the newest closed pull requests,
+    pull requests, and per issue its comments and, when its pull request is a draft, its
+    recorded blockers (#2063), or, when it has no open pull request, itself and its closed
+    pull requests. Those come from one page of the newest closed pull requests,
     read at most once (#1913): a coder's PR closed after its fire is hours old at most."""
     pulls = ghrest.pages(gh, f"repos/{repository}/pulls?state=open")
     if pulls is None:
@@ -92,7 +94,11 @@ def github(gh, repository: str, now: datetime) -> running.GitHub:
         got = newest_closed()
         return running.pulls_for(number, got) if isinstance(got, list) else None
 
-    return running.GitHub(pulls=pulls,
+    def blockers(number: int) -> list[int] | None:
+        got = gh(ghrest.blocked_by(repository, number))
+        return ghrest.open_blockers(got) if isinstance(got, list) else None
+
+    return running.GitHub(pulls=pulls, blockers=blockers,
                           comments=lambda n: ghrest.pages(gh, f"repos/{repository}/issues/{n}/comments"),
                           issue=lambda n: gh(f"repos/{repository}/issues/{n}"), now=now, closed=closed)
 

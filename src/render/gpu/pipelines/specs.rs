@@ -123,7 +123,7 @@ fn primed(spec: PipelineSpec) -> PipelineSpec {
 /// Transparent pass (#242): same shader/layout as the forward pass but blended by
 /// `blend` (#1523) and depth-WRITE-off (still depth-TESTED against opaque) so
 /// overlapping translucent surfaces all blend rather than z-cull each other. Drawn
-/// back-to-front after opaque. With `reactive`, a view running TAA, it writes TAA's
+/// after opaque, by sorting priority then back-to-front (#2039). With `reactive`, a view running TAA, it writes TAA's
 /// reactive mask too through `fs_transparent` (#1845).
 pub(super) fn transparent_spec(blend: TransparentBlend, reactive: bool) -> PipelineSpec {
     PipelineSpec {

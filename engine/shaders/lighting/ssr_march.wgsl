@@ -114,12 +114,13 @@ const THICKNESS: f32 = 0.15;
 const DEPTH_SLACK: f32 = 0.02;
 
 // Where a hit's blur, the cone's on-screen radius as a fraction of the screen's
-// shorter side, stops being able to hide what the march cannot blur (#2004): the
-// pyramid softens the hit's colour, but where a ray stops hitting (a reflected
-// silhouette) is decided per pixel, so a wide blur drawn inside a hard edge reads
-// as a block. From `BLUR_FADE_START` the hit fades out to the probe it replaces,
-// gone at `BLUR_FADE_END`. A contact reflection (a short ray) keeps a narrow blur
-// and stays; a long ray from a rough surface takes the probe.
+// shorter side, is too wide for screen space (#2004): where a ray stops hitting (a
+// reflected silhouette) is decided per pixel, and only the SSR pass's resolve
+// (#2028) averages it over the blur, so a wide blur drawn inside a hard edge reads
+// as a block here, and the resolve's average over so wide a disk only approximates
+// the lobe. From `BLUR_FADE_START` the hit fades out to the probe it replaces, gone
+// at `BLUR_FADE_END`. A contact reflection (a short ray) keeps a narrow blur and
+// stays; a long ray from a rough surface takes the probe.
 const BLUR_FADE_START: f32 = 0.04;
 const BLUR_FADE_END: f32 = 0.12;
 
@@ -185,6 +186,21 @@ fn refine(f: Frame, t_depth: texture_2d<f32>, a: vec3<f32>, b: vec3<f32>, start:
 // on-screen width there, so a rough surface reflects a blur of what it sees (cone
 // tracing, as Frostbite and UE do). A `t_color` with one level reads sharp.
 fn trace(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_color: sampler, origin: vec3<f32>, r: vec3<f32>, steps: i32, step: f32, cone: f32) -> vec4<f32> {
+    return trace_hit(f, t_depth, t_color, s_color, origin, r, steps, step, cone, 1.0).colour;
+}
+
+// What `trace_hit` found: `trace`'s colour and weight, and `dist`, how far the ray
+// went from its origin to the hit (0 on a miss). The SSR pass's resolve
+// (`postfx/ssr.wgsl`) widens a rough hit by it (#2028).
+struct Hit {
+    colour: vec4<f32>,
+    dist: f32,
+};
+
+// `trace`, with the hit's distance, reading the hit's colour at `blur` times the
+// cone's width (0: the pyramid's first level, for a caller that blurs the hits
+// itself; the fades still count the whole cone).
+fn trace_hit(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_color: sampler, origin: vec3<f32>, r: vec3<f32>, steps: i32, step: f32, cone: f32, blur_scale: f32) -> Hit {
     let depth_dim = vec2<f32>(textureDimensions(t_depth));
     let cap = step_cap(steps, depth_dim);
     var prev = origin;
@@ -218,7 +234,7 @@ fn trace(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_color: 
                 let t = distance(origin, back);
                 let width = footprint(f, back, r, t, cone, hit.uv, dim);
                 let top = f32(textureNumLevels(t_color) - 1u);
-                let lod = clamp(log2(max(width, 1.0)), 0.0, top);
+                let lod = clamp(log2(max(width * blur_scale, 1.0)), 0.0, top);
                 let edge = min(min(hit.uv.x, 1.0 - hit.uv.x), min(hit.uv.y, 1.0 - hit.uv.y));
                 let blur = 0.5 * width / min(dim.x, dim.y);
                 let done = f32(i) + distance(prev, back) / len;
@@ -231,12 +247,12 @@ fn trace(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_color: 
                 // would take half its colour from the surface beside it.
                 let centre = (floor(clamp(hit.uv, vec2<f32>(0.0), vec2<f32>(0.999999)) * depth_dim) + 0.5) / depth_dim;
                 let colour = textureSampleLevel(t_color, s_color, centre, lod).rgb;
-                return vec4<f32>(colour, clamp(edge / (SCREEN_FADE + blur), 0.0, 1.0) * far * wide);
+                return Hit(vec4<f32>(colour, clamp(edge / (SCREEN_FADE + blur), 0.0, 1.0) * far * wide), t);
             }
         }
         prev = p;
         prev_uv = here.uv;
         was = now;
     }
-    return vec4<f32>(0.0);
+    return Hit(vec4<f32>(0.0), 0.0);
 }

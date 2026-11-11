@@ -123,6 +123,7 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, view: &UiView) -
     if let Value::Object(map) = &mut value {
         map.extend(
             fields::component_fields(scene, id)
+                .into_iter()
                 .map(|(k, v)| (k.to_owned(), v.unwrap_or(Value::Null))),
         );
     }
@@ -130,54 +131,14 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, view: &UiView) -
 }
 
 /// Names of the optional first-class components this entity carries (the
-/// "component inventory" authoring needs). `Transform` is mandatory and omitted.
+/// "component inventory" authoring needs), then `Script` when it has any.
+/// `Transform` is mandatory and omitted.
 fn inventory(world: &World, id: u32) -> Vec<&'static str> {
-    type Probe = fn(&World, u32) -> bool;
-    let probes: &[(Probe, &'static str)] = &[
-        (World::has_mesh, "Mesh"),
-        (World::has_material, "Material"),
-        (World::has_light, "Light"),
-        (World::has_collider, "Collider"),
-        (World::has_rigidbody, "Rigidbody"),
-        (World::has_camera, "Camera"),
-        (World::has_nav_agent, "NavMeshAgent"),
-        (World::has_nav_obstacle, "NavMeshObstacle"),
-        (World::has_offmesh_link, "OffMeshLink"),
-        (World::has_nav_modifier, "NavMeshModifierVolume"),
-        (World::has_nav_mesh_modifier, "NavMeshModifier"),
-        (World::has_ai_perception, "AIPerception"),
-        (World::has_particles, "ParticleEmitter"),
-        (World::has_animator, "Animator"),
-        (World::has_audio, "AudioSource"),
-        (World::has_reverb_zone, "AudioReverbZone"),
-        (World::has_canvas, "Canvas"),
-        (World::has_rect_transform, "RectTransform"),
-        (World::has_image, "Image"),
-        (World::has_canvas_group, "CanvasGroup"),
-        (World::has_rect_mask, "RectMask"),
-        (World::has_mask, "Mask"),
-        (World::has_backdrop_filter, "BackdropFilter"),
-        (World::has_text, "Text"),
-        (World::has_shape, "Shape"),
-        (World::has_selectable, "Selectable"),
-        (World::has_layout_group, "LayoutGroup"),
-        (World::has_layout_element, "LayoutElement"),
-        (World::has_joint, "Joint"),
-        (World::has_character_controller, "CharacterController"),
-        (World::has_lod_group, "LODGroup"),
-        (World::has_light_probe_proxy_volume, "LightProbeProxyVolume"),
-        (World::has_trail, "TrailRenderer"),
-        (World::has_line, "LineRenderer"),
-        (
-            |w, id| w.scripts(id).is_some_and(|s| !s.is_empty()),
-            "Script",
-        ),
-    ];
-    probes
-        .iter()
-        .filter(|(has, _)| has(world, id))
-        .map(|&(_, name)| name)
-        .collect()
+    let mut names = fields::carried(world, id);
+    if world.scripts(id).is_some_and(|s| !s.is_empty()) {
+        names.push("Script");
+    }
+    names
 }
 
 /// Full transform — position, Euler rotation (degrees), and **scale**.

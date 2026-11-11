@@ -12,6 +12,7 @@
 //! standing in a forbidden area can still walk out). Every cost is at least 1, so
 //! the heuristic stays admissible.
 
+use super::pool::NodePool;
 use super::{in_mask, NavSpan, NavigationGraph, SpanRef, ALL_AREAS, MIN_AREA_COST};
 use glam::Vec3;
 use std::collections::BinaryHeap;
@@ -44,25 +45,17 @@ impl PartialOrd for NodeState {
     }
 }
 
-/// The mutable A\* working set: dense per-span arrays (a span index is the node id),
-/// cheaper than hashing on the long cross-level queries a bot issues.
-struct Frontier {
+/// The mutable A\* working set: the open heap, and the graph's reusable
+/// [`NodePool`] for each span's best cost and parent (a span index is the node id),
+/// so a query starts in O(1) whatever the navmesh's size (#2083).
+struct Frontier<'p> {
     open_set: BinaryHeap<NodeState>,
-    g_score: Vec<f32>,
-    came_from: Vec<Option<SpanRef>>,
+    pool: &'p mut NodePool,
 }
 
-impl Frontier {
-    fn new(spans: usize) -> Self {
-        Self {
-            open_set: BinaryHeap::new(),
-            g_score: vec![f32::INFINITY; spans],
-            came_from: vec![None; spans],
-        }
-    }
-
+impl Frontier<'_> {
     fn g_of(&self, index: u32) -> f32 {
-        self.g_score[index as usize]
+        self.pool.g(index)
     }
 }
 
@@ -110,8 +103,24 @@ impl NavigationGraph {
         if start == goal {
             return (vec![start], true);
         }
-        let mut frontier = Frontier::new(self.spans.len());
-        frontier.g_score[start.index as usize] = 0.0;
+        self.search.with(self.spans.len(), |pool| {
+            let mut frontier = Frontier {
+                open_set: BinaryHeap::new(),
+                pool,
+            };
+            self.search_from(start, goal, mask, &mut frontier)
+        })
+    }
+
+    /// The A\* loop of [`Self::find_path_masked`] on a freshly begun `frontier`.
+    fn search_from(
+        &self,
+        start: SpanRef,
+        goal: SpanRef,
+        mask: u32,
+        frontier: &mut Frontier,
+    ) -> (Vec<SpanRef>, bool) {
+        frontier.pool.set(start.index, 0.0, None);
         frontier.open_set.push(NodeState {
             node: start,
             g_score: 0.0,
@@ -121,7 +130,7 @@ impl NavigationGraph {
 
         while let Some(current) = frontier.open_set.pop() {
             if current.node == goal {
-                return (reconstruct_path(&frontier.came_from, goal), true);
+                return (reconstruct_path(frontier.pool, goal), true);
             }
             if current.g_score > frontier.g_of(current.node.index) {
                 continue; // a stale heap entry
@@ -131,9 +140,9 @@ impl NavigationGraph {
             if key < (closest.0, closest.1, closest.2.index) {
                 closest = (h, current.g_score, current.node);
             }
-            self.expand(current, goal, mask, &mut frontier);
+            self.expand(current, goal, mask, frontier);
         }
-        (reconstruct_path(&frontier.came_from, closest.2), false)
+        (reconstruct_path(frontier.pool, closest.2), false)
     }
 
     /// Relax every span `current` can move to. The cardinal links are found once and
@@ -184,8 +193,7 @@ impl NavigationGraph {
 /// Record `next` as reached from `here` at cost `g` when that beats its best so far.
 fn relax(frontier: &mut Frontier, here: SpanRef, next: SpanRef, g: f32, goal: SpanRef) {
     if g < frontier.g_of(next.index) {
-        frontier.came_from[next.index as usize] = Some(here);
-        frontier.g_score[next.index as usize] = g;
+        frontier.pool.set(next.index, g, Some(here));
         frontier.open_set.push(NodeState {
             node: next,
             g_score: g,
@@ -203,10 +211,10 @@ pub(super) fn heuristic(a: SpanRef, b: SpanRef) -> f32 {
 }
 
 /// Walk the `came_from` chain back from `goal`, returning the path start→goal.
-fn reconstruct_path(came_from: &[Option<SpanRef>], goal: SpanRef) -> Vec<SpanRef> {
+fn reconstruct_path(pool: &NodePool, goal: SpanRef) -> Vec<SpanRef> {
     let mut path = vec![goal];
     let mut curr = goal;
-    while let Some(prev) = came_from[curr.index as usize] {
+    while let Some(prev) = pool.came_from(curr.index) {
         path.push(prev);
         curr = prev;
     }

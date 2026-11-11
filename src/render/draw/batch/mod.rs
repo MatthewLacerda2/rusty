@@ -9,8 +9,8 @@
 //! Opaque items are sorted by key first, so every copy of a prop lands in one run,
 //! then the runs are ordered roughly front to back ([`sort::front_to_back`], #1499),
 //! so nearer solids fill the depth buffer before farther ones are shaded.
-//! Transparent items are not: their back-to-front order is what makes blending
-//! correct, so only *consecutive* equal keys merge there — "where order allows".
+//! Transparent items are not: their order (sorting priority, then back to front,
+//! [`sort::transparent_order`]) is what makes blending correct, so only *consecutive* equal keys merge there — "where order allows".
 //! The selection outline (#1175) is recorded here too: an item marked `outline` gets
 //! an [`OutlineDraw`] naming the very instance and uniform slot it was packed into.
 //! Pure CPU logic, no GPU state, so the grouping rules are unit-tested without an
@@ -138,7 +138,7 @@ pub(crate) struct FrameDraws {
 
 impl FrameDraws {
     /// Batch `opaque` (sorted by key, its runs nearest first) and `transparent` (order kept — the caller sorted
-    /// it back-to-front). With `instancing` off every item is its own draw, in the
+    /// it by priority, then back-to-front). With `instancing` off every item is its own draw, in the
     /// order given: the pre-#470 path, kept for equivalence tests and measurement.
     ///
     /// Each item's record slot is first turned into its value class's representative

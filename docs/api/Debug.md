@@ -163,11 +163,13 @@ end
 | `render_texture_draws` | cameras drawn into render textures this frame (#430) — their geometry is already in `draw_calls` / `triangles`; a camera skipped (unreferenced, or between its `update_every` frames) is not counted |
 | `velocity_passes` | opaque scene passes that wrote a velocity buffer (#1435): one per stacked camera of each view whose base camera runs motion blur, depth of field or SSR (SSR's holds only depths, #1526); `0` when none does |
 | `primed_passes` | opaque scene passes that started from their SSAO depth prepass (#1499): one per camera that ran SSAO, which then shades each lit pixel once; `0` with AO off, never for a camera with a forward override of its own (the shader preview), and never on Metal: Apple GPUs are tile-based and remove hidden opaque fragments themselves (Unity URP's *Auto* depth priming is off on tile-based targets too) |
+| `history_passes` | reasons this frame reads history an earlier frame left (#2092), counted per reason, not per view: one for each view (the screen, each render-texture camera's) whose frame runs TAA, SSIL's accumulation, the volumetric fog's reprojection, an authored effect, or motion vectors on a frame that is not a cut; one for each render texture shown, every frame whatever its `update_every` (its picture is kept from a draw: an earlier one between draws, and last frame's for a camera that sees a monitor); and one while a shadowed light's tile resize is pending (#1711's hysteresis counts frames). So a render-texture camera running TAA whose texture is shown counts twice. `0` means drawing the frame again with no sim step gives the same image, which is how `Harness.Screenshot`'s `settle` knows to draw nothing more |
 | `sky_reflection_bakes` | sky reflection cubes baked this frame (#1553): one when the scene's panorama changed, or on a frame showing procedural sky settings (#1620) neither procedural cube holds (the first procedural frame, or a settings change); `0` on every frame the sky holds, including a switch back to the settings the other cube holds (the procedural sky's tint never rebakes it) |
 | `ssr_surface_passes` | opaque scene passes that wrote SSR's surface targets (#1526): one per view whose base camera runs SSR; a stacked overlay camera (a viewmodel) draws with the plain pipelines and writes none, so it never counts |
 | `opaque_copies` | opaque copies made this frame (#1523), Unity's *Opaque Texture*: one per camera whose visible translucents refract or absorb (`Material.SetRefractionModel`, `SetTransmittanceColor`) or trace SSR (`Material.SetReceiveSsr`, on a base camera running SSR, #1570), drawn after its opaque pass and SSR; `0` on a frame showing none, which skips the copy |
 | `texture_bytes` | GPU bytes of the image textures the renderer holds (material maps, UI images, particle and render textures, and the uncompressed copy a slot that cannot read a compressed one gets), every mip included (#1574): the resident total, not a per-frame count. What *Compression* and *Max Size* (`Assets.SetTextureImportSettings`) shrink: a 2048² map is 21.3 MiB uncompressed with mips, 2.7 MiB as BC4, 5.3 MiB as BC5 or BC7 |
 | `lightmap_bytes` | GPU bytes of every lightmap page array the renderer holds (#1694): the scene's bound colour and direction arrays with every mip, and another scene's page list still cached beside them (a rebake's old pages are freed as it deletes them). The resident total, not a per-frame count. An irradiance page is BC6H, a byte a texel, plus 5/16 of that for its two mips; a direction page is RGBA8, four bytes a texel (#1996): a directional 2048² page pair is 26.3 MiB. On a GPU without BC compression the irradiance pages upload from their PNGs as `Rgba16Float`, eight times the BC6H size. Pages still loading in a windowed editor or game are not counted until they land |
+| `reflection_bytes` | GPU bytes of the reflection probes' cube array (#2085): every layer it is allocated with (the resident cubes and the spare slots the budget keeps), every mip, at the array's face (the largest resident cube's). The array is the only copy of a resident cube, so this is all the probe memory there is, held to `reflectionBudgetMB` except for the nearest cube and the fallback, which are kept past it (`Reflection.md`). A 128-texel BC6H cube is 128 KiB with its mips, a 512 one 2 MiB; on a GPU without BC compression eight times that. The resident total, not a per-frame count; `0` while no cube is resident |
 | `grade_lut_bakes` | views whose colour-grading LUT was rebaked this frame (#1440): a grading knob or the tonemap changed, or the view is new; `0` on every frame the grade holds |
 | `ui_mask_passes` / `ui_blur_passes` | UI `Mask` coverage textures rendered (#428) / fullscreen passes of the UI backdrop blur, its composite included — `0` with no backdrop visible (#426) |
 | `renderer_ms` | CPU ms `Renderer::render` took to record the frame |
@@ -192,7 +194,7 @@ each kind's passes summed, under names that never change so two reports diff:
 | `ssil` | screen-space indirect lighting (#1750): its gather, blur, accumulate and upsample before the base camera's opaque pass, and the source it keeps after it; the depth prepass it draws on a camera without SSAO is under `ssao_prepass` |
 | `volumetric_fog` | volumetric fog (#1703): its froxels' scatter and integrate, before the base camera draws |
 | `forward` | the opaque scene pass: solids, decals folded in, skybox — every camera's, render-texture cameras included |
-| `ssr` | screen-space reflections (#1526): the march over the base camera's opaque image; the copy of that image it reads and its mip pyramid (#1736) are recorded before the timed pass, untimed, so they aren't counted |
+| `ssr` | screen-space reflections (#1526): from the march over the base camera's opaque image to the resolve that averages its hits and draws them (#2028), the hits' pyramids between them included; the copy of the opaque image the march reads and its mip pyramid (#1736) are recorded before, untimed, so they aren't counted |
 | `transparent` | translucent solids |
 | `ribbons` | trails and lines |
 | `particles` | particle systems |
@@ -306,7 +308,7 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
 {
   "id": 1, "name": "Crate", "active": true, "active_in_hierarchy": true, "static": false, "layer": 0,
   "parent": null, "children": [],
-  "components": ["Mesh", "Material", "Collider"],   // optional-component inventory
+  "components": ["Collider", "Material", "Mesh"],   // optional-component inventory
   "transform": { "pos": [x,y,z], "rot": [x,y,z], "scale": [x,y,z] },  // rot = Euler°
   "bounds": { "min": [x,y,z], "max": [x,y,z] },     // world-space AABB, or null
   "scripts": ["assets/scripts/foo.lua"],
@@ -325,9 +327,10 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
                  "material_asset": null },  // or "assets/materials/wood.physmat" (#1878),
                                             // whose values `material` then shows
   "rigidbody": { "active": true, "is_kinematic": false, "mass": .., "velocity": [x,y,z],
-                 "use_gravity": true },
+                 "angular_velocity": [x,y,z], "use_gravity": true,
+                 "collision_detection": "Discrete", "drag": 0.0, "angular_drag": 0.05 },
   "camera":    { "active": true, "fov": .., "near": .., "far": .., "culling_mask": ..,
-                 "render_order": 0, "projection": "Perspective",
+                 "render_order": 0, "projection": "Perspective", "fov_axis": "Vertical",
                  "target_texture": null },                      // or "rt:<name>" (#430)
   "nav_agent": { "active": true, "radius": .., "target": [x,y,z], "speed": .., .. },
   "ai_perception": { "sight_range": 20.0, "lose_sight_range": 25.0, "sight_angle": 60.0,
@@ -373,8 +376,11 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
 }
 ```
 
-Every per-component key is present only when the entity carries that component
-(absent ones serialize as `null`); `bounds` comes from the mesh when geometry is
+Every first-class component has its key, keyed by its saved name (the ones not
+shown above too: `post_processing`, `joint`, `trail`, …, each as the component's own
+fields); it holds a value only when the entity carries that component (absent ones
+serialize as `null`), and `components` lists the carried ones in the registry's
+order, then `Script`; `bounds` comes from the mesh when geometry is
 present, else the collider, else `null`. `ui_rect` is the element's computed UI
 layout (see `UI.GetRect`) — `null` unless it is a canvas or laid out under one —
 so the agent can reason about the UI without a screenshot. The shape is shared with the harness's

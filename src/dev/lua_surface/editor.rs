@@ -16,7 +16,9 @@
 //! button does, and a script never tears its own VM down mid-call. Dev builds only,
 //! like `Debug`: a shipped game has no editor to switch, and a dev-built standalone run
 //! (the `player`, the `play` harness) refuses the request with a console warning, as
-//! Unity's `EditorApplication` doesn't exist in a player.
+//! Unity's `EditorApplication` doesn't exist in a player. While a background bake
+//! runs or is asked for, `EnterPlay` errors with the Play button's reason
+//! (`Scene::play_refusal`, #2042): whichever was asked for first wins.
 
 use std::cell::RefCell;
 
@@ -36,16 +38,15 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
         &table,
         "EnterPlay",
         lua.create_function(move |lua, ()| {
-            let asked = request(&*app.get(lua)?, &*console.get(lua)?, true);
-            // A pending `Lighting.GenerateAsync()` was made of edit mode (#1999): the
-            // window's draw after this line would otherwise start it into Play.
-            if asked {
-                scene
-                    .get(lua)?
-                    .borrow_mut()
-                    .drop_bake_request("Play was requested");
+            let (app, console) = (app.get(lua)?, console.get(lua)?);
+            // A bake running or asked for (#2042) refuses Play, as the greyed-out
+            // button does; a no-op (already heading to Play) stays one.
+            let changes = !app.borrow().standalone() && !app.borrow().play_heading();
+            let refusal = scene.get(lua)?.borrow().play_refusal();
+            if let (true, Some(why)) = (changes, refusal) {
+                return Err(mlua::Error::runtime(format!("Editor.EnterPlay: {why}")));
             }
-            Ok(asked)
+            Ok(request(&app, &console, true))
         }),
     )?;
     put(

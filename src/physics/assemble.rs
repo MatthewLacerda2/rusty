@@ -57,6 +57,8 @@ impl PhysicsWorld {
         }
         self.tracked.remember_plan(&next);
         self.plan = next;
+        // What the library-mesh colliders were built from (#2059, `watch::mesh_keys`).
+        self.record_mesh_keys(scene, &built);
         built
     }
 
@@ -81,15 +83,7 @@ impl PhysicsWorld {
                 }
             }
         }
-        self.bodies.remove(
-            handle,
-            &mut self.islands,
-            &mut self.colliders,
-            &mut self.impulse_joints,
-            &mut self.multibody_joints,
-            &mut self.soft_bodies,
-            true,
-        );
+        self.remove_body(handle);
     }
 
     /// Build `owner`'s body with the colliders of `ids` attached. An owner none
@@ -114,14 +108,17 @@ impl PhysicsWorld {
                 .linvel(inp.velocity)
                 .angvel(inp.angular_velocity)
                 // `use_gravity = false` exempts the body from world gravity (#209).
-                .gravity_scale(gravity_scale(inp.use_gravity)),
+                .gravity_scale(gravity_scale(inp.use_gravity))
+                // Unity's `drag` / `angularDrag` (#2062).
+                .linear_damping(inp.damping.linear)
+                .angular_damping(inp.damping.angular),
         }
         // Continuous mode switches on rapier's CCD sweep (anti-tunnelling, #321);
         // Discrete leaves it off. Honoured for every class — mainly dynamic, but a
         // kinematic body may opt in to be swept against dynamic bodies.
         .ccd_enabled(ccd_enabled(inp.collision_detection))
         .pose(to_pose(owner_pose.pos, owner_pose.rot));
-        let body_handle = self.bodies.insert(body_builder.build());
+        let body_handle = self.insert_body(body_builder.build());
         for (id, collider) in parts {
             let handle = self
                 .colliders
@@ -137,7 +134,7 @@ impl PhysicsWorld {
     /// owner's pose, for a body that is `dynamic` or not (a concave mesh is split
     /// into convex pieces on a dynamic one, #1886). `None` for a dead entity or a
     /// degenerate mesh.
-    fn build_collider(
+    pub(super) fn build_collider(
         &self,
         scene: &Scene,
         owner_pose: &WorldPose,

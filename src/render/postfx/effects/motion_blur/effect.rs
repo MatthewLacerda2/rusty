@@ -3,7 +3,7 @@
 //! target the stack wrote, after depth of field: bloom, the exposure meter and the
 //! composite then read the blurred scene. Like FXAA it needs no volume.
 
-use super::super::{Owner, Pass, PassCx, PostEffect};
+use super::super::{History, Owner, Pass, PassCx, PostEffect};
 use super::BlurParams;
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::GraphicsSettings;
@@ -16,6 +16,9 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "motion_blur",
     owner: Owner::Camera,
     gate: Gate::option(GraphicsOption::MotionBlur),
+    history: History::None(
+        "its velocities are the motion vectors, counted where they are recorded",
+    ),
     module: None,
     composite: &[],
     grade: &[],

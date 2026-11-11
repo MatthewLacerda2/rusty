@@ -3,7 +3,7 @@
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `RigidBodyComponent` field by field: the `active` / `is_kinematic` / `use_gravity`
 //! flags, the `mass` (clamped to a sane positive range), the linear/angular
-//! `velocity`, and the `collision_detection` mode.
+//! `velocity`, the `collision_detection` mode and the linear/angular `drag`.
 //!
 //! BOTH the editor's RigidBody card and the Lua `Physics.*` field-setters
 //! (`SetVelocity`, `SetAngularVelocity`, `SetKinematic`, `SetCollisionDetection`)
@@ -17,7 +17,7 @@
 use glam::Vec3;
 
 use crate::components::{CollisionDetection, RigidBodyComponent};
-use crate::scene::authoring::sanitize::{clamped, finite3};
+use crate::scene::authoring::sanitize::{clamped, finite3, non_negative};
 
 /// Set the rigidbody's `active` flag.
 pub fn set_active(rb: &mut RigidBodyComponent, active: bool) {
@@ -50,6 +50,18 @@ pub fn set_angular_velocity(rb: &mut RigidBodyComponent, angular_velocity: Vec3)
     rb.angular_velocity = finite3(angular_velocity);
 }
 
+/// Set the rigidbody's linear drag (Unity: `Rigidbody.drag`), floored at `0`; a
+/// NaN or infinite value is `0` (no damping).
+pub fn set_drag(rb: &mut RigidBodyComponent, drag: f32) {
+    rb.drag = non_negative(drag);
+}
+
+/// Set the rigidbody's angular drag (Unity: `Rigidbody.angularDrag`), floored at
+/// `0`; a NaN or infinite value is `0`.
+pub fn set_angular_drag(rb: &mut RigidBodyComponent, angular_drag: f32) {
+    rb.angular_drag = non_negative(angular_drag);
+}
+
 /// Set the rigidbody's collision-detection mode (Discrete / Continuous).
 pub fn set_collision_detection(rb: &mut RigidBodyComponent, mode: CollisionDetection) {
     rb.collision_detection = mode;
@@ -80,6 +92,8 @@ mod tests {
         set_velocity(&mut e, Vec3::new(1.0, 2.0, 3.0));
         set_angular_velocity(&mut e, Vec3::new(0.0, 4.0, 0.0));
         set_collision_detection(&mut e, CollisionDetection::Continuous);
+        set_drag(&mut e, 2.5);
+        set_angular_drag(&mut e, -1.0);
         let rb = &*e;
         assert!(!rb.active);
         assert!(rb.is_kinematic);
@@ -88,6 +102,11 @@ mod tests {
         assert_eq!(rb.velocity, Vec3::new(1.0, 2.0, 3.0));
         assert_eq!(rb.angular_velocity, Vec3::new(0.0, 4.0, 0.0));
         assert_eq!(rb.collision_detection, CollisionDetection::Continuous);
+        assert_eq!(
+            (rb.drag, rb.angular_drag),
+            (2.5, 0.0),
+            "a negative drag is 0"
+        );
     }
 
     /// NaN mass falls back into the clamp range; a partly-NaN velocity is zero (#1361).
@@ -97,7 +116,14 @@ mod tests {
         let mut e = scene.world.rigidbody_mut(id).unwrap();
         set_mass(&mut e, f32::NAN);
         set_velocity(&mut e, Vec3::new(1.0, f32::NAN, f32::NEG_INFINITY));
+        set_drag(&mut e, f32::NAN);
+        set_angular_drag(&mut e, f32::INFINITY);
         assert_eq!(e.mass, 0.01);
+        assert_eq!(
+            (e.drag, e.angular_drag),
+            (0.0, 0.0),
+            "a non-finite drag is 0"
+        );
         assert_eq!(e.velocity, Vec3::ZERO, "a velocity is refused whole");
     }
 }

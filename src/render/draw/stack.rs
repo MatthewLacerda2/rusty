@@ -5,6 +5,7 @@
 //! draw through here, so a picture-in-picture is the same frame as the screen's.
 
 use super::camera::{CameraCtx, StackShared, CAMERA_PASSES};
+use crate::core::settings::GraphicsSettings;
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::motion::{self, HistoryKey, Velocity};
 use crate::render::passes::ssao::SsaoPlan;
@@ -14,6 +15,31 @@ use crate::render::postfx::effects::{self, taa, volumetric_fog, EffectCx, PassCx
 use crate::render::postfx::params::{frame_params, PostSource};
 use crate::render::{RenderView, Renderer};
 use crate::scene::{Camera, Scene};
+
+/// Whether this frame of `view` reads what an earlier one left (#2092), so drawing
+/// it again with no sim step can change the image: an effect that keeps a history
+/// runs ([`effects::History`]), or motion vectors compare with last frame's poses
+/// on a frame that is not a cut. (A shown render texture and a pending shadow tile
+/// resize are counted where they are drawn.)
+fn reads_history(
+    view: &RenderView,
+    (pass, graphics, taa): (&StackPass, GraphicsSettings, bool),
+    shared: &StackShared,
+) -> bool {
+    let effect = EffectCx {
+        post: pass.post,
+        graphics,
+        full: pass.full_post_fx,
+    };
+    let motion = &view.post_fx.motion;
+    let moving = motion.active() && !motion.history.cut();
+    moving
+        || effects::read_history(&effects::HistoryCx {
+            effect,
+            shared,
+            taa,
+        })
+}
 
 /// What one [`Renderer::draw_stack`] call draws.
 pub(crate) struct StackPass<'a> {
@@ -97,6 +123,8 @@ impl Renderer {
             ssil: ssil::begin(&mut view.post_fx, (&pass, graphics, key), keeps),
             volumetric: volumetric_fog::begin(&mut view.post_fx, (&pass, graphics, key), keeps),
         };
+        let history = reads_history(view, (&pass, graphics, taa_on), &shared);
+        self.frame_counters.history_passes += u32::from(history);
         for idx in 0..pass.stack.len() {
             let mut ctx = CameraCtx::new(scene, &pass, &shared, idx);
             for (_, stage) in CAMERA_PASSES {

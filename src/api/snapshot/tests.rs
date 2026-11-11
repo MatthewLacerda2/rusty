@@ -143,7 +143,7 @@ fn nav_agent_reports_its_turning() {
 
 #[test]
 fn a_subdivided_plane_reports_its_subdivisions() {
-    use super::components::mesh_value;
+    use super::mesh::mesh_value;
     let mut scene = Scene::new();
     let id = create_entity(&mut scene, "Water", Some(Primitive::Plane));
     let read = |s: &Scene| mesh_value(&s.world.mesh(id).unwrap());

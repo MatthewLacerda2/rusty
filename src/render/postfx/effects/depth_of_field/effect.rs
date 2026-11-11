@@ -3,7 +3,7 @@
 //! scene. A display-only render texture, the Scene view and a view with no target
 //! (a shader preview) skip it.
 
-use super::super::{Owner, Pass, PassCx, PostEffect};
+use super::super::{History, Owner, Pass, PassCx, PostEffect};
 use super::DofParams;
 use crate::components::DofMode;
 use crate::core::settings::graphics_options::GraphicsOption;
@@ -16,6 +16,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "depth_of_field",
     owner: Owner::Volume,
     gate: Gate::option(GraphicsOption::DepthOfField),
+    history: History::None("blurs this frame's colour by this frame's depth"),
     module: None,
     composite: &[],
     grade: &[],

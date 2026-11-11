@@ -16,7 +16,7 @@ fn open_editor() -> (Session, EditorUi) {
 }
 
 /// [`open_editor`], its scene in a folder of its own.
-fn open_editor_in(tag: &str) -> (Session, EditorUi) {
+pub(super) fn open_editor_in(tag: &str) -> (Session, EditorUi) {
     let s = Session::new("").expect("an empty session boots");
     s.world()
         .resources
@@ -34,7 +34,7 @@ fn open_editor_in(tag: &str) -> (Session, EditorUi) {
 }
 
 /// One editor frame's bake drive.
-fn frame(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
+pub(super) fn frame(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
     let nav = NavigationGraph::new(-8.0, 8.0, -8.0, 8.0, 1.0);
     poll(editor, &egui::Context::default(), scene, console, &nav);
 }
@@ -57,7 +57,11 @@ fn gpu_a_request_starts_the_buttons_job_runs_and_reports() {
 }
 
 /// Drive the editor's frames until its bake ends.
-fn run_out(editor: &mut EditorUi, scene: &std::cell::RefCell<Scene>, console: &mut ConsoleLogs) {
+pub(super) fn run_out(
+    editor: &mut EditorUi,
+    scene: &std::cell::RefCell<Scene>,
+    console: &mut ConsoleLogs,
+) {
     for _ in 0..4000 {
         frame(editor, &mut scene.borrow_mut(), console);
         if editor.dev.lightmap_bake.is_none() {
@@ -69,69 +73,30 @@ fn run_out(editor: &mut EditorUi, scene: &std::cell::RefCell<Scene>, console: &m
 }
 
 /// The status a script reads.
-fn status(s: &Session) -> String {
+pub(super) fn status(s: &Session) -> String {
     let line =
         "local st = Lighting.GetBakeStatus(); return st.state .. ' ' .. tostring(st.message)";
     s.eval(line).unwrap()
-}
-
-/// A request made in edit mode, then Play and Stop through the session's own
-/// switch: the request is dropped, the editor's next frame starts nothing, and the
-/// status says why (#1999's review: Stop baked it unasked).
-#[test]
-fn play_and_stop_drop_a_request_and_the_status_says_so() {
-    let (mut s, mut editor) = open_editor_in("generate_async_play");
-    s.command("Lighting.GenerateAsync()").unwrap();
-    assert!(status(&s).starts_with("requested"), "{}", status(&s));
-    s.command("Editor.EnterPlay()").unwrap();
-    assert_eq!(s.command("Lighting.IsRunning()").unwrap(), "false");
-    s.command("Editor.ExitPlay()").unwrap();
-    let mut console = ConsoleLogs::new();
-    let scene = s.world().scene().clone();
-    frame(&mut editor, &mut scene.borrow_mut(), &mut console);
-    assert!(editor.dev.lightmap_bake.is_none(), "Stop baked it unasked");
-    let st = status(&s);
-    assert!(
-        st.starts_with("refused") && st.contains("Play was requested"),
-        "{st}"
-    );
 }
 
 /// A job that fails reads `failed` with its line, not the old report's success.
 #[test]
 fn gpu_a_failed_bake_reads_failed_with_its_reason() {
     let (s, mut editor) = open_editor_in("generate_async_fails");
+    // The scene's folder is a file before the job starts (starting it touches no
+    // file), so every write the job makes beside the scene fails, the lighting
+    // included. Swapping it under a running job raced the job's preview writer,
+    // which recreates the folder (#2049).
+    let path = editor.current_scene_path().unwrap();
+    let folder = std::path::Path::new(&path).parent().unwrap();
+    std::fs::remove_dir_all(folder).unwrap();
+    std::fs::write(folder, "not a folder").unwrap();
     s.eval("Lighting.GenerateAsync()").unwrap();
     let scene = s.world().scene().clone();
     let mut console = ConsoleLogs::new();
     frame(&mut editor, &mut scene.borrow_mut(), &mut console);
     assert!(status(&s).starts_with("running"), "{}", status(&s));
-    // The scene's folder goes away under the job: writing the lighting fails.
-    let path = editor.current_scene_path().unwrap();
-    std::fs::remove_dir_all(std::path::Path::new(&path).parent().unwrap()).unwrap();
     run_out(&mut editor, &scene, &mut console);
     let st = status(&s);
     assert!(st.starts_with("failed Generate Lighting failed"), "{st}");
-}
-
-/// `GenerateAsync(); EnterPlay()` in one line, in the window's order: the line is
-/// drained (Play only requested), then the editor draws, which is where a request
-/// is taken. Nothing starts, and the status says Play was asked for (#1999's
-/// second review: the draw took it into Play).
-#[test]
-fn play_requested_in_the_same_line_drops_the_request() {
-    let (s, mut editor) = open_editor_in("generate_async_same_line");
-    s.eval("Lighting.GenerateAsync(); Editor.EnterPlay()")
-        .unwrap();
-    let app = &s.world().resources.application;
-    assert!(app.borrow().play_heading(), "requested, not yet taken");
-    let mut console = ConsoleLogs::new();
-    let scene = s.world().scene().clone();
-    frame(&mut editor, &mut scene.borrow_mut(), &mut console);
-    assert!(editor.dev.lightmap_bake.is_none(), "taken into Play");
-    let st = status(&s);
-    assert!(
-        st.starts_with("refused") && st.contains("Play was requested"),
-        "{st}"
-    );
 }

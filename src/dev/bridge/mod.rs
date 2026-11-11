@@ -9,7 +9,7 @@
 //! `MoveMouse`, `SetAxis`, …); shooting is just pressing `Mouse0`.
 //!
 //! This module adds only what is the scenario's own: the `Harness` table
-//! (Step, StepUntil, Snapshot, Log, Expect, Frame, Stats, AssertBudget, Screenshot,
+//! (Step, StepUntil, Snapshot, Log, Expect, Warnings, Frame, Stats, AssertBudget, Screenshot,
 //! Render, AttachPlayerBot, LoadStress, Bench, RecordAudio, StopAudio, and the demo verbs
 //! FindInDemo, SeekDemo, CutDemo, DemoPath in `demo`), `Scene.GetScript` answered across
 //! the VM boundary (`script_ref`), `Damage.*` and `CharacterController.Move` run
@@ -24,6 +24,7 @@ mod forward;
 mod script_ref;
 #[cfg(test)]
 mod tests;
+mod warnings;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -53,6 +54,7 @@ fn register_harness(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     let t = lua.create_table()?;
     register_harness_stepping(lua, harness, &t)?;
     register_harness_reporting(lua, harness, &t)?;
+    warnings::register(lua, harness, &t)?;
     register_harness_actions(lua, harness, &t)?;
     super::bench::register(lua, harness, &t)?;
     super::harness::audio::register(lua, harness, &t)?;
@@ -162,8 +164,9 @@ fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lua
     // Screenshot(path [, { width =, height =, gizmos =, settle = }]) -> bool. Renders
     // the current scene/camera offscreen to a PNG, at the run's size or the one given
     // (#1583), with the colliders and Debug.Draw lines over it when `gizmos` (#1882),
-    // after `settle` frames drawn with no sim step (#2003, default 0) so TAA
-    // converges. Returns false (no error) when no GPU/software adapter is available.
+    // after up to `settle` frames drawn with no sim step (#2003, default 0) so TAA
+    // converges: none when nothing on the view reads history (#2092). Returns
+    // false (no error) when no GPU/software adapter is available.
     let h = Rc::clone(harness);
     t.set(
         "Screenshot",
@@ -174,10 +177,7 @@ fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lua
                 None => ShotOptions::default(),
             };
             let size = shot.size.unwrap_or_else(|| h.size());
-            if !h.settle(size, shot.settle) {
-                return Ok(false);
-            }
-            Ok(h.screenshot_with(path, size, shot.gizmos))
+            Ok(h.screenshot_settled(path, size, (shot.gizmos, shot.settle)))
         })?,
     )?;
 
@@ -215,7 +215,8 @@ struct ShotOptions {
     size: Option<(u32, u32)>,
     /// Draw the gizmos over the frame (default false).
     gizmos: bool,
-    /// Frames drawn before the shot, with no sim step (default 0).
+    /// Frames drawn before the shot, with no sim step (default 0), when the view
+    /// reads history (`Harness::screenshot_settled`).
     settle: u32,
 }
 

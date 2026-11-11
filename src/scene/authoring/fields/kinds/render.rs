@@ -64,6 +64,7 @@ inspect! {
     CameraComponent => camera, camera_mut, &[
         ro!("active", NO_OP),
         op!("fov", camera::set_fov),
+        op!("fov_axis", camera::set_fov_axis),
         op!("near", camera::set_near),
         op!("far", camera::set_far),
         with!("culling_mask", |c, v: Mask| camera::set_culling_mask(c, v.0)),

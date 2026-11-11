@@ -1,7 +1,7 @@
 //! Tonemapping (#1440): the operator, then, last in the grade before the Color Lookup,
 //! the display-gamma tweak.
 
-use super::super::{Grade, GradeCx, Owner, PostEffect};
+use super::super::{Grade, GradeCx, History, Owner, PostEffect};
 use crate::components::Tonemap;
 use crate::render::postfx::params::Gate;
 
@@ -9,6 +9,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "tonemapping",
     owner: Owner::Volume,
     gate: Gate::NONE,
+    history: History::None("a grade of this frame's colour"),
     module: Some("postfx/effects/tonemapping.wgsl"),
     composite: &[],
     grade: &[

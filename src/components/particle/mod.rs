@@ -81,7 +81,8 @@ pub struct ParticleEmitterComponent {
     pub emit_mode: EmitMode,
     pub blend: ParticleBlend,
     pub collision: CollisionResponse,
-    /// Optional sprite texture path; falls back to the renderer's default texture.
+    /// Optional sprite texture path; with none the pass draws Unity's soft white
+    /// disc (#2052), and a path that fails to load draws the checker.
     #[serde(default)]
     pub texture: Option<MapRef>,
 
@@ -233,4 +234,10 @@ impl EntityRefs for ParticleEmitterComponent {
     fn every_ref() -> Self {
         Self::default()
     }
+}
+
+impl crate::components::FirstClass for ParticleEmitterComponent {
+    const NAME: &'static str = "Particles";
+    const ALIASES: &'static [&'static str] = &["particlesystem"];
+    const INVENTORY: &'static str = "ParticleEmitter";
 }

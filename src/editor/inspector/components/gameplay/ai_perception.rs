@@ -217,3 +217,12 @@ fn draw_known(ui: &mut egui::Ui, p: &Perception) {
         ));
     }
 }
+
+impl crate::editor::inspector::components::add::AddEntry
+    for crate::components::AIPerceptionComponent
+{
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Ai;
+    const LABEL: &'static str = "AI Perception";
+    const ICON: &'static str = egui_phosphor::regular::EYE;
+}

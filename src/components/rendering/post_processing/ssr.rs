@@ -1,9 +1,9 @@
 //! Screen-space reflections, Unity HDRP's *Screen Space Reflection* override: a scene
 //! pass right after the base camera's opaque pass, ahead of the translucents and every
 //! post effect. The quality sets the ray march: its step count and step length
-//! (`render::postfx::effects::ssr`). A rough surface reflects a blurred hit, read
-//! from a mip pyramid of the scene at the width of its GGX lobe (#1736), down to
-//! the *Minimum Smoothness*.
+//! (`render::postfx::effects::ssr`). A rough surface reflects a blur of its hits,
+//! averaged over the width of its GGX lobe (#1736, #2028), down to the *Minimum
+//! Smoothness*.
 
 use serde::{Deserialize, Serialize};
 

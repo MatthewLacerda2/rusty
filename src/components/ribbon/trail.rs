@@ -105,6 +105,12 @@ impl TrailComponent {
     }
 }
 
+impl crate::components::FirstClass for TrailComponent {
+    const NAME: &'static str = "Trail";
+    const ALIASES: &'static [&'static str] = &["trailrenderer"];
+    const INVENTORY: &'static str = "TrailRenderer";
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

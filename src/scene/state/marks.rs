@@ -84,6 +84,8 @@ pub const MARKS: &[Mark] = marks! {
         !s.collision_matrix.can_collide(9, 10);
     "materials" => |s, _| s.materials.insert("Marked".into(), Default::default()),
         s.materials.contains_key("Marked");
+    "meshes" => |s, _| s.meshes.insert("Marked".into(), Default::default()),
+        s.meshes.contains_key("Marked");
     "decals" => |s, b| s.spawn_decal(Vec3::ZERO, Vec3::Y, DecalSpec {
             owner: Some(b),
             ..Default::default()

@@ -37,6 +37,8 @@ pub(super) fn apply(scene: &mut Scene, step: Step) -> Step {
     if let Some(level) = step.level {
         level.restore(scene);
     }
+    // A library mesh's users take its put-back data (#2059); the journal is off.
+    scene.sync_scene_meshes();
     scene.world.rewind_changes(); // once per step: every change cursor rebuilds
     inverse
 }

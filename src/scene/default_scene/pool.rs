@@ -9,7 +9,7 @@ use glam::{Quat, Vec3};
 
 use super::layout::*;
 use super::{block, looks, place, wear, Scene};
-use crate::scene::authoring::{create_entity, Primitive};
+use crate::scene::authoring::{create_drawn_entity, Primitive};
 
 /// The pool floor (id 1), its top at `POOL_FLOOR`.
 pub(super) fn add_floor(scene: &mut Scene) {
@@ -101,7 +101,7 @@ pub(super) fn add_jacuzzi(scene: &mut Scene) {
 /// A static water plane centred at `at`, `half` wide in x and z. The plane
 /// primitive is 15 m square at unit scale.
 fn water(scene: &mut Scene, name: &str, at: Vec3, (hx, hz): (f32, f32)) {
-    let id = create_entity(scene, name, Some(Primitive::Plane));
+    let id = create_drawn_entity(scene, name, Some(Primitive::Plane));
     place(
         scene,
         id,

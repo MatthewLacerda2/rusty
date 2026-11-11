@@ -137,6 +137,11 @@ impl EntityRefs for JointComponent {
     }
 }
 
+impl crate::components::FirstClass for JointComponent {
+    const NAME: &'static str = "Joint";
+    const ALIASES: &'static [&'static str] = &["fixedjoint", "hingejoint", "characterjoint"];
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

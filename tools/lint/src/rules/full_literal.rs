@@ -4,7 +4,8 @@
 //! A literal that spells out every field breaks the day the component gains one,
 //! so one new field means a sweep across the suite, and a reader can't see which
 //! field the test is about. The rule is scoped to the first-class components (the
-//! `…Component` types `Entity` names in `src/components/entity/mod.rs`): any struct
+//! `…Component` types `Entity` and the registry rows its fields are generated from
+//! name, `src/components/entity/mod.rs` and `registry.rs`, #2023): any struct
 //! expression in test code (`test_code.rs`) that names every field of one with
 //! three or more, with no `..rest`, is a finding. When every field is the point of the test, say so:
 //! `// lint: allow(full-literal) <why>`.
@@ -15,7 +16,8 @@ use crate::code::{code_lines, is_ident};
 use std::collections::BTreeMap;
 
 pub const RULE: &str = "full-literal";
-const ENTITY: &str = "src/components/entity/mod.rs";
+/// Where the component types are named: `Entity` (Transform) and the registry.
+const ENTITY: [&str; 2] = ["src/components/entity/mod.rs", "src/components/registry.rs"];
 /// A component with fewer fields is exempt: `MaterialComponent { name }` is the
 /// clearest way to build a one-field struct, and a new field there breaks few tests.
 const MIN_FIELDS: usize = 3;
@@ -28,12 +30,14 @@ impl Components {
     /// `sources` (path, text). A component under [`MIN_FIELDS`] fields is left out.
     pub fn load<'a>(sources: impl IntoIterator<Item = (&'a str, &'a str)>) -> Self {
         let sources: Vec<_> = sources.into_iter().collect();
-        let entity = sources
-            .iter()
-            .find(|(p, _)| *p == ENTITY)
-            .map_or("", |s| s.1);
+        let mut names = Vec::new();
+        for (path, text) in &sources {
+            if ENTITY.contains(path) {
+                names.extend(component_types(text));
+            }
+        }
         let mut map = BTreeMap::new();
-        for name in component_types(entity) {
+        for name in names {
             if let Some(fields) = sources.iter().find_map(|(_, s)| struct_fields(s, &name)) {
                 if fields.len() >= MIN_FIELDS {
                     map.insert(name, fields);
@@ -72,10 +76,15 @@ impl Components {
     }
 }
 
-/// The `…Component` type names in the body of `pub struct Entity`.
-fn component_types(entity: &str) -> Vec<String> {
+/// The `…Component` type names in the body of `pub struct Entity`, or in the
+/// registry's rows (`first_class!`).
+fn component_types(source: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
-    for word in body(entity, "Entity")
+    let rows = source
+        .split_once("macro_rules! first_class {")
+        .map(|(_, r)| r.to_string());
+    for word in rows
+        .or_else(|| body(source, "Entity"))
         .unwrap_or_default()
         .split(|c: char| !is_ident(c))
     {
@@ -180,3 +189,20 @@ pub fn run(scan: &Scan) -> Vec<Finding> {
 #[cfg(test)]
 #[path = "full_literal_tests.rs"]
 mod tests;
+
+/// The real tree's components are found: the day `Entity` became generated from the
+/// registry (#2023), reading `Entity`'s body alone would have found only Transform.
+#[cfg(test)]
+#[test]
+fn the_real_tree_names_the_registry_components() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let scan = Scan::at(&root);
+    let found = Components::load(scan.files.iter().map(|p| (p.as_str(), scan.source(p))));
+    for name in [
+        "TransformComponent",
+        "LightComponent",
+        "NavMeshModifierComponent",
+    ] {
+        assert!(found.0.contains_key(name), "`{name}` not found");
+    }
+}

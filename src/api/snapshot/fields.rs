@@ -1,131 +1,69 @@
 //! src/api/snapshot/fields.rs — every first-class component's snapshot field.
 //!
-//! A table of `(key, value)` pairs merged into the entity object, not keys of one
-//! `json!` literal: that many keys overrun the macro's recursion limit. Grouped by
-//! area so each builder stays short.
+//! Generated from the registry (`components::registry`): each row's value, keyed by
+//! its `Entity` field, is its [`Snapshot`], read off the live entity. A table of
+//! `(key, value)` pairs merged into the entity object, not keys of one `json!`
+//! literal: that many keys overrun the macro's recursion limit.
 
 use serde_json::Value;
 
-use super::animator::animator_value;
-use super::audio::{audio_value, reverb_zone_value};
-use super::components::character_controller_value as cc_value;
-use super::components::{
-    camera_component_value, collider_value, light_value, material_value, mesh_value,
-    nav_agent_value, particle_value, rigidbody_value,
-};
-use super::components::{joint_value, line_value, lod_group_value, trail_value};
-use super::navigation::{ai_perception_value, nav_mesh_modifier_value, nav_modifier_value};
-use super::navigation::{nav_obstacle_value, offmesh_link_value};
-use super::ui::{backdrop_filter_value, mask_value};
-use super::ui::{
-    canvas_group_value, canvas_value, image_value, layout_element_value, layout_group_value,
-    rect_mask_value, rect_transform_value, selectable_value, shape_value, text_value,
-};
+use crate::components::registry::first_class;
+use crate::components::FirstClass;
+use crate::ecs::World;
 use crate::scene::Scene;
 
 type Field = (&'static str, Option<Value>);
 
-/// Each first-class component's authoring fields, keyed by its snapshot name
-/// (`None` when the entity lacks it, written as `null`).
-pub(super) fn component_fields(scene: &Scene, id: u32) -> impl Iterator<Item = Field> {
-    world_fields(scene, id)
-        .into_iter()
-        .chain(rig_fields(scene, id))
-        .chain(ui_fields(scene, id))
+/// A first-class component's authoring fields as the snapshot reports them.
+/// Implemented beside each value builder (`components.rs`, `ui.rs`, …) with
+/// [`snapshot!`]. The Material is the exception: its row reports the library asset
+/// it points at, not the reference.
+pub(super) trait Snapshot {
+    fn snapshot(&self) -> Value;
 }
 
-/// Rendering, physics, navigation, animation and audio.
-fn world_fields(scene: &Scene, id: u32) -> [Field; 16] {
-    let w = &scene.world;
-    [
-        ("mesh", w.mesh(id).map(|m| mesh_value(&m))),
-        ("material", scene.material_asset_of(id).map(material_value)),
-        ("light", w.light(id).map(|l| light_value(&l))),
-        ("collider", w.collider(id).map(|c| collider_value(&c))),
-        ("rigidbody", w.rigidbody(id).map(|r| rigidbody_value(&r))),
-        ("camera", w.camera(id).map(|c| camera_component_value(&c))),
-        ("nav_agent", w.nav_agent(id).map(|n| nav_agent_value(&n))),
-        (
-            "nav_obstacle",
-            w.nav_obstacle(id).map(|o| nav_obstacle_value(&o)),
-        ),
-        (
-            "offmesh_link",
-            w.offmesh_link(id).map(|l| offmesh_link_value(&l)),
-        ),
-        (
-            "nav_modifier",
-            w.nav_modifier(id).map(|v| nav_modifier_value(&v)),
-        ),
-        (
-            "nav_mesh_modifier",
-            w.nav_mesh_modifier(id).map(|m| nav_mesh_modifier_value(&m)),
-        ),
-        (
-            "ai_perception",
-            w.ai_perception(id).map(|p| ai_perception_value(&p)),
-        ),
-        ("particles", w.particles(id).map(|p| particle_value(&p))),
-        ("animator", w.animator(id).map(|a| animator_value(&a))),
-        ("audio", w.audio(id).map(|a| audio_value(&a))),
-        (
-            "reverb_zone",
-            w.reverb_zone(id).map(|z| reverb_zone_value(&z)),
-        ),
-    ]
+/// Implement [`Snapshot`] for each `Type => value builder`.
+macro_rules! snapshot {
+    ($($ty:ty => $value:expr,)*) => {
+        $(impl $crate::api::snapshot::fields::Snapshot for $ty {
+            fn snapshot(&self) -> serde_json::Value {
+                ($value)(self)
+            }
+        })*
+    };
+}
+pub(super) use snapshot;
+
+/// One row's snapshot value on entity `id`.
+macro_rules! field_value {
+    ($scene:ident, $id:ident, material) => {
+        $scene
+            .material_asset_of($id)
+            .map(super::components::material_value)
+    };
+    ($scene:ident, $id:ident, $field:ident) => {
+        $scene.world.$field($id).map(|c| Snapshot::snapshot(&*c))
+    };
 }
 
-/// Joints, character controllers, LOD groups, Light Probe Proxy Volumes and the
-/// ribbon renderers.
-fn rig_fields(scene: &Scene, id: u32) -> [Field; 6] {
-    let w = &scene.world;
-    [
-        ("joint", w.joint(id).map(|j| joint_value(&j))),
-        (
-            "character_controller",
-            w.character_controller(id).map(|c| cc_value(&c)),
-        ),
-        ("lod_group", w.lod_group(id).map(|g| lod_group_value(&g))),
-        (
-            "light_probe_proxy_volume",
-            w.light_probe_proxy_volume(id)
-                .and_then(|v| serde_json::to_value(&*v).ok()),
-        ),
-        ("trail", w.trail(id).map(|t| trail_value(&t))),
-        ("line", w.line(id).map(|l| line_value(&l))),
-    ]
+macro_rules! snapshot_rows {
+    ($($field:ident: $ty:ty => $kind:ident [$get_mut:ident $has:ident $($acc:ident)*];)*) => {
+        /// Each first-class component's authoring fields, keyed by its snapshot name
+        /// (`None` when the entity lacks it, written as `null`).
+        pub(super) fn component_fields(scene: &Scene, id: u32) -> Vec<Field> {
+            vec![$((stringify!($field), field_value!(scene, id, $field)),)*]
+        }
+
+        /// The names of the optional first-class components entity `id` carries,
+        /// by their inventory names, in the registry's order.
+        pub(super) fn carried(world: &World, id: u32) -> Vec<&'static str> {
+            let mut names = Vec::new();
+            $(if world.$has(id) {
+                names.push(<$ty as FirstClass>::INVENTORY);
+            })*
+            names
+        }
+    };
 }
 
-/// The in-game UI components.
-fn ui_fields(scene: &Scene, id: u32) -> [Field; 12] {
-    let w = &scene.world;
-    [
-        ("canvas", w.canvas(id).map(|c| canvas_value(&c))),
-        (
-            "rect_transform",
-            w.rect_transform(id).map(|r| rect_transform_value(&r)),
-        ),
-        ("image", w.image(id).map(|i| image_value(&i))),
-        (
-            "canvas_group",
-            w.canvas_group(id).map(|g| canvas_group_value(&g)),
-        ),
-        ("rect_mask", w.rect_mask(id).map(|m| rect_mask_value(&m))),
-        ("mask", w.mask(id).map(|m| mask_value(&m))),
-        (
-            "backdrop_filter",
-            w.backdrop_filter(id).map(|b| backdrop_filter_value(&b)),
-        ),
-        ("text", w.text(id).map(|t| text_value(&t))),
-        ("shape", w.shape(id).map(|s| shape_value(&s))),
-        ("selectable", w.selectable(id).map(|s| selectable_value(&s))),
-        (
-            "layout_group",
-            w.layout_group(id).map(|g| layout_group_value(&g)),
-        ),
-        (
-            "layout_element",
-            w.layout_element(id).map(|e| layout_element_value(&e)),
-        ),
-    ]
-}
+first_class!(snapshot_rows);

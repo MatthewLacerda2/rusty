@@ -1,12 +1,14 @@
 //! src/editor/inspector/components/camera/ — the Camera inspector card (this
 //! `mod.rs`) plus the Post Processing card (`post_processing`, one section per post
-//! effect). Both cards live on the same camera entity. The Camera card draws the
+//! effect). Both cards live on the same camera entity. The field of view and its
+//! axis are drawn by `fov`. The Camera card draws the
 //! camera effects' sections (`CAMERA_SECTIONS`: motion blur in `motion_blur`, TAA
 //! in `taa`, FXAA here).
 
 use crate::editor::widgets::DragRange;
 use egui_phosphor::regular as icon;
 
+mod fov;
 mod motion_blur;
 mod occlusion;
 pub(crate) mod post_processing;
@@ -20,12 +22,14 @@ use crate::scene::authoring::{self, rendering::camera as camera_ops, ComponentKi
 use crate::scene::{CameraComponent, ClearFlags};
 
 /// Camera Component panel. `named_layers` are the `(index, label)` slots offered in
-/// the culling-mask checklist (layer 0 + named user slots).
+/// the culling-mask checklist (layer 0 + named user slots); `view_aspect` is the
+/// editor viewport's width / height, which the field of view converts at (#2038).
 pub fn draw_camera(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
     named_layers: &[(u8, String)],
+    view_aspect: f32,
     is_dirty: &mut bool,
 ) {
     let Some(cam) = world.camera(id).map(|c| c.clone()) else {
@@ -34,7 +38,7 @@ pub fn draw_camera(
     let mut remove = false;
     component_card(ui, icon::VIDEO_CAMERA, "Camera", Some(&mut remove), |ui| {
         target::draw_projection_mode(ui, world, id, &cam, is_dirty);
-        draw_projection(ui, world, id, &cam, is_dirty);
+        draw_projection(ui, world, id, &cam, view_aspect, is_dirty);
         draw_culling_mask(ui, world, id, cam.culling_mask, named_layers, is_dirty);
         occlusion::draw_occlusion_culling(ui, world, id, &cam, is_dirty);
         draw_stacking(ui, world, id, cam.render_order, cam.clear_flags, is_dirty);
@@ -110,31 +114,17 @@ fn draw_fxaa(
     }
 }
 
-/// The projection widgets (FOV, near/far clip), reading the snapshot and routing each
-/// write through the shared op.
+/// The projection widgets (FOV and its axis, near/far clip), reading the snapshot
+/// and routing each write through the shared op. `view_aspect` is the viewport's.
 fn draw_projection(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
     cam: &crate::scene::CameraComponent,
+    view_aspect: f32,
     is_dirty: &mut bool,
 ) {
-    let mut fov = cam.fov;
-    ui.horizontal(|ui| {
-        ui.label("FOV:");
-        if ui
-            .add(crate::editor::widgets::slider(
-                &mut fov,
-                camera_ops::MIN_FOV..=camera_ops::MAX_FOV,
-            ))
-            .changed()
-        {
-            if let Some(mut c) = world.camera_mut(id) {
-                camera_ops::set_fov(&mut c, fov);
-            }
-            *is_dirty = true;
-        }
-    });
+    fov::draw_fov(ui, world, id, cam, fov::aspect(cam, view_aspect), is_dirty);
     let mut near = cam.near;
     ui.horizontal(|ui| {
         ui.label("Near Clip:");
@@ -255,4 +245,10 @@ fn draw_stacking(
                 }
             });
     });
+}
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::CameraComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Rendering;
+    const LABEL: &'static str = "Camera Component";
 }

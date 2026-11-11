@@ -81,6 +81,8 @@ pub fn default_rigidbody() -> RigidBodyComponent {
         angular_velocity: Vec3::ZERO,
         use_gravity: true,
         collision_detection: CollisionDetection::Discrete,
+        drag: 0.0,
+        angular_drag: crate::components::DEFAULT_ANGULAR_DRAG,
     }
 }
 
@@ -175,6 +177,7 @@ pub fn default_camera() -> CameraComponent {
         fov: crate::components::rendering::camera::DEFAULT_FOV,
         near: crate::components::rendering::camera::DEFAULT_NEAR,
         far: crate::components::rendering::camera::DEFAULT_FAR,
+        fov_axis: Default::default(),
         culling_mask: u32::MAX,
         render_order: 0,
         clear_flags: ClearFlags::Skybox,

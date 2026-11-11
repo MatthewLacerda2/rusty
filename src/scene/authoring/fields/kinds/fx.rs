@@ -47,7 +47,7 @@ inspect! {
         ro!("ik", "Animator.AddTwoBoneIK / AddAimIK / SetIKWeight write them"),
         op!("apply_root_motion", animator::set_apply_root_motion),
         op!("root_bone", animator::set_root_bone),
-    ];
+    ], field_type super::animator_field_type;
     ParticleEmitterComponent => particles, particles_mut, &[
         op!("active", fx::set_active),
         op!("emit_mode", fx::set_emit_mode),

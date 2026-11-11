@@ -115,8 +115,8 @@ pub struct Renderer {
     /// The post effects' shared pipelines (#1467): bloom, depth of field (#1445), the
     /// exposure meter (#1444) and motion blur (#1436).
     pub(crate) post_passes: postfx::effects::Passes,
-    /// Alpha-blended translucent solids (#242); depth write off, drawn back-to-front
-    /// in the transparent pass after opaque. Built on first use, like the three
+    /// Alpha-blended translucent solids (#242); depth write off, drawn by sorting priority,
+    /// then back-to-front (#2039), in the transparent pass after opaque. Built on first use, like the three
     /// editor-only pipelines below (#985).
     transparent_pipelines: gpu::pipelines::TransparentPipelines,
     /// The translucents' depth postpass (#1523).
@@ -191,7 +191,7 @@ pub struct Renderer {
     pub white_texture: Rc<GpuTexture>,
     /// Draws every uploaded image's mip chain (#1322).
     pub(crate) mip_generator: gpu::textures::MipGenerator,
-    /// A group(2) material bind group whose five map slots point at
+    /// A group(2) material bind group whose six map slots point at
     /// `default_texture` (its shader slots at `white_texture`) — used by the
     /// editor-grid and gizmo passes, which never sample the maps (they render unlit /
     /// use the default checker) but still must supply a bind group matching the
