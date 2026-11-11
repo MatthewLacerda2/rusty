@@ -219,31 +219,45 @@ impl PostFx {
         let (from, to) = (&self.scene_hdr.texture, &t.pyramid.texture);
         encoder.copy_texture_to_texture(from.as_image_copy(), to.as_image_copy(), extent);
         t.pyramid.build(&mut encoder, &passes.pyramid);
-        // The timer's `ssr` pair opens on the trace and closes on the resolve, so it
-        // counts the trace's pyramids too.
-        let timed = timer.writes(GpuPass::Ssr);
-        let (open, close) = split(timed);
-        {
-            // Cleared: a pixel that takes no SSR is discarded, so nothing traced.
-            let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
-            let targets = [(&t.hits.top, clear), (&t.spread.top, clear)];
-            let mut pass = begin(&mut encoder, "SSR Trace", &targets, open);
-            pass.set_pipeline(passes.trace.get());
-            pass.set_bind_group(0, &group, &[]);
-            pass.draw(0..3, 0..1);
-        }
-        t.hits.build(&mut encoder, &passes.pyramid);
-        t.spread.build(&mut encoder, &passes.spread);
-        {
-            // Loaded: a pixel that gets no SSR is discarded, left as it was.
-            let targets = [(&self.scene_hdr.view, wgpu::LoadOp::Load)];
-            let mut pass = begin(&mut encoder, "SSR Resolve", &targets, close);
-            pass.set_pipeline(passes.resolve.get());
-            pass.set_bind_group(0, &group, &[]);
-            pass.set_bind_group(1, &traced, &[]);
-            pass.draw(0..3, 0..1);
-        }
+        let groups = [&group, &traced];
+        trace_and_resolve(&mut encoder, passes, t, groups, &self.scene_hdr.view, timer);
         queue.submit(std::iter::once(encoder.finish()));
+    }
+}
+
+/// Record the trace into `t`'s hit targets, their pyramids, and the resolve over
+/// `scene`, with the shared group and the resolve's (`groups`).
+fn trace_and_resolve(
+    encoder: &mut wgpu::CommandEncoder,
+    passes: &SsrPasses,
+    t: &SsrTargets,
+    [group, traced]: [&wgpu::BindGroup; 2],
+    scene: &wgpu::TextureView,
+    timer: &GpuTimer,
+) {
+    // The timer's `ssr` pair opens on the trace and closes on the resolve, so it
+    // counts the trace's pyramids too.
+    let timed = timer.writes(GpuPass::Ssr);
+    let (open, close) = split(timed);
+    {
+        // Cleared: a pixel that takes no SSR is discarded, so nothing traced.
+        let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
+        let targets = [(&t.hits.top, clear), (&t.spread.top, clear)];
+        let mut pass = begin(encoder, "SSR Trace", &targets, open);
+        pass.set_pipeline(passes.trace.get());
+        pass.set_bind_group(0, group, &[]);
+        pass.draw(0..3, 0..1);
+    }
+    t.hits.build(encoder, &passes.pyramid);
+    t.spread.build(encoder, &passes.spread);
+    {
+        // Loaded: a pixel that gets no SSR is discarded, left as it was.
+        let targets = [(scene, wgpu::LoadOp::Load)];
+        let mut pass = begin(encoder, "SSR Resolve", &targets, close);
+        pass.set_pipeline(passes.resolve.get());
+        pass.set_bind_group(0, group, &[]);
+        pass.set_bind_group(1, traced, &[]);
+        pass.draw(0..3, 0..1);
     }
 }
 
