@@ -35,8 +35,13 @@ pub(super) fn on_side(manifolds: &[Manifold], second: bool) -> bool {
 /// a cylinder's contact costs a hull's GJK, not a hull's construction.
 #[derive(Default)]
 pub(super) struct Hulls {
-    built: Mutex<Map<(u32, u32), Option<Arc<ConvexPolyhedron>>>>,
+    built: Mutex<Map<Size, Hull>>,
 }
+
+/// A cylinder's exact size, as the bits of its half height and radius.
+type Size = (u32, u32);
+/// A built side hull, `None` for a cylinder with no volume.
+type Hull = Option<Arc<ConvexPolyhedron>>;
 
 /// More distinct sizes than this (a cylinder scaled every tick) and the store
 /// starts over, so it never grows without bound.
@@ -46,7 +51,7 @@ impl Hulls {
     /// The hull of `cylinder`'s side, `None` for a cylinder with no volume (which
     /// keeps its own shape). Keyed by the cylinder's exact size, so the same
     /// cylinder always gets the same hull.
-    pub(super) fn of(&self, cylinder: &Cylinder) -> Option<Arc<ConvexPolyhedron>> {
+    pub(super) fn of(&self, cylinder: &Cylinder) -> Hull {
         let key = (cylinder.half_height.to_bits(), cylinder.radius.to_bits());
         let mut built = self.built.lock().unwrap_or_else(PoisonError::into_inner);
         if let Some(hull) = built.get(&key) {
