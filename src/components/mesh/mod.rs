@@ -12,12 +12,16 @@ use crate::asset::{AnimationClip, SkinData};
 use serde::{Deserialize, Serialize};
 use std::ops::Range;
 
+mod data;
 mod geometry;
 pub mod primitives;
+mod runs;
 mod shadow_casting;
 mod skeleton;
 mod vertex;
 
+pub use data::{area_weighted_normals, MeshData, MAX_INDICES, MAX_VERTICES, SCENE_KIND};
+pub use runs::{clip_runs, material_runs};
 pub use shadow_casting::ShadowCasting;
 pub use skeleton::{BoneBinding, BoneBody};
 pub use vertex::Vertex;
@@ -30,12 +34,13 @@ pub use crate::asset::MeshRevision;
 pub struct MeshComponent {
     /// How this mesh's geometry is rehydrated on load. `"Box"`/`"Sphere"`/
     /// `"Plane"`/`"Cylinder"`/`"Capsule"` rebuild a primitive; `"Asset"` re-imports an
-    /// authored source file (see `asset_ref`). GPU buffers are never persisted.
+    /// authored source file and `"Scene"` ([`SCENE_KIND`], #2059) reads the scene's
+    /// mesh library (both name theirs in `asset_ref`). GPU buffers are never persisted.
     pub primitive_type: String,
     /// Path-based reference into an imported source file, `path::sub_object`
-    /// (e.g. `assets/models/crates.glb::Barrel`). Present iff
-    /// `primitive_type == "Asset"`; the scene layer re-imports it on load. This is
-    /// the only identity stored — the `.meta` sidecar holds settings, never this.
+    /// (e.g. `assets/models/crates.glb::Barrel`), for an `"Asset"`; the scene
+    /// mesh's library name for a `"Scene"`. Present iff one of the two. It is the
+    /// only identity stored: the `.meta` sidecar holds settings, never this.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asset_ref: Option<String>,
     /// A `"Plane"`'s quads per side (#1524): 1, the single quad, up to
@@ -242,34 +247,6 @@ impl MeshComponent {
         }
         Some((min, max))
     }
-}
-
-/// Which material slot draws which of a mesh's index `runs` (#1285), Unity's way
-/// (`Renderer.sharedMaterials`): slot `i` draws run `i`; a slot past the last run
-/// draws the last run again, so an extra material layers over it; a run past the
-/// last slot is not drawn. `slots` is `None` for an entity without a Material, whose
-/// every run draws with the engine default. The renderer and the lightmap bake
-/// (#1290) both pair slots with runs through this one rule.
-pub fn material_runs(runs: Vec<Range<u32>>, slots: Option<usize>) -> Vec<(usize, Range<u32>)> {
-    let Some(slots) = slots else {
-        return runs.into_iter().enumerate().collect();
-    };
-    let Some(last) = runs.last() else {
-        return Vec::new();
-    };
-    (0..slots)
-        .map(|slot| (slot, runs.get(slot).unwrap_or(last).clone()))
-        .collect()
-}
-
-/// `runs` clipped to the first `count` indices, empty runs dropped (#1285). A mesh's
-/// runs always cover its own indices; the clip only matters when its geometry changed
-/// ahead of a GPU upload. The renderer and the lightmap bake both clip through this
-/// before [`material_runs`], so the two never pair slots with different runs.
-pub fn clip_runs(runs: impl Iterator<Item = Range<u32>>, count: u32) -> Vec<Range<u32>> {
-    runs.map(|r| r.start.min(count)..r.end.min(count))
-        .filter(|r| !r.is_empty())
-        .collect()
 }
 
 impl crate::components::FirstClass for MeshComponent {

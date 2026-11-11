@@ -198,12 +198,36 @@ pub fn save_prefab(scene: &Scene, root_id: u32, path: &str) -> Result<(), String
 
 /// Serialize `prefab` and write it to `path` as pretty JSON. The single writer for the
 /// `.prefab` format, shared by `save_prefab` and the apply-to-source verbs (#268).
+/// Refuses a prefab whose entities draw a library mesh (#2059): it lives in its
+/// scene only, so an instance anywhere else would draw nothing.
 pub fn write_prefab_file(prefab: &PrefabData, path: &str) -> Result<(), String> {
+    if let Some((entity, name)) = scene_mesh_user(prefab) {
+        return Err(format!(
+            "entity '{}' draws the scene mesh {name:?}, which a prefab cannot hold: it lives \
+             in its scene only (give it a primitive or a model first)",
+            entity.name
+        ));
+    }
     let json = serde_json::to_string_pretty(prefab)
         .map_err(|e| format!("Failed to serialize prefab: {e}"))?;
     // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
     crate::core::fs::write_atomic(std::path::Path::new(path), json.as_bytes())
         .map_err(|e| format!("Failed to write prefab file: {e}"))
+}
+
+/// The first entity of `prefab` drawing a library mesh, by its Mesh or a Mesh
+/// collider's kept copy, with the mesh's name.
+fn scene_mesh_user(prefab: &PrefabData) -> Option<(&Entity, &str)> {
+    use crate::components::mesh::SCENE_KIND;
+    prefab.entities.iter().find_map(|e| {
+        let own = e
+            .mesh
+            .as_ref()
+            .and_then(crate::scene::mesh_library::scene_mesh_name);
+        let kept = e.collider.as_ref().and_then(|c| c.shared_mesh.as_ref());
+        let kept = kept.filter(|k| k.primitive_type == SCENE_KIND);
+        Some((e, own.or_else(|| kept?.asset_ref.as_deref())?))
+    })
 }
 
 /// Read and deserialize a `.prefab` document from `path`, its values held through
