@@ -53,7 +53,7 @@ impl MeshData {
         if i > MAX_INDICES {
             return Err(format!("{i} indices, past the limit of {MAX_INDICES}"));
         }
-        if i % 3 != 0 {
+        if !i.is_multiple_of(3) {
             return Err(format!("{i} indices is not a whole number of triangles"));
         }
         if let Some((at, index)) = self

@@ -125,3 +125,17 @@ fn an_entity_naming_a_missing_mesh_loads_empty() {
     assert_eq!(vertex_count(&loaded, id), 0);
     assert!(crate::scene::rehydrate::warned_of("Scene::piece"));
 }
+
+#[test]
+fn set_shared_mesh_switches_back_to_a_primitive_keeping_the_settings() {
+    let (mut scene, id) = scene_drawing(tetra());
+    scene.world.mesh_mut(id).unwrap().max_draw_distance = 12.0;
+    scene.set_shared_mesh(id, "sphere").unwrap();
+    let mesh = scene.world.mesh(id).unwrap();
+    assert_eq!(
+        (mesh.primitive_type.as_str(), mesh.asset_ref.as_deref()),
+        ("Sphere", None)
+    );
+    assert_eq!(mesh.max_draw_distance, 12.0);
+    assert!(!mesh.vertices.is_empty());
+}

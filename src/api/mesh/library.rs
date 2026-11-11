@@ -75,7 +75,7 @@ fn mesh_data(t: &Table) -> Result<MeshData, String> {
     let positions = triples("positions", &numbers("positions")?)?;
     let normals = triples("normals", &numbers("normals")?)?;
     let uvs = numbers("uvs")?;
-    if uvs.len() % 2 != 0 {
+    if !uvs.len().is_multiple_of(2) {
         return Err(format!(
             "{} uvs numbers is not a whole number of u,v pairs",
             uvs.len()
@@ -106,7 +106,7 @@ fn mesh_data(t: &Table) -> Result<MeshData, String> {
 
 /// `values` as x,y,z triples, or why not.
 fn triples(key: &str, values: &[f64]) -> Result<Vec<[f32; 3]>, String> {
-    if values.len() % 3 != 0 {
+    if !values.len().is_multiple_of(3) {
         return Err(format!(
             "{} {key} numbers is not a whole number of x,y,z triples",
             values.len()
