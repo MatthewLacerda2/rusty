@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use super::async_tests::{frame, open_editor_in, run_out, status};
-use super::{poll, Step};
+use super::{poll, take_request, Step};
 use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
@@ -48,19 +48,27 @@ fn gpu_play_asked_after_a_request_in_the_same_line_is_refused() {
 
 /// Refused while the job runs, with the same line the Play button's tooltip
 /// shows; taken once it was cancelled.
+///
+/// The job is started by the frame's first half alone (`take_request`), never a
+/// whole frame: a frame also advances the job, and an empty scene's lightmaps can
+/// finish inside it on a fast GPU, past the step a cancel applies to (#2105). So
+/// the cancel always reaches the lightmap step, and that step reads a cancel taken
+/// before its poll as cancelled even when its worker already finished
+/// (`LightmapBakeJob::poll`), whatever the GPU's speed.
 #[test]
 fn gpu_play_is_refused_while_the_job_runs_and_taken_after_a_cancel() {
     let (s, mut editor) = open_editor_in("play_during_bake");
     s.eval("Lighting.GenerateAsync()").unwrap();
     let mut console = ConsoleLogs::new();
     let scene = s.world().scene().clone();
-    frame(&mut editor, &mut scene.borrow_mut(), &mut console);
+    take_request(&mut editor, &mut scene.borrow_mut(), &mut console);
     let why = scene.borrow().play_refusal().expect("a bake runs");
     assert!(why.starts_with("Baking lighting"), "{why}");
     let err = s.eval("Editor.EnterPlay()").unwrap_err();
     assert!(err.contains(&format!("Editor.EnterPlay: {why}")), "{err}");
-    if let Some(Step::Lightmaps(job)) = editor.dev.lightmap_bake.as_ref().map(|a| &a.step) {
-        job.cancel();
+    match editor.dev.lightmap_bake.as_ref().map(|a| &a.step) {
+        Some(Step::Lightmaps(job)) => job.cancel(),
+        _ => panic!("the job was started, not advanced: {:?}", console.messages),
     }
     // The frame the cancel lands repaints at once, so the next frame draws Play
     // enabled without input.
