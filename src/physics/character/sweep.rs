@@ -95,7 +95,8 @@ impl PhysicsWorld {
     /// flat).
     fn ground_below(&self, m: &MoveCtx, pos: &Pose) -> Option<Vec3> {
         let probe = ShapeCastOptions::with_max_time_of_impact(m.skin + GROUND_PROBE);
-        let hit = self
+        let view = self.controller_view();
+        let hit = view
             .queries(m.filter)
             .cast_shape(pos, -Vector::Y, &m.shape, probe);
         hit.and_then(|(_, h)| h.normal1.try_normalize())
@@ -119,9 +120,10 @@ impl PhysicsWorld {
         let mut ground = None;
         let mut flat_hit = false;
         let mut collisions = Vec::new();
+        let view = self.controller_view();
         let movement = m.controller.move_shape(
             FIXED_DELTA_TIME,
-            &self.queries(m.filter),
+            &view.queries(m.filter),
             &m.shape,
             &m.start,
             motion,
@@ -182,7 +184,7 @@ impl PhysicsWorld {
     ) -> Option<(Vec3, CharacterMove)> {
         let cap = capsule(scene, id, cc, cc.height)?;
         let live = |_: ColliderHandle, c: &Collider| is_live(&self.bodies, c);
-        let m = MoveCtx {
+        let mut m = MoveCtx {
             controller: controller(cc, cap.radius),
             shape: cap.shape(),
             start: Pose::from_translation(cap.center),
@@ -194,6 +196,11 @@ impl PhysicsWorld {
             filter: self.character_filter(scene, id, &live),
         };
         let mut pass = self.pass(&m, motion);
+        if m.controller.autostep.is_some() && self.climbed_dynamic(&m, motion, &pass) {
+            // Again, without autostep: a dynamic body blocks like a wall.
+            m.controller.autostep = None;
+            pass = self.pass(&m, motion).after(pass.collisions);
+        }
         if let Some(steep) = self.steep_climb(&m, motion, &pass) {
             // Again, without the push into the slope: it blocks like a wall.
             pass = self
@@ -220,7 +227,7 @@ impl PhysicsWorld {
 
 /// One move's fixed inputs: the configured controller, the capsule and where it
 /// starts, and what it may hit.
-struct MoveCtx<'a> {
+pub(super) struct MoveCtx<'a> {
     controller: KinematicCharacterController,
     shape: Capsule,
     start: Pose,
@@ -235,7 +242,7 @@ struct MoveCtx<'a> {
 }
 
 impl MoveCtx<'_> {
-    fn walkable(&self, normal: Vec3) -> bool {
+    pub(super) fn walkable(&self, normal: Vec3) -> bool {
         normal.y >= self.slope_cos - 1e-4
     }
 }

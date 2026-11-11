@@ -14,7 +14,9 @@
 //! ([`ControllerHit`], `hits`): what `OnControllerColliderHit` hands scripts
 //! (#1879). The controller pushes nothing: rapier's automatic impulses
 //! (`solve_character_collision_impulses`) are deliberately unused, and a push is
-//! a script, as in Unity (the bundled `controller_push.lua`).
+//! a script, as in Unity (the bundled `controller_push.lua`). Nor does it ride
+//! one: a moving kinematic body under it carries it nowhere, and the sweep
+//! queries a view that hides rapier's own ride (`view`, #2061).
 //!
 //! Plain kinematic bodies are pure movers — they go exactly where their Transform
 //! says and never collide-and-slide (Unity's kinematic Rigidbody).
@@ -32,6 +34,7 @@ mod body;
 mod hits;
 mod pass;
 mod sweep;
+mod view;
 
 pub(super) use body::{character_collider_inputs, upright_offset};
 pub use hits::ControllerHit;
