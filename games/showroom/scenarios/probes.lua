@@ -62,7 +62,8 @@ for _, view in ipairs(views) do
     Camera.SetPitch(math.deg(math.atan(dy, math.sqrt(dx * dx + dz * dz))))
     Camera.ResetHistory()
     local path = "cache/test/probes/" .. view.name .. ".png"
-    if not Harness.Screenshot(path, { settle = 8, gizmos = true }) then
+    -- No settle: the showroom runs no TAA, so a settled frame is this one (#2090).
+    if not Harness.Screenshot(path, { gizmos = true }) then
         Harness.Log("shot skipped (no GPU adapter): " .. view.name)
     end
 end
