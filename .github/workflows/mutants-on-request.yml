@@ -126,6 +126,12 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ inputs.commit }}
+      # The tree is `inputs.commit`, which may predate a step this job calls
+      # (`install-tool`, #1973; `system-libs`, #2101): take `.github/actions`
+      # from the workflow's own commit, so a request queued before a change to
+      # them still runs. Before the first local action, which is `system-libs`.
+      - name: Shared steps from the workflow's commit
+        run: git checkout "$GITHUB_SHA" -- .github/actions
       - name: Toolchain (from rust-toolchain.toml)
         run: rustup show
       - name: Cache cargo registry + target
@@ -135,19 +141,18 @@ jobs:
           shared-key: mutants
           save-if: false
       - name: System libs for winit/wgpu builds
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
+        uses: ./.github/actions/system-libs
+        with:
+          packages: pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       # Mesa's software Vulkan driver, as in `ci.yml` (#489, #785). Without it
       # wgpu finds no adapter, every GPU test skips, and every mutant in code
       # only the GPU tests reach (render, captures) reports MISSED however well
       # it is tested. `RUSTY_REQUIRE_GPU` (job env) turns a lost driver into a
       # failed baseline instead of that silence.
       - name: Software Vulkan driver (lavapipe)
-        run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
-      # The tree is `inputs.commit`, which may predate a step this job calls
-      # (`install-tool`, #1973): take `.github/actions` from the workflow's own
-      # commit, so a request queued before a change to them still runs.
-      - name: Shared steps from the workflow's commit
-        run: git checkout "$GITHUB_SHA" -- .github/actions
+        uses: ./.github/actions/system-libs
+        with:
+          packages: mesa-vulkan-drivers libvulkan1
       # nextest too: mutants run under it (`--test-tool nextest`, below).
       - name: Install cargo-mutants and cargo-nextest
         uses: ./.github/actions/install-tool
