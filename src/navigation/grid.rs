@@ -81,6 +81,9 @@ pub struct NavigationGraph {
     pub(super) static_watch: Option<super::bake::StaticWatch>,
     /// The scene the play loop last started on (`bake::still::start_tracked`).
     pub(super) tracked_scene: Option<crate::scene::SceneId>,
+    /// The reusable per-span search state (#2083, `pool`): A\* starts in O(1)
+    /// instead of filling navmesh-sized arrays per query.
+    pub(super) search: super::pool::SearchScratch,
 }
 
 impl NavigationGraph {
@@ -116,6 +119,7 @@ impl NavigationGraph {
             offmesh: Default::default(),
             static_watch: None,
             tracked_scene: None,
+            search: Default::default(),
         }
     }
 
