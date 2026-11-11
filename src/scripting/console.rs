@@ -12,6 +12,10 @@ pub struct ConsoleLogs {
     /// What a recording demo has not taken yet (#1597); `None` while no demo
     /// records, which makes a mark a no-op.
     feed: Option<DemoFeed>,
+    /// Every warning and error since [`keep_warnings`](Self::keep_warnings), none
+    /// dropped by the buffer's cap: what `Harness.Warnings` reads (#2054). `None`
+    /// keeps none, so the editor's long-lived console never grows.
+    warnings: Option<Vec<(String, LogLevel)>>,
 }
 
 /// What the console hands a recording demo's index each tick (#1597).
@@ -49,7 +53,20 @@ impl ConsoleLogs {
             repeat: None,
             logged: 0,
             feed: None,
+            warnings: None,
         }
+    }
+
+    /// Keep every warning and error from now on, past the buffer's cap: a headless
+    /// run's scenario reads them with `Harness.Warnings` (#2054).
+    pub fn keep_warnings(&mut self) {
+        self.warnings.get_or_insert_with(Vec::new);
+    }
+
+    /// The warnings and errors kept since [`keep_warnings`](Self::keep_warnings),
+    /// oldest first, a repeat folded as the buffer shows it (`msg (×3)`).
+    pub fn warnings(&self) -> &[(String, LogLevel)] {
+        self.warnings.as_deref().unwrap_or_default()
     }
 
     /// Feed a demo from now on (`true`, a demo started recording), or stop
@@ -101,6 +118,12 @@ impl ConsoleLogs {
                 if let Some(entry) = self.messages.last_mut() {
                     entry.0 = Self::collapsed(&msg, count);
                 }
+                // The newest entry is a repeat's, so it is the newest warning too.
+                if let (LogLevel::Warning | LogLevel::Error, Some(kept)) =
+                    (&level, self.warnings.as_mut().and_then(|w| w.last_mut()))
+                {
+                    kept.0 = Self::collapsed(&msg, count);
+                }
                 self.repeat = Some((msg, count));
                 return;
             }
@@ -140,6 +163,9 @@ impl ConsoleLogs {
         self.repeat = None;
         if self.messages.len() >= 100 {
             self.messages.remove(0);
+        }
+        if let (LogLevel::Warning | LogLevel::Error, Some(kept)) = (&level, &mut self.warnings) {
+            kept.push((msg.clone(), level.clone()));
         }
         self.messages.push((msg, level));
     }
@@ -216,5 +242,31 @@ mod tests {
         let after: Vec<_> = log.since(mark).map(|(m, _)| m.as_str()).collect();
         assert_eq!(after.len(), 100, "only what the buffer still holds");
         assert_eq!((after[0], after[99]), ("e50", "e149"));
+    }
+
+    #[test]
+    fn kept_warnings_outlive_the_cap_and_fold_repeats() {
+        let mut log = ConsoleLogs::new();
+        log.warn("before keeping".into());
+        assert!(log.warnings().is_empty(), "kept only once asked");
+        log.keep_warnings();
+        log.error("broken".into());
+        log.repeated("[Asset] gone".into(), LogLevel::Warning, 1);
+        log.repeated("[Asset] gone".into(), LogLevel::Warning, 2);
+        for i in 0..150 {
+            log.info(format!("i{i}"));
+        }
+        let kept: Vec<_> = log
+            .warnings()
+            .iter()
+            .map(|(m, l)| (m.as_str(), l))
+            .collect();
+        assert_eq!(
+            kept,
+            [
+                ("broken", &LogLevel::Error),
+                ("[Asset] gone (×3)", &LogLevel::Warning)
+            ]
+        );
     }
 }
