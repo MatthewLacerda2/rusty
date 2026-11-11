@@ -5,10 +5,49 @@
 
 use egui_phosphor::regular as icon;
 
-use super::Step;
+use super::{ActiveBake, Step};
 use crate::dev::bake::lightmap::job::pass_line;
 use crate::dev::bake::steps::Stage;
 use crate::editor::EditorUi;
+use crate::scene::lighting::bake_status::BakeProgress;
+
+impl ActiveBake {
+    /// How far the bake is, in the bar's own counts (#2042): its step's share, and
+    /// whether the card offers Cancel.
+    pub(super) fn progress(&self) -> BakeProgress {
+        let share = |(done, total): (u64, u64)| {
+            // At most 100, so the cast keeps every value.
+            (total > 0).then(|| (done.min(total) * 100 / total) as u8)
+        };
+        let cells = |(done, total): (usize, usize)| share((done as u64, total as u64));
+        let (what, percent, cancellable) = match &self.step {
+            Step::Lightmaps(job) => {
+                // The trace's texels, then the encode's pages, as the bar counts.
+                let (what, counts) = match job.pages() {
+                    Some((done, n)) => ("lighting (lightmap pages)", (done, n)),
+                    None => ("lighting", job.progress()),
+                };
+                (what, share(counts), !job.is_cancelled())
+            }
+            Step::Probes { job, .. } => {
+                let counts = match job.stage() {
+                    Stage::Light { done, total, .. } | Stage::Reflection { done, total } => {
+                        (done, total)
+                    }
+                    Stage::Done => (1, 1),
+                };
+                ("lighting (probes)", cells(counts), false)
+            }
+            Step::Occlusion { job, .. } => ("lighting (occlusion)", cells(job.cells()), false),
+            Step::OcclusionOnly { job, .. } => ("occlusion", cells(job.cells()), false),
+        };
+        BakeProgress {
+            what,
+            percent,
+            cancellable,
+        }
+    }
+}
 
 /// The running bake's bar, and its Cancel button during the lightmaps.
 pub(super) fn draw_progress(ui: &mut egui::Ui, editor: &mut EditorUi) {
