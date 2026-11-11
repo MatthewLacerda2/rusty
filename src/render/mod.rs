@@ -115,8 +115,8 @@ pub struct Renderer {
     /// The post effects' shared pipelines (#1467): bloom, depth of field (#1445), the
     /// exposure meter (#1444) and motion blur (#1436).
     pub(crate) post_passes: postfx::effects::Passes,
-    /// Alpha-blended translucent solids (#242); depth write off, drawn back-to-front
-    /// in the transparent pass after opaque. Built on first use, like the three
+    /// Alpha-blended translucent solids (#242); depth write off, drawn by sorting priority,
+    /// then back-to-front (#2039), in the transparent pass after opaque. Built on first use, like the three
     /// editor-only pipelines below (#985).
     transparent_pipelines: gpu::pipelines::TransparentPipelines,
     /// The translucents' depth postpass (#1523).

@@ -725,6 +725,7 @@
       "preserve_specular": true,
       "receive_shadows": true,
       "refraction_model": "None",
+      "sorting_priority": 0,
       "ior": 1.5,
       "specular": 1.0,
       "specular_color": [

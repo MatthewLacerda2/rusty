@@ -17,7 +17,8 @@ crate::core::named_enum! {
         /// (foliage, chain-link, grates).
         Cutout = "Cutout",
         /// Alpha-blended (`ALPHA_BLENDING`), depth test on / write off, drawn in a
-        /// separate back-to-front-sorted pass after opaque (glass, holograms, fades).
+        /// separate pass after opaque, sorted by `sorting_priority` then back to front
+        /// (#2039; glass, holograms, fades).
         Transparent = "Transparent",
     }
 }
