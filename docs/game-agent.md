@@ -177,8 +177,9 @@ The tools describe themselves; what they don't say:
 - when the engine warned during a call, the result carries a second text block
   starting `engine warnings:`. Read it: a skipped asset or a dropped collider shows
   up there first;
-- `.mcp.json` registers two servers, each the checkout's built
-  `target/debug/session-mcp`. **Use one at a time**, and approve only the one this
+- `.mcp.json` registers two servers, each a built `session-mcp` of the checkout
+  (`target/<profile>/session-mcp`; one you point at another profile's build there
+  is kept). **Use one at a time**, and approve only the one this
   session will use. `rusty` attaches to the editor window the operator watches; open
   it first, from the checkout, with a `dev` build (a build without `dev` has no
   command socket): `cd <engine> && cargo run --bin rusty --features dev -- --project <game>`.
