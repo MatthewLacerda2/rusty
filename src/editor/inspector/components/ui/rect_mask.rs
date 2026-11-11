@@ -63,3 +63,17 @@ pub fn draw_mask(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_d
     }
     *is_dirty |= remove || changed;
 }
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::MaskComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Ui;
+    const LABEL: &'static str = "Mask";
+    const ICON: &'static str = egui_phosphor::regular::CIRCLE_DASHED;
+}
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::RectMaskComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Ui;
+    const LABEL: &'static str = "Rect Mask";
+    const ICON: &'static str = egui_phosphor::regular::CROP;
+}

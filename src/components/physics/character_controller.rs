@@ -79,3 +79,8 @@ impl Default for CharacterControllerComponent {
         }
     }
 }
+
+impl crate::components::FirstClass for CharacterControllerComponent {
+    const NAME: &'static str = "CharacterController";
+    const ALIASES: &'static [&'static str] = &["character"];
+}

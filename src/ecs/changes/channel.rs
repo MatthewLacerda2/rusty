@@ -3,18 +3,8 @@
 //! type that is neither (`ScriptComponent`, whose column is `Vec<ScriptComponent>`)
 //! does not compile, and a new marker is a column only by saying so.
 
-use crate::components::AIPerceptionComponent;
-use crate::components::{
-    AnimatorComponent, AudioSourceComponent, BackdropFilterComponent, CameraComponent,
-    CanvasComponent, CanvasGroupComponent, CharacterControllerComponent, ColliderComponent,
-    ImageComponent, JointComponent, LayoutElementComponent, LayoutGroupComponent, LightComponent,
-    LightProbeProxyVolumeComponent, LineComponent, LodGroupComponent, MaskComponent, MaterialAsset,
-    MaterialComponent, MeshComponent, NavMeshAgentComponent, NavMeshModifierComponent,
-    NavMeshModifierVolumeComponent, NavMeshObstacleComponent, OffMeshLinkComponent,
-    ParticleEmitterComponent, PostProcessingComponent, PrefabLink, RectMaskComponent,
-    RectTransformComponent, ReverbZoneComponent, RigidBodyComponent, ScriptComponent,
-    SelectableComponent, ShapeComponent, TextComponent, TrailComponent, TransformComponent,
-};
+use crate::components::registry::first_class;
+use crate::components::{MaterialAsset, PrefabLink, ScriptComponent, TransformComponent};
 
 use super::super::bundle::Core;
 
@@ -54,7 +44,7 @@ pub struct Activity;
 pub struct Layer;
 
 macro_rules! channels {
-    ($column:literal: $($ty:ty => $name:literal,)*) => {
+    ($column:literal: $($ty:ty => $name:expr,)*) => {
         $(
             impl sealed::Sealed for $ty {}
             impl Channel for $ty {
@@ -78,40 +68,14 @@ channels! { true:
     TransformComponent => "transform",
     Vec<ScriptComponent> => "scripts",
     MaterialAsset => "pending_material",
-    MeshComponent => "mesh",
-    MaterialComponent => "material",
-    AnimatorComponent => "animator",
-    LightComponent => "light",
-    ColliderComponent => "collider",
-    RigidBodyComponent => "rigidbody",
-    NavMeshAgentComponent => "nav_agent",
-    NavMeshObstacleComponent => "nav_obstacle",
-    OffMeshLinkComponent => "offmesh_link",
-    NavMeshModifierVolumeComponent => "nav_modifier",
-    NavMeshModifierComponent => "nav_mesh_modifier",
-    AIPerceptionComponent => "ai_perception",
-    CameraComponent => "camera",
-    PostProcessingComponent => "post_processing",
-    ParticleEmitterComponent => "particles",
-    AudioSourceComponent => "audio",
-    ReverbZoneComponent => "reverb_zone",
-    CanvasComponent => "canvas",
-    RectTransformComponent => "rect_transform",
-    ImageComponent => "image",
-    CanvasGroupComponent => "canvas_group",
-    RectMaskComponent => "rect_mask",
-    MaskComponent => "mask",
-    BackdropFilterComponent => "backdrop_filter",
-    TextComponent => "text",
-    SelectableComponent => "selectable",
-    LayoutGroupComponent => "layout_group",
-    LayoutElementComponent => "layout_element",
-    JointComponent => "joint",
-    CharacterControllerComponent => "character_controller",
-    LodGroupComponent => "lod_group",
-    LightProbeProxyVolumeComponent => "light_probe_proxy_volume",
-    TrailComponent => "trail",
-    LineComponent => "line",
-    ShapeComponent => "shape",
     PrefabLink => "prefab_link",
 }
+
+/// Each registry row's column is a channel named after its `Entity` field.
+macro_rules! registry_channels {
+    ($($field:ident: $ty:ty => $kind:ident [$($acc:ident)*];)*) => {
+        channels! { true: $($ty => stringify!($field),)* }
+    };
+}
+
+first_class!(registry_channels);

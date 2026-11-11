@@ -134,6 +134,11 @@ impl EntityRefs for LodGroupComponent {
     }
 }
 
+impl crate::components::FirstClass for LodGroupComponent {
+    const NAME: &'static str = "LODGroup";
+    const ALIASES: &'static [&'static str] = &["lod"];
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

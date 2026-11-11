@@ -190,3 +190,9 @@ pub(super) fn vec3_row(ui: &mut egui::Ui, label: &str, value: Vec3) -> Option<Ve
         .inner;
     changed.then_some(value)
 }
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::RigidBodyComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Physics;
+    const LABEL: &'static str = "RigidBody Component";
+}

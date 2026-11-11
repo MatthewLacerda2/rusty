@@ -39,3 +39,12 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
     }
     *is_dirty |= remove || changed;
 }
+
+impl crate::editor::inspector::components::add::AddEntry
+    for crate::components::CanvasGroupComponent
+{
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Ui;
+    const LABEL: &'static str = "Canvas Group";
+    const ICON: &'static str = egui_phosphor::regular::STACK;
+}

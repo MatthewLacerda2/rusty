@@ -170,3 +170,10 @@ fn draw_subdivisions(ui: &mut egui::Ui, current: u32) -> Option<u32> {
     let finished = r.drag_stopped() || r.changed();
     (finished && n != current).then_some(n)
 }
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::MeshComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Rendering;
+    const LABEL: &'static str = "Mesh";
+    const ICON: &'static str = egui_phosphor::regular::CUBE;
+}

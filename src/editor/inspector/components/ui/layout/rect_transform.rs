@@ -163,3 +163,12 @@ fn write_anchor(r: &mut RectTransformComponent, edit: Option<WorldAnchor>) {
     rect_ops::set_anchor_rotate(r, a.rotate_toward_target);
     rect_ops::set_anchor_hide_when_behind(r, a.hide_when_behind);
 }
+
+impl crate::editor::inspector::components::add::AddEntry
+    for crate::components::RectTransformComponent
+{
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Ui;
+    const LABEL: &'static str = "Rect Transform";
+    const ICON: &'static str = egui_phosphor::regular::FRAME_CORNERS;
+}

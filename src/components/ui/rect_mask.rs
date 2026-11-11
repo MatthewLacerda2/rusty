@@ -21,3 +21,8 @@ pub struct RectMaskComponent {
     /// distance inside the clip's edge. `0` is a hard clip. Kept `>= 0`.
     pub feather: f32,
 }
+
+impl crate::components::FirstClass for RectMaskComponent {
+    const NAME: &'static str = "RectMask";
+    const ALIASES: &'static [&'static str] = &["rectmask2d"];
+}

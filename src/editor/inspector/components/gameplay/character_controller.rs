@@ -90,3 +90,12 @@ fn draw_tuning(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, c: &Cc
         write(world, id, d, |c| cc_ops::set_min_move_distance(c, v));
     }
 }
+
+impl crate::editor::inspector::components::add::AddEntry
+    for crate::components::CharacterControllerComponent
+{
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Physics;
+    const LABEL: &'static str = "Character Controller";
+    const ICON: &'static str = egui_phosphor::regular::PERSON_SIMPLE_WALK;
+}

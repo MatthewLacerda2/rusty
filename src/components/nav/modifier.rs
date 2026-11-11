@@ -36,3 +36,8 @@ impl Default for NavMeshModifierVolumeComponent {
         }
     }
 }
+
+impl crate::components::FirstClass for NavMeshModifierVolumeComponent {
+    const NAME: &'static str = "NavMeshModifierVolume";
+    const ALIASES: &'static [&'static str] = &["navmodifiervolume"];
+}

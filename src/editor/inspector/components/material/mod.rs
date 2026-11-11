@@ -282,3 +282,9 @@ fn optional_map(
         });
     }
 }
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::MaterialComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Rendering;
+    const LABEL: &'static str = "Material / Texture Component";
+}

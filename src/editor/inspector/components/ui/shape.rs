@@ -105,3 +105,10 @@ fn write_back(s: &mut ShapeComponent, e: ShapeComponent) {
     ops::set_raycast_target(s, e.raycast_target);
     super::shader::write_back(&mut s.shader, e.shader);
 }
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::ShapeComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Ui;
+    const LABEL: &'static str = "Shape";
+    const ICON: &'static str = egui_phosphor::regular::SHAPES;
+}

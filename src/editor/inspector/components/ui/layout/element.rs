@@ -81,3 +81,12 @@ fn write_back(
     }
     ops::set_fit(e, edit.horizontal_fit, edit.vertical_fit);
 }
+
+impl crate::editor::inspector::components::add::AddEntry
+    for crate::components::LayoutElementComponent
+{
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Ui;
+    const LABEL: &'static str = "Layout Element";
+    const ICON: &'static str = egui_phosphor::regular::ARROWS_OUT;
+}

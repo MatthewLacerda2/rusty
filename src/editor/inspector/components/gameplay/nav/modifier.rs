@@ -74,3 +74,12 @@ pub fn draw_nav_modifier(
         remove_component(world, id, ComponentKind::NavMeshModifierVolume, d);
     }
 }
+
+impl crate::editor::inspector::components::add::AddEntry
+    for crate::components::NavMeshModifierVolumeComponent
+{
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Navigation;
+    const LABEL: &'static str = "NavMesh Modifier Volume";
+    const ICON: &'static str = egui_phosphor::regular::SELECTION;
+}

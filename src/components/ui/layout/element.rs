@@ -63,3 +63,8 @@ impl LayoutElementComponent {
         [self.horizontal_fit, self.vertical_fit][axis]
     }
 }
+
+impl crate::components::FirstClass for LayoutElementComponent {
+    const NAME: &'static str = "LayoutElement";
+    const ALIASES: &'static [&'static str] = &["contentsizefitter"];
+}

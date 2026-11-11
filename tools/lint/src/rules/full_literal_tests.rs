@@ -1,8 +1,11 @@
 use super::{Components, RULE};
 use crate::rules::{allowed, scan::Scan, test_code::test_lines, Finding};
 
-const ENTITY: &str = "pub struct Entity {\n    pub id: u32,\n    pub transform: TransformComponent,\n    \
-                      pub collider: Option<ColliderComponent>,\n    pub material: Option<MaterialComponent>,\n}\n";
+const ENTITY: &str =
+    "pub struct Entity {\n    pub id: u32,\n    pub transform: TransformComponent,\n}\n";
+const REGISTRY: &str =
+    "macro_rules! first_class {\n    collider: physics::ColliderComponent => Collider [];\n    \
+                        material: material::MaterialComponent => Texture [];\n}\n";
 const COLLIDER: &str = "pub struct ColliderComponent {\n    /// The shape.\n    pub shape: Shape,\n    \
                         #[serde(default)]\n    pub is_trigger: bool,\n    pub(crate) active: bool,\n}\n\
                         pub struct MaterialComponent {\n    pub name: String,\n}\n";
@@ -10,6 +13,7 @@ const COLLIDER: &str = "pub struct ColliderComponent {\n    /// The shape.\n    
 fn components() -> Components {
     Components::load([
         ("src/components/entity/mod.rs", ENTITY),
+        ("src/components/registry.rs", REGISTRY),
         ("src/components/collider/mod.rs", COLLIDER),
     ])
 }
@@ -130,6 +134,7 @@ fn a_file_only_a_gated_mod_declares_is_test_code() {
     );
     std::fs::create_dir_all(root.join("src/components/entity")).unwrap();
     file("src/components/entity/mod.rs", ENTITY);
+    file("src/components/registry.rs", REGISTRY);
     file("src/components/collider.rs", COLLIDER);
     let found = |decl: &str| {
         file("src/ui/mod.rs", decl);

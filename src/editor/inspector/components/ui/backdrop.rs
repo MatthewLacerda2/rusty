@@ -60,3 +60,12 @@ fn drag(ui: &mut egui::Ui, label: &str, v: &mut f32, range: std::ops::RangeInclu
     })
     .inner
 }
+
+impl crate::editor::inspector::components::add::AddEntry
+    for crate::components::BackdropFilterComponent
+{
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Ui;
+    const LABEL: &'static str = "Backdrop Filter";
+    const ICON: &'static str = egui_phosphor::regular::DROP_HALF;
+}

@@ -2,173 +2,88 @@
 //!
 //! One arm per first-class [`ComponentKind`] for each World-level primitive the
 //! dependency verbs compose: probe ([`has_kind`]), attach with defaults
-//! ([`set_default`]) and detach raw ([`clear_one`]). The compiler holds them
-//! exhaustive, so a new kind cannot be added without its three arms.
+//! ([`set_default`]) and detach raw ([`clear_one`]). All three are generated from
+//! the registry (`components::registry`), so a new kind has its arms by
+//! construction. Its Add Component default is its `Default`, unless [`added!`]
+//! names another.
 
-use crate::components::{AIPerceptionComponent, BackdropFilterComponent, MaskComponent};
-use crate::components::{
-    CanvasComponent, CanvasGroupComponent, ImageComponent, RectMaskComponent,
-    RectTransformComponent, SelectableComponent, TextComponent,
-};
-use crate::components::{CharacterControllerComponent, JointComponent, LineComponent};
-use crate::components::{LayoutElementComponent, LayoutGroupComponent, ShapeComponent};
-use crate::components::{LightProbeProxyVolumeComponent, ReverbZoneComponent};
-use crate::components::{LodGroupComponent, NavMeshObstacleComponent, TrailComponent};
+use crate::components::registry::first_class;
 use crate::ecs::World;
 use crate::scene::authoring::components::ComponentKind;
 use crate::scene::authoring::defaults::{
     default_animator, default_camera, default_collider, default_light, default_material,
-    default_nav_agent, default_post_processing, default_rigidbody,
+    default_nav_agent, default_rigidbody,
 };
 use crate::scene::authoring::{primitive_mesh_component, Primitive};
 use crate::scene::rehydrate::{bounds_of, refit_collider};
-use crate::scene::{AudioSourceComponent, MaterialComponent, ParticleEmitterComponent};
+use crate::scene::MaterialComponent;
 
-/// Does entity `id` carry a component of `kind`? The dependency machinery's presence
-/// probe, one arm per first-class kind.
-pub fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
-    match kind {
-        ComponentKind::Mesh => world.has_mesh(id),
-        ComponentKind::Light => world.has_light(id),
-        ComponentKind::Animator => world.has_animator(id),
-        ComponentKind::Collider => world.has_collider(id),
-        ComponentKind::RigidBody => world.has_rigidbody(id),
-        ComponentKind::Texture => world.has_material(id),
-        ComponentKind::NavMeshAgent => world.has_nav_agent(id),
-        ComponentKind::NavMeshObstacle => world.has_nav_obstacle(id),
-        ComponentKind::OffMeshLink => world.has_offmesh_link(id),
-        ComponentKind::NavMeshModifierVolume => world.has_nav_modifier(id),
-        ComponentKind::NavMeshModifier => world.has_nav_mesh_modifier(id),
-        ComponentKind::AIPerception => world.has_ai_perception(id),
-        ComponentKind::Camera => world.has_camera(id),
-        ComponentKind::Particles => world.has_particles(id),
-        ComponentKind::PostProcessing => world.has_post_processing(id),
-        ComponentKind::Audio => world.has_audio(id),
-        ComponentKind::ReverbZone => world.has_reverb_zone(id),
-        ComponentKind::Canvas => world.has_canvas(id),
-        ComponentKind::RectTransform => world.has_rect_transform(id),
-        ComponentKind::Image => world.has_image(id),
-        ComponentKind::CanvasGroup => world.has_canvas_group(id),
-        ComponentKind::RectMask => world.has_rect_mask(id),
-        ComponentKind::Mask => world.has_mask(id),
-        ComponentKind::BackdropFilter => world.has_backdrop_filter(id),
-        ComponentKind::Text => world.has_text(id),
-        ComponentKind::Selectable => world.has_selectable(id),
-        ComponentKind::LayoutGroup => world.has_layout_group(id),
-        ComponentKind::LayoutElement => world.has_layout_element(id),
-        ComponentKind::Joint => world.has_joint(id),
-        ComponentKind::CharacterController => world.has_character_controller(id),
-        ComponentKind::LodGroup => world.has_lod_group(id),
-        ComponentKind::LightProbeProxyVolume => world.has_light_probe_proxy_volume(id),
-        ComponentKind::Trail => world.has_trail(id),
-        ComponentKind::Line => world.has_line(id),
-        ComponentKind::Shape => world.has_shape(id),
-    }
+/// Attach one row's component with its Add Component default: the Mesh and the
+/// Material through their own verbs, the kinds below through the inspector's
+/// default values (`scene::authoring::defaults`), every other kind its `Default`.
+macro_rules! added {
+    ($w:ident, $id:ident, mesh, $set:ident) => {
+        add_box_mesh($w, $id)
+    };
+    ($w:ident, $id:ident, material, $set:ident) => {
+        attach_default_material_world($w, $id)
+    };
+    ($w:ident, $id:ident, animator, $set:ident) => {
+        $w.$set($id, Some(default_animator()))
+    };
+    ($w:ident, $id:ident, camera, $set:ident) => {
+        $w.$set($id, Some(default_camera()))
+    };
+    ($w:ident, $id:ident, collider, $set:ident) => {
+        $w.$set($id, Some(default_collider()))
+    };
+    ($w:ident, $id:ident, light, $set:ident) => {
+        $w.$set($id, Some(default_light()))
+    };
+    ($w:ident, $id:ident, nav_agent, $set:ident) => {
+        $w.$set($id, Some(default_nav_agent()))
+    };
+    ($w:ident, $id:ident, rigidbody, $set:ident) => {
+        $w.$set($id, Some(default_rigidbody()))
+    };
+    ($w:ident, $id:ident, $field:ident, $set:ident) => {
+        $w.$set($id, Some(Default::default()))
+    };
 }
 
-/// Attach `kind` with its Add-Component defaults at the World level, returning `false`
-/// when the entity is missing. Material rides in as a staged pending asset (folded into
-/// the library when the world guard drops) — the same path the editor Add menu uses.
-pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bool {
-    match kind {
-        ComponentKind::Mesh => add_box_mesh(world, id),
-        ComponentKind::Light => world.set_light(id, Some(default_light())),
-        ComponentKind::Animator => world.set_animator(id, Some(default_animator())),
-        ComponentKind::Collider => world.set_collider(id, Some(default_collider())),
-        ComponentKind::RigidBody => world.set_rigidbody(id, Some(default_rigidbody())),
-        ComponentKind::Texture => attach_default_material_world(world, id),
-        agent @ (ComponentKind::NavMeshAgent
-        | ComponentKind::NavMeshObstacle
-        | ComponentKind::OffMeshLink
-        | ComponentKind::NavMeshModifierVolume
-        | ComponentKind::NavMeshModifier
-        | ComponentKind::AIPerception) => set_default_agent(world, id, agent),
-        ComponentKind::Camera => world.set_camera(id, Some(default_camera())),
-        ComponentKind::Particles => {
-            world.set_particles(id, Some(ParticleEmitterComponent::default()))
+macro_rules! dispatch {
+    ($($field:ident: $ty:ty => $kind:ident [$get_mut:ident $has:ident $set:ident $take:ident $ids:ident];)*) => {
+        /// Does entity `id` carry a component of `kind`? The dependency machinery's
+        /// presence probe.
+        pub fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
+            match kind {
+                $(ComponentKind::$kind => world.$has(id),)*
+            }
         }
-        ComponentKind::PostProcessing => {
-            world.set_post_processing(id, Some(default_post_processing()))
+
+        /// Attach `kind` with its Add-Component defaults at the World level,
+        /// returning `false` when the entity is missing. Material rides in as a
+        /// staged pending asset (folded into the library when the world guard drops)
+        /// — the same path the editor Add menu uses.
+        pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bool {
+            match kind {
+                $(ComponentKind::$kind => added!(world, id, $field, $set),)*
+            }
         }
-        ComponentKind::Audio => world.set_audio(id, Some(AudioSourceComponent::default())),
-        ComponentKind::ReverbZone => {
-            world.set_reverb_zone(id, Some(ReverbZoneComponent::default()))
+
+        /// Detach `kind` from entity `id` (raw, no cascade). Returns `false` when the
+        /// entity is missing (clearing an absent component is otherwise a no-op
+        /// success). A Material drops only the reference; the shared library material
+        /// may still be in use.
+        pub(crate) fn clear_one(world: &mut World, id: u32, kind: ComponentKind) -> bool {
+            match kind {
+                $(ComponentKind::$kind => world.$set(id, None),)*
+            }
         }
-        ui @ (ComponentKind::Canvas
-        | ComponentKind::RectTransform
-        | ComponentKind::Image
-        | ComponentKind::CanvasGroup
-        | ComponentKind::RectMask
-        | ComponentKind::Mask
-        | ComponentKind::BackdropFilter
-        | ComponentKind::Text
-        | ComponentKind::Selectable
-        | ComponentKind::LayoutGroup
-        | ComponentKind::LayoutElement
-        | ComponentKind::Shape) => set_default_ui(world, id, ui),
-        ComponentKind::Joint => world.set_joint(id, Some(JointComponent::default())),
-        ComponentKind::CharacterController => {
-            world.set_character_controller(id, Some(CharacterControllerComponent::default()))
-        }
-        ComponentKind::LodGroup => world.set_lod_group(id, Some(LodGroupComponent::default())),
-        ComponentKind::LightProbeProxyVolume => {
-            world.set_light_probe_proxy_volume(id, Some(LightProbeProxyVolumeComponent::default()))
-        }
-        ComponentKind::Trail => world.set_trail(id, Some(TrailComponent::default())),
-        ComponentKind::Line => world.set_line(id, Some(LineComponent::default())),
-    }
+    };
 }
 
-/// [`set_default`] for the navigation and AI kinds, split out like
-/// [`set_default_ui`]. Any other kind attaches nothing and returns `false`.
-fn set_default_agent(world: &mut World, id: u32, kind: ComponentKind) -> bool {
-    match kind {
-        ComponentKind::NavMeshAgent => world.set_nav_agent(id, Some(default_nav_agent())),
-        ComponentKind::NavMeshObstacle => {
-            world.set_nav_obstacle(id, Some(NavMeshObstacleComponent::default()))
-        }
-        ComponentKind::OffMeshLink => world.set_offmesh_link(id, Some(Default::default())),
-        ComponentKind::NavMeshModifierVolume => {
-            world.set_nav_modifier(id, Some(Default::default()))
-        }
-        ComponentKind::NavMeshModifier => world.set_nav_mesh_modifier(id, Some(Default::default())),
-        ComponentKind::AIPerception => {
-            world.set_ai_perception(id, Some(AIPerceptionComponent::default()))
-        }
-        _ => false,
-    }
-}
-
-/// [`set_default`] for the in-game UI kinds, split out so the dispatcher stays
-/// under the function-length cap as first-class components keep arriving.
-/// A non-UI kind attaches nothing and returns `false`.
-fn set_default_ui(world: &mut World, id: u32, kind: ComponentKind) -> bool {
-    match kind {
-        ComponentKind::Canvas => world.set_canvas(id, Some(CanvasComponent::default())),
-        ComponentKind::RectTransform => {
-            world.set_rect_transform(id, Some(RectTransformComponent::default()))
-        }
-        ComponentKind::Image => world.set_image(id, Some(ImageComponent::default())),
-        ComponentKind::CanvasGroup => {
-            world.set_canvas_group(id, Some(CanvasGroupComponent::default()))
-        }
-        ComponentKind::RectMask => world.set_rect_mask(id, Some(RectMaskComponent::default())),
-        ComponentKind::Mask => world.set_mask(id, Some(MaskComponent::default())),
-        ComponentKind::BackdropFilter => {
-            world.set_backdrop_filter(id, Some(BackdropFilterComponent::default()))
-        }
-        ComponentKind::Text => world.set_text(id, Some(TextComponent::default())),
-        ComponentKind::Selectable => world.set_selectable(id, Some(SelectableComponent::default())),
-        ComponentKind::LayoutGroup => {
-            world.set_layout_group(id, Some(LayoutGroupComponent::default()))
-        }
-        ComponentKind::LayoutElement => {
-            world.set_layout_element(id, Some(LayoutElementComponent::default()))
-        }
-        ComponentKind::Shape => world.set_shape(id, Some(ShapeComponent::default())),
-        _ => false,
-    }
-}
+first_class!(dispatch);
 
 /// Unity's empty Mesh Filter draws nothing; rusty's Mesh is the Filter and Renderer
 /// in one, so it arrives as the menu's default Box. A Mesh-shaped collider follows
@@ -186,49 +101,6 @@ fn add_box_mesh(world: &mut World, id: u32) -> bool {
         refit_collider(&mut collider, bounds);
     }
     true
-}
-
-/// Detach `kind` from entity `id` (raw, no cascade). Returns `false` when the entity is
-/// missing (clearing an absent component is otherwise a no-op success).
-pub(crate) fn clear_one(world: &mut World, id: u32, kind: ComponentKind) -> bool {
-    match kind {
-        ComponentKind::Mesh => world.set_mesh(id, None),
-        ComponentKind::Light => world.set_light(id, None),
-        ComponentKind::Animator => world.set_animator(id, None),
-        ComponentKind::Collider => world.set_collider(id, None),
-        ComponentKind::RigidBody => world.set_rigidbody(id, None),
-        // Drop only the reference; the shared library material may still be in use.
-        ComponentKind::Texture => world.set_material(id, None),
-        ComponentKind::NavMeshAgent => world.set_nav_agent(id, None),
-        ComponentKind::NavMeshObstacle => world.set_nav_obstacle(id, None),
-        ComponentKind::OffMeshLink => world.set_offmesh_link(id, None),
-        ComponentKind::NavMeshModifierVolume => world.set_nav_modifier(id, None),
-        ComponentKind::NavMeshModifier => world.set_nav_mesh_modifier(id, None),
-        ComponentKind::AIPerception => world.set_ai_perception(id, None),
-        ComponentKind::Camera => world.set_camera(id, None),
-        ComponentKind::Particles => world.set_particles(id, None),
-        ComponentKind::PostProcessing => world.set_post_processing(id, None),
-        ComponentKind::Audio => world.set_audio(id, None),
-        ComponentKind::ReverbZone => world.set_reverb_zone(id, None),
-        ComponentKind::Canvas => world.set_canvas(id, None),
-        ComponentKind::RectTransform => world.set_rect_transform(id, None),
-        ComponentKind::Image => world.set_image(id, None),
-        ComponentKind::CanvasGroup => world.set_canvas_group(id, None),
-        ComponentKind::RectMask => world.set_rect_mask(id, None),
-        ComponentKind::Mask => world.set_mask(id, None),
-        ComponentKind::BackdropFilter => world.set_backdrop_filter(id, None),
-        ComponentKind::Text => world.set_text(id, None),
-        ComponentKind::Selectable => world.set_selectable(id, None),
-        ComponentKind::LayoutGroup => world.set_layout_group(id, None),
-        ComponentKind::LayoutElement => world.set_layout_element(id, None),
-        ComponentKind::Joint => world.set_joint(id, None),
-        ComponentKind::CharacterController => world.set_character_controller(id, None),
-        ComponentKind::LodGroup => world.set_lod_group(id, None),
-        ComponentKind::LightProbeProxyVolume => world.set_light_probe_proxy_volume(id, None),
-        ComponentKind::Trail => world.set_trail(id, None),
-        ComponentKind::Line => world.set_line(id, None),
-        ComponentKind::Shape => world.set_shape(id, None),
-    }
 }
 
 /// Attach a default per-entity library material at the World level via staging — the

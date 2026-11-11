@@ -117,3 +117,7 @@ impl Default for ReverbZoneComponent {
         }
     }
 }
+
+impl crate::components::FirstClass for ReverbZoneComponent {
+    const NAME: &'static str = "AudioReverbZone";
+}

@@ -125,6 +125,10 @@ impl LightComponent {
     }
 }
 
+impl crate::components::FirstClass for LightComponent {
+    const NAME: &'static str = "Light";
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

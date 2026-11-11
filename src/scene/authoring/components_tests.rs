@@ -60,7 +60,7 @@ fn parse_names_are_case_insensitive() {
 #[test]
 fn an_unknown_kind_lists_the_kinds() {
     let err = ComponentKind::parse_or_list("Meshh").unwrap_err();
-    assert!(err.starts_with("unknown component 'Meshh' (kinds: Mesh, Light,"));
+    assert!(err.starts_with("unknown component 'Meshh' (kinds: AIPerception, Animator,"));
     let listed = err.split("(kinds: ").nth(1).unwrap().trim_end_matches(')');
     // The names Component.* uses, each one AddComponent takes, every kind once.
     assert!(
