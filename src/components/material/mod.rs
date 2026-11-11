@@ -286,5 +286,9 @@ pub fn entity_material_key(id: u32) -> String {
     format!("entity_{id}_material")
 }
 
+impl crate::components::FirstClass for MaterialComponent {
+    const NAME: &'static str = "Material";
+}
+
 #[cfg(test)]
 mod tests;

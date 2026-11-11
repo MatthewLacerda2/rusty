@@ -7,8 +7,7 @@
 //! O(k²) migration). The other way, [`World::entity_document`] assembles a live
 //! entity's columns back into a document (moved here from `core.rs`, #1900).
 
-use std::collections::BTreeMap;
-
+use crate::components::registry::first_class;
 use crate::components::{ColliderComponent, Entity, MaterialAsset, MeshComponent};
 
 use super::world::World;
@@ -47,76 +46,65 @@ impl Core {
     }
 }
 
-/// Attach each `Some` value in `$field` to the builder; a `None` simply
-/// leaves that column unattached. Keeps `build_bundle` under the function
-/// line cap despite the component list being long.
-macro_rules! add_present {
-    ($b:expr, $($field:expr),* $(,)?) => {
-        $( if let Some(v) = $field { $b.add(v); } )*
+/// Generates [`add_components`] and [`Documented::copy`] from the registry rows:
+/// each row's column into a bundle, and back out of a live entity.
+macro_rules! bundle_rows {
+    ($($field:ident: $ty:ty => $kind:ident [$($acc:ident)*];)*) => {
+        /// Attach each first-class component `entity` carries to the builder; a
+        /// `None` leaves that column unattached.
+        fn add_components(b: &mut hecs::EntityBuilder, entity: Entity) {
+            $(if let Some(v) = entity.$field { b.add(v); })*
+        }
+
+        impl Documented<'_> {
+            /// Copy each first-class column of the entity into `doc`.
+            fn copy(&self, doc: &mut Entity) {
+                $(doc.$field = document_field!(self, $field);)*
+            }
+        }
     };
 }
 
-/// One `Entity` struct literal: the fields given as `name: value`, then each
-/// `cloned` field read from its accessor (`$world.field($id)`) and cloned. It is
-/// one literal, so the compiler still demands every `Entity` field (a component
-/// forgotten here fails to compile, not to save), while the plain clones pack
-/// several to a line and keep `World::document` under the function line cap.
-macro_rules! document_literal {
-    ($w:expr, $id:expr, { $($k:ident: $v:expr),* $(,)? } cloned: [$($f:ident),* $(,)?]) => {
-        Entity { $($k: $v,)* $($f: $w.$f($id).map(|c| (*c).clone()),)* }
+/// One row's column as a document field: cloned, but for the Mesh and the
+/// Collider, copied by the functions the caller chose.
+macro_rules! document_field {
+    ($d:expr, mesh) => {
+        $d.world.mesh($d.id).map(|c| ($d.mesh)(&c))
+    };
+    ($d:expr, collider) => {
+        $d.world.collider($d.id).map(|c| ($d.collider)(&c))
+    };
+    ($d:expr, $field:ident) => {
+        $d.world.$field($d.id).map(|c| (*c).clone())
     };
 }
+
+/// One live entity being copied into a document ([`World::document`]).
+struct Documented<'w> {
+    world: &'w World,
+    id: u32,
+    mesh: fn(&MeshComponent) -> MeshComponent,
+    collider: fn(&ColliderComponent) -> ColliderComponent,
+}
+
+first_class!(bundle_rows);
 
 /// Build the full component bundle for one `Entity` document — the mandatory
-/// core/name/transform/scripts plus every present optional component. Moves
-/// fields directly off `entity` (a series of partial moves) rather than one
-/// big destructure pattern, to stay well under the function line cap.
+/// core/name/transform/scripts plus every present optional component, so the
+/// whole entity lands in ONE archetype placement.
 pub(in crate::ecs) fn build_bundle(mut entity: Entity, seq: u64) -> hecs::EntityBuilder {
     let mut b = hecs::EntityBuilder::new();
     b.add(Core::take(&mut entity, seq));
-    b.add(entity.name);
-    b.add(entity.transform);
-    b.add(entity.scripts);
-    add_present!(
-        b,
-        entity.mesh,
-        entity.material,
-        entity.pending_material,
-        entity.animator,
-        entity.light,
-        entity.collider,
-        entity.rigidbody,
-        entity.nav_agent,
-        entity.nav_obstacle,
-        entity.offmesh_link,
-        entity.nav_modifier,
-        entity.nav_mesh_modifier,
-        entity.ai_perception,
-        entity.camera,
-        entity.post_processing,
-        entity.particles,
-        entity.audio,
-        entity.reverb_zone,
-        entity.canvas,
-        entity.rect_transform,
-        entity.image,
-        entity.canvas_group,
-        entity.rect_mask,
-        entity.mask,
-        entity.backdrop_filter,
-        entity.text,
-        entity.selectable,
-        entity.layout_group,
-        entity.layout_element,
-        entity.joint,
-        entity.character_controller,
-        entity.lod_group,
-        entity.light_probe_proxy_volume,
-        entity.trail,
-        entity.line,
-        entity.shape,
-        entity.prefab_link,
-    );
+    b.add(std::mem::take(&mut entity.name));
+    b.add(std::mem::take(&mut entity.transform));
+    b.add(std::mem::take(&mut entity.scripts));
+    if let Some(v) = entity.pending_material.take() {
+        b.add(v);
+    }
+    if let Some(v) = entity.prefab_link.take() {
+        b.add(v);
+    }
+    add_components(&mut b, entity);
     b
 }
 
@@ -146,28 +134,24 @@ impl World {
         collider: fn(&ColliderComponent) -> ColliderComponent,
     ) -> Option<Entity> {
         let core = self.component::<Core>(id)?;
-        Some(document_literal!(self, id, {
-            id: core.id,
-            name: (*self.name(id)?).clone(),
-            active: core.active,
-            is_static: core.is_static,
-            layer: core.layer,
-            transform: (*self.transform(id)?).clone(),
-            mesh: self.mesh(id).map(|c| mesh(&c)),
-            pending_material: self.component::<MaterialAsset>(id).map(|c| (*c).clone()),
-            scripts: (*self.scripts(id)?).clone(),
-            collider: self.collider(id).map(|c| collider(&c)),
-            parent_id: core.parent_id,
-            parent_bone: Vec::new(), // document-only, as `bone_refs`: a save fills them
-            bone_refs: BTreeMap::new(),
-            children: core.children.clone(),
-        } cloned: [
-            material, animator, light, rigidbody, nav_agent, nav_obstacle, offmesh_link,
-            nav_modifier, nav_mesh_modifier, ai_perception, camera, post_processing,
-            particles, audio, reverb_zone, canvas, rect_transform, image, canvas_group,
-            rect_mask, mask, backdrop_filter, text, selectable, layout_group,
-            layout_element, joint, character_controller, lod_group,
-            light_probe_proxy_volume, trail, line, shape, prefab_link,
-        ]))
+        let mut doc = Entity::new(core.id, (*self.name(id)?).clone());
+        doc.active = core.active;
+        doc.is_static = core.is_static;
+        doc.layer = core.layer;
+        doc.transform = (*self.transform(id)?).clone();
+        doc.pending_material = self.component::<MaterialAsset>(id).map(|c| (*c).clone());
+        doc.scripts = (*self.scripts(id)?).clone();
+        doc.prefab_link = self.prefab_link(id).map(|c| (*c).clone());
+        doc.parent_id = core.parent_id;
+        doc.children = core.children.clone();
+        // `parent_bone` and `bone_refs` are document-only: a save fills them.
+        let copy = Documented {
+            world: self,
+            id,
+            mesh,
+            collider,
+        };
+        copy.copy(&mut doc);
+        Some(doc)
     }
 }

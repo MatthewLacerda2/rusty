@@ -37,3 +37,8 @@ pub(crate) fn reverb_zone_value(z: &ReverbZoneComponent) -> Value {
         "wet": p.wet,
     })
 }
+
+super::fields::snapshot! {
+    AudioSourceComponent => audio_value,
+    ReverbZoneComponent => reverb_zone_value,
+}

@@ -63,3 +63,8 @@ impl Default for AIPerceptionComponent {
         }
     }
 }
+
+impl crate::components::FirstClass for AIPerceptionComponent {
+    const NAME: &'static str = "AIPerception";
+    const ALIASES: &'static [&'static str] = &["perception"];
+}

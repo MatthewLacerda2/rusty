@@ -8,3 +8,7 @@ pub mod light;
 pub mod light_probe_proxy_volume;
 pub mod lod_group;
 pub mod post_processing;
+
+impl crate::components::FirstClass for camera::CameraComponent {
+    const NAME: &'static str = "Camera";
+}

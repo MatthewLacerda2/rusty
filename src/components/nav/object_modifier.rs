@@ -44,3 +44,8 @@ impl Default for NavMeshModifierComponent {
         }
     }
 }
+
+impl crate::components::FirstClass for NavMeshModifierComponent {
+    const NAME: &'static str = "NavMeshModifier";
+    const ALIASES: &'static [&'static str] = &["navmodifier"];
+}

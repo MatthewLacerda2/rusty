@@ -40,6 +40,12 @@ impl LineComponent {
     }
 }
 
+impl crate::components::FirstClass for LineComponent {
+    const NAME: &'static str = "Line";
+    const ALIASES: &'static [&'static str] = &["linerenderer"];
+    const INVENTORY: &'static str = "LineRenderer";
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

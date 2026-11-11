@@ -135,3 +135,7 @@ impl ImageComponent {
         self.override_texture.as_ref().or(self.texture.as_ref())
     }
 }
+
+impl crate::components::FirstClass for ImageComponent {
+    const NAME: &'static str = "Image";
+}
