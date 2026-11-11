@@ -38,7 +38,7 @@ FAKES = {
     "apt-get": r"""echo "apt-get $*" >> "$LOG"
 dir=$(printf '%s\n' "$@" | sed -n 's/^Dir::Cache::archives=//p')
 case " $* " in
-  *" update "*) grep -q azure "$SOURCES" && [ "$MIRROR" = azure-down ] && exit 100
+  *" update "*) grep -q "^http:" "$SOURCES" && [ "$MIRROR" = http-down ] && exit 100
     [ "$MIRROR" = down ] && echo "W: Temporary failure resolving 'azure.archive.ubuntu.com'"; exit 0;;
   *" --download-only "*) [ "$MIRROR" = down ] && exit 100
     for p in "$@"; do case $p in -*|*=*|install) ;; *) touch "$dir/$p.deb";; esac; done;;
@@ -75,7 +75,8 @@ def install(hit: bool, mirror: str = "up", dpkg: str = "ok", cached: tuple[str, 
             (archive / f"{deb}.deb").touch()
         env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "LOG": str(root / "log"),
                "STATE": str(root / "state"), "MIRROR": mirror, "DPKG": dpkg,
-               "SOURCES": str(root / "mirrors.txt"), "APT_SOURCES": str(root / "mirrors.txt")}
+               "SOURCES": str(root / "mirrors.txt"), "APT_SOURCES": str(root / "mirrors.txt"),
+               "FALLBACKS": "https://one.example/ubuntu https://two.example/ubuntu"}
         done = subprocess.run([str(INSTALL), str(archive), "true" if hit else "false", "pkg-a", "pkg-b"],
                               env=env, capture_output=True, text=True, check=False)
         log = (root / "log").read_text() if (root / "log").exists() else ""
@@ -108,6 +109,7 @@ class Install(unittest.TestCase):
         self.assertNotEqual(status, 0)
         self.assertIn("::error::system-libs", out)
         self.assertEqual(log.count(" update"), 3, "three attempts")
+        self.assertIn("from https://two.example/ubuntu", out, "each fallback in turn")
         self.assertEqual(state, [])
 
     def test_a_miss_with_the_mirror_up_downloads_then_installs(self):
@@ -117,10 +119,10 @@ class Install(unittest.TestCase):
         self.assertLess(log.index("--download-only"), log.index("--no-download"))
         self.assertEqual(sorted(state), ["pkg-a", "pkg-b"])
 
-    def test_a_dead_azure_mirror_falls_back_to_ubuntus_archive(self):
-        status, out, log, state = install(hit=False, mirror="azure-down")
+    def test_a_dead_http_mirror_falls_back_to_an_https_one(self):
+        status, out, log, state = install(hit=False, mirror="http-down")
         self.assertEqual(status, 0, out)
-        self.assertEqual(log.count(" update"), 2, "the Azure mirror, then the archive")
+        self.assertEqual(log.count(" update"), 2, "the Azure mirror, then Ubuntu's over HTTPS")
         self.assertEqual(sorted(state), ["pkg-a", "pkg-b"])
 
     def test_a_hit_that_installs_short_is_flagged(self):

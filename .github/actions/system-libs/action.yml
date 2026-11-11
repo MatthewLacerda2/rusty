@@ -17,7 +17,7 @@
 #   arch are in the key only to make it readable.
 # - A hit installs the `.deb`s with `dpkg -i` and never runs `apt-get update`.
 #   A miss downloads with `Acquire::Retries`, a timeout and three attempts (the
-#   later ones from archive.ubuntu.com instead of the Azure mirror),
+#   later ones from HTTPS mirrors instead of the Azure one),
 #   then installs; `install.sh` says what each path does, and both end by
 #   checking with dpkg that every package is installed, so a mirror that is
 #   down on a miss fails the step loudly, never a half-install.
