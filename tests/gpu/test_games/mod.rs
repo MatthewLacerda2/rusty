@@ -9,6 +9,8 @@
     reason = "the budget times the `game` child, not the sim, with the wall clock (#757)"
 )]
 
+mod failing;
+
 use std::path::Path;
 use std::process::{Command, Output};
 use std::time::{Duration, Instant};
@@ -44,6 +46,7 @@ macro_rules! games {
 games! {
     // sorted: one game per line, so two branches adding a game land on different lines
     arena,
+    fruit,
     smoke,
     tetris,
     topple,
@@ -88,7 +91,7 @@ fn within_budget(took: Duration) -> bool {
 
 fn over_budget(name: &str, took: Duration) -> String {
     format!(
-        "{name}: `game --test` took {:.1} s, over its {} s budget (tests/gpu/test_games.rs, \
+        "{name}: `game --test` took {:.1} s, over its {} s budget (tests/gpu/test_games/mod.rs, \
          BUDGET): make the game's defaults cheaper",
         took.as_secs_f64(),
         BUDGET.as_secs()
@@ -106,7 +109,7 @@ fn a_game_over_its_budget_fails_naming_it() {
 
 /// `game --test` on `name`, generated under this test's temp dir, read from the
 /// `games` folder given (the checkout's when `None`).
-fn game_test(name: &str, games: Option<&Path>) -> Output {
+pub(super) fn game_test(name: &str, games: Option<&Path>) -> Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_game"));
     command
         .arg(name)
@@ -117,34 +120,4 @@ fn game_test(name: &str, games: Option<&Path>) -> Output {
         command.arg("--games").arg(games);
     }
     command.output().expect("the game binary runs")
-}
-
-#[test]
-fn a_failing_scenario_fails_the_play_test() {
-    let games = crate::temp::dir().join("games");
-    let game = games.join("broken");
-    std::fs::create_dir_all(game.join("scenarios")).unwrap();
-    let recipe = "Scene.New()\nScene.CreateEntity(\"Floor\", \"Plane\")\n\
-                  Scene.Save(\"assets/scenes/broken.scene\")\n\
-                  Application.SetStartupScene(\"assets/scenes/broken.scene\")\n";
-    std::fs::write(game.join("recipe.lua"), recipe).unwrap();
-    let scenario = "Harness.Step(1)\nHarness.Expect(false, \"this always fails\")\n";
-    std::fs::write(game.join("scenarios").join("fails.lua"), scenario).unwrap();
-    let out = game_test("broken", Some(&games));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert_eq!(out.status.code(), Some(1), "{stdout}");
-    assert!(stdout.contains("FAIL scenario fails"), "{stdout}");
-    assert!(stdout.contains("ok   generating twice"), "{stdout}");
-}
-
-#[test]
-fn a_recipe_error_fails_the_generation_and_names_the_recipe() {
-    let games = crate::temp::dir().join("games");
-    let game = games.join("raises");
-    std::fs::create_dir_all(&game).unwrap();
-    std::fs::write(game.join("recipe.lua"), "error(\"no floor today\")\n").unwrap();
-    let out = game_test("raises", Some(&games));
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert_eq!(out.status.code(), Some(2), "{stderr}");
-    assert!(stderr.contains("raises: recipe.lua") && stderr.contains("no floor today"));
 }
