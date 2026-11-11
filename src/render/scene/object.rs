@@ -5,6 +5,7 @@
 use glam::{Mat4, Vec3};
 
 use crate::components::{MaterialAsset, MaterialComponent, RenderFace, ShadowCasting};
+use crate::render::draw::batch::sort::TransparentOrder;
 use crate::render::draw::batch::BatchKey;
 use crate::render::draw::materials::material_texture_paths;
 use crate::render::draw::uniforms::solid_object;
@@ -20,13 +21,17 @@ use crate::scene::Scene;
 use super::handles::MeshHandle;
 
 /// One material slot's draw (#1285): its batch key with `bone_base` 0 (a skinned
-/// object's palette is placed per camera), whether it is transparent, the face
+/// object's palette is placed per camera), whether it is transparent and its
+/// sorting priority, the face
 /// its material renders, so a pose that mirrors the object re-picks its facing, and
 /// how it clips its shadow (#648; `None` casts plain depth).
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct SlotDraw {
     pub key: BatchKey,
     pub transparent: bool,
+    /// Its material's clamped Sorting Priority (#2039, `MaterialAsset::sort_priority`):
+    /// what a transparent slot sorts by before its depth.
+    pub priority: i32,
     pub face: RenderFace,
     pub clip: Option<CasterClip>,
 }
@@ -78,6 +83,16 @@ pub(crate) struct RenderObject {
     /// (`passes::shadows::shadow_runs`): derived with the slots, so a shadow sweep
     /// allocates nothing per caster.
     pub shadow_runs: Vec<ShadowRun>,
+}
+
+impl SlotDraw {
+    /// Where this slot sorts among the translucents at view depth `depth`: every
+    /// slot of one object shares its bounds' centre depth, so only the priority
+    /// tells them apart, and at equal priority they keep their slot order.
+    pub(crate) fn order(&self, depth: f32) -> TransparentOrder {
+        let priority = self.priority;
+        TransparentOrder { priority, depth }
+    }
 }
 
 impl RenderObject {
@@ -191,6 +206,7 @@ impl Renderer {
         object.slots.push(SlotDraw {
             key,
             transparent,
+            priority: material.map_or(0, MaterialAsset::sort_priority),
             face: material.map_or(RenderFace::Front, |m: &MaterialAsset| m.render_face),
             clip,
         });

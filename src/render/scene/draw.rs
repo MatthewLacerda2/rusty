@@ -5,7 +5,7 @@
 use glam::{Mat4, Vec3};
 
 use super::RenderObject;
-use crate::render::draw::batch::sort::view_depth;
+use crate::render::draw::batch::sort::{view_depth, TransparentOrder};
 use crate::render::draw::batch::DrawItem;
 use crate::render::draw::proxy_volume;
 use crate::render::draw::visibility::{CameraCulls, ViewCull};
@@ -18,12 +18,12 @@ use crate::scene::Scene;
 type Bounds = Option<(Vec3, Vec3)>;
 
 /// What one camera collects: its opaque items, its transparent items with their
-/// view depth, the joint palettes and proxy volumes they index, and, when the camera
+/// sorting priority and view depth, the joint palettes and proxy volumes they index, and, when the camera
 /// culls by Hi-Z, the objects GPU occlusion culling may test, by slot, with their
 /// world bounds (#1963).
 pub(crate) struct CameraSolids<'a> {
     pub opaque: &'a mut Vec<DrawItem>,
-    pub transparent: &'a mut Vec<(DrawItem, f32)>,
+    pub transparent: &'a mut Vec<(DrawItem, TransparentOrder)>,
     pub joints: &'a mut Vec<JointMatrix>,
     pub proxies: &'a mut proxy_volume::Frame,
     pub tested: Option<&'a mut Vec<(u32, (Vec3, Vec3))>>,
@@ -175,7 +175,7 @@ impl Renderer {
                 outline,
             };
             match slot.transparent {
-                true => out.transparent.push((item, depth)),
+                true => out.transparent.push((item, slot.order(depth))),
                 false => out.opaque.push(item),
             }
         }

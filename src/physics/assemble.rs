@@ -57,6 +57,8 @@ impl PhysicsWorld {
         }
         self.tracked.remember_plan(&next);
         self.plan = next;
+        // What the library-mesh colliders were built from (#2059, `watch::mesh_keys`).
+        self.record_mesh_keys(scene, &built);
         built
     }
 
@@ -132,7 +134,7 @@ impl PhysicsWorld {
     /// owner's pose, for a body that is `dynamic` or not (a concave mesh is split
     /// into convex pieces on a dynamic one, #1886). `None` for a dead entity or a
     /// degenerate mesh.
-    fn build_collider(
+    pub(super) fn build_collider(
         &self,
         scene: &Scene,
         owner_pose: &WorldPose,

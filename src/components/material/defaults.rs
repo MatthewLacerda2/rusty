@@ -34,6 +34,7 @@ impl Default for MaterialAsset {
             preserve_specular: true,
             receive_shadows: true,
             refraction_model: RefractionModel::None,
+            sorting_priority: 0,
             ior: default_ior(),
             specular: default_one(),
             specular_color: white(),

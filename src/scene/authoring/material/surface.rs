@@ -1,12 +1,14 @@
 //! The surface fields of a material (#1523): URP Lit's blending and shadow toggles,
 //! glTF's `KHR_materials_ior` and `KHR_materials_specular` reflectance (#1998), and
-//! HDRP Lit's refraction, absorption, depth postpass, motion vectors,
+//! HDRP Lit's refraction, absorption, sorting priority (#2039), depth postpass, motion vectors,
 //! SSR (opaque and transparent, #2004) and thin translucency, and TAA's reactivity (#1845), as rows of the material field table (`field.rs`).
 //!
 //! Pure.
 
 use super::field::{no_hint, SurfaceField, SurfaceKind, SurfaceValue};
-use crate::components::{BlendMode, MaterialAsset, RefractionModel, TaaReactive};
+use crate::components::{
+    BlendMode, MaterialAsset, RefractionModel, TaaReactive, SORTING_PRIORITY_RANGE,
+};
 
 fn transparent(m: &MaterialAsset) -> bool {
     m.is_transparent()
@@ -48,6 +50,10 @@ fn color(value: SurfaceValue) -> [f32; 3] {
 /// The channel range of a colour that can only tint (`transmittance_color`,
 /// `transmission_color`); `specular_color` can also raise, up to 25.
 const UNIT: std::ops::RangeInclusive<f32> = 0.0..=1.0;
+
+/// HDRP's *Sorting Priority* slider (#2039), an integer the write rounds to.
+const PRIORITY: std::ops::RangeInclusive<f32> =
+    -(SORTING_PRIORITY_RANGE as f32)..=SORTING_PRIORITY_RANGE as f32;
 
 /// Every surface field (blending, reflectance, refraction, absorption, SSR,
 /// translucency, reactivity), in Inspector order.
@@ -161,6 +167,16 @@ pub static SURFACE_FIELDS: &[SurfaceField] = &[
         get: |m| SurfaceValue::Number(m.absorption_distance),
         hint: no_hint,
         put: |m, v| m.absorption_distance = number(v),
+    },
+    SurfaceField {
+        key: "sorting_priority",
+        api: "SortingPriority",
+        label: "Sorting Priority",
+        kind: SurfaceKind::Number(PRIORITY),
+        shown: transparent,
+        get: |m| SurfaceValue::Number(m.sorting_priority as f32),
+        hint: no_hint,
+        put: |m, v| m.sorting_priority = number(v).round() as i32,
     },
     SurfaceField {
         key: "depth_postpass",

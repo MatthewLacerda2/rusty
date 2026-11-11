@@ -66,9 +66,7 @@ pub struct SceneData {
         skip_serializing_if = "crate::scene::AmbientSettings::is_default"
     )]
     pub ambient: crate::scene::AmbientSettings,
-    /// Per-scene navmesh bake settings (#276). A scene that omits the block loads
-    /// with the historical bake constants — and the per-field serde defaults inside `NavMeshSettings` mean a partial block (only
-    /// some knobs authored) fills the rest in too.
+    /// Per-scene navmesh bake settings (#276); a knob left out takes its default.
     #[serde(default)]
     pub nav_settings: NavMeshSettings,
     /// Distance + height fog (#437); off when absent.
@@ -89,6 +87,9 @@ pub struct SceneData {
     /// reference one by name. Empty when absent.
     #[serde(default)]
     pub materials: BTreeMap<String, MaterialAsset>,
+    /// The meshes made from data (#2059), by name. Left out when there are none.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub meshes: crate::scene::mesh_library::MeshLibrary,
     /// Light-probe POSITIONS + grid layout (#240). The probes' baked SH is
     /// `#[serde(skip)]` on `Probe`, so this document carries only positions/layout
     /// (references + values, no GPU/heavy data); the SH lives in the
@@ -132,6 +133,7 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
         layers: scene.layers.clone(),
         collision_matrix: scene.collision_matrix.clone(),
         materials: (*scene.materials).clone(),
+        meshes: scene.meshes.clone(),
         probes: scene.probes.clone(),
         reflection_probes: scene.reflection_probes.clone(),
         lightmaps: saved_lightmaps(scene),
@@ -220,6 +222,7 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
     scene.meshes_read_at = crate::core::fs::written::written_since(u64::MAX).0;
 
     take_materials(scene, &mut data);
+    crate::scene::mesh_library::put_back(std::mem::take(&mut data.meshes), &mut scene.meshes);
 
     let bone_parents = crate::scene::skeleton::take_bone_parents(&mut data.entities);
     let bone_refs = crate::scene::skeleton::take_bone_refs(&mut data.entities);
@@ -240,13 +243,10 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
     data.layers.normalize();
     scene.layers = data.layers;
     scene.collision_matrix = data.collision_matrix;
-    // Probe positions + grid come from the scene doc; their SH stays zero here and is
-    // merged in from the `<scene>.lighting.json` sidecar by `load_from_file` (#240).
+    // Probe positions + grid; their SH is merged from the sidecar by `load_from_file` (#240).
     scene.probes = data.probes;
-    // Reflection probes (positions + boxes + cubemap paths) come straight from the
-    // scene doc; the cubemaps themselves are loaded lazily by the renderer (#244).
-    // Held to their ranges once, here (#1584), so every reader (the bake, the
-    // probe array, `Reflection.Get`, the Inspector) sees the same values.
+    // Reflection probes (#244; the renderer loads their cubemaps lazily), held to
+    // their ranges once, here (#1584), so every reader sees the same values.
     scene.reflection_probes = data.reflection_probes;
     scene.reflection_probes.hold();
     scene.lightmaps = data.lightmaps.into();
@@ -267,6 +267,7 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
     // read the held shapes; prefab propagation holds what it rebuilds.
     if from_disk {
         crate::scene::authoring::fields::hold_world(&mut scene.world);
+        scene.meshes = crate::scene::mesh_library::checked(std::mem::take(&mut scene.meshes));
     }
 
     scene.update_all_colliders();
@@ -277,11 +278,11 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
     // ids, and a source applied to during Play reaches the edit-mode instances. A
     // missing/renamed source is skipped per instance, so this never aborts the load.
     crate::scene::prefab::link::propagate_all_linked_instances(scene);
+    // The entities drawing a library mesh (#2059) take its geometry.
+    scene.sync_scene_meshes();
 
-    // Validate declared component dependencies on load (#359): a hand-edited or
-    // drifted scene carrying a dependent component without its requirement (e.g. a
-    // camera-less PostProcessing) gets the requirement auto-added — the same rule
-    // `add` uses — so the scene loads instead of silently violating it.
+    // Validate declared component dependencies on load (#359): a dependent without
+    // its requirement (a camera-less PostProcessing) gets it added, as `add` does.
     for id in scene.world.ids().to_vec() {
         for (dependent, requirement) in
             crate::scene::authoring::dependency::enforce_requirements(&mut scene.world, id)

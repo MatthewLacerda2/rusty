@@ -1,9 +1,11 @@
 //! src/render/passes/transparent/mod.rs — the alpha-blended transparent solids pass (#242).
 //!
 //! Drawn after opaque solids + decals, before particles/post-FX. The draw list is the
-//! Transparent-material entities for one camera, already sorted back-to-front by the
-//! `precreate_solid_resources` split, so `ALPHA_BLENDING` composites correctly (nearer
-//! glass over farther glass over the opaque world).
+//! Transparent-material entities for one camera, already sorted by the
+//! `precreate_solid_resources` split: by their material's Sorting Priority, then
+//! back-to-front (#2039, `draw::batch::sort::transparent_order`), so `ALPHA_BLENDING`
+//! composites correctly (nearer glass over farther glass over the opaque world, and a
+//! higher priority over a lower one whatever their depths).
 //!
 //! It reuses the camera's instanced draw data the opaque pass binds (group 1 frame
 //! buffers, group 2 shared material, #470) and the same shader; only the pipeline differs
@@ -25,7 +27,7 @@ use crate::render::{RenderView, Renderer};
 
 impl Renderer {
     /// Draw the camera's translucent solids into `view`'s HDR target. `items` is already
-    /// back-to-front (farthest first); only neighbouring copies were merged (#470). No-op when there is nothing translucent,
+    /// in sorting priority order, then back-to-front (farthest first, #2039); only neighbouring copies were merged (#470). No-op when there is nothing translucent,
     /// so opaque-only scenes pay nothing (#242).
     pub(crate) fn draw_transparent(&self, view: &RenderView, items: &[DrawBatch]) {
         if items.is_empty() {
@@ -64,7 +66,7 @@ impl Renderer {
         self.queue.submit(std::iter::once(encoder.finish()));
     }
 
-    /// Record the back-to-front transparent draws into `pass`: the global bind group
+    /// Record the sorted (priority, then back-to-front) transparent draws into `pass`: the global bind group
     /// and `group3` (the shadows, and the opaque copy when this camera made one,
     /// #1523), then the same batch recording the opaque pass uses — each batch
     /// binding the transparent pipeline of its material's shader (#396) and blend,
