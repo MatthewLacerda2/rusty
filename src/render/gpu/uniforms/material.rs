@@ -91,6 +91,8 @@ pub(crate) struct MaterialData {
     // angles in `w`, its `dielectric_f90` (`specular`). The shader mixes both toward
     // a metal's (albedo, 1) by `metallic`.
     pub dielectric_reflectance: [f32; 4],
+    // The detail layer (#1997, HDRP's detail map).
+    pub detail: DetailUniform,
 }
 
 // The stride is a dynamic-offset alignment, not a cap the record has to fit; a storage
@@ -200,4 +202,27 @@ impl Default for MappingUniform {
             _pad: 0,
         }
     }
+}
+
+/// Where and how strongly a draw's detail map applies (#1997), packed from its
+/// material's `DetailLayer` (`draw::uniforms::detail_uniform`); all zero (off) for a
+/// material without one, or one without a map.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct DetailUniform {
+    /// The detail's own scale/offset: under UV0 applied to the main maps' tiled UV
+    /// (HDRP's *Link Details with Base*), under a world mapping to the projection
+    /// at `world_scale`. Packed for v down the image as the main `uv_st` is.
+    pub detail_st: [f32; 4],
+    /// 1 when the detail map is sampled.
+    pub use_detail_map: u32,
+    /// Detail repeats per metre under a world mapping: `1 / world_size`.
+    pub detail_world_scale: f32,
+    /// HDRP's *Detail Albedo Scale*.
+    pub detail_albedo_scale: f32,
+    /// HDRP's *Detail Normal Scale*.
+    pub detail_normal_scale: f32,
+    /// HDRP's *Detail Smoothness Scale*.
+    pub detail_smoothness_scale: f32,
+    pub _pad: [u32; 3],
 }

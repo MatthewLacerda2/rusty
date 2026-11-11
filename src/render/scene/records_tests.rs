@@ -1,7 +1,7 @@
 //! The material table's slots and the edit sort (#1706), adapter-free.
 
 use super::*;
-use crate::components::{RenderFace, RenderMode};
+use crate::components::{DetailLayer, RenderFace, RenderMode};
 
 fn tint(r: f32) -> MaterialData {
     MaterialData::flat([r, 0.0, 0.0, 1.0])
@@ -54,21 +54,34 @@ fn a_value_edit_rewrites_and_a_key_edit_rekeys() {
         f(&mut m);
         m
     };
-    let values: [fn(&mut MaterialAsset); 5] = [
+    let values: [fn(&mut MaterialAsset); 6] = [
         |m| m.base_color = [0.2, 0.3, 0.4],
         |m| m.metallic = 0.7,
         |m| m.emissive = [4.0; 3],
         |m| m.tiling = [2.0, 2.0],
         |m| drop(m.shader_params.insert("tint".into(), vec![1.0])),
+        |m| {
+            m.detail = Some(DetailLayer {
+                albedo_scale: 2.0,
+                ..Default::default()
+            })
+        },
     ];
     for f in values {
         assert!(!rekeys(&base, &with(f)), "{:?}", with(f));
     }
-    let keys: [fn(&mut MaterialAsset); 4] = [
+    let keys: [fn(&mut MaterialAsset); 5] = [
         |m| m.render_mode = RenderMode::Transparent,
         |m| m.render_face = RenderFace::Both,
         |m| m.shader = Some("dissolve".into()),
         |m| m.base_color_map = Some("a.png".into()),
+        // The detail map binds in the material's group (#1997).
+        |m| {
+            m.detail = Some(DetailLayer {
+                map: Some("d.png".into()),
+                ..Default::default()
+            })
+        },
     ];
     for f in keys {
         assert!(rekeys(&base, &with(f)), "{:?}", with(f));

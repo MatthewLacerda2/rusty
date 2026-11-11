@@ -36,11 +36,15 @@ use std::collections::HashMap;
 use crate::scene::SceneId;
 use crate::shadergen::params::PackedParams;
 
-/// Group-2 textures: the five maps plus one per extra shader texture slot (#400).
-pub(crate) const MATERIAL_TEXTURES: usize = 5 + crate::shadergen::textures::SLOTS.len();
+/// The material's own maps in group 2: albedo, metallic, roughness, normal,
+/// emissive and detail (#1997).
+pub(crate) const MATERIAL_MAPS: usize = 6;
 
-/// Albedo, metallic, roughness, normal and emissive map keys, then the extra shader
-/// texture slots (`mask`), in that order.
+/// Group-2 textures: the six maps plus one per extra shader texture slot (#400).
+pub(crate) const MATERIAL_TEXTURES: usize = MATERIAL_MAPS + crate::shadergen::textures::SLOTS.len();
+
+/// Albedo, metallic, roughness, normal, emissive and detail map keys, then the
+/// extra shader texture slots (`mask`), in that order.
 pub(crate) type MapSignature = [String; MATERIAL_TEXTURES];
 
 /// Who owns a param buffer: a material (by its scene and library key), or one

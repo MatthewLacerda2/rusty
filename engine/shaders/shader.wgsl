@@ -8,6 +8,7 @@
 #import lighting::ssr_surface
 #import forward::transparent
 #import forward::mapping
+#import forward::detail
 #import forward::reflection::{baked_diffuse, environment_brdf, environment_reflection, specular_occlusion}
 #import forward::lighting::{ambient_occlusion, sun_shadow_parts, flat_ambient, fold_decals, indirect_bounce, lamp, lightmap_level, probe_irradiance, ssil_realtime, with_ssil_share}
 #import forward::shadowmask::{baked_occlusion, directional_shadows, local_shadows}
@@ -355,13 +356,16 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // glTF metallic-roughness packs metallic in BLUE, roughness in GREEN. Each scalar
     // multiplies its map channel when the flag is set, else acts alone (#202, #1574).
     let surface_metallic = clamp(m.metallic * mapping::mask(m.use_metallic_map, t_metallic, s_metallic, maps, 2u), 0.0, 1.0);
-    let surface_roughness = clamp(m.roughness * mapping::mask(m.use_roughness_map, t_roughness, s_roughness, maps, 1u), 0.04, 1.0);
+    let main_roughness = clamp(m.roughness * mapping::mask(m.use_roughness_map, t_roughness, s_roughness, maps, 1u), 0.04, 1.0);
+    // The detail layer (#1997, `forward::detail`): albedo, roughness and normal, before any light.
+    let detailed = detail::apply(detail::coords(maps, in.world_position, geometric), base_color.rgb, main_roughness, N, facing_tangent(in.world_tangent, behind));
+    N = detailed.normal;
 
     // 0. Surface decals (#638): this cluster's decals change the material inputs
     // before any light is summed, so a decal is lit, shadowed and occluded like the
     // surface it lands on. The angle fade reads the geometric normal.
     let cluster = cluster_index(camera.clusters, camera.view_proj, in.world_position);
-    var surface = DecalSurface(base_color.rgb, N, surface_metallic, surface_roughness, 1.0);
+    var surface = DecalSurface(detailed.albedo, N, surface_metallic, detailed.roughness, 1.0);
     if (m.receive_decals == 1u) {
         surface = fold_decals(surface, cluster, in.world_position, geometric);
     }

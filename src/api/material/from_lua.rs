@@ -12,6 +12,7 @@
 //!   emissive = {0.0, 0.0, 0.0}, emissive_map = "e.png",
 //!   render_mode = "Cutout", alpha = 1.0, alpha_cutoff = 0.5,
 //!   tiling = {4, 4}, offset = {0, 0}, uv_mapping = "Triplanar", world_size = 2.0,
+//!   detail = { map = "detail.png", tiling = {8, 8}, albedo_scale = 1.0 },
 //!   shader = "enemy_toon", shader_textures = { mask = "noise.png" },
 //!   maps = { resolution = 512, nodes = { ... }, outputs = { base_color = "albedo" } },
 //! }
@@ -161,7 +162,13 @@ fn shader_textures(value: Option<serde_json::Value>) -> Result<Vec<(String, Stri
 fn refuse_unknown_keys(value: &serde_json::Value) -> Result<(), String> {
     // Valid, though an empty asset never writes them: the lifted keys and the
     // fields omitted while they hold their defaults.
-    const UNWRITTEN: [&str; 4] = ["shader_textures", "maps", "receive_decals", "decal"];
+    const UNWRITTEN: [&str; 5] = [
+        "shader_textures",
+        "maps",
+        "receive_decals",
+        "decal",
+        "detail",
+    ];
     let known = serde_json::to_value(MaterialAsset::default()).map_err(|e| e.to_string())?;
     let (Some(given), Some(known)) = (value.as_object(), known.as_object()) else {
         return Ok(());

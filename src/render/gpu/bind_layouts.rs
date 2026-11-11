@@ -148,13 +148,16 @@ fn material_sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
 
 /// Group 2 (one per distinct material map set, #470): albedo (0) and its sampler
 /// (1), metallic map (2), roughness map (3), normal map (4), emissive map (5), and
-/// the material's runtime shader params (6, #399) — a fixed `array<vec4<f32>, 16>`
+/// the detail map (15, #1997), the material's runtime shader params (6, #399) — a fixed `array<vec4<f32>, 16>`
 /// uniform only a surface variant with runtime params reads — then one texture per
 /// extra shader slot (7 = `mask`, #400), which only a variant with a block sampling
 /// it reads. Every
 /// texture but albedo has its own sampler at `textures::sampler_binding` (16 past
 /// it), the wrap and filter of its import settings (#1323). This is the layout the
 /// forward pass's group(2) is built against (#202, #207).
+/// The detail map's group-2 binding: `materials::MAP_BINDINGS`' last.
+const DETAIL_BINDING: u32 = crate::render::draw::materials::MAP_BINDINGS[5];
+
 pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     let mut entries = vec![
         material_texture_entry(0),
@@ -163,6 +166,7 @@ pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLa
         material_texture_entry(3),
         material_texture_entry(4),
         material_texture_entry(5),
+        material_texture_entry(DETAIL_BINDING),
         wgpu::BindGroupLayoutEntry {
             binding: crate::shadergen::params::PARAM_BINDING,
             // The vertex stage too: a vertex block's runtime param (#1524).
@@ -181,7 +185,7 @@ pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLa
             .iter()
             .map(|slot| material_texture_entry(slot.binding)),
     );
-    let paired = [2, 3, 4, 5]
+    let paired = [2, 3, 4, 5, DETAIL_BINDING]
         .into_iter()
         .chain(SLOTS.iter().map(|s| s.binding));
     entries.extend(paired.map(|b| material_sampler_entry(sampler_binding(b))));

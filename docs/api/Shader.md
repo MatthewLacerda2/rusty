@@ -248,7 +248,10 @@ into the lit color; postfx blocks grade the sampled scene color.
   energy pattern); `triplanar_detail {scale = 0.5, strength* = 1}` (the mask
   projected in **world space** from the three axes and blended by the normal, so
   it tiles evenly across level geometry with no UV stretching or seams; `scale`
-  is tiles per world unit, 0.5 gray neutral like `detail_overlay`).
+  is tiles per world unit, 0.5 gray neutral like `detail_overlay`). Both
+  multiply the **lit colour**, highlights and reflections included; to change a
+  surface's albedo, roughness or normal before lighting, use the material's
+  detail layer (`Material.SetDetailMap`, #1997).
   Params marked `*` are **runtime**: see below.
   Every surface variant is also fogged by the **scene fog** (`Graphics.SetFog*`,
   #437), applied after the blocks; `height_fog` is a per-material *look* layered

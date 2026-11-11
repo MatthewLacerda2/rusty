@@ -12,7 +12,7 @@ use std::rc::Rc;
 
 use crate::asset::MapRef;
 use crate::components::MaterialAsset;
-use crate::render::gpu::material_cache::{ParamOwner, MATERIAL_TEXTURES};
+use crate::render::gpu::material_cache::{ParamOwner, MATERIAL_MAPS, MATERIAL_TEXTURES};
 use crate::render::gpu::textures::TextureKind;
 use crate::render::{GpuTexture, MaterialData, Renderer};
 use crate::scene::shader_overrides::ParamValues;
@@ -84,7 +84,7 @@ impl Renderer {
             let map = self.resolve_map(paths[i].as_ref(), map_kind(i));
             // An extra slot with no texture of its own is a neutral white mask,
             // not the checker a missing map shows (#400).
-            match i >= 5 && Rc::ptr_eq(&map, &self.default_texture) {
+            match i >= MATERIAL_MAPS && Rc::ptr_eq(&map, &self.default_texture) {
                 true => Rc::clone(&self.white_texture),
                 false => map,
             }
@@ -148,7 +148,7 @@ impl Renderer {
 
     /// Build a group(2) material bind group from the resolved textures (albedo,
     /// metallic, roughness, normal, emissive, then the extra slots — that order),
-    /// against `material_layout`. Maps bind at 0,2,3,4,5 (#202, #207), each extra
+    /// against `material_layout`. Maps bind at `MAP_BINDINGS` (#202, #207, #1997), each extra
     /// slot at its own binding (7, #400), and each texture's own sampler — its
     /// import settings' wrap and filter (#1323) — beside it: albedo's at 1, the
     /// rest at `textures::sampler_binding`. `owner`'s param buffer (or the shared
@@ -183,7 +183,7 @@ pub(crate) fn material_group(
 ) -> wgpu::BindGroup {
     let mut entries = Vec::with_capacity(2 * MATERIAL_TEXTURES + 1);
     let slots = textures::SLOTS.iter().map(|slot| slot.binding);
-    let bindings = [0u32, 2, 3, 4, 5].into_iter().chain(slots);
+    let bindings = MAP_BINDINGS.into_iter().chain(slots);
     for (i, (map, binding)) in maps.into_iter().zip(bindings).enumerate() {
         let view = match is_colour_map(i) {
             true => &map.view,
@@ -208,6 +208,12 @@ pub(crate) fn material_group(
         entries: &entries,
     })
 }
+
+/// Each map's group-2 binding, in [`material_texture_paths`] order: albedo,
+/// metallic, roughness, normal and emissive at 0 and 2–5 (#202, #207), the detail
+/// map at 15 (#1997), the last texture binding below the samplers' offset, so the
+/// extra shader slots keep the bindings after the param uniform (7, …).
+pub(crate) const MAP_BINDINGS: [u32; MATERIAL_MAPS] = [0, 2, 3, 4, 5, 15];
 
 /// The binding of the sampler paired with the material texture at `binding`:
 /// albedo's `s_diffuse` at 1, every other at `textures::sampler_binding` (#1323).
@@ -239,7 +245,8 @@ pub(crate) fn material_maps(
 
 /// What the map at `index` holds, which decides how an uncompressed upload's mips
 /// average (#1322) and which compressed formats it can read (#1574): metallic and
-/// roughness are masks, the normal map a normal map, the shader texture slots data.
+/// roughness are masks, the normal map a normal map, the detail map (#1997) and the
+/// shader texture slots data.
 fn map_kind(index: usize) -> TextureKind {
     match index {
         1 | 2 => TextureKind::Mask,
@@ -250,7 +257,8 @@ fn map_kind(index: usize) -> TextureKind {
 }
 
 /// Every texture path `material`'s group 2 binds, in [`MapSignature`] order: the
-/// five maps, then the texture each extra shader slot names (#400). Also the list
+/// six maps (the detail map last, #1997), then the texture each extra shader slot
+/// names (#400). Also the list
 /// of textures to upload before the group is built.
 ///
 /// [`MapSignature`]: crate::render::gpu::material_cache::MapSignature
@@ -266,6 +274,7 @@ pub(crate) fn material_texture_paths(
         &m.roughness_map,
         &m.normal_map,
         &m.emissive_map,
+        &m.detail.as_ref().and_then(|d| d.map.clone()),
     ];
     let slots = textures::SLOTS
         .iter()
