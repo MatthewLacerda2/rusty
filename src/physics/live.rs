@@ -28,8 +28,8 @@
 //!
 //! - **Mesh shape.** A mesh collider built from a library mesh (#2059) whose
 //!   triangles changed (`Mesh.Create` replaced it, `watch::mesh_keys`) is rebuilt
-//!   the same way, in place, and every body touching it is woken, so what rested
-//!   on a plank that was halved falls.
+//!   the same way, in place; rapier wakes what loses a contact, so what rested on
+//!   a plank that was halved falls.
 //!
 //! All walk the sorted plan, or the bodies the change log named (`watch`; a
 //! step's changes reach only the body-state pass, `sync`), and touch a collider
@@ -46,7 +46,7 @@ use super::shape::build::{
 use super::shape::fit::{build_shape_for, fit_mark};
 use super::watch::mesh_keys::key_of;
 use super::watch::Owners;
-use super::world::{body_to_write, collider_to_write, PhysicsWorld};
+use super::world::{collider_to_write, PhysicsWorld};
 use crate::scene::Scene;
 
 /// The lightest mass a body may be given, so a zero never divides.
@@ -187,29 +187,6 @@ impl PhysicsWorld {
             if let Some(c) = collider_to_write(&mut self.colliders, handle, |_| true) {
                 c.set_shape(built.shared_shape().clone());
                 c.user_data = want;
-            }
-            self.wake_touching(handle);
-        }
-    }
-
-    /// Wake every body in contact with collider `handle`, whose shape just changed.
-    fn wake_touching(&mut self, handle: ColliderHandle) {
-        let pairs = self.narrow_phase.contact_pairs_with(handle);
-        let others = pairs.map(|p| {
-            if p.collider1 == handle {
-                p.collider2
-            } else {
-                p.collider1
-            }
-        });
-        let mut bodies: Vec<RigidBodyHandle> = others
-            .filter_map(|c| self.colliders.get(c)?.parent())
-            .collect();
-        bodies.sort_unstable_by_key(|h| h.into_raw_parts());
-        bodies.dedup();
-        for body in bodies {
-            if let Some(b) = body_to_write(&mut self.bodies, body, |b| b.is_sleeping()) {
-                b.wake_up(true);
             }
         }
     }

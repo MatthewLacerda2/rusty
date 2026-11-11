@@ -7,6 +7,7 @@ class and `MeshFilter.sharedMesh`), and the per-renderer settings of an entity's
 | Function | Arguments | Returns |
 |---|---|---|
 | `Mesh.Create` | `(name, { positions, indices, normals?, uvs? })` | — defines or replaces the scene mesh `name`; a Lua error on bad data |
+| `Mesh.DeleteAsset` | `(name [, { force = true }])` | an array of the entity ids it took the mesh off (empty when none); see *Deleting a scene mesh* below |
 | `Mesh.GetAsset` | `(name)` | the mesh's data, in the table form `Create` takes; `nil` when there is none |
 | `Mesh.GetMaxDrawDistance` | `(id)` | the distance in metres past which a camera stops drawing it; `0` = unlimited |
 | `Mesh.GetMinScreenSize` | `(id)` | the screen-relative height (`0..1`) under which a camera stops drawing it; `0` = off |
@@ -45,19 +46,30 @@ shadows ([`Light`](Light.md#cast-shadows)), culled like the rest.
   and is not a primitive's (`Box`, `Sphere`, `Plane`, `Cylinder`, `Capsule`, the
   lights), since `SetSharedMesh` reads that as the primitive.
 - **Replacing is shared.** `Mesh.Create` on an existing name replaces it, and
-  every entity drawing it redraws (Unity's shared mesh edited in place). They share
-  one GPU upload, made once per change, not per frame or per entity.
+  every entity drawing it redraws (Unity's shared mesh edited in place). The
+  geometry is built once per change and they share one GPU upload, not one per
+  frame or per entity; `SetSharedMesh` onto an existing mesh builds nothing and
+  leaves the other entities drawing it untouched.
 - **Saved with the scene.** In edit mode the library is saved in the scene file
   (`meshes`, left out while empty) and an entity saves only the name it draws.
-  `Mesh.Create` and `SetSharedMesh` are undone by Undo like any edit. In Play, a
+  `Mesh.Create`, `SetSharedMesh` and `DeleteAsset` are undone by Undo like any
+  edit. A loaded file is held to the same rules as `Create`: an entry with bad
+  data or a bad name (an index past the last vertex, normals or UVs not one per
+  vertex, a primitive's name) is dropped with a console warning naming it, and
+  the entities drawing it draw nothing, as for a missing model. In Play, a
   mesh made or replaced is Play state: Stop puts the edit-mode library back. A
   `DontDestroyOnLoad` entity carries the mesh it draws into a loaded scene, unless
   that scene defines one of the same name, which it then draws.
 - **Not in a prefab.** A scene mesh lives in its scene only, so saving or applying
   a prefab whose entities draw one is refused with the entity's name.
 - **Colliders.** A [`Mesh` collider](Physics.md) on the entity (convex or not)
-  builds from the scene mesh as from any Mesh, and follows a replace. The
-  simulation reads only this CPU data, never the GPU.
+  builds from the scene mesh as from any Mesh, and follows a replace: in edit
+  mode its box refits, and in Play the collider's shape is rebuilt in place on
+  the next physics step (once per replace, not per frame), so a crate resting on
+  a plank that is halved falls. That holds for a collider keeping a copy of a
+  removed Mesh too. The simulation reads only this CPU data, never the GPU.
+- **A prefab instance** whose part was pointed at a scene mesh (an override)
+  keeps drawing it when the instance is rebuilt from its source.
 - `SetSharedMesh` switches an entity between a primitive and a scene mesh; it keeps
   the Mesh's own settings (shadows, culling, Scale In Lightmap). A model's sub-mesh
   is placed with [`Scene.Instantiate`](Scene.md), not here.
@@ -79,6 +91,28 @@ Mesh.Create("tetra", {
 local rock = Scene.CreateEntity("Rock", "Box")
 Mesh.SetSharedMesh(rock, "tetra")
 print(Mesh.GetSharedMesh(rock), #Mesh.GetAsset("tetra").positions) --> tetra 12
+```
+
+#### Deleting a scene mesh
+
+`Mesh.DeleteAsset(name)` takes a mesh out of the library, by the rules
+[`Material.DeleteAsset`](Material.md#deleting-a-material-asset) keeps. Its **users**
+are the entities whose Mesh draws it and the Mesh colliders keeping a copy of it.
+A mesh still in use is **refused**: the error names every user (`entity 3
+"Plank"`, with `(instance of prefabs/crate.prefab)` for a prefab instance's
+entity), and nothing changes. With `{ force = true }` each user lets go of it: an
+entity drawing it loses its Mesh (Unity's *Mesh Filter* left with no mesh draws
+nothing), a collider's kept copy is dropped, and the console warns which. An
+absent `name` is an error. The renderer frees the mesh's GPU buffers on its next
+frame, so a game that makes one mesh per gib lets each go when the gib is gone.
+
+```lua
+Mesh.Create("gib", { positions = { 0,0,0, 1,0,0, 0,1,0 }, indices = { 0,1,2 } })
+local gib = Scene.CreateEntity("Gib")
+Mesh.SetSharedMesh(gib, "gib")
+-- Mesh.DeleteAsset("gib") would refuse: the entity draws it.
+local freed = Mesh.DeleteAsset("gib", { force = true })
+print(#freed, Mesh.HasAsset("gib")) --> 1 false
 ```
 
 ### Small-object cull

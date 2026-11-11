@@ -61,3 +61,17 @@ fn delete_refuses_a_used_mesh_unless_forced() {
         Vec::<u32>::new()
     );
 }
+
+#[test]
+fn undo_of_a_forced_delete_brings_the_mesh_and_its_users_back() {
+    let mut scene = Scene::new();
+    scene.define_mesh("plank", triangle()).unwrap();
+    let drawn = scene.add_entity("Plank".into());
+    scene.set_shared_mesh(drawn, "plank").unwrap();
+    scene.begin_edits();
+    scene.delete_mesh("plank", true).unwrap();
+    scene.commit_edits(Some("Delete"));
+    assert_eq!(scene.undo().as_deref(), Some("Delete"));
+    assert!(scene.meshes.contains_key("plank"));
+    assert_eq!(scene.world.mesh(drawn).unwrap().vertices.len(), 3);
+}
