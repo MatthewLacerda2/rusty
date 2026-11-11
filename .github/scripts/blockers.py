@@ -77,8 +77,7 @@ def missing(gh: Gh, repo: str) -> list[tuple[int, dict]]:
         wanted = [n for n in mentioned(issue["body"]) if n != issue["number"]]
         if not wanted:
             continue
-        path = f"repos/{repo}/issues/{issue['number']}/dependencies/blocked_by?per_page=100"
-        recorded = {b["number"] for b in gh("api", path) or []}
+        recorded = {b["number"] for b in gh("api", ghrest.blocked_by(repo, issue["number"])) or []}
         for number in wanted:
             if number in recorded:
                 continue

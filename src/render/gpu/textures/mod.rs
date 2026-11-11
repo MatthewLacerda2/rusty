@@ -67,6 +67,24 @@ impl Renderer {
         Self::finalize_texture(device, layout, (texture, DATA_FORMAT), sampler, Some(label))
     }
 
+    /// Unity's `Default-Particle`: a white disc whose alpha falls smoothly to 0 at
+    /// its rim, what a sprite emitter with no texture draws (#2052). Not the
+    /// checker, which marks a map that failed to load; with mips, so a far
+    /// particle stays round.
+    pub(crate) fn create_soft_disc_texture(
+        (device, queue, mips): Uploader,
+        layout: &wgpu::BindGroupLayout,
+    ) -> GpuTexture {
+        let label = "Default Particle Texture";
+        let side = SOFT_DISC_SIDE;
+        let disc = soft_disc(side);
+        let levels = (full_chain_len(side, side), true);
+        let texture = upload((device, queue), label, &disc, levels);
+        mips.generate(device, queue, &texture, TextureKind::Colour);
+        let sampler = default_sampler(device);
+        Self::finalize_texture(device, layout, (texture, DATA_FORMAT), sampler, Some(label))
+    }
+
     /// A 1×1 white texture: what an effect with no texture of its own samples, so
     /// its colour is its tint alone (#441's ribbons).
     pub(crate) fn create_white_texture(
@@ -206,6 +224,21 @@ fn checkerboard(side: u32, cell: u32) -> image::RgbaImage {
     })
 }
 
+/// The default particle sprite's side, in texels.
+const SOFT_DISC_SIDE: u32 = 64;
+
+/// A `side`² white disc inscribed in the square, its alpha a smoothstep from 1 at
+/// the centre to 0 at the rim (and beyond it, in the corners).
+pub(crate) fn soft_disc(side: u32) -> image::RgbaImage {
+    let half = side as f32 * 0.5;
+    image::RgbaImage::from_fn(side, side, |x, y| {
+        let (dx, dy) = (x as f32 + 0.5 - half, y as f32 + 0.5 - half);
+        let t = (1.0 - (dx * dx + dy * dy).sqrt() / half).clamp(0.0, 1.0);
+        let alpha = t * t * (3.0 - 2.0 * t);
+        image::Rgba([255, 255, 255, (alpha * 255.0).round() as u8])
+    })
+}
+
 #[cfg(test)]
 mod compressed_gpu_tests;
 #[cfg(test)]
@@ -218,6 +251,8 @@ mod freshness_tests;
 mod normal_variance_gpu_tests;
 #[cfg(test)]
 mod panorama_tests;
+#[cfg(test)]
+mod soft_disc_tests;
 
 /// The image `map` names, decoded: a map that references a texture a conversion
 /// extracted is read where the import cache holds it ([`MapRef::file`], #1130).
