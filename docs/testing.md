@@ -698,6 +698,8 @@ games/<name>/
   key it does not know (`games/smoke/recipe.lua` shows the four lines).
 - **Deterministic**: the same recipe and parameters write the same bytes. Draw from
   a `seed` parameter (`Texture`'s and `Sound`'s `seed`, `Random`), never a clock.
+  The check leaves a scene's bake reports (`<scene>.bake/`) out: they record when
+  and how long a bake ran, by design, while the baked data they describe is compared.
 - **Every test game is 3D**, and has no lightmap bake by default: a `bake`
   parameter may offer a tiny, lowest-resolution one, off unless asked for.
 - The generator clears its output folder before writing, but only one it made

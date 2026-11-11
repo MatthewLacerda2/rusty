@@ -78,7 +78,7 @@ fn deterministic(game: &Game, out: &Path, params: &Params) -> Result<bool, Strin
     // lint: allow(atomic-write) moves the first generation aside whole; it writes nothing
     std::fs::rename(out, &first).map_err(|e| format!("{}: {e}", out.display()))?;
     generate(game, out, params)?;
-    let differ = tree::differences(&first, out)?;
+    let differ = compared_differences(&first, out)?;
     tree::remove(&first)?;
     for path in &differ {
         eprintln!(
@@ -87,6 +87,16 @@ fn deterministic(game: &Game, out: &Path, params: &Params) -> Result<bool, Strin
         );
     }
     Ok(differ.is_empty())
+}
+
+/// The files that differ between two generations, leaving out a scene's bake
+/// reports (`<scene>.bake/`): they are measurements by design, the clock and
+/// stage times included (`docs/api/Lighting.md`, *Bake reports*), while the baked
+/// data they describe (SH sidecar, cubemaps, lightmap pages, PVS) stays compared.
+fn compared_differences(first: &Path, second: &Path) -> Result<Vec<PathBuf>, String> {
+    let mut differ = tree::differences(first, second)?;
+    differ.retain(|rel| !crate::dev::bake::report::in_report_dir(rel));
+    Ok(differ)
 }
 
 /// The scene a run of the project boots, as `play` picks it.
@@ -172,7 +182,7 @@ fn one_colour(path: &Path) -> Result<bool, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::one_colour;
+    use super::{compared_differences, one_colour};
 
     fn png(name: &str, image: &image::RgbaImage) -> std::path::PathBuf {
         let path = crate::test_temp::dir().join(name);
@@ -186,6 +196,27 @@ mod tests {
         assert!(one_colour(&png("flat.png", &image)).unwrap());
         image.put_pixel(7, 3, image::Rgba([0, 0, 1, 255]));
         assert!(!one_colour(&png("dot.png", &image)).unwrap());
+    }
+
+    #[test]
+    fn a_scenes_bake_reports_are_left_out_and_everything_else_is_compared() {
+        let dir = crate::test_temp::dir().join("bake-reports");
+        let reports = std::path::Path::new("assets/scenes/x.scene.bake");
+        let differing = [
+            reports.join("probes.json"),
+            reports.join("sub/probes.json"),
+            "assets/bread.bake/probes.json".into(),
+            "assets/scenes/x.scene.lighting.json".into(),
+        ];
+        for (side, text) in [("a", "1"), ("b", "2")] {
+            for rel in &differing {
+                let path = dir.join(side).join(rel);
+                std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+                std::fs::write(path, text).unwrap();
+            }
+        }
+        let differ = compared_differences(&dir.join("a"), &dir.join("b")).unwrap();
+        assert_eq!(differ, &differing[2..], "the reports alone are left out");
     }
 
     #[test]
