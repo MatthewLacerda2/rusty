@@ -133,7 +133,7 @@ impl GpuResources {
         let billboards = create_billboard_passes(
             device,
             queue,
-            &textures.texture_layout,
+            &textures,
             &camera_lighting_layout,
             &mut registry,
         );
@@ -159,24 +159,29 @@ impl GpuResources {
 
 /// Billboard particle and ribbon (#441) passes; both reuse the renderer's
 /// `texture_layout`, and the particles also read the scene depth and the camera +
-/// lighting group 0 (#440).
+/// lighting group 0 (#440), and own their default sprite (#2052).
 fn create_billboard_passes(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    texture_layout: &wgpu::BindGroupLayout,
+    textures: &Textures,
     camera_lighting_layout: &wgpu::BindGroupLayout,
     registry: &mut ShaderRegistry,
 ) -> BillboardPasses {
     use crate::render::passes::particles::{ParticleRenderer, SharedLayouts};
     use crate::render::passes::ribbons::RibbonRenderer;
+    use crate::render::Renderer;
+    use std::rc::Rc;
+    let texture_layout = &textures.texture_layout;
     let scene_depth_layout = bind_layouts::create_scene_depth_layout(device);
+    let uploader = (device, queue, &textures.mip_generator);
+    let sprite = Rc::new(Renderer::create_soft_disc_texture(uploader, texture_layout));
     let layouts = SharedLayouts {
         texture: texture_layout,
         depth: &scene_depth_layout,
         camera_lighting: camera_lighting_layout,
     };
     BillboardPasses {
-        particle_renderer: ParticleRenderer::new(device, layouts, registry),
+        particle_renderer: ParticleRenderer::new(device, layouts, sprite, registry),
         ribbon_renderer: RibbonRenderer::new(device, queue, texture_layout, registry),
         scene_depth_layout,
     }
