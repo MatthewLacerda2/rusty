@@ -84,7 +84,10 @@ fn a_big_region_is_answered_once() {
         "the default cell: `other` is 4 cells over"
     );
     let mut islands = Islands::new(&nav);
-    assert!(!islands.cut_off(goal, start), "too big to be an island");
+    assert!(
+        !islands.cut_off(&nav, goal, start),
+        "too big to be an island"
+    );
     // The capped walk keeps the disc round the goal (breadth-first, not a
     // depth-first snake), so a goal a few metres off is a lookup.
     assert!(islands.open.contains(&goal.index));
@@ -92,6 +95,6 @@ fn a_big_region_is_answered_once() {
         let near = snap(x, z).index;
         assert!(islands.open.contains(&near), "({x}, {z}) is cached");
     }
-    assert!(!islands.cut_off(other, start));
-    assert!(islands.cut.is_empty(), "nothing here is an island");
+    assert!(!islands.cut_off(&nav, other, start));
+    assert!(islands.pieces.is_empty(), "nothing here is an island");
 }

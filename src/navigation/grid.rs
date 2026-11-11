@@ -84,6 +84,8 @@ pub struct NavigationGraph {
     /// The reusable per-span search state (#2083, `pool`): A\* starts in O(1)
     /// instead of filling navmesh-sized arrays per query.
     pub(super) search: super::pool::SearchScratch,
+    /// What the flood keeps between queries for the current bake (#2088, `flood::cache`).
+    pub(super) flood_cache: super::flood::FloodCache,
 }
 
 impl NavigationGraph {
@@ -120,6 +122,7 @@ impl NavigationGraph {
             static_watch: None,
             tracked_scene: None,
             search: Default::default(),
+            flood_cache: Default::default(),
         }
     }
 
