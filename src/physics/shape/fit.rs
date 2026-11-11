@@ -1,10 +1,11 @@
 //! src/physics/shape/fit.rs — a collider entity's shape as its body needs it.
 //!
-//! A concave mesh collider is the one shape that depends on its body: the exact
-//! trimesh on a static or kinematic body, convex pieces on a dynamic one (#1886).
-//! This builds a collider for an entity, logs why one was not built or not split,
-//! and stamps the fit it was built for, which the live sync reads when a body
-//! changes type in Play.
+//! Two shapes depend on their body. A concave mesh collider is the exact trimesh
+//! on a static or kinematic body and convex pieces on a dynamic one (#1886); a
+//! cylinder or capsule on a dynamic body is built to roll (`physics::contact`,
+//! #2071), and is the plain shape on any other. This builds a collider for an
+//! entity, logs why one was not built or not split, and stamps the fit it was
+//! built for, which the live sync reads when a body changes type in Play.
 
 use glam::Vec3;
 use rapier3d::prelude::*;
@@ -37,18 +38,24 @@ pub(in crate::physics) fn build_shape_for(
 }
 
 /// A concave mesh collider built for a dynamic body (decomposed), in its rapier
-/// collider's `user_data`: the fit `live::sync_mesh_fits` compares with the body's
+/// collider's `user_data`: the fit `live::sync_fits` compares with the body's
 /// class, to rebuild the shape when a body changes type in Play.
 pub(in crate::physics) const DECOMPOSED: u128 = 2;
-/// A concave mesh collider built for a static or kinematic body (exact).
+/// A concave mesh, cylinder or capsule collider built for a static or kinematic
+/// body (the exact shape).
 pub(in crate::physics) const EXACT: u128 = 1;
+/// A cylinder or capsule collider built for a dynamic body (rolling).
+pub(in crate::physics) const ROLLING: u128 = 3;
 
-/// The `user_data` [`build_shape_for`] stamps: [`DECOMPOSED`], [`EXACT`], or zero
-/// for every collider whose shape is the same on any body.
+/// The `user_data` [`build_shape_for`] stamps: [`DECOMPOSED`], [`ROLLING`],
+/// [`EXACT`], or zero for every collider whose shape is the same on any body.
 pub(in crate::physics) fn fit_mark(shape: &ColliderShape, dynamic: bool) -> u128 {
     match shape {
         ColliderShape::Mesh { convex: false, .. } if dynamic => DECOMPOSED,
-        ColliderShape::Mesh { convex: false, .. } => EXACT,
+        ColliderShape::Cylinder { .. } | ColliderShape::Capsule { .. } if dynamic => ROLLING,
+        ColliderShape::Mesh { convex: false, .. }
+        | ColliderShape::Cylinder { .. }
+        | ColliderShape::Capsule { .. } => EXACT,
         _ => 0,
     }
 }

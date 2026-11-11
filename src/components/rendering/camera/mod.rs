@@ -1,9 +1,15 @@
-//! src/components/rendering/camera.rs — Camera component
-//!
-//! fov/near/far/motion-blur, plus the camera-stack knobs (`render_order`,
-//! `clear_flags`). Unity: Camera. Moved verbatim from the former `core/scene.rs`.
+//! src/components/rendering/camera/ — Camera component (this `mod.rs`): fov /
+//! near / far / motion blur, plus the camera-stack knobs (`render_order`,
+//! `clear_flags`). Unity: Camera. The field of view's display axis and its
+//! conversions sit in `fov_axis` (#2038), the render-texture target in `target`.
 
 use serde::{Deserialize, Serialize};
+
+mod fov_axis;
+mod target;
+
+pub use fov_axis::{horizontal_to_vertical_fov, vertical_to_horizontal_fov, FovAxis};
+pub use target::{is_render_texture, RenderTarget, RENDER_TEXTURE_PREFIX};
 
 use crate::core::settings::quality::EffectQuality;
 
@@ -74,7 +80,12 @@ fn default_taa_jitter_scale() -> f32 {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CameraComponent {
     pub active: bool,
+    /// The **vertical** field of view, in degrees (Unity's `fieldOfView`).
     pub fov: f32,
+    /// Which axis the Inspector shows and edits `fov` along (#2038, Unity's
+    /// *FOV Axis*); display only, `fov` stays vertical.
+    #[serde(default)]
+    pub fov_axis: FovAxis,
     pub near: f32,
     pub far: f32,
     /// Layer membership bitmask (one bit per `LayerRegistry` slot): the camera
@@ -209,6 +220,7 @@ impl Default for CameraComponent {
         Self {
             active: true,
             fov: DEFAULT_FOV,
+            fov_axis: FovAxis::Vertical,
             near: DEFAULT_NEAR,
             far: DEFAULT_FAR,
             culling_mask: default_culling_mask(),
@@ -243,58 +255,4 @@ pub enum Projection {
     /// Parallel projection; `size` is half the view's height in world units
     /// (Unity's `orthographicSize`), the width following the aspect.
     Orthographic { size: f32 },
-}
-
-/// A camera's render-texture target (#430, Unity's `Camera.targetTexture`): the
-/// texture it draws into and what that costs.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct RenderTarget {
-    /// The texture's name; consumers reference it as `"rt:<name>"`.
-    pub name: String,
-    /// Resolution in pixels (each at least 1).
-    pub width: u32,
-    pub height: u32,
-    /// Run the full post-FX chain (grading, bloom, FXAA, motion blur). Off, the
-    /// camera is only tonemapped — cheaper, and right for a flat minimap.
-    #[serde(default = "default_true")]
-    pub post_fx: bool,
-    /// Redraw every `n`th frame (1 = every frame); the texture holds its last
-    /// picture in between — a security monitor at 1/4 rate is a quarter the cost.
-    #[serde(default = "default_every")]
-    pub update_every: u32,
-}
-
-impl RenderTarget {
-    /// A target named `name` at `width` x `height`, post-FX on, every frame.
-    pub fn new(name: &str, width: u32, height: u32) -> Self {
-        Self {
-            name: name.to_string(),
-            width: width.max(1),
-            height: height.max(1),
-            post_fx: true,
-            update_every: 1,
-        }
-    }
-
-    /// The path a UI `Image` or a material map uses to show this texture.
-    pub fn path(&self) -> String {
-        format!("{RENDER_TEXTURE_PREFIX}{}", self.name)
-    }
-}
-
-/// The prefix that marks a texture path as a render texture's name (#430) — one
-/// convention for every consumer (`Image.texture`, material maps).
-pub const RENDER_TEXTURE_PREFIX: &str = "rt:";
-
-/// Whether `path` names a render texture rather than a file.
-pub fn is_render_texture(path: &str) -> bool {
-    path.starts_with(RENDER_TEXTURE_PREFIX)
-}
-
-fn default_true() -> bool {
-    true
-}
-
-fn default_every() -> u32 {
-    1
 }

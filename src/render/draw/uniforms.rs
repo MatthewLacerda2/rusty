@@ -10,7 +10,7 @@ use glam::{Mat4, Vec3};
 
 use crate::components::{MaterialAsset, RefractionModel, RenderFace, RenderMode, UvMapping};
 use crate::render::gpu::lightmaps::Lightmaps;
-use crate::render::gpu::uniforms::{MappingUniform, ObjectData, SurfaceUniform};
+use crate::render::gpu::uniforms::{DetailUniform, MappingUniform, ObjectData, SurfaceUniform};
 use crate::render::postfx::effects::ssr;
 use crate::render::MaterialData;
 use crate::scene::authoring::material::{BLEND_SHARPNESS_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE};
@@ -69,6 +69,7 @@ pub(crate) fn material_data(lit: bool, material: Option<&MaterialAsset>) -> Mate
         mapping: material.map_or_else(MappingUniform::default, mapping_uniform),
         normal_variance: [0; 4],
         dielectric_reflectance: [f0[0], f0[1], f0[2], f90],
+        detail: material.map_or_else(DetailUniform::default, super::detail::detail_uniform),
     }
 }
 
