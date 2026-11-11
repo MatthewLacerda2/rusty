@@ -127,9 +127,9 @@ impl NavigationGraph {
 
     /// A\* from span `start` toward span `goal`, both ends included, entering only
     /// the areas in `mask` (#460). When the goal is unreachable, or the search hits
-    /// its cap ([`MAX_SEARCH_NODES`], less toward an island), the path ends on the reached span nearest to it instead
-    /// (Unity's `PathPartial`): least octile distance, then least cost, then lowest
-    /// index, so the choice is deterministic. The flag says whether the path reaches
+    /// its cap ([`MAX_SEARCH_NODES`], less toward an island), the path ends on the
+    /// reached span nearest to it instead (Unity's `PathPartial`): least octile
+    /// distance, then least cost, then lowest index, so the choice is deterministic. The flag says whether the path reaches
     /// `goal`.
     pub fn find_path_masked(
         &self,

@@ -50,6 +50,7 @@ pub use areas::{
     area_index, cost_table, default_areas, in_mask, NavArea, ALL_AREAS, MAX_AREAS, MIN_AREA_COST,
     NOT_WALKABLE_AREA, WALKABLE_AREA,
 };
+pub use astar::MAX_SEARCH_NODES;
 pub use bake::{baked_fingerprint, CellRect, Rebake, Start};
 pub use bounds::{bake_collider_ids, NavBounds};
 pub use flood::Flood;
@@ -57,6 +58,7 @@ pub use grid::{NavSpan, NavigationGraph, SpanRef, DEFAULT_MAX_SLOPE, DEFAULT_MAX
 pub use obstacle::{tick_obstacles, ObstacleVolume};
 pub use offmesh::{LinkEnd, OffMeshLink, OffMeshLinkData, OffMeshLinkKind};
 pub use path::{path_length, NavPath, NavPathStatus, NavRaycastHit};
+pub use request::islands::UNREACHABLE_SEARCH_NODES;
 pub use request::DEFAULT_ITERATIONS_PER_FRAME;
 // The bake settings are scene data (#721): the scene saves them, navigation reads them.
 pub use crate::scene::nav_settings::{NavMeshSettings, DEFAULT_AGENT_HEIGHT};
