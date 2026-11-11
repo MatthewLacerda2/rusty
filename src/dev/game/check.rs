@@ -126,7 +126,8 @@ fn scenarios(out: &Path) -> Result<Vec<PathBuf>, String> {
 
 /// The scenario that takes the shots: for each entry of `shots.lua`, put the main
 /// camera at its `position` looking at its `target`, start the view's history
-/// over and screenshot. A shot `Screenshot` declines (no GPU or software adapter)
+/// over and screenshot, settled: eight frames first only when the view reads
+/// history (TAA, SSIL, fog, an authored effect), one render otherwise (#2092). A shot `Screenshot` declines (no GPU or software adapter)
 /// is logged as skipped, as every GPU test skips without one.
 const SHOTS_SCENARIO: &str = r#"
 for _, shot in ipairs(dofile("shots.lua")) do

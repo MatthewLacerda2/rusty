@@ -36,6 +36,12 @@ fn chain<'a>(cx: &EffectCx<'a>) -> (&'a [String], &'a BTreeMap<String, Vec<f32>>
     }
 }
 
+/// Whether the view runs authored effects, each of which may read last frame's
+/// result (their history) (#2092): the volume names any.
+pub(crate) fn reads_history(cx: &EffectCx) -> bool {
+    !chain(cx).0.is_empty()
+}
+
 /// Compile any module not cached yet; whether one of them loaded.
 fn prepare(pfx: &mut PostFx, device: &wgpu::Device, cx: &EffectCx) -> bool {
     let (names, _) = chain(cx);

@@ -1,5 +1,5 @@
-//! The harness's rendering verbs: `Screenshot` (a frame to a PNG, after `settle`
-//! frames drawn first, #2003) and `Render` (a frame drawn only for what it costs,
+//! The harness's rendering verbs: `Screenshot` (a frame to a PNG, after up to
+//! `settle` frames drawn first, #2003: none when the view reads no history, #2092) and `Render` (a frame drawn only for what it costs,
 //! #835). Both draw through the run's one
 //! [`CaptureHost`](crate::dev::capture::CaptureHost) and fold the frame's cost —
 //! render counters, `renderer_ms`, GPU time where the adapter measures it — into
@@ -76,6 +76,42 @@ impl Harness {
             record_render(&mut self.stats.borrow_mut(), &frame);
             self.publish_exposure();
         }
+        self.report_shot(result, &path, size)
+    }
+
+    /// [`screenshot_with`](Self::screenshot_with) after up to `settle` frames drawn
+    /// with no sim step (#2003), so the temporal effects (TAA above all) converge on
+    /// the view first. None are drawn when the first one reads no history an earlier
+    /// frame left (#2092, `history_passes`): every later frame would be the same
+    /// image, so that first frame is the shot, drawn again only for the gizmos.
+    /// The shot is the same image a full settle gives, at one render instead of
+    /// `settle + 1`.
+    pub fn screenshot_settled(
+        &mut self,
+        path: impl AsRef<Path>,
+        size: (u32, u32),
+        (gizmos, settle): (bool, u32),
+    ) -> bool {
+        if settle == 0 {
+            return self.screenshot_with(path, size, gizmos);
+        }
+        let Some(first) = self.render_frame_at(size) else {
+            return false;
+        };
+        if first.counters.history_passes > 0 {
+            if !self.settle(size, settle - 1) {
+                return false;
+            }
+        } else if !gizmos {
+            let path = path.as_ref();
+            let result = self.capture.write_png(path).map(|()| true);
+            return self.report_shot(result, path, size);
+        }
+        self.screenshot_with(path, size, gizmos)
+    }
+
+    /// Log how a shot went; whether it was written.
+    fn report_shot(&mut self, result: Result<bool, String>, path: &Path, size: (u32, u32)) -> bool {
         match result {
             Ok(true) => {
                 self.log(format!(

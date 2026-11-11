@@ -25,7 +25,7 @@
 
 mod effect;
 
-pub(crate) use effect::EFFECT;
+pub(crate) use effect::{reads_history, EFFECT};
 
 use std::collections::{BTreeMap, HashMap};
 

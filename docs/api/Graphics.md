@@ -907,6 +907,8 @@ apart they were, so two shots of an unchanged scene can differ. `Harness.Step` r
 steps never settle it. A shot after a camera jump ghosts the last shot's view in
 unless the jump is cut (`Camera.ResetHistory()`); `Harness.Screenshot(path, { settle
 = n })` draws `n` frames with no sim step before the shot, so the history converges
+(only when the view reads history at all, #2092: with TAA, SSIL, the fog and the
+authored effects off, a settled shot after a cut is one render)
 (a still pixel keeps 0.9ⁿ of the old view: about 3% at 32, 0.1% at 64). A cut and a
 settle give a player's settled image of the new view; a cut alone, the new view's
 first frame. To compare shots pixel for pixel, or to judge a scene's edges, turn TAA off

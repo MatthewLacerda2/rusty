@@ -149,6 +149,12 @@ pub struct RenderCounters {
     /// camera that ran SSAO, `0` with AO off. A camera shading with a forward
     /// override of its own (the shader preview) is never primed, nor is any on Metal.
     pub primed_passes: u32,
+    /// Views whose frame read history an earlier frame of the same view left
+    /// (#2092): TAA, SSIL's accumulation, the volumetric fog's reprojection, a
+    /// custom effect's feedback, motion vectors past a cut, or a render texture
+    /// shown (its picture kept from a draw). `0` means drawing
+    /// the frame again with no sim step gives the same image.
+    pub history_passes: u32,
     /// Opaque scene passes that wrote SSR's surface targets with the SSR pipelines
     /// (#1526): one per view whose base camera runs SSR. An overlay camera of the
     /// stack draws with the plain ones, so it never counts.
@@ -225,6 +231,7 @@ impl RenderCounters {
             ("render_texture_draws", self.render_texture_draws.into()),
             ("velocity_passes", self.velocity_passes.into()),
             ("primed_passes", self.primed_passes.into()),
+            ("history_passes", self.history_passes.into()),
             ("ssr_surface_passes", self.ssr_surface_passes.into()),
             ("grade_lut_bakes", self.grade_lut_bakes.into()),
             ("sky_reflection_bakes", self.sky_reflection_bakes.into()),

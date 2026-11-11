@@ -10,10 +10,24 @@ use crate::render::motion::{self, HistoryKey, Velocity};
 use crate::render::passes::ssao::SsaoPlan;
 use crate::render::postfx::effects::ssil;
 use crate::render::postfx::effects::ssr::{ssr_enabled, surface, transparent};
-use crate::render::postfx::effects::{self, taa, volumetric_fog, EffectCx, PassCx};
+use crate::render::postfx::effects::{self, custom_effects, taa, volumetric_fog, EffectCx, PassCx};
 use crate::render::postfx::params::{frame_params, PostSource};
 use crate::render::{RenderView, Renderer};
 use crate::scene::{Camera, Scene};
+
+/// Whether this frame of `view` reads what an earlier one left (#2092), so drawing
+/// it again with no sim step can change the image: TAA, SSIL, the volumetric fog
+/// and the authored effects keep a history; motion vectors compare with last
+/// frame's poses unless this frame is a cut. (A shown render texture is counted
+/// where it is drawn, `render_texture`.)
+fn reads_history(view: &RenderView, effect: &EffectCx, taa: bool, shared: &StackShared) -> bool {
+    let motion = &view.post_fx.motion;
+    let moving = motion.active() && !motion.history.cut();
+    taa || shared.ssil.is_some()
+        || shared.volumetric.is_some()
+        || custom_effects::reads_history(effect)
+        || moving
+}
 
 /// What one [`Renderer::draw_stack`] call draws.
 pub(crate) struct StackPass<'a> {
@@ -97,6 +111,13 @@ impl Renderer {
             ssil: ssil::begin(&mut view.post_fx, (&pass, graphics, key), keeps),
             volumetric: volumetric_fog::begin(&mut view.post_fx, (&pass, graphics, key), keeps),
         };
+        let effect = EffectCx {
+            post: pass.post,
+            graphics,
+            full: pass.full_post_fx,
+        };
+        let history = reads_history(view, &effect, taa_on, &shared);
+        self.frame_counters.history_passes += u32::from(history);
         for idx in 0..pass.stack.len() {
             let mut ctx = CameraCtx::new(scene, &pass, &shared, idx);
             for (_, stage) in CAMERA_PASSES {
