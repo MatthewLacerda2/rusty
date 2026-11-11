@@ -3,7 +3,9 @@
 //! Translucent solids (#242), particle emitters and the particles inside an
 //! alpha-blended emitter (#440) all order back to front by view depth — the distance
 //! along the camera's forward axis — so two passes can never disagree about what is
-//! in front. World-space UI canvases (#429) should sort with this key too.
+//! in front. Translucent solids sort by their material's Sorting Priority first
+//! ([`transparent_order`], #2039), as HDRP's transparent queue does; particles
+//! and ribbons have no priority and sort by depth alone. World-space UI canvases (#429) should sort with this key too.
 //!
 //! Opaque solids order roughly front to back instead (#1499), as Unity's
 //! `SortingCriteria.CommonOpaque` does (its `QuantizedFrontToBack`): the nearest

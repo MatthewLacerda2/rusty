@@ -78,10 +78,15 @@ fn gpu_a_lower_priority_liquid_draws_before_its_glass_whatever_the_slot_order() 
     // An edit of the priority alone re-sorts the kept object.
     priority(&mut scene, "liquid", -1);
     assert_eq!(drawn(&mut r, &scene), [LIQUID, GLASS]);
-    // Raising the glass instead does the same; past the range it is held at 50.
+    // Raising the glass instead does the same.
     priority(&mut scene, "liquid", 0);
-    priority(&mut scene, "glass", 9000);
+    priority(&mut scene, "glass", 1);
     assert_eq!(drawn(&mut r, &scene), [LIQUID, GLASS]);
+    // Past the range it is held at 50: against a liquid at 50 the two tie, so
+    // slot order holds (unclamped, the glass at 9000 would draw last).
+    priority(&mut scene, "liquid", 50);
+    priority(&mut scene, "glass", 9000);
+    assert_eq!(drawn(&mut r, &scene), [GLASS, LIQUID]);
     // With the liquid's slot first, equal priority keeps it first.
     let scene = bottle(["liquid", "glass"]);
     assert_eq!(drawn(&mut r, &scene), [LIQUID, GLASS]);
