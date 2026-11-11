@@ -83,7 +83,7 @@ first.
   the default `8` (a NaN or infinite tolerance its default `0.9`), and
   a file's out-of-range value is held the same way when the scene loads); the editor's card edits the
   same fields under the button. The reflection probes' defaults sit beside them:
-  `reflectionResolution` (default `512`, a power of two in 16–2048) and
+  `reflectionResolution` (default `128`, Unity's and Unreal's, a power of two in 16–2048) and
   `reflectionBudgetMB` (default `256`, `8`–`2048`) and `reflectionMaxProbes` (default
   `512`, `1`–`4096`, the most probes auto-placement makes), edited in the scene Inspector's
   *Reflection Probes* section (see `Reflection.md`). A scene whose settings are all
