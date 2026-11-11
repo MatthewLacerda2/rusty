@@ -25,6 +25,10 @@ every number after `hit` is `0` and the rest are `nil`.
 | `Physics.SetMass` | `(id, kg)` | — (clamped to `[0.01, 1000]`, as the inspector's field is; see [Mass](#mass-and-forces-at-a-point-466)) |
 | `Physics.GetUseGravity` | `(id)` | `bool` (`false` without a Rigidbody) |
 | `Physics.SetUseGravity` | `(id, on)` | — (Unity `Rigidbody.useGravity`) |
+| `Physics.GetDrag` | `(id)` | `number` — linear drag (`0` without a Rigidbody) |
+| `Physics.SetDrag` | `(id, drag)` | — (Unity `Rigidbody.drag`; floored at `0`, a NaN or infinity is `0`; see [Drag](#drag-and-angular-drag-2062)) |
+| `Physics.GetAngularDrag` | `(id)` | `number` — angular drag (`0` without a Rigidbody) |
+| `Physics.SetAngularDrag` | `(id, drag)` | — (Unity `Rigidbody.angularDrag`, default `0.05`; floored at `0` the same way) |
 | `Physics.IsTrigger` | `(id)` | `bool` (`false` without a Collider) |
 | `Physics.SetTrigger` | `(id, on)` | — (Unity `Collider.isTrigger`: a trigger reports overlaps and blocks nothing) |
 | `Physics.GetCollisionDetection` | `(id)` | `"Discrete"` \| `"Continuous"` |
@@ -540,6 +544,25 @@ it (`GetMass` reads it back), and changing it during Play takes effect on the
 next step. So do `SetKinematic` and an entity's layer: the body
 switches class in place (keeping its joints and contacts), and a collider follows
 its layer's Collision Matrix row.
+
+### Drag and angular drag (#2062)
+
+A Rigidbody's **drag** (default `0`) and **angular drag** (default `0.05`) are
+Unity's `Rigidbody.drag` and `angularDrag`: each tick the body's linear velocity
+is scaled by `1 / (1 + dt · drag)` and its spin by `1 / (1 + dt · angularDrag)`.
+Drag gives a falling body a terminal speed and slows debris in the air; the
+default angular drag is what brings a barrel rolling on its side to rest, where
+`0` lets it roll for good. Both are floored at `0`, saved with the scene, shown in
+the inspector's Rigidbody card, and a change in Play takes effect on the next
+step. `Component.Set(id, "RigidBody", { drag =, angular_drag = })` writes them
+too.
+
+```lua with=crate:RigidBody
+Physics.SetDrag(crate, 0.5)
+Physics.SetAngularDrag(crate, -1)                 -- floored at 0
+assert(Physics.GetDrag(crate) == 0.5 and Physics.GetAngularDrag(crate) == 0)
+Component.Set(crate, "RigidBody", { angular_drag = 0.05 })
+```
 
 `AddImpulseAtPosition(id, jx, jy, jz, px, py, pz)` applies an impulse (N·s) at a
 world point — Unity's `AddForceAtPosition(…, ForceMode.Impulse)`. It changes the

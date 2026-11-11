@@ -5,6 +5,7 @@
 use rapier3d::prelude::*;
 
 use super::shape::build::EntityBodyState;
+use crate::components::RigidBodyComponent;
 
 /// Whether `PhysicsWorld::apply_body_state` has anything to write: the
 /// comparisons its setters make before they write. A disabled body's `position`
@@ -34,7 +35,10 @@ pub(super) fn state_differs(
     let moved = if snap.kinematic || snap.is_static {
         placed
     } else {
-        b.linvel() != snap.vel || b.angvel() != snap.angular_velocity || b.gravity_scale() != scale
+        b.linvel() != snap.vel
+            || b.angvel() != snap.angular_velocity
+            || b.gravity_scale() != scale
+            || !snap.damping.held_by(b)
     };
     b.body_type() != class || b.is_ccd_enabled() != snap.ccd_enabled || moved
 }
@@ -69,4 +73,26 @@ pub(super) fn collider_to_write(
     }
     // lint: allow(physics-borrow) the helper itself: `differs` found a value to write
     colliders.get_mut(handle)
+}
+
+/// A body's linear and angular damping: its Rigidbody's `drag` and
+/// `angular_drag`, zero without one (a static or lone-collider body never moves).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(in crate::physics) struct Damping {
+    pub linear: f32,
+    pub angular: f32,
+}
+
+impl Damping {
+    pub(in crate::physics) fn of(rb: Option<&RigidBodyComponent>) -> Self {
+        rb.map_or_else(Self::default, |r| Self {
+            linear: r.drag,
+            angular: r.angular_drag,
+        })
+    }
+
+    /// Whether rapier's `body` already carries this damping.
+    pub(in crate::physics) fn held_by(self, body: &RigidBody) -> bool {
+        body.linear_damping() == self.linear && body.angular_damping() == self.angular
+    }
 }
