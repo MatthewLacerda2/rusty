@@ -23,6 +23,9 @@
 //! (its entity destroyed, Play stopped, the script reloaded), every access errors,
 //! even when a new instance has taken the same entity id and script name. A
 //! proxy pins its function the same way: it calls the function it was read as.
+//!
+//! While a demo records, every write and call is noted in the world's journal
+//! (`demo::note_script_set` / `note_script_call`), so a replay makes it again.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -34,6 +37,8 @@ use mlua::{
 
 use super::copy::{copy, Copier};
 use crate::app::GameWorld;
+use crate::dev::demo;
+use crate::scripting::HostJournal;
 
 /// A scenario's handle on one live script instance (see the module doc).
 struct ScriptRef {
@@ -42,6 +47,8 @@ struct ScriptRef {
     name: String,
     /// The instance's table, held in the gameplay VM's registry: its identity.
     pinned: RegistryKey,
+    /// Where its writes and calls are noted while a demo records.
+    journal: Rc<RefCell<HostJournal>>,
 }
 
 impl ScriptRef {
@@ -81,13 +88,16 @@ impl ScriptRef {
                 self.name, self.id
             ))
         };
+        let with_self = matches!(args.front(), Some(Value::UserData(u)) if u.to_pointer() == handle.to_pointer());
+        let noted: Vec<Value> = args.iter().skip(usize::from(with_self)).cloned().collect();
+        let script = (self.id, self.name.as_str());
+        demo::note_script_call(&self.journal, script, (key, with_self), &noted);
         self.with(|glua, t| {
             let func: Function = glua.registry_value(func)?;
             let mut into_game = Copier::new(glua);
             let mut crossed = MultiValue::new();
             for (i, arg) in args.iter().enumerate() {
-                let is_self = i == 0
-                    && matches!(arg, Value::UserData(u) if u.to_pointer() == handle.to_pointer());
+                let is_self = i == 0 && with_self;
                 crossed.push_back(if is_self {
                     Value::Table(t.clone())
                 } else {
@@ -141,7 +151,10 @@ impl UserData for ScriptRef {
         methods.add_meta_method(
             MetaMethod::NewIndex,
             |_, this, (key, value): (Value, Value)| {
-                this.with(|glua, t| t.raw_set(copy(&key, glua)?, copy(&value, glua)?))
+                this.with(|glua, t| t.raw_set(copy(&key, glua)?, copy(&value, glua)?))?;
+                let script = (this.id, this.name.as_str());
+                demo::note_script_set(&this.journal, script, &key, &value);
+                Ok(())
             },
         );
     }
@@ -159,11 +172,13 @@ pub fn register(lua: &Lua, world: &Rc<RefCell<GameWorld>>) -> LuaResult<()> {
         let Some(pinned) = pinned else {
             return Ok(Value::Nil);
         };
+        let journal = world.borrow().script_manager().journal();
         let handle = ScriptRef {
             world: Rc::clone(&world),
             id,
             name,
             pinned,
+            journal,
         };
         lua.create_userdata(handle).map(Value::UserData)
     })?;

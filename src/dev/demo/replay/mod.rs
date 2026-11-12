@@ -3,8 +3,8 @@
 //!
 //! Right before Play is entered it repeats the acts made before it (a scenario's
 //! set-up); right before each tick's input is published it repeats the host acts
-//! recorded for it (a console line, a scenario's API call), sets the Game view
-//! size and writes the recorded [`InputFrame`](crate::core::input::InputFrame)
+//! recorded for it (a console line, a scenario's API call or handle act), sets
+//! the Game view size and writes the recorded [`InputFrame`](crate::core::input::InputFrame)
 //! over whatever live input there was, and the tick runs on the recorded `dt`;
 //! after the tick it compares the digest, when one was stored, and after the
 //! last the digest Play ended on. The first tick whose digest differs is the divergence, and
@@ -12,9 +12,9 @@
 
 use mlua::Lua;
 
-use super::calls;
 use super::format::{host_call, End};
 use super::read::{Demo, DemoTick, DemoTicks};
+use super::{calls, script_ref};
 mod cut;
 mod lend;
 mod origin;
@@ -93,6 +93,10 @@ impl Replayer {
             HostCall::Call { function, args } if function.starts_with("Harness.") => {
                 let verb = &function["Harness.".len()..];
                 calls::invoke_harness(&self.lua, world.scene(), verb, &args).err()
+            }
+            HostCall::Call { function, args } if function.starts_with(script_ref::PREFIX) => {
+                let verb = &function[script_ref::PREFIX.len()..];
+                script_ref::invoke(world.script_manager(), verb, &args).err()
             }
             HostCall::Call { function, args } => {
                 calls::invoke(&self.lua, world.script_manager(), &function, &args).err()
