@@ -45,6 +45,8 @@ pub struct DemoTick {
     pub display_scale: Option<f32>,
     /// The state digest stored after this tick, if one was.
     pub digest: Option<String>,
+    /// The `Scene.LoadAsync` operations ready from this tick's head (#2123).
+    pub loads: Vec<u32>,
 }
 
 /// The lines after a demo's header: a tick's [`Entry`], an index line (or one
@@ -235,6 +237,7 @@ impl Iterator for DemoTicks {
         self.tick.t = t;
         self.tick.host.clear();
         self.tick.digest = None;
+        self.tick.loads.clear();
         // A capture is an edge: it is published on its own tick only.
         self.tick.input.clipboard = None;
         if let Some(entry) = self.ahead.take_if(|e| e.t == t) {
@@ -247,6 +250,7 @@ impl Iterator for DemoTicks {
             self.tick.size = entry.size.or(self.tick.size);
             self.tick.display_scale = entry.display_scale.or(self.tick.display_scale);
             self.tick.digest = entry.digest;
+            self.tick.loads = entry.loads;
         }
         Some(self.tick.clone())
     }

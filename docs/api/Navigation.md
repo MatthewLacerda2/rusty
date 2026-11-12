@@ -34,7 +34,9 @@ frame (a door swinging shut) and agents see it the same tick. Wherever a scene g
 navmesh as a whole (loading the game, the player or the harness; Play's first frame; a
 play-mode `Scene.Load`; Stop) it starts from the scene's **saved navmesh** when it has one
 that still matches (below), and bakes in full when not, once; a change of the bake
-settings or of the grid's bounds bakes in full too.
+settings or of the grid's bounds bakes in full too. A `Scene.LoadAsync` with no saved
+navmesh bakes it in the background with the rest of the scene and restores that bake at
+the swap, when the scene it swapped in still matches it.
 
 ### The saved navmesh (#1887)
 

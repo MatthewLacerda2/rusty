@@ -14,17 +14,14 @@ use crate::scene::Scene;
 
 type Mesh = (Vec<[f32; 3]>, Vec<u32>);
 
-/// Suzanne's mesh, imported on its own thread (each thread parses into its own
-/// import cache), so every call reads her file and her sidecar afresh.
+/// Suzanne's mesh, imported with her entry dropped from the import cache, so
+/// every call reads her file and her sidecar afresh.
 fn import(path: &std::path::Path) -> Mesh {
-    let path = path.to_path_buf();
-    let mesh = std::thread::spawn(move || {
-        let import = crate::asset::imported(&path).expect("imports");
-        let sub = &import.sub_meshes[0];
-        let positions = sub.vertices.iter().map(|v| v.position).collect();
-        (positions, sub.indices.clone())
-    });
-    mesh.join().expect("the import thread")
+    crate::asset::import_cache::forget(path);
+    let import = crate::asset::imported(path).expect("imports");
+    let sub = &import.sub_meshes[0];
+    let positions = sub.vertices.iter().map(|v| v.position).collect();
+    (positions, sub.indices.clone())
 }
 
 /// Enter "Play": a dynamic Suzanne, her collider's shape, and the V-HACD runs.

@@ -62,6 +62,13 @@ pub struct NavmeshFile {
     read: std::io::Result<Option<Arc<[u8]>>>,
 }
 
+impl NavmeshFile {
+    /// Whether a navmesh was read: a file there, and readable.
+    pub fn has_bytes(&self) -> bool {
+        matches!(self.read, Ok(Some(_)))
+    }
+}
+
 /// Read the navmesh beside `scene_path`: none when there is no file.
 pub fn read_navmesh(scene_path: &str) -> NavmeshFile {
     let path = navmesh_path(scene_path);

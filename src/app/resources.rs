@@ -127,6 +127,8 @@ pub struct Resources {
     /// The tick's tap (#1581) — a dev demo recorder or replay. `None` unless
     /// installed via `GameWorld::set_tap`.
     pub(super) tap: Option<Box<dyn super::TickTap>>,
+    /// What prepares `Scene.LoadAsync` operations (#2123) and the scene it made ready.
+    pub(super) loading: super::scene_load::Loading,
     /// How far the edit scene's meshes follow the write log (#1242).
     pub(super) model_writes: crate::scene::model_writes::ModelWrites,
 }
@@ -209,6 +211,7 @@ impl Resources {
             probe: None,
             load_probe: None,
             tap: None,
+            loading: Default::default(),
             model_writes: Default::default(),
         }
     }

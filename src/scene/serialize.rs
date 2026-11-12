@@ -51,7 +51,7 @@ fn default_ambient_intensity() -> f32 {
 /// serialize a World for free, and we never want GPU buffers in the file. Its
 /// `#[serde(default)]`s let a sparse, hand-written scene omit a block; no older
 /// format is read (CLAUDE.md, *Backward compatibility is not a concern*).
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct SceneData {
     pub entities: Vec<Entity>,
     pub next_entity_id: u32,

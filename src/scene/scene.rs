@@ -114,9 +114,9 @@ pub struct Scene {
     /// destroy door and `GameWorld`'s transitions all read
     /// ([`Scene::is_playing`]). Transient, never serialized.
     pub(in crate::scene) playing: bool,
-    /// The scene file a play-mode `Scene.Load` asked for (#432); swapped in at the
-    /// tick's tail by the scene-load phase (`scene_load`). Transient, never serialized.
-    pub pending_load: Option<String>,
+    /// The pending `Scene.Load` / `LoadAsync` and the operations' statuses (#432,
+    /// #2123, `runtime::loads`), drained at the tick's tail. Transient, never serialized.
+    pub loads: crate::scene::runtime::loads::SceneLoads,
     /// Entities marked `Scene.DontDestroyOnLoad` (#432): they and their descendants
     /// survive a scene swap. Transient runtime state, never serialized.
     pub persistent: std::collections::BTreeSet<u32>,
@@ -198,7 +198,7 @@ impl Default for Scene {
             lighting_settings: Default::default(),
             pending_destroy: Vec::new(),
             playing: false,
-            pending_load: None,
+            loads: Default::default(),
             persistent: std::collections::BTreeSet::new(),
             debug_lines: Default::default(),
             shader_time: 0.0,

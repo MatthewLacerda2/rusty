@@ -121,6 +121,10 @@ impl Log for Forward {
     }
 
     fn log(&self, record: &Record<'_>) {
+        // A staged copy's warnings are the real apply's again (`core::quiet`).
+        if crate::core::quiet::is_quiet() && is_kept(record.metadata()) {
+            return;
+        }
         if self.stderr.matches(record) {
             self.stderr.log(record);
         }
