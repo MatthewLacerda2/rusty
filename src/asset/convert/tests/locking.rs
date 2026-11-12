@@ -100,7 +100,7 @@ fn a_projects_lock_lives_in_its_cache_folder_never_in_assets() {
     let is_lock = |p: &PathBuf| p.extension().is_some_and(|e| e == "lock");
     assert!(!assets.iter().any(is_lock), "{assets:?}");
     // Canonical, as `lock::path` is: macOS's temp dir `/var` is a link to `/private/var`.
-    let locks = std::fs::canonicalize(&root.join(project::CACHE_DIR).join(lock::LOCKS_DIR));
+    let locks = std::fs::canonicalize(root.join(project::CACHE_DIR).join(lock::LOCKS_DIR));
     let locks = files_under(&locks.unwrap());
     assert_eq!(locks, vec![lock::path(&out).unwrap()], "one lock, reused");
 }
