@@ -14,13 +14,22 @@
 //!    ranked best first, a tie to the earliest generated, and [`pick`] chooses
 //!    one by [`RunMode`].
 //!
-//! Synchronous (decision 1): a query answers in the call that runs it. It is a
+//! Synchronous (decision 1): [`run`] answers in the call that runs it. It is a
 //! pure function of the scene, the navmesh, the physics world, the active camera
 //! and the spec; only [`pick`]'s random modes draw from the seeded
 //! [`Random`](crate::core::random::Random), once per query that found anything.
+//!
+//! Time-sliced (#2116): [`QueryQueue`] runs the same query in stages, as
+//! Unreal's EQS manager does: generation and every test but `path` when it is
+//! requested ([`Progress`]), then the `path` tests' search on a per-tick budget of
+//! node expansions shared by every query waiting, oldest first; the ranking and
+//! the pick happen on the tick the search finishes. Its answers are exactly
+//! [`run`]'s for the same world as it was when the query was requested.
 
 mod generate;
 mod measure;
+mod progress;
+pub mod queue;
 mod rank;
 mod sight;
 pub mod spec;
@@ -43,11 +52,14 @@ pub(crate) mod test_world;
 
 use glam::{Vec2, Vec3};
 
+pub use progress::Progress;
+pub use queue::{QueryQueue, Ticket, DEFAULT_ITERATIONS_PER_FRAME};
 pub use rank::pick;
 pub use spec::{
     Anchor, Curve, Filter, Generator, Measure, QuerySpec, RunMode, Score, Test, DEFAULT_PROJECT,
     MAX_ITEMS,
 };
+pub use walk::FloodAsk;
 
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
@@ -75,29 +87,13 @@ pub struct Item {
 
 /// Run `spec` for `querier`: every surviving item, best first. Empty when
 /// nothing survives (never an error: the spec was checked when it was built).
+/// The `path` tests' search runs to its end in the call; [`QueryQueue`] runs
+/// the same query with that search sliced across ticks.
 pub fn run(world: &QueryWorld, querier: Anchor, spec: &QuerySpec) -> Vec<Item> {
-    let items = generate::items(world.nav, &spec.generator, spec.project);
-    let mut alive: Vec<usize> = (0..items.len()).collect();
-    let mut raws: Vec<Vec<f32>> = vec![Vec::new(); spec.tests.len()];
-    // Cheap first, written order within a cost (a stable sort).
-    let mut order: Vec<usize> = (0..spec.tests.len()).collect();
-    order.sort_by_key(|&t| spec.tests[t].measure.cost());
-    for t in order {
-        let test = &spec.tests[t];
-        let points: Vec<Vec3> = alive.iter().map(|&i| items[i]).collect();
-        let values = measure::raw(world, querier, &test.measure, &points);
-        let mut row = vec![f32::NAN; items.len()];
-        let mut kept = Vec::with_capacity(alive.len());
-        for (&i, value) in alive.iter().zip(values) {
-            // `None` fails the test outright (an unreachable item's path length).
-            let Some(v) = value else { continue };
-            if test.filter.is_none_or(|f| f.keeps(v)) {
-                row[i] = v;
-                kept.push(i);
-            }
-        }
-        raws[t] = row;
-        alive = kept;
+    let mut progress = Progress::start(world, querier, spec.clone());
+    while let Some(ask) = progress.ask() {
+        let lengths = ask.lengths(world.nav);
+        progress.answer(lengths);
     }
-    rank::rank(spec, &items, &alive, &raws)
+    progress.ranked()
 }

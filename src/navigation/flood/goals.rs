@@ -31,6 +31,7 @@
 use crate::navigation::astar::heuristic;
 use crate::navigation::{NavigationGraph, SpanRef};
 
+#[derive(Default)]
 pub(super) struct Goals {
     /// The goals not settled yet, deduplicated.
     left: Vec<SpanRef>,

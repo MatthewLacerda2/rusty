@@ -23,6 +23,7 @@ use std::rc::Rc;
 
 use mlua::Lua;
 
+use crate::ai::query::QueryQueue;
 use crate::audio::AudioMaestro;
 use crate::core::application::Application;
 use crate::core::frame_stats::FrameStats;
@@ -136,6 +137,8 @@ pub struct ApiCtx {
     /// The UI event system (#420): selection, hover and press state behind the `UI`
     /// namespace's pointer and focus verbs.
     pub event_system: ApiCell<EventSystem>,
+    /// The time-sliced environment queries (#2116), behind `EnvironmentQuery.Request`.
+    pub queries: ApiCell<QueryQueue>,
 }
 
 /// Run `body`, so a namespace test can use `?` on its Lua calls in one place.

@@ -80,6 +80,7 @@ pub(super) fn apply_scene_load(world: &mut World, res: &mut Resources) {
     };
 
     res.script_manager.unload_entities(&outgoing);
+    res.script_manager.forget_queries(); // made against the outgoing scene (#2116)
     stop_voices(world, res, &outgoing);
     let swapped = world.scene.borrow_mut().swap_in(data, &path, &survivors);
     if let Err(err) = swapped {

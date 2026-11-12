@@ -41,11 +41,17 @@ pub fn raw(
             let at = p + Vec3::Y * *item_height;
             answer(sight::in_view(world.view, world.screen, at, *margin) == *inside)
         }),
-        Measure::PathExists => walk::lengths(world, querier, items)
-            .into_iter()
-            .map(|l| Some(answer(l.is_some())))
-            .collect(),
-        Measure::PathLength => walk::lengths(world, querier, items),
+        Measure::PathExists | Measure::PathLength => {
+            let lengths = walk::FloodAsk::new(world, querier, items)
+                .map_or_else(Vec::new, |ask| ask.lengths(world.nav));
+            match measure {
+                Measure::PathExists => lengths
+                    .into_iter()
+                    .map(|l| Some(answer(l.is_some())))
+                    .collect(),
+                _ => lengths,
+            }
+        }
         Measure::Separation { radius } => {
             let others = others(world.scene, querier.entity);
             each(items, |p| nearest(&others, p).min(*radius))
@@ -55,7 +61,7 @@ pub fn raw(
 }
 
 /// A yes/no test's raw value: 1 for the answer it asks for.
-fn answer(matches: bool) -> f32 {
+pub(super) fn answer(matches: bool) -> f32 {
     if matches {
         1.0
     } else {

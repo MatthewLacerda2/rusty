@@ -149,6 +149,7 @@ impl ScriptManager {
         self.forget_loads();
         self.lua = Some(lua);
         self.cells.timers.borrow_mut().clear();
+        *self.cells.queries.borrow_mut() = Default::default();
 
         Ok(())
     }
@@ -175,6 +176,7 @@ impl ScriptManager {
         self.load_attempted.clear();
         self.forget_loads();
         self.cells.timers.borrow_mut().clear();
+        *self.cells.queries.borrow_mut() = Default::default();
         self.lua = None;
     }
 

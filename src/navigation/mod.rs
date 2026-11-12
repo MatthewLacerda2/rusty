@@ -53,7 +53,7 @@ pub use areas::{
 pub use astar::MAX_SEARCH_NODES;
 pub use bake::{baked_fingerprint, CellRect, Rebake, Start};
 pub use bounds::{bake_collider_ids, NavBounds};
-pub use flood::Flood;
+pub use flood::{Flood, FloodSearch};
 pub use grid::{NavSpan, NavigationGraph, SpanRef, DEFAULT_MAX_SLOPE, DEFAULT_MAX_STEP};
 pub use obstacle::{tick_obstacles, ObstacleVolume};
 pub use offmesh::{LinkEnd, OffMeshLink, OffMeshLinkData, OffMeshLinkKind};

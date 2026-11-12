@@ -123,6 +123,7 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, init_scripts)
         .add_system(Stage::FixedUpdate, super::systems::ui::dispatch_ui_events)
         .add_system(Stage::FixedUpdate, update_scripts)
+        .add_system(Stage::FixedUpdate, serve_queries)
         .add_system(Stage::FixedUpdate, tick_nav)
         .add_system(Stage::FixedUpdate, physics::step_physics)
         .add_system(Stage::FixedUpdate, super::animation::graph::evaluate_graphs)
@@ -172,6 +173,14 @@ fn init_scripts(_world: &mut World, res: &mut Resources) {
 fn update_scripts(_world: &mut World, res: &mut Resources) {
     res.script_manager.update_scripts(res.frame_dt);
     res.script_manager.tick_timers(res.frame_dt);
+}
+
+/// The environment query phase (#2116): after every `Update` and timer, spend
+/// this tick's budget of navmesh expansions on the queries scripts requested
+/// (`EnvironmentQuery.Request`), so one asked this tick may be answered by the
+/// next `Update`. Before `tick_nav`, as the agents' path queue is served there.
+fn serve_queries(_world: &mut World, res: &mut Resources) {
+    res.script_manager.serve_queries();
 }
 
 /// The post-physics script phase (#324): once physics, animation and particles
