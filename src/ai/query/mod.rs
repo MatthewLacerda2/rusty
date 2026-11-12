@@ -36,6 +36,8 @@ pub mod spec;
 mod walk;
 
 #[cfg(test)]
+mod carry_tests;
+#[cfg(test)]
 mod context_tests;
 #[cfg(test)]
 mod filter_tests;

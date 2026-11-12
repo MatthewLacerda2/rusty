@@ -22,7 +22,8 @@
 //! hash. The [`Flood`] holds the pool while it is read and hands it back when
 //! dropped. Which spans an off-mesh link leaves from is kept on the graph until
 //! the next bake (`cache`). The search itself is resumable (`search`, #2116): the
-//! query's time-sliced form steps one across ticks on a budget of expansions.
+//! query's time-sliced form steps one across ticks on a budget of expansions, and
+//! carries it across an incremental rebake that leaves it standing (`carry`).
 
 use glam::Vec3;
 
@@ -32,6 +33,7 @@ pub(super) use cache::FloodCache;
 pub use search::FloodSearch;
 
 mod cache;
+mod carry;
 mod goals;
 mod moves;
 mod search;

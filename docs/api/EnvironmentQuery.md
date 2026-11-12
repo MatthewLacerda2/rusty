@@ -144,10 +144,13 @@ end
 ```
 
 A request belongs to its Play run: Stop, a `Scene.Load` and destroying the
-querier drop it, and its ticket then reads as `"gone"` (never an error). A
-rebake while a search is held starts that search over on the new navmesh. The
-queue is served only in Play: a request made in edit mode waits. `RunAll` has
-no time-sliced form.
+querier drop it, and its ticket then reads as `"gone"` (never an error). The
+queue is served only in Play, and entering Play starts a fresh one, so a request
+made in edit mode is never answered: its ticket reads `"gone"` once Play starts.
+A rebake while a search is held carries the search onto the new navmesh when
+the change lies away from everything it reached (a carving obstacle moving
+elsewhere on the map), and starts it over otherwise; either way the answer is
+the new navmesh's. `RunAll` has no time-sliced form.
 
 ### Picking and determinism
 

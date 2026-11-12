@@ -9,9 +9,12 @@
 //! and its answer (`Flood`); a held search keeps a pool of its own, so a script's
 //! synchronous query in between never touches its slots.
 //!
-//! A search remembers what it was asked and the bake it runs on. Stepped after a
-//! rebake (or an area-cost change, which bumps the same generation) it starts
-//! over on the new navmesh from the same ask: its costs so far may no longer hold.
+//! A search remembers what it was asked and the bake it runs on. Stepped after an
+//! incremental rebake that reached nothing it holds, it is carried onto the new
+//! spans (`carry`), so a moving carving obstacle rebaking every few ticks cannot
+//! stall it; after any other rebake (one that reaches it, a full bake, or an
+//! area-cost change, which bumps the same generation) it starts over on the new
+//! navmesh from the same ask: its costs so far may no longer hold.
 
 use std::collections::BinaryHeap;
 
@@ -20,13 +23,13 @@ use glam::Vec3;
 use super::goals::Goals;
 use super::moves::{Move, Open};
 use crate::navigation::pool::NodePool;
-use crate::navigation::NavigationGraph;
+use crate::navigation::{NavigationGraph, SpanRef};
 
 /// What a flood was asked: its start, goals, bound (metres) and area mask.
 #[derive(Clone, Default)]
-struct Ask {
+pub(super) struct Ask {
     start: Vec3,
-    goals: Vec<Vec3>,
+    pub(super) goals: Vec<Vec3>,
     max_length: f32,
     mask: u32,
 }
@@ -36,19 +39,23 @@ struct Ask {
 #[derive(Default)]
 pub struct FloodSearch {
     pub(super) cost: NodePool,
-    open: BinaryHeap<Open>,
+    pub(super) open: BinaryHeap<Open>,
     moves: Vec<Move>,
-    ask: Ask,
-    goals: Goals,
+    pub(super) ask: Ask,
+    pub(super) goals: Goals,
+    /// The span the start snapped to, while on the navmesh.
+    pub(super) from: Option<SpanRef>,
     /// The bound in cells, and the cell size, metres.
     bound: f32,
     pub(super) spacing: f32,
     pub(super) reached: usize,
     /// The bake the costs are for: `(bake_generation, span count)`.
-    key: (u64, usize),
-    /// Whether the start snapped onto the navmesh.
-    on_mesh: bool,
-    done: bool,
+    pub(super) key: (u64, usize),
+    /// That bake's cell offsets, copied once a step leaves the search unfinished
+    /// (`cells_fresh`): what a rebake's renumbering counts from (`carry`).
+    pub(super) cells: Vec<u32>,
+    pub(super) cells_fresh: bool,
+    pub(super) done: bool,
 }
 
 impl FloodSearch {
@@ -60,22 +67,14 @@ impl FloodSearch {
         }
     }
 
-    /// Whether the search has finished: every goal settled or proven out of
-    /// reach, or its bound reached.
-    pub fn done(&self) -> bool {
-        self.done
-    }
-
-    /// Whether its start was on the navmesh; off it, the search reaches nothing.
-    pub fn on_mesh(&self) -> bool {
-        self.on_mesh
-    }
-
     /// The travel cost from the start to the span `p` snaps to, metres, or
-    /// `None` when not reached (see [`super::Flood::length_to`]).
+    /// `None` when not reached (see [`super::Flood::length_to`]), or when the
+    /// search was not run on `nav` as it is now (never begun, or a rebake since
+    /// its last step).
     pub fn length_to(&self, nav: &NavigationGraph, p: Vec3) -> Option<f32> {
         let span = nav.snap(p)?;
-        let g = self.cost.g(span.index);
+        let current = self.key == (nav.bake_generation, nav.spans.len());
+        let g = (current && self.cost.covers(span.index)).then(|| self.cost.g(span.index))?;
         g.is_finite().then_some(g * self.spacing)
     }
 }
@@ -104,17 +103,19 @@ impl NavigationGraph {
     /// Start `search` over from its ask on the navmesh as it is now.
     fn restart_flood(&self, s: &mut FloodSearch) {
         s.key = (self.bake_generation, self.spans.len());
+        s.cells_fresh = false;
         s.cost.begin(self.spans.len());
         s.open.clear();
         s.reached = 0;
         s.spacing = self.grid_spacing.max(f32::EPSILON);
         s.bound = (s.ask.max_length / s.spacing).max(0.0);
-        let Some(from) = self.snap(s.ask.start) else {
-            (s.on_mesh, s.done, s.goals) = (false, true, Goals::default());
+        s.from = self.snap(s.ask.start);
+        let Some(from) = s.from else {
+            (s.done, s.goals) = (true, Goals::default());
             return;
         };
         s.goals = Goals::new(self, from, &s.ask.goals, s.bound);
-        (s.on_mesh, s.done, s.reached) = (true, false, 1);
+        (s.done, s.reached) = (false, 1);
         s.cost.set(from.index, 0.0, None);
         if !s.goals.done() {
             s.open.push(Open::new(from, 0.0, s.goals.h(from)));
@@ -123,9 +124,9 @@ impl NavigationGraph {
 
     /// Run `search` for at most `budget` node expansions, taking what it spends
     /// off `budget`: `true` once it has finished. A search begun on an earlier
-    /// bake starts over first (module doc).
+    /// bake is carried onto this one first, or starts over (module doc).
     pub fn step_flood(&self, search: &mut FloodSearch, budget: &mut u32) -> bool {
-        if search.key != (self.bake_generation, self.spans.len()) {
+        if search.key != (self.bake_generation, self.spans.len()) && !self.carry_flood(search) {
             self.restart_flood(search);
         }
         let s = search;
@@ -165,6 +166,10 @@ impl NavigationGraph {
                 s.done = true;
             }
         });
+        if !s.done && !s.cells_fresh {
+            s.cells.clone_from(&self.cell_start);
+            s.cells_fresh = true;
+        }
         s.done
     }
 }

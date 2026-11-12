@@ -1,6 +1,7 @@
 //! The flood stepped on a budget (#2116): sliced as finely as one expansion a
 //! step, it settles every goal at the very cost the synchronous flood gives it,
-//! and a rebake between two steps starts it over on the new navmesh.
+//! and a full rebake between two steps starts it over on the new navmesh (an
+//! incremental one that misses it carries it: `ai::query::carry_tests`).
 
 use glam::Vec3;
 
@@ -98,7 +99,7 @@ fn a_sliced_flood_gives_each_goal_the_synchronous_cost_to_the_bit() {
 }
 
 #[test]
-fn a_rebake_between_steps_starts_the_flood_over_on_the_new_navmesh() {
+fn a_full_rebake_between_steps_starts_the_flood_over_on_the_new_navmesh() {
     let (mut scene, block) = level();
     let mut nav = bake(&scene);
     let goals = goals();
@@ -129,6 +130,7 @@ fn a_start_off_the_navmesh_finishes_at_once_reaching_nothing() {
     let mut search = FloodSearch::default();
     nav.begin_flood(&mut search, FROM, &goals(), BOUND, ALL_AREAS);
     let mut budget = 5;
-    assert!(nav.step_flood(&mut search, &mut budget) && !search.on_mesh());
+    assert!(nav.step_flood(&mut search, &mut budget), "finished");
     assert_eq!(budget, 5, "nothing expanded");
+    assert_eq!(search.length_to(&nav, Vec3::new(15.0, 0.0, 15.0)), None);
 }
