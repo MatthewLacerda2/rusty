@@ -71,6 +71,11 @@ impl NodePool {
         }
     }
 
+    /// Whether span `index` has a slot: the pool was begun for at least `index + 1` spans.
+    pub(crate) fn covers(&self, index: u32) -> bool {
+        (index as usize) < self.slots.len()
+    }
+
     /// The best cost found to span `index` this search; `INFINITY` when unreached.
     pub(crate) fn g(&self, index: u32) -> f32 {
         self.slot(index).g

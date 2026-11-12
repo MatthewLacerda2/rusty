@@ -25,9 +25,13 @@ if found then NavMeshAgent.SetTarget(self_id, x, y, z) end
 |---|---|---|
 | `EnvironmentQuery.Run` | `(querier, spec [, contexts [, mode]])` — `mode` is `"best"` (default), `"random_best_5"` or `"random_best_25"` | `found, x, y, z, score`; `false, 0, 0, 0, 0` when no item survives |
 | `EnvironmentQuery.RunAll` | `(querier, spec [, contexts])` | every surviving item, best first: an array of `{ x, y, z, score }` (empty when none survives) |
+| `EnvironmentQuery.Request` | `(querier, spec [, contexts [, mode]])`, as `Run` | a ticket (an integer) for the query, answered on a later tick: see *Time-sliced queries* |
+| `EnvironmentQuery.Poll` | `(ticket)` | `"pending"` while it waits; `"done", found, x, y, z, score` once answered (`Run`'s returns), read once; `"gone"` for a ticket read, cancelled, dropped or never issued |
+| `EnvironmentQuery.Cancel` | `(ticket)` | `true` when it dropped a waiting or unread request, `false` otherwise |
+| `EnvironmentQuery.SetIterationsPerFrame` / `GetIterationsPerFrame` | `(n)` / `()` | the navmesh node expansions the time-sliced queries share each tick (Unreal's EQS `MaxAllowedTestingTime`, counted in expansions; at least `1`, default `2048`). It goes back to the default when Play starts and on Stop |
 
-The query runs **synchronously**: it answers in the call. Nothing surviving is
-not an error. A spec is a plain Lua table, so a script can keep one as a
+`Run` and `RunAll` run **synchronously**: they answer in the call. Nothing
+surviving is not an error. A spec is a plain Lua table, so a script can keep one as a
 module-level constant or build one on the fly.
 
 ### Contexts
@@ -101,6 +105,53 @@ the dear tests only see the survivors of the cheap filters.
 test, and a `purpose` a field contradicts (`purpose = "score"` with `min` or
 `max`, `purpose = "filter"` with a `score`).
 
+### Time-sliced queries
+
+A `path` test's search is the dear part of a query: toward a donut 20 m away on
+a Dust2-sized map it expands several thousand navmesh nodes, and a few such
+queries in one tick can cost milliseconds. `Request` runs the same query in
+slices, as Unreal's EQS manager does:
+
+1. **On the call**, the query is generated and every test but `path` is run
+   against the world as it is then (its contexts, the target included, are
+   read then too). A query with no `path` test is answered right there.
+2. **Each tick, after every `Update` and timer**, the engine spends
+   `GetIterationsPerFrame()` node expansions on the waiting queries' `path`
+   searches, oldest request first (one tick's requests in the order they were
+   made), resuming the search the last tick left unfinished.
+3. **On the tick its search ends**, the query is scored and its item picked
+   (a random mode draws from [`Random`](Random.md) then), and `Poll` hands the
+   answer to the next `Update` that asks.
+
+So a request made in an `Update` is answered by a later `Update`: the next one
+when its search fits what is left of a tick's budget, a few ticks later for a
+long one (a donut 20 m away takes about 7 000 expansions, under four ticks of
+the default budget). The answer is exactly what `Run` would have given in the
+`Update` that made the request, the `best` pick included; a random mode draws
+on the tick it is answered, from the stream as it is then.
+
+```lua with=self_id,player_id
+local spot = { generator = { donut = { context = "target", outer = 8 } }, tests = { { path = "exists" } } }
+if not ticket then
+  ticket = EnvironmentQuery.Request(self_id, spot, { target = player_id })
+else
+  local state, found, x, y, z = EnvironmentQuery.Poll(ticket)
+  if state ~= "pending" then
+    ticket = nil                      -- answered (or gone): ask again next time
+    if found then NavMeshAgent.SetTarget(self_id, x, y, z) end
+  end
+end
+```
+
+A request belongs to its Play run: Stop, a `Scene.Load` and destroying the
+querier drop it, and its ticket then reads as `"gone"` (never an error). The
+queue is served only in Play, and entering Play starts a fresh one, so a request
+made in edit mode is never answered: its ticket reads `"gone"` once Play starts.
+A rebake while a search is held carries the search onto the new navmesh when
+the change lies away from everything it reached (a carving obstacle moving
+elsewhere on the map), and starts it over otherwise; either way the answer is
+the new navmesh's. `RunAll` has no time-sliced form.
+
 ### Picking and determinism
 
 `best` takes the highest score; a tie goes to the earliest-generated item. The
@@ -108,4 +159,6 @@ random modes take a uniform pick among the items scoring within the top 5% or
 25% of the score range (Unreal's `RandomBest5Pct` / `RandomBest25Pct`), drawn
 from [`Random`](Random.md): **exactly one draw** per query that found something,
 and **none** when nothing survives or the mode is `best`. Items are generated in
-a fixed order, so the same seed, scene and spec always pick the same point.
+a fixed order, so the same seed, scene and spec always pick the same point. A
+time-sliced query's budget is counted in node expansions, never in time, so the
+same run answers every request on the same tick.

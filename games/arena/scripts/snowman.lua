@@ -5,6 +5,8 @@
 --
 --   * Sees someone: turns to face it and fires (combat.lua's gun, with spread
 --     and recoil), closing in to a spot an EnvironmentQuery picks around it.
+--     The query is time-sliced (Request / Poll): the bot keeps walking to its
+--     last spot until the engine's per-tick budget answers it.
 --   * Knows of someone it can't see (heard a shot, was hit, lost sight of it):
 --     walks to where it last was.
 --   * Knows of no one: roams between the spawn points, the upper floor and the
@@ -71,6 +73,23 @@ local function roam(id)
     NavMeshAgent.SetTarget(id, x, y, z)
 end
 
+-- Drop the query in flight, if any: its answer is for a fight that is over.
+local function drop_query()
+    if Snowman.query ~= nil then
+        EnvironmentQuery.Cancel(Snowman.query)
+        Snowman.query = nil
+    end
+end
+
+-- Walk to the spot the query in flight picked, once it is answered.
+local function poll_spot(id)
+    if Snowman.query == nil then return end
+    local state, found, sx, sy, sz = EnvironmentQuery.Poll(Snowman.query)
+    if state == "pending" then return end
+    Snowman.query = nil
+    if found then NavMeshAgent.SetTarget(id, sx, sy, sz) end
+end
+
 local function fight(id, known, now)
     local x, y, z = Transform.GetPosition(id)
     local tx, ty, tz = Transform.GetPosition(known.id)
@@ -78,20 +97,22 @@ local function fight(id, known, now)
     face(id, dx, dz)
     local len = math.sqrt(dx * dx + dy * dy + dz * dz)
     Combat.fire(Snowman.gun, id, x, y + Combat.EYE, z, dx / len, dy / len, dz / len)
-    if now - Snowman.planned_at >= REQUERY then
+    poll_spot(id)
+    if Snowman.query == nil and now - Snowman.planned_at >= REQUERY then
         Snowman.planned_at = now
-        local found, sx, sy, sz = EnvironmentQuery.Run(id, Snowman.spot, { target = { tx, ty, tz } })
-        if found then NavMeshAgent.SetTarget(id, sx, sy, sz) end
+        Snowman.query = EnvironmentQuery.Request(id, Snowman.spot, { target = { tx, ty, tz } })
     end
 end
 
 function Snowman.Update(id, dt)
     local match = Combat.match()
     if match ~= nil and match.over then
+        drop_query()
         NavMeshAgent.ResetPath(id)
         return
     end
     if Combat.dead(Snowman, id, dt, NavMeshAgent.Warp) then
+        drop_query()
         NavMeshAgent.ResetPath(id)
         return
     end
@@ -105,6 +126,7 @@ function Snowman.Update(id, dt)
         roam(id)
     end
     if not sees then
+        drop_query()
         local vx, _, vz = NavMeshAgent.GetVelocity(id)
         face(id, vx, vz)
     end

@@ -14,6 +14,7 @@ use std::rc::Rc;
 
 use mlua::Lua;
 
+use crate::ai::query::QueryQueue;
 use crate::api::bind;
 use crate::audio::AudioMaestro;
 use crate::core::application::Application;
@@ -87,6 +88,10 @@ pub struct ApiCells {
     /// The UI event system (#420): selection, hover and press state, shared with
     /// `Resources` (whose systems drive it) and the `UI` namespace. Reset every Play.
     pub(super) event_system: Rc<RefCell<EventSystem>>,
+    /// The time-sliced environment queries (#2116) behind `EnvironmentQuery.Request`
+    /// and `Poll`, served each tick by [`ScriptManager::serve_queries`]. Made
+    /// afresh with every fresh VM: its tickets and budget belong to one Play run.
+    pub(super) queries: Rc<RefCell<QueryQueue>>,
 }
 
 impl ApiCells {
@@ -118,6 +123,7 @@ impl ApiCells {
             stats: Rc::default(),
             timers: Rc::default(),
             event_system: Rc::default(),
+            queries: Rc::default(),
         }
     }
 
@@ -141,6 +147,7 @@ impl ApiCells {
         bind(lua, &self.input);
         bind(lua, &self.nav);
         bind(lua, &self.physics);
+        bind(lua, &self.queries);
         bind(lua, &self.random);
         bind(lua, &self.scene);
         bind(lua, &self.scene_path);
@@ -158,5 +165,22 @@ impl ScriptManager {
     /// surface over the same world (see the module doc).
     pub fn api_cells(&self) -> ApiCells {
         self.cells.clone()
+    }
+}
+
+impl ScriptManager {
+    /// The query phase (#2116): spend this tick's budget on the environment
+    /// queries scripts requested, ranking and picking (from the seeded `Random`)
+    /// each one whose search ends. Runs after the tick's `Update`s and timers.
+    pub fn serve_queries(&self) {
+        let nav = self.cells.nav.borrow();
+        let mut random = self.cells.random.borrow_mut();
+        self.cells.queries.borrow_mut().serve(&nav, &mut random);
+    }
+
+    /// Drop every environment query in flight (a scene load: they were made
+    /// against the scene it replaces); their tickets read as gone.
+    pub fn forget_queries(&self) {
+        self.cells.queries.borrow_mut().clear();
     }
 }

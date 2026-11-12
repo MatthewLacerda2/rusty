@@ -30,7 +30,8 @@ fn every_api_handle_reaches_its_own_attached_cell() {
     m.cells.attach(&lua);
     every_cell_is_its_own!(&m.cells, &lua;
         scene, input, nav, camera, time, physics, console, storage, graphics, video,
-        scene_path, audio, random, screen, application, stats, timers, event_system);
+        scene_path, audio, random, screen, application, stats, timers, event_system,
+        queries);
 }
 
 /// No registrar reads a cell at registration (#175's rule, kept by #1709): a

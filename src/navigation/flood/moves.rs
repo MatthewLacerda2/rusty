@@ -40,6 +40,17 @@ impl Open {
     pub(super) fn g(self) -> f32 {
         f32::from_bits(self.g)
     }
+
+    /// The same entry for `node`, its span renumbered by a rebake (`carry`):
+    /// its key and cost are kept, only the tie-breaking index moves.
+    pub(super) fn moved(self, node: SpanRef) -> Self {
+        Self {
+            key: (self.key & !u64::from(u32::MAX)) | u64::from(node.index),
+            gx: node.gx,
+            gz: node.gz,
+            ..self
+        }
+    }
 }
 
 impl Ord for Open {

@@ -29,8 +29,11 @@
 //! makes its span pop sooner than needed.
 
 use crate::navigation::astar::heuristic;
+use glam::Vec3;
+
 use crate::navigation::{NavigationGraph, SpanRef};
 
+#[derive(Default)]
 pub(super) struct Goals {
     /// The goals not settled yet, deduplicated.
     left: Vec<SpanRef>,
@@ -38,28 +41,52 @@ pub(super) struct Goals {
     any: bool,
     /// What `h` keeps of the octile distance: `1 - slack`, or 0 for none.
     keep: f32,
+    /// Every span the goal points snapped to, and those the island map kept: a
+    /// flood carried across a rebake must find the very same ones (`carry`).
+    all: Vec<SpanRef>,
+    kept: Vec<SpanRef>,
 }
 
 impl Goals {
     /// The goals `points` snap to, less those no walk or link chain leads to
     /// from `from` (`request::islands`): they are out of reach for any mask,
     /// so the flood need not run to its bound to find that out.
-    pub(super) fn new(
+    pub(super) fn new(nav: &NavigationGraph, from: SpanRef, points: &[Vec3], bound: f32) -> Self {
+        let all = snapped(nav, points);
+        let mut kept = all.clone();
+        nav.retain_reachable(from, &mut kept);
+        Self {
+            left: kept.clone(),
+            any: !all.is_empty(),
+            keep: (1.0 - Self::slack(bound)).max(0.0),
+            all,
+            kept,
+        }
+    }
+
+    /// Renumber the goals onto a rebaked navmesh by `remap` (`carry`): `false`,
+    /// changing nothing, when `remap` refuses one, or when `points` no longer
+    /// snap to the same spans or the island map from `from` keeps others.
+    pub(super) fn carry(
+        &mut self,
         nav: &NavigationGraph,
         from: SpanRef,
-        points: &[glam::Vec3],
-        bound: f32,
-    ) -> Self {
-        let mut left: Vec<SpanRef> = points.iter().filter_map(|&p| nav.snap(p)).collect();
-        left.sort_unstable_by_key(|s| s.index);
-        left.dedup_by_key(|s| s.index);
-        let any = !left.is_empty();
-        nav.retain_reachable(from, &mut left);
-        Self {
-            left,
-            any,
-            keep: (1.0 - Self::slack(bound)).max(0.0),
+        points: &[Vec3],
+        remap: &dyn Fn(u32) -> Option<SpanRef>,
+    ) -> bool {
+        let map = |v: &[SpanRef]| v.iter().map(|g| remap(g.index)).collect::<Option<Vec<_>>>();
+        let (Some(all), Some(kept), Some(left)) =
+            (map(&self.all), map(&self.kept), map(&self.left))
+        else {
+            return false;
+        };
+        let mut reach = all.clone();
+        nav.retain_reachable(from, &mut reach);
+        if snapped(nav, points) != all || reach != kept {
+            return false;
         }
+        (self.all, self.kept, self.left) = (all, kept, left);
+        true
     }
 
     /// The share of the octile distance `h` gives up for `f32` rounding (module doc).
@@ -94,4 +121,12 @@ impl Goals {
     pub(super) fn done(&self) -> bool {
         self.any && self.left.is_empty()
     }
+}
+
+/// The spans `points` snap to, by index, each once.
+fn snapped(nav: &NavigationGraph, points: &[Vec3]) -> Vec<SpanRef> {
+    let mut spans: Vec<SpanRef> = points.iter().filter_map(|&p| nav.snap(p)).collect();
+    spans.sort_unstable_by_key(|s| s.index);
+    spans.dedup_by_key(|s| s.index);
+    spans
 }

@@ -102,6 +102,7 @@ pub const LAYERS: &[Layer] = &[
     sim(
         "scripting",
         &[
+            "ai",
             "api",
             "audio",
             "components",

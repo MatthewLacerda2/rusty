@@ -21,34 +21,30 @@
 //! starting a flood costs nothing per span, and a cost is an array read, not a
 //! hash. The [`Flood`] holds the pool while it is read and hands it back when
 //! dropped. Which spans an off-mesh link leaves from is kept on the graph until
-//! the next bake (`cache`).
-
-use std::collections::BinaryHeap;
+//! the next bake (`cache`). The search itself is resumable (`search`, #2116): the
+//! query's time-sliced form steps one across ticks on a budget of expansions, and
+//! carries it across an incremental rebake that leaves it standing (`carry`).
 
 use glam::Vec3;
 
-use super::pool::NodePool;
 use super::NavigationGraph;
-use goals::Goals;
-use moves::{Move, Open};
 
 pub(super) use cache::FloodCache;
+pub use search::FloodSearch;
 
 mod cache;
+mod carry;
 mod goals;
 mod moves;
+mod search;
 
 /// The spans a flood reached, each with its travel cost from the start. Holds
 /// the graph's search pool until it is dropped: a search that runs meanwhile
 /// works on a fresh one.
 pub struct Flood<'a> {
     nav: &'a NavigationGraph,
-    /// Cost from the start span, in A\*'s units (cells × area cost), by span index.
-    cost: NodePool,
-    /// How many spans the flood reached.
-    reached: usize,
-    /// The grid's cell size, metres: turns a cost into metres.
-    spacing: f32,
+    /// The finished search, its costs in the graph's pool.
+    search: FloodSearch,
 }
 
 impl Flood<'_> {
@@ -56,20 +52,19 @@ impl Flood<'_> {
     /// (area costs weighed in, as the planner weighs them), or `None` when the
     /// flood never reached it: unreachable, or past its bound.
     pub fn length_to(&self, nav: &NavigationGraph, p: Vec3) -> Option<f32> {
-        let span = nav.snap(p)?;
-        let g = self.cost.g(span.index);
-        g.is_finite().then_some(g * self.spacing)
+        self.search.length_to(nav, p)
     }
 
     /// How many spans the flood reached.
     pub fn reached(&self) -> usize {
-        self.reached
+        self.search.reached
     }
 }
 
 impl Drop for Flood<'_> {
     fn drop(&mut self) {
-        self.nav.search.restore(std::mem::take(&mut self.cost));
+        let pool = std::mem::take(&mut self.search.cost);
+        self.nav.search.restore(pool);
     }
 }
 
@@ -87,7 +82,8 @@ impl NavigationGraph {
     /// asks about a few dozen spots, and the flood around them is most of its
     /// cost. Exact for the goals, to the bit; another span it reports may hold a
     /// cost a full flood would still lower, or be left unreached. A goal off the
-    /// navmesh is ignored; with none at all, it is [`Self::flood`].
+    /// navmesh is ignored; with none at all, it is [`Self::flood`]. It is a
+    /// [`FloodSearch`] run to its end in the call (`search`).
     pub fn flood_to(
         &self,
         start: Vec3,
@@ -95,51 +91,12 @@ impl NavigationGraph {
         max_length: f32,
         mask: u32,
     ) -> Option<Flood<'_>> {
-        let from = self.snap(start)?;
-        let spacing = self.grid_spacing.max(f32::EPSILON);
-        let bound = (max_length / spacing).max(0.0);
-        let mut goals = Goals::new(self, from, goals, bound);
-        let mut cost = self.search.take(self.spans.len());
-        let mut reached = 1;
-        let mut open = BinaryHeap::new();
-        let mut moves: Vec<Move> = Vec::with_capacity(8);
-        cost.set(from.index, 0.0, None);
-        open.push(Open::new(from, 0.0, goals.h(from)));
-        if goals.done() {
-            open.clear(); // every goal is out of reach
-        }
-        self.flood_cache.with(self, |cache| {
-            while let Some(here) = open.pop() {
-                let (node, g) = (here.node(), here.g());
-                if g > cost.g(node.index) {
-                    continue; // a stale heap entry
-                }
-                goals.settle(node.index);
-                if goals.done() {
-                    break;
-                }
-                moves.clear();
-                self.moves(here, mask, cache.has_exit(node.index), &mut moves);
-                for &(next, g) in &moves {
-                    let best = cost.g(next.index);
-                    if g >= best || g > bound {
-                        continue;
-                    }
-                    let f = g + goals.h(next);
-                    if f <= bound {
-                        reached += usize::from(best == f32::INFINITY);
-                        cost.set(next.index, g, None);
-                        open.push(Open::new(next, g, f));
-                    }
-                }
-            }
-        });
-        Some(Flood {
-            nav: self,
-            cost,
-            reached,
-            spacing,
-        })
+        self.snap(start)?;
+        let mut search = FloodSearch::with_pool(self.search.take(self.spans.len()));
+        self.begin_flood(&mut search, start, goals, max_length, mask);
+        let mut unlimited = u32::MAX;
+        self.step_flood(&mut search, &mut unlimited);
+        Some(Flood { nav: self, search })
     }
 }
 
@@ -155,3 +112,6 @@ mod order_tests;
 // The bench level it runs on is a `dev` test fixture.
 #[cfg(all(test, feature = "dev"))]
 mod exact_tests;
+
+#[cfg(test)]
+mod slice_tests;
