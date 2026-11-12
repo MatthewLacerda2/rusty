@@ -1,5 +1,6 @@
 //! Play-test a test game: generate it twice and compare, run every scenario as
-//! `play` does, take the shots, and refuse a shot that is all one colour.
+//! `play` does, replay each demo a scenario recorded and refuse one that
+//! diverges, take the shots, and refuse a shot that is all one colour.
 
 use std::path::{Path, PathBuf};
 
@@ -31,7 +32,7 @@ impl Report {
 
 /// Generate `game` into `out`, prove a second generation writes the same files,
 /// then run each of its `scenarios/*.lua` (in name order) on the project's startup
-/// scene and take its shots into `cache/test/shots/`. An `Err` is a step that could
+/// scene, replay the demo each one recorded ([`replays`]), and take its shots into `cache/test/shots/`. An `Err` is a step that could
 /// not run at all; a step that ran and failed is in the [`Report`].
 pub fn check(game: &Game, out: &Path, params: &Params) -> Result<Report, String> {
     let out = std::path::absolute(out).map_err(|e| format!("{}: {e}", out.display()))?;
@@ -61,11 +62,33 @@ pub fn check(game: &Game, out: &Path, params: &Params) -> Result<Report, String>
         )?;
         let results = run.results_path.display();
         report.step(run.passed, format!("scenario {stem} ({results})"));
+        replays(&run.demos, &dir, &stem, &mut report)?;
     }
     if out.join(SHOTS).is_file() {
         shots(&out, &scene, &opened, &mut report)?;
     }
     Ok(report)
+}
+
+/// Replay each of `demos`, the ones the scenario `stem` just recorded, headless
+/// into `<dir>/replay/`: a demo whose replay diverges, or stops short, fails its
+/// step. A scenario's run records every act it makes on the world, so its demo
+/// must replay bit for bit; one that does not reached the sim by a way the demo
+/// does not record.
+fn replays(demos: &[PathBuf], dir: &Path, stem: &str, report: &mut Report) -> Result<(), String> {
+    for (i, demo) in demos.iter().enumerate() {
+        let out = match i {
+            0 => dir.join("replay"),
+            _ => dir.join(format!("replay-{i}")),
+        };
+        let run = crate::dev::demo::replay(demo, None, &out, Default::default())?;
+        let results = run.results_path.display();
+        report.step(
+            run.passed,
+            format!("scenario {stem}'s demo replays ({results})"),
+        );
+    }
+    Ok(())
 }
 
 /// Generate into `out`, move it aside to `<out>.first`, generate again into the

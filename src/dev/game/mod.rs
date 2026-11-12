@@ -17,8 +17,9 @@
 //! recipe writes everything else (scenes, materials, textures, sounds) through the
 //! API, so what it cannot do is an API gap, never a generator feature.
 //! [`check`] generates it, generates it again to prove the files are the same,
-//! runs every scenario as `play` does and takes the shots, failing on a scenario
-//! that fails and on a shot that is all one colour. The `game` binary is the
+//! runs every scenario as `play` does, replays the demo each recorded and takes
+//! the shots, failing on a scenario that fails, a demo that diverges on replay
+//! and a shot that is all one colour. The `game` binary is the
 //! command (`make game`, `make game-test`), and `tests/gpu/test_games/mod.rs` runs
 //! [`check`] on every folder.
 

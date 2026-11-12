@@ -72,13 +72,9 @@ fn a_forwarded_damage_call_replays_with_its_handler() {
         "the replayed handler killed the bot: {health}"
     );
     assert_eq!((verdict.diverged, verdict.checked), (None, 3));
-    // The harness's scene has no file, and `Scene.GetScript`'s handle is the
-    // one act the demo cannot carry.
-    let handle = "Scene.GetScript returned a handle (userdata), whose calls are not recorded";
-    assert_eq!(
-        verdict.taints,
-        [(0, NO_FILE.to_string()), (2, handle.to_string())]
-    );
+    // The harness's scene has no file; the handle that read the health is
+    // no taint (it notes its own writes and calls, #2120).
+    assert_eq!(verdict.taints, [(0, NO_FILE.to_string())]);
 }
 
 #[test]
