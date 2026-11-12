@@ -122,7 +122,7 @@ impl Bench {
 
 /// `dir` as the list stores it: absolute and resolved, or as given once it is gone.
 fn canonical(dir: &Path) -> PathBuf {
-    crate::core::paths::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf())
+    std::fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf())
 }
 
 #[cfg(test)]

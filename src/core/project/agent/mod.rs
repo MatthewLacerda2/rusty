@@ -42,7 +42,7 @@ const SESSION_MCP: &str = "session-mcp";
 /// The engine checkout this build was made from.
 fn checkout() -> PathBuf {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    crate::core::paths::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf())
+    std::fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf())
 }
 
 /// Write the agent files at `root` for an edit-open: `CLAUDE.md` when absent, and the
@@ -83,7 +83,7 @@ pub(super) fn session_binary(
 /// [`session_binary`] for this process.
 fn running_session_binary(engine: &Path) -> PathBuf {
     let exe = std::env::current_exe().ok();
-    let exe = exe.map(|e| crate::core::paths::canonicalize(&e).unwrap_or(e));
+    let exe = exe.map(|e| std::fs::canonicalize(&e).unwrap_or(e));
     session_binary(engine, exe.as_deref(), Path::is_file)
 }
 

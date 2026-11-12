@@ -2,7 +2,6 @@
 //! one, whatever their prefix, case or separators.
 
 use super::super::{cache_path, project_relative};
-use crate::core::paths::native;
 use proptest::prelude::*;
 use std::path::Path;
 
@@ -10,11 +9,11 @@ use std::path::Path;
 fn a_project_caches_beside_its_generated_assets_under_the_whole_source_path() {
     let root = Path::new("/game");
     assert_eq!(
-        cache_path(root, &native("assets/models/soldier.fbx")),
+        cache_path(root, Path::new("assets/models/soldier.fbx")),
         Path::new("/game/assets/generated/imported/assets/models/soldier.fbx.glb")
     );
     assert_eq!(
-        cache_path(root, &native("props/crate.FBX")),
+        cache_path(root, Path::new("props/crate.FBX")),
         Path::new("/game/assets/generated/imported/props/crate.FBX.glb")
     );
 }
@@ -77,7 +76,7 @@ fn project_relative_keeps_a_backslash_and_drops_a_leading_dot() {
     assert_eq!(rel(r"a\b.fbx").as_deref(), Some(Path::new(r"a\b.fbx")));
     assert_eq!(
         rel("./a/b.fbx").as_deref(),
-        Some(native("a/b.fbx").as_path())
+        Some(std::path::PathBuf::from("a/b.fbx").as_path())
     );
     assert_eq!(rel("../a.fbx"), None);
     assert_ne!(cache_of(&root, &["A.fbx"]), cache_of(&root, &["a.fbx"]));

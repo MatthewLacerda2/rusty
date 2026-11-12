@@ -27,7 +27,7 @@ use std::rc::Rc;
 
 use mlua::{Function, IntoLuaMulti, Lua, MultiValue, Table, Value};
 
-use crate::core::paths::{self, native, to_slash};
+use crate::core::paths::{self, to_slash};
 use crate::core::project::SCRIPTS_DIR;
 use crate::scene::io::bundled;
 use crate::scripting::console::ConsoleLogs;
@@ -108,8 +108,8 @@ fn install_searchers(lua: &Lua, access: &Rc<Access>) -> mlua::Result<()> {
 }
 
 /// `require`'s answer for a module found at `origin`: its chunk, and where it was.
-/// Every searcher answers through here, so every chunk name and origin is
-/// `/`-separated, whatever the OS (#1106).
+/// Every searcher answers through here, so every chunk name and origin is the
+/// path as the filesystem spells it, a `\` in a folder's name kept (#1106).
 fn found(lua: &Lua, code: &str, origin: &Path) -> mlua::Result<MultiValue> {
     let origin = to_slash(origin);
     let chunk = lua
@@ -120,7 +120,7 @@ fn found(lua: &Lua, code: &str, origin: &Path) -> mlua::Result<MultiValue> {
 }
 
 /// Looks a module up under `assets/scripts`. A name that maps to anything but
-/// a relative path of plain components (an empty segment, a `/`, a drive prefix)
+/// a relative path of plain components (an empty segment, a `/`, a `..`)
 /// is refused with a `require` error rather than "not found", so `package.path`
 /// is not tried for it either (#1391); `a.b` and `a.init`-style names resolve.
 fn project_searcher(lua: &Lua, access: Rc<Access>) -> mlua::Result<Function> {
@@ -137,10 +137,10 @@ fn project_searcher(lua: &Lua, access: Rc<Access>) -> mlua::Result<Function> {
             )));
         }
         let rel = name.replace('.', "/");
-        let dir = access.workspace.join(native(SCRIPTS_DIR));
+        let dir = access.workspace.join(SCRIPTS_DIR);
         let mut tried = Vec::new();
         for file in [format!("{rel}.lua"), format!("{rel}/init.lua")] {
-            let path = dir.join(native(&file));
+            let path = dir.join(&file);
             if let Some(code) = access.read(&path, &format!("require(\"{name}\")")) {
                 return found(lua, &code, &path);
             }
@@ -154,7 +154,7 @@ fn engine_searcher(lua: &Lua) -> mlua::Result<Function> {
     lua.create_function(|lua, name: String| {
         let rel = format!("{}.lua", name.replace('.', "/"));
         match bundled::script(&rel) {
-            Some(code) => found(lua, code, &native(&format!("engine/scripts/{rel}"))),
+            Some(code) => found(lua, code, Path::new(&format!("engine/scripts/{rel}"))),
             None => format!("no engine script 'engine/scripts/{rel}'").into_lua_multi(lua),
         }
     })
@@ -210,12 +210,8 @@ fn wrap_file_reader(lua: &Lua, access: &Rc<Access>, name: &str) -> mlua::Result<
 }
 
 /// `path` as handed to the stock `dofile` / `loadfile`, which open it and name the
-/// chunk after it: `/`-separated where `\` is a separator (Windows opens either),
-/// untouched where `\` is a filename character, so the same file still opens.
+/// chunk after it: untouched, since `\` is a filename character on macOS and Linux
+/// and respelling it would open another file.
 fn opened_path(path: &Path) -> String {
-    if std::path::MAIN_SEPARATOR == '\\' {
-        to_slash(path)
-    } else {
-        path.to_string_lossy().into_owned()
-    }
+    path.to_string_lossy().into_owned()
 }

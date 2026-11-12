@@ -95,7 +95,7 @@ fn reverting_a_part_gone_since_the_last_reimport_says_so() {
 fn another_spelling_of_the_model_path_finds_its_instances() {
     let (mut scene, root) = spawn_file("rusty_1637_spelling.gltf", KIT, Vec3::ZERO);
     let path = scene.world.prefab_link(root).unwrap().source.clone();
-    // Natively spelled, so the extra `.` component reads the same way on Windows.
+    // The same file through an extra `.` component.
     let path = std::path::Path::new(&path);
     let other = path
         .parent()

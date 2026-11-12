@@ -77,7 +77,7 @@ pub const FIXTURE_PROJECT: &str = "tests/fixtures/project";
 pub fn fixture_project() -> PathBuf {
     let engine = crate::core::project::engine_dir();
     let root = engine.parent().unwrap_or(engine);
-    root.join(crate::core::paths::native(FIXTURE_PROJECT))
+    root.join(FIXTURE_PROJECT)
 }
 
 /// The headless harness: owns the world and the run record.

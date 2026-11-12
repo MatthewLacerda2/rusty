@@ -12,7 +12,6 @@ use std::path::{Path, PathBuf};
 use super::bundled::{self, STARTER_MATERIALS, STARTER_MATERIALS_PATH};
 use super::manifest::{SeedManifest, SeedOutcome, SEED_MANIFEST_PATH};
 use super::scene_json;
-use crate::core::paths::native;
 use crate::scene::{default_scene, Scene};
 
 /// Where the default scene is seeded in the project.
@@ -42,7 +41,7 @@ pub fn build_default_scene(scene: &mut Scene) -> String {
 /// is `core::project::boot_scene`'s call, not this one's.
 pub fn seed_default_scene() {
     let manifest = Path::new(SEED_MANIFEST_PATH);
-    let dest = native(DEFAULT_SCENE_PATH);
+    let dest = PathBuf::from(DEFAULT_SCENE_PATH);
     seed_default_scene_at(manifest, &dest, default_scene::seed_default_assets);
 }
 
@@ -79,8 +78,11 @@ fn seed_default_scene_at(
 /// `authoring::ui::widgets::seed`).
 pub fn seed_default_scripts() {
     crate::scene::authoring::ui::widgets::seed();
-    let mut files = embedded(bundled::SCRIPTS, &native(DEFAULT_SCRIPTS_DEST_DIR));
-    files.push((native(STARTER_MATERIALS_PATH), STARTER_MATERIALS.to_vec()));
+    let mut files = embedded(bundled::SCRIPTS, Path::new(DEFAULT_SCRIPTS_DEST_DIR));
+    files.push((
+        PathBuf::from(STARTER_MATERIALS_PATH),
+        STARTER_MATERIALS.to_vec(),
+    ));
     seed_files(
         Path::new(SEED_MANIFEST_PATH),
         &files,
@@ -101,7 +103,7 @@ pub fn seed_default_scripts() {
 pub fn seed_project() -> crate::asset::audio::Refresh {
     seed_default_scripts();
     seed_default_scene();
-    crate::asset::audio::refresh(&native(crate::core::project::ASSETS_DIR))
+    crate::asset::audio::refresh(Path::new(crate::core::project::ASSETS_DIR))
 }
 
 /// Print a [`seed_project`] refresh, one line per MP3, to stderr: the `session`
@@ -122,15 +124,12 @@ pub fn print_refresh(report: &crate::asset::audio::Refresh) {
 /// edited copy is kept on purpose.
 pub fn seed_workspace(root: &Path, samples: Option<&Path>) {
     use crate::scene::authoring::ui::widgets::parts::SCRIPT_DIR;
-    let scripts = root.join(native(DEFAULT_SCRIPTS_DEST_DIR));
+    let scripts = root.join(DEFAULT_SCRIPTS_DEST_DIR);
     let mut files = samples.map_or_else(Vec::new, |dir| lua_files(dir, &scripts));
     files.extend(embedded(bundled::SCRIPTS, &scripts));
-    files.extend(embedded(
-        bundled::UI_SCRIPTS,
-        &root.join(native(SCRIPT_DIR)),
-    ));
+    files.extend(embedded(bundled::UI_SCRIPTS, &root.join(SCRIPT_DIR)));
     files.push((
-        root.join(native(STARTER_MATERIALS_PATH)),
+        root.join(STARTER_MATERIALS_PATH),
         STARTER_MATERIALS.to_vec(),
     ));
     for (to, bytes) in files {

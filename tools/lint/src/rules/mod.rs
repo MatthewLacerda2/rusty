@@ -25,7 +25,6 @@ mod full_literal;
 mod fullscreen_triangle;
 mod ignored;
 mod log_tag;
-mod lua_path_slash;
 mod markers;
 mod named_enum;
 mod physics_borrow;
@@ -34,7 +33,6 @@ mod prefix;
 mod sanitize;
 mod self_path;
 mod skip;
-mod slash_join;
 mod sorted;
 mod stored_format;
 mod subprocess;
@@ -83,7 +81,6 @@ const RULES: &[(Rule, Allow)] = &[
     (fullscreen_triangle::run, Allow::Inline),
     (ignored::run, Allow::Never),
     (log_tag::run, Allow::Inline),
-    (lua_path_slash::run, Allow::Inline),
     (markers::run, Allow::Inline),
     (named_enum::run, Allow::Inline),
     (physics_borrow::run, Allow::Inline),
@@ -92,7 +89,6 @@ const RULES: &[(Rule, Allow)] = &[
     (sanitize::run, Allow::Inline),
     (self_path::run, Allow::Inline),
     (skip::run, Allow::Inline),
-    (slash_join::run, Allow::Inline),
     (sorted::run, Allow::Inline),
     (stored_format::run, Allow::Inline),
     (subprocess::run, Allow::Inline),

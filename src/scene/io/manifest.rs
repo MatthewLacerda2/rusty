@@ -51,8 +51,7 @@ pub enum SeedOutcome {
 }
 
 /// The recorded seed hashes, keyed by the destination path `/`-spelled
-/// (`core::paths::to_slash`), so one committed manifest names the same files on
-/// every OS (#1371).
+/// (`core::paths::to_slash`), the one spelling a stored path has.
 pub struct SeedManifest {
     path: PathBuf,
     entries: BTreeMap<String, u64>,

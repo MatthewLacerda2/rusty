@@ -423,15 +423,12 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
   In-crate tests have the same helper,
   `crate::test_temp::dir()` (#999); the `test-temp-dir` rule fails a bare
   `std::env::temp_dir()` in test code (see `linting.md`).
-- **A path a test expects is spelled as the engine writes it**: on Windows the
-  engine's `Path::join`s build `\`-separated paths, so an expectation written
-  `"a/b/c"` matches on macOS and Linux only. Tests use `core::paths::native("a/b/c")`
-  / `native_string(…)` (`crate::` in-crate, `rusty::` under `tests/`), the helper
-  the engine itself joins `/`-spelled paths with, and in-crate tests
-  `crate::test_path::relative(dir)` for a relative root; the `slash-join` rule
-  fails a `/` path joined onto a path anywhere in `src/` and `tests/` (#1332,
-  #1371). Every text file checks out LF (`.gitattributes`), so embedded and
-  byte-compared text reads the same on Windows.
+- **A path a test expects is spelled as the engine writes it**: a plain
+  `Path::join("a/b/c")` or `"a/b/c"`, `/`-separated, with a `\` read as part of a
+  name, never a separator. In-crate tests take a relative root from
+  `crate::test_path::relative(dir)` (#1332). Every text file checks out LF
+  (`.gitattributes`), so embedded and byte-compared text reads the same whatever
+  the git config.
 - Filtering works by module path: `cargo nextest run -E 'binary(integration)' physics_`.
 
 ## Build and test share one dependency graph

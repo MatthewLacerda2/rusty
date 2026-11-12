@@ -174,8 +174,8 @@ pub(super) fn is_open_scene(editor: &EditorUi, card: &str) -> bool {
     open == card
         || matches!(
             (
-                crate::core::paths::canonicalize(Path::new(&open)),
-                crate::core::paths::canonicalize(Path::new(card)),
+                std::fs::canonicalize(Path::new(&open)),
+                std::fs::canonicalize(Path::new(card)),
             ),
             (Ok(a), Ok(b)) if a == b
         )

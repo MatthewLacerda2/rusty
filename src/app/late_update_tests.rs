@@ -57,9 +57,8 @@ fn falling_body_world() -> GameWorld {
             ..crate::scene::authoring::default_collider()
         }),
     );
-    // Forward slashes: a Windows `\` would be a Lua escape in the path literal.
     *s.world.scripts_mut(id).unwrap() = vec![ScriptComponent {
-        path: script.to_string_lossy().replace('\\', "/"),
+        path: script.to_string_lossy().into_owned(),
         ..Default::default()
     }];
 

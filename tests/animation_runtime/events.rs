@@ -44,7 +44,7 @@ fn event_log(tag: &str, ticks: usize) -> Vec<String> {
     let graph: AnimationGraph = serde_json::from_str(GRAPH).unwrap();
     animation_graph::save(&graph_path, &graph).unwrap();
     std::fs::write(&script_path, SCRIPT).unwrap();
-    let slashed = |p: std::path::PathBuf| p.to_string_lossy().replace('\\', "/");
+    let slashed = |p: std::path::PathBuf| p.to_string_lossy().into_owned();
     scene.world.animator_mut(hero).unwrap().graph = Some(slashed(graph_path));
     *scene.world.scripts_mut(hero).unwrap() = vec![ScriptComponent {
         path: slashed(script_path),

@@ -50,7 +50,6 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Function ("endpoint") length | clippy `too_many_lines` + `tools/lint -- --determinism` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]`; its one exception, `Renderer::assemble`, is locked (`ESCAPE`, #961) |
 | Lint exceptions carry a reason | clippy `allow_attributes` + `allow_attributes_without_reason` | **hard gate**: an exception is `#[expect(lint, reason = "…")]` (outer `#[allow]` is denied; a module-root `#![allow]` still needs its `reason`), and an expectation that no longer fires fails too (#961) |
 | Local gate = CI gate | `unittest` (`make scripts`, `test_gate_mirror.py`) | **hard gate**: every command a `GATES` recipe runs appears in a step of `ci.yml`/`lint.yml`, and every clippy run passes nothing after `--` but `-D warnings` (#964) |
-| Lua paths are `/` | `tools/lint -- --rules` | **hard gate** (`lua-path-slash`): a path returned to a script goes through `core::paths::to_slash`, never `to_string_lossy()`/`display()` (#1390) |
 | Merge helpers | `unittest` (`make scripts`) | **hard gate**: `.github/scripts/tests` pass — `make mergeable` judges every merge, and the ruleset's required checks (`make ruleset`, #491) cannot tell a draft's run from a ready one (#486) |
 | Module layering | `tools/lint -- --layers` | every `crate::<module>` import and every external crate a module names matches the declared table (`tools/lint/src/layers/table.rs`): nothing undeclared, nothing stale, no cycle, no sim → platform edge (#724, #938) |
 | No shared process state | clippy `disallowed_methods` + `tools/lint -- --determinism` | **hard gate**: `std::env::{set_var, remove_var, set_current_dir}` are banned crate-wide in `clippy.toml`, tests included, since `cargo test` runs every in-crate test in one process; production opts out inline with a reason (`project::open`), and `--determinism` keeps the three on the list (#977) |
@@ -64,7 +63,6 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Order-free lists stay sorted | `tools/lint -- --rules` (`sorted`) | **hard gate**: a list under a `// sorted: <why>` (or `<!-- sorted: <why> -->`) marker stays in order up to its first blank line, so two branches adding entries touch different lines (#911) |
 | Physics body changes are counted | `tools/lint -- --rules` (`body-table`) | **hard gate**: a non-test line of `src/physics/` that calls `.set_body_type(`, or `.insert(` / `.remove(` on `bodies`, fails, since the character controller sweeps a cached copy of the body table remade only when its change counter moves; go through `PhysicsWorld::insert_body` / `remove_body` / `ControllerBodies::retype`, which bump it and carry `// lint: allow(body-table) <why>` (#2061) |
 | Physics sync borrows only to write | `tools/lint -- --rules` (`physics-borrow`) | **hard gate**: a non-test line of `src/physics/` that borrows a rapier body or collider mutably (`bodies`/`colliders` with `.get_mut(`, `.iter_mut(`, or an index under `&mut` or before a `.set_` call or an assignment) fails, since rapier marks whatever is borrowed modified, written or not, and the full and incremental syncs then step differently; borrow through `physics::writes::body_to_write` / `collider_to_write`, which compare first; the two helpers take `// lint: allow(physics-borrow) <why>` (#1798) |
-| Portable paths | `tools/lint -- --rules` | **hard gate** (`slash-join`): `src/` and `tests/` never join a `/`-separated path (literal, `format!` or constant) onto a path or make a path from one; they join one part per call or join `core::paths::native(…)`, and never `format!` a native path (`.to_string_lossy()`, `.display()`) before a `/`: that is `core::paths::to_slash` (#1332, #1371, #1428) |
 | Post effect completeness | `cargo test` (`render::postfx::effects::completeness`, #1467) | **hard gate**: every effect in `render::postfx::effects::POST_EFFECTS` has its settings (a `PostProcessingComponent` field, or a `CameraComponent` field named after it for a camera effect), its authoring row, its `Graphics.*` registrar, its Inspector section, a `<!-- effect: <name> -->` section in `docs/api/Graphics.md` naming each knob's tween path, and, when player-facing, a `GraphicsOption` of its name with a row in the doc's *Player options*; each composite texture it declares is bound in the assembled composite, at its place (#1473); and no layer lists an effect the renderer lacks. A must-flag test removes each part in turn |
 | Proptest seed | `make scripts` (`test_workflow_hygiene.py`, `ProptestSeed`) | **hard gate**: `ci.yml`'s gates pin `PROPTEST_RNG_SEED` and its nightly leaves it random (#1800), and `make test` and `make test-one-process` run on that same number, read from `ci.yml`, never copied (#1852): a probe made a prerequisite of each verb reads the seed its recipe sees, and a Makefile that drops the export or copies another number must flag; `make test-explore` is the local **signal** that draws fresh seeds |
 | Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
@@ -439,16 +437,6 @@ new flag, gate, CI step or baseline.
   arguments may spread over the next few lines, and the message may be a raw
   string. A message that is not a literal takes `// lint: allow(log-tag) <why>`
   (`rules/log_tag.rs`).
-- **`lua-path-slash`** (#1390) — scene asset paths are `/` on every OS, so a path
-  an API function returns to a script must be too: a bare `to_string_lossy()` keeps
-  the `\` on Windows and the scene a script writes it into stops resolving on macOS
-  and Linux. A non-test `.to_string_lossy()` or `.display()` in `src/api/` or
-  `src/dev/lua_surface/` (the two directories that build Lua values) is a finding;
-  spell it `crate::core::paths::to_slash`. The rule is lexical: it cannot see a
-  `PathBuf` handed to Lua directly (mlua keeps the `\`), and it skips `.to_str()`
-  because `mlua::String::to_str` is far commoner there. It does flag a call on an
-  `mlua::String` or a literal; that line says so with
-  `// lint: allow(lua-path-slash) <why>`.
 - **`markers`** — nothing in rusty is temporary. A marker word (`TODO`, `FIXME`,
   `XXX`, `HACK`) standing alone in a scanned `.rs` file fails, comment or not;
   part of a longer identifier (`TODOS`, `MY_HACK`) does not. File an issue instead.
@@ -527,39 +515,6 @@ new flag, gate, CI step or baseline.
 - **`skip`** — an ignored test reads as passing to anyone who reads only the
   summary. `#[ignore]` and `#[cfg_attr(…, ignore)]` fail unless an allow says why:
   `// lint: allow(skip) a timing measurement, run by hand` right above it.
-- **`slash-join`** (#1332, #1371) — `Path::join("a/b")` keeps the `/`, so on
-  Windows it builds `dir\a/b` where joining one part at a time builds `dir\a\b`:
-  equal as `Path`s, unequal as strings, and a test comparing strings fails on
-  Windows only. The engine keeps one spelling everywhere, production and tests
-  alike: in `src/` and `tests/`, a `.join(…)`, `.push(…)`, `Path::new(…)` or
-  `PathBuf::from(…)` whose whole argument is a string literal holding a `/` (raw
-  or not, wrapped by rustfmt or not), a `format!` whose template holds one, or a
-  `/`-holding `&str` constant the scan defines (matched by name, aliases followed)
-  is a finding: a path *made* from a `/` path turns mixed the moment something is
-  joined onto it. A literal of only `/`s and spaces (`parts.join(" / ")`) is a
-  slice's separator, and one starting with `/` is an absolute Unix path (a socket,
-  a test's out-of-tree root); neither is flagged. Join one part per call, or use
-  `core::paths::native("a/b")` (`crate::core::paths::native` in the library,
-  `rusty::core::paths::native` in `tests/`; `native_string` for the written
-  string), which turns a `/`-spelled path or constant such as `IMPORT_CACHE_DIR`
-  into the platform's. The mix runs the other way too (#1428): a `format!`
-  whose template puts a `/` after a positional `{}` filled from a native path's
-  `.to_string_lossy()` or `.display()` builds `dir\a/b` on Windows, which a
-  baked material once stored in its scene; spell the path with
-  `core::paths::to_slash(path)`. The match is coarse: any `{}/` in the template
-  plus any `.to_string_lossy()` / `.display()` argument flags, so a ratio such as
-  `"{}/{} in {}"` beside a displayed path misfires; it misses `{0}/`, a named
-  placeholder (`{DIR}/`), `.to_str()`, `write!` / `println!`, and a native path
-  stringified into a variable first. The rule reads text, not types, so it **misfires** on a
-  `.push` of a `/` literal (or of a space-free `/` `format!`) onto a list of
-  strings, on a slice join whose separator holds a `/` beside other text, and on a
-  constant matched by bare name: a `/` constant in one module flags a same-named
-  plain one joined in another. It is **blind** to a `/` path held in a variable or
-  handed to a helper that joins it; a constant built by a macro, wrapped by rustfmt
-  onto the line after `const X: &str =`, typed `&'static str` or declared
-  `static`; and a bare `"/a/b"` expectation (test code is full of `/`-led JSON
-  pointers): those use the same helper. A path that must keep its `/`, or a
-  misfire, says why with `// lint: allow(slash-join) <why>`.
 - **`sorted`** (#911) — two branches appending to the end of one list always
   collide on its last line; entries inserted in order land on different lines. A
   list whose order means nothing carries `// sorted: <why order is free>` (Markdown:

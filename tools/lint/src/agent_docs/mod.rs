@@ -62,7 +62,7 @@ pub fn tree(base: &Path) -> Result<Vec<Finding>, String> {
     let tracked: Vec<String> = ls_files(base, &[], &spec)?
         .into_iter()
         .filter(|p| base.join(p).is_file())
-        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .map(|p| p.to_string_lossy().into_owned())
         .filter(|p| is_agent_doc(p))
         .collect();
     let mut found = missing_skill_md(&tracked);
@@ -78,7 +78,7 @@ pub fn tree(base: &Path) -> Result<Vec<Finding>, String> {
 pub fn files(base: &Path, paths: &[String]) -> Vec<Finding> {
     paths
         .iter()
-        .map(|p| p.trim_start_matches("./").replace('\\', "/"))
+        .map(|p| p.trim_start_matches("./").to_string())
         .filter(|p| is_agent_doc(p))
         .flat_map(|p| file(&p, &read(&base.join(&p))))
         .collect()

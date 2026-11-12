@@ -13,7 +13,7 @@ fn project(name: &str, scenes: &[&str]) -> PathBuf {
     std::fs::remove_dir_all(&root).ok();
     std::fs::create_dir_all(&root).unwrap();
     for scene in scenes {
-        let path = root.join(crate::core::paths::native(scene));
+        let path = root.join(scene);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, "{}").unwrap();
     }
@@ -96,7 +96,7 @@ fn remembering_overwrites_the_last_record() {
 #[test]
 fn the_editor_remembers_a_project_scene_by_its_relative_path() {
     let root = project("remember", &[OTHER]);
-    let absolute = root.join(crate::core::paths::native(OTHER));
+    let absolute = root.join(OTHER);
     let absolute = absolute.to_string_lossy();
     let remember = |open, last, playing| scene_to_remember(&root, open, last, playing);
     assert_eq!(remember(Some(OTHER), None, false).as_deref(), Some(OTHER));
@@ -105,8 +105,9 @@ fn the_editor_remembers_a_project_scene_by_its_relative_path() {
         Some(OTHER)
     );
     assert_eq!(
-        remember(Some("./assets\\x.scene"), None, false).as_deref(),
-        Some("assets/x.scene")
+        remember(Some(r"./assets\x.scene"), None, false).as_deref(),
+        Some(r"assets\x.scene"),
+        "a `\\` is part of the name"
     );
     assert_eq!(
         remember(None, Some(OTHER), false),

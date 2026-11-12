@@ -16,7 +16,7 @@ fn read(root: &Path) -> Value {
 #[test]
 fn the_servers_run_the_checkouts_built_binary_in_attach_and_embed_mode() {
     let mut config = json!({});
-    let binary = crate::core::paths::native_string("/engine/target/debug/session-mcp");
+    let binary = String::from("/engine/target/debug/session-mcp");
     merge(
         &mut config,
         "/games/horde",

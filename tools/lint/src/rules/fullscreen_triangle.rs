@@ -52,7 +52,7 @@ pub fn run(_: &Scan) -> Vec<Finding> {
     crate::size::shaders_in(Path::new("engine"))
         .iter()
         .flat_map(|p| {
-            let path = p.to_string_lossy().replace('\\', "/");
+            let path = p.to_string_lossy().into_owned();
             let source = fs::read_to_string(p).unwrap_or_default();
             judged(&path, &source)
         })

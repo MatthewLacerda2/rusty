@@ -55,7 +55,7 @@ fn a_directory_is_flagged_and_an_allow_above_its_mod_line_excuses_it() {
     fs::create_dir_all(&dir).unwrap();
     let owner = "mod light;\n// lint: allow(prefix-group) mirrors Unity's names\nmod nav_a;\nmod nav_b;\nmod nav_c;\n";
     fs::write(dir.join("mod.rs"), owner).unwrap();
-    let dir_s = dir.to_string_lossy().replace('\\', "/");
+    let dir_s = dir.to_string_lossy().into_owned();
     let found = check_dir(
         &dir_s,
         &["mod.rs", "light.rs", "nav_a.rs", "nav_b.rs", "nav_c.rs"],

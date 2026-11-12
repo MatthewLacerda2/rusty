@@ -37,7 +37,7 @@ fn project(models: &[&str], start: &str) -> PathBuf {
     for name in models {
         std::fs::copy(fixture(name), models_dir.join(name)).unwrap();
     }
-    let script = root.join(rusty::core::paths::native(SPAWN));
+    let script = root.join(SPAWN);
     std::fs::create_dir_all(script.parent().unwrap()).unwrap();
     let lua = format!("local Spawn = {{}}\nfunction Spawn.Start(id)\n{start}\nend\nreturn Spawn\n");
     std::fs::write(script, lua).unwrap();
@@ -118,7 +118,7 @@ fn collect(root: &Path, dir: &Path, files: &mut BTreeMap<String, Vec<u8>>) {
             collect(root, &path, files);
         } else {
             let rel = path.strip_prefix(root).unwrap().to_string_lossy();
-            files.insert(rel.replace('\\', "/"), std::fs::read(&path).unwrap());
+            files.insert(rel.into_owned(), std::fs::read(&path).unwrap());
         }
     }
 }

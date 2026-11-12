@@ -33,7 +33,7 @@ fn a_demo_that_does_not_open_is_an_error() {
     let mut game = capture::default_world(ProjectSource::defaults());
     let out = crate::temp::dir().join("none.png");
     let opts = EditorCaptureOptions::default();
-    let missing = rusty::core::paths::native("no/such.demo");
+    let missing = std::path::PathBuf::from("no/such.demo");
     let err = capture::capture_demo(&mut game, &out, &opts, &missing, 0).unwrap_err();
     assert!(err.contains("such.demo"), "{err}");
     assert!(!out.exists(), "nothing was written");

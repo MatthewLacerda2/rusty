@@ -26,7 +26,7 @@ Harness.Step(2)
 fn run(name: &str) -> (Vec<u8>, Vec<u8>) {
     let dir = crate::temp::dir().join(name);
     std::fs::create_dir_all(&dir).unwrap();
-    let posix = dir.to_string_lossy().replace('\\', "/");
+    let posix = dir.to_string_lossy().into_owned();
     let path = dir.join("scenario.lua");
     std::fs::write(&path, SCENARIO.replace("DIR", &posix)).unwrap();
     let out = dir.join("out");

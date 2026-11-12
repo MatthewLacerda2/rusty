@@ -111,8 +111,6 @@ mod tests {
         std::fs::write(format!("{dir}/c.lua"), "return { Update = function() end }").unwrap();
         let found = monobehaviour_scripts(dir);
         assert_eq!(found.len(), 2, "only lifecycle scripts returned");
-        // Match on the file name, not a hardcoded separator: paths come back
-        // with `\` on Windows and `/` elsewhere.
         assert!(found.iter().any(|p| p.ends_with("a.lua")));
         assert!(found.iter().any(|p| p.ends_with("c.lua")));
         assert!(!found.iter().any(|p| p.ends_with("b.lua")));

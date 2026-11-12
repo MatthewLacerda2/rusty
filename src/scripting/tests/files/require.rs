@@ -6,18 +6,16 @@ use super::{backslash_dir, dir, manager, out, warnings, write};
 fn require_finds_project_modules_first_without_warning() {
     let root = dir("project");
     write(
-        &root.join(crate::core::paths::native("assets/scripts/util/math2.lua")),
+        &root.join("assets/scripts/util/math2.lua"),
         "return { v = 'project' }",
     );
     write(
-        &root.join(crate::core::paths::native("assets/scripts/pkg/init.lua")),
+        &root.join("assets/scripts/pkg/init.lua"),
         "return { v = 'init' }",
     );
     // A project copy of an engine helper wins over the bundled one.
     write(
-        &root.join(crate::core::paths::native(
-            "assets/scripts/ui/range_axis.lua",
-        )),
+        &root.join("assets/scripts/ui/range_axis.lua"),
         "return { v = 'mine' }",
     );
     let (m, console) = manager(&root);
@@ -82,61 +80,53 @@ fn native_modules_stay_off() {
 pub(super) const SOURCE: &str = "local _, e = pcall(function() error('here') end) return e";
 
 #[test]
-fn a_project_module_is_named_with_slashes_only() {
+fn a_project_module_keeps_a_backslash_in_its_name() {
     let root = backslash_dir("slash_project");
-    write(
-        &root.join(crate::core::paths::native("assets/scripts/ui/axis.lua")),
-        SOURCE,
-    );
+    write(&root.join("assets/scripts/ui/axis.lua"), SOURCE);
     let (m, _) = manager(&root);
     let named = out(&m, "local s, o = require('ui.axis'); out = s .. '|' .. o");
-    assert!(!named.contains('\\'), "{named}");
     assert!(
-        named.contains("a/b/assets/scripts/ui/axis.lua:1: here|"),
+        named.contains(r"a\b/assets/scripts/ui/axis.lua:1: here|"),
         "{named}"
     );
-    assert!(named.ends_with("a/b/assets/scripts/ui/axis.lua"), "{named}");
+    assert!(
+        named.ends_with(r"a\b/assets/scripts/ui/axis.lua"),
+        "{named}"
+    );
 }
 
 #[test]
-fn a_package_path_module_is_named_with_slashes_only() {
+fn a_package_path_module_keeps_a_backslash_in_its_name() {
     let root = dir("slash_path_root");
     let lib = backslash_dir("slash_path_lib");
     write(&lib.join("shared.lua"), SOURCE);
     let (m, _) = manager(&root);
-    // lint: allow(slash-join) the mixed spelling is the input under test
     let path = format!("{}/?.lua", lib.display());
     m.exec(&format!("package.path = [[{path}]]"))
         .expect("set path");
     let named = out(&m, "local s, o = require('shared'); out = s .. '|' .. o");
-    assert!(!named.contains('\\'), "{named}");
-    assert!(named.contains("a/b/shared.lua:1: here|"), "{named}");
-    assert!(named.ends_with("a/b/shared.lua"), "{named}");
+    assert!(named.contains(r"a\b/shared.lua:1: here|"), "{named}");
+    assert!(named.ends_with(r"a\b/shared.lua"), "{named}");
 }
 
 #[test]
-fn the_outside_warning_prints_a_slash_path_without_a_verbatim_prefix() {
+fn the_outside_warning_keeps_a_backslash_in_its_path() {
     let root = dir("slash_warn_root");
     let lib = backslash_dir("slash_warn_lib");
     write(&lib.join("shared.lua"), "return 1");
     let (m, console) = manager(&root);
-    // lint: allow(slash-join) the mixed spelling is the input under test
     m.exec(&format!("package.path = [[{}/?.lua]]", lib.display()))
         .expect("set path");
     m.exec("require('shared')").expect("require");
     let warned = warnings(&console);
     let shown = warned[0].split(", outside").next().expect("path");
-    assert!(!shown.contains('\\'), "no `\\` and no `\\\\?\\`: {shown}");
-    assert!(shown.ends_with("a/b/shared.lua"), "{shown}");
+    assert!(shown.ends_with(r"a\b/shared.lua"), "{shown}");
 }
 
 #[test]
 fn a_module_name_that_is_not_a_relative_path_is_refused_and_reads_nothing() {
     let root = dir("empty_segment");
-    write(
-        &root.join(crate::core::paths::native("assets/scripts/a/b.lua")),
-        "return { v = 'ab' }",
-    );
+    write(&root.join("assets/scripts/a/b.lua"), "return { v = 'ab' }");
     let outside = dir("empty_segment_outside");
     write(&outside.join("x.lua"), "ran = true; return 1");
     let (m, console) = manager(&root);

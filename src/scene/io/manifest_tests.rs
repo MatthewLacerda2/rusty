@@ -95,11 +95,10 @@ fn saving_merges_over_entries_another_run_wrote() {
 }
 
 #[test]
-fn a_key_is_slash_spelled_on_every_os() {
+fn a_key_is_the_destination_path_as_the_filesystem_spells_it() {
     let (manifest, dest) = workspace("slash_key");
     seed(&manifest, &dest, "v1");
     let text = read(&manifest);
-    assert!(!text.contains('\\'), "{text}");
     assert!(
         text.contains(&crate::core::paths::to_slash(&dest)),
         "{text}"

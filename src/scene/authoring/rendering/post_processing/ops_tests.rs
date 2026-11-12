@@ -96,7 +96,7 @@ fn exposure_ops_hold_their_ranges() {
 fn lut_path_has_one_spelling_and_blank_clears() {
     let (mut scene, id) = scene_with_vc();
     let mut e = scene.world.post_processing_mut(id).unwrap();
-    grading::color_lookup::set_lut(&mut e, Some(" ./luts\\a.cube ".into()));
+    grading::color_lookup::set_lut(&mut e, Some(" ./luts/a.cube ".into()));
     assert_eq!(
         e.color_lookup.lut.as_deref(),
         Some("luts/a.cube"),

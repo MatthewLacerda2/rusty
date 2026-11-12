@@ -165,7 +165,7 @@ fn write_page(
     for path in [&png_path, &ktx2_path] {
         crate::core::fs::written::note_written(&path.to_string_lossy());
     }
-    // The scene document stores `/` paths on every OS, like its other assets (#819).
+    // The scene document stores `/` paths, like its other assets (#819).
     Ok(crate::core::paths::to_slash(&ktx2_path))
 }
 

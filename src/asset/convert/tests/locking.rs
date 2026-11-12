@@ -3,7 +3,7 @@
 
 use super::super::{cache_path, lock, record, refresh};
 use super::COPY;
-use crate::core::{paths, project};
+use crate::core::project;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver};
 use std::time::Duration;
@@ -89,9 +89,9 @@ fn a_projects_lock_lives_in_its_cache_folder_never_in_assets() {
     let root = crate::test_temp::dir();
     std::fs::write(root.join(project::PROJECT_FILE), "").unwrap();
     std::fs::create_dir_all(root.join("assets").join("models")).unwrap();
-    let source = root.join(crate::core::paths::native("assets/models/a.src"));
+    let source = root.join("assets/models/a.src");
     std::fs::write(&source, "one").unwrap();
-    let out = cache_path(&root, &paths::native("assets/models/a.src"));
+    let out = cache_path(&root, Path::new("assets/models/a.src"));
     refresh(&COPY, &source, &out).unwrap();
     std::fs::write(&source, "two").unwrap();
     refresh(&COPY, &source, &out).unwrap();
@@ -100,7 +100,7 @@ fn a_projects_lock_lives_in_its_cache_folder_never_in_assets() {
     let is_lock = |p: &PathBuf| p.extension().is_some_and(|e| e == "lock");
     assert!(!assets.iter().any(is_lock), "{assets:?}");
     // Canonical, as `lock::path` is: macOS's temp dir `/var` is a link to `/private/var`.
-    let locks = paths::canonicalize(&root.join(project::CACHE_DIR).join(lock::LOCKS_DIR));
+    let locks = std::fs::canonicalize(root.join(project::CACHE_DIR).join(lock::LOCKS_DIR));
     let locks = files_under(&locks.unwrap());
     assert_eq!(locks, vec![lock::path(&out).unwrap()], "one lock, reused");
 }
@@ -110,9 +110,6 @@ fn two_spellings_of_one_cache_share_its_lock() {
     let dir = crate::test_temp::dir();
     std::fs::create_dir_all(dir.join("sub")).unwrap();
     let plain = lock::path(&dir.join("a.src.glb")).unwrap();
-    assert_eq!(
-        lock::path(&dir.join(crate::core::paths::native("sub/../a.src.glb"))).unwrap(),
-        plain
-    );
+    assert_eq!(lock::path(&dir.join("sub/../a.src.glb")).unwrap(), plain);
     assert_ne!(lock::path(&dir.join("b.src.glb")).unwrap(), plain);
 }

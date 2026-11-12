@@ -50,7 +50,7 @@ pub fn boot_scene(root: &Path, startup_scene: &str, access: Access) -> Result<Bo
         }
         return Ok(BootPlan::of(startup_scene));
     }
-    let exists = |path: &str| !path.is_empty() && root.join(paths::native(path)).is_file();
+    let exists = |path: &str| !path.is_empty() && root.join(path).is_file();
     let mut plan = BootPlan::default();
     plan.scenes
         .extend(remembered(root).filter(|path| exists(path)));
@@ -77,8 +77,7 @@ pub fn scene_to_remember(
 ) -> Option<String> {
     let open = open.filter(|open| !playing && Some(*open) != last && !open.is_empty())?;
     let relative = paths::relativize(open, root);
-    let outside =
-        Path::new(&relative).is_absolute() || relative.split(['/', '\\']).any(|c| c == "..");
+    let outside = Path::new(&relative).is_absolute() || relative.split('/').any(|c| c == "..");
     (!outside).then(|| paths::stored(&relative))
 }
 
@@ -88,7 +87,7 @@ pub fn remember_scene(root: &Path, scene: &str) -> Result<(), String> {
     if remembered(root).as_deref() == Some(scene) {
         return Ok(());
     }
-    let path = root.join(paths::native(LAST_SCENE_PATH));
+    let path = root.join(LAST_SCENE_PATH);
     let parent = path.parent().unwrap_or(root);
     std::fs::create_dir_all(parent)
         // lint: allow(asset-write) the last-open-scene record, read once on boot
@@ -98,7 +97,7 @@ pub fn remember_scene(root: &Path, scene: &str) -> Result<(), String> {
 
 /// The remembered scene, if the record exists and names one.
 fn remembered(root: &Path) -> Option<String> {
-    let text = std::fs::read_to_string(root.join(paths::native(LAST_SCENE_PATH))).ok()?;
+    let text = std::fs::read_to_string(root.join(LAST_SCENE_PATH)).ok()?;
     let scene = text.trim();
     (!scene.is_empty()).then(|| scene.to_string())
 }

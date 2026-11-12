@@ -73,7 +73,7 @@ fn soldier() -> (Scene, u32) {
         }),
     );
     let mut anim = AnimatorComponent {
-        graph: Some(path.to_string_lossy().replace('\\', "/")),
+        graph: Some(path.to_string_lossy().into_owned()),
         ..Default::default()
     };
     anim.set_float("speed", 4.0);

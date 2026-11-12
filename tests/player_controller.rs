@@ -94,9 +94,7 @@ fn left_mouse_shoots_once_per_press_and_space_does_not() {
     let dir = crate::temp::dir().join("rusty_player_shoot");
     std::fs::create_dir_all(&dir).unwrap();
     let probe = dir.join("shot_probe.lua");
-    let workspace = Harness::workspace_of(&dir)
-        .to_string_lossy()
-        .replace('\\', "/");
+    let workspace = Harness::workspace_of(&dir).to_string_lossy().into_owned();
     std::fs::write(&probe, SHOT_PROBE.replace("WORKSPACE", &workspace)).unwrap();
     let h = Harness::new(&dir, "");
     let path = probe.to_str().unwrap();

@@ -61,11 +61,10 @@ pub fn path(name: &str) -> String {
     file(name).to_string_lossy().into_owned()
 }
 
-/// [`file`] with `/` separators, safe inside a Lua string literal: a Windows temp
-/// path (`C:\Users\…`) trips Lua's escape parser at `\U`. Windows accepts `/` for
-/// file I/O, so the same string serves the assertions too.
+/// [`path`], named for the string a script passes, so the same string serves a
+/// Lua literal and the assertions.
 pub fn lua_path(name: &str) -> String {
-    path(name).replace('\\', "/")
+    path(name)
 }
 
 /// The running test's name as one path component (`a::b` → `a-b`).

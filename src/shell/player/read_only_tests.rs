@@ -8,7 +8,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use crate::core::paths::native;
 use crate::core::project::{open, Access};
 
 /// Set on the child: which half it runs (`export` or `play`).
@@ -45,8 +44,8 @@ fn an_exported_game_boots_without_writing_into_its_install() {
 
     // What a seeding or a refresh would act on, were the player to run one: a
     // bundled script the game left out, and an MP3 copied in by hand.
-    std::fs::remove_file(out.join(native("assets/scripts/bot.lua"))).unwrap();
-    std::fs::copy(mp3(), out.join(native("assets/audio/extra.mp3"))).unwrap();
+    std::fs::remove_file(out.join("assets/scripts/bot.lua")).unwrap();
+    std::fs::copy(mp3(), out.join("assets/audio/extra.mp3")).unwrap();
     let shipped = tree(&out);
     run_child("play", &game, &out);
     let written = differing(&shipped, &tree(&out));
@@ -66,7 +65,7 @@ fn differing(before: &Files, after: &Files) -> BTreeSet<String> {
 
 /// The audio fixture, an MP3 the refresh converts.
 fn mp3() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join(native("src/asset/audio/fixtures/loop.mp3"))
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("src/asset/audio/fixtures/loop.mp3")
 }
 
 /// Run [`child`] in a new process on `step`.

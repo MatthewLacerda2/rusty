@@ -17,17 +17,15 @@ use rusty::api::bind;
 use rusty::scene::Scene;
 
 /// A scene whose root entity sits at (1, 2, 3), plus the tmp `.prefab` path this
-/// test round-trips through (unique per test: they run in parallel). The path is
-/// interpolated into single-quoted Lua strings, where a Windows `\` would be
-/// taken as an escape sequence — so it is normalized to `/`, which `std::fs`
-/// accepts on every platform.
+/// test round-trips through (unique per test: they run in parallel), spelled with
+/// `/` as a stored path is, since it is interpolated into single-quoted Lua strings.
 fn fixture(tag: &str) -> (Rc<RefCell<Scene>>, u32, String) {
     let mut scene = Scene::new();
     let root = scene.add_entity("Root".to_string());
     scene.world.transform_mut(root).unwrap().position = Vec3::new(1.0, 2.0, 3.0);
     let dir = crate::temp::dir();
     let file = format!("rusty_prefab_api_{tag}_{}.prefab", std::process::id());
-    let path = dir.join(file).to_string_lossy().replace('\\', "/");
+    let path = dir.join(file).to_string_lossy().into_owned();
     (Rc::new(RefCell::new(scene)), root, path)
 }
 

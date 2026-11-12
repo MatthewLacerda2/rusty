@@ -2,8 +2,6 @@
 //! `io`, `math.random` over the world's seeded `Random`, and the project-aware
 //! `require` / `dofile` / `loadfile` (#1717).
 
-use rusty::core::paths::native;
-
 use super::run;
 
 const DRAWS: &str = r#"
@@ -35,11 +33,10 @@ fn math_random_gives_identical_results_run_to_run() {
 fn a_scenario_requires_a_project_module_and_warns_once_outside_it() {
     let name = "rusty_scenario_require";
     let dir = crate::temp::dir().join(name);
-    let scripts = dir.join(native("out/workspace/assets/scripts"));
+    let scripts = dir.join("out/workspace/assets/scripts");
     std::fs::create_dir_all(scripts.join("lib")).unwrap();
-    let write = |at: &std::path::Path, rel: &str, code: &str| {
-        std::fs::write(at.join(native(rel)), code).unwrap()
-    };
+    let write =
+        |at: &std::path::Path, rel: &str, code: &str| std::fs::write(at.join(rel), code).unwrap();
     write(&scripts, "lib/inner.lua", "return { value = 7 }");
     write(
         &scripts,
@@ -62,7 +59,7 @@ Harness.Expect(loadfile("../../outside_load.lua")() == 2, "loadfile outside load
 "#;
     let (passed, json) = run(name, code);
     assert!(passed, "a module chain loads in a scenario: {json}");
-    let log = std::fs::read_to_string(dir.join(native("out/console.log"))).unwrap();
+    let log = std::fs::read_to_string(dir.join("out/console.log")).unwrap();
     let warned = |file: &str| {
         log.lines()
             .filter(|l| l.contains(file) && l.contains("outside the project"))

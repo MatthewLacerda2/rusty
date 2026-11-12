@@ -46,7 +46,7 @@ pub fn attach_script(scene: &mut Scene, id: u32, file: &str, source: &str) {
     let path = crate::temp::dir().join(file);
     std::fs::write(&path, source).unwrap();
     *scene.world.scripts_mut(id).unwrap() = vec![ScriptComponent {
-        path: path.to_string_lossy().replace('\\', "/"),
+        path: path.to_string_lossy().into_owned(),
         ..Default::default()
     }];
 }

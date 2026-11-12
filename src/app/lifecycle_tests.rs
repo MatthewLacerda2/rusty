@@ -30,7 +30,7 @@ fn world_with_script(tag: &str, code: &str) -> (GameWorld, Rc<RefCell<ConsoleLog
     let mut s = Scene::new();
     let id = s.add_entity("Scripted".to_string());
     *s.world.scripts_mut(id).unwrap() = vec![ScriptComponent {
-        path: script.to_string_lossy().replace('\\', "/"),
+        path: script.to_string_lossy().into_owned(),
         ..Default::default()
     }];
 

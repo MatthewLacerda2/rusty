@@ -124,8 +124,7 @@ mod tests {
         register(&lua).unwrap();
         let dir = crate::test_temp::dir().join("rusty_shader_api_bake");
         // Pass the path as a Lua global *value*, not interpolated into the Lua
-        // source: a Windows path embedded in a string literal trips Lua's escape
-        // parser (`\U`). As a global it's a plain string, safe on every platform.
+        // source, so no character of it is read as Lua syntax.
         lua.globals().set("OUT", dir.to_str().unwrap()).unwrap();
         let script = r#"
             return Shader.Bake({

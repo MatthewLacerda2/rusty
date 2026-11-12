@@ -40,7 +40,7 @@ fn create_configure_parent_save_round_trips() {
 
     // Save to a fresh temp file via the explicit-path form.
     let out = crate::temp::dir().join("rusty_structural_authoring.scene");
-    let out_str = out.to_str().unwrap().replace('\\', "/");
+    let out_str = out.to_str().unwrap().to_string();
     let saved = ok(&session, &format!("Scene.Save(\"{out_str}\")"));
     assert_eq!(saved, out_str, "Save returns the written path");
     assert!(out.exists(), "scene file was written");

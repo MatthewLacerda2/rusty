@@ -51,7 +51,7 @@ fn session() -> (GameWorld, Rc<RefCell<ConsoleLogs>>, [u32; 4]) {
     s.world.set_rect_transform(screen, Some(rt));
     s.world.set_image(screen, Some(ImageComponent::default()));
     *s.world.scripts_mut(screen).expect("scripts") = vec![ScriptComponent {
-        path: script.to_string_lossy().replace('\\', "/"),
+        path: script.to_string_lossy().into_owned(),
         ..Default::default()
     }];
     s.set_parent(screen, Some(terminal)).expect("parent");

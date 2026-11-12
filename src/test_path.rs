@@ -1,8 +1,7 @@
 //! A folder spelled from the working directory (#1332).
 //!
 //! [`relative`] spells a folder from the working directory, which a fixed `..`
-//! count only does on one platform. A multi-part path as the engine writes it is
-//! `core::paths::native`, which the engine itself uses (#1371).
+//! count only does from one working directory.
 
 use std::path::{Component, Path, PathBuf};
 
