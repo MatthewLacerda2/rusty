@@ -30,6 +30,11 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.Save` | `([path])` | the written path |
 | `Scene.New` | `()` | `nil` — the editor's File ▸ New: the World becomes an empty scene (no entities, default ambient, sky and layers) with no current scene file, so `GetActivePath()` reads `nil` and a bare `Save()` errors until `Save(path)` names one. An unsaved scene is discarded without asking, as `Load` discards it; an open editor drops its entity selection and its unsaved mark. Edit mode only: errors during Play |
 | `Scene.Load` | `(path)` | `nil`, or in edit mode a warning string when the scene loaded but its lighting sidecar did not (errors, naming `path`, if there is no file there) |
+| `Scene.LoadAsync` | `(path)` | Unity's `LoadSceneAsync`: an operation id (an integer) for the load, prepared in the background and swapped in on a later tick — see *Loading scenes*. In edit mode the scene loads at once, as `Load`, and the operation is already done (errors, naming `path`, if there is no file there) |
+| `Scene.GetLoadProgress` | `(op)` | the operation's `progress`: `0` while loading, `0.9` once ready (it holds there while activation waits), `1` once swapped in; `0` for one that failed, was replaced or is unknown |
+| `Scene.IsLoadDone` | `(op)` | its `isDone`: `true` once swapped in, failed or replaced, and for an id this Play session never opened |
+| `Scene.GetLoadStatus` | `(op)` | `"loading"`, `"ready"` (prepared, waiting for activation or the tick's end), `"done"`, `"failed"`, `"replaced"` (another load came first), or `"gone"` for an id this Play session never opened |
+| `Scene.SetAllowSceneActivation` | `(op, allow)` | `true` if `op` is the pending load — its `allowSceneActivation` (default `true`): while `false` the operation holds at ready, the current scene running, until it is set back |
 | `Scene.GetActivePath` | `()` | the current scene file, or `nil` |
 | `Scene.DontDestroyOnLoad` | `(id)` | `true` if an entity existed at `id` (errors outside play) |
 | `Scene.SavePrefab` | `(rootId, path)` | the written path |
@@ -256,12 +261,57 @@ scene — additive loading is not supported.
   mode a file that fails to load errors at the call too, and the current scene
   stays. During play a file that exists but fails to parse at the swap is reported
   to the console, and the current scene keeps running.
-- **Loading screens:** the load is synchronous at the tick's tail — there is no
-  async/streamed loading. For a one-frame "Loading…" screen, activate a loading
-  canvas, then call `Scene.Load` on the next tick. In a `dev` build each play-mode
-  load logs what it cost, step by step, as one `Scene load <path>: <ms> (…)`
-  console line, and `Debug.Stats()` keeps the same figures as `load_ms` and
-  `load_<step>_ms` (`Debug.md`).
+- **Cost:** a `Scene.Load` does all its work at the tick's tail, so the window
+  stops for as long as it takes. In a `dev` build each play-mode load logs what it
+  cost, step by step, as one `Scene load <path>: <ms> (…)` console line, and
+  `Debug.Stats()` keeps the same figures as `load_ms` and `load_<step>_ms`
+  (`Debug.md`). To keep the game running meanwhile, use `Scene.LoadAsync`.
+
+#### Loading in the background (#2123)
+
+**`Scene.LoadAsync(path)`** is Unity's `SceneManager.LoadSceneAsync`: the next scene
+is read, its meshes rebuilt, its sidecars read and its navmesh baked (when none is
+saved) off the tick, while the current scene keeps running and drawing; then it is
+swapped in at a tick's tail exactly as `Scene.Load` swaps — same unload lifecycle,
+same `DontDestroyOnLoad` survivors, same world. It returns an **operation id**: rusty's
+namespaces hand out ids, not objects, so Unity's `AsyncOperation` is polled through
+`GetLoadProgress`, `IsLoadDone`, `GetLoadStatus` and `SetAllowSceneActivation`, as
+`EnvironmentQuery.Request`'s ticket is.
+
+- **When it lands:** the operation becomes ready at the head of a tick, and with
+  activation allowed it is swapped in at that tick's tail (its new scripts
+  `Awake`/`Start` at the next tick's head, as after `Load`). Headless runs (`play`,
+  `game --test`, a scenario) read it ready on the tick after the call, every run; in
+  the editor's Play and the player a worker thread prepares it, and it is ready on
+  the first tick after the worker finishes. Which tick that was is recorded in the
+  demo, so a replay swaps on the same tick.
+- **One load at a time:** a later `Load` or `LoadAsync` replaces a pending operation
+  (`"replaced"`, `IsLoadDone` true) and its preparation is dropped.
+- **Errors:** a path with no file errors at the call. A file that does not parse
+  ends the operation `"failed"`, reported to the console, and the current scene keeps
+  running.
+- **What stays on the tick:** the swap itself — the outgoing scene's teardown, the
+  World replaced, the physics world built and the navmesh restored — and the new
+  scene's GPU uploads on its first drawn frame.
+- **Loading screens:** a `DontDestroyOnLoad` canvas, shown before the call and
+  hidden once the operation is done:
+
+  ```lua
+  local Loader = {}
+
+  function Loader.Go(id, path)
+      Scene.DontDestroyOnLoad(id)                -- the loading canvas survives
+      Scene.SetActive(id, true)
+      local op = Scene.LoadAsync(path)
+      Timer.StartCoroutine(id, function(id)
+          coroutine.yield(Timer.WaitUntil(function() return Scene.IsLoadDone(op) end))
+          Scene.SetActive(id, false)
+      end)
+  end
+  ```
+
+  Set `Scene.SetAllowSceneActivation(op, false)` to hold a prepared scene (progress
+  0.9) until the player presses a key.
 
 ### Prefabs
 

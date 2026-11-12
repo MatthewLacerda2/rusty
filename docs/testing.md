@@ -137,7 +137,10 @@ the Game view size and the display scale (`Video.GetDisplayScale`, #1715) at
 each change, and per tick the input the tick published
 (`InputFrame`), as a delta from the tick before, and the tick's `dt`: the editor
 and the dev player tick on the fixed tick in Play (#1877) and on wall-clock time
-outside it, and the replay runs each tick on the `dt` it was recorded with. Everything else that reaches a playing world is
+outside it, and the replay runs each tick on the `dt` it was recorded with. The
+`Scene.LoadAsync` operations the tick read ready (#2123) are recorded with it too:
+a window's load worker decides that tick, so a replay makes them ready on the
+recorded tick, waiting for its own loader there if it is behind. Everything else that reaches a playing world is
 recorded as a **host act** before its tick: a console, MCP or command-channel
 line (the one evaluator, `ScriptManager::eval`), a scenario's API calls with their
 plain-data arguments, and the `Harness` verbs that change the world without a
