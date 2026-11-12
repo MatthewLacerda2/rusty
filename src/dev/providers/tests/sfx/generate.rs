@@ -97,7 +97,7 @@ fn no_key_or_no_budget_spends_nothing() {
         SfxError::Refused(Refusal::MissingKey { .. })
     ));
     let broke = Ledger {
-        budget_cents: 4,
+        budget_cents: 2,
         spent_cents: 0,
     };
     broke.save(&root.join("provider_budget.json")).unwrap();
