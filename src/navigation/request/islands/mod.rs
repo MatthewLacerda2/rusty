@@ -4,7 +4,8 @@
 //! partial path: on the Dust2 arena that is the whole [`MAX_SEARCH_NODES`], sixty
 //! ticks of the path queue's budget, with every agent behind it waiting.
 //!
-//! So each bake's islands are worked out once, lazily: the walking areas, joined
+//! So the navmesh's islands are worked out by the first search that needs them,
+//! and kept: the walking areas, joined
 //! by A\*'s own eight grid steps (`NavigationGraph::neighbour`: a diagonal into a
 //! sunken cell no cardinal step reaches still joins it), taken both ways, and the
 //! off-mesh links between them, followed one way. A diagonal step can be one-way;
@@ -17,8 +18,11 @@
 //!
 //! The map is built from scratch after a full bake; an incremental rebake and an
 //! area-cost change carry it forward instead (`carry`), which may join areas a
-//! fresh build would keep apart, never the reverse. Split: `areas` joins the
-//! walking areas, `carry` carries them.
+//! fresh build would keep apart, never the reverse, until the navmesh has stood
+//! still for a second and a carried map is built fresh again. So what the map
+//! holds depends on the rebake history, not only the current bake: still a pure
+//! function of the sim's inputs. Split: `areas` joins the walking areas, `carry`
+//! carries them.
 
 use std::cell::{RefCell, RefMut};
 use std::collections::VecDeque;
@@ -41,13 +45,21 @@ struct IslandMap {
     generation: u64,
     area: Vec<u32>,
     exits: Vec<Vec<u32>>,
+    /// Carried across a rebake since it was last built: it may join areas a fresh
+    /// build keeps apart, so a quiet spell rebuilds it (`carry::QUIET_SYNCS`).
+    carried: bool,
 }
 
 /// The graph's cached [`IslandMap`]: carried across an incremental rebake and an
-/// area-cost change (`carry`), rebuilt after anything else.
+/// area-cost change (`carry`), rebuilt after anything else, and after a carried map
+/// has stood still a while. Not a pure function of the bake: what it holds depends
+/// on the rebake history and on the syncs since, all of them sim inputs, so it is
+/// deterministic.
 #[derive(Default)]
 pub(crate) struct Islands {
     map: RefCell<Option<IslandMap>>,
+    /// Syncs without a change since the map was last carried (`Islands::still`).
+    quiet: u32,
     /// How many times the map was built from scratch (a test probe).
     #[cfg(test)]
     pub(crate) builds: std::cell::Cell<u32>,
@@ -118,6 +130,7 @@ impl NavigationGraph {
             generation: self.bake_generation,
             area,
             exits,
+            carried: false,
         }
     }
 

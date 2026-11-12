@@ -2,6 +2,7 @@
 //! thousand expansions, a goal on the floor the full cap, and no search more.
 
 mod carry;
+mod quiet;
 
 use glam::Vec3;
 

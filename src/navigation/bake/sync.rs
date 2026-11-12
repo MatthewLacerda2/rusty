@@ -12,8 +12,11 @@
 //! A settings change or a change of the grid's bounds or spacing is a full bake:
 //! every cell moves or every span may differ. Connectivity is computed on demand
 //! from the spans (`links.rs`), so there are no stored components or links to
-//! recompute, locally or globally. Off-mesh links (#462) are the exception: the
-//! generated ones near the change are regenerated, and authored ones re-snap.
+//! recompute, locally or globally. Three things are carried instead: off-mesh links
+//! (#462), the generated ones near the change regenerated and the authored ones
+//! re-snapped; the agents' search in progress (`request::carry`, #2087); and the
+//! island map (`request::islands::carry`, #2111), joined anew around the change
+//! and built fresh after a quiet spell, which a sync without a change counts.
 
 use super::super::NavigationGraph;
 use super::erosion;
@@ -68,6 +71,7 @@ impl NavigationGraph {
         let link_dirty = st.update_links(scene, self);
         if dirty.is_empty() && link_dirty.is_empty() {
             self.bake_state = Some(st);
+            self.islands.still(); // a carried island map rebuilds after a quiet spell (#2111)
             return Rebake::Unchanged;
         }
         let before = self.cells_before_rebake();

@@ -14,7 +14,7 @@ use crate::scene::Scene;
 /// A 20 × 10 floor split by a wall at x = 10 with a doorway over z 3..8, a crate
 /// no step climbs, a ledge the drop links leave, and a door-sized carving
 /// obstacle standing at `door`.
-fn level(door: Vec3) -> (Scene, u32) {
+pub(super) fn level(door: Vec3) -> (Scene, u32) {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 1.0;
     scene.nav_settings.bounds = Some(NavBounds::new(0.0, 20.0, 0.0, 10.0));
@@ -40,10 +40,10 @@ fn level(door: Vec3) -> (Scene, u32) {
     (scene, id)
 }
 
-const SHUT: Vec3 = Vec3::new(10.0, 1.0, 5.5);
-const OPEN: Vec3 = Vec3::new(1.0, 1.0, 5.5);
+pub(super) const SHUT: Vec3 = Vec3::new(10.0, 1.0, 5.5);
+pub(super) const OPEN: Vec3 = Vec3::new(1.0, 1.0, 5.5);
 
-fn moved(scene: &mut Scene, g: &mut NavigationGraph, id: u32, at: Vec3) {
+pub(super) fn moved(scene: &mut Scene, g: &mut NavigationGraph, id: u32, at: Vec3) {
     move_to(scene, id, at);
     tick_obstacles(scene, 1.0 / 60.0);
     assert_ne!(g.sync(scene), Rebake::Full, "an incremental rebake");
@@ -85,12 +85,14 @@ fn a_moving_obstacle_and_a_cost_change_never_rebuild_the_map() {
 fn a_carried_map_caps_no_goal_a_fresh_one_reaches() {
     let (mut scene, id) = level(OPEN);
     let mut g = NavigationGraph::from_scene(&scene);
-    let mut path = (0..12)
-        .map(|i| OPEN.lerp(SHUT, i as f32 / 11.0))
-        .collect::<Vec<_>>();
-    path.extend(path.clone().into_iter().rev());
+    let at = |i: u32| OPEN.lerp(SHUT, i as f32 / 11.0);
+    let path = (1..12).chain((0..11).rev()).map(at); // every step a rebake
+    reach_sets(&g); // builds the map each rebake then carries
     for at in path {
         moved(&mut scene, &mut g, id, at);
+        let map = g.islands.map.borrow();
+        assert!(map.as_ref().is_some_and(|m| m.carried), "at {at}: carried");
+        drop(map);
         let carried = reach_sets(&g);
         let kept = g.islands.map.borrow_mut().take();
         let fresh = reach_sets(&g);
