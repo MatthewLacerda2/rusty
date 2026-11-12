@@ -4,6 +4,7 @@
 
 mod format;
 mod fresh;
+mod ids;
 mod malformed;
 mod restore;
 

@@ -44,7 +44,9 @@ A full bake can be **saved beside the scene**, as `<scene>.navmesh` (Unity's bak
 `NavMeshData`): the baked spans, the pre-erosion copy the incremental rebake splices, the
 generated off-mesh links, and a fingerprint of everything the bake read (the static
 colliders' world triangles, the carving obstacles, the modifier volumes, the authored links,
-the bake settings bar the area costs, and the grid). When a scene loads or Play starts, a
+the bake settings bar the area costs, and the grid). It holds no entity id and no order:
+a load that renumbers the level's entities (a `DontDestroyOnLoad` survivor already holding
+one of its ids) keeps the file current. When a scene loads or Play starts, a
 file whose fingerprint matches the scene is used as is and **no bake runs**, so a shipped
 game pays no bake on a level load; the per-tick rebake then
 carries on from it exactly as from a bake. A stale, truncated or malformed file is ignored
