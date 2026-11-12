@@ -18,6 +18,32 @@ fn flags_every_spelling_of_an_unshipped_platform() {
 }
 
 #[test]
+fn flags_a_wrapped_predicate_on_the_line_its_cfg_starts() {
+    let src = "fn a() {}\n\
+               #[cfg_attr(\n\
+                   unix,\n\
+                   allow(dead_code)\n\
+               )]\n\
+               #[cfg(any(\n\
+                   target_os = \"macos\", // a note\n\
+                   target_family = \"windows\",\n\
+               ))]\n";
+    assert_eq!(lines(src), [2, 6]);
+}
+
+#[test]
+fn passes_other_keys_string_values_and_cfg_attrs_attributes() {
+    let src = "#[cfg(feature = \"windows\")]\n\
+               #[cfg_attr(test, doc = \"over a unix socket\")]\n\
+               #[cfg_attr(\n\
+                   feature = \"unix\",\n\
+                   path = \"windows.rs\"\n\
+               )]\n\
+               #[cfg(target_family = \"wasm\")]\n";
+    assert!(lines(src).is_empty(), "{:?}", lines(src));
+}
+
+#[test]
 fn passes_real_splits_comments_strings_and_other_words() {
     let src = "#[cfg(target_os = \"macos\")]\n\
                #[cfg(not(target_os = \"linux\"))]\n\

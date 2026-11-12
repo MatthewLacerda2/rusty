@@ -46,8 +46,9 @@ use std::time::Duration;
 /// two devices instead of one-per-core. Two is also what a test comparing two
 /// renderers takes, as one pair (#1844); at a cap of one it can never be granted.
 ///
-/// **If WARP runs out of memory again, lower this to 1 before anything else.** That
-/// fully serializes headless renderers and makes the suite's GPU memory deterministic.
+/// **If a software adapter (lavapipe) runs out of memory, lower this to 1 before
+/// anything else.** That fully serializes headless renderers and makes the suite's
+/// GPU memory deterministic.
 /// The cost is real: the GPU tests are under a tenth of the suite by count, but under
 /// nextest this cap (the `gpu` group's `max-threads`) makes them its critical path, so
 /// their time ÷ the cap *is* the suite's wall time (#985), and lowering it to 1
@@ -63,8 +64,8 @@ pub(crate) const MAX_CONCURRENT_HEADLESS: usize = 2;
 
 /// How long to wait for a permit before declaring the budget deadlocked.
 ///
-/// Generous on purpose: a cold WARP renderer plus a probe bake is slow, and a false
-/// positive here would be a confusing CI failure. This is not a performance budget —
+/// Generous on purpose: a cold software (lavapipe) renderer plus a probe bake is
+/// slow, and a false positive here would be a confusing CI failure. This is not a performance budget —
 /// it exists so a deadlock the holder check can't see (a nested acquire on a thread
 /// that is not a test's) fails with an explanation instead of hanging until the job
 /// times out with no output at all.

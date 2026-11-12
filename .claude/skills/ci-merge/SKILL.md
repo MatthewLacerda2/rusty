@@ -485,7 +485,7 @@ Why this is not a gate: `--in-diff` line matching drifts after an update from
 weekly and flags a drop without failing. Raise a floor as coverage improves;
 lowering one needs an inline `# reason:` (`make scripts` fails otherwise).
 
-The platform layer (`shell`, `render`, `dev`) is unfloored. GPU tests run on all
-three CI OSes, Linux on lavapipe, with `RUSTY_REQUIRE_GPU=1`, so a green run means
-they rendered. Two of the three adapters are software (lavapipe, WARP): a change
-that depends on real-GPU behaviour is proven on macOS's Metal.
+The platform layer (`shell`, `render`, `dev`) is unfloored. GPU tests run on both
+CI OSes, Linux on lavapipe and macOS on Metal, with `RUSTY_REQUIRE_GPU=1`, so a
+green run means they rendered. Lavapipe is a software adapter: a change that
+depends on real-GPU behaviour is proven on macOS's Metal.

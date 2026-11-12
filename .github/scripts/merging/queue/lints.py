@@ -100,7 +100,7 @@ def chained(first, second, work: str) -> list[str]:
 
 
 def binary_name() -> str:
-    return "lint.exe" if os.name == "nt" else "lint"
+    return "lint"
 
 
 def output(done) -> list[str]:

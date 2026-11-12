@@ -31,8 +31,8 @@ pub(super) fn verdict(name: &str, run: &Measured, budget: Duration) -> Result<()
     Ok(())
 }
 
-// The proofs run `sh` and read `wait4`'s CPU time: Unix only (off Unix the budget
-// falls back to wall time, which a sleeping child would fail).
+// The proofs run `sh` and read `wait4`'s CPU time, which a sleeping child does
+// not spend.
 fn sh(script: &str, budget: Duration) -> Measured {
     measure::run(
         Command::new("sh").arg("-c").arg(script),
