@@ -209,6 +209,14 @@ impl SceneLoads {
         self.pending.is_some()
     }
 
+    /// The pending `Scene.LoadAsync` operation, ready or not.
+    pub fn pending_op(&self) -> Option<u32> {
+        match self.pending.as_ref()? {
+            Pending::Async(op) => Some(op.op),
+            Pending::Sync(_) => None,
+        }
+    }
+
     /// The scene file the pending load is of.
     pub fn pending_path(&self) -> Option<&str> {
         match self.pending.as_ref()? {

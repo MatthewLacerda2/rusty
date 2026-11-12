@@ -20,8 +20,9 @@ use crate::scene::serialize::RehydratedScene;
 use super::super::game::GameWorld;
 
 /// Prepares `Scene.LoadAsync` operations for a world: installed by its host with
-/// [`GameWorld::set_scene_loader`]. One job at a time.
-pub trait SceneLoader {
+/// [`GameWorld::set_scene_loader`], reached again with [`GameWorld::scene_loader_mut`].
+/// One job at a time.
+pub trait SceneLoader: std::any::Any {
     /// Begin preparing `path` for operation `op`, dropping any job before it.
     fn start(&mut self, op: u32, path: String);
     /// Whether the job for `op` is finished, without waiting for it.
@@ -93,6 +94,12 @@ impl GameWorld {
         self.resources.scene_loader = loader;
     }
 
+    /// The installed loader, if it is a `T`: the host's own, between ticks.
+    pub fn scene_loader_mut<T: SceneLoader>(&mut self) -> Option<&mut T> {
+        let loader: &mut dyn std::any::Any = self.resources.scene_loader.as_mut();
+        loader.downcast_mut::<T>()
+    }
+
     /// Hand the loader the operation a script opened since it last looked.
     pub(in crate::app) fn start_loads(&mut self) {
         let job = self.world.scene.borrow_mut().loads.to_start();
@@ -102,13 +109,20 @@ impl GameWorld {
     }
 
     /// The tick head's publish: what the loader finished, as the tap leaves it, moves
-    /// the operation to ready (its scene held for the tail) or failed. A load no
-    /// longer pending drops its job and any scene held for it.
+    /// the operation to ready (its scene held for the tail) or failed. An operation
+    /// no longer pending drops its job and any scene held for it.
     pub(in crate::app) fn publish_loads(&mut self) {
         self.start_loads();
         let res = &mut self.resources;
-        if !self.world.scene.borrow().loads.has_pending() {
-            res.ready_scene = None;
+        let pending = self.world.scene.borrow().loads.pending_op();
+        if res
+            .ready_scene
+            .as_ref()
+            .is_some_and(|(op, _)| Some(*op) != pending)
+        {
+            res.ready_scene = None; // replaced, or Play stopped
+        }
+        if pending.is_none() {
             res.scene_loader.cancel();
         }
         let waiting = self.world.scene.borrow().loads.waiting();

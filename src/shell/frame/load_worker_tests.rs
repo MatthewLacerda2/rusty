@@ -51,3 +51,19 @@ fn a_cancelled_job_is_gone() {
     assert!(!loader.finished(1));
     assert!(loader.take(1).is_err());
 }
+
+#[test]
+fn the_shell_reaches_its_installed_loader() {
+    use std::{cell::RefCell, rc::Rc};
+    let mut game = crate::app::GameWorld::new(
+        Rc::new(RefCell::new(Scene::new())),
+        Rc::new(RefCell::new(crate::core::input::InputState::new())),
+        Rc::new(RefCell::new(crate::navigation::NavigationGraph::new(
+            -5.0, 5.0, -5.0, 5.0, 1.0,
+        ))),
+        Rc::new(RefCell::new(crate::scripting::ConsoleLogs::new())),
+    );
+    game.set_scene_loader(Box::new(Threaded::default()));
+    assert!(game.scene_loader_mut::<Threaded>().is_some());
+    assert!(game.scene_loader_mut::<crate::app::Inline>().is_none());
+}
