@@ -28,7 +28,9 @@ use crate::scene::lighting::LightingSettings;
 use crate::scene::nav_settings::NavMeshSettings;
 use crate::scene::Scene;
 
-pub use super::rehydrate::{asset_mesh_component, asset_ref_file, rehydrate_entity_mesh};
+pub use super::rehydrate::{
+    asset_mesh_component, asset_ref_file, rehydrate_entity_mesh, RehydratedScene,
+};
 
 fn default_skybox_path() -> String {
     String::new()
@@ -151,19 +153,17 @@ fn saved_lightmaps(scene: &Scene) -> LightmapSet {
     set
 }
 
-/// Rebuild every mesh in the document from its reference (see [`rehydrate_one`]).
-fn rehydrate_meshes(data: &mut SceneData) {
-    for entity in &mut data.entities {
-        rehydrate_entity_mesh(entity);
-    }
-}
-
 /// Replace the scene's World (single active scene) with the document's contents,
 /// rehydrating meshes (stamping `meshes_read_at`, #1242), holding every loaded
 /// number through its authoring op (#1418) and recomputing collider AABBs.
 /// Preserves entity order/ids.
 pub fn apply_scene_data(scene: &mut Scene, data: SceneData) {
-    apply(scene, data, true);
+    apply_rehydrated(scene, RehydratedScene::new(data));
+}
+
+/// [`apply_scene_data`] for a document already rehydrated.
+pub fn apply_rehydrated(scene: &mut Scene, document: RehydratedScene) {
+    apply(scene, document, true);
 }
 
 /// [`apply_scene_data`] for a document the World itself wrote (a Play snapshot):
@@ -172,7 +172,7 @@ pub fn apply_scene_data(scene: &mut Scene, data: SceneData) {
 /// the World comes back as captured, with any change made to a source during Play
 /// (#1527).
 pub fn apply_world_data(scene: &mut Scene, data: SceneData) {
-    apply(scene, data, false);
+    apply(scene, RehydratedScene::new(data), false);
 }
 
 /// Start from the document's library, then fold in any material an entity still
@@ -217,9 +217,9 @@ fn drop_old_world(scene: &mut Scene) {
 
 /// `from_disk`: the document came from a file, so its values are held; a World
 /// snapshot's already were.
-fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
-    rehydrate_meshes(&mut data);
-    scene.meshes_read_at = crate::core::fs::written::written_since(u64::MAX).0;
+fn apply(scene: &mut Scene, document: RehydratedScene, from_disk: bool) {
+    let (mut data, read_at) = document.into_parts();
+    scene.meshes_read_at = read_at;
 
     take_materials(scene, &mut data);
     crate::scene::mesh_library::put_back(std::mem::take(&mut data.meshes), &mut scene.meshes);

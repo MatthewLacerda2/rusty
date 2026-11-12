@@ -66,7 +66,8 @@ pub use bake::{
     bake_occlusion, gather_occlusion, OcclusionBakeReport, OcclusionInput, OCCLUSION_SEED,
 };
 pub use file::{
-    decode, encode, load_sidecar, occlusion_path, save_sidecar, SUFFIX as OCCLUSION_SUFFIX,
+    apply_sidecar, decode, encode, load_sidecar, occlusion_path, read_sidecar, save_sidecar,
+    OcclusionFile, SUFFIX as OCCLUSION_SUFFIX,
 };
 pub use gather::{fingerprint, Fingerprints};
 pub use grid::{Grid, CELL_SIZE, MAX_CELL, MAX_CELLS};

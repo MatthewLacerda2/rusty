@@ -82,3 +82,26 @@ fn gpu_times_fold_in_as_a_total_and_per_pass() {
     assert!(stats.to_json(false).get("gpu_passes").is_none());
     assert!(stats.to_json(true)["gpu_passes"]["forward"].is_object());
 }
+
+#[test]
+fn a_load_timer_reports_a_swapped_in_load_and_drops_a_failed_one() {
+    let stats = Rc::new(RefCell::new(FrameStats::default()));
+    let mut timer = LoadTimer::new(Rc::clone(&stats));
+    let mut console = ConsoleLogs::new();
+    let mut ran = 0;
+    timer.step("read", &mut || ran += 1);
+    timer.finish(None, &mut console);
+    assert!(stats.borrow().metrics.is_empty() && console.messages.is_empty());
+    timer.step("read", &mut || ran += 1);
+    timer.step("physics", &mut || ran += 1);
+    timer.finish(Some("a.scene"), &mut console);
+    assert_eq!(ran, 3, "each step ran once");
+    let stats = stats.borrow();
+    let keys: Vec<&str> = stats.metrics.keys().map(String::as_str).collect();
+    assert_eq!(keys, ["load_ms", "load_physics_ms", "load_read_ms"]);
+    let line = &console.messages[0].0;
+    assert!(
+        line.starts_with("Scene load a.scene: ") && line.contains("(read "),
+        "{line}"
+    );
+}

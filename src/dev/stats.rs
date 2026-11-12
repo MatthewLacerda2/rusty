@@ -25,8 +25,9 @@ use std::rc::Rc;
 use std::time::Instant;
 
 use super::capture::RenderedFrame;
-use crate::app::{GameWorld, Resources, Stage, SystemProbe, World};
+use crate::app::{GameWorld, LoadProbe, Resources, Stage, SystemProbe, World};
 use crate::core::frame_stats::{FrameStats, Series};
+use crate::scripting::ConsoleLogs;
 
 /// The metric each per-frame stage's CPU time is recorded under.
 fn stage_key(stage: Stage) -> &'static str {
@@ -139,11 +140,57 @@ fn record_changes(
     }
 }
 
-/// Install a [`TimingProbe`] on `world`, writing into the script runtime's stats cell
-/// so `Debug.Stats()` reads what the probe records. Returns that cell.
+/// Times each step of a play-mode scene load (#2123) and, once it swapped in,
+/// reports them: one console line, and `load_<step>_ms` plus `load_ms` (their sum)
+/// in the stats `Debug.Stats()` reads, so a series spans every load of the session.
+pub struct LoadTimer {
+    stats: Rc<RefCell<FrameStats>>,
+    steps: Vec<(&'static str, f64)>,
+}
+
+impl LoadTimer {
+    pub fn new(stats: Rc<RefCell<FrameStats>>) -> Self {
+        let steps = Vec::new();
+        Self { stats, steps }
+    }
+}
+
+impl LoadProbe for LoadTimer {
+    fn step(&mut self, name: &'static str, step: &mut dyn FnMut()) {
+        let start = Instant::now();
+        step();
+        self.steps
+            .push((name, start.elapsed().as_secs_f64() * 1000.0));
+    }
+
+    fn finish(&mut self, loaded: Option<&str>, console: &mut ConsoleLogs) {
+        let steps = std::mem::take(&mut self.steps);
+        let Some(path) = loaded else {
+            return; // a failed load swapped nothing in: nothing to compare against
+        };
+        let total: f64 = steps.iter().map(|(_, ms)| ms).sum();
+        let mut stats = self.stats.borrow_mut();
+        let parts: Vec<String> = steps
+            .iter()
+            .map(|(name, ms)| {
+                stats.record(&format!("load_{name}_ms"), *ms);
+                format!("{name} {ms:.1}")
+            })
+            .collect();
+        stats.record("load_ms", total);
+        console.info(format!(
+            "Scene load {path}: {total:.1} ms ({})",
+            parts.join(", ")
+        ));
+    }
+}
+
+/// Install a [`TimingProbe`] and a [`LoadTimer`] on `world`, writing into the script
+/// runtime's stats cell so `Debug.Stats()` reads what they record. Returns that cell.
 pub fn install(world: &mut GameWorld) -> Rc<RefCell<FrameStats>> {
     let stats = world.script_manager().stats_cell();
     world.set_probe(Some(Box::new(TimingProbe::new(Rc::clone(&stats)))));
+    world.set_load_probe(Some(Box::new(LoadTimer::new(Rc::clone(&stats)))));
     stats
 }
 
