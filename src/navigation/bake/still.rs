@@ -123,7 +123,7 @@ impl NavigationGraph {
             _ => self.restore_or_bake(scene),
         };
         self.static_watch = Some(watch);
-        self.tracked_scene = Some(scene.id());
+        self.tracked_scene = Some((scene.id(), start));
         start
     }
 
@@ -138,7 +138,13 @@ impl NavigationGraph {
     /// Whether [`Self::start_tracked`] last started on `scene` (a play-mode
     /// `Scene.Load` swaps in another, which starts afresh).
     pub fn tracks(&self, scene: &Scene) -> bool {
-        self.tracked_scene == Some(scene.id())
+        self.tracked_scene.is_some_and(|(id, _)| id == scene.id())
+    }
+
+    /// How the last [`Self::start_tracked`] made the navmesh: restored, so no bake
+    /// ran on that tick, or baked; `None` before the first.
+    pub fn last_start(&self) -> Option<Start> {
+        self.tracked_scene.map(|(_, start)| start)
     }
 }
 

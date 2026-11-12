@@ -204,6 +204,9 @@ mod scene_load_api_tests;
 #[path = "async_tests.rs"]
 mod scene_load_async_tests;
 #[cfg(test)]
+#[path = "navmesh_tests.rs"]
+mod scene_load_navmesh_tests;
+#[cfg(test)]
 #[path = "new_tests.rs"]
 mod scene_load_new_tests;
 #[cfg(test)]

@@ -236,7 +236,8 @@ scene — additive loading is not supported.
   across loads — the music player, the game manager, the persistent HUD canvas.
   Survivors keep their **ids**, components and running scripts, timers and
   coroutines; their scripts do not re-run `Awake`. A new-scene entity whose id a
-  survivor already holds gets a fresh id instead. A survivor whose parent does
+  survivor already holds gets a fresh id instead; its saved navmesh (or the one
+  `Scene.LoadAsync` baked) is still used, since the navmesh holds no ids. A survivor whose parent does
   not survive becomes a root, and the materials it uses come along unless the
   new scene defines one of the same name. Physics state (velocities) restarts
   from the survivor's transform, since the physics world is rebuilt. The mark
