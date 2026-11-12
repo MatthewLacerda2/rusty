@@ -14,6 +14,7 @@ mod forwards;
 mod hosts;
 mod index;
 mod index_edges;
+mod load_async;
 mod play_bin;
 mod script_ref;
 #[cfg(feature = "editor")]

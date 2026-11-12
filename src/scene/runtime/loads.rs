@@ -44,7 +44,7 @@ impl LoadStatus {
     /// Unity's `AsyncOperation.progress`: 0 while loading, 0.9 once ready (it holds
     /// there while activation waits), 1 once swapped in; 0 for a load that ended
     /// without one.
-    pub fn progress(self) -> f32 {
+    pub fn progress(self) -> f64 {
         match self {
             Self::Loading | Self::Failed | Self::Replaced => 0.0,
             Self::Ready => 0.9,
@@ -207,5 +207,12 @@ impl SceneLoads {
     /// Whether a load is pending.
     pub fn has_pending(&self) -> bool {
         self.pending.is_some()
+    }
+
+    /// The scene file the pending load is of.
+    pub fn pending_path(&self) -> Option<&str> {
+        match self.pending.as_ref()? {
+            Pending::Sync(path) | Pending::Async(AsyncOp { path, .. }) => Some(path),
+        }
     }
 }

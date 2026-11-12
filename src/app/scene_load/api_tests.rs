@@ -62,7 +62,7 @@ fn a_missing_scene_file_errors_with_its_path() {
     let play = gw.script_manager().eval(call).unwrap_err();
     assert!(play.contains("no/such/level.scene"), "{play}");
     assert!(
-        gw.scene().borrow().pending_load.is_none(),
+        !gw.scene().borrow().loads.has_pending(),
         "nothing was queued"
     );
 }

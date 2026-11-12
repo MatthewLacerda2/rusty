@@ -30,11 +30,7 @@ fn editor_play_is_play_to_the_lua_api() {
     eval(format!("Scene.DontDestroyOnLoad({keep})"));
     eval(format!("Scene.DestroyEntity({keep})"));
     let scene = gw.scene().borrow();
-    assert_eq!(
-        scene.pending_load.as_deref(),
-        Some(path.as_str()),
-        "deferred"
-    );
+    assert_eq!(scene.loads.pending_path(), Some(path.as_str()), "deferred");
     assert!(scene.persistent.contains(&keep), "DontDestroyOnLoad took");
     assert!(scene.world.contains(keep), "live until the destroy phase");
     assert_eq!(scene.pending_destroy, vec![keep], "queued");
