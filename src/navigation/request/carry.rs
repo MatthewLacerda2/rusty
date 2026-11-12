@@ -14,25 +14,23 @@ use super::super::offmesh::LinkParams;
 use super::super::{NavMeshSettings, NavigationGraph, SpanRef};
 use super::PathQueue;
 
-impl PathQueue {
-    /// Before a rebake rewrites the spans: the cell offsets the active search's
-    /// span indices count from, or `None` with no search to carry.
-    pub(in crate::navigation) fn cells_before_rebake(
-        &self,
-        cell_start: &[u32],
-    ) -> Option<Vec<u32>> {
-        self.active.as_ref().map(|_| cell_start.to_vec())
-    }
-}
-
 impl NavigationGraph {
+    /// Before a rebake rewrites the spans: the cell offsets the active search's and
+    /// the island map's span indices count from (`islands::carry`), or `None` with
+    /// neither to carry.
+    pub(in crate::navigation) fn cells_before_rebake(&mut self) -> Option<Vec<u32>> {
+        let searching = self.requests.get_mut().active.is_some();
+        let mapped = self.islands.current(self.bake_generation, self.spans.len());
+        (searching || mapped).then(|| self.cell_start.clone())
+    }
+
     /// After an incremental rebake of `changed`: carry the active search onto the
     /// new spans when no change reaches it (see the module doc), else drop it so it
     /// restarts on the new navmesh. `old_start` is
-    /// [`PathQueue::cells_before_rebake`]'s.
+    /// [`Self::cells_before_rebake`]'s.
     pub(in crate::navigation) fn carry_search(
         &self,
-        old_start: Option<Vec<u32>>,
+        old_start: Option<&[u32]>,
         changed: &[CellRect],
         settings: &NavMeshSettings,
     ) {

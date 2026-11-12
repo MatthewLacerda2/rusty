@@ -9,8 +9,8 @@
 //! Builds the game `games/<name>/` describes into a project folder (default the
 //! worktree's `target/games/<name>/`; `make game NAME=<name>`), by running its
 //! `recipe.lua` in edit mode with the `--param`s (`dev::game::generate`). With
-//! `--test` it also proves the generation deterministic, runs every scenario and
-//! takes the shots (`dev::game::check`; `make game-test NAME=<name>`), printing one
+//! `--test` it also proves the generation deterministic, runs every scenario,
+//! replays the demo each one recorded, and takes the shots (`dev::game::check`; `make game-test NAME=<name>`), printing one
 //! line per step and exiting 1 when one failed. `--games <dir>` reads the games from
 //! another folder than the checkout's `games/`. `session` and `play` are the two
 //! halves of this, but neither runs a recipe file with parameters and reports its

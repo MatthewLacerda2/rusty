@@ -9,8 +9,10 @@
 //! verbs that change the world ([`HARNESS_VERBS`]) are noted the same way and
 //! replayed by [`invoke_harness`]; the rest only read it, or step it (the steps
 //! are ticks).
-//! An argument or a returned value that is not plain data (a function, a script
-//! handle from `Scene.GetScript`) cannot be replayed, and taints the demo instead.
+//! An argument or a returned value that is not plain data (a function, a
+//! userdata) cannot be replayed, and taints the demo instead. The one userdata
+//! that does not is `Scene.GetScript`'s handle: it notes its own field writes
+//! and calls (`script_ref`, #2120).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -77,6 +79,10 @@ pub fn journal_calls(lua: &Lua, journal: &Rc<RefCell<HostJournal>>) -> mlua::Res
     })?;
     let checks = Rc::clone(journal);
     let check = lua.create_function(move |_, (function, returned): (String, MultiValue)| {
+        // Its handle notes its own writes and calls (`script_ref`).
+        if function == "Scene.GetScript" {
+            return Ok(());
+        }
         if let Some(kind) = returned.iter().find_map(|v| plain(v, 0).err()) {
             let what = format!("{function} returned a {kind}, whose calls are not recorded");
             checks.borrow_mut().push(HostCall::Taint(what));
@@ -96,7 +102,7 @@ pub fn plain_value(value: &Value) -> Result<Plain, &'static str> {
 }
 
 /// `value` as plain data, or what kind of value kept it from being plain.
-fn plain(value: &Value, depth: usize) -> Result<Plain, &'static str> {
+pub(super) fn plain(value: &Value, depth: usize) -> Result<Plain, &'static str> {
     Ok(match value {
         Value::Nil => Plain::Nil,
         Value::Boolean(b) => Plain::Bool(*b),
@@ -135,7 +141,7 @@ fn table(t: &Table, depth: usize) -> Result<Plain, &'static str> {
     Ok(Plain::Map(pairs))
 }
 
-fn to_lua(lua: &Lua, value: &Plain) -> mlua::Result<Value> {
+pub(super) fn to_lua(lua: &Lua, value: &Plain) -> mlua::Result<Value> {
     Ok(match value {
         Plain::Nil => Value::Nil,
         Plain::Bool(b) => Value::Boolean(*b),

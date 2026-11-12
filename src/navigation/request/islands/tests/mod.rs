@@ -1,6 +1,9 @@
 //! The island cap (#2087): a goal on a crate top nothing climbs costs a few
 //! thousand expansions, a goal on the floor the full cap, and no search more.
 
+mod carry;
+mod quiet;
+
 use glam::Vec3;
 
 use super::super::super::astar::MAX_SEARCH_NODES;

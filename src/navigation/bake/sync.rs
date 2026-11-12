@@ -12,8 +12,11 @@
 //! A settings change or a change of the grid's bounds or spacing is a full bake:
 //! every cell moves or every span may differ. Connectivity is computed on demand
 //! from the spans (`links.rs`), so there are no stored components or links to
-//! recompute, locally or globally. Off-mesh links (#462) are the exception: the
-//! generated ones near the change are regenerated, and authored ones re-snap.
+//! recompute, locally or globally. Three things are carried instead: off-mesh links
+//! (#462), the generated ones near the change regenerated and the authored ones
+//! re-snapped; the agents' search in progress (`request::carry`, #2087); and the
+//! island map (`request::islands::carry`, #2111), joined anew around the change
+//! and built fresh after a quiet spell, which a sync without a change counts.
 
 use super::super::NavigationGraph;
 use super::erosion;
@@ -68,12 +71,10 @@ impl NavigationGraph {
         let link_dirty = st.update_links(scene, self);
         if dirty.is_empty() && link_dirty.is_empty() {
             self.bake_state = Some(st);
+            self.islands.still(); // a carried island map rebuilds after a quiet spell (#2111)
             return Rebake::Unchanged;
         }
-        let searched = self
-            .requests
-            .get_mut()
-            .cells_before_rebake(&self.cell_start);
+        let before = self.cells_before_rebake();
         let mut changed = self.rebake_regions(scene, &mut st, dirty);
         self.offmesh.authored = self.resolve_authored(&st.inputs.link_keys());
         self.index_links();
@@ -82,7 +83,8 @@ impl NavigationGraph {
         self.bake_generation = self.bake_generation.wrapping_add(1);
         st.log.record(self.bake_generation, Some(changed.clone()));
         self.bake_state = Some(st);
-        self.carry_search(searched, &changed, &scene.nav_settings); // #2087
+        self.carry_search(before.as_deref(), &changed, &scene.nav_settings); // #2087
+        self.carry_islands(before.as_deref(), &changed); // #2111
         Rebake::Incremental(changed)
     }
 

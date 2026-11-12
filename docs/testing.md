@@ -152,8 +152,12 @@ after. `Editor.EnterPlay()` and `Editor.ExitPlay()` are not acts: the transition
 they ask for is the demo's start and end. A demo still being written is never
 pruned (its recorder holds a lock on the file). An act it cannot carry **taints** the demo from that tick: an edit made
 by hand in the editor during Play (the Inspector, the hierarchy, a gizmo), a call
-passing or returning a function or a handle (`Scene.GetScript`'s calls are not
-recorded), Play started on unsaved scene edits. The replay warns from there on.
+passing or returning a function or a userdata, a value written into a script or
+passed to its function through a `Scene.GetScript` handle that is not plain data
+(a function, a table with mixed keys), Play started on unsaved scene edits. The
+handle itself is no taint: its field writes and function calls are recorded
+(`ScriptRef.Set` / `ScriptRef.Call` in the file, `dev::demo::script_ref`, #2120)
+and made again on the replay. The replay warns from there on.
 Script and asset changes on disk wait for Stop (the editor's watch holds them
 through Play), so they never reach a Play session. `play --size` and `--scene`
 are refused with `--demo`: the replay plays the scene, the Game view size and the
@@ -701,7 +705,10 @@ make game-test NAME=smoke                  # generate, prove it deterministic, p
 
 `make game-test` generates the game, moves it aside, generates it again at the same
 path and compares every file; then runs each `scenarios/*.lua` as `play` does, on
-the project's startup scene, and takes the shots. It prints one `ok`/`FAIL` line per
+the project's startup scene, replays the demo each run recorded (a step of its
+own, `scenario <name>'s demo replays`, results in `cache/test/<scenario>/replay/`:
+one that diverges fails, since a scenario's every act on the world is recorded),
+and takes the shots. It prints one `ok`/`FAIL` line per
 step and exits 1 when one failed. Results go to the project's `cache/test/<scenario>/`
 (`results.json`, `console.log`) and the shots to `cache/test/shots/<name>.png`; open
 them with `Read`. A shot fails only when it is all one colour: rendering changes too

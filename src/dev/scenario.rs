@@ -36,6 +36,8 @@ const DEFAULT_BOT_SCRIPT: &str = crate::scene::default_scene::BOT_SCRIPT;
 pub struct RunReport {
     pub results_path: PathBuf,
     pub passed: bool,
+    /// The demos the run recorded, oldest first: none unless it recorded one.
+    pub demos: Vec<PathBuf>,
 }
 
 /// How `play` sets a run up beyond the scene: what its command line asked for.
@@ -125,11 +127,15 @@ pub fn run_code(harness: Harness, code: &str, name: &str) -> Result<RunReport, S
 
     super::demo::conclude(&mut harness.borrow_mut());
     let h = harness.borrow();
+    let demos = (h.world.borrow_mut().tap_mut::<super::demo::Recorder>())
+        .map(|recorder| recorder.written().to_vec())
+        .unwrap_or_default();
     let results_path = h
         .write_results()
         .map_err(|e| format!("Failed to write results: {}", e))?;
     Ok(RunReport {
         results_path,
         passed: h.all_passed() && exec.is_ok(),
+        demos,
     })
 }
