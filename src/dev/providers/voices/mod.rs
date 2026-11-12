@@ -12,7 +12,9 @@
 //! The machinery is scorsese's `voices` module, used as-is: the cache under the
 //! project's `cache/voices/` (re-read after [`REFRESH_AFTER_DAYS`] or on demand,
 //! and every answer saying how old it is), the fallback to a stale list when the
-//! vendor cannot be asked, and the sorting of a 404 into [`Unusable::Gone`]. rusty
+//! vendor cannot be asked, and the reading of a 404: the Voice Library is asked
+//! next, so a voice found there is [`Availability::InLibrary`] and only one found
+//! nowhere is [`Unusable::Gone`]. rusty
 //! adds the account-wide paginated listing ([`Account`], [`every_page`]), the name/label filter and
 //! the Play check.
 

@@ -1,9 +1,9 @@
-//! The speech brief (#386): its four local refusals and its canonical form. Nothing
+//! The speech brief (#386): its local refusals and its canonical form. Nothing
 //! here reaches a key, a budget or a network.
 
 mod generate;
 
-use scorsese_core::{SpeechModel, MAX_CHARACTERS};
+use scorsese_core::SpeechModel;
 
 use super::super::generated::{canonical, Brief};
 use super::super::speech::*;
@@ -64,23 +64,22 @@ fn empty_text_is_refused() {
 }
 
 #[test]
-fn text_past_the_vendor_limit_is_refused_by_character_not_byte() {
-    // Multi-byte characters: the limit counts what the vendor counts.
-    let at_limit = "é".repeat(MAX_CHARACTERS);
-    assert!(draft(&at_limit).gather().is_ok());
-    let over = format!("{at_limit}é");
-    let why = draft(&over).gather().unwrap_err();
-    assert_eq!(
-        why,
-        Incomplete::TooLong {
-            found: MAX_CHARACTERS + 1
-        }
-    );
-    assert!(why.to_string().contains("40000"));
+fn text_past_the_models_limit_is_refused_by_character_not_byte() {
+    for (id, limit) in [("eleven_flash_v2_5", 40_000), ("eleven_v4", 10_000)] {
+        let at = |text: &str| Draft {
+            model: Some(id.into()),
+            ..draft(text)
+        };
+        let at_limit = "é".repeat(limit);
+        assert!(at(&at_limit).gather().is_ok());
+        let why = at(&format!("{at_limit}é")).gather().unwrap_err();
+        assert!(matches!(why, Incomplete::TooLong { found, .. } if found == limit + 1));
+        assert!(why.to_string().contains(&limit.to_string()), "{why}");
+    }
 }
 
 #[test]
-fn a_missing_voice_is_refused() {
+fn a_missing_or_malformed_voice_is_refused() {
     for voice in [None, Some("")] {
         let d = Draft {
             voice: voice.map(Into::into),
@@ -89,6 +88,13 @@ fn a_missing_voice_is_refused() {
         assert_eq!(d.gather().unwrap_err(), Incomplete::NoVoice);
     }
     assert!(Incomplete::NoVoice.to_string().contains("`voice`"));
+    for voice in ["..", "a/b", "voice?x"] {
+        let d = Draft {
+            voice: Some(voice.into()),
+            ..draft("Behind you")
+        };
+        assert_eq!(d.gather().unwrap_err(), Incomplete::BadVoice(voice.into()));
+    }
 }
 
 #[test]

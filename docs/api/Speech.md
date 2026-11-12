@@ -32,8 +32,8 @@ Audio.PlayAt(wav, 0, 1.6, 4)
 
 | Field | | Meaning |
 |---|---|---|
-| `text` | required | The words. At most 40,000 characters. |
-| `voice` | required | An ElevenLabs voice id. **No default exists**: every vendor default voice expires on 2026-12-31. |
+| `text` | required | The words. At most 40,000 characters on `eleven_flash_v2_5`, 10,000 on `eleven_multilingual_v2` and `eleven_v4`. |
+| `voice` | required | An ElevenLabs voice id: letters, digits, `-` and `_` only. **No default exists**: every vendor default voice expires on 2026-12-31. |
 | `model` | optional | `eleven_flash_v2_5` (**default**, 4¢ / 1000 chars), `eleven_multilingual_v2` (8¢), `eleven_v4` (8¢, most expressive). |
 | `language` | optional | ISO 639-1 code pinning the reading. Refused on `eleven_multilingual_v2`, which accepts it and silently ignores it. |
 | `seed` | optional | Integer. **Best-effort, not guaranteed**: the one place in the engine where "same input, same bytes" is a hope rather than a promise. |
@@ -41,8 +41,9 @@ Audio.PlayAt(wav, 0, 1.6, 4)
 ### What a call does
 
 1. **Refused during Play** — raises.
-2. **Local refusals** — empty `text`, more than 40,000 characters, no `voice`, an
-   unknown `model`, `language` on `eleven_multilingual_v2`. Each returns
+2. **Local refusals** — empty `text`, more characters than the model speaks, no
+   `voice` or one that is not a voice id, an unknown `model`, `language` on
+   `eleven_multilingual_v2`. Each returns
    `nil, why` naming the field, and **does not raise**, so a loop over twenty lines
    loses none to one unfinished brief:
    ```lua no-run

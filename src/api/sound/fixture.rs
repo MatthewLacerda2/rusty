@@ -1,5 +1,6 @@
 //! What the `Sound` tests share: a Lua state with the namespace registered, a
-//! temp path a Lua literal can carry, and a percussive patch.
+//! temp path a Lua literal can carry, and two patches: a percussive one and a held
+//! one.
 
 use mlua::Lua;
 
