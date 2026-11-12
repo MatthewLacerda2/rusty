@@ -51,11 +51,17 @@ pub(super) fn timed<T>(
         return step();
     };
     let (mut step, mut out) = (Some(step), None);
-    probe.step(name, &mut || out = step.take().map(|run| run()));
+    // A probe that calls the step twice runs it once; the second call does nothing.
+    probe.step(name, &mut || {
+        if let Some(run) = step.take() {
+            out = Some(run());
+        }
+    });
     match (out, step) {
         (Some(out), _) => out,
         // A probe that broke its contract and skipped the step: run it here, once.
         (None, Some(run)) => run(),
+        // Never: the step is only ever taken to fill `out`, which nothing empties.
         (None, None) => unreachable!("a step that ran left its result"),
     }
 }

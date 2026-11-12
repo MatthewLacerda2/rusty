@@ -61,3 +61,30 @@ fn a_load_that_cannot_read_its_file_finishes_with_nothing_loaded() {
     assert_eq!(seen[seen.len() - 2], "read", "nothing past the read ran");
     assert!(gw.scene().borrow().find_entity_by_name("Level").is_some());
 }
+
+/// A probe that breaks the once-only contract by calling each step twice.
+struct Twice;
+
+impl LoadProbe for Twice {
+    fn step(&mut self, _: &'static str, step: &mut dyn FnMut()) {
+        step();
+        step();
+    }
+
+    fn finish(&mut self, _: Option<&str>, _: &mut ConsoleLogs) {}
+}
+
+#[test]
+fn a_probe_that_calls_a_step_twice_runs_it_once() {
+    let (menu, _) = write_scenes("probe_twice");
+    let (mut gw, console) = world_at(&menu);
+    gw.set_load_probe(Some(Box::new(Twice)));
+    gw.set_playing(true);
+    gw.tick(DT);
+    assert!(gw.scene().borrow().find_entity_by_name("Level").is_some());
+    let disables = super::fixture::logs(&console)
+        .iter()
+        .filter(|l| l.contains("menu:disable"))
+        .count();
+    assert_eq!(disables, 1, "the teardown ran once");
+}

@@ -252,7 +252,7 @@ fn install(mesh: &mut crate::scene::MeshComponent, rebuilt: RehydratedMesh) {
 
 /// Build an `"Asset"` mesh component from a path-based reference, importing its
 /// geometry up front. The reference is the only identity stored; on save the
-/// vertices are dropped and re-imported from it (see `rehydrate_meshes`). Returns
+/// vertices are dropped and re-imported from it (see `RehydratedScene::new`). Returns
 /// an empty-geometry component if the import fails.
 pub fn asset_mesh_component(reference: &str) -> crate::scene::MeshComponent {
     built(
