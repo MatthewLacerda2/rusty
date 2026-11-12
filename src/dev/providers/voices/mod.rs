@@ -108,6 +108,16 @@ pub fn info(
     catalogue.one(voice_id).map_err(VoicesError::Catalogue)
 }
 
+/// What a script is told about a Voice Library voice the account has not saved:
+/// usable, but only on a paid plan.
+pub fn in_library(voice_id: &str) -> String {
+    format!(
+        "voice {voice_id} is in the ElevenLabs Voice Library, not yet saved to the \
+         account: any paid plan can generate with it (a free plan cannot), and the \
+         first line spoken saves it"
+    )
+}
+
 /// What a script is told about a voice it cannot use: named, and never replaced.
 pub fn withdrawn(voice_id: &str, why: &Unusable) -> String {
     let state = match why {

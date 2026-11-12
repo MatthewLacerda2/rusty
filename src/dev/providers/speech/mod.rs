@@ -43,7 +43,7 @@ pub struct ElevenLabs;
 
 impl Speaker for ElevenLabs {
     fn speak(&self, key: &Secret, voice: &str, body: &Speak) -> Result<Vec<u8>, String> {
-        Speech::new(key)
+        let timed = Speech::new(key)
             .speak(voice, body)
             .map_err(|error| match error {
                 // The vendor's body, sorted into advice (a bad key, a missing scope,
@@ -52,7 +52,12 @@ impl Speaker for ElevenLabs {
                     VendorRefusal::of(status, voice, &body).to_string()
                 }
                 other => other.to_string(),
-            })
+            })?;
+        // The reply carries the MP3 as base64 beside per-character timings; only
+        // the audio is kept.
+        timed
+            .audio()
+            .ok_or_else(|| "the vendor's audio was not base64".to_owned())
     }
 }
 

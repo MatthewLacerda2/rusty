@@ -6,11 +6,16 @@ use super::*;
 
 /// Every provider rusty can name, spelled as a `match` so a new one fails to
 /// compile here until it is added.
-fn every_provider() -> [Provider; 3] {
-    let all = [Provider::Gemini, Provider::ElevenLabs, Provider::Anthropic];
+fn every_provider() -> [Provider; 4] {
+    let all = [
+        Provider::Gemini,
+        Provider::ElevenLabs,
+        Provider::Anthropic,
+        Provider::Pixabay,
+    ];
     for provider in all {
         match provider {
-            Provider::Gemini | Provider::ElevenLabs | Provider::Anthropic => {}
+            Provider::Gemini | Provider::ElevenLabs | Provider::Anthropic | Provider::Pixabay => {}
         }
     }
     all

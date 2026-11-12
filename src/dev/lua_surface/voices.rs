@@ -57,6 +57,10 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
                 Availability::Available(voice) => {
                     Ok((Value::Table(voice_table(lua, &voice)?), None))
                 }
+                Availability::InLibrary(voice) => Ok((
+                    Value::Table(voice_table(lua, &voice)?),
+                    Some(voices::in_library(&id)),
+                )),
                 Availability::Unusable(why) => Ok((Value::Nil, Some(voices::withdrawn(&id, &why)))),
             }
         }),
