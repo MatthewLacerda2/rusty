@@ -14,12 +14,10 @@
 //! ordering and determinism are unchanged. The editor may be asleep outside Play
 //! (`shell::pace`, #1721), so a handler rings [`crate::core::wake`] with each command.
 //!
-//! ## Transport (cross-platform — see `transport`)
-//! - **unix:** a `UnixListener` at `$RUSTY_CMD_SOCK`, else `$XDG_RUNTIME_DIR/rusty.sock`,
-//!   else `/tmp/rusty.sock`. A stale socket file is removed before binding and (best
-//!   effort) on drop.
-//! - **windows:** a `TcpListener` on `$RUSTY_CMD_ADDR`, else `127.0.0.1:8787`. Std only —
-//!   no named-pipe crate, no new dependency.
+//! ## Transport (see `transport`)
+//! A `UnixListener` at `$RUSTY_CMD_SOCK`, else `$XDG_RUNTIME_DIR/rusty.sock`, else
+//! `/tmp/rusty.sock`. A stale socket file is removed before binding and (best effort)
+//! on drop.
 //!
 //! The chosen address/path is logged to the engine console on boot so an agent can
 //! find it. A bind failure is logged and the engine keeps running **without** the
@@ -59,9 +57,8 @@ pub(super) type Command = (String, Sender<Reply>);
 /// to evaluate queued commands on the main thread and reply.
 pub struct CommandChannel {
     rx: Receiver<Command>,
-    /// On unix, the bound socket path — removed (best effort) on drop so a restart
-    /// can rebind cleanly. Unused on windows (TCP needs no filesystem cleanup).
-    #[cfg(unix)]
+    /// The bound socket path — removed (best effort) on drop so a restart can
+    /// rebind cleanly.
     socket_path: std::path::PathBuf,
 }
 
@@ -70,10 +67,7 @@ impl CommandChannel {
     /// channel. On bind failure the error is logged to `console` and `None` is
     /// returned — the windowed app keeps running without a command channel.
     pub fn start(console: &RefCell<ConsoleLogs>) -> Option<Self> {
-        #[cfg(unix)]
         let bind = |tx| transport::bind_and_listen(tx, transport::socket_path());
-        #[cfg(windows)]
-        let bind = transport::bind_and_listen;
         Self::listen(console, bind)
     }
 
@@ -91,7 +85,6 @@ impl CommandChannel {
                 ));
                 Some(Self {
                     rx,
-                    #[cfg(unix)]
                     socket_path: bound.path,
                 })
             }
@@ -136,7 +129,6 @@ impl CommandChannel {
     }
 }
 
-#[cfg(unix)]
 impl Drop for CommandChannel {
     fn drop(&mut self) {
         // Best-effort cleanup so a restart can rebind to the same path.

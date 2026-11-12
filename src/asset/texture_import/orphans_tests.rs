@@ -43,10 +43,8 @@ fn caches_of_gone_sources_and_of_baked_pages_are_orphans_and_the_rest_stay() {
     );
 }
 
-/// Unix only: there a path under a file answers `ENOTDIR`, an error that is not
-/// "not found"; Windows answers it with "path not found", which is gone, rightly
-/// (nothing can be at such a path), so it is no case of an unreadable source there.
-#[cfg(unix)]
+/// A path under a file answers `ENOTDIR`, an error that is not "not found", so the
+/// source is unreadable, not gone.
 #[test]
 fn a_source_that_cannot_be_read_is_not_gone() {
     let root = crate::test_temp::dir();

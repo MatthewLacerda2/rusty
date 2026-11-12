@@ -54,7 +54,6 @@ fn drain(pipe: Option<impl Read + Send + 'static>) -> std::thread::JoinHandle<Ve
     })
 }
 
-#[cfg(unix)]
 fn reap(child: &mut Child, start: Instant, ceiling: Duration) -> (ExitStatus, Duration, bool) {
     use std::os::unix::process::ExitStatusExt;
     let pid = i32::try_from(child.id()).expect("a pid fits pid_t");
@@ -73,26 +72,9 @@ fn reap(child: &mut Child, start: Instant, ceiling: Duration) -> (ExitStatus, Du
     }
 }
 
-/// Off Unix there is no rusage: the child's wall time stands in for its CPU time.
-#[cfg(not(unix))]
-fn reap(child: &mut Child, start: Instant, ceiling: Duration) -> (ExitStatus, Duration, bool) {
-    let mut killed = false;
-    loop {
-        if let Some(status) = child.try_wait().expect("the child waits") {
-            return (status, start.elapsed(), killed);
-        }
-        if start.elapsed() > ceiling && !killed {
-            child.kill().expect("the hung child is killed");
-            killed = true;
-        }
-        std::thread::sleep(Duration::from_millis(50));
-    }
-}
-
 /// `wait4(2)`, declared here: libc links into every Rust program on Unix, and
 /// `struct rusage` has the same 144-byte layout on 64-bit Linux and macOS but
 /// for `tv_usec`'s width.
-#[cfg(unix)]
 mod rusage {
     use std::time::Duration;
 

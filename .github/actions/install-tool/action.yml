@@ -92,16 +92,12 @@ runs:
       run: |
         set -euo pipefail
         mkdir -p ~/.rusty-tools/bin
-        # install-action puts a tool in ~/.cargo/bin on Linux and Windows and in
-        # ~/.install-action/bin on macOS; look in both, then on PATH. `.exe`
-        # first: Git Bash's `-f foo` is true for `foo.exe` too, and copying it as
-        # `foo` would leave cargo nothing to run on Windows.
+        # install-action puts a tool in ~/.cargo/bin on Linux and in
+        # ~/.install-action/bin on macOS; look in both, then on PATH.
         for name in $NAMES; do
           found=""
-          for candidate in ~/.install-action/bin/"$name" ~/.cargo/bin/"$name" "$(command -v "$name" || true)"; do
-            for path in "$candidate.exe" "$candidate"; do
-              if [ -z "$found" ] && [ -f "$path" ]; then found="$path"; fi
-            done
+          for path in ~/.install-action/bin/"$name" ~/.cargo/bin/"$name" "$(command -v "$name" || true)"; do
+            if [ -z "$found" ] && [ -f "$path" ]; then found="$path"; fi
           done
           [ -n "$found" ] || { echo "::error::install-tool: $name was installed but not found"; exit 1; }
           cp "$found" ~/.rusty-tools/bin/
@@ -123,8 +119,7 @@ runs:
       run: |
         set -euo pipefail
         bin=~/.rusty-tools/bin
-        # Windows' PATH takes `C:\…`, not Git Bash's `/c/…`.
-        if command -v cygpath >/dev/null; then cygpath -w "$bin"; else echo "$bin"; fi >> "$GITHUB_PATH"
+        echo "$bin" >> "$GITHUB_PATH"
         echo "install-tool: cache hit: ${HIT:-false} (${{ steps.pin.outputs.key }})"
         # Which copy runs, and its version: on a hit it must be the cached one.
         ls "$bin"

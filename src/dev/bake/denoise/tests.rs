@@ -51,8 +51,6 @@ fn a_library_that_loads_without_oidns_calls_is_passed_over() {
     // A system library every machine of that OS loads, with no OIDN symbols in it.
     let decoy = PathBuf::from(if cfg!(target_os = "macos") {
         "/usr/lib/libSystem.B.dylib"
-    } else if cfg!(windows) {
-        "kernel32.dll"
     } else {
         "libm.so.6"
     });

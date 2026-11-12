@@ -124,8 +124,7 @@ pub fn meta_path(source: &Path) -> PathBuf {
 /// that name each other (a hand edit) read as their own, warned once per file.
 pub fn load(source: &Path) -> Result<ImportSettings, ImportError> {
     let path = meta_path(source);
-    // Windows can briefly deny the open while a concurrent save replaces the file.
-    match fs::retry_transient(|| std::fs::read_to_string(&path)) {
+    match std::fs::read_to_string(&path) {
         Ok(text) => {
             let mut settings: ImportSettings =
                 serde_json::from_str(&text).map_err(|e| ImportError::Sidecar(e.to_string()))?;

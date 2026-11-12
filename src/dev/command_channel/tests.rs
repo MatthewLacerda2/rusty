@@ -58,7 +58,6 @@ fn local_channel() -> (Sender<Command>, CommandChannel) {
     let (tx, rx) = mpsc::channel::<Command>();
     let channel = CommandChannel {
         rx,
-        #[cfg(unix)]
         socket_path: std::path::PathBuf::from("/tmp/rusty-test-unused.sock"),
     };
     (tx, channel)
@@ -142,7 +141,6 @@ fn drain_replies_once_per_queued_command_in_order() {
     assert!(done(b_rx.recv().unwrap()).contains("\"result\":\"4\""));
 }
 
-#[cfg(unix)]
 #[test]
 fn start_binds_a_unix_socket_then_drops_cleanly() {
     // Point the channel at an isolated path so the test never collides with a
@@ -165,7 +163,6 @@ fn start_binds_a_unix_socket_then_drops_cleanly() {
 
 /// The editor sleeps outside Play (#1721): a command must wake it, or its client
 /// waits for a frame that nothing asks for.
-#[cfg(unix)]
 #[test]
 fn a_command_wakes_a_sleeping_window() {
     use std::io::Write;

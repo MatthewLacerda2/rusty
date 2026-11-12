@@ -117,7 +117,7 @@ pub fn base_source(pass: PassKind, engine_shaders: &str) -> Result<String, Strin
         PassKind::Ui => "ui.wgsl",
         PassKind::Postfx => return Ok(String::new()),
     };
-    // Splice points span lines, so a CRLF checkout (Windows) must not hide them.
+    // Splice points span lines, so a CRLF file (an editor's line endings) must not hide them.
     let source =
         std::fs::read_to_string(format!("{engine_shaders}/{file}")).map_err(|e| e.to_string())?;
     Ok(source.replace("\r\n", "\n"))

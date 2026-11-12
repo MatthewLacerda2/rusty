@@ -12,21 +12,15 @@
 //! where the socket is.
 
 use std::io::{self, BufRead, BufReader, Write};
+use std::os::unix::net::UnixStream;
 
 use super::transport;
-
-/// The platform connection type: a unix domain socket on unix, a loopback TCP stream
-/// on windows — mirroring the listener's two transports.
-#[cfg(unix)]
-type RawStream = std::os::unix::net::UnixStream;
-#[cfg(windows)]
-type RawStream = std::net::TcpStream;
 
 /// A connected line client: a buffered reader half and a writer half over one
 /// connection to a running engine's command socket.
 pub struct Client {
-    reader: BufReader<RawStream>,
-    writer: RawStream,
+    reader: BufReader<UnixStream>,
+    writer: UnixStream,
 }
 
 impl Client {
@@ -89,28 +83,15 @@ pub fn address_label(explicit: Option<&str>) -> String {
     }
 }
 
-#[cfg(unix)]
 fn default_address() -> String {
     transport::socket_path().display().to_string()
 }
-#[cfg(windows)]
-fn default_address() -> String {
-    transport::tcp_addr()
-}
 
-#[cfg(unix)]
-fn dial(explicit: Option<&str>) -> io::Result<RawStream> {
+fn dial(explicit: Option<&str>) -> io::Result<UnixStream> {
     let path = explicit
         .map(std::path::PathBuf::from)
         .unwrap_or_else(transport::socket_path);
-    RawStream::connect(&path)
-}
-#[cfg(windows)]
-fn dial(explicit: Option<&str>) -> io::Result<RawStream> {
-    let addr = explicit
-        .map(str::to_string)
-        .unwrap_or_else(transport::tcp_addr);
-    RawStream::connect(&addr)
+    UnixStream::connect(&path)
 }
 
 #[cfg(test)]
@@ -132,14 +113,11 @@ mod tests {
     #[test]
     fn connect_to_an_absent_address_is_an_io_error_not_a_panic() {
         // Nothing is listening here, so the dial must fail cleanly.
-        #[cfg(unix)]
         // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is ~104 bytes)
         let absent = std::env::temp_dir()
             .join(format!("rusty-client-absent-{}.sock", std::process::id()))
             .display()
             .to_string();
-        #[cfg(windows)]
-        let absent = "127.0.0.1:1".to_string();
         assert!(Client::connect(Some(&absent)).is_err());
     }
 }

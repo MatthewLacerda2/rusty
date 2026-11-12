@@ -59,9 +59,7 @@ from __future__ import annotations
 # a draft too, so it proves nothing ran. Matrix jobs report as
 # `build-test-cross (macos-latest)`; [`base`] strips the suffix. Anything else
 # on the commit — `main-health` (a `workflow_run` on `main`, never a PR check),
-# the coverage and mutation signals, the `windows` signal (#741: Windows
-# is not a shipped platform, so its run informs and never holds a merge) — is
-# not asked about, and counting it would be the same mistake in a new costume.
+# the coverage, mutation and nightly `cargo-test` signals — is not asked about, and counting it would be the same mistake in a new costume.
 WORKFLOWS: dict[str, tuple[str, tuple[str, ...]]] = {
     "ci": ("ci-gate", ("build-test", "build-test-cross", "blender", "deny")),
     "lint": ("lint-gate", ("lint",)),

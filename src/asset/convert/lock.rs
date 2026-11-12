@@ -1,9 +1,7 @@
 //! The lock that keeps two conversions of one cache from interleaving (#1166).
 //!
-//! A lock file of its own, never the source: Windows' locks are mandatory, so a
-//! lock on the source refuses the converter's own read of it, and an exporter that
-//! saves by renaming a new file over the source would hand the next conversion an
-//! unlocked file. The lock file stays when released: removing it would let a
+//! A lock file of its own, never the source: an exporter that saves by renaming a
+//! new file over the source would hand the next conversion an unlocked file. The lock file stays when released: removing it would let a
 //! waiter lock a file no newcomer opens.
 //!
 //! **Where it lives** (#1190): never beside the cache, which sits in `assets/`

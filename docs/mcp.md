@@ -144,8 +144,7 @@ paths resolve against it. Without it the bridge opens `./project`. It may sit be
 or after the scene argument, and a scene path is relative to the project root.
 
 `--attach` resolves the **same** socket address the window binds (so they always agree):
-on unix `$RUSTY_CMD_SOCK`, else `$XDG_RUNTIME_DIR/rusty.sock`, else `/tmp/rusty.sock`;
-on windows `$RUSTY_CMD_ADDR`, else `127.0.0.1:8787`. Pass `--attach <addr>` to override.
+`$RUSTY_CMD_SOCK`, else `$XDG_RUNTIME_DIR/rusty.sock`, else `/tmp/rusty.sock`. Pass `--attach <addr>` to override.
 The window must be built with `--features dev` for its socket to exist.
 
 ## Registering it with Claude Code

@@ -29,6 +29,7 @@ mod lua_path_slash;
 mod markers;
 mod named_enum;
 mod physics_borrow;
+mod platform_cfg;
 mod prefix;
 mod sanitize;
 mod self_path;
@@ -86,6 +87,7 @@ const RULES: &[(Rule, Allow)] = &[
     (markers::run, Allow::Inline),
     (named_enum::run, Allow::Inline),
     (physics_borrow::run, Allow::Inline),
+    (platform_cfg::run, Allow::Inline),
     (prefix::run, Allow::Inline),
     (sanitize::run, Allow::Inline),
     (self_path::run, Allow::Inline),

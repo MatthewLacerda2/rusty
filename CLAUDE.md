@@ -268,7 +268,7 @@ adapts it.
   never made by a test (traits and mocks). `docs/providers.md`.
 - **Use `glam`** for all math (`deny.toml` bans `cgmath`, and `nalgebra` outside
   physics); keep egui / wgpu / mlua decoupled. **Single crate.**
-- **Ships for macOS and Linux; Windows comes later.** Working on only one is not done.
+- **Ships for macOS and Linux**, no other platform (`platform-cfg`). Not done on one.
 - **Group by subfolder, not by filename prefix** (`draw_lighting.rs` →
   `draw/lighting.rs`): aim for ≲10 source files per module directory (`dir-size` fails
   past 12; components cluster by Unity's *Add Component* categories). **One exception:**

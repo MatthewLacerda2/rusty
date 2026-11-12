@@ -53,7 +53,6 @@ fn a_second_refresh_reads_no_unchanged_source_again() {
     assert!(reads >= 1);
 }
 
-#[cfg(unix)]
 #[test]
 fn a_symlinked_folder_is_not_followed() {
     let root = crate::test_temp::dir().join("assets");
