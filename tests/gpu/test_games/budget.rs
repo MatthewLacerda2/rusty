@@ -3,10 +3,13 @@
 //! at the hang guard. The children are `sleep` and `sh`, not games, so each
 //! proof costs a second or two.
 
+#[cfg(unix)]
 use std::process::Command;
 use std::time::Duration;
 
-use super::measure::{self, Measured};
+#[cfg(unix)]
+use super::measure;
+use super::measure::Measured;
 use super::HANG_FACTOR;
 
 /// Whether a run kept to `budget` of CPU time and finished before the hang
@@ -30,6 +33,9 @@ pub(super) fn verdict(name: &str, run: &Measured, budget: Duration) -> Result<()
     Ok(())
 }
 
+// The proofs run `sh` and read `wait4`'s CPU time: Unix only (off Unix the budget
+// falls back to wall time, which a sleeping child would fail).
+#[cfg(unix)]
 fn sh(script: &str, budget: Duration) -> Measured {
     measure::run(
         Command::new("sh").arg("-c").arg(script),
@@ -37,6 +43,7 @@ fn sh(script: &str, budget: Duration) -> Measured {
     )
 }
 
+#[cfg(unix)]
 #[test]
 fn a_child_that_sleeps_past_its_budget_passes() {
     let budget = Duration::from_millis(500);
@@ -48,10 +55,14 @@ fn a_child_that_sleeps_past_its_budget_passes() {
     assert_eq!(verdict("sleeper", &run, budget), Ok(()));
 }
 
+#[cfg(unix)]
 #[test]
 fn a_child_that_spins_past_its_budget_fails_naming_it() {
     let budget = Duration::from_millis(200);
-    let run = sh("while :; do :; done", budget);
+    // A ceiling well past budget × HANG_FACTOR, so the spinner collects its 0.2 s
+    // of CPU even with a fraction of a core beside two lavapipe games.
+    let mut spin = Command::new("sh");
+    let run = measure::run(spin.arg("-c").arg("while :; do :; done"), budget * 15);
     assert!(run.cpu > budget, "it spun only {:?}", run.cpu);
     let message = verdict("spinner", &run, budget).unwrap_err();
     assert!(message.starts_with("spinner: ") && message.contains("over its 0.2 s budget"));
@@ -61,6 +72,7 @@ fn a_child_that_spins_past_its_budget_fails_naming_it() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn a_child_that_hangs_is_killed_at_the_guard() {
     let budget = Duration::from_millis(200);
