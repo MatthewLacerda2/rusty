@@ -38,7 +38,7 @@ fn starter_materials_are_discoverable_via_manifest() {
     let entry = manifest
         .assets
         .iter()
-        .find(|a| a.path.replace('\\', "/").ends_with(STARTER))
+        .find(|a| a.path.ends_with(STARTER))
         .expect("starter.gltf is discovered under the project asset root");
     assert_eq!(
         entry.material_count,

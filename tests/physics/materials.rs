@@ -37,7 +37,7 @@ fn slab(scene: &mut Scene, z: f32, depth: f32, asset: Option<&str>) -> u32 {
 /// path, concrete path).
 fn range() -> (GameWorld, String, String) {
     let dir = crate::temp::dir();
-    let path = |n: &str| dir.join(n).to_string_lossy().replace('\\', "/");
+    let path = |n: &str| dir.join(n).to_string_lossy().into_owned();
     let (wood, concrete) = (path("wood.physmat"), path("concrete.physmat"));
     let mut s = Scene::new();
     slab(&mut s, 3.0, 0.5, Some(&wood));

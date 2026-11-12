@@ -27,7 +27,7 @@ fn layered_scene() -> (Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Soldier".to_string());
     let anim = AnimatorComponent {
-        graph: Some(path.to_string_lossy().replace('\\', "/")),
+        graph: Some(path.to_string_lossy().into_owned()),
         ..Default::default()
     };
     scene.world.set_animator(id, Some(anim));

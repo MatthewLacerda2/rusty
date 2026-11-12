@@ -22,7 +22,7 @@ fn a_scenarios_move_reaches_the_game_scripts_handler() {
     let lua = Lua::new();
     cells.install(&lua).expect("cells install");
     lua.globals()
-        .set("LISTENER", listener.to_string_lossy().replace('\\', "/"))
+        .set("LISTENER", listener.to_string_lossy().into_owned())
         .unwrap();
     crate::api::attempt(|| {
         super::super::register(&lua, &harness)?;

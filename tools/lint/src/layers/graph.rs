@@ -45,7 +45,7 @@ pub fn edges(tree: &Tree) -> Vec<Edge> {
         let Some(from) = owner(&tree.src, file) else {
             continue;
         };
-        let norm = file.to_string_lossy().replace('\\', "/");
+        let norm = file.to_string_lossy().into_owned();
         for Ref { line, module } in scan::refs(content) {
             if module != from {
                 out.push(Edge {

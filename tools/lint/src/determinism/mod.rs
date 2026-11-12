@@ -94,7 +94,7 @@ pub fn run() {
     walk(Path::new("src"), &mut files);
     files.sort();
     for path in files {
-        let norm = path.to_string_lossy().replace('\\', "/");
+        let norm = path.to_string_lossy().into_owned();
         let content = fs::read_to_string(&path).unwrap_or_default();
         violations.extend(opt_out_violations(&norm, &content, &roots));
     }
@@ -104,7 +104,7 @@ pub fn run() {
     }
     files.sort();
     for path in files {
-        let norm = path.to_string_lossy().replace('\\', "/");
+        let norm = path.to_string_lossy().into_owned();
         violations.extend(escapes::violations(
             &norm,
             &fs::read_to_string(&path).unwrap_or_default(),

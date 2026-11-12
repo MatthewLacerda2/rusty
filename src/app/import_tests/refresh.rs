@@ -11,7 +11,7 @@ use crate::asset::convert::{cached_gltf, conversion_allowed};
 use crate::scene::ScriptComponent;
 
 fn slashed(path: &Path) -> String {
-    path.to_string_lossy().replace('\\', "/")
+    path.to_string_lossy().into_owned()
 }
 
 #[test]

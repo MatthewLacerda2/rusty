@@ -11,9 +11,8 @@ use std::path::{Path, PathBuf};
 /// `path` relative to `root`, `/`-separated, when `path` lies under `root`; `None`
 /// otherwise (a relative path, another tree, `root` itself, or a remainder with a
 /// `..` that may climb back out). Purely lexical, comparing components exactly,
-/// so a symlinked spelling only matches itself — [`relativize`] resolves those. It
-/// reads both `/` and `\\` as separators, because a path inside a file authored
-/// with other tools (an FBX's texture paths) may arrive `\\`-spelled.
+/// so a symlinked spelling only matches itself — [`relativize`] resolves those.
+/// Only `/` separates: a `\` is a filename character on macOS and Linux.
 pub fn relative_to(path: &str, root: &str) -> Option<String> {
     let (path, root) = (components(path), components(root));
     if path.len() <= root.len() || root.is_empty() || path[..root.len()] != root[..] {
@@ -62,17 +61,15 @@ pub fn shown(real: &Path) -> String {
     to_slash(&real.canonicalize().unwrap_or_else(|_| real.to_path_buf()))
 }
 
-/// `path` as a `/`-separated string, the form scenes and the editor store (#939):
-/// every `\` becomes `/`, so a path read from a file authored with other tools
-/// (an FBX's texture paths) is stored like any other. Non-UTF-8 bytes are
-/// replaced lossily.
+/// `path` as the `/`-separated string scenes and the editor store (#939): the
+/// platform's own spelling, a `\` kept as the filename character it is. Non-UTF-8
+/// bytes are replaced lossily.
 pub fn to_slash(path: &Path) -> String {
-    path.to_string_lossy().replace('\\', "/")
+    path.to_string_lossy().into_owned()
 }
 
-/// `path` as a stored asset path is kept, so one file is one key: trimmed,
-/// [`to_slash`]ed, and without a leading `./` (`./assets\\a.cube` →
-/// `assets/a.cube`).
+/// `path` as a stored asset path is kept, so one file is one key: trimmed and
+/// without a leading `./` (` ./assets/a.cube` → `assets/a.cube`).
 pub fn stored(path: &str) -> String {
     let mut slashed = to_slash(Path::new(path.trim()));
     while let Some(rest) = slashed.strip_prefix("./") {
@@ -124,11 +121,11 @@ pub fn fold(path: &Path) -> PathBuf {
     out.iter().collect()
 }
 
-/// The path's components, split on `/` and `\\`, with empty or `.` components
+/// The path's components, split on `/`, with empty or `.` components
 /// dropped. A leading `/` leaves an empty first component, so absolute and
 /// relative paths never match.
 fn components(path: &str) -> Vec<&str> {
-    let mut parts: Vec<&str> = path.split(['/', '\\']).collect();
+    let mut parts: Vec<&str> = path.split('/').collect();
     let absolute = parts.first() == Some(&"");
     parts.retain(|p| !p.is_empty() && *p != ".");
     if absolute {

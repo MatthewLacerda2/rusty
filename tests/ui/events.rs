@@ -47,7 +47,7 @@ fn session(tag: &str) -> (GameWorld, Rc<RefCell<ConsoleLogs>>, u32, u32) {
     s.world
         .set_selectable(button, Some(SelectableComponent::default()));
     *s.world.scripts_mut(button).expect("scripts") = vec![ScriptComponent {
-        path: script.to_string_lossy().replace('\\', "/"),
+        path: script.to_string_lossy().into_owned(),
         ..Default::default()
     }];
     s.set_parent(button, Some(canvas)).expect("parent");

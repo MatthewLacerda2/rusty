@@ -34,7 +34,7 @@ impl Scan {
             .collect();
         let relative = |p: &Path| {
             let p = p.strip_prefix(base).unwrap_or(p);
-            p.to_string_lossy().replace('\\', "/")
+            p.to_string_lossy().into_owned()
         };
         let files: Vec<String> = found.iter().map(|p| relative(p)).collect();
         let sources: BTreeMap<String, String> = files

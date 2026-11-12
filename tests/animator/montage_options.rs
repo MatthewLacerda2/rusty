@@ -33,7 +33,7 @@ fn a_graph_that_fails_to_load_warns_and_plays_nothing() {
     let (scene, id) = with_flinch();
     let path = crate::temp::dir().join("rusty_1894_broken.animgraph");
     std::fs::write(&path, "{ \"nodes\": [ oops").unwrap();
-    let path = path.to_string_lossy().replace('\\', "/");
+    let path = path.to_string_lossy().into_owned();
     scene.borrow_mut().world.animator_mut(id).unwrap().graph = Some(path.clone());
     let (started, added) = eval(&scene, &format!("Animator.PlayMontage({id}, 'Flinch')"));
     assert!(!started, "never the clip of the same name");

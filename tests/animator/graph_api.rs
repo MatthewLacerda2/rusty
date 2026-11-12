@@ -41,7 +41,7 @@ fn saved_graph() -> String {
     };
     let path = crate::temp::dir().join("rusty_316_api.animgraph");
     animation_graph::save(&path, &graph).unwrap();
-    path.to_string_lossy().replace('\\', "/")
+    path.to_string_lossy().into_owned()
 }
 
 #[test]

@@ -25,7 +25,7 @@ fn fixture(tag: &str) -> (Rc<RefCell<Scene>>, u32, String) {
     scene.world.transform_mut(root).unwrap().position = Vec3::new(1.0, 2.0, 3.0);
     let dir = crate::temp::dir();
     let file = format!("rusty_prefab_api_{tag}_{}.prefab", std::process::id());
-    let path = dir.join(file).to_string_lossy().replace('\\', "/");
+    let path = dir.join(file).to_string_lossy().into_owned();
     (Rc::new(RefCell::new(scene)), root, path)
 }
 

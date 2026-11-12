@@ -32,7 +32,7 @@ return { Update = function(id)
 end }"#;
 
 fn slashed(p: std::path::PathBuf) -> String {
-    p.to_string_lossy().replace('\\', "/")
+    p.to_string_lossy().into_owned()
 }
 
 /// A scene holding `Bot`, an Animator on the one-state graph (written as

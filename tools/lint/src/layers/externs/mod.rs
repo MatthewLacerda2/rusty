@@ -47,7 +47,7 @@ fn uses(tree: &Tree, crates: &BTreeSet<String>) -> Vec<Use> {
         let Some(module) = owner(&tree.src, file) else {
             continue;
         };
-        let norm = file.to_string_lossy().replace('\\', "/");
+        let norm = file.to_string_lossy().into_owned();
         for r in find::crate_refs(content, crates) {
             out.push(Use {
                 module: module.clone(),

@@ -80,21 +80,23 @@ fn native_modules_stay_off() {
 pub(super) const SOURCE: &str = "local _, e = pcall(function() error('here') end) return e";
 
 #[test]
-fn a_project_module_is_named_with_slashes_only() {
+fn a_project_module_keeps_a_backslash_in_its_name() {
     let root = backslash_dir("slash_project");
     write(&root.join("assets/scripts/ui/axis.lua"), SOURCE);
     let (m, _) = manager(&root);
     let named = out(&m, "local s, o = require('ui.axis'); out = s .. '|' .. o");
-    assert!(!named.contains('\\'), "{named}");
     assert!(
-        named.contains("a/b/assets/scripts/ui/axis.lua:1: here|"),
+        named.contains(r"a\b/assets/scripts/ui/axis.lua:1: here|"),
         "{named}"
     );
-    assert!(named.ends_with("a/b/assets/scripts/ui/axis.lua"), "{named}");
+    assert!(
+        named.ends_with(r"a\b/assets/scripts/ui/axis.lua"),
+        "{named}"
+    );
 }
 
 #[test]
-fn a_package_path_module_is_named_with_slashes_only() {
+fn a_package_path_module_keeps_a_backslash_in_its_name() {
     let root = dir("slash_path_root");
     let lib = backslash_dir("slash_path_lib");
     write(&lib.join("shared.lua"), SOURCE);
@@ -103,13 +105,12 @@ fn a_package_path_module_is_named_with_slashes_only() {
     m.exec(&format!("package.path = [[{path}]]"))
         .expect("set path");
     let named = out(&m, "local s, o = require('shared'); out = s .. '|' .. o");
-    assert!(!named.contains('\\'), "{named}");
-    assert!(named.contains("a/b/shared.lua:1: here|"), "{named}");
-    assert!(named.ends_with("a/b/shared.lua"), "{named}");
+    assert!(named.contains(r"a\b/shared.lua:1: here|"), "{named}");
+    assert!(named.ends_with(r"a\b/shared.lua"), "{named}");
 }
 
 #[test]
-fn the_outside_warning_prints_a_slash_path() {
+fn the_outside_warning_keeps_a_backslash_in_its_path() {
     let root = dir("slash_warn_root");
     let lib = backslash_dir("slash_warn_lib");
     write(&lib.join("shared.lua"), "return 1");
@@ -119,8 +120,7 @@ fn the_outside_warning_prints_a_slash_path() {
     m.exec("require('shared')").expect("require");
     let warned = warnings(&console);
     let shown = warned[0].split(", outside").next().expect("path");
-    assert!(!shown.contains('\\'), "no `\\`: {shown}");
-    assert!(shown.ends_with("a/b/shared.lua"), "{shown}");
+    assert!(shown.ends_with(r"a\b/shared.lua"), "{shown}");
 }
 
 #[test]

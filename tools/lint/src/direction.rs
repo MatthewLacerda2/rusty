@@ -69,7 +69,7 @@ fn scan_file(path: &Path, violations: &mut Vec<String>) {
     let Ok(content) = fs::read_to_string(path) else {
         return;
     };
-    let norm = path.to_string_lossy().replace('\\', "/");
+    let norm = path.to_string_lossy().into_owned();
     for (i, code) in code_lines(&content).iter().enumerate() {
         for needle in banned_in(code) {
             violations.push(format!(

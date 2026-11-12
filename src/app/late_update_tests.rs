@@ -58,7 +58,7 @@ fn falling_body_world() -> GameWorld {
         }),
     );
     *s.world.scripts_mut(id).unwrap() = vec![ScriptComponent {
-        path: script.to_string_lossy().replace('\\', "/"),
+        path: script.to_string_lossy().into_owned(),
         ..Default::default()
     }];
 

@@ -105,8 +105,9 @@ fn the_editor_remembers_a_project_scene_by_its_relative_path() {
         Some(OTHER)
     );
     assert_eq!(
-        remember(Some("./assets\\x.scene"), None, false).as_deref(),
-        Some("assets/x.scene")
+        remember(Some(r"./assets\x.scene"), None, false).as_deref(),
+        Some(r"assets\x.scene"),
+        "a `\\` is part of the name"
     );
     assert_eq!(
         remember(None, Some(OTHER), false),

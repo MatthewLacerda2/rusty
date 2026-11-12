@@ -59,7 +59,7 @@ fn state_log(tag: &str, ticks: usize) -> Vec<String> {
     aim.name = "AimClip".to_string();
     mesh.clips.push(aim);
     drop(mesh);
-    let slashed = |p: std::path::PathBuf| p.to_string_lossy().replace('\\', "/");
+    let slashed = |p: std::path::PathBuf| p.to_string_lossy().into_owned();
     scene.world.animator_mut(hero).unwrap().graph = Some(slashed(graph_path));
     *scene.world.scripts_mut(hero).unwrap() = vec![ScriptComponent {
         path: slashed(script_path),

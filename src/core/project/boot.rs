@@ -77,8 +77,7 @@ pub fn scene_to_remember(
 ) -> Option<String> {
     let open = open.filter(|open| !playing && Some(*open) != last && !open.is_empty())?;
     let relative = paths::relativize(open, root);
-    let outside =
-        Path::new(&relative).is_absolute() || relative.split(['/', '\\']).any(|c| c == "..");
+    let outside = Path::new(&relative).is_absolute() || relative.split('/').any(|c| c == "..");
     (!outside).then(|| paths::stored(&relative))
 }
 

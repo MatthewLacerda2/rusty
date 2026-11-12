@@ -129,9 +129,7 @@ pub(super) fn read_md_dir(dir: &str) -> String {
 }
 
 fn normalize(path: &Path) -> String {
-    path.to_string_lossy()
-        .trim_start_matches("./")
-        .replace('\\', "/")
+    path.to_string_lossy().trim_start_matches("./").to_string()
 }
 
 #[cfg(test)]

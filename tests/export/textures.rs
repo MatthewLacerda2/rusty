@@ -53,7 +53,7 @@ fn a_texture_outside_assets_fails_the_export_naming_it() {
     std::fs::copy(fixture("textured_bricks.png"), &png).unwrap();
     // The fixture triangle, its texture pointed at `<game>/textures/gone.png`.
     let fbx = std::fs::read_to_string(fixture("missing_texture.fbx")).unwrap();
-    let at = png.to_string_lossy().replace('\\', "/");
+    let at = png.to_string_lossy().into_owned();
     let fbx = fbx
         .replace("\"/missing/gone.png\"", &format!("{at:?}"))
         .replace(

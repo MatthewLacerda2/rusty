@@ -118,7 +118,7 @@ fn collect(root: &Path, dir: &Path, files: &mut BTreeMap<String, Vec<u8>>) {
             collect(root, &path, files);
         } else {
             let rel = path.strip_prefix(root).unwrap().to_string_lossy();
-            files.insert(rel.replace('\\', "/"), std::fs::read(&path).unwrap());
+            files.insert(rel.into_owned(), std::fs::read(&path).unwrap());
         }
     }
 }

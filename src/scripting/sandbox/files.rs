@@ -108,8 +108,8 @@ fn install_searchers(lua: &Lua, access: &Rc<Access>) -> mlua::Result<()> {
 }
 
 /// `require`'s answer for a module found at `origin`: its chunk, and where it was.
-/// Every searcher answers through here, so every chunk name and origin is
-/// `/`-separated, whatever the OS (#1106).
+/// Every searcher answers through here, so every chunk name and origin is the
+/// path as the filesystem spells it, a `\` in a folder's name kept (#1106).
 fn found(lua: &Lua, code: &str, origin: &Path) -> mlua::Result<MultiValue> {
     let origin = to_slash(origin);
     let chunk = lua
@@ -120,7 +120,7 @@ fn found(lua: &Lua, code: &str, origin: &Path) -> mlua::Result<MultiValue> {
 }
 
 /// Looks a module up under `assets/scripts`. A name that maps to anything but
-/// a relative path of plain components (an empty segment, a `/`, a drive prefix)
+/// a relative path of plain components (an empty segment, a `/`, a `..`)
 /// is refused with a `require` error rather than "not found", so `package.path`
 /// is not tried for it either (#1391); `a.b` and `a.init`-style names resolve.
 fn project_searcher(lua: &Lua, access: Rc<Access>) -> mlua::Result<Function> {

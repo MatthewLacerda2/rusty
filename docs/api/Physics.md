@@ -398,7 +398,7 @@ is clamped), by convention under `assets/materials/` with the extension
 **Asset** field of the inspector's Collider card, or `Component.Set(id,
 "Collider", {material_asset = path})`) and then takes its values instead of its
 inline ones. All three refuse a path no asset loads from, and store the path in
-one form (trimmed, forward slashes, no leading `./`), so every spelling of one
+one form (trimmed, no leading `./`), so every spelling of one
 file names one material. Setting the inline values through `Component.Set`
 (`material = {…}`) keeps the asset; only `SetPhysicsMaterial` drops it. Unity's
 behaviour throughout:

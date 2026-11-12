@@ -19,11 +19,12 @@ fn two_runs_in_different_roots_store_the_same_path() {
 }
 
 #[test]
-fn a_backslash_spelled_path_from_an_imported_file_still_matches() {
+fn a_backslash_is_a_filename_character_not_a_separator() {
     assert_eq!(
-        relative_to(r"models\textures\a.png", "models").as_deref(),
-        Some("textures/a.png")
+        relative_to(r"/ws/models/a\b.png", "/ws/models").as_deref(),
+        Some(r"a\b.png")
     );
+    assert_eq!(relative_to(r"/ws\models/a.png", "/ws"), None, "one name");
 }
 
 #[test]
@@ -61,18 +62,19 @@ fn relativize_resolves_through_the_filesystem_and_leaves_the_rest() {
 }
 
 #[test]
-fn stored_trims_slashes_and_drops_a_leading_dot() {
-    assert_eq!(stored(" ./assets\\luts/a.cube \n"), "assets/luts/a.cube");
+fn stored_trims_and_drops_a_leading_dot_but_keeps_a_backslash() {
+    assert_eq!(stored(" ./assets/luts/a.cube \n"), "assets/luts/a.cube");
+    assert_eq!(stored(r"./assets\a.cube"), r"assets\a.cube");
     assert_eq!(stored(".//./a.cube"), "a.cube");
     assert_eq!(stored("/abs/a.cube"), "/abs/a.cube");
     assert_eq!(stored("../a.cube"), "../a.cube");
 }
 
 #[test]
-fn to_slash_turns_every_backslash_into_a_slash() {
+fn to_slash_keeps_a_backslash_as_part_of_a_name() {
     assert_eq!(
         to_slash(Path::new(r"assets\scripts/a.lua")),
-        "assets/scripts/a.lua"
+        r"assets\scripts/a.lua"
     );
     assert_eq!(to_slash(Path::new("/tmp/x")), "/tmp/x");
 }

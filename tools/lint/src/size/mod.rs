@@ -257,9 +257,7 @@ fn check_file(path: &Path) -> Option<String> {
 }
 
 fn normalize(path: &Path) -> String {
-    path.to_string_lossy()
-        .trim_start_matches("./")
-        .replace('\\', "/")
+    path.to_string_lossy().trim_start_matches("./").to_string()
 }
 
 fn report(violations: &[String], docs: &[String]) {
