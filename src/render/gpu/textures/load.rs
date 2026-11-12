@@ -51,6 +51,7 @@ impl Renderer {
             return Rc::clone(&self.default_texture);
         };
         self.texture_kinds.uploaded(path_str, kind);
+        self.uploads.add(compressed::gpu_bytes(&tex.texture));
         self.gpu_textures.insert(map.clone(), Rc::clone(&tex));
         tex
     }
@@ -75,6 +76,7 @@ impl Renderer {
         let Some(tex) = self.upload_map(map, kind) else {
             return Rc::clone(&self.default_texture);
         };
+        self.uploads.add(compressed::gpu_bytes(&tex.texture));
         self.texture_fallbacks.insert(map.clone(), Rc::clone(&tex));
         tex
     }

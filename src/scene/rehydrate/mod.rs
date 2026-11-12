@@ -56,6 +56,11 @@ impl RehydratedScene {
         &mut self.data
     }
 
+    /// The document, rehydrated: what a load's GPU warm-up reads (`render::warm`).
+    pub fn data(&self) -> &crate::scene::serialize::SceneData {
+        &self.data
+    }
+
     /// The document and its stamp, for `serialize`'s apply.
     pub(crate) fn into_parts(self) -> (crate::scene::serialize::SceneData, u64) {
         (self.data, self.read_at)

@@ -76,7 +76,7 @@ fn a_replaced_or_cancelled_job_is_abandoned() {
 fn an_abandoned_job_ends_without_its_bake() {
     // No navmesh beside it: a job left to run would bake one.
     let path = scene_file("abandoned");
-    let (rx, thread) = super::spawn(path, Arc::new(AtomicBool::new(true)));
+    let (rx, thread) = super::spawn(path, Arc::new(AtomicBool::new(true)), Default::default());
     thread.unwrap().join().expect("the thread ends");
     match rx.recv().unwrap() {
         Err(why) => assert_eq!(why, crate::app::ABANDONED),

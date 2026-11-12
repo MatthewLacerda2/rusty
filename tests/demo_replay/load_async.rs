@@ -12,7 +12,7 @@ use super::replay;
 
 /// The default scene, saved as `<dir>/level.scene` with no navmesh beside it, so
 /// the load bakes one (off the tick for `LoadAsync`).
-fn level(dir: &std::path::Path) -> String {
+pub(super) fn level(dir: &std::path::Path) -> String {
     std::fs::create_dir_all(dir).unwrap();
     let path = rusty::core::paths::to_slash(&dir.join("level.scene"));
     let mut scene = Scene::new();
@@ -21,15 +21,16 @@ fn level(dir: &std::path::Path) -> String {
     path
 }
 
-/// A loader that reports a job finished only `after` asks: a worker still running.
-struct Late {
+/// A loader that reports a job finished only `after` asks, and how far along it is
+/// meanwhile: a worker still running.
+pub(super) struct Late {
     inner: Inline,
     after: u32,
     asked: u32,
 }
 
 impl Late {
-    fn new(after: u32) -> Self {
+    pub(super) fn new(after: u32) -> Self {
         Self {
             inner: Inline::default(),
             after,
@@ -53,9 +54,12 @@ impl SceneLoader for Late {
     fn cancel(&mut self) {
         self.inner.cancel();
     }
+    fn progress(&mut self, _op: u32) -> f32 {
+        self.asked as f32 / (self.after + 1) as f32
+    }
 }
 
-fn eval(h: &Harness, code: &str) -> String {
+pub(super) fn eval(h: &Harness, code: &str) -> String {
     h.world.borrow().script_manager().eval(code).unwrap()
 }
 

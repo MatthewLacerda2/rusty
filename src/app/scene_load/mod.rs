@@ -24,7 +24,9 @@
 mod background;
 mod boot;
 
-pub use background::{prepare_in_background, Inline, Loading, SceneLoader, ABANDONED};
+pub use background::{
+    prepare_counted, prepare_in_background, Inline, Loading, SceneLoader, ABANDONED, PREPARE_STEPS,
+};
 #[cfg(test)]
 pub(crate) use boot::project_tests;
 pub use boot::{load_boot_scene, ProjectSource};
@@ -212,6 +214,9 @@ mod scene_load_play_state_tests;
 #[cfg(test)]
 #[path = "probe_tests.rs"]
 mod scene_load_probe_tests;
+#[cfg(test)]
+#[path = "progress_tests.rs"]
+mod scene_load_progress_tests;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod scene_load_tests;

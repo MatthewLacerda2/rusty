@@ -123,6 +123,7 @@ impl Renderer {
         let skin_bounds = SkinBounds::from_vertices(vertices);
         // Every retained object drawing this geometry re-reads its runs and bounds.
         self.retained.meshes.uploaded(&id);
+        self.uploads.add((v_bytes.len() + i_bytes.len()) as u64);
 
         // Re-use resident buffers when the new data still fits (a newer revision
         // of geometry already resident under this id). Both buffers carry COPY_DST

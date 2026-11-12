@@ -10,6 +10,15 @@ product name (the player's window title) and the window mode a first launch open
 | `Application.GetStartupScene` / `SetStartupScene` | `()` / `(path)` | `path` (an empty path is an error) |
 | `Application.GetProductName` / `SetProductName` | `()` / `(name)` | `name` |
 | `Application.GetWindowMode` / `SetWindowMode` | `()` / (`"Windowed"` \| `"Fullscreen"`) | the mode name / `bool` (`false`: unknown name, ignored) |
+| `Application.GetBackgroundLoadingPriority` / `SetBackgroundLoadingPriority` | `()` / (`"Low"` \| `"BelowNormal"` \| `"Normal"` \| `"High"`) | the priority name / `bool` (`false`: unknown name, ignored) |
+
+**`backgroundLoadingPriority`** is Unity's: how long a frame may spend on a
+`Scene.LoadAsync`'s main-thread work, its GPU warm-up ([`Scene.md`](Scene.md),
+*Loading in the background*): `Low` 2 ms, `BelowNormal` 4 ms (the default, as in
+Unity), `Normal` 10 ms, `High` 50 ms. A higher one loads sooner and costs the frames
+around it more. It is a setting of the run, not of the project file: every run starts
+at `BelowNormal`. It decides only how soon the operation reads ready, never what the
+game computes, and a headless run, which warms nothing, ignores it.
 
 **`Quit` means what the host says it means.** The call only records the request;
 the host acts on it after the tick:

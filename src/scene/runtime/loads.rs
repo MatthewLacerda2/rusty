@@ -89,6 +89,8 @@ pub struct SceneLoads {
     next_op: u32,
     pending: Option<Pending>,
     status: BTreeMap<u32, LoadStatus>,
+    /// How far the waiting operation is, in percent, as the host last published it.
+    loaded: u8,
 }
 
 impl SceneLoads {
@@ -101,6 +103,7 @@ impl SceneLoads {
     /// Open a `Scene.LoadAsync` operation for `path`, replacing any pending load.
     pub fn request_async(&mut self, path: String) -> u32 {
         self.replace();
+        self.loaded = 0;
         let op = self.open(LoadStatus::Loading);
         let (started, allow) = (false, true);
         self.pending = Some(Pending::Async(AsyncOp {
@@ -133,6 +136,29 @@ impl SceneLoads {
     /// Where operation `op` stands; `None` for one never opened this session.
     pub fn status(&self, op: u32) -> Option<LoadStatus> {
         self.status.get(&op).copied()
+    }
+
+    /// Unity's `AsyncOperation.progress` of `op`: a waiting operation's moves from 0
+    /// toward 0.9 as the host publishes it ([`Self::set_loaded`]), then as
+    /// [`LoadStatus::progress`]; `None` for one never opened this session.
+    pub fn progress(&self, op: u32) -> Option<f64> {
+        match self.waiting() == Some(op) {
+            true => Some(0.9 * f64::from(self.loaded) / 100.0),
+            false => self.status(op).map(LoadStatus::progress),
+        }
+    }
+
+    /// The waiting operation's progress, in percent, as last published.
+    pub fn loaded(&self) -> u8 {
+        self.loaded
+    }
+
+    /// The host's report at a tick head: the waiting operation `op` is `percent`
+    /// (0 to 100) of the way to ready. Ignored for any other operation.
+    pub fn set_loaded(&mut self, op: u32, percent: u8) {
+        if self.waiting() == Some(op) {
+            self.loaded = percent.min(100);
+        }
     }
 
     /// Unity's `allowSceneActivation` for the pending operation `op`: `false` when

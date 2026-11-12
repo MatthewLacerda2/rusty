@@ -207,9 +207,8 @@ pub(super) fn handle_window_event<F: Frontend>(
     }
 }
 
-/// One frame: advance the sim, apply the audio mix, act on play transitions and a
-/// quit request, apply scripted video settings, then let the frontend draw onto the
-/// swapchain.
+/// One frame: advance the sim, warm a pending `Scene.LoadAsync`, act on play
+/// transitions and a quit request, apply scripted video settings, then draw.
 fn run_frame<F: Frontend>(
     elwt: &ActiveEventLoop,
     shell: &mut Shell,
@@ -224,6 +223,7 @@ fn run_frame<F: Frontend>(
     pump_pads(shell, game, pads_live);
     let step = Step::of(&mut shell.ticks, &mut shell.renderer.draw_poses);
     let transition = frontend.advance(game, step, delta_time);
+    frame::load::warm::warm_load(&mut shell.renderer, game);
     if let Some(clipboard) = shell.clipboard.as_mut() {
         input::clipboard::apply_request(clipboard, &mut game.input().borrow_mut());
     }

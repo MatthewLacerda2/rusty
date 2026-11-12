@@ -42,6 +42,7 @@
 
 mod load;
 mod upload;
+mod warm;
 mod worker;
 
 use std::collections::HashMap;
@@ -75,6 +76,8 @@ pub(crate) struct Lightmaps {
     seen: u64,
     /// Read page lists in line rather than on a worker: a headless renderer.
     in_line: bool,
+    /// The arrays uploaded since the renderer last took them.
+    pub(crate) uploads: crate::render::stats::Uploads,
 }
 
 impl Lightmaps {
@@ -91,6 +94,7 @@ impl Lightmaps {
             fallback,
             seen: written_since(u64::MAX).0,
             in_line,
+            uploads: Default::default(),
         }
     }
 
@@ -145,7 +149,10 @@ impl Lightmaps {
                 // The loader died without an answer (it panicked): a failed load.
                 Err(TryRecvError::Disconnected) => Err("the page loader stopped".into()),
             };
-            *entry = Entry::Ready(finish(device, queue, list, result));
+            *entry = Entry::Ready(warm::counted(
+                &mut self.uploads,
+                finish(device, queue, list, result),
+            ));
             landed = true;
         }
         landed
@@ -179,11 +186,14 @@ impl Lightmaps {
         if pages.is_empty() {
             return None;
         }
-        let in_line = self.in_line;
+        let (in_line, uploads) = (self.in_line, &mut self.uploads);
         let entry = self.cache.entry(pages.to_vec()).or_insert_with(|| {
             let list = pages.to_vec();
             match in_line {
-                true => Entry::Ready(finish(device, queue, &list, load::load(&list, kind, bc))),
+                true => Entry::Ready(warm::counted(
+                    uploads,
+                    finish(device, queue, &list, load::load(&list, kind, bc)),
+                )),
                 false => Entry::Pending(start(list, kind, bc)),
             }
         });
