@@ -722,9 +722,15 @@ worktree writes its own `target/games/`. `gpu::test_games` runs `game --test` on
 every folder under `games/` in CI, one test per game so nextest runs them side by
 side (#2070).
 
-**Each game has a 90 s budget** for `game --test` at its defaults (`BUDGET` in
-`tests/gpu/test_games/mod.rs`): a game over it fails by name with its time, so the game
-whose defaults grew is the one made cheaper. Longer runs go behind a `--param`.
+**Each game has a 90 s budget of CPU time** for `game --test` at its defaults
+(`BUDGET` in `tests/gpu/test_games/mod.rs`): the test reaps the `game` child itself
+and reads its user + system time, so a busy machine (the nightly's one-process
+`cargo test`, where the games share the cores with the rest of the suite) slows a
+game's clock but not its budget. A game over it fails by name with its CPU time, so
+the game whose defaults grew is the one made cheaper. Wall time is only a hang
+guard: a game still running at 5× the budget is killed and fails as hung. CPU time
+counts every thread, so a game that renders on lavapipe can use more CPU than wall
+time. Longer runs go behind a `--param`.
 
 **Adding a game** is adding its folder and its line in the sorted `games!` list of
 `tests/gpu/test_games/mod.rs`; a folder with no line fails that file's check, naming it:
