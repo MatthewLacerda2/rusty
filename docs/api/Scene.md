@@ -258,7 +258,10 @@ scene — additive loading is not supported.
   to the console, and the current scene keeps running.
 - **Loading screens:** the load is synchronous at the tick's tail — there is no
   async/streamed loading. For a one-frame "Loading…" screen, activate a loading
-  canvas, then call `Scene.Load` on the next tick.
+  canvas, then call `Scene.Load` on the next tick. In a `dev` build each play-mode
+  load logs what it cost, step by step, as one `Scene load <path>: <ms> (…)`
+  console line, and `Debug.Stats()` keeps the same figures as `load_ms` and
+  `load_<step>_ms` (`Debug.md`).
 
 ### Prefabs
 
