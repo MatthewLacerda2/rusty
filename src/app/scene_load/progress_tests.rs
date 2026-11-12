@@ -108,3 +108,20 @@ fn a_replay_hands_back_the_recorded_progress_not_the_loaders() {
         "0.45"
     );
 }
+
+#[test]
+fn the_prepare_counts_the_steps_it_runs_a_saved_navmesh_skipping_the_bake() {
+    use crate::app::{prepare_counted, PrepareSteps};
+    let dir = crate::test_temp::dir().join("rusty_2123_steps");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = paths::to_slash(&dir.join("level.scene"));
+    Scene::new().save_to_file(&path).unwrap();
+    let run = || {
+        let steps = PrepareSteps::default();
+        prepare_counted(&path, &Default::default(), &steps).unwrap();
+        (steps.total(), steps.fraction())
+    };
+    assert_eq!(run(), (4, 1.0), "no navmesh: it is baked");
+    std::fs::write(crate::scene::nav_settings::navmesh_path(&path), b"saved").unwrap();
+    assert_eq!(run(), (3, 1.0), "saved: three steps, all of them done");
+}

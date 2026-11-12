@@ -25,7 +25,7 @@ mod background;
 mod boot;
 
 pub use background::{
-    prepare_counted, prepare_in_background, Inline, Loading, SceneLoader, ABANDONED, PREPARE_STEPS,
+    prepare_counted, prepare_in_background, Inline, Loading, PrepareSteps, SceneLoader, ABANDONED,
 };
 #[cfg(test)]
 pub(crate) use boot::project_tests;

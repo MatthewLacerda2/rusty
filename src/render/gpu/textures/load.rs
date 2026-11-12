@@ -88,10 +88,55 @@ impl Renderer {
     /// current one and its type fits `kind`; else it is decoded, fitted to its
     /// *Max Size* and its mips drawn on the GPU.
     pub(crate) fn upload_map(&self, map: &MapRef, kind: TextureKind) -> Option<Rc<GpuTexture>> {
-        let file = map.file()?;
-        let import = crate::asset::sidecar::texture(&file);
-        let compress = compressed::wanted_for(map.as_str(), self.device.features(), &import, kind);
-        let loaded = texture_import::load(&file, &import, kind, compress)?;
+        let decoded = decode(map, kind, self.device.features())?;
+        Some(self.upload_decoded(map, kind, decoded))
+    }
+
+    /// Cache `decoded`, the file `map` names read for `kind` off the frame thread
+    /// (`render::warm`), as [`Self::load_texture_as`] would have cached it: the
+    /// upload, its uncompressed copy where a cached upload cannot be read as `kind`,
+    /// or a miss when the file could not be read. Nothing when a lookup already
+    /// finds it.
+    pub(crate) fn install_decoded(
+        &mut self,
+        map: &MapRef,
+        kind: TextureKind,
+        decoded: Option<Decoded>,
+    ) {
+        if self.texture_for(map, kind).is_some() {
+            return;
+        }
+        let first = !self.gpu_textures.contains_key(map);
+        let Some(tex) = decoded.map(|d| self.upload_decoded(map, kind, d)) else {
+            if first {
+                self.texture_freshness.miss(map.as_str());
+            }
+            return;
+        };
+        self.uploads.add(compressed::gpu_bytes(&tex.texture));
+        match first {
+            true => {
+                self.texture_kinds.uploaded(map.as_str(), kind);
+                self.gpu_textures.insert(map.clone(), tex);
+            }
+            false => {
+                self.texture_kinds.requested(map.as_str(), kind, "material");
+                self.texture_fallbacks.insert(map.clone(), tex);
+            }
+        }
+    }
+
+    /// Whether a lookup of `map` for `kind` reads nothing from disk: it is cached,
+    /// remembered as a miss, or a render texture (never on disk).
+    pub(crate) fn texture_settled(&self, map: &MapRef, kind: TextureKind) -> bool {
+        self.texture_for(map, kind).is_some()
+            || self.texture_freshness.is_miss(map.as_str())
+            || crate::render::render_texture::is_render_texture(map.as_str())
+    }
+
+    /// The GPU half of [`Self::upload_map`]: `decoded` uploaded.
+    fn upload_decoded(&self, map: &MapRef, kind: TextureKind, decoded: Decoded) -> Rc<GpuTexture> {
+        let Decoded { import, loaded } = decoded;
         let srgb = !texture_import::is_linear(&import);
         let mut texture = match &loaded.texels {
             Texels::Blocks(blocks) => {
@@ -113,7 +158,7 @@ impl Renderer {
             Texels::Blocks(b) if b.format == texture_import::BlockFormat::Bc5 => Some(b.variance),
             _ => None,
         };
-        Some(Rc::new(texture))
+        Rc::new(texture)
     }
 
     /// Uploads a decoded image holding `kind`, with the mips and the sampler its
@@ -142,4 +187,22 @@ impl Renderer {
             Some(path_str),
         )
     }
+}
+
+/// An image file read, decoded and fitted for one slot, ready to upload: the file
+/// half of an upload, which runs on any thread.
+pub(crate) struct Decoded {
+    import: TextureSettings,
+    loaded: texture_import::Loaded,
+}
+
+/// Read the file `map` names for a slot holding `kind`, on a device with
+/// `features`: its import settings, then its compressed levels from the import
+/// cache or its decoded, fitted image. `None` when it cannot be read.
+pub(crate) fn decode(map: &MapRef, kind: TextureKind, features: wgpu::Features) -> Option<Decoded> {
+    let file = map.file()?;
+    let import = crate::asset::sidecar::texture(&file);
+    let compress = compressed::wanted_for(map.as_str(), features, &import, kind);
+    let loaded = texture_import::load(&file, &import, kind, compress)?;
+    Some(Decoded { import, loaded })
 }

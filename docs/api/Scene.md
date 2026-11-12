@@ -301,13 +301,19 @@ namespaces hand out ids, not objects, so Unity's `AsyncOperation` is polled thro
 - **The GPU warm-up:** before a windowed host reports the operation ready, the
   renderer uploads what the prepared scene draws with, while the current scene still
   draws: each mesh's buffers, every material map, the sky's panorama and the
-  lightmap pages. It spends at most a frame's budget at it, Unity's
+  lightmap pages. Image files are read and decoded on a worker thread; a frame only
+  uploads them. It spends at most a frame's budget at it, Unity's
   `Application.backgroundLoadingPriority` (`Application.SetBackgroundLoadingPriority`:
   4 ms a frame by default), and at least one resource a frame, so the new scene's
   first frame finds them made (`Debug.Stats()`'s `asset_uploads` reads `0` there).
+  The budget is checked between resources, so one resource can run past it by its
+  own GPU upload (a texture's levels and mips, a lightmap page array). A retry of the
+  level already loaded makes nothing: its meshes and maps are still resident.
   Still made on that frame: its material bind groups and object records, its
-  reflection probes' cubes, and the textures of its particles, ribbons, decals and
-  UI. Headless hosts warm nothing; their first frame uploads it all.
+  reflection probes' cubes, the meshes of its own library (`Mesh.Create`), a new
+  sky's panorama binding and reflection cube, the mesh of a `.prefab` edited since
+  the scene was saved, and the textures of its particles, ribbons, decals and UI.
+  Headless hosts warm nothing; their first frame uploads it all.
 - **What stays on the tick:** the swap itself — the outgoing scene's teardown, the
   World replaced, the physics world built and the navmesh restored.
 - **Loading screens:** a `DontDestroyOnLoad` canvas, shown before the call and

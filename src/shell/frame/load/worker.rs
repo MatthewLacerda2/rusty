@@ -13,27 +13,31 @@
 //! `LoadAsync` again before the last one finished, or a Stop mid-load, leaves no
 //! full preparation running beside the ticking thread.
 
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, TryRecvError};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
-use crate::app::{prepare_counted, SceneLoader, PREPARE_STEPS};
+use crate::app::{prepare_counted, PrepareSteps, SceneLoader};
 use crate::render::warm::Warming;
 use crate::scene::runtime::prepare::PreparedScene;
 use crate::scene::serialize::SceneData;
 
 type Prepared = Result<PreparedScene, String>;
 
+/// What the thread sends: the prepared scene, and its warm-up's plan when the loader
+/// warms (planned there too, so the tick thread never walks the document).
+type Answer = (Prepared, Option<Warming>);
+
 /// One operation's job: its thread's channel, the result once it came, the flag
 /// that abandons it (set when the job is dropped), the steps its thread passed, and
 /// the GPU warm-up of its scene once it is prepared.
 struct Job {
     op: u32,
-    rx: Receiver<Prepared>,
+    rx: Receiver<Answer>,
     done: Option<Prepared>,
     abandoned: Arc<AtomicBool>,
-    steps: Arc<AtomicU8>,
+    steps: Arc<PrepareSteps>,
     warm: Option<Warming>,
 }
 
@@ -48,7 +52,10 @@ impl Job {
     fn poll(&mut self) -> bool {
         if self.done.is_none() {
             self.done = match self.rx.try_recv() {
-                Ok(prepared) => Some(prepared),
+                Ok((prepared, warm)) => {
+                    self.warm = warm;
+                    Some(prepared)
+                }
                 Err(TryRecvError::Empty) => None,
                 Err(TryRecvError::Disconnected) => Some(Err(STOPPED.into())),
             };
@@ -56,30 +63,33 @@ impl Job {
         self.done.is_some()
     }
 
-    /// The prepared scene and its warm-up, planned on first ask; `None` before the
-    /// thread answered, or for a job that failed.
+    /// The prepared scene and its warm-up; `None` before the thread answered, for a
+    /// job that failed, or in a loader that does not warm.
     fn warming(&mut self) -> Option<(&SceneData, &mut Warming)> {
         let Some(Ok(prepared)) = &self.done else {
             return None;
         };
-        let warm = self
-            .warm
-            .get_or_insert_with(|| Warming::plan(prepared.data()));
-        Some((prepared.data(), warm))
+        Some((prepared.data(), self.warm.as_mut()?))
     }
 }
 
 /// Prepare `path` on a thread of its own, which checks `abandoned` between steps
-/// and counts them in `steps`.
+/// and counts them in `steps`, and plans its warm-up when `warms`.
 fn spawn(
     path: String,
     abandoned: Arc<AtomicBool>,
-    steps: Arc<AtomicU8>,
-) -> (Receiver<Prepared>, std::io::Result<JoinHandle<()>>) {
+    steps: Arc<PrepareSteps>,
+    warms: bool,
+) -> (Receiver<Answer>, std::io::Result<JoinHandle<()>>) {
     let (tx, rx) = channel();
     let thread = std::thread::Builder::new()
         .name("scene-load".into())
-        .spawn(move || drop(tx.send(prepare_counted(&path, &abandoned, &steps))));
+        .spawn(move || {
+            let prepared = prepare_counted(&path, &abandoned, &steps);
+            let plan = |p: &PreparedScene| Warming::plan(p.data());
+            let warm = prepared.as_ref().ok().filter(|_| warms).map(plan);
+            drop(tx.send((prepared, warm)));
+        });
     (rx, thread)
 }
 
@@ -114,8 +124,8 @@ impl SceneLoader for Threaded {
     fn start(&mut self, op: u32, path: String) {
         self.job = None; // the one before is abandoned first
         let abandoned = Arc::new(AtomicBool::new(false));
-        let steps = Arc::new(AtomicU8::new(0));
-        let (rx, spawned) = spawn(path, abandoned.clone(), steps.clone());
+        let steps = Arc::new(PrepareSteps::default());
+        let (rx, spawned) = spawn(path, abandoned.clone(), steps.clone(), self.warms);
         // No thread to be had: the job fails, and the current scene keeps running.
         let done = spawned
             .err()
@@ -146,8 +156,11 @@ impl SceneLoader for Threaded {
 
     fn take(&mut self, op: u32) -> Prepared {
         match self.job.take_if(|job| job.op == op) {
-            Some(mut job) => (job.done.take())
-                .unwrap_or_else(|| job.rx.recv().unwrap_or_else(|_| Err(STOPPED.into()))),
+            Some(mut job) => (job.done.take()).unwrap_or_else(|| {
+                job.rx
+                    .recv()
+                    .map_or_else(|_| Err(STOPPED.into()), |(p, _)| p)
+            }),
             None => Err(format!("no load operation {op} was started")),
         }
     }
@@ -163,8 +176,7 @@ impl SceneLoader for Threaded {
         let Some(job) = self.job.as_mut().filter(|job| job.op == op) else {
             return 0.0;
         };
-        let steps = job.steps.load(Ordering::Relaxed).min(PREPARE_STEPS);
-        let prepared = f32::from(steps) / f32::from(PREPARE_STEPS);
+        let prepared = job.steps.fraction();
         match (warms, job.warm.as_ref()) {
             (false, _) => prepared,
             (true, None) => prepared * 0.5,

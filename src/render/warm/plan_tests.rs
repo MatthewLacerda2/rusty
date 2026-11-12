@@ -1,10 +1,10 @@
-//! What a load's warm-up lists (#2123): each geometry once at its newest revision,
+//! What a load's warm-up lists (#2123): each geometry slot once, from its newest revision,
 //! each material map once as its slot reads it, the sky, and the lightmaps only
 //! when the scene has pages.
 
 use super::{Item, Warming};
 use crate::asset::MapRef;
-use crate::components::MaterialComponent;
+use crate::components::{MaterialComponent, MeshRevision};
 use crate::render::gpu::textures::TextureKind;
 use crate::scene::authoring::{primitive_mesh_component, Primitive};
 use crate::scene::serialize::{to_scene_data, SceneData};
@@ -40,7 +40,9 @@ fn data() -> SceneData {
 
 #[test]
 fn each_geometry_is_listed_once_by_its_newest_revision() {
-    let data = data();
+    let mut data = data();
+    // The second box edited since: its slot is uploaded from it.
+    data.entities[1].mesh.as_mut().unwrap().revision = MeshRevision::next();
     let warming = Warming::plan(&data);
     let meshes: Vec<usize> = (warming.items.iter())
         .filter_map(|i| match i {
@@ -49,23 +51,19 @@ fn each_geometry_is_listed_once_by_its_newest_revision() {
         })
         .collect();
     assert_eq!(meshes.len(), 2, "one box, one sphere: {:?}", warming.items);
-    let boxes = [&data.entities[0], &data.entities[1]];
-    let newest = boxes.map(|e| e.mesh.as_ref().unwrap().revision);
-    let newest = if newest[1] > newest[0] { 1 } else { 0 };
-    assert_eq!(meshes[0], newest, "the box at its newest revision");
+    assert_eq!(meshes[0], 1, "the box at its newest revision");
 }
 
 #[test]
 fn each_map_is_listed_once_as_its_slot_reads_it_and_no_lightmaps_without_pages() {
     let warming = Warming::plan(&data());
     let maps: Vec<&Item> = (warming.items.iter())
-        .filter(|i| matches!(i, Item::Map(..)))
+        .filter(|i| matches!(i, Item::Texture(..)))
         .collect();
-    let albedo = Item::Map(MapRef::from("albedo.png"), TextureKind::Colour);
-    let normal = Item::Map(MapRef::from("normal.png"), TextureKind::Normal);
-    assert_eq!(maps, [&albedo, &normal], "three wearers, two maps");
+    let albedo = Item::Texture(MapRef::from("albedo.png"), TextureKind::Colour);
+    let normal = Item::Texture(MapRef::from("normal.png"), TextureKind::Normal);
+    assert_eq!(maps, [&albedo, &normal], "three wearers, two maps, no sky");
     assert!(!warming.items.contains(&Item::Lightmaps));
-    assert!(!warming.items.iter().any(|i| matches!(i, Item::Sky(_))));
 }
 
 #[test]
@@ -74,7 +72,8 @@ fn a_sky_and_lightmap_pages_are_listed_and_progress_counts_what_is_made() {
     data.skybox_path = "sky.hdr".into();
     data.lightmaps.pages = vec!["page_0.ktx2".into()];
     let mut warming = Warming::plan(&data);
-    assert!(warming.items.contains(&Item::Sky("sky.hdr".into())));
+    let sky = Item::Texture(MapRef::from("sky.hdr"), TextureKind::Colour);
+    assert!(warming.items.contains(&sky), "as the panorama loads it");
     assert_eq!(
         warming.items.last(),
         Some(&Item::Lightmaps),

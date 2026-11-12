@@ -91,8 +91,7 @@ impl Renderer {
         let resident = |id: &MeshId| self.gpu_meshes.get(id).map(|g| g.revision);
         for (id, (revision, entity)) in stale_uploads(candidates, resident) {
             let mesh = scene.world.mesh(entity).expect("collected above");
-            self.update_gpu_mesh(id.clone(), revision, &mesh.vertices, &mesh.indices);
-            self.attach_clusters(&id, mesh.clusters());
+            self.upload_geometry(id, revision, &mesh);
         }
     }
 

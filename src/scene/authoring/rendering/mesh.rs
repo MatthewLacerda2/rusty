@@ -11,7 +11,7 @@
 use crate::components::mesh::primitives::MAX_PLANE_SUBDIVISIONS;
 use crate::components::{MeshComponent, ShadowCasting};
 use crate::scene::authoring::sanitize::{self, clamped, non_negative};
-use crate::scene::authoring::{subdivided_geometry, Primitive};
+use crate::scene::authoring::{primitive_revision, subdivided_geometry, Primitive};
 
 /// Cut a `Plane` into `subdivisions` quads per side and rebuild its geometry.
 /// Refuses a count outside `1..=`[`MAX_PLANE_SUBDIVISIONS`], and any count but 1 on
@@ -40,7 +40,7 @@ pub fn set_subdivisions(mesh: &mut MeshComponent, subdivisions: u32) -> Result<(
     mesh.subdivisions = subdivisions;
     mesh.vertices = vertices;
     mesh.indices = indices;
-    mesh.revision = crate::components::MeshRevision::next();
+    mesh.revision = primitive_revision(Primitive::Plane, subdivisions);
     Ok(())
 }
 

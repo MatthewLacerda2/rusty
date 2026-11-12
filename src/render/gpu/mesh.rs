@@ -42,3 +42,19 @@ pub fn vertex_layout() -> wgpu::VertexBufferLayout<'static> {
         attributes: &ATTRIBS,
     }
 }
+
+impl crate::render::Renderer {
+    /// Upload `mesh`'s geometry and clusters under `id` at `revision`: what the
+    /// extract (`upload_meshes_of`) and a load's warm-up (`render::warm`) both do
+    /// with each slot [`stale_uploads`](crate::render::debug_meshes::stale_uploads)
+    /// names, so the two can never upload differently.
+    pub(crate) fn upload_geometry(
+        &mut self,
+        id: MeshId,
+        revision: crate::components::MeshRevision,
+        mesh: &crate::scene::MeshComponent,
+    ) {
+        self.update_gpu_mesh(id.clone(), revision, &mesh.vertices, &mesh.indices);
+        self.attach_clusters(&id, mesh.clusters());
+    }
+}

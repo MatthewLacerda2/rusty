@@ -17,8 +17,10 @@ product name (the player's window title) and the window mode a first launch open
 *Loading in the background*): `Low` 2 ms, `BelowNormal` 4 ms (the default, as in
 Unity), `Normal` 10 ms, `High` 50 ms. A higher one loads sooner and costs the frames
 around it more. It is a setting of the run, not of the project file: every run starts
-at `BelowNormal`. It decides only how soon the operation reads ready, never what the
-game computes, and a headless run, which warms nothing, ignores it.
+at `BelowNormal`. The budget is checked between resources, so a frame runs past it
+by at most one upload (image files are decoded on a worker, never in the frame). It
+decides only how soon the operation reads ready, never what the game computes, and
+a headless run, which warms nothing, ignores it.
 
 **`Quit` means what the host says it means.** The call only records the request;
 the host acts on it after the tick:

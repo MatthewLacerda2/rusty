@@ -96,24 +96,53 @@ pub const ABANDONED: &str = "the load was abandoned";
 /// read, so a model written while it ran is still followed. `abandoned` is checked
 /// between steps: once set, the job ends at the next one with [`ABANDONED`].
 pub fn prepare_in_background(path: &str, abandoned: &AtomicBool) -> Result<PreparedScene, String> {
-    prepare_counted(path, abandoned, &AtomicU8::new(0))
+    prepare_counted(path, abandoned, &PrepareSteps::default())
 }
 
-/// How many steps [`prepare_counted`] counts at most: the read, the meshes, the
-/// navmesh bake's staging and the sidecars (one fewer when a navmesh is saved).
-pub const PREPARE_STEPS: u8 = 4;
+/// How far a [`prepare_counted`] is: the steps done of the steps it will run. It runs
+/// four (the read, the meshes, staging the navmesh bake, the bake) and three when a
+/// navmesh is saved beside the scene, which it learns from the sidecars before the
+/// meshes, so the count never plateaus on a step it skips.
+#[derive(Debug)]
+pub struct PrepareSteps {
+    done: AtomicU8,
+    total: AtomicU8,
+}
 
-/// [`prepare_in_background`], counting each step done in `steps` (up to
-/// [`PREPARE_STEPS`]), which a loader reads as its progress.
+impl Default for PrepareSteps {
+    fn default() -> Self {
+        Self {
+            done: AtomicU8::new(0),
+            total: AtomicU8::new(4),
+        }
+    }
+}
+
+impl PrepareSteps {
+    /// The steps done over the steps the job will run, from 0 to 1.
+    pub fn fraction(&self) -> f32 {
+        let total = self.total.load(Ordering::Relaxed).max(1);
+        let done = self.done.load(Ordering::Relaxed).min(total);
+        f32::from(done) / f32::from(total)
+    }
+
+    /// The steps the job will run, as it knows them now.
+    pub fn total(&self) -> u8 {
+        self.total.load(Ordering::Relaxed)
+    }
+}
+
+/// [`prepare_in_background`], counting each step done in `steps`, which a loader
+/// reads as its progress.
 pub fn prepare_counted(
     path: &str,
     abandoned: &AtomicBool,
-    steps: &AtomicU8,
+    steps: &PrepareSteps,
 ) -> Result<PreparedScene, String> {
     let step = || match abandoned.load(Ordering::Relaxed) {
         true => Err(ABANDONED.to_string()),
         false => {
-            steps.fetch_add(1, Ordering::Relaxed);
+            steps.done.fetch_add(1, Ordering::Relaxed);
             Ok(())
         }
     };
@@ -121,9 +150,12 @@ pub fn prepare_counted(
     let read_at = crate::core::fs::written::written_since(u64::MAX).0;
     let data = crate::scene::read_scene_file(path)?;
     step()?;
+    let sidecars = SceneSidecars::read(path);
+    if sidecars.has_navmesh() {
+        steps.total.store(3, Ordering::Relaxed); // no bake: its staging step is not run
+    }
     let document = RehydratedScene::read_since(data, read_at);
     step()?;
-    let sidecars = SceneSidecars::read(path);
     let baked = match sidecars.has_navmesh() {
         true => None,
         false => Some(bake_navmesh(&document, step)?),

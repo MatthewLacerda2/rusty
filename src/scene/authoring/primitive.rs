@@ -8,7 +8,7 @@
 use glam::Vec3;
 
 use crate::components::mesh::primitives;
-use crate::components::mesh::Vertex;
+use crate::components::mesh::{MeshRevision, Vertex};
 use crate::components::{CapsuleAxis, ColliderComponent, ColliderShape};
 use crate::scene::authoring::defaults::{default_collider, light};
 use crate::scene::rehydrate::bounds_of;
@@ -84,6 +84,29 @@ pub fn subdivided_geometry(
     geometry
 }
 
+/// The one revision of a primitive's geometry cut into `subdivisions`, for the
+/// whole process: the geometry is a pure function of the two, so every mesh holding
+/// it (created, loaded, reloaded, rebuilt by a prefab's propagation) carries the
+/// same revision, as every instance of one import carries its import's. A renderer
+/// that has it resident skips it, so a scene load's warm-up (`render::warm`) and
+/// a reload never upload a primitive twice, nor rewrite the drawing scene's buffers.
+pub fn primitive_revision(primitive: Primitive, subdivisions: u32) -> MeshRevision {
+    let cut = if primitive == Primitive::Plane {
+        subdivisions
+    } else {
+        1
+    };
+    static GIVEN: std::sync::Mutex<Vec<((Primitive, u32), MeshRevision)>> =
+        std::sync::Mutex::new(Vec::new());
+    let mut given = GIVEN.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((_, revision)) = given.iter().find(|(key, _)| *key == (primitive, cut)) {
+        return *revision;
+    }
+    let revision = MeshRevision::next();
+    given.push(((primitive, cut), revision));
+    revision
+}
+
 /// Build [`subdivided_geometry`]'s result afresh.
 fn generated(primitive: Primitive, subdivisions: u32) -> Option<(Vec<Vertex>, Vec<u32>)> {
     match primitive {
@@ -121,7 +144,9 @@ fn primitive_mesh_name(primitive: Primitive) -> Option<&'static str> {
 pub fn primitive_mesh_component(primitive: Primitive) -> Option<MeshComponent> {
     let name = primitive_mesh_name(primitive)?;
     let (vertices, indices) = primitive_geometry(primitive)?;
-    Some(MeshComponent::new(name, vertices, indices))
+    let mut mesh = MeshComponent::new(name, vertices, indices);
+    mesh.revision = primitive_revision(primitive, 1);
+    Some(mesh)
 }
 
 /// The default light for a light primitive (the hierarchy toolbar's values).

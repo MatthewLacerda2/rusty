@@ -10,6 +10,8 @@ use crate::asset::sidecar::{FilterMode, TextureSettings};
 use crate::asset::texture_import::variance::VarianceTable;
 use crate::asset::MapRef;
 use crate::render::Renderer;
+pub(crate) use freshness::texture_written;
+pub(crate) use load::{decode, Decoded};
 use mips::full_chain_len;
 pub(crate) use mips::{MipGenerator, MipSettings, TextureKind};
 pub(crate) use sampler::{sampler, ui_sampler};
