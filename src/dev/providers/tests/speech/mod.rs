@@ -42,7 +42,7 @@ fn naming_the_default_model_and_omitting_it_hash_alike() {
 
 #[test]
 fn every_vendor_model_id_is_accepted() {
-    for id in ["eleven_flash_v2_5", "eleven_multilingual_v2", "eleven_v3"] {
+    for id in ["eleven_flash_v2_5", "eleven_multilingual_v2", "eleven_v4"] {
         let brief = Draft {
             model: Some(id.into()),
             ..draft("Flank left!")
@@ -107,7 +107,7 @@ fn language_on_multilingual_v2_is_refused() {
     );
     assert!(why.to_string().contains("eleven_multilingual_v2"));
     // The models that honour it take it.
-    for id in ["eleven_flash_v2_5", "eleven_v3"] {
+    for id in ["eleven_flash_v2_5", "eleven_v4"] {
         let d = Draft {
             model: Some(id.into()),
             language: Some("pt".into()),
@@ -125,20 +125,20 @@ fn an_unknown_model_is_refused_naming_the_three() {
     };
     let why = d.gather().unwrap_err().to_string();
     assert!(
-        why.contains("eleven_turbo_v2_5") && why.contains("eleven_v3"),
+        why.contains("eleven_turbo_v2_5") && why.contains("eleven_v4"),
         "{why}"
     );
 }
 
 #[test]
 fn the_estimate_matches_the_rate_table() {
-    // Flash 5¢ and v3 10¢ per thousand characters, rounded up.
+    // Flash 4¢ and v4 8¢ per thousand characters, rounded up.
     let estimate = |d: Draft| estimate_cents(&d.gather().unwrap()).unwrap();
     assert_eq!(estimate(draft("Contact, second floor.")), 1);
-    assert_eq!(estimate(draft(&"a".repeat(3000))), 15);
-    let v3 = Draft {
-        model: Some("eleven_v3".into()),
+    assert_eq!(estimate(draft(&"a".repeat(3000))), 12);
+    let v4 = Draft {
+        model: Some("eleven_v4".into()),
         ..draft(&"a".repeat(3001))
     };
-    assert_eq!(estimate(v3), 31);
+    assert_eq!(estimate(v4), 25);
 }

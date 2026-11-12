@@ -12,7 +12,7 @@ use serde::Serialize;
 
 use super::super::generated::Brief;
 
-/// The model a brief that names none speaks with: Flash. `multilingual_v2` and `v3`
+/// The model a brief that names none speaks with: Flash. `multilingual_v2` and `v4`
 /// cost the same as each other, so the only real choice is *fast or not*, and a
 /// default nobody set should not quietly be the dearer one.
 pub const DEFAULT_MODEL: SpeechModel = SpeechModel::Fast;
@@ -28,7 +28,7 @@ pub struct SpeechBrief {
     /// expires on 2026-12-31, so a voice written here would be an outage with a date.
     pub voice: String,
     /// Which model reads it, serialised as the vendor's id (`eleven_flash_v2_5`,
-    /// `eleven_multilingual_v2`, `eleven_v3`). Always present, so naming the default
+    /// `eleven_multilingual_v2`, `eleven_v4`). Always present, so naming the default
     /// and omitting it hash alike.
     #[serde(serialize_with = "vendor_id")]
     pub model: SpeechModel,

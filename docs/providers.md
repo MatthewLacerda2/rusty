@@ -99,7 +99,7 @@ Every generated asset is in one of three states:
 | Verb | Vendor | Makes | Priced by |
 |---|---|---|---|
 | [`Sfx.Generate`](api/Sfx.md) (#388) | ElevenLabs sound generation | `sfx-<hash>.wav` | requested seconds × 0.4¢, rounded up (rusty's own rate, unverified and deliberately high: see the page) |
-| [`Speech.Generate`](api/Speech.md) (#386) | ElevenLabs text-to-speech | `speech-<hash>.wav` | characters × the model's rate (Flash 5¢ / 1000, multilingual v2 and v3 10¢), rounded up |
+| [`Speech.Generate`](api/Speech.md) (#386) | ElevenLabs text-to-speech | `speech-<hash>.wav` | characters × the model's rate (Flash 4¢ / 1000, multilingual v2 and v4 8¢), rounded up |
 | [`Speech.Voices` / `FindVoice` / `VoiceInfo`](api/Speech.md#where-a-voice-id-comes-from) (#387) | ElevenLabs voice listing | nothing (a list, cached under `cache/voices/`) | free: never charged to the budget |
 
 Rates are scorsese's dated tables (`scorsese_providers::prices`), read off the

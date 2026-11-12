@@ -34,7 +34,7 @@ Audio.PlayAt(wav, 0, 1.6, 4)
 |---|---|---|
 | `text` | required | The words. At most 40,000 characters. |
 | `voice` | required | An ElevenLabs voice id. **No default exists**: every vendor default voice expires on 2026-12-31. |
-| `model` | optional | `eleven_flash_v2_5` (**default**, 5¢ / 1000 chars), `eleven_multilingual_v2` (10¢), `eleven_v3` (10¢, most expressive). |
+| `model` | optional | `eleven_flash_v2_5` (**default**, 4¢ / 1000 chars), `eleven_multilingual_v2` (8¢), `eleven_v4` (8¢, most expressive). |
 | `language` | optional | ISO 639-1 code pinning the reading. Refused on `eleven_multilingual_v2`, which accepts it and silently ignores it. |
 | `seed` | optional | Integer. **Best-effort, not guaranteed**: the one place in the engine where "same input, same bytes" is a hope rather than a promise. |
 
