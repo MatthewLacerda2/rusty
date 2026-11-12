@@ -38,17 +38,32 @@ impl fmt::Display for Finding {
 }
 
 /// An allow comment on `line`: the rule it names, and its reason (maybe empty).
+/// The comment is Rust's `// lint: allow(<rule>) <why>` or Markdown's
+/// `<!-- lint: allow(<rule>) <why> -->`, whose reason ends at the `-->`.
 pub(super) fn parse_allow(line: &str) -> Option<(&str, &str)> {
+    let at = line.find(MARKER)?;
+    let before = &line[..at];
     // comment-cut: this reads the comment itself, never the code before it
-    let comment = &line[line.find("//")?..];
-    let rest = &comment[comment.find(MARKER)? + MARKER.len()..];
+    let html = match (before.rfind("<!--"), before.rfind("//")) {
+        (Some(h), Some(s)) => h > s,
+        (Some(_), None) => true,
+        (None, Some(_)) => false,
+        (None, None) => return None,
+    };
+    let rest = &line[at + MARKER.len()..];
     let close = rest.find(')')?;
-    Some((rest[..close].trim(), rest[close + 1..].trim()))
+    let why = &rest[close + 1..];
+    let why = if html {
+        why.split_once("-->").map_or(why, |(w, _)| w)
+    } else {
+        why
+    };
+    Some((rest[..close].trim(), why.trim()))
 }
 
 /// Is the 1-based `line` of `source` excused from `rule`? An allow counts on the
-/// line itself or in the unbroken run of comment and attribute lines above it,
-/// and only when it gives a reason.
+/// line itself or in the unbroken run of comment and attribute lines (Markdown's
+/// `<!-- … -->` among them) above it, and only when it gives a reason.
 pub fn allowed(source: &str, line: usize, rule: &str) -> bool {
     let lines: Vec<&str> = source.lines().collect();
     let Some(at) = line.checked_sub(1).filter(|&i| i < lines.len()) else {
@@ -62,7 +77,7 @@ pub fn allowed(source: &str, line: usize, rule: &str) -> bool {
         .iter()
         .rev()
         .map(|l| l.trim_start())
-        .take_while(|l| l.starts_with("//") || l.starts_with("#["))
+        .take_while(|l| l.starts_with("//") || l.starts_with("#[") || l.starts_with("<!--"))
         .any(excuses)
 }
 
@@ -120,6 +135,19 @@ mod tests {
         assert_eq!(found[0].line, 1);
         assert_eq!(found[0].rule, ALLOW);
         assert!(unexplained("x.rs", "// lint: allow(skip) flaky driver\n").is_empty());
+    }
+
+    #[test]
+    fn the_markdown_form_reads_its_reason_up_to_the_comment_close() {
+        let md = "<!-- lint: allow(history) a quoted message -->";
+        assert_eq!(parse_allow(md), Some(("history", "a quoted message")));
+        let bare = format!("<!-- lint: {}allow(history) -->", "");
+        assert_eq!(parse_allow(&bare), Some(("history", "")));
+        let url = "see https://x.y <!-- lint: allow(history) why --> tail";
+        assert_eq!(parse_allow(url), Some(("history", "why")));
+        let src = format!("{md}\nsee #12\n");
+        assert!(allowed(&src, 2, "history"));
+        assert!(!allowed(&format!("{bare}\nsee #12\n"), 2, "history"));
     }
 
     #[test]

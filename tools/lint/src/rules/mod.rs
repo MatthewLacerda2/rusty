@@ -42,7 +42,7 @@ mod test_shape;
 mod unwrap;
 mod world_space;
 
-pub use finding::{allowed, Finding};
+pub use finding::{allowed, unexplained, Finding};
 use scan::Scan;
 use std::collections::BTreeMap;
 use std::fs;

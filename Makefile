@@ -87,11 +87,11 @@ check: target-dir fmt size ## Fast edit loop: formatting, size gate, dev-feature
 	cargo clippy --all-targets --features dev
 
 # tools/lint is its own crate, out of `--all`'s reach: formatted only when staged (#1096).
-pre-commit: ## What the commit hook runs: formatting + size gate on staged .rs, .py, .lua and .wgsl files
+pre-commit: ## What the commit hook runs: formatting + size gate on staged .rs, .py, .lua, .wgsl and .md files
 	@cargo fmt --all --check
 	@if git diff --cached --name-only --diff-filter=ACMR -- tools/lint | grep -q .; then \
 		cargo fmt --manifest-path tools/lint/Cargo.toml --check; fi
-	@files="$$(git diff --cached --name-only --diff-filter=ACMR -- '*.rs' '*.py' '*.lua' '*.wgsl')"; \
+	@files="$$(git diff --cached --name-only --diff-filter=ACMR -- '*.rs' '*.py' '*.lua' '*.wgsl' '*.md')"; \
 		if [ -n "$$files" ]; then $(LINT) -- $$files; fi
 
 # `git rebase --continue` and `--no-verify` skip the commit hook; the push hook covers them (#1096).
@@ -133,7 +133,7 @@ fmt: ## [gate] rustfmt, engine and tools/lint
 	cargo fmt --all --check
 	cargo fmt --manifest-path tools/lint/Cargo.toml --check
 
-size: ## [gate] File-length cap on .rs, .py, .lua and .wgsl, full scan (tools/lint)
+size: ## [gate] File-length cap on .rs, .py, .lua and .wgsl, and the agent docs' shape (CLAUDE.md, skills), full scan (tools/lint)
 	$(LINT)
 
 rules: ## [gate] Finding-based rules with inline allows, one module each in tools/lint/src/rules (docs/linting.md lists them)

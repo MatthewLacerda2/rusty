@@ -34,7 +34,7 @@ jobs:
   # On a push to `main` the filter diffs the merge commit, as ci.yml's does, so a
   # Markdown-only merge skips too; `code` is also 'false' when a recent
   # successful lint run already linted this very tree (#1784; ci.yml's `changes`
-  # job says how). The docrefs step is unguarded and still runs.
+  # job says how). The docrefs and size-gate steps are unguarded and still run.
   changes:
     timeout-minutes: 5
     runs-on: ubuntu-24.04
@@ -85,8 +85,10 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      # Unguarded: it installs `rust-toolchain.toml`'s channel, which the
+      # unguarded size gate builds `tools/lint` with, as a setup step
+      # (`merging/verdict/setup.py`), so a failed download is read as the runner's.
       - name: Ensure rustfmt + clippy
-        if: needs.changes.outputs.code != 'false'
         run: rustup component add rustfmt clippy
       # Only `main` saves (#482) — see the note on ci.yml's first cache step.
       - name: Cache cargo registry + target
@@ -113,8 +115,11 @@ jobs:
         run: |
           cargo fmt --all --check
           cargo fmt --manifest-path tools/lint/Cargo.toml --check
-      - name: Size gate (full scan, .rs and .py; nothing grandfathered)
-        if: needs.changes.outputs.code != 'false'
+      # Not guarded on `code` either: the size gate also holds the agent docs
+      # (every `CLAUDE.md` and skill file, docs/linting.md *Agent docs*), which a
+      # Markdown-only PR is exactly where they grow. `tools/lint` is std-only and
+      # builds cold in seconds, so it needs neither the cache nor the libs.
+      - name: Size gate (full scan, code and agent docs; nothing grandfathered)
         run: cargo run --quiet --manifest-path tools/lint/Cargo.toml
       - name: Rules (prefix-group; shared Finding + inline allow)
         if: needs.changes.outputs.code != 'false'

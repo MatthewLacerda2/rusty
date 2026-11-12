@@ -174,6 +174,10 @@ def needs_check(pull: dict, opts: argparse.Namespace) -> bool:
 
 def needs_lint(pull: dict, opts: argparse.Namespace) -> bool:
     """Whether `tools/lint`'s passes run on this pull request's update
-    ([`lints.Linter.check`], #1956): `--no-check` or not, never in a dry run or
-    for a Markdown-only branch."""
-    return not (opts.dry_run or changes.markdown_only(github.paths(pull)))
+    ([`lints.Linter.check`], #1956): `--no-check` or not, never in a dry run, and
+    for a Markdown-only branch only when it touches an agent doc
+    ([`changes.agent_doc`]), which the size pass holds to its caps: two such
+    branches can each fit and overflow merged."""
+    paths = github.paths(pull)
+    docs_only = changes.markdown_only(paths) and not any(map(changes.agent_doc, paths))
+    return not (opts.dry_run or docs_only)

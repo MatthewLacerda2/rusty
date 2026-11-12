@@ -28,6 +28,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Check | Tool | Rule |
 |---|---|---|
 | Active in the hierarchy | `tools/lint -- --rules` (`active-self`) | **hard gate**: outside `src/ecs/`, no non-test line of `src/` calls `is_active_self(` — systems ask `World::is_active_in_hierarchy`, so an inactive parent hides its subtree; what shows or stores the own flag takes `// lint: allow(active-self) <why>` (#1363) |
+| Agent docs keep their shape | `tools/lint` (the size gate: `claude-md`, `skill`, `history`) | **hard gate**: every tracked `CLAUDE.md` is ≤ 300 lines and every tracked file of a skill folder (`.claude/skills/<folder>/`) ≤ 500, every line counted; a `SKILL.md` opens with the frontmatter Claude Code loads it by (`name` = its folder, ≤ 64 of `[a-z0-9-]`; `description` non-empty, ≤ 1024 characters), and a skill folder has one; no issue or PR number (`#123`, `owner/repo#123`, `…/issues/123`, `…/pull/123`) or `YYYY-MM-DD` date in them. Runs on Markdown-only PRs too; exceptions are `<!-- lint: allow(<rule>) <why> -->` (*Agent docs*, below) |
 | Asset writes tell the caches | `tools/lint -- --rules` (`asset-write`) | **hard gate**: a non-test line of `src/` outside `src/core/fs/` that calls `fs::write(`, `File::create(`, `.save(<arg>)` or any `write_atomic(` (#2005; a whole identifier, outside string literals) has a `note_written` later in its function, or `// lint: allow(asset-write) <why>` (a file no path-keyed cache reads) (#1220) |
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (default, `--features dev`, and `--no-default-features` — the editor-free player build), plus `tools/lint` itself (#935) |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), or a written waiver (`WAIVERS`) |
@@ -118,7 +119,7 @@ can't list them (a tarball with no `.git`) it walks the disk and says so on stde
 The code gates (rules, layers, determinism, direction, components, parity) keep
 walking the disk: they check what cargo compiles, and an ignored `.rs` file is
 compiled all the same, which is the file the `ignored` rule flags.
-The commit hook checks whatever `.rs`, `.py`, `.lua` and `.wgsl` files are staged, wherever they live.
+The commit hook checks whatever `.rs`, `.py`, `.lua`, `.wgsl` and `.md` files are staged, wherever they live (a `.md` only when it is an agent doc, below).
 
 ## Run it
 ```
@@ -140,7 +141,7 @@ round, so the gate list cannot silently lose a gate. `GATES` is `QUICK_GATES` pl
 ## Where it runs
 - **Commit hook:** `.githooks/pre-commit` → `make pre-commit`: `cargo fmt --check`
   (and `tools/lint`'s, when a staged file is under it) and the size gate on the staged
-  `.rs`, `.py`, `.lua` and `.wgsl` files — nothing else, so it stays under a
+  `.rs`, `.py`, `.lua`, `.wgsl` and `.md` files — nothing else, so it stays under a
   second. Activate it once per clone with `make setup` (cloud sessions do it in
   `.claude/hooks/session-start.sh`). `git commit --no-verify` skips it; CI doesn't.
   `make setup` also switches the worktrees' compile cache on when sccache is
@@ -207,6 +208,40 @@ component and parity burn-down lists had all emptied, and an empty list is
 machinery for an exception that no longer exists, so #926 retired them. An exception
 a check does need is written inline beside what it excuses, with its reason (the
 component `WAIVERS`, the rules gate's `lint: allow`), never in an unread list.
+
+## Agent docs (the size gate)
+The files an agent loads as instructions, every tracked `CLAUDE.md` (the root and the
+nested ones) and every tracked file of a skill under `.claude/skills/<folder>/`, are
+held to their shape by the size gate (`tools/lint/src/agent_docs/`), so a prune or a
+split stays true instead of growing back. Three rules:
+
+- **`claude-md`**: a `CLAUDE.md` is at most 300 lines, **every** line counted, blank
+  ones too: the whole file is read into context on every load.
+- **`skill`**: every file of a skill folder is at most 500 lines; its `SKILL.md`
+  opens with `---`, a `name:` equal to the folder's name (≤ 64 characters, only
+  `a-z`, `0-9` and `-`) and a non-empty `description:` of at most 1024 characters,
+  and a closing `---`. Those are the limits Claude Code loads a skill by: one
+  outside them is skipped without a word, so the gate says it at commit time. A
+  skill folder without a `SKILL.md` fails, since it is never loaded.
+- **`history`**: no `#123`, `owner/repo#123`, `…/issues/123`, `…/pull/123` or
+  `YYYY-MM-DD` date. An agent doc states the rule; its story lives in the issue and
+  PR, which `git log -S` finds. Placeholders (`#N`), hex colours (`#33ccff`, `#0f0`:
+  no issue number opens with `0`), HTML entities (`&#123;`), version strings and
+  digit runs that are no calendar date pass; a colour of only digits (`#333333`)
+  reads as a number.
+
+Only **tracked** files are read (`git ls-files`), so a scratch `CLAUDE.md` nobody
+added is not judged, and `.claude/` is reached though it is a dot-directory. The
+commit hook checks the staged agent docs (the folder-has-a-`SKILL.md` check needs
+the whole tree, so it waits for `make size`). CI runs the size gate on Markdown-only
+pull requests too, beside `docrefs`, and the merge queue lints a Markdown-only
+branch's merged tree when it touches an agent doc (`checks.needs_lint`), since two
+such branches can each fit and overflow merged.
+
+An exception is inline, with its reason: `<!-- lint: allow(<rule>) <why> -->` on the
+flagged line or in the comment lines right above it; a length cap belongs to no
+line, so an allow anywhere in the file excuses it. An allow without a reason is
+itself a finding (`[allow]`), as in Rust.
 
 ## Rules, findings and inline allows (`--rules`)
 `--rules` runs every check built on one shared shape (#934): a rule reports

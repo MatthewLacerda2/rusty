@@ -116,6 +116,12 @@ class Which(unittest.TestCase):
         pull = {**READY, "files": [{"path": "docs/notes.md"}]}
         self.assertFalse(checks.needs_lint(pull, self.opts(no_check=True)))
 
+    def test_a_markdown_only_branch_touching_an_agent_doc_is_linted(self):
+        for doc in ("CLAUDE.md", "src/render/CLAUDE.md", ".claude/skills/ci-merge/SKILL.md"):
+            pull = {**READY, "files": [{"path": "docs/notes.md"}, {"path": doc}]}
+            self.assertTrue(checks.needs_lint(pull, self.opts(no_check=True)), doc)
+            self.assertFalse(checks.needs_check(pull, self.opts()), "still never compiled")
+
 
 class Taken(unittest.TestCase):
     take = test_taking.Taking.take
