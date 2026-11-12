@@ -79,8 +79,9 @@ pub struct NavigationGraph {
     /// The play loop's view of the static geometry's changes (#1707,
     /// `bake::still`); `None` until `start_tracked` or `sync_changes` opens it.
     pub(super) static_watch: Option<super::bake::StaticWatch>,
-    /// The scene the play loop last started on (`bake::still::start_tracked`).
-    pub(super) tracked_scene: Option<crate::scene::SceneId>,
+    /// The scene the play loop last started on (`bake::still::start_tracked`), and
+    /// how that start made the navmesh.
+    pub(super) tracked_scene: Option<(crate::scene::SceneId, super::Start)>,
     /// The reusable per-span search state (#2083, `pool`): A\* starts in O(1)
     /// instead of filling navmesh-sized arrays per query.
     pub(super) search: super::pool::SearchScratch,
