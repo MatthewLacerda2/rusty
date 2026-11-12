@@ -27,9 +27,7 @@ impl Harness {
     /// absent on the first run and present afterwards, breaking byte-determinism.
     pub fn new(out_dir: impl AsRef<Path>, bot_script: &str) -> Self {
         let workspace = Self::workspace_of(&out_dir);
-        let samples = fixture_project().join(crate::core::paths::native(
-            crate::scene::DEFAULT_SCRIPTS_DEST_DIR,
-        ));
+        let samples = fixture_project().join(crate::scene::DEFAULT_SCRIPTS_DEST_DIR);
         crate::scene::seed_workspace(&workspace, Some(&samples));
         // The default scene's texture and shader, seeded into the working directory
         // when missing (the shader also re-baked when stale, #1638); only

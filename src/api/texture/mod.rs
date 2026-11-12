@@ -168,10 +168,8 @@ mod tests {
         register(&lua).unwrap();
         let path = crate::test_temp::dir().join("rusty_texture_api_bake.png");
         let p = path.to_str().unwrap();
-        // Pass the path as a Lua global *value*, not interpolated into the Lua source:
-        // a Windows path (`C:\Users\…`) embedded in a Lua string literal trips Lua's
-        // escape parser (`\U` is an invalid escape). As a global it's a plain string,
-        // safe on every platform.
+        // Pass the path as a Lua global *value*, not interpolated into the Lua
+        // source, so no character of it is read as Lua syntax.
         lua.globals().set("OUT", p).unwrap();
         let script = r#"
             return Texture.Bake({

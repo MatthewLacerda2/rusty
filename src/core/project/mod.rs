@@ -188,8 +188,7 @@ static MOVES: AtomicU64 = AtomicU64::new(0);
 /// and check its engine. Returns what it found and the progress lines to report.
 pub(crate) fn prepare(dir: &Path, access: Access) -> Result<(Opened, Vec<String>), String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    let root =
-        crate::core::paths::canonicalize(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let root = std::fs::canonicalize(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     create_skeleton(&root)?;
     let (engine, file, lines) = match access {
         Access::Edit => {

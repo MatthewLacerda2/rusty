@@ -207,14 +207,13 @@ pub fn apply_lighting_sidecar(scene: &mut Scene, file: LightingFile) -> Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::paths::native;
     use glam::Vec3;
 
     #[test]
     fn sidecar_path_appends_suffix() {
         assert_eq!(
             sidecar_path("a/foo.scene"),
-            native("a/foo.scene.lighting.json")
+            PathBuf::from("a/foo.scene.lighting.json")
         );
     }
 

@@ -228,12 +228,11 @@ mod tests {
     #[test]
     fn a_scenes_bake_reports_are_left_out_and_everything_else_is_compared() {
         let dir = crate::test_temp::dir().join("bake-reports");
-        let native = crate::core::paths::native;
         let differing = [
-            native("assets/scenes/x.scene.bake/probes.json"),
-            native("assets/scenes/x.scene.bake/sub/probes.json"),
-            native("assets/bread.bake/probes.json"),
-            native("assets/scenes/x.scene.lighting.json"),
+            std::path::PathBuf::from("assets/scenes/x.scene.bake/probes.json"),
+            std::path::PathBuf::from("assets/scenes/x.scene.bake/sub/probes.json"),
+            std::path::PathBuf::from("assets/bread.bake/probes.json"),
+            std::path::PathBuf::from("assets/scenes/x.scene.lighting.json"),
         ];
         for (side, text) in [("a", "1"), ("b", "2")] {
             for rel in &differing {

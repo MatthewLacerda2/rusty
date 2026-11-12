@@ -18,7 +18,7 @@ mod run;
 
 pub(super) fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join(crate::core::paths::native("tests/fixtures/models"))
+        .join("tests/fixtures/models")
         .join(name)
 }
 

@@ -40,14 +40,12 @@ fn runtime_spawned_prefab_scripts_run_from_the_next_tick() {
 
     // The live scene: a spawner whose first Update instantiates that prefab.
     let spawner_lua = &temp_path("rusty_322_spawner.lua");
-    // Forward slashes in the Lua literal: a Windows `\` would be a Lua escape.
-    let prefab_lua = prefab.replace('\\', "/");
     std::fs::write(
         spawner_lua,
         format!(
             "return {{ Update = function(id, dt)\n\
              if not _G.__spawned then _G.__spawned = true; \
-             Scene.Instantiate('{prefab_lua}') end\nend }}"
+             Scene.Instantiate('{prefab}') end\nend }}"
         ),
     )
     .unwrap();

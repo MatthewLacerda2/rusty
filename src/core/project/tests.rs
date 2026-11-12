@@ -4,7 +4,6 @@
 
 use super::locate::{find_engine_dir, find_packaged_project};
 use super::*;
-use crate::core::paths::native;
 
 fn fresh(name: &str) -> PathBuf {
     let dir = crate::test_temp::dir().join("project_seam").join(name);
@@ -20,7 +19,10 @@ fn args(list: &[&str]) -> Vec<String> {
 #[test]
 fn the_project_flag_is_taken_out_of_the_arguments() {
     let mut a = args(&["scene.scene", "--project", "../game", "--empty"]);
-    assert_eq!(take_flag(&mut a), Ok(Some(native("../game"))));
+    assert_eq!(
+        take_flag(&mut a),
+        Ok(Some(std::path::PathBuf::from("../game")))
+    );
     assert_eq!(a, args(&["scene.scene", "--empty"]));
     let mut b = args(&["--project=/abs/game"]);
     assert_eq!(take_flag(&mut b), Ok(Some(PathBuf::from("/abs/game"))));
@@ -66,11 +68,7 @@ fn the_engine_content_is_found_from_this_checkout() {
 fn a_shipped_layout_finds_its_engine_and_project_beside_the_executable() {
     let ship = fresh("ship");
     std::fs::create_dir_all(ship.join("engine").join("shaders")).unwrap();
-    std::fs::write(
-        ship.join(crate::core::paths::native("engine/shaders/common.wgsl")),
-        "",
-    )
-    .unwrap();
+    std::fs::write(ship.join("engine/shaders/common.wgsl"), "").unwrap();
     std::fs::create_dir_all(ship.join("project").join("assets")).unwrap();
     assert_eq!(find_engine_dir(&ship), Some(ship.join("engine")));
     assert_eq!(find_packaged_project(&ship), Some(ship.join("project")));
@@ -80,11 +78,7 @@ fn a_shipped_layout_finds_its_engine_and_project_beside_the_executable() {
     let (macos, res) = (bundle.join("MacOS"), bundle.join("Resources"));
     std::fs::create_dir_all(&macos).unwrap();
     std::fs::create_dir_all(res.join("engine").join("shaders")).unwrap();
-    std::fs::write(
-        res.join(crate::core::paths::native("engine/shaders/common.wgsl")),
-        "",
-    )
-    .unwrap();
+    std::fs::write(res.join("engine/shaders/common.wgsl"), "").unwrap();
     std::fs::create_dir_all(res.join("project").join("assets")).unwrap();
     let found = find_engine_dir(&macos).unwrap();
     assert!(

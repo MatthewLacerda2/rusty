@@ -39,7 +39,7 @@ pub(super) fn tree(
     out: &Path,
     written: &mut Vec<String>,
 ) -> Result<(), String> {
-    if rel == paths::native(IMPORT_CACHE_DIR) {
+    if rel == PathBuf::from(IMPORT_CACHE_DIR) {
         return Ok(());
     }
     let dir = root.join(rel);

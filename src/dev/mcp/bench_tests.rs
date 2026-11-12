@@ -18,7 +18,7 @@ fn fresh(name: &str) -> PathBuf {
     let dir = crate::test_temp::dir().join("mcp_bench").join(name);
     std::fs::remove_dir_all(&dir).ok();
     std::fs::create_dir_all(&dir).unwrap();
-    crate::core::paths::canonicalize(&dir).unwrap()
+    std::fs::canonicalize(&dir).unwrap()
 }
 
 /// Call `name` and return its text parsed as JSON, or its in-band error as `Err`.

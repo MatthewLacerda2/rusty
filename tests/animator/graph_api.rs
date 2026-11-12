@@ -18,8 +18,8 @@ fn animator_of(scene: &Rc<RefCell<Scene>>, id: u32) -> AnimatorComponent {
     scene.borrow().world.animator(id).unwrap().clone()
 }
 
-/// A one-node graph saved to a temp `.animgraph`; the path uses forward slashes
-/// so it can be embedded in a Lua literal on Windows too.
+/// A one-node graph saved to a temp `.animgraph`, its path ready to embed in a
+/// Lua literal.
 fn saved_graph() -> String {
     let graph = AnimationGraph {
         base: StateMachine {

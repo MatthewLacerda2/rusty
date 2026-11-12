@@ -5,7 +5,6 @@
 
 use super::{SurfacePipelines, SurfaceShaders};
 use crate::core::fs::written::{written_since, Stale};
-use crate::core::paths::native;
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::shadergen::params::sidecar_path;
 
@@ -36,7 +35,7 @@ impl SurfaceShaders {
         let mut any = false;
         for slot in self.slots.iter_mut().filter(|s| !s.stale) {
             slot.stale = dirs.iter().any(|dir| {
-                let wgsl = native(dir).join(format!("{}.wgsl", slot.name));
+                let wgsl = std::path::PathBuf::from(dir).join(format!("{}.wgsl", slot.name));
                 written.matches(&wgsl.to_string_lossy())
                     || written.matches(&sidecar_path(&wgsl).to_string_lossy())
             });

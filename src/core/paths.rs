@@ -1,29 +1,22 @@
 //! src/core/paths.rs — paths relative to a workspace root (#782, #783).
 //!
 //! A scene names its scripts by paths relative to the project root (#829, the
-//! working directory once `core::project::open` ran), written with `/` on every OS, so a scene saved on one
-//! machine — or by one test run — names the same files on the next. These helpers
-//! turn an absolute path under a root back into that form, and [`native`] turns
-//! such a path (or a `/`-spelled constant like `IMPORT_CACHE_DIR`) into the
-//! platform's own (#1371).
+//! working directory once `core::project::open` ran), written with `/`, so a scene
+//! saved on one machine — or by one test run — names the same files on the next.
+//! These helpers turn an absolute path under a root back into that form, and
+//! [`to_slash`] / [`stored`] spell a path the way a stored file keeps it.
 
 use std::path::{Path, PathBuf};
 
 /// `path` relative to `root`, `/`-separated, when `path` lies under `root`; `None`
 /// otherwise (a relative path, another tree, `root` itself, or a remainder with a
-/// `..` that may climb back out). Purely lexical, and it reads both `/` and `\` as
-/// separators, so a Windows path parses on any OS. A drive letter compares
-/// case-insensitively; every other component exactly, so a short name (`RUNNER~1`)
-/// only matches itself — [`relativize`] resolves those.
+/// `..` that may climb back out). Purely lexical, comparing components exactly,
+/// so a symlinked spelling only matches itself — [`relativize`] resolves those. It
+/// reads both `/` and `\\` as separators, because a path inside a file authored
+/// with other tools (an FBX's texture paths) may arrive `\\`-spelled.
 pub fn relative_to(path: &str, root: &str) -> Option<String> {
     let (path, root) = (components(path), components(root));
-    if path.len() <= root.len() || root.is_empty() {
-        return None;
-    }
-    let same = |(i, (a, b)): (usize, (&&str, &&str))| {
-        a == b || (i == 0 && a.ends_with(':') && a.eq_ignore_ascii_case(b))
-    };
-    if !path.iter().zip(&root).enumerate().all(same) {
+    if path.len() <= root.len() || root.is_empty() || path[..root.len()] != root[..] {
         return None;
     }
     let rest = &path[root.len()..];
@@ -32,8 +25,7 @@ pub fn relative_to(path: &str, root: &str) -> Option<String> {
 
 /// `path` relative to `root` when it is absolute and lies under it, else `path`
 /// unchanged. Tries the paths as given, then their canonical forms, which resolve
-/// symlinks, `..` and Windows short names (`C:\Users\RUNNER~1` and
-/// `C:\Users\runneradmin` name one directory).
+/// symlinks and `..` (macOS's `/var` is `/private/var`).
 pub fn relativize(path: &str, root: &Path) -> String {
     if Path::new(path).is_relative() {
         return path.to_string();
@@ -49,24 +41,11 @@ pub fn relativize(path: &str, root: &Path) -> String {
         .unwrap_or_else(|| path.to_string())
 }
 
-/// [`std::fs::canonicalize`] without Windows' verbatim prefix (#904). Windows
-/// returns `\\?\D:\...`, which it never normalises, so a `/` joined onto it is a
-/// literal character and the read fails; macOS and Linux keep their symlink
-/// resolution unchanged.
-pub fn canonicalize(path: &Path) -> std::io::Result<PathBuf> {
-    let canonical = std::fs::canonicalize(path)?;
-    Ok(match canonical.to_str() {
-        Some(s) => PathBuf::from(strip_verbatim(s)),
-        None => canonical,
-    })
-}
-
 /// `file`'s real path when it lies outside `root`, `None` inside it: the one rule
 /// for "an input the project doesn't hold" (#1062), shared by the Lua VM's
 /// `require` / `dofile` and the texture generator's `image` files. An empty `root`
-/// is the working directory. Both sides are std-canonical, so a non-UTF-8 path
-/// can't lose its verbatim prefix on one side only (#1106); print the result with
-/// [`shown`].
+/// is the working directory. Both sides are canonical, so a symlink on one side
+/// only can't hide the match; print the result with [`shown`].
 pub fn outside_root(file: &Path, root: &Path) -> Option<PathBuf> {
     let real = file.canonicalize().unwrap_or_else(|_| file.to_path_buf());
     let root = if root.as_os_str().is_empty() {
@@ -78,33 +57,15 @@ pub fn outside_root(file: &Path, root: &Path) -> Option<PathBuf> {
     (!inside).then_some(real)
 }
 
-/// `real` as a message prints it: no `\\?\` verbatim prefix, `/`-separated.
+/// `real` as a message prints it: canonical when it exists, `/`-separated.
 pub fn shown(real: &Path) -> String {
-    to_slash(&canonicalize(real).unwrap_or_else(|_| real.to_path_buf()))
-}
-
-/// `slashed`, a `/`-separated path, joined one part at a time: the platform's own
-/// spelling (#1332, #1371). `Path::join("a/b")` keeps the `/`, so on Windows
-/// `root.join("a/b")` is `root\a/b`; `root.join(native("a/b"))` is `root\a\b`,
-/// the one spelling the engine writes everywhere and its tests compare against.
-/// A leading `/` stays the root, as `Path::new("/")` is; empty parts drop.
-pub fn native(slashed: &str) -> PathBuf {
-    let (start, rest) = match slashed.strip_prefix('/') {
-        Some(rest) => (PathBuf::from("/"), rest),
-        None => (PathBuf::new(), slashed),
-    };
-    rest.split('/')
-        .filter(|part| !part.is_empty())
-        .fold(start, |path, part| path.join(part))
-}
-
-/// [`native`] as the string the engine writes into a file or a log line.
-pub fn native_string(slashed: &str) -> String {
-    native(slashed).to_string_lossy().into_owned()
+    to_slash(&real.canonicalize().unwrap_or_else(|_| real.to_path_buf()))
 }
 
 /// `path` as a `/`-separated string, the form scenes and the editor store (#939):
-/// every `\` becomes `/`, whatever the OS. Non-UTF-8 bytes are replaced lossily.
+/// every `\` becomes `/`, so a path read from a file authored with other tools
+/// (an FBX's texture paths) is stored like any other. Non-UTF-8 bytes are
+/// replaced lossily.
 pub fn to_slash(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
 }
@@ -163,20 +124,10 @@ pub fn fold(path: &Path) -> PathBuf {
     out.iter().collect()
 }
 
-/// `path` without a verbatim prefix: `\\?\C:\x` → `C:\x`, `\\?\UNC\host\share`
-/// → `\\host\share`. Any other path, `/`-rooted ones included, comes back as is.
-pub fn strip_verbatim(path: &str) -> String {
-    if let Some(rest) = path.strip_prefix(r"\\?\UNC\") {
-        return format!(r"\\{rest}");
-    }
-    path.strip_prefix(r"\\?\").unwrap_or(path).to_string()
-}
-
-/// The path's components, with Windows' verbatim prefix (`\\?\`, which
-/// `canonicalize` adds) and empty or `.` components dropped. A leading `/` leaves
-/// an empty first component, so absolute and relative paths never match.
+/// The path's components, split on `/` and `\\`, with empty or `.` components
+/// dropped. A leading `/` leaves an empty first component, so absolute and
+/// relative paths never match.
 fn components(path: &str) -> Vec<&str> {
-    let path = path.strip_prefix(r"\\?\").unwrap_or(path);
     let mut parts: Vec<&str> = path.split(['/', '\\']).collect();
     let absolute = parts.first() == Some(&"");
     parts.retain(|p| !p.is_empty() && *p != ".");

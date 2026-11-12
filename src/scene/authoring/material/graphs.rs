@@ -11,7 +11,7 @@
 use std::path::Path;
 
 use crate::core::naming::variant_case::decode;
-use crate::core::paths::{native, to_slash};
+use crate::core::paths::to_slash;
 use crate::procgen::graph::{Graphs, EXTENSION};
 use crate::procgen::TextureRecipe;
 
@@ -38,7 +38,7 @@ pub fn read_graph(path: &str, root: &Path) -> Result<TextureRecipe, String> {
     if !path.ends_with(EXTENSION) {
         return Err(format!("a graph is a {EXTENSION} file"));
     }
-    let file = root.join(native(path));
+    let file = root.join(path);
     let text = std::fs::read_to_string(&file).map_err(|e| e.to_string())?;
     super::sources::warn_if_outside(&file, root, "graph", path);
     decode(serde_json::from_str(&text).map_err(|e| e.to_string())?)

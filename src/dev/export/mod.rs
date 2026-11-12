@@ -75,7 +75,7 @@ pub fn export(out: &Path) -> Result<Exported, String> {
     // A baked shader stale against this engine's shaders is re-baked from its
     // recipe, so the player loads it as shipped (#1638); one that fails is
     // warned of and ships as it is.
-    crate::shadergen::rebake::refresh_all(&paths::native(SHADERS_DIR));
+    crate::shadergen::rebake::refresh_all(Path::new(SHADERS_DIR));
     let existed = out.is_dir();
     let written = copy_runtime_files(Path::new("."), &sources, &out).and_then(|files| {
         create_skeleton(&out)?;
@@ -210,7 +210,7 @@ fn check_out(root: &Path, out: &Path) -> Result<(), String> {
 fn resolved(path: &Path) -> PathBuf {
     let path = paths::fold(&std::path::absolute(path).unwrap_or(path.to_path_buf()));
     for ancestor in path.ancestors() {
-        if let Ok(canonical) = paths::canonicalize(ancestor) {
+        if let Ok(canonical) = std::fs::canonicalize(ancestor) {
             let rest = path.strip_prefix(ancestor).unwrap_or(Path::new(""));
             return canonical.join(rest);
         }

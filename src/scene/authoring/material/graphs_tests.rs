@@ -16,7 +16,7 @@ fn flat(color: [f32; 4]) -> Value {
 fn project(test: &str, files: &[(&str, Value)]) -> std::path::PathBuf {
     let root = crate::test_temp::dir().join(test);
     for (path, doc) in files {
-        let file = root.join(native(path));
+        let file = root.join(path);
         std::fs::create_dir_all(file.parent().unwrap()).unwrap();
         std::fs::write(file, doc.to_string()).unwrap();
     }
@@ -107,11 +107,7 @@ fn a_rebake_reads_the_edited_graph_and_the_asset_keeps_the_instance() {
     };
     rebake_maps(&mut materials, "tint", None, &root, &root).unwrap();
     assert_eq!(pixel(&materials), [255, 0, 0, 255]);
-    std::fs::write(
-        root.join(native(path)),
-        flat([0.0, 0.0, 1.0, 1.0]).to_string(),
-    )
-    .unwrap();
+    std::fs::write(root.join(path), flat([0.0, 0.0, 1.0, 1.0]).to_string()).unwrap();
     rebake_maps(&mut materials, "tint", None, &root, &root).unwrap();
     assert_eq!(pixel(&materials), [0, 0, 255, 255]);
     assert_eq!(materials["tint"].maps_recipe, Some(instancing(path)));

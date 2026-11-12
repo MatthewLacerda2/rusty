@@ -1,14 +1,10 @@
 use super::*;
 
-/// The path #783's Windows run embedded: the runner's temp dir, short-named.
-const RUN: &str = r"C:\Users\RUNNER~1\AppData\Local\Temp\rusty-tests\4192\busy";
-
 #[test]
-fn a_windows_path_under_its_root_comes_out_slash_separated() {
-    let path = format!(r"{RUN}\rusty_busy_a\project\assets\scripts\busy_director.lua");
-    let root = format!(r"{RUN}\rusty_busy_a");
+fn a_path_under_its_root_comes_out_slash_separated() {
+    let path = "/tmp/rusty-tests/4192/rusty_busy_a/project/assets/scripts/busy_director.lua";
     assert_eq!(
-        relative_to(&path, &root).as_deref(),
+        relative_to(path, "/tmp/rusty-tests/4192/rusty_busy_a").as_deref(),
         Some("project/assets/scripts/busy_director.lua")
     );
 }
@@ -16,30 +12,22 @@ fn a_windows_path_under_its_root_comes_out_slash_separated() {
 #[test]
 fn two_runs_in_different_roots_store_the_same_path() {
     let at = |run: &str| {
-        let path = format!(r"{RUN}\{run}\project\assets\scripts\busy_box.lua");
-        relative_to(&path, &format!(r"{RUN}\{run}"))
+        let path = format!("/tmp/ws/{run}/project/assets/scripts/busy_box.lua");
+        relative_to(&path, &format!("/tmp/ws/{run}"))
     };
     assert_eq!(at("rusty_busy_a"), at("rusty_busy_b"));
 }
 
 #[test]
-fn the_drive_letter_and_mixed_separators_and_a_verbatim_prefix_still_match() {
-    let path = r"\\?\c:\Users\RUNNER~1/ws\project\x.lua";
+fn a_backslash_spelled_path_from_an_imported_file_still_matches() {
     assert_eq!(
-        relative_to(path, r"C:\Users\RUNNER~1\ws\").as_deref(),
-        Some("project/x.lua")
+        relative_to(r"models\textures\a.png", "models").as_deref(),
+        Some("textures/a.png")
     );
 }
 
 #[test]
-fn a_short_name_does_not_lexically_match_its_long_name() {
-    let path = r"C:\Users\RUNNER~1\ws\x.lua";
-    assert_eq!(relative_to(path, r"C:\Users\runneradmin\ws"), None);
-}
-
-#[test]
-fn only_the_drive_letter_ignores_case() {
-    assert_eq!(relative_to(r"C:\Users\Me\x.lua", r"C:\users\me"), None);
+fn components_compare_case_sensitively() {
     assert_eq!(relative_to("/tmp/WS/x.lua", "/tmp/ws"), None);
 }
 
@@ -73,21 +61,6 @@ fn relativize_resolves_through_the_filesystem_and_leaves_the_rest() {
 }
 
 #[test]
-fn the_verbatim_prefix_is_stripped_so_a_slash_join_reads_on_windows() {
-    // #904: `engine_path` joined `/shaders/...` onto `\\?\D:\...`, which Windows reads
-    // literally.
-    let engine = strip_verbatim(r"\\?\D:\a\rusty\rusty\engine");
-    assert_eq!(engine, r"D:\a\rusty\rusty\engine");
-    assert_eq!(
-        strip_verbatim(r"\\?\UNC\host\share\engine"),
-        r"\\host\share\engine"
-    );
-    for plain in [r"D:\a\engine", r"\\host\share", "/home/u/engine", "engine"] {
-        assert_eq!(strip_verbatim(plain), plain);
-    }
-}
-
-#[test]
 fn stored_trims_slashes_and_drops_a_leading_dot() {
     assert_eq!(stored(" ./assets\\luts/a.cube \n"), "assets/luts/a.cube");
     assert_eq!(stored(".//./a.cube"), "a.cube");
@@ -98,7 +71,6 @@ fn stored_trims_slashes_and_drops_a_leading_dot() {
 #[test]
 fn to_slash_turns_every_backslash_into_a_slash() {
     assert_eq!(
-        // lint: allow(slash-join) a mixed spelling on purpose: the input under test
         to_slash(Path::new(r"assets\scripts/a.lua")),
         "assets/scripts/a.lua"
     );
@@ -108,7 +80,7 @@ fn to_slash_turns_every_backslash_into_a_slash() {
 #[test]
 fn extension_matching_ignores_case() {
     assert!(has_extension("assets/scripts/Enemy.LUA", "lua"));
-    assert!(has_extension(native("a/b.Lua"), "lua"));
+    assert!(has_extension(Path::new("a/b.Lua"), "lua"));
     assert!(
         !has_extension("a/lua", "lua"),
         "a bare name has no extension"
@@ -121,23 +93,12 @@ fn extension_matching_ignores_case() {
 #[test]
 fn fold_drops_dots_and_folds_climbs_without_the_disk() {
     let fold = |p: &str| super::fold(Path::new(p));
-    assert_eq!(fold("./a/b/../../../../m/s.png"), native("../../m/s.png"));
-    assert_eq!(fold("./cache/x/../../m/s.png"), native("m/s.png"));
+    assert_eq!(
+        fold("./a/b/../../../../m/s.png"),
+        Path::new("../../m/s.png")
+    );
+    assert_eq!(fold("./cache/x/../../m/s.png"), Path::new("m/s.png"));
     assert_eq!(fold("/tmp/r/../../../home/s.png"), Path::new("/home/s.png"));
     assert_eq!(fold("a/.."), Path::new("."));
-    assert_eq!(fold("a/./b"), native("a/b"));
-}
-
-#[test]
-fn a_slashed_path_comes_out_in_the_platforms_separator() {
-    use std::path::MAIN_SEPARATOR_STR as SEP;
-    assert_eq!(native_string("a/b/c"), ["a", "b", "c"].join(SEP));
-    assert_eq!(native("a/b/c"), Path::new("a").join("b").join("c"));
-    let rooted = Path::new("/").join("engine").join("target");
-    assert_eq!(native("/engine/target"), rooted);
-    assert_eq!(
-        native("a//b/"),
-        Path::new("a").join("b"),
-        "empty parts drop"
-    );
+    assert_eq!(fold("a/./b"), Path::new("a/b"));
 }

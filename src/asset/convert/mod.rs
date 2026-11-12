@@ -195,7 +195,7 @@ pub fn cache_path_as(root: &Path, rel: &Path, suffix: &str) -> PathBuf {
 
 /// The import cache folder of the project at `root`.
 fn cache_root(root: &Path) -> PathBuf {
-    root.join(paths::native(IMPORT_CACHE_DIR))
+    root.join(IMPORT_CACHE_DIR)
 }
 
 /// True when `path` is inside an import cache: what the manifest and the content
@@ -241,11 +241,11 @@ fn relative_to_cwd(path: &Path) -> Option<PathBuf> {
         let cwd = std::env::current_dir().ok()?;
         match path.strip_prefix(&cwd) {
             Ok(rel) => rel.to_path_buf(),
-            // Symlinks, `..`, Windows short names: compare the canonical forms.
+            // Symlinks, `..`: compare the canonical forms.
             Err(_) => {
                 let (path, cwd) = (
-                    paths::canonicalize(path).ok()?,
-                    paths::canonicalize(&cwd).ok()?,
+                    std::fs::canonicalize(path).ok()?,
+                    std::fs::canonicalize(&cwd).ok()?,
                 );
                 path.strip_prefix(cwd).ok()?.to_path_buf()
             }

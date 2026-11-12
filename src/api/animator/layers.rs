@@ -159,7 +159,6 @@ fn node_tag(anim: &AnimatorComponent, index: usize, node: &str) -> Option<String
 /// A layer argument as a warning shows it.
 pub(super) fn describe(layer: &Value) -> String {
     match layer {
-        // lint: allow(lua-path-slash) a Lua string shown in a warning, not a path
         Value::String(s) => format!("'{}'", s.to_string_lossy()),
         Value::Integer(i) => i.to_string(),
         Value::Number(n) => n.to_string(),

@@ -20,7 +20,7 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use crate::core::paths::{native, outside_root, shown};
+use crate::core::paths::{outside_root, shown};
 use crate::procgen::graph::expand;
 use crate::procgen::{Source, Sources, TextureRecipe};
 
@@ -56,7 +56,7 @@ pub fn load_recipe(recipe: &TextureRecipe, root: &Path) -> Result<Loaded, String
 fn read_images(recipe: &TextureRecipe, root: &Path) -> Result<Sources, String> {
     let mut paths = Vec::new();
     for (node, path) in recipe.image_paths() {
-        let file = root.join(native(path));
+        let file = root.join(path);
         if !file.is_file() {
             return Err(format!(
                 "image node '{node}' can't read {path:?}: no such file"
@@ -67,7 +67,7 @@ fn read_images(recipe: &TextureRecipe, root: &Path) -> Result<Sources, String> {
     }
     let root = root.to_path_buf();
     let loader = Arc::new(move |path: &str| {
-        let bytes = std::fs::read(root.join(native(path))).map_err(|e| e.to_string())?;
+        let bytes = std::fs::read(root.join(path)).map_err(|e| e.to_string())?;
         Source::decode(path, &bytes)
     });
     Ok(Sources::lazy(paths, loader))

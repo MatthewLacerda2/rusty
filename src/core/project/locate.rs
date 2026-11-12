@@ -54,7 +54,7 @@ fn packaged_project() -> Option<PathBuf> {
 
 fn exe_dir() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
-    let exe = crate::core::paths::canonicalize(&exe).unwrap_or(exe);
+    let exe = std::fs::canonicalize(&exe).unwrap_or(exe);
     exe.parent().map(Path::to_path_buf)
 }
 
@@ -66,10 +66,7 @@ pub(super) fn find_engine_dir(exe_dir: &Path) -> Option<PathBuf> {
         .ancestors()
         .map(|dir| dir.join(ENGINE_DIR))
         .chain(std::iter::once(bundle))
-        .find(|dir| {
-            dir.join(crate::core::paths::native(ENGINE_MARKER))
-                .is_file()
-        })
+        .find(|dir| dir.join(ENGINE_MARKER).is_file())
 }
 
 pub(super) fn find_packaged_project(exe_dir: &Path) -> Option<PathBuf> {

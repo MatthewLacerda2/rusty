@@ -14,7 +14,6 @@ use super::stage::{
 };
 use crate::asset::gltf::uri;
 use crate::asset::{ImportError, IMAGE_EXTENSIONS};
-use crate::core::paths;
 use std::path::{Component, Path};
 
 /// The sanitised stem and lowercase extension of the file `raw` names, holding
@@ -108,8 +107,8 @@ pub(super) fn unique(stem: &str, ext: &str, taken: &[String]) -> String {
 /// `target` as a `/`-separated, percent-encoded URI from directory `from`, both
 /// resolved first.
 pub(super) fn relative_uri(from: &Path, target: &Path) -> Option<String> {
-    let from = paths::canonicalize(from).ok()?;
-    let target = paths::canonicalize(target).ok()?;
+    let from = std::fs::canonicalize(from).ok()?;
+    let target = std::fs::canonicalize(target).ok()?;
     let from: Vec<Component> = from.components().collect();
     let target: Vec<Component> = target.components().collect();
     let shared = from.iter().zip(&target).take_while(|(a, b)| a == b).count();

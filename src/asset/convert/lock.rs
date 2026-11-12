@@ -83,7 +83,7 @@ pub fn path(out: &Path) -> std::io::Result<PathBuf> {
         return Err(std::io::Error::other("not a file path"));
     };
     // The folder, not the file: the cache may not exist yet.
-    let canonical = paths::canonicalize(if dir.as_os_str().is_empty() {
+    let canonical = std::fs::canonicalize(if dir.as_os_str().is_empty() {
         Path::new(".")
     } else {
         dir
@@ -108,5 +108,5 @@ fn project_of(cache: &Path) -> Option<&Path> {
     cache
         .ancestors()
         .skip(1)
-        .find(|root| cache.starts_with(root.join(crate::core::paths::native(IMPORT_CACHE_DIR))))
+        .find(|root| cache.starts_with(root.join(IMPORT_CACHE_DIR)))
 }

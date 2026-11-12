@@ -80,9 +80,9 @@ pub fn written_since(seen: u64) -> (u64, Vec<String>) {
 /// The paths a consumer just drained, as a test for its cache keys: a key is stale
 /// when it names one of them, by the same [`stored`] form or by another
 /// spelling of the same file (relative vs absolute, a symlink). The stored form is
-/// what lets a deleted file match (#1937): the editor's watch notes it with native
-/// separators (`\` on Windows) while a cache keys it slashed, and a file that no
-/// longer exists has no canonical form to fall back on.
+/// what lets a deleted file match (#1937): a note spelled with `\` (a path read
+/// from a file authored with other tools) and a cache key spelled with `/` name one
+/// file, and a file that no longer exists has no canonical form to fall back on.
 pub struct Stale {
     paths: Vec<String>,
     canonical: Vec<PathBuf>,
@@ -191,14 +191,14 @@ mod tests {
     }
 
     #[test]
-    fn a_deleted_file_noted_with_native_separators_matches_its_slashed_key() {
-        // Windows' watch notes `assets\gone.physmat`; the file is gone, so only the
+    fn a_deleted_file_noted_with_backslashes_matches_its_slashed_key() {
+        // A note spelled `assets\gone.physmat`; the file is gone, so only the
         // stored form can tie it to the cache's `assets/gone.physmat` (#1937).
         let stale = Stale::new(vec![".\\assets\\deleted\\gone.physmat".to_string()]);
         assert!(stale.matches("assets/deleted/gone.physmat"));
         assert!(stale.matches("./assets/deleted/gone.physmat"));
         assert!(!stale.matches("assets/deleted/kept.physmat"));
-        // And the other way round: a slashed note, a cache keyed natively.
+        // And the other way round: a slashed note, a cache keyed with `\\`.
         let stale = Stale::new(vec!["assets/deleted/gone.physmat".to_string()]);
         assert!(stale.matches("assets\\deleted\\gone.physmat"));
     }

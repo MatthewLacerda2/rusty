@@ -20,7 +20,7 @@ fn scene_sized(source: &str) -> Vec<String> {
 /// The effect's own non-test source files: `effects/<name>.rs`, the folder
 /// `effects/<name>/`, or either inside a family folder (`lens/`, `grading/`).
 fn sources(name: &str) -> Vec<std::path::PathBuf> {
-    let root = crate::core::paths::native("src/render/postfx/effects");
+    let root = std::path::PathBuf::from("src/render/postfx/effects");
     let families = std::fs::read_dir(&root)
         .unwrap()
         .flatten()

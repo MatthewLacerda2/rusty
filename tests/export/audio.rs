@@ -6,7 +6,7 @@ use super::{export, project, tree};
 
 /// Put `bytes` at `rel` under `game`.
 fn put(game: &std::path::Path, rel: &str, bytes: &[u8]) {
-    let path = game.join(rusty::core::paths::native(rel));
+    let path = game.join(rel);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(path, bytes).unwrap();
 }

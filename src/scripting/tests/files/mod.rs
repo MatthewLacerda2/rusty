@@ -25,8 +25,8 @@ pub(super) fn dir(name: &str) -> PathBuf {
     dir
 }
 
-/// A fresh directory whose path holds a `\\`: a separator on Windows, a filename
-/// character elsewhere, so a path test built on it runs on every OS (#1106).
+/// A fresh directory whose path holds a `\\`, a filename character on macOS and
+/// Linux, so a path test proves the engine never respells it as a separator (#1106).
 pub(super) fn backslash_dir(name: &str) -> PathBuf {
     let dir = dir(name).join("a\\b");
     std::fs::create_dir_all(&dir).expect("backslash dir");

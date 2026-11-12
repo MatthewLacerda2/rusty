@@ -33,7 +33,6 @@ use super::from_lua::{asset_from_lua, Validated};
 use super::{put, Reg};
 use crate::api::ApiCell;
 use crate::components::{MaterialAsset, RenderMode};
-use crate::core::paths::native;
 use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
 
@@ -70,7 +69,7 @@ pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> 
         lua.create_function(move |lua, (name, resolution): (String, Option<u32>)| {
             let scene = &*scene.get(lua)?;
             let mut scene = scene.borrow_mut();
-            let dir = &native(mat_ops::MAPS_DIR);
+            let dir = std::path::Path::new(mat_ops::MAPS_DIR);
             let root = crate::core::project::root();
             mat_ops::rebake_maps(&mut scene.materials, &name, resolution, &root, dir)
                 .map_err(mlua::Error::RuntimeError)
@@ -98,7 +97,12 @@ fn define(
     validated: Validated,
 ) -> Result<(), String> {
     let root = crate::core::project::root();
-    mat_ops::bake_maps(&mut asset, name, &root, &native(mat_ops::MAPS_DIR))?;
+    mat_ops::bake_maps(
+        &mut asset,
+        name,
+        &root,
+        std::path::Path::new(mat_ops::MAPS_DIR),
+    )?;
     let mut scene = scene.borrow_mut();
     let materials = &mut scene.materials;
     let (metallic, roughness) = (asset.metallic, asset.roughness);

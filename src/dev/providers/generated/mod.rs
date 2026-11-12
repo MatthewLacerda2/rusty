@@ -40,7 +40,7 @@ pub use crate::core::project::GENERATED_DIR;
 /// through `core::paths::to_slash` first (#1390).
 pub fn address<B: Brief + ?Sized>(brief: &B) -> serde_json::Result<PathBuf> {
     let name = format!("{}-{}.{}", brief.kind(), digest(brief)?, brief.extension());
-    Ok(crate::core::paths::native(GENERATED_DIR).join(name))
+    Ok(PathBuf::from(GENERATED_DIR).join(name))
 }
 
 /// Where a generated asset stands. No `queued` and no `expired`: none of the

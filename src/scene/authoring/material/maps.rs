@@ -51,8 +51,8 @@ pub fn bake_maps(
     check_set(recipe).map_err(in_error)?;
     let loaded = super::load_recipe(recipe, root).map_err(in_error)?;
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    // `/`-spelled, `dir` included, not `Path::join`: the paths land in the scene file,
-    // which must read the same on every platform (Windows accepts `/` too).
+    // `/`-spelled, `dir` included: the paths land in the scene file, which stores
+    // `/` (`core::paths::to_slash`).
     let prefix = format!("{}/{name}", to_slash(dir).trim_end_matches('/'));
     let baked = bake_set(&loaded.recipe, &loaded.sources, &prefix).map_err(in_error)?;
     fill_empty_maps(asset, &baked);
