@@ -17,7 +17,7 @@ never bills.
 | `Speech.Generate` | `(brief)` | the generated `.wav`'s path; or `nil, why` when the brief is not finished |
 | `Speech.Voices` | `([refresh])` | `voices, source`: every voice on the account (free) |
 | `Speech.FindVoice` | `(query [, refresh])` | `voices, source`: those whose name or a label contains `query` |
-| `Speech.VoiceInfo` | `(id)` | the voice; or `nil, why` when it is withdrawn or not on this plan |
+| `Speech.VoiceInfo` | `(id)` | the voice (and a note when it is a Voice Library voice not yet saved); or `nil, why` when it is withdrawn or not on this plan |
 
 ```lua no-run
 local wav = Speech.Generate({
@@ -94,7 +94,10 @@ print(source)  -- "3 ElevenLabs voices, out of the project's cache, read today. 
 - **`Speech.VoiceInfo(id)`** — asks the vendor about one id, **never from the cache**.
   A voice that is gone returns `nil, "voice <id> is withdrawn: …"`; one the account's
   plan may not use returns `nil, "… not on this plan …"`. **Nothing is ever
-  substituted.** No key, a key without `voices_read`, or a vendor that cannot be
+  substituted.** A voice published in the ElevenLabs Voice Library that the account
+  has not saved returns the voice and a second value saying so: any paid plan
+  generates with it (and the first line saves it to the account), a free plan is
+  refused. No key, a key without `voices_read`, or a vendor that cannot be
   reached raise instead: those say nothing about the voice.
 
 **The cache, and its staleness.** The list is kept per project under

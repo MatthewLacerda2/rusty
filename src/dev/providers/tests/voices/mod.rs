@@ -106,3 +106,16 @@ fn no_key_and_a_cold_cache_says_where_it_looked_and_calls_nothing() {
     .to_string();
     assert!(said.contains("ELEVENLABS_API_KEY"), "{said}");
 }
+
+#[test]
+fn a_library_voice_is_usable_but_says_a_free_plan_is_refused() {
+    let said = in_library("lib-voice");
+    assert!(
+        said.contains("lib-voice") && said.contains("Voice Library"),
+        "{said}"
+    );
+    assert!(
+        said.contains("paid plan") && said.contains("free plan cannot"),
+        "{said}"
+    );
+}
