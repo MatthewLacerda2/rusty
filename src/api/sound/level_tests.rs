@@ -4,7 +4,7 @@
 
 use mlua::{Lua, Table};
 
-use super::fixture::{lua_with_sound, tmp, HELD_PATCH, IMPACT_PATCH};
+use super::fixture::{lua_with_sound, tmp, HELD_PATCH};
 
 /// Write interleaved 16-bit `samples` as a 44.1 kHz WAV — the bare RIFF header,
 /// so a test can hand `Sound.Level` a signal of exactly known amplitude.
