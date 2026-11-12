@@ -39,13 +39,9 @@ fn dofile_names_its_chunk_as_the_os_opens_it() {
         &m,
         "out = dofile('data/level.lua') .. '|' .. loadfile('data/level.lua')()",
     );
-    // Windows: `\\` is a separator, so the name is `/`-only. Elsewhere the `\\`
-    // is part of a folder's name and stays, or the file would not open at all.
-    let expect = if cfg!(windows) {
-        "a/b/data/level.lua"
-    } else {
-        "a\\b/data/level.lua"
-    };
+    // The `\\` is part of a folder's name and stays, or the file would not open
+    // at all.
+    let expect = "a\\b/data/level.lua";
     for name in named.split('|') {
         assert!(name.ends_with(&format!("{expect}:1: here")), "{named}");
     }

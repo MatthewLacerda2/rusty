@@ -13,7 +13,7 @@
 # this script.
 set -euo pipefail
 
-WATCHED='ci lint mutants-sweep coverage windows cargo-test'
+WATCHED='ci lint mutants-sweep coverage cargo-test'
 LABEL=bug
 
 run=$(gh api "repos/$REPO/actions/runs/$RUN_ID")
@@ -61,9 +61,8 @@ done
 # Every other non-success job files. The weekly signal jobs never fail on a
 # finding — `coverage` flags a floor drop without exiting non-zero, and
 # `mutants-report` only summarises — so their failure is always
-# infrastructural. The nightly `windows` signal is the exception on purpose: a
-# red Windows build is the finding, and this issue is where it lands (#741).
-# The nightly `cargo-test` signal (#981, #1338) is the same: its red is the finding.
+# infrastructural. The nightly `cargo-test` signal (#981, #1338) is the
+# exception on purpose: its red is the finding, and this issue is where it lands.
 # Its `dead-pub` job (#1205) goes red only when that signal made no report,
 # which is the breakage to file.
 failed=()
@@ -134,9 +133,7 @@ if [[ $state == red && -z $issue ]]; then
     echo ''
     echo 'Informational signals (coverage, the weekly mutation sweep) file here only when they'
     echo 'fail to *run* — a crash, a timeout, a cancelled shard. Their findings (surviving mutants,'
-    echo 'a coverage drop) stay in their own reports. The nightly Windows signal files when it'
-    echo 'goes red too: Windows is not a shipped platform, so this never blocked a merge, but it is'
-    echo 'how Windows rot is caught before it piles up (#741). Later red runs comment here when the set of'
+    echo 'a coverage drop) stay in their own reports. Later red runs comment here when the set of'
     echo 'failing jobs changes. A green run leaves a note but does not close this: green can be'
     echo 'vacuous (a docs-only merge skips the build steps, and so does a push whose tree its PR'
     echo 'run already built, #1784), so close'

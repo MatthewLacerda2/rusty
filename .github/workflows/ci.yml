@@ -18,9 +18,8 @@ on:
   # rebuilds `main` against what moves with nothing in any diff (the runner
   # image and the lavapipe driver under it, #769/#930; macOS's Metal; a
   # `rust-cache` release) and re-saves `main`'s caches. One run a night instead
-  # of one per merge; `ci-gate` goes red with any of them. (The nightly Windows
-  # run is a signal in `windows.yml`, #741.) Off the hour, where GitHub's
-  # scheduler is least backed up.
+  # of one per merge; `ci-gate` goes red with any of them. Off the hour, where
+  # GitHub's scheduler is least backed up.
   schedule:
     - cron: '7 3 * * *'
   # A proof run of a branch: the gates, nothing else.
@@ -255,9 +254,7 @@ jobs:
   # Verify the wgpu cross-platform claim (issue #121): the build and the `dev`
   # suite on macOS (Metal), the other shipped platform, so the portability premise is
   # checked, not assumed. Separate from `build-test` to avoid renaming that
-  # required check. Windows is not a shipped platform yet, so its run is a signal
-  # in `windows.yml` (#741), outside this gate; its steps follow this job's,
-  # plus the default suite this job no longer runs (#1976).
+  # required check.
   # A one-entry matrix, so the check is named `build-test-cross (macos-26)`;
   # `mergeable` reads it by its base name.
   build-test-cross:
@@ -301,8 +298,7 @@ jobs:
       - name: Install Open Image Denoise
         run: brew install open-image-denoise
       # macOS uses its native backend and needs no extra system libs; the apt
-      # step is Linux-only and lives on the `build-test` job above. Bash so
-      # `windows.yml` can run the same script.
+      # step is Linux-only and lives on the `build-test` job above.
       #
       # Only the `dev` suite runs here (#1976), where `build-test` runs both.
       # What this leg proves is Metal and the platform, and the `dev` build

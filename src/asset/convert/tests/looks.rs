@@ -10,7 +10,6 @@ fn a_folder_is_absent_not_read() {
     assert_eq!(looked.seen(), Seen::Absent);
 }
 
-#[cfg(unix)]
 #[test]
 fn a_device_that_never_ends_is_absent_not_read() {
     // Read whole, `/dev/zero` would never end.
@@ -18,7 +17,6 @@ fn a_device_that_never_ends_is_absent_not_read() {
     assert_eq!(looked.seen(), Seen::Absent);
 }
 
-#[cfg(unix)]
 #[test]
 fn a_path_that_is_not_utf8_is_refused() {
     use std::os::unix::ffi::OsStrExt;

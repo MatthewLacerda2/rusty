@@ -75,7 +75,6 @@ fn a_save_over_a_scene_leaves_the_new_bytes_and_no_temp_file() {
 /// A save that cannot write its temp file (the folder read-only) leaves the old
 /// scene whole: the save goes through a sibling file, never the scene in place
 /// (#1991).
-#[cfg(unix)]
 #[test]
 fn a_failed_save_leaves_the_old_scene_whole() {
     use std::os::unix::fs::PermissionsExt;

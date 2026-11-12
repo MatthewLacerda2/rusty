@@ -43,14 +43,9 @@ fn sources_differing_only_by_the_assets_prefix_get_distinct_caches() {
 }
 
 /// A path component: letters of either case, `.` and `_`, and `\` where it is part
-/// of a name (Linux and macOS; a separator on Windows), never `.` or `..`.
+/// of a name, never `.` or `..`.
 fn component() -> impl Strategy<Value = String> {
-    let name = if cfg!(windows) {
-        "[aAbB._]{1,3}"
-    } else {
-        "[aAbB\\\\._]{1,3}"
-    };
-    name.prop_filter("a name, not . or ..", |c| c != "." && c != "..")
+    "[aAbB\\\\._]{1,3}".prop_filter("a name, not . or ..", |c| c != "." && c != "..")
 }
 
 /// A project-relative source path, `assets/` first or not.
@@ -90,7 +85,6 @@ fn project_relative_keeps_a_backslash_and_drops_a_leading_dot() {
 
 /// A name that is not UTF-8 is refused, so every name the cache derives from
 /// it is exact.
-#[cfg(unix)]
 #[test]
 fn a_non_utf8_source_path_is_refused() {
     use std::ffi::OsStr;

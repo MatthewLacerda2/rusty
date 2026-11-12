@@ -35,7 +35,7 @@ fn multiple_calls_each_reconnect_and_succeed() {
 /// The window's bake progress crosses the socket and reaches the client as MCP
 /// progress for a call that asked (#1999); one that didn't ask gets only its reply.
 #[test]
-fn a_windows_bake_progress_reaches_a_call_with_a_progress_token() {
+fn the_window_s_bake_progress_reaches_a_call_with_a_progress_token() {
     let call = |meta: &str| {
         format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{{"name":"eval","arguments":{{"line":"Lighting.Generate()"}},"_meta":{meta}}}}}"#
@@ -61,15 +61,11 @@ fn a_windows_bake_progress_reaches_a_call_with_a_progress_token() {
 fn resources_read_works_without_any_engine() {
     // The scripting-API resource is embedded, so attach mode serves it even with no
     // window running — you can read the API doc before opening the engine.
-    let bogus = if cfg!(windows) {
-        "127.0.0.1:1".to_string()
-    } else {
-        // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is ~104 bytes)
-        std::env::temp_dir()
-            .join("rusty-attach-noengine.sock")
-            .display()
-            .to_string()
-    };
+    // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is ~104 bytes)
+    let bogus = std::env::temp_dir()
+        .join("rusty-attach-noengine.sock")
+        .display()
+        .to_string();
     let out = drive(
         bogus,
         &[

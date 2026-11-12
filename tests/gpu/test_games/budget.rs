@@ -3,11 +3,9 @@
 //! at the hang guard. The children are `sleep` and `sh`, not games, so each
 //! proof costs a second or two.
 
-#[cfg(unix)]
 use std::process::Command;
 use std::time::Duration;
 
-#[cfg(unix)]
 use super::measure;
 use super::measure::Measured;
 use super::HANG_FACTOR;
@@ -35,7 +33,6 @@ pub(super) fn verdict(name: &str, run: &Measured, budget: Duration) -> Result<()
 
 // The proofs run `sh` and read `wait4`'s CPU time: Unix only (off Unix the budget
 // falls back to wall time, which a sleeping child would fail).
-#[cfg(unix)]
 fn sh(script: &str, budget: Duration) -> Measured {
     measure::run(
         Command::new("sh").arg("-c").arg(script),
@@ -43,7 +40,6 @@ fn sh(script: &str, budget: Duration) -> Measured {
     )
 }
 
-#[cfg(unix)]
 #[test]
 fn a_child_that_sleeps_past_its_budget_passes() {
     let budget = Duration::from_millis(500);
@@ -55,7 +51,6 @@ fn a_child_that_sleeps_past_its_budget_passes() {
     assert_eq!(verdict("sleeper", &run, budget), Ok(()));
 }
 
-#[cfg(unix)]
 #[test]
 fn a_child_that_spins_past_its_budget_fails_naming_it() {
     let budget = Duration::from_millis(200);
@@ -72,7 +67,6 @@ fn a_child_that_spins_past_its_budget_fails_naming_it() {
     );
 }
 
-#[cfg(unix)]
 #[test]
 fn a_child_that_hangs_is_killed_at_the_guard() {
     let budget = Duration::from_millis(200);

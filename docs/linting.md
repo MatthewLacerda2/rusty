@@ -72,6 +72,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
 | Self-naming headers | `tools/lint -- --rules` (`self-path`) | **hard gate**: a source file's first `//!` line (a shader's first `//` line) that opens with a path under `src/`, `tests/`, `tools/`, `fuzz/`, `engine/` or `.github/` names the file itself; a `mod.rs` may name its directory (`src/scene/prefab/`). No header, or one opening with prose, is fine (#1654) |
 | Shared process | `make test-one-process` (`cargo test --features dev --tests`) | **signal**, never a gate: the `dev` suite with every test of a binary in one process, so a test leaking process-wide state (a moved working directory, a `static` left set), which nextest's process per test hides, is named (it broke the mutation baseline four times while cargo-mutants ran `cargo test`, #1844). Nightly on `main` in `cargo-test.yml` (both feature sets), filed by `main-health` when red; `gh workflow run cargo-test.yml --ref <branch>` runs it on a branch (#1338) |
+| Shipped platforms only | `tools/lint -- --rules` (`platform-cfg`) | **hard gate**: no code line of a scanned `.rs` file has a `cfg(…)` / `cfg!(…)` / `cfg_attr(…)` naming `windows` or `unix` (bare, `target_os` or `target_family`) — rusty ships for macOS and Linux, so the code is written unconditionally and a real split names `target_os = "macos"` / `"linux"` |
 | Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
 | Sim panic-freedom | clippy `unwrap_used` + `tools/lint -- --rules` (`unwrap-deny`) | **hard gate**: every sim row of the layer table carries `#![deny(clippy::unwrap_used)]` at its `mod.rs`, and no sim file lifts it; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`, which `--determinism` keeps set); no `allow`/`expect` of `unwrap_used` anywhere (`ESCAPE`, #961) (#195, #962) |
 | Skipped tests | `tools/lint -- --rules` (`skip`) | **hard gate**: `#[ignore]` / `#[cfg_attr(…, ignore)]` needs `// lint: allow(skip) <why>` (#935) |
@@ -483,6 +484,13 @@ new flag, gate, CI step or baseline.
   other line in `src/physics/` borrows a body or collider mutably. Building and
   removing (`insert_with_parent`, `remove`) are not borrows and are not matched
   (`rules/physics_borrow.rs`).
+- **`platform-cfg`** — rusty ships for macOS and Linux (CLAUDE.md), so a `cfg`
+  naming Windows is code nobody builds and a `unix` one is true everywhere it
+  runs. A code line whose `cfg(…)`, `cfg!(…)` or `cfg_attr(…)` names the word
+  `windows` or `unix` (bare, as `target_os = "…"`, or `target_family`) fails, in
+  every scanned root; a `cfg` in a comment or a string literal passes. Write the
+  code unconditionally; a real macOS / Linux difference names `target_os`
+  (`rules/platform_cfg.rs`).
 - **`prefix-group`** — CLAUDE.md's "group by subfolder, not by filename prefix".
   Three or more sibling `.rs` files whose names start with the same word (up to the
   first `_` or `-`) fail. Files count by stem, so `x.rs` and `x_tests.rs` are one,

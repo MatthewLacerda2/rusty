@@ -91,7 +91,7 @@ fn gpu_shader_override_with_an_unreadable_path_falls_back_instead_of_panicking()
 ///
 /// Asserted in the same test as the render rather than its own: a second `Renderer`
 /// is a whole device + pipelines + shadow maps, and enough concurrent ones exhaust
-/// memory on a software adapter (Windows CI's WARP).
+/// memory on a software adapter (lavapipe renders into system RAM).
 #[test]
 fn gpu_a_shader_override_renders_and_stays_on_its_own_view() {
     let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {

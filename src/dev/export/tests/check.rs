@@ -37,7 +37,6 @@ fn an_output_overlapping_the_project_is_refused() {
     }
 }
 
-#[cfg(unix)]
 #[test]
 fn an_output_reaching_the_project_through_a_symlink_is_refused() {
     let dir = crate::test_temp::dir();

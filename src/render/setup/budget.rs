@@ -5,12 +5,12 @@
 //! simultaneously, so the test suite's peak GPU memory was whatever the machine
 //! happened to schedule — an *emergent* ceiling, written down nowhere.
 //!
-//! That ceiling was real. On the Windows CI runner there is no GPU, so wgpu selects
-//! **WARP**, Microsoft's software rasterizer, whose textures live in ordinary system
-//! RAM alongside rustc and the test harness. Adding three GPU tests in #365 pushed it
-//! over, and the failure landed on two *unrelated* pre-existing tests as a bare
-//! `Queue::write_texture: Not enough memory left.` — a diagnosis that cost a
-//! cross-platform timing comparison and a feature-set differential to reach (#366).
+//! That ceiling was real. A CI runner with no GPU renders on a software adapter, whose
+//! textures live in ordinary system RAM alongside rustc and the test harness. Adding
+//! three GPU tests in #365 pushed it over, and the failure landed on two *unrelated*
+//! pre-existing tests as a bare `Queue::write_texture: Not enough memory left.` — a
+//! diagnosis that cost a cross-platform timing comparison and a feature-set
+//! differential to reach (#366).
 //!
 //! So the limit becomes explicit: [`MAX_CONCURRENT_HEADLESS`], enforced by an RAII
 //! permit that a headless renderer holds for its whole life.

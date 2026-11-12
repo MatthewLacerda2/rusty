@@ -300,7 +300,7 @@ What `make mergeable` asks:
 - **A Markdown-only change to a `CODE_DOCS` file** needs `build-test`'s dev test
   step to have really run.
 
-It ignores what is not a gate: `main-health`, coverage, mutation and Windows,
+It ignores what is not a gate: `main-health`, coverage, mutation and `cargo-test`,
 and jobs outside a gate's `needs:` (a `ci` run counts as settled once `ci-gate`
 concluded). Its tests run in `make scripts`.
 

@@ -22,7 +22,7 @@ from merging.watch import ending, lock, loop
 POLL_SECONDS = 30
 
 # The ceiling on one branch, in minutes: well past a cold run (the macOS job
-# is the slow one since Windows left the gate, #741), because giving up early
+# is the slow one), because giving up early
 # hands back a branch about to go green. Reaching it is a hand-back, never a merge.
 DEADLINE_MINUTES = 45
 

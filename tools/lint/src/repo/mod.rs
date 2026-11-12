@@ -38,18 +38,11 @@ pub fn git(root: &Path) -> Command {
     cmd
 }
 
-/// Git's file names are raw bytes: on Unix they are kept as such, so a name that
-/// isn't UTF-8 still names the file on disk.
+/// Git's file names are raw bytes, kept as such, so a name that isn't UTF-8 still
+/// names the file on disk.
 fn path_of(bytes: &[u8]) -> PathBuf {
-    #[cfg(unix)]
-    {
-        use std::os::unix::ffi::OsStrExt;
-        PathBuf::from(std::ffi::OsStr::from_bytes(bytes))
-    }
-    #[cfg(not(unix))]
-    {
-        PathBuf::from(String::from_utf8_lossy(bytes).into_owned())
-    }
+    use std::os::unix::ffi::OsStrExt;
+    PathBuf::from(std::ffi::OsStr::from_bytes(bytes))
 }
 
 /// `git ls-files -z <flags> -- <pathspecs>` in the repository at `root`: the paths

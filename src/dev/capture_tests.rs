@@ -56,7 +56,7 @@ fn an_unused_host_builds_nothing() {
 /// than all four frames being the same blank sky.
 ///
 /// One host and one scenario deliberately, not a test per axis: each renderer is a
-/// device + pipelines + shadow maps, and on Windows CI's WARP (system RAM) enough
+/// device + pipelines + shadow maps, and on a software adapter (system RAM) enough
 /// concurrent ones exhaust memory mid-suite (#366). Sharing is also the point being
 /// made — the whole test is that sharing works.
 #[test]

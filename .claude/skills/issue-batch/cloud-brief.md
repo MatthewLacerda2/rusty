@@ -197,10 +197,6 @@ What cloud coders' run logs taught; each one cost a coder real time.
   invariance): `gh workflow run ci.yml --ref <branch>`, quoted in the PR.
   Lavapipe and x86_64 can pass where Metal or aarch64 fails. Never commit a
   golden hash taken on one platform (`docs/testing.md`).
-- **Windows runs on a branch only when asked** (it runs nightly on `main`): a
-  branch that touches paths, separators, process spawning or other platform code
-  dispatches `gh workflow run windows.yml --ref <branch>` and quotes the run in
-  its PR. Nothing else runs Windows on a PR.
 - Never fall back to `cargo test`: CI runs nextest, and its per-test process
   isolation and the `gpu` test group are what the gate measures.
 - Don't run `cargo mutants` locally; ask for a scoped run (above).

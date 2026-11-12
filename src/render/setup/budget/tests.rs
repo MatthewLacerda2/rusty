@@ -37,7 +37,7 @@ fn a_permit_frees_its_slot_when_dropped() {
 
 /// The invariant the whole issue exists for: however many threads pile in, the number
 /// alive at once never exceeds the cap. Fails against an unguarded constructor, which
-/// is the state #365 tripped over on Windows.
+/// is the state #365 tripped over on a software adapter.
 #[test]
 fn concurrency_never_exceeds_the_cap() {
     static B: Budget = Budget::new(2, TIMEOUT, unchecked);

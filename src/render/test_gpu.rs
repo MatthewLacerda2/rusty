@@ -26,7 +26,7 @@ use crate::render::REQUIRE_GPU_ENV;
 ///
 /// `None` means **skip, don't fail**, so a GPU-less machine still runs the rest of the
 /// suite. CI never relies on that path: every CI job has an adapter (Metal on macOS,
-/// WARP on Windows, Mesa's lavapipe on Linux, #489) and sets [`REQUIRE_GPU_ENV`], so
+/// Mesa's lavapipe on Linux, #489) and sets [`REQUIRE_GPU_ENV`], so
 /// the canary below fails if the driver ever goes missing instead of letting every GPU
 /// test quietly skip. A test that cannot tolerate being skipped locally does not belong
 /// on the GPU — pin the rule it cares about with an adapter-free unit test as well.

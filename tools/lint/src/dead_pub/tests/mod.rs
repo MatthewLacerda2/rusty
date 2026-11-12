@@ -76,8 +76,12 @@ fn platform_cfg_is_found_in_a_file_and_in_its_declaring_mod() {
     assert!(mentions_platform(
         "#[cfg(target_os = \"macos\")]\nfn f() {}"
     ));
-    assert!(mentions_platform("#[cfg(not(windows))]\nfn f() {}"));
-    assert!(!mentions_platform("// cfg(unix)\nfn f() {}\n#[cfg(test)]"));
+    assert!(mentions_platform(
+        "#[cfg(not(target_os = \"linux\"))]\nfn f() {}"
+    ));
+    assert!(!mentions_platform(
+        "// cfg(target_os)\nfn f() {}\n#[cfg(test)]"
+    ));
     let dir = std::env::temp_dir().join(format!("lint_dead_pub_gated_{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(dir.join("src/s")).unwrap();
@@ -88,7 +92,10 @@ fn platform_cfg_is_found_in_a_file_and_in_its_declaring_mod() {
     );
     put("src/s/mac.rs", "pub fn dock() {}\n");
     put("src/s/plain.rs", "pub fn nothing() {}\n");
-    put("src/s/own.rs", "#[cfg(unix)]\npub fn u() {}\n");
+    put(
+        "src/s/own.rs",
+        "#[cfg(target_os = \"linux\")]\npub fn u() {}\n",
+    );
     let flagged = is_gated(&dir, "src/s/mac.rs") && is_gated(&dir, "src/s/own.rs");
     let passed = !is_gated(&dir, "src/s/plain.rs");
     let _ = fs::remove_dir_all(&dir);

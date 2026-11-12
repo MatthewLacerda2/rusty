@@ -1,36 +1,19 @@
 //! The fake engine: a listener speaking the #282 framed line protocol, plus the driver.
 
 use std::io::{BufRead, BufReader, Write};
+use std::os::unix::net::{UnixListener, UnixStream};
 use std::thread;
 
 use serde_json::Value;
 
 use rusty::dev::mcp::{self, attach::SocketClient};
 
-/// A connection splittable into reader + writer halves — both fake transports
-/// (unix socket, loopback TCP) provide `try_clone`.
-trait Dup: std::io::Read + Write + Sized {
-    fn dup(&self) -> std::io::Result<Self>;
-}
-#[cfg(unix)]
-impl Dup for std::os::unix::net::UnixStream {
-    fn dup(&self) -> std::io::Result<Self> {
-        self.try_clone()
-    }
-}
-#[cfg(windows)]
-impl Dup for std::net::TcpStream {
-    fn dup(&self) -> std::io::Result<Self> {
-        self.try_clone()
-    }
-}
-
 /// Per-connection: read each command line and reply with a framed JSON line that
 /// echoes the received line back as the `result`, so a test can assert the exact line
 /// crossed the socket. A line that asks for progress (`ASK`, #1999) streams one
 /// progress line first and has the ask taken off.
-fn serve<S: Dup>(stream: S) {
-    let mut writer = match stream.dup() {
+fn serve(stream: UnixStream) {
+    let mut writer = match stream.try_clone() {
         Ok(w) => w,
         Err(_) => return,
     };
@@ -56,9 +39,7 @@ fn serve<S: Dup>(stream: S) {
 /// Spawn a fake engine on a fresh address and return that address for
 /// `SocketClient::new`. The accept loop handles one connection at a time — all the
 /// per-call-connecting client needs.
-#[cfg(unix)]
 pub(super) fn fake_engine() -> String {
-    use std::os::unix::net::UnixListener;
     use std::sync::atomic::{AtomicU32, Ordering};
     // Cargo runs the tests in one process, so a process-id path would collide between
     // tests; a per-bind counter keeps each fake engine's socket distinct.
@@ -75,18 +56,6 @@ pub(super) fn fake_engine() -> String {
         }
     });
     path.display().to_string()
-}
-#[cfg(windows)]
-pub(super) fn fake_engine() -> String {
-    use std::net::TcpListener;
-    let listener = TcpListener::bind("127.0.0.1:0").expect("bind fake engine");
-    let addr = listener.local_addr().unwrap().to_string();
-    thread::spawn(move || {
-        for stream in listener.incoming().flatten() {
-            serve(stream);
-        }
-    });
-    addr
 }
 
 /// Drive JSON-RPC lines through the attach backend against `addr` and parse the

@@ -141,8 +141,8 @@ mod tests {
     ];
 
     /// Every shipped shader must compose against the registered `common` module
-    /// without a GPU. This catches `#import` / module-name regressions on Linux
-    /// CI — the GPU screenshot test only exercises this path on macOS/Windows.
+    /// without a GPU, so an `#import` / module-name regression fails here before
+    /// any adapter is asked for.
     #[test]
     fn all_shaders_compose() {
         let mut registry = ShaderRegistry::new("engine/shaders");

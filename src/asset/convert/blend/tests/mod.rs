@@ -12,10 +12,8 @@ mod drop;
 mod fingerprint;
 mod library_image;
 mod linked;
-#[cfg(unix)]
 mod locate;
 mod packed_formats;
-#[cfg(unix)]
 mod run;
 
 pub(super) fn fixture(name: &str) -> PathBuf {

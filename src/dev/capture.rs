@@ -4,10 +4,9 @@
 //! same line: build a whole `Renderer`, draw one frame, drop it. A `Renderer` is a wgpu
 //! device, the full pipeline set, the shader registry, the shadow maps and every cached
 //! mesh/texture, so "one shot, one device" meant a scenario taking six screenshots paid
-//! for six devices, and a test comparing an effect on-vs-off paid for two. On Windows CI
-//! that cost is not abstract: WARP is a software adapter whose textures live in system
-//! RAM beside rustc, and unbounded concurrent renderers is exactly what exhausted it in
-//! #366.
+//! for six devices, and a test comparing an effect on-vs-off paid for two. On a
+//! software adapter that cost is not abstract: its textures live in system RAM beside
+//! rustc, and unbounded concurrent renderers is exactly what exhausted it in #366.
 //!
 //! That pattern existed because it *had* to. The renderer was a single-view machine:
 //! size, depth buffer and post-FX chain were one shared copy, so a second consumer could
