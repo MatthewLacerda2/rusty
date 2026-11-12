@@ -51,7 +51,8 @@ your vendor dashboard for the real bill.
   feature.
 - **Edit mode only.** Provider verbs are refused during Play. Generation is
   authoring, and a network call inside the sim would break the determinism the
-  harness depends on.
+  harness depends on. The determinism guard scans for clocks, not sockets, so this
+  rule is what keeps the network out of the sim.
 - **No test makes a real call.** Every provider sits behind a trait, and tests use
   mocks. A headless run (a harness scenario, a bench) refuses every provider verb
   for its whole life, before its world enters Play too.
