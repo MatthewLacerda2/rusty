@@ -21,7 +21,8 @@ pub(super) fn register(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Result<(), Str
         lua.create_function(
             move |lua, (id, spec, contexts, mode): (EntityArg, Table, Option<Table>, Option<String>)| {
                 let mode = read_mode(mode.as_deref(), "Request")?;
-                let (owner, progress) = with_query(lua, &c, id, "Request", &spec, contexts, |world, querier, spec| {
+                let args = (id, spec, contexts);
+                let (owner, progress) = with_query(lua, &c, "Request", args, |world, querier, spec| {
                     (querier.entity.unwrap_or(0), Progress::start(world, querier, spec))
                 })?;
                 let queries = c.queries.get(lua)?;
@@ -49,6 +50,12 @@ pub(super) fn register(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Result<(), Str
             }
         }),
     )?;
+    register_cancel_and_budget(lua, table, ctx)
+}
+
+/// `Cancel`, and the budget's setter and getter.
+fn register_cancel_and_budget(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Result<(), String> {
+    let c = *ctx;
     put(
         table,
         "Cancel",

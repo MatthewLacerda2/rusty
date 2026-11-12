@@ -95,6 +95,9 @@ impl GameWorld {
 /// Register the play-mode systems into the schedule, in the exact order the old
 /// hand-wired loop ran them. The sim systems live in `FixedUpdate`, headed by the
 /// `Debug.Draw*` lines ageing (#1882).
+/// `serve_queries` (#2116) follows the scripts, so the environment queries they
+/// requested this tick get their share of the tick's search budget before
+/// `tick_nav` serves the agents' paths.
 /// The graph evaluator (#316) sits after the scripts (so parameters set this tick
 /// are seen) and right before `animate` (so a fired transition is sampled the
 /// same tick). `late_update_scripts` (#324) runs after physics, animation and

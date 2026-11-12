@@ -37,7 +37,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
         lua.create_function(
             move |lua, (id, spec, contexts, mode): (EntityArg, Table, Option<Table>, Option<String>)| {
                 let mode = read_mode(mode.as_deref(), "Run")?;
-                let ranked = run(lua, &c, id, "Run", &spec, contexts)?;
+                let ranked = run(lua, &c, "Run", (id, spec, contexts))?;
                 let picked = c.random.with(lua, |rng| Ok(query::pick(&ranked, mode, &mut rng.borrow_mut())))?;
                 Ok(answer(picked))
             },
@@ -48,7 +48,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
         "RunAll",
         lua.create_function(
             move |lua, (id, spec, contexts): (EntityArg, Table, Option<Table>)| {
-                let ranked = run(lua, &c, id, "RunAll", &spec, contexts)?;
+                let ranked = run(lua, &c, "RunAll", (id, spec, contexts))?;
                 let list = lua.create_table()?;
                 for (i, item) in ranked.iter().enumerate() {
                     let t = lua.create_table()?;
@@ -89,16 +89,12 @@ fn read_mode(name: Option<&str>, verb: &str) -> mlua::Result<RunMode> {
     }
 }
 
+/// A query call's arguments: the querier, the spec and the contexts.
+type QueryArgs = (EntityArg, Table, Option<Table>);
+
 /// Resolve the querier and contexts, read the spec, and run it: the ranked items.
-fn run(
-    lua: &Lua,
-    c: &ApiCtx,
-    id: EntityArg,
-    verb: &str,
-    spec: &Table,
-    contexts: Option<Table>,
-) -> mlua::Result<Vec<Item>> {
-    with_query(lua, c, id, verb, spec, contexts, |world, querier, spec| {
+fn run(lua: &Lua, c: &ApiCtx, verb: &str, args: QueryArgs) -> mlua::Result<Vec<Item>> {
+    with_query(lua, c, verb, args, |world, querier, spec| {
         query::run(world, querier, &spec)
     })
 }
@@ -108,10 +104,8 @@ fn run(
 fn with_query<R>(
     lua: &Lua,
     c: &ApiCtx,
-    id: EntityArg,
     verb: &str,
-    spec: &Table,
-    contexts: Option<Table>,
+    (id, spec, contexts): QueryArgs,
     f: impl FnOnce(&QueryWorld, Anchor, QuerySpec) -> R,
 ) -> mlua::Result<R> {
     let id = id.live("EnvironmentQuery", verb)?;
@@ -119,7 +113,7 @@ fn with_query<R>(
     let scene = scene.borrow();
     let querier = contexts::entity(&scene, id, &format!("EnvironmentQuery.{verb}: querier"))?;
     let contexts = Contexts::read(&scene, querier, contexts)?;
-    let spec = spec::read(spec, &contexts)?;
+    let spec = spec::read(&spec, &contexts)?;
     let (nav, physics, camera) = (c.nav.get(lua)?, c.physics.get(lua)?, c.camera.get(lua)?);
     let (screen, video) = (c.screen.get(lua)?, c.video.get(lua)?);
     let (nav, physics) = (nav.borrow(), physics.borrow());
