@@ -1,5 +1,4 @@
-//! One line through the boundary (#386), with a mock speaker that answers with a
-//! committed MP3 fixture and counts its calls. No test holds the real client.
+//! One line through the boundary (#386), with a mock speaker; no test holds the real one.
 
 use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
@@ -18,14 +17,14 @@ const MP3: &[u8] = include_bytes!("../../../../asset/audio/fixtures/loop.mp3");
 struct Mock {
     calls: Cell<u32>,
     last: RefCell<Option<(String, String, Speak)>>,
-    refuse: Option<String>,
+    answer: Option<Unspoken>,
 }
 
 impl Speaker for Mock {
-    fn speak(&self, key: &Secret, voice: &str, body: &Speak) -> Result<Vec<u8>, String> {
+    fn speak(&self, key: &Secret, voice: &str, body: &Speak) -> Result<Vec<u8>, Unspoken> {
         self.calls.set(self.calls.get() + 1);
         *self.last.borrow_mut() = Some((key.expose().into(), voice.into(), body.clone()));
-        self.refuse.clone().map_or(Ok(MP3.to_vec()), Err)
+        self.answer.clone().map_or(Ok(MP3.to_vec()), Err)
     }
 }
 
@@ -46,6 +45,11 @@ fn run(
     generate(draft("Contact, second floor."), &at, mock)
 }
 
+fn spent(root: &Path) -> u64 {
+    let ledger = Ledger::load(&root.join("provider_budget.json"));
+    ledger.unwrap().spent_cents
+}
+
 fn path(r: Realised) -> PathBuf {
     match r {
         Realised::Cached(p) | Realised::Generated(p) => p,
@@ -60,10 +64,9 @@ fn a_line_generates_once_as_a_wav_is_charged_once_and_is_cached() {
     assert!(matches!(first, Realised::Generated(_)));
     let file = root.join(path(first.clone()));
     let bytes = std::fs::read(&file).unwrap();
-    assert_eq!(
-        &bytes[..4],
-        b"RIFF",
-        "the MP3 is converted to WAV on arrival"
+    assert!(
+        bytes.starts_with(b"RIFF"),
+        "the MP3 becomes a WAV on arrival"
     );
     assert_eq!(Sidecar::load(&file).unwrap().generated_on, "2026-10-05");
 
@@ -71,8 +74,7 @@ fn a_line_generates_once_as_a_wav_is_charged_once_and_is_cached() {
     assert_eq!(second, Realised::Cached(path(first)));
     assert_eq!(mock.calls.get(), 1, "a cache hit calls nothing");
     // Flash, 22 characters: 1 cent, charged once.
-    let ledger = Ledger::load(&root.join("provider_budget.json")).unwrap();
-    assert_eq!(ledger.spent_cents, 1);
+    assert_eq!(spent(&root), 1);
 }
 
 #[test]
@@ -125,14 +127,24 @@ fn no_key_or_no_budget_spends_nothing() {
 fn a_vendor_refusal_writes_nothing_and_charges_nothing() {
     let root = scratch("386_vendor");
     let mock = Mock {
-        refuse: Some("ElevenLabs has no voice `voice-123`".into()),
+        answer: Some(Unspoken::Refused("no voice `voice-123`".into())),
         ..Mock::default()
     };
     let err = run(&root, false, &keyed(), &mock).unwrap_err();
-    assert!(err.to_string().contains("voice-123"), "{err}");
+    assert!(matches!(&err, SpeechError::Vendor(w) if w.contains("voice-123")));
     assert!(!root.join("project").exists(), "no file written");
-    assert!(
-        !root.join("provider_budget.json").exists(),
-        "nothing charged"
-    );
+    assert!(!root.join("provider_budget.json").exists(), "no charge");
+}
+
+#[test]
+fn an_unreadable_200_writes_nothing_and_is_charged() {
+    let root = scratch("386_unreadable");
+    let mock = Mock {
+        answer: Some(Unspoken::Unreadable("not base64".into())),
+        ..Mock::default()
+    };
+    let err = run(&root, false, &keyed(), &mock).unwrap_err();
+    assert!(matches!(err, SpeechError::Unplayable(_)), "{err}");
+    assert!(!root.join("project").exists(), "no file written");
+    assert_eq!(spent(&root), 1);
 }

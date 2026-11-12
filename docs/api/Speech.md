@@ -17,7 +17,7 @@ never bills.
 | `Speech.Generate` | `(brief)` | the generated `.wav`'s path; or `nil, why` when the brief is not finished |
 | `Speech.Voices` | `([refresh])` | `voices, source`: every voice on the account (free) |
 | `Speech.FindVoice` | `(query [, refresh])` | `voices, source`: those whose name or a label contains `query` |
-| `Speech.VoiceInfo` | `(id)` | the voice; or `nil, why` when it is withdrawn or not on this plan |
+| `Speech.VoiceInfo` | `(id)` | the voice (and a note when it is a Voice Library voice not yet saved); or `nil, why` when it is withdrawn or not on this plan |
 
 ```lua no-run
 local wav = Speech.Generate({
@@ -32,17 +32,18 @@ Audio.PlayAt(wav, 0, 1.6, 4)
 
 | Field | | Meaning |
 |---|---|---|
-| `text` | required | The words. At most 40,000 characters. |
-| `voice` | required | An ElevenLabs voice id. **No default exists**: every vendor default voice expires on 2026-12-31. |
-| `model` | optional | `eleven_flash_v2_5` (**default**, 5¢ / 1000 chars), `eleven_multilingual_v2` (10¢), `eleven_v3` (10¢, most expressive). |
+| `text` | required | The words. At most 40,000 characters on `eleven_flash_v2_5`, 10,000 on `eleven_multilingual_v2` and `eleven_v4`. |
+| `voice` | required | An ElevenLabs voice id: letters, digits, `-` and `_` only. **No default exists**: every vendor default voice expires on 2026-12-31. |
+| `model` | optional | `eleven_flash_v2_5` (**default**, 4¢ / 1000 chars), `eleven_multilingual_v2` (8¢), `eleven_v4` (8¢, most expressive). |
 | `language` | optional | ISO 639-1 code pinning the reading. Refused on `eleven_multilingual_v2`, which accepts it and silently ignores it. |
 | `seed` | optional | Integer. **Best-effort, not guaranteed**: the one place in the engine where "same input, same bytes" is a hope rather than a promise. |
 
 ### What a call does
 
 1. **Refused during Play** — raises.
-2. **Local refusals** — empty `text`, more than 40,000 characters, no `voice`, an
-   unknown `model`, `language` on `eleven_multilingual_v2`. Each returns
+2. **Local refusals** — empty `text`, more characters than the model speaks, no
+   `voice` or one that is not a voice id, an unknown `model`, `language` on
+   `eleven_multilingual_v2`. Each returns
    `nil, why` naming the field, and **does not raise**, so a loop over twenty lines
    loses none to one unfinished brief:
    ```lua no-run
@@ -94,7 +95,10 @@ print(source)  -- "3 ElevenLabs voices, out of the project's cache, read today. 
 - **`Speech.VoiceInfo(id)`** — asks the vendor about one id, **never from the cache**.
   A voice that is gone returns `nil, "voice <id> is withdrawn: …"`; one the account's
   plan may not use returns `nil, "… not on this plan …"`. **Nothing is ever
-  substituted.** No key, a key without `voices_read`, or a vendor that cannot be
+  substituted.** A voice published in the ElevenLabs Voice Library that the account
+  has not saved returns the voice and a second value saying so: any paid plan
+  generates with it (and the first line saves it to the account), a free plan is
+  refused. No key, a key without `voices_read`, or a vendor that cannot be
   reached raise instead: those say nothing about the voice.
 
 **The cache, and its staleness.** The list is kept per project under

@@ -664,9 +664,9 @@ What is not one row's lives in `tools/lint/src/layers/externs/policy.rs`:
 - **`common`** — the vocabulary any module may name unlisted: `glam`, `serde`,
   `serde_json`, `log`.
 - **`unscoped`** — dependencies no module names, each with why it is in
-  `Cargo.toml`. It is empty today: `env_logger` left the list when `src/logging`
-  took it over (#1139), and `getrandom`, a feature pin (#552), when its pin was
-  dropped (#1334).
+  `Cargo.toml`. One today: `getrandom`, a feature pin that keeps the `dev` build
+  and its tests on one dependency graph (`Cargo.toml` says why); it is never
+  `use`d.
 - **`confined`** — crates only some subtrees may name, finer than a module: the
   `egui` crates only under `src/editor` and `src/shell/editor` (the `editor`
   feature, #431), the provider crates only under `src/dev/providers` (#383).

@@ -93,12 +93,11 @@ fn a_prompt_influence_outside_zero_to_one_is_refused() {
 }
 
 #[test]
-fn the_estimate_is_the_dated_rate_per_second_rounded_up() {
-    // 0.4¢ a second (price::MILLS_PER_SECOND), rounded up per call.
-    assert_eq!(price::CHECKED, "2026-10-06");
+fn the_estimate_is_scorsese_sound_rate_rounded_up() {
+    // 12¢ a minute (`prices::elevenlabs::SOUND`), rounded up per call.
     assert_eq!(estimate_cents(0.5), 1);
-    assert_eq!(estimate_cents(2.5), 1);
-    assert_eq!(estimate_cents(2.501), 2);
-    assert_eq!(estimate_cents(10.0), 4);
-    assert_eq!(estimate_cents(30.0), 12);
+    assert_eq!(estimate_cents(5.0), 1);
+    assert_eq!(estimate_cents(5.001), 2);
+    assert_eq!(estimate_cents(10.0), 2);
+    assert_eq!(estimate_cents(30.0), 6);
 }

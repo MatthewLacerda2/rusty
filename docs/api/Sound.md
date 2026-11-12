@@ -45,7 +45,7 @@ or option raises a Lua error naming what was wrong, and writes no file.
 
 | Field | Default | Meaning |
 |---|---|---|
-| `duration` | `0.5` | Gate length in seconds — how long the note is *held*. The amp release rings out **after** it, and an fx chain adds its own tail, so the file is longer than this. |
+| `duration` | `0.5` | Gate length in seconds — how long the note is *held*. The amp release rings out **after** it and an fx chain adds its own tail, and the file **ends where the sound does**: past the gate for a held note, short of it for a hit that decays to silence first (that hit writes the same file under any longer `duration`). |
 | `velocity` | `0.8` | Striking force, `0..1`, scaling the note's peak amplitude. |
 | `timbre` | `0.0` | How far this strike's *brightness* sits from its level, in velocity units: added to `velocity` only for the routings that read velocity as effort (a filter's `vel_octaves`, `fm2`'s `vel_index`), so a note can be brighter without being louder. |
 | `glide` | none | `{ semitones, seconds }` — the note starts `semitones` away from its pitch (positive = above) and slides onto it over `seconds`. Both fields required. |
@@ -54,9 +54,10 @@ or option raises a Lua error naming what was wrong, and writes no file.
 ### The patch shape
 
 The signal path is **fixed** — `source → filter → amp envelope → fx`, with an
-optional pitch envelope and one LFO tapping one target. You choose what fills each
-stage, never how they connect; that is what makes a patch playable as a note.
-`source` and `amp` are mandatory, the rest optional.
+optional pitch envelope, up to three extra `layers` summed in before the fx, and up
+to two LFOs. You choose what fills each stage, never how they connect; that is what
+makes a patch playable as a note. `source` and `amp` are mandatory, the rest
+optional.
 
 ```lua
 {
@@ -79,16 +80,25 @@ The stages at a glance (field-level detail is in zimmer's rustdoc, `zimmer::patc
   `sine`/`triangle`/`saw`/`square`, each with optional unison `voices`/`spread`),
   `karplus` (plucked string), `noise` (`color` = `white`/`pink`/`brown`), `fm2`
   (2-operator FM), `fm4` (4-operator FM with per-operator envelopes) and `additive`
-  (a series of partials).
+  (a series of partials). A `square` takes a `pulse_width` (`0.5`, the default, is
+  square); an `osc_stack`'s unison spreads across the stereo field with `width`.
 - **`filter`** — `kind` ∈ `lowpass`/`highpass`/`bandpass`/`notch`, `cutoff` in Hz,
   `resonance`, `slope`, and its own `adsr`. Modulation is in **octaves**: the cutoff
-  is `cutoff × 2^(env_octaves × env + vel_octaves × velocity + lfo)`.
+  is `cutoff × 2^(env_octaves × env + vel_octaves × velocity + lfo)`, and
+  `key_track` (`0` by default, `1` follows the note exactly) makes it follow the pitch.
   *(Before #413 these were `env_amount`/`vel_cutoff` in Hz; an old patch using them
   is refused by name, not misread.)*
 - **`amp`** — the mandatory ADSR: `a`/`d`/`r` in seconds, `s` a level `0..1`.
 - **`pitch_env`** — a pitch shape the instrument puts on every note (a kick's drop).
-- **`lfo`** — one sine at `rate` Hz on one `target`: `pitch` (semitones), `cutoff`
-  (octaves) or `amp` (tremolo).
+- **`layers`** — up to three more sounds in the same note (a snare's crack over its
+  body, a kick's click over its sine), each its own `source`, `filter`, `amp`,
+  `pitch_env` and `gain`, added to the patch's own sound before its one `fx` chain.
+- **`lfo`**, **`lfo2`** — each at `rate` Hz (or `beats`, inside a song) on one
+  `target`: `pitch` (semitones), `cutoff` (octaves), `amp` (tremolo) or `pulse_width`
+  (every `square`). `shape` is `sine` *(default)*, `triangle`, `saw_up`, `saw_down`,
+  `square` or `random` (a seeded sample-and-hold); `delay` and `fade` (seconds) hold
+  it back and grow it in, for vibrato arriving on a held note. Two aimed at one target
+  add.
 - **`fx`** — applied in list order, tagged by `fx`: `delay`, `reverb` (stereo),
   `saturate`, `compress`, `chorus`, `eq`. The bake limiter is **not** listed here: it
   is not a choice.

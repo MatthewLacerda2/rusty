@@ -1,7 +1,7 @@
 //! A `Sound` re-bake reaches the clip cache (#1208): the cache the device backend
 //! keeps for the whole session plays what was baked last at a path.
 
-use super::fixture::{lua_with_sound, tmp, IMPACT_PATCH};
+use super::fixture::{lua_with_sound, tmp, HELD_PATCH};
 
 /// The shared cache contract (#1207, #1208): one clip cache, as the device backend
 /// keeps for the session, plays a path baked after it was first played, then the
@@ -18,7 +18,7 @@ fn the_clip_cache_follows_bakes_at_one_path() {
         |p, which| {
             let duration = seconds(which);
             let call =
-                format!(r#"Sound.Bake({IMPACT_PATCH}, "C2", "{p}", {{ duration = {duration} }})"#);
+                format!(r#"Sound.Bake({HELD_PATCH}, "C2", "{p}", {{ duration = {duration} }})"#);
             lua.load(call).exec().expect("the bake runs");
         },
         |p| cache.get_or_decode(p).map(|clip| clip.frames()),

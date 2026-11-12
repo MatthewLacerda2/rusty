@@ -12,7 +12,9 @@
 //! The machinery is scorsese's `voices` module, used as-is: the cache under the
 //! project's `cache/voices/` (re-read after [`REFRESH_AFTER_DAYS`] or on demand,
 //! and every answer saying how old it is), the fallback to a stale list when the
-//! vendor cannot be asked, and the sorting of a 404 into [`Unusable::Gone`]. rusty
+//! vendor cannot be asked, and the reading of a 404: the Voice Library is asked
+//! next, so a voice found there is [`Availability::InLibrary`] and only one found
+//! nowhere is [`Unusable::Gone`]. rusty
 //! adds the account-wide paginated listing ([`Account`], [`every_page`]), the name/label filter and
 //! the Play check.
 
@@ -106,6 +108,16 @@ pub fn info(
 ) -> Result<Availability, VoicesError> {
     edit_mode(playing)?;
     catalogue.one(voice_id).map_err(VoicesError::Catalogue)
+}
+
+/// What a script is told about a Voice Library voice the account has not saved:
+/// usable, but only on a paid plan.
+pub fn in_library(voice_id: &str) -> String {
+    format!(
+        "voice {voice_id} is in the ElevenLabs Voice Library, not yet saved to the \
+         account: any paid plan can generate with it (a free plan cannot), and the \
+         first line spoken saves it"
+    )
 }
 
 /// What a script is told about a voice it cannot use: named, and never replaced.

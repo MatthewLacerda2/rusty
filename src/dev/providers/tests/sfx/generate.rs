@@ -55,14 +55,14 @@ fn an_effect_generates_once_as_a_wav_is_charged_once_and_is_cached() {
     assert!(path(first.clone()).to_string_lossy().contains("sfx-"));
     assert_eq!(&std::fs::read(&file).unwrap()[..4], b"RIFF");
     let sidecar = Sidecar::load(&file).unwrap();
-    assert_eq!((sidecar.kind.as_str(), sidecar.estimate_cents), ("sfx", 5));
+    assert_eq!((sidecar.kind.as_str(), sidecar.estimate_cents), ("sfx", 3));
 
     let second = run(&root, false, &keyed(), &mock).unwrap();
     assert_eq!(second, Realised::Cached(path(first)));
     assert_eq!(mock.calls.get(), 1, "a cache hit calls nothing");
-    // 12 s at 0.4¢: 4.8, rounded up to 5, charged once.
+    // 12 s at 12¢ a minute: 2.4, rounded up to 3, charged once.
     let ledger = Ledger::load(&root.join("provider_budget.json")).unwrap();
-    assert_eq!(ledger.spent_cents, 5);
+    assert_eq!(ledger.spent_cents, 3);
 }
 
 #[test]
@@ -97,7 +97,7 @@ fn no_key_or_no_budget_spends_nothing() {
         SfxError::Refused(Refusal::MissingKey { .. })
     ));
     let broke = Ledger {
-        budget_cents: 4,
+        budget_cents: 2,
         spent_cents: 0,
     };
     broke.save(&root.join("provider_budget.json")).unwrap();

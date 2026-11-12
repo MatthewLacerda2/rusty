@@ -1,10 +1,9 @@
-//! The three verbs over a mocked catalogue: the cache, the filter, a withdrawn
-//! voice and Play. No key, no network.
+//! The three verbs over a mocked catalogue: cache, filter, withdrawn voice, Play. No network.
 
 use std::cell::Cell;
 
 use scorsese_providers::api::elevenlabs::voices::Filters;
-use scorsese_providers::voices::Page;
+use scorsese_providers::voices::{Origin, Page};
 
 use super::super::super::voices::*;
 use super::{captured, scratch};
@@ -36,6 +35,13 @@ impl Catalogue for Mock {
             Some(voice) => Availability::Available(voice.clone()),
             None => Availability::Unusable(Unusable::Gone),
         })
+    }
+    fn origin(&self, id: &str) -> Result<Option<Origin>, VoiceError> {
+        Ok(self
+            .voices
+            .iter()
+            .any(|v| v.id == id)
+            .then_some(Origin::Builtin))
     }
     fn name(&self) -> &'static str {
         "mock"

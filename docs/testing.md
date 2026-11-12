@@ -436,8 +436,11 @@ Cargo resolves features for `cargo build` without the dev-dependencies. If a
 dev-dependency switches on a feature that the normal build leaves off, `cargo test`
 compiles its own copy of that crate, of everything above it, and of rusty. proptest
 did this to `getrandom`'s `std` feature, and that doubled ahash, hecs, wgpu and egui
-(#552). `Cargo.toml` once named `getrandom` with `std` directly to close the gap;
-#1334 builds proptest without its default features instead and dropped that pin.
+(#552). #1334 builds proptest without its default features to close that gap. Where
+a normal dependency brings in a crate a test-only one widens (`scorsese-providers`'
+`zip` and getrandom 0.4, under `dev`), `Cargo.toml` names that crate with the test
+build's features, as a `dev`-gated pin no code uses (listed `unscoped`, with its
+reason, in `tools/lint/src/layers/externs/policy.rs`).
 **Don't let a dev-dependency turn on a feature the normal build lacks.** The
 `feature-split` gate (`make feature-split`, `.github/scripts/feature_split.py`, #979)
 compares the two resolutions on every run. Test-only crates (proptest and its
