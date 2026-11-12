@@ -17,7 +17,9 @@ fn level(pad: usize, reversed: bool) -> (Scene, u32, u32) {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 0.5;
     scene.nav_settings.agent_radius = 0.25;
-    (0..pad).for_each(|_| drop(scene.add_entity("Survivor's id".into())));
+    for _ in 0..pad {
+        scene.add_entity("Survivor's id".into());
+    }
     let crates = [(2.0, 3.0), (5.0, 6.0)];
     let order: Vec<_> = match reversed {
         true => crates.iter().rev().collect(),
