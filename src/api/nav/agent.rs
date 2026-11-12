@@ -24,7 +24,7 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>, nav: ApiCell<NavigationGraph>)
     register_agent_queries(lua, &table, scene)?;
     register_agent_avoidance(lua, &table, scene)?;
     super::turning::register(lua, &table, scene)?;
-    super::path_state::register_reads(lua, &table, scene)?;
+    super::path_state::register_reads(lua, &table, scene, nav)?;
     super::path_state::register_writes(lua, &table, scene, nav)?;
     super::offmesh::register_agent(lua, &table, scene)?;
     super::areas::register_agent(lua, &table, scene)?;

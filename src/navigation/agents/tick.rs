@@ -29,11 +29,15 @@ fn xz(v: Vec3) -> Vec2 {
 
 impl NavigationGraph {
     /// Steers and updates positions of active NavMesh agents in the scene, in
-    /// three passes: each agent computes its preferred velocity, ORCA local avoidance (#463)
+    /// three passes after the path queue's turn: each agent computes its preferred velocity, ORCA local avoidance (#463)
     /// bends those so agents steer around each other, and each agent integrates
     /// the result, constrained to walkable cells by the 2D slide. Agents are
     /// visited in the ECS's stable order, so the tick stays deterministic.
     pub fn tick_nav_agents(&self, scene: &mut Scene, delta_time: f32) {
+        // Stale paths are asked for, then the queue's budget answers what it can
+        // (#2087); an agent still waiting steers along its old path.
+        self.ask_paths(scene);
+        self.serve_paths(scene);
         let mut ticked = Vec::new();
         let mut inputs = Vec::new();
         for id in scene.world.ids_with_nav_agent() {
@@ -52,13 +56,6 @@ impl NavigationGraph {
                 if agent.off_mesh_link.is_some() {
                     self.on_link(scene, id, agent, position, delta_time);
                     continue;
-                }
-                // Re-plan first, so arrival is measured against this target's path —
-                // unless there is nothing to plan: no path, already at the target
-                // (a `ResetPath` agent plans nothing until it gets a new one).
-                if !(agent.cached_path.is_empty() && is_at_target(&agent, position)) {
-                    let feet = agent.feet(position);
-                    self.refresh_path(&mut agent, feet);
                 }
                 let steering = !agent.cached_path.is_empty() && !is_at_target(&agent, position);
                 let moved_with = agent.velocity;
@@ -125,8 +122,8 @@ impl NavigationGraph {
         current_pos: Vec3,
         delta_time: f32,
     ) -> Vec2 {
-        // Query the next waypoint from the agent's cached path,
-        // re-planning with A* only when the cache is invalid (#126).
+        // Query the next waypoint from the agent's cached path (#126), which the
+        // path queue re-plans when it goes stale (#2087).
         let feet = agent.feet(current_pos);
         let next_step = self.cached_next_step(agent, feet);
         if agent.off_mesh_link.is_some() {

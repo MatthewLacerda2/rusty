@@ -8,8 +8,13 @@
 mod collider;
 pub mod model_writes;
 mod reimport;
+mod warned;
 
 pub(crate) use collider::{rebuild as rebuild_collider_mesh, refit_collider, Which};
+use warned::warn_once;
+pub(crate) use warned::warn_once_of;
+#[cfg(test)]
+pub(crate) use warned::warned_of;
 
 pub use reimport::{
     reimport_model, reimport_model_except, reimport_model_ids, reimport_written, Rig,
@@ -20,7 +25,47 @@ use glam::{Mat4, Vec3};
 use crate::asset::{self, MeshRevision, MeshVertex, SubMesh};
 use crate::components::mesh::Vertex;
 use crate::components::Entity;
-use crate::scene::authoring::{subdivided_geometry, Primitive};
+use crate::scene::authoring::{primitive_revision, subdivided_geometry, Primitive};
+
+/// A document with every mesh rebuilt from its reference, and the write-log stamp
+/// taken once they were (`meshes_read_at`, #1242): the file-only half of a load,
+/// which never touches a live scene (#2123).
+#[derive(Clone)]
+pub struct RehydratedScene {
+    data: crate::scene::serialize::SceneData,
+    read_at: u64,
+}
+
+impl RehydratedScene {
+    pub fn new(data: crate::scene::serialize::SceneData) -> Self {
+        let mut scene = Self::read_since(data, 0);
+        scene.read_at = crate::core::fs::written::written_since(u64::MAX).0;
+        scene
+    }
+
+    /// [`Self::new`] stamped `read_at`, taken before the document was read: a load
+    /// off the ticking thread (#2123) still follows a model written while it ran.
+    pub fn read_since(mut data: crate::scene::serialize::SceneData, read_at: u64) -> Self {
+        data.entities.iter_mut().for_each(rehydrate_entity_mesh);
+        Self { data, read_at }
+    }
+
+    /// The document, for the id moves a load makes before applying it
+    /// (`scene::runtime::load::make_room`): ids are not what rehydration reads.
+    pub(crate) fn data_mut(&mut self) -> &mut crate::scene::serialize::SceneData {
+        &mut self.data
+    }
+
+    /// The document, rehydrated: what a load's GPU warm-up reads (`render::warm`).
+    pub fn data(&self) -> &crate::scene::serialize::SceneData {
+        &self.data
+    }
+
+    /// The document and its stamp, for `serialize`'s apply.
+    pub(crate) fn into_parts(self) -> (crate::scene::serialize::SceneData, u64) {
+        (self.data, self.read_at)
+    }
+}
 
 /// Convert one imported `MeshVertex` (pure data) into the renderer's `Vertex`,
 /// carrying the skin binding (`joint_indices`/`joint_weights`) through to the GPU
@@ -48,19 +93,21 @@ struct RehydratedMesh {
     bind_palette: Vec<Mat4>,
     skin: Option<crate::asset::SkinData>,
     clips: Vec<crate::asset::AnimationClip>,
-    /// The revision of the import it came from (#857): every instance of one
-    /// import shares it. `None` (a primitive, a failed import) takes a fresh one.
+    /// The revision of the import (#857) or primitive it came from: every instance
+    /// of one shares it. `None` (a failed import) takes a fresh one.
     revision: Option<MeshRevision>,
     /// The import's clusters (#1968), which describe `revision`'s geometry.
     clusters: Option<std::sync::Arc<crate::asset::clusters::Clusters>>,
 }
 
 impl RehydratedMesh {
-    /// A primitive's geometry with no rig — primitives are never skinned/animated.
-    fn primitive(geometry: (Vec<Vertex>, Vec<u32>)) -> Self {
+    /// A primitive's geometry with no rig — primitives are never skinned/animated —
+    /// at its one revision (`authoring::primitive_revision`).
+    fn primitive(geometry: (Vec<Vertex>, Vec<u32>), revision: MeshRevision) -> Self {
         Self {
             vertices: geometry.0,
             indices: geometry.1,
+            revision: Some(revision),
             ..Self::default()
         }
     }
@@ -114,35 +161,6 @@ fn shared_sub_mesh(reference: &str) -> Result<RehydratedMesh, asset::ImportError
     Ok(RehydratedMesh::from_sub_mesh(sub, import.revision))
 }
 
-thread_local! {
-    /// The references a failed rehydrate was already warned of: a scene reloads
-    /// often, and one warning per reference is enough (#1295).
-    static WARNED: std::cell::RefCell<std::collections::BTreeSet<String>> =
-        const { std::cell::RefCell::new(std::collections::BTreeSet::new()) };
-}
-
-/// Say why `reference`'s mesh comes back empty, once per reference, rather than
-/// leaving an invisible entity with no explanation.
-fn warn_once(reference: &str, error: &asset::ImportError) {
-    warn_once_of(reference, || {
-        format!("mesh '{reference}' loads empty: {error}")
-    });
-}
-
-/// Say `message` once per `key` in the console, out of the set every failed
-/// rehydrate shares: a scene reloads often, and once is enough.
-pub(crate) fn warn_once_of(key: &str, message: impl FnOnce() -> String) {
-    if WARNED.with(|warned| warned.borrow_mut().insert(key.to_string())) {
-        log::warn!("[Scene] {}", message());
-    }
-}
-
-/// Whether `key` was already warned of ([`warn_once_of`]).
-#[cfg(test)]
-pub(crate) fn warned_of(key: &str) -> bool {
-    WARNED.with(|warned| warned.borrow().contains(key))
-}
-
 /// Rebuild one mesh's vertex/index data + rig from its on-disk REFERENCE: a
 /// primitive from `primitive_type`, or an imported sub-mesh from `asset_ref` when
 /// the type is `"Asset"`. GPU buffers are never stored on disk, only rebuilt here.
@@ -153,8 +171,14 @@ fn rehydrate_one(mesh: &crate::scene::MeshComponent) -> RehydratedMesh {
     // Primitive geometry is owned by `scene::authoring` so a created primitive and
     // a loaded one are byte-identical.
     let primitive = Primitive::parse(&mesh.primitive_type);
-    match primitive.and_then(|p| subdivided_geometry(p, mesh.subdivisions)) {
-        Some(geometry) => RehydratedMesh::primitive(geometry),
+    let Some(primitive) = primitive else {
+        return RehydratedMesh::default();
+    };
+    match subdivided_geometry(primitive, mesh.subdivisions) {
+        Some(geometry) => {
+            let revision = primitive_revision(primitive, mesh.subdivisions);
+            RehydratedMesh::primitive(geometry, revision)
+        }
         None => RehydratedMesh::default(),
     }
 }
@@ -225,7 +249,7 @@ fn install(mesh: &mut crate::scene::MeshComponent, rebuilt: RehydratedMesh) {
 
 /// Build an `"Asset"` mesh component from a path-based reference, importing its
 /// geometry up front. The reference is the only identity stored; on save the
-/// vertices are dropped and re-imported from it (see `rehydrate_meshes`). Returns
+/// vertices are dropped and re-imported from it (see `RehydratedScene::new`). Returns
 /// an empty-geometry component if the import fails.
 pub fn asset_mesh_component(reference: &str) -> crate::scene::MeshComponent {
     built(

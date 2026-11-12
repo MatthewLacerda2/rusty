@@ -19,7 +19,7 @@ use mlua::{Lua, Table};
 
 use super::{put, Reg};
 use crate::api::ApiCell;
-use crate::core::application::{Application, WindowMode};
+use crate::core::application::{Application, LoadingPriority, WindowMode};
 
 /// Register the `Application` namespace onto `lua`, backed by the shared cell.
 pub fn register(lua: &Lua, app: ApiCell<Application>) -> Reg {
@@ -35,6 +35,7 @@ pub fn register(lua: &Lua, app: ApiCell<Application>) -> Reg {
     )?;
     register_names(lua, &table, app)?;
     register_window_mode(lua, &table, app)?;
+    register_loading_priority(lua, &table, app)?;
 
     lua.globals()
         .set("Application", table)
@@ -102,6 +103,32 @@ fn register_window_mode(lua: &mlua::Lua, table: &Table, app: ApiCell<Application
                 return Ok(false);
             };
             edit(&*app.get(lua)?, |b| b.window_mode = mode)?;
+            Ok(true)
+        }),
+    )
+}
+
+/// `Get/SetBackgroundLoadingPriority` — Unity's `backgroundLoadingPriority`: `"Low"`,
+/// `"BelowNormal"` (the default), `"Normal"` or `"High"`, a frame's 2, 4, 10 or 50 ms
+/// for a `Scene.LoadAsync`'s GPU warm-up. An unknown name is ignored and the setter
+/// returns `false`, as `SetWindowMode`'s.
+fn register_loading_priority(lua: &mlua::Lua, table: &Table, app: ApiCell<Application>) -> Reg {
+    put(
+        table,
+        "GetBackgroundLoadingPriority",
+        lua.create_function(move |lua, ()| {
+            Ok(app.get(lua)?.borrow().background_loading_priority().name())
+        }),
+    )?;
+    put(
+        table,
+        "SetBackgroundLoadingPriority",
+        lua.create_function(move |lua, name: String| {
+            let Some(priority) = LoadingPriority::parse(&name) else {
+                return Ok(false);
+            };
+            let app = app.get(lua)?;
+            app.borrow_mut().set_background_loading_priority(priority);
             Ok(true)
         }),
     )

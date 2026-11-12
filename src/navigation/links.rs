@@ -61,12 +61,6 @@ impl NavigationGraph {
         dh <= self.max_step && gap >= self.agent_height
     }
 
-    /// Centre-to-centre metres from `from`'s cell to cell `(gx, gz)`.
-    pub(super) fn run_between(&self, from: SpanRef, gx: i32, gz: i32) -> f32 {
-        let (dx, dz) = ((gx - from.gx) as f32, (gz - from.gz) as f32);
-        self.grid_spacing * (dx * dx + dz * dz).sqrt()
-    }
-
     /// The span an 8-way grid step `(dx, dz)` from `from` lands on. A diagonal step
     /// also needs both cardinal cells it cuts past to be reachable from `from`, so
     /// an agent never slips diagonally around a wall corner or a ledge.

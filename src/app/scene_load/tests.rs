@@ -87,7 +87,7 @@ fn stop_restores_the_scene_play_started_in() {
     let path = gw.script_manager().scene_path_cell().borrow().clone();
     assert_eq!(path.as_deref(), Some(menu.as_str()), "and its scene file");
     let scene = gw.scene().borrow();
-    assert!(scene.persistent.is_empty() && scene.pending_load.is_none());
+    assert!(scene.persistent.is_empty() && !scene.loads.has_pending());
     assert_eq!(
         scene.id(),
         id,

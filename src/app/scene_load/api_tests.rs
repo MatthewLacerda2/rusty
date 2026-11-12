@@ -62,7 +62,27 @@ fn a_missing_scene_file_errors_with_its_path() {
     let play = gw.script_manager().eval(call).unwrap_err();
     assert!(play.contains("no/such/level.scene"), "{play}");
     assert!(
-        gw.scene().borrow().pending_load.is_none(),
+        !gw.scene().borrow().loads.has_pending(),
         "nothing was queued"
     );
+}
+
+/// A play-mode load drops the environment queries in flight (#2116): an answer
+/// made against the outgoing scene, unread, reads as gone after it, even one
+/// whose querier survives the load.
+#[test]
+fn a_load_drops_the_environment_queries_in_flight() {
+    let (_, level) = write_scenes("queries");
+    let (mut gw, _) = world_at(&level);
+    gw.set_playing(true);
+    gw.tick(DT);
+    let ask = "local q = Scene.FindEntityByName('Level'); Scene.DontDestroyOnLoad(q) \
+               ticket = EnvironmentQuery.Request(q, { generator = { points = { { 0, 0, 0 } } } })";
+    gw.script_manager().eval(ask).unwrap();
+    let poll = "return (EnvironmentQuery.Poll(ticket))";
+    gw.script_manager()
+        .eval(&format!("Scene.Load('{level}')"))
+        .unwrap();
+    gw.tick(DT);
+    assert_eq!(gw.script_manager().eval(poll).unwrap(), "gone");
 }

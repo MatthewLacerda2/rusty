@@ -9,7 +9,7 @@
 
 use std::collections::VecDeque;
 
-use super::super::NavigationGraph;
+use super::super::{NavMeshSettings, NavigationGraph};
 use super::inputs::BakeInputs;
 use super::region::CellRect;
 
@@ -57,6 +57,7 @@ impl NavigationGraph {
     /// changed): a new generation whose change log entry says "anything changed".
     pub(in crate::navigation) fn invalidate_paths(&mut self) {
         self.bake_generation = self.bake_generation.wrapping_add(1);
+        self.islands.keep(self.bake_generation); // no span or link moved (#2111)
         if let Some(st) = self.bake_state.as_mut() {
             st.log.record(self.bake_generation, None);
         }
@@ -66,6 +67,12 @@ impl NavigationGraph {
     /// that is unknown (a full bake, or too long ago): then anything may have.
     pub fn changes_since(&self, generation: u64) -> Option<Vec<CellRect>> {
         self.bake_state.as_ref()?.log.since(generation)
+    }
+
+    /// The settings the last bake read, `None` before any bake: what an
+    /// incremental rebake regenerated its links with (`request::carry`).
+    pub(in crate::navigation) fn baked_settings(&self) -> Option<&NavMeshSettings> {
+        Some(&self.bake_state.as_ref()?.inputs.settings)
     }
 }
 

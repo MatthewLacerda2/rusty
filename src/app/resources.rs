@@ -121,9 +121,14 @@ pub struct Resources {
     /// The schedule's observer (#433) — the dev layer's frame-stats timer. `None`
     /// unless installed via `GameWorld::set_probe`; it only watches the frame.
     pub(super) probe: Option<Box<dyn super::SystemProbe>>,
+    /// The scene load's observer (#2123), the dev layer's load timer. `None` unless
+    /// installed via `GameWorld::set_load_probe`; it only watches the load.
+    pub(super) load_probe: Option<Box<dyn super::LoadProbe>>,
     /// The tick's tap (#1581) — a dev demo recorder or replay. `None` unless
     /// installed via `GameWorld::set_tap`.
     pub(super) tap: Option<Box<dyn super::TickTap>>,
+    /// What prepares `Scene.LoadAsync` operations (#2123) and the scene it made ready.
+    pub(super) loading: super::scene_load::Loading,
     /// How far the edit scene's meshes follow the write log (#1242).
     pub(super) model_writes: crate::scene::model_writes::ModelWrites,
 }
@@ -204,7 +209,9 @@ impl Resources {
             controller_hits: Vec::new(),
             sight_rays: Default::default(),
             probe: None,
+            load_probe: None,
             tap: None,
+            loading: Default::default(),
             model_writes: Default::default(),
         }
     }

@@ -42,24 +42,29 @@
 //!   function of (file, settings); the cache only decides whether to parse.
 //! - **A failed import is not kept**: the next lookup tries again, as before.
 //!
-//! One cache per thread, like the resolved texture references
-//! (`asset::convert::texture_ref::resolved`): a bake or preview thread keeps its
-//! own, and nothing takes a lock across a parse.
+//! One cache per process (#2123), so a scene a load worker prepares imports into
+//! the cache the ticking thread hits. Its lock is held to look up or insert, never
+//! across a parse: two threads may parse one file at once, into the same value.
 //! stored-format: the files the import cache writes beside a model (the hull sidecars)
 
+#[cfg(test)]
+mod counts;
 pub mod hulls;
 mod reads;
 mod revision;
 mod size;
 
+#[cfg(test)]
+use counts::PARSES;
+#[cfg(test)]
+pub use counts::{forget, parses};
 use reads::{files_of, stamp, Files, Stamp};
 pub use revision::MeshRevision;
 pub use size::approx_bytes;
 
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
 use super::humanoid::HumanoidSettings;
 use super::lightmap_uv::LightmapUvSettings;
@@ -69,7 +74,7 @@ use crate::core::fs::freshness::Freshness;
 use crate::core::fs::written::Stale;
 use crate::core::project;
 
-/// How much geometry one thread's cache holds before it drops the least recently
+/// How much geometry the cache holds before it drops the least recently
 /// used entries: a Dust2-sized level's whole model set fits (a few million
 /// vertices), and a long editor session that opens many models stays under it.
 pub const BUDGET_BYTES: usize = 512 << 20;
@@ -139,19 +144,11 @@ struct Cache {
     bytes: usize,
 }
 
-thread_local! {
-    static CACHE: RefCell<Cache> = RefCell::new(Cache::default());
-}
+static CACHE: LazyLock<Mutex<Cache>> = LazyLock::new(Mutex::default);
 
-#[cfg(test)]
-thread_local! {
-    static PARSES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-}
-
-/// How many files this thread's cache has parsed (tests).
-#[cfg(test)]
-pub fn parses() -> usize {
-    PARSES.get()
+/// Run `f` on the cache, under its lock.
+fn with_cache<T>(f: impl FnOnce(&mut Cache) -> T) -> T {
+    f(&mut CACHE.lock().unwrap_or_else(PoisonError::into_inner))
 }
 
 /// The import of the model file at `path` with its sidecar's settings: the cached
@@ -162,7 +159,7 @@ pub fn imported(path: &Path) -> Result<Imported, ImportError> {
     // The one conversion check: a re-conversion notes the source in the write
     // log, which the lookup below drains.
     let read = super::read_target(path).inspect_err(|_| {
-        CACHE.with_borrow_mut(|cache| cache.remove(&key));
+        with_cache(|cache| cache.remove(&key));
     })?;
     let settings = super::settings_of(path);
     // The models it borrows clips from too (#1747): a re-exported source's
@@ -171,7 +168,7 @@ pub fn imported(path: &Path) -> Result<Imported, ImportError> {
         let _ = super::read_target(Path::new(from));
     }
     let geometry = Geometry::of(&settings);
-    let held = CACHE.with_borrow_mut(|cache| {
+    let held = with_cache(|cache| {
         cache.enter(project::moves());
         cache.forget_written();
         cache.hit(&key, &geometry)
@@ -185,7 +182,7 @@ pub fn imported(path: &Path) -> Result<Imported, ImportError> {
     let files = files_of(&read, &settings.humanoid.clips_from);
     // With its meshes' decompositions, from the hull sidecar (#1940).
     let fresh = super::import_with(path, &read, &settings).inspect(|a| hulls::load(path, a));
-    CACHE.with_borrow_mut(|cache| match fresh {
+    with_cache(|cache| match fresh {
         Ok(asset) => Ok(cache.insert(key, geometry, files, asset, BUDGET_BYTES)),
         Err(e) => {
             cache.remove(&key);

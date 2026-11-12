@@ -117,7 +117,7 @@ pub const MARKS: &[Mark] = marks! {
         s.lighting_settings.reflections.budget_mb == 77;
     "pending_destroy" => |s, b| s.pending_destroy.push(b), s.pending_destroy.contains(&b);
     "playing" => |s, _| s.playing = true, s.is_playing();
-    "pending_load" => |s, _| s.pending_load = Some("marked.scene".into()), s.pending_load.is_some();
+    "loads" => |s, _| s.loads.request("marked.scene".into()), s.loads.has_pending();
     "persistent" => |s, b| s.persistent.insert(b), s.persistent.contains(&b);
     "shader_overrides" => |s, b| s.shader_overrides.set(b, "marked".into(), vec![1.0]),
         s.shader_overrides.has(b);

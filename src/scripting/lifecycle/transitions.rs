@@ -150,6 +150,10 @@ impl ScriptManager {
             .timers
             .borrow_mut()
             .retain_owners(|owner| !gone(&owner));
+        self.cells
+            .queries
+            .borrow_mut()
+            .retain_owners(|owner| !gone(&owner));
         self.entity_scripts.retain(|(eid, _), _| !gone(eid));
         if let Some(lua) = &self.lua {
             for &id in ids {

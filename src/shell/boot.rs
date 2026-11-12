@@ -115,11 +115,10 @@ pub fn load_game(plan: &BootPlan) -> GameWorld {
     // Baked over the scene's own bounds (#452) — the same path the headless harness takes.
     let nav = Rc::new(RefCell::new(NavigationGraph::from_scene(&scene.borrow())));
     let input = Rc::new(RefCell::new(InputState::new()));
-    #[cfg_attr(
-        not(feature = "dev"),
-        expect(unused_mut, reason = "the dev probe install mutates it")
-    )]
     let mut game = GameWorld::new(scene, input, nav, console);
+    // A `Scene.LoadAsync` is prepared on a thread while frames go on, and its GPU
+    // resources made a slice per frame before it reads ready (#2123).
+    game.set_scene_loader(Box::new(super::frame::load::worker::Threaded::warming()));
     // Dev builds time the schedule so `Debug.Stats()` answers in a playtest (#433),
     // add `Debug.*` and the bake verbs to the console's surface (#737), and record.
     #[cfg(feature = "dev")]

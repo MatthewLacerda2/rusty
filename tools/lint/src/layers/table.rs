@@ -102,6 +102,7 @@ pub const LAYERS: &[Layer] = &[
     sim(
         "scripting",
         &[
+            "ai",
             "api",
             "audio",
             "components",
@@ -155,7 +156,7 @@ pub const LAYERS: &[Layer] = &[
     ),
     // The platform layer: real time, the GPU, windows and the editor live here.
     // The process logger (#1139): stderr, plus engine warnings for the console.
-    platform("logging", &["scripting"]).uses(&["env_logger"]),
+    platform("logging", &["core", "scripting"]).uses(&["env_logger"]),
     platform("preview", &["asset", "components", "core", "scene"]),
     platform(
         "render",

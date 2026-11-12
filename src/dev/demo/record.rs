@@ -3,11 +3,11 @@
 //! It opens a demo right before Play is entered, however it is entered (a tick, a
 //! paused frame's poll, `Editor.EnterPlay`): the header is read before `Awake` and
 //! `Start` run, and the host acts made since the last tick (a scenario's set-up)
-//! go in it as `before_play`. Then it writes one line per tick that changed
-//! anything (the input delta, the `dt`, the host acts before it, a new Game view
-//! size, a digest every [`digest::EVERY`] ticks), and right before Play is left
-//! (or the run ends, [`Recorder::stop`]) the end line: the acts after the last
-//! tick and a final digest. After each tick's line comes its index line (`index`,
+//! go in it as `before_play`. Then it writes one line per tick that changed anything
+//! (the input delta, the `dt`, the host acts before it, a new Game view size, the
+//! `Scene.LoadAsync` operations ready from its head and the pending one's progress, a
+//! digest every [`digest::EVERY`] ticks), and right before Play is left (or the run
+//! ends, [`Recorder::stop`]) the end line: the acts after the last tick and a final digest. After each tick's line comes its index line (`index`,
 //! #1597). Host acts come from the world's journal
 //! (`scripting::HostJournal`); acts in edit mode are dropped frame by frame,
 //! ticked or paused, and `Editor.EnterPlay` / `Editor.ExitPlay` are never kept:
@@ -17,6 +17,7 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
+use super::calls::is_play_verb;
 use super::delta::InputDelta;
 use super::digest;
 use super::files::Destination;
@@ -46,9 +47,8 @@ struct Session {
 pub struct Recorder {
     destination: Destination,
     session: Option<Session>,
-    /// Whether the scene had no unsaved edits when the recorder was installed,
-    /// while no tick has passed since: acts made then (a scenario's set-up) are
-    /// replayed, so they are no unsaved edit of their own.
+    /// Whether the scene had no unsaved edits at install, until a tick passes: acts
+    /// made then (a scenario's set-up) are replayed, so no unsaved edit of their own.
     clean_at_install: Option<bool>,
     /// The demos this recorder wrote, oldest first.
     written: Vec<PathBuf>,
@@ -58,18 +58,6 @@ pub struct Recorder {
 fn is_saved(world: &GameWorld) -> Option<bool> {
     let path = world.script_manager().scene_path_cell().borrow().clone()?;
     Some(!world.scene().borrow().has_unsaved_edits(&path))
-}
-
-/// Whether `act` only enters or leaves Play: the transition it asks for is the
-/// demo's own start or end, so it is not an act to replay.
-fn is_play_verb(act: &HostCall) -> bool {
-    let named = match act {
-        HostCall::Eval(line) => line.trim_end_matches(';').trim_end(),
-        HostCall::Call { function, .. } => function,
-        HostCall::Taint(_) => return false,
-    };
-    let named = named.strip_suffix("()").unwrap_or(named);
-    matches!(named, "Editor.EnterPlay" | "Editor.ExitPlay")
 }
 
 /// `file` locked for as long as it is open, so no pruning deletes it meanwhile
@@ -204,7 +192,7 @@ impl Session {
             host: host.iter().map(host_json).collect(),
             size: (size != self.size).then_some(size).flatten(),
             display_scale: (scale != self.display_scale).then_some(scale).flatten(),
-            digest: None,
+            ..Entry::default()
         };
         self.last = frame;
         self.size = size;
@@ -281,6 +269,20 @@ impl TickTap for Recorder {
             session.read_dt(dt);
         }
         dt
+    }
+
+    fn loads(&mut self, ready: Vec<u32>) -> Vec<u32> {
+        if let Some(session) = &mut self.session {
+            session.entry.loads.clone_from(&ready);
+        }
+        ready
+    }
+
+    fn load_progress(&mut self, moved: Option<u8>) -> Option<u8> {
+        if let Some(session) = &mut self.session {
+            session.entry.load_progress = moved;
+        }
+        moved
     }
 }
 

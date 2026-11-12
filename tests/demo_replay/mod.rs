@@ -14,7 +14,10 @@ mod forwards;
 mod hosts;
 mod index;
 mod index_edges;
+mod load_async;
+mod load_progress;
 mod play_bin;
+mod script_ref;
 #[cfg(feature = "editor")]
 pub mod timeline;
 mod timing;

@@ -157,6 +157,14 @@ pub struct Entry {
     /// The state digest after this tick (`digest::of`), in hex.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub digest: Option<String>,
+    /// The `Scene.LoadAsync` operations the loader had finished by this tick's head
+    /// (#2123): where a window's worker made one ready, an input like the rest.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub loads: Vec<u32>,
+    /// The pending operation's progress before ready, in percent, when it moved at
+    /// this tick's head (#2123): how far a window's worker and GPU warm-up were.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub load_progress: Option<u8>,
 }
 
 impl Entry {
@@ -168,6 +176,8 @@ impl Entry {
             && self.size.is_none()
             && self.display_scale.is_none()
             && self.digest.is_none()
+            && self.loads.is_empty()
+            && self.load_progress.is_none()
     }
 }
 

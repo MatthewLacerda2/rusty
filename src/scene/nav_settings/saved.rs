@@ -54,14 +54,39 @@ pub fn save_navmesh(scene: &Scene, scene_path: &str) -> Result<Saved, String> {
     scene.bake_files.store_shared(&path, want, "Navigation")
 }
 
-/// Read the navmesh beside `scene_path` onto `scene`: none when there is no file,
-/// and none, with a warning, when it cannot be read. Its content is checked when Play
-/// uses it (`navigation`), never here.
-pub fn load_navmesh(scene: &mut Scene, scene_path: &str) {
+/// What a load found at `<scene>.navmesh`, read from the file alone
+/// ([`read_navmesh`]) and put on a scene later ([`apply_navmesh`]), so a load can
+/// read it before it touches the live scene (#2123).
+pub struct NavmeshFile {
+    path: PathBuf,
+    read: std::io::Result<Option<Arc<[u8]>>>,
+}
+
+impl NavmeshFile {
+    /// Whether a navmesh was read: a file there, and readable.
+    pub fn has_bytes(&self) -> bool {
+        matches!(self.read, Ok(Some(_)))
+    }
+}
+
+/// Read the navmesh beside `scene_path`: none when there is no file.
+pub fn read_navmesh(scene_path: &str) -> NavmeshFile {
     let path = navmesh_path(scene_path);
-    let bytes: Option<Arc<[u8]>> = match std::fs::read(&path) {
-        Ok(bytes) => Some(Arc::from(bytes)),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+    let read = match std::fs::read(&path) {
+        Ok(bytes) => Ok(Some(Arc::from(bytes))),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e),
+    };
+    NavmeshFile { path, read }
+}
+
+/// Put what [`read_navmesh`] found on `scene`: none, with a warning, when the file
+/// could not be read. Its content is checked when Play uses it (`navigation`),
+/// never here.
+pub fn apply_navmesh(scene: &mut Scene, file: NavmeshFile) {
+    let NavmeshFile { path, read } = file;
+    let bytes = match read {
+        Ok(bytes) => bytes,
         Err(e) => {
             log::warn!(
                 "[Navigation] could not read {} ({e}): Play bakes the navmesh in full",
@@ -74,6 +99,12 @@ pub fn load_navmesh(scene: &mut Scene, scene_path: &str) {
     };
     scene.bake_files.loaded_shared(&path, bytes.as_ref());
     scene.navmesh = SavedNavmesh { bytes };
+}
+
+/// Read the navmesh beside `scene_path` onto `scene`, at once
+/// ([`read_navmesh`] then [`apply_navmesh`]).
+pub fn load_navmesh(scene: &mut Scene, scene_path: &str) {
+    apply_navmesh(scene, read_navmesh(scene_path));
 }
 
 impl Scene {

@@ -42,11 +42,12 @@
 
 mod load;
 mod upload;
+mod warm;
 mod worker;
 
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::mpsc::{Receiver, TryRecvError};
+use std::sync::mpsc::Receiver;
 
 use crate::core::fs::written::{written_since, Stale};
 use load::{Kind, Loaded};
@@ -75,6 +76,12 @@ pub(crate) struct Lightmaps {
     seen: u64,
     /// Read page lists in line rather than on a worker: a headless renderer.
     in_line: bool,
+    /// The arrays uploaded since the renderer last took them.
+    pub(crate) uploads: crate::render::stats::Uploads,
+    /// A list landed since the last bind, by either caller (`warm::land`): the bind
+    /// looks again even when its lists are unchanged, so a list a warm-up landed is
+    /// bound by the frame that draws it.
+    fresh: bool,
 }
 
 impl Lightmaps {
@@ -91,6 +98,8 @@ impl Lightmaps {
             fallback,
             seen: written_since(u64::MAX).0,
             in_line,
+            uploads: Default::default(),
+            fresh: false,
         }
     }
 
@@ -107,10 +116,11 @@ impl Lightmaps {
         masks: &[String],
     ) -> bool {
         let rewritten = self.drop_rewritten();
-        let landed = self.land(device, queue);
         let lists = [pages, directions, masks];
+        self.land(device, queue, lists);
+        let fresh = std::mem::take(&mut self.fresh);
         let same = self.bound.iter().zip(lists).all(|(b, l)| b == l);
-        if same && !rewritten && !landed {
+        if same && !rewritten && !fresh {
             return false;
         }
         self.bound = lists.map(|l| l.to_vec());
@@ -130,25 +140,6 @@ impl Lightmaps {
             || !same_array(&masks, &self.masks);
         (self.current, self.directions, self.masks) = (current, directions, masks);
         changed || !same
-    }
-
-    /// Upload every page list whose worker finished. Returns whether one did.
-    fn land(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) -> bool {
-        let mut landed = false;
-        for (list, entry) in &mut self.cache {
-            let Entry::Pending(inbox) = entry else {
-                continue;
-            };
-            let result = match inbox.try_recv() {
-                Ok(result) => result,
-                Err(TryRecvError::Empty) => continue,
-                // The loader died without an answer (it panicked): a failed load.
-                Err(TryRecvError::Disconnected) => Err("the page loader stopped".into()),
-            };
-            *entry = Entry::Ready(finish(device, queue, list, result));
-            landed = true;
-        }
-        landed
     }
 
     /// Forget every array (a failed or pending one included) holding a page the
@@ -179,11 +170,14 @@ impl Lightmaps {
         if pages.is_empty() {
             return None;
         }
-        let in_line = self.in_line;
+        let (in_line, uploads) = (self.in_line, &mut self.uploads);
         let entry = self.cache.entry(pages.to_vec()).or_insert_with(|| {
             let list = pages.to_vec();
             match in_line {
-                true => Entry::Ready(finish(device, queue, &list, load::load(&list, kind, bc))),
+                true => Entry::Ready(warm::counted(
+                    uploads,
+                    finish(device, queue, &list, load::load(&list, kind, bc)),
+                )),
                 false => Entry::Pending(start(list, kind, bc)),
             }
         });

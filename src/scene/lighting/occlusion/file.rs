@@ -113,38 +113,68 @@ pub fn save_sidecar(scene: &Scene, scene_path: &str) -> Result<Saved, String> {
 /// removes it, while it is still that file). A file that is there but cannot be read (a permission, a transient
 /// failure) also loads none, with a warning, and the next save keeps it.
 pub fn load_sidecar(scene: &mut Scene, scene_path: &str) {
+    apply_sidecar(scene, read_sidecar(scene_path));
+}
+
+/// What a load found at `<scene>.occlusion`, read and decoded from the file alone
+/// ([`read_sidecar`]) and put on a scene later ([`apply_sidecar`]), so a load can
+/// do the work before it touches the live scene (#2123).
+pub struct OcclusionFile {
+    path: PathBuf,
+    read: Read,
+}
+
+enum Read {
+    Missing,
+    Unreadable(std::io::Error),
+    Refused(Vec<u8>, String),
+    /// The file's bytes, what a save would write (encoded afresh: a file that does
+    /// not round-trip byte for byte never reads as a bake since), and the PVS.
+    Decoded(Vec<u8>, Vec<u8>, OcclusionData),
+}
+
+/// Read and decode the PVS beside `scene_path`.
+pub fn read_sidecar(scene_path: &str) -> OcclusionFile {
     let path = occlusion_path(scene_path);
+    let read = match std::fs::read(&path) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Read::Missing,
+        Err(e) => Read::Unreadable(e),
+        Ok(bytes) => match decode(&bytes) {
+            Err(e) => Read::Refused(bytes, e),
+            Ok(data) => Read::Decoded(bytes, encode(&data), data),
+        },
+    };
+    OcclusionFile { path, read }
+}
+
+/// Put what [`read_sidecar`] found on `scene` ([`load_sidecar`] says what each
+/// outcome loads).
+pub fn apply_sidecar(scene: &mut Scene, file: OcclusionFile) {
+    let OcclusionFile { path, read } = file;
     *scene.occlusion = None;
-    let bytes = match std::fs::read(&path) {
-        Ok(bytes) => bytes,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            return scene.bake_files.loaded(&path, None, None);
-        }
-        Err(e) => {
+    match read {
+        Read::Missing => scene.bake_files.loaded(&path, None, None),
+        Read::Unreadable(e) => {
             log::warn!(
                 "[Occlusion] could not read {} ({e}): nothing is occlusion-culled, and \
                  the file is kept",
                 path.display()
             );
-            return scene.bake_files.unreadable(&path);
+            scene.bake_files.unreadable(&path)
         }
-    };
-    let data = match decode(&bytes) {
-        Ok(data) => data,
-        Err(e) => {
+        Read::Refused(bytes, e) => {
             log::warn!(
                 "[Occlusion] {} refused ({e}): nothing is occlusion-culled, and the next \
                  save removes it",
                 path.display()
             );
-            return scene.bake_files.refused(&path, &bytes);
+            scene.bake_files.refused(&path, &bytes)
         }
-    };
-    // What a save would write, encoded afresh: a file that does not round-trip
-    // byte for byte never reads as a bake since.
-    let held = encode(&data);
-    scene.bake_files.loaded(&path, Some(&bytes), Some(&held));
-    *scene.occlusion = Some(Arc::new(data));
+        Read::Decoded(bytes, held, data) => {
+            scene.bake_files.loaded(&path, Some(&bytes), Some(&held));
+            *scene.occlusion = Some(Arc::new(data));
+        }
+    }
 }
 
 impl Scene {

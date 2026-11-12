@@ -15,6 +15,9 @@
 //! another's slots. A query that panics mid-way leaves stale stamps behind, which
 //! the next query's generation hides: the pool stays usable with no cleanup.
 //!
+//! The flood (#2088) keeps its costs past the call that ran it, so it takes the
+//! pool out with [`SearchScratch::take`] and hands it back when its answer drops.
+//!
 //! What a slot holds never decides a search's outcome (a stale slot reads exactly
 //! as a fresh array's would), so reusing the pool keeps paths byte-identical.
 
@@ -46,8 +49,9 @@ pub(crate) struct NodePool {
 }
 
 impl NodePool {
-    /// Start a new search over `spans` spans: every slot reads as unreached.
-    fn begin(&mut self, spans: usize) {
+    /// Start a new search over `spans` spans: every slot reads as unreached. The
+    /// path queue (#2087) keeps a pool of its own and begins it once per search.
+    pub(crate) fn begin(&mut self, spans: usize) {
         if self.slots.len() < spans {
             self.slots.resize(spans, UNREACHED);
         }
@@ -65,6 +69,11 @@ impl NodePool {
             s if s.stamp == self.generation => s,
             _ => UNREACHED,
         }
+    }
+
+    /// Whether span `index` has a slot: the pool was begun for at least `index + 1` spans.
+    pub(crate) fn covers(&self, index: u32) -> bool {
+        (index as usize) < self.slots.len()
     }
 
     /// The best cost found to span `index` this search; `INFINITY` when unreached.
@@ -88,6 +97,34 @@ impl NodePool {
     }
 }
 
+impl NodePool {
+    /// Carry this search's slots onto a rebaked navmesh of `spans` spans (#2087,
+    /// `request::carry`), each span index renumbered by `remap`; `false`, changing
+    /// nothing, when `remap` refuses one.
+    pub(crate) fn remap(&mut self, spans: usize, remap: &dyn Fn(u32) -> Option<SpanRef>) -> bool {
+        let generation = self.generation;
+        let mut moved = Vec::new();
+        for (i, s) in self
+            .slots
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.stamp == generation)
+        {
+            let at = remap(i as u32).map(|r| r.index);
+            let from = s.from.map(|f| remap(f.index));
+            let (Some(at), None | Some(Some(_))) = (at, from) else {
+                return false;
+            };
+            moved.push((at, s.g, from.flatten()));
+        }
+        self.begin(spans);
+        for (at, g, from) in moved {
+            self.set(at, g, from);
+        }
+        true
+    }
+}
+
 /// The graph's reusable [`NodePool`] (see the module doc for why a `RefCell`).
 #[derive(Default)]
 pub(crate) struct SearchScratch(RefCell<NodePool>);
@@ -103,6 +140,29 @@ impl SearchScratch {
         match self.0.try_borrow_mut() {
             Ok(mut pool) => run(&mut pool),
             Err(_) => run(&mut NodePool::default()),
+        }
+    }
+
+    /// Take the shared pool out, begun for `spans` spans, for a search whose
+    /// answer outlives the call (the flood's, #2088): a fresh one when the shared
+    /// one is in use or already out. Hand it back with [`Self::restore`]; a search
+    /// that runs meanwhile works on the empty pool left in its place.
+    pub(crate) fn take(&self, spans: usize) -> NodePool {
+        let mut pool = match self.0.try_borrow_mut() {
+            Ok(mut shared) => std::mem::take(&mut *shared),
+            Err(_) => NodePool::default(),
+        };
+        pool.begin(spans);
+        pool
+    }
+
+    /// Put back a pool [`Self::take`] lent out, keeping whichever of it and the
+    /// one in its place has more slots, so nothing grown is lost.
+    pub(crate) fn restore(&self, pool: NodePool) {
+        if let Ok(mut shared) = self.0.try_borrow_mut() {
+            if shared.slots.len() < pool.slots.len() {
+                *shared = pool;
+            }
         }
     }
 }

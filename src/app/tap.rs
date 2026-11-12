@@ -45,6 +45,20 @@ pub trait TickTap: Any {
     fn dt(&mut self, dt: f32) -> f32 {
         dt
     }
+
+    /// The `Scene.LoadAsync` operations the loader finished by this tick's head
+    /// (#2123), right after `dt`: a recorder notes them, a replay hands back the
+    /// recorded ones, which the world then waits for.
+    fn loads(&mut self, ready: Vec<u32>) -> Vec<u32> {
+        ready
+    }
+
+    /// The pending operation's progress before ready, in percent, when the loader
+    /// moved it by this tick's head (`None`: it did not move), right after
+    /// [`Self::loads`]: a recorder notes it, a replay hands back the recorded one.
+    fn load_progress(&mut self, moved: Option<u8>) -> Option<u8> {
+        moved
+    }
 }
 
 impl GameWorld {
@@ -73,10 +87,13 @@ impl GameWorld {
         }
     }
 
-    /// The tap at [`TapPoint::BeforeInput`], then the tick's `dt` as it has it.
+    /// The tap at [`TapPoint::BeforeInput`], then the tick's `dt` as it has it, then
+    /// the `Scene.LoadAsync` operations the loader finished (`publish_loads`).
     pub(super) fn tap_input(&mut self, dt: f32) -> f32 {
         self.tap(TapPoint::BeforeInput);
-        self.resources.tap.as_mut().map_or(dt, |tap| tap.dt(dt))
+        let dt = self.resources.tap.as_mut().map_or(dt, |tap| tap.dt(dt));
+        self.publish_loads();
+        dt
     }
 
     /// The play transition, with the tap told before and after one happens.

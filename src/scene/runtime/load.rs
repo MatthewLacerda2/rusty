@@ -16,20 +16,16 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use super::prepare::PreparedScene;
 use crate::components::EntityRefs;
-use crate::scene::serialize::{apply_scene_data, SceneData};
+use crate::scene::serialize::{apply_rehydrated, SceneData};
 use crate::scene::{Entity, MaterialAsset, Scene};
 
 impl Scene {
     /// Queue a play-mode load of `path`, swapped in at the tick's tail. A later
-    /// request in the same tick replaces an earlier one: the last `Scene.Load` wins.
+    /// request replaces an earlier one: the last `Scene.Load` wins (`runtime::loads`).
     pub fn request_load(&mut self, path: String) {
-        self.pending_load = Some(path);
-    }
-
-    /// Take the queued load, if any — the scene-load phase's drain.
-    pub fn take_pending_load(&mut self) -> Option<String> {
-        self.pending_load.take()
+        self.loads.request(path);
     }
 
     /// Mark `id` to survive scene loads, with its descendants. `false` when no entity
@@ -63,10 +59,27 @@ impl Scene {
     /// runtime identity — it is a different scene now.
     pub fn swap_in(
         &mut self,
-        mut data: SceneData,
+        data: SceneData,
         path: &str,
         survivors: &BTreeSet<u32>,
     ) -> Result<(), String> {
+        self.swap_in_prepared(PreparedScene::from_data(data, path), survivors)
+    }
+
+    /// [`Scene::swap_in`] for a scene already prepared from its files: the
+    /// activation half of a load (`scene::runtime::prepare`, #2123). Only what
+    /// depends on the survivors and the live scene happens here.
+    pub fn swap_in_prepared(
+        &mut self,
+        prepared: PreparedScene,
+        survivors: &BTreeSet<u32>,
+    ) -> Result<(), String> {
+        let PreparedScene {
+            path: _,
+            mut document,
+            sidecars,
+            baked_navmesh: _, // activation's, taken before (`app::scene_load`)
+        } = prepared;
         let carried: Vec<Entity> = self
             .entity_ids()
             .into_iter()
@@ -84,8 +97,8 @@ impl Scene {
         let decals = self.take_persistent_decals(survivors);
         let mut ragdolls = std::mem::take(&mut self.ragdolls);
         ragdolls.retain(|id| survivors.contains(&id));
-        let moved = make_room(&mut data, survivors);
-        apply_scene_data(self, data);
+        let moved = make_room(document.data_mut(), survivors);
+        apply_rehydrated(self, document);
         self.ragdolls = ragdolls;
         for mut entity in carried {
             if entity.parent_id.is_some_and(|p| !survivors.contains(&p)) {
@@ -108,8 +121,8 @@ impl Scene {
         self.pending_destroy.retain(|id| survivors.contains(id));
         self.land_persistent_decals(decals);
         self.renew_id();
-        crate::scene::nav_settings::load_navmesh(self, path);
-        let loaded = crate::scene::lighting::io::load_lighting_sidecar(self, path);
+        crate::scene::nav_settings::apply_navmesh(self, sidecars.navmesh);
+        let loaded = crate::scene::lighting::io::apply_lighting_sidecar(self, sidecars.lighting);
         self.remap_occlusion(&moved);
         loaded
     }

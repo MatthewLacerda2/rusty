@@ -23,6 +23,7 @@ mod stats;
 pub(crate) mod test_gpu;
 pub(crate) mod timing;
 mod view;
+pub mod warm;
 
 pub mod gpu;
 pub(crate) mod ibl;
@@ -30,8 +31,7 @@ pub(crate) mod passes;
 pub mod postfx;
 pub mod ui;
 
-// Moved submodules pulled back under short names so this module's body keeps
-// naming them directly (grouped by subfolder — see the convention in CLAUDE.md).
+// Moved submodules, pulled back under short names this module's body names them by.
 use ibl::{reflection_probes, sky_cube, skybox};
 use passes::{particles, shadows};
 
@@ -175,8 +175,7 @@ pub struct Renderer {
     /// Whether the adapter's backend primes at all (`pipelines::priming`): not Metal.
     pub(crate) priming_recommended: bool,
 
-    // Asset cache keyed by mesh-asset identity (#127): identical geometry shared
-    // across entities resolves to one buffer pair, not one per entity.
+    // Asset caches. Meshes by mesh-asset identity (#127): one buffer pair per geometry.
     pub gpu_meshes: HashMap<MeshId, GpuMesh>,
     pub gpu_textures: HashMap<crate::asset::MapRef, Rc<GpuTexture>>,
     /// An uncompressed copy of a cached upload whose block format a slot cannot
@@ -279,6 +278,8 @@ pub struct Renderer {
 
     /// What the last `render` call submitted (#433) — read by the dev layer's stats.
     pub frame_counters: RenderCounters,
+    /// The scene assets uploaded since the last frame's counters closed.
+    pub(crate) uploads: stats::Uploads,
     /// GPU time per render pass (#835): disabled without `TIMESTAMP_QUERY`.
     pub(crate) gpu_timer: timing::GpuTimer,
 

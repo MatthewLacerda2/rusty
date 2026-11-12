@@ -121,7 +121,7 @@ authored_fields!(scene_state {
         navmesh: BakeOutput, No as ["nav_settings"];
         pending_destroy: Runtime, Dropped;
         playing: Runtime, No;
-        pending_load: Runtime, No;
+        loads: Runtime, No;
         persistent: Runtime, Dropped;
         // Draw-only (#1882): a line's ends are points, not entities. An
         // edit-mode load clears them (`serialize::drop_old_world`), as Stop does.

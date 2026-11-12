@@ -8,7 +8,7 @@
 use glam::Vec3;
 
 use crate::components::mesh::primitives;
-use crate::components::mesh::Vertex;
+use crate::components::mesh::{MeshRevision, Vertex};
 use crate::components::{CapsuleAxis, ColliderComponent, ColliderShape};
 use crate::scene::authoring::defaults::{default_collider, light};
 use crate::scene::rehydrate::bounds_of;
@@ -67,6 +67,48 @@ pub fn subdivided_geometry(
     primitive: Primitive,
     subdivisions: u32,
 ) -> Option<(Vec<Vertex>, Vec<u32>)> {
+    if primitive == Primitive::Plane {
+        return generated(primitive, subdivisions);
+    }
+    // The other shapes take no argument, and the round ones carry a generated
+    // lightmap unwrap that costs ~1 ms each (#2123): build each once per process
+    // (a pure function, so a copy is what building again would give) and copy it.
+    type Built = Option<(Vec<Vertex>, Vec<u32>)>;
+    static BUILT: std::sync::Mutex<Vec<(Primitive, Built)>> = std::sync::Mutex::new(Vec::new());
+    let mut built = BUILT.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((_, geometry)) = built.iter().find(|(p, _)| *p == primitive) {
+        return geometry.clone();
+    }
+    let geometry = generated(primitive, subdivisions);
+    built.push((primitive, geometry.clone()));
+    geometry
+}
+
+/// The one revision of a primitive's geometry cut into `subdivisions`, for the
+/// whole process: the geometry is a pure function of the two, so every mesh holding
+/// it (created, loaded, reloaded, rebuilt by a prefab's propagation) carries the
+/// same revision, as every instance of one import carries its import's. A renderer
+/// that has it resident skips it, so a scene load's warm-up (`render::warm`) and
+/// a reload never upload a primitive twice, nor rewrite the drawing scene's buffers.
+pub fn primitive_revision(primitive: Primitive, subdivisions: u32) -> MeshRevision {
+    let cut = if primitive == Primitive::Plane {
+        subdivisions
+    } else {
+        1
+    };
+    static GIVEN: std::sync::Mutex<Vec<((Primitive, u32), MeshRevision)>> =
+        std::sync::Mutex::new(Vec::new());
+    let mut given = GIVEN.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((_, revision)) = given.iter().find(|(key, _)| *key == (primitive, cut)) {
+        return *revision;
+    }
+    let revision = MeshRevision::next();
+    given.push(((primitive, cut), revision));
+    revision
+}
+
+/// Build [`subdivided_geometry`]'s result afresh.
+fn generated(primitive: Primitive, subdivisions: u32) -> Option<(Vec<Vertex>, Vec<u32>)> {
     match primitive {
         Primitive::Box => Some(primitives::generate_box(1.0, 1.0, 1.0)),
         Primitive::Sphere => Some(primitives::generate_sphere(RADIUS, 16, 16)),
@@ -102,7 +144,9 @@ fn primitive_mesh_name(primitive: Primitive) -> Option<&'static str> {
 pub fn primitive_mesh_component(primitive: Primitive) -> Option<MeshComponent> {
     let name = primitive_mesh_name(primitive)?;
     let (vertices, indices) = primitive_geometry(primitive)?;
-    Some(MeshComponent::new(name, vertices, indices))
+    let mut mesh = MeshComponent::new(name, vertices, indices);
+    mesh.revision = primitive_revision(primitive, 1);
+    Some(mesh)
 }
 
 /// The default light for a light primitive (the hierarchy toolbar's values).
@@ -144,4 +188,32 @@ pub fn primitive_collider(primitive: Primitive, mesh: &MeshComponent) -> Option<
         shape,
         ..default_collider()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The kept copy is what building afresh gives, every call (#2123).
+    #[test]
+    fn a_kept_primitive_is_what_building_it_again_gives() {
+        for p in [
+            Primitive::Box,
+            Primitive::Sphere,
+            Primitive::Cylinder,
+            Primitive::Capsule,
+        ] {
+            let fresh = generated(p, 1).expect("a mesh primitive has geometry");
+            for _ in 0..2 {
+                let kept = subdivided_geometry(p, 7).expect("and keeps it");
+                assert_eq!(format!("{kept:?}"), format!("{fresh:?}"), "{p:?}");
+            }
+        }
+        assert!(subdivided_geometry(Primitive::SpotLight, 1).is_none());
+        let plane = |n| subdivided_geometry(Primitive::Plane, n).unwrap().1.len();
+        assert!(
+            plane(4) > plane(1),
+            "a Plane is still cut by its subdivisions"
+        );
+    }
 }

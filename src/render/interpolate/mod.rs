@@ -127,7 +127,7 @@ impl DrawPoses {
     }
 
     /// Draw everything at its pose from now on: the sim is not running on the tick
-    /// (edit mode, paused, a Play transition, a demo). The next [`Self::record`]
+    /// (edit mode, paused, a Play transition, a scene load, a demo). The next [`Self::record`]
     /// starts afresh. What was drawn blended is still re-posed once.
     pub fn clear(&mut self) {
         self.tracked = None;

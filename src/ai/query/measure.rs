@@ -1,10 +1,11 @@
 //! The raw value each test reads off an item (#1892). The pure-maths tests are
-//! here; rays are `sight`'s and the navmesh's `walk`'s.
+//! here and rays are `sight`'s; the navmesh's `path` tests run on their flood
+//! (`walk`, through `progress`).
 
 use glam::Vec3;
 
 use super::spec::{Anchor, Measure};
-use super::{sight, walk, QueryWorld};
+use super::{sight, QueryWorld};
 use crate::scene::Scene;
 
 /// Each item's raw value for `measure`, in `items`' order. `None` fails the
@@ -41,11 +42,9 @@ pub fn raw(
             let at = p + Vec3::Y * *item_height;
             answer(sight::in_view(world.view, world.screen, at, *margin) == *inside)
         }),
-        Measure::PathExists => walk::lengths(world, querier, items)
-            .into_iter()
-            .map(|l| Some(answer(l.is_some())))
-            .collect(),
-        Measure::PathLength => walk::lengths(world, querier, items),
+        Measure::PathExists | Measure::PathLength => {
+            unreachable!("a path test runs on its flood (`Progress`), never through `raw`")
+        }
         Measure::Separation { radius } => {
             let others = others(world.scene, querier.entity);
             each(items, |p| nearest(&others, p).min(*radius))
@@ -55,7 +54,7 @@ pub fn raw(
 }
 
 /// A yes/no test's raw value: 1 for the answer it asks for.
-fn answer(matches: bool) -> f32 {
+pub(super) fn answer(matches: bool) -> f32 {
     if matches {
         1.0
     } else {

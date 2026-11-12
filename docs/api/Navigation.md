@@ -34,7 +34,9 @@ frame (a door swinging shut) and agents see it the same tick. Wherever a scene g
 navmesh as a whole (loading the game, the player or the harness; Play's first frame; a
 play-mode `Scene.Load`; Stop) it starts from the scene's **saved navmesh** when it has one
 that still matches (below), and bakes in full when not, once; a change of the bake
-settings or of the grid's bounds bakes in full too.
+settings or of the grid's bounds bakes in full too. A `Scene.LoadAsync` with no saved
+navmesh bakes it in the background with the rest of the scene and restores that bake at
+the swap, when the scene it swapped in still matches it.
 
 ### The saved navmesh (#1887)
 
@@ -42,7 +44,9 @@ A full bake can be **saved beside the scene**, as `<scene>.navmesh` (Unity's bak
 `NavMeshData`): the baked spans, the pre-erosion copy the incremental rebake splices, the
 generated off-mesh links, and a fingerprint of everything the bake read (the static
 colliders' world triangles, the carving obstacles, the modifier volumes, the authored links,
-the bake settings bar the area costs, and the grid). When a scene loads or Play starts, a
+the bake settings bar the area costs, and the grid). It holds no entity id and no order:
+a load that renumbers the level's entities (a `DontDestroyOnLoad` survivor already holding
+one of its ids) keeps the file current. When a scene loads or Play starts, a
 file whose fingerprint matches the scene is used as is and **no bake runs**, so a shipped
 game pays no bake on a level load; the per-tick rebake then
 carries on from it exactly as from a bake. A stale, truncated or malformed file is ignored
@@ -114,16 +118,24 @@ off every wall. A path is a table:
 - **`complete`** — the path reaches the target. Its ends are the query points themselves
   (on their floors) when they stand over the navmesh.
 - **`partial`** — the target is unreachable (another island, a sealed room); the path ends
-  on the reachable point nearest to it, as Unity's `PathPartial`.
+  on the reachable point nearest to it, as Unity's `PathPartial`. A search gives up after
+  65 536 node expansions (Detour's `maxNodes`; the longest complete path on the Dust2
+  arena takes about 45 000), and after 4 096 toward a target on an island no walk or
+  off-mesh link reaches: then the path ends on the nearest point that many expansions
+  found, headed toward the target. Either way an unreachable target costs a bounded
+  amount, not a flood of the whole navmesh.
 - **`invalid`** — the start or the target has no navmesh within 5 cells; no corners.
 
 `SamplePosition` and `Raycast` answer on the navmesh, not physics: *walkable*, not
-*solid*. Every query is synchronous and deterministic.
+*solid*. Every query is synchronous and deterministic. Agents plan their own paths
+through a time-sliced queue instead (`NavMeshAgent`, *Following a path*), whose budget
+is the one knob below.
 
 | Function | Signature | Returns |
 |---|---|---|
 | `Navigation.GetNextPathStep` | `(cx, cy, cz, tx, ty, tz)` | the next corner `x, y, z` of the smoothed path (its `y` is that floor's height); with no path, the target itself |
 | `Navigation.CalculatePath` | `(fx, fy, fz, tx, ty, tz [, areaMask])` | a path table (above); with `areaMask`, the path enters only those areas (see *Areas and costs*) |
+| `Navigation.SetPathfindingIterationsPerFrame` / `GetPathfindingIterationsPerFrame` | `(n)` / `()` | the node expansions the agents' path queue spends each tick (Unity's `NavMesh.pathfindingIterationsPerFrame`; at least `1`, default `2048`). Higher answers agents sooner and costs more per tick; it is the engine's, not the scene's, survives a rebake, and goes back to the default when Play starts and on Stop (a play-mode change reverts) |
 | `Navigation.GetPathLength` | `(path)` | the length along a path table's `corners` (the same number as its `length`) |
 | `Navigation.SamplePosition` | `(x, y, z, maxDistance [, areaMask])` | `found, x, y, z` — the walkable point nearest the given one (3D distance) within `maxDistance`, on a floor whose area `areaMask` allows; `false, 0, 0, 0` when there is none |
 | `Navigation.Raycast` | `(fx, fy, fz, tx, ty, tz [, areaMask])` | `hit, x, y, z` — walks the navmesh straight from the start toward the end; `hit` is `true` when a wall, ledge, eroded edge, a step taller than `MaxStep` or a floor outside `areaMask` stops it, and `x, y, z` is where it stopped (the end point when clear), on the floor it reached |
@@ -233,8 +245,8 @@ Component.Set(table, "NavMeshModifier", { override_area = 1 })  -- no walking on
 - A query's start floor is exempt from the mask, so an agent standing in a forbidden area
   can still walk out; a target in one gives a `partial` path.
 - **Costs are read at search time, never baked.** `SetAreaCost` takes effect on the very
-  next query, rebakes nothing, and makes every agent re-plan on its next tick (a cost
-  change anywhere may change any path). Area *assignments* (moving a volume) rebake only
+  next query, rebakes nothing, and makes every agent ask for a new path on its next tick
+  (a cost change anywhere may change any path), answered through the agents' path queue. Area *assignments* (moving a volume) rebake only
   the cells involved.
 
 The table serializes with the scene (`nav_settings.areas`) and is editable from the scene

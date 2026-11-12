@@ -9,6 +9,7 @@ use mlua::{Lua, Table};
 
 use super::register;
 use crate::ai::query::test_world::Arena;
+use crate::ai::query::QueryQueue;
 use crate::api::{bind, ApiCtx};
 use crate::core::random::Random;
 use crate::core::settings::video::VideoSettings;
@@ -29,6 +30,7 @@ pub(super) fn vm() -> (Lua, Rc<RefCell<Random>>) {
     bind(&lua, &Rc::new(RefCell::new(ScreenSize::default())));
     bind(&lua, &Rc::new(RefCell::new(VideoSettings::default())));
     bind(&lua, &rng);
+    bind(&lua, &Rc::<RefCell<QueryQueue>>::default());
     register(&lua, &ApiCtx::default()).unwrap();
     lua.globals().set("bot", bot).unwrap();
     lua.globals().set("player", player).unwrap();

@@ -224,6 +224,7 @@ impl NavigationGraph {
             bake_generation: self.bake_generation,
             tracked_scene: self.tracked_scene,
             static_watch: self.static_watch.take(),
+            requests: std::mem::take(&mut self.requests),
             ..Self::new(b.min_x, b.max_x, b.min_z, b.max_z, spacing)
         };
     }

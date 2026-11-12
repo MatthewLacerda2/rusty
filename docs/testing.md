@@ -137,7 +137,12 @@ the Game view size and the display scale (`Video.GetDisplayScale`, #1715) at
 each change, and per tick the input the tick published
 (`InputFrame`), as a delta from the tick before, and the tick's `dt`: the editor
 and the dev player tick on the fixed tick in Play (#1877) and on wall-clock time
-outside it, and the replay runs each tick on the `dt` it was recorded with. Everything else that reaches a playing world is
+outside it, and the replay runs each tick on the `dt` it was recorded with. The
+`Scene.LoadAsync` operations the tick read ready (#2123) are recorded with it too,
+and the pending operation's progress where it moved: a window's load worker and GPU
+warm-up decide both, so a replay reads the recorded progress and makes the
+operations ready on the recorded tick, waiting for its own loader there if it is
+behind. Everything else that reaches a playing world is
 recorded as a **host act** before its tick: a console, MCP or command-channel
 line (the one evaluator, `ScriptManager::eval`), a scenario's API calls with their
 plain-data arguments, and the `Harness` verbs that change the world without a
@@ -152,8 +157,12 @@ after. `Editor.EnterPlay()` and `Editor.ExitPlay()` are not acts: the transition
 they ask for is the demo's start and end. A demo still being written is never
 pruned (its recorder holds a lock on the file). An act it cannot carry **taints** the demo from that tick: an edit made
 by hand in the editor during Play (the Inspector, the hierarchy, a gizmo), a call
-passing or returning a function or a handle (`Scene.GetScript`'s calls are not
-recorded), Play started on unsaved scene edits. The replay warns from there on.
+passing or returning a function or a userdata, a value written into a script or
+passed to its function through a `Scene.GetScript` handle that is not plain data
+(a function, a table with mixed keys), Play started on unsaved scene edits. The
+handle itself is no taint: its field writes and function calls are recorded
+(`ScriptRef.Set` / `ScriptRef.Call` in the file, `dev::demo::script_ref`, #2120)
+and made again on the replay. The replay warns from there on.
 Script and asset changes on disk wait for Stop (the editor's watch holds them
 through Play), so they never reach a Play session. `play --size` and `--scene`
 are refused with `--demo`: the replay plays the scene, the Game view size and the
@@ -683,7 +692,7 @@ recipe and scripts are committed; the project is regenerable output.
 
 | Game | What it is for |
 |---|---|
-| `arena` | The CS:GO yardstick in miniature: a two-floor deathmatch from primitives (a staircase, a ladder link, a drop, a crate to jump onto, a 10 cm wall bullets go through), snowman bots on `NavMeshAgent` + `AIPerception` + `EnvironmentQuery` fighting everyone, raycast guns with spread and recoil, a smoke grenade that blocks sight. Scenarios: `nav` (every spawn reaches every room and both floors), `match` (bots reach the kill limit, each scores and dies), `shot` (a wallbang hurts, a 40 cm wall stops it). The recipe bakes the navmesh and saves it with the scene, so Play restores it instead of baking on its first tick. `--param size=dust2` lays out 25 blocks, 120 m a side, for map-scale work, and `--param bake=true` adds a Generate Lighting at the showroom's lowest settings (lightmaps, probes, reflections, occlusion; about a minute and a half per generation at the default size on a software adapter); both run on request. |
+| `arena` | The CS:GO yardstick in miniature: a two-floor deathmatch from primitives (a staircase, a ladder link, a drop, a crate to jump onto, a 10 cm wall bullets go through), snowman bots on `NavMeshAgent` + `AIPerception` + `EnvironmentQuery` (its time-sliced `Request` / `Poll`) fighting everyone, raycast guns with spread and recoil, a smoke grenade that blocks sight. Scenarios: `nav` (every spawn reaches every room and both floors), `match` (bots reach the kill limit, each scores and dies), `shot` (a wallbang hurts, a 40 cm wall stops it). The recipe bakes the navmesh and saves it with the scene, so Play restores it instead of baking on its first tick. `--param size=dust2` lays out 25 blocks, 120 m a side, for map-scale work, and `--param bake=true` adds a Generate Lighting at the showroom's lowest settings (lightmaps, probes, reflections, occlusion; about a minute and a half per generation at the default size on a software adapter); both run on request. |
 | `fruit` | A slice-the-fruit arcade game in 3D: rigidbody fruit and bombs thrown in bursts on a no-collision layer, a mouse swipe hit-tested on screen against the moving bodies, a cut splitting a fruit into two halves with a juice burst, lives, score, combo, a game-over banner and zimmer sounds; scenarios `slice` (injected swipe), `bomb`, `miss`, `waves`. |
 | `runner` | An endless runner: a kinematic runner at rising speed in three lanes (jump, slide, lane change), a following camera, seeded chunks built ahead and destroyed behind (the entity count stays flat), crates and barrels dropped as rigidbodies that settle the same way every load, dust, sparks and a trail, a crash on any hit, a distance counter; a dodging bot (`runner/bot.lua`) drives four scenarios and two in-run shots. |
 | `showroom` | Lighting and reflections in one interior room: a polished floor (SSR from a minimum smoothness of 0.1), a mirror, a clear and a tinted glass pane, a drinking glass before the mirror, a lacquered pedestal (`ior`, `KHR_materials_specular`), an emissive sign, daylight through a window, a turned box and a sphere reflection probe, six light probes and a ball rolling through them with a proxy volume. Scenarios: `load`, `ball` (its probe light rises in the sun), `probes` (the volumes drawn as gizmos), `bake` (only with `--param bake=true`: a tiny Generate Lighting, applied on load). |
@@ -701,7 +710,10 @@ make game-test NAME=smoke                  # generate, prove it deterministic, p
 
 `make game-test` generates the game, moves it aside, generates it again at the same
 path and compares every file; then runs each `scenarios/*.lua` as `play` does, on
-the project's startup scene, and takes the shots. It prints one `ok`/`FAIL` line per
+the project's startup scene, replays the demo each run recorded (a step of its
+own, `scenario <name>'s demo replays`, results in `cache/test/<scenario>/replay/`:
+one that diverges fails, since a scenario's every act on the world is recorded),
+and takes the shots. It prints one `ok`/`FAIL` line per
 step and exits 1 when one failed. Results go to the project's `cache/test/<scenario>/`
 (`results.json`, `console.log`) and the shots to `cache/test/shots/<name>.png`; open
 them with `Read`. A shot fails only when it is all one colour: rendering changes too

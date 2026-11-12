@@ -3,6 +3,8 @@
 //! incrementally like a baked one.
 
 mod format;
+mod fresh;
+mod ids;
 mod malformed;
 mod restore;
 

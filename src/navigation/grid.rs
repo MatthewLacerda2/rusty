@@ -79,11 +79,19 @@ pub struct NavigationGraph {
     /// The play loop's view of the static geometry's changes (#1707,
     /// `bake::still`); `None` until `start_tracked` or `sync_changes` opens it.
     pub(super) static_watch: Option<super::bake::StaticWatch>,
-    /// The scene the play loop last started on (`bake::still::start_tracked`).
-    pub(super) tracked_scene: Option<crate::scene::SceneId>,
+    /// The scene the play loop last started on (`bake::still::start_tracked`), and
+    /// how that start made the navmesh.
+    pub(super) tracked_scene: Option<(crate::scene::SceneId, super::Start)>,
     /// The reusable per-span search state (#2083, `pool`): A\* starts in O(1)
     /// instead of filling navmesh-sized arrays per query.
     pub(super) search: super::pool::SearchScratch,
+    /// What the flood keeps between queries for the current bake (#2088, `flood::cache`).
+    pub(super) flood_cache: super::flood::FloodCache,
+    /// The agents' path requests and the search in progress (#2087, `request`).
+    pub(super) requests: std::cell::RefCell<super::request::PathQueue>,
+    /// The navmesh's islands, for the search cap toward an unreachable goal (#2087),
+    /// carried across incremental rebakes (#2111).
+    pub(super) islands: super::request::islands::Islands,
 }
 
 impl NavigationGraph {
@@ -120,6 +128,9 @@ impl NavigationGraph {
             static_watch: None,
             tracked_scene: None,
             search: Default::default(),
+            flood_cache: Default::default(),
+            requests: Default::default(),
+            islands: Default::default(),
         }
     }
 
