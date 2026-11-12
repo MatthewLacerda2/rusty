@@ -15,7 +15,7 @@
 //! `maxNodes` answer). The environment query's flood (`flood`, #2088) asks the
 //! same map which of its goals to drop before it starts.
 
-use std::cell::RefCell;
+use std::cell::{RefCell, RefMut};
 use std::collections::VecDeque;
 
 use super::super::astar::MAX_SEARCH_NODES;
@@ -52,32 +52,35 @@ impl NavigationGraph {
     /// Whether some walk and chain of off-mesh links leads from `start` to `goal`,
     /// whatever the area mask. `true` whenever it cannot tell (the cache in use).
     fn may_reach(&self, start: SpanRef, goal: SpanRef) -> bool {
-        let mut goals = vec![goal];
-        self.retain_reachable(start, &mut goals);
-        !goals.is_empty()
+        self.reach(start, std::slice::from_ref(&goal))
+            .is_none_or(|reach| reach.has(goal))
     }
 
     /// Keep only the `goals` some walk and chain of off-mesh links may lead to
     /// from `start`, whatever the area mask: the flood (#2088) drops the rest
     /// before it starts. Keeps them all whenever it cannot tell (the cache in use).
     pub(crate) fn retain_reachable(&self, start: SpanRef, goals: &mut Vec<SpanRef>) {
-        let Ok(mut cache) = self.islands.0.try_borrow_mut() else {
-            return;
-        };
+        if let Some(reach) = self.reach(start, goals) {
+            goals.retain(|&g| reach.has(g));
+        }
+    }
+
+    /// The areas a walk and chain of links from `start` leads to, walked only as
+    /// far as every one of `goals`' areas is found. `None` when the cache is in
+    /// use.
+    fn reach<'a>(&'a self, start: SpanRef, goals: &[SpanRef]) -> Option<Reach<'a>> {
+        let mut cache = self.islands.0.try_borrow_mut().ok()?;
         let stale = |m: &IslandMap| {
             m.generation != self.bake_generation || m.area.len() != self.spans.len()
         };
         if cache.as_ref().is_none_or(stale) {
             *cache = Some(self.island_map());
         }
-        let Some(map) = cache.as_ref() else {
-            return;
-        };
+        let map = RefMut::filter_map(cache, Option::as_mut).ok()?;
         let area = |s: SpanRef| map.area[s.index as usize];
         let mut seen = vec![false; map.exits.len()];
         let mut queue = VecDeque::from([area(start)]);
         seen[area(start) as usize] = true;
-        // Walk the areas only as far as the last goal's is found.
         let mut left = goals.iter().filter(|&&g| !seen[area(g) as usize]).count();
         while let Some(a) = queue.pop_front().filter(|_| left > 0) {
             for &b in &map.exits[a as usize] {
@@ -87,7 +90,7 @@ impl NavigationGraph {
                 }
             }
         }
-        goals.retain(|&g| seen[area(g) as usize]);
+        Some(Reach { map, seen })
     }
 
     /// The current bake's [`IslandMap`].
@@ -145,6 +148,19 @@ impl NavigationGraph {
             area[i as usize] = area[r];
         }
         (area, count)
+    }
+}
+
+/// The areas [`NavigationGraph::reach`] found, holding the cached map they index.
+struct Reach<'a> {
+    map: RefMut<'a, IslandMap>,
+    seen: Vec<bool>,
+}
+
+impl Reach<'_> {
+    /// Whether the walk found `span`'s area.
+    fn has(&self, span: SpanRef) -> bool {
+        self.seen[self.map.area[span.index as usize] as usize]
     }
 }
 

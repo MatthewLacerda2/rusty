@@ -9,12 +9,18 @@
 //! **Bit-exact, not only exact.** The flood's costs are `f32` sums, and a sum's
 //! rounding can make the cheapest path's cost an ulp *under* the real-valued
 //! `g + h` of a span on it, which would let a goal pop an ulp too dear. So `h`
-//! is shrunk by [`Goals::slack`], `4 ε (bound + 4)`: a path of total cost `T ≤
-//! bound` whose moves each cost at least one cell rounds by at most `ε T` per
-//! cell still ahead, and `h` gives up `ε (bound + 4)` per cell, four times over,
-//! which also covers rounding in `h` and in the key's own sum. With the slack,
-//! every span on the cheapest path keys at or under its goal's cost, so each
-//! goal settles at the very `f32` the full Dijkstra flood gives it.
+//! is shrunk by [`Goals::slack`], `4 ε (bound + 4)`. A path of total cost `T ≤
+//! bound` rounds by at most `ε T` per move still ahead. A move that closes at
+//! least one cell of octile distance (every grid step, and every link whose ends
+//! lie in different grid columns) is paid for by `h` giving up `ε (bound + 4)`
+//! per cell, four times over, which also covers rounding in `h` and in the key's
+//! own sum. A move that closes none (an authored link whose ends share a column,
+//! a ladder: octile 0, its cost its `cost_override`) is paid for by itself: `h`
+//! counts none of its cost `c`, and adding `c` to an `f32` rounds by at most `c`,
+//! as the sum before it is itself an `f32`. With the slack, every span on the
+//! cheapest path keys at or under its goal's cost, so each goal settles at the
+//! very `f32` the full Dijkstra flood gives it (`exact_tests` holds it, a ladder
+//! included).
 //!
 //! **A settled goal raises `h`** for the frontier left, so keys already in the
 //! heap are lower than a fresh one would be. They are not re-keyed: a key from a
