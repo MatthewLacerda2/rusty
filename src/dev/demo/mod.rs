@@ -14,8 +14,9 @@
 //!   `InputFrame` right before it is published, [`Replayer`] writes it back there.
 //! - **Host acts** go through the world's journal (`scripting::HostJournal`): the
 //!   one REPL evaluator notes its lines, a scenario VM's API calls are noted by
-//!   [`journal_calls`]. What cannot be carried as plain data (an Inspector edit,
-//!   a script handle's calls) taints the demo from that tick, and the replay warns.
+//!   [`journal_calls`], and a `Scene.GetScript` handle's field writes and calls by
+//!   `script_ref`. What cannot be carried as plain data (an Inspector edit, a
+//!   function passed to a call) taints the demo from that tick, and the replay warns.
 //! - **Checked, not promised.** A digest of the world every two seconds and one
 //!   when Play ends (`digest`), compared on replay: the first that differs is
 //!   reported.
@@ -44,6 +45,7 @@ mod index;
 mod read;
 mod record;
 mod replay;
+mod script_ref;
 mod sources;
 
 use std::path::Path;
@@ -58,6 +60,7 @@ pub use replay::{
     cut, cut_scenario, full_path, lend, prepare, seek, Divergence, Lent, Origin, Replayer, Verdict,
     NO_DEMO,
 };
+pub use script_ref::{note_call as note_script_call, note_set as note_script_set};
 
 use crate::app::GameWorld;
 use crate::dev::harness::Harness;
