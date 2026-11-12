@@ -1,5 +1,6 @@
 //! src/shell/frame/mod.rs — the frame clock, the sim advance, quit semantics, and
-//! swapchain acquisition: the per-frame logic both frontends share.
+//! swapchain acquisition: the per-frame logic both frontends share, and the worker
+//! that prepares a `Scene.LoadAsync` while frames go on (`load_worker`, #2123).
 //!
 //! Everything but [`acquire_frame`] is window- and GPU-free, so it is unit-tested
 //! directly (`frame_tests.rs`).
@@ -13,6 +14,7 @@ use crate::scene::SceneId;
 use crate::time::FIXED_DELTA_TIME;
 use wgpu::CurrentSurfaceTexture;
 
+pub mod load_worker;
 pub mod ticks;
 pub use ticks::FixedTicks;
 

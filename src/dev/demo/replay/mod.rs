@@ -5,7 +5,8 @@
 //! set-up); right before each tick's input is published it repeats the host acts
 //! recorded for it (a console line, a scenario's API call or handle act), sets
 //! the Game view size and writes the recorded [`InputFrame`](crate::core::input::InputFrame)
-//! over whatever live input there was, and the tick runs on the recorded `dt`;
+//! over whatever live input there was, and the tick runs on the recorded `dt` with
+//! the `Scene.LoadAsync` operations ready that were then;
 //! after the tick it compares the digest, when one was stored, and after the
 //! last the digest Play ended on. The first tick whose digest differs is the divergence, and
 //! a tainted tick is warned about from there on: a replay never drifts in silence.
@@ -281,5 +282,11 @@ impl TickTap for Replayer {
 
     fn dt(&mut self, dt: f32) -> f32 {
         self.tick.as_ref().map_or(dt, |tick| tick.dt)
+    }
+
+    /// The recorded ready operations, never the live ones: the world waits for its
+    /// own loader on each (#2123).
+    fn loads(&mut self, ready: Vec<u32>) -> Vec<u32> {
+        self.tick.as_ref().map_or(ready, |tick| tick.loads.clone())
     }
 }

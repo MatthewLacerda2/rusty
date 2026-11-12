@@ -127,6 +127,11 @@ pub struct Resources {
     /// The tick's tap (#1581) — a dev demo recorder or replay. `None` unless
     /// installed via `GameWorld::set_tap`.
     pub(super) tap: Option<Box<dyn super::TickTap>>,
+    /// What prepares `Scene.LoadAsync` operations (#2123), the host's: inline by
+    /// default, a worker thread in the windowed shell (`GameWorld::set_scene_loader`).
+    pub(super) scene_loader: Box<dyn super::SceneLoader>,
+    /// The ready operation's prepared scene, held for the tick's tail.
+    pub(super) ready_scene: Option<(u32, crate::scene::runtime::prepare::PreparedScene)>,
     /// How far the edit scene's meshes follow the write log (#1242).
     pub(super) model_writes: crate::scene::model_writes::ModelWrites,
 }
@@ -209,6 +214,8 @@ impl Resources {
             probe: None,
             load_probe: None,
             tap: None,
+            scene_loader: Box::new(super::scene_load::Inline::default()),
+            ready_scene: None,
             model_writes: Default::default(),
         }
     }

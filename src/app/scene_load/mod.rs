@@ -13,18 +13,24 @@
 //!
 //! The load runs in two stages (#2123): [`prepare`] reads everything it can from the
 //! files alone into a `PreparedScene` (`scene::runtime::prepare`), then [`activate`]
-//! swaps it in. Each step runs under the installed `LoadProbe`, which times it.
+//! swaps it in. Each step runs under the installed `LoadProbe`, which times it. A
+//! `Scene.Load` runs both here, at once; a `Scene.LoadAsync` operation was prepared
+//! by the host's loader (`background`) and only activates here, on the first tick
+//! tail that finds it ready with its activation allowed.
 //!
 //! Editor Play: Stop restores the edit snapshot taken at Play — the scene Play was
 //! pressed in, not the one play ended in — together with its scene-file path.
 
+mod background;
 mod boot;
 
+pub use background::{prepare_in_background, Inline, SceneLoader};
 #[cfg(test)]
 pub(crate) use boot::project_tests;
 pub use boot::{load_boot_scene, ProjectSource};
 
 use crate::physics::PhysicsWorld;
+use crate::scene::runtime::loads::{Due, LoadStatus};
 use crate::scene::runtime::prepare::{PreparedScene, SceneSidecars};
 use crate::scene::serialize::RehydratedScene;
 
@@ -68,21 +74,48 @@ impl GameWorld {
 /// The scene-load phase: swap in the scene a `Scene.Load` queued this tick, if any.
 /// Prepared from its files, then activated, each step under the load probe.
 pub(super) fn apply_scene_load(world: &mut World, res: &mut Resources) {
-    let Some(path) = world.scene.borrow_mut().take_pending_load() else {
+    let Some(due) = world.scene.borrow_mut().loads.take_due() else {
         return;
     };
     let mut probe = res.load_probe.take();
-    let loaded = match prepare(path, &mut probe) {
-        Ok(prepared) => Some(activate(world, res, prepared, &mut probe)),
-        Err(err) => {
-            res.console.borrow_mut().error(format!("Scene.Load: {err}"));
-            None
-        }
+    let loaded = match due {
+        Due::Sync(path) => match prepare(path, &mut probe) {
+            Ok(prepared) => Some(activate(world, res, prepared, &mut probe)),
+            Err(err) => {
+                res.console.borrow_mut().error(format!("Scene.Load: {err}"));
+                None
+            }
+        },
+        Due::Async { op, path } => activate_ready(world, res, op, &path, &mut probe),
     };
     if let Some(probe) = probe.as_mut() {
         probe.finish(loaded.as_deref(), &mut res.console.borrow_mut());
     }
     res.load_probe = probe;
+}
+
+/// Activate operation `op`, whose scene the tick head published ready; it ends done.
+fn activate_ready(
+    world: &mut World,
+    res: &mut Resources,
+    op: u32,
+    path: &str,
+    probe: &mut Option<Box<dyn LoadProbe>>,
+) -> Option<String> {
+    let held = res.ready_scene.take().filter(|(at, _)| *at == op);
+    let Some((_, prepared)) = held else {
+        let why = format!("Scene.LoadAsync: {path}: the prepared scene was lost");
+        res.console.borrow_mut().error(why);
+        world
+            .scene
+            .borrow_mut()
+            .loads
+            .finish(op, LoadStatus::Failed);
+        return None;
+    };
+    let loaded = activate(world, res, prepared, probe);
+    world.scene.borrow_mut().loads.finish(op, LoadStatus::Done);
+    Some(loaded)
 }
 
 /// The load's first stage, from the files alone (`scene::runtime::prepare`): read
@@ -101,10 +134,11 @@ fn prepare(path: String, probe: &mut Option<Box<dyn LoadProbe>>) -> Result<Prepa
 fn activate(
     world: &mut World,
     res: &mut Resources,
-    prepared: PreparedScene,
+    mut prepared: PreparedScene,
     probe: &mut Option<Box<dyn LoadProbe>>,
 ) -> String {
     let path = prepared.path().to_string();
+    let baked = prepared.take_baked_navmesh();
     let (survivors, outgoing) = {
         let scene = world.scene.borrow();
         let survivors = scene.load_survivors();
@@ -132,10 +166,11 @@ fn activate(
         let mut scene = world.scene.borrow_mut();
         let physics = timed(probe, "physics", || PhysicsWorld::from_scene(&scene));
         *res.physics.borrow_mut() = Some(physics);
-        // Restored from the new scene's saved navmesh or baked, once (#1887): the
-        // play loop's next tick finds it tracking this scene and only syncs.
+        // Restored from the new scene's saved navmesh, or the one prepare baked from
+        // its files, or baked, once (#1887): the next tick only syncs.
+        let mut nav = res.nav.borrow_mut();
         timed(probe, "navmesh", || {
-            res.nav.borrow_mut().start_tracked(&mut scene)
+            nav.start_tracked_with(&mut scene, baked.as_deref())
         });
     }
     *res.script_manager.scene_path_cell().borrow_mut() = Some(path.clone());

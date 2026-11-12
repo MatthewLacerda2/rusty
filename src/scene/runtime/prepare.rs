@@ -8,10 +8,12 @@
 //! files. **Activate** is [`Scene::swap_in_prepared`](crate::scene::Scene::swap_in_prepared): the swap at the tick's tail,
 //! which needs the survivors and so the live scene. `Scene.Load` runs both at once.
 //!
-//! What prepare does not yet cover: the physics shapes (`PhysicsWorld::from_scene`
-//! builds from a live scene) and the navmesh restore (`navigation`), which run at
-//! activation, and model imports, which go through `asset::import_cache`'s
-//! thread-local cache and so must stay on the thread that activates.
+//! Prepare runs on the thread that ticks for a `Scene.Load`, and on a worker for a
+//! `Scene.LoadAsync` (`app::scene_load::background`), which also bakes the navmesh
+//! when none is saved ([`PreparedScene::set_baked_navmesh`]): it needs a scene to bake
+//! from, so it bakes a [`staged`] copy that no survivor has joined. What stays at
+//! activation: the physics world and the navmesh restore, both built from the live
+//! scene, survivors included.
 
 use crate::scene::lighting::io::{read_lighting_sidecar, LightingFile};
 use crate::scene::nav_settings::{read_navmesh, NavmeshFile};
@@ -40,6 +42,9 @@ pub struct PreparedScene {
     pub(super) path: String,
     pub(super) document: RehydratedScene,
     pub(super) sidecars: SceneSidecars,
+    /// A navmesh baked from the files when none is saved beside them: restored at
+    /// activation where it still matches the live scene (`<scene>.navmesh`'s bytes).
+    pub(super) baked_navmesh: Option<Vec<u8>>,
 }
 
 impl PreparedScene {
@@ -50,6 +55,7 @@ impl PreparedScene {
             path,
             document,
             sidecars,
+            baked_navmesh: None,
         }
     }
 
@@ -63,4 +69,27 @@ impl PreparedScene {
     pub fn path(&self) -> &str {
         &self.path
     }
+
+    /// Whether a navmesh is saved beside the scene file.
+    pub fn has_saved_navmesh(&self) -> bool {
+        self.sidecars.navmesh.has_bytes()
+    }
+
+    /// Keep `bytes`, a navmesh baked from these files, for activation.
+    pub fn set_baked_navmesh(&mut self, bytes: Vec<u8>) {
+        self.baked_navmesh = Some(bytes);
+    }
+
+    /// Take the navmesh baked from these files, if one was.
+    pub fn take_baked_navmesh(&mut self) -> Option<Vec<u8>> {
+        self.baked_navmesh.take()
+    }
+}
+
+/// A scene holding `document` alone, as a load with no survivors would leave it,
+/// sidecars aside: what a bake from the files reads.
+pub fn staged(document: RehydratedScene) -> crate::scene::Scene {
+    let mut scene = crate::scene::Scene::new();
+    crate::scene::serialize::apply_rehydrated(&mut scene, document);
+    scene
 }

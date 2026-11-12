@@ -234,6 +234,18 @@ pub fn invoke_harness(
     done.map_err(|e| format!("Harness.{verb}: {e}"))
 }
 
+/// Whether `act` only enters or leaves Play: the transition it asks for is the
+/// demo's own start or end, so it is not an act to replay.
+pub(super) fn is_play_verb(act: &HostCall) -> bool {
+    let named = match act {
+        HostCall::Eval(line) => line.trim_end_matches(';').trim_end(),
+        HostCall::Call { function, .. } => function,
+        HostCall::Taint(_) => return false,
+    };
+    let named = named.strip_suffix("()").unwrap_or(named);
+    matches!(named, "Editor.EnterPlay" | "Editor.ExitPlay")
+}
+
 #[cfg(test)]
 #[path = "calls_tests.rs"]
 mod tests;

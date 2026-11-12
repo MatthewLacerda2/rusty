@@ -11,6 +11,7 @@
 //!     file, through the editor's own `scene::new_scene`. Edit mode only.
 //!   - `GetActivePath()` — the current scene file, `nil` when there is none.
 //!   - `DontDestroyOnLoad(id)` — the entity and its children survive play-mode loads.
+//!   - `LoadAsync(path)` and its operation's verbs — `api::scene_load_async` (#2123).
 
 use std::path::Path;
 
@@ -31,24 +32,15 @@ pub fn register(
         "Load",
         lua.create_function(move |lua, path: String| {
             let scene = &*scene.get(lua)?;
-            if !Path::new(&path).is_file() {
-                return Err(runtime(format!("Scene.Load: no scene file at '{path}'")));
-            }
+            check_file("Load", &path)?;
             if scene.borrow().is_playing() {
                 scene.borrow_mut().request_load(path);
                 return Ok(None);
             }
-            // A sidecar failure comes after the World became the new file's, so the
-            // current scene file follows it and the load returns a warning (#1374).
-            let warning = match scene.borrow_mut().load_from_file(&path) {
-                Ok(()) => None,
-                Err(e) if e.replaced_world() => Some(format!("Scene.Load: {path}: {e}")),
-                Err(e) => return Err(runtime(format!("Scene.Load: {e}"))),
-            };
-            *scene_path.get(lua)?.borrow_mut() = Some(path);
-            Ok(warning)
+            load_now(scene, &*scene_path.get(lua)?, path)
         }),
     )?;
+    super::scene_load_async::register(lua, table, scene, scene_path)?;
 
     register_new(lua, table, scene, scene_path)?;
 
@@ -97,6 +89,31 @@ fn register_new(
     )
 }
 
-fn runtime(message: String) -> mlua::Error {
+/// Error, naming the verb, when there is no file at `path`.
+pub(super) fn check_file(verb: &str, path: &str) -> mlua::Result<()> {
+    if Path::new(path).is_file() {
+        return Ok(());
+    }
+    Err(runtime(format!("Scene.{verb}: no scene file at '{path}'")))
+}
+
+/// Edit mode's load: File ▸ Open, at once; `path` becomes the current scene file.
+/// A sidecar failure comes after the World became the new file's, so the current
+/// scene file follows it and the load returns a warning (#1374).
+pub(super) fn load_now(
+    scene: &std::cell::RefCell<Scene>,
+    scene_path: &std::cell::RefCell<Option<String>>,
+    path: String,
+) -> mlua::Result<Option<String>> {
+    let warning = match scene.borrow_mut().load_from_file(&path) {
+        Ok(()) => None,
+        Err(e) if e.replaced_world() => Some(format!("Scene.Load: {path}: {e}")),
+        Err(e) => return Err(runtime(format!("Scene.Load: {e}"))),
+    };
+    *scene_path.borrow_mut() = Some(path);
+    Ok(warning)
+}
+
+pub(super) fn runtime(message: String) -> mlua::Error {
     mlua::Error::RuntimeError(message)
 }

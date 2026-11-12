@@ -8,8 +8,13 @@
 mod collider;
 pub mod model_writes;
 mod reimport;
+mod warned;
 
 pub(crate) use collider::{rebuild as rebuild_collider_mesh, refit_collider, Which};
+use warned::warn_once;
+pub(crate) use warned::warn_once_of;
+#[cfg(test)]
+pub(crate) use warned::warned_of;
 
 pub use reimport::{
     reimport_model, reimport_model_except, reimport_model_ids, reimport_written, Rig,
@@ -31,9 +36,16 @@ pub struct RehydratedScene {
 }
 
 impl RehydratedScene {
-    pub fn new(mut data: crate::scene::serialize::SceneData) -> Self {
+    pub fn new(data: crate::scene::serialize::SceneData) -> Self {
+        let mut scene = Self::read_since(data, 0);
+        scene.read_at = crate::core::fs::written::written_since(u64::MAX).0;
+        scene
+    }
+
+    /// [`Self::new`] stamped `read_at`, taken before the document was read: a load
+    /// off the ticking thread (#2123) still follows a model written while it ran.
+    pub fn read_since(mut data: crate::scene::serialize::SceneData, read_at: u64) -> Self {
         data.entities.iter_mut().for_each(rehydrate_entity_mesh);
-        let read_at = crate::core::fs::written::written_since(u64::MAX).0;
         Self { data, read_at }
     }
 
@@ -139,35 +151,6 @@ fn shared_sub_mesh(reference: &str) -> Result<RehydratedMesh, asset::ImportError
         asset::ImportError::BadReference(format!("'{reference}': the file has no such sub-object"))
     })?;
     Ok(RehydratedMesh::from_sub_mesh(sub, import.revision))
-}
-
-thread_local! {
-    /// The references a failed rehydrate was already warned of: a scene reloads
-    /// often, and one warning per reference is enough (#1295).
-    static WARNED: std::cell::RefCell<std::collections::BTreeSet<String>> =
-        const { std::cell::RefCell::new(std::collections::BTreeSet::new()) };
-}
-
-/// Say why `reference`'s mesh comes back empty, once per reference, rather than
-/// leaving an invisible entity with no explanation.
-fn warn_once(reference: &str, error: &asset::ImportError) {
-    warn_once_of(reference, || {
-        format!("mesh '{reference}' loads empty: {error}")
-    });
-}
-
-/// Say `message` once per `key` in the console, out of the set every failed
-/// rehydrate shares: a scene reloads often, and once is enough.
-pub(crate) fn warn_once_of(key: &str, message: impl FnOnce() -> String) {
-    if WARNED.with(|warned| warned.borrow_mut().insert(key.to_string())) {
-        log::warn!("[Scene] {}", message());
-    }
-}
-
-/// Whether `key` was already warned of ([`warn_once_of`]).
-#[cfg(test)]
-pub(crate) fn warned_of(key: &str) -> bool {
-    WARNED.with(|warned| warned.borrow().contains(key))
 }
 
 /// Rebuild one mesh's vertex/index data + rig from its on-disk REFERENCE: a

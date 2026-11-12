@@ -109,11 +109,30 @@ impl NavigationGraph {
     /// [`Self::restore_or_bake`], then open the watch [`Self::sync_changes`] reads
     /// from, and remember which scene it started on ([`Self::tracks`]).
     pub fn start_tracked(&mut self, scene: &mut Scene) -> Start {
+        self.start_tracked_with(scene, None)
+    }
+
+    /// [`Self::start_tracked`] for a load that baked the navmesh off the ticking
+    /// thread (`app::scene_load::background`, #2123): with no navmesh saved, the
+    /// `baked` bytes are restored when they still match the live scene, the same
+    /// graph a bake gives; otherwise it bakes, as [`Self::restore_or_bake`].
+    pub fn start_tracked_with(&mut self, scene: &mut Scene, baked: Option<&[u8]>) -> Start {
         let watch = StaticWatch::open(&mut scene.world);
-        let start = self.restore_or_bake(scene);
+        let start = match baked.filter(|_| scene.navmesh.bytes.is_none()) {
+            Some(bytes) if self.restore(scene, bytes).is_ok() => Start::Restored,
+            _ => self.restore_or_bake(scene),
+        };
         self.static_watch = Some(watch);
         self.tracked_scene = Some(scene.id());
         start
+    }
+
+    /// A full bake of `scene` by a fresh graph, as the bytes that restore it: what a
+    /// load bakes from its files when no navmesh is saved beside them.
+    pub fn baked_bytes(scene: &Scene) -> Vec<u8> {
+        let b = crate::navigation::NavBounds::EMPTY_SCENE;
+        let spacing = crate::scene::nav_settings::DEFAULT_GRID_SPACING;
+        Self::new(b.min_x, b.max_x, b.min_z, b.max_z, spacing).bake_to_bytes(scene)
     }
 
     /// Whether [`Self::start_tracked`] last started on `scene` (a play-mode

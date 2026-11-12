@@ -23,14 +23,9 @@ use crate::scene::{Entity, MaterialAsset, Scene};
 
 impl Scene {
     /// Queue a play-mode load of `path`, swapped in at the tick's tail. A later
-    /// request in the same tick replaces an earlier one: the last `Scene.Load` wins.
+    /// request replaces an earlier one: the last `Scene.Load` wins (`runtime::loads`).
     pub fn request_load(&mut self, path: String) {
-        self.pending_load = Some(path);
-    }
-
-    /// Take the queued load, if any — the scene-load phase's drain.
-    pub fn take_pending_load(&mut self) -> Option<String> {
-        self.pending_load.take()
+        self.loads.request(path);
     }
 
     /// Mark `id` to survive scene loads, with its descendants. `false` when no entity
@@ -83,6 +78,7 @@ impl Scene {
             path: _,
             mut document,
             sidecars,
+            baked_navmesh: _, // activation's, taken before (`app::scene_load`)
         } = prepared;
         let carried: Vec<Entity> = self
             .entity_ids()

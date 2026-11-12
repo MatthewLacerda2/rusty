@@ -119,8 +119,8 @@ fn a_failed_import_is_not_kept() {
 fn another_project_drops_every_entry() {
     let path = model("project");
     let first = imported(&path).unwrap();
-    CACHE.with_borrow_mut(|c| c.enter(u64::MAX));
-    assert!(CACHE.with_borrow(|c| c.by_path.is_empty()));
+    with_cache(|c| c.enter(u64::MAX));
+    assert!(with_cache(|c| c.by_path.is_empty()));
     assert!(imported(&path).unwrap().revision > first.revision);
 }
 

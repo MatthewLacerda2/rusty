@@ -49,11 +49,8 @@ impl GameWorld {
         nav: Rc<RefCell<NavigationGraph>>,
         console: Rc<RefCell<ConsoleLogs>>,
     ) -> Self {
-        let camera = Rc::new(RefCell::new(Camera::new(
-            Vec3::new(0.0, 5.0, -10.0),
-            90.0,
-            -20.0,
-        )));
+        let eye = Vec3::new(0.0, 5.0, -10.0);
+        let camera = Rc::new(RefCell::new(Camera::new(eye, 90.0, -20.0)));
         let time = Rc::new(RefCell::new(Time::new()));
         let resources = Resources::new(
             Rc::clone(&scene),
@@ -147,6 +144,7 @@ impl GameWorld {
         self.sync_render_camera();
         self.sync_shader_time();
         self.push_audio(dt);
+        self.start_loads(); // a `Scene.LoadAsync` this tick opened: prepared meanwhile
         self.tap(TapPoint::AfterTick);
         transition
     }
