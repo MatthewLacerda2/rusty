@@ -37,7 +37,7 @@ impl NavigationGraph {
         let Some(old_start) = old_start else {
             return;
         };
-        let remap = self.spliced(&old_start, changed, settings);
+        let remap = self.spliced(old_start, changed, settings);
         let mut queue = self.requests.borrow_mut();
         let PathQueue { active, pool, .. } = &mut *queue;
         let Some(a) = active.as_mut() else {
