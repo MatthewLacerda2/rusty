@@ -5,7 +5,7 @@
 //! parsed document with every mesh rebuilt from its reference (`RehydratedScene`),
 //! and the sidecars beside it (the saved navmesh, the lighting SH and the baked PVS),
 //! read and decoded. The result, a [`PreparedScene`], is a pure function of the
-//! files. **Activate** is [`Scene::swap_in_prepared`]: the swap at the tick's tail,
+//! files. **Activate** is [`Scene::swap_in_prepared`](crate::scene::Scene::swap_in_prepared): the swap at the tick's tail,
 //! which needs the survivors and so the live scene. `Scene.Load` runs both at once.
 //!
 //! What prepare does not yet cover: the physics shapes (`PhysicsWorld::from_scene`

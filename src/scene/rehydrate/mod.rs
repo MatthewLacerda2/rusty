@@ -22,6 +22,33 @@ use crate::components::mesh::Vertex;
 use crate::components::Entity;
 use crate::scene::authoring::{subdivided_geometry, Primitive};
 
+/// A document with every mesh rebuilt from its reference, and the write-log stamp
+/// taken once they were (`meshes_read_at`, #1242): the file-only half of a load,
+/// which never touches a live scene (#2123).
+pub struct RehydratedScene {
+    data: crate::scene::serialize::SceneData,
+    read_at: u64,
+}
+
+impl RehydratedScene {
+    pub fn new(mut data: crate::scene::serialize::SceneData) -> Self {
+        data.entities.iter_mut().for_each(rehydrate_entity_mesh);
+        let read_at = crate::core::fs::written::written_since(u64::MAX).0;
+        Self { data, read_at }
+    }
+
+    /// The document, for the id moves a load makes before applying it
+    /// (`scene::runtime::load::make_room`): ids are not what rehydration reads.
+    pub(crate) fn data_mut(&mut self) -> &mut crate::scene::serialize::SceneData {
+        &mut self.data
+    }
+
+    /// The document and its stamp, for `serialize`'s apply.
+    pub(crate) fn into_parts(self) -> (crate::scene::serialize::SceneData, u64) {
+        (self.data, self.read_at)
+    }
+}
+
 /// Convert one imported `MeshVertex` (pure data) into the renderer's `Vertex`,
 /// carrying the skin binding (`joint_indices`/`joint_weights`) through to the GPU
 /// vertex; static meshes keep the unskinned identity binding (#79).
@@ -138,33 +165,6 @@ pub(crate) fn warn_once_of(key: &str, message: impl FnOnce() -> String) {
 }
 
 /// Whether `key` was already warned of ([`warn_once_of`]).
-/// A document with every mesh rebuilt from its reference, and the write-log stamp
-/// taken once they were (`meshes_read_at`, #1242): the file-only half of a load,
-/// which never touches a live scene (#2123).
-pub struct RehydratedScene {
-    data: crate::scene::serialize::SceneData,
-    read_at: u64,
-}
-
-impl RehydratedScene {
-    pub fn new(mut data: crate::scene::serialize::SceneData) -> Self {
-        data.entities.iter_mut().for_each(rehydrate_entity_mesh);
-        let read_at = crate::core::fs::written::written_since(u64::MAX).0;
-        Self { data, read_at }
-    }
-
-    /// The document, for the id moves a load makes before applying it
-    /// (`scene::runtime::load::make_room`): ids are not what rehydration reads.
-    pub(crate) fn data_mut(&mut self) -> &mut crate::scene::serialize::SceneData {
-        &mut self.data
-    }
-
-    /// The document and its stamp, for `serialize`'s apply.
-    pub(crate) fn into_parts(self) -> (crate::scene::serialize::SceneData, u64) {
-        (self.data, self.read_at)
-    }
-}
-
 #[cfg(test)]
 pub(crate) fn warned_of(key: &str) -> bool {
     WARNED.with(|warned| warned.borrow().contains(key))
