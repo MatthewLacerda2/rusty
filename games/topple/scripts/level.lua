@@ -1,6 +1,7 @@
 -- level.lua — one level's rules and HUD. Its targets are the bodies under
 -- `Bodies` whose names start "Target"; the level is cleared when every one has
--- fallen below the platforms' top. Then the next level loads.
+-- fallen below the platforms' top. Then the next level loads in the background
+-- (Scene.LoadAsync) behind the `Loading` canvas, while this one keeps running.
 
 local Level = {
     fields = {
@@ -28,6 +29,30 @@ function Level.Start(id)
     Level.wait = WAIT
     Level.status = Scene.FindEntityByName("Status")
     Level.banner = Scene.FindEntityByName("Banner")
+    Level.loading = Scene.FindEntityByName("Loading")
+    Level.loading_text = Scene.FindEntityByName("LoadingText")
+    Scene.SetActive(Level.loading, false) -- found while active, then hidden
+    Level.op = nil
+end
+
+-- Start loading the next level behind the loading canvas; its operation.
+function Level.LoadNext()
+    if not Level.op then
+        Scene.SetActive(Level.loading, true)
+        Level.op = Scene.LoadAsync(Level.next)
+    end
+    return Level.op
+end
+
+-- The loading canvas follows the operation; a load that failed hides it again.
+local function show_loading()
+    if Scene.GetLoadStatus(Level.op) == "failed" then
+        Scene.SetActive(Level.loading, false)
+        Text.SetText(Level.banner, "The next level could not be loaded")
+        return
+    end
+    local percent = math.floor(Scene.GetLoadProgress(Level.op) * 100)
+    Text.SetText(Level.loading_text, string.format("Loading level %d   %d%%", Level.number + 1, percent))
 end
 
 -- How many targets still stand on a platform.
@@ -52,9 +77,11 @@ function Level.Update(id, dt)
     elseif not Level.cleared and balls == 0 then
         Text.SetText(Level.banner, "Out of balls: R to retry")
     end
-    if Level.cleared and Level.next ~= "" then
+    if Level.op then
+        show_loading()
+    elseif Level.cleared and Level.next ~= "" then
         Level.wait = Level.wait - dt
-        if Level.wait <= 0 then Scene.Load(Level.next) end
+        if Level.wait <= 0 then Level.LoadNext() end
     end
 end
 

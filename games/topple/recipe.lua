@@ -201,8 +201,8 @@ local function level(n, balls, eye, build)
 
     local canvas = UI.Create("Canvas")
     Scene.SetName(canvas, "HUD")
-    local function label(name, ay, y, size)
-        local id = UI.Create("Text", canvas)
+    local function label(parent, name, ay, y, size)
+        local id = UI.Create("Text", parent)
         Scene.SetName(id, name)
         RectTransform.SetAnchorMin(id, 0.5, ay)
         RectTransform.SetAnchorMax(id, 0.5, ay)
@@ -212,9 +212,21 @@ local function level(n, balls, eye, build)
         Text.SetFontSize(id, size)
         Text.SetAlignment(id, "MiddleCenter")
         Text.SetText(id, "")
+        return id
     end
-    label("Status", 1, -30, 28)
-    label("Banner", 0.5, 0, 56)
+    label(canvas, "Status", 1, -30, 28)
+    label(canvas, "Banner", 0.5, 0, 56)
+
+    -- The loading screen (#2123): drawn over the level while the next one is
+    -- prepared in the background, which keeps this one running until the swap.
+    local loading = UI.Create("Canvas")
+    Scene.SetName(loading, "Loading")
+    local shade = UI.Create("Image", loading)
+    RectTransform.SetAnchorMin(shade, 0, 0)
+    RectTransform.SetAnchorMax(shade, 1, 1)
+    RectTransform.SetSizeDelta(shade, 0, 0)
+    Image.SetColor(shade, 0.05, 0.05, 0.07, 0.85)
+    Text.SetColor(label(loading, "LoadingText", 0.5, 0, 44), 1, 1, 1, 1) -- hidden by level.lua's Start
 
     local next_scene = n < 4 and string.format("assets/scenes/level_%d.scene", n + 1) or ""
     local manager = Scene.CreateEntity("Level")
