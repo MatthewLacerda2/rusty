@@ -1,212 +1,157 @@
-//! src/navigation/flood/mod.rs — one bounded Dijkstra flood from a point (#1892).
+//! src/navigation/flood/mod.rs — one bounded search from a point to many goals (#1892, #2088).
 //!
 //! An environment query's `path` test asks, for every candidate spot, whether the
 //! querier can walk there and how far. One A\* per item is what Unreal pays; a
-//! single flood out from the querier answers every item at once. The flood walks
-//! the same moves and costs as [`NavigationGraph::find_path_masked`] (8-way span
+//! single search out from the querier answers every item at once. It walks the
+//! same moves and costs as [`NavigationGraph::find_path_masked`] (8-way span
 //! links, the diagonal corner rule, area costs, off-mesh links, the area mask with
-//! the start span exempt), but with no goal and no heuristic, and stops at
-//! `max_length`, so it costs the area it covers, not the level.
+//! the start span exempt), and stops at `max_length`, so it costs the area it
+//! covers, not the level.
 //!
-//! The reached set is a hash map keyed by span index, not a dense per-span array:
-//! a flood bounded to a few dozen metres touches a sliver of a Dust2-sized grid,
-//! and the dense arrays A\* allocates would cost the whole grid every query.
+//! With goals it is an A\* toward all of them at once (`goals`): the key is the
+//! cost so far plus the octile distance to the nearest goal not yet settled, so it
+//! searches a corridor toward the items instead of a disc as wide as the farthest
+//! one. That heuristic never overestimates and is shrunk for `f32` rounding, so
+//! each goal's cost is the very `f32` a plain Dijkstra flood (no goals) gives it.
+//! A span whose key is past the bound leads to no goal within it, and is not
+//! entered. Goals no walk or link chain leads to are dropped up front, from the
+//! bake's island map (`request::islands`).
+//!
+//! Its costs live in the graph's stamped search pool (`pool`, #2083), as A\*'s do:
+//! starting a flood costs nothing per span, and a cost is an array read, not a
+//! hash. The [`Flood`] holds the pool while it is read and hands it back when
+//! dropped. Which spans an off-mesh link leaves from is kept on the graph until
+//! the next bake (`cache`).
 
 use std::collections::BinaryHeap;
 
 use glam::Vec3;
 
-use super::{in_mask, NavSpan, NavigationGraph, SpanRef, MIN_AREA_COST};
-use crate::core::collections::{Map, Set};
-use islands::Islands;
+use super::pool::NodePool;
+use super::NavigationGraph;
+use goals::Goals;
+use moves::{Move, Open};
 
-mod islands;
+pub(super) use cache::FloodCache;
 
-/// The spans a flood reached, each with its travel cost from the start.
-pub struct Flood {
+mod cache;
+mod goals;
+mod moves;
+
+/// The spans a flood reached, each with its travel cost from the start. Holds
+/// the graph's search pool until it is dropped: a search that runs meanwhile
+/// works on a fresh one.
+pub struct Flood<'a> {
+    nav: &'a NavigationGraph,
     /// Cost from the start span, in A\*'s units (cells × area cost), by span index.
-    cost: Map<u32, f32>,
+    cost: NodePool,
+    /// How many spans the flood reached.
+    reached: usize,
     /// The grid's cell size, metres: turns a cost into metres.
     spacing: f32,
 }
 
-impl Flood {
+impl Flood<'_> {
     /// The travel cost from the flood's start to the span `p` snaps to, metres
     /// (area costs weighed in, as the planner weighs them), or `None` when the
     /// flood never reached it: unreachable, or past its bound.
     pub fn length_to(&self, nav: &NavigationGraph, p: Vec3) -> Option<f32> {
         let span = nav.snap(p)?;
-        self.cost.get(&span.index).map(|c| c * self.spacing)
+        let g = self.cost.g(span.index);
+        g.is_finite().then_some(g * self.spacing)
     }
 
     /// How many spans the flood reached.
     pub fn reached(&self) -> usize {
-        self.cost.len()
+        self.reached
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
-struct Open {
-    node: SpanRef,
-    g: f32,
-}
-
-impl Eq for Open {}
-
-impl Ord for Open {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // Min-heap on cost; ties on the span index, so the pop order is fixed.
-        other
-            .g
-            .total_cmp(&self.g)
-            .then(other.node.index.cmp(&self.node.index))
+impl Drop for Flood<'_> {
+    fn drop(&mut self) {
+        self.nav.search.restore(std::mem::take(&mut self.cost));
     }
 }
-
-impl PartialOrd for Open {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-/// The 8-way moves: (dx, dz, horizontal cost in cells), as A\* takes them.
-const DIRS: [(i32, i32, f32); 8] = [
-    (1, 0, 1.0),
-    (-1, 0, 1.0),
-    (0, 1, 1.0),
-    (0, -1, 1.0),
-    (1, 1, std::f32::consts::SQRT_2),
-    (1, -1, std::f32::consts::SQRT_2),
-    (-1, 1, std::f32::consts::SQRT_2),
-    (-1, -1, std::f32::consts::SQRT_2),
-];
 
 impl NavigationGraph {
     /// Flood out from the span `start` snaps to, entering only the areas in
-    /// `mask`, as far as `max_length` metres of travel cost. `None` when `start`
-    /// is off the navmesh.
-    pub fn flood(&self, start: Vec3, max_length: f32, mask: u32) -> Option<Flood> {
+    /// `mask`, as far as `max_length` metres of travel cost: a Dijkstra flood
+    /// that leaves every span within the bound at its exact cost. `None` when
+    /// `start` is off the navmesh.
+    pub fn flood(&self, start: Vec3, max_length: f32, mask: u32) -> Option<Flood<'_>> {
         self.flood_to(start, &[], max_length, mask)
     }
 
-    /// [`Self::flood`] that stops early once the span each of `goals` snaps to is
-    /// settled (its cost final), instead of covering the whole bound: the
-    /// environment query asks about a few dozen spots and the flood around them
-    /// is most of its cost. Exact for the goals; another span it reports may
-    /// hold a cost a longer flood would still lower. A goal off the navmesh is
-    /// ignored; with none left, it runs to the bound.
+    /// [`Self::flood`] headed for the spans `goals` snap to, stopping once each
+    /// is settled (its cost final) or proven out of reach: the environment query
+    /// asks about a few dozen spots, and the flood around them is most of its
+    /// cost. Exact for the goals, to the bit; another span it reports may hold a
+    /// cost a full flood would still lower, or be left unreached. A goal off the
+    /// navmesh is ignored; with none at all, it is [`Self::flood`].
     pub fn flood_to(
         &self,
         start: Vec3,
         goals: &[Vec3],
         max_length: f32,
         mask: u32,
-    ) -> Option<Flood> {
+    ) -> Option<Flood<'_>> {
         let from = self.snap(start)?;
         let spacing = self.grid_spacing.max(f32::EPSILON);
         let bound = (max_length / spacing).max(0.0);
-        // Each goal with the cost past which it is overdue: its flat distance
-        // in cells (the least a path to it could cost), stretched as a path
-        // round a wall or two would be, so a goal on the start's own floor
-        // settles before it is ever checked.
-        let mut overdue: Vec<(f32, SpanRef)> = goals
-            .iter()
-            .filter_map(|&g| self.snap(g))
-            .map(|s| {
-                let least = self.run_between(from, s.gx, s.gz) / spacing;
-                (least * OVERDUE_STRETCH + OVERDUE_CELLS, s)
-            })
-            .collect();
-        overdue.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.index.cmp(&b.1.index)));
-        let mut waiting: Set<u32> = overdue.iter().map(|(_, s)| s.index).collect();
-        let stop_early = !waiting.is_empty();
-        let mut islands = Islands::new(self);
-        let mut next_overdue = 0;
-        let mut cost: Map<u32, f32> = Map::default();
+        let mut goals = Goals::new(self, from, goals, bound);
+        let mut cost = self.search.take(self.spans.len());
+        let mut reached = 1;
         let mut open = BinaryHeap::new();
-        cost.insert(from.index, 0.0);
-        open.push(Open { node: from, g: 0.0 });
-        while let Some(here) = open.pop() {
-            if cost.get(&here.node.index).is_some_and(|&g| here.g > g) {
-                continue; // a stale heap entry
-            }
-            waiting.remove(&here.node.index);
-            // A goal still unsettled past its least possible cost may sit on an
-            // island the flood can never reach: check once, and drop it if so.
-            while let Some(&(least, goal)) = overdue.get(next_overdue) {
-                if least >= here.g {
+        let mut moves: Vec<Move> = Vec::with_capacity(8);
+        cost.set(from.index, 0.0, None);
+        open.push(Open::new(from, 0.0, goals.h(from)));
+        if goals.done() {
+            open.clear(); // every goal is out of reach
+        }
+        self.flood_cache.with(self, |cache| {
+            while let Some(here) = open.pop() {
+                let (node, g) = (here.node(), here.g());
+                if g > cost.g(node.index) {
+                    continue; // a stale heap entry
+                }
+                goals.settle(node.index);
+                if goals.done() {
                     break;
                 }
-                next_overdue += 1;
-                if waiting.contains(&goal.index) && islands.cut_off(goal, from) {
-                    waiting.remove(&goal.index);
-                }
-            }
-            if stop_early && waiting.is_empty() {
-                break; // every goal settled, or proven out of reach
-            }
-            for (next, g) in self.moves(here, mask) {
-                let best = cost.get(&next.index).copied().unwrap_or(f32::INFINITY);
-                if g <= bound && g < best {
-                    cost.insert(next.index, g);
-                    open.push(Open { node: next, g });
-                }
-            }
-        }
-        Some(Flood { cost, spacing })
-    }
-
-    /// Every move out of `here` with the cost it reaches its span at: A\*'s
-    /// `expand`, step for step.
-    fn moves(&self, here: Open, mask: u32) -> Vec<(SpanRef, f32)> {
-        let at = here.node;
-        let NavSpan { y, area, .. } = self.spans[at.index as usize];
-        let step = |dx: i32, dz: i32| {
-            let to = self.link_to(at, at.gx + dx, at.gz + dz)?;
-            in_mask(mask, self.spans[to.index as usize].area).then_some(to)
-        };
-        let (east, west, north, south) = (step(1, 0), step(-1, 0), step(0, 1), step(0, -1));
-        let cost_of = |s: SpanRef| self.area_cost(self.spans[s.index as usize].area);
-        let mut out = Vec::with_capacity(8);
-        for &(dx, dz, horiz) in &DIRS {
-            let (next, corner) = match (dx, dz) {
-                (1, 0) => (east, MIN_AREA_COST),
-                (-1, 0) => (west, MIN_AREA_COST),
-                (0, 1) => (north, MIN_AREA_COST),
-                (0, -1) => (south, MIN_AREA_COST),
-                _ => {
-                    let x = if dx > 0 { east } else { west };
-                    let z = if dz > 0 { north } else { south };
-                    let (Some(x), Some(z)) = (x, z) else {
+                moves.clear();
+                self.moves(here, mask, cache.has_exit(node.index), &mut moves);
+                for &(next, g) in &moves {
+                    let best = cost.g(next.index);
+                    if g >= best || g > bound {
                         continue;
-                    };
-                    (step(dx, dz), cost_of(x).max(cost_of(z)))
+                    }
+                    let f = g + goals.h(next);
+                    if f <= bound {
+                        reached += usize::from(best == f32::INFINITY);
+                        cost.set(next.index, g, None);
+                        open.push(Open::new(next, g, f));
+                    }
                 }
-            };
-            let Some(next) = next else {
-                continue;
-            };
-            let to = self.spans[next.index as usize];
-            let cost = (0.5 * (self.area_cost(area) + cost_of(next))).max(corner);
-            out.push((next, here.g + (horiz + (to.y - y).abs()) * cost));
-        }
-        for link in self.link_moves(at) {
-            let lands = self.spans[link.to.index as usize].area;
-            if in_mask(mask, link.area) && in_mask(mask, lands) {
-                out.push((link.to, here.g + link.cost));
             }
-        }
-        out
+        });
+        Some(Flood {
+            nav: self,
+            cost,
+            reached,
+            spacing,
+        })
     }
 }
-
-/// When a goal counts as overdue: its least possible cost times this, plus
-/// [`OVERDUE_CELLS`].
-const OVERDUE_STRETCH: f32 = 1.5;
-const OVERDUE_CELLS: f32 = 4.0;
 
 #[cfg(test)]
 mod tests;
 
 #[cfg(test)]
 mod island_tests;
+
+#[cfg(test)]
+mod order_tests;
+
+// The bench level it runs on is a `dev` test fixture.
+#[cfg(all(test, feature = "dev"))]
+mod exact_tests;

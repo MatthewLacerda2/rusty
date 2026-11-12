@@ -6,8 +6,8 @@
 //! `bake` (rasterise → spans → agent-radius erosion, and the saved `<scene>.navmesh`, #1887), `links` (which span a move
 //! reaches), `snap` (which span a world point means), `astar` (the span search),
 //! `areas` (per-span area ids, their costs and agent masks, #460), `offmesh` (drop, jump and authored links between spans, #462),
-//! `pool` (the search scratch A\* reuses, #2083), `path` (smoothed paths, `SamplePosition`, `Raycast`), `flood` (one bounded Dijkstra
-//! answering many reachability questions at once, #1892), `agents` (cached-path planning + the steering tick), `request` (the agents' time-sliced path queue, #2087), and
+//! `pool` (the search scratch A\* and the flood reuse, #2083), `path` (smoothed paths, `SamplePosition`, `Raycast`), `flood` (one bounded search
+//! answering many reachability questions at once: a goal-directed A\* toward all its goals, or a Dijkstra flood with none, #1892, #2088), `agents` (cached-path planning + the steering tick), `request` (the agents' time-sliced path queue, #2087), and
 //! `avoidance` (ORCA local avoidance between agents, #463) — all hanging off the
 //! single re-exported [`NavigationGraph`] type.
 

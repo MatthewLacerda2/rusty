@@ -1,5 +1,6 @@
-//! Reachability and path length (#1892, decision 3): one bounded flood from the
-//! querier answers every item, instead of an A\* per item.
+//! Reachability and path length (#1892, decision 3): one bounded search from the
+//! querier toward every item at once (`navigation::flood`, an A\* to many goals,
+//! #2088) answers them all, instead of an A\* per item.
 
 use glam::Vec3;
 

@@ -13,7 +13,7 @@ fn open_floor() -> NavigationGraph {
     bake_pinned(&mut scene)
 }
 
-fn flood(nav: &NavigationGraph, from: Vec3, bound: f32) -> Flood {
+fn flood(nav: &NavigationGraph, from: Vec3, bound: f32) -> Flood<'_> {
     nav.flood(from, bound, ALL_AREAS)
         .expect("start on the navmesh")
 }
