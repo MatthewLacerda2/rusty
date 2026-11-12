@@ -30,8 +30,8 @@ impl FixedTicks {
     /// Add a frame of `raw` wall-clock seconds (negative or NaN as zero, at most
     /// [`MAXIMUM_DELTA_TIME`]) and take the whole ticks now owed.
     /// The first frame after a [`Self::clear`] owes nothing: its time is the frame
-    /// the sim came back on (a Play entry's import, snapshot and `Start`), not time
-    /// the game ran.
+    /// the sim came back on (a Play entry's import, snapshot and `Start`, or a
+    /// play-mode `Scene.Load`'s swap), not time the game ran.
     pub fn owe(&mut self, raw: f32) -> u32 {
         if std::mem::take(&mut self.restart) {
             return 0;
@@ -57,7 +57,7 @@ impl FixedTicks {
     }
 
     /// Drop the remainder, and the next frame's time: the sim stopped running on the
-    /// tick (edit mode, a pause, a Play transition), and the time since is not owed
+    /// tick (edit mode, a pause, a Play transition, a scene load), and the time since is not owed
     /// to it, so the accumulator starts empty.
     pub fn clear(&mut self) {
         (self.owed, self.restart) = (0.0, true);

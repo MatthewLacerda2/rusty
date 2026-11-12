@@ -216,6 +216,11 @@ scene — additive loading is not supported.
   middle of a callback and a replay swaps on the same tick every time. Code after
   the call still sees the old scene, and `Scene.GetActivePath()` still names the
   old file until the swap.
+- **A window does not catch up on the load.** In the editor's Play and the
+  player, the tick that swapped the scene is its frame's last, and the time the
+  load took is not owed to the game (as on entering Play), so the new scene opens
+  without a burst of catch-up ticks, and no pose of the outgoing scene is blended
+  into its first frames. A headless run steps one tick at a time either way.
 - **Unload lifecycle.** Every script of the outgoing scene gets `OnDisable` (if
   its entity was active) then `OnDestroy`, exactly as `Scene.DestroyEntity`
   would, in the same order (children before parents). Its timers and coroutines stop, its sounds stop, and UI focus, hover
