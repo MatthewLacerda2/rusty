@@ -1,7 +1,8 @@
 //! tools/lint — project size gate (the custom part clippy can't do).
 //!
-//! Measures each `.rs` and `.py` file and fails on any over its cap; nothing is
-//! grandfathered (#926). Function-length and code-smell checks are clippy's job
+//! Measures each `.rs`, `.py`, `.lua` and `.wgsl` file and fails on any over its cap;
+//! nothing is grandfathered (#926); it holds the agent docs to their shape too
+//! (`agent_docs`). Function-length and code-smell checks are clippy's job
 //! (see clippy.toml); without a flag this binary enforces the per-file / per-test-file
 //! size rules, and the flags below run the other gates. Dependency-free, std-only.
 //!
@@ -11,6 +12,7 @@
 //!
 //! Output: result to stdout and `.lint/report.txt`; exit code 1 on any violation.
 
+mod agent_docs;
 mod code;
 mod components;
 mod dead_pub;

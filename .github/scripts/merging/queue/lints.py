@@ -14,7 +14,9 @@ cap when the brief was written.
 `tools/lint` needs no compile of rusty: it is a std-only crate of its own that
 builds in seconds and runs every pass CI's `lint` job runs ([`PASSES`]) in a few.
 So the queue runs it on the tree it is about to push: after `main` is merged into
-a head ([`update.advance`]'s `check`), and on a merge train's tree before its
+a head ([`update.advance`]'s `check`), on a head touching an agent doc that
+`main` passed only by Markdown, merged just to lint ([`update.docs_merge_check`]),
+and on a merge train's tree before its
 branch is pushed (`train.world.compiles`). A violation hands the head back with
 the report's first lines and the pull requests merged since its base that touched
 the file ([`blame`]), with no push and no CI round; re-admission is by a push,
@@ -72,8 +74,9 @@ BLAMED_FILES = 3
 SQUASHED = re.compile(r"\(#(\d+)\)\s*$")
 TRAIN_CAR = re.compile(r"^merge train: #(\d+) ")
 
-# A path in a report line: something with a slash and a dot-extension.
-PATH = re.compile(r"(?<![\w/.-])((?:[\w.-]+/)+[\w.-]+\.\w+)")
+# A path in a report line: something with a slash and a dot-extension, or the
+# root `CLAUDE.md` (the agent doc most likely to overflow, #2027's review).
+PATH = re.compile(r"(?<![\w/.-])((?:[\w.-]+/)+[\w.-]+\.\w+|CLAUDE\.md)")
 
 # The last line of an update's hand-back. It claims only what the queue checked:
 # the merged tree fails, not that either side passed alone (#1956's review).

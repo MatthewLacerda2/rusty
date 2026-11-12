@@ -83,7 +83,7 @@ class Taking(unittest.TestCase):
     def test_a_dry_run_pushes_comments_and_merges_nothing(self):
         (_, state, why), rebased, called, _ = self.take("--dry-run", advance=("1" * 40, []))
         self.assertEqual(state, outcomes.DRY)
-        self.assertEqual(rebased.call_args.kwargs, {"push": False, "check": None, "log": None})
+        self.assertEqual(rebased.call_args.kwargs, {"push": False, "check": None, "log": None, "docs_check": None})
         called.assert_not_called()
         self.assertIn("would push 1111111", why)
 

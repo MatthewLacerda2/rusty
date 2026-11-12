@@ -84,8 +84,9 @@ pub fn run(args: &[String]) {
     };
 
     let violations: Vec<String> = files.iter().filter_map(|p| check_file(p)).collect();
-    report(&violations);
-    if violations.is_empty() {
+    let docs = crate::agent_docs::gate(args);
+    report(&violations, &docs);
+    if violations.is_empty() && docs.is_empty() {
         println!("lint: ok");
     } else {
         exit(1);
@@ -261,24 +262,34 @@ fn normalize(path: &Path) -> String {
         .replace('\\', "/")
 }
 
-fn report(violations: &[String]) {
-    let mut body = if violations.is_empty() {
+fn report(violations: &[String], docs: &[String]) {
+    let mut body = if violations.is_empty() && docs.is_empty() {
         String::from("lint: ok\n")
     } else {
         String::from("lint: FAILED\n")
     };
-    for v in violations {
+    for v in violations.iter().chain(docs) {
         body.push_str(v);
         body.push('\n');
     }
     fs::create_dir_all(".lint").ok();
     fs::write(REPORT, &body).ok();
+    if violations.is_empty() && docs.is_empty() {
+        return;
+    }
+    eprint!("{}", body);
     if !violations.is_empty() {
-        eprint!("{}", body);
         eprintln!(
             "\n{} file(s) over the size cap. Split them by responsibility; nothing is \
              grandfathered (see docs/linting.md).",
             violations.len()
+        );
+    }
+    if !docs.is_empty() {
+        eprintln!(
+            "\n{} agent-doc finding(s) (`CLAUDE.md` and skill files; docs/linting.md, \
+             *Agent docs*).",
+            docs.len()
         );
     }
 }

@@ -116,6 +116,12 @@ class Which(unittest.TestCase):
         pull = {**READY, "files": [{"path": "docs/notes.md"}]}
         self.assertFalse(checks.needs_lint(pull, self.opts(no_check=True)))
 
+    def test_a_markdown_only_branch_touching_an_agent_doc_is_linted(self):
+        for doc in ("CLAUDE.md", "src/render/CLAUDE.md", ".claude/skills/ci-merge/SKILL.md"):
+            pull = {**READY, "files": [{"path": "docs/notes.md"}, {"path": doc}]}
+            self.assertTrue(checks.needs_lint(pull, self.opts(no_check=True)), doc)
+            self.assertFalse(checks.needs_check(pull, self.opts()), "still never compiled")
+
 
 class Taken(unittest.TestCase):
     take = test_taking.Taking.take
@@ -125,6 +131,14 @@ class Taken(unittest.TestCase):
         check = rebased.call_args.kwargs["check"]
         self.assertIsInstance(check.func.__self__, lints.Linter)
         self.assertEqual(check.keywords, {"since": READY["headRefOid"], "upto": "origin/main"})
+
+    def test_only_a_take_touching_an_agent_doc_lints_a_docs_advance(self):
+        _, rebased, _, _ = self.take("--no-check")
+        self.assertIsNone(rebased.call_args.kwargs["docs_check"])
+        doc = {**READY, "files": [{"path": "CLAUDE.md"}]}
+        _, rebased, _, _ = self.take("--no-check", pull=doc)
+        kwargs = rebased.call_args.kwargs
+        self.assertIs(kwargs["docs_check"], kwargs["check"], "the lint alone, never a compile")
 
     def test_a_checked_take_compiles_then_lints(self):
         _, rebased, _, _ = self.take()

@@ -77,15 +77,20 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
         fresh, notes = dependabot.bot_head(number, head, opts.root, opts)
     else:
         outcomes.say(f"#{number} ({branch}): merging origin/main into {head[:7]}.")
-        check = None
+        check = docs_check = None
         if checks.needs_lint(pull, opts):
             # `--no-check` skips the compile, never `tools/lint` on the merged tree (#1956).
             check = functools.partial(lints.shared(lints.target_dir(opts.root)).check, since=head, upto="origin/main")
+            # A head `main` passed only by Markdown is not merged in, but its agent docs
+            # are still linted merged: two can each fit a cap and overflow it together.
+            docs_check = check if checks.touches_agent_doc(pull) else None
         if checks.needs_check(pull, opts):
             check = lints.both(functools.partial(checks.verify, target=checks.target_dir(opts)), check)
         # A dry run's conflicts are previews, not conflicts the queue met: unrecorded.
         log = None if opts.dry_run else functools.partial(record.note, record.path(opts.root), number, head)
-        fresh, notes = update.advance(branch, head, opts.root, push=not opts.dry_run, check=check, log=log)
+        fresh, notes = update.advance(
+            branch, head, opts.root, push=not opts.dry_run, check=check, log=log, docs_check=docs_check
+        )
     if fresh is None:
         # Moved since the take began: the watch takes its new head afresh
         # (#1568); named pull requests are never retaken, so there it is not merged.

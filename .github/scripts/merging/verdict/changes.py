@@ -42,6 +42,16 @@ def markdown_only(files: list[str]) -> bool:
     return bool(files) and all(f.endswith(".md") for f in files)
 
 
+def agent_doc(path: str) -> bool:
+    """Whether `path` is a doc `tools/lint`'s agent-docs pass holds (a `CLAUDE.md`
+    anywhere, a file of a skill's folder): `tools/lint/src/agent_docs/mod.rs`'s
+    `is_agent_doc`, mirrored since the scripts cannot call `tools/lint`."""
+    skill = path.removeprefix(".claude/skills/")
+    folder, _, rest = skill.partition("/")
+    in_skill = skill != path and bool(folder) and bool(rest)
+    return path == "CLAUDE.md" or path.endswith("/CLAUDE.md") or in_skill
+
+
 def inert(files: list[str]) -> bool:
     """Whether a change to these paths cannot alter what any branch compiles
     or tests against: Markdown, [`CODE_DOCS`] aside (#587). Nothing changed

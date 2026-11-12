@@ -15,7 +15,7 @@
 //! no exception and is reported as itself. The rule reads that allow
 //! itself, so one past its use (the directory back under the cap) is reported.
 
-use super::finding::{parse_allow, Finding};
+use super::finding::{parse_allow, Finding, Form};
 use super::prefix::owner_of;
 use super::scan::Scan;
 
@@ -42,7 +42,7 @@ fn allow_in(owner: &str) -> Option<(usize, bool)> {
         if !l.starts_with("//") || l.starts_with("///") || l.starts_with("//!") {
             return None;
         }
-        let (_, why) = parse_allow(l).filter(|(r, _)| *r == RULE)?;
+        let (_, why) = parse_allow(l, Form::Code).filter(|(r, _)| *r == RULE)?;
         Some((i + 1, !why.is_empty()))
     })
 }

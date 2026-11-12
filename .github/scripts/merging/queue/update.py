@@ -50,7 +50,10 @@ network mid-push records nothing, since nobody knows yet; the pair is met again.
 `main` moving only by Markdown skips the merge (#587) only when the head merges
 clean ([`merges_clean`]): a head that conflicts with that Markdown, say both
 adding to a `sorted` list in an inert doc, goes on to the merge and the
-resolver, or it would wait on a merge GitHub refuses (#1723's review).
+resolver, or it would wait on a merge GitHub refuses (#1723's review). A head
+that touches an agent doc is still linted merged, in a throwaway worktree with
+nothing pushed ([`docs_merge_check`], #2027): two such branches can each fit
+`CLAUDE.md`'s cap and overflow it together. One that fails is handed back.
 
 A merged branch's worktree under `.claude/worktrees/` is **not** removed and
 no branch is deleted — that is 12–16 GB and a checkout somebody may be
@@ -166,8 +169,35 @@ def handed_back(branch: str, work: str, named: list[str], stderr: str) -> list[s
     ]
 
 
+def skipped(head: str, why: str) -> list[str]:
+    """Say that the agent-docs lint of `head`'s merged tree could not run, and
+    pass it: failing open, as `lints.Linter` does for a broken tool, but never
+    silently (#2027's review)."""
+    print(f"queue: {head[:7]}: agent docs not linted merged ({why}); the push-to-`main` lint still holds them", flush=True)
+    return []
+
+
+def docs_merge_check(head: str, root: str, check) -> list[str]:
+    """Why the merged tree of a head `main` passed only by Markdown must not be
+    taken, or `[]`: `check` (`tools/lint`'s build-free passes, [`lints.Linter.check`])
+    on `origin/main` merged into `head` in a throwaway worktree. Nothing is pushed
+    and no CI round is bought: the run on record still stands when it passes. Two
+    Markdown-only branches can each fit `CLAUDE.md`'s cap and overflow it merged,
+    which only this sees before `main` does."""
+    with tempfile.TemporaryDirectory(prefix="rusty-queue-") as tmp:
+        work = os.path.join(tmp, "wt")
+        if gitio.git("worktree", "add", "--detach", work, head, cwd=root).returncode != 0:
+            return skipped(head, "no worktree")  # the push-to-`main` lint still holds it
+        try:
+            if gitio.git("merge", "--ff", "--no-edit", "--no-verify", "origin/main", cwd=work).returncode != 0:
+                return skipped(head, "the merge failed")
+            return check(work)
+        finally:
+            gitio.git("worktree", "remove", "--force", work, cwd=root)
+
+
 def advance(
-    branch: str, head: str, root: str, push: bool, check=None, log=None
+    branch: str, head: str, root: str, push: bool, check=None, log=None, docs_check=None
 ) -> tuple[str | None, list[str]]:
     """Merge `main`'s tip into `branch`. Returns the new head, or why not.
 
@@ -177,14 +207,17 @@ def advance(
     updated tree's path, returns why not to push it ([`checks.verify`]); it runs only
     when the merge moved the head. A head `main` passed only by Markdown is
     returned as it is, with [`DOCS_ONLY`] as its note ([`docs_advance`]), unless
-    it conflicts with that Markdown. A conflict the sorted-list rule resolves is
+    it conflicts with that Markdown, or `docs_check` (given when the head touches
+    an agent doc) finds the merged tree broken ([`docs_merge_check`]): it is then
+    handed back with that reason, unpushed. A conflict the sorted-list rule resolves is
     committed and goes on like a clean merge, with a note saying so
     ([`resolved_merge`]); `log(main, paths, ended)` records each conflict once
     its outcome is known ([`conflict.record.note`])."""
     # Only when the head merges clean: a conflict goes on to the merge and the
     # resolver, or it would wait on a merge GitHub refuses (#1723's review).
     if main_moved_by_docs(head, root) and merges_clean(head, root):
-        return head, [f"{DOCS_ONLY}."]
+        broken = docs_merge_check(head, root, docs_check) if docs_check else []
+        return (None, broken) if broken else (head, [f"{DOCS_ONLY}."])
     main = gitio.git("rev-parse", "origin/main", cwd=root).stdout.strip()
     verdicts: dict[str, bool] = {}
 
