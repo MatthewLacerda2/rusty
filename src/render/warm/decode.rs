@@ -10,7 +10,7 @@
 //! its step reads it again, as a lookup would.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::mpsc::{channel, Receiver, TryRecvError};
+use std::sync::mpsc::{sync_channel, Receiver, TryRecvError};
 
 use crate::asset::MapRef;
 use crate::core::fs::written::{written_since, Stale};
@@ -46,7 +46,9 @@ impl Decoding {
     pub(super) fn start(jobs: Vec<Job>, features: wgpu::Features) -> Self {
         let since = written_since(u64::MAX).0;
         let queued = jobs.iter().map(|(index, ..)| *index).collect();
-        let (tx, rx) = channel();
+        // Bounded: the thread reads at most two textures ahead of the steps that
+        // upload them, so a big level's maps never all sit decoded in memory.
+        let (tx, rx) = sync_channel(2);
         let read = move || {
             for (index, map, kind) in jobs {
                 if tx.send((index, decode(&map, kind, features))).is_err() {
