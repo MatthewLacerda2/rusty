@@ -177,6 +177,11 @@ premise costs a review round. Before writing a brief:
   path that still samples it, say);
 - a brief for work that records, replays or digests the sim names every input
   the sim reads, the frame's `dt` included;
+- a brief for work held across ticks (a search, a query, a warm-up, a cache) says
+  what a rebake, a scene load, a Stop and a replaced request do to it: carry it
+  when the change misses it and restart only when it reaches it, since a restart
+  on every change never finishes behind something that changes every few ticks;
+  and when it makes state process-wide, it says which tests reset that state;
 - verify any claim about a platform or a tool in one command (what a path may
   hold, say);
 - write "Builds on PR #N merged" only after `gh pr view N --json state` says
