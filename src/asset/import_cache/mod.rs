@@ -47,11 +47,17 @@
 //! across a parse: two threads may parse one file at once, into the same value.
 //! stored-format: the files the import cache writes beside a model (the hull sidecars)
 
+#[cfg(test)]
+mod counts;
 pub mod hulls;
 mod reads;
 mod revision;
 mod size;
 
+#[cfg(test)]
+use counts::PARSES;
+#[cfg(test)]
+pub use counts::{forget_all, parses};
 use reads::{files_of, stamp, Files, Stamp};
 pub use revision::MeshRevision;
 pub use size::approx_bytes;
@@ -143,15 +149,6 @@ static CACHE: LazyLock<Mutex<Cache>> = LazyLock::new(Mutex::default);
 /// Run `f` on the cache, under its lock.
 fn with_cache<T>(f: impl FnOnce(&mut Cache) -> T) -> T {
     f(&mut CACHE.lock().unwrap_or_else(PoisonError::into_inner))
-}
-
-#[cfg(test)]
-thread_local!(static PARSES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) });
-
-/// How many files this thread has parsed into the cache (tests).
-#[cfg(test)]
-pub fn parses() -> usize {
-    PARSES.get()
 }
 
 /// The import of the model file at `path` with its sidecar's settings: the cached
