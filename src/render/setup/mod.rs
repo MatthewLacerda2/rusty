@@ -130,10 +130,9 @@ impl Renderer {
         renderer
     }
 
-    /// Flatten the grouped [`GpuResources`] plus the window-dependent parameters
-    /// into the renderer's single struct. Trivial fields (the asset caches, the
-    /// editor gizmo buffers, the skybox slots) start empty/`None` and are filled in
-    /// by the caller or at runtime.
+    /// Flatten the grouped [`GpuResources`] plus the window-dependent parameters into
+    /// the renderer's single struct. Trivial fields (the asset caches, the editor gizmo
+    /// buffers, the skybox slots) start empty and are filled by the caller or at runtime.
     // A flat field-mapping constructor: no logic, just one line per `Renderer`
     // field, so the line/argument counts are inherent to the struct's width.
     #[expect(
@@ -264,6 +263,7 @@ impl Renderer {
             retained: Default::default(),
             draw_poses: Default::default(),
             frame_counters: Default::default(),
+            uploads: Default::default(),
             gpu_timer,
             render_texture_ids: Default::default(),
             _gpu_permit: gpu_permit,

@@ -22,6 +22,8 @@
 //!   They and the quality presets are re-read from the bound file at each Play and
 //!   before each write (`reread`), so a hand edit reaches the running editor and a
 //!   save never erases it.
+//! * **The background loading priority** (#2123, Unity's `backgroundLoadingPriority`):
+//!   a frame's budget for a `Scene.LoadAsync`'s GPU warm-up, for this run (`loading`).
 //! * **The quit request** — `Application.Quit()` only *records* that the game asked to
 //!   quit. What that means is the host's call: the player closes the window, the editor
 //!   stops Play (Unity ignores `Quit` in the editor), and the headless harness ends the
@@ -63,9 +65,12 @@ use crate::core::settings::render_scale::ProjectGraphics;
 mod demo;
 mod gizmos;
 mod host;
+mod loading;
 mod quality;
 mod render_scale;
 mod reread;
+
+pub use loading::LoadingPriority;
 
 pub use demo::DemoRequest;
 pub use gizmos::{Gizmo, GizmoRow, SceneGizmos};
@@ -152,6 +157,8 @@ pub struct Application {
     demo: demo::DemoDesk,
     /// The Scene view's gizmo mailbox (#1909).
     gizmos: gizmos::GizmoDesk,
+    /// Unity's `backgroundLoadingPriority` (#2123): a load's warm-up budget.
+    loading_priority: LoadingPriority,
 }
 
 impl Application {

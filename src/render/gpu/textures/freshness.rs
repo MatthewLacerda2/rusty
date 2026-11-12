@@ -60,8 +60,7 @@ impl Renderer {
     /// vs absolute) goes too.
     pub(crate) fn invalidate_textures(&mut self, paths: &[String]) {
         let stale = Stale::new(paths.to_vec());
-        let is_stale =
-            |key: &str| texture_ref::is_written(&stale, key) || settings_written(&stale, key);
+        let is_stale = |key: &str| texture_written(&stale, key);
         // A probe cube re-written (#1207): its probe-array slot and what the array
         // knew of its shape go, so the next frame reads and copies it again (#1206).
         self.reflection_probes.forget(is_stale);
@@ -86,6 +85,13 @@ impl Renderer {
             self.skybox_path.clear();
         }
     }
+}
+
+/// Whether the file the map `key` names, or its import settings, is in `stale`:
+/// what drops a cached upload, and what a texture decoded off the frame thread
+/// (`render::warm`) checks before it is cached.
+pub(crate) fn texture_written(stale: &Stale, key: &str) -> bool {
+    texture_ref::is_written(stale, key) || settings_written(stale, key)
 }
 
 /// Whether the import-settings sidecar of the file the map `key` names is in

@@ -35,7 +35,7 @@ pub fn register(
         table,
         "GetLoadProgress",
         lua.create_function(move |lua, op: u32| {
-            Ok(status(lua, op)?.map_or(0.0, LoadStatus::progress))
+            Ok(scene.get(lua)?.borrow().loads.progress(op).unwrap_or(0.0))
         }),
     )?;
     put(
