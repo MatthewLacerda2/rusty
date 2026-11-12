@@ -281,12 +281,15 @@ namespaces hand out ids, not objects, so Unity's `AsyncOperation` is polled thro
 - **When it lands:** the operation becomes ready at the head of a tick, and with
   activation allowed it is swapped in at that tick's tail (its new scripts
   `Awake`/`Start` at the next tick's head, as after `Load`). Headless runs (`play`,
-  `game --test`, a scenario) read it ready on the tick after the call, every run; in
+  `game --test`, a scenario) read it ready on the tick after the call, every run,
+  with one exception: a call from `Awake` or `Start` on entering Play comes before
+  that first tick's head, so it is prepared and swapped in on that same tick. In
   the editor's Play and the player a worker thread prepares it, and it is ready on
-  the first tick after the worker finishes. Which tick that was is recorded in the
+  the first tick head after the worker finishes. Which tick that was is recorded in the
   demo, so a replay swaps on the same tick.
 - **One load at a time:** a later `Load` or `LoadAsync` replaces a pending operation
-  (`"replaced"`, `IsLoadDone` true) and its preparation is dropped.
+  (`"replaced"`, `IsLoadDone` true) and its preparation is abandoned: the worker
+  stops at its next step. So does a pending one's when Play stops.
 - **Errors:** a path with no file errors at the call. A file that does not parse
   ends the operation `"failed"`, reported to the console, and the current scene keeps
   running.

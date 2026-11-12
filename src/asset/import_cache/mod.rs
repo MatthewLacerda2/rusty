@@ -57,7 +57,7 @@ mod size;
 #[cfg(test)]
 use counts::PARSES;
 #[cfg(test)]
-pub use counts::{forget_all, parses};
+pub use counts::{forget, parses};
 use reads::{files_of, stamp, Files, Stamp};
 pub use revision::MeshRevision;
 pub use size::approx_bytes;

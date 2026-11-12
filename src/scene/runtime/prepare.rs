@@ -33,6 +33,11 @@ impl SceneSidecars {
             lighting: read_lighting_sidecar(path),
         }
     }
+
+    /// Whether a navmesh is saved beside the scene file.
+    pub fn has_navmesh(&self) -> bool {
+        self.navmesh.has_bytes()
+    }
 }
 
 /// A scene made ready from its files alone, for [`Scene::swap_in_prepared`].
@@ -68,11 +73,6 @@ impl PreparedScene {
     /// The scene file this was prepared from.
     pub fn path(&self) -> &str {
         &self.path
-    }
-
-    /// Whether a navmesh is saved beside the scene file.
-    pub fn has_saved_navmesh(&self) -> bool {
-        self.sidecars.navmesh.has_bytes()
     }
 
     /// Keep `bytes`, a navmesh baked from these files, for activation.

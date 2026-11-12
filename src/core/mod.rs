@@ -15,6 +15,7 @@ pub mod input;
 pub mod naming;
 pub mod paths;
 pub mod project;
+pub mod quiet;
 pub mod random;
 pub mod settings;
 pub mod storage;

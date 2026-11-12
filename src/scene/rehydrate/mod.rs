@@ -30,6 +30,7 @@ use crate::scene::authoring::{subdivided_geometry, Primitive};
 /// A document with every mesh rebuilt from its reference, and the write-log stamp
 /// taken once they were (`meshes_read_at`, #1242): the file-only half of a load,
 /// which never touches a live scene (#2123).
+#[derive(Clone)]
 pub struct RehydratedScene {
     data: crate::scene::serialize::SceneData,
     read_at: u64,

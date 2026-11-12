@@ -1,6 +1,9 @@
 //! The windowed loader prepares on a thread (#2123): a job is taken once, by its own
 //! operation, waiting when the thread is still at it; a bad file fails the job.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
 use super::Threaded;
 use crate::app::SceneLoader;
 use crate::core::paths;
@@ -50,6 +53,35 @@ fn a_cancelled_job_is_gone() {
     loader.cancel();
     assert!(!loader.finished(1));
     assert!(loader.take(1).is_err());
+}
+
+#[test]
+fn a_replaced_or_cancelled_job_is_abandoned() {
+    let mut loader = Threaded::default();
+    let flag = |l: &Threaded| l.job.as_ref().unwrap().abandoned.clone();
+    loader.start(1, scene_file("replace"));
+    let first = flag(&loader);
+    loader.start(2, scene_file("replace"));
+    assert!(
+        first.load(Ordering::Relaxed),
+        "a replaced job is told to stop"
+    );
+    let second = flag(&loader);
+    assert!(!second.load(Ordering::Relaxed));
+    loader.cancel();
+    assert!(second.load(Ordering::Relaxed), "so is a cancelled one");
+}
+
+#[test]
+fn an_abandoned_job_ends_without_its_bake() {
+    // No navmesh beside it: a job left to run would bake one.
+    let path = scene_file("abandoned");
+    let (rx, thread) = super::spawn(path, Arc::new(AtomicBool::new(true)));
+    thread.unwrap().join().expect("the thread ends");
+    match rx.recv().unwrap() {
+        Err(why) => assert_eq!(why, crate::app::ABANDONED),
+        Ok(_) => panic!("an abandoned job prepared its scene"),
+    }
 }
 
 #[test]

@@ -13,6 +13,8 @@
 //! waits for its own loader there), and only then does the operation's status move.
 //! What the operation loads is the files' alone, so it is the same on every host.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use crate::navigation::NavigationGraph;
 use crate::scene::runtime::prepare::{staged, PreparedScene, SceneSidecars};
 use crate::scene::serialize::RehydratedScene;
@@ -67,7 +69,7 @@ impl SceneLoader for Inline {
 
     fn take(&mut self, op: u32) -> Result<PreparedScene, String> {
         match self.job.take_if(|(at, _)| *at == op) {
-            Some((_, path)) => prepare_in_background(&path),
+            Some((_, path)) => prepare_in_background(&path, &AtomicBool::new(false)),
             None => Err(format!("no load operation {op} was started")),
         }
     }
@@ -77,32 +79,51 @@ impl SceneLoader for Inline {
     }
 }
 
+/// What a job whose operation was replaced, cancelled or stopped reports: it
+/// stopped at the next step rather than finishing a scene nobody will take.
+pub const ABANDONED: &str = "the load was abandoned";
+
 /// Everything a `Scene.LoadAsync` prepares from the files alone, on any thread: the
 /// document read and parsed, its meshes rebuilt, its sidecars read, and the navmesh
 /// baked when none is saved. No conversion runs meanwhile (a load happens in Play,
 /// `asset::convert::PlayHold`), and the write-log stamp is taken before anything is
-/// read, so a model written while it ran is still followed.
-pub fn prepare_in_background(path: &str) -> Result<PreparedScene, String> {
+/// read, so a model written while it ran is still followed. `abandoned` is checked
+/// between steps: once set, the job ends at the next one with [`ABANDONED`].
+pub fn prepare_in_background(path: &str, abandoned: &AtomicBool) -> Result<PreparedScene, String> {
+    let step = || match abandoned.load(Ordering::Relaxed) {
+        true => Err(ABANDONED.to_string()),
+        false => Ok(()),
+    };
     let _hold = crate::asset::convert::PlayHold::take();
     let read_at = crate::core::fs::written::written_since(u64::MAX).0;
     let data = crate::scene::read_scene_file(path)?;
+    step()?;
     let document = RehydratedScene::read_since(data, read_at);
+    step()?;
     let sidecars = SceneSidecars::read(path);
+    let baked = match sidecars.has_navmesh() {
+        true => None,
+        false => Some(bake_navmesh(&document, step)?),
+    };
+    step()?;
     let mut prepared = PreparedScene::new(path.to_string(), document, sidecars);
-    if !prepared.has_saved_navmesh() {
-        if let Some(bytes) = bake_navmesh(path) {
-            prepared.set_baked_navmesh(bytes);
-        }
+    if let Some(bytes) = baked {
+        prepared.set_baked_navmesh(bytes);
     }
     Ok(prepared)
 }
 
-/// Bake `path`'s navmesh from a staged copy of its document: the bytes activation
-/// restores when they still match the live scene (`NavigationGraph::start_tracked_with`).
-fn bake_navmesh(path: &str) -> Option<Vec<u8>> {
-    let data = crate::scene::read_scene_file(path).ok()?;
-    let scene = staged(RehydratedScene::new(data));
-    Some(NavigationGraph::baked_bytes(&scene))
+/// Bake the navmesh of a staged copy of `document`, the one just read: the bytes
+/// activation restores when they still match the live scene
+/// (`NavigationGraph::start_tracked_with`). Staging applies the document as the
+/// activation will again, so its warnings are left to that one (`core::quiet`).
+fn bake_navmesh(
+    document: &RehydratedScene,
+    step: impl Fn() -> Result<(), String>,
+) -> Result<Vec<u8>, String> {
+    let scene = crate::core::quiet::quietly(|| staged(document.clone()));
+    step()?;
+    Ok(NavigationGraph::baked_bytes(&scene))
 }
 
 impl GameWorld {

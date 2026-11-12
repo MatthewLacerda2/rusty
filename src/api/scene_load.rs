@@ -37,7 +37,7 @@ pub fn register(
                 scene.borrow_mut().request_load(path);
                 return Ok(None);
             }
-            load_now(scene, &*scene_path.get(lua)?, path)
+            load_now("Load", scene, &*scene_path.get(lua)?, path)
         }),
     )?;
     super::scene_load_async::register(lua, table, scene, scene_path)?;
@@ -99,16 +99,18 @@ pub(super) fn check_file(verb: &str, path: &str) -> mlua::Result<()> {
 
 /// Edit mode's load: File ▸ Open, at once; `path` becomes the current scene file.
 /// A sidecar failure comes after the World became the new file's, so the current
-/// scene file follows it and the load returns a warning (#1374).
+/// scene file follows it and the load returns a warning (#1374). Its errors name
+/// `verb`, as [`check_file`]'s do.
 pub(super) fn load_now(
+    verb: &str,
     scene: &std::cell::RefCell<Scene>,
     scene_path: &std::cell::RefCell<Option<String>>,
     path: String,
 ) -> mlua::Result<Option<String>> {
     let warning = match scene.borrow_mut().load_from_file(&path) {
         Ok(()) => None,
-        Err(e) if e.replaced_world() => Some(format!("Scene.Load: {path}: {e}")),
-        Err(e) => return Err(runtime(format!("Scene.Load: {e}"))),
+        Err(e) if e.replaced_world() => Some(format!("Scene.{verb}: {path}: {e}")),
+        Err(e) => return Err(runtime(format!("Scene.{verb}: {e}"))),
     };
     *scene_path.borrow_mut() = Some(path);
     Ok(warning)

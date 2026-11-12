@@ -22,8 +22,12 @@ pub(super) fn warn_once(reference: &str, error: &asset::ImportError) {
 }
 
 /// Say `message` once per `key` in the console, out of the set every failed
-/// rehydrate shares: a scene reloads often, and once is enough.
+/// rehydrate shares: a scene reloads often, and once is enough. A quiet stretch
+/// (`core::quiet`) leaves the key unspent, for the apply that is heard.
 pub(crate) fn warn_once_of(key: &str, message: impl FnOnce() -> String) {
+    if crate::core::quiet::is_quiet() {
+        return;
+    }
     if warned().insert(key.to_string()) {
         log::warn!("[Scene] {}", message());
     }

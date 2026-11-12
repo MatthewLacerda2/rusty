@@ -117,11 +117,26 @@ fn a_failed_import_is_not_kept() {
 
 #[test]
 fn another_project_drops_every_entry() {
+    // A cache of its own: the process-wide one is shared with every other test.
     let path = model("project");
-    let first = imported(&path).unwrap();
-    with_cache(|c| c.enter(u64::MAX));
-    assert!(with_cache(|c| c.by_path.is_empty()));
-    assert!(imported(&path).unwrap().revision > first.revision);
+    let mut cache = Cache::default();
+    cache.enter(1);
+    let geometry = Geometry::of(&ImportSettings::default());
+    let asset = import_file(&path).unwrap();
+    cache.insert(
+        "a".into(),
+        geometry.clone(),
+        Vec::new(),
+        asset,
+        BUDGET_BYTES,
+    );
+    cache.enter(1);
+    assert!(
+        cache.hit("a", &geometry).is_some(),
+        "the same project keeps it"
+    );
+    cache.enter(2);
+    assert!(cache.by_path.is_empty() && cache.bytes == 0);
 }
 
 #[test]

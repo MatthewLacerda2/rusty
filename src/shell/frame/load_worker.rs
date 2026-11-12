@@ -4,21 +4,47 @@
 //!
 //! The world asks it only at a tick's head (`app::scene_load::background`), so when
 //! the thread finishes decides only which tick the operation reads ready on: an
-//! input, which a demo records. One job at a time; starting another, or cancelling,
-//! drops the one before, whose thread finishes into a channel nobody reads.
+//! input, which a demo records. One job at a time; starting another, cancelling
+//! or dropping the loader abandons the one before: its thread stops at the next
+//! step of the prepare (`app::scene_load::ABANDONED`), so a script that calls
+//! `LoadAsync` again before the last one finished, or a Stop mid-load, leaves no
+//! full preparation running beside the ticking thread.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, TryRecvError};
+use std::sync::Arc;
+use std::thread::JoinHandle;
 
 use crate::app::{prepare_in_background, SceneLoader};
 use crate::scene::runtime::prepare::PreparedScene;
 
 type Prepared = Result<PreparedScene, String>;
 
-/// One operation's job: its thread's channel, and the result once it came.
+/// One operation's job: its thread's channel, the result once it came, and the
+/// flag that abandons it, set when the job is dropped.
 struct Job {
     op: u32,
     rx: Receiver<Prepared>,
     done: Option<Prepared>,
+    abandoned: Arc<AtomicBool>,
+}
+
+impl Drop for Job {
+    fn drop(&mut self) {
+        self.abandoned.store(true, Ordering::Relaxed);
+    }
+}
+
+/// Prepare `path` on a thread of its own, which checks `abandoned` between steps.
+fn spawn(
+    path: String,
+    abandoned: Arc<AtomicBool>,
+) -> (Receiver<Prepared>, std::io::Result<JoinHandle<()>>) {
+    let (tx, rx) = channel();
+    let thread = std::thread::Builder::new()
+        .name("scene-load".into())
+        .spawn(move || drop(tx.send(prepare_in_background(&path, &abandoned))));
+    (rx, thread)
 }
 
 /// Prepares each operation on a thread of its own.
@@ -29,15 +55,19 @@ pub struct Threaded {
 
 impl SceneLoader for Threaded {
     fn start(&mut self, op: u32, path: String) {
-        let (tx, rx) = channel();
-        let spawned = std::thread::Builder::new()
-            .name("scene-load".into())
-            .spawn(move || drop(tx.send(prepare_in_background(&path))));
+        self.job = None; // the one before is abandoned first
+        let abandoned = Arc::new(AtomicBool::new(false));
+        let (rx, spawned) = spawn(path, abandoned.clone());
         // No thread to be had: the job fails, and the current scene keeps running.
         let done = spawned
             .err()
             .map(|e| Err(format!("no load thread could start ({e})")));
-        self.job = Some(Job { op, rx, done });
+        self.job = Some(Job {
+            op,
+            rx,
+            done,
+            abandoned,
+        });
     }
 
     fn finished(&mut self, op: u32) -> bool {
@@ -56,9 +86,8 @@ impl SceneLoader for Threaded {
 
     fn take(&mut self, op: u32) -> Prepared {
         match self.job.take_if(|job| job.op == op) {
-            Some(Job { rx, done, .. }) => {
-                done.unwrap_or_else(|| rx.recv().unwrap_or_else(|_| Err(STOPPED.into())))
-            }
+            Some(mut job) => (job.done.take())
+                .unwrap_or_else(|| job.rx.recv().unwrap_or_else(|_| Err(STOPPED.into()))),
             None => Err(format!("no load operation {op} was started")),
         }
     }

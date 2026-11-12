@@ -82,7 +82,7 @@ fn register_load_async(
             if scene.borrow().is_playing() {
                 return Ok(scene.borrow_mut().loads.request_async(path));
             }
-            if let Some(warning) = load_now(&scene, &*scene_path.get(lua)?, path)? {
+            if let Some(warning) = load_now("LoadAsync", &scene, &*scene_path.get(lua)?, path)? {
                 log::warn!("[Scene] {warning}");
             }
             let op = scene.borrow_mut().loads.ended(LoadStatus::Done);
