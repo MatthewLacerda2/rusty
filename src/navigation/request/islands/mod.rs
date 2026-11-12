@@ -14,9 +14,17 @@
 //! partial path still heads toward it, as far as that many expansions get (Detour's
 //! `maxNodes` answer). The environment query's flood (`flood`, #2088) asks the
 //! same map which of its goals to drop before it starts.
+//!
+//! The map is built from scratch after a full bake; an incremental rebake and an
+//! area-cost change carry it forward instead (`carry`), which may join areas a
+//! fresh build would keep apart, never the reverse. Split: `areas` joins the
+//! walking areas, `carry` carries them.
 
 use std::cell::{RefCell, RefMut};
 use std::collections::VecDeque;
+
+mod areas;
+mod carry;
 
 use super::super::astar::MAX_SEARCH_NODES;
 use super::super::{NavigationGraph, SpanRef};
@@ -29,14 +37,21 @@ pub const UNREACHABLE_SEARCH_NODES: u32 = 4_096;
 /// One bake's islands: each span's walking area, and the areas each one's
 /// off-mesh links lead to.
 struct IslandMap {
+    /// The bake it answers for: the current one, or an older one carried forward.
     generation: u64,
     area: Vec<u32>,
     exits: Vec<Vec<u32>>,
 }
 
-/// The graph's cached [`IslandMap`], rebuilt when the bake changes.
+/// The graph's cached [`IslandMap`]: carried across an incremental rebake and an
+/// area-cost change (`carry`), rebuilt after anything else.
 #[derive(Default)]
-pub(crate) struct Islands(RefCell<Option<IslandMap>>);
+pub(crate) struct Islands {
+    map: RefCell<Option<IslandMap>>,
+    /// How many times the map was built from scratch (a test probe).
+    #[cfg(test)]
+    pub(crate) builds: std::cell::Cell<u32>,
+}
 
 impl NavigationGraph {
     /// The expansions a search from `start` to `goal` may spend:
@@ -69,7 +84,7 @@ impl NavigationGraph {
     /// far as every one of `goals`' areas is found. `None` when the cache is in
     /// use.
     fn reach<'a>(&'a self, start: SpanRef, goals: &[SpanRef]) -> Option<Reach<'a>> {
-        let mut cache = self.islands.0.try_borrow_mut().ok()?;
+        let mut cache = self.islands.map.try_borrow_mut().ok()?;
         let stale = |m: &IslandMap| {
             m.generation != self.bake_generation || m.area.len() != self.spans.len()
         };
@@ -93,19 +108,12 @@ impl NavigationGraph {
         Some(Reach { map, seen })
     }
 
-    /// The current bake's [`IslandMap`].
+    /// The current bake's [`IslandMap`], built from scratch.
     fn island_map(&self) -> IslandMap {
+        #[cfg(test)]
+        self.islands.builds.set(self.islands.builds.get() + 1);
         let (area, count) = self.step_areas();
-        let mut exits = vec![Vec::new(); count];
-        for here in self.span_refs() {
-            let a = area[here.index as usize];
-            for link in self.link_moves(here) {
-                let b = area[link.to.index as usize];
-                if b != a && !exits[a as usize].contains(&b) {
-                    exits[a as usize].push(b);
-                }
-            }
-        }
+        let exits = self.link_exits(&area, count);
         IslandMap {
             generation: self.bake_generation,
             area,
@@ -113,41 +121,28 @@ impl NavigationGraph {
         }
     }
 
-    /// Each span's walking area under A\*'s steps (see the module doc), numbered in
-    /// scan order, and how many there are. The cardinal steps join first; a
-    /// diagonal is tried only into a cell holding a span of another area, so open
-    /// floor pays no more than the cardinals.
-    fn step_areas(&self) -> (Vec<u32>, usize) {
-        let mut roots = Roots((0..self.spans.len() as u32).collect());
-        for here in self.span_refs() {
-            for (dx, dz) in CARDINAL {
-                if let Some(next) = self.link_to(here, here.gx + dx, here.gz + dz) {
-                    roots.join(here.index, next.index);
-                }
+    /// The areas each of the `count` areas' off-mesh links lead to, spans in
+    /// `area`'s: one pass over the links, both ways for a two-way one.
+    fn link_exits(&self, area: &[u32], count: usize) -> Vec<Vec<u32>> {
+        let mut exits = vec![Vec::new(); count];
+        let mut exit = |a: u32, b: u32| {
+            if a != b && !exits[a as usize].contains(&b) {
+                exits[a as usize].push(b);
+            }
+        };
+        let links = &self.offmesh;
+        for l in links.auto.iter().chain(&links.authored) {
+            let ends = (self.link_span(l.from), self.link_span(l.to));
+            let (Some(from), Some(to)) = ends else {
+                continue;
+            };
+            let (a, b) = (area[from.index as usize], area[to.index as usize]);
+            exit(a, b);
+            if l.bidirectional {
+                exit(b, a);
             }
         }
-        for here in self.span_refs() {
-            for (dx, dz) in DIAGONAL {
-                let own = roots.find(here.index);
-                let cell = self.span_range(here.gx + dx, here.gz + dz);
-                if cell.clone().all(|i| roots.find(i as u32) == own) {
-                    continue;
-                }
-                if let Some(next) = self.neighbour(here, dx, dz) {
-                    roots.join(here.index, next.index);
-                }
-            }
-        }
-        let mut area = vec![u32::MAX; self.spans.len()];
-        let mut count = 0;
-        for i in 0..self.spans.len() as u32 {
-            let r = roots.find(i) as usize;
-            if area[r] == u32::MAX {
-                (area[r], count) = (count as u32, count + 1);
-            }
-            area[i as usize] = area[r];
-        }
-        (area, count)
+        exits
     }
 }
 
@@ -164,30 +159,5 @@ impl Reach<'_> {
     }
 }
 
-/// A union-find over span indices, each set rooted at its lowest index.
-struct Roots(Vec<u32>);
-
-impl Roots {
-    fn find(&mut self, mut i: u32) -> u32 {
-        while self.0[i as usize] != i {
-            self.0[i as usize] = self.0[self.0[i as usize] as usize];
-            i = self.0[i as usize];
-        }
-        i
-    }
-
-    fn join(&mut self, a: u32, b: u32) {
-        let (a, b) = (self.find(a), self.find(b));
-        self.0[a.max(b) as usize] = a.min(b);
-    }
-}
-
-/// The grid steps A\* takes. A step can go one way only (`link_to` picks the
-/// nearest floor, a diagonal needs its own two cardinals), so every span tries
-/// all eight of its own.
-const CARDINAL: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
-const DIAGONAL: [(i32, i32); 4] = [(1, 1), (1, -1), (-1, 1), (-1, -1)];
-
 #[cfg(test)]
-#[path = "islands_tests.rs"]
 mod tests;
