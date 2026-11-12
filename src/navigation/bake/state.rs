@@ -57,6 +57,7 @@ impl NavigationGraph {
     /// changed): a new generation whose change log entry says "anything changed".
     pub(in crate::navigation) fn invalidate_paths(&mut self) {
         self.bake_generation = self.bake_generation.wrapping_add(1);
+        self.islands.keep(self.bake_generation); // no span or link moved (#2111)
         if let Some(st) = self.bake_state.as_mut() {
             st.log.record(self.bake_generation, None);
         }

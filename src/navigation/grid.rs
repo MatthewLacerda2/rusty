@@ -88,7 +88,8 @@ pub struct NavigationGraph {
     pub(super) flood_cache: super::flood::FloodCache,
     /// The agents' path requests and the search in progress (#2087, `request`).
     pub(super) requests: std::cell::RefCell<super::request::PathQueue>,
-    /// Each bake's islands, for the search cap toward an unreachable goal (#2087).
+    /// The navmesh's islands, for the search cap toward an unreachable goal (#2087),
+    /// carried across incremental rebakes (#2111).
     pub(super) islands: super::request::islands::Islands,
 }
 
