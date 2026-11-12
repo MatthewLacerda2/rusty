@@ -45,7 +45,8 @@ pub use resources::Resources;
 #[cfg(test)]
 pub(crate) use scene_load::project_tests;
 pub use scene_load::{
-    load_boot_scene, prepare_in_background, Inline, ProjectSource, SceneLoader, ABANDONED,
+    load_boot_scene, prepare_counted, prepare_in_background, Inline, PrepareSteps, ProjectSource,
+    SceneLoader, ABANDONED,
 };
 pub use schedule::Schedule;
 pub use stage::Stage;

@@ -2,7 +2,7 @@
 //!
 //! An operation's scene is prepared by the host's [`SceneLoader`], never by a
 //! system: the windowed shell's runs [`prepare_in_background`] on a worker thread
-//! (`shell::load_worker`); the default, [`Inline`], runs it at the tick head that
+//! (`shell::frame::load::worker`); the default, [`Inline`], runs it at the tick head that
 //! asks, so every headless host (the harness, `play`, `game --test`) reads the
 //! operation ready from the first tick after the request, every run.
 //!
@@ -13,7 +13,7 @@
 //! waits for its own loader there), and only then does the operation's status move.
 //! What the operation loads is the files' alone, so it is the same on every host.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
 use crate::navigation::NavigationGraph;
 use crate::scene::runtime::prepare::{staged, PreparedScene, SceneSidecars};
@@ -33,6 +33,12 @@ pub trait SceneLoader: std::any::Any {
     fn take(&mut self, op: u32) -> Result<PreparedScene, String>;
     /// Drop the job, if any: nothing is pending any more.
     fn cancel(&mut self);
+    /// How far the job for `op` is, from 0 to 1, while it is not finished: what a
+    /// script reads as `progress` (× 0.9) before the operation is ready. Asked only
+    /// at a tick head; a loader that cannot tell answers 0.
+    fn progress(&mut self, _op: u32) -> f32 {
+        0.0
+    }
 }
 
 /// The host's loader — inline by default, a worker thread in the windowed shell
@@ -90,17 +96,66 @@ pub const ABANDONED: &str = "the load was abandoned";
 /// read, so a model written while it ran is still followed. `abandoned` is checked
 /// between steps: once set, the job ends at the next one with [`ABANDONED`].
 pub fn prepare_in_background(path: &str, abandoned: &AtomicBool) -> Result<PreparedScene, String> {
+    prepare_counted(path, abandoned, &PrepareSteps::default())
+}
+
+/// How far a [`prepare_counted`] is: the steps done of the steps it will run. It runs
+/// four (the read, the meshes, staging the navmesh bake, the bake) and three when a
+/// navmesh is saved beside the scene, which it learns from the sidecars before the
+/// meshes, so the count never plateaus on a step it skips.
+#[derive(Debug)]
+pub struct PrepareSteps {
+    done: AtomicU8,
+    total: AtomicU8,
+}
+
+impl Default for PrepareSteps {
+    fn default() -> Self {
+        Self {
+            done: AtomicU8::new(0),
+            total: AtomicU8::new(4),
+        }
+    }
+}
+
+impl PrepareSteps {
+    /// The steps done over the steps the job will run, from 0 to 1.
+    pub fn fraction(&self) -> f32 {
+        let total = self.total.load(Ordering::Relaxed).max(1);
+        let done = self.done.load(Ordering::Relaxed).min(total);
+        f32::from(done) / f32::from(total)
+    }
+
+    /// The steps the job will run, as it knows them now.
+    pub fn total(&self) -> u8 {
+        self.total.load(Ordering::Relaxed)
+    }
+}
+
+/// [`prepare_in_background`], counting each step done in `steps`, which a loader
+/// reads as its progress.
+pub fn prepare_counted(
+    path: &str,
+    abandoned: &AtomicBool,
+    steps: &PrepareSteps,
+) -> Result<PreparedScene, String> {
     let step = || match abandoned.load(Ordering::Relaxed) {
         true => Err(ABANDONED.to_string()),
-        false => Ok(()),
+        false => {
+            steps.done.fetch_add(1, Ordering::Relaxed);
+            Ok(())
+        }
     };
     let _hold = crate::asset::convert::PlayHold::take();
     let read_at = crate::core::fs::written::written_since(u64::MAX).0;
     let data = crate::scene::read_scene_file(path)?;
     step()?;
+    let sidecars = SceneSidecars::read(path);
+    if sidecars.has_navmesh() {
+        steps.total.store(3, Ordering::Relaxed); // no bake: its staging step is not run
+    }
     let document = RehydratedScene::read_since(data, read_at);
     step()?;
-    let sidecars = SceneSidecars::read(path);
     let baked = match sidecars.has_navmesh() {
         true => None,
         false => Some(bake_navmesh(&document, step)?),
@@ -187,6 +242,25 @@ impl GameWorld {
                     .error(format!("Scene.LoadAsync: {err}")),
             }
             self.world.scene.borrow_mut().loads.publish(op, ok);
+        }
+        self.publish_progress();
+    }
+
+    /// The tick head's progress: the still-waiting operation's, in whole percent,
+    /// set when it moved, as the tap leaves it.
+    fn publish_progress(&mut self) {
+        let Some(op) = self.world.scene.borrow().loads.waiting() else {
+            return;
+        };
+        let res = &mut self.resources;
+        let percent = (res.loading.loader.progress(op).clamp(0.0, 1.0) * 100.0) as u8;
+        let moved = (percent != self.world.scene.borrow().loads.loaded()).then_some(percent);
+        let moved = match res.tap.as_mut() {
+            Some(tap) => tap.load_progress(moved),
+            None => moved,
+        };
+        if let Some(percent) = moved {
+            self.world.scene.borrow_mut().loads.set_loaded(op, percent);
         }
     }
 }

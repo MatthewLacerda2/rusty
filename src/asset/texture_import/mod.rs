@@ -70,7 +70,7 @@ pub const ENCODER_VERSION: u32 = 3;
 
 /// What a slot reads a texture as: how an uncompressed upload's mips average,
 /// and which compressed formats it can sample ([`fits`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TextureKind {
     /// Authored in sRGB and sampled through the decoding view (albedo, emissive,
     /// UI images, particles).

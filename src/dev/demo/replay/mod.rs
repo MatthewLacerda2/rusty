@@ -289,4 +289,8 @@ impl TickTap for Replayer {
     fn loads(&mut self, ready: Vec<u32>) -> Vec<u32> {
         self.tick.as_ref().map_or(ready, |tick| tick.loads.clone())
     }
+
+    fn load_progress(&mut self, moved: Option<u8>) -> Option<u8> {
+        self.tick.as_ref().map_or(moved, |tick| tick.load_progress)
+    }
 }

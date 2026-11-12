@@ -12,6 +12,37 @@ commit, ≈3 attempts then hand back); `cloud-brief.md` holds what every coder
 follows; `ci-merge` holds the merge queue. This skill is how the orchestrator runs
 a batch on top of them.
 
+When in doubt mid-batch, write a comment on the issue and resume the work where
+possible, rather than asking in the chat and spending the night waiting for an
+answer. A conversation that plans issues doesn't wait: ask its questions right away.
+
+## The board's signals
+
+- **An assigned issue is in progress; an unassigned one is fair game.** Assign the
+  user the moment work on an issue begins.
+- **`planning` and `human` are the only stops**, and no amount of the issue looking
+  ready overrides them. An idea still being shaped is what `planning` is for, so
+  asking again whether an unlabelled issue is ready when work begins adds nothing.
+- **How an issue reads is the writer's call**; the repo's rules about issues are
+  CLAUDE.md's *Issues, labels & priority*. A bug or doc fix is filed without
+  `planning` and merged like any other ready PR.
+
+## How many coders, and why
+
+The limits are CLAUDE.md's; the reasons are here, so they are kept, not re-argued.
+
+- **Cloud coders ≤5**, paced by how many diffs one orchestrator can read: review,
+  not coder count, is the bottleneck. `make coder` refuses a sixth.
+- **Local coders ≤2**: the queue lands one tested tree per CI run, so a third
+  finishes nothing sooner.
+- **Read-only agents** (research, review, planning) **without limit**: they build
+  nothing.
+- Merging stays one at a time, whatever the count.
+- **One worktree per branch**, under `.claude/worktrees/`, off the latest `main`,
+  removed the moment it merges. **Never a shared `CARGO_TARGET_DIR`**: worktrees
+  overwrite each other's artifacts, and a green gate stops meaning this branch
+  compiled.
+
 ## What runs together: file collision, not count
 
 Merging is serialized, one tested tree at a time, but the queue tests up to four
@@ -67,7 +98,16 @@ the code*, not merely listable.
 
 ## Where a branch runs
 
-**Cloud by default** (CLAUDE.md, *Worktrees are cheap*). Once the local-only proof
+**Cloud by default** (CLAUDE.md, *Worktrees are cheap*). rusty is developed by one
+person, locally or in a cloud session, not by many contributors on many cold
+machines, so don't propose tooling built for that. Each worktree compiles into its
+own `target/`, and one cold build fills every core and several GB of memory:
+parallelise the work and stagger the compiles. Everything a container can prove
+(lavapipe runs the GPU tests) goes to the cloud, which lifts the local build limit,
+never the one-at-a-time merge. A branch goes local only when it needs the machine:
+a real GPU (Metal, performance, driver races), the display, the speakers, the
+operator's files or keys, or a measurement. With the coding in the cloud, the merge
+queue is the only local work (*The orchestrator's loop*). Once the local-only proof
 is in the PR, the rest of the branch can go to the cloud. Local builds: check
 `free -g` and `df -h` first, and give each heavy build half the cores
 (`CARGO_BUILD_JOBS`) when another may overlap it. Never run `cargo mutants`

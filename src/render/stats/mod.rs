@@ -197,6 +197,8 @@ pub struct RenderCounters {
     /// camera summed: per-draw uniforms, joints, instances, proxy volumes, and the
     /// object and material records that changed.
     pub render_upload_bytes: u64,
+    /// The scene assets uploaded for this frame (`asset_uploads`, `asset_upload_bytes`).
+    pub uploads: Uploads,
 }
 
 impl RenderCounters {
@@ -249,6 +251,7 @@ impl RenderCounters {
             ("render_upload_bytes", self.render_upload_bytes),
         ];
         pairs.extend(self.shadow_pairs());
+        pairs.extend(self.uploads.pairs());
         pairs
     }
 
@@ -284,6 +287,8 @@ impl RenderCounters {
 }
 
 mod frame;
+mod uploads;
+pub use uploads::Uploads;
 
 #[cfg(test)]
 use frame::{count_lights, draws_of};

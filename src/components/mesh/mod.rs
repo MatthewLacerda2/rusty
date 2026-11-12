@@ -107,7 +107,10 @@ pub struct MeshComponent {
     #[serde(default, skip_serializing_if = "is_zero")]
     pub min_screen_size: f32,
     /// Which edit of the geometry this is; set a [`MeshRevision::next`] whenever
-    /// `vertices` or `indices` change, so every renderer re-uploads them.
+    /// `vertices` or `indices` change, so every renderer re-uploads them. A
+    /// primitive's geometry is the exception: it carries the one revision of its
+    /// (primitive, cut) (`scene::authoring::primitive_revision`), so an edit to a
+    /// primitive's vertices must give it a new `MeshId` as well as a new revision.
     #[serde(skip)]
     pub revision: MeshRevision,
     /// The clusters its import built (#1968, `asset::clusters`), with the

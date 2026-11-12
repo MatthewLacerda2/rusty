@@ -31,7 +31,7 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.New` | `()` | `nil` — the editor's File ▸ New: the World becomes an empty scene (no entities, default ambient, sky and layers) with no current scene file, so `GetActivePath()` reads `nil` and a bare `Save()` errors until `Save(path)` names one. An unsaved scene is discarded without asking, as `Load` discards it; an open editor drops its entity selection and its unsaved mark. Edit mode only: errors during Play |
 | `Scene.Load` | `(path)` | `nil`, or in edit mode a warning string when the scene loaded but its lighting sidecar did not (errors, naming `path`, if there is no file there) |
 | `Scene.LoadAsync` | `(path)` | Unity's `LoadSceneAsync`: an operation id (an integer) for the load, prepared in the background and swapped in on a later tick — see *Loading scenes*. In edit mode the scene loads at once, as `Load`, and the operation is already done (errors, naming `path`, if there is no file there) |
-| `Scene.GetLoadProgress` | `(op)` | the operation's `progress`: `0` while loading, `0.9` once ready (it holds there while activation waits), `1` once swapped in; `0` for one that failed, was replaced or is unknown |
+| `Scene.GetLoadProgress` | `(op)` | the operation's `progress`: from `0` toward `0.9` while loading (in the editor's Play and the player, as the worker and the GPU warm-up go; `0` throughout on a headless run), `0.9` once ready (it holds there while activation waits), `1` once swapped in; `0` for one that failed, was replaced or is unknown |
 | `Scene.IsLoadDone` | `(op)` | its `isDone`: `true` once swapped in, failed or replaced, and for an id this Play session never opened |
 | `Scene.GetLoadStatus` | `(op)` | `"loading"`, `"ready"` (prepared, waiting for activation or the tick's end), `"done"`, `"failed"`, `"replaced"` (another load came first), or `"gone"` for an id this Play session never opened |
 | `Scene.SetAllowSceneActivation` | `(op, allow)` | `true` if `op` is the pending load — its `allowSceneActivation` (default `true`): while `false` the operation holds at ready, the current scene running, until it is set back |
@@ -288,18 +288,38 @@ namespaces hand out ids, not objects, so Unity's `AsyncOperation` is polled thro
   `game --test`, a scenario) read it ready on the tick after the call, every run,
   with one exception: a call from `Awake` or `Start` on entering Play comes before
   that first tick's head, so it is prepared and swapped in on that same tick. In
-  the editor's Play and the player a worker thread prepares it, and it is ready on
-  the first tick head after the worker finishes. Which tick that was is recorded in the
-  demo, so a replay swaps on the same tick.
+  the editor's Play and the player a worker thread prepares it, then the renderer
+  makes its GPU resources (below), and it is ready on the first tick head after both
+  finish. Which tick that was, and the progress a script read meanwhile, are recorded
+  in the demo, so a replay swaps on the same tick and reads the same progress.
+- **Progress:** in the editor's Play and the player, `GetLoadProgress` climbs from `0`
+  to `0.9` while loading: the worker's steps fill its first half and the GPU warm-up
+  the second, published at a tick's head in whole percent. A headless run reads `0`
+  until ready, as it has nothing to wait for.
 - **One load at a time:** a later `Load` or `LoadAsync` replaces a pending operation
   (`"replaced"`, `IsLoadDone` true) and its preparation is abandoned: the worker
   stops at its next step. So does a pending one's when Play stops.
 - **Errors:** a path with no file errors at the call. A file that does not parse
   ends the operation `"failed"`, reported to the console, and the current scene keeps
   running.
+- **The GPU warm-up:** before a windowed host reports the operation ready, the
+  renderer uploads what the prepared scene draws with, while the current scene still
+  draws: each mesh's buffers, every material map, the sky's panorama and the
+  lightmap pages. Image files are read and decoded on a worker thread; a frame only
+  uploads them. It spends at most a frame's budget at it, Unity's
+  `Application.backgroundLoadingPriority` (`Application.SetBackgroundLoadingPriority`:
+  4 ms a frame by default), and at least one resource a frame, so the new scene's
+  first frame finds them made (`Debug.Stats()`'s `asset_uploads` reads `0` there).
+  The budget is checked between resources, so one resource can run past it by its
+  own GPU upload (a texture's levels and mips, a lightmap page array). A retry of the
+  level already loaded makes nothing: its meshes and maps are still resident.
+  Still made on that frame: its material bind groups and object records, its
+  reflection probes' cubes, the meshes of its own library (`Mesh.Create`), a new
+  sky's panorama binding and reflection cube, the mesh of a `.prefab` edited since
+  the scene was saved, and the textures of its particles, ribbons, decals and UI.
+  Headless hosts warm nothing; their first frame uploads it all.
 - **What stays on the tick:** the swap itself — the outgoing scene's teardown, the
-  World replaced, the physics world built and the navmesh restored — and the new
-  scene's GPU uploads on its first drawn frame.
+  World replaced, the physics world built and the navmesh restored.
 - **Loading screens:** a `DontDestroyOnLoad` canvas, shown before the call and
   hidden once the operation is done:
 

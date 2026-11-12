@@ -25,7 +25,7 @@ use glam::{Mat4, Vec3};
 use crate::asset::{self, MeshRevision, MeshVertex, SubMesh};
 use crate::components::mesh::Vertex;
 use crate::components::Entity;
-use crate::scene::authoring::{subdivided_geometry, Primitive};
+use crate::scene::authoring::{primitive_revision, subdivided_geometry, Primitive};
 
 /// A document with every mesh rebuilt from its reference, and the write-log stamp
 /// taken once they were (`meshes_read_at`, #1242): the file-only half of a load,
@@ -54,6 +54,11 @@ impl RehydratedScene {
     /// (`scene::runtime::load::make_room`): ids are not what rehydration reads.
     pub(crate) fn data_mut(&mut self) -> &mut crate::scene::serialize::SceneData {
         &mut self.data
+    }
+
+    /// The document, rehydrated: what a load's GPU warm-up reads (`render::warm`).
+    pub fn data(&self) -> &crate::scene::serialize::SceneData {
+        &self.data
     }
 
     /// The document and its stamp, for `serialize`'s apply.
@@ -88,19 +93,21 @@ struct RehydratedMesh {
     bind_palette: Vec<Mat4>,
     skin: Option<crate::asset::SkinData>,
     clips: Vec<crate::asset::AnimationClip>,
-    /// The revision of the import it came from (#857): every instance of one
-    /// import shares it. `None` (a primitive, a failed import) takes a fresh one.
+    /// The revision of the import (#857) or primitive it came from: every instance
+    /// of one shares it. `None` (a failed import) takes a fresh one.
     revision: Option<MeshRevision>,
     /// The import's clusters (#1968), which describe `revision`'s geometry.
     clusters: Option<std::sync::Arc<crate::asset::clusters::Clusters>>,
 }
 
 impl RehydratedMesh {
-    /// A primitive's geometry with no rig — primitives are never skinned/animated.
-    fn primitive(geometry: (Vec<Vertex>, Vec<u32>)) -> Self {
+    /// A primitive's geometry with no rig — primitives are never skinned/animated —
+    /// at its one revision (`authoring::primitive_revision`).
+    fn primitive(geometry: (Vec<Vertex>, Vec<u32>), revision: MeshRevision) -> Self {
         Self {
             vertices: geometry.0,
             indices: geometry.1,
+            revision: Some(revision),
             ..Self::default()
         }
     }
@@ -164,8 +171,14 @@ fn rehydrate_one(mesh: &crate::scene::MeshComponent) -> RehydratedMesh {
     // Primitive geometry is owned by `scene::authoring` so a created primitive and
     // a loaded one are byte-identical.
     let primitive = Primitive::parse(&mesh.primitive_type);
-    match primitive.and_then(|p| subdivided_geometry(p, mesh.subdivisions)) {
-        Some(geometry) => RehydratedMesh::primitive(geometry),
+    let Some(primitive) = primitive else {
+        return RehydratedMesh::default();
+    };
+    match subdivided_geometry(primitive, mesh.subdivisions) {
+        Some(geometry) => {
+            let revision = primitive_revision(primitive, mesh.subdivisions);
+            RehydratedMesh::primitive(geometry, revision)
+        }
         None => RehydratedMesh::default(),
     }
 }

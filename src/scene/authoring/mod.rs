@@ -44,8 +44,8 @@ pub use crate::scene::authoring::defaults::{
     material_asset_from_import,
 };
 pub use crate::scene::authoring::primitive::{
-    primitive_collider, primitive_geometry, primitive_mesh_component, subdivided_geometry,
-    Primitive,
+    primitive_collider, primitive_geometry, primitive_mesh_component, primitive_revision,
+    subdivided_geometry, Primitive,
 };
 pub use crate::scene::authoring::script::add_script;
 

@@ -75,6 +75,11 @@ impl PreparedScene {
         &self.path
     }
 
+    /// The document with every mesh rebuilt, as activation will apply it.
+    pub fn data(&self) -> &SceneData {
+        self.document.data()
+    }
+
     /// Keep `bytes`, a navmesh baked from these files, for activation.
     pub fn set_baked_navmesh(&mut self, bytes: Vec<u8>) {
         self.baked_navmesh = Some(bytes);

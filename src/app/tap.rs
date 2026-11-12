@@ -52,6 +52,13 @@ pub trait TickTap: Any {
     fn loads(&mut self, ready: Vec<u32>) -> Vec<u32> {
         ready
     }
+
+    /// The pending operation's progress before ready, in percent, when the loader
+    /// moved it by this tick's head (`None`: it did not move), right after
+    /// [`Self::loads`]: a recorder notes it, a replay hands back the recorded one.
+    fn load_progress(&mut self, moved: Option<u8>) -> Option<u8> {
+        moved
+    }
 }
 
 impl GameWorld {
