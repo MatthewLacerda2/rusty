@@ -25,7 +25,7 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
     for (i, line) in source.lines().enumerate() {
         let mut code = vec![false; line.len()];
         code_of(line, &mut open, |at, _| code[at] = true);
-        if cfgs(line, &code).any(|p| names_unshipped(p)) {
+        if cfgs(line, &code).any(names_unshipped) {
             found.push(Finding {
                 path: path.to_string(),
                 line: i + 1,
