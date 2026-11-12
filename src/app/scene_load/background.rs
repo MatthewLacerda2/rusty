@@ -33,6 +33,23 @@ pub trait SceneLoader: std::any::Any {
     fn cancel(&mut self);
 }
 
+/// The host's loader — inline by default, a worker thread in the windowed shell
+/// (`GameWorld::set_scene_loader`) — and the ready operation's scene, held for the
+/// tick's tail.
+pub struct Loading {
+    pub(in crate::app) loader: Box<dyn SceneLoader>,
+    pub(in crate::app) ready: Option<(u32, PreparedScene)>,
+}
+
+impl Default for Loading {
+    fn default() -> Self {
+        Self {
+            loader: Box::new(Inline::default()),
+            ready: None,
+        }
+    }
+}
+
 /// The default loader: prepares at the tick head that takes it, on the ticking thread.
 #[derive(Default)]
 pub struct Inline {
@@ -91,12 +108,12 @@ fn bake_navmesh(path: &str) -> Option<Vec<u8>> {
 impl GameWorld {
     /// Install the host's [`SceneLoader`] (the default prepares inline).
     pub fn set_scene_loader(&mut self, loader: Box<dyn SceneLoader>) {
-        self.resources.scene_loader = loader;
+        self.resources.loading.loader = loader;
     }
 
     /// The installed loader, if it is a `T`: the host's own, between ticks.
     pub fn scene_loader_mut<T: SceneLoader>(&mut self) -> Option<&mut T> {
-        let loader: &mut dyn std::any::Any = self.resources.scene_loader.as_mut();
+        let loader: &mut dyn std::any::Any = self.resources.loading.loader.as_mut();
         loader.downcast_mut::<T>()
     }
 
@@ -104,7 +121,7 @@ impl GameWorld {
     pub(in crate::app) fn start_loads(&mut self) {
         let job = self.world.scene.borrow_mut().loads.to_start();
         if let Some((op, path)) = job {
-            self.resources.scene_loader.start(op, path);
+            self.resources.loading.loader.start(op, path);
         }
     }
 
@@ -116,18 +133,19 @@ impl GameWorld {
         let res = &mut self.resources;
         let pending = self.world.scene.borrow().loads.pending_op();
         if res
-            .ready_scene
+            .loading
+            .ready
             .as_ref()
             .is_some_and(|(op, _)| Some(*op) != pending)
         {
-            res.ready_scene = None; // replaced, or Play stopped
+            res.loading.ready = None; // replaced, or Play stopped
         }
         if pending.is_none() {
-            res.scene_loader.cancel();
+            res.loading.loader.cancel();
         }
         let waiting = self.world.scene.borrow().loads.waiting();
         let live: Vec<u32> = waiting
-            .filter(|&op| res.scene_loader.finished(op))
+            .filter(|&op| res.loading.loader.finished(op))
             .into_iter()
             .collect();
         let ready = match res.tap.as_mut() {
@@ -138,10 +156,10 @@ impl GameWorld {
             if self.world.scene.borrow().loads.waiting() != Some(op) {
                 continue;
             }
-            let prepared = res.scene_loader.take(op);
+            let prepared = res.loading.loader.take(op);
             let ok = prepared.is_ok();
             match prepared {
-                Ok(scene) => res.ready_scene = Some((op, scene)),
+                Ok(scene) => res.loading.ready = Some((op, scene)),
                 Err(err) => res
                     .console
                     .borrow_mut()

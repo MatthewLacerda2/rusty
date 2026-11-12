@@ -27,22 +27,7 @@ pub fn register(
     scene: ApiCell<Scene>,
     scene_path: ApiCell<Option<String>>,
 ) -> Reg {
-    put(
-        table,
-        "LoadAsync",
-        lua.create_function(move |lua, path: String| {
-            let scene = scene.get(lua)?;
-            check_file("LoadAsync", &path)?;
-            if scene.borrow().is_playing() {
-                return Ok(scene.borrow_mut().loads.request_async(path));
-            }
-            if let Some(warning) = load_now(&scene, &*scene_path.get(lua)?, path)? {
-                log::warn!("[Scene] {warning}");
-            }
-            let op = scene.borrow_mut().loads.ended(LoadStatus::Done);
-            Ok(op)
-        }),
-    )?;
+    register_load_async(lua, table, scene, scene_path)?;
     let status = move |lua: &mlua::Lua, op: u32| -> mlua::Result<Option<LoadStatus>> {
         Ok(scene.get(lua)?.borrow().loads.status(op))
     };
@@ -76,6 +61,32 @@ pub fn register(
                 .borrow_mut()
                 .loads
                 .allow_activation(op, allow))
+        }),
+    )
+}
+
+/// `LoadAsync(path)`: an operation in Play; in edit mode the scene loads at once and
+/// the operation is born done.
+fn register_load_async(
+    lua: &mlua::Lua,
+    table: &mlua::Table,
+    scene: ApiCell<Scene>,
+    scene_path: ApiCell<Option<String>>,
+) -> Reg {
+    put(
+        table,
+        "LoadAsync",
+        lua.create_function(move |lua, path: String| {
+            let scene = scene.get(lua)?;
+            check_file("LoadAsync", &path)?;
+            if scene.borrow().is_playing() {
+                return Ok(scene.borrow_mut().loads.request_async(path));
+            }
+            if let Some(warning) = load_now(&scene, &*scene_path.get(lua)?, path)? {
+                log::warn!("[Scene] {warning}");
+            }
+            let op = scene.borrow_mut().loads.ended(LoadStatus::Done);
+            Ok(op)
         }),
     )
 }

@@ -24,7 +24,7 @@
 mod background;
 mod boot;
 
-pub use background::{prepare_in_background, Inline, SceneLoader};
+pub use background::{prepare_in_background, Inline, Loading, SceneLoader};
 #[cfg(test)]
 pub(crate) use boot::project_tests;
 pub use boot::{load_boot_scene, ProjectSource};
@@ -102,7 +102,7 @@ fn activate_ready(
     path: &str,
     probe: &mut Option<Box<dyn LoadProbe>>,
 ) -> Option<String> {
-    let held = res.ready_scene.take().filter(|(at, _)| *at == op);
+    let held = res.loading.ready.take().filter(|(at, _)| *at == op);
     let Some((_, prepared)) = held else {
         let why = format!("Scene.LoadAsync: {path}: the prepared scene was lost");
         res.console.borrow_mut().error(why);
