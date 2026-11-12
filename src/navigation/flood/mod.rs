@@ -110,3 +110,6 @@ mod order_tests;
 // The bench level it runs on is a `dev` test fixture.
 #[cfg(all(test, feature = "dev"))]
 mod exact_tests;
+
+#[cfg(test)]
+mod slice_tests;

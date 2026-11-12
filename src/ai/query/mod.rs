@@ -44,6 +44,8 @@ mod generate_tests;
 #[cfg(all(test, feature = "dev"))]
 pub(crate) mod query_cost_tests;
 #[cfg(test)]
+mod queue_tests;
+#[cfg(test)]
 mod rank_tests;
 #[cfg(test)]
 mod spread_tests;

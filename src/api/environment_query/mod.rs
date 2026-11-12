@@ -15,6 +15,8 @@ mod spec;
 #[cfg(test)]
 mod purpose_tests;
 #[cfg(test)]
+mod sliced_tests;
+#[cfg(test)]
 mod tests;
 
 use mlua::{Lua, Table, Value};
