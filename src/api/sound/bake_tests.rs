@@ -1,7 +1,7 @@
 //! Tests for the `Sound` namespace, driven the way a script drives it: author a
 //! patch as a Lua table, bake a note, check the file that came out.
 
-use super::fixture::{lua_with_sound, tmp, IMPACT_PATCH};
+use super::fixture::{lua_with_sound, tmp, HELD_PATCH, IMPACT_PATCH};
 use super::*;
 
 #[test]
@@ -78,19 +78,29 @@ fn opts_are_optional_and_change_the_rendered_note() {
     let lua = lua_with_sound();
     let short = tmp("rusty_sound_short.wav");
     let long = tmp("rusty_sound_long.wav");
+    let (short_hit, long_hit) = (tmp("rusty_sound_hit.wav"), tmp("rusty_sound_hit_long.wav"));
     lua.load(format!(
         r#"
-        Sound.Bake({IMPACT_PATCH}, "C4", "{short}")
-        Sound.Bake({IMPACT_PATCH}, "C4", "{long}", {{ duration = 2.0 }})
+        Sound.Bake({HELD_PATCH}, "C4", "{short}")
+        Sound.Bake({HELD_PATCH}, "C4", "{long}", {{ duration = 2.0 }})
+        Sound.Bake({IMPACT_PATCH}, "C4", "{short_hit}")
+        Sound.Bake({IMPACT_PATCH}, "C4", "{long_hit}", {{ duration = 2.0 }})
     "#
     ))
     .exec()
-    .expect("both bakes run");
-    let (a, b) = (
-        std::fs::metadata(&short).unwrap().len(),
-        std::fs::metadata(&long).unwrap().len(),
+    .expect("every bake runs");
+    let len = |p: &str| std::fs::metadata(p).unwrap().len();
+    let (a, b) = (len(&short), len(&long));
+    assert!(
+        b > a * 2,
+        "a 2 s held note is far longer than the 0.5 s default"
     );
-    assert!(b > a * 2, "a 2 s note is far longer than the 0.5 s default");
+    // A one-shot's file ends where its sound does: an impact silent long before
+    // either gate closes writes the same length under both.
+    assert_eq!(len(&short_hit), len(&long_hit), "the gate outlasts the hit");
+    for p in [short_hit, long_hit] {
+        std::fs::remove_file(p).ok();
+    }
     std::fs::remove_file(short).ok();
     std::fs::remove_file(long).ok();
 }

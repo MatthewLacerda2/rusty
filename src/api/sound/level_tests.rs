@@ -4,7 +4,7 @@
 
 use mlua::{Lua, Table};
 
-use super::fixture::{lua_with_sound, tmp, IMPACT_PATCH};
+use super::fixture::{lua_with_sound, tmp, HELD_PATCH};
 
 /// Write interleaved 16-bit `samples` as a 44.1 kHz WAV — the bare RIFF header,
 /// so a test can hand `Sound.Level` a signal of exactly known amplitude.
@@ -90,7 +90,7 @@ fn a_bake_returns_its_level_and_it_matches_the_file_on_disk() {
     lua.globals().set("OUT", path.as_str()).unwrap();
     let (returned, baked): (String, Table) = lua
         .load(format!(
-            "return Sound.Bake({IMPACT_PATCH}, \"C2\", OUT, {{ duration = 0.15, seed = 7 }})"
+            "return Sound.Bake({HELD_PATCH}, \"C2\", OUT, {{ duration = 0.15, seed = 7 }})"
         ))
         .eval()
         .expect("the bake runs");

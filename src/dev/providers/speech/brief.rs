@@ -1,5 +1,5 @@
-//! A line of speech as a brief: what is asked for, and the four reasons a line is
-//! not ready to be asked for yet (#386).
+//! A line of speech as a brief: what is asked for, and the reasons a line is not
+//! ready to be asked for yet (#386).
 //!
 //! Every refusal here happens before a key is resolved or a cent estimated, and each
 //! names the field to fix. None of them is an error in the batch sense: a line with
@@ -7,12 +7,12 @@
 
 use std::fmt;
 
-use scorsese_core::{SpeechModel, MAX_CHARACTERS};
+use scorsese_core::{is_voice_id, SpeechModel};
 use serde::Serialize;
 
 use super::super::generated::Brief;
 
-/// The model a brief that names none speaks with: Flash. `multilingual_v2` and `v3`
+/// The model a brief that names none speaks with: Flash. `multilingual_v2` and `v4`
 /// cost the same as each other, so the only real choice is *fast or not*, and a
 /// default nobody set should not quietly be the dearer one.
 pub const DEFAULT_MODEL: SpeechModel = SpeechModel::Fast;
@@ -28,7 +28,7 @@ pub struct SpeechBrief {
     /// expires on 2026-12-31, so a voice written here would be an outage with a date.
     pub voice: String,
     /// Which model reads it, serialised as the vendor's id (`eleven_flash_v2_5`,
-    /// `eleven_multilingual_v2`, `eleven_v3`). Always present, so naming the default
+    /// `eleven_multilingual_v2`, `eleven_v4`). Always present, so naming the default
     /// and omitting it hash alike.
     #[serde(serialize_with = "vendor_id")]
     pub model: SpeechModel,
@@ -67,10 +67,13 @@ pub struct Draft {
 pub enum Incomplete {
     /// No words, or only whitespace.
     NoText,
-    /// More characters than one request speaks.
-    TooLong { found: usize },
+    /// More characters than one request to the chosen model speaks.
+    TooLong { found: usize, model: SpeechModel },
     /// Nobody chosen to say it.
     NoVoice,
+    /// A voice id that is not one (letters, digits, `-`, `_`): refused here so a
+    /// `/` or `..` never reaches the vendor's URL.
+    BadVoice(String),
     /// A model id that is not one of the three.
     UnknownModel(String),
     /// `language` on `eleven_multilingual_v2`, which accepts it and ignores it.
@@ -81,13 +84,19 @@ impl fmt::Display for Incomplete {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NoText => write!(f, "`text` is empty: there is nothing to speak"),
-            Self::TooLong { found } => write!(
+            Self::TooLong { found, model } => write!(
                 f,
-                "`text` is {found} characters; one request speaks at most {MAX_CHARACTERS}"
+                "`text` is {found} characters; one request to {} speaks at most {}",
+                model.model_id(),
+                model.max_characters()
             ),
             Self::NoVoice => write!(
                 f,
                 "`voice` is missing: choose an ElevenLabs voice id (there is no default)"
+            ),
+            Self::BadVoice(voice) => write!(
+                f,
+                "`voice` {voice:?} is not a voice id: only letters, digits, `-` and `_`"
             ),
             Self::UnknownModel(model) => write!(
                 f,
@@ -108,16 +117,19 @@ impl Draft {
     pub fn gather(self) -> Result<SpeechBrief, Incomplete> {
         let text = self.text.filter(|t| !t.trim().is_empty());
         let text = text.ok_or(Incomplete::NoText)?;
-        let found = text.chars().count();
-        if found > MAX_CHARACTERS {
-            return Err(Incomplete::TooLong { found });
-        }
         let voice = self.voice.filter(|v| !v.trim().is_empty());
         let voice = voice.ok_or(Incomplete::NoVoice)?;
+        if !is_voice_id(&voice) {
+            return Err(Incomplete::BadVoice(voice));
+        }
         let model = match self.model {
             None => DEFAULT_MODEL,
             Some(id) => model_of(&id).ok_or(Incomplete::UnknownModel(id))?,
         };
+        let found = text.chars().count();
+        if found > model.max_characters() {
+            return Err(Incomplete::TooLong { found, model });
+        }
         if let Some(language) = self.language.as_ref() {
             if !model.takes_language() {
                 let language = language.clone();

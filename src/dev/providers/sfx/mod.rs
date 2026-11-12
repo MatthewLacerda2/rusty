@@ -8,14 +8,12 @@
 //! **Same lifecycle as speech, no exceptions**: [`generate`] runs Play check →
 //! brief → cache → [`permit`] → the one call → record → MP3→WAV → store.
 //!
-//! **The endpoint is declared here**, because the pinned scorsese-providers has no
-//! sound-effects client. Only the declaration is rusty's: the wire is scorsese's
+//! **The endpoint is declared here.** Only the declaration is rusty's: the wire is scorsese's
 //! [`Caller`], and a refusal is sorted by scorsese's [`VendorRefusal::of`], so no
 //! HTTP code lives in this tree. The endpoint takes no seed; the cache is what makes
 //! an effect reproducible.
 
 mod brief;
-pub mod price;
 
 use std::fmt;
 
@@ -24,10 +22,22 @@ use scorsese_providers::api::http::{Caller, HttpError};
 use serde::Serialize;
 
 pub use brief::{Draft, Incomplete, SfxBrief, MAX_SECONDS, MIN_SECONDS, MODEL};
-pub use price::estimate_cents;
 
 use super::generated::{self, Realised};
-use super::{permit, Context, Provider, Refusal, Secret};
+use super::{permit, prices, Context, Provider, Refusal, Secret};
+
+/// What `seconds` of effect is estimated to cost, in US cents: scorsese's dated
+/// sound rate (`prices::sound`), billed on the length asked for, not the words,
+/// and rounded up so a run can never creep past the budget.
+pub fn estimate_cents(seconds: f64) -> u64 {
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "the brief's bounds (0.5 to 30 s) keep the milliseconds small and positive"
+    )]
+    let millis = (seconds * 1000.0).ceil() as u32;
+    prices::sound(millis).cents
+}
 
 /// The endpoint, asking for the one MP3 format every tier gets (192 kbps needs
 /// Creator, PCM needs Pro).

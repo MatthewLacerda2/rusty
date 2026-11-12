@@ -14,8 +14,9 @@ use crate::api::{global_table, put, ApiCtx, Reg};
 
 /// `Voices([refresh])` and `FindVoice(query [, refresh])` → `voices, source`, where
 /// `source` says whether the list was just read or cached and how old it is.
-/// `VoiceInfo(id)` → the voice, or `nil, why` when it is withdrawn. Anything that
-/// stops every question (Play, no key on a cold cache, the vendor) raises.
+/// `VoiceInfo(id)` → the voice; `voice, note` for a Voice Library voice the account
+/// has not saved (usable on a paid plan); or `nil, why` when it is withdrawn or
+/// otherwise unusable. Anything that stops every question (Play, no key on a cold cache, the vendor) raises.
 pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let scene = ctx.scene;
     let table = global_table(lua, "Speech")?;
@@ -57,6 +58,10 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
                 Availability::Available(voice) => {
                     Ok((Value::Table(voice_table(lua, &voice)?), None))
                 }
+                Availability::InLibrary(voice) => Ok((
+                    Value::Table(voice_table(lua, &voice)?),
+                    Some(voices::in_library(&id)),
+                )),
                 Availability::Unusable(why) => Ok((Value::Nil, Some(voices::withdrawn(&id, &why)))),
             }
         }),

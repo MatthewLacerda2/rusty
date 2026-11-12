@@ -85,10 +85,7 @@ it is part of the brief's hash.
 
 ### What it costs
 
-Billed on the **length asked for**, not the words: **0.4¢ a second, rounded up per
-call** (a 2 s door slam is 1¢, the 30 s maximum is 12¢). This rate is **unverified
-and deliberately high**. On 2026-10-06 the vendor's pricing page couldn't be reached,
-and the sources that could be reached disagree (11 credits a second on the API, 40
-on the website). rusty uses the highest figure, so the estimate can only run over
-and a guess can never cross the budget. The rate and its date live in
-`src/dev/providers/sfx/price.rs`, and #388 records the sources.
+Billed on the **length asked for**, not the words: **12¢ a minute, rounded up per
+call** (a 2 s door slam is 1¢, the 30 s maximum is 6¢). The rate is scorsese's dated
+table (`scorsese_providers::prices`, see `docs/providers.md`), so moving the scorsese
+pin is how it changes.

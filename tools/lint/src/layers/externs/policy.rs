@@ -27,7 +27,10 @@ pub const POLICY: Policy = Policy {
     // The math, the scene document's serde and logging: CLAUDE.md's "use glam for
     // all math", and every module saves or logs something.
     common: &["glam", "log", "serde", "serde_json"],
-    unscoped: &[],
+    unscoped: &[(
+        "getrandom",
+        "a feature pin closing a build/test split under `dev` (docs/testing.md)",
+    )],
     confined: &[
         // The editor is a Cargo feature (#431): egui lives only behind it.
         egui("egui"),

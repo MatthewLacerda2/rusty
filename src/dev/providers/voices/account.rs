@@ -20,7 +20,7 @@ use scorsese_providers::api::http::{Caller, HttpError};
 use scorsese_providers::credentials::CredentialError;
 use scorsese_providers::video::ProviderError;
 use scorsese_providers::voices::{
-    Availability, Catalogue, ElevenLabsVoices, Page, Voice, VoiceError,
+    Availability, Catalogue, ElevenLabsVoices, Origin, Page, Voice, VoiceError,
 };
 
 use super::super::{resolve, Environment, Provider, Refusal, Secret};
@@ -148,6 +148,10 @@ impl Catalogue for Account<'_> {
 
     fn one(&self, voice_id: &str) -> Result<Availability, VoiceError> {
         ElevenLabsVoices::new(&self.key()?).one(voice_id)
+    }
+
+    fn origin(&self, voice_id: &str) -> Result<Option<Origin>, VoiceError> {
+        ElevenLabsVoices::new(&self.key()?).origin(voice_id)
     }
 
     fn name(&self) -> &'static str {

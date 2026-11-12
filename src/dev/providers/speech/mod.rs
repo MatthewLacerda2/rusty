@@ -32,9 +32,20 @@ use super::{permit, prices, Provider, Refusal, Secret};
 /// Somewhere a line can be spoken. **The call that spends**, and the seam every
 /// test replaces: no test ever holds the real one.
 pub trait Speaker {
-    /// Speak `body` in `voice`, authenticating with `key`; the vendor's MP3 bytes, or
-    /// the vendor's own sentence about why not.
-    fn speak(&self, key: &Secret, voice: &str, body: &Speak) -> Result<Vec<u8>, String>;
+    /// Speak `body` in `voice`, authenticating with `key`: the vendor's MP3 bytes, or
+    /// why there are none, sorted by whether the call was billed.
+    fn speak(&self, key: &Secret, voice: &str, body: &Speak) -> Result<Vec<u8>, Unspoken>;
+}
+
+/// Why [`Speaker::speak`] brought back no MP3.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Unspoken {
+    /// The vendor refused the call (a non-200), or it never arrived: nothing was
+    /// billed. The vendor's own sentence about why.
+    Refused(String),
+    /// The vendor answered 200, so the line is billed, but its body did not parse
+    /// or its audio was not base64.
+    Unreadable(String),
 }
 
 /// ElevenLabs, through scorsese's client.
@@ -42,17 +53,26 @@ pub trait Speaker {
 pub struct ElevenLabs;
 
 impl Speaker for ElevenLabs {
-    fn speak(&self, key: &Secret, voice: &str, body: &Speak) -> Result<Vec<u8>, String> {
-        Speech::new(key)
+    fn speak(&self, key: &Secret, voice: &str, body: &Speak) -> Result<Vec<u8>, Unspoken> {
+        let timed = Speech::new(key)
             .speak(voice, body)
             .map_err(|error| match error {
                 // The vendor's body, sorted into advice (a bad key, a missing scope,
                 // a voice withdrawn), never just a status code.
                 HttpError::Refused { status, body, .. } => {
-                    VendorRefusal::of(status, voice, &body).to_string()
+                    Unspoken::Refused(VendorRefusal::of(status, voice, &body).to_string())
                 }
-                other => other.to_string(),
-            })
+                // A 200 whose body is not the reply's shape: the line was spoken.
+                unreadable @ HttpError::Unreadable { .. } => {
+                    Unspoken::Unreadable(unreadable.to_string())
+                }
+                other => Unspoken::Refused(other.to_string()),
+            })?;
+        // The reply carries the MP3 as base64 beside per-character timings; only
+        // the audio is kept.
+        timed
+            .audio()
+            .ok_or_else(|| Unspoken::Unreadable("the vendor's audio was not base64".to_owned()))
     }
 }
 
@@ -82,9 +102,10 @@ pub enum SpeechError {
     Incomplete(Incomplete),
     /// The boundary refused before spending: Play, no key, the budget.
     Refused(Refusal),
-    /// The vendor took the call and refused it, in its own words.
+    /// The vendor took the call and refused it, in its own words. Nothing is spent.
     Vendor(String),
-    /// The vendor's bytes would not decode to audio. The spend is already recorded.
+    /// The vendor answered 200 with a body that would not parse or bytes that would
+    /// not decode to audio. The spend is already recorded.
     Unplayable(String),
     /// The file or its sidecar could not be written.
     Io(std::io::Error),
@@ -139,10 +160,15 @@ pub fn generate(
             at.ledger,
         )?;
         let spoken = speaker.speak(permit.key(), &brief.voice, &request(brief));
-        let mp3 = spoken.map_err(SpeechError::Vendor)?;
-        // Recorded the moment the vendor answers: from here on the money is spent,
-        // whatever becomes of the bytes.
+        let answered = match spoken {
+            Err(Unspoken::Refused(why)) => return Err(SpeechError::Vendor(why)),
+            Ok(mp3) => Ok(mp3),
+            Err(Unspoken::Unreadable(why)) => Err(SpeechError::Unplayable(why)),
+        };
+        // Recorded the moment the vendor answers 200: from here on the money is
+        // spent, whatever becomes of the bytes.
         permit.record(at.ledger)?;
+        let mp3 = answered?;
         let wav = generated::to_wav(mp3).map_err(SpeechError::Unplayable)?;
         Ok((wav, estimate))
     })
