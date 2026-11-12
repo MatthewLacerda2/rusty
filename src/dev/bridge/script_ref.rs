@@ -91,8 +91,11 @@ impl ScriptRef {
         let with_self = matches!(args.front(), Some(Value::UserData(u)) if u.to_pointer() == handle.to_pointer());
         let noted: Vec<Value> = args.iter().skip(usize::from(with_self)).cloned().collect();
         let script = (self.id, self.name.as_str());
-        demo::note_script_call(&self.journal, script, (key, with_self), &noted);
         self.with(|glua, t| {
+            // Noted once the pinned instance is known live, before the call runs: a
+            // stale handle's call errors and is not noted, so the replay can't run
+            // it on a newer instance of the same name.
+            demo::note_script_call(&self.journal, script, (key, with_self), &noted);
             let func: Function = glua.registry_value(func)?;
             let mut into_game = Copier::new(glua);
             let mut crossed = MultiValue::new();

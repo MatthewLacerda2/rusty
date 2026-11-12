@@ -75,7 +75,8 @@ pub fn check(game: &Game, out: &Path, params: &Params) -> Result<Report, String>
 /// into `<dir>/replay/`: a demo whose replay diverges, or stops short, fails its
 /// step. A scenario's run records every act it makes on the world, so its demo
 /// must replay bit for bit; one that does not reached the sim by a way the demo
-/// does not record.
+/// does not record. A taint (an act the demo knows it could not record) is only
+/// logged in the replay's `results.json`: the step fails on what the digests see.
 fn replays(demos: &[PathBuf], dir: &Path, stem: &str, report: &mut Report) -> Result<(), String> {
     for (i, demo) in demos.iter().enumerate() {
         let out = match i {
