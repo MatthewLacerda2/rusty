@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 use crate::app::{GameWorld, PlayTransition};
 use crate::render::interpolate::DrawPoses;
 use crate::render::Renderer;
+use crate::scene::SceneId;
 use crate::time::FIXED_DELTA_TIME;
 use wgpu::CurrentSurfaceTexture;
 
@@ -74,7 +75,8 @@ impl<'a> Step<'a> {
         Self { ticks, poses }
     }
 
-    /// The sim is off the tick this frame: nothing owed, everything drawn as it is.
+    /// The sim is off the tick this frame (or came back from a scene load): nothing
+    /// owed, everything drawn as it is.
     pub fn clear(&mut self) {
         self.ticks.clear();
         self.poses.clear();
@@ -87,7 +89,9 @@ impl<'a> Step<'a> {
 ///   [`FIXED_DELTA_TIME`] tick now owed (none on a frame shorter than a tick, at most
 ///   20 after a hitch); `poses` records each one and is told how far the frame is into
 ///   the next, so drawing blends between the last two ticks. A frame that owes no tick
-///   leaves the input it saw pending for the next one.
+///   leaves the input it saw pending for the next one. A tick that swaps the scene
+///   (a play-mode `Scene.Load`, [`swapped_scene`]) is the frame's last, and the clock
+///   starts afresh after it.
 /// * **Entering or leaving Play:** one fixed tick runs the transition now (`Start` and
 ///   the first `Update`, or the Stop), and the clock starts afresh.
 /// * **Edit mode:** one frame of `raw` time, as the editor always ran it.
@@ -114,16 +118,32 @@ pub fn advance_sim(game: &mut GameWorld, mut step: Step<'_>, raw: f32) -> PlayTr
         return game.tick(FIXED_DELTA_TIME);
     }
     for _ in 0..step.ticks.owe(raw) {
+        let scene = game.scene().borrow().id();
         let transition = game.tick(FIXED_DELTA_TIME);
         if transition != PlayTransition::None {
             // A Stop a tick ran (a script's `Editor.ExitPlay`): the rest is edit mode.
             step.clear();
             return transition;
         }
+        if swapped_scene(game, scene) {
+            // The load's time is the frame the sim came back on, as a Play entry's.
+            step.clear();
+            return PlayTransition::None;
+        }
         step.poses.record(&game.scene().borrow());
     }
     step.poses.set_alpha(step.ticks.alpha());
     PlayTransition::None
+}
+
+/// Whether the tick that just ran swapped the scene `before` names (a play-mode
+/// `Scene.Load` landed at its tail): the World's runtime identity changed
+/// (`Scene::swap_in` renews it). Such a tick ends its frame's ticks and restarts the
+/// clock ([`Step::clear`]): the ticks still owed would run the new scene before any
+/// frame drew it, the next frame's time holds the load itself, and no pose of the
+/// outgoing scene is blended into the new one's first frames.
+pub fn swapped_scene(game: &GameWorld, before: SceneId) -> bool {
+    game.scene().borrow().id() != before
 }
 
 /// Which frontend is hosting the game — it decides what `Application.Quit()` means.
@@ -201,6 +221,9 @@ mod frame_edit_tests;
 #[cfg(test)]
 #[path = "frame_tests.rs"]
 mod frame_tests;
+#[cfg(test)]
+#[path = "load_tick_tests.rs"]
+mod load_tick_tests;
 #[cfg(test)]
 #[path = "tick_input_tests.rs"]
 mod tick_input_tests;
