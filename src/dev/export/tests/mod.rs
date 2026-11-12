@@ -108,7 +108,6 @@ fn the_runtime_files_are_copied_in_order_and_the_sources_left_behind() {
     }
 }
 
-#[cfg(unix)]
 #[test]
 fn a_symlinked_folder_fails_the_export_naming_it() {
     let dir = crate::test_temp::dir();

@@ -498,7 +498,6 @@ Where they actually run is not uniform, and it is worth knowing before you rely 
 |---|---|---|
 | `build-test` (ubuntu) | Mesa **lavapipe** (software Vulkan, #489) | run, on the CPU |
 | `build-test-cross` (macos) | real Metal GPU | run, against real VRAM |
-| `build-test-windows` (`windows.yml`, a signal: nightly and on dispatch, #741, #1395) | **WARP** (software) | run, against **system RAM** |
 
 **CI requires an adapter.** Every workflow job that runs the suite (nextest,
 `cargo test` other than `--doc`, `llvm-cov`, `mutants`) sets `RUSTY_REQUIRE_GPU=1`, and
@@ -538,13 +537,13 @@ Moving to a new image is a one-line PR of its own. `ubuntu-26.04` is already pro
 (#868): the apt list resolves unchanged, lavapipe is Mesa 26.0.8, and a cold-cache
 build ran every GPU test there.
 
-Two of the three CI adapters are software renderers, so a green run proves the render
+Linux CI's adapter is a software renderer, so a green run there proves the render
 path is correct on a conformant driver, not that it performs or behaves identically on
 real hardware — Metal on macOS is the one real GPU. Pair anything load-bearing with an
 adapter-free unit test on the underlying predicate so the rule is pinned everywhere.
 
 **Concurrency is capped.** A `Renderer` is a device, the full pipeline set and shadow
-maps, and Windows CI's WARP allocates all of that in system RAM shared with rustc — so
+maps, and a software adapter (lavapipe) allocates all of that in system RAM shared with rustc — so
 unbounded parallel renderers exhausted memory and failed *unrelated* tests with a bare
 `Queue::write_texture: Not enough memory left.` (#366). Two caps, one per runner:
 

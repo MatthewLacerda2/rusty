@@ -1,6 +1,6 @@
-# Every text file checks out with LF, Windows included. Git for Windows' default
-# (`core.autocrlf=true`) would otherwise hand a Windows checkout CRLF text, and
-# whatever the build embeds or a test compares byte-for-byte breaks there only:
+# Every text file checks out with LF, whatever the editor or git config. A
+# `core.autocrlf=true` checkout would otherwise hold CRLF text, and whatever the
+# build embeds or a test compares byte-for-byte breaks there only:
 # blessed snapshots (#1036), the game `CLAUDE.md` template `include_str!` reads
 # (#1345). Binary files are detected and left alone.
 * text=auto eol=lf

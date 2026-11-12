@@ -27,8 +27,7 @@ use crate::dev::command_channel::client::{self, Client};
 ///
 /// This type holds no world of its own — it is a thin client over the socket.
 pub struct SocketClient {
-    /// An explicit `--attach <addr>` override (a socket path on unix, a `host:port` on
-    /// windows), or `None` to use the shared default address the listener binds.
+    /// An explicit `--attach <addr>` override (a socket path), or `None` to use the shared default address the listener binds.
     explicit: Option<String>,
     /// The engine warnings the last reply carried, until [`EvalBackend::take_warnings`].
     warnings: RefCell<Vec<String>>,
@@ -162,17 +161,11 @@ mod tests {
         assert!(err.contains("no rusty engine reachable"), "got: {err}");
     }
 
-    #[cfg(unix)]
     fn absent_address() -> String {
         // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is ~104 bytes)
         std::env::temp_dir()
             .join(format!("rusty-attach-absent-{}.sock", std::process::id()))
             .display()
             .to_string()
-    }
-    #[cfg(windows)]
-    fn absent_address() -> String {
-        // Port 1 is privileged and unbound in CI: connect is refused immediately.
-        "127.0.0.1:1".to_string()
     }
 }

@@ -7,11 +7,7 @@ use std::path::Path;
 
 const MARKERS: &[&str] = &[
     "cfg(target_os",
-    "cfg(windows",
-    "cfg(unix",
     "cfg(not(target_os",
-    "cfg(not(windows",
-    "cfg(not(unix",
     "cfg(all(target_os",
     "cfg(any(target_os",
 ];

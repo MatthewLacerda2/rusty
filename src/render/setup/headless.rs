@@ -34,7 +34,7 @@ pub fn gpu_required() -> bool {
 /// brings up wgpu-hal's GLES/EGL backend, whose EGL display is shared process-wide:
 /// dropping one instance terminates it under another thread's `make_current`, a
 /// `NotInitialized` panic (#518). Every adapter a headless render runs on — a real
-/// GPU, lavapipe on Linux CI, Metal on macOS, WARP on Windows — is a primary
+/// GPU, lavapipe on Linux CI, Metal on macOS — is a primary
 /// backend, so leaving GL out costs no coverage. The windowed renderer keeps
 /// `all()`: it owns one instance per process, and GL-only machines need it.
 pub(crate) const HEADLESS_BACKENDS: wgpu::Backends = wgpu::Backends::PRIMARY;

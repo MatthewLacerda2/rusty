@@ -97,7 +97,7 @@ request whose base is not `main` is never taken: the queue merges `main` in.
 (the composite actions the workflows call, #1973) is never taken**
 ([`board.held`], #825). The actions entry in `dependabot.yml` only ever proposes
 majors (the workflows pin `@v4`, which floats the rest), and those bumps edit
-workflows a pull-request run never executes (the sweep, coverage, Windows,
+workflows a pull-request run never executes (the sweep, coverage,
 main-health), so a green run proves nothing about them. The watch says so once
 per head, in a line beginning [`board.HELD_LINE`], and goes on; the orchestrator
 reviews the bump, dispatches the workflows it touches on the branch, and merges

@@ -12,7 +12,8 @@ fn rules(path: &str, src: &str) -> Vec<(usize, &'static str)> {
 fn an_inner_cfg_in_tests_is_flagged_and_a_declaration_cfg_passes() {
     let file = "//! A dev-only test.\n#![cfg(feature = \"dev\")]\nuse rusty::x;\n";
     assert_eq!(rules("tests/a.rs", file), [(2, INNER_CFG)]);
-    let main = "#[cfg(feature = \"dev\")]\nmod a;\n#[cfg(unix)]\n#[test]\nfn b() {}\n";
+    let main =
+        "#[cfg(feature = \"dev\")]\nmod a;\n#[cfg(target_os = \"linux\")]\n#[test]\nfn b() {}\n";
     assert!(rules("tests/main.rs", main).is_empty());
 }
 

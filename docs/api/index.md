@@ -107,12 +107,8 @@ The same command channel is also exposed by the **windowed** engine (`cargo run
 --bin rusty --features dev`), so an agent can attach to a *running, rendered* playtest and drive
 it live — not just the headless `session` binary. The framing and protocol are
 the headless session's above, edit mode and the Play/Stop rule for globals
-included; the transport differs:
-
-- **Linux / macOS:** a unix domain socket. Path is `$RUSTY_CMD_SOCK` if set, else
-  `$XDG_RUNTIME_DIR/rusty.sock`, else `/tmp/rusty.sock`.
-- **Windows:** a TCP listener on `127.0.0.1`. Address is `$RUSTY_CMD_ADDR` if set,
-  else `127.0.0.1:8787`.
+included; only the transport differs: a unix domain socket. Its path is `$RUSTY_CMD_SOCK` if set, else
+`$XDG_RUNTIME_DIR/rusty.sock`, else `/tmp/rusty.sock`.
 
 The chosen address/path is logged to the engine console on boot (`[cmd] command
 channel listening on …`). Connect, then send one Lua command per line and read one

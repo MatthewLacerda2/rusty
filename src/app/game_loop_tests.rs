@@ -7,7 +7,7 @@ use crate::scene::{Scene, ScriptComponent};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// Platform-safe temp path (the Windows runner has no `/tmp`).
+/// A temp path under the test's own folder, `/`-spelled for a Lua literal.
 fn temp_path(name: &str) -> String {
     crate::core::paths::to_slash(&crate::test_temp::dir().join(name))
 }

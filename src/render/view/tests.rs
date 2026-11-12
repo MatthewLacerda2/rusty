@@ -45,7 +45,7 @@ fn gpu_offscreen_view_owns_a_target_targetless_does_not() {
 ///
 /// One scenario, one renderer, every axis asserted — deliberately not three tests.
 /// Each `Renderer` is a full device + pipelines + shadow maps, and on a software
-/// adapter (Windows CI's WARP renders into system RAM) enough concurrent ones
+/// adapter (lavapipe renders into system RAM) enough concurrent ones
 /// exhaust memory mid-suite. Sharing the scenario keeps the peak flat.
 ///
 /// The three axes, and what each looked like when it was broken:

@@ -44,7 +44,7 @@ impl CursorPolicy {
 
 /// Apply a cursor state to the window. A lock prefers `Locked` (the pointer stays
 /// put, raw motion keeps flowing — macOS/Wayland) and falls back to `Confined`
-/// (X11/Windows, which lack `Locked`).
+/// (X11, which lacks `Locked`).
 fn apply(cursor: CursorState, window: &winit::window::Window) {
     use winit::window::CursorGrabMode;
     if cursor.locked {

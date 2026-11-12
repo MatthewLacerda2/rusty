@@ -26,7 +26,6 @@ fn an_exported_blend_plays_without_starting_blender() {
     let (fake, mark) = (dir.join("blender.sh"), dir.join("started"));
     let script = format!("#!/bin/sh\ntouch {:?}\nexit 1\n", mark.to_string_lossy());
     std::fs::write(&fake, script).unwrap();
-    #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();

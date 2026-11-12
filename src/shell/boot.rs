@@ -36,7 +36,7 @@ pub fn refresh_assets() -> crate::asset::audio::Refresh {
 
 /// The attributes of a window at `size` with `title`, named `app_id` on Linux when one
 /// is given ([`Launch::app_id`](super::Launch::app_id)). `maximized` asks the window
-/// manager to fill the screen (winit: the maximized state on Linux and Windows, the
+/// manager to fill the screen (winit: the maximized state on Linux, the
 /// zoom to the visible frame on macOS, never native fullscreen); `size` is then only
 /// the size it returns to.
 fn window_attributes(
