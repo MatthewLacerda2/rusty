@@ -30,7 +30,7 @@ use crate::physics::collider_world_triangles;
 use crate::scene::Scene;
 
 /// The inputs a bake of `scene` on `raw`'s grid reads, and their fingerprint.
-/// `g` is the graph the authored links snap onto (the same grid).
+/// Authored links enter only by their endpoints; `restore` re-snaps them.
 pub(super) fn read(scene: &Scene, raw: &NavigationGraph) -> (BakeInputs, u64) {
     let mut bytes = Vec::with_capacity(4096);
     bytes.extend(FORMAT.to_le_bytes());
@@ -75,7 +75,7 @@ fn colliders(
     let mut chunks = Vec::new();
     for (id, key) in collider_keys(scene) {
         let mut chunk = Vec::new();
-        // A `NavMeshModifier`'s override (#1959), tagged so no id reads as none.
+        // A `NavMeshModifier`'s override (#1959), tagged so area 0 doesn't read as no override.
         match key.area {
             None => chunk.push(0),
             Some(a) => chunk.extend([1, a]),
