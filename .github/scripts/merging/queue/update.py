@@ -50,7 +50,10 @@ network mid-push records nothing, since nobody knows yet; the pair is met again.
 `main` moving only by Markdown skips the merge (#587) only when the head merges
 clean ([`merges_clean`]): a head that conflicts with that Markdown, say both
 adding to a `sorted` list in an inert doc, goes on to the merge and the
-resolver, or it would wait on a merge GitHub refuses (#1723's review).
+resolver, or it would wait on a merge GitHub refuses (#1723's review). A head
+that touches an agent doc is still linted merged, in a throwaway worktree with
+nothing pushed ([`docs_merge_check`], #2027): two such branches can each fit
+`CLAUDE.md`'s cap and overflow it together. One that fails is handed back.
 
 A merged branch's worktree under `.claude/worktrees/` is **not** removed and
 no branch is deleted — that is 12–16 GB and a checkout somebody may be
@@ -166,6 +169,14 @@ def handed_back(branch: str, work: str, named: list[str], stderr: str) -> list[s
     ]
 
 
+def skipped(head: str, why: str) -> list[str]:
+    """Say that the agent-docs lint of `head`'s merged tree could not run, and
+    pass it: failing open, as `lints.Linter` does for a broken tool, but never
+    silently (#2027's review)."""
+    print(f"queue: {head[:7]}: agent docs not linted merged ({why}); the push-to-`main` lint still holds them", flush=True)
+    return []
+
+
 def docs_merge_check(head: str, root: str, check) -> list[str]:
     """Why the merged tree of a head `main` passed only by Markdown must not be
     taken, or `[]`: `check` (`tools/lint`'s build-free passes, [`lints.Linter.check`])
@@ -176,10 +187,10 @@ def docs_merge_check(head: str, root: str, check) -> list[str]:
     with tempfile.TemporaryDirectory(prefix="rusty-queue-") as tmp:
         work = os.path.join(tmp, "wt")
         if gitio.git("worktree", "add", "--detach", work, head, cwd=root).returncode != 0:
-            return []  # nothing to read: the push-to-`main` lint still holds it
+            return skipped(head, "no worktree")  # the push-to-`main` lint still holds it
         try:
             if gitio.git("merge", "--ff", "--no-edit", "--no-verify", "origin/main", cwd=work).returncode != 0:
-                return []
+                return skipped(head, "the merge failed")
             return check(work)
         finally:
             gitio.git("worktree", "remove", "--force", work, cwd=root)

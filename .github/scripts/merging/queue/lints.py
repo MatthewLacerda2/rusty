@@ -74,8 +74,9 @@ BLAMED_FILES = 3
 SQUASHED = re.compile(r"\(#(\d+)\)\s*$")
 TRAIN_CAR = re.compile(r"^merge train: #(\d+) ")
 
-# A path in a report line: something with a slash and a dot-extension.
-PATH = re.compile(r"(?<![\w/.-])((?:[\w.-]+/)+[\w.-]+\.\w+)")
+# A path in a report line: something with a slash and a dot-extension, or the
+# root `CLAUDE.md` (the agent doc most likely to overflow, #2027's review).
+PATH = re.compile(r"(?<![\w/.-])((?:[\w.-]+/)+[\w.-]+\.\w+|CLAUDE\.md)")
 
 # The last line of an update's hand-back. It claims only what the queue checked:
 # the merged tree fails, not that either side passed alone (#1956's review).
