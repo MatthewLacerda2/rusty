@@ -25,8 +25,9 @@ use std::rc::Rc;
 use std::time::Instant;
 
 use super::capture::RenderedFrame;
-use crate::app::{GameWorld, Resources, Stage, SystemProbe, World};
+use crate::app::{GameWorld, LoadProbe, Resources, Stage, SystemProbe, World};
 use crate::core::frame_stats::{FrameStats, Series};
+use crate::scripting::ConsoleLogs;
 
 /// The metric each per-frame stage's CPU time is recorded under.
 fn stage_key(stage: Stage) -> &'static str {
@@ -49,7 +50,14 @@ pub struct TimingProbe {
     system_ms: Vec<(&'static str, f64)>,
     /// Each change channel's `logged` count at the last frame's end, for its delta.
     logged: BTreeMap<&'static str, u64>,
+    /// The [`LoadTimer`]'s samples of a load this frame, recorded at its end.
+    loads: LoadSamples,
 }
+
+/// A finished load's `load_*` samples (#2123), held until the frame's end: a load in
+/// a Play session's first tick runs before `end_frame` starts the stats afresh, and
+/// recorded at once its samples would be wiped with the rest.
+pub type LoadSamples = Rc<RefCell<Vec<(String, f64)>>>;
 
 impl TimingProbe {
     pub fn new(stats: Rc<RefCell<FrameStats>>) -> Self {
@@ -58,7 +66,13 @@ impl TimingProbe {
             stage_ms: [0.0; 4],
             system_ms: Vec::new(),
             logged: BTreeMap::new(),
+            loads: LoadSamples::default(),
         }
+    }
+
+    /// The buffer a [`LoadTimer`] fills, recorded into the stats at each frame's end.
+    pub fn loads(&self) -> LoadSamples {
+        Rc::clone(&self.loads)
     }
 }
 
@@ -79,6 +93,9 @@ impl SystemProbe for TimingProbe {
         // starts the stats afresh.
         if res.play_frame() == 1 {
             *stats = FrameStats::default();
+        }
+        for (key, ms) in self.loads.borrow_mut().drain(..) {
+            stats.record(&key, ms);
         }
         for (name, ms) in self.system_ms.drain(..) {
             stats.record_system(name, ms);
@@ -139,11 +156,59 @@ fn record_changes(
     }
 }
 
-/// Install a [`TimingProbe`] on `world`, writing into the script runtime's stats cell
-/// so `Debug.Stats()` reads what the probe records. Returns that cell.
+/// Times each step of a play-mode scene load (#2123) and, once it swapped in,
+/// reports them: one console line at once, and `load_<step>_ms` plus `load_ms`
+/// (their sum) into `loads`, which the [`TimingProbe`] records at the frame's end
+/// into the stats `Debug.Stats()` reads, so a series spans every load of the session.
+pub struct LoadTimer {
+    loads: LoadSamples,
+    steps: Vec<(&'static str, f64)>,
+}
+
+impl LoadTimer {
+    pub fn new(loads: LoadSamples) -> Self {
+        let steps = Vec::new();
+        Self { loads, steps }
+    }
+}
+
+impl LoadProbe for LoadTimer {
+    fn step(&mut self, name: &'static str, step: &mut dyn FnMut()) {
+        let start = Instant::now();
+        step();
+        self.steps
+            .push((name, start.elapsed().as_secs_f64() * 1000.0));
+    }
+
+    fn finish(&mut self, loaded: Option<&str>, console: &mut ConsoleLogs) {
+        let steps = std::mem::take(&mut self.steps);
+        let Some(path) = loaded else {
+            return; // a failed load swapped nothing in: nothing to compare against
+        };
+        let total: f64 = steps.iter().map(|(_, ms)| ms).sum();
+        let mut loads = self.loads.borrow_mut();
+        let parts: Vec<String> = steps
+            .iter()
+            .map(|(name, ms)| {
+                loads.push((format!("load_{name}_ms"), *ms));
+                format!("{name} {ms:.1}")
+            })
+            .collect();
+        loads.push(("load_ms".to_string(), total));
+        console.info(format!(
+            "Scene load {path}: {total:.1} ms ({})",
+            parts.join(", ")
+        ));
+    }
+}
+
+/// Install a [`TimingProbe`] and a [`LoadTimer`] on `world`, writing into the script
+/// runtime's stats cell so `Debug.Stats()` reads what they record. Returns that cell.
 pub fn install(world: &mut GameWorld) -> Rc<RefCell<FrameStats>> {
     let stats = world.script_manager().stats_cell();
-    world.set_probe(Some(Box::new(TimingProbe::new(Rc::clone(&stats)))));
+    let timing = TimingProbe::new(Rc::clone(&stats));
+    world.set_load_probe(Some(Box::new(LoadTimer::new(timing.loads()))));
+    world.set_probe(Some(Box::new(timing)));
     stats
 }
 
@@ -207,6 +272,9 @@ pub fn budgets_from_lua(table: mlua::Table) -> mlua::Result<Vec<(String, f64)>> 
     Ok(budgets)
 }
 
+#[cfg(test)]
+#[path = "stats_load_tests.rs"]
+mod stats_load_tests;
 #[cfg(test)]
 #[path = "stats_tests.rs"]
 mod stats_tests;

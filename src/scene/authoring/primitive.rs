@@ -67,6 +67,25 @@ pub fn subdivided_geometry(
     primitive: Primitive,
     subdivisions: u32,
 ) -> Option<(Vec<Vertex>, Vec<u32>)> {
+    if primitive == Primitive::Plane {
+        return generated(primitive, subdivisions);
+    }
+    // The other shapes take no argument, and the round ones carry a generated
+    // lightmap unwrap that costs ~1 ms each (#2123): build each once per process
+    // (a pure function, so a copy is what building again would give) and copy it.
+    type Built = Option<(Vec<Vertex>, Vec<u32>)>;
+    static BUILT: std::sync::Mutex<Vec<(Primitive, Built)>> = std::sync::Mutex::new(Vec::new());
+    let mut built = BUILT.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((_, geometry)) = built.iter().find(|(p, _)| *p == primitive) {
+        return geometry.clone();
+    }
+    let geometry = generated(primitive, subdivisions);
+    built.push((primitive, geometry.clone()));
+    geometry
+}
+
+/// Build [`subdivided_geometry`]'s result afresh.
+fn generated(primitive: Primitive, subdivisions: u32) -> Option<(Vec<Vertex>, Vec<u32>)> {
     match primitive {
         Primitive::Box => Some(primitives::generate_box(1.0, 1.0, 1.0)),
         Primitive::Sphere => Some(primitives::generate_sphere(RADIUS, 16, 16)),
@@ -144,4 +163,32 @@ pub fn primitive_collider(primitive: Primitive, mesh: &MeshComponent) -> Option<
         shape,
         ..default_collider()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The kept copy is what building afresh gives, every call (#2123).
+    #[test]
+    fn a_kept_primitive_is_what_building_it_again_gives() {
+        for p in [
+            Primitive::Box,
+            Primitive::Sphere,
+            Primitive::Cylinder,
+            Primitive::Capsule,
+        ] {
+            let fresh = generated(p, 1).expect("a mesh primitive has geometry");
+            for _ in 0..2 {
+                let kept = subdivided_geometry(p, 7).expect("and keeps it");
+                assert_eq!(format!("{kept:?}"), format!("{fresh:?}"), "{p:?}");
+            }
+        }
+        assert!(subdivided_geometry(Primitive::SpotLight, 1).is_none());
+        let plane = |n| subdivided_geometry(Primitive::Plane, n).unwrap().1.len();
+        assert!(
+            plane(4) > plane(1),
+            "a Plane is still cut by its subdivisions"
+        );
+    }
 }

@@ -147,15 +147,44 @@ pub fn save_sh_sidecar(scene: &Scene, scene_path: &str) -> Result<(), String> {
 /// zero SH), and one saved for other probes is left unapplied with a warning.
 /// Returns an error only on a present-but-corrupt sidecar.
 pub fn load_lighting_sidecar(scene: &mut Scene, scene_path: &str) -> Result<(), String> {
-    super::occlusion::load_sidecar(scene, scene_path);
+    apply_lighting_sidecar(scene, read_lighting_sidecar(scene_path))
+}
+
+/// What a load found in the lighting sidecar and the PVS beside a scene, read and
+/// parsed from the files alone ([`read_lighting_sidecar`]) and put on a scene later
+/// ([`apply_lighting_sidecar`]), so a load can do the work before it touches the
+/// live scene (#2123).
+pub struct LightingFile {
+    occlusion: super::occlusion::OcclusionFile,
+    path: std::path::PathBuf,
+    read: Result<Option<LightingData>, String>,
+}
+
+/// Read and parse the lighting sidecar and the PVS beside `scene_path`.
+pub fn read_lighting_sidecar(scene_path: &str) -> LightingFile {
+    let occlusion = super::occlusion::read_sidecar(scene_path);
     let path = sidecar_path(scene_path);
-    let json = match std::fs::read_to_string(&path) {
-        Ok(json) => json,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(e) => return Err(format!("Failed to read lighting sidecar: {}", e)),
+    let read = match std::fs::read_to_string(&path) {
+        Ok(json) => serde_json::from_str(&json)
+            .map(Some)
+            .map_err(|e| format!("Failed to deserialize lighting sidecar: {}", e)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(format!("Failed to read lighting sidecar: {}", e)),
     };
-    let data: LightingData = serde_json::from_str(&json)
-        .map_err(|e| format!("Failed to deserialize lighting sidecar: {}", e))?;
+    LightingFile {
+        occlusion,
+        path,
+        read,
+    }
+}
+
+/// Put what [`read_lighting_sidecar`] found on `scene` ([`load_lighting_sidecar`]
+/// says what each outcome loads).
+pub fn apply_lighting_sidecar(scene: &mut Scene, file: LightingFile) -> Result<(), String> {
+    super::occlusion::apply_sidecar(scene, file.occlusion);
+    let Some(data) = file.read? else {
+        return Ok(());
+    };
     if data.probes != Some(ProbeKey::of(scene)) {
         let why = match data.probes {
             None => "by an older engine, with no probe key",
@@ -167,7 +196,7 @@ pub fn load_lighting_sidecar(scene: &mut Scene, scene_path: &str) -> Result<(), 
         log::warn!(
             "[Lighting] {} was saved {why}: its SH is not applied, and the probes are \
              unbaked until Generate Lighting",
-            path.display()
+            file.path.display()
         );
         return Ok(());
     }
