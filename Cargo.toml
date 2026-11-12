@@ -79,7 +79,7 @@ path = "tests/main.rs"
 [features]
 default = ["editor"]
 # The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.
-dev = ["dep:scorsese-providers", "dep:scorsese-core", "dep:libloading"]
+dev = ["dep:scorsese-providers", "dep:scorsese-core", "dep:libloading", "dep:getrandom"]
 # The egui editor (#431): `src/editor` and the shell's editor frontend. Default-on so
 # `cargo run` opens the editor; a shipped player builds with `--no-default-features`.
 editor = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor", "dep:notify"]
@@ -202,6 +202,11 @@ scorsese-core = { git = "https://github.com/MatthewLacerda2/scorsese", rev = "4b
 # `dlopen`ed, never linked, and a bake without it filters. Already in the tree
 # through wgpu; same version. `dev` only: a shipped game never bakes.
 libloading = { version = "0.8.9", optional = true }
+# Named only to close a feature split (docs/testing.md, *Build and test share one
+# dependency graph*): scorsese-providers' `zip` brings getrandom 0.4 into the `dev`
+# build without `std`/`sys_rng`, which a test-only crate (`rand`) turns on, so
+# `cargo test` would build its own copy of everything above it. Never `use`d.
+getrandom = { version = "0.4.3", optional = true, features = ["std", "sys_rng"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # The editor's Dock icon (#669): winit has no window icon on macOS, so it is set on
