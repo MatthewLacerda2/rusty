@@ -204,6 +204,13 @@ impl SceneLoads {
         self.status.insert(op, status);
     }
 
+    /// Play is entered: operations are numbered from 1 again, so a demo's ids are its
+    /// replay's. A queued `Scene.Load` stays queued.
+    pub fn enter_play(&mut self) {
+        self.next_op = 0;
+        self.status.clear();
+    }
+
     /// Whether a load is pending.
     pub fn has_pending(&self) -> bool {
         self.pending.is_some()

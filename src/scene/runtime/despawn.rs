@@ -50,14 +50,13 @@ impl Scene {
                 "Play stopped"
             });
         }
-        if playing != self.playing {
-            self.loads = Default::default(); // a session's operations are its own
-        }
         if playing && !self.playing {
+            self.loads.enter_play(); // a session's operations are its own
             self.clear_undo();
             self.forget_perception();
         }
         if !playing && self.playing {
+            self.loads = Default::default();
             self.pending_destroy.clear(); // the next Play must not destroy edit entities
             self.persistent.clear();
             self.ragdolls = Default::default();
