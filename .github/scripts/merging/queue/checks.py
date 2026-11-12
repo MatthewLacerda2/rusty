@@ -172,12 +172,20 @@ def needs_check(pull: dict, opts: argparse.Namespace) -> bool:
     return not (opts.no_check or opts.dry_run or changes.markdown_only(github.paths(pull)))
 
 
+def touches_agent_doc(pull: dict) -> bool:
+    """Whether the pull request changes a doc `tools/lint`'s agent-docs pass holds
+    ([`changes.agent_doc`]): a `CLAUDE.md` or a skill's file."""
+    return any(map(changes.agent_doc, github.paths(pull)))
+
+
 def needs_lint(pull: dict, opts: argparse.Namespace) -> bool:
-    """Whether `tools/lint`'s passes run on this pull request's update
-    ([`lints.Linter.check`], #1956): `--no-check` or not, never in a dry run, and
-    for a Markdown-only branch only when it touches an agent doc
-    ([`changes.agent_doc`]), which the size pass holds to its caps: two such
-    branches can each fit and overflow merged."""
-    paths = github.paths(pull)
-    docs_only = changes.markdown_only(paths) and not any(map(changes.agent_doc, paths))
+    """Whether `tools/lint`'s passes run on this pull request's merged tree
+    ([`lints.Linter.check`], #1956), `--no-check` or not. Never in a dry run.
+    A Markdown-only branch gets them only when it touches an agent doc
+    ([`touches_agent_doc`]), since two such branches can each fit the size pass's
+    caps and overflow them merged. They run when the merge moved the head, and,
+    for a head touching an agent doc, also when `main` passed it only by Markdown
+    and it is not merged in ([`update.docs_merge_check`]): the tree is then merged
+    in a throwaway worktree, linted, and nothing is pushed."""
+    docs_only = changes.markdown_only(github.paths(pull)) and not touches_agent_doc(pull)
     return not (opts.dry_run or docs_only)

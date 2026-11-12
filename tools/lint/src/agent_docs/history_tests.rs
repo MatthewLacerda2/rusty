@@ -13,6 +13,8 @@ fn each_shape_of_history_is_flagged() {
         ("(https://github.com/o/r/pull/7)", "/pull/7"),
         ("on 2026-11-08 that cost a round", "2026-11-08"),
         ("#9", "#9"),
+        ("a parenthesised (#12) ref", "#12"),
+        ("[a link](#setup) then #34", "#34"),
     ] {
         let msg = flagged(line).unwrap_or_else(|| panic!("{line:?} passed"));
         assert!(msg.starts_with(&format!("`{what}` is history")), "{msg}");
@@ -29,6 +31,7 @@ fn look_alikes_pass() {
         "a placeholder: `Closes #N`, `watch: #A goes before #B`",
         "a hex colour #33ccff, a short one #0f0, black #000000",
         "an entity &#123; in HTML",
+        "an in-page link [setup](#1-setup), [step](#2)",
         "rustc 1.95.0, cargo-nextest 0.9.146, actions/checkout@v7",
         "a digit run 1234-56-78 and a long one 202611-08-12",
         "an id abc2026-11-12 glued to a word",

@@ -12,7 +12,7 @@
 //!   agent doc states the rule, and its story lives in the issue and PR.
 //!
 //! An exception is inline, with a reason: `<!-- lint: allow(<rule>) <why> -->` on
-//! the line or in the comment lines right above it (`rules::allowed`); a length
+//! the line or in the comment lines right above it (`rules::allowed_in`); a length
 //! cap, which belongs to no single line, is excused by an allow anywhere in the
 //! file.
 //!
@@ -26,7 +26,7 @@ mod history;
 mod tests;
 
 use crate::repo::ls_files;
-use crate::rules::{allowed, unexplained, Finding};
+use crate::rules::{allowed_in, unexplained, Finding};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
@@ -113,7 +113,7 @@ pub fn file(path: &str, source: &str) -> Vec<Finding> {
         Some(_) => (SKILL, MAX_SKILL_FILE_LINES),
         None => (CLAUDE_MD, MAX_CLAUDE_MD_LINES),
     };
-    if lines > cap.1 && !excused_anywhere(source, cap.0) {
+    if lines > cap.1 && !excused_anywhere(path, source, cap.0) {
         let msg = format!(
             "{lines}/{} lines, every line counted; move a procedure into the skill or \
              doc that owns it",
@@ -123,13 +123,13 @@ pub fn file(path: &str, source: &str) -> Vec<Finding> {
     }
     if let Some(folder) = skill_of(path).filter(|_| path.ends_with(&format!("/{SKILL_MD}"))) {
         for (line, msg) in frontmatter::check(folder, source) {
-            if !allowed(source, line, SKILL) {
+            if !allowed_in(path, source, line, SKILL) {
                 found.push(finding(line, SKILL, msg));
             }
         }
     }
     for (line, msg) in history::check(source) {
-        if !allowed(source, line, HISTORY) {
+        if !allowed_in(path, source, line, HISTORY) {
             found.push(finding(line, HISTORY, msg));
         }
     }
@@ -138,8 +138,8 @@ pub fn file(path: &str, source: &str) -> Vec<Finding> {
 }
 
 /// Does an allow for `rule`, with its reason, sit anywhere in `source`?
-fn excused_anywhere(source: &str, rule: &str) -> bool {
-    source.lines().any(|line| allowed(line, 1, rule))
+fn excused_anywhere(path: &str, source: &str, rule: &str) -> bool {
+    source.lines().any(|line| allowed_in(path, line, 1, rule))
 }
 
 /// A skill folder with tracked files but no tracked `SKILL.md` loads as nothing.

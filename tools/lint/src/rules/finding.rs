@@ -37,39 +37,75 @@ impl fmt::Display for Finding {
     }
 }
 
-/// An allow comment on `line`: the rule it names, and its reason (maybe empty).
-/// The comment is Rust's `// lint: allow(<rule>) <why>` or Markdown's
-/// `<!-- lint: allow(<rule>) <why> -->`, whose reason ends at the `-->`.
-pub(super) fn parse_allow(line: &str) -> Option<(&str, &str)> {
-    let at = line.find(MARKER)?;
-    let before = &line[..at];
+/// Which comment an allow is written in, chosen by the file's type: code's
+/// `// lint: allow(<rule>) <why>`, or Markdown's
+/// `<!-- lint: allow(<rule>) <why> -->`, whose reason ends at the `-->`. Each file
+/// reads only its own form, so code quoting the other in a string is not an allow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Form {
+    Code,
+    Markdown,
+}
+
+impl Form {
+    /// The form for the repo-relative `path`.
+    pub fn of(path: &str) -> Form {
+        if path.ends_with(".md") {
+            Form::Markdown
+        } else {
+            Form::Code
+        }
+    }
+
+    fn opener(self) -> &'static str {
+        match self {
+            Form::Code => "//",
+            Form::Markdown => "<!--",
+        }
+    }
+
+    /// Whether the trimmed `line` belongs to the run of comment (and, in code,
+    /// attribute) lines an allow above an item may sit in.
+    fn continues(self, line: &str) -> bool {
+        line.starts_with(self.opener()) || (self == Form::Code && line.starts_with("#["))
+    }
+}
+
+/// An allow comment of `form` on `line`: the rule it names, and its reason
+/// (maybe empty).
+pub(super) fn parse_allow(line: &str, form: Form) -> Option<(&str, &str)> {
     // comment-cut: this reads the comment itself, never the code before it
-    let html = match (before.rfind("<!--"), before.rfind("//")) {
-        (Some(h), Some(s)) => h > s,
-        (Some(_), None) => true,
-        (None, Some(_)) => false,
-        (None, None) => return None,
-    };
-    let rest = &line[at + MARKER.len()..];
+    let comment = &line[line.find(form.opener())?..];
+    let rest = &comment[comment.find(MARKER)? + MARKER.len()..];
     let close = rest.find(')')?;
     let why = &rest[close + 1..];
-    let why = if html {
-        why.split_once("-->").map_or(why, |(w, _)| w)
-    } else {
-        why
+    let why = match form {
+        Form::Markdown => why.split_once("-->").map_or(why, |(w, _)| w),
+        Form::Code => why,
     };
     Some((rest[..close].trim(), why.trim()))
 }
 
-/// Is the 1-based `line` of `source` excused from `rule`? An allow counts on the
-/// line itself or in the unbroken run of comment and attribute lines (Markdown's
-/// `<!-- … -->` among them) above it, and only when it gives a reason.
+/// Is the 1-based `line` of the code `source` excused from `rule`? An allow
+/// counts on the line itself or in the unbroken run of comment and attribute
+/// lines above it, and only when it gives a reason. [`allowed_in`] for a file
+/// whose type is known by its path.
 pub fn allowed(source: &str, line: usize, rule: &str) -> bool {
+    allowed_as(Form::Code, source, line, rule)
+}
+
+/// [`allowed`], reading the allow form of `path`'s type ([`Form::of`]).
+pub fn allowed_in(path: &str, source: &str, line: usize, rule: &str) -> bool {
+    allowed_as(Form::of(path), source, line, rule)
+}
+
+fn allowed_as(form: Form, source: &str, line: usize, rule: &str) -> bool {
     let lines: Vec<&str> = source.lines().collect();
     let Some(at) = line.checked_sub(1).filter(|&i| i < lines.len()) else {
         return false;
     };
-    let excuses = |l: &str| parse_allow(l).is_some_and(|(r, why)| r == rule && !why.is_empty());
+    let excuses =
+        |l: &str| parse_allow(l, form).is_some_and(|(r, why)| r == rule && !why.is_empty());
     if excuses(lines[at]) {
         return true;
     }
@@ -77,17 +113,18 @@ pub fn allowed(source: &str, line: usize, rule: &str) -> bool {
         .iter()
         .rev()
         .map(|l| l.trim_start())
-        .take_while(|l| l.starts_with("//") || l.starts_with("#[") || l.starts_with("<!--"))
+        .take_while(|l| form.continues(l))
         .any(excuses)
 }
 
-/// Every allow in `source` that names a rule but gives no reason.
+/// Every allow in `source` (the file at `path`, read in its [`Form`]) that names a
+/// rule but gives no reason.
 pub fn unexplained(path: &str, source: &str) -> Vec<Finding> {
     source
         .lines()
         .enumerate()
         .filter_map(|(i, l)| {
-            let (rule, why) = parse_allow(l)?;
+            let (rule, why) = parse_allow(l, Form::of(path))?;
             why.is_empty().then(|| Finding {
                 path: path.to_string(),
                 line: i + 1,
@@ -140,18 +177,49 @@ mod tests {
     #[test]
     fn the_markdown_form_reads_its_reason_up_to_the_comment_close() {
         let md = "<!-- lint: allow(history) a quoted message -->";
-        assert_eq!(parse_allow(md), Some(("history", "a quoted message")));
+        assert_eq!(
+            parse_allow(md, Form::Markdown),
+            Some(("history", "a quoted message"))
+        );
         let bare = format!("<!-- lint: {}allow(history) -->", "");
-        assert_eq!(parse_allow(&bare), Some(("history", "")));
+        assert_eq!(parse_allow(&bare, Form::Markdown), Some(("history", "")));
         let url = "see https://x.y <!-- lint: allow(history) why --> tail";
-        assert_eq!(parse_allow(url), Some(("history", "why")));
+        assert_eq!(parse_allow(url, Form::Markdown), Some(("history", "why")));
         let src = format!("{md}\nsee #12\n");
-        assert!(allowed(&src, 2, "history"));
-        assert!(!allowed(&format!("{bare}\nsee #12\n"), 2, "history"));
+        assert!(allowed_in("CLAUDE.md", &src, 2, "history"));
+        assert!(!allowed_in(
+            "CLAUDE.md",
+            &format!("{bare}\nsee #12\n"),
+            2,
+            "history"
+        ));
+        assert_eq!(unexplained("a/CLAUDE.md", &bare).len(), 1);
+    }
+
+    #[test]
+    fn each_file_reads_only_its_own_form() {
+        let html = format!("let s = \"<!-- lint: {}allow(x) y -->\";", "");
+        assert!(parse_allow(&html, Form::Code).is_none(), "a string in code");
+        assert!(!allowed_in("a.rs", &html, 1, "x"));
+        let slashes = format!("// lint: {}allow(x) y", "");
+        assert!(parse_allow(&slashes, Form::Markdown).is_none());
+        assert!(!allowed_in("a.md", &slashes, 1, "x"));
+        assert_eq!(Form::of("a/SKILL.md"), Form::Markdown);
+        assert_eq!(Form::of("a.rs"), Form::Code);
+    }
+
+    #[test]
+    fn a_code_allow_after_a_string_quoting_the_marker_still_counts() {
+        let line = format!(
+            "let s = \"lint: {0}allow(x) q\"; // lint: {0}allow(y) why",
+            ""
+        );
+        assert_eq!(parse_allow(&line, Form::Code), Some(("y", "why")));
+        assert!(allowed_in("a.rs", &line, 1, "y"));
     }
 
     #[test]
     fn the_marker_counts_only_inside_a_comment() {
-        assert!(parse_allow("let s = \"lint: allow(x) y\";").is_none());
+        assert!(parse_allow("let s = \"lint: allow(x) y\";", Form::Code).is_none());
     }
 }

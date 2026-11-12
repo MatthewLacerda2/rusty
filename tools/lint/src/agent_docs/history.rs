@@ -4,7 +4,7 @@
 //! and `git log -S` and the issue tracker find the story.
 //!
 //! Look-alikes pass: a placeholder (`#N`), a hex colour (`#33ccff`, or `#0f0`,
-//! since no issue number opens with `0`), an HTML entity (`&#123;`), a version
+//! since no issue number opens with `0`), an HTML entity (`&#123;`), an in-page link (`[setup](#1-setup)`), a version
 //! string (`1.95.0`) and a digit run that is no calendar date (`1234-56-78`). A
 //! colour of only digits (`#333333`) reads as a number: write it lowercase-hex or
 //! take an allow.
@@ -42,7 +42,8 @@ fn reference(line: &str) -> Option<String> {
                 .is_none_or(|c| !(c.is_ascii_alphanumeric() || *c == b'_'));
             (open && closed).then_some(end)
         };
-        if b[i] == b'#' && (i == 0 || b[i - 1] != b'&') {
+        let anchor = i >= 2 && &b[i - 2..i] == b"](";
+        if b[i] == b'#' && (i == 0 || b[i - 1] != b'&') && !anchor {
             if let Some(end) = number(i + 1) {
                 return Some(line[i..end].to_string());
             }

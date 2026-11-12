@@ -52,3 +52,20 @@ fn the_description_is_present_non_empty_and_short() {
         "characters, not bytes"
     );
 }
+
+#[test]
+fn a_value_continued_on_indented_lines_counts_whole() {
+    let continued = |rest: &str| format!("---\nname: a\ndescription: Use it\n  {rest}\n---\n");
+    let over = "x".repeat(MAX_DESCRIPTION);
+    assert!(
+        problems("a", &continued(&over))[0].contains("characters, over"),
+        "the continuation joins the cap"
+    );
+    let fits = "x".repeat(MAX_DESCRIPTION - "Use it ".len());
+    assert!(problems("a", &continued(&fits)).is_empty());
+    let quoted = "---\nname: a\ndescription: \"Use it\n  when asked.\"\n---\n";
+    assert!(
+        problems("a", quoted).is_empty(),
+        "a quoted value spans lines too"
+    );
+}

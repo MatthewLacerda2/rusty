@@ -87,8 +87,10 @@ opened since then.
 2. Compile-check the updated tree: `cargo check --locked --all-targets` with `dev`
    and with `--no-default-features`, then the size gate, into
    `target/merge-queue`. Skipped for Markdown-only branches, Dependabot and
-   `--no-check`. Under `--no-check` the tree still gets `tools/lint`'s build-free
-   passes (`merging/queue/lints.py`; size, rules, layers, determinism, direction,
+   `--no-check`. Every merged tree but a Markdown-only one touching no agent doc
+   (a `CLAUDE.md`, a skill's file) still gets `tools/lint`'s build-free passes, and
+   so does a head touching one that `main` passed only by Markdown (merged
+   unpushed, just to lint) (`merging/queue/lints.py`; size, rules, layers, determinism, direction,
    components, parity), built once per `tools/lint` tree into
    `target/merge-queue-lint`; a violation hands the head back unpushed, naming the
    pass, rule and file and the PRs merged since the branch's base that touched it.
@@ -251,8 +253,9 @@ A dry run prints the train it would form. A watch killed mid-train leaves a
 ### The Markdown exception
 
 CI's `changes` filter starts `code: - '!**/*.md'`: a Markdown-only PR skips the
-heavy steps, but its gating jobs still run and succeed (a ruleset reads a skipped
-required check as unsatisfied). The three Markdown paths code reads (`docs/api/`,
+heavy steps, but its gating jobs still run (a ruleset reads a skipped required
+check as unsatisfied) and succeed, save `lint`'s size gate: it holds every agent doc
+and goes red on one over its cap. The three Markdown paths code reads (`docs/api/`,
 `docs/game-agent.md`, `src/core/project/game_claude.md`) are listed in CI's `code` filter and in
 `merging/verdict/changes.py`'s `CODE_DOCS`, so a PR touching one runs the tests
 and is serialized like code.

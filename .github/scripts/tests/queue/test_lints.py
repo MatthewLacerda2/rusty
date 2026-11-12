@@ -132,6 +132,14 @@ class Taken(unittest.TestCase):
         self.assertIsInstance(check.func.__self__, lints.Linter)
         self.assertEqual(check.keywords, {"since": READY["headRefOid"], "upto": "origin/main"})
 
+    def test_only_a_take_touching_an_agent_doc_lints_a_docs_advance(self):
+        _, rebased, _, _ = self.take("--no-check")
+        self.assertIsNone(rebased.call_args.kwargs["docs_check"])
+        doc = {**READY, "files": [{"path": "CLAUDE.md"}]}
+        _, rebased, _, _ = self.take("--no-check", pull=doc)
+        kwargs = rebased.call_args.kwargs
+        self.assertIs(kwargs["docs_check"], kwargs["check"], "the lint alone, never a compile")
+
     def test_a_checked_take_compiles_then_lints(self):
         _, rebased, _, _ = self.take()
         check = rebased.call_args.kwargs["check"]

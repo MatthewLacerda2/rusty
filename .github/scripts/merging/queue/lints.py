@@ -14,7 +14,9 @@ cap when the brief was written.
 `tools/lint` needs no compile of rusty: it is a std-only crate of its own that
 builds in seconds and runs every pass CI's `lint` job runs ([`PASSES`]) in a few.
 So the queue runs it on the tree it is about to push: after `main` is merged into
-a head ([`update.advance`]'s `check`), and on a merge train's tree before its
+a head ([`update.advance`]'s `check`), on a head touching an agent doc that
+`main` passed only by Markdown, merged just to lint ([`update.docs_merge_check`]),
+and on a merge train's tree before its
 branch is pushed (`train.world.compiles`). A violation hands the head back with
 the report's first lines and the pull requests merged since its base that touched
 the file ([`blame`]), with no push and no CI round; re-admission is by a push,

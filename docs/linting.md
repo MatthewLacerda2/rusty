@@ -227,19 +227,24 @@ split stays true instead of growing back. Three rules:
   `YYYY-MM-DD` date. An agent doc states the rule; its story lives in the issue and
   PR, which `git log -S` finds. Placeholders (`#N`), hex colours (`#33ccff`, `#0f0`:
   no issue number opens with `0`), HTML entities (`&#123;`), version strings and
-  digit runs that are no calendar date pass; a colour of only digits (`#333333`)
+  digit runs that are no calendar date pass, and so does an in-page link
+  (`[setup](#1-setup)`); a colour of only digits (`#333333`)
   reads as a number.
 
 Only **tracked** files are read (`git ls-files`), so a scratch `CLAUDE.md` nobody
 added is not judged, and `.claude/` is reached though it is a dot-directory. The
 commit hook checks the staged agent docs (the folder-has-a-`SKILL.md` check needs
 the whole tree, so it waits for `make size`). CI runs the size gate on Markdown-only
-pull requests too, beside `docrefs`, and the merge queue lints a Markdown-only
-branch's merged tree when it touches an agent doc (`checks.needs_lint`), since two
-such branches can each fit and overflow merged.
+pull requests too, beside `docrefs`. The merge queue lints the merged tree of a
+branch that touches an agent doc, Markdown-only or not (`checks.needs_lint`), since
+two such branches can each fit and overflow merged: when the merge moved its head,
+and when `main` passed it only by Markdown, where the head is merged in a throwaway
+worktree, linted and not pushed (`update.docs_merge_check`). A finding hands it
+back before anything reaches `main`.
 
 An exception is inline, with its reason: `<!-- lint: allow(<rule>) <why> -->` on the
-flagged line or in the comment lines right above it; a length cap belongs to no
+flagged line or in the comment lines right above it (a Markdown file reads only that
+form, and code only `//`, so neither counts the other's quoted in a string); a length cap belongs to no
 line, so an allow anywhere in the file excuses it. An allow without a reason is
 itself a finding (`[allow]`), as in Rust.
 

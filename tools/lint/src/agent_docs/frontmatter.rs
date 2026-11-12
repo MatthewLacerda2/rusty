@@ -76,25 +76,28 @@ fn name_problem(folder: &str, name: &str) -> Option<String> {
 }
 
 /// `key`'s value in the frontmatter `block` (whose first line is the file's line
-/// 2) and the line it is on: quotes dropped, a folded (`>`) or literal (`|`) block
-/// joined from its indented lines.
+/// 2) and the line it is on: quotes dropped, and the indented lines after it
+/// joined, whether they continue a plain or quoted value or hold a folded (`>`)
+/// or literal (`|`) block.
 fn value(block: &[&str], key: &str) -> Option<(usize, String)> {
     let at = block
         .iter()
         .position(|l| l.strip_prefix(key).is_some_and(|r| r.starts_with(':')))?;
     let raw = block[at][key.len() + 1..].trim();
-    let joined = if matches!(raw, ">" | "|" | ">-" | "|-" | "") {
-        let more = block[at + 1..]
-            .iter()
-            .take_while(|l| l.starts_with(' ') || l.is_empty());
-        more.map(|l| l.trim())
-            .collect::<Vec<_>>()
-            .join(" ")
-            .trim()
-            .to_string()
+    let head = if matches!(raw, ">" | "|" | ">-" | "|-") {
+        ""
     } else {
-        raw.to_string()
+        raw
     };
+    let more = block[at + 1..]
+        .iter()
+        .take_while(|l| l.starts_with([' ', '\t']) || l.is_empty())
+        .map(|l| l.trim());
+    let joined = std::iter::once(head)
+        .chain(more)
+        .filter(|l| !l.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
     let unquoted = ['"', '\'']
         .iter()
         .find_map(|q| joined.strip_prefix(*q).and_then(|r| r.strip_suffix(*q)));
