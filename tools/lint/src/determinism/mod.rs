@@ -89,9 +89,16 @@ const REPORT: &str = ".lint/report.txt";
 pub fn run() {
     let read = |p: &str| fs::read_to_string(p).unwrap_or_default();
     let mut violations = config_violations(&read("clippy.toml"), &read("Cargo.toml"));
+    // The root package holds the modules not yet moved: it inherits the policy too.
+    violations.extend(member_violations("Cargo.toml", &read("Cargo.toml")));
+    for manifest in crate::modules::member_manifests(Path::new("")) {
+        let at = manifest.to_string_lossy();
+        violations.extend(member_violations(&at, &read(&at)));
+    }
     let roots = crate::layers::platform_roots();
     let mut files = Vec::new();
     walk(Path::new("src"), &mut files);
+    walk(Path::new(crate::modules::CRATES), &mut files);
     files.sort();
     for path in files {
         let norm = path.to_string_lossy().into_owned();
@@ -131,13 +138,38 @@ fn config_violations(clippy_toml: &str, cargo_toml: &str) -> Vec<String> {
     let undenied = DENIES
         .iter()
         .filter(|d| !cargo_toml.lines().any(|l| l.trim() == **d))
-        .map(|d| format!("UNDENIED `{d}` — missing from Cargo.toml's [lints.clippy]"));
+        .map(|d| format!("UNDENIED `{d}` — missing from Cargo.toml's [workspace.lints.clippy]"));
     missing.chain(undenied).chain(unset).collect()
+}
+
+/// A package (the root's or a member crate's) that does not inherit the
+/// workspace's lints: its code would escape the clock ban and every deny above.
+/// Defining `[workspace.lints]` applies it to nobody; each package opts in.
+fn member_violations(path: &str, manifest: &str) -> Vec<String> {
+    let mut section = "";
+    let inherits = manifest.lines().any(|l| {
+        let l = l.split('#').next().unwrap_or("").trim();
+        if l.starts_with('[') {
+            section = l;
+        }
+        section == "[lints]" && l.replace(' ', "") == "workspace=true"
+    });
+    if inherits {
+        Vec::new()
+    } else {
+        vec![format!(
+            "UNINHERITED {path} — every package takes the workspace's lint policy: \
+             add `[lints]` with `workspace = true`"
+        )]
+    }
 }
 
 /// Every line of `path` that opts out of the ban, unless `path` is a platform root.
 fn opt_out_violations(path: &str, content: &str, roots: &[String]) -> Vec<String> {
-    if roots.iter().any(|r| r == path) {
+    if roots
+        .iter()
+        .any(|r| *r == crate::modules::module_path(path))
+    {
         return Vec::new();
     }
     let mut out = Vec::new();

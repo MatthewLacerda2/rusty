@@ -31,16 +31,19 @@ const MAX_FILE_LINES: usize = 300;
 /// bundle several `#[test]` fns plus fixtures, and over-splitting them hurts
 /// readability more than it helps.
 const MAX_TEST_FILE_LINES: usize = 150;
-/// The directories the `.rs` scans walk: the engine, its integration suite, the fuzz
+/// The directories the `.rs` scans walk: the engine (`src/` and the member crates
+/// under `crates/`), its integration suite, the fuzz
 /// targets (#535), and the dev-tool crates under `tools/` (#541). The rules gate
 /// walks these too.
-pub(crate) const SCAN_ROOTS: &[&str] = &["src", "tests", "fuzz", "tools"];
+pub(crate) const SCAN_ROOTS: &[&str] = &["src", "crates", "tests", "fuzz", "tools"];
 /// What the size gate walks: [`SCAN_ROOTS`] plus `.github`, where the merge and
 /// mutation scripts live (#926), and `engine`, the shipped shaders and script
 /// components (#1015). `assets/` is not one: it is gitignored, the open project's
 /// seeded and baked copies, so nothing in it is ever pushed; nor is a gitignored
 /// path inside a root ([`full_scan`]).
-const SIZE_ROOTS: &[&str] = &["src", "tests", "fuzz", "tools", ".github", "engine"];
+const SIZE_ROOTS: &[&str] = &[
+    "src", "crates", "tests", "fuzz", "tools", ".github", "engine",
+];
 const REPORT: &str = ".lint/report.txt";
 
 /// The languages the size gate measures.

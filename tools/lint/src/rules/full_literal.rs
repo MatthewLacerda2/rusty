@@ -32,7 +32,7 @@ impl Components {
         let sources: Vec<_> = sources.into_iter().collect();
         let mut names = Vec::new();
         for (path, text) in &sources {
-            if ENTITY.contains(path) {
+            if ENTITY.contains(&&*crate::modules::module_path(path)) {
                 names.extend(component_types(text));
             }
         }

@@ -93,11 +93,14 @@ pub fn check_dir(dir: &str, files: &[&str], owner: Option<(&str, &str)>) -> Opti
     }
 }
 
-/// The rule over every scanned directory under `src/`.
+/// The rule over every scanned module directory (`src/`, `crates/<m>/src/`).
 pub fn run(scan: &Scan) -> Vec<Finding> {
     scan.dirs()
         .iter()
-        .filter(|(d, _)| d.starts_with("src/") || **d == "src")
+        .filter(|(d, _)| {
+            let at = crate::modules::module_path(d);
+            at.starts_with("src/") || at == "src"
+        })
         .filter_map(|(d, names)| {
             let owner = owner_of(d);
             let owner = owner.as_deref().map(|p| (p, scan.source(p)));

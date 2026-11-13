@@ -16,7 +16,8 @@ pub const RULE: &str = "active-self";
 
 /// Every non-test line of `source` that reads an entity's own active flag.
 pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
-    if !path.starts_with("src/") || path.starts_with("src/ecs/") {
+    let at = crate::modules::module_path(path);
+    if !at.starts_with("src/") || at.starts_with("src/ecs/") {
         return Vec::new();
     }
     code_lines(source)

@@ -73,10 +73,8 @@ fn gpu_lightmaps_rebind_on_colour_pages_and_match_direction_shapes() {
 /// baked binds once it is, and a re-bake at the same path binds the new page.
 #[test]
 fn gpu_lightmaps_follow_bakes_at_one_path() {
-    use crate::core::fs::written::{
-        self,
-        contract::{follows_rebakes, Bake},
-    };
+    use crate::core::fs::written;
+    use rusty_test_support::rebakes::{follows_rebakes, Bake};
     let Some(renderer) = headless_or_skip(4, 4) else {
         return;
     };

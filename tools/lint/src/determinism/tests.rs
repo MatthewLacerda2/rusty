@@ -103,3 +103,33 @@ fn a_dropped_reason_deny_or_test_unwrap_setting_is_reported() {
     );
     assert_eq!(v.len(), 2, "{v:?}");
 }
+
+#[test]
+fn a_moved_platform_root_may_opt_out_and_its_files_may_not() {
+    let roots = vec!["src/shell/mod.rs".to_string()];
+    assert!(opt_out_violations("crates/shell/src/lib.rs", ALLOW, &roots).is_empty());
+    assert_eq!(
+        opt_out_violations("crates/shell/src/frame.rs", ALLOW, &roots).len(),
+        2
+    );
+}
+
+#[test]
+fn a_member_inherits_the_workspace_lints_or_is_reported() {
+    let inherits = "[package]\nname = \"rusty-x\"\n\n[lints]\nworkspace = true\n";
+    assert!(member_violations("crates/x/Cargo.toml", inherits).is_empty());
+    let own =
+        "[package]\nname = \"rusty-x\"\nworkspace = true\n\n[lints.clippy]\ntodo = \"deny\"\n";
+    let v = member_violations("crates/x/Cargo.toml", own);
+    assert!(v[0].starts_with("UNINHERITED crates/x/Cargo.toml"), "{v:?}");
+}
+
+#[test]
+fn the_root_package_inherits_the_workspace_lints_or_is_reported() {
+    let defines_only = "[workspace.lints.clippy]\ntodo = \"deny\"\n\n[package]\nname = \"rusty\"\n";
+    let v = member_violations("Cargo.toml", defines_only);
+    assert!(v[0].starts_with("UNINHERITED Cargo.toml"), "{v:?}");
+    let root = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../Cargo.toml"))
+        .expect("the engine's root manifest");
+    assert!(member_violations("Cargo.toml", &root).is_empty());
+}

@@ -65,6 +65,12 @@ class Repo(unittest.TestCase):
         with self.assertRaises(SystemExit):
             scope.resolve("src/nowhere/**", "main")
 
+    def test_one_glob_matching_nothing_is_refused_beside_ones_that_match(self) -> None:
+        with self.assertRaises(SystemExit) as stop:
+            scope.resolve("src/physics/** src/moved/**", "main")
+        self.assertIn("src/moved/**", str(stop.exception.code))
+        self.assertEqual(len(scope.matching(["src/physics/**", "src/navigation/**"])), 3)
+
     def test_a_commit_diff_is_that_commit_s_rust_whatever_the_base(self) -> None:
         sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
         plan, diff = scope.resolve("diff", "origin/absent", commit=sha)

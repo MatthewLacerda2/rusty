@@ -7,10 +7,10 @@ use glam::Vec3;
 use crate::asset::convert::texture_ref::is_written;
 use crate::components::{MaterialAsset, MaterialComponent, Tonemap};
 use crate::core::fs::freshness::MISS_RETRY_FRAMES;
-use crate::core::fs::written::contract::{follows_rebakes, Bake};
 use crate::procgen::{bake::bake_to_png, Image, Slot};
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::{Camera, MeshComponent, Scene};
+use rusty_test_support::rebakes::{follows_rebakes, Bake};
 
 /// A box filling the view lit only by a white emissive modulated by `map`, with
 /// every post-FX knob neutral, so the centre pixel is the map's colour.

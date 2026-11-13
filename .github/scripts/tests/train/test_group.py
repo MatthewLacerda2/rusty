@@ -28,13 +28,16 @@ class Forming(unittest.TestCase):
         self.assertEqual(group.CAP, 4)
 
     def test_a_merge_path_or_manifest_change_goes_alone_first_and_waits_behind(self):
-        for path in (".github/scripts/merging/watch/loop.py", ".github/workflows/ci.yml", ".github/actions/install-tool/action.yml", "Cargo.lock", "Makefile", "tools/lint/src/main.rs"):
+        for path in (".github/scripts/merging/watch/loop.py", ".github/workflows/ci.yml", ".github/actions/install-tool/action.yml", "Cargo.lock", "crates/core/Cargo.toml", "Makefile", "tools/lint/src/main.rs"):
             with self.subTest(path=path):
                 alone = pr(1, files=(path,))
                 self.assertEqual(formed(Fx([alone, pr(2)]), [alone, pr(2)])[:2], ([1], None))
                 members, train, notes = formed(Fx([pr(2), alone, pr(3)]), [pr(2), alone, pr(3)])
                 self.assertEqual(train, [2, 3])
                 self.assertIn(f"#1 waits for a train of its own: it changes {path}", notes[0])
+
+    def test_a_members_code_rides(self):
+        self.assertIsNone(group.alone(["crates/core/src/lib.rs", "crates/core/build.rs"]))
 
     def test_red_or_missing_own_ci_waits(self):
         line = [pr(1), pr(2), pr(3)]

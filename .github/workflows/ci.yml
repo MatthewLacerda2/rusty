@@ -99,7 +99,7 @@ jobs:
               # Read by code and its tests: the game guide session-mcp serves and
               # the game CLAUDE.md template a project's edit-open embeds (#1313).
               - 'docs/game-agent.md'
-              - 'src/core/project/game_claude.md'
+              - 'crates/core/src/project/game_claude.md'
       # Only a push asks, and only when it changes code: a Markdown-only merge
       # already skips. A push that changes a cache key's inputs (`Cargo.lock`,
       # the toolchain, `.github/actions/`, which pins the CI tools, #1973) runs

@@ -6,7 +6,7 @@ a path that no longer exists sends the next agent searching. Nothing noticed whe
 move left one behind: the audit (#933) found ten in one pass. This scans every
 tracked `*.md` outside fenced code blocks for inline code that names
 
-- a repo path: a token starting `src/`, `tests/`, `tools/`, `docs/` or `.github/`
+- a repo path: a token starting `src/`, `crates/`, `tests/`, `tools/`, `docs/` or `.github/`
   must exist (a `:line` or `::symbol` suffix is dropped first);
 - a make verb: `make <verb>` must be a Makefile target;
 - CLAUDE.md's API namespace list: each must have its `docs/api/<Name>.md`.
@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-PREFIXES = ("src/", "tests/", "tools/", "docs/", ".github/")
+PREFIXES = ("src/", "crates/", "tests/", "tools/", "docs/", ".github/")
 PLACEHOLDER = re.compile(r"[<*{…$]|\.\.\.")
 CODE = re.compile(r"(?<!`)`([^`\n]+)`(?!`)")
 ALLOW = re.compile(r"<!-- docrefs: allow \S.*-->")

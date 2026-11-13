@@ -7,33 +7,57 @@
 use super::extent::item_end;
 use super::gate::{is_test_gate, test_only_files};
 use crate::code::{strip_comment, Open};
+use crate::modules;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// The tree under `src`, read once and shared by the module list, the edge scan
-/// and the external-crate scan (#1136): every `.rs` file's text, and which files
+/// The engine's modules, read once and shared by the module list, the edge scan
+/// and the external-crate scan (#1136): every `.rs` file's text under `src/` and
+/// under each moved module's `crates/<m>/src/` (`crate::modules`), and which files
 /// are test-only.
 pub struct Tree {
-    pub src: PathBuf,
+    pub root: PathBuf,
     sources: BTreeMap<PathBuf, String>,
     test_only: BTreeSet<PathBuf>,
 }
 
 impl Tree {
-    pub fn read(src: &Path) -> Self {
-        let files = walk(src);
+    /// The tree of the repository at `root` (`""` for the working directory).
+    pub fn read(root: &Path) -> Self {
+        let mut files = walk(&root.join("src"));
+        for m in modules::moved(root) {
+            files.extend(walk(&modules::dir(root, &m)));
+        }
         let sources: BTreeMap<PathBuf, String> = files
             .iter()
             .map(|f| (f.clone(), fs::read_to_string(f).unwrap_or_default()))
             .collect();
         let test_only = test_only_files(&files, |f| sources.get(f).map(String::as_str));
         Self {
-            src: src.to_path_buf(),
+            root: root.to_path_buf(),
             sources,
             test_only,
         }
+    }
+
+    /// The top-level module `file` belongs to, read at its module path; `None` for
+    /// the root package's crate roots and binaries.
+    pub fn owner(&self, file: &Path) -> Option<String> {
+        let rel = file.strip_prefix(&self.root).unwrap_or(file);
+        let at = rel.to_string_lossy();
+        let at = modules::module_path(&at);
+        let rel = Path::new(at.as_ref()).strip_prefix("src").ok()?;
+        let first = rel.components().next()?.as_os_str().to_str()?;
+        let name = first.strip_suffix(".rs").unwrap_or(first);
+        (!matches!(name, "bin" | "lib" | "main")).then(|| name.to_string())
+    }
+
+    /// The moved module whose crate holds `file`, where `crate::` names that module.
+    pub fn crate_of(&self, file: &Path) -> Option<String> {
+        let rel = file.strip_prefix(&self.root).unwrap_or(file);
+        modules::crate_module(&rel.to_string_lossy()).map(str::to_string)
     }
 
     pub fn is_test_only(&self, path: &Path) -> bool {
@@ -49,7 +73,8 @@ impl Tree {
     }
 }
 
-/// One `crate::<module>` reference in non-test, non-comment code.
+/// One reference to another module in non-test, non-comment code:
+/// `crate::<module>` in the root package, `rusty_<module>::` anywhere.
 pub struct Ref {
     pub line: usize,
     pub module: String,
@@ -79,17 +104,37 @@ fn walk_into(dir: &Path, out: &mut Vec<PathBuf>) {
 
 pub use crate::code::is_ident;
 
-/// The `crate::<module>` references in `content`, minus comments and inline
-/// `#[cfg(test)]` items. `crate::{a, b::C}` yields both `a` and `b`.
-pub fn refs(content: &str) -> Vec<Ref> {
+/// The module references in `content`, minus comments and inline `#[cfg(test)]`
+/// items. `crate::{a, b::C}` yields both `a` and `b`; `rusty_core::x` yields
+/// `core`. In a moved module's crate (`in_crate`), `crate::` names the module
+/// itself, so only its `rusty_<module>::` paths count.
+pub fn refs(content: &str, in_crate: bool) -> Vec<Ref> {
     let mut out = Vec::new();
     let mut group: Option<i32> = None;
     for (line, code) in live_lines(content) {
-        for module in crate_refs(&code, &mut group) {
-            out.push(Ref { line, module });
-        }
+        // Walked in a crate too, so a multi-line `crate::{…}` is never misread.
+        let own = crate_refs(&code, &mut group);
+        let named = sibling_refs(&code);
+        let modules = if in_crate {
+            named
+        } else {
+            own.into_iter().chain(named).collect()
+        };
+        out.extend(modules.into_iter().map(|module| Ref { line, module }));
     }
     out
+}
+
+/// The modules a line names through their crates: `rusty_<module>::…`.
+fn sibling_refs(code: &str) -> Vec<String> {
+    code.match_indices(modules::CRATE_PREFIX)
+        .filter(|(at, _)| !code[..*at].chars().next_back().is_some_and(is_ident))
+        .filter_map(|(at, p)| {
+            let rest = &code[at + p.len()..];
+            let end = rest.find(|c: char| !is_ident(c)).unwrap_or(rest.len());
+            (end > 0 && rest[end..].starts_with("::")).then(|| rest[..end].to_string())
+        })
+        .collect()
 }
 
 /// The lines of `content` that are live (non-test) code, numbered from 1, each with

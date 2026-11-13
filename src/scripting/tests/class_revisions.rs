@@ -15,7 +15,7 @@ use crate::core::fs::written::write;
 /// written, and a rewrite at the same path loads its new contents.
 #[test]
 fn the_class_cache_follows_rewrites_at_one_path() {
-    use crate::core::fs::written::contract::{follows_rebakes, Bake};
+    use rusty_test_support::rebakes::{follows_rebakes, Bake};
     let (mut m, _) = manager_with_entity();
     m.init_runtime().unwrap();
     let v = |which| if which == Bake::A { 1 } else { 2 };

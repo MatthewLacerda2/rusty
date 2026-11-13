@@ -22,7 +22,8 @@ const LINTS: [&str; 2] = ["clippy::unwrap_used", "clippy::restriction"];
 
 /// The findings for one scanned file, given the sim rows' directories (`src/<m>`).
 pub fn check(path: &str, source: &str, sim_dirs: &[String]) -> Vec<Finding> {
-    let Some(dir) = sim_dirs.iter().find(|d| path.starts_with(&format!("{d}/"))) else {
+    let at = crate::modules::module_path(path);
+    let Some(dir) = sim_dirs.iter().find(|d| at.starts_with(&format!("{d}/"))) else {
         return Vec::new();
     };
     let finding = |line, message: String| Finding {
@@ -38,7 +39,7 @@ pub fn check(path: &str, source: &str, sim_dirs: &[String]) -> Vec<Finding> {
         .map(|(i, l)| (i + 1, l.trim()))
         .collect();
     let mut out = Vec::new();
-    if path == format!("{dir}/mod.rs") && !code.iter().any(|(_, l)| *l == DENY) {
+    if at == format!("{dir}/mod.rs") && !code.iter().any(|(_, l)| *l == DENY) {
         out.push(finding(
             1,
             format!("a sim module's root must carry `{DENY}`"),
@@ -58,12 +59,17 @@ pub fn check(path: &str, source: &str, sim_dirs: &[String]) -> Vec<Finding> {
     out
 }
 
-/// The sim rows whose root `src/<module>/mod.rs` is not among `files`.
+/// The sim rows whose root `src/<module>/mod.rs` (a moved one's `lib.rs`) is not
+/// among `files`.
 pub fn missing_roots(files: &[String], sim_dirs: &[String]) -> Vec<Finding> {
+    let roots: Vec<_> = files
+        .iter()
+        .map(|f| crate::modules::module_path(f))
+        .collect();
     sim_dirs
         .iter()
         .map(|d| format!("{d}/mod.rs"))
-        .filter(|root| !files.contains(root))
+        .filter(|root| !roots.iter().any(|r| r == root))
         .map(|root| Finding {
             path: root,
             line: 1,

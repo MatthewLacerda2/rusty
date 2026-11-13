@@ -24,7 +24,8 @@ const SPREAD: usize = 6;
 
 /// Every engine warning or error whose message does not open with `[Module]`.
 pub fn check(path: &str, source: &str) -> Vec<Finding> {
-    if !path.starts_with("src/") {
+    let at = crate::modules::module_path(path);
+    if !at.starts_with("src/") {
         return Vec::new();
     }
     let bare = source.contains("use log::");

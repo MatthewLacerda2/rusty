@@ -22,7 +22,8 @@ const NAMES: &[&str] = &[
 
 /// Every non-test line of `source` whose Lua callback takes an entity as a bare id.
 pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
-    if !path.starts_with("src/api/") {
+    let at = crate::modules::module_path(path);
+    if !at.starts_with("src/api/") {
         return Vec::new();
     }
     code_lines(source)

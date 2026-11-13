@@ -130,7 +130,10 @@ fn crowded<'a>(dirs: &BTreeMap<&'a str, Vec<&str>>) -> Vec<(&'a str, usize)> {
         .iter()
         .map(|(d, names)| (*d, dir_size::sources(d, names).len()))
         .filter(|(_, n)| *n > prefix::AIM_FILES_PER_DIR)
-        .filter(|(d, n)| !(d.starts_with("src/") && *n > dir_size::MAX_FILES_PER_DIR))
+        .filter(|(d, n)| {
+            let gated = crate::modules::module_path(d).starts_with("src/");
+            !(gated && *n > dir_size::MAX_FILES_PER_DIR)
+        })
         .collect();
     over.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
     over

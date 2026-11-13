@@ -26,7 +26,8 @@ pub const RULE: &str = "named-enum";
 
 /// Every hand-written parse of a type that also has a hand-written name.
 pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
-    if !path.starts_with("src/") {
+    let at = crate::modules::module_path(path);
+    if !at.starts_with("src/") {
         return Vec::new();
     }
     // Per type: the line of its first parse, and whether it has a name.

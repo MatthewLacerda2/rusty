@@ -1,11 +1,31 @@
-[package]
-name = "rusty"
+# The engine is a workspace being split into one crate per top-level module
+# (`rusty-<module>` under `crates/<module>/`); crates/CLAUDE.md is the recipe for
+# moving the next one. This root package keeps the modules not yet moved, the
+# binaries and the integration tests, and re-exports each moved crate under its
+# module's old name (`src/lib.rs`), so `crate::core::…` and `rusty::core::…` paths
+# keep compiling.
+[workspace]
+members = ["crates/*"]
+# Every member, so a plain `cargo build`, `clippy`, `nextest run`, `doc` or `test`
+# from the root (each `make` gate and CI step) covers the moved crates' own code
+# and tests too, not only the root package.
+default-members = [".", "crates/*"]
+resolver = "2"
+
+# What every member inherits (`version.workspace = true`, …).
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
 # This is the engine application itself, not a library we publish to crates.io.
-# `publish = false` also lets the cargo-deny license gate skip our own crate
+# `publish = false` also lets the cargo-deny license gate skip our own crates
 # (via `[licenses] private.ignore`) while still gating every dependency.
 publish = false
+
+[package]
+name = "rusty"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
 # Integration tests build as ONE binary, not one per `tests/*.rs` (#483): each of those
 # linked the whole engine (wgpu, egui, rapier, Lua). See the `[[test]]` target below.
 autotests = false
@@ -79,17 +99,18 @@ path = "tests/main.rs"
 [features]
 default = ["editor"]
 # The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.
-dev = ["dep:scorsese-providers", "dep:scorsese-core", "dep:libloading", "dep:getrandom"]
+dev = ["rusty-core/dev", "dep:scorsese-providers", "dep:scorsese-core", "dep:libloading", "dep:getrandom"]
 # The egui editor (#431): `src/editor` and the shell's editor frontend. Default-on so
 # `cargo run` opens the editor; a shipped player builds with `--no-default-features`.
-editor = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor", "dep:notify"]
+editor = ["rusty-core/editor", "dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor", "dep:notify"]
 
-# The crate's lint policy lives here, not in command-line flags, so a plain
-# `cargo clippy`, rust-analyzer and CI all read the same rules (#485). The
+# The workspace's lint policy lives here, not in command-line flags, so a plain
+# `cargo clippy`, rust-analyzer and CI all read the same rules (#485); every member
+# inherits it with `[lints] workspace = true`. The
 # threshold is `too-many-lines-threshold` in clippy.toml. CI adds `-D warnings`;
 # the sim modules' `#![deny(clippy::unwrap_used)]` stays module-scoped (#195), one per
 # sim row of the layer table, held there by `make rules` (`unwrap-deny`, #962).
-[lints.clippy]
+[workspace.lints.clippy]
 too_many_lines = "deny"
 # Exceptions are inline, with a written reason (#961): `#[expect(lint, reason = "…")]`,
 # which also goes stale loudly once the lint stops firing. A module-root `#![allow]`
@@ -104,7 +125,17 @@ dbg_macro = "deny"
 todo = "deny"
 unimplemented = "deny"
 
-[dependencies]
+[lints]
+workspace = true
+
+# Every external crate's version, features and why, in one place: a member names one
+# with `{ workspace = true }` (adding `optional = true` where a feature turns it on).
+[workspace.dependencies]
+# The workspace's own crates, named the same way by the members that depend on them.
+rusty-core = { path = "crates/core" }
+rusty-time = { path = "crates/time" }
+rusty-test-support = { path = "crates/test-support" }
+
 winit = { version = "0.30.13" }
 wgpu = { version = "30.0.1", features = ["naga-ir"] }
 # WGSL only (`shadergen`): its default `glsl` front end would build naga's GLSL parser for nothing.
@@ -113,10 +144,10 @@ naga_oil = { version = "0.23", default-features = false }
 # (`shadergen::compose`, #722) needs no `wgpu`. Same 30 that wgpu 30 links:
 # wgpu, naga and naga_oil upgrade as a unit.
 naga = { version = "30.0.1" }
-egui = { version = "0.36.2", optional = true }
-egui-wgpu = { version = "0.36.2", optional = true }
-egui-winit = { version = "0.36.2", default-features = false, features = ["clipboard"], optional = true }
-egui-phosphor = { version = "0.14.0", optional = true }
+egui = { version = "0.36.2" }
+egui-wgpu = { version = "0.36.2" }
+egui-winit = { version = "0.36.2", default-features = false, features = ["clipboard"] }
+egui-phosphor = { version = "0.14.0" }
 mlua = { version = "0.12", features = ["lua54", "vendored", "serialize"] }
 glam = { version = "0.33", features = ["bytemuck", "serde"] }
 # MikkTSpace tangents (#756): the basis normal maps are baked in. Pure, no deps.
@@ -167,7 +198,7 @@ gilrs = "0.11.2"
 # reloads it. Editor-only: a shipped game never watches its files. Its default
 # features are cut to the FSEvents backend on macOS; on Linux its inotify crate is
 # already in the tree through gilrs (same version), and it adds mio for its loop.
-notify = { version = "8.2", default-features = false, features = ["macos_fsevent"], optional = true }
+notify = { version = "8.2", default-features = false, features = ["macos_fsevent"] }
 # The OS clipboard for `Input.GetClipboard` / `SetClipboard` (#612), read by the shell
 # in both frontends: X11 and macOS. Already in the tree through egui-winit (same
 # version), but the player build has no egui. egui-winit's `clipboard` feature also
@@ -191,42 +222,95 @@ zimmer = { package = "scorsese-zimmer", git = "https://github.com/MatthewLacerda
 # — behind `src/dev/providers/`. Optional and enabled only by `dev`, so ship and
 # player builds carry no HTTP client. Same rev as zimmer, which it depends on:
 # move the two pins together, or the tree gains a second zimmer.
-scorsese-providers = { git = "https://github.com/MatthewLacerda2/scorsese", rev = "4bd8c840ef991cb124357bb60484fc40a74b8730", optional = true }
+scorsese-providers = { git = "https://github.com/MatthewLacerda2/scorsese", rev = "4bd8c840ef991cb124357bb60484fc40a74b8730" }
 # Its core crate, named directly for one function: `hash_bytes` (sha256 → hex), the
 # hasher scorsese names its bakes and briefs with, so a generated asset's address
 # (#384) is the same answer in both trees. Already in the lockfile through the line
 # above; same rev, same `dev` gate. Nothing of its `Project` model is used.
-scorsese-core = { git = "https://github.com/MatthewLacerda2/scorsese", rev = "4bd8c840ef991cb124357bb60484fc40a74b8730", optional = true }
+scorsese-core = { git = "https://github.com/MatthewLacerda2/scorsese", rev = "4bd8c840ef991cb124357bb60484fc40a74b8730" }
 # Open Image Denoise, opened at run time (#1884, `src/dev/bake/denoise/`): the
 # lightmap bake's trained denoiser is a native library a machine may lack, so it is
 # `dlopen`ed, never linked, and a bake without it filters. Already in the tree
 # through wgpu; same version. `dev` only: a shipped game never bakes.
-libloading = { version = "0.8.9", optional = true }
+libloading = { version = "0.8.9" }
 # Named only to close a feature split (docs/testing.md, *Build and test share one
 # dependency graph*): scorsese-providers' `zip` brings getrandom 0.4 into the `dev`
 # build without `std`/`sys_rng`, which a test-only crate (`rand`) turns on, so
 # `cargo test` would build its own copy of everything above it. Never `use`d.
-getrandom = { version = "0.4.3", optional = true, features = ["std", "sys_rng"] }
-
-[target.'cfg(target_os = "macos")'.dependencies]
+getrandom = { version = "0.4.3", features = ["std", "sys_rng"] }
 # The editor's Dock icon (#669): winit has no window icon on macOS, so it is set on
 # `NSApplication`. The same versions arboard already brings into the tree.
 objc2 = "0.6.4"
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData"] }
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSApplication", "NSImage", "NSResponder"] }
-
-[target.'cfg(target_os = "linux")'.dependencies]
 # The Wayland half of the clipboard (#612), on the window's own `wl_display`; also
 # already in the tree through egui-winit. Pinned to 0.7.2: 0.7.3 only moves to SCTK 0.20,
 # which duplicates winit 0.30's SCTK 0.19 stack (5 crates). Remove the pin when winit moves
 # to SCTK 0.20; egui-winit requires `^0.7.2`.
 smithay-clipboard = "=0.7.2"
-
-[dev-dependencies]
 # Property-based testing for the deterministic sim (#123): generators are seeded
 # by proptest itself (no wall-clock), so the determinism guard is respected. `std` is for
 # the regex strategies; no test uses fork, timeout or bit-set strategies.
 proptest = { version = "1", default-features = false, features = ["std"] }
+
+[dependencies]
+# The moved modules (crates/), re-exported in src/lib.rs under their old names.
+rusty-core = { workspace = true }
+rusty-time = { workspace = true }
+winit = { workspace = true }
+wgpu = { workspace = true }
+naga_oil = { workspace = true }
+naga = { workspace = true }
+egui = { workspace = true, optional = true }
+egui-wgpu = { workspace = true, optional = true }
+egui-winit = { workspace = true, optional = true }
+egui-phosphor = { workspace = true, optional = true }
+mlua = { workspace = true }
+glam = { workspace = true }
+bevy_mikktspace = { workspace = true }
+hecs = { workspace = true }
+rustc-hash = { workspace = true }
+xxhash-rust = { workspace = true }
+rapier3d = { workspace = true }
+image = { workspace = true }
+ktx2 = { workspace = true }
+block_compression = { workspace = true }
+tobj = { workspace = true }
+gltf = { workspace = true }
+ufbx = { workspace = true }
+meshopt = { workspace = true }
+bytemuck = { workspace = true }
+env_logger = { workspace = true }
+log = { workspace = true }
+pollster = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+skrifa = { workspace = true }
+harfrust = { workspace = true }
+gilrs = { workspace = true }
+notify = { workspace = true, optional = true }
+arboard = { workspace = true }
+kira = { workspace = true }
+symphonia = { workspace = true }
+zimmer = { workspace = true }
+scorsese-providers = { workspace = true, optional = true }
+scorsese-core = { workspace = true, optional = true }
+libloading = { workspace = true, optional = true }
+getrandom = { workspace = true, optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = { workspace = true }
+objc2-foundation = { workspace = true }
+objc2-app-kit = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+smithay-clipboard = { workspace = true }
+
+[dev-dependencies]
+# The in-crate tests' shared helpers (`crate::test_temp`), a crate of their own so
+# every member's tests reach them (crates/test-support).
+rusty-test-support = { workspace = true }
+proptest = { workspace = true }
 
 # Dev builds (#487); `cargo test` inherits this profile, and so do CI, coverage and
 # mutants. rusty's own crate stays at opt-level 0 so an edit rebuilds in seconds, and

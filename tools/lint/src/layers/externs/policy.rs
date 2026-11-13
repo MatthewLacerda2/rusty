@@ -1,6 +1,6 @@
 //! What the crate half of the table needs beyond one row per module.
 
-/// A crate only files under one of `within` may name (paths from the repo root).
+/// A crate only files under one of `within` may name (module paths: `crate::modules`).
 pub struct Confined {
     pub krate: &'static str,
     pub within: &'static [&'static str],

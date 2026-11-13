@@ -72,6 +72,15 @@ impl Scan {
         self.sources.get(path).map_or("", String::as_str)
     }
 
+    /// The text of the scanned file at module path `at` (`crate::modules`), wherever
+    /// it lives; empty when none is.
+    pub fn module_source(&self, at: &str) -> &str {
+        self.files
+            .iter()
+            .find(|p| crate::modules::module_path(p) == at)
+            .map_or("", |p| self.source(p))
+    }
+
     /// For each line of a scanned file, whether it is test code (`test_code.rs`).
     pub fn test_lines(&self, path: &str) -> &[bool] {
         self.test_lines.get(path).map_or(&[], Vec::as_slice)

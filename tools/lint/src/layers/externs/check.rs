@@ -65,7 +65,7 @@ fn source(layers: &[Layer], policy: &Policy, uses: &[Use], out: &mut Vec<String>
                 u.at, u.module
             ));
         }
-        let path = u.at.split(':').next().unwrap_or("");
+        let path = crate::modules::module_path(u.at.split(':').next().unwrap_or(""));
         for c in policy.confined.iter().filter(|c| c.krate == k) {
             if !c.within.iter().any(|w| path.starts_with(&format!("{w}/"))) {
                 out.push(format!(

@@ -6,7 +6,7 @@ run ratchets against. The run itself is an informational signal, but the floor
 file is not: "never lower one silently to make a table green" was a sentence in
 the file's header, `docs/testing.md` and the ci-merge skill, and nothing held
 it. A floor that drops (or a floored module that disappears while its
-`src/<module>/` is still there) is a finding unless the lowered line carries an
+`src/<module>/`, or its moved `crates/<module>/src/`, is still there) is a finding unless the lowered line carries an
 inline reason:
 
     api 85.00  # reason: the Sound.* adapter moved out of api (#1234)
@@ -28,6 +28,8 @@ from __future__ import annotations
 
 import subprocess
 import sys
+
+from modules import module_dir
 from pathlib import Path
 from typing import Callable
 
@@ -84,7 +86,7 @@ def against(base_ref: str, root: Path) -> list[str]:
     merge_base = git("merge-base", "HEAD", base_ref, cwd=root).strip()
     base = git("show", f"{merge_base}:{BASELINE}", cwd=root)
     head = (root / BASELINE).read_text()
-    return findings(base, head, lambda m: (root / "src" / m).is_dir())
+    return findings(base, head, lambda m: module_dir(root, m).is_dir())
 
 
 def main() -> None:

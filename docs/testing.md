@@ -421,7 +421,8 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
   instead. Production code that really owns the process (`project::open` moving
   the working directory) opts out inline with `#[expect(…, reason = "…")]`.
   In-crate tests have the same helper,
-  `crate::test_temp::dir()` (#999); the `test-temp-dir` rule fails a bare
+  `crate::test_temp::dir()` (#999), which a moved crate's tests call as
+  `rusty_test_support::temp::dir()` (`crates/test-support/`); the `test-temp-dir` rule fails a bare
   `std::env::temp_dir()` in test code (see `linting.md`).
 - **A path a test expects is spelled as the engine writes it**: a plain
   `Path::join("a/b/c")` or `"a/b/c"`, `/`-separated, with a `\` read as part of a

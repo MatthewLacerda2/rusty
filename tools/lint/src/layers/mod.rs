@@ -34,7 +34,8 @@ use std::process::exit;
 
 const REPORT: &str = ".lint/report.txt";
 
-/// The sim modules' directories, derived from the table's `sim` marks.
+/// The sim modules' directories at their module paths (`src/<m>`, wherever the
+/// module lives: `crate::modules`), derived from the table's `sim` marks.
 pub fn sim_dirs() -> Vec<String> {
     table::LAYERS
         .iter()
@@ -43,8 +44,9 @@ pub fn sim_dirs() -> Vec<String> {
         .collect()
 }
 
-/// The platform modules' roots (`src/<module>/mod.rs`): the only files that may opt
-/// out of the sim's clock and RNG ban (#757).
+/// The platform modules' roots at their module paths (`src/<module>/mod.rs`, a
+/// moved one's `lib.rs`): the only files that may opt out of the sim's clock and
+/// RNG ban (#757).
 pub fn platform_roots() -> Vec<String> {
     table::LAYERS
         .iter()
@@ -53,9 +55,9 @@ pub fn platform_roots() -> Vec<String> {
         .collect()
 }
 
-/// Entry point: measure the module graph under `src/` and check it against the table.
+/// Entry point: measure the module graph and check it against the table.
 pub fn run() {
-    let tree = scan::Tree::read(Path::new("src"));
+    let tree = scan::Tree::read(Path::new(""));
     let edges = graph::edges(&tree);
     let mut violations = check::all(
         table::LAYERS,
@@ -64,11 +66,7 @@ pub fn run() {
         &graph::modules(&tree),
         &edges,
     );
-    violations.extend(externs::violations(
-        table::LAYERS,
-        Path::new("Cargo.toml"),
-        &tree,
-    ));
+    violations.extend(externs::violations(table::LAYERS, Path::new(""), &tree));
     report(&violations);
     if violations.is_empty() {
         println!("layers: ok");

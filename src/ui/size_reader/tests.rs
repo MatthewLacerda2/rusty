@@ -13,10 +13,10 @@ use crate::components::{
     RectTransformComponent,
 };
 use crate::core::fs::freshness::MISS_RETRY_FRAMES;
-use crate::core::fs::written::contract::{follows_rebakes, Bake};
 use crate::procgen::{bake::bake_to_png, Image, Slot};
 use crate::scene::Scene;
 use crate::ui::{TextureSizes, UiLayout, UiView};
+use rusty_test_support::rebakes::{follows_rebakes, Bake};
 
 /// A canvas holding one Image of `texture`, fitted to its preferred size.
 pub(super) fn fitted_image(texture: &str) -> (Scene, u32) {

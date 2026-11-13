@@ -13,7 +13,6 @@ mod tests;
 
 pub use find::flatten;
 
-use super::graph::owner;
 use super::scan::Tree;
 use super::table::Layer;
 use std::collections::BTreeSet;
@@ -27,24 +26,33 @@ pub struct Use {
     pub at: String,
 }
 
-/// Check the crates under `src` against the table and `Cargo.toml`.
-pub fn violations(layers: &[Layer], manifest: &Path, tree: &Tree) -> Vec<String> {
-    let Ok(text) = fs::read_to_string(manifest) else {
+/// Check the modules' crates against the table and the manifests: the root
+/// package's `Cargo.toml` and every member's under `root`.
+pub fn violations(layers: &[Layer], root: &Path, tree: &Tree) -> Vec<String> {
+    let manifest = root.join("Cargo.toml");
+    let Ok(text) = fs::read_to_string(&manifest) else {
         return vec![format!(
             "NO_MANIFEST {} — cannot read it",
             manifest.display()
         )];
     };
-    let deps = cargo::dependencies(&text);
+    let mut deps = cargo::dependencies(&text);
+    for member in crate::modules::member_manifests(root) {
+        deps.extend(cargo::dependencies(
+            &fs::read_to_string(member).unwrap_or_default(),
+        ));
+    }
+    deps.sort();
+    deps.dedup();
     let uses = uses(tree, &deps.iter().cloned().collect());
     check::all(layers, &policy::POLICY, &deps, &uses)
 }
 
-/// Every external-crate reference in non-test module code under `src`.
+/// Every external-crate reference in non-test module code.
 fn uses(tree: &Tree, crates: &BTreeSet<String>) -> Vec<Use> {
     let mut out = Vec::new();
     for (file, content) in tree.live_files() {
-        let Some(module) = owner(&tree.src, file) else {
+        let Some(module) = tree.owner(file) else {
             continue;
         };
         let norm = file.to_string_lossy().into_owned();

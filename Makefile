@@ -32,7 +32,7 @@ export PROPTEST_RNG_SEED ?= $(PROPTEST_SEED)
 # `deny` sits last: its failures are about dependencies (and it needs the network),
 # so a code failure reports first. GATES is exactly the two lists joined —
 # `make scripts` (test_gate_mirror.py) fails when it is anything else.
-QUICK_GATES := fmt size rules layers determinism direction components parity test-lint scripts feature-split docrefs
+QUICK_GATES := fmt size rules layers determinism direction components parity test-lint scripts feature-split player-tree docrefs
 HEAVY_GATES := clippy doc test deny
 GATES := $(QUICK_GATES) $(HEAVY_GATES)
 # Checks on the gate runner itself, run before any gate.
@@ -40,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-explore test-one-process dead-pub editor-capture game game-test export launcher bench bless-converters
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote move-crate test-explore test-one-process dead-pub editor-capture game game-test export launcher bench bless-converters
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -161,6 +161,11 @@ test-lint: ## [gate] tools/lint's own tests
 # rebuild that crate and everything above it (#552). No build: `cargo tree` twice.
 feature-split: ## [gate] No dev-dependency turns on a feature the normal build lacks (docs/testing.md)
 	python3 .github/scripts/feature_split.py
+
+# The shipped player (`--no-default-features`) resolves no egui, no editor or dev
+# crate and no provider HTTP client: clippy only proves the code never names them.
+player-tree: ## [gate] The player build links no editor, dev layer or HTTP client (docs/linting.md)
+	python3 .github/scripts/player_tree.py
 
 # A path, make verb or API namespace the docs name must exist (#973): agents drive
 # rusty by its docs, and a move that leaves a reference behind sends them searching.
@@ -330,6 +335,11 @@ review-level: ## The independent review's level (high or medium) and why. make r
 # re-briefs by their `Round:` line. A report, never a gate: exits 0.
 rebriefs: ## Briefs per issue and re-briefs by Round. ARGS="--since 2026-10-29" sets the window
 	@python3 .github/scripts/rebriefs.py $(ARGS)
+
+# The mechanical half of moving a module into its own crate (crates/CLAUDE.md).
+move-crate: ## Move a module into crates/<m>/: make move-crate MODULE=<m>, then fix what it lists
+	@test -n "$(MODULE)" || { echo "move-crate: name the module: make move-crate MODULE=<m>" >&2; exit 2; }
+	@python3 .github/scripts/move_crate.py $(MODULE)
 
 # ---- signals (#750)---------------------------------------------------------
 

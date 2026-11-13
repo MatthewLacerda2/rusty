@@ -26,6 +26,7 @@
 use super::finding::{allowed, Finding};
 use super::scan::Scan;
 use crate::code::{code_lines, is_ident};
+use crate::modules::module_path;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[path = "api_parity_names.rs"]
@@ -54,7 +55,7 @@ pub fn run(scan: &Scan) -> Vec<Finding> {
         let files = scan
             .files
             .iter()
-            .filter(|p| dirs.iter().any(|d| p.starts_with(d)));
+            .filter(|p| dirs.iter().any(|d| module_path(p).starts_with(d)));
         files
             .flat_map(|p| ops_named(scan.source(p), scan.test_lines(p)))
             .collect()
@@ -62,18 +63,18 @@ pub fn run(scan: &Scan) -> Vec<Finding> {
     let ops: BTreeMap<String, &str> = scan
         .files
         .iter()
-        .filter(|p| p.starts_with(AUTHORING))
+        .filter(|p| module_path(p).starts_with(AUTHORING))
         .map(|p| (p.clone(), scan.source(p)))
         .collect();
     let mut api = named(API);
     for (path, source) in ops
         .iter()
-        .filter(|(p, _)| ROWS.iter().any(|d| p.starts_with(d)))
+        .filter(|(p, _)| ROWS.iter().any(|d| module_path(p).starts_with(d)))
     {
         api.extend(local_ops_named(
             source,
             scan.test_lines(path),
-            &module_of(path),
+            &module_of(&module_path(path)),
         ));
     }
     check(&named(&[EDITOR]), &api, &ops)

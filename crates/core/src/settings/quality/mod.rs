@@ -1,0 +1,175 @@
+//! crates/core/src/settings/quality/ — quality presets: the game's named bundles of
+//! per-effect quality values (#1522), HDRP's model.
+//!
+//! Every post effect with a cost knob carries a [`EffectQuality`] selector on the
+//! camera or volume. `Low` / `Medium` / `High` take that effect's values from the
+//! **active preset** (its row for that level); `Custom` uses the values authored on
+//! the volume beside the selector. So a preset writes the defaults a volume opts
+//! into, and a volume can always say exactly what it wants.
+//!
+//! The presets are the game's, as Unity's Project Settings → Quality levels are:
+//! they live in `project.rusty` (`"quality"`, [`QualityPresets`]), a new project is
+//! seeded with `Low`, `Medium` and `High` (`seeds`), and the game may edit, rename,
+//! add to or delete them. The engine gates no effect on a preset: an effect that is
+//! on runs, at the quality its settings say. Plain data, no GPU types — the render
+//! layer reads the values (#494).
+
+use serde::{Deserialize, Serialize};
+
+mod partial;
+mod presets;
+mod seeds;
+
+pub use presets::{QualityPreset, QualityPresets};
+
+crate::named_enum! {
+    /// Which values an effect's cost knobs take: one of the active preset's three
+    /// levels, or the ones authored beside the selector.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+    pub enum EffectQuality {
+        Low = "Low",
+        /// HDRP's default level.
+        #[default]
+        Medium = "Medium",
+        High = "High",
+        /// The values on the camera or volume itself.
+        Custom = "Custom",
+    }
+}
+
+impl EffectQuality {
+    /// The effect's value at this level: `levels`' row, or `custom` for `Custom`.
+    pub fn pick<T: Copy>(self, levels: &Levels<T>, custom: T) -> T {
+        match self {
+            EffectQuality::Low => levels.low,
+            EffectQuality::Medium => levels.medium,
+            EffectQuality::High => levels.high,
+            EffectQuality::Custom => custom,
+        }
+    }
+}
+
+/// The coarsest working resolution a quality value may ask for: a quarter.
+pub const MAX_RESOLUTION_DIVISOR: u32 = 4;
+
+/// One effect's values at a preset's three levels.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Levels<T> {
+    pub low: T,
+    pub medium: T,
+    pub high: T,
+}
+
+pub(super) const fn levels<T>(low: T, medium: T, high: T) -> Levels<T> {
+    Levels { low, medium, high }
+}
+
+/// The SSAO pass's cost (#436): its sample count and working resolution.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SsaoQuality {
+    /// Hemisphere samples traced per occlusion texel.
+    pub samples: u32,
+    /// The occlusion target is the view's size divided by this (1 = full).
+    pub resolution_divisor: u32,
+}
+
+/// The SSIL gather's cost (#1750): its sample count and working resolution.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SsilQuality {
+    /// Hemisphere samples gathered per texel.
+    pub samples: u32,
+    /// The gather runs at the view's size divided by this (1 = full).
+    pub resolution_divisor: u32,
+}
+
+/// The SSR ray march (#1521): how many steps, how long each at most in world
+/// units. Its reach is at most their product: a step is also held to
+/// `max(1/64, 1/steps)` of the screen's shorter side (#2004), so a ray that
+/// crosses the screen fast reaches less, but any count can cross the screen.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SsrQuality {
+    pub steps: u32,
+    pub step_length: f32,
+}
+
+/// Volumetric fog's froxel grid (#1703): froxels across the view (up is `9/16` of
+/// it) and depth slices out to its distance. Its cost scales with their product.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VolumetricFogQuality {
+    pub resolution: u32,
+    pub slices: u32,
+}
+
+/// Every per-effect quality value one preset holds. A value a preset leaves out,
+/// whole or in part, is the seeded `Medium` preset's (`partial`).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct QualityValues {
+    #[serde(deserialize_with = "partial::ssao")]
+    pub ssao: Levels<SsaoQuality>,
+    #[serde(deserialize_with = "partial::ssil")]
+    pub ssil: Levels<SsilQuality>,
+    #[serde(deserialize_with = "partial::ssr")]
+    pub ssr: Levels<SsrQuality>,
+    /// Bloom's buffer is the view's size divided by this.
+    #[serde(deserialize_with = "partial::bloom")]
+    pub bloom_resolution_divisor: Levels<u32>,
+    /// Depth of field blurs at the view's size divided by this (#1445).
+    #[serde(deserialize_with = "partial::depth_of_field")]
+    pub depth_of_field_resolution_divisor: Levels<u32>,
+    /// Motion blur's taps per pixel (#1436).
+    #[serde(deserialize_with = "partial::motion_blur")]
+    pub motion_blur_samples: Levels<u32>,
+    #[serde(deserialize_with = "partial::volumetric_fog")]
+    pub volumetric_fog: Levels<VolumetricFogQuality>,
+    /// The UI backdrop blur's working-resolution divisor (#426), a power of two. The
+    /// UI has no volume, so it takes one value, not three levels.
+    pub ui_blur_divisor: u32,
+    /// Which casters draw a shadowmasked light's realtime shadow (#1695), Unity's
+    /// `QualitySettings.shadowmaskMode`: one value per preset, as Unity keeps it
+    /// per quality level.
+    pub shadowmask_mode: ShadowmaskMode,
+    /// Whether a camera with `use_occlusion_culling` culls its opaque instances by
+    /// the GPU's depth pyramid (#1963), Unity 6's *GPU Occlusion* toggle on the URP
+    /// asset: on in every seeded preset. The baked PVS (#1714) does not read it.
+    pub gpu_occlusion_culling: bool,
+    /// Whether that cull also tests a big mesh's clusters one by one (#1968), so
+    /// the part of a canopy or a building shell another wall hides is not drawn:
+    /// the culling half of UE5's Nanite. On in every seeded preset; it does
+    /// nothing with `gpu_occlusion_culling` off.
+    pub gpu_cluster_culling: bool,
+}
+
+crate::named_enum! {
+    /// Unity's *Shadowmask Mode* (#1695), read only where the scene's Mixed
+    /// Lighting Mode is `Shadowmask`.
+    ///
+    /// * `Shadowmask` — only dynamic casters draw a `Mixed` light's realtime shadow;
+    ///   static casters' shadows come from the baked mask at every distance, and
+    ///   the darker of the two wins. Cheaper: static casters stay out of its maps.
+    /// * `DistanceShadowmask` — every caster draws it within the shadow distance,
+    ///   fading to the baked mask past it.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum ShadowmaskMode {
+        #[default]
+        Shadowmask = "Shadowmask",
+        DistanceShadowmask = "DistanceShadowmask",
+    }
+}
+
+impl QualityValues {
+    /// The UI backdrop blur's divisor, as the blur takes it: a power of two, `1..=8`.
+    pub fn backdrop_divisor(&self) -> u32 {
+        self.ui_blur_divisor.clamp(1, 8).next_power_of_two()
+    }
+}
+
+impl Default for QualityValues {
+    /// The seeded `Medium` preset's values: what runs when a game defines none.
+    fn default() -> Self {
+        seeds::medium()
+    }
+}
+
+#[cfg(test)]
+mod tests;

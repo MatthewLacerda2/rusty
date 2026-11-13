@@ -36,7 +36,7 @@ pub(crate) fn discover() -> Vec<String> {
 
 /// [`discover`] under the repo `root`, as a result (testable from any directory).
 pub(crate) fn discover_in(root: &Path) -> Result<Vec<String>, String> {
-    let dir = root.join(COMPONENTS_DIR);
+    let dir = crate::modules::real(root, COMPONENTS_DIR);
     let Some(src) = registry_source(&dir) else {
         return Err(format!(
             "NO_REGISTRY no `{DECL}` found under `{COMPONENTS_DIR}/` — the gates \

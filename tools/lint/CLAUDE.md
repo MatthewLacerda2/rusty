@@ -56,6 +56,11 @@ file is what a coder changing the tool must keep.
   the table (`layers::sim_dirs`, `layers::platform_roots`); a new check that asks
   "which modules are sim?" reads it the same way.
 - The table is exact, not a ceiling: an entry nothing uses fails as stale.
+- **A module lives in `src/<m>/` or `crates/<m>/src/`** while the engine is split
+  (`crates/CLAUDE.md`). A pass that scopes by module matches a path through
+  `modules::module_path` (and finds a folder with `modules::dir`), never a bare
+  `starts_with("src/…")`, and reports the real path. `.github/scripts/modules.py`
+  is its mirror: change both together.
 
 ## Docs
 - **`docs/linting.md` lists every gate**: one row per check in *What's enforced*, and

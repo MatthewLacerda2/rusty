@@ -4,9 +4,9 @@
 use super::{mark_stale, retry_appeared, CachedMesh};
 use crate::components::{ParticleEmitterComponent, ParticleRender, ParticleRenderMode};
 use crate::core::fs::freshness::MISS_RETRY_FRAMES;
-use crate::core::fs::written::contract::{follows_rebakes, Bake};
 use crate::core::fs::written::{note_written, written_since, Stale};
 use crate::render::MeshId;
+use rusty_test_support::rebakes::{follows_rebakes, Bake};
 use std::collections::HashMap;
 
 /// A two-triangle quad (6 indices).

@@ -5,7 +5,7 @@
 //! behind, and a stale path sends an agent to a place that is not there (the #1650
 //! audit fixed about 35 by hand). When a source file's first module-doc line
 //! (`//!`) or a shader's first line (`// …`) opens with a path under a repository
-//! root (`src/`, `tests/`, `tools/`, `fuzz/`, `engine/`, `.github/`), that path
+//! root (`src/`, `crates/`, `tests/`, `tools/`, `fuzz/`, `engine/`, `.github/`), that path
 //! must be the file's own. A `mod.rs` may instead name its directory, `src/a/b/`
 //! or `src/a/b/mod.rs` (a directory is written with its trailing `/`, a file with
 //! its extension; `tools/lint` is prose). A header that opens with no path, or a file with no
@@ -23,7 +23,9 @@ use std::path::Path;
 pub const RULE: &str = "self-path";
 
 /// What a header's leading path starts with to count as a path.
-const ROOTS: &[&str] = &["src/", "tests/", "tools/", "fuzz/", "engine/", ".github/"];
+const ROOTS: &[&str] = &[
+    "src/", "crates/", "tests/", "tools/", "fuzz/", "engine/", ".github/",
+];
 
 /// How many leading lines are searched for the header (attributes may come first).
 const HEAD: usize = 10;

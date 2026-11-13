@@ -54,6 +54,13 @@ fn reads_the_dependency_sections_only() {
     );
 }
 
+#[test]
+fn a_member_manifest_names_its_crates_but_not_the_workspaces_own() {
+    let manifest = "[dependencies]\nglam = { workspace = true }\nlog.workspace = true\n\
+        rusty-core = { workspace = true }\n";
+    assert_eq!(dependencies(manifest), ["glam", "log"]);
+}
+
 const ROWS: &[Layer] = &[
     Layer {
         module: "scene",

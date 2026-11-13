@@ -134,7 +134,7 @@ fn classify(field: &str, src: &str) -> Card {
 /// Every inspector-card source under [`CARDS_DIR`], one string per file.
 fn card_sources() -> Vec<String> {
     let mut files = Vec::new();
-    walk(Path::new(CARDS_DIR), &mut files);
+    walk(&crate::modules::real(Path::new(""), CARDS_DIR), &mut files);
     files.iter().map(read).collect()
 }
 

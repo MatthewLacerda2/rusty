@@ -21,24 +21,34 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 
 /// Banned paths, matched as whole path segments on non-comment source: the engine's
-/// own display modules, and the GPU / UI crates by name.
-const BANNED: &[&str] = &["crate::render", "crate::editor", "wgpu", "egui"];
+/// own display modules (by module path, or by crate once moved), and the GPU / UI
+/// crates by name.
+const BANNED: &[&str] = &[
+    "crate::render",
+    "crate::editor",
+    "rusty_render",
+    "rusty_editor",
+    "wgpu",
+    "egui",
+];
 
 const REPORT: &str = ".lint/report.txt";
 
 /// Entry point: scan the sim modules and fail on any sim → display-layer reference.
 pub fn run() {
     let mut violations = Vec::new();
-    for dir in crate::layers::sim_dirs() {
-        let dir = dir.as_str();
-        if !Path::new(dir).is_dir() {
+    for at in crate::layers::sim_dirs() {
+        let module = at.strip_prefix("src/").unwrap_or(&at);
+        let dir = crate::modules::dir(Path::new(""), module);
+        let dir = dir.to_string_lossy();
+        if !Path::new(dir.as_ref()).is_dir() {
             violations.push(format!(
                 "MISSING_DIR {dir} — a sim module in the layer table but absent; update tools/lint/src/layers/table.rs"
             ));
             continue;
         }
         let mut files = Vec::new();
-        walk(Path::new(dir), &mut files);
+        walk(Path::new(dir.as_ref()), &mut files);
         for path in files {
             scan_file(&path, &mut violations);
         }

@@ -21,7 +21,8 @@ fn test_file(path: &str) -> bool {
 pub fn test_lines(path: &str, source: &str, declared_test_only: bool) -> Vec<bool> {
     let stripped = code_lines(source);
     let lines: Vec<&str> = stripped.iter().map(|l| l.as_ref()).collect();
-    if !(path.starts_with("src/") || path.starts_with("tests/")) {
+    let at = crate::modules::module_path(path);
+    if !(at.starts_with("src/") || at.starts_with("tests/")) {
         return vec![false; lines.len()];
     }
     if declared_test_only || test_file(path) {
