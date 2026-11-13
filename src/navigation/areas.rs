@@ -22,15 +22,11 @@
 //!   invalidates every cached agent path so agents re-plan on the next tick.
 
 pub use crate::scene::nav_settings::{
-    default_areas, NavArea, ALL_AREAS, MAX_AREAS, MIN_AREA_COST, NOT_WALKABLE_AREA, WALKABLE_AREA,
+    area_index, clamp_cost, default_areas, NavArea, ALL_AREAS, MAX_AREAS, MIN_AREA_COST,
+    NOT_WALKABLE_AREA, WALKABLE_AREA,
 };
 
-use super::{NavMeshSettings, NavigationGraph};
-
-/// A cost as the table stores it: at least [`MIN_AREA_COST`], `None` when not finite.
-pub fn clamp_cost(cost: f32) -> Option<f32> {
-    cost.is_finite().then(|| cost.max(MIN_AREA_COST))
-}
+use super::NavigationGraph;
 
 /// An authored area id as the bake reads it: one past the table's limit (a
 /// hand-edited scene file) is clamped to the last id, so it never indexes past it.
@@ -48,43 +44,9 @@ pub fn cost_table(areas: &[NavArea]) -> [f32; MAX_AREAS] {
     costs
 }
 
-/// The index of the area called `name` (case-sensitive, as Unity), if defined.
-pub fn area_index(areas: &[NavArea], name: &str) -> Option<u8> {
-    areas.iter().position(|a| a.name == name).map(|i| i as u8)
-}
-
 /// Whether `mask` lets an agent into `area`.
 pub fn in_mask(mask: u32, area: u8) -> bool {
     (area as usize) < MAX_AREAS && mask & (1 << area) != 0
-}
-
-impl NavMeshSettings {
-    /// Set the cost of the area called `name` (clamped to at least 1), returning its
-    /// id, or `None` when no such area exists or the cost is not finite. The editor's
-    /// area table and `Navigation.SetAreaCost` both write through here.
-    pub fn set_area_cost(&mut self, name: &str, cost: f32) -> Option<u8> {
-        let cost = clamp_cost(cost)?;
-        let i = area_index(&self.areas, name)?;
-        self.areas[i as usize].cost = cost;
-        Some(i)
-    }
-
-    /// Define the area `name` with `cost`, or re-cost it when it exists. Returns its
-    /// id, or `None` when the table is full, the name is empty or the cost not finite.
-    pub fn define_area(&mut self, name: &str, cost: f32) -> Option<u8> {
-        let clamped = clamp_cost(cost)?;
-        if let Some(i) = self.set_area_cost(name, cost) {
-            return Some(i);
-        }
-        if name.is_empty() || self.areas.len() >= MAX_AREAS {
-            return None;
-        }
-        self.areas.push(NavArea {
-            name: name.to_string(),
-            cost: clamped,
-        });
-        Some((self.areas.len() - 1) as u8)
-    }
 }
 
 impl NavigationGraph {
@@ -130,21 +92,6 @@ mod tests {
         assert_eq!(area_index(&areas, "Mud"), Some(3));
         assert_eq!(area_index(&areas, "mud"), None, "names are case-sensitive");
         assert_eq!(clamp_cost(f32::NAN), None);
-    }
-
-    #[test]
-    fn defining_areas_appends_rows_up_to_the_limit() {
-        let mut s = NavMeshSettings::default();
-        assert_eq!(s.define_area("Fire", 10.0), Some(2));
-        assert_eq!(s.define_area("Fire", 0.5), Some(2), "redefining re-costs");
-        assert_eq!(s.areas[2].cost, 1.0, "costs clamp to 1");
-        assert_eq!(s.set_area_cost("Smoke", 2.0), None, "unknown area");
-        assert_eq!(s.define_area("", 2.0), None);
-        assert_eq!(s.define_area("Ice", f32::INFINITY), None);
-        for i in s.areas.len()..MAX_AREAS {
-            assert!(s.define_area(&format!("A{i}"), 1.0).is_some());
-        }
-        assert_eq!(s.define_area("Overflow", 1.0), None, "32 areas at most");
     }
 
     #[test]

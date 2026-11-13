@@ -3303,6 +3303,7 @@ dependencies = [
  "rusty-core",
  "rusty-ecs",
  "rusty-procgen",
+ "rusty-scene",
  "rusty-shadergen",
  "rusty-test-support",
  "rusty-time",
@@ -3385,6 +3386,26 @@ dependencies = [
  "glam 0.33.12",
  "image",
  "rusty-core",
+ "rusty-test-support",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "rusty-scene"
+version = "0.1.0"
+dependencies = [
+ "glam 0.33.12",
+ "image",
+ "log",
+ "mlua",
+ "rapier3d",
+ "rusty-asset",
+ "rusty-components",
+ "rusty-core",
+ "rusty-ecs",
+ "rusty-procgen",
+ "rusty-shadergen",
  "rusty-test-support",
  "serde",
  "serde_json",

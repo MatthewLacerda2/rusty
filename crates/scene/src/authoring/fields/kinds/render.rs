@@ -1,0 +1,140 @@
+//! crates/scene/src/authoring/fields/kinds/render.rs — the rendering components' field tables:
+//! `Transform`, `Mesh`, `Material`, `Light`, `Camera`, `PostProcessing` and
+//! `LODGroup` and `LightProbeProxyVolume`.
+
+use super::super::table::{group, inspect, op, part, ro, unheld, with, Group};
+use super::super::value::Mask;
+use super::NO_OP;
+use crate::authoring::{
+    rendering::camera, rendering::light, rendering::light_probe_proxy_volume as lppv,
+    rendering::lod_group as lod, rendering::mesh, rendering::post_processing as vc,
+};
+use rusty_components::rendering::camera::RenderTarget;
+use rusty_components::{
+    CameraComponent, LightComponent, LightProbeProxyVolumeComponent, LodGroupComponent, LodLevel,
+    MaterialComponent, MeshComponent, PostProcessingComponent, TransformComponent,
+};
+
+const CONES: Group<LightComponent> =
+    group!(|l, inner_cone: f32, outer_cone: f32| light::set_cones(l, inner_cone, outer_cone));
+
+const MESH: &str = "set by the model or primitive the entity was made from";
+
+inspect! {
+    TransformComponent => transform, transform_mut, &[
+        ro!("position", "Transform.SetLocalPosition / SetPosition write it"),
+        ro!("rotation", "Transform.SetLocalRotation / SetRotation write it"),
+        ro!("scale", "Transform.SetLocalScale writes it"),
+    ];
+    MeshComponent => mesh, mesh_mut, &[
+        ro!("primitive_type", MESH),
+        ro!("asset_ref", MESH),
+        unheld!(
+            "rehydration holds it (mesh::hold_subdivisions), with the grid it builds",
+            with!("subdivisions", |m, n: u32| mesh::set_subdivisions(m, n)?)
+        ),
+        op!("cast_shadows", mesh::set_cast_shadows),
+        unheld!(
+            "rehydration holds it (mesh::hold_scale_in_lightmap) without copying the geometry",
+            op!("scale_in_lightmap", mesh::set_scale_in_lightmap)
+        ),
+        ro!("skeleton", MESH),
+        op!("max_draw_distance", mesh::set_max_draw_distance),
+        op!("min_screen_size", mesh::set_min_screen_size),
+    ], shown mesh::shown;
+    MaterialComponent => material, material_mut, &[
+        ro!("materials", "Material.Set points a slot at a library material"),
+    ];
+    LightComponent => light, light_mut, &[
+        op!("light_type", light::set_type),
+        op!("color", light::set_color),
+        op!("intensity", light::set_intensity),
+        op!("range", light::set_range),
+        part!("inner_cone", CONES),
+        part!("outer_cone", CONES),
+        op!("cast_shadows", light::set_cast_shadows),
+        with!("mode", |l, m: rusty_components::LightMode| {
+            light::set_mode(l, m)
+                .then_some(())
+                .ok_or_else(|| format!("an Area light is always Baked, not {}", m.name()))?
+        }),
+        op!("area_size", light::set_area_size),
+        op!("shadow_fade_distance", light::set_shadow_fade_distance),
+    ], shown light::shown;
+    CameraComponent => camera, camera_mut, &[
+        ro!("active", NO_OP),
+        op!("fov", camera::set_fov),
+        op!("fov_axis", camera::set_fov_axis),
+        op!("near", camera::set_near),
+        op!("far", camera::set_far),
+        with!("culling_mask", |c, v: Mask| camera::set_culling_mask(c, v.0)),
+        op!("render_order", camera::set_render_order),
+        op!("clear_flags", camera::set_clear_flags),
+        op!("motion_blur_active", camera::set_motion_blur_active),
+        op!("motion_blur_quality", camera::set_motion_blur_quality),
+        op!("motion_blur_samples", camera::set_motion_blur_samples),
+        op!("motion_blur_intensity", camera::set_motion_blur_intensity),
+        op!("motion_blur_max_length", camera::set_motion_blur_max_length),
+        op!("fxaa_active", camera::set_fxaa_active),
+        op!("taa_active", camera::set_taa_active),
+        op!("taa_quality", camera::set_taa_quality),
+        op!("taa_base_blend_factor", camera::set_taa_base_blend_factor),
+        op!("taa_variance_clamp_scale", camera::set_taa_variance_clamp_scale),
+        op!("taa_jitter_scale", camera::set_taa_jitter_scale),
+        op!("taa_mip_bias", camera::set_taa_mip_bias),
+        op!(
+            "taa_contrast_adaptive_sharpening",
+            camera::set_taa_contrast_adaptive_sharpening
+        ),
+        op!("projection", camera::set_projection),
+        op!("use_occlusion_culling", camera::set_use_occlusion_culling),
+        with!("target_texture", |c, v: Option<RenderTarget>| set_target(c, v)),
+    ];
+    PostProcessingComponent => post_processing, post_processing_mut, &vc::FIELDS;
+    LodGroupComponent => lod_group, lod_group_mut, &[
+        with!("levels", |g, v: Vec<LodLevel>| set_levels(g, v)),
+        op!("size", lod::set_size),
+    ];
+    LightProbeProxyVolumeComponent => light_probe_proxy_volume, light_probe_proxy_volume_mut, &[
+        op!("bounds_mode", lppv::set_bounds_mode),
+        op!("size", lppv::set_size),
+        op!("origin", lppv::set_origin),
+        op!("resolution_mode", lppv::set_resolution_mode),
+        op!("probe_density", lppv::set_probe_density),
+        op!("grid_resolution", lppv::set_grid_resolution),
+        op!("quality", lppv::set_quality),
+    ];
+}
+
+/// A camera's render target, whole: `None` draws to the screen again.
+fn set_target(c: &mut CameraComponent, target: Option<RenderTarget>) {
+    let Some(t) = target else {
+        return camera::set_target_texture(c, "", 0, 0);
+    };
+    camera::set_target_texture(c, &t.name, t.width, t.height);
+    camera::set_target_post_fx(c, t.post_fx);
+    camera::set_target_update_every(c, t.update_every);
+}
+
+/// The LOD levels, whole: the count through add/remove, then each level's
+/// renderers and threshold. A threshold is clamped between its neighbours, so
+/// they are first dropped to zero, coarsest first, and then set finest first: each
+/// one is then clamped only by the finer threshold just set. Two passes, not one
+/// per level.
+fn set_levels(g: &mut LodGroupComponent, levels: Vec<LodLevel>) {
+    while g.levels.len() > levels.len() {
+        lod::remove_level(g, g.levels.len() - 1);
+    }
+    while g.levels.len() < levels.len() {
+        lod::add_level(g);
+    }
+    for i in (0..levels.len()).rev() {
+        lod::set_level_height(g, i, 0.0);
+    }
+    for (i, level) in levels.iter().enumerate() {
+        lod::set_level_height(g, i, level.screen_height);
+    }
+    for (i, level) in levels.into_iter().enumerate() {
+        lod::set_renderers(g, i, level.renderers);
+    }
+}

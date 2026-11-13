@@ -109,6 +109,20 @@ def rewrite(text: str, module: str, deps: set[str]) -> tuple[str, set[str]]:
 
     # Siblings first: `crate::<m>::scene::` must not read as the sibling `scene`.
     text = re.sub(r"(?<![\w$])crate::(\w+)::", sibling, text)
+    # A macro's `$crate` is now this crate, so its `$crate::<dep>::` names the sibling's
+    # crate from the root (scene's field tables had two that did not build, #2141).
+    text = re.sub(r"\$crate::(\w+)::", lambda m: f"::{sibling(m)}" if m.group(1) in deps else m.group(0), text)
+    # `use crate::<dep>;` imported the sibling module bare, so its file writes `<dep>::`:
+    # the import goes and each `<dep>::` names the crate (scene's `rehydrate::warned`, #2141).
+    # So does `use crate::<dep>::{self, …}`, rewritten above to bind `rusty_<dep>`: its
+    # `self` goes too (scene's `asset_instance`, #2141).
+    for dep in sorted(deps):
+        bare = re.compile(rf"^[ \t]*use crate::{dep};\n", re.M)
+        grouped = re.compile(rf"(\buse rusty_{dep}::\{{)\s*self,\s*")
+        if bare.search(text) or grouped.search(text):
+            named.add(dep)
+            text = grouped.sub(r"\1", bare.sub("", text))
+            text = re.sub(rf"(?<![\w:$]){dep}::", f"rusty_{dep}::", text)
     # `pub(in crate::<m>)` named the module's root, which is now the crate's own; left
     # as it was it names no module of the crate and fails to build (ecs had 57, #2140).
     text = re.sub(rf"\bpub\(in crate::{module}\)", "pub(crate)", text.replace(f"crate::{module}::", "crate::"))
