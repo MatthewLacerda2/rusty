@@ -1,8 +1,8 @@
 //! crates/audio/src/lib.rs — the audio runtime (#212).
 //!
-//! The platform-layer audio engine: the [`AudioMaestro`] resource (one per World)
-//! owns the device/mixer, enforces a single master volume, holds the live roster of
-//! entity voices, and keeps the agent-facing introspection (a play-event log + a
+//! The audio engine, a sim crate stepped by sim time: the [`AudioMaestro`]
+//! resource (one per World) owns the device/mixer, enforces a single master volume,
+//! holds the live roster of entity voices, and keeps the agent-facing introspection (a play-event log + a
 //! per-source roster). Every tick ends by re-resolving every live voice
 //! (3D rolloff + pan from #213, `Time.timeScale` / pause) and handing the resulting
 //! [`VoiceMix`] to the backend (`mix.rs`, #412); the real device pans each voice
@@ -39,8 +39,8 @@ pub mod maestro;
 pub mod mix;
 pub mod mixer;
 pub mod occlusion;
-/// A test hook: the recording backend `app`'s audio tests assert on, compiled in
-/// every build since those tests are another crate's.
+// A test hook: the recording backend `app`'s audio tests assert on, compiled in
+// every build since those tests are another crate's (its own docs say so too).
 #[doc(hidden)]
 pub mod recording;
 pub mod reverb;

@@ -31,7 +31,10 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
    `orphan-seeds` lint fails on one).
 2. Inside the crate: `crate::<dep>::` → `rusty_<dep>::` for each dep in its table
    row (a macro's `$crate::<dep>::` → `::rusty_<dep>::`; a file importing the module
-   bare, `use crate::<dep>;` or `{self, …}`, has its `<dep>::` paths rewritten), then
+   bare, `use crate::<dep>;` or `{self, …}`, has its `<dep>::` paths rewritten and
+   the import dropped with its attributes; a re-export keeps its name, `pub use
+   rusty_<dep> as <dep>;` or `{self as <dep>, …}`, and `use crate::<dep> as x;`
+   becomes `use rusty_<dep> as x;`), then
    `crate::<m>::` → `crate::` and `pub(in crate::<m>)` → `pub(crate)` (siblings
    first, so a submodule named like a module, `crate::render::scene::`, stays the crate's own). A module the row does
    not list is left alone and listed: it is a unit test reaching up (*What the

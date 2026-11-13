@@ -13,7 +13,9 @@ so this makes them, and lists what it cannot decide:
 - in the crate's files: `crate::<dep>::` → `rusty_<dep>::` for each module its
   row of the layer table (`tools/lint/src/layers/table.rs`) lists as a dep (a
   macro's `$crate::<dep>::` → `::rusty_<dep>::`, and a file's `<dep>::` paths when it
-  imports the module bare, `use crate::<dep>;` or `{self, …}`), then `crate::<m>::` → `crate::` and `pub(in crate::<m>)` → `pub(crate)`
+  imports the module bare, `use crate::<dep>;` or `{self, …}`, dropped with the attributes above it; a
+  re-export keeps its name, `pub use rusty_<dep> as <dep>;`, and `use crate::<dep> as x;`
+  names the crate as `x`), then `crate::<m>::` → `crate::` and `pub(in crate::<m>)` → `pub(crate)`
   (no module `<m>` is left for it to name: ecs's 57 did not build, #2140), in that order, so a
   submodule named like a module, `crate::render::scene::`, stays the crate's
   own, the shared test helper (`crate::test_temp::dir()` →
