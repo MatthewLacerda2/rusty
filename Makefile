@@ -32,7 +32,7 @@ export PROPTEST_RNG_SEED ?= $(PROPTEST_SEED)
 # `deny` sits last: its failures are about dependencies (and it needs the network),
 # so a code failure reports first. GATES is exactly the two lists joined —
 # `make scripts` (test_gate_mirror.py) fails when it is anything else.
-QUICK_GATES := fmt size rules layers determinism direction components parity test-lint scripts feature-split docrefs
+QUICK_GATES := fmt size rules layers determinism direction components parity test-lint scripts feature-split player-tree docrefs
 HEAVY_GATES := clippy doc test deny
 GATES := $(QUICK_GATES) $(HEAVY_GATES)
 # Checks on the gate runner itself, run before any gate.
@@ -161,6 +161,11 @@ test-lint: ## [gate] tools/lint's own tests
 # rebuild that crate and everything above it (#552). No build: `cargo tree` twice.
 feature-split: ## [gate] No dev-dependency turns on a feature the normal build lacks (docs/testing.md)
 	python3 .github/scripts/feature_split.py
+
+# The shipped player (`--no-default-features`) resolves no egui, no editor or dev
+# crate and no provider HTTP client: clippy only proves the code never names them.
+player-tree: ## [gate] The player build links no editor, dev layer or HTTP client (docs/linting.md)
+	python3 .github/scripts/player_tree.py
 
 # A path, make verb or API namespace the docs name must exist (#973): agents drive
 # rusty by its docs, and a move that leaves a reference behind sends them searching.
@@ -331,6 +336,11 @@ review-level: ## The independent review's level (high or medium) and why. make r
 rebriefs: ## Briefs per issue and re-briefs by Round. ARGS="--since 2026-10-29" sets the window
 	@python3 .github/scripts/rebriefs.py $(ARGS)
 
+# The mechanical half of moving a module into its own crate (crates/CLAUDE.md).
+move-crate: ## Move a module into crates/<m>/: make move-crate MODULE=<m>, then fix what it lists
+	@test -n "$(MODULE)" || { echo "move-crate: name the module: make move-crate MODULE=<m>" >&2; exit 2; }
+	@python3 .github/scripts/move_crate.py $(MODULE)
+
 # ---- signals (#750)---------------------------------------------------------
 
 # Mutation testing on GitHub's runners, over exactly what SCOPE names: `diff`
@@ -339,11 +349,6 @@ rebriefs: ## Briefs per issue and re-briefs by Round. ARGS="--since 2026-10-29" 
 # the survivors' diffs. A signal, never a gate: survivors exit 0, and only "no
 # report" (a red, cancelled or missing run) exits 1. No PR runs mutation any
 # more, so ask for this before readying a branch that adds mechanism.
-# The mechanical half of moving a module into its own crate (crates/CLAUDE.md).
-move-crate: ## Move a module into crates/<m>/: make move-crate MODULE=<m>, then fix what it lists
-	@test -n "$(MODULE)" || { echo "move-crate: name the module: make move-crate MODULE=<m>" >&2; exit 2; }
-	@python3 .github/scripts/move_crate.py $(MODULE)
-
 mutants-remote: ## Mutation on GitHub's runners, scoped. make mutants-remote SCOPE=diff or SCOPE='src/physics/**'
 	@test -n "$(SCOPE)" || { \
 		echo "mutants-remote: what should be mutated? SCOPE=diff, or path globs" >&2; \

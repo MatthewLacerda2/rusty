@@ -9,6 +9,17 @@ from pathlib import Path
 import modules
 
 
+class Mirror(unittest.TestCase):
+    def test_the_rust_mirror_lists_the_same_non_modules(self):
+        rust = (Path(__file__).resolve().parents[4] / modules.RUST_MIRROR).read_text()
+        self.assertIsNone(modules.drift(rust))
+
+    def test_a_member_listed_in_one_mirror_only_is_named(self):
+        rust = 'pub const NOT_MODULES: &[(&str, &str)] = &[("test-support", "x"), ("bench", "y")];'
+        self.assertIn("only in tools/lint/src/modules.rs: ['bench']", modules.drift(rust))
+        self.assertIn("only in .github/scripts/modules.py: ['test-support']", modules.drift("fn f() {}"))
+
+
 class ModulePath(unittest.TestCase):
     def test_a_moved_file_reads_at_its_module_path(self):
         self.assertEqual(modules.module_path("crates/core/src/lib.rs"), "src/core/mod.rs")

@@ -65,9 +65,18 @@ def kind(scope: str) -> str:
 
 
 def matching(globs: list[str]) -> list[str]:
-    """The tracked Rust files the globs name, in git's glob dialect."""
-    listed = git("ls-files", "-z", "--", *(f":(glob){g}" for g in globs))
-    return sorted(p for p in listed.split("\0") if p.endswith(".rs"))
+    """The tracked Rust files the globs name, in git's glob dialect. One glob
+    that matches nothing is refused, not only all of them: a module moved to
+    `crates/<m>/src/` leaves its old `src/<m>/**` glob naming nothing, and the
+    other globs would hide it."""
+    found: set[str] = set()
+    for g in globs:
+        listed = git("ls-files", "-z", "--", f":(glob){g}")
+        rust = {p for p in listed.split("\0") if p.endswith(".rs")}
+        if not rust:
+            sys.exit(f"mutants-scope: no tracked Rust file matches {g!r} -- moved to crates/? (crates/CLAUDE.md)")
+        found |= rust
+    return sorted(found)
 
 
 def whole(files: list[str]) -> str:
@@ -147,11 +156,16 @@ def main() -> None:
     res.add_argument("--commit", help="the checked-out commit a `diff` is that commit's own change (#1934)")
     res.add_argument("--out", type=Path, required=True, help="where the plan JSON goes")
     res.add_argument("--diff", type=Path, required=True, help="where the scope's diff goes")
+    globs = sub.add_parser("globs", help="refuse any glob that names no tracked Rust file")
+    globs.add_argument("glob", nargs="+")
     chk = sub.add_parser("check", help="the scope line, from what --list planned")
     chk.add_argument("plan", type=Path, help="the JSON `resolve` wrote")
     chk.add_argument("planned", type=Path, help="`cargo mutants --list --json` output")
     args = parser.parse_args()
 
+    if args.command == "globs":
+        print(f"mutants-scope: {len(matching(args.glob))} files")
+        return
     if args.command == "resolve":
         plan, diff = resolve(args.scope, args.base, args.commit or None)
         args.out.write_text(json.dumps(plan))

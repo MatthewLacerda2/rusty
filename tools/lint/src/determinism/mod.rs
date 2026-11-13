@@ -89,6 +89,8 @@ const REPORT: &str = ".lint/report.txt";
 pub fn run() {
     let read = |p: &str| fs::read_to_string(p).unwrap_or_default();
     let mut violations = config_violations(&read("clippy.toml"), &read("Cargo.toml"));
+    // The root package holds the modules not yet moved: it inherits the policy too.
+    violations.extend(member_violations("Cargo.toml", &read("Cargo.toml")));
     for manifest in crate::modules::member_manifests(Path::new("")) {
         let at = manifest.to_string_lossy();
         violations.extend(member_violations(&at, &read(&at)));
@@ -140,8 +142,9 @@ fn config_violations(clippy_toml: &str, cargo_toml: &str) -> Vec<String> {
     missing.chain(undenied).chain(unset).collect()
 }
 
-/// A member crate that does not inherit the workspace's lints: its code would
-/// escape the clock ban and every deny above.
+/// A package (the root's or a member crate's) that does not inherit the
+/// workspace's lints: its code would escape the clock ban and every deny above.
+/// Defining `[workspace.lints]` applies it to nobody; each package opts in.
 fn member_violations(path: &str, manifest: &str) -> Vec<String> {
     let mut section = "";
     let inherits = manifest.lines().any(|l| {
@@ -155,7 +158,7 @@ fn member_violations(path: &str, manifest: &str) -> Vec<String> {
         Vec::new()
     } else {
         vec![format!(
-            "UNINHERITED {path} — a member crate takes the workspace's lint policy: \
+            "UNINHERITED {path} — every package takes the workspace's lint policy: \
              add `[lints]` with `workspace = true`"
         )]
     }

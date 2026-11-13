@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The llvm-cov ignore regex that isolates one floored module (#965).
+r"""The llvm-cov ignore regex that isolates one floored module (#965).
 
 `coverage.yml`'s ratchet measures each module named in `coverage-baseline.txt`
 on its own. The `regex` crate llvm-cov uses has no look-around, so a module is

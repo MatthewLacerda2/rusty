@@ -59,6 +59,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | One dependency graph | `make feature-split` (`.github/scripts/feature_split.py`) | **hard gate**: no dev-dependency turns on a feature the normal build lacks, so `cargo test` never rebuilds a shared crate (#552, #979; `docs/testing.md`) |
 | One fullscreen triangle | `tools/lint -- --rules` (`fullscreen-triangle`) | **hard gate**: no `.wgsl` under `engine/` but `fullscreen.wgsl` spells the triangle's `(i << 1u) & 2u`; `#import fullscreen` and call `fullscreen::triangle` / `uv` (#1370) |
 | One name table per enum | `tools/lint -- --rules` (`named-enum`) | **hard gate**: no file of `src/` hand-writes both a parse (`fn parse(_: &str) -> Option<Self>` in an `impl T`, or a free `fn parse_*(_: &str) -> Option<T>`) and a name (`fn name`/`fn as_str(self) -> &'static str`, or a free `fn *_name(_: T) -> &'static str`) for one type, nor a `const`/`static` table of `(T, &str)` pairs — a script-facing enum declares its names once with `core::named_enum!`, which writes `ALL`, `name`, a case-insensitive `parse`, `Display` and its serde (#1478); a parse that does more takes `// lint: allow(named-enum) <why>` (#1329) |
+| One player tree | `make player-tree` (`.github/scripts/player_tree.py`) | **hard gate**: the shipped player's resolution (`cargo tree -p rusty --no-default-features -e normal`) reaches no `egui*`, no `rusty-editor`, no `rusty-dev`, no `scorsese-providers` and no `ureq`; clippy on that feature set only proves the code never names them, while a manifest can still link one (a member's dependency without `optional`, `crates/CLAUDE.md`) |
 | One world space | `tools/lint -- --rules` (`world-space`) | **hard gate**: outside `ecs::world_space` and `components::transform`, no engine code line decomposes a matrix (`to_scale_rotation_translation`), names the retired `compute_world_matrix` / `world_matrix(` / `parent_world_matrix`, or folds a Transform over `ancestors(` — world space is read from `ecs::World`'s world API; test code is not scanned, and converting file data takes `// lint: allow(world-space) <why>` (#1196) |
 | Order-free lists stay sorted | `tools/lint -- --rules` (`sorted`) | **hard gate**: a list under a `// sorted: <why>` (or `<!-- sorted: <why> -->`) marker stays in order up to its first blank line, so two branches adding entries touch different lines (#911) |
 | Physics body changes are counted | `tools/lint -- --rules` (`body-table`) | **hard gate**: a non-test line of `src/physics/` that calls `.set_body_type(`, or `.insert(` / `.remove(` on `bodies`, fails, since the character controller sweeps a cached copy of the body table remade only when its change counter moves; go through `PhysicsWorld::insert_body` / `remove_body` / `ControllerBodies::retype`, which bump it and carry `// lint: allow(body-table) <why>` (#2061) |
@@ -80,7 +81,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Tagged engine warnings | `tools/lint -- --rules` (`log-tag`) | **hard gate**: every engine warning or error in `src/` (`log::warn!` / `log::error!`, an imported bare `warn!` / `error!`, `log!` at `Level::Warn`/`Level::Error`) opens its message with its module, `[Asset] …`, since those records reach the console and the session/MCP replies (#1139); a message that is not a literal takes `// lint: allow(log-tag) <why>` |
 | Test / fixture file length | `tools/lint` | <= 150 lines (every measured file under a `tests/` or `fixtures/` directory, whatever its language, a standalone `*_test.rs` or `test_*` file, and a `*_tests.rs` with no source beside it); a `<x>_tests.rs` **sibling** of `<x>.rs` (or of a `<x>/` module directory) shares the 300-line source cap |
 | Test source shape | `tools/lint -- --rules` (`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`) | **hard gate**: no inner `#![cfg]` in `tests/`, no user workspace in tests, a GPU only through `headless_or_skip` (#980) |
-| Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `crate::test_temp::dir()` / `crate::temp::dir()`, never a bare `std::env::temp_dir()` (#999) |
+| Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `crate::test_temp::dir()` (`rusty_test_support::temp::dir()` in a moved crate) / `crate::temp::dir()`, never a bare `std::env::temp_dir()` (#999) |
 | Tests | nextest + `cargo test --doc` (`make test`) | **hard gate**: the engine's tests and doctests, both feature sets; the GPU tests run on lavapipe (`docs/testing.md`) |
 | `tools/lint` stays std-only | `make test-lint` | its `Cargo.lock` names one package, itself (#935) |
 
@@ -161,8 +162,9 @@ round, so the gate list cannot silently lose a gate. `GATES` is `QUICK_GATES` pl
 ## The lint policy lives in `Cargo.toml`
 Crate-wide lint levels go in the root `Cargo.toml`'s `[workspace.lints]` table, never
 in command-line flags: a plain `cargo clippy`, rust-analyzer and CI then all read the
-same policy, so nothing is green locally and red in CI. Every member crate inherits it
-with `[lints] workspace = true`, and `make determinism` fails one that doesn't
+same policy, so nothing is green locally and red in CI. Every package, the root's and
+each member crate's, inherits it with `[lints] workspace = true` (defining
+`[workspace.lints]` applies it to nobody), and `make determinism` fails one that doesn't
 (`UNINHERITED`): its code would escape the clock ban and every deny. CI adds only `-D warnings`. Thresholds
 stay in `clippy.toml`. Module-scoped rules stay module-scoped — the sim modules'
 `#![deny(clippy::unwrap_used)]` below is deliberately not crate-wide (the

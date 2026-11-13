@@ -18,23 +18,32 @@ half moved for many PRs, and everything must work that way. This is the recipe.
 
 ## Moving a module, step by step
 `make move-crate MODULE=<m>` makes steps 1–4 and prints, as *by hand*, what a text
-edit cannot settle (a `crate::{…}` group, `CARGO_MANIFEST_DIR`, a feature gating an
-optional dependency). Read its diff: it is the recipe below, run.
+edit cannot settle (a `crate::{…}` group, `CARGO_MANIFEST_DIR`, an optional dependency
+no single `dev` / `editor` feature turns on, a feature other than those two, and every
+tracked file outside the crate still naming `src/<m>/`). Read its diff: it is the
+recipe below, run.
 1. `git mv src/<m> crates/<m>/src`, then `git mv crates/<m>/src/mod.rs
    crates/<m>/src/lib.rs`. Its `#![deny(clippy::unwrap_used)]` (a sim row) or its
    clock opt-out (a platform row) stays at the top of `lib.rs`.
-2. Inside the crate: `crate::<m>::` → `crate::`, and `crate::<dep>::` →
-   `rusty_<dep>::` for each dep in its table row. Headers that name a path
+2. Inside the crate: `crate::<dep>::` → `rusty_<dep>::` for each dep in its table
+   row, then `crate::<m>::` → `crate::` (siblings first, so a submodule named like a
+   module, `crate::render::scene::`, stays the crate's own). Headers that name a path
    (`//! src/<m>/x.rs — …`) become `crates/<m>/src/x.rs` (`make rules`, `self-path`).
 3. `crates/<m>/Cargo.toml`: `version`, `edition` and `publish` `.workspace = true`;
    `[lints] workspace = true` (`make determinism` fails a member without it: the
    clock ban and every deny live there); every dependency `{ workspace = true }`,
    the external crates exactly its table row's plus the common ones it names, its
-   sibling crates exactly its row's `deps`. A new external version goes in the
+   sibling crates exactly its row's `deps`. A crate only its tests name is a
+   `[dev-dependencies]` entry; one the root has under a `[target.…]` table keeps
+   that table. A new external version goes in the
    root's `[workspace.dependencies]`, never in a member.
 4. The root `Cargo.toml`: the crate in `[workspace.dependencies]` and the root's
-   `[dependencies]`; `src/lib.rs`: drop `pub mod <m>;`, add the re-export.
-5. `cargo check --workspace --all-targets` with `--features dev` and with
+   `[dependencies]`; `src/lib.rs`: drop `pub mod <m>;`, add the re-export. A
+   `pub mod` gated by a feature stays gated (*Features*).
+5. Every tracked file outside the crate that names `src/<m>/` (the tool lists them):
+   a file path (a fixture, a mutation glob, a doc) becomes `crates/<m>/src/…`; a
+   module path the lint tools read (the layer table, `externs/policy.rs`) stays.
+6. `cargo check --workspace --all-targets` with `--features dev` and with
    `--no-default-features`, then fix what the compiler names (below), then
    `make gates`.
 
@@ -60,9 +69,19 @@ optional dependency). Read its diff: it is the recipe below, run.
 
 ## Features
 - A crate holding `cfg(feature = "dev")` or `"editor"` code declares that feature
-  itself (`dev = []`, or the `dep:` it gates), and the root's feature forwards it
-  (`dev = ["rusty-core/dev", …]`). A crate with none declares none. The player
-  (`--no-default-features`) must still build without egui and without `dev`.
+  itself, and the root's feature forwards it (`dev = ["rusty-core/dev", …]`). A crate
+  with none declares none.
+- **A dependency the root declares `optional` stays optional in the crate**, turned
+  on by the crate's feature of the same name (`editor = ["dep:egui"]`); a sibling
+  crate with a `dev` / `editor` feature has it forwarded (`dev = ["rusty-core/dev"]`).
+- **A feature-gated module stays gated.** `#[cfg(feature = "dev")] pub mod dev;`
+  becomes `#[cfg(feature = "dev")] pub use rusty_dev as dev;`, the root depends on
+  `rusty-dev` with `optional = true`, and its `dev` feature turns it on
+  (`"dep:rusty-dev"`). A crate depending on such a sibling depends on it optionally
+  behind the same feature.
+- The player (`--no-default-features`) must still build without egui and without
+  `dev`, and must not *link* them: `make player-tree` fails when its resolution
+  reaches `egui*`, `rusty-editor`, `rusty-dev` or the providers' HTTP client.
 
 ## Profiles
 - `[profile.dev.package."*"]` optimises dependencies only, never a member, so a
@@ -73,9 +92,13 @@ optional dependency). Read its diff: it is the recipe below, run.
 `tools/lint` (`tools/lint/src/modules.rs`) and the scripts (`.github/scripts/modules.py`)
 read a moved file at its **module path**, `src/<m>/…`, so the layer table, the rules,
 the determinism and direction gates, `make review-level`'s table and the
-`stored-format` markers, coverage isolation and the mutation scopes hold a module in
-either place. Keep the two mirrors in step. A member that is no module of the table
-(`test-support`) is listed in both `NOT_MODULES`.
+`stored-format` markers, coverage isolation and a `SCOPE=diff` mutation run hold a
+module in either place. **A path glob does not**: `mutants-sweep.yml`'s
+`SWEEP_FILES`, `make mutants-remote SCOPE='src/<m>/**'` and a string path in another
+module's code name the file where it lies, so the move rewrites them (step 5);
+`mutants-scope.py` refuses any one glob that matches nothing. Keep the two mirrors in
+step. A member that is no module of the table (`test-support`) is listed in both
+`NOT_MODULES`, which `make scripts` holds equal (`modules.drift`).
 
 ## What the PR shows
 - The `cargo check` matrix and `make gates` green on its head.

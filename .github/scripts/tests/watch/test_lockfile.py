@@ -31,6 +31,10 @@ class Lockfile(unittest.TestCase):
         self.assertEqual(board.lock_waits(pulls, BOTS), {12: 10})
         self.assertEqual([p["number"] for p in order.ready(pulls, {}, set(), BOTS)], [11])
 
+    def test_a_members_manifest_is_a_lockfile_edit(self):
+        pulls = [editing(10, "crates/core/Cargo.toml"), editing(11, "Cargo.lock"), editing(12, "crates/core/src/lib.rs")]
+        self.assertEqual(board.lock_waits(pulls, BOTS), {11: 10})
+
     def test_one_editor_or_dependabot_holds_nobody(self):
         self.assertEqual(board.lock_waits([editing(10, "Cargo.lock"), editing(11, "README.md")], BOTS), {})
         bumps = [editing(9, "Cargo.lock", bot=True), editing(10, "Cargo.lock")]

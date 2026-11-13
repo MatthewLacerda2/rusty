@@ -182,6 +182,13 @@ jobs:
           REPORTS: ${{ steps.last.outputs.reports }}
         run: |
           set -f   # the globs are for cargo-mutants, not the shell
+          # Every glob must still name code: a module moved to crates/<m>/src/
+          # leaves its `src/<m>/**` naming nothing, silently out of the sweep.
+          if ! python3 .github/scripts/mutants-scope.py globs $SWEEP_FILES 2> globs-error.txt; then
+            cat globs-error.txt | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "::error::a SWEEP_FILES glob matches no tracked Rust file; see the job summary"
+            exit 1
+          fi
           files=()
           for glob in $SWEEP_FILES; do files+=(--file "$glob"); done
           if ! cargo mutants --list --workspace "${files[@]}" > mutants-list.txt 2> list-error.txt; then

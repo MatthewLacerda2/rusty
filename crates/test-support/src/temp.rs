@@ -1,4 +1,4 @@
-//! A scratch directory owned by one in-crate test (#629, #709, #999).
+//! A scratch directory owned by one test (#629, #709, #999).
 //!
 //! Under nextest every test is its own process and several run at once, and parallel
 //! worktrees share one system temp dir. Under `cargo test` (the nightly `cargo-test.yml`
@@ -6,7 +6,7 @@
 //! A fixed path under `std::env::temp_dir()` — or one keyed only on the process id —
 //! is therefore written by one test while another reads it. In-crate tests write
 //! under [`dir`] instead, keyed on both the process and the test. The integration
-//! suite has the same helper (`tests/temp.rs`). A pid is reused within one
+//! suite re-exports it (`tests/temp.rs`). A pid is reused within one
 //! `make test`, so a test's first [`dir`] call clears what a dead process left there
 //! (#2078); later calls in the same test keep its files. The root package's
 //! `crate::test_temp` re-exports [`dir`] beside its `lua_path`.

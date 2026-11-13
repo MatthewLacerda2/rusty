@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from datetime import datetime
 
 
@@ -49,6 +51,8 @@ def held_line(pull: dict, workflows: list[str]) -> str:
 # (`ci-merge`). On 2026-10-04 seven lockfile PRs merged within five hours and
 # #767 was handed back three times.
 LOCKFILES = ("Cargo.toml", "Cargo.lock")
+# A workspace member's manifest resolves into the same lockfile (crates/CLAUDE.md).
+MEMBER_MANIFEST = re.compile(r"crates/[^/]+/Cargo\.toml")
 
 # How the line saying who waits on whom begins.
 LOCKFILE_LINE = "LOCKFILE"
@@ -66,7 +70,7 @@ def lock_waits(pulls: list[dict], bots: tuple[str, ...]) -> dict[int, int]:
     neither: it rebases itself."""
     editing = sorted(
         p.get("number") for p in pulls
-        if not is_bot(p, bots) and any(path in LOCKFILES for path in paths(p))
+        if not is_bot(p, bots) and any(path in LOCKFILES or MEMBER_MANIFEST.fullmatch(path) for path in paths(p))
     )
     return {number: editing[0] for number in editing[1:]}
 

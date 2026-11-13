@@ -123,3 +123,13 @@ fn a_member_inherits_the_workspace_lints_or_is_reported() {
     let v = member_violations("crates/x/Cargo.toml", own);
     assert!(v[0].starts_with("UNINHERITED crates/x/Cargo.toml"), "{v:?}");
 }
+
+#[test]
+fn the_root_package_inherits_the_workspace_lints_or_is_reported() {
+    let defines_only = "[workspace.lints.clippy]\ntodo = \"deny\"\n\n[package]\nname = \"rusty\"\n";
+    let v = member_violations("Cargo.toml", defines_only);
+    assert!(v[0].starts_with("UNINHERITED Cargo.toml"), "{v:?}");
+    let root = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../Cargo.toml"))
+        .expect("the engine's root manifest");
+    assert!(member_violations("Cargo.toml", &root).is_empty());
+}

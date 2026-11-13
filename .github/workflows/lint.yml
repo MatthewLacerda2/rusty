@@ -144,6 +144,11 @@ jobs:
       - name: Feature split (no dev-dependency adds a feature the normal build lacks)
         if: needs.changes.outputs.code != 'false'
         run: python3 .github/scripts/feature_split.py
+      # A manifest linking egui, the dev layer or the HTTP client into the shipped
+      # player is invisible to clippy (crates/CLAUDE.md, *Features*). `cargo tree` only.
+      - name: Player tree (the --no-default-features build links no editor, dev or HTTP crate)
+        if: needs.changes.outputs.code != 'false'
+        run: python3 .github/scripts/player_tree.py
       # Clippy is a HARD gate: every warning fails CI, for every feature set.
       # The 50-line function cap (clippy::too_many_lines, threshold in clippy.toml)
       # is denied crate-wide in Cargo.toml's [lints] table (#485). The legacy burn-down

@@ -5,16 +5,34 @@
 A script that scopes by module reads a path at its **module path**, the
 `src/<m>/…` spelling it has wherever it lives, so one table row holds a module
 before and after its move. The mirror of `tools/lint/src/modules.rs`, which the
-scripts cannot call; keep the two in step.
+scripts cannot call; keep the two in step: [`drift`] holds their
+`NOT_MODULES` equal (`tests/modules/test_modules.py`).
 """
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 CRATES = "crates"
 #: Members that are no module of the layer table, each with why.
 NOT_MODULES = {"test-support": "the in-crate tests' shared helpers, only ever a dev-dependency"}
+
+
+#: The Rust mirror whose `NOT_MODULES` must match this one's.
+RUST_MIRROR = "tools/lint/src/modules.rs"
+
+
+def drift(rust: str) -> str | None:
+    """How the Rust mirror's `NOT_MODULES` (its source, `rust`) differs from this
+    one's, or `None` when they name the same members."""
+    table = re.search(r"NOT_MODULES[^=]*=\s*&\[(.*?)\];", rust, re.S)
+    theirs = set(re.findall(r'\(\s*"([^"]+)"', table.group(1))) if table else set()
+    ours = set(NOT_MODULES)
+    if theirs == ours:
+        return None
+    return (f"NOT_MODULES differ: only in {RUST_MIRROR}: {sorted(theirs - ours)}, "
+            f"only in .github/scripts/modules.py: {sorted(ours - theirs)}; list a member in both")
 
 
 def crate_module(path: str) -> str | None:

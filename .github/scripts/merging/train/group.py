@@ -10,6 +10,8 @@ train that found nobody to ride with it ("a group of one is just today's path").
 
 from __future__ import annotations
 
+import re
+
 from merging.train import build
 from merging.verdict import changes
 
@@ -36,6 +38,8 @@ ALONE_FILES = (
     ".github/scripts/merge-queue.py", ".github/scripts/queue-daemon.py",
 )
 RIDES = ("tools/lint/src/layers/table.rs", "tools/lint/src/components/waivers.rs")
+# A workspace member's manifest is a manifest too (crates/CLAUDE.md).
+MEMBER_MANIFEST = re.compile(r"crates/[^/]+/Cargo\.toml")
 
 
 def alone(files: list[str]) -> str | None:
@@ -48,7 +52,7 @@ def alone(files: list[str]) -> str | None:
     broken code member could drag it through bisection (#1785's review)."""
     if files and changes.inert(files):
         return "it is Markdown-only, which merges in minutes alone"
-    hit = next((f for f in files if f not in RIDES and (f in ALONE_FILES or f.startswith(ALONE_PREFIXES))), None)
+    hit = next((f for f in files if f not in RIDES and (f in ALONE_FILES or f.startswith(ALONE_PREFIXES) or MEMBER_MANIFEST.fullmatch(f))), None)
     return f"it changes {hit}, which goes alone" if hit else None
 
 
