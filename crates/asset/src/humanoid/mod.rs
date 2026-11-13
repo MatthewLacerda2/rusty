@@ -191,7 +191,8 @@ mod guess_tests;
 mod retarget_pose_tests;
 #[cfg(test)]
 mod retarget_tests;
-#[cfg(test)]
-pub(crate) mod rig_fixture;
+/// A test hook, compiled in every build: the root's `app` tests build rigs with it.
+#[doc(hidden)]
+pub mod rig_fixture;
 #[cfg(test)]
 pub(crate) mod tests;

@@ -78,4 +78,4 @@ pub fn load(path: &Path) -> Result<Lut, ImportError> {
 const CUBE: &str = "cube";
 
 #[cfg(test)]
-pub(crate) mod tests;
+mod tests;

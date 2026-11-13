@@ -10,7 +10,7 @@ fn a_reexported_converted_source_reparses_the_borrower() {
     let dir = rusty_test_support::temp::dir().join("rusty_import_cache_borrow_fbx");
     std::fs::create_dir_all(&dir).unwrap();
     let source = dir.join("grunt.fbx");
-    let fbx = include_str!("../../../tests/fixtures/models/embedded_textures.fbx");
+    let fbx = include_str!("../../../../tests/fixtures/models/embedded_textures.fbx");
     std::fs::write(&source, fbx).unwrap();
     let brute = model(&dir, "brute.gltf", "Idle", &[&source]);
     imported(&brute).unwrap();

@@ -2,9 +2,9 @@
 //! (Blender's second UV map) lands in `MeshVertex::lightmap_uv`, and a mesh without
 //! one imports all-zero lightmap UVs, the bake's "no lightmap" signal.
 
-use rusty_test_support::models::quad_mode_gltf;
 use crate::import_file;
 use crate::mesh_data::SubMesh;
+use rusty_test_support::models::quad_mode_gltf;
 
 const UV0: [[f32; 2]; 3] = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
 const UV1: [[f32; 2]; 3] = [[0.1, 0.2], [0.9, 0.2], [0.1, 0.8]];

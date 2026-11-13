@@ -11,7 +11,7 @@ use super::super::super::{Environment, Ledger, Refusal, Secret};
 use super::super::{keyed, scratch};
 use super::draft;
 
-const MP3: &[u8] = include_bytes!("../../../../asset/audio/fixtures/loop.mp3");
+const MP3: &[u8] = include_bytes!("../../../../../crates/asset/src/audio/fixtures/loop.mp3");
 
 #[derive(Default)]
 struct Mock {

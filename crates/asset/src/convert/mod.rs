@@ -90,8 +90,8 @@ pub use shipped::{cached_without_source, served_from_cache, with_cache_files};
 pub use stage::{textures_dirs, Staging};
 
 use super::ImportError;
-use rusty_core::{hash, paths, project};
 use record::{record, stamp_path};
+use rusty_core::{hash, paths, project};
 use stale::{stale, Tool};
 use std::path::{Component, Path, PathBuf};
 

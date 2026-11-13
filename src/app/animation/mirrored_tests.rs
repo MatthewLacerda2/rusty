@@ -30,8 +30,14 @@ fn rest_and_last_key() -> (Vec<JointTransform>, JointTransform) {
 fn blending_the_rest_pose_with_a_later_key_does_not_flip() {
     let (rest, last) = rest_and_last_key();
     let half = blend_poses(&rest, &[last], 0.5)[0];
-    assert!(half.scale.abs_diff_eq(Vec3::new(1.0, 1.0, -1.0), 1e-5), "{half:?}");
+    assert!(
+        half.scale.abs_diff_eq(Vec3::new(1.0, 1.0, -1.0), 1e-5),
+        "{half:?}"
+    );
     let expected = Quat::from_rotation_y(60f32.to_radians());
     assert!(half.rotation.dot(expected).abs() > 1.0 - 1e-5, "{half:?}");
-    assert!((half.translation - 1.5 * Vec3::Y).length() < 1e-4, "{half:?}");
+    assert!(
+        (half.translation - 1.5 * Vec3::Y).length() < 1e-4,
+        "{half:?}"
+    );
 }

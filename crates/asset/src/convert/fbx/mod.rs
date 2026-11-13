@@ -30,8 +30,8 @@ use super::stage;
 use super::stage::hook::{self, Step};
 use super::{glb, Converted, Skip, Staging};
 use crate::ImportError;
-use rusty_core::collections::Map;
 use basis::Basis;
+use rusty_core::collections::Map;
 use std::path::Path;
 use texture::Textures;
 

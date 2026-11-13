@@ -13,8 +13,8 @@ mod range;
 
 use super::basis::Basis;
 use crate::convert::{glb, Skip};
-use rusty_core::collections::Map;
 use glam::{Quat, Vec3};
+use rusty_core::collections::Map;
 
 /// One glTF animation per stack in `scene`, keying the nodes `nodes` maps (FBX
 /// element id → glTF node index). A stack that keys none of them is dropped; one

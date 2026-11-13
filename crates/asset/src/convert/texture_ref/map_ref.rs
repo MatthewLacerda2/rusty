@@ -39,8 +39,9 @@ impl MapRef {
         super::file(&self.0)
     }
 
-    /// The source a reference names (`soldier.fbx`), `None` for a plain path.
-    #[cfg(test)]
+    /// The source a reference names (`soldier.fbx`), `None` for a plain path. A
+    /// test hook, compiled in every build: the root's `ui` tests read it.
+    #[doc(hidden)]
     pub fn source(&self) -> Option<&str> {
         super::source(&self.0)
     }

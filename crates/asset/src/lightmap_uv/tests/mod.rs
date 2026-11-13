@@ -64,14 +64,23 @@ pub(super) fn sphere(rings: u32, sectors: u32) -> (Vec<[f32; 3]>, Vec<u32>) {
         let theta = r as f32 * PI / rings as f32;
         for s in 0..=sectors {
             let phi = s as f32 * TAU / sectors as f32;
-            positions.push([theta.sin() * phi.cos(), theta.cos(), theta.sin() * phi.sin()]);
+            positions.push([
+                theta.sin() * phi.cos(),
+                theta.cos(),
+                theta.sin() * phi.sin(),
+            ]);
         }
     }
     let row = sectors + 1;
     let indices = (0..rings)
         .flat_map(|r| (0..sectors).map(move |s| (r, s)))
         .flat_map(|(r, s)| {
-            let (a, b, c, d) = (r * row + s, r * row + s + 1, (r + 1) * row + s, (r + 1) * row + s + 1);
+            let (a, b, c, d) = (
+                r * row + s,
+                r * row + s + 1,
+                (r + 1) * row + s,
+                (r + 1) * row + s + 1,
+            );
             [a, b, d, a, d, c]
         })
         .collect();

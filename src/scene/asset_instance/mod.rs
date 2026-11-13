@@ -218,7 +218,7 @@ mod humanoid;
 pub use humanoid::set_humanoid;
 
 #[cfg(test)]
-mod humanoid_tests;
+pub(crate) mod humanoid_tests;
 #[cfg(test)]
 mod multi_material_tests;
 #[cfg(test)]

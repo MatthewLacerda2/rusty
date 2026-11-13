@@ -5,9 +5,9 @@
 use glam::Vec3;
 
 use super::{instantiate_asset, set_lightmap_uv_settings};
-use rusty_test_support::models::quad_mode_gltf;
 use crate::asset::LightmapUvSettings;
 use crate::scene::Scene;
+use rusty_test_support::models::quad_mode_gltf;
 
 /// A one-quad glTF (no `TEXCOORD_1`) in its own temp dir, with no sidecar yet.
 pub(crate) fn quad_model(dir: &str) -> String {

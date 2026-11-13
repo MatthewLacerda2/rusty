@@ -952,7 +952,7 @@ changes without a bump of its `Converter::version`, which is what tells the impo
 cache to re-make its files. Each converter in `CONVERTERS` converts each fixture of
 its extension in `tests/fixtures/models/` twice (the two must be byte-identical),
 and the hash of the `.glb` and the files written beside it is compared with
-`src/asset/convert/fingerprints.txt`, one row per converter, version, fixture and
+`crates/asset/src/convert/fingerprints.txt`, one row per converter, version, fixture and
 program. A changed output at the blessed version fails, naming the converter: bump
 its `version` in `convert/converter.rs`, then re-bless with `make bless-converters`.
 A bumped version, a different Blender or an added fixture fails until re-blessed;

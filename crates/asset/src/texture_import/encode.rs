@@ -178,7 +178,7 @@ fn compress(
 
 /// The bytes of a `width`×`height` level in 4×4 blocks of `block_bytes`: whole
 /// blocks, so a level smaller than one still takes one.
-pub(crate) fn blocks_len(width: u32, height: u32, block_bytes: u32) -> usize {
+pub fn blocks_len(width: u32, height: u32, block_bytes: u32) -> usize {
     width.div_ceil(4) as usize * height.div_ceil(4) as usize * block_bytes as usize
 }
 

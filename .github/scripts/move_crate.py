@@ -10,8 +10,10 @@ so this makes them, and lists what it cannot decide:
   row of the layer table (`tools/lint/src/layers/table.rs`) lists as a dep, then `crate::<m>::` → `crate::` (in that order, so a
   submodule named like a module, `crate::render::scene::`, stays the crate's
   own), the shared test helper (`crate::test_temp::dir()` →
-  `rusty_test_support::temp::dir()`), and each `src/<m>/` path it names →
-  `crates/<m>/src/`;
+  `rusty_test_support::temp::dir()`), each `src/<m>/` path it names →
+  `crates/<m>/src/`, and each relative `include_str!` / `include_bytes!` path
+  re-aimed from the file's new folder (in any tracked file whose include names a
+  file of the crate, too);
 - `crates/<m>/Cargo.toml`: the workspace's package fields and lints, the sibling
   crates it now names, and the external crates of the root's
   `[workspace.dependencies]` its code names (by `name::`, as the layer lint
@@ -48,6 +50,7 @@ outside, test hooks); the recipe says what to do with each.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -272,6 +275,38 @@ def wire_root(root: Path, module: str, features: list[str], hand: list[str]) -> 
     (root / "src" / "lib.rs").write_text(lib)
 
 
+INCLUDE = re.compile(r'(include_(?:str|bytes)!\(\s*")([^"]+)(")')
+
+
+def reaim(text: str, was: Path, now: Path, module: str) -> str:
+    """`text`'s relative `include_str!` / `include_bytes!` paths, written from `was`'s
+    folder, re-aimed from `now`'s at the file they named, which may itself have moved
+    from `src/<m>/` (paths relative to the checkout)."""
+    def one(m: re.Match) -> str:
+        target = Path(os.path.normpath(was.parent / m.group(2)))
+        if target.parts[:2] == ("src", module):
+            target = Path(layout.CRATES, module, "src", *target.parts[2:])
+        rel = os.path.relpath(target, now.parent).replace(os.sep, "/")
+        return f"{m.group(1)}{rel}{m.group(3)}"
+    return INCLUDE.sub(one, text)
+
+
+def reaim_outside(root: Path, module: str) -> list[str]:
+    """Rewrite each tracked `.rs` file outside the crate whose relative include named a
+    file under `src/<m>/`; the files rewritten."""
+    done = subprocess.run(["git", "-C", str(root), "grep", "-l", "-E", r"include_(str|bytes)!", "--", "*.rs",
+                           f":(exclude){layout.CRATES}/{module}/**"], capture_output=True, text=True, check=False)
+    changed = []
+    for rel in done.stdout.split():
+        path = root / rel
+        text = path.read_text()
+        new = reaim(text, Path(rel), Path(rel), module)
+        if new != text:
+            path.write_text(new)
+            changed.append(rel)
+    return changed
+
+
 def outside(root: Path, module: str) -> list[str]:
     """Each tracked file outside the crate still naming `src/<m>/`, with its lines."""
     done = subprocess.run(["git", "-C", str(root), "grep", "-n", "-F", f"src/{module}/", "--", ".",
@@ -300,10 +335,11 @@ def move(root: Path, module: str) -> list[str]:
         if path.suffix not in (".rs", ".md"):
             continue
         before = path.read_text()
+        rel = path.relative_to(crate / "src")
         text, named = rewrite(before, module, deps & others)
+        text = reaim(text, Path("src", module, rel), Path(layout.CRATES, module, "src", rel), module)
         path.write_text(text)
         siblings |= named
-        rel = path.relative_to(crate / "src")
         if is_test_file(rel):
             test_code.append(text)
         else:
@@ -325,6 +361,7 @@ def move(root: Path, module: str) -> list[str]:
     (crate / "Cargo.toml").write_text(plan.manifest(used))
     declared = [f for f in FEATURES if plan.features[f] or f in used]
     wire_root(root, module, declared, hand)
+    reaim_outside(root, module)
     return hand + outside(root, module)
 
 

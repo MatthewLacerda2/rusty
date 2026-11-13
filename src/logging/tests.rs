@@ -42,8 +42,12 @@ fn a_workspace_crates_warning_lands_in_the_console() {
     log::warn!(target: "rustyline::edit", "[Dep] crate: a lookalike's quirk");
 
     let forwarded = forward(&console());
-    assert!(forwarded.iter().any(|m| m.contains("crate: a converter skipped")));
-    assert!(!forwarded.iter().any(|m| m.contains("crate: a lookalike's quirk")));
+    assert!(forwarded
+        .iter()
+        .any(|m| m.contains("crate: a converter skipped")));
+    assert!(!forwarded
+        .iter()
+        .any(|m| m.contains("crate: a lookalike's quirk")));
 }
 
 #[test]

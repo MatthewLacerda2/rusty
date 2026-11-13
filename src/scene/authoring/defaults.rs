@@ -282,6 +282,9 @@ mod tests {
             ..MaterialData::default()
         };
         material_asset_from_import(&data);
-        assert!(!texture(&png).srgb, "a packed ORM map is data, as Unity marks it");
+        assert!(
+            !texture(&png).srgb,
+            "a packed ORM map is data, as Unity marks it"
+        );
     }
 }

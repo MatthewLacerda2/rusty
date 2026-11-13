@@ -1,8 +1,8 @@
 //! The import cache (#857): one parse per file, as fresh as a re-import.
 
 use super::*;
-use rusty_test_support::models::TRIANGLE_OBJ;
 use crate::{import_file, sidecar};
+use rusty_test_support::models::TRIANGLE_OBJ;
 use std::path::PathBuf;
 
 pub(super) fn model(name: &str) -> PathBuf {
@@ -143,7 +143,7 @@ fn another_project_drops_every_entry() {
 fn a_converted_source_hits_with_its_source_gone() {
     // As an exported game ships it (`dev::export`): the cached `.glb`, no `.fbx`.
     let path = rusty_test_support::temp::dir().join("shipped.fbx");
-    let fbx = include_str!("../../../tests/fixtures/models/embedded_textures.fbx");
+    let fbx = include_str!("../../../../tests/fixtures/models/embedded_textures.fbx");
     std::fs::write(&path, fbx).unwrap();
     let first = imported(&path).unwrap();
     std::fs::remove_file(&path).unwrap();

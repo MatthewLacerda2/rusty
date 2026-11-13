@@ -9,11 +9,11 @@ use std::path::{Path, PathBuf};
 
 /// A quad (6 indices) under the object name `Quad`.
 pub(super) const QUAD: &str =
-    include_str!("../../../../tests/fixtures/models/embedded_textures.fbx");
+    include_str!("../../../../../tests/fixtures/models/embedded_textures.fbx");
 
 /// One triangle (3 indices) under the same object name.
 fn triangle() -> String {
-    include_str!("../../../../tests/fixtures/models/missing_texture.fbx").replace("Tri", "Quad")
+    include_str!("../../../../../tests/fixtures/models/missing_texture.fbx").replace("Tri", "Quad")
 }
 
 fn source(text: &str) -> PathBuf {

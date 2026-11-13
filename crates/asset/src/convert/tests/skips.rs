@@ -30,7 +30,10 @@ fn warnings_of(source: &Path) -> usize {
         "[Asset] {}: skipped texture `Skin`: embeds a `.tga`, not an image",
         source.display()
     );
-    rusty_test_support::logs::take().iter().filter(|m| m.starts_with(&line)).count()
+    rusty_test_support::logs::take()
+        .iter()
+        .filter(|m| m.starts_with(&line))
+        .count()
 }
 
 /// `source` converted into `out` (warning once, stored under the stamp), with the

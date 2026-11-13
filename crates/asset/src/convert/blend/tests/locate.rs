@@ -46,7 +46,9 @@ fn no_blender_anywhere_says_so_and_where_to_get_it() {
 
 #[test]
 fn an_override_naming_no_file_is_refused_by_name() {
-    let missing = rusty_test_support::temp::dir().join("nowhere").join("blender");
+    let missing = rusty_test_support::temp::dir()
+        .join("nowhere")
+        .join("blender");
     let why = error(&search(Some(&missing), None));
     assert!(why.contains(&missing.display().to_string()), "{why}");
     assert!(why.contains("not a file"), "{why}");

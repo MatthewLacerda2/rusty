@@ -8,7 +8,7 @@ use std::rc::Rc;
 use glam::Vec3;
 
 use super::assets::manager;
-use crate::asset::humanoid::tests::model;
+use crate::scene::asset_instance::humanoid_tests::model;
 use crate::scene::asset_instance::instantiate_asset;
 use crate::scene::Scene;
 

@@ -149,7 +149,7 @@ fn collect_model_paths(dir: &Path, out: &mut Vec<String>) {
 /// is the asset, #1024). A symlinked folder is not followed, so a link back up the
 /// tree never loops; an unreadable folder is skipped. The one walk of a project's
 /// assets: the manifest's and Play's refresh (`convert::refresh_sources`, #1253).
-pub(crate) fn walk(dir: &Path, visit: &mut dyn FnMut(&Path)) {
+pub fn walk(dir: &Path, visit: &mut dyn FnMut(&Path)) {
     let Ok(read) = std::fs::read_dir(dir) else {
         return;
     };

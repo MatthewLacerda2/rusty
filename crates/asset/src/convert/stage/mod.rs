@@ -43,8 +43,8 @@ pub use clear::textures_dirs;
 pub(in crate::convert) use note::write;
 
 use super::{record, stamp_path, write_error, Converted, Converter, ImportError};
-use rusty_core::fs;
 use hook::{at, Step};
+use rusty_core::fs;
 use std::path::{Path, PathBuf};
 
 /// Where one conversion writes: plain files, in a fresh folder of its own.

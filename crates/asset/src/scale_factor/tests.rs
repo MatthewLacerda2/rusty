@@ -5,9 +5,9 @@
 use glam::{Mat4, Vec3};
 
 use super::{sanitize, MIN_SCALE};
-use rusty_test_support::models::{quad_mode_gltf, skinned_buffer, SKINNED_GLTF};
-use rusty_test_support::models::anim::{animated_buffer, ANIMATED_GLTF};
 use crate::{import_file, sidecar, ImportedAsset};
+use rusty_test_support::models::anim::{animated_buffer, ANIMATED_GLTF};
+use rusty_test_support::models::{quad_mode_gltf, skinned_buffer, SKINNED_GLTF};
 
 /// Write `files` into a fresh temp dir and import `main` from it at `scale`.
 fn import_at(dir: &str, files: &[(&str, &[u8])], main: &str, scale: f32) -> ImportedAsset {

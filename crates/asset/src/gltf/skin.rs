@@ -13,8 +13,8 @@
 //! resulting palette is mesh-local — exactly what the GPU skinning path expects.
 
 use crate::mesh_data::{JointTransform, SkinData};
-use rusty_core::collections::Map;
 use glam::{Mat4, Quat, Vec3};
+use rusty_core::collections::Map;
 
 /// Global (model-space) transforms of every node, composed down the scene
 /// hierarchy from each root. glTF stores only local transforms.

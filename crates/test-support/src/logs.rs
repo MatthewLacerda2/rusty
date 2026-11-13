@@ -67,7 +67,9 @@ mod tests {
     #[test]
     fn another_threads_warning_is_not_taken() {
         init();
-        std::thread::spawn(|| log::warn!("elsewhere")).join().unwrap();
+        std::thread::spawn(|| log::warn!("elsewhere"))
+            .join()
+            .unwrap();
         assert!(take().is_empty());
     }
 }

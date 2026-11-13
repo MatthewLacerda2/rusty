@@ -47,16 +47,14 @@
 //! across a parse: two threads may parse one file at once, into the same value.
 //! stored-format: the files the import cache writes beside a model (the hull sidecars)
 
-#[cfg(test)]
 mod counts;
 pub mod hulls;
 mod reads;
 mod revision;
 mod size;
 
-#[cfg(test)]
 use counts::PARSES;
-#[cfg(test)]
+#[doc(hidden)]
 pub use counts::{forget, parses};
 use reads::{files_of, stamp, Files, Stamp};
 pub use revision::MeshRevision;
@@ -176,7 +174,6 @@ pub fn imported(path: &Path) -> Result<Imported, ImportError> {
     if let Some(import) = held {
         return Ok(import);
     }
-    #[cfg(test)]
     PARSES.set(PARSES.get() + 1);
     // Stamped before the parse: a write during it is a change next time.
     let files = files_of(&read, &settings.humanoid.clips_from);

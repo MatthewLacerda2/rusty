@@ -1,7 +1,7 @@
 //! crates/asset/src/tests.rs — importer unit tests over tiny embedded fixtures.
 
-use rusty_test_support::models::{SKINNED_GLTF, TEXTURED_GLTF, TRIANGLE_GLTF, TRIANGLE_OBJ};
 use super::*;
+use rusty_test_support::models::{SKINNED_GLTF, TEXTURED_GLTF, TRIANGLE_GLTF, TRIANGLE_OBJ};
 use std::path::PathBuf;
 
 fn tmp(name: &str) -> PathBuf {
@@ -91,7 +91,11 @@ fn gltf_imports_skin_and_bind_pose_palette() {
     // The skinned glTF references a sibling `model.bin`; write both, then import.
     let dir = rusty_test_support::temp::dir().join("rusty_skin_fixture");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("model.bin"), rusty_test_support::models::skinned_buffer()).unwrap();
+    std::fs::write(
+        dir.join("model.bin"),
+        rusty_test_support::models::skinned_buffer(),
+    )
+    .unwrap();
     let gltf_path = dir.join("model.gltf");
     std::fs::write(&gltf_path, SKINNED_GLTF).unwrap();
 

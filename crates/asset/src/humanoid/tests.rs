@@ -5,8 +5,8 @@
 use std::path::{Path, PathBuf};
 
 use super::HumanoidSettings;
-use rusty_test_support::models::anim::{animated_buffer, ANIMATED_GLTF};
 use crate::{import_file, imported, sidecar, ImportedAsset};
+use rusty_test_support::models::anim::{animated_buffer, ANIMATED_GLTF};
 
 /// `name`, a copy of the animated fixture whose one clip is `clip`, in `dir`,
 /// its sidecar mapping `Joint0` to the hips with `clips_from`.

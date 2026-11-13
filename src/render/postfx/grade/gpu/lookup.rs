@@ -5,11 +5,11 @@
 use std::path::Path;
 
 use super::{chain, Chain, W};
-use crate::asset::lut::tests::{cube_of, identity_cube};
 use crate::components::PostProcessingComponent;
 use crate::core::fs::written::write;
 use crate::render::postfx::effects::grading::color_lookup::Lookup;
 use crate::scene::authoring::default_post_processing;
+use rusty_test_support::luts::{cube_of, identity_cube};
 use rusty_test_support::rebakes::{follows_rebakes, Bake};
 
 /// A colour card: black, white, greys and saturated colours, in scene-linear HDR.

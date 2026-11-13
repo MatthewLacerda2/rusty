@@ -1,9 +1,9 @@
 //! crates/asset/src/manifest_tests.rs — manifest walk + round-trip tests over the
 //! embedded fixtures written into a temp asset root.
 
-use rusty_test_support::models::{TRIANGLE_GLTF, TRIANGLE_OBJ};
 use super::manifest::build_manifest;
 use super::{import_sub_mesh, AssetRef};
+use rusty_test_support::models::{TRIANGLE_GLTF, TRIANGLE_OBJ};
 
 /// A fresh, unique temp dir to act as an isolated asset root per test.
 fn tmp_root(name: &str) -> std::path::PathBuf {

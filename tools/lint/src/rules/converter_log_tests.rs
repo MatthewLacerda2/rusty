@@ -20,6 +20,9 @@ fn flags_a_converter_logging_a_failed_extract() {
         lines("src/asset/convert/blend/run.rs", "log::info!(\"x\");"),
         [1]
     );
+    // The module moved to its crate (crates/CLAUDE.md) is read at its module path.
+    let moved = "crates/asset/src/convert/fbx/texture/mod.rs";
+    assert_eq!(lines(moved, "warn!(\"x\");"), [1]);
 }
 
 #[test]

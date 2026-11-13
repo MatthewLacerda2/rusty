@@ -5,10 +5,7 @@ use std::path::Path;
 
 use super::*;
 
-const FIXTURE: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/src/audio/fixtures/loop.mp3"
-);
+const FIXTURE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/audio/fixtures/loop.mp3");
 /// The fixture's source: 0.5 s of 0.5 * sin(2π·440·t) at 44.1 kHz, mono. 440 Hz fits
 /// exactly 220 cycles in it, so the tone loops without a seam.
 const RATE: u32 = 44_100;

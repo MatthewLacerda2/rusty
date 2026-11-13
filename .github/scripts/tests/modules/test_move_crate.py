@@ -38,6 +38,7 @@ fn f() { let _ = glam::Vec3::ZERO; let p = env!("CARGO_MANIFEST_DIR"); }
 fn t() { crate::test_temp::dir(); }
 """
 TABLE = 'sim("core", &[]),\n    sim(\n        "asset",\n        &["core"],\n    ),\n    sim("scene", &["asset", "core"]),\n'
+INC = 'const F: &str = include_str!("../../../tests/f.fbx");\nconst O: &str = include_str!("../cache.rs");\n'
 UP = "use crate::logging;\nfn bake() { crate::scene::bake(); }\n"
 
 
@@ -49,7 +50,8 @@ class Move(unittest.TestCase):
         files = {"Cargo.toml": CARGO, "src/lib.rs": LIB, "src/asset/mod.rs": ASSET,
                  "src/asset/cache.rs": "//! src/asset/cache.rs — keys\n", "src/scene/mod.rs": "", "src/logging/mod.rs": "",
                  "src/asset/up_tests.rs": UP, "crates/core/src/lib.rs": "",
-                 "tools/lint/src/layers/table.rs": TABLE}
+                 "tools/lint/src/layers/table.rs": TABLE, "src/asset/deep/inc_tests.rs": INC,
+                 "src/dev/mp3.rs": 'const A: &[u8] = include_bytes!("../asset/cache.rs");\n'}
         for name, text in files.items():
             (root / name).parent.mkdir(parents=True, exist_ok=True)
             (root / name).write_text(text)
@@ -98,6 +100,12 @@ class Move(unittest.TestCase):
         whys = "\n".join(self.hand)
         self.assertIn("crates/asset/src/up_tests.rs:1: names `logging`, which the row does not list", whys)
         self.assertIn("crates/asset/src/up_tests.rs:2: names `scene`, which the row does not list", whys)
+
+    def test_a_relative_include_still_names_its_file(self):
+        inc = self.read("crates/asset/src/deep/inc_tests.rs")
+        self.assertIn('include_str!("../../../../tests/f.fbx")', inc)
+        self.assertIn('include_str!("../cache.rs")', inc, "a file inside the crate moved with it")
+        self.assertIn('include_bytes!("../../crates/asset/src/cache.rs")', self.read("src/dev/mp3.rs"))
 
     def test_a_module_with_no_row_is_refused(self):
         (self.root / "src/orphan").mkdir()

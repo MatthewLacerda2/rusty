@@ -9,7 +9,10 @@ use rusty_test_support::models::quad_mode_gltf;
 
 #[test]
 fn the_margin_is_measured_at_the_bakes_default_resolution() {
-    assert_eq!(REFERENCE_TEXELS_PER_UNIT, super::BakeSettings::default().texels_per_unit);
+    assert_eq!(
+        REFERENCE_TEXELS_PER_UNIT,
+        super::BakeSettings::default().texels_per_unit
+    );
 }
 
 /// Write a JSON + `<stem>.bin` pair into its own temp dir and import its one mesh.

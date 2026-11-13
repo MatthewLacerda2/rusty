@@ -79,8 +79,8 @@ class Markers(unittest.TestCase):
         # markers are held here, read straight from the files.
         for owner in ["src/scene/lighting/occlusion/mod.rs", "src/navigation/bake/saved/mod.rs",
                       "src/scene/serialize.rs", "src/scene/io/mod.rs", "src/scene/prefab/mod.rs",
-                      "crates/core/src/storage.rs", "src/asset/sidecar/mod.rs", "src/asset/convert/mod.rs",
-                      "src/asset/import_cache/mod.rs", "src/asset/animation_graph/mod.rs",
+                      "crates/core/src/storage.rs", "crates/asset/src/sidecar/mod.rs", "crates/asset/src/convert/mod.rs",
+                      "crates/asset/src/import_cache/mod.rs", "crates/asset/src/animation_graph/mod.rs",
                       "src/shadergen/mod.rs", "src/dev/demo/mod.rs", "src/scene/lighting/io.rs"]:
             with self.subTest(owner):
                 lines = (ROOT / owner).read_text().splitlines()

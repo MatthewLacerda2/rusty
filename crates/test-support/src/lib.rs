@@ -3,6 +3,7 @@
 //! dev-dependency (crates/CLAUDE.md), so nothing that ships links it.
 
 pub mod logs;
+pub mod luts;
 pub mod models;
 pub mod rebakes;
 pub mod temp;

@@ -7,8 +7,8 @@
 //! `gltf` crate + `glam`, never wgpu/egui/mlua.
 
 use crate::anim_data::{AnimationClip, Interpolation, JointTrack, Track};
-use rusty_core::collections::Map;
 use glam::{Quat, Vec3};
+use rusty_core::collections::Map;
 
 /// Read every animation in the document into clips bound to `joint_nodes` (the skin's
 /// joint slots, by glTF node index). Clips with no track for any of these joints are

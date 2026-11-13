@@ -2,9 +2,9 @@
 //! every triangle primitive mode imports as the same triangle list, and the
 //! non-surface modes are skipped instead of being misread as triangles.
 
-use rusty_test_support::models::quad_mode_gltf;
 use crate::import_file;
 use crate::mesh_data::SubMesh;
+use rusty_test_support::models::quad_mode_gltf;
 
 // glTF 2.0 `primitive.mode` values.
 const POINTS: u32 = 0;

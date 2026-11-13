@@ -1,5 +1,6 @@
 //! What tests read of the import cache: how many parses this thread made, and a
-//! fresh launch's cache for one file.
+//! fresh launch's cache for one file. Test hooks (crates/CLAUDE.md): compiled in
+//! every build, since the root's tests (`physics`, `scene`) call them too.
 
 thread_local!(pub(super) static PARSES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) });
 

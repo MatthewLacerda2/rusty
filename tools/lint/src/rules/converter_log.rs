@@ -4,7 +4,8 @@
 //! cache stamps a file missing a part as current (#1168); one that logs a skip is
 //! heard once, then never again from the cache. So a converter returns what it
 //! skipped in `Converted` and fails on anything else, and `convert::refresh`
-//! alone warns. Under `src/asset/convert/`, every module but [`NOT_CONVERTERS`]
+//! alone warns. Under `src/asset/convert/` (a module path, `crates/asset/src/convert/`
+//! on disk), every module but [`NOT_CONVERTERS`]
 //! is a converter's, a folder or a single file, and a code line there that names
 //! `log::` or a bare logging macro is a finding. Its root (`<name>/mod.rs` or
 //! `<name>.rs`) must also carry [`DENY`], however rustfmt wraps it: clippy, not

@@ -19,7 +19,7 @@ fn an_fbx_quad_with_two_materials_is_one_sub_mesh_with_two_runs() {
     let path = rusty_test_support::temp::dir().join("quad.fbx");
     std::fs::write(
         &path,
-        include_str!("../../tests/fixtures/models/embedded_textures.fbx"),
+        include_str!("../../../tests/fixtures/models/embedded_textures.fbx"),
     )
     .unwrap();
     let asset = import_file(&path).unwrap();
