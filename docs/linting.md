@@ -710,7 +710,9 @@ accounts for, so a **new dependency** needs a table decision in the same PR),
 `STALE_EXCEPTION` and `STRAY_CRATE` (a member `crates/<m>`'s `[dependencies]`
 naming a sibling `rusty-<x>` not in its row's `deps`, or an external crate not in
 its row's `uses`, `common` or its exceptions: the merged set alone cannot see a crate
-one member declares that only another member's row names). It counts the first segment of a `use` path and any `name::`
+one member declares that only another member's row names) and `STRAY_DEV_CRATE` (a
+member's `[dev-dependencies]` naming itself, a module at or above its row, or one whose
+row reaches back to it: the test build would make a cycle). It counts the first segment of a `use` path and any `name::`
 path elsewhere, outside comments and test code. A file that declares `mod image;`
 or imports a local `image` means its own module by `image::`, so that name is not
 counted there; glob imports are not followed, the one place a local name could

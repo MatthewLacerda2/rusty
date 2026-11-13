@@ -75,3 +75,9 @@ fn a_module_below_that_reaches_back_through_its_deps_is_flagged() {
     let text = "[dev-dependencies]\nrusty-a = { workspace = true }\n";
     assert_eq!(dev_stray("b", text, &rows).len(), 1);
 }
+
+#[test]
+fn a_dev_dependency_in_a_one_crate_header_is_flagged() {
+    let text = "[dev-dependencies.rusty-render]\nworkspace = true\n";
+    assert_eq!(dev_stray("physics", text, LAYERS).len(), 1);
+}

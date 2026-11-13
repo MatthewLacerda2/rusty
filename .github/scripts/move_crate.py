@@ -131,6 +131,13 @@ def rewrite(text: str, module: str, deps: set[str]) -> tuple[str, set[str]]:
     return text, named
 
 
+def unsettled(path: str, before: str, deps: set[str]) -> list[str]:
+    """`crate_imports.unsettled` on the text as `siblings` leaves it, before `crate::<m>::` is
+    stripped: after it, the crate's own submodule named like a sibling (`crate::api::physics::`)
+    would read as that sibling, and be listed to name `rusty_<dep>` by hand."""
+    return crate_imports.unsettled(path, crate_imports.siblings(before, deps)[0], deps)
+
+
 def lib_header(text: str, module: str) -> str:
     """`text` with a leading `//! src/<m>` or `//! crates/<m>/src/` header naming `lib.rs`
     instead. A `mod.rs` header may name its directory, which `lib.rs`'s may not: the
@@ -234,16 +241,23 @@ class Plan:
         self.deps.setdefault(table, []).append(f"{name} = {spec}")
         if gate in FEATURES:
             self.features[gate].add(f"dep:{name}")
+        if table == "dev-dependencies" and name.startswith("rusty-"):
+            # A sibling only the tests name gets the feature too: a test gated on it may call
+            # the sibling's gated items (`rusty-physics`' sidecar tests and `rusty-asset/editor`).
+            self.forward(name, optional=False)
+
+    def forward(self, name: str, optional: bool) -> None:
+        """Turn on each of `name`'s own `dev` / `editor` features from the crate's."""
+        crate = self.root / layout.CRATES / name[len("rusty-"):] / "Cargo.toml"
+        theirs = tomllib.loads(crate.read_text()).get("features", {}) if crate.is_file() else {}
+        for f in FEATURES:
+            if f in theirs:
+                self.features[f].add(f"{name}?/{f}" if optional else f"{name}/{f}")
 
     def sibling(self, s: str) -> None:
         name = f"rusty-{s}"
         self.add(name, "dependencies")
-        crate = self.root / layout.CRATES / s / "Cargo.toml"
-        theirs = tomllib.loads(crate.read_text()).get("features", {}) if crate.is_file() else {}
-        optional = any(name in d and "optional" in d for d in self.deps["dependencies"])
-        for f in FEATURES:
-            if f in theirs:
-                self.features[f].add(f"{name}?/{f}" if optional else f"{name}/{f}")
+        self.forward(name, any(name in d and "optional" in d for d in self.deps["dependencies"]))
 
     def declared(self, used: set[str]) -> dict[str, list[str]]:
         """The features the crate declares, each with what it turns on: one its own code names
@@ -365,7 +379,7 @@ def move(root: Path, module: str) -> list[str]:
             live_code.append(live(text))
             test_code.append(text)
         hand += by_hand(str(path.relative_to(root)), text, before)
-        hand += crate_imports.unsettled(str(path.relative_to(root)), text, deps & others)
+        hand += unsettled(str(path.relative_to(root)), before, deps & others)
         hand += reaching_up(str(path.relative_to(root)), before, others - deps, below)
     code = "\n".join(test_code)
     used = {f for f in FEATURES if f'feature = "{f}"' in code}

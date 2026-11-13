@@ -48,6 +48,11 @@ class Unsettled(unittest.TestCase):
         text, _ = mover.rewrite("use crate::asset; // why\n", "scene", {"asset"})
         self.assertIn("`crate::asset` the rewrite did not settle", "\n".join(imports.unsettled("x.rs", text, {"asset"})))
 
+    def test_an_own_submodule_named_like_a_sibling_is_not_listed(self):
+        before = "use crate::api::physics::Ray;\nfn f() { crate::api::physics::cast(); }\n"
+        self.assertEqual(mover.unsettled("x.rs", before, {"physics"}), [])
+        self.assertEqual(len(mover.unsettled("x.rs", "use crate::physics; // why\n", {"physics"})), 1)
+
 
 TABLE = ('sim("core", &[]),\n    sim("api", &["core", "scripting"]),\n    sim("ui", &["core"]),\n'
          '    sim("scripting", &["api", "core", "ui"]),\n')

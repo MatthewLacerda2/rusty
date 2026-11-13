@@ -14,6 +14,9 @@ so that the file goes on writing `<dep>::`: `use crate::<dep>;`, and a group's t
   `pub use crate::<dep>::{self, A};` → `{self as <dep>, A}`;
 - `use crate::<dep> as x;` → `use rusty_<dep> as x;`.
 
+A file that binds the name and also writes `<dep>::` where it may not name the sibling (in a
+`use` group after `{` or `,`, or inside a string) is left alone for that dep and listed.
+
 Every other form a `self` sits in (nested beside other groups, not first, a comment in
 the group, `{self,}`, a group over several lines), and any `crate::<dep>` the rules left,
 is **listed** for the by-hand pass, never guessed: four reviews in a row each found one
@@ -79,11 +82,37 @@ def siblings(text: str, deps: set[str]) -> tuple[str, set[str]]:
     # A macro's `$crate` is now this crate, so its `$crate::<dep>::` names the sibling from the root.
     text = re.sub(r"\$crate::(\w+)::", lambda m: f"::{sibling(m)}" if m.group(1) in deps else m.group(0), text)
     for dep in sorted(deps):
+        if _ambiguous(text, dep):
+            continue  # listed by `unsettled`: a rewrite would guess
         text, bare = _bind(text, dep)
         if bare:
             named.add(dep)
             text = re.sub(rf"(?<![\w:$]){dep}::", f"rusty_{dep}::", text)
     return text, named
+
+
+def _binds(text: str, dep: str) -> bool:
+    """Whether a private import binds `dep`'s name (so the file's bare `<dep>::` would be rewritten)."""
+    lone = rf"^(?:[ \t]*#\[[^\n]*\]\n)*[ \t]*use (?:crate::{dep}|rusty_{dep}::\{{\s*self\s*\}});"
+    return bool(re.search(lone, text, re.M)) or any(not m.group(1) for m, *_ in _groups(text, dep))
+
+
+def _ambiguous(text: str, dep: str) -> list[int]:
+    """Where a bare `<dep>::` may not name the sibling, in a file that binds its name: inside a
+    `use` group after `{` or `,` (a path under another root, `use x::{<dep>::A}`) or inside a
+    string literal. A file-wide rewrite would hit those too, so the file is listed instead."""
+    if not _binds(text, dep):
+        return []
+    uses = [(m.start(), m.end()) for m in re.finditer(r"\buse\b[^;]*;", text)]
+    out = []
+    for m in re.finditer(rf"(?<![\w:$]){dep}::", text):
+        line_start = text.rfind("\n", 0, m.start()) + 1
+        in_string = text[line_start:m.start()].replace('\\"', "").count('"') % 2 == 1
+        after = text[:m.start()].rstrip()[-1:] in ("{", ",")
+        in_use = any(a <= m.start() < b for a, b in uses)
+        if in_string or (after and in_use):
+            out.append(m.start())
+    return out
 
 
 def _bind(text: str, dep: str) -> tuple[str, bool]:
@@ -107,9 +136,15 @@ def _bind(text: str, dep: str) -> tuple[str, bool]:
 
 
 def unsettled(path: str, text: str, deps: set[str]) -> list[str]:
-    """`path:line: why` for each sibling import the plain rules did not settle, in the rewritten `text`."""
+    """`path:line: why` for each sibling import the plain rules did not settle, in `text` as
+    `siblings` left it (before the module's own `crate::<m>::` is stripped)."""
     out = []
     for dep in sorted(deps):
+        if spots := _ambiguous(text, dep):
+            out += [f"{path}:{text.count(chr(10), 0, at) + 1}: `{dep}::` inside a `use` group or a string, in a "
+                    f"file that imports `{dep}` by name: the rewrite left the file alone; settle `{dep}::` by hand"
+                    for at in spots]
+            continue
         for m, *_ in _groups(text, dep):
             out.append(f"{path}:{text.count(chr(10), 0, m.start()) + 1}: a `rusty_{dep}::{{…}}` group binds "
                        f"`self` in a form the rewrite leaves alone: settle `{dep}::` by hand")

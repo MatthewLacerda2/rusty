@@ -15,12 +15,11 @@ a floor on nothing would report the whole crate as that module.
 
 While the engine is split into crates (#2139, crates/CLAUDE.md), a module is
 `src/<m>/` or `crates/<m>/src/`, so every other member under `crates/` is ignored
-too, and the root package's top-level files are named one by one rather than as
-`src/[^/]+\.rs`, which would also match a moved crate's own top-level files. A
-moved module with a subfolder named like a root module is refused: its
-`src/<name>/` would read as that module and be ignored. One file still goes
-uncounted: a moved crate's `lib.rs` matches the root's `src/lib.rs`; it holds
-the crate's `mod` lines, which no line count covers anyway.
+too, and the root package's top-level files are named one by one and anchored
+to the checkout's absolute path (llvm-cov reports absolute file names), so a
+moved crate's own `lib.rs` is not read as the root's `src/lib.rs`. A moved
+module with a subfolder named like a root module is refused: its `src/<name>/`
+would read as that module and be ignored.
 
     coverage-ignore.py app            # prints the regex for `--ignore-filename-regex`
     coverage-ignore.py --modules      # prints the floored modules, one per line
@@ -82,7 +81,10 @@ def ignore_regex(module: str, modules: list[str], dirs: list[str], files: list[s
                      "its lines would be ignored as theirs: rename the folder")
     parts = [f"src/({'|'.join(others)})/"] if others else []
     stems = [re.escape(f) for f in files] or [r"[^/]+\.rs"]
-    parts.append(f"src/({'|'.join(stems)})")
+    # Anchored at the checkout when it is known: unanchored, `src/lib.rs` also
+    # matches `crates/<m>/src/lib.rs`, and the isolated crate would lose its own.
+    anchor = f"^{re.escape(root.resolve().as_posix())}/" if root is not None else ""
+    parts.append(f"{anchor}src/({'|'.join(stems)})")
     if rest := [c for c in crates if c != module]:
         parts.append(f"crates/({'|'.join(rest)})/")
     parts.append("tools/")
