@@ -171,8 +171,8 @@ fn exceptions_allow_until_fixed() {
 
 #[test]
 fn real_table_accounts_for_every_dependency() {
-    let manifest = concat!(env!("CARGO_MANIFEST_DIR"), "/../../Cargo.toml");
-    let deps = dependencies(&std::fs::read_to_string(manifest).expect("rusty's Cargo.toml"));
+    let root = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
+    let deps = super::workspace_dependencies(root).expect("rusty's Cargo.toml");
     let v = check::all(LAYERS, &POLICY, &deps, &[]);
     let shape: Vec<_> = v.iter().filter(|m| !m.starts_with("STALE")).collect();
     assert!(shape.is_empty(), "{shape:?}");

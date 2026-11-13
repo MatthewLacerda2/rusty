@@ -36,6 +36,21 @@ fn an_engine_warning_lands_in_the_console() {
 }
 
 #[test]
+fn a_workspace_crates_warning_lands_in_the_console() {
+    init();
+    log::warn!(target: "rusty_asset::convert", "[Test] crate: a converter skipped a part");
+    log::warn!(target: "rustyline::edit", "[Dep] crate: a lookalike's quirk");
+
+    let forwarded = forward(&console());
+    assert!(forwarded
+        .iter()
+        .any(|m| m.contains("crate: a converter skipped")));
+    assert!(!forwarded
+        .iter()
+        .any(|m| m.contains("crate: a lookalike's quirk")));
+}
+
+#[test]
 fn info_and_dependency_warnings_stay_out_of_the_console() {
     init();
     log::info!("[Test] out: routine progress");

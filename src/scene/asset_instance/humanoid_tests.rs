@@ -2,14 +2,39 @@
 //! re-imports the borrowing model's meshes in the open scene.
 
 use std::collections::BTreeSet;
+use std::path::{Path, PathBuf};
 
 use glam::Vec3;
 
-use crate::asset::humanoid::tests::model;
 use crate::core::fs::written::Stale;
 use crate::scene::asset_instance::instantiate_asset;
 use crate::scene::rehydrate::reimport_written;
 use crate::scene::Scene;
+use rusty_test_support::models::anim::{animated_buffer, ANIMATED_GLTF};
+
+/// `name`, a copy of the animated fixture whose one clip is `clip`, in `dir`,
+/// its sidecar mapping `Joint0` to the hips with `clips_from`; the root's copy of
+/// `rusty-asset`'s own test helper, which its crate keeps to itself.
+pub(crate) fn model(dir: &Path, name: &str, clip: &str, clips_from: &[&Path]) -> PathBuf {
+    std::fs::create_dir_all(dir).unwrap();
+    std::fs::write(dir.join("anim.bin"), animated_buffer()).unwrap();
+    let path = dir.join(name);
+    let text = ANIMATED_GLTF.replace("\"name\": \"Wave\"", &format!("\"name\": \"{clip}\""));
+    std::fs::write(&path, text).unwrap();
+    let mut humanoid = crate::asset::humanoid::HumanoidSettings::default();
+    humanoid.bones.insert("Hips".into(), "Joint0".into());
+    humanoid.bones.insert("Spine".into(), "Joint1".into());
+    humanoid.clips_from = clips_from
+        .iter()
+        .map(|p| p.to_string_lossy().into())
+        .collect();
+    let settings = crate::asset::sidecar::ImportSettings {
+        humanoid,
+        ..Default::default()
+    };
+    crate::asset::sidecar::save(&path, &settings).unwrap();
+    path
+}
 
 #[test]
 fn a_rewritten_source_reimports_the_models_borrowing_from_it() {

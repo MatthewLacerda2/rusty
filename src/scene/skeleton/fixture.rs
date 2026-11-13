@@ -5,11 +5,11 @@
 
 use glam::{Mat4, Quat, Vec3};
 
-use crate::asset::fixtures_anim::{animated_buffer, ANIMATED_GLTF};
 use crate::asset::{AssetRef, JointTransform, SkinData};
 use crate::components::{JointComponent, MeshComponent};
 use crate::scene::serialize::{apply_scene_data, to_scene_data, SceneData};
 use crate::scene::Scene;
+use rusty_test_support::models::anim::{animated_buffer, ANIMATED_GLTF};
 
 /// Write the animated fixture under a per-test folder and return its
 /// `path::Animated` reference.

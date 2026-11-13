@@ -6,12 +6,14 @@ The engine is split one crate per module, over many pull requests
 so this makes them, and lists what it cannot decide:
 
 - `git mv src/<m> crates/<m>/src`, its `mod.rs` becoming `lib.rs`;
-- in the crate's files: `crate::<dep>::` → `rusty_<dep>::` for every other
-  top-level module, then `crate::<m>::` → `crate::` (in that order, so a
+- in the crate's files: `crate::<dep>::` → `rusty_<dep>::` for each module its
+  row of the layer table (`tools/lint/src/layers/table.rs`) lists as a dep, then `crate::<m>::` → `crate::` (in that order, so a
   submodule named like a module, `crate::render::scene::`, stays the crate's
   own), the shared test helper (`crate::test_temp::dir()` →
-  `rusty_test_support::temp::dir()`), and each `src/<m>/` path it names →
-  `crates/<m>/src/`;
+  `rusty_test_support::temp::dir()`), each `src/<m>/` path it names →
+  `crates/<m>/src/`, and each relative `include_str!` / `include_bytes!` path
+  re-aimed from the file's new folder (in any tracked file whose include names a
+  file of the crate, too);
 - `crates/<m>/Cargo.toml`: the workspace's package fields and lints, the sibling
   crates it now names, and the external crates of the root's
   `[workspace.dependencies]` its code names (by `name::`, as the layer lint
@@ -24,14 +26,19 @@ so this makes them, and lists what it cannot decide:
   forwarded (`"rusty-y/dev"`); a `dev` / `editor` the code tests with
   `cfg(feature = …)` is declared;
 - the root: the crate in `[workspace.dependencies]` and `[dependencies]`, the
-  feature forwards, and `src/lib.rs`'s `pub mod <m>;` → `pub use rusty_<m> as <m>;`.
+  feature forwards, each external crate the crate took that nothing left in the
+  root names dropped from its `[dependencies]`, and `src/lib.rs`'s `pub mod <m>;` → `pub use rusty_<m> as <m>;`.
   A `pub mod` gated by `#[cfg(feature = "f")]` stays gated: the root depends on
   the crate optionally, its feature `f` turns it on (`"dep:rusty-<m>"`), and the
   re-export carries the same `cfg`.
 
-What it prints as **by hand** is what a text edit cannot settle: a `crate::{…}`
+What it prints as **by hand** is what a text edit cannot settle: a
+`crate::<x>::` naming a module the row does not list (a unit test reaching up the
+layering, which moves to `tests/` or to `<x>`'s own tests: no crate may depend on
+a module above it), a `crate::{…}`
 group (its entries may name several modules), `CARGO_MANIFEST_DIR` (it now names
-the crate's folder), `crate::test_temp::lua_path`, an optional dependency no one
+the crate's folder), a string path from the checkout's root (`"tests/fixtures/…"`,
+read from the working directory, which is the crate's folder under its tests), `crate::test_temp::lua_path`, an optional dependency no one
 feature of `dev` / `editor` turns on, a feature other than those two, a `pub mod`
 gated by anything but one feature, and every tracked file outside the crate that
 still names `src/<m>/` (a file path to rewrite, or a module path the lint tools
@@ -45,6 +52,7 @@ outside, test hooks); the recipe says what to do with each.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -67,12 +75,24 @@ def known_modules(root: Path) -> set[str]:
     return src | set(layout.moved(root))
 
 
-def rewrite(text: str, module: str, others: set[str]) -> tuple[str, set[str]]:
-    """`text` with its module paths rewritten for the crate, and the sibling modules it names."""
+TABLE = Path("tools/lint/src/layers/table.rs")
+
+
+def row_deps(root: Path, module: str) -> set[str]:
+    """The modules `module`'s row of the layer table may import."""
+    row = re.search(rf'(?:sim|platform)\(\s*"{module}",\s*&\[([^\]]*)\]', (root / TABLE).read_text())
+    if not row:
+        sys.exit(f"move-crate: {TABLE} has no row for `{module}`")
+    return set(re.findall(r'"(\w+)"', row.group(1)))
+
+
+def rewrite(text: str, module: str, deps: set[str]) -> tuple[str, set[str]]:
+    """`text` with its module paths rewritten for the crate, and the sibling modules it names.
+    Only the row's `deps` are rewritten: a module above it stays `crate::<x>::`, for `by_hand`."""
     named = set()
 
     def sibling(m: re.Match) -> str:
-        if m.group(1) not in others:
+        if m.group(1) not in deps:
             return m.group(0)
         named.add(m.group(1))
         return f"rusty_{m.group(1)}::"
@@ -83,18 +103,35 @@ def rewrite(text: str, module: str, others: set[str]) -> tuple[str, set[str]]:
     text = text.replace("crate::test_temp::dir()", "rusty_test_support::temp::dir()")
     text = re.sub(rf"(?<![\w/])src/{module}/mod\.rs", f"crates/{module}/src/lib.rs", text)
     text = re.sub(rf"(?<![\w/])src/{module}/", f"crates/{module}/src/", text)
-    named |= {m for m in re.findall(r"(?<!\w)rusty_(\w+)::", text) if m in others}
+    named |= {m for m in re.findall(r"(?<!\w)rusty_(\w+)::", text) if m in deps}
     return text, named
 
 
-def by_hand(path: str, text: str) -> list[str]:
-    """`path:line: why` for each line a text edit cannot settle."""
-    checks = [("crate::{", "a `crate::{…}` group: split it per crate"),
-              ("CARGO_MANIFEST_DIR", "names the crate's folder now: `rusty_core::project::checkout()`?"),
+def reaching_up(path: str, text: str, above: set[str]) -> list[str]:
+    """`path:line: why` for each `crate::<x>::` naming a module the row does not list."""
+    return [f"{path}:{n}: names `{x}`, which the row does not list: a test reaching up moves to "
+            f"`tests/` (or `{x}`'s own tests); live code is a layering violation"
+            for n, line in enumerate(text.splitlines(), 1)
+            for x in sorted(set(re.findall(r"(?<![\w$])crate::(\w+)(?!\w)", line)) & above)]
+
+
+#: A string literal naming a path from the checkout's root (`"tests/fixtures/…"`).
+CWD_PATH = re.compile(r'(?<![\w/])"(?:tests|engine|games|docs)/')
+
+
+def by_hand(path: str, text: str, before: str) -> list[str]:
+    """`path:line: why` for each line a text edit cannot settle. A `crate::{…}` group is read in
+    `before`, the text as it was: a `crate::<m>::{…}` group was the module's own, and stays so."""
+    groups = [f"{path}:{n}: a `crate::{{…}}` group: split it per crate"
+              for n, line in enumerate(before.splitlines(), 1) if "crate::{" in line]
+    checks = [("CARGO_MANIFEST_DIR", "names the crate's folder now: `rusty_core::project::checkout()`?"),
               ("crate::test_temp::lua_path", "the root's helper: build it from `rusty_test_support::temp::dir()`")]
-    out = [f"{path}:{n}: {why}" for n, line in enumerate(text.splitlines(), 1)
-           for needle, why in checks if needle in line]
+    out = groups + [f"{path}:{n}: {why}" for n, line in enumerate(text.splitlines(), 1)
+                    for needle, why in checks if needle in line]
     for n, line in enumerate(text.splitlines(), 1):
+        if CWD_PATH.search(line) and "checkout()" not in line and not line.lstrip().startswith("//"):
+            out.append(f"{path}:{n}: a path from the checkout's root read from the working directory, the "
+                       "crate's folder under its tests: `rusty_core::project::checkout().join(…)`?")
         for f in re.findall(r'feature\s*=\s*"([\w-]+)"', line):
             if f not in FEATURES:
                 out.append(f"{path}:{n}: feature `{f}` is none of {'/'.join(FEATURES)}: declare and forward it")
@@ -247,6 +284,55 @@ def wire_root(root: Path, module: str, features: list[str], hand: list[str]) -> 
     (root / "src" / "lib.rs").write_text(lib)
 
 
+INCLUDE = re.compile(r'(include_(?:str|bytes)!\(\s*")([^"]+)(")')
+
+
+def reaim(text: str, was: Path, now: Path, module: str) -> str:
+    """`text`'s relative `include_str!` / `include_bytes!` paths, written from `was`'s
+    folder, re-aimed from `now`'s at the file they named, which may itself have moved
+    from `src/<m>/` (paths relative to the checkout)."""
+    def one(m: re.Match) -> str:
+        target = Path(os.path.normpath(was.parent / m.group(2)))
+        if target.parts[:2] == ("src", module):
+            target = Path(layout.CRATES, module, "src", *target.parts[2:])
+        rel = os.path.relpath(target, now.parent).replace(os.sep, "/")
+        return f"{m.group(1)}{rel}{m.group(3)}"
+    return INCLUDE.sub(one, text)
+
+
+def reaim_outside(root: Path, module: str) -> list[str]:
+    """Rewrite each tracked `.rs` file outside the crate whose relative include named a
+    file under `src/<m>/`; the files rewritten."""
+    done = subprocess.run(["git", "-C", str(root), "grep", "-l", "-E", r"include_(str|bytes)!", "--", "*.rs",
+                           f":(exclude){layout.CRATES}/{module}/**"], capture_output=True, text=True, check=False)
+    changed = []
+    for rel in done.stdout.split():
+        path = root / rel
+        text = path.read_text()
+        new = reaim(text, Path(rel), Path(rel), module)
+        if new != text:
+            path.write_text(new)
+            changed.append(rel)
+    return changed
+
+
+def leave_root(root: Path, module: str, externs_: list[str]) -> list[str]:
+    """Drop from the root's `[dependencies]` each external crate the moved crate takes
+    that no `.rs` file left outside `crates/` names; the crates dropped."""
+    left = subprocess.run(["git", "-C", str(root), "ls-files", "--", "*.rs", f":(exclude){layout.CRATES}/**"],
+                          capture_output=True, text=True, check=False).stdout.split()
+    code = "\n".join((root / f).read_text() for f in left if (root / f).is_file())
+    cargo = (root / "Cargo.toml").read_text()
+    gone = [d for d in externs_ if not externs(code, [d])
+            and re.search(rf"^\[dependencies\]\n(?:.*\n)*?{re.escape(d)} = \{{ workspace = true \}}\n", cargo, re.M)]
+    for d in gone:
+        section = cargo.index("\n[dependencies]\n")
+        cargo = cargo[:section] + re.sub(rf"^{re.escape(d)} = \{{ workspace = true \}}\n", "",
+                                         cargo[section:], count=1, flags=re.M)
+    (root / "Cargo.toml").write_text(cargo)
+    return gone
+
+
 def outside(root: Path, module: str) -> list[str]:
     """Each tracked file outside the crate still naming `src/<m>/`, with its lines."""
     done = subprocess.run(["git", "-C", str(root), "grep", "-n", "-F", f"src/{module}/", "--", ".",
@@ -265,6 +351,7 @@ def move(root: Path, module: str) -> list[str]:
     if not src.is_dir() or crate.exists():
         sys.exit(f"move-crate: needs src/{module}/ and no crates/{module}/")
     others = known_modules(root) - {module}
+    deps = row_deps(root, module)
     crate.mkdir(parents=True)
     git = ["git", "-C", str(root), "mv"]
     subprocess.run([*git, f"src/{module}", f"crates/{module}/src"], check=True)
@@ -273,30 +360,37 @@ def move(root: Path, module: str) -> list[str]:
     for path in sorted((crate / "src").rglob("*")):
         if path.suffix not in (".rs", ".md"):
             continue
-        text, named = rewrite(path.read_text(), module, others)
+        before = path.read_text()
+        rel = path.relative_to(crate / "src")
+        text, named = rewrite(before, module, deps & others)
+        text = reaim(text, Path("src", module, rel), Path(layout.CRATES, module, "src", rel), module)
         path.write_text(text)
         siblings |= named
-        rel = path.relative_to(crate / "src")
         if is_test_file(rel):
             test_code.append(text)
         else:
             live_code.append(live(text))
             test_code.append(text)
-        hand += by_hand(str(path.relative_to(root)), text)
+        hand += by_hand(str(path.relative_to(root)), text, before)
+        hand += reaching_up(str(path.relative_to(root)), text, others - deps)
     code = "\n".join(test_code)
     used = {f for f in FEATURES if f'feature = "{f}"' in code}
-    deps = workspace_deps((root / "Cargo.toml").read_text())
-    normal = externs("\n".join(live_code), deps)
+    registry = workspace_deps((root / "Cargo.toml").read_text())
+    normal = externs("\n".join(live_code), registry)
     plan = Plan(root, module, hand)
     for s in sorted(siblings):
         plan.sibling(s)
     for d in normal:
         plan.add(d)
-    for d in sorted(set(externs(code, deps)) - set(normal)):
+    for d in sorted(set(externs(code, registry)) - set(normal)):
         plan.add(d, "dev-dependencies")
     (crate / "Cargo.toml").write_text(plan.manifest(used))
     declared = [f for f in FEATURES if plan.features[f] or f in used]
     wire_root(root, module, declared, hand)
+    reaim_outside(root, module)
+    gone = leave_root(root, module, normal)
+    if gone:
+        hand.append(f"Cargo.toml: {', '.join(gone)} left the root's [dependencies] (only the crate names them now)")
     return hand + outside(root, module)
 
 

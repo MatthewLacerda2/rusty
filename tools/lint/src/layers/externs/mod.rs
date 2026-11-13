@@ -29,13 +29,20 @@ pub struct Use {
 /// Check the modules' crates against the table and the manifests: the root
 /// package's `Cargo.toml` and every member's under `root`.
 pub fn violations(layers: &[Layer], root: &Path, tree: &Tree) -> Vec<String> {
-    let manifest = root.join("Cargo.toml");
-    let Ok(text) = fs::read_to_string(&manifest) else {
-        return vec![format!(
-            "NO_MANIFEST {} — cannot read it",
-            manifest.display()
-        )];
+    let deps = match workspace_dependencies(root) {
+        Ok(deps) => deps,
+        Err(why) => return vec![why],
     };
+    let uses = uses(tree, &deps.iter().cloned().collect());
+    check::all(layers, &policy::POLICY, &deps, &uses)
+}
+
+/// The external crates the root package and every member under `root` depend on:
+/// a crate a moved module took with it is declared only in its member's manifest.
+pub fn workspace_dependencies(root: &Path) -> Result<Vec<String>, String> {
+    let manifest = root.join("Cargo.toml");
+    let text = fs::read_to_string(&manifest)
+        .map_err(|_| format!("NO_MANIFEST {} — cannot read it", manifest.display()))?;
     let mut deps = cargo::dependencies(&text);
     for member in crate::modules::member_manifests(root) {
         deps.extend(cargo::dependencies(
@@ -44,8 +51,7 @@ pub fn violations(layers: &[Layer], root: &Path, tree: &Tree) -> Vec<String> {
     }
     deps.sort();
     deps.dedup();
-    let uses = uses(tree, &deps.iter().cloned().collect());
-    check::all(layers, &policy::POLICY, &deps, &uses)
+    Ok(deps)
 }
 
 /// Every external-crate reference in non-test module code.

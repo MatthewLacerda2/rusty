@@ -271,4 +271,20 @@ mod tests {
         material_asset_from_import(&data);
         assert_eq!(texture(&png).texture_type, TextureType::NormalMap);
     }
+
+    #[test]
+    fn an_imported_metallic_roughness_map_turns_srgb_off() {
+        use crate::asset::sidecar::texture;
+        let png = crate::test_temp::dir().join("orm.png");
+        image::RgbaImage::new(4, 4).save(&png).unwrap();
+        let data = MaterialData {
+            metallic_roughness_map: Some(png.to_string_lossy().into_owned().into()),
+            ..MaterialData::default()
+        };
+        material_asset_from_import(&data);
+        assert!(
+            !texture(&png).srgb,
+            "a packed ORM map is data, as Unity marks it"
+        );
+    }
 }

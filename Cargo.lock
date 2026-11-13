@@ -3273,8 +3273,6 @@ name = "rusty"
 version = "0.1.0"
 dependencies = [
  "arboard",
- "bevy_mikktspace",
- "block_compression",
  "bytemuck",
  "egui",
  "egui-phosphor",
@@ -3284,7 +3282,6 @@ dependencies = [
  "getrandom 0.4.3",
  "gilrs",
  "glam 0.33.12",
- "gltf",
  "harfrust",
  "hecs",
  "image",
@@ -3292,7 +3289,6 @@ dependencies = [
  "ktx2",
  "libloading",
  "log",
- "meshopt",
  "mlua",
  "naga",
  "naga_oil",
@@ -3304,6 +3300,7 @@ dependencies = [
  "proptest",
  "rapier3d",
  "rustc-hash 2.1.3",
+ "rusty-asset",
  "rusty-core",
  "rusty-test-support",
  "rusty-time",
@@ -3314,12 +3311,31 @@ dependencies = [
  "serde_json",
  "skrifa",
  "smithay-clipboard",
- "symphonia",
- "tobj",
- "ufbx",
  "wgpu",
  "winit",
  "xxhash-rust",
+]
+
+[[package]]
+name = "rusty-asset"
+version = "0.1.0"
+dependencies = [
+ "bevy_mikktspace",
+ "block_compression",
+ "glam 0.33.12",
+ "gltf",
+ "image",
+ "ktx2",
+ "log",
+ "meshopt",
+ "proptest",
+ "rusty-core",
+ "rusty-test-support",
+ "serde",
+ "serde_json",
+ "symphonia",
+ "tobj",
+ "ufbx",
 ]
 
 [[package]]
@@ -3338,6 +3354,9 @@ dependencies = [
 [[package]]
 name = "rusty-test-support"
 version = "0.1.0"
+dependencies = [
+ "log",
+]
 
 [[package]]
 name = "rusty-time"

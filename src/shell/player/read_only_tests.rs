@@ -65,7 +65,7 @@ fn differing(before: &Files, after: &Files) -> BTreeSet<String> {
 
 /// The audio fixture, an MP3 the refresh converts.
 fn mp3() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("src/asset/audio/fixtures/loop.mp3")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("crates/asset/src/audio/fixtures/loop.mp3")
 }
 
 /// Run [`child`] in a new process on `step`.

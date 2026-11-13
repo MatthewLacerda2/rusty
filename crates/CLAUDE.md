@@ -18,17 +18,21 @@ half moved for many PRs, and everything must work that way. This is the recipe.
 
 ## Moving a module, step by step
 `make move-crate MODULE=<m>` makes steps 1–4 and prints, as *by hand*, what a text
-edit cannot settle (a `crate::{…}` group, `CARGO_MANIFEST_DIR`, an optional dependency
-no single `dev` / `editor` feature turns on, a feature other than those two, and every
-tracked file outside the crate still naming `src/<m>/`). Read its diff: it is the
-recipe below, run.
+edit cannot settle (a `crate::<x>` naming a module the row does not list, a
+`crate::{…}` group, `CARGO_MANIFEST_DIR`, a string path from the checkout's root, an optional dependency no single `dev` /
+`editor` feature turns on, a feature other than those two, and every tracked file
+outside the crate still naming `src/<m>/`). Read its diff: it is the recipe below, run.
 1. `git mv src/<m> crates/<m>/src`, then `git mv crates/<m>/src/mod.rs
    crates/<m>/src/lib.rs`. Its `#![deny(clippy::unwrap_used)]` (a sim row) or its
    clock opt-out (a platform row) stays at the top of `lib.rs`.
 2. Inside the crate: `crate::<dep>::` → `rusty_<dep>::` for each dep in its table
    row, then `crate::<m>::` → `crate::` (siblings first, so a submodule named like a
-   module, `crate::render::scene::`, stays the crate's own). Headers that name a path
-   (`//! src/<m>/x.rs — …`) become `crates/<m>/src/x.rs` (`make rules`, `self-path`).
+   module, `crate::render::scene::`, stays the crate's own). A module the row does
+   not list is left alone and listed: it is a unit test reaching up (*What the
+   compiler will name*). Headers that name a path (`//! src/<m>/x.rs — …`) become
+   `crates/<m>/src/x.rs` (`make rules`, `self-path`). A relative `include_str!` /
+   `include_bytes!` is re-aimed from the file's new folder, in the crate and in any
+   file outside whose include names a file of the crate.
 3. `crates/<m>/Cargo.toml`: `version`, `edition` and `publish` `.workspace = true`;
    `[lints] workspace = true` (`make determinism` fails a member without it: the
    clock ban and every deny live there); every dependency `{ workspace = true }`,
@@ -57,13 +61,23 @@ recipe below, run.
   Never a `test-support` feature: a dev-dependency feature the normal build lacks
   rebuilds the crate and everything above it for `cargo test` (`make feature-split`).
 - **Shared test helpers** live in `rusty-test-support` (`crates/test-support/`),
-  only ever a dev-dependency: the per-test temp dir (`temp::dir`) and the rebake
-  contract (`rebakes::follows_rebakes`). A crate's tests call it directly; the root
-  keeps `crate::test_temp` as a re-export beside its `lua_path`.
+  only ever a dev-dependency: the per-test temp dir (`temp::dir`), the rebake
+  contract (`rebakes::follows_rebakes`), the embedded model files (`models`,
+  `models::anim`), `.cube` lookups as text (`luts`) and the warnings a test logged
+  (`logs::init`, `logs::take`: the root's `logging` sits above every member). A
+  crate's tests call it directly; the root keeps `crate::test_temp` as a re-export
+  beside its `lua_path`. A fixture that is plain data moves here; one built on a
+  crate's types is a test hook instead.
 - **A unit test that reaches into another module** (its items or its private ones)
-  moves to that module's tests, or to `tests/`.
-- **`env!("CARGO_MANIFEST_DIR")`** names the crate's folder, not the checkout: use
+  moves to that module's tests, or to `tests/`. One reaching *up* (a module above
+  the crate, which no crate may depend on) splits: the crate keeps its own half,
+  and the half checking the module above moves to that module's tests, through
+  the crate's public API (an import check that bakes moves to `scene`'s tests).
+- **`env!("CARGO_MANIFEST_DIR")`** names the crate's folder, not the checkout, and
+  so does the working directory a crate's tests run in: use
   `rusty_core::project::checkout()` for a path in the checkout (`engine/`, a fixture).
+- **A crate's warnings reach the console** by their log target: `logging` keeps
+  `rusty::…` and every `rusty_<module>::…`, so a moved crate needs nothing for it.
 - **A build script's `cargo:rustc-env`** reaches only its own package, so a build
   script moves with the code that reads its variables (`crates/core/build.rs`).
 

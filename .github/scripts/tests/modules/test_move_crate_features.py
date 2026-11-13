@@ -52,8 +52,9 @@ mod t {
 FILES = {
     "Cargo.toml": CARGO, "src/lib.rs": LIB, "src/shell/mod.rs": SHELL,
     "src/shell/scene.rs": "", "src/shell/tests.rs": "fn g() { proptest::prop_assert!(true); }\n",
-    "src/render/mod.rs": "", "src/dev/mod.rs": "", "src/render/scene.rs": "",
+    "src/render/mod.rs": "fn v() { let _ = glam::Vec3::ZERO; }\n", "src/dev/mod.rs": "", "src/render/scene.rs": "",
     "src/render/read_tests.rs": 'const F: &str = "src/shell/fixtures/a.png";\n',
+    "tools/lint/src/layers/table.rs": 'platform("shell", &["core", "dev", "render"]),\n',
     "crates/core/src/lib.rs": "", "crates/core/Cargo.toml": '[package]\nname = "rusty-core"\n\n[features]\ndev = []\n',
 }
 
@@ -77,6 +78,11 @@ class Gated(unittest.TestCase):
         self.assertIn('dev = ["dep:rusty-dev", "rusty-core/dev"]', self.cargo)
         self.assertIn("rusty-dev = { workspace = true, optional = true }", self.cargo)
         self.assertIn("glam = { workspace = true }\n", self.cargo)
+
+    def test_a_crate_the_root_still_names_stays_in_it(self):
+        root = (self.root / "Cargo.toml").read_text().split("\n[dependencies]\n")[1]
+        self.assertIn("glam = { workspace = true }", root)
+        self.assertIn("egui = { workspace = true, optional = true }", root)
 
     def test_a_target_only_dependency_keeps_its_table(self):
         self.assertIn("[target.'cfg(target_os = \"macos\")'.dependencies]\nobjc2 = { workspace = true }", self.cargo)

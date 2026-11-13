@@ -63,7 +63,7 @@ fn a_re_import_with_no_geometry_keeps_the_old_shared_mesh() {
     scene.world.set_collider(id, Some(collider));
     assert!(remove_component(&mut scene, id, ComponentKind::Mesh));
     // The quad is now points: not a surface, so it imports no triangles.
-    let (json, bin) = crate::asset::fixtures::quad_mode_gltf(0, &[]);
+    let (json, bin) = rusty_test_support::models::quad_mode_gltf(0, &[]);
     let dir = std::path::Path::new(&path).parent().unwrap();
     std::fs::write(dir.join("quad.bin"), bin).unwrap();
     std::fs::write(&path, json).unwrap();

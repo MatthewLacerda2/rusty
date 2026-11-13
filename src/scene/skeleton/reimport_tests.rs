@@ -7,12 +7,12 @@ use glam::Vec3;
 
 use super::fixture::{animated_model, armature_owner, chain_skin, reimport_to, warnings_of};
 use super::HITBOX_NAME;
-use crate::asset::fixtures_anim::ANIMATED_GLTF;
 use crate::components::ColliderComponent;
 use crate::scene::asset_instance::instantiate_asset;
 use crate::scene::model_writes::ModelWrites;
 use crate::scene::serialize::{apply_scene_data, to_scene_data};
 use crate::scene::Scene;
+use rusty_test_support::models::anim::ANIMATED_GLTF;
 
 /// The rewrite that drops `Joint1` from the fixture's skin.
 const DROP_JOINT1: (&str, &str) = (

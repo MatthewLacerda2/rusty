@@ -4,8 +4,8 @@
 use glam::Vec3;
 
 use super::tests::child;
-use crate::asset::fixtures_anim::{animated_buffer, ANIMATED_GLTF};
 use crate::scene::Scene;
+use rusty_test_support::models::anim::{animated_buffer, ANIMATED_GLTF};
 
 /// The animated rig with a `Prop` mesh on `Joint1` and a `Gun` under it 1 m
 /// along Z, spawned whole.

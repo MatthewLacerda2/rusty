@@ -267,6 +267,8 @@ mod end_tests;
 #[cfg(test)]
 mod layer_tests;
 #[cfg(test)]
+mod mirrored_tests;
+#[cfg(test)]
 mod nested_pose_tests;
 #[cfg(test)]
 mod playhead_tests;

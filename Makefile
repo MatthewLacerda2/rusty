@@ -207,7 +207,7 @@ test-explore: ## Signal: the nextest suite, both feature sets, on random proptes
 # The converters' fingerprints (#1286): re-blessed after a bump of a converter's
 # `version`, never in place of one (the test refuses). Blender's rows only where
 # Blender runs (RUSTY_BLENDER, or `blender` on the PATH), as CI's `blender` job does.
-bless-converters: ## Re-bless src/asset/convert/fingerprints.txt after a converter's version bump
+bless-converters: ## Re-bless crates/asset/src/convert/fingerprints.txt after a converter's version bump
 	RUSTY_BLESS_CONVERTERS=1 $(TEST) -E 'test(converter_fingerprints)'
 	@if command -v "$${RUSTY_BLENDER:-blender}" >/dev/null 2>&1; then \
 		RUSTY_BLESS_CONVERTERS=1 $(TEST) --run-ignored only -E 'test(converter_fingerprints)'; \

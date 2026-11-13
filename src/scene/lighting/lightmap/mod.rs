@@ -101,6 +101,8 @@ mod falloff_tests;
 #[cfg(test)]
 mod gather_tests;
 #[cfg(test)]
+mod import_tests;
+#[cfg(test)]
 mod inset_tests;
 #[cfg(test)]
 mod mask_tests;

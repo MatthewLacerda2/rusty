@@ -3,7 +3,8 @@
 //! [`init`] installs `env_logger` with a default filter of `warn` (`RUST_LOG`
 //! overrides it), so an engine warning reaches stderr without anyone asking for it.
 //! The logger also keeps a copy of every **engine** `warn!` / `error!` record (its
-//! target is in this crate; a dependency's warnings go to stderr only) in a small
+//! target is in this crate or a workspace crate, `rusty_<module>`; a dependency's
+//! warnings go to stderr only) in a small
 //! buffer. Records arrive from any thread (the audio device thread logs too), so the
 //! buffer is a mutex, and whoever owns a console drains it once per frame or command
 //! with [`forward`]: the shell's frame loop, the headless session, the harness. That
@@ -139,10 +140,11 @@ impl Log for Forward {
     }
 }
 
-/// A warning or error raised by this crate's own code.
+/// A warning or error raised by the engine's own code: this crate (`rusty::…`) or
+/// one of the workspace's crates (`rusty_core::…`, `rusty_asset::…`, `crates/`).
 fn is_kept(metadata: &Metadata<'_>) -> bool {
-    let target = metadata.target();
-    let ours = target == "rusty" || target.starts_with("rusty::");
+    let krate = metadata.target().split("::").next().unwrap_or_default();
+    let ours = krate == "rusty" || krate.starts_with("rusty_");
     ours && metadata.level() <= Level::Warn
 }
 

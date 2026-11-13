@@ -10,7 +10,6 @@
 pub mod ai;
 pub mod api;
 pub mod app;
-pub mod asset;
 pub mod audio;
 pub mod components;
 pub mod ecs;
@@ -31,6 +30,7 @@ pub mod ui;
 // The modules already moved into crates of their own (crates/CLAUDE.md), under their
 // old names, so every `crate::core::…` path here and `rusty::core::…` path in
 // `tests/` keeps compiling.
+pub use rusty_asset as asset;
 pub use rusty_core as core;
 pub use rusty_time as time;
 

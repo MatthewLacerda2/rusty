@@ -29,6 +29,7 @@ glam = { workspace = true }
 LIB = "pub mod asset;\npub mod scene;\n\npub use rusty_core as core;\n"
 ASSET = """//! src/asset/mod.rs — the asset pipeline
 use crate::asset::cache::Key;
+use crate::asset::{cache, Thing};
 use crate::core::paths::to_slash;
 use crate::{core::fs, scene};
 #[cfg(feature = "dev")]
@@ -36,6 +37,9 @@ fn f() { let _ = glam::Vec3::ZERO; let p = env!("CARGO_MANIFEST_DIR"); }
 #[cfg(test)]
 fn t() { crate::test_temp::dir(); }
 """
+TABLE = 'sim("core", &[]),\n    sim(\n        "asset",\n        &["core"],\n    ),\n    sim("scene", &["asset", "core"]),\n'
+INC = 'fn d() { let _ = std::path::Path::new("tests/fixtures/a.fbx"); }\nconst F: &str = include_str!("../../../tests/f.fbx");\nconst O: &str = include_str!("../cache.rs");\n'
+UP = "use crate::logging;\nfn bake() { crate::scene::bake(); }\n"
 
 
 class Move(unittest.TestCase):
@@ -44,8 +48,10 @@ class Move(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.root = root = Path(tmp.name)
         files = {"Cargo.toml": CARGO, "src/lib.rs": LIB, "src/asset/mod.rs": ASSET,
-                 "src/asset/cache.rs": "//! src/asset/cache.rs — keys\n", "src/scene/mod.rs": "",
-                 "crates/core/src/lib.rs": ""}
+                 "src/asset/cache.rs": "//! src/asset/cache.rs — keys\n", "src/scene/mod.rs": "", "src/logging/mod.rs": "",
+                 "src/asset/up_tests.rs": UP, "crates/core/src/lib.rs": "",
+                 "tools/lint/src/layers/table.rs": TABLE, "src/asset/deep/inc_tests.rs": INC,
+                 "src/dev/mp3.rs": 'const A: &[u8] = include_bytes!("../asset/cache.rs");\n'}
         for name, text in files.items():
             (root / name).parent.mkdir(parents=True, exist_ok=True)
             (root / name).write_text(text)
@@ -84,8 +90,35 @@ class Move(unittest.TestCase):
 
     def test_what_text_cannot_settle_is_listed(self):
         whys = "\n".join(self.hand)
-        self.assertIn("crates/asset/src/lib.rs:4: a `crate::{…}` group", whys)
-        self.assertIn("lib.rs:6: names the crate's folder", whys)
+        self.assertIn("crates/asset/src/lib.rs:5: a `crate::{…}` group", whys)
+        self.assertNotIn("lib.rs:3: a `crate::{…}` group", whys)
+        self.assertIn("lib.rs:7: names the crate's folder", whys)
+
+    def test_a_module_above_it_is_listed_not_made_a_dependency(self):
+        self.assertEqual(self.read("crates/asset/src/up_tests.rs"), UP)
+        self.assertNotIn("rusty-scene", self.read("crates/asset/Cargo.toml"))
+        whys = "\n".join(self.hand)
+        self.assertIn("crates/asset/src/up_tests.rs:1: names `logging`, which the row does not list", whys)
+        self.assertIn("crates/asset/src/up_tests.rs:2: names `scene`, which the row does not list", whys)
+
+    def test_a_relative_include_still_names_its_file(self):
+        inc = self.read("crates/asset/src/deep/inc_tests.rs")
+        self.assertIn('include_str!("../../../../tests/f.fbx")', inc)
+        whys = "\n".join(self.hand)
+        self.assertIn("inc_tests.rs:1: a path from the checkout's root read from the working directory", whys)
+        self.assertNotIn("inc_tests.rs:2: a path from the checkout's root", whys)
+        self.assertIn('include_str!("../cache.rs")', inc, "a file inside the crate moved with it")
+        self.assertIn('include_bytes!("../../crates/asset/src/cache.rs")', self.read("src/dev/mp3.rs"))
+
+    def test_a_crate_only_the_moved_code_names_leaves_the_root(self):
+        cargo = self.read("Cargo.toml").split("[dependencies]")[1]
+        self.assertNotIn("glam", cargo)
+        self.assertIn("glam left the root's [dependencies]", "\n".join(self.hand))
+
+    def test_a_module_with_no_row_is_refused(self):
+        (self.root / "src/orphan").mkdir()
+        with self.assertRaises(SystemExit):
+            mover.move(self.root, "orphan")
 
     def test_a_module_already_moved_is_refused(self):
         with self.assertRaises(SystemExit):

@@ -5,9 +5,9 @@
 use glam::Vec3;
 
 use super::{instantiate_asset, set_model_scale_factor};
-use crate::asset::fixtures::{skinned_buffer, SKINNED_GLTF};
 use crate::scene::asset_instance::lightmap_test_support::quad_model;
 use crate::scene::Scene;
+use rusty_test_support::models::{skinned_buffer, SKINNED_GLTF};
 
 fn max_corner(scene: &Scene, id: u32) -> Vec3 {
     let mesh = scene.world.mesh(id).unwrap();
