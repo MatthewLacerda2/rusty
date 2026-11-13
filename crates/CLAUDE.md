@@ -121,8 +121,9 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
 - **A dependency the root declares `optional` stays optional in the crate**, turned
   on by the crate's feature of the same name (`editor = ["dep:egui"]`). A crate that
   declares a feature forwards it to each sibling that has one (`dev =
-  ["rusty-core/dev"]`), so its own `cargo test -p` build sees the sibling's gated
-  items.
+  ["rusty-core/dev"]`), a dev-dependency sibling too (`rusty-physics`' `editor`
+  turns on `rusty-asset/editor` for its sidecar tests), so its own `cargo test -p`
+  build sees the sibling's gated items.
 - **A feature-gated module stays gated.** `#[cfg(feature = "dev")] pub mod dev;`
   becomes `#[cfg(feature = "dev")] pub use rusty_dev as dev;`, the root depends on
   `rusty-dev` with `optional = true`, and its `dev` feature turns it on

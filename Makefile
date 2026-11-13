@@ -352,7 +352,7 @@ move-crate: ## Move a module into crates/<m>/: make move-crate MODULE=<m>, then 
 mutants-remote: ## Mutation on GitHub's runners, scoped. make mutants-remote SCOPE=diff or SCOPE='crates/physics/src/**'
 	@test -n "$(SCOPE)" || { \
 		echo "mutants-remote: what should be mutated? SCOPE=diff, or path globs" >&2; \
-		echo "                e.g. make mutants-remote SCOPE='src/navigation/**'" >&2; \
+		echo "                e.g. make mutants-remote SCOPE='crates/navigation/src/**'" >&2; \
 		exit 1; }
 	@python3 .github/scripts/mutants-remote.py '$(SCOPE)'
 

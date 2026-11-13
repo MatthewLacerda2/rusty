@@ -8,6 +8,7 @@ import unittest
 from tests import load
 
 mover = load("move_crate.py")
+imports = load("crate_imports.py")
 
 
 class BareImport(unittest.TestCase):
@@ -53,6 +54,27 @@ class BareImport(unittest.TestCase):
         self.assertEqual(text, "pub use rusty_asset::{self as asset, A};\n")
         text, _ = mover.rewrite("pub(crate) use crate::asset::{self};\n", "scene", {"asset"})
         self.assertEqual(text, "pub(crate) use rusty_asset::{self as asset};\n")
+
+
+class Ambiguous(unittest.TestCase):
+    """A bare `<dep>::` in a `use` group under another root, or in a string, may not be the sibling."""
+
+    FORMS = (
+        "use crate::asset;\nuse x::{asset::A};\nfn f() { asset::a(); }\n",
+        "use crate::asset::{self, B};\nuse x::{A, asset::C};\nfn f() { asset::a(); }\n",
+        'use crate::asset;\nfn f() { asset::a(); let s = "asset::b"; }\n',
+    )
+
+    def test_the_file_is_left_alone_and_listed(self):
+        for form in self.FORMS:
+            text, _ = mover.rewrite(form, "scene", {"asset"})
+            self.assertEqual(text, form.replace("crate::asset", "rusty_asset").replace("use rusty_asset;", "use crate::asset;"), form)
+            hand = imports.unsettled("x.rs", imports.siblings(form, {"asset"})[0], {"asset"})
+            self.assertTrue(hand and all("inside a `use` group or a string" in h for h in hand), f"{form}: {hand}")
+
+    def test_a_block_or_an_argument_after_a_brace_or_comma_is_still_rewritten(self):
+        text, _ = mover.rewrite("use crate::asset;\nfn f() {asset::a(); g(1, asset::b()); }\n", "scene", {"asset"})
+        self.assertEqual(text, "fn f() {rusty_asset::a(); g(1, rusty_asset::b()); }\n")
 
 
 class MacroCrate(unittest.TestCase):

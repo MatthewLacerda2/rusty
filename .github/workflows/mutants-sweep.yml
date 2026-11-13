@@ -52,7 +52,7 @@ env:
     src/app/**/*.rs
     src/scripting/**/*.rs
     crates/physics/src/**/*.rs
-    src/navigation/**/*.rs
+    crates/navigation/src/**/*.rs
 
 jobs:
   # Decides whether this sweep would measure anything new (#506). In a week

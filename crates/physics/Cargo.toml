@@ -5,8 +5,8 @@ edition.workspace = true
 publish.workspace = true
 
 [features]
-dev = ["rusty-core/dev", "rusty-scene/dev"]
-editor = ["rusty-core/editor"]
+dev = ["rusty-core/dev", "rusty-scene/dev", "rusty-asset/dev"]
+editor = ["rusty-core/editor", "rusty-asset/editor"]
 
 [lints]
 workspace = true

@@ -112,6 +112,18 @@ class Gated(unittest.TestCase):
                         self.hand)
 
 
+class DevSibling(unittest.TestCase):
+    def test_a_sibling_only_tests_name_gets_the_crates_feature(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "crates/asset").mkdir(parents=True)
+            (root / "Cargo.toml").write_text(CARGO)
+            (root / "crates/asset/Cargo.toml").write_text('[package]\nname = "rusty-asset"\n\n[features]\neditor = []\n')
+            plan = mover.Plan(root, "physics", [])
+            plan.add("rusty-asset", "dev-dependencies")
+            self.assertEqual(plan.declared({"editor"}), {"editor": ["rusty-asset/editor"]})
+
+
 class Unsettled(unittest.TestCase):
     def test_a_gate_on_anything_but_one_feature_is_listed(self):
         hand: list[str] = []

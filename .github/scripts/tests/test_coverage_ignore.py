@@ -67,7 +67,7 @@ class Moved(unittest.TestCase):
     def setUp(self) -> None:
         self.dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.dir.cleanup)
-        self.root = Path(self.dir.name)
+        self.root = Path(self.dir.name).resolve()
         for d in ("src/app", "src/render", "crates/physics/src/shape", "crates/test-support/src"):
             (self.root / d).mkdir(parents=True)
         (self.root / "src" / "lib.rs").write_text("")
@@ -77,16 +77,23 @@ class Moved(unittest.TestCase):
         return cov.ignore_regex(module, ["app", "physics"], cov.src_dirs(r), cov.src_files(r),
                                 cov.members(r), r)
 
+    def at(self, path: str) -> str:
+        """`path` as llvm-cov reports it: absolute, under the checkout."""
+        return f"{self.root.as_posix()}/{path}"
+
     def test_a_moved_module_is_measured_and_its_top_files_too(self):
-        for path in ("/w/rusty/crates/physics/src/ray.rs", "/w/rusty/crates/physics/src/shape/a.rs"):
-            self.assertIsNone(re.search(self.regex("physics"), path), path)
-        self.assertRegex("/w/rusty/src/app/run.rs", self.regex("physics"))
-        self.assertRegex("/w/rusty/src/lib.rs", self.regex("physics"))
+        for path in ("crates/physics/src/ray.rs", "crates/physics/src/shape/a.rs"):
+            self.assertIsNone(re.search(self.regex("physics"), self.at(path)), path)
+        self.assertRegex(self.at("src/app/run.rs"), self.regex("physics"))
+        self.assertRegex(self.at("src/lib.rs"), self.regex("physics"))
+
+    def test_a_moved_crates_own_lib_rs_is_not_the_roots(self):
+        self.assertIsNone(re.search(self.regex("physics"), self.at("crates/physics/src/lib.rs")))
 
     def test_a_moved_module_and_the_test_helpers_are_ignored_beside_another(self):
-        for path in ("/w/rusty/crates/physics/src/ray.rs", "/w/rusty/crates/test-support/src/temp.rs"):
-            self.assertRegex(path, self.regex("app"))
-        self.assertIsNone(re.search(self.regex("app"), "/w/rusty/src/app/run.rs"))
+        for path in ("crates/physics/src/ray.rs", "crates/test-support/src/temp.rs"):
+            self.assertRegex(self.at(path), self.regex("app"))
+        self.assertIsNone(re.search(self.regex("app"), self.at("src/app/run.rs")))
 
     def test_a_moved_subfolder_named_like_a_root_module_is_refused(self):
         (self.root / "crates/physics/src/render").mkdir()

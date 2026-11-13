@@ -421,7 +421,7 @@ issue, and a follow-up PR off `main` when worth fixing.
 How to read a clean report:
 
 - **The weekly sweep covers only `src/app`, `src/scripting`, `crates/physics/src`,
-  `src/navigation`.** Elsewhere, silence means unmeasured, not clean.
+  `crates/navigation/src`.** Elsewhere, silence means unmeasured, not clean.
 - **A scoped run names what it planned** (how many mutants, any from outside the
   scope). A `diff` with nothing to mutate says so; it is not a pass.
 - **A run stopped at its budget names what it never reached**: unmeasured; ask

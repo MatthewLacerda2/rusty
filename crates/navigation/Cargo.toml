@@ -1,0 +1,25 @@
+[package]
+name = "rusty-navigation"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[features]
+dev = ["rusty-core/dev", "rusty-physics/dev", "rusty-scene/dev"]
+
+[lints]
+workspace = true
+
+[dependencies]
+rusty-components = { workspace = true }
+rusty-core = { workspace = true }
+rusty-ecs = { workspace = true }
+rusty-physics = { workspace = true }
+rusty-scene = { workspace = true }
+glam = { workspace = true }
+log = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+rusty-test-support = { workspace = true }
+proptest = { workspace = true }
