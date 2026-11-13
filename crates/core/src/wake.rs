@@ -20,20 +20,20 @@ pub fn install(bell: impl Fn() + Send + Sync + 'static) {
 /// Ask the window for a frame soon. Call it after the work is visible to the main
 /// thread (the message sent, the note taken), so the frame it wakes finds it.
 pub fn frame() {
-    #[cfg(test)]
     RINGS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     if let Some(bell) = BELL.get() {
         bell();
     }
 }
 
-/// How many times [`frame`] rang in this test process. Tests run side by side, so
-/// compare it only as "it went up".
-#[cfg(test)]
 static RINGS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
-#[cfg(test)]
-pub(crate) fn rings() -> usize {
+/// How many times [`frame`] rang in this process. Tests run side by side, so
+/// compare it only as "it went up". A test hook in every build: other crates' tests
+/// call it, and a `#[cfg(test)]` item is invisible outside its crate
+/// (crates/CLAUDE.md, *Test hooks*).
+#[doc(hidden)]
+pub fn rings() -> usize {
     RINGS.load(std::sync::atomic::Ordering::Relaxed)
 }
 

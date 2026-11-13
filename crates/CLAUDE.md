@@ -43,7 +43,8 @@ optional dependency). Read its diff: it is the recipe below, run.
   crate's API, so say so in the PR. An item only tests use elsewhere is a *test hook*.
 - **Test hooks.** A `#[cfg(test)]` item is invisible outside its crate, so one that
   another crate's tests call is compiled in every build, `#[doc(hidden)] pub`, with a
-  line saying it is a test hook (`core::project::pin_engine`, `core::hulls::forget`).
+  line saying it is a test hook (`core::project::pin_engine`, `core::hulls::forget`,
+  `core::wake::rings`).
   Never a `test-support` feature: a dev-dependency feature the normal build lacks
   rebuilds the crate and everything above it for `cargo test` (`make feature-split`).
 - **Shared test helpers** live in `rusty-test-support` (`crates/test-support/`),

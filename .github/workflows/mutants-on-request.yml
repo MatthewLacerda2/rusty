@@ -174,7 +174,7 @@ jobs:
           # An empty diff (a branch that changed no Rust) plans nothing; it is
           # not handed to cargo-mutants, which refuses an empty `--in-diff`.
           if [ -s scope.diff ]; then
-            cargo mutants --workspace --list --json --in-diff scope.diff > planned.json
+            cargo mutants --list --workspace --json --in-diff scope.diff > planned.json
           else
             : > planned.json
           fi
