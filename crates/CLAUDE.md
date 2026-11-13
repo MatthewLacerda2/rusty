@@ -30,11 +30,14 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
    nearest `lib.rs`, now the crate's, and left at the root they never replay (the
    `orphan-seeds` lint fails on one).
 2. Inside the crate: `crate::<dep>::` → `rusty_<dep>::` for each dep in its table
-   row (a macro's `$crate::<dep>::` → `::rusty_<dep>::`; a file importing the module
-   bare, `use crate::<dep>;` or `{self, …}`, has its `<dep>::` paths rewritten and
-   the import dropped with its attributes; a re-export keeps its name, `pub use
-   rusty_<dep> as <dep>;` or `{self as <dep>, …}`, and `use crate::<dep> as x;`
-   becomes `use rusty_<dep> as x;`), then
+   row (a macro's `$crate::<dep>::` → `::rusty_<dep>::`). An import binding the
+   module's name is settled in its plain forms only: `use crate::<dep>;` and a
+   one-line, flat `{self, …}` with `self` first have the file's `<dep>::` paths
+   rewritten and the import (with its attributes) or its `self` dropped; a re-export
+   keeps its name, `pub use rusty_<dep> as <dep>;` or `{self as <dep>, …}`; `use
+   crate::<dep> as x;` becomes `use rusty_<dep> as x;`. Any other form a `self` sits
+   in (not first, beside a nested group, a comment in the group, `{self,}`, over
+   several lines) is listed, never guessed (`.github/scripts/crate_imports.py`). Then
    `crate::<m>::` → `crate::` and `pub(in crate::<m>)` → `pub(crate)` (siblings
    first, so a submodule named like a module, `crate::render::scene::`, stays the crate's own). A module the row does
    not list is left alone and listed: it is a unit test reaching up (*What the
@@ -98,8 +101,10 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
   the crate's public API (an import check that bakes moves to `scene`'s tests).
   One naming a module *below* that the row does not list (a test baking with
   `procgen`) takes `rusty-<x>` as a `[dev-dependencies]` entry and names it
-  `rusty_<x>::`: the layer table does not hold test code, and nothing below can
-  depend back on the crate.
+  `rusty_<x>::`: the layer table does not hold test code. *Below* means an earlier
+  row that does not name the crate back: `scripting` and `api` name each other, so
+  neither is below the other. `make layers` flags a member's dev-dependency on
+  itself, on a module at or above its row, or on one that reaches back to it.
 - **`env!("CARGO_MANIFEST_DIR")`** names the crate's folder, not the checkout, and
   so does the working directory a crate's tests run in: use
   `rusty_core::project::checkout()` for a path in the checkout (`engine/`, a fixture).

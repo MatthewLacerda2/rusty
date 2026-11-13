@@ -13,10 +13,19 @@ from pathlib import Path
 import modules as layout
 
 
+#: A folder `crates/<name>/` just before a `src/<m>/`: another crate's folder of that name.
+CRATE_DIR = re.compile(r"crates/[\w-]+/$")
+
+
 def paths(text: str, module: str) -> str:
-    """`text` with each `src/<m>/` path it names → `crates/<m>/src/` (`mod.rs` → `lib.rs`)."""
-    text = re.sub(rf"(?<![\w/])src/{module}/mod\.rs", f"crates/{module}/src/lib.rs", text)
-    return re.sub(rf"(?<![\w/])src/{module}/", f"crates/{module}/src/", text)
+    """`text` with each `src/<m>/` path it names → `crates/<m>/src/` (`mod.rs` → `lib.rs`). Read as
+    `outside()` reads one (PR #2159's review): `./src/<m>/`, `../src/<m>/` and `$(CURDIR)/src/<m>/`
+    are the module's paths too, and only one after `crates/<name>/` is another crate's folder."""
+    def one(m: re.Match) -> str:
+        if CRATE_DIR.search(text[:m.start()]):
+            return m.group(0)
+        return f"crates/{module}/src/lib.rs" if m.group(1) else f"crates/{module}/src/"
+    return re.sub(rf"(?<![\w-])src/{module}/(mod\.rs\b)?", one, text)
 
 
 INCLUDE = re.compile(r'(include_(?:str|bytes)!\(\s*")([^"]+)(")')
@@ -56,7 +65,6 @@ def reaim_outside(root: Path, module: str) -> list[str]:
     return changed
 
 
-CRATE_DIR = re.compile(r"crates/[\w-]+/$")
 #: Tests whose `src/<m>/` strings are made-up paths, never files to rewrite: coverage
 #: isolation's absolute `/w/rusty/src/<m>/…` and a mutation scope's `+++ b/src/<m>/…` diff
 #: header. The wider match lists them for every module; they are fixtures of a module path.

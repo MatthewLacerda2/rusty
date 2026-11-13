@@ -20,9 +20,7 @@ class BareImport(unittest.TestCase):
         text, _ = mover.rewrite("use crate::asset::{self, A};\nfn f() { asset::load(); }\n", "scene", {"asset"})
         self.assertEqual(text, "use rusty_asset::{A};\nfn f() { rusty_asset::load(); }\n")
 
-    def test_a_self_not_first_or_alone_goes_too(self):
-        text, _ = mover.rewrite("use crate::asset::{A, self};\nfn f() { asset::load(); }\n", "scene", {"asset"})
-        self.assertEqual(text, "use rusty_asset::{A};\nfn f() { rusty_asset::load(); }\n")
+    def test_a_lone_self_goes_whole(self):
         text, named = mover.rewrite("#[cfg(test)]\nuse crate::asset::{self};\nfn f() { asset::a(); }\n", "scene", {"asset"})
         self.assertEqual(text, "fn f() { rusty_asset::a(); }\n")
         self.assertEqual(named, {"asset"})
@@ -55,8 +53,6 @@ class BareImport(unittest.TestCase):
         self.assertEqual(text, "pub use rusty_asset::{self as asset, A};\n")
         text, _ = mover.rewrite("pub(crate) use crate::asset::{self};\n", "scene", {"asset"})
         self.assertEqual(text, "pub(crate) use rusty_asset::{self as asset};\n")
-        text, _ = mover.rewrite("pub use crate::asset::{A, self};\n", "scene", {"asset"})
-        self.assertEqual(text, "pub use rusty_asset::{A, self as asset};\n")
 
 
 class MacroCrate(unittest.TestCase):
