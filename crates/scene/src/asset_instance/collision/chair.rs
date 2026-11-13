@@ -8,8 +8,9 @@ use rusty_asset::{sidecar, MeshColliderKind, SubObjectCollider};
 
 /// Write a bumpy `Chair` of `n`×`n` quads (2n² triangles, 0.1 high) and a
 /// two-triangle `Chair_col` as the `.obj` at `path`, its sidecar's `Chair`
-/// collider built from `mesh`.
-pub fn write(path: &Path, n: u32, mesh: Option<&str>) -> Result<(), String> {
+/// collider built from `mesh`; `path` slashed (`rusty_core::paths::to_slash`), so a
+/// test can put it in a Lua literal or a scene reference.
+pub fn write(path: &Path, n: u32, mesh: Option<&str>) -> Result<String, String> {
     let mut obj = String::from("o Chair\n");
     for z in 0..=n {
         for x in 0..=n {
@@ -35,5 +36,6 @@ pub fn write(path: &Path, n: u32, mesh: Option<&str>) -> Result<(), String> {
         mesh: mesh.map(str::to_string),
     };
     settings.colliders.insert("Chair".into(), entry);
-    sidecar::save(path, &settings).map_err(|e| e.to_string())
+    sidecar::save(path, &settings).map_err(|e| e.to_string())?;
+    Ok(rusty_core::paths::to_slash(path))
 }

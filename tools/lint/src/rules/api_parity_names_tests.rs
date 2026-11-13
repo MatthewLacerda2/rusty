@@ -35,3 +35,23 @@ fn a_file_of_the_scene_crate_names_ops_by_its_own_root() {
     );
     assert!(ops_named(src, &[], root_of("src/api/component.rs")).is_empty());
 }
+
+/// A file in another member crate (`api` and `editor`, once moved) names the ops
+/// through `rusty_scene::authoring`, by a `use` or spelled whole.
+#[test]
+fn a_file_of_another_member_names_ops_through_the_scene_crate() {
+    let src = "use rusty_scene::authoring::rendering::camera;\n\
+               fn f() { camera::set_far(x, 1.0); \
+               rusty_scene::authoring::physics::collider::set_active(y, true); }\n";
+    let root = root_of("crates/api/src/component.rs");
+    assert_eq!(root, "rusty_scene::authoring");
+    let named: Vec<String> = ops_named(src, &[], root).into_iter().collect();
+    assert_eq!(
+        named,
+        [
+            "physics::collider::set_active",
+            "rendering::camera::set_far"
+        ]
+    );
+    assert_eq!(root_of("src/api/component.rs"), super::ROOT);
+}

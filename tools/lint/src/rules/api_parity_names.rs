@@ -5,6 +5,7 @@
 use super::{Op, ROOT};
 use crate::code::{code_lines, is_ident};
 use crate::layers::flatten_use;
+use crate::modules::{crate_module, module_path};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Every op `source` names outside its test lines, `root` being the path its
@@ -34,16 +35,13 @@ pub fn ops_named(source: &str, test: &[bool], root: &str) -> BTreeSet<Op> {
             let Some((tail, _)) = rest.split_last() else {
                 return aliases.get(head).cloned();
             };
+            // A path spelled from the root is whole; one through an alias goes on from it.
             let base = match aliases.get(head.as_str()) {
-                Some(base) => base.clone(),
+                Some(base) => join(base, &rest[..rest.len() - 1].join("::")),
                 None if segs.join("::").starts_with(&format!("{root}::")) => {
                     segs[root.split("::").count()..segs.len() - 1].join("::")
                 }
                 None => return None,
-            };
-            let base = match &segs[..] {
-                [first, ..] if first == "crate" => base,
-                _ => join(&base, &rest[..rest.len() - 1].join("::")),
             };
             Some(join(&base, tail))
         })
@@ -92,13 +90,19 @@ pub fn local_ops_named(source: &str, test: &[bool], module: &str) -> BTreeSet<Op
         .collect()
 }
 
-/// How the file at `path` spells `scene::authoring`: `crate::authoring` inside the
-/// `rusty-scene` crate (`crates/scene/src/`), `crate::scene::authoring` elsewhere.
+/// How the file at `path` spells `scene::authoring`, by the crate it is in:
+/// `crate::authoring` inside `rusty-scene`, `rusty_scene::authoring` in another
+/// member crate, `crate::scene::authoring` ([`ROOT`]) in the root package, which
+/// re-exports the crate under its old name.
 pub fn root_of(path: &str) -> &'static str {
-    if path.starts_with("crates/scene/") {
-        "crate::authoring"
-    } else {
-        ROOT
+    let module = module_path(path);
+    let module = module
+        .strip_prefix("src/")
+        .and_then(|p| p.split('/').next());
+    match (crate_module(path).is_some(), module) {
+        (true, Some("scene")) => "crate::authoring",
+        (true, _) => "rusty_scene::authoring",
+        (false, _) => ROOT,
     }
 }
 
@@ -111,11 +115,14 @@ pub(super) fn join(a: &str, b: &str) -> String {
 }
 
 /// Each name a `use` of `scene::authoring` binds, to its path under `authoring`
-/// (`""` for `authoring` itself, `rigidbody::set_mass` for a setter by name).
+/// (`""` for `authoring` itself, `rigidbody::set_mass` for a setter by name). Read
+/// from each `use` starting where `root` does (`use crate::…`, `use rusty_scene::…`).
 fn aliases(text: &str, root: &str) -> BTreeMap<String, String> {
     let mut out = BTreeMap::new();
+    let first = root.split("::").next().unwrap_or(root);
+    let needle = format!("use {first}::");
     let mut rest = text;
-    while let Some(at) = rest.find("use crate::") {
+    while let Some(at) = rest.find(&needle) {
         let after = &rest[at + 4..];
         let end = after.find(';').unwrap_or(after.len());
         for (path, name) in flatten_use(&after[..end]) {

@@ -105,11 +105,11 @@ pub fn check(
                 found.push(finding(path, line, msg("")));
             }
             Some(_) => {}
-            None => found.push(finding(
-                AUTHORING.into(),
-                1,
-                msg(" (its `fn` is not found under src/scene/authoring/)"),
-            )),
+            None => {
+                let folder = folder(authoring);
+                let why = format!(" (its `fn` is not found under {folder})");
+                found.push(finding(folder, 1, msg(&why)));
+            }
         }
     }
     for (path, source) in authoring {
@@ -189,6 +189,20 @@ fn allows(source: &str) -> Vec<(usize, usize, String)> {
         out.push((i + 1, at + 1, name.unwrap_or_default()));
     }
     out
+}
+
+/// Where the authoring files lie on disk (`crates/scene/src/authoring/` once `scene`
+/// moved), read from the files found: a finding names a real path, never the module
+/// path [`AUTHORING`] they are matched by.
+fn folder(authoring: &BTreeMap<String, &str>) -> String {
+    let at = |p: &String| {
+        p.find("authoring/")
+            .map(|i| p[..i + "authoring/".len()].to_string())
+    };
+    authoring
+        .keys()
+        .find_map(at)
+        .unwrap_or_else(|| AUTHORING.into())
 }
 
 #[cfg(test)]

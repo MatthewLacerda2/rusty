@@ -2,17 +2,11 @@
 //! the low-poly sibling builds it, is never drawn, survives a save and load, and a
 //! name the model lacks falls back to the own mesh with one warning.
 
+use super::chair::write as write_chair;
 use crate::model_instance::instantiate_model;
 use crate::serialize::{apply_scene_data, to_scene_data};
 use crate::Scene;
-
-/// The [`chair::write`](super::chair::write) model as `file` in the test's temp dir;
-/// its path, slashed (`core::paths::to_slash`) so a test can put it in a Lua literal.
-pub(super) fn chair(file: &str, n: u32, mesh: Option<&str>) -> String {
-    let path = rusty_test_support::temp::dir().join(file);
-    super::chair::write(&path, n, mesh).unwrap();
-    rusty_core::paths::to_slash(&path)
-}
+use rusty_components::ColliderShape;
 
 /// The model at `path` spawned whole, and its child entities' names and ids.
 pub(super) fn spawn(path: &str) -> (Scene, Vec<(String, u32)>) {
@@ -26,12 +20,15 @@ pub(super) fn spawn(path: &str) -> (Scene, Vec<(String, u32)>) {
     (scene, named)
 }
 
-/// The triangles of the mesh `id`'s active collider is built from: its collision
-/// mesh, else its entity's Mesh, else its kept `shared_mesh`. Scene's half of the
+/// The triangles of the mesh `id`'s active Mesh collider is built from (0 for any
+/// other shape, which builds from no mesh): its collision mesh, else its entity's
+/// Mesh, else its kept `shared_mesh`. Scene's half of the
 /// collider physics builds (`physics::shape::build::collider_inputs` makes the same
 /// choice; the shape it builds from the mesh is physics' tests').
 pub(super) fn triangles(scene: &Scene, id: u32) -> usize {
-    let Some(c) = scene.world.collider(id).filter(|c| c.active) else {
+    let collider = scene.world.collider(id);
+    let built_from_mesh = |c: &_| matches!(c, ColliderShape::Mesh { .. });
+    let Some(c) = collider.filter(|c| c.active && built_from_mesh(&c.shape)) else {
         return 0;
     };
     let count = |indices: &[u32]| indices.len() / 3;
@@ -44,7 +41,12 @@ pub(super) fn triangles(scene: &Scene, id: u32) -> usize {
 
 #[test]
 fn the_low_poly_sibling_builds_the_collider_and_is_not_drawn() {
-    let path = chair("rusty_1960_chair.obj", 12, Some("Chair_col"));
+    let path = write_chair(
+        &rusty_test_support::temp::dir().join("rusty_1960_chair.obj"),
+        12,
+        Some("Chair_col"),
+    )
+    .unwrap();
     let (scene, kids) = spawn(&path);
     let names: Vec<&str> = kids.iter().map(|(n, _)| n.as_str()).collect();
     assert_eq!(names, ["Chair"], "no entity draws the collision mesh");
@@ -67,7 +69,12 @@ fn the_low_poly_sibling_builds_the_collider_and_is_not_drawn() {
 
 #[test]
 fn the_collision_mesh_is_rebuilt_on_load() {
-    let path = chair("rusty_1960_chair_load.obj", 6, Some("Chair_col"));
+    let path = write_chair(
+        &rusty_test_support::temp::dir().join("rusty_1960_chair_load.obj"),
+        6,
+        Some("Chair_col"),
+    )
+    .unwrap();
     let (scene, kids) = spawn(&path);
     let text = serde_json::to_string(&to_scene_data(&scene)).unwrap();
     assert!(!text.contains("positions"), "only the reference is saved");
@@ -80,7 +87,12 @@ fn the_collision_mesh_is_rebuilt_on_load() {
 
 #[test]
 fn an_undone_edit_keeps_the_collision_mesh() {
-    let path = chair("rusty_1960_chair_undo.obj", 4, Some("Chair_col"));
+    let path = write_chair(
+        &rusty_test_support::temp::dir().join("rusty_1960_chair_undo.obj"),
+        4,
+        Some("Chair_col"),
+    )
+    .unwrap();
     let (mut scene, kids) = spawn(&path);
     let id = kids[0].1;
     scene.clear_undo();
@@ -94,7 +106,12 @@ fn an_undone_edit_keeps_the_collision_mesh() {
 #[test]
 fn removing_and_adding_the_mesh_keeps_the_collision_mesh() {
     use crate::authoring::{add_component, remove_component, ComponentKind};
-    let path = chair("rusty_1960_chair_remove.obj", 4, Some("Chair_col"));
+    let path = write_chair(
+        &rusty_test_support::temp::dir().join("rusty_1960_chair_remove.obj"),
+        4,
+        Some("Chair_col"),
+    )
+    .unwrap();
     let (mut scene, kids) = spawn(&path);
     let id = kids[0].1;
     assert!(remove_component(&mut scene, id, ComponentKind::Mesh));
@@ -109,7 +126,12 @@ fn removing_and_adding_the_mesh_keeps_the_collision_mesh() {
 
 #[test]
 fn a_missing_name_falls_back_to_the_own_mesh_with_one_warning() {
-    let path = chair("rusty_1960_chair_missing.obj", 3, Some("Nope"));
+    let path = write_chair(
+        &rusty_test_support::temp::dir().join("rusty_1960_chair_missing.obj"),
+        3,
+        Some("Nope"),
+    )
+    .unwrap();
     let (scene, kids) = spawn(&path);
     let (_, again) = spawn(&path);
     let id = kids.iter().find(|(n, _)| n == "Chair").unwrap().1;

@@ -151,6 +151,13 @@ impl MeshComponent {
         self.scale_in_lightmap <= 0.0
     }
 
+    /// Whether any vertex carries a generated lightmap UV. A test hook: the import
+    /// tests of `scene` and `scripting` ask it of a re-imported model.
+    #[doc(hidden)]
+    pub fn has_lightmap_uv(&self) -> bool {
+        self.vertices.iter().any(|v| v.lightmap_uv != [0.0, 0.0])
+    }
+
     /// A static mesh: `primitive_type` (see the field) over this geometry, with no
     /// asset reference, skin or clips, and a fresh revision so every renderer uploads it.
     /// Set the skinned and asset fields on top with `..MeshComponent::new(…)`.

@@ -3,7 +3,8 @@
 
 use std::collections::BTreeSet;
 
-use super::tests::{chair, spawn, triangles};
+use super::chair::write as write_chair;
+use super::tests::{spawn, triangles};
 use crate::asset_instance::{instantiate_asset, set_model_scale_factor};
 use crate::rehydrate::{reimport_model_except, Rig};
 use crate::serialize::{apply_scene_data, to_scene_data};
@@ -11,7 +12,12 @@ use crate::Scene;
 
 #[test]
 fn a_scale_factor_change_reaches_the_collision_mesh() {
-    let path = chair("rusty_1960_chair_scale.obj", 4, Some("Chair_col"));
+    let path = write_chair(
+        &rusty_test_support::temp::dir().join("rusty_1960_chair_scale.obj"),
+        4,
+        Some("Chair_col"),
+    )
+    .unwrap();
     let (mut scene, _) = spawn(&path);
     set_model_scale_factor(&mut scene, &path, 2.0).unwrap();
     let chair = scene.world.ids_with_collider().into_iter().next().unwrap();
@@ -23,7 +29,12 @@ fn a_scale_factor_change_reaches_the_collision_mesh() {
 #[test]
 fn a_collision_mesh_that_no_longer_loads_falls_back_on_load() {
     // A lone part: a whole model is rebuilt from its sidecar on load instead.
-    let path = chair("rusty_1960_chair_gone_load.obj", 4, Some("Chair_col"));
+    let path = write_chair(
+        &rusty_test_support::temp::dir().join("rusty_1960_chair_gone_load.obj"),
+        4,
+        Some("Chair_col"),
+    )
+    .unwrap();
     let mut scene = Scene::new();
     let part = format!("{path}::Chair");
     let id = instantiate_asset(&mut scene, &part, None, glam::Vec3::ZERO).unwrap();
@@ -46,7 +57,12 @@ fn a_collision_mesh_that_no_longer_loads_falls_back_on_load() {
 
 #[test]
 fn a_re_import_without_the_collision_mesh_falls_back() {
-    let path = chair("rusty_1960_chair_gone_live.obj", 4, Some("Chair_col"));
+    let path = write_chair(
+        &rusty_test_support::temp::dir().join("rusty_1960_chair_gone_live.obj"),
+        4,
+        Some("Chair_col"),
+    )
+    .unwrap();
     let (mut scene, kids) = spawn(&path);
     let id = kids[0].1;
     let obj = std::fs::read_to_string(&path).unwrap();
@@ -68,7 +84,12 @@ fn a_re_import_without_the_collision_mesh_falls_back() {
 
 #[test]
 fn a_mesh_naming_its_own_sub_object_is_its_own() {
-    let path = chair("rusty_1960_chair_self.obj", 3, Some("Chair"));
+    let path = write_chair(
+        &rusty_test_support::temp::dir().join("rusty_1960_chair_self.obj"),
+        3,
+        Some("Chair"),
+    )
+    .unwrap();
     let (scene, kids) = spawn(&path);
     let names: Vec<&str> = kids.iter().map(|(n, _)| n.as_str()).collect();
     assert_eq!(names, ["Chair", "Chair_col"], "nothing is hidden");
@@ -79,7 +100,12 @@ fn a_mesh_naming_its_own_sub_object_is_its_own() {
 
 #[test]
 fn a_skipped_entity_keeps_its_collision_mesh() {
-    let path = chair("rusty_1960_chair_skip.obj", 4, Some("Chair_col"));
+    let path = write_chair(
+        &rusty_test_support::temp::dir().join("rusty_1960_chair_skip.obj"),
+        4,
+        Some("Chair_col"),
+    )
+    .unwrap();
     let (mut scene, kids) = spawn(&path);
     let id = kids[0].1;
     let mut settings = rusty_asset::sidecar::load(std::path::Path::new(&path)).unwrap();
