@@ -21,7 +21,7 @@ pub fn trace_texels(
     count: usize,
     threads: usize,
 ) -> (usize, u64) {
-    let rays = Rays::build(triangles(scene));
+    let rays = Rays::build(triangles(scene)).counted();
     let tracer = Tracer::new(scene, &rays);
     let max = max_map_edge(settings.page());
     let receivers: Vec<usize> = (0..scene.meshes.len())

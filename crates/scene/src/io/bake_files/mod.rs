@@ -261,7 +261,6 @@ impl BakeFiles {
     }
 
     /// Whether a save warned that the file at `path` is newer than this world's.
-    #[cfg(test)]
     pub fn warned(&self, path: &Path) -> bool {
         self.warned.borrow().contains(&key(path))
     }
@@ -284,3 +283,11 @@ mod refused_tests;
 
 #[cfg(test)]
 mod replace_tests;
+
+impl crate::Scene {
+    /// What this world last read or wrote at each bake sidecar's path: what a save
+    /// keeps, read by `dev::bake`'s tests (the field itself is written only here).
+    pub fn bake_files(&self) -> &BakeFiles {
+        &self.bake_files
+    }
+}

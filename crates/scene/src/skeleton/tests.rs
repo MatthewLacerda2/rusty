@@ -1,10 +1,10 @@
 //! Bones are GameObjects (#453): spawning, re-binding, the palette build, lookup,
-//! destroy, and the snapshot filter.
+//! and destroy (the snapshot's bone filter is `api::snapshot::bone_tests`).
 
-use glam::{Vec2, Vec3};
+use glam::Vec3;
 
 use super::fixture::{armature_owner, armature_skin, hero};
-use crate::{Camera, Scene};
+use crate::Scene;
 
 fn names(scene: &Scene, ids: &[u32]) -> Vec<String> {
     ids.iter()
@@ -100,26 +100,4 @@ fn destroying_the_skinned_entity_takes_its_skeleton_and_attachments() {
     let bystander = scene.add_entity("Crate".to_string());
     scene.destroy_entity(rig);
     assert_eq!(scene.entity_ids(), vec![bystander]);
-}
-
-#[test]
-fn the_snapshot_leaves_bones_out_unless_asked() {
-    let mut scene = Scene::new();
-    let rig = armature_owner(&mut scene);
-    scene.sync_skeleton(rig);
-    let read = |bones| {
-        let v = crate::api::snapshot::world_value_with(
-            &scene,
-            &Camera::new(Vec3::ZERO, 0.0, 0.0),
-            0,
-            false,
-            &crate::ui::UiView::screen(Vec2::new(800.0, 600.0), Default::default()),
-            bones,
-        );
-        v["entities"].as_array().unwrap().clone()
-    };
-    assert_eq!(read(false).len(), 1);
-    let all = read(true);
-    assert_eq!(all.len(), 4);
-    assert_eq!(all.iter().filter(|e| e["bone"] == true).count(), 3);
 }

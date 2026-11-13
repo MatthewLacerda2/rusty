@@ -1,13 +1,14 @@
 //! Primitive sites for #1737's acceptance tests: a yard, a house on it whose roof
-//! no one reaches (on the yard, or alone as an indoor level), and placement on a
-//! baked nav surface.
+//! no one reaches (on the yard, or alone as an indoor level), and a pool. A test
+//! hook: compiled in every build, since placement on a baked nav surface is
+//! `navigation`'s tests' (`navigation::probe_site`).
 
 use glam::Vec3;
 
 use super::test_level::block;
-use super::{plan_reflection_probes, ReflectionPlacement, ReflectionPlan, Site};
-use crate::navigation::NavigationGraph;
+use crate::authoring::{create_entity, Primitive};
 use crate::Scene;
+use rusty_components::{MaterialAsset, MaterialComponent, RenderMode};
 
 /// A 30 × 30 m yard, top at y = 0.
 pub fn yard() -> Scene {
@@ -47,26 +48,41 @@ pub fn indoor_house() -> Scene {
     scene
 }
 
-/// `scene`'s reflection plans on its baked nav surface's reachable floor.
-pub fn plan_on_nav(scene: &Scene) -> Vec<ReflectionPlan> {
-    plan_on_nav_from(scene, &[])
-}
-
-/// [`plan_on_nav`] with actors starting at `starts`.
-pub fn plan_on_nav_from(scene: &Scene, starts: &[Vec3]) -> Vec<ReflectionPlan> {
-    let site = site_on_nav_from(scene, starts);
-    plan_reflection_probes(scene, &site, &ReflectionPlacement::default(), &[])
-}
-
-/// `scene`'s site on its baked nav surface's reachable floor.
-pub fn site_on_nav(scene: &Scene) -> Site {
-    site_on_nav_from(scene, &[])
-}
-
-/// [`site_on_nav`] with actors starting at `starts`.
-pub fn site_on_nav_from(scene: &Scene, starts: &[Vec3]) -> Site {
-    let nav = NavigationGraph::from_scene(scene);
-    let reach = nav.reachable_spans(starts);
-    let floor = nav.floor_grid(scene.nav_settings.agent_radius, Some(&reach));
-    Site::survey(scene, floor, None, 0.5).expect("a site")
+/// A 6 × 6 m pit 1.5 m deep in the yard's deck, water at deck level.
+pub fn pool() -> Scene {
+    let mut scene = Scene::new();
+    let (d, r) = (-1.5, 15.0);
+    block(&mut scene, Vec3::new(-r, -0.2, -r), Vec3::new(r, 0.0, -3.0));
+    block(&mut scene, Vec3::new(-r, -0.2, 3.0), Vec3::new(r, 0.0, r));
+    block(
+        &mut scene,
+        Vec3::new(-r, -0.2, -3.0),
+        Vec3::new(-3.0, 0.0, 3.0),
+    );
+    block(
+        &mut scene,
+        Vec3::new(3.0, -0.2, -3.0),
+        Vec3::new(r, 0.0, 3.0),
+    );
+    block(
+        &mut scene,
+        Vec3::new(-3.0, d - 0.2, -3.0),
+        Vec3::new(3.0, d, 3.0),
+    );
+    let water = create_entity(&mut scene, "Water", Some(Primitive::Plane));
+    scene.world.set_static(water, true);
+    if let Some(mut t) = scene.world.transform_mut(water) {
+        t.position = Vec3::new(0.0, -0.15, 0.0);
+        t.scale = Vec3::new(6.0 / 15.0, 1.0, 6.0 / 15.0);
+    }
+    let look = MaterialAsset {
+        render_mode: RenderMode::Transparent,
+        alpha: 0.5,
+        ..MaterialAsset::default()
+    };
+    scene.materials.insert("water".into(), look);
+    scene
+        .world
+        .set_material(water, Some(MaterialComponent::new("water")));
+    scene
 }

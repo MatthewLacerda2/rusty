@@ -30,11 +30,6 @@ pub(super) fn sky_radiance(scene: &Scene, color: Vec3) -> Sh9 {
 }
 
 #[cfg(test)]
-mod fixture;
-#[cfg(test)]
 mod tests;
 
-#[cfg(test)]
-pub use fixture::panorama_fixture;
-#[cfg(test)]
 pub use procedural::sky_color as procedural_sky_color;

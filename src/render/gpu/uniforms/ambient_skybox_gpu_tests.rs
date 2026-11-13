@@ -19,7 +19,7 @@ fn gpu_the_skybox_ambient_is_the_cpus() {
     ] {
         let mut sky = Scene::new();
         sky.ambient.mode = AmbientMode::Skybox;
-        sky.skybox_path = crate::scene::panorama_fixture(name, top, bottom, 40);
+        sky.skybox_path = rusty_test_support::panorama::fixture(name, top, bottom, 40);
         skies.push(sky);
     }
     let mut procedural = Scene::new();

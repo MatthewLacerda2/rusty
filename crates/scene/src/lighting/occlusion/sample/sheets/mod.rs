@@ -133,7 +133,7 @@ impl Sheet {
     }
 
     /// The bytes its texels' sums take.
-    #[cfg(all(test, feature = "dev"))]
+    #[cfg(feature = "dev")]
     pub fn bytes(&self) -> usize {
         self.sums.len() * 4
     }

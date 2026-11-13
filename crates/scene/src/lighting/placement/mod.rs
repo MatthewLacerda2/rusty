@@ -38,8 +38,9 @@ mod occupancy;
 mod reflection;
 mod room_probes;
 mod rooms;
-#[cfg(test)]
-pub(crate) mod test_level;
+// A test hook: the levels other crates' probe-placement tests build.
+#[doc(hidden)]
+pub mod test_level;
 
 use glam::Vec3;
 
@@ -130,8 +131,5 @@ mod light_tests;
 #[cfg(test)]
 #[path = "liquid_tests.rs"]
 mod liquid_tests;
-#[cfg(test)]
-#[path = "reflection_tests.rs"]
-mod reflection_tests;
-#[cfg(test)]
-pub(crate) mod test_sites;
+#[doc(hidden)]
+pub mod test_sites;

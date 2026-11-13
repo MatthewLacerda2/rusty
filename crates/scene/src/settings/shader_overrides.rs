@@ -63,12 +63,11 @@ impl ShaderOverrides {
     }
 
     /// How many entities carry an override.
-    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
-    #[cfg(test)]
+    /// Whether no entity carries an override.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }

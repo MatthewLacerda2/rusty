@@ -43,7 +43,7 @@ fn the_memo_keeps_failures_and_follows_the_sidecar() {
     assert_eq!(radiance(&broken), None);
     assert_eq!(decodes(), before + 1, "a failure is remembered");
 
-    let sky = crate::panorama_fixture("sized.png", [200, 0, 0], [0, 0, 200], 0);
+    let sky = rusty_test_support::panorama::fixture("sized.png", [200, 0, 0], [0, 0, 200], 0);
     let first = radiance(&sky).expect("decodes");
     assert_eq!(radiance(&sky), Some(first));
     assert_eq!(decodes(), before + 2, "a success is remembered");

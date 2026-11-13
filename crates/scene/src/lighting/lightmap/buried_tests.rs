@@ -1,19 +1,17 @@
 //! A buried face is ordinary content (#1949's review): a wall standing on a floor
 //! bakes with no warning, though its foot's UV island has no valid texel.
 
-use std::cell::RefCell;
-
 use glam::Vec3;
 
 use super::input::BakeScene;
 use super::*;
 use crate::lighting::occlusion::test_level::block;
-use crate::scripting::ConsoleLogs;
 use crate::Scene;
 
 #[test]
 fn a_wall_standing_on_a_floor_bakes_without_a_warning() {
-    crate::logging::init();
+    rusty_test_support::logs::init();
+    rusty_test_support::logs::take(); // what earlier code on this thread logged
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     let floor = Vec3::new(-4.0, -0.2, -4.0);
@@ -34,8 +32,7 @@ fn a_wall_standing_on_a_floor_bakes_without_a_warning() {
     };
     let maps = bake(&BakeScene::gather(&scene, &|_| None), &settings);
     assert_eq!(maps.len(), 2, "both boxes baked a lightmap");
-    let console = RefCell::new(ConsoleLogs::default());
-    let said = crate::logging::forward(&console);
+    let said = rusty_test_support::logs::take();
     let lighting: Vec<_> = said.iter().filter(|l| l.contains("[Lighting]")).collect();
     assert!(lighting.is_empty(), "the bake warned: {lighting:?}");
 }

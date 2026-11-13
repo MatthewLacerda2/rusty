@@ -58,6 +58,10 @@ mod late_update_tests;
 #[cfg(test)]
 mod lifecycle_tests;
 #[cfg(test)]
+mod missing_bone_tests;
+#[cfg(test)]
+mod model_writes_tests;
+#[cfg(test)]
 mod probe_tests;
 #[cfg(test)]
 mod schedule_tests;

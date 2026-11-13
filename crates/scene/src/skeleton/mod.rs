@@ -40,7 +40,8 @@ mod hitbox;
 mod ik;
 mod palette;
 mod persist;
-pub(crate) mod probe;
+#[doc(hidden)]
+pub mod probe;
 mod ragdoll;
 mod reimport;
 mod sync;
@@ -234,5 +235,7 @@ mod ragdoll_refs_tests;
 mod rebind_tests;
 #[cfg(test)]
 mod reimport_tests;
+#[doc(hidden)]
+pub mod rig;
 #[cfg(test)]
 mod tests;

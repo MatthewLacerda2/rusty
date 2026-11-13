@@ -7,21 +7,9 @@ use glam::Vec3;
 use super::{instantiate_asset, set_lightmap_uv_settings};
 use crate::Scene;
 use rusty_asset::LightmapUvSettings;
-use rusty_test_support::models::quad_mode_gltf;
+use rusty_test_support::models::quad_file as quad_model;
 
-/// A one-quad glTF (no `TEXCOORD_1`) in its own temp dir, with no sidecar yet.
-pub(crate) fn quad_model(dir: &str) -> String {
-    let dir = rusty_test_support::temp::dir().join(dir);
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).unwrap();
-    let (json, bin) = quad_mode_gltf(4, &[0, 1, 2, 0, 2, 3]);
-    std::fs::write(dir.join("quad.bin"), bin).unwrap();
-    let path = dir.join("quad.gltf");
-    std::fs::write(&path, json).unwrap();
-    path.to_string_lossy().into_owned()
-}
-
-pub(crate) fn has_lightmap_uv(scene: &Scene, id: u32) -> bool {
+fn has_lightmap_uv(scene: &Scene, id: u32) -> bool {
     let mesh = scene.world.mesh(id).unwrap();
     mesh.vertices.iter().any(|v| v.lightmap_uv != [0.0, 0.0])
 }

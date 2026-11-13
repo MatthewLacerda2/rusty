@@ -5,7 +5,7 @@ use glam::Vec3;
 
 use crate::components::{ColliderComponent, ColliderShape};
 use crate::physics::PhysicsWorld;
-use crate::scene::skeleton::fixture::armature_owner;
+use crate::scene::skeleton::rig::armature_owner;
 use crate::scene::skeleton::{Drive, RagdollOptions, HITBOX_NAME};
 use crate::scene::Scene;
 

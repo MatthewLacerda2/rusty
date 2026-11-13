@@ -2,16 +2,13 @@
 //! CPU mesh and its mesh collider's box follow the file, and a write of another file
 //! leaves them alone.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use glam::Vec3;
 
 use super::ModelWrites;
 use crate::{asset_mesh_component, Scene};
 use rusty_components::{ColliderComponent, ColliderShape};
 use rusty_core::fs::written::write;
-use rusty_test_support::rebakes::{follows_rebakes, Bake};
+use rusty_test_support::rebakes::Bake;
 
 /// A two-triangle unit quad (6 indices).
 const QUAD: &str = "o Model\nv 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nf 1 2 3\nf 1 3 4\n";
@@ -115,30 +112,4 @@ fn a_scene_load_reads_every_note_made_before_it() {
     );
 }
 
-/// An edit-mode game over `scene`.
-fn game_over(scene: Rc<RefCell<Scene>>) -> crate::app::GameWorld {
-    let nav = crate::navigation::NavigationGraph::new(-1.0, 1.0, -1.0, 1.0, 1.0);
-    crate::app::GameWorld::new(
-        scene,
-        Rc::new(RefCell::new(rusty_core::input::InputState::new())),
-        Rc::new(RefCell::new(nav)),
-        Rc::new(RefCell::new(crate::scripting::ConsoleLogs::new())),
-    )
-}
-
-#[test]
-fn an_edit_mode_tick_follows_rebakes() {
-    let path = model("rusty_model_writes_tick");
-    let scene = Rc::new(RefCell::new(Scene::new()));
-    let id = spawn(&mut scene.borrow_mut(), &path);
-    let mut game = game_over(Rc::clone(&scene));
-    follows_rebakes(
-        &path,
-        bake,
-        |_| {
-            game.tick(1.0 / 60.0);
-            index_count(&scene.borrow(), id)
-        },
-        |count, which| *count == if which == Bake::A { 6 } else { 3 },
-    );
-}
+// An edit-mode tick follows rebakes too: `app::model_writes_tests`.

@@ -72,10 +72,12 @@ pub fn bake_occlusion(
 
 impl OcclusionInput {
     /// The scene ready to sample and its grid, for a measurement that times or
-    /// counts cells one by one; `None` when no grid is laid.
-    #[cfg(all(test, feature = "dev"))]
-    pub(crate) fn sampler(&self) -> Option<Sampler> {
-        let baking = Baking::of(&self.objects);
+    /// counts cells one by one, counting its rays; `None` when no grid is laid.
+    /// A test hook, as [`Sampler`] is.
+    #[cfg(feature = "dev")]
+    #[doc(hidden)]
+    pub fn sampler(&self) -> Option<Sampler> {
+        let baking = Baking::of(&self.objects).counted();
         let (min, max) = baking.bounds?;
         let grid = Grid::over(min, max)?;
         Some(Sampler { baking, grid })
@@ -92,8 +94,9 @@ impl OcclusionInput {
     /// of a level too large to bake whole in a test: the grid's cell count and
     /// edge, and the sheets the occluders fused into (count, bytes). `None` when
     /// no grid is laid.
-    #[cfg(all(test, feature = "dev"))]
-    pub(crate) fn bake_sample(&self, count: usize) -> Option<(usize, f32, (usize, usize))> {
+    #[cfg(feature = "dev")]
+    #[doc(hidden)]
+    pub fn bake_sample(&self, count: usize) -> Option<(usize, f32, (usize, usize))> {
         let sampler = self.sampler()?;
         sampler.spread(count as u64);
         let grid = &sampler.grid;
@@ -149,14 +152,16 @@ impl OcclusionInput {
     }
 }
 
-/// One bake's sampling, a cell at a time ([`OcclusionInput::sampler`]).
-#[cfg(all(test, feature = "dev"))]
-pub(crate) struct Sampler {
+/// One bake's sampling, a cell at a time ([`OcclusionInput::sampler`]). A test
+/// hook: `dev::bake`'s cost tests measure through it, from another crate.
+#[cfg(feature = "dev")]
+#[doc(hidden)]
+pub struct Sampler {
     baking: Baking,
     pub grid: Grid,
 }
 
-#[cfg(all(test, feature = "dev"))]
+#[cfg(feature = "dev")]
 impl Sampler {
     /// What cell `index` sees on its own, as the bake samples it.
     pub fn cell(&self, index: usize) -> Vec<u64> {

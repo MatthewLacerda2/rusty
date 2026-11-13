@@ -32,8 +32,10 @@ use std::f32::consts::{PI, TAU};
 
 use glam::{Vec2, Vec3, Vec4};
 
-#[cfg(all(test, feature = "dev"))]
-pub(super) mod bench;
+// A test hook: `dev::bake`'s per-texel cost measurement.
+#[cfg(feature = "dev")]
+#[doc(hidden)]
+pub mod bench;
 mod direct;
 mod emitter;
 #[cfg(test)]

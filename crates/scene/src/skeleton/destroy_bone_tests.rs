@@ -1,9 +1,6 @@
 //! Destroying one bone takes its subtree, Unity's way (#1273): no bone of the rig
 //! is left a root posed as a child, and the missing slots ride with their parent bone.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use super::fixture::{armature_owner, armature_skin, hero, reload};
 use crate::Scene;
 
@@ -37,7 +34,7 @@ fn destroying_a_bone_takes_its_descendant_bones_and_what_hangs_from_them() {
 }
 
 #[test]
-fn a_destroyed_bone_stays_missing_and_a_frame_skins_it() {
+fn a_destroyed_bone_stays_missing() {
     let mut scene = Scene::new();
     let (rig, bones, _) = rig_with_gun(&mut scene);
     scene.destroy_entity(bones[1]);
@@ -54,18 +51,7 @@ fn a_destroyed_bone_stays_missing_and_a_frame_skins_it() {
         [Some(bones[0]), None, None],
         "spine and head are missing"
     );
-
-    // The next tick runs the whole frame over the half-gone rig without a panic.
-    let scene = Rc::new(RefCell::new(scene));
-    let mut game = game_over(Rc::clone(&scene));
-    game.set_playing(true);
-    game.tick(1.0 / 60.0);
-    let palette = scene.borrow().world.mesh(rig).unwrap().pose_palette.clone();
-    let bind = armature_skin().bind_palette();
-    assert_eq!(palette.len(), 3);
-    for (got, want) in palette.iter().zip(bind.iter()) {
-        assert!(got.abs_diff_eq(*want, 1e-5), "got {got:?} want {want:?}");
-    }
+    // The next tick's whole frame skins it: `app::missing_bone_tests`.
 }
 
 #[test]
@@ -103,15 +89,4 @@ fn a_reload_rebuilds_a_destroyed_bone_from_the_model() {
     let hero = loaded.find_entity_by_name("Hero").unwrap();
     assert_eq!(loaded.bone_ids().len(), 2, "the rig is whole again");
     assert!(loaded.find_bone(hero, "Joint1").is_some());
-}
-
-/// A game over `scene`.
-fn game_over(scene: Rc<RefCell<Scene>>) -> crate::app::GameWorld {
-    let nav = crate::navigation::NavigationGraph::new(-1.0, 1.0, -1.0, 1.0, 1.0);
-    crate::app::GameWorld::new(
-        scene,
-        Rc::new(RefCell::new(rusty_core::input::InputState::new())),
-        Rc::new(RefCell::new(nav)),
-        Rc::new(RefCell::new(crate::scripting::ConsoleLogs::new())),
-    )
 }

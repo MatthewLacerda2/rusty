@@ -105,7 +105,7 @@ impl Polygons {
     }
 
     /// How many sheets the polygons fused into, and the bytes they take.
-    #[cfg(all(test, feature = "dev"))]
+    #[cfg(feature = "dev")]
     pub fn sheet_bytes(&self) -> (usize, usize) {
         (
             self.sheets.len(),

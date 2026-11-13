@@ -109,11 +109,11 @@ fn seeding_bakes_the_texture_and_shader_once() {
             "{ext}"
         );
     }
+    // Read as `api::recipe_from_json_str` (and a JSON string passed to Lua) reads it.
     let json = std::fs::read_to_string(shaders.join(format!("{SHADER_NAME}.recipe.json")));
-    let lua = mlua::Lua::new();
-    let json = mlua::Value::String(lua.create_string(json.unwrap()).unwrap());
+    let json = serde_json::from_str(&json.unwrap()).unwrap();
     assert_eq!(
-        crate::api::lua_json::recipe_from_lua(&json),
+        rusty_core::naming::variant_case::decode(json),
         Ok(shader_recipe())
     );
 

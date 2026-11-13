@@ -42,8 +42,7 @@ use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
 pub use radiance::AmbientRadiance;
-#[cfg(test)]
-pub use skybox::{panorama_fixture, procedural_sky_color};
+pub use skybox::procedural_sky_color;
 
 use crate::{LightType, Scene, Sh9, DEFAULT_AMBIENT_COLOR};
 

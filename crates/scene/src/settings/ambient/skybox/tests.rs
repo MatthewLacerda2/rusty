@@ -2,9 +2,10 @@
 
 use glam::Vec3;
 
-use super::{panorama, panorama_fixture, procedural};
+use super::{panorama, procedural};
 use crate::lighting::probe_fill::fibonacci_sphere;
 use crate::{AmbientMode, AmbientRadiance, LightType, Scene, SkySettings};
+use rusty_test_support::panorama::fixture as panorama_fixture;
 
 const NORMALS: [Vec3; 5] = [
     Vec3::Y,

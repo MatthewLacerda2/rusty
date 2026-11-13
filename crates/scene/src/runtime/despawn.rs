@@ -40,7 +40,7 @@ impl Scene {
     /// paused Play left queued, #1298), every `DontDestroyOnLoad` mark and every
     /// `Debug.Draw*` line still held (#1882): the
     /// scene state inventory's runtime class (`scene::state`, #1649).
-    pub(crate) fn set_playing(&mut self, playing: bool) {
+    pub fn set_playing(&mut self, playing: bool) {
         // A script's pending `Lighting.GenerateAsync()` was made in the other mode.
         #[cfg(feature = "dev")]
         if playing != self.playing {
@@ -124,7 +124,7 @@ impl Scene {
     /// lightmap entries, the decals they own, their shader overrides and ragdoll state. The World's references go in
     /// `World::despawn_all`, one pass for the batch. Every despawn in the scene runs
     /// through here, saying `why` it may skip script teardown.
-    pub(crate) fn despawn_batch(&mut self, ids: &BTreeSet<u32>, why: Despawn) {
+    pub fn despawn_batch(&mut self, ids: &BTreeSet<u32>, why: Despawn) {
         debug_assert!(
             !(self.playing && why == Despawn::EditMode),
             "an edit-mode despawn of {ids:?} in Play skips script teardown; use Scene::destroy"

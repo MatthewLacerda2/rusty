@@ -3398,7 +3398,6 @@ dependencies = [
  "glam 0.33.12",
  "image",
  "log",
- "mlua",
  "rapier3d",
  "rusty-asset",
  "rusty-components",
@@ -3428,6 +3427,7 @@ dependencies = [
 name = "rusty-test-support"
 version = "0.1.0"
 dependencies = [
+ "image",
  "log",
 ]
 

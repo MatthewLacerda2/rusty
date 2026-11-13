@@ -32,7 +32,7 @@ fn the_ramps_join_the_deck_to_the_pool_floor() {
             assert!((corner.y - want).abs() < 1e-3, "{name}: {corner} vs {want}");
         }
     }
-    assert!(ramp_grade() < crate::navigation::DEFAULT_MAX_SLOPE);
+    assert!(ramp_grade() < crate::nav_settings::DEFAULT_MAX_SLOPE);
     assert!(
         ramp_grade().atan().to_degrees() < 45.0,
         "CharacterController limit"
@@ -61,7 +61,7 @@ fn the_jacuzzi_rim_needs_a_jump() {
     let player = scene.find_entity_by_name("Player").unwrap();
     let cc = scene.world.character_controller(player).unwrap();
     assert!(top - DECK_TOP > cc.step_offset * 1.6, "a step climbs it");
-    assert!(top - BASIN_TOP > crate::navigation::DEFAULT_MAX_STEP);
+    assert!(top - BASIN_TOP > crate::nav_settings::DEFAULT_MAX_STEP);
 }
 
 /// The bot-player walks straight at Enemy_1: along that line nothing standing on the

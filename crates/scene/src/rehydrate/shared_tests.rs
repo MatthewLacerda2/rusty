@@ -4,9 +4,9 @@
 use glam::Vec3;
 
 use crate::asset_instance::instantiate_asset;
-use crate::asset_instance::lightmap_test_support::quad_model;
 use crate::{apply_scene_data, to_scene_data, Scene};
 use rusty_asset::import_cache::parses;
+use rusty_test_support::models::quad_file as quad_model;
 
 #[test]
 fn a_load_parses_each_file_once_and_instances_share_a_revision() {

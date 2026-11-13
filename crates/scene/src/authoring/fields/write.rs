@@ -17,8 +17,9 @@ pub enum Skip<'a> {
     /// ticks writes only its edits, not the sim values it read (a `velocity` the
     /// physics moved since, an animator's `time`).
     SinceGet(&'a Map<String, Value>),
-    /// None: every key runs its op (the round-trip tests drive the ops).
-    #[cfg(test)]
+    /// None: every key runs its op (the round-trip tests drive the ops). A test
+    /// hook: compiled in every build, since `api`'s round-trip tests are another crate's.
+    #[doc(hidden)]
     Nothing,
 }
 
@@ -31,7 +32,6 @@ impl Skip<'_> {
         let got = match self {
             Skip::Held => None,
             Skip::SinceGet(got) => Some(got.get(key).unwrap_or(&Value::Null)),
-            #[cfg(test)]
             Skip::Nothing => return Some(value.clone()),
         };
         if merge {

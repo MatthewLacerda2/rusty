@@ -5,7 +5,8 @@
 use glam::Vec3;
 
 use super::ambient_tests::open_texel;
-use crate::{panorama_fixture, AmbientMode, Scene};
+use crate::{AmbientMode, Scene};
+use rusty_test_support::panorama::fixture as panorama_fixture;
 
 #[test]
 fn an_open_texel_bakes_the_skys_light() {

@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use super::lifecycle::write_script;
 use super::timers::{rig, tick};
 use super::transitions::LOGGER;
-use crate::scene::skeleton::fixture::armature_owner;
+use crate::scene::skeleton::rig::armature_owner;
 use crate::scripting::manager::ScriptManager;
 
 /// `LOGGER`'s tags, plus a pending invoke and a waiting coroutine from `Start`.

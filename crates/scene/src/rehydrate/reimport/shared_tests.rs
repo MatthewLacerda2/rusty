@@ -4,11 +4,11 @@
 
 use glam::Vec3;
 
-use crate::asset_instance::lightmap_test_support::quad_model;
 use crate::asset_instance::{instantiate_asset, set_model_scale_factor};
 use crate::authoring::{create_entity, remove_component, ComponentKind, Primitive};
 use crate::{apply_scene_data, to_scene_data, Scene};
 use rusty_components::{ColliderComponent, ColliderShape};
+use rusty_test_support::models::quad_file as quad_model;
 
 fn mesh_box(collider: &ColliderComponent) -> (Vec3, Vec3) {
     match collider.shape {

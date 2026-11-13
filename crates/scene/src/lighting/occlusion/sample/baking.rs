@@ -55,15 +55,24 @@ impl Baking {
     }
 
     /// How many sheets the occluders fused into, and the bytes they take.
-    #[cfg(all(test, feature = "dev"))]
+    #[cfg(feature = "dev")]
     pub fn sheets(&self) -> (usize, usize) {
         self.polygons.sheet_bytes()
     }
 
-    /// How many rays it has cast, for a cost measurement.
-    #[cfg(all(test, feature = "dev"))]
+    /// How many rays it has cast, for a cost measurement ([`Self::counted`]).
+    #[cfg(feature = "dev")]
     pub fn rays_cast(&self) -> u64 {
         self.rays.cast.load(Ordering::Relaxed)
+    }
+
+    /// This bake, counting its rays (a cost measurement's).
+    #[cfg(feature = "dev")]
+    pub fn counted(self) -> Self {
+        Self {
+            rays: self.rays.counted(),
+            ..self
+        }
     }
 
     pub fn of(objects: &[Object]) -> Self {

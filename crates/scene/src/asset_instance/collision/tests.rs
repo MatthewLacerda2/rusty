@@ -3,47 +3,19 @@
 //! name the model lacks falls back to the own mesh with one warning.
 
 use crate::model_instance::instantiate_model;
-use crate::physics::collider_world_triangles;
 use crate::serialize::{apply_scene_data, to_scene_data};
 use crate::Scene;
-use rusty_asset::{sidecar, MeshColliderKind, SubObjectCollider};
 
-/// A bumpy `Chair` of `n`×`n` quads (2n² triangles, 0.1 high) and a two-triangle `Chair_col`,
-/// written as `file`, its sidecar's `Chair` collider built from `mesh`. Returns the path,
-/// slashed ([`crate::test_temp::lua_path`]) so a test can put it in a Lua literal.
-pub(crate) fn chair(file: &str, n: u32, mesh: Option<&str>) -> String {
-    let mut obj = String::from("o Chair\n");
-    for z in 0..=n {
-        for x in 0..=n {
-            let y = if (x + z) % 2 == 1 { 0.1 } else { 0.0 };
-            obj += &format!("v {} {y} {}\n", x as f32 / n as f32, z as f32 / n as f32);
-        }
-    }
-    let at = |x: u32, z: u32| z * (n + 1) + x + 1;
-    for z in 0..n {
-        for x in 0..n {
-            let (a, b, c, d) = (at(x, z), at(x + 1, z), at(x + 1, z + 1), at(x, z + 1));
-            obj += &format!("f {a} {b} {c}\nf {a} {c} {d}\n");
-        }
-    }
-    let base = (n + 1) * (n + 1);
-    obj += "o Chair_col\nv 0 0 0\nv 1 0 0\nv 1 0.5 1\nv 0 0.5 1\n";
-    obj += &format!("f {} {} {}\n", base + 1, base + 2, base + 3);
-    obj += &format!("f {} {} {}\n", base + 1, base + 3, base + 4);
+/// The [`chair::write`](super::chair::write) model as `file` in the test's temp dir;
+/// its path, slashed (`core::paths::to_slash`) so a test can put it in a Lua literal.
+pub(super) fn chair(file: &str, n: u32, mesh: Option<&str>) -> String {
     let path = rusty_test_support::temp::dir().join(file);
-    std::fs::write(&path, obj).unwrap();
-    let mut settings = sidecar::ImportSettings::default();
-    let entry = SubObjectCollider {
-        kind: MeshColliderKind::TriMesh,
-        mesh: mesh.map(str::to_string),
-    };
-    settings.colliders.insert("Chair".into(), entry);
-    sidecar::save(&path, &settings).unwrap();
-    crate::test_temp::lua_path(file)
+    super::chair::write(&path, n, mesh).unwrap();
+    rusty_core::paths::to_slash(&path)
 }
 
 /// The model at `path` spawned whole, and its child entities' names and ids.
-pub(crate) fn spawn(path: &str) -> (Scene, Vec<(String, u32)>) {
+pub(super) fn spawn(path: &str) -> (Scene, Vec<(String, u32)>) {
     let asset = rusty_asset::import_and_sync_sidecar(std::path::Path::new(path)).unwrap();
     let mut scene = Scene::new();
     let root = instantiate_model(&mut scene, path, &asset, glam::Vec3::ZERO);
@@ -54,8 +26,20 @@ pub(crate) fn spawn(path: &str) -> (Scene, Vec<(String, u32)>) {
     (scene, named)
 }
 
-pub(crate) fn triangles(scene: &Scene, id: u32) -> usize {
-    collider_world_triangles(scene, id).map_or(0, |t| t.triangles.len())
+/// The triangles of the mesh `id`'s active collider is built from: its collision
+/// mesh, else its entity's Mesh, else its kept `shared_mesh`. Scene's half of the
+/// collider physics builds (`physics::shape::build::collider_inputs` makes the same
+/// choice; the shape it builds from the mesh is physics' tests').
+pub(super) fn triangles(scene: &Scene, id: u32) -> usize {
+    let Some(c) = scene.world.collider(id).filter(|c| c.active) else {
+        return 0;
+    };
+    let count = |indices: &[u32]| indices.len() / 3;
+    c.built_collision_mesh()
+        .map(|m| count(&m.indices))
+        .or_else(|| scene.world.mesh(id).map(|m| count(&m.indices)))
+        .or_else(|| c.shared_mesh.as_ref().map(|m| count(&m.indices)))
+        .unwrap_or(0)
 }
 
 #[test]

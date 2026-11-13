@@ -100,7 +100,7 @@ fn swap_carries_survivors_with_their_ids() {
 #[test]
 fn a_re_rooted_survivors_bounds_stand_where_it_is_now() {
     // Under a holder 100 along X its box sat there; re-rooted by the load, it stands
-    // at its local pose, and both Physics.GetBounds and the nav bake must see it there.
+    // at its local pose, where Physics.GetBounds must see it.
     let mut s = Scene::new();
     let holder = s.add_entity("Holder".to_string());
     let crate_ = s.add_entity("Crate".to_string());
@@ -117,6 +117,5 @@ fn a_re_rooted_survivors_bounds_stand_where_it_is_now() {
         .unwrap();
     let (min, max) = s.world.collider_bounds(crate_).unwrap();
     assert!((min + max).abs().max_element() < 1e-4, "{min} {max}");
-    let nav = crate::navigation::NavigationGraph::from_scene(&s).bounds();
-    assert!(nav.min_x <= min.x && nav.max_x < 50.0, "{nav:?}");
+    // The nav bake sees it there too: `navigation::load_bounds_tests`.
 }

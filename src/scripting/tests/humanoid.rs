@@ -8,9 +8,27 @@ use std::rc::Rc;
 use glam::Vec3;
 
 use super::assets::manager;
-use crate::scene::asset_instance::humanoid_tests::model;
 use crate::scene::asset_instance::instantiate_asset;
 use crate::scene::Scene;
+use rusty_test_support::models::anim::{animated_buffer, ANIMATED_GLTF};
+
+/// `scene`'s humanoid model fixture (`asset_instance::humanoid_fixture`).
+fn model(
+    dir: &std::path::Path,
+    name: &str,
+    clip: &str,
+    from: &[&std::path::Path],
+) -> std::path::PathBuf {
+    let bin = animated_buffer();
+    crate::scene::asset_instance::humanoid_fixture::write(
+        dir,
+        name,
+        clip,
+        from,
+        (ANIMATED_GLTF, &bin),
+    )
+    .unwrap()
+}
 
 #[test]
 fn the_assets_api_reads_the_map_and_borrows_clips_into_the_scene() {

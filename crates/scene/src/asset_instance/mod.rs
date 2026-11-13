@@ -216,8 +216,10 @@ mod humanoid;
 
 pub use humanoid::set_humanoid;
 
+#[doc(hidden)]
+pub mod humanoid_fixture;
 #[cfg(test)]
-pub(crate) mod humanoid_tests;
+mod humanoid_tests;
 #[cfg(test)]
 mod multi_material_tests;
 #[cfg(test)]
@@ -285,5 +287,4 @@ mod prefab_scale_tests;
 mod scale_tests;
 
 #[cfg(test)]
-#[path = "lightmap_tests.rs"]
-pub(crate) mod lightmap_test_support;
+mod lightmap_tests;

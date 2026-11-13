@@ -134,9 +134,11 @@ fn named_mesh(model: Option<&str>, name: &str) -> SharedMesh {
     }
 }
 
+#[doc(hidden)]
+pub mod chair;
 #[cfg(test)]
 mod edge_tests;
 #[cfg(test)]
 mod fallback_tests;
 #[cfg(test)]
-pub(crate) mod tests;
+mod tests;

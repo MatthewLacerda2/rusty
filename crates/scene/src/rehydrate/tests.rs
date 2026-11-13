@@ -5,9 +5,9 @@ use glam::Vec3;
 
 use super::{reimport_model, Rig};
 use crate::asset_instance::instantiate_asset;
-use crate::asset_instance::lightmap_test_support::quad_model;
 use crate::Scene;
 use rusty_asset::SkinData;
+use rusty_test_support::models::quad_file as quad_model;
 
 fn spawn(scene: &mut Scene, path: &str) -> u32 {
     instantiate_asset(scene, &format!("{path}::Quad"), None, Vec3::ZERO).unwrap()

@@ -78,8 +78,10 @@ pub use unsaved::unsaved_materials;
 
 #[cfg(test)]
 mod bake_tests;
-#[cfg(all(test, feature = "dev"))]
-pub(crate) mod bench;
+// Test hooks: the levels other crates' bake, render and cost tests build.
+#[cfg(feature = "dev")]
+#[doc(hidden)]
+pub mod bench;
 #[cfg(test)]
 mod carry_tests;
 #[cfg(test)]
@@ -96,10 +98,10 @@ mod print_tests;
 mod sampling_tests;
 #[cfg(all(test, feature = "dev"))]
 mod tessellated_tests;
-#[cfg(test)]
-pub(crate) mod test_gap;
-#[cfg(test)]
-pub(crate) mod test_level;
+#[doc(hidden)]
+pub mod test_gap;
+#[doc(hidden)]
+pub mod test_level;
 #[cfg(test)]
 mod unread_tests;
 #[cfg(test)]

@@ -5,10 +5,10 @@
 use glam::Vec3;
 
 use super::{instantiate_asset, set_model_scale_factor};
-use crate::asset_instance::lightmap_test_support::quad_model;
 use crate::authoring::defaults::default_collider;
 use crate::{list_instance_overrides, load_and_instantiate_linked, save_prefab, Scene};
 use rusty_components::ColliderShape;
+use rusty_test_support::models::quad_file as quad_model;
 
 #[test]
 fn a_refit_mesh_collider_is_no_override() {

@@ -6,8 +6,8 @@ use glam::{Quat, Vec3};
 
 use crate::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
 use crate::physics::PhysicsWorld;
-use crate::scene::skeleton::fixture::armature_owner;
 use crate::scene::skeleton::probe;
+use crate::scene::skeleton::rig::armature_owner;
 use crate::scene::Scene;
 
 fn collider() -> ColliderComponent {

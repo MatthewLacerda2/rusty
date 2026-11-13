@@ -5,8 +5,8 @@
 use glam::Vec3;
 
 use super::{instantiate_asset, set_model_scale_factor};
-use crate::asset_instance::lightmap_test_support::quad_model;
 use crate::Scene;
+use rusty_test_support::models::quad_file as quad_model;
 use rusty_test_support::models::{skinned_buffer, SKINNED_GLTF};
 
 fn max_corner(scene: &Scene, id: u32) -> Vec3 {

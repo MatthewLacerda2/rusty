@@ -73,9 +73,11 @@ pub(in crate::lighting) struct Rays {
     pub tris: Vec<Tri>,
     mesh: Option<TriMesh>,
     /// How many rays were cast, either kind: what a cost test counts instead of
-    /// timing (#1883), so it holds on any machine.
-    #[cfg(test)]
+    /// timing (#1883), so it holds on any machine. Counted only when `counting`:
+    /// in a test build, and for `dev::bake`'s bench ([`Rays::counted`]), so a bake
+    /// shares no counter across its workers.
     pub cast: std::sync::atomic::AtomicU64,
+    counting: bool,
 }
 
 impl Rays {
@@ -84,8 +86,8 @@ impl Rays {
             return Rays {
                 tris,
                 mesh: None,
-                #[cfg(test)]
                 cast: Default::default(),
+                counting: cfg!(test),
             };
         }
         let vertices = tris
@@ -101,8 +103,8 @@ impl Rays {
         Rays {
             tris,
             mesh: Some(mesh),
-            #[cfg(test)]
             cast: Default::default(),
+            counting: cfg!(test),
         }
     }
 
@@ -184,10 +186,20 @@ impl Rays {
         blocker
     }
 
-    /// One more ray cast, in a test build; nothing otherwise.
+    /// These rays, counting every cast into `cast` (the cost bench's).
+    #[cfg(feature = "dev")]
+    pub(in crate::lighting) fn counted(self) -> Self {
+        Self {
+            counting: true,
+            ..self
+        }
+    }
+
+    /// One more ray cast, when counting; nothing otherwise.
     fn count(&self) {
-        #[cfg(test)]
-        self.cast.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if self.counting {
+            self.cast.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
     }
 }
 

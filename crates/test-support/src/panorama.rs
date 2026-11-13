@@ -1,10 +1,11 @@
-//! A panorama file for the `Skybox` tests (#1675), here and in the bakes'.
+//! A panorama file for the `Skybox` tests (#1675): `scene`'s, and the bakes' and
+//! renderer's that read a sky.
 
 /// A panorama for tests (#1675): a `top` colour over a `bottom` one (the horizon
 /// at the image's middle row), the eastern half's red lifted by `east`, written as
 /// a small PNG under the test's own temp dir. Returns its path, as `skybox_path`
 /// names it.
-pub fn panorama_fixture(name: &str, top: [u8; 3], bottom: [u8; 3], east: u8) -> String {
+pub fn fixture(name: &str, top: [u8; 3], bottom: [u8; 3], east: u8) -> String {
     let (w, h) = (64, 32);
     let image = image::RgbaImage::from_fn(w, h, |x, y| {
         let [r, g, b] = if y < h / 2 { top } else { bottom };
@@ -16,7 +17,7 @@ pub fn panorama_fixture(name: &str, top: [u8; 3], bottom: [u8; 3], east: u8) -> 
         };
         image::Rgba([r, g, b, 255])
     });
-    let path = rusty_test_support::temp::dir().join(name);
+    let path = crate::temp::dir().join(name);
     image.save(&path).expect("write the panorama fixture");
     path.to_string_lossy().into_owned()
 }
