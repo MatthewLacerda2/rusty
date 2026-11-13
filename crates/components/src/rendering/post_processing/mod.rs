@@ -64,10 +64,10 @@ pub struct PostProcessingComponent {
     pub custom_effects: CustomEffects,
     pub depth_of_field: DepthOfField,
     /// Test hook: the test-only dummy effect's settings, compiled in every build for
-    /// the root's tests. Not part of the scene format: a load never reads it and a
-    /// save writes it only while a test has moved it off its default.
+    /// the root's tests, which save, load and hold it like any effect's (a field
+    /// left out at its default could not be held back to it). Nothing outside those
+    /// tests registers or sets it, so a scene file only ever holds it off.
     #[doc(hidden)]
-    #[serde(skip_deserializing, skip_serializing_if = "dummy::Dummy::is_default")]
     pub dummy: dummy::Dummy,
     pub exposure: Exposure,
     pub film_grain: FilmGrain,

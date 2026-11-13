@@ -137,7 +137,9 @@ A post effect is a module in every layer: it adds its own files and **one
 row per registry** (each folder's `mod` list counts as one), and edits no shared
 struct, shader body or list position. Group a family (`grading/`, `lens/`) the same way
 in every layer. The test-only `dummy` effect is the worked example: grep `dummy` for
-every file and row.
+every file and row. Its settings alone are compiled in every build (a test hook: the
+root's tests reach them across the `rusty-components` crate line); a real effect's
+are plain.
 - **Settings** — `components/rendering/post_processing/<effect>.rs` (serde, `Default`,
   the clamp constants) and one field on `PostProcessingComponent`, plus its line in
   that struct's `Default` (the compiler asks for it: the volume applies by default, so

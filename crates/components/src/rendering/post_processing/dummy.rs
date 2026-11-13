@@ -11,10 +11,3 @@ pub struct Dummy {
     /// `0..=1`.
     pub strength: f32,
 }
-
-impl Dummy {
-    /// Whether it holds its default: a save leaves it out then.
-    pub fn is_default(&self) -> bool {
-        *self == Self::default()
-    }
-}

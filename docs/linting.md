@@ -523,7 +523,7 @@ new flag, gate, CI step or baseline.
   must be the file's own, or for a `mod.rs` its directory, `src/scene/prefab/` or
   `src/scene/prefab/mod.rs`. A path has an extension (a file) or a trailing `/` (a
   directory), or is a bare word naming a directory that holds scanned files, at its
-  real path or its module path (`tools/lint`, or `src/core` once `core` is a crate),
+  real path or its module path (`tools/lint`, or a moved module's old `src/<m>`),
   so a stale `//! src/<m> — …` in a moved `lib.rs` is caught; a word naming no such
   directory is prose. A finding names the expected path; a header
   naming another file on purpose carries `// lint: allow(self-path) <why>`. The rule
