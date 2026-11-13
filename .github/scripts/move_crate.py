@@ -108,15 +108,18 @@ def rewrite(text: str, module: str, deps: set[str]) -> tuple[str, set[str]]:
 
 
 def reaching_up(path: str, text: str, above: set[str]) -> list[str]:
-    """`path:line: why` for each `crate::<x>::` naming a module the row does not list."""
+    """`path:line: why` for each `crate::<x>::` naming a module the row does not list. Read in
+    the text as it was: once `crate::<m>::` is `crate::`, the crate's own submodule named
+    like a module above it (`crate::<m>::ui::`) would read as that module."""
     return [f"{path}:{n}: names `{x}`, which the row does not list: a test reaching up moves to "
             f"`tests/` (or `{x}`'s own tests); live code is a layering violation"
             for n, line in enumerate(text.splitlines(), 1)
             for x in sorted(set(re.findall(r"(?<![\w$])crate::(\w+)(?!\w)", line)) & above)]
 
 
-#: A string literal naming a path from the checkout's root (`"tests/fixtures/…"`).
-CWD_PATH = re.compile(r'(?<![\w/])"(?:tests|engine|games|docs)/')
+#: A string literal naming a path from the checkout's root (`"tests/fixtures/…"`), the crate's
+#: own `"crates/<m>/src/…"` (a `"src/<m>/…"` the rewrite re-aimed) among them.
+CWD_PATH = re.compile(r'(?<![\w/])"(?:tests|engine|games|docs|src|crates)/')
 
 
 def by_hand(path: str, text: str, before: str) -> list[str]:
@@ -287,14 +290,17 @@ def wire_root(root: Path, module: str, features: list[str], hand: list[str]) -> 
 INCLUDE = re.compile(r'(include_(?:str|bytes)!\(\s*")([^"]+)(")')
 
 
-def reaim(text: str, was: Path, now: Path, module: str) -> str:
+def reaim(text: str, was: Path, now: Path, module: str, moved_only: bool = False) -> str:
     """`text`'s relative `include_str!` / `include_bytes!` paths, written from `was`'s
     folder, re-aimed from `now`'s at the file they named, which may itself have moved
-    from `src/<m>/` (paths relative to the checkout)."""
+    from `src/<m>/` (paths relative to the checkout). `moved_only` leaves every include
+    whose file did not move exactly as written."""
     def one(m: re.Match) -> str:
         target = Path(os.path.normpath(was.parent / m.group(2)))
         if target.parts[:2] == ("src", module):
             target = Path(layout.CRATES, module, "src", *target.parts[2:])
+        elif moved_only:
+            return m.group(0)
         rel = os.path.relpath(target, now.parent).replace(os.sep, "/")
         return f"{m.group(1)}{rel}{m.group(3)}"
     return INCLUDE.sub(one, text)
@@ -309,7 +315,7 @@ def reaim_outside(root: Path, module: str) -> list[str]:
     for rel in done.stdout.split():
         path = root / rel
         text = path.read_text()
-        new = reaim(text, Path(rel), Path(rel), module)
+        new = reaim(text, Path(rel), Path(rel), module, moved_only=True)
         if new != text:
             path.write_text(new)
             changed.append(rel)
@@ -323,12 +329,15 @@ def leave_root(root: Path, module: str, externs_: list[str]) -> list[str]:
                           capture_output=True, text=True, check=False).stdout.split()
     code = "\n".join((root / f).read_text() for f in left if (root / f).is_file())
     cargo = (root / "Cargo.toml").read_text()
+    start = cargo.index("\n[dependencies]\n") + 1
+    end = cargo.find("\n[", start)
+    end = len(cargo) if end < 0 else end + 1
+    table = cargo[start:end]
     gone = [d for d in externs_ if not externs(code, [d])
-            and re.search(rf"^\[dependencies\]\n(?:.*\n)*?{re.escape(d)} = \{{ workspace = true \}}\n", cargo, re.M)]
+            and re.search(rf"^{re.escape(d)} = \{{ workspace = true \}}\n", table, re.M)]
     for d in gone:
-        section = cargo.index("\n[dependencies]\n")
-        cargo = cargo[:section] + re.sub(rf"^{re.escape(d)} = \{{ workspace = true \}}\n", "",
-                                         cargo[section:], count=1, flags=re.M)
+        table = re.sub(rf"^{re.escape(d)} = \{{ workspace = true \}}\n", "", table, count=1, flags=re.M)
+    cargo = cargo[:start] + table + cargo[end:]
     (root / "Cargo.toml").write_text(cargo)
     return gone
 
@@ -372,7 +381,7 @@ def move(root: Path, module: str) -> list[str]:
             live_code.append(live(text))
             test_code.append(text)
         hand += by_hand(str(path.relative_to(root)), text, before)
-        hand += reaching_up(str(path.relative_to(root)), text, others - deps)
+        hand += reaching_up(str(path.relative_to(root)), before, others - deps)
     code = "\n".join(test_code)
     used = {f for f in FEATURES if f'feature = "{f}"' in code}
     registry = workspace_deps((root / "Cargo.toml").read_text())
@@ -403,7 +412,8 @@ def main() -> None:
     print(f"move-crate: src/{args.module}/ is crates/{args.module}/ (rusty-{args.module}).")
     if hand:
         print("by hand:\n" + "\n".join(f"  {h}" for h in hand))
-    print("next: `cargo check --workspace --all-targets --features dev` and `--no-default-features`, "
+    print("next: `cargo fmt --all` (the rewritten imports re-sort and re-wrap), "
+          "`cargo check --workspace --all-targets --features dev` and `--no-default-features`, "
           "then crates/CLAUDE.md, *What the compiler will name*.")
 
 

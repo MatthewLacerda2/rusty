@@ -29,7 +29,7 @@ use rusty_core::hash;
 use std::path::{Path, PathBuf};
 use table::{Now, Row};
 
-/// The committed table, relative to the crate root.
+/// The committed table, relative to the checkout.
 pub const FINGERPRINTS: &str = "crates/asset/src/convert/fingerprints.txt";
 
 /// Set to re-bless [`FINGERPRINTS`] instead of checking it (`make bless-converters`).
@@ -37,7 +37,7 @@ const BLESS: &str = "RUSTY_BLESS_CONVERTERS";
 
 /// Check (or, with [`BLESS`] set, re-bless) every converter `which` picks.
 pub fn gate(which: impl Fn(&Converter) -> bool) {
-    let path = crate_root().join(FINGERPRINTS);
+    let path = rusty_core::project::checkout().join(FINGERPRINTS);
     let text = std::fs::read_to_string(&path).unwrap_or_default();
     let mut rows: Vec<Row> = table::parse(&text).unwrap_or_else(|e| panic!("{FINGERPRINTS}: {e}"));
     let bless = std::env::var_os(BLESS).is_some();
@@ -123,7 +123,7 @@ fn convert(converter: &Converter, source: &Path, name: &str, run: &str) -> Vec<u
 
 /// The fixtures of `extension`, by name.
 fn fixtures(extension: &str) -> Vec<PathBuf> {
-    let dir = crate_root().join("tests/fixtures/models");
+    let dir = rusty_core::project::checkout().join("tests/fixtures/models");
     let mut found: Vec<PathBuf> = std::fs::read_dir(&dir)
         .expect("the model fixtures")
         .map(|e| e.expect("a fixtures entry").path())
@@ -136,10 +136,6 @@ fn fixtures(extension: &str) -> Vec<PathBuf> {
 fn file_name(path: &Path) -> String {
     path.file_name()
         .map_or_else(String::new, |n| n.to_string_lossy().into_owned())
-}
-
-fn crate_root() -> PathBuf {
-    rusty_core::project::checkout().to_path_buf()
 }
 
 #[cfg(test)]

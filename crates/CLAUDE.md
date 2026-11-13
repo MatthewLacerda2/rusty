@@ -47,7 +47,8 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
 5. Every tracked file outside the crate that names `src/<m>/` (the tool lists them):
    a file path (a fixture, a mutation glob, a doc) becomes `crates/<m>/src/…`; a
    module path the lint tools read (the layer table, `externs/policy.rs`) stays.
-6. `cargo check --workspace --all-targets` with `--features dev` and with
+6. `cargo fmt --all` (the rewritten imports re-sort), then
+   `cargo check --workspace --all-targets` with `--features dev` and with
    `--no-default-features`, then fix what the compiler names (below), then
    `make gates`.
 

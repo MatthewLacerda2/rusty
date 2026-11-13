@@ -94,7 +94,7 @@ fn area(tri: &[Vec2; 3]) -> f32 {
 
 /// Separating-axis test on the six edge normals: the interiors overlap unless some
 /// axis separates the two, touching (within `eps`) counting as separated.
-pub(super) fn interiors_overlap(a: &[Vec2; 3], b: &[Vec2; 3], eps: f32) -> bool {
+pub fn interiors_overlap(a: &[Vec2; 3], b: &[Vec2; 3], eps: f32) -> bool {
     let edges = (0..3).flat_map(|k| [a[(k + 1) % 3] - a[k], b[(k + 1) % 3] - b[k]]);
     for edge in edges {
         let axis = edge.perp();
