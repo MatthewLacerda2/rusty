@@ -102,25 +102,34 @@ pub fn check(path: &str, source: &str, dirs: &BTreeSet<String>) -> Vec<Finding> 
     }]
 }
 
-/// The rule over every shader under `engine/`.
-fn shaders(dirs: &BTreeSet<String>) -> Vec<Finding> {
-    crate::size::shaders_in(Path::new("engine"))
+/// The rule over the shaders under `engine/`, at their paths.
+fn shaders(paths: &[String], dirs: &BTreeSet<String>) -> Vec<Finding> {
+    paths
         .iter()
-        .flat_map(|p| {
-            let path = p.to_string_lossy().into_owned();
-            let source = fs::read_to_string(p).unwrap_or_default();
-            let mut found = check(&path, &source, dirs);
+        .flat_map(|path| {
+            let source = fs::read_to_string(path).unwrap_or_default();
+            let mut found = check(path, &source, dirs);
             found.retain(|f| !finding::allowed(&source, f.line, f.rule));
-            found.extend(finding::unexplained(&path, &source));
+            found.extend(finding::unexplained(path, &source));
             found
         })
         .collect()
 }
 
+/// The directories a bare header word may name: those of the scanned `.rs` files
+/// and of the scanned shaders, so a bare `engine/shaders/postfx` counts too.
+pub fn scanned_dirs(files: &[String], shaders: &[String]) -> BTreeSet<String> {
+    dirs_of(files.iter().chain(shaders))
+}
+
 pub fn run(scan: &Scan) -> Vec<Finding> {
-    let dirs = dirs_of(&scan.files);
+    let wgsl: Vec<String> = crate::size::shaders_in(Path::new("engine"))
+        .iter()
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect();
+    let dirs = scanned_dirs(&scan.files, &wgsl);
     let mut found = scan.each_file(|path, source| check(path, source, &dirs));
-    found.extend(shaders(&dirs));
+    found.extend(shaders(&wgsl, &dirs));
     found
 }
 

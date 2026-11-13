@@ -1,4 +1,4 @@
-use super::{check, dirs_of, RULE};
+use super::{check, dirs_of, scanned_dirs, RULE};
 use std::collections::BTreeSet;
 
 /// The directories of a small tree: `src/a/b/`, the tool `tools/lint`, and `core`
@@ -69,4 +69,17 @@ fn a_bare_directory_header_is_a_path_when_the_directory_exists() {
     // Its own directory passes, as with a trailing `/`.
     assert_eq!(flagged("src/a/b/mod.rs", "//! src/a/b — x.\n"), 0);
     assert!(tree().contains("src/core") && tree().contains("crates/core/src"));
+}
+
+#[test]
+fn a_bare_shader_directory_header_is_a_path() {
+    let files = ["src/a.rs".to_string()];
+    let wgsl = ["engine/shaders/postfx/a.wgsl".to_string()];
+    let dirs = scanned_dirs(&files, &wgsl);
+    let src = "//! engine/shaders/postfx — x.\n";
+    assert_eq!(check("src/a.rs", src, &dirs).len(), 1);
+    // Without the shaders the word names no directory, so it is prose.
+    assert!(check("src/a.rs", src, &scanned_dirs(&files, &[])).is_empty());
+    let sh = "// engine/shaders/postfx — x\n";
+    assert!(check("engine/shaders/postfx/a.wgsl", sh, &dirs).len() == 1);
 }
