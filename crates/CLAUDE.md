@@ -24,7 +24,11 @@ edit cannot settle (a `crate::<x>` naming a module the row does not list, a
 outside the crate still naming `src/<m>/`). Read its diff: it is the recipe below, run.
 1. `git mv src/<m> crates/<m>/src`, then `git mv crates/<m>/src/mod.rs
    crates/<m>/src/lib.rs`. Its `#![deny(clippy::unwrap_used)]` (a sim row) or its
-   clock opt-out (a platform row) stays at the top of `lib.rs`.
+   clock opt-out (a platform row) stays at the top of `lib.rs`. The module's saved
+   proptest seeds move too, `proptest-regressions/<m>/` →
+   `crates/<m>/proptest-regressions/`: proptest reads them beside the folder of the
+   nearest `lib.rs`, now the crate's, and left at the root they never replay (the
+   `orphan-seeds` lint fails on one).
 2. Inside the crate: `crate::<dep>::` → `rusty_<dep>::` for each dep in its table
    row, then `crate::<m>::` → `crate::` and `pub(in crate::<m>)` → `pub(crate)` (siblings first, so a submodule named like a
    module, `crate::render::scene::`, stays the crate's own). A module the row does
@@ -63,7 +67,9 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
   dev-dependency (a proptest strategy) is a `#[doc(hidden)] #[macro_export]` macro,
   expanded in the caller's test against the caller's dev-dependency
   (`rusty_ecs::edit_ops!`). Instrumentation kept under `#[cfg(test)]` (a counter a
-  test reads) is compiled in too, off until a test arms it (`ecs::world::walks`).
+  test reads) is compiled in too, off until a test arms it (`ecs::world::walks`). A
+  whole file that is test fixture (`ecs::changes::ops`) goes in `.cargo/mutants.toml`'s
+  `exclude_globs`, so mutation never asks a test of it.
   Never a `test-support` feature: a dev-dependency feature the normal build lacks
   rebuilds the crate and everything above it for `cargo test` (`make feature-split`).
 - **Shared test helpers** live in `rusty-test-support` (`crates/test-support/`),

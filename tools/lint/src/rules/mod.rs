@@ -27,6 +27,7 @@ mod ignored;
 mod log_tag;
 mod markers;
 mod named_enum;
+mod orphan_seeds;
 mod physics_borrow;
 mod platform_cfg;
 mod prefix;
@@ -83,6 +84,7 @@ const RULES: &[(Rule, Allow)] = &[
     (log_tag::run, Allow::Inline),
     (markers::run, Allow::Inline),
     (named_enum::run, Allow::Inline),
+    (orphan_seeds::run, Allow::Never),
     (physics_borrow::run, Allow::Inline),
     (platform_cfg::run, Allow::Inline),
     (prefix::run, Allow::Inline),

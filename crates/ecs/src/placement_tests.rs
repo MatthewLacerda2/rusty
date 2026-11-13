@@ -25,7 +25,7 @@ fn late_parent() -> World {
 }
 
 /// The proptest's minimal case, as its `cc` line in
-/// `proptest-regressions/ecs/activity_tests.txt` records it.
+/// `crates/ecs/proptest-regressions/activity_tests.txt` records it.
 #[test]
 fn an_overwrite_naming_a_future_id_follows_that_id_once_it_spawns() {
     let mut w = World::new();

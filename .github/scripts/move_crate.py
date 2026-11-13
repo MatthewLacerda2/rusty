@@ -5,11 +5,16 @@ The engine is split one crate per module, over many pull requests
 (`crates/CLAUDE.md` is the recipe). Most of a move is the same edits every time,
 so this makes them, and lists what it cannot decide:
 
-- `git mv src/<m> crates/<m>/src`, its `mod.rs` becoming `lib.rs`;
+- `git mv src/<m> crates/<m>/src`, its `mod.rs` becoming `lib.rs`, and the
+  module's saved proptest seeds with it: `proptest-regressions/<m>/` →
+  `crates/<m>/proptest-regressions/`, where proptest looks once the nearest
+  `lib.rs` is the crate's (left at the root, ecs's seeds stopped replaying, #2140;
+  the `orphan-seeds` lint fails on one left behind);
 - in the crate's files: `crate::<dep>::` → `rusty_<dep>::` for each module its
-  row of the layer table (`tools/lint/src/layers/table.rs`) lists as a dep, then `crate::<m>::` → `crate::` and `pub(in crate::<m>)` → `pub(crate)` (in that order, so a
+  row of the layer table (`tools/lint/src/layers/table.rs`) lists as a dep, then `crate::<m>::` → `crate::` and `pub(in crate::<m>)` → `pub(crate)`
+  (no module `<m>` is left for it to name: ecs's 57 did not build, #2140), in that order, so a
   submodule named like a module, `crate::render::scene::`, stays the crate's
-  own), the shared test helper (`crate::test_temp::dir()` →
+  own, the shared test helper (`crate::test_temp::dir()` →
   `rusty_test_support::temp::dir()`), each `src/<m>/` path it names →
   `crates/<m>/src/`, `lib.rs`'s header naming its directory (`//! src/<m> — …`,
   as the `mod.rs` it was may) → `crates/<m>/src/lib.rs` (`lib_header`), and each
@@ -61,6 +66,7 @@ import tomllib
 from pathlib import Path
 
 import modules as layout
+from crate_code import externs, is_test_file, live, workspace_deps
 
 FEATURES = ("dev", "editor")
 
@@ -77,6 +83,9 @@ def known_modules(root: Path) -> set[str]:
 
 
 TABLE = Path("tools/lint/src/layers/table.rs")
+# proptest reads a seed beside the folder of the test's nearest `lib.rs`, which is the
+# crate's after the move: left at the root, ecs's seeds stopped replaying (#2140).
+SEEDS = "proptest-regressions"
 
 
 def row_deps(root: Path, module: str) -> set[str]:
@@ -100,7 +109,8 @@ def rewrite(text: str, module: str, deps: set[str]) -> tuple[str, set[str]]:
 
     # Siblings first: `crate::<m>::scene::` must not read as the sibling `scene`.
     text = re.sub(r"(?<![\w$])crate::(\w+)::", sibling, text)
-    # `pub(in crate::<m>)` named the module's root, which is now the crate's own.
+    # `pub(in crate::<m>)` named the module's root, which is now the crate's own; left
+    # as it was it names no module of the crate and fails to build (ecs had 57, #2140).
     text = re.sub(rf"\bpub\(in crate::{module}\)", "pub(crate)", text.replace(f"crate::{module}::", "crate::"))
     text = text.replace("crate::test_temp::dir()", "rusty_test_support::temp::dir()")
     text = re.sub(rf"(?<![\w/])src/{module}/mod\.rs", f"crates/{module}/src/lib.rs", text)
@@ -158,61 +168,6 @@ def by_hand(path: str, text: str, before: str) -> list[str]:
             if f not in FEATURES:
                 out.append(f"{path}:{n}: feature `{f}` is none of {'/'.join(FEATURES)}: declare and forward it")
     return out
-
-
-def is_test_file(rel: Path) -> bool:
-    """A file only tests compile, by the repo's naming: `tests.rs`, `*_tests.rs`, under `tests/`."""
-    return rel.name == "tests.rs" or rel.name.endswith("_tests.rs") or "tests" in rel.parts[:-1]
-
-
-def live(text: str) -> str:
-    """`text` without its `#[cfg(test)]` items (a coarse line scan, like the layer lint's)."""
-    out, lines, at = [], text.splitlines(), 0
-    while at < len(lines):
-        line = lines[at]
-        if not line.strip().startswith("#[cfg(test)]"):
-            out.append(line)
-            at += 1
-            continue
-        depth, opened = 0, False
-        rest = line.strip()[len("#[cfg(test)]"):]
-        while True:
-            depth += rest.count("{") - rest.count("}")
-            opened |= "{" in rest
-            if (opened and depth <= 0) or (not opened and rest.rstrip().endswith(";")):
-                break
-            at += 1
-            if at >= len(lines):
-                break
-            rest = lines[at]
-        at += 1
-    return "\n".join(out)
-
-
-def workspace_deps(manifest: str) -> list[str]:
-    """The keys of the root's `[workspace.dependencies]` that are not the workspace's own."""
-    keys = tomllib.loads(manifest).get("workspace", {}).get("dependencies", {})
-    return [k for k in keys if not k.startswith("rusty-")]
-
-
-def shadowed(code: str) -> set[str]:
-    """The names a file declares or imports as its own (`mod image;`, `use super::image;`,
-    `use crate::{a, image}`, `… as image`), whose `name::` then means the local item, not a
-    crate: the rule `tools/lint/src/layers/externs/find.rs` scans by."""
-    names = set(re.findall(r"^\s*(?:pub(?:\([\w:]+\))?\s+)?mod\s+(\w+)", code, re.M))
-    names |= set(re.findall(r"\bas\s+(\w+)\s*[;,}]", code))
-    for path in re.findall(r"\buse\s+((?:crate|super|self)\b[^;]*);", code):
-        names |= {seg.strip().split("::")[-1] for seg in re.split(r"[{},]", path) if seg.strip()}
-    return names - {"self", "super", "crate", "*"}
-
-
-def externs(code: str | list[str], deps: list[str]) -> list[str]:
-    """The external crates `code` (one file's text, or each file's) names as `name::` (`-` read
-    as `_`), sorted. In each file, a name it declares as its own (`shadowed`) is no crate."""
-    files = [code] if isinstance(code, str) else code
-    return sorted(d for d in deps if any(
-        d.replace("-", "_") not in shadowed(f) and re.search(rf"(?<![\w:]){d.replace('-', '_')}::", f)
-        for f in files))
 
 
 class Plan:
@@ -410,6 +365,8 @@ def move(root: Path, module: str) -> list[str]:
     git = ["git", "-C", str(root), "mv"]
     subprocess.run([*git, f"src/{module}", f"crates/{module}/src"], check=True)
     subprocess.run([*git, f"crates/{module}/src/mod.rs", f"crates/{module}/src/lib.rs"], check=True)
+    if (root / SEEDS / module).is_dir():
+        subprocess.run([*git, f"{SEEDS}/{module}", f"crates/{module}/{SEEDS}"], check=True)
     siblings, live_code, test_code, hand = set(), [], [], []
     for path in sorted((crate / "src").rglob("*")):
         if path.suffix not in (".rs", ".md"):

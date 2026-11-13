@@ -66,6 +66,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Physics sync borrows only to write | `tools/lint -- --rules` (`physics-borrow`) | **hard gate**: a non-test line of `src/physics/` that borrows a rapier body or collider mutably (`bodies`/`colliders` with `.get_mut(`, `.iter_mut(`, or an index under `&mut` or before a `.set_` call or an assignment) fails, since rapier marks whatever is borrowed modified, written or not, and the full and incremental syncs then step differently; borrow through `physics::writes::body_to_write` / `collider_to_write`, which compare first; the two helpers take `// lint: allow(physics-borrow) <why>` (#1798) |
 | Post effect completeness | `cargo test` (`render::postfx::effects::completeness`, #1467) | **hard gate**: every effect in `render::postfx::effects::POST_EFFECTS` has its settings (a `PostProcessingComponent` field, or a `CameraComponent` field named after it for a camera effect), its authoring row, its `Graphics.*` registrar, its Inspector section, a `<!-- effect: <name> -->` section in `docs/api/Graphics.md` naming each knob's tween path, and, when player-facing, a `GraphicsOption` of its name with a row in the doc's *Player options*; each composite texture it declares is bound in the assembled composite, at its place (#1473); and no layer lists an effect the renderer lacks. A must-flag test removes each part in turn |
 | Proptest seed | `make scripts` (`test_workflow_hygiene.py`, `ProptestSeed`) | **hard gate**: `ci.yml`'s gates pin `PROPTEST_RNG_SEED` and its nightly leaves it random (#1800), and `make test` and `make test-one-process` run on that same number, read from `ci.yml`, never copied (#1852): a probe made a prerequisite of each verb reads the seed its recipe sees, and a Makefile that drops the export or copies another number must flag; `make test-explore` is the local **signal** that draws fresh seeds |
+| Proptest seeds replay | `tools/lint -- --rules` (`orphan-seeds`) | **hard gate**: every `proptest-regressions/<path>.txt` under the root or a `crates/<name>/` has its `<path>.rs` in a sibling folder holding a `lib.rs` or `main.rs`, the only place proptest reads it from; a seed left behind by a module's move to its crate, or by a renamed or deleted test, fails and the message names where it goes; no allow |
 | Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
 | Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `src/editor` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); an editor slider is built by `editor::widgets::slider`, never a bare `egui::Slider::new(`, whose default clamping does the same (#1444); a real need takes `// lint: allow(drag-range) <why>` |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
@@ -470,6 +471,15 @@ new flag, gate, CI step or baseline.
   as winit's `KeyCode`) takes the allow. A parse that does more than read one name per variant (separators
   ignored, a name built from parts, a `Result` with its own listing) is left alone
   or takes `// lint: allow(named-enum) <why>`. Test code is not scanned.
+- **`orphan-seeds`** — a saved proptest seed must be one a test still reads.
+  proptest keeps a failing case at `<root>/proptest-regressions/<path>.txt`, beside
+  the folder that holds the test's nearest `lib.rs` or `main.rs` (`src/` or `tests/`
+  at the root, `crates/<m>/src/` in a member crate), with `<path>` the source file's
+  path inside it. A seed file whose `<path>.rs` is in no such sibling folder never
+  replays, silently: a module moved to its crate without its seeds (`make
+  move-crate` carries them), or a test file renamed or deleted. It takes **no
+  allow**: move the file (the message names the `git mv` when the module moved) or
+  delete it with its test. It reads the tree itself, as `Scan` holds only Rust.
 - **`physics-borrow`** (#1798) — rapier's `RigidBodySet::get_mut`,
   `ColliderSet::get_mut` and `IndexMut` put the handle on rapier's modified list
   whether or not anything is then written, and that list's order is the order the

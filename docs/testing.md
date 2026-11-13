@@ -365,8 +365,11 @@ which caches it, #1973). What it buys over `cargo test`:
   blocks: the nightly `ci.yml` run and `make test-explore` draw fresh seeds
   (`PROPTEST_CASES=<n>` for more cases). Whichever finds a case, commit its `cc` line
   with the fix, to the file proptest names when it fails: `proptest-regressions/<module
-  path>.txt` at the crate root (e.g. `proptest-regressions/physics/watch/tests.txt`,
-  #1798), which every later run replays first. A suite that pins its own seed in
+  path>.txt` beside the nearest folder holding the test's `lib.rs` (the root's for
+  `src/`, e.g. `proptest-regressions/physics/watch/tests.txt`; the crate's for a moved
+  module, e.g. `crates/ecs/proptest-regressions/activity_tests.txt`), which every later
+  run replays first. A root file naming a module no longer under `src/` is never read,
+  and `make rules` fails on it (`orphan-seeds`). A suite that pins its own seed in
   its config (`tests/proptest/world_space.rs`) doesn't explore.
 - **No retries.** A retried pass is still green, and a flaky test is a bug.
 
