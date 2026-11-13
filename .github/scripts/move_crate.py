@@ -271,10 +271,17 @@ class Plan:
             if f in theirs:
                 self.features[f].add(f"{name}?/{f}" if optional else f"{name}/{f}")
 
+    def declared(self, used: set[str]) -> dict[str, list[str]]:
+        """The features the crate declares, each with what it turns on: one its own code names
+        (`used`) or an optional dependency needs. A crate with neither declares none, even beside
+        a sibling that has it: the root turns each member's feature on directly, so only a crate
+        that declares one forwards it to its siblings (for its own `-p` builds)."""
+        return {f: sorted(v) for f, v in self.features.items() if f in used or any(x.startswith("dep:") for x in v)}
+
     def manifest(self, used: set[str]) -> str:
         out = [f'[package]\nname = "rusty-{self.module}"',
                *(f"{k}.workspace = true" for k in ("version", "edition", "publish"))]
-        declared = {f: sorted(v) for f, v in self.features.items() if v or f in used}
+        declared = self.declared(used)
         if declared:
             rows = (f"{f} = [{', '.join(map(quote, v))}]" for f, v in declared.items())
             out.append("\n[features]\n" + "\n".join(rows))
@@ -433,7 +440,7 @@ def move(root: Path, module: str) -> list[str]:
     for d in sorted(set(externs(test_code, registry)) - set(normal)):
         plan.add(d, "dev-dependencies")
     (crate / "Cargo.toml").write_text(plan.manifest(used))
-    declared = [f for f in FEATURES if plan.features[f] or f in used]
+    declared = list(plan.declared(used))
     wire_root(root, module, declared, hand)
     reaim_outside(root, module)
     gone = leave_root(root, module, normal)

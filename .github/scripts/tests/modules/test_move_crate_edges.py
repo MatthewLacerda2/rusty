@@ -31,7 +31,7 @@ image = { workspace = true }
 LIB = "pub mod asset;\npub mod ui;\n\npub use rusty_core as core;\n"
 TABLE = 'sim("core", &[]),\n    sim("asset", &["core"]),\n    sim("ui", &["asset", "core"]),\n'
 ASSET = ("pub mod ui;\nuse crate::asset::ui::Panel;\n"
-         'fn f() { let _ = glam::Vec3::ZERO; let _ = image::load; let p = "src/asset/x.png"; }\n')
+         'fn f() { let _ = glam::Vec3::ZERO; let _ = image::load; let _ = crate::core::P; let p = "src/asset/x.png"; }\n')
 OUTSIDE = ('const A: &str = include_str!("./a.wgsl");\nconst B: &str = include_str!("../x/../y.txt");\n'
            'const C: &str = include_str!("../asset/ui.rs");\n')
 
@@ -44,6 +44,7 @@ class Edges(unittest.TestCase):
         files = {"Cargo.toml": CARGO, "src/lib.rs": LIB, "src/asset/mod.rs": ASSET,
                  "src/asset/ui.rs": "pub struct Panel;\n", "src/ui/mod.rs": "",
                  "src/render/mod.rs": OUTSIDE, "crates/core/src/lib.rs": "",
+                 "crates/core/Cargo.toml": '[package]\nname = "rusty-core"\n\n[features]\ndev = []\n',
                  "tools/lint/src/layers/table.rs": TABLE}
         for name, text in files.items():
             (root / name).parent.mkdir(parents=True, exist_ok=True)
@@ -69,6 +70,10 @@ class Edges(unittest.TestCase):
         deps, dev = cargo.split("[dev-dependencies]")
         self.assertNotIn("glam", deps.split("[dependencies]")[1])
         self.assertIn("glam = { workspace = true }\nimage = { workspace = true }", dev)
+
+    def test_a_crate_with_no_feature_code_declares_none_beside_a_sibling_with_one(self):
+        self.assertNotIn("[features]", self.read("crates/asset/Cargo.toml"))
+        self.assertNotIn("rusty-asset/dev", self.read("Cargo.toml"))
 
     def test_an_include_whose_file_did_not_move_is_left_as_written(self):
         outside = self.read("src/render/mod.rs")

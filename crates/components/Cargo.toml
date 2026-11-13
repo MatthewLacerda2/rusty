@@ -4,10 +4,6 @@ version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
-[features]
-dev = ["rusty-asset/dev", "rusty-core/dev", "rusty-procgen/dev"]
-editor = ["rusty-asset/editor", "rusty-core/editor", "rusty-procgen/editor"]
-
 [lints]
 workspace = true
 
