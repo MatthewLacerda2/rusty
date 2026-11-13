@@ -3302,6 +3302,7 @@ dependencies = [
  "rustc-hash 2.1.3",
  "rusty-asset",
  "rusty-core",
+ "rusty-procgen",
  "rusty-test-support",
  "rusty-time",
  "scorsese-core",
@@ -3349,6 +3350,18 @@ dependencies = [
  "serde",
  "serde_json",
  "xxhash-rust",
+]
+
+[[package]]
+name = "rusty-procgen"
+version = "0.1.0"
+dependencies = [
+ "glam 0.33.12",
+ "image",
+ "rusty-core",
+ "rusty-test-support",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
