@@ -9,12 +9,12 @@ use proptest::prelude::*;
 use super::super::super::test_support::{add_box, add_box_with, add_floor};
 use super::super::super::{NavBounds, NavigationGraph};
 use crate::components::ColliderShape;
-use crate::ecs::changes::ops_tests::{self, Edit};
+use crate::ecs::changes::ops::{self, Edit};
 use crate::scene::Scene;
 
 #[derive(Clone, Debug)]
 enum Op {
-    World(ops_tests::Op),
+    World(ops::Op),
     /// Give the entity at this index a box collider, or a trigger one.
     Collider(usize, bool),
     NoCollider(usize),
@@ -22,7 +22,7 @@ enum Op {
 
 fn op() -> impl Strategy<Value = Op> {
     prop_oneof![
-        6 => ops_tests::op().prop_map(Op::World),
+        6 => crate::ecs::edit_ops!().prop_map(Op::World),
         2 => (0usize..10, any::<bool>()).prop_map(|(i, t)| Op::Collider(i, t)),
         1 => (0usize..10).prop_map(Op::NoCollider),
     ]
@@ -51,8 +51,8 @@ fn apply(scene: &mut Scene, op: &Op) {
     match op {
         // An Undo restores the parent's record and rewinds the log too
         // (`scene::undo::restore::apply`); the bare restore is physics' test's.
-        Op::World(ops_tests::Op::On(_, Edit::UndoFlip | Edit::UndoDespawn)) => {}
-        Op::World(op) => ops_tests::apply(&mut scene.world, op),
+        Op::World(ops::Op::On(_, Edit::UndoFlip | Edit::UndoDespawn)) => {}
+        Op::World(op) => ops::apply(&mut scene.world, op),
         Op::Collider(i, trigger) => {
             if let Some(e) = pick(scene, *i) {
                 let c = crate::components::ColliderComponent {

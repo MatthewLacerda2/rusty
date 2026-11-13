@@ -1,0 +1,17 @@
+[package]
+name = "rusty-ecs"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+rusty-components = { workspace = true }
+glam = { workspace = true }
+hecs = { workspace = true }
+
+[dev-dependencies]
+rusty-test-support = { workspace = true }
+proptest = { workspace = true }

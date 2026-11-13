@@ -1,6 +1,6 @@
 """`make move-crate` at its edges: a submodule named like a module above, a re-aimed
-string path, a later manifest table, an include whose file did not move, and a `lib.rs`
-header that named its directory."""
+string path, a later manifest table, an include whose file did not move, a `lib.rs`
+header that named its directory, and a visibility naming the module's root."""
 
 from __future__ import annotations
 
@@ -91,6 +91,16 @@ class Externs(unittest.TestCase):
     def test_another_file_naming_it_is_still_the_crate(self):
         files = ["pub mod image;\npub use image::Look;\n", "fn f() { image::load(); }\n"]
         self.assertEqual(mover.externs(files, ["image"]), ["image"])
+
+
+class Visibility(unittest.TestCase):
+    def test_a_path_restricted_to_the_module_root_names_the_crate(self):
+        text, _ = mover.rewrite("pub(in crate::ecs) fn a() {}\npub(in crate::ecs::changes) fn b() {}\n", "ecs", set())
+        self.assertEqual(text, "pub(crate) fn a() {}\npub(in crate::changes) fn b() {}\n")
+
+    def test_one_naming_a_longer_module_is_left_alone(self):
+        text, _ = mover.rewrite("pub(in crate::ecsx) fn a() {}\n", "ecs", set())
+        self.assertEqual(text, "pub(in crate::ecsx) fn a() {}\n")
 
 
 class LibHeader(unittest.TestCase):

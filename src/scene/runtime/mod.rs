@@ -21,4 +21,6 @@ pub mod prepare;
 #[cfg(test)]
 mod load_tests;
 #[cfg(test)]
+mod repin_tests;
+#[cfg(test)]
 mod swap_refs_tests;

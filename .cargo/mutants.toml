@@ -5,3 +5,8 @@
 # did when the engine was one crate. The workflows pass `--workspace` so mutants are
 # drawn from every member, not only the root package.
 test_workspace = true
+
+# Test fixture compiled as normal code, so other crates' tests can reach it: a mutant
+# there changes what a test feeds the World, never what the engine does, so no test
+# is owed for it (crates/CLAUDE.md, *Test hooks*).
+exclude_globs = ["crates/ecs/src/changes/ops.rs"]

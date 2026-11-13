@@ -1,5 +1,5 @@
 //! The spawn queue against the full scan it replaced (#1710): after any sequence
-//! of World edits (`changes::ops_tests`'s: spawn, clear, despawn, overwrite, Undo,
+//! of World edits (`changes::ops`'s: spawn, clear, despawn, overwrite, Undo,
 //! re-parent…), scripts attached anywhere and entities destroyed through the
 //! manager, each drain loads exactly the slots the old every-entity scan would
 //! have: every script slot in the World with no load attempt yet.
@@ -10,12 +10,12 @@ use proptest::prelude::*;
 
 use super::lifecycle::{manager_with_entity, write_script};
 use crate::components::ScriptComponent;
-use crate::ecs::changes::ops_tests::{self, apply};
+use crate::ecs::changes::ops::{self, apply};
 use crate::scripting::manager::ScriptManager;
 
 #[derive(Clone, Debug)]
 enum Op {
-    World(ops_tests::Op),
+    World(ops::Op),
     /// Attach a script to the entity at this index of the insertion order.
     Attach(usize),
     /// `Scene.DestroyEntity` and the manager's teardown of it.
@@ -27,7 +27,7 @@ enum Op {
 
 fn op() -> impl Strategy<Value = Op> {
     prop_oneof![
-        6 => ops_tests::op().prop_map(Op::World),
+        6 => crate::ecs::edit_ops!().prop_map(Op::World),
         4 => (0usize..10).prop_map(Op::Attach),
         1 => (0usize..10).prop_map(Op::Destroy),
         3 => Just(Op::Drain),

@@ -19,7 +19,7 @@ const DT: f32 = 1.0 / 60.0;
 /// pass re-pushed the box's rotation on the paused step, the incremental one left
 /// the solver's.
 fn ops() -> Vec<Op> {
-    use crate::ecs::changes::ops_tests::{Edit, Op as W};
+    use crate::ecs::changes::ops::{Edit, Op as W};
     vec![
         Op::Settle,
         Op::On(2, Phys::Velocity(-22)),

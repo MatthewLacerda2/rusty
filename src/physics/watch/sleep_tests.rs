@@ -5,7 +5,7 @@
 
 use super::ops_tests::{Op, Phys};
 use super::tests::{agree, Twin};
-use crate::ecs::changes::ops_tests::{Edit, Op as W};
+use crate::ecs::changes::ops::{Edit, Op as W};
 
 /// The fixture's `i`th entity.
 fn id(twin: &Twin, i: usize) -> u32 {

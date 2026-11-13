@@ -51,7 +51,8 @@ class Move(unittest.TestCase):
                  "src/asset/cache.rs": "//! src/asset/cache.rs — keys\n", "src/scene/mod.rs": "", "src/logging/mod.rs": "",
                  "src/asset/up_tests.rs": UP, "crates/core/src/lib.rs": "",
                  "tools/lint/src/layers/table.rs": TABLE, "src/asset/deep/inc_tests.rs": INC,
-                 "src/dev/mp3.rs": 'const A: &[u8] = include_bytes!("../asset/cache.rs");\n'}
+                 "src/dev/mp3.rs": 'const A: &[u8] = include_bytes!("../asset/cache.rs");\n',
+                 "proptest-regressions/asset/deep/inc_tests.txt": "cc 1\n", "proptest-regressions/scene/a.txt": "cc 2\n"}
         for name, text in files.items():
             (root / name).parent.mkdir(parents=True, exist_ok=True)
             (root / name).write_text(text)
@@ -109,6 +110,11 @@ class Move(unittest.TestCase):
         self.assertNotIn("inc_tests.rs:2: a path from the checkout's root", whys)
         self.assertIn('include_str!("../cache.rs")', inc, "a file inside the crate moved with it")
         self.assertIn('include_bytes!("../../crates/asset/src/cache.rs")', self.read("src/dev/mp3.rs"))
+
+    def test_its_proptest_seeds_move_beside_the_crate_and_no_others(self):
+        self.assertEqual(self.read("crates/asset/proptest-regressions/deep/inc_tests.txt"), "cc 1\n")
+        self.assertFalse((self.root / "proptest-regressions/asset").exists())
+        self.assertEqual(self.read("proptest-regressions/scene/a.txt"), "cc 2\n")
 
     def test_a_crate_only_the_moved_code_names_leaves_the_root(self):
         cargo = self.read("Cargo.toml").split("[dependencies]")[1]

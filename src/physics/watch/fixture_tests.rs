@@ -9,7 +9,7 @@ use glam::Vec3;
 use rapier3d::prelude::InteractionGroups;
 
 use super::ops_tests::{apply, Op, Phys};
-use crate::ecs::changes::ops_tests;
+use crate::ecs::changes::ops;
 use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 
@@ -59,13 +59,13 @@ pub fn scene_digest(scene: &Scene) -> String {
 /// The shared World edit, completed as an Undo completes it: `restore_entity`'s
 /// one caller (`scene::undo::restore::apply`) also restores the parent's record,
 /// whose `children` names the restored child again, then rewinds the log.
-pub fn world_op(w: &mut crate::ecs::World, op: &ops_tests::Op) {
-    use ops_tests::{Edit, Op};
+pub fn world_op(w: &mut crate::ecs::World, op: &ops::Op) {
+    use ops::{Edit, Op};
     let undone = match op {
         Op::On(i, Edit::UndoFlip | Edit::UndoDespawn) => w.ids().get(*i).copied(),
         _ => None,
     };
-    ops_tests::apply(w, op);
+    ops::apply(w, op);
     if let Some(e) = undone {
         if let Some(p) = w.parent_id(e).filter(|&p| !w.children(p).contains(&e)) {
             w.add_child(p, e);

@@ -1,5 +1,5 @@
 //! src/render/scene/equivalence_ops.rs — the edits `equivalence_tests` draws its
-//! sequences from (#1706): the ECS write paths of `ops_tests`, the inputs the log
+//! sequences from (#1706): the ECS write paths of `changes::ops`, the inputs the log
 //! does not cover, and the shadow ops.
 
 use proptest::prelude::*;
@@ -8,7 +8,7 @@ use super::fixture::{on, probe};
 use super::shadow_ops::{self, s_op, S};
 use crate::components::mesh::MeshRevision;
 use crate::components::{LightComponent, MaterialComponent, RenderMode};
-use crate::ecs::changes::ops_tests::{apply, op, Op};
+use crate::ecs::changes::ops::{apply, Op};
 use crate::render::Renderer;
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::lighting::lightmap::LightmapEntry;
@@ -43,7 +43,7 @@ pub(super) enum R {
 pub(super) fn r_op() -> impl Strategy<Value = R> {
     let at = || 0usize..12;
     prop_oneof![
-        8 => op().prop_map(R::World),
+        8 => crate::ecs::edit_ops!().prop_map(R::World),
         2 => (0u8..3).prop_map(R::Prop),
         3 => (at(), proptest::option::of(0u8..3), any::<bool>())
             .prop_map(|(i, m, two)| R::Material(i, m, two)),

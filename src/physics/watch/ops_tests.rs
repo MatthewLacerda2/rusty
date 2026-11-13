@@ -1,6 +1,6 @@
 //! src/physics/watch/ops_tests.rs — the ops the incremental sync's equivalence
 //! proptest runs (#1707, `tests.rs`): the World's own shared edit sequence
-//! (`ecs::changes::ops_tests`), the physics edits (`edit_tests.rs`), a collision
+//! (`ecs::changes::ops`), the physics edits (`edit_tests.rs`), a collision
 //! matrix change and steps: `Time.timeScale` 0 among them, and a run long
 //! enough for bodies to fall asleep.
 
@@ -9,13 +9,13 @@ use proptest::prelude::*;
 pub use super::edit_tests::Phys;
 use super::edit_tests::{edit_one, phys};
 use super::fixture_tests::world_op;
-use crate::ecs::changes::ops_tests;
+use crate::ecs::changes::ops;
 use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 
 #[derive(Clone, Debug)]
 pub enum Op {
-    World(ops_tests::Op),
+    World(ops::Op),
     On(usize, Phys),
     Matrix(u8, bool),
     Step,
@@ -32,7 +32,7 @@ pub const SETTLE_STEPS: usize = 90;
 
 pub fn op() -> impl Strategy<Value = Op> {
     prop_oneof![
-        6 => ops_tests::op().prop_map(Op::World),
+        6 => crate::ecs::edit_ops!().prop_map(Op::World),
         8 => (0usize..10, phys()).prop_map(|(i, p)| Op::On(i, p)),
         1 => (0u8..3, any::<bool>()).prop_map(|(l, on)| Op::Matrix(l, on)),
         6 => Just(Op::Step),

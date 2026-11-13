@@ -79,7 +79,7 @@ proptest! {
 /// inert, and both syncs step on.
 #[test]
 fn a_joint_from_a_fixed_body_to_a_disabled_one_steps() {
-    use crate::ecs::changes::ops_tests::{Edit, Op as W};
+    use crate::ecs::changes::ops::{Edit, Op as W};
     agree(&[
         Op::World(W::On(0, Edit::Adopt(false))),
         Op::On(5, Phys::Body(false)),
@@ -95,7 +95,7 @@ fn a_joint_from_a_fixed_body_to_a_disabled_one_steps() {
 /// next real step steps on.
 #[test]
 fn a_paused_first_step_then_a_despawn_steps() {
-    use crate::ecs::changes::ops_tests::{Edit, Op as W};
+    use crate::ecs::changes::ops::{Edit, Op as W};
     agree(&[Op::Pause, Op::World(W::On(1, Edit::Despawn)), Op::Step]).unwrap();
 }
 

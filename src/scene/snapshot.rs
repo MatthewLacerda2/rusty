@@ -82,3 +82,7 @@ impl SceneSnapshot {
         scene.bake_files = self.bake_files;
     }
 }
+
+#[cfg(test)]
+#[path = "snapshot_tests.rs"]
+mod tests;
