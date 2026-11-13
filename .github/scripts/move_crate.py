@@ -11,9 +11,10 @@ so this makes them, and lists what it cannot decide:
   submodule named like a module, `crate::render::scene::`, stays the crate's
   own), the shared test helper (`crate::test_temp::dir()` →
   `rusty_test_support::temp::dir()`), each `src/<m>/` path it names →
-  `crates/<m>/src/`, and each relative `include_str!` / `include_bytes!` path
-  re-aimed from the file's new folder (in any tracked file whose include names a
-  file of the crate, too);
+  `crates/<m>/src/`, `lib.rs`'s header naming its directory (`//! src/<m> — …`,
+  as the `mod.rs` it was may) → `crates/<m>/src/lib.rs` (`lib_header`), and each
+  relative `include_str!` / `include_bytes!` path re-aimed from the file's new
+  folder (in any tracked file whose include names a file of the crate, too);
 - `crates/<m>/Cargo.toml`: the workspace's package fields and lints, the sibling
   crates it now names, and the external crates of the root's
   `[workspace.dependencies]` its code names (by `name::`, as the layer lint
@@ -109,9 +110,9 @@ def rewrite(text: str, module: str, deps: set[str]) -> tuple[str, set[str]]:
 
 def lib_header(text: str, module: str) -> str:
     """`text` with a leading `//! src/<m>` or `//! crates/<m>/src/` header naming `lib.rs`
-    instead. A `mod.rs` header may name its directory, which `lib.rs`'s may not, and the
-    bare `src/<m>` (no trailing `/`) reads as prose to `self-path`: the rewrite left
-    `shadergen`'s `//! src/shadergen — …` a stale path no gate flagged (#2140)."""
+    instead. A `mod.rs` header may name its directory, which `lib.rs`'s may not: the
+    rewrite once left `shadergen`'s `//! src/shadergen — …` a stale path, which
+    `self-path` now flags (#2140)."""
     lines = text.split("\n")
     for n, line in enumerate(lines):
         if line.startswith("//! "):
@@ -193,9 +194,24 @@ def workspace_deps(manifest: str) -> list[str]:
     return [k for k in keys if not k.startswith("rusty-")]
 
 
-def externs(code: str, deps: list[str]) -> list[str]:
-    """The external crates `code` names as `name::` (`-` read as `_`), sorted."""
-    return sorted(d for d in deps if re.search(rf"(?<![\w:]){d.replace('-', '_')}::", code))
+def shadowed(code: str) -> set[str]:
+    """The names a file declares or imports as its own (`mod image;`, `use super::image;`,
+    `use crate::{a, image}`, `… as image`), whose `name::` then means the local item, not a
+    crate: the rule `tools/lint/src/layers/externs/find.rs` scans by."""
+    names = set(re.findall(r"^\s*(?:pub(?:\([\w:]+\))?\s+)?mod\s+(\w+)", code, re.M))
+    names |= set(re.findall(r"\bas\s+(\w+)\s*[;,}]", code))
+    for path in re.findall(r"\buse\s+((?:crate|super|self)\b[^;]*);", code):
+        names |= {seg.strip().split("::")[-1] for seg in re.split(r"[{},]", path) if seg.strip()}
+    return names - {"self", "super", "crate", "*"}
+
+
+def externs(code: str | list[str], deps: list[str]) -> list[str]:
+    """The external crates `code` (one file's text, or each file's) names as `name::` (`-` read
+    as `_`), sorted. In each file, a name it declares as its own (`shadowed`) is no crate."""
+    files = [code] if isinstance(code, str) else code
+    return sorted(d for d in deps if any(
+        d.replace("-", "_") not in shadowed(f) and re.search(rf"(?<![\w:]){d.replace('-', '_')}::", f)
+        for f in files))
 
 
 class Plan:
@@ -255,10 +271,17 @@ class Plan:
             if f in theirs:
                 self.features[f].add(f"{name}?/{f}" if optional else f"{name}/{f}")
 
+    def declared(self, used: set[str]) -> dict[str, list[str]]:
+        """The features the crate declares, each with what it turns on: one its own code names
+        (`used`) or an optional dependency needs. A crate with neither declares none, even beside
+        a sibling that has it: the root turns each member's feature on directly, so only a crate
+        that declares one forwards it to its siblings (for its own `-p` builds)."""
+        return {f: sorted(v) for f, v in self.features.items() if f in used or any(x.startswith("dep:") for x in v)}
+
     def manifest(self, used: set[str]) -> str:
         out = [f'[package]\nname = "rusty-{self.module}"',
                *(f"{k}.workspace = true" for k in ("version", "edition", "publish"))]
-        declared = {f: sorted(v) for f, v in self.features.items() if v or f in used}
+        declared = self.declared(used)
         if declared:
             rows = (f"{f} = [{', '.join(map(quote, v))}]" for f, v in declared.items())
             out.append("\n[features]\n" + "\n".join(rows))
@@ -348,7 +371,7 @@ def leave_root(root: Path, module: str, externs_: list[str]) -> list[str]:
     line of the same name (`[dev-dependencies]`, a `[target.…]` one)."""
     left = subprocess.run(["git", "-C", str(root), "ls-files", "--", "*.rs", f":(exclude){layout.CRATES}/**"],
                           capture_output=True, text=True, check=False).stdout.split()
-    code = "\n".join((root / f).read_text() for f in left if (root / f).is_file())
+    code = [(root / f).read_text() for f in left if (root / f).is_file()]
     cargo = (root / "Cargo.toml").read_text()
     start = cargo.index("\n[dependencies]\n") + 1
     end = cargo.find("\n[", start)
@@ -408,16 +431,16 @@ def move(root: Path, module: str) -> list[str]:
     code = "\n".join(test_code)
     used = {f for f in FEATURES if f'feature = "{f}"' in code}
     registry = workspace_deps((root / "Cargo.toml").read_text())
-    normal = externs("\n".join(live_code), registry)
+    normal = externs(live_code, registry)
     plan = Plan(root, module, hand)
     for s in sorted(siblings):
         plan.sibling(s)
     for d in normal:
         plan.add(d)
-    for d in sorted(set(externs(code, registry)) - set(normal)):
+    for d in sorted(set(externs(test_code, registry)) - set(normal)):
         plan.add(d, "dev-dependencies")
     (crate / "Cargo.toml").write_text(plan.manifest(used))
-    declared = [f for f in FEATURES if plan.features[f] or f in used]
+    declared = list(plan.declared(used))
     wire_root(root, module, declared, hand)
     reaim_outside(root, module)
     gone = leave_root(root, module, normal)

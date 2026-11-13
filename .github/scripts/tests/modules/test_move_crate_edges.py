@@ -31,7 +31,7 @@ image = { workspace = true }
 LIB = "pub mod asset;\npub mod ui;\n\npub use rusty_core as core;\n"
 TABLE = 'sim("core", &[]),\n    sim("asset", &["core"]),\n    sim("ui", &["asset", "core"]),\n'
 ASSET = ("pub mod ui;\nuse crate::asset::ui::Panel;\n"
-         'fn f() { let _ = glam::Vec3::ZERO; let _ = image::load; let p = "src/asset/x.png"; }\n')
+         'fn f() { let _ = glam::Vec3::ZERO; let _ = image::load; let _ = crate::core::P; let p = "src/asset/x.png"; }\n')
 OUTSIDE = ('const A: &str = include_str!("./a.wgsl");\nconst B: &str = include_str!("../x/../y.txt");\n'
            'const C: &str = include_str!("../asset/ui.rs");\n')
 
@@ -44,6 +44,7 @@ class Edges(unittest.TestCase):
         files = {"Cargo.toml": CARGO, "src/lib.rs": LIB, "src/asset/mod.rs": ASSET,
                  "src/asset/ui.rs": "pub struct Panel;\n", "src/ui/mod.rs": "",
                  "src/render/mod.rs": OUTSIDE, "crates/core/src/lib.rs": "",
+                 "crates/core/Cargo.toml": '[package]\nname = "rusty-core"\n\n[features]\ndev = []\n',
                  "tools/lint/src/layers/table.rs": TABLE}
         for name, text in files.items():
             (root / name).parent.mkdir(parents=True, exist_ok=True)
@@ -70,11 +71,26 @@ class Edges(unittest.TestCase):
         self.assertNotIn("glam", deps.split("[dependencies]")[1])
         self.assertIn("glam = { workspace = true }\nimage = { workspace = true }", dev)
 
+    def test_a_crate_with_no_feature_code_declares_none_beside_a_sibling_with_one(self):
+        self.assertNotIn("[features]", self.read("crates/asset/Cargo.toml"))
+        self.assertNotIn("rusty-asset/dev", self.read("Cargo.toml"))
+
     def test_an_include_whose_file_did_not_move_is_left_as_written(self):
         outside = self.read("src/render/mod.rs")
         self.assertIn('include_str!("./a.wgsl")', outside)
         self.assertIn('include_str!("../x/../y.txt")', outside)
         self.assertIn('include_str!("../../crates/asset/src/ui.rs")', outside)
+
+
+class Externs(unittest.TestCase):
+    def test_a_name_a_file_declares_as_its_own_is_no_crate_there(self):
+        for own in ("pub mod image;\npub use image::Look;\n", "use super::image;\nfn f() { image::look(); }\n",
+                    "use crate::ui::{image, x};\nfn f() { image::look(); }\n", "use crate::ui::look as image;\n"):
+            self.assertEqual(mover.externs([own, "fn g() { glam::Vec3::ZERO; }\n"], ["glam", "image"]), ["glam"])
+
+    def test_another_file_naming_it_is_still_the_crate(self):
+        files = ["pub mod image;\npub use image::Look;\n", "fn f() { image::load(); }\n"]
+        self.assertEqual(mover.externs(files, ["image"]), ["image"])
 
 
 class LibHeader(unittest.TestCase):

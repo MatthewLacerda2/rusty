@@ -40,8 +40,6 @@ pub(crate) mod textures;
 pub(crate) mod bloom;
 pub(crate) mod custom_effects;
 pub(crate) mod depth_of_field;
-#[cfg(test)]
-pub(crate) mod dummy;
 pub(crate) mod exposure;
 pub(crate) mod fxaa;
 pub(crate) mod grading;
@@ -73,8 +71,6 @@ pub(crate) const POST_EFFECTS: &[PostEffect] = &[
     color_lookup::EFFECT,
     custom_effects::EFFECT,
     depth_of_field::EFFECT,
-    #[cfg(test)]
-    dummy::EFFECT,
     exposure::EFFECT,
     film_grain::EFFECT,
     fxaa::EFFECT,

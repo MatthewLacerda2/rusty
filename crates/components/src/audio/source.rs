@@ -1,0 +1,124 @@
+//! crates/components/src/audio/source.rs — AudioSource component (#212, #213, #412).
+//!
+//! Unity's `AudioSource`: a per-entity emitter referencing an audio `clip` to play,
+//! with a linear 3D rolloff (`spatial_blend`, `initial_distance`, `final_distance`),
+//! a time-scale opt-out, the mixer group it plays through (#465), an occlusion
+//! opt-out (#467) and a doppler level (#1749). The windowed
+//! runtime applies all of it to the device every tick (`api/audio/frame.rs`).
+//!
+//! Pure authoring data — every field serde-persists. The component knows nothing
+//! about the audio device: the platform-layer `AudioMaestro` (the resource) owns
+//! the mixer and turns these fields into actual sound. Keeping the component
+//! device-free is what lets the deterministic harness carry `AudioSource`s with no
+//! audio backend at all.
+
+use serde::{Deserialize, Serialize};
+
+/// Per-entity audio emitter. Mirrors Unity's `AudioSource`. All fields persist; the
+/// `AudioMaestro` reads them when (re)starting a voice for this entity.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AudioSourceComponent {
+    /// Asset path to the clip (`.ogg` / `.wav` / `.mp3`). Empty means "no clip assigned".
+    pub clip: String,
+    /// Per-source linear gain in `[0, 1]`, multiplied by the master volume.
+    pub volume: f32,
+    /// Whether playback loops when it reaches the end.
+    #[serde(rename = "loop")]
+    pub looping: bool,
+    /// Start playing automatically when the entity enters Play (Unity's "Play On
+    /// Awake").
+    pub play_on_start: bool,
+    /// `true` ⇒ the voice's rate follows `Time.timeScale` (slows in slow-mo, stops
+    /// when paused) — for diegetic gameplay sound. `false` ⇒ wall-clock rate, for
+    /// music and UI that should keep playing through a pause/slow-mo.
+    pub is_time_scaled: bool,
+
+    // --- Spatial fields (3D spatialization, #213; applied to the device by #412). ---
+    /// 0.0 = fully 2D (no attenuation/panning, stereo image kept), 1.0 = fully 3D
+    /// (a stereo clip is downmixed to mono, then panned).
+    pub spatial_blend: f32,
+    /// Rolloff: full volume out to this distance (model: flat ≤ initial, linear
+    /// falloff initial→final, silent beyond).
+    pub initial_distance: f32,
+    /// Rolloff: silent at/after this distance.
+    pub final_distance: f32,
+
+    /// The mixer group the voice plays through (#465; Unity's `outputAudioMixerGroup`).
+    /// Empty means Master. Read when the voice starts, so a change reroutes the next
+    /// `Play`, not a voice already sounding.
+    #[serde(default)]
+    pub output_group: String,
+
+    /// Whether geometry between the listener and this source muffles it (#467,
+    /// Steam Audio's per-source occlusion toggle). Only a spatialized source
+    /// (`spatial_blend > 0`) is ever occluded.
+    #[serde(default = "occlusion_default")]
+    pub occlusion_enabled: bool,
+
+    /// How strongly the source's and the listener's motion bend its pitch (#1749,
+    /// Unity's *Doppler Level*): `0` off, `1` physical, above `1` exaggerated. It is
+    /// scaled by `spatial_blend`, so a 2D source never shifts whatever it says.
+    #[serde(default = "doppler_default")]
+    pub doppler_level: f32,
+}
+
+/// Physical doppler unless a source says otherwise.
+fn doppler_default() -> f32 {
+    1.0
+}
+
+/// Occlusion is on unless a source opts out.
+fn occlusion_default() -> bool {
+    true
+}
+
+impl Default for AudioSourceComponent {
+    fn default() -> Self {
+        Self {
+            clip: String::new(),
+            volume: 1.0,
+            looping: false,
+            play_on_start: false,
+            is_time_scaled: true,
+            spatial_blend: 0.0,
+            initial_distance: 1.0,
+            final_distance: 16.0,
+            output_group: String::new(),
+            occlusion_enabled: true,
+            doppler_level: 1.0,
+        }
+    }
+}
+
+impl crate::FirstClass for AudioSourceComponent {
+    const NAME: &'static str = "AudioSource";
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_is_2d_oneshot_unit_volume() {
+        let a = AudioSourceComponent::default();
+        assert_eq!(a.volume, 1.0);
+        assert!(!a.looping);
+        assert!(!a.play_on_start);
+        assert!(a.is_time_scaled);
+        assert_eq!(a.spatial_blend, 0.0);
+        assert!(a.clip.is_empty());
+    }
+
+    #[test]
+    fn loop_field_serializes_as_loop_keyword() {
+        let a = AudioSourceComponent {
+            clip: "music/theme.ogg".to_string(),
+            looping: true,
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&a).unwrap();
+        assert!(json.contains("\"loop\":true"), "got {json}");
+        let back: AudioSourceComponent = serde_json::from_str(&json).unwrap();
+        assert_eq!(a, back);
+    }
+}

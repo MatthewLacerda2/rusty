@@ -1,0 +1,117 @@
+//! Unit tests for the graph-state writes (#316): entering a node adopts its clip,
+//! loop flag and speed; binding seeds declared defaults without clobbering script
+//! writes; and the new graph fields
+//! round-trip through serde with the entity.
+
+use std::collections::BTreeMap;
+
+use rusty_asset::animation_graph::{AnimationGraph, GraphNode, ParameterDeclaration, StateMachine};
+
+use super::{AnimatorComponent, AnimatorParameter, Playback};
+
+fn run_node() -> GraphNode {
+    GraphNode {
+        name: "Run".to_string(),
+        clip: "RunClip".to_string(),
+        blend_tree: None,
+        is_loop: true,
+        speed: Some(2.0),
+        events: Vec::new(),
+        sync_group: None,
+        sync_markers: Vec::new(),
+        tag: String::new(),
+    }
+}
+
+fn one_node_graph() -> AnimationGraph {
+    AnimationGraph {
+        parameters: BTreeMap::from([
+            ("speed".to_string(), ParameterDeclaration::Float(1.5)),
+            ("Jump".to_string(), ParameterDeclaration::Trigger),
+        ]),
+        base: StateMachine {
+            nodes: vec![run_node()],
+            edges: Vec::new(),
+            entry: "Run".to_string(),
+        },
+        layers: Vec::new(),
+        ..AnimationGraph::default()
+    }
+}
+
+#[test]
+fn enter_node_with_a_blend_crossfades_into_the_node() {
+    let mut anim = AnimatorComponent {
+        base: Playback {
+            current_clip: "IdleClip".to_string(),
+            ..Default::default()
+        },
+        is_playing: true,
+        ..Default::default()
+    };
+    anim.enter_node(&run_node(), 0.3);
+    assert_eq!(anim.base.current_node.as_deref(), Some("Run"));
+    assert_eq!(anim.base.current_clip, "RunClip");
+    assert_eq!(anim.base.previous_clip.as_deref(), Some("IdleClip"));
+    assert_eq!(anim.base.crossfade_duration, 0.3);
+    assert!(anim.base.loop_clip && anim.is_playing);
+    assert_eq!(anim.base.node_speed, 2.0);
+}
+
+#[test]
+fn enter_node_with_zero_blend_is_a_hard_cut() {
+    let mut anim = AnimatorComponent::default();
+    anim.enter_node(&run_node(), 0.0);
+    assert!(!anim.is_crossfading());
+    assert_eq!(anim.base.current_clip, "RunClip");
+    assert_eq!(anim.base.time, 0.0);
+}
+
+#[test]
+fn bind_graph_seeds_defaults_and_enters_the_entry_node() {
+    let mut anim = AnimatorComponent::default();
+    anim.set_float("speed", 9.0); // a script wrote this before the bind
+    anim.bind_graph(&one_node_graph());
+    assert_eq!(anim.base.current_node.as_deref(), Some("Run"));
+    assert_eq!(anim.get_float("speed"), Some(9.0), "script value wins");
+    assert!(!anim.trigger_is_set("Jump"), "a trigger starts clear");
+    assert_eq!(
+        anim.parameters.get("Jump"),
+        Some(&AnimatorParameter::Trigger(false))
+    );
+}
+
+#[test]
+fn graph_fields_round_trip_through_serde() {
+    let anim = AnimatorComponent {
+        base: Playback {
+            current_node: Some("Run".to_string()),
+            node_speed: 2.0,
+            ..Default::default()
+        },
+        graph: Some("guard.animgraph".to_string()),
+        graph_enabled: false,
+        ..Default::default()
+    };
+    let json = serde_json::to_string(&anim).unwrap();
+    let back: AnimatorComponent = serde_json::from_str(&json).unwrap();
+    assert_eq!(back.graph.as_deref(), Some("guard.animgraph"));
+    assert!(!back.graph_enabled);
+    assert_eq!(back.base.current_node.as_deref(), Some("Run"));
+    assert_eq!(back.base.node_speed, 2.0);
+}
+
+#[test]
+fn default_graph_fields_stay_out_of_the_serialized_form() {
+    // The defaults (enabled, no node, 1× speed) are skipped, so a graph-less
+    // animator serializes without any graph fields...
+    let json = serde_json::to_string(&AnimatorComponent::default()).unwrap();
+    for key in ["graph", "current_node", "node_speed", "graph_enabled"] {
+        assert!(!json.contains(key), "default `{key}` must not serialize");
+    }
+    // ...and a document missing them deserializes to the same defaults.
+    let back: AnimatorComponent = serde_json::from_str(&json).unwrap();
+    assert!(back.graph_enabled, "graph evaluation defaults to enabled");
+    assert_eq!(back.base.node_speed, 1.0);
+    assert_eq!(back.base.current_node, None);
+}

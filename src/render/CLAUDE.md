@@ -136,8 +136,8 @@ Before building a layout or pipeline by hand, use these:
 A post effect is a module in every layer: it adds its own files and **one
 row per registry** (each folder's `mod` list counts as one), and edits no shared
 struct, shader body or list position. Group a family (`grading/`, `lens/`) the same way
-in every layer. The test-only `dummy` effect is the worked example: grep `dummy` for
-every file and row.
+in every layer. The vignette, the smallest real effect, is the worked example: grep
+`vignette` for every file and row.
 - **Settings** — `components/rendering/post_processing/<effect>.rs` (serde, `Default`,
   the clamp constants) and one field on `PostProcessingComponent`, plus its line in
   that struct's `Default` (the compiler asks for it: the volume applies by default, so
@@ -185,8 +185,7 @@ every file and row.
   io layout or `PostFx::run`. A `view` of `None` binds one shared black texel, so the
   function must draw nothing when it reads black (bloom's dirt, the lens flare), and
   an effect that is off skips the fetch on a slot's on flag, as bloom and the flare
-  do (`p.w`), so per pixel it costs a uniform branch, not a texture read. It samples with the chain's own samplers (`s_color`, `s_skybox`). The `dummy`
-  declares one, never provided.
+  do (`p.w`), so per pixel it costs a uniform branch, not a texture read. It samples with the chain's own samplers (`s_color`, `s_skybox`).
 - **Gate** — its `PostEffect::gate`: the player option, when it is player-facing.
   It asks through `EffectCx::runs(EFFECT.gate, on)`; no shared `match` names it. No
   quality preset gates an effect.

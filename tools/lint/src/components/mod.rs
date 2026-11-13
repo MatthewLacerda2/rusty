@@ -2,7 +2,7 @@
 //!
 //! Every first-class component must satisfy four axes that deliberately live in layers
 //! which don't depend on each other:
-//!   1. a row of the registry (`first_class!`, located under `src/components/`,
+//!   1. a row of the registry (`first_class!`, located under `crates/components/src/`,
 //!      #2023) — the discovery source, from which `Entity`'s field is generated,
 //!   2. an Add Component entry (`src/editor/inspector/components/add/`),
 //!      guarding on absence through the #344 accessor facade,

@@ -1,13 +1,13 @@
 //! Component discovery: first-class components are the rows of the registry
-//! (`src/components/registry.rs`'s `first_class!`, #2023), from which `Entity`'s
-//! fields are generated, so a new component can't dodge the gates that enumerate
-//! them.
+//! (`crates/components/src/registry.rs`'s `first_class!`, #2023), from which
+//! `Entity`'s fields are generated, so a new component can't dodge the gates that
+//! enumerate them.
 //!
-//! The registry is *located* (the file under `src/components/` declaring `macro_rules!
-//! first_class`), never read from a fixed path: when `Entity` moved from `entity.rs`
-//! to `entity/mod.rs` the old constant read an empty string and both gates checked
-//! zero components for weeks (#959). Not finding it, or finding no rows in it,
-//! fails loudly.
+//! The registry is *located* (the file under the `components` module's folder
+//! declaring `macro_rules! first_class`), never read from a fixed path: when
+//! `Entity` moved from `entity.rs` to `entity/mod.rs` the old constant read an empty
+//! string and both gates checked zero components for weeks (#959). Not finding it,
+//! or finding no rows in it, fails loudly.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -15,7 +15,8 @@ use std::process::exit;
 
 use super::axes::read;
 
-/// Where the registry lives (searched recursively).
+/// Where the registry lives (searched recursively), as a module path:
+/// `modules::real` finds the folder, `src/` or `crates/`.
 pub(super) const COMPONENTS_DIR: &str = "src/components";
 const DECL: &str = "macro_rules! first_class {";
 const REPORT: &str = ".lint/report.txt";

@@ -1,6 +1,6 @@
 //! The flare's composite texture on lavapipe (#1473): bound to the flare's target
-//! while the view flares, to the registry's black texel once it stops; the dummy's,
-//! never provided, always to the black texel.
+//! while the view flares, to the registry's black texel once it stops; bloom's dirt,
+//! which the scene never picks, always to the black texel.
 
 use super::gpu_tests::{eye, renderer, scene, H, W};
 use crate::render::postfx::effects::textures::{bound_views, composite_textures};
@@ -35,7 +35,7 @@ fn gpu_the_flare_binds_its_target_while_it_flares_and_black_after() {
             view_formats: &[],
         })
         .create_view(&Default::default());
-    let (flare, dummy) = (binding("lens_flare"), binding("dummy"));
+    let (flare, dirt) = (binding("lens_flare"), binding("bloom"));
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     let out = view.color_target_view().unwrap();
 
@@ -51,7 +51,7 @@ fn gpu_the_flare_binds_its_target_while_it_flares_and_black_after() {
         std::ptr::eq(views[flare], &target.view),
         "the flare's target"
     );
-    assert!(std::ptr::eq(views[dummy], &black), "the dummy has none");
+    assert!(std::ptr::eq(views[dirt], &black), "no dirt picked: black");
     assert_eq!(views.len(), composite_textures().len());
 
     r.render(&mut view, &scene(40.0, false), &eye(), &out, false);

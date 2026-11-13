@@ -7,6 +7,7 @@
 mod cargo;
 mod check;
 mod find;
+mod members;
 pub mod policy;
 #[cfg(test)]
 mod tests;
@@ -34,7 +35,16 @@ pub fn violations(layers: &[Layer], root: &Path, tree: &Tree) -> Vec<String> {
         Err(why) => return vec![why],
     };
     let uses = uses(tree, &deps.iter().cloned().collect());
-    check::all(layers, &policy::POLICY, &deps, &uses)
+    let mut out = check::all(layers, &policy::POLICY, &deps, &uses);
+    for member in crate::modules::member_manifests(root) {
+        let Some(module) = member.parent().and_then(|d| d.file_name()) else {
+            continue;
+        };
+        let text = fs::read_to_string(&member).unwrap_or_default();
+        let module = module.to_string_lossy();
+        out.extend(members::stray(&module, &text, layers, &policy::POLICY));
+    }
+    out
 }
 
 /// The external crates the root package and every member under `root` depend on:

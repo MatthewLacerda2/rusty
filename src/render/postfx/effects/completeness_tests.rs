@@ -95,17 +95,17 @@ fn a_section_or_doc_marker_for_no_effect_is_flagged() {
 fn a_composite_texture_not_bound_or_not_passed_is_flagged() {
     let mut l = engine();
     assert!(
-        (l.textures.iter()).any(|t| t.effect == "dummy" && t.name == "dummy_probe"),
-        "the dummy declares a composite texture"
+        (l.textures.iter()).any(|t| t.effect == "lens_flare" && t.name == "lens_flare_image"),
+        "the lens flare declares a composite texture"
     );
     l.composite = (l.composite.lines())
-        .filter(|line| !line.contains("var dummy_probe"))
+        .filter(|line| !line.contains("var lens_flare_image"))
         .map(|line| line.replace(", bloom_dirt", ""))
         .collect::<Vec<_>>()
         .join("\n");
     let problems = check(&l).join("\n");
     for needle in [
-        "`dummy`'s composite texture `dummy_probe` is not bound at group 1",
+        "`lens_flare`'s composite texture `lens_flare_image` is not bound at group 1",
         "`bloom`'s composite texture `bloom_dirt` is not passed to its function",
     ] {
         assert!(
@@ -121,8 +121,8 @@ fn a_composite_texture_passed_to_another_call_or_out_of_place_is_flagged() {
     let swap = |line: &str| match line.starts_with("    c = ") {
         true => (line
             .replace("bloom_dirt", "@")
-            .replace("dummy_probe", "bloom_dirt"))
-        .replace('@', "dummy_probe"),
+            .replace("lens_flare_image", "bloom_dirt"))
+        .replace('@', "lens_flare_image"),
         false => line.to_string(),
     };
     l.composite = l.composite.lines().map(swap).collect::<Vec<_>>().join("\n");
@@ -137,7 +137,7 @@ fn a_composite_texture_passed_to_another_call_or_out_of_place_is_flagged() {
     }
     l.composite += "\n    c = twin::hdr(c, f, twin_b, twin_a);";
     let problems = check(&l).join("\n");
-    for name in ["bloom_dirt", "dummy_probe", "twin_a", "twin_b"] {
+    for name in ["bloom_dirt", "lens_flare_image", "twin_a", "twin_b"] {
         let needle = format!("composite texture `{name}` is not passed to its function");
         assert!(
             problems.contains(&needle),

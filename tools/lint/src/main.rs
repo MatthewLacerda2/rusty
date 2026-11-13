@@ -1,4 +1,5 @@
-//! tools/lint — project size gate (the custom part clippy can't do).
+//! The lint tool (`tools/lint`): the project size gate (the custom part clippy
+//! can't do).
 //!
 //! Measures each `.rs`, `.py`, `.lua` and `.wgsl` file and fails on any over its cap;
 //! nothing is grandfathered (#926); it holds the agent docs to their shape too

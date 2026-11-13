@@ -5,8 +5,6 @@
 //! `scene::authoring` ops the Inspector calls; an effect's numeric knobs that are a
 //! pair on their own come from its knob table ([`knobs`]).
 
-// lint: allow(dir-size) a flat registry: one file per effect's `Graphics.*` functions, listed in `REGISTRARS`; families already have their folders (`grading`, `lens`)
-
 use super::super::Reg;
 use crate::api::ApiCell;
 use crate::scene::Scene;
@@ -15,8 +13,6 @@ use crate::scene::Scene;
 mod bloom;
 mod custom_effects;
 mod depth_of_field;
-#[cfg(test)]
-mod dummy;
 mod exposure;
 mod fxaa;
 mod grading;
@@ -44,8 +40,6 @@ pub(crate) const REGISTRARS: &[(&str, Registrar)] = &[
     ("color_lookup", color_lookup::register),
     ("custom_effects", custom_effects::register),
     ("depth_of_field", depth_of_field::register),
-    #[cfg(test)]
-    ("dummy", dummy::register),
     ("exposure", exposure::register),
     ("film_grain", film_grain::register),
     ("fxaa", fxaa::register),

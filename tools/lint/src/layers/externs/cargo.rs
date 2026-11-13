@@ -6,6 +6,14 @@
 /// The workspace's own crates (`rusty-<module>`) are modules, not external
 /// crates: the module half of the table holds them.
 pub fn dependencies(manifest: &str) -> Vec<String> {
+    let mut out = keys(manifest);
+    out.retain(|k| !k.starts_with("rusty_"));
+    out
+}
+
+/// Every crate name (`-` read as `_`) under `[dependencies]` and every
+/// `[target.….dependencies]`, the workspace's own included, sorted.
+pub fn keys(manifest: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut in_deps = false;
     for raw in manifest.lines() {
@@ -20,8 +28,7 @@ pub fn dependencies(manifest: &str) -> Vec<String> {
         };
         // `serde.workspace = true` names `serde`.
         let key = key.trim().split('.').next().unwrap_or("");
-        let own = key.starts_with("rusty-") || key.starts_with("rusty_");
-        if key.starts_with(|c: char| c.is_ascii_alphabetic()) && !own {
+        if key.starts_with(|c: char| c.is_ascii_alphabetic()) {
             out.push(key.replace('-', "_"));
         }
     }

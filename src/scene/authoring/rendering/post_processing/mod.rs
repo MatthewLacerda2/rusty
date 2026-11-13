@@ -23,8 +23,6 @@ use crate::scene::authoring::fields::table::Field;
 pub mod bloom;
 pub mod custom_effects;
 pub mod depth_of_field;
-#[cfg(test)]
-pub mod dummy;
 pub mod exposure;
 pub mod grading;
 mod knob;
@@ -50,8 +48,6 @@ pub const EFFECTS: &[Effect] = &[
     color_lookup::EFFECT,
     custom_effects::EFFECT,
     depth_of_field::EFFECT,
-    #[cfg(test)]
-    dummy::EFFECT,
     exposure::EFFECT,
     film_grain::EFFECT,
     lens_flare::EFFECT,
