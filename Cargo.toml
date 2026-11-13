@@ -99,10 +99,10 @@ path = "tests/main.rs"
 [features]
 default = ["editor"]
 # The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.
-dev = ["rusty-scene/dev", "rusty-shadergen/dev", "rusty-asset/dev", "rusty-core/dev", "dep:scorsese-providers", "dep:scorsese-core", "dep:libloading", "dep:getrandom"]
+dev = ["rusty-physics/dev", "rusty-scene/dev", "rusty-shadergen/dev", "rusty-asset/dev", "rusty-core/dev", "dep:scorsese-providers", "dep:scorsese-core", "dep:libloading", "dep:getrandom"]
 # The egui editor (#431): `src/editor` and the shell's editor frontend. Default-on so
 # `cargo run` opens the editor; a shipped player builds with `--no-default-features`.
-editor = ["rusty-shadergen/editor", "rusty-asset/editor", "rusty-core/editor", "dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor", "dep:notify"]
+editor = ["rusty-physics/editor", "rusty-shadergen/editor", "rusty-asset/editor", "rusty-core/editor", "dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor", "dep:notify"]
 
 # The workspace's lint policy lives here, not in command-line flags, so a plain
 # `cargo clippy`, rust-analyzer and CI all read the same rules (#485); every member
@@ -142,6 +142,7 @@ rusty-ecs = { path = "crates/ecs" }
 rusty-scene = { path = "crates/scene" }
 rusty-audio = { path = "crates/audio" }
 rusty-ui = { path = "crates/ui" }
+rusty-physics = { path = "crates/physics" }
 rusty-test-support = { path = "crates/test-support" }
 
 winit = { version = "0.30.13" }
@@ -263,6 +264,7 @@ proptest = { version = "1", default-features = false, features = ["std"] }
 
 [dependencies]
 # The moved modules (crates/), re-exported in src/lib.rs under their old names.
+rusty-physics = { workspace = true }
 rusty-ui = { workspace = true }
 rusty-audio = { workspace = true }
 rusty-scene = { workspace = true }
@@ -284,7 +286,6 @@ mlua = { workspace = true }
 glam = { workspace = true }
 rustc-hash = { workspace = true }
 xxhash-rust = { workspace = true }
-rapier3d = { workspace = true }
 image = { workspace = true }
 ktx2 = { workspace = true }
 bytemuck = { workspace = true }
