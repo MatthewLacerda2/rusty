@@ -60,7 +60,10 @@ fn convex_collider(
     });
     let mut scene = Scene::new();
     let id = scene.add_entity("Hull".to_string());
-    let mut t = scene.world.transform_mut(id).unwrap();
+    let mut t = scene
+        .world
+        .transform_mut(id)
+        .expect("an entity just added has a Transform");
     (t.position, t.rotation, t.scale) = (pos, rot, scale);
     drop(t);
     scene.world.set_static(id, true);
