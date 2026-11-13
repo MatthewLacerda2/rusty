@@ -7,7 +7,7 @@ so this makes them, and lists what it cannot decide:
 
 - `git mv src/<m> crates/<m>/src`, its `mod.rs` becoming `lib.rs`;
 - in the crate's files: `crate::<dep>::` → `rusty_<dep>::` for each module its
-  row of the layer table (`tools/lint/src/layers/table.rs`) lists as a dep, then `crate::<m>::` → `crate::` (in that order, so a
+  row of the layer table (`tools/lint/src/layers/table.rs`) lists as a dep, then `crate::<m>::` → `crate::` and `pub(in crate::<m>)` → `pub(crate)` (in that order, so a
   submodule named like a module, `crate::render::scene::`, stays the crate's
   own), the shared test helper (`crate::test_temp::dir()` →
   `rusty_test_support::temp::dir()`), each `src/<m>/` path it names →
@@ -100,7 +100,8 @@ def rewrite(text: str, module: str, deps: set[str]) -> tuple[str, set[str]]:
 
     # Siblings first: `crate::<m>::scene::` must not read as the sibling `scene`.
     text = re.sub(r"(?<![\w$])crate::(\w+)::", sibling, text)
-    text = text.replace(f"crate::{module}::", "crate::")
+    # `pub(in crate::<m>)` named the module's root, which is now the crate's own.
+    text = re.sub(rf"\bpub\(in crate::{module}\)", "pub(crate)", text.replace(f"crate::{module}::", "crate::"))
     text = text.replace("crate::test_temp::dir()", "rusty_test_support::temp::dir()")
     text = re.sub(rf"(?<![\w/])src/{module}/mod\.rs", f"crates/{module}/src/lib.rs", text)
     text = re.sub(rf"(?<![\w/])src/{module}/", f"crates/{module}/src/", text)

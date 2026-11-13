@@ -26,7 +26,7 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
    crates/<m>/src/lib.rs`. Its `#![deny(clippy::unwrap_used)]` (a sim row) or its
    clock opt-out (a platform row) stays at the top of `lib.rs`.
 2. Inside the crate: `crate::<dep>::` → `rusty_<dep>::` for each dep in its table
-   row, then `crate::<m>::` → `crate::` (siblings first, so a submodule named like a
+   row, then `crate::<m>::` → `crate::` and `pub(in crate::<m>)` → `pub(crate)` (siblings first, so a submodule named like a
    module, `crate::render::scene::`, stays the crate's own). A module the row does
    not list is left alone and listed: it is a unit test reaching up (*What the
    compiler will name*). Headers that name a path (`//! src/<m>/x.rs — …`) become

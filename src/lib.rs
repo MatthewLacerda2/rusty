@@ -11,7 +11,6 @@ pub mod ai;
 pub mod api;
 pub mod app;
 pub mod audio;
-pub mod ecs;
 #[cfg(feature = "editor")]
 pub mod editor;
 pub mod logging;
@@ -30,6 +29,7 @@ pub mod ui;
 pub use rusty_asset as asset;
 pub use rusty_components as components;
 pub use rusty_core as core;
+pub use rusty_ecs as ecs;
 pub use rusty_procgen as procgen;
 pub use rusty_shadergen as shadergen;
 pub use rusty_time as time;

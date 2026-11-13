@@ -1,6 +1,6 @@
 //! src/render/scene/equivalence_tests.rs — after any edit sequence the retained
 //! objects and their object-table records equal a build from scratch (#1706): the
-//! ECS write paths of `ops_tests`, the inputs the log does not cover (library,
+//! ECS write paths of `changes::ops`, the inputs the log does not cover (library,
 //! overrides, lightmaps and a bake's light record (`in_bake`, #1750), probes, a
 //! capture, a re-uploaded shared mesh, the blend between two ticks, #1877), the shadow ops (`shadow_ops`) and the baked
 //! PVS's binding (`occlusion::ops`, #1714), with a second kept scene holding the

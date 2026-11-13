@@ -138,6 +138,7 @@ rusty-asset = { path = "crates/asset" }
 rusty-procgen = { path = "crates/procgen" }
 rusty-shadergen = { path = "crates/shadergen" }
 rusty-components = { path = "crates/components" }
+rusty-ecs = { path = "crates/ecs" }
 rusty-test-support = { path = "crates/test-support" }
 
 winit = { version = "0.30.13" }
@@ -259,6 +260,7 @@ proptest = { version = "1", default-features = false, features = ["std"] }
 
 [dependencies]
 # The moved modules (crates/), re-exported in src/lib.rs under their old names.
+rusty-ecs = { workspace = true }
 rusty-components = { workspace = true }
 rusty-shadergen = { workspace = true }
 rusty-procgen = { workspace = true }
@@ -274,7 +276,6 @@ egui-winit = { workspace = true, optional = true }
 egui-phosphor = { workspace = true, optional = true }
 mlua = { workspace = true }
 glam = { workspace = true }
-hecs = { workspace = true }
 rustc-hash = { workspace = true }
 xxhash-rust = { workspace = true }
 rapier3d = { workspace = true }

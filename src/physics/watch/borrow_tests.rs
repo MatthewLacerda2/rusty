@@ -12,7 +12,7 @@ use super::tests::{agree, Twin};
 /// meets two new contact pairs at once, whose order the twins must agree on.
 #[test]
 fn a_collider_reparented_under_a_body_steps_alike() {
-    use crate::ecs::changes::ops_tests::{Edit, Op as W};
+    use crate::ecs::changes::ops::{Edit, Op as W};
     let s = Op::Step;
     let ops = [
         s.clone(),
@@ -51,7 +51,7 @@ fn a_collider_reparented_under_a_body_steps_alike() {
 /// on later steps, and re-enabled it steps alike again.
 #[test]
 fn a_disabled_kinematic_body_that_moved_steps_alike() {
-    use crate::ecs::changes::ops_tests::{Edit, Op as W};
+    use crate::ecs::changes::ops::{Edit, Op as W};
     agree(&[
         Op::Settle,
         Op::World(W::On(4, Edit::SetActive(false))),
