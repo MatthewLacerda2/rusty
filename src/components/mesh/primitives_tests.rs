@@ -3,7 +3,9 @@
 //! every lightmap UV inside [0, 1] and no two faces sharing one. And the Capsule's
 //! shape (#1191).
 
-use glam::Vec3;
+use glam::{Vec2, Vec3};
+
+use crate::asset::lightmap_uv::interiors_overlap;
 
 use super::primitives::{
     generate_box, generate_capsule, generate_cylinder, generate_plane, generate_sphere,
@@ -62,6 +64,29 @@ fn round_primitives_get_a_generated_lightmap_uv() {
         let uvs = vertices.iter().flat_map(|v| v.lightmap_uv);
         assert!(uvs.clone().all(|c| (0.0..=1.0).contains(&c)));
         assert!(uvs.into_iter().any(|c| c > 0.0), "#831 unwraps them");
+    }
+}
+
+/// The Sphere's generated lightmap UV, as the primitive builds it: no two triangles
+/// with surface share lightmap texels (asset's own sphere test runs a copy of this
+/// layout, since `components` sits above it).
+#[test]
+fn the_sphere_lightmap_uv_never_overlaps() {
+    let (vertices, indices) = generate_sphere(1.0, 8, 8);
+    let corner = |i: u32| &vertices[i as usize];
+    let tris: Vec<[Vec2; 3]> = indices
+        .chunks_exact(3)
+        .filter(|t| {
+            let [p, q, r] = [0, 1, 2].map(|k| Vec3::from(corner(t[k]).position));
+            (q - p).cross(r - p).length() > 1e-6
+        })
+        .map(|t| [0, 1, 2].map(|k| Vec2::from(corner(t[k]).lightmap_uv)))
+        .collect();
+    assert!(tris.len() > 64, "the pole fans are dropped, the bands kept");
+    for (i, a) in tris.iter().enumerate() {
+        for (j, b) in tris.iter().enumerate().skip(i + 1) {
+            assert!(!interiors_overlap(a, b, 1e-6), "tris {i} and {j} overlap");
+        }
     }
 }
 

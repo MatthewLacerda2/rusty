@@ -26,6 +26,11 @@ mod chart;
 mod overlap;
 mod pack;
 
+/// Whether two UV triangles' interiors overlap (a shared edge or corner is not
+/// overlap): the check a generated lightmap UV holds, and the one a mesh's own
+/// tests run on its unwrap (`components::mesh`'s primitives).
+pub use overlap::interiors_overlap;
+
 use serde::{Deserialize, Serialize};
 
 use super::mesh_data::{MeshVertex, SubMesh};
