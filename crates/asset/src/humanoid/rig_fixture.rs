@@ -72,6 +72,7 @@ pub fn rig(shape: Shape) -> SkinData {
     let down = Quat::from_rotation_z(-shape.arm_down);
     let face = Quat::from_rotation_y(shape.facing);
     let shoulder = Vec3::from(BONES[LEFT_UPPER_ARM].2) * shape.height;
+    // lint: allow(world-space) a test rig's joint chain in model space, not the scene hierarchy
     let inherited = shape.armature.to_scale_rotation_translation().0;
     // Model-space joint globals; a bone inherits the armature's scale.
     let globals: Vec<Mat4> = (BONES.iter().enumerate())
@@ -89,8 +90,9 @@ pub fn rig(shape: Shape) -> SkinData {
     let local_bind = (BONES.iter().enumerate())
         .map(|(slot, (_, parent, _))| {
             let parent = parent.map_or(root_parent, |p| globals[p]);
-            let (scale, rotation, translation) =
-                (parent.inverse() * globals[slot]).to_scale_rotation_translation();
+            let local = parent.inverse() * globals[slot];
+            // lint: allow(world-space) a test rig's joint chain in model space, not the scene hierarchy
+            let (scale, rotation, translation) = local.to_scale_rotation_translation();
             JointTransform {
                 translation,
                 rotation,
@@ -178,6 +180,7 @@ pub fn walk(skin: &SkinData) -> AnimationClip {
 pub fn lunge(skin: &SkinData, travel: Vec3, turn: f32) -> AnimationClip {
     let parent = skin.mesh_to_model() * skin.root_offset(HIPS);
     let rest = skin.local_bind[HIPS];
+    // lint: allow(world-space) a test rig's joint chain in model space, not the scene hierarchy
     let (_, spin, _) = parent.to_scale_rotation_translation();
     let times = vec![0.0, 0.5, 1.0];
     let key = |t: f32| {

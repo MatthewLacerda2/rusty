@@ -1,4 +1,4 @@
-//! crates/asset/src/ — the headless 3D-asset importer (issue #74).
+//! crates/asset/src/lib.rs — the headless 3D-asset importer (issue #74).
 //!
 //! Turns an authored source file (glTF 2.0 `.gltf`/`.glb`, Wavefront `.obj`, or an
 //! `.fbx`/`.blend` read through the glTF it is converted to, `convert`) into

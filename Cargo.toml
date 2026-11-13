@@ -269,18 +269,12 @@ egui-winit = { workspace = true, optional = true }
 egui-phosphor = { workspace = true, optional = true }
 mlua = { workspace = true }
 glam = { workspace = true }
-bevy_mikktspace = { workspace = true }
 hecs = { workspace = true }
 rustc-hash = { workspace = true }
 xxhash-rust = { workspace = true }
 rapier3d = { workspace = true }
 image = { workspace = true }
 ktx2 = { workspace = true }
-block_compression = { workspace = true }
-tobj = { workspace = true }
-gltf = { workspace = true }
-ufbx = { workspace = true }
-meshopt = { workspace = true }
 bytemuck = { workspace = true }
 env_logger = { workspace = true }
 log = { workspace = true }
@@ -293,7 +287,6 @@ gilrs = { workspace = true }
 notify = { workspace = true, optional = true }
 arboard = { workspace = true }
 kira = { workspace = true }
-symphonia = { workspace = true }
 zimmer = { workspace = true }
 scorsese-providers = { workspace = true, optional = true }
 scorsese-core = { workspace = true, optional = true }

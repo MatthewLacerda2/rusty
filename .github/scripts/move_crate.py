@@ -26,7 +26,8 @@ so this makes them, and lists what it cannot decide:
   forwarded (`"rusty-y/dev"`); a `dev` / `editor` the code tests with
   `cfg(feature = …)` is declared;
 - the root: the crate in `[workspace.dependencies]` and `[dependencies]`, the
-  feature forwards, and `src/lib.rs`'s `pub mod <m>;` → `pub use rusty_<m> as <m>;`.
+  feature forwards, each external crate the crate took that nothing left in the
+  root names dropped from its `[dependencies]`, and `src/lib.rs`'s `pub mod <m>;` → `pub use rusty_<m> as <m>;`.
   A `pub mod` gated by `#[cfg(feature = "f")]` stays gated: the root depends on
   the crate optionally, its feature `f` turns it on (`"dep:rusty-<m>"`), and the
   re-export carries the same `cfg`.
@@ -307,6 +308,23 @@ def reaim_outside(root: Path, module: str) -> list[str]:
     return changed
 
 
+def leave_root(root: Path, module: str, externs_: list[str]) -> list[str]:
+    """Drop from the root's `[dependencies]` each external crate the moved crate takes
+    that no `.rs` file left outside `crates/` names; the crates dropped."""
+    left = subprocess.run(["git", "-C", str(root), "ls-files", "--", "*.rs", f":(exclude){layout.CRATES}/**"],
+                          capture_output=True, text=True, check=False).stdout.split()
+    code = "\n".join((root / f).read_text() for f in left if (root / f).is_file())
+    cargo = (root / "Cargo.toml").read_text()
+    gone = [d for d in externs_ if not externs(code, [d])
+            and re.search(rf"^\[dependencies\]\n(?:.*\n)*?{re.escape(d)} = \{{ workspace = true \}}\n", cargo, re.M)]
+    for d in gone:
+        section = cargo.index("\n[dependencies]\n")
+        cargo = cargo[:section] + re.sub(rf"^{re.escape(d)} = \{{ workspace = true \}}\n", "",
+                                         cargo[section:], count=1, flags=re.M)
+    (root / "Cargo.toml").write_text(cargo)
+    return gone
+
+
 def outside(root: Path, module: str) -> list[str]:
     """Each tracked file outside the crate still naming `src/<m>/`, with its lines."""
     done = subprocess.run(["git", "-C", str(root), "grep", "-n", "-F", f"src/{module}/", "--", ".",
@@ -362,6 +380,9 @@ def move(root: Path, module: str) -> list[str]:
     declared = [f for f in FEATURES if plan.features[f] or f in used]
     wire_root(root, module, declared, hand)
     reaim_outside(root, module)
+    gone = leave_root(root, module, normal)
+    if gone:
+        hand.append(f"Cargo.toml: {', '.join(gone)} left the root's [dependencies] (only the crate names them now)")
     return hand + outside(root, module)
 
 

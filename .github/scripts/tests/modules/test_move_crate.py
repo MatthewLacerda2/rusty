@@ -107,6 +107,11 @@ class Move(unittest.TestCase):
         self.assertIn('include_str!("../cache.rs")', inc, "a file inside the crate moved with it")
         self.assertIn('include_bytes!("../../crates/asset/src/cache.rs")', self.read("src/dev/mp3.rs"))
 
+    def test_a_crate_only_the_moved_code_names_leaves_the_root(self):
+        cargo = self.read("Cargo.toml").split("[dependencies]")[1]
+        self.assertNotIn("glam", cargo)
+        self.assertIn("glam left the root's [dependencies]", "\n".join(self.hand))
+
     def test_a_module_with_no_row_is_refused(self):
         (self.root / "src/orphan").mkdir()
         with self.assertRaises(SystemExit):
