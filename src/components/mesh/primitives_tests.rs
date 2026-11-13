@@ -67,27 +67,38 @@ fn round_primitives_get_a_generated_lightmap_uv() {
     }
 }
 
-/// The Sphere's generated lightmap UV, as the primitive builds it: no two triangles
-/// with surface share lightmap texels (asset's own sphere test runs a copy of this
-/// layout, since `components` sits above it).
+/// The Sphere's generated lightmap UV, as the primitive builds it, held to asset's
+/// `assert_valid`: no two triangles share lightmap texels, and every one with surface
+/// has UV area (asset's own sphere test runs a copy of this layout, since
+/// `components` sits above it).
 #[test]
 fn the_sphere_lightmap_uv_never_overlaps() {
     let (vertices, indices) = generate_sphere(1.0, 8, 8);
     let corner = |i: u32| &vertices[i as usize];
-    let tris: Vec<[Vec2; 3]> = indices
+    let tris: Vec<[u32; 3]> = indices
         .chunks_exact(3)
-        .filter(|t| {
-            let [p, q, r] = [0, 1, 2].map(|k| Vec3::from(corner(t[k]).position));
-            (q - p).cross(r - p).length() > 1e-6
-        })
-        .map(|t| [0, 1, 2].map(|k| Vec2::from(corner(t[k]).lightmap_uv)))
+        .map(|t| [t[0], t[1], t[2]])
         .collect();
-    assert!(tris.len() > 64, "the pole fans are dropped, the bands kept");
+    let uv = |t: &[u32; 3]| t.map(|i| Vec2::from(corner(i).lightmap_uv));
+    let mut surfaced = 0;
     for (i, a) in tris.iter().enumerate() {
+        let [p, q, r] = a.map(|k| Vec3::from(corner(k).position));
+        if (q - p).cross(r - p).length() > 1e-6 {
+            let [u0, u1, u2] = uv(a);
+            assert!(
+                (u1 - u0).perp_dot(u2 - u0).abs() > 0.0,
+                "tri {i} has UV area"
+            );
+            surfaced += 1;
+        }
         for (j, b) in tris.iter().enumerate().skip(i + 1) {
-            assert!(!interiors_overlap(a, b, 1e-6), "tris {i} and {j} overlap");
+            assert!(
+                !interiors_overlap(&uv(a), &uv(b), 1e-6),
+                "tris {i} and {j} overlap"
+            );
         }
     }
+    assert!(surfaced > 64, "the bands have surface");
 }
 
 /// Every capsule vertex lies `radius` off the inner segment, the ends reach the

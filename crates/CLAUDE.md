@@ -30,7 +30,8 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
    module, `crate::render::scene::`, stays the crate's own). A module the row does
    not list is left alone and listed: it is a unit test reaching up (*What the
    compiler will name*). Headers that name a path (`//! src/<m>/x.rs — …`) become
-   `crates/<m>/src/x.rs` (`make rules`, `self-path`). A relative `include_str!` /
+   `crates/<m>/src/x.rs` (`make rules`, `self-path`), and `lib.rs`'s, which as a
+   `mod.rs` may have named its directory (`//! src/<m> — …`), names `lib.rs`. A relative `include_str!` /
    `include_bytes!` is re-aimed from the file's new folder, in the crate and in any
    file outside whose include names a file of the crate.
 3. `crates/<m>/Cargo.toml`: `version`, `edition` and `publish` `.workspace = true`;
