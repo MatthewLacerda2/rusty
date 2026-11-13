@@ -84,10 +84,7 @@ fn a_saved_scene_never_names_the_import_cache() {
 #[test]
 fn a_texture_on_disk_beside_the_fbx_is_saved_as_its_own_path() {
     let dir = rusty_test_support::temp::dir();
-    let fixture = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/fixtures/models/missing_texture.fbx"
-    );
+    let fixture = rusty_core::project::checkout().join("tests/fixtures/models/missing_texture.fbx");
     let path = dir.join("tri.fbx");
     std::fs::copy(fixture, &path).unwrap();
     // The FBX names it `gone.png`, relative to itself.

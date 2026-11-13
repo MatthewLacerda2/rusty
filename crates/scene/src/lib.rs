@@ -58,10 +58,6 @@ pub mod prefab;
 pub mod rehydrate;
 pub mod revision;
 pub mod runtime;
-#[expect(
-    clippy::module_inception,
-    reason = "`scene::scene` holds the `Scene` type; renaming the file churns every import for no gain"
-)]
 pub mod scene;
 pub mod serialize;
 pub mod settings;

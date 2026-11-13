@@ -19,7 +19,6 @@ pub enum Skip<'a> {
     SinceGet(&'a Map<String, Value>),
     /// None: every key runs its op (the round-trip tests drive the ops). A test
     /// hook: compiled in every build, since `api`'s round-trip tests are another crate's.
-    #[doc(hidden)]
     Nothing,
 }
 

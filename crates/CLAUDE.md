@@ -30,8 +30,10 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
    nearest `lib.rs`, now the crate's, and left at the root they never replay (the
    `orphan-seeds` lint fails on one).
 2. Inside the crate: `crate::<dep>::` → `rusty_<dep>::` for each dep in its table
-   row, then `crate::<m>::` → `crate::` and `pub(in crate::<m>)` → `pub(crate)` (siblings first, so a submodule named like a
-   module, `crate::render::scene::`, stays the crate's own). A module the row does
+   row (a macro's `$crate::<dep>::` → `::rusty_<dep>::`; a file importing the module
+   bare, `use crate::<dep>;` or `{self, …}`, has its `<dep>::` paths rewritten), then
+   `crate::<m>::` → `crate::` and `pub(in crate::<m>)` → `pub(crate)` (siblings
+   first, so a submodule named like a module, `crate::render::scene::`, stays the crate's own). A module the row does
    not list is left alone and listed: it is a unit test reaching up (*What the
    compiler will name*). Headers that name a path (`//! src/<m>/x.rs — …`) become
    `crates/<m>/src/x.rs` (`make rules`, `self-path`), and `lib.rs`'s, which as a
@@ -67,7 +69,8 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
   dev-dependency (a proptest strategy) is a `#[doc(hidden)] #[macro_export]` macro,
   expanded in the caller's test against the caller's dev-dependency
   (`rusty_ecs::edit_ops!`). Instrumentation kept under `#[cfg(test)]` (a counter a
-  test reads) is compiled in too, off until a test arms it (`ecs::world::walks`). A
+  test reads) is compiled in too, off until a test arms it (`ecs::world::walks`), or
+  off unless the value was built counting (`scene::lighting::lightmap::Rays::counted`). A
   whole file that is test fixture (`ecs::changes::ops`) goes in `.cargo/mutants.toml`'s
   `exclude_globs`, so mutation never asks a test of it.
   Never a `test-support` feature: a dev-dependency feature the normal build lacks
@@ -75,11 +78,16 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
 - **Shared test helpers** live in `rusty-test-support` (`crates/test-support/`),
   only ever a dev-dependency: the per-test temp dir (`temp::dir`), the rebake
   contract (`rebakes::follows_rebakes`), the embedded model files (`models`,
-  `models::anim`), `.cube` lookups as text (`luts`) and the warnings a test logged
+  `models::anim`, `models::quad_file` on disk), a sky panorama on disk
+  (`panorama::fixture`), `.cube` lookups as text (`luts`) and the warnings a test logged
   (`logs::init`, `logs::take`: the root's `logging` sits above every member). A
   crate's tests call it directly; the root keeps `crate::test_temp` as a re-export
   beside its `lua_path`. A fixture that is plain data moves here; one built on a
   crate's types is a test hook instead.
+- **An inherent `impl` a module above writes for a moved crate's type** no longer
+  builds (E0116): a method on the type's own data moves into the crate beside it
+  (`scene::nav_settings::NavMeshSettings::define_area`), a helper only the module
+  above needs becomes its free function (`navigation::bounds`' `grown`).
 - **A unit test that reaches into another module** (its items or its private ones)
   moves to that module's tests, or to `tests/`. One reaching *up* (a module above
   the crate, which no crate may depend on) splits: the crate keeps its own half,

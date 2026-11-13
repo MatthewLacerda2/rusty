@@ -40,11 +40,14 @@ auxmd.md
 /tests/fixtures/project/assets/scripts/*
 !/tests/fixtures/project/assets/scripts/bot_player.lua
 
-# In-process tests run with the checkout as their working directory, so what they
-# seed or bake (project-relative paths) lands here. The engine's own content is
-# engine/, so nothing tracked lives under these.
+# In-process tests run with their package's folder as their working directory (the
+# checkout for the root's, `crates/<m>/` for a member's), so what they seed or bake
+# (project-relative paths) lands there. The engine's own content is engine/, so
+# nothing tracked lives under these.
 /assets/
 /.seeded
+/crates/*/assets/
+/crates/*/.seeded
 
 # Lint reports
 .lint/

@@ -9,4 +9,15 @@ test_workspace = true
 # Test fixture compiled as normal code, so other crates' tests can reach it: a mutant
 # there changes what a test feeds the World, never what the engine does, so no test
 # is owed for it (crates/CLAUDE.md, *Test hooks*).
-exclude_globs = ["crates/ecs/src/changes/ops.rs"]
+exclude_globs = [
+  "crates/ecs/src/changes/ops.rs",
+  "crates/scene/src/asset_instance/collision/chair.rs",
+  "crates/scene/src/asset_instance/humanoid_fixture.rs",
+  "crates/scene/src/lighting/lightmap/trace/bench.rs",
+  "crates/scene/src/lighting/occlusion/bench/**",
+  "crates/scene/src/lighting/occlusion/test_gap.rs",
+  "crates/scene/src/lighting/occlusion/test_level.rs",
+  "crates/scene/src/lighting/placement/test_level.rs",
+  "crates/scene/src/lighting/placement/test_sites.rs",
+  "crates/scene/src/skeleton/rig.rs",
+]
