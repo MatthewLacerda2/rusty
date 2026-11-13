@@ -11,9 +11,10 @@ so this makes them, and lists what it cannot decide:
   submodule named like a module, `crate::render::scene::`, stays the crate's
   own), the shared test helper (`crate::test_temp::dir()` →
   `rusty_test_support::temp::dir()`), each `src/<m>/` path it names →
-  `crates/<m>/src/`, and each relative `include_str!` / `include_bytes!` path
-  re-aimed from the file's new folder (in any tracked file whose include names a
-  file of the crate, too);
+  `crates/<m>/src/`, `lib.rs`'s header naming its directory (`//! src/<m> — …`,
+  as the `mod.rs` it was may) → `crates/<m>/src/lib.rs` (`lib_header`), and each
+  relative `include_str!` / `include_bytes!` path re-aimed from the file's new
+  folder (in any tracked file whose include names a file of the crate, too);
 - `crates/<m>/Cargo.toml`: the workspace's package fields and lints, the sibling
   crates it now names, and the external crates of the root's
   `[workspace.dependencies]` its code names (by `name::`, as the layer lint
@@ -109,9 +110,9 @@ def rewrite(text: str, module: str, deps: set[str]) -> tuple[str, set[str]]:
 
 def lib_header(text: str, module: str) -> str:
     """`text` with a leading `//! src/<m>` or `//! crates/<m>/src/` header naming `lib.rs`
-    instead. A `mod.rs` header may name its directory, which `lib.rs`'s may not, and the
-    bare `src/<m>` (no trailing `/`) reads as prose to `self-path`: the rewrite left
-    `shadergen`'s `//! src/shadergen — …` a stale path no gate flagged (#2140)."""
+    instead. A `mod.rs` header may name its directory, which `lib.rs`'s may not: the
+    rewrite once left `shadergen`'s `//! src/shadergen — …` a stale path, which
+    `self-path` now flags (#2140)."""
     lines = text.split("\n")
     for n, line in enumerate(lines):
         if line.startswith("//! "):

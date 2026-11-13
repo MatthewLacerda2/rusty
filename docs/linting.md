@@ -69,7 +69,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
 | Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `src/editor` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); an editor slider is built by `editor::widgets::slider`, never a bare `egui::Slider::new(`, whose default clamping does the same (#1444); a real need takes `// lint: allow(drag-range) <why>` |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
-| Self-naming headers | `tools/lint -- --rules` (`self-path`) | **hard gate**: a source file's first `//!` line (a shader's first `//` line) that opens with a path under `src/`, `tests/`, `tools/`, `fuzz/`, `engine/` or `.github/` names the file itself; a `mod.rs` may name its directory (`src/scene/prefab/`). No header, or one opening with prose, is fine (#1654) |
+| Self-naming headers | `tools/lint -- --rules` (`self-path`) | **hard gate**: a source file's first `//!` line (a shader's first `//` line) that opens with a path under `src/`, `crates/`, `tests/`, `tools/`, `fuzz/`, `engine/` or `.github/` (a bare word too, when it names a directory of scanned files) names the file itself; a `mod.rs` may name its directory (`src/scene/prefab/`). No header, or one opening with prose, is fine (#1654) |
 | Shared process | `make test-one-process` (`cargo test --features dev --tests`) | **signal**, never a gate: the `dev` suite with every test of a binary in one process, so a test leaking process-wide state (a moved working directory, a `static` left set), which nextest's process per test hides, is named (it broke the mutation baseline four times while cargo-mutants ran `cargo test`, #1844). Nightly on `main` in `cargo-test.yml` (both feature sets), filed by `main-health` when red; `gh workflow run cargo-test.yml --ref <branch>` runs it on a branch (#1338) |
 | Shipped platforms only | `tools/lint -- --rules` (`platform-cfg`) | **hard gate**: no `cfg(…)` / `cfg!(…)` / `cfg_attr(…)` in a scanned `.rs` file names `windows` or `unix` (bare, `target_os = "windows"`, or as a `target_family` value) — rusty ships for macOS and Linux, so the code is written unconditionally and a real split names `target_os = "macos"` / `"linux"` |
 | Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
@@ -521,8 +521,11 @@ new flag, gate, CI step or baseline.
   #1650 doc audit fixed about 35 by hand. When a file's first `//!` line (a `.wgsl`
   shader's first line, `// …`) opens with a path under a repository root, that path
   must be the file's own, or for a `mod.rs` its directory, `src/scene/prefab/` or
-  `src/scene/prefab/mod.rs`. A path has an extension (a file) or a trailing `/` (a directory),
-  so `tools/lint` in prose is not one. A finding names the expected path; a header
+  `src/scene/prefab/mod.rs`. A path has an extension (a file) or a trailing `/` (a
+  directory), or is a bare word naming a directory that holds scanned files, at its
+  real path or its module path (`tools/lint`, or `src/core` once `core` is a crate),
+  so a stale `//! src/<m> — …` in a moved `lib.rs` is caught; a word naming no such
+  directory is prose. A finding names the expected path; a header
   naming another file on purpose carries `// lint: allow(self-path) <why>`. The rule
   never asks for a header (`rules/self_path.rs`).
 - **`skip`** — an ignored test reads as passing to anyone who reads only the

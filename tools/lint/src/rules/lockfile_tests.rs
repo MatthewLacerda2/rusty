@@ -1,6 +1,6 @@
-//! `tools/lint` is held to the policy it enforces (#935): std-only, so its
-//! `Cargo.lock` names exactly one package, itself. A dependency is a decision, not
-//! a drive-by; drop this test only with the issue that makes it.
+//! The lint tool (`tools/lint`) is held to the policy it enforces (#935): std-only,
+//! so its `Cargo.lock` names exactly one package, itself. A dependency is a
+//! decision, not a drive-by; drop this test only with the issue that makes it.
 
 fn packages(lock: &str) -> usize {
     lock.lines().filter(|l| l.trim() == "[[package]]").count()
