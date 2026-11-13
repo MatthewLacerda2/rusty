@@ -19,7 +19,6 @@ pub mod preview;
 pub mod render;
 pub mod scripting;
 pub mod shell;
-pub mod ui;
 
 // The modules already moved into crates of their own (crates/CLAUDE.md), under their
 // old names, so every `crate::core::…` path here and `rusty::core::…` path in
@@ -33,6 +32,7 @@ pub use rusty_procgen as procgen;
 pub use rusty_scene as scene;
 pub use rusty_shadergen as shadergen;
 pub use rusty_time as time;
+pub use rusty_ui as ui;
 
 #[cfg(feature = "dev")]
 pub mod dev;

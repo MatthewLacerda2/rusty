@@ -297,7 +297,10 @@ new flag, gate, CI step or baseline.
   `scene::authoring::rendering::post_processing` (#1467), so there an op the module
   calls by its bare name (`set_intensity(c, v.intensity)`) counts as reached too.
   Ops are matched by
-  path: each file's `use crate::scene::authoring::…` trees give its aliases
+  path, from the root a file spells `scene::authoring` by: `crate::authoring` inside
+  `rusty-scene`, `rusty_scene::authoring` in another member crate,
+  `crate::scene::authoring` in the root package. Each file's `use` trees from that
+  root give its aliases
   (`rigidbody as rb`, `{self as ops, …}`, `nav::{agent, …}`, a setter imported by
   name and called bare), so the finding names `nav::agent::set_speed` however a file
   spells it. An op only the inspector may write (a display toggle) takes

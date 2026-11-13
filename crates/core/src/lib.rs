@@ -20,3 +20,8 @@ pub mod random;
 pub mod settings;
 pub mod storage;
 pub mod wake;
+
+/// serde, for [`named_enum!`]'s expansion: a crate calling the macro needs no serde
+/// dependency of its own.
+#[doc(hidden)]
+pub use serde as __serde;

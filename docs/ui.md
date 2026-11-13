@@ -79,7 +79,7 @@ Screen pixels are the same frame multiplied by the scale factor — also bottom-
 
 ## Layout
 
-Layout **runs in the sim, on the CPU** (`src/ui/layout/`). No GPU is involved, so the
+Layout **runs in the sim, on the CPU** (`crates/ui/src/layout/`). No GPU is involved, so the
 headless harness has exactly the window's layout and a bot can reason about — and, with
 #420, click — the UI.
 
@@ -284,7 +284,7 @@ memoised per font (it is size-free), so auto-size and a HUD redrawn every frame 
 each string once.
 
 **Layout is CPU, in the sim's terms.** Measuring, wrapping, overflow and auto-size
-(`src/ui/text/`) never touch the GPU: headless layout is the window's, and
+(`crates/ui/src/text/`) never touch the GPU: headless layout is the window's, and
 `Text.GetPreferredSize` and the layout groups read the same numbers the
 renderer draws. Coordinates are rect-local reference units.
 
@@ -504,7 +504,7 @@ UI.SetShaderParam(healthBar, "glitch_slices.amount", 16)       -- on hit; ease i
 ## Interaction
 
 Unity's `EventSystem`, `StandaloneInputModule` and `GraphicRaycaster`, run **in the
-sim, on the CPU** (`src/ui/events/`): a headless run clicks exactly what a window
+sim, on the CPU** (`crates/ui/src/events/`): a headless run clicks exactly what a window
 would, and a replay of the same inputs fires the same callbacks. Once per tick, at
 the head of the script phase (after `Awake`/`Start`, before `Update`), the event
 system reads this tick's input and last tick's settled layout and fires the UI
@@ -762,7 +762,7 @@ Each widget's inspector fields (its script's `fields` schema) and owner API:
 UI that lives in the 3D world (#429): diegetic displays, visor HUDs and markers
 over enemies. Layout is unchanged — every canvas lays out in its own reference
 units — and one question decides the rest: where do those units end up
-(`src/ui/space.rs`)?
+(`crates/ui/src/space.rs`)?
 
 - **`WorldSpace`** — a quad in the scene. Its rect is the reference resolution
   (scale factor 1), `pixels_per_unit` reference units to the metre, centred on the
@@ -863,7 +863,7 @@ view's pixel size into the `ScreenSize` resource every frame; a headless run nev
 it, and the `Video` resolution stands in. The native texture sizes an `Image` measures by
 are read from the files before each tick (see *Layout groups*), so they are an input too.
 Same (seed, inputs, dt, screen size, texture files) ⇒ same
-layout — and the same hits and UI callbacks. `src/ui` sits under the determinism and
+layout — and the same hits and UI callbacks. `crates/ui/src` sits under the determinism and
 direction guards: no wall clock, no unseeded RNG, and no `render` / `editor` / `wgpu` / `egui` imports.
 
 ## Pausing under a menu

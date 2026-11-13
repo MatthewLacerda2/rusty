@@ -76,7 +76,9 @@ def code_only(text: str) -> str:
                 out.append("\n" if text[at] == "\n" else "")
                 at += 2 if text[at:at + 2] in ("/*", "*/") else 1
         elif (raw := RAW.match(text, at)) and (at == 0 or not IDENT.match(text[at - 1])):
-            end = text.find('"' + raw.group(1), at + raw.end())
+            # `raw.end()` is already absolute: adding `at` again blanked the rest of a file whose
+            # raw string sat past offset 0 (PR #2157's review).
+            end = text.find('"' + raw.group(1), raw.end())
             end = n if end < 0 else end + 1 + len(raw.group(1))
             out.append("\n" * text.count("\n", at, end))
             at = end

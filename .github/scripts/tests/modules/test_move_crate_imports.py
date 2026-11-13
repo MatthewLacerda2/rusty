@@ -20,6 +20,13 @@ class BareImport(unittest.TestCase):
         text, _ = mover.rewrite("use crate::asset::{self, A};\nfn f() { asset::load(); }\n", "scene", {"asset"})
         self.assertEqual(text, "use rusty_asset::{A};\nfn f() { rusty_asset::load(); }\n")
 
+    def test_a_self_not_first_or_alone_goes_too(self):
+        text, _ = mover.rewrite("use crate::asset::{A, self};\nfn f() { asset::load(); }\n", "scene", {"asset"})
+        self.assertEqual(text, "use rusty_asset::{A};\nfn f() { rusty_asset::load(); }\n")
+        text, named = mover.rewrite("#[cfg(test)]\nuse crate::asset::{self};\nfn f() { asset::a(); }\n", "scene", {"asset"})
+        self.assertEqual(text, "fn f() { rusty_asset::a(); }\n")
+        self.assertEqual(named, {"asset"})
+
     def test_a_path_through_another_module_is_left_alone(self):
         text, _ = mover.rewrite("use crate::asset;\nfn f() { asset::a(); x::asset::b(); }\n", "scene", {"asset"})
         self.assertIn("x::asset::b()", text)
@@ -48,6 +55,8 @@ class BareImport(unittest.TestCase):
         self.assertEqual(text, "pub use rusty_asset::{self as asset, A};\n")
         text, _ = mover.rewrite("pub(crate) use crate::asset::{self};\n", "scene", {"asset"})
         self.assertEqual(text, "pub(crate) use rusty_asset::{self as asset};\n")
+        text, _ = mover.rewrite("pub use crate::asset::{A, self};\n", "scene", {"asset"})
+        self.assertEqual(text, "pub use rusty_asset::{A, self as asset};\n")
 
 
 class MacroCrate(unittest.TestCase):
@@ -68,6 +77,9 @@ class Comments(unittest.TestCase):
     def test_a_trailing_comment_a_block_comment_or_a_string_is_no_dependency(self):
         code = 'fn f() {} // wgpu::x\n/* a\n wgpu::Limits */\nconst S: &str = "wgpu::y";\n'
         self.assertEqual(mover.externs(code, ["wgpu"]), [])
+        for raw in ('r"wgpu::a"', 'r#"wgpu::"a"#', 'br"wgpu::b"'):
+            self.assertEqual(mover.externs(f"fn f() {{ let s = {raw}; }}\n", ["wgpu"]), [])
+            self.assertEqual(mover.externs(f"fn f() {{ let s = {raw}; wgpu::x(); }}\n", ["wgpu"]), ["wgpu"])
 
     def test_one_the_code_names_still_is(self):
         self.assertEqual(mover.externs("// note\nfn f() { wgpu::x(); }\n", ["wgpu"]), ["wgpu"])

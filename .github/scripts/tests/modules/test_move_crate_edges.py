@@ -41,12 +41,17 @@ class Edges(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = root = Path(tmp.name)
+        (root / "src/asset").mkdir(parents=True)
+        (root / "src/asset/x.bin").write_bytes(b"\xff\xfe src/asset/")
         files = {"Cargo.toml": CARGO, "src/lib.rs": LIB, "src/asset/mod.rs": ASSET,
                  "src/asset/ui.rs": "pub struct Panel;\n", "src/ui/mod.rs": "",
                  "src/render/mod.rs": OUTSIDE, "crates/core/src/lib.rs": "",
                  "crates/core/Cargo.toml": '[package]\nname = "rusty-core"\n\n[features]\ndev = []\n',
                  "crates/core/src/asset/x.rs": "//! crates/core/src/asset/x.rs\n",
-                 "docs/a.md": "see `src/asset/ui.rs`\n", "tools/lint/src/layers/table.rs": TABLE}
+                 "docs/a.md": "see `src/asset/ui.rs`\n", "tools/lint/src/layers/table.rs": TABLE,
+                 "src/asset/make.py": "python3 src/asset/make.py\n",
+                 "Makefile": "a:\n\tcat $(CURDIR)/src/asset/a ../src/asset/b ./src/asset/c\n",
+                 ".github/scripts/tests/mutants/test_scope.py": "+++ b/src/asset/b.rs\n"}
         for name, text in files.items():
             (root / name).parent.mkdir(parents=True, exist_ok=True)
             (root / name).write_text(text)
@@ -86,6 +91,19 @@ class Edges(unittest.TestCase):
     def test_a_file_naming_the_folder_is_listed_and_another_crates_like_named_folder_is_not(self):
         self.assertIn("docs/a.md:1: names `src/asset/`", self.hand)
         self.assertNotIn("crates/core/src/asset/x.rs", self.hand)
+
+    def test_a_test_naming_a_module_below_takes_it_as_a_dev_dependency(self):
+        hand = "\n".join(mover.reaching_up("x.rs", "crate::core::a();\ncrate::ui::b();\n", {"core", "ui"}, {"core"}))
+        self.assertIn("x.rs:1: names `core`, which the row does not list: a test takes `rusty-core`", hand)
+        self.assertIn("x.rs:2: names `ui`, which the row does not list: a test reaching up", hand)
+
+    def test_a_relative_path_outside_is_listed_and_a_fixture_is_not(self):
+        self.assertIn("Makefile:2: names `src/asset/`", self.hand)
+        self.assertNotIn("test_scope.py", self.hand)
+
+    def test_any_other_text_file_in_the_crate_is_re_aimed_and_a_binary_one_kept(self):
+        self.assertEqual(self.read("crates/asset/src/make.py"), "python3 crates/asset/src/make.py\n")
+        self.assertEqual((self.root / "crates/asset/src/x.bin").read_bytes(), b"\xff\xfe src/asset/")
 
 
 class Externs(unittest.TestCase):
