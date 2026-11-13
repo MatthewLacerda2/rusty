@@ -64,12 +64,6 @@ pub(super) struct TextureUse {
     pub position: usize,
 }
 
-/// The test-only effects' sections, which no shipped doc holds.
-const TEST_ONLY_DOCS: &[&str] = &[
-    // sorted: one row per test-only effect
-    super::dummy::DOC,
-];
-
 /// The layers as the engine has them.
 pub(super) fn engine() -> Layers {
     let fields_of = |kind: &str| -> Vec<String> {
@@ -108,7 +102,7 @@ pub(super) fn engine() -> Layers {
             .iter()
             .map(|o| o.name().into())
             .collect(),
-        docs: TEST_ONLY_DOCS.iter().fold(docs, |all, doc| all + doc),
+        docs,
         textures: texture_uses(),
         composite: assemble::composite_source(),
     }

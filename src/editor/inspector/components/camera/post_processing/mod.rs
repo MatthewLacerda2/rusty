@@ -30,8 +30,6 @@ impl crate::editor::inspector::components::add::AddEntry
     const LABEL: &'static str = "Post Processing Component";
 }
 
-#[cfg(test)]
-mod dummy;
 mod exposure;
 mod grading;
 mod lens;
@@ -80,8 +78,6 @@ pub(crate) const SECTIONS: &[Section] = &[
     color_lookup::SECTION,
     custom_effects::SECTION,
     depth_of_field::SECTION,
-    #[cfg(test)]
-    dummy::SECTION,
     exposure::SECTION,
     film_grain::SECTION,
     lens_flare::SECTION,

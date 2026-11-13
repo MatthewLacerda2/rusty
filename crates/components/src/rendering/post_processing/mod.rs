@@ -18,10 +18,6 @@ impl crate::FirstClass for PostProcessingComponent {
     const NAME: &'static str = "PostProcessing";
 }
 
-/// Test hook: the root's tests register the test-only dummy effect in every layer,
-/// so its settings are compiled in every build (`PostProcessingComponent::dummy`).
-#[doc(hidden)]
-pub mod dummy;
 mod exposure;
 mod grading;
 mod lens;
@@ -63,12 +59,6 @@ pub struct PostProcessingComponent {
     pub color_lookup: ColorLookup,
     pub custom_effects: CustomEffects,
     pub depth_of_field: DepthOfField,
-    /// Test hook: the test-only dummy effect's settings, compiled in every build for
-    /// the root's tests, which save, load and hold it like any effect's (a field
-    /// left out at its default could not be held back to it). Nothing outside those
-    /// tests registers or sets it, so a scene file only ever holds it off.
-    #[doc(hidden)]
-    pub dummy: dummy::Dummy,
     pub exposure: Exposure,
     pub film_grain: FilmGrain,
     pub lens_flare: LensFlare,
@@ -100,7 +90,6 @@ impl Default for PostProcessingComponent {
             color_lookup: Default::default(),
             custom_effects: Default::default(),
             depth_of_field: Default::default(),
-            dummy: Default::default(),
             exposure: Default::default(),
             film_grain: Default::default(),
             lens_flare: Default::default(),

@@ -618,8 +618,6 @@ scene.entities[].post_processing.depth_of_field.gaussian_start: f32
 scene.entities[].post_processing.depth_of_field.mode: enum Off|Gaussian|Bokeh
 scene.entities[].post_processing.depth_of_field.quality: enum Low|Medium|High|Custom
 scene.entities[].post_processing.depth_of_field.resolution_divisor: u32
-scene.entities[].post_processing.dummy.active: bool
-scene.entities[].post_processing.dummy.strength: f32
 scene.entities[].post_processing.exposure.automatic.compensation: f32
 scene.entities[].post_processing.exposure.automatic.high_percent: f32
 scene.entities[].post_processing.exposure.automatic.low_percent: f32
