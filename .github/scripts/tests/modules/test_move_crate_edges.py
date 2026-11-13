@@ -77,6 +77,17 @@ class Edges(unittest.TestCase):
         self.assertIn('include_str!("../../crates/asset/src/ui.rs")', outside)
 
 
+class Externs(unittest.TestCase):
+    def test_a_name_a_file_declares_as_its_own_is_no_crate_there(self):
+        for own in ("pub mod image;\npub use image::Look;\n", "use super::image;\nfn f() { image::look(); }\n",
+                    "use crate::ui::{image, x};\nfn f() { image::look(); }\n", "use crate::ui::look as image;\n"):
+            self.assertEqual(mover.externs([own, "fn g() { glam::Vec3::ZERO; }\n"], ["glam", "image"]), ["glam"])
+
+    def test_another_file_naming_it_is_still_the_crate(self):
+        files = ["pub mod image;\npub use image::Look;\n", "fn f() { image::load(); }\n"]
+        self.assertEqual(mover.externs(files, ["image"]), ["image"])
+
+
 class LibHeader(unittest.TestCase):
     def test_a_header_naming_the_directory_names_lib_rs(self):
         for was, tail in (("//! src/asset — x", " — x"), ("//! crates/asset/src/ — x", " — x"),

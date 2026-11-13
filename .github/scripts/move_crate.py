@@ -194,9 +194,24 @@ def workspace_deps(manifest: str) -> list[str]:
     return [k for k in keys if not k.startswith("rusty-")]
 
 
-def externs(code: str, deps: list[str]) -> list[str]:
-    """The external crates `code` names as `name::` (`-` read as `_`), sorted."""
-    return sorted(d for d in deps if re.search(rf"(?<![\w:]){d.replace('-', '_')}::", code))
+def shadowed(code: str) -> set[str]:
+    """The names a file declares or imports as its own (`mod image;`, `use super::image;`,
+    `use crate::{a, image}`, `… as image`), whose `name::` then means the local item, not a
+    crate: the rule `tools/lint/src/layers/externs/find.rs` scans by."""
+    names = set(re.findall(r"^\s*(?:pub(?:\([\w:]+\))?\s+)?mod\s+(\w+)", code, re.M))
+    names |= set(re.findall(r"\bas\s+(\w+)\s*[;,}]", code))
+    for path in re.findall(r"\buse\s+((?:crate|super|self)\b[^;]*);", code):
+        names |= {seg.strip().split("::")[-1] for seg in re.split(r"[{},]", path) if seg.strip()}
+    return names - {"self", "super", "crate", "*"}
+
+
+def externs(code: str | list[str], deps: list[str]) -> list[str]:
+    """The external crates `code` (one file's text, or each file's) names as `name::` (`-` read
+    as `_`), sorted. In each file, a name it declares as its own (`shadowed`) is no crate."""
+    files = [code] if isinstance(code, str) else code
+    return sorted(d for d in deps if any(
+        d.replace("-", "_") not in shadowed(f) and re.search(rf"(?<![\w:]){d.replace('-', '_')}::", f)
+        for f in files))
 
 
 class Plan:
@@ -349,7 +364,7 @@ def leave_root(root: Path, module: str, externs_: list[str]) -> list[str]:
     line of the same name (`[dev-dependencies]`, a `[target.…]` one)."""
     left = subprocess.run(["git", "-C", str(root), "ls-files", "--", "*.rs", f":(exclude){layout.CRATES}/**"],
                           capture_output=True, text=True, check=False).stdout.split()
-    code = "\n".join((root / f).read_text() for f in left if (root / f).is_file())
+    code = [(root / f).read_text() for f in left if (root / f).is_file()]
     cargo = (root / "Cargo.toml").read_text()
     start = cargo.index("\n[dependencies]\n") + 1
     end = cargo.find("\n[", start)
@@ -409,13 +424,13 @@ def move(root: Path, module: str) -> list[str]:
     code = "\n".join(test_code)
     used = {f for f in FEATURES if f'feature = "{f}"' in code}
     registry = workspace_deps((root / "Cargo.toml").read_text())
-    normal = externs("\n".join(live_code), registry)
+    normal = externs(live_code, registry)
     plan = Plan(root, module, hand)
     for s in sorted(siblings):
         plan.sibling(s)
     for d in normal:
         plan.add(d)
-    for d in sorted(set(externs(code, registry)) - set(normal)):
+    for d in sorted(set(externs(test_code, registry)) - set(normal)):
         plan.add(d, "dev-dependencies")
     (crate / "Cargo.toml").write_text(plan.manifest(used))
     declared = [f for f in FEATURES if plan.features[f] or f in used]

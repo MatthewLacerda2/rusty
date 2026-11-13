@@ -693,8 +693,11 @@ of every member's, the workspace's own `rusty-*` crates aside (they are modules)
 `UNDECLARED_CRATE` (a module names a crate its row lacks), `STALE_CRATE`,
 `CONFINED_CRATE`, `UNCLAIMED_CRATE` (a dependency no row, `common` or `unscoped`
 accounts for, so a **new dependency** needs a table decision in the same PR),
-`UNKNOWN_CRATE`, `REDUNDANT_CRATE` (a row listing a common crate) and
-`STALE_EXCEPTION`. It counts the first segment of a `use` path and any `name::`
+`UNKNOWN_CRATE`, `REDUNDANT_CRATE` (a row listing a common crate),
+`STALE_EXCEPTION` and `STRAY_CRATE` (a member `crates/<m>`'s `[dependencies]`
+naming a sibling `rusty-<x>` not in its row's `deps`, or an external crate not in
+its row's `uses`, `common` or its exceptions: the merged set alone cannot see a crate
+one member declares that only another member's row names). It counts the first segment of a `use` path and any `name::`
 path elsewhere, outside comments and test code. A file that declares `mod image;`
 or imports a local `image` means its own module by `image::`, so that name is not
 counted there; glob imports are not followed, the one place a local name could

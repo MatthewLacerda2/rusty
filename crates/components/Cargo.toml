@@ -17,7 +17,6 @@ rusty-core = { workspace = true }
 rusty-procgen = { workspace = true }
 bytemuck = { workspace = true }
 glam = { workspace = true }
-image = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
