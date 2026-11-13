@@ -3290,7 +3290,6 @@ dependencies = [
  "libloading",
  "log",
  "mlua",
- "naga",
  "naga_oil",
  "notify",
  "objc2 0.6.5",
@@ -3303,6 +3302,7 @@ dependencies = [
  "rusty-asset",
  "rusty-core",
  "rusty-procgen",
+ "rusty-shadergen",
  "rusty-test-support",
  "rusty-time",
  "scorsese-core",
@@ -3358,6 +3358,19 @@ version = "0.1.0"
 dependencies = [
  "glam 0.33.12",
  "image",
+ "rusty-core",
+ "rusty-test-support",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "rusty-shadergen"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "naga",
+ "naga_oil",
  "rusty-core",
  "rusty-test-support",
  "serde",

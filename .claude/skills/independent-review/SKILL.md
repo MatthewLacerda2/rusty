@@ -90,7 +90,7 @@ the diff:
 on its first line, then the paths that decided it, read from the PR's own files
 on GitHub (what the PR really touches, not what its brief meant it to) against
 the table in `.github/scripts/dispatch/review_level.py` and the
-`//! stored-format:` markers modules carry (one in `mod.rs` covers its
+`//! stored-format:` markers modules carry (one in `mod.rs` or a crate's `lib.rs` covers its
 directory; `tools/lint`'s `stored-format` rule fails a serde file format without
 one). Pass both into the prompt. A path table cannot see everything (a stored format changed through a
 component's serde fields, say), so the reviewer may raise `medium` to `high`,

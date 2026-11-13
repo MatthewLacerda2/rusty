@@ -81,7 +81,7 @@ class Markers(unittest.TestCase):
                       "src/scene/serialize.rs", "src/scene/io/mod.rs", "src/scene/prefab/mod.rs",
                       "crates/core/src/storage.rs", "crates/asset/src/sidecar/mod.rs", "crates/asset/src/convert/mod.rs",
                       "crates/asset/src/import_cache/mod.rs", "crates/asset/src/animation_graph/mod.rs",
-                      "src/shadergen/mod.rs", "src/dev/demo/mod.rs", "src/scene/lighting/io.rs"]:
+                      "crates/shadergen/src/lib.rs", "src/dev/demo/mod.rs", "src/scene/lighting/io.rs"]:
             with self.subTest(owner):
                 lines = (ROOT / owner).read_text().splitlines()
                 self.assertTrue(any(review_level.parse_marker(line) for line in lines))

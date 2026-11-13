@@ -1,0 +1,23 @@
+[package]
+name = "rusty-shadergen"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[features]
+dev = ["rusty-core/dev"]
+editor = ["rusty-core/editor"]
+
+[lints]
+workspace = true
+
+[dependencies]
+rusty-core = { workspace = true }
+log = { workspace = true }
+naga = { workspace = true }
+naga_oil = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+rusty-test-support = { workspace = true }
