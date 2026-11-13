@@ -23,8 +23,8 @@ use super::progress::Progress;
 use super::rank::pick;
 use super::spec::RunMode;
 use super::Item;
-use crate::core::random::Random;
-use crate::navigation::{FloodSearch, NavigationGraph};
+use rusty_core::random::Random;
+use rusty_navigation::{FloodSearch, NavigationGraph};
 
 /// The node expansions the queue spends each tick by default. Picked on the
 /// Dust2 arena (#2116): one query's search toward a 24-item donut 20 m away

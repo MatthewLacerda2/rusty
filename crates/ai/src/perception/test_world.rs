@@ -4,12 +4,12 @@
 use glam::Vec3;
 
 use super::{drain_updates, step, SightRays};
-use crate::components::{
+use rusty_components::{
     AIPerceptionComponent, ColliderComponent, ColliderShape, Memory, PerceptionUpdate,
 };
-use crate::navigation::test_support::{add_box, add_floor};
-use crate::physics::PhysicsWorld;
-use crate::scene::Scene;
+use rusty_navigation::test_support::{add_box, add_floor};
+use rusty_physics::PhysicsWorld;
+use rusty_scene::Scene;
 
 /// One fixed tick, seconds.
 pub const DT: f32 = 1.0 / 60.0;

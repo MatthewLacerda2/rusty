@@ -6,7 +6,7 @@ use glam::Vec3;
 
 use super::test_world::{perceiver, target, wall, Arena};
 use super::{forget, report_damage, report_noise};
-use crate::components::Sense;
+use rusty_components::Sense;
 
 #[test]
 fn a_noise_is_heard_through_a_wall_inside_its_range_only() {

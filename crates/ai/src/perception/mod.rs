@@ -1,4 +1,4 @@
-//! src/ai/perception/ — the AI Perception senses (#1900): Unreal's
+//! crates/ai/src/perception/ — the AI Perception senses (#1900): Unreal's
 //! `UAIPerceptionComponent` with *Sight*, *Hearing* and *Damage*, so an agent
 //! acts on what it knows instead of reading the player's transform.
 //!
@@ -24,7 +24,7 @@
 //! perceiver's own body (under it, or above it: a perceiver on a `Head` child),
 //! and not under another target (a character's hitboxes are the character).
 //! Static entities are the level, never a target. Every last-known position is
-//! where the target **stood** ([`stand::feet`](crate::ai::stand::feet)), so an
+//! where the target **stood** ([`stand::feet`](crate::stand::feet)), so an
 //! environment query around it reads the ground, not a character's middle.
 //!
 //! **Play only**: entering Play empties every memory (`Scene::set_playing`,
@@ -36,16 +36,21 @@ pub mod stimulus;
 
 #[cfg(test)]
 mod budget_tests;
+// Test hook: the bench level the root's `dev::bench` times.
+#[cfg(feature = "dev")]
+#[doc(hidden)]
+pub mod bench;
 #[cfg(all(test, feature = "dev"))]
-pub(crate) mod perception_cost_tests;
+mod perception_cost_tests;
 #[cfg(test)]
 mod self_tests;
 #[cfg(test)]
 mod sight_tests;
 #[cfg(test)]
 mod stimulus_tests;
-#[cfg(test)]
-pub(crate) mod test_world;
+// Test hook: the arena this module's tests, its `bench` and the root's `dev::bench` build on.
+#[doc(hidden)]
+pub mod test_world;
 
 use std::collections::BTreeMap;
 
@@ -53,9 +58,9 @@ use glam::Vec3;
 
 pub use stimulus::{forget, perceiver_of, report_damage, report_noise};
 
-use crate::components::{AIPerceptionComponent, Known, PerceptionUpdate as Update, Sense};
-use crate::physics::PhysicsWorld;
-use crate::scene::Scene;
+use rusty_components::{AIPerceptionComponent, Known, PerceptionUpdate as Update, Sense};
+use rusty_physics::PhysicsWorld;
+use rusty_scene::Scene;
 
 /// Sight rays per tick across all perceivers, by default (decision 5, #1900).
 pub const DEFAULT_SIGHT_RAYS: usize = 64;

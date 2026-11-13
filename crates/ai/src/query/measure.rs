@@ -6,7 +6,7 @@ use glam::Vec3;
 
 use super::spec::{Anchor, Measure};
 use super::{sight, QueryWorld};
-use crate::scene::Scene;
+use rusty_scene::Scene;
 
 /// Each item's raw value for `measure`, in `items`' order. `None` fails the
 /// test for that item whatever its filter (an item the querier can't reach has

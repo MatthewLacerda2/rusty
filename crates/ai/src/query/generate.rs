@@ -3,7 +3,7 @@
 use glam::Vec3;
 
 use super::spec::{grid_side, Generator};
-use crate::navigation::NavigationGraph;
+use rusty_navigation::NavigationGraph;
 
 /// The generator's points in generation order, each moved onto the walkable floor
 /// nearest it within `project` metres; a point with none is dropped.

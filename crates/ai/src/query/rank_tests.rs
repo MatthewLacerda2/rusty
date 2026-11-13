@@ -6,7 +6,7 @@ use glam::Vec3;
 use super::rank::{pick, rank};
 use super::spec::{Curve, Generator, Measure, QuerySpec, RunMode, Score, Test};
 use super::Item;
-use crate::core::random::Random;
+use rusty_core::random::Random;
 
 fn spec(scores: &[Score]) -> QuerySpec {
     let tests = scores

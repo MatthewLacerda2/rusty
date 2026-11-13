@@ -1,4 +1,4 @@
-//! src/ai/query/ — the environment query (#1892): Unreal's EQS, so an agent can
+//! crates/ai/src/query/ — the environment query (#1892): Unreal's EQS, so an agent can
 //! ask "where should I stand?".
 //!
 //! A query runs in three steps:
@@ -17,7 +17,7 @@
 //! Synchronous (decision 1): [`run`] answers in the call that runs it. It is a
 //! pure function of the scene, the navmesh, the physics world, the active camera
 //! and the spec; only [`pick`]'s random modes draw from the seeded
-//! [`Random`](crate::core::random::Random), once per query that found anything.
+//! [`Random`](rusty_core::random::Random), once per query that found anything.
 //!
 //! Time-sliced (#2116): [`QueryQueue`] runs the same query in stages, as
 //! Unreal's EQS manager does: generation and every test but `path` when it is
@@ -43,16 +43,21 @@ mod context_tests;
 mod filter_tests;
 #[cfg(test)]
 mod generate_tests;
+// Test hook: the bench level the root's `dev::bench` times.
+#[cfg(feature = "dev")]
+#[doc(hidden)]
+pub mod bench;
 #[cfg(all(test, feature = "dev"))]
-pub(crate) mod query_cost_tests;
+mod query_cost_tests;
 #[cfg(test)]
 mod queue_tests;
 #[cfg(test)]
 mod rank_tests;
 #[cfg(test)]
 mod spread_tests;
-#[cfg(test)]
-pub(crate) mod test_world;
+// Test hook: the arena this module's tests and the root's `api` tests build on.
+#[doc(hidden)]
+pub mod test_world;
 
 use glam::{Vec2, Vec3};
 
@@ -65,9 +70,9 @@ pub use spec::{
 };
 pub use walk::FloodAsk;
 
-use crate::navigation::NavigationGraph;
-use crate::physics::PhysicsWorld;
-use crate::scene::{Camera, Scene};
+use rusty_navigation::NavigationGraph;
+use rusty_physics::PhysicsWorld;
+use rusty_scene::{Camera, Scene};
 
 /// What a query reads: the engine state it measures items against.
 pub struct QueryWorld<'a> {

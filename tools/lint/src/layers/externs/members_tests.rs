@@ -81,3 +81,11 @@ fn a_dev_dependency_in_a_one_crate_header_is_flagged() {
     let text = "[dev-dependencies.rusty-render]\nworkspace = true\n";
     assert_eq!(dev_stray("physics", text, LAYERS).len(), 1);
 }
+
+#[test]
+fn a_stray_crate_under_a_bare_target_triple_is_flagged() {
+    let text = "[target.aarch64-apple-darwin.dependencies]\nwgpu = { workspace = true }\n\
+        [target.aarch64-apple-darwin.dev-dependencies]\nrusty-render = { workspace = true }\n";
+    assert_eq!(stray("components", text, LAYERS, &POLICY).len(), 1);
+    assert_eq!(dev_stray("physics", text, LAYERS).len(), 1);
+}

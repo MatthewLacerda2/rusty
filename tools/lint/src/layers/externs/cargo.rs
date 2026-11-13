@@ -57,11 +57,13 @@ fn table_keys(manifest: &str, table: &str) -> Vec<String> {
 /// `Some(Some(name))` when it is one crate's `<table>.<name>`, `None` otherwise.
 fn header_crate<'a>(header: &'a str, table: &str) -> Option<Option<&'a str>> {
     let rest = match header.strip_prefix("target.") {
-        // A target's cfg is quoted and may hold dots: the table follows its closing quote.
-        Some(t) => t
+        // A target's cfg is quoted and may hold dots: the table follows its closing
+        // quote. A bare triple (`aarch64-apple-darwin`) holds none: its first dot.
+        Some(t) if t.starts_with(['\'', '"']) => t
             .split_once("'.")
             .or_else(|| t.split_once("\"."))
             .map(|(_, r)| r)?,
+        Some(t) => t.split_once('.').map(|(_, r)| r)?,
         None => header,
     };
     let rest = rest.strip_prefix(table)?;
@@ -69,7 +71,9 @@ fn header_crate<'a>(header: &'a str, table: &str) -> Option<Option<&'a str>> {
         return Some(None);
     }
     let name = rest.strip_prefix('.')?.trim_matches(['"', '\'']);
-    Some(Some(name).filter(|n| n.starts_with(|c: char| c.is_ascii_alphabetic())))
+    // A name that is no crate's is no table of crates either: its keys are not read.
+    name.starts_with(|c: char| c.is_ascii_alphabetic())
+        .then_some(Some(name))
 }
 
 #[cfg(test)]
@@ -82,6 +86,20 @@ mod tests {
             workspace = true\n[target.'cfg(target_os = \"macos\")'.dev-dependencies.objc2]\nworkspace = true\n";
         assert_eq!(keys(text), ["serde"]);
         assert_eq!(dev_keys(text), ["objc2", "rusty_render"]);
+    }
+
+    #[test]
+    fn a_bare_target_triple_is_read() {
+        let text = "[target.aarch64-apple-darwin.dependencies]\nobjc2 = 1\n\
+            [target.x86_64-unknown-linux-gnu.dev-dependencies.wgpu]\nworkspace = true\n";
+        assert_eq!(keys(text), ["objc2"]);
+        assert_eq!(dev_keys(text), ["wgpu"]);
+    }
+
+    #[test]
+    fn a_header_whose_name_is_no_crate_reads_nothing() {
+        let text = "[dependencies.\"1bad\"]\nversion = \"1\"\nfeatures = []\n";
+        assert!(keys(text).is_empty());
     }
 
     #[test]

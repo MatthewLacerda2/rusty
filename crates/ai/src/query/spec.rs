@@ -26,10 +26,10 @@ impl Anchor {
     /// Transform, which for a character is its middle) and its world forward
     /// (+Z).
     ///
-    /// [`stand::feet`]: crate::ai::stand::feet
-    pub fn of_entity(scene: &crate::scene::Scene, id: u32) -> Self {
+    /// [`stand::feet`]: crate::stand::feet
+    pub fn of_entity(scene: &rusty_scene::Scene, id: u32) -> Self {
         Self {
-            position: crate::ai::stand::feet(scene, id),
+            position: crate::stand::feet(scene, id),
             facing: Some(scene.world.world_rotation(id) * Vec3::Z),
             entity: Some(id),
         }
@@ -183,7 +183,7 @@ impl Filter {
     }
 }
 
-crate::core::named_enum! {
+rusty_core::named_enum! {
     /// How a normalized raw value (0..1) becomes a score before its weight.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum Curve {
@@ -240,7 +240,7 @@ pub struct QuerySpec {
 /// floor under a standing character.
 pub const DEFAULT_PROJECT: f32 = 2.0;
 
-crate::core::named_enum! {
+rusty_core::named_enum! {
     /// Which item a query hands back (Unreal's `EEnvQueryRunMode`).
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum RunMode {

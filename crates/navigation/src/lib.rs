@@ -41,7 +41,8 @@ mod reach;
 mod request;
 mod snap;
 mod surface;
-// Test hook: the fixtures the root's ai, api, app and editor tests bake with.
+// Test hook: the fixtures `rusty-ai`'s tests and the root's api, app, editor and
+// shell tests bake with.
 #[doc(hidden)]
 pub mod test_support;
 #[cfg(test)]

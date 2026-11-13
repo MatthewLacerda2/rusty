@@ -16,9 +16,9 @@
 use glam::Vec3;
 
 use super::perceivers;
-use crate::ai::stand;
-use crate::components::{AIPerceptionComponent, Known, PerceptionUpdate, Sense};
-use crate::scene::Scene;
+use crate::stand;
+use rusty_components::{AIPerceptionComponent, Known, PerceptionUpdate, Sense};
+use rusty_scene::Scene;
 
 /// Remember `stimulus` from `target` on `c`, and raise its update.
 fn remember(c: &mut AIPerceptionComponent, target: Option<u32>, mut stimulus: Known) {

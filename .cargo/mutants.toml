@@ -10,6 +10,10 @@ test_workspace = true
 # there changes what a test feeds the World, never what the engine does, so no test
 # is owed for it (crates/CLAUDE.md, *Test hooks*).
 exclude_globs = [
+  "crates/ai/src/perception/bench.rs",
+  "crates/ai/src/perception/test_world.rs",
+  "crates/ai/src/query/bench.rs",
+  "crates/ai/src/query/test_world.rs",
   "crates/audio/src/recording.rs",
   "crates/ecs/src/changes/ops.rs",
   "crates/navigation/src/test_support.rs",

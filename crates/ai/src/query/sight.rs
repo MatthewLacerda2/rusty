@@ -3,9 +3,9 @@
 use glam::{Vec2, Vec3};
 
 use super::QueryWorld;
-use crate::ai::ray;
-use crate::components::Projection;
-use crate::scene::Camera;
+use crate::ray;
+use rusty_components::Projection;
+use rusty_scene::Camera;
 
 /// Whether the segment `eye → at` is clear of colliders on `mask` ([`ray::clear`]).
 pub fn clear(

@@ -60,7 +60,7 @@ fn trace_rejects_a_point_behind_a_wall() {
 #[test]
 fn path_exists_rejects_a_point_on_an_unreachable_roof() {
     let mut arena = Arena::new(|s| {
-        crate::navigation::test_support::add_box(
+        rusty_navigation::test_support::add_box(
             s,
             Vec3::new(10.0, 0.0, 10.0),
             Vec3::new(15.0, 5.0, 15.0),

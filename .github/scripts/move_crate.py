@@ -161,7 +161,8 @@ def reaching_up(path: str, text: str, above: set[str], below: set[str] = frozens
     def why(x: str) -> str:
         if x in below:
             return (f"names `{x}`, which the row does not list: a test takes `rusty-{x}` as a "
-                    f"dev-dependency and names `rusty_{x}::`; live code is a layering violation")
+                    f"dev-dependency, turning on its `dev` / `editor` features from the crate's own, "
+                    f"and names `rusty_{x}::`; live code is a layering violation")
         return (f"names `{x}`, which the row does not list: a test reaching up moves to "
                 f"`tests/` (or `{x}`'s own tests); live code is a layering violation")
     return [f"{path}:{n}: {why(x)}"
@@ -241,10 +242,6 @@ class Plan:
         self.deps.setdefault(table, []).append(f"{name} = {spec}")
         if gate in FEATURES:
             self.features[gate].add(f"dep:{name}")
-        if table == "dev-dependencies" and name.startswith("rusty-"):
-            # A sibling only the tests name gets the feature too: a test gated on it may call
-            # the sibling's gated items (`rusty-physics`' sidecar tests and `rusty-asset/editor`).
-            self.forward(name, optional=False)
 
     def forward(self, name: str, optional: bool) -> None:
         """Turn on each of `name`'s own `dev` / `editor` features from the crate's."""

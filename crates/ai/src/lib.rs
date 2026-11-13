@@ -1,4 +1,4 @@
-//! src/ai/ — how agents decide things about the world around them (#1892).
+//! crates/ai/src/lib.rs — how agents decide things about the world around them (#1892).
 //!
 //! Not navigation: navigation moves an agent to a point; this module chooses the
 //! point and senses what is around it, as Unreal's `AIModule` does: the environment

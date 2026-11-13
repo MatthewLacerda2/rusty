@@ -95,6 +95,7 @@ class Edges(unittest.TestCase):
     def test_a_test_naming_a_module_below_takes_it_as_a_dev_dependency(self):
         hand = "\n".join(mover.reaching_up("x.rs", "crate::core::a();\ncrate::ui::b();\n", {"core", "ui"}, {"core"}))
         self.assertIn("x.rs:1: names `core`, which the row does not list: a test takes `rusty-core`", hand)
+        self.assertIn("turning on its `dev` / `editor` features", hand)
         self.assertIn("x.rs:2: names `ui`, which the row does not list: a test reaching up", hand)
 
     def test_a_relative_path_outside_is_listed_and_a_fixture_is_not(self):

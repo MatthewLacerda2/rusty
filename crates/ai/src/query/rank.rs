@@ -4,7 +4,7 @@ use glam::Vec3;
 
 use super::spec::{QuerySpec, RunMode};
 use super::Item;
-use crate::core::random::Random;
+use rusty_core::random::Random;
 
 /// The surviving items `alive` ranked best first, a tie to the earliest
 /// generated. A scoring test normalizes its raw values to 0..1 over the
