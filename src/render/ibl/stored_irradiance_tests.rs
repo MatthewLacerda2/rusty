@@ -12,7 +12,8 @@ use crate::render::ibl::reflection_probes::uniform::{luminance_sh, normalisation
 use crate::render::Renderer;
 use crate::scene::authoring::{primitive_mesh_component, Primitive};
 use crate::scene::lighting::sh::Sh9;
-use crate::scene::{panorama_fixture, AmbientMode, Scene};
+use crate::scene::{AmbientMode, Scene};
+use rusty_test_support::panorama::fixture as panorama_fixture;
 
 const RES: u32 = 32;
 

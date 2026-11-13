@@ -5,7 +5,7 @@ use glam::Vec3;
 
 use super::*;
 use crate::scene::authoring::{create_entity, Primitive};
-use crate::scene::skeleton::fixture::armature_owner;
+use crate::scene::skeleton::rig::armature_owner;
 
 #[test]
 fn a_mesh_on_a_moving_bone_is_drawn_at_the_tick() {

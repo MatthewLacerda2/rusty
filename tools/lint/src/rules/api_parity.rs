@@ -32,12 +32,12 @@ use std::collections::{BTreeMap, BTreeSet};
 #[path = "api_parity_names.rs"]
 mod names;
 use names::join;
-pub use names::{local_ops_named, ops_named};
+pub use names::{local_ops_named, ops_named, root_of};
 
 pub const RULE: &str = "api-parity";
 
 const AUTHORING: &str = "src/scene/authoring/";
-const ROOT: &str = "crate::scene::authoring";
+pub const ROOT: &str = "crate::scene::authoring";
 const EDITOR: &str = "src/editor/";
 /// Where Lua reaches ops from: the bindings, and `Component.Set`'s field table
 /// once it sits under `scene::authoring` (#1418 moves it there).
@@ -57,7 +57,7 @@ pub fn run(scan: &Scan) -> Vec<Finding> {
             .iter()
             .filter(|p| dirs.iter().any(|d| module_path(p).starts_with(d)));
         files
-            .flat_map(|p| ops_named(scan.source(p), scan.test_lines(p)))
+            .flat_map(|p| ops_named(scan.source(p), scan.test_lines(p), root_of(p)))
             .collect()
     };
     let ops: BTreeMap<String, &str> = scan
@@ -135,7 +135,9 @@ pub fn check(
 }
 
 /// `src/scene/authoring/nav/agent.rs` → `nav::agent`; a `mod.rs` is its folder.
+/// Read at its module path, so the file of a moved crate counts the same.
 fn module_of(path: &str) -> String {
+    let path = module_path(path);
     let rel = path.trim_start_matches(AUTHORING).trim_end_matches(".rs");
     let rel = rel.trim_end_matches("/mod").trim_end_matches("mod");
     rel.trim_end_matches('/').replace('/', "::")
@@ -148,7 +150,8 @@ fn definition(op: &str, authoring: &BTreeMap<String, &str>) -> Option<(String, u
     let dir = format!("{AUTHORING}{}", module.replace("::", "/"));
     let dir = format!("{}/", dir.trim_end_matches('/'));
     let candidates = authoring.iter().filter(|(p, _)| {
-        module_of(p) == module || p.strip_prefix(&dir).is_some_and(|f| !f.contains('/'))
+        let at = module_path(p);
+        module_of(p) == module || at.strip_prefix(&dir).is_some_and(|f| !f.contains('/'))
     });
     let needle = format!("fn {name}(");
     candidates.into_iter().find_map(|(p, src)| {

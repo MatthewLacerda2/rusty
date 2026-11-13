@@ -10,10 +10,17 @@ use glam::Vec3;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::asset_instance::instantiate_asset;
-use crate::scene::asset_instance::lightmap_test_support::{has_lightmap_uv, quad_model};
+use rusty_test_support::models::quad_file as quad_model;
+
 use crate::scene::{Camera, Scene};
 use crate::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
+
+/// Whether `id`'s mesh carries generated lightmap UVs.
+fn has_lightmap_uv(scene: &Scene, id: u32) -> bool {
+    let mesh = scene.world.mesh(id).unwrap();
+    mesh.vertices.iter().any(|v| v.lightmap_uv != [0.0, 0.0])
+}
 
 #[test]
 fn the_assets_api_sets_and_reads_the_setting() {

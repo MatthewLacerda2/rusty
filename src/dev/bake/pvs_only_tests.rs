@@ -128,7 +128,7 @@ fn the_lighting_save_keeps_a_newer_pvs_and_a_failed_pvs_step_loses_nothing() {
     editor.ambient_intensity = 0.5;
     editor.save_to_file(&path).unwrap();
     assert_eq!(std::fs::read(&pvs).unwrap(), b"theirs", "a save after");
-    assert!(editor.bake_files.warned(&pvs), "the save says it kept it");
+    assert!(editor.bake_files().warned(&pvs), "the save says it kept it");
     // A PVS step that ends writes this world's bake (the last write wins).
     let baked = super::super::occlusion::bake_occlusion_logged(&editor, &mut BakeLog::off());
     apply_occlusion(&mut editor, &path, baked.unwrap()).unwrap();

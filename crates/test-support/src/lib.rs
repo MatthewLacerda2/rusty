@@ -5,5 +5,6 @@
 pub mod logs;
 pub mod luts;
 pub mod models;
+pub mod panorama;
 pub mod rebakes;
 pub mod temp;

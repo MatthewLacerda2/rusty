@@ -28,11 +28,15 @@ mod bounds_tests;
 mod flood;
 mod grid;
 mod links;
+#[cfg(test)]
+mod load_bounds_tests;
 mod object_modifier;
 mod obstacle;
 mod offmesh;
 mod path;
 mod pool;
+#[cfg(test)]
+mod probe_site;
 mod reach;
 mod request;
 mod snap;

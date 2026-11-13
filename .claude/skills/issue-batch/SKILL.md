@@ -63,7 +63,7 @@ avoid:
   generated, so two component branches touch different lines; what still
   collides is each one's hand-written rows (`inspect!`, `snapshot!`,
   `AddEntry`) when they share an area file;
-- `src/scene/serialize.rs`'s `apply` and `src/scene/undo/level.rs`'s list: every
+- `crates/scene/src/serialize.rs`'s `apply` and `crates/scene/src/undo/level.rs`'s list: every
   saved `Scene` field adds a line to both, so two such branches pass clippy's
   50-line cap in `apply`; the level list's check test asks the
   second to land for its field;

@@ -14,9 +14,9 @@ use crate::asset::LightmapUvSettings;
 use crate::components::{LightComponent, LightMode, LightType};
 use crate::dev::capture::CaptureHost;
 use crate::dev::screenshot::capture_into;
-use crate::scene::asset_instance::lightmap_test_support::quad_model;
 use crate::scene::asset_instance::{instantiate_asset, set_lightmap_uv_settings};
 use crate::scene::{Camera, Scene};
+use rusty_test_support::models::quad_file as quad_model;
 
 const SIZE: u32 = 32;
 

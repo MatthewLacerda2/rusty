@@ -77,11 +77,11 @@ class Markers(unittest.TestCase):
     def test_the_tree_still_marks_the_formats_the_table_used_to_list(self):
         # Hand-coded formats (`.occlusion`, `.navmesh`) no lint rule can see: their
         # markers are held here, read straight from the files.
-        for owner in ["src/scene/lighting/occlusion/mod.rs", "src/navigation/bake/saved/mod.rs",
-                      "src/scene/serialize.rs", "src/scene/io/mod.rs", "src/scene/prefab/mod.rs",
+        for owner in ["crates/scene/src/lighting/occlusion/mod.rs", "src/navigation/bake/saved/mod.rs",
+                      "crates/scene/src/serialize.rs", "crates/scene/src/io/mod.rs", "crates/scene/src/prefab/mod.rs",
                       "crates/core/src/storage.rs", "crates/asset/src/sidecar/mod.rs", "crates/asset/src/convert/mod.rs",
                       "crates/asset/src/import_cache/mod.rs", "crates/asset/src/animation_graph/mod.rs",
-                      "crates/shadergen/src/lib.rs", "src/dev/demo/mod.rs", "src/scene/lighting/io.rs"]:
+                      "crates/shadergen/src/lib.rs", "src/dev/demo/mod.rs", "crates/scene/src/lighting/io.rs"]:
             with self.subTest(owner):
                 lines = (ROOT / owner).read_text().splitlines()
                 self.assertTrue(any(review_level.parse_marker(line) for line in lines))

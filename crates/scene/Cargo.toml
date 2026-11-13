@@ -1,0 +1,28 @@
+[package]
+name = "rusty-scene"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[features]
+dev = ["rusty-asset/dev", "rusty-core/dev", "rusty-shadergen/dev"]
+
+[lints]
+workspace = true
+
+[dependencies]
+rusty-asset = { workspace = true }
+rusty-components = { workspace = true }
+rusty-core = { workspace = true }
+rusty-ecs = { workspace = true }
+rusty-procgen = { workspace = true }
+rusty-shadergen = { workspace = true }
+glam = { workspace = true }
+log = { workspace = true }
+rapier3d = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+image = { workspace = true }
+rusty-test-support = { workspace = true }

@@ -5,7 +5,8 @@
 
 use glam::Vec3;
 
-use crate::scene::{panorama_fixture, AmbientMode, Scene};
+use crate::scene::{AmbientMode, Scene};
+use rusty_test_support::panorama::fixture as panorama_fixture;
 
 const RES: u32 = 32;
 

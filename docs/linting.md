@@ -44,7 +44,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Entity ids from Lua | `tools/lint -- --rules` (`entity-arg`) | **hard gate**: in `src/api/`, a Lua callback never takes an entity (`id`, `…_id`, `parent`, `child`, `target`, `entity`, `body`, `canvas`) as a bare `u32` or `Option<u32>`: it takes `api::entity_arg::EntityArg`, so a `nil` id reads as a missing entity and fails a write with the verb's name (#1383) |
 | Every ECS write is stamped | `tools/lint -- --rules` (`ecs-write`) | **hard gate**: a non-test line of `crates/ecs/src/` that borrows a hecs column mutably (`get::<&mut …>`, `query_one::<(&mut …)>`, `query_mut`) or reshapes the store through `inner.` (`spawn`, `despawn`, `insert`, `remove`, `clear`, …) fails, since a write that skips `World::touch` stamps no change and every change-log consumer misses it; each funnel line, and `World::derived_mut`, takes `// lint: allow(ecs-write) <why>` (#1705) |
 | File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py`, `.lua` or `.wgsl` one (docstrings, comments and blank lines free, #926, #1015); nothing grandfathered |
-| Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `src/scene/authoring/` that takes a float (an `f32`/`f64`, a glam vector, or a float struct such as `Curve`) passes it to a `scene::authoring::sanitize` helper (or a sibling setter of its file), so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
+| Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `crates/scene/src/authoring/` that takes a float (an `f32`/`f64`, a glam vector, or a float struct such as `Curve`) passes it to a `scene::authoring::sanitize` helper (or a sibling setter of its file), so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
 | Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix (#934) |
 | Full component literals in tests | `tools/lint -- --rules` (`full-literal`) | **hard gate**: test code builds a first-class component with `..rest` or a constructor, never a literal naming every field (#663, #976) |
 | Function ("endpoint") length | clippy `too_many_lines` + `tools/lint -- --determinism` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]`; its one exception, `Renderer::assemble`, is locked (`ESCAPE`, #961) |
@@ -70,7 +70,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
 | Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `src/editor` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); an editor slider is built by `editor::widgets::slider`, never a bare `egui::Slider::new(`, whose default clamping does the same (#1444); a real need takes `// lint: allow(drag-range) <why>` |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
-| Self-naming headers | `tools/lint -- --rules` (`self-path`) | **hard gate**: a source file's first `//!` line (a shader's first `//` line) that opens with a path under `src/`, `crates/`, `tests/`, `tools/`, `fuzz/`, `engine/` or `.github/` (a bare word too, when it names a directory of scanned files) names the file itself; a `mod.rs` may name its directory (`src/scene/prefab/`). No header, or one opening with prose, is fine (#1654) |
+| Self-naming headers | `tools/lint -- --rules` (`self-path`) | **hard gate**: a source file's first `//!` line (a shader's first `//` line) that opens with a path under `src/`, `crates/`, `tests/`, `tools/`, `fuzz/`, `engine/` or `.github/` (a bare word too, when it names a directory of scanned files) names the file itself; a `mod.rs` may name its directory (`crates/scene/src/prefab/`). No header, or one opening with prose, is fine (#1654) |
 | Shared process | `make test-one-process` (`cargo test --features dev --tests`) | **signal**, never a gate: the `dev` suite with every test of a binary in one process, so a test leaking process-wide state (a moved working directory, a `static` left set), which nextest's process per test hides, is named (it broke the mutation baseline four times while cargo-mutants ran `cargo test`, #1844). Nightly on `main` in `cargo-test.yml` (both feature sets), filed by `main-health` when red; `gh workflow run cargo-test.yml --ref <branch>` runs it on a branch (#1338) |
 | Shipped platforms only | `tools/lint -- --rules` (`platform-cfg`) | **hard gate**: no `cfg(…)` / `cfg!(…)` / `cfg_attr(…)` in a scanned `.rs` file names `windows` or `unix` (bare, `target_os = "windows"`, or as a `target_family` value) — rusty ships for macOS and Linux, so the code is written unconditionally and a real split names `target_os = "macos"` / `"linux"` |
 | Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
@@ -514,7 +514,7 @@ new flag, gate, CI step or baseline.
   with the reason, and the exemption covers that directory only, not its
   subfolders.
 - **`sanitize`** — every authoring setter refuses a non-finite float (#1361).
-  A `pub fn set_*` (any `pub` visibility) under `src/scene/authoring/` (test code
+  A `pub fn set_*` (any `pub` visibility) under `crates/scene/src/authoring/` (test code
   aside) that takes a float-carrying parameter fails unless each such parameter is
   passed whole to a helper `scene::authoring::sanitize` defines (`finite`,
   `finite_or`, `at_least`, `non_negative`, `clamped`, `unit`, `unit_color`,
@@ -530,8 +530,8 @@ new flag, gate, CI step or baseline.
   the file is, and the directory regroupings `dir-size` drives leave it behind: the
   #1650 doc audit fixed about 35 by hand. When a file's first `//!` line (a `.wgsl`
   shader's first line, `// …`) opens with a path under a repository root, that path
-  must be the file's own, or for a `mod.rs` its directory, `src/scene/prefab/` or
-  `src/scene/prefab/mod.rs`. A path has an extension (a file) or a trailing `/` (a
+  must be the file's own, or for a `mod.rs` its directory, `crates/scene/src/prefab/` or
+  `crates/scene/src/prefab/mod.rs`. A path has an extension (a file) or a trailing `/` (a
   directory), or is a bare word naming a directory that holds scanned files, at its
   real path or its module path (`tools/lint`, or a moved module's old `src/<m>`),
   so a stale `//! src/<m> — …` in a moved `lib.rs` is caught; a word naming no such

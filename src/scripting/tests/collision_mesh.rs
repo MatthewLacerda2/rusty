@@ -5,8 +5,15 @@
 
 use super::collider::manager_with_collider;
 use crate::physics::collider_world_triangles;
-use crate::scene::asset_instance::collision::tests::chair;
 use crate::scene::asset_instance::instantiate_asset;
+
+/// `scene`'s collision-mesh model (`collision::chair::write`) as `file` in the test's
+/// temp dir; its path as a Lua literal names it.
+fn chair(file: &str, n: u32, mesh: Option<&str>) -> String {
+    let path = crate::test_temp::dir().join(file);
+    crate::scene::asset_instance::collision::chair::write(&path, n, mesh).unwrap();
+    crate::test_temp::lua_path(file)
+}
 
 #[test]
 fn a_script_names_the_collision_mesh() {

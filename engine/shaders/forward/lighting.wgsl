@@ -123,7 +123,7 @@ fn lightmap_direction_rebalance(dir: vec3<f32>, N: vec3<f32>, Ng: vec3<f32>) -> 
 
 // A direction page texel back to its vector (`xyz`, direction scaled by
 // directionality) and its lamp share (`w`, #1695); mirrors `decode_direction` in
-// src/scene/lighting/lightmap/encode.rs, which stores each component as 128 + 127x.
+// crates/scene/src/lighting/lightmap/encode.rs, which stores each component as 128 + 127x.
 fn decode_lightmap_direction(texel: vec4<f32>) -> vec4<f32> {
     return vec4<f32>((texel.xyz * 255.0 - 128.0) / 127.0, texel.a);
 }
@@ -298,7 +298,7 @@ fn sun_shadow_parts(world_pos: vec3<f32>, N: vec3<f32>) -> vec2<f32> {
 }
 
 // Reconstruct diffuse irradiance from the entity's L2 SH probe for a surface normal
-// (#240). Mirrors `Sh9::eval` in src/scene/lighting/sh.rs: the same 9 real-SH
+// (#240). Mirrors `Sh9::eval` in crates/scene/src/lighting/sh.rs: the same 9 real-SH
 // basis polynomials (`lighting::sh::sh_basis`) and the same cosine-lobe band factors
 // (pi, 2pi/3, pi/4), so the headless analytic path and the GPU agree. Result clamped
 // to non-negative.

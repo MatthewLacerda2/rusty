@@ -60,6 +60,8 @@ def externs(code: str | list[str], deps: list[str]) -> list[str]:
     """The external crates `code` (one file's text, or each file's) names as `name::` (`-` read
     as `_`), sorted. In each file, a name it declares as its own (`shadowed`) is no crate."""
     files = [code] if isinstance(code, str) else code
+    # A crate a comment names is no dependency (scene's docs name `wgpu::Limits`, #2141).
+    files = [re.sub(r"^\s*//.*$", "", f, flags=re.M) for f in files]
     return sorted(d for d in deps if any(
         d.replace("-", "_") not in shadowed(f) and re.search(rf"(?<![\w:]){d.replace('-', '_')}::", f)
         for f in files))

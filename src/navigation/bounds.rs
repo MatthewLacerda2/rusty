@@ -32,25 +32,24 @@ pub const BOUNDS_MARGIN: f32 = 2.0;
 
 // `NavBounds` itself is scene data (the authored override is saved with the scene);
 // the resolution steps below are the bake's.
-impl NavBounds {
-    /// Grow every side by `margin`.
-    fn grown(self, margin: f32) -> Self {
-        Self {
-            min_x: self.min_x - margin,
-            max_x: self.max_x + margin,
-            min_z: self.min_z - margin,
-            max_z: self.max_z + margin,
-        }
-    }
 
-    /// Snap outward to multiples of `spacing`, keeping cell centres on a fixed lattice.
-    fn snapped(self, spacing: f32) -> Self {
-        Self {
-            min_x: (self.min_x / spacing).floor() * spacing,
-            max_x: (self.max_x / spacing).ceil() * spacing,
-            min_z: (self.min_z / spacing).floor() * spacing,
-            max_z: (self.max_z / spacing).ceil() * spacing,
-        }
+/// `b` with every side grown by `margin`.
+fn grown(b: NavBounds, margin: f32) -> NavBounds {
+    NavBounds {
+        min_x: b.min_x - margin,
+        max_x: b.max_x + margin,
+        min_z: b.min_z - margin,
+        max_z: b.max_z + margin,
+    }
+}
+
+/// `b` snapped outward to multiples of `spacing`, keeping cell centres on a fixed lattice.
+fn snapped(b: NavBounds, spacing: f32) -> NavBounds {
+    NavBounds {
+        min_x: (b.min_x / spacing).floor() * spacing,
+        max_x: (b.max_x / spacing).ceil() * spacing,
+        min_z: (b.min_z / spacing).floor() * spacing,
+        max_z: (b.max_z / spacing).ceil() * spacing,
     }
 }
 
@@ -116,11 +115,11 @@ pub fn resolve_bounds(scene: &Scene, spacing: f32) -> NavBounds {
     let raw = match s.bounds.filter(NavBounds::is_valid) {
         Some(authored) => authored,
         None => geometry_extent(scene)
-            .map(|g| g.grown(BOUNDS_MARGIN + s.agent_radius.max(0.0)))
+            .map(|g| grown(g, BOUNDS_MARGIN + s.agent_radius.max(0.0)))
             .filter(NavBounds::is_valid)
             .unwrap_or(NavBounds::EMPTY_SCENE),
     };
-    raw.snapped(spacing)
+    snapped(raw, spacing)
 }
 
 impl NavigationGraph {

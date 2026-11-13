@@ -171,4 +171,6 @@ fn bounds_value(scene: &Scene, id: u32, world_matrix: Mat4) -> Value {
 }
 
 #[cfg(test)]
+mod bone_tests;
+#[cfg(test)]
 mod tests;
