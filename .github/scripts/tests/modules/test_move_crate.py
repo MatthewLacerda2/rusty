@@ -36,6 +36,8 @@ fn f() { let _ = glam::Vec3::ZERO; let p = env!("CARGO_MANIFEST_DIR"); }
 #[cfg(test)]
 fn t() { crate::test_temp::dir(); }
 """
+TABLE = 'sim("core", &[]),\n    sim(\n        "asset",\n        &["core"],\n    ),\n    sim("scene", &["asset", "core"]),\n'
+UP = "fn bake() { crate::scene::bake(); }\n"
 
 
 class Move(unittest.TestCase):
@@ -45,7 +47,8 @@ class Move(unittest.TestCase):
         self.root = root = Path(tmp.name)
         files = {"Cargo.toml": CARGO, "src/lib.rs": LIB, "src/asset/mod.rs": ASSET,
                  "src/asset/cache.rs": "//! src/asset/cache.rs — keys\n", "src/scene/mod.rs": "",
-                 "crates/core/src/lib.rs": ""}
+                 "src/asset/up_tests.rs": UP, "crates/core/src/lib.rs": "",
+                 "tools/lint/src/layers/table.rs": TABLE}
         for name, text in files.items():
             (root / name).parent.mkdir(parents=True, exist_ok=True)
             (root / name).write_text(text)
@@ -86,6 +89,16 @@ class Move(unittest.TestCase):
         whys = "\n".join(self.hand)
         self.assertIn("crates/asset/src/lib.rs:4: a `crate::{…}` group", whys)
         self.assertIn("lib.rs:6: names the crate's folder", whys)
+
+    def test_a_module_above_it_is_listed_not_made_a_dependency(self):
+        self.assertEqual(self.read("crates/asset/src/up_tests.rs"), UP)
+        self.assertNotIn("rusty-scene", self.read("crates/asset/Cargo.toml"))
+        self.assertIn("crates/asset/src/up_tests.rs:1: names `scene`, which the row does not list", "\n".join(self.hand))
+
+    def test_a_module_with_no_row_is_refused(self):
+        (self.root / "src/orphan").mkdir()
+        with self.assertRaises(SystemExit):
+            mover.move(self.root, "orphan")
 
     def test_a_module_already_moved_is_refused(self):
         with self.assertRaises(SystemExit):

@@ -6,8 +6,8 @@ The engine is split one crate per module, over many pull requests
 so this makes them, and lists what it cannot decide:
 
 - `git mv src/<m> crates/<m>/src`, its `mod.rs` becoming `lib.rs`;
-- in the crate's files: `crate::<dep>::` → `rusty_<dep>::` for every other
-  top-level module, then `crate::<m>::` → `crate::` (in that order, so a
+- in the crate's files: `crate::<dep>::` → `rusty_<dep>::` for each module its
+  row of the layer table (`tools/lint/src/layers/table.rs`) lists as a dep, then `crate::<m>::` → `crate::` (in that order, so a
   submodule named like a module, `crate::render::scene::`, stays the crate's
   own), the shared test helper (`crate::test_temp::dir()` →
   `rusty_test_support::temp::dir()`), and each `src/<m>/` path it names →
@@ -29,7 +29,10 @@ so this makes them, and lists what it cannot decide:
   the crate optionally, its feature `f` turns it on (`"dep:rusty-<m>"`), and the
   re-export carries the same `cfg`.
 
-What it prints as **by hand** is what a text edit cannot settle: a `crate::{…}`
+What it prints as **by hand** is what a text edit cannot settle: a
+`crate::<x>::` naming a module the row does not list (a unit test reaching up the
+layering, which moves to `tests/` or to `<x>`'s own tests: no crate may depend on
+a module above it), a `crate::{…}`
 group (its entries may name several modules), `CARGO_MANIFEST_DIR` (it now names
 the crate's folder), `crate::test_temp::lua_path`, an optional dependency no one
 feature of `dev` / `editor` turns on, a feature other than those two, a `pub mod`
@@ -67,12 +70,24 @@ def known_modules(root: Path) -> set[str]:
     return src | set(layout.moved(root))
 
 
-def rewrite(text: str, module: str, others: set[str]) -> tuple[str, set[str]]:
-    """`text` with its module paths rewritten for the crate, and the sibling modules it names."""
+TABLE = Path("tools/lint/src/layers/table.rs")
+
+
+def row_deps(root: Path, module: str) -> set[str]:
+    """The modules `module`'s row of the layer table may import."""
+    row = re.search(rf'(?:sim|platform)\(\s*"{module}",\s*&\[([^\]]*)\]', (root / TABLE).read_text())
+    if not row:
+        sys.exit(f"move-crate: {TABLE} has no row for `{module}`")
+    return set(re.findall(r'"(\w+)"', row.group(1)))
+
+
+def rewrite(text: str, module: str, deps: set[str]) -> tuple[str, set[str]]:
+    """`text` with its module paths rewritten for the crate, and the sibling modules it names.
+    Only the row's `deps` are rewritten: a module above it stays `crate::<x>::`, for `by_hand`."""
     named = set()
 
     def sibling(m: re.Match) -> str:
-        if m.group(1) not in others:
+        if m.group(1) not in deps:
             return m.group(0)
         named.add(m.group(1))
         return f"rusty_{m.group(1)}::"
@@ -83,8 +98,16 @@ def rewrite(text: str, module: str, others: set[str]) -> tuple[str, set[str]]:
     text = text.replace("crate::test_temp::dir()", "rusty_test_support::temp::dir()")
     text = re.sub(rf"(?<![\w/])src/{module}/mod\.rs", f"crates/{module}/src/lib.rs", text)
     text = re.sub(rf"(?<![\w/])src/{module}/", f"crates/{module}/src/", text)
-    named |= {m for m in re.findall(r"(?<!\w)rusty_(\w+)::", text) if m in others}
+    named |= {m for m in re.findall(r"(?<!\w)rusty_(\w+)::", text) if m in deps}
     return text, named
+
+
+def reaching_up(path: str, text: str, above: set[str]) -> list[str]:
+    """`path:line: why` for each `crate::<x>::` naming a module the row does not list."""
+    return [f"{path}:{n}: names `{x}`, which the row does not list: a test reaching up moves to "
+            f"`tests/` (or `{x}`'s own tests); live code is a layering violation"
+            for n, line in enumerate(text.splitlines(), 1)
+            for x in sorted(set(re.findall(r"(?<![\w$])crate::(\w+)::", line)) & above)]
 
 
 def by_hand(path: str, text: str) -> list[str]:
@@ -265,6 +288,7 @@ def move(root: Path, module: str) -> list[str]:
     if not src.is_dir() or crate.exists():
         sys.exit(f"move-crate: needs src/{module}/ and no crates/{module}/")
     others = known_modules(root) - {module}
+    deps = row_deps(root, module)
     crate.mkdir(parents=True)
     git = ["git", "-C", str(root), "mv"]
     subprocess.run([*git, f"src/{module}", f"crates/{module}/src"], check=True)
@@ -273,7 +297,7 @@ def move(root: Path, module: str) -> list[str]:
     for path in sorted((crate / "src").rglob("*")):
         if path.suffix not in (".rs", ".md"):
             continue
-        text, named = rewrite(path.read_text(), module, others)
+        text, named = rewrite(path.read_text(), module, deps & others)
         path.write_text(text)
         siblings |= named
         rel = path.relative_to(crate / "src")
@@ -283,16 +307,17 @@ def move(root: Path, module: str) -> list[str]:
             live_code.append(live(text))
             test_code.append(text)
         hand += by_hand(str(path.relative_to(root)), text)
+        hand += reaching_up(str(path.relative_to(root)), text, others - deps)
     code = "\n".join(test_code)
     used = {f for f in FEATURES if f'feature = "{f}"' in code}
-    deps = workspace_deps((root / "Cargo.toml").read_text())
-    normal = externs("\n".join(live_code), deps)
+    registry = workspace_deps((root / "Cargo.toml").read_text())
+    normal = externs("\n".join(live_code), registry)
     plan = Plan(root, module, hand)
     for s in sorted(siblings):
         plan.sibling(s)
     for d in normal:
         plan.add(d)
-    for d in sorted(set(externs(code, deps)) - set(normal)):
+    for d in sorted(set(externs(code, registry)) - set(normal)):
         plan.add(d, "dev-dependencies")
     (crate / "Cargo.toml").write_text(plan.manifest(used))
     declared = [f for f in FEATURES if plan.features[f] or f in used]

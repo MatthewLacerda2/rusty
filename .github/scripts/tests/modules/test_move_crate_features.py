@@ -54,6 +54,7 @@ FILES = {
     "src/shell/scene.rs": "", "src/shell/tests.rs": "fn g() { proptest::prop_assert!(true); }\n",
     "src/render/mod.rs": "", "src/dev/mod.rs": "", "src/render/scene.rs": "",
     "src/render/read_tests.rs": 'const F: &str = "src/shell/fixtures/a.png";\n',
+    "tools/lint/src/layers/table.rs": 'platform("shell", &["core", "dev", "render"]),\n',
     "crates/core/src/lib.rs": "", "crates/core/Cargo.toml": '[package]\nname = "rusty-core"\n\n[features]\ndev = []\n',
 }
 
