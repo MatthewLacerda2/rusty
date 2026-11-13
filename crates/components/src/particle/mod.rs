@@ -230,6 +230,7 @@ impl EntityRefs for ParticleEmitterComponent {
         self.sub_emitters.each_ref(visit);
     }
 
+    /// Test hook: the root's tests build it to reach every id slot.
     #[doc(hidden)]
     fn every_ref() -> Self {
         Self::default()

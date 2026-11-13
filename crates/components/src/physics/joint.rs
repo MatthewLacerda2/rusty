@@ -131,6 +131,7 @@ impl EntityRefs for JointComponent {
         }
     }
 
+    /// Test hook: the root's tests build it to reach every id slot.
     #[doc(hidden)]
     fn every_ref() -> Self {
         Self::default()

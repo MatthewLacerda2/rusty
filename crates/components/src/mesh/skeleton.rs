@@ -132,6 +132,7 @@ impl EntityRefs for MeshComponent {
         self.each_ref(&mut |_, r| visit(r));
     }
 
+    /// Test hook: the root's tests build it to reach every id slot.
     #[doc(hidden)]
     fn every_ref() -> Self {
         let body = BoneBody {

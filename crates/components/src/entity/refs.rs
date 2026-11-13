@@ -76,6 +76,7 @@ pub trait EntityRefs {
 
     /// A value with at least one id slot of each kind it can hold, for the tests that
     /// fill every slot through [`EntityRefs::visit_refs`].
+    /// Test hook: the root's tests build it to reach every id slot.
     #[doc(hidden)]
     fn every_ref() -> Self
     where
@@ -127,6 +128,7 @@ macro_rules! entity_walk {
 
             /// An entity carrying every reference-holding component, each with
             /// [`EntityRefs::every_ref`].
+            /// Test hook: the root's tests build it to reach every id slot.
             #[doc(hidden)]
             fn every_ref() -> Self {
                 let mut e = Self::new(0, "Refs".into());

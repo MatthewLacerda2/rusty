@@ -3346,7 +3346,6 @@ version = "0.1.0"
 dependencies = [
  "bytemuck",
  "glam 0.33.12",
- "image",
  "rusty-asset",
  "rusty-core",
  "rusty-procgen",

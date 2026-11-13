@@ -77,7 +77,7 @@ pub struct CanvasComponent {
     pub tilt: Vec2,
     /// `ScreenSpaceCamera`: how much the canvas lags behind the view when the
     /// camera turns, `0` (glued) … `1` (the whole turn), recovering over
-    /// `ui::SWAY_RECOVERY` seconds. Kept in `[0, 1]`.
+    /// the root's `ui::SWAY_RECOVERY` seconds. Kept in `[0, 1]`.
     pub sway: f32,
     /// Runtime only, never saved: the sway lag state.
     #[serde(skip)]
