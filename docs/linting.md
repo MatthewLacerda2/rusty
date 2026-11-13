@@ -598,8 +598,8 @@ new flag, gate, CI step or baseline.
 - **`test-temp-dir`** — a path under `std::env::temp_dir()` is shared by every test
   process, every worktree and (under `cargo test`) every test
   thread, so a fixed or process-keyed name races. Test code (the *Test code* bullet)
-  calls `crate::test_temp::dir()` (in-crate) or `crate::temp::dir()`
-  (integration) instead: both key on the process *and* the running test (#709,
+  calls `crate::test_temp::dir()` (in-crate; `rusty_test_support::temp::dir()` in a
+  moved crate) or `crate::temp::dir()` (integration) instead: both key on the process *and* the running test (#709,
   #999). Comment lines never count. The
   helper itself and Unix socket paths (which must stay short) carry an inline
   allow. `tools/` is not scanned: the lint crate's own tests are not the engine's.
