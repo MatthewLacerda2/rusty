@@ -107,16 +107,18 @@ def reaching_up(path: str, text: str, above: set[str]) -> list[str]:
     return [f"{path}:{n}: names `{x}`, which the row does not list: a test reaching up moves to "
             f"`tests/` (or `{x}`'s own tests); live code is a layering violation"
             for n, line in enumerate(text.splitlines(), 1)
-            for x in sorted(set(re.findall(r"(?<![\w$])crate::(\w+)::", line)) & above)]
+            for x in sorted(set(re.findall(r"(?<![\w$])crate::(\w+)(?!\w)", line)) & above)]
 
 
-def by_hand(path: str, text: str) -> list[str]:
-    """`path:line: why` for each line a text edit cannot settle."""
-    checks = [("crate::{", "a `crate::{…}` group: split it per crate"),
-              ("CARGO_MANIFEST_DIR", "names the crate's folder now: `rusty_core::project::checkout()`?"),
+def by_hand(path: str, text: str, before: str) -> list[str]:
+    """`path:line: why` for each line a text edit cannot settle. A `crate::{…}` group is read in
+    `before`, the text as it was: a `crate::<m>::{…}` group was the module's own, and stays so."""
+    groups = [f"{path}:{n}: a `crate::{{…}}` group: split it per crate"
+              for n, line in enumerate(before.splitlines(), 1) if "crate::{" in line]
+    checks = [("CARGO_MANIFEST_DIR", "names the crate's folder now: `rusty_core::project::checkout()`?"),
               ("crate::test_temp::lua_path", "the root's helper: build it from `rusty_test_support::temp::dir()`")]
-    out = [f"{path}:{n}: {why}" for n, line in enumerate(text.splitlines(), 1)
-           for needle, why in checks if needle in line]
+    out = groups + [f"{path}:{n}: {why}" for n, line in enumerate(text.splitlines(), 1)
+                    for needle, why in checks if needle in line]
     for n, line in enumerate(text.splitlines(), 1):
         for f in re.findall(r'feature\s*=\s*"([\w-]+)"', line):
             if f not in FEATURES:
@@ -297,7 +299,8 @@ def move(root: Path, module: str) -> list[str]:
     for path in sorted((crate / "src").rglob("*")):
         if path.suffix not in (".rs", ".md"):
             continue
-        text, named = rewrite(path.read_text(), module, deps & others)
+        before = path.read_text()
+        text, named = rewrite(before, module, deps & others)
         path.write_text(text)
         siblings |= named
         rel = path.relative_to(crate / "src")
@@ -306,7 +309,7 @@ def move(root: Path, module: str) -> list[str]:
         else:
             live_code.append(live(text))
             test_code.append(text)
-        hand += by_hand(str(path.relative_to(root)), text)
+        hand += by_hand(str(path.relative_to(root)), text, before)
         hand += reaching_up(str(path.relative_to(root)), text, others - deps)
     code = "\n".join(test_code)
     used = {f for f in FEATURES if f'feature = "{f}"' in code}

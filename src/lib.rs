@@ -10,7 +10,6 @@
 pub mod ai;
 pub mod api;
 pub mod app;
-pub mod asset;
 pub mod audio;
 pub mod components;
 pub mod ecs;
@@ -33,6 +32,7 @@ pub mod ui;
 // `tests/` keeps compiling.
 pub use rusty_core as core;
 pub use rusty_time as time;
+pub use rusty_asset as asset;
 
 #[cfg(feature = "dev")]
 pub mod dev;

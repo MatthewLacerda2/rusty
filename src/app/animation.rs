@@ -259,6 +259,8 @@ mod bounds_tests;
 #[cfg(test)]
 mod clamp_tests;
 #[cfg(test)]
+mod mirrored_tests;
+#[cfg(test)]
 mod dominant_tests;
 #[cfg(test)]
 mod end_resolve_tests;

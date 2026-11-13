@@ -6,7 +6,7 @@ use std::path::Path;
 use glam::Vec3;
 
 use super::fixture::animated_model;
-use crate::asset::fixtures_anim::{animated_buffer, ANIMATED_GLTF};
+use rusty_test_support::models::anim::{animated_buffer, ANIMATED_GLTF};
 use crate::core::fs::written;
 use crate::scene::asset_instance::instantiate_asset;
 use crate::scene::model_writes::ModelWrites;

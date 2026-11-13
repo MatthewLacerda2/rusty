@@ -7,7 +7,7 @@ use glam::Vec3;
 
 use super::fixture::{animated_model, armature_owner, chain_skin, reimport_to, warnings_of};
 use super::HITBOX_NAME;
-use crate::asset::fixtures_anim::ANIMATED_GLTF;
+use rusty_test_support::models::anim::ANIMATED_GLTF;
 use crate::components::ColliderComponent;
 use crate::scene::asset_instance::instantiate_asset;
 use crate::scene::model_writes::ModelWrites;

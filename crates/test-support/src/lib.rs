@@ -2,5 +2,7 @@
 //! because a `#[cfg(test)]` item is invisible outside its crate. Only ever a
 //! dev-dependency (crates/CLAUDE.md), so nothing that ships links it.
 
+pub mod logs;
+pub mod models;
 pub mod rebakes;
 pub mod temp;

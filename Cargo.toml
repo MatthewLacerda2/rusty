@@ -99,10 +99,10 @@ path = "tests/main.rs"
 [features]
 default = ["editor"]
 # The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.
-dev = ["rusty-core/dev", "dep:scorsese-providers", "dep:scorsese-core", "dep:libloading", "dep:getrandom"]
+dev = ["rusty-asset/dev", "rusty-core/dev", "dep:scorsese-providers", "dep:scorsese-core", "dep:libloading", "dep:getrandom"]
 # The egui editor (#431): `src/editor` and the shell's editor frontend. Default-on so
 # `cargo run` opens the editor; a shipped player builds with `--no-default-features`.
-editor = ["rusty-core/editor", "dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor", "dep:notify"]
+editor = ["rusty-asset/editor", "rusty-core/editor", "dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor", "dep:notify"]
 
 # The workspace's lint policy lives here, not in command-line flags, so a plain
 # `cargo clippy`, rust-analyzer and CI all read the same rules (#485); every member
@@ -134,6 +134,7 @@ workspace = true
 # The workspace's own crates, named the same way by the members that depend on them.
 rusty-core = { path = "crates/core" }
 rusty-time = { path = "crates/time" }
+rusty-asset = { path = "crates/asset" }
 rusty-test-support = { path = "crates/test-support" }
 
 winit = { version = "0.30.13" }
@@ -255,6 +256,7 @@ proptest = { version = "1", default-features = false, features = ["std"] }
 
 [dependencies]
 # The moved modules (crates/), re-exported in src/lib.rs under their old names.
+rusty-asset = { workspace = true }
 rusty-core = { workspace = true }
 rusty-time = { workspace = true }
 winit = { workspace = true }

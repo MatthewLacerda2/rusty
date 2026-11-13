@@ -5,7 +5,7 @@
 use glam::Vec3;
 
 use super::{instantiate_asset, set_lightmap_uv_settings};
-use crate::asset::fixtures::quad_mode_gltf;
+use rusty_test_support::models::quad_mode_gltf;
 use crate::asset::LightmapUvSettings;
 use crate::scene::Scene;
 
