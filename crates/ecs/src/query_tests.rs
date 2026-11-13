@@ -101,3 +101,22 @@ fn matches_the_order_filter_reference_on_a_mixed_scene() {
         .collect();
     assert_eq!(w.ids_with_particles(), reference);
 }
+
+/// `world::walks` counts a column's walks once a test has asked for it, and only
+/// then: the render scene's idle test reads it from another crate (#1706).
+#[test]
+fn walks_count_from_the_first_ask() {
+    use crate::world::walks;
+    let mut w = World::new();
+    let id = w.spawn("e".into());
+    w.set_particles(id, Some(emitter()));
+    std::thread::spawn(move || {
+        let _ = w.ids_with_component::<ParticleEmitterComponent>();
+        let armed = walks::of::<ParticleEmitterComponent>();
+        assert_eq!(armed, 0, "a walk before the first ask is not counted");
+        let _ = w.ids_with_component::<ParticleEmitterComponent>();
+        assert_eq!(walks::of::<ParticleEmitterComponent>(), 1);
+    })
+    .join()
+    .expect("the walks thread");
+}

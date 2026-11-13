@@ -59,7 +59,11 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
 - **Test hooks.** A `#[cfg(test)]` item is invisible outside its crate, so one that
   another crate's tests call is compiled in every build, `#[doc(hidden)] pub`, with a
   line saying it is a test hook (`core::project::pin_engine`, `core::hulls::forget`,
-  `core::wake::rings`).
+  `core::wake::rings`). One that needs a crate the hook's own crate has only as a
+  dev-dependency (a proptest strategy) is a `#[doc(hidden)] #[macro_export]` macro,
+  expanded in the caller's test against the caller's dev-dependency
+  (`rusty_ecs::edit_ops!`). Instrumentation kept under `#[cfg(test)]` (a counter a
+  test reads) is compiled in too, off until a test arms it (`ecs::world::walks`).
   Never a `test-support` feature: a dev-dependency feature the normal build lacks
   rebuilds the crate and everything above it for `cargo test` (`make feature-split`).
 - **Shared test helpers** live in `rusty-test-support` (`crates/test-support/`),
