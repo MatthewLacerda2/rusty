@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 /// path) and one whose textures are embedded, both converted.
 fn converted() -> (PathBuf, PathBuf, PathBuf) {
     let dir = rusty_test_support::temp::dir();
-    let fixtures = Path::new("tests/fixtures/models");
+    let fixtures = rusty_core::project::checkout().join("tests/fixtures/models");
     let missing = dir.join("missing.fbx");
     let embedded = dir.join("embedded.fbx");
     std::fs::copy(fixtures.join("missing_texture.fbx"), &missing).unwrap();

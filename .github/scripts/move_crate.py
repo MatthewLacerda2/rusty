@@ -37,7 +37,8 @@ What it prints as **by hand** is what a text edit cannot settle: a
 layering, which moves to `tests/` or to `<x>`'s own tests: no crate may depend on
 a module above it), a `crate::{…}`
 group (its entries may name several modules), `CARGO_MANIFEST_DIR` (it now names
-the crate's folder), `crate::test_temp::lua_path`, an optional dependency no one
+the crate's folder), a string path from the checkout's root (`"tests/fixtures/…"`,
+read from the working directory, which is the crate's folder under its tests), `crate::test_temp::lua_path`, an optional dependency no one
 feature of `dev` / `editor` turns on, a feature other than those two, a `pub mod`
 gated by anything but one feature, and every tracked file outside the crate that
 still names `src/<m>/` (a file path to rewrite, or a module path the lint tools
@@ -114,6 +115,10 @@ def reaching_up(path: str, text: str, above: set[str]) -> list[str]:
             for x in sorted(set(re.findall(r"(?<![\w$])crate::(\w+)(?!\w)", line)) & above)]
 
 
+#: A string literal naming a path from the checkout's root (`"tests/fixtures/…"`).
+CWD_PATH = re.compile(r'(?<![\w/])"(?:tests|engine|games|docs)/')
+
+
 def by_hand(path: str, text: str, before: str) -> list[str]:
     """`path:line: why` for each line a text edit cannot settle. A `crate::{…}` group is read in
     `before`, the text as it was: a `crate::<m>::{…}` group was the module's own, and stays so."""
@@ -124,6 +129,9 @@ def by_hand(path: str, text: str, before: str) -> list[str]:
     out = groups + [f"{path}:{n}: {why}" for n, line in enumerate(text.splitlines(), 1)
                     for needle, why in checks if needle in line]
     for n, line in enumerate(text.splitlines(), 1):
+        if CWD_PATH.search(line) and "checkout()" not in line and not line.lstrip().startswith("//"):
+            out.append(f"{path}:{n}: a path from the checkout's root read from the working directory, the "
+                       "crate's folder under its tests: `rusty_core::project::checkout().join(…)`?")
         for f in re.findall(r'feature\s*=\s*"([\w-]+)"', line):
             if f not in FEATURES:
                 out.append(f"{path}:{n}: feature `{f}` is none of {'/'.join(FEATURES)}: declare and forward it")

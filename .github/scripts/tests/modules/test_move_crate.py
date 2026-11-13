@@ -38,7 +38,7 @@ fn f() { let _ = glam::Vec3::ZERO; let p = env!("CARGO_MANIFEST_DIR"); }
 fn t() { crate::test_temp::dir(); }
 """
 TABLE = 'sim("core", &[]),\n    sim(\n        "asset",\n        &["core"],\n    ),\n    sim("scene", &["asset", "core"]),\n'
-INC = 'const F: &str = include_str!("../../../tests/f.fbx");\nconst O: &str = include_str!("../cache.rs");\n'
+INC = 'fn d() { let _ = std::path::Path::new("tests/fixtures/a.fbx"); }\nconst F: &str = include_str!("../../../tests/f.fbx");\nconst O: &str = include_str!("../cache.rs");\n'
 UP = "use crate::logging;\nfn bake() { crate::scene::bake(); }\n"
 
 
@@ -104,6 +104,9 @@ class Move(unittest.TestCase):
     def test_a_relative_include_still_names_its_file(self):
         inc = self.read("crates/asset/src/deep/inc_tests.rs")
         self.assertIn('include_str!("../../../../tests/f.fbx")', inc)
+        whys = "\n".join(self.hand)
+        self.assertIn("inc_tests.rs:1: a path from the checkout's root read from the working directory", whys)
+        self.assertNotIn("inc_tests.rs:2: a path from the checkout's root", whys)
         self.assertIn('include_str!("../cache.rs")', inc, "a file inside the crate moved with it")
         self.assertIn('include_bytes!("../../crates/asset/src/cache.rs")', self.read("src/dev/mp3.rs"))
 
