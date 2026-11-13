@@ -1,0 +1,273 @@
+//! crates/physics/src/shape/build_tests.rs — the single test home for `shape/build.rs`.
+//!
+//! All unit tests for body/collider construction live here, in one place, rather
+//! than split between an inline `#[cfg(test)] mod tests` in `shape/build.rs` and this
+//! sibling. The lint counts `shape/build.rs` and this sibling as one logical unit (see
+//! `tools/lint`), so there is no size-cap reason to test `shape/build.rs` from two
+//! locations. These assert the *values* `shape/build.rs` computes (baked extents, layer
+//! bits, body class) rather than just that a collider is produced, so
+//! arithmetic/comparison mutations are caught.
+
+use glam::Vec3;
+use rapier3d::prelude::*;
+
+use super::build::{
+    build_shape, class_of, classify, collider_inputs, interaction_groups, BodyClass,
+};
+use rusty_components::{CapsuleAxis, ColliderComponent, ColliderShape, RigidBodyComponent};
+
+/// Local-AABB half-extents `(x, y, z)` of a built collider.
+fn half_extents(c: &Collider) -> [f32; 3] {
+    let aabb = c.shape().compute_local_aabb();
+    [aabb.maxs[0], aabb.maxs[1], aabb.maxs[2]]
+}
+
+/// A unit cube (half-extent 0.5) as rest-pose positions + triangle indices.
+fn unit_cube() -> (Vec<[f32; 3]>, Vec<u32>) {
+    let p = vec![
+        [-0.5, -0.5, -0.5],
+        [0.5, -0.5, -0.5],
+        [0.5, 0.5, -0.5],
+        [-0.5, 0.5, -0.5],
+        [-0.5, -0.5, 0.5],
+        [0.5, -0.5, 0.5],
+        [0.5, 0.5, 0.5],
+        [-0.5, 0.5, 0.5],
+    ];
+    #[rustfmt::skip]
+    let i = vec![
+        0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 0, 4, 5,
+        0, 5, 1, 3, 2, 6, 3, 6, 7, 0, 3, 7, 0, 7, 4, 1, 5, 6, 1, 6, 2,
+    ];
+    (p, i)
+}
+
+pub(crate) fn mesh_shape(convex: bool) -> ColliderShape {
+    ColliderShape::Mesh {
+        convex,
+        local_min: Vec3::splat(-0.5),
+        local_max: Vec3::splat(0.5),
+    }
+}
+
+fn assert_cube_extent(collider: &Collider, half: f32) {
+    let aabb = collider.shape().compute_local_aabb();
+    for axis in 0..3 {
+        assert!((aabb.maxs[axis] - half).abs() < 1e-4, "max {:?}", aabb.maxs);
+        assert!((aabb.mins[axis] + half).abs() < 1e-4, "min {:?}", aabb.mins);
+    }
+}
+
+#[test]
+fn box_bakes_size_and_scale_into_half_extents() {
+    // half = size * scale * 0.5, per axis. Asymmetric values so a `*`->`+`/`/`
+    // mutation in any factor changes the result.
+    let c = build_shape(
+        &ColliderShape::Box {
+            size: Vec3::new(4.0, 6.0, 8.0),
+        },
+        Vec3::splat(2.0),
+        None,
+    )
+    .unwrap();
+    let h = half_extents(&c);
+    assert!((h[0] - 4.0).abs() < 1e-4, "x half-extent {h:?}"); // 4*2*0.5
+    assert!((h[1] - 6.0).abs() < 1e-4, "y half-extent {h:?}"); // 6*2*0.5
+    assert!((h[2] - 8.0).abs() < 1e-4, "z half-extent {h:?}"); // 8*2*0.5
+}
+
+#[test]
+fn sphere_bakes_radius_times_max_scale() {
+    // r = radius * scale.max_element() = 2 * 3 = 6.
+    let c = build_shape(
+        &ColliderShape::Sphere { radius: 2.0 },
+        Vec3::new(3.0, 1.0, 1.0),
+        None,
+    )
+    .unwrap();
+    for axis in half_extents(&c) {
+        assert!((axis - 6.0).abs() < 1e-4, "sphere radius");
+    }
+}
+
+#[test]
+fn cylinder_bakes_the_larger_cross_axis_radius_and_half_height_y() {
+    // Like a capsule, the radius follows the larger of scale.x and scale.z, so a
+    // collider never sits inside its drawn surface (#1131). Here x wins:
+    // r = radius * max(3, 1) = 2*3 = 6; half_h = height * scale.y * 0.5 = 10*4*0.5 = 20.
+    let c = build_shape(
+        &ColliderShape::Cylinder {
+            radius: 2.0,
+            height: 10.0,
+        },
+        Vec3::new(3.0, 4.0, 1.0),
+        None,
+    )
+    .unwrap();
+    let h = half_extents(&c);
+    assert!((h[0] - 6.0).abs() < 1e-4, "cylinder radius x {h:?}");
+    assert!((h[1] - 20.0).abs() < 1e-4, "cylinder half-height y {h:?}");
+    assert!((h[2] - 6.0).abs() < 1e-4, "cylinder radius z {h:?}");
+}
+
+/// A capsule built under `scale`, as `(radius, segment half-length, axis half-extents)`.
+fn capsule(radius: f32, height: f32, axis: CapsuleAxis, scale: Vec3) -> (f32, f32, [f32; 3]) {
+    let shape = ColliderShape::Capsule {
+        radius,
+        height,
+        axis,
+    };
+    let c = build_shape(&shape, scale, None).unwrap();
+    let cap = c.shape().as_capsule().expect("a capsule");
+    (cap.radius, cap.half_height(), half_extents(&c))
+}
+
+#[test]
+fn capsule_height_is_the_full_length_with_scale_baked_in() {
+    // Unscaled: height 2, radius 0.5 ⇒ segment half 1 - 0.5 = 0.5, full reach 1.
+    let (r, half, h) = capsule(0.5, 2.0, CapsuleAxis::Y, Vec3::ONE);
+    assert_eq!((r, half), (0.5, 0.5));
+    assert!(
+        (h[1] - 1.0).abs() < 1e-4 && (h[0] - 0.5).abs() < 1e-4,
+        "{h:?}"
+    );
+    // Scale (2, 3, 1.5): r = 0.5 * max(2, 1.5) = 1; full length 2*3 = 6 ⇒ half 3 - 1.
+    let (r, half, h) = capsule(0.5, 2.0, CapsuleAxis::Y, Vec3::new(2.0, 3.0, 1.5));
+    assert!(
+        (r - 1.0).abs() < 1e-5 && (half - 2.0).abs() < 1e-5,
+        "{r} {half}"
+    );
+    assert!((h[1] - 3.0).abs() < 1e-4, "{h:?}");
+}
+
+#[test]
+fn capsule_axis_picks_the_length_and_cross_scales() {
+    let scale = Vec3::new(4.0, 1.0, 2.0);
+    // X: length 1 * 4 = 4, r = 0.25 * max(1, 2) = 0.5 ⇒ segment half 2 - 0.5.
+    let (r, half, h) = capsule(0.25, 1.0, CapsuleAxis::X, scale);
+    assert!(
+        (r - 0.5).abs() < 1e-5 && (half - 1.5).abs() < 1e-5,
+        "{r} {half}"
+    );
+    assert!(
+        (h[0] - 2.0).abs() < 1e-4 && (h[1] - 0.5).abs() < 1e-4,
+        "{h:?}"
+    );
+    // Z: length 1 * 2 = 2, r = 0.25 * max(4, 1) = 1 ⇒ the caps meet: a sphere.
+    let (r, half, h) = capsule(0.25, 1.0, CapsuleAxis::Z, scale);
+    assert!((r - 1.0).abs() < 1e-5 && half == 0.0, "{r} {half}");
+    assert!((h[2] - 1.0).abs() < 1e-4, "{h:?}");
+    // Y: length 3 * 1, r = 0.25 * max(4, 2) = 1 ⇒ segment half 1.5 - 1.
+    let (r, half, _) = capsule(0.25, 3.0, CapsuleAxis::Y, scale);
+    assert!(
+        (r - 1.0).abs() < 1e-5 && (half - 0.5).abs() < 1e-5,
+        "{r} {half}"
+    );
+}
+
+#[test]
+fn convex_hull_from_mesh_matches_extents() {
+    let (p, i) = unit_cube();
+    let c = build_shape(&mesh_shape(true), Vec3::ONE, Some((&p, &i))).unwrap();
+    assert_cube_extent(&c, 0.5);
+}
+
+#[test]
+fn trimesh_from_mesh_matches_extents() {
+    let (p, i) = unit_cube();
+    let c = build_shape(&mesh_shape(false), Vec3::ONE, Some((&p, &i))).unwrap();
+    assert_cube_extent(&c, 0.5);
+}
+
+#[test]
+fn scale_is_baked_into_mesh_collider() {
+    let (p, i) = unit_cube();
+    let c = build_shape(&mesh_shape(false), Vec3::splat(2.0), Some((&p, &i))).unwrap();
+    assert_cube_extent(&c, 1.0);
+}
+
+#[test]
+fn mesh_collider_needs_at_least_four_points() {
+    // Exactly four non-coplanar points form a valid convex hull (a tetrahedron); the
+    // `< 4` guard must admit four, so a `<=`-mutation that rejects them is caught.
+    let tetra = vec![
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ];
+    assert!(build_shape(&mesh_shape(true), Vec3::ONE, Some((&tetra, &[]))).is_some());
+}
+
+#[test]
+fn degenerate_mesh_yields_no_collider() {
+    // Too few points for any shape.
+    let sparse = vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
+    assert!(build_shape(&mesh_shape(true), Vec3::ONE, Some((&sparse, &[0, 1, 2]))).is_none());
+    // Enough points, but a trimesh needs triangles.
+    let (p, _) = unit_cube();
+    assert!(build_shape(&mesh_shape(false), Vec3::ONE, Some((&p, &[]))).is_none());
+    // No geometry supplied at all.
+    assert!(build_shape(&mesh_shape(true), Vec3::ONE, None).is_none());
+}
+
+#[test]
+fn analytic_shapes_still_build_without_mesh() {
+    assert!(build_shape(&ColliderShape::Sphere { radius: 1.0 }, Vec3::ONE, None).is_some());
+}
+
+#[test]
+fn interaction_groups_encode_layer_bit_and_filter() {
+    let g = interaction_groups(5, 0xFF);
+    assert_eq!(g.memberships, Group::from_bits_truncate(1 << 5));
+    assert_eq!(g.filter, Group::from_bits_truncate(0xFF));
+    // Layers >= 32 have no representable bit -> empty membership, never a wrapped
+    // (panicking) `1 << 32` shift.
+    assert_eq!(interaction_groups(32, 0xFF).memberships, Group::empty());
+}
+
+#[test]
+fn is_kinematic_only_for_non_static_bodies_without_a_dynamic_rigidbody() {
+    let dynamic = RigidBodyComponent {
+        collision_detection: rusty_components::CollisionDetection::Discrete,
+        ..rusty_scene::authoring::default_rigidbody()
+    };
+    let kinematic = |s, rb| matches!(classify(s, rb), BodyClass::Kinematic);
+    assert!(!kinematic(true, None), "static is not kinematic");
+    assert!(kinematic(false, None), "no rigidbody defaults to kinematic");
+    assert!(
+        !kinematic(false, Some(&dynamic)),
+        "dynamic is not kinematic"
+    );
+    // A CharacterController's body is kinematic whatever else it carries (#451).
+    let mut world = rusty_ecs::World::new();
+    let id = world.spawn("Walker".to_string());
+    world.set_static(id, true);
+    world.set_rigidbody(id, Some(dynamic));
+    world.set_character_controller(id, Some(Default::default()));
+    assert!(matches!(class_of(&world, id), BodyClass::Kinematic));
+}
+
+#[test]
+fn collider_inputs_respects_the_active_flag() {
+    let mut world = rusty_ecs::World::new();
+    let id = world.spawn("Box".to_string());
+    world.set_collider(
+        id,
+        Some(ColliderComponent {
+            active: false,
+            shape: ColliderShape::Box { size: Vec3::ONE },
+            ..rusty_scene::authoring::default_collider()
+        }),
+    );
+    assert!(
+        collider_inputs(&world, id).is_none(),
+        "an inactive collider yields no body"
+    );
+    // Activating it produces inputs — pins the match guard in both directions.
+    world.collider_mut(id).unwrap().active = true;
+    assert!(
+        collider_inputs(&world, id).is_some(),
+        "an active collider yields inputs"
+    );
+}

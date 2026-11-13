@@ -11,11 +11,10 @@ so this makes them, and lists what it cannot decide:
   `lib.rs` is the crate's (left at the root, ecs's seeds stopped replaying, #2140;
   the `orphan-seeds` lint fails on one left behind);
 - in the crate's files: `crate::<dep>::` → `rusty_<dep>::` for each module its
-  row of the layer table (`tools/lint/src/layers/table.rs`) lists as a dep (a
-  macro's `$crate::<dep>::` → `::rusty_<dep>::`, and a file's `<dep>::` paths when it
-  imports the module bare, `use crate::<dep>;` or `{self, …}`, dropped with the attributes above it; a
-  re-export keeps its name, `pub use rusty_<dep> as <dep>;`, and `use crate::<dep> as x;`
-  names the crate as `x`), then `crate::<m>::` → `crate::` and `pub(in crate::<m>)` → `pub(crate)`
+  row of the layer table (`tools/lint/src/layers/table.rs`) lists as a dep, with only
+  the plain forms of an import that binds the module's name settled and every other
+  form listed (`crate_imports.py` says which), then `crate::<m>::` → `crate::` and
+  `pub(in crate::<m>)` → `pub(crate)`
   (no module `<m>` is left for it to name: ecs's 57 did not build, #2140), in that order, so a
   submodule named like a module, `crate::render::scene::`, stays the crate's
   own, the shared test helper (`crate::test_temp::dir()` →
@@ -46,7 +45,8 @@ What it prints as **by hand** is what a text edit cannot settle: a
 `crate::<x>::` naming a module the row does not list (a unit test reaching up the
 layering, which moves to `tests/` or to `<x>`'s own tests: no crate may depend on
 a module above it), a `crate::{…}`
-group (its entries may name several modules), `CARGO_MANIFEST_DIR` (it now names
+group (its entries may name several modules), a sibling import binding the module's name in a
+form the plain rules leave alone (`crate_imports.unsettled`), `CARGO_MANIFEST_DIR` (it now names
 the crate's folder), a string path from the checkout's root (`"tests/fixtures/…"`,
 read from the working directory, which is the crate's folder under its tests), `crate::test_temp::lua_path`, an optional dependency no one
 feature of `dev` / `editor` turns on, a feature other than those two, a `pub mod`
@@ -70,6 +70,7 @@ from pathlib import Path
 
 import modules as layout
 from crate_code import externs, is_test_file, live, workspace_deps
+import crate_imports
 from crate_paths import outside, paths, reaim, reaim_outside
 
 FEATURES = ("dev", "editor")
@@ -101,53 +102,26 @@ def row_deps(root: Path, module: str) -> set[str]:
 
 
 def rows_below(root: Path, module: str) -> set[str]:
-    """The modules of the layer table's rows before `module`'s, which sit below it: the table is
-    bottom-up."""
-    rows = re.findall(r'(?:sim|platform)\(\s*"(\w+)"', (root / TABLE).read_text())
-    return set(rows[:rows.index(module)]) if module in rows else set()
+    """The modules of the layer table's rows before `module`'s that do not name it back: the table
+    is bottom-up, but an earlier row may still reach a later one (`scripting` and `api` name each
+    other), and a crate a dev-dependency of `module` reached that way would make a cycle."""
+    rows = {m: set(re.findall(r'"(\w+)"', d)) for m, d in
+            re.findall(r'(?:sim|platform)\(\s*"(\w+)",\s*&\[([^\]]*)\]', (root / TABLE).read_text())}
+    order = list(rows)
+    if module not in rows:
+        return set()
+
+    def reaches(m: str, seen: set[str]) -> bool:
+        return any(d == module or (d not in seen and reaches(d, seen | {d})) for d in rows.get(m, ()))
+    return {m for m in order[:order.index(module)] if not reaches(m, {m})}
 
 
 def rewrite(text: str, module: str, deps: set[str]) -> tuple[str, set[str]]:
     """`text` with its module paths rewritten for the crate, and the sibling modules it names.
-    Only the row's `deps` are rewritten: a module above it stays `crate::<x>::`, for `by_hand`."""
-    named = set()
-
-    def sibling(m: re.Match) -> str:
-        if m.group(1) not in deps:
-            return m.group(0)
-        named.add(m.group(1))
-        return f"rusty_{m.group(1)}::"
-
-    # Siblings first: `crate::<m>::scene::` must not read as the sibling `scene`.
-    text = re.sub(r"(?<![\w$])crate::(\w+)::", sibling, text)
-    # A macro's `$crate` is now this crate, so its `$crate::<dep>::` names the sibling's
-    # crate from the root (scene's field tables had two that did not build, #2141).
-    text = re.sub(r"\$crate::(\w+)::", lambda m: f"::{sibling(m)}" if m.group(1) in deps else m.group(0), text)
-    # `use crate::<dep>;` imported the sibling module bare, so its file writes `<dep>::`:
-    # the import goes and each `<dep>::` names the crate (scene's `rehydrate::warned`, #2141).
-    # So does `use crate::<dep>::{self, …}`, rewritten above to bind `rusty_<dep>`: its
-    # `self` goes too (scene's `asset_instance`, #2141).
-    # PR #2156's review: an attribute above the removed import (`#[cfg(test)]`) goes with it,
-    # never onto the item after; a re-export keeps its name (`pub use crate::<dep>;` →
-    # `pub use rusty_<dep> as <dep>;`, a `pub use …::{self, …}` keeps `self as <dep>`); and
-    # `use crate::<dep> as x;` names the crate under `x`.
-    for dep in sorted(deps):
-        text = re.sub(rf"\b((?:pub(?:\([\w: ]+\))?\s+)?use )crate::{dep} as (\w+);", rf"\1rusty_{dep} as \2;", text)
-        text = re.sub(rf"\b(pub(?:\([\w: ]+\))?\s+use )crate::{dep};", rf"\1rusty_{dep} as {dep};", text)
-        # PR #2157's review: `self` anywhere in the group (`{A, self}`), and a lone `{self}`,
-        # which as a private import goes whole, like `use crate::<dep>;`.
-        text = re.sub(rf"(\bpub(?:\([\w: ]+\))?\s+use rusty_{dep}::\{{[^}}]*?)\bself(?=\s*[,}}])",
-                      rf"\1self as {dep}", text)
-        bare = re.compile(rf"^(?:[ \t]*#\[[^\n]*\]\n)*[ \t]*use (?:crate::{dep}|rusty_{dep}::\{{\s*self\s*\}});\n", re.M)
-        grouped = re.compile(rf"((?<!pub )(?<!\) )\buse rusty_{dep}::\{{)([^}}]*)\}}")
-        has_self = re.compile(r"(?:^|,)\s*self\s*(?:,|$)")
-        selfish = [g for g in grouped.finditer(text) if "{" not in g.group(2) and has_self.search(g.group(2))]
-        if bare.search(text) or selfish:
-            named.add(dep)
-            text = grouped.sub(lambda g: g.group(1) + _drop_self(g.group(2)) + "}"
-                               if "{" not in g.group(2) and has_self.search(g.group(2)) else g.group(0),
-                               bare.sub("", text))
-            text = re.sub(rf"(?<![\w:$]){dep}::", f"rusty_{dep}::", text)
+    Only the row's `deps` are rewritten (`crate_imports.siblings`, which settles the plain
+    import forms only and leaves the rest for `crate_imports.unsettled` to list): a module
+    above it stays `crate::<x>::`, for `by_hand`."""
+    text, named = crate_imports.siblings(text, deps)
     # `pub(in crate::<m>)` named the module's root, which is now the crate's own; left
     # as it was it names no module of the crate and fails to build (ecs had 57, #2140).
     text = re.sub(rf"\bpub\(in crate::{module}\)", "pub(crate)", text.replace(f"crate::{module}::", "crate::"))
@@ -155,12 +129,6 @@ def rewrite(text: str, module: str, deps: set[str]) -> tuple[str, set[str]]:
     text = paths(text, module)
     named |= {m for m in re.findall(r"(?<!\w)rusty_(\w+)(?:::|\s+as\b)", text) if m in deps}
     return text, named
-
-
-def _drop_self(group: str) -> str:
-    """A `use …::{…}` group's entries without a bare `self` (`self as x` stays)."""
-    entries = [e for e in group.split(",") if e.strip() and e.strip() != "self"]
-    return ", ".join(e.strip() for e in entries)
 
 
 def lib_header(text: str, module: str) -> str:
@@ -397,6 +365,7 @@ def move(root: Path, module: str) -> list[str]:
             live_code.append(live(text))
             test_code.append(text)
         hand += by_hand(str(path.relative_to(root)), text, before)
+        hand += crate_imports.unsettled(str(path.relative_to(root)), text, deps & others)
         hand += reaching_up(str(path.relative_to(root)), before, others - deps, below)
     code = "\n".join(test_code)
     used = {f for f in FEATURES if f'feature = "{f}"' in code}

@@ -349,7 +349,7 @@ move-crate: ## Move a module into crates/<m>/: make move-crate MODULE=<m>, then 
 # the survivors' diffs. A signal, never a gate: survivors exit 0, and only "no
 # report" (a red, cancelled or missing run) exits 1. No PR runs mutation any
 # more, so ask for this before readying a branch that adds mechanism.
-mutants-remote: ## Mutation on GitHub's runners, scoped. make mutants-remote SCOPE=diff or SCOPE='src/physics/**'
+mutants-remote: ## Mutation on GitHub's runners, scoped. make mutants-remote SCOPE=diff or SCOPE='crates/physics/src/**'
 	@test -n "$(SCOPE)" || { \
 		echo "mutants-remote: what should be mutated? SCOPE=diff, or path globs" >&2; \
 		echo "                e.g. make mutants-remote SCOPE='src/navigation/**'" >&2; \

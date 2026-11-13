@@ -16,7 +16,7 @@
 #   gh workflow run mutants-on-request.yml --ref <branch> -f scope='<scope>'
 #
 # The scope is `diff` (this branch against `origin/main`) or path globs
-# (`src/physics/**`), read by `.github/scripts/mutants-scope.py`, whose
+# (`crates/physics/src/**`), read by `.github/scripts/mutants-scope.py`, whose
 # docstring says why both become `--in-diff`. The scope and the request id
 # `make mutants-remote` generates are in the run's name: a dispatch returns no
 # run id, so the id is how the command finds *its* run.
@@ -50,7 +50,7 @@ on:
   workflow_dispatch:
     inputs:
       scope:
-        description: "`diff`, or space-separated path globs (src/physics/**)"
+        description: "`diff`, or space-separated path globs (crates/physics/src/**)"
         required: true
         type: string
       request:

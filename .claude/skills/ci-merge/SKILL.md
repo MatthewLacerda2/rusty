@@ -420,7 +420,7 @@ issue, and a follow-up PR off `main` when worth fixing.
 
 How to read a clean report:
 
-- **The weekly sweep covers only `src/app`, `src/scripting`, `src/physics`,
+- **The weekly sweep covers only `src/app`, `src/scripting`, `crates/physics/src`,
   `src/navigation`.** Elsewhere, silence means unmeasured, not clean.
 - **A scoped run names what it planned** (how many mutants, any from outside the
   scope). A `diff` with nothing to mutate says so; it is not a pass.
@@ -455,7 +455,7 @@ mechanism at all.
 
 **Establish equivalence by applying the mutation and running the suite**, never by
 reasoning about symmetry. Re-ask narrower (`make mutants-remote
-SCOPE=src/physics/query/through.rs`), or reproduce locally as the job runs it
+SCOPE=crates/physics/src/query/through.rs`), or reproduce locally as the job runs it
 (nextest, fail-fast, two test processes to fit the memory limit):
 
     git diff origin/main > branch.diff

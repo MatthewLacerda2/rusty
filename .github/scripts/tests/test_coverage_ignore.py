@@ -100,10 +100,10 @@ class Baseline(unittest.TestCase):
 
     def test_the_real_baseline_floors_real_directories(self):
         modules = cov.floored((REPO / cov.BASELINE).read_text())
-        dirs = cov.src_dirs(REPO)
+        dirs, crates = cov.src_dirs(REPO), cov.members(REPO)
         for module in modules:
             with self.subTest(module=module):
-                cov.ignore_regex(module, modules, dirs)
+                cov.ignore_regex(module, modules, dirs, crates=crates, root=REPO)
 
 
 class Workflow(unittest.TestCase):

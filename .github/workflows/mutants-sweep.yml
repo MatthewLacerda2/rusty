@@ -51,7 +51,7 @@ env:
   SWEEP_FILES: >-
     src/app/**/*.rs
     src/scripting/**/*.rs
-    src/physics/**/*.rs
+    crates/physics/src/**/*.rs
     src/navigation/**/*.rs
 
 jobs:

@@ -43,6 +43,7 @@ pub fn violations(layers: &[Layer], root: &Path, tree: &Tree) -> Vec<String> {
         let text = fs::read_to_string(&member).unwrap_or_default();
         let module = module.to_string_lossy();
         out.extend(members::stray(&module, &text, layers, &policy::POLICY));
+        out.extend(members::dev_stray(&module, &text, layers));
     }
     out
 }

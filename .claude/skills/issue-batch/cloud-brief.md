@@ -76,7 +76,7 @@ nothing to wait for.
   description and leave the PR a draft naming the run.
 - **A branch that adds mechanism asks for a scoped mutation run** with a line of
   its own in the PR description: `Mutation: diff` (or path globs, `Mutation:
-  src/physics/**`). **Never dispatch `mutants-on-request.yml` yourself**: runs
+  crates/physics/src/**`). **Never dispatch `mutants-on-request.yml` yourself**: runs
   dispatched at ready hold runners the gating CI that merges PRs waits behind.
   The merge queue dispatches the run after it merges your PR, on `main` at the
   squash commit, two at a time, and the report lands as a comment on your merged
