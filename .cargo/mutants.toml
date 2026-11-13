@@ -12,6 +12,7 @@ test_workspace = true
 exclude_globs = [
   "crates/audio/src/recording.rs",
   "crates/ecs/src/changes/ops.rs",
+  "crates/navigation/src/test_support.rs",
   "crates/physics/src/query/convex_fixture.rs",
   "crates/scene/src/asset_instance/collision/chair.rs",
   "crates/scene/src/asset_instance/humanoid_fixture.rs",

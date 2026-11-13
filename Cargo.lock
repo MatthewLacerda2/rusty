@@ -3300,6 +3300,7 @@ dependencies = [
  "rusty-components",
  "rusty-core",
  "rusty-ecs",
+ "rusty-navigation",
  "rusty-physics",
  "rusty-procgen",
  "rusty-scene",
@@ -3392,6 +3393,22 @@ dependencies = [
  "proptest",
  "rusty-components",
  "rusty-test-support",
+]
+
+[[package]]
+name = "rusty-navigation"
+version = "0.1.0"
+dependencies = [
+ "glam 0.33.12",
+ "log",
+ "proptest",
+ "rusty-components",
+ "rusty-core",
+ "rusty-ecs",
+ "rusty-physics",
+ "rusty-scene",
+ "rusty-test-support",
+ "serde_json",
 ]
 
 [[package]]

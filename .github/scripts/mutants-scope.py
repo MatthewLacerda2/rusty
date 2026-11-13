@@ -7,7 +7,7 @@ and this is what the workflow asks to make sense of it. Two spellings:
 - **`diff`** — the Rust this branch changed against `origin/main`: "would
   anything notice if what I just wrote were wrong?"
 - **anything else** — one or more git pathspec globs, space-separated
-  (`crates/physics/src/query/through.rs`, `'src/navigation/**'`). `**` crosses
+  (`crates/physics/src/query/through.rs`, `'crates/navigation/src/**'`). `**` crosses
   directories and `*` does not, git's own `:(glob)` rules.
 
 A third form is the merge queue's (#1934): **`diff` with `--commit SHA`**, the
@@ -31,7 +31,7 @@ says in the report's scope line how many planned mutants came from anywhere
 else. A named path with nothing to mutate is refused, red: reporting zero
 survivors for it would be a clean bill of health over an absence.
 
-    mutants-scope.py resolve 'src/navigation/**' --out plan.json --diff scope.diff
+    mutants-scope.py resolve 'crates/navigation/src/**' --out plan.json --diff scope.diff
     cargo mutants --list --json --in-diff scope.diff > planned.json
     mutants-scope.py check plan.json planned.json > scope.txt
 """
