@@ -11,8 +11,8 @@
 //! //! stored-format: the `<scene>.occlusion` file beside the scene
 //! ```
 //!
-//! A marker in `mod.rs` covers its directory and everything under it; one in
-//! `x.rs` covers that file and `x/`. `review_level.py` reads the markers.
+//! A marker in `mod.rs` (a moved crate's `lib.rs`) covers its directory and
+//! everything under it; one in `x.rs` covers that file and `x/`. `review_level.py` reads the markers.
 //!
 //! This rule keeps the marker from being forgotten. A non-test file of `src/` is a
 //! finding, on every file read or write, when it
@@ -109,7 +109,13 @@ pub fn marker(text: &str) -> Option<(usize, &str)> {
 
 /// Whether a marked file covers `path`: the file itself, a `mod.rs` of its
 /// directory or one above it, or the `<dir>.rs` beside any of those directories.
+/// Both sides are read at their module paths, so a moved crate's `lib.rs` covers its
+/// folder as the `mod.rs` it was (`shadergen`'s marker, #2140).
 pub fn covered(path: &str, marked: &[&str]) -> bool {
+    use crate::modules::module_path;
+    let path = &*module_path(path);
+    let marked: Vec<_> = marked.iter().map(|m| module_path(m)).collect();
+    let marked: Vec<&str> = marked.iter().map(|m| &**m).collect();
     if marked.contains(&path) {
         return true;
     }

@@ -13,3 +13,6 @@ src/a/x.rs	src/a/b/mod.rs	no
 src/b/y.rs	src/c/d.rs,src/b.rs	yes
 src/bb/y.rs	src/b.rs	no
 src/a/b/c.rs	src/a/b/c/mod.rs	no
+crates/a/src/b/c.rs	crates/a/src/lib.rs	yes
+crates/a/src/b.rs	src/a/mod.rs	yes
+crates/a/src/b.rs	crates/b/src/lib.rs	no
