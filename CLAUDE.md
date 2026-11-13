@@ -107,7 +107,7 @@ wins.
   `main`, or a **merge train** of up to four tested together; a branch is updated by
   **merging `main` in, never rebasing**; ≈3 attempts at one failure, then draft and hand
   it to the user. Markdown-only PRs skip CI's build, **except the Markdown code reads**
-  (`docs/api/`, `docs/game-agent.md`, `src/core/project/game_claude.md`). `ci-merge`.
+  (`docs/api/`, `docs/game-agent.md`, `crates/core/src/project/game_claude.md`). `ci-merge`.
 - **Coding parallelises; merging does not.** **Cloud coders ≤5, local coders ≤2,
   read-only agents without limit**; **one worktree per branch** under
   `.claude/worktrees/`, **never a shared `CARGO_TARGET_DIR`**; split issues by
@@ -126,8 +126,7 @@ wins.
   **hard gate**, green-to-merge. One *auditing quality* (mutation, coverage) is an
   **informational signal**: it runs **weekly** on `main` or **on request** over what
   someone names, never on a pull request, **never blocks a merge**, and is **surfaced
-  where the agent acts on it** (terminal, job summary). No hard gate where a signal
-  does.
+  where the agent acts on it** (terminal, job summary); no hard gate where a signal does.
 
 ## Issues, labels & priority
 - **Issues come before PRs.** The unit of work is an issue a future Claude can read cold
@@ -267,7 +266,8 @@ adapts it.
   `src/dev/providers/`: `dev` only, refused during Play, held to the project's `budget`,
   never made by a test (traits and mocks). `docs/providers.md`.
 - **Use `glam`** for all math (`deny.toml` bans `cgmath`, and `nalgebra` outside
-  physics); keep egui / wgpu / mlua decoupled. **Single crate.**
+  physics); keep egui / wgpu / mlua decoupled. **A workspace being split one crate
+  per module** (`crates/<module>/`): `crates/CLAUDE.md` is the recipe for the next.
 - **Ships for macOS and Linux**, no other platform (`platform-cfg`). Not done on one.
 - **Group by subfolder, not by filename prefix** (`draw_lighting.rs` →
   `draw/lighting.rs`): aim for ≲10 source files per module directory (`dir-size` fails

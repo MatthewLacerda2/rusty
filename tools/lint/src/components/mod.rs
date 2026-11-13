@@ -62,12 +62,15 @@ const AXES: &[&str] = &["add_menu", "inspector", "api"];
 /// Entry point: discover every component and fail on any unwaived missing axis.
 pub fn run() {
     let components = discover();
-    let registry = discover::registry_source(std::path::Path::new(discover::COMPONENTS_DIR))
-        .unwrap_or_default();
+    let registry = discover::registry_source(&crate::modules::real(
+        std::path::Path::new(""),
+        discover::COMPONENTS_DIR,
+    ))
+    .unwrap_or_default();
     let add_src = kinds::with_kind_guards(&add_menu_src(), &registry);
     let editor_blob = editor_blob();
     let api_stems = api_stems();
-    let api_mod = read(API_MOD);
+    let api_mod = read(crate::modules::real(std::path::Path::new(""), API_MOD));
     let docs = read_md_dir(DOCS).to_lowercase();
 
     let present = |field: &str, axis: &str| match axis {

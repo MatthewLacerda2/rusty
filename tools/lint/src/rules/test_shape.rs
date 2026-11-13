@@ -74,7 +74,8 @@ pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
 
 /// Whether `path` is the GPU helper module: `test_gpu.rs` or a file under `test_gpu/`.
 fn is_helper(path: &str) -> bool {
-    path.strip_prefix(GPU_HELPER)
+    crate::modules::module_path(path)
+        .strip_prefix(GPU_HELPER)
         .is_some_and(|rest| rest == ".rs" || rest.starts_with('/'))
 }
 

@@ -139,7 +139,7 @@ pub fn check(sources: &[Source]) -> Vec<Finding> {
             None => {}
         }
     }
-    let engine = |s: &&Source| s.path.starts_with("src/");
+    let engine = |s: &&Source| crate::modules::module_path(&s.path).starts_with("src/");
     let lives: Vec<_> = sources
         .iter()
         .filter(engine)

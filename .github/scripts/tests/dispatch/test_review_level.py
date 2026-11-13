@@ -33,6 +33,11 @@ class Level(unittest.TestCase):
             with self.subTest(why):
                 self.assertEqual(review_level.level(["README.md", path]), ("high", [(why, path)]))
 
+    def test_a_row_holds_its_module_in_either_place(self):
+        for path in ("crates/core/src/random.rs", "src/core/random.rs", "crates/scripting/src/sandbox/a.rs"):
+            with self.subTest(path):
+                self.assertEqual(review_level.level([path])[0], "high")
+
     def test_everything_else_is_medium(self):
         paths = ["src/render/post/bloom.rs", "docs/api/Scene.md", ".github/scripts/board.py",
                  "src/scene/io_helpers.rs", "src/scripting/sandboxing.rs",

@@ -20,7 +20,8 @@ pub const RULE: &str = "drag-range";
 /// Every `.range(` code line of an editor file that uses `DragValue`, and every
 /// `Slider::new(` code line of an editor file.
 pub fn check(path: &str, source: &str) -> Vec<Finding> {
-    if !path.starts_with("src/editor/") {
+    let at = crate::modules::module_path(path);
+    if !at.starts_with("src/editor/") {
         return Vec::new();
     }
     let drags = source.contains("DragValue");

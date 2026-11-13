@@ -1,0 +1,11 @@
+# Helpers every member's in-crate tests share. A crate of its own because a
+# `#[cfg(test)]` item is invisible outside its crate; it is only ever a
+# dev-dependency, so no build that ships links it.
+[package]
+name = "rusty-test-support"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

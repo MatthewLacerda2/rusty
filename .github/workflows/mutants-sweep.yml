@@ -63,13 +63,13 @@ jobs:
   # not count. Fails open: if the lookup itself errors, the sweep runs (a wasted
   # weekend beats a silent gap), so a skipped sweep reads as `skipped` — not red
   # — to main-health. `force` bypasses the lookup. On `main` this job goes red
-  # only when sizing fails (below): `cargo mutants --list` errors, the count is
+  # only when sizing fails (below): `cargo mutants --workspace --list` errors, the count is
   # zero, or the matrix would pass GitHub's ceiling. main-health then files it
   # on the board like any red run, with the reason in this job's summary.
   # Any ref but `main` is refused, red, before anything else (#972).
   #
   # When it sweeps, it also sizes the matrix (#1684): it counts the mutants
-  # (`cargo mutants --list` builds nothing) and `mutants-shards.py` turns the
+  # (`cargo mutants --workspace --list` builds nothing) and `mutants-shards.py` turns the
   # count into the shard list and the width, from the per-shard rates the
   # newest earlier sweep measured (its `mutants-report` artifact keeps each
   # shard's seconds and outcome lists under `shards/`): shards sized so the
@@ -184,10 +184,10 @@ jobs:
           set -f   # the globs are for cargo-mutants, not the shell
           files=()
           for glob in $SWEEP_FILES; do files+=(--file "$glob"); done
-          if ! cargo mutants --list "${files[@]}" > mutants-list.txt 2> list-error.txt; then
-            { echo 'Sizing failed: `cargo mutants --list` exited non-zero:'; echo '```'
+          if ! cargo mutants --workspace --list "${files[@]}" > mutants-list.txt 2> list-error.txt; then
+            { echo 'Sizing failed: `cargo mutants --workspace --list` exited non-zero:'; echo '```'
               tail -n 20 list-error.txt; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
-            echo "::error::cargo mutants --list failed, so the matrix could not be sized; see the job summary"
+            echo "::error::cargo mutants --workspace --list failed, so the matrix could not be sized; see the job summary"
             exit 1
           fi
           if ! python3 .github/scripts/mutants-shards.py plan --reports "${REPORTS:-none}" --source "$SOURCE" \
@@ -313,7 +313,7 @@ jobs:
           for glob in $SWEEP_FILES; do files+=(--file "$glob"); done
           rc=0
           timeout --signal=INT --kill-after=60s "${budget}s" \
-            cargo mutants --test-tool nextest --no-shuffle --timeout-multiplier 3 \
+            cargo mutants --workspace --test-tool nextest --no-shuffle --timeout-multiplier 3 \
               --shard '${{ matrix.shard }}/${{ strategy.job-total }}' --sharding round-robin \
               "${files[@]}" \
               -- --features dev --fail-fast --test-threads 2 || rc=$?

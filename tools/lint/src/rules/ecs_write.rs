@@ -40,7 +40,8 @@ const SHAPES: &[&str] = &[
 
 /// Every non-test line of `source` with a raw write to the World's store.
 pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
-    if !path.starts_with("src/ecs/") {
+    let at = crate::modules::module_path(path);
+    if !at.starts_with("src/ecs/") {
         return Vec::new();
     }
     code_lines(source)

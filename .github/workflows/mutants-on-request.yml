@@ -174,7 +174,7 @@ jobs:
           # An empty diff (a branch that changed no Rust) plans nothing; it is
           # not handed to cargo-mutants, which refuses an empty `--in-diff`.
           if [ -s scope.diff ]; then
-            cargo mutants --list --json --in-diff scope.diff > planned.json
+            cargo mutants --workspace --list --json --in-diff scope.diff > planned.json
           else
             : > planned.json
           fi
@@ -205,7 +205,7 @@ jobs:
           ulimit -v 8388608
           rc=0
           timeout --signal=INT --kill-after=60s "${budget}s" \
-            cargo mutants --test-tool nextest --no-shuffle --timeout-multiplier 3 \
+            cargo mutants --workspace --test-tool nextest --no-shuffle --timeout-multiplier 3 \
               --in-diff scope.diff -- --features dev --fail-fast --test-threads 2 || rc=$?
           echo "status=$rc" >> "$GITHUB_OUTPUT"
 

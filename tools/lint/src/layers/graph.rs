@@ -1,9 +1,9 @@
 //! The measured module graph: who references whom, from the source.
 
 use super::scan::{self, Ref, Tree};
+use crate::modules;
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::Path;
 
 /// One edge occurrence: `from` names `crate::<to>` at `file:line`.
 pub struct Edge {
@@ -12,10 +12,10 @@ pub struct Edge {
     pub at: String,
 }
 
-/// The top-level modules under `src`: every directory but `bin`, plus any
-/// `src/<name>.rs` that is not a crate root.
+/// The top-level modules: every directory under `src` but `bin`, plus any
+/// `src/<name>.rs` that is not a crate root, plus every moved module's crate.
 pub fn modules(tree: &Tree) -> Vec<String> {
-    let mut out: Vec<String> = fs::read_dir(&tree.src)
+    let mut out: Vec<String> = fs::read_dir(tree.root.join("src"))
         .into_iter()
         .flatten()
         .flatten()
@@ -32,21 +32,23 @@ pub fn modules(tree: &Tree) -> Vec<String> {
             };
             is_mod.then_some(name)
         })
+        .chain(modules::moved(&tree.root))
         .collect();
     out.sort();
     out.dedup();
     out
 }
 
-/// Every cross-module reference in non-test code under `src`.
+/// Every cross-module reference in non-test module code.
 pub fn edges(tree: &Tree) -> Vec<Edge> {
     let mut out = Vec::new();
     for (file, content) in tree.live_files() {
-        let Some(from) = owner(&tree.src, file) else {
+        let Some(from) = tree.owner(file) else {
             continue;
         };
         let norm = file.to_string_lossy().into_owned();
-        for Ref { line, module } in scan::refs(content) {
+        let in_crate = tree.crate_of(file).is_some();
+        for Ref { line, module } in scan::refs(content, in_crate) {
             if module != from {
                 out.push(Edge {
                     from: from.clone(),
@@ -57,14 +59,6 @@ pub fn edges(tree: &Tree) -> Vec<Edge> {
         }
     }
     out
-}
-
-/// The top-level module a file belongs to; `None` for crate roots and binaries.
-pub fn owner(src: &Path, file: &Path) -> Option<String> {
-    let rel = file.strip_prefix(src).ok()?;
-    let first = rel.components().next()?.as_os_str().to_str()?;
-    let name = first.strip_suffix(".rs").unwrap_or(first);
-    (!matches!(name, "bin" | "lib" | "main")).then(|| name.to_string())
 }
 
 /// `from → {to → first occurrence}`, the deduplicated graph.

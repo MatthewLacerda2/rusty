@@ -103,7 +103,8 @@ fn fn_end(code: &[String], from: usize) -> usize {
 /// Every non-test line of an engine source that writes a file with no
 /// `note_written` after it in its function. `test[i]` says line `i` is test code.
 pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
-    if !path.starts_with("src/") || path.starts_with(HOME) {
+    let at = crate::modules::module_path(path);
+    if !at.starts_with("src/") || at.starts_with(HOME) {
         return Vec::new();
     }
     let code = bare_lines(source);

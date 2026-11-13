@@ -49,7 +49,8 @@ const LOGGING: &[&str] = &[
 /// Every logging line of a converter's source, and a converter root without
 /// [`DENY`].
 pub fn check(path: &str, source: &str) -> Vec<Finding> {
-    let Some(name) = converter(path) else {
+    let at = crate::modules::module_path(path);
+    let Some(name) = converter(&at) else {
         return Vec::new();
     };
     let finding = |line, message: &str| Finding {
@@ -69,7 +70,7 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
             ));
         }
     }
-    let root = path == format!("{ROOT}{name}/mod.rs") || path == format!("{ROOT}{name}.rs");
+    let root = at == format!("{ROOT}{name}/mod.rs") || at == format!("{ROOT}{name}.rs");
     if root && !denies(source) {
         found.push(finding(
             1,

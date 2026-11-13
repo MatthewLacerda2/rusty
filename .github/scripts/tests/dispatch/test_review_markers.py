@@ -79,7 +79,7 @@ class Markers(unittest.TestCase):
         # markers are held here, read straight from the files.
         for owner in ["src/scene/lighting/occlusion/mod.rs", "src/navigation/bake/saved/mod.rs",
                       "src/scene/serialize.rs", "src/scene/io/mod.rs", "src/scene/prefab/mod.rs",
-                      "src/core/storage.rs", "src/asset/sidecar/mod.rs", "src/asset/convert/mod.rs",
+                      "crates/core/src/storage.rs", "src/asset/sidecar/mod.rs", "src/asset/convert/mod.rs",
                       "src/asset/import_cache/mod.rs", "src/asset/animation_graph/mod.rs",
                       "src/shadergen/mod.rs", "src/dev/demo/mod.rs", "src/scene/lighting/io.rs"]:
             with self.subTest(owner):
@@ -105,6 +105,12 @@ class Markers(unittest.TestCase):
         self.assertIsNone(review_level.covering("src/c/e.rs", marked))
         self.assertIsNone(review_level.covering("src/bb/y.rs", marked))
         self.assertEqual(review_level.reasons_for("src/a/z.rs", marked), ["stored format (a)"])
+
+    def test_a_moved_module_is_covered_as_it_was(self):
+        marked = {"crates/a/src/lib.rs": "a", "src/b/mod.rs": "b"}
+        self.assertEqual(review_level.covering("crates/a/src/x/y.rs", marked), "a")
+        self.assertEqual(review_level.covering("crates/b/src/y.rs", marked), "b")
+        self.assertIsNone(review_level.covering("crates/a/build.rs", marked))
 
     def test_a_marker_a_pr_adds_counts(self):
         files = [{"filename": "src/new/mod.rs", "patch": "@@ -1 +1,3 @@\n //! x\n+//!\n+//! stored-format: `.new`"},

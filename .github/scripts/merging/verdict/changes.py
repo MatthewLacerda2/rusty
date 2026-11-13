@@ -16,7 +16,7 @@ from __future__ import annotations
 # Path prefixes: the scripting-API reference is one file per namespace (#569); a
 # prefix not ending in `/` is one file, the game guide `session-mcp` serves and the
 # game CLAUDE.md template the build embeds (#1313).
-CODE_DOCS = ("docs/api/", "docs/game-agent.md", "src/core/project/game_claude.md")
+CODE_DOCS = ("docs/api/", "docs/game-agent.md", "crates/core/src/project/game_claude.md")
 
 
 def code_doc_example(prefix: str) -> str:

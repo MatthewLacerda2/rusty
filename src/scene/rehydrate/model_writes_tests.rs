@@ -9,9 +9,9 @@ use glam::Vec3;
 
 use super::ModelWrites;
 use crate::components::{ColliderComponent, ColliderShape};
-use crate::core::fs::written::contract::{follows_rebakes, Bake};
 use crate::core::fs::written::write;
 use crate::scene::{asset_mesh_component, Scene};
+use rusty_test_support::rebakes::{follows_rebakes, Bake};
 
 /// A two-triangle unit quad (6 indices).
 const QUAD: &str = "o Model\nv 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nf 1 2 3\nf 1 3 4\n";

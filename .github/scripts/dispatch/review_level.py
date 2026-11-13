@@ -21,13 +21,21 @@ directory and everything under it, one in `x.rs` covers that file and `x/`. The
 markers come from `origin/main` (`git grep`, one local call, [`tree_markers`])
 plus any marker line a PR's own patches add or remove ([`patch_markers`]), so a
 PR that brings a new format reads `high` too. Only what a marker cannot express
-(a fingerprint file, WGSL bindings, a path outside `src/`) stays a hand row.
+(a fingerprint file, WGSL bindings, a path outside the modules) stays a hand row.
+
+**A module reads the same before and after its move into a crate** (#2139): a
+path, a table entry and a marker are each compared at its module path
+(`modules.module_path`), so `crates/core/src/random.rs` is the row
+`src/core/random.rs` was, and a crate's `lib.rs` marker covers the crate as a
+`mod.rs` one covers its directory.
 """
 
 from __future__ import annotations
 
 import subprocess
 import sys
+
+import modules
 
 #: Why a path calls for `high`, then the paths. A miss there is a broken save,
 #: a desynced harness, an escape from the sandbox, or a queue that merges the
@@ -43,8 +51,8 @@ TABLE: dict[str, tuple[str, ...]] = {
         "engine/shaders/forward/bindings.wgsl",
     ),
     "determinism": (
-        "src/core/random.rs",  # the seeded Random resource
-        "src/core/collections.rs",  # the deterministic maps the sim must use
+        "crates/core/src/random.rs",  # the seeded Random resource
+        "crates/core/src/collections.rs",  # the deterministic maps the sim must use
         "src/api/random.rs",  # Random, the script's view of that stream
         "clippy.toml",  # the disallowed clocks, RNGs and std hash maps
         "tools/lint/src/determinism/",  # `make determinism`, the guard's opt-outs
@@ -58,7 +66,7 @@ TABLE: dict[str, tuple[str, ...]] = {
         # which `Debug.Stats` keys are wall-clock and stay out of the harness's
         # `results.json`: a timing key let through makes two runs of one seed differ
         # (#1872 found `render_extract_us` leaking, and read `medium`)
-        "src/core/frame_stats.rs",
+        "crates/core/src/frame_stats.rs",
     ),
     "scripting sandbox": (
         "src/scripting/sandbox/",  # the gameplay VM's stdlib: no os/io, require's reach
@@ -82,7 +90,10 @@ PATTERN = r"^[[:space:]]*//! stored-format:"
 
 def covering(path: str, marked: dict[str, str]) -> str | None:
     """The text of the nearest marker covering `path`: the file's own, then each
-    enclosing directory's `mod.rs` or `<dir>.rs`, as `tools/lint`'s rule reads them."""
+    enclosing directory's `mod.rs` or `<dir>.rs`, as `tools/lint`'s rule reads them.
+    Both sides are read at their module paths."""
+    path = modules.module_path(path)
+    marked = {modules.module_path(p): why for p, why in marked.items()}
     if path in marked:
         return marked[path]
     parent = path
@@ -101,12 +112,12 @@ def parse_marker(line: str) -> str | None:
 
 
 def tree_markers(rev: str | None = "origin/main", cwd=None) -> dict[str, str]:
-    """`path -> text` for every marker under `src/` at `rev` (the working tree when
+    """`path -> text` for every marker under `src/` and `crates/` at `rev` (the working tree when
     `None`, or when `rev` cannot be read). A marker may be indented, as the lint's
     `marker()` and [`parse_marker`] read it. Says on stderr when it falls back or
     finds nothing, since either makes every marked path read `medium`."""
     tree = [rev] if rev else []
-    done = subprocess.run(["git", "grep", "-I", "-E", "--full-name", "-e", PATTERN, *tree, "--", "src"],
+    done = subprocess.run(["git", "grep", "-I", "-E", "--full-name", "-e", PATTERN, *tree, "--", "src", modules.CRATES],
                           capture_output=True, text=True, check=False, cwd=cwd)
     if done.returncode not in (0, 1):
         print(f"review-level: cannot read {rev or 'the working tree'}'s markers"
@@ -137,8 +148,10 @@ def patch_markers(files: list[dict]) -> dict[str, str]:
 def reasons_for(path: str, marked: dict[str, str] | None = None) -> list[str]:
     """Each responsibility of [`TABLE`] that `path` falls under, then the stored
     format a marker covering it names."""
+    at = modules.module_path(path)
     reasons = [why for why, entries in TABLE.items()
-               if any(path == entry or (entry.endswith("/") and path.startswith(entry)) for entry in entries)]
+               if any(at == (row := modules.module_path(entry)) or (row.endswith("/") and at.startswith(row))
+                      for entry in entries)]
     if (text := covering(path, marked or {})) is not None:
         reasons.append(f"stored format ({text})")
     return reasons

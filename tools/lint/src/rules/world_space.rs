@@ -36,7 +36,8 @@ const TRANSFORM_READS: &[&str] = &[".transform(", "to_matrix(", ".pose()"];
 
 /// Every line of `source` that derives world space; `test` marks its test lines.
 pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
-    if !path.starts_with("src/") || OWNERS.iter().any(|o| path.starts_with(o)) {
+    let at = crate::modules::module_path(path);
+    if !at.starts_with("src/") || OWNERS.iter().any(|o| at.starts_with(o)) {
         return Vec::new();
     }
     let code = code_lines(source);

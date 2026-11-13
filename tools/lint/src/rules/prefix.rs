@@ -86,7 +86,10 @@ pub fn owner_of(dir: &str) -> Option<String> {
 
 /// The findings for one directory, given its file names.
 pub fn check_dir(dir: &str, files: &[&str]) -> Vec<Finding> {
-    if EXEMPT.iter().any(|(d, _)| *d == dir) {
+    if EXEMPT
+        .iter()
+        .any(|(d, _)| *d == crate::modules::module_path(dir))
+    {
         return Vec::new();
     }
     let owner = owner_of(dir).map(|p| (fs::read_to_string(&p).unwrap_or_default(), p));

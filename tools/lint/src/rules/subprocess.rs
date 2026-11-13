@@ -21,7 +21,8 @@ pub const RULE: &str = "subprocess";
 
 /// Every line of an engine source that names `std::process::Command`.
 pub fn check(path: &str, source: &str) -> Vec<Finding> {
-    if !path.starts_with("src/") {
+    let at = crate::modules::module_path(path);
+    if !at.starts_with("src/") {
         return Vec::new();
     }
     code_lines(source)

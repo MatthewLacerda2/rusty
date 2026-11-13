@@ -16,6 +16,13 @@ fn the_default_scene_serializes_to_the_same_bytes_every_build() {
     assert_eq!(built_json(), built_json());
 }
 
+/// A new project's build settings start on the scene the engine seeds.
+#[test]
+fn the_default_startup_scene_is_the_seeded_scene() {
+    let startup = crate::core::application::DEFAULT_STARTUP_SCENE;
+    assert_eq!(startup, super::DEFAULT_SCENE_PATH);
+}
+
 #[test]
 fn building_the_default_scene_replaces_what_was_there() {
     let mut scene = Scene::new();

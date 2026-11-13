@@ -1,8 +1,10 @@
-//! The crates `Cargo.toml` depends on: the set the scan looks for, and the set every
+//! The crates a manifest depends on: the set the scan looks for, and the set every
 //! one of which the table must account for.
 
 /// The crate names (`-` read as `_`) under `[dependencies]` and every
 /// `[target.….dependencies]`; dev- and build-dependencies are not the modules'.
+/// The workspace's own crates (`rusty-<module>`) are modules, not external
+/// crates: the module half of the table holds them.
 pub fn dependencies(manifest: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut in_deps = false;
@@ -16,8 +18,10 @@ pub fn dependencies(manifest: &str) -> Vec<String> {
         let Some((key, _)) = line.split_once('=').filter(|_| in_deps) else {
             continue;
         };
-        let key = key.trim();
-        if key.starts_with(|c: char| c.is_ascii_alphabetic()) {
+        // `serde.workspace = true` names `serde`.
+        let key = key.trim().split('.').next().unwrap_or("");
+        let own = key.starts_with("rusty-") || key.starts_with("rusty_");
+        if key.starts_with(|c: char| c.is_ascii_alphabetic()) && !own {
             out.push(key.replace('-', "_"));
         }
     }

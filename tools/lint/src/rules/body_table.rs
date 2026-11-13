@@ -25,7 +25,8 @@ const CHANGES: &[&str] = &[".insert(", ".remove("];
 
 /// Every non-test line of `source` that changes the body table uncounted.
 pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
-    if !path.starts_with("src/physics/") {
+    let at = crate::modules::module_path(path);
+    if !at.starts_with("src/physics/") {
         return Vec::new();
     }
     let lines = code_lines(source);

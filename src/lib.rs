@@ -13,7 +13,6 @@ pub mod app;
 pub mod asset;
 pub mod audio;
 pub mod components;
-pub mod core;
 pub mod ecs;
 #[cfg(feature = "editor")]
 pub mod editor;
@@ -27,8 +26,13 @@ pub mod scene;
 pub mod scripting;
 pub mod shadergen;
 pub mod shell;
-pub mod time;
 pub mod ui;
+
+// The modules already moved into crates of their own (crates/CLAUDE.md), under their
+// old names, so every `crate::core::…` path here and `rusty::core::…` path in
+// `tests/` keeps compiling.
+pub use rusty_core as core;
+pub use rusty_time as time;
 
 #[cfg(feature = "dev")]
 pub mod dev;

@@ -56,7 +56,7 @@ fn candidates(field: &str) -> Vec<String> {
 /// one namespace unit.
 pub(super) fn api_stems() -> Vec<String> {
     let mut out = Vec::new();
-    let Ok(entries) = fs::read_dir(API_DIR) else {
+    let Ok(entries) = fs::read_dir(crate::modules::real(Path::new(""), API_DIR)) else {
         return out;
     };
     for entry in entries.flatten() {
@@ -77,7 +77,7 @@ pub(super) fn api_stems() -> Vec<String> {
 /// Concatenate every source of the Add menu module (`ADD_MENU/**/*.rs`).
 pub(super) fn add_menu_src() -> String {
     let mut files = Vec::new();
-    walk(Path::new(ADD_MENU), &mut files);
+    walk(&crate::modules::real(Path::new(""), ADD_MENU), &mut files);
     files.iter().map(read).collect::<Vec<_>>().join("\n")
 }
 
@@ -85,8 +85,11 @@ pub(super) fn add_menu_src() -> String {
 /// not, by itself, satisfy the separate inspector-card axis).
 pub(super) fn editor_blob() -> String {
     let mut files = Vec::new();
-    walk(Path::new(EDITOR_DIR), &mut files);
-    let add = format!("{}/", normalize(Path::new(ADD_MENU)));
+    walk(&crate::modules::real(Path::new(""), EDITOR_DIR), &mut files);
+    let add = format!(
+        "{}/",
+        normalize(&crate::modules::real(Path::new(""), ADD_MENU))
+    );
     files
         .iter()
         .filter(|p| !normalize(p).starts_with(&add))

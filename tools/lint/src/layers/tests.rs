@@ -4,7 +4,7 @@ use super::scan::refs;
 use super::table::{Exception, Layer, EXCEPTIONS, LAYERS};
 
 fn names(code: &str) -> Vec<String> {
-    refs(code).into_iter().map(|r| r.module).collect()
+    refs(code, false).into_iter().map(|r| r.module).collect()
 }
 
 #[test]
@@ -20,6 +20,15 @@ fn finds_paths_and_groups() {
         ["scene", "ui"]
     );
     assert!(names("use rusty::crate_like::X; // crate::render").is_empty());
+}
+
+#[test]
+fn a_crate_names_its_siblings_by_crate_and_itself_by_crate_path() {
+    let code = "use crate::paths::x;\nuse rusty_core::{a, b};\nfn f() { rusty_time::Time::new(); }";
+    let found: Vec<String> = refs(code, true).into_iter().map(|r| r.module).collect();
+    assert_eq!(found, ["core", "time"]);
+    assert_eq!(names(code), ["paths", "core", "time"]);
+    assert!(names("use my_rusty_core::x;\nlet rusty_x = 1;").is_empty());
 }
 
 #[test]

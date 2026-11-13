@@ -21,7 +21,7 @@ fn with_asset(path: Option<&str>) -> ColliderComponent {
 
 #[test]
 fn the_cache_follows_rebakes() {
-    use crate::core::fs::written::contract::{follows_rebakes, Bake};
+    use rusty_test_support::rebakes::{follows_rebakes, Bake};
     let friction = |b: Bake| if b == Bake::A { 0.1 } else { 0.7 };
     follows_rebakes(
         &path_in("rebaked.physmat"),

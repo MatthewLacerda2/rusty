@@ -59,7 +59,8 @@ fn calls_bare(code: &str, name: &str) -> bool {
 /// Every line of an engine source outside [`HOME`] whose code names `fs::rename`,
 /// or calls `rename` bare after importing it from `std::fs`.
 pub fn check(path: &str, source: &str) -> Vec<Finding> {
-    if !path.starts_with("src/") || path.starts_with(HOME) {
+    let at = crate::modules::module_path(path);
+    if !at.starts_with("src/") || at.starts_with(HOME) {
         return Vec::new();
     }
     let lines = code_lines(source);

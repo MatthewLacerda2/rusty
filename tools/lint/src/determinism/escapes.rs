@@ -12,18 +12,20 @@ use crate::code::{code_of, Open};
 /// The lints whose escapes are locked.
 const LOCKED: &[&str] = &["clippy::too_many_lines", "clippy::unwrap_used"];
 
-/// The sanctioned escapes: (file, lint). Each permits one attribute in that file.
+/// The sanctioned escapes: (file at its module path, lint). Each permits one
+/// attribute in that file.
 const ESCAPES: &[(&str, &str)] = &[("src/render/setup/mod.rs", "clippy::too_many_lines")];
 
-/// What the scan walks: the engine crate's own source, as clippy lints it.
-pub const ROOTS: &[&str] = &["src", "tests", "fuzz", "build.rs"];
+/// What the scan walks: the engine's own source, every member crate's included (its
+/// build script too), as clippy lints it.
+pub const ROOTS: &[&str] = &["src", "crates", "tests", "fuzz"];
 
 /// Every attribute in `content` that silences a locked lint without being one of
 /// the sanctioned [`ESCAPES`], reported at the attribute's first line.
 pub fn violations(path: &str, content: &str) -> Vec<String> {
     let mut sanctioned: Vec<&str> = ESCAPES
         .iter()
-        .filter(|(p, _)| *p == path)
+        .filter(|(p, _)| *p == crate::modules::module_path(path))
         .map(|(_, lint)| *lint)
         .collect();
     let mut out = Vec::new();

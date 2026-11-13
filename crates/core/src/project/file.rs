@@ -1,0 +1,214 @@
+//! crates/core/src/project/file.rs — `project.rusty`, the file that marks a project (#853).
+//!
+//! One JSON file at the project root, Unreal's `.uproject` and Unity's
+//! `ProjectVersion.txt` plus Player Settings in one:
+//!
+//! ```json
+//! { "engine_commit": "<git commit>", "engine_order": 1318, "build": { … },
+//!   "graphics_options": { "motion_blur": true, … }, "graphics": { "render_scale": 1 },
+//!   "quality": { "default": "Medium", "presets": [ { "name": "Low", … }, … ] },
+//!   "decals": { "max_per_owner": 256, "max_world": 1024, "max_total": 4096 },
+//!   "demos": { "keep": 20 }, "audio": { "speed_of_sound": 343 } }
+//! ```
+//!
+//! * **`engine_commit`** — the engine build the project was last opened with, so a
+//!   game that lives in its own repo knows which engine it was built against.
+//!   [`open`](super::open) compares it with the running build ([`EngineCheck`]) and,
+//!   when it may write, records the running one (Unity rewrites its version file the
+//!   same way).
+//! * **`engine_order`** — that commit's place in history, which tells a newer engine
+//!   from an older one (#1319); absent when the engine couldn't count (a shallow
+//!   clone).
+//! * **`build`** — the [`BuildSettings`].
+//! * **`graphics_options`** — the player graphics options a fresh install starts
+//!   with ([`GraphicsOptions`], #1438); a player's saved choice wins over them.
+//! * **`graphics`** — the render scale that runs while the player has chosen none
+//!   ([`ProjectGraphics`], #1715): a factor, or `"match_display"` for `1 / display
+//!   scale`.
+//! * **`quality`** — the game's quality presets ([`QualityPresets`], #1522): named
+//!   bundles of per-effect quality values, seeded with `Low`, `Medium` and `High`
+//!   when the file is created, the game's to edit, rename, add to or delete.
+//! * **`decals`** — the game's decal budgets ([`DecalLimits`], #1517), applied to
+//!   the scene on entering Play.
+//! * **`demos`** — how many play demos a dev build keeps in `saved/demos/`
+//!   ([`DemoSettings`], #1581; default 20).
+//! * **`audio`** — the speed of sound doppler resolves with ([`AudioSettings`],
+//!   #1749), applied to the audio on entering Play.
+//!
+//! stored-format: `project.rusty`, the project file
+
+use std::path::Path;
+
+use serde::{Deserialize, Serialize};
+
+use super::engine::commit::{engine_commit, engine_order, UNKNOWN_COMMIT};
+use super::engine::{base, EngineCheck};
+use crate::application::BuildSettings;
+use crate::settings::audio::AudioSettings;
+use crate::settings::decals::DecalLimits;
+use crate::settings::demos::DemoSettings;
+use crate::settings::graphics_options::GraphicsOptions;
+use crate::settings::quality::QualityPresets;
+use crate::settings::render_scale::ProjectGraphics;
+
+/// The project file, at the project root.
+pub const PROJECT_FILE: &str = "project.rusty";
+
+/// What `project.rusty` holds. Every field is `#[serde(default)]`, so a partial file
+/// keeps the defaults for what it omits.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ProjectFile {
+    /// The engine commit the project was last opened with.
+    pub engine_commit: String,
+    /// Where that commit sits in history ([`engine_order`]). A file that omits it
+    /// reads as `None`, never as the running engine's, so a record from before
+    /// counts were kept is an upgrade.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engine_order: Option<u64>,
+    /// The project's build settings.
+    pub build: BuildSettings,
+    /// The project's default player graphics options (all allowed by default).
+    pub graphics_options: GraphicsOptions,
+    /// The project's render-scale default (#1715).
+    pub graphics: ProjectGraphics,
+    /// The game's quality presets (a file that omits them gets the seeded three).
+    pub quality: QualityPresets,
+    /// The game's decal budgets.
+    pub decals: DecalLimits,
+    /// How many play demos `saved/demos/` keeps (#1581).
+    pub demos: DemoSettings,
+    /// The game's audio settings (#1749).
+    pub audio: AudioSettings,
+}
+
+impl Default for ProjectFile {
+    fn default() -> Self {
+        Self {
+            engine_commit: engine_commit().to_string(),
+            engine_order: engine_order(),
+            build: BuildSettings::default(),
+            graphics_options: GraphicsOptions::default(),
+            graphics: ProjectGraphics::default(),
+            quality: QualityPresets::default(),
+            decals: DecalLimits::default(),
+            demos: DemoSettings::default(),
+            audio: AudioSettings::default(),
+        }
+    }
+}
+
+/// What a run of the project plays under: the file's settings, without the engine
+/// record. The player and `play` hand it to an unbound `Application`
+/// (`Application::run_with`), so a shipped game reads them but never rewrites them.
+/// A demo keeps it in its header, so a replay plays under the settings it was
+/// recorded with (#1581).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ProjectSettings {
+    pub build: BuildSettings,
+    pub graphics_options: GraphicsOptions,
+    pub graphics: ProjectGraphics,
+    pub quality: QualityPresets,
+    pub decals: DecalLimits,
+    pub demos: DemoSettings,
+    pub audio: AudioSettings,
+}
+
+impl From<ProjectFile> for ProjectSettings {
+    fn from(file: ProjectFile) -> Self {
+        Self {
+            build: file.build,
+            graphics_options: file.graphics_options,
+            graphics: file.graphics,
+            quality: file.quality,
+            decals: file.decals,
+            demos: file.demos,
+            audio: file.audio,
+        }
+    }
+}
+
+impl ProjectFile {
+    /// Parse the file's JSON text. Malformed JSON is an error.
+    pub fn from_json(text: &str) -> Result<Self, String> {
+        serde_json::from_str(text).map_err(|e| format!("Failed to parse {PROJECT_FILE}: {e}"))
+    }
+
+    /// The pretty JSON the file holds (with a trailing newline).
+    pub fn to_json(&self) -> String {
+        let mut text = serde_json::to_string_pretty(self).unwrap_or_default();
+        text.push('\n');
+        text
+    }
+
+    /// Read the file at `path`; `None` when there is none.
+    pub fn read(path: &Path) -> Result<Option<Self>, String> {
+        if !path.exists() {
+            return Ok(None);
+        }
+        let text = std::fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read {}: {e}", path.display()))?;
+        Self::from_json(&text).map(Some)
+    }
+
+    /// What the project at `root` holds, without writing anything: its file, else
+    /// the defaults.
+    pub fn load(root: &Path) -> Result<Self, String> {
+        Ok(Self::read(&root.join(PROJECT_FILE))?.unwrap_or_default())
+    }
+
+    /// Write the file to `path`, unless it already holds exactly this — a project
+    /// opened by the same engine is left untouched (no git noise, no write to a
+    /// read-only bundle).
+    pub fn write(&self, path: &Path) -> Result<(), String> {
+        let text = self.to_json();
+        if std::fs::read_to_string(path).is_ok_and(|old| old == text) {
+            return Ok(());
+        }
+        // lint: allow(asset-write) project settings, not read by a path-keyed cache
+        crate::fs::write_atomic(path, text.as_bytes())
+            .map_err(|e| format!("Failed to write {}: {e}", path.display()))
+    }
+}
+
+/// Bring the project file at `root` up to date when the project is opened for
+/// editing: create it if missing, and record the running engine. Returns the check
+/// made against what the file held before (an upgrade reports itself through it:
+/// [`EngineCheck::upgrade`]), the file as it now stands, and one line per change. A file it creates names the product
+/// after the project's folder, Unity's default Product Name (#1317); an existing file
+/// keeps whatever it says.
+pub(super) fn record(root: &Path) -> Result<(EngineCheck, ProjectFile, Vec<String>), String> {
+    let path = root.join(PROJECT_FILE);
+    let existed = path.exists();
+    let mut file = ProjectFile::load(root)?;
+    let check = EngineCheck::against(Some(&file.engine_commit), file.engine_order);
+    let mut lines = Vec::new();
+    if let Some(name) = root.file_name().filter(|_| !existed) {
+        file.build.product_name = name.to_string_lossy().into_owned();
+    }
+    // An `unknown` build can't say which engine it is: keep the last known record.
+    // A shallow build can't count: keep the record's count while the commit holds.
+    if engine_commit() != UNKNOWN_COMMIT || file.engine_commit.is_empty() {
+        if engine_order().is_some() || base(&file.engine_commit) != base(engine_commit()) {
+            file.engine_order = engine_order();
+        }
+        file.engine_commit = engine_commit().to_string();
+    }
+    file.write(&path)?;
+    if !existed {
+        lines.push(format!("created {PROJECT_FILE}"));
+    }
+    Ok((check, file, lines))
+}
+
+/// The check and the file, for a project opened only to run: nothing is written.
+pub(super) fn inspect(root: &Path) -> Result<(EngineCheck, ProjectFile), String> {
+    let file = ProjectFile::load(root)?;
+    let check = EngineCheck::against(Some(&file.engine_commit), file.engine_order);
+    Ok((check, file))
+}
+
+#[cfg(test)]
+#[path = "file_tests.rs"]
+mod file_tests;

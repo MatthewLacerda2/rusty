@@ -29,7 +29,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 |---|---|---|
 | Active in the hierarchy | `tools/lint -- --rules` (`active-self`) | **hard gate**: outside `src/ecs/`, no non-test line of `src/` calls `is_active_self(` — systems ask `World::is_active_in_hierarchy`, so an inactive parent hides its subtree; what shows or stores the own flag takes `// lint: allow(active-self) <why>` (#1363) |
 | Agent docs keep their shape | `tools/lint` (the size gate: `claude-md`, `skill`, `history`) | **hard gate**: every tracked `CLAUDE.md` is ≤ 300 lines and every tracked file of a skill folder (`.claude/skills/<folder>/`) ≤ 500, every line counted; a `SKILL.md` opens with the frontmatter Claude Code loads it by (`name` = its folder, ≤ 64 of `[a-z0-9-]`; `description` non-empty, ≤ 1024 characters), and a skill folder has one; no issue or PR number (`#123`, `owner/repo#123`, `…/issues/123`, `…/pull/123`) or `YYYY-MM-DD` date in them. Runs on Markdown-only PRs too; exceptions are `<!-- lint: allow(<rule>) <why> -->` (*Agent docs*, below) |
-| Asset writes tell the caches | `tools/lint -- --rules` (`asset-write`) | **hard gate**: a non-test line of `src/` outside `src/core/fs/` that calls `fs::write(`, `File::create(`, `.save(<arg>)` or any `write_atomic(` (#2005; a whole identifier, outside string literals) has a `note_written` later in its function, or `// lint: allow(asset-write) <why>` (a file no path-keyed cache reads) (#1220) |
+| Asset writes tell the caches | `tools/lint -- --rules` (`asset-write`) | **hard gate**: a non-test line of `src/` outside `crates/core/src/fs/` that calls `fs::write(`, `File::create(`, `.save(<arg>)` or any `write_atomic(` (#2005; a whole identifier, outside string literals) has a `note_written` later in its function, or `// lint: allow(asset-write) <why>` (a file no path-keyed cache reads) (#1220) |
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (default, `--features dev`, and `--no-default-features` — the editor-free player build), plus `tools/lint` itself (#935) |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), or a written waiver (`WAIVERS`) |
 | Converters report, never log | `tools/lint -- --rules` (`converter-log`) | **hard gate**: no code line of a converter under `src/asset/convert/` (every module, folder or single file, but the cache's own `mod`, `converter`, `depends`, `fingerprint`, `gate`, `lock`, `record`, `stage`, `stale`, `texture_ref` and `tests`) names `log::` or a bare logging macro — a converter returns what it skipped in `Converted` and fails on anything else, and `convert::refresh` alone warns; each converter's root carries `#![deny(clippy::let_underscore_must_use, clippy::unused_result_ok, clippy::print_stdout, clippy::print_stderr)]`, wrapped or not, so clippy refuses a dropped `Result` and a print there (#1172) |
@@ -55,7 +55,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | No shared process state | clippy `disallowed_methods` + `tools/lint -- --determinism` | **hard gate**: `std::env::{set_var, remove_var, set_current_dir}` are banned crate-wide in `clippy.toml`, tests included, since `cargo test` runs every in-crate test in one process; production opts out inline with a reason (`project::open`), and `--determinism` keeps the three on the list (#977) |
 | No subprocesses | `tools/lint -- --rules` (`subprocess`) | **hard gate**: no line of `src/` names `std::process::Command` — the engine starts no other program but Blender, to convert a `.blend` while authoring, and `git`, which a debug build asks for its checkout's commit; a real need takes `// lint: allow(subprocess) <why>` (#975) |
 | Nothing temporary | clippy `dbg_macro`/`todo`/`unimplemented` + `tools/lint -- --rules` (`markers`) | **hard gate**: the three are denied in `Cargo.toml`'s `[lints]` (and `tools/lint`'s); a marker word (`TODO`, `FIXME`, `XXX`, `HACK`) in a scanned `.rs` file fails — an unfinished thing is an issue (#935) |
-| One atomic write | `tools/lint -- --rules` (`atomic-write`) | **hard gate**: no line of `src/` outside `src/core/fs/` names `fs::rename` — a file a reader may open is written through `core::fs::write_atomic`; a rename that moves rather than writes takes `// lint: allow(atomic-write) <why>` (#1129) |
+| One atomic write | `tools/lint -- --rules` (`atomic-write`) | **hard gate**: no line of `src/` outside `crates/core/src/fs/` names `fs::rename` — a file a reader may open is written through `core::fs::write_atomic`; a rename that moves rather than writes takes `// lint: allow(atomic-write) <why>` (#1129) |
 | One dependency graph | `make feature-split` (`.github/scripts/feature_split.py`) | **hard gate**: no dev-dependency turns on a feature the normal build lacks, so `cargo test` never rebuilds a shared crate (#552, #979; `docs/testing.md`) |
 | One fullscreen triangle | `tools/lint -- --rules` (`fullscreen-triangle`) | **hard gate**: no `.wgsl` under `engine/` but `fullscreen.wgsl` spells the triangle's `(i << 1u) & 2u`; `#import fullscreen` and call `fullscreen::triangle` / `uv` (#1370) |
 | One name table per enum | `tools/lint -- --rules` (`named-enum`) | **hard gate**: no file of `src/` hand-writes both a parse (`fn parse(_: &str) -> Option<Self>` in an `impl T`, or a free `fn parse_*(_: &str) -> Option<T>`) and a name (`fn name`/`fn as_str(self) -> &'static str`, or a free `fn *_name(_: T) -> &'static str`) for one type, nor a `const`/`static` table of `(T, &str)` pairs — a script-facing enum declares its names once with `core::named_enum!`, which writes `ALL`, `name`, a case-insensitive `parse`, `Display` and its serde (#1478); a parse that does more takes `// lint: allow(named-enum) <why>` (#1329) |
@@ -159,17 +159,28 @@ round, so the gate list cannot silently lose a gate. `GATES` is `QUICK_GATES` pl
 - **CI:** `.github/workflows/{ci,lint}.yml` — the durable layer; survives `--no-verify`.
 
 ## The lint policy lives in `Cargo.toml`
-Crate-wide lint levels go in `Cargo.toml`'s `[lints]` table, never in command-line
-flags: a plain `cargo clippy`, rust-analyzer and CI then all read the same policy,
-so nothing is green locally and red in CI. CI adds only `-D warnings`. Thresholds
+Crate-wide lint levels go in the root `Cargo.toml`'s `[workspace.lints]` table, never
+in command-line flags: a plain `cargo clippy`, rust-analyzer and CI then all read the
+same policy, so nothing is green locally and red in CI. Every member crate inherits it
+with `[lints] workspace = true`, and `make determinism` fails one that doesn't
+(`UNINHERITED`): its code would escape the clock ban and every deny. CI adds only `-D warnings`. Thresholds
 stay in `clippy.toml`. Module-scoped rules stay module-scoped — the sim modules'
 `#![deny(clippy::unwrap_used)]` below is deliberately not crate-wide (the
 `unwrap-deny` rule derives its scope from the layer table). `tools/lint`
 is held to the same policy (#935): `make clippy` and CI clippy it with `-D warnings`,
 and its own `[lints]` carries the nothing-temporary denies.
 
+## A module in either place: its module path
+While the engine is split into crates (`crates/CLAUDE.md`), a module is `src/<m>/` or,
+once moved, `crates/<m>/src/` with `lib.rs` for `mod.rs`. Every gate that scopes by
+module reads a file at its **module path**, the `src/<m>/…` spelling it has wherever
+it lives (`tools/lint/src/modules.rs`), so each rule, row and path below written as
+`src/<m>/…` holds the module in both places; a finding names the real file. In a
+moved crate, `crate::` is the module itself and a sibling is `rusty_<m>::`, which the
+layer and direction gates read as that module.
+
 ## What the size gate measures, and nothing grandfathered (#926)
-The size gate walks `src/`, `tests/`, `fuzz/`, `tools/`, `.github/` and `engine/`, and
+The size gate walks `src/`, `crates/`, `tests/`, `fuzz/`, `tools/`, `.github/` and `engine/`, and
 measures four languages. A `.rs` file counts every line. A `.py` file counts its **lines of
 code**: blank lines, `#` comments and docstrings are free, as scorsese's gate counts
 them, because a Python file's prose grows with how carefully it explains itself and
@@ -300,7 +311,7 @@ new flag, gate, CI step or baseline.
   that directory counts as the API side too.
 - **`asset-write`** (#1220) — a file a path-keyed cache reads is written through
   `core::fs::written::write`, or its writer calls `note_written` after (#1207).
-  A non-test line of `src/` outside `src/core/fs/` calling `fs::write(`,
+  A non-test line of `src/` outside `crates/core/src/fs/` calling `fs::write(`,
   `File::create(`, `.save(<arg>)` or any `write_atomic(` (#2005: a whole
   identifier, so `try_write_atomic(` is not one, and its definition,
   `fn write_atomic(`, is not a call; a string literal never counts) is a finding
@@ -313,7 +324,7 @@ new flag, gate, CI step or baseline.
   written through `core::fs::write_atomic`: a temp name unique to the process and
   the call, renamed into place, the temp removed on any failure. Hand-rolled copies
   drifted (a fixed `.part` name, a pid-only one, litter on failure), so a line of
-  `src/` outside `src/core/fs/` whose code names `fs::rename` fails. A rename that
+  `src/` outside `crates/core/src/fs/` whose code names `fs::rename` fails. A rename that
   moves rather than writes (the import cache's staging swap, the seed's staged
   files) carries an inline allow. Comment text never counts;
   `tests/` and `tools/` are not scanned (`rules/atomic_write.rs`).
@@ -672,7 +683,8 @@ What is not one row's lives in `tools/lint/src/layers/externs/policy.rs`:
   feature, #431), the provider crates only under `src/dev/providers` (#383).
 - **`exceptions`** — a use the rules forbid but the code still has, each naming its open issue. There are none today.
 
-The lint reads `Cargo.toml`'s `[dependencies]` (and per-target ones) and reports
+The lint reads the `[dependencies]` (and per-target ones) of the root `Cargo.toml` and
+of every member's, the workspace's own `rusty-*` crates aside (they are modules), and reports
 `UNDECLARED_CRATE` (a module names a crate its row lacks), `STALE_CRATE`,
 `CONFINED_CRATE`, `UNCLAIMED_CRATE` (a dependency no row, `common` or `unscoped`
 accounts for, so a **new dependency** needs a table decision in the same PR),
@@ -707,8 +719,8 @@ two, which is where a leaked order would show.
 The ban is crate-wide. The platform modules that need real time (`dev`, `editor`,
 `render`, `shell` today) opt out with
 `#![allow(clippy::disallowed_methods, clippy::disallowed_types, reason = "…")]` at
-their `mod.rs`. `make determinism` keeps that escape hatch honest: it fails
-(`OPT_OUT`) when any other file under `src/` names those lints or allows the groups
+their `mod.rs` (a moved module's `lib.rs`). `make determinism` keeps that escape hatch
+honest: it fails (`OPT_OUT`) when any other file under `src/` or `crates/` names those lints or allows the groups
 that hold them (`clippy::style`, `clippy::all`), so a sim module can't quietly gain
 an `allow`; and it fails (`UNBANNED` / `UNDENIED`) when `clippy.toml` drops a banned
 item or `Cargo.toml` stops denying the lints. Which rows are platform comes from the
@@ -827,7 +839,7 @@ it through a shared op, never to grandfather.
 
 ## The function-length cap (`too_many_lines`)
 The 50-line per-function cap is a **hard clippy gate** (`too_many_lines = "deny"` in
-`Cargo.toml`'s `[lints.clippy]`, both feature sets) and is **on for the whole crate**
+`Cargo.toml`'s `[workspace.lints.clippy]`, both feature sets) and is **on for the whole crate**
 — the legacy functions that predated it were split (#124). The one remaining
 exception is `Renderer::assemble` in `src/render/setup/mod.rs`
 (`#[expect(clippy::too_many_lines, reason = …)]`), a flat one-line-per-field

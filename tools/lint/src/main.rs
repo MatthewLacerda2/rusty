@@ -19,6 +19,7 @@ mod dead_pub;
 mod determinism;
 mod direction;
 mod layers;
+mod modules;
 mod parity;
 mod repo;
 mod rules;

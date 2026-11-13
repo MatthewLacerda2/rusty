@@ -76,7 +76,8 @@ pub fn helpers(source: &str) -> Vec<String> {
 
 /// Every setter of `source` that stores a float parameter unsanitized.
 pub fn check(path: &str, source: &str, test: &[bool], helpers: &[String]) -> Vec<Finding> {
-    if !path.starts_with(DIR) || path == HELPERS {
+    let at = crate::modules::module_path(path);
+    if !at.starts_with(DIR) || at == HELPERS {
         return Vec::new();
     }
     let code = code_lines(source);
@@ -233,7 +234,7 @@ fn ident_after(line: &str, marker: &str) -> Option<String> {
 
 /// The rule over every scanned file.
 pub fn run(scan: &Scan) -> Vec<Finding> {
-    let helpers = helpers(scan.source(HELPERS));
+    let helpers = helpers(scan.module_source(HELPERS));
     scan.files
         .iter()
         .flat_map(|p| check(p, scan.source(p), scan.test_lines(p), &helpers))

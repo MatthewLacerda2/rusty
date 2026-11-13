@@ -8,7 +8,7 @@ use super::fixture::{lua_with_sound, tmp, HELD_PATCH};
 /// re-bake at that path rather than the clip it decoded first.
 #[test]
 fn the_clip_cache_follows_bakes_at_one_path() {
-    use crate::core::fs::written::contract::{follows_rebakes, Bake};
+    use rusty_test_support::rebakes::{follows_rebakes, Bake};
     let lua = lua_with_sound();
     let mut cache = crate::audio::device::decode::ClipCache::new();
     let seconds = |which| if which == Bake::A { 0.15 } else { 0.6 };

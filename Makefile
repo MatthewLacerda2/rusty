@@ -40,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-explore test-one-process dead-pub editor-capture game game-test export launcher bench bless-converters
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote move-crate test-explore test-one-process dead-pub editor-capture game game-test export launcher bench bless-converters
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -339,6 +339,11 @@ rebriefs: ## Briefs per issue and re-briefs by Round. ARGS="--since 2026-10-29" 
 # the survivors' diffs. A signal, never a gate: survivors exit 0, and only "no
 # report" (a red, cancelled or missing run) exits 1. No PR runs mutation any
 # more, so ask for this before readying a branch that adds mechanism.
+# The mechanical half of moving a module into its own crate (crates/CLAUDE.md).
+move-crate: ## Move a module into crates/<m>/: make move-crate MODULE=<m>, then fix what it lists
+	@test -n "$(MODULE)" || { echo "move-crate: name the module: make move-crate MODULE=<m>" >&2; exit 2; }
+	@python3 .github/scripts/move_crate.py $(MODULE)
+
 mutants-remote: ## Mutation on GitHub's runners, scoped. make mutants-remote SCOPE=diff or SCOPE='src/physics/**'
 	@test -n "$(SCOPE)" || { \
 		echo "mutants-remote: what should be mutated? SCOPE=diff, or path globs" >&2; \

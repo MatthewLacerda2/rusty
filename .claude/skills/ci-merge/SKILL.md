@@ -256,7 +256,7 @@ CI's `changes` filter starts `code: - '!**/*.md'`: a Markdown-only PR skips the
 heavy steps, but its gating jobs still run (a ruleset reads a skipped required
 check as unsatisfied) and succeed, save `lint`'s size gate: it holds every agent doc
 and goes red on one over its cap. The three Markdown paths code reads (`docs/api/`,
-`docs/game-agent.md`, `src/core/project/game_claude.md`) are listed in CI's `code` filter and in
+`docs/game-agent.md`, `crates/core/src/project/game_claude.md`) are listed in CI's `code` filter and in
 `merging/verdict/changes.py`'s `CODE_DOCS`, so a PR touching one runs the tests
 and is serialized like code.
 
