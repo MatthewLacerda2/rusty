@@ -18,11 +18,11 @@ rusty-ecs = { workspace = true }
 rusty-procgen = { workspace = true }
 rusty-shadergen = { workspace = true }
 glam = { workspace = true }
-image = { workspace = true }
 log = { workspace = true }
 rapier3d = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
+image = { workspace = true }
 rusty-test-support = { workspace = true }

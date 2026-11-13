@@ -1,8 +1,8 @@
-use super::{check, ops_named, RULE};
+use super::{check, ops_named, ROOT, RULE};
 use std::collections::{BTreeMap, BTreeSet};
 
 fn named(src: &str) -> Vec<String> {
-    ops_named(src, &[]).into_iter().collect()
+    ops_named(src, &[], ROOT).into_iter().collect()
 }
 
 #[test]
@@ -33,7 +33,7 @@ fn resolves_aliases_trees_and_table_paths() {
 fn skips_test_lines_and_comments() {
     let src = "use crate::scene::authoring::rigidbody as rb;\n// rb::set_mass(r, 1.0)\nrb::set_kinematic(r, true);\n";
     assert_eq!(named(src), ["rigidbody::set_kinematic"]);
-    assert!(ops_named(src, &[false, false, true]).is_empty());
+    assert!(ops_named(src, &[false, false, true], ROOT).is_empty());
 }
 
 fn set(ops: &[&str]) -> BTreeSet<String> {
@@ -78,22 +78,23 @@ fn flags_a_stale_allow() {
     );
 }
 
+/// Its files under `crates/scene/src/`, as a moved crate holds them.
 #[test]
 fn finds_an_op_reexported_from_a_folder_file() {
     let fx = BTreeMap::from([
         (
-            "src/scene/authoring/particles/mod.rs".to_string(),
+            "crates/scene/src/authoring/particles/mod.rs".to_string(),
             "pub use render::*;\n",
         ),
         (
-            "src/scene/authoring/particles/render.rs".to_string(),
+            "crates/scene/src/authoring/particles/render.rs".to_string(),
             "\npub fn set_blend() {}\n",
         ),
     ]);
     let f = check(&set(&["particles::set_blend"]), &set(&[]), &fx);
     assert_eq!(
         (f[0].path.as_str(), f[0].line),
-        ("src/scene/authoring/particles/render.rs", 2)
+        ("crates/scene/src/authoring/particles/render.rs", 2)
     );
 }
 

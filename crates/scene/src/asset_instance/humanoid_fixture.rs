@@ -17,10 +17,11 @@ pub fn write(
 ) -> Result<PathBuf, String> {
     let err = |e: std::io::Error| e.to_string();
     std::fs::create_dir_all(dir).map_err(err)?;
-    std::fs::write(dir.join("anim.bin"), bin).map_err(err)?;
+    let write = rusty_core::fs::written::write;
+    write(&dir.join("anim.bin"), bin).map_err(err)?;
     let path = dir.join(name);
     let text = gltf.replace("\"name\": \"Wave\"", &format!("\"name\": \"{clip}\""));
-    std::fs::write(&path, text).map_err(err)?;
+    write(&path, text.as_bytes()).map_err(err)?;
     let mut humanoid = rusty_asset::humanoid::HumanoidSettings::default();
     humanoid.bones.insert("Hips".into(), "Joint0".into());
     humanoid.bones.insert("Spine".into(), "Joint1".into());

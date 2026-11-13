@@ -7,15 +7,16 @@ use crate::code::{code_lines, is_ident};
 use crate::layers::flatten_use;
 use std::collections::{BTreeMap, BTreeSet};
 
-/// Every op `source` names outside its test lines.
-pub fn ops_named(source: &str, test: &[bool]) -> BTreeSet<Op> {
+/// Every op `source` names outside its test lines, `root` being the path its
+/// file spells `scene::authoring` by ([`root_of`]).
+pub fn ops_named(source: &str, test: &[bool], root: &str) -> BTreeSet<Op> {
     let code = code_lines(source);
     let live: Vec<&str> = (0..code.len())
         .filter(|&i| !test.get(i).copied().unwrap_or(false))
         .map(|i| code[i].as_ref())
         .collect();
     let text = live.join("\n");
-    let aliases = aliases(&text);
+    let aliases = aliases(&text, root);
     let is_op = |path: &str| {
         path.rsplit("::")
             .next()
@@ -35,8 +36,8 @@ pub fn ops_named(source: &str, test: &[bool]) -> BTreeSet<Op> {
             };
             let base = match aliases.get(head.as_str()) {
                 Some(base) => base.clone(),
-                None if segs.join("::").starts_with(&format!("{ROOT}::")) => {
-                    segs[3..segs.len() - 1].join("::")
+                None if segs.join("::").starts_with(&format!("{root}::")) => {
+                    segs[root.split("::").count()..segs.len() - 1].join("::")
                 }
                 None => return None,
             };
@@ -91,6 +92,16 @@ pub fn local_ops_named(source: &str, test: &[bool], module: &str) -> BTreeSet<Op
         .collect()
 }
 
+/// How the file at `path` spells `scene::authoring`: `crate::authoring` inside the
+/// `rusty-scene` crate (`crates/scene/src/`), `crate::scene::authoring` elsewhere.
+pub fn root_of(path: &str) -> &'static str {
+    if path.starts_with("crates/scene/") {
+        "crate::authoring"
+    } else {
+        ROOT
+    }
+}
+
 pub(super) fn join(a: &str, b: &str) -> String {
     match (a.is_empty(), b.is_empty()) {
         (true, _) => b.to_string(),
@@ -101,7 +112,7 @@ pub(super) fn join(a: &str, b: &str) -> String {
 
 /// Each name a `use` of `scene::authoring` binds, to its path under `authoring`
 /// (`""` for `authoring` itself, `rigidbody::set_mass` for a setter by name).
-fn aliases(text: &str) -> BTreeMap<String, String> {
+fn aliases(text: &str, root: &str) -> BTreeMap<String, String> {
     let mut out = BTreeMap::new();
     let mut rest = text;
     while let Some(at) = rest.find("use crate::") {
@@ -109,8 +120,8 @@ fn aliases(text: &str) -> BTreeMap<String, String> {
         let end = after.find(';').unwrap_or(after.len());
         for (path, name) in flatten_use(&after[..end]) {
             let path = path.join("::");
-            if path == ROOT || path.starts_with(&format!("{ROOT}::")) {
-                out.insert(name, path[ROOT.len()..].trim_start_matches("::").into());
+            if path == root || path.starts_with(&format!("{root}::")) {
+                out.insert(name, path[root.len()..].trim_start_matches("::").into());
             }
         }
         rest = &after[end..];

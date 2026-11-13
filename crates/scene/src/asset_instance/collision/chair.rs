@@ -28,7 +28,7 @@ pub fn write(path: &Path, n: u32, mesh: Option<&str>) -> Result<(), String> {
     obj += "o Chair_col\nv 0 0 0\nv 1 0 0\nv 1 0.5 1\nv 0 0.5 1\n";
     obj += &format!("f {} {} {}\n", base + 1, base + 2, base + 3);
     obj += &format!("f {} {} {}\n", base + 1, base + 3, base + 4);
-    std::fs::write(path, obj).map_err(|e| e.to_string())?;
+    rusty_core::fs::written::write(path, obj.as_bytes()).map_err(|e| e.to_string())?;
     let mut settings = sidecar::ImportSettings::default();
     let entry = SubObjectCollider {
         kind: MeshColliderKind::TriMesh,
