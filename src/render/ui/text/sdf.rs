@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn a_glyph_field_is_inside_at_its_stroke_and_outside_at_its_padding() {
-        let f = font::default_font();
+        let f = font::load(None);
         let field = glyph_field(&f, f.glyph('I').expect("I")).expect("I has an outline");
         let (w, h) = (field.width as usize, field.height as usize);
         let at = |x: usize, y: usize| field.pixels[y * w + x];

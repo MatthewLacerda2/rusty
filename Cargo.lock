@@ -3282,7 +3282,6 @@ dependencies = [
  "getrandom 0.4.3",
  "gilrs",
  "glam 0.33.12",
- "harfrust",
  "image",
  "ktx2",
  "libloading",
@@ -3307,6 +3306,7 @@ dependencies = [
  "rusty-shadergen",
  "rusty-test-support",
  "rusty-time",
+ "rusty-ui",
  "scorsese-core",
  "scorsese-providers",
  "scorsese-zimmer",
@@ -3449,6 +3449,25 @@ dependencies = [
 [[package]]
 name = "rusty-time"
 version = "0.1.0"
+
+[[package]]
+name = "rusty-ui"
+version = "0.1.0"
+dependencies = [
+ "glam 0.33.12",
+ "harfrust",
+ "image",
+ "log",
+ "rusty-asset",
+ "rusty-components",
+ "rusty-core",
+ "rusty-ecs",
+ "rusty-procgen",
+ "rusty-scene",
+ "rusty-test-support",
+ "rusty-time",
+ "skrifa",
+]
 
 [[package]]
 name = "safe_arch"

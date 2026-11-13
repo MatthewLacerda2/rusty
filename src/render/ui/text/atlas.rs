@@ -138,7 +138,7 @@ mod tests {
 
     #[test]
     fn glyphs_pack_once_and_the_atlas_grows_instead_of_moving_them() {
-        let f = font::default_font();
+        let f = font::load(None);
         let mut atlas = GlyphAtlas::default();
         let a = atlas.glyph(&f, f.glyph('A').expect("A")).expect("packed");
         atlas.dirty = false;

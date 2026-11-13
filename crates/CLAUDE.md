@@ -96,6 +96,10 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
   the crate, which no crate may depend on) splits: the crate keeps its own half,
   and the half checking the module above moves to that module's tests, through
   the crate's public API (an import check that bakes moves to `scene`'s tests).
+  One naming a module *below* that the row does not list (a test baking with
+  `procgen`) takes `rusty-<x>` as a `[dev-dependencies]` entry and names it
+  `rusty_<x>::`: the layer table does not hold test code, and nothing below can
+  depend back on the crate.
 - **`env!("CARGO_MANIFEST_DIR")`** names the crate's folder, not the checkout, and
   so does the working directory a crate's tests run in: use
   `rusty_core::project::checkout()` for a path in the checkout (`engine/`, a fixture).

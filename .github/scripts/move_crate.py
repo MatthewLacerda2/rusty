@@ -100,6 +100,13 @@ def row_deps(root: Path, module: str) -> set[str]:
     return set(re.findall(r'"(\w+)"', row.group(1)))
 
 
+def rows_below(root: Path, module: str) -> set[str]:
+    """The modules of the layer table's rows before `module`'s, which sit below it: the table is
+    bottom-up."""
+    rows = re.findall(r'(?:sim|platform)\(\s*"(\w+)"', (root / TABLE).read_text())
+    return set(rows[:rows.index(module)]) if module in rows else set()
+
+
 def rewrite(text: str, module: str, deps: set[str]) -> tuple[str, set[str]]:
     """`text` with its module paths rewritten for the crate, and the sibling modules it names.
     Only the row's `deps` are rewritten: a module above it stays `crate::<x>::`, for `by_hand`."""
@@ -170,13 +177,19 @@ def lib_header(text: str, module: str) -> str:
     return "\n".join(lines)
 
 
-def reaching_up(path: str, text: str, above: set[str]) -> list[str]:
+def reaching_up(path: str, text: str, above: set[str], below: set[str] = frozenset()) -> list[str]:
     """`path:line: why` for each `crate::<x>::` naming a module the row does not list. Read in
     the text as it was: once `crate::<m>::` is `crate::`, the crate's own submodule named
     like a module above it (`crate::<m>::ui::`) would read as that module, a false report PR #2149's review
-    found."""
-    return [f"{path}:{n}: names `{x}`, which the row does not list: a test reaching up moves to "
-            f"`tests/` (or `{x}`'s own tests); live code is a layering violation"
+    found. A module `below` (an earlier row of the table) cannot depend on the crate, so a
+    test may name it through a dev-dependency (`ui`'s tests bake with `procgen`, #2141)."""
+    def why(x: str) -> str:
+        if x in below:
+            return (f"names `{x}`, which the row does not list: a test takes `rusty-{x}` as a "
+                    f"dev-dependency and names `rusty_{x}::`; live code is a layering violation")
+        return (f"names `{x}`, which the row does not list: a test reaching up moves to "
+                f"`tests/` (or `{x}`'s own tests); live code is a layering violation")
+    return [f"{path}:{n}: {why(x)}"
             for n, line in enumerate(text.splitlines(), 1)
             for x in sorted(set(re.findall(r"(?<![\w$])crate::(\w+)(?!\w)", line)) & above)]
 
@@ -349,6 +362,7 @@ def move(root: Path, module: str) -> list[str]:
         sys.exit(f"move-crate: needs src/{module}/ and no crates/{module}/")
     others = known_modules(root) - {module}
     deps = row_deps(root, module)
+    below = rows_below(root, module)
     crate.mkdir(parents=True)
     git = ["git", "-C", str(root), "mv"]
     subprocess.run([*git, f"src/{module}", f"crates/{module}/src"], check=True)
@@ -383,7 +397,7 @@ def move(root: Path, module: str) -> list[str]:
             live_code.append(live(text))
             test_code.append(text)
         hand += by_hand(str(path.relative_to(root)), text, before)
-        hand += reaching_up(str(path.relative_to(root)), before, others - deps)
+        hand += reaching_up(str(path.relative_to(root)), before, others - deps, below)
     code = "\n".join(test_code)
     used = {f for f in FEATURES if f'feature = "{f}"' in code}
     registry = workspace_deps((root / "Cargo.toml").read_text())

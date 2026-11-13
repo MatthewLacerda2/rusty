@@ -93,12 +93,12 @@ macro_rules! named_enum {
 
         // A stored file holds `name()` and is read through `parse()` (#1478).
         const _: () = {
-            use ::serde::de::{self, EnumAccess, VariantAccess};
+            use $crate::__serde::de::{self, EnumAccess, VariantAccess};
 
             const NAMES: &[&str] = &[$($name),+];
 
-            impl ::serde::Serialize for $Name {
-                fn serialize<S: ::serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+            impl $crate::__serde::Serialize for $Name {
+                fn serialize<S: $crate::__serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
                     let index = Self::ALL.iter().position(|v| v == self).unwrap_or(0);
                     s.serialize_unit_variant(stringify!($Name), index as u32, self.name())
                 }
@@ -107,8 +107,8 @@ macro_rules! named_enum {
             /// The variant a stored name picks, read as serde's enum tag.
             struct Tag($Name);
 
-            impl<'de> ::serde::Deserialize<'de> for Tag {
-                fn deserialize<D: ::serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+            impl<'de> $crate::__serde::Deserialize<'de> for Tag {
+                fn deserialize<D: $crate::__serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
                     d.deserialize_identifier(Visitor)
                 }
             }
@@ -133,8 +133,8 @@ macro_rules! named_enum {
                 }
             }
 
-            impl<'de> ::serde::Deserialize<'de> for $Name {
-                fn deserialize<D: ::serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+            impl<'de> $crate::__serde::Deserialize<'de> for $Name {
+                fn deserialize<D: $crate::__serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
                     Ok(d.deserialize_enum(stringify!($Name), NAMES, Visitor)?.0)
                 }
             }
