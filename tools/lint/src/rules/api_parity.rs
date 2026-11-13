@@ -13,10 +13,13 @@
 //! so one in a re-exported sub-file (`particles/render.rs`) counts.
 //!
 //! A line scan, not a parser, with known limits:
-//! - an op is matched by path: `use crate::scene::authoring::…` trees give each
-//!   file's aliases (`rigidbody as rb`, `{self as ops, …}`, `nav::{agent, …}`,
+//! - an op is matched by path, from the root its file spells `scene::authoring` by
+//!   (`names::root_of`: `crate::authoring` inside `rusty-scene`,
+//!   `rusty_scene::authoring` in another member crate, `crate::scene::authoring` in
+//!   the root package): the `use` trees starting there give each file's aliases
+//!   (`rigidbody as rb`, `{self as ops, …}`, `nav::{agent, …}`,
 //!   `rigidbody::{set_mass}`), and `alias::…::set_x`, a bare imported `set_x` (or its
-//!   `as` name), or `crate::scene::authoring::…::set_x` names the op;
+//!   `as` name), or `<root>::…::set_x` names the op;
 //! - a glob import (`use …::rigidbody::*`) and an op reached only through a helper
 //!   in another module are not seen. On the API side that is a false finding; on
 //!   the editor side the rule **fails open**: an op the inspector writes that way is

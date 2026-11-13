@@ -1,6 +1,6 @@
 """Regenerate tone.mp3, the MP3 decode fixture (#545).
 
-    pip install lameenc==1.8.4 && python3 src/audio/device/fixtures/make_tone_mp3.py
+    pip install lameenc==1.8.4 && python3 crates/audio/src/device/fixtures/make_tone_mp3.py
 
 250 ms of a 440 Hz sine at half scale, mono, 44.1 kHz in, 32 kbps CBR (LAME
 resamples it to 22.05 kHz). The PCM is a
