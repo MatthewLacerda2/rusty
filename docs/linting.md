@@ -27,7 +27,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 <!-- sorted: each check is one row, so two branches adding a rule land on different lines (#1409) -->
 | Check | Tool | Rule |
 |---|---|---|
-| Active in the hierarchy | `tools/lint -- --rules` (`active-self`) | **hard gate**: outside `src/ecs/`, no non-test line of `src/` calls `is_active_self(` — systems ask `World::is_active_in_hierarchy`, so an inactive parent hides its subtree; what shows or stores the own flag takes `// lint: allow(active-self) <why>` (#1363) |
+| Active in the hierarchy | `tools/lint -- --rules` (`active-self`) | **hard gate**: outside `crates/ecs/src/`, no non-test line of `src/` calls `is_active_self(` — systems ask `World::is_active_in_hierarchy`, so an inactive parent hides its subtree; what shows or stores the own flag takes `// lint: allow(active-self) <why>` (#1363) |
 | Agent docs keep their shape | `tools/lint` (the size gate: `claude-md`, `skill`, `history`) | **hard gate**: every tracked `CLAUDE.md` is ≤ 300 lines and every tracked file of a skill folder (`.claude/skills/<folder>/`) ≤ 500, every line counted; a `SKILL.md` opens with the frontmatter Claude Code loads it by (`name` = its folder, ≤ 64 of `[a-z0-9-]`; `description` non-empty, ≤ 1024 characters), and a skill folder has one; no issue or PR number (`#123`, `owner/repo#123`, `…/issues/123`, `…/pull/123`) or `YYYY-MM-DD` date in them. Runs on Markdown-only PRs too; exceptions are `<!-- lint: allow(<rule>) <why> -->` (*Agent docs*, below) |
 | Asset writes tell the caches | `tools/lint -- --rules` (`asset-write`) | **hard gate**: a non-test line of `src/` outside `crates/core/src/fs/` that calls `fs::write(`, `File::create(`, `.save(<arg>)` or any `write_atomic(` (#2005; a whole identifier, outside string literals) has a `note_written` later in its function, or `// lint: allow(asset-write) <why>` (a file no path-keyed cache reads) (#1220) |
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (default, `--features dev`, and `--no-default-features` — the editor-free player build), plus `tools/lint` itself (#935) |
@@ -42,7 +42,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Editor↔API parity per op | `tools/lint -- --rules` (`api-parity`) | **hard gate**: every `scene::authoring::<module>::set_*` op a non-test line of `src/editor/` names is also named from the API side — a named setter's call in `src/api/`, an `op!`/`with!`/`group!` row of the field table `Component.Set` writes through (`scene::authoring::fields`), or a post effect's own row or knob table (#1467) — so anything the inspector writes, Lua can; an editor-only op takes `// lint: allow(api-parity) <why>` at its `fn`, and an allow on an op Lua reaches or no inspector names is stale and fails (#1368) |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard) |
 | Entity ids from Lua | `tools/lint -- --rules` (`entity-arg`) | **hard gate**: in `src/api/`, a Lua callback never takes an entity (`id`, `…_id`, `parent`, `child`, `target`, `entity`, `body`, `canvas`) as a bare `u32` or `Option<u32>`: it takes `api::entity_arg::EntityArg`, so a `nil` id reads as a missing entity and fails a write with the verb's name (#1383) |
-| Every ECS write is stamped | `tools/lint -- --rules` (`ecs-write`) | **hard gate**: a non-test line of `src/ecs/` that borrows a hecs column mutably (`get::<&mut …>`, `query_one::<(&mut …)>`, `query_mut`) or reshapes the store through `inner.` (`spawn`, `despawn`, `insert`, `remove`, `clear`, …) fails, since a write that skips `World::touch` stamps no change and every change-log consumer misses it; each funnel line, and `World::derived_mut`, takes `// lint: allow(ecs-write) <why>` (#1705) |
+| Every ECS write is stamped | `tools/lint -- --rules` (`ecs-write`) | **hard gate**: a non-test line of `crates/ecs/src/` that borrows a hecs column mutably (`get::<&mut …>`, `query_one::<(&mut …)>`, `query_mut`) or reshapes the store through `inner.` (`spawn`, `despawn`, `insert`, `remove`, `clear`, …) fails, since a write that skips `World::touch` stamps no change and every change-log consumer misses it; each funnel line, and `World::derived_mut`, takes `// lint: allow(ecs-write) <why>` (#1705) |
 | File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py`, `.lua` or `.wgsl` one (docstrings, comments and blank lines free, #926, #1015); nothing grandfathered |
 | Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `src/scene/authoring/` that takes a float (an `f32`/`f64`, a glam vector, or a float struct such as `Curve`) passes it to a `scene::authoring::sanitize` helper (or a sibling setter of its file), so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
 | Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix (#934) |
@@ -281,10 +281,10 @@ new flag, gate, CI step or baseline.
   question a system asks; `World::is_active_self` (Unity's `activeSelf`) is for
   what shows or stores the flag itself: the inspector checkbox, `Scene.IsActive`,
   the snapshot, and the UI clip walk that folds one level at a time. A non-test
-  line of `src/` outside `src/ecs/` that calls `is_active_self(` fails; those
+  line of `src/` outside `crates/ecs/src/` that calls `is_active_self(` fails; those
   callers carry an inline allow. The rule is lexical (`rules/active_self.rs`): it
   misses a read of the flag that does not go through that name, which the private
-  `ecs::bundle::Core` keeps inside `src/ecs/`.
+  `ecs::bundle::Core` keeps inside `crates/ecs/src/`.
 - **`api-parity`** (#1368) — "anything the editor does, the API does"
   (`docs/game-agent.md`), field by field. `--parity` holds that the inspector writes
   through a shared `scene::authoring` op; this rule holds that Lua reaches the same
@@ -395,9 +395,9 @@ new flag, gate, CI step or baseline.
   `// lint: allow(drag-range) <why>` (`rules/drag_range.rs`).
 - **`ecs-write`** (#1705) — the change log (`ecs::changes`) reports a write only
   because the write funnel calls `World::touch` (or `touch_entity`) on its way in.
-  `World::inner` is visible to all of `src/ecs/`, so a raw `self.inner.get::<&mut T>`
+  `World::inner` is visible to all of `crates/ecs/src/`, so a raw `self.inner.get::<&mut T>`
   written beside the funnel compiles, and every consumer then misses that write. A
-  non-test line of `src/ecs/` that borrows a column mutably through a turbofish
+  non-test line of `crates/ecs/src/` that borrows a column mutably through a turbofish
   (`get::<`, `query::<` or `query_one::<` with `&mut` after it, or `query_mut` /
   `query_one_mut`) or reshapes the store through `inner.` (`spawn`, `despawn`,
   `insert`, `remove`, `exchange`, `clear` and their `_one` / `_at` forms) fails. The
@@ -622,7 +622,7 @@ new flag, gate, CI step or baseline.
   working out where an entity is in the world and getting a hierarchy case wrong: a
   mirror, a zero scale, a turned child under a non-uniform parent. `ecs::World`'s
   world API (`local_to_world`, `world_pose`, `lossy_scale`, `inverse_transform_frame`, …) is
-  the one answer, so a code line of `src/` outside `src/ecs/world_space/` and
+  the one answer, so a code line of `src/` outside `crates/ecs/src/world_space/` and
   `components::transform` fails when it decomposes a matrix
   (`to_scale_rotation_translation`), names `compute_world_matrix`,
   `parent_world_matrix` or a call `world_matrix(` (a variable of that name passes),
