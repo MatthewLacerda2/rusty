@@ -141,4 +141,8 @@ fn a_trailing_allow_excuses_and_goes_stale() {
 fn an_op_with_no_definition_says_so() {
     let f = check(&set(&["ghost::set_x"]), &set(&[]), &BTreeMap::new());
     assert!(f[0].message.contains("not found"), "{}", f[0].message);
+    // It names the folder where the authoring files lie, not their module path.
+    let moved = BTreeMap::from([("crates/scene/src/authoring/a.rs".to_string(), "")]);
+    let f = check(&set(&["ghost::set_x"]), &set(&[]), &moved);
+    assert_eq!(f[0].path, "crates/scene/src/authoring/");
 }

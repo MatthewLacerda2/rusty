@@ -16,12 +16,6 @@ use crate::scene::{Camera, Scene};
 use crate::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
 
-/// Whether `id`'s mesh carries generated lightmap UVs.
-fn has_lightmap_uv(scene: &Scene, id: u32) -> bool {
-    let mesh = scene.world.mesh(id).unwrap();
-    mesh.vertices.iter().any(|v| v.lightmap_uv != [0.0, 0.0])
-}
-
 #[test]
 fn the_assets_api_sets_and_reads_the_setting() {
     let path = quad_model("rusty_lmuv_api");
@@ -37,7 +31,12 @@ fn the_assets_api_sets_and_reads_the_setting() {
          assert(s.generate and s.hardAngle == 88 and s.packMargin == 64, 'clamped')"
     );
     m.exec(&lua).unwrap();
-    assert!(has_lightmap_uv(&scene.borrow(), id.unwrap()));
+    assert!(scene
+        .borrow()
+        .world
+        .mesh(id.unwrap())
+        .unwrap()
+        .has_lightmap_uv());
 }
 
 #[test]

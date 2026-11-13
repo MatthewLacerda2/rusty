@@ -1,0 +1,60 @@
+//! crates/audio/src/lib.rs — the audio runtime (#212).
+//!
+//! The audio engine, a sim crate stepped by sim time: the [`AudioMaestro`]
+//! resource (one per World) owns the device/mixer, enforces a single master volume,
+//! holds the live roster of entity voices, and keeps the agent-facing introspection (a play-event log + a
+//! per-source roster). Every tick ends by re-resolving every live voice
+//! (3D rolloff + pan from #213, `Time.timeScale` / pause) and handing the resulting
+//! [`VoiceMix`] to the backend (`mix.rs`, #412); the real device pans each voice
+//! through `device/voice.rs`. Every voice routes through a group of the [`Mixer`]
+//! (`mixer/`, #465): buses with volume, filters, a reverb send and effects
+//! (`mixer/effects/`, #1748: Master starts with a limiter), snapshots and
+//! ducking, stepped by sim time; every group sends into one reverb bus that reverb
+//! zones tune from the listener's position (`reverb/`, #469). The speaker mode (#546, `speaker.rs`) shapes the
+//! output for the listening setup: per voice here, on the summed signal at the
+//! device's output stage. A capture (`capture/`, #1579) writes the final mix to a WAV,
+//! rendering it offline in step with the sim when there is no device. A 3D source
+//! moving against the listener is pitch-shifted by doppler (`doppler.rs`, #1749).
+//!
+//! Layering: the maestro and the backend trait live here so both the windowed app
+//! and the (device-free) harness can construct a maestro. The real kira device
+//! ([`KiraBackend`]) is the *only* part that touches hardware; it is injected by
+//! `shell/boot.rs` after `GameWorld::new`; the harness and the headless session keep
+//! the [`NullBackend`] until a capture starts, which swaps in the same mixer over an
+//! offline backend clocked by the sim's ticks. Nothing here reads a wall clock or
+//! unseeded RNG.
+//!
+//! kira is used for the output device only.
+
+// Panic-free sim (#195, #962): bare `.unwrap()` is denied in every sim module (use `?`
+// or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
+#![deny(clippy::unwrap_used)]
+
+pub mod backend;
+pub mod capture;
+pub mod device;
+pub mod doppler;
+pub mod introspection;
+pub mod maestro;
+pub mod mix;
+pub mod mixer;
+pub mod occlusion;
+// A test hook: the recording backend `app`'s audio tests assert on, compiled in
+// every build since those tests are another crate's (its own docs say so too).
+#[doc(hidden)]
+pub mod recording;
+pub mod reverb;
+pub mod spatial;
+pub mod speaker;
+mod stop;
+
+pub use backend::{AudioBackend, NullBackend, PlayParams, VoiceId, VoiceMix};
+pub use device::KiraBackend;
+pub use introspection::{AudioEvent, AudioEventKind, AudioEventLog, SpatialResult, VoiceInfo};
+pub use maestro::AudioMaestro;
+pub use mix::{MixEnv, Rolloff, Shot};
+pub use mixer::{GroupPatch, GroupState, Mixer};
+pub use occlusion::{Occluder, OcclusionSettings};
+pub use reverb::ReverbState;
+pub use spatial::Listener;
+pub use speaker::SpeakerMode;

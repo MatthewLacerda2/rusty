@@ -10,7 +10,6 @@
 pub mod ai;
 pub mod api;
 pub mod app;
-pub mod audio;
 #[cfg(feature = "editor")]
 pub mod editor;
 pub mod logging;
@@ -26,6 +25,7 @@ pub mod ui;
 // old names, so every `crate::core::…` path here and `rusty::core::…` path in
 // `tests/` keeps compiling.
 pub use rusty_asset as asset;
+pub use rusty_audio as audio;
 pub use rusty_components as components;
 pub use rusty_core as core;
 pub use rusty_ecs as ecs;

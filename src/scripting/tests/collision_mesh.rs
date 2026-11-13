@@ -5,20 +5,18 @@
 
 use super::collider::manager_with_collider;
 use crate::physics::collider_world_triangles;
+use crate::scene::asset_instance::collision::chair::write as write_chair;
 use crate::scene::asset_instance::instantiate_asset;
-
-/// `scene`'s collision-mesh model (`collision::chair::write`) as `file` in the test's
-/// temp dir; its path as a Lua literal names it.
-fn chair(file: &str, n: u32, mesh: Option<&str>) -> String {
-    let path = crate::test_temp::dir().join(file);
-    crate::scene::asset_instance::collision::chair::write(&path, n, mesh).unwrap();
-    crate::test_temp::lua_path(file)
-}
 
 #[test]
 fn a_script_names_the_collision_mesh() {
     let (m, scene, _) = manager_with_collider();
-    let path = chair("rusty_1960_lua_chair.obj", 5, None);
+    let path = write_chair(
+        &crate::test_temp::dir().join("rusty_1960_lua_chair.obj"),
+        5,
+        None,
+    )
+    .unwrap();
     let reference = format!("{path}::Chair");
     let id = instantiate_asset(&mut scene.borrow_mut(), &reference, None, glam::Vec3::ZERO);
     let id = id.unwrap();
@@ -63,7 +61,12 @@ fn a_script_names_the_collision_mesh() {
 #[test]
 fn the_assets_api_writes_a_sub_objects_collider() {
     let (m, _, _) = manager_with_collider();
-    let path = chair("rusty_1960_lua_sidecar.obj", 2, None);
+    let path = write_chair(
+        &crate::test_temp::dir().join("rusty_1960_lua_sidecar.obj"),
+        2,
+        None,
+    )
+    .unwrap();
     m.exec(&format!(
         "local p = {path:?}
          local c = Assets.GetModelImportSettings(p).colliders
@@ -110,7 +113,12 @@ fn a_name_on_a_mesh_from_no_model_is_kept() {
 #[test]
 fn collision_meshes_naming_each_other_are_refused_and_nothing_is_written() {
     let (m, _, _) = manager_with_collider();
-    let path = chair("rusty_1960_lua_loop.obj", 2, Some("Chair_col"));
+    let path = write_chair(
+        &crate::test_temp::dir().join("rusty_1960_lua_loop.obj"),
+        2,
+        Some("Chair_col"),
+    )
+    .unwrap();
     let meta = crate::asset::sidecar::meta_path(std::path::Path::new(&path));
     let before = std::fs::read_to_string(&meta).unwrap();
     let looped = format!(

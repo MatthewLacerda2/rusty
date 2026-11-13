@@ -140,6 +140,7 @@ rusty-shadergen = { path = "crates/shadergen" }
 rusty-components = { path = "crates/components" }
 rusty-ecs = { path = "crates/ecs" }
 rusty-scene = { path = "crates/scene" }
+rusty-audio = { path = "crates/audio" }
 rusty-test-support = { path = "crates/test-support" }
 
 winit = { version = "0.30.13" }
@@ -261,6 +262,7 @@ proptest = { version = "1", default-features = false, features = ["std"] }
 
 [dependencies]
 # The moved modules (crates/), re-exported in src/lib.rs under their old names.
+rusty-audio = { workspace = true }
 rusty-scene = { workspace = true }
 rusty-ecs = { workspace = true }
 rusty-components = { workspace = true }
@@ -294,7 +296,6 @@ harfrust = { workspace = true }
 gilrs = { workspace = true }
 notify = { workspace = true, optional = true }
 arboard = { workspace = true }
-kira = { workspace = true }
 zimmer = { workspace = true }
 scorsese-providers = { workspace = true, optional = true }
 scorsese-core = { workspace = true, optional = true }

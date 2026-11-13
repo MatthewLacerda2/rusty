@@ -2,7 +2,8 @@
 //! one subdivision (no "held at" warning on any rebuild), an undo refits the box to
 //! it once every mesh is back, and collision meshes that name each other hide nothing.
 
-use super::tests::{chair, spawn, triangles};
+use super::chair::write as write_chair;
+use super::tests::{spawn, triangles};
 use crate::asset_instance::instantiate_asset;
 use crate::authoring::rendering::mesh::hold_subdivisions;
 use crate::authoring::{add_component, remove_component, ComponentKind};
@@ -26,7 +27,12 @@ fn starts_at_one(scene: &Scene, id: u32) {
 
 #[test]
 fn a_spawn_with_a_collision_mesh_warns_of_no_subdivisions() {
-    let path = chair("rusty_1960_chair_subdiv.obj", 3, Some("Chair_col"));
+    let path = write_chair(
+        &rusty_test_support::temp::dir().join("rusty_1960_chair_subdiv.obj"),
+        3,
+        Some("Chair_col"),
+    )
+    .unwrap();
     let (scene, kids) = spawn(&path);
     starts_at_one(&scene, kids[0].1);
     let mut lone = Scene::new();
@@ -41,7 +47,12 @@ fn a_spawn_with_a_collision_mesh_warns_of_no_subdivisions() {
 
 #[test]
 fn undoing_an_added_mesh_refits_the_box_to_the_collision_mesh() {
-    let path = chair("rusty_1960_chair_undo_add.obj", 4, Some("Chair_col"));
+    let path = write_chair(
+        &rusty_test_support::temp::dir().join("rusty_1960_chair_undo_add.obj"),
+        4,
+        Some("Chair_col"),
+    )
+    .unwrap();
     let (mut scene, kids) = spawn(&path);
     let id = kids[0].1;
     assert!(remove_component(&mut scene, id, ComponentKind::Mesh));
@@ -59,7 +70,12 @@ fn undoing_an_added_mesh_refits_the_box_to_the_collision_mesh() {
 
 #[test]
 fn collision_meshes_that_name_each_other_hide_nothing() {
-    let path = chair("rusty_1960_chair_loop.obj", 3, Some("Chair_col"));
+    let path = write_chair(
+        &rusty_test_support::temp::dir().join("rusty_1960_chair_loop.obj"),
+        3,
+        Some("Chair_col"),
+    )
+    .unwrap();
     let source = std::path::Path::new(&path);
     let mut settings = sidecar::load(source).unwrap();
     let back = SubObjectCollider {

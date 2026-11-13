@@ -1,5 +1,5 @@
 """`make move-crate`'s rewrite of the sibling forms a `crate::<dep>::` scan misses: a bare
-`use crate::<dep>;`, a macro's `$crate::<dep>::`, and a crate a comment names."""
+`use crate::<dep>;` (an attribute above it, a re-export, a rename), a macro's `$crate::<dep>::`, and a crate only a comment or a string names."""
 
 from __future__ import annotations
 
@@ -29,6 +29,27 @@ class BareImport(unittest.TestCase):
         self.assertEqual(text, "mod asset;\nfn f() { asset::a(); }\n")
 
 
+    def test_an_attribute_above_the_removed_import_goes_with_it(self):
+        text, _ = mover.rewrite("#[cfg(test)]\nuse crate::asset;\nfn f() { asset::a(); }\n", "scene", {"asset"})
+        self.assertEqual(text, "fn f() { rusty_asset::a(); }\n")
+
+    def test_a_bare_re_export_keeps_its_name(self):
+        text, named = mover.rewrite("pub use crate::asset;\n", "scene", {"asset"})
+        self.assertEqual(text, "pub use rusty_asset as asset;\n")
+        self.assertEqual(named, {"asset"})
+
+    def test_a_renamed_import_names_the_crate_under_its_name(self):
+        text, named = mover.rewrite("use crate::asset as a;\nfn f() { a::x(); }\n", "scene", {"asset"})
+        self.assertEqual(text, "use rusty_asset as a;\nfn f() { a::x(); }\n")
+        self.assertEqual(named, {"asset"})
+
+    def test_a_re_exported_self_keeps_its_name(self):
+        text, _ = mover.rewrite("pub use crate::asset::{self, A};\n", "scene", {"asset"})
+        self.assertEqual(text, "pub use rusty_asset::{self as asset, A};\n")
+        text, _ = mover.rewrite("pub(crate) use crate::asset::{self};\n", "scene", {"asset"})
+        self.assertEqual(text, "pub(crate) use rusty_asset::{self as asset};\n")
+
+
 class MacroCrate(unittest.TestCase):
     def test_a_macros_sibling_path_names_the_crate_from_the_root(self):
         text, named = mover.rewrite("fn r(w: &$crate::ecs::World) {}\n", "scene", {"ecs"})
@@ -43,6 +64,10 @@ class MacroCrate(unittest.TestCase):
 class Comments(unittest.TestCase):
     def test_a_crate_only_a_comment_names_is_no_dependency(self):
         self.assertEqual(mover.externs("/// `wgpu::Limits::default()`\nfn f() {}\n", ["wgpu"]), [])
+
+    def test_a_trailing_comment_a_block_comment_or_a_string_is_no_dependency(self):
+        code = 'fn f() {} // wgpu::x\n/* a\n wgpu::Limits */\nconst S: &str = "wgpu::y";\n'
+        self.assertEqual(mover.externs(code, ["wgpu"]), [])
 
     def test_one_the_code_names_still_is(self):
         self.assertEqual(mover.externs("// note\nfn f() { wgpu::x(); }\n", ["wgpu"]), ["wgpu"])
