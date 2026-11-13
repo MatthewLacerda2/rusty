@@ -1,6 +1,6 @@
 """`make move-crate` at its edges: a submodule named like a module above, a re-aimed
 string path, a later manifest table, an include whose file did not move, a `lib.rs`
-header that named its directory, and a visibility naming the module's root."""
+header that named its directory, another crate's folder named like the module's, and a visibility naming the module's root."""
 
 from __future__ import annotations
 
@@ -45,7 +45,8 @@ class Edges(unittest.TestCase):
                  "src/asset/ui.rs": "pub struct Panel;\n", "src/ui/mod.rs": "",
                  "src/render/mod.rs": OUTSIDE, "crates/core/src/lib.rs": "",
                  "crates/core/Cargo.toml": '[package]\nname = "rusty-core"\n\n[features]\ndev = []\n',
-                 "tools/lint/src/layers/table.rs": TABLE}
+                 "crates/core/src/asset/x.rs": "//! crates/core/src/asset/x.rs\n",
+                 "docs/a.md": "see `src/asset/ui.rs`\n", "tools/lint/src/layers/table.rs": TABLE}
         for name, text in files.items():
             (root / name).parent.mkdir(parents=True, exist_ok=True)
             (root / name).write_text(text)
@@ -80,6 +81,11 @@ class Edges(unittest.TestCase):
         self.assertIn('include_str!("./a.wgsl")', outside)
         self.assertIn('include_str!("../x/../y.txt")', outside)
         self.assertIn('include_str!("../../crates/asset/src/ui.rs")', outside)
+
+
+    def test_a_file_naming_the_folder_is_listed_and_another_crates_like_named_folder_is_not(self):
+        self.assertIn("docs/a.md:1: names `src/asset/`", self.hand)
+        self.assertNotIn("crates/core/src/asset/x.rs", self.hand)
 
 
 class Externs(unittest.TestCase):

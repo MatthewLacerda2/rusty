@@ -118,9 +118,16 @@ def rewrite(text: str, module: str, deps: set[str]) -> tuple[str, set[str]]:
     # the import goes and each `<dep>::` names the crate (scene's `rehydrate::warned`, #2141).
     # So does `use crate::<dep>::{self, …}`, rewritten above to bind `rusty_<dep>`: its
     # `self` goes too (scene's `asset_instance`, #2141).
+    # PR #2156's review: an attribute above the removed import (`#[cfg(test)]`) goes with it,
+    # never onto the item after; a re-export keeps its name (`pub use crate::<dep>;` →
+    # `pub use rusty_<dep> as <dep>;`, a `pub use …::{self, …}` keeps `self as <dep>`); and
+    # `use crate::<dep> as x;` names the crate under `x`.
     for dep in sorted(deps):
-        bare = re.compile(rf"^[ \t]*use crate::{dep};\n", re.M)
-        grouped = re.compile(rf"(\buse rusty_{dep}::\{{)\s*self,\s*")
+        text = re.sub(rf"\b((?:pub(?:\([\w: ]+\))?\s+)?use )crate::{dep} as (\w+);", rf"\1rusty_{dep} as \2;", text)
+        text = re.sub(rf"\b(pub(?:\([\w: ]+\))?\s+use )crate::{dep};", rf"\1rusty_{dep} as {dep};", text)
+        text = re.sub(rf"(\bpub(?:\([\w: ]+\))?\s+use rusty_{dep}::\{{\s*)self(?=\s*[,}}])", rf"\1self as {dep}", text)
+        bare = re.compile(rf"^(?:[ \t]*#\[[^\n]*\]\n)*[ \t]*use crate::{dep};\n", re.M)
+        grouped = re.compile(rf"((?<!pub )(?<!\) )\buse rusty_{dep}::\{{)\s*self,\s*")
         if bare.search(text) or grouped.search(text):
             named.add(dep)
             text = grouped.sub(r"\1", bare.sub("", text))
@@ -131,7 +138,7 @@ def rewrite(text: str, module: str, deps: set[str]) -> tuple[str, set[str]]:
     text = text.replace("crate::test_temp::dir()", "rusty_test_support::temp::dir()")
     text = re.sub(rf"(?<![\w/])src/{module}/mod\.rs", f"crates/{module}/src/lib.rs", text)
     text = re.sub(rf"(?<![\w/])src/{module}/", f"crates/{module}/src/", text)
-    named |= {m for m in re.findall(r"(?<!\w)rusty_(\w+)::", text) if m in deps}
+    named |= {m for m in re.findall(r"(?<!\w)rusty_(\w+)(?:::|\s+as\b)", text) if m in deps}
     return text, named
 
 
@@ -363,9 +370,13 @@ def outside(root: Path, module: str) -> list[str]:
     done = subprocess.run(["git", "-C", str(root), "grep", "-n", "-F", f"src/{module}/", "--", ".",
                            f":(exclude)crates/{module}/**"], capture_output=True, text=True, check=False)
     hits: dict[str, list[str]] = {}
+    # `crates/asset/src/audio/` holds `src/audio/` too but names another crate's folder: the
+    # `audio` move listed eight such lines (#2141). Only a path starting there counts.
+    own = re.compile(rf"(?<![\w/.-])src/{module}/")
     for row in done.stdout.splitlines():
-        path, line, _ = row.split(":", 2)
-        hits.setdefault(path, []).append(line)
+        path, line, text = row.split(":", 2)
+        if own.search(text):
+            hits.setdefault(path, []).append(line)
     return [f"{p}:{','.join(ls)}: names `src/{module}/`: rewrite a file path to `crates/{module}/src/`; "
             "a module path the lint tools read stays" for p, ls in sorted(hits.items())]
 

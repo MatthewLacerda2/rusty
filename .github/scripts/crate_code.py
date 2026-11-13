@@ -56,12 +56,51 @@ def shadowed(code: str) -> set[str]:
     return names - {"self", "super", "crate", "*"}
 
 
+RAW = re.compile(r'b?r(#*)"')  # a raw string's opening, `r"`, `br#"`, …
+IDENT = re.compile(r"\w")
+
+
+def code_only(text: str) -> str:
+    """`text` with its comments and string literals blanked (a newline kept for each one they
+    held). A char literal is skipped whole, so `'"'` opens no string; a lone `'` is a lifetime."""
+    out, at, n = [], 0, len(text)
+    while at < n:
+        two, c = text[at:at + 2], text[at]
+        if two == "//":
+            at = text.find("\n", at)
+            at = n if at < 0 else at
+        elif two == "/*":
+            depth, at = 1, at + 2
+            while at < n and depth:
+                depth += (text[at:at + 2] == "/*") - (text[at:at + 2] == "*/")
+                out.append("\n" if text[at] == "\n" else "")
+                at += 2 if text[at:at + 2] in ("/*", "*/") else 1
+        elif (raw := RAW.match(text, at)) and (at == 0 or not IDENT.match(text[at - 1])):
+            end = text.find('"' + raw.group(1), at + raw.end())
+            end = n if end < 0 else end + 1 + len(raw.group(1))
+            out.append("\n" * text.count("\n", at, end))
+            at = end
+        elif c == '"':
+            at += 1
+            while at < n and text[at] != '"':
+                out.append("\n" if text[at] == "\n" else "")
+                at += 2 if text[at] == "\\" else 1
+            at += 1
+        elif c == "'" and (ch := re.match(r"'(?:\\.[^']*|[^\\'])'", text[at:at + 12])):
+            at += ch.end()
+        else:
+            out.append(c)
+            at += 1
+    return "".join(out)
+
+
 def externs(code: str | list[str], deps: list[str]) -> list[str]:
     """The external crates `code` (one file's text, or each file's) names as `name::` (`-` read
     as `_`), sorted. In each file, a name it declares as its own (`shadowed`) is no crate."""
     files = [code] if isinstance(code, str) else code
-    # A crate a comment names is no dependency (scene's docs name `wgpu::Limits`, #2141).
-    files = [re.sub(r"^\s*//.*$", "", f, flags=re.M) for f in files]
+    # A crate a comment or a string names is no dependency (scene's docs name `wgpu::Limits`,
+    # #2141; PR #2156's review: a trailing `//`, a `/* */` block or a literal did too).
+    files = [code_only(f) for f in files]
     return sorted(d for d in deps if any(
         d.replace("-", "_") not in shadowed(f) and re.search(rf"(?<![\w:]){d.replace('-', '_')}::", f)
         for f in files))
