@@ -22,7 +22,6 @@ pub mod preview;
 pub mod render;
 pub mod scene;
 pub mod scripting;
-pub mod shadergen;
 pub mod shell;
 pub mod ui;
 
@@ -32,6 +31,7 @@ pub mod ui;
 pub use rusty_asset as asset;
 pub use rusty_core as core;
 pub use rusty_procgen as procgen;
+pub use rusty_shadergen as shadergen;
 pub use rusty_time as time;
 
 #[cfg(feature = "dev")]

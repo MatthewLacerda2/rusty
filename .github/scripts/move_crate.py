@@ -107,10 +107,25 @@ def rewrite(text: str, module: str, deps: set[str]) -> tuple[str, set[str]]:
     return text, named
 
 
+def lib_header(text: str, module: str) -> str:
+    """`text` with a leading `//! src/<m>` or `//! crates/<m>/src/` header naming `lib.rs`
+    instead. A `mod.rs` header may name its directory, which `lib.rs`'s may not, and the
+    bare `src/<m>` (no trailing `/`) reads as prose to `self-path`: the rewrite left
+    `shadergen`'s `//! src/shadergen — …` a stale path no gate flagged (#2140)."""
+    lines = text.split("\n")
+    for n, line in enumerate(lines):
+        if line.startswith("//! "):
+            word = rf"(?<=^//! )(?:src/{module}/?|crates/{module}/src/?)(?=[\s:,—]|$)"
+            lines[n] = re.sub(word, f"crates/{module}/src/lib.rs", line, count=1)
+            break
+    return "\n".join(lines)
+
+
 def reaching_up(path: str, text: str, above: set[str]) -> list[str]:
     """`path:line: why` for each `crate::<x>::` naming a module the row does not list. Read in
     the text as it was: once `crate::<m>::` is `crate::`, the crate's own submodule named
-    like a module above it (`crate::<m>::ui::`) would read as that module."""
+    like a module above it (`crate::<m>::ui::`) would read as that module, a false report PR #2149's review
+    found."""
     return [f"{path}:{n}: names `{x}`, which the row does not list: a test reaching up moves to "
             f"`tests/` (or `{x}`'s own tests); live code is a layering violation"
             for n, line in enumerate(text.splitlines(), 1)
@@ -118,7 +133,9 @@ def reaching_up(path: str, text: str, above: set[str]) -> list[str]:
 
 
 #: A string literal naming a path from the checkout's root (`"tests/fixtures/…"`), the crate's
-#: own `"crates/<m>/src/…"` (a `"src/<m>/…"` the rewrite re-aimed) among them.
+#: own `"crates/<m>/src/…"` (a `"src/<m>/…"` the rewrite re-aimed) among them: PR #2149's review
+#: found the rewrite re-aiming such a literal silently, though the crate's tests read it from the
+#: crate's folder, where it names nothing.
 CWD_PATH = re.compile(r'(?<![\w/])"(?:tests|engine|games|docs|src|crates)/')
 
 
@@ -294,7 +311,9 @@ def reaim(text: str, was: Path, now: Path, module: str, moved_only: bool = False
     """`text`'s relative `include_str!` / `include_bytes!` paths, written from `was`'s
     folder, re-aimed from `now`'s at the file they named, which may itself have moved
     from `src/<m>/` (paths relative to the checkout). `moved_only` leaves every include
-    whose file did not move exactly as written."""
+    whose file did not move exactly as written (PR #2149's review): the outside pass would
+    otherwise respell an include it has no reason to touch (`normpath` folds a `./` or a
+    `a/../`), a diff in a file no move asked for."""
     def one(m: re.Match) -> str:
         target = Path(os.path.normpath(was.parent / m.group(2)))
         if target.parts[:2] == ("src", module):
@@ -324,7 +343,9 @@ def reaim_outside(root: Path, module: str) -> list[str]:
 
 def leave_root(root: Path, module: str, externs_: list[str]) -> list[str]:
     """Drop from the root's `[dependencies]` each external crate the moved crate takes
-    that no `.rs` file left outside `crates/` names; the crates dropped."""
+    that no `.rs` file left outside `crates/` names; the crates dropped. Only inside that
+    table: PR #2149's review found the old match running on past it, into a later table's
+    line of the same name (`[dev-dependencies]`, a `[target.…]` one)."""
     left = subprocess.run(["git", "-C", str(root), "ls-files", "--", "*.rs", f":(exclude){layout.CRATES}/**"],
                           capture_output=True, text=True, check=False).stdout.split()
     code = "\n".join((root / f).read_text() for f in left if (root / f).is_file())
@@ -373,6 +394,8 @@ def move(root: Path, module: str) -> list[str]:
         rel = path.relative_to(crate / "src")
         text, named = rewrite(before, module, deps & others)
         text = reaim(text, Path("src", module, rel), Path(layout.CRATES, module, "src", rel), module)
+        if rel == Path("lib.rs"):
+            text = lib_header(text, module)
         path.write_text(text)
         siblings |= named
         if is_test_file(rel):

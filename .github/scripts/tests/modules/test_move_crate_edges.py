@@ -1,5 +1,6 @@
 """`make move-crate` at its edges: a submodule named like a module above, a re-aimed
-string path, a later manifest table, and an include whose file did not move."""
+string path, a later manifest table, an include whose file did not move, and a `lib.rs`
+header that named its directory."""
 
 from __future__ import annotations
 
@@ -74,6 +75,18 @@ class Edges(unittest.TestCase):
         self.assertIn('include_str!("./a.wgsl")', outside)
         self.assertIn('include_str!("../x/../y.txt")', outside)
         self.assertIn('include_str!("../../crates/asset/src/ui.rs")', outside)
+
+
+class LibHeader(unittest.TestCase):
+    def test_a_header_naming_the_directory_names_lib_rs(self):
+        for was, tail in (("//! src/asset — x", " — x"), ("//! crates/asset/src/ — x", " — x"),
+                          ("#![deny(x)]\n//! crates/asset/src: x", ": x")):
+            now = mover.lib_header(f"{was}\n//! src/asset y\n", "asset")
+            self.assertIn(f"//! crates/asset/src/lib.rs{tail}\n//! src/asset y\n", now)
+
+    def test_any_other_header_is_left_alone(self):
+        for text in ("//! crates/asset/src/lib.rs — x", "//! the asset pipeline, src/asset", "//! src/assets — x"):
+            self.assertEqual(mover.lib_header(text, "asset"), text)
 
 
 if __name__ == "__main__":
