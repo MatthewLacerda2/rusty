@@ -758,7 +758,7 @@ zero violations (#494), and it is the groundwork the crate split (#495) needs.
 ## Component completeness (`--components`)
 A first-class component is only "done" when it appears on all four axes that
 deliberately live in non-dependent layers: a row in the component registry
-(`src/components/registry.rs`'s `first_class!`, #2023, which generates its `Entity`
+(`crates/components/src/registry.rs`'s `first_class!`, #2023, which generates its `Entity`
 field), an Add Component entry (`inspector/components/add/`: a
 `!world.has_<field>(id)` gate, or the menu generated from the registry, which
 offers every row behind `authoring::has_kind`; there the `AddEntry` bound holds the
@@ -768,7 +768,7 @@ namespace (`src/api/<x>.rs` registered in `api/mod.rs` and documented in
 `docs/api/`, as the field or its Lua spelling: `layout_group` is `LayoutGroup`). The
 gate discovers components from the registry's rows — so a new one can't slip
 through — and fails on any missing axis. It *finds* `macro_rules! first_class`
-under `src/components/` rather than reading a fixed path, and fails loudly
+under `crates/components/src/` rather than reading a fixed path, and fails loudly
 (`NO_REGISTRY` / `NO_COMPONENTS`) when it can't or when it yields no rows (the
 `full-literal` rule reads the same rows, with a real-tree test of its own): for weeks after `entity.rs` became `entity/mod.rs` both gates
 checked zero components and printed ok (#959). A test-lint test runs discovery on

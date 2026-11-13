@@ -57,7 +57,7 @@ navigation, audio, CI) at once; within one module, run one branch at a time.
 The files every feature appends to, where two branches at once is the case to
 avoid:
 
-- `src/components/registry.rs`'s `first_class!` rows: one sorted line per
+- `crates/components/src/registry.rs`'s `first_class!` rows: one sorted line per
   component, from which `Entity`, the `World` accessors, `ComponentKind`, the
   dependency dispatch, `KINDS`, the snapshot and the Add Component menu are
   generated, so two component branches touch different lines; what still

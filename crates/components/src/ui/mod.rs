@@ -1,0 +1,40 @@
+//! crates/components/src/ui/ — the in-game UI's first-class components (#414).
+//!
+//! The uGUI primitives, each pure authoring data: [`CanvasComponent`] (a UI root),
+//! [`RectTransformComponent`] (2D placement inside the parent rect), the
+//! [`ImageComponent`] graphic, the [`TextComponent`] label, the texture-free
+//! [`ShapeComponent`] graphic and the blend / gradient look they share (#425), the
+//! [`CanvasGroupComponent`] (subtree alpha and interaction flags) and the
+//! [`RectMaskComponent`] clip and [`MaskComponent`] graphic clip (#428), the
+//! [`BackdropFilterComponent`] frosted glass (#426), the [`SelectableComponent`] (an interactive
+//! element, #420), and the [`LayoutGroupComponent`] / [`LayoutElementComponent`]
+//! pair that arranges children automatically (#421). An Image, Shape or Text may name a
+//! custom [`UiShader`] (#427). Computed state — rects,
+//! batches — lives in `ui::UiLayout` and the renderer, never here. The model is
+//! recorded in `docs/ui.md`.
+
+pub mod backdrop;
+pub mod image;
+pub mod layout;
+pub mod look;
+pub mod mask;
+pub mod rect_mask;
+pub mod selectable;
+pub mod shader;
+pub mod shape;
+pub mod text;
+
+pub use backdrop::BackdropFilterComponent;
+pub use image::{FillMethod, FillOrigin, ImageComponent, ImageType};
+pub use layout::canvas::{CanvasComponent, CanvasRenderMode, CanvasSway};
+pub use layout::canvas_group::CanvasGroupComponent;
+pub use layout::element::{LayoutAxisFit, LayoutElementComponent};
+pub use layout::group::{LayoutConstraint, LayoutCorner, LayoutGroupComponent, LayoutKind};
+pub use layout::rect_transform::{RectTransformComponent, WorldAnchor};
+pub use look::{GradientKind, GradientStop, UiBlend, UiGradient, MAX_GRADIENT_STOPS};
+pub use mask::MaskComponent;
+pub use rect_mask::RectMaskComponent;
+pub use selectable::{NavigationMode, SelectableComponent, SelectableTransition, SelectionState};
+pub use shader::UiShader;
+pub use shape::{ShapeComponent, ShapeCorner, ShapeGlow, ShapeKind, ShapeShadow};
+pub use text::{TextAlignment, TextComponent, TextOverflow};
