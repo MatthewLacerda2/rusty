@@ -1,14 +1,13 @@
 //! The animated bound (#833): it holds every vertex of an animated pose, skinned the
-//! way the shader skins it, and refuses what it cannot bound. It lives with the
-//! animation because it poses through the animation's own path (`posed`); the
-//! bound is `render`'s, reached through its public API.
+//! way the shader skins it, and refuses what it cannot bound. The poses are built
+//! here, joint by joint down the chain, since the animation that samples a clip
+//! sits above this crate; the bound holds for any palette of them.
 
 use glam::{Mat4, Quat, Vec3, Vec4};
 
-use super::posed::posed_palette;
-use crate::asset::{AnimationClip, Interpolation, JointTrack, JointTransform, SkinData, Track};
-use crate::components::mesh::Vertex;
-use crate::render::SkinBounds;
+use super::SkinBounds;
+use rusty_asset::{JointTransform, SkinData};
+use rusty_components::mesh::Vertex;
 
 /// A vertex at `p` weighted to `joints` by `weights`.
 fn vertex(p: Vec3, joints: [u32; 4], weights: [f32; 4]) -> Vertex {
@@ -60,35 +59,32 @@ fn chain() -> (SkinData, Vec<Vertex>) {
     (skin, vertices)
 }
 
-/// A clip that moves every joint: the hips slide and squash, the spine bends 70°
-/// about Z, the head twists about X and grows.
-fn bend() -> AnimationClip {
-    fn track<T>(values: Vec<T>) -> Track<T> {
-        let times = (0..values.len()).map(|k| k as f32 * 0.5).collect();
-        Track {
-            times,
-            values,
-            interpolation: Interpolation::Linear,
-        }
+/// The palette of a pose that moves every joint, `t` from 0 to 1: the hips slide
+/// and squash, the spine bends up to 70° about Z, the head twists about X and grows.
+/// Each joint's local transform is composed down the chain (`parents`), as a frame
+/// poses its bones, then multiplied by its inverse bind.
+fn bend(skin: &SkinData, t: f32) -> Vec<Mat4> {
+    let wave = (t * std::f32::consts::TAU).sin();
+    let locals = [
+        Mat4::from_scale_rotation_translation(
+            Vec3::new(1.0 + 0.4 * wave, 1.0 - 0.4 * wave, 1.0),
+            Quat::IDENTITY,
+            Vec3::new(0.4, -0.2, 0.0) * wave + Vec3::X * t,
+        ),
+        Mat4::from_rotation_translation(Quat::from_rotation_z(1.2 * wave), Vec3::Y),
+        Mat4::from_scale_rotation_translation(
+            Vec3::splat(1.0 + 0.5 * wave.abs()),
+            Quat::from_rotation_x(0.9 * wave),
+            Vec3::Y,
+        ),
+    ];
+    let mut globals: Vec<Mat4> = Vec::new();
+    for (j, local) in locals.iter().enumerate() {
+        let parent = skin.parents[j].map_or(Mat4::IDENTITY, |p| globals[p]);
+        globals.push(parent * *local);
     }
-    let rot = |axis: Vec3, a: f32| {
-        [0.0, a, -a]
-            .map(|s| Quat::from_axis_angle(axis, s))
-            .to_vec()
-    };
-    let mut tracks = vec![JointTrack::default(); 3];
-    tracks[0].translation = track(vec![Vec3::ZERO, Vec3::new(0.4, -0.2, 0.0), Vec3::X]);
-    tracks[0].scale = track(vec![Vec3::ONE, Vec3::new(1.4, 0.6, 1.0), Vec3::ONE]);
-    tracks[1].rotation = track(rot(Vec3::Z, 1.2));
-    tracks[2].rotation = track(rot(Vec3::X, 0.9));
-    tracks[2].scale = track(vec![Vec3::ONE, Vec3::splat(1.5), Vec3::ONE]);
-    let mut clip = AnimationClip {
-        name: "Bend".into(),
-        tracks,
-        duration: 0.0,
-    };
-    clip.recompute_duration();
-    clip
+    let palette = globals.iter().zip(&skin.inverse_bind);
+    palette.map(|(g, inverse)| *g * *inverse).collect()
 }
 
 /// Where the shader draws `v` under `palette` (`blend_joints`, then the divide).
@@ -115,10 +111,9 @@ fn the_bound_holds_every_vertex_of_every_animated_pose() {
     let (skin, vertices) = chain();
     let bounds = SkinBounds::from_vertices(&vertices);
     let rest = SkinBounds::from_vertices(&vertices).posed(&skin.bind_palette());
-    let clip = bend();
     let mut left_the_rest_box = false;
     for k in 0..=40 {
-        let palette = posed_palette(&skin, &clip, k as f32 * clip.duration / 40.0);
+        let palette = bend(&skin, k as f32 / 40.0);
         let posed = bounds
             .posed(&palette)
             .expect("a well-formed skin is bounded");
@@ -130,7 +125,7 @@ fn the_bound_holds_every_vertex_of_every_animated_pose() {
     }
     assert!(
         left_the_rest_box,
-        "the clip must move a limb past the rest-pose box"
+        "the pose must move a limb past the rest-pose box"
     );
 }
 

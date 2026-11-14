@@ -3464,7 +3464,6 @@ dependencies = [
  "image",
  "ktx2",
  "log",
- "mlua",
  "naga_oil",
  "pollster",
  "proptest",

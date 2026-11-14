@@ -109,5 +109,9 @@ impl GpuMesh {
 }
 
 #[cfg(test)]
+#[path = "skinned_tests.rs"]
+mod tests;
+
+#[cfg(test)]
 #[path = "skinned_weight_tests.rs"]
 mod weight_tests;

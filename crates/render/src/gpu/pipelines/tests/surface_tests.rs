@@ -16,8 +16,7 @@ const RES: u32 = 32;
 
 /// A fresh workspace for this test's baked modules.
 fn workspace(tag: &str) -> String {
-    let dir =
-        rusty_test_support::temp::dir().join(format!("rusty_surface_{tag}_{}", std::process::id()));
+    let dir = rusty_test_support::temp::dir().join(format!("rusty_surface_{tag}"));
     std::fs::create_dir_all(&dir).unwrap();
     dir.to_str().unwrap().to_owned()
 }

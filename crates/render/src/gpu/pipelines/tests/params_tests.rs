@@ -4,7 +4,6 @@
 //! Skips with no adapter.
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
 use glam::Vec3;
 
@@ -15,6 +14,11 @@ use rusty_shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
 pub(super) const RES: u32 = 32;
+
+#[path = "material_ops.rs"]
+mod material_ops;
+use material_ops::set_asset_param;
+pub(crate) use material_ops::{clear_params, set_param, set_texture};
 
 /// A red hit-flash surface shader baked where scripts and the renderer resolve it,
 /// under a name unique to this run; removed on drop.
@@ -60,34 +64,6 @@ pub(super) fn sphere(scene: &mut Scene, x: f32, shader: &str) -> u32 {
     let key = mat_ops::ensure_material_key(scene, id).unwrap();
     mat_ops::set_shader(&mut scene.materials, &key, shader.to_string());
     id
-}
-
-// What a script's `Material.*` calls do, through the scene ops the API wraps:
-// these tests check the GPU side, and the API's own tests hold the Lua side.
-
-/// `Material.SetShaderParam(id, name, value)`: `id`'s own value.
-pub(super) fn set_param(scene: &Rc<RefCell<Scene>>, id: u32, name: &str, value: f32) {
-    let scene = &mut scene.borrow_mut();
-    mat_ops::set_entity_shader_param(scene, id, name, vec![value]).unwrap();
-}
-
-/// `Material.ClearShaderParam(id)`: every value of `id`'s own.
-pub(super) fn clear_params(scene: &Rc<RefCell<Scene>>, id: u32) {
-    mat_ops::clear_entity_shader_param(&mut scene.borrow_mut(), id, None).unwrap();
-}
-
-/// `Material.SetAssetShaderParam(asset, name, value)`: the library asset's value.
-fn set_asset_param(scene: &Rc<RefCell<Scene>>, asset: &str, name: &str, value: f32) {
-    let scene = &mut *scene.borrow_mut();
-    let layout = mat_ops::shader_layout(&scene.materials, asset).unwrap();
-    mat_ops::set_shader_param(&mut scene.materials, asset, &layout, name, vec![value]).unwrap();
-}
-
-/// `Material.SetShaderTexture(id, slot, path)`.
-pub(super) fn set_texture(scene: &Rc<RefCell<Scene>>, id: u32, slot: &str, path: &str) {
-    let scene = &mut *scene.borrow_mut();
-    let key = mat_ops::ensure_material_key(scene, id).unwrap();
-    mat_ops::set_shader_texture(&mut scene.materials, &key, slot, Some(path.into())).unwrap();
 }
 
 /// The summed (red, blue) of the centre row's left and right halves.

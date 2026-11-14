@@ -19,9 +19,7 @@ pub(crate) mod render_texture;
 pub(crate) mod scene;
 mod setup;
 mod stats;
-/// A test hook: the one place a test asks for a GPU, compiled into every build so
-/// the crates above (`dev`, `shell`) reach it from their own tests.
-#[doc(hidden)]
+#[doc(hidden)] // A test hook: the crates above reach it from their own tests.
 pub mod test_gpu;
 pub(crate) mod timing;
 mod view;

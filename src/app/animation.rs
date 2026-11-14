@@ -275,8 +275,6 @@ mod playhead_tests;
 #[cfg(test)]
 pub(crate) mod posed;
 #[cfg(test)]
-mod skin_bounds_tests;
-#[cfg(test)]
 pub(crate) mod test_rig;
 #[cfg(test)]
 mod tests;

@@ -25,12 +25,11 @@ glam = { workspace = true }
 image = { workspace = true }
 ktx2 = { workspace = true }
 log = { workspace = true }
-mlua = { workspace = true }
 naga_oil = { workspace = true }
 pollster = { workspace = true }
-proptest = { workspace = true }
 wgpu = { workspace = true }
 
 [dev-dependencies]
 rusty-test-support = { workspace = true }
 rusty-procgen = { workspace = true }
+proptest = { workspace = true }
