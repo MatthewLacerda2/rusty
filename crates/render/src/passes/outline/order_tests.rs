@@ -8,7 +8,7 @@ use glam::Vec3;
 use super::tests::{is_outline, RES};
 use crate::postfx::HDR_FORMAT;
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// A unit box at `(0, 1, 0)`, selected, beside a light probe whose marker is in

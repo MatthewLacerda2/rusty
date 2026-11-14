@@ -5,7 +5,7 @@
 use glam::Vec3;
 
 use super::{brightness, looking, yard};
-use rusty_scene::authoring::Primitive;
+use rusty_scene::create::Primitive;
 
 /// A 5 x 5 grid of points around `centre`, spanning `u` and `v` either side.
 fn grid(centre: Vec3, u: Vec3, v: Vec3) -> Vec<Vec3> {

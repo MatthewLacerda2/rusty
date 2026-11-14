@@ -23,7 +23,7 @@ fn sun(s: &mut Scene) -> u32 {
         light_type: LightType::Directional,
         mode: LightMode::Mixed,
         intensity: 3.0,
-        ..rusty_scene::authoring::default_light()
+        ..rusty_edit::authoring::default_light()
     };
     s.world.set_light(id, Some(light));
     s.world.transform_mut(id).unwrap().rotation =

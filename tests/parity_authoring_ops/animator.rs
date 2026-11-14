@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use mlua::Lua;
 use rusty::components::AnimatorComponent;
-use rusty::scene::authoring::animator as animator_ops;
+use rusty::edit::authoring::animator as animator_ops;
 use rusty::scene::Scene;
 use rusty::script::api::bind;
 use rusty::script::scripting::ConsoleLogs;

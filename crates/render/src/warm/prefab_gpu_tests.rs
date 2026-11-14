@@ -4,8 +4,9 @@
 
 use super::warm_gpu_tests::{first_frame, prepare, render, warm};
 use crate::stats::Uploads;
-use rusty_scene::authoring::{create_entity, Primitive};
-use rusty_scene::{load_and_instantiate_linked, save_prefab, Scene};
+use rusty_edit::{load_and_instantiate_linked, save_prefab};
+use rusty_scene::create::{create_entity, Primitive};
+use rusty_scene::Scene;
 
 /// `<tmp>/rusty_2123_prefab/level.scene`: two linked instances of a Capsule
 /// holding a Cylinder.
@@ -26,7 +27,7 @@ fn level() -> String {
         *place = glam::Vec3::new(x, 0.0, -4.0);
     }
     let path = rusty_core::paths::to_slash(&dir.join("level.scene"));
-    rusty_scene::save_to_file(&scene, &path).unwrap();
+    rusty_edit::save_to_file(&scene, &path).unwrap();
     path
 }
 

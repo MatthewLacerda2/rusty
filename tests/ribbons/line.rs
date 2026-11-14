@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use rusty::components::{LineComponent, TextureMode};
-use rusty::scene::authoring::{add_component, ComponentKind};
+use rusty::edit::authoring::{add_component, ComponentKind};
 use rusty::scene::Scene;
 
 use super::{eval, round_trip, with_api};

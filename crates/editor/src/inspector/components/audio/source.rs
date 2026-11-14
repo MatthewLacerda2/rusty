@@ -10,11 +10,11 @@
 use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use crate::inspector::components::card::component_card;
 use rusty_audio::mixer::DEFAULT_GROUPS;
-use rusty_scene::authoring::audio::source as audio_ops;
+use rusty_edit::authoring::audio::source as audio_ops;
 use rusty_scene::AudioSourceComponent;
 
 /// 3F-audio. AudioSource component card. A THIN client (#287): each widget reads the

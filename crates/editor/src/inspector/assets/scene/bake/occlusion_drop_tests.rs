@@ -33,7 +33,7 @@ fn probing(path: &str) -> (EditorUi, Scene) {
         .add(Vec3::new(0.0, 1.0, 2.0), Vec3::splat(2.0));
     scene.reflection_probes.edit(i, |p| p.manual = true);
     scene.lighting_settings.reflections.resolution = 16;
-    rusty_scene::save_to_file(&scene, path).unwrap();
+    rusty_edit::save_to_file(&scene, path).unwrap();
     let mut editor = EditorUi::new(Default::default());
     editor.set_current_scene_path(Some(path.to_string()));
     let job = start_probes(&mut scene, path, None).unwrap();
@@ -82,7 +82,7 @@ fn gpu_a_bake_dropped_while_the_pvs_bakes_keeps_the_written_lighting() {
     let (line, level) = console.messages.last().unwrap();
     assert_eq!(*level, LogLevel::Warning, "{line}");
     let mut back = Scene::new();
-    rusty_scene::load_from_file(&mut back, &path).unwrap();
+    rusty_edit::load_from_file(&mut back, &path).unwrap();
     assert_eq!(
         back.reflection_probes.probes[0].cubemap_path, cube,
         "written"

@@ -9,13 +9,13 @@
 use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use super::super::physics::vec3_row;
 use crate::inspector::components::card::component_card;
 use rusty_components::NavMeshModifierVolumeComponent as Volume;
+use rusty_edit::authoring::nav::modifier as volume_ops;
 use rusty_navigation::MAX_AREAS;
-use rusty_scene::authoring::nav::modifier as volume_ops;
 
 /// Route one edit through the shared ops and mark the scene dirty.
 fn write(world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool, op: impl FnOnce(&mut Volume)) {

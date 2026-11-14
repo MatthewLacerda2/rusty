@@ -12,7 +12,7 @@
 use std::collections::BTreeMap;
 
 use rusty_asset::MapRef;
-use rusty_scene::authoring::material as mat_ops;
+use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::MaterialAsset;
 
 /// The runtime-param rows for material `key`; nothing when its shader has none (or

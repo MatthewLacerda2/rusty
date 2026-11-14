@@ -2,7 +2,7 @@
 //! table, scroll's two meanings, and the bounds frame-selected fits.
 
 use super::*;
-use rusty_scene::authoring::{self, Primitive};
+use rusty_edit::authoring::{self, Primitive};
 
 fn buttons(primary: bool, secondary: bool, middle: bool, alt: bool) -> Buttons {
     Buttons {

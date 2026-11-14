@@ -29,7 +29,7 @@ fn add_child(scene: &mut Scene, parent: u32, pos: Vec3, shape: ColliderShape) ->
     scene.world.set_static(id, true);
     let collider = ColliderComponent {
         shape,
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_scene::create::default_collider()
     };
     scene.world.set_collider(id, Some(collider));
     id

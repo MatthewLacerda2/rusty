@@ -6,7 +6,7 @@ use std::f32::consts::FRAC_PI_2;
 
 use glam::{Quat, Vec3};
 use rusty::components::{MaterialAsset, RenderFace};
-use rusty::scene::authoring::Primitive;
+use rusty::edit::authoring::Primitive;
 
 use super::{black_plastic, reflectance, scene};
 

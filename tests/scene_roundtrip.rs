@@ -1,8 +1,8 @@
 //! Scene save/load round-trip + edit-mode snapshot/restore (issue #6).
 
 use glam::Vec3;
+use rusty::edit::SceneSnapshot;
 use rusty::scene::Scene;
-use rusty::scene::SceneSnapshot;
 
 fn tmp(name: &str) -> String {
     crate::temp::dir().join(name).to_string_lossy().into_owned()
@@ -23,10 +23,10 @@ fn save_load_preserves_values_and_rehydrates_mesh() {
         )),
     );
     let path = tmp("rusty_scene_roundtrip.scene");
-    rusty::scene::save_to_file(&scene, &path).unwrap();
+    rusty::edit::save_to_file(&scene, &path).unwrap();
 
     let mut loaded = Scene::new();
-    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
+    rusty::edit::load_from_file(&mut loaded, &path).unwrap();
     assert_eq!(loaded.entity_count(), 1);
     assert_eq!(loaded.skybox_path, "sky.png");
     let e = loaded.world.entity_document(id).unwrap();
@@ -43,10 +43,10 @@ fn save_load_preserves_layer_names_and_entity_layer() {
     scene.world.set_layer(id, 3);
 
     let path = tmp("rusty_layers_roundtrip.scene");
-    rusty::scene::save_to_file(&scene, &path).unwrap();
+    rusty::edit::save_to_file(&scene, &path).unwrap();
 
     let mut loaded = Scene::new();
-    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
+    rusty::edit::load_from_file(&mut loaded, &path).unwrap();
     // The registry name and the entity's layer index both survive the round-trip.
     assert_eq!(loaded.layers.name(3), "Enemy");
     assert_eq!(loaded.layers.index_of("Enemy"), Some(3));
@@ -71,10 +71,10 @@ fn save_load_preserves_collision_matrix() {
     assert!(scene.collision_matrix.can_collide(1, 3));
 
     let path = tmp("rusty_collision_matrix_roundtrip.scene");
-    rusty::scene::save_to_file(&scene, &path).unwrap();
+    rusty::edit::save_to_file(&scene, &path).unwrap();
 
     let mut loaded = Scene::new();
-    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
+    rusty::edit::load_from_file(&mut loaded, &path).unwrap();
     assert!(!loaded.collision_matrix.can_collide(1, 2));
     assert!(!loaded.collision_matrix.can_collide(2, 1));
     assert!(loaded.collision_matrix.can_collide(1, 3));
@@ -104,5 +104,5 @@ fn corpus_seed_scene_loads_in_the_current_format() {
         serde_json::from_str(&serde_json::to_string(&data).unwrap()).unwrap();
     let file: serde_json::Value = serde_json::from_str(&text).unwrap();
     assert_eq!(saved, file, "{path} is stale");
-    rusty::scene::apply_scene_data(&mut Scene::new(), data);
+    rusty::edit::apply_scene_data(&mut Scene::new(), data);
 }

@@ -26,7 +26,7 @@ fn add_wall(scene: &mut Scene, x: f32, is_trigger: bool) -> u32 {
             size: Vec3::new(1.0, 4.0, 4.0),
         },
         is_trigger,
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_scene::create::default_collider()
     };
     scene.world.set_collider(id, Some(collider));
     id
@@ -87,7 +87,7 @@ fn add_box(scene: &mut Scene, parent: Option<u32>, pos: Vec3, size: Vec3) -> u32
     }
     let collider = ColliderComponent {
         shape: ColliderShape::Box { size },
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_scene::create::default_collider()
     };
     scene.world.set_collider(id, Some(collider));
     id
@@ -98,7 +98,7 @@ fn kinematic(scene: &mut Scene, id: u32) {
     let rb = RigidBodyComponent {
         is_kinematic: true,
         use_gravity: false,
-        ..rusty_scene::authoring::default_rigidbody()
+        ..rusty_scene::create::default_rigidbody()
     };
     scene.world.set_rigidbody(id, Some(rb));
 }

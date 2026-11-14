@@ -8,7 +8,7 @@ use glam::{Quat, Vec3};
 
 use super::render_face_tests::{asset, card, frame, mean};
 use rusty_components::{Projection, RenderFace};
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// A flat tangent-space normal map tilted `tilt` along the bitangent, written to disk.

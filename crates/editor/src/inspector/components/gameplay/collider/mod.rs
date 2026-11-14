@@ -19,8 +19,8 @@ use glam::Vec3;
 
 use crate::inspector::components::card::{component_card, remove_component};
 use rusty_components::CapsuleAxis;
-use rusty_scene::authoring::physics::collider as collider_ops;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::physics::collider as collider_ops;
+use rusty_edit::authoring::ComponentKind;
 use rusty_scene::ColliderShape;
 
 pub fn draw_collider(

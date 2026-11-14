@@ -9,7 +9,7 @@ use std::rc::Rc;
 use mlua::Lua;
 
 use crate::api::bind;
-use rusty_scene::authoring::defaults;
+use rusty_edit::authoring::defaults;
 use rusty_scene::Scene;
 use rusty_shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT_DIR};
 

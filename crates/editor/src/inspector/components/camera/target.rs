@@ -1,10 +1,10 @@
 //! The Camera card's projection mode and render-texture target (#430). Every write
-//! routes through `scene::authoring::rendering::camera`, the ops the `Camera.*` per-entity
+//! routes through `edit::authoring::rendering::camera`, the ops the `Camera.*` per-entity
 //! functions use.
 
 use crate::widgets::DragRange;
 use rusty_components::{CameraComponent, Projection};
-use rusty_scene::authoring::rendering::camera as camera_ops;
+use rusty_edit::authoring::rendering::camera as camera_ops;
 
 /// Perspective / orthographic, and the orthographic half-height.
 pub(super) fn draw_projection_mode(

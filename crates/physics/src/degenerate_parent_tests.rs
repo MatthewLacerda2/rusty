@@ -14,8 +14,9 @@ use super::compound::world_pose;
 use super::shape::build::build_shape;
 use super::PhysicsWorld;
 use rusty_components::{CapsuleAxis, ColliderComponent, ColliderShape};
-use rusty_scene::authoring::defaults::default_rigidbody;
-use rusty_scene::{apply_scene_data, to_scene_data, Scene};
+use rusty_edit::{apply_scene_data, to_scene_data};
+use rusty_scene::create::defaults::default_rigidbody;
+use rusty_scene::Scene;
 
 /// A capsule child, turned 90° about Z, under a parent scaled by `parent_scale`
 /// and turned about Y. Returns the child's id.

@@ -10,7 +10,7 @@ use crate::lod::LodSelection;
 use rusty_asset::{JointTransform, SkinData};
 use rusty_components::mesh::primitives::generate_sphere;
 use rusty_components::{LodGroupComponent, LodLevel, MeshComponent, ShadowCasting};
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// A one-joint skinned sphere (radius 0.8) whose pose moves it by `pose`, selected

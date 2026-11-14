@@ -8,7 +8,7 @@ use std::rc::Rc;
 use glam::Vec3;
 
 use super::assets::manager;
-use rusty_scene::asset_instance::instantiate_asset;
+use rusty_edit::asset_instance::instantiate_asset;
 use rusty_scene::Scene;
 use rusty_test_support::models::anim::{animated_buffer, ANIMATED_GLTF};
 
@@ -20,7 +20,7 @@ fn model(
     from: &[&std::path::Path],
 ) -> std::path::PathBuf {
     let bin = animated_buffer();
-    rusty_scene::asset_instance::humanoid_fixture::write(
+    rusty_edit::asset_instance::humanoid_fixture::write(
         dir,
         name,
         clip,

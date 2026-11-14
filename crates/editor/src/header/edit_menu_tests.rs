@@ -4,7 +4,7 @@
 
 use super::{repl_input_id, shortcuts, typing_holds_step};
 use crate::EditorUi;
-use rusty_scene::authoring::create_entity;
+use rusty_edit::authoring::create_entity;
 use rusty_scene::Scene;
 
 /// What widget has the keyboard when Ctrl+Z is pressed.

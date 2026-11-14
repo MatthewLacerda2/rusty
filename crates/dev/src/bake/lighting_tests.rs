@@ -27,7 +27,7 @@ fn room_scene() -> Scene {
             shape: ColliderShape::Box {
                 size: Vec3::new(20.0, 6.0, 20.0),
             },
-            ..rusty_scene::authoring::default_collider()
+            ..rusty_edit::authoring::default_collider()
         }),
     );
     scene

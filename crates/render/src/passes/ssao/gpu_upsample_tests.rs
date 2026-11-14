@@ -7,7 +7,7 @@ use glam::Vec3;
 
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_core::settings::quality::EffectQuality;
-use rusty_scene::authoring::{create_entity, default_post_processing, Primitive};
+use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::{Camera, Scene};
 
 const W: u32 = 96;

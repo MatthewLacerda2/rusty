@@ -16,7 +16,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use rusty::app::GameWorld;
-use rusty::scene::authoring::ui::widgets::{self, create_ui, UiWidget};
+use rusty::edit::authoring::ui::widgets::{self, create_ui, UiWidget};
 use rusty::scene::Scene;
 use rusty::script::scripting::ConsoleLogs;
 

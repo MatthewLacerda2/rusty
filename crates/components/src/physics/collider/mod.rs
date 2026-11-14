@@ -95,7 +95,7 @@ pub struct ColliderComponent {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shared_mesh: Option<SharedMesh>,
     /// The collision mesh a `Mesh` shape builds from instead of whatever Mesh its
-    /// entity has (#1960, `scene::asset_instance::collision`): Unity's
+    /// entity has (#1960, `edit::asset_instance::collision`): Unity's
     /// `MeshCollider.sharedMesh` pointed at a low-poly copy, named by its model's
     /// sidecar or a script. Adding or removing a Mesh never touches it. While its
     /// geometry is empty (the sub-object failed to load) the collider falls back to

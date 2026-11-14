@@ -6,7 +6,7 @@ use glam::Vec3;
 use super::{collider_wire, WireCache};
 use crate::shape::fixture::arch;
 use rusty_components::{RigidBodyComponent, SharedMesh};
-use rusty_scene::authoring::defaults::default_rigidbody;
+use rusty_scene::create::defaults::default_rigidbody;
 use rusty_scene::{ColliderComponent, ColliderShape, Scene};
 
 /// A scene with one entity whose concave mesh collider is the fixture's arch.

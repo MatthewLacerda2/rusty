@@ -31,7 +31,7 @@
 //! (`SkySettings::resolved`) whatever the mode; outside `Skybox` it is apart from
 //! the ambient, as Unity's skybox is, and no light-probe or lightmap bake sees it.
 //!
-//! Pure data. Every write goes through `scene::authoring::environment`.
+//! Pure data. Every write goes through `edit::authoring::environment`.
 
 mod radiance;
 mod skybox;

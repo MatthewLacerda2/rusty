@@ -4,7 +4,7 @@
 //! / Grid layout groups): the kind, padding, spacing, child alignment, the
 //! row/column control and force-expand pairs, and the grid's cell size,
 //! constraint, count, start corner and start axis. Every setter routes through
-//! the shared `scene::authoring::ui::layout::group` ops the inspector card uses.
+//! the shared `edit::authoring::ui::layout::group` ops the inspector card uses.
 //! Getters return a neutral default without a group; setters are then no-ops.
 //! Enum values travel as their names (case-insensitive; unknown names ignored).
 //! The placed rects are read with `UI.GetRect`.
@@ -18,7 +18,7 @@ use crate::api::ApiCell;
 use rusty_components::{
     LayoutConstraint, LayoutCorner, LayoutGroupComponent, LayoutKind, TextAlignment,
 };
-use rusty_scene::authoring::ui::layout::group as ops;
+use rusty_edit::authoring::ui::layout::group as ops;
 use rusty_scene::Scene;
 
 type G = LayoutGroupComponent;

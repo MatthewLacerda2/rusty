@@ -11,7 +11,7 @@ use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_components::{
     LightComponent, LightMode, LightType, MaterialAsset, MaterialComponent, Ssil, Tonemap,
 };
-use rusty_scene::authoring::{create_entity, default_light, default_post_processing, Primitive};
+use rusty_scene::create::{create_entity, default_light, default_post_processing, Primitive};
 use rusty_scene::{Camera, Scene};
 
 pub const W: u32 = 96;

@@ -8,12 +8,12 @@
 
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use super::physics::vec3_row;
 use crate::inspector::components::card::component_card;
 use rusty_components::CharacterControllerComponent as Cc;
-use rusty_scene::authoring::physics::character_controller as cc_ops;
+use rusty_edit::authoring::physics::character_controller as cc_ops;
 
 /// Route one edit through the shared ops and mark the scene dirty.
 fn write(world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool, op: impl FnOnce(&mut Cc)) {

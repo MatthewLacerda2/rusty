@@ -68,7 +68,7 @@ pub fn register(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, (id, name): (EntityArg, String)| {
         let id = id.live("Mesh", "SetSharedMesh")?;
         let cell = scene.get(lua)?;
-        let set = rusty_scene::edit_side::mesh::set_shared_mesh(&mut cell.borrow_mut(), id, &name);
+        let set = rusty_edit::mesh::set_shared_mesh(&mut cell.borrow_mut(), id, &name);
         set.map_err(|e| refusal("SetSharedMesh", &e))
     });
     put(t, "SetSharedMesh", f)

@@ -34,7 +34,7 @@ fn a_collider_reads_back_its_asset_and_the_values_the_solver_uses() {
     let c = ColliderComponent {
         material: PhysicsMaterial::new(0.9, 0.9),
         material_asset: Some(metal.clone()),
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_edit::authoring::default_collider()
     };
     let v = super::collider_value(&c);
     assert_eq!(v["material_asset"].as_str(), Some(metal.as_str()));

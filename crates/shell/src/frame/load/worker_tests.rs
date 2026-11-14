@@ -15,7 +15,7 @@ fn scene_file(tag: &str) -> String {
     let path = paths::to_slash(&dir.join("level.scene"));
     let mut scene = Scene::new();
     scene.add_entity("Level".into());
-    rusty_scene::save_to_file(&scene, &path).unwrap();
+    rusty_edit::save_to_file(&scene, &path).unwrap();
     path
 }
 

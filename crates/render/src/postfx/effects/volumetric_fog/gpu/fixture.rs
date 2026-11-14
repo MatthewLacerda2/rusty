@@ -10,7 +10,7 @@ use rusty_components::{
     LightComponent, LightMode, LightType, MaterialAsset, MaterialComponent, Tonemap, VolumetricFog,
 };
 use rusty_core::settings::quality::EffectQuality;
-use rusty_scene::authoring::{create_entity, default_light, default_post_processing, Primitive};
+use rusty_scene::create::{create_entity, default_light, default_post_processing, Primitive};
 use rusty_scene::{Camera, Scene};
 
 pub(super) const W: u32 = 96;

@@ -2,7 +2,7 @@
 //! the inspector does (#1215): it fills an empty key and never replaces an authored
 //! asset (#997).
 
-use rusty::scene::snapshot::SceneSnapshot;
+use rusty::edit::snapshot::SceneSnapshot;
 use rusty::scene::{MaterialAsset, MaterialComponent, Scene};
 
 /// An entity referencing its own key with `default` staged, as the Add menu leaves it

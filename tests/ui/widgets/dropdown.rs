@@ -1,7 +1,7 @@
 //! Dropdown: opens on a popup canvas, picks by click or keys, closes on Escape and
 //! on a click outside.
 
-use rusty::scene::authoring::ui::widgets::UiWidget;
+use rusty::edit::authoring::ui::widgets::UiWidget;
 
 use super::{part, widget, Ui};
 

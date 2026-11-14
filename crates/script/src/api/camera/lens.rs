@@ -15,7 +15,7 @@ use crate::api::{put, Reg};
 use rusty_components::{
     horizontal_to_vertical_fov, vertical_to_horizontal_fov, ClearFlags, FovAxis,
 };
-use rusty_scene::authoring::rendering::camera as camera_ops;
+use rusty_edit::authoring::rendering::camera as camera_ops;
 use rusty_scene::camera::held_lens;
 use rusty_scene::Scene;
 

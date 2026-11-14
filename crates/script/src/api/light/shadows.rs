@@ -6,7 +6,7 @@ use mlua::Lua;
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
-use rusty_scene::authoring::rendering::light as light_ops;
+use rusty_edit::authoring::rendering::light as light_ops;
 use rusty_scene::Scene;
 
 /// Register `Get/SetCastShadows` and `Get/SetShadowFadeDistance` onto `table`.

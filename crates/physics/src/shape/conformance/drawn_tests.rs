@@ -12,7 +12,7 @@ use super::{samples, turns, world_poses, KINDS, SCALES};
 use crate::shape::build::build_shape;
 use crate::shape::hull::{beyond_faces, has_volume};
 use rusty_components::{CapsuleAxis, ColliderShape, Pose};
-use rusty_scene::authoring::{primitive_geometry, Primitive};
+use rusty_scene::create::{primitive_geometry, Primitive};
 
 /// A drawn mesh's positions, and the collider that should fit it.
 type Drawn = (ColliderShape, Vec<[f32; 3]>, Option<Vec<u32>>);

@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use super::params_tests::{halves, set_param, set_texture, sphere, RES};
 use crate::Renderer;
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 use rusty_shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};

@@ -95,7 +95,7 @@ fn a_chasing_bot_stays_in_the_yard_and_follows_through_the_pool() {
 
 #[test]
 fn the_default_bot_holds_a_spot_round_the_player() {
-    rusty::scene::seed_default_scripts();
+    rusty::edit::seed_default_scripts();
     let (scene, enemy) = default_scene();
     let player_id = scene.find_entity_by_name("Player").expect("Player");
     let mut world = world_of(scene);

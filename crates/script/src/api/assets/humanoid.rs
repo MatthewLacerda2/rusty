@@ -31,7 +31,7 @@ pub(super) fn register_set(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> R
             let stored = sidecar::load(Path::new(&path)).map_err(runtime)?;
             let settings = merged(stored.humanoid, &t)?;
             let mut scene = scene.borrow_mut();
-            rusty_scene::asset_instance::set_humanoid(&mut scene, &path, settings)
+            rusty_edit::asset_instance::set_humanoid(&mut scene, &path, settings)
                 .map_err(mlua::Error::RuntimeError)
         }),
     )

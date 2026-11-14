@@ -44,7 +44,7 @@ use std::path::{Path, PathBuf};
 use rusty_asset::convert::{cached_gltf, convertible_sources};
 use rusty_core::paths;
 use rusty_core::project::{create_skeleton, is_project, ASSETS_DIR, PROJECT_FILE, SHADERS_DIR};
-use rusty_scene::edit_side::io::SEED_MANIFEST_PATH;
+use rusty_edit::io::SEED_MANIFEST_PATH;
 
 /// What an export did.
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -95,7 +95,7 @@ pub fn export(out: &Path) -> Result<Exported, String> {
 }
 
 /// Bring the open project's seeded files and its audio up to date
-/// (`scene::seed_project`, what the editor runs on every open), so the export
+/// (`edit::seed_project`, what the editor runs on every open), so the export
 /// ships them and the player, which boots read-only (#1653), neither seeds nor
 /// converts: the bundled scripts, the starter materials, the UI widget kit,
 /// `default.scene` where the seed manifest says it is due, the manifest itself,
@@ -107,7 +107,7 @@ pub fn export(out: &Path) -> Result<Exported, String> {
 /// overwriting somebody's file; it is warned of, naming both, since the editor
 /// plays the MP3 and the shipped game the `.wav`.
 fn seed_and_refresh_audio() -> Result<(), String> {
-    let refresh = rusty_scene::seed_project();
+    let refresh = rusty_edit::seed_project();
     let converted = refresh.lines().into_iter().filter(|(warning, _)| !warning);
     for (_, line) in converted {
         println!("{line}");

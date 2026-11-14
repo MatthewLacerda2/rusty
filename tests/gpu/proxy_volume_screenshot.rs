@@ -13,7 +13,7 @@ use rusty::components::{
 use rusty::dev::bake::probe::bake_scene_probes;
 use rusty::dev::bake::progress::BakeLog;
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::{primitive_mesh_component, Primitive};
+use rusty::edit::authoring::{primitive_mesh_component, Primitive};
 use rusty::scene::{Camera, Scene};
 
 const SIZE: u32 = 64;
@@ -54,7 +54,7 @@ pub(super) fn baked_room() -> Option<(Scene, u32)> {
         mode: LightMode::Baked,
         intensity: 6.0,
         range: 3.0,
-        ..rusty::scene::authoring::default_light()
+        ..rusty::edit::authoring::default_light()
     };
     scene.world.set_light(lamp, Some(light));
     scene.world.transform_mut(lamp).unwrap().position = Vec3::new(0.9, 2.2, -0.4);

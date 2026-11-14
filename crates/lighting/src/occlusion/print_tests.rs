@@ -9,7 +9,7 @@ use glam::Vec3;
 use crate::occlusion::test_level::corridors;
 use crate::occlusion::{bake_occlusion, fingerprint};
 use rusty_components::{RenderFace, RenderMode};
-use rusty_scene::authoring::material::define_asset;
+use rusty_edit::authoring::material::define_asset;
 use rusty_scene::lighting::occlusion::save_sidecar;
 use rusty_scene::{MaterialAsset, MaterialComponent, MeshRevision, Scene};
 
@@ -28,17 +28,17 @@ fn a_fresh_load_matches_a_bake_that_defined_a_material_in_memory() {
         level.world.set_material(id, wood);
     }
     level.materials.remove("wood");
-    rusty_scene::save_to_file(&level, &path).unwrap();
+    rusty_edit::save_to_file(&level, &path).unwrap();
 
     let mut baking = Scene::new();
-    rusty_scene::load_from_file(&mut baking, &path).unwrap();
+    rusty_edit::load_from_file(&mut baking, &path).unwrap();
     define_asset(&mut baking.materials, "wood", MaterialAsset::default());
     let data = bake_occlusion(&baking, 2).0.expect("occluders");
     *baking.occlusion = Some(Arc::new(data));
     save_sidecar(&baking, &path).unwrap();
 
     let mut editor = Scene::new();
-    rusty_scene::load_from_file(&mut editor, &path).unwrap();
+    rusty_edit::load_from_file(&mut editor, &path).unwrap();
     let pvs = editor.occlusion.as_deref().expect("the bake loaded");
     assert!(pvs.objects.iter().any(|o| o.occluder));
     for baked in &pvs.objects {

@@ -7,7 +7,7 @@ use super::fixture::{draw, eye, paint, place, renderer, rgb, tuned, MIRROR};
 use super::fixture::{H, W};
 use crate::{RenderView, OFFSCREEN_FORMAT};
 use rusty_components::Tonemap;
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// [`eye`] turned `degrees` to the right.

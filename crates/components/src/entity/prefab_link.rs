@@ -61,7 +61,7 @@ pub struct PrefabLink {
     /// This entity's overrides as last stored: its diff against [`Self::baseline`]
     /// in the shapes of [`PrefabOverrides`] (a removed part is recorded, not
     /// diffed). Propagation rebuilds the entity from the source, then re-applies them, so what the instance did not change
-    /// tracks the source. The current set is `scene::prefab::live::live_overrides`;
+    /// tracks the source. The current set is `edit::prefab::live::live_overrides`;
     /// it is stored here before a propagation, a save and a Play snapshot.
     #[serde(default, skip_serializing_if = "PrefabOverrides::is_empty")]
     pub overrides: PrefabOverrides,
@@ -92,7 +92,7 @@ pub struct PrefabOverrides {
     /// Parts of a model instance the user removed (Unity's *Removed GameObject*
     /// override, `m_RemovedGameObjects`), by node path, held on the instance root
     /// only (#1665): propagation never stamps them back. Not a diff: the live set
-    /// carries it over (`scene::prefab::live`).
+    /// carries it over (`edit::prefab::live`).
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub removed_parts: BTreeSet<String>,
 }

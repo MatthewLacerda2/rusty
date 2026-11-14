@@ -10,7 +10,7 @@ use super::reflection_bake_tests::colored_room;
 use crate::ibl::reflection_probes::uniform::{luminance_sh, normalisation};
 use crate::Renderer;
 use rusty_core::color::luminance;
-use rusty_scene::authoring::{primitive_mesh_component, Primitive};
+use rusty_scene::create::{primitive_mesh_component, Primitive};
 use rusty_scene::lighting::sh::Sh9;
 use rusty_scene::{AmbientMode, Scene};
 use rusty_test_support::panorama::fixture as panorama_fixture;

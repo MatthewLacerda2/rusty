@@ -51,7 +51,7 @@ fn a_lit_particle_is_dark_unlit_and_brightens_by_a_light() {
             intensity: 20.0,
             inner_cone: 0.0,
             outer_cone: 0.0,
-            ..rusty::scene::authoring::default_light()
+            ..rusty::edit::authoring::default_light()
         }),
     );
     let (Some(u), Some(d), Some(b)) = (

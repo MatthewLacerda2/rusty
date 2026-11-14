@@ -3,7 +3,7 @@
 //! Unreal's AI Perception (Unity has none): what an agent with an `AIPerception`
 //! knows through sight, hearing and damage, the noises a game reports, and the
 //! component's settings. The senses themselves run in `ai::perception`; every
-//! setter routes through the shared `scene::authoring::ai::perception` ops the
+//! setter routes through the shared `edit::authoring::ai::perception` ops the
 //! inspector card uses, after refusing a value it would not keep (a negative
 //! distance or age, a non-finite one, a NaN angle) with an error. Getters read
 //! the component in place and return a neutral value without it; setters are
@@ -19,7 +19,7 @@ use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_ai::perception;
 use rusty_components::{AIPerceptionComponent as Perception, Known};
-use rusty_scene::authoring::ai::perception as ops;
+use rusty_edit::authoring::ai::perception as ops;
 use rusty_scene::Scene;
 
 const NS: &str = "AIPerception";

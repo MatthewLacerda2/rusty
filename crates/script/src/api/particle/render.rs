@@ -1,6 +1,6 @@
 //! crates/script/src/api/particle/render.rs — the `Particles` render setters (#440): render mode,
 //! stretch, mesh, texture (#2052), flipbook, soft and lit. Each is a field write routed through the
-//! shared `scene::authoring::particles` op the inspector's Render section calls.
+//! shared `edit::authoring::particles` op the inspector's Render section calls.
 
 use super::with_emitter;
 use crate::api::entity_arg::EntityArg;
@@ -8,7 +8,7 @@ use crate::api::ApiCell;
 use crate::api::{put, Reg};
 use rusty_asset::MapRef;
 use rusty_components::{Flipbook, ParticleRenderMode};
-use rusty_scene::authoring::particles as particle_ops;
+use rusty_edit::authoring::particles as particle_ops;
 use rusty_scene::Scene;
 
 /// Register the render setters onto the `Particles` table.

@@ -1,18 +1,18 @@
 //! The Text inspector card (#419): the string, fonts, size, colour, alignment,
 //! wrapping, overflow, spacing, auto-size, rich text and raycast target, plus the
 //! SDF effects (outline, shadow, glow) and the blend mode (#425). Widgets edit a snapshot; every write
-//! routes through `scene::authoring::ui::text`.
+//! routes through `edit::authoring::ui::text`.
 
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
 use rusty_components::TextOverflow;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use super::look::{blend_row, color_row, drag_row};
 use super::{combo, vec2_row};
 use crate::inspector::components::card::component_card;
 use rusty_components::{TextAlignment, TextComponent};
-use rusty_scene::authoring::ui::text::{self as ops, FontSlot};
+use rusty_edit::authoring::ui::text::{self as ops, FontSlot};
 
 /// Text card. A THIN client (#287): widgets edit a snapshot and the changed
 /// snapshot is written back field by field through the shared ops; remove detaches.

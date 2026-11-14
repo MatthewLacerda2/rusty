@@ -7,7 +7,7 @@ use glam::Vec3;
 use rusty::components::{CameraComponent, PostProcessingComponent, RenderTarget};
 use rusty::dev::capture::CaptureHost;
 use rusty::dev::screenshot::{capture, capture_into};
-use rusty::scene::authoring::default_post_processing;
+use rusty::edit::authoring::default_post_processing;
 use rusty::scene::{Camera, MeshComponent, Scene};
 
 use super::super::render_texture_scene::{pip_scene, screen_camera, SIZE};

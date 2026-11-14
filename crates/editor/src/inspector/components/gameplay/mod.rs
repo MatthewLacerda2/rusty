@@ -9,7 +9,7 @@
 
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 use std::path::Path;
 
 mod ai_perception;
@@ -30,7 +30,7 @@ pub use physics::draw_rigidbody;
 
 use crate::inspector::components::card::component_card;
 use crate::theme;
-use rusty_scene::authoring::animator as animator_ops;
+use rusty_edit::authoring::animator as animator_ops;
 
 /// The body cards, in inspector order: RigidBody, Joint, CharacterController.
 pub fn draw_bodies(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {

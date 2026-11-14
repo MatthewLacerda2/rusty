@@ -6,7 +6,7 @@ use super::super::state::{with_cam, with_cam_mut};
 use super::knobs::parse_quality;
 use crate::api::ApiCell;
 use crate::api::{put, Reg};
-use rusty_scene::authoring::rendering::camera as camera_ops;
+use rusty_edit::authoring::rendering::camera as camera_ops;
 use rusty_scene::Scene;
 
 /// Camera motion blur: active, quality level, `Custom` sample count, intensity and

@@ -33,7 +33,7 @@ use super::from_lua::{asset_from_lua, Validated};
 use super::{put, Reg};
 use crate::api::ApiCell;
 use rusty_components::{MaterialAsset, RenderMode};
-use rusty_scene::authoring::material as mat_ops;
+use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::Scene;
 
 /// Register the standalone asset-authoring verbs onto the `Material` `table`.

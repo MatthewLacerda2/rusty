@@ -8,7 +8,7 @@ use mlua::Lua;
 use rusty::components::{
     horizontal_to_vertical_fov, vertical_to_horizontal_fov, CameraComponent, FovAxis,
 };
-use rusty::scene::authoring::rendering::camera as camera_ops;
+use rusty::edit::authoring::rendering::camera as camera_ops;
 use rusty::scene::Scene;
 use rusty::script::api::bind;
 

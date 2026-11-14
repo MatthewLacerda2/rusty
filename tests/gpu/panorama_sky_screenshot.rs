@@ -15,7 +15,7 @@ use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::core::settings::quality::EffectQuality;
 use rusty::dev::capture::CaptureHost;
 use rusty::dev::screenshot::capture_into;
-use rusty::scene::authoring::{create_entity, default_post_processing, Primitive};
+use rusty::edit::authoring::{create_entity, default_post_processing, Primitive};
 use rusty::scene::{Camera, Scene};
 
 /// Write the two-tone panorama into the test's temp dir and return its path.

@@ -32,9 +32,9 @@ fn a_subdivided_plane_is_set_from_lua_and_round_trips_through_save() {
     let mesh = scene.borrow().world.mesh(id).map(|m| m.clone());
     edit.world.set_mesh(copy, mesh);
     let path = crate::temp::dir().join("rusty_plane_subdivisions.scene");
-    rusty::scene::save_to_file(&edit, &path.to_string_lossy()).unwrap();
+    rusty::edit::save_to_file(&edit, &path.to_string_lossy()).unwrap();
     let mut loaded = Scene::new();
-    rusty::scene::load_from_file(&mut loaded, &path.to_string_lossy()).unwrap();
+    rusty::edit::load_from_file(&mut loaded, &path.to_string_lossy()).unwrap();
     let vertices = |s: &Scene| {
         s.world
             .mesh(copy)

@@ -83,7 +83,7 @@ fn overrides_never_save_and_go_with_their_entity() {
     );
     run(&scene, &script).unwrap();
     let mut s = scene.borrow_mut();
-    let json = serde_json::to_string(&rusty_scene::to_scene_data(&s)).unwrap();
+    let json = serde_json::to_string(&rusty_edit::to_scene_data(&s)).unwrap();
     assert!(
         !json.contains("hit_flash"),
         "the override is not scene data"
@@ -91,7 +91,7 @@ fn overrides_never_save_and_go_with_their_entity() {
     s.destroy_entity(a);
     assert!(!s.shader_overrides.has(a) && s.shader_overrides.has(b));
     // Stop restores the edit scene through the same document apply a load uses.
-    rusty_scene::SceneSnapshot::capture(&Scene::new()).restore(&mut s);
+    rusty_edit::SceneSnapshot::capture(&Scene::new()).restore(&mut s);
     assert!(s.shader_overrides.is_empty(), "Stop discards them");
 }
 

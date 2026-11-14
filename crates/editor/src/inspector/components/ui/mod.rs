@@ -3,7 +3,7 @@
 //! (#425), the Text label, the Canvas Group, the Rect Mask and Mask, the Backdrop
 //! Filter, the Selectable, and the Layout Group and Layout
 //! Element. Each is a thin client over its shared
-//! `scene::authoring` ops, the same ones the matching Lua namespace calls.
+//! `edit::authoring` ops, the same ones the matching Lua namespace calls.
 
 pub mod backdrop;
 pub mod image;

@@ -6,7 +6,7 @@
 use super::{chain, Chain, W};
 use rusty_components::Tonemap;
 use rusty_core::color::srgb_to_linear;
-use rusty_scene::authoring::default_post_processing;
+use rusty_scene::create::default_post_processing;
 
 const ORANGE: [f32; 3] = [1.0, 0.45, 0.1];
 

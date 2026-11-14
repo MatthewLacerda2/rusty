@@ -3,7 +3,8 @@
 //! bounds) is `scene::runtime::load_tests`.
 
 use super::NavigationGraph;
-use rusty_scene::{authoring, to_scene_data, Scene};
+use rusty_edit::{authoring, to_scene_data};
+use rusty_scene::Scene;
 
 /// A path with no lighting sidecar beside it: the swap's sidecar merge is a no-op.
 const NO_SIDECAR: &str = "rusty_432_no_such_dir/level.scene";
@@ -26,8 +27,7 @@ fn a_re_rooted_survivor_is_baked_where_it_stands_now() {
     let lamp = level.add_entity("Lamp".to_string());
     level.set_parent(lamp, Some(floor)).unwrap();
     let survivors = s.load_survivors();
-    rusty_scene::edit_side::load::swap_in(&mut s, to_scene_data(&level), NO_SIDECAR, &survivors)
-        .unwrap();
+    rusty_edit::load::swap_in(&mut s, to_scene_data(&level), NO_SIDECAR, &survivors).unwrap();
     let (min, _) = s.world.collider_bounds(crate_).unwrap();
     let nav = NavigationGraph::from_scene(&s).bounds();
     assert!(nav.min_x <= min.x && nav.max_x < 50.0, "{nav:?}");

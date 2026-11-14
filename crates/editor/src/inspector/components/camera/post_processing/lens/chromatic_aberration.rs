@@ -1,7 +1,7 @@
 //! Chromatic Aberration: on/off and intensity.
 
 use super::super::{knob, knob_row, toggle, Section, LENS_EFFECTS};
-use rusty_scene::authoring::rendering::post_processing::lens::chromatic_aberration as ca;
+use rusty_edit::authoring::rendering::post_processing::lens::chromatic_aberration as ca;
 use rusty_scene::PostProcessingComponent;
 
 pub(in super::super) const SECTION: Section = Section {

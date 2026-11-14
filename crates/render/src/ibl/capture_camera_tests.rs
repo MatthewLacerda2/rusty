@@ -6,7 +6,7 @@ use glam::{Quat, Vec3};
 
 use super::texture_cube_tests::patched_room;
 use rusty_components::ClearFlags;
-use rusty_scene::authoring::default_camera;
+use rusty_scene::create::default_camera;
 use rusty_scene::{camera_for_entity, Camera, ReflectionProbe, Scene};
 
 const RES: u32 = 32;

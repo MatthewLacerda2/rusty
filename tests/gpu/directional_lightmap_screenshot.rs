@@ -13,7 +13,7 @@ use glam::{Quat, Vec3};
 use rusty::components::{LightComponent, LightMode, LightType, MaterialAsset, MaterialComponent};
 use rusty::dev::bake::lightmap::bake_scene_lightmaps;
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::{primitive_mesh_component, Primitive};
+use rusty::edit::authoring::{primitive_mesh_component, Primitive};
 use rusty::scene::lighting::settings::BakeSettings;
 use rusty::scene::{Camera, Scene};
 
@@ -60,7 +60,7 @@ fn scene(dir: &std::path::Path) -> Scene {
             inner_cone: 0.0,
             outer_cone: 0.0,
             mode: LightMode::Baked,
-            ..rusty::scene::authoring::default_light()
+            ..rusty::edit::authoring::default_light()
         }),
     );
     let down = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);

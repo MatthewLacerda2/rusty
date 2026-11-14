@@ -11,8 +11,8 @@ use glam::Vec3;
 use crate::GameWorld;
 use rusty_asset::convert::cache_location;
 use rusty_core::input::InputState;
+use rusty_edit::asset_instance::instantiate_asset;
 use rusty_navigation::NavigationGraph;
-use rusty_scene::asset_instance::instantiate_asset;
 use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 

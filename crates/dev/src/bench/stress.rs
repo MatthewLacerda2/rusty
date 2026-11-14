@@ -10,12 +10,12 @@ use glam::{Quat, Vec3};
 use super::rig;
 use rusty_components::{AnimatorComponent, MaterialComponent};
 use rusty_core::curve::Range;
-use rusty_scene::authoring::{
+use rusty_edit::authoring::{
     self, add_component, create_entity, nav::agent as nav_agent, particles,
     physics::character_controller as cc, ComponentKind, Primitive,
 };
+use rusty_edit::default_scene::layout::{ground_at, YARD_HALF};
 use rusty_scene::decal::DecalSpec;
-use rusty_scene::default_scene::layout::{ground_at, YARD_HALF};
 use rusty_scene::Scene;
 
 /// What to spawn. [`Default`] is the issue's worst case.

@@ -4,10 +4,10 @@
 //! - `Get(id, name)` — the entity's component as a table of its serialized fields,
 //!   or `nil` without one.
 //! - `Set(id, name, fields)` — write the named fields, all or nothing. Each goes
-//!   through the `scene::authoring` op the inspector's card calls, so clamping,
+//!   through the `edit::authoring` op the inspector's card calls, so clamping,
 //!   sanitizing and what follows a write are the inspector's own; a field with no
 //!   op is read-only and writing it is an error naming why. The table itself is
-//!   `scene::authoring::fields`, which a scene load also holds its values through. A key left
+//!   `edit::authoring::fields`, which a scene load also holds its values through. A key left
 //!   as `Get` returned it is skipped (`write::Skip`): `Get` keeps what it returned
 //!   in the table's metatable, so a table held across ticks writes only its edits.
 //! - `Fields(name)` — what an inspector lists: each field's name, the Lua type of
@@ -34,8 +34,8 @@ use serde_json::Value;
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
-use rusty_scene::authoring;
-use rusty_scene::authoring::fields::{self as kinds, Kind, Skip};
+use rusty_edit::authoring;
+use rusty_edit::authoring::fields::{self as kinds, Kind, Skip};
 use rusty_scene::Scene;
 use value::{from_lua, to_lua};
 

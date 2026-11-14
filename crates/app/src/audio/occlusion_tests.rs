@@ -28,7 +28,7 @@ fn walled_with(parented: bool) -> (GameWorld, u32) {
         shape: ColliderShape::Box {
             size: Vec3::new(20.0, 10.0, 1.0),
         },
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_edit::authoring::default_collider()
     };
     scene.world.set_collider(wall, Some(collider));
     let speaker = scene.add_entity("Speaker".to_string());

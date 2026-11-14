@@ -7,7 +7,7 @@ use crate::temp::dir;
 use rusty::components::{PostProcessingComponent, RenderTarget};
 use rusty::dev::capture::CaptureHost;
 use rusty::dev::screenshot::capture_into;
-use rusty::scene::authoring::default_post_processing;
+use rusty::edit::authoring::default_post_processing;
 
 use super::super::render_texture_scene::{pip_scene, screen_camera, SIZE};
 

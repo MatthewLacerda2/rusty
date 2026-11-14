@@ -119,7 +119,7 @@ pub fn floor(scene: &mut Scene) -> u32 {
             shape: ColliderShape::Box {
                 size: Vec3::new(40.0, 1.0, 40.0),
             },
-            ..rusty::scene::authoring::default_collider()
+            ..rusty::edit::authoring::default_collider()
         }),
     );
     id

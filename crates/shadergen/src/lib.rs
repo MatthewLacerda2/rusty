@@ -13,7 +13,7 @@
 //! in **text**, not pixels: a shader recipe selects a base pass kind (surface,
 //! postfx or ui) and a list of blocks/params, and the assembler concatenates their WGSL
 //! snippets into a module. It is distinct from `procgen` (textures) and
-//! `scene::authoring` (entities/components); this authors *shaders*.
+//! `edit::authoring` (entities/components); this authors *shaders*.
 //!
 //! **Bounded by design.** This is authoring shaders that *fit the engine*, not a
 //! general-purpose shader compiler: every block already speaks the engine's

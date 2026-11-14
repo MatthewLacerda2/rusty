@@ -7,7 +7,7 @@ fn finite() -> Vec<Rule> {
     resolved([("crates/scene/src/rules/sanitize.rs", FINITE)].into_iter())
 }
 
-const PATH: &str = "src/scene/authoring/a.rs";
+const PATH: &str = "src/edit/authoring/a.rs";
 
 fn found(src: &str) -> Vec<usize> {
     check(PATH, src, &[], &finite())
@@ -26,6 +26,19 @@ fn flags_a_raw_float_or_vector_and_a_single_component() {
     assert_eq!(found(component), [1]);
     let f = &check(PATH, raw, &[], &finite())[0];
     assert_eq!(f.rule, RULE);
+}
+
+/// The setters are read where the edit crate holds them, by the real path too, and
+/// nowhere else: the base's own `create` builders are no setters.
+#[test]
+fn reads_the_edit_crates_authoring_folder_only() {
+    let raw = "pub fn set_a(c: &mut C, v: f32) {\n    c.a = v;\n}\n";
+    assert_eq!(
+        check("crates/edit/src/authoring/a.rs", raw, &[], &finite()).len(),
+        1
+    );
+    assert!(check("crates/scene/src/create/a.rs", raw, &[], &finite()).is_empty());
+    assert!(check("crates/scene/src/authoring/a.rs", raw, &[], &finite()).is_empty());
 }
 
 #[test]
@@ -82,7 +95,7 @@ fn a_rule_in_the_rules_folder_holds_a_setter_and_an_op_elsewhere_does_not() {
     let files = [
         ("crates/scene/src/rules/lens.rs", lens),
         ("crates/scene/src/rules/sanitize.rs", FINITE),
-        ("crates/scene/src/authoring/rendering/camera/mod.rs", op),
+        ("crates/edit/src/authoring/rendering/camera/mod.rs", op),
     ];
     let setter = "pub fn set_fov(c: &mut C, fov: f32) {\n    c.fov = lens::hold_fov(fov);\n}\n";
     assert!(check(PATH, setter, &[], &resolved(files.into_iter())).is_empty());

@@ -5,7 +5,7 @@ edition.workspace = true
 publish.workspace = true
 
 [features]
-dev = ["dep:rusty-dev", "rusty-dev/dev", "rusty-app/dev", "rusty-asset/dev", "rusty-core/dev", "rusty-lighting/dev", "rusty-navigation/dev", "rusty-scene/dev", "rusty-script/dev", "rusty-shadergen/dev"]
+dev = ["dep:rusty-dev", "rusty-dev/dev", "rusty-app/dev", "rusty-asset/dev", "rusty-core/dev", "rusty-lighting/dev", "rusty-navigation/dev", "rusty-edit/dev", "rusty-scene/dev", "rusty-script/dev", "rusty-shadergen/dev"]
 editor = ["dep:egui", "dep:egui-phosphor", "rusty-app/editor", "rusty-asset/editor", "rusty-core/editor", "rusty-shadergen/editor"]
 
 [lints]
@@ -21,6 +21,7 @@ rusty-ecs = { workspace = true }
 rusty-lighting = { workspace = true }
 rusty-navigation = { workspace = true }
 rusty-preview = { workspace = true }
+rusty-edit = { workspace = true }
 rusty-scene = { workspace = true }
 rusty-script = { workspace = true }
 rusty-shadergen = { workspace = true }

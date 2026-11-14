@@ -33,7 +33,7 @@ pub(super) fn emissive_scene(map: &str) -> Scene {
         ..MaterialAsset::default()
     };
     scene.materials.insert("glow".to_string(), asset);
-    let mut vc = rusty_scene::authoring::defaults::default_post_processing();
+    let mut vc = rusty_scene::create::defaults::default_post_processing();
     (vc.active, vc.bloom.active, vc.ssr.active) = (true, false, false);
     vc.tonemapping.mode = Tonemap::None;
     scene.world.set_post_processing(id, Some(vc));

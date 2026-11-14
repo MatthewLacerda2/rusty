@@ -9,7 +9,7 @@
 use std::collections::BTreeMap;
 
 use rusty_asset::MapRef;
-use rusty_scene::authoring::material::{self as mat_ops, DETAIL_FIELDS};
+use rusty_edit::authoring::material::{self as mat_ops, DETAIL_FIELDS};
 use rusty_scene::MaterialAsset;
 
 /// Draw material `key`'s detail section.

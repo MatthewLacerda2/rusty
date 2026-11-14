@@ -14,7 +14,7 @@ fn run(menu: &str) -> (Vec<String>, String) {
     for _ in 0..20 {
         gw.tick(DT);
     }
-    let doc = rusty_scene::to_scene_data(&gw.scene().borrow());
+    let doc = rusty_edit::to_scene_data(&gw.scene().borrow());
     (logs(&console), serde_json::to_string(&doc).unwrap())
 }
 

@@ -83,7 +83,7 @@ fn a_disabled_timer_hands_out_no_writes() {
 #[test]
 fn gpu_a_rendered_frame_reports_its_passes_when_the_adapter_has_timestamps() {
     use crate::{test_gpu, RenderView, OFFSCREEN_FORMAT};
-    use rusty_scene::authoring::{create_entity, Primitive};
+    use rusty_scene::create::{create_entity, Primitive};
     let Some(mut renderer) = test_gpu::headless_or_skip(64, 64) else {
         return;
     };

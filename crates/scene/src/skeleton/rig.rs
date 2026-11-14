@@ -3,7 +3,7 @@
 //! the mesh and the skeleton, and the joint and re-import helpers the skeleton
 //! tests share. A test hook: compiled in every build, since the physics and render
 //! tests that build on it are other crates', and so are the edit side's skeleton
-//! tests (`edit_side::base_tests::skeleton`).
+//! tests (`rusty_edit`'s `base_tests::skeleton`).
 
 use glam::{Mat4, Quat, Vec3};
 

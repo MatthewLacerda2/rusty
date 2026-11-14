@@ -5,7 +5,7 @@
 use rusty::app::{Inline, SceneLoader};
 use rusty::dev::demo::{self, state_digest, Demo, Destination};
 use rusty::dev::harness::Harness;
-use rusty::scene::edit_side::load::prepare::PreparedScene;
+use rusty::edit::load::prepare::PreparedScene;
 use rusty::scene::Scene;
 
 use super::replay;
@@ -16,8 +16,8 @@ pub(super) fn level(dir: &std::path::Path) -> String {
     std::fs::create_dir_all(dir).unwrap();
     let path = rusty::core::paths::to_slash(&dir.join("level.scene"));
     let mut scene = Scene::new();
-    rusty::scene::default_scene::build(&mut scene, "");
-    rusty::scene::save_to_file(&scene, &path).unwrap();
+    rusty::edit::default_scene::build(&mut scene, "");
+    rusty::edit::save_to_file(&scene, &path).unwrap();
     path
 }
 

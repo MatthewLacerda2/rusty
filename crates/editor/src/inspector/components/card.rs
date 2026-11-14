@@ -8,7 +8,7 @@ use egui_phosphor::regular as icon;
 
 use crate::theme::{self, chrome};
 use rusty_ecs::World;
-use rusty_scene::authoring::{self, ComponentKind};
+use rusty_edit::authoring::{self, ComponentKind};
 
 /// Render a component foldout card. Pass `Some(&mut flag)` for a removable
 /// component (the X button sets the flag); pass `None` for mandatory ones

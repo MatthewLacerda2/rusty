@@ -10,7 +10,8 @@ use glam::{Quat, Vec3};
 use crate::gpu::pipelines::surface::cut_depth_tests::{dissolve, ground_halves, slab_yard};
 use crate::gpu::pipelines::surface::mask_tests::Dissolve;
 use rusty_components::RenderMode;
-use rusty_scene::authoring::{create_entity, material, Primitive};
+use rusty_edit::authoring::material;
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
 /// [`slab_yard`] lit by a shadowing spotlight straight overhead instead of its sun.

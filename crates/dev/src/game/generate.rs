@@ -38,7 +38,7 @@ pub fn generate(game: &Game, out: &Path, params: &Params) -> Result<(), String> 
         .map_err(|e| format!("{}: {e}", marker.display()))?;
 
     let opened = rusty_core::project::open(out, Access::Edit)?;
-    rusty_scene::print_refresh(&rusty_scene::seed_project());
+    rusty_edit::print_refresh(&rusty_edit::seed_project());
     let mut session = Session::boot(&BootPlan::default(), ProjectSource::bound(&opened))?;
     let line = format!("return assert(loadfile(\"{RECIPE}\"))({})", params.to_lua());
     let ran = session.command(&line);

@@ -6,7 +6,7 @@ use super::super::state::{with_vc, with_vc_mut};
 use super::knobs::{register as knobs, register_flag};
 use crate::api::ApiCell;
 use rusty_components::rendering::post_processing::LensFlare;
-use rusty_scene::authoring::rendering::post_processing::lens_flare;
+use rusty_edit::authoring::rendering::post_processing::lens_flare;
 use rusty_scene::Scene;
 
 /// The switch, the knobs, the ghost count and the tint (a new volume's without an

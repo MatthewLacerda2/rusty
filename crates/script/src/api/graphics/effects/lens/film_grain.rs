@@ -3,7 +3,7 @@
 use super::super::super::super::Reg;
 use super::super::knobs::{register as knobs, register_flag};
 use crate::api::ApiCell;
-use rusty_scene::authoring::rendering::post_processing::lens::film_grain;
+use rusty_edit::authoring::rendering::post_processing::lens::film_grain;
 use rusty_scene::Scene;
 
 /// The switch and the knobs.

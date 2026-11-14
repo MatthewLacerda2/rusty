@@ -1,12 +1,12 @@
 //! The Canvas Group inspector card (#418): subtree alpha plus the interactable and
-//! blocks-raycasts flags. Every write routes through `scene::authoring::ui::layout::canvas_group`.
+//! blocks-raycasts flags. Every write routes through `edit::authoring::ui::layout::canvas_group`.
 
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use crate::inspector::components::card::component_card;
-use rusty_scene::authoring::ui::layout::canvas_group as group_ops;
+use rusty_edit::authoring::ui::layout::canvas_group as group_ops;
 
 /// Canvas Group card. A THIN client (#287): widgets read a snapshot and route each
 /// write through a shared op; remove detaches the component.

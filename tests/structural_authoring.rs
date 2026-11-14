@@ -47,7 +47,7 @@ fn create_configure_parent_save_round_trips() {
 
     // Reload into a brand-new scene and assert the authored structure survived.
     let mut reloaded = Scene::new();
-    rusty::scene::load_from_file(&mut reloaded, &out_str).expect("saved scene loads back");
+    rusty::edit::load_from_file(&mut reloaded, &out_str).expect("saved scene loads back");
 
     let child: u32 = child_id.parse().unwrap();
     let parent: u32 = parent_id.parse().unwrap();

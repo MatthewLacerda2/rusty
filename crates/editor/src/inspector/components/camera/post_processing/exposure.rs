@@ -4,7 +4,7 @@
 
 use super::{knob, knob_row, Section, COLOR_CORRECTION};
 use rusty_components::{AutoExposure, ExposureMode};
-use rusty_scene::authoring::rendering::post_processing::exposure;
+use rusty_edit::authoring::rendering::post_processing::exposure;
 use rusty_scene::PostProcessingComponent;
 
 pub(super) const SECTION: Section = Section {

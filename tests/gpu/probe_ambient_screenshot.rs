@@ -12,7 +12,7 @@
 
 use glam::Vec3;
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::{primitive_mesh_component, Primitive};
+use rusty::edit::authoring::{primitive_mesh_component, Primitive};
 use rusty::scene::{Camera, Scene, Sh9};
 
 const SIZE: u32 = 32;

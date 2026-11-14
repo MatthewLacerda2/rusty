@@ -5,7 +5,7 @@
 //! way the named setters do: a whole-number float is an integer, and a list is
 //! rebuilt from its largest index, so a `nil` hole (`Selectable.sprites`) keeps the
 //! entries after it. Taking that JSON as a field's type is the field table's
-//! (`scene::authoring::fields::value`).
+//! (`edit::authoring::fields::value`).
 
 use mlua::{Lua, LuaSerdeExt, Table};
 use serde_json::{Map, Number, Value};

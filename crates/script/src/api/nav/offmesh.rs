@@ -17,8 +17,8 @@ use super::settings::set_and_rebake;
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::OffMeshLinkData;
+use rusty_edit::authoring::nav::agent as nav_ops;
 use rusty_navigation::{complete_off_mesh_link, NavMeshSettings, NavigationGraph};
-use rusty_scene::authoring::nav::agent as nav_ops;
 use rusty_scene::Scene;
 
 fn point(lua: &Lua, p: Vec3) -> mlua::Result<Table> {

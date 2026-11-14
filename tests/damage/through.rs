@@ -4,7 +4,7 @@
 
 use glam::Vec3;
 use rusty::components::RigidBodyComponent;
-use rusty::scene::authoring::default_rigidbody;
+use rusty::edit::authoring::default_rigidbody;
 use rusty::scene::Scene;
 
 use super::{eval, play, static_box};

@@ -1,10 +1,10 @@
 //! The custom-shader row the Image, Shape and Text cards share (#427): the name of the
 //! baked ui shader the graphic draws with (empty: the standard UI shader). Edits go
-//! through `scene::authoring::ui::shader`, like `UI.SetShader`; runtime params are
+//! through `edit::authoring::ui::shader`, like `UI.SetShader`; runtime params are
 //! driven from scripts (`UI.SetShaderParam`).
 
 use rusty_components::UiShader;
-use rusty_scene::authoring::ui::shader as ops;
+use rusty_edit::authoring::ui::shader as ops;
 
 /// Edit the snapshot's shader name; returns whether it changed.
 pub fn row(ui: &mut egui::Ui, slot: &mut Option<UiShader>) -> bool {

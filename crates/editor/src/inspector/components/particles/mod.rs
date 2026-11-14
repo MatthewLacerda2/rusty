@@ -18,12 +18,12 @@ pub(in crate::inspector::components) mod widgets;
 
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 use widgets::{clamped, combo, drag_u32};
 
 use crate::inspector::components::card::component_card;
 use rusty_components::SimulationSpace;
-use rusty_scene::authoring::particles as particle_ops;
+use rusty_edit::authoring::particles as particle_ops;
 use rusty_scene::{CollisionResponse, EmitMode, ParticleEmitterComponent};
 
 type Cx<'w> = (&'w mut rusty_ecs::World, u32); // world + entity id, as one param

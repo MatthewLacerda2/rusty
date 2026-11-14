@@ -9,7 +9,7 @@ use super::fixture::{eye, frame};
 use crate::lod::LodSelection;
 use crate::{Frustum, Renderer};
 use rusty_components::{MaterialAsset, MaterialComponent, RefractionModel, RenderMode};
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
 const GLASS: f32 = 0.25;

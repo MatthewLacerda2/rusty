@@ -5,7 +5,7 @@
 use super::{count_row, quality_row, slider_row, Section};
 use rusty_components::{DepthOfField, DofMode};
 use rusty_core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
-use rusty_scene::authoring::rendering::post_processing::{self as vc_ops, Knob};
+use rusty_edit::authoring::rendering::post_processing::{self as vc_ops, Knob};
 use rusty_scene::PostProcessingComponent;
 
 pub(super) const SECTION: Section = Section {

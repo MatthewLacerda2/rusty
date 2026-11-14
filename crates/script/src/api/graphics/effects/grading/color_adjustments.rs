@@ -3,7 +3,7 @@
 
 use super::super::super::super::Reg;
 use crate::api::ApiCell;
-use rusty_scene::authoring::rendering::post_processing::grading::color_adjustments;
+use rusty_edit::authoring::rendering::post_processing::grading::color_adjustments;
 use rusty_scene::Scene;
 
 /// Its knobs; neutral without an active volume, as a new volume starts.

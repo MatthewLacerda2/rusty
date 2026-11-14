@@ -9,7 +9,7 @@
 //! the pass that drew it; [`commit_abandoned`], called by the inspector every pass,
 //! writes a draft whose field was not drawn last pass.
 
-use rusty_scene::authoring::rendering::post_processing as vc_ops;
+use rusty_edit::authoring::rendering::post_processing as vc_ops;
 use rusty_scene::{PostProcessingComponent, Scene};
 
 /// One path field: what it is called, what it reads and the op that writes it.

@@ -5,7 +5,7 @@
 //! `OnControllerColliderHit` on the controller's scripts for each collider it
 //! touched (#1879) and returns what it touched; the getters read back the grounded state that move
 //! left; the size and tuning setters route through the shared
-//! `scene::authoring::physics::character_controller` ops the inspector card uses.
+//! `edit::authoring::physics::character_controller` ops the inspector card uses.
 //! Getters return a neutral default without a controller; setters and `Move` are
 //! then no-ops. Attach one with `Scene.AddComponent(id, "CharacterController")`.
 
@@ -22,8 +22,8 @@ use rusty_components::physics::character_controller::{
     COLLIDED_ABOVE, COLLIDED_BELOW, COLLIDED_SIDES,
 };
 use rusty_components::CharacterControllerComponent as Cc;
+use rusty_edit::authoring::physics::character_controller as ops;
 use rusty_physics::PhysicsWorld;
-use rusty_scene::authoring::physics::character_controller as ops;
 use rusty_scene::Scene;
 
 /// A field's reader and its shared-op writer.

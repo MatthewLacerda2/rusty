@@ -7,7 +7,7 @@ use glam::Vec3;
 
 use super::timers::{counted, rig, tick};
 use crate::scripting::manager::ScriptManager;
-use rusty_scene::authoring::defaults::default_collider;
+use rusty_edit::authoring::defaults::default_collider;
 
 /// A collider child one unit along X from the script's entity; returns its id.
 fn child_crate(m: &ScriptManager, parent: u32) -> u32 {

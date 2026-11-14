@@ -10,7 +10,7 @@ use super::fixture::{frame, fresh, held, table_holds, RES};
 use crate::test_gpu::HeadlessPair;
 use crate::{RenderCounters, Renderer};
 use rusty_components::{MaterialAsset, MaterialComponent};
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
 const BOXES: u32 = 8;

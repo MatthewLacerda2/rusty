@@ -16,7 +16,7 @@ fn collider() -> ColliderComponent {
     };
     ColliderComponent {
         shape,
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_scene::create::default_collider()
     }
 }
 
@@ -40,7 +40,7 @@ fn level(scene: &mut Scene) -> Vec<u32> {
     scene.world.set_collider(crate_id, Some(collider()));
     let rb = RigidBodyComponent {
         is_kinematic: false,
-        ..rusty_scene::authoring::defaults::default_rigidbody()
+        ..rusty_scene::create::defaults::default_rigidbody()
     };
     scene.world.set_rigidbody(crate_id, Some(rb));
     hitboxes

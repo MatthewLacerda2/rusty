@@ -1,15 +1,15 @@
 //! The Rect Mask and Mask inspector cards (#418, #428): the rect clip's padding and
 //! feather, and the graphic clip's show-graphic toggle. Writes route through
-//! `scene::authoring::ui::rect_mask`.
+//! `edit::authoring::ui::rect_mask`.
 
 use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use super::vec4_row;
 use crate::inspector::components::card::component_card;
-use rusty_scene::authoring::ui::rect_mask as mask_ops;
+use rusty_edit::authoring::ui::rect_mask as mask_ops;
 
 /// Rect Mask card. A THIN client (#287): the widget reads a snapshot and routes the
 /// write through the shared op; remove detaches the component.

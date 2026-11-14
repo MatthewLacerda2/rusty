@@ -3,7 +3,7 @@
 
 use glam::{Quat, Vec3};
 
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
 /// A dark scene: no sky, sun or ambient.

@@ -9,7 +9,7 @@ use std::rc::Rc;
 use glam::Vec4;
 use mlua::Lua;
 use rusty::components::{BackdropFilterComponent, MaskComponent, RectMaskComponent};
-use rusty::scene::authoring::{add_component, ComponentKind};
+use rusty::edit::authoring::{add_component, ComponentKind};
 use rusty::scene::Scene;
 use rusty::script::api::bind;
 
@@ -87,9 +87,9 @@ fn masks_and_backdrops_survive_save_and_load() {
         .join("rusty_ui_mask_api.json")
         .to_string_lossy()
         .into_owned();
-    rusty::scene::save_to_file(&scene, &path).unwrap();
+    rusty::edit::save_to_file(&scene, &path).unwrap();
     let mut loaded = Scene::new();
-    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
+    rusty::edit::load_from_file(&mut loaded, &path).unwrap();
     std::fs::remove_file(&path).ok();
     assert_eq!(loaded.world.rect_mask(id).map(|m| m.clone()), Some(rect));
     assert_eq!(loaded.world.mask(id).map(|m| m.clone()), Some(mask));

@@ -13,8 +13,9 @@ use super::preview;
 use crate::EditorUi;
 use egui_phosphor::regular as icon;
 use rusty_asset::{IMAGE_EXTENSIONS, LUT_EXTENSIONS, MODEL_EXTENSIONS};
+use rusty_edit::PREFAB_EXTENSION;
 use rusty_navigation::NavigationGraph;
-use rusty_scene::{Scene, PREFAB_EXTENSION, SCENE_EXTENSION};
+use rusty_scene::{Scene, SCENE_EXTENSION};
 use rusty_script::scripting::ConsoleLogs;
 
 pub fn draw_inspector(

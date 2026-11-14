@@ -107,7 +107,7 @@ pub(super) fn load_now(
     scene_path: &std::cell::RefCell<Option<String>>,
     path: String,
 ) -> mlua::Result<Option<String>> {
-    let warning = match rusty_scene::load_from_file(&mut scene.borrow_mut(), &path) {
+    let warning = match rusty_edit::load_from_file(&mut scene.borrow_mut(), &path) {
         Ok(()) => None,
         Err(e) if e.replaced_world() => Some(format!("Scene.{verb}: {path}: {e}")),
         Err(e) => return Err(runtime(format!("Scene.{verb}: {e}"))),

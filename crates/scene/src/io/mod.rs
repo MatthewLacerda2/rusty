@@ -2,7 +2,7 @@
 //! its document, the record of the text at it and the bake files beside it.
 //!
 //! Saving, loading into a live scene and seeding the default scene are the edit
-//! side's (`edit_side::io`): a save converts the World through `to_scene_data`, a
+//! side's (`rusty_edit::io`): a save converts the World through `to_scene_data`, a
 //! load through `apply_scene_data`.
 //!
 //! stored-format: the scene file's text as read (`read_scene_file`), the bake files

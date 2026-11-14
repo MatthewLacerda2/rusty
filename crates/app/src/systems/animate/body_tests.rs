@@ -16,14 +16,14 @@ fn dynamic(scene: &mut Scene, id: u32) {
     let rb = RigidBodyComponent {
         is_kinematic: false,
         use_gravity: false,
-        ..rusty_scene::authoring::defaults::default_rigidbody()
+        ..rusty_edit::authoring::defaults::default_rigidbody()
     };
     scene.world.set_rigidbody(id, Some(rb));
     let mut collider = ColliderComponent {
         shape: ColliderShape::Box {
             size: Vec3::splat(0.5),
         },
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_edit::authoring::default_collider()
     };
     collider.material.friction = 0.0;
     scene.world.set_collider(id, Some(collider));

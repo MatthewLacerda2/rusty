@@ -9,8 +9,8 @@ use mlua::Lua;
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
+use rusty_edit::authoring::nav::agent as nav_ops;
 use rusty_navigation::{is_at_target, NavigationGraph};
-use rusty_scene::authoring::nav::agent as nav_ops;
 use rusty_scene::Scene;
 
 /// `NavMeshAgent.*` target / speed / radius accessors over the nav-agent component, and

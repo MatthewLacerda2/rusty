@@ -1,5 +1,5 @@
 //! The RectTransform inspector card (#417): anchors, pivot, anchored position and
-//! size delta. Every write routes through `scene::authoring::ui::layout::rect_transform`. The
+//! size delta. Every write routes through `edit::authoring::ui::layout::rect_transform`. The
 //! Transform card above it keeps rotation and scale; its position is ignored for a
 //! rect-laid-out entity. The *World Anchor* section (#429) makes the element a
 //! marker pinned to a world point. The anchor-preset picker (#423) sits on top;
@@ -7,13 +7,13 @@
 
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use super::super::{entity_row, vec2_row};
 use super::anchor_presets;
 use crate::inspector::components::card::component_card;
 use rusty_components::{RectTransformComponent, WorldAnchor};
-use rusty_scene::authoring::ui::layout::rect_transform as rect_ops;
+use rusty_edit::authoring::ui::layout::rect_transform as rect_ops;
 use rusty_ui::layout::{driven_by_group, rect_in};
 use rusty_ui::UiView;
 

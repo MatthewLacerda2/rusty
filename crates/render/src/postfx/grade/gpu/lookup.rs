@@ -8,7 +8,7 @@ use super::{chain, Chain, W};
 use crate::postfx::effects::grading::color_lookup::Lookup;
 use rusty_components::PostProcessingComponent;
 use rusty_core::fs::written::write;
-use rusty_scene::authoring::default_post_processing;
+use rusty_scene::create::default_post_processing;
 use rusty_test_support::luts::{cube_of, identity_cube};
 use rusty_test_support::rebakes::{follows_rebakes, Bake};
 

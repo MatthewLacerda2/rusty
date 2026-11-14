@@ -7,7 +7,7 @@ use glam::Vec3;
 
 use super::PhysicsWorld;
 use rusty_components::{ColliderComponent, ColliderShape, RigidBodyComponent};
-use rusty_scene::authoring::defaults::{default_collider, default_rigidbody};
+use rusty_scene::create::defaults::{default_collider, default_rigidbody};
 use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
@@ -18,7 +18,7 @@ fn body(scene: &mut Scene, pos: Vec3, size: Vec3, is_static: bool) -> u32 {
     scene.world.transform_mut(id).unwrap().position = pos;
     let collider = ColliderComponent {
         shape: ColliderShape::Box { size },
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_scene::create::default_collider()
     };
     scene.world.set_collider(id, Some(collider));
     if is_static {
@@ -26,7 +26,7 @@ fn body(scene: &mut Scene, pos: Vec3, size: Vec3, is_static: bool) -> u32 {
     } else {
         let rb = RigidBodyComponent {
             is_kinematic: false,
-            ..rusty_scene::authoring::defaults::default_rigidbody()
+            ..rusty_scene::create::defaults::default_rigidbody()
         };
         scene.world.set_rigidbody(id, Some(rb));
     }

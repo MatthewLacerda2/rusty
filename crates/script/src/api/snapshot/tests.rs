@@ -3,7 +3,7 @@
 
 use super::*;
 use glam::Vec2;
-use rusty_scene::authoring::{add_component, create_entity, ComponentKind, Primitive};
+use rusty_edit::authoring::{add_component, create_entity, ComponentKind, Primitive};
 use rusty_scene::Camera;
 use rusty_scene::Scene;
 

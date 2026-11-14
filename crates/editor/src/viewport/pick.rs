@@ -105,7 +105,7 @@ pub fn entity_world_position(scene: &Scene, entity_id: u32) -> Option<Vec3> {
 mod tests {
     use super::*;
     use rusty_components::ShadowCasting;
-    use rusty_scene::authoring::{self, Primitive};
+    use rusty_edit::authoring::{self, Primitive};
     use rusty_scene::Scene;
 
     #[test]

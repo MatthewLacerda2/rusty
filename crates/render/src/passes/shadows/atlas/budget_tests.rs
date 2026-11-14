@@ -24,7 +24,7 @@ fn point(i: usize, color: Vec3, intensity: f32) -> LocalLight {
         inner_cone: 20.0,
         outer_cone: 30.0,
         cast_shadows: true,
-        ..rusty_scene::authoring::default_light()
+        ..rusty_scene::create::default_light()
     };
     LocalLight::new(at, Vec3::NEG_Z, &light).expect("a local light")
 }

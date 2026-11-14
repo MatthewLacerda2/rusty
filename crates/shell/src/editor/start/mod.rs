@@ -68,7 +68,7 @@ fn prepare(
     }
     // The bundled scripts, the default scene where due, and the audio refresh
     // (#1653: the player does none of it, so every authoring entry point does).
-    rusty_scene::print_refresh(&rusty_scene::seed_project());
+    rusty_edit::print_refresh(&rusty_edit::seed_project());
     let startup = &opened.settings.build.startup_scene;
     let plan = rusty_core::project::boot_scene(&opened.root, startup, Access::Edit);
     let game = world(&plan.unwrap_or_default(), ProjectSource::bound(opened));

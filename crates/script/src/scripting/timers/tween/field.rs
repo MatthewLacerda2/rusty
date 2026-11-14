@@ -3,7 +3,7 @@
 //! A property path is `"Component.field"` — `"CanvasGroup.alpha"`,
 //! `"RectTransform.anchored_position"`. Only the numeric fields listed here are
 //! animatable, so a typo is an error at `Tween.To`, never a silent no-op. Writes
-//! route through the same `scene::authoring` ops the inspector and the component
+//! route through the same `edit::authoring` ops the inspector and the component
 //! namespaces use, so a tweened alpha is clamped exactly like a `SetAlpha`.
 //! `Transform.position` and `Transform.rotation` are world space, as
 //! `Transform.SetPosition` / `SetRotation` are; `Transform.scale` is the local scale,
@@ -14,7 +14,7 @@
 use glam::{Vec2, Vec3, Vec4};
 
 use rusty_components::transform::{euler_degrees, from_euler_degrees};
-use rusty_scene::authoring::{
+use rusty_edit::authoring::{
     audio::source as audio, rendering::camera, rendering::light, ui::image,
     ui::layout::canvas_group, ui::layout::rect_transform as rect, ui::text,
 };

@@ -56,7 +56,7 @@ pub enum Lifecycle {
     /// `Scene.Load` and the editor's follow of a file changed on disk.
     Load,
     /// A Play-mode `Scene.Load`: the tick's scene-load phase swaps another
-    /// document in (`edit_side::load::swap_in`), carrying only the `DontDestroyOnLoad`
+    /// document in (`rusty_edit::load::swap_in`), carrying only the `DontDestroyOnLoad`
     /// survivors. It is judged with the marked entity left behind, so whatever is
     /// keyed by that entity must not cross with its stale id (`promise`).
     PlayLoad,

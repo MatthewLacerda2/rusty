@@ -6,7 +6,7 @@ use glam::Vec3;
 
 use super::{assert_common, scene_path};
 use crate::bake::report::{read, reflections, Kind, Stages};
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_edit::authoring::{create_entity, Primitive};
 use rusty_scene::Scene;
 
 /// Two 4 m rooms side by side, touching at `x = 0` and overlapping by 1 m, with a

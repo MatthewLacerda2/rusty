@@ -20,8 +20,9 @@ use egui_phosphor::regular as icon;
 use crate::inspector::components::card::component_card;
 use crate::theme;
 use rusty_components::PART_KEY;
-use rusty_scene::prefab::instance;
-use rusty_scene::{authoring, Scene};
+use rusty_edit::authoring;
+use rusty_edit::prefab::instance;
+use rusty_scene::Scene;
 
 /// A prefab-override edit the card requested this frame, dispatched by the caller once
 /// the entity guard has dropped (the verbs need `&mut Scene`). Whole-object verbs take
@@ -80,7 +81,7 @@ impl Apply {
 
     /// The apply state for an instance of `source`.
     fn of(source: &str) -> Self {
-        Apply(rusty_scene::prefab::source::is_model_source(source).then_some(Self::MODEL))
+        Apply(rusty_edit::prefab::source::is_model_source(source).then_some(Self::MODEL))
     }
 
     /// Add `button`, enabled with `hover` as its tooltip, or greyed out with the
@@ -143,7 +144,7 @@ fn draw_overrides_list(
     action: &mut Option<PrefabAction>,
 ) {
     let t = theme::from_ui(ui);
-    let paths = rusty_scene::prefab::live::entity_overrides(world, id).keys();
+    let paths = rusty_edit::prefab::live::entity_overrides(world, id).keys();
     ui.separator();
     if paths.is_empty() {
         ui.colored_label(t.text_secondary, "No overrides on this object");
@@ -219,7 +220,7 @@ pub fn instance_root(scene: &Scene, selected_id: u32) -> u32 {
 }
 
 /// Apply a [`PrefabAction`] against the live scene, routing through the shared
-/// `scene::authoring` prefab verbs (the same ones the `Scene.*` API calls). Returns
+/// `edit::authoring` prefab verbs (the same ones the `Scene.*` API calls). Returns
 /// whether the scene changed (so the caller can mark the editor dirty).
 pub fn dispatch(scene: &mut Scene, action: PrefabAction) -> bool {
     match action {

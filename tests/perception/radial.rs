@@ -4,7 +4,7 @@
 
 use glam::Vec3;
 use rusty::components::{AIPerceptionComponent, ColliderComponent, ColliderShape};
-use rusty::scene::authoring::default_collider;
+use rusty::edit::authoring::default_collider;
 use rusty::scene::Scene;
 
 use super::{eval, play};

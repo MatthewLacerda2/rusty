@@ -6,7 +6,7 @@
 use super::{set_param, sphere, Flash, RES};
 use crate::gpu::material_cache::ParamOwner;
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// Pixels of one frame dominated by red and by blue.

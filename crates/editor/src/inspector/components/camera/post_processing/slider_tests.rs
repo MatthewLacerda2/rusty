@@ -4,8 +4,8 @@
 
 use rusty_components::AutoExposure;
 use rusty_ecs::World;
-use rusty_scene::authoring::default_post_processing;
-use rusty_scene::authoring::rendering::post_processing as vc_ops;
+use rusty_edit::authoring::default_post_processing;
+use rusty_edit::authoring::rendering::post_processing as vc_ops;
 
 /// Draw one compensation row over a volume holding `ev`; return whether the row
 /// reported a change, and the value the volume holds after.

@@ -29,7 +29,7 @@ fn add_box(scene: &mut Scene, name: &str, pos: Vec3, layer: u8) -> u32 {
             shape: ColliderShape::Box {
                 size: Vec3::splat(2.0),
             },
-            ..rusty_scene::authoring::default_collider()
+            ..rusty_edit::authoring::default_collider()
         }),
     );
     id

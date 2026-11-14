@@ -25,10 +25,11 @@ use rusty_components::MontageEvent;
 use rusty_core::application::Application;
 use rusty_core::input::InputState;
 use rusty_core::storage::Storage;
+use rusty_edit::SceneSnapshot;
 use rusty_navigation::NavigationGraph;
 use rusty_physics::PhysicsWorld;
 use rusty_scene::Camera;
-use rusty_scene::{Scene, SceneSnapshot};
+use rusty_scene::Scene;
 use rusty_script::scripting::{ConsoleLogs, ScriptManager};
 use rusty_time::Time;
 use rusty_ui::{EventSystem, ScreenSize, TextureSizeReader, UiLayout};
@@ -130,7 +131,7 @@ pub struct Resources {
     /// What prepares `Scene.LoadAsync` operations (#2123) and the scene it made ready.
     pub(super) loading: super::scene_load::Loading,
     /// How far the edit scene's meshes follow the write log (#1242).
-    pub(super) model_writes: rusty_scene::model_writes::ModelWrites,
+    pub(super) model_writes: rusty_edit::model_writes::ModelWrites,
 }
 
 /// The audio maestro, shared with the script runtime so the `Audio` namespace

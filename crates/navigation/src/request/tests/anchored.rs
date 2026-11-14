@@ -7,7 +7,7 @@ use super::super::super::test_support::{add_box, add_floor};
 use super::super::super::{NavBounds, NavigationGraph, ALL_AREAS};
 use super::{agent, level, spawn, sync_path, DT};
 use rusty_components::NavPathStatus;
-use rusty_scene::authoring::nav::agent::set_area_mask;
+use rusty_edit::authoring::nav::agent::set_area_mask;
 use rusty_scene::Scene;
 
 #[test]

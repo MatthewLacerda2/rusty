@@ -16,7 +16,7 @@ use super::particles::widgets::{combo, curve_editor, gradient_editor};
 use rusty_asset::MapRef;
 use rusty_components::{ParticleBlend, RibbonStyle, TextureMode};
 use rusty_core::curve::{Curve, Gradient};
-use rusty_scene::authoring::ribbon as ribbon_ops;
+use rusty_edit::authoring::ribbon as ribbon_ops;
 
 /// One edit the Style section made, applied through the shared ribbon ops.
 enum StyleEdit {

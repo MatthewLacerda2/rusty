@@ -1,7 +1,7 @@
 //! `api-parity`: every inspector op is reachable from Lua (#1368).
 //!
 //! "Anything the editor does, the API does" (`docs/game-agent.md`). `--parity`
-//! holds that the inspector writes through a shared `scene::authoring` op; this rule
+//! holds that the inspector writes through a shared `edit::authoring` op; this rule
 //! holds the other half, field by field: every `authoring::<module>::set_*` op that
 //! `src/editor/` names is also named from `src/script/api/`, either called by a named setter
 //! or listed in `api::component`'s `op!`/`with!`/`group!` tables (a table entry names
@@ -13,9 +13,9 @@
 //! so one in a re-exported sub-file (`particles/render.rs`) counts.
 //!
 //! A line scan, not a parser, with known limits:
-//! - an op is matched by path, from the root its file spells `scene::authoring` by
-//!   (`names::root_of`: `crate::authoring` inside `rusty-scene`,
-//!   `rusty_scene::authoring` in another member crate, `crate::scene::authoring` in
+//! - an op is matched by path, from the root its file spells `edit::authoring` by
+//!   (`names::root_of`: `crate::authoring` inside `rusty-edit`,
+//!   `rusty_edit::authoring` in another member crate, `crate::edit::authoring` in
 //!   the root package): the `use` trees starting there give each file's aliases
 //!   (`rigidbody as rb`, `{self as ops, …}`, `nav::{agent, …}`,
 //!   `rigidbody::{set_mass}`), and `alias::…::set_x`, a bare imported `set_x` (or its
@@ -39,18 +39,18 @@ pub use names::{local_ops_named, ops_named, root_of};
 
 pub const RULE: &str = "api-parity";
 
-const AUTHORING: &str = "src/scene/authoring/";
-pub const ROOT: &str = "crate::scene::authoring";
+const AUTHORING: &str = "src/edit/authoring/";
+pub const ROOT: &str = "crate::edit::authoring";
 const EDITOR: &str = "src/editor/";
 /// Where Lua reaches ops from: the bindings, and `Component.Set`'s field table
-/// once it sits under `scene::authoring` (#1418 moves it there).
-const API: &[&str] = &["src/script/api/", "src/scene/authoring/fields/"];
+/// once it sits under `edit::authoring` (#1418 moves it there).
+const API: &[&str] = &["src/script/api/", "src/edit/authoring/fields/"];
 /// Modules whose own file holds the field-table row (and knob table) that reaches
 /// its ops, so an op it calls by bare name is reached from Lua: the post effects,
 /// each declaring its `Effect` beside its ops (#1467).
-const ROWS: &[&str] = &["src/scene/authoring/rendering/post_processing/"];
+const ROWS: &[&str] = &["src/edit/authoring/rendering/post_processing/"];
 
-/// An op by its path under `scene::authoring`: `nav::agent::set_speed`.
+/// An op by its path under `edit::authoring`: `nav::agent::set_speed`.
 type Op = String;
 
 pub fn run(scan: &Scan) -> Vec<Finding> {
@@ -84,7 +84,7 @@ pub fn run(scan: &Scan) -> Vec<Finding> {
 }
 
 /// The findings, given the ops the editor and the API name and the sources of
-/// `src/scene/authoring/` by path.
+/// `src/edit/authoring/` by path.
 pub fn check(
     editor: &BTreeSet<Op>,
     api: &BTreeSet<Op>,
@@ -137,7 +137,7 @@ pub fn check(
     found
 }
 
-/// `src/scene/authoring/nav/agent.rs` → `nav::agent`; a `mod.rs` is its folder.
+/// `src/edit/authoring/nav/agent.rs` → `nav::agent`; a `mod.rs` is its folder.
 /// Read at its module path, as every module-scoped rule reads a crate's file.
 fn module_of(path: &str) -> String {
     let path = module_path(path);
@@ -194,9 +194,9 @@ fn allows(source: &str) -> Vec<(usize, usize, String)> {
     out
 }
 
-/// Where the authoring files lie on disk (`crates/scene/src/authoring/` once `scene`
-/// moved), read from the files found: a finding names a real path, never the module
-/// path [`AUTHORING`] they are matched by.
+/// Where the authoring files lie on disk (`crates/edit/src/authoring/`), read from
+/// the files found: a finding names a real path, never the module path
+/// [`AUTHORING`] they are matched by.
 fn folder(authoring: &BTreeMap<String, &str>) -> String {
     let at = |p: &String| {
         p.find("authoring/")

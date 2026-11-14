@@ -10,7 +10,7 @@ use super::silhouette::{at, shot, BRONZE, H, W};
 use crate::readback::read_texture_bytes;
 use crate::{RenderView, OFFSCREEN_FORMAT};
 use rusty_core::color::f16_to_f32;
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// The lifted cube over a mirror floor; when `strip`, a satin (roughness 0.5)

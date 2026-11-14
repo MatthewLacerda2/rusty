@@ -1,5 +1,5 @@
 //! An edit-mode tick reloads a model the engine re-writes (#1242) into the
-//! entities that use it. The reload itself is `scene::edit_side::rehydrate::model_writes_tests`.
+//! entities that use it. The reload itself is `edit::rehydrate::model_writes_tests`.
 
 use std::cell::RefCell;
 use std::rc::Rc;

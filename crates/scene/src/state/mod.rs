@@ -39,7 +39,7 @@
 
 // The inventory, its classes and a mark per field are test hooks: compiled in every
 // build, since the lifecycles that save, load or snapshot are checked by the edit
-// side's tests (`edit_side::base_tests::state`).
+// side's tests (`rusty_edit`'s `base_tests::state`).
 #[doc(hidden)]
 pub mod class;
 #[doc(hidden)]

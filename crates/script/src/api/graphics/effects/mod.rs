@@ -2,7 +2,7 @@
 //! (grading and lens effects in their folders), listed once in [`REGISTRARS`]. A
 //! volume effect writes the main camera's active post-processing volume and a camera
 //! effect (motion blur, FXAA, TAA) the main camera's component, both through the
-//! `scene::authoring` ops the Inspector calls; an effect's numeric knobs that are a
+//! `edit::authoring` ops the Inspector calls; an effect's numeric knobs that are a
 //! pair on their own come from its knob table (`knobs`).
 
 use super::super::Reg;

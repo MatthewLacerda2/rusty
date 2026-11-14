@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 
 use crate::widgets::DragRange;
 
-use rusty_scene::authoring::material::{self as mat_ops, SurfaceField, SurfaceKind, SurfaceValue};
+use rusty_edit::authoring::material::{self as mat_ops, SurfaceField, SurfaceKind, SurfaceValue};
 use rusty_scene::MaterialAsset;
 
 /// Draw every row of `fields` material `key` shows.

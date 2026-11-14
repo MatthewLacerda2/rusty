@@ -22,9 +22,10 @@ use crate::bake::lightmap::bake_scene_lightmaps_logged;
 use crate::bake::occlusion::{bake_occlusion_logged, BakedOcclusion};
 use crate::bake::progress::{BakeLog, Step};
 use crate::bake::steps::LightingBake;
+use rusty_edit::{save_lighting, LightingSave, LIGHTING_IN_PLAY};
 use rusty_lighting::occlusion::OcclusionBakeReport;
 use rusty_navigation::NavigationGraph;
-use rusty_scene::{save_lighting, LightingSave, Scene, LIGHTING_IN_PLAY};
+use rusty_scene::Scene;
 
 /// Why Generate Lighting cannot start: the bakes write beside the scene file.
 pub const UNSAVED: &str = "save the scene before generating lighting";

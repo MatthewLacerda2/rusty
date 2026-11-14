@@ -30,7 +30,7 @@ fn vc(bloom: bool) -> PostProcessingComponent {
             active: false,
             ..Default::default()
         },
-        ..rusty::scene::authoring::default_post_processing()
+        ..rusty::edit::authoring::default_post_processing()
     }
 }
 

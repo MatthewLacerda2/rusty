@@ -9,8 +9,8 @@ use crate::scripting::manager::ScriptManager;
 use glam::Vec3;
 use rusty_components::{CapsuleAxis, ColliderShape, CombineMode, PhysicsMaterial};
 use rusty_core::input::InputState;
+use rusty_edit::authoring::defaults::default_collider;
 use rusty_navigation::NavigationGraph;
-use rusty_scene::authoring::defaults::default_collider;
 use rusty_scene::{Camera, Scene};
 use rusty_time::Time;
 

@@ -16,7 +16,7 @@ fn box_collider(size: f32, is_trigger: bool) -> ColliderComponent {
             size: Vec3::splat(size),
         },
         is_trigger,
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_scene::create::default_collider()
     }
 }
 
@@ -41,7 +41,7 @@ fn step_surfaces_enter_stay_exit_edges() {
             is_kinematic: true,
             use_gravity: false,
             collision_detection: rusty_components::CollisionDetection::Discrete,
-            ..rusty_scene::authoring::default_rigidbody()
+            ..rusty_scene::create::default_rigidbody()
         }),
     );
 
@@ -90,7 +90,7 @@ fn a_bodys_own_trigger_ignores_its_solid_parts() {
         Some(RigidBodyComponent {
             is_kinematic: true,
             use_gravity: false,
-            ..rusty_scene::authoring::defaults::default_rigidbody()
+            ..rusty_scene::create::defaults::default_rigidbody()
         }),
     );
     let sensor = scene.add_entity("Sensor".to_string());

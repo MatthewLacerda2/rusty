@@ -9,7 +9,7 @@ use crate::gpu::reflection_probe_per_object_screenshot::solid_cube_ktx2;
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::{create_entity, Primitive};
+use rusty::edit::authoring::{create_entity, Primitive};
 use rusty::scene::{Camera, Scene};
 
 const SIZE: u32 = 48;

@@ -10,8 +10,9 @@ mod pool;
 mod steering;
 
 use glam::Vec3;
-use rusty::scene::default_scene::layout::{self, ground_at, RAMP_HALF_WIDTH, RAMP_RUN};
-use rusty::scene::{apply_scene_data, to_scene_data, Scene};
+use rusty::edit::default_scene::layout::{self, ground_at, RAMP_HALF_WIDTH, RAMP_RUN};
+use rusty::edit::{apply_scene_data, to_scene_data};
+use rusty::scene::Scene;
 
 /// The walls' inner faces: how far from the centre the yard is walkable (x, z).
 pub const INNER: (f32, f32) = (
@@ -30,13 +31,13 @@ const GROUND_TOLERANCE: f32 = 0.02;
 /// The default scene as the editor boots it (built, then through its saved
 /// document), and Enemy_1's id in it.
 pub fn default_scene() -> (Scene, u32) {
-    default_scene_with(rusty::scene::default_scene::BOT_SCRIPT)
+    default_scene_with(rusty::edit::default_scene::BOT_SCRIPT)
 }
 
 /// [`default_scene`] with `bot_script` as Enemy_1's brain.
 pub fn default_scene_with(bot_script: &str) -> (Scene, u32) {
     let mut built = Scene::new();
-    rusty::scene::default_scene::build(&mut built, bot_script);
+    rusty::edit::default_scene::build(&mut built, bot_script);
     let mut scene = Scene::new();
     apply_scene_data(&mut scene, to_scene_data(&built));
     let enemy = scene.find_entity_by_name("Enemy_1").expect("Enemy_1");

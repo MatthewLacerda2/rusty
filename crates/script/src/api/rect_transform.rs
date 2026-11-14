@@ -3,7 +3,7 @@
 //! Get/Set over an entity's `RectTransformComponent`: anchors, pivot, anchored
 //! position and size delta, each an `x, y` pair in the owning canvas's reference
 //! units (y-up). Every setter routes through the shared
-//! `scene::authoring::ui::layout::rect_transform` ops the inspector card uses, so validation
+//! `edit::authoring::ui::layout::rect_transform` ops the inspector card uses, so validation
 //! (anchors clamped to `[0, 1]` and kept ordered) lives once. The computed rect is
 //! read with `UI.GetRect`; the Transform keeps rotation and scale. The world
 //! anchor verbs (#429) make an element a marker pinned to a world point.
@@ -18,7 +18,7 @@ use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::RectTransformComponent;
 use rusty_core::settings::video::VideoSettings;
-use rusty_scene::authoring::ui::layout::rect_transform::{
+use rusty_edit::authoring::ui::layout::rect_transform::{
     self as rect_ops, AnchorPreset, AxisPreset,
 };
 use rusty_scene::Scene;

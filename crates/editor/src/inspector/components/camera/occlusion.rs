@@ -4,7 +4,7 @@
 //! Writes through the shared op, so this and `Camera.SetUseOcclusionCulling` are
 //! one path.
 
-use rusty_scene::authoring::rendering::camera as camera_ops;
+use rusty_edit::authoring::rendering::camera as camera_ops;
 use rusty_scene::CameraComponent;
 
 pub(super) fn draw_occlusion_culling(

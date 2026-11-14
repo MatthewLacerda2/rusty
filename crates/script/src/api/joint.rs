@@ -3,7 +3,7 @@
 //! Get/Set over an entity's `JointComponent`: its kind, the connected body, the
 //! anchors and axes, the limits, the break thresholds, the collision flag and the
 //! drive (#1895).
-//! Every setter routes through the shared `scene::authoring::physics::joint` ops the
+//! Every setter routes through the shared `edit::authoring::physics::joint` ops the
 //! inspector card uses. Getters return a neutral default without a Joint; setters
 //! are then no-ops. The kind travels as its name (`"Fixed"`, `"Hinge"`, `"Ball"`,
 //! case-insensitive; an unknown name is ignored). Attach one with
@@ -19,7 +19,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::{JointComponent, JointKind};
-use rusty_scene::authoring::physics::joint as ops;
+use rusty_edit::authoring::physics::joint as ops;
 use rusty_scene::Scene;
 
 /// A field's reader and its shared-op writer.

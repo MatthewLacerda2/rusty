@@ -8,12 +8,12 @@
 
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use super::super::physics::vec3_row;
 use crate::inspector::components::card::component_card;
 use rusty_components::{NavMeshObstacleComponent as Obstacle, ObstacleShape};
-use rusty_scene::authoring::nav::obstacle as obstacle_ops;
+use rusty_edit::authoring::nav::obstacle as obstacle_ops;
 
 /// Route one edit through the shared ops and mark the scene dirty.
 fn write(

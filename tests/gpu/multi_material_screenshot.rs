@@ -10,7 +10,7 @@ use crate::temp::{dir, file as tmp};
 use glam::Vec3;
 use rusty::components::MaterialAsset;
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::{instantiate_asset, material as mat_ops};
+use rusty::edit::authoring::{instantiate_asset, material as mat_ops};
 use rusty::scene::{Camera, Scene};
 
 /// Pixels whose colour is dominated by red, green and blue.

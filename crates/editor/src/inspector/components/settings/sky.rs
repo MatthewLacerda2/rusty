@@ -5,7 +5,7 @@
 use egui_phosphor::regular as icon;
 
 use crate::EditorUi;
-use rusty_scene::authoring::environment as env_ops;
+use rusty_edit::authoring::environment as env_ops;
 use rusty_scene::{Scene, SkySettings};
 
 /// A colour's label, what it reads when unset, and its op.

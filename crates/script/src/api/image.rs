@@ -3,7 +3,7 @@
 //! Get/Set over an entity's `ImageComponent`: tint colour, texture, image type,
 //! 9-slice border, the fill (method, origin, amount, direction), preserve-aspect,
 //! raycast target, and the look (#425): blend mode and gradient tint. Every setter
-//! routes through the shared `scene::authoring::ui::image` ops the inspector card
+//! routes through the shared `edit::authoring::ui::image` ops the inspector card
 //! uses, so validation lives once.
 //! Getters return a neutral default when the entity has no Image; setters are then
 //! no-ops. Enum values travel as their names (case-insensitive; unknown ignored).
@@ -20,7 +20,7 @@ use crate::api::ApiCell;
 use rusty_asset::MapRef;
 use rusty_components::ImageComponent;
 use rusty_components::{FillMethod, FillOrigin, ImageType};
-use rusty_scene::authoring::ui::image as image_ops;
+use rusty_edit::authoring::ui::image as image_ops;
 use rusty_scene::Scene;
 
 type Vec4Get = fn(&ImageComponent) -> Vec4;

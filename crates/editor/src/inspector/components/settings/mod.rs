@@ -16,8 +16,8 @@ use glam::Vec3;
 
 use crate::theme;
 use crate::EditorUi;
-use rusty_scene::authoring::environment as env_ops;
-use rusty_scene::authoring::fog as fog_ops;
+use rusty_edit::authoring::environment as env_ops;
+use rusty_edit::authoring::fog as fog_ops;
 use rusty_scene::{FogMode, FogSettings, Scene, LAYER_COUNT};
 
 /// Render the Scene Settings panel (skybox, ambient light, Tags & Layers).

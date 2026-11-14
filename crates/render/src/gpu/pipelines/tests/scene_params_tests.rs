@@ -7,7 +7,7 @@
 
 use super::{halves, sphere, Flash, RES};
 use crate::gpu::material_cache::ParamOwner;
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
 /// A scene of one flashing sphere at the left whose material flashes `color`; its

@@ -88,7 +88,7 @@ impl Scene {
 
     /// Whether `id` is a hitbox [`Scene::generate_hitboxes`] made: named
     /// [`HITBOX_NAME`] and carrying a collider.
-    pub(crate) fn is_generated_hitbox(&self, id: u32) -> bool {
+    pub fn is_generated_hitbox(&self, id: u32) -> bool {
         self.world.has_collider(id) && self.world.name(id).is_some_and(|n| *n == HITBOX_NAME)
     }
 

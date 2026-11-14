@@ -8,7 +8,7 @@ use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_components::{
     DepthOfField, DofMode, MaterialAsset, MaterialComponent, PostProcessingComponent, SsaoSettings,
 };
-use rusty_scene::authoring::{create_entity, default_post_processing, Primitive};
+use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// 160 × 120: the largest Bokeh circle is 3 px of radius (1/40 of the height).

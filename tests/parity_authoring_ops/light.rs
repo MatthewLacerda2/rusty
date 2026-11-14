@@ -6,7 +6,7 @@ use std::rc::Rc;
 use glam::Vec3;
 use mlua::Lua;
 use rusty::components::{LightComponent, LightType};
-use rusty::scene::authoring::rendering::light as light_ops;
+use rusty::edit::authoring::rendering::light as light_ops;
 use rusty::scene::Scene;
 use rusty::script::api::bind;
 
@@ -20,7 +20,7 @@ fn entity_with_light(scene: &mut Scene, name: &str) -> u32 {
             range: 5.0,
             inner_cone: 0.0,
             outer_cone: 0.0,
-            ..rusty::scene::authoring::default_light()
+            ..rusty::edit::authoring::default_light()
         }),
     );
     id

@@ -8,8 +8,8 @@ use std::rc::Rc;
 use glam::Vec3;
 
 use rusty_core::input::InputState;
+use rusty_edit::asset_instance::instantiate_asset;
 use rusty_navigation::NavigationGraph;
-use rusty_scene::asset_instance::instantiate_asset;
 use rusty_test_support::models::quad_file as quad_model;
 
 use crate::scripting::{ConsoleLogs, ScriptManager};

@@ -2,7 +2,7 @@
 //! `SetUseGravity` / `IsTrigger` / `SetTrigger` (#1365, #1368), and the drag
 //! pair `GetDrag` / `SetDrag` / `GetAngularDrag` / `SetAngularDrag` (#2062).
 //!
-//! The body's authorable switches, over the same `scene::authoring` ops the
+//! The body's authorable switches, over the same `edit::authoring` ops the
 //! inspector's Rigidbody and Collider cards write through, so a script's mass is
 //! clamped exactly as the card's is. Unity: `Rigidbody.mass`, `Rigidbody.useGravity`,
 //! `Rigidbody.drag`, `Rigidbody.angularDrag` and `Collider.isTrigger`. Getters answer a neutral default without the
@@ -14,7 +14,7 @@ use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::RigidBodyComponent;
-use rusty_scene::authoring::{physics::collider as collider_ops, physics::rigidbody as rb_ops};
+use rusty_edit::authoring::{physics::collider as collider_ops, physics::rigidbody as rb_ops};
 use rusty_scene::Scene;
 
 /// Put a getter/setter pair over one `f32` Rigidbody field: the getter reads it

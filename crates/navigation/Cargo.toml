@@ -5,7 +5,7 @@ edition.workspace = true
 publish.workspace = true
 
 [features]
-dev = ["rusty-core/dev", "rusty-lighting/dev", "rusty-physics/dev", "rusty-scene/dev"]
+dev = ["rusty-core/dev", "rusty-lighting/dev", "rusty-physics/dev", "rusty-edit/dev", "rusty-scene/dev"]
 
 [lints]
 workspace = true
@@ -22,6 +22,7 @@ serde_json = { workspace = true }
 
 [dev-dependencies]
 # Probe placement and the bench level on a baked nav surface (`probe_site`, `flood`).
+rusty-edit = { workspace = true }
 rusty-lighting = { workspace = true }
 rusty-test-support = { workspace = true }
 proptest = { workspace = true }

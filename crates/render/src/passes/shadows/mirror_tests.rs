@@ -11,7 +11,8 @@ use glam::{Quat, Vec3};
 use crate::gpu::pipelines::surface::cut_depth_tests::{ground_halves, slab_yard};
 use crate::Renderer;
 use rusty_components::RenderMode;
-use rusty_scene::authoring::{create_entity, material, Primitive};
+use rusty_edit::authoring::material;
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
 /// A 6 x 6 one-sided `Plane` at y = 3, mirrored along X when `mirrored`; with

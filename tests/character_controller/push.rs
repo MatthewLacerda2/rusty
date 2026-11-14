@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use rusty::components::{ColliderComponent, ColliderShape};
-use rusty::scene::authoring::{default_collider, default_rigidbody};
+use rusty::edit::authoring::{default_collider, default_rigidbody};
 use rusty::scene::Scene;
 
 use super::hits::attach_scripts;

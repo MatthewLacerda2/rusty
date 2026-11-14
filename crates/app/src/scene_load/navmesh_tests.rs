@@ -25,7 +25,7 @@ fn scenes(tag: &str, saved: bool) -> (String, String) {
     let mut start = Scene::new();
     start.add_entity("Keeper".into());
     start.add_entity("Other".into());
-    rusty_scene::save_to_file(&start, &path("start.scene")).unwrap();
+    rusty_edit::save_to_file(&start, &path("start.scene")).unwrap();
     let mut level = Scene::new();
     add_floor(&mut level, 0.0, 6.0, 0.0, 6.0);
     add_box(
@@ -37,7 +37,7 @@ fn scenes(tag: &str, saved: bool) -> (String, String) {
         let bytes = NavigationGraph::baked_bytes(&level);
         level.put_baked_navmesh(Arc::from(bytes));
     }
-    rusty_scene::save_to_file(&level, &path("level.scene")).unwrap();
+    rusty_edit::save_to_file(&level, &path("level.scene")).unwrap();
     (path("start.scene"), path("level.scene"))
 }
 

@@ -29,7 +29,7 @@
 //!   each as `op = "graph"` with its path, inputs and params (#1744).
 //!
 //! A recipe's graph instances (#1744) and `image` nodes read their files from the
-//! project root before any verb evaluates it (`scene::authoring::material::load_recipe`,
+//! project root before any verb evaluates it (`edit::authoring::material::load_recipe`,
 //! #1491): procgen itself reads no files. Each verb evaluates the expanded recipe,
 //! so `Stats` and `Preview` show an instance's nodes under their prefixed ids
 //! (`brick/mortar`); `ToJson` writes the recipe as given, instances unexpanded.
@@ -60,8 +60,8 @@ use mlua::{Lua, Value};
 
 use super::{put, Reg};
 use from_lua::parse_recipe;
+use rusty_edit::authoring::material::{load_recipe, Loaded};
 use rusty_procgen::{bake_recipe, bake_set, check_set, Slot, TextureRecipe};
-use rusty_scene::authoring::material::{load_recipe, Loaded};
 
 /// Register the `Texture` namespace onto `lua`.
 pub fn register(lua: &Lua) -> Reg {

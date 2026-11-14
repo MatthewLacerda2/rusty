@@ -38,7 +38,7 @@ fn scene(material: MaterialAsset) -> Scene {
         range: 30.0,
         inner_cone: 0.0,
         outer_cone: 0.0,
-        ..rusty::scene::authoring::default_light()
+        ..rusty::edit::authoring::default_light()
     };
     s.world.set_light(lamp, Some(light));
     s

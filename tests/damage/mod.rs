@@ -17,7 +17,7 @@ use std::rc::Rc;
 use glam::Vec3;
 use rusty::app::GameWorld;
 use rusty::components::{ColliderComponent, ColliderShape};
-use rusty::scene::authoring::default_collider;
+use rusty::edit::authoring::default_collider;
 use rusty::scene::Scene;
 
 use crate::play::{attach_script, playing, run};
@@ -105,7 +105,7 @@ fn a_point_impulse_pushes_the_struck_dynamic_body() {
     let body = rusty::components::RigidBodyComponent {
         use_gravity: false,
         is_kinematic: false,
-        ..rusty::scene::authoring::default_rigidbody()
+        ..rusty::edit::authoring::default_rigidbody()
     };
     scene.world.set_rigidbody(crate_id, Some(body));
     let game = play(scene);

@@ -15,7 +15,7 @@ fn box_collider(size: Vec3, is_trigger: bool) -> ColliderComponent {
     ColliderComponent {
         shape: ColliderShape::Box { size },
         is_trigger,
-        ..rusty::scene::authoring::default_collider()
+        ..rusty::edit::authoring::default_collider()
     }
 }
 
@@ -34,7 +34,7 @@ fn static_floor_contact_is_a_collision_not_a_trigger() {
         .set_collider(ball, Some(box_collider(Vec3::ONE, false)));
     scene
         .world
-        .set_rigidbody(ball, Some(rusty::scene::authoring::default_rigidbody()));
+        .set_rigidbody(ball, Some(rusty::edit::authoring::default_rigidbody()));
     let want = (floor.min(ball), floor.max(ball));
 
     let mut physics = PhysicsWorld::from_scene(&scene);
@@ -63,7 +63,7 @@ fn set_trigger_mid_play_turns_a_floor_into_a_trigger() -> mlua::Result<()> {
     raw.world.transform_mut(ball).unwrap().position = Vec3::Y;
     raw.world
         .set_collider(ball, Some(box_collider(Vec3::ONE, false)));
-    let rb = rusty::scene::authoring::default_rigidbody();
+    let rb = rusty::edit::authoring::default_rigidbody();
     raw.world.set_rigidbody(ball, Some(rb));
     let mut physics = PhysicsWorld::from_scene(&raw);
     let scene = Rc::new(std::cell::RefCell::new(raw));

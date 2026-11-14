@@ -4,7 +4,7 @@
 
 use glam::Vec3;
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::{create_entity, default_post_processing, Primitive};
+use rusty::edit::authoring::{create_entity, default_post_processing, Primitive};
 use rusty::scene::{Camera, Scene};
 
 /// A floor slab, optionally with a crate standing on it, lit by ambient light alone

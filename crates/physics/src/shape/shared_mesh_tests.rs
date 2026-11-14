@@ -9,10 +9,9 @@ use super::build::collider_inputs;
 use super::triangles::collider_world_triangles;
 use rusty_components::mesh::{MeshComponent, Vertex};
 use rusty_components::ColliderComponent;
-use rusty_scene::authoring::{
-    add_component, create_entity, remove_component, ComponentKind, Primitive,
-};
-use rusty_scene::edit_side::serialize::{apply_scene_data, to_scene_data};
+use rusty_edit::authoring::{add_component, remove_component, ComponentKind};
+use rusty_edit::serialize::{apply_scene_data, to_scene_data};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
 /// An imported-style part: an `"Asset"` mesh (a 2×1×1 slab, not a

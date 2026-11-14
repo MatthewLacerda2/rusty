@@ -33,7 +33,7 @@ pub(super) fn scene() -> (Scene, u32) {
     let floor = scene.add_entity("Plank".into());
     let collider = ColliderComponent::from_mesh_bounds(false, Vec3::ZERO, Vec3::ZERO);
     scene.world.set_collider(floor, Some(collider));
-    rusty_scene::edit_side::mesh::set_shared_mesh(&mut scene, floor, "plank").unwrap();
+    rusty_edit::mesh::set_shared_mesh(&mut scene, floor, "plank").unwrap();
     scene.world.set_static(floor, true);
     let crate_ = scene.add_entity("Crate".into());
     scene.world.transform_mut(crate_).unwrap().position = Vec3::new(1.5, 0.3, 0.0);
@@ -42,10 +42,10 @@ pub(super) fn scene() -> (Scene, u32) {
     };
     let collider = ColliderComponent {
         shape,
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_scene::create::default_collider()
     };
     scene.world.set_collider(crate_, Some(collider));
-    let rb = rusty_scene::authoring::defaults::default_rigidbody();
+    let rb = rusty_scene::create::defaults::default_rigidbody();
     scene.world.set_rigidbody(
         crate_,
         Some(RigidBodyComponent {

@@ -14,7 +14,7 @@
 //!
 //! Three of the layers sit above this crate's live code: the authoring layer (the
 //! component field tables, the volume's effect rows, the camera's knob tables:
-//! `scene::authoring`), the `Graphics.*` registrars (`api`) and the Inspector's
+//! `edit::authoring`), the `Graphics.*` registrars (`api`) and the Inspector's
 //! sections (`editor`), so the root's test hands them in ([`problems`], the
 //! authoring layer as an [`Authored`]); this crate's own tests fill the authoring
 //! layer the same way, the other two with the renderer's names, and check the rest.
@@ -26,7 +26,7 @@ use rusty_components::PostProcessingComponent;
 use rusty_core::settings::graphics_options::GraphicsOption;
 
 /// What the authoring layer lists (`scene::authored`), built by
-/// `scene::authoring::rendering::post_processing::authored` and handed in.
+/// `edit::authoring::rendering::post_processing::authored` and handed in.
 pub use rusty_scene::authored::Authored;
 
 /// What one layer of the engine lists, by effect name.

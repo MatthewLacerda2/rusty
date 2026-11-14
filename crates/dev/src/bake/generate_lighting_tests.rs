@@ -7,8 +7,9 @@ use glam::Vec3;
 use super::{generate_lighting, GenerateReport, UNSAVED};
 use crate::bake::progress::{BakeLog, Line};
 use rusty_components::{ColliderComponent, ColliderShape};
-use rusty_scene::authoring::{primitive_mesh_component, Primitive};
-use rusty_scene::{LightingSave, Scene};
+use rusty_edit::authoring::{primitive_mesh_component, Primitive};
+use rusty_edit::LightingSave;
+use rusty_scene::Scene;
 
 /// A saved scene with one static, lightmappable floor and cheap bake settings.
 fn saved_floor(name: &str) -> (Scene, String) {
@@ -27,12 +28,12 @@ fn saved_floor(name: &str) -> (Scene, String) {
     };
     let collider = ColliderComponent {
         shape,
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_edit::authoring::default_collider()
     };
     scene.world.set_collider(floor, Some(collider));
     let s = &mut scene.lighting_settings.lightmaps;
     (s.texels_per_unit, s.samples, s.bounces, s.max_lightmap_size) = (2.0, 4, 1, 32);
-    rusty_scene::save_to_file(&scene, &path).unwrap();
+    rusty_edit::save_to_file(&scene, &path).unwrap();
     (scene, path)
 }
 
@@ -65,7 +66,7 @@ fn gpu_generate_bakes_lightmaps_then_probes_and_writes_the_scene() {
     assert_eq!(report.saved, LightingSave::Written);
 
     let mut back = Scene::new();
-    rusty_scene::load_from_file(&mut back, &path).unwrap();
+    rusty_edit::load_from_file(&mut back, &path).unwrap();
     assert_eq!(back.lightmaps, scene.lightmaps, "no re-save needed");
     assert_eq!(back.probes.probes().len(), scene.probes.probes().len());
     assert_eq!(back.lighting_settings, scene.lighting_settings);
@@ -126,7 +127,7 @@ fn generate_is_refused_in_play() {
         &mut |_| {},
         &mut BakeLog::off(),
     );
-    assert_eq!(refused.unwrap_err(), rusty_scene::LIGHTING_IN_PLAY);
+    assert_eq!(refused.unwrap_err(), rusty_edit::LIGHTING_IN_PLAY);
     assert_eq!(
         std::fs::read(&path).unwrap(),
         before,

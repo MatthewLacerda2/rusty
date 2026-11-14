@@ -36,7 +36,7 @@ fn world_with_level(tag: &str) -> (GameWorld, Rc<RefCell<FrameStats>>, String) {
     let level = paths::to_slash(&dir.join("level.scene"));
     let mut lvl = Scene::new();
     lvl.add_entity("Level".to_string());
-    rusty_scene::save_to_file(&lvl, &level).unwrap();
+    rusty_edit::save_to_file(&lvl, &level).unwrap();
     let mut gw = GameWorld::new(
         Rc::new(RefCell::new(Scene::new())),
         Rc::new(RefCell::new(InputState::new())),

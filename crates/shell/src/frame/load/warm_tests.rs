@@ -4,7 +4,7 @@
 
 use super::worker::Threaded;
 use rusty_app::SceneLoader;
-use rusty_scene::authoring::{primitive_mesh_component, Primitive};
+use rusty_edit::authoring::{primitive_mesh_component, Primitive};
 use rusty_scene::Scene;
 
 /// `<tmp>/rusty_2123_warm_<tag>/level.scene`, holding a box when `boxed`.
@@ -20,7 +20,7 @@ fn level(tag: &str, boxed: bool) -> String {
             .set_mesh(id, primitive_mesh_component(Primitive::Box));
     }
     let path = rusty_core::paths::to_slash(&dir.join("level.scene"));
-    rusty_scene::save_to_file(&scene, &path).unwrap();
+    rusty_edit::save_to_file(&scene, &path).unwrap();
     path
 }
 

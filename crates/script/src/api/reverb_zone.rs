@@ -2,7 +2,7 @@
 //!
 //! Get/Set over an entity's `ReverbZoneComponent` (Unity's `AudioReverbZone`): the
 //! full-effect and fade-out radii, the preset, and the raw params. Every setter
-//! routes through the shared `scene::authoring::audio::reverb_zone` ops the inspector card
+//! routes through the shared `edit::authoring::audio::reverb_zone` ops the inspector card
 //! uses, so picking a preset writes its params and setting params makes the zone
 //! `Custom`. Getters return `nil` without a zone; setters are then an error naming
 //! the entity. The listener's blended result is `Audio.GetReverbState`.
@@ -15,7 +15,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::{ReverbParams, ReverbPreset, ReverbZoneComponent};
-use rusty_scene::authoring::audio::reverb_zone as ops;
+use rusty_edit::authoring::audio::reverb_zone as ops;
 use rusty_scene::Scene;
 
 /// The keys a params table carries.

@@ -122,7 +122,7 @@ impl RenderObject {
 }
 
 /// The names `materials` references, each once: two slots may name one material
-/// (`scene::authoring::material::set_slot` pads with its key), and `RenderScene::set` indexes
+/// (`edit::authoring::material::set_slot` pads with its key), and `RenderScene::set` indexes
 /// each name once.
 fn library_names(materials: Option<&MaterialComponent>) -> Vec<String> {
     let mut names = materials.map_or_else(Vec::new, |m| m.materials.clone());

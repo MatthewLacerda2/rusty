@@ -7,7 +7,7 @@
 
 use crate::gpu::pipelines::surface::cut_depth_tests::{ground_halves, slab_yard};
 use rusty_components::{MaterialAsset, RenderMode, UvMapping};
-use rusty_scene::authoring::material;
+use rusty_edit::authoring::material;
 
 /// `[-X, +X]` ground brightness under the Cutout slab, mapped by `map`.
 fn halves_mapped(name: &str, map: impl Fn(&mut MaterialAsset)) -> Option<[f32; 2]> {

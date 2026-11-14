@@ -28,11 +28,11 @@ fn open_a(tag: &str) -> ([String; 3], GameWorld, EditorUi) {
             .into_owned();
         let mut scene = Scene::new();
         scene.add_entity(name.to_string());
-        rusty_scene::save_to_file(&scene, &path).unwrap();
+        rusty_edit::save_to_file(&scene, &path).unwrap();
         path
     });
     let mut scene = Scene::new();
-    rusty_scene::load_from_file(&mut scene, &paths[0]).unwrap();
+    rusty_edit::load_from_file(&mut scene, &paths[0]).unwrap();
     let game = GameWorld::new(
         Rc::new(RefCell::new(scene)),
         Rc::new(RefCell::new(InputState::new())),
@@ -107,7 +107,7 @@ fn a_scripted_load_is_what_the_editor_saves() {
 #[test]
 fn new_then_save_writes_no_file() {
     let ([a, _, _], game, mut editor) = open_a("new_save");
-    let default = rusty_scene::DEFAULT_SCENE_PATH;
+    let default = rusty_edit::DEFAULT_SCENE_PATH;
     let (a_before, default_before) = (std::fs::read(&a).unwrap(), std::fs::read(default).ok());
     let mut console = ConsoleLogs::new();
     let mut scene = game.scene().borrow_mut();

@@ -2,7 +2,7 @@
 //! so a dependent leaves with what it requires, and the scene is marked unsaved.
 
 use super::remove_component;
-use rusty_scene::authoring::{add_with_requirements, has_kind, ComponentKind};
+use rusty_edit::authoring::{add_with_requirements, has_kind, ComponentKind};
 use rusty_scene::Scene;
 
 #[test]

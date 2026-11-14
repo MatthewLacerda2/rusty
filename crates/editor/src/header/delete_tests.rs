@@ -6,7 +6,7 @@ use egui::{Event, Key, Modifiers, Pos2};
 
 use super::{edit_menu, shortcuts};
 use crate::EditorUi;
-use rusty_scene::authoring::create_entity;
+use rusty_edit::authoring::create_entity;
 use rusty_scene::Scene;
 
 /// An editor over a scene whose selected "Crate" holds a "Lid".

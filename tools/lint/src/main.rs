@@ -53,7 +53,7 @@ fn main() {
 
     // `--parity` runs the editor↔shared-op parity gate (#287): every *migrated*
     // first-class component's inspector card must route its mutations through a
-    // shared `scene::authoring` op (no direct `&mut entity.<field>`).
+    // shared `edit::authoring` op (no direct `&mut entity.<field>`).
     if args.iter().any(|a| a == "--parity") {
         parity::run();
         return;

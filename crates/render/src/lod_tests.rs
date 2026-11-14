@@ -92,7 +92,7 @@ fn the_static_bake_and_inactive_groups() {
 #[test]
 fn an_orthographic_view_uses_the_held_half_height() {
     use rusty_components::{CameraComponent, Projection};
-    use rusty_scene::authoring::rendering::camera::MIN_ORTHO_SIZE;
+    use rusty_scene::rules::lens::MIN_ORTHO_SIZE;
     let (scene, group) = scene_with_group(4.0);
     let ortho = |size| CameraComponent {
         projection: Projection::Orthographic { size },

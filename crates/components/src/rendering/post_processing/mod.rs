@@ -45,7 +45,7 @@ pub use volumetric_fog::VolumetricFog;
 
 /// A post-processing volume. Every field defaults when a file leaves it out, so a
 /// scene names only what it sets, each effect to its own default (the Add Component
-/// menu's, `scene::authoring::default_post_processing`).
+/// menu's, `edit::authoring::default_post_processing`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PostProcessingComponent {

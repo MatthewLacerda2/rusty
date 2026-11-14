@@ -108,7 +108,7 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
             out.set("occlusionObjects", report.occlusion.objects)?;
             out.set("occlusionBytes", report.occlusion.bytes)?;
             out.set("occlusionNeverCulled", report.occlusion.never_culled)?;
-            out.set("saved", report.saved == rusty_scene::LightingSave::Written)?;
+            out.set("saved", report.saved == rusty_edit::LightingSave::Written)?;
             Ok(out)
         }),
     )?;

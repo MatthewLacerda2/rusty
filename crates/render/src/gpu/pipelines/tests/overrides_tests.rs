@@ -6,7 +6,7 @@
 
 use super::{clear_params, halves, set_param, sphere, Flash, RES};
 use crate::{RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// A lit scene of `n` spheres in a row sharing one material named `shader`.

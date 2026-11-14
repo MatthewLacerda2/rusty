@@ -23,7 +23,7 @@ fn boxes(asset: &str) -> (Scene, [u32; 3]) {
             shape: ColliderShape::Box { size: Vec3::ONE },
             material: PhysicsMaterial::new(0.25, 0.0),
             material_asset: (i < 2).then(|| asset.to_string()),
-            ..rusty_scene::authoring::default_collider()
+            ..rusty_scene::create::default_collider()
         };
         scene.world.set_collider(*id, Some(collider));
     }

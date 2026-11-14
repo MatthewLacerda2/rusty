@@ -61,7 +61,7 @@ fn body(kinematic: bool) -> RigidBodyComponent {
     RigidBodyComponent {
         is_kinematic: kinematic,
         use_gravity: false,
-        ..rusty::scene::authoring::default_rigidbody()
+        ..rusty::edit::authoring::default_rigidbody()
     }
 }
 

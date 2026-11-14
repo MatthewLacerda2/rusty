@@ -20,12 +20,12 @@ fn frame_on_body(yaw: f32, axis: Vec3) -> Quat {
     scene.world.transform_mut(id).unwrap().rotation = Quat::from_rotation_y(yaw);
     let collider = ColliderComponent {
         shape: ColliderShape::Box { size: Vec3::ONE },
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_scene::create::default_collider()
     };
     scene.world.set_collider(id, Some(collider));
     let rb = RigidBodyComponent {
         is_kinematic: false,
-        ..rusty_scene::authoring::defaults::default_rigidbody()
+        ..rusty_scene::create::defaults::default_rigidbody()
     };
     scene.world.set_rigidbody(id, Some(rb));
     let joint = JointComponent {

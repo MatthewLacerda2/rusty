@@ -9,12 +9,12 @@
 use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use crate::inspector::components::card::component_card;
 use rusty_components::NavMeshModifierComponent as Modifier;
+use rusty_edit::authoring::nav::object_modifier as ops;
 use rusty_navigation::{MAX_AREAS, NOT_WALKABLE_AREA};
-use rusty_scene::authoring::nav::object_modifier as ops;
 
 /// Route one edit through the shared ops and mark the scene dirty.
 fn write(

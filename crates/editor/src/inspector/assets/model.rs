@@ -83,7 +83,7 @@ fn draw_scale_factor(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene
         .inner;
     if r.drag_stopped() || (r.changed() && !r.dragged()) {
         ui.data_mut(|d| d.remove::<f32>(held));
-        let set = rusty_scene::asset_instance::set_model_scale_factor(scene, path, scale);
+        let set = rusty_edit::asset_instance::set_model_scale_factor(scene, path, scale);
         editor.is_dirty |= set.is_ok_and(|n| n > 0);
     } else if r.dragged() {
         ui.data_mut(|d| d.insert_temp(held, scale));
@@ -118,7 +118,7 @@ fn draw_lightmap_uvs(ui: &mut egui::Ui, scene: &mut Scene, path: &str) {
         knob(ui, "Pack Margin:", &mut s.pack_margin, 64.0);
     }
     if commit {
-        let _ = rusty_scene::asset_instance::set_lightmap_uv_settings(scene, path, s);
+        let _ = rusty_edit::asset_instance::set_lightmap_uv_settings(scene, path, s);
     } else if s != stored {
         let _ = rusty_asset::sidecar::set_lightmap_uvs(source, s);
     }
@@ -260,7 +260,7 @@ fn instantiate(editor: &mut EditorUi, scene: &mut Scene, path: &str) {
         Ok(a) => a,
         Err(_) => return,
     };
-    let root = rusty_scene::authoring::instantiate_model(scene, path, &asset, glam::Vec3::ZERO);
+    let root = rusty_edit::authoring::instantiate_model(scene, path, &asset, glam::Vec3::ZERO);
     editor.is_dirty = true;
     editor.selected_entity_id = Some(root);
     editor.selected_asset_path = None;

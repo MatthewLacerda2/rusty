@@ -26,7 +26,7 @@ fn scene_with_wall(response: CollisionResponse) -> (Scene, u32) {
             shape: ColliderShape::Box {
                 size: Vec3::new(1.0, 4.0, 4.0),
             },
-            ..rusty::scene::authoring::default_collider()
+            ..rusty::edit::authoring::default_collider()
         }),
     );
 

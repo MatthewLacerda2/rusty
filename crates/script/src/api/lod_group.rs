@@ -2,7 +2,7 @@
 //!
 //! Get/Set over an entity's `LodGroupComponent`: its size, its levels' screen
 //! heights and renderer lists, and adding/removing levels. Every setter routes
-//! through the shared `scene::authoring::rendering::lod_group` ops the inspector card uses.
+//! through the shared `edit::authoring::rendering::lod_group` ops the inspector card uses.
 //! Levels are indexed from **0** (`LOD0` is the finest), matching the `_LOD0`
 //! naming. Getters return a neutral default (`0`, `nil`, an empty table) without an
 //! LODGroup or for an out-of-range level; setters are then no-ops. Which level is
@@ -17,7 +17,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::LodGroupComponent;
-use rusty_scene::authoring::rendering::lod_group as ops;
+use rusty_edit::authoring::rendering::lod_group as ops;
 use rusty_scene::Scene;
 
 /// Register the `LODGroup` namespace onto `lua`.

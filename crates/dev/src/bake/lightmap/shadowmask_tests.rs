@@ -9,8 +9,8 @@ use glam::Vec3;
 use super::tests::{quick, scene, scene_path};
 use super::*;
 use rusty_components::{LightComponent, LightMode, LightType};
+use rusty_edit::authoring::default_light;
 use rusty_lighting::lightmap::BakeScene;
-use rusty_scene::authoring::default_light;
 use rusty_scene::lighting::MixedLightingMode;
 
 /// `count` shadowed `Mixed` lamps over the floor, all overlapping.

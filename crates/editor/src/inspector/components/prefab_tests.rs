@@ -1,15 +1,13 @@
 //! Tests for the editor prefab-instance override card's logic layer (#263): the
 //! deferred-action dispatch and root resolution. The egui `draw` is left to manual
 //! verification; what matters for correctness is that the buttons map onto the exact
-//! same `scene::authoring` verbs the `Scene.*` API uses — proven here by driving
+//! same `edit::authoring` verbs the `Scene.*` API uses — proven here by driving
 //! `dispatch` and comparing against the verbs directly.
 
 use super::*;
-use rusty_scene::authoring::{create_entity, Primitive};
-use rusty_scene::{
-    list_instance_overrides, load_and_instantiate_linked, save_prefab, MaterialAsset,
-    MaterialComponent, Scene,
-};
+use rusty_edit::authoring::{create_entity, Primitive};
+use rusty_edit::{list_instance_overrides, load_and_instantiate_linked, save_prefab};
+use rusty_scene::{MaterialAsset, MaterialComponent, Scene};
 
 /// Author a 2-entity prefab (Box root + Sphere child) to a unique temp `.prefab`.
 fn write_prefab(tag: &str) -> String {
@@ -62,7 +60,7 @@ fn an_edit_is_listed_as_an_override_without_recording() {
     assert!(list_instance_overrides(&scene, root).unwrap().is_empty());
     scene.world.transform_mut(child).unwrap().position.x = 5.0;
     // What the card lists is the live diff: the edit shows the moment it is made.
-    let paths = rusty_scene::prefab::live::entity_overrides(&scene.world, child).keys();
+    let paths = rusty_edit::prefab::live::entity_overrides(&scene.world, child).keys();
     assert_eq!(paths, ["/transform/position/0"]);
 }
 

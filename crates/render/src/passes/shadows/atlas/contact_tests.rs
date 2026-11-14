@@ -6,7 +6,7 @@
 use glam::{Quat, Vec3};
 
 use crate::passes::shadows::contact_tests::{brightness, looking, RES};
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
 /// A dark scene: the floor (top at y = 0), a unit box resting on it at the origin,

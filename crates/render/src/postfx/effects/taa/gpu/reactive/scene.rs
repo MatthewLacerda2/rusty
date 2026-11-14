@@ -9,7 +9,7 @@ use rusty_components::{
     MaterialAsset, MaterialComponent, RefractionModel, RenderMode, TaaReactive,
 };
 use rusty_core::settings::render_scale::RenderScale;
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// The view is the fixture's this many times on a side (256×192), so the ball

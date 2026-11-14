@@ -7,7 +7,7 @@ use glam::Vec3;
 
 use super::RenderView;
 use crate::OFFSCREEN_FORMAT;
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Camera;
 use rusty_scene::{MeshComponent, Scene};
 

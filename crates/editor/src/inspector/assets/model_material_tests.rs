@@ -3,11 +3,12 @@
 //! library entry (#203), a `SceneData` round-trip, and the engine-default fallback
 //! for a material-less glTF (#214). The per-sub-object spawn now routes through the
 //! shared `authoring::instantiate_asset` verb (#182); its unit-level dedup test
-//! lives alongside that verb in `scene::asset_instance`.
+//! lives alongside that verb in `edit::asset_instance`.
 
 use super::instantiate;
 use crate::EditorUi;
-use rusty_scene::{apply_scene_data, to_scene_data, Scene};
+use rusty_edit::{apply_scene_data, to_scene_data};
+use rusty_scene::Scene;
 
 /// A glTF with TWO meshes that both reference material 0 — proves sub-objects sharing
 /// one glTF material share ONE library key (dedup). One embedded buffer holds three

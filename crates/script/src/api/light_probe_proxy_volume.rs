@@ -3,7 +3,7 @@
 //! Get/Set over an entity's `LightProbeProxyVolumeComponent` (Unity's
 //! `LightProbeProxyVolume`): the bounding box mode and custom box, the resolution
 //! mode with its density or per-axis counts, and the quality. Every setter routes
-//! through the shared `scene::authoring::rendering::light_probe_proxy_volume` ops
+//! through the shared `edit::authoring::rendering::light_probe_proxy_volume` ops
 //! the inspector card uses. Without a volume a getter returns `nil` (zeros for a
 //! vector or a resolution), and a setter is an error naming the entity. Attach one with
 //! `Scene.AddComponent(id, "LightProbeProxyVolume")`.
@@ -19,7 +19,7 @@ use crate::api::ApiCell;
 use rusty_components::{
     LightProbeProxyVolumeComponent as Volume, ProxyBoundsMode, ProxyQuality, ProxyResolutionMode,
 };
-use rusty_scene::authoring::rendering::light_probe_proxy_volume as ops;
+use rusty_edit::authoring::rendering::light_probe_proxy_volume as ops;
 use rusty_scene::Scene;
 
 const NS: &str = "LightProbeProxyVolume";

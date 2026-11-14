@@ -6,8 +6,8 @@ use std::rc::Rc;
 use glam::Vec3;
 use mlua::Lua;
 use rusty::components::NavMeshAgentComponent;
+use rusty::edit::authoring::nav::agent as nav_ops;
 use rusty::navigation::NavigationGraph;
-use rusty::scene::authoring::nav::agent as nav_ops;
 use rusty::scene::Scene;
 use rusty::script::api::bind;
 

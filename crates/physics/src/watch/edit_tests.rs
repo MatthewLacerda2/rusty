@@ -10,7 +10,7 @@ use rusty_components::{
     RigidBodyComponent,
 };
 use rusty_ecs::World;
-use rusty_scene::authoring::defaults::{default_collider, default_rigidbody};
+use rusty_scene::create::defaults::{default_collider, default_rigidbody};
 
 #[derive(Clone, Debug)]
 pub enum Phys {

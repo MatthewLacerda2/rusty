@@ -10,10 +10,10 @@ use std::path::Path;
 use mlua::{Lua, Table, Value};
 
 use crate::api::lua_json::to_lua;
+use rusty_edit::authoring::material::{project_graphs, read_graph};
 use rusty_procgen::graph::ParamDecl;
 use rusty_procgen::recipe::{Lit, OpInfo, OpParam, OPS};
 use rusty_procgen::TextureRecipe;
-use rusty_scene::authoring::material::{project_graphs, read_graph};
 
 /// `{ {op, category, min_inputs, max_inputs, params = { {name, type, default, required, socket, values?} } }, … }`.
 /// `socket` says whether the param takes a link to another node as well as a

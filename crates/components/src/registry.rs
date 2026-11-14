@@ -10,8 +10,8 @@
 //! - the accessor family on `World` and the hecs bundle in and out (`ecs::access`,
 //!   `ecs::bundle`), and the change channels (`ecs::changes::channel`);
 //! - `ComponentKind`, its name parsing, and the dependency verbs' dispatch
-//!   (`scene::authoring::components`, `scene::authoring::dependency::dispatch`);
-//! - `Component.*`'s `KINDS` table (`scene::authoring::fields::kinds`);
+//!   (`edit::authoring::components`, `edit::authoring::dependency::dispatch`);
+//! - `Component.*`'s `KINDS` table (`edit::authoring::fields::kinds`);
 //! - the snapshot's inventory and fields (`api::snapshot`);
 //! - the Add Component menu (`editor::inspector::components::add`).
 //!
@@ -26,7 +26,7 @@
 //!    (or an arm in `dispatch.rs`'s `added!` naming another default).
 //! 2. Its row below. The compiler then asks for the three traits the generated
 //!    lists need, each pointing at this file: `Inspect` (an `inspect!` row in
-//!    `scene::authoring::fields::kinds::<area>`), `Snapshot` (a `snapshot!` row in
+//!    `edit::authoring::fields::kinds::<area>`), `Snapshot` (a `snapshot!` row in
 //!    `api::snapshot::<area>`) and `AddEntry` (beside its inspector card).
 //! 3. Its inspector card and API namespace, which the component gate
 //!    (`tools/lint -- --components`) asks for; its `docs/api/` page; and the

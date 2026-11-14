@@ -3,7 +3,7 @@
 
 use super::super::{knob, knob_row, toggle, Section, LENS_EFFECTS};
 use rusty_components::Vignette;
-use rusty_scene::authoring::rendering::post_processing::lens::vignette;
+use rusty_edit::authoring::rendering::post_processing::lens::vignette;
 use rusty_scene::PostProcessingComponent;
 
 pub(in super::super) const SECTION: Section = Section {

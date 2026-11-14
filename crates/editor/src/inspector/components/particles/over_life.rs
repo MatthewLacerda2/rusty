@@ -4,7 +4,7 @@
 use super::widgets::{clamped, curve_editor, gradient_editor};
 use super::{apply, Cx};
 use rusty_components::{ParticleEmitterComponent, SubEmitTrigger};
-use rusty_scene::authoring::particles as particle_ops;
+use rusty_edit::authoring::particles as particle_ops;
 
 /// Size / drag / rotation-speed curves and the colour gradient.
 pub(super) fn draw(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {

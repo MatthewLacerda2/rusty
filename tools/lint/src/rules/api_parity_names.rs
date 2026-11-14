@@ -9,7 +9,7 @@ use crate::modules::{crate_module, module_path};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Every op `source` names outside its test lines, `root` being the path its
-/// file spells `scene::authoring` by ([`root_of`]).
+/// file spells `edit::authoring` by ([`root_of`]).
 pub fn ops_named(source: &str, test: &[bool], root: &str) -> BTreeSet<Op> {
     let code = code_lines(source);
     let live: Vec<&str> = (0..code.len())
@@ -90,9 +90,9 @@ pub fn local_ops_named(source: &str, test: &[bool], module: &str) -> BTreeSet<Op
         .collect()
 }
 
-/// How the file at `path` spells `scene::authoring`, by the crate it is in:
-/// `crate::authoring` inside `rusty-scene`, `rusty_scene::authoring` in another
-/// member crate, `crate::scene::authoring` ([`ROOT`]) in the root package, which
+/// How the file at `path` spells `edit::authoring`, by the crate it is in:
+/// `crate::authoring` inside `rusty-edit`, `rusty_edit::authoring` in another
+/// member crate, `crate::edit::authoring` ([`ROOT`]) in the root package, which
 /// re-exports the crate under its old name.
 pub fn root_of(path: &str) -> &'static str {
     let module = module_path(path);
@@ -100,8 +100,8 @@ pub fn root_of(path: &str) -> &'static str {
         .strip_prefix("src/")
         .and_then(|p| p.split('/').next());
     match (crate_module(path).is_some(), module) {
-        (true, Some("scene")) => "crate::authoring",
-        (true, _) => "rusty_scene::authoring",
+        (true, Some("edit")) => "crate::authoring",
+        (true, _) => "rusty_edit::authoring",
         (false, _) => ROOT,
     }
 }
@@ -114,9 +114,9 @@ pub(super) fn join(a: &str, b: &str) -> String {
     }
 }
 
-/// Each name a `use` of `scene::authoring` binds, to its path under `authoring`
+/// Each name a `use` of `edit::authoring` binds, to its path under `authoring`
 /// (`""` for `authoring` itself, `rigidbody::set_mass` for a setter by name). Read
-/// from each `use` starting where `root` does (`use crate::…`, `use rusty_scene::…`).
+/// from each `use` starting where `root` does (`use crate::…`, `use rusty_edit::…`).
 fn aliases(text: &str, root: &str) -> BTreeMap<String, String> {
     let mut out = BTreeMap::new();
     let first = root.split("::").next().unwrap_or(root);

@@ -2,7 +2,7 @@
 
 use super::super::{knob, knob_row, Section, COLOR_CORRECTION};
 use rusty_components::WhiteBalance;
-use rusty_scene::authoring::rendering::post_processing::grading::white_balance;
+use rusty_edit::authoring::rendering::post_processing::grading::white_balance;
 use rusty_scene::PostProcessingComponent;
 
 pub(in super::super) const SECTION: Section = Section {

@@ -13,7 +13,7 @@ const DT: f32 = 1.0 / 60.0;
 fn collider(shape: ColliderShape) -> ColliderComponent {
     ColliderComponent {
         shape,
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_scene::create::default_collider()
     }
 }
 
@@ -39,7 +39,7 @@ fn sphere_over_floor() -> (Scene, u32, u32) {
         ball,
         Some(RigidBodyComponent {
             is_kinematic: false,
-            ..rusty_scene::authoring::defaults::default_rigidbody()
+            ..rusty_scene::create::defaults::default_rigidbody()
         }),
     );
     (scene, floor, ball)

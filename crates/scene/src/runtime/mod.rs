@@ -8,7 +8,7 @@
 //!   loads         — the pending load and `Scene.LoadAsync`'s operations (#2123)
 //!
 //! The swap itself and the file-only half of a load it takes are the edit side's
-//! (`edit_side::load`): the swap applies the document through the authoring holds.
+//! (`rusty_edit::load`): the swap applies the document through the authoring holds.
 //!
 //! The script-side teardown (`OnDisable`/`OnDestroy`) lives in `scripting`; the
 //! systems that sequence both live in `app::play`.

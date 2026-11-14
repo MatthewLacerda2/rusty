@@ -19,7 +19,7 @@ fn add_box(scene: &mut Scene, pos: Vec3, trigger: bool) -> u32 {
             size: Vec3::splat(2.0),
         },
         is_trigger: trigger,
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_scene::create::default_collider()
     };
     scene.world.set_collider(id, Some(collider));
     id

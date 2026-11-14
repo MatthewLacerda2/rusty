@@ -5,7 +5,7 @@ use glam::Vec3;
 
 use super::fixture::{block, fog, glow, renderer, room, settled};
 use rusty_components::{LightComponent, LightMode, LightType};
-use rusty_scene::authoring::default_light;
+use rusty_scene::create::default_light;
 
 #[test]
 fn gpu_a_shadowed_spot_casts_a_shaft_with_a_dark_side() {

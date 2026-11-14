@@ -20,7 +20,7 @@ use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use crate::scripting::ConsoleLogs;
 use rusty_components::{LightMode, LightType};
-use rusty_scene::authoring::rendering::light as light_ops;
+use rusty_edit::authoring::rendering::light as light_ops;
 use rusty_scene::Scene;
 
 /// Register the `Light` namespace onto `lua`.

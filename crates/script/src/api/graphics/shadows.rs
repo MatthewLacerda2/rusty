@@ -6,7 +6,7 @@ use super::super::{put, Reg};
 use super::state::{with_vc, with_vc_mut};
 use crate::api::ApiCell;
 use rusty_components::ShadowSettings;
-use rusty_scene::authoring::rendering::post_processing as vc_ops;
+use rusty_edit::authoring::rendering::post_processing as vc_ops;
 use rusty_scene::Scene;
 
 /// Cascade count and shadow distance. The getters report the engine defaults when

@@ -7,7 +7,7 @@ use glam::Vec3;
 use rusty::components::{DetailLayer, MaterialAsset, MaterialComponent, UvMapping};
 use rusty::dev::capture::CaptureHost;
 use rusty::dev::screenshot::capture_into;
-use rusty::scene::authoring::{create_entity, Primitive};
+use rusty::edit::authoring::{create_entity, Primitive};
 use rusty::scene::{Camera, Scene};
 
 /// An 8² detail map at a fresh path `name`: every texel `texel`, or seeded noise

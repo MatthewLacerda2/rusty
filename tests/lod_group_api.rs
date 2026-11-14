@@ -9,7 +9,7 @@ use std::rc::Rc;
 use crate::lua::eval;
 use mlua::Lua;
 use rusty::components::{Entity, LodGroupComponent, LodLevel};
-use rusty::scene::authoring::{add_component, ComponentKind};
+use rusty::edit::authoring::{add_component, ComponentKind};
 use rusty::scene::Scene;
 use rusty::script::api::bind;
 
@@ -82,9 +82,9 @@ fn an_lod_group_survives_save_and_load() {
         .join(format!("rusty_lod_{}.json", std::process::id()))
         .to_string_lossy()
         .into_owned();
-    rusty::scene::save_to_file(&scene, &path).unwrap();
+    rusty::edit::save_to_file(&scene, &path).unwrap();
     let mut loaded = Scene::new();
-    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
+    rusty::edit::load_from_file(&mut loaded, &path).unwrap();
     let _ = std::fs::remove_file(&path);
     assert_eq!(loaded.world.lod_group(group).map(|g| g.clone()), Some(lod));
 }

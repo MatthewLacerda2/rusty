@@ -4,7 +4,7 @@
 use glam::Vec3;
 
 use super::*;
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::skeleton::rig::armature_owner;
 
 #[test]

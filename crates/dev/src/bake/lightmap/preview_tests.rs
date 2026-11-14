@@ -70,7 +70,7 @@ fn a_preview_is_shown_but_never_saved_and_a_cancel_puts_the_lightmaps_back() {
     );
     assert!(scene.lightmaps.get(floor).is_some());
     assert_eq!(*scene.lightmaps.saved(), before);
-    let saved = rusty_scene::to_scene_data(&scene).lightmaps;
+    let saved = rusty_edit::to_scene_data(&scene).lightmaps;
     assert_eq!(saved, before, "a save writes the scene's own lightmaps");
     job.cancel();
     assert_eq!(run(&mut job, &mut scene).0, BakeOutcome::Cancelled);

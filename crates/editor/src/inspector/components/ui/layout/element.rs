@@ -1,17 +1,17 @@
 //! The Layout Element inspector card (#421): ignore-layout, the min / preferred /
 //! flexible size overrides (each axis toggled on to override the content's
 //! size) and the content fitter per axis. Widgets edit a snapshot; every write
-//! routes through `scene::authoring::ui::layout::element`.
+//! routes through `edit::authoring::ui::layout::element`.
 
 use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use crate::inspector::components::card::component_card;
 use crate::inspector::components::ui::combo;
 use rusty_components::{LayoutAxisFit, LayoutElementComponent};
-use rusty_scene::authoring::ui::layout::element::{self as ops, SizeKind};
+use rusty_edit::authoring::ui::layout::element::{self as ops, SizeKind};
 
 /// Layout Element card. A THIN client (#287): widgets edit a snapshot and the
 /// changed snapshot is written back through the shared ops; remove detaches.

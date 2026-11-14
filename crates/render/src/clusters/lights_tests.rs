@@ -22,7 +22,7 @@ fn a_parented_spotlight_lights_from_its_world_pose() {
     scene.world.transform_mut(lamp).unwrap().position = Vec3::new(0.0, 0.0, -2.0);
     let light = LightComponent {
         light_type: LightType::Spotlight,
-        ..rusty_scene::authoring::default_light()
+        ..rusty_scene::create::default_light()
     };
     scene.world.set_light(lamp, Some(light));
     let lights = local_lights(&scene, false);
@@ -41,7 +41,7 @@ fn a_bake_capture_takes_no_shadow_fade() {
     let light = LightComponent {
         light_type: LightType::Point,
         shadow_fade_distance: 20.0,
-        ..rusty_scene::authoring::default_light()
+        ..rusty_scene::create::default_light()
     };
     scene.world.set_light(lamp, Some(light));
     let fade = |capture| local_lights(&scene, capture)[0].0.shadow_fade;
@@ -56,7 +56,7 @@ fn an_area_light_stands_in_as_its_own_one_frustum_kind() {
     use super::lights::{LocalLight, KIND_AREA};
     let light = LightComponent {
         light_type: LightType::Area,
-        ..rusty_scene::authoring::default_light()
+        ..rusty_scene::create::default_light()
     };
     let l = LocalLight::new(Vec3::ZERO, Vec3::NEG_Z, &light).expect("a local light");
     assert_eq!(l.kind, KIND_AREA);
@@ -71,7 +71,7 @@ fn an_area_light_stands_in_as_its_own_one_frustum_kind() {
     );
     let point = LightComponent {
         light_type: LightType::Point,
-        ..rusty_scene::authoring::default_light()
+        ..rusty_scene::create::default_light()
     };
     let p = LocalLight::new(Vec3::ZERO, Vec3::NEG_Z, &point).unwrap();
     assert!(!p.one_frustum() && p.near == 0.0);

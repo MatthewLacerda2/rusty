@@ -2,13 +2,13 @@
 
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use super::draw_style;
 use crate::inspector::components::card::component_card;
 use crate::inspector::components::particles::widgets::vec3;
 use rusty_components::LineComponent;
-use rusty_scene::authoring::ribbon::line as line_ops;
+use rusty_edit::authoring::ribbon::line as line_ops;
 
 /// Route one edit through the shared ops and mark the scene dirty.
 fn write(

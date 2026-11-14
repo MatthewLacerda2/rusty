@@ -12,7 +12,7 @@
 //! reported to the console and the current scene keeps running.
 //!
 //! The load runs in two stages (#2123): [`prepare`] reads everything it can from the
-//! files alone into a `PreparedScene` (`scene::edit_side::load::prepare`), then [`activate`]
+//! files alone into a `PreparedScene` (`edit::load::prepare`), then [`activate`]
 //! swaps it in. Each step runs under the installed `LoadProbe`, which times it. A
 //! `Scene.Load` runs both here, at once; a `Scene.LoadAsync` operation was prepared
 //! by the host's loader (`background`) and only activates here, on the first tick
@@ -31,8 +31,8 @@ pub use background::{
 pub mod project_fixture;
 pub use boot::{load_boot_scene, ProjectSource};
 
+use rusty_edit::load::prepare::{PreparedScene, SceneSidecars};
 use rusty_physics::PhysicsWorld;
-use rusty_scene::edit_side::load::prepare::{PreparedScene, SceneSidecars};
 use rusty_scene::runtime::loads::{Due, LoadStatus};
 use rusty_scene::serialize::RehydratedScene;
 
@@ -120,7 +120,7 @@ fn activate_ready(
     Some(loaded)
 }
 
-/// The load's first stage, from the files alone (`scene::edit_side::load::prepare`): read
+/// The load's first stage, from the files alone (`edit::load::prepare`): read
 /// and parse the document, rebuild its meshes, read its sidecars. Fails, before
 /// anything of the current scene is touched, on a file that cannot be read or parsed.
 fn prepare(path: String, probe: &mut Option<Box<dyn LoadProbe>>) -> Result<PreparedScene, String> {
@@ -156,11 +156,7 @@ fn activate(
         stop_voices(world, res, &outgoing);
     });
     let swapped = timed(probe, "swap", || {
-        rusty_scene::edit_side::load::swap_in_prepared(
-            &mut (world.scene.borrow_mut()),
-            prepared,
-            &survivors,
-        )
+        rusty_edit::load::swap_in_prepared(&mut (world.scene.borrow_mut()), prepared, &survivors)
     });
     if let Err(err) = swapped {
         res.console.borrow_mut().error(format!("Scene.Load: {err}"));

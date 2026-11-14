@@ -8,8 +8,8 @@ use super::super::state::{with_vc, with_vc_mut};
 use crate::api::ApiCell;
 use rusty_components::PostProcessingComponent;
 use rusty_core::settings::quality::EffectQuality;
-use rusty_scene::authoring::default_post_processing;
-use rusty_scene::authoring::rendering::post_processing::Knob;
+use rusty_edit::authoring::default_post_processing;
+use rusty_edit::authoring::rendering::post_processing::Knob;
 use rusty_scene::Scene;
 
 /// Register `Set<api>(value)` / `Get<api>()` for each of `knobs` that names an

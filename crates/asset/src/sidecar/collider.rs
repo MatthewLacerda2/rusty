@@ -6,7 +6,7 @@
 //! same file is its collision mesh (`"Chair": { "kind": "TriMesh", "mesh":
 //! "Chair_col" }`), Unity's `MeshCollider.sharedMesh` pointed at a low-poly copy.
 //! The collision sub-object is imported for its geometry and never drawn: a whole
-//! model spawns no entity for it (`scene::model_instance`). Its vertices are read in
+//! model spawns no entity for it (`edit::model_instance`). Its vertices are read in
 //! the render sub-object's local space, so it shares that object's origin, as a
 //! Blender duplicate with a Decimate modifier does.
 

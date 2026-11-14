@@ -3,7 +3,7 @@
 //! A glTF file places its meshes with *nodes*: each node has a local transform,
 //! a parent and, optionally, a mesh. Instantiating a whole model rebuilds that
 //! tree as GameObjects, one per node (Unity's model prefab,
-//! `scene::model_instance`), so a building kit keeps its layout and every pivot
+//! `edit::model_instance`), so a building kit keeps its layout and every pivot
 //! survives. The tree is plain data on the [`ImportedAsset`], where an import
 //! cache can hold it (#857).
 

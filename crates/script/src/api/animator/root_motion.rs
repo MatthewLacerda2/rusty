@@ -15,7 +15,7 @@ use mlua::IntoLuaMulti;
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
-use rusty_scene::authoring::animator as animator_ops;
+use rusty_edit::authoring::animator as animator_ops;
 use rusty_scene::Scene;
 
 /// Register the root-motion verbs onto the `Animator` table.

@@ -17,7 +17,7 @@ fn hosted(tag: &str, saved: bool) -> Session {
         let dir = rusty_test_support::temp::dir().join(format!("generate_async_{tag}"));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("level.scene").to_string_lossy().into_owned();
-        rusty_scene::save_to_file(&s.world().scene().borrow(), &path).unwrap();
+        rusty_edit::save_to_file(&s.world().scene().borrow(), &path).unwrap();
         *s.world().script_manager().scene_path_cell().borrow_mut() = Some(path);
     }
     s
@@ -45,7 +45,7 @@ fn play_is_refused() {
     let s = hosted("play", true);
     s.world().scene().borrow_mut().set_playing(true);
     let err = s.eval("Lighting.GenerateAsync()").unwrap_err();
-    assert!(err.contains(rusty_scene::LIGHTING_IN_PLAY), "{err}");
+    assert!(err.contains(rusty_edit::LIGHTING_IN_PLAY), "{err}");
 }
 
 #[test]
@@ -78,8 +78,8 @@ fn a_load_drops_a_request_and_the_status_says_why() {
     s.eval("Lighting.GenerateAsync()").unwrap();
     let other = rusty_test_support::temp::dir().join("generate_async_other.scene");
     let other = other.to_string_lossy().into_owned();
-    rusty_scene::save_to_file(&rusty_scene::Scene::new(), &other).unwrap();
-    rusty_scene::load_from_file(&mut s.world().scene().borrow_mut(), &other).unwrap();
+    rusty_edit::save_to_file(&rusty_scene::Scene::new(), &other).unwrap();
+    rusty_edit::load_from_file(&mut s.world().scene().borrow_mut(), &other).unwrap();
     assert_eq!(s.eval("Lighting.IsRunning()").unwrap(), "false");
     let state = s.eval("return Lighting.GetBakeStatus().state").unwrap();
     assert!(state.contains("refused"), "{state}");
@@ -95,12 +95,12 @@ fn play_requested_but_not_taken_is_refused() {
     let err = s
         .eval("Editor.EnterPlay(); Lighting.GenerateAsync()")
         .unwrap_err();
-    assert!(err.contains(rusty_scene::LIGHTING_IN_PLAY), "{err}");
+    assert!(err.contains(rusty_edit::LIGHTING_IN_PLAY), "{err}");
     let host = hosted("host_play", true);
     let app = &host.world().resources.application;
     app.borrow_mut().set_host_play(true);
     let err = host.eval("Lighting.GenerateAsync()").unwrap_err();
-    assert!(err.contains(rusty_scene::LIGHTING_IN_PLAY), "{err}");
+    assert!(err.contains(rusty_edit::LIGHTING_IN_PLAY), "{err}");
 }
 
 /// `Scene.New()` (File ▸ New's path) drops a request and says why, as a load does.

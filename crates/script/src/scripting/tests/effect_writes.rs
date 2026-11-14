@@ -8,7 +8,7 @@ use super::timers::{counted, rig, tick};
 fn volume_rig(name: &str) -> (crate::scripting::manager::ScriptManager, u32) {
     let (mut m, id) = rig(name, &counted(""));
     let mut scene = m.cells.scene.borrow_mut();
-    let vc = rusty_scene::authoring::default_post_processing();
+    let vc = rusty_edit::authoring::default_post_processing();
     scene.world.set_post_processing(id, Some(vc));
     scene.world.set_camera(id, Some(Default::default()));
     drop(scene);

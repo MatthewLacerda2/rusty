@@ -3,7 +3,7 @@
 //! Get/Set over an entity's `BackdropFilterComponent`: the frosted-glass blur
 //! radius, tint, saturation and brightness. Whether one exists is
 //! `Scene.AddComponent(id, "BackdropFilter")` / `RemoveComponent`. Setters route
-//! through the shared `scene::authoring::ui::backdrop` ops the inspector card uses;
+//! through the shared `edit::authoring::ui::backdrop` ops the inspector card uses;
 //! getters return the defaults without one, and setters are then no-ops.
 
 use glam::Vec4;
@@ -13,7 +13,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::BackdropFilterComponent;
-use rusty_scene::authoring::ui::backdrop as ops;
+use rusty_edit::authoring::ui::backdrop as ops;
 use rusty_scene::Scene;
 
 type Get = fn(&BackdropFilterComponent) -> f32;

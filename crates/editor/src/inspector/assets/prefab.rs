@@ -1,7 +1,7 @@
 //! crates/editor/src/inspector/assets/prefab.rs — `.prefab` asset inspector (#215).
 //!
 //! Mirrors the model inspector: a metadata card plus an "Instantiate into Scene"
-//! button. Instantiate routes through the shared `scene::prefab` verbs (load +
+//! button. Instantiate routes through the shared `edit::prefab` verbs (load +
 //! `instantiate_prefab`), so it stamps an independent copy with fresh deterministic
 //! ids exactly like `Scene.Instantiate` does for a script.
 
@@ -60,16 +60,16 @@ fn draw_metadata(ui: &mut egui::Ui, path: &str) {
 /// Read the prefab document and report its `(entity_count, material_count)`, or
 /// `None` if it cannot be read/parsed.
 fn counts(path: &str) -> Option<(usize, usize)> {
-    // lint: allow(stored-format) reads the prefab document, whose format `scene::prefab` owns
+    // lint: allow(stored-format) reads the prefab document, whose format `edit::prefab` owns
     let json = fs::read_to_string(path).ok()?;
-    let prefab: rusty_scene::PrefabData = serde_json::from_str(&json).ok()?;
+    let prefab: rusty_edit::PrefabData = serde_json::from_str(&json).ok()?;
     Some((prefab.entities.len(), prefab.materials.len()))
 }
 
 /// Load + instantiate the prefab into the scene root, select the new root, and mark
 /// the editor dirty — the same effect as the model inspector's instantiate.
 fn instantiate(editor: &mut EditorUi, scene: &mut Scene, path: &str) {
-    if let Ok(root_id) = rusty_scene::load_and_instantiate(scene, path, None) {
+    if let Ok(root_id) = rusty_edit::load_and_instantiate(scene, path, None) {
         editor.is_dirty = true;
         editor.selected_entity_id = Some(root_id);
         editor.selected_asset_path = None;

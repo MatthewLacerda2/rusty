@@ -11,12 +11,12 @@ fn box_collider(size: Vec3, is_trigger: bool) -> ColliderComponent {
     ColliderComponent {
         shape: ColliderShape::Box { size },
         is_trigger,
-        ..rusty::scene::authoring::default_collider()
+        ..rusty::edit::authoring::default_collider()
     }
 }
 
 fn dynamic_body() -> RigidBodyComponent {
-    rusty::scene::authoring::default_rigidbody()
+    rusty::edit::authoring::default_rigidbody()
 }
 
 fn pos_of(scene: &Scene, id: u32) -> Vec3 {

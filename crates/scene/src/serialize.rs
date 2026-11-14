@@ -7,7 +7,7 @@
 //! human-readable, diffable and small, and never holds a box gone stale.
 //!
 //! The conversion between a live `Scene` and this document (`to_scene_data`, the
-//! `apply_*` functions) is the edit side's, `edit_side::serialize`: it runs the
+//! `apply_*` functions) is the edit side's, `rusty_edit::serialize`: it runs the
 //! authoring holds and prefab propagation.
 //!
 //! stored-format: the scene document (`SceneData`), its serde shape and defaults

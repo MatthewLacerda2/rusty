@@ -7,14 +7,14 @@ fn named(src: &str) -> Vec<String> {
 
 #[test]
 fn resolves_aliases_trees_and_table_paths() {
-    let src = "use crate::scene::authoring::{character_controller as cc, collider};\n\
-               use crate::scene::authoring::nav::{agent, obstacle as ob};\n\
-               use crate::scene::authoring::text::{self as ops, FontSlot};\n\
-               use crate::scene::{authoring, Scene};\n\
+    let src = "use crate::edit::authoring::{character_controller as cc, collider};\n\
+               use crate::edit::authoring::nav::{agent, obstacle as ob};\n\
+               use crate::edit::authoring::text::{self as ops, FontSlot};\n\
+               use crate::{edit::authoring, scene::Scene};\n\
                fn f() {\n    cc::set_height(c, 1.0);\n    op!(\"is_trigger\", collider::set_trigger),\n    \
                agent::set_speed(a, 2.0); ob::set_carve(o, true);\n    ops::set_font(t, s);\n    \
                authoring::rigidbody::set_mass(r, 5.0);\n    \
-               crate::scene::authoring::camera::set_fov(c, 60.0);\n    other::set_x(1);\n}\n";
+               crate::edit::authoring::camera::set_fov(c, 60.0);\n    other::set_x(1);\n}\n";
     assert_eq!(
         named(src),
         [
@@ -31,7 +31,7 @@ fn resolves_aliases_trees_and_table_paths() {
 
 #[test]
 fn skips_test_lines_and_comments() {
-    let src = "use crate::scene::authoring::rigidbody as rb;\n// rb::set_mass(r, 1.0)\nrb::set_kinematic(r, true);\n";
+    let src = "use crate::edit::authoring::rigidbody as rb;\n// rb::set_mass(r, 1.0)\nrb::set_kinematic(r, true);\n";
     assert_eq!(named(src), ["rigidbody::set_kinematic"]);
     assert!(ops_named(src, &[false, false, true], ROOT).is_empty());
 }
@@ -40,7 +40,7 @@ fn set(ops: &[&str]) -> BTreeSet<String> {
     ops.iter().map(|s| s.to_string()).collect()
 }
 
-const RB: &str = "src/scene/authoring/rigidbody.rs";
+const RB: &str = "src/edit/authoring/rigidbody.rs";
 
 fn findings(editor: &[&str], api: &[&str], src: &str) -> Vec<(usize, bool)> {
     let authoring = BTreeMap::from([(RB.to_string(), src)]);
@@ -78,29 +78,29 @@ fn flags_a_stale_allow() {
     );
 }
 
-/// Its files under `crates/scene/src/`, as the crate holds them.
+/// Its files under `crates/edit/src/`, as the crate holds them.
 #[test]
 fn finds_an_op_reexported_from_a_folder_file() {
     let fx = BTreeMap::from([
         (
-            "crates/scene/src/authoring/particles/mod.rs".to_string(),
+            "crates/edit/src/authoring/particles/mod.rs".to_string(),
             "pub use render::*;\n",
         ),
         (
-            "crates/scene/src/authoring/particles/render.rs".to_string(),
+            "crates/edit/src/authoring/particles/render.rs".to_string(),
             "\npub fn set_blend() {}\n",
         ),
     ]);
     let f = check(&set(&["particles::set_blend"]), &set(&[]), &fx);
     assert_eq!(
         (f[0].path.as_str(), f[0].line),
-        ("crates/scene/src/authoring/particles/render.rs", 2)
+        ("crates/edit/src/authoring/particles/render.rs", 2)
     );
 }
 
 #[test]
 fn counts_a_setter_imported_by_name_and_called_bare() {
-    let src = "use crate::scene::authoring::rigidbody::{set_mass, set_kinematic as kin};\n\
+    let src = "use crate::edit::authoring::rigidbody::{set_mass, set_kinematic as kin};\n\
                fn f() { set_mass(r, 1.0); kin(r, true); }\n";
     assert_eq!(
         named(src),
@@ -112,11 +112,11 @@ fn counts_a_setter_imported_by_name_and_called_bare() {
 fn an_allow_in_a_reexported_file_excuses_its_op_and_can_go_stale() {
     let fx = BTreeMap::from([
         (
-            "src/scene/authoring/particles/mod.rs".to_string(),
+            "src/edit/authoring/particles/mod.rs".to_string(),
             "pub use render::*;\n",
         ),
         (
-            "src/scene/authoring/particles/render.rs".to_string(),
+            "src/edit/authoring/particles/render.rs".to_string(),
             "// lint: allow(api-parity) a preview toggle\npub fn set_blend() {}\n",
         ),
     ]);
@@ -142,7 +142,7 @@ fn an_op_with_no_definition_says_so() {
     let f = check(&set(&["ghost::set_x"]), &set(&[]), &BTreeMap::new());
     assert!(f[0].message.contains("not found"), "{}", f[0].message);
     // It names the folder where the authoring files lie, not their module path.
-    let moved = BTreeMap::from([("crates/scene/src/authoring/a.rs".to_string(), "")]);
+    let moved = BTreeMap::from([("crates/edit/src/authoring/a.rs".to_string(), "")]);
     let f = check(&set(&["ghost::set_x"]), &set(&[]), &moved);
-    assert_eq!(f[0].path, "crates/scene/src/authoring/");
+    assert_eq!(f[0].path, "crates/edit/src/authoring/");
 }

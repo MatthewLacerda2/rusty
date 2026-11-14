@@ -5,7 +5,7 @@
 //! the SDF effects (outline, shadow, glow) and the blend mode (#425) — plus two reads of the CPU layout:
 //! `GetPreferredSize` (what the text wants, for layout) and `GetLayout` (what it
 //! drew: size, lines, the auto-sized font size, whether it was cut). Every setter
-//! routes through the shared `scene::authoring::ui::text` ops the inspector card uses.
+//! routes through the shared `edit::authoring::ui::text` ops the inspector card uses.
 //! Getters return a neutral default when the entity has no Text; setters are then
 //! no-ops. Enum values travel as their names (case-insensitive; unknown ignored).
 
@@ -18,7 +18,7 @@ use crate::api::ApiCell;
 use rusty_components::TextComponent;
 use rusty_components::{TextAlignment, TextOverflow};
 use rusty_core::settings::video::VideoSettings;
-use rusty_scene::authoring::ui::text::{self as ops, FontSlot};
+use rusty_edit::authoring::ui::text::{self as ops, FontSlot};
 use rusty_scene::Scene;
 use rusty_ui::ScreenSize;
 

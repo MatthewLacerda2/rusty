@@ -281,7 +281,7 @@ mod refused_tests;
 
 impl crate::Scene {
     /// What this world last read or wrote at each bake sidecar's path: what a save
-    /// keeps, read by `dev::bake`'s tests (the field itself is written only here).
+    /// keeps, read by `dev::bake`'s tests and taken by `rusty_edit`'s snapshot.
     pub fn bake_files(&self) -> &BakeFiles {
         &self.bake_files
     }
@@ -290,5 +290,11 @@ impl crate::Scene {
     /// what the old one saw is no record of this one.
     pub fn forget_bake_files(&mut self) {
         self.bake_files = Default::default();
+    }
+
+    /// Put back what [`Self::bake_files`] held when an edit-mode snapshot was taken:
+    /// Stop restores the record with the rest of the edit scene.
+    pub fn restore_bake_files(&mut self, files: BakeFiles) {
+        self.bake_files = files;
     }
 }

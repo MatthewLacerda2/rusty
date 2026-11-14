@@ -33,8 +33,8 @@ use super::{global_table, put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::CollisionDetection;
+use rusty_edit::authoring::physics::rigidbody as rb_ops;
 use rusty_physics::PhysicsWorld;
-use rusty_scene::authoring::physics::rigidbody as rb_ops;
 use rusty_scene::Scene;
 use rusty_time::FIXED_DELTA_TIME;
 

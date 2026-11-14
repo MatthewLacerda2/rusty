@@ -10,7 +10,7 @@ use glam::Vec3;
 use super::fixture::{frame, fresh, held, yard, RES};
 use crate::RenderCounters;
 use rusty_components::RenderMode;
-use rusty_scene::snapshot::SceneSnapshot;
+use rusty_edit::snapshot::SceneSnapshot;
 
 fn extracted(c: &RenderCounters) -> (u32, u32) {
     (c.render_extracted, c.render_posed)

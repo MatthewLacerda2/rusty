@@ -13,7 +13,7 @@ use glam::{Quat, Vec3};
 use rusty::components::{LightComponent, MaterialAsset, MaterialComponent};
 use rusty::dev::capture::CaptureHost;
 use rusty::dev::screenshot::capture_into;
-use rusty::scene::authoring::{create_entity, Primitive};
+use rusty::edit::authoring::{create_entity, Primitive};
 use rusty::scene::{Camera, Scene};
 
 const SIZE: u32 = 96;
@@ -64,7 +64,7 @@ fn scene(degrees: f32, normal_map: &std::path::Path) -> Scene {
         intensity: 20.0,
         range: 20.0,
         cast_shadows: false,
-        ..rusty::scene::authoring::default_light()
+        ..rusty::edit::authoring::default_light()
     };
     scene.world.set_light(lamp, Some(light));
     scene

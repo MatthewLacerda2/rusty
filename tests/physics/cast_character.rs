@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use rusty::components::{CharacterControllerComponent, ColliderComponent};
-use rusty::scene::authoring::default_collider;
+use rusty::edit::authoring::default_collider;
 use rusty::scene::Scene;
 
 use crate::play::{playing, run};

@@ -17,7 +17,7 @@ use rusty::dev::bake::lightmap::bake_scene_lightmaps;
 use rusty::dev::bake::progress::BakeLog;
 use rusty::dev::bake::reflection::bake_scene_reflections;
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::{primitive_mesh_component, Primitive};
+use rusty::edit::authoring::{primitive_mesh_component, Primitive};
 use rusty::scene::lighting::settings::BakeSettings;
 use rusty::scene::{Camera, Scene};
 
@@ -57,7 +57,7 @@ fn scene(name: &str, normalised: bool) -> Scene {
         intensity: 20.0,
         range: 6.0,
         mode: LightMode::Baked,
-        ..rusty::scene::authoring::default_light()
+        ..rusty::edit::authoring::default_light()
     };
     scene.world.set_light(lamp, Some(light));
     scene.world.transform_mut(lamp).unwrap().position = Vec3::new(0.0, 1.5, 0.0);

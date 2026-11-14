@@ -140,7 +140,7 @@ pub fn advance_sim(game: &mut GameWorld, mut step: Step<'_>, raw: f32) -> PlayTr
 
 /// Whether the tick that just ran swapped the scene `before` names (a play-mode
 /// `Scene.Load` landed at its tail): the World's runtime identity changed
-/// (`edit_side::load::swap_in` renews it). Such a tick ends its frame's ticks and restarts the
+/// (`rusty_edit::load::swap_in` renews it). Such a tick ends its frame's ticks and restarts the
 /// clock ([`Step::clear`]): the ticks still owed would run the new scene before any
 /// frame drew it, the next frame's time holds the load itself, and no pose of the
 /// outgoing scene is blended into the new one's first frames.

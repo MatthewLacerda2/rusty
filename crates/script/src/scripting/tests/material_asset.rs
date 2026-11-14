@@ -8,8 +8,8 @@ use std::collections::BTreeMap;
 use super::collider::manager_with_collider;
 use super::lifecycle::write_script;
 use crate::test_temp::lua_path as asset;
+use rusty_edit::authoring::defaults::default_collider;
 use rusty_physics::{CollisionEvents, CollisionPair, Contact, PhysicsEvents};
-use rusty_scene::authoring::defaults::default_collider;
 
 #[test]
 fn an_asset_is_created_named_and_retuned_from_lua() {

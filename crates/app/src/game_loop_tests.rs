@@ -35,7 +35,7 @@ fn runtime_spawned_prefab_scripts_run_from_the_next_tick() {
             path: enemy_lua.to_string(),
             ..Default::default()
         }];
-        rusty_scene::save_prefab(&authoring, id, prefab).unwrap();
+        rusty_edit::save_prefab(&authoring, id, prefab).unwrap();
     }
 
     // The live scene: a spawner whose first Update instantiates that prefab.

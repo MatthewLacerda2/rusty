@@ -7,7 +7,7 @@ use super::widgets::{clamped, combo, range_row, vec3};
 use super::{apply, Cx};
 use rusty_components::{EmitFrom, EmitShape, ParticleEmitterComponent};
 use rusty_core::curve::ColorRange;
-use rusty_scene::authoring::particles as particle_ops;
+use rusty_edit::authoring::particles as particle_ops;
 
 /// Emission shape: kind, volume/surface, and the kind's size knobs.
 pub(super) fn draw_shape(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {

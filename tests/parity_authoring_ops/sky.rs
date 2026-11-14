@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
-use rusty::scene::authoring::environment as env_ops;
+use rusty::edit::authoring::environment as env_ops;
 use rusty::scene::Scene;
 use rusty::script::api::bind;
 

@@ -3,8 +3,8 @@
 
 use glam::Vec3;
 use rusty::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
+use rusty::edit::authoring::{default_collider, default_rigidbody};
 use rusty::physics::PhysicsWorld;
-use rusty::scene::authoring::{default_collider, default_rigidbody};
 use rusty::scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;

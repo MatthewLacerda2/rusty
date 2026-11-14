@@ -49,7 +49,7 @@ pub(super) fn add_box(scene: &mut Scene, at: Vec3, size: Vec3) -> u32 {
     scene.world.set_static(id, true);
     let collider = ColliderComponent {
         shape: ColliderShape::Box { size },
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_edit::authoring::default_collider()
     };
     scene.world.set_collider(id, Some(collider));
     id

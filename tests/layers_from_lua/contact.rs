@@ -19,13 +19,13 @@ fn body(scene: &mut Scene, pos: Vec3, size: Vec3, dynamic: bool) -> u32 {
     scene.world.transform_mut(id).unwrap().position = pos;
     let collider = ColliderComponent {
         shape: ColliderShape::Box { size },
-        ..rusty::scene::authoring::default_collider()
+        ..rusty::edit::authoring::default_collider()
     };
     scene.world.set_collider(id, Some(collider));
     if dynamic {
         let rb = RigidBodyComponent {
             is_kinematic: false,
-            ..rusty::scene::authoring::defaults::default_rigidbody()
+            ..rusty::edit::authoring::defaults::default_rigidbody()
         };
         scene.world.set_rigidbody(id, Some(rb));
     } else {

@@ -5,8 +5,8 @@
 use std::collections::BTreeSet;
 
 use glam::Vec3;
+use rusty::edit::default_scene::layout::{DECK_TOP, POOL_FLOOR};
 use rusty::navigation::NavigationGraph;
-use rusty::scene::default_scene::layout::{DECK_TOP, POOL_FLOOR};
 
 use super::steering::{assert_stopped, chase_with};
 use super::{

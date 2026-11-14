@@ -2,7 +2,7 @@
 
 The structural-authoring surface: the API equivalent of the editor's GameObject
 menu (create), the Hierarchy's Destroy and the inspector's parenting + Add
-Component menu. Every verb routes through the shared `scene::authoring` module, so
+Component menu. Every verb routes through the shared `edit::authoring` module, so
 it behaves identically to the editor and uses the same default values.
 
 | Function | Signature | Returns |

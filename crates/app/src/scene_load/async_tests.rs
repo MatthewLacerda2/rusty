@@ -18,7 +18,7 @@ fn scenes(tag: &str) -> (String, String) {
         let path = paths::to_slash(&dir.join(format!("{}.scene", name.to_lowercase())));
         let mut scene = Scene::new();
         scene.add_entity(name.into());
-        rusty_scene::save_to_file(&scene, &path).unwrap();
+        rusty_edit::save_to_file(&scene, &path).unwrap();
         path
     };
     (write("Start"), write("Next"))

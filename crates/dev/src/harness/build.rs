@@ -27,21 +27,21 @@ impl Harness {
     /// absent on the first run and present afterwards, breaking byte-determinism.
     pub fn new(out_dir: impl AsRef<Path>, bot_script: &str) -> Self {
         let workspace = Self::workspace_of(&out_dir);
-        let samples = fixture_project().join(rusty_scene::DEFAULT_SCRIPTS_DEST_DIR);
-        rusty_scene::seed_workspace(&workspace, Some(&samples));
+        let samples = fixture_project().join(rusty_edit::DEFAULT_SCRIPTS_DEST_DIR);
+        rusty_edit::seed_workspace(&workspace, Some(&samples));
         // The default scene's texture and shader, seeded into the working directory
         // when missing (the shader also re-baked when stale, #1638); only
         // screenshots read them.
-        rusty_scene::default_scene::seed_default_assets();
+        rusty_edit::default_scene::seed_default_assets();
         let mut scene = Scene::new();
-        rusty_scene::default_scene::build(&mut scene, bot_script);
+        rusty_edit::default_scene::build(&mut scene, bot_script);
         Self::in_workspace(out_dir, scene, workspace)
     }
 
     /// A harness on the open project (`core::project`, the working directory),
     /// playing the scene at `scene_path` — what an agent play-testing its game wants
     /// (the `play` binary passes the project's startup scene, #1343). The project is
-    /// seeded first (`scene::seed_project`: the bundled scripts, the default scene
+    /// seeded first (`edit::seed_project`: the bundled scripts, the default scene
     /// through the seed manifest, the audio refresh), as the editor's open and
     /// `make export` do (the standalone player, which runs an export, boots
     /// read-only, #1653), so a fresh project's startup scene exists.
@@ -56,11 +56,11 @@ impl Harness {
         scene_path: &str,
         settings: ProjectSettings,
     ) -> Result<Self, String> {
-        rusty_scene::print_refresh(&rusty_scene::seed_project());
+        rusty_edit::print_refresh(&rusty_edit::seed_project());
         rusty_scene::io::read_scene_file(scene_path)?;
         let mut scene = Scene::new();
         // The document parsed just above, so what fails here is the sidecar.
-        let sidecar = rusty_scene::load_from_file(&mut scene, scene_path);
+        let sidecar = rusty_edit::load_from_file(&mut scene, scene_path);
         let harness = Self::in_workspace(out_dir, scene, PathBuf::new());
         if let Err(err) = sidecar {
             let line = format!("Failed to load scene {scene_path}: {err}");

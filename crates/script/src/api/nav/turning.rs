@@ -10,7 +10,7 @@ use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::NavMeshAgentComponent;
-use rusty_scene::authoring::nav::agent as nav_ops;
+use rusty_edit::authoring::nav::agent as nav_ops;
 use rusty_scene::Scene;
 
 /// The turning getters and setters on `NavMeshAgent`.

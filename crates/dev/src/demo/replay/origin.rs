@@ -12,8 +12,8 @@
 
 use rusty_app::GameWorld;
 use rusty_core::input::InputState;
+use rusty_edit::SceneSnapshot;
 use rusty_navigation::NavigationGraph;
-use rusty_scene::SceneSnapshot;
 
 /// A world's scene as it stood, to put back.
 pub struct Origin {

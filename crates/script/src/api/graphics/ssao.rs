@@ -8,7 +8,7 @@ use super::effects::knobs::{register_count, register_quality};
 use super::state::{with_vc, with_vc_mut};
 use crate::api::ApiCell;
 use rusty_components::SsaoSettings;
-use rusty_scene::authoring::rendering::post_processing as vc_ops;
+use rusty_edit::authoring::rendering::post_processing as vc_ops;
 use rusty_scene::Scene;
 
 /// Active flag, radius and intensity. AO lives on the volume, so without an active

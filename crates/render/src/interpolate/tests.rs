@@ -5,7 +5,7 @@ use glam::Vec3;
 
 use super::*;
 use rusty_components::CameraComponent;
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 
 fn scene_with_box() -> (Scene, u32) {
     let mut scene = Scene::new();

@@ -8,14 +8,14 @@
 //! `Instantiate(prefabPath, ...)` is **linked by default** (the Unity default: an
 //! instance that tracks its source). The v1 unpacked copy is the explicit special
 //! case `InstantiateUnpacked(prefabPath, ...)`. Every verb routes through
-//! `scene::authoring`, so the API and the editor never drift.
+//! `edit::authoring`, so the API and the editor never drift.
 
 use std::cell::RefCell;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
-use rusty_scene::authoring;
+use rusty_edit::authoring;
 use rusty_scene::Scene;
 
 /// Register every prefab/asset verb onto the (already-created) `Scene` `table`.
@@ -33,7 +33,7 @@ fn register_save_and_spawn(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<
         lua.create_function(move |lua, (root_id, path): (EntityArg, String)| {
             scene.with(lua, |scene| {
                 let root_id = root_id.live("Scene", "SavePrefab")?;
-                rusty_scene::save_prefab(&scene.borrow(), root_id, &path)
+                rusty_edit::save_prefab(&scene.borrow(), root_id, &path)
                     .map(|()| path)
                     .map_err(mlua::Error::RuntimeError)
             })
@@ -71,12 +71,12 @@ fn instantiate(
     linked: bool,
 ) -> mlua::Result<u32> {
     let mut s = scene.borrow_mut();
-    if rusty_scene::is_prefab_path(path) {
+    if rusty_edit::is_prefab_path(path) {
         let parent = prefab_parent(rest)?;
         let spawn = if linked {
-            rusty_scene::load_and_instantiate_linked
+            rusty_edit::load_and_instantiate_linked
         } else {
-            rusty_scene::load_and_instantiate
+            rusty_edit::load_and_instantiate
         };
         spawn(&mut s, path, parent).map_err(mlua::Error::RuntimeError)
     } else {

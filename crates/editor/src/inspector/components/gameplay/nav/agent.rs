@@ -8,11 +8,11 @@ use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
 use glam::Vec3;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use super::super::physics::vec3_row;
 use crate::inspector::components::card::component_card;
-use rusty_scene::authoring::nav::agent as nav_ops;
+use rusty_edit::authoring::nav::agent as nav_ops;
 
 /// A shared `authoring::nav::agent` scalar setter, one per clamped drag row.
 type NavOp = fn(&mut rusty_components::NavMeshAgentComponent, f32);

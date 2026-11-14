@@ -6,7 +6,7 @@
 use glam::{Quat, Vec2, Vec3};
 
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
 pub(super) const RES: u32 = 192;

@@ -68,7 +68,7 @@ fn ssr_fades_in_over_at_most_a_fifth_and_is_whole_by_point_nine() {
 /// no SSR, so the view builds no pyramid for a pass that would discard every pixel.
 #[test]
 fn a_minimum_smoothness_nothing_reaches_runs_no_ssr() {
-    let mut vc = rusty_scene::authoring::default_post_processing();
+    let mut vc = rusty_scene::create::default_post_processing();
     let runs = |vc: &rusty_components::PostProcessingComponent| {
         let post = PostSource {
             volume: Some(vc),

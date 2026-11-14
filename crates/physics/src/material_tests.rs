@@ -19,7 +19,7 @@ fn collider(shape: ColliderShape, material: PhysicsMaterial) -> ColliderComponen
     ColliderComponent {
         shape,
         material,
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_scene::create::default_collider()
     }
 }
 
@@ -48,7 +48,7 @@ fn floor_and_body(
         body,
         Some(RigidBodyComponent {
             is_kinematic: false,
-            ..rusty_scene::authoring::defaults::default_rigidbody()
+            ..rusty_scene::create::defaults::default_rigidbody()
         }),
     );
     (scene, body)

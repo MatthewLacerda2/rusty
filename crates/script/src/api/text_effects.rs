@@ -11,7 +11,7 @@ use super::text::Effect;
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
-use rusty_scene::authoring::ui::text as ops;
+use rusty_edit::authoring::ui::text as ops;
 use rusty_scene::Scene;
 
 /// `Get<suffix>(id)` / `Set<suffix>(id, …)` for every effect row.

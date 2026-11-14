@@ -57,7 +57,7 @@ pub struct Recorder {
 fn is_saved(world: &GameWorld) -> Option<bool> {
     let path = world.script_manager().scene_path_cell().borrow().clone()?;
     let scene = world.scene();
-    Some(!rusty_scene::has_unsaved_edits(&scene.borrow(), &path))
+    Some(!rusty_edit::has_unsaved_edits(&scene.borrow(), &path))
 }
 
 /// `file` locked for as long as it is open, so no pruning deletes it meanwhile
