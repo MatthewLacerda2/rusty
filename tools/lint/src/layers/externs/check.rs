@@ -34,6 +34,7 @@ fn accounted(layers: &[Layer], policy: &Policy, deps: &[String], out: &mut Vec<S
     let named = named.chain(policy.common.iter().copied());
     let named = named.chain(policy.unscoped.iter().map(|&(u, _)| u));
     let named = named.chain(policy.confined.iter().map(|c| c.krate));
+    let named = named.chain(policy.display.iter().copied());
     for k in named {
         if !deps.iter().any(|d| d == k) {
             out.push(format!(
