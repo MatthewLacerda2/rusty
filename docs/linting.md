@@ -864,7 +864,7 @@ it through a shared op, never to grandfather.
 The 50-line per-function cap is a **hard clippy gate** (`too_many_lines = "deny"` in
 `Cargo.toml`'s `[workspace.lints.clippy]`, both feature sets) and is **on for the whole crate**
 — the legacy functions that predated it were split (#124). The one remaining
-exception is `Renderer::assemble` in `src/render/setup/mod.rs`
+exception is `Renderer::assemble` in `crates/render/src/setup/mod.rs`
 (`#[expect(clippy::too_many_lines, reason = …)]`), a flat one-line-per-field
 constructor whose length is the struct's width. If a function grows past 50 lines,
 split it: `make determinism` fails (`ESCAPE`) on any other `allow`/`expect` of

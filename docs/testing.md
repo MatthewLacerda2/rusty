@@ -551,7 +551,7 @@ unbounded parallel renderers exhausted memory and failed *unrelated* tests with 
 - **nextest (the gate):** every test is its own process, so nothing in-process can see
   its neighbours. The `gpu` **test group** in `.config/nextest.toml` (`max-threads = 2`)
   bounds how many GPU tests run at once.
-- **`cargo test`:** `MAX_CONCURRENT_HEADLESS` in `src/render/setup/budget.rs` bounds
+- **`cargo test`:** `MAX_CONCURRENT_HEADLESS` in `crates/render/src/setup/budget.rs` bounds
   how many renderers are alive in the one process, enforced by an RAII permit the
   renderer holds for its whole life. It applies to the normal library build, not just
   `cfg(test)`, because the screenshot integration tests reach the renderer indirectly

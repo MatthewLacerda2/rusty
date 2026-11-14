@@ -94,7 +94,7 @@ fn with_ssil_share(c: vec4<f32>) -> vec4<f32> {
 // The mip level of the lightmap pages that `uv` reads (#1694): the larger screen
 // footprint of one pixel, in page texels, as a GPU's own implicit LOD picks it. The
 // derivatives are taken here, so call it before any per-pixel branch
-// (src/render/CLAUDE.md); the sample itself then reads with `textureSampleLevel`,
+// (crates/render/src/CLAUDE.md); the sample itself then reads with `textureSampleLevel`,
 // which is safe in the per-instance branch that follows.
 fn lightmap_level(uv: vec2<f32>) -> f32 {
     let edge = f32(textureDimensions(t_lightmaps).x);

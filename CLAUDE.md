@@ -39,7 +39,7 @@ not authoring tooling that calls an external service.
 - **auxmd.md** *(gitignored)* — the operator's scratchpad; read it if pointed there.
 - **Nested CLAUDE.md files** carry one area's rules and load only when you read files
   there: `.github/scripts/CLAUDE.md` (merge and batch tooling), `tools/lint/CLAUDE.md`,
-  `src/render/CLAUDE.md` (with `engine/shaders/`) and `crates/procgen/src/CLAUDE.md`.
+  `crates/render/src/CLAUDE.md` (with `engine/shaders/`) and `crates/procgen/src/CLAUDE.md`.
 
 **Three skills carry the working protocols**: `issue-batch` (issues from board to
 merged: coders, worktrees, briefs, filing a bug), `ci-merge` (the gates, CI, the merge
