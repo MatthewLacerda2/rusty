@@ -21,12 +21,17 @@ An exported environment variable wins over `.env`. The file only fills gaps, so
 a key exported in your shell is the one used. When no key is found, the refusal
 names the variable and every place that was checked.
 
-Only the binaries you spend from read a key: the editor (built with `dev`),
-`session` and `session-mcp`. Every other process sees none and is refused, saying
-it reads no provider keys: `play`, `game`, `export`, every test, and any binary a
-test starts (the tests start them with `RUSTY_NO_PROVIDER_KEYS` set, which turns
-the keys off even in those three). The `read-keys` lint keeps the list to those
-three, and fails if one of them stops reading keys.
+Only the binaries you spend from read a key: the editor (`rusty`, built with
+`dev`), `session` and `session-mcp`. Every other process sees none. `play` and
+`game` run headless, so a provider verb there is refused as a headless run before
+any key is looked for; `export`, every test, and any binary a test starts are
+refused saying the process reads no provider keys. A test starts a binary with
+`RUSTY_NO_PROVIDER_KEYS` set, which turns the keys off even in those three, and
+under nextest (`make test`, CI) every process it runs holds no key either. The
+`read-keys` lint is the primary guard: it fails a call to `read_keys` anywhere but
+those three (another binary needs an inline allow with a reason), and fails if one
+of them stops reading keys. Nextest's own variable is the backstop, for a spawn the
+lint's text match cannot see.
 
 ## The budget
 

@@ -3,6 +3,8 @@
 
 use std::fmt;
 
+use super::credentials::{KEY_READERS, NO_KEYS_VAR};
+
 /// A provider call refused before it spent anything.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Refusal {
@@ -13,7 +15,7 @@ pub enum Refusal {
     Headless,
     /// This process reads no provider keys (`credentials::read_keys`): it is not
     /// one of the binaries an author spends from, or it was started with
-    /// `RUSTY_NO_PROVIDER_KEYS` set. The fix is to run the verb from one that is.
+    /// `RUSTY_NO_PROVIDER_KEYS` set or under nextest. The fix is to run the verb from one that is.
     KeysNotRead { provider: &'static str },
     /// No key in the environment or the `.env`.
     MissingKey {
@@ -48,13 +50,9 @@ impl fmt::Display for Refusal {
                 "provider calls are refused in a headless run (a scenario or a bench): \
                  generation is authoring, and a test never calls a vendor"
             ),
-            Self::KeysNotRead { provider } => write!(
-                f,
-                "no key for {provider}: this process does not read provider keys. Only \
-                 the editor (`rusty`, built with `dev`), `session` and `session-mcp` \
-                 do, and not when RUSTY_NO_PROVIDER_KEYS is set: run the verb from one \
-                 of them"
-            ),
+            Self::KeysNotRead { provider } => {
+                write!(f, "no key for {provider}: {}", keys_not_read())
+            }
             Self::MissingKey {
                 provider,
                 variable,
@@ -83,3 +81,19 @@ impl fmt::Display for Refusal {
 }
 
 impl std::error::Error for Refusal {}
+
+/// Why [`Refusal::KeysNotRead`] found no key, naming the binaries that read one
+/// ([`KEY_READERS`], as "`a`, `b` and `c`").
+pub(super) fn keys_not_read() -> String {
+    let named: Vec<String> = KEY_READERS.iter().map(|b| format!("`{b}`")).collect();
+    let readers = match named.split_last() {
+        Some((last, [])) => last.clone(),
+        Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+        None => "no binary".to_owned(),
+    };
+    format!(
+        "this process does not read provider keys. Only {readers} do (`rusty` is the \
+         editor, built with `dev`), and not when {NO_KEYS_VAR} is set or under a test \
+         runner: run the verb from one of them"
+    )
+}

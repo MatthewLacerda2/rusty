@@ -9,7 +9,9 @@ mod catalogue;
 use std::cell::RefCell;
 
 use scorsese_providers::api::http::HttpError;
+use scorsese_providers::voices::VoiceError;
 
+use super::super::credentials::without_keys;
 use super::super::voices::*;
 use super::*;
 
@@ -105,6 +107,18 @@ fn no_key_and_a_cold_cache_says_where_it_looked_and_calls_nothing() {
     .unwrap_err()
     .to_string();
     assert!(said.contains("ELEVENLABS_API_KEY"), "{said}");
+}
+
+#[test]
+fn a_process_that_reads_no_keys_is_a_credential_error_not_a_vendor_one() {
+    let blanked = without_keys([(Provider::ElevenLabs.variable().to_owned(), KEY.to_owned())]);
+    let err = Account {
+        environment: &blanked,
+    }
+    .builtin()
+    .unwrap_err();
+    assert!(matches!(err, VoiceError::Credential(_)), "{err:?}");
+    assert!(err.to_string().contains("session-mcp"), "{err}");
 }
 
 #[test]

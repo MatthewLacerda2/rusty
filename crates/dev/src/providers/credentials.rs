@@ -15,7 +15,10 @@
 //! refused instead of spending, on a machine that has a real key as much as on CI.
 //! A process started with [`NO_KEYS_VAR`] set is blanked even when it opted in: every
 //! test spawns an engine binary through one helper that sets it (`tests/spawn.rs`,
-//! held by the `engine-spawn` lint), so the runner is never what keeps a key out.
+//! held by the `engine-spawn` lint). That lint is the primary guard. The backstop is
+//! [`NEXTEST_VAR`], which nextest sets in every test process and every child inherits:
+//! a spawn the text match cannot see (`Command::new` on a built path, `cargo run
+//! --bin`, `assert_cmd`) still holds no key under the runner CI and `make test` use.
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -28,6 +31,14 @@ use super::Refusal;
 /// it opted in with [`read_keys`]. A blanked [`environment`] carries it too, which
 /// is how [`resolve`] tells "this process reads no keys" from "no key was set".
 pub const NO_KEYS_VAR: &str = "RUSTY_NO_PROVIDER_KEYS";
+
+/// Set by cargo-nextest in every test process it runs, and so inherited by every
+/// binary a test starts: a process that sees it holds no key ([`keys_blanked`]).
+pub const NEXTEST_VAR: &str = "NEXTEST";
+
+/// The `[[bin]]` names of the binaries that call [`read_keys`], in the order the
+/// `read-keys` lint's `MUST_CALL` lists them (the lint holds the two equal, on one line).
+pub const KEY_READERS: &[&str] = &["rusty", "session", "session-mcp"];
 
 /// The process environment, plus the `.env` at the project root (the working
 /// directory, #829) or the nearest one above it; in a process that reads no keys
@@ -51,17 +62,19 @@ pub fn read_keys() {
 }
 
 /// Whether [`environment`] hands out no keys in this process (#974): it never
-/// opted in with [`read_keys`], or it was started with [`NO_KEYS_VAR`] set.
+/// opted in with [`read_keys`], it was started with [`NO_KEYS_VAR`] set, or it runs
+/// under nextest ([`NEXTEST_VAR`]).
 pub fn keys_blanked() -> bool {
     blanked(
         KEYS_READ.load(Ordering::Relaxed),
         std::env::var_os(NO_KEYS_VAR).is_some(),
+        std::env::var_os(NEXTEST_VAR).is_some(),
     )
 }
 
-/// [`keys_blanked`] as a pure function of its two inputs, so both are testable.
-pub(super) fn blanked(opted_in: bool, told_not_to: bool) -> bool {
-    !opted_in || told_not_to
+/// [`keys_blanked`] as a pure function of its three inputs, so each is testable.
+pub(super) fn blanked(opted_in: bool, told_not_to: bool, under_nextest: bool) -> bool {
+    !opted_in || told_not_to || under_nextest
 }
 
 /// `vars` minus every provider key (anything named `*_API_KEY`), no `.env`, and
@@ -83,13 +96,16 @@ pub(super) fn is_key(name: &str) -> bool {
 /// in a process that reads no keys, that it does not).
 ///
 /// A pure function of the value, so the order is testable without touching the
-/// process environment (global state shared with every test thread).
+/// process environment (global state shared with every test thread). The marker is
+/// read as [`keys_blanked`] reads it, from the process environment only: a blanked
+/// [`environment`] never reads a `.env`, so one that did cannot carry the marker,
+/// and a `.env` line setting it is ignored, as it is by [`keys_blanked`].
 pub fn resolve(provider: Provider, environment: &Environment) -> Result<Secret, Refusal> {
     let variable = provider.variable();
     if let Some(key) = environment.get(variable) {
         return Ok(Secret::new(key));
     }
-    if environment.get(NO_KEYS_VAR).is_some() {
+    if environment.dotenv().is_none() && environment.get(NO_KEYS_VAR).is_some() {
         return Err(Refusal::KeysNotRead {
             provider: provider.label(),
         });

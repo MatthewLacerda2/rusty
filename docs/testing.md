@@ -393,7 +393,10 @@ the binary opted in at startup (`dev::providers::read_keys`, which only the edit
 binary only through `tests/spawn.rs` (`crate::spawn::engine_bin!("session")`), which
 sets `RUSTY_NO_PROVIDER_KEYS`, so a spawned binary holds no key either, under nextest
 or a bare `cargo test` alike; the `engine-spawn` lint fails a `CARGO_BIN_EXE_` named
-anywhere else. Doctests stay on `cargo test --doc`, which nextest
+anywhere else. That lint is the primary guard; the backstop is nextest's `NEXTEST`
+variable, which every test process and every child it starts inherits, and which
+blanks the keys too, so a spawn the lint cannot see (`cargo run --bin`, a built path)
+holds none under nextest. Doctests stay on `cargo test --doc`, which nextest
 cannot run. CI's `ci` profile additionally writes JUnit, rendered as the
 `build-test` job summary.
 

@@ -16,7 +16,7 @@
 
 use super::finding::Finding;
 use super::scan::Scan;
-use crate::code::{code_of, is_ident, Open};
+use crate::code::{bare_lines, is_ident};
 
 pub const RULE: &str = "asset-write";
 const HOME: &str = "src/core/fs/";
@@ -35,25 +35,6 @@ fn writes(code: &str) -> bool {
         !before.chars().next_back().is_some_and(is_ident) && !before.ends_with("fn ")
     });
     code.contains("fs::write(") || code.contains("File::create(") || saves || atomic
-}
-
-/// Every line of `source` as code, its comments cut and every char inside a
-/// string or char literal turned to a space.
-fn bare_lines(source: &str) -> Vec<String> {
-    let mut open = Open::None;
-    source
-        .lines()
-        .map(|line| {
-            let mut bare: Vec<char> = Vec::new();
-            let code = code_of(line, &mut open, |at, c| {
-                let col = line[..at].chars().count();
-                bare.resize(col, ' ');
-                bare.push(c);
-            });
-            bare.resize(code.chars().count(), ' ');
-            bare.into_iter().collect()
-        })
-        .collect()
 }
 
 /// Does the function holding line `from` call `note_written` at or after it?

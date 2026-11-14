@@ -13,12 +13,14 @@ fn a_test_binary_never_opted_in() {
 
 #[test]
 fn keys_are_read_only_by_a_process_that_opted_in_and_was_not_told_not_to() {
-    // Must flag: no opt-in, or started with the variable set (a spawned binary).
-    assert!(blanked(false, false));
-    assert!(blanked(false, true));
-    assert!(blanked(true, true));
+    // Must flag: no opt-in, started with the variable set (a spawned binary), or
+    // under nextest (a spawn the `engine-spawn` lint could not see).
+    assert!(blanked(false, false, false));
+    assert!(blanked(false, true, false));
+    assert!(blanked(true, true, false));
+    assert!(blanked(true, false, true));
     // Must pass: an authoring binary run by hand.
-    assert!(!blanked(true, false));
+    assert!(!blanked(true, false, false));
 }
 
 #[test]
@@ -41,6 +43,18 @@ fn a_process_that_reads_keys_is_told_where_it_looked() {
     // Must pass: without the marker a miss is the ordinary "set the variable" one.
     let refusal = resolve(Provider::Gemini, &Environment::default()).unwrap_err();
     assert!(matches!(refusal, Refusal::MissingKey { .. }), "{refusal:?}");
+}
+
+#[test]
+fn a_marker_in_a_dotenv_is_not_the_process_reading_no_keys() {
+    // Must pass: `keys_blanked` reads the marker from the process environment only,
+    // so `resolve` ignores one a `.env` sets. (A real exported key resolves: Ok.)
+    let dir = scratch("marker_in_dotenv");
+    std::fs::write(dir.join(".env"), format!("{NO_KEYS_VAR}=1\n")).unwrap();
+    let env = Environment::discover(&dir);
+    assert!(env.dotenv().is_some());
+    let got = resolve(Provider::Gemini, &env);
+    assert!(!matches!(got, Err(Refusal::KeysNotRead { .. })), "{got:?}");
 }
 
 #[test]

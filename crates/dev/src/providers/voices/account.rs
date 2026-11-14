@@ -23,6 +23,7 @@ use scorsese_providers::voices::{
     Availability, Catalogue, ElevenLabsVoices, Origin, Page, Voice, VoiceError,
 };
 
+use super::super::refusal::keys_not_read;
 use super::super::{resolve, Environment, Provider, Refusal, Secret};
 
 /// The most voices `/v2/voices` puts on one page.
@@ -129,6 +130,12 @@ impl Account<'_> {
             } => VoiceError::Credential(CredentialError::Missing {
                 provider,
                 places: format!("{looked_in}. Set {variable} (see .env.example)"),
+            }),
+            // Not a vendor failure: this process holds no key by design, and the
+            // refusal says which binaries do.
+            Refusal::KeysNotRead { provider } => VoiceError::Credential(CredentialError::Missing {
+                provider,
+                places: format!("nothing, because {}", keys_not_read()),
             }),
             other => VoiceError::Provider(ProviderError::new(NAME, other)),
         })

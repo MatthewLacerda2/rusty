@@ -108,7 +108,8 @@ own UI shows up after `Speech.Voices(true)`. The second return value, `source`,
 always says whether the list was just read or cached and how old it is. If the
 vendor cannot be asked and a cached list exists, that list is returned and `source`
 says why it was not refreshed. A cold cache with no key raises, naming where it
-looked.
+looked, or, in a process that reads no provider keys (anything but the editor,
+`session` and `session-mcp`), that it looked nowhere and which binaries do.
 
 `Speech.Generate` with a withdrawn voice raises the vendor's own "no voice `<id>`"
 sentence and spends nothing.

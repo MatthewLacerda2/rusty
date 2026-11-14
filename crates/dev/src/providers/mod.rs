@@ -25,7 +25,8 @@
 //!   tests here use mocks, and nothing in this module touches a network. The live
 //!   surface does call the real vendor, so [`environment`] hands out no keys at all
 //!   unless the binary opted in at startup ([`read_keys`], #974), which no test
-//!   binary does, and a binary a test spawns is started with [`NO_KEYS_VAR`] set:
+//!   binary does, a binary a test spawns is started with [`NO_KEYS_VAR`] set, and
+//!   nothing under nextest reads a key:
 //!   there a complete brief is refused, never sent.
 //!
 //! Every verb that spends goes through [`permit`] first and, once the vendor has

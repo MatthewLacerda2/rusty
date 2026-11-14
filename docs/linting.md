@@ -68,7 +68,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Post effect completeness | `cargo test` (`render::postfx::effects::completeness`, #1467) | **hard gate**: every effect in `render::postfx::effects::POST_EFFECTS` has its settings (a `PostProcessingComponent` field, or a `CameraComponent` field named after it for a camera effect), its authoring row, its `Graphics.*` registrar, its Inspector section, a `<!-- effect: <name> -->` section in `docs/api/Graphics.md` naming each knob's tween path, and, when player-facing, a `GraphicsOption` of its name with a row in the doc's *Player options*; each composite texture it declares is bound in the assembled composite, at its place (#1473); and no layer lists an effect the renderer lacks. A must-flag test removes each part in turn |
 | Proptest seed | `make scripts` (`test_workflow_hygiene.py`, `ProptestSeed`) | **hard gate**: `ci.yml`'s gates pin `PROPTEST_RNG_SEED` and its nightly leaves it random (#1800), and `make test` and `make test-one-process` run on that same number, read from `ci.yml`, never copied (#1852): a probe made a prerequisite of each verb reads the seed its recipe sees, and a Makefile that drops the export or copies another number must flag; `make test-explore` is the local **signal** that draws fresh seeds |
 | Proptest seeds replay | `tools/lint -- --rules` (`orphan-seeds`) | **hard gate**: every `proptest-regressions/<path>.txt` under the root or a `crates/<name>/` has its `<path>.rs` in a sibling folder holding a `lib.rs` or `main.rs`, the only place proptest reads it from; a seed left behind by a module's move to its crate, or by a renamed or deleted test, fails and the message names where it goes; no allow |
-| Provider keys stay out of tests | `tools/lint -- --rules` (`read-keys`, `engine-spawn`) | **hard gate**: `dev::providers::read_keys()` is called only from a binary's root (`src/main.rs`, `src/bin/*.rs`), and the editor, `session` and `session-mcp` each still call it; a test starts an engine binary only through `tests/spawn.rs`, which tells it to read no key (#974) |
+| Provider keys stay out of tests | `tools/lint -- --rules` (`read-keys`, `engine-spawn`) | **hard gate**: `dev::providers::read_keys()` is called only by the editor, `session` and `session-mcp`, each still calls it, and `KEY_READERS` names the same three; a test starts an engine binary only through `tests/spawn.rs`, which tells it to read no key (#974) |
 | Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
 | Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `src/editor` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); an editor slider is built by `editor::widgets::slider`, never a bare `egui::Slider::new(`, whose default clamping does the same (#1444); a real need takes `// lint: allow(drag-range) <why>` |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
@@ -532,13 +532,17 @@ new flag, gate, CI step or baseline.
   subfolders.
 - **`read-keys`** and **`engine-spawn`** (#974) — a test never holds a provider key,
   under any runner. A process reads `*_API_KEY` and the `.env` only after it calls
-  `dev::providers::read_keys()`, so `read-keys` fails a call outside a binary's root
-  (`src/main.rs`, `src/bin/*.rs`; its definition is not a call), and fails each of
-  the binaries an author spends from (`MUST_CALL`: the editor, `session`,
-  `session-mcp`) that no longer calls it, since every provider verb there would be
-  refused. A binary a test spawns opted in, so `engine-spawn` fails a code line
+  `dev::providers::read_keys()`, so `read-keys` fails a call anywhere but the
+  binaries an author spends from (`MUST_CALL`: the editor's `src/main.rs`,
+  `session`, `session-mcp`; only code counts, not a comment, a string literal or its
+  definition), fails each of them that no longer calls it, since every provider verb
+  there would be refused, and fails `KEY_READERS` in
+  `crates/dev/src/providers/credentials.rs` (the names the refusal prints) when it
+  no longer lists the same binaries. A binary a test spawns opted in, so `engine-spawn` fails a code line
   naming `CARGO_BIN_EXE_` outside `tests/spawn.rs`, whose `engine_bin!` sets
-  `RUSTY_NO_PROVIDER_KEYS` on the child. `tools/` is not scanned by either
+  `RUSTY_NO_PROVIDER_KEYS` on the child. Both are the primary guard; nextest's
+  `NEXTEST` variable, which blanks the keys in every process under it, is the
+  backstop for a spawn neither can see. `tools/` is not scanned by either
   (`rules/read_keys.rs`, `rules/engine_spawn.rs`).
 - **`sanitize`** — every authoring setter refuses a non-finite float (#1361).
   A `pub fn set_*` (any `pub` visibility) under `crates/scene/src/authoring/` (test code
