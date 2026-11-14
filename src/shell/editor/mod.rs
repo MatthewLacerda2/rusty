@@ -12,7 +12,7 @@
 pub mod capture;
 mod cursor_release;
 #[cfg(feature = "dev")]
-mod demo;
+pub mod demo;
 mod game_focus;
 mod icon;
 mod last_scene;
@@ -193,10 +193,7 @@ impl Frontend for EditorFrontend {
 
     #[cfg(feature = "dev")]
     fn advance(&mut self, game: &mut GameWorld, mut step: Step<'_>, dt: f32) -> PlayTransition {
-        let demo = self
-            .editor_ui
-            .advance_demo(game, dt)
-            .inspect(|_| step.clear());
+        let demo = demo::advance(&mut self.editor_ui, game, dt).inspect(|_| step.clear());
         demo.unwrap_or_else(|| super::frame::advance_sim(game, step, dt))
     }
 
@@ -204,7 +201,7 @@ impl Frontend for EditorFrontend {
     /// own store and settings, never the demo's (#1598).
     #[cfg(feature = "dev")]
     fn before_exit(&mut self, game: &mut GameWorld) {
-        self.editor_ui.close_demo(game);
+        demo::close(&mut self.editor_ui, game);
     }
 
     /// Outside Play nothing moves on its own, so the editor draws on demand, as Unity's

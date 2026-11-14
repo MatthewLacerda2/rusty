@@ -30,7 +30,7 @@ pub fn capture_demo(
             .application
             .borrow_mut()
             .request_demo(request);
-        ui.advance_demo(game, 0.0);
+        crate::shell::editor::demo::advance(&mut ui, game, 0.0);
         // Only the timeline's own refusals: a replay that diverges or a script
         // error in it is still a demo to look at.
         let refused = (game.console().borrow().messages.iter())

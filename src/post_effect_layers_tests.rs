@@ -9,11 +9,7 @@ use crate::render::postfx::completeness::problems;
 /// The Inspector's sections, by the effect each draws (both cards).
 #[cfg(feature = "editor")]
 fn sections() -> Vec<&'static str> {
-    use crate::editor::inspector::components::camera::{post_processing, CAMERA_SECTIONS};
-    let volume = post_processing::SECTIONS.iter().map(|s| s.effect);
-    volume
-        .chain(CAMERA_SECTIONS.iter().map(|s| s.effect))
-        .collect()
+    crate::editor::inspector::components::camera::drawn_effects()
 }
 
 #[test]

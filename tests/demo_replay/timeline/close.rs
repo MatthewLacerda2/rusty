@@ -7,6 +7,7 @@ use rusty::core::application::DemoRequest;
 use rusty::dev::demo::{self, Destination};
 use rusty::dev::harness::Harness;
 use rusty::dev::scenario;
+use rusty::shell::editor::demo as editor_demo;
 
 use super::{demo_of_a_saved_scene, editor_world};
 
@@ -34,13 +35,13 @@ fn closing_puts_back_the_scene_itself_unsaved_edits_and_all() {
         &mut game,
         DemoRequest::Open(path.to_string_lossy().into_owned()),
     );
-    ui.advance_demo(&mut game, 0.0).unwrap();
+    editor_demo::advance(&mut ui, &mut game, 0.0).unwrap();
     assert_ne!(
         game.scene().borrow().id(),
         id,
         "the demo's scene is another"
     );
-    ui.close_demo(&mut game);
+    editor_demo::close(&mut ui, &mut game);
 
     let scene = game.scene().borrow();
     assert_eq!(scene.id(), id, "a bake waiting on it still recognises it");
@@ -76,11 +77,11 @@ fn a_key_the_recording_held_is_not_held_after_close() {
         DemoRequest::Open(path.to_string_lossy().into_owned()),
     );
     ask(&mut game, DemoRequest::Seek(9));
-    ui.advance_demo(&mut game, 0.0).unwrap();
+    editor_demo::advance(&mut ui, &mut game, 0.0).unwrap();
     let console = game.console().borrow().messages.clone();
     assert!(ui.demo_open(), "{console:?}");
     assert!(game.input().borrow().is_key_down("W"), "the replay holds W");
-    ui.close_demo(&mut game);
+    editor_demo::close(&mut ui, &mut game);
     assert!(
         !game.input().borrow().is_key_down("W"),
         "not into the next Play"
@@ -97,17 +98,17 @@ fn a_drag_back_seeks_once_when_it_ends() {
         DemoRequest::Open(path.to_string_lossy().into_owned()),
     );
     ask(&mut game, DemoRequest::Seek(40));
-    ui.advance_demo(&mut game, 0.0).unwrap();
+    editor_demo::advance(&mut ui, &mut game, 0.0).unwrap();
 
     for tick in [30, 20, 10] {
         let view = ui.dev.demo.as_mut().unwrap();
         view.scrub(tick);
         assert_eq!((view.seek, view.shown()), (None, tick), "shown, not sought");
-        ui.advance_demo(&mut game, 0.0).unwrap();
+        editor_demo::advance(&mut ui, &mut game, 0.0).unwrap();
         assert_eq!(ui.dev.demo.as_ref().unwrap().current, 40);
     }
     ui.dev.demo.as_mut().unwrap().release();
-    ui.advance_demo(&mut game, 0.0).unwrap();
+    editor_demo::advance(&mut ui, &mut game, 0.0).unwrap();
     let view = ui.dev.demo.as_mut().unwrap();
     assert_eq!((view.current, view.target), (10, None));
 

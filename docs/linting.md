@@ -40,7 +40,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Dependency locks | cargo-deny (`deny.toml`) | **hard gate**: every git dependency is pinned by `rev` (`required-git-spec`); `nalgebra` only through the physics stack and no `cgmath` — glam is the one math crate (#975) |
 | Directory size | `tools/lint -- --rules` (`dir-size`) | **hard gate**: no directory under `src/` holds more than 12 source files directly in it (tests and its `mod.rs` aside); cluster by responsibility into subfolders, or a flat registry of one file per public unit says so with an inline `// lint: allow(dir-size) <why>` in its `mod.rs` (`crates/script/src/api/`). The ≲10 aim prints as a signal (#1367) |
 | Docs name what exists | `make docrefs` (`.github/scripts/docrefs.py`) | **hard gate**: every `src/`, `tests/`, `tools/`, `docs/` or `.github/` path in a tracked `*.md`'s inline code is tracked, every `` `make <verb>` `` is a target, and CLAUDE.md's namespaces each have a `docs/api/` page; placeholders pass, anything else takes `<!-- docrefs: allow <why> -->`. Runs on Markdown-only PRs too (#973) |
-| Editor↔API parity per op | `tools/lint -- --rules` (`api-parity`) | **hard gate**: every `scene::authoring::<module>::set_*` op a non-test line of `src/editor/` names is also named from the API side — a named setter's call in `crates/script/src/api/`, an `op!`/`with!`/`group!` row of the field table `Component.Set` writes through (`scene::authoring::fields`), or a post effect's own row or knob table (#1467) — so anything the inspector writes, Lua can; an editor-only op takes `// lint: allow(api-parity) <why>` at its `fn`, and an allow on an op Lua reaches or no inspector names is stale and fails (#1368) |
+| Editor↔API parity per op | `tools/lint -- --rules` (`api-parity`) | **hard gate**: every `scene::authoring::<module>::set_*` op a non-test line of `crates/editor/src/` names is also named from the API side — a named setter's call in `crates/script/src/api/`, an `op!`/`with!`/`group!` row of the field table `Component.Set` writes through (`scene::authoring::fields`), or a post effect's own row or knob table (#1467) — so anything the inspector writes, Lua can; an editor-only op takes `// lint: allow(api-parity) <why>` at its `fn`, and an allow on an op Lua reaches or no inspector names is stale and fails (#1368) |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard) |
 | Entity ids from Lua | `tools/lint -- --rules` (`entity-arg`) | **hard gate**: in `crates/script/src/api/`, a Lua callback never takes an entity (`id`, `…_id`, `parent`, `child`, `target`, `entity`, `body`, `canvas`) as a bare `u32` or `Option<u32>`: it takes `api::entity_arg::EntityArg`, so a `nil` id reads as a missing entity and fails a write with the verb's name (#1383) |
 | Every ECS write is stamped | `tools/lint -- --rules` (`ecs-write`) | **hard gate**: a non-test line of `crates/ecs/src/` that borrows a hecs column mutably (`get::<&mut …>`, `query_one::<(&mut …)>`, `query_mut`) or reshapes the store through `inner.` (`spawn`, `despawn`, `insert`, `remove`, `clear`, …) fails, since a write that skips `World::touch` stamps no change and every change-log consumer misses it; each funnel line, and `World::derived_mut`, takes `// lint: allow(ecs-write) <why>` (#1705) |
@@ -70,7 +70,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Proptest seeds replay | `tools/lint -- --rules` (`orphan-seeds`) | **hard gate**: every `proptest-regressions/<path>.txt` under the root or a `crates/<name>/` has its `<path>.rs` in a sibling folder holding a `lib.rs` or `main.rs`, the only place proptest reads it from; a seed left behind by a module's move to its crate, or by a renamed or deleted test, fails and the message names where it goes; no allow |
 | Provider keys stay out of tests | `tools/lint -- --rules` (`read-keys`, `engine-spawn`) | **hard gate**: `dev::providers::read_keys()` is called only by the editor, `session` and `session-mcp`, each still calls it, and `KEY_READERS` names the same three; a test starts an engine binary only through `tests/spawn.rs`, which tells it to read no key (#974) |
 | Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
-| Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `src/editor` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); an editor slider is built by `editor::widgets::slider`, never a bare `egui::Slider::new(`, whose default clamping does the same (#1444); a real need takes `// lint: allow(drag-range) <why>` |
+| Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `crates/editor/src` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); an editor slider is built by `editor::widgets::slider`, never a bare `egui::Slider::new(`, whose default clamping does the same (#1444); a real need takes `// lint: allow(drag-range) <why>` |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
 | Self-naming headers | `tools/lint -- --rules` (`self-path`) | **hard gate**: a source file's first `//!` line (a shader's first `//` line) that opens with a path under `src/`, `crates/`, `tests/`, `tools/`, `fuzz/`, `engine/` or `.github/` (a bare word too, when it names a directory of scanned files) names the file itself; a `mod.rs` may name its directory (`crates/scene/src/prefab/`). No header, or one opening with prose, is fine (#1654) |
 | Shared process | `make test-one-process` (`cargo test --features dev --tests`) | **signal**, never a gate: the `dev` suite with every test of a binary in one process, so a test leaking process-wide state (a moved working directory, a `static` left set), which nextest's process per test hides, is named (it broke the mutation baseline four times while cargo-mutants ran `cargo test`, #1844). Nightly on `main` in `cargo-test.yml` (both feature sets), filed by `main-health` when red; `gh workflow run cargo-test.yml --ref <branch>` runs it on a branch (#1338) |
@@ -291,7 +291,7 @@ new flag, gate, CI step or baseline.
 - **`api-parity`** (#1368) — "anything the editor does, the API does"
   (`docs/game-agent.md`), field by field. `--parity` holds that the inspector writes
   through a shared `scene::authoring` op; this rule holds that Lua reaches the same
-  op: every `authoring::<module>::set_*` op a non-test line of `src/editor/` names
+  op: every `authoring::<module>::set_*` op a non-test line of `crates/editor/src/` names
   must be named from the API side too, by a named setter in `crates/script/src/api/`
   (`Physics.SetMass`) or by the field table (`op!("mass", rb::set_mass)`, which
   `Component.Set` dispatches through), so editor and Lua share one validation. A post effect's
@@ -404,7 +404,7 @@ new flag, gate, CI step or baseline.
   subfolder unless the directory is a flat registry.
 - **`drag-range`** (#1158, #1444) — egui's `DragValue::range` also clamps the value
   a field *shows*, so selecting an entity whose value sits outside the range
-  rewrites it; `egui::Slider` clamps the same way by default. Under `src/editor/`,
+  rewrites it; `egui::Slider` clamps the same way by default. Under `crates/editor/src/`,
   a code line with `.range(` in a file that names `DragValue` fails (a file that
   never names it is not scanned for `.range(`, so another type's is safe), and so
   does any `Slider::new(`: use `.ranged(..)` (`editor::widgets::DragRange`) and
@@ -725,7 +725,7 @@ What is not one row's lives in `tools/lint/src/layers/externs/policy.rs`:
   and its tests on one dependency graph (`Cargo.toml` says why); it is never
   `use`d.
 - **`confined`** — crates only some subtrees may name, finer than a module: the
-  `egui` crates only under `src/editor` and `src/shell/editor` (the `editor`
+  `egui` crates only under `crates/editor/src` and `src/shell/editor` (the `editor`
   feature, #431), the provider crates only under `crates/dev/src/providers` (#383).
 - **`exceptions`** — a use the rules forbid but the code still has, each naming its open issue. There are none today.
 

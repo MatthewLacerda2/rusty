@@ -468,7 +468,7 @@ so no merging happens (#574). The CGU count is the number of `.o` files in the n
 session dir under `target/debug/incremental/rusty-*`. Once it nears 4096, raise the cap.
 
 Measured on a 4-core cloud machine with a warm `target/`, `cargo build --features dev`,
-alternating edits in `crates/physics/src/` and `src/editor/`, 8-12 samples each (medians,
+alternating edits in `crates/physics/src/` and `crates/editor/src/`, 8-12 samples each (medians,
 ranges in brackets):
 
 | Edit | Cap | CGUs recompiled | rusty codegen | build wall | then `test --no-run` |

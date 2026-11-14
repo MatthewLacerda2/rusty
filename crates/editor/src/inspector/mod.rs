@@ -1,0 +1,266 @@
+pub mod assets;
+pub mod components;
+mod pending;
+pub mod preview;
+
+use egui_phosphor::regular as icon;
+
+use self::components::context::gather_context;
+use self::components::{
+    add, audio, camera, gameplay, lod_group, material, mesh, particles, prefab, render, ribbons,
+    settings, transform, ui as ui_cards,
+};
+use self::pending::PendingEdits;
+use crate::theme::chrome;
+use crate::{EditorUi, InspectorTarget};
+use rusty_navigation::NavigationGraph;
+use rusty_scene::{MaterialAsset, Scene};
+use rusty_script::scripting::ConsoleLogs;
+use std::collections::BTreeMap;
+
+/// RIGHT PANEL: Properties Inspector
+pub fn draw(
+    editor: &mut EditorUi,
+    ui: &mut egui::Ui,
+    scene: &mut Scene,
+    console: &mut ConsoleLogs,
+    nav: &mut NavigationGraph,
+) {
+    #[cfg(feature = "dev")]
+    assets::scene::bake::poll(editor, ui.ctx(), scene, console, nav);
+    // A post-processing path field (the Color Lookup, the bloom dirt, #1441, #1442)
+    // typed and left by selecting something else.
+    editor.is_dirty |= camera::commit_abandoned_paths(ui.ctx(), scene);
+    // The Collider's asset path left the same way, and an asset edit whose drag ended.
+    editor.is_dirty |= components::gameplay::commit_abandoned_collider(ui.ctx(), scene);
+    let t = editor.theme;
+    if !editor.inspector_open {
+        draw_collapsed(ui, t, &mut editor.inspector_open);
+        return;
+    }
+    let frame = chrome::panel_frame(&t);
+    egui::Panel::right("Inspector Panel")
+        .resizable(true)
+        .size_range((182.0 + frame.inner_margin.sum().x)..=380.0)
+        .frame(frame)
+        .show(ui, |ui| {
+            let glyph = icon::SLIDERS_HORIZONTAL;
+            if chrome::panel_header(ui, &t, glyph, "Inspector", icon::CARET_RIGHT) {
+                editor.inspector_open = false;
+            }
+
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                // Dispatch on the explicit inspector target (mutually exclusive).
+                match editor.inspector_target() {
+                    InspectorTarget::Entity(selected_id) => {
+                        draw_entity_inspector(editor, ui, scene, selected_id);
+                    }
+                    InspectorTarget::Asset(asset_path) => {
+                        assets::draw_inspector(ui, editor, scene, console, nav, &asset_path);
+                    }
+                    InspectorTarget::SceneSettings => {
+                        settings::draw(editor, ui, scene);
+                    }
+                }
+            });
+        });
+}
+
+/// Collapsed state: a thin rail with a caret that reopens the inspector panel.
+fn draw_collapsed(ui: &mut egui::Ui, t: crate::theme::Theme, open: &mut bool) {
+    let frame = chrome::rail_frame(&t);
+    egui::Panel::right("Inspector Rail")
+        .resizable(false)
+        .exact_size(26.0 + frame.inner_margin.sum().x)
+        .frame(frame)
+        .show(ui, |ui| {
+            if chrome::icon_button(ui, icon::CARET_LEFT, "Expand").clicked() {
+                *open = true;
+            }
+        });
+}
+
+fn draw_entity_inspector(
+    editor: &mut EditorUi,
+    ui: &mut egui::Ui,
+    scene: &mut Scene,
+    selected_id: u32,
+) {
+    let mut pending = PendingEdits::default();
+    let cx = gather_context(scene, selected_id);
+    // A material delete's confirm belongs to the scene it came from (#1576).
+    editor.material_delete.keep_scene(scene.id());
+
+    // The cards borrow the world (`scene.world`) and the material library
+    // (`scene.materials`) as DISJOINT fields of `Scene`, so the material card can
+    // edit the shared library asset alongside the component accessors (#344).
+    let materials = &mut scene.materials;
+    let world = &mut scene.world;
+    if world.contains(selected_id) {
+        // Reconcile declared component dependencies (#359): drop any component whose
+        // requirement was cleared out from under it (e.g. a Camera removed via its
+        // card, orphaning a PostProcessing). Declaration-driven, not hand-written.
+        rusty_scene::authoring::reconcile_requirements(world, selected_id);
+
+        draw_object_header(
+            ui,
+            editor.theme,
+            world,
+            selected_id,
+            &cx.layer_labels,
+            &mut editor.is_dirty,
+        );
+
+        // Linked-prefab override affordance, just under the header (a no-op for a plain
+        // entity). Emits a deferred action so the prefab verbs run outside the card pass.
+        pending.prefab_action = prefab::draw(ui, world, selected_id, cx.prefab_root);
+
+        transform::draw(
+            ui,
+            world,
+            selected_id,
+            &cx.selected_parent_name,
+            &cx.valid_parents,
+            &mut pending.parent_change,
+            &mut editor.is_dirty,
+        );
+
+        draw_components(
+            ui,
+            editor,
+            world,
+            selected_id,
+            materials,
+            &cx.named_layers,
+            &mut pending,
+        );
+    }
+
+    pending.apply(editor, scene, selected_id);
+}
+
+/// The Unity-style object header card: name + active/static toggles + layer combo.
+/// Widgets edit local snapshots and write back through the facade on change (#344).
+fn draw_object_header(
+    ui: &mut egui::Ui,
+    t: crate::theme::Theme,
+    world: &mut rusty_ecs::World,
+    id: u32,
+    layer_labels: &[String],
+    is_dirty: &mut bool,
+) {
+    components::card::card_frame(&t).show(ui, |ui| {
+        ui.horizontal(|ui| {
+            ui.colored_label(t.text_secondary, icon::CUBE_FOCUS);
+            let mut name = world.name(id).map(|n| n.clone()).unwrap_or_default();
+            if ui
+                .add(egui::TextEdit::singleline(&mut name).desired_width(f32::INFINITY))
+                .changed()
+            {
+                world.set_name(id, name);
+                *is_dirty = true;
+            }
+        });
+        ui.horizontal(|ui| {
+            // lint: allow(active-self) the checkbox shows and sets the own flag
+            let mut active = world.is_active_self(id);
+            if ui.checkbox(&mut active, "Active").changed() {
+                world.set_active(id, active);
+                *is_dirty = true;
+            }
+            let mut is_static = world.is_static(id);
+            if ui
+                .checkbox(&mut is_static, "Static")
+                .on_hover_text("Blocks the navmesh")
+                .changed()
+            {
+                world.set_static(id, is_static);
+                *is_dirty = true;
+            }
+        });
+        draw_layer_combo(ui, world, id, layer_labels, is_dirty);
+    });
+    ui.add_space(t.space_xs);
+}
+
+/// The header's Layer combo: a snapshot-selected row written back via the facade.
+fn draw_layer_combo(
+    ui: &mut egui::Ui,
+    world: &mut rusty_ecs::World,
+    id: u32,
+    layer_labels: &[String],
+    is_dirty: &mut bool,
+) {
+    ui.horizontal(|ui| {
+        ui.label("Layer:");
+        let mut layer = world.layer(id);
+        let selected = layer_labels
+            .get(layer as usize)
+            .cloned()
+            .unwrap_or_default();
+        egui::ComboBox::from_id_salt("entity_layer")
+            .selected_text(selected)
+            .show_ui(ui, |ui| {
+                for (i, label) in layer_labels.iter().enumerate() {
+                    if ui.selectable_value(&mut layer, i as u8, label).clicked() {
+                        world.set_layer(id, layer);
+                        *is_dirty = true;
+                    }
+                }
+            });
+    });
+}
+
+/// The per-component card chain (mesh, material, light, gameplay, camera, …) plus
+/// the Add Component menu, in the canonical inspector order.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "(world, id) replaced the single &mut Entity handle"
+)]
+fn draw_components(
+    ui: &mut egui::Ui,
+    editor: &mut EditorUi,
+    world: &mut rusty_ecs::World,
+    id: u32,
+    materials: &mut BTreeMap<String, MaterialAsset>,
+    named_layers: &[(u8, String)],
+    pending: &mut PendingEdits,
+) {
+    let skin_tool = &mut pending.skin_tool;
+    mesh::draw_mesh(ui, world, id, &mut editor.is_dirty, skin_tool);
+    let action = &mut pending.material_action;
+    material::draw_material_card(ui, editor, world, id, materials, action);
+    render::draw_light(ui, world, id, &mut editor.is_dirty);
+    lod_group::draw_lod_group(ui, world, id, &mut editor.is_dirty);
+    render::draw_light_probe_proxy_volume(ui, world, id, &mut editor.is_dirty);
+
+    gameplay::draw_script(ui, world, id, &mut editor.is_dirty);
+    gameplay::draw_animator(ui, world, id, &mut editor.is_dirty);
+    gameplay::draw_collider(ui, world, id, &mut editor.is_dirty);
+    gameplay::draw_bodies(ui, world, id, &mut editor.is_dirty);
+    gameplay::draw_navigation(ui, world, id, &mut editor.is_dirty);
+
+    let size = editor.viewport_image_size;
+    let view_aspect = size.x / size.y;
+    camera::draw_camera(
+        ui,
+        world,
+        id,
+        named_layers,
+        view_aspect,
+        &mut editor.is_dirty,
+    );
+    camera::draw_post_processing(ui, world, id, &mut editor.is_dirty);
+
+    particles::draw(ui, world, id, &mut editor.is_dirty);
+    ribbons::draw_trail(ui, world, id, &mut editor.is_dirty);
+    ribbons::draw_line(ui, world, id, &mut editor.is_dirty);
+    audio::draw(ui, world, id, &mut editor.is_dirty);
+
+    let px = editor.viewport_image_size * ui.ctx().pixels_per_point();
+    let screen = glam::Vec2::new(px.x, px.y).round();
+    let view = rusty_ui::UiView::screen(screen, std::rc::Rc::clone(&editor.ui_textures));
+    ui_cards::draw(ui, world, id, &view, &mut editor.is_dirty);
+
+    add::draw(ui, world, id, &mut editor.is_dirty);
+}
