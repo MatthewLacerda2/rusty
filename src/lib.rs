@@ -7,7 +7,6 @@
 //! egui editor, `src/editor` + `shell::editor`). A shipped game is the `player` binary
 //! built with `--no-default-features` — neither layer.
 
-pub mod app;
 #[cfg(feature = "editor")]
 pub mod editor;
 pub mod logging;
@@ -18,6 +17,7 @@ pub mod shell;
 // old names, so every `crate::core::…` path here and `rusty::core::…` path in
 // `tests/` keeps compiling.
 pub use rusty_ai as ai;
+pub use rusty_app as app;
 pub use rusty_asset as asset;
 pub use rusty_audio as audio;
 pub use rusty_components as components;

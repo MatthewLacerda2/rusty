@@ -1,0 +1,31 @@
+[package]
+name = "rusty-app"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[features]
+dev = ["rusty-ai/dev", "rusty-asset/dev", "rusty-core/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-scene/dev", "rusty-script/dev"]
+editor = ["rusty-asset/editor", "rusty-core/editor", "rusty-physics/editor"]
+
+[lints]
+workspace = true
+
+[dependencies]
+rusty-ai = { workspace = true }
+rusty-asset = { workspace = true }
+rusty-audio = { workspace = true }
+rusty-components = { workspace = true }
+rusty-core = { workspace = true }
+rusty-navigation = { workspace = true }
+rusty-physics = { workspace = true }
+rusty-scene = { workspace = true }
+rusty-script = { workspace = true }
+rusty-time = { workspace = true }
+rusty-ui = { workspace = true }
+glam = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+rusty-test-support = { workspace = true }
+serde_json = { workspace = true }

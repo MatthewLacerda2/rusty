@@ -101,6 +101,45 @@ class Moved(unittest.TestCase):
             self.regex("physics")
 
 
+class Halves(unittest.TestCase):
+    """`script` is one moved crate holding two floored folders, `api` and `scripting`."""
+
+    def setUp(self) -> None:
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.root = Path(self.dir.name).resolve()
+        for d in ("src/app", "crates/script/src/api", "crates/script/src/scripting"):
+            (self.root / d).mkdir(parents=True)
+        (self.root / "crates/script/src/lib.rs").write_text("")
+
+    def regex(self, module: str) -> str:
+        r = self.root
+        floors = ["app", "script/api", "script/scripting"]
+        return cov.ignore_regex(module, floors, cov.src_dirs(r), cov.src_files(r),
+                                cov.members(r), r, cov.entries(r, "script"))
+
+    def at(self, path: str) -> str:
+        return f"{self.root.as_posix()}/{path}"
+
+    def test_a_half_is_measured_without_the_other_half(self):
+        self.assertIsNone(re.search(self.regex("script/api"), self.at("crates/script/src/api/a.rs")))
+        self.assertRegex(self.at("crates/script/src/scripting/vm.rs"), self.regex("script/api"))
+        self.assertRegex(self.at("crates/script/src/lib.rs"), self.regex("script/api"))
+
+    def test_a_half_with_a_nested_folder_named_like_its_sibling_stays_measured(self):
+        path = self.at("crates/script/src/scripting/api/bind.rs")
+        self.assertIsNone(re.search(self.regex("script/scripting"), path))
+
+    def test_the_halves_are_ignored_beside_another_module(self):
+        self.assertRegex(self.at("crates/script/src/api/a.rs"), self.regex("app"))
+
+    def test_a_half_the_crate_does_not_hold_is_refused(self):
+        r = self.root
+        with self.assertRaises(SystemExit):
+            cov.ignore_regex("script/gone", ["script/gone"], cov.src_dirs(r), cov.src_files(r),
+                             cov.members(r), r, cov.entries(r, "script"))
+
+
 class Baseline(unittest.TestCase):
     def test_comments_and_blanks_are_not_modules(self):
         self.assertEqual(cov.floored(BASELINE), ["app", "physics"])
@@ -110,7 +149,8 @@ class Baseline(unittest.TestCase):
         dirs, crates = cov.src_dirs(REPO), cov.members(REPO)
         for module in modules:
             with self.subTest(module=module):
-                cov.ignore_regex(module, modules, dirs, crates=crates, root=REPO)
+                inside = cov.entries(REPO, module.partition("/")[0])
+                cov.ignore_regex(module, modules, dirs, crates=crates, root=REPO, inside=inside)
 
 
 class Workflow(unittest.TestCase):

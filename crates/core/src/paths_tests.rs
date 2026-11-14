@@ -80,6 +80,17 @@ fn to_slash_keeps_a_backslash_as_part_of_a_name() {
 }
 
 #[test]
+fn the_test_helpers_lua_path_spells_a_path_as_to_slash_does() {
+    // `rusty_test_support::temp::lua_path` sits below `core` and repeats `to_slash`;
+    // this holds the two in step.
+    let name = "a dir/b.lua";
+    assert_eq!(
+        rusty_test_support::temp::lua_path(name),
+        to_slash(&rusty_test_support::temp::dir().join(name))
+    );
+}
+
+#[test]
 fn extension_matching_ignores_case() {
     assert!(has_extension("assets/scripts/Enemy.LUA", "lua"));
     assert!(has_extension(Path::new("a/b.Lua"), "lua"));
