@@ -88,7 +88,7 @@ batch's issues by what they add. When three or more add an instance of one kind,
 and each would edit a shared struct, shader body, match arm or list rather than
 add its own file plus one sorted row, the batch's first issue makes that kind a
 registry: filed before any of them is briefed, and `Blocked by` on each. The
-model is `src/render/CLAUDE.md`, *Adding a post effect*, with the `// sorted:`
+model is `crates/render/src/CLAUDE.md`, *Adding a post effect*, with the `// sorted:`
 marker. No check holds this: it is read from issues before any code exists.
 
 **Split by responsibility, not by parallelism.** Sub-issues that all touch the

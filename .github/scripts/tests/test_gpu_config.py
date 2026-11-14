@@ -4,7 +4,7 @@
 Two rules written in several files and held equal by hand until now:
 
 - **The cap.** nextest's `gpu` test group and `MAX_CONCURRENT_HEADLESS`
-  (`src/render/setup/budget.rs`) bound the same thing for the two runners; one
+  (`crates/render/src/setup/budget.rs`) bound the same thing for the two runners; one
   edited alone is the #366 out-of-memory red. Beside it, the nextest settings
   the doc promises: no retries, `fail-fast = false`, the 60 s / 5-period kill.
 - **An adapter is required wherever the suite runs on CI.** A job that runs the
@@ -29,7 +29,7 @@ except ModuleNotFoundError:
 REPO = Path(__file__).resolve().parents[3]
 WORKFLOWS = REPO / ".github" / "workflows"
 NEXTEST = tomllib.loads((REPO / ".config" / "nextest.toml").read_text()) if tomllib else {}
-BUDGET = REPO / "src" / "render" / "setup" / "budget.rs"
+BUDGET = REPO / "crates" / "render" / "src" / "setup" / "budget.rs"
 
 #: A command that runs the engine's tests. `cargo test --doc` renders nothing,
 #: `tools/lint` is its own crate with no renderer, and `cargo mutants --list`

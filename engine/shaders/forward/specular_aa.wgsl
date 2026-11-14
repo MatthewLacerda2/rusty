@@ -39,7 +39,7 @@ const THRESHOLD: f32 = 0.2;
 
 // What one pixel's footprint adds to α²: the variance of the interpolated vertex normal
 // `n` across the pixel, from its screen derivatives. Call it before any per-pixel
-// branch (src/render/CLAUDE.md); `widen` then applies it anywhere.
+// branch (crates/render/src/CLAUDE.md); `widen` then applies it anywhere.
 fn kernel(n: vec3<f32>) -> f32 {
     let du = dpdx(n);
     let dv = dpdy(n);

@@ -9,7 +9,7 @@
 #import lighting::cascades::ShadowCascades
 
 // One draw's own data (#1616), mirroring `DrawUniform`
-// (src/render/gpu/uniforms/material.rs) byte-for-byte: its transform on top of each
+// (crates/render/src/gpu/uniforms/material.rs) byte-for-byte: its transform on top of each
 // instance's (identity for instanced solids), where its joint 0 sits in `bones`
 // (#455; 0 is the shared identity), and its record in `materials`.
 struct DrawUniforms {
@@ -21,7 +21,7 @@ struct DrawUniforms {
 };
 
 // One material record (#1616), mirroring `MaterialData`
-// (src/render/gpu/uniforms/material.rs) byte-for-byte, its `SurfaceUniform` and
+// (crates/render/src/gpu/uniforms/material.rs) byte-for-byte, its `SurfaceUniform` and
 // `MappingUniform` written out flat. Read through `material()`. A new field takes a
 // pad word or a 16-byte run at the end; that file's doc says how.
 struct MaterialData {
@@ -110,7 +110,7 @@ struct MaterialData {
 
 // One object a kept scene draws (#1706), at its slot of `objects`: what the object
 // holds, written when it changes, never per camera. Mirrors `ObjectData`
-// (src/render/gpu/uniforms/instance.rs) byte-for-byte. Slot 0 is the identity, which
+// (crates/render/src/gpu/uniforms/instance.rs) byte-for-byte. Slot 0 is the identity, which
 // overlays name. `use_sh == 1` reconstructs the ambient term from `sh` (#240, xyz =
 // RGB radiance). Material flags stay in the draw's `MaterialData`, so texture
 // sampling never depends on an object value.
@@ -135,7 +135,7 @@ struct ObjectData {
 
 // One instance of an instanced draw (#470), indexed by `instance_index`: what one
 // camera decides for one drawn object this frame. Mirrors `InstanceData`
-// (src/render/gpu/uniforms/instance.rs) byte-for-byte.
+// (crates/render/src/gpu/uniforms/instance.rs) byte-for-byte.
 struct InstanceData {
     // The object's slot in `objects`.
     object: u32,

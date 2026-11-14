@@ -20,6 +20,8 @@ exclude_globs = [
   "crates/ecs/src/changes/ops.rs",
   "crates/navigation/src/test_support.rs",
   "crates/physics/src/query/convex_fixture.rs",
+  "crates/render/src/test_gpu.rs",
+  "crates/render/src/test_gpu/**",
   "crates/scene/src/asset_instance/collision/chair.rs",
   "crates/scene/src/asset_instance/humanoid_fixture.rs",
   "crates/scene/src/lighting/lightmap/trace/bench.rs",

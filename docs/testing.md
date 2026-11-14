@@ -551,7 +551,7 @@ unbounded parallel renderers exhausted memory and failed *unrelated* tests with 
 - **nextest (the gate):** every test is its own process, so nothing in-process can see
   its neighbours. The `gpu` **test group** in `.config/nextest.toml` (`max-threads = 2`)
   bounds how many GPU tests run at once.
-- **`cargo test`:** `MAX_CONCURRENT_HEADLESS` in `src/render/setup/budget.rs` bounds
+- **`cargo test`:** `MAX_CONCURRENT_HEADLESS` in `crates/render/src/setup/budget.rs` bounds
   how many renderers are alive in the one process, enforced by an RAII permit the
   renderer holds for its whole life. It applies to the normal library build, not just
   `cfg(test)`, because the screenshot integration tests reach the renderer indirectly
@@ -570,7 +570,9 @@ of memory, **lower both to 1** before weakening the test.
 **The GPU naming rule.** A test group selects tests by name, so the name says whether
 a test renders:
 
-- an **integration** test that renders lives under `tests/gpu/` (path `gpu::…`);
+- an **integration** test that renders lives under `tests/gpu/` (path `gpu::…`; the
+  filter takes that path in the integration binary only, `kind(test)`, because
+  `rusty-render`'s own unit tests sit in its `gpu` module and share the prefix);
 - an **in-crate** test that renders has a function name starting with **`gpu_`**
   (`fn gpu_resize_tracks_the_new_size`).
 

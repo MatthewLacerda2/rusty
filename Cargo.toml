@@ -99,10 +99,10 @@ path = "tests/main.rs"
 [features]
 default = ["editor"]
 # The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.
-dev = ["rusty-app/dev", "rusty-script/dev", "rusty-ai/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-scene/dev", "rusty-shadergen/dev", "rusty-asset/dev", "rusty-core/dev", "dep:scorsese-providers", "dep:scorsese-core", "dep:libloading", "dep:getrandom"]
+dev = ["rusty-render/dev", "rusty-app/dev", "rusty-script/dev", "rusty-ai/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-scene/dev", "rusty-shadergen/dev", "rusty-asset/dev", "rusty-core/dev", "dep:scorsese-providers", "dep:scorsese-core", "dep:libloading", "dep:getrandom"]
 # The egui editor (#431): `src/editor` and the shell's editor frontend. Default-on so
 # `cargo run` opens the editor; a shipped player builds with `--no-default-features`.
-editor = ["rusty-app/editor", "rusty-physics/editor", "rusty-shadergen/editor", "rusty-asset/editor", "rusty-core/editor", "dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor", "dep:notify"]
+editor = ["rusty-render/editor", "rusty-app/editor", "rusty-physics/editor", "rusty-shadergen/editor", "rusty-asset/editor", "rusty-core/editor", "dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor", "dep:notify"]
 
 # The workspace's lint policy lives here, not in command-line flags, so a plain
 # `cargo clippy`, rust-analyzer and CI all read the same rules (#485); every member
@@ -145,6 +145,7 @@ rusty-ui = { path = "crates/ui" }
 rusty-physics = { path = "crates/physics" }
 rusty-navigation = { path = "crates/navigation" }
 rusty-ai = { path = "crates/ai" }
+rusty-render = { path = "crates/render" }
 rusty-script = { path = "crates/script" }
 rusty-app = { path = "crates/app" }
 rusty-test-support = { path = "crates/test-support" }
@@ -268,6 +269,7 @@ proptest = { version = "1", default-features = false, features = ["std"] }
 
 [dependencies]
 # The moved modules (crates/), re-exported in src/lib.rs under their old names.
+rusty-render = { workspace = true }
 rusty-app = { workspace = true }
 rusty-script = { workspace = true }
 rusty-ai = { workspace = true }
@@ -285,7 +287,6 @@ rusty-core = { workspace = true }
 rusty-time = { workspace = true }
 winit = { workspace = true }
 wgpu = { workspace = true }
-naga_oil = { workspace = true }
 egui = { workspace = true, optional = true }
 egui-wgpu = { workspace = true, optional = true }
 egui-winit = { workspace = true, optional = true }

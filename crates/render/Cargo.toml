@@ -1,0 +1,35 @@
+[package]
+name = "rusty-render"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[features]
+dev = ["rusty-asset/dev", "rusty-core/dev", "rusty-physics/dev", "rusty-scene/dev", "rusty-shadergen/dev"]
+editor = ["rusty-asset/editor", "rusty-core/editor", "rusty-physics/editor", "rusty-shadergen/editor"]
+
+[lints]
+workspace = true
+
+[dependencies]
+rusty-asset = { workspace = true }
+rusty-components = { workspace = true }
+rusty-core = { workspace = true }
+rusty-ecs = { workspace = true }
+rusty-physics = { workspace = true }
+rusty-scene = { workspace = true }
+rusty-shadergen = { workspace = true }
+rusty-ui = { workspace = true }
+bytemuck = { workspace = true }
+glam = { workspace = true }
+image = { workspace = true }
+ktx2 = { workspace = true }
+log = { workspace = true }
+naga_oil = { workspace = true }
+pollster = { workspace = true }
+wgpu = { workspace = true }
+
+[dev-dependencies]
+rusty-test-support = { workspace = true }
+rusty-procgen = { workspace = true }
+proptest = { workspace = true }

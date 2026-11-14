@@ -2,7 +2,7 @@
 //!
 //! Every fullscreen pass draws three vertices with no vertex buffer, and the vertex
 //! maths lives in `engine/shaders/fullscreen.wgsl`, the composable module a pass
-//! `#import`s (`src/render/CLAUDE.md`, *Shaders*). A shader that spells the
+//! `#import`s (`crates/render/src/CLAUDE.md`, *Shaders*). A shader that spells the
 //! triangle's bit-twiddle itself (`(i << 1u) & 2u`, the line every copy had) is a
 //! finding; the fix is `fullscreen::triangle` / `fullscreen::uv`. A shader that must
 //! stand alone says why with `// lint: allow(fullscreen-triangle) <why>`.
