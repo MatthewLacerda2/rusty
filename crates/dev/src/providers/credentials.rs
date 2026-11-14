@@ -63,7 +63,7 @@ pub fn read_keys() {
 
 /// Whether [`environment`] hands out no keys in this process (#974): it never
 /// opted in with [`read_keys`], it was started with [`NO_KEYS_VAR`] set, or it runs
-/// under nextest ([`NEXTEST_VAR`]).
+/// under nextest (its `NEXTEST` variable).
 pub fn keys_blanked() -> bool {
     blanked(
         KEYS_READ.load(Ordering::Relaxed),
