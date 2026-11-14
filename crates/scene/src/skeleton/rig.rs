@@ -71,12 +71,13 @@ pub fn armature_owner(scene: &mut Scene) -> u32 {
     id
 }
 
-/// Re-import `rig` to `skin` in place, as a re-written model does.
+/// Re-import `rig` to `skin` in place, as a re-written model does. A missing Mesh
+/// panics: the test fails.
 pub fn reimport_to(scene: &mut Scene, rig: u32, skin: SkinData) {
     let parked = scene.take_skeleton(rig);
-    if let Some(mut mesh) = scene.world.mesh_mut(rig) {
-        mesh.skin = Some(skin);
-    }
+    let mut mesh = scene.world.mesh_mut(rig).expect("the rig has a Mesh");
+    mesh.skin = Some(skin);
+    drop(mesh);
     scene.restore_skeleton(rig, parked);
 }
 
@@ -97,7 +98,8 @@ pub fn joint_to(scene: &mut Scene, id: u32, body: Option<u32>) {
     scene.world.set_joint(id, Some(joint));
 }
 
-/// The body `id`'s Joint is connected to.
+/// The body `id`'s Joint is connected to. A missing Joint panics: the test fails.
 pub fn connected(scene: &Scene, id: u32) -> Option<u32> {
-    scene.world.joint(id).and_then(|j| j.connected_body)
+    let joint = scene.world.joint(id).expect("the entity has a Joint");
+    joint.connected_body
 }

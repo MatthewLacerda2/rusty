@@ -66,9 +66,11 @@ pub const EFFECTS: &[Effect] = &[
 /// the renderer's tests and the integration suite hand in.
 pub fn authored() -> crate::authored::Authored {
     let fields_of = |kind: &str| -> Vec<String> {
-        let table = crate::authoring::fields::find(kind).map(|k| (k.fields)());
-        let table = table.unwrap_or_default();
-        table.into_iter().map(|(n, _)| n.to_string()).collect()
+        let kind = crate::authoring::fields::find(kind).expect("a first-class component");
+        (kind.fields)()
+            .into_iter()
+            .map(|(n, _)| n.to_string())
+            .collect()
     };
     let names = |fields: &mut dyn Iterator<Item = &str>| fields.map(String::from).collect();
     use super::camera::{TAA_EFFECT, TAA_KNOBS};

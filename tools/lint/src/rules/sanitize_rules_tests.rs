@@ -89,3 +89,34 @@ fn an_excused_rule_holds_its_first_float() {
     assert_eq!(held(&rules, "optional"), [0]);
     assert!(unheld(&rules).is_empty());
 }
+
+#[test]
+fn a_test_on_another_variable_holds_only_that_one() {
+    let src = "pub fn bounded(v: f32, lo: f32) -> f32 {\n    if lo.is_finite() && v > lo { v } else { lo }\n}\n";
+    let rules = of(src);
+    assert_eq!(held(&rules, "bounded"), [1], "`v` is never tested");
+    let setter = "pub fn set_a(c: &mut C, v: f32) {\n    c.a = bounded(v, 0.0);\n}\n";
+    assert_eq!(check(SETTER, setter, &[], &rules).len(), 1);
+}
+
+#[test]
+fn an_is_nan_test_alone_holds_nothing() {
+    let src = "pub fn zeroed(v: f32) -> f32 {\n    if v.is_nan() { 0.0 } else { v }\n}\n";
+    let found = unheld(&of(src));
+    assert_eq!(found.len(), 1, "`+inf` is stored");
+}
+
+#[test]
+fn a_chain_or_a_closure_on_the_parameter_holds_it() {
+    let chain = "pub fn all(v: [f32; 3], f: [f32; 3]) -> [f32; 3] {\n    if v.iter().all(|x| x.is_finite()) { v } else { f }\n}\n";
+    let keys = "pub fn keys(mut g: Vec<f32>) -> Vec<f32> {\n    g.keys\n        .retain(|k| k.t.is_finite() && k.c.iter().all(|x| x.is_finite()));\n    g\n}\n";
+    let other = "pub fn other(v: f32, w: [f32; 2]) -> f32 {\n    if w.iter().all(|v| v.is_finite()) { v } else { 0.0 }\n}\n";
+    let rules = of(&format!("{chain}{keys}{other}"));
+    assert_eq!(held(&rules, "all"), [0]);
+    assert_eq!(held(&rules, "keys"), [0]);
+    assert_eq!(
+        held(&rules, "other"),
+        [1],
+        "`w`'s closure argument shadows `v`"
+    );
+}

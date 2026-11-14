@@ -3,8 +3,9 @@
 //! counts as held only when it reaches a rule at one of those positions, so a rule
 //! that passes a value through (a fallback, a bound) never vouches for it.
 //!
-//! A rule holds a float parameter when a statement or match arm of its body tests
-//! it (`is_finite`, `is_nan`) or hands it whole to another rule at a position that
+//! A rule holds a float parameter when a statement or match arm of its body calls
+//! `is_finite()` on it (on the parameter itself, a field or a chain of it; `is_nan`
+//! alone lets `±inf` through) or hands it whole to another rule at a position that
 //! rule holds; the positions are found to a fixed point over every rule. A rule
 //! taking floats and holding none (a pass-through) is itself a finding, excused
 //! with `// lint: allow(sanitize) <why>` when it holds its value another way (a
@@ -106,20 +107,99 @@ pub fn resolved<'a>(files: impl Iterator<Item = (&'a str, &'a str)>) -> Vec<Rule
     }
 }
 
-/// Whether `rule`'s body tests `param` in one statement, or hands it to another of
+/// Whether `rule`'s body tests `param` itself in one statement (an `is_finite()`
+/// whose receiver starts at `param`, see [`tested`]), or hands it to another of
 /// `rules` at a position that one holds.
 fn holds(rule: &Rule, param: &str, rules: &[Rule]) -> bool {
-    let mentions = |s: &str| {
-        s.match_indices(param).any(|(at, _)| {
-            let before = s[..at].chars().next_back();
-            let after = s[at + param.len()..].chars().next();
-            !before.is_some_and(is_ident) && !after.is_some_and(is_ident)
-        })
-    };
-    let tests = |s: &&str| mentions(s) && (s.contains("is_finite") || s.contains("is_nan"));
-    rule.body.split([';', ',', '{', '}']).any(|s| tests(&s))
+    rule.body
+        .split([';', ',', '{', '}'])
+        .any(|s| tested(s, param))
         || (rules.iter().filter(|r| r.name != rule.name))
             .any(|r| passes_at(&rule.body, &r.name, param, Some(&r.held)))
+}
+
+/// Whether `segment` calls `is_finite()` on `param`: on the parameter, a field or a
+/// method chain of it (`r.min.is_finite()`, `v.iter().all(|x| x.is_finite())`, the
+/// closure's argument traced back to the chain it is called on). A test on another
+/// variable vouches for nothing, and neither does `is_nan` alone: it lets `±inf`
+/// through.
+pub(super) fn tested(segment: &str, param: &str) -> bool {
+    segment.match_indices(".is_finite()").any(|(mut at, _)| {
+        // A closure's argument stands for the chain the closure is passed to; each
+        // step moves left, so the walk ends.
+        while let Some(root) = receiver_root(segment, at) {
+            let Some(bar) = segment[..at].rfind(&format!("|{root}|")) else {
+                return root == param;
+            };
+            let Some(open) = open_paren(segment, bar) else {
+                return false;
+            };
+            at = open;
+        }
+        false
+    })
+}
+
+/// The identifier a method chain ending at byte `end` of `s` starts from: back over
+/// `.name`, `(..)` and `[..]` groups and whitespace.
+fn receiver_root(s: &str, end: usize) -> Option<&str> {
+    let b = s.as_bytes();
+    let mut i = end;
+    loop {
+        while i > 0 && b[i - 1].is_ascii_whitespace() {
+            i -= 1;
+        }
+        while i > 0 && matches!(b[i - 1], b')' | b']') {
+            i = group_start(b, i - 1)?;
+        }
+        let stop = i;
+        while i > 0 && is_ident(char::from(b[i - 1])) {
+            i -= 1;
+        }
+        if i == stop {
+            return None;
+        }
+        let mut j = i;
+        while j > 0 && b[j - 1].is_ascii_whitespace() {
+            j -= 1;
+        }
+        if j == 0 || b[j - 1] != b'.' {
+            return Some(&s[i..stop]);
+        }
+        i = j - 1;
+    }
+}
+
+/// The index of the bracket opening the group that closes at `close`.
+fn group_start(b: &[u8], close: usize) -> Option<usize> {
+    let mut depth = 0usize;
+    for k in (0..=close).rev() {
+        match b[k] {
+            b')' | b']' => depth += 1,
+            b'(' | b'[' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(k);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// The index of the unmatched `(` enclosing byte `at` of `s`.
+fn open_paren(s: &str, at: usize) -> Option<usize> {
+    let mut depth = 0usize;
+    for (k, c) in s.as_bytes()[..at].iter().enumerate().rev() {
+        match *c {
+            b')' => depth += 1,
+            b'(' if depth == 0 => return Some(k),
+            b'(' => depth -= 1,
+            _ => {}
+        }
+    }
+    None
 }
 
 /// A finding for each rule taking floats and holding none of them: a pass-through.
@@ -133,7 +213,7 @@ pub fn unheld(rules: &[Rule]) -> Vec<Finding> {
             line: r.line,
             rule: RULE,
             message: format!(
-                "rule `{}` takes floats and holds none of them: test it (`is_finite`, `is_nan`) \
+                "rule `{}` takes floats and holds none of them: test it (`<param>.is_finite()`) \
                  or hand it to a rule that does, so a setter passing through it cannot \
                  store NaN or ±inf",
                 r.name

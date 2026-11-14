@@ -57,6 +57,7 @@ pub fn clamped(v: f32, lo: f32, hi: f32) -> f32 {
 /// `v` clamped to `[lo, hi]`, an infinity saturating to the end it points at;
 /// `lo` when `v` is NaN (`f32::clamp` would keep it). For a bounded field whose
 /// `+inf` reads as "as far as it goes", like a camera's field of view.
+// lint: allow(sanitize) holds `v`: the clamp turns ±inf into a bound and the `is_nan` test catches NaN
 pub fn saturated(v: f32, lo: f32, hi: f32) -> f32 {
     if v.is_nan() {
         lo

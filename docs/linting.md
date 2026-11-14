@@ -565,13 +565,16 @@ new flag, gate, CI step or baseline.
   the rule reads the list from those files), or to another `set_*` of the same
   file, which it checks in turn. **A rule is not trusted by name**
   (`rules/sanitize_rules.rs`): it holds a float parameter when a statement or match
-  arm of its body tests it (`is_finite`, `is_nan`) or hands it whole to another rule
-  at a position that one holds, found to a fixed point over every rule. So
+  arm of its body calls `is_finite()` on that parameter (on it, a field or a method
+  chain of it, or a closure argument traced back to such a chain:
+  `v.iter().all(|x| x.is_finite())`) or hands it whole to another rule at a position
+  that one holds, found to a fixed point over every rule. So
   `finite_or(v, fallback)` holds `v` and not `fallback`, and a setter passing its
-  value as the fallback fails. A rule taking floats and holding none (a
+  value as the fallback fails. A test on another parameter holds only that one, and
+  `is_nan` alone holds nothing: it lets `±inf` through. A rule taking floats and holding none (a
   pass-through) is itself a finding, on its `fn` line; one holding its value another
   way says so with `// lint: allow(sanitize) <why>` above it and then holds its
-  first float (`rules::lens::hold_projection`, `optional_color_or`). A parameter
+  first float (`rules::lens::hold_projection`, `optional_color_or`, `saturated`). A parameter
   carries a float when its type, under `&`, `Option<…>`, `Vec<…>` or `[…; N]`, is
   `f32`, `f64`, `Vec2`/`3`/`4`, `Quat` or one of the float structs the setters take
   (`Curve`, `Gradient`, `Range`, …: `FLOATS` in the rule; a new one joins it). `finite(v.x)`

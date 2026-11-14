@@ -11,6 +11,7 @@ mod mesh_library;
 mod physics_material;
 mod reflection_probes;
 mod round_trips;
+mod settings;
 mod skeleton;
 mod state;
 mod undo;

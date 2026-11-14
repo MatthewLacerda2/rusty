@@ -76,12 +76,12 @@ pub struct CameraKnob {
     pub set: fn(&mut CameraComponent, f32),
 }
 
-/// TAA's float knobs, in the Inspector's order. Each is an Inspector slider, a
-/// `Graphics.Get/Set<api>` pair and a `Graphics.taa.<field>` tween path, all through
-/// the same op.
 /// The camera effect [`TAA_KNOBS`] belongs to, as its tween paths spell it.
 pub const TAA_EFFECT: &str = "taa";
 
+/// TAA's float knobs, in the Inspector's order. Each is an Inspector slider, a
+/// `Graphics.Get/Set<api>` pair and a `Graphics.taa.<field>` tween path, all through
+/// the same op.
 pub const TAA_KNOBS: &[CameraKnob] = &[
     CameraKnob {
         field: "base_blend_factor",

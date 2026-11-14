@@ -140,11 +140,11 @@ fn geometry_is_kept_for_the_same_source_and_rebuilt_for_another() {
 #[test]
 fn the_history_keeps_its_last_steps_and_play_clears_it() {
     let (mut scene, id) = scene_with_crate();
-    for i in 0..=super::DEPTH {
+    for i in 0..=crate::undo::DEPTH {
         edit(&mut scene, |s| move_to(s, id, i as f32 + 1.0));
     }
     let undone = std::iter::from_fn(|| scene.undo()).count();
-    assert_eq!(undone, super::DEPTH);
+    assert_eq!(undone, crate::undo::DEPTH);
     scene.redo();
     scene.set_playing(true);
     assert_eq!((scene.undo_name(), scene.redo_name()), (None, None));
