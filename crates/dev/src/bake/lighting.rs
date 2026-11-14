@@ -10,7 +10,7 @@
 //!      `probe_bake`) and the GGX reflection-probe bake (#252, `reflection_bake`) — as
 //!      one job stepped a probe or a few at a time (`steps`, #1602).
 //!
-//! Placement is the deterministic, pure step (`scene::lighting::placement`); the bakes
+//! Placement is the deterministic, pure step (`lighting::placement`); the bakes
 //! are the render/dev step. This module is the single path both callers route through,
 //! so the button and the API never drift (editor↔API parity). It is dev-only — a baked
 //! lighting set is an authoring artifact (SH sidecar + KTX2 cubemaps) the runtime loads.
@@ -32,10 +32,10 @@ use super::progress::{stage_progress, BakeLog};
 use super::steps::LightingBake;
 use glam::Vec3;
 
+use rusty_lighting::lightmap::{BakeMesh, BakeScene};
+use rusty_lighting::placement::{self, ReflectionPlacement, Site, Solid};
 use rusty_navigation::NavigationGraph;
 use rusty_physics::collider_world_triangles;
-use rusty_scene::lighting::lightmap::{BakeMesh, BakeScene};
-use rusty_scene::lighting::placement::{self, ReflectionPlacement, Site, Solid};
 use rusty_scene::lighting::probe::ProbeVolume;
 use rusty_scene::{ReflectionProbeSet, Scene};
 

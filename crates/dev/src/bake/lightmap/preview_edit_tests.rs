@@ -70,7 +70,7 @@ fn lightmaps_cleared_during_a_bake_stay_cleared_on_save_and_cancel() {
 }
 
 /// The wall's entry in the save of `scene`.
-fn saved(scene: &Scene, wall: u32) -> Option<rusty_scene::lighting::lightmap::LightmapEntry> {
+fn saved(scene: &Scene, wall: u32) -> Option<rusty_scene::lighting::lightmap_set::LightmapEntry> {
     rusty_scene::to_scene_data(scene)
         .lightmaps
         .get(wall)

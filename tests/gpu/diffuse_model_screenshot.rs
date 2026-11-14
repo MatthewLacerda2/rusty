@@ -10,7 +10,7 @@ use rusty::components::{LightComponent, LightMode};
 use rusty::dev::bake::lightmap::bake_scene_lightmaps;
 use rusty::dev::screenshot::capture;
 use rusty::scene::authoring::{primitive_mesh_component, Primitive};
-use rusty::scene::lighting::lightmap::BakeSettings;
+use rusty::scene::lighting::settings::BakeSettings;
 use rusty::scene::lighting::DiffuseModel;
 use rusty::scene::{Camera, Scene};
 
@@ -63,7 +63,7 @@ fn baked_shot(model: DiffuseModel, name: &str) -> image::RgbImage {
         texels_per_unit: 24.0,
         samples: 4,
         bounces: 1,
-        denoiser: rusty::scene::lighting::lightmap::Denoiser::Filter,
+        denoiser: rusty::scene::lighting::settings::Denoiser::Filter,
         filter_radius: 0,
         ..BakeSettings::default()
     };

@@ -12,7 +12,7 @@ use super::cluster_gpu_tests::cluster_indices;
 use super::gpu_tests::{drawn, offscreen, shot, words, H, W};
 use crate::{RenderView, Renderer};
 use rusty_components::mesh::{primitives, MeshRevision};
-use rusty_scene::lighting::occlusion::bench::level::rooms;
+use rusty_lighting::occlusion::bench::level::rooms;
 use rusty_scene::Camera;
 use rusty_scene::Scene;
 

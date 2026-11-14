@@ -15,7 +15,8 @@ use serde_json::{json, Value};
 use super::{entity_name, point, secs, Kind, Report, Stages};
 use crate::bake::lightmap::EncodedPages;
 use crate::bake::progress::MeshTime;
-use rusty_scene::lighting::lightmap::{BakeLight, BakeMesh, BakeScene, BakeSettings, LightShape};
+use rusty_lighting::lightmap::{BakeLight, BakeMesh, BakeScene, LightShape};
+use rusty_scene::lighting::settings::BakeSettings;
 use rusty_scene::Scene;
 
 /// What a lightmap bake measured beside its pages.

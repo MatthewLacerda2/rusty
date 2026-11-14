@@ -8,7 +8,7 @@ use super::logged::{bake_logged, read, watch};
 use super::tests::{quick, scene};
 use super::*;
 use crate::bake::progress::Line;
-use rusty_scene::lighting::lightmap::BakeProgress;
+use rusty_lighting::lightmap::BakeProgress;
 
 #[test]
 fn a_logged_bake_is_byte_identical_to_an_unlogged_one() {

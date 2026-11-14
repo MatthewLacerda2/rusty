@@ -80,11 +80,17 @@ pub const LAYERS: &[Layer] = &[
     sim("ecs", &["components"]).uses(&["hecs"]),
     // A sim `Resource` stepped by sim time; its device thread never reads a clock.
     sim("audio", &["asset", "components", "core"]).uses(&["kira"]),
-    // The lightmap bake traces rays through parry's `TriMesh` (#1330); `physics` sits
-    // above `scene`, so the crate is named here rather than the module.
     sim(
         "scene",
         &["asset", "components", "core", "ecs", "procgen", "shadergen"],
+    ),
+    // The lighting bakes, apart from the data they write (`scene::lighting`), so an
+    // edit to a bake rebuilds only what runs one. The lightmap bake traces rays
+    // through parry's `TriMesh` (#1330); `physics` sits above, so the crate is named
+    // here rather than the module.
+    sim(
+        "lighting",
+        &["asset", "components", "core", "procgen", "scene"],
     )
     .uses(&["rapier3d"]),
     // The in-game UI's layout runs headless inside the sim (#417).
@@ -99,7 +105,14 @@ pub const LAYERS: &[Layer] = &[
     // navmesh, rays through physics and the active camera. Unreal's `AIModule`.
     sim(
         "ai",
-        &["components", "core", "navigation", "physics", "scene"],
+        &[
+            "components",
+            "core",
+            "lighting",
+            "navigation",
+            "physics",
+            "scene",
+        ],
     ),
     // The Lua side: `scripting` (the VM, lifecycle, timers, console) and `api` (the
     // one surface) name each other, so they are one module, two halves of one crate.
@@ -112,6 +125,7 @@ pub const LAYERS: &[Layer] = &[
             "components",
             "core",
             "ecs",
+            "lighting",
             "navigation",
             "physics",
             "procgen",
@@ -149,6 +163,7 @@ pub const LAYERS: &[Layer] = &[
             "components",
             "core",
             "ecs",
+            "lighting",
             // The collider gizmo draws the shape physics collides with (#1882).
             "physics",
             "scene",
@@ -166,6 +181,7 @@ pub const LAYERS: &[Layer] = &[
             "asset",
             "components",
             "core",
+            "lighting",
             "logging",
             "navigation",
             "physics",
@@ -195,6 +211,7 @@ pub const LAYERS: &[Layer] = &[
             "core",
             "dev",
             "ecs",
+            "lighting",
             "navigation",
             "preview",
             "scene",

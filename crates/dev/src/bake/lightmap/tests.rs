@@ -4,8 +4,8 @@
 use std::path::Path;
 
 use super::*;
+use rusty_lighting::lightmap::bake;
 use rusty_scene::authoring::{primitive_mesh_component, Primitive};
-use rusty_scene::lighting::lightmap::bake;
 
 /// A scene with a static floor Plane, a static Sphere stripped of its lightmap UV (an
 /// imported mesh without `TEXCOORD_1`) and a dynamic Box; returns it with the floor's
@@ -37,7 +37,7 @@ pub(super) fn quick() -> BakeSettings {
         bounces: 1,
         seed: 1,
         max_lightmap_size: 32,
-        denoiser: rusty_scene::lighting::lightmap::Denoiser::Filter,
+        denoiser: rusty_scene::lighting::settings::Denoiser::Filter,
         filter_radius: 1,
         directional: true,
         backface_tolerance: BakeSettings::DEFAULT_BACKFACE_TOLERANCE,

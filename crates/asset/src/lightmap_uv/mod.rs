@@ -1,7 +1,7 @@
 //! crates/asset/src/lightmap_uv/ — Generate Lightmap UVs (#831), Unity's import checkbox.
 //!
 //! Unwraps a mesh into a second, non-overlapping UV set the lightmap bake
-//! (`scene::lighting::lightmap`) can rasterize, so a level exported from Blender
+//! (`lighting::lightmap`) can rasterize, so a level exported from Blender
 //! without a hand-made UV2 still gets a lightmap. Two well-known steps, no
 //! dependency:
 //!

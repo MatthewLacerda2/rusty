@@ -96,7 +96,7 @@ pub struct Scene {
     /// Baked lightmaps (#438): which lightmap page each static mesh wears. A mesh
     /// absent from it keeps probe / ambient lighting.
     /// Every write moves its revision (`scene::revision`), which the renderer reads.
-    pub lightmaps: crate::revision::Revisioned<crate::lighting::lightmap::LightmapSet>,
+    pub lightmaps: crate::revision::Revisioned<crate::lighting::lightmap_set::LightmapSet>,
     /// The baked occlusion culling (#1714), from `<scene>.occlusion`: see its type.
     pub occlusion: crate::lighting::occlusion::SceneOcclusion,
     /// The `<scene>.navmesh` bytes (#1887, `nav_settings::saved`), checked on use.

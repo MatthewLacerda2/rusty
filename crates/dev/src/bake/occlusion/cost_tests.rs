@@ -9,9 +9,9 @@ use std::time::Instant;
 
 use glam::Vec3;
 
-use rusty_scene::lighting::occlusion::bench::level::rooms;
-use rusty_scene::lighting::occlusion::test_level::block;
-use rusty_scene::lighting::occlusion::{bake_occlusion, gather_occlusion};
+use rusty_lighting::occlusion::bench::level::rooms;
+use rusty_lighting::occlusion::test_level::block;
+use rusty_lighting::occlusion::{bake_occlusion, gather_occlusion};
 use rusty_scene::Scene;
 
 /// The process's peak resident memory, MB (Linux; 0 elsewhere).

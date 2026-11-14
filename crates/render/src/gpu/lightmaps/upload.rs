@@ -26,7 +26,7 @@ pub(crate) const MAX_ARRAY_BYTES: u64 = 1 << 30;
 /// past [`MAX_ARRAY_BYTES`] (a dense directional bake) can exhaust the device's
 /// memory; `Err` instead leaves the scene unlit by lightmaps.
 ///
-/// [`MAX_PAGES`]: rusty_scene::lighting::lightmap::MAX_PAGES
+/// [`MAX_PAGES`]: rusty_lighting::lightmap::MAX_PAGES
 pub(crate) fn fits(
     limits: &wgpu::Limits,
     edge: u32,

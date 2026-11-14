@@ -15,7 +15,7 @@
 //! a lamp's direction up to 5° off a texel, which a glossy surface's baked
 //! highlight showed as a sawtooth (#1996). Its mips are the bake's, made from its
 //! float directions, so the loader uploads the levels as they are. The
-//! bake (`scene::lighting::lightmap`) makes the levels; this module only encodes,
+//! bake (`lighting::lightmap`) makes the levels; this module only encodes,
 //! decodes and stores them (`blocks`), as Unity, Godot 4 and Unreal store theirs.
 //! Baked reflection cubes share the BC6H level encoder ([`bc6h_level`], #1885).
 //!

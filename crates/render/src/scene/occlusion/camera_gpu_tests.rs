@@ -9,9 +9,9 @@ use glam::Vec3;
 
 use crate::{readback, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_components::Projection;
-use rusty_scene::lighting::occlusion::bake_occlusion;
-use rusty_scene::lighting::occlusion::test_gap::gap;
-use rusty_scene::lighting::occlusion::test_level::corridors;
+use rusty_lighting::occlusion::bake_occlusion;
+use rusty_lighting::occlusion::test_gap::gap;
+use rusty_lighting::occlusion::test_level::corridors;
 use rusty_scene::{Camera, Scene};
 
 const W: u32 = 96;

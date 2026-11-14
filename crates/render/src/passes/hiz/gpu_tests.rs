@@ -7,8 +7,8 @@ use std::sync::Arc;
 use glam::Vec3;
 
 use crate::{readback, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_scene::lighting::occlusion::bake_occlusion;
-use rusty_scene::lighting::occlusion::test_level::block;
+use rusty_lighting::occlusion::bake_occlusion;
+use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::{Camera, Scene};
 
 pub(super) const W: u32 = 96;

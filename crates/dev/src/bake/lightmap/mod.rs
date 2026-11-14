@@ -2,7 +2,7 @@
 //!
 //! The one path behind `Lighting.BakeLightmaps()` and the lightmap step of the
 //! editor's Generate Lighting button (#832), so the two never drift. It gathers the
-//! static scene, runs the CPU bake (`scene::lighting::lightmap`, pure and seeded),
+//! static scene, runs the CPU bake (`lighting::lightmap`, pure and seeded),
 //! writes its atlas pages beside the scene, and points the scene's
 //! `lightmaps` at them. Saving the scene (or Generate Lighting, which writes them)
 //! then persists those references. Headless: no GPU is involved.
@@ -40,7 +40,8 @@ use crate::bake::denoise::{self, Oidn};
 use crate::bake::progress::{BakeLog, MeshCost, MeshTime, Step};
 use crate::bake::report::{self, lightmaps::Measured, Stages};
 use rusty_asset::MapRef;
-use rusty_scene::lighting::lightmap::{BakeProgress, BakeScene, BakeSettings};
+use rusty_lighting::lightmap::{BakeProgress, BakeScene};
+use rusty_scene::lighting::settings::BakeSettings;
 use rusty_scene::Scene;
 
 mod encoder;
@@ -96,7 +97,7 @@ pub fn bake_scene_lightmaps_logged(
     let times = &run.measured.times;
     log.mesh_costs(times.iter().map(|t| mesh_cost(scene, t)).collect());
     let mut encoded = run.pages;
-    encoded.lights = rusty_scene::lighting::lightmap::taken_lights(scene);
+    encoded.lights = rusty_lighting::lightmap::taken_lights(scene);
     encoded.shadowmask = input.shadowmask.clone();
     warn_missing_uvs(lightmap_receivers(&input), encoded.maps);
     let written = apply_encoded(scene, scene_path, &encoded)?;

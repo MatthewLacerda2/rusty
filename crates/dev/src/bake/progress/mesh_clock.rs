@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
-use rusty_scene::lighting::lightmap::BakeObserver;
+use rusty_lighting::lightmap::BakeObserver;
 
 /// One mesh's share of a timed bake: its entity, its texels, and the worker time its
 /// batches took, summed over every thread that traced one.

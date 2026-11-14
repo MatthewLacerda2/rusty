@@ -18,9 +18,10 @@ use std::time::{Duration, Instant};
 
 use crate::bake::lightmap::logged::watch;
 use crate::bake::progress::{BakeLog, Progress, Step};
-use rusty_scene::lighting::occlusion::{
-    gather_occlusion, OcclusionBakeReport, OcclusionData, OcclusionInput, OcclusionProgress,
+use rusty_lighting::occlusion::{
+    gather_occlusion, OcclusionBakeReport, OcclusionInput, OcclusionProgress,
 };
+use rusty_scene::lighting::occlusion::OcclusionData;
 use rusty_scene::Scene;
 
 mod clocks;

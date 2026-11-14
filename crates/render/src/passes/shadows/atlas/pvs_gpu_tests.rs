@@ -10,7 +10,7 @@ use super::static_tests::{frame, RES};
 use crate::scene::occlusion_fixture::{baked, nearest, ROOM_1};
 use crate::{RenderView, Renderer};
 use rusty_components::ShadowCasting;
-use rusty_scene::lighting::occlusion::test_level::corridors;
+use rusty_lighting::occlusion::test_level::corridors;
 use rusty_scene::Scene;
 
 /// From the room, through its doorway, to the corridor's far end (mid-way, the

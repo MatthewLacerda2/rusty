@@ -6,7 +6,8 @@ use super::finish;
 use super::load::Loaded;
 use super::upload::{fits, MAX_ARRAY_BYTES};
 use crate::test_gpu::headless_or_skip;
-use rusty_scene::lighting::lightmap::{MAX_PAGE, MAX_PAGES};
+use rusty_lighting::lightmap::MAX_PAGES;
+use rusty_scene::lighting::settings::MAX_PAGE;
 
 #[test]
 fn the_bake_s_page_limit_is_the_array_the_renderer_asks_for() {

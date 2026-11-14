@@ -7,7 +7,7 @@ use glam::{Vec3, Vec4};
 
 use super::fixture::{bake, block, patch, renderer, scene, settled};
 use rusty_components::LightMode;
-use rusty_scene::lighting::lightmap::{mixed_occlusion, BakeScene};
+use rusty_lighting::lightmap::{mixed_occlusion, BakeScene};
 use rusty_scene::lighting::MixedLightingMode::Shadowmask;
 
 #[test]

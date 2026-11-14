@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use crate::authoring::material::fold_pending;
 use crate::collision_matrix::CollisionMatrix;
 use crate::layers::LayerRegistry;
-use crate::lighting::lightmap::LightmapSet;
+use crate::lighting::lightmap_set::LightmapSet;
 use crate::lighting::LightingSettings;
 use crate::nav_settings::NavMeshSettings;
 use crate::Scene;

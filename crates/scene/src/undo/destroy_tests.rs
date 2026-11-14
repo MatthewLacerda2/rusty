@@ -6,7 +6,7 @@ use glam::Vec3;
 
 use crate::authoring::{create_entity, Primitive};
 use crate::decal::DecalSpec;
-use crate::lighting::lightmap::LightmapEntry;
+use crate::lighting::lightmap_set::LightmapEntry;
 use crate::{to_scene_data, Scene};
 
 fn document(scene: &Scene) -> String {

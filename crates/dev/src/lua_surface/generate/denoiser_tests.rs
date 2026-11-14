@@ -3,7 +3,7 @@
 //! (#1949), clamped like the other knobs.
 
 use super::super::super::session::Session;
-use rusty_scene::lighting::lightmap::{BakeSettings, Denoiser};
+use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 
 #[test]
 fn the_denoiser_sets_by_name_and_refuses_an_unknown_one() {

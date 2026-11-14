@@ -123,7 +123,7 @@ fn lightmap_direction_rebalance(dir: vec3<f32>, N: vec3<f32>, Ng: vec3<f32>) -> 
 
 // A direction page texel back to its vector (`xyz`, direction scaled by
 // directionality) and its lamp share (`w`, #1695); mirrors `decode_direction` in
-// crates/scene/src/lighting/lightmap/encode.rs, which stores each component as 128 + 127x.
+// crates/lighting/src/lightmap/encode.rs, which stores each component as 128 + 127x.
 fn decode_lightmap_direction(texel: vec4<f32>) -> vec4<f32> {
     return vec4<f32>((texel.xyz * 255.0 - 128.0) / 127.0, texel.a);
 }

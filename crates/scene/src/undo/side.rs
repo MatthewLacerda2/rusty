@@ -13,7 +13,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::decal::Decal;
-use crate::lighting::lightmap::LightmapEntry;
+use crate::lighting::lightmap_set::LightmapEntry;
 use crate::Scene;
 
 /// What a step's destroyed entities held in the scene's side tables.

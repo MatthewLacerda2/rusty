@@ -539,7 +539,7 @@ CI's `build-test` (the pinned release, where `RUSTY_OIDN` points) and the macOS 
 `oidn_is_present_where_ci_requires_it` into a failure when OIDN does not open. The
 other jobs build `--features dev` without it (rusty opens OIDN at run time, never
 links it) and skip those tests. The bake's own denoiser logic is tested with mocks
-(`scene::lighting::lightmap::denoise_tests`) and runs everywhere.
+(`lighting::lightmap::denoise_tests`) and runs everywhere.
 
 **Running them on a GPU-less Linux box** (a container, a cloud session): install
 lavapipe — `sudo apt-get install -y mesa-vulkan-drivers libvulkan1` — and the same

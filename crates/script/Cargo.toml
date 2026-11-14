@@ -5,7 +5,7 @@ edition.workspace = true
 publish.workspace = true
 
 [features]
-dev = ["rusty-ai/dev", "rusty-asset/dev", "rusty-core/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-scene/dev", "rusty-shadergen/dev"]
+dev = ["rusty-ai/dev", "rusty-asset/dev", "rusty-core/dev", "rusty-lighting/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-scene/dev", "rusty-shadergen/dev"]
 
 [lints]
 workspace = true
@@ -17,6 +17,7 @@ rusty-audio = { workspace = true }
 rusty-components = { workspace = true }
 rusty-core = { workspace = true }
 rusty-ecs = { workspace = true }
+rusty-lighting = { workspace = true }
 rusty-navigation = { workspace = true }
 rusty-physics = { workspace = true }
 rusty-procgen = { workspace = true }

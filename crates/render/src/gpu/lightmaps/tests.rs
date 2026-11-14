@@ -8,7 +8,7 @@ use glam::Mat4;
 use super::Lightmaps;
 use crate::draw::uniforms::solid_object;
 use crate::test_gpu::headless_or_skip;
-use rusty_scene::lighting::lightmap::LightmapEntry;
+use rusty_scene::lighting::lightmap_set::LightmapEntry;
 use rusty_scene::Scene;
 
 /// Write a black `edge`² PNG named `name` under the test's temp dir.

@@ -10,7 +10,7 @@ use rusty_components::{
 };
 use rusty_render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_scene::authoring::{create_entity, default_light, default_post_processing, Primitive};
-use rusty_scene::lighting::lightmap::BakeSettings;
+use rusty_scene::lighting::settings::BakeSettings;
 use rusty_scene::lighting::MixedLightingMode;
 use rusty_scene::{Camera, Scene};
 
@@ -94,7 +94,7 @@ pub(super) fn bake(scene: &mut Scene, name: &str) {
         bounces: 1,
         seed: 1,
         max_lightmap_size: 256,
-        denoiser: rusty_scene::lighting::lightmap::Denoiser::Filter,
+        denoiser: rusty_scene::lighting::settings::Denoiser::Filter,
         filter_radius: 1,
         directional: false,
         backface_tolerance: BakeSettings::DEFAULT_BACKFACE_TOLERANCE,

@@ -5,8 +5,8 @@
 use glam::Vec3;
 
 use super::gpu_tests::{drawn, offscreen, shot, H, W};
+use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::authoring::material;
-use rusty_scene::lighting::occlusion::test_level::block;
 use rusty_scene::{Camera, Scene};
 
 /// The layer frame 1's camera leaves out.

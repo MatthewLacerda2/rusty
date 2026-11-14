@@ -3287,6 +3287,7 @@ dependencies = [
  "rusty-dev",
  "rusty-ecs",
  "rusty-editor",
+ "rusty-lighting",
  "rusty-logging",
  "rusty-navigation",
  "rusty-physics",
@@ -3311,6 +3312,7 @@ dependencies = [
  "glam 0.33.12",
  "rusty-components",
  "rusty-core",
+ "rusty-lighting",
  "rusty-navigation",
  "rusty-physics",
  "rusty-scene",
@@ -3418,6 +3420,7 @@ dependencies = [
  "rusty-asset",
  "rusty-components",
  "rusty-core",
+ "rusty-lighting",
  "rusty-logging",
  "rusty-navigation",
  "rusty-physics",
@@ -3460,6 +3463,7 @@ dependencies = [
  "rusty-core",
  "rusty-dev",
  "rusty-ecs",
+ "rusty-lighting",
  "rusty-navigation",
  "rusty-preview",
  "rusty-scene",
@@ -3469,6 +3473,22 @@ dependencies = [
  "rusty-ui",
  "serde_json",
  "skrifa",
+]
+
+[[package]]
+name = "rusty-lighting"
+version = "0.1.0"
+dependencies = [
+ "glam 0.33.12",
+ "log",
+ "rapier3d",
+ "rusty-asset",
+ "rusty-components",
+ "rusty-core",
+ "rusty-procgen",
+ "rusty-scene",
+ "rusty-test-support",
+ "serde_json",
 ]
 
 [[package]]
@@ -3492,6 +3512,7 @@ dependencies = [
  "rusty-components",
  "rusty-core",
  "rusty-ecs",
+ "rusty-lighting",
  "rusty-physics",
  "rusty-scene",
  "rusty-test-support",
@@ -3556,6 +3577,7 @@ dependencies = [
  "rusty-components",
  "rusty-core",
  "rusty-ecs",
+ "rusty-lighting",
  "rusty-physics",
  "rusty-procgen",
  "rusty-scene",
@@ -3572,7 +3594,6 @@ dependencies = [
  "glam 0.33.12",
  "image",
  "log",
- "rapier3d",
  "rusty-asset",
  "rusty-components",
  "rusty-core",
@@ -3599,6 +3620,7 @@ dependencies = [
  "rusty-components",
  "rusty-core",
  "rusty-ecs",
+ "rusty-lighting",
  "rusty-navigation",
  "rusty-physics",
  "rusty-procgen",

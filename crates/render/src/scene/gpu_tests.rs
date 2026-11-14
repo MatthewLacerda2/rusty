@@ -12,7 +12,7 @@ use super::fixture::{frame, yard, RES};
 use rusty_asset::{JointTransform, SkinData};
 use rusty_components::mesh::primitives::generate_sphere;
 use rusty_components::{MaterialComponent, MeshComponent, RenderMode, ShadowCasting};
-use rusty_scene::lighting::lightmap::LightmapEntry;
+use rusty_scene::lighting::lightmap_set::LightmapEntry;
 use rusty_scene::Scene;
 
 /// A one-joint skinned sphere at `at`, posed by its palette.

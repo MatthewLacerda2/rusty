@@ -162,6 +162,7 @@ fn sim_set_is_pinned() {
         "components",
         "core",
         "ecs",
+        "lighting",
         "navigation",
         "physics",
         "procgen",

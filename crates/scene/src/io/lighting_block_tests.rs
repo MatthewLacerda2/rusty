@@ -1,5 +1,5 @@
 use super::{save_lighting, LightingSave};
-use crate::lighting::lightmap::LightmapEntry;
+use crate::lighting::lightmap_set::LightmapEntry;
 use crate::Scene;
 
 /// A scratch folder per test, so parallel tests never share a scene file.

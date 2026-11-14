@@ -92,7 +92,7 @@ use rusty_components::{
     LightComponent, LodGroupComponent, MaterialAsset, MaterialComponent, MeshComponent,
 };
 use rusty_ecs::{Activity, Changes, Cursor, Layer, StaticSet, WorldPose};
-use rusty_scene::lighting::lightmap::LightmapSet;
+use rusty_scene::lighting::lightmap_set::LightmapSet;
 use rusty_scene::revision::{Revision, Revisioned};
 use rusty_scene::shader_overrides::ShaderOverrides;
 use rusty_scene::Scene;

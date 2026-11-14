@@ -5,7 +5,7 @@ edition.workspace = true
 publish.workspace = true
 
 [features]
-dev = ["dep:libloading", "dep:scorsese-core", "dep:scorsese-providers", "rusty-ai/dev", "rusty-app/dev", "rusty-asset/dev", "rusty-core/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-render/dev", "rusty-scene/dev", "rusty-script/dev", "rusty-shadergen/dev"]
+dev = ["dep:libloading", "dep:scorsese-core", "dep:scorsese-providers", "rusty-ai/dev", "rusty-app/dev", "rusty-asset/dev", "rusty-core/dev", "rusty-lighting/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-render/dev", "rusty-scene/dev", "rusty-script/dev", "rusty-shadergen/dev"]
 
 [lints]
 workspace = true
@@ -15,6 +15,7 @@ rusty-app = { workspace = true }
 rusty-asset = { workspace = true }
 rusty-components = { workspace = true }
 rusty-core = { workspace = true }
+rusty-lighting = { workspace = true }
 rusty-logging = { workspace = true }
 rusty-navigation = { workspace = true }
 rusty-physics = { workspace = true }

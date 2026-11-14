@@ -6,8 +6,9 @@ use super::{apply_occlusion, write_lighting};
 use super::{bake_occlusion_only, OcclusionOnlyReport, UNSAVED_OCCLUSION};
 use crate::bake::progress::BakeLog;
 use crate::session::Session;
-use rusty_scene::lighting::occlusion::OcclusionBakeReport;
-use rusty_scene::lighting::occlusion::{fingerprint, occlusion_path, test_level::corridors};
+use rusty_lighting::occlusion::OcclusionBakeReport;
+use rusty_lighting::occlusion::{fingerprint, test_level::corridors};
+use rusty_scene::lighting::occlusion::occlusion_path;
 use rusty_scene::{MaterialComponent, Scene};
 use rusty_script::scripting::LogLevel;
 

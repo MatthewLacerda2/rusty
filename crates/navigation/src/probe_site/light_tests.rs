@@ -4,8 +4,8 @@
 use glam::Vec3;
 
 use super::site_on_nav;
-use rusty_scene::lighting::placement::test_level::block;
-use rusty_scene::lighting::placement::test_sites::{roofed_house, yard};
+use rusty_lighting::placement::test_level::block;
+use rusty_lighting::placement::test_sites::{roofed_house, yard};
 
 #[test]
 fn light_probes_stay_in_the_air_actors_move_through() {

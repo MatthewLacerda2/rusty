@@ -7,11 +7,11 @@ use std::sync::Mutex;
 use std::time::Instant;
 
 use glam::Vec3;
-use rusty_scene::lighting::occlusion::bench::level::rooms;
+use rusty_lighting::occlusion::bench::level::rooms;
 
-use rusty_scene::lighting::occlusion::bench::shift;
-use rusty_scene::lighting::occlusion::bench::town::{town, Make};
-use rusty_scene::lighting::occlusion::gather_occlusion;
+use rusty_lighting::occlusion::bench::shift;
+use rusty_lighting::occlusion::bench::town::{town, Make};
+use rusty_lighting::occlusion::gather_occlusion;
 use rusty_scene::Scene;
 
 #[test]

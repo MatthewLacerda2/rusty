@@ -15,7 +15,7 @@ use crate::authoring::{create_entity, Primitive};
 use crate::decal::DecalSpec;
 #[cfg(feature = "dev")]
 use crate::lighting::bake_status::BakeStatus;
-use crate::lighting::lightmap::LightmapEntry;
+use crate::lighting::lightmap_set::LightmapEntry;
 use crate::lighting::reflection_probe::ReflectionProbe;
 use crate::{Scene, SceneId};
 
