@@ -69,7 +69,9 @@ pub(crate) struct CameraSection {
 
 /// Every post effect the Inspector draws a section for, on either card (the volume's
 /// and the camera's): what the post effects' completeness gate checks the renderer
-/// against (`render::postfx::completeness`).
+/// against (`render::postfx::completeness`). A test hook in every build: the
+/// integration suite's `tests/post_effect_layers.rs` reads it.
+#[doc(hidden)]
 pub fn drawn_effects() -> Vec<&'static str> {
     let volume = post_processing::SECTIONS.iter().map(|s| s.effect);
     volume
