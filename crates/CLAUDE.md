@@ -51,6 +51,31 @@ A member that is no module of the table (`test-support`) is listed in both
 `NOT_MODULES`, `tools/lint/src/modules.rs` and `.github/scripts/modules.py`, which
 `make scripts` holds equal (`modules.drift`).
 
+## Splitting a crate
+A sub-module leaving an existing crate for a new one, by hand: `git mv`, the
+manifest, the row, then the compiler names every path left to fix.
+- **Cut where nothing below names the half that moves.** Map who uses each
+  sub-module first; what the staying half's live code reaches (a type a field of
+  the base holds, the settings it stores) moves *down* into the base before the
+  cut, and the half above names it there (`scene::lighting::settings::BakeSettings`).
+  A test-only reach from a crate below the new one is a `[dev-dependencies]` entry,
+  never a live edge.
+- **No re-export facade** in the base for what moved: a `pub use` of the new crate
+  from the old one is an edge back down, and it rebuilds the base's dependents on
+  every edit the split was meant to spare them. Callers name the new crate.
+- **Inside the new crate**, `crate::<old>::<m>` becomes `crate::<m>`, the old
+  crate's own items become `rusty_<old>::…`, and `pub(in crate::<old>)` becomes
+  `pub(crate)`. A `use super::*` test reaching a moved item finds it through a
+  `#[cfg(test)] use` in its parent; rustdoc does not see that one, so an
+  intra-doc link to the item names its full path.
+- **What tests reach across the cut** becomes a test hook (a `#[cfg(test)]`
+  method the moved tests call turns `#[doc(hidden)] pub`), and an inherent method
+  the new crate wrote on a base type becomes its free function (E0116).
+- **Paths kept outside the code follow**: `include_str!`'s relative paths (one
+  folder shallower or deeper), `.cargo/mutants.toml`'s globs, a `stored-format`
+  marker whose directory no longer covers a moved file (the moved file takes its
+  own), `layers`' pinned sim set, and prose naming the old module path.
+
 ## Crossing a crate boundary
 - **An item another crate reaches is `pub`**: it is that crate's API, so a PR making
   one `pub` says so. An item only tests use elsewhere is a *test hook*.
