@@ -1,0 +1,154 @@
+//! Construction of the renderer-wide SSAO resources: the bind-group layout, the
+//! occlusion, blur and upsample pipelines, and the white no-AO fallback.
+
+use super::{SsaoRenderer, Stage, AO_FORMAT};
+use crate::gpu::fullscreen::Fullscreen;
+use crate::gpu::layout_entries::{depth_entry, texture_entry, uniform_entry};
+use crate::gpu::pipelines::LazyPipeline;
+use crate::gpu::shaders::ShaderRegistry;
+use crate::timing::GpuTimer;
+
+impl SsaoRenderer {
+    pub(crate) fn new(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        registry: &mut ShaderRegistry,
+    ) -> Self {
+        let layout = create_layout(device);
+        let shader = registry.load(device, "ssao.wgsl", "SSAO Shader");
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("SSAO Pipeline Layout"),
+            bind_group_layouts: &[Some(&layout)],
+            immediate_size: 0,
+        });
+        // Built on the first frame a view runs AO (#985): most renderers never do.
+        let pipeline = |stage: Stage| {
+            let (shader, layout) = (shader.clone(), pipeline_layout.clone());
+            LazyPipeline::new(device, move |device| {
+                let pass = Fullscreen {
+                    label: stage.label(),
+                    shader: &shader,
+                    layout: &layout,
+                    vs: "vs_fullscreen",
+                    fs: stage.entry(),
+                };
+                pass.colour(device, &[Some(AO_FORMAT.into())])
+            })
+        };
+        let (no_ao_texture, no_ao) = white_texture(device, queue);
+        Self {
+            pipelines: Stage::ALL.map(pipeline),
+            layout,
+            _no_ao_texture: no_ao_texture,
+            no_ao,
+        }
+    }
+
+    /// The pipelines, for warming (`Renderer::lazy_pipelines`).
+    pub(crate) fn lazy_pipelines(&self) -> impl Iterator<Item = &LazyPipeline> {
+        self.pipelines.iter()
+    }
+
+    /// Record one fullscreen pass of `stage` over `group` into `target`, timed under
+    /// the stage's own entry.
+    pub(super) fn fullscreen(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        stage: Stage,
+        (group, target): (&wgpu::BindGroup, &wgpu::TextureView),
+        timer: &GpuTimer,
+    ) {
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            multiview_mask: None,
+            label: Some(stage.label()),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                depth_slice: None,
+                view: target,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: timer.writes(stage.timed()),
+            occlusion_query_set: None,
+        });
+        pass.set_pipeline(self.pipelines[stage as usize].get());
+        pass.set_bind_group(0, group, &[]);
+        pass.draw(0..3, 0..1);
+    }
+
+    /// A bind group over the SSAO layout: the view's uniform, its depth, and `raw` —
+    /// the occlusion the stage reads (the white fallback for the AO pass).
+    pub(super) fn group(
+        &self,
+        device: &wgpu::Device,
+        uniform: &wgpu::Buffer,
+        depth: &wgpu::TextureView,
+        raw: &wgpu::TextureView,
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("SSAO Bind Group"),
+            layout: &self.layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: uniform.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(depth),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(raw),
+                },
+            ],
+        })
+    }
+}
+
+/// Uniform (every stage's params), the view's depth, and the occlusion a stage reads — all read
+/// with `textureLoad`, so no sampler.
+fn create_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("SSAO Layout"),
+        entries: &[
+            uniform_entry(0, wgpu::ShaderStages::FRAGMENT),
+            depth_entry(1, wgpu::TextureViewDimension::D2),
+            texture_entry(2, wgpu::TextureViewDimension::D2),
+        ],
+    })
+}
+
+/// The 1x1 white AO texture: "nothing occluded".
+fn white_texture(device: &wgpu::Device, queue: &wgpu::Queue) -> (wgpu::Texture, wgpu::TextureView) {
+    let size = wgpu::Extent3d {
+        width: 1,
+        height: 1,
+        depth_or_array_layers: 1,
+    };
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("SSAO No-AO Fallback"),
+        size,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: AO_FORMAT,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+    queue.write_texture(
+        texture.as_image_copy(),
+        &[255],
+        wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(1),
+            rows_per_image: None,
+        },
+        size,
+    );
+    let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    (texture, view)
+}

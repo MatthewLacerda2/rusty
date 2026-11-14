@@ -34,6 +34,16 @@ fn a_degenerate_graph_has_no_walkable_extent() {
     );
 }
 
+/// Flat in X alone: one column of cells along Z is still no baked grid, so a single
+/// degenerate axis is enough to report no extent.
+#[test]
+fn a_graph_degenerate_in_one_axis_has_no_walkable_extent() {
+    assert_eq!(
+        NavigationGraph::new(0.0, 0.0, -4.0, 4.0, 1.0).walkable_aabb(),
+        None
+    );
+}
+
 #[test]
 fn a_graph_with_nothing_walkable_has_no_extent() {
     let g = NavigationGraph::from_scene(&Scene::new());

@@ -6,13 +6,16 @@
 #
 # These are RECORDED floors a hair below the achieved coverage (measured both
 # feature sets accumulated, each module isolated from every other src/ dir):
-# app 95.03, scripting 96.63, physics 97.59, navigation 96.39, api 86.72. `script` holds
-# `scripting` and `api` since they became one crate: its floor is their two floors
-# weighted by lines (~9k at 96, ~30k at 86), to re-measure on the next weekly run.
+# app 95.03, scripting 96.63, physics 97.59, navigation 96.39, api 86.72. The `script`
+# crate holds `scripting` and `api`, so each half keeps a floor of its own (a
+# `<crate>/<folder>` line, .github/scripts/coverage-ignore.py): one merged floor would
+# let the better-covered half's slack hide the other's drop. The crate's own
+# top-level files (`lib.rs`, `test_temp.rs`) count toward neither.
 # Ratchet them UP as coverage improves; never lower one silently to hide a
 # regression. A lowered floor ends its line with `# reason: <why>`, or
 # `make scripts` fails it (.github/scripts/coverage_floors.py, #963).
 app 95.00
-script 88.00
+script/scripting 96.00
+script/api 86.00  # reason: the merged `script 88.00` averaged in scripting; api measured alone is 86.72
 physics 97.00
 navigation 96.00

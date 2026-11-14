@@ -68,7 +68,7 @@ avoid:
   50-line cap in `apply`; the level list's check test asks the
   second to land for its field;
 - `crates/script/src/api/mod.rs`, `crates/script/src/scripting/callbacks.rs`;
-- `src/app/registry.rs`'s `build()`, where order *is* execution order, so a merge
+- `crates/app/src/registry.rs`'s `build()`, where order *is* execution order, so a merge
   that reorders it changes behaviour silently;
 - `docs/api/index.md`, `docs/api/Scene.md`'s component list,
   `docs/linting.md` (a rule's table row and section; both are kept sorted under
@@ -88,7 +88,7 @@ batch's issues by what they add. When three or more add an instance of one kind,
 and each would edit a shared struct, shader body, match arm or list rather than
 add its own file plus one sorted row, the batch's first issue makes that kind a
 registry: filed before any of them is briefed, and `Blocked by` on each. The
-model is `src/render/CLAUDE.md`, *Adding a post effect*, with the `// sorted:`
+model is `crates/render/src/CLAUDE.md`, *Adding a post effect*, with the `// sorted:`
 marker. No check holds this: it is read from issues before any code exists.
 
 **Split by responsibility, not by parallelism.** Sub-issues that all touch the

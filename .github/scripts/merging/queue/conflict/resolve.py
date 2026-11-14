@@ -27,7 +27,7 @@ file with no `diff3` base section, a conflict git left without markers (a
 delete, a rename). [`settle`] writes nothing unless every conflicted path
 resolves, so a branch is never half-resolved by machine.
 
-`src/app/registry.rs` stays out by construction: its order is the frame's system
+`crates/app/src/registry.rs` stays out by construction: its order is the frame's system
 schedule, so it carries no marker (a test holds that).
 """
 

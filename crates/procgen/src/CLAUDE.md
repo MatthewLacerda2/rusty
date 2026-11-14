@@ -4,7 +4,7 @@ Area rules for `crates/procgen/src/`. Project-wide rules stay in the root `CLAUD
 
 ## Adding an op
 An op is **one file plus one row**, the way a post effect is a module in
-every layer (`src/render/CLAUDE.md`, *Adding a post effect*). It edits no shared
+every layer (`crates/render/src/CLAUDE.md`, *Adding a post effect*). It edits no shared
 `match`, enum body or table. The test-only `dummy`
 (`catalog/color/dummy.rs`) is the worked example: grep `dummy` for its file and
 its rows.

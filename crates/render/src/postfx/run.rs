@@ -1,0 +1,229 @@
+//! Per-frame execution of the post-process chain after the effects' scene passes:
+//! the composite (assembled from the effects' functions around the grading LUT
+//! `grade` baked), the LDR passes (the authored effects, #397, TAA's sharpen, then
+//! FXAA — or a plain copy, unless the last pass wrote the output itself) that write
+//! the finished image to the target.
+
+use super::effects::{self, EffectCx, Gpu, LdrRun, Pass};
+use super::{PostFx, PostFxContext, PostParams};
+use crate::timing::GpuPass;
+
+impl PostFx {
+    /// Run the chain after the effects' scene passes: the composite, then the LDR
+    /// passes that run for `cx` (the authored effects in place, FXAA finishing), or
+    /// a plain copy when only in-place ones ran. `params` is the frame: `ctx.output`
+    /// the final swapchain/screenshot view.
+    pub(crate) fn run(
+        &mut self,
+        gpu: Gpu,
+        ctx: PostFxContext<'_>,
+        cx: &EffectCx,
+        params: PostParams,
+    ) {
+        let (device, queue) = gpu;
+        queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
+        let slots = effects::composite_slots(cx);
+        queue.write_buffer(&self.fx_buffer, 0, bytemuck::cast_slice(&slots));
+        let ldr: Vec<&LdrRun> = effects::ldr_passes()
+            .iter()
+            .filter_map(|pass| {
+                let Pass::Ldr { prepare, run, .. } = pass else {
+                    return None;
+                };
+                prepare(self, device, cx).then_some(run)
+            })
+            .collect();
+
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("PostFX Encoder"),
+        });
+        // When an LDR pass follows the composite it lands in the LDR target for that
+        // pass to sample; otherwise it writes the output directly, so the plain path
+        // is byte-for-byte what the chain produced before those existed.
+        let [io, textures] = self.composite_groups(device, &ctx);
+        let followed = !ldr.is_empty();
+        let composite_target = if followed { &self.ldr.view } else { ctx.output };
+        let composite = (&self.composite_pipeline, ctx.timer.writes(GpuPass::PostFx));
+        Self::fullscreen(&mut encoder, composite, &[&io, &textures], composite_target);
+
+        let mut finish = None;
+        let mut ended = false;
+        let count = ldr.len();
+        for (i, run) in ldr.into_iter().enumerate() {
+            match run {
+                LdrRun::InPlace(run) => run(self, gpu, &mut encoder, &ctx, cx),
+                LdrRun::MayEnd(run) => {
+                    // Only a finishing pass comes after the in-place ones, so the
+                    // last one in the list is the chain's last.
+                    ended = run(self, gpu, &mut encoder, &ctx, cx, i + 1 == count);
+                }
+                LdrRun::Finish(pipeline) => finish = Some(*pipeline),
+            }
+        }
+        // The finishing pass, or the copy that lands the in-place passes' result,
+        // unless the last one wrote the output itself. The aux/depth/skybox bindings
+        // are unused by either but must satisfy the shared IO layout.
+        let last = match finish {
+            Some(pipeline) => Some(pipeline(self)),
+            None => (followed && !ended).then_some(&self.copy_pipeline),
+        };
+        if let Some(pipeline) = last {
+            let bg = self.io_bind_group(
+                device,
+                &self.ldr.view,
+                self.bloom_view(),
+                ctx.depth_view,
+                ctx.skybox,
+            );
+            let last = (pipeline, ctx.timer.writes(GpuPass::PostFx));
+            Self::fullscreen(&mut encoder, last, &[&bg], ctx.output);
+        }
+
+        queue.submit(std::iter::once(encoder.finish()));
+    }
+
+    /// Composite this frame's scene once more into `ctx.output` — graded,
+    /// tonemapped and bloomed, without FXAA or the authored effects — as the source
+    /// of the UI's backdrop blur (#426), which runs after the chain at its own,
+    /// downsampled size (every read is by uv). Uses the params and bloom `run` left.
+    pub(crate) fn composite_into(
+        &self,
+        device: &wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
+        ctx: PostFxContext<'_>,
+    ) {
+        let [io, textures] = self.composite_groups(device, &ctx);
+        // The UI's backdrop source, so its time is the UI's.
+        let composite = (&self.composite_pipeline, ctx.timer.writes(GpuPass::Ui));
+        Self::fullscreen(encoder, composite, &[&io, &textures], ctx.output);
+    }
+
+    /// The composite's groups: the chain's io group over this frame's scene, and the
+    /// effects' own textures (#1473).
+    fn composite_groups(&self, device: &wgpu::Device, ctx: &PostFxContext) -> [wgpu::BindGroup; 2] {
+        let io = self.io_bind_group(
+            device,
+            self.scene_color(),
+            self.bloom_view(),
+            ctx.depth_view,
+            ctx.skybox,
+        );
+        [io, self.effect_textures.bind_group(device, self)]
+    }
+
+    /// The format the chain writes its output in (what [`PostFx::composite_into`]
+    /// must target).
+    pub(crate) fn output_format(&self) -> wgpu::TextureFormat {
+        self.output_format
+    }
+
+    /// Build a bind group: params + color(1) + sampler(2) + bloom(3) + depth(4) +
+    /// skybox(5) + its sampler(6) + the grading LUT(7) + the adapted exposure(8) + the
+    /// effect slots(9). `color` is the texture the pass reads, `bloom` an aux texture.
+    pub(crate) fn io_bind_group(
+        &self,
+        device: &wgpu::Device,
+        color: &wgpu::TextureView,
+        bloom: &wgpu::TextureView,
+        depth: &wgpu::TextureView,
+        (skybox, skybox_sampler): (&wgpu::TextureView, &wgpu::Sampler),
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("PostFX IO Bind Group"),
+            layout: &self.io_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.params_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(color),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(bloom),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::TextureView(depth),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: wgpu::BindingResource::TextureView(skybox),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: wgpu::BindingResource::Sampler(skybox_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 7,
+                    resource: wgpu::BindingResource::TextureView(&self.grade.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 8,
+                    resource: self.exposure.state().as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 9,
+                    resource: self.fx_buffer.as_entire_binding(),
+                },
+            ],
+        })
+    }
+
+    /// One fullscreen triangle into `target`, `groups` bound from group 0 up, with
+    /// the pass's timestamp writes (#835).
+    pub(crate) fn fullscreen(
+        encoder: &mut wgpu::CommandEncoder,
+        timed: Timed<'_>,
+        groups: &[&wgpu::BindGroup],
+        target: &wgpu::TextureView,
+    ) {
+        Self::fullscreen_into(encoder, timed, groups, [target]);
+    }
+
+    /// [`Self::fullscreen`] into several colour `targets` at once, in their
+    /// locations' order (TAA's colour and surface, #1846).
+    pub(crate) fn fullscreen_into<const N: usize>(
+        encoder: &mut wgpu::CommandEncoder,
+        (pipeline, timestamp_writes): Timed<'_>,
+        groups: &[&wgpu::BindGroup],
+        targets: [&wgpu::TextureView; N],
+    ) {
+        let attachments = targets.map(|view| {
+            Some(wgpu::RenderPassColorAttachment {
+                depth_slice: None,
+                view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: wgpu::StoreOp::Store,
+                },
+            })
+        });
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            multiview_mask: None,
+            label: Some("PostFX Pass"),
+            color_attachments: &attachments,
+            depth_stencil_attachment: None,
+            timestamp_writes,
+            occlusion_query_set: None,
+        });
+        pass.set_pipeline(pipeline);
+        for (i, group) in groups.iter().enumerate() {
+            pass.set_bind_group(i as u32, *group, &[]);
+        }
+        pass.draw(0..3, 0..1);
+    }
+}
+
+/// A pass's pipeline and its timestamp writes.
+pub(crate) type Timed<'a> = (
+    &'a wgpu::RenderPipeline,
+    Option<wgpu::RenderPassTimestampWrites<'a>>,
+);
