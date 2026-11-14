@@ -1,0 +1,295 @@
+//! crates/render/src/ibl/cubemap_capture.rs — Static-scene cubemap capture from a point (#243).
+//!
+//! A reusable render primitive: given a world position, render the STATIC scene into
+//! a 6-face cubemap of linear HDR radiance, reusing the forward lit pass. This is the
+//! shared spine both probe bakes and reflection bakes stand on.
+//!
+//! The faces are read from the view's HDR scene target (`Rgba16Float`, the forward
+//! pass's own output) before the post-FX composite, so a capture carries no grade,
+//! no tonemap, no display encode and no clamp (#1696): a lamp of radiance 40 is 40
+//! in the cube, as Unity's HDR probes and UE's FP16 captures keep it. A texel the
+//! half float cannot hold (a NaN from a material, an emissive past 65504 overflowing
+//! to infinity) is filtered here, once, so it never reaches a mip or a probe's SH:
+//! [`sanitize`].
+//!
+//! Only `is_static` entities (plus, for a reflection capture, the skybox — the distant
+//! environment) are drawn; dynamic actors are excluded so they never bake into a
+//! probe/reflection. A light probe's capture draws no sky and reflects nothing, and
+//! its bake adds the ambient where the view escapes (`probe::capture`, #1668). The static
+//! filter mirrors the shadow pass's static sweep (`passes::shadows::casters::sweep`):
+//! the forward solid-gather honours the renderer's [`CaptureMode::static_only`],
+//! toggled on here for the six faces and restored after.
+//!
+//! Output is a function of (static scene, position, resolution, lens) — no wall-clock/RNG,
+//! so it is exempt from (and clean under) the determinism guard. Pure render layer.
+
+use glam::Vec3;
+
+use super::faces::mirror_rows;
+pub use super::faces::CubemapFace;
+pub(crate) use super::faces::{face_camera, face_view_projection};
+use rusty_core::color::f16_to_f32;
+
+use crate::readback::read_texture_bytes;
+use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
+
+use rusty_scene::Camera;
+use rusty_scene::Scene;
+
+/// Six faces of linear HDR radiance captured from one world point (#1696). Each face
+/// is `resolution × resolution` texels, row-major top to bottom, laid out as a
+/// `texture_cube` samples it (#1615): uploaded as a cube's six layers, a direction
+/// reads what the capture saw along it. Every texel is finite and non-negative
+/// (`sanitize`). Indexed by `CubemapFace as usize` via [`CubemapCapture::face`].
+pub struct CubemapCapture {
+    /// Edge length in pixels of every face.
+    pub resolution: u32,
+    /// The six faces in `CubemapFace::ALL` order.
+    pub faces: [Vec<Vec3>; 6],
+}
+
+impl CubemapCapture {
+    /// The texels of one face.
+    pub fn face(&self, face: CubemapFace) -> &[Vec3] {
+        &self.faces[face as usize]
+    }
+}
+
+/// The largest finite half float: what an emissive past it saturates to.
+pub(crate) const HALF_MAX: f32 = 65504.0;
+
+/// One captured channel as the bake may use it (#1696): a NaN is black, a negative
+/// is zero and anything past [`HALF_MAX`] (an overflowed `+inf`) is held there, so
+/// one bad texel stays one bright texel and never poisons a mip's average or a
+/// probe's SH.
+pub(crate) fn sanitize(c: f32) -> f32 {
+    if c.is_nan() {
+        0.0
+    } else {
+        c.clamp(0.0, HALF_MAX)
+    }
+}
+
+/// An `Rgba16Float` readback's RGB, sanitized; alpha is dropped.
+pub(crate) fn decode_half_texels(bytes: &[u8]) -> Vec<Vec3> {
+    let half = |b: &[u8]| sanitize(f16_to_f32(u16::from_le_bytes([b[0], b[1]])));
+    (bytes.chunks_exact(8))
+        .map(|t| Vec3::new(half(&t[..2]), half(&t[2..4]), half(&t[4..6])))
+        .collect()
+}
+
+impl Renderer {
+    /// Render the STATIC scene into a 6-face cubemap centred on `position`, each face
+    /// `resolution × resolution` linear HDR radiance (#243, #1696). Reuses the forward lit pass with a
+    /// 90° FOV per face; only `is_static` entities and the skybox are drawn. A light
+    /// probe captures through [`Renderer::capture_light_probe`] instead, which draws
+    /// no sky (#1668).
+    ///
+    /// The faces render into a target of their own, `resolution²`, whatever the
+    /// renderer's own size.
+    pub fn capture_static_cubemap(
+        &mut self,
+        scene: &Scene,
+        position: Vec3,
+        resolution: u32,
+    ) -> CubemapCapture {
+        self.capture_static_cubemap_inner(scene, position, resolution, CaptureSky::Drawn)
+            .0
+    }
+
+    /// Like [`Renderer::capture_static_cubemap`], through a reflection probe's `lens`:
+    /// its clip planes, and shadows or none (#1584). It also returns, per face, the
+    /// texels nothing covered, where the sky is drawn: the bake projects its stored
+    /// irradiance with the ambient there instead, as a light probe's (#1697).
+    pub fn capture_reflection_cubemap(
+        &mut self,
+        scene: &Scene,
+        position: Vec3,
+        resolution: u32,
+        lens: CaptureLens,
+    ) -> (CubemapCapture, [Vec<bool>; 6]) {
+        let sky = CaptureSky::Reflection(lens);
+        self.capture_static_cubemap_inner(scene, position, resolution, sky)
+    }
+
+    /// Shared capture spine: render the static scene into a 6-face cubemap from
+    /// `position`, the sky drawn or not as `sky` says. A light-probe or reflection
+    /// capture also returns, per face, which texels nothing covered (their depth is
+    /// the cleared far plane): the directions that escape the scene, where the
+    /// projection adds the ambient (`probe::bake::project_light_probe`).
+    pub(crate) fn capture_static_cubemap_inner(
+        &mut self,
+        scene: &Scene,
+        position: Vec3,
+        resolution: u32,
+        sky: CaptureSky,
+    ) -> (CubemapCapture, [Vec<bool>; 6]) {
+        let resolution = resolution.max(1);
+        let target = self.make_face_target(resolution);
+        let output = target.create_view(&wgpu::TextureViewDescriptor::default());
+        // One throwaway view (its own depth + post-FX) sized to the face, reused across
+        // all six faces since they share a resolution (#355).
+        let mut render_view =
+            RenderView::targetless(&self.device, OFFSCREEN_FORMAT, resolution, resolution);
+
+        // Gather only static geometry, (for bounce ≥2) let those static surfaces
+        // sample the probe field, and cast shadows as the lens says. The mode is
+        // restored after the six faces.
+        let prev = self.capture;
+        self.capture = sky.mode();
+        let lens = sky.lens();
+
+        let mut open: [Vec<bool>; 6] = Default::default();
+        let faces = CubemapFace::ALL.map(|face| {
+            let mut camera = face_camera(position, face);
+            (camera.near, camera.far) = (lens.near, lens.far);
+            self.render_capture_face(&mut render_view, scene, &camera, &output);
+            let hdr = &render_view.post_fx.scene_hdr.texture;
+            let size = (resolution, resolution);
+            let bytes = read_texture_bytes(&self.device, &self.queue, hdr, size, 8);
+            let mut pixels = decode_half_texels(&bytes);
+            mirror_rows(&mut pixels, resolution);
+            if sky.reads_open() {
+                open[face as usize] = self.read_open_texels(&render_view, resolution);
+            }
+            pixels
+        });
+
+        self.capture = prev;
+        (CubemapCapture { resolution, faces }, open)
+    }
+
+    /// Which texels of the face just drawn into `view` nothing covered: its depth is
+    /// still the far plane the scene pass cleared to. Mirrored as the colour is.
+    fn read_open_texels(&self, view: &RenderView, resolution: u32) -> Vec<bool> {
+        let size = (resolution, resolution);
+        let depth = read_texture_bytes(&self.device, &self.queue, &view.depth_texture, size, 4);
+        let mut open: Vec<bool> = (depth.chunks_exact(4))
+            .map(|d| f32::from_le_bytes([d[0], d[1], d[2], d[3]]) >= 1.0)
+            .collect();
+        mirror_rows(&mut open, resolution);
+        open
+    }
+
+    /// Build the per-face output the post-FX composite writes. The capture reads the
+    /// view's HDR scene target instead, ahead of the composite; this is only where
+    /// the shared frame path lands its display image.
+    fn make_face_target(&self, resolution: u32) -> wgpu::Texture {
+        self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Cubemap Face Target"),
+            size: wgpu::Extent3d {
+                width: resolution,
+                height: resolution,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: OFFSCREEN_FORMAT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        })
+    }
+}
+
+/// How the renderer draws while a static cubemap is captured; the default (all
+/// dynamic, no probe bounce, shadows on) is every other frame's.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct CaptureMode {
+    /// The forward pass gathers only `is_static` entities (#243), so probe and
+    /// reflection bakes see the distant environment (static walls + skybox) without
+    /// the dynamic actors that would otherwise bake into the captured lighting.
+    pub static_only: bool,
+    /// Static surfaces sample the probe field instead of flat ambient (#285): the
+    /// multi-bounce probe bake sets it for bounce ≥2, adding one indirect bounce per
+    /// pass. Off everywhere else, so direct-only capture and runtime shading keep
+    /// their "static ⇒ no probe SH" rule.
+    pub probe_bounce: bool,
+    /// Lights cast shadows; off for a reflection probe captured without (#1584).
+    pub shadows: bool,
+    /// A light-probe capture (#1668): no sky is drawn and the background clears to
+    /// black, so the escaping directions carry nothing but what the CPU adds, the
+    /// ambient (Unity bakes light probes against Environment Lighting, not the skybox).
+    pub ambient_sky: bool,
+}
+
+impl Default for CaptureMode {
+    fn default() -> Self {
+        Self {
+            static_only: false,
+            probe_bounce: false,
+            shadows: true,
+            ambient_sky: false,
+        }
+    }
+}
+
+/// What a static capture sees where nothing covers the view.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum CaptureSky {
+    /// The skybox, through the scene camera's planes.
+    Drawn,
+    /// The skybox, through a reflection probe's lens (#1584).
+    Reflection(CaptureLens),
+    /// Nothing: a light probe's capture (#1668), the ambient added on the CPU.
+    /// `bounce` lights the static surfaces from the probe field too (#285).
+    Ambient { bounce: bool },
+}
+
+impl CaptureSky {
+    /// The capture mode its six faces draw with.
+    fn mode(self) -> CaptureMode {
+        CaptureMode {
+            static_only: true,
+            probe_bounce: matches!(self, Self::Ambient { bounce: true }),
+            shadows: self.lens().shadows,
+            ambient_sky: matches!(self, Self::Ambient { .. }),
+        }
+    }
+
+    /// Whether the capture reads which texels nothing covered: a light probe's and
+    /// a reflection probe's do (their bakes add the ambient there, #1668, #1697).
+    fn reads_open(self) -> bool {
+        !matches!(self, Self::Drawn)
+    }
+
+    fn lens(self) -> CaptureLens {
+        match self {
+            Self::Reflection(lens) => lens,
+            Self::Drawn | Self::Ambient { .. } => CaptureLens::default(),
+        }
+    }
+}
+
+/// How a capture sees (#1584): the clip planes of its six cameras, and whether its
+/// lights cast shadows. A reflection probe sets its own; the default is the scene
+/// camera's planes, with shadows.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CaptureLens {
+    pub near: f32,
+    pub far: f32,
+    pub shadows: bool,
+}
+
+impl Default for CaptureLens {
+    fn default() -> Self {
+        let camera = Camera::new(Vec3::ZERO, 0.0, 0.0);
+        Self {
+            near: camera.near,
+            far: camera.far,
+            shadows: true,
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "cubemap_capture_tests.rs"]
+mod cubemap_capture_tests;
+
+#[cfg(test)]
+#[path = "texture_cube_tests.rs"]
+mod texture_cube_tests;
+
+#[cfg(test)]
+#[path = "capture_camera_tests.rs"]
+mod capture_camera_tests;

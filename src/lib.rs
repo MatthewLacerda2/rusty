@@ -12,7 +12,6 @@ pub mod app;
 pub mod editor;
 pub mod logging;
 pub mod preview;
-pub mod render;
 pub mod shell;
 
 // The modules already moved into crates of their own (crates/CLAUDE.md), under their
@@ -27,6 +26,7 @@ pub use rusty_ecs as ecs;
 pub use rusty_navigation as navigation;
 pub use rusty_physics as physics;
 pub use rusty_procgen as procgen;
+pub use rusty_render as render;
 pub use rusty_scene as scene;
 pub use rusty_script as script;
 pub use rusty_shadergen as shadergen;
@@ -36,6 +36,8 @@ pub use rusty_ui as ui;
 #[cfg(feature = "dev")]
 pub mod dev;
 
+#[cfg(test)]
+mod post_effect_layers_tests;
 #[cfg(test)]
 mod test_path;
 #[cfg(test)]

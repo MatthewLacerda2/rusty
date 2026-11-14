@@ -30,7 +30,7 @@
 // image and leaves it as it was.
 //
 // The march itself is `lighting/ssr_march.wgsl`, shared with a transparent surface
-// that traces its own (#1570). No derivatives here (src/render/CLAUDE.md, *Shaders*):
+// that traces its own (#1570). No derivatives here (crates/render/src/CLAUDE.md, *Shaders*):
 // every read is a `textureLoad` or an explicit-LOD sample, so the per-pixel branches
 // below are safe.
 

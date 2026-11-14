@@ -5,7 +5,7 @@
 // axis from the velocity target's `.z`; a transparent reads the eye distance in the
 // opaque copy's `.a` (`opaque_copy.wgsl`). A `Frame` says which.
 //
-// No derivatives here (src/render/CLAUDE.md, *Shaders*): every read is a
+// No derivatives here (crates/render/src/CLAUDE.md, *Shaders*): every read is a
 // `textureLoad` or an explicit-LOD sample, so a caller may march in a per-pixel branch.
 
 #define_import_path lighting::ssr_march
