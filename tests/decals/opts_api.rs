@@ -5,14 +5,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::MaterialAsset;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 fn run(scene: &Rc<RefCell<Scene>>, script: &str) -> mlua::Result<()> {
     let lua = Lua::new();
     crate::lua::attempt(|| {
-        rusty::api::decals::register(&lua, bind(&lua, scene)).unwrap();
+        rusty::script::api::decals::register(&lua, bind(&lua, scene)).unwrap();
         lua.load(script).exec()
     })
 }

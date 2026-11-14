@@ -13,7 +13,7 @@ pub use edit_menu::typing_holds_step;
 use crate::editor::menu_create;
 use crate::editor::EditorUi;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 /// TOP BAR — one row (#1914): the menus (File / Edit / GameObject / Config / About) on
 /// the left, the transport (Play, Stop during Play) and the Developer Console button

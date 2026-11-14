@@ -7,7 +7,7 @@ use crate::dev::session::Session;
 use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 /// A session with its empty scene saved, and an editor window open on that file
 /// (the window marks itself the bake's host).

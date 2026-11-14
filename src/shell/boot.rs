@@ -20,7 +20,7 @@ use crate::core::settings::video::VideoSettings;
 use crate::navigation::NavigationGraph;
 use crate::render::{PixelSize, Renderer};
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 /// The project tree an asset refresh sweeps (Unity's `Assets/`): an `.mp3`
 /// anywhere under it is converted to `.wav` (#385).

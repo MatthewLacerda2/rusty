@@ -7,10 +7,10 @@ use std::rc::Rc;
 
 use glam::{Quat, Vec3};
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::particle::{EmitMode, ParticleEmitterComponent, SimulationSpace};
 use rusty::core::curve::Range;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 use super::{burst, emitter, state};
 
@@ -18,7 +18,7 @@ use super::{burst, emitter, state};
 fn lua<R: mlua::FromLuaMulti>(scene: &Rc<RefCell<Scene>>, code: &str) -> mlua::Result<R> {
     let lua = Lua::new();
     crate::lua::attempt(|| {
-        rusty::api::particle::register(&lua, bind(&lua, scene)).unwrap();
+        rusty::script::api::particle::register(&lua, bind(&lua, scene)).unwrap();
         lua.load(code).eval::<R>()
     })
 }

@@ -12,7 +12,7 @@ use crate::core::fs::written::write;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::{asset_mesh_component, Scene};
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 fn edit_game(scene: &Rc<RefCell<Scene>>) -> GameWorld {
     GameWorld::new(

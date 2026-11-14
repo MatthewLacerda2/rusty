@@ -6,13 +6,13 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 fn eval<T: mlua::FromLuaMulti>(scene: &Rc<RefCell<Scene>>, script: &str) -> mlua::Result<T> {
     let lua = Lua::new();
     crate::lua::attempt(|| {
-        rusty::api::decals::register(&lua, bind(&lua, scene)).unwrap();
+        rusty::script::api::decals::register(&lua, bind(&lua, scene)).unwrap();
         lua.load(script).eval()
     })
 }

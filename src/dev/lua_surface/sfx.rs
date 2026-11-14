@@ -12,8 +12,8 @@ use mlua::{Lua, Table};
 use super::super::providers::generated::{self, Realised};
 use super::super::providers::sfx::{self, Draft, ElevenLabs, SfxError};
 use super::super::providers::{environment, ledger, Context};
-use crate::api::{put, ApiCtx, Reg};
 use crate::core::paths::to_slash;
+use crate::script::api::{put, ApiCtx, Reg};
 
 /// `Sfx.Generate(brief)` → the generated WAV's path; or `nil, why` when the brief is
 /// not finished, so a loop over a weapon's twenty sounds loses none to one typo.

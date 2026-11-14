@@ -6,19 +6,22 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::{CameraComponent, ChromaticAberration, FilmGrain, Vignette};
 use rusty::scene::authoring::default_post_processing;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 /// Run `script` against `scene` with the `Graphics` namespace registered.
 fn run(scene: Scene, script: &str) -> Scene {
     let lua = Lua::new();
     let (scene, graphics, app) = (Rc::new(RefCell::new(scene)), Rc::default(), Rc::default());
-    rusty::api::graphics::register(
+    rusty::script::api::graphics::register(
         &lua,
         bind(&lua, &scene),
-        (bind(&lua, &graphics), rusty::api::ApiCell::default()),
+        (
+            bind(&lua, &graphics),
+            rusty::script::api::ApiCell::default(),
+        ),
         bind(&lua, &app),
     )
     .unwrap();
@@ -79,10 +82,13 @@ fn without_a_volume_the_getters_report_the_defaults() {
         Rc::default(),
     );
     let got: (bool, f32, f32, f32, f32, f32, f32, f32) = crate::lua::attempt(|| {
-        rusty::api::graphics::register(
+        rusty::script::api::graphics::register(
             &lua,
             bind(&lua, &scene),
-            (bind(&lua, &graphics), rusty::api::ApiCell::default()),
+            (
+                bind(&lua, &graphics),
+                rusty::script::api::ApiCell::default(),
+            ),
             bind(&lua, &app),
         )
         .unwrap();

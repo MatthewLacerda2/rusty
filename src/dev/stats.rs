@@ -27,7 +27,7 @@ use std::time::Instant;
 use super::capture::RenderedFrame;
 use crate::app::{GameWorld, LoadProbe, Resources, Stage, SystemProbe, World};
 use crate::core::frame_stats::{FrameStats, Series};
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 /// The metric each per-frame stage's CPU time is recorded under.
 fn stage_key(stage: Stage) -> &'static str {

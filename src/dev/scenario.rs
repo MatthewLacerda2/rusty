@@ -101,7 +101,7 @@ pub fn run_code(harness: Harness, code: &str, name: &str) -> Result<RunReport, S
     // The world's one `Random` stream, not a scenario-only one: Unity has one
     // `Random` too, and a scenario's draws are its inputs, as deterministic as
     // the rest of them.
-    let lua = crate::scripting::sandboxed_vm()?;
+    let lua = crate::script::scripting::sandboxed_vm()?;
     cells.install(&lua)?;
     // The gameplay VM's project-aware `require` / `dofile` / `loadfile` (#1717).
     harness

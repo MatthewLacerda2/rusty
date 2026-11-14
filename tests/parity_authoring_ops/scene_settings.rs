@@ -7,11 +7,11 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::core::settings::GraphicsSettings;
 use rusty::scene::authoring::environment as env_ops;
 use rusty::scene::authoring::fog as fog_ops;
 use rusty::scene::{FogMode, Scene};
+use rusty::script::api::bind;
 
 #[test]
 fn fog_api_and_shared_op_converge_without_a_volume() -> Result<(), Box<dyn std::error::Error>> {
@@ -21,10 +21,10 @@ fn fog_api_and_shared_op_converge_without_a_volume() -> Result<(), Box<dyn std::
     let app = Rc::default();
     let lua = Lua::new();
     let read: (String, f32, f32, f32, f32) = crate::lua::attempt(|| {
-        rusty::api::graphics::register(
+        rusty::script::api::graphics::register(
             &lua,
             bind(&lua, &lua_scene),
-            (bind(&lua, &quality), rusty::api::ApiCell::default()),
+            (bind(&lua, &quality), rusty::script::api::ApiCell::default()),
             bind(&lua, &app),
         )
         .unwrap();
@@ -74,7 +74,7 @@ fn environment_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Er
     let lua_scene = Rc::new(RefCell::new(Scene::new()));
     let lua = Lua::new();
     let read: (String, f32, f32, String) = crate::lua::attempt(|| {
-        rusty::api::lighting::register(&lua, bind(&lua, &lua_scene)).unwrap();
+        rusty::script::api::lighting::register(&lua, bind(&lua, &lua_scene)).unwrap();
         lua.load(
             r#"
             Lighting.SetSkybox("sky/sunset.hdr")

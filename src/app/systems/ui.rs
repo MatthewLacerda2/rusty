@@ -131,7 +131,7 @@ mod tests {
     use crate::core::input::InputState;
     use crate::navigation::NavigationGraph;
     use crate::scene::{Scene, ScriptComponent};
-    use crate::scripting::ConsoleLogs;
+    use crate::script::scripting::ConsoleLogs;
 
     #[test]
     fn a_play_tick_lays_out_the_ui_on_the_video_resolution() {

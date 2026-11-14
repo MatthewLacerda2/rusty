@@ -17,7 +17,7 @@
 
 use std::cell::RefCell;
 
-use crate::scripting::{ConsoleLogs, ScriptManager};
+use crate::script::scripting::{ConsoleLogs, ScriptManager};
 
 /// Evaluate one REPL line against the live runtime and log the outcome.
 ///
@@ -30,7 +30,7 @@ use crate::scripting::{ConsoleLogs, ScriptManager};
 /// into during eval. We therefore borrow it only at the log sites (the prompt echo,
 /// then the result/error) and **never across `scripts.eval`**: holding the borrow
 /// across eval would clash with the `borrow_mut` those bindings take mid-script and
-/// panic with `BorrowMutError` (#208). This mirrors the `src/api/scene.rs` guidance.
+/// panic with `BorrowMutError` (#208). This mirrors the `crates/script/src/api/scene.rs` guidance.
 pub fn evaluate_line(
     scripts: &ScriptManager,
     console: &RefCell<ConsoleLogs>,
@@ -158,7 +158,7 @@ mod tests {
             .borrow()
             .messages
             .iter()
-            .any(|(_, lvl)| *lvl == crate::scripting::LogLevel::Error));
+            .any(|(_, lvl)| *lvl == crate::script::scripting::LogLevel::Error));
     }
 
     #[test]

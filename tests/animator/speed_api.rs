@@ -7,9 +7,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::scene::Scene;
-use rusty::scripting::ConsoleLogs;
+use rusty::script::api::bind;
+use rusty::script::scripting::ConsoleLogs;
 
 use super::{run, scene_with_animator};
 
@@ -34,7 +34,7 @@ fn add_component_starts_at_authored_speed() {
     let path = Rc::new(RefCell::new(None));
     let lua = Lua::new();
     crate::lua::attempt(|| {
-        rusty::api::scene::register(&lua, bind(&lua, &scene), bind(&lua, &path)).unwrap();
+        rusty::script::api::scene::register(&lua, bind(&lua, &scene), bind(&lua, &path)).unwrap();
         lua.load(format!("Scene.AddComponent({id}, 'Animator')"))
             .exec()
     })
@@ -75,7 +75,8 @@ fn eval(scene: &Rc<RefCell<Scene>>, script: &str) -> Result<(), String> {
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
     let lua = Lua::new();
     crate::lua::attempt(|| {
-        rusty::api::animator::register(&lua, bind(&lua, scene), bind(&lua, &console)).unwrap();
+        rusty::script::api::animator::register(&lua, bind(&lua, scene), bind(&lua, &console))
+            .unwrap();
         lua.load(script).exec()
     })
     .map_err(|e| e.to_string())

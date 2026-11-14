@@ -8,8 +8,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 pub(super) fn scene_with_entity() -> (Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::new();
@@ -26,7 +26,7 @@ fn position_rotation_scale_round_trip() {
     let lua = Lua::new();
     let (scene, id) = scene_with_entity();
 
-    rusty::api::transform::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::transform::register(&lua, bind(&lua, &scene)).unwrap();
     lua.load(format!(
         "Transform.SetPosition({id}, 1, 2, 3)\n\
          Transform.SetRotation({id}, 0, 45, 0)\n\
@@ -59,7 +59,7 @@ fn missing_entity_gets_defaults_and_sets_are_noops() {
     let lua = Lua::new();
     let (scene, _) = scene_with_entity();
 
-    rusty::api::transform::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::transform::register(&lua, bind(&lua, &scene)).unwrap();
     let pos: (f32, f32, f32) = lua
         .load("return Transform.GetPosition(999)")
         .eval()
@@ -87,7 +87,7 @@ fn inverse_transform_point_is_nil_under_a_zero_scale() {
     let (scene, p, c) = world::hierarchy();
     scene.borrow_mut().world.transform_mut(p).unwrap().scale = glam::Vec3::new(1.0, 0.0, 1.0);
     let lua = Lua::new();
-    rusty::api::transform::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::transform::register(&lua, bind(&lua, &scene)).unwrap();
     let x: Option<f32> = lua
         .load(format!(
             "return Transform.InverseTransformPoint({c}, 1, 1, 1)"

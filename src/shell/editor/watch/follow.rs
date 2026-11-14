@@ -29,7 +29,7 @@
 use crate::app::GameWorld;
 use crate::core::fs::written::{written_since, Stale};
 use crate::scene::{load_parsed, parse_scene_text, Scene};
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 use crate::shell::editor::EditorFrontend;
 
 /// What the follow needs to remember between frames.

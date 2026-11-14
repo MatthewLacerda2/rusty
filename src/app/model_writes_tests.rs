@@ -46,7 +46,7 @@ pub(super) fn game_over(scene: Rc<RefCell<Scene>>) -> crate::app::GameWorld {
         scene,
         Rc::new(RefCell::new(crate::core::input::InputState::new())),
         Rc::new(RefCell::new(nav)),
-        Rc::new(RefCell::new(crate::scripting::ConsoleLogs::new())),
+        Rc::new(RefCell::new(crate::script::scripting::ConsoleLogs::new())),
     )
 }
 

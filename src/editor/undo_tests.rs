@@ -6,7 +6,7 @@ use super::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::authoring::{add_component, create_entity, ComponentKind, Primitive};
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 /// One editor frame with no input, recorded as a full edit.
 fn idle_frame(editor: &mut EditorUi, scene: &mut Scene) {

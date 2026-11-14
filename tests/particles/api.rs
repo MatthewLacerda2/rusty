@@ -7,8 +7,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::scene::{ParticleEmitterComponent, Scene};
+use rusty::script::api::bind;
 
 /// A scene with one emitter entity (engine defaults: burst 32, cap 256) and one
 /// bare entity with no emitter.
@@ -27,7 +27,7 @@ fn emit_spawns_counts_and_clears() {
     let lua = Lua::new();
     let (scene, id, _) = scene_with_emitter();
 
-    rusty::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
 
     let spawned: u32 = lua
         .load(format!("return Particles.Emit({id}, 5)"))
@@ -53,7 +53,7 @@ fn emit_is_swallowed_at_the_max_particle_cap() {
     let lua = Lua::new();
     let (scene, id, _) = scene_with_emitter();
 
-    rusty::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
     // Default cap is 256: an oversized request is truncated, a full emitter spawns 0.
     let spawned: u32 = lua
         .load(format!("return Particles.Emit({id}, 999)"))
@@ -72,7 +72,7 @@ fn burst_fires_the_configured_burst_count() {
     let lua = Lua::new();
     let (scene, id, _) = scene_with_emitter();
 
-    rusty::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
     let spawned: u32 = lua
         .load(format!("return Particles.Burst({id})"))
         .eval()
@@ -85,7 +85,7 @@ fn tuning_verbs_write_the_component() {
     let lua = Lua::new();
     let (scene, id, _) = scene_with_emitter();
 
-    rusty::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
     lua.load(format!(
         "Particles.SetActive({id}, false); Particles.SetRate({id}, 7.5)"
     ))
@@ -108,7 +108,7 @@ fn verbs_are_safe_noops_without_an_emitter() {
     let lua = Lua::new();
     let (scene, _, bare) = scene_with_emitter();
 
-    rusty::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
     for target in [bare, 999] {
         let spawned: u32 = lua
             .load(format!("return Particles.Emit({target}, 5)"))

@@ -46,7 +46,7 @@ use crate::editor::EditorUi;
 use crate::scene::lighting::bake_status::{BakeProgress, BakeStatus};
 use crate::scene::lighting::lightmap::BakeView;
 use crate::scene::{Scene, SceneId};
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 mod outcome;
 mod poll;

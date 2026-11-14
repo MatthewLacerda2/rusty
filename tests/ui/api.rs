@@ -8,10 +8,10 @@ use std::rc::Rc;
 
 use glam::{Vec2, Vec3};
 use mlua::{Lua, Table};
-use rusty::api::bind;
 use rusty::components::{CanvasComponent, RectTransformComponent};
 use rusty::core::settings::video::VideoSettings;
 use rusty::scene::{Camera, Scene};
+use rusty::script::api::bind;
 use rusty::ui::ScreenSize;
 
 /// A canvas with one centred 100×100 child. Returns `(scene, canvas, child)`.
@@ -40,9 +40,9 @@ pub(crate) fn with_ui_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
     let camera = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
     let camera = bind(&lua, &Rc::new(RefCell::new(camera)));
     let (scene, screen, video) = (bind(&lua, scene), bind(&lua, &screen), bind(&lua, &video));
-    rusty::api::canvas::register(&lua, scene, screen, video).unwrap();
-    rusty::api::rect_transform::register(&lua, scene, (screen, video)).unwrap();
-    rusty::api::ui::register(&lua, scene, (screen, video), camera).unwrap();
+    rusty::script::api::canvas::register(&lua, scene, screen, video).unwrap();
+    rusty::script::api::rect_transform::register(&lua, scene, (screen, video)).unwrap();
+    rusty::script::api::ui::register(&lua, scene, (screen, video), camera).unwrap();
     f(&lua);
 }
 

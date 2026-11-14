@@ -6,7 +6,7 @@ use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::lighting::occlusion::{occlusion_path, test_level::corridors};
 use crate::scene::Scene;
-use crate::scripting::{ConsoleLogs, LogLevel};
+use crate::script::scripting::{ConsoleLogs, LogLevel};
 
 /// The corridors level saved under `tag`, open in an editor whose Bake Occlusion
 /// was just pressed.

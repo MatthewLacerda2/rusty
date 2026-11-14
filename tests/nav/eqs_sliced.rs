@@ -9,7 +9,7 @@ use std::rc::Rc;
 use rusty::app::GameWorld;
 use rusty::core::input::InputState;
 use rusty::navigation::NavigationGraph;
-use rusty::scripting::ConsoleLogs;
+use rusty::script::scripting::ConsoleLogs;
 
 use super::off_floor::default_scene_with;
 

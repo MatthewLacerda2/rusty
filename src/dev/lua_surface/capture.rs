@@ -11,7 +11,7 @@ use std::path::Path;
 
 use mlua::Lua;
 
-use crate::api::{global_table, put, ApiCtx, Reg};
+use crate::script::api::{global_table, put, ApiCtx, Reg};
 
 /// Add `StartCapture(path)` and `StopCapture()` to the `Audio` table. Both raise a
 /// Lua error on a refusal (a second start, a stop with nothing running, a file that

@@ -7,8 +7,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 fn empty_scene() -> Rc<RefCell<Scene>> {
     Rc::new(RefCell::new(Scene::new()))
@@ -19,7 +19,7 @@ fn spawn_with_defaults_then_clear() {
     let lua = Lua::new();
     let scene = empty_scene();
 
-    rusty::api::decals::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::decals::register(&lua, bind(&lua, &scene)).unwrap();
     lua.load("Decals.Spawn(1, 2, 3, 0, 1, 0)").exec().unwrap();
 
     let n: u32 = lua.load("return Decals.Count()").eval().unwrap();
@@ -44,7 +44,7 @@ fn spawn_honours_optional_size_texture_and_tint() {
     let lua = Lua::new();
     let scene = empty_scene();
 
-    rusty::api::decals::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::decals::register(&lua, bind(&lua, &scene)).unwrap();
     lua.load("Decals.Spawn(0, 0, 0, 0, 1, 0, 2.0, 'decals/scorch.png', 45, 1, 0, 0, 0.5)")
         .exec()
         .unwrap();
@@ -62,7 +62,7 @@ fn fifo_eviction_caps_the_live_list() {
     let lua = Lua::new();
     let scene = empty_scene();
 
-    rusty::api::decals::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::decals::register(&lua, bind(&lua, &scene)).unwrap();
     // Spawn well past the world budget (1024 by default), each at x = i so survivors are
     // identifiable. The exact cap is the renderer's business; the API contract
     // under test is "bounded, oldest evicted first".
@@ -86,7 +86,7 @@ fn spawn_rejects_missing_or_non_numeric_required_args() {
     let lua = Lua::new();
     let scene = empty_scene();
 
-    rusty::api::decals::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::decals::register(&lua, bind(&lua, &scene)).unwrap();
     assert!(
         lua.load("Decals.Spawn(1, 2, 3)").exec().is_err(),
         "fewer than the 6 required point+normal floats must error"

@@ -1,0 +1,52 @@
+//! crates/script/src/api/animator/speed.rs — the `Animator` playback-speed surface (#1342).
+//!
+//! `SetSpeed` / `GetSpeed` over the component's own `speed` multiplier, Unity's
+//! `animator.speed`: it scales every layer's playhead on top of each graph
+//! node's own speed. Set from `Update` it takes effect in the same fixed step
+//! (`update_scripts` runs before `animate`); from `LateUpdate`, the next one. The
+//! write goes through `authoring::animator::set_speed`, the same op the
+//! inspector's Animator card uses, so both accept the same values: any finite
+//! number (0 holds the pose, negative runs the playhead backwards). That op keeps
+//! the old speed on NaN or infinity; the binding also raises a Lua error, so a
+//! script learns its value was refused.
+
+use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
+use rusty_scene::authoring::animator as animator_ops;
+use rusty_scene::Scene;
+
+/// Register `SetSpeed` / `GetSpeed` onto the `Animator` table.
+pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
+    put(
+        table,
+        "SetSpeed",
+        lua.create_function(move |lua, (id, speed): (EntityArg, f32)| {
+            let scene = &*scene.get(lua)?;
+            let id = id.live("Animator", "SetSpeed")?;
+            if !speed.is_finite() {
+                return Err(mlua::Error::RuntimeError(format!(
+                    "Animator.SetSpeed: speed must be a finite number, got {speed}"
+                )));
+            }
+            let mut scene = scene.borrow_mut();
+            if let Some(mut c) = scene.world.animator_mut(id) {
+                animator_ops::set_speed(&mut c, speed);
+            }
+            Ok(())
+        }),
+    )?;
+
+    put(
+        table,
+        "GetSpeed",
+        lua.create_function(move |lua, id: EntityArg| {
+            Ok(scene
+                .get(lua)?
+                .borrow()
+                .world
+                .animator(id.read())
+                .map(|a| a.speed))
+        }),
+    )
+}

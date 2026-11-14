@@ -8,10 +8,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::core::settings::GraphicsSettings;
 use rusty::dev::capture::CaptureHost;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 use rusty::shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT_DIR};
 
 use super::super::fog::scene::{shot, srgb8, wall_scene};
@@ -24,7 +24,7 @@ fn scene() -> Rc<RefCell<Scene>> {
         r#"{{"pass":"postfx","name":"{NAME}","blocks":[{{"id":"damage_vignette","params":{{"color":[1,0,0]}}}}]}}"#
     );
     bake_recipe(
-        &rusty::api::recipe_from_json_str::<ShaderRecipe>(&json).unwrap(),
+        &rusty::script::api::recipe_from_json_str::<ShaderRecipe>(&json).unwrap(),
         engine_shader_dir(),
         DEFAULT_OUT_DIR,
     )
@@ -56,10 +56,10 @@ fn run(scene: &Rc<RefCell<Scene>>, script: &str) {
     );
     let app = Rc::default();
     crate::lua::attempt(|| {
-        rusty::api::graphics::register(
+        rusty::script::api::graphics::register(
             &lua,
             bind(&lua, scene),
-            (bind(&lua, &quality), rusty::api::ApiCell::default()),
+            (bind(&lua, &quality), rusty::script::api::ApiCell::default()),
             bind(&lua, &app),
         )
         .unwrap();

@@ -10,10 +10,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::AnimatorComponent;
 use rusty::scene::Scene;
-use rusty::scripting::ConsoleLogs;
+use rusty::script::api::bind;
+use rusty::script::scripting::ConsoleLogs;
 
 /// A scene with one entity, "Rig", carrying a default Animator.
 fn scene_with_animator() -> (Rc<RefCell<Scene>>, u32) {
@@ -32,7 +32,8 @@ fn run(scene: &Rc<RefCell<Scene>>, script: &str) -> String {
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
     let lua = Lua::new();
     crate::lua::attempt(|| {
-        rusty::api::animator::register(&lua, bind(&lua, scene), bind(&lua, &console)).unwrap();
+        rusty::script::api::animator::register(&lua, bind(&lua, scene), bind(&lua, &console))
+            .unwrap();
         lua.load(format!("return tostring(({script}))")).eval()
     })
     .unwrap()

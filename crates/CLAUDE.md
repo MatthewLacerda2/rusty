@@ -102,10 +102,15 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
   One naming a module *below* that the row does not list (a test baking with
   `procgen`) takes `rusty-<x>` as a `[dev-dependencies]` entry, by hand (the tool
   lists it), and names it `rusty_<x>::`: the layer table does not hold test code.
-  Forward the crate's `dev` / `editor` features to it as to any sibling (*Features*). *Below* means an earlier
-  row that does not name the crate back: `scripting` and `api` name each other, so
-  neither is below the other. `make layers` flags a member's dev-dependency on
-  itself, on a module at or above its row, or on one that reaches back to it.
+  Forward the crate's `dev` / `editor` features to it as to any sibling (*Features*).
+  *Below* means an earlier row. `make layers` flags a member's dev-dependency on
+  itself or on a module at or above its row.
+- **Two modules that name each other are one crate**, the pair its submodules under
+  a new module name (`script` holds `scripting` and `api`): rename them into
+  `src/<new>/` inside the root package first (`crate::api::` → `crate::script::api::`,
+  in `tests/` too), give the table one row for both, then `make move-crate` the
+  new module as any other. Inside the crate the halves stay `crate::api::…` and
+  `crate::scripting::…`.
 - **`env!("CARGO_MANIFEST_DIR")`** names the crate's folder, not the checkout, and
   so does the working directory a crate's tests run in: use
   `rusty_core::project::checkout()` for a path in the checkout (`engine/`, a fixture).

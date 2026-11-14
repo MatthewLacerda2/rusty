@@ -6,11 +6,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::asset::anim_data::AnimationClip;
 use rusty::components::MeshComponent;
 use rusty::scene::Scene;
-use rusty::scripting::{ConsoleLogs, LogLevel};
+use rusty::script::api::bind;
+use rusty::script::scripting::{ConsoleLogs, LogLevel};
 
 use super::{run, scene_with_animator};
 
@@ -76,7 +76,7 @@ fn an_unknown_montage_warns_and_returns_false() {
     let (scene, id) = with_flinch();
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
     let lua = Lua::new();
-    rusty::api::animator::register(&lua, bind(&lua, &scene), bind(&lua, &console)).unwrap();
+    rusty::script::api::animator::register(&lua, bind(&lua, &scene), bind(&lua, &console)).unwrap();
     let mark = console.borrow().logged();
     let started: bool = lua
         .load(format!("return Animator.PlayMontage({id}, 'Flich')"))
@@ -95,7 +95,7 @@ fn a_non_positive_rate_is_a_lua_error_naming_it() {
     let (scene, id) = with_flinch();
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
     let lua = Lua::new();
-    rusty::api::animator::register(&lua, bind(&lua, &scene), bind(&lua, &console)).unwrap();
+    rusty::script::api::animator::register(&lua, bind(&lua, &scene), bind(&lua, &console)).unwrap();
     let script = format!("Animator.PlayMontage({id}, 'Flinch', {{ rate = 0 }})");
     let err = lua.load(script).exec().unwrap_err().to_string();
     assert!(err.contains("rate"), "{err}");

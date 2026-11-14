@@ -6,7 +6,7 @@ use super::EditorUi;
 use crate::navigation::test_support::{add_box, add_floor, move_to};
 use crate::navigation::{NavigationGraph, Rebake};
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 use glam::Vec3;
 
 /// A floor with one static crate, baked, then the crate moved without a rebake.

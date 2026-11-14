@@ -3,7 +3,7 @@
 //! "Anything the editor does, the API does" (`docs/game-agent.md`). `--parity`
 //! holds that the inspector writes through a shared `scene::authoring` op; this rule
 //! holds the other half, field by field: every `authoring::<module>::set_*` op that
-//! `src/editor/` names is also named from `src/api/`, either called by a named setter
+//! `src/editor/` names is also named from `src/script/api/`, either called by a named setter
 //! or listed in `api::component`'s `op!`/`with!`/`group!` tables (a table entry names
 //! the op as a path, which counts the same). An op the inspector alone may write (a
 //! display toggle) says why at its `fn` with `// lint: allow(api-parity) <why>`, above
@@ -44,7 +44,7 @@ pub const ROOT: &str = "crate::scene::authoring";
 const EDITOR: &str = "src/editor/";
 /// Where Lua reaches ops from: the bindings, and `Component.Set`'s field table
 /// once it sits under `scene::authoring` (#1418 moves it there).
-const API: &[&str] = &["src/api/", "src/scene/authoring/fields/"];
+const API: &[&str] = &["src/script/api/", "src/scene/authoring/fields/"];
 /// Modules whose own file holds the field-table row (and knob table) that reaches
 /// its ops, so an op it calls by bare name is reached from Lua: the post effects,
 /// each declaring its `Effect` beside its ops (#1467).

@@ -11,7 +11,7 @@ use crate::navigation::NavigationGraph;
 use crate::scene::lighting::occlusion::occlusion_path;
 use crate::scene::lighting::occlusion::test_level::block;
 use crate::scene::Scene;
-use crate::scripting::{ConsoleLogs, LogLevel};
+use crate::script::scripting::{ConsoleLogs, LogLevel};
 
 fn poll_once(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
     let nav = NavigationGraph::new(-8.0, 8.0, -8.0, 8.0, 1.0);

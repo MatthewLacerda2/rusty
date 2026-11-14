@@ -19,7 +19,7 @@ use glam::Vec3;
 use crate::core::input::{CursorState, InputState};
 use crate::navigation::NavigationGraph;
 use crate::scene::{Camera, Scene, SceneSnapshot};
-use crate::scripting::{ConsoleLogs, ScriptManager};
+use crate::script::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
 
 use super::tap::TapPoint;

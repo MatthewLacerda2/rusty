@@ -12,9 +12,9 @@
 use glam::Vec3;
 use mlua::{Lua, MultiValue, Table};
 
-use crate::api::{put, ApiCell, Reg};
 use crate::scene::runtime::debug_lines::duration_ticks;
 use crate::scene::Scene;
+use crate::script::api::{put, ApiCell, Reg};
 
 /// Register `Debug.DrawLine` and `Debug.DrawRay` onto `table`.
 pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {

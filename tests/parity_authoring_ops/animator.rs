@@ -4,11 +4,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::AnimatorComponent;
 use rusty::scene::authoring::animator as animator_ops;
 use rusty::scene::Scene;
-use rusty::scripting::ConsoleLogs;
+use rusty::script::api::bind;
+use rusty::script::scripting::ConsoleLogs;
 
 #[test]
 fn animator_stop_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
@@ -34,7 +34,7 @@ fn animator_stop_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::
     };
 
     let lua = Lua::new();
-    rusty::api::animator::register(&lua, bind(&lua, &scene), bind(&lua, &console)).unwrap();
+    rusty::script::api::animator::register(&lua, bind(&lua, &scene), bind(&lua, &console)).unwrap();
     lua.load(format!("Animator.Stop({via_lua})"))
         .exec()
         .unwrap();

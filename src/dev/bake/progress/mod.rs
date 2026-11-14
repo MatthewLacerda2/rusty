@@ -39,7 +39,7 @@
 use std::cell::RefCell;
 use std::time::{Duration, Instant};
 
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 mod format;
 pub mod listen;

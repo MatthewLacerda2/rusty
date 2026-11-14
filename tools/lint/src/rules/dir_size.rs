@@ -8,7 +8,7 @@
 //! printed signal); the gate leaves two files of room above it.
 //!
 //! The one exception is a flat registry, where one file is one public unit and the
-//! flat list is the documentation (`src/api/`: one file per Lua namespace). It says
+//! flat list is the documentation (`src/script/api/`: one file per Lua namespace). It says
 //! so in the directory's owner file (its `mod.rs`, or the `<dir>.rs` beside it),
 //! on a plain `//` comment line anywhere in it: `// lint: allow(dir-size) <why>`.
 //! A directory with no owner file (`src/bin/`) has nowhere to say it, so it takes

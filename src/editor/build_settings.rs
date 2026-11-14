@@ -28,7 +28,7 @@ use crate::core::settings::render_scale::{RenderScale, RenderScaleDefault, Rende
 use crate::core::settings::GraphicsSettings;
 use crate::editor::widgets::DragRange;
 use crate::editor::EditorUi;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 /// Draw the window while `editor.show_build_settings` is set. The draft is taken from
 /// the live settings when the window opens and dropped when it closes.

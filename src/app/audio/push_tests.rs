@@ -14,7 +14,7 @@ use crate::components::AudioSourceComponent;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 /// A playing world with one fully-3D `play_on_start` speaker at the origin, on a
 /// recording backend.
@@ -72,8 +72,9 @@ fn the_frame_mix_matches_the_spatial_read_back() {
     let (game, id, rec) = playing_speaker();
     place_camera(&game, Vec3::new(2.0, 0.0, 5.0));
     game.push_audio(0.0);
-    let (src, pos) = crate::api::audio::emitter(&game.scene().borrow(), id).unwrap();
-    let listener = crate::api::audio::listener(&game.resources.camera, &game.world.scene.borrow());
+    let (src, pos) = crate::script::api::audio::emitter(&game.scene().borrow(), id).unwrap();
+    let listener =
+        crate::script::api::audio::listener(&game.resources.camera, &game.world.scene.borrow());
     let read = game
         .resources
         .audio

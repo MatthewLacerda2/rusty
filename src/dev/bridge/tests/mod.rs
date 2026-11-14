@@ -32,7 +32,7 @@ fn a_handle_errors_once_its_instance_is_replaced() {
         w.tick(FIXED_DT);
     };
     cells.install(&lua).unwrap();
-    crate::api::attempt(|| {
+    attempt(|| {
         super::register(&lua, &harness)?;
         lua.load("Harness.Step(2)").exec()?;
         let old: mlua::Value = lua.load(GET).eval()?;
@@ -60,4 +60,9 @@ fn a_too_deep_table_is_refused_not_overflowed() {
     let deep = super::copy::copy(&nest(super::copy::MAX_DEPTH + 1), &into).unwrap_err();
     assert!(deep.to_string().contains("nested deeper"), "{deep}");
     assert!(super::copy::copy(&nest(super::copy::MAX_DEPTH), &into).is_ok());
+}
+
+/// Run `body`, so a bridge test can use `?` on its Lua calls in one place.
+fn attempt<R>(body: impl FnOnce() -> mlua::Result<R>) -> mlua::Result<R> {
+    body()
 }

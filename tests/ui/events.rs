@@ -13,7 +13,7 @@ use rusty::components::{
     CanvasComponent, ImageComponent, RectTransformComponent, SelectableComponent,
 };
 use rusty::scene::{Scene, ScriptComponent};
-use rusty::scripting::ConsoleLogs;
+use rusty::script::scripting::ConsoleLogs;
 
 const DT: f32 = 1.0 / 60.0;
 

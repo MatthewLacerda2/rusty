@@ -5,10 +5,10 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::particle::{EmitFrom, EmitShape, ParticleEmitterComponent};
 use rusty::core::curve::Range;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 #[test]
 fn module_setters_write_the_emitter() {
@@ -21,7 +21,7 @@ fn module_setters_write_the_emitter() {
     let scene = Rc::new(RefCell::new(scene));
     let lua = Lua::new();
     let (ok, bad_shape, bad_trigger): (bool, bool, bool) = crate::lua::attempt(|| {
-            rusty::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
+            rusty::script::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
             lua.load(format!(
                 r#"
                 local ok = Particles.SetShape({id}, "cone", {{ angle = 40, radius = 0.2, surface = true }})
@@ -68,7 +68,7 @@ fn clearing_a_sub_emitter_takes_nil() {
     let scene = Rc::new(RefCell::new(scene));
     let lua = Lua::new();
     crate::lua::attempt(|| {
-        rusty::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
+        rusty::script::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
         lua.load(format!("Particles.SetSubEmitter({id}, 'birth', nil)"))
             .exec()
     })

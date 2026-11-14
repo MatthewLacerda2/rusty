@@ -8,14 +8,14 @@ use std::rc::Rc;
 
 use crate::lua::eval;
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::{Entity, LodGroupComponent, LodLevel};
 use rusty::scene::authoring::{add_component, ComponentKind};
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
-    rusty::api::lod_group::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::script::api::lod_group::register(&lua, bind(&lua, scene)).unwrap();
     f(&lua);
 }
 

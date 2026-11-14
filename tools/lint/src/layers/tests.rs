@@ -94,7 +94,7 @@ const ROWS: &[Layer] = &[
 
 fn run(rows: &[Layer], edges: &[Edge]) -> Vec<String> {
     let modules: Vec<String> = rows.iter().map(|l| l.module.to_string()).collect();
-    check::all(rows, &[], &[], &modules, edges)
+    check::all(rows, &[], &modules, edges)
 }
 
 #[test]
@@ -158,8 +158,8 @@ fn exceptions_allow_until_fixed() {
         edge("render", "scene"),
         edge("scene", "render"),
     ];
-    assert!(check::all(ROWS, &[], &x, &modules, &live).is_empty());
-    let v = check::all(ROWS, &[], &x, &modules, &live[..2]);
+    assert!(check::all(ROWS, &x, &modules, &live).is_empty());
+    let v = check::all(ROWS, &x, &modules, &live[..2]);
     assert!(v.iter().any(|m| m.starts_with("STALE_EXCEPTION")), "{v:?}");
 }
 
@@ -171,7 +171,7 @@ fn real_table_is_well_formed() {
         .flat_map(|l| l.deps.iter().map(|d| edge(l.module, d)))
         .chain(EXCEPTIONS.iter().map(|x| edge(x.from, x.to)))
         .collect();
-    let v = check::all(LAYERS, super::table::PEERS, EXCEPTIONS, &modules, &edges);
+    let v = check::all(LAYERS, EXCEPTIONS, &modules, &edges);
     assert!(v.is_empty(), "{v:?}");
     assert!(
         EXCEPTIONS.iter().all(|x| x.issue > 0),
@@ -186,7 +186,6 @@ fn sim_set_is_pinned() {
     dirs.sort();
     let want = [
         "ai",
-        "api",
         "app",
         "asset",
         "audio",
@@ -197,7 +196,7 @@ fn sim_set_is_pinned() {
         "physics",
         "procgen",
         "scene",
-        "scripting",
+        "script",
         "shadergen",
         "time",
         "ui",

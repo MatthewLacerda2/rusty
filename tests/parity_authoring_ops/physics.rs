@@ -5,10 +5,10 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::CollisionDetection;
 use rusty::scene::authoring::physics::rigidbody as rb_ops;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 /// Attach a default rigidbody to a fresh entity; returns its id.
 fn entity_with_rb(scene: &mut Scene, name: &str) -> u32 {
@@ -26,7 +26,7 @@ fn physics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>
     let via_op = entity_with_rb(&mut scene.borrow_mut(), "ViaOp");
 
     let lua = Lua::new();
-    rusty::api::physics::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::physics::register(&lua, bind(&lua, &scene)).unwrap();
     lua.load(format!(
         r#"
         Physics.SetVelocity({via_lua}, 1.0, 2.0, 3.0)
@@ -68,7 +68,7 @@ fn mass_gravity_and_trigger_reach_their_ops() -> Result<(), Box<dyn std::error::
 
     let lua = Lua::new();
     let read: (f32, f32, bool, bool, f32) = crate::lua::attempt(|| {
-        rusty::api::physics::register(&lua, bind(&lua, &scene)).unwrap();
+        rusty::script::api::physics::register(&lua, bind(&lua, &scene)).unwrap();
         lua.load(format!(
             r#"
             local before = Physics.GetMass({id})
