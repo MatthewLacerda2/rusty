@@ -174,7 +174,8 @@ def needs_check(pull: dict, opts: argparse.Namespace) -> bool:
 
 def touches_agent_doc(pull: dict) -> bool:
     """Whether the pull request changes a doc `tools/lint`'s agent-docs pass holds
-    ([`changes.agent_doc`]): a `CLAUDE.md` or a skill's file."""
+    ([`changes.agent_doc`]): a `CLAUDE.md`, a skill's file or a subagent
+    definition (`.claude/agents/<name>.md`)."""
     return any(map(changes.agent_doc, github.paths(pull)))
 
 

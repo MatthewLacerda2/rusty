@@ -32,6 +32,8 @@ pub use externs::flatten as flatten_use;
 /// A manifest's `[dependencies]` and `[dev-dependencies]` crate names, shared with
 /// the `key-guard` rule.
 pub use externs::{manifest_dependencies, manifest_dev_dependencies};
+/// The lexical path folder, shared with the `orphan-module` rule.
+pub use gate::normalise;
 pub use gate::{is_test_gate, test_only_files};
 use std::fs;
 use std::path::Path;

@@ -1,3 +1,4 @@
+// lint: allow(orphan-module) a standalone script built by `rustc` directly, no manifest names it
 //! loc.rs — throwaway curiosity tool: which .rs files / src subtrees are biggest.
 //! NOT part of the build, NOT run in CI, NOT maintained. Run from the repo root:
 //!   rustc -O tools/loc.rs -o /tmp/loc && /tmp/loc

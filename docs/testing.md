@@ -414,7 +414,8 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
 
 - **A new test file needs a `mod` line** in `tests/main.rs` (or its folder's `mod.rs`) —
   Cargo no longer discovers it. `tests/layout.rs` fails the suite, naming the file, if
-  one is forgotten, so a file can't silently never run.
+  one is forgotten, so a file can't silently never run; `make rules` (`orphan-module`)
+  holds the same for every scanned `.rs` file, crates and tools included.
 - **Dev-only files are gated at the declaration**, `#[cfg(feature = "dev")] mod …;`,
   not by a `#![cfg]` inside the file. `make rules` (`test-inner-cfg`) fails on one,
   and its sibling locks hold the user-workspace and GPU-entry rules below (#980).

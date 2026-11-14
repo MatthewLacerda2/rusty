@@ -10,11 +10,13 @@ from merging.verdict import changes
 
 class AgentDoc(unittest.TestCase):
     def test_claude_md_files_and_skill_folders_files_are_agent_docs(self):
-        for path in ("CLAUDE.md", "src/render/CLAUDE.md", ".claude/skills/a/SKILL.md", ".claude/skills/a/x/y.md"):
+        for path in ("CLAUDE.md", "src/render/CLAUDE.md", ".claude/skills/a/SKILL.md", ".claude/skills/a/x/y.md",
+                     ".claude/agents/coder.md"):
             self.assertTrue(changes.agent_doc(path), path)
 
     def test_other_markdown_is_not(self):
-        for path in ("README.md", "docs/CLAUDE.md.bak", "XCLAUDE.md", ".claude/skills/loose.md", ".claude/x.md"):
+        for path in ("README.md", "docs/CLAUDE.md.bak", "XCLAUDE.md", ".claude/skills/loose.md", ".claude/x.md",
+                     ".claude/agents/x/y.md", ".claude/agents/y.txt"):
             self.assertFalse(changes.agent_doc(path), path)
 
 
