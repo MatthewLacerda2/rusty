@@ -9,15 +9,17 @@ fn problems(stem: &str, source: &str) -> Vec<String> {
 }
 
 #[test]
-fn the_definitions_on_main_pass() {
-    for stem in ["reviewer", "coder", "merge-fixer"] {
-        let path = format!(
-            "{}/../../.claude/agents/{stem}.md",
-            env!("CARGO_MANIFEST_DIR")
-        );
-        let source = std::fs::read_to_string(&path).expect("the definition is on main");
-        assert!(problems(stem, &source).is_empty(), "{stem}");
-    }
+fn a_model_without_a_space_after_its_colon_is_no_model() {
+    let found = problems("helper", &def("helper", "model:opus\n"));
+    assert!(found.iter().any(|m| m.contains("no `model:`")), "{found:?}");
+}
+
+#[test]
+fn a_trailing_comment_is_cut_from_an_unquoted_model() {
+    let commented = def("helper", "model: opus  # the reviewer's\n");
+    assert!(problems("helper", &commented).is_empty());
+    let quoted = problems("helper", &def("helper", "model: \"opus # x\"\n"));
+    assert!(quoted[0].contains("is no concrete model"), "{quoted:?}");
 }
 
 #[test]
@@ -58,6 +60,11 @@ fn a_pinned_definition_on_another_model_fails() {
     let found = problems("reviewer", &def("reviewer", "model: sonnet\n"));
     assert_eq!(found.len(), 1);
     assert!(found[0].contains("pinned to `model: opus`"));
+    let full_id = problems("reviewer", &def("reviewer", "model: claude-opus-5-5\n"));
+    assert!(
+        full_id[0].contains("the alias and not a full id"),
+        "{full_id:?}"
+    );
     assert!(problems("coder", &def("coder", "model: opus\n")).is_empty());
 }
 

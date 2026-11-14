@@ -247,7 +247,10 @@ growing back. Four rules:
   harness ignores an unknown or misspelt key without a word. The definitions the
   orchestration rule pins (`agent_docs::agent::PINS`: `coder` and `reviewer` on
   `opus`) must exist and say that model, so changing who writes or judges code is an
-  edit to that table, not one word in a Markdown file.
+  edit to that table, not one word in a Markdown file. A pinned definition names
+  the alias, not a full id (`claude-opus-…`), since the alias follows the latest
+  model. A key is read as YAML reads it (`model:opus`, with no space, is no `model`
+  key), and a trailing ` # comment` on an unquoted value is dropped.
 - **`history`**: no `#123`, `owner/repo#123`, `…/issues/123`, `…/pull/123` or
   `YYYY-MM-DD` date. An agent doc states the rule; its story lives in the issue and
   PR, which `git log -S` finds. Placeholders (`#N`), hex colours (`#33ccff`, `#0f0`:

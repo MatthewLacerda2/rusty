@@ -122,8 +122,9 @@ fn model_problem(stem: &str, model: Option<(usize, String)>) -> Option<(usize, S
         (
             at,
             format!(
-                "`{stem}` is pinned to `model: {pin}` (`agent_docs::agent::PINS`); change \
-                 who runs it in that table, with the doctrine, not here"
+                "`{stem}` is pinned to `model: {pin}` (`agent_docs::agent::PINS`), the \
+                 alias and not a full id, so it follows the latest model; change who \
+                 runs it in that table, with the doctrine, not here"
             ),
         )
     })

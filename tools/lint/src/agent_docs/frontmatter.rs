@@ -82,14 +82,23 @@ fn name_problem(folder: &str, name: &str) -> Option<String> {
 }
 
 /// `key`'s value in the frontmatter `block` (whose first line is the file's line
-/// 2) and the line it is on: quotes dropped, and the indented lines after it
-/// joined, whether they continue a plain or quoted value or hold a folded (`>`)
-/// or literal (`|`) block.
+/// 2) and the line it is on: quotes dropped, a trailing ` #` comment cut from an
+/// unquoted value, and the indented lines after it joined, whether they continue
+/// a plain or quoted value or hold a folded (`>`) or literal (`|`) block. As in
+/// YAML, the key is `key:` followed by a space or the line's end (`key:value` is
+/// no key at all).
 pub(super) fn value(block: &[&str], key: &str) -> Option<(usize, String)> {
-    let at = block
-        .iter()
-        .position(|l| l.strip_prefix(key).is_some_and(|r| r.starts_with(':')))?;
+    let at = block.iter().position(|l| {
+        l.strip_prefix(key)
+            .and_then(|r| r.strip_prefix(':'))
+            .is_some_and(|r| r.is_empty() || r.starts_with([' ', '\t']))
+    })?;
     let raw = block[at][key.len() + 1..].trim();
+    let raw = if raw.starts_with(['"', '\'']) {
+        raw
+    } else {
+        raw.split_once(" #").map_or(raw, |(v, _)| v.trim_end())
+    };
     let head = if matches!(raw, ">" | "|" | ">-" | "|-") {
         ""
     } else {
