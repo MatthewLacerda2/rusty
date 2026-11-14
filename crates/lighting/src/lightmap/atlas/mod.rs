@@ -6,7 +6,7 @@
 //! index and a scale/offset into it (its `LightmapEntry`). Lightmapped copies of a
 //! prop then still draw as one instanced call. Pages are the smallest power of two
 //! that holds everything in one page, up to the bake's page edge (Unity's *Max
-//! Lightmap Size*, `BakeSettings::max_lightmap_size`, at most [`MAX_PAGE`]); past
+//! Lightmap Size*, `BakeSettings::max_lightmap_size`, at most [`MAX_PAGE`](rusty_scene::lighting::settings::MAX_PAGE)); past
 //! that, as many pages of that edge as it takes.
 //!
 //! **The cell.** Each lightmap sits in a square cell: the map, a [`PAD`]-texel ring
@@ -71,7 +71,7 @@ pub struct LightmapAtlas {
 }
 
 /// Pack `maps` into pages of at most `max_page` texels a side (a power of two in
-/// [`MIN_PAGE`]`..=`[`MAX_PAGE`]; anything else is first held there by
+/// [`MIN_PAGE`]`..=`[`MAX_PAGE`](rusty_scene::lighting::settings::MAX_PAGE); anything else is first held there by
 /// [`page_edge`]). No lightmaps, no pages. A map wider than [`max_map_edge`] of
 /// that page keeps only its top-left corner of that size.
 pub fn pack(maps: &[Lightmap], max_page: u32) -> LightmapAtlas {

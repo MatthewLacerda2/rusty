@@ -23,7 +23,7 @@
 //!   ([`bake_progressive`], #1970) runs the trace in passes over every texel, each
 //!   pass shown, the camera's texels first (`view`, [`BakeView`]), to the same bytes;
 //! * `atlas` — packing the lightmaps into equal-size pages ([`pack`]), each map in
-//!   a cell its BC blocks and first [`MIP_LEVELS`] mips never leave (#1694);
+//!   a cell its BC blocks and first [`MIP_LEVELS`](rusty_scene::lighting::settings::MIP_LEVELS) mips never leave (#1694);
 //! * `encode` — RGBM, how a page's fallback is stored as an 8-bit PNG, the RGBA8 direction
 //!   page a directional bake adds (#810) and the RGBA8 shadowmask page a
 //!   `Shadowmask` bake adds (#1695);
