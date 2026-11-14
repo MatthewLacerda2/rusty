@@ -1,4 +1,5 @@
 mod fold;
+mod workspace;
 
 use super::report;
 use std::fs;

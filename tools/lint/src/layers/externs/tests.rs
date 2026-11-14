@@ -1,4 +1,3 @@
-use super::cargo::dependencies;
 use super::check;
 use super::find::crate_refs;
 use super::policy::{Confined, Policy, POLICY};
@@ -39,26 +38,6 @@ fn a_local_item_shadows_the_crate() {
     assert!(found("use super::image;\nfn f() { image::draw(); }").is_empty());
     let aliased = "use crate::scene::authoring::{audio, image as img};\nfn f() { image::open(); }";
     assert_eq!(found(aliased), ["image"]);
-}
-
-#[test]
-fn reads_the_dependency_sections_only() {
-    let manifest = "[package]\nname = \"x\"\n\n[dependencies]\nwgpu = \"1\"\n\
-        egui-wgpu = { version = \"1\", optional = true } # a comment = x\n\
-        zimmer = { package = \"scorsese-zimmer\", git = \"u\" }\n\n\
-        [target.'cfg(target_os = \"linux\")'.dependencies]\nsmithay-clipboard = \"0.7\"\n\n\
-        [dev-dependencies]\nproptest = \"1\"\n";
-    assert_eq!(
-        dependencies(manifest),
-        ["egui_wgpu", "smithay_clipboard", "wgpu", "zimmer"]
-    );
-}
-
-#[test]
-fn a_member_manifest_names_its_crates_but_not_the_workspaces_own() {
-    let manifest = "[dependencies]\nglam = { workspace = true }\nlog.workspace = true\n\
-        rusty-core = { workspace = true }\n";
-    assert_eq!(dependencies(manifest), ["glam", "log"]);
 }
 
 const ROWS: &[Layer] = &[
@@ -153,4 +132,18 @@ fn real_table_accounts_for_every_dependency() {
     let v = check::all(LAYERS, &POLICY, &deps, &[]);
     let shape: Vec<_> = v.iter().filter(|m| !m.starts_with("STALE")).collect();
     assert!(shape.is_empty(), "{shape:?}");
+}
+
+#[test]
+fn a_display_entry_no_manifest_depends_on_is_unknown() {
+    let typo = Policy {
+        display: &["wgpu", "eguii"],
+        ..TIGHT
+    };
+    let v = check::all(ROWS, &typo, &deps(), &[]);
+    let unknown: Vec<_> = v.iter().filter(|m| m.starts_with("UNKNOWN")).collect();
+    assert_eq!(
+        unknown,
+        ["UNKNOWN_CRATE eguii — not a dependency in Cargo.toml"]
+    );
 }
