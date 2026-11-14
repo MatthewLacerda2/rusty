@@ -30,6 +30,7 @@ mod key_guard;
 mod log_tag;
 mod markers;
 mod named_enum;
+mod orphan_module;
 mod orphan_seeds;
 mod physics_borrow;
 mod platform_cfg;
@@ -93,6 +94,7 @@ const RULES: &[(Rule, Allow)] = &[
     (log_tag::run, Allow::Inline),
     (markers::run, Allow::Inline),
     (named_enum::run, Allow::Inline),
+    (orphan_module::run, Allow::Inline),
     (orphan_seeds::run, Allow::Never),
     (physics_borrow::run, Allow::Inline),
     (platform_cfg::run, Allow::Inline),

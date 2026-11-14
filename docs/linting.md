@@ -72,6 +72,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
 | Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `crates/editor/src` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); an editor slider is built by `editor::widgets::slider`, never a bare `egui::Slider::new(`, whose default clamping does the same (#1444); a real need takes `// lint: allow(drag-range) <why>` |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
+| Rust files are compiled | `tools/lint -- --rules` (`orphan-module`) | **hard gate**: every scanned `.rs` file is a crate root (a target's `src_path` in `cargo metadata` of the root, `fuzz/` and `tools/lint/` workspaces, so a `path =` target counts), is reached from one by `mod` as rustc resolves it (`name.rs` or `name/mod.rs`, under `a/` for a declaring `a.rs`, inline `mod a { mod b; }`, `#[path]`, a `mod` under `#[cfg]` included), or is named by `include!` / `include_str!`; rustc, clippy and rustfmt are silent about a file no `mod` names, and its tests stop running; a file built another way says why on its first line with `// lint: allow(orphan-module) <why>` |
 | Self-naming headers | `tools/lint -- --rules` (`self-path`) | **hard gate**: a source file's first `//!` line (a shader's first `//` line) that opens with a path under `src/`, `crates/`, `tests/`, `tools/`, `fuzz/`, `engine/` or `.github/` (a bare word too, when it names a directory of scanned files) names the file itself; a `mod.rs` may name its directory (`crates/scene/src/prefab/`). No header, or one opening with prose, is fine (#1654) |
 | Shared process | `make test-one-process` (`cargo test --features dev --tests`) | **signal**, never a gate: the `dev` suite with every test of a binary in one process, so a test leaking process-wide state (a moved working directory, a `static` left set), which nextest's process per test hides, is named (it broke the mutation baseline four times while cargo-mutants ran `cargo test`, #1844). Nightly on `main` in `cargo-test.yml` (both feature sets), filed by `main-health` when red; `gh workflow run cargo-test.yml --ref <branch>` runs it on a branch (#1338) |
 | Shipped platforms only | `tools/lint -- --rules` (`platform-cfg`) | **hard gate**: no `cfg(…)` / `cfg!(…)` / `cfg_attr(…)` in a scanned `.rs` file names `windows` or `unix` (bare, `target_os = "windows"`, or as a `target_family` value) — rusty ships for macOS and Linux, so the code is written unconditionally and a real split names `target_os = "macos"` / `"linux"` |
@@ -487,6 +488,23 @@ new flag, gate, CI step or baseline.
   as winit's `KeyCode`) takes the allow. A parse that does more than read one name per variant (separators
   ignored, a name built from parts, a `Result` with its own listing) is left alone
   or takes `// lint: allow(named-enum) <why>`. Test code is not scanned.
+- **`orphan-module`** — every scanned `.rs` file is one cargo compiles. rustc
+  builds only what a crate root reaches through `mod`: a file no `mod` names gives
+  no error, clippy and rustfmt skip it, and its tests stop running while a count of
+  `#[test]` lines still finds them (a move that forgets one `mod` line). The roots
+  are cargo's, not a list: every target's `src_path` in `cargo metadata --no-deps`
+  of the root workspace and of each scanned folder whose `Cargo.toml` has its own
+  `[workspace]` (`fuzz/`, `tools/lint/`). From each root the rule follows `mod`
+  the way rustc does (`tools/lint/src/rules/module_tree.rs`): `mod b;` in a
+  `mod.rs`, a crate root or a `#[path]`-loaded file is `b.rs` or `b/mod.rs` beside
+  it, and in any other `a.rs` it is under `a/`; an inline `mod x { mod b; }` adds
+  `x/`; `#[path = "p"]` is `p` from the declaring file's directory (plus any inline
+  modules around it). A `mod` under `#[cfg(...)]` counts, since some build compiles
+  it, and a file named by `include!` or `include_str!` is reached. The finding is
+  on the file's line 1 and names the `mod` to add, or says to delete a dead file;
+  a file built another way (a script run with `rustc`) takes
+  `// lint: allow(orphan-module) <why>` on its first line. A workspace cargo
+  cannot read is a finding on its `Cargo.toml`.
 - **`orphan-seeds`** — a saved proptest seed must be one a test still reads.
   proptest keeps a failing case at `<root>/proptest-regressions/<path>.txt`, beside
   the folder that holds the test's nearest `lib.rs` or `main.rs` (`src/` or `tests/`
