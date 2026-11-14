@@ -26,6 +26,7 @@ mod entity_arg;
 mod full_literal;
 mod fullscreen_triangle;
 mod ignored;
+mod key_guard;
 mod log_tag;
 mod markers;
 mod named_enum;
@@ -86,6 +87,7 @@ const RULES: &[(Rule, Allow)] = &[
     (full_literal::run, Allow::Inline),
     (fullscreen_triangle::run, Allow::Inline),
     (ignored::run, Allow::Never),
+    (key_guard::run, Allow::Inline),
     (log_tag::run, Allow::Inline),
     (markers::run, Allow::Inline),
     (named_enum::run, Allow::Inline),

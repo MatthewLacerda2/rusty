@@ -138,7 +138,7 @@ pub fn check(
 }
 
 /// `src/scene/authoring/nav/agent.rs` → `nav::agent`; a `mod.rs` is its folder.
-/// Read at its module path, so the file of a moved crate counts the same.
+/// Read at its module path, as every module-scoped rule reads a crate's file.
 fn module_of(path: &str) -> String {
     let path = module_path(path);
     let rel = path.trim_start_matches(AUTHORING).trim_end_matches(".rs");

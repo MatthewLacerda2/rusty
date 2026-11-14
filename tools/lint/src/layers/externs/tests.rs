@@ -1,7 +1,7 @@
 use super::cargo::dependencies;
 use super::check;
 use super::find::crate_refs;
-use super::policy::{Confined, CrateException, Policy, POLICY};
+use super::policy::{Confined, Policy, POLICY};
 use super::Use;
 use crate::layers::table::{Layer, LAYERS};
 use std::collections::BTreeSet;
@@ -83,7 +83,7 @@ const TIGHT: Policy = Policy {
         krate: "wgpu",
         within: &["src/render/gpu"],
     }],
-    exceptions: &[],
+    display: &["wgpu"],
 };
 
 fn deps() -> Vec<String> {
@@ -101,31 +101,32 @@ fn at(module: &str, krate: &str, file: &str) -> Use {
 #[test]
 fn exact_table_passes() {
     let uses = [
-        at("render", "wgpu", "src/render/gpu/x.rs"),
-        at("scene", "glam", "src/scene/x.rs"),
+        at("render", "wgpu", "crates/render/src/gpu/x.rs"),
+        at("scene", "glam", "crates/scene/src/x.rs"),
     ];
     let v = check::all(ROWS, &TIGHT, &deps(), &uses);
     assert!(v.is_empty(), "{v:?}");
 }
 
 #[test]
-fn flags_undeclared_confined_and_stale() {
+fn flags_confined_and_stale() {
     let uses = [
-        at("scene", "wgpu", "src/scene/x.rs"),
-        at("scene", "env_logger", "src/scene/x.rs"),
+        at("render", "wgpu", "crates/render/src/x.rs"),
+        at("scene", "env_logger", "crates/scene/src/x.rs"),
     ];
     let v = check::all(ROWS, &TIGHT, &deps(), &uses);
     let has = |p: &str| v.iter().any(|m| m.starts_with(p));
     assert!(
-        has("UNDECLARED_CRATE src/scene/x.rs:1 `scene → wgpu`"),
+        has("CONFINED_CRATE crates/render/src/x.rs:1 `wgpu`"),
         "{v:?}"
     );
-    assert!(has(
-        "UNDECLARED_CRATE src/scene/x.rs:1 `scene → env_logger`"
-    ));
-    assert!(has("CONFINED_CRATE src/scene/x.rs:1 `wgpu`"), "{v:?}");
-    assert!(has("STALE_CRATE render → wgpu"), "{v:?}");
+    assert_eq!(v.len(), 2, "{v:?}");
     assert!(has("STALE_CRATE common → glam"), "{v:?}");
+    let v = check::all(ROWS, &TIGHT, &deps(), &[]);
+    assert!(
+        v.iter().any(|m| m.starts_with("STALE_CRATE render → wgpu")),
+        "{v:?}"
+    );
 }
 
 #[test]
@@ -137,36 +138,12 @@ fn flags_a_table_out_of_step_with_cargo() {
         deps: &[],
         crates: &["wgpu", "glam", "winit"],
     }];
-    let uses = [at("render", "wgpu", "src/render/gpu/x.rs")];
+    let uses = [at("render", "wgpu", "crates/render/src/gpu/x.rs")];
     let v = check::all(&rows, &TIGHT, &more, &uses);
     let has = |p: &str| v.iter().any(|m| m.starts_with(p));
     assert!(has("UNCLAIMED_CRATE kira"), "{v:?}");
     assert!(has("UNKNOWN_CRATE winit"), "{v:?}");
     assert!(has("REDUNDANT_CRATE render → glam"), "{v:?}");
-}
-
-#[test]
-fn exceptions_allow_until_fixed() {
-    let policy = Policy {
-        exceptions: &[CrateException {
-            module: "scene",
-            krate: "wgpu",
-            issue: 1,
-        }],
-        confined: &[],
-        ..TIGHT
-    };
-    let mut uses = vec![
-        at("render", "wgpu", "src/render/gpu/x.rs"),
-        at("scene", "glam", "src/scene/x.rs"),
-        at("scene", "wgpu", "src/scene/x.rs"),
-    ];
-    assert!(check::all(ROWS, &policy, &deps(), &uses).is_empty());
-    uses.pop();
-    let v = check::all(ROWS, &policy, &deps(), &uses);
-    assert!(v
-        .iter()
-        .any(|m| m.starts_with("STALE_EXCEPTION scene → wgpu")));
 }
 
 #[test]
@@ -176,5 +153,4 @@ fn real_table_accounts_for_every_dependency() {
     let v = check::all(LAYERS, &POLICY, &deps, &[]);
     let shape: Vec<_> = v.iter().filter(|m| !m.starts_with("STALE")).collect();
     assert!(shape.is_empty(), "{shape:?}");
-    assert!(POLICY.exceptions.iter().all(|x| x.issue > 0));
 }

@@ -1,4 +1,4 @@
-use super::{dev_stray, stray};
+use super::{dev_stray, display, stray};
 use crate::layers::externs::policy::POLICY;
 use crate::layers::table::LAYERS;
 
@@ -65,6 +65,33 @@ fn a_dev_dependency_in_a_one_crate_header_is_flagged() {
 fn a_stray_crate_under_a_bare_target_triple_is_flagged() {
     let text = "[target.aarch64-apple-darwin.dependencies]\nwgpu = { workspace = true }\n\
         [target.aarch64-apple-darwin.dev-dependencies]\nrusty-render = { workspace = true }\n";
-    assert_eq!(stray("components", text, LAYERS, &POLICY).len(), 1);
+    let stray_found = stray("components", text, LAYERS, &POLICY);
+    let strays = stray_found.iter().filter(|m| m.starts_with("STRAY_CRATE"));
+    assert_eq!(strays.count(), 1, "{stray_found:?}");
     assert_eq!(dev_stray("physics", text, LAYERS).len(), 1);
+}
+
+#[test]
+fn a_crate_the_row_names_but_the_manifest_lacks_is_flagged() {
+    let text = MANIFEST
+        .replace("rusty-procgen = { workspace = true }\n", "")
+        .replace("bytemuck = { workspace = true }\n", "");
+    let found = stray("components", &text, LAYERS, &POLICY).join("\n");
+    for name in ["MISSING_CRATE", "→ rusty-procgen —", "→ bytemuck —"] {
+        assert!(found.contains(name), "not flagged: {name}\n{found}");
+    }
+    assert_eq!(found.lines().count(), 2, "{found}");
+}
+
+#[test]
+fn a_sim_member_naming_a_display_crate_even_in_tests_is_flagged() {
+    let text = "[dependencies]\nwgpu = { workspace = true }\n\
+        [dev-dependencies]\negui = { workspace = true }\nrusty-render = { workspace = true }\n\
+        proptest = { workspace = true }\n";
+    let found = display("physics", text, LAYERS, &POLICY).join("\n");
+    for name in ["→ wgpu —", "→ egui —", "→ rusty-render —"] {
+        assert!(found.contains(name), "not flagged: {name}\n{found}");
+    }
+    assert_eq!(found.lines().count(), 3, "{found}");
+    assert!(display("render", text, LAYERS, &POLICY).is_empty());
 }

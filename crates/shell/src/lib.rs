@@ -6,18 +6,15 @@
 //! persisted video/quality settings, the cursor policy, what `Application.Quit()`
 //! means, and the dev-only socket command channel. A [`Frontend`] adds what differs:
 //!
-//! * [`editor::EditorFrontend`] (the `editor` Cargo feature) — the egui dashboard, the
-//!   Scene/Game viewports rendered offscreen, and the edit snapshot on Play/Stop. The
-//!   `rusty` binary.
-//! * [`player::PlayerFrontend`] — no chrome: boots the configured startup scene
-//!   straight into Play and renders the camera stack onto the swapchain. The `player`
-//!   binary, the thing a game ships as.
+//! * [`editor::EditorFrontend`] (the `editor` feature, the `rusty` binary) — the egui
+//!   dashboard, the Scene/Game viewports offscreen, the edit snapshot on Play/Stop.
+//! * [`player::PlayerFrontend`] (the `player` binary, what a game ships as) — no
+//!   chrome: the startup scene straight into Play, the camera stack on the swapchain.
 //!
 //! The shell is platform layer (like `render`), so it may read the wall clock; the
-//! sim it drives stays a pure function of `(seed, inputs, fixed dt)`.
-//!
-//! [`Frontend`] is not a plugin trait: it has exactly two compile-time implementations,
-//! one per binary, and exists so the loop is written once.
+//! sim it drives stays a pure function of `(seed, inputs, fixed dt)`. [`Frontend`] is
+//! no plugin trait: two compile-time implementations, one per binary, so the loop is
+//! written once.
 
 #![allow(
     clippy::disallowed_methods,
@@ -298,3 +295,6 @@ fn drain_commands(shell: &mut Shell, game: &GameWorld) {
 /// No command channel in ship builds.
 #[cfg(not(feature = "dev"))]
 fn drain_commands(_shell: &mut Shell, _game: &GameWorld) {}
+
+#[cfg(all(test, feature = "dev"))] // the provider-key tripwire (`key-guard`)
+rusty_dev::no_provider_keys!();

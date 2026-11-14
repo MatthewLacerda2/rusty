@@ -377,8 +377,8 @@ Each backed by a gate that otherwise fails at merge time:
 - **An inspector card routes through `scene::authoring`**: `--parity` fails on a
   direct field write.
 
-A new top-level `src/<dir>/` owes the coverage ratchet nothing:
-`.github/scripts/coverage-ignore.py` derives its lists from `src/` and
+A new crate owes the coverage ratchet nothing:
+`.github/scripts/coverage-ignore.py` derives its lists from `crates/` and
 `coverage-baseline.txt`. A new *floor* is one line in the baseline.
 
 There is no format or bake version to bump. The only version stamps are the

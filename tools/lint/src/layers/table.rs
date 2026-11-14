@@ -1,23 +1,27 @@
-//! The declared module layering (#724) — the one place that answers "may `src/x`
-//! use `src/y`?". `make layers` checks the source against it.
+//! The declared module layering (#724): one row per workspace member
+//! `crates/<module>/`, the readable map of the engine's layers. Cargo holds the
+//! edges themselves (a crate cannot name a crate it does not depend on); `make
+//! layers` holds this table **equal** to the manifests, so the map is never a
+//! second copy that drifts.
 //!
-//! Rows run bottom-up: a module may import only the modules in its `deps`, and each
-//! of those must be declared **above** it. That order is what makes the graph
-//! acyclic: no edge points down the list.
-//! `sim` marks the deterministic simulation; everything a sim module imports must be
-//! sim too. The direction guard scans this derived set, and the determinism gate
-//! lets only the platform rows opt out of clippy's clock ban, instead of either
-//! keeping copies (see [`super::sim_dirs`], [`super::platform_roots`]).
+//! Rows run bottom-up: each of a row's `deps` is declared **above** it, the
+//! topological order the dev-dependency check reads "below" from.
+//! `sim` marks the deterministic simulation, which cargo cannot know: everything a
+//! sim module depends on must be sim too, and no sim crate names a display crate.
+//! The determinism gate lets only the platform rows opt out of clippy's clock ban,
+//! reading this set instead of keeping a copy (see [`super::sim_dirs`],
+//! [`super::platform_roots`]).
 //!
-//! Each row also names the external crates its module may use (#938); the rest of
-//! that policy (crates every module shares, confined ones) is in
-//! [`super::externs::policy`].
+//! Each row also names the external crates its manifest depends on (#938), beyond
+//! the common ones in [`super::externs::policy`], which also confines some crates
+//! to a subtree.
 //!
 //! The table is exact, not a ceiling: a dep nothing references any more is
 //! reported as stale, so this file never claims more than the code does.
 
-/// One top-level module under `src/`, the modules it may import and the external
-/// crates it may name (#938), beyond the common ones in [`super::externs::policy`].
+/// One member crate `crates/<module>/`, the sibling crates it depends on and the
+/// external crates it depends on (#938), beyond the common ones in
+/// [`super::externs::policy`].
 pub struct Layer {
     pub module: &'static str,
     pub sim: bool,
@@ -237,14 +241,3 @@ pub const LAYERS: &[Layer] = &[
         "winit",
     ]),
 ];
-
-/// An edge the layering forbids but the code still has, each tracked by an open
-/// issue. Allowed until fixed; reported as stale the moment it disappears.
-pub struct Exception {
-    pub from: &'static str,
-    pub to: &'static str,
-    pub issue: u32,
-}
-
-/// Empty since #737 and #738 removed the last two (`api → dev`/`preview`, `dev → editor`).
-pub const EXCEPTIONS: &[Exception] = &[];

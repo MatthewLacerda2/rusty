@@ -5,7 +5,7 @@
 [workspace]
 members = ["crates/*"]
 # Every member, so a plain `cargo build`, `clippy`, `nextest run`, `doc` or `test`
-# from the root (each `make` gate and CI step) covers the moved crates' own code
+# from the root (each `make` gate and CI step) covers the member crates' own code
 # and tests too, not only the root package.
 default-members = [".", "crates/*"]
 resolver = "2"

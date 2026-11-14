@@ -863,8 +863,8 @@ view's pixel size into the `ScreenSize` resource every frame; a headless run nev
 it, and the `Video` resolution stands in. The native texture sizes an `Image` measures by
 are read from the files before each tick (see *Layout groups*), so they are an input too.
 Same (seed, inputs, dt, screen size, texture files) ⇒ same
-layout — and the same hits and UI callbacks. `crates/ui/src` sits under the determinism and
-direction guards: no wall clock, no unseeded RNG, and no `render` / `editor` / `wgpu` / `egui` imports.
+layout — and the same hits and UI callbacks. `rusty-ui` is a sim crate, under the determinism
+and layering gates: no wall clock, no unseeded RNG, and no `render` / `editor` / `wgpu` / `egui` dependency.
 
 ## Pausing under a menu
 

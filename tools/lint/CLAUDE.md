@@ -1,7 +1,7 @@
 # CLAUDE.md — the lint tool
 
 This file loads when you work under `tools/lint/`: the binary behind `make size`,
-`make rules`, `make layers`, `make determinism`, `make direction`, `make components` and
+`make rules`, `make layers`, `make determinism`, `make components` and
 `make parity`, and the `make dead-pub` signal. The root `CLAUDE.md` says what each gate protects and why a convention
 a machine can check is a gate; `docs/linting.md` is the reference for every rule. This
 file is what a coder changing the tool must keep.
@@ -47,20 +47,23 @@ file is what a coder changing the tool must keep.
   `.lint/report.txt`, exit 1 on any finding, so an agent reads exactly what failed.
 
 ## The layer table
-- **`tools/lint/src/layers/table.rs` is the one place module edges and external-crate
-  uses are declared**: one row per `src/<module>`, bottom-up, `sim` or
-  platform, its crates in `.uses(&[…])`. What belongs to no single row (crates any
-  module may name, crates confined to a subtree, dependencies no module names, and
-  exceptions with their open issue) is in `tools/lint/src/layers/externs/policy.rs`.
-- **Derive, don't copy.** The direction and determinism gates read the sim set from
+- **`tools/lint/src/layers/table.rs` maps the workspace's crates**: one row per member
+  `crates/<module>`, bottom-up, `sim` or platform, its sibling deps and its external
+  crates in `.uses(&[…])`, held **equal** to each member's `Cargo.toml`. What belongs
+  to no single row (crates any module may name, crates confined to a subtree,
+  dependencies no module names, the display crates no sim member may take) is in
+  `tools/lint/src/layers/externs/policy.rs`.
+- **Check only what cargo cannot.** A crate cannot name what it does not depend on,
+  so a pass that would flag an undeclared edge in code can never fail: the layer
+  lint reads the source only for unused edges and confined crates.
+- **Derive, don't copy.** The determinism gate and the rules read the sim set from
   the table (`layers::sim_dirs`, `layers::platform_roots`); a new check that asks
   "which modules are sim?" reads it the same way.
 - The table is exact, not a ceiling: an entry nothing uses fails as stale.
-- **A module lives in `src/<m>/` or `crates/<m>/src/`** while the engine is split
-  (`crates/CLAUDE.md`). A pass that scopes by module matches a path through
-  `modules::module_path` (and finds a folder with `modules::dir`), never a bare
-  `starts_with("src/…")`, and reports the real path. `.github/scripts/modules.py`
-  is its mirror: change both together.
+- **A pass that scopes by module reads a file at its module path**, `src/<m>/…` for
+  `crates/<m>/src/…` (`modules::module_path`; a folder from `modules::dir`), never a
+  bare `starts_with("crates/…")`, and reports the real path.
+  `.github/scripts/modules.py` is its mirror: change both together.
 
 ## Docs
 - **`docs/linting.md` lists every gate**: one row per check in *What's enforced*, and

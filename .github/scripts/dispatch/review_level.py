@@ -23,11 +23,11 @@ plus any marker line a PR's own patches add or remove ([`patch_markers`]), so a
 PR that brings a new format reads `high` too. Only what a marker cannot express
 (a fingerprint file, WGSL bindings, a path outside the modules) stays a hand row.
 
-**A module reads the same before and after its move into a crate** (#2139): a
+**A module is read at its module path** (#2139): a
 path, a table entry and a marker are each compared at its module path
-(`modules.module_path`), so `crates/core/src/random.rs` is the row
-`src/core/random.rs` was, and a crate's `lib.rs` marker covers the crate as a
-`mod.rs` one covers its directory.
+(`modules.module_path`), so `crates/core/src/random.rs` and `src/core/random.rs`
+name one row, and a crate's `lib.rs` marker covers the crate as a `mod.rs` one
+covers its directory.
 """
 
 from __future__ import annotations
@@ -139,19 +139,26 @@ def tree_markers(rev: str | None = "origin/main", cwd=None) -> dict[str, str]:
 #: This package, which holds the table: what a stale checkout gets wrong.
 HERE = Path(__file__).resolve().parent
 
+#: What decides the level besides this package, relative to it: the module-path
+#: mapping a `crates/…` path's row is read through, and the command line.
+DECIDERS = ("../modules.py", "../review-level.py")
+
 
 def stale_copy(rev: str = "origin/main", here: Path = HERE) -> str | None:
-    """A warning when this checkout's copy of the package differs from `rev`'s, else
-    `None`. The table and the module paths decide the level, so a copy run from a
-    checkout that was never fast-forwarded answers by an old rule (every module
-    read as unmarked once they moved into crates) with nothing on stdout to say so."""
-    done = subprocess.run(["git", "diff", "--quiet", rev, "--", "."],
+    """A warning when this checkout's copy of the package, or of a file in
+    [`DECIDERS`], differs from `rev`'s, else `None`. The table and the module paths
+    decide the level, so a copy run from a checkout that was never fast-forwarded
+    answers by an old rule (every module read as unmarked once they moved into
+    crates) with nothing on stdout to say so. A checkout with no `rev` (a cloud
+    session's clone has no `origin/main`) cannot compare, and says so."""
+    paths = [".", *(d for d in DECIDERS if (here / d).exists())]
+    done = subprocess.run(["git", "diff", "--quiet", rev, "--", *paths],
                           capture_output=True, text=True, check=False, cwd=here)
     if done.returncode == 0:
         return None
     if done.returncode == 1:
-        return (f"review-level: this checkout's {here.name}/ differs from {rev}'s, so the level "
-                f"may be stale; run it from an up-to-date checkout (git pull)")
+        return (f"review-level: this checkout's {here.name}/ or its deciders differ from "
+                f"{rev}'s, so the level may be stale; run it from an up-to-date checkout (git pull)")
     return f"review-level: cannot compare {here.name}/ with {rev}; the level may be stale"
 
 

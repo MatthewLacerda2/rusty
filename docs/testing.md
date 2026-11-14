@@ -434,7 +434,7 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
 - **A path a test expects is spelled as the engine writes it**: a plain
   `Path::join("a/b/c")` or `"a/b/c"`, `/`-separated, with a `\` read as part of a
   name, never a separator. In-crate tests take a relative root from
-  `crate::test_path::relative(dir)` (#1332). Every text file checks out LF
+  `rusty_test_support::temp::relative(dir)` (#1332). Every text file checks out LF
   (`.gitattributes`), so embedded and byte-compared text reads the same whatever
   the git config.
 - Filtering works by module path: `cargo nextest run -E 'binary(integration)' physics_`.
@@ -462,12 +462,14 @@ with a feature only the second has is the split. By hand:
 rustc compiles a crate in codegen units (CGUs), roughly two per module. The default
 dev cap is 256. Above the cap, rustc merges units by size. An edit that changes one
 function's size then reshuffles the merge, and dozens of unrelated units recompile.
-A workspace member whose count nears the cap gets a `[profile.dev.package.<crate>]`
-row in `Cargo.toml` raising it (`codegen-units = 4096`), so no merging happens
-(#574). The CGU count is the number of `.o` files in the newest session dir under
+A crate past the cap should get a `[profile.dev.package.<crate>]` row in
+`Cargo.toml` raising it (`codegen-units = 4096`), so no merging happens (#574). The
+CGU count is the number of `.o` files in the newest session dir under
 `target/debug/incremental/<crate>-*`. The row was the root crate's while every
-module lived inside it, about 1600 units in all; most members now sit at the cap
-of 256 without one (#2175).
+module lived inside it, about 1600 units in all. **No member has one yet**, though
+most sit at the cap of 256: #2175 settles the shape (a row per member at the cap,
+or a gate failing a capped member without its row) and re-measures. Until then an
+edit in a capped member pays the merge reshuffle measured below.
 
 The measurement below was taken then, when the editor, physics and every other module
 were one crate, `rusty`:
@@ -1069,7 +1071,7 @@ the runner's memory (`test_gpu_config.py` holds the product).
 
 **The jobs run their own baseline** (`--baseline skip`, #2164). cargo-mutants builds
 and tests its baseline with `--package` set to the mutated packages only, whatever
-`test_workspace` says, while every mutant tests the whole workspace: a moved crate's
+`test_workspace` says, while every mutant tests the whole workspace: a member crate's
 baseline timed only that crate's tests, so every mutant overran its timeout and a
 member with no `dev` feature failed the baseline outright. So each job's `Baseline`
 step runs what a mutant runs (the workspace build, then its tests, timed), and the

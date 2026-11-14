@@ -36,7 +36,7 @@ fn a_file_of_the_scene_crate_names_ops_by_its_own_root() {
     assert!(ops_named(src, &[], root_of("src/script/api/component.rs")).is_empty());
 }
 
-/// A file in another member crate (`api` and `editor`, once moved) names the ops
+/// A file in another member crate (`api` and `editor`) names the ops
 /// through `rusty_scene::authoring`, by a `use` or spelled whole.
 #[test]
 fn a_file_of_another_member_names_ops_through_the_scene_crate() {

@@ -57,7 +57,7 @@ from merging.queue import checks, gitio, outcomes
 # Every pass CI's `lint` job runs (`.github/workflows/lint.yml`), in its order.
 # None compiles rusty; `--dead-pub` is a signal, never a gate, so it is not here.
 PASSES: tuple[tuple[str, ...], ...] = (
-    (), ("--rules",), ("--layers",), ("--determinism",), ("--direction",), ("--components",), ("--parity",),
+    (), ("--rules",), ("--layers",), ("--determinism",), ("--components",), ("--parity",),
 )
 
 # Where each pass writes its verdict, relative to the tree it ran in.

@@ -1,8 +1,8 @@
-//! The crate half of the layer table (#938): which external crates each module may
-//! name. Each row in [`super::table`] lists its crates; [`policy`] holds what is
-//! not one row's (the crates every module shares, the ones no module names, the
-//! ones confined to one subtree, and the exceptions). `make layers` runs both
-//! halves.
+//! The crate half of the layer table (#938): which crates each member's manifest
+//! depends on. Each row in [`super::table`] lists its external crates; [`policy`]
+//! holds what is not one row's (the crates every module shares, the ones no module
+//! names, the ones confined to one subtree, and the display crates no sim member
+//! may take). `make layers` runs both halves.
 
 mod cargo;
 mod check;
@@ -12,6 +12,7 @@ pub mod policy;
 #[cfg(test)]
 mod tests;
 
+pub use cargo::{dev_keys as manifest_dev_dependencies, keys as manifest_dependencies};
 pub use find::flatten;
 
 use super::scan::Tree;
@@ -27,8 +28,8 @@ pub struct Use {
     pub at: String,
 }
 
-/// Check the modules' crates against the table and the manifests: the root
-/// package's `Cargo.toml` and every member's under `root`.
+/// Check the table against the manifests (the root package's `Cargo.toml` and
+/// every member's under `root`) and the modules' code.
 pub fn violations(layers: &[Layer], root: &Path, tree: &Tree) -> Vec<String> {
     let deps = match workspace_dependencies(root) {
         Ok(deps) => deps,
@@ -44,12 +45,12 @@ pub fn violations(layers: &[Layer], root: &Path, tree: &Tree) -> Vec<String> {
         let module = module.to_string_lossy();
         out.extend(members::stray(&module, &text, layers, &policy::POLICY));
         out.extend(members::dev_stray(&module, &text, layers));
+        out.extend(members::display(&module, &text, layers, &policy::POLICY));
     }
     out
 }
 
-/// The external crates the root package and every member under `root` depend on:
-/// a crate a moved module took with it is declared only in its member's manifest.
+/// The external crates the root package and every member under `root` depend on.
 pub fn workspace_dependencies(root: &Path) -> Result<Vec<String>, String> {
     let manifest = root.join("Cargo.toml");
     let text = fs::read_to_string(&manifest)

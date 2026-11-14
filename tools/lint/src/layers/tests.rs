@@ -1,51 +1,36 @@
 use super::check;
 use super::graph::Edge;
 use super::scan::refs;
-use super::table::{Exception, Layer, EXCEPTIONS, LAYERS};
+use super::table::{Layer, LAYERS};
 
 fn names(code: &str) -> Vec<String> {
-    refs(code, false).into_iter().map(|r| r.module).collect()
+    refs(code).into_iter().map(|r| r.module).collect()
 }
 
 #[test]
-fn finds_paths_and_groups() {
-    assert_eq!(names("use crate::scene::Scene;"), ["scene"]);
-    assert_eq!(names("let x = crate::core::f();"), ["core"]);
-    assert_eq!(
-        names("use crate::{scene::Scene, ui::{A, B}};"),
-        ["scene", "ui"]
-    );
-    assert_eq!(
-        names("use crate::{\n    scene::Scene,\n    ui::{A, B},\n};"),
-        ["scene", "ui"]
-    );
-    assert!(names("use rusty::crate_like::X; // crate::render").is_empty());
-}
-
-#[test]
-fn a_crate_names_its_siblings_by_crate_and_itself_by_crate_path() {
+fn finds_sibling_crate_paths() {
     let code = "use crate::paths::x;\nuse rusty_core::{a, b};\nfn f() { rusty_time::Time::new(); }";
-    let found: Vec<String> = refs(code, true).into_iter().map(|r| r.module).collect();
-    assert_eq!(found, ["core", "time"]);
-    assert_eq!(names(code), ["paths", "core", "time"]);
+    assert_eq!(names(code), ["core", "time"]);
     assert!(names("use my_rusty_core::x;\nlet rusty_x = 1;").is_empty());
+    assert!(names("use rusty::crate_like::X; // rusty_render::X").is_empty());
 }
 
 #[test]
 fn skips_test_items() {
-    let code = "#[cfg(test)]\nmod tests {\n    use crate::render::X;\n}\nuse crate::core::Y;";
+    let code = "#[cfg(test)]\nmod tests {\n    use rusty_render::X;\n}\nuse rusty_core::Y;";
     assert_eq!(names(code), ["core"]);
     assert_eq!(
-        names("#[cfg(test)] use crate::render::X;\nuse crate::ui::Z;"),
+        names("#[cfg(test)] use rusty_render::X;\nuse rusty_ui::Z;"),
         ["ui"]
     );
 }
 
 #[test]
 fn an_any_test_import_is_checked_and_a_wrapped_all_test_one_is_skipped() {
-    let any = "#[cfg(any(test, feature = \"x\"))]\nuse crate::render::X;";
+    let any = "#[cfg(any(test, feature = \"x\"))]\nuse rusty_render::X;";
     assert_eq!(names(any), ["render"]);
-    let all = "#[cfg(all(\n    feature = \"dev\",\n    test\n))]\nuse crate::render::X;\nuse crate::ui::Z;";
+    let all =
+        "#[cfg(all(\n    feature = \"dev\",\n    test\n))]\nuse rusty_render::X;\nuse rusty_ui::Z;";
     assert_eq!(names(all), ["ui"]);
 }
 
@@ -53,13 +38,13 @@ fn an_any_test_import_is_checked_and_a_wrapped_all_test_one_is_skipped() {
 fn a_gated_fn_with_a_wrapped_signature_is_skipped_to_its_closing_brace() {
     let code =
         "#[cfg(test)]\nfn f<T>(t: T) -> Result<\n    A,\n    B,\n>\nwhere\n    T: X,\n{\n    \
-                use crate::render::X;\n}\nuse crate::core::Y;";
+                use rusty_render::X;\n}\nuse rusty_core::Y;";
     assert_eq!(names(code), ["core"]);
 }
 
 #[test]
 fn a_comment_after_a_raw_string_closing_on_a_later_line_is_cut() {
-    let code = "let s = r#\"\n(\n\"#; // see crate::render\nuse crate::core::Y;";
+    let code = "let s = r#\"\n(\n\"#; // see rusty_render::X\nuse rusty_core::Y;";
     assert_eq!(names(code), ["core"]);
 }
 
@@ -67,7 +52,7 @@ fn edge(from: &str, to: &str) -> Edge {
     Edge {
         from: from.into(),
         to: to.into(),
-        at: "src/x.rs:1".into(),
+        at: "crates/x/src/lib.rs:1".into(),
     }
 }
 
@@ -94,7 +79,7 @@ const ROWS: &[Layer] = &[
 
 fn run(rows: &[Layer], edges: &[Edge]) -> Vec<String> {
     let modules: Vec<String> = rows.iter().map(|l| l.module.to_string()).collect();
-    check::all(rows, &[], &modules, edges)
+    check::all(rows, &modules, edges)
 }
 
 #[test]
@@ -103,13 +88,21 @@ fn exact_table_passes() {
 }
 
 #[test]
-fn flags_undeclared_and_stale() {
-    let v = run(ROWS, &[edge("scene", "core"), edge("scene", "render")]);
-    assert!(v.iter().any(|m| m.starts_with("UNDECLARED_DEP")), "{v:?}");
+fn flags_a_stale_dep_and_a_crate_without_its_row() {
+    let v = run(ROWS, &[edge("scene", "core")]);
     assert!(
         v.iter().any(|m| m.starts_with("STALE_DEP render → scene")),
         "{v:?}"
     );
+    let modules = ["core".to_string(), "scene".into(), "ui".into()];
+    let v = check::all(
+        ROWS,
+        &modules,
+        &[edge("scene", "core"), edge("render", "scene")],
+    );
+    let has = |p: &str| v.iter().any(|m| m.starts_with(p));
+    assert!(has("UNDECLARED_MODULE crates/ui"), "{v:?}");
+    assert!(has("MISSING_MODULE render"), "{v:?}");
 }
 
 #[test]
@@ -146,37 +139,14 @@ fn flags_cycles_and_sim_leaks() {
 }
 
 #[test]
-fn exceptions_allow_until_fixed() {
-    let x = [Exception {
-        from: "scene",
-        to: "render",
-        issue: 1,
-    }];
-    let modules: Vec<String> = ROWS.iter().map(|l| l.module.to_string()).collect();
-    let live = [
-        edge("scene", "core"),
-        edge("render", "scene"),
-        edge("scene", "render"),
-    ];
-    assert!(check::all(ROWS, &x, &modules, &live).is_empty());
-    let v = check::all(ROWS, &x, &modules, &live[..2]);
-    assert!(v.iter().any(|m| m.starts_with("STALE_EXCEPTION")), "{v:?}");
-}
-
-#[test]
 fn real_table_is_well_formed() {
     let modules: Vec<String> = LAYERS.iter().map(|l| l.module.to_string()).collect();
     let edges: Vec<Edge> = LAYERS
         .iter()
         .flat_map(|l| l.deps.iter().map(|d| edge(l.module, d)))
-        .chain(EXCEPTIONS.iter().map(|x| edge(x.from, x.to)))
         .collect();
-    let v = check::all(LAYERS, EXCEPTIONS, &modules, &edges);
+    let v = check::all(LAYERS, &modules, &edges);
     assert!(v.is_empty(), "{v:?}");
-    assert!(
-        EXCEPTIONS.iter().all(|x| x.issue > 0),
-        "every exception names its issue"
-    );
 }
 
 #[test]

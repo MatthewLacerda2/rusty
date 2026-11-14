@@ -78,7 +78,7 @@ fn flags_a_stale_allow() {
     );
 }
 
-/// Its files under `crates/scene/src/`, as a moved crate holds them.
+/// Its files under `crates/scene/src/`, as the crate holds them.
 #[test]
 fn finds_an_op_reexported_from_a_folder_file() {
     let fx = BTreeMap::from([

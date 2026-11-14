@@ -111,6 +111,7 @@ class StaleCopy(unittest.TestCase):
         self.pkg = self.repo / "dispatch"
         self.pkg.mkdir()
         (self.pkg / "review_level.py").write_text("TABLE = {}\n")
+        (self.repo / "modules.py").write_text("CRATES = 'crates'\n")
         git = lambda *a: subprocess.run(["git", *a], cwd=self.repo, check=True, capture_output=True)  # noqa: E731
         git("init", "-q")
         git("add", ".")
@@ -118,7 +119,14 @@ class StaleCopy(unittest.TestCase):
 
     def test_a_copy_that_differs_warns(self):
         (self.pkg / "review_level.py").write_text("TABLE = {'old': []}\n")
-        self.assertIn("differs from HEAD", review_level.stale_copy("HEAD", self.pkg))
+        self.assertIn("differ from HEAD", review_level.stale_copy("HEAD", self.pkg))
+
+    def test_a_stale_module_path_mapping_warns_too(self):
+        (self.repo / "modules.py").write_text("CRATES = 'src'\n")
+        self.assertIn("differ from HEAD", review_level.stale_copy("HEAD", self.pkg))
+
+    def test_a_checkout_without_the_ref_cannot_compare(self):
+        self.assertIn("cannot compare", review_level.stale_copy("origin/main", self.pkg))
 
     def test_an_up_to_date_copy_is_quiet(self):
         self.assertIsNone(review_level.stale_copy("HEAD", self.pkg))

@@ -255,9 +255,9 @@ adapts it.
   `--no-default-features`, and engine code outside those stays egui-free.
 - **One runtime shell, two frontends.** `crates/shell/` owns the window, frame loop, input,
   cursor, settings and `Application.Quit()`; what both frontends need goes there, once.
-- **One declared layering.** `tools/lint/src/layers/table.rs` says which module may
-  import which and name which crates, and marks the **sim** rows (the rest is the
-  platform layer); `make layers` checks it. Change it in the PR adding the import.
+- **One declared layering, held by cargo.** A crate names only what its manifest names;
+  `tools/lint/src/layers/table.rs` maps those edges and marks the **sim** rows, and `make
+  layers` holds it equal to the manifests, sim crates off platform and display crates.
 - **Determinism.** The sim is a pure function of (seed, inputs, fixed dt): no wall-clock
   reads, unseeded RNG or `std`'s `HashMap`/`HashSet` in sim modules (use
   `core::collections`). The gameplay Lua VM has no `os`/`io`; `math.random` uses the
@@ -266,8 +266,8 @@ adapts it.
   `crates/dev/src/providers/`: `dev` only, refused during Play, held to the project's `budget`,
   never made by a test (traits and mocks). `docs/providers.md`.
 - **Use `glam`** for all math (`deny.toml` bans `cgmath`, and `nalgebra` outside
-  physics); keep egui / wgpu / mlua decoupled. **A workspace being split one crate
-  per module** (`crates/<module>/`): `crates/CLAUDE.md` is the recipe for the next.
+  physics); keep egui / wgpu / mlua decoupled. **A workspace of one crate per module**
+  (`crates/<module>/`; the root keeps the binaries and `tests/`): `crates/CLAUDE.md`.
 - **Ships for macOS and Linux**, no other platform (`platform-cfg`). Not done on one.
 - **Group by subfolder, not by filename prefix** (`draw_lighting.rs` →
   `draw/lighting.rs`): aim for ≲10 source files per module directory (`dir-size` fails
@@ -288,8 +288,8 @@ adapts it.
 
 ## Commit gate (programmatic — no AI needed)
 `make gates` runs everything CI blocks on, fastest-failing first (`make check` is the
-edit loop; failures land in `.lint/report.txt`). **Nothing is grandfathered.** The gates
-and hooks: `docs/linting.md`, *The commit gate in brief*.
+edit loop; failures land in `.lint/report.txt`); the compiler holds the module edges.
+**Nothing is grandfathered.** The gates and hooks: `docs/linting.md`, *The commit gate in brief*.
 
 ## Overrides
 Any rule in this file may be overridden by the user's explicit say-so — in the current

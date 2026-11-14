@@ -1,4 +1,8 @@
-//! The crate checks, pure over (table, policy, `Cargo.toml`'s crates, measured uses).
+//! The crate checks, pure over (table, policy, the manifests' crates, measured
+//! uses). Cargo rejects code naming a crate its manifest lacks, and each manifest
+//! equals its row ([`super::members`]), so the source is read only for what cargo
+//! accepts: a declared crate nothing names, and a confined crate named outside its
+//! subtree of one crate.
 
 use super::policy::Policy;
 use super::Use;
@@ -8,7 +12,7 @@ use crate::layers::table::Layer;
 pub fn all(layers: &[Layer], policy: &Policy, deps: &[String], uses: &[Use]) -> Vec<String> {
     let mut out = Vec::new();
     accounted(layers, policy, deps, &mut out);
-    source(layers, policy, uses, &mut out);
+    confined(policy, uses, &mut out);
     stale(layers, policy, uses, &mut out);
     out
 }
@@ -30,7 +34,7 @@ fn accounted(layers: &[Layer], policy: &Policy, deps: &[String], out: &mut Vec<S
     let named = named.chain(policy.common.iter().copied());
     let named = named.chain(policy.unscoped.iter().map(|&(u, _)| u));
     let named = named.chain(policy.confined.iter().map(|c| c.krate));
-    for k in named.chain(policy.exceptions.iter().map(|x| x.krate)) {
+    for k in named {
         if !deps.iter().any(|d| d == k) {
             out.push(format!(
                 "UNKNOWN_CRATE {k} — not a dependency in Cargo.toml"
@@ -47,24 +51,10 @@ fn accounted(layers: &[Layer], policy: &Policy, deps: &[String], out: &mut Vec<S
     }
 }
 
-/// Each use is in its module's row (or common, or excepted), and inside its
-/// crate's confinement.
-fn source(layers: &[Layer], policy: &Policy, uses: &[Use], out: &mut Vec<String>) {
+/// Each use of a confined crate is inside its confinement.
+fn confined(policy: &Policy, uses: &[Use], out: &mut Vec<String>) {
     for u in uses {
         let k = u.krate.as_str();
-        let listed = layers
-            .iter()
-            .any(|l| l.module == u.module && l.crates.contains(&k));
-        let excepted = policy
-            .exceptions
-            .iter()
-            .any(|x| (x.module, x.krate) == (u.module.as_str(), k));
-        if !listed && !excepted && !policy.common.contains(&k) {
-            out.push(format!(
-                "UNDECLARED_CRATE {} `{} → {k}` — not in {1}'s row",
-                u.at, u.module
-            ));
-        }
         let path = crate::modules::module_path(u.at.split(':').next().unwrap_or(""));
         for c in policy.confined.iter().filter(|c| c.krate == k) {
             if !c.within.iter().any(|w| path.starts_with(&format!("{w}/"))) {
@@ -84,7 +74,7 @@ fn stale(layers: &[Layer], policy: &Policy, uses: &[Use], out: &mut Vec<String>)
     for l in layers {
         for k in l.crates.iter().filter(|k| !used(l.module, k)) {
             out.push(format!(
-                "STALE_CRATE {} → {k} — nothing in src/{0} names it; drop it",
+                "STALE_CRATE {} → {k} — nothing in crates/{0}/src names it; drop it from the row and the manifest",
                 l.module
             ));
         }
@@ -95,15 +85,5 @@ fn stale(layers: &[Layer], policy: &Policy, uses: &[Use], out: &mut Vec<String>)
         .filter(|k| !uses.iter().any(|u| u.krate == **k))
     {
         out.push(format!("STALE_CRATE common → {k} — no module names it"));
-    }
-    for x in policy
-        .exceptions
-        .iter()
-        .filter(|x| !used(x.module, x.krate))
-    {
-        out.push(format!(
-            "STALE_EXCEPTION {} → {} — fixed; drop it and close #{}",
-            x.module, x.krate, x.issue
-        ));
     }
 }

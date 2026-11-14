@@ -188,7 +188,7 @@ jobs:
       # The baseline is run here, not by cargo-mutants (`--baseline skip`, #2164):
       # cargo-mutants 27 builds and tests its own baseline with `--package` set
       # to the mutated packages only, whatever `test_workspace` says, while each
-      # mutant runs the whole workspace's tests. A moved crate's baseline then
+      # mutant runs the whole workspace's tests. A member crate's baseline then
       # timed only that crate's tests and every mutant overran 3x of it (#2160),
       # and a member without a `dev` feature failed it outright (#2155). This
       # step runs exactly what each mutant will: the same build, then the same
