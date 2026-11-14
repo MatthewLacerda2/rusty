@@ -3625,8 +3625,6 @@ dependencies = [
  "rusty-components",
  "rusty-core",
  "rusty-ecs",
- "rusty-procgen",
- "rusty-shadergen",
  "rusty-test-support",
  "serde",
  "serde_json",
