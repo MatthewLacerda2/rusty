@@ -42,7 +42,9 @@ The limits are CLAUDE.md's; the reasons are here, so they are kept, not re-argue
   pins, so the choice never follows the orchestrator's. `make coder` pins the
   cloud coder's (`dispatch/routine.py`'s `MODEL`). The `Agent` tool's types are
   in `.claude/agents/`: `coder` (a local coder) and `reviewer` on the latest
-  Opus, `merge-fixer` (a hand-back's mechanical fix) on Sonnet. Dispatch them by
+  Opus, `merge-fixer` (a hand-back's mechanical fix) on Sonnet; `agent-docs`
+  holds the pins (`agent_docs::agent::PINS`) and a concrete `model:` on every
+  definition. Dispatch them by
   `subagent_type` and never pass `model`, which would override the pin. The
   orchestrator's own quick read-only searches run on what it picks.
 - Merging stays one at a time, whatever the count.

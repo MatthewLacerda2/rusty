@@ -15,17 +15,12 @@ pub const MAX_DESCRIPTION: usize = 1024;
 /// Every problem with the frontmatter of `source`, the `SKILL.md` of `folder`, as
 /// (1-based line, message).
 pub fn check(folder: &str, source: &str) -> Vec<(usize, String)> {
-    let lines: Vec<&str> = source.lines().collect();
-    let Some(end) = (lines.first().map(|l| l.trim_end()) == Some("---"))
-        .then(|| lines.iter().skip(1).position(|l| l.trim_end() == "---"))
-        .flatten()
-        .map(|i| i + 1)
-    else {
+    let Some(lines) = block(source) else {
         let msg = "a `SKILL.md` opens with `---`, its `name:` and `description:`, and a \
                    closing `---`; without it Claude Code skips the skill";
         return vec![(1, msg.into())];
     };
-    let block = &lines[1..end];
+    let block = &lines[..];
     let mut found = Vec::new();
     match value(block, "name") {
         None => found.push((
@@ -56,6 +51,17 @@ pub fn check(folder: &str, source: &str) -> Vec<(usize, String)> {
     found
 }
 
+/// The lines between a file's opening `---` and its closing `---` (the first is
+/// the file's line 2), or `None` when `source` opens with no closed block.
+pub(super) fn block(source: &str) -> Option<Vec<&str>> {
+    let lines: Vec<&str> = source.lines().collect();
+    let end = (lines.first().map(|l| l.trim_end()) == Some("---"))
+        .then(|| lines.iter().skip(1).position(|l| l.trim_end() == "---"))
+        .flatten()?
+        + 1;
+    Some(lines[1..end].to_vec())
+}
+
 fn name_problem(folder: &str, name: &str) -> Option<String> {
     let bad = |c: char| !(c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
     if name.chars().count() > MAX_NAME {
@@ -79,7 +85,7 @@ fn name_problem(folder: &str, name: &str) -> Option<String> {
 /// 2) and the line it is on: quotes dropped, and the indented lines after it
 /// joined, whether they continue a plain or quoted value or hold a folded (`>`)
 /// or literal (`|`) block.
-fn value(block: &[&str], key: &str) -> Option<(usize, String)> {
+pub(super) fn value(block: &[&str], key: &str) -> Option<(usize, String)> {
     let at = block
         .iter()
         .position(|l| l.strip_prefix(key).is_some_and(|r| r.starts_with(':')))?;
