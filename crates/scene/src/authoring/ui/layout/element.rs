@@ -8,7 +8,7 @@
 //!
 //! Pure.
 
-use crate::authoring::sanitize::optional_non_negative;
+use crate::rules::sanitize::optional_non_negative;
 use rusty_components::{LayoutAxisFit, LayoutElementComponent};
 
 rusty_core::named_enum! {

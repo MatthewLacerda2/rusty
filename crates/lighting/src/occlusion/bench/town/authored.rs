@@ -6,7 +6,7 @@
 use glam::Vec3;
 
 use rusty_components::mesh::{MeshRevision, Vertex};
-use rusty_scene::authoring::{create_drawn_entity, Primitive};
+use rusty_scene::create::{create_drawn_entity, Primitive};
 use rusty_scene::Scene;
 
 /// The tessellation's spacing, metres.

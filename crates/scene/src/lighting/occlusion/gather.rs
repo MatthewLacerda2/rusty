@@ -1,6 +1,7 @@
 //! What the occlusion bake reads (#1714), and what the renderer checks it against:
 //! which static meshes take part, each one's [`fingerprint`], and the occluders'
-//! world-space triangles with the side of each a camera sees.
+//! world-space triangles with the side of each a camera sees. In the base, beside the
+//! file it prints, because the renderer reads the prints every frame.
 //!
 //! stored-format: the fingerprint each baked object carries in the `<scene>.occlusion` file
 
@@ -9,15 +10,15 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use glam::{Mat4, Vec3};
 
+use crate::Scene;
 use rusty_components::mesh::{clip_runs, material_runs, MeshRevision};
 use rusty_components::{MaterialAsset, MeshComponent, RenderFace, RenderMode};
-use rusty_scene::Scene;
 
 /// Which side of an occluder's triangle stops a view: the one its world winding
 /// faces (`Ccw`), the other (`Cw`), or both. A mirrored mesh's front faces wind the
 /// other way, as the renderer's `Facing` says.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Face {
+pub enum Face {
     Ccw,
     Cw,
     Both,
@@ -35,7 +36,7 @@ impl Face {
 
     /// The normal of the side a camera sees, given the world winding normal
     /// `normal`; `None` when both sides draw.
-    pub(super) fn front(self, normal: Vec3) -> Option<Vec3> {
+    pub fn front(self, normal: Vec3) -> Option<Vec3> {
         match self {
             Self::Ccw => Some(normal),
             Self::Cw => Some(-normal),
@@ -45,7 +46,7 @@ impl Face {
 
     /// Whether a ray along `dir` meets the drawn side of a triangle whose world
     /// winding normal is `normal`.
-    pub(super) fn stops(self, normal: Vec3, dir: Vec3) -> bool {
+    pub fn stops(self, normal: Vec3, dir: Vec3) -> bool {
         match self {
             Self::Ccw => normal.dot(dir) < 0.0,
             Self::Cw => normal.dot(dir) > 0.0,
@@ -56,7 +57,7 @@ impl Face {
 
 /// One object as the bake sees it: its drawn triangles (where a view must reach)
 /// and its occluding ones (empty for an occludee alone), each with the side it draws.
-pub(super) struct Object {
+pub struct Object {
     pub entity: u32,
     pub fingerprint: u64,
     pub drawn: Vec<([Vec3; 3], Face)>,
@@ -174,7 +175,7 @@ impl Fingerprints {
     }
 
     /// Entity `id` ready to bake, `None` when it takes no part.
-    pub(super) fn object(&self, scene: &Scene, id: u32) -> Option<Object> {
+    pub fn object(&self, scene: &Scene, id: u32) -> Option<Object> {
         let mesh = scene.world.mesh(id)?;
         let read = self.read(scene, id, &mesh)?;
         let world = scene.world.local_to_world(id);
@@ -220,7 +221,7 @@ impl Fingerprints {
 /// bake never reads them (#1958). In index order, so the same corners making other
 /// triangles differ. An index past the vertices hashes as NaN corners, so it still
 /// differs from any real one.
-pub(super) fn corners_hash(mesh: &MeshComponent) -> u64 {
+pub fn corners_hash(mesh: &MeshComponent) -> u64 {
     let mut hash = rusty_core::hash::Content::default();
     for &i in &mesh.indices {
         let corner = mesh
@@ -236,7 +237,7 @@ pub(super) fn corners_hash(mesh: &MeshComponent) -> u64 {
 
 /// Whether entity `id`, drawing `mesh`, takes part in the bake: active, static, not
 /// skinned (its posed bounds move), not shadows-only (no camera draws it).
-pub(super) fn takes_part(scene: &Scene, id: u32, mesh: &MeshComponent) -> bool {
+pub fn takes_part(scene: &Scene, id: u32, mesh: &MeshComponent) -> bool {
     let world = &scene.world;
     world.is_active_in_hierarchy(id)
         && world.is_static(id)
@@ -259,7 +260,7 @@ fn grouped(scene: &Scene) -> BTreeSet<u32> {
 
 /// Entity `id`'s index runs by material slot, each holding at least one whole
 /// triangle: empty when it draws nothing (no index, or an empty material list).
-pub(super) fn drawn_runs(
+pub fn drawn_runs(
     scene: &Scene,
     id: u32,
     mesh: &MeshComponent,
@@ -286,7 +287,7 @@ fn occludes(material: Option<&MaterialAsset>) -> bool {
 
 /// A slot's material as the bake reads it: whether it occludes, and its Render Face.
 /// As the fingerprint's bytes: `[occludes, face]`.
-pub(super) fn as_occluder(material: Option<&MaterialAsset>) -> [u8; 2] {
+pub fn as_occluder(material: Option<&MaterialAsset>) -> [u8; 2] {
     let face = material.map_or(RenderFace::Front, |m| m.render_face);
     [u8::from(occludes(material)), face as u8]
 }

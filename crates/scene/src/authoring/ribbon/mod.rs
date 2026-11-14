@@ -11,7 +11,7 @@
 pub mod line;
 pub mod trail;
 
-use super::sanitize::{finite_curve, finite_gradient, non_negative, unit};
+use crate::rules::sanitize::{finite_curve, finite_gradient, non_negative, unit};
 use rusty_asset::MapRef;
 use rusty_components::{ParticleBlend, RibbonStyle, TextureMode};
 use rusty_core::curve::{Curve, Gradient};

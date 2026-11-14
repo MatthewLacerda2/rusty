@@ -17,9 +17,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::prefab::instance::instance_members;
-use crate::prefab::removed::is_removed;
 use crate::prefab::source::{node_paths, GONE};
 use crate::prefab::stamp_entity;
+use crate::prefab_link::removed::is_removed;
 use crate::runtime::despawn::Despawn;
 use crate::{Entity, PrefabData, Scene};
 use rusty_components::{PrefabLink, TransformComponent};

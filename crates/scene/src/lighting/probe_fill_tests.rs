@@ -53,7 +53,7 @@ fn sun_from_above() -> Scene {
     let light = LightComponent {
         light_type: LightType::Directional,
         intensity: 5.0,
-        ..crate::authoring::default_light()
+        ..crate::create::default_light()
     };
     scene.world.set_light(id, Some(light));
     scene
@@ -124,7 +124,7 @@ fn an_ambient_light_entity_overrides_the_fill() {
         light_type: LightType::Ambient,
         color: Vec3::new(1.0, 0.0, 0.0),
         intensity: 2.0,
-        ..crate::authoring::default_light()
+        ..crate::create::default_light()
     };
     scene.world.set_light(id, Some(light));
     let want = AmbientRadiance::Hemisphere(Vec3::new(2.0, 0.0, 0.0));

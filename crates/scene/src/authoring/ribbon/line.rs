@@ -7,7 +7,7 @@
 
 use glam::Vec3;
 
-use crate::authoring::sanitize::finite3_or;
+use crate::rules::sanitize::finite3_or;
 use rusty_components::LineComponent;
 
 /// The most points a line holds — a guard against a runaway script loop.

@@ -4,7 +4,7 @@
 
 use glam::Vec3;
 
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
 /// The corridor's half width and the rooms' depth past its walls, metres.
@@ -16,15 +16,7 @@ pub const HEIGHT: f32 = 3.0;
 pub(super) const WALL: f32 = 0.2;
 pub(super) const DOOR: f32 = 1.4;
 
-/// A static box over `[min, max]`.
-pub fn block(scene: &mut Scene, name: &str, min: Vec3, max: Vec3) -> u32 {
-    let id = create_entity(scene, name, Some(Primitive::Box));
-    let mut t = scene.world.transform_mut(id).expect("a new entity");
-    (t.position, t.scale) = ((min + max) * 0.5, max - min);
-    drop(t);
-    scene.world.set_static(id, true);
-    id
-}
+pub use rusty_scene::test_levels::block;
 
 /// A wall along X at `z` over `[x0, x1]`, with a doorway centred at `door`.
 fn wall_x(scene: &mut Scene, z: f32, (x0, x1): (f32, f32), door: Option<f32>) {

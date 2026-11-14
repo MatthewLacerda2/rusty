@@ -8,7 +8,8 @@ use super::atlas::pack;
 use super::bake::Lightmap;
 use super::pages::{level_count, levels};
 use super::raster::fill_rest;
-use rusty_scene::lighting::settings::{MAX_PAGE, MIP_LEVELS};
+use rusty_scene::lighting::page::MIP_LEVELS;
+use rusty_scene::lighting::settings::MAX_PAGE;
 
 fn map(entity: u32, size: u32, value: f32) -> Lightmap {
     Lightmap {

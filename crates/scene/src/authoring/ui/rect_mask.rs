@@ -9,7 +9,7 @@
 
 use glam::Vec4;
 
-use crate::authoring::sanitize::{finite4, non_negative};
+use crate::rules::sanitize::{finite4, non_negative};
 use rusty_components::{MaskComponent, RectMaskComponent};
 
 /// Set the clip's inset from the element's bounds (left, bottom, right, top), in

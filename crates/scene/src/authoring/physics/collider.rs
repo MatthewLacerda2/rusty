@@ -14,8 +14,8 @@
 //!
 //! Pure, but for `set_material_asset`, which reads the asset it is given.
 
-use crate::authoring::sanitize::{non_negative, unit};
 use crate::physics_material;
+use crate::rules::sanitize::{non_negative, unit};
 use rusty_components::{ColliderComponent, ColliderShape, PhysicsMaterial};
 
 /// Set the collider's `active` flag.

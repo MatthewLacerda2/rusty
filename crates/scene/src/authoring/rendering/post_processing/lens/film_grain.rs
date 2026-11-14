@@ -2,7 +2,7 @@
 
 use super::super::{Effect, Knob};
 use crate::authoring::fields::table::effect;
-use crate::authoring::sanitize::unit;
+use crate::rules::sanitize::unit;
 use rusty_components::{FilmGrain, PostProcessingComponent};
 
 /// Set whether film grain draws.

@@ -26,7 +26,7 @@ fn a_load_that_clamps_an_inline_value_keeps_the_asset() {
     write(&wood, PhysicsMaterial::new(0.6, 0.0)).unwrap();
     let collider = ColliderComponent {
         material_asset: Some(wood.clone()),
-        ..crate::authoring::default_collider()
+        ..crate::create::default_collider()
     };
     let (scene, id) = scene_with(collider);
     let mut doc = serde_json::to_value(to_scene_data(&scene)).unwrap();
@@ -50,7 +50,7 @@ fn a_load_that_clamps_an_inline_value_keeps_the_asset() {
 fn one_file_is_one_key_however_it_is_written() {
     let path = asset("keyed.physmat");
     write(&format!("{path} "), PhysicsMaterial::new(0.3, 0.0)).unwrap();
-    let mut c = crate::authoring::default_collider();
+    let mut c = crate::create::default_collider();
     let set = crate::authoring::physics::collider::set_material_asset;
     set(&mut c, Some(format!(" {path}"))).unwrap();
     assert_eq!(c.material_asset.as_deref(), Some(path.as_str()));
@@ -61,7 +61,7 @@ fn one_file_is_one_key_however_it_is_written() {
 
 #[test]
 fn component_set_refuses_a_path_that_does_not_load_and_takes_one_that_does() {
-    let (mut scene, id) = scene_with(crate::authoring::default_collider());
+    let (mut scene, id) = scene_with(crate::create::default_collider());
     let set = |scene: &mut Scene, path: &str| {
         let changes: Map<_, _> = [("material_asset".to_string(), json!(path))]
             .into_iter()

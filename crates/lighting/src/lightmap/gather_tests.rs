@@ -6,7 +6,7 @@ use glam::{Vec2, Vec3};
 use super::tests::{floor, mean, settings};
 use super::*;
 use rusty_components::{LightComponent, LightMode, MeshComponent, ShadowCasting};
-use rusty_scene::authoring::{primitive_mesh_component, Primitive};
+use rusty_scene::create::{primitive_mesh_component, Primitive};
 use rusty_scene::Scene;
 
 #[test]
@@ -77,7 +77,7 @@ fn gather_takes_static_meshes_and_baked_in_lights_only() {
             inner_cone: 0.0,
             outer_cone: 0.0,
             mode,
-            ..rusty_scene::authoring::default_light()
+            ..rusty_scene::create::default_light()
         };
         scene.world.set_light(id, Some(light));
     }

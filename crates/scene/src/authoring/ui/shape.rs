@@ -9,8 +9,8 @@
 
 use glam::{Vec2, Vec4};
 
-use crate::authoring::sanitize::{finite2, finite4, finite_or, non_negative, unit_color};
 use crate::authoring::ui::look::sanitize_gradient;
+use crate::rules::sanitize::{finite2, finite4, finite_or, non_negative, unit_color};
 use rusty_components::{
     ShapeComponent, ShapeCorner, ShapeGlow, ShapeKind, ShapeShadow, UiBlend, UiGradient,
 };

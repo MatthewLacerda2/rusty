@@ -15,6 +15,9 @@
 //!   scene     — the `Scene` aggregate (the `ecs::World` + scene-level state)
 //!   serialize — World <-> SceneData
 //!   authoring — the shared edit verbs the editor, the API and loads all go through
+//!   create    — a new GameObject: the primitives, the Add-Component defaults, `create_entity`
+//!   rules     — the bounds a stored value is held to (float sanitizing, lens, drive, ranges)
+//!   prefab_link — a linked instance's members, a link's source, a removed part
 //!   asset_instance, prefab — instantiate one imported sub-object; prefabs
 //!   camera, decal, lighting — the active view, decal records, baked lighting
 //!   identity, material_lookup — a live scene's identity; material slot lookups
@@ -42,6 +45,7 @@
 pub mod asset_instance;
 pub mod authoring;
 pub mod camera;
+pub mod create;
 pub mod decal;
 pub mod default_scene;
 pub mod identity;
@@ -55,8 +59,10 @@ pub mod model_instance;
 pub mod nav_settings;
 pub mod physics_material;
 pub mod prefab;
+pub mod prefab_link;
 pub mod rehydrate;
 pub mod revision;
+pub mod rules;
 pub mod runtime;
 pub mod scene;
 pub mod serialize;
@@ -64,6 +70,8 @@ pub mod settings;
 pub mod skeleton;
 pub mod snapshot;
 pub mod state;
+#[doc(hidden)]
+pub mod test_levels;
 pub mod undo;
 pub mod world_cache;
 

@@ -105,14 +105,7 @@ pub const LAYERS: &[Layer] = &[
     // navmesh, rays through physics and the active camera. Unreal's `AIModule`.
     sim(
         "ai",
-        &[
-            "components",
-            "core",
-            "lighting",
-            "navigation",
-            "physics",
-            "scene",
-        ],
+        &["components", "core", "navigation", "physics", "scene"],
     ),
     // The Lua side: `scripting` (the VM, lifecycle, timers, console) and `api` (the
     // one surface) name each other, so they are one module, two halves of one crate.
@@ -163,7 +156,6 @@ pub const LAYERS: &[Layer] = &[
             "components",
             "core",
             "ecs",
-            "lighting",
             // The collider gizmo draws the shape physics collides with (#1882).
             "physics",
             "scene",

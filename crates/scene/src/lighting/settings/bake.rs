@@ -9,20 +9,6 @@ use std::ops::RangeInclusive;
 pub const MAX_PAGE: u32 = 4096;
 /// The smallest page tried: Unity's smallest Max Lightmap Size.
 pub const MIN_PAGE: u32 = 32;
-/// The mip levels a page's layout keeps apart (`lightmap::atlas`'s module doc): the
-/// base and two halvings.
-pub const MIP_LEVELS: u32 = 3;
-/// The ring around each lightmap, in texels: the width of a texel of the last
-/// mip level.
-pub const PAD: u32 = 1 << (MIP_LEVELS - 1);
-
-/// The largest lightmap edge a `page`-edge atlas takes: the page less the ring on
-/// both sides, so its cell is exactly the page (`page` is a multiple of the 16-texel grid).
-/// The one definition of a map's cap (#1704).
-pub const fn max_map_edge(page: u32) -> u32 {
-    page - 2 * PAD
-}
-
 /// `edge` held to a page edge the packer takes: the next power of two, inside
 /// [`MIN_PAGE`]`..=`[`MAX_PAGE`]. What a hand-edited Max Lightmap Size becomes.
 pub fn page_edge(edge: u32) -> u32 {
@@ -81,7 +67,7 @@ pub struct BakeSettings {
     /// Unity's *Max Lightmap Size* (#1704): the atlas page's edge, in texels, a
     /// power of two in [`Self::MAX_LIGHTMAP_SIZE`]. A mesh's lightmap follows its
     /// area × `texels_per_unit` up to the largest map such a page holds
-    /// ([`max_map_edge`]); the packer picks the smallest page that holds the bake,
+    /// (`rusty-lighting`'s `lightmap::max_map_edge`); the packer picks the smallest page that holds the bake,
     /// up to this edge, then adds pages. Read through [`Self::page`].
     pub max_lightmap_size: u32,
     /// What cleans the baked bounce (#1884, Unity's *Denoiser* and *Filter*): OIDN

@@ -14,6 +14,7 @@
 use super::progress::{stage_progress, BakeLog};
 use super::report::{self, probes::Timeline};
 use super::steps::Stage;
+use rusty_lighting::lightmap::probe_direct;
 use rusty_render::{Renderer, DEFAULT_BAKE_RESOLUTION};
 use rusty_scene::Scene;
 
@@ -45,7 +46,7 @@ pub fn bake_scene_probes_at(
         }
     };
     let mut times = Timeline::default();
-    renderer.bake_probes_observed(scene, res, &mut |bounce, done, total| {
+    renderer.bake_probes_observed(scene, res, probe_direct, &mut |bounce, done, total| {
         let stage = Stage::Light {
             bounce,
             done,

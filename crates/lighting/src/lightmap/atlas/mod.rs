@@ -42,13 +42,25 @@ mod rects;
 use glam::{Vec3, Vec4};
 
 use super::bake::Lightmap;
-use rusty_scene::lighting::settings::{max_map_edge, page_edge, MIN_PAGE, MIP_LEVELS, PAD};
+use rusty_scene::lighting::page::MIP_LEVELS;
+use rusty_scene::lighting::settings::{page_edge, MIN_PAGE};
 
 /// The most pages a bake may make (#1704): the layers of one texture array under
 /// `wgpu::Limits::default()`, which the renderer asks its device for
 /// (`render::gpu::lightmaps` checks the device's own limit at load, and a test
 /// holds the two equal).
 pub const MAX_PAGES: usize = 256;
+/// The ring around each lightmap, in texels: the width of a texel of the last
+/// mip level.
+pub const PAD: u32 = 1 << (MIP_LEVELS - 1);
+
+/// The largest lightmap edge a `page`-edge atlas takes: the page less the ring on
+/// both sides, so its cell is exactly the page (`page` is a multiple of the 16-texel grid).
+/// The one definition of a map's cap (#1704).
+pub const fn max_map_edge(page: u32) -> u32 {
+    page - 2 * PAD
+}
+
 /// The grid cells are aligned to, in texels: a 4×4 BC block of the last mip
 /// level, so no block of any kept level spans two cells.
 pub const GRID: u32 = 4 << (MIP_LEVELS - 1);

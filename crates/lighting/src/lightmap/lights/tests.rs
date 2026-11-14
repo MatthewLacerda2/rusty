@@ -4,7 +4,7 @@
 use super::taken_lights;
 use crate::lightmap::BakeScene;
 use rusty_components::{LightComponent, LightMode};
-use rusty_scene::authoring::{default_light, primitive_mesh_component, Primitive};
+use rusty_scene::create::{default_light, primitive_mesh_component, Primitive};
 use rusty_scene::Scene;
 
 fn light(scene: &mut Scene, mode: LightMode, intensity: f32) -> u32 {

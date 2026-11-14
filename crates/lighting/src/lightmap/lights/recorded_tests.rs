@@ -7,7 +7,7 @@ use glam::{Vec3, Vec4};
 
 use crate::lightmap::{assign_channels, mixed_occlusion, BakeScene};
 use rusty_components::{LightComponent, LightMode, LightType};
-use rusty_scene::authoring::{create_entity, default_light, Primitive};
+use rusty_scene::create::{create_entity, default_light, Primitive};
 use rusty_scene::lighting::MixedLightingMode;
 use rusty_scene::Scene;
 

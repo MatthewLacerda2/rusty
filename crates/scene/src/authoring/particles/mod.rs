@@ -24,7 +24,7 @@ pub use render::*;
 
 use glam::Vec3;
 
-use crate::authoring::sanitize::{
+use crate::rules::sanitize::{
     clamped, color_range_or, finite, finite3, finite3_or, finite_curve, finite_gradient,
     non_negative, range_or,
 };

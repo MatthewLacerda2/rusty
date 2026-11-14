@@ -24,7 +24,8 @@
 //!
 //! Pure.
 
-use crate::authoring::sanitize::{at_least, saturated};
+use crate::rules::lens;
+use crate::rules::sanitize::saturated;
 use rusty_components::{CameraComponent, ClearFlags, FovAxis, Projection, RenderTarget};
 use rusty_core::settings::quality::EffectQuality;
 
@@ -35,22 +36,12 @@ pub use taa::{
     CameraKnob, TAA_KNOBS,
 };
 
-/// The field-of-view range, in degrees: Unity's Camera inspector bounds, applied
-/// to every write (the view camera's `Camera.SetFov` too).
-pub const MIN_FOV: f32 = 1.0;
-pub const MAX_FOV: f32 = 179.0;
-/// The nearest a near plane may sit (Unity's inspector floor): a viewmodel's
-/// 0.01 is allowed, 0 (an infinite depth range) is not.
-pub const MIN_NEAR: f32 = 0.01;
-/// How far beyond the near plane the far plane must at least sit (Unity's gap).
-pub const MIN_CLIP_GAP: f32 = 0.01;
-/// The smallest orthographic half-height, so the view keeps a volume.
-pub const MIN_ORTHO_SIZE: f32 = 0.01;
+pub use crate::rules::lens::{MAX_FOV, MIN_CLIP_GAP, MIN_FOV, MIN_NEAR, MIN_ORTHO_SIZE};
 
 /// Set the camera's vertical field of view (degrees), clamped to
 /// [`MIN_FOV`]..=[`MAX_FOV`]. A NaN takes [`MIN_FOV`] (`f32::clamp` would keep it).
 pub fn set_fov(c: &mut CameraComponent, fov: f32) {
-    c.fov = saturated(fov, MIN_FOV, MAX_FOV);
+    c.fov = lens::hold_fov(fov);
 }
 
 /// Set which axis the Inspector shows and edits the field of view along (#2038).
@@ -65,11 +56,7 @@ pub fn set_fov_axis(c: &mut CameraComponent, axis: FovAxis) {
 /// always sits strictly beyond the near one, even where `near + MIN_CLIP_GAP`
 /// rounds back to `near`.
 pub fn set_clip_planes(c: &mut CameraComponent, near: f32, far: f32) {
-    // Below f32::MAX, so the plane just beyond it is still finite.
-    let near = at_least(near, MIN_NEAR).min(f32::MAX.next_down());
-    let min_far = (near + MIN_CLIP_GAP).max(near.next_up());
-    c.near = near;
-    c.far = at_least(far, min_far);
+    (c.near, c.far) = lens::hold_clip_planes(near, far);
 }
 
 /// Set the camera's near clip plane (see [`set_clip_planes`]).
@@ -150,14 +137,8 @@ pub const MAX_TARGET_SIZE: u32 = 4096;
 
 /// Set the camera's projection (#430). An orthographic size is at least
 /// [`MIN_ORTHO_SIZE`].
-// lint: allow(sanitize) the orthographic size, its one float, goes through `at_least`
 pub fn set_projection(c: &mut CameraComponent, projection: Projection) {
-    c.projection = match projection {
-        Projection::Orthographic { size } => Projection::Orthographic {
-            size: at_least(size, MIN_ORTHO_SIZE),
-        },
-        p => p,
-    };
+    c.projection = lens::hold_projection(projection);
 }
 
 /// The projection's name: `"Perspective"` or `"Orthographic"`.

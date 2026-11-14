@@ -10,7 +10,8 @@ use super::super::input::BakeScene;
 use super::super::raster::{lightmap_size, rasterize, TexelPoint};
 use super::super::rays::Rays;
 use super::Tracer;
-use rusty_scene::lighting::settings::{max_map_edge, BakeSettings};
+use crate::lightmap::max_map_edge;
+use rusty_scene::lighting::settings::BakeSettings;
 
 /// Trace about `count` texels of `scene` spread evenly over its receiving meshes,
 /// on `threads` workers, exactly as the bake traces each one; returns how many

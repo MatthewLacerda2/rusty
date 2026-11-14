@@ -3,8 +3,8 @@
 //! (#1359).
 
 use super::*;
-use crate::authoring::default_camera;
 use crate::authoring::rendering::camera as ops;
+use crate::create::default_camera;
 use crate::serialize::{apply_scene_data, to_scene_data};
 use rusty_components::CameraComponent;
 

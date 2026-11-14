@@ -21,7 +21,7 @@ use crate::gpu::uniforms::ObjectData;
 use crate::scene::Variant;
 use crate::{InstanceData, Renderer};
 use rusty_components::{MaterialAsset, ParticleEmitterComponent, ParticleRenderMode};
-use rusty_scene::authoring::{primitive_mesh_component, Primitive};
+use rusty_scene::create::{primitive_mesh_component, Primitive};
 use rusty_scene::serialize::asset_mesh_component;
 use rusty_scene::{Camera, MeshComponent, Scene};
 

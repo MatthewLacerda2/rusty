@@ -9,7 +9,7 @@
 //! ([`ShaderOverrides`](crate::shader_overrides::ShaderOverrides)).
 
 use super::{ensure_material_key, MaterialLibrary};
-use crate::authoring::sanitize::finite_values;
+use crate::rules::sanitize::finite_values;
 use crate::Scene;
 use rusty_shadergen::params::{self, ParamLayout};
 

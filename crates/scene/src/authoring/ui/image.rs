@@ -11,8 +11,8 @@
 
 use glam::Vec4;
 
-use crate::authoring::sanitize::{finite4, unit, unit_color};
 use crate::authoring::ui::look::sanitize_gradient;
+use crate::rules::sanitize::{finite4, unit, unit_color};
 use rusty_asset::MapRef;
 use rusty_components::{FillMethod, FillOrigin, ImageComponent, ImageType, UiBlend, UiGradient};
 

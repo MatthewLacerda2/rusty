@@ -12,7 +12,6 @@
 use glam::{Quat, Vec3};
 
 use super::{game_camera_from_scene, held_fov, main_camera, Camera, MAX_PITCH};
-use crate::authoring::rendering::camera as camera_ops;
 use crate::Scene;
 
 /// Copy the main camera entity's pose onto the view `camera`; without one, the free
@@ -49,7 +48,7 @@ pub fn set_view_orientation(camera: &mut Camera, scene: &mut Scene, yaw: f32, pi
 pub fn set_view_fov(camera: &mut Camera, scene: &mut Scene, fov: f32) {
     camera.fov = held_fov(fov);
     if let Some(mut c) = main_camera(scene).and_then(|id| scene.world.camera_mut(id)) {
-        camera_ops::set_fov(&mut c, fov);
+        c.fov = held_fov(fov);
     }
 }
 

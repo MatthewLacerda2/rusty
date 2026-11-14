@@ -20,7 +20,7 @@ use rusty_ecs::World;
 
 /// Attach one row's component with its Add Component default: the Mesh and the
 /// Material through their own verbs, the kinds below through the inspector's
-/// default values (`scene::authoring::defaults`), every other kind its `Default`.
+/// default values (`scene::create::defaults`), every other kind its `Default`.
 macro_rules! added {
     ($w:ident, $id:ident, mesh, $set:ident) => {
         add_box_mesh($w, $id)

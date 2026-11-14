@@ -17,8 +17,9 @@ use std::time::Instant;
 
 use super::{available, Oidn};
 use crate::bake::lightmap_cost_tests::lit_level;
+use rusty_lighting::lightmap::max_map_edge;
 use rusty_lighting::lightmap::{bake_with_progress, lightmap_size, BakeProgress};
-use rusty_scene::lighting::settings::{max_map_edge, BakeSettings, Denoiser};
+use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 
 /// Lightmap texels per world unit the level is baked at.
 const DENSITY: f32 = 2.0;

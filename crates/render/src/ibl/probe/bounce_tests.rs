@@ -143,7 +143,8 @@ fn gpu_multibounce_increases_color_bleed() {
 
     // Full multi-bounce solve.
     let mut scene = bleed_room(probe);
-    let report = renderer.bake_probes_multibounce(&mut scene, RES);
+    let report =
+        renderer.bake_probes_multibounce(&mut scene, RES, rusty_lighting::lightmap::probe_direct);
     let converged = scene.probes.probes()[0].sh;
 
     assert!(report.bounces >= 2, "expected ≥2 bounces, got {report:?}");
@@ -176,7 +177,8 @@ fn gpu_early_out_on_dark_scene() {
     );
     scene.probes.add_probe(Vec3::ZERO);
 
-    let report = renderer.bake_probes_multibounce(&mut scene, RES);
+    let report =
+        renderer.bake_probes_multibounce(&mut scene, RES, rusty_lighting::lightmap::probe_direct);
     assert!(report.converged, "dark scene should converge: {report:?}");
     assert!(
         report.bounces < MAX_BOUNCES,
@@ -194,8 +196,8 @@ fn gpu_multibounce_is_deterministic() {
 
     let mut a = bleed_room(probe);
     let mut b = bleed_room(probe);
-    let ra = renderer.bake_probes_multibounce(&mut a, RES);
-    let rb = renderer.bake_probes_multibounce(&mut b, RES);
+    let ra = renderer.bake_probes_multibounce(&mut a, RES, rusty_lighting::lightmap::probe_direct);
+    let rb = renderer.bake_probes_multibounce(&mut b, RES, rusty_lighting::lightmap::probe_direct);
 
     assert_eq!(ra, rb, "bounce reports diverged: {ra:?} vs {rb:?}");
     assert_eq!(

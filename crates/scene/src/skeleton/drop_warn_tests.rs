@@ -24,7 +24,7 @@ fn a_dropped_bone_warns_about_its_override_physics_and_components() {
         scene.find_bone(rig, "head").unwrap(),
     );
     scene.world.transform_mut(head).unwrap().position = Vec3::X;
-    let body = crate::authoring::default_rigidbody();
+    let body = crate::create::default_rigidbody();
     scene.world.set_rigidbody(spine, Some(body));
     joint_to(&mut scene, spine, None);
     let collider = ColliderComponent::from_mesh_bounds(true, -Vec3::ONE, Vec3::ONE);

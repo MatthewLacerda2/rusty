@@ -10,9 +10,7 @@ use super::reflection_probe::clamp_resolution;
 
 mod bake;
 
-pub use bake::{
-    max_map_edge, page_edge, BakeSettings, Denoiser, MAX_PAGE, MIN_PAGE, MIP_LEVELS, PAD,
-};
+pub use bake::{page_edge, BakeSettings, Denoiser, MAX_PAGE, MIN_PAGE};
 
 /// Unity's Lighting Settings, the part rusty has: the lightmap bake's knobs, the
 /// reflection probes' defaults, the diffuse model every lit path shades with and

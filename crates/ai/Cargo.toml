@@ -6,9 +6,7 @@ publish.workspace = true
 
 [features]
 dev = [
-    "dep:rusty-lighting",
     "rusty-core/dev",
-    "rusty-lighting/dev",
     "rusty-navigation/dev",
     "rusty-physics/dev",
     "rusty-scene/dev",
@@ -20,8 +18,6 @@ workspace = true
 [dependencies]
 rusty-components = { workspace = true }
 rusty-core = { workspace = true }
-# The bench level `query::bench` (dev-only) builds is the occlusion bake's.
-rusty-lighting = { workspace = true, optional = true }
 rusty-navigation = { workspace = true }
 rusty-physics = { workspace = true }
 rusty-scene = { workspace = true }

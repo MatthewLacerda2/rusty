@@ -76,7 +76,11 @@ fn gpu_stepping_bakes_what_one_call_bakes() {
     let Some(mut r) = rusty_render::test_gpu::headless_or_skip(8, 8) else {
         return;
     };
-    r.bake_probes(&mut whole, rusty_render::DEFAULT_BAKE_RESOLUTION);
+    r.bake_probes(
+        &mut whole,
+        rusty_render::DEFAULT_BAKE_RESOLUTION,
+        rusty_lighting::lightmap::probe_direct,
+    );
     drop(r);
     let params = LightingBakeParams::default();
     let mut job = start_lighting(&stepped, Some(&path), None, params).unwrap();

@@ -23,13 +23,13 @@
 //!   ([`bake_progressive`], #1970) runs the trace in passes over every texel, each
 //!   pass shown, the camera's texels first (`view`, [`BakeView`]), to the same bytes;
 //! * `atlas` — packing the lightmaps into equal-size pages ([`pack`]), each map in
-//!   a cell its BC blocks and first [`MIP_LEVELS`](rusty_scene::lighting::settings::MIP_LEVELS) mips never leave (#1694);
-//! * `encode` — RGBM, how a page's fallback is stored as an 8-bit PNG, the RGBA8 direction
-//!   page a directional bake adds (#810) and the RGBA8 shadowmask page a
-//!   `Shadowmask` bake adds (#1695);
-//! * `pages` — a packed page's mip chain, as BC6H irradiance (#1694) with the RGBM
-//!   PNG beside it as the fallback, and the RGBA8 levels of a direction page (never
-//!   block-compressed, #1996) and a shadowmask;
+//!   a cell its BC blocks and first [`MIP_LEVELS`](rusty_scene::lighting::page::MIP_LEVELS) mips never leave (#1694);
+//! * `pages` — a packed page as BC6H irradiance (#1694) with the RGBM PNG beside
+//!   it as the fallback, and a direction page's RGBA8 levels (never
+//!   block-compressed, #1996). How a page is stored and read back (RGBM, the RGBA8
+//!   direction page of a directional bake, #810, and the RGBA8 shadowmask page of a
+//!   `Shadowmask` bake, #1695, and every page's mip chain) is the scene's
+//!   (`rusty_scene::lighting::page`), so the renderer's loader reads it there;
 //! * the scene's pages and each entity's place in them are the scene's
 //!   (`rusty_scene::lighting::lightmap_set`), and so are the bake's knobs
 //!   (`rusty_scene::lighting::settings::BakeSettings`), which it stores;
@@ -42,7 +42,7 @@
 
 mod atlas;
 mod bake;
-mod encode;
+use rusty_scene::lighting::page::encode;
 mod filter;
 mod input;
 mod lights;
@@ -54,7 +54,7 @@ mod rays;
 mod rng;
 mod trace;
 
-pub use atlas::{check_page_count, pack, page_count, LightmapAtlas, MAX_PAGES};
+pub use atlas::{check_page_count, max_map_edge, pack, page_count, LightmapAtlas, MAX_PAGES, PAD};
 pub(crate) use bake::pool::run as run_pool;
 pub use bake::{
     bake, bake_progressive, bake_with_progress, BakeView, Lightmap, LightmapDenoiser, Pass,
@@ -67,7 +67,7 @@ pub use input::{BakeLight, BakeMesh, BakeRun, BakeScene, LightShape};
 pub use lights::area::AreaShape;
 pub use lights::{assign_channels, taken_lights, MaskChannels, MASK_CHANNELS};
 pub use pages::{colour_page, direction_levels, direction_page, level_count, levels, mask_levels};
-pub use probe_direct::{baked_direct_sh, mixed_occlusion};
+pub use probe_direct::{baked_direct_sh, mixed_occlusion, probe_direct};
 pub use progress::{BakeObserver, BakeProgress};
 pub use raster::{lightmap_size, MIN_RESOLUTION};
 pub(crate) use raster::{rasterize_surface, world_per_uv, Surface, TexelPoint};
@@ -79,7 +79,7 @@ pub use trace::bench::trace_texels;
 pub(crate) use trace::cosine_sample;
 // The knobs the bake reads, in the scope of the tests' `use super::*`.
 #[cfg(test)]
-use rusty_scene::lighting::settings::{max_map_edge, BakeSettings, Denoiser, MAX_PAGE};
+use rusty_scene::lighting::settings::{BakeSettings, Denoiser, MAX_PAGE};
 
 #[cfg(test)]
 mod ambient_tests;

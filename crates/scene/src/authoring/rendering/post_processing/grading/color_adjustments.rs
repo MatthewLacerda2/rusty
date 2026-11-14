@@ -2,7 +2,7 @@
 
 use super::super::{Effect, Knob};
 use crate::authoring::fields::table::effect;
-use crate::authoring::sanitize::{clamped, finite_or};
+use crate::rules::sanitize::{clamped, finite_or};
 use rusty_components::{ColorAdjustments, PostProcessingComponent};
 
 /// Set the contrast, clamped to `0..=2` (Unity's `-100..=100`); a non-finite value

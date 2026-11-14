@@ -1,9 +1,10 @@
 //! crates/scene/src/lighting/occlusion/ — baked occlusion culling's data (#1714,
 //! part 2): a potentially visible set (PVS) over a grid of cells, baked from the
 //! static scene. This half is what a scene holds, saves and loads: the grid, the
-//! PVS ([`OcclusionData`]) and its file. The bake (`bake`, `gather`, `sample`, the
-//! levels its tests build) is `rusty_lighting::occlusion`; the module paths below
-//! are that crate's unless they are this one's (`file`, `grid`).
+//! PVS ([`OcclusionData`]) and its file, and the fingerprints it is baked against
+//! (`gather`). The bake (`bake`, `sample`, the levels its tests build) is
+//! `rusty_lighting::occlusion`; the module paths below are that crate's unless they
+//! are this one's (`file`, `gather`, `grid`).
 //!
 //! Unity's Occlusion Culling (Umbra) bakes the same thing from the same inputs:
 //! static occluders and static occludees (`StaticEditorFlags`), read at runtime by a
@@ -39,7 +40,7 @@
 //! visible. The sampling is a pure function of the scene and the seed, and each cell
 //! is baked alone, so the bytes are the same at any worker count.
 //!
-//! **What is baked against** (`gather`): each object's fingerprint (`rusty_lighting::occlusion::fingerprint`), a hash of
+//! **What is baked against** (`gather`): each object's fingerprint (`gather::fingerprint`), a hash of
 //! what the bake reads of it and nothing else (#1958): its triangles corner by
 //! corner (so a re-export that moved a doorway with the same counts differs, while
 //! one that welds the same corners differently does not), its world matrix, layer,
@@ -56,9 +57,10 @@
 //! nothing by occlusion. A runtime level load that moves incoming ids out of a
 //! carried entity's way renames the baked objects with them ([`OcclusionData::remap`]).
 //!
-//! stored-format: the `<scene>.occlusion` file and the baked PVS (its fingerprint: `rusty_lighting::occlusion::gather`)
+//! stored-format: the `<scene>.occlusion` file and the baked PVS (its fingerprint: `gather`)
 
 mod file;
+pub mod gather;
 mod grid;
 
 pub use file::{

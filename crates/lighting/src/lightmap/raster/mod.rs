@@ -18,8 +18,6 @@
 //! (`lighting::mesh_maps`, #1849) a model's UV0, so both rasterize and inset
 //! the same way.
 
-use std::ops::{Add, Div, Mul};
-
 use glam::{Vec2, Vec3};
 
 use super::input::BakeMesh;
@@ -27,15 +25,7 @@ use super::input::BakeMesh;
 /// A value a lightmap map holds texel by texel: a colour (`Vec3`), or a direction
 /// texel (`Vec4`, the vector and its lamp share, #1695). Dilation, the fill, the
 /// atlas and the mips only ever copy, add and scale one.
-pub(super) trait Texel:
-    Copy + Default + Add<Output = Self> + Mul<f32, Output = Self> + Div<f32, Output = Self>
-{
-}
-
-impl<T> Texel for T where
-    T: Copy + Default + Add<Output = T> + Mul<f32, Output = T> + Div<f32, Output = T>
-{
-}
+pub(super) use rusty_scene::lighting::page::Texel;
 
 mod charts;
 #[cfg(test)]

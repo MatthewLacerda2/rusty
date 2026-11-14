@@ -12,7 +12,7 @@
 //!
 //! Pure.
 
-use crate::authoring::sanitize::saturated;
+use crate::rules::sanitize::saturated;
 use rusty_components::{CameraComponent, TaaQuality};
 
 /// Set the camera's TAA flag — temporal anti-aliasing (#1702), which replaces FXAA

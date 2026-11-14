@@ -17,7 +17,7 @@
 //!
 //! Pure.
 
-use crate::authoring::sanitize::{non_negative, unit};
+use crate::rules::sanitize::{non_negative, unit};
 use rusty_components::AudioSourceComponent;
 
 /// Set the source's clip path.

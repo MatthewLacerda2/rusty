@@ -15,7 +15,7 @@ fn jointed_rig(scene: &mut Scene) -> u32 {
         scene.find_bone(rig, "spine").unwrap(),
         scene.find_bone(rig, "head").unwrap(),
     );
-    let body = crate::authoring::default_rigidbody();
+    let body = crate::create::default_rigidbody();
     scene.world.set_rigidbody(head, Some(body));
     joint_to(scene, head, Some(spine));
     rig
@@ -100,7 +100,7 @@ fn landed_on_the_rig(rig_body: bool) -> (u32, Vec<String>) {
     let mut loaded = Scene::new();
     assert_eq!(armature_owner(&mut loaded), rig);
     if rig_body {
-        let body = crate::authoring::default_rigidbody();
+        let body = crate::create::default_rigidbody();
         loaded.world.set_rigidbody(rig, Some(body));
     }
     let mut mesh = loaded.world.mesh_mut(rig).unwrap();

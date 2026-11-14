@@ -6,7 +6,7 @@
 //!
 //! Pure.
 
-use crate::authoring::sanitize::unit;
+use crate::rules::sanitize::unit;
 use rusty_components::CanvasGroupComponent;
 
 /// Set the subtree opacity, clamped to `[0, 1]`.

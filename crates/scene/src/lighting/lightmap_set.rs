@@ -10,6 +10,18 @@ use serde::{Deserialize, Serialize};
 
 use rusty_components::LightMode;
 
+/// Whether the lightmap bake takes mesh `id` in: active, static, unskinned and no
+/// light gizmo. Such a mesh occludes, bounces and emits in the bake whether or not
+/// it receives a lightmap, so the renderer's SSIL gathers none of its emission once
+/// the scene holds a bake (#1750, `ObjectData::in_bake`). The bake's gather
+/// (`rusty-lighting`'s `BakeScene::takes_mesh`) reads this one rule.
+pub fn bakes_mesh(scene: &crate::Scene, id: u32) -> bool {
+    scene.world.is_active_in_hierarchy(id)
+        && scene.world.is_static(id)
+        && !scene.world.has_light(id)
+        && scene.world.mesh(id).is_some_and(|m| !m.is_skinned())
+}
+
 /// One lightmapped entity: which page, and where in it.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LightmapEntry {

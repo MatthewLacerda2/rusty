@@ -2,7 +2,7 @@
 //! frame: a fallen-back lamp set to `Realtime` draws live, and a masked lamp set to
 //! `Realtime` (or its shadows turned off) is masked by no stale channel.
 
-use crate::authoring::default_light;
+use crate::create::default_light;
 use crate::lighting::MixedLightingMode;
 use crate::Scene;
 use rusty_components::{LightComponent, LightMode, LightType};

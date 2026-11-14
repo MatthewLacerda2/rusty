@@ -1,4 +1,4 @@
-//! crates/scene/src/prefab/removed.rs — a part the user takes out of a model instance
+//! crates/scene/src/prefab_link/removed.rs — a part the user takes out of a model instance
 //! (#1665): Unity's *Removed GameObject* override.
 //!
 //! A model instance takes its model's node tree on propagation (`structure`): a
@@ -20,13 +20,13 @@
 
 use std::collections::BTreeSet;
 
-use crate::prefab::instance::{instance_members_with, instance_root_with};
-use crate::prefab::source::{is_model_source, GONE};
+use super::instance::{instance_members_with, instance_root_with};
+use super::{is_model_source, GONE};
 use crate::Scene;
 use rusty_components::PrefabLink;
 
 /// Whether node `path` is one of `removed` or under one.
-pub(super) fn is_removed(removed: &BTreeSet<String>, path: &str) -> bool {
+pub fn is_removed(removed: &BTreeSet<String>, path: &str) -> bool {
     removed.iter().any(|r| match path.strip_prefix(r.as_str()) {
         Some(rest) => rest.is_empty() || rest.starts_with('/'),
         None => false,
@@ -39,7 +39,7 @@ pub(super) fn is_removed(removed: &BTreeSet<String>, path: &str) -> bool {
 /// part whose node the model lost records nothing: propagation is what destroys
 /// it. Play records nothing: the scene it would be recorded on is discarded at
 /// Stop, and a Play destroy stays cheap.
-pub(crate) fn record_removed(scene: &mut Scene, id: u32) {
+pub fn record_removed(scene: &mut Scene, id: u32) {
     if scene.playing {
         return;
     }

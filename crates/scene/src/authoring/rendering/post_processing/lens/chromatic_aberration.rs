@@ -2,7 +2,7 @@
 
 use super::super::{Effect, Knob};
 use crate::authoring::fields::table::effect;
-use crate::authoring::sanitize::unit;
+use crate::rules::sanitize::unit;
 use rusty_components::{ChromaticAberration, PostProcessingComponent};
 
 /// Set whether chromatic aberration draws.

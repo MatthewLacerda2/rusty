@@ -8,7 +8,7 @@
 
 use glam::Vec4;
 
-use crate::authoring::sanitize::{non_negative, unit_color};
+use crate::rules::sanitize::{non_negative, unit_color};
 use rusty_asset::MapRef;
 use rusty_components::{NavigationMode, SelectableComponent, SelectableTransition, SelectionState};
 

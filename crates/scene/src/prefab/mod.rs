@@ -21,23 +21,20 @@
 pub mod apply;
 pub mod diff;
 mod extract;
-pub mod instance;
+pub use crate::prefab_link::instance;
 pub mod link;
 pub mod live;
 mod merge;
 pub mod overrides;
 mod pointer;
-mod removed;
 pub mod restamp;
 pub mod source;
 mod structure;
 
 pub use extract::extract_prefab;
 use merge::{merge_materials, rename_entity_material, Merge};
-pub(crate) use removed::record_removed;
 
 use std::collections::BTreeMap;
-use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
@@ -46,17 +43,7 @@ use crate::skeleton::{take_bone_parents, take_bone_refs, BoneRef, Hung};
 use crate::Scene;
 use rusty_components::{Entity, EntityRefs, MaterialAsset, PrefabLink};
 
-/// The one standardised prefab file extension (JSON inside) — a distinct extension
-/// from `.scene` so the inspector dispatch recognises it cleanly.
-pub const PREFAB_EXTENSION: &str = "prefab";
-
-/// True if `path` looks like a prefab file (`.prefab`).
-pub fn is_prefab_path(path: &str) -> bool {
-    Path::new(path)
-        .extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|e| e.eq_ignore_ascii_case(PREFAB_EXTENSION))
-}
+pub use crate::prefab_link::{is_prefab_path, PREFAB_EXTENSION};
 
 /// A saved GameObject subtree: the root's local id, the root + descendants with
 /// LOCAL (0-based) ids, and the material-library slice the subtree references.

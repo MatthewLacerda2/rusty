@@ -16,18 +16,10 @@
 
 use std::collections::BTreeMap;
 
-use crate::prefab::{is_prefab_path, read_prefab_file, PrefabData};
+use crate::prefab::{read_prefab_file, PrefabData};
 use rusty_ecs::World;
 
-/// The local id an entity of a model instance takes when its node is gone from the
-/// model's current import: no source entity has it, so propagation destroys the
-/// entity (`structure`, #1665).
-pub const GONE: u32 = u32::MAX;
-
-/// Whether `source` (a link's source path) is a model rather than a `.prefab`.
-pub fn is_model_source(source: &str) -> bool {
-    !is_prefab_path(source) && rusty_asset::is_model_path(source)
-}
+pub use crate::prefab_link::{is_model_source, GONE};
 
 /// The source at `path` as a prefab: the `.prefab` document, or the model's node
 /// tree as its current import builds it.

@@ -2,7 +2,7 @@
 //! door, and its id is retired for good, as Unity never hands an undone
 //! object's id out again.
 
-use crate::authoring::{create_entity, Primitive};
+use crate::create::{create_entity, Primitive};
 use crate::lighting::lightmap_set::LightmapEntry;
 use crate::{to_scene_data, Scene};
 

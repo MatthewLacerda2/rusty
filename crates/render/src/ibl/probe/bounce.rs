@@ -15,7 +15,9 @@
 //!     dim to matter.
 //!
 //! Once the solve stops, the direct light of `Baked` lights is added to every probe
-//! analytically (`lighting::lightmap::baked_direct_sh`, #809): those lights
+//! analytically (#809), by the [`BakedDirect`] the bake hands in
+//! (`rusty_lighting::lightmap::probe_direct`, so a lightmapper edit never rebuilds
+//! this crate's live code): those lights
 //! never render live, so the probes are how dynamic objects receive them, and a
 //! capture only ever sees lit surfaces, never a light. It is added after the loop, so
 //! the bounce captures (which re-light static surfaces from the field) never count it
@@ -26,14 +28,20 @@
 //! the early-out logic is covered even on an adapter-less host. Render layer: exempt
 //! from the determinism guard, but the SH output is byte-identical across runs.
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 
 use super::solve::BounceSolve;
 use crate::Renderer;
-use rusty_lighting::lightmap::{baked_direct_sh, mixed_occlusion, BakeScene};
 use rusty_scene::lighting::probe::ProbeVolume;
 use rusty_scene::lighting::sh::Sh9;
 use rusty_scene::Scene;
+
+/// The direct light of a scene's `Baked` lights at each probe position, and each
+/// probe's shadowmask occlusion of its `Mixed` lights (#809, #1695): what the solve
+/// adds once its bounces stop. The lightmapper computes it
+/// (`rusty_lighting::lightmap::probe_direct`), so the bake that drives the solve
+/// hands it in, and this crate's live code never names the lightmapper.
+pub type BakedDirect = fn(&Scene, &[Vec3]) -> (Vec<Sh9>, Vec<Vec4>);
 
 /// Hard cap on bounce iterations. Five passes capture direct light plus four
 /// indirect bounces — well past the point diffuse GI stops visibly changing for the
@@ -67,8 +75,13 @@ impl Renderer {
     /// the direct light of the scene's `Baked` lights (#809). With no probes it is a
     /// no-op. Returns a [`BounceReport`] describing the termination. The solve is
     /// `probe::solve::BounceSolve` run to its end; the editor steps the same one across frames.
-    pub fn bake_probes_multibounce(&mut self, scene: &mut Scene, resolution: u32) -> BounceReport {
-        self.bake_probes_observed(scene, resolution, &mut |_, _, _| {})
+    pub fn bake_probes_multibounce(
+        &mut self,
+        scene: &mut Scene,
+        resolution: u32,
+        direct: BakedDirect,
+    ) -> BounceReport {
+        self.bake_probes_observed(scene, resolution, direct, &mut |_, _, _| {})
     }
 
     /// [`bake_probes_multibounce`](Self::bake_probes_multibounce), telling `observe`
@@ -79,9 +92,10 @@ impl Renderer {
         &mut self,
         scene: &mut Scene,
         resolution: u32,
+        direct: BakedDirect,
         observe: &mut dyn FnMut(u32, usize, usize),
     ) -> BounceReport {
-        let mut solve = BounceSolve::new(scene, resolution);
+        let mut solve = BounceSolve::new(scene, resolution, direct);
         loop {
             let (bounce, done, total) = solve.progress();
             observe(bounce, done, total);
@@ -105,19 +119,14 @@ pub(super) fn write_field(volume: &mut ProbeVolume, field: &[Sh9]) {
 
 /// Add the direct light of `scene`'s `Baked` lights to every probe of `volume` (#809),
 /// shadowed by the static meshes the lightmap bake sees, and write each probe's
-/// shadowmask occlusion (#1695, `mixed_occlusion`; unoccluded unless the scene's
-/// Mixed Lighting Mode is `Shadowmask`). The channels and fallbacks are the ones
-/// the last lightmap bake recorded (`LightmapSet::channels`, `fell_back`), never
-/// assigned here, so the frame reads each light's occlusion on its own channel.
-pub(super) fn add_baked_direct(scene: &Scene, volume: &mut ProbeVolume) {
+/// shadowmask occlusion (#1695; unoccluded unless the scene's Mixed Lighting Mode is
+/// `Shadowmask`), both as `direct` computes them ([`BakedDirect`]).
+pub(super) fn add_baked_direct(scene: &Scene, volume: &mut ProbeVolume, direct: BakedDirect) {
     let positions: Vec<Vec3> = volume.probes().iter().map(|p| p.position).collect();
     if positions.is_empty() {
         return;
     }
-    let mut statics = BakeScene::gather(scene, &|_| None);
-    statics.use_recorded_channels(scene);
-    let direct = baked_direct_sh(&statics, &positions);
-    let occlusion = mixed_occlusion(&statics, &positions);
+    let (direct, occlusion) = direct(scene, &positions);
     for ((probe, direct), occlusion) in volume.probes_mut().iter_mut().zip(direct).zip(occlusion) {
         probe.sh.accumulate(&direct);
         probe.occlusion = occlusion;

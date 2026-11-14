@@ -45,7 +45,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Entity ids from Lua | `tools/lint -- --rules` (`entity-arg`) | **hard gate**: in `crates/script/src/api/`, a Lua callback never takes an entity (`id`, `…_id`, `parent`, `child`, `target`, `entity`, `body`, `canvas`) as a bare `u32` or `Option<u32>`: it takes `api::entity_arg::EntityArg`, so a `nil` id reads as a missing entity and fails a write with the verb's name (#1383) |
 | Every ECS write is stamped | `tools/lint -- --rules` (`ecs-write`) | **hard gate**: a non-test line of `crates/ecs/src/` that borrows a hecs column mutably (`get::<&mut …>`, `query_one::<(&mut …)>`, `query_mut`) or reshapes the store through `inner.` (`spawn`, `despawn`, `insert`, `remove`, `clear`, …) fails, since a write that skips `World::touch` stamps no change and every change-log consumer misses it; each funnel line, and `World::derived_mut`, takes `// lint: allow(ecs-write) <why>` (#1705) |
 | File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py`, `.lua` or `.wgsl` one (docstrings, comments and blank lines free, #926, #1015); nothing grandfathered |
-| Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `crates/scene/src/authoring/` that takes a float (an `f32`/`f64`, a glam vector, or a float struct such as `Curve`) passes it to a `scene::authoring::sanitize` helper (or a sibling setter of its file), so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
+| Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `crates/scene/src/authoring/` that takes a float (an `f32`/`f64`, a glam vector, or a float struct such as `Curve`) passes it to a `scene::rules` function (a `rules::sanitize` helper or a bound such as `rules::lens::hold_fov`), or a sibling setter of its file, so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
 | Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix (#934) |
 | Full component literals in tests | `tools/lint -- --rules` (`full-literal`) | **hard gate**: test code builds a first-class component with `..rest` or a constructor, never a literal naming every field (#663, #976) |
 | Function ("endpoint") length | clippy `too_many_lines` + `tools/lint -- --determinism` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]`; its one exception, `Renderer::assemble`, is locked (`ESCAPE`, #961) |
@@ -557,10 +557,13 @@ new flag, gate, CI step or baseline.
 - **`sanitize`** — every authoring setter refuses a non-finite float (#1361).
   A `pub fn set_*` (any `pub` visibility) under `crates/scene/src/authoring/` (test code
   aside) that takes a float-carrying parameter fails unless each such parameter is
-  passed whole to a helper `scene::authoring::sanitize` defines (`finite`,
-  `finite_or`, `at_least`, `non_negative`, `clamped`, `unit`, `unit_color`,
-  `finite2`/`3`/`4` and their `_or` forms; the rule reads the list from that file)
-  or to another `set_*` of the same file, which it checks in turn. A parameter
+  passed whole to a rule: a function a file under `crates/scene/src/rules/` defines,
+  the float helpers of `scene::rules::sanitize` (`finite`, `finite_or`, `at_least`,
+  `non_negative`, `clamped`, `unit`, `unit_color`, `finite2`/`3`/`4` and their `_or`
+  forms) or a bound the base holds too (`rules::lens::hold_fov`,
+  `rules::joint::drive_value`; the rule reads the list from those files), or to
+  another `set_*` of the same file, which it checks in turn. A rule is trusted to
+  hold what it takes: it is the one place its bound lives. A parameter
   carries a float when its type, under `&`, `Option<…>`, `Vec<…>` or `[…; N]`, is
   `f32`, `f64`, `Vec2`/`3`/`4`, `Quat` or one of the float structs the setters take
   (`Curve`, `Gradient`, `Range`, …: `FLOATS` in the rule; a new one joins it). `finite(v.x)`

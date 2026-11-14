@@ -30,7 +30,6 @@ mod sources;
 mod surface;
 
 use std::collections::BTreeMap;
-use std::ops::RangeInclusive;
 
 pub use rusty_components::material::entity_material_key;
 
@@ -57,15 +56,12 @@ pub use slots::{keys, set_slot, slot_count};
 pub use sources::{load_recipe, Loaded};
 pub use surface::{import_reflectance, SURFACE_FIELDS};
 
-use super::sanitize::{finite_array_or, non_negative, unit};
+use crate::rules::sanitize::{finite_array_or, non_negative, unit};
 use crate::{MaterialAsset, MaterialComponent, RenderMode, Scene};
 use rusty_asset::MapRef;
 use rusty_components::RenderFace;
 
-/// The range of the `[0, 1]` factors (metallic, roughness, alpha, alpha cutoff): the
-/// setters clamp to it (a non-finite value reads as 0) and the editor's sliders span
-/// it, so the limit lives here once, as `rigidbody::set_mass`'s does (#993).
-pub const FACTOR_RANGE: RangeInclusive<f32> = 0.0..=1.0;
+pub use crate::rules::material::FACTOR_RANGE;
 
 /// The scene's material library: library key -> shared asset. Matches
 /// `Scene.materials`; aliased here so callers name one type.

@@ -10,7 +10,8 @@
 
 use glam::{Vec2, Vec3};
 
-use crate::authoring::sanitize::{clamped, finite3, non_negative};
+pub use crate::rules::joint::drive_value;
+use crate::rules::sanitize::{clamped, finite3, non_negative};
 use rusty_components::{JointComponent, JointKind};
 
 /// The widest angle (degrees) a limit may name: just short of a half-turn, where
@@ -108,20 +109,14 @@ pub fn set_break_torque(j: &mut JointComponent, torque: f32) {
     j.break_torque = non_negative(torque);
 }
 
-/// A drive strength or damping as the setters below store it: floored at 0, and
-/// 0 when NaN or infinite. For a drive held outside a joint (a hit reaction's).
-pub fn drive_value(v: f32) -> f32 {
-    non_negative(v)
-}
-
 /// Set the drive's strength (1/s²), floored at 0 (no motor).
 pub fn set_drive_strength(j: &mut JointComponent, strength: f32) {
-    j.drive_strength = non_negative(strength);
+    j.drive_strength = drive_value(strength);
 }
 
 /// Set the drive's damping (1/s), floored at 0.
 pub fn set_drive_damping(j: &mut JointComponent, damping: f32) {
-    j.drive_damping = non_negative(damping);
+    j.drive_damping = drive_value(damping);
 }
 
 /// Set whether the two joined bodies collide with each other.

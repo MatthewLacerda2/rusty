@@ -2,7 +2,7 @@
 
 use super::super::{Effect, Knob};
 use crate::authoring::fields::table::effect;
-use crate::authoring::sanitize::clamped;
+use crate::rules::sanitize::clamped;
 use rusty_components::{PostProcessingComponent, WhiteBalance};
 
 /// Set the white balance: `temperature` and `tint`, each clamped to `-100..=100`.

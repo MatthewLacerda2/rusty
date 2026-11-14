@@ -10,7 +10,7 @@
 
 use glam::Vec2;
 
-use crate::authoring::sanitize::{at_least, finite2, finite2_or, unit, MIN_EXTENT};
+use crate::rules::sanitize::{at_least, finite2, finite2_or, unit, MIN_EXTENT};
 use rusty_components::{CanvasComponent, CanvasRenderMode};
 
 /// Set where the canvas draws.

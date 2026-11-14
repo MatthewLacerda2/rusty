@@ -211,7 +211,7 @@ fn field_label(path: &str) -> String {
     trimmed.replace('/', " / ")
 }
 
-/// The instance root for `selected_id` (`scene::prefab::instance::instance_root`, the
+/// The instance root for `selected_id` (`scene::prefab_link::instance::instance_root`, the
 /// rule every prefab verb shares). Returns `selected_id` itself when it is not a linked
 /// instance, so callers can pass the result unconditionally.
 pub fn instance_root(scene: &Scene, selected_id: u32) -> u32 {

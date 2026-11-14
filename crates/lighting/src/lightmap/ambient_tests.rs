@@ -116,7 +116,7 @@ fn the_gather_takes_the_gradient_and_an_ambient_light_overrides_it() {
         light_type: LightType::Ambient,
         color: Vec3::new(1.0, 0.0, 0.0),
         intensity: 0.5,
-        ..rusty_scene::authoring::default_light()
+        ..rusty_scene::create::default_light()
     };
     scene.world.set_light(id, Some(light));
     let sky = BakeScene::gather(&scene, &|_| None).sky;

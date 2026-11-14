@@ -13,8 +13,8 @@ use crate::gpu::uniforms::{DetailUniform, MappingUniform, ObjectData, SurfaceUni
 use crate::postfx::effects::ssr;
 use crate::MaterialData;
 use rusty_components::{MaterialAsset, RefractionModel, RenderFace, RenderMode, UvMapping};
-use rusty_lighting::lightmap::BakeScene;
-use rusty_scene::authoring::material::{BLEND_SHARPNESS_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE};
+use rusty_scene::lighting::lightmap_set::bakes_mesh;
+use rusty_scene::rules::material::{BLEND_SHARPNESS_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE};
 use rusty_scene::Scene;
 
 /// The material record (tint, lit flag, PBR params, cutout, surface and mapping
@@ -200,7 +200,7 @@ pub(crate) fn solid_object(
         lightmap_page: lightmap.map_or(0, |l| l.page + 1),
         lightmap_directional: u32::from(lightmap.is_some() && lightmaps.directional()),
         lightmap_st: lightmap.map_or([0.0; 4], |l| l.scale_offset),
-        in_bake: u32::from(scene.lightmaps.holds_bake() && BakeScene::takes_mesh(scene, id)),
+        in_bake: u32::from(scene.lightmaps.holds_bake() && bakes_mesh(scene, id)),
         sh,
         occlusion: probe_occlusion_at(scene, centre),
     }

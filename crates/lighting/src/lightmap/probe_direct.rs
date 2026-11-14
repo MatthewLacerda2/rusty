@@ -22,6 +22,22 @@ use super::lights::area;
 use super::rays::Rays;
 use super::trace::{arrival, Tracer, T_MIN};
 use rusty_scene::lighting::sh::Sh9;
+use rusty_scene::Scene;
+
+/// The direct light of `scene`'s `Baked` lights at each of `positions`
+/// ([`baked_direct_sh`]) and each one's shadowmask occlusion ([`mixed_occlusion`]),
+/// on the channels the last lightmap bake recorded (`LightmapSet::channels`,
+/// `fell_back`), never assigned here, so the frame reads each light's occlusion on
+/// its own channel. What the renderer's probe solve adds once its bounces stop: the
+/// bake that drives the solve hands this in (`render`'s `BakedDirect`).
+pub fn probe_direct(scene: &Scene, positions: &[Vec3]) -> (Vec<Sh9>, Vec<Vec4>) {
+    let mut statics = BakeScene::gather(scene, &|_| None);
+    statics.use_recorded_channels(scene);
+    (
+        baked_direct_sh(&statics, positions),
+        mixed_occlusion(&statics, positions),
+    )
+}
 
 /// One SH per position in `positions`: the direct light of every `Baked` light in
 /// `scene` (lights with `bakes_direct`), shadowed by its static meshes. Zero where no

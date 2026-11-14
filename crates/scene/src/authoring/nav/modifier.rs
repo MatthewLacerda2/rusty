@@ -9,12 +9,12 @@
 
 use glam::Vec3;
 
-use crate::authoring::sanitize::finite3_or;
 use crate::nav_settings::MAX_AREAS;
+use crate::rules::sanitize::finite3_or;
 use rusty_components::NavMeshModifierVolumeComponent as Volume;
 
 /// The smallest extent a box side may have.
-pub const MIN_SIZE: f32 = crate::authoring::sanitize::MIN_EXTENT;
+pub const MIN_SIZE: f32 = crate::rules::sanitize::MIN_EXTENT;
 
 /// Enable or disable the volume.
 pub fn set_active(v: &mut Volume, active: bool) {

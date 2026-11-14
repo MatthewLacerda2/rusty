@@ -5,7 +5,7 @@ use std::ops::RangeInclusive;
 
 use crate::gpu::uniforms::DetailUniform;
 use rusty_components::{MaterialAsset, UvMapping};
-use rusty_scene::authoring::material::{DETAIL_SCALE_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE};
+use rusty_scene::rules::material::{DETAIL_SCALE_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE};
 
 /// Where and how strongly material `c`'s detail layer applies (#1997): off (all
 /// zero) without a layer or its map. Each value clamped to its authoring row's

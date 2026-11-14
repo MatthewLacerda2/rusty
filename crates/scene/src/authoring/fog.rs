@@ -10,8 +10,8 @@
 
 use glam::Vec3;
 
-use super::sanitize::{finite, finite3, non_negative};
 use crate::fog::{FogMode, FogSettings};
+use crate::rules::sanitize::{finite, finite3, non_negative};
 
 /// Set the fog mode (`Off` disables fog everywhere).
 pub fn set_mode(fog: &mut FogSettings, mode: FogMode) {

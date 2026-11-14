@@ -11,7 +11,7 @@ use super::Lightmaps;
 use crate::test_gpu::headless_or_skip;
 use rusty_asset::lightmap_page;
 use rusty_lighting::lightmap::{colour_page, encode_texels};
-use rusty_scene::lighting::settings::MIP_LEVELS;
+use rusty_scene::lighting::page::MIP_LEVELS;
 
 /// A `edge`² page of smooth light written as `name.ktx2` and its `name.png`
 /// fallback; returns the KTX2 path.

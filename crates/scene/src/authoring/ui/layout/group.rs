@@ -9,7 +9,7 @@
 
 use glam::{Vec2, Vec4};
 
-use crate::authoring::sanitize::{finite2, finite4};
+use crate::rules::sanitize::{finite2, finite4};
 use rusty_components::{
     LayoutConstraint, LayoutCorner, LayoutGroupComponent, LayoutKind, TextAlignment,
 };
