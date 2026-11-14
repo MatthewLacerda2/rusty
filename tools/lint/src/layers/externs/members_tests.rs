@@ -1,6 +1,6 @@
-use super::{dev_stray, display, stray};
+use super::{dev_stray, display, stray, support};
 use crate::layers::externs::policy::POLICY;
-use crate::layers::table::LAYERS;
+use crate::layers::table::{Layer, LAYERS};
 
 const MANIFEST: &str = "[package]\nname = \"rusty-components\"\n\n[dependencies]\n\
     rusty-asset = { workspace = true }\nrusty-core = { workspace = true }\n\
@@ -86,12 +86,63 @@ fn a_crate_the_row_names_but_the_manifest_lacks_is_flagged() {
 #[test]
 fn a_sim_member_naming_a_display_crate_even_in_tests_is_flagged() {
     let text = "[dependencies]\nwgpu = { workspace = true }\n\
-        [dev-dependencies]\negui = { workspace = true }\nrusty-render = { workspace = true }\n\
-        proptest = { workspace = true }\n";
+        [dev-dependencies]\negui_extras = { workspace = true }\n\
+        proptest = { workspace = true }\nnaga = { workspace = true }\n";
     let found = display("physics", text, LAYERS, &POLICY).join("\n");
-    for name in ["→ wgpu —", "→ egui —", "→ rusty-render —"] {
+    for name in ["→ wgpu —", "→ egui-extras —"] {
+        assert!(found.contains(name), "not flagged: {name}\n{found}");
+    }
+    assert_eq!(found.lines().count(), 2, "{found}");
+    assert!(display("render", text, LAYERS, &POLICY).is_empty());
+}
+
+#[test]
+fn a_sim_member_testing_against_a_platform_sibling_below_it_is_flagged() {
+    let row = |module, sim| Layer {
+        module,
+        sim,
+        deps: &[],
+        crates: &[],
+    };
+    let rows = [
+        row("logging", false),
+        row("core", true),
+        row("physics", true),
+    ];
+    let text = "[dev-dependencies]\nrusty-logging = { workspace = true }\n\
+        rusty-core = { workspace = true }\nrusty-test-support = { workspace = true }\n";
+    let found = display("physics", text, &rows, &POLICY);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].starts_with("PLATFORM_DEV_CRATE crates/physics/Cargo.toml → rusty-logging"));
+    // The real table's own platform rows sit above every sim row: a dev-dependency
+    // there is `STRAY_DEV_CRATE`'s, so one line never gets two findings.
+    let up = "[dev-dependencies]\nrusty-render = { workspace = true }\n";
+    assert!(display("physics", up, LAYERS, &POLICY).is_empty());
+    assert_eq!(dev_stray("physics", up, LAYERS).len(), 1);
+}
+
+#[test]
+fn test_support_naming_a_sibling_or_a_display_crate_is_flagged() {
+    let text =
+        "[dependencies]\nimage = { workspace = true }\nrusty-render = { workspace = true }\n\
+        egui = { workspace = true }\n[dev-dependencies]\nrusty-core = { workspace = true }\n";
+    let found = support("test-support", text).join("\n");
+    for name in ["→ rusty-render —", "→ egui —", "→ rusty-core —"] {
         assert!(found.contains(name), "not flagged: {name}\n{found}");
     }
     assert_eq!(found.lines().count(), 3, "{found}");
-    assert!(display("render", text, LAYERS, &POLICY).is_empty());
+    let plain = "[dependencies]\nimage = { workspace = true }\nlog = { workspace = true }\n";
+    assert!(support("test-support", plain).is_empty());
+    // A module of the table is its row's business, not this check's.
+    assert!(support("physics", text).is_empty());
+}
+
+#[test]
+fn display_names_a_crate_family_not_a_prefix() {
+    for k in ["egui", "egui_wgpu", "egui_extras", "wgpu", "wgpu_types"] {
+        assert!(POLICY.is_display(k), "{k}");
+    }
+    for k in ["eguilike", "naga", "rusty_render"] {
+        assert!(!POLICY.is_display(k), "{k}");
+    }
 }

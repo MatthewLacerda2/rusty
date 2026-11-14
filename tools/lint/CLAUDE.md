@@ -30,9 +30,10 @@ file is what a coder changing the tool must keep.
   `#[path]`, and takes one line in `rules/mod.rs`'s sorted `mod` list and one row in
   the sorted `RULES` table, so parallel rule branches touch different lines:
   no new flag, gate, CI step or baseline. Its row says `Allow::Inline` when an inline
-  allow may excuse it, `Allow::Never` when nothing may: `ignored` is the one, because
-  its fix is the `.gitignore` pattern. `Allow::Own` is for a rule that reads its own
-  allows, so the shared filter is skipped: `api-parity`, whose allow sits on the op
+  allow may excuse it, `Allow::Never` when nothing may: `ignored` (its fix is the
+  `.gitignore` pattern), `orphan-seeds` (its fix is moving the file) and `key-guard`
+  (its finding sits on a manifest, where no inline allow can go). `Allow::Own` is for
+  a rule that reads its own allows, so the shared filter is skipped: `api-parity`, whose allow sits on the op
   rather than on the finding's cause, and must be reported when it goes stale, and
   `dir-size`, whose allow sits anywhere in the directory's owner file.
 - **What holds Markdown rides the size gate, not `--rules`**: `agent_docs/` (every

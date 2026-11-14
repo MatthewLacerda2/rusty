@@ -4,7 +4,9 @@
 //! the common list. Cargo then holds the code to the manifest, so the row is what
 //! the crate can name. Its dev-dependencies may name a sibling crate only below its
 //! row ([`dev_stray`]): cargo accepts a dev-dependency cycle, the table does not.
-//! A sim member names no display crate at all ([`display`]).
+//! A sim member names no display crate at all, and its tests no platform sibling
+//! ([`display`]); a member that is no module names no sibling or display crate
+//! ([`support`]).
 
 use super::cargo::{dev_keys, keys};
 use super::policy::Policy;
@@ -75,20 +77,17 @@ pub fn dev_stray(module: &str, text: &str, layers: &[Layer]) -> Vec<String> {
     out
 }
 
-/// Every display crate (`policy.display`) the manifest of a sim member `module`
-/// names, as a dependency or a dev-dependency: the sim and its tests run with no
-/// GPU and no window.
+/// Every display crate ([`Policy::is_display`]) the manifest of a sim member `module`
+/// names, as a dependency or a dev-dependency, and every platform sibling below its row
+/// in its dev-dependencies (one above is a [`dev_stray`]; one in `[dependencies]` is
+/// the row's, held by `SIM_LEAK`): the sim and its tests run with no GPU and no window.
 pub fn display(module: &str, text: &str, layers: &[Layer], policy: &Policy) -> Vec<String> {
-    if !layers.iter().any(|l| l.module == module && l.sim) {
+    let Some(at) = layers.iter().position(|l| l.module == module && l.sim) else {
         return Vec::new();
-    }
-    let mut named = keys(text);
-    named.extend(dev_keys(text));
-    named.sort();
-    named.dedup();
-    named
+    };
+    let mut out: Vec<String> = all_keys(text)
         .iter()
-        .filter(|k| policy.display.contains(&k.as_str()))
+        .filter(|k| policy.is_display(k))
         .map(|k| {
             format!(
                 "WRONG_DIRECTION crates/{module}/Cargo.toml → {} — a sim crate never depends \
@@ -97,7 +96,54 @@ pub fn display(module: &str, text: &str, layers: &[Layer], policy: &Policy) -> V
                 k.replace('_', "-")
             )
         })
+        .collect();
+    for key in dev_keys(text) {
+        let below = layers[..at].iter().find(|l| {
+            !l.sim && Some(l.module.replace('-', "_").as_str()) == key.strip_prefix("rusty_")
+        });
+        if let Some(l) = below {
+            out.push(format!(
+                "PLATFORM_DEV_CRATE crates/{module}/Cargo.toml → rusty-{} — a sim crate's tests \
+                 take only sim siblings; test the pair from `tests/` or from {0}'s own tests",
+                l.module
+            ));
+        }
+    }
+    out
+}
+
+/// Every sibling and display crate the manifest of a member that is no module of the
+/// table (`modules::NOT_MODULES`: `rusty-test-support`) names. Any member may take it
+/// as a dev-dependency, unchecked, so it reaches nothing a sim crate's tests may not,
+/// and no sibling at all (a dev-dependency cycle the table cannot see).
+pub fn support(module: &str, text: &str) -> Vec<String> {
+    if !crate::modules::NOT_MODULES
+        .iter()
+        .any(|(m, _)| *m == module)
+    {
+        return Vec::new();
+    }
+    all_keys(text)
+        .iter()
+        .filter(|k| k.starts_with("rusty_") || super::policy::POLICY.is_display(k))
+        .map(|k| {
+            format!(
+                "SUPPORT_REACH crates/{module}/Cargo.toml → {} — every member may take {module} \
+                 as a dev-dependency, so it names no workspace crate and no display crate; \
+                 move the helper into the crate that needs it",
+                k.replace('_', "-")
+            )
+        })
         .collect()
+}
+
+/// The manifest's dependencies and dev-dependencies, sorted, each once.
+fn all_keys(text: &str) -> Vec<String> {
+    let mut named = keys(text);
+    named.extend(dev_keys(text));
+    named.sort();
+    named.dedup();
+    named
 }
 
 #[cfg(test)]

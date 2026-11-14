@@ -23,8 +23,9 @@ layer table **equal** to the manifests (each row's `deps` are its sibling
 `[dependencies]`, its `uses` its external ones, plus the common crates in
 `tools/lint/src/layers/externs/policy.rs`), and adds what cargo cannot know: the
 rows' bottom-up order, the sim mark (a sim crate depends only on sim crates and
-never on a display crate, `wgpu`, `egui*`, `rusty-render` or `rusty-editor`, not
-even as a dev-dependency), a dev-dependency only on a crate below its row (cargo
+never on a display crate, `rusty-render`, `rusty-editor` or the `wgpu` and `egui`
+families (`egui_*`, `wgpu_*`), not even as a dev-dependency), `test-support` on no
+sibling and no display crate, a dev-dependency only on a crate below its row (cargo
 accepts a dev-dependency cycle), and no declared edge that live code no longer
 names (cargo builds an unused dependency without a word).
 
@@ -106,7 +107,7 @@ A member that is no module of the table (`test-support`) is listed in both
   script moves with the code that reads its variables (`crates/core/build.rs`).
 
 ## Features
-- **A crate whose tests link `rusty-dev`** (a dependency or dev-dependency) expands
+- **A crate whose manifest names `rusty-dev`** (a dependency or dev-dependency) expands
   `rusty_dev::no_provider_keys!();` once in its tests, under `#[cfg(all(test,
   feature = "dev"))]`: no test binary may hold a provider key (`key-guard`).
 - A crate holding `cfg(feature = "dev")` or `"editor"` code declares that feature
