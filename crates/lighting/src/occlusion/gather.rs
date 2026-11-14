@@ -1,6 +1,8 @@
 //! What the occlusion bake reads (#1714), and what the renderer checks it against:
 //! which static meshes take part, each one's [`fingerprint`], and the occluders'
 //! world-space triangles with the side of each a camera sees.
+//!
+//! stored-format: the fingerprint each baked object carries in the `<scene>.occlusion` file
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};

@@ -6,7 +6,6 @@ use glam::Vec3;
 use super::input::BakeScene;
 use super::*;
 use crate::occlusion::test_level::block;
-use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 use rusty_scene::Scene;
 
 #[test]

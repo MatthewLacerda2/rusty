@@ -9,7 +9,6 @@ use super::bake::bake_on;
 use super::bake::progressive::progressive_on;
 use super::tests::{floor, settings, sun, wall};
 use super::*;
-use rusty_scene::lighting::settings::BakeSettings;
 
 /// The floor and wall under a `Baked` sun, a `Baked` Area panel (its direct light
 /// drawn from the texel's stream after its paths) and a `Mixed` point lamp on

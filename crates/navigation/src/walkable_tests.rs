@@ -1,6 +1,6 @@
 //! Tests for `NavigationGraph::walkable_aabb` (`bounds.rs`, #721): the walkable
 //! extent light-probe placement fills, and the probe grid it yields through
-//! `scene::lighting::placement` — the same layout the graph-taking placement gave.
+//! `lighting::placement` — the same layout the graph-taking placement gave.
 
 use super::test_support::{add_box, add_floor};
 use super::*;

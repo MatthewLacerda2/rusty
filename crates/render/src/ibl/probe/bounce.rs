@@ -15,7 +15,7 @@
 //!     dim to matter.
 //!
 //! Once the solve stops, the direct light of `Baked` lights is added to every probe
-//! analytically (`scene::lighting::lightmap::baked_direct_sh`, #809): those lights
+//! analytically (`lighting::lightmap::baked_direct_sh`, #809): those lights
 //! never render live, so the probes are how dynamic objects receive them, and a
 //! capture only ever sees lit surfaces, never a light. It is added after the loop, so
 //! the bounce captures (which re-light static surfaces from the field) never count it

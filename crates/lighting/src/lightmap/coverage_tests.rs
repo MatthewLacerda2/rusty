@@ -7,7 +7,6 @@ use glam::{Vec2, Vec3};
 use super::raster::{rasterize, world_per_uv, INSET};
 use super::tests::settings;
 use super::*;
-use rusty_scene::lighting::settings::BakeSettings;
 
 /// The lightmap edge the strips are rasterized at.
 const S: u32 = 16;

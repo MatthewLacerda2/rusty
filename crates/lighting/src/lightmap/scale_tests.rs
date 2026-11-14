@@ -8,7 +8,6 @@ use glam::Vec3;
 use super::tests::{floor, settings};
 use super::*;
 use rusty_components::MeshComponent;
-use rusty_scene::lighting::settings::{max_map_edge, BakeSettings};
 
 /// A `Baked` sun shining straight down.
 fn noon() -> BakeLight {

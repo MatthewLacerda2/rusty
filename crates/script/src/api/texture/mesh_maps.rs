@@ -1,5 +1,5 @@
 //! crates/script/src/api/texture/mesh_maps.rs — `Texture.BakeMeshMaps` (#1849): bake a model's
-//! mesh maps (`scene::lighting::mesh_maps`) to `<prefix><map>.png`, for a recipe's
+//! mesh maps (`lighting::mesh_maps`) to `<prefix><map>.png`, for a recipe's
 //! `image` op to read.
 //!
 //! `model` is an asset reference as `Scene.Instantiate` takes it:

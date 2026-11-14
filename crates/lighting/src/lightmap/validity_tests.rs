@@ -5,7 +5,6 @@ use glam::{Vec2, Vec3};
 
 use super::tests::sun;
 use super::*;
-use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 
 /// A sunlit 4×4 floor (y = 0, facing up) and a 4×4 underside (y = -1, facing
 /// down, which nothing lights) as two charts of one mesh, side by side in its

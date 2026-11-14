@@ -3,7 +3,7 @@
 //! used at all.
 //!
 //! Bound once per change, not per frame. A whole bind checks every baked object's
-//! fingerprint (`scene::lighting::occlusion::Fingerprints`): when the scene's PVS was
+//! fingerprint (`lighting::occlusion::Fingerprints`): when the scene's PVS was
 //! replaced, the objects were rebuilt, or a `LODGroup` changed which renderers it
 //! holds. Otherwise only the static objects re-derived or moved since are re-checked
 //! ([`OcclusionBinding::touch`]), so a script tweening one static door costs one

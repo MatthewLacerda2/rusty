@@ -77,6 +77,9 @@ pub(crate) use rng::Rng;
 #[doc(hidden)]
 pub use trace::bench::trace_texels;
 pub(crate) use trace::cosine_sample;
+// The knobs the bake reads, in the scope of the tests' `use super::*`.
+#[cfg(test)]
+use rusty_scene::lighting::settings::{max_map_edge, BakeSettings, Denoiser, MAX_PAGE};
 
 #[cfg(test)]
 mod ambient_tests;

@@ -6,7 +6,6 @@ use glam::{Vec3, Vec4};
 
 use super::tests::{floor, settings, sun, wall};
 use super::*;
-use rusty_scene::lighting::settings::{BakeSettings, MAX_PAGE};
 
 /// The mean direction texel of `entity`'s lightmap.
 fn mean_dir(maps: &[Lightmap], entity: u32) -> Vec3 {

@@ -12,7 +12,6 @@ use glam::Vec3;
 use super::bake::bake_on;
 use super::tests::{floor, settings, sun, wall};
 use super::*;
-use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 
 /// What a mock does to each image it is handed.
 #[derive(Clone, Copy)]

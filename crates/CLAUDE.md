@@ -64,7 +64,7 @@ A member that is no module of the table (`test-support`) is listed in both
   test reads) is compiled in too, off until a test arms it (`ecs::world::walks`,
   `logging::init_for_tests`; a `cfg!(test)` switch is false for other crates'
   tests, `cfg-test-switch`), or
-  off unless the value was built counting (`scene::lighting::lightmap::Rays::counted`). A
+  off unless the value was built counting (`lighting::lightmap::Rays::counted`). A
   whole file that is test fixture (`ecs::changes::ops`) goes in `.cargo/mutants.toml`'s
   `exclude_globs`, so mutation never asks a test of it.
   Never a `test-support` feature: a dev-dependency feature the normal build lacks

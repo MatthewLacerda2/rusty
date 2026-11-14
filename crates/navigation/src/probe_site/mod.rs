@@ -1,6 +1,6 @@
-//! Probe placement on a baked nav surface (#1737): `scene::lighting::placement`
+//! Probe placement on a baked nav surface (#1737): `lighting::placement`
 //! surveys the reachable floor `NavigationGraph::floor_grid` plans, as
-//! `dev::bake::lighting` asks it to. The placement's own tests are `scene`'s; these
+//! `dev::bake::lighting` asks it to. The placement's own tests are `lighting`'s; these
 //! are the half that bakes a navmesh.
 
 use glam::Vec3;

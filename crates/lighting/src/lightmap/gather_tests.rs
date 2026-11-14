@@ -7,7 +7,6 @@ use super::tests::{floor, mean, settings};
 use super::*;
 use rusty_components::{LightComponent, LightMode, MeshComponent, ShadowCasting};
 use rusty_scene::authoring::{primitive_mesh_component, Primitive};
-use rusty_scene::lighting::settings::BakeSettings;
 use rusty_scene::Scene;
 
 #[test]

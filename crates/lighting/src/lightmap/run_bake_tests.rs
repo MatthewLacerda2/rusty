@@ -10,7 +10,6 @@ use super::tests::{floor, settings};
 use super::*;
 use rusty_components::mesh::Vertex;
 use rusty_components::{MaterialComponent, MeshComponent};
-use rusty_scene::lighting::settings::BakeSettings;
 
 /// The mean brightness of `map`'s columns left of its middle, then right of it.
 pub(super) fn halves(map: &Lightmap) -> (f32, f32) {

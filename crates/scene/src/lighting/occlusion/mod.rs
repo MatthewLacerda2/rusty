@@ -56,7 +56,7 @@
 //! nothing by occlusion. A runtime level load that moves incoming ids out of a
 //! carried entity's way renames the baked objects with them ([`OcclusionData::remap`]).
 //!
-//! stored-format: the `<scene>.occlusion` file, the baked PVS and its fingerprint
+//! stored-format: the `<scene>.occlusion` file and the baked PVS (its fingerprint: `rusty_lighting::occlusion::gather`)
 
 mod file;
 mod grid;

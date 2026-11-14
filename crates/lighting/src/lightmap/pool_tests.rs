@@ -9,7 +9,6 @@ use super::bake::pool::{run, BATCH};
 use super::raster::{lightmap_size, rasterize};
 use super::tests::{floor, quad, settings, sun, wall};
 use super::*;
-use rusty_scene::lighting::settings::BakeSettings;
 
 /// Charts of awkward sizes: empty, one item, a batch exactly, a batch and one more.
 fn charts() -> Vec<Vec<usize>> {
