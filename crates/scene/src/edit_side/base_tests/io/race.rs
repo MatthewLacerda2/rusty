@@ -84,7 +84,7 @@ fn a_save_that_baked_nothing_keeps_the_newer_bake_and_warns() {
             kind.name
         );
         let file = (kind.path)(&path);
-        assert!(editor.bake_files.warned(&file), "{}: warned", kind.name);
+        assert!(editor.bake_files().warned(&file), "{}: warned", kind.name);
     }
     assert_eq!(opened(&path).ambient_intensity, 0.25, "the edit is saved");
 }
