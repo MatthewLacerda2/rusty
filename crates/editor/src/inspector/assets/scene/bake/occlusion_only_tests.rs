@@ -4,7 +4,8 @@
 use super::{poll, start_occlusion, Step};
 use crate::EditorUi;
 use rusty_navigation::NavigationGraph;
-use rusty_scene::lighting::occlusion::{occlusion_path, test_level::corridors};
+use rusty_scene::lighting::occlusion::occlusion_path;
+use rusty_lighting::occlusion::test_level::corridors;
 use rusty_scene::Scene;
 use rusty_script::scripting::{ConsoleLogs, LogLevel};
 

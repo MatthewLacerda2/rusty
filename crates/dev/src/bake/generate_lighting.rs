@@ -23,7 +23,7 @@ use crate::bake::occlusion::{bake_occlusion_logged, BakedOcclusion};
 use crate::bake::progress::{BakeLog, Step};
 use crate::bake::steps::LightingBake;
 use rusty_navigation::NavigationGraph;
-use rusty_scene::lighting::occlusion::OcclusionBakeReport;
+use rusty_lighting::occlusion::OcclusionBakeReport;
 use rusty_scene::{save_lighting, LightingSave, Scene, LIGHTING_IN_PLAY};
 
 /// Why Generate Lighting cannot start: the bakes write beside the scene file.
@@ -245,13 +245,13 @@ pub fn apply_occlusion(
 
 /// The warning a bake gives when the scene file at `path` lacks, or holds
 /// otherwise, a material the baked meshes draw (#1958,
-/// [`unsaved_materials`](rusty_scene::lighting::occlusion::unsaved_materials)):
+/// [`unsaved_materials`](rusty_lighting::occlusion::unsaved_materials)):
 /// the PVS fingerprints the live library, so the next load of the file would read
 /// it as stale. `None` when the file agrees, or cannot be read.
 pub fn unsaved_materials_warning(scene: &Scene, path: &str) -> Option<String> {
     let text = std::fs::read_to_string(path).ok()?;
     let saved = rusty_scene::parse_scene_text(&text, path).ok()?.materials;
-    let keys = rusty_scene::lighting::occlusion::unsaved_materials(scene, &saved);
+    let keys = rusty_lighting::occlusion::unsaved_materials(scene, &saved);
     if keys.is_empty() {
         return None;
     }

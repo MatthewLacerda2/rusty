@@ -1,5 +1,9 @@
-//! crates/scene/src/lighting/occlusion/ — baked occlusion culling (#1714, part 2): a
-//! potentially visible set (PVS) over a grid of cells, baked from the static scene.
+//! crates/scene/src/lighting/occlusion/ — baked occlusion culling's data (#1714,
+//! part 2): a potentially visible set (PVS) over a grid of cells, baked from the
+//! static scene. This half is what a scene holds, saves and loads: the grid, the
+//! PVS ([`OcclusionData`]) and its file. The bake (`bake`, `gather`, `sample`, the
+//! levels its tests build) is `rusty_lighting::occlusion`; the module paths below
+//! are that crate's unless they are this one's (`file`, `grid`).
 //!
 //! Unity's Occlusion Culling (Umbra) bakes the same thing from the same inputs:
 //! static occluders and static occludees (`StaticEditorFlags`), read at runtime by a
@@ -35,7 +39,7 @@
 //! visible. The sampling is a pure function of the scene and the seed, and each cell
 //! is baked alone, so the bytes are the same at any worker count.
 //!
-//! **What is baked against** (`gather`): each object's [`fingerprint`], a hash of
+//! **What is baked against** (`gather`): each object's fingerprint (`rusty_lighting::occlusion::fingerprint`), a hash of
 //! what the bake reads of it and nothing else (#1958): its triangles corner by
 //! corner (so a re-export that moved a doorway with the same counts differs, while
 //! one that welds the same corners differently does not), its world matrix, layer,
@@ -54,60 +58,19 @@
 //!
 //! stored-format: the `<scene>.occlusion` file, the baked PVS and its fingerprint
 
-mod bake;
 mod file;
-mod gather;
 mod grid;
-mod progress;
-mod sample;
-mod unsaved;
 
-pub use bake::{
-    bake_occlusion, gather_occlusion, OcclusionBakeReport, OcclusionInput, OCCLUSION_SEED,
-};
 pub use file::{
     apply_sidecar, decode, encode, load_sidecar, occlusion_path, read_sidecar, save_sidecar,
     OcclusionFile, SUFFIX as OCCLUSION_SUFFIX,
 };
-pub use gather::{fingerprint, Fingerprints};
 pub use grid::{Grid, CELL_SIZE, MAX_CELL, MAX_CELLS};
-pub use progress::OcclusionObserver;
-pub use progress::OcclusionProgress;
-pub use sample::{MAX_TARGETS, TARGET_SPACING, VOXEL};
-pub use unsaved::unsaved_materials;
 
 #[cfg(test)]
-mod bake_tests;
-// Test hooks: the levels other crates' bake, render and cost tests build.
-#[cfg(feature = "dev")]
-#[doc(hidden)]
-pub mod bench;
-#[cfg(test)]
-mod carry_tests;
-#[cfg(test)]
-mod dense_tests;
-#[cfg(test)]
-mod file_tests;
-#[cfg(test)]
 mod grid_tests;
-#[cfg(all(test, feature = "dev"))]
-mod opening_tests;
-#[cfg(test)]
-mod print_tests;
-#[cfg(test)]
-mod sampling_tests;
-#[cfg(all(test, feature = "dev"))]
-mod tessellated_tests;
-#[doc(hidden)]
-pub mod test_gap;
-#[doc(hidden)]
-pub mod test_level;
 #[cfg(test)]
 mod unread_tests;
-#[cfg(test)]
-mod unsaved_tests;
-#[cfg(test)]
-mod window_tests;
 
 /// A scene's baked PVS (`Scene::occlusion`): `None` until Generate Lighting bakes
 /// one, and then nothing is occlusion-culled. Every write moves its revision,
@@ -129,7 +92,7 @@ pub fn culls_from(projection: rusty_components::Projection, near: f32) -> bool {
     perspective && near <= MAX_CULLING_NEAR
 }
 
-/// One baked object: the entity, what it was baked as ([`fingerprint`]), and
+/// One baked object: the entity, what it was baked as (its fingerprint), and
 /// whether it occludes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BakedObject {

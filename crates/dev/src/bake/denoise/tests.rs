@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use glam::Vec3;
 
 use super::{available, ffi, missing, Oidn, REQUIRE_OIDN_ENV};
-use rusty_scene::lighting::lightmap::LightmapDenoiser;
+use rusty_lighting::lightmap::LightmapDenoiser;
 
 /// OIDN's denoiser, or `None` (skip) on a machine without it.
 pub(super) fn oidn_or_skip() -> Option<Oidn> {

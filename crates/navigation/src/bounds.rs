@@ -22,7 +22,7 @@
 use super::object_modifier::bake_as;
 use super::NavigationGraph;
 use glam::{Vec2, Vec3};
-use rusty_scene::lighting::placement::{FloorCell, FloorGrid};
+use rusty_scene::lighting::floor::{FloorCell, FloorGrid};
 pub use rusty_scene::nav_settings::NavBounds;
 use rusty_scene::Scene;
 

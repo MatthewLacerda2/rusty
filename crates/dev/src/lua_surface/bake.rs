@@ -18,7 +18,7 @@ use super::super::{
     bake::progress::BakeLog, bake::reflection as reflection_bake,
 };
 use super::generate::Overrides;
-use rusty_scene::lighting::placement::MIN_REGION;
+use rusty_lighting::placement::MIN_REGION;
 use rusty_script::api::{global_table, put, ApiCtx, Reg};
 
 /// Add `Bake` to the `Probe`, `Reflection` and `Lighting` tables.

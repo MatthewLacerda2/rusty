@@ -16,11 +16,9 @@ use glam::Vec3;
 
 use super::quality::error;
 use super::{available, Oidn};
-use rusty_scene::lighting::lightmap::{
-    bake_with_progress, AreaShape, BakeLight, BakeProgress, BakeScene, BakeSettings, Denoiser,
-    LightShape, Lightmap,
-};
-use rusty_scene::lighting::occlusion::bench::level::rooms;
+use rusty_lighting::lightmap::{bake_with_progress, AreaShape, BakeLight, BakeProgress, BakeScene, LightShape, Lightmap};
+use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
+use rusty_lighting::occlusion::bench::level::rooms;
 use rusty_scene::AmbientRadiance;
 
 /// Paths per texel of the converged bake every row is measured against.

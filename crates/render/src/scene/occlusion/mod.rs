@@ -32,7 +32,8 @@ use std::sync::Arc;
 
 use glam::Vec3;
 
-use rusty_scene::lighting::occlusion::{Fingerprints, OcclusionData};
+use rusty_lighting::occlusion::Fingerprints;
+use rusty_scene::lighting::occlusion::OcclusionData;
 use rusty_scene::revision::Revision;
 use rusty_scene::Scene;
 

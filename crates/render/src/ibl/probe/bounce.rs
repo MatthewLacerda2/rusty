@@ -30,7 +30,7 @@ use glam::Vec3;
 
 use super::solve::BounceSolve;
 use crate::Renderer;
-use rusty_scene::lighting::lightmap::{baked_direct_sh, mixed_occlusion, BakeScene};
+use rusty_lighting::lightmap::{baked_direct_sh, mixed_occlusion, BakeScene};
 use rusty_scene::lighting::probe::ProbeVolume;
 use rusty_scene::lighting::sh::Sh9;
 use rusty_scene::Scene;

@@ -147,7 +147,7 @@ pub(super) fn far_objects(scene: &Scene, volume: &ProbeVolume) -> Value {
 pub fn scene_fingerprint(scene: &Scene) -> u64 {
     let mut hash = rusty_core::hash::Content::default();
     let world = &scene.world;
-    let prints = rusty_scene::lighting::occlusion::Fingerprints::of_scene(scene);
+    let prints = rusty_lighting::occlusion::Fingerprints::of_scene(scene);
     let mut ids = world.ids_with_mesh();
     ids.sort_unstable();
     let drawn = |&id: &u32| world.is_static(id) && world.is_active_in_hierarchy(id);

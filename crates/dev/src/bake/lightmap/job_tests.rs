@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use super::tests::{quick, scene, scene_path};
 use super::*;
-use rusty_scene::lighting::lightmap::BakeProgress;
+use rusty_lighting::lightmap::BakeProgress;
 
 /// Poll `job` until its worker has finished (a debug-build bake of the test scene
 /// takes well under the bound).
@@ -72,7 +72,7 @@ fn a_cancelled_bake_keeps_the_previous_lightmaps() {
 fn a_cancel_during_the_encode_keeps_the_previous_lightmaps() {
     // The encode itself stops between two levels and makes nothing.
     let input = gather_bake_input(&scene().0);
-    let maps = rusty_scene::lighting::lightmap::bake(&input, &quick());
+    let maps = rusty_lighting::lightmap::bake(&input, &quick());
     let cancelled = BakeProgress::default();
     cancelled.cancel();
     assert_eq!(encode_pages(&maps, 1024, &cancelled), Ok(None));

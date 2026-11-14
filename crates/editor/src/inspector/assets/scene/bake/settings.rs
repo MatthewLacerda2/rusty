@@ -2,7 +2,7 @@
 //! the scene's lighting settings, as `Lighting.SetSettings{…}` edits them.
 
 use crate::widgets::DragRange;
-use rusty_scene::lighting::lightmap::{BakeSettings, Denoiser};
+use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 use rusty_scene::lighting::{DiffuseModel, MixedLightingMode};
 
 /// The scene's lightmap knobs; returns whether any changed.

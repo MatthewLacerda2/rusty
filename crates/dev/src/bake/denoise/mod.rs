@@ -23,7 +23,8 @@ use std::time::{Duration, Instant};
 
 use glam::Vec3;
 
-use rusty_scene::lighting::lightmap::{BakeSettings, Denoiser, LightmapDenoiser};
+use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
+use rusty_lighting::lightmap::LightmapDenoiser;
 
 pub mod ffi;
 

@@ -9,7 +9,8 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use rusty_asset::lightmap_page::{self, Page};
-use rusty_scene::lighting::lightmap::{BakeProgress, Lightmap, LightmapSet};
+use rusty_lighting::lightmap::{BakeProgress, Lightmap};
+use rusty_scene::lighting::lightmap_set::LightmapSet;
 use rusty_scene::Scene;
 
 use super::{encode_pages, lightmap_dir, EncodedPages};
@@ -23,7 +24,7 @@ pub(super) const PREVIEW: &str = "lightmap_preview";
 /// pages as stored, and each shadowmask page as RGBA8 with the mips made on load.
 fn gpu_bytes(encoded: &EncodedPages) -> usize {
     let size = encoded.page_size;
-    let levels = rusty_scene::lighting::lightmap::level_count(size);
+    let levels = rusty_lighting::lightmap::level_count(size);
     let mask: usize = (0..levels).map(|l| ((size >> l) as usize).pow(2) * 4).sum();
     let stored = encoded
         .colour

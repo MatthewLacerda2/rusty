@@ -33,9 +33,8 @@ use super::{
     EncodedPages,
 };
 use crate::bake::progress::{duration, eta, Progress, Step};
-use rusty_scene::lighting::lightmap::{
-    bake_progressive, BakeProgress, BakeScene, BakeSettings, BakeView, MaskChannels, Pass,
-};
+use rusty_lighting::lightmap::{bake_progressive, BakeProgress, BakeScene, BakeView, MaskChannels, Pass};
+use rusty_scene::lighting::settings::BakeSettings;
 use rusty_scene::Scene;
 
 /// What the worker hands back: the encoded pages with the trace's and the
@@ -88,7 +87,7 @@ impl LightmapBakeJob {
         let started = Instant::now();
         let input = gather_bake_input(scene);
         let (progress, measure) = Measure::start(&settings, started.elapsed());
-        let lights = rusty_scene::lighting::lightmap::taken_lights(scene);
+        let lights = rusty_lighting::lightmap::taken_lights(scene);
         let shadowmask = input.shadowmask.clone();
         let static_meshes = lightmap_receivers(&input);
         let progress = Arc::new(progress);

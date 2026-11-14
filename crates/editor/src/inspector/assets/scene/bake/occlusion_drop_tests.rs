@@ -9,7 +9,7 @@ use crate::EditorUi;
 use rusty_dev::bake::generate_lighting::start_probes;
 use rusty_navigation::NavigationGraph;
 use rusty_scene::lighting::occlusion::occlusion_path;
-use rusty_scene::lighting::occlusion::test_level::block;
+use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::Scene;
 use rusty_script::scripting::{ConsoleLogs, LogLevel};
 

@@ -5,7 +5,7 @@
 use super::test_support::{add_box, add_floor};
 use super::*;
 use glam::Vec3;
-use rusty_scene::lighting::placement::plan_light_probes;
+use rusty_lighting::placement::plan_light_probes;
 use rusty_scene::Scene;
 
 /// A 20×6×20 room: a single static box spanning [-10,10] in XZ, [-3,3] in Y.

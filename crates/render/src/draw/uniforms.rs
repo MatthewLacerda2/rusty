@@ -14,7 +14,7 @@ use crate::postfx::effects::ssr;
 use crate::MaterialData;
 use rusty_components::{MaterialAsset, RefractionModel, RenderFace, RenderMode, UvMapping};
 use rusty_scene::authoring::material::{BLEND_SHARPNESS_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE};
-use rusty_scene::lighting::lightmap::BakeScene;
+use rusty_lighting::lightmap::BakeScene;
 use rusty_scene::Scene;
 
 /// The material record (tint, lit flag, PBR params, cutout, surface and mapping

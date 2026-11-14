@@ -12,7 +12,7 @@ use glam::Vec3;
 use crate::test_support::add_modifier;
 use crate::{NavArea, NavigationGraph, ALL_AREAS};
 use rusty_components::{ColliderShape, OffMeshLinkComponent};
-use rusty_scene::lighting::occlusion::bench::level::rooms;
+use rusty_lighting::occlusion::bench::level::rooms;
 use rusty_scene::ColliderComponent;
 
 /// The area of the mud strip across the ground floor.

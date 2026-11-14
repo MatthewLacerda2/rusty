@@ -17,7 +17,7 @@ use crate::api::Reg;
 use rusty_asset::SubMesh;
 use rusty_procgen::bake::bake_to_png;
 use rusty_procgen::Slot;
-use rusty_scene::lighting::mesh_maps::{bake, MeshMap, MeshSource};
+use rusty_lighting::mesh_maps::{bake, MeshMap, MeshSource};
 
 /// The resolution a call that names none bakes at.
 pub(super) const DEFAULT_RESOLUTION: u32 = 1024;

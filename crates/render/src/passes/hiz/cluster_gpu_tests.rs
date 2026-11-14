@@ -11,7 +11,7 @@ use crate::Renderer;
 use rusty_components::mesh::{MeshRevision, Vertex};
 use rusty_components::RenderFace;
 use rusty_scene::authoring::{create_entity, material, Primitive};
-use rusty_scene::lighting::occlusion::test_level::block;
+use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::{Camera, Scene};
 
 /// Quads per side of a test panel: 8192 triangles, about 70 clusters.

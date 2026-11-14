@@ -7,7 +7,7 @@
 use glam::{Vec2, Vec3};
 
 use rusty_core::color::luminance;
-use rusty_scene::lighting::lightmap::{BakeMesh, BakeScene, Lightmap};
+use rusty_lighting::lightmap::{BakeMesh, BakeScene, Lightmap};
 
 /// Whether each texel of `mesh`'s `size`² lightmap is inside its chart, four
 /// neighbours included.

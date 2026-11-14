@@ -23,7 +23,8 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError, TryLockError};
 
 use super::lightmap_dir;
 use super::write::{clear_pages, remove_stems, stems, PREVIEW};
-use rusty_scene::lighting::lightmap::{LightmapSet, Pass};
+use rusty_scene::lighting::lightmap_set::LightmapSet;
+use rusty_lighting::lightmap::Pass;
 use rusty_scene::Scene;
 
 /// What the writer and the UI share, under one lock held only to swap or remove

@@ -14,7 +14,7 @@ use glam::Vec3;
 
 use rusty_components::{ColliderComponent, ColliderShape};
 use rusty_navigation::{NavigationGraph, Rebake};
-use rusty_scene::lighting::occlusion::bench::level::rooms;
+use rusty_lighting::occlusion::bench::level::rooms;
 use rusty_scene::Scene;
 
 /// The process's peak resident memory, MB (Linux; 0 elsewhere).

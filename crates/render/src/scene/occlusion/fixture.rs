@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use glam::Vec3;
 
-use rusty_scene::lighting::occlusion::{bake_occlusion, test_level::corridors};
+use rusty_lighting::occlusion::{bake_occlusion, test_level::corridors};
 use rusty_scene::Scene;
 
 /// In the first and the second north room, a lamp's height up.

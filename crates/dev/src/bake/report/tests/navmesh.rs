@@ -8,7 +8,7 @@ use crate::bake::navmesh::bake_navmesh;
 use crate::bake::report::{read, Kind};
 use rusty_components::{ColliderComponent, ColliderShape};
 use rusty_navigation::NavigationGraph;
-use rusty_scene::lighting::occlusion::test_level::block;
+use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::Scene;
 
 /// A static box over `[min, max]` with a box collider.
