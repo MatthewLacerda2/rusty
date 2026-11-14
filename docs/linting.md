@@ -36,7 +36,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), or a written waiver (`WAIVERS`) |
 | Converters report, never log | `tools/lint -- --rules` (`converter-log`) | **hard gate**: no code line of a converter under `crates/asset/src/convert/` (every module, folder or single file, but the cache's own `mod`, `converter`, `depends`, `fingerprint`, `gate`, `lock`, `record`, `stage`, `stale`, `texture_ref` and `tests`) names `log::` or a bare logging macro — a converter returns what it skipped in `Converted` and fails on anything else, and `convert::refresh` alone warns; each converter's root carries `#![deny(clippy::let_underscore_must_use, clippy::unused_result_ok, clippy::print_stdout, clippy::print_stderr)]`, wrapped or not, so clippy refuses a dropped `Result` and a print there (#1172) |
 | Coverage floors drop with a reason | `unittest` (`make scripts`, `.github/scripts/coverage_floors.py`) | **hard gate**: a floor in `coverage-baseline.txt` lowered from the merge base with `origin/main` needs an inline `# reason: <why>` on its line, and a removed floor passes only once its `crates/<module>/src/` is gone; the weekly coverage run stays a signal (#963) |
-| Dead `pub` items | `make dead-pub` (`tools/lint -- --dead-pub`) | **signal**, never a gate: `src/lib.rs` exports every module, so rustc's `dead_code` never fires on a `pub` item. On a copy under `target/dead-pub/` the modules go `pub(crate)` and every bin and the integration suite fold into the lib; the report lists items nothing uses, items only tests use (a test seam may be fine), and unused imports apart (#940, #1003). It builds for the host only, so a finding in a file with a platform `cfg` (or in a module declared under one) is listed under *Platform-gated*: check it on that platform before narrowing (#1092). It runs weekly on `main` as `cargo-test.yml`'s `dead-pub` job, the report in its job summary; the job goes red only when no report came out, and `main-health` files that (#1205). **Blind since the workspace split**: the fold rewrites only `src/lib.rs`'s `pub mod`s, and the root now holds re-exports only, so no member crate's `pub` API is seen until #2176 widens it |
+| Dead `pub` items | `make dead-pub` (`tools/lint -- --dead-pub`) | **signal**, never a gate: a `pub` item across a crate boundary is never dead to rustc, and every module is a crate. On a copy under `target/dead-pub/` the fold rebuilds one crate for the check: each member crate is mounted as a `pub(crate)` module of the root's lib (its `rusty_<m>::` paths rewritten to `crate::<m>::`, its dependencies moved to the root), and every bin and the integration suite fold in too, so a use from another crate still counts. The report lists items nothing uses, items only tests use (a test seam may be fine), and unused imports apart (#940, #1003), by their real `crates/<m>/…` paths. It builds for the host only, so a finding in a file with a platform `cfg` (or in a module declared under one) is listed under *Platform-gated*: check it on that platform before narrowing (#1092). It runs weekly on `main` as `cargo-test.yml`'s `dead-pub` job, the report in its job summary; the job goes red when no report came out, including when the fold found nothing to make crate-private (a layout it does not know), and `main-health` files that (#1205) |
 | Dependency locks | cargo-deny (`deny.toml`) | **hard gate**: every git dependency is pinned by `rev` (`required-git-spec`); `nalgebra` only through the physics stack and no `cgmath` — glam is the one math crate (#975) |
 | Directory size | `tools/lint -- --rules` (`dir-size`) | **hard gate**: no directory under `src/` holds more than 12 source files directly in it (tests and its `mod.rs` aside); cluster by responsibility into subfolders, or a flat registry of one file per public unit says so with an inline `// lint: allow(dir-size) <why>` in its `mod.rs` (`crates/script/src/api/`). The ≲10 aim prints as a signal (#1367) |
 | Docs name what exists | `make docrefs` (`.github/scripts/docrefs.py`) | **hard gate**: every `src/`, `tests/`, `tools/`, `docs/` or `.github/` path in a tracked `*.md`'s inline code is tracked, every `` `make <verb>` `` is a target, and CLAUDE.md's namespaces each have a `docs/api/` page; placeholders pass, anything else takes `<!-- docrefs: allow <why> -->`. Runs on Markdown-only PRs too (#973) |
@@ -52,7 +52,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Lint exceptions carry a reason | clippy `allow_attributes` + `allow_attributes_without_reason` | **hard gate**: an exception is `#[expect(lint, reason = "…")]` (outer `#[allow]` is denied; a module-root `#![allow]` still needs its `reason`), and an expectation that no longer fires fails too (#961) |
 | Local gate = CI gate | `unittest` (`make scripts`, `test_gate_mirror.py`) | **hard gate**: every command a `GATES` recipe runs appears in a step of `ci.yml`/`lint.yml`, and every clippy run passes nothing after `--` but `-D warnings` (#964) |
 | Merge helpers | `unittest` (`make scripts`) | **hard gate**: `.github/scripts/tests` pass — `make mergeable` judges every merge, and the ruleset's required checks (`make ruleset`, #491) cannot tell a draft's run from a ready one (#486) |
-| Module layering | `tools/lint -- --layers` | **hard gate**: the declared table (`tools/lint/src/layers/table.rs`) equals the workspace's manifests (each row's `deps` and `uses` are its crate's `[dependencies]`), rows run bottom-up, no sim crate depends on a platform one or names a display crate (`wgpu`, `egui*`, `rusty-render`, `rusty-editor`), not even as a dev-dependency, no dev-dependency reaches up, and nothing declared is unused (#724, #938, #494) |
+| Module layering | `tools/lint -- --layers` | **hard gate**: the declared table (`tools/lint/src/layers/table.rs`) equals the workspace's manifests (each row's `deps` and `uses` are its crate's `[dependencies]`), rows run bottom-up, no sim crate depends on a platform one or names a display crate (the `wgpu` and `egui` families: `wgpu`, `wgpu_*`, `egui`, `egui_*`), not even as a dev-dependency, no sim crate's dev-dependency is a platform sibling, no dev-dependency reaches up, `test-support` names no sibling and no display crate, and nothing declared is unused (#724, #938, #494) |
 | No shared process state | clippy `disallowed_methods` + `tools/lint -- --determinism` | **hard gate**: `std::env::{set_var, remove_var, set_current_dir}` are banned crate-wide in `clippy.toml`, tests included, since `cargo test` runs every in-crate test in one process; production opts out inline with a reason (`project::open`), and `--determinism` keeps the three on the list (#977) |
 | No subprocesses | `tools/lint -- --rules` (`subprocess`) | **hard gate**: no line of `src/` names `std::process::Command` — the engine starts no other program but Blender, to convert a `.blend` while authoring, and `git`, which a debug build asks for its checkout's commit; a real need takes `// lint: allow(subprocess) <why>` (#975) |
 | Nothing temporary | clippy `dbg_macro`/`todo`/`unimplemented` + `tools/lint -- --rules` (`markers`) | **hard gate**: the three are denied in `Cargo.toml`'s `[lints]` (and `tools/lint`'s); a marker word (`TODO`, `FIXME`, `XXX`, `HACK`) in a scanned `.rs` file fails — an unfinished thing is an issue (#935) |
@@ -68,7 +68,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Post effect completeness | `cargo test` (`render::postfx::effects::completeness`, #1467) | **hard gate**: every effect in `render::postfx::effects::POST_EFFECTS` has its settings (a `PostProcessingComponent` field, or a `CameraComponent` field named after it for a camera effect), its authoring row, its `Graphics.*` registrar, its Inspector section, a `<!-- effect: <name> -->` section in `docs/api/Graphics.md` naming each knob's tween path, and, when player-facing, a `GraphicsOption` of its name with a row in the doc's *Player options*; each composite texture it declares is bound in the assembled composite, at its place (#1473); and no layer lists an effect the renderer lacks. A must-flag test removes each part in turn |
 | Proptest seed | `make scripts` (`test_workflow_hygiene.py`, `ProptestSeed`) | **hard gate**: `ci.yml`'s gates pin `PROPTEST_RNG_SEED` and its nightly leaves it random (#1800), and `make test` and `make test-one-process` run on that same number, read from `ci.yml`, never copied (#1852): a probe made a prerequisite of each verb reads the seed its recipe sees, and a Makefile that drops the export or copies another number must flag; `make test-explore` is the local **signal** that draws fresh seeds |
 | Proptest seeds replay | `tools/lint -- --rules` (`orphan-seeds`) | **hard gate**: every `proptest-regressions/<path>.txt` under the root or a `crates/<name>/` has its `<path>.rs` in a sibling folder holding a `lib.rs` or `main.rs`, the only place proptest reads it from; a seed left behind by a module's move to its crate, or by a renamed or deleted test, fails and the message names where it goes; no allow |
-| Provider keys stay out of tests | `tools/lint -- --rules` (`read-keys`, `engine-spawn`, `key-guard`) | **hard gate**: `dev::providers::read_keys()` is called only by the editor, `session` and `session-mcp`, each still calls it, and `KEY_READERS` names the same three; a test starts an engine binary only through `tests/spawn.rs`, which tells it to read no key; every package whose tests link `rusty-dev` expands `rusty_dev::no_provider_keys!()` (#974) |
+| Provider keys stay out of tests | `tools/lint -- --rules` (`read-keys`, `engine-spawn`, `key-guard`) | **hard gate**: `dev::providers::read_keys()` is called only by the editor, `session` and `session-mcp`, each still calls it, and `KEY_READERS` names the same three; a test starts an engine binary only through `tests/spawn.rs`, which tells it to read no key; every package whose manifest names `rusty-dev` expands `rusty_dev::no_provider_keys!()` once, a sample of one test binary per package (#974) |
 | Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
 | Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `crates/editor/src` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); an editor slider is built by `editor::widgets::slider`, never a bare `egui::Slider::new(`, whose default clamping does the same (#1444); a real need takes `// lint: allow(drag-range) <why>` |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
@@ -544,11 +544,16 @@ new flag, gate, CI step or baseline.
   `NEXTEST` variable, which blanks the keys in every process under it, is the
   backstop for a spawn neither can see. `tools/` is not scanned by either
   (`rules/read_keys.rs`, `rules/engine_spawn.rs`).
-  **`key-guard`** holds the tripwire to every test binary: each package whose
-  `[dependencies]` or `[dev-dependencies]` name `rusty-dev` (the root, `rusty-shell`,
-  `rusty-editor`) expands `rusty_dev::no_provider_keys!()` once in its code, two
-  tests asserting the binary never opted in and no key resolves in it. It has no
-  allow (`rules/key_guard.rs`).
+  **`key-guard`** samples the tripwire: each package whose `[dependencies]` or
+  `[dev-dependencies]` (per-target ones too) name `rusty-dev` directly (the root,
+  `rusty-shell`, `rusty-editor`) expands `rusty_dev::no_provider_keys!()` once in its
+  `src/` or `tests/`, two tests asserting their binary never opted in and no key
+  resolves in it. It is a sample, not a check of every binary: cargo builds one test
+  binary per lib, per bin and per `tests/*.rs`, the guard sits in one of them, and a
+  package linking `rusty-dev` only through a sibling is not read. `read-keys` and the
+  `NEXTEST` backstop are what keep every test process keyless; the sample proves they
+  hold inside a binary that links the provider layer. Nothing excuses it
+  (`Allow::Never`: its finding sits on a manifest, `rules/key_guard.rs`).
 - **`sanitize`** — every authoring setter refuses a non-finite float (#1361).
   A `pub fn set_*` (any `pub` visibility) under `crates/scene/src/authoring/` (test code
   aside) that takes a float-carrying parameter fails unless each such parameter is
@@ -706,9 +711,15 @@ is never a second copy that drifts. It adds what cargo cannot know.
   the sim only through a reviewed edit.
 - **The sim never reaches the display layer** (#494). The sim runs headless with no
   GPU and no UI: `render` and `editor` import sim types, never the reverse. A sim
-  member's manifest names no display crate (`policy.display`: `wgpu`, the `egui`
-  crates, `rusty-render`, `rusty-editor`), as a dependency or a dev-dependency
-  (`WRONG_DIRECTION`), so its tests stay runnable without a GPU or a window. Plain
+  member's manifest names no display crate, as a dependency or a dev-dependency
+  (`WRONG_DIRECTION`), so its tests stay runnable without a GPU or a window.
+  `policy.display` lists crate families: an entry bans the crate of that name and
+  every `<entry>_…` one, so `egui` bans `egui_wgpu` and `egui_extras`, `wgpu` bans
+  `wgpu_types` (each entry must be a real dependency, `UNKNOWN_CRATE` otherwise).
+  The engine's own display crates, `rusty-render` and `rusty-editor`, are platform
+  rows: a sim row's `[dependencies]` can't name one (`SIM_LEAK`), and its
+  `[dev-dependencies]` can't either, above its row (`STRAY_DEV_CRATE`) or below it
+  (`PLATFORM_DEV_CRATE`), each line one finding. Plain
   data the renderer and the sim share lives sim-side: the mesh `Vertex` and the
   primitive builders in `components::mesh`, `Camera` and `Decal` in `scene`,
   `QualityPreset` in `core::settings::quality`; the renderer keeps only the GPU half
@@ -719,6 +730,11 @@ is never a second copy that drifts. It adds what cargo cannot know.
   `STRAY_CRATE` for one the row lacks, `MISSING_CRATE` for one the manifest lacks. Its
   `[dev-dependencies]` may name a sibling only below its row (`STRAY_DEV_CRATE`:
   cargo accepts a dev-dependency cycle, the table does not).
+- **`test-support` reaches nothing.** A member in `NOT_MODULES` has no row, and any
+  member may take it as a dev-dependency, so its manifest names no `rusty-*` sibling
+  and no display crate, in either table (`SUPPORT_REACH`): otherwise a sim crate's
+  tests could reach the GPU through a re-export, or close a dev-dependency cycle the
+  table never sees.
 - **Exact, not a ceiling.** Cargo builds an unused dependency without a word, so the
   lint reads every non-comment `rusty_<module>::` path outside test code and
   reports `STALE_DEP` for a row's dep nothing names (only tests naming it makes it a
@@ -745,13 +761,13 @@ What is not one row's lives in `tools/lint/src/layers/externs/policy.rs`:
 - **`confined`** — crates only some subtrees may name, finer than a crate: the
   `egui` crates only under `crates/editor/src` and `crates/shell/src/editor` (the `editor`
   feature, #431), the provider crates only under `crates/dev/src/providers` (#383).
-- **`display`** — the crates no sim member may take (above).
+- **`display`** — the crate families no sim member may take (above).
 
 Beside the per-member equality, the lint reads the `[dependencies]` of the root
 `Cargo.toml` and of every member, the workspace's own `rusty-*` crates aside, and
 reports `UNCLAIMED_CRATE` (a dependency no row, `common` or `unscoped` accounts for,
 so a **new dependency** needs a table decision in the same PR), `UNKNOWN_CRATE` (a
-crate the policy names that nothing depends on), `REDUNDANT_CRATE` (a row listing a
+crate the policy names, `display` included, that nothing depends on), `REDUNDANT_CRATE` (a row listing a
 common crate), `STALE_CRATE` (a row's crate, or a common one, no live code names)
 and `CONFINED_CRATE`. It counts the first segment of a `use` path and any `name::`
 path elsewhere, outside comments and test code. A file that declares `mod image;`

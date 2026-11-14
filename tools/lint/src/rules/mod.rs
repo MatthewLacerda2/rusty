@@ -58,7 +58,9 @@ const REPORT: &str = ".lint/report.txt";
 #[derive(PartialEq)]
 enum Allow {
     Inline,
-    /// `ignored`: its fix is the `.gitignore` pattern, never an allow.
+    /// Nothing may excuse it: `ignored` and `orphan-seeds`, whose fixes are a
+    /// `.gitignore` pattern and a moved file, and `key-guard`, whose finding sits on a
+    /// manifest, where no inline allow can go.
     Never,
     /// The rule reads its own allows, so it can report a stale one
     /// (`api-parity`, whose allow sits on the op, not on the finding's cause;
@@ -87,7 +89,7 @@ const RULES: &[(Rule, Allow)] = &[
     (full_literal::run, Allow::Inline),
     (fullscreen_triangle::run, Allow::Inline),
     (ignored::run, Allow::Never),
-    (key_guard::run, Allow::Inline),
+    (key_guard::run, Allow::Never),
     (log_tag::run, Allow::Inline),
     (markers::run, Allow::Inline),
     (named_enum::run, Allow::Inline),

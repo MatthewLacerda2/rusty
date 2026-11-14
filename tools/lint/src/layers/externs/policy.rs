@@ -12,8 +12,23 @@ pub struct Policy {
     /// Dependencies no module names: each says why it is in `Cargo.toml` at all.
     pub unscoped: &'static [(&'static str, &'static str)],
     pub confined: &'static [Confined],
-    /// Crates no sim member may depend on, tests included: the display layer's.
+    /// Crate families no sim member may depend on, tests included: the display
+    /// layer's. An entry bans the crate of that name and every `<name>_…` crate
+    /// ([`Policy::is_display`]), so `egui` bans `egui_extras` too.
     pub display: &'static [&'static str],
+}
+
+impl Policy {
+    /// Whether `krate` (as code writes it) is a display crate: an entry of
+    /// `display`, or one of its `<entry>_…` family.
+    pub fn is_display(&self, krate: &str) -> bool {
+        self.display.iter().any(|d| {
+            krate == *d
+                || krate
+                    .strip_prefix(d)
+                    .is_some_and(|rest| rest.starts_with('_'))
+        })
+    }
 }
 
 pub const POLICY: Policy = Policy {
@@ -41,17 +56,10 @@ pub const POLICY: Policy = Policy {
         },
     ],
     // The sim runs headless, with no GPU and no UI (#494): the arrow is display →
-    // sim, never back. The engine's own display crates are platform rows, which
-    // `SIM_LEAK` and the dev-dependency check already keep out of a sim crate.
-    display: &[
-        "egui",
-        "egui_phosphor",
-        "egui_wgpu",
-        "egui_winit",
-        "rusty_editor",
-        "rusty_render",
-        "wgpu",
-    ],
+    // sim, never back. Each entry is a crate family (`egui` covers `egui_wgpu`,
+    // `egui_extras`, …). The engine's own display crates are platform rows, which
+    // `SIM_LEAK`, `STRAY_DEV_CRATE` and `PLATFORM_DEV_CRATE` keep out of a sim crate.
+    display: &["egui", "wgpu"],
 };
 
 const fn egui(krate: &'static str) -> Confined {

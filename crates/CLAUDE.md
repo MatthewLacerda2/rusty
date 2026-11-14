@@ -23,8 +23,9 @@ layer table **equal** to the manifests (each row's `deps` are its sibling
 `[dependencies]`, its `uses` its external ones, plus the common crates in
 `tools/lint/src/layers/externs/policy.rs`), and adds what cargo cannot know: the
 rows' bottom-up order, the sim mark (a sim crate depends only on sim crates and
-never on a display crate, `wgpu`, `egui*`, `rusty-render` or `rusty-editor`, not
-even as a dev-dependency), a dev-dependency only on a crate below its row (cargo
+never on a display crate, `rusty-render`, `rusty-editor` or the `wgpu` and `egui`
+families (`egui_*`, `wgpu_*`), not even as a dev-dependency), `test-support` on no
+sibling and no display crate, a dev-dependency only on a crate below its row (cargo
 accepts a dev-dependency cycle), and no declared edge that live code no longer
 names (cargo builds an unused dependency without a word).
 
@@ -131,9 +132,10 @@ manifest, the row, then the compiler names every path left to fix.
   script moves with the code that reads its variables (`crates/core/build.rs`).
 
 ## Features
-- **A crate whose tests link `rusty-dev`** (a dependency or dev-dependency) expands
+- **A crate whose manifest names `rusty-dev`** (a dependency or dev-dependency) expands
   `rusty_dev::no_provider_keys!();` once in its tests, under `#[cfg(all(test,
-  feature = "dev"))]`: no test binary may hold a provider key (`key-guard`).
+  feature = "dev"))]` (`key-guard` checks one expansion per such package, a sample:
+  the `read-keys` lint and the `NEXTEST` backstop are what keep a key out of a test).
 - A crate holding `cfg(feature = "dev")` or `"editor"` code declares that feature
   itself, and the root's feature turns it on directly (`dev = ["rusty-core/dev", …]`).
   A crate with none declares none, even beside a sibling that has one: the root
