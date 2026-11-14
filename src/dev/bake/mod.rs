@@ -19,6 +19,8 @@ pub mod report;
 pub mod steps;
 
 #[cfg(test)]
+mod drawn;
+#[cfg(test)]
 mod lightmap_cost_tests;
 #[cfg(test)]
 mod navmesh_cost_tests;

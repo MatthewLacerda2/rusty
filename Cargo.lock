@@ -3287,7 +3287,6 @@ dependencies = [
  "libloading",
  "log",
  "mlua",
- "naga_oil",
  "notify",
  "objc2 0.6.5",
  "objc2-app-kit 0.3.2",
@@ -3305,6 +3304,7 @@ dependencies = [
  "rusty-physics",
  "rusty-preview",
  "rusty-procgen",
+ "rusty-render",
  "rusty-scene",
  "rusty-script",
  "rusty-shadergen",
@@ -3466,6 +3466,31 @@ dependencies = [
  "rusty-test-support",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "rusty-render"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "glam 0.33.12",
+ "image",
+ "ktx2",
+ "log",
+ "naga_oil",
+ "pollster",
+ "proptest",
+ "rusty-asset",
+ "rusty-components",
+ "rusty-core",
+ "rusty-ecs",
+ "rusty-physics",
+ "rusty-procgen",
+ "rusty-scene",
+ "rusty-shadergen",
+ "rusty-test-support",
+ "rusty-ui",
+ "wgpu",
 ]
 
 [[package]]

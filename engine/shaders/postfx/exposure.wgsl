@@ -1,7 +1,7 @@
 // engine/shaders/postfx/exposure.wgsl — automatic exposure (#1444), Unity HDRP's
 // *Automatic Histogram*: two compute passes over one view's HDR scene, run each
 // frame its volume is in Automatic mode (`ExposureMeter::run` in
-// `src/render/postfx/effects/exposure/mod.rs`, with pipelines from `ExposurePasses`).
+// `crates/render/src/postfx/effects/exposure/mod.rs`, with pipelines from `ExposurePasses`).
 //
 //   cs_histogram — the scene downsampled to a quarter of its size (one invocation per
 //                  BLOCK × BLOCK box of pixels, their mean), each block's luminance
@@ -17,7 +17,7 @@
 
 #import postfx::grade::luminance
 
-// Mirrors the `BINS` / `BLOCK` consts in `src/render/postfx/effects/exposure/mod.rs`.
+// Mirrors the `BINS` / `BLOCK` consts in `crates/render/src/postfx/effects/exposure/mod.rs`.
 const BINS: u32 = 64u;
 // Pixels per side of the box each histogram sample averages: a ¼-resolution
 // downsample. Every pixel is metered, so a lamp a few pixels wide counts by its area

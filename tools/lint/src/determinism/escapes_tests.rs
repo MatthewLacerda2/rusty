@@ -34,7 +34,7 @@ fn a_deny_a_comment_and_other_lints_are_not_escapes() {
 
 #[test]
 fn the_engine_tree_has_only_the_sanctioned_escape() {
-    let src = include_str!("../../../../src/render/setup/mod.rs");
+    let src = include_str!("../../../../crates/render/src/setup/mod.rs");
     assert!(violations(ASSEMBLE, src).is_empty());
 }
 

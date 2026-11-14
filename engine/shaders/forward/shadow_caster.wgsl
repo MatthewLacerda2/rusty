@@ -19,7 +19,7 @@ var<uniform> shadow_light: ShadowLight;
 // (#648): the albedo map's alpha when `use_texture == 1` (a cutout's tint alpha is
 // always 1), read where its material's `mapping` puts it (#1594), clipped below
 // `alpha_cutoff` (0 for a material that does not clip).
-// Mirrors `CasterData` (src/render/passes/shadows/casters/buffer.rs) byte-for-byte.
+// Mirrors `CasterData` (crates/render/src/passes/shadows/casters/buffer.rs) byte-for-byte.
 struct Caster {
     model: mat4x4<f32>,
     bone_base: u32,
