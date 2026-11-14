@@ -263,7 +263,7 @@ adapts it.
   `core::collections`). The gameplay Lua VM has no `os`/`io`; `math.random` uses the
   seeded `Random` resource (`core::random`); a `require` outside the project warns.
 - **Provider calls are authoring, never gameplay.** Paid, networked calls live behind
-  `src/dev/providers/`: `dev` only, refused during Play, held to the project's `budget`,
+  `crates/dev/src/providers/`: `dev` only, refused during Play, held to the project's `budget`,
   never made by a test (traits and mocks). `docs/providers.md`.
 - **Use `glam`** for all math (`deny.toml` bans `cgmath`, and `nalgebra` outside
   physics); keep egui / wgpu / mlua decoupled. **A workspace being split one crate

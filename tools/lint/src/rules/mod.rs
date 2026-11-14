@@ -21,6 +21,7 @@ mod converter_log;
 mod dir_size;
 mod drag_range;
 mod ecs_write;
+mod engine_spawn;
 mod entity_arg;
 mod full_literal;
 mod fullscreen_triangle;
@@ -32,6 +33,7 @@ mod orphan_seeds;
 mod physics_borrow;
 mod platform_cfg;
 mod prefix;
+mod read_keys;
 mod sanitize;
 mod self_path;
 mod skip;
@@ -79,6 +81,7 @@ const RULES: &[(Rule, Allow)] = &[
     (dir_size::run, Allow::Own),
     (drag_range::run, Allow::Inline),
     (ecs_write::run, Allow::Inline),
+    (engine_spawn::run, Allow::Inline),
     (entity_arg::run, Allow::Inline),
     (full_literal::run, Allow::Inline),
     (fullscreen_triangle::run, Allow::Inline),
@@ -90,6 +93,7 @@ const RULES: &[(Rule, Allow)] = &[
     (physics_borrow::run, Allow::Inline),
     (platform_cfg::run, Allow::Inline),
     (prefix::run, Allow::Inline),
+    (read_keys::run, Allow::Inline),
     (sanitize::run, Allow::Inline),
     (self_path::run, Allow::Inline),
     (skip::run, Allow::Inline),

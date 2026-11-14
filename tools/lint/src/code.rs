@@ -35,6 +35,25 @@ pub fn code_lines(source: &str) -> Vec<Cow<'_, str>> {
         .collect()
 }
 
+/// Every line of `source` as code, its comments cut and every char inside a
+/// string or char literal turned to a space, so a match on it is a match on code.
+pub fn bare_lines(source: &str) -> Vec<String> {
+    let mut open = Open::None;
+    source
+        .lines()
+        .map(|line| {
+            let mut bare: Vec<char> = Vec::new();
+            let code = code_of(line, &mut open, |at, c| {
+                let col = line[..at].chars().count();
+                bare.resize(col, ' ');
+                bare.push(c);
+            });
+            bare.resize(code.chars().count(), ' ');
+            bare.into_iter().collect()
+        })
+        .collect()
+}
+
 /// [`strip_comment`], also calling `f` with each char (and its byte offset in
 /// `line`) that is code outside string and char literals.
 pub fn code_of<'a>(line: &'a str, open: &mut Open, f: impl FnMut(usize, char)) -> Cow<'a, str> {

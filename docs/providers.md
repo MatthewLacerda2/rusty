@@ -2,7 +2,7 @@
 
 Some authoring verbs ask a third-party vendor to generate an asset (ElevenLabs for
 voice lines, for example). Those calls live behind one dev-only boundary,
-`src/dev/providers/` (#383), and this page is the part a person does by hand.
+`crates/dev/src/providers/` (#383), and this page is the part a person does by hand.
 
 A shipped game never makes a provider call. It plays the files that were generated
 while authoring, the same way it uses baked lighting.
@@ -20,6 +20,18 @@ rusty never ships or shares an account. You bring your own key:
 An exported environment variable wins over `.env`. The file only fills gaps, so
 a key exported in your shell is the one used. When no key is found, the refusal
 names the variable and every place that was checked.
+
+Only the binaries you spend from read a key: the editor (`rusty`, built with
+`dev`), `session` and `session-mcp`. Every other process sees none. `play` and
+`game` run headless, so a provider verb there is refused as a headless run before
+any key is looked for; `export`, every test, and any binary a test starts are
+refused saying the process reads no provider keys. A test starts a binary with
+`RUSTY_NO_PROVIDER_KEYS` set, which turns the keys off even in those three, and
+under nextest (`make test`, CI) every process it runs holds no key either. The
+`read-keys` lint is the primary guard: it fails a call to `read_keys` anywhere but
+those three (another binary needs an inline allow with a reason), and fails if one
+of them stops reading keys. Nextest's own variable is the backstop, for a spawn the
+lint's text match cannot see.
 
 ## The budget
 

@@ -3,7 +3,7 @@
 //! binary runs as a child, since opening a project moves the working directory.
 
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 
 use rusty::scene::Scene;
 use serde_json::Value;
@@ -32,7 +32,7 @@ pub fn play(game: &Path, extra: &[&str]) -> (Output, Option<Value>) {
     std::fs::create_dir_all(&dir).unwrap();
     let scenario = dir.join("scenario.lua");
     std::fs::write(&scenario, "Harness.Step(3)\n").unwrap();
-    let out = Command::new(env!("CARGO_BIN_EXE_play"))
+    let out = crate::spawn::engine_bin!("play")
         .arg("--project")
         .arg(game)
         .args(extra)

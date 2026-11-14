@@ -105,7 +105,7 @@ pub(super) fn game_test(name: &str, games: Option<&Path>) -> Output {
 }
 
 fn game_command(name: &str, games: Option<&Path>) -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_game"));
+    let mut command = crate::spawn::engine_bin!("game");
     command
         .arg(name)
         .arg("--test")

@@ -16,6 +16,9 @@ use rusty::core::project::{self, Access};
 
 fn main() {
     rusty::logging::init();
+    // The editor is an authoring binary: with `dev` it may spend on a provider.
+    #[cfg(feature = "dev")]
+    rusty::dev::providers::read_keys();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     match project::take_flag(&mut args) {
         Ok(Some(dir)) => {

@@ -1,0 +1,264 @@
+//! crates/dev/src/mcp/ — MCP stdio server over the one edit-mode evaluator (#288).
+//!
+//! "Blender-MCP, but for game development." This is the **third framing** over the
+//! engine's *single* evaluator ([`crate::session::Session::eval`]), exactly
+//! parallel to the two that already exist:
+//!   - [`crate::session`]     — line-Lua-in / line-JSON-out over stdin/stdout.
+//!   - [`crate::command_channel`] — the same protocol over a socket (windowed).
+//!   - **this** — the same `Session::eval`, spoken as Model Context Protocol so
+//!     Claude Code attaches to the engine natively, with no second control surface.
+//!
+//! ## Design: in-process, no-dep, synchronous
+//! The session is sync and single-threaded (`Rc<RefCell<…>>`, not `Send`), so there
+//! is no async runtime and no subprocess: we [`run`] a plain read-line / dispatch /
+//! write-line loop on one thread that calls [`Session::eval`] in-process. The wire
+//! format is MCP's stdio transport — newline-delimited JSON-RPC 2.0 — and the only
+//! dependency is `serde_json` (already in the tree). No tokio, no rmcp, no Node.
+//!
+//! ## stdout is JSON-RPC only
+//! Exactly one JSON-RPC message per line goes to `output`; nothing else. Engine logs
+//! already go to stderr (`rusty_logging`) or the in-memory `ConsoleLogs` (Lua `print`
+//! / `Debug.*`), never stdout — so the channel stays clean. Engine warnings also come
+//! back in-band, as a second text block on the tool result (#1139). Any diagnostics this layer
+//! emits use `eprintln!` (stderr).
+//!
+//! ## Robustness
+//! A request (has an `id`) gets exactly one response line, after the progress
+//! notifications its token asked for ([`progress`], #1999); a notification (no `id`)
+//! gets none. A malformed line yields a JSON-RPC parse-error response and the loop
+//! continues — a bad message never panics and never tears down the server. The loop
+//! ends only at EOF (stdin closed).
+
+pub mod attach;
+pub mod bench;
+pub mod embed;
+pub mod progress;
+pub mod protocol;
+pub mod resources;
+pub mod tools;
+
+use std::cell::RefCell;
+use std::io::{BufRead, Write};
+use std::path::Path;
+use std::rc::Rc;
+
+use serde_json::{json, Value};
+
+use crate::session::Session;
+use protocol::Incoming;
+
+/// The one thing the MCP dispatch needs from whatever it fronts: evaluate one line of
+/// the rusty Lua API and return the rendered result or an error message.
+///
+/// Two backends implement it, giving the `session-mcp` bin its two modes — both still
+/// running one line through the *same* evaluator, so the MCP surface, the console and
+/// the headless session can never drift apart:
+///   - [`embed::Embedded`] (**embed**): evaluate in-process against a headless
+///     edit-mode world ([`Session`], which is a backend on its own in tests).
+///   - [`attach::SocketClient`] (**attach**): forward the line to a *running window's*
+///     command socket (#282) and unwrap its framed reply (#307).
+pub trait EvalBackend {
+    /// Evaluate one Lua API line; `Ok` is the rendered result, `Err` the message.
+    fn eval(&self, line: &str) -> Result<String, String>;
+
+    /// Make `root` the open project and drive it from now on (`bench_open`, #942).
+    /// `None` when this backend cannot: attach mode drives a window, which has to be
+    /// relaunched on the project instead.
+    fn reopen(&self, _root: &Path) -> Option<Result<(), String>> {
+        None
+    }
+
+    /// The engine warnings and errors logged since the last call (#1139). Attach
+    /// mode returns those its last reply carried: what the window raised while that
+    /// line was evaluated.
+    fn take_warnings(&self) -> Vec<String> {
+        Vec::new()
+    }
+}
+
+impl EvalBackend for Session {
+    fn eval(&self, line: &str) -> Result<String, String> {
+        Session::eval(self, line)
+    }
+
+    fn take_warnings(&self) -> Vec<String> {
+        Session::take_warnings(self)
+    }
+}
+
+/// Run the MCP stdio server: read newline-delimited JSON-RPC messages from `input`,
+/// dispatch each against the live `session`, and write one response line per request
+/// to `output` (notifications produce nothing). A request carrying a progress token
+/// also gets its bake's progress as notifications while it runs ([`progress`],
+/// #1999). Blank lines are skipped. The loop ends at EOF; an I/O error on the
+/// channel itself is fatal and propagates.
+pub fn run<R: BufRead, W: Write + 'static>(
+    backend: &dyn EvalBackend,
+    input: R,
+    output: W,
+) -> std::io::Result<()> {
+    let output = Rc::new(RefCell::new(output));
+    for line in input.lines() {
+        let line = line?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let token = progress::token(&line);
+        if let Some(response) = progress::reporting(token, &output, || handle_line(backend, &line))
+        {
+            let mut output = output.borrow_mut();
+            writeln!(output, "{response}")?;
+            output.flush()?;
+        }
+    }
+    Ok(())
+}
+
+/// Process one wire line, returning the response to write (a request) or `None` (a
+/// notification, or a blank/handled line). Never panics: an unparseable line becomes
+/// a parse-error response.
+fn handle_line(backend: &dyn EvalBackend, line: &str) -> Option<String> {
+    match protocol::parse(line) {
+        Some(Incoming::Request { id, method, params }) => {
+            Some(dispatch(backend, &id, &method, &params))
+        }
+        // Notifications are processed for side effects only; `notifications/*` here
+        // carry none, so we simply acknowledge by writing nothing back.
+        Some(Incoming::Notification) => None,
+        None => Some(protocol::parse_error()),
+    }
+}
+
+/// Route a parsed request to its handler and frame the JSON-RPC response. Method
+/// handlers return either a result `Value` (success) or a `(code, message)` protocol
+/// error; tool/resource *execution* errors are reported in-band, not here.
+fn dispatch(backend: &dyn EvalBackend, id: &Value, method: &str, params: &Value) -> String {
+    let outcome: Result<Value, (i64, String)> = match method {
+        "initialize" => Ok(initialize(params)),
+        "ping" => Ok(json!({})),
+        "tools/list" => Ok(tools::tools_list()),
+        "tools/call" => tools::tools_call(backend, params),
+        "resources/list" => Ok(resources::resources_list()),
+        "resources/read" => resources::resources_read(params),
+        other => Err((-32601, format!("Method not found: {other}"))),
+    };
+    match outcome {
+        Ok(result) => protocol::success(id, result),
+        Err((code, message)) => protocol::error(id, code, &message),
+    }
+}
+
+/// MCP's server instructions: a pointer to the two resources, never the guide itself
+/// (Claude Code truncates long instructions, #1313).
+const INSTRUCTIONS: &str = "rusty game engine. Before working on a game, read the \
+resource rusty://game-guide.md (the engine's rules for building a game), then \
+rusty://scripting-api.md (the Lua API that the eval tool runs) before writing Lua.";
+
+/// The `initialize` result: echo the client's protocol version (defaulting to the
+/// baseline `2024-11-05`), advertise the tools + resources capabilities, identify
+/// the server, and point at the resources to read first ([`INSTRUCTIONS`]).
+fn initialize(params: &Value) -> Value {
+    let protocol_version = params
+        .get("protocolVersion")
+        .and_then(Value::as_str)
+        .unwrap_or("2024-11-05");
+    json!({
+        "protocolVersion": protocol_version,
+        "capabilities": { "tools": {}, "resources": {} },
+        "serverInfo": { "name": "rusty-session", "version": "0.1.0" },
+        "instructions": INSTRUCTIONS,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn session() -> Session {
+        Session::new("").expect("session boots in edit mode")
+    }
+
+    fn parse_line(line: &str) -> Value {
+        serde_json::from_str(line).expect("response is JSON")
+    }
+
+    #[test]
+    fn initialize_echoes_version_and_identifies_the_server() {
+        let s = session();
+        let req = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26"}}"#;
+        let resp = parse_line(&handle_line(&s, req).unwrap());
+        assert_eq!(resp["id"], json!(1));
+        assert_eq!(resp["result"]["protocolVersion"], "2025-03-26");
+        assert_eq!(resp["result"]["serverInfo"]["name"], "rusty-session");
+        let instructions = resp["result"]["instructions"].as_str().unwrap();
+        assert!(
+            instructions.contains(resources::GAME_GUIDE_URI),
+            "{instructions}"
+        );
+        assert!(
+            instructions.contains(resources::SCRIPTING_API_URI),
+            "{instructions}"
+        );
+    }
+
+    #[test]
+    fn initialize_defaults_the_protocol_version() {
+        let s = session();
+        let req = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#;
+        let resp = parse_line(&handle_line(&s, req).unwrap());
+        assert_eq!(resp["result"]["protocolVersion"], "2024-11-05");
+    }
+
+    #[test]
+    fn a_notification_produces_no_response() {
+        let s = session();
+        let note = r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#;
+        assert!(handle_line(&s, note).is_none());
+    }
+
+    #[test]
+    fn ping_returns_an_empty_result() {
+        let s = session();
+        let req = r#"{"jsonrpc":"2.0","id":9,"method":"ping"}"#;
+        let resp = parse_line(&handle_line(&s, req).unwrap());
+        assert_eq!(resp["result"], json!({}));
+    }
+
+    #[test]
+    fn an_unknown_method_is_method_not_found() {
+        let s = session();
+        let req = r#"{"jsonrpc":"2.0","id":2,"method":"no/such"}"#;
+        let resp = parse_line(&handle_line(&s, req).unwrap());
+        assert_eq!(resp["error"]["code"], json!(-32601));
+    }
+
+    #[test]
+    fn a_malformed_line_yields_a_parse_error() {
+        let s = session();
+        let resp = parse_line(&handle_line(&s, "{ not json").unwrap());
+        assert_eq!(resp["id"], Value::Null);
+        assert_eq!(resp["error"]["code"], json!(-32700));
+    }
+
+    #[test]
+    fn run_writes_one_line_per_request_and_skips_notifications() {
+        let s = session();
+        let input = concat!(
+            r#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#,
+            "\n",
+            r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#,
+            "\n",
+            r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#,
+            "\n",
+        )
+        .as_bytes();
+        let out = progress::Captured::default();
+        run(&s, input, out.clone()).expect("runs to EOF");
+        let text = out.text();
+        // Two requests -> two lines; the notification writes nothing.
+        assert_eq!(text.lines().count(), 2);
+    }
+}
+
+#[cfg(test)]
+mod progress_tests;

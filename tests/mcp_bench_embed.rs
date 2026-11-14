@@ -7,7 +7,7 @@
 
 use std::io::Write;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 use serde_json::{json, Value};
 
@@ -20,7 +20,7 @@ fn call(id: u64, name: &str, arguments: Value) -> String {
 /// Run `session-mcp` on `start` with `lines` on stdin, its user config under `home`,
 /// and return its response lines.
 fn drive(start: &Path, home: &Path, lines: &[String]) -> Vec<Value> {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_session-mcp"))
+    let mut child = crate::spawn::engine_bin!("session-mcp")
         .args(["--project".as_ref(), start.as_os_str(), "--empty".as_ref()])
         .current_dir(start)
         .env("HOME", home)

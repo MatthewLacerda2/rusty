@@ -63,7 +63,7 @@ fn run(mut command: Command) -> Output {
 
 /// `export --project <game> --out <out>`.
 fn export(game: &Path, out: &Path) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_export"));
+    let mut command = crate::spawn::engine_bin!("export");
     command.arg("--project").arg(game).arg("--out").arg(out);
     run(command)
 }
@@ -86,7 +86,7 @@ fn play_scenario(game: &Path, scenario: &str, env: &[(&str, &Path)]) -> (Output,
     let lua = scenario;
     let scenario = dir.join("scenario.lua");
     std::fs::write(&scenario, lua).unwrap();
-    let mut command = Command::new(env!("CARGO_BIN_EXE_play"));
+    let mut command = crate::spawn::engine_bin!("play");
     command.arg("--project").arg(game).arg(&scenario).arg(&dir);
     command.envs(env.iter().copied());
     let out = run(command);

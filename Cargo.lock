@@ -3273,7 +3273,6 @@ name = "rusty"
 version = "0.1.0"
 dependencies = [
  "arboard",
- "bytemuck",
  "egui",
  "egui-phosphor",
  "egui-wgpu",
@@ -3283,7 +3282,6 @@ dependencies = [
  "glam 0.33.12",
  "image",
  "ktx2",
- "libloading",
  "log",
  "mlua",
  "notify",
@@ -3299,6 +3297,7 @@ dependencies = [
  "rusty-audio",
  "rusty-components",
  "rusty-core",
+ "rusty-dev",
  "rusty-ecs",
  "rusty-logging",
  "rusty-navigation",
@@ -3312,8 +3311,6 @@ dependencies = [
  "rusty-test-support",
  "rusty-time",
  "rusty-ui",
- "scorsese-core",
- "scorsese-providers",
  "serde",
  "serde_json",
  "skrifa",
@@ -3419,6 +3416,38 @@ dependencies = [
  "serde",
  "serde_json",
  "xxhash-rust",
+]
+
+[[package]]
+name = "rusty-dev"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "glam 0.33.12",
+ "image",
+ "libloading",
+ "log",
+ "mlua",
+ "pollster",
+ "rusty-ai",
+ "rusty-app",
+ "rusty-asset",
+ "rusty-components",
+ "rusty-core",
+ "rusty-logging",
+ "rusty-navigation",
+ "rusty-physics",
+ "rusty-preview",
+ "rusty-render",
+ "rusty-scene",
+ "rusty-script",
+ "rusty-shadergen",
+ "rusty-test-support",
+ "rusty-time",
+ "scorsese-core",
+ "scorsese-providers",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -1,8 +1,6 @@
 //! `play` records its run in the project's `saved/demos/`, and `play --demo`
 //! replays it, failing the run if the game no longer plays it the same.
 
-use std::process::Command;
-
 use crate::play_project::{game, play};
 
 #[test]
@@ -25,7 +23,7 @@ fn play_records_a_demo_and_play_demo_replays_it() {
         .starts_with("arena-"));
 
     let out_dir = crate::temp::dir().join("replay");
-    let out = Command::new(env!("CARGO_BIN_EXE_play"))
+    let out = crate::spawn::engine_bin!("play")
         .arg("--project")
         .arg(&game)
         .arg("--demo")
@@ -52,7 +50,7 @@ fn play_records_a_demo_and_play_demo_replays_it() {
 
 #[test]
 fn play_demo_refuses_another_scene() {
-    let out = Command::new(env!("CARGO_BIN_EXE_play"))
+    let out = crate::spawn::engine_bin!("play")
         .args(["--demo", "x.demo", "--scene", "other.scene", "out"])
         .output()
         .unwrap();
