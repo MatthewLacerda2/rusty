@@ -56,7 +56,7 @@ pub fn chain<T: Texel>(page: &[T], edge: u32) -> Vec<Vec<T>> {
 }
 
 /// A direction page's levels as their RGBA8 texels (`encode::encode_direction`):
-/// what [`direction_page`] stores, and what the loader makes of a progressive
+/// what `rusty-lighting`'s `direction_page` stores, and what the loader makes of a progressive
 /// preview's direction PNG (`render::gpu::lightmaps`).
 pub fn direction_levels(page: &[Vec4], edge: u32) -> Vec<Vec<[u8; 4]>> {
     chain(page, edge)
