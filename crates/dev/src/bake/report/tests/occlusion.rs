@@ -8,8 +8,8 @@ use super::{assert_common, scene_path};
 use crate::bake::generate_lighting::bake_occlusion_only;
 use crate::bake::progress::BakeLog;
 use crate::bake::report::{occlusion, point, read, Kind, Stages, TOP};
-use rusty_scene::lighting::occlusion::bake_occlusion;
-use rusty_scene::lighting::occlusion::test_level::corridors;
+use rusty_lighting::occlusion::bake_occlusion;
+use rusty_lighting::occlusion::test_level::corridors;
 
 #[test]
 fn the_corridors_cull_a_share_of_their_objects() {

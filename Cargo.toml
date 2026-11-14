@@ -97,7 +97,7 @@ path = "tests/main.rs"
 [features]
 default = ["editor"]
 # The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.
-dev = ["rusty-shell/dev", "rusty-editor?/dev", "dep:rusty-dev", "rusty-dev/dev", "rusty-render/dev", "rusty-app/dev", "rusty-script/dev", "rusty-ai/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-scene/dev", "rusty-shadergen/dev", "rusty-asset/dev", "rusty-core/dev", "dep:getrandom"]
+dev = ["rusty-shell/dev", "rusty-editor?/dev", "dep:rusty-dev", "rusty-dev/dev", "rusty-render/dev", "rusty-app/dev", "rusty-script/dev", "rusty-ai/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-lighting/dev", "rusty-scene/dev", "rusty-shadergen/dev", "rusty-asset/dev", "rusty-core/dev", "dep:getrandom"]
 # The egui editor (#431): `rusty-editor` (`crates/editor/`) and the shell's editor frontend. Default-on so
 # `cargo run` opens the editor; a shipped player builds with `--no-default-features`.
 editor = ["rusty-shell/editor", "dep:rusty-editor", "rusty-editor/editor", "rusty-render/editor", "rusty-app/editor", "rusty-physics/editor", "rusty-shadergen/editor", "rusty-asset/editor", "rusty-core/editor"]
@@ -138,6 +138,7 @@ rusty-shadergen = { path = "crates/shadergen" }
 rusty-components = { path = "crates/components" }
 rusty-ecs = { path = "crates/ecs" }
 rusty-scene = { path = "crates/scene" }
+rusty-lighting = { path = "crates/lighting" }
 rusty-audio = { path = "crates/audio" }
 rusty-ui = { path = "crates/ui" }
 rusty-physics = { path = "crates/physics" }
@@ -285,6 +286,7 @@ rusty-navigation = { workspace = true }
 rusty-physics = { workspace = true }
 rusty-ui = { workspace = true }
 rusty-audio = { workspace = true }
+rusty-lighting = { workspace = true }
 rusty-scene = { workspace = true }
 rusty-ecs = { workspace = true }
 rusty-components = { workspace = true }

@@ -13,9 +13,8 @@ use std::time::Duration;
 use serde_json::{json, Value};
 
 use super::{entity_name, point, Kind, Report, Stages, TOP};
-use rusty_scene::lighting::occlusion::{
-    OcclusionBakeReport, OcclusionData, CELL_SIZE, MAX_CELL, OCCLUSION_SEED,
-};
+use rusty_lighting::occlusion::{OcclusionBakeReport, OCCLUSION_SEED};
+use rusty_scene::lighting::occlusion::{OcclusionData, CELL_SIZE, MAX_CELL};
 use rusty_scene::Scene;
 
 /// The report of a bake of `scene` that reported `r`, baked `data`, took `cells`

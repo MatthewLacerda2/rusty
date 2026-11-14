@@ -3,8 +3,8 @@
 use glam::Vec3;
 
 use super::{plan_on_nav, plan_on_nav_from, site_on_nav_from};
-use rusty_scene::lighting::placement::test_sites::{indoor_house, roofed_house, yard};
-use rusty_scene::lighting::placement::ReflectionPlan;
+use rusty_lighting::placement::test_sites::{indoor_house, roofed_house, yard};
+use rusty_lighting::placement::ReflectionPlan;
 
 /// No plan on the roof, and one in the room.
 fn assert_in_the_room(plans: &[ReflectionPlan]) {

@@ -4,16 +4,16 @@
 use glam::Vec3;
 
 use super::{static_solids, survey};
+use rusty_lighting::placement::Occupancy;
+use rusty_lighting::placement::{plan_reflection_probes, ReflectionPlacement, Solid};
 use rusty_scene::authoring::{create_entity, Primitive};
-use rusty_scene::lighting::placement::Occupancy;
-use rusty_scene::lighting::placement::{plan_reflection_probes, ReflectionPlacement, Solid};
 use rusty_scene::Scene;
 
 /// A 12 × 12 m floor and four walls with colliders, under a ceiling 4 m up that
 /// is a box mesh with no collider.
 fn room_under_a_mesh_ceiling() -> Scene {
     let mut scene = Scene::new();
-    let block = rusty_scene::lighting::placement::test_level::block;
+    let block = rusty_lighting::placement::test_level::block;
     let (r, h) = (6.0, 4.0);
     block(&mut scene, Vec3::new(-r, -0.2, -r), Vec3::new(r, 0.0, r));
     block(

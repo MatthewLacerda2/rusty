@@ -3,7 +3,7 @@
 //! object's id out again.
 
 use crate::authoring::{create_entity, Primitive};
-use crate::lighting::lightmap::LightmapEntry;
+use crate::lighting::lightmap_set::LightmapEntry;
 use crate::{to_scene_data, Scene};
 
 fn create(scene: &mut Scene, name: &str) -> u32 {

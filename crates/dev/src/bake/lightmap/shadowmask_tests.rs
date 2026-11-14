@@ -9,8 +9,8 @@ use glam::Vec3;
 use super::tests::{quick, scene, scene_path};
 use super::*;
 use rusty_components::{LightComponent, LightMode, LightType};
+use rusty_lighting::lightmap::BakeScene;
 use rusty_scene::authoring::default_light;
-use rusty_scene::lighting::lightmap::BakeScene;
 use rusty_scene::lighting::MixedLightingMode;
 
 /// `count` shadowed `Mixed` lamps over the floor, all overlapping.
@@ -62,7 +62,8 @@ fn a_shadowmask_bake_writes_mask_pages_and_records_channels_and_fallbacks() {
 
     // Saved and loaded with the scene.
     let json = serde_json::to_string(&*scene.lightmaps).unwrap();
-    let back: rusty_scene::lighting::lightmap::LightmapSet = serde_json::from_str(&json).unwrap();
+    let back: rusty_scene::lighting::lightmap_set::LightmapSet =
+        serde_json::from_str(&json).unwrap();
     assert_eq!(back, *scene.lightmaps);
 
     // Back on `BakedIndirect`: the frame ignores the mask at once, the next bake

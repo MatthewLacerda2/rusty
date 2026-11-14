@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
-use rusty_scene::lighting::occlusion::OcclusionObserver;
+use rusty_lighting::occlusion::OcclusionObserver;
 
 /// Each cell's sampling time so far, in nanoseconds, by cell index.
 #[derive(Default)]

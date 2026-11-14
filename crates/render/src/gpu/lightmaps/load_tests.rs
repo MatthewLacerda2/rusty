@@ -6,7 +6,7 @@ use glam::{Vec3, Vec4};
 
 use super::load::{load, Kind};
 use rusty_asset::lightmap_page;
-use rusty_scene::lighting::lightmap::{colour_page, direction_page, encode_directions};
+use rusty_lighting::lightmap::{colour_page, direction_page, encode_directions};
 
 /// An `edge`² direction field turning across the page, with a lamp share.
 fn directions(edge: u32) -> Vec<Vec4> {

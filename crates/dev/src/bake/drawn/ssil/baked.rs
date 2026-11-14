@@ -9,7 +9,7 @@ use rusty_components::{LightMode, Ssil};
 use rusty_render::test_gpu::ssil::{
     energy, on, patch, point, renderer, scene, set_ssil, settled, FLOOR, LAMP,
 };
-use rusty_scene::lighting::lightmap::BakeSettings;
+use rusty_scene::lighting::settings::BakeSettings;
 use rusty_scene::Scene;
 
 /// How much brighter a scene whose light is all baked may get with SSIL on, as a
@@ -45,7 +45,7 @@ pub(super) fn bake_with(scene: &mut Scene, name: &str, directional: bool) -> usi
         bounces: 1,
         seed: 1,
         max_lightmap_size: 64,
-        denoiser: rusty_scene::lighting::lightmap::Denoiser::Filter,
+        denoiser: rusty_scene::lighting::settings::Denoiser::Filter,
         filter_radius: 1,
         directional,
         backface_tolerance: BakeSettings::DEFAULT_BACKFACE_TOLERANCE,

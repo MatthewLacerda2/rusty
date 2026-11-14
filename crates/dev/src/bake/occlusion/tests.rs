@@ -9,10 +9,9 @@ use std::sync::Arc;
 
 use super::{bake_occlusion_logged, CellClocks, OcclusionBakeJob};
 use crate::bake::progress::{BakeLog, Line};
-use rusty_scene::lighting::occlusion::test_level::corridors;
-use rusty_scene::lighting::occlusion::{
-    bake_occlusion, encode, gather_occlusion, OcclusionProgress,
-};
+use rusty_lighting::occlusion::test_level::corridors;
+use rusty_lighting::occlusion::{bake_occlusion, gather_occlusion, OcclusionProgress};
+use rusty_scene::lighting::occlusion::encode;
 
 #[test]
 fn the_worker_and_the_logged_run_bake_what_the_inline_bake_does() {
@@ -73,7 +72,7 @@ fn a_cancelled_bake_returns_nothing() {
 #[test]
 fn the_summary_counts_the_never_culled_and_says_a_level_too_large() {
     use crate::bake::generate_lighting::GenerateReport;
-    use rusty_scene::lighting::occlusion::OcclusionBakeReport;
+    use rusty_lighting::occlusion::OcclusionBakeReport;
     let occlusion = OcclusionBakeReport {
         objects: 9,
         never_culled: 2,

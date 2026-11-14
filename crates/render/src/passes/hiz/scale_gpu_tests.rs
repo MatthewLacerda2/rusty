@@ -5,7 +5,7 @@ use glam::Vec3;
 
 use super::cull::CameraCull;
 use super::gpu_tests::{drawn, offscreen, shot, words, H, W};
-use rusty_scene::lighting::occlusion::test_level::block;
+use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::{Camera, Scene};
 
 #[test]

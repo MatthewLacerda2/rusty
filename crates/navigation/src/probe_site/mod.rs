@@ -1,12 +1,12 @@
-//! Probe placement on a baked nav surface (#1737): `scene::lighting::placement`
+//! Probe placement on a baked nav surface (#1737): `lighting::placement`
 //! surveys the reachable floor `NavigationGraph::floor_grid` plans, as
-//! `dev::bake::lighting` asks it to. The placement's own tests are `scene`'s; these
+//! `dev::bake::lighting` asks it to. The placement's own tests are `lighting`'s; these
 //! are the half that bakes a navmesh.
 
 use glam::Vec3;
 
 use super::NavigationGraph;
-use rusty_scene::lighting::placement::{
+use rusty_lighting::placement::{
     plan_reflection_probes, ReflectionPlacement, ReflectionPlan, Site,
 };
 use rusty_scene::Scene;

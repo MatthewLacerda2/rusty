@@ -11,7 +11,7 @@ fn session() -> Session {
 fn settings_read_back_the_scenes_defaults() {
     let read = "local s = Lighting.GetSettings() \
         return table.concat({s.texelsPerUnit, s.samples, s.bounces, s.seed, tostring(s.directional), s.maxLightmapSize, s.denoiser}, ' ')";
-    let samples = rusty_scene::lighting::lightmap::BakeSettings::DEFAULT_SAMPLES;
+    let samples = rusty_scene::lighting::settings::BakeSettings::DEFAULT_SAMPLES;
     let want = format!("8.0 {samples} 3 0 true 1024 OIDN");
     assert_eq!(session().eval(read).unwrap(), want);
 }
@@ -81,7 +81,7 @@ fn generate_needs_a_saved_scene() {
 #[test]
 fn bake_lightmaps_takes_the_scenes_settings_for_missing_arguments() {
     use super::Overrides;
-    let base = rusty_scene::lighting::lightmap::BakeSettings {
+    let base = rusty_scene::lighting::settings::BakeSettings {
         samples: 9,
         ..Default::default()
     };
@@ -96,7 +96,7 @@ fn bake_lightmaps_takes_the_scenes_settings_for_missing_arguments() {
 #[test]
 fn bake_lightmaps_applies_every_named_argument_and_clamps() {
     use super::Overrides;
-    use rusty_scene::lighting::lightmap::BakeSettings;
+    use rusty_scene::lighting::settings::BakeSettings;
     let base = BakeSettings::default();
     let named = Overrides {
         texels_per_unit: Some(3.0),

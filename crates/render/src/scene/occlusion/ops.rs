@@ -8,7 +8,7 @@ use std::sync::Arc;
 use super::OcclusionBinding;
 use crate::scene::fixture::yard;
 use crate::Renderer;
-use rusty_scene::lighting::occlusion::bake_occlusion;
+use rusty_lighting::occlusion::bake_occlusion;
 use rusty_scene::Scene;
 
 /// [`yard`] with every mesh static and its PVS baked.

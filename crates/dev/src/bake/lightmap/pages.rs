@@ -13,10 +13,11 @@
 use std::io::Cursor;
 
 use rusty_asset::lightmap_page::Page;
-use rusty_scene::lighting::lightmap::{
+use rusty_lighting::lightmap::{
     check_page_count, colour_page, direction_page, encode_masks, encode_texels, pack, BakeProgress,
-    Lightmap, LightmapEntry, MaskChannels, MAX_PAGES,
+    Lightmap, MaskChannels, MAX_PAGES,
 };
+use rusty_scene::lighting::lightmap_set::LightmapEntry;
 
 /// A bake's pages encoded, ready to write.
 #[derive(Debug, PartialEq)]

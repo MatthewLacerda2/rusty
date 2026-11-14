@@ -1,5 +1,5 @@
 //! What a saved navmesh was baked from (#1887), as the occlusion bake's fingerprint
-//! (`scene::lighting::occlusion::gather::fingerprint`) is what its PVS was: one hash
+//! (`lighting::occlusion::gather::fingerprint`) is what its PVS was: one hash
 //! of everything the bake reads and nothing time- or path-dependent. The static
 //! colliders' world triangles (the very ones `raster` clips, so a mesh collider's
 //! vertices count, not only its bounds) and the area a `NavMeshModifier` gives each

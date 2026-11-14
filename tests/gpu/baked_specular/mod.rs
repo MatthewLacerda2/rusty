@@ -29,7 +29,7 @@ use rusty::components::{LightComponent, LightMode, LightType, MaterialAsset, Mat
 use rusty::dev::bake::lightmap::bake_scene_lightmaps;
 use rusty::dev::screenshot::capture;
 use rusty::scene::authoring::{primitive_mesh_component, Primitive};
-use rusty::scene::lighting::lightmap::BakeSettings;
+use rusty::scene::lighting::settings::BakeSettings;
 use rusty::scene::{Camera, Scene};
 
 pub(super) use measure::{mean_gap, most, peak};
@@ -119,7 +119,7 @@ pub(super) fn bake(scene: &mut Scene, name: &str, directional: bool, density: f3
         bounces: 1,
         seed: 5,
         max_lightmap_size: 64,
-        denoiser: rusty::scene::lighting::lightmap::Denoiser::Filter,
+        denoiser: rusty::scene::lighting::settings::Denoiser::Filter,
         filter_radius: 1,
         directional,
         backface_tolerance: BakeSettings::DEFAULT_BACKFACE_TOLERANCE,

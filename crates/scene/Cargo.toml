@@ -19,7 +19,6 @@ rusty-procgen = { workspace = true }
 rusty-shadergen = { workspace = true }
 glam = { workspace = true }
 log = { workspace = true }
-rapier3d = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 

@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use super::tests::{quick, scene, scene_path};
 use super::*;
-use rusty_scene::lighting::lightmap::Pass;
+use rusty_lighting::lightmap::Pass;
 
 /// The `lightmap_preview_*` pages beside `path`.
 pub(super) fn preview_pages(path: &str) -> usize {

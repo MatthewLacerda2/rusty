@@ -1,5 +1,5 @@
 //! crates/script/src/api/texture/mesh_maps.rs — `Texture.BakeMeshMaps` (#1849): bake a model's
-//! mesh maps (`scene::lighting::mesh_maps`) to `<prefix><map>.png`, for a recipe's
+//! mesh maps (`lighting::mesh_maps`) to `<prefix><map>.png`, for a recipe's
 //! `image` op to read.
 //!
 //! `model` is an asset reference as `Scene.Instantiate` takes it:
@@ -15,9 +15,9 @@ use mlua::{Lua, Table};
 use super::{folder, put};
 use crate::api::Reg;
 use rusty_asset::SubMesh;
+use rusty_lighting::mesh_maps::{bake, MeshMap, MeshSource};
 use rusty_procgen::bake::bake_to_png;
 use rusty_procgen::Slot;
-use rusty_scene::lighting::mesh_maps::{bake, MeshMap, MeshSource};
 
 /// The resolution a call that names none bakes at.
 pub(super) const DEFAULT_RESOLUTION: u32 = 1024;

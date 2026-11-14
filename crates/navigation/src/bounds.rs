@@ -22,7 +22,7 @@
 use super::object_modifier::bake_as;
 use super::NavigationGraph;
 use glam::{Vec2, Vec3};
-use rusty_scene::lighting::placement::{FloorCell, FloorGrid};
+use rusty_scene::lighting::floor::{FloorCell, FloorGrid};
 pub use rusty_scene::nav_settings::NavBounds;
 use rusty_scene::Scene;
 
@@ -165,7 +165,7 @@ impl NavigationGraph {
     /// stands, and every span above that lowest one as an upper floor. With
     /// `reachable` ([`Self::reachable_spans`], #1737) only the spans it marks count,
     /// so a wall top or a roof no actor reaches is no floor. Handed to
-    /// `scene::lighting::placement` as data, as [`Self::walkable_aabb`] is (#721).
+    /// `lighting::placement` as data, as [`Self::walkable_aabb`] is (#721).
     /// The spans stop `agent_radius` short of the walls, which the plan's `inset`
     /// carries. `None` when the graph is unbaked.
     pub fn floor_grid(&self, agent_radius: f32, reachable: Option<&[bool]>) -> Option<FloorGrid> {

@@ -4,7 +4,7 @@
 use glam::Vec3;
 
 use super::plan_on_nav;
-use rusty_scene::lighting::placement::test_sites::pool;
+use rusty_lighting::placement::test_sites::pool;
 
 #[test]
 fn no_capture_point_is_at_or_under_the_water() {

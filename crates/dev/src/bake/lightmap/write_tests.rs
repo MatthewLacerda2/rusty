@@ -8,7 +8,7 @@ use super::preview::{lock, Previews};
 use super::preview_tests::preview_pages;
 use super::tests::{quick, scene, scene_path};
 use super::*;
-use rusty_scene::lighting::lightmap::Lightmap;
+use rusty_lighting::lightmap::Lightmap;
 
 #[test]
 fn a_failed_write_leaves_the_old_pages_and_the_scene_on_them() {
@@ -17,7 +17,7 @@ fn a_failed_write_leaves_the_old_pages_and_the_scene_on_them() {
     bake_scene_lightmaps(&mut scene, Some(&path), &quick()).unwrap();
     let before = (*scene.lightmaps).clone();
     let other = BakeSettings { seed: 7, ..quick() };
-    let maps = rusty_scene::lighting::lightmap::bake(&gather_bake_input(&scene), &other);
+    let maps = rusty_lighting::lightmap::bake(&gather_bake_input(&scene), &other);
     let encoded = encode_pages(&maps, other.page(), &BakeProgress::default())
         .unwrap()
         .unwrap();
@@ -47,9 +47,9 @@ fn a_failed_write_leaves_the_old_pages_and_the_scene_on_them() {
 }
 
 /// Pass `k` of 9, as the bake hands it to the preview writer.
-fn pass(k: u32) -> rusty_scene::lighting::lightmap::Pass {
+fn pass(k: u32) -> rusty_lighting::lightmap::Pass {
     let (done, samples, view, passes, target) = (k, k, k, 9, 9);
-    rusty_scene::lighting::lightmap::Pass {
+    rusty_lighting::lightmap::Pass {
         done,
         passes,
         samples,

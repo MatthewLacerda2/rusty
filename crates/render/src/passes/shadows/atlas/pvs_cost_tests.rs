@@ -13,8 +13,8 @@ use glam::Vec3;
 
 use super::static_tests::RES;
 use crate::{RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
+use rusty_lighting::occlusion::{bake_occlusion, bench::level::rooms};
 use rusty_scene::authoring::{create_entity, Primitive};
-use rusty_scene::lighting::occlusion::{bake_occlusion, bench::level::rooms};
 use rusty_scene::{Camera, Scene};
 
 /// The bench level, `n × n` rooms, with three shadowed lamps of `range` in each

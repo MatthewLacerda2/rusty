@@ -9,7 +9,8 @@ use super::{keep_report, lend_denoiser, EncodedPages};
 use crate::bake::denoise::Oidn;
 use crate::bake::progress::MeshClocks;
 use crate::bake::report::{lightmaps::Measured, Stages};
-use rusty_scene::lighting::lightmap::{BakeProgress, BakeScene, BakeSettings};
+use rusty_lighting::lightmap::{BakeProgress, BakeScene};
+use rusty_scene::lighting::settings::BakeSettings;
 use rusty_scene::Scene;
 
 /// A bake's clocks, from its start to its report.
