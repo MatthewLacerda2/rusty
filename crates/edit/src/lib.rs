@@ -2,9 +2,11 @@
 //! paths that build one from files.
 //!
 //! The base (`rusty-scene`) holds the `Scene` and every type its fields hold; this
-//! crate sits above it so an authoring edit rebuilds only the crates that write a
-//! scene (`script`, `editor`, `dev`, `app`, `shell`), never the renderer, physics,
-//! navigation, AI or UI.
+//! crate sits above it so an authoring edit rebuilds only the crates that write or
+//! build a scene (`script`, `editor`, `dev`, `app`, `shell`, `preview`) and the root
+//! package, never AI or UI. `render`, `physics`, `navigation` and `lighting` name
+//! this crate from their tests only: their libraries do not rebuild, their test
+//! targets do.
 //!
 //! Submodules:
 //!   authoring — the shared edit verbs the editor, the API and loads all go through

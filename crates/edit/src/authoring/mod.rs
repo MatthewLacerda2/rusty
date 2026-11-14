@@ -60,11 +60,11 @@ pub use crate::authoring::dependency::{
     remove_with_cascade, satisfy_requirements,
 };
 
-// The prefab structural verbs live in `edit::prefab` (#215) and `scene::prefab_link`
-// (#216 linked instances + apply/revert), size-cap splits plus the `.prefab` format
-// itself; re-exported here so editor and API reach extract / instantiate (unpacked
-// and linked) and the apply/revert/list verbs through this one shared authoring entry
-// point.
+// The prefab structural verbs live in this crate's `prefab` module: extract and
+// instantiate (unpacked and linked), and `prefab::{apply, link}` for apply, revert and
+// the override list. The base's `scene::prefab_link` holds only what the base reads of
+// a link. Re-exported here so the editor and the API reach them through this one
+// shared authoring entry point.
 pub use crate::prefab::apply::{
     apply_instance_field_to_source, apply_instance_to_source, revert_instance_field,
 };

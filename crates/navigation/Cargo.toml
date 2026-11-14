@@ -21,8 +21,9 @@ log = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
-# Probe placement and the bench level on a baked nav surface (`probe_site`, `flood`).
+# A play-mode load's swap (`load_bounds_tests`) and an agent's area mask (`request::tests::anchored`).
 rusty-edit = { workspace = true }
+# Probe placement and the bench level on a baked nav surface (`probe_site`, `flood`).
 rusty-lighting = { workspace = true }
 rusty-test-support = { workspace = true }
 proptest = { workspace = true }

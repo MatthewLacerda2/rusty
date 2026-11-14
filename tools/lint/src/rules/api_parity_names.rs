@@ -93,7 +93,7 @@ pub fn local_ops_named(source: &str, test: &[bool], module: &str) -> BTreeSet<Op
 /// How the file at `path` spells `edit::authoring`, by the crate it is in:
 /// `crate::authoring` inside `rusty-edit`, `rusty_edit::authoring` in another
 /// member crate, `crate::edit::authoring` ([`ROOT`]) in the root package, which
-/// re-exports the crate under its old name.
+/// re-exports the crate as its module `edit`.
 pub fn root_of(path: &str) -> &'static str {
     let module = module_path(path);
     let module = module
