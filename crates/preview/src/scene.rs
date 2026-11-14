@@ -1,4 +1,4 @@
-//! src/preview/scene.rs — the isolated preview scene (#352).
+//! crates/preview/src/scene.rs — the isolated preview scene (#352).
 //!
 //! [`build_preview_scene`] is the single entry point: given a mesh choice and a
 //! preview subject, it returns a brand-new [`Scene`] — never the active editor
@@ -18,19 +18,18 @@ use std::path::Path;
 
 use glam::{Quat, Vec3};
 
-use crate::asset;
-use crate::components::{MaterialAsset, MaterialComponent};
-use crate::scene::authoring::{self, Primitive};
-use crate::scene::{LightComponent, LightType, Scene};
+use rusty_components::{MaterialAsset, MaterialComponent};
+use rusty_scene::authoring::{self, Primitive};
+use rusty_scene::{LightComponent, LightType, Scene};
 
 /// The bundled preview mesh (#352): a hardcoded `.obj`, never a project asset — it
 /// lives in the engine's own content (`engine/`, found from any project), never in
 /// the project's `assets/`, so it is never listed as a project asset.
 fn suzanne_path() -> String {
-    crate::core::project::engine_path("models/suzanne.obj")
+    rusty_core::project::engine_path("models/suzanne.obj")
 }
 
-crate::core::named_enum! {
+rusty_core::named_enum! {
     /// Which mesh the Preview tab shows the subject on (models render as themselves
     /// instead — see [`PreviewSubject::Model`]); its name is the tab's label.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -153,14 +152,14 @@ fn spawn_preview_mesh(scene: &mut Scene, mesh: PreviewMesh) -> u32 {
 }
 
 /// Instantiate the embedded Suzanne `.obj` exactly like any other model asset — same
-/// `asset::import_and_sync_sidecar` + `authoring::instantiate_imported` path the model
+/// `rusty_asset::import_and_sync_sidecar` + `authoring::instantiate_imported` path the model
 /// inspector's "Instantiate into Scene" button uses (#352 leans on existing plumbing
 /// rather than a bespoke embedded-mesh loader) — then fitted like a model subject.
 fn spawn_suzanne(scene: &mut Scene) -> u32 {
     let fallback = |scene: &mut Scene| {
         authoring::create_drawn_entity(scene, "PreviewMesh", Some(Primitive::Sphere))
     };
-    let Ok(asset) = asset::import_and_sync_sidecar(Path::new(&suzanne_path())) else {
+    let Ok(asset) = rusty_asset::import_and_sync_sidecar(Path::new(&suzanne_path())) else {
         return fallback(scene);
     };
     let Some(sub) = asset.sub_meshes.first() else {
@@ -179,7 +178,7 @@ fn spawn_suzanne(scene: &mut Scene) -> u32 {
 /// carrying its own imported materials. Unlike the model inspector's "Instantiate into Scene", which
 /// spawns at the file's own size, the preview rescales it (see [`fit_scale`]).
 fn spawn_model(scene: &mut Scene, path: &str) {
-    let Ok(asset) = asset::import_and_sync_sidecar(Path::new(path)) else {
+    let Ok(asset) = rusty_asset::import_and_sync_sidecar(Path::new(path)) else {
         return;
     };
     spawn_fitted(scene, asset.model_bounds(), |scene, origin| {
