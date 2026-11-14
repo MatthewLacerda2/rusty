@@ -49,12 +49,16 @@ And on demand: when the user asks for a PR to be reviewed, open or merged
 
 ## Dispatch
 
-- **A fresh local agent**: the `Agent` tool with `subagent_type:
-  "general-purpose"`. **Never `"fork"`**: a fork inherits the orchestrator's
-  context, and with it the bias this skill exists to avoid. **`isolation:
-  "worktree"`**: `code-review` checks the PR out to read it, and in the shared
-  main checkout that moves other agents' branches and leaves `prNNNN` branches
-  behind. Remove a reviewer's worktree only after its report is in, by its own
+- **A fresh local agent**: the `Agent` tool with `subagent_type: "reviewer"`
+  (`.claude/agents/reviewer.md`), and no `model` argument: the definition pins
+  the latest Opus whatever model orchestrates, and an argument would override
+  it. **Never `"fork"`**: a fork inherits the orchestrator's context, and with it
+  the bias this skill exists to avoid. The definition gives it its own worktree:
+  `code-review` checks the PR out to read it, and in the shared main checkout
+  that moves other agents' branches and leaves `prNNNN` branches behind. When
+  the Agent tool does not list `reviewer` (the session started before the
+  definition existed), restart the session rather than fall back to another
+  type. Remove a reviewer's worktree only after its report is in, by its own
   path, never by a pattern (an `agent-*` sweep removes a running reviewer's
   checkout and loses its report). The harness locks it for the orchestrator's
   whole session, so `make reclaim` leaves it as `PROTECTED` and a plain `git
@@ -188,10 +192,10 @@ code first, then:
    a test that could be stronger, a style nit: fold it in only when it costs a line,
    otherwise drop it, and don't file it. A reviewer told to look hard always finds
    more; most of it is noise for this project.
-1. **Must-fix** findings go back to the coder: a local coder is resumed with
-   `SendMessage`; a cloud coder gets a new `Brief` comment listing them and a
-   fresh routine (`issue-batch`, *The brief is a comment on the issue*), on the
-   model its task calls for. Anything declined gets its reason. A finding that
+1. **Must-fix** findings go back to the coder, never to the orchestrator's own
+   hands: a local coder is resumed with `SendMessage`; a cloud coder gets a new
+   `Brief` comment listing them and a fresh routine (`issue-batch`, *The brief
+   is a comment on the issue*). Anything declined gets its reason. A finding that
    needs a decision no rule settles goes to the user, and the PR goes to draft
    naming it.
 2. **One PR comment, headed `Independent review`**, lists every finding and what
@@ -233,6 +237,8 @@ links the fix.
 ## Common mistakes
 
 - Dispatching a `fork`: it is the orchestrator again, with its blind spots.
+- Dispatching `general-purpose`, or passing `model`: the reviewer then runs on
+  whatever model orchestrates, not the one `reviewer` pins.
 - Pasting the `Brief` or a summary "to save it time"; it then reviews the
   summary, not the code.
 - Letting the reviewer push its own fixes. It reports; the coder fixes.
