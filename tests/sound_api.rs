@@ -11,10 +11,10 @@ use std::rc::Rc;
 use crate::temp::lua_path as tmp;
 use glam::Vec3;
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::audio::{AudioEventKind, AudioMaestro};
 use rusty::scene::Camera;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 use rusty::time::Time;
 
 /// A gunshot: a noise burst through a fast, resonant lowpass sweep — the patch
@@ -36,12 +36,12 @@ fn a_baked_one_shot_plays_through_the_audio_namespace() {
     let time = Rc::new(RefCell::new(Time::default()));
     let camera = Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0)));
 
-    rusty::api::sound::register(&lua).unwrap();
+    rusty::script::api::sound::register(&lua).unwrap();
     bind(&lua, &scene);
     bind(&lua, &audio);
     bind(&lua, &time);
     bind(&lua, &camera);
-    rusty::api::audio::register(&lua, &rusty::api::ApiCtx::default()).unwrap();
+    rusty::script::api::audio::register(&lua, &rusty::script::api::ApiCtx::default()).unwrap();
     let script = format!(
         r#"
         local clip = Sound.Bake({GUNSHOT}, "C2", "{path}", {{ duration = 0.12, seed = 9 }})
@@ -71,7 +71,7 @@ fn a_saved_patch_re_bakes_byte_for_byte() {
     let rebaked = tmp("rusty_sound_e2e_rebaked.wav");
     let patch_json = tmp("rusty_sound_e2e_patch.json");
 
-    rusty::api::sound::register(&lua).unwrap();
+    rusty::script::api::sound::register(&lua).unwrap();
     lua.globals()
         .set("PATCH_PATH", patch_json.as_str())
         .unwrap();
@@ -114,7 +114,7 @@ fn a_saved_song_re_bakes_the_identical_mix() {
     let authored = tmp("rusty_song_e2e_authored.wav");
     let rebaked = tmp("rusty_song_e2e_rebaked.wav");
 
-    rusty::api::sound::register(&lua).unwrap();
+    rusty::script::api::sound::register(&lua).unwrap();
     let script = format!(
         r#"
         local song = {{

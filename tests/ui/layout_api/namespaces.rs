@@ -6,14 +6,14 @@ use std::rc::Rc;
 
 use glam::Vec2;
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::{LayoutConstraint, LayoutElementComponent, LayoutGroupComponent};
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
-    rusty::api::layout_group::register(&lua, bind(&lua, scene)).unwrap();
-    rusty::api::layout_element::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::script::api::layout_group::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::script::api::layout_element::register(&lua, bind(&lua, scene)).unwrap();
     f(&lua);
 }
 

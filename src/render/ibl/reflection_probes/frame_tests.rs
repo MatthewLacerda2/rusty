@@ -11,7 +11,7 @@ use super::ranked;
 use crate::render::ibl::cubemap::read_cube_shape;
 use crate::render::ibl::reflection_probes::MAX_REFLECTION_PROBES;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 /// A probe whose box holds the camera ranks first, however far its capture point.
 #[test]

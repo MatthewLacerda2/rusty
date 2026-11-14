@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 use rusty::components::AnimatorComponent;
 use rusty::scene::{prefab, Scene};
-use rusty::scripting::ConsoleLogs;
+use rusty::script::scripting::ConsoleLogs;
 
 const GRAPH: &str = r#"{
   "nodes": [ { "name": "Idle", "clip": "Slide", "is_loop": true, "tag": "calm" } ],

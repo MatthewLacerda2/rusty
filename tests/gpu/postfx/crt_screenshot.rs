@@ -13,7 +13,7 @@ use super::super::fog::scene::{shot, wall_scene};
 fn bake(name: &str, blocks: &str) {
     let json = format!(r#"{{"pass":"postfx","name":"{name}","blocks":[{blocks}]}}"#);
     bake_recipe(
-        &rusty::api::recipe_from_json_str::<ShaderRecipe>(&json).unwrap(),
+        &rusty::script::api::recipe_from_json_str::<ShaderRecipe>(&json).unwrap(),
         engine_shader_dir(),
         DEFAULT_OUT_DIR,
     )

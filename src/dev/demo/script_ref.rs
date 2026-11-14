@@ -17,7 +17,7 @@ use std::cell::RefCell;
 use mlua::{Function, MultiValue, Table, Value};
 
 use super::calls::{plain, to_lua};
-use crate::scripting::{HostCall, HostJournal, Plain, ScriptManager};
+use crate::script::scripting::{HostCall, HostJournal, Plain, ScriptManager};
 
 /// The prefix of a handle act's name in a demo.
 pub const PREFIX: &str = "ScriptRef.";

@@ -7,7 +7,7 @@ mod bake {
         _: &mut egui::Ui,
         _: &mut crate::editor::EditorUi,
         _: &mut crate::scene::Scene,
-        _: &mut crate::scripting::ConsoleLogs,
+        _: &mut crate::script::scripting::ConsoleLogs,
         _: &str,
     ) {
     }
@@ -18,7 +18,7 @@ mod reflections;
 use crate::editor::EditorUi;
 use crate::navigation::{NavBounds, NavigationGraph};
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 use egui_phosphor::regular as icon;
 use std::fs;
 use std::path::Path;

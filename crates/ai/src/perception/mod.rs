@@ -48,7 +48,9 @@ mod self_tests;
 mod sight_tests;
 #[cfg(test)]
 mod stimulus_tests;
-// Test hook: the arena this module's tests, its `bench` and the root's `dev::bench` build on.
+// Test hook: the arena this module's tests, its `bench` and the root's `dev::bench` build
+// on; only those use it, so the player never compiles it.
+#[cfg(any(test, feature = "dev"))]
 #[doc(hidden)]
 pub mod test_world;
 

@@ -29,7 +29,7 @@ use crate::asset::animation_graph::{
     self, AnimationGraph, Condition, GraphEdge, NumericOp, StateMachine,
 };
 use crate::components::{AnimatorComponent, Playback};
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 use super::super::{Resources, World};
 

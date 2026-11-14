@@ -10,7 +10,7 @@ use rusty::app::GameWorld;
 use rusty::components::particle::{CollisionResponse, EmitMode, ParticleEmitterComponent};
 use rusty::core::curve::Range;
 use rusty::scene::{ColliderComponent, ColliderShape, Scene};
-use rusty::scripting::ConsoleLogs;
+use rusty::script::scripting::ConsoleLogs;
 
 /// Build a world: a static wall at x=+3 and an emitter at the origin firing one
 /// burst of particles straight at the wall along +X.

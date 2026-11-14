@@ -37,7 +37,7 @@ mod tests {
     use crate::core::input::InputState;
     use crate::navigation::NavigationGraph;
     use crate::scene::Scene;
-    use crate::scripting::ConsoleLogs;
+    use crate::script::scripting::ConsoleLogs;
 
     fn game() -> GameWorld {
         let nav = NavigationGraph::new(-20.0, 20.0, -20.0, 20.0, 1.0);

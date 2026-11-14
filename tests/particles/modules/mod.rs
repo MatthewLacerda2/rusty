@@ -10,7 +10,7 @@ use std::rc::Rc;
 
 use rusty::app::GameWorld;
 use rusty::scene::Scene;
-use rusty::scripting::ConsoleLogs;
+use rusty::script::scripting::ConsoleLogs;
 
 /// Enter Play on `scene` and step it `frames` fixed 60 Hz ticks.
 fn play(scene: Scene, frames: u32) -> Rc<RefCell<GameWorld>> {

@@ -14,7 +14,7 @@ use rusty::dev::session::Session;
 /// The committed scripting-API doc, `docs/api/` assembled (#569) and read at run time
 /// (#931), so the test reads exactly what is in the repo and a doc edit rebuilds nothing.
 fn reference() -> String {
-    rusty::scripting::api_doc::api_reference().expect("docs/api/ reads")
+    rusty::script::scripting::api_doc::api_reference().expect("docs/api/ reads")
 }
 
 /// Live namespaces deliberately *not* in the user-facing scripting doc. Empty by

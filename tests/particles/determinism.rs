@@ -12,7 +12,7 @@ use rusty::app::GameWorld;
 use rusty::components::particle::{EmitMode, ParticleBlend, ParticleEmitterComponent};
 use rusty::core::curve::Range;
 use rusty::scene::Scene;
-use rusty::scripting::ConsoleLogs;
+use rusty::script::scripting::ConsoleLogs;
 
 /// Build a play-mode world with a single seeded emitter and run `frames` ticks,
 /// returning every live particle's (position, size, alpha) as a flat vector.

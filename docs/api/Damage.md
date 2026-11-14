@@ -1,6 +1,6 @@
 ## `Damage`
 
-Tell an entity "you were hit" (#1893, `src/api/damage/`). Unity has no damage
+Tell an entity "you were hit" (#1893, `crates/script/src/api/damage/`). Unity has no damage
 system (projects `SendMessage("ApplyDamage")`), so this is **Unreal's**:
 `ApplyDamage`, `ApplyPointDamage` and `ApplyRadialDamageWithFalloff`, delivered to
 the target's [`OnTakeDamage`](index.md) callback. The engine stores **no health**:

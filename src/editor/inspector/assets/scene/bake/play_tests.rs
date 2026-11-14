@@ -10,7 +10,7 @@ use super::{poll, take_request, Step};
 use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 /// One editor frame's bake drive; whether it asked for a repaint at once (not the
 /// progress bar's timed one). The header read Play's refusal before it, so the

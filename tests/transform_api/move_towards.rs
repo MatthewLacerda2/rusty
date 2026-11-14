@@ -1,7 +1,7 @@
 //! `Transform.MoveTowards` steps, snaps and backs away (#350, #997).
 
 use mlua::Lua;
-use rusty::api::bind;
+use rusty::script::api::bind;
 
 use super::{approx, scene_with_entity};
 
@@ -10,7 +10,7 @@ fn move_towards_steps_by_step_then_snaps_at_target() {
     let lua = Lua::new();
     let (scene, id) = scene_with_entity();
 
-    rusty::api::transform::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::transform::register(&lua, bind(&lua, &scene)).unwrap();
 
     // 10 units away, stepping 4: two part-steps, then the remainder (2 < 4) snaps.
     lua.load(format!("Transform.MoveTowards({id}, 10, 0, 0, 4)"))
@@ -43,7 +43,7 @@ fn move_towards_steps_by_step_then_snaps_at_target() {
 fn move_towards_holds_position_when_already_at_target() {
     let lua = Lua::new();
     let (scene, id) = scene_with_entity();
-    rusty::api::transform::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::transform::register(&lua, bind(&lua, &scene)).unwrap();
     lua.load(format!(
         "Transform.SetPosition({id}, 7, 0, 0)\n\
          Transform.MoveTowards({id}, 7, 0, 0, 0.5)"

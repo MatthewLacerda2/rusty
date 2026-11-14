@@ -13,8 +13,8 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 /// A scene whose root entity sits at (1, 2, 3), plus the tmp `.prefab` path this
 /// test round-trips through (unique per test: they run in parallel), spelled with
@@ -32,8 +32,8 @@ fn fixture(tag: &str) -> (Rc<RefCell<Scene>>, u32, String) {
 fn run(scene: &Rc<RefCell<Scene>>, body: impl FnOnce(&Lua)) {
     let lua = Lua::new();
     let scene_path: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
-    rusty::api::scene::register(&lua, bind(&lua, scene), bind(&lua, &scene_path)).unwrap();
-    rusty::api::transform::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::script::api::scene::register(&lua, bind(&lua, scene), bind(&lua, &scene_path)).unwrap();
+    rusty::script::api::transform::register(&lua, bind(&lua, scene)).unwrap();
     body(&lua);
 }
 

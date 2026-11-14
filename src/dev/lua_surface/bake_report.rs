@@ -8,7 +8,7 @@ use mlua::serde::SerializeOptions;
 use mlua::{Lua, LuaSerdeExt, Value};
 
 use super::super::bake::report::{read, Kind};
-use crate::api::{global_table, put, ApiCell, ApiCtx, Reg};
+use crate::script::api::{global_table, put, ApiCell, ApiCtx, Reg};
 
 /// Add `GetBakeReport` to the `Lighting` and `Navigation` tables.
 pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {

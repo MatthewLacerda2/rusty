@@ -10,7 +10,7 @@ use crate::components::AudioSourceComponent;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 const DT: f32 = 1.0 / 60.0;
 

@@ -31,7 +31,7 @@ use serde_json::{json, Value};
 
 use crate::app::GameWorld;
 use crate::core::frame_stats::FrameStats;
-use crate::scripting::{ConsoleLogs, LogLevel};
+use crate::script::scripting::{ConsoleLogs, LogLevel};
 
 pub mod audio;
 mod build;

@@ -1,6 +1,6 @@
 ## `LODGroup`
 
-Read and tune an entity's `LodGroupComponent` (#472, `src/api/lod_group.rs`) —
+Read and tune an entity's `LodGroupComponent` (#472, `crates/script/src/api/lod_group.rs`) —
 Unity's `LODGroup`. It sits on a parent entity and lists its **levels of detail**,
 finest first. Each level names the entities that render it (its **renderers**,
 usually the group's children) and the **screen height** down to which it is shown:

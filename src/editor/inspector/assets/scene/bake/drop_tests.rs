@@ -10,7 +10,7 @@ use crate::dev::bake::generate_lighting::start_probes;
 use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
-use crate::scripting::{ConsoleLogs, LogLevel};
+use crate::script::scripting::{ConsoleLogs, LogLevel};
 
 /// An editor whose bake is in its probe step on a saved scene with two reflection
 /// probes.

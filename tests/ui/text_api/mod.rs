@@ -10,10 +10,10 @@ use std::rc::Rc;
 
 use glam::Vec2;
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::{CanvasComponent, RectTransformComponent, TextComponent};
 use rusty::core::settings::video::VideoSettings;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 use rusty::ui::ScreenSize;
 
 /// A canvas with one 400×100 Text child; returns the scene and the label's id.
@@ -43,7 +43,7 @@ pub(super) fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
         height: 1080,
         ..VideoSettings::default()
     }));
-    rusty::api::text::register(
+    rusty::script::api::text::register(
         &lua,
         bind(&lua, scene),
         bind(&lua, &screen),

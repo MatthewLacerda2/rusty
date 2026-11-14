@@ -5,10 +5,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::{CameraComponent, PostProcessingComponent};
 use rusty::scene::authoring::{default_post_processing, rendering::post_processing as vc_ops};
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 /// A camera with an active volume, and its id.
 fn scene() -> (Scene, u32) {
@@ -52,10 +52,13 @@ fn lens_flare_api_and_shared_op_converge() {
     let (graphics, app) = (Rc::default(), Rc::default());
     let lua = Lua::new();
     crate::lua::attempt(|| {
-        rusty::api::graphics::register(
+        rusty::script::api::graphics::register(
             &lua,
             bind(&lua, &lua_scene),
-            (bind(&lua, &graphics), rusty::api::ApiCell::default()),
+            (
+                bind(&lua, &graphics),
+                rusty::script::api::ApiCell::default(),
+            ),
             bind(&lua, &app),
         )
         .unwrap();

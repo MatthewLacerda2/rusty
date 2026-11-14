@@ -12,7 +12,7 @@ use rusty::components::{CanvasComponent, RectTransformComponent};
 use rusty::scene::authoring::default_camera;
 use rusty::scene::camera::set_view_fov;
 use rusty::scene::Scene;
-use rusty::scripting::ConsoleLogs;
+use rusty::script::scripting::ConsoleLogs;
 
 /// A 1280×720 session: a `MainCamera` at the origin looking down -Z and a HUD
 /// marker pinned to the world point (1, 0, -10). Returns the world and the ids.

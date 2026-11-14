@@ -5,18 +5,18 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::asset::anim_data::AnimationClip;
 use rusty::components::MeshComponent;
 use rusty::scene::Scene;
-use rusty::scripting::{ConsoleLogs, LogLevel};
+use rusty::script::api::bind;
+use rusty::script::scripting::{ConsoleLogs, LogLevel};
 
 use super::scene_with_animator;
 
 /// Run `script` against `scene` with `console` as the namespace's console.
 fn run_with(scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<ConsoleLogs>>, script: &str) {
     let lua = Lua::new();
-    rusty::api::animator::register(&lua, bind(&lua, scene), bind(&lua, console)).unwrap();
+    rusty::script::api::animator::register(&lua, bind(&lua, scene), bind(&lua, console)).unwrap();
     lua.load(script).exec().unwrap();
 }
 

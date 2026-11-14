@@ -11,12 +11,12 @@
 
 use std::collections::BTreeSet;
 
-use rusty::scripting::callbacks::LIFECYCLE_CALLBACKS;
+use rusty::script::scripting::callbacks::LIFECYCLE_CALLBACKS;
 
 /// The committed scripting-API doc, `docs/api/` assembled (#569) and read at run time
 /// (#931), so the test reads exactly what is in the repo and a doc edit rebuilds nothing.
 fn reference() -> String {
-    rusty::scripting::api_doc::api_reference().expect("docs/api/ reads")
+    rusty::script::scripting::api_doc::api_reference().expect("docs/api/ reads")
 }
 
 /// The heading the callback table lives under. Deliberately not backticked, so
@@ -38,7 +38,7 @@ fn doc_matches_dispatched_callbacks() {
     assert!(
         doc_only.is_empty() && live_only.is_empty(),
         "docs/api/index.md has drifted from the dispatched lifecycle callbacks \
-         (src/scripting/callbacks.rs is the source of truth for existence):\n  \
+         (crates/script/src/scripting/callbacks.rs is the source of truth for existence):\n  \
          documented but never dispatched: {doc_only:?}\n  \
          dispatched but not documented: {live_only:?}"
     );

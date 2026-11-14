@@ -102,18 +102,10 @@ def row_deps(root: Path, module: str) -> set[str]:
 
 
 def rows_below(root: Path, module: str) -> set[str]:
-    """The modules of the layer table's rows before `module`'s that do not name it back: the table
-    is bottom-up, but an earlier row may still reach a later one (`scripting` and `api` name each
-    other), and a crate a dev-dependency of `module` reached that way would make a cycle."""
-    rows = {m: set(re.findall(r'"(\w+)"', d)) for m, d in
-            re.findall(r'(?:sim|platform)\(\s*"(\w+)",\s*&\[([^\]]*)\]', (root / TABLE).read_text())}
-    order = list(rows)
-    if module not in rows:
-        return set()
-
-    def reaches(m: str, seen: set[str]) -> bool:
-        return any(d == module or (d not in seen and reaches(d, seen | {d})) for d in rows.get(m, ()))
-    return {m for m in order[:order.index(module)] if not reaches(m, {m})}
+    """The modules of the layer table's rows before `module`'s: the table is bottom-up and
+    acyclic, so a crate a dev-dependency of `module` may name is one of these."""
+    order = re.findall(r'(?:sim|platform)\(\s*"(\w+)",', (root / TABLE).read_text())
+    return set(order[:order.index(module)]) if module in order else set()
 
 
 def rewrite(text: str, module: str, deps: set[str]) -> tuple[str, set[str]]:

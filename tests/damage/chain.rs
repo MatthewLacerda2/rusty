@@ -1,5 +1,5 @@
 //! A handler that applies damage: a barrel chaining to the next, and a loop that
-//! feeds itself stopping at [`rusty::api::damage::MAX_DEPTH`].
+//! feeds itself stopping at [`rusty::script::api::damage::MAX_DEPTH`].
 
 use glam::Vec3;
 use rusty::scene::Scene;

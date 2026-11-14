@@ -8,7 +8,7 @@
 //!      guarding on absence through the #344 accessor facade,
 //!   3. an inspector card (some `src/editor/inspector/components/*.rs`) writing
 //!      through the facade's `_mut`/`set_` accessors,
-//!   4. an API namespace (`src/api/<x>.rs` + registration in `src/api/mod.rs`, and a
+//!   4. an API namespace (`src/script/api/<x>.rs` + registration in `src/script/api/mod.rs`, and a
 //!      mention in `docs/api/`).
 //!
 //! Components are DISCOVERED from the registry's rows, so a new
@@ -52,7 +52,7 @@ use waivers::{stale_waivers, waived};
 
 /// The Add Component menu: a module directory, every `.rs` under it.
 const ADD_MENU: &str = "src/editor/inspector/components/add";
-const API_MOD: &str = "src/api/mod.rs";
+const API_MOD: &str = "src/script/api/mod.rs";
 const DOCS: &str = "docs/api";
 const REPORT: &str = ".lint/report.txt";
 

@@ -27,7 +27,7 @@ use super::format::plain_json;
 mod find;
 use crate::app::GameWorld;
 use crate::scene::{Scene, SceneId};
-use crate::scripting::LogLevel;
+use crate::script::scripting::LogLevel;
 pub use find::{find_in, EventKind, Query};
 
 /// Ticks between two camera samples: four a second at 60 Hz.

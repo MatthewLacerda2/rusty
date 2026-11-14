@@ -96,7 +96,7 @@ fn the_shell_reaches_its_installed_loader() {
         Rc::new(RefCell::new(crate::navigation::NavigationGraph::new(
             -5.0, 5.0, -5.0, 5.0, 1.0,
         ))),
-        Rc::new(RefCell::new(crate::scripting::ConsoleLogs::new())),
+        Rc::new(RefCell::new(crate::script::scripting::ConsoleLogs::new())),
     );
     game.set_scene_loader(Box::new(Threaded::default()));
     assert!(game.scene_loader_mut::<Threaded>().is_some());

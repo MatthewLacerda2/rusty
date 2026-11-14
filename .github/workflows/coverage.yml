@@ -1,7 +1,7 @@
 name: coverage
 # The coverage ratchet, weekly (#750). A signal, never a gate (CLAUDE.md,
 # *Gates vs. signals*): it ratchets the floored modules — the deterministic sim
-# (app/scripting/physics/navigation) plus the script-facing `api` surface
+# (app/physics/navigation) plus `script`, the Lua runtime and its `api` surface
 # (#350) — against the committed floors in `coverage-baseline.txt`, and a drop
 # below a floor is surfaced in the run summary without failing anything. The
 # platform layer (main.rs, render, dev) is exempt — see docs/testing.md.

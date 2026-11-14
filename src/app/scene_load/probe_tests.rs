@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use super::fixture::{world_at, write_scenes};
 use crate::app::LoadProbe;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 const DT: f32 = 1.0 / 60.0;
 

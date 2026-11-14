@@ -7,11 +7,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::core::application::Application;
 use rusty::core::settings::render_scale::{RenderScale, RenderScaleDefault};
 use rusty::core::settings::GraphicsSettings;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 use rusty::ui::ScreenSize;
 
 type Cells = (
@@ -27,8 +27,9 @@ fn vm() -> (Lua, Cells) {
     let (screen, app, video) = (Rc::default(), Rc::default(), Rc::default());
     let screen_cell = bind(&lua, &screen);
     let (gfx, app_cell) = (bind(&lua, &graphics), bind(&lua, &app));
-    rusty::api::graphics::register(&lua, bind(&lua, &scene), (gfx, screen_cell), app_cell).unwrap();
-    rusty::api::video::register(&lua, bind(&lua, &video), screen_cell).unwrap();
+    rusty::script::api::graphics::register(&lua, bind(&lua, &scene), (gfx, screen_cell), app_cell)
+        .unwrap();
+    rusty::script::api::video::register(&lua, bind(&lua, &video), screen_cell).unwrap();
     (lua, (graphics, screen, app))
 }
 

@@ -4,7 +4,7 @@ use super::{is_open_scene, poll, start};
 use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
-use crate::scripting::{ConsoleLogs, LogLevel};
+use crate::script::scripting::{ConsoleLogs, LogLevel};
 
 /// The follow reloads the same file after an outside edit: same path, new World.
 /// The bake's lightmaps (keyed by the old entity ids) are dropped, not applied.

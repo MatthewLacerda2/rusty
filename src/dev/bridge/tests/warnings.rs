@@ -17,7 +17,7 @@ fn run(scenario: &str) -> mlua::Result<()> {
     let cells = world.borrow().script_manager().api_cells();
     let lua = Lua::new();
     cells.install(&lua).map_err(mlua::Error::RuntimeError)?;
-    crate::api::attempt(|| {
+    super::attempt(|| {
         super::super::register(&lua, &harness)?;
         lua.load(scenario).exec()
     })

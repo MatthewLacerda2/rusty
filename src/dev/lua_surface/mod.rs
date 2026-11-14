@@ -31,7 +31,7 @@ use std::sync::Once;
 
 use mlua::Lua;
 
-use crate::api::{self, ApiCtx, Reg};
+use crate::script::api::{self, ApiCtx, Reg};
 
 /// Install the dev namespaces onto the Lua surface, once per process.
 pub fn install_api() {

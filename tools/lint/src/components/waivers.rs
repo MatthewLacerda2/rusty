@@ -27,7 +27,7 @@ pub(super) const WAIVERS: &[(&str, &str, &str)] = &[
     (
         "nav_agent",
         "api",
-        "Served by the `NavMeshAgent`/`Navigation` namespace in src/api/nav/mod.rs \
+        "Served by the `NavMeshAgent`/`Navigation` namespace in src/script/api/nav/mod.rs \
          (the field is `nav_agent`, the namespace is the Unity name `NavMeshAgent`).",
     ),
     (
@@ -104,7 +104,7 @@ mod tests {
 
     #[test]
     fn light_api_is_not_waived_it_is_implemented() {
-        // `light` gets a real `src/api/light/` namespace (#82), so it must NOT be
+        // `light` gets a real `src/script/api/light/` namespace (#82), so it must NOT be
         // on the waiver list — removing the namespace must make the gate fail.
         assert!(!waived("light", "api"));
     }

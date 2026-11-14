@@ -6,14 +6,13 @@ use super::table::{Exception, Layer};
 /// Every violation, in a stable order: table shape first, then the source.
 pub fn all(
     layers: &[Layer],
-    peers: &[(&str, &str)],
     exceptions: &[Exception],
     modules: &[String],
     edges: &[Edge],
 ) -> Vec<String> {
     let mut out = Vec::new();
     declared(layers, modules, &mut out);
-    order(layers, peers, &mut out);
+    order(layers, &mut out);
     sim_closed(layers, &mut out);
     source(layers, exceptions, edges, &mut out);
     out
@@ -38,18 +37,15 @@ fn declared(layers: &[Layer], modules: &[String], out: &mut Vec<String>) {
     }
 }
 
-/// Each dep is declared above its importer (or is a peer): the table is a
-/// topological order, so the declared graph — and the code under it — is acyclic.
-fn order(layers: &[Layer], peers: &[(&str, &str)], out: &mut Vec<String>) {
+/// Each dep is declared above its importer: the table is a topological order, so
+/// the declared graph — and the code under it — is acyclic.
+fn order(layers: &[Layer], out: &mut Vec<String>) {
     let rank = |m: &str| layers.iter().position(|l| l.module == m);
     for (i, l) in layers.iter().enumerate() {
         for &dep in l.deps {
-            let is_peer = peers
-                .iter()
-                .any(|&(a, b)| (a, b) == (l.module, dep) || (b, a) == (l.module, dep));
             match rank(dep) {
                 None => out.push(format!("UNKNOWN_DEP {} → {dep} — no such row", l.module)),
-                Some(j) if j >= i && !is_peer => out.push(format!(
+                Some(j) if j >= i => out.push(format!(
                     "CYCLE {} → {dep} — {dep} is declared below {0}; deps point up the table",
                     l.module
                 )),

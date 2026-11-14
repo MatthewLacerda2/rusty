@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::core::fs::written::{written_since, Stale};
 use crate::scene::{ScriptComponent, ScriptFieldValue};
-use crate::scripting::{parse_fields, FieldKind, ScriptField};
+use crate::script::scripting::{parse_fields, FieldKind, ScriptField};
 
 /// The parsed schemas by script path, and how far into the write log they are
 /// current.

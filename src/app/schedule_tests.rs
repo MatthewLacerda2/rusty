@@ -8,7 +8,7 @@ use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::Camera;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 use crate::time::Time;
 use std::cell::RefCell;
 use std::rc::Rc;

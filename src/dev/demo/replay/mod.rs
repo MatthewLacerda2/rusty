@@ -24,7 +24,7 @@ mod verdict;
 use crate::app::{GameWorld, PlayTransition, TapPoint, TickTap};
 use crate::core::settings::video::{VideoSettings, VIDEO_NAMESPACE};
 use crate::core::settings::{saved_quality, GraphicsSettings};
-use crate::scripting::HostCall;
+use crate::script::scripting::HostCall;
 pub use cut::{cut, full_path, scenario as cut_scenario};
 use lend::Host;
 pub use lend::{lend, Lent};
@@ -138,7 +138,7 @@ pub fn prepare(world: &mut GameWorld, demo: Demo) -> Result<(), String> {
 /// The replay's own VM, with the API over `world`'s cells installed once (#1709):
 /// the scenario calls the demo recorded are made again in it.
 pub(super) fn replay_vm(world: &GameWorld) -> Result<Lua, String> {
-    let lua = crate::scripting::sandboxed_vm()?;
+    let lua = crate::script::scripting::sandboxed_vm()?;
     world.script_manager().api_cells().install(&lua)?;
     Ok(lua)
 }

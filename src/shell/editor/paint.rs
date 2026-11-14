@@ -108,7 +108,7 @@ pub(super) fn take_edits(editor_ui: &mut EditorUi, game: &GameWorld) -> bool {
         let journal = game.script_manager().journal();
         journal
             .borrow_mut()
-            .push(crate::scripting::HostCall::Taint(what));
+            .push(crate::script::scripting::HostCall::Taint(what));
     }
     edited
 }
@@ -138,7 +138,7 @@ pub(super) fn drain_repl(_editor_ui: &mut EditorUi, _game: &GameWorld) {}
 mod tests {
     use super::*;
     use crate::dev::harness::Harness;
-    use crate::scripting::HostCall;
+    use crate::script::scripting::HostCall;
 
     #[test]
     fn an_inspector_edit_during_play_taints_the_demo() {

@@ -1,7 +1,7 @@
 ## `Ragdoll`
 
 Turn an animated character into a physics-driven body — on death, or a big hit —
-and back (#466, `src/api/ragdoll.rs`). Unity's Ragdoll Wizard plus the switch every
+and back (#466, `crates/script/src/api/ragdoll.rs`). Unity's Ragdoll Wizard plus the switch every
 Unity project writes by hand.
 
 **Build.** `Ragdoll.Build(id)` (or **Build Ragdoll** on the inspector's Mesh card)

@@ -7,12 +7,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::{CameraComponent, PostProcessingComponent, Tonemap};
 use rusty::core::settings::quality::EffectQuality;
 use rusty::core::settings::GraphicsSettings;
 use rusty::scene::authoring::default_post_processing;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 fn scene_with_volume() -> Rc<RefCell<Scene>> {
     let mut scene = Scene::new();
@@ -44,10 +44,10 @@ fn bloom_and_color_round_trip() {
     let quality = Rc::new(RefCell::new(GraphicsSettings::default()));
     let app = Rc::default();
 
-    rusty::api::graphics::register(
+    rusty::script::api::graphics::register(
         &lua,
         bind(&lua, &scene),
-        (bind(&lua, &quality), rusty::api::ApiCell::default()),
+        (bind(&lua, &quality), rusty::script::api::ApiCell::default()),
         bind(&lua, &app),
     )
     .unwrap();
@@ -85,10 +85,10 @@ fn motion_blur_knobs_are_clamped() {
     let quality = Rc::new(RefCell::new(GraphicsSettings::default()));
     let app = Rc::default();
 
-    rusty::api::graphics::register(
+    rusty::script::api::graphics::register(
         &lua,
         bind(&lua, &scene),
-        (bind(&lua, &quality), rusty::api::ApiCell::default()),
+        (bind(&lua, &quality), rusty::script::api::ApiCell::default()),
         bind(&lua, &app),
     )
     .unwrap();
@@ -113,10 +113,10 @@ fn getters_return_defaults_with_no_active_volume() {
     let quality = Rc::new(RefCell::new(GraphicsSettings::default()));
     let app = Rc::default();
 
-    rusty::api::graphics::register(
+    rusty::script::api::graphics::register(
         &lua,
         bind(&lua, &scene),
-        (bind(&lua, &quality), rusty::api::ApiCell::default()),
+        (bind(&lua, &quality), rusty::script::api::ApiCell::default()),
         bind(&lua, &app),
     )
     .unwrap();

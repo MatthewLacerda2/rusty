@@ -13,7 +13,7 @@ use rusty::app::GameWorld;
 use rusty::components::particle::{EmitMode, EmitShape, ParticleEmitterComponent, SimulationSpace};
 use rusty::core::curve::Range;
 use rusty::scene::Scene;
-use rusty::scripting::ConsoleLogs;
+use rusty::script::scripting::ConsoleLogs;
 
 /// A one-shot burst of 8 long-lived particles from a box, launched along +X.
 fn emitter(space: SimulationSpace, speed: f32) -> ParticleEmitterComponent {

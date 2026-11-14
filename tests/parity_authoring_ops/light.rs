@@ -5,10 +5,10 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::{LightComponent, LightType};
 use rusty::scene::authoring::rendering::light as light_ops;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 /// Attach a default-ish light to a fresh entity named `name`; returns its id.
 fn entity_with_light(scene: &mut Scene, name: &str) -> u32 {
@@ -32,9 +32,9 @@ fn light_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> 
     let via_lua = entity_with_light(&mut scene.borrow_mut(), "ViaLua");
     let via_op = entity_with_light(&mut scene.borrow_mut(), "ViaOp");
 
-    let console = Rc::new(RefCell::new(rusty::scripting::ConsoleLogs::new()));
+    let console = Rc::new(RefCell::new(rusty::script::scripting::ConsoleLogs::new()));
     let lua = Lua::new();
-    rusty::api::light::register(&lua, bind(&lua, &scene), bind(&lua, &console)).unwrap();
+    rusty::script::api::light::register(&lua, bind(&lua, &scene), bind(&lua, &console)).unwrap();
     lua.load(format!(
         r#"
         Light.SetColor({via_lua}, 0.2, 0.4, 0.6)

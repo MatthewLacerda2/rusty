@@ -6,14 +6,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::core::input::{CursorState, InputState};
+use rusty::script::api::bind;
 
 /// Run `f` with a Lua VM whose `Input` table is bound to `input`.
 fn with_input(input: &Rc<RefCell<InputState>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
-    rusty::api::input::register_readable(&lua, bind(&lua, input)).unwrap();
-    rusty::api::input::register_writable(&lua, bind(&lua, input)).unwrap();
+    rusty::script::api::input::register_readable(&lua, bind(&lua, input)).unwrap();
+    rusty::script::api::input::register_writable(&lua, bind(&lua, input)).unwrap();
     f(&lua);
 }
 

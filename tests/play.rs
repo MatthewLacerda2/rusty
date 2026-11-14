@@ -9,7 +9,7 @@ use rusty::app::GameWorld;
 use rusty::core::input::InputState;
 use rusty::navigation::NavigationGraph;
 use rusty::scene::{Scene, ScriptComponent};
-use rusty::scripting::ConsoleLogs;
+use rusty::script::scripting::ConsoleLogs;
 
 /// One fixed 60 Hz step.
 pub const DT: f32 = 1.0 / 60.0;

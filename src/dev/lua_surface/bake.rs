@@ -18,8 +18,8 @@ use super::super::{
     bake::progress::BakeLog, bake::reflection as reflection_bake,
 };
 use super::generate::Overrides;
-use crate::api::{global_table, put, ApiCtx, Reg};
 use crate::scene::lighting::placement::MIN_REGION;
+use crate::script::api::{global_table, put, ApiCtx, Reg};
 
 /// Add `Bake` to the `Probe`, `Reflection` and `Lighting` tables.
 pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
@@ -82,7 +82,7 @@ fn register_probe(lua: &Lua, ctx: &ApiCtx) -> Reg {
 /// missing (#1695, `Scene::shadowmask_note`): `lightmaps` for the lightmap verb.
 fn shadowmask_note(
     scene: &crate::scene::Scene,
-    console: &std::cell::RefCell<crate::scripting::ConsoleLogs>,
+    console: &std::cell::RefCell<crate::script::scripting::ConsoleLogs>,
     lightmaps: bool,
 ) {
     if let Some(note) = scene.shadowmask_note(lightmaps) {

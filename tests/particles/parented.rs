@@ -7,11 +7,11 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::particle::{EmitMode, ParticleEmitterComponent};
 use rusty::core::curve::Range;
 use rusty::scene::Scene;
-use rusty::scripting::ConsoleLogs;
+use rusty::script::api::bind;
+use rusty::script::scripting::ConsoleLogs;
 
 const PIVOT: Vec3 = Vec3::new(50.0, 2.0, -3.0);
 
@@ -58,7 +58,7 @@ fn emit_and_burst_spawn_at_the_world_position() {
     let (scene, id) = parented(EmitMode::Burst);
     let scene = Rc::new(RefCell::new(scene));
     let lua = Lua::new();
-    rusty::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
     lua.load(format!("Particles.Emit({id}, 3); Particles.Burst({id})"))
         .exec()
         .unwrap();

@@ -14,7 +14,7 @@ fn flags_a_callback_taking_a_bare_id() {
                let g = scope.create_function(|lua, (id, x): (u32, f32)| Ok(x));\n\
                let h = move |_: &Lua, (root_id, n): (Option<u32>, String)| Ok(n);\n\
                let k = scope.create_function(|_, (x, parent): (f32, Option<u32>)| Ok(x));\n";
-    assert_eq!(found("src/api/scene.rs", src), [1, 2, 3, 4]);
+    assert_eq!(found("src/script/api/scene.rs", src), [1, 2, 3, 4]);
 }
 
 #[test]
@@ -26,18 +26,22 @@ fn passes_entity_arg_other_counts_helpers_and_other_roots() {
               let edit = move |id: u32, f: &dyn Fn(&mut R)| f(id);\n\
               let s = move |lua: &Lua, id: u32, t: Value, d: f64| Ok(());\n\
               let m = a | b | c;\n";
-    assert!(found("src/api/scene.rs", ok).is_empty());
+    assert!(found("src/script/api/scene.rs", ok).is_empty());
     let bare = "scope.create_function(move |_, id: u32| Ok(id));\n";
-    assert!(found("src/scripting/a.rs", bare).is_empty());
-    assert!(found("src/api/a_tests.rs", bare).is_empty());
-    assert!(found("src/api/a.rs", &format!("// {bare}")).is_empty());
+    assert!(found("src/script/scripting/a.rs", bare).is_empty());
+    assert!(found("src/script/api/a_tests.rs", bare).is_empty());
+    assert!(found("src/script/api/a.rs", &format!("// {bare}")).is_empty());
 }
 
 #[test]
 fn an_allow_with_a_reason_excuses_it() {
     let src = "// lint: allow(entity-arg) a raw slot index, not an entity\n\
                scope.create_function(|_, id: u32| Ok(id));\n";
-    let found = check("src/api/a.rs", src, &test_lines("src/api/a.rs", src, false));
+    let found = check(
+        "src/script/api/a.rs",
+        src,
+        &test_lines("src/script/api/a.rs", src, false),
+    );
     assert_eq!(found.len(), 1);
     assert!(allowed(src, found[0].line, RULE));
 }
