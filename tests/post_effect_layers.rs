@@ -1,0 +1,30 @@
+//! The post effects' completeness gate (`render::postfx::completeness`) over every
+//! layer, the two above `render` included: each effect has its `Graphics.*`
+//! registrar (`script::api::graphics::effects::REGISTRARS`) and its Inspector section, and
+//! neither lists an effect the renderer lacks. The gate's own cases are `render`'s
+//! tests.
+
+use rusty::render::postfx::completeness::problems;
+
+/// The Inspector's sections, by the effect each draws (both cards).
+#[cfg(feature = "editor")]
+fn sections() -> Vec<&'static str> {
+    rusty::editor::inspector::components::camera::drawn_effects()
+}
+
+#[test]
+fn every_effect_has_every_part_in_every_layer() {
+    let api: Vec<&str> = rusty::script::api::graphics::effects::REGISTRARS
+        .iter()
+        .map(|(n, _)| *n)
+        .collect();
+    // Without the editor there is no card to check: every effect the renderer has
+    // counts as drawn, so only the registrars are checked (and a missing one is
+    // reported once, as a registrar).
+    #[cfg(not(feature = "editor"))]
+    let sections = rusty::render::postfx::completeness::effect_names();
+    #[cfg(feature = "editor")]
+    let sections = sections();
+    let problems = problems(&api, &sections);
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}

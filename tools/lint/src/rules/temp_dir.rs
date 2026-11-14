@@ -2,9 +2,9 @@
 //!
 //! A path under `std::env::temp_dir()` is shared by every test process and every
 //! worktree, and under `cargo test` (cargo-mutants) by every test thread of one
-//! process, so a fixed or process-keyed name races. In-crate tests use
-//! `crate::test_temp::dir()` (`rusty_test_support::temp::dir()` inside a moved
-//! crate, `crates/CLAUDE.md`), integration tests `crate::temp::dir()`: all key on
+//! process, so a fixed or process-keyed name races. A crate's own tests use
+//! `rusty_test_support::temp::dir()` (`crates/CLAUDE.md`), integration tests
+//! `crate::temp::dir()`: both key on
 //! the process and the test. The two helpers themselves, and a Unix socket path
 //! (which must stay short), carry an inline allow.
 //!
@@ -31,9 +31,8 @@ pub fn check_file(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
                 line: i + 1,
                 rule: RULE,
                 message: "a shared temp path races between tests; use \
-                          `crate::test_temp::dir()` (in-crate; `rusty_test_support::temp::dir()` \
-                          inside a moved crate) or `crate::temp::dir()` \
-                          (tests/)"
+                          `rusty_test_support::temp::dir()` (in-crate) or \
+                          `crate::temp::dir()` (tests/)"
                     .to_string(),
             });
         }

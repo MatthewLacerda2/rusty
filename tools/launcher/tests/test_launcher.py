@@ -38,7 +38,7 @@ class DesktopEntry(unittest.TestCase):
 
     def test_the_app_id_is_the_editor_windows(self):
         # The window names itself after the entry; renamed alone, the dock loses it.
-        start = launcher.CHECKOUT / "src" / "shell" / "editor" / "start" / "mod.rs"
+        start = launcher.CHECKOUT / "crates" / "shell" / "src" / "editor" / "start" / "mod.rs"
         self.assertIn(f'const APP_ID: &str = "{launcher.APP_ID}";', start.read_text())
 
 

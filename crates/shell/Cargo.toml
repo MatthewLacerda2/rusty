@@ -1,0 +1,52 @@
+[package]
+name = "rusty-shell"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[features]
+dev = ["dep:rusty-dev", "rusty-app/dev", "rusty-asset/dev", "rusty-core/dev", "rusty-dev?/dev", "rusty-editor?/dev", "rusty-navigation/dev", "rusty-render/dev", "rusty-scene/dev", "rusty-script/dev"]
+editor = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:notify", "dep:rusty-editor", "rusty-app/editor", "rusty-asset/editor", "rusty-core/editor", "rusty-editor?/editor", "rusty-render/editor"]
+
+[lints]
+workspace = true
+
+[dependencies]
+rusty-app = { workspace = true }
+rusty-asset = { workspace = true }
+rusty-audio = { workspace = true }
+rusty-core = { workspace = true }
+rusty-dev = { workspace = true, optional = true }
+rusty-ecs = { workspace = true }
+rusty-editor = { workspace = true, optional = true }
+rusty-logging = { workspace = true }
+rusty-navigation = { workspace = true }
+rusty-render = { workspace = true }
+rusty-scene = { workspace = true }
+rusty-script = { workspace = true }
+rusty-time = { workspace = true }
+arboard = { workspace = true }
+egui = { workspace = true, optional = true }
+egui-wgpu = { workspace = true, optional = true }
+egui-winit = { workspace = true, optional = true }
+gilrs = { workspace = true }
+glam = { workspace = true }
+image = { workspace = true }
+log = { workspace = true }
+notify = { workspace = true, optional = true }
+pollster = { workspace = true }
+wgpu = { workspace = true }
+winit = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+smithay-clipboard = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = { workspace = true }
+objc2-app-kit = { workspace = true }
+objc2-foundation = { workspace = true }
+
+[dev-dependencies]
+rusty-components = { workspace = true }
+rusty-procgen = { workspace = true }
+rusty-test-support = { workspace = true }

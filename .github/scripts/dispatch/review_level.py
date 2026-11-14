@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from pathlib import Path
 
 import modules
 
@@ -133,6 +134,25 @@ def tree_markers(rev: str | None = "origin/main", cwd=None) -> dict[str, str]:
     if not marked:
         print(f"review-level: no stored-format marker in {rev or 'the working tree'}", file=sys.stderr)
     return marked
+
+
+#: This package, which holds the table: what a stale checkout gets wrong.
+HERE = Path(__file__).resolve().parent
+
+
+def stale_copy(rev: str = "origin/main", here: Path = HERE) -> str | None:
+    """A warning when this checkout's copy of the package differs from `rev`'s, else
+    `None`. The table and the module paths decide the level, so a copy run from a
+    checkout that was never fast-forwarded answers by an old rule (every module
+    read as unmarked once they moved into crates) with nothing on stdout to say so."""
+    done = subprocess.run(["git", "diff", "--quiet", rev, "--", "."],
+                          capture_output=True, text=True, check=False, cwd=here)
+    if done.returncode == 0:
+        return None
+    if done.returncode == 1:
+        return (f"review-level: this checkout's {here.name}/ differs from {rev}'s, so the level "
+                f"may be stale; run it from an up-to-date checkout (git pull)")
+    return f"review-level: cannot compare {here.name}/ with {rev}; the level may be stale"
 
 
 def patch_markers(files: list[dict]) -> dict[str, str]:

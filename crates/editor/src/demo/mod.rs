@@ -21,6 +21,11 @@ impl crate::EditorUi {
     pub fn demo_open(&self) -> bool {
         self.dev.demo.is_some()
     }
+
+    /// The Game view size an open demo replays on; `None` with none open.
+    pub fn demo_size(&self) -> Option<(u32, u32)> {
+        self.dev.demo.as_ref().map(|demo| demo.size)
+    }
 }
 
 /// A demo open in the Game view.
@@ -121,13 +126,6 @@ impl DemoView {
     /// Whether the replay stands on the demo's last tick.
     pub fn at_end(&self) -> bool {
         self.current + 1 >= self.ticks
-    }
-}
-
-impl crate::EditorUi {
-    /// The Game view size an open demo replays on; `None` with none open.
-    pub fn demo_size(&self) -> Option<(u32, u32)> {
-        self.dev.demo.as_ref().map(|demo| demo.size)
     }
 }
 

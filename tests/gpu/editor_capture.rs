@@ -14,15 +14,13 @@ const H: u32 = 720;
 fn panel_share(img: &image::RgbaImage, x0: u32, x1: u32) -> f32 {
     let theme = Theme::dark();
     let fills = [theme.bg_tier1, theme.bg_tier2];
-    let near = |p: [u8; 4], c: egui::Color32| {
-        p[0].abs_diff(c.r()) <= 2 && p[1].abs_diff(c.g()) <= 2 && p[2].abs_diff(c.b()) <= 2
-    };
+    let near = |p: [u8; 4], c: [u8; 4]| (0..3).all(|i| p[i].abs_diff(c[i]) <= 2);
     let (mut hits, mut total) = (0u32, 0u32);
     for y in H / 4..H * 3 / 4 {
         for x in x0..x1 {
             let p = img.get_pixel(x, y).0;
             total += 1;
-            hits += u32::from(fills.iter().any(|&c| near(p, c)));
+            hits += u32::from(fills.iter().any(|c| near(p, c.to_array())));
         }
     }
     hits as f32 / total as f32

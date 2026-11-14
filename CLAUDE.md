@@ -253,7 +253,7 @@ adapts it.
 - **The editor is a feature too.** `crates/editor/`, its shell frontend and egui sit
   behind the default-on `editor` feature; a shipped game is the `player` binary built
   `--no-default-features`, and engine code outside those stays egui-free.
-- **One runtime shell, two frontends.** `src/shell` owns the window, frame loop, input,
+- **One runtime shell, two frontends.** `crates/shell/` owns the window, frame loop, input,
   cursor, settings and `Application.Quit()`; what both frontends need goes there, once.
 - **One declared layering.** `tools/lint/src/layers/table.rs` says which module may
   import which and name which crates, and marks the **sim** rows (the rest is the

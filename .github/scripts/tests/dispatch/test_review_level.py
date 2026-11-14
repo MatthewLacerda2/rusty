@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import contextlib
 import io
+import shutil
+import subprocess
+import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from dispatch import review_level
@@ -70,7 +74,8 @@ class CommandLine(unittest.TestCase):
         gh = lambda path: files if "page=1" in path else []  # noqa: E731
         with mock.patch.object(cli.ghrest, "slug", return_value="o/r"), \
                 contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
-            code = cli.main(["12"], gh=gh if files is not None else (lambda path: None), markers=dict)
+            code = cli.main(["12"], gh=gh if files is not None else (lambda path: None), markers=dict,
+                            stale=lambda: None)
         return code, out.getvalue()
 
     def test_prints_the_level_then_why(self):
@@ -85,6 +90,38 @@ class CommandLine(unittest.TestCase):
 
     def test_an_unreadable_pr_exits_2(self):
         self.assertEqual(self.run_cli(None)[0], 2)
+
+    def test_a_stale_copy_warns_on_stderr_and_keeps_the_first_line(self):
+        out, err = io.StringIO(), io.StringIO()
+        files = [{"filename": "src/render/x.rs"}]
+        with mock.patch.object(cli.ghrest, "slug", return_value="o/r"), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            cli.main(["12"], gh=lambda p: files if "page=1" in p else [], markers=dict,
+                     stale=lambda: "review-level: stale")
+        self.assertEqual(out.getvalue().splitlines()[0], "medium")
+        self.assertIn("review-level: stale", err.getvalue())
+
+
+class StaleCopy(unittest.TestCase):
+    """The package compared with a ref: a real repository, since `git diff` is the check."""
+
+    def setUp(self):
+        self.repo = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.repo)
+        self.pkg = self.repo / "dispatch"
+        self.pkg.mkdir()
+        (self.pkg / "review_level.py").write_text("TABLE = {}\n")
+        git = lambda *a: subprocess.run(["git", *a], cwd=self.repo, check=True, capture_output=True)  # noqa: E731
+        git("init", "-q")
+        git("add", ".")
+        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base")
+
+    def test_a_copy_that_differs_warns(self):
+        (self.pkg / "review_level.py").write_text("TABLE = {'old': []}\n")
+        self.assertIn("differs from HEAD", review_level.stale_copy("HEAD", self.pkg))
+
+    def test_an_up_to_date_copy_is_quiet(self):
+        self.assertIsNone(review_level.stale_copy("HEAD", self.pkg))
 
 
 if __name__ == "__main__":

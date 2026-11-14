@@ -8,11 +8,10 @@
 //! under [`dir`] instead, keyed on both the process and the test. The integration
 //! suite re-exports it (`tests/temp.rs`). A pid is reused within one
 //! `make test`, so a test's first [`dir`] call clears what a dead process left there
-//! (#2078); later calls in the same test keep its files. The root package's
-//! `crate::test_temp` re-exports [`dir`] and [`lua_path`].
+//! (#2078); later calls in the same test keep its files.
 
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
 
 /// `<temp>/rusty-tests/<pid>/<test>/`, emptied and created on
@@ -44,6 +43,21 @@ pub fn dir() -> PathBuf {
 /// integration suite use this one.
 pub fn lua_path(name: &str) -> String {
     dir().join(name).to_string_lossy().into_owned()
+}
+
+/// `dir` spelled relative to the working directory, the way the editor gives
+/// `assets`, so a test can hand the engine a relative root (#1332). A fixed `..`
+/// count only spells it from one working directory.
+pub fn relative(dir: &Path) -> PathBuf {
+    let anchor = |p: &Path| -> PathBuf {
+        let normal = |c: &Component| matches!(c, Component::Normal(_));
+        p.components().take_while(|c| !normal(c)).collect()
+    };
+    let cwd = std::env::current_dir().expect("the working directory");
+    let ups = cwd.strip_prefix(anchor(&cwd)).unwrap().components().count();
+    let mut path: PathBuf = std::iter::repeat_n("..", ups).collect();
+    path.push(dir.strip_prefix(anchor(dir)).unwrap());
+    path
 }
 
 /// The test names this process has already handed a folder (and cleared it for).
@@ -87,5 +101,15 @@ mod tests {
             std::fs::read_to_string(dir().join("kept.txt")).unwrap(),
             "mine"
         );
+    }
+
+    #[test]
+    fn a_relative_spelling_names_the_same_folder() {
+        let dir = dir();
+        let rel = relative(&dir);
+        assert!(rel.is_relative(), "{rel:?}");
+        let cwd = std::env::current_dir().unwrap();
+        let canonical = |p: &Path| p.canonicalize().unwrap();
+        assert_eq!(canonical(&cwd.join(&rel)), canonical(&dir), "{rel:?}");
     }
 }

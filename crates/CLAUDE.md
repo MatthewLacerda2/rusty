@@ -90,8 +90,9 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
   (`panorama::fixture`), `.cube` lookups as text (`luts`) and the warnings a test logged
   (`logs::init`, `logs::take`, `logs::take_leveled` with each record's level:
   `rusty-logging` needs `script`, so it sits above most members), and a path in the temp dir spelled as a
-  script passes it (`temp::lua_path`). A crate's tests call it directly; the root
-  keeps `crate::test_temp` as a re-export. A fixture that is plain data moves here; one built on a
+  script passes it (`temp::lua_path`). A crate's tests call it directly, the
+  integration suite through `tests/temp.rs`; a folder spelled from the working
+  directory is `temp::relative`. A fixture that is plain data moves here; one built on a
   crate's types is a test hook instead.
 - **An inherent `impl` a module above writes for a moved crate's type** no longer
   builds (E0116): a method on the type's own data moves into the crate beside it
