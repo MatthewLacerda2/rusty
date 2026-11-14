@@ -1,24 +1,28 @@
-//! `--dead-pub`: `pub` items nothing in the project uses (#1003). A **signal**,
+//! `--dead-pub`: `pub` items nothing in the project uses. A **signal**,
 //! never a gate: it prints and exits 0, and exits 1 only when it produced no report.
 //!
-//! `src/lib.rs` makes every module `pub mod`, so rustc's `dead_code` never fires on
-//! a `pub` item. On a copy of the tree under `target/dead-pub/` (the worktree is
-//! never touched) [`fold`] makes the modules crate-private and folds every bin and
-//! the integration suite into the lib, then `cargo check --lib` runs twice with
-//! `--features dev`: with `--profile test` (dead even counting tests) and without
-//! (the difference is what only tests use). Both share this worktree's `target/`,
-//! so only the copied crate itself compiles. Code behind `not(feature = "dev")` is
-//! not seen, and neither is a member crate's `pub` API (`crates/`): the fold makes only
-//! the root package's modules crate-private, and since the workspace split the root
-//! has none, so the signal finds nothing until #2176 widens the fold. The recipe and what it found first are #940's. It runs weekly on
-//! `main` (`cargo-test.yml`'s `dead-pub` job), so a fold that stops compiling
-//! goes red there instead of silently (#1205).
+//! A `pub` item across a crate boundary is never dead to rustc, and the engine is a
+//! workspace of one crate per module. So on a copy of the tree under
+//! `target/dead-pub/` (the worktree is never touched) the fold rebuilds the one-crate
+//! shape for the check only: [`workspace`] mounts every member crate as a
+//! crate-private module of the root's lib and gives the root their dependencies,
+//! [`fold`] folds every bin and the integration suite in as modules, and every
+//! `rusty_<m>::` path becomes `crate::<m>::`. A use from another crate is then a use
+//! rustc sees. `cargo check --lib` runs twice with `--features dev`: with `--profile
+//! test` (dead even counting tests) and without (the difference is what only tests
+//! use). Both share this worktree's `target/`, so only the copied crate compiles.
+//! Code behind `not(feature = "dev")` is not seen. A fold that made nothing
+//! crate-private is an error, not an empty report: a layout the fold does not know
+//! would otherwise read as "nothing dead". It runs weekly on `main`
+//! (`cargo-test.yml`'s `dead-pub` job), so a fold that stops compiling goes red
+//! there instead of silently.
 //!
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --dead-pub` (`make dead-pub`)
 
 pub mod fold;
 pub mod platform;
 pub mod report;
+pub mod workspace;
 
 use std::fs;
 use std::io;
@@ -64,27 +68,68 @@ fn write_report(report: &Path, body: &str) -> io::Result<()> {
     fs::write(report, body)
 }
 
-/// Copy `root` to `tree` (a fresh copy) and fold its callers into its lib.
+/// Copy `root` to `tree` (a fresh copy) and fold its members and callers into its
+/// lib. An error when the fold made nothing crate-private: then rustc would see
+/// every `pub` item as used and the report would be empty for the wrong reason.
 pub fn prepare(root: &Path, tree: &Path, lib_name: &str) -> io::Result<()> {
     if tree.exists() {
         fs::remove_dir_all(tree)?;
     }
     copy(root, tree)?;
-    let bins = fold::bins(&fs::read_to_string(tree.join("Cargo.toml"))?);
+    let manifest = tree.join("Cargo.toml");
+    let lib = tree.join("src/lib.rs");
+    let members = workspace::members(tree, &fs::read_to_string(&lib)?)?;
+    let names: Vec<(String, String)> = members
+        .iter()
+        .map(|m| (m.ident.clone(), m.module.clone()))
+        .collect();
+    let bins = fold::bins(&fs::read_to_string(&manifest)?);
     let tests = tree
         .join("tests/main.rs")
         .exists()
         .then_some("tests/main.rs");
-    let lib = tree.join("src/lib.rs");
-    fs::write(&lib, fold::lib(&fs::read_to_string(&lib)?, &bins, tests))?;
+    let (body, private) = fold::lib(&fs::read_to_string(&lib)?, &bins, tests);
+    if private + members.len() == 0 {
+        return Err(io::Error::other(
+            "the fold made nothing crate-private: the lib has no `pub mod` and the \
+             workspace no member, so every `pub` item would read as used. The layout \
+             changed under tools/lint/src/dead_pub/: teach the fold the new one",
+        ));
+    }
+    fs::write(&lib, workspace::mount(&body, &members))?;
+    if !members.is_empty() {
+        let mut all = vec![workspace::deps(&fs::read_to_string(&manifest)?)];
+        let mut packages = Vec::new();
+        for m in &members {
+            let toml = fs::read_to_string(tree.join(&m.dir).join("Cargo.toml"))?;
+            packages.extend(workspace::package_name(&toml));
+            all.push(workspace::deps(&toml));
+        }
+        let root_toml = fs::read_to_string(&manifest)?;
+        fs::write(&manifest, workspace::manifest(&root_toml, &all, &packages))?;
+    }
+    let caller = |file: &Path, module: &str, root: bool| -> io::Result<()> {
+        let source = fs::read_to_string(file)?;
+        fs::write(file, fold::caller(&source, module, lib_name, root, &names))
+    };
+    for m in &members {
+        let src = tree.join(&m.dir).join("src");
+        each_rs(&src, &mut |f| caller(f, &m.module, false))?;
+        let mut lib = fs::read_to_string(src.join("lib.rs"))?;
+        lib.push_str(&workspace::macro_reexport(m));
+        fs::write(src.join("lib.rs"), lib)?;
+    }
     for bin in &bins {
         let file = tree.join(&bin.path);
-        rewrite(&file, &bin.module(), lib_name, true)?;
-        rewrite_dir(&file.with_extension(""), &bin.module(), lib_name, None)?;
+        caller(&file, &bin.module(), true)?;
+        each_rs(&file.with_extension(""), &mut |f| {
+            caller(f, &bin.module(), false)
+        })?;
     }
     if tests.is_some() {
         let tests = tree.join("tests");
-        rewrite_dir(&tests, "__itests", lib_name, Some(&tests.join("main.rs")))?;
+        let main = tests.join("main.rs");
+        each_rs(&tests, &mut |f| caller(f, "__itests", f == main))?;
     }
     Ok(())
 }
@@ -109,9 +154,9 @@ pub fn check(
         .current_dir(tree)
         .args(["check", "--lib", "--message-format", "short"]);
     cargo.arg("--target-dir").arg(target).args(profile);
-    if tree.join("Cargo.lock").exists() {
-        cargo.arg("--locked");
-    }
+    // Not `--locked`: the fold rewrote the root's dependency list, so its entry in
+    // the copied `Cargo.lock` changes. Every other entry, version and git rev stays
+    // what the lock says: cargo re-resolves only what the manifest moved.
     if !features.is_empty() {
         cargo.args(["--features", &features.join(",")]);
     }
@@ -143,23 +188,17 @@ fn copy(from: &Path, to: &Path) -> io::Result<()> {
     Ok(())
 }
 
-fn rewrite(file: &Path, module: &str, lib_name: &str, root: bool) -> io::Result<()> {
-    let source = fs::read_to_string(file)?;
-    fs::write(file, fold::caller(&source, module, lib_name, root))
-}
-
-/// Every `.rs` under `dir` (when it exists) rewritten as part of `module`; only
-/// `root` (if any) is the module's root file.
-fn rewrite_dir(dir: &Path, module: &str, lib_name: &str, root: Option<&Path>) -> io::Result<()> {
+/// `visit` on every `.rs` under `dir`, when it exists.
+fn each_rs(dir: &Path, visit: &mut dyn FnMut(&Path) -> io::Result<()>) -> io::Result<()> {
     if !dir.is_dir() {
         return Ok(());
     }
     for entry in fs::read_dir(dir)? {
         let path = entry?.path();
         if path.is_dir() {
-            rewrite_dir(&path, module, lib_name, root)?;
+            each_rs(&path, visit)?;
         } else if path.extension().is_some_and(|e| e == "rs") {
-            rewrite(&path, module, lib_name, root == Some(path.as_path()))?;
+            visit(&path)?;
         }
     }
     Ok(())
