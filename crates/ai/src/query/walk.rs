@@ -12,7 +12,7 @@ use glam::Vec3;
 
 use super::spec::Anchor;
 use super::QueryWorld;
-use crate::navigation::{FloodSearch, NavigationGraph, ALL_AREAS};
+use rusty_navigation::{FloodSearch, NavigationGraph, ALL_AREAS};
 
 /// How far past the farthest item the flood may wander, as a factor of that
 /// straight-line distance: a path around a wall or up a stair is longer than the

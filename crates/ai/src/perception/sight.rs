@@ -14,9 +14,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use glam::Vec3;
 
 use super::SightRays;
-use crate::ai::{ray, stand};
-use crate::physics::PhysicsWorld;
-use crate::scene::{layer_in_mask, Scene};
+use crate::{ray, stand};
+use rusty_physics::PhysicsWorld;
+use rusty_scene::{layer_in_mask, Scene};
 
 /// A sight target: where a ray aims at it and where it stands (its feet,
 /// [`stand::feet`]: the last-known position a script reads).

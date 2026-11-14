@@ -100,8 +100,9 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
   and the half checking the module above moves to that module's tests, through
   the crate's public API (an import check that bakes moves to `scene`'s tests).
   One naming a module *below* that the row does not list (a test baking with
-  `procgen`) takes `rusty-<x>` as a `[dev-dependencies]` entry and names it
-  `rusty_<x>::`: the layer table does not hold test code. *Below* means an earlier
+  `procgen`) takes `rusty-<x>` as a `[dev-dependencies]` entry, by hand (the tool
+  lists it), and names it `rusty_<x>::`: the layer table does not hold test code.
+  Forward the crate's `dev` / `editor` features to it as to any sibling (*Features*). *Below* means an earlier
   row that does not name the crate back: `scripting` and `api` name each other, so
   neither is below the other. `make layers` flags a member's dev-dependency on
   itself, on a module at or above its row, or on one that reaches back to it.

@@ -1,20 +1,19 @@
-//! What perception costs on the Dust2-sized bench level (#1900): 30 perceivers
+//! Test hook: the Dust2-sized bench level perception is costed on (#1900): 30 perceivers
 //! spread over `rooms(20)` and one target. Every perceiver has a body, as a real
 //! bot does, on a `BOT` layer: looking for the target's layer only (the default
 //! scene's bots look for `Player`) it has 1 candidate; with `sight_mask = all`
-//! (the component default) it has the other 29 bots too. The gate run checks the step works at
-//! level scale under the ray budget; the timing is a release-build measurement
-//! run by hand, in `dev::bench::perception_cost_tests` (a sim module may not read
-//! a clock).
+//! (the component default) it has the other 29 bots too. The gate run is `perception_cost_tests`; the
+//! timing, a release-build measurement run by hand, is the root's
+//! `dev::bench::query_cost_tests` (a sim module may not read a clock).
 
 use glam::Vec3;
 
 use super::{step, SightRays};
-use crate::ai::perception::test_world::{target, PLAYER};
-use crate::ai::query::query_cost_tests::level;
-use crate::components::AIPerceptionComponent;
-use crate::physics::PhysicsWorld;
-use crate::scene::Scene;
+use crate::perception::test_world::target;
+use crate::query::bench::level;
+use rusty_components::AIPerceptionComponent;
+use rusty_physics::PhysicsWorld;
+use rusty_scene::Scene;
 
 /// The layer the perceivers' bodies stand on.
 const BOT: u8 = 4;
@@ -22,7 +21,7 @@ const BOT: u8 = 4;
 /// The bench level with 30 perceivers in a 6 × 5 grid of rooms, each a 1.8 m
 /// body, looking for `sight_mask` (the target's layer, or `u32::MAX`), one target
 /// standing in room (2, 2), and its physics world.
-pub(crate) fn level_with_perceivers(n: usize, sight_mask: u32) -> (Scene, PhysicsWorld, Vec<u32>) {
+pub fn level_with_perceivers(n: usize, sight_mask: u32) -> (Scene, PhysicsWorld, Vec<u32>) {
     let (mut scene, _nav, _) = level(n, 1.0);
     let mut bots = Vec::new();
     for i in 0..30 {
@@ -50,33 +49,8 @@ pub(crate) fn level_with_perceivers(n: usize, sight_mask: u32) -> (Scene, Physic
 }
 
 /// Step `ticks` perception ticks.
-pub(crate) fn run(scene: &mut Scene, physics: &PhysicsWorld, rays: &mut SightRays, ticks: usize) {
+pub fn run(scene: &mut Scene, physics: &PhysicsWorld, rays: &mut SightRays, ticks: usize) {
     for _ in 0..ticks {
         step(scene, Some(physics), rays, 1.0 / 60.0);
     }
-}
-
-#[test]
-fn thirty_perceivers_on_the_bench_level_see_the_target_near_them_only() {
-    let (mut scene, physics, bots) = level_with_perceivers(20, 1 << PLAYER);
-    let mut rays = SightRays::default();
-    run(&mut scene, &physics, &mut rays, 2);
-    let seeing: Vec<u32> = bots
-        .iter()
-        .copied()
-        .filter(|&b| {
-            !scene
-                .world
-                .ai_perception(b)
-                .expect("bot")
-                .memory
-                .in_sight
-                .is_empty()
-        })
-        .collect();
-    assert!(!seeing.is_empty(), "the bot in the target's room sees it");
-    assert!(
-        seeing.len() < bots.len(),
-        "walls hide it from the rest: {seeing:?}"
-    );
 }

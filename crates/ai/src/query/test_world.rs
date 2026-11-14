@@ -4,10 +4,10 @@
 use glam::{Vec2, Vec3};
 
 use super::{Anchor, QueryWorld};
-use crate::navigation::test_support::{add_box, add_floor};
-use crate::navigation::{NavBounds, NavigationGraph};
-use crate::physics::PhysicsWorld;
-use crate::scene::{Camera, NavMeshAgentComponent, Scene};
+use rusty_navigation::test_support::{add_box, add_floor};
+use rusty_navigation::{NavBounds, NavigationGraph};
+use rusty_physics::PhysicsWorld;
+use rusty_scene::{Camera, NavMeshAgentComponent, Scene};
 
 /// The arena and what a query reads from it.
 pub struct Arena {

@@ -1,10 +1,10 @@
-//! src/ai/ray.rs — the line-of-sight ray every AI sense shares (#1892, #1900):
+//! crates/ai/src/ray.rs — the line-of-sight ray every AI sense shares (#1892, #1900):
 //! the environment query's `trace` test and perception's sight sense.
 
 use glam::Vec3;
 
-use crate::physics::{is_hittable, PhysicsWorld};
-use crate::scene::{layer_in_mask, Scene};
+use rusty_physics::{is_hittable, PhysicsWorld};
+use rusty_scene::{layer_in_mask, Scene};
 
 /// Whether the segment `eye → at` is clear: no collider on `mask`'s layers in the
 /// way. The entities in `ignore` and their descendants (a character's hitboxes)

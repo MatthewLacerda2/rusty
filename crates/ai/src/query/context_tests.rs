@@ -6,8 +6,8 @@ use glam::Vec3;
 
 use super::test_world::{wall, Arena};
 use super::{run, Anchor, Curve, Filter, Generator, Measure, QuerySpec, Score, Test};
-use crate::components::CharacterControllerComponent;
-use crate::scene::Scene;
+use rusty_components::CharacterControllerComponent;
+use rusty_scene::Scene;
 
 /// A Player: a 2 m `CharacterController` whose Transform (its middle) is at `at`.
 fn player(scene: &mut Scene, at: Vec3) -> u32 {
@@ -40,7 +40,7 @@ fn an_entity_context_stands_on_its_feet() {
         (feet - Vec3::new(1.0, 0.0, 2.0)).length() < 1e-5,
         "{feet:?}"
     );
-    let crate_top = crate::navigation::test_support::add_box(
+    let crate_top = rusty_navigation::test_support::add_box(
         &mut scene,
         Vec3::new(4.0, 0.5, 4.0),
         Vec3::new(6.0, 1.5, 6.0),

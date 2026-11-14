@@ -3295,6 +3295,7 @@ dependencies = [
  "pollster",
  "proptest",
  "rustc-hash 2.1.3",
+ "rusty-ai",
  "rusty-asset",
  "rusty-audio",
  "rusty-components",
@@ -3318,6 +3319,19 @@ dependencies = [
  "wgpu",
  "winit",
  "xxhash-rust",
+]
+
+[[package]]
+name = "rusty-ai"
+version = "0.1.0"
+dependencies = [
+ "glam 0.33.12",
+ "rusty-components",
+ "rusty-core",
+ "rusty-navigation",
+ "rusty-physics",
+ "rusty-scene",
+ "rusty-test-support",
 ]
 
 [[package]]

@@ -9,10 +9,10 @@ use super::queue::Status;
 use super::test_world::wall;
 use super::{pick, run, Anchor, Generator, Measure, Progress, QueryQueue, QuerySpec, QueryWorld};
 use super::{Curve, Item, RunMode, Score, Test};
-use crate::core::random::Random;
-use crate::navigation::test_support::{add_floor, add_obstacle, move_to};
-use crate::navigation::{tick_obstacles, NavBounds, NavigationGraph, Rebake};
-use crate::scene::{Camera, Scene};
+use rusty_core::random::Random;
+use rusty_navigation::test_support::{add_floor, add_obstacle, move_to};
+use rusty_navigation::{tick_obstacles, NavBounds, NavigationGraph, Rebake};
+use rusty_scene::{Camera, Scene};
 
 const FROM: Vec3 = Vec3::new(-40.0, 0.0, 5.0);
 /// A 90 × 20 m floor, a wall at x = −32 with two doorways (z 3..7 and −7..−3),

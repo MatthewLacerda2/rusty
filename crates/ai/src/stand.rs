@@ -1,11 +1,11 @@
-//! src/ai/stand.rs — where an entity **stands** (#1892, #1900): its feet, not
+//! crates/ai/src/stand.rs — where an entity **stands** (#1892, #1900): its feet, not
 //! its Transform, which for a character is its middle. The environment query's
 //! contexts and every perception sense's last-known position read it, so a
 //! trace's eye height and a distance mean the same for every kind of body.
 
 use glam::Vec3;
 
-use crate::scene::Scene;
+use rusty_scene::Scene;
 
 /// Entity `id`'s feet: a `NavMeshAgent`'s, else the bottom of a
 /// `CharacterController`'s capsule, else the bottom of its collider, else its

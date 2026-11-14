@@ -1,18 +1,18 @@
 //! What one environment query costs (#1892), timed: the bench level's 64-point
-//! donut with `trace` and `path` tests (`ai::query::query_cost_tests`), at the
+//! donut with `trace` and `path` tests (`ai::query::bench`), at the
 //! Kolvik-sized `n = 5` and the Dust2-sized `n = 20`, on 1 m and 0.25 m navmesh
 //! cells, then the `path` worst case (`query_far`: a bot 40 m off and one
 //! survivor upstairs that no stair reaches). Here because the sim may not read
 //! a clock. Beside it, what perception's step costs (#1900): 30 perceivers and
-//! one target on the Dust2-sized level (`ai::perception::perception_cost_tests`),
+//! one target on the Dust2-sized level (`ai::perception::bench`),
 //! the bots looking for the target's layer only, then for every layer.
 
 use std::time::Instant;
 
-use crate::ai::perception::perception_cost_tests::{level_with_perceivers, run};
+use crate::ai::perception::bench::{level_with_perceivers, run};
 use crate::ai::perception::test_world::PLAYER;
 use crate::ai::perception::SightRays;
-use crate::ai::query::query_cost_tests::{level, query, query_far};
+use crate::ai::query::bench::{level, query, query_far};
 
 #[test]
 // lint: allow(skip) a timing measurement in a release build, run by hand, never a gate

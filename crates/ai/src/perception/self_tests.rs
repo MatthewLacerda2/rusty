@@ -10,7 +10,7 @@ use super::{report_damage, report_noise};
 
 /// A body on the target layer with a perceiver on its `Head` child; returns
 /// (body, head).
-fn headed(s: &mut crate::scene::Scene, at: Vec3) -> (u32, u32) {
+fn headed(s: &mut rusty_scene::Scene, at: Vec3) -> (u32, u32) {
     let body = target(s, at);
     let head = perceiver(s, Vec3::ZERO);
     s.set_parent(head, Some(body)).expect("parent");

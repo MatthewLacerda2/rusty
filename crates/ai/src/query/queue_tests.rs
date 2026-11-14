@@ -9,7 +9,7 @@ use super::queue::Status;
 use super::test_world::{wall, Arena};
 use super::{pick, run, Curve, Filter, Generator, Measure, Progress, QueryQueue, QuerySpec};
 use super::{RunMode, Score, Test};
-use crate::core::random::Random;
+use rusty_core::random::Random;
 
 /// Walls with gaps between the querier and a 24-item donut, so the search is
 /// long; `exists` then `length` (two searches), and a distance score.

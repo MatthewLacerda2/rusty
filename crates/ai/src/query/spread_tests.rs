@@ -6,7 +6,7 @@ use glam::Vec3;
 
 use super::test_world::Arena;
 use super::{pick, run, Curve, Filter, Generator, Measure, QuerySpec, RunMode, Score, Test};
-use crate::core::random::Random;
+use rusty_core::random::Random;
 
 /// Six agents' query around `target`: reachable, near the asker, and (when
 /// `spread`) away from the others' claims.
