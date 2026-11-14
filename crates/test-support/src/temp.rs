@@ -9,7 +9,7 @@
 //! suite re-exports it (`tests/temp.rs`). A pid is reused within one
 //! `make test`, so a test's first [`dir`] call clears what a dead process left there
 //! (#2078); later calls in the same test keep its files. The root package's
-//! `crate::test_temp` re-exports [`dir`] beside its `lua_path`.
+//! `crate::test_temp` re-exports [`dir`] and [`lua_path`].
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -35,6 +35,15 @@ pub fn dir() -> PathBuf {
     }
     std::fs::create_dir_all(&dir).expect("create the test's temp dir");
     dir
+}
+
+/// `name` inside [`dir`], spelled as the string a script passes: the stored
+/// form (`rusty_core::paths::to_slash`, the platform's own spelling, which this
+/// crate cannot name from below `core`), so one string serves a Lua literal and the
+/// test's own reads and assertions (#1937). Every member's tests and the
+/// integration suite use this one.
+pub fn lua_path(name: &str) -> String {
+    dir().join(name).to_string_lossy().into_owned()
 }
 
 /// The test names this process has already handed a folder (and cleared it for).

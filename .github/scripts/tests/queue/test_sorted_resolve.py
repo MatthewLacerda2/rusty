@@ -89,7 +89,7 @@ class Mirror(unittest.TestCase):
 
     def test_the_system_schedule_carries_no_marker_so_it_is_never_resolved(self):
         # Its order is the frame's system schedule (#1723's decision).
-        lines = (REPO / "src/app/registry.rs").read_text().splitlines()
+        lines = (REPO / "crates/app/src/registry.rs").read_text().splitlines()
         self.assertFalse([line for line in lines if lists.reason(line) is not None])
 
 

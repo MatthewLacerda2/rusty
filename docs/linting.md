@@ -557,7 +557,7 @@ new flag, gate, CI step or baseline.
   that governs no entries (a blank line under it, or a first entry indented deeper
   than it) is itself a finding. Rust files and the tracked Markdown under `docs/`,
   `.claude/skills/` and the repo root are scanned. A list
-  whose order matters (`src/app/registry.rs`'s `build()`, `docs/api/index.md`'s
+  whose order matters (`crates/app/src/registry.rs`'s `build()`, `docs/api/index.md`'s
   namespaces) gets a comment saying why instead of a marker
   (`rules/sorted.rs`).
 - **`stored-format`** (#1966) — `make review-level` reviews a change to an on-disk
@@ -687,7 +687,7 @@ breaks the order or leaves the sim, move the code down a layer instead.
 ### External crates (#938)
 Each row also names the external crates its module may use (`.uses(&[…])`, the
 crate name as code writes it: `egui_wgpu`, not `egui-wgpu`), so `wgpu` stays in
-`render`, `winit` in `shell`, `kira` in `audio`, `mlua` in `scripting`/`api`/`dev`.
+`render`, `winit` in `shell`, `kira` in `audio`, `mlua` in `script`/`dev`.
 What is not one row's lives in `tools/lint/src/layers/externs/policy.rs`:
 
 - **`common`** — the vocabulary any module may name unlisted: `glam`, `serde`,

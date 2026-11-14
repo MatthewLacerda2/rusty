@@ -40,7 +40,7 @@ fn a_dev_dependency_on_a_module_below_or_on_test_support_passes() {
 }
 
 #[test]
-fn a_dev_dependency_on_itself_a_module_above_or_one_naming_it_back_is_flagged() {
+fn a_dev_dependency_on_itself_or_a_module_above_is_flagged() {
     let text = "[dev-dependencies]\nrusty-render = { workspace = true }\n\
         rusty-physics = { workspace = true }\n\
         [target.'cfg(unix)'.dev-dependencies]\nrusty-navigation = { workspace = true }\n";

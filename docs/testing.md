@@ -1018,8 +1018,8 @@ dev-only surface); for the lines a branch changed, `cargo llvm-cov report --cobe
 [`cargo-mutants`](https://github.com/sourcefrog/cargo-mutants) audits whether the
 suite actually *catches* bugs — the headline guardrail against green-but-vacuous
 agent-written tests. It mutates the core of the deterministic sim (`app`,
-`scripting`, `physics`, `navigation`; a deliberate subset of the layer table's sim
-rows), the pure-logic part where a silent bug hurts most, and
+`scripting` (the VM half of the `script` row; `api` is left out), `physics`,
+`navigation`; a deliberate subset of the layer table's sim rows), the pure-logic part where a silent bug hurts most, and
 reports the **surviving** mutants (a change no test failed on). It is
 **non-blocking** — mutation never gates a merge — and it runs on **no pull
 request** (#750). Two ways in:

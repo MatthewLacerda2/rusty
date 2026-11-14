@@ -18,7 +18,13 @@ BASE = "# floors\napp 95.00\napi 86.00\n"
 
 
 def check(head: str, present: tuple[str, ...] = ("app", "api")) -> list[str]:
-    return findings(BASE, head, lambda m: m in present)
+    return findings(BASE, head, lambda m: f"src/{m}" if m in present else None,
+                    lambda m: ["a", "b"])
+
+
+def split(base: str, head: str, folders: list[str]) -> list[str]:
+    """`findings` for a crate `base` floors whole and `head` floors by folder."""
+    return findings(base, head, lambda m: f"crates/{m}/src", lambda m: folders)
 
 
 class Rule(unittest.TestCase):
@@ -38,7 +44,7 @@ class Rule(unittest.TestCase):
 
     def test_a_drop_keeping_the_old_reason_is_flagged(self):
         base = "api 85.00  # reason: X\n"
-        found = findings(base, "api 70.00  # reason: X\n", lambda m: True)
+        found = findings(base, "api 70.00  # reason: X\n", lambda m: f"src/{m}")
         self.assertIn("`api` floor dropped 85.00 -> 70.00", found[0])
 
     def test_the_floor_is_printed_as_written(self):
@@ -48,7 +54,26 @@ class Rule(unittest.TestCase):
         self.assertEqual(check("app 95.50\napi 86.00\nphysics 97.00\n"), [])
 
     def test_a_removed_floor_on_a_live_module_is_flagged(self):
-        self.assertIn("`api` floor (86.00) was removed", check("app 95.00\n")[0])
+        found = check("app 95.00\n")
+        self.assertIn("`api` floor (86.00) was removed while src/api/ still exists", found[0])
+
+    def test_a_floor_split_into_halves_at_least_as_high_passes(self):
+        self.assertEqual(check("app 95.00\napi/a 90.00\napi/b 86.00\n"), [])
+
+    def test_one_low_half_standing_in_for_a_whole_crate_is_flagged(self):
+        found = split("script 88.00\n", "script/api 0.00\n", ["api", "scripting"])
+        self.assertEqual(len(found), 2)
+        self.assertIn("split into `script/api` at 0.00, below it", found[0])
+        self.assertIn("crates/script/src/scripting/ has no `script/scripting` floor", found[1])
+
+    def test_a_low_half_of_one_folder_is_flagged(self):
+        found = split("physics 97.00\n", "physics/shape 1.00\n", ["shape"])
+        self.assertEqual(len(found), 1)
+        self.assertIn("split into `physics/shape` at 1.00", found[0])
+
+    def test_a_half_below_the_old_floor_passes_with_a_reason(self):
+        head = "script/api 86.00  # reason: measured alone\nscript/scripting 96.00\n"
+        self.assertEqual(split("script 88.00\n", head, ["api", "scripting"]), [])
 
     def test_a_removed_floor_on_a_gone_module_passes(self):
         self.assertEqual(check("app 95.00\n", present=("app",)), [])

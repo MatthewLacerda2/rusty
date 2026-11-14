@@ -5,20 +5,12 @@
 
 use std::path::PathBuf;
 
-pub use rusty_test_support::temp::dir;
+pub use rusty_test_support::temp::{dir, lua_path};
 
 /// `name` inside [`dir`].
 pub fn file(name: &str) -> PathBuf {
     dir().join(name)
 }
 
-/// [`file`] as a string.
-pub fn path(name: &str) -> String {
-    file(name).to_string_lossy().into_owned()
-}
-
-/// [`path`], named for the string a script passes, so the same string serves a
-/// Lua literal and the assertions.
-pub fn lua_path(name: &str) -> String {
-    path(name)
-}
+/// [`file`] as a string: [`lua_path`] under the name these tests import.
+pub use rusty_test_support::temp::lua_path as path;

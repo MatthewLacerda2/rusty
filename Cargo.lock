@@ -3295,6 +3295,7 @@ dependencies = [
  "proptest",
  "rustc-hash 2.1.3",
  "rusty-ai",
+ "rusty-app",
  "rusty-asset",
  "rusty-audio",
  "rusty-components",
@@ -3333,6 +3334,27 @@ dependencies = [
  "rusty-physics",
  "rusty-scene",
  "rusty-test-support",
+]
+
+[[package]]
+name = "rusty-app"
+version = "0.1.0"
+dependencies = [
+ "glam 0.33.12",
+ "log",
+ "rusty-ai",
+ "rusty-asset",
+ "rusty-audio",
+ "rusty-components",
+ "rusty-core",
+ "rusty-navigation",
+ "rusty-physics",
+ "rusty-scene",
+ "rusty-script",
+ "rusty-test-support",
+ "rusty-time",
+ "rusty-ui",
+ "serde_json",
 ]
 
 [[package]]
