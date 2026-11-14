@@ -105,7 +105,7 @@ fn gpu_an_empty_scene_bakes_the_analytic_fill() {
         let baked = renderer.bake_probe(&scene(mode), Vec3::ZERO, RES);
         assert_matches(&baked, &analytic(mode), mode.name());
         let mut solved = probed(mode);
-        renderer.bake_probes(&mut solved, RES);
+        renderer.bake_probes(&mut solved, RES, rusty_lighting::lightmap::probe_direct);
         assert_matches(&solved.probes.probes()[0].sh, &baked, "multi-bounce");
     }
 }

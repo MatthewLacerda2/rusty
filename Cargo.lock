@@ -3312,7 +3312,6 @@ dependencies = [
  "glam 0.33.12",
  "rusty-components",
  "rusty-core",
- "rusty-lighting",
  "rusty-navigation",
  "rusty-physics",
  "rusty-scene",

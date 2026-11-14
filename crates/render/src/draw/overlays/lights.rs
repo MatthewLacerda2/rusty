@@ -7,7 +7,7 @@
 use glam::Vec3;
 
 use rusty_components::mesh::Vertex;
-use rusty_lighting::lightmap::AreaShape;
+use rusty_scene::lighting::area::AreaShape;
 use rusty_scene::{LightType, Scene};
 
 /// An Area light's gizmo tint: a pale yellow, brighter when selected.

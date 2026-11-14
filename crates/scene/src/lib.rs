@@ -70,6 +70,8 @@ pub mod settings;
 pub mod skeleton;
 pub mod snapshot;
 pub mod state;
+#[doc(hidden)]
+pub mod test_levels;
 pub mod undo;
 pub mod world_cache;
 

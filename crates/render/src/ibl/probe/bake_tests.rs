@@ -102,7 +102,7 @@ fn gpu_bake_probes_fills_all_in_place() {
     let mut scene = red_wall_scene();
     scene.probes.add_probe(Vec3::new(4.0, 0.0, 0.0));
     scene.probes.add_probe(Vec3::new(-4.0, 0.0, 0.0));
-    renderer.bake_probes(&mut scene, RES);
+    renderer.bake_probes(&mut scene, RES, rusty_lighting::lightmap::probe_direct);
     assert!(scene
         .probes
         .probes()

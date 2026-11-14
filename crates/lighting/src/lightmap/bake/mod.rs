@@ -18,7 +18,8 @@ use super::raster::{
 use super::rays::{Rays, Tri};
 use super::rng::Rng;
 use super::trace::{TexelLight, Tracer};
-use rusty_scene::lighting::settings::{max_map_edge, BakeSettings};
+use crate::lightmap::max_map_edge;
+use rusty_scene::lighting::settings::BakeSettings;
 
 mod assemble;
 mod denoise;

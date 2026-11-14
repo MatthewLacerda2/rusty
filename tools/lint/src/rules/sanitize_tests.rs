@@ -1,4 +1,4 @@
-use super::{check, helpers, RULE};
+use super::{check, helpers, rules, RULE};
 
 const PATH: &str = "src/scene/authoring/a.rs";
 
@@ -71,4 +71,21 @@ fn any_pub_visibility_and_float_carrying_types_are_checked() {
     }
     let other = "pub fn set_a(c: &mut C, v: Option<String>, w: &[u32]) {\n    c.a = v;\n}\n";
     assert!(found(other).is_empty());
+}
+
+#[test]
+fn every_file_under_the_rules_folder_gives_helpers_and_no_other() {
+    let lens = "pub fn hold_fov(v: f32) -> f32 {\n    v\n}\n";
+    let sanitize = "pub fn finite(v: f32) -> f32 {\n    v\n}\n";
+    let op = "pub fn clamp_it(v: f32) -> f32 {\n    v\n}\n";
+    let files = [
+        ("crates/scene/src/rules/lens.rs", lens),
+        ("crates/scene/src/rules/sanitize.rs", sanitize),
+        ("crates/scene/src/authoring/rendering/camera/mod.rs", op),
+    ];
+    assert_eq!(rules(files.into_iter()), ["hold_fov", "finite"]);
+    let setter = "pub fn set_fov(c: &mut C, fov: f32) {\n    c.fov = lens::hold_fov(fov);\n}\n";
+    assert!(check(PATH, setter, &[], &rules(files.into_iter())).is_empty());
+    let raw = "pub fn set_fov(c: &mut C, fov: f32) {\n    c.fov = clamp_it(fov);\n}\n";
+    assert_eq!(check(PATH, raw, &[], &rules(files.into_iter())).len(), 1);
 }

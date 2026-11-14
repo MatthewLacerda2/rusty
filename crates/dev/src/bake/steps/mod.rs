@@ -29,6 +29,7 @@ use super::lighting::{LightingBakeReport, PlannedProbes};
 use super::reflection::{out_dir, prune_stale, reflection_dir, UNSAVED};
 use super::report::probes::Timeline;
 use glam::Vec3;
+use rusty_lighting::lightmap::probe_direct;
 use rusty_render::ibl::probe::solve::BounceSolve;
 pub use rusty_render::ibl::probe::solve::PROBES_CHANGED;
 use rusty_render::{Renderer, DEFAULT_BAKE_RESOLUTION};
@@ -145,7 +146,7 @@ impl LightingBake {
         let any = !planned.light.is_empty() || !planned.reflections.is_empty();
         Ok(Self {
             skipped: any && renderer.is_none(),
-            light: BounceSolve::of(planned.light, DEFAULT_BAKE_RESOLUTION),
+            light: BounceSolve::of(planned.light, DEFAULT_BAKE_RESOLUTION, probe_direct),
             light_done: renderer.is_none(),
             renderer,
             scene_path: scene_path.map(str::to_owned),

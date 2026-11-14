@@ -22,6 +22,7 @@
 
 use glam::Vec3;
 
+use super::bounce::BakedDirect;
 use super::capture::ProbeCapture;
 use crate::ibl::cube_sample::{face_uv, FaceProjections};
 use crate::{CubemapCapture, CubemapFace, Renderer};
@@ -50,8 +51,8 @@ impl Renderer {
     /// [`Renderer::bake_probes_multibounce`] (the iteration lives in `bounce.rs`);
     /// the discarded [`crate::ibl::probe::bounce::BounceReport`] is available
     /// from that method when the caller wants the bounce count.
-    pub fn bake_probes(&mut self, scene: &mut Scene, resolution: u32) {
-        self.bake_probes_multibounce(scene, resolution);
+    pub fn bake_probes(&mut self, scene: &mut Scene, resolution: u32, direct: BakedDirect) {
+        self.bake_probes_multibounce(scene, resolution, direct);
     }
 }
 

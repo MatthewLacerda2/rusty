@@ -169,10 +169,7 @@ impl BakeScene {
     /// not it receives a lightmap, so the renderer's SSIL gathers none of its
     /// emission once the scene holds a bake (#1750, `ObjectData::in_bake`).
     pub fn takes_mesh(scene: &Scene, id: u32) -> bool {
-        scene.world.is_active_in_hierarchy(id)
-            && scene.world.is_static(id)
-            && !scene.world.has_light(id)
-            && scene.world.mesh(id).is_some_and(|m| !m.is_skinned())
+        rusty_scene::lighting::lightmap_set::bakes_mesh(scene, id)
     }
 }
 

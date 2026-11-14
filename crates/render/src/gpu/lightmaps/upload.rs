@@ -21,12 +21,11 @@ pub(crate) const MAX_ARRAY_BYTES: u64 = 1 << 30;
 
 /// Whether `limits` take a page list of `layers` pages `edge` texels a side,
 /// `bytes` in all, as one array (#1704). A file baked past the bake's
-/// [`MAX_PAGES`] refusal (a hand edit, another engine version) would panic
+/// `MAX_PAGES` refusal (`rusty_lighting::lightmap::MAX_PAGES`; a hand edit, another engine version) would panic
 /// `create_texture` in wgpu's default error handler on every load, and an array
 /// past [`MAX_ARRAY_BYTES`] (a dense directional bake) can exhaust the device's
 /// memory; `Err` instead leaves the scene unlit by lightmaps.
 ///
-/// [`MAX_PAGES`]: rusty_lighting::lightmap::MAX_PAGES
 pub(crate) fn fits(
     limits: &wgpu::Limits,
     edge: u32,

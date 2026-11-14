@@ -1,13 +1,15 @@
 //! `sanitize`: every authoring setter refuses a non-finite float (#1361).
 //!
-//! `scene::authoring::sanitize` holds the float rules the authoring setters share: a
-//! value from Lua, the editor or a scene file is finite and in range before it is
-//! stored, and NaN or `±inf` takes the field's fallback. Setters kept skipping it
-//! (#993, #1341, #1342), so a `set_*` under `src/scene/authoring/` with any `pub`
-//! visibility that takes a float-carrying parameter is a finding unless each such
-//! parameter is passed whole to a `sanitize` helper (a call `helper(param…` of any
-//! `fn` that `sanitize.rs` defines) or to another `set_*` of the same file, which this
-//! rule checks in turn. A parameter carries a float when its type, under `&`,
+//! `scene::rules` holds the bounds the authoring setters store through: the float
+//! rules every setter shares (`rules::sanitize`: a value from Lua, the editor or a
+//! scene file is finite and in range before it is stored, and NaN or `±inf` takes
+//! the field's fallback) and the bounds the base holds a value to as well (a lens, a
+//! joint drive). Setters kept skipping them (#993, #1341, #1342), so a `set_*` under
+//! `src/scene/authoring/` with any `pub` visibility that takes a float-carrying
+//! parameter is a finding unless each such parameter is passed whole to a rule (a
+//! call `helper(param…` of any `fn` a file under `src/scene/rules/` defines) or to
+//! another `set_*` of the same file, which this rule checks in turn. A rule is
+//! trusted to hold what it takes: it is the one place a bound lives. A parameter carries a float when its type, under `&`,
 //! `Option<…>`, `Vec<…>` and `[…; N]`, is one of [`FLOATS`]. A value checked another
 //! way says so with `// lint: allow(sanitize) <why>`. Test code is not scanned.
 //!
@@ -26,9 +28,9 @@ use crate::code::{code_lines, is_ident};
 
 pub const RULE: &str = "sanitize";
 
-/// Where the setters live, and the file of helpers they must use.
+/// Where the setters live, and the folder of rules they must store through.
 const DIR: &str = "src/scene/authoring/";
-const HELPERS: &str = "src/scene/authoring/sanitize.rs";
+const HELPERS: &str = "src/scene/rules/";
 
 /// Parameter types that can carry a NaN or an infinity: the float scalars, glam's
 /// vectors, and the float structs the setters take.
@@ -61,7 +63,16 @@ struct Setter {
     body: String,
 }
 
-/// Every `fn` name `sanitize.rs` defines outside its tests.
+/// Every `fn` name the files under [`HELPERS`] define outside their tests, of
+/// `files` (each a path and its text).
+pub fn rules<'a>(files: impl Iterator<Item = (&'a str, &'a str)>) -> Vec<String> {
+    let under = |p: &str| crate::modules::module_path(p).starts_with(HELPERS);
+    (files.filter(|(p, _)| under(p)))
+        .flat_map(|(_, source)| helpers(source))
+        .collect()
+}
+
+/// Every `fn` name `source` defines outside its tests.
 pub fn helpers(source: &str) -> Vec<String> {
     let code = code_lines(source);
     let end = code
@@ -77,7 +88,7 @@ pub fn helpers(source: &str) -> Vec<String> {
 /// Every setter of `source` that stores a float parameter unsanitized.
 pub fn check(path: &str, source: &str, test: &[bool], helpers: &[String]) -> Vec<Finding> {
     let at = crate::modules::module_path(path);
-    if !at.starts_with(DIR) || at == HELPERS {
+    if !at.starts_with(DIR) {
         return Vec::new();
     }
     let code = code_lines(source);
@@ -108,7 +119,7 @@ pub fn check(path: &str, source: &str, test: &[bool], helpers: &[String]) -> Vec
                 rule: RULE,
                 message: format!(
                     "`{}` stores `{}` without a `sanitize` helper: NaN and ±inf must take \
-                     the field's fallback (scene::authoring::sanitize)",
+                     the field's fallback (scene::rules)",
                     s.name,
                     raw.join("`, `")
                 ),
@@ -234,7 +245,7 @@ fn ident_after(line: &str, marker: &str) -> Option<String> {
 
 /// The rule over every scanned file.
 pub fn run(scan: &Scan) -> Vec<Finding> {
-    let helpers = helpers(scan.module_source(HELPERS));
+    let helpers = rules(scan.files.iter().map(|p| (p.as_str(), scan.source(p))));
     scan.files
         .iter()
         .flat_map(|p| check(p, scan.source(p), scan.test_lines(p), &helpers))

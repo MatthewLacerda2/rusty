@@ -22,7 +22,8 @@
 use std::path::Path;
 
 use rusty_asset::lightmap_page::{self, PageFormat};
-use rusty_lighting::lightmap::{decode_mask, decode_rgbm, levels, mask_levels};
+use rusty_scene::lighting::page::encode::{decode_mask, decode_rgbm};
+use rusty_scene::lighting::page::{levels, mask_levels};
 
 /// Which pages a list holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

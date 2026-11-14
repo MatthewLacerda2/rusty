@@ -1,8 +1,9 @@
 //! The primitive levels the occlusion bake is measured on: rooms on two storeys
-//! (`level`, Dust2-sized at its largest) and a town of buildings and courtyards
+//! (`level`, Dust2-sized at its largest; the base's `rusty_scene::test_levels::rooms`,
+//! so a crate that bakes nothing builds it too) and a town of buildings and courtyards
 //! (`town`, #1981), plus [`shift`], which moves a level off round coordinates.
 
-pub mod level;
+pub use rusty_scene::test_levels::rooms as level;
 pub mod town;
 
 use glam::Vec3;

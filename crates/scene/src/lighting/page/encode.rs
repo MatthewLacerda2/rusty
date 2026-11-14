@@ -1,5 +1,5 @@
 //! RGBM: how a baked lightmap's PNG fallback is stored (#438; the GPU reads BC6H
-//! since #1694, `pages`). An HDR texel fits an 8-bit RGBA PNG
+//! since #1694, `page`). An HDR texel fits an 8-bit RGBA PNG
 //! as `rgb * m * RGBM_RANGE`, Unity's lightmap encoding on platforms without float
 //! textures. No new dependency (the PNG encoder is already in), the file stays small,
 //! and an agent can open it.
