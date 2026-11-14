@@ -1,26 +1,17 @@
-//! The integration binary holds no provider key either (#974). `cfg(test)` is off for
-//! the library here, so the blanking rests on nextest's `NEXTEST` variable reaching
-//! this process; this fails if the library stops honouring it, before a test could
-//! spend. A bare `cargo test` (the mutation jobs' runner) sets no such variable, so
-//! there these return early; `make test-one-process` and the nightly `cargo-test.yml`
-//! run set `NEXTEST=1` and are checked like nextest (#1338). Gated on `dev`.
-
-fn under_nextest() -> bool {
-    std::env::var_os("NEXTEST").is_some()
-}
+//! The integration binary holds no provider key either (#974), under any runner:
+//! keys are read only by a binary that opted in at startup
+//! (`dev::providers::read_keys`), and no test binary does, so this holds under plain
+//! `cargo test` as under nextest. Gated on `dev`.
 
 use rusty::dev::providers::{environment, keys_blanked, resolve, Provider};
 
 #[test]
 fn the_integration_binary_is_known_to_be_a_test() {
-    assert!(keys_blanked() || !under_nextest());
+    assert!(keys_blanked());
 }
 
 #[test]
 fn no_provider_key_resolves_in_the_integration_binary() {
-    if !under_nextest() {
-        return;
-    }
     let env = environment();
     for provider in [Provider::Gemini, Provider::ElevenLabs, Provider::Anthropic] {
         assert!(resolve(provider, &env).is_err(), "{}", provider.variable());

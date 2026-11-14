@@ -1,0 +1,59 @@
+//! crates/dev/src/lua_surface/speech.rs — `Speech.Generate(brief)` (#386).
+//!
+//! The one spending verb on the Lua surface, so the one that lives here, behind
+//! `dev`, beside the bakes: a shipped game has no `Speech` table at all. Reachable
+//! over MCP for free, since the bridge is one `eval` over this surface.
+
+use std::path::Path;
+
+use mlua::{Lua, Table};
+
+use super::super::providers::generated::{self, Realised};
+use super::super::providers::speech::{self, Context, Draft, ElevenLabs, SpeechError};
+use super::super::providers::{environment, ledger};
+use rusty_core::paths::to_slash;
+use rusty_script::api::{put, ApiCtx, Reg};
+
+/// `Speech.Generate(brief)` → the generated WAV's path; or `nil, why` when the brief
+/// is not finished, so a loop over twenty lines loses none to one typo. Anything
+/// that would stop every line (Play, no key, the budget, the vendor) raises.
+pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
+    let scene = ctx.scene;
+    let table = lua.create_table().map_err(|e| e.to_string())?;
+    put(
+        &table,
+        "Generate",
+        lua.create_function(move |lua, brief: Table| {
+            let draft = draft_of(&brief)?;
+            let (environment, ledger, today) = (environment(), ledger::path(), generated::today());
+            let at = Context {
+                root: Path::new(""),
+                playing: scene.get(lua)?.borrow().is_playing(),
+                environment: &environment,
+                ledger: &ledger,
+                today: &today,
+            };
+            match speech::generate(draft, &at, &ElevenLabs) {
+                Ok(Realised::Cached(path) | Realised::Generated(path)) => {
+                    Ok((Some(to_slash(&path)), None))
+                }
+                Err(SpeechError::Incomplete(why)) => Ok((None, Some(why.to_string()))),
+                Err(other) => Err(mlua::Error::external(other)),
+            }
+        }),
+    )?;
+    lua.globals()
+        .set("Speech", table)
+        .map_err(|e| e.to_string())
+}
+
+/// The brief table's fields, each optional until [`Draft::gather`] says otherwise.
+fn draft_of(brief: &Table) -> mlua::Result<Draft> {
+    Ok(Draft {
+        text: brief.get("text")?,
+        voice: brief.get("voice")?,
+        model: brief.get("model")?,
+        language: brief.get("language")?,
+        seed: brief.get("seed")?,
+    })
+}

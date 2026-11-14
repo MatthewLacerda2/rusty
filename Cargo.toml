@@ -99,7 +99,7 @@ path = "tests/main.rs"
 [features]
 default = ["editor"]
 # The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.
-dev = ["rusty-render/dev", "rusty-app/dev", "rusty-script/dev", "rusty-ai/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-scene/dev", "rusty-shadergen/dev", "rusty-asset/dev", "rusty-core/dev", "dep:scorsese-providers", "dep:scorsese-core", "dep:libloading", "dep:getrandom"]
+dev = ["dep:rusty-dev", "rusty-dev/dev", "rusty-render/dev", "rusty-app/dev", "rusty-script/dev", "rusty-ai/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-scene/dev", "rusty-shadergen/dev", "rusty-asset/dev", "rusty-core/dev"]
 # The egui editor (#431): `src/editor` and the shell's editor frontend. Default-on so
 # `cargo run` opens the editor; a shipped player builds with `--no-default-features`.
 editor = ["rusty-render/editor", "rusty-app/editor", "rusty-physics/editor", "rusty-shadergen/editor", "rusty-asset/editor", "rusty-core/editor", "dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor", "dep:notify"]
@@ -150,6 +150,7 @@ rusty-script = { path = "crates/script" }
 rusty-logging = { path = "crates/logging" }
 rusty-preview = { path = "crates/preview" }
 rusty-app = { path = "crates/app" }
+rusty-dev = { path = "crates/dev" }
 rusty-test-support = { path = "crates/test-support" }
 
 winit = { version = "0.30.13" }
@@ -235,7 +236,7 @@ symphonia = { version = "0.6", default-features = false, features = ["mp3", "ogg
 zimmer = { package = "scorsese-zimmer", git = "https://github.com/MatthewLacerda2/scorsese", rev = "4bd8c840ef991cb124357bb60484fc40a74b8730" }
 # The provider boundary (#383): scorsese's providers crate — the key resolver, the
 # budget ceiling, dated price tables and the vendors' HTTP client (`ureq` + `rustls`)
-# — behind `src/dev/providers/`. Optional and enabled only by `dev`, so ship and
+# — behind `crates/dev/src/providers/`. Optional and enabled only by `dev`, so ship and
 # player builds carry no HTTP client. Same rev as zimmer, which it depends on:
 # move the two pins together, or the tree gains a second zimmer.
 scorsese-providers = { git = "https://github.com/MatthewLacerda2/scorsese", rev = "4bd8c840ef991cb124357bb60484fc40a74b8730" }
@@ -244,7 +245,7 @@ scorsese-providers = { git = "https://github.com/MatthewLacerda2/scorsese", rev 
 # (#384) is the same answer in both trees. Already in the lockfile through the line
 # above; same rev, same `dev` gate. Nothing of its `Project` model is used.
 scorsese-core = { git = "https://github.com/MatthewLacerda2/scorsese", rev = "4bd8c840ef991cb124357bb60484fc40a74b8730" }
-# Open Image Denoise, opened at run time (#1884, `src/dev/bake/denoise/`): the
+# Open Image Denoise, opened at run time (#1884, `crates/dev/src/bake/denoise/`): the
 # lightmap bake's trained denoiser is a native library a machine may lack, so it is
 # `dlopen`ed, never linked, and a bake without it filters. Already in the tree
 # through wgpu; same version. `dev` only: a shipped game never bakes.
@@ -271,6 +272,7 @@ proptest = { version = "1", default-features = false, features = ["std"] }
 
 [dependencies]
 # The moved modules (crates/), re-exported in src/lib.rs under their old names.
+rusty-dev = { workspace = true, optional = true }
 rusty-logging = { workspace = true }
 rusty-preview = { workspace = true }
 rusty-render = { workspace = true }
@@ -301,7 +303,6 @@ rustc-hash = { workspace = true }
 xxhash-rust = { workspace = true }
 image = { workspace = true }
 ktx2 = { workspace = true }
-bytemuck = { workspace = true }
 log = { workspace = true }
 pollster = { workspace = true }
 serde = { workspace = true }
@@ -310,10 +311,6 @@ skrifa = { workspace = true }
 gilrs = { workspace = true }
 notify = { workspace = true, optional = true }
 arboard = { workspace = true }
-scorsese-providers = { workspace = true, optional = true }
-scorsese-core = { workspace = true, optional = true }
-libloading = { workspace = true, optional = true }
-getrandom = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = { workspace = true }

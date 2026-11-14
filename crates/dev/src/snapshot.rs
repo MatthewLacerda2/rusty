@@ -1,0 +1,24 @@
+//! crates/dev/src/snapshot.rs — world → JSON snapshot (what the agent "sees").
+//!
+//! One observation == one snapshot. The harness/bot path spends a `StepUntil` to
+//! skip hundreds of frames, then reads ONE of these. The structured shape itself
+//! lives on the API surface in [`rusty_script::api::snapshot`] (the read half of
+//! editor↔API parity, #180), so this play-testing entry point and the dev-only
+//! `Debug.Snapshot` binding return the exact same rich document — no drift.
+
+use serde_json::Value;
+
+use rusty_app::GameWorld;
+
+/// Build the full world snapshot from the live world (frame + play-state envelope,
+/// camera, and every entity in the authoring-rich shape).
+pub fn snapshot(world: &GameWorld) -> Value {
+    let scene = world.scene().borrow();
+    rusty_script::api::snapshot::world_value(
+        &scene,
+        &world.main_view(),
+        world.play_frame(),
+        scene.is_playing(),
+        &world.resources.ui_view(&scene),
+    )
+}

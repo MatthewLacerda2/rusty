@@ -40,6 +40,8 @@ const USAGE: &str =
 
 fn main() {
     rusty::logging::init();
+    // An authoring binary: it may spend on a provider (docs/providers.md).
+    rusty::dev::providers::read_keys();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let project = rusty::core::project::take_flag(&mut args);
     let scene = rusty::core::project::take_value(&mut args, "--scene");

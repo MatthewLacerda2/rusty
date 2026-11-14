@@ -1,0 +1,34 @@
+//! crates/dev/src/botplayer.rs — Bot-player pattern (notes + shared helpers)
+//!
+//! A bot-player is NOT special engine code. It is a normal scene script, tagged
+//! dev-only ("won't ship"), attached to the Player, that drives WRITABLE Input from
+//! its Update() — i.e. it presses the same keys a human would. Run it headless via
+//! the harness at max speed and read the summary (won/lost, time, errors).
+//!
+//! The actual bots live in `assets/scripts/*.lua`, like any other script. This file
+//! only documents the pattern and hosts the small shared helpers the harness needs to
+//! wire a bot onto the Player at run time.
+
+use rusty_scene::authoring::add_script;
+use rusty_scene::Scene;
+
+/// Canonical path to the example bot-player script (attached to the Player).
+/// Test seam for `tests/bot_player_session.rs`.
+pub const PLAYER_BOT_SCRIPT: &str = "assets/scripts/bot_player.lua";
+
+/// Attach a bot-player script to the entity named `Player` in `scene`.
+///
+/// Called *before* the first headless tick, so the script is picked up when the
+/// world enters play mode (`enter_play` reads every entity's `scripts`). The bot
+/// brain *drives* the Player, so it REPLACES the human controller script(s)
+/// rather than running alongside them. Returns `true` if a Player was found and
+/// tagged, `false` otherwise.
+pub fn attach_player_bot(scene: &mut Scene, script_path: &str) -> bool {
+    let Some(player_id) = scene.find_entity_by_name("Player") else {
+        return false;
+    };
+    if let Some(mut scripts) = scene.world.scripts_mut(player_id) {
+        scripts.clear();
+    }
+    add_script(&mut scene.world, player_id, script_path, Default::default())
+}

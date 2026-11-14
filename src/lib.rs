@@ -34,10 +34,12 @@ pub use rusty_time as time;
 pub use rusty_ui as ui;
 
 #[cfg(feature = "dev")]
-pub mod dev;
+pub use rusty_dev as dev;
 
 #[cfg(test)]
 mod post_effect_layers_tests;
+#[cfg(all(test, feature = "dev"))]
+mod provider_keys_tests;
 #[cfg(test)]
 mod test_path;
 #[cfg(test)]
