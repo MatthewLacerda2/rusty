@@ -369,8 +369,9 @@ test-one-process: ## Signal: the dev suite under plain cargo test, one process p
 	exit "$$rc"
 
 # `pub` items nothing in the project uses, and items only tests use (#1003): rustc's
-# dead_code over a copy of the tree (under target/dead-pub/) with the lib's modules
-# crate-private and every bin and the integration suite folded in. A signal, never a
+# dead_code over a copy of the tree (under target/dead-pub/) with every member crate
+# mounted as a crate-private module of the lib and every bin and the integration
+# suite folded in. A signal, never a
 # gate: it prints the report (and .lint/dead-pub.txt) and exits 0. About a minute
 # warm; the first run checks the copied crate's dependencies once. Weekly on `main`
 # in cargo-test.yml's `dead-pub` job, red only when no report came out (#1205).

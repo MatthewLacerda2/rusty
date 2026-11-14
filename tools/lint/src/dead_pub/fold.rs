@@ -1,11 +1,14 @@
 //! The rewrite that makes rustc's `dead_code` see the whole project (#1003, #940).
 //!
-//! `src/lib.rs` exports every module, so no `pub` item is ever dead to rustc. On a
-//! throwaway copy: the modules go `pub(crate)`, and every real caller is folded
+//! An exported module's `pub` item is never dead to rustc. On a throwaway copy: a
+//! lib's `pub mod`s go `pub(crate)` (the workspace's members are mounted the same
+//! way by `super::workspace`), and every real caller is folded
 //! into the lib as a module, so its uses still count — each `[[bin]]` as
 //! `__bin_<name>` (behind its `required-features`), and `tests/main.rs` as
 //! `#[cfg(test)] __itests`. Their sources then name the lib as `crate::` and their
-//! own root as `crate::<module>::`.
+//! own root as `crate::<module>::`. A workspace member is folded the same way
+//! (`super::workspace`): its sources are a caller whose module is the member's, and
+//! every member's `rusty_<m>::` is `crate::<m>::` in every folded file.
 
 use crate::code::{code_of, Open};
 
@@ -57,12 +60,17 @@ pub fn bins(cargo_toml: &str) -> Vec<Bin> {
     out
 }
 
-/// `lib.rs` with its modules crate-private and every caller folded in.
-pub fn lib(source: &str, bins: &[Bin], tests_root: Option<&str>) -> String {
+/// `lib.rs` with its modules crate-private and every caller folded in, and how
+/// many `pub mod`s it made crate-private.
+pub fn lib(source: &str, bins: &[Bin], tests_root: Option<&str>) -> (String, usize) {
+    let mut private = 0;
     let mut out: String = source
         .lines()
         .map(|l| match l.strip_prefix("pub mod ") {
-            Some(rest) => format!("pub(crate) mod {rest}\n"),
+            Some(rest) => {
+                private += 1;
+                format!("pub(crate) mod {rest}\n")
+            }
             None => format!("{l}\n"),
         })
         .collect();
@@ -89,6 +97,35 @@ pub fn lib(source: &str, bins: &[Bin], tests_root: Option<&str>) -> String {
             "#[cfg(test)]\n#[path = \"../{root}\"]\nmod __itests;\n"
         ));
     }
+    (out, private)
+}
+
+/// `line` with every path `<from>::…` now `<to>::…`, in one pass, so a
+/// replacement is never renamed again. A `from` must start an identifier
+/// (`$crate` counts), so `trusty::` is not `rusty::`; a global `::<from>::` loses
+/// its leading `::`, since every `to` is a `crate::` path.
+pub fn renamed(line: &str, renames: &[(&str, &str)]) -> String {
+    let mut out = String::new();
+    let mut rest = line;
+    while let Some(c) = rest.chars().next() {
+        let starts = !out.ends_with(|p: char| p.is_alphanumeric() || p == '_');
+        let hit = renames.iter().find(|(from, _)| {
+            starts && rest.strip_prefix(from).is_some_and(|r| r.starts_with("::"))
+        });
+        match hit {
+            Some((from, to)) => {
+                if out.ends_with("::") && !out.ends_with(":::") {
+                    out.truncate(out.len() - 2);
+                }
+                out.push_str(to);
+                rest = &rest[from.len()..];
+            }
+            None => {
+                out.push(c);
+                rest = &rest[c.len_utf8()..];
+            }
+        }
+    }
     out
 }
 
@@ -99,11 +136,24 @@ pub fn lib(source: &str, bins: &[Bin], tests_root: Option<&str>) -> String {
 /// module's root can't carry them, and a submodule's own (`#![cfg(..)]`) belong to
 /// it. One inside a macro body, such as `proptest!`'s `#![proptest_config(..)]`,
 /// is the macro's input and stays (#1205). Brackets are counted outside literals.
-pub fn caller(source: &str, module: &str, lib_name: &str, root: bool) -> String {
+pub fn caller(
+    source: &str,
+    module: &str,
+    lib_name: &str,
+    root: bool,
+    members: &[(String, String)],
+) -> String {
     let mut out = String::new();
     let mut depth = 0i32;
     let mut head = root;
     let mut open = Open::None;
+    let own = format!("crate::{module}");
+    let theirs: Vec<(&str, String)> = members
+        .iter()
+        .map(|(ident, m)| (ident.as_str(), format!("crate::{m}")))
+        .collect();
+    let mut renames = vec![("crate", own.as_str()), (lib_name, "crate")];
+    renames.extend(theirs.iter().map(|(i, m)| (*i, m.as_str())));
     for line in source.lines() {
         let mut brackets = 0i32;
         let code = code_of(line, &mut open, |_, c| match c {
@@ -118,9 +168,7 @@ pub fn caller(source: &str, module: &str, lib_name: &str, root: bool) -> String 
             out.push('\n');
             continue;
         }
-        let line = line
-            .replace("crate::", &format!("crate::{module}::"))
-            .replace(&format!("{lib_name}::"), "crate::");
+        let line = renamed(&line, &renames);
         let line = match line.strip_prefix("fn main(") {
             Some(rest) => format!("pub fn main({rest}"),
             None => line,

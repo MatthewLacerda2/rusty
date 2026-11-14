@@ -29,8 +29,10 @@ pub fn parse(stderr: &str) -> (BTreeSet<Warning>, bool) {
             .strip_prefix("warning: ")
             .filter(|m| is_dead(m) || is_import(m))
         {
+            // A folded member's file is reached through the lib's `#[path]`:
+            // `src/../crates/<m>/…` is named by its real path.
             found.insert(Warning {
-                path: path.to_string(),
+                path: path.strip_prefix("src/../").unwrap_or(path).to_string(),
                 line: row,
                 message: message.to_string(),
             });
