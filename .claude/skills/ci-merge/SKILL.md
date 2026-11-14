@@ -370,9 +370,9 @@ Each backed by a gate that otherwise fails at merge time:
 - **A binding change updates its namespace's page in `docs/api/`** (existence
   parity both directions, dev feature set; signatures out of scope).
 - **A new lifecycle callback updates `docs/api/index.md`'s callback section**,
-  against `src/scripting/callbacks.rs`.
+  against `crates/script/src/scripting/callbacks.rs`.
 - **A new first-class component satisfies all four axes** (the `Entity` field, the
-  Add Component entry, an inspector card, a documented `src/api/` namespace) or
+  Add Component entry, an inspector card, a documented `crates/script/src/api/` namespace) or
   gets a `WAIVERS` row in `tools/lint/src/components/waivers.rs` with a reason.
 - **An inspector card routes through `scene::authoring`**: `--parity` fails on a
   direct field write.
@@ -420,7 +420,7 @@ issue, and a follow-up PR off `main` when worth fixing.
 
 How to read a clean report:
 
-- **The weekly sweep covers only `src/app`, `src/scripting`, `crates/physics/src`,
+- **The weekly sweep covers only `src/app`, `crates/script/src/scripting`, `crates/physics/src`,
   `crates/navigation/src`.** Elsewhere, silence means unmeasured, not clean.
 - **A scoped run names what it planned** (how many mutants, any from outside the
   scope). A `diff` with nothing to mutate says so; it is not a pass.

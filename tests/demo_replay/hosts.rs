@@ -2,7 +2,7 @@
 
 use rusty::dev::demo::{self, Demo, Destination};
 use rusty::dev::harness::Harness;
-use rusty::scripting::HostCall;
+use rusty::script::scripting::HostCall;
 
 use super::{record, replay};
 

@@ -15,7 +15,7 @@ use crate::editor::theme::chrome;
 use crate::editor::{EditorUi, InspectorTarget};
 use crate::navigation::NavigationGraph;
 use crate::scene::{MaterialAsset, Scene};
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 use std::collections::BTreeMap;
 
 /// RIGHT PANEL: Properties Inspector

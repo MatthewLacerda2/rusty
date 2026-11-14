@@ -53,7 +53,7 @@ TABLE: dict[str, tuple[str, ...]] = {
     "determinism": (
         "crates/core/src/random.rs",  # the seeded Random resource
         "crates/core/src/collections.rs",  # the deterministic maps the sim must use
-        "src/api/random.rs",  # Random, the script's view of that stream
+        "crates/script/src/api/random.rs",  # Random, the script's view of that stream
         "clippy.toml",  # the disallowed clocks, RNGs and std hash maps
         "tools/lint/src/determinism/",  # `make determinism`, the guard's opt-outs
         # which modules are sim and which crates each may name: a new crate in a sim
@@ -69,7 +69,7 @@ TABLE: dict[str, tuple[str, ...]] = {
         "crates/core/src/frame_stats.rs",
     ),
     "scripting sandbox": (
-        "src/scripting/sandbox/",  # the gameplay VM's stdlib: no os/io, require's reach
+        "crates/script/src/scripting/sandbox/",  # the gameplay VM's stdlib: no os/io, require's reach
     ),
     "merge path": (
         ".github/scripts/merge-queue.py",

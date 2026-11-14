@@ -4,7 +4,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::{CameraComponent, ExposureMode, PostProcessingComponent, Tonemap, Wheel};
 use rusty::core::settings::quality::EffectQuality;
 use rusty::core::settings::GraphicsSettings;
@@ -12,6 +11,7 @@ use rusty::scene::authoring::{
     rendering::camera as camera_ops, rendering::post_processing as vc_ops,
 };
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 /// A scene with one active post-FX volume + active camera; returns `(scene_rc, id)`.
 fn scene_with_volume_and_cam() -> (Rc<RefCell<Scene>>, u32) {
@@ -114,10 +114,10 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     let app = Rc::default();
 
     let lua = Lua::new();
-    rusty::api::graphics::register(
+    rusty::script::api::graphics::register(
         &lua,
         bind(&lua, &lua_scene),
-        (bind(&lua, &quality), rusty::api::ApiCell::default()),
+        (bind(&lua, &quality), rusty::script::api::ApiCell::default()),
         bind(&lua, &app),
     )
     .unwrap();

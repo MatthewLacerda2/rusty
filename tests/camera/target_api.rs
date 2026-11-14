@@ -5,15 +5,15 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::{CameraComponent, Projection};
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
     crate::lua::attempt(|| {
         let table = lua.create_table()?;
-        rusty::api::camera::component::register(&lua, &table, bind(&lua, scene)).unwrap();
+        rusty::script::api::camera::component::register(&lua, &table, bind(&lua, scene)).unwrap();
         lua.globals().set("Camera", table)?;
         f(&lua);
         Ok(())

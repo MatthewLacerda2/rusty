@@ -1,7 +1,7 @@
 use super::SceneFollow;
 use crate::core::fs::written::note_written;
 use crate::scene::Scene;
-use crate::scripting::{ConsoleLogs, LogLevel};
+use crate::script::scripting::{ConsoleLogs, LogLevel};
 
 /// A scene file holding `Root` with child `Gun`, plus each of `extra`, written by
 /// "someone outside the editor" (saved, then noted as the watch notes it).

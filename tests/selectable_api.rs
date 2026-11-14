@@ -9,17 +9,17 @@ use std::rc::Rc;
 use crate::lua::eval;
 use glam::Vec4;
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::{
     ImageComponent, NavigationMode, SelectableComponent, SelectableTransition,
 };
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 use rusty::ui::EventSystem;
 
 fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
     let events = Rc::new(RefCell::new(EventSystem::default()));
-    rusty::api::selectable::register(&lua, bind(&lua, scene), bind(&lua, &events)).unwrap();
+    rusty::script::api::selectable::register(&lua, bind(&lua, scene), bind(&lua, &events)).unwrap();
     f(&lua);
 }
 

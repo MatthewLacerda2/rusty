@@ -6,8 +6,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::scene::{ParticleEmitterComponent, Scene};
+use rusty::script::api::bind;
 
 #[test]
 fn set_texture_round_trips_and_nil_clears() {
@@ -19,7 +19,7 @@ fn set_texture_round_trips_and_nil_clears() {
         .set_particles(id, Some(ParticleEmitterComponent::default()));
     let bare = scene.add_entity("NoEmitter".to_string());
     let scene = Rc::new(RefCell::new(scene));
-    rusty::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
     let get = |lua: &Lua, id: u32| -> Option<String> {
         lua.load(format!("return Particles.GetTexture({id})"))
             .eval()

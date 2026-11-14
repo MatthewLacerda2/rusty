@@ -8,11 +8,11 @@ use std::rc::Rc;
 
 use glam::Vec4;
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::{
     CanvasComponent, ImageComponent, ShapeCorner, ShapeKind, TextComponent, UiBlend,
 };
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 /// The recipe from `docs/ui.md` (kept verbatim; `hud` is a canvas).
 const RECIPE: &str = include_str!("look_recipe.lua");
@@ -25,15 +25,15 @@ fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
         rusty::core::settings::video::VideoSettings::default(),
     ));
     let lua = Lua::new();
-    rusty::api::scene::register(&lua, bind(&lua, scene), bind(&lua, &path)).unwrap();
-    rusty::api::rect_transform::register(
+    rusty::script::api::scene::register(&lua, bind(&lua, scene), bind(&lua, &path)).unwrap();
+    rusty::script::api::rect_transform::register(
         &lua,
         bind(&lua, scene),
         (bind(&lua, &screen), bind(&lua, &video)),
     )
     .unwrap();
-    rusty::api::shape::register(&lua, bind(&lua, scene)).unwrap();
-    rusty::api::image::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::script::api::shape::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::script::api::image::register(&lua, bind(&lua, scene)).unwrap();
     f(&lua);
 }
 

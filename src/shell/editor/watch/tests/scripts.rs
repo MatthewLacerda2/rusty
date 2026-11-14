@@ -11,7 +11,7 @@ use std::time::Duration;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::{Camera, Scene};
-use crate::scripting::{ConsoleLogs, ScriptManager};
+use crate::script::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
 
 /// A playing VM over a fresh scene, and that scene.

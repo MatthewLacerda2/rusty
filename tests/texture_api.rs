@@ -7,8 +7,8 @@ use std::rc::Rc;
 
 use crate::temp::lua_path as tmp;
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 #[test]
 fn baked_texture_feeds_a_material_slot() {
@@ -17,8 +17,8 @@ fn baked_texture_feeds_a_material_slot() {
     let id = scene.borrow_mut().add_entity("Crate".to_string());
     let path = tmp("rusty_texture_api_albedo.png");
 
-    rusty::api::texture::register(&lua).unwrap();
-    rusty::api::material::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::texture::register(&lua).unwrap();
+    rusty::script::api::material::register(&lua, bind(&lua, &scene)).unwrap();
     let script = format!(
         r#"
         local out = Texture.Bake({{
@@ -45,7 +45,7 @@ fn baked_texture_feeds_a_material_slot() {
 #[test]
 fn bake_json_matches_bake_table() {
     let lua = Lua::new();
-    rusty::api::texture::register(&lua).unwrap();
+    rusty::script::api::texture::register(&lua).unwrap();
     let from_table = tmp("rusty_texture_table.png");
     let from_json = tmp("rusty_texture_json.png");
 
@@ -73,7 +73,7 @@ fn bake_json_matches_bake_table() {
 #[test]
 fn the_documented_riveted_plate_bakes() {
     let lua = Lua::new();
-    rusty::api::texture::register(&lua).unwrap();
+    rusty::script::api::texture::register(&lua).unwrap();
     let path = tmp("rusty_texture_api_plate_n.png");
     // docs/api/Texture.md's hard-surface example, at a test-sized resolution.
     let script = format!(

@@ -14,7 +14,7 @@ use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::asset_instance::instantiate_asset;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 mod gate;
 mod refresh;

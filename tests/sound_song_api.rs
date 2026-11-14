@@ -28,7 +28,7 @@ fn song(patch: &str) -> String {
 #[test]
 fn a_track_naming_a_patch_file_bakes_the_same_mix_as_the_inline_patch() {
     let lua = Lua::new();
-    rusty::api::sound::register(&lua).unwrap();
+    rusty::script::api::sound::register(&lua).unwrap();
     let (patch_path, inline, by_path) = (
         tmp("rusty_song_path_pluck.json"),
         tmp("rusty_song_path_inline.wav"),
@@ -63,7 +63,7 @@ fn a_track_naming_a_patch_file_bakes_the_same_mix_as_the_inline_patch() {
 #[test]
 fn a_missing_patch_file_is_reported_and_writes_nothing() {
     let lua = Lua::new();
-    rusty::api::sound::register(&lua).unwrap();
+    rusty::script::api::sound::register(&lua).unwrap();
     let out = tmp("rusty_song_path_missing.wav");
     std::fs::remove_file(&out).ok();
     let broken = song(r#""no/such/patch.json""#);

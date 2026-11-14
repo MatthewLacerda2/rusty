@@ -16,11 +16,11 @@ mod draw;
 
 use mlua::{Lua, Table};
 
-use crate::api::{put, snapshot, ApiCtx, Reg};
 use crate::dev::preview::{capture_asset, capture_material, PreviewOptions};
 use crate::preview::PreviewMesh;
 use crate::scene::game_camera_from_scene;
-use crate::scripting::Mark;
+use crate::script::api::{put, snapshot, ApiCtx, Reg};
+use crate::script::scripting::Mark;
 
 /// Register the `Debug` namespace onto `lua` (dev builds only).
 pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
@@ -42,7 +42,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
 fn register_logging(
     lua: &mlua::Lua,
     table: &mlua::Table,
-    console: crate::api::ApiCell<crate::scripting::ConsoleLogs>,
+    console: crate::script::api::ApiCell<crate::script::scripting::ConsoleLogs>,
 ) -> Reg {
     put(
         table,
@@ -93,7 +93,7 @@ fn register_logging(
 fn register_stats(
     lua: &mlua::Lua,
     table: &Table,
-    stats: crate::api::ApiCell<crate::core::frame_stats::FrameStats>,
+    stats: crate::script::api::ApiCell<crate::core::frame_stats::FrameStats>,
 ) -> Reg {
     put(
         table,
@@ -111,7 +111,7 @@ fn register_stats(
 fn register_adapted_exposure(
     lua: &mlua::Lua,
     table: &Table,
-    scene: crate::api::ApiCell<crate::scene::Scene>,
+    scene: crate::script::api::ApiCell<crate::scene::Scene>,
 ) -> Reg {
     put(
         table,
@@ -152,7 +152,7 @@ fn register_preview(lua: &Lua, table: &Table) -> Reg {
 fn register_preview_material(
     lua: &mlua::Lua,
     table: &Table,
-    scene: crate::api::ApiCell<crate::scene::Scene>,
+    scene: crate::script::api::ApiCell<crate::scene::Scene>,
 ) -> Reg {
     put(
         table,
@@ -246,7 +246,7 @@ fn register_snapshot(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Reg 
     put(
         table,
         "SnapshotEntity",
-        lua.create_function(move |lua, id: crate::api::entity_arg::EntityArg| {
+        lua.create_function(move |lua, id: crate::script::api::entity_arg::EntityArg| {
             let scene = &*scene.get(lua)?;
             let id = id.read();
             let scene = scene.borrow();
@@ -264,3 +264,7 @@ fn register_snapshot(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Reg 
 #[cfg(test)]
 #[path = "exposure_tests.rs"]
 mod exposure_tests;
+
+#[cfg(test)]
+#[path = "snapshot_tests.rs"]
+mod snapshot_tests;

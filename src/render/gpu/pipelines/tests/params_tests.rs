@@ -65,7 +65,7 @@ pub(super) fn sphere(scene: &mut Scene, x: f32, shader: &str) -> u32 {
 
 pub(super) fn lua(scene: &Rc<RefCell<Scene>>, script: &str) {
     let lua = Lua::new();
-    crate::api::material::register(&lua, crate::api::bind(&lua, scene)).unwrap();
+    crate::script::api::material::register(&lua, crate::script::api::bind(&lua, scene)).unwrap();
     lua.load(script).exec().unwrap();
 }
 

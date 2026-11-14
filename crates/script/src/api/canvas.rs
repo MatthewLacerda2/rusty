@@ -1,0 +1,219 @@
+//! crates/script/src/api/canvas.rs — `Canvas` namespace (#417).
+//!
+//! Get/Set over an entity's `CanvasComponent` — render mode, sort order and the
+//! *Scale With Screen Size* scaler (reference resolution, width/height match) —
+//! plus the scale factor those produce on the current screen, and the world /
+//! camera canvas knobs (#429): pixels per unit, plane distance, tilt and sway. Every
+//! setter routes
+//! through the shared `scene::authoring::ui::layout::canvas` ops the inspector card uses.
+//! Getters return a neutral default when the entity has no canvas.
+
+use glam::Vec2;
+use mlua::Lua;
+
+use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
+use rusty_components::CanvasComponent;
+use rusty_components::CanvasRenderMode;
+use rusty_core::settings::video::VideoSettings;
+use rusty_scene::authoring::ui::layout::canvas as canvas_ops;
+use rusty_scene::Scene;
+use rusty_ui::ScreenSize;
+
+/// Register the `Canvas` namespace onto `lua`.
+pub fn register(
+    lua: &Lua,
+    scene: ApiCell<Scene>,
+    screen: ApiCell<ScreenSize>,
+    video: ApiCell<VideoSettings>,
+) -> Reg {
+    let table = lua.create_table().map_err(|e| e.to_string())?;
+    register_order_and_mode(lua, &table, scene)?;
+    register_scaler(lua, &table, scene)?;
+    register_world(lua, &table, scene)?;
+    put(
+        &table,
+        "GetScaleFactor",
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
+            let px = screen.get(lua)?.borrow().pixels(&video.get(lua)?.borrow());
+            let scene = scene.borrow();
+            Ok(scene.world.canvas(id.read()).map(|c| c.scale_factor(px)))
+        }),
+    )?;
+    lua.globals()
+        .set("Canvas", table)
+        .map_err(|e| e.to_string())
+}
+
+/// `GetSortOrder` / `SetSortOrder` and `GetRenderMode` / `SetRenderMode` (by name;
+/// an unknown name is ignored).
+fn register_order_and_mode(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
+    put(
+        table,
+        "GetSortOrder",
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
+            let scene = scene.borrow();
+            Ok(scene
+                .world
+                .canvas(id.read())
+                .map(|c| c.sort_order)
+                .unwrap_or(0))
+        }),
+    )?;
+    put(
+        table,
+        "SetSortOrder",
+        lua.create_function(move |lua, (id, order): (EntityArg, i32)| {
+            let id = id.live("Canvas", "SetSortOrder")?;
+            if let Some(mut c) = scene.get(lua)?.borrow_mut().world.canvas_mut(id) {
+                canvas_ops::set_sort_order(&mut c, order);
+            }
+            Ok(())
+        }),
+    )?;
+    put(
+        table,
+        "GetRenderMode",
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
+            let scene = scene.borrow();
+            let mode = scene.world.canvas(id.read()).map(|c| c.render_mode);
+            Ok(mode.map_or("None", CanvasRenderMode::name).to_string())
+        }),
+    )?;
+    put(
+        table,
+        "SetRenderMode",
+        lua.create_function(move |lua, (id, name): (EntityArg, String)| {
+            let id = id.live("Canvas", "SetRenderMode")?;
+            let mode = CanvasRenderMode::parse(&name);
+            if let (Some(mut c), Some(mode)) =
+                (scene.get(lua)?.borrow_mut().world.canvas_mut(id), mode)
+            {
+                canvas_ops::set_render_mode(&mut c, mode);
+            }
+            Ok(())
+        }),
+    )
+}
+
+/// The scaler: `Get/SetReferenceResolution` (each axis ≥ 1) and
+/// `Get/SetMatchWidthOrHeight` (clamped to `[0, 1]`).
+fn register_scaler(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
+    put(
+        table,
+        "GetReferenceResolution",
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
+            let scene = scene.borrow();
+            let r = scene
+                .world
+                .canvas(id.read())
+                .map(|c| c.reference_resolution);
+            let r = r.unwrap_or(Vec2::ZERO);
+            Ok((r.x, r.y))
+        }),
+    )?;
+    put(
+        table,
+        "SetReferenceResolution",
+        lua.create_function(move |lua, (id, w, h): (EntityArg, f32, f32)| {
+            let id = id.live("Canvas", "SetReferenceResolution")?;
+            if let Some(mut c) = scene.get(lua)?.borrow_mut().world.canvas_mut(id) {
+                canvas_ops::set_reference_resolution(&mut c, Vec2::new(w, h));
+            }
+            Ok(())
+        }),
+    )?;
+    put(
+        table,
+        "GetMatchWidthOrHeight",
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
+            let scene = scene.borrow();
+            let m = scene
+                .world
+                .canvas(id.read())
+                .map(|c| c.match_width_or_height);
+            Ok(m.unwrap_or(0.0))
+        }),
+    )?;
+    put(
+        table,
+        "SetMatchWidthOrHeight",
+        lua.create_function(move |lua, (id, value): (EntityArg, f32)| {
+            let id = id.live("Canvas", "SetMatchWidthOrHeight")?;
+            if let Some(mut c) = scene.get(lua)?.borrow_mut().world.canvas_mut(id) {
+                canvas_ops::set_match_width_or_height(&mut c, value);
+            }
+            Ok(())
+        }),
+    )
+}
+
+/// A scalar canvas field: its getter and its authoring setter.
+type Scalar = (fn(&CanvasComponent) -> f32, fn(&mut CanvasComponent, f32));
+
+/// The world / camera canvas knobs: `Get/SetPixelsPerUnit`, `Get/SetPlaneDistance`,
+/// `Get/SetSway` (scalars), then [`register_tilt`].
+fn register_world(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
+    let scalars: [(&str, Scalar); 3] = [
+        (
+            "PixelsPerUnit",
+            (|c| c.pixels_per_unit, canvas_ops::set_pixels_per_unit),
+        ),
+        (
+            "PlaneDistance",
+            (|c| c.plane_distance, canvas_ops::set_plane_distance),
+        ),
+        ("Sway", (|c| c.sway, canvas_ops::set_sway)),
+    ];
+    for (suffix, (get, set)) in scalars {
+        let f = lua.create_function(move |lua, id: EntityArg| {
+            Ok(scene
+                .get(lua)?
+                .borrow()
+                .world
+                .canvas(id.read())
+                .map(|c| get(&c))
+                .unwrap_or(0.0))
+        });
+        put(table, &format!("Get{suffix}"), f)?;
+        let verb = format!("Set{suffix}");
+        let f = lua.create_function(move |lua, (id, v): (EntityArg, f32)| {
+            let id = id.live("Canvas", &verb)?;
+            if let Some(mut c) = scene.get(lua)?.borrow_mut().world.canvas_mut(id) {
+                set(&mut c, v);
+            }
+            Ok(())
+        });
+        put(table, &format!("Set{suffix}"), f)?;
+    }
+    register_tilt(lua, table, scene)
+}
+
+/// `GetTilt` / `SetTilt`: a camera canvas's tilt, an `x, y` pair of degrees.
+fn register_tilt(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        let t = scene
+            .get(lua)?
+            .borrow()
+            .world
+            .canvas(id.read())
+            .map(|c| c.tilt);
+        let t = t.unwrap_or(Vec2::ZERO);
+        Ok((t.x, t.y))
+    });
+    put(table, "GetTilt", f)?;
+    let f = lua.create_function(move |lua, (id, x, y): (EntityArg, f32, f32)| {
+        let id = id.live("Canvas", "SetTilt")?;
+        if let Some(mut c) = scene.get(lua)?.borrow_mut().world.canvas_mut(id) {
+            canvas_ops::set_tilt(&mut c, Vec2::new(x, y));
+        }
+        Ok(())
+    });
+    put(table, "SetTilt", f)
+}

@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use rusty::app::GameWorld;
 use rusty::scene::Scene;
-use rusty::scripting::ConsoleLogs;
+use rusty::script::scripting::ConsoleLogs;
 
 fn game() -> GameWorld {
     let mut s = Scene::new();

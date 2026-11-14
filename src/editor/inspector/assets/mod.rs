@@ -14,7 +14,7 @@ use crate::asset::{IMAGE_EXTENSIONS, LUT_EXTENSIONS, MODEL_EXTENSIONS};
 use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::{Scene, PREFAB_EXTENSION, SCENE_EXTENSION};
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 use egui_phosphor::regular as icon;
 
 pub fn draw_inspector(

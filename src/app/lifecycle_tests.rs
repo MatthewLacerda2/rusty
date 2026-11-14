@@ -13,7 +13,7 @@ use std::rc::Rc;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::{Scene, ScriptComponent};
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 use super::GameWorld;
 

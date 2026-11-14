@@ -56,27 +56,6 @@ fn a_dev_dependency_on_itself_a_module_above_or_one_naming_it_back_is_flagged() 
 }
 
 #[test]
-fn a_module_below_that_reaches_back_through_its_deps_is_flagged() {
-    use crate::layers::table::Layer;
-    let rows = [
-        Layer {
-            module: "a",
-            sim: true,
-            deps: &["b"],
-            crates: &[],
-        },
-        Layer {
-            module: "b",
-            sim: true,
-            deps: &[],
-            crates: &[],
-        },
-    ];
-    let text = "[dev-dependencies]\nrusty-a = { workspace = true }\n";
-    assert_eq!(dev_stray("b", text, &rows).len(), 1);
-}
-
-#[test]
 fn a_dev_dependency_in_a_one_crate_header_is_flagged() {
     let text = "[dev-dependencies.rusty-render]\nworkspace = true\n";
     assert_eq!(dev_stray("physics", text, LAYERS).len(), 1);

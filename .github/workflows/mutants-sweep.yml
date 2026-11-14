@@ -50,7 +50,7 @@ env:
   # exactly the mutants the shards draw from. Space-separated `--file` globs.
   SWEEP_FILES: >-
     src/app/**/*.rs
-    src/scripting/**/*.rs
+    crates/script/src/scripting/**/*.rs
     crates/physics/src/**/*.rs
     crates/navigation/src/**/*.rs
 

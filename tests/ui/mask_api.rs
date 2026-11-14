@@ -8,17 +8,17 @@ use std::rc::Rc;
 
 use glam::Vec4;
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::{BackdropFilterComponent, MaskComponent, RectMaskComponent};
 use rusty::scene::authoring::{add_component, ComponentKind};
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 /// Run `f` with the three namespaces registered over `scene`.
 fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
-    rusty::api::rect_mask::register(&lua, bind(&lua, scene)).unwrap();
-    rusty::api::mask::register(&lua, bind(&lua, scene)).unwrap();
-    rusty::api::backdrop_filter::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::script::api::rect_mask::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::script::api::mask::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::script::api::backdrop_filter::register(&lua, bind(&lua, scene)).unwrap();
     f(&lua);
 }
 

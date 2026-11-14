@@ -6,9 +6,9 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::scene::authoring::environment as env_ops;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 type Read = (Option<f32>, f32, f32, bool, f32);
 
@@ -17,7 +17,7 @@ fn sky_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
     let lua_scene = Rc::new(RefCell::new(Scene::new()));
     let lua = Lua::new();
     let read: Read = crate::lua::attempt(|| {
-        rusty::api::lighting::register(&lua, bind(&lua, &lua_scene)).unwrap();
+        rusty::script::api::lighting::register(&lua, bind(&lua, &lua_scene)).unwrap();
         lua.load(
             r#"
             local unset = Lighting.GetSkyZenithColor()

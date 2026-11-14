@@ -3,7 +3,7 @@
 //!
 //! Rows run bottom-up: a module may import only the modules in its `deps`, and each
 //! of those must be declared **above** it. That order is what makes the graph
-//! acyclic; the only edges that may point down the list are between [`PEERS`].
+//! acyclic: no edge points down the list.
 //! `sim` marks the deterministic simulation; everything a sim module imports must be
 //! sim too. The direction guard scans this derived set, and the determinism gate
 //! lets only the platform rows opt out of clippy's clock ban, instead of either
@@ -97,28 +97,10 @@ pub const LAYERS: &[Layer] = &[
         "ai",
         &["components", "core", "navigation", "physics", "scene"],
     ),
-    // `scripting` and `api` are one layer (see PEERS): scripting installs the Lua
-    // surface, and the surface reads runtime state scripting owns.
+    // The Lua side: `scripting` (the VM, lifecycle, timers, console) and `api` (the
+    // one surface) name each other, so they are one module, two halves of one crate.
     sim(
-        "scripting",
-        &[
-            "ai",
-            "api",
-            "audio",
-            "components",
-            "core",
-            "ecs",
-            "navigation",
-            "physics",
-            "scene",
-            "shadergen",
-            "time",
-            "ui",
-        ],
-    )
-    .uses(&["mlua"]),
-    sim(
-        "api",
+        "script",
         &[
             "ai",
             "asset",
@@ -130,7 +112,6 @@ pub const LAYERS: &[Layer] = &[
             "physics",
             "procgen",
             "scene",
-            "scripting",
             "shadergen",
             "time",
             "ui",
@@ -141,7 +122,6 @@ pub const LAYERS: &[Layer] = &[
         "app",
         &[
             "ai",
-            "api",
             "asset",
             "audio",
             "components",
@@ -149,14 +129,14 @@ pub const LAYERS: &[Layer] = &[
             "navigation",
             "physics",
             "scene",
-            "scripting",
+            "script",
             "time",
             "ui",
         ],
     ),
     // The platform layer: real time, the GPU, windows and the editor live here.
     // The process logger (#1139): stderr, plus engine warnings for the console.
-    platform("logging", &["core", "scripting"]).uses(&["env_logger"]),
+    platform("logging", &["core", "script"]).uses(&["env_logger"]),
     platform("preview", &["asset", "components", "core", "scene"]),
     platform(
         "render",
@@ -178,7 +158,6 @@ pub const LAYERS: &[Layer] = &[
     platform(
         "dev",
         &[
-            "api",
             "app",
             "asset",
             "components",
@@ -189,7 +168,7 @@ pub const LAYERS: &[Layer] = &[
             "preview",
             "render",
             "scene",
-            "scripting",
+            "script",
             "shadergen",
             "time",
         ],
@@ -215,7 +194,7 @@ pub const LAYERS: &[Layer] = &[
             "navigation",
             "preview",
             "scene",
-            "scripting",
+            "script",
             "shadergen",
             "ui",
         ],
@@ -237,7 +216,7 @@ pub const LAYERS: &[Layer] = &[
             "navigation",
             "render",
             "scene",
-            "scripting",
+            "script",
             "time",
         ],
     )
@@ -258,11 +237,6 @@ pub const LAYERS: &[Layer] = &[
         "winit",
     ]),
 ];
-
-/// Pairs declared as one layer: they may reference each other in either order.
-/// `scripting` ↔ `api` (#724): untangling them would move `ConsoleLogs`, one of the
-/// crate's most-referenced types, for little gain.
-pub const PEERS: &[(&str, &str)] = &[("scripting", "api")];
 
 /// An edge the layering forbids but the code still has, each tracked by an open
 /// issue. Allowed until fixed; reported as stale the moment it disappears.

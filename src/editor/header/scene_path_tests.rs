@@ -14,7 +14,7 @@ use crate::core::paths::to_slash;
 use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
-use crate::scripting::{ConsoleLogs, LogLevel};
+use crate::script::scripting::{ConsoleLogs, LogLevel};
 
 /// Scene files `a`, `b` and `c` (one entity each, named after the file) in a fresh
 /// dir, and a world plus editor with `a` open, sharing the cell as the shell does.

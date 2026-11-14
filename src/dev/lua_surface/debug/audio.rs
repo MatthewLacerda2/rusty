@@ -10,9 +10,9 @@
 
 use mlua::{Table, Value};
 
-use crate::api::audio::{emitter, listener};
-use crate::api::lua_json::to_lua;
-use crate::api::{put, ApiCtx, Reg};
+use crate::script::api::audio::{emitter, listener};
+use crate::script::api::lua_json::to_lua;
+use crate::script::api::{put, ApiCtx, Reg};
 
 /// Register both audio reads on the `Debug` table.
 pub fn register(lua: &mlua::Lua, table: &Table, ctx: &ApiCtx) -> Reg {

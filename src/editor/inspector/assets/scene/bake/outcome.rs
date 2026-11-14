@@ -5,7 +5,7 @@
 use super::Step;
 use crate::scene::lighting::bake_status::BakeStatus;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 /// Say the bake ended with `summary`, in the console and as the scene's status.
 pub(super) fn done(

@@ -11,7 +11,7 @@ use std::rc::Rc;
 use mlua::{Lua, Result as LuaResult, Table};
 
 use super::Shared;
-use crate::scripting::LogLevel;
+use crate::script::scripting::LogLevel;
 
 /// Register `Harness.Warnings` on the `Harness` table `t`.
 pub(super) fn register(lua: &Lua, harness: &Shared, t: &Table) -> LuaResult<()> {

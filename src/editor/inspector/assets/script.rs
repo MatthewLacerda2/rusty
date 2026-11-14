@@ -1,7 +1,7 @@
 use crate::editor::EditorUi;
 use crate::scene::authoring;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 use egui_phosphor::regular as icon;
 use std::path::Path;
 

@@ -7,13 +7,13 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::scene::{apply_scene_data, to_scene_data, MaterialComponent, RenderMode, Scene};
+use rusty::script::api::bind;
 
 /// Register the `Material` namespace against `scene` and run `script`.
 fn run(scene: &Rc<RefCell<Scene>>, script: &str) {
     let lua = Lua::new();
-    rusty::api::material::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::script::api::material::register(&lua, bind(&lua, scene)).unwrap();
     lua.load(script).exec().unwrap();
 }
 

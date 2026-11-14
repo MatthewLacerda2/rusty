@@ -7,20 +7,23 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::core::application::Application;
 use rusty::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
 use rusty::core::settings::GraphicsSettings;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 /// Run `f` with a `Graphics` namespace over fresh cells.
 fn with_graphics(f: impl FnOnce(&Lua, &Rc<RefCell<GraphicsSettings>>, &Rc<RefCell<Application>>)) {
     let (lua, scene) = (Lua::new(), Rc::new(RefCell::new(Scene::new())));
     let (graphics, app) = (Rc::default(), Rc::new(RefCell::new(Application::new())));
-    rusty::api::graphics::register(
+    rusty::script::api::graphics::register(
         &lua,
         bind(&lua, &scene),
-        (bind(&lua, &graphics), rusty::api::ApiCell::default()),
+        (
+            bind(&lua, &graphics),
+            rusty::script::api::ApiCell::default(),
+        ),
         bind(&lua, &app),
     )
     .unwrap();

@@ -38,7 +38,7 @@ use mlua::{
 use super::copy::{copy, Copier};
 use crate::app::GameWorld;
 use crate::dev::demo;
-use crate::scripting::HostJournal;
+use crate::script::scripting::HostJournal;
 
 /// A scenario's handle on one live script instance (see the module doc).
 struct ScriptRef {

@@ -49,7 +49,7 @@ impl super::GameWorld {
     pub fn push_audio(&self, seconds: f32) {
         let res = &self.resources;
         let (scene, time) = (&self.world.scene, &res.time);
-        crate::api::audio::push_frame(scene, &res.audio, time, &res.camera, seconds.into());
+        crate::script::api::audio::push_frame(scene, &res.audio, time, &res.camera, seconds.into());
     }
 }
 

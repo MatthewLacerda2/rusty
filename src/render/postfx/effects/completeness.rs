@@ -93,7 +93,7 @@ pub(super) fn engine() -> Layers {
             })
             .collect(),
         camera_knobs: camera_knobs(),
-        api: crate::api::graphics::effects::REGISTRARS
+        api: crate::script::api::graphics::effects::REGISTRARS
             .iter()
             .map(|(n, _)| n.to_string())
             .collect(),

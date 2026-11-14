@@ -216,7 +216,7 @@ scene saves only per-bone overrides and what hangs from a bone.
    and bot-players. One surface, three callers — they never drift apart.
 
 Outside the five: **zimmer**, `Sound.*`'s synthesiser, a git dependency on
-[scorsese](https://github.com/MatthewLacerda2/scorsese) by `rev`; `src/api/sound/`
+[scorsese](https://github.com/MatthewLacerda2/scorsese) by `rev`; `crates/script/src/api/sound/`
 adapts it.
 
 ## Conventions that matter

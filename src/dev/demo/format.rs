@@ -29,7 +29,7 @@ use super::delta::InputDelta;
 use super::sources::Sources;
 use crate::app::GameWorld;
 use crate::core::project::ProjectSettings;
-use crate::scripting::{HostCall, Plain};
+use crate::script::scripting::{HostCall, Plain};
 
 /// An `f64` that survives the file bit for bit.
 #[derive(Clone, Copy, Debug)]

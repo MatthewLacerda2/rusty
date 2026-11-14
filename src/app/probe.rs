@@ -18,7 +18,7 @@ use super::game::GameWorld;
 use super::resources::Resources;
 use super::stage::Stage;
 use super::world::World;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 /// Observes the schedule. Must run `system` exactly once per call — the schedule's
 /// behaviour is unchanged by a probe, only watched.

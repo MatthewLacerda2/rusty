@@ -70,9 +70,9 @@ fn a_directory_is_flagged_and_an_allow_above_its_mod_line_excuses_it() {
 #[test]
 fn exempt_registries_pass() {
     let files = ["scene.rs", "scene_load.rs", "scene_prefab.rs"];
-    assert!(check_dir("src/api", &files).is_empty());
+    assert!(check_dir("src/script/api", &files).is_empty());
     assert_eq!(
-        check_dir("src/api/material", &files).len(),
+        check_dir("src/script/api/material", &files).len(),
         1,
         "not its subfolders"
     );

@@ -2,7 +2,7 @@ use egui_phosphor::regular as icon;
 
 use crate::editor::theme::chrome;
 use crate::editor::EditorUi;
-use crate::scripting::{ConsoleLogs, LogLevel};
+use crate::script::scripting::{ConsoleLogs, LogLevel};
 
 /// BOTTOM PANEL: the Console (log buffer, plus the Lua REPL in dev builds).
 pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, console: &mut ConsoleLogs) {

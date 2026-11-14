@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use glam::Vec3;
 
 use super::super::gpu_tests::{cube_file, probes_at, renderer};
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 #[test]
 fn gpu_a_cube_that_fails_to_load_is_left_out_until_rewritten() {

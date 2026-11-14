@@ -7,8 +7,8 @@ use std::rc::Rc;
 
 use glam::{EulerRot, Quat, Vec3};
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 /// A child at local `(1, 2, 3)` under a parent turned 90° about Y, scaled
 /// `(2, 3, -1)` (a mirror) and moved to `(5, 0, 0)`.
@@ -34,7 +34,7 @@ pub(super) fn hierarchy() -> (Rc<RefCell<Scene>>, u32, u32) {
 /// Run `body` with `Transform` bound over `scene`; `get(lua)` evaluates a vector.
 pub(super) fn with_lua(scene: &Rc<RefCell<Scene>>, body: impl FnOnce(&dyn Fn(&str) -> Vec3)) {
     let lua = Lua::new();
-    rusty::api::transform::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::script::api::transform::register(&lua, bind(&lua, scene)).unwrap();
     let get = |code: &str| -> Vec3 {
         let (x, y, z): (f32, f32, f32) = lua.load(code).eval().unwrap();
         Vec3::new(x, y, z)

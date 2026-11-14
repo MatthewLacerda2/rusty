@@ -10,7 +10,7 @@ use mlua::{Lua, Table, Value};
 
 use super::super::providers::environment;
 use super::super::providers::voices::{self, Account, Answer, Availability, Voice, REFRESH};
-use crate::api::{global_table, put, ApiCtx, Reg};
+use crate::script::api::{global_table, put, ApiCtx, Reg};
 
 /// `Voices([refresh])` and `FindVoice(query [, refresh])` → `voices, source`, where
 /// `source` says whether the list was just read or cached and how old it is.

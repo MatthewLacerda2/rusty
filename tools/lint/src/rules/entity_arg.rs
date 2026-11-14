@@ -5,7 +5,7 @@
 //! its neighbours answered the missing-entity default, and the five `Scene` reads
 //! that took `Option<u32>` each decided what `nil` meant by hand. `EntityArg`
 //! decides it once: a read answers its default, a write raises an error naming the
-//! verb. In `src/api/`, a Lua callback's parameters (`|_, …|`, `|lua, …|`,
+//! verb. In `src/script/api/`, a Lua callback's parameters (`|_, …|`, `|lua, …|`,
 //! `|_: &Lua, …|`) that name an entity (`id`, `…_id`, `parent`, `child`, `target`,
 //! `entity`, `body`, `canvas`) typed `u32` or `Option<u32>` are a finding. A
 //! helper closure's `id: u32` is not a Lua argument and is left alone.
@@ -23,7 +23,7 @@ const NAMES: &[&str] = &[
 /// Every non-test line of `source` whose Lua callback takes an entity as a bare id.
 pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
     let at = crate::modules::module_path(path);
-    if !at.starts_with("src/api/") {
+    if !at.starts_with("src/script/api/") {
         return Vec::new();
     }
     code_lines(source)

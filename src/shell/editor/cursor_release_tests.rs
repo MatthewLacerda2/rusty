@@ -9,7 +9,7 @@ use crate::core::input::keymap::Keymap;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 use crate::shell::input::write_key;
 
 fn click(tab: ViewportTab, inside: bool) -> ViewportInteraction {

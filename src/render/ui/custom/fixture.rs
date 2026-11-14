@@ -115,9 +115,9 @@ pub(super) fn lua(scene: &Rc<RefCell<Scene>>, script: &str) {
         0.0,
     )));
     let lua = Lua::new();
-    use crate::api::bind;
+    use crate::script::api::bind;
     let view = (bind(&lua, &screen), bind(&lua, &video));
-    crate::api::ui::register(&lua, bind(&lua, scene), view, bind(&lua, &camera)).unwrap();
+    crate::script::api::ui::register(&lua, bind(&lua, scene), view, bind(&lua, &camera)).unwrap();
     lua.load(script).exec().unwrap();
 }
 

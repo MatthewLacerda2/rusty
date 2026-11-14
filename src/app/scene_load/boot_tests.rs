@@ -3,7 +3,7 @@
 use super::load_boot_scene;
 use crate::core::project::BootPlan;
 use crate::scene::Scene;
-use crate::scripting::{ConsoleLogs, LogLevel};
+use crate::script::scripting::{ConsoleLogs, LogLevel};
 
 fn errors(console: &ConsoleLogs) -> usize {
     let is_error = |(_, level): &&(String, LogLevel)| *level == LogLevel::Error;

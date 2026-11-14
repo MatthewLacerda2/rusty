@@ -3,7 +3,7 @@
 use super::SceneFollow;
 use crate::core::fs::written::note_written;
 use crate::scene::{save_lighting, Scene};
-use crate::scripting::{ConsoleLogs, LogLevel};
+use crate::script::scripting::{ConsoleLogs, LogLevel};
 
 /// `names` saved at `path` by "someone outside the editor", noted as the watch does.
 fn write_outside(path: &str, names: &[&str]) {

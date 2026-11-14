@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use super::super::game::GameWorld;
 use crate::core::project::{BootPlan, Opened, ProjectSettings, PROJECT_FILE};
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 /// Where a world takes its project settings from ([`GameWorld::open_project`]).
 #[derive(Clone, Debug)]

@@ -6,8 +6,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 fn scene_with_entity() -> (Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::new();
@@ -20,7 +20,7 @@ fn layer_index_round_trips_and_defaults_to_zero() {
     let lua = Lua::new();
     let (scene, id) = scene_with_entity();
 
-    rusty::api::layers::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::layers::register(&lua, bind(&lua, &scene)).unwrap();
 
     let layer: u8 = lua
         .load(format!("return Layers.GetLayer({id})"))
@@ -44,7 +44,7 @@ fn missing_entity_reads_zero_and_set_is_a_noop() {
     let lua = Lua::new();
     let (scene, _) = scene_with_entity();
 
-    rusty::api::layers::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::layers::register(&lua, bind(&lua, &scene)).unwrap();
     let layer: u8 = lua.load("return Layers.GetLayer(999)").eval().unwrap();
     assert_eq!(layer, 0);
     lua.load("Layers.SetLayer(999, 3)").exec().unwrap();
@@ -55,7 +55,7 @@ fn name_resolution_mirrors_the_registry() {
     let lua = Lua::new();
     let (scene, _) = scene_with_entity();
 
-    rusty::api::layers::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::layers::register(&lua, bind(&lua, &scene)).unwrap();
 
     let name: String = lua.load("return Layers.GetName(0)").eval().unwrap();
     assert_eq!(name, "Default");

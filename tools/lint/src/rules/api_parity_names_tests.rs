@@ -33,7 +33,7 @@ fn a_file_of_the_scene_crate_names_ops_by_its_own_root() {
             "rendering::camera::set_far"
         ]
     );
-    assert!(ops_named(src, &[], root_of("src/api/component.rs")).is_empty());
+    assert!(ops_named(src, &[], root_of("src/script/api/component.rs")).is_empty());
 }
 
 /// A file in another member crate (`api` and `editor`, once moved) names the ops
@@ -53,5 +53,5 @@ fn a_file_of_another_member_names_ops_through_the_scene_crate() {
             "rendering::camera::set_far"
         ]
     );
-    assert_eq!(root_of("src/api/component.rs"), super::ROOT);
+    assert_eq!(root_of("src/script/api/component.rs"), super::ROOT);
 }

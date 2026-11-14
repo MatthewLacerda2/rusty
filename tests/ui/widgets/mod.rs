@@ -18,7 +18,7 @@ use std::rc::Rc;
 use rusty::app::GameWorld;
 use rusty::scene::authoring::ui::widgets::{self, create_ui, UiWidget};
 use rusty::scene::Scene;
-use rusty::scripting::ConsoleLogs;
+use rusty::script::scripting::ConsoleLogs;
 
 const DT: f32 = 1.0 / 60.0;
 const SCREEN_H: f32 = 1080.0;

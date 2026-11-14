@@ -23,7 +23,7 @@ use std::thread::ThreadId;
 
 use log::{Level, LevelFilter, Log, Metadata, Record};
 
-use crate::scripting::{ConsoleLogs, LogLevel};
+use crate::script::scripting::{ConsoleLogs, LogLevel};
 
 #[cfg(test)]
 mod tests;

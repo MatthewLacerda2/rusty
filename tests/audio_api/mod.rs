@@ -62,12 +62,12 @@ fn fixture() -> Fixture {
 }
 
 fn register(lua: &Lua, f: &Fixture) {
-    use rusty::api::bind;
+    use rusty::script::api::bind;
     // Attach every cell `Audio` reaches; the context's handles carry no data.
     bind(lua, &f.scene);
     bind(lua, &f.audio);
     bind(lua, &f.time);
     bind(lua, &f.camera);
     bind(lua, &f.app);
-    rusty::api::audio::register(lua, &rusty::api::ApiCtx::default()).unwrap();
+    rusty::script::api::audio::register(lua, &rusty::script::api::ApiCtx::default()).unwrap();
 }

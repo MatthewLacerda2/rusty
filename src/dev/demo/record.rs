@@ -26,7 +26,7 @@ use super::index::{IndexLine, Indexer};
 use crate::app::{GameWorld, PlayTransition, TapPoint, TickTap};
 use crate::core::input::InputFrame;
 use crate::dev::harness::FIXED_DT;
-use crate::scripting::HostCall;
+use crate::script::scripting::HostCall;
 
 /// One open demo.
 struct Session {
