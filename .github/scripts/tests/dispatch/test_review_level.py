@@ -19,7 +19,7 @@ class Level(unittest.TestCase):
         cases = {
             "stored format": "engine/shaders/forward/bindings.wgsl",
             "determinism": "clippy.toml",
-            "scripting sandbox": "src/scripting/sandbox/files.rs",
+            "scripting sandbox": "src/script/scripting/sandbox/files.rs",
             "merge path": ".github/workflows/ci.yml",
         }
         cases_by_path = {
@@ -34,13 +34,13 @@ class Level(unittest.TestCase):
                 self.assertEqual(review_level.level(["README.md", path]), ("high", [(why, path)]))
 
     def test_a_row_holds_its_module_in_either_place(self):
-        for path in ("crates/core/src/random.rs", "src/core/random.rs", "crates/scripting/src/sandbox/a.rs"):
+        for path in ("crates/core/src/random.rs", "src/core/random.rs", "crates/script/src/scripting/sandbox/a.rs"):
             with self.subTest(path):
                 self.assertEqual(review_level.level([path])[0], "high")
 
     def test_everything_else_is_medium(self):
         paths = ["src/render/post/bloom.rs", "docs/api/Scene.md", ".github/scripts/board.py",
-                 "src/scene/io_helpers.rs", "src/scripting/sandboxing.rs",
+                 "src/scene/io_helpers.rs", "src/script/scripting/sandboxing.rs",
                  "tests/scene_format/trace.rs"]
         self.assertEqual(review_level.level(paths), ("medium", []))
 

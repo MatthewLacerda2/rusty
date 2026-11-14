@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use rusty::asset::animation_graph::{self, AnimationGraph};
 use rusty::scene::ScriptComponent;
-use rusty::scripting::ConsoleLogs;
+use rusty::script::scripting::ConsoleLogs;
 
 use super::rig::armed_scene;
 

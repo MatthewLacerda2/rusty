@@ -916,7 +916,7 @@ source of truth for existence is the live surface — reconcile by editing the d
 
 The **callback half** of the surface has its own gate: `tests/callback_doc_drift.rs`
 (#309, both feature sets) asserts the same existence parity between the doc's
-"Script lifecycle callbacks" section and `src/scripting/callbacks.rs` — the one
+"Script lifecycle callbacks" section and `crates/script/src/scripting/callbacks.rs` — the one
 list dispatch and MonoBehaviour discovery read — so a script callback can neither
 be added undocumented nor advertised when the engine never dispatches it.
 
@@ -980,10 +980,10 @@ gates-vs-signals rule), surfaced where the agent acts on it.
 
 Targets are deliberately differentiated:
 
-- **A per-module floor on the core sim modules** (`app`, `scripting`, `physics`,
-  `navigation`; a deliberate subset of the layer table's sim rows) — pure logic, no GPU, the part that must be right and where
-  mutation/property testing is aimed — **and on `api`** (#350), the Lua surface
-  every game script drives: the doc drift gate proves a binding *exists*, only a
+- **A per-module floor on the core sim modules** (`app`, `physics`, `navigation`;
+  a deliberate subset of the layer table's sim rows) — pure logic, no GPU, the part that must be right and where
+  mutation/property testing is aimed — **and on `script`**, the Lua runtime and its
+  `api` surface (#350), which every game script drives: the doc drift gate proves a binding *exists*, only a
   behavioral test proves it *works* (`tests/<namespace>_api.rs`, one file per
   namespace). The floors live in `coverage-baseline.txt` at the repo root (one
   `module floor` line each) and **ratchet**: raise them as coverage improves,

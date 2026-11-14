@@ -58,7 +58,7 @@ fn game(scene: Scene) -> GameWorld {
         Rc::new(RefCell::new(scene)),
         Rc::new(RefCell::new(InputState::new())),
         Rc::new(RefCell::new(nav)),
-        Rc::new(RefCell::new(rusty::scripting::ConsoleLogs::new())),
+        Rc::new(RefCell::new(rusty::script::scripting::ConsoleLogs::new())),
     )
 }
 

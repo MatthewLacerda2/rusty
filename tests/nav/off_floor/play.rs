@@ -12,7 +12,7 @@ use glam::Vec3;
 use rusty::app::GameWorld;
 use rusty::core::input::InputState;
 use rusty::navigation::NavigationGraph;
-use rusty::scripting::ConsoleLogs;
+use rusty::script::scripting::ConsoleLogs;
 
 use super::{
     assert_grounded, assert_in_pool_only_by_ramp, default_scene, default_scene_with, home, planar,

@@ -6,7 +6,7 @@ use std::path::Path;
 
 use crate::editor::EditorUi;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 impl EditorUi {
     /// The scene file the editor is editing, `None` for a scene never saved. One

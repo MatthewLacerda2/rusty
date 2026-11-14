@@ -54,17 +54,16 @@ class Unsettled(unittest.TestCase):
         self.assertEqual(len(mover.unsettled("x.rs", "use crate::physics; // why\n", {"physics"})), 1)
 
 
-TABLE = ('sim("core", &[]),\n    sim("api", &["core", "scripting"]),\n    sim("ui", &["core"]),\n'
-         '    sim("scripting", &["api", "core", "ui"]),\n')
+TABLE = 'sim("core", &[]),\n    sim("ui", &["core"]),\n    sim("script", &["core", "ui"]),\n'
 
 
 class RowsBelow(unittest.TestCase):
-    def test_an_earlier_row_naming_the_module_back_is_not_below_it(self):
+    def test_the_rows_before_the_module_are_below_it(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / mover.TABLE).parent.mkdir(parents=True)
             (root / mover.TABLE).write_text(TABLE)
-            self.assertEqual(mover.rows_below(root, "scripting"), {"core", "ui"})
+            self.assertEqual(mover.rows_below(root, "script"), {"core", "ui"})
             self.assertEqual(mover.rows_below(root, "ui"), {"core"})
 
 

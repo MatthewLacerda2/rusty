@@ -29,7 +29,7 @@ use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
 use crate::scene::Camera;
 use crate::scene::{Scene, SceneSnapshot};
-use crate::scripting::{ConsoleLogs, ScriptManager};
+use crate::script::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
 use crate::ui::{EventSystem, ScreenSize, TextureSizeReader, UiLayout};
 

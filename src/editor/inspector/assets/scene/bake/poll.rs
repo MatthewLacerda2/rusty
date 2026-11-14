@@ -18,7 +18,7 @@ use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::lighting::bake_status::BakeStatus;
 use crate::scene::{LightingSave, Scene};
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 /// How often the editor repaints while the lightmaps bake, so the bar moves on its
 /// own; the probe step repaints at once, a step a frame.

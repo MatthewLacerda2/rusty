@@ -31,7 +31,7 @@ non-`nil`) id on a write stays a no-op. Where `nil` means "none" on purpose (a
 joint's connected body, `UI.SetSelected(nil)`, `Scene.SetParent(child, nil)`), the page says so.
 
 > **Maintenance:** `docs/api/` is **hand-written** and must be kept in sync with
-> the bindings: `src/api/` (registered by `api::register`) and the dev-only
+> the bindings: `crates/script/src/api/` (registered by `api::register`) and the dev-only
 > namespaces in `src/dev/lua_surface/`. `tests/api_doc_drift.rs` (#280) fails CI
 > when a namespace or function exists on one side only; it checks names, not
 > signatures or what a page says a call does.
@@ -211,7 +211,7 @@ interaction — press, drag, scroll, submit and cancel stop at it without firing
 Focus callbacks (`OnSelect` … `OnMove`) go to the focused entity itself. How
 hits are found and what a Selectable adds is in [`docs/ui.md`](../ui.md).
 
-**Deterministic dispatch order** (enforced in `src/scripting/lifecycle/`, so
+**Deterministic dispatch order** (enforced in `crates/script/src/scripting/lifecycle/`, so
 headless replays stay byte-identical):
 
 - Init is two-phase, at play-enter and again at the head of every tick's
@@ -311,7 +311,7 @@ headless replays stay byte-identical):
 > `OnDisable` instead.
 
 > **Drift gate:** the callback list is centralized in
-> `src/scripting/callbacks.rs` (dispatch and MonoBehaviour discovery both read
+> `crates/script/src/scripting/callbacks.rs` (dispatch and MonoBehaviour discovery both read
 > it), and `tests/callback_doc_drift.rs` fails CI when this section and that
 > list disagree — the callback sibling of the #280 namespace gate
 > (`tests/api_doc_drift.rs`).

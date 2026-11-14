@@ -4,7 +4,7 @@
 
 use super::Session;
 use crate::scene::Scene;
-use crate::scripting::LogLevel;
+use crate::script::scripting::LogLevel;
 
 /// A one-entity scene saved at a fresh path.
 fn saved(tag: &str) -> String {

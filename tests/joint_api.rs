@@ -9,14 +9,14 @@ use std::rc::Rc;
 use crate::lua::eval;
 use glam::{Vec2, Vec3};
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::{Entity, JointComponent, JointKind};
 use rusty::scene::prefab::extract_prefab;
 use rusty::scene::{instantiate_prefab, Scene};
+use rusty::script::api::bind;
 
 fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
-    rusty::api::joint::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::script::api::joint::register(&lua, bind(&lua, scene)).unwrap();
     f(&lua);
 }
 

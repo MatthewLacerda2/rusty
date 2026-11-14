@@ -7,17 +7,17 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::AnimatorParameter;
 use rusty::scene::{apply_scene_data, to_scene_data, Scene};
-use rusty::scripting::ConsoleLogs;
+use rusty::script::api::bind;
+use rusty::script::scripting::ConsoleLogs;
 
 use super::scene_with_animator;
 
 /// Register the `Animator` namespace against `scene` and run `script`.
 fn run(scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<ConsoleLogs>>, script: &str) {
     let lua = Lua::new();
-    rusty::api::animator::register(&lua, bind(&lua, scene), bind(&lua, console)).unwrap();
+    rusty::script::api::animator::register(&lua, bind(&lua, scene), bind(&lua, console)).unwrap();
     lua.load(script).exec().unwrap();
 }
 

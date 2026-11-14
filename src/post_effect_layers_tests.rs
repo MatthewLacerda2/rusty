@@ -1,6 +1,6 @@
 //! The post effects' completeness gate (`render::postfx::completeness`) over every
 //! layer, the two above `render` included: each effect has its `Graphics.*`
-//! registrar (`api::graphics::effects::REGISTRARS`) and its Inspector section, and
+//! registrar (`script::api::graphics::effects::REGISTRARS`) and its Inspector section, and
 //! neither lists an effect the renderer lacks. The gate's own cases are `render`'s
 //! tests.
 
@@ -18,7 +18,7 @@ fn sections() -> Vec<&'static str> {
 
 #[test]
 fn every_effect_has_every_part_in_every_layer() {
-    let api: Vec<&str> = crate::api::graphics::effects::REGISTRARS
+    let api: Vec<&str> = crate::script::api::graphics::effects::REGISTRARS
         .iter()
         .map(|(n, _)| *n)
         .collect();

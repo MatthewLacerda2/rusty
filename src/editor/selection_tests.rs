@@ -5,7 +5,7 @@
 use super::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 fn draw_frame(editor: &mut EditorUi, scene: &mut Scene) {
     let ctx = egui::Context::default();

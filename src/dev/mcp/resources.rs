@@ -49,7 +49,7 @@ pub fn resources_list() -> Value {
 pub fn resources_read(params: &Value) -> Result<Value, (i64, String)> {
     read_from(
         params,
-        &crate::scripting::api_doc::api_doc_dir(),
+        &crate::script::scripting::api_doc::api_doc_dir(),
         &game_guide_path(),
     )
 }
@@ -59,7 +59,7 @@ pub fn resources_read(params: &Value) -> Result<Value, (i64, String)> {
 fn read_from(params: &Value, doc_dir: &Path, guide: &Path) -> Result<Value, (i64, String)> {
     let uri = params.get("uri").and_then(Value::as_str).unwrap_or("");
     let text = match uri {
-        SCRIPTING_API_URI => crate::scripting::api_doc::assemble(doc_dir),
+        SCRIPTING_API_URI => crate::script::scripting::api_doc::assemble(doc_dir),
         GAME_GUIDE_URI => std::fs::read_to_string(guide)
             .map_err(|e| format!("Failed to read {}: {e}", guide.display())),
         _ => return Err((-32602, format!("Unknown resource: {uri}"))),

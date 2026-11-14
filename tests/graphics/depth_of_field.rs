@@ -7,10 +7,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::{CameraComponent, DofMode};
 use rusty::scene::authoring::default_post_processing;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 /// Run `script` against `scene` with the `Graphics` namespace registered; the
 /// script's error, if any.
@@ -18,10 +18,13 @@ fn run(scene: Scene, script: &str) -> (Scene, Option<String>) {
     let lua = Lua::new();
     let (scene, graphics, app) = (Rc::new(RefCell::new(scene)), Rc::default(), Rc::default());
     let err = crate::lua::attempt(|| {
-        rusty::api::graphics::register(
+        rusty::script::api::graphics::register(
             &lua,
             bind(&lua, &scene),
-            (bind(&lua, &graphics), rusty::api::ApiCell::default()),
+            (
+                bind(&lua, &graphics),
+                rusty::script::api::ApiCell::default(),
+            ),
             bind(&lua, &app),
         )
         .unwrap();

@@ -6,9 +6,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::scene::Scene;
-use rusty::scripting::{ConsoleLogs, LogLevel};
+use rusty::script::api::bind;
+use rusty::script::scripting::{ConsoleLogs, LogLevel};
 
 use super::montage_api::with_flinch;
 
@@ -17,7 +17,7 @@ use super::montage_api::with_flinch;
 fn eval(scene: &Rc<RefCell<Scene>>, script: &str) -> (bool, Vec<(String, LogLevel)>) {
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
     let lua = Lua::new();
-    rusty::api::animator::register(&lua, bind(&lua, scene), bind(&lua, &console)).unwrap();
+    rusty::script::api::animator::register(&lua, bind(&lua, scene), bind(&lua, &console)).unwrap();
     let mark = console.borrow().logged();
     let value: bool = lua.load(format!("return {script}")).eval().unwrap();
     let added = console

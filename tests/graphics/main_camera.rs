@@ -6,12 +6,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::{CameraComponent, RenderTarget};
 use rusty::core::settings::GraphicsSettings;
 use rusty::scene::authoring::default_post_processing;
 use rusty::scene::camera::main_camera;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 /// A camera entity with a default volume, on the screen or into `target`.
 fn camera(scene: &mut Scene, name: &str, target: Option<RenderTarget>) -> u32 {
@@ -32,10 +32,10 @@ fn run(scene: &Rc<RefCell<Scene>>, script: &str) {
     let quality = Rc::new(RefCell::new(GraphicsSettings::default()));
     let app = Rc::default();
     crate::lua::attempt(|| {
-        rusty::api::graphics::register(
+        rusty::script::api::graphics::register(
             &lua,
             bind(&lua, scene),
-            (bind(&lua, &quality), rusty::api::ApiCell::default()),
+            (bind(&lua, &quality), rusty::script::api::ApiCell::default()),
             bind(&lua, &app),
         )
         .unwrap();

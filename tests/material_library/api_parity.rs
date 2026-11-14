@@ -4,9 +4,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::scene::authoring::material as mat_ops;
 use rusty::scene::{RenderMode, Scene};
+use rusty::script::api::bind;
 
 #[test]
 fn lua_material_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
@@ -22,7 +22,7 @@ fn lua_material_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::E
     let via_op = scene.borrow_mut().add_entity("ViaOp".to_string());
 
     let lua = Lua::new();
-    rusty::api::material::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::material::register(&lua, bind(&lua, &scene)).unwrap();
     lua.load(format!(
         r#"
         Material.SetMetallic({via_lua}, 0.7)

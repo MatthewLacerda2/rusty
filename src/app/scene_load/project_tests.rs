@@ -12,7 +12,7 @@ use crate::core::input::InputState;
 use crate::core::project::ProjectFile;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
-use crate::scripting::{ConsoleLogs, LogLevel};
+use crate::script::scripting::{ConsoleLogs, LogLevel};
 
 /// A project file whose startup scene and initial quality preset are not the
 /// engine's defaults.

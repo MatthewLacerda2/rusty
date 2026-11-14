@@ -5,13 +5,13 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::{LineComponent, ParticleBlend, TextureMode, TrailComponent};
 use rusty::core::curve::{Curve, Gradient};
 use rusty::scene::authoring::{
     ribbon as ribbon_ops, ribbon::line as line_ops, ribbon::trail as trail_ops,
 };
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 /// Two sibling entities (Lua-driven, op-driven), each given a default component
 /// by `attach`; runs `script` (with `{id}` = the Lua entity) through both
@@ -23,8 +23,8 @@ fn drive(attach: fn(&mut Scene, u32) -> bool, script: &str) -> (Rc<RefCell<Scene
     attach(&mut scene.borrow_mut(), via_lua);
     attach(&mut scene.borrow_mut(), via_op);
     let lua = Lua::new();
-    rusty::api::trail::register(&lua, bind(&lua, &scene)).unwrap();
-    rusty::api::line::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::trail::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::script::api::line::register(&lua, bind(&lua, &scene)).unwrap();
     let code = script.replace("{id}", &via_lua.to_string());
     lua.load(code).exec().unwrap();
     (scene, via_lua, via_op)

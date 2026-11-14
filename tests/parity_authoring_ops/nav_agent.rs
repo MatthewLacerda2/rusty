@@ -5,11 +5,11 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::NavMeshAgentComponent;
 use rusty::navigation::NavigationGraph;
 use rusty::scene::authoring::nav::agent as nav_ops;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 /// Attach a default nav-agent to a fresh entity; returns its id.
 fn entity_with_agent(scene: &mut Scene, name: &str) -> u32 {
@@ -36,7 +36,7 @@ fn nav_agent_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Erro
 
     let lua = Lua::new();
     let (scene_cell, nav_cell) = (bind(&lua, &scene), bind(&lua, &nav));
-    rusty::api::nav::register(&lua, scene_cell, nav_cell).unwrap();
+    rusty::script::api::nav::register(&lua, scene_cell, nav_cell).unwrap();
     lua.load(format!(
         r#"
         NavMeshAgent.SetActive({via_lua}, true)
@@ -88,7 +88,7 @@ fn base_offset_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Er
     let nav = graph();
     let lua = Lua::new();
     let read = crate::lua::attempt(|| {
-        rusty::api::nav::register(&lua, bind(&lua, &scene), bind(&lua, &nav)).unwrap();
+        rusty::script::api::nav::register(&lua, bind(&lua, &scene), bind(&lua, &nav)).unwrap();
         let src = format!(
             "NavMeshAgent.SetBaseOffset({via_lua}, 1.0) return NavMeshAgent.GetBaseOffset({via_lua})"
         );
@@ -115,7 +115,7 @@ fn turning_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>
     let nav = graph();
     let lua = Lua::new();
     let read: (bool, f32, f32) = crate::lua::attempt(|| {
-        rusty::api::nav::register(&lua, bind(&lua, &scene), bind(&lua, &nav)).unwrap();
+        rusty::script::api::nav::register(&lua, bind(&lua, &scene), bind(&lua, &nav)).unwrap();
         lua.load(format!(
             "NavMeshAgent.SetUpdateRotation({via_lua}, false)
              NavMeshAgent.SetAngularSpeed({via_lua}, 90)

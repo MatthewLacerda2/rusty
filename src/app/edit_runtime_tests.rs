@@ -6,7 +6,7 @@ use crate::app::GameWorld;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 use std::cell::RefCell;
 use std::rc::Rc;
 

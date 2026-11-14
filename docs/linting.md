@@ -37,11 +37,11 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Dead `pub` items | `make dead-pub` (`tools/lint -- --dead-pub`) | **signal**, never a gate: `src/lib.rs` exports every module, so rustc's `dead_code` never fires on a `pub` item. On a copy under `target/dead-pub/` the modules go `pub(crate)` and every bin and the integration suite fold into the lib; the report lists items nothing uses, items only tests use (a test seam may be fine), and unused imports apart (#940, #1003). It builds for the host only, so a finding in a file with a platform `cfg` (or in a module declared under one) is listed under *Platform-gated*: check it on that platform before narrowing (#1092). It runs weekly on `main` as `cargo-test.yml`'s `dead-pub` job, the report in its job summary; the job goes red only when no report came out, and `main-health` files that (#1205) |
 | Dependency direction | `tools/lint -- --direction` | the table's sim modules never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
 | Dependency locks | cargo-deny (`deny.toml`) | **hard gate**: every git dependency is pinned by `rev` (`required-git-spec`); `nalgebra` only through the physics stack and no `cgmath` — glam is the one math crate (#975) |
-| Directory size | `tools/lint -- --rules` (`dir-size`) | **hard gate**: no directory under `src/` holds more than 12 source files directly in it (tests and its `mod.rs` aside); cluster by responsibility into subfolders, or a flat registry of one file per public unit says so with an inline `// lint: allow(dir-size) <why>` in its `mod.rs` (`src/api/`). The ≲10 aim prints as a signal (#1367) |
+| Directory size | `tools/lint -- --rules` (`dir-size`) | **hard gate**: no directory under `src/` holds more than 12 source files directly in it (tests and its `mod.rs` aside); cluster by responsibility into subfolders, or a flat registry of one file per public unit says so with an inline `// lint: allow(dir-size) <why>` in its `mod.rs` (`crates/script/src/api/`). The ≲10 aim prints as a signal (#1367) |
 | Docs name what exists | `make docrefs` (`.github/scripts/docrefs.py`) | **hard gate**: every `src/`, `tests/`, `tools/`, `docs/` or `.github/` path in a tracked `*.md`'s inline code is tracked, every `` `make <verb>` `` is a target, and CLAUDE.md's namespaces each have a `docs/api/` page; placeholders pass, anything else takes `<!-- docrefs: allow <why> -->`. Runs on Markdown-only PRs too (#973) |
-| Editor↔API parity per op | `tools/lint -- --rules` (`api-parity`) | **hard gate**: every `scene::authoring::<module>::set_*` op a non-test line of `src/editor/` names is also named from the API side — a named setter's call in `src/api/`, an `op!`/`with!`/`group!` row of the field table `Component.Set` writes through (`scene::authoring::fields`), or a post effect's own row or knob table (#1467) — so anything the inspector writes, Lua can; an editor-only op takes `// lint: allow(api-parity) <why>` at its `fn`, and an allow on an op Lua reaches or no inspector names is stale and fails (#1368) |
+| Editor↔API parity per op | `tools/lint -- --rules` (`api-parity`) | **hard gate**: every `scene::authoring::<module>::set_*` op a non-test line of `src/editor/` names is also named from the API side — a named setter's call in `crates/script/src/api/`, an `op!`/`with!`/`group!` row of the field table `Component.Set` writes through (`scene::authoring::fields`), or a post effect's own row or knob table (#1467) — so anything the inspector writes, Lua can; an editor-only op takes `// lint: allow(api-parity) <why>` at its `fn`, and an allow on an op Lua reaches or no inspector names is stale and fails (#1368) |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard) |
-| Entity ids from Lua | `tools/lint -- --rules` (`entity-arg`) | **hard gate**: in `src/api/`, a Lua callback never takes an entity (`id`, `…_id`, `parent`, `child`, `target`, `entity`, `body`, `canvas`) as a bare `u32` or `Option<u32>`: it takes `api::entity_arg::EntityArg`, so a `nil` id reads as a missing entity and fails a write with the verb's name (#1383) |
+| Entity ids from Lua | `tools/lint -- --rules` (`entity-arg`) | **hard gate**: in `crates/script/src/api/`, a Lua callback never takes an entity (`id`, `…_id`, `parent`, `child`, `target`, `entity`, `body`, `canvas`) as a bare `u32` or `Option<u32>`: it takes `api::entity_arg::EntityArg`, so a `nil` id reads as a missing entity and fails a write with the verb's name (#1383) |
 | Every ECS write is stamped | `tools/lint -- --rules` (`ecs-write`) | **hard gate**: a non-test line of `crates/ecs/src/` that borrows a hecs column mutably (`get::<&mut …>`, `query_one::<(&mut …)>`, `query_mut`) or reshapes the store through `inner.` (`spawn`, `despawn`, `insert`, `remove`, `clear`, …) fails, since a write that skips `World::touch` stamps no change and every change-log consumer misses it; each funnel line, and `World::derived_mut`, takes `// lint: allow(ecs-write) <why>` (#1705) |
 | File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py`, `.lua` or `.wgsl` one (docstrings, comments and blank lines free, #926, #1015); nothing grandfathered |
 | Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `crates/scene/src/authoring/` that takes a float (an `f32`/`f64`, a glam vector, or a float struct such as `Curve`) passes it to a `scene::authoring::sanitize` helper (or a sibling setter of its file), so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
@@ -290,7 +290,7 @@ new flag, gate, CI step or baseline.
   (`docs/game-agent.md`), field by field. `--parity` holds that the inspector writes
   through a shared `scene::authoring` op; this rule holds that Lua reaches the same
   op: every `authoring::<module>::set_*` op a non-test line of `src/editor/` names
-  must be named from the API side too, by a named setter in `src/api/`
+  must be named from the API side too, by a named setter in `crates/script/src/api/`
   (`Physics.SetMass`) or by the field table (`op!("mass", rb::set_mass)`, which
   `Component.Set` dispatches through), so editor and Lua share one validation. A post effect's
   field-table row and knob table sit beside its ops, in its own module under
@@ -380,7 +380,7 @@ new flag, gate, CI step or baseline.
   registry, one file per public unit, which says so on a plain `//` comment line
   anywhere in its owner file (`mod.rs`, or the `<dir>.rs` beside it):
   `// lint: allow(dir-size) <why>`; a doc comment (`///`, `//!`) quoting that
-  syntax is not an allow. `src/api/` carries it (one file per Lua namespace). The
+  syntax is not an allow. `crates/script/src/api/` carries it (one file per Lua namespace). The
   rule reads that allow itself, so one left on a directory back under the cap is a
   finding too (`rules/dir_size.rs`). A directory with no owner file (`src/bin/`,
   one binary per file) has nowhere to write the allow, so it takes no exception
@@ -417,13 +417,13 @@ new flag, gate, CI step or baseline.
   the reads that took `Option<u32>` each decided what `nil` meant by hand.
   `api::entity_arg::EntityArg` decides it once: `read()` names no entity (id 0,
   which the allocator never hands out), `live(namespace, verb)` is the write's
-  error, `get()` the `Option` where `nil` means "none" on purpose. In `src/api/`, a
+  error, `get()` the `Option` where `nil` means "none" on purpose. In `crates/script/src/api/`, a
   closure whose first parameter is the Lua state (`_`, `lua`, `_: &Lua`) and whose
   arguments name an entity typed `u32` or `Option<u32>` fails. The rule reads one
   line and goes by the parameter's name (`rules/entity_arg.rs`): an id under
   another name, in a hand-parsed `MultiValue`, in a closure whose arguments are a
   type alias (`|_, (id, x): Args|`), or after a Lua state spelled `lua: &mlua::Lua`
-  gets past it; so does any binding outside `src/api/`.
+  gets past it; so does any binding outside `crates/script/src/api/`.
 - **`full-literal`** (#976) — a test builds a first-class component (a `…Component`
   type `Entity` names, with three or more fields) through a constructor or a
   `..rest`, never a struct expression naming every field: such a literal breaks the
@@ -513,7 +513,7 @@ new flag, gate, CI step or baseline.
   and a bare `nav.rs` counts with the `nav_*` files beside it; `mod.rs`, `main.rs`
   and `lib.rs` never count. The finding anchors on the first `mod` line that
   declares the group, which is where its allow goes. The flat registry CLAUDE.md
-  exempts (`src/api/`, one file per Lua namespace) is listed in `rules/prefix.rs`
+  exempts (`crates/script/src/api/`, one file per Lua namespace) is listed in `rules/prefix.rs`
   with the reason, and the exemption covers that directory only, not its
   subfolders.
 - **`sanitize`** — every authoring setter refuses a non-finite float (#1361).
@@ -659,9 +659,9 @@ and direction guards, `CLAUDE.md` and these docs each kept.
 
 - **One row per `src/<module>`, bottom-up.** A row names the modules it may import,
   and each must sit **above** it. The table is then a topological order: the graph
-  has no cycles. The only pair allowed to reference each other is listed in `PEERS`
-  (`scripting` ↔ `api`: scripting installs the Lua surface, the surface reads state
-  scripting owns).
+  has no cycles, and none is allowed: two modules that must name each other are one
+  module (`script` holds `scripting` and `api`: the runtime installs the Lua surface,
+  and the surface reads state the runtime owns).
 - **Rows mark the sim.** Everything a sim module imports must be sim as well, so
   `scene → shadergen → render` style leaks fail, not only direct ones. The
   direction guard scans this derived set (`layers::sim_dirs`), the determinism gate
@@ -785,7 +785,7 @@ field), an Add Component entry (`inspector/components/add/`: a
 offers every row behind `authoring::has_kind`; there the `AddEntry` bound holds the
 axis at compile time, and the text check only confirms the menu's code, not a
 comment, expands `first_class!`), an inspector card (some `inspector/components/*.rs`), and an API
-namespace (`src/api/<x>.rs` registered in `api/mod.rs` and documented in
+namespace (`crates/script/src/api/<x>.rs` registered in `api/mod.rs` and documented in
 `docs/api/`, as the field or its Lua spelling: `layout_group` is `LayoutGroup`). The
 gate discovers components from the registry's rows — so a new one can't slip
 through — and fails on any missing axis. It *finds* `macro_rules! first_class`
@@ -800,9 +800,9 @@ gap closed or waived) and was retired in #926, so a missing axis is closed or wa
 An axis can be satisfied in two ways:
 
 - **Closed** — the artifact exists (the field, Add Component entry, inspector card,
-  or `src/api/<x>.rs` namespace + doc). #82 closed `animator add_menu` (Animator got
+  or `crates/script/src/api/<x>.rs` namespace + doc). #82 closed `animator add_menu` (Animator got
   its own Add Component entry, added/removed independently) and `light api` (the new
-  `src/api/light/` `Light` namespace); #1657 closed `mesh add_menu` (a `Mesh`
+  `crates/script/src/api/light/` `Light` namespace); #1657 closed `mesh add_menu` (a `Mesh`
   kind, so `Scene.RemoveComponent(id, "Mesh")` keeps a box's collider).
 - **Waived** — a documented decision *not* to add a per-component artifact, because
   the axis is already served by a shared namespace or a content-driven workflow, and
@@ -815,7 +815,7 @@ An axis can be satisfied in two ways:
 **`WAIVERS`** is for axes we have decided not to implement standalone, never for an
 axis not closed yet: that one fails until it is. A row that no longer waives anything
 fails too (`STALE_WAIVER`): its component is no longer discovered, or the axis is
-present after all (`material api` was, once `src/api/material/` landed), so a
+present after all (`material api` was, once `crates/script/src/api/material/` landed), so a
 waiver can't outlive its reason and hide a later regression. A waiver is never a silent skip — its rationale lives in code and is reviewable in
 `git`. To add one, add a row to `WAIVERS` with a clear justification; to revisit one,
 delete the row and the gate will demand the artifact again. The particle system is on

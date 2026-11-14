@@ -21,7 +21,7 @@ use mlua::{Function, Lua, MultiValue, Table, Value};
 
 use super::forwards;
 use crate::scene::Scene;
-use crate::scripting::{HostCall, HostJournal, Plain, ScriptManager};
+use crate::script::scripting::{HostCall, HostJournal, Plain, ScriptManager};
 
 /// The `Harness` verbs that change the world without a tick: noted like an API
 /// call. Every other `Harness` verb reads the world, or steps it.

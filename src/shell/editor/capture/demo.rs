@@ -8,7 +8,7 @@ use super::{capture_with, initial_ui, EditorCaptureOptions};
 use crate::app::GameWorld;
 use crate::core::application::DemoRequest;
 use crate::dev::capture::CaptureHost;
-use crate::scripting::LogLevel;
+use crate::script::scripting::LogLevel;
 
 /// [`capture`](super::capture) with the demo at `demo` opened through
 /// `Editor.OpenDemo`'s path and replayed to `tick`: `Err` when it does not open

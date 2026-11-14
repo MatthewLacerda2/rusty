@@ -19,12 +19,12 @@ use super::super::bake::generate_lighting::{
     bake_occlusion_only, generate_lighting, unsaved_materials_warning,
 };
 use super::super::bake::progress::BakeLog;
-use crate::api::{global_table, put, ApiCell, ApiCtx, Reg};
 use crate::scene::lighting::lightmap::{BakeSettings, Denoiser};
 use crate::scene::lighting::settings::ReflectionSettings;
 use crate::scene::lighting::{DiffuseModel, MixedLightingMode};
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::api::{global_table, put, ApiCell, ApiCtx, Reg};
+use crate::script::scripting::ConsoleLogs;
 
 /// The knobs a script may override, each optional; `None` keeps `base`'s.
 #[derive(Default)]

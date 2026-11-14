@@ -24,11 +24,11 @@ use std::cell::RefCell;
 
 use mlua::Lua;
 
-use crate::api::ApiCell;
-use crate::api::{put, ApiCtx, Reg};
 use crate::core::application::{Application, DemoRequest, Gizmo};
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::api::ApiCell;
+use crate::script::api::{put, ApiCtx, Reg};
+use crate::script::scripting::ConsoleLogs;
 
 /// Register the `Editor` namespace onto `lua` (dev builds only).
 pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {

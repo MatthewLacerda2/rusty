@@ -17,7 +17,7 @@ use super::format::{host_call, End, Entry, Header};
 use super::index::IndexLine;
 use crate::core::input::InputFrame;
 use crate::dev::harness::FIXED_DT;
-use crate::scripting::HostCall;
+use crate::script::scripting::HostCall;
 
 /// A demo on disk, checked: its header and end line, its ticks streamed on demand.
 pub struct Demo {

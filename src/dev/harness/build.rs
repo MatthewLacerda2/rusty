@@ -11,7 +11,7 @@ use crate::core::input::InputState;
 use crate::core::project::ProjectSettings;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 impl Harness {
     /// Build a harness around the default scene — the one the editor seeds (#667) —

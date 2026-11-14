@@ -9,7 +9,7 @@ use crate::dev::session::Session;
 use crate::scene::lighting::occlusion::OcclusionBakeReport;
 use crate::scene::lighting::occlusion::{fingerprint, occlusion_path, test_level::corridors};
 use crate::scene::{MaterialComponent, Scene};
-use crate::scripting::LogLevel;
+use crate::script::scripting::LogLevel;
 
 /// The corridors level saved at a fresh path.
 fn saved(tag: &str) -> String {

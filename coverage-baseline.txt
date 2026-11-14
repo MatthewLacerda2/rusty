@@ -6,12 +6,13 @@
 #
 # These are RECORDED floors a hair below the achieved coverage (measured both
 # feature sets accumulated, each module isolated from every other src/ dir):
-# app 95.03, scripting 96.63, physics 97.59, navigation 96.39, api 86.72.
+# app 95.03, scripting 96.63, physics 97.59, navigation 96.39, api 86.72. `script` holds
+# `scripting` and `api` since they became one crate: its floor is their two floors
+# weighted by lines (~9k at 96, ~30k at 86), to re-measure on the next weekly run.
 # Ratchet them UP as coverage improves; never lower one silently to hide a
 # regression. A lowered floor ends its line with `# reason: <why>`, or
 # `make scripts` fails it (.github/scripts/coverage_floors.py, #963).
 app 95.00
-scripting 96.00
+script 88.00
 physics 97.00
 navigation 96.00
-api 86.00

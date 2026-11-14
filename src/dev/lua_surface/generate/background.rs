@@ -21,10 +21,10 @@
 
 use mlua::Lua;
 
-use crate::api::{global_table, put, ApiCtx, Reg};
 use crate::dev::bake::generate_lighting::refuse_while_baking;
 use crate::scene::lighting::bake_status::BakeStatus;
 use crate::scene::LIGHTING_IN_PLAY;
+use crate::script::api::{global_table, put, ApiCtx, Reg};
 
 /// Why a host that steps no background bake refuses `GenerateAsync`.
 pub const NO_BAKE_HOST: &str = "Lighting.GenerateAsync: no editor frame loop here to \

@@ -43,7 +43,7 @@ use std::sync::mpsc::{self, Receiver, Sender};
 
 use super::bake::progress::listen::listening;
 use super::{console, session};
-use crate::scripting::{ConsoleLogs, ScriptManager};
+use crate::script::scripting::{ConsoleLogs, ScriptManager};
 pub(super) use progress::Reply;
 pub use progress::{asks, parse_progress, progress_line, ASK};
 

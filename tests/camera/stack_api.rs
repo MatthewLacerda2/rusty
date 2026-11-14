@@ -6,15 +6,15 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::components::{CameraComponent, ClearFlags};
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 fn run(scene: &Rc<RefCell<Scene>>, code: &str) -> mlua::Result<()> {
     let lua = Lua::new();
     crate::lua::attempt(|| {
         let table = lua.create_table()?;
-        rusty::api::camera::component::register(&lua, &table, bind(&lua, scene)).unwrap();
+        rusty::script::api::camera::component::register(&lua, &table, bind(&lua, scene)).unwrap();
         lua.globals().set("Camera", table)?;
         lua.load(code).exec()
     })

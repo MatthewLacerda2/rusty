@@ -34,7 +34,7 @@ use crate::editor::{viewport::scene_nav::selection_bounds, EditorUi, ViewportTab
 use crate::navigation::NavigationGraph;
 use crate::render::{readback, OFFSCREEN_FORMAT};
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 pub use demo::capture_demo;
 pub(super) use paint::paint;
 

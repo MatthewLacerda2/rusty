@@ -67,7 +67,7 @@ avoid:
   saved `Scene` field adds a line to both, so two such branches pass clippy's
   50-line cap in `apply`; the level list's check test asks the
   second to land for its field;
-- `src/api/mod.rs`, `src/scripting/callbacks.rs`;
+- `crates/script/src/api/mod.rs`, `crates/script/src/scripting/callbacks.rs`;
 - `src/app/registry.rs`'s `build()`, where order *is* execution order, so a merge
   that reorders it changes behaviour silently;
 - `docs/api/index.md`, `docs/api/Scene.md`'s component list,

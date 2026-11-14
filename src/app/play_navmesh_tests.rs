@@ -13,7 +13,7 @@ use crate::core::input::InputState;
 use crate::navigation::test_support::{add_box, add_floor};
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 const DT: f32 = 1.0 / 60.0;
 /// The floor a marked file gives its first span: no bake makes it.

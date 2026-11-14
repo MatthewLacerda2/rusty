@@ -125,7 +125,7 @@ fn menu_order() -> impl Iterator<Item = (Category, &'static Entry)> {
 /// project has no such scripts, a disabled hint is shown instead. Returns whether
 /// a script was added.
 fn add_script_menu(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) -> bool {
-    let scripts = crate::scripting::monobehaviour_scripts(DEFAULT_SCRIPTS_DEST_DIR);
+    let scripts = crate::script::scripting::monobehaviour_scripts(DEFAULT_SCRIPTS_DEST_DIR);
     if scripts.is_empty() {
         ui.add_enabled(
             false,
@@ -135,7 +135,7 @@ fn add_script_menu(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) ->
     }
     let mut added = false;
     for path in scripts {
-        let label = crate::scripting::script_label(&path);
+        let label = crate::script::scripting::script_label(&path);
         if ui.button(format!("{}  {}", icon::MOON, label)).clicked() {
             added |= authoring::add_script(world, id, &path, Default::default());
             ui.close();

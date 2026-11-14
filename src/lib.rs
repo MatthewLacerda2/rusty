@@ -7,13 +7,11 @@
 //! egui editor, `src/editor` + `shell::editor`). A shipped game is the `player` binary
 //! built with `--no-default-features` — neither layer.
 
-pub mod api;
 pub mod app;
 #[cfg(feature = "editor")]
 pub mod editor;
 pub mod logging;
 pub mod preview;
-pub mod scripting;
 pub mod shell;
 
 // The modules already moved into crates of their own (crates/CLAUDE.md), under their
@@ -30,6 +28,7 @@ pub use rusty_physics as physics;
 pub use rusty_procgen as procgen;
 pub use rusty_render as render;
 pub use rusty_scene as scene;
+pub use rusty_script as script;
 pub use rusty_shadergen as shadergen;
 pub use rusty_time as time;
 pub use rusty_ui as ui;

@@ -61,7 +61,6 @@ pub fn run() {
     let edges = graph::edges(&tree);
     let mut violations = check::all(
         table::LAYERS,
-        table::PEERS,
         table::EXCEPTIONS,
         &graph::modules(&tree),
         &edges,

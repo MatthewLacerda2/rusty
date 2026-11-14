@@ -9,7 +9,7 @@ use super::*;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::script::scripting::ConsoleLogs;
 
 pub(super) fn playing_world() -> GameWorld {
     let mut game = GameWorld::new(

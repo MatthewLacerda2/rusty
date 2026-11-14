@@ -14,7 +14,7 @@ fn a_scenarios_damage_reaches_the_game_scripts_handler() {
     let cells = harness.borrow().world.borrow().script_manager().api_cells();
     let lua = Lua::new();
     cells.install(&lua).expect("cells install");
-    crate::api::attempt(|| {
+    super::attempt(|| {
         super::super::register(&lua, &harness)?;
         lua.load(
             r#"

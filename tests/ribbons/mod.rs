@@ -9,14 +9,14 @@ use std::rc::Rc;
 
 use crate::lua::eval;
 use mlua::Lua;
-use rusty::api::bind;
 use rusty::scene::Scene;
+use rusty::script::api::bind;
 
 /// Run `f` with the `Trail` and `Line` namespaces registered over `scene`.
 fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
-    rusty::api::trail::register(&lua, bind(&lua, scene)).unwrap();
-    rusty::api::line::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::script::api::trail::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::script::api::line::register(&lua, bind(&lua, scene)).unwrap();
     f(&lua);
 }
 

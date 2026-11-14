@@ -24,7 +24,7 @@ fn a_scenarios_move_reaches_the_game_scripts_handler() {
     lua.globals()
         .set("LISTENER", listener.to_string_lossy().into_owned())
         .unwrap();
-    crate::api::attempt(|| {
+    super::attempt(|| {
         super::super::register(&lua, &harness)?;
         lua.load(
             r#"
@@ -50,7 +50,7 @@ fn a_move_before_the_first_step_runs_in_the_scenario() {
     let cells = harness.borrow().world.borrow().script_manager().api_cells();
     let lua = Lua::new();
     cells.install(&lua).expect("cells install");
-    crate::api::attempt(|| {
+    super::attempt(|| {
         super::super::register(&lua, &harness)?;
         lua.load(
             r#"

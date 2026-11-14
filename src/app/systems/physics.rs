@@ -36,7 +36,7 @@ fn log_rebuild(res: &Resources, rebuilt: crate::physics::Rebuilt) {
         ));
     } else {
         let line = format!("Physics: rapier panicked again ({message}); {rebuilt_from_scene}");
-        console.repeated(line, crate::scripting::LogLevel::Error, 1);
+        console.repeated(line, crate::script::scripting::LogLevel::Error, 1);
     }
 }
 

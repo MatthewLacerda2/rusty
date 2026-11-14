@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use super::ADD_MENU;
 
 const EDITOR_DIR: &str = "src/editor";
-const API_DIR: &str = "src/api";
+const API_DIR: &str = "src/script/api";
 
 /// Axis 2: a standalone Add Component entry guards on absence via the #344
 /// accessor facade — `!world.has_<field>(id)`, or a table of entries each naming
@@ -50,7 +50,7 @@ fn candidates(field: &str) -> Vec<String> {
     v
 }
 
-/// Module stems under `src/api/` (the registered namespace module names), minus
+/// Module stems under `src/script/api/` (the registered namespace module names), minus
 /// `mod`: plain `<x>.rs` files AND `<x>/mod.rs` directory modules — a namespace
 /// split into a subfolder to fit the size cap (e.g. `animator/`, `nav/`) is still
 /// one namespace unit.

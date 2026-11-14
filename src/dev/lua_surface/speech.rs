@@ -11,8 +11,8 @@ use mlua::{Lua, Table};
 use super::super::providers::generated::{self, Realised};
 use super::super::providers::speech::{self, Context, Draft, ElevenLabs, SpeechError};
 use super::super::providers::{environment, ledger};
-use crate::api::{put, ApiCtx, Reg};
 use crate::core::paths::to_slash;
+use crate::script::api::{put, ApiCtx, Reg};
 
 /// `Speech.Generate(brief)` → the generated WAV's path; or `nil, why` when the brief
 /// is not finished, so a loop over twenty lines loses none to one typo. Anything
