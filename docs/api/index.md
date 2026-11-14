@@ -32,7 +32,7 @@ joint's connected body, `UI.SetSelected(nil)`, `Scene.SetParent(child, nil)`), t
 
 > **Maintenance:** `docs/api/` is **hand-written** and must be kept in sync with
 > the bindings: `crates/script/src/api/` (registered by `api::register`) and the dev-only
-> namespaces in `src/dev/lua_surface/`. `tests/api_doc_drift.rs` (#280) fails CI
+> namespaces in `crates/dev/src/lua_surface/`. `tests/api_doc_drift.rs` (#280) fails CI
 > when a namespace or function exists on one side only; it checks names, not
 > signatures or what a page says a call does.
 

@@ -61,7 +61,7 @@ jobs:
       # failing tests instead of pointing at the raw log; `--no-fail-fast` runs every
       # binary, so every leak is named, not only the first binary's. The `dev` step is
       # `make test-one-process` without `--quiet` (the summary reads the per-test
-      # lines); `NEXTEST=1` keeps a provider key out of the tests (#974), and
+      # lines); `NEXTEST=1` keeps a provider key out of the binaries the tests spawn (#974), and
       # doctests are left to `make test`, which runs them in the gate.
       - name: cargo test (default)
         run: cargo test --locked --no-fail-fast 2>&1 | tee test-default.log

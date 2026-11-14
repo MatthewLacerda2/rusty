@@ -386,12 +386,14 @@ CI for a leak that only breaks the informational mutation runs (#1338).
 To check a branch before it merges: `make test-one-process` runs the `dev` suite that
 way locally (quiet, every binary, the failing tests named at the end), and
 `gh workflow run cargo-test.yml --ref <branch>` runs the whole signal on GitHub.
-One guarantee is nextest's alone: **a test never
-holds a provider key** (#974). Inside a unit test, or any process nextest starts (it
-sets `NEXTEST`), `dev::providers::environment()` drops every `*_API_KEY` and skips the
-`.env`; the integration binary under plain `cargo test` gets neither signal unless
-`NEXTEST` is set by hand, as `make test-one-process` and the signal's `dev` run do, so
-on a machine with a key a bare `cargo test` is not covered. Doctests stay on `cargo test --doc`, which nextest
+**A test never holds a provider key** (#974), under either runner:
+`dev::providers::environment()` drops every `*_API_KEY` and skips the `.env` unless
+the binary opted in at startup (`dev::providers::read_keys`, which only the editor,
+`session`, `session-mcp` and `play` call), and no test binary does. A binary a test
+spawns (`CARGO_BIN_EXE_session`) has opted in, so it is blanked by `NEXTEST` instead,
+which nextest sets and `make test-one-process` and the signal's `dev` run set by hand:
+under a bare `cargo test` on a machine with a key, those spawned binaries are not
+covered. Doctests stay on `cargo test --doc`, which nextest
 cannot run. CI's `ci` profile additionally writes JUnit, rendered as the
 `build-test` job summary.
 

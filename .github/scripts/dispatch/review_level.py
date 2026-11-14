@@ -62,7 +62,7 @@ TABLE: dict[str, tuple[str, ...]] = {
         "tools/lint/src/layers/table.rs",
         # record and replay: a replay that diverges is a desynced harness (#1636's
         # seek/restore read `medium`)
-        "src/dev/demo/",
+        "crates/dev/src/demo/",
         # which `Debug.Stats` keys are wall-clock and stay out of the harness's
         # `results.json`: a timing key let through makes two runs of one seed differ
         # (#1872 found `render_extract_us` leaking, and read `medium`)

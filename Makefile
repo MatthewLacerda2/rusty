@@ -361,8 +361,8 @@ mutants-remote: ## Mutation on GitHub's runners, scoped. make mutants-remote SCO
 # working directory, a `static` left set); while cargo-mutants ran `cargo test`, such a
 # leak broke the mutation baseline of every branch after it (#1042, #1069, #1337, #1844).
 # A signal, never a gate: it runs nightly on `main` in cargo-test.yml, and this verb
-# runs it on demand. `NEXTEST=1` keeps the guarantee that a test never holds a provider
-# key (`dev::providers::credentials`, #974), and it runs on the gates' proptest seed
+# runs it on demand. `NEXTEST=1` keeps a provider key out of the binaries the tests spawn,
+# which opted in to keys (`dev::providers::credentials`, #974), and it runs on the gates' proptest seed
 # (PROPTEST_RNG_SEED, above; the nightly explores). `--quiet`, since its ~1,800 pass lines are
 # output every agent pays for; `--no-fail-fast` runs every binary, and the failing tests
 # are named again at the end (the log stays in target/one-process.log).

@@ -711,7 +711,7 @@ What is not one row's lives in `tools/lint/src/layers/externs/policy.rs`:
   `use`d.
 - **`confined`** — crates only some subtrees may name, finer than a module: the
   `egui` crates only under `src/editor` and `src/shell/editor` (the `editor`
-  feature, #431), the provider crates only under `src/dev/providers` (#383).
+  feature, #431), the provider crates only under `crates/dev/src/providers` (#383).
 - **`exceptions`** — a use the rules forbid but the code still has, each naming its open issue. There are none today.
 
 The lint reads the `[dependencies]` (and per-target ones) of the root `Cargo.toml` and

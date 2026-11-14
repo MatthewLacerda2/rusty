@@ -2,7 +2,7 @@
 
 Some authoring verbs ask a third-party vendor to generate an asset (ElevenLabs for
 voice lines, for example). Those calls live behind one dev-only boundary,
-`src/dev/providers/` (#383), and this page is the part a person does by hand.
+`crates/dev/src/providers/` (#383), and this page is the part a person does by hand.
 
 A shipped game never makes a provider call. It plays the files that were generated
 while authoring, the same way it uses baked lighting.
@@ -20,6 +20,9 @@ rusty never ships or shares an account. You bring your own key:
 An exported environment variable wins over `.env`. The file only fills gaps, so
 a key exported in your shell is the one used. When no key is found, the refusal
 names the variable and every place that was checked.
+
+Only the binaries you author with read a key: the editor, `session`, `session-mcp`
+and `play`. Every other process, the tests included, sees none and is refused.
 
 ## The budget
 

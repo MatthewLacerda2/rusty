@@ -1,8 +1,8 @@
 //! crates/preview/src/lib.rs — the asset-preview machinery, shared by the editor and the agent.
 //!
 //! One isolated preview scene (#352) with two front-ends: the Inspector's Preview tab
-//! (`editor/inspector/preview.rs`, human-facing, with drag-to-orbit) and the headless
-//! `Debug.Preview` capture (`dev/preview.rs`, agent-facing, fixed framing) — the same
+//! (`src/editor/inspector/preview.rs`, human-facing, with drag-to-orbit) and the headless
+//! `Debug.Preview` capture (`crates/dev/src/preview.rs`, agent-facing, fixed framing) — the same
 //! "one surface, three callers" rule the scripting API follows (#353).
 //!
 //! Nothing here touches egui, wgpu or the active editor World: [`scene`] builds a

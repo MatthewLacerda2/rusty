@@ -3277,6 +3277,7 @@ dependencies = [
  "egui-phosphor",
  "egui-wgpu",
  "egui-winit",
+ "getrandom 0.4.3",
  "gilrs",
  "glam 0.33.12",
  "image",
@@ -3422,7 +3423,6 @@ name = "rusty-dev"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
- "getrandom 0.4.3",
  "glam 0.33.12",
  "image",
  "libloading",

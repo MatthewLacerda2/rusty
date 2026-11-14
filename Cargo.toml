@@ -99,7 +99,7 @@ path = "tests/main.rs"
 [features]
 default = ["editor"]
 # The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.
-dev = ["dep:rusty-dev", "rusty-dev/dev", "rusty-render/dev", "rusty-app/dev", "rusty-script/dev", "rusty-ai/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-scene/dev", "rusty-shadergen/dev", "rusty-asset/dev", "rusty-core/dev"]
+dev = ["dep:rusty-dev", "rusty-dev/dev", "rusty-render/dev", "rusty-app/dev", "rusty-script/dev", "rusty-ai/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-scene/dev", "rusty-shadergen/dev", "rusty-asset/dev", "rusty-core/dev", "dep:getrandom"]
 # The egui editor (#431): `src/editor` and the shell's editor frontend. Default-on so
 # `cargo run` opens the editor; a shipped player builds with `--no-default-features`.
 editor = ["rusty-render/editor", "rusty-app/editor", "rusty-physics/editor", "rusty-shadergen/editor", "rusty-asset/editor", "rusty-core/editor", "dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor", "dep:notify"]
@@ -311,6 +311,8 @@ skrifa = { workspace = true }
 gilrs = { workspace = true }
 notify = { workspace = true, optional = true }
 arboard = { workspace = true }
+# A feature pin, never `use`d: why is beside its version above.
+getrandom = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = { workspace = true }
