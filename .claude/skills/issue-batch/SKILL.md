@@ -37,6 +37,14 @@ The limits are CLAUDE.md's; the reasons are here, so they are kept, not re-argue
   finishes nothing sooner.
 - **Read-only agents** (research, review, planning) **without limit**: they build
   nothing.
+- **Who runs on what.** The orchestrator runs on whatever model the operator
+  picked; everything that writes or judges code runs on a model its definition
+  pins, so the choice never follows the orchestrator's. `make coder` pins the
+  cloud coder's (`dispatch/routine.py`'s `MODEL`). The `Agent` tool's types are
+  in `.claude/agents/`: `coder` (a local coder) and `reviewer` on the latest
+  Opus, `merge-fixer` (a hand-back's mechanical fix) on Sonnet. Dispatch them by
+  `subagent_type` and never pass `model`, which would override the pin. The
+  orchestrator's own quick read-only searches run on what it picks.
 - Merging stays one at a time, whatever the count.
 - **One worktree per branch**, under `.claude/worktrees/`, off the latest `main`,
   removed the moment it merges. **Never a shared `CARGO_TARGET_DIR`**: worktrees
@@ -98,7 +106,7 @@ the code*, not merely listable.
 
 ## Where a branch runs
 
-**Cloud by default** (CLAUDE.md, *Worktrees are cheap*). rusty is developed by one
+**Cloud by default** (CLAUDE.md, *Coding parallelises*). rusty is developed by one
 person, locally or in a cloud session, not by many contributors on many cold
 machines, so don't propose tooling built for that. Each worktree compiles into its
 own `target/`, and one cold build fills every core and several GB of memory:
@@ -111,9 +119,9 @@ queue is the only local work (*The orchestrator's loop*). Once the local-only pr
 is in the PR, the rest of the branch can go to the cloud. Local builds: check
 `free -g` and `df -h` first, and give each heavy build half the cores
 (`CARGO_BUILD_JOBS`) when another may overlap it. Never run `cargo mutants`
-locally during a batch. A local coder gets the same `Brief` and `cloud-brief.md`,
-and puts its issue number in every scratch filename: siblings share the
-scratchpad.
+locally during a batch. A local coder is the `Agent` tool's `coder` type, its
+prompt the issue number and its `Brief` comment's URL: it follows the same
+`cloud-brief.md`.
 
 **Launching a cloud coder: post the `Brief`, then `make coder ISSUE=N`.**
 It reads the newest `Brief` comment on #N and creates the one-off routine that
@@ -221,8 +229,11 @@ finish the pushed branch.
 
 ## The orchestrator's loop
 
-The orchestrator (this session, local) writes no feature code. It picks work,
-briefs coders, reads diffs and labels. GitHub is the batch's state: open PRs,
+The orchestrator (this session, local) writes no code: not a feature, not a fix
+a review asked for, not a conflict's resolution. It picks work, writes issues
+and briefs, reads diffs and labels; the one branch it writes itself is a small
+documentation or doctrine PR (a skill, a `CLAUDE.md`, an agent definition).
+GitHub is the batch's state: open PRs,
 their comments and `RemoteTrigger list` resume a batch from nothing, so nothing
 lives only in the scratchpad.
 
@@ -280,12 +291,13 @@ Per pull request:
    mutation run (a `Mutation:` line, which the queue dispatches after the merge),
    read the report when it lands on the merged PR (`ci-merge`, *Triaging a
    survivor*).
-2. **A hand-back** skips that PR and the watch carries on. A one-line fix is
-   yours: under `--no-check` nothing compiles it before CI, so grep every use of
-   what either side moved and check the 300-line and 50-line caps first; the
-   `pre-push` hook (`make resolved`) catches a resolution rustfmt rejects. A
+2. **A hand-back** skips that PR and the watch carries on. A mechanical fix (a
+   conflict where both sides are kept, a one-line red) goes to the `Agent`
+   tool's `merge-fixer`, its prompt the PR, its branch and the hand-back line;
+   take `queue` off first and put it back after reading what it pushed. A
    resolution that needs a compile to trust (a split, a dispatcher, system
-   order, `Cargo.lock`) goes to a fresh routine.
+   order, `Cargo.lock`), or one `merge-fixer` stopped on, goes to a fresh
+   routine.
 3. **After a merge:** `make reclaim` (removes merged worktrees and deletes
    finished local branches, refuses unpushed work), then re-read the board.
 

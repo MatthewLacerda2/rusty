@@ -111,9 +111,9 @@ wins.
 - **Coding parallelises; merging does not.** **Cloud coders ≤5, local coders ≤2,
   read-only agents without limit**; **one worktree per branch** under
   `.claude/worktrees/`, **never a shared `CARGO_TARGET_DIR`**; split issues by
-  responsibility, never by parallelism. **Worktrees are cheap, simultaneous builds are
-  not:** **a branch is written in a cloud session by default** (`issue-batch`, *Where a
-  branch runs*, has the reasons).
+  responsibility, never by parallelism; **a branch is written in a cloud session by
+  default**. **The orchestrator writes issues and briefs, never code** (a doc or
+  doctrine PR aside); **coders and reviewers run on the latest Opus** (`issue-batch`).
 - **Dependencies (not batches).** Record how issues relate with GitHub's native
   **relationships** (`Blocked by` / `Blocks`, **sub-issues** for literal groundwork)
   when one lays groundwork for, eases, or would conflict with another. The dependency
