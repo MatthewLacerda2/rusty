@@ -8,7 +8,7 @@
 //! before it is added and a seeded one never is.
 //!
 //! Only the size gate reads this list. The code gates (rules, layers, determinism,
-//! direction, components, parity) keep walking the disk: they check what cargo
+//! components, parity) keep walking the disk: they check what cargo
 //! compiles, and an ignored `.rs` under a scan root is compiled all the same. The
 //! `ignored` rule flags exactly that file, so it must see it.
 

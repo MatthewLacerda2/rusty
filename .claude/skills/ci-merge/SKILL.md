@@ -90,7 +90,7 @@ opened since then.
    `--no-check`. Every merged tree but a Markdown-only one touching no agent doc
    (a `CLAUDE.md`, a skill's file) still gets `tools/lint`'s build-free passes, and
    so does a head touching one that `main` passed only by Markdown (merged
-   unpushed, just to lint) (`merging/queue/lints.py`; size, rules, layers, determinism, direction,
+   unpushed, just to lint) (`merging/queue/lints.py`; size, rules, layers, determinism,
    components, parity), built once per `tools/lint` tree into
    `target/merge-queue-lint`; a violation hands the head back unpushed, naming the
    pass, rule and file and the PRs merged since the branch's base that touched it.
