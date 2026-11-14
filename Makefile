@@ -148,7 +148,7 @@ determinism: ## [gate] Lint policy: only platform roots opt out of the clock/RNG
 components: ## [gate] Every first-class component has all four axes
 	$(LINT) -- --components
 
-parity: ## [gate] Migrated inspector cards route through scene::authoring
+parity: ## [gate] Migrated inspector cards route through edit::authoring
 	$(LINT) -- --parity
 
 test-lint: ## [gate] tools/lint's own tests

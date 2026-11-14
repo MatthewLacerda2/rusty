@@ -299,7 +299,7 @@ new flag, gate, CI step or baseline.
   calls by its bare name (`set_intensity(c, v.intensity)`) counts as reached too.
   Ops are matched by
   path, from the root a file spells `edit::authoring` by: `crate::authoring` inside
-  `rusty-scene`, `rusty_scene::authoring` in another member crate,
+  `rusty-edit`, `rusty_edit::authoring` in another member crate,
   `crate::edit::authoring` in the root package. Each file's `use` trees from that
   root give its aliases
   (`rigidbody as rb`, `{self as ops, …}`, `nav::{agent, …}`, a setter imported by
