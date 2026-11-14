@@ -7,9 +7,10 @@
 //! joint drive). Setters kept skipping them (#993, #1341, #1342), so a `set_*` under
 //! `src/scene/authoring/` with any `pub` visibility that takes a float-carrying
 //! parameter is a finding unless each such parameter is passed whole to a rule (a
-//! call `helper(param…` of any `fn` a file under `src/scene/rules/` defines) or to
-//! another `set_*` of the same file, which this rule checks in turn. A rule is
-//! trusted to hold what it takes: it is the one place a bound lives. A parameter carries a float when its type, under `&`,
+//! bare `pub fn` under `src/scene/rules/`) at a position that rule holds, or to
+//! another `set_*` of the same file, which this rule checks in turn. Which
+//! positions a rule holds, and the finding for a rule that holds a float nowhere,
+//! are `sanitize_rules`'. A parameter carries a float when its type, under `&`,
 //! `Option<…>`, `Vec<…>` and `[…; N]`, is one of [`FLOATS`]. A value checked another
 //! way says so with `// lint: allow(sanitize) <why>`. Test code is not scanned.
 //!
@@ -23,14 +24,14 @@
 //! - [`FLOATS`] names the float structs the setters take today: a new one joins it.
 
 use super::finding::Finding;
+use super::sanitize_rules::{resolved, unheld, Rule};
 use super::scan::Scan;
 use crate::code::{code_lines, is_ident};
 
 pub const RULE: &str = "sanitize";
 
-/// Where the setters live, and the folder of rules they must store through.
+/// Where the setters live.
 const DIR: &str = "src/scene/authoring/";
-const HELPERS: &str = "src/scene/rules/";
 
 /// Parameter types that can carry a NaN or an infinity: the float scalars, glam's
 /// vectors, and the float structs the setters take.
@@ -63,30 +64,8 @@ struct Setter {
     body: String,
 }
 
-/// Every `fn` name the files under [`HELPERS`] define outside their tests, of
-/// `files` (each a path and its text).
-pub fn rules<'a>(files: impl Iterator<Item = (&'a str, &'a str)>) -> Vec<String> {
-    let under = |p: &str| crate::modules::module_path(p).starts_with(HELPERS);
-    (files.filter(|(p, _)| under(p)))
-        .flat_map(|(_, source)| helpers(source))
-        .collect()
-}
-
-/// Every `fn` name `source` defines outside its tests.
-pub fn helpers(source: &str) -> Vec<String> {
-    let code = code_lines(source);
-    let end = code
-        .iter()
-        .position(|l| l.contains("#[cfg(test)]"))
-        .unwrap_or(code.len());
-    code[..end]
-        .iter()
-        .filter_map(|l| ident_after(l, "fn "))
-        .collect()
-}
-
 /// Every setter of `source` that stores a float parameter unsanitized.
-pub fn check(path: &str, source: &str, test: &[bool], helpers: &[String]) -> Vec<Finding> {
+pub fn check(path: &str, source: &str, test: &[bool], rules: &[Rule]) -> Vec<Finding> {
     let at = crate::modules::module_path(path);
     if !at.starts_with(DIR) {
         return Vec::new();
@@ -101,15 +80,15 @@ pub fn check(path: &str, source: &str, test: &[bool], helpers: &[String]) -> Vec
     let names: Vec<&str> = setters.iter().map(|s| s.name.as_str()).collect();
     let mut found = Vec::new();
     for s in &setters {
-        let callees = helpers
-            .iter()
-            .map(String::as_str)
-            .chain(names.iter().copied().filter(|n| *n != s.name));
-        let callees: Vec<&str> = callees.collect();
-        let raw: Vec<&str> = s
-            .floats
-            .iter()
-            .filter(|p| !callees.iter().any(|c| passes(&s.body, c, p)))
+        let siblings = names.iter().copied().filter(|n| *n != s.name);
+        let held = |p: &str| {
+            rules
+                .iter()
+                .any(|r| passes_at(&s.body, &r.name, p, Some(&r.held)))
+                || siblings.clone().any(|n| passes_at(&s.body, n, p, None))
+        };
+        let raw: Vec<&str> = (s.floats.iter())
+            .filter(|p| !held(p))
             .map(String::as_str)
             .collect();
         if !raw.is_empty() {
@@ -151,7 +130,7 @@ fn setter(code: &[&str], i: usize) -> Option<Setter> {
 }
 
 /// The names of the parameters in `params` whose type is a float or a glam vector.
-fn float_params(params: &str) -> Vec<String> {
+pub(super) fn float_params(params: &str) -> Vec<String> {
     split_top(params)
         .iter()
         .filter_map(|p| p.split_once(':'))
@@ -179,7 +158,7 @@ fn carries_float(ty: &str) -> bool {
 }
 
 /// `s` split at its top-level commas.
-fn split_top(s: &str) -> Vec<&str> {
+pub(super) fn split_top(s: &str) -> Vec<&str> {
     let (mut depth, mut from, mut parts) = (0i32, 0, Vec::new());
     for (at, c) in s.char_indices() {
         match c {
@@ -197,7 +176,7 @@ fn split_top(s: &str) -> Vec<&str> {
 }
 
 /// Byte offset of the bracket closing the one `s` starts with.
-fn matching(s: &str, open: char, close: char) -> Option<usize> {
+pub(super) fn matching(s: &str, open: char, close: char) -> Option<usize> {
     let mut depth = 0;
     for (at, c) in s.char_indices() {
         if c == open {
@@ -212,9 +191,14 @@ fn matching(s: &str, open: char, close: char) -> Option<usize> {
     None
 }
 
-/// Does `body` call `callee` with `param` itself (not one of its fields) among the
-/// arguments?
-fn passes(body: &str, callee: &str, param: &str) -> bool {
+/// Does `body` call `callee` with `param` itself (not one of its fields) as an
+/// argument, at one of `positions` (any, for `None`)?
+pub(super) fn passes_at(
+    body: &str,
+    callee: &str,
+    param: &str,
+    positions: Option<&[usize]>,
+) -> bool {
     body.match_indices(callee).any(|(at, _)| {
         let before = body[..at].chars().next_back();
         let after = &body[at + callee.len()..];
@@ -224,14 +208,17 @@ fn passes(body: &str, callee: &str, param: &str) -> bool {
         let Some(close) = matching(after, '(', ')') else {
             return false;
         };
-        split_top(&after[1..close])
-            .iter()
-            .any(|arg| arg.trim() == param)
+        let args = split_top(&after[1..close]);
+        let at = |k: &usize| args.get(*k).is_some_and(|a| a.trim() == param);
+        match positions {
+            Some(held) => held.iter().any(at),
+            None => args.iter().any(|a| a.trim() == param),
+        }
     })
 }
 
 /// The identifier right after the first `marker` in `line`.
-fn ident_after(line: &str, marker: &str) -> Option<String> {
+pub(super) fn ident_after(line: &str, marker: &str) -> Option<String> {
     let at = line.find(marker)?;
     if line[..at].chars().next_back().is_some_and(is_ident) {
         return None;
@@ -245,11 +232,10 @@ fn ident_after(line: &str, marker: &str) -> Option<String> {
 
 /// The rule over every scanned file.
 pub fn run(scan: &Scan) -> Vec<Finding> {
-    let helpers = rules(scan.files.iter().map(|p| (p.as_str(), scan.source(p))));
-    scan.files
-        .iter()
-        .flat_map(|p| check(p, scan.source(p), scan.test_lines(p), &helpers))
-        .collect()
+    let rules = resolved(scan.files.iter().map(|p| (p.as_str(), scan.source(p))));
+    let setters =
+        (scan.files.iter()).flat_map(|p| check(p, scan.source(p), scan.test_lines(p), &rules));
+    setters.chain(unheld(&rules)).collect()
 }
 
 #[cfg(test)]

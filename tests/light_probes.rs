@@ -65,7 +65,7 @@ fn positions_in_scene_sh_in_sidecar_round_trip() {
     let path = tmp("rusty_light_probes.scene");
     let sidecar = sidecar_path(&path);
     let _ = std::fs::remove_file(&sidecar);
-    scene.save_to_file(&path).unwrap();
+    rusty::scene::save_to_file(&scene, &path).unwrap();
 
     // The scene doc carries positions but NOT the SH (sidecar holds it).
     let scene_json = std::fs::read_to_string(&path).unwrap();
@@ -80,7 +80,7 @@ fn positions_in_scene_sh_in_sidecar_round_trip() {
     assert!(sidecar.exists(), "lighting sidecar was not written");
 
     let mut loaded = Scene::new();
-    loaded.load_from_file(&path).unwrap();
+    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
     assert_eq!(loaded.probes.probes().len(), probe_count);
     assert_eq!(
         loaded.probes.probes()[0].position,
@@ -99,13 +99,13 @@ fn unbaked_probes_write_no_sidecar() {
     let path = tmp("rusty_light_probes_unbaked.scene");
     let sidecar = sidecar_path(&path);
     let _ = std::fs::remove_file(&sidecar);
-    scene.save_to_file(&path).unwrap();
+    rusty::scene::save_to_file(&scene, &path).unwrap();
     assert!(
         !sidecar.exists(),
         "unbaked probes should not write a sidecar"
     );
 
     let mut loaded = Scene::new();
-    loaded.load_from_file(&path).unwrap();
+    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
     assert_eq!(loaded.probes.probes().len(), 1);
 }

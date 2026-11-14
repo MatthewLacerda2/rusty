@@ -45,7 +45,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Entity ids from Lua | `tools/lint -- --rules` (`entity-arg`) | **hard gate**: in `crates/script/src/api/`, a Lua callback never takes an entity (`id`, `…_id`, `parent`, `child`, `target`, `entity`, `body`, `canvas`) as a bare `u32` or `Option<u32>`: it takes `api::entity_arg::EntityArg`, so a `nil` id reads as a missing entity and fails a write with the verb's name (#1383) |
 | Every ECS write is stamped | `tools/lint -- --rules` (`ecs-write`) | **hard gate**: a non-test line of `crates/ecs/src/` that borrows a hecs column mutably (`get::<&mut …>`, `query_one::<(&mut …)>`, `query_mut`) or reshapes the store through `inner.` (`spawn`, `despawn`, `insert`, `remove`, `clear`, …) fails, since a write that skips `World::touch` stamps no change and every change-log consumer misses it; each funnel line, and `World::derived_mut`, takes `// lint: allow(ecs-write) <why>` (#1705) |
 | File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py`, `.lua` or `.wgsl` one (docstrings, comments and blank lines free, #926, #1015); nothing grandfathered |
-| Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `crates/scene/src/authoring/` that takes a float (an `f32`/`f64`, a glam vector, or a float struct such as `Curve`) passes it to a `scene::rules` function (a `rules::sanitize` helper or a bound such as `rules::lens::hold_fov`), or a sibling setter of its file, so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
+| Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `crates/scene/src/authoring/` that takes a float (an `f32`/`f64`, a glam vector, or a float struct such as `Curve`) passes it to a `scene::rules` function (a bare `pub fn`: a `rules::sanitize` helper or a bound such as `rules::lens::hold_fov`) at a position that rule holds, or a sibling setter of its file; a rule taking floats and holding none (a pass-through) fails too, so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
 | Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix (#934) |
 | Full component literals in tests | `tools/lint -- --rules` (`full-literal`) | **hard gate**: test code builds a first-class component with `..rest` or a constructor, never a literal naming every field (#663, #976) |
 | Function ("endpoint") length | clippy `too_many_lines` + `tools/lint -- --determinism` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]`; its one exception, `Renderer::assemble`, is locked (`ESCAPE`, #961) |
@@ -557,13 +557,24 @@ new flag, gate, CI step or baseline.
 - **`sanitize`** — every authoring setter refuses a non-finite float (#1361).
   A `pub fn set_*` (any `pub` visibility) under `crates/scene/src/authoring/` (test code
   aside) that takes a float-carrying parameter fails unless each such parameter is
-  passed whole to a rule: a function a file under `crates/scene/src/rules/` defines,
-  the float helpers of `scene::rules::sanitize` (`finite`, `finite_or`, `at_least`,
-  `non_negative`, `clamped`, `unit`, `unit_color`, `finite2`/`3`/`4` and their `_or`
-  forms) or a bound the base holds too (`rules::lens::hold_fov`,
-  `rules::joint::drive_value`; the rule reads the list from those files), or to
-  another `set_*` of the same file, which it checks in turn. A rule is trusted to
-  hold what it takes: it is the one place its bound lives. A parameter
+  passed whole to a rule at a position the rule holds: a bare `pub fn` a file under
+  `crates/scene/src/rules/` defines outside its tests, the float helpers of
+  `scene::rules::sanitize` (`finite`, `finite_or`, `at_least`, `non_negative`,
+  `clamped`, `unit`, `unit_color`, `finite2`/`3`/`4` and their `_or` forms) or a
+  bound the base holds too (`rules::lens::hold_fov`, `rules::joint::drive_value`;
+  the rule reads the list from those files), or to another `set_*` of the same
+  file, which it checks in turn. **A rule is not trusted by name**
+  (`rules/sanitize_rules.rs`): it holds a float parameter when a statement or match
+  arm of its body calls `is_finite()` on that parameter (on it, a field or a method
+  chain of it, or a closure argument traced back to such a chain:
+  `v.iter().all(|x| x.is_finite())`) or hands it whole to another rule at a position
+  that one holds, found to a fixed point over every rule. So
+  `finite_or(v, fallback)` holds `v` and not `fallback`, and a setter passing its
+  value as the fallback fails. A test on another parameter holds only that one, and
+  `is_nan` alone holds nothing: it lets `±inf` through. A rule taking floats and holding none (a
+  pass-through) is itself a finding, on its `fn` line; one holding its value another
+  way says so with `// lint: allow(sanitize) <why>` above it and then holds its
+  first float (`rules::lens::hold_projection`, `optional_color_or`, `saturated`). A parameter
   carries a float when its type, under `&`, `Option<…>`, `Vec<…>` or `[…; N]`, is
   `f32`, `f64`, `Vec2`/`3`/`4`, `Quat` or one of the float structs the setters take
   (`Curve`, `Gradient`, `Range`, …: `FLOATS` in the rule; a new one joins it). `finite(v.x)`

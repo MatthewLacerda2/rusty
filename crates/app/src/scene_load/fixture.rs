@@ -62,15 +62,15 @@ pub(super) fn write_scenes(tag: &str) -> (String, String) {
         path: level_lua,
         ..Default::default()
     }];
-    menu.save_to_file(&path("menu.scene")).unwrap();
-    lvl.save_to_file(&level).unwrap();
+    rusty_scene::save_to_file(&menu, &path("menu.scene")).unwrap();
+    rusty_scene::save_to_file(&lvl, &level).unwrap();
     (path("menu.scene"), level)
 }
 
 /// A world with `path` loaded as its scene file, and its console.
 pub(super) fn world_at(path: &str) -> (GameWorld, Rc<RefCell<ConsoleLogs>>) {
     let mut scene = Scene::new();
-    scene.load_from_file(path).unwrap();
+    rusty_scene::load_from_file(&mut scene, path).unwrap();
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
     let gw = GameWorld::new(
         Rc::new(RefCell::new(scene)),

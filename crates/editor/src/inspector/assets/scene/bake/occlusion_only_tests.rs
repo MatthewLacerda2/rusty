@@ -16,7 +16,7 @@ fn started(tag: &str) -> (EditorUi, Scene, String, ConsoleLogs) {
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("level.scene").to_string_lossy().into_owned();
     let mut scene = corridors();
-    scene.save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&scene, &path).unwrap();
     let mut editor = EditorUi::new(Default::default());
     editor.set_current_scene_path(Some(path.clone()));
     let mut console = ConsoleLogs::default();

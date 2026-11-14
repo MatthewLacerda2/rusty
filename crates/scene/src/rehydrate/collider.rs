@@ -10,12 +10,12 @@
 
 use glam::Vec3;
 
-use super::{bounds_of, hold_fields, install, rehydrate_one, reimport};
+use super::{bounds_of, hold_fields, install, rehydrate_one};
 use rusty_components::{ColliderComponent, ColliderShape, SharedMesh};
 
 /// Which of a collider's own meshes to rebuild.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Which {
+pub enum Which {
     /// `shared_mesh`: the copy kept of a removed Mesh.
     Kept,
     /// `collision_mesh`: the authored collision mesh.
@@ -24,7 +24,7 @@ pub(crate) enum Which {
 
 impl Which {
     /// The field this names on `collider`, read-only.
-    pub(crate) fn get(self, collider: &ColliderComponent) -> &Option<SharedMesh> {
+    pub fn get(self, collider: &ColliderComponent) -> &Option<SharedMesh> {
         match self {
             Which::Kept => &collider.shared_mesh,
             Which::Collision => &collider.collision_mesh,
@@ -32,7 +32,7 @@ impl Which {
     }
 
     /// The field this names on `collider`.
-    pub(crate) fn of(self, collider: &mut ColliderComponent) -> &mut Option<SharedMesh> {
+    pub fn of(self, collider: &mut ColliderComponent) -> &mut Option<SharedMesh> {
         match self {
             Which::Kept => &mut collider.shared_mesh,
             Which::Collision => &mut collider.collision_mesh,
@@ -64,11 +64,24 @@ pub(crate) fn rebuild(id: u32, collider: &mut ColliderComponent, which: Which) {
 /// `MeshCollider` follows its mesh: its collision mesh when that has triangles, else
 /// `own` (its entity's Mesh bounds), else its kept shared mesh. With none of them,
 /// or for any other shape, the box is left as it is.
-pub(crate) fn refit_collider(collider: &mut ColliderComponent, own: Option<(Vec3, Vec3)>) {
+pub fn refit_collider(collider: &mut ColliderComponent, own: Option<(Vec3, Vec3)>) {
     let points = |m: &SharedMesh| bounds_of(m.positions.iter().copied());
     let collision = collider.built_collision_mesh().and_then(points);
     let kept = || collider.shared_mesh.as_ref().and_then(points);
     if let Some(bounds) = collision.or(own).or_else(kept) {
-        reimport::refit(collider, bounds);
+        refit(collider, bounds);
+    }
+}
+
+/// Size `collider`'s box to `(min, max)` when it is a mesh collider, as Unity's
+/// `MeshCollider` follows its shared mesh. Any other shape is left as authored.
+fn refit(collider: &mut ColliderComponent, (min, max): (Vec3, Vec3)) {
+    if let ColliderShape::Mesh {
+        local_min,
+        local_max,
+        ..
+    } = &mut collider.shape
+    {
+        (*local_min, *local_max) = (min, max);
     }
 }

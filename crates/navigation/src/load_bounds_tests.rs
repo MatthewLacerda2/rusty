@@ -26,7 +26,7 @@ fn a_re_rooted_survivor_is_baked_where_it_stands_now() {
     let lamp = level.add_entity("Lamp".to_string());
     level.set_parent(lamp, Some(floor)).unwrap();
     let survivors = s.load_survivors();
-    s.swap_in(to_scene_data(&level), NO_SIDECAR, &survivors)
+    rusty_scene::edit_side::load::swap_in(&mut s, to_scene_data(&level), NO_SIDECAR, &survivors)
         .unwrap();
     let (min, _) = s.world.collider_bounds(crate_).unwrap();
     let nav = NavigationGraph::from_scene(&s).bounds();

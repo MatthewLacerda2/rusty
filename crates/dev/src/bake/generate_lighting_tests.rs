@@ -32,7 +32,7 @@ fn saved_floor(name: &str) -> (Scene, String) {
     scene.world.set_collider(floor, Some(collider));
     let s = &mut scene.lighting_settings.lightmaps;
     (s.texels_per_unit, s.samples, s.bounces, s.max_lightmap_size) = (2.0, 4, 1, 32);
-    scene.save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&scene, &path).unwrap();
     (scene, path)
 }
 
@@ -65,7 +65,7 @@ fn gpu_generate_bakes_lightmaps_then_probes_and_writes_the_scene() {
     assert_eq!(report.saved, LightingSave::Written);
 
     let mut back = Scene::new();
-    back.load_from_file(&path).unwrap();
+    rusty_scene::load_from_file(&mut back, &path).unwrap();
     assert_eq!(back.lightmaps, scene.lightmaps, "no re-save needed");
     assert_eq!(back.probes.probes().len(), scene.probes.probes().len());
     assert_eq!(back.lighting_settings, scene.lighting_settings);

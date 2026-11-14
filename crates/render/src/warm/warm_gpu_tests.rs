@@ -13,7 +13,7 @@ use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_asset::MapRef;
 use rusty_components::MaterialComponent;
 use rusty_scene::authoring::{primitive_mesh_component, Primitive};
-use rusty_scene::runtime::prepare::PreparedScene;
+use rusty_scene::edit_side::load::prepare::PreparedScene;
 use rusty_scene::{Camera, MaterialAsset, Scene};
 
 const W: u32 = 32;
@@ -45,7 +45,7 @@ fn level(tag: &str, props: [Primitive; 2]) -> String {
     };
     scene.materials.insert("mapped".into(), mapped);
     let path = rusty_core::paths::to_slash(&dir.join(format!("{tag}.scene")));
-    scene.save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&scene, &path).unwrap();
     path
 }
 
@@ -64,7 +64,7 @@ pub(super) fn first_frame(
     scene: &mut Scene,
     prepared: PreparedScene,
 ) -> Uploads {
-    scene.swap_in_prepared(prepared, &BTreeSet::new()).unwrap();
+    rusty_scene::edit_side::load::swap_in_prepared(scene, prepared, &BTreeSet::new()).unwrap();
     render(renderer, scene)
 }
 

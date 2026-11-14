@@ -60,6 +60,33 @@ pub const EFFECTS: &[Effect] = &[
     white_balance::EFFECT,
 ];
 
+/// What this layer lists for the post effects' completeness gate
+/// (`render::postfx::completeness`): the volume's and the camera's field tables,
+/// the volume's effect rows and the camera's knob tables, by name. The one builder
+/// the renderer's tests and the integration suite hand in.
+pub fn authored() -> crate::authored::Authored {
+    let fields_of = |kind: &str| -> Vec<String> {
+        let kind = crate::authoring::fields::find(kind).expect("a first-class component");
+        (kind.fields)()
+            .into_iter()
+            .map(|(n, _)| n.to_string())
+            .collect()
+    };
+    let names = |fields: &mut dyn Iterator<Item = &str>| fields.map(String::from).collect();
+    use super::camera::{TAA_EFFECT, TAA_KNOBS};
+    crate::authored::Authored {
+        volume_fields: fields_of("PostProcessing"),
+        camera_fields: fields_of("Camera"),
+        ops: (EFFECTS.iter())
+            .map(|e| (e.name.into(), names(&mut e.knobs.iter().map(|k| k.field))))
+            .collect(),
+        camera_knobs: vec![(
+            TAA_EFFECT.into(),
+            names(&mut TAA_KNOBS.iter().map(|k| k.field)),
+        )],
+    }
+}
+
 /// How many rows the volume's field table has.
 const ROWS: usize = volume::FIELDS.len() + EFFECTS.len();
 

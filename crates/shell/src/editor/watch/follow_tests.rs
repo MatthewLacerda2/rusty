@@ -13,7 +13,7 @@ fn write_outside(path: &str, extra: &[&str]) {
     for name in extra {
         scene.add_entity(name.to_string());
     }
-    scene.save_to_file(path).unwrap();
+    rusty_scene::save_to_file(&scene, path).unwrap();
     note_written(path);
 }
 
@@ -23,7 +23,7 @@ fn open(tag: &str) -> (String, Scene, SceneFollow, Option<u32>) {
     let path = path.to_string_lossy().into_owned();
     write_outside(&path, &["Gone"]);
     let mut scene = Scene::new();
-    scene.load_from_file(&path).unwrap();
+    rusty_scene::load_from_file(&mut scene, &path).unwrap();
     let mut follow = SceneFollow::new();
     let mut selected = scene.find_entity_by_name("Gun");
     let mut console = ConsoleLogs::new();
@@ -71,7 +71,7 @@ fn unsaved_edits_are_discarded_with_a_warning() {
 fn the_editors_own_save_is_not_an_outside_change() {
     let (path, mut scene, mut follow, mut selected) = open("own_save");
     scene.add_entity("Saved".to_string());
-    scene.save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&scene, &path).unwrap();
     note_written(&path); // the watch reports the editor's own write
     let mut console = ConsoleLogs::new();
     assert!(!follow.apply(&mut scene, Some(&path), &mut selected, &mut console));

@@ -22,7 +22,7 @@ pub fn demo_of_a_saved_scene() -> (PathBuf, String) {
     let harness = Harness::new(dir.join("record"), "");
     {
         let mut world = harness.world.borrow_mut();
-        world.scene().borrow().save_to_file(&scene_file).unwrap();
+        rusty::scene::save_to_file(&world.scene().borrow(), &scene_file).unwrap();
         *world.script_manager().scene_path_cell().borrow_mut() = Some(scene_file.clone());
         demo::record(&mut world, Destination::File(path.clone()));
     }

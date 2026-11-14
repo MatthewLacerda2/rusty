@@ -210,32 +210,6 @@ impl Scene {
 }
 
 #[cfg(test)]
-mod bone_refs_tests;
-#[cfg(test)]
-mod connected_bone_tests;
-#[cfg(test)]
-mod despawn_refs_tests;
-#[cfg(test)]
-mod destroy_bone_tests;
-#[cfg(test)]
 mod drop_warn_tests;
-#[cfg(test)]
-pub(crate) mod fixture;
-#[cfg(test)]
-mod missing_slot_tests;
-#[cfg(test)]
-mod moved_bone_tests;
-#[cfg(test)]
-mod persist_tests;
-#[cfg(test)]
-mod prefab;
-#[cfg(test)]
-mod ragdoll_refs_tests;
-#[cfg(test)]
-mod rebind_tests;
-#[cfg(test)]
-mod reimport_tests;
 #[doc(hidden)]
 pub mod rig;
-#[cfg(test)]
-mod tests;

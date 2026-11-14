@@ -10,7 +10,7 @@ use glam::Vec3;
 
 use super::gone_tests::spawn_then_rename;
 use super::tests::{child, spawn_file, KIT};
-use crate::serialize::to_scene_data;
+use crate::edit_side::serialize::to_scene_data;
 use crate::{list_instance_overrides, reimport_instance};
 
 #[test]
@@ -19,9 +19,13 @@ fn a_play_mode_load_removes_a_gone_part() {
     let data = to_scene_data(&scene);
     let mut playing = crate::Scene::new();
     playing.set_playing(true);
-    playing
-        .swap_in(data, "rusty_1665_no_sidecar.scene", &BTreeSet::new())
-        .unwrap();
+    crate::edit_side::load::swap_in(
+        &mut playing,
+        data,
+        "rusty_1665_no_sidecar.scene",
+        &BTreeSet::new(),
+    )
+    .unwrap();
     assert!(!playing.world.contains(wall), "not left behind by the swap");
 }
 

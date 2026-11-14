@@ -130,7 +130,7 @@ pub const MARKS: &[Mark] = marks! {
     "meshes_read_at" => |s, _| s.meshes_read_at = u64::MAX - 1, s.meshes_read_at == u64::MAX - 1;
     "meshes_reimported" => |s, _| s.meshes_reimported.insert("marked.glb".into(), 7),
         s.meshes_reimported.contains_key("marked.glb");
-    "disk_text" => |s, _| s.disk_text.record("marked.scene", "marked".into()),
+    "disk_text" => |s, _| s.record_disk_text("marked.scene", "marked".into()),
         s.is_disk_text("marked.scene", "marked");
     "bake_files" => |s, _| s.bake_files.loaded(std::path::Path::new("marked.occlusion"), None, None),
         s.bake_files.has(std::path::Path::new("marked.occlusion"));

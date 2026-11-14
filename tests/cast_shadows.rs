@@ -57,9 +57,9 @@ fn cast_shadows_round_trips_through_a_scene_and_a_prefab() {
         .join("rusty_cast_shadows.scene")
         .to_string_lossy()
         .into_owned();
-    scene.save_to_file(&path).unwrap();
+    rusty::scene::save_to_file(&scene, &path).unwrap();
     let mut loaded = Scene::new();
-    loaded.load_from_file(&path).unwrap();
+    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
     let mode = |s: &Scene, id| s.world.mesh(id).map(|m| m.cast_shadows);
     assert_eq!(mode(&loaded, water), Some(ShadowCasting::TwoSided));
     assert_eq!(mode(&loaded, floor), Some(ShadowCasting::On));
@@ -88,11 +88,11 @@ fn an_out_of_range_scale_in_lightmap_is_held_by_a_scene_and_a_prefab_load() {
     scene.world.set_mesh(wall, Some(mesh));
     let path = |name: &str| crate::temp::dir().join(name).to_string_lossy().into_owned();
     let (scene_file, prefab) = (path("rusty_1704.scene"), path("rusty_1704.prefab"));
-    scene.save_to_file(&scene_file).unwrap();
+    rusty::scene::save_to_file(&scene, &scene_file).unwrap();
     save_prefab(&scene, wall, &prefab).unwrap();
     let scale = |s: &Scene, id| s.world.mesh(id).map(|m| m.scale_in_lightmap);
     let mut loaded = Scene::new();
-    loaded.load_from_file(&scene_file).unwrap();
+    rusty::scene::load_from_file(&mut loaded, &scene_file).unwrap();
     assert_eq!(scale(&loaded, wall), Some(64.0), "held at its top");
     let mut stamped = Scene::new();
     let root = instantiate_prefab(&mut stamped, &read_prefab_file(&prefab).unwrap(), None);

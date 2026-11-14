@@ -32,7 +32,7 @@ fn asset_mesh_reference_rehydrates_on_load() {
     assert_eq!(scene.world.mesh(id).unwrap().vertices.len(), 4);
 
     let path = tmp("rusty_asset_ref.scene");
-    scene.save_to_file(path.to_str().unwrap()).unwrap();
+    rusty::scene::save_to_file(&scene, path.to_str().unwrap()).unwrap();
 
     // The on-disk document stores the REFERENCE, never the vertices. Compare
     // against the JSON-ENCODED reference: `to_string` yields the quoted, escaped
@@ -45,7 +45,7 @@ fn asset_mesh_reference_rehydrates_on_load() {
 
     // Loading re-imports the file and rebuilds the geometry from the reference.
     let mut loaded = Scene::new();
-    loaded.load_from_file(path.to_str().unwrap()).unwrap();
+    rusty::scene::load_from_file(&mut loaded, path.to_str().unwrap()).unwrap();
     let mesh = loaded.world.mesh(id).unwrap().clone();
     assert_eq!(mesh.primitive_type, "Asset");
     assert_eq!(mesh.asset_ref.as_deref(), Some(reference.as_str()));

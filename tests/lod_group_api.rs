@@ -82,9 +82,9 @@ fn an_lod_group_survives_save_and_load() {
         .join(format!("rusty_lod_{}.json", std::process::id()))
         .to_string_lossy()
         .into_owned();
-    scene.save_to_file(&path).unwrap();
+    rusty::scene::save_to_file(&scene, &path).unwrap();
     let mut loaded = Scene::new();
-    loaded.load_from_file(&path).unwrap();
+    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
     let _ = std::fs::remove_file(&path);
     assert_eq!(loaded.world.lod_group(group).map(|g| g.clone()), Some(lod));
 }

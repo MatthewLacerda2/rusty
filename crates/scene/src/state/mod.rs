@@ -17,12 +17,13 @@
 //! - **Undo reads it.** The `Authored` fields are listed once, with Undo's hooks,
 //!   and `undo::level` is expanded from that list.
 //! - **The other lists are checked against it.** `SceneData`'s fields are exactly
-//!   the saved classes' fields, in `names_tests`.
-//! - **Their behaviour is checked against it.** `lifecycle_tests` sets every field
-//!   (each has a mark in `marks`, and a field with none fails), runs save → load,
-//!   Play → Stop, edit → Undo, an edit-mode load over it and a Play-mode
-//!   `Scene.Load` (`runners`), and compares what came back with what the class
-//!   promises; `keyed_tests` does the same for the tables keyed by entity id
+//!   the saved classes' fields, in the edit side's `base_tests::state::names`.
+//! - **Their behaviour is checked against it.** The edit side's
+//!   `base_tests::state::lifecycle` sets every field (each has a mark in `marks`,
+//!   and a field with none fails), runs save → load, Play → Stop, edit → Undo, an
+//!   edit-mode load over it and a Play-mode `Scene.Load` (its `runners`), and
+//!   compares what came back with what the class promises; `keyed_tests` does the
+//!   same for the tables keyed by entity id
 //!   (lightmap entries, owned decals, …), through the despawn door and the Undo of
 //!   a Destroy.
 //!
@@ -36,22 +37,17 @@
 //! data, the Lighting data asset sits beside the scene and survives Undo, and
 //! play-mode state is thrown away on Stop.
 
-pub(crate) mod inventory;
-
-#[cfg(test)]
-mod check;
-#[cfg(test)]
-mod class;
+// The inventory, its classes and a mark per field are test hooks: compiled in every
+// build, since the lifecycles that save, load or snapshot are checked by the edit
+// side's tests (`edit_side::base_tests::state`).
+#[doc(hidden)]
+pub mod class;
+#[doc(hidden)]
+pub mod inventory;
 #[cfg(test)]
 mod keyed_tests;
-#[cfg(test)]
-mod lifecycle_tests;
-#[cfg(test)]
-mod marks;
-#[cfg(test)]
-mod names_tests;
-#[cfg(test)]
-mod runners;
+#[doc(hidden)]
+pub mod marks;
 
-#[cfg(test)]
+#[doc(hidden)]
 pub use class::{promise, Class, Field, Keyed, Lifecycle, Outcome};

@@ -6,8 +6,8 @@ use glam::Vec3;
 
 use super::tests::{child, spawn_file, KIT};
 use crate::asset_instance::{instantiate_asset, set_model_scale_factor};
+use crate::edit_side::serialize::{apply_scene_data, to_scene_data};
 use crate::prefab::apply::apply_instance_to_source;
-use crate::serialize::{apply_scene_data, to_scene_data};
 use crate::{list_instance_overrides, reimport_instance, Scene};
 
 fn path_of(scene: &Scene, root: u32) -> String {

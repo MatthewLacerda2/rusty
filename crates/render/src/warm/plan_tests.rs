@@ -7,7 +7,8 @@ use crate::gpu::textures::TextureKind;
 use rusty_asset::MapRef;
 use rusty_components::{MaterialComponent, MeshRevision};
 use rusty_scene::authoring::{primitive_mesh_component, Primitive};
-use rusty_scene::serialize::{to_scene_data, SceneData};
+use rusty_scene::edit_side::serialize::to_scene_data;
+use rusty_scene::serialize::SceneData;
 use rusty_scene::{MaterialAsset, Scene};
 
 /// Two boxes and a sphere wearing `mapped`, whose albedo and normal maps are files,

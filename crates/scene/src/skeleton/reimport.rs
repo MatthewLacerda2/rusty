@@ -37,7 +37,7 @@ impl Scene {
     /// replaced: each bone's name and chain, and which were moved off its rest
     /// pose. Nothing is despawned. Empty for an entity with no skin. A bone moved
     /// out from under `owner` is no longer a bone, and is left where it is.
-    pub(crate) fn take_skeleton(&self, owner: u32) -> Parked {
+    pub fn take_skeleton(&self, owner: u32) -> Parked {
         let Some(skin) = self.world.mesh(owner).and_then(|m| m.skin.clone()) else {
             return Parked::default();
         };
@@ -57,7 +57,7 @@ impl Scene {
     /// Re-bind `parked` to `owner`'s (new) rig: keep each bone the rig still
     /// names, spawn the new ones, and despawn the rest, hanging what hung from
     /// them, and re-binding the leaves naming them, by bone name.
-    pub(crate) fn restore_skeleton(&mut self, owner: u32, parked: Parked) {
+    pub fn restore_skeleton(&mut self, owner: u32, parked: Parked) {
         let Parked {
             bones: old,
             mut overrides,

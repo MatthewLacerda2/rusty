@@ -1,6 +1,6 @@
 #![no_main]
 //! Fuzz the scene-load path (#119): the "what happens when someone hands the
-//! engine a corrupt save file" class of bug. Mirrors `Scene::load_from_file` —
+//! engine a corrupt save file" class of bug. Mirrors `scene::load_from_file` —
 //! arbitrary bytes -> UTF-8 -> `SceneData` (serde) -> `apply_scene_data` (the
 //! rehydration that rebuilds meshes/colliders/skeletons). Surfaces panics,
 //! hangs, and unguarded `unwrap`s in the deserializer and rehydration.

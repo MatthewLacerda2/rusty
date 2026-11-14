@@ -38,7 +38,7 @@ fn a_scene_without_ambient_loads_with_defaults() {
     std::fs::write(&path, minimal).unwrap();
 
     let mut loaded = Scene::new();
-    loaded.load_from_file(&path).unwrap();
+    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
     assert_eq!(loaded.ambient_color, DEFAULT_AMBIENT_COLOR);
     assert_eq!(loaded.ambient_intensity, DEFAULT_AMBIENT_INTENSITY);
 }
@@ -49,10 +49,10 @@ fn ambient_survives_round_trip() {
     scene.ambient_color = glam::Vec3::new(0.1, 0.2, 0.3);
     scene.ambient_intensity = 0.7;
     let path = tmp("rusty_ambient_roundtrip.scene");
-    scene.save_to_file(&path).unwrap();
+    rusty::scene::save_to_file(&scene, &path).unwrap();
 
     let mut loaded = Scene::new();
-    loaded.load_from_file(&path).unwrap();
+    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
     assert_eq!(loaded.ambient_color, glam::Vec3::new(0.1, 0.2, 0.3));
     assert_eq!(loaded.ambient_intensity, 0.7);
 }

@@ -246,9 +246,7 @@ fn register_save(
                     ))
                 }
             };
-            scene
-                .borrow()
-                .save_to_file(&target)
+            rusty_scene::save_to_file(&scene.borrow(), &target)
                 .map_err(|e| mlua::Error::RuntimeError(format!("Scene.Save: {e}")))?;
             *scene_path.borrow_mut() = Some(target.clone());
             Ok(target)

@@ -17,7 +17,7 @@ fn hosted(tag: &str, saved: bool) -> Session {
         let dir = rusty_test_support::temp::dir().join(format!("generate_async_{tag}"));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("level.scene").to_string_lossy().into_owned();
-        s.world().scene().borrow().save_to_file(&path).unwrap();
+        rusty_scene::save_to_file(&s.world().scene().borrow(), &path).unwrap();
         *s.world().script_manager().scene_path_cell().borrow_mut() = Some(path);
     }
     s
@@ -78,12 +78,8 @@ fn a_load_drops_a_request_and_the_status_says_why() {
     s.eval("Lighting.GenerateAsync()").unwrap();
     let other = rusty_test_support::temp::dir().join("generate_async_other.scene");
     let other = other.to_string_lossy().into_owned();
-    rusty_scene::Scene::new().save_to_file(&other).unwrap();
-    s.world()
-        .scene()
-        .borrow_mut()
-        .load_from_file(&other)
-        .unwrap();
+    rusty_scene::save_to_file(&rusty_scene::Scene::new(), &other).unwrap();
+    rusty_scene::load_from_file(&mut s.world().scene().borrow_mut(), &other).unwrap();
     assert_eq!(s.eval("Lighting.IsRunning()").unwrap(), "false");
     let state = s.eval("return Lighting.GetBakeStatus().state").unwrap();
     assert!(state.contains("refused"), "{state}");

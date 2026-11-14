@@ -221,7 +221,7 @@ impl Fingerprints {
 /// bake never reads them (#1958). In index order, so the same corners making other
 /// triangles differ. An index past the vertices hashes as NaN corners, so it still
 /// differs from any real one.
-pub fn corners_hash(mesh: &MeshComponent) -> u64 {
+fn corners_hash(mesh: &MeshComponent) -> u64 {
     let mut hash = rusty_core::hash::Content::default();
     for &i in &mesh.indices {
         let corner = mesh

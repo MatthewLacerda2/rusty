@@ -38,7 +38,7 @@ fn only_a_command_that_asks_gets_its_bakes_progress() {
     let s = session();
     let path = rusty_test_support::temp::dir().join("channel_progress.scene");
     let path = path.to_string_lossy().into_owned();
-    s.world().scene().borrow().save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&s.world().scene().borrow(), &path).unwrap();
     *s.world().script_manager().scene_path_cell().borrow_mut() = Some(path);
     let (tx, ch) = local_channel();
     let plain = all_replies(&s, &tx, &ch, "Lighting.BakeOcclusion()");

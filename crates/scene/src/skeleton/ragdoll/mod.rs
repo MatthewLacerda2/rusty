@@ -236,6 +236,3 @@ fn joint_from(p: JointPreset, dir: Vec3, (front, side): (Vec3, Vec3)) -> JointCo
 fn flex_limits((min, max): (f32, f32)) -> glam::Vec2 {
     glam::Vec2::new(-max, -min)
 }
-
-#[cfg(test)]
-mod persist_tests;

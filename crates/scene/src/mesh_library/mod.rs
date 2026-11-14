@@ -30,10 +30,9 @@ use std::sync::{Arc, OnceLock};
 
 use serde::{Deserialize, Serialize};
 
-use crate::authoring::ComponentKind;
-use crate::create::{primitive_mesh_component, Primitive};
+use crate::create::Primitive;
 use crate::Scene;
-use rusty_components::mesh::{BoneBinding, MeshData, MeshRevision, Vertex, SCENE_KIND};
+use rusty_components::mesh::{MeshData, MeshRevision, Vertex, SCENE_KIND};
 use rusty_components::{ColliderComponent, MeshComponent};
 
 /// What an entry draws: its vertices and indices, built from its data.
@@ -59,17 +58,18 @@ impl SceneMesh {
     /// scene's library has.
     pub fn geometry(&self) -> &Geometry {
         self.built.get_or_init(|| {
-            #[cfg(test)]
             BUILDS.with(|n| n.set(n.get() + 1));
             self.data.geometry()
         })
     }
 }
 
-#[cfg(test)]
 thread_local! {
-    /// How many geometries [`SceneMesh::geometry`] built on this thread.
-    pub(crate) static BUILDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// How many geometries [`SceneMesh::geometry`] built on this thread. A test
+    /// hook (the edit side's tests read it), counted in every build: a geometry is
+    /// built once per entry, so the count costs nothing a frame.
+    #[doc(hidden)]
+    pub static BUILDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 impl PartialEq for SceneMesh {
@@ -163,7 +163,7 @@ pub fn checked(library: MeshLibrary) -> MeshLibrary {
 /// The once-only warning key of a library mesh `name` an entity cannot draw: one
 /// key whether [`checked`] dropped it or no file ever defined it, so a dropped
 /// entry is warned of once, with its cause, and not again as missing.
-pub(crate) fn missing_key(name: &str) -> String {
+pub fn missing_key(name: &str) -> String {
     format!("{SCENE_KIND}::{name}")
 }
 
@@ -194,51 +194,6 @@ impl Scene {
         Ok(())
     }
 
-    /// Point entity `id`'s Mesh at `reference`: a primitive's name (`"Box"`, …) or a
-    /// library mesh's, adding a Mesh when it has none (Unity's
-    /// `MeshFilter.sharedMesh`). The Mesh's own settings (shadows, culling, Scale In
-    /// Lightmap) stay; its geometry, rig and grid are the new mesh's.
-    pub fn set_shared_mesh(&mut self, id: u32, reference: &str) -> Result<(), String> {
-        if !self.world.contains(id) {
-            return Err(format!("no entity {id}"));
-        }
-        let fresh = match Primitive::parse(reference) {
-            Some(p) => primitive_mesh_component(p)
-                .ok_or_else(|| format!("{reference:?} is a light, not a mesh"))?,
-            // The entry's own build and revision: the other entities drawing it
-            // stay as they are, and nothing is built again.
-            None if self.meshes.contains_key(reference) => {
-                let entry = &self.meshes[reference];
-                let (vertices, indices) = entry.geometry().clone();
-                MeshComponent {
-                    asset_ref: Some(reference.to_string()),
-                    revision: entry.revision,
-                    ..MeshComponent::new(SCENE_KIND, vertices, indices)
-                }
-            }
-            None => {
-                return Err(format!(
-                    "no mesh named {reference:?} (a primitive, or one made with Mesh.Create)"
-                ))
-            }
-        };
-        if self.world.mesh(id).is_none() {
-            crate::authoring::add_component(self, id, ComponentKind::Mesh);
-        }
-        if let Some(mut mesh) = self.world.mesh_mut(id) {
-            *mesh = MeshComponent {
-                cast_shadows: mesh.cast_shadows,
-                scale_in_lightmap: mesh.scale_in_lightmap,
-                max_draw_distance: mesh.max_draw_distance,
-                min_screen_size: mesh.min_screen_size,
-                skeleton: BoneBinding::default(),
-                ..fresh
-            };
-        }
-        sync::refit(self, id);
-        Ok(())
-    }
-
     /// Bring every entity drawing a library mesh to its entry's geometry and
     /// revision, and fill a Mesh collider's kept copy of one (#1657). Cheap when
     /// nothing changed: one comparison per Mesh entity.
@@ -251,11 +206,4 @@ impl Scene {
 mod delete;
 mod sync;
 
-#[cfg(test)]
-mod delete_tests;
-#[cfg(test)]
-mod revision_tests;
-#[cfg(test)]
-mod tests;
-#[cfg(test)]
-mod users_tests;
+pub use sync::refit;

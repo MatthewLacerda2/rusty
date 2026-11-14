@@ -44,7 +44,7 @@ use std::path::{Path, PathBuf};
 use rusty_asset::convert::{cached_gltf, convertible_sources};
 use rusty_core::paths;
 use rusty_core::project::{create_skeleton, is_project, ASSETS_DIR, PROJECT_FILE, SHADERS_DIR};
-use rusty_scene::io::SEED_MANIFEST_PATH;
+use rusty_scene::edit_side::io::SEED_MANIFEST_PATH;
 
 /// What an export did.
 #[derive(Debug, Default, PartialEq, Eq)]

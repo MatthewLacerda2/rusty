@@ -7,7 +7,7 @@
 //! through its one entry point.
 
 pub mod defaults;
-pub mod primitive;
+mod primitive;
 
 pub use defaults::{
     attach_default_material, default_animator, default_camera, default_collider, default_light,

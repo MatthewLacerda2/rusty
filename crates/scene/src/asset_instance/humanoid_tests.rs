@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use glam::Vec3;
 
 use crate::asset_instance::instantiate_asset;
-use crate::rehydrate::reimport_written;
+use crate::edit_side::rehydrate::reimport_written;
 use crate::Scene;
 use rusty_core::fs::written::Stale;
 use rusty_test_support::models::anim::{animated_buffer, ANIMATED_GLTF};
