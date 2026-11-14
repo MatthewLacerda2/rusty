@@ -424,8 +424,10 @@ How to read a clean report:
   `crates/navigation/src`.** Elsewhere, silence means unmeasured, not clean.
 - **A scoped run names what it planned** (how many mutants, any from outside the
   scope). A `diff` with nothing to mutate says so; it is not a pass.
-- **A run stopped at its budget names what it never reached**: unmeasured; ask
-  again narrower.
+- **A run stopped at its budget names what it never reached** and is never called
+  clean: unmeasured; ask again narrower.
+- **Timeouts are unmeasured.** A run where most viable mutants timed out says it is
+  not a result: the tool broke, so read its log, don't trust its counts.
 
 ### Triaging a survivor
 
@@ -456,11 +458,15 @@ mechanism at all.
 **Establish equivalence by applying the mutation and running the suite**, never by
 reasoning about symmetry. Re-ask narrower (`make mutants-remote
 SCOPE=crates/physics/src/query/through.rs`), or reproduce locally as the job runs it
-(nextest, fail-fast, two test processes to fit the memory limit):
+(nextest, fail-fast, two test processes to fit the memory limit, and the workspace's
+own baseline, because cargo-mutants' tests only the mutated package; `docs/testing.md`,
+*Mutation testing*, says why):
 
     git diff origin/main > branch.diff
-    cargo mutants --test-tool nextest --in-diff branch.diff \
-      -- --features dev --fail-fast --test-threads 2
+    cargo nextest run --no-run --workspace --features=dev   # build first, untimed
+    cargo nextest run --workspace --features=dev --fail-fast --test-threads 2   # time it
+    cargo mutants --workspace --test-tool nextest --baseline skip --timeout <3x secs> \
+      --features dev --in-diff branch.diff -- --fail-fast --test-threads 2
 
 `cargo mutants --list` names the functions and builds nothing: reach for it before
 believing a structural explanation of a bad report.
