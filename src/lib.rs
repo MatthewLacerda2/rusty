@@ -10,7 +10,6 @@
 pub mod app;
 #[cfg(feature = "editor")]
 pub mod editor;
-pub mod logging;
 pub mod preview;
 pub mod shell;
 
@@ -23,6 +22,7 @@ pub use rusty_audio as audio;
 pub use rusty_components as components;
 pub use rusty_core as core;
 pub use rusty_ecs as ecs;
+pub use rusty_logging as logging;
 pub use rusty_navigation as navigation;
 pub use rusty_physics as physics;
 pub use rusty_procgen as procgen;

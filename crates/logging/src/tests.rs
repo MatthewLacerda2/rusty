@@ -90,7 +90,7 @@ fn the_buffer_keeps_only_the_newest_records() {
 #[test]
 fn a_quiet_stretch_says_nothing() {
     init();
-    crate::core::quiet::quietly(|| log::warn!("[Test] quiet: a staged copy's warning"));
+    rusty_core::quiet::quietly(|| log::warn!("[Test] quiet: a staged copy's warning"));
     log::warn!("[Test] quiet: the real one");
     let forwarded = forward(&console());
     assert!(!forwarded.iter().any(|m| m.contains("a staged copy's")));

@@ -1,4 +1,4 @@
-//! src/logging/ — the one logger every binary starts (#1139).
+//! crates/logging/src/lib.rs — the one logger every binary starts (#1139).
 //!
 //! [`init`] installs `env_logger` with a default filter of `warn` (`RUST_LOG`
 //! overrides it), so an engine warning reaches stderr without anyone asking for it.
@@ -23,8 +23,10 @@ use std::thread::ThreadId;
 
 use log::{Level, LevelFilter, Log, Metadata, Record};
 
-use crate::script::scripting::{ConsoleLogs, LogLevel};
+use rusty_script::scripting::{ConsoleLogs, LogLevel};
 
+#[cfg(test)]
+mod filter_tests;
 #[cfg(test)]
 mod tests;
 
@@ -123,7 +125,7 @@ impl Log for Forward {
 
     fn log(&self, record: &Record<'_>) {
         // A staged copy's warnings are the real apply's again (`core::quiet`).
-        if crate::core::quiet::is_quiet() && is_kept(record.metadata()) {
+        if rusty_core::quiet::is_quiet() && is_kept(record.metadata()) {
             return;
         }
         if self.stderr.matches(record) {

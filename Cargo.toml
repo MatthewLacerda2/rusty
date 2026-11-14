@@ -147,6 +147,7 @@ rusty-navigation = { path = "crates/navigation" }
 rusty-ai = { path = "crates/ai" }
 rusty-render = { path = "crates/render" }
 rusty-script = { path = "crates/script" }
+rusty-logging = { path = "crates/logging" }
 rusty-test-support = { path = "crates/test-support" }
 
 winit = { version = "0.30.13" }
@@ -268,6 +269,7 @@ proptest = { version = "1", default-features = false, features = ["std"] }
 
 [dependencies]
 # The moved modules (crates/), re-exported in src/lib.rs under their old names.
+rusty-logging = { workspace = true }
 rusty-render = { workspace = true }
 rusty-script = { workspace = true }
 rusty-ai = { workspace = true }
@@ -296,7 +298,6 @@ xxhash-rust = { workspace = true }
 image = { workspace = true }
 ktx2 = { workspace = true }
 bytemuck = { workspace = true }
-env_logger = { workspace = true }
 log = { workspace = true }
 pollster = { workspace = true }
 serde = { workspace = true }

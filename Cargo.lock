@@ -3278,7 +3278,6 @@ dependencies = [
  "egui-phosphor",
  "egui-wgpu",
  "egui-winit",
- "env_logger",
  "getrandom 0.4.3",
  "gilrs",
  "glam 0.33.12",
@@ -3300,6 +3299,7 @@ dependencies = [
  "rusty-components",
  "rusty-core",
  "rusty-ecs",
+ "rusty-logging",
  "rusty-navigation",
  "rusty-physics",
  "rusty-procgen",
@@ -3406,6 +3406,17 @@ dependencies = [
  "hecs",
  "proptest",
  "rusty-components",
+ "rusty-test-support",
+]
+
+[[package]]
+name = "rusty-logging"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "log",
+ "rusty-core",
+ "rusty-script",
  "rusty-test-support",
 ]
 

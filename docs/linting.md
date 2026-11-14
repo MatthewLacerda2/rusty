@@ -445,7 +445,7 @@ new flag, gate, CI step or baseline.
   (MatthewLacerda2/scorsese#872). It takes **no allow**: anchor the pattern
   (`/out/`, not `out/`) or move the file. A failed `git` call is a finding too.
 - **`log-tag`** (#1139) — engine warnings reach the console and the session and
-  MCP replies (`src/logging`), so a reader must see where each came from. In
+  MCP replies (`crates/logging`), so a reader must see where each came from. In
   `src/`, a warning or error call whose message literal does not open with
   `[Module]` (`[Asset] …`, `[Render] …`) fails. The calls read are `log::warn!` and
   `log::error!` (a space before the parenthesis included), the bare `warn!` /
