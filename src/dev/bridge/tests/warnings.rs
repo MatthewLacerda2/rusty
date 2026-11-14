@@ -10,7 +10,7 @@ use crate::dev::harness::Harness;
 /// Run `scenario` on a fresh harness world (the default scene) with the API and
 /// the `Harness` table, as `play` registers them.
 fn run(scenario: &str) -> mlua::Result<()> {
-    crate::logging::init();
+    crate::logging::init_for_tests();
     let out = crate::test_temp::dir().join(format!("bridge_warn_{}", std::process::id()));
     let harness = Rc::new(RefCell::new(Harness::new(out, "")));
     let world = Rc::clone(&harness.borrow().world);

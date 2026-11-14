@@ -48,7 +48,8 @@ a module above it), a `crate::{…}`
 group (its entries may name several modules), a sibling import binding the module's name in a
 form the plain rules leave alone (`crate_imports.unsettled`), `CARGO_MANIFEST_DIR` (it now names
 the crate's folder), a string path from the checkout's root (`"tests/fixtures/…"`,
-read from the working directory, which is the crate's folder under its tests), `crate::test_temp::lua_path`, an optional dependency no one
+read from the working directory, which is the crate's folder under its tests), `crate::test_temp::lua_path`, a `cfg!(test)` in a non-test file (true only in
+the crate's own tests now: `cfg-test-switch`), an optional dependency no one
 feature of `dev` / `editor` turns on, a feature other than those two, a `pub mod`
 gated by anything but one feature, and every tracked file outside the crate that
 still names `src/<m>/` (a file path to rewrite, or a module path the lint tools
@@ -169,6 +170,10 @@ def reaching_up(path: str, text: str, above: set[str], below: set[str] = frozens
 CWD_PATH = re.compile(r'(?<![\w/])"(?:tests|engine|games|docs|src|crates)/')
 
 
+#: A `cfg!(…)` naming `test`: the `cfg-test-switch` rule's match, as a text edit sees it.
+CFG_TEST = re.compile(r"cfg!\([^)]*\btest\b")
+
+
 def by_hand(path: str, text: str, before: str) -> list[str]:
     """`path:line: why` for each line a text edit cannot settle. A `crate::{…}` group is read in
     `before`, the text as it was: a `crate::<m>::{…}` group was the module's own, and stays so."""
@@ -178,7 +183,14 @@ def by_hand(path: str, text: str, before: str) -> list[str]:
               ("crate::test_temp::lua_path", "the root's helper: build it from `rusty_test_support::temp::dir()`")]
     out = groups + [f"{path}:{n}: {why}" for n, line in enumerate(text.splitlines(), 1)
                     for needle, why in checks if needle in line]
-    for n, line in enumerate(text.splitlines(), 1):
+    lines = text.splitlines()
+    test_file = path.endswith(("/tests.rs", "_tests.rs"))
+    for n, line in enumerate(lines, 1):
+        allowed = "allow(cfg-test-switch)" in line or (n > 1 and "allow(cfg-test-switch)" in lines[n - 2])
+        if CFG_TEST.search(line) and not test_file and not allowed and not line.lstrip().startswith("//"):
+            out.append(f"{path}:{n}: `cfg!(test)` is false for every other crate's tests now: a test hook armed at "
+                       "run time, or an allow saying only this crate's tests need it (`cfg-test-switch`)")
+    for n, line in enumerate(lines, 1):
         if CWD_PATH.search(line) and "checkout()" not in line and not line.lstrip().startswith("//"):
             out.append(f"{path}:{n}: a path from the checkout's root read from the working directory, the "
                        "crate's folder under its tests: `rusty_core::project::checkout().join(…)`?")

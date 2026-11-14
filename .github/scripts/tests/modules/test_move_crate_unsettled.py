@@ -54,6 +54,19 @@ class Unsettled(unittest.TestCase):
         self.assertEqual(len(mover.unsettled("x.rs", "use crate::physics; // why\n", {"physics"})), 1)
 
 
+class CfgTest(unittest.TestCase):
+    def test_a_cfg_test_switch_in_live_code_is_listed(self):
+        text = "fn f() -> bool {\n    cfg!(test) || x()\n}\nlet k = cfg!(any(test, unix));\n"
+        hand = mover.by_hand("crates/a/src/lib.rs", text, text)
+        self.assertEqual([h.split(": ", 1)[0] for h in hand], ["crates/a/src/lib.rs:2", "crates/a/src/lib.rs:4"])
+        self.assertIn("cfg-test-switch", hand[0])
+
+    def test_a_test_file_an_allowed_one_and_a_comment_are_not(self):
+        text = "// lint: allow(cfg-test-switch) why\nlet t = cfg!(test);\n// cfg!(test)\nlet d = cfg!(debug_assertions);\n"
+        self.assertEqual(mover.by_hand("crates/a/src/lib.rs", text, text), [])
+        self.assertEqual(mover.by_hand("crates/a/src/a_tests.rs", "let t = cfg!(test);\n", ""), [])
+
+
 TABLE = 'sim("core", &[]),\n    sim("ui", &["core"]),\n    sim("script", &["core", "ui"]),\n'
 
 

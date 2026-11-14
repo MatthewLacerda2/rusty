@@ -28,7 +28,7 @@ fn a_drain_folds_a_repeat_split_by_another_thread_into_one_counted_entry() {
         kept(me, Level::Warn, "b", 1),
         kept(me, Level::Error, "b", 1),
     ];
-    let runs = take_mine(&mut pending);
+    let runs = take_mine(&mut pending, true);
     let got: Vec<_> = runs
         .iter()
         .map(|k| (k.level, k.text.as_str(), k.times))
@@ -47,6 +47,26 @@ fn a_drain_folds_a_repeat_split_by_another_thread_into_one_counted_entry() {
         1,
         "another thread's record stays for its own drain"
     );
+}
+
+#[test]
+fn an_unarmed_drain_takes_every_threads_records() {
+    let me = std::thread::current().id();
+    let other = std::thread::spawn(|| std::thread::current().id())
+        .join()
+        .unwrap();
+    let mut pending = vec![
+        kept(me, Level::Warn, "mine", 1),
+        kept(other, Level::Warn, "theirs", 1),
+    ];
+    let runs = take_mine(&mut pending, false);
+    let got: Vec<_> = runs.iter().map(|k| k.text.as_str()).collect();
+    assert_eq!(
+        got,
+        ["mine", "theirs"],
+        "a binary's drain shows every thread's warnings"
+    );
+    assert!(pending.is_empty());
 }
 
 #[test]

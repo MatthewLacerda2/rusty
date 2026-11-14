@@ -87,6 +87,7 @@ impl Rays {
                 tris,
                 mesh: None,
                 cast: Default::default(),
+                // lint: allow(cfg-test-switch) scene's own tests; another crate counts through `Rays::counted`
                 counting: cfg!(test),
             };
         }
@@ -104,6 +105,7 @@ impl Rays {
             tris,
             mesh: Some(mesh),
             cast: Default::default(),
+            // lint: allow(cfg-test-switch) scene's own tests; another crate counts through `Rays::counted`
             counting: cfg!(test),
         }
     }

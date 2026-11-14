@@ -3,11 +3,11 @@
 //! [`init`] installs `env_logger` with a default filter of `warn` (`RUST_LOG`
 //! overrides it), so an engine warning reaches stderr without anyone asking for it.
 //! The logger also keeps a copy of every **engine** `warn!` / `error!` record (its
-//! target is in this crate or a workspace crate, `rusty_<module>`; a dependency's
-//! warnings go to stderr only) in a small
-//! buffer. Records arrive from any thread (the audio device thread logs too), so the
-//! buffer is a mutex, and whoever owns a console drains it once per frame or command
-//! with [`forward`]: the shell's frame loop, the headless session, the harness. That
+//! target is in the root package `rusty` or a workspace crate, `rusty_<module>`; a
+//! dependency's warnings go to stderr only) in a small buffer. Records arrive from
+//! any thread (the audio device thread logs too), so the buffer is a mutex, and
+//! whoever owns a console drains it once per frame or command with [`forward`]: the
+//! shell's frame loop, the headless session, the harness. That
 //! is how the editor console, `play`'s `console.log` and the session/MCP replies see
 //! what the engine dropped, as Unity's Console shows `Debug.LogWarning`.
 //!
@@ -18,6 +18,7 @@
 //! nothing in a sim module reads this buffer, so the determinism rule is untouched.
 
 use std::cell::RefCell;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, Once};
 use std::thread::ThreadId;
 
@@ -44,6 +45,10 @@ struct Kept {
 
 static PENDING: Mutex<Vec<Kept>> = Mutex::new(Vec::new());
 
+/// Whether a drain takes only its own thread's records ([`take_mine`]): off in every
+/// binary, on once a test calls [`init_for_tests`].
+static PER_THREAD: AtomicBool = AtomicBool::new(false);
+
 /// Start logging for this process: stderr at `RUST_LOG` (default `warn`), plus the
 /// console copy of engine warnings and errors. Every binary calls it first thing; a
 /// second call is a no-op.
@@ -60,12 +65,23 @@ pub fn init() {
     });
 }
 
+/// [`init`] for a test, in this crate or any other: from now on each drain in this
+/// process takes only the records its own thread logged, so tests sharing one
+/// process (plain `cargo test`) never drain each other's warnings. A test hook:
+/// compiled in every build, since most of its callers are other crates' tests,
+/// and off until one calls it. Records logged before it are drained whole.
+#[doc(hidden)]
+pub fn init_for_tests() {
+    PER_THREAD.store(true, Ordering::SeqCst);
+    init();
+}
+
 /// Move the engine records logged since the last drain into `console` (as warnings
 /// or errors) and return their text, oldest first, a repeat shown with its count.
 pub fn forward(console: &RefCell<ConsoleLogs>) -> Vec<String> {
     let records = {
         let mut pending = PENDING.lock().unwrap_or_else(|e| e.into_inner());
-        take_mine(&mut pending)
+        take_mine(&mut pending, PER_THREAD.load(Ordering::SeqCst))
     };
     if records.is_empty() {
         return Vec::new();
@@ -85,13 +101,14 @@ pub fn forward(console: &RefCell<ConsoleLogs>) -> Vec<String> {
         .collect()
 }
 
-/// The records a drain takes: all of them. Under `cargo test` every test is a thread
-/// sharing this buffer, so a test takes only what its own thread logged, and one
-/// test's drain never steals another's warnings (nextest runs a process per test).
+/// The records a drain takes: all of them, unless `per_thread` (a test armed the
+/// split, [`init_for_tests`]). Under plain `cargo test` every test is a thread sharing this
+/// buffer, so then a drain takes only what its own thread logged, and one test's
+/// drain never steals another's warnings (nextest runs a process per test).
 /// Repeats left side by side once another thread's records are set aside count as
 /// one run.
-fn take_mine(pending: &mut Vec<Kept>) -> Vec<Kept> {
-    let taken = if cfg!(test) {
+fn take_mine(pending: &mut Vec<Kept>, per_thread: bool) -> Vec<Kept> {
+    let taken = if per_thread {
         let me = std::thread::current().id();
         let (mine, others) = std::mem::take(pending)
             .into_iter()
@@ -142,8 +159,9 @@ impl Log for Forward {
     }
 }
 
-/// A warning or error raised by the engine's own code: this crate (`rusty::…`) or
-/// one of the workspace's crates (`rusty_core::…`, `rusty_asset::…`, `crates/`).
+/// A warning or error raised by the engine's own code: the root package `rusty`
+/// (`rusty::…`, `src/`) or one of the workspace's crates (`rusty_core::…`,
+/// `rusty_asset::…`, `crates/`), this one included.
 fn is_kept(metadata: &Metadata<'_>) -> bool {
     let krate = metadata.target().split("::").next().unwrap_or_default();
     let ours = krate == "rusty" || krate.starts_with("rusty_");

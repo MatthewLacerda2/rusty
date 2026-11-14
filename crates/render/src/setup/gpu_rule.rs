@@ -38,8 +38,10 @@ pub(crate) fn check_current_thread() {
     // `cfg!(test)` holds only in this crate's own unit-test binary. Every other
     // test binary is taken for the integration one: no other crate's tests sit in a
     // top-level `gpu` module, so the overstatement selects nothing.
+    // lint: allow(cfg-test-switch) it tells this crate's own test binary from the rest, which is the point
+    let integration = !cfg!(test);
     assert!(
-        !name.contains("::") || is_gpu_test(name, !cfg!(test)),
+        !name.contains("::") || is_gpu_test(name, integration),
         "test `{name}` builds a headless renderer but its name does not mark it as a \
          GPU test, so nextest will not cap it with the others (the `gpu` test group in \
          .config/nextest.toml). Start the test function's name with `gpu_`, or move an \
