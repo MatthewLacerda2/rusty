@@ -12,7 +12,6 @@
 //! A field a lifecycle handles by a hook of its own says so beside its entry:
 //! the hook belongs to the field, not to each lifecycle that touches it.
 
-#[cfg(test)]
 use super::{Class, Field, Keyed};
 use crate::Scene;
 
@@ -58,7 +57,6 @@ macro_rules! scene_state {
         other { $($field:ident: $class:ident, $keyed:ident $(as [$($saved:literal),*])?;)* }
         dev { $($dev:ident: $dev_class:ident, $dev_keyed:ident;)* }
     ) => {
-        #[cfg(test)]
         const ALWAYS: &[Field] = &[
             $(Field {
                 name: stringify!($authored),
@@ -74,7 +72,7 @@ macro_rules! scene_state {
             },)*
         ];
 
-        #[cfg(all(test, feature = "dev"))]
+        #[cfg(feature = "dev")]
         const DEV: &[Field] = &[$(Field {
             name: stringify!($dev),
             class: Class::$dev_class,
@@ -152,8 +150,7 @@ authored_fields!(scene_state {
     }
 });
 
-/// Every field of `Scene` in this build, classified.
-#[cfg(test)]
+/// Every field of `Scene` in this build, classified. A test hook, as the module is.
 pub fn fields() -> Vec<Field> {
     let fields = ALWAYS.iter();
     #[cfg(feature = "dev")]

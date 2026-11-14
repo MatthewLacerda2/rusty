@@ -265,8 +265,9 @@ impl BakeFiles {
         self.warned.borrow().contains(&key(path))
     }
 
-    /// Whether this world holds a record for `path`.
-    #[cfg(test)]
+    /// Whether this world holds a record for `path`. A test hook: the state
+    /// inventory's marks read it (`state::marks`).
+    #[doc(hidden)]
     pub fn has(&self, path: &Path) -> bool {
         self.seen.borrow().contains_key(&key(path))
     }
@@ -276,18 +277,18 @@ impl BakeFiles {
 mod tests;
 
 #[cfg(test)]
-mod race_tests;
-
-#[cfg(test)]
 mod refused_tests;
-
-#[cfg(test)]
-mod replace_tests;
 
 impl crate::Scene {
     /// What this world last read or wrote at each bake sidecar's path: what a save
     /// keeps, read by `dev::bake`'s tests (the field itself is written only here).
     pub fn bake_files(&self) -> &BakeFiles {
         &self.bake_files
+    }
+
+    /// Forget what the world saw at its bake files: a load made it a new scene, and
+    /// what the old one saw is no record of this one.
+    pub fn forget_bake_files(&mut self) {
+        self.bake_files = Default::default();
     }
 }

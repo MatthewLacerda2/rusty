@@ -284,16 +284,4 @@ impl Scene {
 
         Ok(())
     }
-
-    /// Serialize the live World to `path`. Delegates to `crate::io`,
-    /// which owns the on-disk `SceneData` document.
-    pub fn save_to_file(&self, path: &str) -> Result<(), String> {
-        crate::save_to_file(self, path)
-    }
-
-    /// Load `path`, REPLACING this scene's World (single active scene).
-    /// Delegates to `crate::io`; meshes are rehydrated from disk there.
-    pub fn load_from_file(&mut self, path: &str) -> Result<(), crate::LoadError> {
-        crate::load_from_file(self, path)
-    }
 }

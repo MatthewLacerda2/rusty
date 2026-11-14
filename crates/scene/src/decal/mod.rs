@@ -18,7 +18,7 @@
 //! ([`DecalSet::tick`]), never the wall clock; the registry is [`DecalSet`].
 //!
 //! **Persistence (#1518).** A Play-mode load drops every decal but the
-//! [`Decal::persist`] ones, which `Scene::swap_in` carries across (`persist.rs`);
+//! [`Decal::persist`] ones, which `edit_side::load::swap_in` carries across (`persist.rs`);
 //! an edit-mode load drops them all. Nothing is saved to disk, and Stop's snapshot
 //! restore puts back the edit-mode decals, dropping every one Play stamped.
 //!

@@ -1,4 +1,4 @@
-//! Decals across a scene load (#1518): `Scene::swap_in` takes the persistent ones
+//! Decals across a scene load (#1518): `edit_side::load::swap_in` takes the persistent ones
 //! out before the outgoing World goes and lands them in the incoming one.
 //!
 //! An owned decal whose owner survives (`DontDestroyOnLoad`) keeps that owner, ids
@@ -33,10 +33,7 @@ impl Scene {
     /// Drop every decal, returning the persistent ones to carry into the scene that
     /// replaces this one. `survivors` are the entities the load keeps; a decal whose
     /// owner is gone, or whose path does not name it, is dropped.
-    pub(crate) fn take_persistent_decals(
-        &mut self,
-        survivors: &BTreeSet<u32>,
-    ) -> Vec<CarriedDecal> {
+    pub fn take_persistent_decals(&mut self, survivors: &BTreeSet<u32>) -> Vec<CarriedDecal> {
         let world = &self.world;
         let mut paths: BTreeMap<u32, Option<HierarchyPath>> = BTreeMap::new();
         let mut path_to = |entity: u32| {
@@ -62,7 +59,7 @@ impl Scene {
 
     /// Land `carried` in the incoming World, oldest first: each left-behind owner is
     /// looked up by its path, and a decal with none to land on is dropped.
-    pub(crate) fn land_persistent_decals(&mut self, carried: Vec<CarriedDecal>) {
+    pub fn land_persistent_decals(&mut self, carried: Vec<CarriedDecal>) {
         let mut found: BTreeMap<HierarchyPath, Option<u32>> = BTreeMap::new();
         for CarriedDecal { mut decal, path } in carried {
             if let (Some(path), Some(owner)) = (path, decal.owner.as_mut()) {
@@ -75,11 +72,3 @@ impl Scene {
         }
     }
 }
-
-#[cfg(test)]
-#[path = "persist_tests.rs"]
-mod tests;
-
-#[cfg(test)]
-#[path = "persist_paths_tests.rs"]
-mod paths_tests;

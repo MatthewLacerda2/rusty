@@ -141,12 +141,12 @@ fn first_root_canvas(scene: &Scene) -> Option<u32> {
 }
 
 /// Rewrite the engine-owned widget directories: the scripts embedded from
-/// `engine/scripts/ui/` (`scene::io::bundled`), and one prefab per widget built fresh. Called on boot
+/// `engine/scripts/ui/` (`scene::edit_side::io::bundled`), and one prefab per widget built fresh. Called on boot
 /// (and by tests); failures are skipped, like the other seeders.
 pub fn seed() {
     let scripts = std::path::PathBuf::from(parts::SCRIPT_DIR);
     std::fs::create_dir_all(&scripts).ok();
-    for (name, code) in crate::io::bundled::UI_SCRIPTS {
+    for (name, code) in crate::edit_side::io::bundled::UI_SCRIPTS {
         write_if_changed(&scripts.join(name), code.as_bytes());
     }
     std::fs::create_dir_all(std::path::PathBuf::from(PREFAB_DIR)).ok();

@@ -44,12 +44,15 @@ def markdown_only(files: list[str]) -> bool:
 
 def agent_doc(path: str) -> bool:
     """Whether `path` is a doc `tools/lint`'s agent-docs pass holds (a `CLAUDE.md`
-    anywhere, a file of a skill's folder): `tools/lint/src/agent_docs/mod.rs`'s
+    anywhere, a file of a skill's folder, a subagent definition
+    `.claude/agents/<name>.md`): `tools/lint/src/agent_docs/mod.rs`'s
     `is_agent_doc`, mirrored since the scripts cannot call `tools/lint`."""
     skill = path.removeprefix(".claude/skills/")
     folder, _, rest = skill.partition("/")
     in_skill = skill != path and bool(folder) and bool(rest)
-    return path == "CLAUDE.md" or path.endswith("/CLAUDE.md") or in_skill
+    stem = path.removeprefix(".claude/agents/")
+    agent = stem != path and stem.endswith(".md") and len(stem) > 3 and "/" not in stem
+    return path == "CLAUDE.md" or path.endswith("/CLAUDE.md") or in_skill or agent
 
 
 def inert(files: list[str]) -> bool:

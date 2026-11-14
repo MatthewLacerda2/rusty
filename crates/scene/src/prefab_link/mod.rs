@@ -4,8 +4,10 @@
 //! (`removed`, Unity's *Removed GameObject* override).
 //!
 //! The prefab verbs (`scene::prefab`: extract, stamp, propagate, apply, revert)
-//! build on these and re-export them; they sit below that layer because the base
-//! reaches them in live code (a destroy records the part it removed).
+//! build on these, and `prefab` re-exports `instance`, the extension and the
+//! source tests under its own paths (`prefab::source`); `removed` is named here
+//! only. They sit below that layer because the base reaches them in live code (a
+//! destroy records the part it removed).
 //!
 //! stored-format: the `.prefab` links a scene saves (a removed part's node path in `removed_parts`)
 

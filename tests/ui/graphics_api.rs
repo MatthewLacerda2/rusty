@@ -133,9 +133,9 @@ fn graphics_components_survive_save_and_load() {
         .join(format!("rusty_ui_graphics_{}.json", std::process::id()))
         .to_string_lossy()
         .into_owned();
-    scene.save_to_file(&path).unwrap();
+    rusty::scene::save_to_file(&scene, &path).unwrap();
     let mut loaded = Scene::new();
-    loaded.load_from_file(&path).unwrap();
+    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
     std::fs::remove_file(&path).ok();
     assert_eq!(loaded.world.image(id).map(|i| i.clone()), Some(ring));
     assert_eq!(

@@ -29,7 +29,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Check | Tool | Rule |
 |---|---|---|
 | Active in the hierarchy | `tools/lint -- --rules` (`active-self`) | **hard gate**: outside `crates/ecs/src/`, no non-test line of `src/` calls `is_active_self(` — systems ask `World::is_active_in_hierarchy`, so an inactive parent hides its subtree; what shows or stores the own flag takes `// lint: allow(active-self) <why>` (#1363) |
-| Agent docs keep their shape | `tools/lint` (the size gate: `claude-md`, `skill`, `history`) | **hard gate**: every tracked `CLAUDE.md` is ≤ 300 lines and every tracked file of a skill folder (`.claude/skills/<folder>/`) ≤ 500, every line counted; a `SKILL.md` opens with the frontmatter Claude Code loads it by (`name` = its folder, ≤ 64 of `[a-z0-9-]`; `description` non-empty, ≤ 1024 characters), and a skill folder has one; no issue or PR number (`#123`, `owner/repo#123`, `…/issues/123`, `…/pull/123`) or `YYYY-MM-DD` date in them. Runs on Markdown-only PRs too; exceptions are `<!-- lint: allow(<rule>) <why> -->` (*Agent docs*, below) |
+| Agent docs keep their shape | `tools/lint` (the size gate: `claude-md`, `skill`, `agent`, `history`) | **hard gate**: every tracked `CLAUDE.md` is ≤ 300 lines, every tracked file of a skill folder (`.claude/skills/<folder>/`) ≤ 500 and every subagent definition (`.claude/agents/<name>.md`) ≤ 60, every line counted; a `SKILL.md` opens with the frontmatter Claude Code loads it by (`name` = its folder, ≤ 64 of `[a-z0-9-]`; `description` non-empty, ≤ 1024 characters), and a skill folder has one; a definition opens with `name` (= its file's stem), a non-empty `description` and a concrete `model` (never `inherit` or absent), only keys Claude Code documents, and the definitions the pin table names exist on their pinned model; no issue or PR number (`#123`, `owner/repo#123`, `…/issues/123`, `…/pull/123`) or `YYYY-MM-DD` date in them. Runs on Markdown-only PRs too; exceptions are `<!-- lint: allow(<rule>) <why> -->` (*Agent docs*, below) |
 | Asset writes tell the caches | `tools/lint -- --rules` (`asset-write`) | **hard gate**: a non-test line of `src/` outside `crates/core/src/fs/` that calls `fs::write(`, `File::create(`, `.save(<arg>)` or any `write_atomic(` (#2005; a whole identifier, outside string literals) has a `note_written` later in its function, or `// lint: allow(asset-write) <why>` (a file no path-keyed cache reads) (#1220) |
 | `cfg!(test)` is no switch | `tools/lint -- --rules` (`cfg-test-switch`) | **hard gate**: no production line of a crate's `src/` holds a `cfg!(…)` naming `test` — it is true only in the crate's own unit tests, so every other crate's tests and `tests/` silently get the shipped behaviour; a switch another crate's tests need is a test hook armed at run time (`crates/CLAUDE.md`, *Test hooks*), and one only the crate's own tests need takes `// lint: allow(cfg-test-switch) <why>` |
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (default, `--features dev`, and `--no-default-features` — the editor-free player build), plus `tools/lint` itself (#935) |
@@ -45,7 +45,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Entity ids from Lua | `tools/lint -- --rules` (`entity-arg`) | **hard gate**: in `crates/script/src/api/`, a Lua callback never takes an entity (`id`, `…_id`, `parent`, `child`, `target`, `entity`, `body`, `canvas`) as a bare `u32` or `Option<u32>`: it takes `api::entity_arg::EntityArg`, so a `nil` id reads as a missing entity and fails a write with the verb's name (#1383) |
 | Every ECS write is stamped | `tools/lint -- --rules` (`ecs-write`) | **hard gate**: a non-test line of `crates/ecs/src/` that borrows a hecs column mutably (`get::<&mut …>`, `query_one::<(&mut …)>`, `query_mut`) or reshapes the store through `inner.` (`spawn`, `despawn`, `insert`, `remove`, `clear`, …) fails, since a write that skips `World::touch` stamps no change and every change-log consumer misses it; each funnel line, and `World::derived_mut`, takes `// lint: allow(ecs-write) <why>` (#1705) |
 | File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py`, `.lua` or `.wgsl` one (docstrings, comments and blank lines free, #926, #1015); nothing grandfathered |
-| Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `crates/scene/src/authoring/` that takes a float (an `f32`/`f64`, a glam vector, or a float struct such as `Curve`) passes it to a `scene::rules` function (a `rules::sanitize` helper or a bound such as `rules::lens::hold_fov`), or a sibling setter of its file, so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
+| Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `crates/scene/src/authoring/` that takes a float (an `f32`/`f64`, a glam vector, or a float struct such as `Curve`) passes it to a `scene::rules` function (a bare `pub fn`: a `rules::sanitize` helper or a bound such as `rules::lens::hold_fov`) at a position that rule holds, or a sibling setter of its file; a rule taking floats and holding none (a pass-through) fails too, so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
 | Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix (#934) |
 | Full component literals in tests | `tools/lint -- --rules` (`full-literal`) | **hard gate**: test code builds a first-class component with `..rest` or a constructor, never a literal naming every field (#663, #976) |
 | Function ("endpoint") length | clippy `too_many_lines` + `tools/lint -- --determinism` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]`; its one exception, `Renderer::assemble`, is locked (`ESCAPE`, #961) |
@@ -226,9 +226,10 @@ component `WAIVERS`, the rules gate's `lint: allow`), never in an unread list.
 
 ## Agent docs (the size gate)
 The files an agent loads as instructions, every tracked `CLAUDE.md` (the root and the
-nested ones) and every tracked file of a skill under `.claude/skills/<folder>/`, are
-held to their shape by the size gate (`tools/lint/src/agent_docs/`), so a prune or a
-split stays true instead of growing back. Three rules:
+nested ones), every tracked file of a skill under `.claude/skills/<folder>/` and every
+tracked subagent definition `.claude/agents/<name>.md`, are held to their shape by the
+size gate (`tools/lint/src/agent_docs/`), so a prune or a split stays true instead of
+growing back. Four rules:
 
 - **`claude-md`**: a `CLAUDE.md` is at most 300 lines, **every** line counted, blank
   ones too: the whole file is read into context on every load.
@@ -238,6 +239,19 @@ split stays true instead of growing back. Three rules:
   and a closing `---`. Those are the limits Claude Code loads a skill by: one
   outside them is skipped without a word, so the gate says it at commit time. A
   skill folder without a `SKILL.md` fails, since it is never loaded.
+- **`agent`**: a subagent definition is at most 60 lines (it is the helper's whole
+  standing brief, paid on every dispatch); it opens with `---`, a `name:` equal to
+  its file's stem, a non-empty `description:`, a `model:` that is concrete (`opus`,
+  `sonnet`, `haiku`, `fable` or a full `claude-…` id; never `inherit` or absent, which
+  follow the orchestrator's model), and a closing `---`. Every top-level key is one
+  Claude Code documents for a subagent file (`agent_docs::agent::KEYS`), since the
+  harness ignores an unknown or misspelt key without a word. The definitions the
+  orchestration rule pins (`agent_docs::agent::PINS`: `coder` and `reviewer` on
+  `opus`) must exist and say that model, so changing who writes or judges code is an
+  edit to that table, not one word in a Markdown file. A pinned definition names
+  the alias, not a full id (`claude-opus-…`), since the alias follows the latest
+  model. A key is read as YAML reads it (`model:opus`, with no space, is no `model`
+  key), and a trailing ` # comment` on an unquoted value is dropped.
 - **`history`**: no `#123`, `owner/repo#123`, `…/issues/123`, `…/pull/123` or
   `YYYY-MM-DD` date. An agent doc states the rule; its story lives in the issue and
   PR, which `git log -S` finds. Placeholders (`#N`), hex colours (`#33ccff`, `#0f0`:
@@ -248,8 +262,8 @@ split stays true instead of growing back. Three rules:
 
 Only **tracked** files are read (`git ls-files`), so a scratch `CLAUDE.md` nobody
 added is not judged, and `.claude/` is reached though it is a dot-directory. The
-commit hook checks the staged agent docs (the folder-has-a-`SKILL.md` check needs
-the whole tree, so it waits for `make size`). CI runs the size gate on Markdown-only
+commit hook checks the staged agent docs (the folder-has-a-`SKILL.md` check and the
+pinned definitions' presence need the whole tree, so they wait for `make size`). CI runs the size gate on Markdown-only
 pull requests too, beside `docrefs`. The merge queue lints the merged tree of a
 branch that touches an agent doc, Markdown-only or not (`checks.needs_lint`), since
 two such branches can each fit and overflow merged: when the merge moved its head,
@@ -579,13 +593,24 @@ new flag, gate, CI step or baseline.
 - **`sanitize`** — every authoring setter refuses a non-finite float (#1361).
   A `pub fn set_*` (any `pub` visibility) under `crates/scene/src/authoring/` (test code
   aside) that takes a float-carrying parameter fails unless each such parameter is
-  passed whole to a rule: a function a file under `crates/scene/src/rules/` defines,
-  the float helpers of `scene::rules::sanitize` (`finite`, `finite_or`, `at_least`,
-  `non_negative`, `clamped`, `unit`, `unit_color`, `finite2`/`3`/`4` and their `_or`
-  forms) or a bound the base holds too (`rules::lens::hold_fov`,
-  `rules::joint::drive_value`; the rule reads the list from those files), or to
-  another `set_*` of the same file, which it checks in turn. A rule is trusted to
-  hold what it takes: it is the one place its bound lives. A parameter
+  passed whole to a rule at a position the rule holds: a bare `pub fn` a file under
+  `crates/scene/src/rules/` defines outside its tests, the float helpers of
+  `scene::rules::sanitize` (`finite`, `finite_or`, `at_least`, `non_negative`,
+  `clamped`, `unit`, `unit_color`, `finite2`/`3`/`4` and their `_or` forms) or a
+  bound the base holds too (`rules::lens::hold_fov`, `rules::joint::drive_value`;
+  the rule reads the list from those files), or to another `set_*` of the same
+  file, which it checks in turn. **A rule is not trusted by name**
+  (`rules/sanitize_rules.rs`): it holds a float parameter when a statement or match
+  arm of its body calls `is_finite()` on that parameter (on it, a field or a method
+  chain of it, or a closure argument traced back to such a chain:
+  `v.iter().all(|x| x.is_finite())`) or hands it whole to another rule at a position
+  that one holds, found to a fixed point over every rule. So
+  `finite_or(v, fallback)` holds `v` and not `fallback`, and a setter passing its
+  value as the fallback fails. A test on another parameter holds only that one, and
+  `is_nan` alone holds nothing: it lets `±inf` through. A rule taking floats and holding none (a
+  pass-through) is itself a finding, on its `fn` line; one holding its value another
+  way says so with `// lint: allow(sanitize) <why>` above it and then holds its
+  first float (`rules::lens::hold_projection`, `optional_color_or`, `saturated`). A parameter
   carries a float when its type, under `&`, `Option<…>`, `Vec<…>` or `[…; N]`, is
   `f32`, `f64`, `Vec2`/`3`/`4`, `Quat` or one of the float structs the setters take
   (`Curve`, `Gradient`, `Range`, …: `FLOATS` in the rule; a new one joins it). `finite(v.x)`

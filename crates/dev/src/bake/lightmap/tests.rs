@@ -114,9 +114,9 @@ fn references_survive_a_save_and_load() {
     let (mut scene, floor, _) = scene();
     let path = scene_path("save");
     bake_scene_lightmaps(&mut scene, Some(&path), &quick()).unwrap();
-    scene.save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&scene, &path).unwrap();
     let mut loaded = Scene::new();
-    loaded.load_from_file(&path).unwrap();
+    rusty_scene::load_from_file(&mut loaded, &path).unwrap();
     assert_eq!(loaded.lightmaps, scene.lightmaps);
     assert!(loaded.lightmaps.get(floor).is_some());
 }

@@ -58,7 +58,7 @@ impl EditorUi {
             console.info(format!("Scene load queued: {path}"));
             return false;
         }
-        match scene.load_from_file(path) {
+        match rusty_scene::load_from_file(scene, path) {
             Ok(()) => console.info(format!("Scene loaded from {path}")),
             // The World is the new file's: so is the current scene file (#1374).
             Err(err) if err.replaced_world() => console.warn(format!("Scene {path}: {err}")),
@@ -76,7 +76,7 @@ impl EditorUi {
 
     /// Save the scene to `path`, which becomes the current scene file.
     pub(crate) fn save_scene_to(&mut self, scene: &Scene, console: &mut ConsoleLogs, path: &str) {
-        match scene.save_to_file(path) {
+        match rusty_scene::save_to_file(scene, path) {
             Ok(_) => {
                 self.set_current_scene_path(Some(path.to_string()));
                 self.is_dirty = false;

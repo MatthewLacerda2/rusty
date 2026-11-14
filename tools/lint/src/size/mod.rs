@@ -288,8 +288,8 @@ fn report(violations: &[String], docs: &[String]) {
     }
     if !docs.is_empty() {
         eprintln!(
-            "\n{} agent-doc finding(s) (`CLAUDE.md` and skill files; docs/linting.md, \
-             *Agent docs*).",
+            "\n{} agent-doc finding(s) (`CLAUDE.md`, skill files and `.claude/agents/` \
+             definitions; docs/linting.md, *Agent docs*).",
             docs.len()
         );
     }

@@ -18,7 +18,7 @@ pub fn game() -> PathBuf {
         let mut scene = Scene::new();
         scene.add_entity(name.to_string());
         let path = scenes.join(file);
-        scene.save_to_file(&path.to_string_lossy()).unwrap();
+        rusty::scene::save_to_file(&scene, &path.to_string_lossy()).unwrap();
     }
     let file = r#"{ "build": { "startup_scene": "assets/scenes/arena.scene" } }"#;
     std::fs::write(root.join("project.rusty"), file).unwrap();

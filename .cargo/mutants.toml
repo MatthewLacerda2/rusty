@@ -33,4 +33,5 @@ exclude_globs = [
   "crates/scene/src/asset_instance/collision/chair.rs",
   "crates/scene/src/asset_instance/humanoid_fixture.rs",
   "crates/scene/src/skeleton/rig.rs",
+  "crates/scene/src/state/marks.rs",
 ]

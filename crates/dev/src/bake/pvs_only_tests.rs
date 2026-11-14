@@ -17,7 +17,7 @@ fn saved(tag: &str) -> String {
     let dir = rusty_test_support::temp::dir().join(format!("occlusion_only_{tag}"));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("level.scene").to_string_lossy().into_owned();
-    corridors().save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&corridors(), &path).unwrap();
     path
 }
 
@@ -26,7 +26,7 @@ fn it_writes_only_the_pvs_and_a_fresh_load_matches_it() {
     let path = saved("writes");
     let scene_text = std::fs::read(&path).unwrap();
     let mut scene = Scene::new();
-    scene.load_from_file(&path).unwrap();
+    rusty_scene::load_from_file(&mut scene, &path).unwrap();
     let report = bake_occlusion_only(&mut scene, Some(&path), &mut BakeLog::off()).unwrap();
     assert!(report.occlusion.cells > 0 && report.occlusion.occluders > 0);
     assert!(report
@@ -41,7 +41,7 @@ fn it_writes_only_the_pvs_and_a_fresh_load_matches_it() {
     );
 
     let mut back = Scene::new();
-    back.load_from_file(&path).unwrap();
+    rusty_scene::load_from_file(&mut back, &path).unwrap();
     let data = back.occlusion.as_deref().expect("the PVS loads");
     for baked in &data.objects {
         assert_eq!(fingerprint(&back, baked.entity), Some(baked.fingerprint));
@@ -96,12 +96,12 @@ fn a_level_too_large_to_cull_claims_nothing_saved() {
 fn the_script_verb_warns_of_a_material_the_file_lacks() {
     let path = saved("warns");
     let mut level = Scene::new();
-    level.load_from_file(&path).unwrap();
+    rusty_scene::load_from_file(&mut level, &path).unwrap();
     for id in level.world.ids_with_mesh() {
         let glass = Some(MaterialComponent::new("glass"));
         level.world.set_material(id, glass);
     }
-    level.save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&level, &path).unwrap();
     let s = Session::new(&path).unwrap();
     s.eval(r#"Material.DefineAsset("glass", { render_face = "Both" })"#)
         .unwrap();
@@ -119,7 +119,7 @@ fn the_lighting_save_keeps_a_newer_pvs_and_a_failed_pvs_step_loses_nothing() {
     let pvs = occlusion_path(&path);
     std::fs::remove_file(&pvs).ok();
     let mut editor = Scene::new();
-    editor.load_from_file(&path).unwrap();
+    rusty_scene::load_from_file(&mut editor, &path).unwrap();
     // Another process bakes the PVS while the editor has the scene open.
     std::fs::write(&pvs, b"theirs").unwrap();
     let lit = write_lighting(&editor, &path);
@@ -127,7 +127,7 @@ fn the_lighting_save_keeps_a_newer_pvs_and_a_failed_pvs_step_loses_nothing() {
     assert_eq!(std::fs::read(&pvs).unwrap(), b"theirs", "the lighting save");
     // The PVS step fails, so `finish` never runs: a plain save keeps the newer file.
     editor.ambient_intensity = 0.5;
-    editor.save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&editor, &path).unwrap();
     assert_eq!(std::fs::read(&pvs).unwrap(), b"theirs", "a save after");
     assert!(editor.bake_files().warned(&pvs), "the save says it kept it");
     // A PVS step that ends writes this world's bake (the last write wins).

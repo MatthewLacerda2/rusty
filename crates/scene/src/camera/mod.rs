@@ -216,10 +216,6 @@ pub fn apply_lens(cam: &mut Camera, c: &rusty_components::CameraComponent) {
 #[path = "sync_tests.rs"]
 mod sync_tests;
 
-#[cfg(test)]
-#[path = "lens_tests.rs"]
-mod lens_tests;
-
 /// Yaw/pitch (degrees) of a world matrix's forward (-Z) axis, the inverse of
 /// [`Camera::forward`], so a camera entity's orientation maps onto the render camera.
 fn yaw_pitch_from_matrix(world: Mat4) -> (f32, f32) {

@@ -99,7 +99,7 @@ fn fill_kept_copy(scene: &mut Scene, id: u32, changed: &BTreeSet<String>) {
 }
 
 /// Size `id`'s Mesh collider's box to what it now builds from, and its world box.
-pub(super) fn refit(scene: &mut Scene, id: u32) {
+pub fn refit(scene: &mut Scene, id: u32) {
     let own = scene
         .world
         .mesh(id)

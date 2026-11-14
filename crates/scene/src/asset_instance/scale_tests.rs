@@ -54,7 +54,7 @@ fn a_skinned_instances_bones_move_to_the_scaled_rest_pose() {
 
 #[test]
 fn the_change_is_noted_for_other_caches_and_the_scene_reads_it_once() {
-    use crate::rehydrate::model_writes::ModelWrites;
+    use crate::edit_side::rehydrate::model_writes::ModelWrites;
     use rusty_core::fs::written::{note_written, written_since};
     let path = quad_model("rusty_scale_noted");
     let mut scene = Scene::new();
@@ -86,7 +86,7 @@ fn a_nan_or_unchanged_factor_changes_nothing() {
 
 #[test]
 fn a_saved_mesh_colliders_box_follows_a_scale_factor_set_since() {
-    use crate::serialize::{apply_scene_data, to_scene_data};
+    use crate::edit_side::serialize::{apply_scene_data, to_scene_data};
     use rusty_components::{ColliderComponent, ColliderShape};
     let path = quad_model("rusty_scale_collider");
     let mut scene = Scene::new();

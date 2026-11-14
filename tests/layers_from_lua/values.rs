@@ -10,9 +10,9 @@ use super::with_api;
 
 fn save_load(scene: &Scene, name: &str) -> Scene {
     let path = crate::temp::dir().join(name).to_string_lossy().into_owned();
-    scene.save_to_file(&path).unwrap();
+    rusty::scene::save_to_file(scene, &path).unwrap();
     let mut loaded = Scene::new();
-    loaded.load_from_file(&path).unwrap();
+    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
     loaded
 }
 

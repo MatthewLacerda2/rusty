@@ -41,6 +41,7 @@ pub fn hold_clip_planes(near: f32, far: f32) -> (f32, f32) {
 }
 
 /// A projection with an orthographic size of at least [`MIN_ORTHO_SIZE`].
+// lint: allow(sanitize) holds `projection`: its one float, the orthographic size, goes through `at_least`
 pub fn hold_projection(projection: Projection) -> Projection {
     match projection {
         Projection::Orthographic { size } => Projection::Orthographic {

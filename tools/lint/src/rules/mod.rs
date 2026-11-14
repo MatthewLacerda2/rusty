@@ -37,6 +37,7 @@ mod platform_cfg;
 mod prefix;
 mod read_keys;
 mod sanitize;
+mod sanitize_rules;
 mod self_path;
 mod skip;
 mod sorted;

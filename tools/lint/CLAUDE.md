@@ -39,7 +39,7 @@ file is what a coder changing the tool must keep.
   `orphan-module`, whose orphan file takes an allow while its unreadable-workspace
   finding, on a manifest, takes none.
 - **What holds Markdown rides the size gate, not `--rules`**: `agent_docs/` (every
-  `CLAUDE.md` and skill file) runs in `make size`, which the commit hook and CI's
+  `CLAUDE.md`, skill file and subagent definition) runs in `make size`, which the commit hook and CI's
   Markdown-only runs reach and `--rules` does not. It still reports `Finding`s and
   reads the shared allow, whose Markdown form is `<!-- lint: allow(<rule>) <why> -->`.
 - **Signals print and never fail.** What CLAUDE.md only says to *aim* for (≲10 files

@@ -68,9 +68,9 @@ fn text_survives_save_and_load() {
         .join(format!("rusty_ui_text_{}.json", std::process::id()))
         .to_string_lossy()
         .into_owned();
-    scene.save_to_file(&path).unwrap();
+    rusty::scene::save_to_file(&scene, &path).unwrap();
     let mut loaded = Scene::new();
-    loaded.load_from_file(&path).unwrap();
+    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
     std::fs::remove_file(&path).ok();
     assert_eq!(loaded.world.text(id).map(|t| t.clone()), Some(text));
 }

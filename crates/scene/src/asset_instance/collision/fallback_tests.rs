@@ -6,8 +6,8 @@ use std::collections::BTreeSet;
 use super::chair::write as write_chair;
 use super::tests::{spawn, triangles};
 use crate::asset_instance::{instantiate_asset, set_model_scale_factor};
-use crate::rehydrate::{reimport_model_except, Rig};
-use crate::serialize::{apply_scene_data, to_scene_data};
+use crate::edit_side::rehydrate::{reimport_model_except, Rig};
+use crate::edit_side::serialize::{apply_scene_data, to_scene_data};
 use crate::Scene;
 
 #[test]

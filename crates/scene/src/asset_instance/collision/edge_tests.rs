@@ -7,7 +7,7 @@ use super::tests::{spawn, triangles};
 use crate::asset_instance::instantiate_asset;
 use crate::authoring::rendering::mesh::hold_subdivisions;
 use crate::authoring::{add_component, remove_component, ComponentKind};
-use crate::serialize::to_scene_data;
+use crate::edit_side::serialize::to_scene_data;
 use crate::Scene;
 use rusty_asset::{sidecar, MeshColliderKind, SubObjectCollider};
 

@@ -42,9 +42,11 @@ The limits are CLAUDE.md's; the reasons are here, so they are kept, not re-argue
   pins, so the choice never follows the orchestrator's. `make coder` pins the
   cloud coder's (`dispatch/routine.py`'s `MODEL`). The `Agent` tool's types are
   in `.claude/agents/`: `coder` (a local coder) and `reviewer` on the latest
-  Opus, `merge-fixer` (a hand-back's mechanical fix) on Sonnet. Dispatch them by
-  `subagent_type` and never pass `model`, which would override the pin. The
-  orchestrator's own quick read-only searches run on what it picks.
+  Opus, `merge-fixer` (a hand-back's mechanical fix) on Sonnet; `agent-docs`
+  holds the pins (`agent_docs::agent::PINS`) and a concrete `model:` on every
+  definition. Dispatch them by `subagent_type` and never pass `model`, which
+  would override the pin. The orchestrator's own quick read-only searches run on
+  what it picks.
 - Merging stays one at a time, whatever the count.
 - **One worktree per branch**, under `.claude/worktrees/`, off the latest `main`,
   removed the moment it merges. **Never a shared `CARGO_TARGET_DIR`**: worktrees
@@ -71,7 +73,7 @@ avoid:
   generated, so two component branches touch different lines; what still
   collides is each one's hand-written rows (`inspect!`, `snapshot!`,
   `AddEntry`) when they share an area file;
-- `crates/scene/src/serialize.rs`'s `apply` and `crates/scene/src/undo/level.rs`'s list: every
+- `crates/scene/src/edit_side/serialize.rs`'s `apply` and `crates/scene/src/undo/level.rs`'s list: every
   saved `Scene` field adds a line to both, so two such branches pass clippy's
   50-line cap in `apply`; the level list's check test asks the
   second to land for its field;
