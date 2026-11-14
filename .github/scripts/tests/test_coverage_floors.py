@@ -50,6 +50,10 @@ class Rule(unittest.TestCase):
     def test_a_removed_floor_on_a_live_module_is_flagged(self):
         self.assertIn("`api` floor (86.00) was removed", check("app 95.00\n")[0])
 
+    def test_a_floor_split_into_its_halves_passes(self):
+        head = "app 95.00\napi/a 90.00\napi/b 80.00\n"
+        self.assertEqual(check(head), [])
+
     def test_a_removed_floor_on_a_gone_module_passes(self):
         self.assertEqual(check("app 95.00\n", present=("app",)), [])
 

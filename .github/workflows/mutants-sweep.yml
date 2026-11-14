@@ -207,8 +207,8 @@ jobs:
           echo "mutants=$(grep -c . mutants-list.txt)" >> "$GITHUB_OUTPUT"
           echo "Matrix: $(cat sizing.txt)." | tee -a "$GITHUB_STEP_SUMMARY"
 
-  # Re-mutates the *entire* deterministic sim (app/scripting/physics/
-  # navigation), re-examining code no on-request run was asked about and
+  # Re-mutates the core of the deterministic sim (app, the `scripting` half of
+  # the `script` crate, physics, navigation), re-examining code no on-request run was asked about and
   # tracking the survivor backlog (#158–#161).
   #
   # Sharded (#480), and the shard count and width are `mutants-plan`'s, not

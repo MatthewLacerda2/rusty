@@ -107,8 +107,8 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
   itself or on a module at or above its row.
 - **Two modules that name each other are one crate**, the pair its submodules under
   a new module name (`script` holds `scripting` and `api`): rename them into
-  `src/<new>/` inside the root package first (`crate::api::` → `crate::script::api::`,
-  in `tests/` too), give the table one row for both, then `make move-crate` the
+  `src/<new>/` inside the root package first (`crate::api::` → `crate::script::api::`
+  in `src/`, `rusty::api::` → `rusty::script::api::` in `tests/`), give the table one row for both, then `make move-crate` the
   new module as any other. Inside the crate the halves stay `crate::api::…` and
   `crate::scripting::…`.
 - **`env!("CARGO_MANIFEST_DIR")`** names the crate's folder, not the checkout, and

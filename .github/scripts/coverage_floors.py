@@ -15,7 +15,9 @@ A reason answers for one drop: lowering a line again while keeping the reason
 it already had is still silent. A raise, an unchanged floor and a new floor
 always pass. A removed floor can
 carry no reason on its line, so it passes only when its module is gone from
-`src/` (`coverage-ignore.py` refuses a floor on a missing directory anyway).
+`src/` (`coverage-ignore.py` refuses a floor on a missing directory anyway), or
+when it was split into floors on its halves (`script` into `script/api` and
+`script/scripting`), which hold more than the one floor did.
 
 The check runs as a `make scripts` test against the merge base with
 `origin/main` (`tests/test_coverage_floors.py`), so it holds in `make gates` and
@@ -59,7 +61,8 @@ def findings(base: str, head: str, has_module: Callable[[str], bool]) -> list[st
     out = []
     for module, (floor, written, old_reason) in old.items():
         if module not in new:
-            if has_module(module):
+            split = any(name.startswith(f"{module}/") for name in new)
+            if has_module(module) and not split:
                 out.append(
                     f"{BASELINE}: the `{module}` floor ({written}) was removed while "
                     f"src/{module}/ still exists; keep it, or lower it with `{REASON} <why>`"
@@ -86,7 +89,11 @@ def against(base_ref: str, root: Path) -> list[str]:
     merge_base = git("merge-base", "HEAD", base_ref, cwd=root).strip()
     base = git("show", f"{merge_base}:{BASELINE}", cwd=root)
     head = (root / BASELINE).read_text()
-    return findings(base, head, lambda m: module_dir(root, m).is_dir())
+    def has_module(m: str) -> bool:
+        crate, _, sub = m.partition("/")
+        return (module_dir(root, crate) / sub).is_dir()
+
+    return findings(base, head, has_module)
 
 
 def main() -> None:
