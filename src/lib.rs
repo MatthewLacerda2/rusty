@@ -13,7 +13,6 @@ pub mod app;
 pub mod editor;
 pub mod logging;
 pub mod preview;
-pub mod render;
 pub mod scripting;
 pub mod shell;
 
@@ -29,6 +28,7 @@ pub use rusty_ecs as ecs;
 pub use rusty_navigation as navigation;
 pub use rusty_physics as physics;
 pub use rusty_procgen as procgen;
+pub use rusty_render as render;
 pub use rusty_scene as scene;
 pub use rusty_shadergen as shadergen;
 pub use rusty_time as time;

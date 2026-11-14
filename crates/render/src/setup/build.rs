@@ -1,0 +1,290 @@
+//! GPU-resource construction for [`Renderer`]. Each builder returns one cohesive
+//! group (the camera/lighting bindings, the shadow system, the forward passes, the
+//! billboard passes), and `Renderer::from_parts` (`render::setup`) destructures the
+//! groups into the renderer, so the seams follow what depends on what (#211).
+
+use crate::clusters::ClusterBuffers;
+use crate::decals::DecalBuffers;
+use crate::draw::{ball_pipeline, NavMeshGizmo};
+use crate::gpu::bind_layouts;
+use crate::gpu::global_group::GlobalGroup;
+use crate::gpu::lightmaps::Lightmaps;
+use crate::gpu::pipelines;
+use crate::gpu::shaders::ShaderRegistry;
+use crate::ibl::reflection_probes::ProbeArray;
+use crate::ibl::sky_cube::SkyReflection;
+use crate::passes::outline::OutlinePasses;
+use crate::passes::transparent::OpaqueCopyPass;
+use crate::postfx::effects::volumetric_fog::SharedVolume;
+use crate::postfx::{effects::Passes, grade::GradeBake, HDR_FORMAT};
+use crate::setup::shadow_system::{create_shadow_system, ShadowSystem};
+use crate::setup::textures::{create_textures, Textures};
+use crate::{ibl::skybox, passes::ssao};
+use crate::{CameraUniform, LightingUniform, OFFSCREEN_FORMAT};
+use rusty_core::settings::quality::QualityValues;
+
+/// Camera + lighting uniform buffers and the group(0) bind group.
+pub(crate) struct GlobalBindings {
+    pub camera_buffer: wgpu::Buffer,
+    pub lighting_buffer: wgpu::Buffer,
+    pub global_bind_group: wgpu::BindGroup,
+    /// The light-cluster buffers group 0 binds (#434).
+    pub clusters: ClusterBuffers,
+    /// The decal records and atlas group 0 binds (#638).
+    pub decals: DecalBuffers,
+    /// The baked lightmap pages group 0 binds (#438).
+    pub lightmaps: Lightmaps,
+    /// The reflection-probe cube array group 0 binds (#1206).
+    pub reflection_probes: ProbeArray,
+    /// The sky's reflection cubes group 0 binds (#1553).
+    pub sky_reflection: SkyReflection,
+    /// The integrated volumetric fog group 0 binds (#1703).
+    pub fog_volume: SharedVolume,
+}
+
+/// The forward-lit, line, outline and skybox passes — everything that draws into
+/// the HDR offscreen target.
+pub(crate) struct ForwardPasses {
+    pub render_pipeline: pipelines::FacedPipeline,
+    pub velocity_pipeline: pipelines::VelocityPipelines,
+    pub primed_pipelines: pipelines::PrimedPipelines,
+    pub transparent_pipelines: pipelines::TransparentPipelines,
+    pub depth_postpass_pipelines: pipelines::DepthPostpassPipelines,
+    pub line_pipeline: pipelines::LazyPipeline,
+    pub vertex_line_pipeline: pipelines::LazyPipeline,
+    /// The reflection-probe ball gizmo (#1911), over post-FX like the lines.
+    pub probe_ball_pipeline: pipelines::LazyPipeline,
+    /// The navmesh gizmo (#1910), over post-FX like the lines.
+    pub navmesh: NavMeshGizmo,
+    /// The selection outline's mask and edge pipelines (#1175).
+    pub outline: crate::passes::outline::OutlinePasses,
+    pub prepass_pipeline: pipelines::FacedPipeline,
+    pub skybox_renderer: skybox::SkyboxRenderer,
+}
+
+/// Billboard particle and ribbon (#441) passes; both reuse the renderer's
+/// `texture_layout`, and the particles sample the scene depth through
+/// `scene_depth_layout`.
+pub(crate) struct BillboardPasses {
+    pub particle_renderer: crate::passes::particles::ParticleRenderer,
+    pub ribbon_renderer: crate::passes::ribbons::RibbonRenderer,
+    pub scene_depth_layout: wgpu::BindGroupLayout,
+}
+
+/// Every non-trivial GPU resource a [`Renderer`] needs, grouped by role. Built in
+/// dependency order (layouts → textures → bindings → passes) and consumed once by
+/// [`Renderer::from_parts`], which moves each group into the flat renderer.
+pub(crate) struct GpuResources {
+    pub camera_lighting_layout: wgpu::BindGroupLayout,
+    pub entity_bones_layout: wgpu::BindGroupLayout,
+    pub textures: Textures,
+    pub global: GlobalBindings,
+    pub shadows: ShadowSystem,
+    pub forward: ForwardPasses,
+    pub billboards: BillboardPasses,
+    /// The in-game UI pass (#418).
+    pub ui: crate::ui::UiRenderer,
+    /// The SSAO passes (#436).
+    pub ssao: ssao::SsaoRenderer,
+    pub grade_bake: GradeBake,
+    pub post_passes: Passes,
+    pub quality: QualityValues,
+}
+
+impl GpuResources {
+    /// Build every *shared* GPU resource from an already-created device/queue. The
+    /// per-view targets (depth + post-FX chain) are no longer built here — each
+    /// [`crate::RenderView`] owns its own (#355). `output_format` is what
+    /// post-FX writes, which the editor's outline ring and gizmos draw over (#1224).
+    pub(crate) fn build(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        output_format: wgpu::TextureFormat,
+    ) -> Self {
+        let mut registry = ShaderRegistry::new(rusty_shadergen::engine_shader_dir());
+        let camera_lighting_layout = bind_layouts::create_camera_lighting_layout(device);
+        let entity_bones_layout = bind_layouts::create_entity_bones_layout(device);
+        let textures = create_textures(device, queue, &mut registry);
+        let global = create_global_bindings(device, &camera_lighting_layout, &mut registry);
+        let ssao = ssao::SsaoRenderer::new(device, queue, &mut registry);
+        // One module draws the solids and their shadows (#648).
+        let shader = registry.load(device, "shader.wgsl", "Forward Lit Shader");
+        let atlas_shader = registry.load(device, "shadow_atlas.wgsl", "Shadow Atlas Shader");
+        let shadow_shaders = [&shader, &atlas_shader];
+        let opaque_copy = OpaqueCopyPass::new(device, &mut registry);
+        let shadows = create_shadow_system(
+            device,
+            shadow_shaders,
+            (&ssao.no_ao, opaque_copy),
+            &textures,
+        );
+        let forward = create_forward_passes(
+            device,
+            &shader,
+            [
+                &camera_lighting_layout,
+                &entity_bones_layout,
+                &shadows.layout,
+            ],
+            &textures,
+            output_format,
+            &mut registry,
+        );
+        let billboards = create_billboard_passes(
+            device,
+            queue,
+            &textures,
+            &camera_lighting_layout,
+            &mut registry,
+        );
+        let ui = crate::ui::UiRenderer::new(device, queue, &mut registry);
+        Self {
+            camera_lighting_layout,
+            entity_bones_layout,
+            textures,
+            global,
+            shadows,
+            forward,
+            billboards,
+            ui,
+            ssao,
+            grade_bake: GradeBake::new(device, &mut registry),
+            // The window's format and the offscreen views' (render textures, the
+            // editor's panels, captures): the two an LDR pass writes.
+            post_passes: Passes::new(device, &mut registry, &[output_format, OFFSCREEN_FORMAT]),
+            quality: QualityValues::default(),
+        }
+    }
+}
+
+/// Billboard particle and ribbon (#441) passes; both reuse the renderer's
+/// `texture_layout`, and the particles also read the scene depth and the camera +
+/// lighting group 0 (#440), and own their default sprite (#2052).
+fn create_billboard_passes(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    textures: &Textures,
+    camera_lighting_layout: &wgpu::BindGroupLayout,
+    registry: &mut ShaderRegistry,
+) -> BillboardPasses {
+    use crate::passes::particles::{ParticleRenderer, SharedLayouts};
+    use crate::passes::ribbons::RibbonRenderer;
+    use crate::Renderer;
+    use std::rc::Rc;
+    let texture_layout = &textures.texture_layout;
+    let scene_depth_layout = bind_layouts::create_scene_depth_layout(device);
+    let uploader = (device, queue, &textures.mip_generator);
+    let sprite = Rc::new(Renderer::create_soft_disc_texture(uploader, texture_layout));
+    let layouts = SharedLayouts {
+        texture: texture_layout,
+        depth: &scene_depth_layout,
+        camera_lighting: camera_lighting_layout,
+    };
+    BillboardPasses {
+        particle_renderer: ParticleRenderer::new(device, layouts, sprite, registry),
+        ribbon_renderer: RibbonRenderer::new(device, queue, texture_layout, registry),
+        scene_depth_layout,
+    }
+}
+
+/// Camera + lighting uniform buffers, the light clusters and the group-0 bind group
+/// (with the procedural sky's reflection cube, baked on the first frame).
+fn create_global_bindings(
+    device: &wgpu::Device,
+    camera_lighting_layout: &wgpu::BindGroupLayout,
+    registry: &mut ShaderRegistry,
+) -> GlobalBindings {
+    let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Camera Uniform Buffer"),
+        size: std::mem::size_of::<CameraUniform>() as u64,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+
+    let lighting_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Lighting Uniform Buffer"),
+        size: std::mem::size_of::<LightingUniform>() as u64,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+
+    // One black cube until a frame makes probes resident; no draw selects a slot of
+    // it, so the shader never samples it.
+    let reflection_probes = ProbeArray::new(device);
+    let clusters = ClusterBuffers::new(device);
+    let decals = DecalBuffers::new(device);
+    let lightmaps = Lightmaps::new(device, false);
+    let sky_reflection = SkyReflection::new(device, registry);
+    let fog_volume = SharedVolume::new(device);
+    let global_bind_group = GlobalGroup {
+        camera: &camera_buffer,
+        lighting: &lighting_buffer,
+        skybox: (sky_reflection.view(None), &sky_reflection.sampler),
+        cube: (&reflection_probes.view, &reflection_probes.sampler),
+        clusters: &clusters,
+        decals: &decals,
+        lightmaps: lightmaps.binding(),
+        fog_volume: (fog_volume.view(), &fog_volume.sampler),
+    }
+    .create(device, camera_lighting_layout);
+
+    GlobalBindings {
+        camera_buffer,
+        lighting_buffer,
+        global_bind_group,
+        clusters,
+        decals,
+        lightmaps,
+        reflection_probes,
+        sky_reflection,
+        fog_volume,
+    }
+}
+
+/// Build the forward-lit, line, outline and skybox passes, the solids through the
+/// forward `shader`. Solids and sky draw into the HDR offscreen target; the editor's
+/// outline ring and line gizmos into `output_format`, over post-FX (#1224).
+/// `layouts` are groups 0, 1 and 3: camera + lighting, entity + bones, shadows.
+fn create_forward_passes(
+    device: &wgpu::Device,
+    shader: &wgpu::ShaderModule,
+    [camera_lighting_layout, entity_bones_layout, shadow_layout]: [&wgpu::BindGroupLayout; 3],
+    textures: &Textures,
+    output_format: wgpu::TextureFormat,
+    registry: &mut ShaderRegistry,
+) -> ForwardPasses {
+    // Skybox binds a single-texture `GpuTexture.bind_group` at its group(1), so it
+    // keeps the single `texture_layout`; the forward pipelines use `material_layout`.
+    let skybox_renderer = skybox::SkyboxRenderer::new(
+        device,
+        &textures.texture_layout,
+        camera_lighting_layout,
+        HDR_FORMAT,
+        registry,
+    );
+
+    let pl = pipelines::create_pipelines(
+        device,
+        shader,
+        [HDR_FORMAT, output_format],
+        camera_lighting_layout,
+        entity_bones_layout,
+        &textures.material_layout,
+        shadow_layout,
+    );
+
+    ForwardPasses {
+        render_pipeline: pl.forward,
+        velocity_pipeline: pl.velocity,
+        primed_pipelines: pl.primed,
+        transparent_pipelines: pl.transparent,
+        depth_postpass_pipelines: pl.depth_postpass,
+        line_pipeline: pl.line,
+        vertex_line_pipeline: pl.vertex_line,
+        probe_ball_pipeline: ball_pipeline(device, registry, &pl.layout, output_format),
+        navmesh: NavMeshGizmo::new(device, registry, &pl.layout, output_format),
+        outline: OutlinePasses::new(device, registry, &pl.layout, output_format),
+        prepass_pipeline: pl.prepass,
+        skybox_renderer,
+    }
+}

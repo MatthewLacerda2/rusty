@@ -1,0 +1,198 @@
+//! Screen-space ambient occlusion (#436).
+//!
+//! Probes light a room from a few points; they cannot darken the foot of a crate or
+//! the corner of a corridor. SSAO does, per pixel, from depth — and only the
+//! ambient/indirect light, never the sun or a lamp, so it has to be known *before*
+//! the forward shader adds those up. Each camera therefore runs, when AO is on
+//! (except a `DepthOnly` camera stacked on another, a viewmodel, which runs none
+//! of it and samples no AO, as URP's overlay cameras: `draw::camera::is_overlay`):
+//!
+//! 1. a **depth prepass** of its solids (the forward vertex stage, depth only) into
+//!    the view's own depth target, which a primed forward pass then starts from
+//!    (#1499): one prepass, shared;
+//! 2. the **occlusion** pass (`ssao.wgsl` `fs_ao`) at its quality's resolution;
+//! 3. a depth-aware **blur** at that same resolution (`fs_blur`);
+//! 4. below full resolution, one depth-aware (bilateral) **upsample** to it
+//!    (`fs_upsample`), HDRP's shape (#1578);
+//!
+//! and the forward pass reads the result at its group 3 (`t_ao`) to scale its
+//! ambient term, and the environment reflection through its specular occlusion
+//! (`forward::reflection::specular_occlusion`, #1697). With AO off none of this runs, and
+//! group 3 carries a 1x1 white texture instead.
+//!
+//! Cost, per camera that runs it: one more depth-only draw of every visible solid, plus
+//! `samples` depth taps per occlusion texel (the seeded Medium preset's Medium
+//! level: 8 at half resolution — a quarter of the pixels), 25 per occlusion texel
+//! for the blur and 4 per pixel for the upsample, so all but the upsample scale
+//! with the resolution divisor. The frame stats count the draws
+//! (`draw_calls`/`triangles` include the prepass) and the occlusion taps
+//! (`ssao_samples`); `Debug.Stats().gpu_passes` times the prepass (`ssao_prepass`),
+//! the occlusion (`ssao`) and the blur with its upsample (`ssao_blur`) apart.
+
+mod run;
+mod setup;
+mod targets;
+
+pub(crate) use targets::SsaoTargets;
+
+use glam::{Mat4, Vec3};
+
+use crate::gpu::pipelines::LazyPipeline;
+use crate::postfx::params::{effect_runs, Gate};
+use crate::timing::GpuPass;
+use rusty_components::{PostProcessingComponent, SsaoSettings};
+use rusty_core::settings::graphics_options::GraphicsOption;
+use rusty_core::settings::quality::{SsaoQuality, MAX_RESOLUTION_DIVISOR};
+use rusty_core::settings::GraphicsSettings;
+use rusty_scene::Camera;
+
+/// The occlusion, blur and upsample targets' format: one unorm channel is all AO needs.
+pub(crate) const AO_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R8Unorm;
+
+/// One of SSAO's fullscreen passes, in the order a frame records them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Stage {
+    Occlusion,
+    Blur,
+    Upsample,
+}
+
+impl Stage {
+    const ALL: [Self; 3] = [Self::Occlusion, Self::Blur, Self::Upsample];
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Occlusion => "SSAO Pass",
+            Self::Blur => "SSAO Blur Pass",
+            Self::Upsample => "SSAO Upsample Pass",
+        }
+    }
+
+    /// Its fragment entry point in `ssao.wgsl`.
+    fn entry(self) -> &'static str {
+        match self {
+            Self::Occlusion => "fs_ao",
+            Self::Blur => "fs_blur",
+            Self::Upsample => "fs_upsample",
+        }
+    }
+
+    /// The `gpu_passes` entry it is timed under: the upsample rides with the blur.
+    fn timed(self) -> GpuPass {
+        match self {
+            Self::Occlusion => GpuPass::Ssao,
+            Self::Blur | Self::Upsample => GpuPass::SsaoBlur,
+        }
+    }
+}
+
+/// The renderer-wide half of SSAO: its fullscreen pipelines (one per [`Stage`]),
+/// their layout, and the white texture the forward pass reads where no AO ran. The
+/// size-dependent targets are per view ([`SsaoTargets`]).
+pub(crate) struct SsaoRenderer {
+    pipelines: [LazyPipeline; 3],
+    layout: wgpu::BindGroupLayout,
+    _no_ao_texture: wgpu::Texture,
+    /// 1x1 white: "unoccluded", bound wherever the AO pass did not run.
+    pub(crate) no_ao: wgpu::TextureView,
+}
+
+/// CPU mirror of `SsaoParams` in `ssao.wgsl`.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct SsaoUniform {
+    inv_view_proj: [f32; 16],
+    view_proj: [f32; 16],
+    camera_pos: [f32; 4],
+    camera_fwd: [f32; 4],
+    /// radius, intensity, sample count, full-res pixels per AO texel
+    params: [f32; 4],
+}
+
+/// What gates SSAO besides the volume's switch: the player's `ssao` option.
+const GATE: Gate = Gate::option(GraphicsOption::Ssao);
+
+/// What this frame's SSAO does, when it runs at all: the active volume's look and
+/// its quality's cost.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct SsaoPlan {
+    pub settings: SsaoSettings,
+    pub quality: SsaoQuality,
+}
+
+impl SsaoPlan {
+    /// The plan for a view whose base camera's volume is `volume` (#1434), under
+    /// `graphics`: that volume with AO on and the player's `ssao` option allowing
+    /// it (`effect_runs`, #1438), at its quality's samples and resolution (#1522),
+    /// within the pass's range. `None` — nothing runs — otherwise.
+    pub(crate) fn for_volume(
+        volume: Option<&PostProcessingComponent>,
+        graphics: GraphicsSettings,
+    ) -> Option<Self> {
+        let settings = volume?.ssao;
+        let on = settings.active && settings.intensity > 0.0;
+        if !effect_runs(graphics, GATE, on) {
+            return None;
+        }
+        let custom = SsaoQuality {
+            samples: settings.samples,
+            resolution_divisor: settings.resolution_divisor,
+        };
+        let picked = settings.quality.pick(&graphics.quality.ssao, custom);
+        let quality = SsaoQuality {
+            samples: picked.samples.clamp(1, SsaoSettings::MAX_SAMPLES),
+            resolution_divisor: picked.resolution_divisor.clamp(1, MAX_RESOLUTION_DIVISOR),
+        };
+        Some(Self { settings, quality })
+    }
+}
+
+/// One camera's SSAO inputs: the plan plus where the camera is looking.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SsaoFrame {
+    pub plan: SsaoPlan,
+    pub view_proj: Mat4,
+    pub camera_pos: Vec3,
+    pub camera_forward: Vec3,
+}
+
+impl SsaoFrame {
+    /// `plan` for `camera`, drawn with `view_proj`.
+    pub(crate) fn for_camera(plan: SsaoPlan, view_proj: Mat4, camera: &Camera) -> Self {
+        Self {
+            plan,
+            view_proj,
+            camera_pos: camera.position,
+            camera_forward: camera.forward(),
+        }
+    }
+
+    /// The uniform every SSAO stage reads.
+    pub(crate) fn uniform(&self) -> SsaoUniform {
+        let s = self.plan.settings;
+        SsaoUniform {
+            inv_view_proj: self.view_proj.inverse().to_cols_array(),
+            view_proj: self.view_proj.to_cols_array(),
+            camera_pos: self.camera_pos.extend(0.0).to_array(),
+            camera_fwd: self.camera_forward.normalize().extend(0.0).to_array(),
+            params: [
+                s.radius,
+                s.intensity,
+                self.plan.quality.samples as f32,
+                self.plan.quality.resolution_divisor as f32,
+            ],
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "tests.rs"]
+mod ssao_tests;
+
+#[cfg(test)]
+#[path = "gpu_tests.rs"]
+mod ssao_gpu_tests;
+
+#[cfg(test)]
+#[path = "gpu_upsample_tests.rs"]
+mod ssao_gpu_upsample_tests;
