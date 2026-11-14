@@ -36,7 +36,7 @@ fn wgsl_struct(name: &str) -> (Vec<(String, usize)>, usize) {
 
 /// [`wgsl_struct`] in the composed `probe`.
 pub(crate) fn wgsl_struct_in(probe: &str, name: &str) -> (Vec<(String, usize)>, usize) {
-    let mut composer = compose::composer_with_common("engine/shaders").unwrap();
+    let mut composer = compose::composer_with_common(rusty_shadergen::engine_shader_dir()).unwrap();
     let module = compose::compose(&mut composer, probe, "probe.wgsl").unwrap();
     let found = module
         .types

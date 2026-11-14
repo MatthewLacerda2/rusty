@@ -7,7 +7,11 @@ use super::CasterData;
 fn the_caster_layout_matches_the_shadow_stage() {
     use crate::gpu::uniform_layout_tests::{assert_members, wgsl_struct_in};
     use std::mem::{offset_of, size_of};
-    let shader = std::fs::read_to_string("engine/shaders/shader.wgsl").unwrap();
+    let shader = std::fs::read_to_string(format!(
+        "{}/shader.wgsl",
+        rusty_shadergen::engine_shader_dir()
+    ))
+    .unwrap();
     let pairs = [
         ("bone_base", offset_of!(CasterData, bone_base)),
         ("alpha_cutoff", offset_of!(CasterData, alpha_cutoff)),
@@ -25,7 +29,11 @@ fn the_caster_mapping_terms_match_the_mapping_uniform() {
     use crate::gpu::uniform_layout_tests::{assert_members, wgsl_struct_in};
     use crate::gpu::uniforms::MappingUniform;
     use std::mem::{offset_of, size_of};
-    let shader = std::fs::read_to_string("engine/shaders/shader.wgsl").unwrap();
+    let shader = std::fs::read_to_string(format!(
+        "{}/shader.wgsl",
+        rusty_shadergen::engine_shader_dir()
+    ))
+    .unwrap();
     let pairs = [
         ("uv_st", offset_of!(MappingUniform, uv_st)),
         ("uv_mapping", offset_of!(MappingUniform, uv_mapping)),

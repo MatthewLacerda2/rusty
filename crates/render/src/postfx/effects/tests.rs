@@ -9,7 +9,9 @@ use crate::gpu::shaders::ShaderRegistry;
 #[test]
 fn every_module_names_itself_by_its_path() {
     for module in POST_EFFECTS.iter().filter_map(|e| e.module) {
-        let source = std::fs::read_to_string(format!("engine/shaders/{module}")).unwrap();
+        let source =
+            std::fs::read_to_string(format!("{}/{module}", rusty_shadergen::engine_shader_dir()))
+                .unwrap();
         let directive = format!("#define_import_path {}", import_path(module));
         assert!(source.contains(&directive), "{module} lacks `{directive}`");
     }
@@ -25,7 +27,7 @@ fn an_effect_with_functions_has_a_module_and_one_without_has_none() {
 
 #[test]
 fn the_assembled_composite_and_bake_compose_without_a_gpu() {
-    let mut registry = ShaderRegistry::new("engine/shaders");
+    let mut registry = ShaderRegistry::new(rusty_shadergen::engine_shader_dir());
     assemble::register_modules(&mut registry);
     let composite = registry.compose_source(&composite_source(), COMPOSITE);
     let entries: Vec<&str> = composite

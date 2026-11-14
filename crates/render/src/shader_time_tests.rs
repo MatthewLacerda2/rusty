@@ -27,7 +27,11 @@ fn stripes_shader() -> std::path::PathBuf {
             params,
         }],
     };
-    let base = std::fs::read_to_string("engine/shaders/shader.wgsl").unwrap();
+    let base = std::fs::read_to_string(format!(
+        "{}/shader.wgsl",
+        rusty_shadergen::engine_shader_dir()
+    ))
+    .unwrap();
     let path =
         rusty_test_support::temp::dir().join(format!("rusty_398_{}.wgsl", std::process::id()));
     std::fs::write(&path, assemble(&recipe, &base).unwrap()).unwrap();

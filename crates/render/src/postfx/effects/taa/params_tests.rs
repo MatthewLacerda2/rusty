@@ -8,10 +8,7 @@ use super::*;
 use rusty_scene::Camera;
 
 fn shader() -> String {
-    let path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/engine/shaders/postfx/taa.wgsl"
-    );
+    let path = format!("{}/postfx/taa.wgsl", rusty_shadergen::engine_shader_dir());
     std::fs::read_to_string(path).unwrap()
 }
 

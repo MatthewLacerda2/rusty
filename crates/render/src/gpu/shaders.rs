@@ -145,7 +145,7 @@ mod tests {
     /// any adapter is asked for.
     #[test]
     fn all_shaders_compose() {
-        let mut registry = ShaderRegistry::new("engine/shaders");
+        let mut registry = ShaderRegistry::new(rusty_shadergen::engine_shader_dir());
         for name in SHIPPED {
             let module = registry.compose(name);
             assert!(
@@ -160,10 +160,13 @@ mod tests {
     /// composed entry points, and a module one rejects the other rejects too.
     #[test]
     fn bake_validation_and_load_compose_identically() {
-        let mut registry = ShaderRegistry::new("engine/shaders");
+        let mut registry = ShaderRegistry::new(rusty_shadergen::engine_shader_dir());
         for name in SHIPPED {
-            let source = std::fs::read_to_string(format!("engine/shaders/{name}")).unwrap();
-            let baked = validate("engine/shaders", &source).expect("bake validates");
+            let source =
+                std::fs::read_to_string(format!("{}/{name}", rusty_shadergen::engine_shader_dir()))
+                    .unwrap();
+            let baked =
+                validate(rusty_shadergen::engine_shader_dir(), &source).expect("bake validates");
             let loaded: Vec<String> = registry
                 .compose(name)
                 .entry_points
@@ -178,7 +181,11 @@ mod tests {
         for module in compose::MODULES {
             let to = dir.join(module);
             std::fs::create_dir_all(to.parent().unwrap()).unwrap();
-            std::fs::copy(format!("engine/shaders/{module}"), to).unwrap();
+            std::fs::copy(
+                format!("{}/{module}", rusty_shadergen::engine_shader_dir()),
+                to,
+            )
+            .unwrap();
         }
         // Names a `common` struct that does not exist: naga rejects the unknown type.
         let bad = "#import common::{CameraUniforms}\n\

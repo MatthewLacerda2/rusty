@@ -14,7 +14,9 @@ const RES: u32 = 32;
 
 /// The engine's own forward shader — a module guaranteed to compose, so the override
 /// path is exercised rather than its fallback.
-const SHADER: &str = "engine/shaders/shader.wgsl";
+fn shader() -> String {
+    format!("{}/shader.wgsl", rusty_shadergen::engine_shader_dir())
+}
 
 /// A preview render view (own target + depth + post-FX) sized to the test resolution.
 fn preview_view(renderer: &Renderer) -> RenderView {
@@ -102,7 +104,7 @@ fn gpu_a_shader_override_renders_and_stays_on_its_own_view() {
 
     let mut view = preview_view(&renderer);
     let target = view.color_target_view().unwrap();
-    renderer.render_preview_with_shader(&mut view, &scene, &camera, &target, SHADER);
+    renderer.render_preview_with_shader(&mut view, &scene, &camera, &target, &shader());
 
     // A different view of the same renderer is untouched by that override.
     let mut plain = preview_view(&renderer);
