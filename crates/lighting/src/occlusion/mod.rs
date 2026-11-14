@@ -1,5 +1,5 @@
 //! crates/lighting/src/occlusion/ — the baked occlusion culling's bake (#1714): the
-//! potentially visible set a scene holds (`crate::occlusion`, whose
+//! potentially visible set a scene holds (`rusty_scene::lighting::occlusion`, whose
 //! module doc says what a cell holds and how it is sampled), baked from the static
 //! scene. `gather` reads what the bake is against (each object's [`fingerprint`]),
 //! `sample` casts the seeded rays and proves the ones it can skip, `bake` drives it

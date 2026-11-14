@@ -58,11 +58,11 @@ manifest, the row, then the compiler names every path left to fix.
   sub-module first; what the staying half's live code reaches (a type a field of
   the base holds, the settings it stores) moves *down* into the base before the
   cut, and the half above names it there (`scene::lighting::settings::BakeSettings`).
-  A test-only reach from a crate below the new one is a `[dev-dependencies]` entry,
-  never a live edge.
-- **No re-export facade** in the base for what moved: a `pub use` of the new crate
-  from the old one is an edge back down, and it rebuilds the base's dependents on
-  every edit the split was meant to spare them. Callers name the new crate.
+  A crate *above* the new one whose tests alone reach it takes it as a
+  `[dev-dependencies]` entry, never a live edge (`navigation`'s tests and
+  `rusty-lighting`); a crate below it cannot, so such a test moves up instead.
+- Callers name the new crate directly: the base cannot re-export it (that would be a
+  dependency cycle).
 - **Inside the new crate**, `crate::<old>::<m>` becomes `crate::<m>`, the old
   crate's own items become `rusty_<old>::…`, and `pub(in crate::<old>)` becomes
   `pub(crate)`. A `use super::*` test reaching a moved item finds it through a

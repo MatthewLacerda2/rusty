@@ -142,7 +142,7 @@ fn is_zero(v: &f32) -> bool {
 
 impl MeshComponent {
     /// The Scale In Lightmap values a mesh takes. Unity has no upper bound; past a
-    /// few the map reaches the page's cap anyway (`lightmap::max_map_edge`).
+    /// few the map reaches the page's cap anyway (`scene::lighting::settings::max_map_edge`).
     pub const SCALE_IN_LIGHTMAP: std::ops::RangeInclusive<f32> = 0.0..=64.0;
 
     /// Whether a static mesh reads light probes instead of a lightmap: its Scale

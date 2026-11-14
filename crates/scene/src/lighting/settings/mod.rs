@@ -196,5 +196,4 @@ impl ReflectionSettings {
 }
 
 #[cfg(test)]
-#[path = "diffuse_tests.rs"]
 mod diffuse_tests;
