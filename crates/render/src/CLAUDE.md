@@ -203,7 +203,7 @@ in every layer. The vignette, the smallest real effect, is the worked example: g
   effect's part, or a composite texture it declares isn't bound and passed at its place in its own function's call. Pixels of every other effect stay byte-identical: no other offset or
   struct moved. Two layers sit above this crate, the `Graphics.*` registrars and the
   Inspector's sections, so render's own test fills them with the renderer's effect
-  names and cannot see either one missing: the root's `src/post_effect_layers_tests.rs`
+  names and cannot see either one missing: the integration suite's `tests/post_effect_layers.rs`
   hands the real ones in, and is what catches a missing registrar or Inspector section.
 
 ## GPU tests

@@ -1,9 +1,7 @@
-# The engine is a workspace being split into one crate per top-level module
-# (`rusty-<module>` under `crates/<module>/`); crates/CLAUDE.md is the recipe for
-# moving the next one. This root package keeps the modules not yet moved, the
-# binaries and the integration tests, and re-exports each moved crate under its
-# module's old name (`src/lib.rs`), so `crate::core::…` and `rusty::core::…` paths
-# keep compiling.
+# The engine is a workspace of one crate per top-level module (`rusty-<module>` under
+# `crates/<module>/`, crates/CLAUDE.md). This root package keeps only the binaries and
+# the integration tests, and re-exports each crate under its module's name
+# (`src/lib.rs`), so `rusty::core::…` paths name one surface.
 [workspace]
 members = ["crates/*"]
 # Every member, so a plain `cargo build`, `clippy`, `nextest run`, `doc` or `test`
@@ -99,10 +97,10 @@ path = "tests/main.rs"
 [features]
 default = ["editor"]
 # The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.
-dev = ["rusty-editor?/dev", "dep:rusty-dev", "rusty-dev/dev", "rusty-render/dev", "rusty-app/dev", "rusty-script/dev", "rusty-ai/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-scene/dev", "rusty-shadergen/dev", "rusty-asset/dev", "rusty-core/dev", "dep:getrandom"]
+dev = ["rusty-shell/dev", "rusty-editor?/dev", "dep:rusty-dev", "rusty-dev/dev", "rusty-render/dev", "rusty-app/dev", "rusty-script/dev", "rusty-ai/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-scene/dev", "rusty-shadergen/dev", "rusty-asset/dev", "rusty-core/dev", "dep:getrandom"]
 # The egui editor (#431): `rusty-editor` (`crates/editor/`) and the shell's editor frontend. Default-on so
 # `cargo run` opens the editor; a shipped player builds with `--no-default-features`.
-editor = ["dep:rusty-editor", "rusty-editor/editor", "rusty-render/editor", "rusty-app/editor", "rusty-physics/editor", "rusty-shadergen/editor", "rusty-asset/editor", "rusty-core/editor", "dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor", "dep:notify"]
+editor = ["rusty-shell/editor", "dep:rusty-editor", "rusty-editor/editor", "rusty-render/editor", "rusty-app/editor", "rusty-physics/editor", "rusty-shadergen/editor", "rusty-asset/editor", "rusty-core/editor"]
 
 # The workspace's lint policy lives here, not in command-line flags, so a plain
 # `cargo clippy`, rust-analyzer and CI all read the same rules (#485); every member
@@ -152,6 +150,7 @@ rusty-preview = { path = "crates/preview" }
 rusty-app = { path = "crates/app" }
 rusty-dev = { path = "crates/dev" }
 rusty-editor = { path = "crates/editor" }
+rusty-shell = { path = "crates/shell" }
 rusty-test-support = { path = "crates/test-support" }
 
 winit = { version = "0.30.13" }
@@ -272,7 +271,8 @@ smithay-clipboard = "=0.7.2"
 proptest = { version = "1", default-features = false, features = ["std"] }
 
 [dependencies]
-# The moved modules (crates/), re-exported in src/lib.rs under their old names.
+# The workspace's crates, re-exported in src/lib.rs under their module names.
+rusty-shell = { workspace = true }
 rusty-editor = { workspace = true, optional = true }
 rusty-dev = { workspace = true, optional = true }
 rusty-logging = { workspace = true }
@@ -293,42 +293,21 @@ rusty-procgen = { workspace = true }
 rusty-asset = { workspace = true }
 rusty-core = { workspace = true }
 rusty-time = { workspace = true }
-winit = { workspace = true }
-wgpu = { workspace = true }
-egui = { workspace = true, optional = true }
-egui-wgpu = { workspace = true, optional = true }
-egui-winit = { workspace = true, optional = true }
-egui-phosphor = { workspace = true, optional = true }
-mlua = { workspace = true }
-glam = { workspace = true }
-rustc-hash = { workspace = true }
-xxhash-rust = { workspace = true }
-image = { workspace = true }
-ktx2 = { workspace = true }
-log = { workspace = true }
-pollster = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-skrifa = { workspace = true }
-gilrs = { workspace = true }
-notify = { workspace = true, optional = true }
-arboard = { workspace = true }
 # A feature pin, never `use`d: why is beside its version above.
 getrandom = { workspace = true, optional = true }
 
-[target.'cfg(target_os = "macos")'.dependencies]
-objc2 = { workspace = true }
-objc2-foundation = { workspace = true }
-objc2-app-kit = { workspace = true }
-
-[target.'cfg(target_os = "linux")'.dependencies]
-smithay-clipboard = { workspace = true }
-
 [dev-dependencies]
-# The in-crate tests' shared helpers (`crate::test_temp`), a crate of their own so
+# The integration tests' shared helpers (`tests/temp.rs`), a crate of their own so
 # every member's tests reach them (crates/test-support).
 rusty-test-support = { workspace = true }
 proptest = { workspace = true }
+# What the integration tests name beside `rusty::…`: none is linked by a binary.
+glam = { workspace = true }
+image = { workspace = true }
+ktx2 = { workspace = true }
+mlua = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 # Dev builds (#487); `cargo test` inherits this profile, and so do CI, coverage and
 # mutants. rusty's own crate stays at opt-level 0 so an edit rebuilds in seconds, and
@@ -343,10 +322,3 @@ debug = "line-tables-only"
 [profile.dev.package."*"]
 opt-level = 2
 debug = false
-
-# rusty splits into ~1600 codegen units (roughly two per module). At the default
-# cap of 256, rustc merges them by size, so an edit that changes one function's size
-# reshuffles the merge and recompiles 4-99 units instead of 2. A cap above the
-# natural count keeps each module in its own unit. docs/testing.md has the numbers (#574).
-[profile.dev.package.rusty]
-codegen-units = 4096

@@ -429,8 +429,7 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
   instead. Production code that really owns the process (`project::open` moving
   the working directory) opts out inline with `#[expect(…, reason = "…")]`.
   In-crate tests have the same helper,
-  `crate::test_temp::dir()` (#999), which a moved crate's tests call as
-  `rusty_test_support::temp::dir()` (`crates/test-support/`); the `test-temp-dir` rule fails a bare
+  `rusty_test_support::temp::dir()` (#999, `crates/test-support/`); the `test-temp-dir` rule fails a bare
   `std::env::temp_dir()` in test code (see `linting.md`).
 - **A path a test expects is spelled as the engine writes it**: a plain
   `Path::join("a/b/c")` or `"a/b/c"`, `/`-separated, with a `\` read as part of a
@@ -460,15 +459,20 @@ with a feature only the second has is the split. By hand:
     cargo tree -e normal,build,dev --features dev -f '{p} [{f}]' --prefix none | sort -u
 
 ## Incremental rebuilds: one codegen unit per module
-rustc compiles the rusty crate in codegen units (CGUs), roughly two per module, about
-1600 in all. The default dev cap is 256. Above the cap, rustc merges units by size.
-An edit that changes one function's size then reshuffles the merge, and dozens of
-unrelated units recompile. `Cargo.toml` raises the cap for the rusty package to 4096
-so no merging happens (#574). The CGU count is the number of `.o` files in the newest
-session dir under `target/debug/incremental/rusty-*`. Once it nears 4096, raise the cap.
+rustc compiles a crate in codegen units (CGUs), roughly two per module. The default
+dev cap is 256. Above the cap, rustc merges units by size. An edit that changes one
+function's size then reshuffles the merge, and dozens of unrelated units recompile.
+A workspace member whose count nears the cap gets a `[profile.dev.package.<crate>]`
+row in `Cargo.toml` raising it (`codegen-units = 4096`), so no merging happens
+(#574). The CGU count is the number of `.o` files in the newest session dir under
+`target/debug/incremental/<crate>-*`. No member is near it today; the row was the
+root crate's while every module lived inside it, about 1600 units in all.
+
+The measurement below was taken then, when the editor, physics and every other module
+were one crate, `rusty`:
 
 Measured on a 4-core cloud machine with a warm `target/`, `cargo build --features dev`,
-alternating edits in `crates/physics/src/` and `crates/editor/src/`, 8-12 samples each (medians,
+alternating edits in the physics and editor modules, 8-12 samples each (medians,
 ranges in brackets):
 
 | Edit | Cap | CGUs recompiled | rusty codegen | build wall | then `test --no-run` |

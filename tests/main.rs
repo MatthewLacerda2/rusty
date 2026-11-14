@@ -57,6 +57,7 @@ mod particles;
 mod perception;
 mod physics;
 mod plane_subdivisions;
+mod post_effect_layers;
 mod prefab_api;
 mod process_order;
 mod procgen;

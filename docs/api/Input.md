@@ -122,7 +122,7 @@ return Shooter
 ### Key names
 
 Letters and digits are bare (`"A"`…`"Z"`, `"0"`…`"9"`); the rest follow Unity's
-`KeyCode` names, uppercased. The table lives in `src/shell/input/keys.rs`.
+`KeyCode` names, uppercased. The table lives in `crates/shell/src/input/keys.rs`.
 
 | Group | Names |
 |---|---|

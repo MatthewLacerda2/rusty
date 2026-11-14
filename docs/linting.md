@@ -84,7 +84,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Tagged engine warnings | `tools/lint -- --rules` (`log-tag`) | **hard gate**: every engine warning or error in `src/` (`log::warn!` / `log::error!`, an imported bare `warn!` / `error!`, `log!` at `Level::Warn`/`Level::Error`) opens its message with its module, `[Asset] …`, since those records reach the console and the session/MCP replies (#1139); a message that is not a literal takes `// lint: allow(log-tag) <why>` |
 | Test / fixture file length | `tools/lint` | <= 150 lines (every measured file under a `tests/` or `fixtures/` directory, whatever its language, a standalone `*_test.rs` or `test_*` file, and a `*_tests.rs` with no source beside it); a `<x>_tests.rs` **sibling** of `<x>.rs` (or of a `<x>/` module directory) shares the 300-line source cap |
 | Test source shape | `tools/lint -- --rules` (`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`) | **hard gate**: no inner `#![cfg]` in `tests/`, no user workspace in tests, a GPU only through `headless_or_skip` (#980) |
-| Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `crate::test_temp::dir()` (`rusty_test_support::temp::dir()` in a moved crate) / `crate::temp::dir()`, never a bare `std::env::temp_dir()` (#999) |
+| Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `rusty_test_support::temp::dir()` (in-crate) / `crate::temp::dir()` (`tests/`), never a bare `std::env::temp_dir()` (#999) |
 | Tests | nextest + `cargo test --doc` (`make test`) | **hard gate**: the engine's tests and doctests, both feature sets; the GPU tests run on lavapipe (`docs/testing.md`) |
 | `tools/lint` stays std-only | `make test-lint` | its `Cargo.lock` names one package, itself (#935) |
 
@@ -644,8 +644,8 @@ new flag, gate, CI step or baseline.
 - **`test-temp-dir`** — a path under `std::env::temp_dir()` is shared by every test
   process, every worktree and (under `cargo test`) every test
   thread, so a fixed or process-keyed name races. Test code (the *Test code* bullet)
-  calls `crate::test_temp::dir()` (in-crate; `rusty_test_support::temp::dir()` in a
-  moved crate) or `crate::temp::dir()` (integration) instead: both key on the process *and* the running test (#709,
+  calls `rusty_test_support::temp::dir()` (in-crate) or `crate::temp::dir()`
+  (integration) instead: both key on the process *and* the running test (#709,
   #999). Comment lines never count. The
   helper itself and Unix socket paths (which must stay short) carry an inline
   allow. `tools/` is not scanned: the lint crate's own tests are not the engine's.
@@ -725,7 +725,7 @@ What is not one row's lives in `tools/lint/src/layers/externs/policy.rs`:
   and its tests on one dependency graph (`Cargo.toml` says why); it is never
   `use`d.
 - **`confined`** — crates only some subtrees may name, finer than a module: the
-  `egui` crates only under `crates/editor/src` and `src/shell/editor` (the `editor`
+  `egui` crates only under `crates/editor/src` and `crates/shell/src/editor` (the `editor`
   feature, #431), the provider crates only under `crates/dev/src/providers` (#383).
 - **`exceptions`** — a use the rules forbid but the code still has, each naming its open issue. There are none today.
 

@@ -1,17 +1,12 @@
 //! src/lib.rs — the `rusty` library crate.
 //!
-//! Exposes the engine modules so every binary shares one simulation: the editor
-//! (`main.rs`), the standalone player (`bin/player.rs`), and the dev-only headless
-//! tools (`bin/play.rs`, `bin/session.rs`, …). Two Cargo features strip layers from a
-//! build: `dev` (the harness, console/REPL, `Debug.*`) and `editor` (default-on: the
-//! egui editor, `rusty-editor` (`crates/editor/`) + `shell::editor`). A shipped game is the `player` binary
-//! built with `--no-default-features` — neither layer.
+//! Holds no code of its own: it re-exports every workspace crate (`crates/<module>/`,
+//! crates/CLAUDE.md) under its module's name, so the binaries (`main.rs`, `bin/`)
+//! and the integration tests (`tests/`) name one surface, `rusty::core::…`. Two Cargo
+//! features strip layers from a build: `dev` (the harness, console/REPL, `Debug.*`)
+//! and `editor` (default-on: the egui editor, `rusty-editor` + `shell::editor`). A
+//! shipped game is the `player` binary built with `--no-default-features`, neither layer.
 
-pub mod shell;
-
-// The modules already moved into crates of their own (crates/CLAUDE.md), under their
-// old names, so every `crate::core::…` path here and `rusty::core::…` path in
-// `tests/` keeps compiling.
 pub use rusty_ai as ai;
 pub use rusty_app as app;
 pub use rusty_asset as asset;
@@ -28,6 +23,7 @@ pub use rusty_render as render;
 pub use rusty_scene as scene;
 pub use rusty_script as script;
 pub use rusty_shadergen as shadergen;
+pub use rusty_shell as shell;
 pub use rusty_time as time;
 pub use rusty_ui as ui;
 
@@ -35,12 +31,3 @@ pub use rusty_ui as ui;
 pub use rusty_dev as dev;
 #[cfg(feature = "editor")]
 pub use rusty_editor as editor;
-
-#[cfg(test)]
-mod post_effect_layers_tests;
-#[cfg(all(test, feature = "dev"))]
-mod provider_keys_tests;
-#[cfg(test)]
-mod test_path;
-#[cfg(test)]
-mod test_temp;
