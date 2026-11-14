@@ -465,8 +465,9 @@ function's size then reshuffles the merge, and dozens of unrelated units recompi
 A workspace member whose count nears the cap gets a `[profile.dev.package.<crate>]`
 row in `Cargo.toml` raising it (`codegen-units = 4096`), so no merging happens
 (#574). The CGU count is the number of `.o` files in the newest session dir under
-`target/debug/incremental/<crate>-*`. No member is near it today; the row was the
-root crate's while every module lived inside it, about 1600 units in all.
+`target/debug/incremental/<crate>-*`. The row was the root crate's while every
+module lived inside it, about 1600 units in all; most members now sit at the cap
+of 256 without one (#2175).
 
 The measurement below was taken then, when the editor, physics and every other module
 were one crate, `rusty`:
