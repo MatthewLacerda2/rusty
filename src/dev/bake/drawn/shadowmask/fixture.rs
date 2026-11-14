@@ -4,15 +4,15 @@
 
 use glam::{Vec2, Vec3};
 
-use crate::dev::bake::lightmap::bake_scene_lightmaps;
-use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_components::{
+use crate::components::{
     LightComponent, LightMode, LightType, MaterialAsset, MaterialComponent, Tonemap,
 };
-use rusty_scene::authoring::{create_entity, default_light, default_post_processing, Primitive};
-use rusty_scene::lighting::lightmap::BakeSettings;
-use rusty_scene::lighting::MixedLightingMode;
-use rusty_scene::{Camera, Scene};
+use crate::dev::bake::lightmap::bake_scene_lightmaps;
+use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
+use crate::scene::authoring::{create_entity, default_light, default_post_processing, Primitive};
+use crate::scene::lighting::lightmap::BakeSettings;
+use crate::scene::lighting::MixedLightingMode;
+use crate::scene::{Camera, Scene};
 
 pub(super) const W: u32 = 96;
 pub(super) const H: u32 = 72;
@@ -21,7 +21,7 @@ pub(super) const H: u32 = 72;
 pub(super) const LAMP: Vec3 = Vec3::new(0.0, 2.5, -5.0);
 
 pub(super) fn renderer() -> Option<Renderer> {
-    crate::test_gpu::headless_or_skip(W, H)
+    crate::render::test_gpu::headless_or_skip(W, H)
 }
 
 pub(super) fn eye() -> Camera {
@@ -84,7 +84,7 @@ pub(super) fn scene(mode: LightMode, mixed: MixedLightingMode, roughness: f32) -
 
 /// Bake `scene`'s lightmaps into a temp folder `name`.
 pub(super) fn bake(scene: &mut Scene, name: &str) {
-    let dir = rusty_test_support::temp::dir().join(format!("rusty_shadowmask_{name}"));
+    let dir = crate::test_temp::dir().join(format!("rusty_shadowmask_{name}"));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("level.scene").to_string_lossy().into_owned();
@@ -94,7 +94,7 @@ pub(super) fn bake(scene: &mut Scene, name: &str) {
         bounces: 1,
         seed: 1,
         max_lightmap_size: 256,
-        denoiser: rusty_scene::lighting::lightmap::Denoiser::Filter,
+        denoiser: crate::scene::lighting::lightmap::Denoiser::Filter,
         filter_radius: 1,
         directional: false,
         backface_tolerance: BakeSettings::DEFAULT_BACKFACE_TOLERANCE,
@@ -135,7 +135,7 @@ pub(super) fn patch(frame: &[u8], p: Vec3) -> f32 {
         for x in x.saturating_sub(1)..(x + 2).min(W) {
             let i = ((y * W + x) * 4) as usize;
             for c in 0..3 {
-                sum += rusty_core::color::srgb_to_linear(frame[i + c]);
+                sum += crate::core::color::srgb_to_linear(frame[i + c]);
             }
             n += 3.0;
         }

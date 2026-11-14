@@ -3,8 +3,8 @@
 use glam::Vec3;
 
 use super::fixture::{bake, block, patch, renderer, scene, settled};
-use rusty_components::LightMode;
-use rusty_scene::lighting::MixedLightingMode::{BakedIndirect, Shadowmask};
+use crate::components::LightMode;
+use crate::scene::lighting::MixedLightingMode::{BakedIndirect, Shadowmask};
 
 /// A floor point the lamp lights, and one a pillar beside it shades.
 pub(super) const LIT: Vec3 = Vec3::new(-1.0, 0.0, -5.0);
@@ -19,7 +19,7 @@ const LIKE_BAKED: f32 = 0.2;
 /// lamp's mirror image lands.
 const GLINT: f32 = 1.5;
 
-pub(super) fn pillar(scene: &mut rusty_scene::Scene) {
+pub(super) fn pillar(scene: &mut crate::scene::Scene) {
     let at = (Vec3::new(0.8, 1.0, -5.0), Vec3::new(0.3, 2.0, 0.3));
     block(scene, "pillar", at, 1.0, true);
 }

@@ -26,7 +26,7 @@ impl Renderer {
 
     /// The scene's render scale: native in the editor's Scene view (`editor_mode`),
     /// which ignores it as Unity's ignores the URP asset's; else the applied one.
-    pub(crate) fn render_scale(&self, editor_mode: bool) -> RenderScale {
+    pub fn render_scale(&self, editor_mode: bool) -> RenderScale {
         match editor_mode {
             true => RenderScale::NATIVE,
             false => self.render_scale,

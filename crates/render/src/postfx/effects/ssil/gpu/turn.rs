@@ -3,7 +3,7 @@
 
 use glam::{Quat, Vec3};
 
-use super::fixture::{block, draw, eye, on, pixel_at, renderer, scene, view, LAMP, W};
+use crate::test_gpu::ssil::{block, draw, eye, on, pixel_at, renderer, scene, view, LAMP, W};
 
 /// The panel's centre: beside the lamp's pool, facing the camera.
 const PANEL: Vec3 = Vec3::new(1.0, 0.8, -4.4);

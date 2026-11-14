@@ -1,7 +1,8 @@
 //! Two headless slots taken together (#1844): what a test keeping two renderers
 //! alive at once holds, so it never holds one slot while waiting for the other.
 //!
-//! Test-only: no engine path holds two headless renderers on purpose, and a test
+//! Only tests take one (it is compiled in for the crates above, whose tests link
+//! the normal build): no engine path holds two headless renderers on purpose. A test
 //! reaches a pair through `render::test_gpu::headless_pair_or_skip`.
 
 use std::sync::atomic::{AtomicUsize, Ordering};

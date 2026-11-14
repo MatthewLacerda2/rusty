@@ -2,8 +2,8 @@
 //! material map, drawing exactly what its 8-bit twin draws.
 
 use super::freshness_tests::{centre, emissive_scene, temp_png};
-use crate::procgen::bake::{bake_to_png, encode};
-use crate::procgen::{Image, Slot};
+use rusty_procgen::bake::{bake_to_png, encode};
+use rusty_procgen::{Image, Slot};
 
 #[test]
 fn gpu_a_16_bit_data_map_draws_like_its_8_bit_twin() {

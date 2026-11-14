@@ -91,13 +91,6 @@ pub(crate) struct PostEffect {
     /// As every layer names it: the volume's field, or the camera effect's name.
     pub name: &'static str,
     /// Where its settings live.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "the completeness test reads it, to check each layer"
-        )
-    )]
     pub owner: Owner,
     /// The player option that gates it, when it is player-facing (#1438): its own
     /// rule, asked through [`EffectCx::runs`]. No quality preset gates it (#1522).
@@ -119,13 +112,7 @@ pub(crate) struct PostEffect {
 #[derive(Clone, Copy)]
 pub(crate) enum History {
     /// It draws from this frame alone; why its state carries nothing over.
-    None(
-        #[cfg_attr(
-            not(test),
-            expect(dead_code, reason = "the completeness test reads the reason")
-        )]
-        &'static str,
-    ),
+    None(&'static str),
     /// It keeps a history: whether it runs on this frame of the view.
     Reads(fn(&HistoryCx) -> bool),
 }
@@ -274,8 +261,8 @@ pub(crate) struct PassCx<'a> {
 
 #[cfg(test)]
 mod chain_size_tests;
-#[cfg(test)]
-mod completeness;
+#[doc(hidden)]
+pub mod completeness;
 #[cfg(test)]
 mod pack_tests;
 #[cfg(test)]

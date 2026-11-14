@@ -6,9 +6,9 @@
 use glam::{Vec3, Vec4};
 
 use super::fixture::{bake, block, patch, renderer, scene, settled};
-use rusty_components::LightMode;
-use rusty_scene::lighting::lightmap::{mixed_occlusion, BakeScene};
-use rusty_scene::lighting::MixedLightingMode::Shadowmask;
+use crate::components::LightMode;
+use crate::scene::lighting::lightmap::{mixed_occlusion, BakeScene};
+use crate::scene::lighting::MixedLightingMode::Shadowmask;
 
 #[test]
 fn gpu_a_dynamic_cube_under_a_shadowmask_lamp_casts_a_realtime_shadow() {

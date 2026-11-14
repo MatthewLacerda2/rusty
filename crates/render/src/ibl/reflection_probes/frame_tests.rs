@@ -1,7 +1,6 @@
 //! Choosing the frame's resident probes (#1238): ranked by box, ties by scene index,
 //! cubes that don't fit passed over before the budget.
 
-use std::cell::RefCell;
 use std::panic::AssertUnwindSafe;
 
 use glam::Vec3;
@@ -10,7 +9,6 @@ use super::super::gpu_tests::{cube_file, first, probes_at, renderer};
 use super::ranked;
 use crate::ibl::cubemap::read_cube_shape;
 use crate::ibl::reflection_probes::MAX_REFLECTION_PROBES;
-use crate::scripting::ConsoleLogs;
 use rusty_scene::Scene;
 
 /// A probe whose box holds the camera ranks first, however far its capture point.
@@ -85,11 +83,11 @@ fn gpu_a_larger_cube_is_passed_over_and_never_uploaded() {
         cube_file("small_4.ktx2", 4, 5),
     );
     let scene = probes_at(&[(-2.0, &big), (2.0, &small)]);
-    crate::logging::init();
-    let console = RefCell::new(ConsoleLogs::new());
+    rusty_test_support::logs::init();
+    rusty_test_support::logs::take(); // what earlier code on this thread logged
     let warnings = |renderer: &mut crate::Renderer| {
         renderer.update_reflection_probes(&scene, Vec3::ZERO);
-        let logged = crate::logging::forward(&console);
+        let logged = rusty_test_support::logs::take();
         logged.iter().filter(|m| m.contains(big.as_str())).count()
     };
     assert_eq!(warnings(&mut renderer), 1, "the first frame warns");

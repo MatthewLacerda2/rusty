@@ -2,7 +2,7 @@
 //! floor and no metal one; a scene lit only by indirect light gains nothing; off
 //! draws as before.
 
-use super::fixture::{energy, on, patch, renderer, scene, settled, FLOOR, LAMP};
+use crate::test_gpu::ssil::{energy, on, patch, renderer, scene, settled, FLOOR, LAMP};
 use rusty_components::Ssil;
 
 /// How far the floor's red over its green must rise with SSIL on: the issue's "a
@@ -44,9 +44,9 @@ fn gpu_off_holds_nothing_and_draws_as_never_on() {
     let Some(mut r) = renderer() else { return };
     let (lit, _) = scene(on(1.0), LAMP);
     let (dark, _) = scene(Ssil::default(), LAMP);
-    let mut v = super::fixture::view(&r);
-    let cam = super::fixture::eye(0.0);
-    let draw = super::fixture::draw;
+    let mut v = crate::test_gpu::ssil::view(&r);
+    let cam = crate::test_gpu::ssil::eye(0.0);
+    let draw = crate::test_gpu::ssil::draw;
     let before = draw(&mut r, &mut v, &dark, &cam);
     assert_eq!(r.frame_counters.ssil_samples, 0);
     for _ in 0..3 {

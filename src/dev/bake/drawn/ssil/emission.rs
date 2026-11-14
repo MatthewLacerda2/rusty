@@ -5,9 +5,9 @@
 use glam::Vec3;
 
 use super::baked::{bake, off_and_on, BAKED_GAIN};
-use super::fixture::{block, floor, on, patch, renderer, set_ssil, settled, FLOOR};
-use rusty_components::Ssil;
-use rusty_scene::Scene;
+use crate::components::Ssil;
+use crate::render::test_gpu::ssil::{block, floor, on, patch, renderer, set_ssil, settled, FLOOR};
+use crate::scene::Scene;
 
 /// The fixture's floor and, where its red wall stands, a wall glowing red that
 /// gets no lightmap (Scale In Lightmap 0), baked. Returns the scene and the wall.

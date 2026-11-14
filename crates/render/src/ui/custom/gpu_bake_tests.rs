@@ -4,9 +4,7 @@
 //! another shader's bake rebuilds nothing (#794). How a shaded graphic draws is
 //! `gpu_draw_tests`. Skips with no adapter.
 
-use std::cell::RefCell;
-
-use super::fixture::{lua, scene, shot, Baked, RES};
+use super::fixture::{scene, set_param, shot, Baked, RES};
 use crate::test_gpu::headless_or_skip;
 use rusty_shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
@@ -43,20 +41,13 @@ fn gpu_a_runtime_param_redraws_without_a_rebuild() {
         return;
     };
     let baked = Baked::new("param", &[("wipe", &[("softness", 0.01)])]);
-    let (scene, _, id) = scene(Some(&baked.0));
-    let scene = std::rc::Rc::new(RefCell::new(scene));
+    let (mut scene, _, id) = scene(Some(&baked.0));
     let mut view = None;
-    assert!(shot(&mut renderer, &mut view, &scene.borrow()).px(44, 32)[0] > 240);
+    assert!(shot(&mut renderer, &mut view, &scene).px(44, 32)[0] > 240);
     let builds = renderer.ui_renderer.shaders.builds();
-    lua(
-        &scene,
-        &format!("UI.SetShaderParam({id}, 'wipe.progress', 0.25)"),
-    );
-    lua(
-        &scene,
-        &format!("assert(UI.GetShaderParam({id}, 'wipe.progress') == 0.25)"),
-    );
-    let after = shot(&mut renderer, &mut view, &scene.borrow());
+    let set = set_param(&mut scene, id, "wipe.progress", 0.25);
+    assert_eq!(set, [0.25; 1], "the image draws with the value set");
+    let after = shot(&mut renderer, &mut view, &scene);
     assert!(after.px(44, 32)[0] < 15, "the right side wiped away");
     assert!(after.px(18, 32)[0] > 240, "the left quarter still shows");
     assert_eq!(renderer.ui_renderer.shaders.builds(), builds, "no rebuild");

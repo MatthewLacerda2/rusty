@@ -33,3 +33,4 @@ wgpu = { workspace = true }
 
 [dev-dependencies]
 rusty-test-support = { workspace = true }
+rusty-procgen = { workspace = true }

@@ -6,11 +6,11 @@
 
 use super::fixture::{bake, patch, renderer, scene, settled};
 use super::static_tests::{pillar, LIT, SHADED};
-use crate::Renderer;
-use rusty_components::{LightMode, VolumetricFog};
-use rusty_core::settings::quality::ShadowmaskMode;
-use rusty_scene::lighting::MixedLightingMode::Shadowmask;
-use rusty_scene::Scene;
+use crate::components::{LightMode, VolumetricFog};
+use crate::core::settings::quality::ShadowmaskMode;
+use crate::render::Renderer;
+use crate::scene::lighting::MixedLightingMode::Shadowmask;
+use crate::scene::Scene;
 
 /// Every mask page lit at every texel: what's dark is the realtime maps' doing.
 pub(super) fn whiten(scene: &Scene) {

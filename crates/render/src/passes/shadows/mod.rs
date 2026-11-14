@@ -259,9 +259,6 @@ impl ShadowRenderer {
 #[cfg(test)]
 mod cache_tests;
 
-#[cfg(all(test, feature = "dev"))]
-mod shadowmask;
-
 #[cfg(test)]
 mod casting_tests;
 

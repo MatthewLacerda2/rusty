@@ -8,7 +8,7 @@ use std::rc::Rc;
 use glam::{Quat, Vec3};
 
 use super::mask_tests::Dissolve;
-use super::params_tests::lua;
+use super::params_tests::{set_param, set_texture};
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_scene::authoring::{create_entity, default_post_processing, material, Primitive};
 use rusty_scene::{Camera, Scene};
@@ -44,12 +44,8 @@ pub(crate) fn slab_yard(shader: Option<&str>) -> (Scene, u32) {
 
 /// Point `id`'s mask at `d`'s and set its `dissolve.amount`.
 pub(crate) fn dissolve(scene: &Rc<RefCell<Scene>>, id: u32, d: &Dissolve, amount: f32) {
-    let script = format!(
-        r#"Material.SetShaderTexture({id}, "mask", [==[{}]==])
-        Material.SetShaderParam({id}, "dissolve.amount", {amount})"#,
-        d.mask
-    );
-    lua(scene, &script);
+    set_texture(scene, id, "mask", &d.mask);
+    set_param(scene, id, "dissolve.amount", amount);
 }
 
 /// The frame `cam` sees, as RGBA8.

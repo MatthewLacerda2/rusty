@@ -38,6 +38,8 @@ pub use rusty_ui as ui;
 pub mod dev;
 
 #[cfg(test)]
+mod post_effect_layers_tests;
+#[cfg(test)]
 mod test_path;
 #[cfg(test)]
 mod test_temp;

@@ -1,12 +1,14 @@
 //! The animated bound (#833): it holds every vertex of an animated pose, skinned the
-//! way the shader skins it, and refuses what it cannot bound.
+//! way the shader skins it, and refuses what it cannot bound. It lives with the
+//! animation because it poses through the animation's own path (`posed`); the
+//! bound is `render`'s, reached through its public API.
 
 use glam::{Mat4, Quat, Vec3, Vec4};
 
-use super::SkinBounds;
-use crate::app::animation::posed::posed_palette;
-use rusty_asset::{AnimationClip, Interpolation, JointTrack, JointTransform, SkinData, Track};
-use rusty_components::mesh::Vertex;
+use super::posed::posed_palette;
+use crate::asset::{AnimationClip, Interpolation, JointTrack, JointTransform, SkinData, Track};
+use crate::components::mesh::Vertex;
+use crate::render::SkinBounds;
 
 /// A vertex at `p` weighted to `joints` by `weights`.
 fn vertex(p: Vec3, joints: [u32; 4], weights: [f32; 4]) -> Vertex {

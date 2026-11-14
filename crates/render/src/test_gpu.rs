@@ -20,13 +20,11 @@
 
 use crate::Renderer;
 
-use crate::REQUIRE_GPU_ENV;
-
 /// A headless renderer, or `None` when this machine has no GPU or software adapter.
 ///
 /// `None` means **skip, don't fail**, so a GPU-less machine still runs the rest of the
 /// suite. CI never relies on that path: every CI job has an adapter (Metal on macOS,
-/// Mesa's lavapipe on Linux, #489) and sets [`REQUIRE_GPU_ENV`], so
+/// Mesa's lavapipe on Linux, #489) and sets [`REQUIRE_GPU_ENV`](crate::REQUIRE_GPU_ENV), so
 /// the canary below fails if the driver ever goes missing instead of letting every GPU
 /// test quietly skip. A test that cannot tolerate being skipped locally does not belong
 /// on the GPU — pin the rule it cares about with an adapter-free unit test as well.
@@ -34,12 +32,14 @@ use crate::REQUIRE_GPU_ENV;
 /// The returned renderer holds a slot in the headless budget until it is dropped, so
 /// callers should let it fall out of scope promptly rather than parking it in a
 /// long-lived static.
-pub(crate) fn headless_or_skip(width: u32, height: u32) -> Option<Renderer> {
+pub fn headless_or_skip(width: u32, height: u32) -> Option<Renderer> {
     pollster::block_on(Renderer::new_headless(width, height))
 }
 
-pub(crate) mod pair;
-pub(crate) use pair::{headless_pair_or_skip, HeadlessPair};
+pub mod pair;
+#[cfg(any(test, feature = "dev"))]
+pub mod ssil;
+pub use pair::{headless_pair_or_skip, HeadlessPair};
 
 /// Give `scene` a black skybox panorama, so nothing but its own lights and emissives
 /// lights it. `ambient_intensity = 0` removes the ambient term only: the procedural
@@ -57,6 +57,7 @@ pub(crate) fn black_sky(scene: &mut rusty_scene::Scene) {
 /// A compute probe: dispatch `source`'s `main` over 64 × 2 invocations and read
 /// back the 256 `vec4`s it writes to its one binding, a storage array (#1524): how
 /// a test runs a WGSL helper as written on the GPU.
+#[cfg(test)]
 pub(crate) fn run_probe(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
@@ -123,7 +124,7 @@ mod tests {
             super::headless_or_skip(4, 4).is_some(),
             "{}=1 but no GPU or software adapter was found: on Linux install Mesa's \
              lavapipe (`mesa-vulkan-drivers`), or unset the variable to skip GPU tests",
-            super::REQUIRE_GPU_ENV
+            crate::REQUIRE_GPU_ENV
         );
     }
 }

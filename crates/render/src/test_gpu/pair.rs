@@ -14,7 +14,7 @@ use crate::Renderer;
 /// calls would hold one budget slot while waiting for the next, which deadlocks
 /// under plain `cargo test` the moment two such tests run together; the budget
 /// panics on that second call and points here.
-pub(crate) fn headless_pair_or_skip(width: u32, height: u32) -> Option<(Renderer, HeadlessPair)> {
+pub fn headless_pair_or_skip(width: u32, height: u32) -> Option<(Renderer, HeadlessPair)> {
     let pair = headless_pair();
     let first = pair.build(width, height)?;
     Some((first, pair))
@@ -24,13 +24,13 @@ pub(crate) fn headless_pair_or_skip(width: u32, height: u32) -> Option<(Renderer
 /// renderers the engine builds (a capture host beside a bake): while it lives,
 /// every headless renderer built on the test's thread takes one of its slots.
 /// Hold it from the test's first line.
-pub(crate) fn headless_pair() -> HeadlessPair {
+pub fn headless_pair() -> HeadlessPair {
     HeadlessPair(crate::setup::budget::acquire_headless_pair())
 }
 
 /// Two headless slots held by one test ([`headless_pair_or_skip`], [`headless_pair`]):
 /// at most two renderers alive on them at once, however they are built.
-pub(crate) struct HeadlessPair(crate::setup::budget::Pair);
+pub struct HeadlessPair(crate::setup::budget::Pair);
 
 impl HeadlessPair {
     /// A renderer on the pair's slot. The first one built proved an adapter here,
@@ -39,7 +39,7 @@ impl HeadlessPair {
     /// # Panics
     ///
     /// When the adapter is gone, or two renderers already live on the pair.
-    pub(crate) fn renderer(&self, width: u32, height: u32) -> Renderer {
+    pub fn renderer(&self, width: u32, height: u32) -> Renderer {
         self.build(width, height)
             .expect("the pair's first renderer found an adapter")
     }

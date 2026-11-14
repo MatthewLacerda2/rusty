@@ -4,11 +4,11 @@
 
 use glam::Vec3;
 
-use crate::procgen::{bake::bake_to_png, Image, Slot};
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_asset::convert::texture_ref::is_written;
 use rusty_components::{MaterialAsset, MaterialComponent, Tonemap};
 use rusty_core::fs::freshness::MISS_RETRY_FRAMES;
+use rusty_procgen::{bake::bake_to_png, Image, Slot};
 use rusty_scene::{Camera, MeshComponent, Scene};
 use rusty_test_support::rebakes::{follows_rebakes, Bake};
 

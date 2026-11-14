@@ -16,7 +16,7 @@
 //! permit that a headless renderer holds for its whole life.
 //!
 //! **A test holds one grant at a time** (#1844): one [`Permit`], or one pair (the
-//! test-only `budget::pair`) when it keeps two renderers alive together; while it
+//! `budget::pair`, which only tests take) when it keeps two renderers alive together; while it
 //! holds the pair, every renderer its thread builds, in the engine too (a bake beside
 //! a capture host), takes one of the pair's two slots. Under nextest each test is its
 //! own process and gets the whole budget, but plain `cargo test` (the nightly
@@ -114,7 +114,6 @@ struct Holder {
     thread: ThreadId,
     /// The pair it holds, if the grant is one: its thread's renderers take its
     /// shares (`pair::Pair`).
-    #[cfg(test)]
     pair: std::sync::Weak<pair::PairSlots>,
 }
 
@@ -187,7 +186,6 @@ impl Budget {
         held.live += slots;
         held.holders.extend(holder.map(|thread| Holder {
             thread,
-            #[cfg(test)]
             pair: std::sync::Weak::new(),
         }));
         holder
@@ -206,7 +204,6 @@ impl Budget {
 
     /// Take one slot, blocking while all of them are held (panics: [`Self::take`]).
     pub(crate) fn acquire(&'static self) -> Permit {
-        #[cfg(test)]
         if let Some(pair) = self.pair_of_this_thread() {
             return pair.permit();
         }
@@ -237,7 +234,6 @@ enum Grant {
         holder: Option<ThreadId>,
     },
     /// One of a pair's two slots (`pair::Pair`).
-    #[cfg(test)]
     InPair(
         #[expect(dead_code, reason = "held for its drop, which gives the share back")] pair::Share,
     ),
@@ -247,7 +243,6 @@ impl Drop for Permit {
     fn drop(&mut self) {
         match &self.0 {
             Grant::Slot { budget, holder } => budget.give(1, *holder),
-            #[cfg(test)]
             Grant::InPair(_) => {}
         }
     }
@@ -259,9 +254,11 @@ pub(crate) fn acquire_headless() -> Permit {
     HEADLESS.acquire()
 }
 
-#[cfg(test)]
+// Compiled into every build, though only a test takes a pair: the crates above
+// (`dev`'s bake tests) take one through `test_gpu::pair`, and they link this
+// crate's normal build. Inert until taken: `acquire` asks for it only on a test's
+// thread.
 mod pair;
-#[cfg(test)]
 pub(crate) use pair::{acquire_headless_pair, Pair};
 
 #[cfg(test)]

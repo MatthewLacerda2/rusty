@@ -14,6 +14,10 @@
 //! SSR's march, ...), so an integrated GPU can hold ~30fps; no preset turns a pass off.
 
 pub(crate) mod effects;
+/// A test hook: the post effects' completeness gate, which the root's test runs
+/// with the layers above this crate (`effects::completeness`).
+#[doc(hidden)]
+pub use effects::completeness;
 pub(crate) mod grade;
 mod inputs;
 pub(crate) mod params;

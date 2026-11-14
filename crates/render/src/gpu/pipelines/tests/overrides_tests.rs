@@ -4,7 +4,7 @@
 //! flashing, cost five extra draws — the fifteen others still draw as one. Skips
 //! with no adapter.
 
-use super::{halves, lua, sphere, Flash, RES};
+use super::{clear_params, halves, set_param, sphere, Flash, RES};
 use crate::{RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_scene::authoring::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
@@ -40,10 +40,7 @@ fn gpu_an_override_flashes_one_of_two_entities_sharing_a_material() {
     let buffers = renderer.materials.params_len();
 
     let left = ids[0];
-    lua(
-        &scene,
-        &format!(r#"Material.SetShaderParam({left}, "hit_flash.amount", 1)"#),
-    );
+    set_param(&scene, left, "hit_flash.amount", 1.0);
     let [l1, r1] = halves(&mut renderer, &scene.borrow());
     assert!(
         l1.1 < l0.1 / 4 && l1.0 > l0.0,
@@ -59,7 +56,7 @@ fn gpu_an_override_flashes_one_of_two_entities_sharing_a_material() {
         "one group for the override"
     );
 
-    lua(&scene, &format!("Material.ClearShaderParam({left})"));
+    clear_params(&scene, left);
     assert_eq!(
         halves(&mut renderer, &scene.borrow())[0],
         l0,
@@ -92,10 +89,7 @@ fn gpu_twenty_enemies_five_flashing_cost_five_draws_and_the_rest_still_batch() {
     let scene = std::rc::Rc::new(std::cell::RefCell::new(scene));
     let calm = counters(&mut renderer, &scene.borrow());
     for id in &ids[..5] {
-        lua(
-            &scene,
-            &format!(r#"Material.SetShaderParam({id}, "hit_flash.amount", 1)"#),
-        );
+        set_param(&scene, *id, "hit_flash.amount", 1.0);
     }
     let hit = counters(&mut renderer, &scene.borrow());
     eprintln!("#670 counters\n  calm: {calm:?}\n  5 flashing: {hit:?}");

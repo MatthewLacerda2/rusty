@@ -3,7 +3,7 @@
 //! different colours keep them under one `SetShaderParam`, frame after frame.
 //! Skips with no adapter.
 
-use super::{lua, sphere, Flash, RES};
+use super::{set_param, sphere, Flash, RES};
 use crate::gpu::material_cache::ParamOwner;
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_scene::authoring::{create_entity, Primitive};
@@ -50,10 +50,7 @@ fn gpu_two_slots_with_their_own_flash_colours_keep_them_under_one_override() {
     };
     assert!(half > 0);
     let scene = std::rc::Rc::new(std::cell::RefCell::new(scene));
-    lua(
-        &scene,
-        &format!(r#"Material.SetShaderParam({id}, "hit_flash.amount", 1)"#),
-    );
+    set_param(&scene, id, "hit_flash.amount", 1.0);
 
     let first = red_blue(&mut renderer, &scene.borrow());
     let second = red_blue(&mut renderer, &scene.borrow());

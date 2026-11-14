@@ -7,10 +7,10 @@ use glam::{Quat, Vec3};
 
 use super::fixture::{bake, block, patch, renderer, scene, settled};
 use super::statics_tests::{set_fog, whiten};
-use rusty_components::{LightMode, LightType};
-use rusty_core::settings::quality::ShadowmaskMode;
-use rusty_scene::lighting::MixedLightingMode::{self, BakedIndirect, Shadowmask};
-use rusty_scene::Scene;
+use crate::components::{LightMode, LightType};
+use crate::core::settings::quality::ShadowmaskMode;
+use crate::scene::lighting::MixedLightingMode::{self, BakedIndirect, Shadowmask};
+use crate::scene::Scene;
 
 /// How much brighter (linear, summed RGB / 3) the masked room's air may read than
 /// the `BakedIndirect` one's: a sealed room holds no light either way.
@@ -19,11 +19,11 @@ const SEALED: f32 = 0.01;
 /// A directional `Mixed` sun added to `s`, low from -X.
 fn sun(s: &mut Scene) -> u32 {
     let id = s.add_entity("Sun".to_string());
-    let light = rusty_components::LightComponent {
+    let light = crate::components::LightComponent {
         light_type: LightType::Directional,
         mode: LightMode::Mixed,
         intensity: 3.0,
-        ..rusty_scene::authoring::default_light()
+        ..crate::scene::authoring::default_light()
     };
     s.world.set_light(id, Some(light));
     s.world.transform_mut(id).unwrap().rotation =
@@ -57,7 +57,7 @@ fn sealed(mixed: MixedLightingMode, name: &str) -> Scene {
 
 /// The mean of the frame (summed RGB / 3, linear), air and walls.
 fn mean(frame: &[u8]) -> f32 {
-    let lin = |b: &u8| rusty_core::color::srgb_to_linear(*b);
+    let lin = |b: &u8| crate::core::color::srgb_to_linear(*b);
     let sum: f32 = frame.chunks(4).flat_map(|p| &p[..3]).map(lin).sum();
     sum / (frame.len() / 4 * 3) as f32
 }

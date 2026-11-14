@@ -11,6 +11,11 @@
 //! (#2092), with a reason when it reads none. Each composite texture it declares
 //! is bound in the assembled composite and passed to its own function, at its
 //! place (#1473).
+//!
+//! Two of the layers sit above this crate, the `Graphics.*` registrars (`api`) and
+//! the Inspector's sections (`editor`), so the root's test hands them in
+//! ([`problems`]); this crate's own tests fill them with the renderer's names and
+//! check the rest. A test hook, compiled into every build for that.
 
 use super::textures::{composite_textures, PlacedTexture, GROUP};
 use super::{assemble, History, Owner, PostEffect, POST_EFFECTS};
@@ -64,8 +69,24 @@ pub(super) struct TextureUse {
     pub position: usize,
 }
 
-/// The layers as the engine has them.
+/// Every part missing from the engine's layers, given the two that sit above this
+/// crate: the `Graphics.*` registrars' names and the Inspector's sections' (the
+/// effect each draws). Empty when every effect is whole. The root's test calls it.
+pub fn problems(api: &[&str], sections: &[&str]) -> Vec<String> {
+    let names = |list: &[&str]| list.iter().map(|n| n.to_string()).collect();
+    check(&engine_with(names(api), names(sections)))
+}
+
+/// The layers as the engine has them, the two above this crate read as the
+/// renderer's own names (each effect counts as registered and drawn).
+#[cfg(test)]
 pub(super) fn engine() -> Layers {
+    let own: Vec<String> = POST_EFFECTS.iter().map(|e| e.name.to_string()).collect();
+    engine_with(own.clone(), own)
+}
+
+/// The layers as the engine has them, with `api` and `sections` as given.
+fn engine_with(api: Vec<String>, sections: Vec<String>) -> Layers {
     let fields_of = |kind: &str| -> Vec<String> {
         let kind = fields::find(kind).expect("a first-class component");
         (kind.fields)()
@@ -74,7 +95,8 @@ pub(super) fn engine() -> Layers {
             .collect()
     };
     let not_effect = |f: &String| !PostProcessingComponent::NOT_EFFECTS.contains(&f.as_str());
-    let docs = std::fs::read_to_string("docs/api/Graphics.md").expect("docs/api/Graphics.md");
+    let docs = rusty_core::project::checkout().join("docs/api/Graphics.md");
+    let docs = std::fs::read_to_string(docs).expect("docs/api/Graphics.md");
     Layers {
         render: POST_EFFECTS.iter().map(rendered).collect(),
         history: POST_EFFECTS.iter().map(history).collect(),
@@ -93,11 +115,8 @@ pub(super) fn engine() -> Layers {
             })
             .collect(),
         camera_knobs: camera_knobs(),
-        api: crate::api::graphics::effects::REGISTRARS
-            .iter()
-            .map(|(n, _)| n.to_string())
-            .collect(),
-        sections: sections(),
+        api,
+        sections,
         options: GraphicsOption::ALL
             .iter()
             .map(|o| o.name().into())
@@ -141,23 +160,6 @@ fn texture_uses() -> Vec<TextureUse> {
                 .expect("its own function's"),
         })
         .collect()
-}
-
-#[cfg(feature = "editor")]
-fn sections() -> Vec<String> {
-    use crate::editor::inspector::components::camera::{post_processing, CAMERA_SECTIONS};
-    let volume = post_processing::SECTIONS
-        .iter()
-        .map(|s| s.effect.to_string());
-    volume
-        .chain(CAMERA_SECTIONS.iter().map(|s| s.effect.to_string()))
-        .collect()
-}
-
-/// Without the editor there is no card to check: every effect counts as drawn.
-#[cfg(not(feature = "editor"))]
-fn sections() -> Vec<String> {
-    POST_EFFECTS.iter().map(|e| e.name.to_string()).collect()
 }
 
 fn has(list: &[String], name: &str) -> bool {

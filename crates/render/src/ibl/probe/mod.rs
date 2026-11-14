@@ -4,6 +4,6 @@
 //! sky (`capture`, #1668).
 
 pub(crate) mod bake;
-pub(crate) mod bounce;
+pub mod bounce;
 pub(crate) mod capture;
-pub(crate) mod solve;
+pub mod solve;

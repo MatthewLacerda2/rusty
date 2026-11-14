@@ -2,7 +2,7 @@
 //! turning camera doesn't crawl, a cut starts over, and a NaN in last frame's light
 //! never spreads.
 
-use super::fixture::{draw, eye, on, patch, patch_at, renderer, scene, view, FLOOR, LAMP};
+use crate::test_gpu::ssil::{draw, eye, on, patch, patch_at, renderer, scene, view, FLOOR, LAMP};
 use rusty_components::Ssil;
 
 /// Frames after a light goes off by which its bounce is under a tenth of what it
@@ -30,13 +30,13 @@ fn gpu_a_light_switched_off_fades_within_two_frames() {
     }
     let before = bounce(
         &frame,
-        &super::fixture::settled(&mut r, &off_scene(LAMP), 1),
+        &crate::test_gpu::ssil::settled(&mut r, &off_scene(LAMP), 1),
     );
     lit.world.light_mut(lamp).unwrap().intensity = 0.0;
     for _ in 0..FADE_FRAMES {
         frame = draw(&mut r, &mut v, &lit, &cam);
     }
-    let dark = super::fixture::settled(&mut r, &off_scene(0.0), 1);
+    let dark = crate::test_gpu::ssil::settled(&mut r, &off_scene(0.0), 1);
     let after = bounce(&frame, &dark);
     eprintln!("[ssil] bounce {before} lit, {after} {FADE_FRAMES} frames after");
     assert!(
@@ -108,7 +108,7 @@ fn gpu_a_cut_starts_the_history_over() {
     // Another scene is another history key: its first frame gathers nothing.
     let (other, _) = scene(on(1.0), LAMP);
     let first = draw(&mut r, &mut v, &other, &cam);
-    let off = super::fixture::settled(&mut r, &scene(Ssil::default(), LAMP).0, 1);
+    let off = crate::test_gpu::ssil::settled(&mut r, &scene(Ssil::default(), LAMP).0, 1);
     assert!(
         first == off,
         "a cut adds nothing, rather than last scene's light"

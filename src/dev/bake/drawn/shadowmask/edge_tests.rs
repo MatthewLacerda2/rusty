@@ -4,9 +4,9 @@
 use glam::Vec3;
 
 use super::fixture::{bake, block, patch, renderer, scene, settled};
-use rusty_components::{LightMode, LightType};
-use rusty_core::settings::quality::ShadowmaskMode;
-use rusty_scene::lighting::MixedLightingMode::Shadowmask;
+use crate::components::{LightMode, LightType};
+use crate::core::settings::quality::ShadowmaskMode;
+use crate::scene::lighting::MixedLightingMode::Shadowmask;
 
 /// The largest step, as a share of the lit floor, between two neighbouring floor
 /// points in the wall's shadow, either side of the shadow distance.

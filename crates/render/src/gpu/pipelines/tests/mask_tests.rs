@@ -6,7 +6,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use super::params_tests::{halves, lua, sphere, RES};
+use super::params_tests::{halves, set_param, set_texture, sphere, RES};
 use crate::Renderer;
 use rusty_scene::authoring::{create_entity, Primitive};
 use rusty_scene::Scene;
@@ -65,12 +65,7 @@ fn two_spheres(d: &Dissolve) -> (Rc<RefCell<Scene>>, u32, u32) {
     let masked = sphere(&mut scene, -1.2, &d.shader);
     let plain = sphere(&mut scene, 1.2, &d.shader);
     let scene = Rc::new(RefCell::new(scene));
-    // A long-bracket string: nothing in the path is read as a Lua escape there.
-    let script = format!(
-        r#"Material.SetShaderTexture({masked}, "mask", [==[{}]==])"#,
-        d.mask
-    );
-    lua(&scene, &script);
+    set_texture(&scene, masked, "mask", &d.mask);
     (scene, masked, plain)
 }
 
@@ -98,10 +93,7 @@ fn gpu_dissolve_burns_away_where_the_mask_is_below_amount_and_no_mask_is_white()
         return;
     };
     let (scene, masked, plain) = two_spheres(&d);
-    let set = |id: u32, amount: f32| {
-        let script = format!(r#"Material.SetShaderParam({id}, "dissolve.amount", {amount})"#);
-        lua(&scene, &script)
-    };
+    let set = |id: u32, amount: f32| set_param(&scene, id, "dissolve.amount", amount);
 
     let [l0, r0] = halves(&mut renderer, &scene.borrow());
     assert!(

@@ -3,9 +3,9 @@
 //! shows it gains nothing from SSIL, as the lightmap's own light gains nothing.
 
 use super::baked::{bake_with, off_and_on, BAKED_GAIN};
-use super::fixture::{energy, point, renderer, scene, set_ssil, settled, LAMP};
-use rusty_components::{LightMode, Ssil};
-use rusty_scene::Scene;
+use crate::components::{LightMode, Ssil};
+use crate::render::test_gpu::ssil::{energy, point, renderer, scene, set_ssil, settled, LAMP};
+use crate::scene::Scene;
 
 /// Give the fixture's floor `roughness`.
 fn floor_roughness(scene: &mut Scene, roughness: f32) {

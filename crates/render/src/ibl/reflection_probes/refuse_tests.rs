@@ -1,12 +1,9 @@
 //! A cube whose header passed but whose load fails (#1609): refused with one warning
 //! until it is re-written, and kept out of the frame it failed in.
 
-use std::cell::RefCell;
-
 use glam::Vec3;
 
 use super::super::gpu_tests::{cube_file, probes_at, renderer};
-use crate::scripting::ConsoleLogs;
 
 #[test]
 fn gpu_a_cube_that_fails_to_load_is_left_out_until_rewritten() {
@@ -23,11 +20,11 @@ fn gpu_a_cube_that_fails_to_load_is_left_out_until_rewritten() {
     assert!(renderer.reflection_probes.shape(&broken).is_some());
     let bytes = std::fs::read(&broken).unwrap();
     std::fs::write(&broken, &bytes[..bytes.len() - 1]).unwrap();
-    crate::logging::init();
-    let console = RefCell::new(ConsoleLogs::new());
+    rusty_test_support::logs::init();
+    rusty_test_support::logs::take(); // what earlier code on this thread logged
     let frame = |renderer: &mut crate::Renderer| {
         renderer.update_reflection_probes(&scene, Vec3::ZERO);
-        let logged = crate::logging::forward(&console);
+        let logged = rusty_test_support::logs::take();
         logged
             .iter()
             .filter(|m| m.contains(broken.as_str()))

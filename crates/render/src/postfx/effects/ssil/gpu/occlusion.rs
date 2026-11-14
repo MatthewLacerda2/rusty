@@ -4,7 +4,7 @@
 
 use glam::Vec3;
 
-use super::fixture::{block, floor, lamp, on, patch, renderer, scene, settled, LAMP};
+use crate::test_gpu::ssil::{block, floor, lamp, on, patch, renderer, scene, settled, LAMP};
 use rusty_components::Ssil;
 use rusty_scene::{FogMode, Scene};
 
@@ -48,9 +48,9 @@ fn gpu_a_white_floor_alone_bounces_nothing_onto_itself() {
     let mut scene = floor(on(4.0));
     let far = lamp(&mut scene, Vec3::new(0.0, 0.6, -18.0), LAMP * 8.0);
     scene.world.light_mut(far).unwrap().range = 10.0;
-    let mut v = super::fixture::view(&r);
+    let mut v = crate::test_gpu::ssil::view(&r);
     for _ in 0..6 {
-        super::fixture::draw(&mut r, &mut v, &scene, &super::fixture::eye(0.0));
+        crate::test_gpu::ssil::draw(&mut r, &mut v, &scene, &crate::test_gpu::ssil::eye(0.0));
     }
     let result = v.post_fx.ssil_result(&r.device, &r.queue);
     let most = result.iter().map(|c| c.max_element()).fold(0.0, f32::max);
@@ -62,9 +62,9 @@ fn gpu_a_white_floor_alone_bounces_nothing_onto_itself() {
 /// frame: under thick fog an 8-bit frame rounds the floor's bounce away on
 /// lavapipe and flips one code step on Metal (run 41886704978).
 fn result(r: &mut crate::Renderer, scene: &Scene) -> Vec<Vec3> {
-    let mut v = super::fixture::view(r);
+    let mut v = crate::test_gpu::ssil::view(r);
     for _ in 0..6 {
-        super::fixture::draw(r, &mut v, scene, &super::fixture::eye(0.0));
+        crate::test_gpu::ssil::draw(r, &mut v, scene, &crate::test_gpu::ssil::eye(0.0));
     }
     v.post_fx.ssil_result(&r.device, &r.queue)
 }

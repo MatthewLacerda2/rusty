@@ -8,7 +8,6 @@ use std::collections::BTreeSet;
 use glam::Vec3;
 
 use super::Warming;
-use crate::app::prepare_in_background;
 use crate::stats::Uploads;
 use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_asset::MapRef;
@@ -69,8 +68,10 @@ pub(super) fn first_frame(
     render(renderer, scene)
 }
 
+/// `path` read and prepared at once, as the background load prepares it bar the
+/// navmesh bake, which uploads nothing (`app::prepare_in_background`).
 pub(super) fn prepare(path: &str) -> PreparedScene {
-    prepare_in_background(path, &Default::default()).unwrap()
+    PreparedScene::from_data(rusty_scene::read_scene_file(path).unwrap(), path)
 }
 
 /// Warm `prepared` to the end, as frames would, a step at a time, waiting while a

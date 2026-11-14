@@ -90,7 +90,7 @@ pub struct RenderView {
     /// [`RenderView::set_ui_output`]. Consumed by that render.
     ui_output: Option<(wgpu::TextureView, wgpu::TextureFormat)>,
     /// The UI pass's per-canvas vertex buffers for this view (#418).
-    pub(crate) ui: crate::ui::UiViewCache,
+    pub ui: crate::ui::UiViewCache,
     /// The render textures this view's scene draws (#430); see
     /// `crate::render_texture`.
     pub(crate) render_textures: crate::render_texture::RenderTextures,

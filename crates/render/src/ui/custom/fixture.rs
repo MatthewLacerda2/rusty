@@ -2,14 +2,11 @@
 //! renderer resolves it, build a canvas with one shaded white graphic over an opaque
 //! black backdrop (one reference unit per pixel), and render it to pixels.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use glam::{Vec2, Vec3, Vec4};
-use mlua::Lua;
 
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_components::{CanvasComponent, ImageComponent, RectTransformComponent, UiShader};
+use rusty_scene::authoring::ui::shader as ops;
 use rusty_scene::{Camera, Scene};
 use rusty_shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
@@ -103,22 +100,14 @@ pub(super) fn shade(scene: &mut Scene, id: u32, shader: Option<&str>) {
     });
 }
 
-/// Run `script` against the `UI` namespace (a throwaway screen and camera).
-pub(super) fn lua(scene: &Rc<RefCell<Scene>>, script: &str) {
-    let screen = Rc::new(RefCell::new(rusty_ui::ScreenSize::default()));
-    let video = Rc::new(RefCell::new(
-        rusty_core::settings::video::VideoSettings::default(),
-    ));
-    let camera = Rc::new(RefCell::new(Camera::new(
-        Vec3::new(0.0, 0.0, 5.0),
-        -90.0,
-        0.0,
-    )));
-    let lua = Lua::new();
-    use crate::api::bind;
-    let view = (bind(&lua, &screen), bind(&lua, &video));
-    crate::api::ui::register(&lua, bind(&lua, scene), view, bind(&lua, &camera)).unwrap();
-    lua.load(script).exec().unwrap();
+/// `UI.SetShaderParam(id, name, value)` on the fixture's image, through the scene
+/// op the API wraps (the API's own tests hold the Lua side); returns the value the
+/// image now draws with, as `UI.GetShaderParam` reads it.
+pub(super) fn set_param(scene: &mut Scene, id: u32, name: &str, value: f32) -> Vec<f32> {
+    let mut image = scene.world.image_mut(id).expect("the fixture's image");
+    let layout = ops::layout(&image.shader).expect("a baked layout");
+    ops::set_param(&mut image.shader, &layout, name, vec![value]).expect("a known param");
+    ops::param(&image.shader, &layout, name).expect("a known param")
 }
 
 /// A rendered frame's pixels, RGBA, addressed bottom-up like the canvas.

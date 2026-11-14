@@ -4,11 +4,13 @@
 //! `Light.bakingOutput` keeps it out; the same light spawned after the bake (a
 //! script's muzzle flash) still bounces.
 
-use super::fixture::{energy, on, patch, point, renderer, scene, set_ssil, settled, FLOOR, LAMP};
+use crate::components::{LightMode, Ssil};
 use crate::dev::bake::lightmap::bake_scene_lightmaps;
-use rusty_components::{LightMode, Ssil};
-use rusty_scene::lighting::lightmap::BakeSettings;
-use rusty_scene::Scene;
+use crate::render::test_gpu::ssil::{
+    energy, on, patch, point, renderer, scene, set_ssil, settled, FLOOR, LAMP,
+};
+use crate::scene::lighting::lightmap::BakeSettings;
+use crate::scene::Scene;
 
 /// How much brighter a scene whose light is all baked may get with SSIL on, as a
 /// share of its light: `INDIRECT_GAIN` in `bounce`, the documented bound.
@@ -33,7 +35,7 @@ pub(super) fn bake(scene: &mut Scene, name: &str) -> usize {
 
 /// [`bake`], into `directional` pages (#810) or not.
 pub(super) fn bake_with(scene: &mut Scene, name: &str, directional: bool) -> usize {
-    let dir = rusty_test_support::temp::dir().join(format!("rusty_ssil_{name}"));
+    let dir = crate::test_temp::dir().join(format!("rusty_ssil_{name}"));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("level.scene").to_string_lossy().into_owned();
@@ -43,7 +45,7 @@ pub(super) fn bake_with(scene: &mut Scene, name: &str, directional: bool) -> usi
         bounces: 1,
         seed: 1,
         max_lightmap_size: 64,
-        denoiser: rusty_scene::lighting::lightmap::Denoiser::Filter,
+        denoiser: crate::scene::lighting::lightmap::Denoiser::Filter,
         filter_radius: 1,
         directional,
         backface_tolerance: BakeSettings::DEFAULT_BACKFACE_TOLERANCE,
@@ -53,7 +55,7 @@ pub(super) fn bake_with(scene: &mut Scene, name: &str, directional: bool) -> usi
 }
 
 /// The whole frame's light, settled, with SSIL off and on.
-pub(super) fn off_and_on(r: &mut crate::Renderer, scene: &mut Scene) -> (f32, f32) {
+pub(super) fn off_and_on(r: &mut crate::render::Renderer, scene: &mut Scene) -> (f32, f32) {
     set_ssil(scene, Ssil::default());
     let off = energy(&settled(r, scene, 4));
     set_ssil(scene, on(4.0));
