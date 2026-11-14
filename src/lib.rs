@@ -4,11 +4,9 @@
 //! (`main.rs`), the standalone player (`bin/player.rs`), and the dev-only headless
 //! tools (`bin/play.rs`, `bin/session.rs`, …). Two Cargo features strip layers from a
 //! build: `dev` (the harness, console/REPL, `Debug.*`) and `editor` (default-on: the
-//! egui editor, `src/editor` + `shell::editor`). A shipped game is the `player` binary
+//! egui editor, `rusty-editor` (`crates/editor/`) + `shell::editor`). A shipped game is the `player` binary
 //! built with `--no-default-features` — neither layer.
 
-#[cfg(feature = "editor")]
-pub mod editor;
 pub mod shell;
 
 // The modules already moved into crates of their own (crates/CLAUDE.md), under their
@@ -35,6 +33,8 @@ pub use rusty_ui as ui;
 
 #[cfg(feature = "dev")]
 pub use rusty_dev as dev;
+#[cfg(feature = "editor")]
+pub use rusty_editor as editor;
 
 #[cfg(test)]
 mod post_effect_layers_tests;

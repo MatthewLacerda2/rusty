@@ -23,7 +23,7 @@ const MIN_DISTANCE: f32 = 0.5;
 const MAX_DISTANCE: f32 = 20.0;
 
 /// Orbit-camera state for the preview scene, persisted on the editor's `EditorUi`
-/// (`src/editor/mod.rs`) across frames so drag/zoom accumulate. Always orbits the world origin — the
+/// (`crates/editor/src/lib.rs`) across frames so drag/zoom accumulate. Always orbits the world origin — the
 /// preview mesh is always placed there (see [`super::scene::build_preview_scene`]).
 #[derive(Clone, Copy, Debug)]
 pub struct OrbitState {

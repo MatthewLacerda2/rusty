@@ -8,6 +8,7 @@ use rusty::app::GameWorld;
 use rusty::core::application::DemoRequest;
 use rusty::core::settings::video::VideoSettings;
 use rusty::core::settings::GraphicsSettings;
+use rusty::shell::editor::demo as editor_demo;
 
 use super::{demo_of_a_saved_scene, editor_world};
 
@@ -56,17 +57,17 @@ fn opening_scrubbing_and_closing_a_demo_leaves_saved_files_and_settings_alone() 
         &mut game,
         DemoRequest::Open(path.to_string_lossy().into_owned()),
     );
-    ui.advance_demo(&mut game, 0.0).unwrap();
+    editor_demo::advance(&mut ui, &mut game, 0.0).unwrap();
     assert!(ui.dev.demo.is_some(), "the demo opened");
     let storage = game.resources.storage.borrow().data();
     assert_eq!(storage, serde_json::json!({}), "the demo's save data");
     // Back past where it stands: a restart, which leaves Play (a Stop flush).
     for tick in [40, 10] {
         ask(&mut game, DemoRequest::Seek(tick));
-        ui.advance_demo(&mut game, 0.0).unwrap();
+        editor_demo::advance(&mut ui, &mut game, 0.0).unwrap();
     }
     ui.dev.demo.as_mut().unwrap().close = true;
-    ui.advance_demo(&mut game, 0.0).unwrap();
+    editor_demo::advance(&mut ui, &mut game, 0.0).unwrap();
     assert!(ui.dev.demo.is_none());
 
     assert_eq!(

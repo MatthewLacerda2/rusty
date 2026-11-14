@@ -1,0 +1,266 @@
+//! crates/editor/src/inspector/components/gameplay/ — the gameplay inspector cards. This
+//! `mod.rs` holds the Lua Script and Animator cards; the physics-flavoured cards
+//! live apart to stay under the size cap: the Collider card in `collider`, the
+//! RigidBody card in `physics`, the NavMesh Agent card in `nav_agent`, the NavMesh
+//! Obstacle card in `nav_obstacle`, the Off-Mesh Link card in `offmesh_link`, the
+//! NavMesh Modifier Volume and Modifier cards in `nav`, the Joint card in `joint`, the
+//! CharacterController card in `character_controller`, the AI Perception card in
+//! `ai_perception`.
+
+use crate::inspector::components::card::remove_component;
+use egui_phosphor::regular as icon;
+use rusty_scene::authoring::ComponentKind;
+use std::path::Path;
+
+mod ai_perception;
+mod character_controller;
+mod collider;
+mod joint;
+mod nav;
+mod offmesh_link;
+mod physics;
+
+pub use ai_perception::draw_ai_perception;
+pub use character_controller::draw_character_controller;
+pub use collider::{commit_abandoned as commit_abandoned_collider, draw_collider};
+pub use joint::draw_joint;
+pub use nav::{draw_nav_agent, draw_nav_mesh_modifier, draw_nav_modifier, draw_nav_obstacle};
+pub use offmesh_link::draw_offmesh_link;
+pub use physics::draw_rigidbody;
+
+use crate::inspector::components::card::component_card;
+use crate::theme;
+use rusty_scene::authoring::animator as animator_ops;
+
+/// The body cards, in inspector order: RigidBody, Joint, CharacterController.
+pub fn draw_bodies(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+    draw_rigidbody(ui, world, id, is_dirty);
+    draw_joint(ui, world, id, is_dirty);
+    draw_character_controller(ui, world, id, is_dirty);
+}
+
+/// The navigation cards, in inspector order: NavMesh Agent, NavMesh Obstacle,
+/// Off-Mesh Link, NavMesh Modifier Volume, NavMesh Modifier, then the AI card: AI Perception.
+pub fn draw_navigation(
+    ui: &mut egui::Ui,
+    world: &mut rusty_ecs::World,
+    id: u32,
+    is_dirty: &mut bool,
+) {
+    draw_nav_agent(ui, world, id, is_dirty);
+    draw_nav_obstacle(ui, world, id, is_dirty);
+    draw_offmesh_link(ui, world, id, is_dirty);
+    draw_nav_modifier(ui, world, id, is_dirty);
+    draw_nav_mesh_modifier(ui, world, id, is_dirty);
+    draw_ai_perception(ui, world, id, is_dirty);
+}
+
+/// 3D. Script bindings — one card per attached script (#83). An entity can carry
+/// many scripts; each renders as its own removable Lua Script card.
+pub fn draw_script(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+    // Collect the index to remove (if any) so we don't mutate the vec mid-draw.
+    let mut remove_index: Option<usize> = None;
+    let Some(mut scripts) = world.scripts_mut(id) else {
+        return;
+    };
+    for (i, script) in scripts.iter_mut().enumerate() {
+        let mut remove = false;
+        component_card(ui, icon::SCROLL, "Lua Script", Some(&mut remove), |ui| {
+            ui.horizontal(|ui| {
+                ui.text_edit_singleline(&mut script.path);
+            });
+            let t = theme::from_ui(ui);
+            if Path::new(&script.path).exists() {
+                ui.colored_label(
+                    t.accent,
+                    format!("{}  Loaded and ready to run", icon::CHECK_CIRCLE),
+                );
+            } else {
+                ui.colored_label(
+                    t.danger,
+                    format!("{}  File not found!", icon::WARNING_CIRCLE),
+                );
+            }
+            // Schema-driven field controls (#84): one typed control per field the
+            // script's optional `fields` table declares. No-op for plain scripts.
+            crate::inspector::components::script_fields::draw_script_fields(ui, script, is_dirty);
+        });
+        if remove {
+            remove_index = Some(i);
+        }
+    }
+    if let Some(i) = remove_index {
+        scripts.remove(i);
+        *is_dirty = true;
+    }
+}
+
+/// 3E. Animator Component — the entity's skeletal-animation playback state. The
+/// clips themselves live on the skinned mesh; this card edits which one plays and
+/// how.
+pub fn draw_animator(
+    ui: &mut egui::Ui,
+    world: &mut rusty_ecs::World,
+    id: u32,
+    is_dirty: &mut bool,
+) {
+    let Some(anim) = world.animator(id).map(|a| a.clone()) else {
+        return;
+    };
+    let mut remove = false;
+    component_card(
+        ui,
+        icon::PERSON_SIMPLE_RUN,
+        "Animator",
+        Some(&mut remove),
+        |ui| animator_card_body(ui, world, id, &anim, is_dirty),
+    );
+    if remove {
+        remove_component(world, id, ComponentKind::Animator, is_dirty);
+    }
+}
+
+/// The Animator card's widgets: every field write routes through the shared
+/// `authoring::animator` ops (#287), the same writes the `Animator.*` Lua
+/// bindings use.
+fn animator_card_body(
+    ui: &mut egui::Ui,
+    world: &mut rusty_ecs::World,
+    id: u32,
+    anim: &rusty_components::AnimatorComponent,
+    is_dirty: &mut bool,
+) {
+    let mut clip = anim.base.current_clip.clone();
+    ui.horizontal(|ui| {
+        ui.label("Clip:");
+        if ui.text_edit_singleline(&mut clip).changed() {
+            if let Some(mut a) = world.animator_mut(id) {
+                animator_ops::set_clip(&mut a, clip);
+            }
+            *is_dirty = true;
+        }
+    });
+    let mut speed = anim.speed;
+    ui.horizontal(|ui| {
+        ui.label("Speed:");
+        if ui
+            .add(egui::DragValue::new(&mut speed).speed(0.05))
+            .changed()
+        {
+            if let Some(mut a) = world.animator_mut(id) {
+                animator_ops::set_speed(&mut a, speed);
+            }
+            *is_dirty = true;
+        }
+    });
+    let mut is_playing = anim.is_playing;
+    if ui.checkbox(&mut is_playing, "Is Playing").changed() {
+        if let Some(mut a) = world.animator_mut(id) {
+            animator_ops::set_playing(&mut a, is_playing);
+        }
+        *is_dirty = true;
+    }
+    let mut freeze = anim.freeze;
+    if ui.checkbox(&mut freeze, "Freeze").changed() {
+        if let Some(mut a) = world.animator_mut(id) {
+            animator_ops::set_freeze(&mut a, freeze);
+        }
+        *is_dirty = true;
+    }
+    let mut loop_clip = anim.base.loop_clip;
+    if ui.checkbox(&mut loop_clip, "Loop").changed() {
+        if let Some(mut a) = world.animator_mut(id) {
+            animator_ops::set_looping(&mut a, loop_clip);
+        }
+        *is_dirty = true;
+    }
+    draw_root_motion(ui, world, id, anim, is_dirty);
+    draw_graph(ui, world, id, anim, is_dirty);
+    draw_parameters(ui, anim);
+}
+
+/// Unity's *Apply Root Motion* toggle and the bone it reads (#1745), through the
+/// same `authoring::animator` ops as `Animator.SetApplyRootMotion` / `SetRootBone`.
+fn draw_root_motion(
+    ui: &mut egui::Ui,
+    world: &mut rusty_ecs::World,
+    id: u32,
+    anim: &rusty_components::AnimatorComponent,
+    is_dirty: &mut bool,
+) {
+    let mut apply = anim.apply_root_motion;
+    if ui.checkbox(&mut apply, "Apply Root Motion").changed() {
+        if let Some(mut a) = world.animator_mut(id) {
+            animator_ops::set_apply_root_motion(&mut a, apply);
+        }
+        *is_dirty = true;
+    }
+    let mut bone = anim.root_bone.clone();
+    ui.horizontal(|ui| {
+        ui.label("Root Bone:")
+            .on_hover_text("Empty: the skeleton's first root joint");
+        if ui.text_edit_singleline(&mut bone).changed() {
+            if let Some(mut a) = world.animator_mut(id) {
+                animator_ops::set_root_bone(&mut a, bone);
+            }
+            *is_dirty = true;
+        }
+    });
+}
+
+/// The animation-graph reference (#315/#316): the `.animgraph` path driving this
+/// animator, the auto-evaluation toggle, and (read-only) the active graph state.
+/// Writes route through the shared `authoring::animator` ops, like every other
+/// field on the card.
+fn draw_graph(
+    ui: &mut egui::Ui,
+    world: &mut rusty_ecs::World,
+    id: u32,
+    anim: &rusty_components::AnimatorComponent,
+    is_dirty: &mut bool,
+) {
+    ui.separator();
+    let mut graph = anim.graph.clone().unwrap_or_default();
+    ui.horizontal(|ui| {
+        ui.label("Graph:");
+        if ui.text_edit_singleline(&mut graph).changed() {
+            if let Some(mut a) = world.animator_mut(id) {
+                animator_ops::set_graph(&mut a, (!graph.is_empty()).then_some(graph));
+            }
+            *is_dirty = true;
+        }
+    });
+    if anim.graph.is_none() {
+        return;
+    }
+    let mut enabled = anim.graph_enabled;
+    if ui.checkbox(&mut enabled, "Graph enabled").changed() {
+        if let Some(mut a) = world.animator_mut(id) {
+            animator_ops::set_graph_enabled(&mut a, enabled);
+        }
+        *is_dirty = true;
+    }
+    if let Some(node) = &anim.base.current_node {
+        ui.label(format!("State: {node}"));
+    }
+}
+
+/// Read-only listing of the animator's typed graph parameters (#314). They are
+/// runtime state driven by `Animator.Set*` (and, later, authored defaults on the
+/// graph asset, #315), so the card shows them without offering edits.
+fn draw_parameters(ui: &mut egui::Ui, anim: &rusty_components::AnimatorComponent) {
+    if anim.parameters.is_empty() {
+        return;
+    }
+    ui.separator();
+    ui.label("Parameters (set via Animator.Set*):");
+    for (name, value) in &anim.parameters {
+        ui.label(format!("    {name}: {value}"));
+    }
+}
+
+impl crate::inspector::components::add::AddEntry for rusty_components::AnimatorComponent {
+    const CATEGORY: crate::inspector::components::add::Category =
+        crate::inspector::components::add::Category::Animation;
+    const LABEL: &'static str = "Animator Component";
+}

@@ -12,6 +12,7 @@ use rusty::dev::demo::{self, Destination, Recorder, Replayer};
 use rusty::dev::harness::Harness;
 use rusty::dev::scenario;
 use rusty::editor::EditorUi;
+use rusty::shell::editor::demo as editor_demo;
 
 /// A demo of 60 ticks, recorded at 60 Hz, with one mark at tick 20, on a scene saved to disk.
 pub fn demo_of_a_saved_scene() -> (PathBuf, String) {
@@ -50,7 +51,7 @@ fn a_demo_opens_scrubs_both_ways_and_closes() {
     let open = DemoRequest::Open(path.to_string_lossy().into_owned());
     game.resources.application.borrow_mut().request_demo(open);
 
-    ui.advance_demo(&mut game, 0.0).unwrap();
+    editor_demo::advance(&mut ui, &mut game, 0.0).unwrap();
     let view = ui.dev.demo.as_ref().expect("the demo opened");
     assert_eq!((view.ticks, view.current, view.paused), (60, 0, true));
     assert_eq!(view.marks, [(20, "hit".to_string())]);
@@ -66,7 +67,7 @@ fn a_demo_opens_scrubs_both_ways_and_closes() {
             .application
             .borrow_mut()
             .request_demo(DemoRequest::Seek(tick));
-        ui.advance_demo(&mut game, 0.0).unwrap();
+        editor_demo::advance(&mut ui, &mut game, 0.0).unwrap();
         assert_eq!(ui.dev.demo.as_ref().unwrap().current, tick);
     }
     let verdict = game.tap_mut::<Replayer>().unwrap().verdict().clone();
@@ -90,7 +91,7 @@ fn playing_runs_at_the_recorded_speed_and_close_puts_the_editor_back() {
         .application
         .borrow_mut()
         .request_demo(DemoRequest::Pause(false));
-    ui.advance_demo(&mut game, 0.0).unwrap();
+    editor_demo::advance(&mut ui, &mut game, 0.0).unwrap();
     // Whatever the frame rate: the recording's 60 Hz `dt`, not the display's.
     game.resources
         .application
@@ -100,9 +101,9 @@ fn playing_runs_at_the_recorded_speed_and_close_puts_the_editor_back() {
         .application
         .borrow_mut()
         .request_demo(DemoRequest::Pause(false));
-    ui.advance_demo(&mut game, 0.0).unwrap();
+    editor_demo::advance(&mut ui, &mut game, 0.0).unwrap();
     for _ in 0..10 {
-        ui.advance_demo(&mut game, 1.0 / 120.0).unwrap();
+        editor_demo::advance(&mut ui, &mut game, 1.0 / 120.0).unwrap();
     }
     assert_eq!(
         ui.dev.demo.as_ref().unwrap().current,
@@ -112,7 +113,7 @@ fn playing_runs_at_the_recorded_speed_and_close_puts_the_editor_back() {
 
     // Closing puts the editor back: its scene, no replay, the recorder.
     ui.dev.demo.as_mut().unwrap().close = true;
-    ui.advance_demo(&mut game, 0.0).unwrap();
+    editor_demo::advance(&mut ui, &mut game, 0.0).unwrap();
     assert!(ui.dev.demo.is_none() && !game.scene().borrow().is_playing());
     assert_eq!(game.scene().borrow().world.ids().len(), entities);
     assert!(game.tap_mut::<Replayer>().is_none() && game.tap_mut::<Recorder>().is_some());
@@ -128,7 +129,7 @@ fn a_bad_demo_leaves_the_editor_as_it_was() {
         .application
         .borrow_mut()
         .request_demo(missing);
-    ui.advance_demo(&mut game, 0.0);
+    editor_demo::advance(&mut ui, &mut game, 0.0);
     assert!(ui.dev.demo.is_none() && !game.scene().borrow().is_playing());
     let errors = game
         .console()

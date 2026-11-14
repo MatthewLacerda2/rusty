@@ -250,8 +250,8 @@ adapts it.
   `register(&mut app)`, and cross-system signals are direct typed returns.
 - **Dev-only build profile.** The console/REPL, harness, bot-players and `Debug.*` sit
   behind the `dev` feature, stripped from ship builds.
-- **The editor is a feature too.** `src/editor`, its shell frontend and egui sit behind
-  the default-on `editor` feature; a shipped game is the `player` binary built
+- **The editor is a feature too.** `crates/editor/`, its shell frontend and egui sit
+  behind the default-on `editor` feature; a shipped game is the `player` binary built
   `--no-default-features`, and engine code outside those stays egui-free.
 - **One runtime shell, two frontends.** `src/shell` owns the window, frame loop, input,
   cursor, settings and `Application.Quit()`; what both frontends need goes there, once.

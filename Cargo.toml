@@ -99,10 +99,10 @@ path = "tests/main.rs"
 [features]
 default = ["editor"]
 # The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.
-dev = ["dep:rusty-dev", "rusty-dev/dev", "rusty-render/dev", "rusty-app/dev", "rusty-script/dev", "rusty-ai/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-scene/dev", "rusty-shadergen/dev", "rusty-asset/dev", "rusty-core/dev", "dep:getrandom"]
-# The egui editor (#431): `src/editor` and the shell's editor frontend. Default-on so
+dev = ["rusty-editor?/dev", "dep:rusty-dev", "rusty-dev/dev", "rusty-render/dev", "rusty-app/dev", "rusty-script/dev", "rusty-ai/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-scene/dev", "rusty-shadergen/dev", "rusty-asset/dev", "rusty-core/dev", "dep:getrandom"]
+# The egui editor (#431): `rusty-editor` (`crates/editor/`) and the shell's editor frontend. Default-on so
 # `cargo run` opens the editor; a shipped player builds with `--no-default-features`.
-editor = ["rusty-render/editor", "rusty-app/editor", "rusty-physics/editor", "rusty-shadergen/editor", "rusty-asset/editor", "rusty-core/editor", "dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor", "dep:notify"]
+editor = ["dep:rusty-editor", "rusty-editor/editor", "rusty-render/editor", "rusty-app/editor", "rusty-physics/editor", "rusty-shadergen/editor", "rusty-asset/editor", "rusty-core/editor", "dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor", "dep:notify"]
 
 # The workspace's lint policy lives here, not in command-line flags, so a plain
 # `cargo clippy`, rust-analyzer and CI all read the same rules (#485); every member
@@ -151,6 +151,7 @@ rusty-logging = { path = "crates/logging" }
 rusty-preview = { path = "crates/preview" }
 rusty-app = { path = "crates/app" }
 rusty-dev = { path = "crates/dev" }
+rusty-editor = { path = "crates/editor" }
 rusty-test-support = { path = "crates/test-support" }
 
 winit = { version = "0.30.13" }
@@ -272,6 +273,7 @@ proptest = { version = "1", default-features = false, features = ["std"] }
 
 [dependencies]
 # The moved modules (crates/), re-exported in src/lib.rs under their old names.
+rusty-editor = { workspace = true, optional = true }
 rusty-dev = { workspace = true, optional = true }
 rusty-logging = { workspace = true }
 rusty-preview = { workspace = true }

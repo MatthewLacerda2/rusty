@@ -1,0 +1,36 @@
+[package]
+name = "rusty-editor"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[features]
+dev = ["dep:rusty-dev", "rusty-dev/dev", "rusty-app/dev", "rusty-asset/dev", "rusty-core/dev", "rusty-navigation/dev", "rusty-scene/dev", "rusty-script/dev", "rusty-shadergen/dev"]
+editor = ["dep:egui", "dep:egui-phosphor", "rusty-app/editor", "rusty-asset/editor", "rusty-core/editor", "rusty-shadergen/editor"]
+
+[lints]
+workspace = true
+
+[dependencies]
+rusty-asset = { workspace = true }
+rusty-audio = { workspace = true }
+rusty-components = { workspace = true }
+rusty-core = { workspace = true }
+rusty-dev = { workspace = true, optional = true }
+rusty-ecs = { workspace = true }
+rusty-navigation = { workspace = true }
+rusty-preview = { workspace = true }
+rusty-scene = { workspace = true }
+rusty-script = { workspace = true }
+rusty-shadergen = { workspace = true }
+rusty-ui = { workspace = true }
+egui = { workspace = true, optional = true }
+egui-phosphor = { workspace = true, optional = true }
+glam = { workspace = true }
+log = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+rusty-app = { workspace = true }
+rusty-test-support = { workspace = true }
+skrifa = { workspace = true }

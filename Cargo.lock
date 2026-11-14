@@ -3299,6 +3299,7 @@ dependencies = [
  "rusty-core",
  "rusty-dev",
  "rusty-ecs",
+ "rusty-editor",
  "rusty-logging",
  "rusty-navigation",
  "rusty-physics",
@@ -3459,6 +3460,32 @@ dependencies = [
  "proptest",
  "rusty-components",
  "rusty-test-support",
+]
+
+[[package]]
+name = "rusty-editor"
+version = "0.1.0"
+dependencies = [
+ "egui",
+ "egui-phosphor",
+ "glam 0.33.12",
+ "log",
+ "rusty-app",
+ "rusty-asset",
+ "rusty-audio",
+ "rusty-components",
+ "rusty-core",
+ "rusty-dev",
+ "rusty-ecs",
+ "rusty-navigation",
+ "rusty-preview",
+ "rusty-scene",
+ "rusty-script",
+ "rusty-shadergen",
+ "rusty-test-support",
+ "rusty-ui",
+ "serde_json",
+ "skrifa",
 ]
 
 [[package]]
