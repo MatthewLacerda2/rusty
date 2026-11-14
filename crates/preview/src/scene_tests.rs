@@ -2,7 +2,7 @@
 //! and the mesh toggle — all GPU-free (`Scene` is plain data).
 
 use super::*;
-use crate::asset::MapRef;
+use rusty_asset::MapRef;
 
 /// A minimal two-triangle `.obj` with one named object, for `spawn_model` tests.
 const QUAD_OBJ: &str = "\
@@ -62,7 +62,7 @@ fn write_temp_obj(name: &str) -> String {
 }
 
 fn write_obj(name: &str, contents: &str) -> String {
-    let path = crate::test_temp::dir().join(name);
+    let path = rusty_test_support::temp::dir().join(name);
     std::fs::write(&path, contents).unwrap();
     path.to_string_lossy().into_owned()
 }
@@ -237,7 +237,7 @@ fn the_bundled_suzanne_is_fitted_like_a_model() {
         PreviewMesh::Suzanne,
         &PreviewSubject::Shader("unused.wgsl".to_string()),
     );
-    let asset = asset::import_and_sync_sidecar(Path::new(&suzanne_path())).unwrap();
+    let asset = rusty_asset::import_and_sync_sidecar(Path::new(&suzanne_path())).unwrap();
     // Spawned as its one sub-object, so fitted by that sub-mesh's own bounds.
     let (min, max) = asset.sub_meshes[0].bounds().unwrap();
     let id = scene.world.ids_with_mesh()[0];

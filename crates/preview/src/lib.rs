@@ -1,4 +1,4 @@
-//! src/preview/ — the asset-preview machinery, shared by the editor and the agent.
+//! crates/preview/src/lib.rs — the asset-preview machinery, shared by the editor and the agent.
 //!
 //! One isolated preview scene (#352) with two front-ends: the Inspector's Preview tab
 //! (`editor/inspector/preview.rs`, human-facing, with drag-to-orbit) and the headless
@@ -6,7 +6,7 @@
 //! "one surface, three callers" rule the scripting API follows (#353).
 //!
 //! Nothing here touches egui, wgpu or the active editor World: [`scene`] builds a
-//! brand-new throwaway [`crate::scene::Scene`] and [`orbit`] is pure camera math. That
+//! brand-new throwaway [`rusty_scene::Scene`] and [`orbit`] is pure camera math. That
 //! is the point of the module living outside `editor/` — the headless path must not
 //! reach into the UI tree to render a preview, or the two front-ends drift into two
 //! preview scenes.
@@ -28,11 +28,11 @@ pub use scene::{build_preview_scene, PreviewMesh, PreviewSubject};
 /// card builds it from the entity's `MaterialComponent`; `Debug.PreviewMaterial` from
 /// the library by name, #404).
 pub fn subject_for_path(path: &str) -> Option<PreviewSubject> {
-    if crate::asset::is_image_path(path) {
+    if rusty_asset::is_image_path(path) {
         Some(PreviewSubject::Texture(path.to_string()))
-    } else if crate::asset::is_model_path(path) {
+    } else if rusty_asset::is_model_path(path) {
         Some(PreviewSubject::Model(path.to_string()))
-    } else if crate::core::paths::has_extension(path, "wgsl") {
+    } else if rusty_core::paths::has_extension(path, "wgsl") {
         Some(PreviewSubject::Shader(path.to_string()))
     } else {
         None

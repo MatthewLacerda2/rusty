@@ -146,6 +146,7 @@ rusty-physics = { path = "crates/physics" }
 rusty-navigation = { path = "crates/navigation" }
 rusty-ai = { path = "crates/ai" }
 rusty-script = { path = "crates/script" }
+rusty-preview = { path = "crates/preview" }
 rusty-test-support = { path = "crates/test-support" }
 
 winit = { version = "0.30.13" }
@@ -267,6 +268,7 @@ proptest = { version = "1", default-features = false, features = ["std"] }
 
 [dependencies]
 # The moved modules (crates/), re-exported in src/lib.rs under their old names.
+rusty-preview = { workspace = true }
 rusty-script = { workspace = true }
 rusty-ai = { workspace = true }
 rusty-navigation = { workspace = true }

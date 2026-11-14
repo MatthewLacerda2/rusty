@@ -11,7 +11,6 @@ pub mod app;
 #[cfg(feature = "editor")]
 pub mod editor;
 pub mod logging;
-pub mod preview;
 pub mod render;
 pub mod shell;
 
@@ -26,6 +25,7 @@ pub use rusty_core as core;
 pub use rusty_ecs as ecs;
 pub use rusty_navigation as navigation;
 pub use rusty_physics as physics;
+pub use rusty_preview as preview;
 pub use rusty_procgen as procgen;
 pub use rusty_scene as scene;
 pub use rusty_script as script;
