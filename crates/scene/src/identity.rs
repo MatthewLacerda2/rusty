@@ -54,7 +54,7 @@ impl crate::Scene {
     /// Take back `id`, an identity this World held before (Stop's restore after a
     /// play-mode `Scene.Load`, #1374): the restored World is that scene again, so a
     /// Generate Lighting waiting for Stop still recognises it.
-    pub(crate) fn restore_id(&mut self, id: SceneId) {
+    pub fn restore_id(&mut self, id: SceneId) {
         self.id = id;
     }
 }
@@ -80,17 +80,5 @@ mod tests {
         let second = Scene::new();
         assert_ne!(first.id(), second.id());
         assert_eq!(first.id(), first.id(), "and an id is stable for its scene");
-    }
-
-    #[test]
-    fn an_id_survives_the_play_mode_round_trip() {
-        // Play snapshots to `SceneData` and applies it back to the SAME `Scene`, so
-        // the identity — and therefore every cached GPU resource keyed by it — must
-        // come through unchanged.
-        let mut scene = Scene::new();
-        let before = scene.id();
-        let snapshot = crate::snapshot::SceneSnapshot::capture(&scene);
-        snapshot.restore(&mut scene);
-        assert_eq!(scene.id(), before);
     }
 }

@@ -5,7 +5,7 @@ use super::fixture::world_at;
 use super::{GameWorld, Inline, SceneLoader};
 use crate::TickTap;
 use rusty_core::paths;
-use rusty_scene::runtime::prepare::PreparedScene;
+use rusty_scene::edit_side::load::prepare::PreparedScene;
 use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
@@ -52,7 +52,7 @@ fn playing(tag: &str) -> (GameWorld, String) {
     let path = paths::to_slash(&dir.join("level.scene"));
     let mut scene = Scene::new();
     scene.add_entity("Level".into());
-    scene.save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&scene, &path).unwrap();
     let (mut gw, _) = world_at(&path);
     gw.set_playing(true);
     gw.tick(DT);
@@ -115,7 +115,7 @@ fn the_prepare_counts_the_steps_it_runs_a_saved_navmesh_skipping_the_bake() {
     let dir = rusty_test_support::temp::dir().join("rusty_2123_steps");
     std::fs::create_dir_all(&dir).unwrap();
     let path = paths::to_slash(&dir.join("level.scene"));
-    Scene::new().save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&Scene::new(), &path).unwrap();
     let run = || {
         let steps = PrepareSteps::default();
         prepare_counted(&path, &Default::default(), &steps).unwrap();

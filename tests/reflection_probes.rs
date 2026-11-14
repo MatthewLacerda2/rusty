@@ -29,7 +29,7 @@ fn reflection_probe_set_round_trips() {
         .set_cubemap(i, "reflections/room.ktx2".to_string());
 
     let path = tmp("rusty_reflection_probes.scene");
-    scene.save_to_file(&path).unwrap();
+    rusty::scene::save_to_file(&scene, &path).unwrap();
 
     // Positions + box corners + the cubemap PATH are in the human-diffable scene doc.
     let scene_json = std::fs::read_to_string(&path).unwrap();
@@ -37,7 +37,7 @@ fn reflection_probe_set_round_trips() {
     assert!(scene_json.contains("reflections/room.ktx2"));
 
     let mut loaded = Scene::new();
-    loaded.load_from_file(&path).unwrap();
+    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
     assert_eq!(
         loaded.reflection_probes.probes,
         scene.reflection_probes.probes

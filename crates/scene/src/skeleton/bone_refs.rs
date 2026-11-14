@@ -111,7 +111,7 @@ impl Scene {
 
     /// Point `docs`' leaves naming a live bone at its skinned entity, the bone kept
     /// in `bone_refs`: a document read from this scene leaving its skeleton behind.
-    pub(crate) fn bone_doc_refs(&self, docs: &mut [Entity]) {
+    pub fn bone_doc_refs(&self, docs: &mut [Entity]) {
         repoint_refs(docs, &self.bone_index());
     }
 
@@ -161,7 +161,7 @@ impl Scene {
     /// Bind a document's `bone_refs` against this scene's live skeletons, clearing
     /// them: a linked prefab's fresh baseline, in instance ids, for the live entity
     /// `holder` (what a warning names).
-    pub(crate) fn bind_doc_bone_refs(&self, doc: &mut Entity, holder: u32) {
+    pub fn bind_doc_bone_refs(&self, doc: &mut Entity, holder: u32) {
         let chains = std::mem::take(&mut doc.bone_refs);
         doc.visit_refs(&mut |pointer, r| {
             if let (Some(chain), Some(owner)) = (chains.get(pointer), *r) {

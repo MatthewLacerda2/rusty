@@ -2,7 +2,7 @@
 //! else not of the instance ends the walk, and a malformed hierarchy cannot hang it.
 
 use super::{instance_members, instance_root};
-use crate::authoring::{create_entity, Primitive};
+use crate::create::{create_entity, Primitive};
 use crate::Scene;
 use rusty_components::PrefabLink;
 

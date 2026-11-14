@@ -8,6 +8,8 @@
 //! a 2×2 box filter in linear light, which also averages a direction texel's
 //! vector (a mip of mixed directions is, rightly, less directional) and a
 //! shadowmask's occlusion.
+//!
+//! stored-format: the `.lightmaps` pages' bytes (their mip chain and 8-bit encodings)
 
 use std::ops::{Add, Div, Mul};
 
@@ -46,7 +48,7 @@ pub fn levels(page: &[Vec3], edge: u32) -> Vec<Vec<Vec3>> {
 }
 
 /// [`levels`] of any page: a colour one, a direction one or a shadowmask.
-pub fn chain<T: Texel>(page: &[T], edge: u32) -> Vec<Vec<T>> {
+fn chain<T: Texel>(page: &[T], edge: u32) -> Vec<Vec<T>> {
     let mut chain = vec![page.to_vec()];
     for l in 1..level_count(edge) {
         let parent = &chain[l as usize - 1];

@@ -8,7 +8,7 @@
 //! So Save never persists played state. Mirrors Unity's play-mode behaviour.
 //!
 //! Implemented as a `SceneData` snapshot taken on the play-state transition and
-//! applied back via `serialize::apply_world_data` on Stop, plus what the scene
+//! applied back via `edit_side::serialize::apply_world_data` on Stop, plus what the scene
 //! state inventory (`scene::state`, #1649) says Stop puts back and the document
 //! does not carry: the probes' baked SH, the edit-mode decals, the saved navmesh, the scene's
 //! identity and its disk records. Play's own requests (queued destroys and loads,
@@ -17,7 +17,8 @@
 //! A demo closing over the edit scene puts it back with this same snapshot
 //! (`dev::demo::Origin`, #1598), so the two restores cannot drift.
 
-use crate::serialize::{apply_world_data, to_scene_data, SceneData};
+use crate::edit_side::serialize::{apply_world_data, to_scene_data};
+use crate::serialize::SceneData;
 use crate::Scene;
 
 /// A frozen copy of the edit-mode scene, taken when entering Play.

@@ -18,7 +18,7 @@ fn a_scene_that_fails_to_load_falls_back_to_the_next() {
     let broken = root.join("broken.scene").to_string_lossy().into_owned();
     let good = root.join("good.scene").to_string_lossy().into_owned();
     std::fs::write(&broken, "{ not a scene").unwrap();
-    Scene::new().save_to_file(&good).unwrap();
+    rusty_scene::save_to_file(&Scene::new(), &good).unwrap();
     let plan = BootPlan {
         scenes: vec![broken, good.clone()],
         warnings: vec!["the startup scene is missing".into()],

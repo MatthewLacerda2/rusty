@@ -20,7 +20,7 @@ fn level(tag: &str, boxed: bool) -> String {
             .set_mesh(id, primitive_mesh_component(Primitive::Box));
     }
     let path = rusty_core::paths::to_slash(&dir.join("level.scene"));
-    scene.save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&scene, &path).unwrap();
     path
 }
 

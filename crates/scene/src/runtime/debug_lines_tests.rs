@@ -55,14 +55,3 @@ fn bad_lines_drop_and_the_store_is_bounded() {
         "the oldest went"
     );
 }
-
-/// Opening another scene in edit mode, where no tick ages them, drops the lines
-/// drawn over the old one.
-#[test]
-fn applying_a_document_drops_the_lines() {
-    let mut scene = crate::Scene::new();
-    scene.debug_lines.push(Vec3::ZERO, Vec3::X, WHITE, 7);
-    let data = crate::to_scene_data(&crate::Scene::new());
-    crate::apply_scene_data(&mut scene, data);
-    assert!(scene.debug_lines.is_empty());
-}

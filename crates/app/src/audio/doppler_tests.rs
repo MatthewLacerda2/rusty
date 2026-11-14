@@ -90,7 +90,7 @@ fn a_pause_holds_the_rate_and_the_resume_does_not_jump() {
 fn a_scene_load_forgets_the_listener_motion() {
     let (mut game, rocket, speaker) = rocket();
     let level = rusty_test_support::temp::dir().join("rusty_1749_level.scene");
-    Scene::new().save_to_file(&level.to_string_lossy()).unwrap();
+    rusty_scene::save_to_file(&Scene::new(), &level.to_string_lossy()).unwrap();
     let scene = game.scene().clone();
     scene.borrow_mut().dont_destroy_on_load(rocket); // the speaker rides along
     scene

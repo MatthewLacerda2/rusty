@@ -6,37 +6,8 @@
 //! neither lists an effect the renderer lacks. The gate's own cases are `render`'s
 //! tests.
 
-use rusty::render::postfx::completeness::{problems, Authored};
-use rusty::scene::authoring::fields;
-use rusty::scene::authoring::rendering::{camera, post_processing};
-
-/// What the authoring layer lists: the field tables, the volume's effect rows and
-/// the camera's knob tables.
-fn authored() -> Authored {
-    let fields_of = |kind: &str| -> Vec<String> {
-        let kind = fields::find(kind).expect("a first-class component");
-        (kind.fields)()
-            .into_iter()
-            .map(|(n, _)| n.to_string())
-            .collect()
-    };
-    Authored {
-        volume_fields: fields_of("PostProcessing"),
-        camera_fields: fields_of("Camera"),
-        ops: (post_processing::EFFECTS.iter())
-            .map(|e| {
-                (
-                    e.name.into(),
-                    e.knobs.iter().map(|k| k.field.into()).collect(),
-                )
-            })
-            .collect(),
-        camera_knobs: vec![(
-            "taa".into(),
-            camera::TAA_KNOBS.iter().map(|k| k.field.into()).collect(),
-        )],
-    }
-}
+use rusty::render::postfx::completeness::problems;
+use rusty::scene::authoring::rendering::post_processing::authored;
 
 /// The Inspector's sections, by the effect each draws (both cards).
 #[cfg(feature = "editor")]

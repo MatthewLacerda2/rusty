@@ -21,7 +21,7 @@ fn file_materials(path: &str) -> BTreeMap<String, MaterialAsset> {
 /// How many of the PVS's objects a fresh load of `path` reads as changed.
 fn stale_on_load(path: &str) -> usize {
     let mut fresh = Scene::new();
-    fresh.load_from_file(path).unwrap();
+    rusty_scene::load_from_file(&mut fresh, path).unwrap();
     let pvs = fresh.occlusion.as_deref().expect("the bake loaded");
     let objects = pvs.objects.iter();
     objects
@@ -41,10 +41,10 @@ fn a_material_the_file_lacks_is_named_and_a_save_that_writes_it_makes_the_load_m
             .set_material(id, Some(MaterialComponent::new("glass")));
     }
     level.materials.remove("glass");
-    level.save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&level, &path).unwrap();
 
     let mut baking = Scene::new();
-    baking.load_from_file(&path).unwrap();
+    rusty_scene::load_from_file(&mut baking, &path).unwrap();
     let default_like = MaterialAsset::default();
     define_asset(&mut baking.materials, "glass", default_like);
     assert!(
@@ -63,7 +63,7 @@ fn a_material_the_file_lacks_is_named_and_a_save_that_writes_it_makes_the_load_m
     save_sidecar(&baking, &path).unwrap();
     assert!(stale_on_load(&path) > 0, "the file draws glass one-sided");
 
-    baking.save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&baking, &path).unwrap();
     assert!(unsaved_materials(&baking, &file_materials(&path)).is_empty());
     assert_eq!(stale_on_load(&path), 0, "saved with its materials");
 }

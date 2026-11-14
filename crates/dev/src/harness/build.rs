@@ -60,7 +60,7 @@ impl Harness {
         rusty_scene::io::read_scene_file(scene_path)?;
         let mut scene = Scene::new();
         // The document parsed just above, so what fails here is the sidecar.
-        let sidecar = scene.load_from_file(scene_path);
+        let sidecar = rusty_scene::load_from_file(&mut scene, scene_path);
         let harness = Self::in_workspace(out_dir, scene, PathBuf::new());
         if let Err(err) = sidecar {
             let line = format!("Failed to load scene {scene_path}: {err}");

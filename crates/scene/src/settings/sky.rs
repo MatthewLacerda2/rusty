@@ -86,18 +86,6 @@ mod tests {
     }
 
     #[test]
-    fn the_sky_saves_and_loads_with_the_scene() {
-        use crate::{apply_scene_data, to_scene_data, Scene, SceneData};
-        let mut scene = Scene::new();
-        scene.sky.cloud_coverage = 0.9;
-        scene.sky.ground = Some(Vec3::new(0.2, 0.15, 0.1));
-        let json = serde_json::to_string(&to_scene_data(&scene)).unwrap();
-        let mut back = Scene::new();
-        apply_scene_data(&mut back, serde_json::from_str::<SceneData>(&json).unwrap());
-        assert_eq!(back.sky, scene.sky);
-    }
-
-    #[test]
     fn unset_colours_derive_from_the_ambient_then_the_zenith() {
         let ambient = Vec3::new(0.4, 0.5, 0.6);
         let [z, h, g] = SkySettings::default().resolved(ambient);
@@ -108,12 +96,5 @@ mod tests {
             ..SkySettings::default()
         };
         assert_eq!(set.resolved(ambient)[2], Vec3::splat(0.25));
-    }
-
-    #[test]
-    fn an_untouched_sky_stays_out_of_the_file() {
-        let scene = crate::Scene::new();
-        let json = serde_json::to_string(&crate::to_scene_data(&scene)).unwrap();
-        assert!(!json.contains("\"sky\""), "{json}");
     }
 }

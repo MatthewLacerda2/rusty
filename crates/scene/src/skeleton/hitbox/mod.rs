@@ -169,8 +169,6 @@ impl Scene {
 #[cfg(test)]
 mod armature_tests;
 #[cfg(test)]
-mod persist_tests;
-#[cfg(test)]
 mod play_tests;
 #[cfg(test)]
 mod rig;

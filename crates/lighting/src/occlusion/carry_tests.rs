@@ -31,7 +31,8 @@ fn a_carried_player_keeps_the_next_levels_culling_on() {
     };
     s.dont_destroy_on_load(player);
     let survivors = s.load_survivors();
-    s.swap_in(to_scene_data(&level), &path, &survivors).unwrap();
+    rusty_scene::edit_side::load::swap_in(&mut s, to_scene_data(&level), &path, &survivors)
+        .unwrap();
 
     let pvs = s.occlusion.as_deref().expect("the level's bake loaded");
     assert!(

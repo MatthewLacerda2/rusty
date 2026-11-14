@@ -8,7 +8,7 @@ use glam::Vec3;
 use super::tests::{child, spawn_file, KIT};
 use crate::asset_instance::set_model_scale_factor;
 use crate::authoring::{create_entity, revert_instance_field};
-use crate::serialize::{apply_scene_data, to_scene_data};
+use crate::edit_side::serialize::{apply_scene_data, to_scene_data};
 use crate::{list_instance_overrides, reimport_instance, Scene};
 
 /// Spawn the kit as `file` and rename its `Wall` node to `Panel` in the file, so

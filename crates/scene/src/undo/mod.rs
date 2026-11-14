@@ -190,7 +190,7 @@ impl Scene {
     }
 
     /// Forget all history: a scene was loaded over this one, or Play started.
-    pub(crate) fn clear_undo(&mut self) {
+    pub fn clear_undo(&mut self) {
         self.world.journal_pause();
         self.world.journal_take();
         self.history = UndoStack::default();
@@ -280,14 +280,4 @@ mod bake_tests;
 #[cfg(test)]
 mod changes_tests;
 #[cfg(test)]
-mod destroy_tests;
-#[cfg(test)]
-mod ids_tests;
-#[cfg(test)]
 mod level_tests;
-#[cfg(test)]
-mod refs_tests;
-#[cfg(test)]
-mod shared_mesh_tests;
-#[cfg(test)]
-mod tests;

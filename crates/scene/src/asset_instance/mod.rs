@@ -24,8 +24,9 @@
 use glam::Vec3;
 
 use crate::authoring::material_asset_from_import;
+use crate::edit_side::rehydrate::{self as reimports, Rig};
 use crate::lod_instance::instantiate_lod_set;
-use crate::rehydrate::{self, Rig};
+use crate::rehydrate;
 use crate::Scene;
 use rusty_asset::{Imported, ImportedAsset};
 use rusty_components::{ColliderComponent, MaterialComponent};
@@ -240,7 +241,7 @@ pub fn set_lightmap_uv_settings(
 ) -> Result<usize, String> {
     rusty_asset::sidecar::set_lightmap_uvs(std::path::Path::new(path), settings)
         .map_err(|e| e.to_string())?;
-    Ok(rehydrate::reimport_model(scene, path, Rig::Keep))
+    Ok(reimports::reimport_model(scene, path, Rig::Keep))
 }
 
 /// Set a model's Scale Factor (#1398) in its `.meta` sidecar and re-import every
@@ -267,7 +268,7 @@ pub fn set_model_scale_factor(scene: &mut Scene, path: &str, scale: f32) -> Resu
     // re-imports its mesh.
     let refit = |scene: &mut Scene, skip: &_| {
         let before = crate::lod_instance::lod0_extents(scene);
-        let ids = rehydrate::model_writes::reimport_noted_except(scene, path, Rig::Rebuild, skip);
+        let ids = reimports::model_writes::reimport_noted_except(scene, path, Rig::Rebuild, skip);
         crate::lod_instance::rescale_groups_over(scene, &ids, &before);
         ids.len() + skip.len()
     };

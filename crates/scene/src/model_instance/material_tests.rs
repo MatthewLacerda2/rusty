@@ -7,7 +7,7 @@ use glam::Vec3;
 
 use super::tests::{child, spawn_file, KIT};
 use crate::asset_instance::set_model_scale_factor;
-use crate::serialize::{apply_scene_data, to_scene_data};
+use crate::edit_side::serialize::{apply_scene_data, to_scene_data};
 use crate::snapshot::SceneSnapshot;
 use crate::Scene;
 

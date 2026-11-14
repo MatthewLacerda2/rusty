@@ -4,9 +4,10 @@
 
 use glam::Vec3;
 
-use super::fixture::{armature_owner, chain_skin, joint_to, reimport_to, warnings_of};
+use super::rig::{armature_owner, chain_skin, joint_to, reimport_to};
 use crate::Scene;
 use rusty_components::ColliderComponent;
+use rusty_test_support::logs::during as warnings_of;
 
 /// Whether one of `warned` names bone `bone` and says `what`.
 fn says(warned: &[String], bone: &str, what: &str) -> bool {

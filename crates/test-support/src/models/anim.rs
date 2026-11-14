@@ -87,3 +87,14 @@ pub fn animated_buffer() -> Vec<u8> {
     put_f32(&mut buf, &[0.0, 0.0, 0.0, 2.0, 0.0, 0.0]); // output translations
     buf
 }
+
+/// [`ANIMATED_GLTF`] and its buffer written into the folder `dir` of the test temp
+/// dir. Returns the `.gltf`'s path.
+pub fn animated_file(dir: &str) -> String {
+    let dir = crate::temp::dir().join(dir);
+    std::fs::create_dir_all(&dir).expect("create the animated model's folder");
+    std::fs::write(dir.join("anim.bin"), animated_buffer()).expect("write anim.bin");
+    let path = dir.join("model.gltf");
+    std::fs::write(&path, ANIMATED_GLTF).expect("write model.gltf");
+    path.to_string_lossy().into_owned()
+}

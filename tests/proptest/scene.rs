@@ -65,9 +65,9 @@ intensity,
         }
 
         let path = tmp(tag);
-        scene.save_to_file(&path).unwrap();
+        rusty::scene::save_to_file(&scene, &path).unwrap();
         let mut loaded = Scene::new();
-        loaded.load_from_file(&path).unwrap();
+        rusty::scene::load_from_file(&mut loaded, &path).unwrap();
         let _ = std::fs::remove_file(&path);
 
         prop_assert_eq!(loaded.entity_count(), specs.len());

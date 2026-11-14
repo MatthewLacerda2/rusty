@@ -25,19 +25,9 @@ use super::{assemble, History, Owner, PostEffect, POST_EFFECTS};
 use rusty_components::PostProcessingComponent;
 use rusty_core::settings::graphics_options::GraphicsOption;
 
-/// What the authoring layer lists, as the root's test reads it from
-/// `scene::authoring` and hands it in.
-#[derive(Clone, Default)]
-pub struct Authored {
-    /// `PostProcessingComponent`'s serialized fields (the field table's).
-    pub volume_fields: Vec<String>,
-    /// `CameraComponent`'s serialized fields.
-    pub camera_fields: Vec<String>,
-    /// The volume's effect rows (`post_processing::EFFECTS`), each with its knob paths.
-    pub ops: Vec<(String, Vec<String>)>,
-    /// The camera effects' knob tables (`camera::TAA_KNOBS`), each with its knob paths.
-    pub camera_knobs: Vec<(String, Vec<String>)>,
-}
+/// What the authoring layer lists (`scene::authored`), built by
+/// `scene::authoring::rendering::post_processing::authored` and handed in.
+pub use rusty_scene::authored::Authored;
 
 /// What one layer of the engine lists, by effect name.
 #[derive(Clone, Default)]
