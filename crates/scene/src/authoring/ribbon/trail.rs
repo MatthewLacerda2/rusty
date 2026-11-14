@@ -6,7 +6,7 @@
 //!
 //! Pure.
 
-use crate::authoring::sanitize::non_negative;
+use crate::rules::sanitize::non_negative;
 use rusty_components::TrailComponent;
 
 /// Start or stop recording new points (the existing trail still ages out).

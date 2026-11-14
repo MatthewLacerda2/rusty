@@ -15,7 +15,7 @@
 
 use glam::{Vec2, Vec3};
 
-use crate::authoring::sanitize::{clamped, finite2_or, finite3, non_negative};
+use crate::rules::sanitize::{clamped, finite2_or, finite3, non_negative};
 use rusty_components::{LightComponent, LightMode, LightType};
 
 /// Set the light's linear RGB colour.
@@ -33,8 +33,7 @@ pub fn set_range(l: &mut LightComponent, value: f32) {
     l.range = non_negative(value);
 }
 
-/// The cone angles (degrees) a new light carries, and a spot seeds when it has none.
-pub const DEFAULT_CONES: (f32, f32) = (30.0, 45.0);
+pub use crate::create::defaults::DEFAULT_CONES;
 
 /// Set the light's kind (typed — string parsing stays in the API adapter / card).
 /// Turning a light into a spot whose cones are both still zero seeds

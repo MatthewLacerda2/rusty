@@ -162,7 +162,7 @@ fn a_model_rewritten_as_static_drops_its_bones_and_what_was_authored_on_them() {
     let mut scene = Scene::new();
     let (hero, path) = hero(&mut scene, "reimport_static");
     let joint1 = scene.find_bone(hero, "Joint1").unwrap();
-    let body = crate::authoring::default_rigidbody();
+    let body = crate::create::default_rigidbody();
     scene.world.set_rigidbody(joint1, Some(body));
     scene.world.transform_mut(joint1).unwrap().position = Vec3::X;
     let gun = hang_gun(&mut scene, hero, "Joint1");

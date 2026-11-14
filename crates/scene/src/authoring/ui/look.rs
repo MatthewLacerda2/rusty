@@ -9,7 +9,7 @@
 
 use glam::Vec2;
 
-use crate::authoring::sanitize::{finite, unit_color, MIN_EXTENT};
+use crate::rules::sanitize::{finite, unit_color, MIN_EXTENT};
 use rusty_components::{UiGradient, MAX_GRADIENT_STOPS};
 
 /// `g` made valid, or `None` when it has fewer than two stops: at most

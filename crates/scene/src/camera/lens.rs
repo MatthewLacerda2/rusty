@@ -1,11 +1,11 @@
 //! The view camera's lens, held once where it is copied from a `CameraComponent`
-//! (#1359). The authoring ops hold every *write*; a lens that skipped them (a scene
-//! file, a prefab) is held here, through those same ops, so there is one set of
-//! bounds and the view [`Camera`] is always valid. The stored component keeps
+//! (#1359). The authoring ops hold every *write* through the lens rules
+//! (`rules::lens`); a lens that skipped them (a scene file, a prefab) is held here,
+//! through those same rules, so there is one set of bounds and the view [`Camera`] is always valid. The stored component keeps
 //! what it carries.
 
 use super::Camera;
-use crate::authoring::rendering::camera as ops;
+use crate::rules::lens as rules;
 use rusty_components::{CameraComponent, Projection};
 
 /// The largest near plane and orthographic half-height the view camera takes:
@@ -30,29 +30,25 @@ impl Lens {
     }
 }
 
-/// `c`'s lens held by the authoring ops (as if it had been written through
-/// `set_fov`, `set_clip_planes` and `set_projection`), then capped at
+/// `c`'s lens held by the lens rules (`rules::lens`, as if it had been written
+/// through the camera ops' `set_fov`, `set_clip_planes` and `set_projection`), then capped at
 /// [`MAX_LENS_EXTENT`] with `far` at most `f32::MAX / near`, so the projection
 /// built from it is finite. A lens the ops wrote comes back unchanged.
 pub fn held_lens(c: &CameraComponent) -> Lens {
-    // A scratch component, so the bounds are the ops' own, not a copy of them.
-    let mut h = CameraComponent::default();
-    ops::set_fov(&mut h, c.fov);
-    ops::set_clip_planes(&mut h, c.near, c.far);
-    ops::set_projection(&mut h, c.projection);
+    let (near, far) = rules::hold_clip_planes(c.near, c.far);
     // `near` is finite and at least MIN_NEAR here; after the cap `f32::MAX / near`
     // is still far beyond it, so the far plane stays past the near one.
-    let near = h.near.min(MAX_LENS_EXTENT);
-    let projection = match h.projection {
+    let near = near.min(MAX_LENS_EXTENT);
+    let projection = match rules::hold_projection(c.projection) {
         Projection::Orthographic { size } => Projection::Orthographic {
             size: size.min(MAX_LENS_EXTENT),
         },
         p => p,
     };
     Lens {
-        fov: h.fov,
+        fov: rules::hold_fov(c.fov),
         near,
-        far: h.far.min(f32::MAX / near),
+        far: far.min(f32::MAX / near),
         projection,
     }
 }
@@ -60,7 +56,5 @@ pub fn held_lens(c: &CameraComponent) -> Lens {
 /// `fov` held the way [`held_lens`] holds a component's (the view camera's
 /// `Camera.SetFov`).
 pub fn held_fov(fov: f32) -> f32 {
-    let mut h = CameraComponent::default();
-    ops::set_fov(&mut h, fov);
-    h.fov
+    rules::hold_fov(fov)
 }

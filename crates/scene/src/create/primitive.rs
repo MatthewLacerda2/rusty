@@ -1,4 +1,4 @@
-//! crates/scene/src/authoring/primitive.rs — The Create menu's primitives (#2051).
+//! crates/scene/src/create/primitive.rs — The Create menu's primitives (#2051).
 //!
 //! What each primitive the hierarchy's Create menu and `Scene.CreateEntity` offer
 //! comes with, as Unity's `GameObject.CreatePrimitive`: a mesh primitive gets its
@@ -7,7 +7,7 @@
 
 use glam::Vec3;
 
-use crate::authoring::defaults::{default_collider, light};
+use crate::create::defaults::{default_collider, light};
 use crate::rehydrate::bounds_of;
 use crate::{LightComponent, LightType, MeshComponent};
 use rusty_components::mesh::primitives;

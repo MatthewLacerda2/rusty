@@ -8,7 +8,7 @@
 //!
 //! Pure.
 
-use crate::authoring::sanitize::non_negative;
+use crate::rules::sanitize::non_negative;
 use rusty_components::{ReverbParams, ReverbPreset, ReverbZoneComponent};
 
 /// Set the full-effect radius, floored at 0; the fade radius grows to keep up.

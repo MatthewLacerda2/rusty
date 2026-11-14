@@ -16,7 +16,7 @@
 //!
 //! Pure.
 
-use super::sanitize::finite_or;
+use crate::rules::sanitize::finite_or;
 use rusty_components::AnimatorComponent;
 
 /// Set the animator's current clip name (the base layer's motion becomes that

@@ -9,7 +9,7 @@
 
 use glam::Vec3;
 
-use crate::authoring::sanitize::{finite3_or, finite_or};
+use crate::rules::sanitize::{finite3_or, finite_or};
 use rusty_components::OffMeshLinkComponent as Link;
 
 /// Enable or disable the link (Unity's `activated`).

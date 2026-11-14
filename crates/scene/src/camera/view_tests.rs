@@ -2,7 +2,7 @@
 //! the view camera mirrors it.
 
 use super::*;
-use crate::authoring::default_camera;
+use crate::create::default_camera;
 
 fn scene_with_camera() -> (Scene, u32) {
     let mut scene = Scene::new();

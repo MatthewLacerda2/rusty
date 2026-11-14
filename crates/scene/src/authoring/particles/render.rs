@@ -2,7 +2,7 @@
 //! (#440): what the Particle System card's Render section and the `Particles.Set*`
 //! render bindings both call, so the two can never clamp differently.
 
-use crate::authoring::sanitize::non_negative;
+use crate::rules::sanitize::non_negative;
 use rusty_components::{Flipbook, ParticleEmitterComponent, ParticleRenderMode, TaaReactive};
 
 /// Set how the particles are drawn (billboard / stretched / flat / mesh).

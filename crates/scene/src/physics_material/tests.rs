@@ -15,7 +15,7 @@ fn with_asset(path: Option<&str>) -> ColliderComponent {
     ColliderComponent {
         material: PhysicsMaterial::new(0.9, 0.9),
         material_asset: path.map(str::to_string),
-        ..crate::authoring::default_collider()
+        ..crate::create::default_collider()
     }
 }
 

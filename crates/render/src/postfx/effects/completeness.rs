@@ -12,18 +12,32 @@
 //! is bound in the assembled composite and passed to its own function, at its
 //! place (#1473).
 //!
-//! Two of the layers sit above this crate, the `Graphics.*` registrars (`api`) and
-//! the Inspector's sections (`editor`), so the root's test hands them in
-//! ([`problems`]); this crate's own tests fill them with the renderer's names and
-//! check the rest. A test hook, compiled into every build for that.
+//! Three of the layers sit above this crate's live code: the authoring layer (the
+//! component field tables, the volume's effect rows, the camera's knob tables:
+//! `scene::authoring`), the `Graphics.*` registrars (`api`) and the Inspector's
+//! sections (`editor`), so the root's test hands them in ([`problems`], the
+//! authoring layer as an [`Authored`]); this crate's own tests fill the authoring
+//! layer the same way, the other two with the renderer's names, and check the rest.
+//! A test hook, compiled into every build for that.
 
 use super::textures::{composite_textures, PlacedTexture, GROUP};
 use super::{assemble, History, Owner, PostEffect, POST_EFFECTS};
 use rusty_components::PostProcessingComponent;
 use rusty_core::settings::graphics_options::GraphicsOption;
-use rusty_scene::authoring::fields;
-use rusty_scene::authoring::rendering::camera;
-use rusty_scene::authoring::rendering::post_processing as authoring;
+
+/// What the authoring layer lists, as the root's test reads it from
+/// `scene::authoring` and hands it in.
+#[derive(Clone, Default)]
+pub struct Authored {
+    /// `PostProcessingComponent`'s serialized fields (the field table's).
+    pub volume_fields: Vec<String>,
+    /// `CameraComponent`'s serialized fields.
+    pub camera_fields: Vec<String>,
+    /// The volume's effect rows (`post_processing::EFFECTS`), each with its knob paths.
+    pub ops: Vec<(String, Vec<String>)>,
+    /// The camera effects' knob tables (`camera::TAA_KNOBS`), each with its knob paths.
+    pub camera_knobs: Vec<(String, Vec<String>)>,
+}
 
 /// What one layer of the engine lists, by effect name.
 #[derive(Clone, Default)]
@@ -72,9 +86,9 @@ pub(super) struct TextureUse {
 /// Every part missing from the engine's layers, given the two that sit above this
 /// crate: the `Graphics.*` registrars' names and the Inspector's sections' (the
 /// effect each draws). Empty when every effect is whole. The root's test calls it.
-pub fn problems(api: &[&str], sections: &[&str]) -> Vec<String> {
+pub fn problems(authored: Authored, api: &[&str], sections: &[&str]) -> Vec<String> {
     let names = |list: &[&str]| list.iter().map(|n| n.to_string()).collect();
-    check(&engine_with(names(api), names(sections)))
+    check(&engine_with(authored, names(api), names(sections)))
 }
 
 /// The renderer's effect names: the root's test passes them for a layer its build lacks.
@@ -82,43 +96,30 @@ pub fn effect_names() -> Vec<&'static str> {
     POST_EFFECTS.iter().map(|e| e.name).collect()
 }
 
-/// The layers, the two above this crate read as the renderer's own names.
+/// The layers, the authoring one as `authored`, the two above it read as the
+/// renderer's own names.
 #[cfg(test)]
-pub(super) fn engine() -> Layers {
+pub(super) fn engine_from(authored: Authored) -> Layers {
     let own: Vec<String> = effect_names().into_iter().map(String::from).collect();
-    engine_with(own.clone(), own)
+    engine_with(authored, own.clone(), own)
 }
 
-/// The layers as the engine has them, with `api` and `sections` as given.
-fn engine_with(api: Vec<String>, sections: Vec<String>) -> Layers {
-    let fields_of = |kind: &str| -> Vec<String> {
-        let kind = fields::find(kind).expect("a first-class component");
-        (kind.fields)()
-            .into_iter()
-            .map(|(name, _)| name.to_string())
-            .collect()
-    };
+/// The layers as the engine has them, with the three above this crate as given.
+fn engine_with(authored: Authored, api: Vec<String>, sections: Vec<String>) -> Layers {
     let not_effect = |f: &String| !PostProcessingComponent::NOT_EFFECTS.contains(&f.as_str());
     let docs = rusty_core::project::checkout().join("docs/api/Graphics.md");
     let docs = std::fs::read_to_string(docs).expect("docs/api/Graphics.md");
     Layers {
         render: POST_EFFECTS.iter().map(rendered).collect(),
         history: POST_EFFECTS.iter().map(history).collect(),
-        settings: fields_of("PostProcessing")
+        settings: authored
+            .volume_fields
             .into_iter()
             .filter(not_effect)
             .collect(),
-        camera: fields_of("Camera"),
-        ops: authoring::EFFECTS
-            .iter()
-            .map(|e| {
-                (
-                    e.name.into(),
-                    e.knobs.iter().map(|k| k.field.into()).collect(),
-                )
-            })
-            .collect(),
-        camera_knobs: camera_knobs(),
+        camera: authored.camera_fields,
+        ops: authored.ops,
+        camera_knobs: authored.camera_knobs,
         api,
         sections,
         options: GraphicsOption::ALL
@@ -144,12 +145,6 @@ fn history(e: &PostEffect) -> (String, Option<&'static str>) {
         History::Reads(_) => None,
     };
     (e.name.into(), why)
-}
-
-/// The camera effects' knob tables, each with its knob paths.
-fn camera_knobs() -> Vec<(String, Vec<String>)> {
-    let taa = camera::TAA_KNOBS.iter().map(|k| k.field.into());
-    vec![("taa".into(), taa.collect())]
 }
 
 /// Every declared composite texture, as the composite should use it.
@@ -294,6 +289,10 @@ fn unknown(l: &Layers) -> Vec<String> {
     }
     problems
 }
+
+#[cfg(test)]
+#[path = "completeness_authored.rs"]
+mod authored;
 
 #[cfg(test)]
 #[path = "completeness_tests.rs"]

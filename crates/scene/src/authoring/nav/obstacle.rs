@@ -10,7 +10,7 @@
 
 use glam::Vec3;
 
-use crate::authoring::sanitize::{at_least, finite3_or, non_negative, MIN_EXTENT};
+use crate::rules::sanitize::{at_least, finite3_or, non_negative, MIN_EXTENT};
 use rusty_components::{NavMeshObstacleComponent as Obstacle, ObstacleShape};
 
 /// The smallest extent a box side, radius or height may have.

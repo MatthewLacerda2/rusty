@@ -11,7 +11,7 @@
 
 use glam::Vec3;
 
-use crate::authoring::sanitize::{clamped, finite3_or, finite_or, MIN_EXTENT};
+use crate::rules::sanitize::{clamped, finite3_or, finite_or, MIN_EXTENT};
 use rusty_components::rendering::light_probe_proxy_volume::{resolution, DENSITY_RANGE};
 use rusty_components::{
     LightProbeProxyVolumeComponent as Volume, ProxyBoundsMode, ProxyQuality, ProxyResolutionMode,

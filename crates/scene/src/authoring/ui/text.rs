@@ -10,7 +10,7 @@
 
 use glam::{Vec2, Vec4};
 
-use crate::authoring::sanitize::{at_least, finite, finite2, non_negative, unit_color};
+use crate::rules::sanitize::{at_least, finite, finite2, non_negative, unit_color};
 use rusty_components::{TextAlignment, TextComponent, TextOverflow};
 
 /// The smallest size a text can be set to, in reference units.

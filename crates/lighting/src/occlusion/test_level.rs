@@ -4,7 +4,7 @@
 
 use glam::Vec3;
 
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
 /// The corridor's half width and the rooms' depth past its walls, metres.

@@ -3,7 +3,7 @@
 
 use super::super::{Effect, Knob};
 use crate::authoring::fields::table::effect;
-use crate::authoring::sanitize::{clamped, finite_array_or, unit};
+use crate::rules::sanitize::{clamped, finite_array_or, unit};
 use rusty_components::{LiftGammaGain, PostProcessingComponent, Wheel};
 
 /// Set one wheel: its colour, each channel clamped to `0..=1` (a colour with a NaN

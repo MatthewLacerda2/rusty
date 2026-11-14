@@ -5,7 +5,7 @@
 
 use super::{Effect, Knob};
 use crate::authoring::fields::table::effect;
-use crate::authoring::sanitize::{clamped, finite_or};
+use crate::rules::sanitize::{clamped, finite_or};
 use rusty_components::{AutoExposure, Exposure, ExposureMode, PostProcessingComponent};
 
 /// Set the fixed exposure (EV).

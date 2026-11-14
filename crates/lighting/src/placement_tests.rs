@@ -25,7 +25,7 @@ fn add_static_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3) {
         id,
         Some(ColliderComponent {
             shape: ColliderShape::Box { size },
-            ..rusty_scene::authoring::default_collider()
+            ..rusty_scene::create::default_collider()
         }),
     );
 }

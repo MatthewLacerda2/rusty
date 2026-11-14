@@ -1,7 +1,8 @@
 //! The completeness gate's must-pass case (the engine as it is) and must-flag cases
 //! (each part removed in turn).
 
-use super::{check, engine, TextureUse};
+use super::authored::engine;
+use super::{check, TextureUse};
 
 #[test]
 fn every_effect_has_every_part_in_every_layer() {

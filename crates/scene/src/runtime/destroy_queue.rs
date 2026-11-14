@@ -23,7 +23,7 @@ impl Scene {
     /// as removed from its instance, so propagation never stamps it back (#1665,
     /// `prefab::removed`).
     pub fn destroy(&mut self, id: u32) {
-        crate::prefab::record_removed(self, id);
+        crate::prefab_link::removed::record_removed(self, id);
         if self.playing {
             self.request_destroy(id);
         } else {

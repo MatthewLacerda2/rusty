@@ -4,7 +4,7 @@
 
 use super::{Effect, Knob};
 use crate::authoring::fields::table::effect;
-use crate::authoring::sanitize::{non_negative, unit};
+use crate::rules::sanitize::{non_negative, unit};
 use rusty_components::{Bloom, PostProcessingComponent};
 use rusty_core::paths::stored;
 use rusty_core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};

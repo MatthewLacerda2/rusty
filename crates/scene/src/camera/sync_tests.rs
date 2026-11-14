@@ -2,7 +2,7 @@
 //! goes, and keeps a script's own fov otherwise (#997).
 
 use super::*;
-use crate::authoring::default_camera;
+use crate::create::default_camera;
 
 #[test]
 fn removing_the_scene_camera_restores_the_default_fov() {

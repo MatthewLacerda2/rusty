@@ -30,7 +30,8 @@ use std::sync::{Arc, OnceLock};
 
 use serde::{Deserialize, Serialize};
 
-use crate::authoring::{primitive_mesh_component, ComponentKind, Primitive};
+use crate::authoring::ComponentKind;
+use crate::create::{primitive_mesh_component, Primitive};
 use crate::Scene;
 use rusty_components::mesh::{BoneBinding, MeshData, MeshRevision, Vertex, SCENE_KIND};
 use rusty_components::{ColliderComponent, MeshComponent};

@@ -11,7 +11,7 @@
 //!
 //! Pure apart from reading the sidecar.
 
-use crate::authoring::sanitize::finite_values;
+use crate::rules::sanitize::finite_values;
 use rusty_components::UiShader;
 use rusty_ecs::World;
 use rusty_shadergen::params::{self, ParamLayout};

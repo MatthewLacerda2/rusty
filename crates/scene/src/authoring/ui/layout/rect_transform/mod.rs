@@ -14,7 +14,7 @@
 
 use glam::{Vec2, Vec3};
 
-use crate::authoring::sanitize::{finite2, finite2_or, finite3, non_negative};
+use crate::rules::sanitize::{finite2, finite2_or, finite3, non_negative};
 use rusty_components::{RectTransformComponent, WorldAnchor};
 
 mod preset;

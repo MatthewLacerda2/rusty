@@ -94,7 +94,7 @@ impl Scene {
             let body = RigidBodyComponent {
                 is_kinematic: true,
                 mass: opts.mass * volume / total,
-                ..crate::authoring::default_rigidbody()
+                ..crate::create::default_rigidbody()
             };
             self.world.set_rigidbody(bone, Some(body));
             let mut up = parents[slot];

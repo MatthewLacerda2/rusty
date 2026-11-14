@@ -24,7 +24,7 @@ pub fn block(scene: &mut Scene, min: Vec3, max: Vec3) {
         id,
         Some(ColliderComponent {
             shape: ColliderShape::Box { size: max - min },
-            ..rusty_scene::authoring::default_collider()
+            ..rusty_scene::create::default_collider()
         }),
     );
 }

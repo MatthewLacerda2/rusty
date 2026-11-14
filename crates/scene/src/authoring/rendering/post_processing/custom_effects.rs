@@ -9,7 +9,7 @@ use serde::Deserialize;
 use super::Effect;
 use crate::authoring::fields::table::{unheld, Access, Field};
 use crate::authoring::fields::value::decode;
-use crate::authoring::sanitize::finite_values;
+use crate::rules::sanitize::finite_values;
 use rusty_components::PostProcessingComponent;
 use rusty_shadergen::post_params::PostChain;
 

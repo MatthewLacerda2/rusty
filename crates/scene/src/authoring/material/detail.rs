@@ -8,8 +8,6 @@
 //!
 //! Pure.
 
-use std::ops::RangeInclusive;
-
 use super::coordinates::{MAP_COORD_RANGE, WORLD_SIZE_RANGE};
 use super::field::{no_hint, SurfaceField, SurfaceKind, SurfaceValue};
 use super::surface::number;
@@ -17,8 +15,7 @@ use super::{fit_data_slot, MaterialLibrary};
 use rusty_asset::MapRef;
 use rusty_components::{DetailLayer, MaterialAsset, UvMapping};
 
-/// HDRP's range for the three detail scales (albedo, normal, smoothness).
-pub const DETAIL_SCALE_RANGE: RangeInclusive<f32> = 0.0..=2.0;
+pub use crate::rules::material::DETAIL_SCALE_RANGE;
 
 /// Set (or, with `None` or an empty path, clear) material `key`'s detail map: the
 /// one rule `Material.SetDetailMap` and the Inspector's path field share, so an

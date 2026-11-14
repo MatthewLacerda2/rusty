@@ -107,7 +107,7 @@ fn a_re_rooted_survivors_bounds_stand_where_it_is_now() {
     s.world.transform_mut(holder).unwrap().position = glam::Vec3::X * 100.0;
     s.set_parent(crate_, Some(holder)).unwrap();
     s.world.set_static(crate_, true);
-    let collider = crate::authoring::defaults::default_collider();
+    let collider = crate::create::defaults::default_collider();
     s.world.set_collider(crate_, Some(collider));
     s.update_all_colliders();
     s.dont_destroy_on_load(crate_);

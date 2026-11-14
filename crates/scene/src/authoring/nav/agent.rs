@@ -16,7 +16,7 @@
 
 use glam::Vec3;
 
-use crate::authoring::sanitize::{
+use crate::rules::sanitize::{
     at_least, finite, finite3_or, finite_f64_or, non_negative, MIN_EXTENT,
 };
 use rusty_components::{NavMeshAgentComponent, MAX_AVOIDANCE_PRIORITY};

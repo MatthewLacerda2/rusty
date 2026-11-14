@@ -9,11 +9,11 @@
 //!
 //! Pure.
 
-use crate::authoring::sanitize::{at_least, clamped, finite_or, unit};
+use crate::rules::sanitize::{at_least, clamped, finite_or, unit};
 use rusty_components::rendering::lod_group::{default_thresholds, LodGroupComponent, LodLevel};
 
 /// The smallest group size, in metres: a zero size would make every level cull.
-pub const MIN_SIZE: f32 = crate::authoring::sanitize::MIN_EXTENT;
+pub const MIN_SIZE: f32 = crate::rules::sanitize::MIN_EXTENT;
 
 /// Set the group's world-space size, floored at [`MIN_SIZE`]. A non-finite size is
 /// ignored.

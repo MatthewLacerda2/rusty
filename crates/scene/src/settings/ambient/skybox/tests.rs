@@ -131,7 +131,7 @@ fn an_ambient_light_overrides_the_sky_and_the_mode_saves() {
     let light = rusty_components::LightComponent {
         light_type: LightType::Ambient,
         color: Vec3::X,
-        ..crate::authoring::default_light()
+        ..crate::create::default_light()
     };
     scene.world.set_light(id, Some(light));
     let drawn = scene.drawn_ambient();

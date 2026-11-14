@@ -3,7 +3,7 @@
 //! `delete_mesh`.
 
 use super::{missing_key, BUILDS};
-use crate::authoring::{create_entity, Primitive};
+use crate::create::{create_entity, Primitive};
 use crate::{apply_scene_data, to_scene_data, Scene};
 use rusty_components::mesh::MeshData;
 

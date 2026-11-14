@@ -3,7 +3,7 @@
 
 use super::{Effect, Knob};
 use crate::authoring::fields::table::effect;
-use crate::authoring::sanitize::{finite_array_or, non_negative, unit};
+use crate::rules::sanitize::{finite_array_or, non_negative, unit};
 use rusty_components::rendering::post_processing::LensFlare;
 use rusty_components::PostProcessingComponent;
 

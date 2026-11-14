@@ -1,4 +1,4 @@
-//! crates/scene/src/authoring/sanitize.rs — the float rules authoring setters share (#939):
+//! crates/scene/src/rules/sanitize.rs — the float rules authoring setters share (#939):
 //! a value from Lua, the editor or a scene file is finite and in range before it is
 //! stored. A NaN or infinite input becomes the rule's fallback, never the field.
 //!
@@ -19,13 +19,13 @@ use rusty_core::curve::{ColorRange, Curve, Gradient, Range};
 pub const MIN_EXTENT: f32 = 1e-3;
 
 /// `v`, or `0.0` when it is NaN or infinite.
-pub(super) fn finite(v: f32) -> f32 {
+pub fn finite(v: f32) -> f32 {
     finite_or(v, 0.0)
 }
 
 /// `v`, or `fallback` when it is NaN or infinite. A setter whose field has no
 /// natural zero passes the field's current value, so a bad input changes nothing.
-pub(super) fn finite_or(v: f32, fallback: f32) -> f32 {
+pub fn finite_or(v: f32, fallback: f32) -> f32 {
     if v.is_finite() {
         v
     } else {
@@ -34,7 +34,7 @@ pub(super) fn finite_or(v: f32, fallback: f32) -> f32 {
 }
 
 /// `v` floored at `min`; `min` when `v` is NaN or infinite.
-pub(super) fn at_least(v: f32, min: f32) -> f32 {
+pub fn at_least(v: f32, min: f32) -> f32 {
     if v.is_finite() {
         v.max(min)
     } else {
@@ -43,20 +43,20 @@ pub(super) fn at_least(v: f32, min: f32) -> f32 {
 }
 
 /// `v` floored at `0.0`; `0.0` when `v` is NaN or infinite.
-pub(super) fn non_negative(v: f32) -> f32 {
+pub fn non_negative(v: f32) -> f32 {
     at_least(v, 0.0)
 }
 
 /// `v` clamped to `[lo, hi]`; `0.0` (itself clamped into the range) when `v` is
 /// NaN or infinite.
-pub(super) fn clamped(v: f32, lo: f32, hi: f32) -> f32 {
+pub fn clamped(v: f32, lo: f32, hi: f32) -> f32 {
     finite(v).clamp(lo, hi)
 }
 
 /// `v` clamped to `[lo, hi]`, an infinity saturating to the end it points at;
 /// `lo` when `v` is NaN (`f32::clamp` would keep it). For a bounded field whose
 /// `+inf` reads as "as far as it goes", like a camera's field of view.
-pub(super) fn saturated(v: f32, lo: f32, hi: f32) -> f32 {
+pub fn saturated(v: f32, lo: f32, hi: f32) -> f32 {
     if v.is_nan() {
         lo
     } else {
@@ -65,24 +65,24 @@ pub(super) fn saturated(v: f32, lo: f32, hi: f32) -> f32 {
 }
 
 /// `v` clamped to `[0, 1]`; `0.0` when `v` is NaN or infinite.
-pub(super) fn unit(v: f32) -> f32 {
+pub fn unit(v: f32) -> f32 {
     clamped(v, 0.0, 1.0)
 }
 
 /// An RGBA colour with each channel clamped to `[0, 1]`; transparent black when
 /// any channel is NaN or infinite (a colour is refused whole, never mixed).
-pub(super) fn unit_color(c: Vec4) -> Vec4 {
+pub fn unit_color(c: Vec4) -> Vec4 {
     finite4(c).clamp(Vec4::ZERO, Vec4::ONE)
 }
 
 /// `v`, or `Vec2::ZERO` when any component is NaN or infinite.
-pub(super) fn finite2(v: Vec2) -> Vec2 {
+pub fn finite2(v: Vec2) -> Vec2 {
     finite2_or(v, Vec2::ZERO)
 }
 
 /// `v`, or `fallback` when any component is NaN or infinite. A vector is refused
 /// whole, as Unity refuses the assignment: never a point nobody authored.
-pub(super) fn finite2_or(v: Vec2, fallback: Vec2) -> Vec2 {
+pub fn finite2_or(v: Vec2, fallback: Vec2) -> Vec2 {
     if v.is_finite() {
         v
     } else {
@@ -91,12 +91,12 @@ pub(super) fn finite2_or(v: Vec2, fallback: Vec2) -> Vec2 {
 }
 
 /// `v`, or `Vec3::ZERO` when any component is NaN or infinite.
-pub(super) fn finite3(v: Vec3) -> Vec3 {
+pub fn finite3(v: Vec3) -> Vec3 {
     finite3_or(v, Vec3::ZERO)
 }
 
 /// `v`, or `fallback` when any component is NaN or infinite (refused whole).
-pub(super) fn finite3_or(v: Vec3, fallback: Vec3) -> Vec3 {
+pub fn finite3_or(v: Vec3, fallback: Vec3) -> Vec3 {
     if v.is_finite() {
         v
     } else {
@@ -106,7 +106,7 @@ pub(super) fn finite3_or(v: Vec3, fallback: Vec3) -> Vec3 {
 
 /// An optional colour (`None`: derived elsewhere), each channel floored at `0`; one
 /// with a NaN or infinite channel is refused whole and `current` is kept.
-pub(super) fn optional_color_or(v: Option<Vec3>, current: Option<Vec3>) -> Option<Vec3> {
+pub fn optional_color_or(v: Option<Vec3>, current: Option<Vec3>) -> Option<Vec3> {
     match v {
         Some(c) if c.is_finite() => Some(c.max(Vec3::ZERO)),
         Some(_) => current,
@@ -115,7 +115,7 @@ pub(super) fn optional_color_or(v: Option<Vec3>, current: Option<Vec3>) -> Optio
 }
 
 /// `v`, or `Vec4::ZERO` when any component is NaN or infinite.
-pub(super) fn finite4(v: Vec4) -> Vec4 {
+pub fn finite4(v: Vec4) -> Vec4 {
     if v.is_finite() {
         v
     } else {
@@ -124,7 +124,7 @@ pub(super) fn finite4(v: Vec4) -> Vec4 {
 }
 
 /// `v`, or `fallback` when any element is NaN or infinite (refused whole).
-pub(super) fn finite_array_or<const N: usize>(v: [f32; N], fallback: [f32; N]) -> [f32; N] {
+pub fn finite_array_or<const N: usize>(v: [f32; N], fallback: [f32; N]) -> [f32; N] {
     if v.iter().all(|x| x.is_finite()) {
         v
     } else {
@@ -133,7 +133,7 @@ pub(super) fn finite_array_or<const N: usize>(v: [f32; N], fallback: [f32; N]) -
 }
 
 /// [`finite_or`] for an `f64` (a Lua number not yet narrowed).
-pub(super) fn finite_f64_or(v: f64, fallback: f64) -> f64 {
+pub fn finite_f64_or(v: f64, fallback: f64) -> f64 {
     if v.is_finite() {
         v
     } else {
@@ -142,13 +142,13 @@ pub(super) fn finite_f64_or(v: f64, fallback: f64) -> f64 {
 }
 
 /// An optional size: `None` when it is absent, negative, NaN or infinite.
-pub(super) fn optional_non_negative(v: Option<f32>) -> Option<f32> {
+pub fn optional_non_negative(v: Option<f32>) -> Option<f32> {
     v.filter(|v| v.is_finite() && *v >= 0.0)
 }
 
 /// `v`, or an error naming the first NaN or infinite value: a runtime param list is
 /// refused whole, and the caller's `Result` says why.
-pub(super) fn finite_values(v: Vec<f32>) -> Result<Vec<f32>, String> {
+pub fn finite_values(v: Vec<f32>) -> Result<Vec<f32>, String> {
     match v.iter().find(|x| !x.is_finite()) {
         Some(bad) => Err(format!("a param value must be a finite number, got {bad}")),
         None => Ok(v),
@@ -156,7 +156,7 @@ pub(super) fn finite_values(v: Vec<f32>) -> Result<Vec<f32>, String> {
 }
 
 /// `r`, or `fallback` when either end is NaN or infinite (refused whole).
-pub(super) fn range_or(r: Range, fallback: Range) -> Range {
+pub fn range_or(r: Range, fallback: Range) -> Range {
     if r.min.is_finite() && r.max.is_finite() {
         r
     } else {
@@ -165,7 +165,7 @@ pub(super) fn range_or(r: Range, fallback: Range) -> Range {
 }
 
 /// `c`, or `fallback` when any channel of either end is NaN or infinite.
-pub(super) fn color_range_or(c: ColorRange, fallback: ColorRange) -> ColorRange {
+pub fn color_range_or(c: ColorRange, fallback: ColorRange) -> ColorRange {
     let finite = |v: &[f32; 4]| v.iter().all(|x| x.is_finite());
     if finite(&c.min) && finite(&c.max) {
         c
@@ -175,14 +175,14 @@ pub(super) fn color_range_or(c: ColorRange, fallback: ColorRange) -> ColorRange 
 }
 
 /// `c` without the keys whose `t` or value is NaN or infinite, sorted by `t`.
-pub(super) fn finite_curve(mut c: Curve) -> Curve {
+pub fn finite_curve(mut c: Curve) -> Curve {
     c.keys.retain(|k| k.t.is_finite() && k.value.is_finite());
     c.sort();
     c
 }
 
 /// `g` without the colour or alpha keys that carry a NaN or infinity, sorted.
-pub(super) fn finite_gradient(mut g: Gradient) -> Gradient {
+pub fn finite_gradient(mut g: Gradient) -> Gradient {
     g.color_keys
         .retain(|k| k.t.is_finite() && k.color.iter().all(|x| x.is_finite()));
     g.alpha = finite_curve(g.alpha);

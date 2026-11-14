@@ -16,7 +16,7 @@
 
 use glam::Vec3;
 
-use crate::authoring::sanitize::{clamped, finite3, non_negative};
+use crate::rules::sanitize::{clamped, finite3, non_negative};
 use rusty_components::{CollisionDetection, RigidBodyComponent};
 
 /// Set the rigidbody's `active` flag.

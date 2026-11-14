@@ -58,7 +58,7 @@ fn the_drawn_ambient_is_the_scenes_source_unless_an_ambient_light_overrides() {
         light_type: LightType::Ambient,
         color: Vec3::new(1.0, 0.0, 0.0),
         intensity: 2.0,
-        ..crate::authoring::default_light()
+        ..crate::create::default_light()
     };
     scene.world.set_light(id, Some(light.clone()));
     let drawn = scene.drawn_ambient();

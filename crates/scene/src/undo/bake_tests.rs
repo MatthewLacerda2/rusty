@@ -3,7 +3,7 @@
 
 use glam::Vec3;
 
-use crate::authoring::{create_entity, Primitive};
+use crate::create::{create_entity, Primitive};
 use crate::lighting::lightmap_set::LightmapEntry;
 use crate::{Scene, Sh9};
 

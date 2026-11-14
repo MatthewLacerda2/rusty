@@ -6,18 +6,11 @@
 //!
 //! Pure.
 
-use std::ops::RangeInclusive;
-
 use super::field::{no_hint, SurfaceField, SurfaceKind, SurfaceValue};
 use super::surface::{choice, number};
 use rusty_components::{MaterialAsset, UvMapping};
 
-/// Each lane of `tiling` and `offset`.
-pub const MAP_COORD_RANGE: RangeInclusive<f32> = -1000.0..=1000.0;
-/// `world_size`, in metres per repeat.
-pub const WORLD_SIZE_RANGE: RangeInclusive<f32> = 0.01..=100.0;
-/// `blend_sharpness`, the power the normal is raised to.
-pub const BLEND_SHARPNESS_RANGE: RangeInclusive<f32> = 1.0..=64.0;
+pub use crate::rules::material::{BLEND_SHARPNESS_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE};
 
 /// A pair the row's `check` clamped.
 fn pair(value: SurfaceValue) -> [f32; 2] {

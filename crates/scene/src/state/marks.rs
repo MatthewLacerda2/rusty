@@ -11,7 +11,7 @@ use std::sync::OnceLock;
 use glam::Vec3;
 
 use super::Class;
-use crate::authoring::{create_entity, Primitive};
+use crate::create::{create_entity, Primitive};
 use crate::decal::DecalSpec;
 #[cfg(feature = "dev")]
 use crate::lighting::bake_status::BakeStatus;

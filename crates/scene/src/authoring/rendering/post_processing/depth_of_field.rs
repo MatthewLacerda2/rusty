@@ -3,7 +3,7 @@
 
 use super::{Effect, Knob};
 use crate::authoring::fields::table::effect;
-use crate::authoring::sanitize::{clamped, non_negative, saturated};
+use crate::rules::sanitize::{clamped, non_negative, saturated};
 use rusty_components::{DepthOfField, DofMode, PostProcessingComponent};
 use rusty_core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
 

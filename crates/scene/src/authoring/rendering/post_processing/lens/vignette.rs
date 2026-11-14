@@ -3,7 +3,7 @@
 
 use super::super::{Effect, Knob};
 use crate::authoring::fields::table::effect;
-use crate::authoring::sanitize::{clamped, finite_array_or, unit};
+use crate::rules::sanitize::{clamped, finite_array_or, unit};
 use rusty_components::{PostProcessingComponent, Vignette};
 
 /// Set whether the vignette draws.

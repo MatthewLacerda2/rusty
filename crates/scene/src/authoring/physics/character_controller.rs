@@ -12,7 +12,7 @@
 
 use glam::Vec3;
 
-use crate::authoring::sanitize::{at_least, finite3_or, non_negative};
+use crate::rules::sanitize::{at_least, finite3_or, non_negative};
 use rusty_components::CharacterControllerComponent;
 
 /// The smallest radius / skin a capsule may have: a zero would make the sweep

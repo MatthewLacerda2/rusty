@@ -1,4 +1,4 @@
-//! crates/scene/src/prefab/instance.rs — which entities make up a linked instance (#991).
+//! crates/scene/src/prefab_link/instance.rs — which entities make up a linked instance (#991).
 //!
 //! One rule for every prefab verb — record, revert and reimport (`link.rs`), apply to
 //! source (`apply.rs`) and the inspector's prefab card: an instance is its root plus

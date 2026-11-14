@@ -12,7 +12,7 @@
 //!
 //! Pure.
 
-use crate::authoring::sanitize::{at_least, finite_or, saturated};
+use crate::rules::sanitize::{at_least, finite_or, saturated};
 use rusty_components::AIPerceptionComponent as Perception;
 
 /// The widest view half-angle: 180° sees all round.

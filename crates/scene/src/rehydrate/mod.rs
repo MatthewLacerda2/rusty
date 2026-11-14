@@ -22,7 +22,7 @@ pub use reimport::{
 
 use glam::{Mat4, Vec3};
 
-use crate::authoring::{primitive_revision, subdivided_geometry, Primitive};
+use crate::create::{primitive_revision, subdivided_geometry, Primitive};
 use rusty_asset::{MeshRevision, MeshVertex, SubMesh};
 use rusty_components::mesh::Vertex;
 use rusty_components::Entity;
@@ -102,7 +102,7 @@ struct RehydratedMesh {
 
 impl RehydratedMesh {
     /// A primitive's geometry with no rig — primitives are never skinned/animated —
-    /// at its one revision (`authoring::primitive_revision`).
+    /// at its one revision (`create::primitive_revision`).
     fn primitive(geometry: (Vec<Vertex>, Vec<u32>), revision: MeshRevision) -> Self {
         Self {
             vertices: geometry.0,
@@ -170,7 +170,7 @@ fn rehydrate_one(mesh: &crate::MeshComponent) -> RehydratedMesh {
     if mesh.primitive_type == "Asset" {
         return rehydrate_asset_mesh(&mesh.asset_ref);
     }
-    // Primitive geometry is owned by `scene::authoring` so a created primitive and
+    // Primitive geometry is owned by `scene::create` so a created primitive and
     // a loaded one are byte-identical.
     let primitive = Primitive::parse(&mesh.primitive_type);
     let Some(primitive) = primitive else {
@@ -216,10 +216,10 @@ pub fn rehydrate_entity_mesh(entity: &mut Entity) {
 /// subdivisions to what its primitive takes and its Scale In Lightmap to its range
 /// (#1704), warning for each it had to move.
 fn hold_fields(id: u32, mesh: &mut crate::MeshComponent) {
-    use crate::authoring::rendering::mesh;
+    use crate::rules::mesh as rules;
     let warnings = [
-        mesh::hold_subdivisions(mesh),
-        mesh::hold_scale_in_lightmap(mesh),
+        rules::hold_subdivisions(mesh),
+        rules::hold_scale_in_lightmap(mesh),
     ];
     for warning in warnings.into_iter().flatten() {
         log::warn!("[Scene] entity {id}: {warning}");

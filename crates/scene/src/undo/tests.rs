@@ -3,7 +3,7 @@
 
 use glam::Vec3;
 
-use crate::authoring::{create_entity, Primitive};
+use crate::create::{create_entity, Primitive};
 use crate::{to_scene_data, Scene};
 
 fn document(scene: &Scene) -> String {
@@ -126,7 +126,7 @@ fn geometry_is_kept_for_the_same_source_and_rebuilt_for_another() {
     );
     drop(mesh);
     edit(&mut scene, |s| {
-        let sphere = crate::authoring::primitive_mesh_component(Primitive::Sphere);
+        let sphere = crate::create::primitive_mesh_component(Primitive::Sphere);
         s.world.set_mesh(id, sphere);
     });
     scene.undo();

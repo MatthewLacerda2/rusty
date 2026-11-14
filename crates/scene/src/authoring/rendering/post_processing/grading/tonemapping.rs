@@ -3,7 +3,7 @@
 
 use super::super::{Effect, Knob};
 use crate::authoring::fields::table::effect;
-use crate::authoring::sanitize::at_least;
+use crate::rules::sanitize::at_least;
 use rusty_components::{PostProcessingComponent, Tonemap, Tonemapping};
 
 /// Set the tonemap operator.

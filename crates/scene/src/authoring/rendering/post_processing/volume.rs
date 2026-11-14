@@ -5,7 +5,7 @@
 //! rows they merge: a partial write keeps the other fields, an unknown key errors.
 
 use crate::authoring::fields::table::{effect, op, Field};
-use crate::authoring::sanitize::{at_least, clamped};
+use crate::rules::sanitize::{at_least, clamped};
 use rusty_components::{PostProcessingComponent, ShadowSettings, SsaoSettings};
 use rusty_core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
 

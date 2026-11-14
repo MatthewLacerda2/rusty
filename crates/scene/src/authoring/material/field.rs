@@ -11,8 +11,8 @@
 
 use std::ops::RangeInclusive;
 
-use super::super::sanitize::{finite_array_or, saturated};
 use super::MaterialLibrary;
+use crate::rules::sanitize::{finite_array_or, saturated};
 use rusty_components::MaterialAsset;
 
 /// A surface field's value, as the API, a recipe and the Inspector carry it.

@@ -15,7 +15,7 @@ use glam::{Quat, Vec3};
 
 use super::runtime::{critical_damping, Drive, REACT_DURATION, REACT_STRENGTH};
 use super::RAGDOLL_LAYER;
-use crate::authoring::physics::joint as ops;
+use crate::rules::joint::drive_value;
 use crate::skeleton::HitboxOptions;
 use crate::Scene;
 
@@ -35,7 +35,7 @@ pub struct HitReact {
 
 impl HitReact {
     /// These options with every number finite and in range: a NaN or infinite
-    /// duration takes the default, a drive the authoring floor at 0 (`math.huge`
+    /// duration takes the default, a drive the joint rule's floor at 0 (`rules::joint`) (`math.huge`
     /// never reaches rapier).
     pub fn sanitized(&self) -> Self {
         let duration = match self.duration.is_finite() {
@@ -45,8 +45,8 @@ impl HitReact {
         Self {
             duration,
             drive: Drive {
-                strength: ops::drive_value(self.drive.strength),
-                damping: ops::drive_value(self.drive.damping),
+                strength: drive_value(self.drive.strength),
+                damping: drive_value(self.drive.damping),
             },
             up_to: self.up_to,
         }
@@ -115,8 +115,8 @@ impl Scene {
                     damping: j.drive_damping,
                 };
                 let drive = own.merged(given[0], given[1]);
-                ops::set_drive_strength(&mut j, drive.strength);
-                ops::set_drive_damping(&mut j, drive.damping);
+                j.drive_strength = drive_value(drive.strength);
+                j.drive_damping = drive_value(drive.damping);
                 n += 1;
             }
             self.track_if_simulated(b);

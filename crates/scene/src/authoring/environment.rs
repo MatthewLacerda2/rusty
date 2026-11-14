@@ -14,7 +14,7 @@
 
 use glam::Vec3;
 
-use super::sanitize::{clamped, finite3_or, finite_or, non_negative, optional_color_or};
+use crate::rules::sanitize::{clamped, finite3_or, finite_or, non_negative, optional_color_or};
 use crate::{AmbientMode, AmbientSettings, Scene, SkySettings};
 
 /// Set the skybox panorama's path, as the scene file stores it; an empty path goes
