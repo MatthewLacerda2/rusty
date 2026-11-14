@@ -32,7 +32,7 @@ use glam::{UVec2, Vec2, Vec3};
 
 use super::{corners, opposite, CLEAR};
 #[cfg(all(test, feature = "dev"))]
-pub(in rusty_lighting::occlusion) use cover::without_union;
+pub(in crate::occlusion) use cover::without_union;
 pub(super) use group::sheets;
 use group::tolerance;
 

@@ -6,7 +6,9 @@
 use glam::Vec3;
 
 use super::NavigationGraph;
-use rusty_lighting::placement::{plan_reflection_probes, ReflectionPlacement, ReflectionPlan, Site};
+use rusty_lighting::placement::{
+    plan_reflection_probes, ReflectionPlacement, ReflectionPlan, Site,
+};
 use rusty_scene::Scene;
 
 mod light_tests;

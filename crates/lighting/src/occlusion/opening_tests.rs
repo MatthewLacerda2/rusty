@@ -6,11 +6,11 @@
 
 use glam::Vec3;
 
-use super::bench::shift;
-use super::bench::town::authored::entity;
-use super::gather_occlusion;
-use super::sample::without_union;
-use super::test_level::block;
+use crate::occlusion::bench::shift;
+use crate::occlusion::bench::town::authored::entity;
+use crate::occlusion::gather_occlusion;
+use crate::occlusion::sample::without_union;
+use crate::occlusion::test_level::block;
 use rusty_scene::Scene;
 
 /// The wall's grid lines, the window's and the door's edges among them.

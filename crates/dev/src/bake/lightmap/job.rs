@@ -33,7 +33,9 @@ use super::{
     EncodedPages,
 };
 use crate::bake::progress::{duration, eta, Progress, Step};
-use rusty_lighting::lightmap::{bake_progressive, BakeProgress, BakeScene, BakeView, MaskChannels, Pass};
+use rusty_lighting::lightmap::{
+    bake_progressive, BakeProgress, BakeScene, BakeView, MaskChannels, Pass,
+};
 use rusty_scene::lighting::settings::BakeSettings;
 use rusty_scene::Scene;
 

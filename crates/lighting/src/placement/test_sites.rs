@@ -6,9 +6,9 @@
 use glam::Vec3;
 
 use super::test_level::block;
+use rusty_components::{MaterialAsset, MaterialComponent, RenderMode};
 use rusty_scene::authoring::{create_entity, Primitive};
 use rusty_scene::Scene;
-use rusty_components::{MaterialAsset, MaterialComponent, RenderMode};
 
 /// A 30 × 30 m yard, top at y = 0.
 pub fn yard() -> Scene {

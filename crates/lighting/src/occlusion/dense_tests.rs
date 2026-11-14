@@ -5,12 +5,13 @@
 
 use glam::Vec3;
 
-use super::gather::Fingerprints;
-use super::sample::target_points;
-use super::test_level::{block, corridors};
-use super::{bake_occlusion, OcclusionData};
-use rusty_scene::Scene;
+use crate::occlusion::bake_occlusion;
+use crate::occlusion::gather::Fingerprints;
+use crate::occlusion::sample::target_points;
+use crate::occlusion::test_level::{block, corridors};
 use rusty_components::mesh::{primitives, MeshRevision};
+use rusty_scene::lighting::occlusion::OcclusionData;
+use rusty_scene::Scene;
 
 /// The north room's corner, and where the far south room keeps a prop.
 const CORNER: Vec3 = Vec3::new(1.0, 1.6, 8.0);
@@ -90,5 +91,5 @@ fn a_mesh_that_is_not_finite_bakes_and_is_never_culled() {
         assert!((0..data.row_count() as u32).all(|row| data.sees(row, object)));
     }
     // They lay no cells: the grid is the corridor level's, of 2 m.
-    assert_eq!(data.grid.cell, super::CELL_SIZE);
+    assert_eq!(data.grid.cell, rusty_scene::lighting::occlusion::CELL_SIZE);
 }

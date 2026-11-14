@@ -5,6 +5,7 @@ use super::bake::progressive::progressive_on;
 use super::progressive_tests::lit;
 use super::tests::settings;
 use super::*;
+use rusty_scene::lighting::settings::BakeSettings;
 
 #[test]
 fn every_pass_shows_the_whole_scene_converging() {

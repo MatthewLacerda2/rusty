@@ -9,6 +9,7 @@ use super::bake::progressive::progressive_on;
 use super::progressive_tests::camera;
 use super::tests::{floor, quad, settings, wall};
 use super::*;
+use rusty_scene::lighting::settings::BakeSettings;
 
 /// Hears which chart each batch starts on, in order.
 #[derive(Default)]

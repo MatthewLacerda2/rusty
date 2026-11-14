@@ -6,10 +6,10 @@ use std::cell::Cell;
 use glam::Vec3;
 
 use super::*;
-use rusty_scene::Scene;
 use rusty_asset::MapRef;
 use rusty_components::mesh::Vertex;
 use rusty_components::{MaterialAsset, MaterialComponent, MeshComponent, RenderMode};
+use rusty_scene::Scene;
 
 /// A static 4×4 panel at y = 1 facing down, as two runs: the half over x < 0, then
 /// the half over x > 0. No lightmap UV: it only occludes, bounces and emits.

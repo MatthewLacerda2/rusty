@@ -20,8 +20,8 @@
 
 use glam::{Vec2, Vec3};
 
-use rusty_scene::Scene;
 use rusty_components::{falloff_window, LightComponent, FALLOFF_EPSILON_SQ};
+use rusty_scene::Scene;
 
 /// Cells per side of the fixed grid the probe bake integrates a rectangle over:
 /// `GRID²` shadow rays per area light per probe.

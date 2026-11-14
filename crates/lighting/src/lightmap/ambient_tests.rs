@@ -8,8 +8,8 @@ use super::input::BakeScene;
 use super::rays::Rays;
 use super::rng::Rng;
 use super::trace::{TexelLight, Tracer};
-use rusty_scene::AmbientRadiance;
 use rusty_core::color::luminance;
+use rusty_scene::AmbientRadiance;
 
 /// The indirect light of one texel at the origin facing `normal`, in an empty scene.
 pub(super) fn open_texel(sky: AmbientRadiance, normal: Vec3) -> Vec3 {
@@ -97,8 +97,8 @@ fn a_horizon_glow_never_bakes_negative_light_or_direction() {
 
 #[test]
 fn the_gather_takes_the_gradient_and_an_ambient_light_overrides_it() {
-    use rusty_scene::{AmbientMode, Scene};
     use rusty_components::{LightComponent, LightType};
+    use rusty_scene::{AmbientMode, Scene};
     let mut scene = Scene::new();
     scene.ambient.mode = AmbientMode::Gradient;
     scene.ambient.sky = Vec3::new(0.1, 0.3, 1.2);

@@ -22,8 +22,8 @@ use crate::bake::lightmap::bake_scene_lightmaps_logged;
 use crate::bake::occlusion::{bake_occlusion_logged, BakedOcclusion};
 use crate::bake::progress::{BakeLog, Step};
 use crate::bake::steps::LightingBake;
-use rusty_navigation::NavigationGraph;
 use rusty_lighting::occlusion::OcclusionBakeReport;
+use rusty_navigation::NavigationGraph;
 use rusty_scene::{save_lighting, LightingSave, Scene, LIGHTING_IN_PLAY};
 
 /// Why Generate Lighting cannot start: the bakes write beside the scene file.

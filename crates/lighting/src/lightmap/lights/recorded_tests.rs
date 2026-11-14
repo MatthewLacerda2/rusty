@@ -5,11 +5,11 @@
 
 use glam::{Vec3, Vec4};
 
-use rusty_scene::authoring::{create_entity, default_light, Primitive};
 use crate::lightmap::{assign_channels, mixed_occlusion, BakeScene};
+use rusty_components::{LightComponent, LightMode, LightType};
+use rusty_scene::authoring::{create_entity, default_light, Primitive};
 use rusty_scene::lighting::MixedLightingMode;
 use rusty_scene::Scene;
-use rusty_components::{LightComponent, LightMode, LightType};
 
 /// Two overlapping shadowed `Mixed` lamps (`a`, `b`) over a static wall at x = 1,
 /// with the lightmap bake's record written as `assign_channels` gives it.

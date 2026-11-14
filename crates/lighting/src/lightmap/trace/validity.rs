@@ -9,9 +9,9 @@
 
 use glam::Vec3;
 
-use super::super::bake::BakeSettings;
 use super::super::rng::Rng;
 use super::{cosine_sample, Tracer, SURFACE_OFFSET, T_MIN};
+use rusty_scene::lighting::settings::BakeSettings;
 
 /// Probe rays per texel that decide its validity, whatever the bake's samples. 32
 /// removed the same blobs as 64 on `quality_tests`' interior at 64 samples for a

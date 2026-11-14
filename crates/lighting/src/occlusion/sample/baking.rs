@@ -21,8 +21,8 @@ use super::targets::{chunks, target_points, Chunk};
 use crate::lightmap::{Rays, Rng, Tri};
 use crate::occlusion::gather::{Face, Object};
 use crate::occlusion::progress::OcclusionProgress;
+use crate::occlusion::OCCLUSION_SEED;
 use rusty_scene::lighting::occlusion::Grid;
-use rusty_lighting::occlusion::OCCLUSION_SEED;
 
 /// Points sampled in each sampling cube of a cell (its centre first, the rest
 /// seeded in the cube).
@@ -37,7 +37,7 @@ pub(super) type Targets = (Vec3, Vec3, Option<Vec<Chunk>>);
 
 /// The scene ready to sample: the occluders' BVH, each triangle's drawn side and
 /// the planar polygons they make, and per object its bounds and target points.
-pub(in rusty_lighting::occlusion) struct Baking {
+pub(in crate::occlusion) struct Baking {
     pub(super) rays: Rays,
     pub(super) faces: Vec<Face>,
     pub(super) polygons: Polygons,

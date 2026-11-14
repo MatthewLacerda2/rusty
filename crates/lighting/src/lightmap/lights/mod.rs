@@ -15,9 +15,9 @@ mod tests;
 pub use channels::{assign_channels, MaskChannels, MASK_CHANNELS};
 
 use super::input::BakeScene;
-use rusty_scene::Scene;
 use area::AreaShape;
 use rusty_components::{LightMode, LightType};
+use rusty_scene::Scene;
 
 /// Where a baked light sits and how it falls off — the forward shader's models.
 #[derive(Clone, Copy, Debug)]

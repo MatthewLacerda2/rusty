@@ -17,9 +17,9 @@ use glam::{Vec2, Vec3};
 
 use super::enclosure::CAPTURE_CLEARANCE;
 use super::enclosure::{ceiling_over, clearest, cluttered_region, open_to_sky, room_clutter};
-use rusty_scene::lighting::floor::FloorGrid;
 use super::occupancy::Occupancy;
 use super::{ReflectionPlan, MIN_REGION, OPEN_AIR_IMPORTANCE};
+use rusty_scene::lighting::floor::FloorGrid;
 use rusty_scene::ReflectionProbe;
 
 /// How high over the floor a probe captures from: a standing actor's eyes.

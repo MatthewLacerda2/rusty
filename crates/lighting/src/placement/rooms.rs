@@ -21,8 +21,8 @@
 
 use std::collections::VecDeque;
 
-use rusty_scene::lighting::floor::FloorGrid;
 use super::islands::absorb_islands;
+use rusty_scene::lighting::floor::FloorGrid;
 
 /// What counts as a room.
 #[derive(Clone, Copy, Debug, PartialEq)]

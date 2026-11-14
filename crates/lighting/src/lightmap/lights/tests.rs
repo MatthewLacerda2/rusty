@@ -2,10 +2,10 @@
 //! meshes whose emission it holds, which SSIL then leaves out.
 
 use super::taken_lights;
-use rusty_scene::authoring::{default_light, primitive_mesh_component, Primitive};
 use crate::lightmap::BakeScene;
-use rusty_scene::Scene;
 use rusty_components::{LightComponent, LightMode};
+use rusty_scene::authoring::{default_light, primitive_mesh_component, Primitive};
+use rusty_scene::Scene;
 
 fn light(scene: &mut Scene, mode: LightMode, intensity: f32) -> u32 {
     let id = scene.add_entity("Light".to_string());

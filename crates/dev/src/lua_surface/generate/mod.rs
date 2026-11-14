@@ -19,8 +19,8 @@ use super::super::bake::generate_lighting::{
     bake_occlusion_only, generate_lighting, unsaved_materials_warning,
 };
 use super::super::bake::progress::BakeLog;
-use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 use rusty_scene::lighting::settings::ReflectionSettings;
+use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 use rusty_scene::lighting::{DiffuseModel, MixedLightingMode};
 use rusty_scene::Scene;
 use rusty_script::api::{global_table, put, ApiCell, ApiCtx, Reg};

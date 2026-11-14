@@ -17,8 +17,8 @@ use std::time::{Duration, Instant};
 use super::{encode_pages, lend_denoiser, EncodedPages};
 use crate::bake::progress::{BakeLog, MeshClocks, Progress, Step};
 use crate::bake::report::lightmaps::Measured;
-use rusty_scene::lighting::settings::BakeSettings;
 use rusty_lighting::lightmap::{bake_with_progress, BakeProgress, BakeScene};
+use rusty_scene::lighting::settings::BakeSettings;
 
 /// How often the calling thread reads the counters (the log decides what prints).
 const POLL: Duration = Duration::from_millis(200);

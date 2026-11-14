@@ -3,8 +3,8 @@
 //! all the same, so its rays are proved stopped instead of cast. Counted in
 //! rays, not timed (#1883), so it holds on any machine.
 
-use super::bench::town::{town, Make};
-use super::gather_occlusion;
+use crate::occlusion::bench::town::{town, Make};
+use crate::occlusion::gather_occlusion;
 
 /// Rays cast baking `cells` cells spread over `make`'s town, per cell. The town
 /// sits on round coordinates: moved off them, a tessellated wall fuses to the

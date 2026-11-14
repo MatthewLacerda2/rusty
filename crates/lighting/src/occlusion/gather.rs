@@ -7,9 +7,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use glam::{Mat4, Vec3};
 
-use rusty_scene::Scene;
 use rusty_components::mesh::{clip_runs, material_runs, MeshRevision};
 use rusty_components::{MaterialAsset, MeshComponent, RenderFace, RenderMode};
+use rusty_scene::Scene;
 
 /// Which side of an occluder's triangle stops a view: the one its world winding
 /// faces (`Ccw`), the other (`Cw`), or both. A mirrored mesh's front faces wind the

@@ -18,7 +18,7 @@ use super::raster::{
 use super::rays::{Rays, Tri};
 use super::rng::Rng;
 use super::trace::{TexelLight, Tracer};
-use rusty_scene::lighting::settings::{max_map_edge, BakeSettings, Denoiser};
+use rusty_scene::lighting::settings::{max_map_edge, BakeSettings};
 
 mod assemble;
 mod denoise;
@@ -28,8 +28,8 @@ pub(super) mod progressive;
 pub(super) mod view;
 
 use assemble::assemble;
-use denoise::{Chart, Cleaner};
 pub use denoise::LightmapDenoiser;
+use denoise::{Chart, Cleaner};
 pub use progressive::{bake_progressive, Pass, PassSink};
 pub use view::BakeView;
 

@@ -4,10 +4,10 @@
 use glam::Vec3;
 
 use super::assign_channels;
+use rusty_components::{LightComponent, LightMode, LightType};
 use rusty_scene::authoring::default_light;
 use rusty_scene::lighting::MixedLightingMode;
 use rusty_scene::Scene;
-use rusty_components::{LightComponent, LightMode, LightType};
 
 fn shadowmask() -> Scene {
     let mut scene = Scene::new();

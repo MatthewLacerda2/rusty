@@ -5,8 +5,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::gather::{as_occluder, drawn_runs, takes_part};
-use rusty_scene::Scene;
 use rusty_components::MaterialAsset;
+use rusty_scene::Scene;
 
 /// The material keys the baked meshes draw that a fresh load of a scene file
 /// whose library is `saved` reads otherwise as an occluder (`as_occluder`; a key

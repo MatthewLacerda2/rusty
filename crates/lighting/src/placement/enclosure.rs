@@ -17,9 +17,9 @@
 
 use glam::{Vec2, Vec3};
 
-use rusty_scene::lighting::floor::FloorGrid;
 use super::occupancy::Occupancy;
 use rusty_core::collections::Set;
+use rusty_scene::lighting::floor::FloorGrid;
 
 /// How far up a ray looks for a ceiling, world units: past it is sky.
 const SKY_REACH: f32 = 60.0;

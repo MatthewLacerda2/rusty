@@ -4,11 +4,11 @@
 
 use glam::{Vec2, Vec3};
 
-use rusty_scene::lighting::floor::{FloorCell, FloorGrid, MAX_FLOOR_CELLS};
 use super::occupancy::{Occupancy, Solid, CELL};
 use super::room_probes::{plan_rooms, Rooms};
 use super::test_level::{block, grid_of_rooms, plan_static, roof};
 use super::{ReflectionPlacement, EYE_HEIGHT, MIN_REGION};
+use rusty_scene::lighting::floor::{FloorCell, FloorGrid, MAX_FLOOR_CELLS};
 use rusty_scene::Scene;
 
 fn placed(scene: &Scene, region: f32, max_probes: usize) -> usize {

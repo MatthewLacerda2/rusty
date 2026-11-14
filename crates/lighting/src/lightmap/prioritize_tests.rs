@@ -10,6 +10,7 @@ use super::progressive_tests::camera;
 use super::tests::{floor, quad, settings, wall};
 use super::*;
 use rusty_components::ShadowCasting;
+use rusty_scene::lighting::settings::BakeSettings;
 
 #[test]
 fn the_view_converges_before_the_rest() {

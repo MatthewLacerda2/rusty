@@ -102,7 +102,7 @@ fn two_opposed_lamps_weaken_the_share() {
 
 #[test]
 fn the_shaders_ramp_is_the_bakes() {
-    let shader = include_str!("../../../../../engine/shaders/forward/lightmap.wgsl");
+    let shader = include_str!("../../../../engine/shaders/forward/lightmap.wgsl");
     let ramp = format!(
         "const LAMP_RAMP: f32 = {:?};",
         super::bake::direction::LAMP_RAMP

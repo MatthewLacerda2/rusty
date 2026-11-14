@@ -4,8 +4,8 @@
 
 use glam::Vec3;
 
-use super::bake_occlusion;
-use super::test_level::block;
+use crate::occlusion::bake_occlusion;
+use crate::occlusion::test_level::block;
 use rusty_scene::Scene;
 
 /// The window in the wall at z = 0 (0.2 m thick), off any regular spacing.

@@ -7,8 +7,8 @@
 use glam::Vec3;
 use rusty::asset::lightmap_page;
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::{primitive_mesh_component, Primitive};
 use rusty::lighting::lightmap::{colour_page, encode_texels};
+use rusty::scene::authoring::{primitive_mesh_component, Primitive};
 use rusty::scene::lighting::lightmap_set::LightmapEntry;
 use rusty::scene::{Camera, Scene};
 

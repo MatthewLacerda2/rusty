@@ -4,8 +4,9 @@
 
 use std::sync::Arc;
 
-use super::test_level::corridors;
-use super::{bake_occlusion, fingerprint, save_sidecar};
+use crate::occlusion::test_level::corridors;
+use crate::occlusion::{bake_occlusion, fingerprint};
+use rusty_scene::lighting::occlusion::save_sidecar;
 use rusty_scene::{to_scene_data, Scene};
 
 #[test]

@@ -7,6 +7,7 @@ use glam::{Vec2, Vec3};
 use super::raster::{rasterize, world_per_uv};
 use super::tests::quad;
 use super::*;
+use rusty_scene::lighting::settings::BakeSettings;
 
 /// The lightmap edge.
 const S: u32 = 16;

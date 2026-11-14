@@ -11,9 +11,9 @@ use super::super::rng::Rng;
 use super::arrival;
 use super::emitter::{emitters, Emitter, NONE};
 use super::grid::LightGrid;
-use rusty_scene::lighting::DiffuseModel;
 use rusty_components::falloff_window;
 use rusty_core::color::luminance;
+use rusty_scene::lighting::DiffuseModel;
 
 /// One thing a vertex may sample: a lamp by its index in `BakeScene::lights`, or
 /// an emitter by its index in [`Sources::emitters`].

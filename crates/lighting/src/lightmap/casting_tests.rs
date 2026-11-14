@@ -6,8 +6,8 @@ use glam::Vec3;
 
 use super::tests::{floor, mean, settings};
 use super::*;
-use rusty_scene::lighting::sh::Sh9;
 use rusty_components::ShadowCasting;
+use rusty_scene::lighting::sh::Sh9;
 
 /// A 4×4 panel 1 unit over the floor, facing down onto it, glowing `emissive`.
 fn panel(mode: ShadowCasting, emissive: f32) -> BakeMesh {

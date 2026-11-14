@@ -1,8 +1,9 @@
 //! The `<scene>.occlusion` file (#1714): a bake comes back byte for byte, and a
 //! truncated, out-of-range or self-contradicting file is refused whole.
 
-use super::test_level::corridors;
-use super::{bake_occlusion, decode, encode};
+use crate::occlusion::bake_occlusion;
+use crate::occlusion::test_level::corridors;
+use rusty_scene::lighting::occlusion::{decode, encode};
 
 fn bytes() -> Vec<u8> {
     encode(&bake_occlusion(&corridors(), 2).0.expect("occluders"))

@@ -11,7 +11,7 @@ use rusty_test_support::models::quad_mode_gltf;
 fn the_margin_is_measured_at_the_bakes_default_resolution() {
     assert_eq!(
         REFERENCE_TEXELS_PER_UNIT,
-        super::BakeSettings::default().texels_per_unit
+        rusty_scene::lighting::settings::BakeSettings::default().texels_per_unit
     );
 }
 
@@ -54,7 +54,8 @@ fn bake_input(mesh: &SubMesh) -> super::BakeScene {
 
 #[test]
 fn ticking_generate_lightmap_uvs_makes_a_mesh_without_texcoord_1_bake() {
-    use super::{bake, BakeSettings};
+    use super::bake;
+    use rusty_scene::lighting::settings::BakeSettings;
     let settings = BakeSettings {
         samples: 4,
         ..Default::default()

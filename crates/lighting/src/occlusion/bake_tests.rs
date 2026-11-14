@@ -3,8 +3,9 @@
 
 use glam::Vec3;
 
-use super::test_level::{block, corridors};
-use super::{bake_occlusion, encode, fingerprint, OcclusionData};
+use crate::occlusion::test_level::{block, corridors};
+use crate::occlusion::{bake_occlusion, fingerprint};
+use rusty_scene::lighting::occlusion::{encode, OcclusionData};
 use rusty_scene::Scene;
 
 fn baked(scene: &Scene, threads: usize) -> OcclusionData {

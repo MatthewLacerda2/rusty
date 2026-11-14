@@ -4,8 +4,8 @@
 
 use glam::Vec3;
 
-use rusty_scene::Scene;
 use rusty_components::{ColliderComponent, ColliderShape};
+use rusty_scene::Scene;
 
 /// Wall thickness and height, world units.
 pub const WALL: f32 = 0.3;

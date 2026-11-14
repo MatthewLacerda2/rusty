@@ -10,8 +10,8 @@ use glam::Vec3;
 use crate::occlusion::test_level::block;
 
 pub mod authored;
-use rusty_scene::Scene;
 use rusty_components::mesh::{primitives, MeshRevision};
+use rusty_scene::Scene;
 
 const BLOCK: f32 = 10.0;
 const HEIGHT: f32 = 4.0;

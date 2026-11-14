@@ -13,7 +13,10 @@ use image::{ExtendedColorType, ImageEncoder};
 use super::job::Taken;
 use super::preview::{lock, Previews, Shared};
 use super::write::{clear_pages, stems, write_png};
-use rusty_lighting::lightmap::{check_page_count, encode_directions, encode_masks, encode_texels, pack, BakeProgress, Lightmap, Pass, PassSink, MAX_PAGES};
+use rusty_lighting::lightmap::{
+    check_page_count, encode_directions, encode_masks, encode_texels, pack, BakeProgress, Lightmap,
+    Pass, PassSink, MAX_PAGES,
+};
 use rusty_scene::lighting::lightmap_set::{LightmapEntry, LightmapSet};
 
 /// A pass's lightmaps, handed to the encoder.

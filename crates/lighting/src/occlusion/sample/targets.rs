@@ -41,7 +41,7 @@ const INWARD: f32 = 0.01;
 /// One point a ray is aimed at, and the plane of its triangle's drawn side
 /// (normal and offset; `None` when both sides draw).
 #[derive(Clone, Copy, Debug)]
-pub(in rusty_lighting::occlusion) struct Target {
+pub(in crate::occlusion) struct Target {
     pub at: Vec3,
     front: Option<(Vec3, f32)>,
 }
@@ -91,9 +91,7 @@ impl Target {
 
 /// `tris`' target points, `None` when it has more than [`MAX_TARGETS`] or a corner
 /// that is not finite.
-pub(in rusty_lighting::occlusion) fn target_points(
-    tris: &[([Vec3; 3], Face)],
-) -> Option<Vec<Target>> {
+pub(in crate::occlusion) fn target_points(tris: &[([Vec3; 3], Face)]) -> Option<Vec<Target>> {
     if !tris.iter().all(|t| t.0.iter().all(|p| p.is_finite())) {
         return None;
     }

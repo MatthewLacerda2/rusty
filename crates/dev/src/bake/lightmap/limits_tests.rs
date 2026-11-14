@@ -6,10 +6,10 @@ use glam::Vec3;
 
 use super::tests::{quick, scene};
 use super::*;
-use rusty_scene::authoring::{primitive_mesh_component, Primitive};
 use rusty_lighting::lightmap::{bake, check_page_count, Lightmap, MAX_PAGES};
-use rusty_scene::lighting::settings::max_map_edge;
+use rusty_scene::authoring::{primitive_mesh_component, Primitive};
 use rusty_scene::lighting::lightmap_set::LightmapEntry;
+use rusty_scene::lighting::settings::max_map_edge;
 
 /// `n` lightmaps each as large as a 32-texel page holds: one page apiece.
 fn page_fillers(n: usize) -> Vec<Lightmap> {

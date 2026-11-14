@@ -5,6 +5,7 @@
 use glam::{Vec2, Vec3};
 
 use super::*;
+use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 
 /// A one-sided quad with corners `c` (CCW seen from its front) as a receiving mesh.
 pub(super) fn quad(entity: u32, c: [Vec3; 4], albedo: Vec3) -> BakeMesh {

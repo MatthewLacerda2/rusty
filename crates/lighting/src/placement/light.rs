@@ -29,9 +29,9 @@
 
 use glam::{IVec3, Vec2, Vec3};
 
-use rusty_scene::lighting::floor::FloorGrid;
 use super::occupancy::Occupancy;
 use super::VERTICAL_HEADROOM;
+use rusty_scene::lighting::floor::FloorGrid;
 
 /// The lowest a probe sits over its floor, world units: a crouching actor's chest.
 const LOWEST: f32 = 1.0;

@@ -5,9 +5,9 @@
 use glam::Vec3;
 
 use super::gpu_tests::{drawn, offscreen, shot, H, W};
+use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::authoring::rendering::mesh::set_subdivisions;
 use rusty_scene::authoring::{create_entity, material, Primitive};
-use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::{Camera, Scene};
 use rusty_shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};

@@ -89,7 +89,7 @@ fn on() -> bool {
 /// `make()` with sheets made as before #1981, each face filling alone, on this
 /// thread: a test's baseline for what the union may never change.
 #[cfg(all(test, feature = "dev"))]
-pub(in rusty_lighting::occlusion) fn without_union<T>(make: impl FnOnce() -> T) -> T {
+pub(in crate::occlusion) fn without_union<T>(make: impl FnOnce() -> T) -> T {
     OFF.with(|off| off.set(true));
     let out = make();
     OFF.with(|off| off.set(false));

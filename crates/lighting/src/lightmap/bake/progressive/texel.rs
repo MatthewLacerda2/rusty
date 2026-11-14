@@ -3,8 +3,9 @@
 use super::super::super::raster::TexelPoint;
 use super::super::super::rng::Rng;
 use super::super::super::trace::{Paths, Shown, TexelLight, Tracer};
-use super::super::{pool, BakeSettings};
+use super::super::pool;
 use super::schedule::Step;
+use rusty_scene::lighting::settings::BakeSettings;
 
 /// One texel between passes: where it is, its stream, its sums, whether it lies
 /// inside geometry (#1949, decided on its first pass and never traced then), and

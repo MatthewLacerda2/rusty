@@ -42,7 +42,7 @@ mod rects;
 use glam::{Vec3, Vec4};
 
 use super::bake::Lightmap;
-use rusty_scene::lighting::settings::{max_map_edge, page_edge, MAX_PAGE, MIN_PAGE, MIP_LEVELS, PAD};
+use rusty_scene::lighting::settings::{max_map_edge, page_edge, MIN_PAGE, MIP_LEVELS, PAD};
 
 /// The most pages a bake may make (#1704): the layers of one texture array under
 /// `wgpu::Limits::default()`, which the renderer asks its device for
@@ -52,7 +52,6 @@ pub const MAX_PAGES: usize = 256;
 /// The grid cells are aligned to, in texels: a 4×4 BC block of the last mip
 /// level, so no block of any kept level spans two cells.
 pub const GRID: u32 = 4 << (MIP_LEVELS - 1);
-
 
 /// The packed pages and where each lightmap went.
 #[derive(Clone, Debug, PartialEq)]

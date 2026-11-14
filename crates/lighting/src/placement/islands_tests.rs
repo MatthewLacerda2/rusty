@@ -3,8 +3,8 @@
 
 use glam::Vec2;
 
-use rusty_scene::lighting::floor::{FloorCell, FloorGrid};
 use super::super::rooms::{find_rooms, RoomParams};
+use rusty_scene::lighting::floor::{FloorCell, FloorGrid};
 
 /// A 20 × 20 m room at 0.5 m cells, floor 0. Each `(x0, z0, side)` is a box 1 m
 /// high, its top walkable and a 0.5 m agent-radius gap left unwalkable around it,

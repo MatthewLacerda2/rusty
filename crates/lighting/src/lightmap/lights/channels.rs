@@ -19,9 +19,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use glam::Vec3;
 
+use rusty_components::{LightMode, LightType};
 use rusty_scene::lighting::MixedLightingMode;
 use rusty_scene::Scene;
-use rusty_components::{LightMode, LightType};
 
 /// How many lights a texel's mask holds: its four channels.
 pub const MASK_CHANNELS: u8 = 4;

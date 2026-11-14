@@ -4,9 +4,9 @@
 use glam::Vec3;
 
 use super::{static_solids, survey};
-use rusty_scene::authoring::{create_entity, Primitive};
 use rusty_lighting::placement::Occupancy;
 use rusty_lighting::placement::{plan_reflection_probes, ReflectionPlacement, Solid};
+use rusty_scene::authoring::{create_entity, Primitive};
 use rusty_scene::Scene;
 
 /// A 12 × 12 m floor and four walls with colliders, under a ceiling 4 m up that

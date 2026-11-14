@@ -5,11 +5,12 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use super::test_level::corridors;
-use super::{bake_occlusion, fingerprint, save_sidecar, unsaved_materials};
-use rusty_scene::authoring::material::define_asset;
-use rusty_scene::{parse_scene_text, MaterialAsset, MaterialComponent, Scene};
+use crate::occlusion::test_level::corridors;
+use crate::occlusion::{bake_occlusion, fingerprint, unsaved_materials};
 use rusty_components::RenderFace;
+use rusty_scene::authoring::material::define_asset;
+use rusty_scene::lighting::occlusion::save_sidecar;
+use rusty_scene::{parse_scene_text, MaterialAsset, MaterialComponent, Scene};
 
 /// The library of the scene file at `path`.
 fn file_materials(path: &str) -> BTreeMap<String, MaterialAsset> {

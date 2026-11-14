@@ -16,9 +16,9 @@
 
 use glam::Vec2;
 
+use rusty_components::RenderMode;
 use rusty_scene::lighting::floor::FloorGrid;
 use rusty_scene::Scene;
-use rusty_components::RenderMode;
 
 /// The most a liquid's surface may rise across its bounds, world units.
 const FLAT: f32 = 0.05;

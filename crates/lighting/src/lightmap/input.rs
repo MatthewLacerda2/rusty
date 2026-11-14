@@ -7,11 +7,11 @@ use std::cell::RefCell;
 use glam::{Vec2, Vec3};
 
 pub use super::lights::{BakeLight, LightShape};
-use rusty_scene::Scene;
 use rusty_asset::MapRef;
 use rusty_components::mesh::{clip_runs, material_runs};
 use rusty_components::{MaterialAsset, MeshComponent, ShadowCasting};
 use rusty_core::collections::Map;
+use rusty_scene::Scene;
 
 /// One static mesh in world space. Its occluding runs block and bounce light; the
 /// ones with a usable lightmap UV also receive a lightmap, over every drawn run.

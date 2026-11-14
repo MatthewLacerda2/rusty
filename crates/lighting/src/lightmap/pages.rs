@@ -18,10 +18,10 @@
 
 use glam::{Vec3, Vec4};
 
-use super::atlas::MIP_LEVELS;
 use super::encode::{encode_direction, encode_mask};
 use super::raster::Texel;
 use rusty_asset::lightmap_page::{self, encode_bc6h, Page};
+use rusty_scene::lighting::settings::MIP_LEVELS;
 
 /// How many levels an `edge`² page is stored with: [`MIP_LEVELS`], fewer when a
 /// level would not be whole blocks.

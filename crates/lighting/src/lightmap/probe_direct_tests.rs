@@ -6,9 +6,9 @@ use glam::Vec3;
 
 use super::tests::{floor, mean, quad, settings, sun};
 use super::*;
+use rusty_components::falloff;
 use rusty_scene::lighting::sh::Sh9;
 use rusty_scene::lighting::DiffuseModel;
-use rusty_components::falloff;
 
 /// A `Baked` (or `Mixed`) point light 2 units above the origin.
 fn lamp(baked: bool) -> BakeLight {

@@ -6,11 +6,12 @@ use std::sync::Arc;
 
 use glam::Vec3;
 
-use super::test_level::corridors;
-use super::{bake_occlusion, fingerprint, save_sidecar};
-use rusty_scene::authoring::material::define_asset;
-use rusty_scene::{MaterialAsset, MaterialComponent, MeshRevision, Scene};
+use crate::occlusion::test_level::corridors;
+use crate::occlusion::{bake_occlusion, fingerprint};
 use rusty_components::{RenderFace, RenderMode};
+use rusty_scene::authoring::material::define_asset;
+use rusty_scene::lighting::occlusion::save_sidecar;
+use rusty_scene::{MaterialAsset, MaterialComponent, MeshRevision, Scene};
 
 /// The case from the game: every static mesh draws with `"wood"`, which the
 /// scene file's library lacks (the game's script defines it). A headless run

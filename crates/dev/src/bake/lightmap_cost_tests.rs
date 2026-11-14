@@ -12,8 +12,8 @@ use std::time::Instant;
 use glam::Vec3;
 
 use rusty_lighting::lightmap::{trace_texels, AreaShape, BakeLight, BakeScene, LightShape};
-use rusty_scene::lighting::settings::BakeSettings;
 use rusty_lighting::occlusion::bench::level::rooms;
+use rusty_scene::lighting::settings::BakeSettings;
 
 /// The `n × n`-rooms bench level as the bake sees it, with its lamps.
 pub(in crate::bake) fn lit_level(n: usize) -> BakeScene {

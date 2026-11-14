@@ -112,13 +112,7 @@ impl Rays {
 
     /// The nearest triangle it can see along `origin + t * dir` with `t` in
     /// `[t_min, t_max)`.
-    pub(crate) fn closest(
-        &self,
-        origin: Vec3,
-        dir: Vec3,
-        t_min: f32,
-        t_max: f32,
-    ) -> Option<Hit> {
+    pub(crate) fn closest(&self, origin: Vec3, dir: Vec3, t_min: f32, t_max: f32) -> Option<Hit> {
         self.count();
         let mesh = self.mesh.as_ref()?;
         let ray = Ray::new(origin + dir * t_min, dir);

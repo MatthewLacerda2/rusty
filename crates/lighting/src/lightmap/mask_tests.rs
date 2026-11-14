@@ -7,6 +7,7 @@ use glam::{Vec3, Vec4};
 use super::bake::bake_on;
 use super::tests::{floor, quad, settings};
 use super::*;
+use rusty_scene::lighting::settings::BakeSettings;
 
 /// The floor and, 1 unit over its `x < 0` half, a panel facing down onto it.
 fn half_covered(lights: Vec<BakeLight>) -> BakeScene {

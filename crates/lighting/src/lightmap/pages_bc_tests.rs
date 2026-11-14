@@ -6,10 +6,11 @@
 
 use glam::Vec3;
 
-use super::atlas::{pack, GRID, MAX_PAGE};
+use super::atlas::{pack, GRID};
 use super::bake::Lightmap;
 use super::pages::colour_page;
 use rusty_asset::lightmap_page::decode_bc6h;
+use rusty_scene::lighting::settings::MAX_PAGE;
 
 fn map(entity: u32, size: u32, light: Vec3) -> Lightmap {
     Lightmap {

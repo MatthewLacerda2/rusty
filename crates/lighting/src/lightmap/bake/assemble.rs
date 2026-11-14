@@ -7,7 +7,7 @@ use super::super::raster::{dilate, fill_rest, fill_within};
 use super::super::trace::TexelLight;
 use super::denoise::{Chart, Cleaner};
 use super::direction::direction_texel;
-use super::BakeSettings;
+use rusty_scene::lighting::settings::BakeSettings;
 
 /// Rings of empty texels dilation fills around each chart.
 const DILATE_PASSES: u32 = 3;

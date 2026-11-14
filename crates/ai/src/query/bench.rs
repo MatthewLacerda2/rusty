@@ -8,9 +8,9 @@ use glam::{Vec2, Vec3};
 
 use super::{run, Anchor, Filter, Generator, Measure, QuerySpec, QueryWorld, Test};
 use rusty_components::ColliderShape;
+use rusty_lighting::occlusion::bench::level::rooms;
 use rusty_navigation::NavigationGraph;
 use rusty_physics::PhysicsWorld;
-use rusty_lighting::occlusion::bench::level::rooms;
 use rusty_scene::{Camera, ColliderComponent, Scene};
 
 /// The bench level with a box collider on every block, baked at `cell` metres.

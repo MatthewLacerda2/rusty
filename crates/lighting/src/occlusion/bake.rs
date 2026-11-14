@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use super::gather::{Fingerprints, Object};
 use super::progress::OcclusionProgress;
 use super::sample::Baking;
-use super::{BakedObject, Grid, OcclusionData};
+use rusty_scene::lighting::occlusion::{BakedObject, Grid, OcclusionData};
 use rusty_scene::Scene;
 
 /// The bake's seed: one fixed stream, so a re-bake of an unchanged scene writes
@@ -145,7 +145,7 @@ impl OcclusionInput {
             cells: grid.cell_count(),
             cell_size: grid.cell,
             rows: data.row_count(),
-            bytes: super::encode(&data).len(),
+            bytes: rusty_scene::lighting::occlusion::encode(&data).len(),
             ..report
         };
         Some((Some(data), report))

@@ -90,7 +90,7 @@ impl BakeProgress {
     }
 
     /// This progress, also lending the bake `denoiser` for its
-    /// [`Denoiser::Oidn`](super::Denoiser::Oidn) charts (#1884). Without one they
+    /// [`Denoiser::Oidn`](rusty_scene::lighting::settings::Denoiser::Oidn) charts (#1884). Without one they
     /// are filtered.
     pub fn with_denoiser(self, denoiser: Arc<dyn LightmapDenoiser>) -> Self {
         Self {

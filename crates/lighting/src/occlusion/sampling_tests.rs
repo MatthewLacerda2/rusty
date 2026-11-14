@@ -5,11 +5,12 @@
 
 use glam::Vec3;
 
-use super::test_gap::gap;
-use super::test_level::{block, corridors};
-use super::{bake_occlusion, culls_from, fingerprint, MAX_CULLING_NEAR};
+use crate::occlusion::test_gap::gap;
+use crate::occlusion::test_level::{block, corridors};
+use crate::occlusion::{bake_occlusion, fingerprint};
 use rusty_components::mesh::MeshRevision;
 use rusty_components::{MaterialComponent, Projection};
+use rusty_scene::lighting::occlusion::{culls_from, MAX_CULLING_NEAR};
 
 /// Where [`gap`]'s doors stand along the wall, off any regular spacing (a door
 /// at the wall's centre meets a lattice point whatever the spacing).

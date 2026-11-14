@@ -110,8 +110,9 @@ impl AmbientRadiance {
 
     /// What a bake from [`Self::incoming`] gives a surface facing `n`: [`Self::at`]
     /// up to the L2 cut (exactly `at` for the hemisphere), the reference the
-    /// invariant tests hold the trace and the probe fill to.
-    #[cfg(test)]
+    /// invariant tests hold the trace and the probe fill to. A test hook: the
+    /// lightmapper's tests (`rusty-lighting`) hold its trace to it.
+    #[doc(hidden)]
     pub fn at_l2(&self, n: Vec3) -> Vec3 {
         if let Self::Sky(sh) = self {
             return sh.convolved_over_pi().eval_radiance(n);

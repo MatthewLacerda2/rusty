@@ -11,8 +11,8 @@ use glam::Vec3;
 
 use super::test_level::plan_static;
 use super::{plan_light_probes, static_scene_aabb, ReflectionPlacement, EYE_HEIGHT};
-use rusty_scene::Scene;
 use rusty_components::{ColliderComponent, ColliderShape};
+use rusty_scene::Scene;
 
 /// Add a static box entity with a box collider of `size`, centred at `pos`.
 fn add_static_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3) {

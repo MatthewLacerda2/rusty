@@ -5,9 +5,10 @@ use glam::{Vec2, Vec3};
 
 use super::tests::{floor, mean, settings};
 use super::*;
-use rusty_scene::authoring::{primitive_mesh_component, Primitive};
-use rusty_scene::Scene;
 use rusty_components::{LightComponent, LightMode, MeshComponent, ShadowCasting};
+use rusty_scene::authoring::{primitive_mesh_component, Primitive};
+use rusty_scene::lighting::settings::BakeSettings;
+use rusty_scene::Scene;
 
 #[test]
 fn an_open_floor_bakes_to_the_sky_gradient() {

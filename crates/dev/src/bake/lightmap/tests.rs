@@ -4,8 +4,8 @@
 use std::path::Path;
 
 use super::*;
-use rusty_scene::authoring::{primitive_mesh_component, Primitive};
 use rusty_lighting::lightmap::bake;
+use rusty_scene::authoring::{primitive_mesh_component, Primitive};
 
 /// A scene with a static floor Plane, a static Sphere stripped of its lightmap UV (an
 /// imported mesh without `TEXCOORD_1`) and a dynamic Box; returns it with the floor's

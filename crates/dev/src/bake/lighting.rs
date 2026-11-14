@@ -32,10 +32,10 @@ use super::progress::{stage_progress, BakeLog};
 use super::steps::LightingBake;
 use glam::Vec3;
 
-use rusty_navigation::NavigationGraph;
-use rusty_physics::collider_world_triangles;
 use rusty_lighting::lightmap::{BakeMesh, BakeScene};
 use rusty_lighting::placement::{self, ReflectionPlacement, Site, Solid};
+use rusty_navigation::NavigationGraph;
+use rusty_physics::collider_world_triangles;
 use rusty_scene::lighting::probe::ProbeVolume;
 use rusty_scene::{ReflectionProbeSet, Scene};
 

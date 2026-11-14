@@ -7,8 +7,8 @@
 use glam::Vec3;
 
 use crate::occlusion::test_level::block;
-use rusty_scene::Scene;
 use rusty_components::mesh::{primitives, MeshRevision};
+use rusty_scene::Scene;
 
 const ROOM: f32 = 10.0;
 const STOREY: f32 = 4.0;

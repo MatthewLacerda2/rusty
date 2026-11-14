@@ -8,6 +8,7 @@
 use glam::Vec3;
 
 use super::*;
+use rusty_scene::lighting::settings::MAX_PAGE;
 
 /// A `size`² lightmap for `entity`, every texel `value`.
 fn map(entity: u32, size: u32, value: f32) -> Lightmap {

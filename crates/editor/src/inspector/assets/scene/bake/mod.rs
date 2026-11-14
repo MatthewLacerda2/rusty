@@ -43,8 +43,8 @@ use rusty_dev::bake::lighting::LightingBakeReport;
 use rusty_dev::bake::lightmap::LightmapBakeJob;
 use rusty_dev::bake::occlusion::OcclusionBakeJob;
 use rusty_dev::bake::steps::LightingBake;
-use rusty_scene::lighting::bake_status::{BakeProgress, BakeStatus};
 use rusty_lighting::lightmap::BakeView;
+use rusty_scene::lighting::bake_status::{BakeProgress, BakeStatus};
 use rusty_scene::{Scene, SceneId};
 use rusty_script::scripting::ConsoleLogs;
 
