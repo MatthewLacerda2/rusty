@@ -53,7 +53,7 @@ impl BounceSolve {
 
     /// A solve of `volume`'s probes, a set the scene does not hold yet: the probe
     /// set a placement plans, applied once its bake finishes (#1737). Bake it with
-    /// [`step`](Self::step) and read the result with [`baked`](Self::baked);
+    /// [`step`](Self::step) and read the result with `baked` (a `dev` build's);
     /// [`changed`](Self::changed) and [`commit`](Self::commit) compare against
     /// the scene's own set, so they are for a solve made by [`new`](Self::new).
     pub fn of(volume: ProbeVolume, resolution: u32) -> Self {

@@ -15,7 +15,7 @@
 //! Integration tests (`tests/*.rs`) do not use this: they reach the renderer through
 //! the dev layer (`screenshot::capture`, `Debug.Preview`, the probe bakes), which owns
 //! its own skip handling (`dev::capture::no_adapter`, failing under the same variable,
-//! #885). The budget in [`super::setup::budget`] covers both, because
+//! #885). The budget in `setup::budget` covers both, because
 //! it sits inside the constructor rather than in this helper.
 
 use crate::Renderer;
