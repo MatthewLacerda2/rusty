@@ -458,36 +458,43 @@ with a feature only the second has is the split. By hand:
     cargo tree -e normal,build --features dev -f '{p} [{f}]' --prefix none | sort -u
     cargo tree -e normal,build,dev --features dev -f '{p} [{f}]' --prefix none | sort -u
 
-## Incremental rebuilds: one codegen unit per module
+## Incremental rebuilds: the codegen-unit cap
 rustc compiles a crate in codegen units (CGUs), roughly two per module. The default
-dev cap is 256. Above the cap, rustc merges units by size. An edit that changes one
-function's size then reshuffles the merge, and dozens of unrelated units recompile.
-A crate past the cap should get a `[profile.dev.package.<crate>]` row in
-`Cargo.toml` raising it (`codegen-units = 4096`), so no merging happens (#574). The
-CGU count is the number of `.o` files in the newest session dir under
-`target/debug/incremental/<crate>-*`. The row was the root crate's while every
-module lived inside it, about 1600 units in all. **No member has one yet**, though
-most sit at the cap of 256: #2175 settles the shape (a row per member at the cap,
-or a gate failing a capped member without its row) and re-measures. Until then an
-edit in a capped member pays the merge reshuffle measured below.
+dev cap is 256. Above the cap, rustc merges units by size, so an edit that changes one
+function's size reshuffles the merge and a large share of the crate's units
+recompile. Most members sit at the cap (`render` would split into about 890 units,
+`scene` into about 1050). The CGU count is the number of `.o` files in the newest
+session dir under `target/debug/incremental/<crate>-*`; the units an edit recompiled
+are the ones whose inode is new in that dir.
 
-The measurement below was taken then, when the editor, physics and every other module
-were one crate, `rusty`:
+**Raising a member's cap does not pay** (`[profile.dev.package.<crate>] codegen-units = 4096`),
+because the row helps only while its own crate is edited. A raised crate recompiles 6-7
+units instead of a hundred or more, but every time something *below* it changes it is
+rebuilt as a dependent, and that rebuild costs more with four times the units. In a
+workspace each edit rebuilds the crates above it, so the gain in one crate is spent in
+the others: raising every member is a wash, and so is raising only the members more
+crates depend on than they depend on (eleven of them, `scene` among them).
 
-Measured on a 4-core cloud machine with a warm `target/`, `cargo build --features dev`,
-alternating edits in the physics and editor modules, 8-12 samples each (medians,
-ranges in brackets):
+Measured on a 4-core cloud machine with a warm `target/`, alternating a line that
+changes the size of `scene::lighting::probe::index::scan` (6-8 samples each, medians,
+ranges in brackets). "scene" is `rusty-scene`'s own compile from `--timings`:
 
-| Edit | Cap | CGUs recompiled | rusty codegen | build wall | then `test --no-run` |
-|---|---|---|---|---|---|
-| a constant's value | 256 | 2 | 0.94 s | 6.2 s | 6.4 s |
-| a constant's value | 4096 | 2-3 | 1.32 s | 6.7 s | n/a |
-| a function's size | 256 | 4-99 | 2.30 s [1.1-3.2] | 8.0 s [6.5-9.1] | 8.9 s [7.1-9.8] |
-| a function's size | 4096 | 2-3 | 1.28 s [1.2-1.9] | 6.7 s [6.3-8.4] | 6.6 s [6.4-7.9] |
+| Cap | CGUs recompiled | scene | `build --features dev` | `nextest run --features dev --no-run` |
+|---|---|---|---|---|
+| 256 everywhere (today) | 129 of 256 (165 in its test target) | 6.2 s, 8.0 s in the test build | 13.9 s [13.1-15.1] | 32.4 s [31.4-34.6] |
+| 4096 on every member | 6-7 | 3.5 s, 4.0 s | 14.5 s [13.4-15.3] | 33.2 s [32.1-34.4] |
+| 4096 on the 11 members with more crates above than below | 6-7 | 4.2 s | n/a | 31.8 s [29.7-33.1] |
+| 4096 on `scene` only | 6-7 | 3.8 s | n/a | 28.9 s [27.4-29.3] |
 
-The cost is about 0.4 s on an edit that only changes a value, and about 2 s on a
-from-scratch rusty build. Most edits change code, and there the cap saves 1-2 s per
-build and 3 s from edit to test binaries ready.
+An edit in `render::camera::texture_cameras` reads the same: 160 of 256 units and
+3.6 s at the cap, 6-7 units and 2.5 s raised, and `cargo build` 9.5 s against 10.2 s,
+the binaries' links eating the difference.
+
+So the row pays only for a long stretch of work inside one crate, where it saves about
+3.5 s of a 32 s edit-to-test-binaries loop. Set it for that session from the command
+line, not in `Cargo.toml`:
+`cargo nextest run --features dev --config 'profile.dev.package.rusty-scene.codegen-units=4096'`
+(the first build after switching it rebuilds that crate and those above it).
 
 The 13-19 s codegen spikes #495 measured did not reproduce, either with a build-only
 loop or with #495's own edit-build-test-revert loop. They also cannot be CGU
