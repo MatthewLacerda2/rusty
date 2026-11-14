@@ -3303,6 +3303,7 @@ dependencies = [
  "rusty-logging",
  "rusty-navigation",
  "rusty-physics",
+ "rusty-preview",
  "rusty-procgen",
  "rusty-render",
  "rusty-scene",
@@ -3474,6 +3475,18 @@ dependencies = [
  "rusty-test-support",
  "rusty-time",
  "serde_json",
+]
+
+[[package]]
+name = "rusty-preview"
+version = "0.1.0"
+dependencies = [
+ "glam 0.33.12",
+ "rusty-asset",
+ "rusty-components",
+ "rusty-core",
+ "rusty-scene",
+ "rusty-test-support",
 ]
 
 [[package]]

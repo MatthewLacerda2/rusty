@@ -148,6 +148,7 @@ rusty-ai = { path = "crates/ai" }
 rusty-render = { path = "crates/render" }
 rusty-script = { path = "crates/script" }
 rusty-logging = { path = "crates/logging" }
+rusty-preview = { path = "crates/preview" }
 rusty-app = { path = "crates/app" }
 rusty-test-support = { path = "crates/test-support" }
 
@@ -271,6 +272,7 @@ proptest = { version = "1", default-features = false, features = ["std"] }
 [dependencies]
 # The moved modules (crates/), re-exported in src/lib.rs under their old names.
 rusty-logging = { workspace = true }
+rusty-preview = { workspace = true }
 rusty-render = { workspace = true }
 rusty-app = { workspace = true }
 rusty-script = { workspace = true }

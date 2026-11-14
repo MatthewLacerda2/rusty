@@ -1036,7 +1036,11 @@ readying it, and reads the answer; the weekly sweep re-examines everything else 
 tracks the survivor backlog. An on-request run goes red only when it has no honest
 answer (a path with nothing to mutate, a baseline that does not build); survivors
 are a result. A run stopped at its budget says how many planned mutants it never
-reached.
+reached and is never called clean, however its measured mutants fared; a mutant that
+timed out is unmeasured too: the report never calls a run with a timeout clean, and
+says a run where most viable mutants timed out is not a result. In the sweep, a shard
+whose mutants mostly timed out is not finished (`mutants-shards.py unfinished`), so
+that sweep does not mark its commit covered.
 
 **The mutation jobs run under nextest** (`cargo mutants --test-tool nextest`, #1844),
 the gate's runner, with `--fail-fast` so a caught mutant stops at its first failing
@@ -1053,13 +1057,33 @@ doctest would catch survives. The runs pass `--test-threads 2`: the jobs' `ulimi
 cap (#674) is per process, so it times the test processes running at once stays within
 the runner's memory (`test_gpu_config.py` holds the product).
 
+**The jobs run their own baseline** (`--baseline skip`, #2164). cargo-mutants builds
+and tests its baseline with `--package` set to the mutated packages only, whatever
+`test_workspace` says, while every mutant tests the whole workspace: a moved crate's
+baseline timed only that crate's tests, so every mutant overran its timeout and a
+member with no `dev` feature failed the baseline outright. So each job's `Baseline`
+step runs what a mutant runs (the workspace build, then its tests, timed), and the
+mutants' test timeout is 3× that time (at least 60 s). `--features dev` goes to
+cargo-mutants itself, not after `--`, where it reached only the test phase, which then
+recompiled the workspace inside the timeout. `--in-place` mutates the job's checkout,
+so the mutants reuse the build the baseline made. `.github/scripts/tests/mutants/test_baseline.py`
+(`make scripts`) holds both workflows' baseline commands to their mutants' arguments
+(the CLI's and `.cargo/mutants.toml`'s), the mutants' `--timeout` to the `Baseline`
+step's output, and the baseline to the mutants' `ulimit -v`.
+
 Prefer `make mutants-remote` (every mutant rebuilds the crate, which is hours of
-contention on a machine building sibling worktrees). Locally, the same question:
+contention on a machine building sibling worktrees). Locally, the same question: time
+the workspace's tests once (built first, so the time is the tests', not the build), then
+pass three times that as the timeout:
 ```
 git diff origin/main > branch.diff
-cargo mutants --test-tool nextest --in-diff branch.diff -- --features dev --fail-fast --test-threads 2   # what the branch changed
-cargo mutants --test-tool nextest --no-shuffle --timeout-multiplier 3 -- --features dev --fail-fast --test-threads 2   # full sweep
+cargo nextest run --no-run --workspace --features=dev   # build first, untimed
+cargo nextest run --workspace --features=dev --fail-fast --test-threads 2   # the baseline: note its time
+cargo mutants --workspace --test-tool nextest --baseline skip --timeout <3x secs> --features dev \
+  --in-diff branch.diff -- --fail-fast --test-threads 2   # what the branch changed
 ```
+(`--file '<glob>'` in place of `--in-diff` mutates named files; the jobs' `--in-place`
+is left out here, so your worktree is never mutated.)
 
 ## Fuzzing (local-first)
 The scene-load path is a parser eating untrusted input (hand-edited or corrupt

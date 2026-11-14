@@ -1,4 +1,4 @@
-//! src/preview/orbit.rs — the preview camera rig (#352).
+//! crates/preview/src/orbit.rs — the preview camera rig (#352).
 //!
 //! Pure math + state: no egui, no GPU types, so it's unit-testable without a window
 //! and usable from the headless capture. The Inspector tab feeds it pointer deltas
@@ -12,8 +12,8 @@
 
 use glam::Vec3;
 
-use crate::scene::camera::MAX_PITCH;
-use crate::scene::Camera;
+use rusty_scene::camera::MAX_PITCH;
+use rusty_scene::Camera;
 
 /// Degrees per point of horizontal/vertical drag.
 const DRAG_SENSITIVITY: f32 = 0.4;
@@ -22,7 +22,7 @@ const ZOOM_SENSITIVITY: f32 = 0.01;
 const MIN_DISTANCE: f32 = 0.5;
 const MAX_DISTANCE: f32 = 20.0;
 
-/// Orbit-camera state for the preview scene, persisted on [`crate::editor::EditorUi`]
+/// Orbit-camera state for the preview scene, persisted on the editor's `EditorUi`
 /// across frames so drag/zoom accumulate. Always orbits the world origin — the
 /// preview mesh is always placed there (see [`super::scene::build_preview_scene`]).
 #[derive(Clone, Copy, Debug)]

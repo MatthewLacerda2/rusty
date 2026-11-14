@@ -3,7 +3,9 @@
 # (crates/CLAUDE.md), and the tests that would catch a mutant in a moved crate are
 # mostly the root package's, so every mutant runs the whole workspace's tests, as it
 # did when the engine was one crate. The workflows pass `--workspace` so mutants are
-# drawn from every member, not only the root package.
+# drawn from every member, not only the root package. cargo-mutants' own baseline
+# ignores this and tests only the mutated packages, so the workflows run their own
+# (`--baseline skip`; docs/testing.md, *Mutation testing*).
 test_workspace = true
 
 # Test fixture compiled as normal code, so other crates' tests can reach it: a mutant

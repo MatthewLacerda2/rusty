@@ -280,17 +280,38 @@ jobs:
         uses: ./.github/actions/install-tool
         with:
           tool: cargo-mutants,cargo-nextest
+      # What every mutant runs, unmutated: the same build, then the same tests,
+      # timed (`mutants-on-request.yml`'s *Baseline* says why it is not
+      # cargo-mutants'). A failed baseline records `baseline` as the shard's
+      # exit code, so the report names it among the unfinished shards.
+      - name: Baseline
+        id: baseline
+        run: |
+          set -euo pipefail
+          ulimit -v 8388608
+          fail() { mkdir -p mutants.out; echo baseline > mutants.out/exit-code; exit 1; }
+          cargo nextest run --no-run --verbose --workspace --features=dev || fail
+          start=$(date +%s)
+          cargo nextest run --verbose --workspace --features=dev --fail-fast --test-threads 2 || fail
+          secs=$(( $(date +%s) - start ))
+          timeout=$(( secs * 3 > 60 ? secs * 3 : 60 ))
+          echo "Baseline: the workspace's tests in ${secs}s, so each mutant's test timeout is ${timeout}s." | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "timeout=$timeout" >> "$GITHUB_OUTPUT"
       - name: Mutation test (one shard of the full deterministic sim, report-only)
-        # Build/test with the dev feature so the headless-harness sim tests run
-        # too, under nextest, the gate's runner (#1844: a process per test and
-        # the `gpu` group, as the gates run the unit and integration tests;
-        # nextest runs no doctests, so those are left out here; plain
+        # Build and test with the dev feature (cargo-mutants' own `--features`,
+        # so the build phase has it too, not only the tests after `--`) so the
+        # headless-harness sim tests run too, under nextest, the gate's runner
+        # (#1844: a process per test and the `gpu` group, as the gates run the
+        # unit and integration tests; nextest runs no doctests, so those are left out here; plain
         # `cargo test` broke it four times, #1042, #1069, #1337, #1844), with
         # `--fail-fast` so a caught mutant stops at its first failing test.
-        # Scoped by --file to the sim modules; the timeout multiplier guards
-        # against mutants that induce infinite loops. The exit code is recorded
-        # so `mutants-report` can tell a finished shard (0 clean, 2 survivors,
-        # 3 timeouts) from one stopped at its budget (124/137: what it measured
+        # Scoped by --file to the sim modules. The baseline is the step above's,
+        # not cargo-mutants' (`--baseline skip`, `mutants-on-request.yml` says
+        # why), and its timeout (3x the baseline's test time) guards against
+        # mutants that induce infinite loops. `--in-place` mutates the checkout
+        # the baseline built, so the first mutant does not rebuild it in a copy.
+        # The exit code is recorded so `mutants-report` can tell a finished
+        # shard (0 clean, 2 survivors, 3 timeouts) from one stopped at its budget (124/137: what it measured
         # is kept, the rest is unmeasured) or one that never got past its
         # baseline. SIGINT, not `timeout`'s default TERM: it is cargo-mutants'
         # Ctrl-C, which it stops on cleanly, and the per-outcome lists it has
@@ -312,6 +333,8 @@ jobs:
         # threads at the runner's 16 GB; the `gpu` group already allows only
         # 2 renderers at once, so it costs only CPU-bound tests' overlap.
         # `test_gpu_config.py` (`make scripts`) holds the product.
+        env:
+          TIMEOUT: ${{ steps.baseline.outputs.timeout }}
         run: |
           budget=$(( BUDGET_SECONDS - ($(date +%s) - JOB_STARTED) ))
           ulimit -v 8388608
@@ -320,10 +343,11 @@ jobs:
           for glob in $SWEEP_FILES; do files+=(--file "$glob"); done
           rc=0
           timeout --signal=INT --kill-after=60s "${budget}s" \
-            cargo mutants --workspace --test-tool nextest --no-shuffle --timeout-multiplier 3 \
+            cargo mutants --workspace --test-tool nextest --no-shuffle --baseline skip --in-place \
+              --timeout "$TIMEOUT" --features dev \
               --shard '${{ matrix.shard }}/${{ strategy.job-total }}' --sharding round-robin \
               "${files[@]}" \
-              -- --features dev --fail-fast --test-threads 2 || rc=$?
+              -- --fail-fast --test-threads 2 || rc=$?
           mkdir -p mutants.out
           echo "$rc" > mutants.out/exit-code
           # Setup included, as the budget counts it: what the next sweep's
@@ -363,7 +387,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v7   # for mutants-shards.py's rate
+      - uses: actions/checkout@v7   # for mutants-shards.py's rate and shard verdicts
       - name: Download every shard's report
         uses: actions/download-artifact@v8
         with:
@@ -389,15 +413,9 @@ jobs:
             cat shards/*/"$kind".txt 2>/dev/null | sort > "mutants.out/$kind.txt" || true
           done
           total=$(cat shards/*/shard-total 2>/dev/null | head -n1 || true)
-          unfinished=''
-          for k in $(seq 0 $(( ${total:-0} - 1 ))); do
-            rc=$(cat "shards/mutants-shard-$k/exit-code" 2>/dev/null || echo none)
-            case "$rc" in
-              0|2|3) ;;
-              124|137) unfinished="$unfinished $k(budget)" ;;
-              *) unfinished="$unfinished $k(exit:$rc)" ;;
-            esac
-          done
+          # Each shard's verdict (`mutants-shards.py`, `unfinished`): stopped at
+          # its budget, broken, lost, or mostly timed out (#2164) is not finished.
+          unfinished=$(python3 .github/scripts/mutants-shards.py unfinished --shards shards --total "${total:-0}")
           count() { grep -c . "mutants.out/$1.txt" || true; }
           measured=$(cat mutants.out/{caught,missed,timeout,unviable}.txt | grep -c . || true)
           {
@@ -414,7 +432,7 @@ jobs:
             if [ -z "$total" ]; then
               echo '> ❌ No shard uploaded a report — nothing was measured.'
             elif [ -n "$unfinished" ]; then
-              echo "> ⚠️ Shards that did not finish (of $total):$unfinished — their remaining mutants are unmeasured, not clean. \`budget\` means the shard stopped itself before the 6 h ceiling: the matrix was sized too small for its slowest shard; the next sweep sizes from the rate above. \`exit:none\` means it was cut off or failed before its run: check its log for a lost runner (\`received a shutdown signal\`, a one-off unless it recurs)."
+              echo "> ⚠️ Shards that did not finish (of $total):$unfinished — their remaining mutants are unmeasured, not clean. \`budget\` means the shard stopped itself before the 6 h ceiling: the matrix was sized too small for its slowest shard; the next sweep sizes from the rate above. \`exit:baseline\` means its unmutated suite failed: \`main\`'s tests are broken (or flaky) on this commit, so no mutant was measured. \`timeouts:t/v\` means most of its viable mutants timed out: the run measured the tool breaking, not the code; read its log. \`exit:none\` means it was cut off or failed before its run: check its log for a lost runner (\`received a shutdown signal\`, a one-off unless it recurs)."
             else
               echo "> All $total shards finished."
               # The marker `mutants-plan` looks for (#506): this commit is covered.
