@@ -9,7 +9,7 @@
 //! 1. `package.preload`, Lua's own first searcher;
 //! 2. the project's scripts folder: `<workspace>/assets/scripts/ui/range_axis.lua`,
 //!    then `…/ui/range_axis/init.lua`;
-//! 3. the engine's bundled scripts (`scene::io::bundled`), so a widget's helper is
+//! 3. the engine's bundled scripts (`scene::edit_side::io::bundled`), so a widget's helper is
 //!    found even where the project holds no copy;
 //! 4. `package.path`, Lua's stock search, which a game may extend.
 //!

@@ -9,7 +9,7 @@
 //! is also what the headless harness loads.
 //!
 //! Principle: scenes store REFERENCES (primitive name, asset path) + values, never
-//! baked GPU buffers — those are rehydrated on load (see serialize.rs).
+//! baked GPU buffers — those are rehydrated on load (see rehydrate).
 //!
 //! Submodules:
 //!   scene     — the `Scene` aggregate (the `ecs::World` + scene-level state)

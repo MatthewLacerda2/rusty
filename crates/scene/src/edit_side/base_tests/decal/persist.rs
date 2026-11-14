@@ -1,4 +1,4 @@
-//! Decals across a scene load (#1518): which ones `Scene::swap_in` carries, onto
+//! Decals across a scene load (#1518): which ones `edit_side::load::swap_in` carries, onto
 //! what, and with what kept.
 
 use glam::Vec3;

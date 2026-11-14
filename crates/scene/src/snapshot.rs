@@ -8,7 +8,7 @@
 //! So Save never persists played state. Mirrors Unity's play-mode behaviour.
 //!
 //! Implemented as a `SceneData` snapshot taken on the play-state transition and
-//! applied back via `serialize::apply_world_data` on Stop, plus what the scene
+//! applied back via `edit_side::serialize::apply_world_data` on Stop, plus what the scene
 //! state inventory (`scene::state`, #1649) says Stop puts back and the document
 //! does not carry: the probes' baked SH, the edit-mode decals, the saved navmesh, the scene's
 //! identity and its disk records. Play's own requests (queued destroys and loads,

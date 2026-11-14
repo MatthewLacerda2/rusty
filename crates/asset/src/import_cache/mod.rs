@@ -3,7 +3,7 @@
 //!
 //! A scene load re-imports every `"Asset"` mesh from its path-based reference
 //! (#74), and so do a prefab stamp, a propagation, `Scene.Instantiate` and the
-//! edit-mode follower of re-written models (`scene::rehydrate::reimport_written`).
+//! edit-mode follower of re-written models (`scene::edit_side::rehydrate::reimport_written`).
 //! Without a cache a level glb with 40 instanced sub-objects was parsed 40 times
 //! per load, and with Generate Lightmap UVs ticked (#831) each parse unwrapped it
 //! again. [`imported`] keeps the last import of each file and hands it back, as

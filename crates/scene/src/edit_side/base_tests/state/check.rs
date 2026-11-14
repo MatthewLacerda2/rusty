@@ -1,5 +1,5 @@
 //! The inventory's gates as plain functions (#1649), so each has a case it must
-//! flag and a case it must pass (`names_tests`), apart from the scenes the
+//! flag and a case it must pass (`names`), apart from the scenes the
 //! lifecycle tests build.
 
 use crate::state::{promise, Class, Keyed, Lifecycle, Outcome};

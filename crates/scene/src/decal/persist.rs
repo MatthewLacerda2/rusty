@@ -1,4 +1,4 @@
-//! Decals across a scene load (#1518): `Scene::swap_in` takes the persistent ones
+//! Decals across a scene load (#1518): `edit_side::load::swap_in` takes the persistent ones
 //! out before the outgoing World goes and lands them in the incoming one.
 //!
 //! An owned decal whose owner survives (`DontDestroyOnLoad`) keeps that owner, ids

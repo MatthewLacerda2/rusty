@@ -1,6 +1,6 @@
 //! The lifecycles the inventory is checked against, as runners (#1649): each sets
 //! one mark on the base scene, runs its lifecycle, and reads what came back as an
-//! [`Outcome`] for `lifecycle_tests` to hold to the mark's class.
+//! [`Outcome`] for `lifecycle` to hold to the mark's class.
 //!
 //! A runner proves its lifecycle ran: a save that fails, or an Undo that undid
 //! nothing, panics instead of passing for an outcome, unless the mark is one
@@ -123,7 +123,7 @@ fn load(mark: &Mark) -> Outcome {
     seen((mark.is_set)(&scene, base), Outcome::Left)
 }
 
-/// A Play-mode `Scene.Load` of an empty scene (`Scene::swap_in`, the tick's
+/// A Play-mode `Scene.Load` of an empty scene (`edit_side::load::swap_in`, the tick's
 /// scene-load phase), the mark set in Play and the base entity left behind, so
 /// nothing keyed by it may cross with its now stale id.
 fn play_load(mark: &Mark) -> Outcome {

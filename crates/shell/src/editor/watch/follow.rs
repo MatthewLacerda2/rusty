@@ -15,7 +15,7 @@
 //!   engine last read or wrote there (`Scene::is_disk_text`) is skipped: the echo of
 //!   a Save, Generate Lighting rewriting its fields (whose unsaved edits stay
 //!   unsaved, #832), a `touch`, a rescan, the same bytes written again.
-//! - **"Unsaved" is computed, not a flag** (`Scene::has_unsaved_edits`), and only
+//! - **"Unsaved" is computed, not a flag** (`scene::has_unsaved_edits`), and only
 //!   picks the console line: info, or a warning that edits were discarded.
 //! - **A half-written file is retried.** A read or parse failure keeps the path
 //!   pending, so the next frame reads it again, until it loads or a newer note comes;
