@@ -12,7 +12,5 @@ pub fn file(name: &str) -> PathBuf {
     dir().join(name)
 }
 
-/// [`file`] as a string.
-pub fn path(name: &str) -> String {
-    file(name).to_string_lossy().into_owned()
-}
+/// [`file`] as a string: [`lua_path`] under the name these tests import.
+pub use rusty_test_support::temp::lua_path as path;

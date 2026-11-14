@@ -86,9 +86,10 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
   contract (`rebakes::follows_rebakes`), the embedded model files (`models`,
   `models::anim`, `models::quad_file` on disk), a sky panorama on disk
   (`panorama::fixture`), `.cube` lookups as text (`luts`) and the warnings a test logged
-  (`logs::init`, `logs::take`: the root's `logging` sits above every member). A
-  crate's tests call it directly; the root keeps `crate::test_temp` as a re-export
-  beside its `lua_path`. A fixture that is plain data moves here; one built on a
+  (`logs::init`, `logs::take`, `logs::take_leveled` with each record's level: the
+  root's `logging` sits above every member), and a path in the temp dir spelled as a
+  script passes it (`temp::lua_path`). A crate's tests call it directly; the root
+  keeps `crate::test_temp` as a re-export. A fixture that is plain data moves here; one built on a
   crate's types is a test hook instead.
 - **An inherent `impl` a module above writes for a moved crate's type** no longer
   builds (E0116): a method on the type's own data moves into the crate beside it

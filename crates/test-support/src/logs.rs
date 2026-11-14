@@ -1,5 +1,6 @@
 //! The warnings a crate's own tests read back: a `log` logger keeping every
-//! `warn!` / `error!` record's text, per thread, for [`take`].
+//! `warn!` / `error!` record's level and text, per thread, for [`take`] and
+//! [`take_leveled`].
 //!
 //! A moved crate's tests cannot reach the root's `logging` (it sits above every
 //! member), so a test asserting "this warns once" installs this instead. It keeps

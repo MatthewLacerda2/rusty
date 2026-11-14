@@ -97,7 +97,7 @@ def ignore_regex(module: str, modules: list[str], dirs: list[str], files: list[s
         inner = layout.module_dir(root, crate)
         clash = sorted(p.name for p in inner.iterdir() if p.is_dir() and p.name in others)
         if clash:
-            sys.exit(f"coverage-ignore: crates/{module}/src/ has {clash}, named like root modules; "
+            sys.exit(f"coverage-ignore: crates/{crate}/src/ has {clash}, named like root modules; "
                      "its lines would be ignored as theirs: rename the folder")
     parts = [f"src/({'|'.join(others)})/"] if others else []
     stems = [re.escape(f) for f in files] or [r"[^/]+\.rs"]

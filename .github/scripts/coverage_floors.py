@@ -17,7 +17,9 @@ always pass. A removed floor can
 carry no reason on its line, so it passes only when its module is gone from
 `src/` (`coverage-ignore.py` refuses a floor on a missing directory anyway), or
 when it was split into floors on its halves (`script` into `script/api` and
-`script/scripting`), which hold more than the one floor did.
+`script/scripting`): every folder the old floor covered then needs a half floor
+at least the old value, and a half below it, or a missing one, needs a reason on
+a half's line, as a drop does.
 
 The check runs as a `make scripts` test against the merge base with
 `origin/main` (`tests/test_coverage_floors.py`), so it holds in `make gates` and
@@ -55,18 +57,16 @@ def parse(text: str) -> dict[str, tuple[float, str, str]]:
     return floors
 
 
-def findings(base: str, head: str, has_module: Callable[[str], bool]) -> list[str]:
-    """Every floor `head` lowers from `base` without a reason, as a message."""
+def findings(base: str, head: str, folder: Callable[[str], str | None],
+             subfolders: Callable[[str], list[str]] = lambda m: []) -> list[str]:
+    """Every floor `head` lowers from `base` without a reason, as a message.
+    `folder(m)` is where module `m`'s code lives (`None` once gone), and
+    `subfolders(m)` the folders that holds, which a split floor must all cover."""
     old, new = parse(base), parse(head)
     out = []
     for module, (floor, written, old_reason) in old.items():
         if module not in new:
-            split = any(name.startswith(f"{module}/") for name in new)
-            if has_module(module) and not split:
-                out.append(
-                    f"{BASELINE}: the `{module}` floor ({written}) was removed while "
-                    f"src/{module}/ still exists; keep it, or lower it with `{REASON} <why>`"
-                )
+            out += removed(module, floor, written, new, folder, subfolders)
             continue
         now, now_written, reason = new[module]
         if now < floor and (not reason or reason == old_reason):
@@ -74,6 +74,35 @@ def findings(base: str, head: str, has_module: Callable[[str], bool]) -> list[st
                 f"{BASELINE}: `{module}` floor dropped {written} -> {now_written} without "
                 f"a new reason; raise coverage instead, or end the line with `{REASON} <why>`"
             )
+    return out
+
+
+def removed(module: str, floor: float, written: str, new: dict[str, tuple[float, str, str]],
+            folder: Callable[[str], str | None],
+            subfolders: Callable[[str], list[str]]) -> list[str]:
+    """Why removing `module`'s floor is silent: its folder still exists and no
+    half floor stands in its place, or the halves leave a folder of it unfloored
+    or floor one below the old value, with no reason on any half's line."""
+    where = folder(module)
+    if where is None:
+        return []
+    halves = {name: v for name, v in new.items() if name.startswith(f"{module}/")}
+    if not halves:
+        return [f"{BASELINE}: the `{module}` floor ({written}) was removed while "
+                f"{where}/ still exists; keep it, or lower it with `{REASON} <why>`"]
+    if any(reason for _, _, reason in halves.values()):
+        return []
+    out = []
+    for sub in subfolders(module):
+        half = f"{module}/{sub}"
+        if half not in halves:
+            out.append(f"{BASELINE}: the `{module}` floor ({written}) was split, but "
+                       f"{where}/{sub}/ has no `{half}` floor; floor it at {written} or more, "
+                       f"or end a half's line with `{REASON} <why>`")
+        elif halves[half][0] < floor:
+            out.append(f"{BASELINE}: the `{module}` floor ({written}) was split into `{half}` "
+                       f"at {halves[half][1]}, below it; floor it at {written} or more, "
+                       f"or end its line with `{REASON} <why>`")
     return out
 
 
@@ -89,11 +118,17 @@ def against(base_ref: str, root: Path) -> list[str]:
     merge_base = git("merge-base", "HEAD", base_ref, cwd=root).strip()
     base = git("show", f"{merge_base}:{BASELINE}", cwd=root)
     head = (root / BASELINE).read_text()
-    def has_module(m: str) -> bool:
+    def path(m: str) -> Path:
         crate, _, sub = m.partition("/")
-        return (module_dir(root, crate) / sub).is_dir()
+        return module_dir(root, crate) / sub
 
-    return findings(base, head, has_module)
+    def folder(m: str) -> str | None:
+        return path(m).relative_to(root).as_posix() if path(m).is_dir() else None
+
+    def subfolders(m: str) -> list[str]:
+        return sorted(p.name for p in path(m).iterdir() if p.is_dir())
+
+    return findings(base, head, folder, subfolders)
 
 
 def main() -> None:

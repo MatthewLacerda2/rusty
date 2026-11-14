@@ -16,6 +16,6 @@
 # `make scripts` fails it (.github/scripts/coverage_floors.py, #963).
 app 95.00
 script/scripting 96.00
-script/api 86.00
+script/api 86.00  # reason: the merged `script 88.00` averaged in scripting; api measured alone is 86.72
 physics 97.00
 navigation 96.00

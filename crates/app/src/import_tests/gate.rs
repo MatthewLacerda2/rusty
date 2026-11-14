@@ -45,7 +45,7 @@ fn a_source_changed_in_play_converts_only_after_stop() {
 }
 
 #[test]
-fn a_source_never_imported_fails_in_play_with_a_console_line() {
+fn a_source_never_imported_fails_in_play_and_logs_why() {
     rusty_test_support::logs::init();
     rusty_test_support::logs::take(); // what earlier code on this thread logged
     let path = source();
