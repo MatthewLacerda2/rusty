@@ -10,7 +10,7 @@ use log::{Level, LevelFilter, Log, Metadata, Record};
 use std::sync::{Mutex, Once};
 use std::thread::ThreadId;
 
-static KEPT: Mutex<Vec<(ThreadId, String)>> = Mutex::new(Vec::new());
+static KEPT: Mutex<Vec<(ThreadId, Level, String)>> = Mutex::new(Vec::new());
 
 struct Keep;
 
@@ -22,7 +22,11 @@ impl Log for Keep {
     fn log(&self, record: &Record<'_>) {
         if self.enabled(record.metadata()) {
             let mut kept = KEPT.lock().unwrap_or_else(|e| e.into_inner());
-            kept.push((std::thread::current().id(), record.args().to_string()));
+            kept.push((
+                std::thread::current().id(),
+                record.level(),
+                record.args().to_string(),
+            ));
         }
     }
 
@@ -42,13 +46,21 @@ pub fn init() {
 /// The warnings and errors this thread logged since the last `take`, oldest first.
 /// Per thread, so tests sharing a process never read each other's.
 pub fn take() -> Vec<String> {
+    take_leveled().into_iter().map(|(_, text)| text).collect()
+}
+
+/// [`take`] with each record's level, for a test asserting a failure is an error
+/// rather than a warning (what the console shows it as).
+pub fn take_leveled() -> Vec<(Level, String)> {
     let me = std::thread::current().id();
     let mut kept = KEPT.lock().unwrap_or_else(|e| e.into_inner());
-    let (mine, others) = std::mem::take(&mut *kept)
+    let (mine, others): (Vec<_>, Vec<_>) = std::mem::take(&mut *kept)
         .into_iter()
-        .partition(|(origin, _)| *origin == me);
+        .partition(|(origin, _, _)| *origin == me);
     *kept = others;
-    mine.into_iter().map(|(_, text)| text).collect()
+    mine.into_iter()
+        .map(|(_, level, text)| (level, text))
+        .collect()
 }
 
 #[cfg(test)]
@@ -62,6 +74,21 @@ mod tests {
         log::warn!("a skip");
         assert_eq!(take(), ["a skip"]);
         assert!(take().is_empty());
+    }
+
+    #[test]
+    fn a_record_keeps_its_level() {
+        init();
+        log::warn!("a skip");
+        log::error!("a failure");
+        let said = take_leveled();
+        assert_eq!(
+            said,
+            [
+                (Level::Warn, "a skip".to_string()),
+                (Level::Error, "a failure".to_string())
+            ]
+        );
     }
 
     #[test]

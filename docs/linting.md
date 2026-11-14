@@ -557,7 +557,7 @@ new flag, gate, CI step or baseline.
   that governs no entries (a blank line under it, or a first entry indented deeper
   than it) is itself a finding. Rust files and the tracked Markdown under `docs/`,
   `.claude/skills/` and the repo root are scanned. A list
-  whose order matters (`src/app/registry.rs`'s `build()`, `docs/api/index.md`'s
+  whose order matters (`crates/app/src/registry.rs`'s `build()`, `docs/api/index.md`'s
   namespaces) gets a comment saying why instead of a marker
   (`rules/sorted.rs`).
 - **`stored-format`** (#1966) — `make review-level` reviews a change to an on-disk

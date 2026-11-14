@@ -420,7 +420,7 @@ issue, and a follow-up PR off `main` when worth fixing.
 
 How to read a clean report:
 
-- **The weekly sweep covers only `src/app`, `crates/script/src/scripting`, `crates/physics/src`,
+- **The weekly sweep covers only `crates/app/src`, `crates/script/src/scripting`, `crates/physics/src`,
   `crates/navigation/src`.** Elsewhere, silence means unmeasured, not clean.
 - **A scoped run names what it planned** (how many mutants, any from outside the
   scope). A `diff` with nothing to mutate says so; it is not a pass.

@@ -114,7 +114,7 @@ fn unix_now() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::project_tests::{assert_runs_the_fixture, FIXTURE};
+    use crate::app::project_fixture::{assert_runs_the_fixture, FIXTURE};
 
     #[test]
     fn the_editor_world_binds_the_projects_settings() {

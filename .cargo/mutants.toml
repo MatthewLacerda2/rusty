@@ -14,6 +14,8 @@ exclude_globs = [
   "crates/ai/src/perception/test_world.rs",
   "crates/ai/src/query/bench.rs",
   "crates/ai/src/query/test_world.rs",
+  "crates/app/src/animation/posed.rs",
+  "crates/app/src/scene_load/project_fixture.rs",
   "crates/audio/src/recording.rs",
   "crates/ecs/src/changes/ops.rs",
   "crates/navigation/src/test_support.rs",

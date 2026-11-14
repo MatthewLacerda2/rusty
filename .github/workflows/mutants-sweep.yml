@@ -49,7 +49,7 @@ env:
   # count in `mutants-plan` and by every shard, so the matrix is sized for
   # exactly the mutants the shards draw from. Space-separated `--file` globs.
   SWEEP_FILES: >-
-    src/app/**/*.rs
+    crates/app/src/**/*.rs
     crates/script/src/scripting/**/*.rs
     crates/physics/src/**/*.rs
     crates/navigation/src/**/*.rs
