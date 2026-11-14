@@ -55,7 +55,9 @@ mod queue_tests;
 mod rank_tests;
 #[cfg(test)]
 mod spread_tests;
-// Test hook: the arena this module's tests and the root's `api` tests build on.
+// Test hook: the arena this module's tests and `rusty-script`'s
+// `api::environment_query` tests build on. Ungated: a `dev` dev-dependency would
+// split the crate's features between its build and its tests.
 #[doc(hidden)]
 pub mod test_world;
 

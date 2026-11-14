@@ -21,6 +21,12 @@ moved crate's own `lib.rs` is not read as the root's `src/lib.rs`. A moved
 module with a subfolder named like a root module is refused: its `src/<name>/`
 would read as that module and be ignored.
 
+A floor may name a sub-path of a moved crate, `<crate>/<folder>` (`script/api`):
+a crate that holds two modules floors each half on its own, so one half's slack
+never hides the other's drop. It is measured as its crate, with every other
+entry of `crates/<crate>/src/` ignored too (so the crate's own top-level files
+count toward neither half).
+
     coverage-ignore.py app            # prints the regex for `--ignore-filename-regex`
     coverage-ignore.py --modules      # prints the floored modules, one per line
 """
@@ -63,21 +69,35 @@ def members(root: Path) -> list[str]:
     return sorted(p.name for p in crates.iterdir() if p.is_dir()) if crates.is_dir() else []
 
 
+def entries(root: Path, crate: str) -> list[str]:
+    """What `crates/<crate>/src/` holds: folders as `name/`, files as `name`."""
+    inner = root / layout.CRATES / crate / "src"
+    if not inner.is_dir():
+        return []
+    return sorted(p.name + "/" if p.is_dir() else p.name for p in inner.iterdir())
+
+
 def ignore_regex(module: str, modules: list[str], dirs: list[str], files: list[str] = (),
-                 crates: list[str] = (), root: Path | None = None) -> str:
+                 crates: list[str] = (), root: Path | None = None,
+                 inside: list[str] = ()) -> str:
     """Ignore every module but `module` (under `src/` or `crates/`), the root
-    package's top-level files and tools."""
+    package's top-level files and tools. A `<crate>/<folder>` floor also ignores
+    every other entry of the crate's `src/`, `inside` being what that holds."""
     if module not in modules:
         sys.exit(f"coverage-ignore: `{module}` has no floor in {BASELINE}")
-    missing = [m for m in modules if m not in dirs and m not in crates]
+    missing = [m for m in modules if m.partition("/")[0] not in dirs
+               and m.partition("/")[0] not in crates]
     if missing:
         sys.exit(f"coverage-ignore: {BASELINE} floors {missing}, which neither src/ nor crates/ has")
-    others = [d for d in dirs if d != module]
-    if module in crates and root is not None:
-        inner = layout.module_dir(root, module)
+    crate, _, sub = module.partition("/")
+    if sub and (crate not in crates or f"{sub}/" not in inside):
+        sys.exit(f"coverage-ignore: `{module}` floors a folder crates/{crate}/src/ does not hold")
+    others = [d for d in dirs if d != crate]
+    if crate in crates and root is not None:
+        inner = layout.module_dir(root, crate)
         clash = sorted(p.name for p in inner.iterdir() if p.is_dir() and p.name in others)
         if clash:
-            sys.exit(f"coverage-ignore: crates/{module}/src/ has {clash}, named like root modules; "
+            sys.exit(f"coverage-ignore: crates/{crate}/src/ has {clash}, named like root modules; "
                      "its lines would be ignored as theirs: rename the folder")
     parts = [f"src/({'|'.join(others)})/"] if others else []
     stems = [re.escape(f) for f in files] or [r"[^/]+\.rs"]
@@ -85,8 +105,11 @@ def ignore_regex(module: str, modules: list[str], dirs: list[str], files: list[s
     # matches `crates/<m>/src/lib.rs`, and the isolated crate would lose its own.
     anchor = f"^{re.escape(root.resolve().as_posix())}/" if root is not None else ""
     parts.append(f"{anchor}src/({'|'.join(stems)})")
-    if rest := [c for c in crates if c != module]:
+    if rest := [c for c in crates if c != crate]:
         parts.append(f"crates/({'|'.join(rest)})/")
+    if sub:
+        siblings = [re.escape(e) for e in inside if e != f"{sub}/"]
+        parts.append(f"crates/{re.escape(crate)}/src/({'|'.join(siblings)})")
     parts.append("tools/")
     return "|".join(parts)
 
@@ -101,8 +124,9 @@ def main() -> None:
     if args.modules:
         print("\n".join(modules))
     elif args.module:
+        crate = args.module.partition("/")[0]
         print(ignore_regex(args.module, modules, src_dirs(args.root), src_files(args.root),
-                           members(args.root), args.root))
+                           members(args.root), args.root, entries(args.root, crate)))
     else:
         parser.error("name a module, or pass --modules")
 

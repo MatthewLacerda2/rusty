@@ -86,9 +86,10 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
   contract (`rebakes::follows_rebakes`), the embedded model files (`models`,
   `models::anim`, `models::quad_file` on disk), a sky panorama on disk
   (`panorama::fixture`), `.cube` lookups as text (`luts`) and the warnings a test logged
-  (`logs::init`, `logs::take`: `rusty-logging` needs `script`, so it sits above most members). A
-  crate's tests call it directly; the root keeps `crate::test_temp` as a re-export
-  beside its `lua_path`. A fixture that is plain data moves here; one built on a
+  (`logs::init`, `logs::take`, `logs::take_leveled` with each record's level:
+  `rusty-logging` needs `script`, so it sits above most members), and a path in the temp dir spelled as a
+  script passes it (`temp::lua_path`). A crate's tests call it directly; the root
+  keeps `crate::test_temp` as a re-export. A fixture that is plain data moves here; one built on a
   crate's types is a test hook instead.
 - **An inherent `impl` a module above writes for a moved crate's type** no longer
   builds (E0116): a method on the type's own data moves into the crate beside it
@@ -107,8 +108,8 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
   itself or on a module at or above its row.
 - **Two modules that name each other are one crate**, the pair its submodules under
   a new module name (`script` holds `scripting` and `api`): rename them into
-  `src/<new>/` inside the root package first (`crate::api::` → `crate::script::api::`,
-  in `tests/` too), give the table one row for both, then `make move-crate` the
+  `src/<new>/` inside the root package first (`crate::api::` → `crate::script::api::`
+  in `src/`, `rusty::api::` → `rusty::script::api::` in `tests/`), give the table one row for both, then `make move-crate` the
   new module as any other. Inside the crate the halves stay `crate::api::…` and
   `crate::scripting::…`.
 - **`env!("CARGO_MANIFEST_DIR")`** names the crate's folder, not the checkout, and

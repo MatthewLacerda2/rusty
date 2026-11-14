@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn the_player_world_runs_the_projects_settings() {
-        use crate::app::project_tests::{assert_runs_the_fixture, FIXTURE};
+        use crate::app::project_fixture::{assert_runs_the_fixture, FIXTURE};
         let file = crate::core::project::ProjectFile::from_json(FIXTURE).unwrap();
         let game = world(&crate::core::project::BootPlan::default(), file.into());
         assert_runs_the_fixture(&game);
