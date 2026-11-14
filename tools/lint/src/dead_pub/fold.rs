@@ -168,7 +168,7 @@ pub fn caller(
             out.push('\n');
             continue;
         }
-        let line = renamed(&line, &renames);
+        let line = renamed(line, &renames);
         let line = match line.strip_prefix("fn main(") {
             Some(rest) => format!("pub fn main({rest}"),
             None => line,
