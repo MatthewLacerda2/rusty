@@ -7,7 +7,7 @@
 
 use rusty::dev::providers::NO_KEYS_VAR;
 
-// The tripwire every test binary linking `rusty-dev` expands (`key-guard`).
+// The tripwire a package linking `rusty-dev` expands once (`key-guard` samples one per package).
 rusty_dev::no_provider_keys!();
 
 #[test]

@@ -104,7 +104,7 @@ pub fn display(module: &str, text: &str, layers: &[Layer], policy: &Policy) -> V
         if let Some(l) = below {
             out.push(format!(
                 "PLATFORM_DEV_CRATE crates/{module}/Cargo.toml → rusty-{} — a sim crate's tests \
-                 take only sim siblings; test the pair from `tests/` or from {0}'s own tests",
+                 take only sim siblings; test the pair from `tests/` (the root's integration tests)",
                 l.module
             ));
         }

@@ -109,7 +109,8 @@ A member that is no module of the table (`test-support`) is listed in both
 ## Features
 - **A crate whose manifest names `rusty-dev`** (a dependency or dev-dependency) expands
   `rusty_dev::no_provider_keys!();` once in its tests, under `#[cfg(all(test,
-  feature = "dev"))]`: no test binary may hold a provider key (`key-guard`).
+  feature = "dev"))]` (`key-guard` checks one expansion per such package, a sample:
+  the `read-keys` lint and the `NEXTEST` backstop are what keep a key out of a test).
 - A crate holding `cfg(feature = "dev")` or `"editor"` code declares that feature
   itself, and the root's feature turns it on directly (`dev = ["rusty-core/dev", …]`).
   A crate with none declares none, even beside a sibling that has one: the root
