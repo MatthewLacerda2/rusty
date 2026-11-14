@@ -88,9 +88,9 @@ wins.
   the exception:** a stale doc, README, comment, CLI help, MCP or API description, skill
   or line of this file is fixed and merged on Claude's own say-so, through the normal
   flow; a **`planning`** issue is never started.
-- **Agent docs state the rule, not its history.** Every `CLAUDE.md` and skill says what
-  to do and, where it helps, why — never the incident behind it, a date, an attribution
-  or an issue/PR number. The story lives in the issue and PR that made the rule, where
+- **Agent docs state the rule, not its history.** Every `CLAUDE.md`, skill and agent
+  definition says what to do and, where it helps, why — never the incident behind it, a
+  date, an attribution or an issue/PR number. The story lives in its issue and PR, where
   `git log -S` and the issue tracker find it. A pointer names the symbol, path or `make`
   verb, not the issue. Every line of this file is a convention whether or not it says
   who asked for it.

@@ -12,6 +12,11 @@ fn rules(found: &[Finding]) -> Vec<&str> {
 
 const SKILL_MD_OK: &str = "---\nname: s\ndescription: Use it.\n---\n";
 
+/// A well-formed definition `name` on `model: opus`.
+fn agent_md(name: &str) -> String {
+    format!("---\nname: {name}\ndescription: Use it.\nmodel: opus\n---\n")
+}
+
 #[test]
 fn a_claude_md_at_its_cap_passes_and_one_line_over_fails() {
     assert!(file("CLAUDE.md", &blank(MAX_CLAUDE_MD_LINES)).is_empty());
@@ -90,6 +95,8 @@ fn the_tree_reads_tracked_files_only_and_flags_a_skill_folder_without_skill_md()
     repo.file("CLAUDE.md", "ok\n");
     repo.file(".claude/skills/s/SKILL.md", SKILL_MD_OK);
     repo.file(".claude/skills/orphan/notes.md", "notes\n");
+    repo.file(".claude/agents/coder.md", &agent_md("coder"));
+    repo.file(".claude/agents/reviewer.md", &agent_md("reviewer"));
     repo.git(&["add", "."]);
     // Untracked: never read, however wrong.
     repo.file("scratch/CLAUDE.md", &blank(MAX_CLAUDE_MD_LINES + 1));
@@ -109,4 +116,27 @@ fn the_commit_hook_list_checks_only_its_agent_docs() {
     let found = files(&repo.0, &staged);
     assert_eq!(rules(&found), [HISTORY]);
     assert_eq!(found[0].path, "CLAUDE.md");
+}
+
+#[test]
+fn a_definition_is_held_to_its_cap_its_frontmatter_and_history() {
+    let ok = agent_md("helper");
+    assert!(file(".claude/agents/helper.md", &ok).is_empty());
+    let over = format!("{ok}{}", blank(MAX_AGENT_LINES));
+    assert_eq!(rules(&file(".claude/agents/helper.md", &over)), [AGENT]);
+    let told = format!("{ok}see #12\n");
+    assert_eq!(rules(&file(".claude/agents/helper.md", &told)), [HISTORY]);
+    assert!(is_agent_doc(".claude/agents/helper.md"));
+    assert!(!is_agent_doc(".claude/agents/x/helper.md"));
+    assert!(!is_agent_doc(".claude/agents/helper.txt"));
+}
+
+#[test]
+fn the_tree_flags_a_pinned_definition_it_does_not_track() {
+    let repo = Repo::new("agent-docs-pins", true);
+    repo.file(".claude/agents/coder.md", &agent_md("coder"));
+    repo.git(&["add", "."]);
+    let found = tree(&repo.0).expect("git lists the tree");
+    assert_eq!(rules(&found), [AGENT], "{found:?}");
+    assert_eq!(found[0].path, ".claude/agents/reviewer.md");
 }

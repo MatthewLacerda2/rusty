@@ -116,8 +116,9 @@ jobs:
           cargo fmt --all --check
           cargo fmt --manifest-path tools/lint/Cargo.toml --check
       # Not guarded on `code` either: the size gate also holds the agent docs
-      # (every `CLAUDE.md` and skill file, docs/linting.md *Agent docs*), which a
-      # Markdown-only PR is exactly where they grow. `tools/lint` is std-only and
+      # (every `CLAUDE.md`, skill file and `.claude/agents/` definition,
+      # docs/linting.md *Agent docs*), which a Markdown-only PR is exactly where
+      # they grow. `tools/lint` is std-only and
       # builds cold in seconds, so it needs neither the cache nor the libs.
       - name: Size gate (full scan, code and agent docs; nothing grandfathered)
         run: cargo run --quiet --manifest-path tools/lint/Cargo.toml
