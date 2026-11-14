@@ -456,11 +456,14 @@ mechanism at all.
 **Establish equivalence by applying the mutation and running the suite**, never by
 reasoning about symmetry. Re-ask narrower (`make mutants-remote
 SCOPE=crates/physics/src/query/through.rs`), or reproduce locally as the job runs it
-(nextest, fail-fast, two test processes to fit the memory limit):
+(nextest, fail-fast, two test processes to fit the memory limit, and the workspace's
+own baseline, because cargo-mutants' tests only the mutated package; `docs/testing.md`,
+*Mutation testing*, says why):
 
     git diff origin/main > branch.diff
-    cargo mutants --test-tool nextest --in-diff branch.diff \
-      -- --features dev --fail-fast --test-threads 2
+    cargo nextest run --workspace --features=dev --fail-fast --test-threads 2   # time it
+    cargo mutants --workspace --test-tool nextest --baseline skip --timeout <3x secs> \
+      --features dev --in-diff branch.diff -- --fail-fast --test-threads 2
 
 `cargo mutants --list` names the functions and builds nothing: reach for it before
 believing a structural explanation of a bad report.

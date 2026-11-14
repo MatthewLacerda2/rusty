@@ -9,10 +9,11 @@ mutants-remote` prints the answer in the terminal.
 
     mutants-report.py mutants.out scope.txt --in-scope 42 --exit 2 --out report/
 
-Two things it never does. It never reports a run that did not finish as if it
-had: a run stopped at its time budget says how many planned mutants it never
-reached, because a smaller-looking run reads as a cleaner one. And it never
-fails over a survivor — mutation is a signal, and survivors are its result.
+Two things it never does. It never reports a mutant it did not measure as if
+it had: a run stopped at its time budget says how many planned mutants it never
+reached, because a smaller-looking run reads as a cleaner one, and a mutant that
+timed out is unmeasured too, never "no survivors". And it never fails over a
+survivor — mutation is a signal, and survivors are its result.
 """
 
 from __future__ import annotations
@@ -56,15 +57,34 @@ def render(scope: str, run: dict, in_scope: int, status: int) -> str:
         out += [f"> ⚠️ Stopped at its time budget: {len(done)} of {in_scope} planned mutants"
                 f" measured, {max(in_scope - len(done), 0)} never reached. Those are"
                 " unmeasured, not clean; ask for a narrower scope.", ""]
+    out += timeouts(counts)
     survivors = sorted(label(o) for o in done if o.get("summary") == "MissedMutant")
     if survivors:
         out += ["These were mutated and no test failed. Strengthen the tests covering them,"
                 " or say why a survivor is equivalent:", "", "```", *survivors, "```"]
-    elif done:
-        out += ["No survivors. ✅"]
-    else:
+    elif not done:
         out += ["Nothing in scope was mutated. ➖"]
+    elif counts["timeout"] or not counts["caught"]:
+        out += [f"No survivors among the {counts['caught']} measured; that is not a clean run."]
+    else:
+        out += ["No survivors. ✅"]
     return "\n".join(out) + "\n"
+
+
+def timeouts(counts: dict[str, int]) -> list[str]:
+    """What the timed-out mutants mean: a timeout is unmeasured, like a budget stop,
+    and when most viable mutants time out the run measured the tool, not the code."""
+    timed_out = counts["timeout"]
+    viable = timed_out + counts["caught"] + counts["missed"]
+    if not timed_out:
+        return []
+    if timed_out * 2 > viable:
+        return [f"> ❌ {timed_out} of {viable} viable mutants timed out. That is the run"
+                " breaking, not a result: a mutant that breaks nothing should finish inside"
+                " the timeout the baseline set. Read the run's log before trusting any count above.", ""]
+    return [f"> ⚠️ {timed_out} of {viable} viable mutants timed out: unmeasured, not clean"
+            " (a mutant that loops forever times out, and so does one whose tests outgrow"
+            " the timeout).", ""]
 
 
 def diffs(root: Path, run: dict) -> str:

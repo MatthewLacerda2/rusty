@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """An on-request report never reads cleaner than the run was (#750).
 
-A run stopped at its budget says how much it never reached; a broken run
-writes no report at all; survivors come with their diffs.
+A run stopped at its budget says how much it never reached; a timed-out
+mutant is unmeasured, never "no survivors", and a run where most time out says
+it is not a result; a broken run writes no report at all; survivors come with
+their diffs.
 """
 
 from __future__ import annotations
@@ -57,6 +59,25 @@ class Render(unittest.TestCase):
         text = report.render("Scoped.", {}, 0, 0)
         self.assertIn("Nothing in scope was mutated", text)
         self.assertNotIn("No survivors", text)
+
+    def test_a_caught_only_run_is_clean(self) -> None:
+        run = {"outcomes": RUN["outcomes"][:2]}
+        self.assertIn("No survivors. ✅", report.render("Scoped.", run, 1, 0))
+
+    def test_an_all_timeout_run_is_not_a_result(self) -> None:
+        run = {"outcomes": [outcome("Timeout", f"a.rs:{n}:1: replace x") for n in range(3)]
+               + RUN["outcomes"][4:]}
+        text = report.render("Scoped.", run, 4, 3)
+        self.assertIn("3 of 3 viable mutants timed out", text)
+        self.assertIn("not a result", text)
+        self.assertNotIn("✅", text)
+
+    def test_one_timeout_among_caught_is_named_unmeasured(self) -> None:
+        run = {"outcomes": RUN["outcomes"][:2] * 2 + [outcome("Timeout", "a.rs:7:1: replace y")]}
+        text = report.render("Scoped.", run, 3, 3)
+        self.assertIn("1 of 3 viable mutants timed out: unmeasured", text)
+        self.assertNotIn("not a result", text)
+        self.assertNotIn("✅", text)
 
 
 class Files(unittest.TestCase):

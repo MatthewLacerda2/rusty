@@ -184,29 +184,61 @@ jobs:
           in_scope=$(python3 -c 'import json,sys; t=open(sys.argv[1]).read().strip(); print(len(json.loads(t)) if t else 0)' planned.json)
           echo "in_scope=$in_scope" >> "$GITHUB_OUTPUT"
 
-      # Same dev-feature build, timeout multiplier, memory cap and test-thread
-      # bound as the sweep (`mutants-sweep.yml` says why each).
-      # The tests run under nextest (`--test-tool nextest`, #1844), the gate's
-      # runner: a process per test and the `gpu` test group, so the baseline
-      # runs the unit and integration tests as the gates do (not the doctests:
-      # nextest doesn't run them, `make test` does). Under plain `cargo test` it broke four times
+      # The baseline is run here, not by cargo-mutants (`--baseline skip`, #2164):
+      # cargo-mutants 27 builds and tests its own baseline with `--package` set
+      # to the mutated packages only, whatever `test_workspace` says, while each
+      # mutant runs the whole workspace's tests. A moved crate's baseline then
+      # timed only that crate's tests and every mutant overran 3x of it (#2160),
+      # and a member without a `dev` feature failed it outright (#2155). This
+      # step runs exactly what each mutant will: the same build, then the same
+      # tests, timed, and the timeout is 3x that test time. `mutants-sweep.yml`
+      # does the same; `test_baseline.py` (`make scripts`) holds
+      # the two commands to cargo-mutants' own arguments. A baseline that fails
+      # turns the run red: there is no honest report to give.
+      #
+      # Under nextest (`--test-tool nextest`, #1844), the gate's runner: a
+      # process per test and the `gpu` test group, so the run covers the unit
+      # and integration tests as the gates do (not the doctests: nextest doesn't
+      # run them, `make test` does). Under plain `cargo test` it broke four times
       # on a test that passed the gate (#1042, #1069, #1337, #1844); runner
       # independence is `cargo-test.yml`'s nightly signal, not this one's.
       # `--fail-fast` overrides the profile's `fail-fast = false` (right for the
-      # gate's summary) so a caught mutant stops at its first failing test. The
-      # per-mutant timeout is the baseline's test time times 3, so the slower
-      # GPU tests raise it on their own. SIGINT at the budget is
-      # cargo-mutants' Ctrl-C: it stops cleanly and keeps what it measured.
+      # gate's summary) so a caught mutant stops at its first failing test.
+      # Memory cap and test-thread bound as the sweep (`mutants-sweep.yml` says why).
+      - name: Baseline
+        id: baseline
+        if: steps.plan.outputs.in_scope != '0'
+        run: |
+          set -euo pipefail
+          ulimit -v 8388608
+          cargo nextest run --no-run --verbose --workspace --features=dev
+          start=$(date +%s)
+          cargo nextest run --verbose --workspace --features=dev --fail-fast --test-threads 2
+          secs=$(( $(date +%s) - start ))
+          timeout=$(( secs * 3 > 60 ? secs * 3 : 60 ))
+          echo "Baseline: the workspace's tests in ${secs}s, so each mutant's test timeout is ${timeout}s." | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "timeout=$timeout" >> "$GITHUB_OUTPUT"
+
+      # `--features dev` is cargo-mutants' own flag, so it reaches the build
+      # phase too: after `--` it reached only the test phase, which then
+      # recompiled the workspace with `dev` inside the mutant's test timeout.
+      # `--in-place` mutates this checkout, whose `target/` the baseline built,
+      # so the first mutant does not rebuild the workspace in a copy. SIGINT at
+      # the budget is cargo-mutants' Ctrl-C: it stops cleanly and keeps what it
+      # measured.
       - name: Mutate
         id: mutate
         if: steps.plan.outputs.in_scope != '0'
+        env:
+          TIMEOUT: ${{ steps.baseline.outputs.timeout }}
         run: |
           budget=$(( BUDGET_SECONDS - ($(date +%s) - JOB_STARTED) ))
           ulimit -v 8388608
           rc=0
           timeout --signal=INT --kill-after=60s "${budget}s" \
-            cargo mutants --workspace --test-tool nextest --no-shuffle --timeout-multiplier 3 \
-              --in-diff scope.diff -- --features dev --fail-fast --test-threads 2 || rc=$?
+            cargo mutants --workspace --test-tool nextest --no-shuffle --baseline skip --in-place \
+              --timeout "$TIMEOUT" --features dev \
+              --in-diff scope.diff -- --fail-fast --test-threads 2 || rc=$?
           echo "status=$rc" >> "$GITHUB_OUTPUT"
 
       # Red when cargo-mutants broke (any status but finished or stopped at
