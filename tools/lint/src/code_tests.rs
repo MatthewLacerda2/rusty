@@ -1,4 +1,4 @@
-use super::{code_lines, strip_comment, Open};
+use super::{code_lines, strip_comment, walk, Open, Piece};
 
 fn code(line: &str) -> String {
     strip_comment(line, &mut Open::None).into_owned()
@@ -91,4 +91,23 @@ fn no_lint_source_cuts_a_comment_by_hand() {
         found.is_empty(),
         "use crate::code::strip_comment: {found:?}"
     );
+}
+
+#[test]
+fn walk_reports_string_bodies_across_lines_and_skips_char_literals() {
+    let mut open = Open::None;
+    let mut seen = Vec::new();
+    for line in ["f('\"', \"a", "b\"); r#\"c\"# /* \"d\" */"] {
+        walk(line, &mut open, |p| {
+            if let Piece::Str { body, raw, closed } = p {
+                seen.push((line[body].to_string(), raw, closed));
+            }
+        });
+    }
+    let want = [("a", false, false), ("b", false, true), ("c", true, true)];
+    let want: Vec<_> = want
+        .iter()
+        .map(|(s, r, c)| (s.to_string(), *r, *c))
+        .collect();
+    assert_eq!(seen, want);
 }

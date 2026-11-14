@@ -92,7 +92,39 @@ pub fn scan(
     open: &mut Open,
     mut f: impl FnMut(usize, char),
 ) -> (usize, Vec<(usize, usize)>) {
+    walk(line, open, |piece| {
+        if let Piece::Code(at, c) = piece {
+            f(at, c);
+        }
+    })
+}
+
+/// What [`walk`] meets on a line, in order.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Piece {
+    /// A char of code outside literals and comments, at its byte offset.
+    Code(usize, char),
+    /// The part of a string literal's body on this line (`body`, a byte range of
+    /// the line, its quotes and `#`s left out): `raw` when it is an `r"…"`, whose
+    /// `\` escapes nothing, and `closed` when it ends on this line. A literal still
+    /// open at the line's start continues the one before; a char literal is none.
+    Str {
+        body: std::ops::Range<usize>,
+        raw: bool,
+        closed: bool,
+    },
+}
+
+/// [`scan`], also reporting each string literal's body ([`Piece::Str`]), so a
+/// reader that needs a literal's text takes it from the same walk that knows where
+/// it opens and closes.
+pub fn walk(line: &str, open: &mut Open, mut f: impl FnMut(Piece)) -> (usize, Vec<(usize, usize)>) {
     let bytes = line.as_bytes();
+    let body = |from: usize, to: Option<usize>, kind: Open| Piece::Str {
+        body: from..to.map_or(bytes.len(), |next| next - quote_len(kind)),
+        raw: matches!(kind, Open::Raw(_)),
+        closed: to.is_some(),
+    };
     let mut cuts = Vec::new();
     let mut i = 0;
     match *open {
@@ -107,10 +139,14 @@ pub fn scan(
                 return (bytes.len(), vec![(0, bytes.len())]);
             }
         },
-        kind => match close(line, 0, kind) {
-            Some(next) => (i, *open) = (next, Open::None),
-            None => return (bytes.len(), cuts),
-        },
+        kind => {
+            let next = close(line, 0, kind);
+            f(body(0, next, kind));
+            match next {
+                Some(next) => (i, *open) = (next, Open::None),
+                None => return (bytes.len(), cuts),
+            }
+        }
     }
     while i < bytes.len() {
         let rest = &line[i..];
@@ -141,8 +177,10 @@ pub fn scan(
             }
             _ => None,
         };
-        if let Some((body, kind)) = literal {
-            match close(line, body, kind) {
+        if let Some((from, kind)) = literal {
+            let next = close(line, from, kind);
+            f(body(from, next, kind));
+            match next {
                 Some(next) => i = next,
                 None => {
                     *open = kind;
@@ -152,10 +190,18 @@ pub fn scan(
             continue;
         }
         let c = rest.chars().next().unwrap_or(' ');
-        f(i, c);
+        f(Piece::Code(i, c));
         i += c.len_utf8();
     }
     (bytes.len(), cuts)
+}
+
+/// How many bytes close a `kind` literal: its `"` and a raw string's `#`s.
+fn quote_len(kind: Open) -> usize {
+    match kind {
+        Open::Raw(hashes) => hashes + 1,
+        _ => 1,
+    }
 }
 
 /// Past the `*/` that closes a block comment `depth` deep, whose body resumes at
