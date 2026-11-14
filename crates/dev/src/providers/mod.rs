@@ -51,9 +51,9 @@ use std::path::Path;
 pub use credentials::{environment, keys_blanked, read_keys, resolve, NO_KEYS_VAR};
 
 /// A test hook: the provider-key tripwire (#974) for a test binary that links this
-/// crate. Every package whose `[dependencies]` names `rusty-dev` expands it once in
-/// its tests, under `dev` (the `key-guard` lint holds it): its test binary never
-/// opted in to keys, and no provider key resolves in it.
+/// crate. Every package whose `[dependencies]` or `[dev-dependencies]` name
+/// `rusty-dev` expands it once in its tests, under `dev` (the `key-guard` lint holds
+/// it): its test binary never opted in to keys, and no provider key resolves in it.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! no_provider_keys {

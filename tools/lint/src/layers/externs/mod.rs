@@ -46,6 +46,7 @@ pub fn violations(layers: &[Layer], root: &Path, tree: &Tree) -> Vec<String> {
         out.extend(members::stray(&module, &text, layers, &policy::POLICY));
         out.extend(members::dev_stray(&module, &text, layers));
         out.extend(members::display(&module, &text, layers, &policy::POLICY));
+        out.extend(members::support(&module, &text));
     }
     out
 }
