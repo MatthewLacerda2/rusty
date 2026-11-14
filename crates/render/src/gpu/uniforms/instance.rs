@@ -35,7 +35,7 @@ pub(crate) struct ObjectData {
     // reshape the baked light, and its `Baked` lamps add one specular lobe (#1695).
     pub lightmap_directional: u32,
     // 1 when the scene holds a lightmap bake that took this mesh in
-    // (`BakeScene::takes_mesh`, #1750): its emission is in the bake, so SSIL
+    // (`scene::lighting::lightmap_set::bakes_mesh`, #1750): its emission is in the bake, so SSIL
     // gathers none of it, lightmap UVs or not.
     pub in_bake: u32,
     pub lightmap_st: [f32; 4],

@@ -3,7 +3,7 @@
 //! inside) or an open courtyard (a floor and the same props under the sky). A
 //! courtyard's long sight lines over the roofs and down the streets beside
 //! dense interiors is the shape a real level such as Kolvik has, and the
-//! all-rooms `bench::level` has not.
+//! all-rooms `bench::level` (`rusty_scene::test_levels::rooms`) has not.
 
 use glam::Vec3;
 

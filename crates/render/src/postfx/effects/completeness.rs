@@ -96,8 +96,8 @@ pub fn effect_names() -> Vec<&'static str> {
     POST_EFFECTS.iter().map(|e| e.name).collect()
 }
 
-/// The layers, the authoring one as `authored`, the two above it read as the
-/// renderer's own names.
+/// The layers, the authoring one as `authored`, the registrars and the Inspector's
+/// sections read as the renderer's own names.
 #[cfg(test)]
 pub(super) fn engine_from(authored: Authored) -> Layers {
     let own: Vec<String> = effect_names().into_iter().map(String::from).collect();

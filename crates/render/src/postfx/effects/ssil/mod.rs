@@ -27,7 +27,7 @@
 //! `forward::lighting::ssil_realtime`: the direct light of every light the scene's
 //! lightmap bake didn't take in (`LightmapSet::lights`, Unity's
 //! `Light.bakingOutput`; uploaded as each light's `bounce_baked`) and the emission
-//! of meshes the bake didn't take in (`BakeScene::takes_mesh`, uploaded as each
+//! of meshes the bake didn't take in (`scene::lighting::lightmap_set::bakes_mesh`, uploaded as each
 //! object's `in_bake`). Not the indirect term (lightmap, probes, flat ambient, SSIL
 //! itself), not the environment reflection. So a lightmapped scene whose lights were
 //! all baked gathers nothing; a light spawned after the bake bounces. Unlit

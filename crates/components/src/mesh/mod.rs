@@ -109,7 +109,7 @@ pub struct MeshComponent {
     /// Which edit of the geometry this is; set a [`MeshRevision::next`] whenever
     /// `vertices` or `indices` change, so every renderer re-uploads them. A
     /// primitive's geometry is the exception: it carries the one revision of its
-    /// (primitive, cut) (`scene::authoring::primitive_revision`), so an edit to a
+    /// (primitive, cut) (`scene::create::primitive_revision`), so an edit to a
     /// primitive's vertices must give it a new `MeshId` as well as a new revision.
     #[serde(skip)]
     pub revision: MeshRevision,

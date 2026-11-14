@@ -24,12 +24,12 @@
 //!   pass shown, the camera's texels first (`view`, [`BakeView`]), to the same bytes;
 //! * `atlas` — packing the lightmaps into equal-size pages ([`pack`]), each map in
 //!   a cell its BC blocks and first [`MIP_LEVELS`](rusty_scene::lighting::page::MIP_LEVELS) mips never leave (#1694);
-//! * `encode` — RGBM, how a page's fallback is stored as an 8-bit PNG, the RGBA8 direction
-//!   page a directional bake adds (#810) and the RGBA8 shadowmask page a
-//!   `Shadowmask` bake adds (#1695);
-//! * `pages` — a packed page's mip chain, as BC6H irradiance (#1694) with the RGBM
-//!   PNG beside it as the fallback, and the RGBA8 levels of a direction page (never
-//!   block-compressed, #1996) and a shadowmask;
+//! * `pages` — a packed page as BC6H irradiance (#1694) with the RGBM PNG beside
+//!   it as the fallback, and a direction page's RGBA8 levels (never
+//!   block-compressed, #1996). How a page is stored and read back (RGBM, the RGBA8
+//!   direction page of a directional bake, #810, and the RGBA8 shadowmask page of a
+//!   `Shadowmask` bake, #1695, and every page's mip chain) is the scene's
+//!   (`rusty_scene::lighting::page`), so the renderer's loader reads it there;
 //! * the scene's pages and each entity's place in them are the scene's
 //!   (`rusty_scene::lighting::lightmap_set`), and so are the bake's knobs
 //!   (`rusty_scene::lighting::settings::BakeSettings`), which it stores;

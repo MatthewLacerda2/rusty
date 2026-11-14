@@ -9,7 +9,7 @@
 //! reading it holds it, the sky's panorama, and the lightmap page arrays. It runs
 //! on the load's worker (`shell::frame::load::worker`), never on the tick thread.
 //! A primitive's revision is one per geometry for the process
-//! (`scene::authoring::primitive_revision`) and an import's is its import's, so the
+//! (`scene::create::primitive_revision`) and an import's is its import's, so the
 //! linked prefab instances activation rebuilds from their `.prefab` draw the
 //! geometry planned from the saved document, and a reload's resident meshes are
 //! skipped, never rewritten under the scene still drawing. (A `.prefab` edited

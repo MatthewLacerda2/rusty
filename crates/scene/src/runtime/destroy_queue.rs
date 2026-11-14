@@ -21,7 +21,7 @@ impl Scene {
     /// edit mode, where no script runs, remove it at once
     /// ([`Scene::destroy_entity`]). A model instance's part it takes is recorded
     /// as removed from its instance, so propagation never stamps it back (#1665,
-    /// `prefab::removed`).
+    /// `prefab_link::removed`).
     pub fn destroy(&mut self, id: u32) {
         crate::prefab_link::removed::record_removed(self, id);
         if self.playing {

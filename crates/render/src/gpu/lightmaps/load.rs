@@ -3,7 +3,7 @@
 //!
 //! An irradiance `.ktx2` page is read as it is stored (BC6H, every mip) when the
 //! GPU has BC compression. Without it, the RGBM PNG beside it is decoded on the
-//! CPU to linear `Rgba16Float`, its mips made by the same `lightmap::levels` the
+//! CPU to linear `Rgba16Float`, its mips made by the same `scene::lighting::page::levels` the
 //! bake made the KTX2's with. A `.png` irradiance page that stands alone (a
 //! progressive bake's preview, #1970, or a scene baked before #1694) uploads its
 //! one level. The shader then reads linear light either way, filtered linearly.
@@ -17,7 +17,7 @@
 //! the colour preview beside it, so both read the same level at any `lod` and a
 //! pass costs no decode or mip build. Every shadowmask page (#1695) is an RGBA8
 //! PNG alone, its mips made here by the bake's own box filter
-//! (`lightmap::mask_levels`).
+//! (`scene::lighting::page::mask_levels`).
 
 use std::path::Path;
 
@@ -141,7 +141,7 @@ fn preview_direction_page(path: &str) -> Result<(wgpu::TextureFormat, u32, Vec<V
 }
 
 /// One shadowmask page (#1695): its PNG's occlusions with the mips the colour
-/// pages carry (`lightmap::mask_levels`, the same box filter), as RGBA8.
+/// pages carry (`scene::lighting::page::mask_levels`, the same box filter), as RGBA8.
 fn mask_page(path: &str) -> Result<(wgpu::TextureFormat, u32, Vec<Vec<u8>>), String> {
     let image = square_rgba8(path)?;
     let edge = image.width();
