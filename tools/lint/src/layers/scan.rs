@@ -1,8 +1,8 @@
-//! Source scan for the layering lint: which top-level modules each file names.
+//! Source scan for the layering lint: which sibling crates each file names.
 //!
 //! Test code is exempt (#724), as `gate` defines it: a test-gated item is
 //! skipped here, and the graph drops the test-only files whole. Not a parser — a
-//! coarse line scan, like the direction guard.
+//! coarse line scan.
 
 use super::extent::item_end;
 use super::gate::{is_test_gate, test_only_files};
@@ -13,10 +13,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// The engine's modules, read once and shared by the module list, the edge scan
-/// and the external-crate scan (#1136): every `.rs` file's text under `src/` and
-/// under each moved module's `crates/<m>/src/` (`crate::modules`), and which files
-/// are test-only.
+/// The engine's modules, read once and shared by the edge scan and the
+/// external-crate scan (#1136): every `.rs` file's text under each module's
+/// `crates/<m>/src/` (`crate::modules`), and which files are test-only.
 pub struct Tree {
     pub root: PathBuf,
     sources: BTreeMap<PathBuf, String>,
@@ -26,8 +25,8 @@ pub struct Tree {
 impl Tree {
     /// The tree of the repository at `root` (`""` for the working directory).
     pub fn read(root: &Path) -> Self {
-        let mut files = walk(&root.join("src"));
-        for m in modules::moved(root) {
+        let mut files = Vec::new();
+        for m in modules::all(root) {
             files.extend(walk(&modules::dir(root, &m)));
         }
         let sources: BTreeMap<PathBuf, String> = files
@@ -42,20 +41,8 @@ impl Tree {
         }
     }
 
-    /// The top-level module `file` belongs to, read at its module path; `None` for
-    /// the root package's crate roots and binaries.
+    /// The module whose crate holds `file`.
     pub fn owner(&self, file: &Path) -> Option<String> {
-        let rel = file.strip_prefix(&self.root).unwrap_or(file);
-        let at = rel.to_string_lossy();
-        let at = modules::module_path(&at);
-        let rel = Path::new(at.as_ref()).strip_prefix("src").ok()?;
-        let first = rel.components().next()?.as_os_str().to_str()?;
-        let name = first.strip_suffix(".rs").unwrap_or(first);
-        (!matches!(name, "bin" | "lib" | "main")).then(|| name.to_string())
-    }
-
-    /// The moved module whose crate holds `file`, where `crate::` names that module.
-    pub fn crate_of(&self, file: &Path) -> Option<String> {
         let rel = file.strip_prefix(&self.root).unwrap_or(file);
         modules::crate_module(&rel.to_string_lossy()).map(str::to_string)
     }
@@ -73,8 +60,8 @@ impl Tree {
     }
 }
 
-/// One reference to another module in non-test, non-comment code:
-/// `crate::<module>` in the root package, `rusty_<module>::` anywhere.
+/// One reference to a sibling crate in non-test, non-comment code:
+/// `rusty_<module>::`.
 pub struct Ref {
     pub line: usize,
     pub module: String,
@@ -104,23 +91,13 @@ fn walk_into(dir: &Path, out: &mut Vec<PathBuf>) {
 
 pub use crate::code::is_ident;
 
-/// The module references in `content`, minus comments and inline `#[cfg(test)]`
-/// items. `crate::{a, b::C}` yields both `a` and `b`; `rusty_core::x` yields
-/// `core`. In a moved module's crate (`in_crate`), `crate::` names the module
-/// itself, so only its `rusty_<module>::` paths count.
-pub fn refs(content: &str, in_crate: bool) -> Vec<Ref> {
+/// The sibling crates `content` names, minus comments and inline `#[cfg(test)]`
+/// items: `rusty_core::x` yields `core`.
+pub fn refs(content: &str) -> Vec<Ref> {
     let mut out = Vec::new();
-    let mut group: Option<i32> = None;
     for (line, code) in live_lines(content) {
-        // Walked in a crate too, so a multi-line `crate::{…}` is never misread.
-        let own = crate_refs(&code, &mut group);
         let named = sibling_refs(&code);
-        let modules = if in_crate {
-            named
-        } else {
-            own.into_iter().chain(named).collect()
-        };
-        out.extend(modules.into_iter().map(|module| Ref { line, module }));
+        out.extend(named.into_iter().map(|module| Ref { line, module }));
     }
     out
 }
@@ -156,63 +133,6 @@ pub fn live_lines(content: &str) -> Vec<(usize, Cow<'_, str>)> {
         i += 1;
     }
     out
-}
-
-/// Module names a line references. `group` carries an open `crate::{` across
-/// lines: `Some(depth)` while inside it, so a multi-line import still counts.
-fn crate_refs(code: &str, group: &mut Option<i32>) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut rest = code;
-    if let Some(d) = *group {
-        if d == 1 {
-            out.extend(leading_ident(rest));
-        }
-        rest = group_names(rest, group, &mut out);
-    }
-    while let Some(at) = find_crate(rest) {
-        let after = &rest[at + "crate::".len()..];
-        if let Some(inner) = after.strip_prefix('{') {
-            *group = Some(1);
-            out.extend(leading_ident(inner));
-            rest = group_names(inner, group, &mut out);
-        } else {
-            out.extend(leading_ident(after));
-            rest = after;
-        }
-    }
-    out
-}
-
-/// Walk an open `crate::{ … }` group, collecting the first segment of each entry
-/// at depth 1; returns what follows the group's close (or "" if still open).
-fn group_names<'a>(s: &'a str, group: &mut Option<i32>, out: &mut Vec<String>) -> &'a str {
-    let Some(mut d) = *group else { return s };
-    for (at, c) in s.char_indices() {
-        match c {
-            '{' => d += 1,
-            '}' if d == 1 => {
-                *group = None;
-                return &s[at + 1..];
-            }
-            '}' => d -= 1,
-            ',' if d == 1 => out.extend(leading_ident(&s[at + 1..])),
-            _ => {}
-        }
-    }
-    *group = Some(d);
-    ""
-}
-
-fn find_crate(s: &str) -> Option<usize> {
-    s.match_indices("crate::")
-        .find(|(at, _)| !s[..*at].chars().next_back().is_some_and(is_ident))
-        .map(|(at, _)| at)
-}
-
-fn leading_ident(s: &str) -> Option<String> {
-    let s = s.trim_start();
-    let end = s.find(|c: char| !is_ident(c)).unwrap_or(s.len());
-    (end > 0 && s[..end] != *"self").then(|| s[..end].to_string())
 }
 
 #[cfg(test)]

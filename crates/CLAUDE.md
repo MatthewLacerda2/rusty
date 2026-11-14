@@ -1,73 +1,59 @@
 # CLAUDE.md — the workspace's crates
 
-This file loads when you work under `crates/`. The engine is a cargo workspace being
-split **one crate per top-level module**: `src/<module>/` becomes `rusty-<module>`
-under `crates/<module>/` (`rusty_<module>` in code), one module (or one tight group)
-per pull request, bottom-up through `tools/lint/src/layers/table.rs`. The tree is
-half moved for many PRs, and everything must work that way. This is the recipe.
+This file loads when you work under `crates/`. The engine is a cargo workspace of
+**one crate per top-level module**: `rusty-<module>` under `crates/<module>/`
+(`rusty_<module>` in code), one row each of `tools/lint/src/layers/table.rs`,
+bottom-up. The root package holds only the binaries (`src/main.rs`, `src/bin/`), the
+integration tests (`tests/`) and `src/lib.rs`'s re-exports. These are the rules a
+crate follows, and how to add one.
 
-## How code names a moved module
-- **The root package re-exports each moved crate under its old name**
-  (`pub use rusty_core as core;` in `src/lib.rs`), so every `crate::core::…` in
-  `src/` and `rusty::core::…` in `tests/` keeps compiling untouched. Don't rewrite
-  those paths: they change when their own module moves.
-- **Inside a moved crate**, its own items are `crate::…` and a sibling crate is
-  `rusty_<module>::…` directly. No alias back to the old names.
-- A macro another module calls is `#[macro_export]`, written with `$crate::…`
-  (`rusty_core::named_enum!`, reached as `crate::core::named_enum!` from the root).
+## How code names a crate
+- **The root package re-exports each crate under its module's name**
+  (`pub use rusty_core as core;` in `src/lib.rs`), so the binaries and `tests/` name
+  one surface, `rusty::core::…`.
+- **Inside a crate**, its own items are `crate::…` and a sibling crate is
+  `rusty_<module>::…` directly. No alias back to the root's names.
+- A macro another crate calls is `#[macro_export]`, written with `$crate::…`
+  (`rusty_core::named_enum!`).
 
-## Moving a module, step by step
-`make move-crate MODULE=<m>` makes steps 1–4 and prints, as *by hand*, what a text
-edit cannot settle (a `crate::<x>` naming a module the row does not list, a
-`crate::{…}` group, `CARGO_MANIFEST_DIR`, a `cfg!(test)` in live code, a string path from the checkout's root, an optional dependency no single `dev` /
-`editor` feature turns on, a feature other than those two, and every tracked file
-outside the crate still naming `src/<m>/`). Read its diff: it is the recipe below, run.
-1. `git mv src/<m> crates/<m>/src`, then `git mv crates/<m>/src/mod.rs
-   crates/<m>/src/lib.rs`. Its `#![deny(clippy::unwrap_used)]` (a sim row) or its
-   clock opt-out (a platform row) stays at the top of `lib.rs`. The module's saved
-   proptest seeds move too, `proptest-regressions/<m>/` →
-   `crates/<m>/proptest-regressions/`: proptest reads them beside the folder of the
-   nearest `lib.rs`, now the crate's, and left at the root they never replay (the
-   `orphan-seeds` lint fails on one).
-2. Inside the crate: `crate::<dep>::` → `rusty_<dep>::` for each dep in its table
-   row (a macro's `$crate::<dep>::` → `::rusty_<dep>::`). An import binding the
-   module's name is settled in its plain forms only: `use crate::<dep>;` and a
-   one-line, flat `{self, …}` with `self` first have the file's `<dep>::` paths
-   rewritten and the import (with its attributes) or its `self` dropped; a re-export
-   keeps its name, `pub use rusty_<dep> as <dep>;` or `{self as <dep>, …}`; `use
-   crate::<dep> as x;` becomes `use rusty_<dep> as x;`. Any other form a `self` sits
-   in (not first, beside a nested group, a comment in the group, `{self,}`, over
-   several lines) is listed, never guessed (`.github/scripts/crate_imports.py`). Then
-   `crate::<m>::` → `crate::` and `pub(in crate::<m>)` → `pub(crate)` (siblings
-   first, so a submodule named like a module, `crate::render::scene::`, stays the crate's own). A module the row does
-   not list is left alone and listed: it is a unit test reaching up (*What the
-   compiler will name*). Headers that name a path (`//! src/<m>/x.rs — …`) become
-   `crates/<m>/src/x.rs` (`make rules`, `self-path`), and `lib.rs`'s, which as a
-   `mod.rs` may have named its directory (`//! src/<m> — …`), names `lib.rs`. A relative `include_str!` /
-   `include_bytes!` is re-aimed from the file's new folder, in the crate and in any
-   file outside whose include names a file of the crate.
-3. `crates/<m>/Cargo.toml`: `version`, `edition` and `publish` `.workspace = true`;
+## What cargo holds, and what `make layers` adds
+A crate can name only what its `Cargo.toml` depends on, and a cycle of
+`[dependencies]` does not resolve: cargo holds the edges. `make layers` holds the
+layer table **equal** to the manifests (each row's `deps` are its sibling
+`[dependencies]`, its `uses` its external ones, plus the common crates in
+`tools/lint/src/layers/externs/policy.rs`), and adds what cargo cannot know: the
+rows' bottom-up order, the sim mark (a sim crate depends only on sim crates and
+never on a display crate, `wgpu`, `egui*`, `rusty-render` or `rusty-editor`, not
+even as a dev-dependency), a dev-dependency only on a crate below its row (cargo
+accepts a dev-dependency cycle), and no declared edge that live code no longer
+names (cargo builds an unused dependency without a word).
+
+## Adding a crate
+1. `crates/<m>/src/lib.rs`, with `#![deny(clippy::unwrap_used)]` at its top for a
+   sim row, or the clock opt-out for a platform row that reads real time (`make
+   determinism` lets only a platform root opt out).
+2. `crates/<m>/Cargo.toml`: `version`, `edition` and `publish` `.workspace = true`;
    `[lints] workspace = true` (`make determinism` fails a member without it: the
-   clock ban and every deny live there); every dependency `{ workspace = true }`,
-   the external crates exactly its table row's plus the common ones it names, its
-   sibling crates exactly its row's `deps`. A crate only its tests name is a
-   `[dev-dependencies]` entry; one the root has under a `[target.…]` table keeps
-   that table. A new external version goes in the
-   root's `[workspace.dependencies]`, never in a member.
+   clock ban and every deny live there); every dependency `{ workspace = true }`.
+   A crate only its tests name is a `[dev-dependencies]` entry; a platform-specific
+   one sits under its `[target.…]` table. A new external version goes in the root's
+   `[workspace.dependencies]`, never in a member.
+3. A row in the layer table, in its bottom-up place, `sim` or `platform`, its
+   `deps` and `.uses(&[…])` exactly the manifest's (`make layers` names any
+   difference).
 4. The root `Cargo.toml`: the crate in `[workspace.dependencies]` and the root's
-   `[dependencies]`; `src/lib.rs`: drop `pub mod <m>;`, add the re-export. A
-   `pub mod` gated by a feature stays gated (*Features*).
-5. Every tracked file outside the crate that names `src/<m>/` (the tool lists them):
-   a file path (a fixture, a mutation glob, a doc) becomes `crates/<m>/src/…`; a
-   module path the lint tools read (the layer table, `externs/policy.rs`) stays.
-6. `cargo fmt --all` (the rewritten imports re-sort), then
-   `cargo check --workspace --all-targets` with `--features dev` and with
-   `--no-default-features`, then fix what the compiler names (below), then
-   `make gates`.
+   `[dependencies]`; `src/lib.rs`: its re-export (gated, when the crate is a
+   feature's: *Features*).
+5. `cargo check --workspace --all-targets` with `--features dev` and with
+   `--no-default-features`, then `make gates`.
 
-## What the compiler will name
-- **`pub(crate)` reached from another module** becomes `pub`: it is now that
-  crate's API, so say so in the PR. An item only tests use elsewhere is a *test hook*.
+A member that is no module of the table (`test-support`) is listed in both
+`NOT_MODULES`, `tools/lint/src/modules.rs` and `.github/scripts/modules.py`, which
+`make scripts` holds equal (`modules.drift`).
+
+## Crossing a crate boundary
+- **An item another crate reaches is `pub`**: it is that crate's API, so a PR making
+  one `pub` says so. An item only tests use elsewhere is a *test hook*.
 - **Test hooks.** A `#[cfg(test)]` item is invisible outside its crate, so one that
   another crate's tests call is compiled in every build, `#[doc(hidden)] pub`, with a
   line saying it is a test hook (`core::project::pin_engine`, `core::hulls::forget`,
@@ -94,36 +80,35 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
   integration suite through `tests/temp.rs`; a folder spelled from the working
   directory is `temp::relative`. A fixture that is plain data moves here; one built on a
   crate's types is a test hook instead.
-- **An inherent `impl` a module above writes for a moved crate's type** no longer
-  builds (E0116): a method on the type's own data moves into the crate beside it
+- **An inherent `impl` a crate above writes for a sibling's type** does not
+  build (E0116): a method on the type's own data moves into the crate beside it
   (`scene::nav_settings::NavMeshSettings::define_area`), a helper only the module
   above needs becomes its free function (`navigation::bounds`' `grown`).
-- **A unit test that reaches into another module** (its items or its private ones)
-  moves to that module's tests, or to `tests/`. One reaching *up* (a module above
-  the crate, which no crate may depend on) splits: the crate keeps its own half,
-  and the half checking the module above moves to that module's tests, through
-  the crate's public API (an import check that bakes moves to `scene`'s tests).
-  One naming a module *below* that the row does not list (a test baking with
-  `procgen`) takes `rusty-<x>` as a `[dev-dependencies]` entry, by hand (the tool
-  lists it), and names it `rusty_<x>::`: the layer table does not hold test code.
-  Forward the crate's `dev` / `editor` features to it as to any sibling (*Features*).
-  *Below* means an earlier row. `make layers` flags a member's dev-dependency on
-  itself or on a module at or above its row.
-- **Two modules that name each other are one crate**, the pair its submodules under
-  a new module name (`script` holds `scripting` and `api`): rename them into
-  `src/<new>/` inside the root package first (`crate::api::` → `crate::script::api::`
-  in `src/`, `rusty::api::` → `rusty::script::api::` in `tests/`), give the table one row for both, then `make move-crate` the
-  new module as any other. Inside the crate the halves stay `crate::api::…` and
-  `crate::scripting::…`.
+- **A unit test that reaches into another crate's private items** moves to that
+  crate's tests, or to `tests/`. One reaching *up* (a crate above, which no crate
+  may depend on) splits: the crate keeps its own half, and the half checking the
+  crate above moves to that crate's tests, through the lower crate's public API.
+  One naming a crate *below* that the row does not list (a test baking with
+  `procgen`) takes `rusty-<x>` as a `[dev-dependencies]` entry and names it
+  `rusty_<x>::`: the table's `deps` are live code's. Forward the crate's `dev` /
+  `editor` features to it as to any sibling (*Features*). *Below* means an earlier
+  row; `make layers` flags a dev-dependency on the crate itself or on one at or
+  above its row.
+- **Two modules that name each other are one crate**, the pair its submodules
+  (`script` holds `scripting` and `api`, one row for both). Inside the crate the
+  halves are `crate::api::…` and `crate::scripting::…`.
 - **`env!("CARGO_MANIFEST_DIR")`** names the crate's folder, not the checkout, and
   so does the working directory a crate's tests run in: use
   `rusty_core::project::checkout()` for a path in the checkout (`engine/`, a fixture).
 - **A crate's warnings reach the console** by their log target: `logging` keeps
-  `rusty::…` and every `rusty_<module>::…`, so a moved crate needs nothing for it.
+  `rusty::…` and every `rusty_<module>::…`, so a crate needs nothing for it.
 - **A build script's `cargo:rustc-env`** reaches only its own package, so a build
   script moves with the code that reads its variables (`crates/core/build.rs`).
 
 ## Features
+- **A crate whose tests link `rusty-dev`** (a dependency or dev-dependency) expands
+  `rusty_dev::no_provider_keys!();` once in its tests, under `#[cfg(all(test,
+  feature = "dev"))]`: no test binary may hold a provider key (`key-guard`).
 - A crate holding `cfg(feature = "dev")` or `"editor"` code declares that feature
   itself, and the root's feature turns it on directly (`dev = ["rusty-core/dev", …]`).
   A crate with none declares none, even beside a sibling that has one: the root
@@ -134,9 +119,9 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
   ["rusty-core/dev"]`), a dev-dependency sibling too (`rusty-physics`' `editor`
   turns on `rusty-asset/editor` for its sidecar tests), so its own `cargo test -p`
   build sees the sibling's gated items.
-- **A feature-gated module stays gated.** `#[cfg(feature = "dev")] pub mod dev;`
-  becomes `#[cfg(feature = "dev")] pub use rusty_dev as dev;`, the root depends on
-  `rusty-dev` with `optional = true`, and its `dev` feature turns it on
+- **A feature's crate is an optional dependency.** `rusty-dev` and `rusty-editor`
+  are re-exported gated (`#[cfg(feature = "dev")] pub use rusty_dev as dev;`), the
+  root depends on each with `optional = true`, and its feature turns it on
   (`"dep:rusty-dev"`). A crate depending on such a sibling depends on it optionally
   behind the same feature.
 - The player (`--no-default-features`) must still build without egui and without
@@ -145,23 +130,21 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
 
 ## Profiles
 - `[profile.dev.package."*"]` optimises dependencies only, never a member, so a
-  moved crate keeps the edit-loop's opt-level 0. A member past ~256 codegen units
-  (the root's `codegen-units = 4096` note) gets the same override row.
+  crate keeps the edit-loop's opt-level 0.
 
-## The tools already know both places
+## Module paths in the tools
 `tools/lint` (`tools/lint/src/modules.rs`) and the scripts (`.github/scripts/modules.py`)
-read a moved file at its **module path**, `src/<m>/…`, so the layer table, the rules,
-the determinism and direction gates, `make review-level`'s table and the
-`stored-format` markers, coverage isolation and a `SCOPE=diff` mutation run hold a
-module in either place. **A path glob does not**: `mutants-sweep.yml`'s
-`SWEEP_FILES`, `make mutants-remote SCOPE='src/<m>/**'` and a string path in another
-module's code name the file where it lies, so the move rewrites them (step 5);
-`mutants-scope.py` refuses any one glob that matches nothing. Keep the two mirrors in
-step. A member that is no module of the table (`test-support`) is listed in both
-`NOT_MODULES`, which `make scripts` holds equal (`modules.drift`).
+read a crate's file at its **module path**, `src/<m>/…` (`lib.rs` read as
+`mod.rs`): the one spelling the rules' scopes, the layer table's sim and platform
+sets, the determinism gate, `make review-level`'s table, the `stored-format`
+markers, coverage isolation and a `SCOPE=diff` mutation run share. Write a scope
+there as a module path; a finding still names the real `crates/<m>/src/…` path.
+**A path glob does not** go through it: `mutants-sweep.yml`'s `SWEEP_FILES`, `make
+mutants-remote SCOPE='crates/<m>/src/**'` and a string path in code name the file
+where it lies; `mutants-scope.py` refuses any one glob that matches nothing. Keep
+the two mirrors in step.
 
-## What the PR shows
+## What a PR adding or splitting a crate shows
 - The `cargo check` matrix and `make gates` green on its head.
-- Each `pub(crate)` made `pub`, each test hook added, each test moved, by name.
-- No doc or skill still names a `src/<m>/` path that moved (`make docrefs` checks
-  paths in backticks; grep for the rest).
+- Each item made `pub` for another crate, each test hook added, each test moved,
+  by name.

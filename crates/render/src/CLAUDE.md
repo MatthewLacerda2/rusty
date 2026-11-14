@@ -6,9 +6,9 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
 `docs/testing.md` is the reference for GPU tests.
 
 ## Where render sits
-- **Platform layer, downstream of the sim.** Render may read the sim modules its row in
-  `tools/lint/src/layers/table.rs` lists; no sim module references `crate::render`,
-  `wgpu` or `egui` (`make direction`). What the sim needs from shaders (validating a
+- **Platform layer, downstream of the sim.** Render depends on the sim crates its row in
+  `tools/lint/src/layers/table.rs` lists; no sim crate depends on `rusty-render`,
+  `wgpu` or `egui`, not even in its tests (`make layers`). What the sim needs from shaders (validating a
   bake, say) lives in a sim module render reads, as `shadergen` does, never in a call
   up into render.
 - The module root opts out of the clock ban because GPU timing is wall-clock;

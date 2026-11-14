@@ -1,23 +1,14 @@
 //! The integration binary holds no provider key either (#974), under any runner:
 //! keys are read only by a binary that opted in at startup
-//! (`dev::providers::read_keys`), and no test binary does, so this holds under plain
+//! (`dev::providers::read_keys`), and no test binary does (`rusty_dev::no_provider_keys!`,
+//! which each member crate linking `rusty-dev` expands too), so this holds under plain
 //! `cargo test` as under nextest; a binary this suite spawns is told to read none
 //! (`spawn`). Gated on `dev`.
 
-use rusty::dev::providers::{environment, keys_blanked, resolve, Provider, NO_KEYS_VAR};
+use rusty::dev::providers::NO_KEYS_VAR;
 
-#[test]
-fn the_integration_binary_never_opted_in() {
-    assert!(keys_blanked());
-}
-
-#[test]
-fn no_provider_key_resolves_in_the_integration_binary() {
-    let env = environment();
-    for provider in Provider::ALL {
-        assert!(resolve(provider, &env).is_err(), "{}", provider.variable());
-    }
-}
+// The tripwire every test binary linking `rusty-dev` expands (`key-guard`).
+rusty_dev::no_provider_keys!();
 
 #[test]
 fn a_spawned_engine_binary_is_told_to_read_no_key() {

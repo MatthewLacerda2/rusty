@@ -4,7 +4,7 @@
 A shipped game is the `player` binary built `--no-default-features` (CLAUDE.md,
 *The editor is a feature too* and *Dev-only build profile*). Clippy on that
 feature set only proves the code compiles without naming egui or `dev`; it never
-fails when a manifest links one anyway. While the engine is split into crates
+fails when a manifest links one anyway. In the workspace of crates
 (`crates/CLAUDE.md`), that is one `{ workspace = true }` without its `optional`
 away: a member that names egui plainly puts it in every build. So this reads
 what the player build resolves, `cargo tree -p rusty --no-default-features -e

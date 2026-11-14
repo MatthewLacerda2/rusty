@@ -130,7 +130,7 @@ def unfinished(shard: Path) -> str:
 
     `budget`: it stopped itself at its budget (`timeout`'s 124/137). `timeouts:t/v`:
     it finished, but most of its viable mutants timed out, so it measured the tool
-    breaking, not the code (#2164: every mutant of a moved crate timed out and the
+    breaking, not the code (#2164: every mutant of a member crate timed out and the
     report read clean). `exit:<code>`: anything else, `baseline` (its suite failed
     unmutated) or `none` (no exit code: cut off before its run) included.
     """

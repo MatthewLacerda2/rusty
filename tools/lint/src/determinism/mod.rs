@@ -89,7 +89,7 @@ const REPORT: &str = ".lint/report.txt";
 pub fn run() {
     let read = |p: &str| fs::read_to_string(p).unwrap_or_default();
     let mut violations = config_violations(&read("clippy.toml"), &read("Cargo.toml"));
-    // The root package holds the modules not yet moved: it inherits the policy too.
+    // The root package (the binaries and `tests/`) inherits the policy too.
     violations.extend(member_violations("Cargo.toml", &read("Cargo.toml")));
     for manifest in crate::modules::member_manifests(Path::new("")) {
         let at = manifest.to_string_lossy();

@@ -18,7 +18,6 @@ mod code;
 mod components;
 mod dead_pub;
 mod determinism;
-mod direction;
 mod layers;
 mod modules;
 mod parity;
@@ -36,15 +35,9 @@ fn main() {
         return;
     }
 
-    // `--direction` runs the dependency-direction guard (#494): sim modules must not
-    // reference `crate::render`, `crate::editor`, `wgpu` or `egui`.
-    if args.iter().any(|a| a == "--direction") {
-        direction::run();
-        return;
-    }
-
-    // `--layers` runs the module-layering lint (#724): every `crate::<module>`
-    // reference must match the declared table in `layers/table.rs`.
+    // `--layers` runs the layering lint (#724): the declared table in
+    // `layers/table.rs` must equal the workspace's manifests, sim rows must stay sim
+    // and away from the display crates, and every declared edge must be used.
     if args.iter().any(|a| a == "--layers") {
         layers::run();
         return;

@@ -32,7 +32,7 @@ export PROPTEST_RNG_SEED ?= $(PROPTEST_SEED)
 # `deny` sits last: its failures are about dependencies (and it needs the network),
 # so a code failure reports first. GATES is exactly the two lists joined —
 # `make scripts` (test_gate_mirror.py) fails when it is anything else.
-QUICK_GATES := fmt size rules layers determinism direction components parity test-lint scripts feature-split player-tree docrefs
+QUICK_GATES := fmt size rules layers determinism components parity test-lint scripts feature-split player-tree docrefs
 HEAVY_GATES := clippy doc test deny
 GATES := $(QUICK_GATES) $(HEAVY_GATES)
 # Checks on the gate runner itself, run before any gate.
@@ -40,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote move-crate test-explore test-one-process dead-pub editor-capture game game-test export launcher bench bless-converters
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-explore test-one-process dead-pub editor-capture game game-test export launcher bench bless-converters
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -139,14 +139,11 @@ size: ## [gate] File-length cap on .rs, .py, .lua and .wgsl, and the agent docs'
 rules: ## [gate] Finding-based rules with inline allows, one module each in tools/lint/src/rules (docs/linting.md lists them)
 	$(LINT) -- --rules
 
-layers: ## [gate] Module imports and external crates match the declared layer table (tools/lint/src/layers/table.rs)
+layers: ## [gate] The layer table (tools/lint/src/layers/table.rs) equals the crates' manifests; sim crates stay sim and off wgpu/egui
 	$(LINT) -- --layers
 
 determinism: ## [gate] Lint policy: only platform roots opt out of the clock/RNG ban; locked escapes; reasons denied
 	$(LINT) -- --determinism
-
-direction: ## [gate] Sim modules never import render/editor/wgpu/egui
-	$(LINT) -- --direction
 
 components: ## [gate] Every first-class component has all four axes
 	$(LINT) -- --components
@@ -335,11 +332,6 @@ review-level: ## The independent review's level (high or medium) and why. make r
 # re-briefs by their `Round:` line. A report, never a gate: exits 0.
 rebriefs: ## Briefs per issue and re-briefs by Round. ARGS="--since 2026-10-29" sets the window
 	@python3 .github/scripts/rebriefs.py $(ARGS)
-
-# The mechanical half of moving a module into its own crate (crates/CLAUDE.md).
-move-crate: ## Move a module into crates/<m>/: make move-crate MODULE=<m>, then fix what it lists
-	@test -n "$(MODULE)" || { echo "move-crate: name the module: make move-crate MODULE=<m>" >&2; exit 2; }
-	@python3 .github/scripts/move_crate.py $(MODULE)
 
 # ---- signals (#750)---------------------------------------------------------
 

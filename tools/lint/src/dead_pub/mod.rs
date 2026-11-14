@@ -8,8 +8,9 @@
 //! `--features dev`: with `--profile test` (dead even counting tests) and without
 //! (the difference is what only tests use). Both share this worktree's `target/`,
 //! so only the copied crate itself compiles. Code behind `not(feature = "dev")` is
-//! not seen, and neither is a moved crate's `pub` API (`crates/`): the fold makes only
-//! the root package's modules crate-private. The recipe and what it found first are #940's. It runs weekly on
+//! not seen, and neither is a member crate's `pub` API (`crates/`): the fold makes only
+//! the root package's modules crate-private, and since the workspace split the root
+//! has none, so the signal finds nothing until #2176 widens the fold. The recipe and what it found first are #940's. It runs weekly on
 //! `main` (`cargo-test.yml`'s `dead-pub` job), so a fold that stops compiling
 //! goes red there instead of silently (#1205).
 //!

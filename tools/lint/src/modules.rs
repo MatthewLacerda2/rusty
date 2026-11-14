@@ -1,9 +1,10 @@
-//! Where a top-level module's code lives while the engine is split into crates
-//! (`crates/CLAUDE.md`): `src/<m>/` until it moves, `crates/<m>/src/` after, with
-//! `crates/<m>/src/lib.rs` in the place of `src/<m>/mod.rs`. Every pass that scopes
-//! by module reads a file at its **module path**, the `src/<m>/…` spelling the
-//! file has wherever it lives, so one rule or table row holds a module before and
-//! after its move. A finding still names the file's real path.
+//! Where a top-level module's code lives: each is a workspace member,
+//! `crates/<m>/src/`, whose `lib.rs` is the module's root (`crates/CLAUDE.md`).
+//! Every pass that scopes by module reads a file at its **module path**,
+//! `src/<m>/…` (`crates/<m>/src/lib.rs` read as `src/<m>/mod.rs`): the spelling the
+//! rules' scopes, the layer table's sim and platform sets, `make review-level`'s
+//! table and the `stored-format` markers share with the scripts' mirror,
+//! `.github/scripts/modules.py`. A finding still names the file's real path.
 
 use std::borrow::Cow;
 use std::fs;
@@ -22,7 +23,7 @@ pub const NOT_MODULES: &[(&str, &str)] = &[(
     "the in-crate tests' shared helpers, only ever a dev-dependency",
 )];
 
-/// The module a moved file belongs to: `<m>` for `crates/<m>/…`, unless `<m>` is
+/// The module a file belongs to: `<m>` for `crates/<m>/…`, unless `<m>` is
 /// one of [`NOT_MODULES`].
 pub fn crate_module(path: &str) -> Option<&str> {
     let rest = path.strip_prefix(CRATES)?.strip_prefix('/')?;
@@ -32,8 +33,8 @@ pub fn crate_module(path: &str) -> Option<&str> {
 
 /// `path` at its module path: `crates/<m>/src/lib.rs` → `src/<m>/mod.rs`,
 /// `crates/<m>/src/<rest>` → `src/<m>/<rest>`, the folder `crates/<m>/src` →
-/// `src/<m>`; any other path unchanged (a
-/// module not yet moved, a crate's `build.rs` or manifest, a non-module member).
+/// `src/<m>`; any other path unchanged (the root package's `src/`, a crate's
+/// `build.rs` or manifest, a non-module member).
 pub fn module_path(path: &str) -> Cow<'_, str> {
     let Some(m) = crate_module(path) else {
         return Cow::Borrowed(path);
@@ -49,19 +50,14 @@ pub fn module_path(path: &str) -> Cow<'_, str> {
     }
 }
 
-/// The folder that holds module `m`'s code under `root`: `crates/<m>/src` once it
-/// moved, else `src/<m>`.
+/// The folder that holds module `m`'s code under `root`: `crates/<m>/src`.
 pub fn dir(root: &Path, m: &str) -> PathBuf {
-    let moved = root.join(CRATES).join(m).join("src");
-    if moved.is_dir() {
-        moved
-    } else {
-        root.join("src").join(m)
-    }
+    root.join(CRATES).join(m).join("src")
 }
 
 /// Where the file or folder at module path `at` really is under `root`: the
-/// inverse of [`module_path`] for a moved module, `root.join(at)` otherwise.
+/// inverse of [`module_path`] for a module's crate, `root.join(at)` for a path
+/// that is no module's (the root package's `src/lib.rs` and `src/bin/`).
 pub fn real(root: &Path, at: &str) -> PathBuf {
     let Some(rest) = at.strip_prefix("src/") else {
         return root.join(at);
@@ -78,9 +74,9 @@ pub fn real(root: &Path, at: &str) -> PathBuf {
     }
 }
 
-/// The modules already moved under `root`: every member of `crates/` with a
-/// `src/` folder but the [`NOT_MODULES`], sorted.
-pub fn moved(root: &Path) -> Vec<String> {
+/// The modules under `root`: every member of `crates/` with a `src/` folder but
+/// the [`NOT_MODULES`], sorted.
+pub fn all(root: &Path) -> Vec<String> {
     let mut out: Vec<String> = fs::read_dir(root.join(CRATES))
         .into_iter()
         .flatten()

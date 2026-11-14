@@ -1,5 +1,5 @@
 //! Which external crates a file names: the scan behind the crate half of the table
-//! (#938). Not a parser, like the `crate::` scan beside it, but it knows the one
+//! (#938). Not a parser, like the sibling-crate scan beside it, but it knows the one
 //! thing a line scan gets wrong: a local item that shares a crate's name. A file
 //! that declares `mod image;` or imports `super::image` means its own `image::` when
 //! it writes one, so that name is not counted there. Glob imports (`use super::*`)

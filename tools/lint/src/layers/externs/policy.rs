@@ -6,21 +6,14 @@ pub struct Confined {
     pub within: &'static [&'static str],
 }
 
-/// A crate use the table's rules forbid but the code still has, tracked by an open
-/// issue. Allowed until fixed; reported as stale the moment it disappears.
-pub struct CrateException {
-    pub module: &'static str,
-    pub krate: &'static str,
-    pub issue: u32,
-}
-
 pub struct Policy {
     /// The vocabulary every module may name without its row listing it.
     pub common: &'static [&'static str],
     /// Dependencies no module names: each says why it is in `Cargo.toml` at all.
     pub unscoped: &'static [(&'static str, &'static str)],
     pub confined: &'static [Confined],
-    pub exceptions: &'static [CrateException],
+    /// Crates no sim member may depend on, tests included: the display layer's.
+    pub display: &'static [&'static str],
 }
 
 pub const POLICY: Policy = Policy {
@@ -47,7 +40,18 @@ pub const POLICY: Policy = Policy {
             within: &["src/dev/providers"],
         },
     ],
-    exceptions: &[],
+    // The sim runs headless, with no GPU and no UI (#494): the arrow is display →
+    // sim, never back. The engine's own display crates are platform rows, which
+    // `SIM_LEAK` and the dev-dependency check already keep out of a sim crate.
+    display: &[
+        "egui",
+        "egui_phosphor",
+        "egui_wgpu",
+        "egui_winit",
+        "rusty_editor",
+        "rusty_render",
+        "wgpu",
+    ],
 };
 
 const fn egui(krate: &'static str) -> Confined {

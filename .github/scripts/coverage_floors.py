@@ -6,7 +6,7 @@ run ratchets against. The run itself is an informational signal, but the floor
 file is not: "never lower one silently to make a table green" was a sentence in
 the file's header, `docs/testing.md` and the ci-merge skill, and nothing held
 it. A floor that drops (or a floored module that disappears while its
-`src/<module>/`, or its moved `crates/<module>/src/`, is still there) is a finding unless the lowered line carries an
+`crates/<module>/src/` is still there) is a finding unless the lowered line carries an
 inline reason:
 
     api 85.00  # reason: the Sound.* adapter moved out of api (#1234)
@@ -15,7 +15,7 @@ A reason answers for one drop: lowering a line again while keeping the reason
 it already had is still silent. A raise, an unchanged floor and a new floor
 always pass. A removed floor can
 carry no reason on its line, so it passes only when its module is gone from
-`src/` (`coverage-ignore.py` refuses a floor on a missing directory anyway), or
+`crates/` (`coverage-ignore.py` refuses a floor on a missing crate anyway), or
 when it was split into floors on its halves (`script` into `script/api` and
 `script/scripting`): every folder the old floor covered then needs a half floor
 at least the old value, and a half below it, or a missing one, needs a reason on

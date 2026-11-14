@@ -49,6 +49,30 @@ mod tests;
 use std::path::Path;
 
 pub use credentials::{environment, keys_blanked, read_keys, resolve, NO_KEYS_VAR};
+
+/// A test hook: the provider-key tripwire (#974) for a test binary that links this
+/// crate. Every package whose `[dependencies]` names `rusty-dev` expands it once in
+/// its tests, under `dev` (the `key-guard` lint holds it): its test binary never
+/// opted in to keys, and no provider key resolves in it.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! no_provider_keys {
+    () => {
+        #[test]
+        fn this_test_binary_never_opted_in_to_provider_keys() {
+            assert!($crate::providers::keys_blanked());
+        }
+
+        #[test]
+        fn no_provider_key_resolves_in_this_test_binary() {
+            let env = $crate::providers::environment();
+            for provider in $crate::providers::Provider::ALL {
+                let got = $crate::providers::resolve(provider, &env);
+                assert!(got.is_err(), "{}", provider.variable());
+            }
+        }
+    };
+}
 pub use headless::{edit_mode, HeadlessHold};
 pub use ledger::Ledger;
 pub use refusal::Refusal;

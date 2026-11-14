@@ -90,7 +90,7 @@ opened since then.
    `--no-check`. Every merged tree but a Markdown-only one touching no agent doc
    (a `CLAUDE.md`, a skill's file) still gets `tools/lint`'s build-free passes, and
    so does a head touching one that `main` passed only by Markdown (merged
-   unpushed, just to lint) (`merging/queue/lints.py`; size, rules, layers, determinism, direction,
+   unpushed, just to lint) (`merging/queue/lints.py`; size, rules, layers, determinism,
    components, parity), built once per `tools/lint` tree into
    `target/merge-queue-lint`; a violation hands the head back unpushed, naming the
    pass, rule and file and the PRs merged since the branch's base that touched it.
@@ -377,8 +377,8 @@ Each backed by a gate that otherwise fails at merge time:
 - **An inspector card routes through `scene::authoring`**: `--parity` fails on a
   direct field write.
 
-A new top-level `src/<dir>/` owes the coverage ratchet nothing:
-`.github/scripts/coverage-ignore.py` derives its lists from `src/` and
+A new crate owes the coverage ratchet nothing:
+`.github/scripts/coverage-ignore.py` derives its lists from `crates/` and
 `coverage-baseline.txt`. A new *floor* is one line in the baseline.
 
 There is no format or bake version to bump. The only version stamps are the

@@ -289,3 +289,10 @@ mod selection_tests;
 #[cfg(test)]
 #[path = "undo_tests.rs"]
 mod undo_tests;
+
+/// This crate's test binary links `rusty-dev` under `dev`, so it holds the
+/// provider-key tripwire too (`key-guard`).
+#[cfg(all(test, feature = "dev"))]
+mod provider_keys {
+    rusty_dev::no_provider_keys!();
+}

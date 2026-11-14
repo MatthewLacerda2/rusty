@@ -82,16 +82,16 @@ jobs:
           } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Ratchet module coverage against the committed baseline
         # Per-module line coverage vs the floors in coverage-baseline.txt. Each
-        # module is isolated by ignoring every other src/ directory, every
-        # top-level src file and tools/; `.github/scripts/coverage-ignore.py`
-        # builds that regex from `src/` and the baseline (#965), so a new module
+        # module is isolated by ignoring every other member crate, the root
+        # package's src/ and tools/; `.github/scripts/coverage-ignore.py`
+        # builds that regex from `crates/` and the baseline (#965), so a new module
         # is excluded the day it lands instead of leaking into every floored
         # number (audio, procgen, shadergen and preview each did, while the
         # lists were typed here by hand).
         # Informational: a drop below a floor is flagged but the step never exits
         # non-zero (and the job is continue-on-error regardless), honouring
         # "inform on quality, never block".
-        # A baseline name with no `src/<name>/` is refused by the script, and
+        # A baseline name with no `crates/<name>/src/` is refused by the script, and
         # pipefail carries that out of the pipe, so the run goes red instead of
         # reporting a floor against the whole crate.
         run: |
