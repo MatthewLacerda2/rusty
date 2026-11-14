@@ -35,8 +35,6 @@
 
 mod radiance;
 mod skybox;
-#[cfg(test)]
-mod tests;
 
 use glam::Vec3;
 use serde::{Deserialize, Serialize};

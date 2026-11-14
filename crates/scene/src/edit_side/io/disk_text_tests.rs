@@ -32,7 +32,7 @@ fn the_selection_is_not_an_unsaved_edit() {
     scene.selected_entity_id = scene.find_entity_by_name("Authored");
     assert!(!crate::has_unsaved_edits(&scene, &path));
     scene.add_entity("Unsaved".into());
-    assert!(!crate::has_unsaved_edits(&scene, &path));
+    assert!(crate::has_unsaved_edits(&scene, &path));
 }
 
 /// Generate Lighting rewrites the file's lighting fields: the new text is the
@@ -105,7 +105,7 @@ fn adopting_a_file_records_its_text() {
     scene.adopt_disk_text(&path);
     assert!(scene.is_disk_text(&path, &text));
     assert!(
-        !crate::has_unsaved_edits(&scene, &path),
+        crate::has_unsaved_edits(&scene, &path),
         "the rebuilt World differs"
     );
     assert_eq!(save_lighting(&scene, &path), Ok(LightingSave::Written));

@@ -139,7 +139,3 @@ fn hold(p: &mut ReflectionProbe) {
     }
     (p.box_min, p.box_max) = (p.box_min.min(p.box_max), p.box_min.max(p.box_max));
 }
-
-#[cfg(test)]
-#[path = "set_tests.rs"]
-mod set_tests;

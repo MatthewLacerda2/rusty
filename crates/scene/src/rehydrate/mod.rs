@@ -50,7 +50,7 @@ impl RehydratedScene {
 
     /// The document, for the id moves a load makes before applying it
     /// (`scene::runtime::load::make_room`): ids are not what rehydration reads.
-    pub(crate) fn data_mut(&mut self) -> &mut crate::serialize::SceneData {
+    pub fn data_mut(&mut self) -> &mut crate::serialize::SceneData {
         &mut self.data
     }
 
@@ -60,7 +60,7 @@ impl RehydratedScene {
     }
 
     /// The document and its stamp, for `serialize`'s apply.
-    pub(crate) fn into_parts(self) -> (crate::serialize::SceneData, u64) {
+    pub fn into_parts(self) -> (crate::serialize::SceneData, u64) {
         (self.data, self.read_at)
     }
 }

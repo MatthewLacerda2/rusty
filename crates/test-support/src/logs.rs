@@ -50,6 +50,15 @@ pub fn take() -> Vec<String> {
     take_leveled().into_iter().map(|(_, text)| text).collect()
 }
 
+/// The warnings and errors `f` logs on this thread, with the logger installed and
+/// what earlier code on the thread logged taken first.
+pub fn during(f: impl FnOnce()) -> Vec<String> {
+    init();
+    take();
+    f();
+    take()
+}
+
 /// [`take`] with each record's level, for a test asserting a failure is an error
 /// rather than a warning (what the console shows it as).
 pub fn take_leveled() -> Vec<(Level, String)> {

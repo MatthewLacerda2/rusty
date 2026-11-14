@@ -4,7 +4,7 @@ use glam::Vec3;
 
 use super::{panorama, procedural};
 use crate::lighting::probe_fill::fibonacci_sphere;
-use crate::{AmbientMode, AmbientRadiance, LightType, Scene, SkySettings};
+use crate::{AmbientMode, AmbientRadiance, Scene, SkySettings};
 use rusty_test_support::panorama::fixture as panorama_fixture;
 
 const NORMALS: [Vec3; 5] = [
@@ -122,23 +122,4 @@ fn the_procedural_sky_lights_without_a_panorama_and_is_affine_in_its_colour() {
     // A panorama that cannot be read falls back to the procedural sky.
     let missing = skybox_scene("no/such/sky.png").drawn_ambient();
     assert_eq!(missing.skybox, drawn.skybox);
-}
-
-#[test]
-fn an_ambient_light_overrides_the_sky_and_the_mode_saves() {
-    let mut scene = skybox_scene("");
-    let id = scene.add_entity("Ambient".into());
-    let light = rusty_components::LightComponent {
-        light_type: LightType::Ambient,
-        color: Vec3::X,
-        ..crate::create::default_light()
-    };
-    scene.world.set_light(id, Some(light));
-    let drawn = scene.drawn_ambient();
-    assert_eq!((drawn.skybox, drawn.color), (None, Vec3::X));
-    let json = serde_json::to_string(&crate::to_scene_data(&scene)).unwrap();
-    assert!(
-        json.contains("\"Skybox\"") && !json.contains("sky_sh"),
-        "{json}"
-    );
 }

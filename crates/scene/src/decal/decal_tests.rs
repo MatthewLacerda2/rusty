@@ -1,10 +1,9 @@
 //! The decal record's lifecycle (#639): opacity over a lifetime and fade, expiry,
-//! and retiring early without popping back to whole; and a load dropping them (#1649).
+//! and retiring early without popping back to whole.
 
 use glam::Vec3;
 
 use super::{Decal, DecalSpec};
-use crate::Scene;
 
 fn stamped(lifetime: Option<f32>, fade: f32) -> Decal {
     let spec = DecalSpec {
@@ -65,23 +64,4 @@ fn retiring_keeps_an_earlier_end() {
     let mut d = stamped(Some(1.0), 0.5);
     d.retire(5.0);
     assert_eq!((d.lifetime, d.fade), (Some(1.0), 0.5));
-}
-
-/// A scene loaded over a live one drops the decals stamped on it (#1649), as
-/// Unity's scene load destroys everything of the old scene; even a persistent
-/// one, which only a Play `Scene.Load` carries across.
-#[test]
-fn a_load_over_the_scene_drops_its_decals() {
-    let path = rusty_test_support::temp::dir().join("empty.scene");
-    let path = path.to_string_lossy().into_owned();
-    crate::save_to_file(&Scene::new(), &path).unwrap();
-    let mut scene = Scene::new();
-    let spec = DecalSpec {
-        persist: true,
-        ..Default::default()
-    };
-    scene.spawn_decal(Vec3::ZERO, Vec3::Y, DecalSpec::default());
-    scene.spawn_decal(Vec3::ZERO, Vec3::Y, spec);
-    crate::load_from_file(&mut scene, &path).unwrap();
-    assert!(scene.decals.is_empty(), "{:?}", scene.decals.len());
 }

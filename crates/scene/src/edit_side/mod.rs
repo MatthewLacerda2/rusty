@@ -18,3 +18,6 @@ pub mod load;
 pub mod mesh;
 pub mod rehydrate;
 pub mod serialize;
+
+#[cfg(test)]
+mod base_tests;

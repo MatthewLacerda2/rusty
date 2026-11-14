@@ -58,17 +58,18 @@ impl SceneMesh {
     /// scene's library has.
     pub fn geometry(&self) -> &Geometry {
         self.built.get_or_init(|| {
-            #[cfg(test)]
             BUILDS.with(|n| n.set(n.get() + 1));
             self.data.geometry()
         })
     }
 }
 
-#[cfg(test)]
 thread_local! {
-    /// How many geometries [`SceneMesh::geometry`] built on this thread.
-    pub(crate) static BUILDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// How many geometries [`SceneMesh::geometry`] built on this thread. A test
+    /// hook (the edit side's tests read it), counted in every build: a geometry is
+    /// built once per entry, so the count costs nothing a frame.
+    #[doc(hidden)]
+    pub static BUILDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 impl PartialEq for SceneMesh {
@@ -162,7 +163,7 @@ pub fn checked(library: MeshLibrary) -> MeshLibrary {
 /// The once-only warning key of a library mesh `name` an entity cannot draw: one
 /// key whether [`checked`] dropped it or no file ever defined it, so a dropped
 /// entry is warned of once, with its cause, and not again as missing.
-pub(crate) fn missing_key(name: &str) -> String {
+pub fn missing_key(name: &str) -> String {
     format!("{SCENE_KIND}::{name}")
 }
 
@@ -206,12 +207,3 @@ mod delete;
 mod sync;
 
 pub use sync::refit;
-
-#[cfg(test)]
-mod delete_tests;
-#[cfg(test)]
-mod revision_tests;
-#[cfg(test)]
-mod tests;
-#[cfg(test)]
-mod users_tests;

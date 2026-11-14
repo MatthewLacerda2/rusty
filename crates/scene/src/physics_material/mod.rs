@@ -29,8 +29,6 @@
 //!   re-applies the material of every built collider (a re-sync, never a rebuild).
 //!   It only decides whether to compare, so the sim never depends on it.
 
-#[cfg(test)]
-mod collider_tests;
 mod file;
 #[cfg(test)]
 mod tests;

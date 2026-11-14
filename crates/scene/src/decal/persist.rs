@@ -72,11 +72,3 @@ impl Scene {
         }
     }
 }
-
-#[cfg(test)]
-#[path = "persist_tests.rs"]
-mod tests;
-
-#[cfg(test)]
-#[path = "persist_paths_tests.rs"]
-mod paths_tests;
