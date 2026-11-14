@@ -499,12 +499,16 @@ new flag, gate, CI step or baseline.
   `mod.rs`, a crate root or a `#[path]`-loaded file is `b.rs` or `b/mod.rs` beside
   it, and in any other `a.rs` it is under `a/`; an inline `mod x { mod b; }` adds
   `x/`; `#[path = "p"]` is `p` from the declaring file's directory (plus any inline
-  modules around it). A `mod` under `#[cfg(...)]` counts, since some build compiles
-  it, and a file named by `include!` or `include_str!` is reached. The finding is
-  on the file's line 1 and names the `mod` to add, or says to delete a dead file;
-  a file built another way (a script run with `rustc`) takes
+  modules around it), and a `#[cfg_attr(…, path = "p")]` reaches both `p` and the
+  default file. A `mod` under `#[cfg(...)]` counts, since some build compiles it,
+  and a file named by `include!` or `include_str!` (an attribute's included) is
+  reached; a `mod` or `include_str!` inside a string, char literal or comment is
+  not, by the literal spans `crate::code::walk` reports. The finding is on the
+  file's line 1 and names the `mod` to add (or, for a file under no crate root,
+  says to make it a target or name it with `#[path]`), or says to delete a dead
+  file; a file built another way (a script run with `rustc`) takes
   `// lint: allow(orphan-module) <why>` on its first line. A workspace cargo
-  cannot read is a finding on its `Cargo.toml`.
+  cannot read is a finding on its `Cargo.toml`, and nothing excuses it.
 - **`orphan-seeds`** — a saved proptest seed must be one a test still reads.
   proptest keeps a failing case at `<root>/proptest-regressions/<path>.txt`, beside
   the folder that holds the test's nearest `lib.rs` or `main.rs` (`src/` or `tests/`

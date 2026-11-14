@@ -8,8 +8,8 @@
 //! file aside (the Reference's *The path attribute*). Comments and literals are
 //! read through `crate::code`, so a `mod x;` in a string or a doc is not one.
 
-use crate::code::{bare_lines, code_lines, is_ident};
-use std::path::{Component, Path, PathBuf};
+use crate::code::{is_ident, walk, Open, Piece};
+use std::path::{Path, PathBuf};
 
 /// A file one source file reaches.
 #[derive(Debug, PartialEq)]
@@ -60,15 +60,17 @@ pub fn reached(path: &str, mod_rs: bool, text: &str, exists: impl Fn(&str) -> bo
     };
     let toks = tokens(text);
     let (mut out, mut frames, mut depth) = (Vec::new(), Vec::new(), 0usize);
-    let mut path_attr: Option<String> = None;
+    let mut path_attr: Option<PathAttr> = None;
     let mut i = 0;
     while i < toks.len() {
         let at = |k: usize| toks.get(i + k);
         match &toks[i] {
             Tok::Punct('#') => {
-                let (end, found) = attribute(&toks, i + 1);
-                path_attr = found.or(path_attr);
-                i = end;
+                let attr = attribute(&toks, i + 1);
+                path_attr = attr.path.or(path_attr);
+                let named = attr.includes.iter().map(|s| normal(&here.join(s)));
+                out.extend(named.map(Reach::Included));
+                i = attr.end.max(i + 1);
                 continue;
             }
             Tok::Ident(m) if m == "mod" => match (at(1), at(2)) {
@@ -80,7 +82,7 @@ pub fn reached(path: &str, mod_rs: bool, text: &str, exists: impl Fn(&str) -> bo
                 (Some(Tok::Ident(name)), Some(Tok::Punct('{'))) => {
                     frames.push((depth, dir.clone()));
                     let path = match path_attr.take() {
-                        Some(p) => dir.path.join(p),
+                        Some(p) => dir.path.join(p.path),
                         None => dir.children().join(name),
                     };
                     dir = Dir {
@@ -93,12 +95,8 @@ pub fn reached(path: &str, mod_rs: bool, text: &str, exists: impl Fn(&str) -> bo
                 }
                 _ => {}
             },
-            Tok::Ident(m) if m == "include" || m == "include_str" => {
-                if let (Some(Tok::Punct('!')), Some(Tok::Punct('(')), Some(Tok::Str(s))) =
-                    (at(1), at(2), at(3))
-                {
-                    out.push(Reach::Included(normal(&here.join(s))));
-                }
+            Tok::Ident(_) => {
+                out.extend(included(&toks, i).map(|s| Reach::Included(normal(&here.join(s)))))
             }
             Tok::Punct('{') => {
                 depth += 1;
@@ -119,128 +117,169 @@ pub fn reached(path: &str, mod_rs: bool, text: &str, exists: impl Fn(&str) -> bo
     out
 }
 
-/// The files `mod name;` loads: its `#[path]`, or `name.rs` / `name/mod.rs`.
+/// The files `mod name;` loads: its `#[path]`, or `name.rs` / `name/mod.rs` (both,
+/// for a `cfg_attr` path).
 fn external(
     dir: &Dir,
     name: &str,
-    path_attr: Option<String>,
+    path_attr: Option<PathAttr>,
     exists: impl Fn(&str) -> bool,
 ) -> Vec<Reach> {
+    let mut out = Vec::new();
     if let Some(p) = path_attr {
-        let path = normal(&dir.path.join(p));
-        return vec![Reach::Module { path, mod_rs: true }];
+        let path = normal(&dir.path.join(p.path));
+        out.push(Reach::Module { path, mod_rs: true });
+        if !p.conditional {
+            return out;
+        }
     }
     let base = dir.children();
-    [
-        (base.join(format!("{name}.rs")), false),
-        (base.join(name).join("mod.rs"), true),
-    ]
-    .into_iter()
-    .map(|(p, mod_rs)| (normal(&p), mod_rs))
-    .filter(|(p, _)| exists(p))
-    .map(|(path, mod_rs)| Reach::Module { path, mod_rs })
-    .collect()
+    out.extend(
+        [
+            (base.join(format!("{name}.rs")), false),
+            (base.join(name).join("mod.rs"), true),
+        ]
+        .into_iter()
+        .map(|(p, mod_rs)| (normal(&p), mod_rs))
+        .filter(|(p, _)| exists(p))
+        .map(|(path, mod_rs)| Reach::Module { path, mod_rs }),
+    );
+    out
 }
 
-/// Past the attribute whose `#` is just before `from` (`#[…]` or `#![…]`), and
-/// the `path = "…"` inside it, a `cfg_attr`'s included.
-fn attribute(toks: &[Tok], from: usize) -> (usize, Option<String>) {
+/// A `mod`'s `path = "…"`: `conditional` when a `cfg_attr` sets it, so the builds
+/// it is off in load the default file.
+struct PathAttr {
+    path: String,
+    conditional: bool,
+}
+
+/// What one attribute holds: where it ends, the `p` of a `#[path = "p"]` (or a
+/// `cfg_attr`'s `path = "p"`), and the files `include!` / `include_str!` name in it.
+struct Attribute {
+    end: usize,
+    path: Option<PathAttr>,
+    includes: Vec<String>,
+}
+
+/// The attribute whose `#` is just before `from` (`#[…]` or `#![…]`).
+fn attribute(toks: &[Tok], from: usize) -> Attribute {
     let mut i = from;
     if toks.get(i) == Some(&Tok::Punct('!')) {
         i += 1;
     }
+    let mut out = Attribute {
+        end: from,
+        path: None,
+        includes: Vec::new(),
+    };
     if toks.get(i) != Some(&Tok::Punct('[')) {
-        return (from, None);
+        return out;
     }
-    let (mut depth, mut found) = (0usize, None);
+    let name = match toks.get(i + 1) {
+        Some(Tok::Ident(n)) => n.as_str(),
+        _ => "",
+    };
+    let mut depth = 0usize;
     while let Some(t) = toks.get(i) {
+        let before = &toks[i - 1];
         match t {
-            Tok::Punct('[') => depth += 1,
-            Tok::Punct(']') => {
+            Tok::Punct('[' | '(') => depth += 1,
+            Tok::Punct(']' | ')') => {
                 depth -= 1;
                 if depth == 0 {
-                    return (i + 1, found);
+                    out.end = i + 1;
+                    return out;
                 }
             }
             Tok::Ident(p) if p == "path" => {
-                if let (Some(Tok::Punct('=')), Some(Tok::Str(s))) =
-                    (toks.get(i + 1), toks.get(i + 2))
+                let named = match name {
+                    "path" => depth == 1,
+                    "cfg_attr" => depth == 2 && *before == Tok::Punct(','),
+                    _ => false,
+                };
+                if let (true, Some(Tok::Punct('=')), Some(Tok::Str(s))) =
+                    (named, toks.get(i + 1), toks.get(i + 2))
                 {
-                    found = Some(s.clone());
+                    out.path = Some(PathAttr {
+                        path: s.clone(),
+                        conditional: name == "cfg_attr",
+                    });
                 }
             }
-            _ => {}
+            _ => out.includes.extend(included(toks, i)),
         }
         i += 1;
     }
-    (i, found)
+    out.end = i;
+    out
 }
 
-/// `text` as identifiers, punctuation and one-line string literals, comments
-/// dropped: structure from [`bare_lines`], a literal's text from [`code_lines`].
-fn tokens(text: &str) -> Vec<Tok> {
-    let mut toks = Vec::new();
-    for (code, bare) in code_lines(text).iter().zip(bare_lines(text)) {
-        let code: Vec<char> = code.chars().collect();
-        let bare: Vec<char> = bare.chars().collect();
-        let mut k = 0;
-        while k < bare.len() {
-            let c = bare[k];
-            if c.is_whitespace() {
-                if code.get(k) == Some(&'"') {
-                    let (s, end) = literal(&code, k + 1);
-                    toks.push(Tok::Str(s));
-                    k = end;
-                } else {
-                    k += 1;
-                }
-            } else if is_ident(c) {
-                let start = k;
-                while k < bare.len() && is_ident(bare[k]) {
-                    k += 1;
-                }
-                toks.push(Tok::Ident(bare[start..k].iter().collect()));
-            } else {
-                toks.push(Tok::Punct(c));
-                k += 1;
-            }
+/// The file an `include!("…")` or `include_str!("…")` starting at `i` names.
+fn included(toks: &[Tok], i: usize) -> Option<String> {
+    match (&toks[i], toks.get(i + 1), toks.get(i + 2), toks.get(i + 3)) {
+        (Tok::Ident(m), Some(Tok::Punct('!')), Some(Tok::Punct('(')), Some(Tok::Str(s)))
+            if m == "include" || m == "include_str" =>
+        {
+            Some(s.clone())
         }
+        _ => None,
+    }
+}
+
+/// `text` as identifiers, punctuation and string literals (a multi-line one
+/// joined by `\n`), comments and char literals dropped: one [`walk`] of each
+/// line, so a literal is exactly what the scanner reads as one.
+fn tokens(text: &str) -> Vec<Tok> {
+    let (mut toks, mut open, mut string) = (Vec::new(), Open::None, None::<String>);
+    for line in text.lines() {
+        // Just past the last code char: an identifier goes on only from there.
+        let mut glued = usize::MAX;
+        walk(line, &mut open, |piece| match piece {
+            Piece::Code(at, c) => {
+                let joined = at == glued;
+                glued = if c.is_whitespace() {
+                    usize::MAX
+                } else {
+                    at + c.len_utf8()
+                };
+                match (toks.last_mut(), is_ident(c)) {
+                    (Some(Tok::Ident(s)), true) if joined => s.push(c),
+                    (_, true) => toks.push(Tok::Ident(c.into())),
+                    _ if c.is_whitespace() => {}
+                    _ => toks.push(Tok::Punct(c)),
+                }
+            }
+            Piece::Str { body, raw, closed } => {
+                glued = usize::MAX;
+                let continued = string.is_some();
+                let s = string.get_or_insert_with(String::new);
+                if continued {
+                    s.push('\n');
+                }
+                unescape(&line[body], raw, s);
+                if closed {
+                    toks.extend(string.take().map(Tok::Str));
+                }
+            }
+        });
     }
     toks
 }
 
-/// A string literal's text from `from` (just past its `"`), and where it ends.
-fn literal(code: &[char], from: usize) -> (String, usize) {
-    let mut out = String::new();
-    let mut k = from;
-    while let Some(&c) = code.get(k) {
-        k += 1;
+/// A literal body's text onto `out`; a backslash keeps the char after it, unless
+/// the literal is `raw`.
+fn unescape(body: &str, raw: bool, out: &mut String) {
+    let mut chars = body.chars();
+    while let Some(c) = chars.next() {
         match c {
-            '"' => break,
-            '\\' => {
-                if let Some(&n) = code.get(k) {
-                    out.push(n);
-                    k += 1;
-                }
-            }
+            '\\' if !raw => out.extend(chars.next()),
             c => out.push(c),
         }
     }
-    (out, k)
 }
 
-/// `p` with its `.` and `..` folded, `/`-separated.
+/// `p` with its `.` and `..` folded ([`crate::layers::normalise`]), `/`-separated.
 pub fn normal(p: &Path) -> String {
-    let mut parts: Vec<String> = Vec::new();
-    for c in p.components() {
-        match c {
-            Component::ParentDir if parts.last().is_some_and(|l| l != "..") => {
-                parts.pop();
-            }
-            Component::Normal(s) => parts.push(s.to_string_lossy().into_owned()),
-            Component::ParentDir => parts.push("..".into()),
-            _ => {}
-        }
-    }
-    parts.join("/")
+    crate::layers::normalise(p).to_string_lossy().into_owned()
 }

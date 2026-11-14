@@ -12,10 +12,11 @@
 //! - named by `include!` or `include_str!`.
 //!
 //! A file meant to be built some other way (a script run with `rustc`) says why on
-//! its first line: `// lint: allow(orphan-module) <why>`. A workspace cargo cannot
-//! read is reported on its manifest, since nothing under it can be checked.
+//! its first line: `// lint: allow(orphan-module) <why>`, which this rule reads
+//! itself (`Allow::Own`). A workspace cargo cannot read is reported on its
+//! manifest, since nothing under it can be checked, and nothing excuses that.
 
-use super::finding::Finding;
+use super::finding::{allowed, Finding};
 use super::scan::Scan;
 use std::collections::BTreeSet;
 use std::fs;
@@ -30,14 +31,14 @@ pub const RULE: &str = "orphan-module";
 
 /// The rule over the repository at the working directory.
 pub fn run(scan: &Scan) -> Vec<Finding> {
-    check(Path::new("."), &scan.files)
+    check(Path::new("."), scan)
 }
 
-/// The rule over `files` (relative to `base`).
-pub fn check(base: &Path, files: &[String]) -> Vec<Finding> {
+/// The rule over `scan`, the files of the repository at `base`.
+pub fn check(base: &Path, scan: &Scan) -> Vec<Finding> {
     let mut findings = Vec::new();
     let mut roots = BTreeSet::new();
-    for ws in workspaces(base, files) {
+    for ws in workspaces(base, &scan.files) {
         match crate_roots(base, &ws) {
             Ok(found) => roots.extend(found),
             Err(why) => findings.push(Finding {
@@ -46,15 +47,26 @@ pub fn check(base: &Path, files: &[String]) -> Vec<Finding> {
                 rule: RULE,
                 message: format!(
                     "`cargo metadata` cannot read this workspace, so no file under it can \
-                     be checked for a missing `mod`: {why}"
+                     be checked for a missing `mod`: {why}; fix the manifest (nothing \
+                     excuses this finding)"
                 ),
             }),
         }
     }
-    let reached = reach(base, roots);
-    let mut orphans: Vec<&String> = files.iter().filter(|f| !reached.contains(*f)).collect();
+    let homes: BTreeSet<String> = roots.iter().map(|r| parent(r)).collect();
+    let reached = reach(base, scan, roots);
+    let mut orphans: Vec<&String> = scan
+        .files
+        .iter()
+        .filter(|f| !reached.contains(*f))
+        .collect();
     orphans.sort();
-    findings.extend(orphans.into_iter().map(|f| orphan(f)));
+    findings.extend(
+        orphans
+            .into_iter()
+            .filter(|f| !allowed(scan.source(f), 1, RULE))
+            .map(|f| orphan(f, &homes)),
+    );
     findings
 }
 
@@ -73,9 +85,17 @@ fn workspaces(base: &Path, files: &[String]) -> Vec<String> {
     let mut out: Vec<String> = manifest("").map(|_| String::new()).into_iter().collect();
     out.extend(
         dirs.into_iter()
-            .filter(|d| manifest(d).is_some_and(|m| m.lines().any(|l| l.trim() == "[workspace]"))),
+            .filter(|d| manifest(d).is_some_and(|m| m.lines().any(opens_workspace))),
     );
     out
+}
+
+/// Is this manifest line the `[workspace]` table's header, a comment after it
+/// included?
+fn opens_workspace(line: &str) -> bool {
+    line.split('#')
+        .next()
+        .is_some_and(|l| l.trim() == "[workspace]")
 }
 
 /// Every target's source file in the workspace at `dir`, relative to `base`.
@@ -140,32 +160,41 @@ fn json_string(s: &str) -> Option<String> {
     None
 }
 
-/// Every file the crate roots reach, the roots included.
-fn reach(base: &Path, roots: BTreeSet<String>) -> BTreeSet<String> {
-    let (mut parsed, mut included) = (BTreeSet::new(), BTreeSet::new());
+/// Every file the crate roots reach, the roots included. A file is parsed once
+/// per way it is loaded (owning its folder or not), as each resolves differently.
+fn reach(base: &Path, scan: &Scan, roots: BTreeSet<String>) -> BTreeSet<String> {
+    let (mut parsed, mut reached) = (BTreeSet::new(), BTreeSet::new());
     let mut queue: Vec<(String, bool)> = roots.into_iter().map(|r| (r, true)).collect();
     while let Some((path, mod_rs)) = queue.pop() {
-        if !parsed.insert(path.clone()) {
+        if !parsed.insert((path.clone(), mod_rs)) {
             continue;
         }
-        let Ok(text) = fs::read_to_string(base.join(&path)) else {
-            continue;
+        reached.insert(path.clone());
+        let text = match scan.source(&path) {
+            "" => fs::read_to_string(base.join(&path)).unwrap_or_default(),
+            text => text.to_string(),
         };
         for r in tree::reached(&path, mod_rs, &text, |p| base.join(p).is_file()) {
             match r {
                 Reach::Module { path, mod_rs } => queue.push((path, mod_rs)),
                 // Read as text, not parsed: a module it also is still is, by its `mod`.
                 Reach::Included(path) => {
-                    included.insert(path);
+                    reached.insert(path);
                 }
             }
         }
     }
-    parsed.extend(included);
-    parsed
+    reached
 }
 
-fn orphan(path: &str) -> Finding {
+/// The folder `path` sits in, `""` at the top.
+fn parent(path: &str) -> String {
+    Path::new(path).parent().map_or(String::new(), normal)
+}
+
+/// The finding for `path`, which nothing reaches; `homes` are the crate roots'
+/// folders, so a file under none of them is told no `mod` can reach it.
+fn orphan(path: &str, homes: &BTreeSet<String>) -> Finding {
     let p = Path::new(path);
     let (name, owned) = match p.file_name().and_then(|n| n.to_str()) {
         Some("mod.rs") => (p.parent(), p.parent().and_then(Path::parent)),
@@ -175,15 +204,26 @@ fn orphan(path: &str) -> Finding {
         .and_then(Path::file_stem)
         .map_or(String::new(), |n| n.to_string_lossy().into_owned());
     let owner = owned.map_or(String::new(), normal);
+    let under =
+        |home: &String| home.is_empty() || format!("{owner}/").starts_with(&format!("{home}/"));
+    let fix = if homes.iter().any(under) {
+        format!(
+            "declare `mod {name};` in the module that owns `{owner}/` (its `mod.rs`, the \
+             `{owner}.rs` beside it, or the crate root there)"
+        )
+    } else {
+        "no crate root sits above it, so no plain `mod` can reach it: make it a target \
+         (`path =` in a `Cargo.toml`) or name it with `#[path]` from a crate"
+            .to_string()
+    };
     Finding {
         path: path.to_string(),
         line: 1,
         rule: RULE,
         message: format!(
             "no `mod` declaration reaches this file, so cargo never compiles it and its \
-             tests never run: declare `mod {name};` in the module that owns `{owner}/` \
-             (its `mod.rs`, the `{owner}.rs` beside it, or the crate root there), or \
-             delete the file if it is dead"
+             tests never run: {fix}; delete it if it is dead, or, if it is built another \
+             way, say why on its first line with `// lint: allow(orphan-module) <why>`"
         ),
     }
 }

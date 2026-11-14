@@ -65,7 +65,9 @@ enum Allow {
     Never,
     /// The rule reads its own allows, so it can report a stale one
     /// (`api-parity`, whose allow sits on the op, not on the finding's cause;
-    /// `dir-size`, whose allow sits anywhere in the directory's owner file).
+    /// `dir-size`, whose allow sits anywhere in the directory's owner file), or so
+    /// one of its findings stays unexcusable (`orphan-module`, whose unreadable
+    /// workspace sits on a manifest).
     Own,
 }
 
@@ -94,7 +96,7 @@ const RULES: &[(Rule, Allow)] = &[
     (log_tag::run, Allow::Inline),
     (markers::run, Allow::Inline),
     (named_enum::run, Allow::Inline),
-    (orphan_module::run, Allow::Inline),
+    (orphan_module::run, Allow::Own),
     (orphan_seeds::run, Allow::Never),
     (physics_borrow::run, Allow::Inline),
     (platform_cfg::run, Allow::Inline),
