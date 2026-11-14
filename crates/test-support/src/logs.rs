@@ -1,9 +1,9 @@
 //! The warnings a crate's own tests read back: a `log` logger keeping every
 //! `warn!` / `error!` record's text, per thread, for [`take`].
 //!
-//! A moved crate's tests cannot reach the root's `logging` (it sits above every
-//! member), so a test asserting "this warns once" installs this instead. It keeps
-//! what the root's console copy keeps, minus its policy: every target, no repeat
+//! A crate's tests cannot reach `rusty-logging` (it needs `script`, so it sits
+//! above most members), so a test asserting "this warns once" installs this instead. It keeps
+//! what `logging`'s console copy keeps, minus its policy: every target, no repeat
 //! counting, no `core::quiet` stretch; that policy is `logging`'s, tested there.
 
 use log::{Level, LevelFilter, Log, Metadata, Record};
