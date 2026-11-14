@@ -32,11 +32,13 @@ pub mod ribbon;
 pub mod script;
 pub mod ui;
 
+// An imported material's asset and attaching a script, authoring's own verbs, under
+// the names callers reach them by.
+pub use crate::authoring::import::material_asset_from_import;
+pub use crate::authoring::script::add_script;
 // Re-export the per-component defaults, the primitives and `create_entity` so callers
 // (editor add-menu, `Scene.AddComponent` API) reach them through this one entry point;
 // they live in `scene::create`, below authoring, because the base builds with them too.
-pub use crate::authoring::import::material_asset_from_import;
-pub use crate::authoring::script::add_script;
 pub use crate::create::{
     attach_default_material, create_drawn_entity, create_entity, default_animator, default_camera,
     default_collider, default_light, default_material, default_nav_agent, default_post_processing,
@@ -45,7 +47,7 @@ pub use crate::create::{
 };
 
 // The Add/Remove-Component verbs + their `ComponentKind` enum live in
-// `authoring_components` (size-cap split); re-exported so existing
+// `authoring::components` (size-cap split); re-exported so existing
 // `authoring::{ComponentKind, add_component, remove_component}` paths still resolve.
 pub use crate::authoring::components::{add_component, remove_component, ComponentKind};
 

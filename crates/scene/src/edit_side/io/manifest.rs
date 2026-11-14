@@ -1,4 +1,4 @@
-//! crates/scene/src/io/manifest.rs — the seed manifest (#746).
+//! crates/scene/src/edit_side/io/manifest.rs — the seed manifest (#746).
 //!
 //! The open project (`core::project`) is seeded from the engine's bundled
 //! defaults. Seeding only when a file is missing let a workspace go stale: an engine

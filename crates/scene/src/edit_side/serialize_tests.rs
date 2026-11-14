@@ -1,4 +1,4 @@
-//! crates/scene/src/serialize_tests.rs — what applying a loaded document holds: a one-sided
+//! crates/scene/src/edit_side/serialize_tests.rs — what applying a loaded document holds: a one-sided
 //! parent link (PR #1774's review, #1805): a child naming a parent whose `children`
 //! lacks it is listed there as it loads, so switching the parent off hides the child;
 //! and the bake settings are held to their ranges (#1704).

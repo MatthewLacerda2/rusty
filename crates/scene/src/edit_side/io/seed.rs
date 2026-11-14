@@ -1,4 +1,4 @@
-//! crates/scene/src/io/seed.rs — seed the engine's defaults into the open project.
+//! crates/scene/src/edit_side/io/seed.rs — seed the engine's defaults into the open project.
 //!
 //! The default scene (built in Rust by `default_scene::build`, #667), the bundled
 //! scripts and the starter materials (embedded, see `bundled`, #829) are seeded into

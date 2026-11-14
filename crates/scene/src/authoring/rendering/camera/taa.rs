@@ -79,6 +79,9 @@ pub struct CameraKnob {
 /// TAA's float knobs, in the Inspector's order. Each is an Inspector slider, a
 /// `Graphics.Get/Set<api>` pair and a `Graphics.taa.<field>` tween path, all through
 /// the same op.
+/// The camera effect [`TAA_KNOBS`] belongs to, as its tween paths spell it.
+pub const TAA_EFFECT: &str = "taa";
+
 pub const TAA_KNOBS: &[CameraKnob] = &[
     CameraKnob {
         field: "base_blend_factor",
@@ -132,7 +135,7 @@ pub const TAA_KNOBS: &[CameraKnob] = &[
 /// `taa`): `None` for any other effect or an unknown field.
 pub fn camera_knob(path: &str) -> Option<&'static CameraKnob> {
     let (effect, field) = path.split_once('.')?;
-    (effect == "taa")
+    (effect == TAA_EFFECT)
         .then(|| TAA_KNOBS.iter().find(|k| k.field == field))
         .flatten()
 }

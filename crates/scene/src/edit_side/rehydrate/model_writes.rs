@@ -1,4 +1,4 @@
-//! crates/scene/src/rehydrate/model_writes.rs — the entity side of `core::fs::written` (#1242).
+//! crates/scene/src/edit_side/rehydrate/model_writes.rs — the entity side of `core::fs::written` (#1242).
 //!
 //! When the engine re-writes a model in place (an FBX's conversion swapped in, an
 //! `.obj` or glTF its writer noted), every entity whose `"Asset"` mesh names that

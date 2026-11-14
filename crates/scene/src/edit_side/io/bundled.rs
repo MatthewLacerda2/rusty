@@ -1,4 +1,4 @@
-//! crates/scene/src/io/bundled.rs — the engine's seed content, embedded (#829).
+//! crates/scene/src/edit_side/io/bundled.rs — the engine's seed content, embedded (#829).
 //!
 //! A project can live anywhere, nowhere near the engine checkout, so the files the
 //! engine seeds into it travel inside the binary instead of being read from

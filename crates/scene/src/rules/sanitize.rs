@@ -4,9 +4,10 @@
 //!
 //! Every setter uses these, so `+inf` from Lua (`math.huge`) is refused the same way
 //! everywhere: it takes the fallback, as NaN does, and never reaches a field (#993).
-//! The `sanitize` lint rule holds it (#1361): a `pub fn set_*` in this module that
-//! takes an `f32` or a glam vector passes it to one of these (or to a sibling
-//! setter that does), or says why not with `// lint: allow(sanitize) <why>`.
+//! The `sanitize` lint rule holds it (#1361): a `pub fn set_*` in `authoring` that
+//! takes an `f32` or a glam vector passes it to one of these, or to another rule
+//! under `rules` (or to a sibling setter that does), or says why not with
+//! `// lint: allow(sanitize) <why>`.
 
 use glam::{Vec2, Vec3, Vec4};
 
@@ -106,6 +107,7 @@ pub fn finite3_or(v: Vec3, fallback: Vec3) -> Vec3 {
 
 /// An optional colour (`None`: derived elsewhere), each channel floored at `0`; one
 /// with a NaN or infinite channel is refused whole and `current` is kept.
+// lint: allow(sanitize) holds `v`: the match tests its colour (`c.is_finite()`)
 pub fn optional_color_or(v: Option<Vec3>, current: Option<Vec3>) -> Option<Vec3> {
     match v {
         Some(c) if c.is_finite() => Some(c.max(Vec3::ZERO)),
@@ -166,8 +168,7 @@ pub fn range_or(r: Range, fallback: Range) -> Range {
 
 /// `c`, or `fallback` when any channel of either end is NaN or infinite.
 pub fn color_range_or(c: ColorRange, fallback: ColorRange) -> ColorRange {
-    let finite = |v: &[f32; 4]| v.iter().all(|x| x.is_finite());
-    if finite(&c.min) && finite(&c.max) {
+    if c.min.iter().chain(&c.max).all(|x| x.is_finite()) {
         c
     } else {
         fallback

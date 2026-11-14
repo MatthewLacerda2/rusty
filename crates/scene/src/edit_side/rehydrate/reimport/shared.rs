@@ -1,4 +1,4 @@
-//! crates/scene/src/rehydrate/reimport/shared.rs — a live re-import reaches a Mesh-shaped
+//! crates/scene/src/edit_side/rehydrate/reimport/shared.rs — a live re-import reaches a Mesh-shaped
 //! collider's own meshes too: a part whose Mesh was removed (its kept `shared_mesh`,
 //! #1657) and a part built from a collision mesh (`collision_mesh`, #1960) collide
 //! with, and feed the navmesh, the model as it is now, not as it was at the last load.

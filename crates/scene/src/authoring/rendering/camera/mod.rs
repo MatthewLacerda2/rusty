@@ -33,7 +33,7 @@ mod taa;
 pub use taa::{
     camera_knob, set_taa_active, set_taa_base_blend_factor, set_taa_contrast_adaptive_sharpening,
     set_taa_jitter_scale, set_taa_mip_bias, set_taa_quality, set_taa_variance_clamp_scale,
-    CameraKnob, TAA_KNOBS,
+    CameraKnob, TAA_EFFECT, TAA_KNOBS,
 };
 
 pub use crate::rules::lens::{MAX_FOV, MIN_CLIP_GAP, MIN_FOV, MIN_NEAR, MIN_ORTHO_SIZE};

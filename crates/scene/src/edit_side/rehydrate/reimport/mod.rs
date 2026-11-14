@@ -1,4 +1,4 @@
-//! crates/scene/src/rehydrate/reimport/mod.rs — re-import the meshes already in a scene when
+//! crates/scene/src/edit_side/rehydrate/reimport/mod.rs — re-import the meshes already in a scene when
 //! their model changed: an import setting (Generate Lightmap UVs, #831; the Scale
 //! Factor, #1398) or the file itself (#1242). Each model file is looked up once per
 //! call however many instances name it, through its shared import

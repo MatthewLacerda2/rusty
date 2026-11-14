@@ -15,6 +15,7 @@
 //!   scene     — the `Scene` aggregate (the `ecs::World` + scene-level state)
 //!   serialize — the scene document, `SceneData`
 //!   edit_side — World <-> SceneData, save/load/seed, the load swap, reimports
+//!   authored  — what the authoring layer lists for the post effects, by name
 //!   authoring — the shared edit verbs the editor, the API and loads all go through
 //!   create    — a new GameObject: the primitives, the Add-Component defaults, `create_entity`
 //!   rules     — the bounds a stored value is held to (float sanitizing, lens, drive, ranges)
@@ -44,6 +45,7 @@
 #![deny(clippy::unwrap_used)]
 
 pub mod asset_instance;
+pub mod authored;
 pub mod authoring;
 pub mod camera;
 pub mod create;

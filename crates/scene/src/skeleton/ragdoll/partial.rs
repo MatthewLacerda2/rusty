@@ -35,8 +35,9 @@ pub struct HitReact {
 
 impl HitReact {
     /// These options with every number finite and in range: a NaN or infinite
-    /// duration takes the default, a drive the joint rule's floor at 0 (`rules::joint`) (`math.huge`
-    /// never reaches rapier).
+    /// duration takes the default, and each drive value takes the joint rule
+    /// (`rules::joint::drive_value`: floored at 0, and 0 when NaN or infinite), so
+    /// `math.huge` never reaches rapier.
     pub fn sanitized(&self) -> Self {
         let duration = match self.duration.is_finite() {
             true => self.duration.max(0.0),
