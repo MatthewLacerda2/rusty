@@ -3,7 +3,7 @@
 //! volume effect writes the main camera's active post-processing volume and a camera
 //! effect (motion blur, FXAA, TAA) the main camera's component, both through the
 //! `scene::authoring` ops the Inspector calls; an effect's numeric knobs that are a
-//! pair on their own come from its knob table ([`knobs`]).
+//! pair on their own come from its knob table (`knobs`).
 
 use super::super::Reg;
 use crate::api::ApiCell;
