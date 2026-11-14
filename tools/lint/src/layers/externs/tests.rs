@@ -140,12 +140,10 @@ fn a_display_entry_no_manifest_depends_on_is_unknown() {
         display: &["wgpu", "eguii"],
         ..TIGHT
     };
-    let uses = [at("render", "wgpu", "crates/render/src/gpu/x.rs")];
-    let v = check::all(ROWS, &typo, &deps(), &uses);
-    assert!(
-        v.iter().any(|m| m.starts_with("UNKNOWN_CRATE eguii")),
-        "{v:?}"
+    let v = check::all(ROWS, &typo, &deps(), &[]);
+    let unknown: Vec<_> = v.iter().filter(|m| m.starts_with("UNKNOWN")).collect();
+    assert_eq!(
+        unknown,
+        ["UNKNOWN_CRATE eguii — not a dependency in Cargo.toml"]
     );
-    let found = v.iter().filter(|m| m.starts_with("UNKNOWN_CRATE"));
-    assert_eq!(found.count(), 1, "{v:?}");
 }
