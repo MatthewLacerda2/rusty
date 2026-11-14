@@ -9,12 +9,7 @@ use crate::dev::providers::{environment, keys_blanked, resolve, Provider};
 fn the_root_unit_tests_hold_no_provider_key() {
     assert!(keys_blanked());
     let env = environment();
-    for provider in [
-        Provider::Gemini,
-        Provider::ElevenLabs,
-        Provider::Anthropic,
-        Provider::Pixabay,
-    ] {
+    for provider in Provider::ALL {
         assert!(resolve(provider, &env).is_err(), "{}", provider.variable());
     }
 }

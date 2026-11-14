@@ -61,14 +61,13 @@ jobs:
       # failing tests instead of pointing at the raw log; `--no-fail-fast` runs every
       # binary, so every leak is named, not only the first binary's. The `dev` step is
       # `make test-one-process` without `--quiet` (the summary reads the per-test
-      # lines); `NEXTEST=1` keeps a provider key out of the binaries the tests spawn (#974), and
-      # doctests are left to `make test`, which runs them in the gate.
+      # lines), and doctests are left to `make test`, which runs them in the gate.
       - name: cargo test (default)
         run: cargo test --locked --no-fail-fast 2>&1 | tee test-default.log
         shell: bash -o pipefail {0}
       - name: cargo test (dev features)
         if: always()
-        run: NEXTEST=1 cargo test --locked --features dev --tests --no-fail-fast 2>&1 | tee test-dev.log
+        run: cargo test --locked --features dev --tests --no-fail-fast 2>&1 | tee test-dev.log
         shell: bash -o pipefail {0}
       - name: Summary
         if: always()

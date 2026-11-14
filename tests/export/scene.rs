@@ -3,7 +3,7 @@
 
 use std::io::Write;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 use super::fbx::{QUAD, SOURCE, START};
 use super::{entity, export, play_scenario, project};
@@ -50,7 +50,7 @@ fn a_saved_scene_loads_its_model_and_texture_from_an_export() {
 /// Instantiate the quad in an edit session of `game` and save the scene, as an
 /// agent driving the editor would.
 fn save_scene(game: &Path) {
-    let mut session = Command::new(env!("CARGO_BIN_EXE_session"))
+    let mut session = crate::spawn::engine_bin!("session")
         .arg("--project")
         .arg(game)
         .arg("--empty")

@@ -25,7 +25,8 @@
 //!   tests here use mocks, and nothing in this module touches a network. The live
 //!   surface does call the real vendor, so [`environment`] hands out no keys at all
 //!   unless the binary opted in at startup ([`read_keys`], #974), which no test
-//!   binary does: there a complete brief is refused, never sent.
+//!   binary does, and a binary a test spawns is started with [`NO_KEYS_VAR`] set:
+//!   there a complete brief is refused, never sent.
 //!
 //! Every verb that spends goes through [`permit`] first and, once the vendor has
 //! answered, [`Permit::record`]s what it spent. What it made is addressed by the
@@ -46,7 +47,7 @@ mod tests;
 
 use std::path::Path;
 
-pub use credentials::{environment, keys_blanked, read_keys, resolve};
+pub use credentials::{environment, keys_blanked, read_keys, resolve, NO_KEYS_VAR};
 pub use headless::{edit_mode, HeadlessHold};
 pub use ledger::Ledger;
 pub use refusal::Refusal;

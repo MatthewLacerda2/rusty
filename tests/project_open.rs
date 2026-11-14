@@ -6,7 +6,7 @@
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 const SCENE: &str = "assets/scenes/arena.scene";
 
@@ -22,7 +22,7 @@ fn game() -> PathBuf {
 }
 
 fn session(game: &Path, lines: &str) -> String {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_session"))
+    let mut child = crate::spawn::engine_bin!("session")
         .arg("--project")
         .arg(game)
         .arg("--empty")
@@ -77,7 +77,7 @@ fn play_reads_the_projects_settings() {
          Application.SetProductName('Arena')\n"
     );
     std::fs::write(&scenario, lua).unwrap();
-    let out = Command::new(env!("CARGO_BIN_EXE_play"))
+    let out = crate::spawn::engine_bin!("play")
         .arg("--project")
         .arg(&game)
         .arg(&scenario)

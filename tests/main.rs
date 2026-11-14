@@ -17,6 +17,8 @@
 mod layout;
 mod lua;
 mod play;
+#[cfg(feature = "dev")]
+mod spawn;
 mod temp;
 
 // ── Both feature sets ────────────────────────────────────────────────────────────

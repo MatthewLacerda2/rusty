@@ -4,6 +4,7 @@
 mod budget;
 mod generated;
 mod keys;
+mod opt_in;
 mod sfx;
 mod speech;
 mod voices;

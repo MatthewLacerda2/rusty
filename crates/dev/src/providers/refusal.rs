@@ -11,6 +11,10 @@ pub enum Refusal {
     /// Inside a headless run (a scenario or a bench), which is a test, and a test
     /// never calls a vendor (#1384).
     Headless,
+    /// This process reads no provider keys (`credentials::read_keys`): it is not
+    /// one of the binaries an author spends from, or it was started with
+    /// `RUSTY_NO_PROVIDER_KEYS` set. The fix is to run the verb from one that is.
+    KeysNotRead { provider: &'static str },
     /// No key in the environment or the `.env`.
     MissingKey {
         provider: &'static str,
@@ -43,6 +47,13 @@ impl fmt::Display for Refusal {
                 f,
                 "provider calls are refused in a headless run (a scenario or a bench): \
                  generation is authoring, and a test never calls a vendor"
+            ),
+            Self::KeysNotRead { provider } => write!(
+                f,
+                "no key for {provider}: this process does not read provider keys. Only \
+                 the editor (`rusty`, built with `dev`), `session` and `session-mcp` \
+                 do, and not when RUSTY_NO_PROVIDER_KEYS is set: run the verb from one \
+                 of them"
             ),
             Self::MissingKey {
                 provider,

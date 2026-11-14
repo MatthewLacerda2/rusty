@@ -21,8 +21,12 @@ An exported environment variable wins over `.env`. The file only fills gaps, so
 a key exported in your shell is the one used. When no key is found, the refusal
 names the variable and every place that was checked.
 
-Only the binaries you author with read a key: the editor, `session`, `session-mcp`
-and `play`. Every other process, the tests included, sees none and is refused.
+Only the binaries you spend from read a key: the editor (built with `dev`),
+`session` and `session-mcp`. Every other process sees none and is refused, saying
+it reads no provider keys: `play`, `game`, `export`, every test, and any binary a
+test starts (the tests start them with `RUSTY_NO_PROVIDER_KEYS` set, which turns
+the keys off even in those three). The `read-keys` lint keeps the list to those
+three, and fails if one of them stops reading keys.
 
 ## The budget
 
