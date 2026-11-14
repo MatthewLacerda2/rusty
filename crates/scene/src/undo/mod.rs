@@ -190,7 +190,7 @@ impl Scene {
     }
 
     /// Forget all history: a scene was loaded over this one, or Play started.
-    pub(crate) fn clear_undo(&mut self) {
+    pub fn clear_undo(&mut self) {
         self.world.journal_pause();
         self.world.journal_take();
         self.history = UndoStack::default();

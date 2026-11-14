@@ -114,7 +114,7 @@ impl SceneFollow {
                 return false;
             }
         };
-        let unsaved = scene.has_unsaved_edits(path);
+        let unsaved = rusty_scene::has_unsaved_edits(scene, path);
         let keep = selected.and_then(|id| name_path(scene, id));
         // Only the sidecar can fail now, after the World was replaced: it is still a
         // reload, with its selection remapped, and the error is a warning (#1374).

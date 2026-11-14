@@ -4,7 +4,8 @@
 
 use super::super::fixture::hero;
 use super::*;
-use crate::serialize::{apply_scene_data, to_scene_data, SceneData};
+use crate::edit_side::serialize::{apply_scene_data, to_scene_data};
+use crate::serialize::SceneData;
 
 /// `j` without its connected body, an id that changes across a load.
 fn shape(j: &JointComponent) -> JointComponent {

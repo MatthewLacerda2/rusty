@@ -46,13 +46,13 @@ fn level(name: &str) -> String {
     let path = dir.join("level.scene").to_string_lossy().into_owned();
     let mut scene = Scene::new();
     KINDS.iter().for_each(|k| (k.bake)(&mut scene, 1));
-    scene.save_to_file(&path).unwrap();
+    crate::save_to_file(&scene, &path).unwrap();
     path
 }
 
 fn opened(path: &str) -> Scene {
     let mut scene = Scene::new();
-    scene.load_from_file(path).unwrap();
+    crate::load_from_file(&mut scene, path).unwrap();
     scene
 }
 
@@ -62,7 +62,7 @@ fn raced(name: &str) -> (String, Scene) {
     let editor = opened(&path);
     let mut headless = opened(&path);
     KINDS.iter().for_each(|k| (k.bake)(&mut headless, 2));
-    headless.save_to_file(&path).unwrap();
+    crate::save_to_file(&headless, &path).unwrap();
     (path, editor)
 }
 
@@ -75,7 +75,7 @@ fn a_save_that_baked_nothing_keeps_the_newer_bake_and_warns() {
     let (path, mut editor) = raced("kept");
     let newer: Vec<_> = KINDS.iter().map(|k| read(k, &path)).collect();
     editor.ambient_intensity = 0.25;
-    editor.save_to_file(&path).unwrap();
+    crate::save_to_file(&editor, &path).unwrap();
     for (kind, newer) in KINDS.iter().zip(newer) {
         assert_eq!(
             read(kind, &path),
@@ -94,7 +94,7 @@ fn a_world_that_baked_since_overwrites() {
     let (path, mut editor) = raced("overwrite");
     let theirs: Vec<_> = KINDS.iter().map(|k| read(k, &path)).collect();
     KINDS.iter().for_each(|k| (k.bake)(&mut editor, 3));
-    editor.save_to_file(&path).unwrap();
+    crate::save_to_file(&editor, &path).unwrap();
     for (kind, theirs) in KINDS.iter().zip(theirs) {
         assert_ne!(
             read(kind, &path),
@@ -110,7 +110,7 @@ fn save_as_writes_the_loaded_bake_to_the_new_path() {
     let path = level("save_as");
     let editor = opened(&path);
     let other = path.replace("level.scene", "copy.scene");
-    editor.save_to_file(&other).unwrap();
+    crate::save_to_file(&editor, &other).unwrap();
     for kind in &KINDS {
         assert_eq!(read(kind, &other), read(kind, &path), "{}", kind.name);
     }
@@ -121,14 +121,14 @@ fn holding_none_unbaked_removes_only_the_file_this_world_saw() {
     let path = level("cleared");
     let mut editor = opened(&path);
     KINDS.iter().for_each(|k| (k.bake)(&mut editor, 0));
-    editor.save_to_file(&path).unwrap();
+    crate::save_to_file(&editor, &path).unwrap();
     for kind in &KINDS {
         assert_eq!(read(kind, &path), None, "{}: removed", kind.name);
     }
 
     let (path, mut editor) = raced("cleared_raced");
     KINDS.iter().for_each(|k| (k.bake)(&mut editor, 0));
-    editor.save_to_file(&path).unwrap();
+    crate::save_to_file(&editor, &path).unwrap();
     for kind in &KINDS {
         assert!(
             read(kind, &path).is_some(),

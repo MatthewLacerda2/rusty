@@ -30,7 +30,7 @@ fn a_file_with_bad_entries_loads_without_a_panic_and_warns() {
     let mut scene = Scene::new();
     let id = scene.add_entity("Piece".into());
     scene.define_mesh("good", triangle(1.0)).unwrap();
-    scene.set_shared_mesh(id, "good").unwrap();
+    crate::edit_side::mesh::set_shared_mesh(&mut scene, id, "good").unwrap();
     let mut data = to_scene_data(&scene);
     let mut bad = |name: &str, edit: fn(&mut MeshData)| {
         let mut mesh = triangle(1.0);
@@ -61,12 +61,12 @@ fn one_mesh_on_many_entities_builds_once_and_touches_no_other_user() {
     let mut scene = Scene::new();
     scene.define_mesh("gib", triangle(1.0)).unwrap();
     let first = scene.add_entity("Gib".into());
-    scene.set_shared_mesh(first, "gib").unwrap();
+    crate::edit_side::mesh::set_shared_mesh(&mut scene, first, "gib").unwrap();
     let revision = scene.world.mesh(first).unwrap().revision;
     let built = BUILDS.with(|n| n.get());
     for i in 0..50 {
         let id = scene.add_entity(format!("Gib{i}"));
-        scene.set_shared_mesh(id, "gib").unwrap();
+        crate::edit_side::mesh::set_shared_mesh(&mut scene, id, "gib").unwrap();
         assert_eq!(scene.world.mesh(id).unwrap().vertices.len(), 3);
         assert_eq!(scene.world.mesh(id).unwrap().revision, revision);
     }
@@ -96,7 +96,7 @@ fn a_kept_copy_follows_a_replace_an_undo_and_a_play_load() {
     assert_eq!(kept_len(&scene, id), 3, "and so does its Undo");
     let survivors = std::collections::BTreeSet::from([id]);
     let empty = to_scene_data(&Scene::new());
-    scene.swap_in(empty, "next.scene", &survivors).unwrap();
+    crate::edit_side::load::swap_in(&mut scene, empty, "next.scene", &survivors).unwrap();
     assert!(scene.meshes.contains_key("plank"), "a Play load carries it");
     assert_eq!(kept_len(&scene, id), 3);
 }
@@ -114,7 +114,7 @@ fn a_rebuilt_prefab_instance_keeps_drawing_its_scene_mesh() {
     let root = crate::load_and_instantiate_linked(&mut scene, &path, None).unwrap();
     let child = scene.world.children(root)[0];
     scene.define_mesh("piece", triangle(1.0)).unwrap();
-    scene.set_shared_mesh(child, "piece").unwrap();
+    crate::edit_side::mesh::set_shared_mesh(&mut scene, child, "piece").unwrap();
     crate::prefab::link::reimport_instance(&mut scene, root).unwrap();
     let mesh = scene.world.mesh(child).unwrap();
     assert_eq!(mesh.asset_ref.as_deref(), Some("piece"));

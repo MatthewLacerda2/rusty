@@ -18,7 +18,7 @@ fn gpu_a_deleted_library_mesh_frees_its_buffers() {
     };
     let id = scene.add_entity("Piece".into());
     scene.define_mesh("piece", triangle.clone()).unwrap();
-    scene.set_shared_mesh(id, "piece").unwrap();
+    rusty_scene::edit_side::mesh::set_shared_mesh(&mut scene, id, "piece").unwrap();
     let key = crate::MeshId("Scene|piece".into());
     frame(&mut r, &scene);
     assert!(r.gpu_meshes.contains_key(&key), "drawn, so uploaded");
@@ -26,7 +26,7 @@ fn gpu_a_deleted_library_mesh_frees_its_buffers() {
     frame(&mut r, &scene);
     assert!(!r.gpu_meshes.contains_key(&key), "freed with the entry");
     scene.define_mesh("piece", triangle).unwrap();
-    scene.set_shared_mesh(id, "piece").unwrap();
+    rusty_scene::edit_side::mesh::set_shared_mesh(&mut scene, id, "piece").unwrap();
     frame(&mut r, &scene);
     assert!(
         r.gpu_meshes.contains_key(&key),

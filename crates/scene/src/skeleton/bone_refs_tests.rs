@@ -5,7 +5,7 @@ use glam::Vec3;
 
 use super::fixture::{armature_owner, connected, hero, reload, rope_to};
 use crate::authoring::ui::layout::rect_transform::set_world_anchor;
-use crate::serialize::to_scene_data;
+use crate::edit_side::serialize::to_scene_data;
 use crate::Scene;
 use rusty_components::{JointComponent, RectTransformComponent};
 

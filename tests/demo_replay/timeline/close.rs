@@ -25,8 +25,8 @@ fn closing_puts_back_the_scene_itself_unsaved_edits_and_all() {
     let mut game = harness.world.borrow_mut();
     let own = crate::temp::dir().join("mine.scene");
     let own = own.to_string_lossy().into_owned();
-    game.scene().borrow().save_to_file(&own).unwrap();
-    game.scene().borrow_mut().load_from_file(&own).unwrap();
+    rusty::scene::save_to_file(&game.scene().borrow(), &own).unwrap();
+    rusty::scene::load_from_file(&mut game.scene().borrow_mut(), &own).unwrap();
     ui.set_current_scene_path(Some(own.clone()));
     game.scene().borrow_mut().add_entity("unsaved".into());
     let id = game.scene().borrow().id();
@@ -50,7 +50,10 @@ fn closing_puts_back_the_scene_itself_unsaved_edits_and_all() {
         scene.is_disk_text(&own, &on_disk),
         "no outside change to reload"
     );
-    assert!(scene.has_unsaved_edits(&own), "the edit is still unsaved");
+    assert!(
+        rusty::scene::has_unsaved_edits(&scene, &own),
+        "the edit is still unsaved"
+    );
     assert!(scene.find_entity_by_name("unsaved").is_some());
     assert_eq!(ui.current_scene_path().as_deref(), Some(own.as_str()));
 }
@@ -63,7 +66,7 @@ fn a_key_the_recording_held_is_not_held_after_close() {
     let harness = Harness::new(dir.join("record"), "");
     {
         let mut world = harness.world.borrow_mut();
-        world.scene().borrow().save_to_file(&scene_file).unwrap();
+        rusty::scene::save_to_file(&world.scene().borrow(), &scene_file).unwrap();
         *world.script_manager().scene_path_cell().borrow_mut() = Some(scene_file);
         demo::record(&mut world, Destination::File(path.clone()));
     }

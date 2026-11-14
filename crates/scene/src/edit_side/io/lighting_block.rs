@@ -52,7 +52,7 @@ pub fn save_lighting(scene: &Scene, path: &str) -> Result<LightingSave, String> 
     // instead of the next Save writing over it (#1374). The old record takes the
     // lighting instead, so that reload does not count the bake as an unsaved edit.
     if scene.is_disk_text(path, &text) {
-        scene.disk_text.record(path, json);
+        scene.record_disk_text(path, json);
     } else {
         add_lighting_to_record(scene, path);
     }
@@ -63,15 +63,14 @@ pub fn save_lighting(scene: &Scene, path: &str) -> Result<LightingSave, String> 
 /// Write `scene`'s lighting into the engine's record of `path`, when it has one.
 fn add_lighting_to_record(scene: &Scene, path: &str) {
     let Some(mut data) = scene
-        .disk_text
-        .text(path)
+        .disk_text_at(path)
         .and_then(|old| parse_scene_text(&old, path).ok())
     else {
         return;
     };
     copy_lighting(scene, &mut data);
     if let Ok(json) = serde_json::to_string_pretty(&data) {
-        scene.disk_text.record(path, json);
+        scene.record_disk_text(path, json);
     }
 }
 

@@ -290,4 +290,10 @@ impl crate::Scene {
     pub fn bake_files(&self) -> &BakeFiles {
         &self.bake_files
     }
+
+    /// Forget what the world saw at its bake files: a load made it a new scene, and
+    /// what the old one saw is no record of this one.
+    pub fn forget_bake_files(&mut self) {
+        self.bake_files = Default::default();
+    }
 }

@@ -7,9 +7,9 @@ fn loaded(tag: &str) -> (Scene, String) {
     let path = dir.join("level.scene").to_string_lossy().into_owned();
     let mut authored = Scene::new();
     authored.add_entity("Authored".into());
-    authored.save_to_file(&path).unwrap();
+    crate::save_to_file(&authored, &path).unwrap();
     let mut scene = Scene::new();
-    scene.load_from_file(&path).unwrap();
+    crate::load_from_file(&mut scene, &path).unwrap();
     (scene, path)
 }
 
@@ -19,8 +19,8 @@ fn a_load_and_a_save_are_the_engines_own_text() {
     let text = std::fs::read_to_string(&path).unwrap();
     assert!(scene.is_disk_text(&path, &text), "the load is recorded");
     assert!(!scene.is_disk_text("elsewhere.scene", &text), "by path");
-    assert!(!scene.has_unsaved_edits(&path));
-    scene.save_to_file(&path).unwrap();
+    assert!(!crate::has_unsaved_edits(&scene, &path));
+    crate::save_to_file(&scene, &path).unwrap();
     let text = std::fs::read_to_string(&path).unwrap();
     assert!(scene.is_disk_text(&path, &text), "the save is recorded");
 }
@@ -30,9 +30,9 @@ fn a_load_and_a_save_are_the_engines_own_text() {
 fn the_selection_is_not_an_unsaved_edit() {
     let (mut scene, path) = loaded("selection");
     scene.selected_entity_id = scene.find_entity_by_name("Authored");
-    assert!(!scene.has_unsaved_edits(&path));
+    assert!(!crate::has_unsaved_edits(&scene, &path));
     scene.add_entity("Unsaved".into());
-    assert!(scene.has_unsaved_edits(&path));
+    assert!(!crate::has_unsaved_edits(&scene, &path));
 }
 
 /// Generate Lighting rewrites the file's lighting fields: the new text is the
@@ -46,7 +46,7 @@ fn a_lighting_save_is_recorded_and_keeps_edits_unsaved() {
     let text = std::fs::read_to_string(&path).unwrap();
     assert!(scene.is_disk_text(&path, &text));
     assert!(
-        scene.has_unsaved_edits(&path),
+        crate::has_unsaved_edits(&scene, &path),
         "the entity is still unsaved"
     );
 }
@@ -72,7 +72,7 @@ fn a_lighting_save_over_an_outside_edit_is_not_recorded() {
     let (scene, path) = loaded("outside");
     let mut outside = Scene::new();
     outside.add_entity("Outside".into());
-    outside.save_to_file(&path).unwrap();
+    crate::save_to_file(&outside, &path).unwrap();
     assert_eq!(save_lighting(&scene, &path), Ok(LightingSave::Written));
     let text = std::fs::read_to_string(&path).unwrap();
     assert!(text.contains("\"Outside\""), "the edit survives the merge");
@@ -87,9 +87,11 @@ fn a_load_with_a_broken_sidecar_is_recorded() {
     std::fs::write(crate::sidecar_path(&path), "{ broken").unwrap();
     let text = std::fs::read_to_string(&path).unwrap();
     let mut fresh = Scene::new();
-    assert!(fresh.load_from_file(&path).unwrap_err().replaced_world());
+    assert!(crate::load_from_file(&mut fresh, &path)
+        .unwrap_err()
+        .replaced_world());
     assert!(fresh.is_disk_text(&path, &text));
-    assert!(!fresh.has_unsaved_edits(&path));
+    assert!(!crate::has_unsaved_edits(&fresh, &path));
 }
 
 /// Reset Scene: the record is the file's text whatever it holds, so a `touch` or
@@ -102,7 +104,10 @@ fn adopting_a_file_records_its_text() {
     scene.add_entity("Rebuilt".into());
     scene.adopt_disk_text(&path);
     assert!(scene.is_disk_text(&path, &text));
-    assert!(scene.has_unsaved_edits(&path), "the rebuilt World differs");
+    assert!(
+        !crate::has_unsaved_edits(&scene, &path),
+        "the rebuilt World differs"
+    );
     assert_eq!(save_lighting(&scene, &path), Ok(LightingSave::Written));
     let lit = std::fs::read_to_string(&path).unwrap();
     assert!(

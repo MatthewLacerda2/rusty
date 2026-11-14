@@ -74,7 +74,7 @@ fn retiring_keeps_an_earlier_end() {
 fn a_load_over_the_scene_drops_its_decals() {
     let path = rusty_test_support::temp::dir().join("empty.scene");
     let path = path.to_string_lossy().into_owned();
-    Scene::new().save_to_file(&path).unwrap();
+    crate::save_to_file(&Scene::new(), &path).unwrap();
     let mut scene = Scene::new();
     let spec = DecalSpec {
         persist: true,
@@ -82,6 +82,6 @@ fn a_load_over_the_scene_drops_its_decals() {
     };
     scene.spawn_decal(Vec3::ZERO, Vec3::Y, DecalSpec::default());
     scene.spawn_decal(Vec3::ZERO, Vec3::Y, spec);
-    scene.load_from_file(&path).unwrap();
+    crate::load_from_file(&mut scene, &path).unwrap();
     assert!(scene.decals.is_empty(), "{:?}", scene.decals.len());
 }

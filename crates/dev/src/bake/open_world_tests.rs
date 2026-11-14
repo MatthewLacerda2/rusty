@@ -62,7 +62,7 @@ fn floor_under_a_baked_sun() -> (Scene, String, String) {
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-1.2);
     let s = &mut scene.lighting_settings.lightmaps;
     (s.texels_per_unit, s.samples, s.bounces, s.max_lightmap_size) = (2.0, 8, 1, 32);
-    scene.save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&scene, &path).unwrap();
     (scene, model, path)
 }
 
@@ -96,9 +96,9 @@ fn gpu_a_bake_after_a_lightmap_uv_reimport_lights_the_open_world() {
     );
     let open = brightness(&mut editor, &scene, "open").unwrap();
 
-    scene.save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&scene, &path).unwrap();
     let mut fresh = Scene::new();
-    fresh.load_from_file(&path).unwrap();
+    rusty_scene::load_from_file(&mut fresh, &path).unwrap();
     let loaded = brightness(&mut CaptureHost::new(), &fresh, "fresh").unwrap();
     eprintln!("[1540] before={dark:.1} open={open:.1} fresh load={loaded:.1}");
     assert!(

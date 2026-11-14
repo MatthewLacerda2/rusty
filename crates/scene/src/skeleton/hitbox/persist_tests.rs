@@ -3,7 +3,8 @@
 
 use super::super::fixture::hero;
 use super::*;
-use crate::serialize::{apply_scene_data, to_scene_data, SceneData};
+use crate::edit_side::serialize::{apply_scene_data, to_scene_data};
+use crate::serialize::SceneData;
 
 #[test]
 fn hitboxes_come_back_under_their_bones_after_a_reload() {

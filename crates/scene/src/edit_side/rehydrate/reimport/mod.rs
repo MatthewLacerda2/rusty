@@ -8,14 +8,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use glam::Vec3;
-
-use super::{install, RehydratedMesh};
 use crate::prefab::diff::masked;
 use crate::prefab::live::shift_baseline;
+use crate::rehydrate::install_sub_mesh;
 use crate::Scene;
 use rusty_asset::{AssetRef, Imported, MeshRevision, SubMesh};
-use rusty_components::{ColliderComponent, ColliderShape};
 use rusty_core::fs::written::Stale;
 
 mod shared;
@@ -149,7 +146,7 @@ fn reimport_entity_mesh(
     // replaced, and re-bound to the new one by name.
     let hung = skinned.then(|| scene.take_skeleton(id));
     if let Some(mut mesh) = scene.world.mesh_mut(id) {
-        install(&mut mesh, RehydratedMesh::from_sub_mesh(sub, revision));
+        install_sub_mesh(&mut mesh, sub, revision);
     }
     if let Some(hung) = hung {
         scene.restore_skeleton(id, hung);
@@ -157,20 +154,7 @@ fn reimport_entity_mesh(
     // The guard refreshes the world AABB. A collision mesh, while it has
     // triangles, still sizes the box (#1960).
     if let Some(mut collider) = scene.world.collider_mut(id) {
-        super::refit_collider(&mut collider, Some(bounds));
+        crate::rehydrate::refit_collider(&mut collider, Some(bounds));
     }
     true
-}
-
-/// Size `collider`'s box to `(min, max)` when it is a mesh collider, as Unity's
-/// `MeshCollider` follows its shared mesh. Any other shape is left as authored.
-pub(super) fn refit(collider: &mut ColliderComponent, (min, max): (Vec3, Vec3)) {
-    if let ColliderShape::Mesh {
-        local_min,
-        local_max,
-        ..
-    } = &mut collider.shape
-    {
-        (*local_min, *local_max) = (min, max);
-    }
 }

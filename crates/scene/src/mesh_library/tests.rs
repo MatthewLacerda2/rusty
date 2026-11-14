@@ -33,7 +33,7 @@ fn scene_drawing(data: MeshData) -> (Scene, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Piece".into());
     scene.define_mesh("piece", data).unwrap();
-    scene.set_shared_mesh(id, "piece").unwrap();
+    crate::edit_side::mesh::set_shared_mesh(&mut scene, id, "piece").unwrap();
     (scene, id)
 }
 
@@ -105,7 +105,7 @@ fn a_mesh_collider_fits_the_scene_mesh_and_follows_a_replace() {
     let (mut scene, id) = scene_drawing(triangle(1.0));
     let collider = ColliderComponent::from_mesh_bounds(false, Vec3::ZERO, Vec3::ZERO);
     scene.world.set_collider(id, Some(collider));
-    scene.set_shared_mesh(id, "piece").unwrap();
+    crate::edit_side::mesh::set_shared_mesh(&mut scene, id, "piece").unwrap();
     let local_max = |scene: &Scene| match scene.world.collider(id).unwrap().shape {
         ColliderShape::Mesh { local_max, .. } => local_max,
         _ => unreachable!(),
@@ -130,7 +130,7 @@ fn an_entity_naming_a_missing_mesh_loads_empty() {
 fn set_shared_mesh_switches_back_to_a_primitive_keeping_the_settings() {
     let (mut scene, id) = scene_drawing(tetra());
     scene.world.mesh_mut(id).unwrap().max_draw_distance = 12.0;
-    scene.set_shared_mesh(id, "sphere").unwrap();
+    crate::edit_side::mesh::set_shared_mesh(&mut scene, id, "sphere").unwrap();
     let mesh = scene.world.mesh(id).unwrap();
     assert_eq!(
         (mesh.primitive_type.as_str(), mesh.asset_ref.as_deref()),

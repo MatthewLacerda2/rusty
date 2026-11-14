@@ -26,7 +26,7 @@ pub(super) fn open_editor_in(tag: &str) -> (Session, EditorUi) {
     let dir = rusty_test_support::temp::dir().join(tag);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("level.scene").to_string_lossy().into_owned();
-    s.world().scene().borrow().save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&s.world().scene().borrow(), &path).unwrap();
     *s.world().script_manager().scene_path_cell().borrow_mut() = Some(path.clone());
     let mut editor = EditorUi::new(Default::default());
     editor.set_current_scene_path(Some(path));

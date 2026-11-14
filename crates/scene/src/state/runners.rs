@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 
 use super::marks::{base, Mark};
 use super::{Lifecycle, Outcome};
-use crate::io::SAVE_IN_PLAY;
+use crate::edit_side::io::SAVE_IN_PLAY;
 use crate::{read_scene_file, Scene, SceneSnapshot};
 
 /// The marks that enter Play. A save refuses them (`SAVE_IN_PLAY`), and Undo has
@@ -39,7 +39,7 @@ fn path(name: &str) -> String {
 /// An empty scene saved to disk, for a load to read.
 fn empty() -> String {
     let empty = path("empty");
-    let saved = Scene::new().save_to_file(&empty);
+    let saved = crate::save_to_file(&Scene::new(), &empty);
     saved.expect("an empty scene saves");
     empty
 }
@@ -51,13 +51,13 @@ fn save(mark: &Mark) -> Outcome {
     (mark.set)(&mut scene, base);
     let file = path(mark.name);
     let refused = IN_PLAY.contains(&mark.name);
-    match scene.save_to_file(&file) {
+    match crate::save_to_file(&scene, &file) {
         Err(e) if refused && e == SAVE_IN_PLAY => return Outcome::Gone,
         Err(e) => panic!("{}: the save failed: {e}", mark.name),
         Ok(()) => assert!(!refused, "{}: a save in Play went through", mark.name),
     }
     let mut loaded = Scene::new();
-    loaded.load_from_file(&file).expect("the saved scene loads");
+    crate::load_from_file(&mut loaded, &file).expect("the saved scene loads");
     seen((mark.is_set)(&loaded, base), Outcome::Back)
 }
 
@@ -119,7 +119,7 @@ fn load(mark: &Mark) -> Outcome {
     let empty = empty();
     let (mut scene, base) = base();
     (mark.set)(&mut scene, base);
-    scene.load_from_file(&empty).expect("the empty scene loads");
+    crate::load_from_file(&mut scene, &empty).expect("the empty scene loads");
     seen((mark.is_set)(&scene, base), Outcome::Left)
 }
 
@@ -132,7 +132,7 @@ fn play_load(mark: &Mark) -> Outcome {
     scene.set_playing(true);
     (mark.set)(&mut scene, base);
     let data = read_scene_file(&empty).expect("the empty scene reads");
-    let swapped = scene.swap_in(data, &empty, &BTreeSet::new());
+    let swapped = crate::edit_side::load::swap_in(&mut scene, data, &empty, &BTreeSet::new());
     swapped.expect("the empty scene swaps in");
     seen((mark.is_set)(&scene, base), Outcome::Left)
 }

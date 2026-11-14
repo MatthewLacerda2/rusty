@@ -22,7 +22,7 @@ pub(super) fn warn_once(reference: &str, error: &rusty_asset::ImportError) {
 /// Say `message` once per `key` in the console, out of the set every failed
 /// rehydrate shares: a scene reloads often, and once is enough. A quiet stretch
 /// (`core::quiet`) leaves the key unspent, for the apply that is heard.
-pub(crate) fn warn_once_of(key: &str, message: impl FnOnce() -> String) {
+pub fn warn_once_of(key: &str, message: impl FnOnce() -> String) {
     if rusty_core::quiet::is_quiet() {
         return;
     }
@@ -31,8 +31,9 @@ pub(crate) fn warn_once_of(key: &str, message: impl FnOnce() -> String) {
     }
 }
 
-/// Whether `key` was already warned of ([`warn_once_of`]).
-#[cfg(test)]
-pub(crate) fn warned_of(key: &str) -> bool {
+/// Whether `key` was already warned of ([`warn_once_of`]). A test hook: the edit
+/// side's tests read it.
+#[doc(hidden)]
+pub fn warned_of(key: &str) -> bool {
     warned().contains(key)
 }

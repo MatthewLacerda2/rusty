@@ -17,7 +17,8 @@
 //! A demo closing over the edit scene puts it back with this same snapshot
 //! (`dev::demo::Origin`, #1598), so the two restores cannot drift.
 
-use crate::serialize::{apply_world_data, to_scene_data, SceneData};
+use crate::edit_side::serialize::{apply_world_data, to_scene_data};
+use crate::serialize::SceneData;
 use crate::Scene;
 
 /// A frozen copy of the edit-mode scene, taken when entering Play.

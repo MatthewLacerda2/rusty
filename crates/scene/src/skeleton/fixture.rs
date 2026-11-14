@@ -7,7 +7,8 @@
 use glam::Vec3;
 
 pub(super) use super::rig::{armature_owner, armature_skin, chain_skin};
-use crate::serialize::{apply_scene_data, to_scene_data, SceneData};
+use crate::edit_side::serialize::{apply_scene_data, to_scene_data};
+use crate::serialize::SceneData;
 use crate::Scene;
 use rusty_asset::{AssetRef, SkinData};
 use rusty_components::JointComponent;

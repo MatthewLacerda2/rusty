@@ -6,9 +6,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use super::super::{bounds_of, install, refit_collider, warn_once_of, RehydratedMesh, Which};
 use crate::prefab::diff::masked;
 use crate::prefab::live::shift_baseline;
+use crate::rehydrate::{bounds_of, install_sub_mesh, refit_collider, warn_once_of, Which};
 use crate::Scene;
 use rusty_asset::{AssetRef, Imported};
 use rusty_components::ColliderShape;
@@ -84,10 +84,7 @@ fn reimport_one(
     };
     let mut mesh = shared.reference();
     match sub {
-        Some(sub) => install(
-            &mut mesh,
-            RehydratedMesh::from_sub_mesh(sub, asset.revision),
-        ),
+        Some(sub) => install_sub_mesh(&mut mesh, sub, asset.revision),
         None => warn_gone(id, &format!("{file}::{}", reference.sub_object)),
     }
     shared.take_geometry(&mesh);

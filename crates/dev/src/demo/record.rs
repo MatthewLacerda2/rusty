@@ -18,11 +18,10 @@ use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
 use super::calls::is_play_verb;
-use super::delta::InputDelta;
-use super::digest;
 use super::files::Destination;
 use super::format::{host_json, End, Entry, Exact, Header};
 use super::index::{IndexLine, Indexer};
+use super::{delta::InputDelta, digest};
 use crate::harness::FIXED_DT;
 use rusty_app::{GameWorld, PlayTransition, TapPoint, TickTap};
 use rusty_core::input::InputFrame;
@@ -57,7 +56,8 @@ pub struct Recorder {
 /// Whether `world`'s scene is its file's, as saved; `None` without a file.
 fn is_saved(world: &GameWorld) -> Option<bool> {
     let path = world.script_manager().scene_path_cell().borrow().clone()?;
-    Some(!world.scene().borrow().has_unsaved_edits(&path))
+    let scene = world.scene();
+    Some(!rusty_scene::has_unsaved_edits(&scene.borrow(), &path))
 }
 
 /// `file` locked for as long as it is open, so no pruning deletes it meanwhile

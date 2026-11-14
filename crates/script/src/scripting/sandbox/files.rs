@@ -30,7 +30,7 @@ use mlua::{Function, IntoLuaMulti, Lua, MultiValue, Table, Value};
 use crate::scripting::console::ConsoleLogs;
 use rusty_core::paths::{self, to_slash};
 use rusty_core::project::SCRIPTS_DIR;
-use rusty_scene::io::bundled;
+use rusty_scene::edit_side::io::bundled;
 
 /// The project root the VM reads against, and the outside paths it already warned
 /// about.

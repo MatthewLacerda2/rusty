@@ -1,11 +1,11 @@
-//! crates/scene/src/runtime/prepare.rs — the file-only half of a scene load (#2123).
+//! crates/scene/src/edit_side/load/prepare.rs — the file-only half of a scene load (#2123).
 //!
 //! A load is two stages with a plain value between them. **Prepare** reads
 //! everything a scene needs from its files alone, never touching a live scene: the
 //! parsed document with every mesh rebuilt from its reference (`RehydratedScene`),
 //! and the sidecars beside it (the saved navmesh, the lighting SH and the baked PVS),
 //! read and decoded. The result, a [`PreparedScene`], is a pure function of the
-//! files. **Activate** is [`Scene::swap_in_prepared`](crate::Scene::swap_in_prepared): the swap at the tick's tail,
+//! files. **Activate** is [`swap_in_prepared`](super::swap_in_prepared): the swap at the tick's tail,
 //! which needs the survivors and so the live scene. `Scene.Load` runs both at once.
 //!
 //! Prepare runs on the thread that ticks for a `Scene.Load`, and on a worker for a
@@ -40,9 +40,7 @@ impl SceneSidecars {
     }
 }
 
-/// A scene made ready from its files alone, for [`Scene::swap_in_prepared`].
-///
-/// [`Scene::swap_in_prepared`]: crate::Scene::swap_in_prepared
+/// A scene made ready from its files alone, for [`swap_in_prepared`](super::swap_in_prepared).
 pub struct PreparedScene {
     pub(super) path: String,
     pub(super) document: RehydratedScene,
@@ -95,6 +93,6 @@ impl PreparedScene {
 /// sidecars aside: what a bake from the files reads.
 pub fn staged(document: RehydratedScene) -> crate::Scene {
     let mut scene = crate::Scene::new();
-    crate::serialize::apply_rehydrated(&mut scene, document);
+    crate::edit_side::serialize::apply_rehydrated(&mut scene, document);
     scene
 }

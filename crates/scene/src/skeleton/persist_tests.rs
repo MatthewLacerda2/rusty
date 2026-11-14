@@ -4,7 +4,7 @@
 use glam::{Quat, Vec3};
 
 use super::fixture::{hero, reload, reload_json};
-use crate::serialize::to_scene_data;
+use crate::edit_side::serialize::to_scene_data;
 use crate::{Scene, SceneSnapshot};
 
 /// A hero whose `Joint1` the designer turned, holding a `Gun` under `Joint1`.

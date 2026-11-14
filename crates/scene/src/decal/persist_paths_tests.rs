@@ -26,8 +26,7 @@ fn reload(s: &mut Scene, names: &[&str]) {
     let mut level = Scene::new();
     arena(&mut level, names);
     let survivors = s.load_survivors();
-    s.swap_in(to_scene_data(&level), NO_SIDECAR, &survivors)
-        .unwrap();
+    crate::edit_side::load::swap_in(s, to_scene_data(&level), NO_SIDECAR, &survivors).unwrap();
 }
 
 /// Mark each owner where it stands with one persistent decal, reload with the

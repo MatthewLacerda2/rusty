@@ -20,7 +20,7 @@ fn triangle() -> MeshData {
 /// An entity drawing `name` through a Mesh collider's kept copy alone.
 pub(super) fn kept_user(scene: &mut Scene, name: &str) -> u32 {
     let id = scene.add_entity("Kept".into());
-    scene.set_shared_mesh(id, name).unwrap();
+    crate::edit_side::mesh::set_shared_mesh(scene, id, name).unwrap();
     let collider = ColliderComponent::from_mesh_bounds(false, Vec3::ZERO, Vec3::ZERO);
     scene.world.set_collider(id, Some(collider));
     remove_component(scene, id, ComponentKind::Mesh);
@@ -36,7 +36,7 @@ fn delete_refuses_a_used_mesh_unless_forced() {
     let mut scene = Scene::new();
     scene.define_mesh("plank", triangle()).unwrap();
     let drawn = scene.add_entity("Plank".into());
-    scene.set_shared_mesh(drawn, "plank").unwrap();
+    crate::edit_side::mesh::set_shared_mesh(&mut scene, drawn, "plank").unwrap();
     let kept = kept_user(&mut scene, "plank");
     let refused = scene.delete_mesh("plank", false).unwrap_err();
     assert!(
@@ -67,7 +67,7 @@ fn undo_of_a_forced_delete_brings_the_mesh_and_its_users_back() {
     let mut scene = Scene::new();
     scene.define_mesh("plank", triangle()).unwrap();
     let drawn = scene.add_entity("Plank".into());
-    scene.set_shared_mesh(drawn, "plank").unwrap();
+    crate::edit_side::mesh::set_shared_mesh(&mut scene, drawn, "plank").unwrap();
     scene.begin_edits();
     scene.delete_mesh("plank", true).unwrap();
     scene.commit_edits(Some("Delete"));
@@ -83,7 +83,7 @@ fn a_forced_delete_empties_the_box_of_a_collider_left_with_nothing() {
     let drawn = scene.add_entity("Plank".into());
     let collider = ColliderComponent::from_mesh_bounds(false, Vec3::ZERO, Vec3::ZERO);
     scene.world.set_collider(drawn, Some(collider));
-    scene.set_shared_mesh(drawn, "plank").unwrap();
+    crate::edit_side::mesh::set_shared_mesh(&mut scene, drawn, "plank").unwrap();
     assert_eq!(scene.world.collider(drawn).unwrap().aabb_max.x, 1.0);
     scene.delete_mesh("plank", true).unwrap();
     let collider = scene.world.collider(drawn).unwrap();

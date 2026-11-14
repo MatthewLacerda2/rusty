@@ -20,7 +20,7 @@ use std::thread::JoinHandle;
 
 use rusty_app::{prepare_counted, PrepareSteps, SceneLoader};
 use rusty_render::warm::Warming;
-use rusty_scene::runtime::prepare::PreparedScene;
+use rusty_scene::edit_side::load::prepare::PreparedScene;
 use rusty_scene::serialize::SceneData;
 
 type Prepared = Result<PreparedScene, String>;

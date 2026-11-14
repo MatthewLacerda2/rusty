@@ -17,8 +17,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::edit_side::rehydrate::{reimport_model_except, reimport_written, Rig};
 use crate::prefab::restamp::restamp_models;
-use crate::rehydrate::{reimport_model_except, reimport_written, Rig};
 use crate::Scene;
 use rusty_core::fs::written::{note_written, written_since, Stale};
 

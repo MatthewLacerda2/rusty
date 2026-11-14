@@ -4,21 +4,19 @@
 //! its geometry, bind palette, skeleton and clips are rebuilt here on load, prefab
 //! stamp and propagation. Split out of `serialize` (#453) to keep it under the size
 //! cap. GPU buffers are never stored on disk, only rebuilt here.
+//!
+//! Rebuilding what a written model changed (`reimport`, `model_writes`) is the edit
+//! side's (`edit_side::rehydrate`): it re-baselines prefab instances.
 
 mod collider;
-pub mod model_writes;
-mod reimport;
 mod warned;
 
-pub(crate) use collider::{rebuild as rebuild_collider_mesh, refit_collider, Which};
+pub(crate) use collider::rebuild as rebuild_collider_mesh;
+pub use collider::{refit_collider, Which};
 use warned::warn_once;
-pub(crate) use warned::warn_once_of;
-#[cfg(test)]
-pub(crate) use warned::warned_of;
-
-pub use reimport::{
-    reimport_model, reimport_model_except, reimport_model_ids, reimport_written, Rig,
-};
+pub use warned::warn_once_of;
+#[doc(hidden)]
+pub use warned::warned_of;
 
 use glam::{Mat4, Vec3};
 
@@ -227,10 +225,16 @@ fn hold_fields(id: u32, mesh: &mut crate::MeshComponent) {
 }
 
 /// The box around `positions`, or `None` for none.
-pub(crate) fn bounds_of(positions: impl Iterator<Item = [f32; 3]>) -> Option<(Vec3, Vec3)> {
+pub fn bounds_of(positions: impl Iterator<Item = [f32; 3]>) -> Option<(Vec3, Vec3)> {
     positions.map(Vec3::from_array).fold(None, |b, p| {
         Some(b.map_or((p, p), |(lo, hi): (Vec3, Vec3)| (lo.min(p), hi.max(p))))
     })
+}
+
+/// Put `sub`'s geometry and rig, imported at `revision`, on `mesh`: what a reimport
+/// rebuilds a mesh drawing a written model with (`edit_side::rehydrate`).
+pub fn install_sub_mesh(mesh: &mut crate::MeshComponent, sub: &SubMesh, revision: MeshRevision) {
+    install(mesh, RehydratedMesh::from_sub_mesh(sub, revision));
 }
 
 /// Put `rebuilt`'s geometry and rig on `mesh`, unbound from any bones: a fresh
@@ -286,8 +290,3 @@ fn built(reference: &str, rebuilt: RehydratedMesh) -> crate::MeshComponent {
 pub fn asset_ref_file(reference: &str) -> Option<String> {
     rusty_asset::AssetRef::parse(reference).ok().map(|r| r.path)
 }
-
-#[cfg(test)]
-mod shared_tests;
-#[cfg(test)]
-mod tests;

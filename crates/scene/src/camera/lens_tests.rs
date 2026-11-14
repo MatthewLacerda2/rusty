@@ -5,7 +5,7 @@
 use super::*;
 use crate::authoring::rendering::camera as ops;
 use crate::create::default_camera;
-use crate::serialize::{apply_scene_data, to_scene_data};
+use crate::edit_side::serialize::{apply_scene_data, to_scene_data};
 use rusty_components::CameraComponent;
 
 /// The view camera synced from a scene whose one camera is `c`.

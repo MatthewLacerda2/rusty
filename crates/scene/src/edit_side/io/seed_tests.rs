@@ -66,7 +66,7 @@ fn the_seeded_default_scene_loads_back() {
     let path = root.join("default.scene");
     let files = [(path.clone(), super::default_scene_bytes().unwrap())];
     super::seed_files(&root.join(".seeded"), &files, "reset");
-    let data = super::super::read_scene_file(path.to_str().unwrap()).expect("loads");
+    let data = crate::io::read_scene_file(path.to_str().unwrap()).expect("loads");
     assert!(!data.entities.is_empty());
 }
 

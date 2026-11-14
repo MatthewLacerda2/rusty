@@ -33,8 +33,7 @@ fn reload(s: &mut Scene, crate_x: f32) {
     let mut level = Scene::new();
     arena(&mut level, crate_x);
     let survivors = s.load_survivors();
-    s.swap_in(to_scene_data(&level), NO_SIDECAR, &survivors)
-        .unwrap();
+    crate::edit_side::load::swap_in(s, to_scene_data(&level), NO_SIDECAR, &survivors).unwrap();
 }
 
 #[test]

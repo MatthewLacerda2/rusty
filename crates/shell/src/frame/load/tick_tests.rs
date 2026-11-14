@@ -25,7 +25,7 @@ fn write_level(tag: &str) -> String {
         ..Default::default()
     }];
     let path = paths::to_slash(&dir.join("level.scene"));
-    level.save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&level, &path).unwrap();
     path
 }
 

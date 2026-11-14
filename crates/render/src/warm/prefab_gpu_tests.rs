@@ -26,7 +26,7 @@ fn level() -> String {
         *place = glam::Vec3::new(x, 0.0, -4.0);
     }
     let path = rusty_core::paths::to_slash(&dir.join("level.scene"));
-    scene.save_to_file(&path).unwrap();
+    rusty_scene::save_to_file(&scene, &path).unwrap();
     path
 }
 

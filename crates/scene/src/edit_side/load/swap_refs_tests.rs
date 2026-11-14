@@ -27,7 +27,8 @@ fn a_surviving_marker_targeting_a_non_survivor_ends_with_no_target() {
     let floor = level.add_entity("Floor".to_string());
     assert_eq!(floor, enemy);
     let survivors = s.load_survivors();
-    s.swap_in(
+    crate::edit_side::load::swap_in(
+        &mut s,
         to_scene_data(&level),
         "rusty_1264_no_dir/level.scene",
         &survivors,

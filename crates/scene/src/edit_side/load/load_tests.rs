@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use super::load::make_room;
+use super::make_room;
 use crate::{to_scene_data, Scene};
 
 /// A path with no lighting sidecar beside it: the swap's sidecar merge is a no-op.
@@ -70,7 +70,7 @@ fn swap_carries_survivors_with_their_ids() {
     let before = s.id();
 
     let survivors = s.load_survivors();
-    s.swap_in(to_scene_data(&level()), NO_SIDECAR, &survivors)
+    crate::edit_side::load::swap_in(&mut s, to_scene_data(&level()), NO_SIDECAR, &survivors)
         .unwrap();
 
     let names: Vec<String> = s
@@ -113,7 +113,7 @@ fn a_re_rooted_survivors_bounds_stand_where_it_is_now() {
     s.dont_destroy_on_load(crate_);
 
     let survivors = s.load_survivors();
-    s.swap_in(to_scene_data(&level()), NO_SIDECAR, &survivors)
+    crate::edit_side::load::swap_in(&mut s, to_scene_data(&level()), NO_SIDECAR, &survivors)
         .unwrap();
     let (min, max) = s.world.collider_bounds(crate_).unwrap();
     assert!((min + max).abs().max_element() < 1e-4, "{min} {max}");

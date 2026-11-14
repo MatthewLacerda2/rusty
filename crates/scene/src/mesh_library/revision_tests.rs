@@ -34,12 +34,14 @@ fn undo_back_to_older_data_gives_the_next_user_a_newer_revision() {
     step(&mut scene, "B", |s| {
         s.define_mesh("m", triangle(2.0)).unwrap()
     });
-    step(&mut scene, "Use", |s| s.set_shared_mesh(f, "m").unwrap());
+    step(&mut scene, "Use", |s| {
+        crate::edit_side::mesh::set_shared_mesh(s, f, "m").unwrap()
+    });
     let uploaded = revision(&scene, f);
     assert_eq!(scene.undo().as_deref(), Some("Use"));
     assert_eq!(scene.undo().as_deref(), Some("B"));
     assert!(scene.mesh_users("m").is_empty());
-    scene.set_shared_mesh(g, "m").unwrap();
+    crate::edit_side::mesh::set_shared_mesh(&mut scene, g, "m").unwrap();
     assert!(
         revision(&scene, g) > uploaded,
         "B's buffers are not reused for A"
@@ -55,10 +57,10 @@ fn stop_after_a_play_replace_gives_the_next_user_a_newer_revision() {
     scene.define_mesh("m", triangle(1.0)).unwrap();
     let snapshot = SceneSnapshot::capture(&scene);
     scene.define_mesh("m", triangle(2.0)).unwrap();
-    scene.set_shared_mesh(f, "m").unwrap();
+    crate::edit_side::mesh::set_shared_mesh(&mut scene, f, "m").unwrap();
     let uploaded = revision(&scene, f);
     snapshot.restore(&mut scene);
-    scene.set_shared_mesh(g, "m").unwrap();
+    crate::edit_side::mesh::set_shared_mesh(&mut scene, g, "m").unwrap();
     assert!(
         revision(&scene, g) > uploaded,
         "Play's buffers are not reused"

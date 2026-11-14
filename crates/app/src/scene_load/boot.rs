@@ -92,7 +92,7 @@ pub fn load_boot_scene(
         if announce {
             console.info(format!("Loading scene from {path}..."));
         }
-        match scene.load_from_file(path) {
+        match rusty_scene::load_from_file(scene, path) {
             Ok(()) => return Some(path.clone()),
             Err(err) if err.replaced_world() => {
                 console.warn(format!("Scene {path}: {err}"));

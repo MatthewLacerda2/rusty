@@ -24,9 +24,13 @@ fn a_carried_rig_never_drives_the_entity_given_its_dead_bones_id() {
     assert!(scene.dont_destroy_on_load(rig));
 
     let survivors = scene.load_survivors();
-    scene
-        .swap_in(level(6), "rusty_1273_no_such_dir/level.scene", &survivors)
-        .unwrap();
+    crate::edit_side::load::swap_in(
+        &mut scene,
+        level(6),
+        "rusty_1273_no_such_dir/level.scene",
+        &survivors,
+    )
+    .unwrap();
     scene.sync_skeletons();
 
     assert!(
@@ -82,9 +86,13 @@ fn a_carried_rig_never_drives_the_entity_given_a_moved_bones_id() {
 
     let survivors = scene.load_survivors();
     assert!(!survivors.contains(&head), "the prop is not carried");
-    scene
-        .swap_in(level(6), "rusty_1273_no_such_dir/level.scene", &survivors)
-        .unwrap();
+    crate::edit_side::load::swap_in(
+        &mut scene,
+        level(6),
+        "rusty_1273_no_such_dir/level.scene",
+        &survivors,
+    )
+    .unwrap();
     scene.sync_skeletons();
 
     assert!(scene.world.contains(head), "the incoming level took the id");

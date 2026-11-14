@@ -3,7 +3,7 @@
 //! same place: the nearest surviving ancestor.
 
 use super::fixture::{armature_owner, chain_skin, connected, joint_to, reimport_to, warnings_of};
-use crate::serialize::to_scene_data;
+use crate::edit_side::serialize::to_scene_data;
 use crate::Scene;
 use rusty_components::mesh::BoneBody;
 

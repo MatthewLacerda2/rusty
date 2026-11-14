@@ -7,8 +7,8 @@
 use std::collections::BTreeSet;
 
 use super::fixture::hero;
+use crate::edit_side::serialize::to_scene_data;
 use crate::lighting::lightmap_set::LightmapEntry;
-use crate::serialize::to_scene_data;
 use crate::Scene;
 use rusty_components::{Entity, EntityRefs};
 

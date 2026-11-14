@@ -3,8 +3,8 @@
 //! name the model lacks falls back to the own mesh with one warning.
 
 use super::chair::write as write_chair;
+use crate::edit_side::serialize::{apply_scene_data, to_scene_data};
 use crate::model_instance::instantiate_model;
-use crate::serialize::{apply_scene_data, to_scene_data};
 use crate::Scene;
 use rusty_components::ColliderShape;
 
