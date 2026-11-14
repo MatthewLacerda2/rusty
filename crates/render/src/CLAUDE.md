@@ -201,11 +201,15 @@ in every layer. The vignette, the smallest real effect, is the worked example: g
   tween path, its rows in the sorted function table, and its *Player options* row.
 - **Completeness** — `render::postfx::effects::completeness` fails when any layer lacks the
   effect's part, or a composite texture it declares isn't bound and passed at its place in its own function's call. Pixels of every other effect stay byte-identical: no other offset or
-  struct moved.
+  struct moved. Two layers sit above this crate, the `Graphics.*` registrars and the
+  Inspector's sections, so render's own test fills them with the renderer's effect
+  names and cannot see either one missing: the root's `src/post_effect_layers_tests.rs`
+  hands the real ones in, and is what catches a missing registrar or Inspector section.
 
 ## GPU tests
 - **The name says it renders**: in-crate tests are named `gpu_*`, integration tests
-  live under `tests/gpu/`. nextest's `gpu` group selects them by name, and a test that
+  live under `tests/gpu/`. nextest's `gpu` group selects them by name (a `gpu::`
+  path only in the integration binary: this crate's `gpu` module is no GPU mark), and a test that
   builds a renderer without such a name panics in debug (`render::setup::gpu_rule`).
 - A test reaches a GPU only through `render::test_gpu::headless_or_skip`
   (`make rules`, `test-gpu-entry`); with no adapter it skips. A test that keeps two

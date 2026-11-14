@@ -26,10 +26,12 @@ gpu = { max-threads = 2 }
 # Which tests are GPU tests is a naming rule, enforced at runtime: a test that builds
 # a headless renderer without matching this filter panics and names the rule
 # (`render::setup::gpu_rule`, which also checks that this filter is unchanged).
-#   - integration tests: live under `tests/gpu/`, so their path starts with `gpu::`;
+#   - integration tests: live under `tests/gpu/`, so their path starts with `gpu::`
+#     (`kind(test)`: only the integration binary, since rusty-render's own unit tests
+#     sit in a `gpu` module too and are not GPU tests by that alone);
 #   - in-crate tests:    the test function's name starts with `gpu_`.
 [[profile.default.overrides]]
-filter = 'test(/^gpu::|(^|::)gpu_[^:]*$/)'
+filter = '(kind(test) & test(/^gpu::/)) | test(/(^|::)gpu_[^:]*$/)'
 test-group = "gpu"
 
 # CI: the default profile plus a JUnit report for the job summary. Profiles inherit

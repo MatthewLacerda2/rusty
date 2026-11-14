@@ -15,9 +15,13 @@
 //! runs it) names each test's thread after the test, which is what makes this work.
 
 /// Whether libtest's full test name (`module::path::test_fn`) marks a GPU test.
-pub(crate) fn is_gpu_test(name: &str) -> bool {
+///
+/// `integration` says the test runs in the integration binary (`tests/main.rs`),
+/// nextest's `kind(test)`: only there does a `gpu::` path count, since this crate's
+/// own unit tests sit under its `gpu` module and are named `gpu::…` too.
+pub(crate) fn is_gpu_test(name: &str, integration: bool) -> bool {
     let test_fn = name.rsplit("::").next().unwrap_or(name);
-    name.starts_with("gpu::") || test_fn.starts_with("gpu_")
+    (integration && name.starts_with("gpu::")) || test_fn.starts_with("gpu_")
 }
 
 /// Panic when a test thread builds a headless renderer without a GPU test name.
@@ -31,8 +35,11 @@ pub(crate) fn check_current_thread() {
     }
     let thread = std::thread::current();
     let Some(name) = thread.name() else { return };
+    // `cfg!(test)` holds only in this crate's own unit-test binary. Every other
+    // test binary is taken for the integration one: no other crate's tests sit in a
+    // top-level `gpu` module, so the overstatement selects nothing.
     assert!(
-        !name.contains("::") || is_gpu_test(name),
+        !name.contains("::") || is_gpu_test(name, !cfg!(test)),
         "test `{name}` builds a headless renderer but its name does not mark it as a \
          GPU test, so nextest will not cap it with the others (the `gpu` test group in \
          .config/nextest.toml). Start the test function's name with `gpu_`, or move an \
@@ -45,25 +52,39 @@ mod tests {
     use super::is_gpu_test;
 
     /// The nextest filterset for [`is_gpu_test`], exactly as `.config/nextest.toml` has it.
-    const NEXTEST_FILTER: &str = "test(/^gpu::|(^|::)gpu_[^:]*$/)";
+    const NEXTEST_FILTER: &str = "(kind(test) & test(/^gpu::/)) | test(/(^|::)gpu_[^:]*$/)";
 
     #[test]
     fn integration_gpu_module_and_gpu_prefixed_fns_are_gpu_tests() {
-        assert!(is_gpu_test("gpu::fxaa_screenshot::fxaa_softens_edges"));
         assert!(is_gpu_test(
-            "render::view::view_tests::gpu_resize_tracks_the_new_size"
+            "gpu::fxaa_screenshot::fxaa_softens_edges",
+            true
         ));
-        assert!(is_gpu_test("render::test_gpu::tests::gpu_adapter_present"));
+        assert!(is_gpu_test(
+            "view::view_tests::gpu_resize_tracks_the_new_size",
+            false
+        ));
+        assert!(is_gpu_test("test_gpu::tests::gpu_adapter_present", false));
+        assert!(is_gpu_test(
+            "gpu::shaders::tests::gpu_compiles_every_shader",
+            false
+        ));
     }
 
     #[test]
     fn a_gpu_word_elsewhere_in_the_path_is_not_enough() {
+        // This crate's own `gpu` module: a unit test there is a CPU test by its path.
         assert!(!is_gpu_test(
-            "render::gpu::entity_pool::tests::pool_reuses_slots"
+            "gpu::shaders::tests::all_shaders_compose",
+            false
         ));
-        assert!(!is_gpu_test("render::test_gpu::tests::adapter_present"));
-        assert!(!is_gpu_test("render::gpu_utils::tests::packs_rows"));
-        assert!(!is_gpu_test("physics::tests::gpu"));
+        assert!(!is_gpu_test(
+            "gpu::textures::mips::tests::halves_each_level",
+            false
+        ));
+        assert!(!is_gpu_test("test_gpu::tests::adapter_present", false));
+        assert!(!is_gpu_test("gpu_utils::tests::packs_rows", true));
+        assert!(!is_gpu_test("physics::tests::gpu", true));
     }
 
     /// The Rust predicate and the nextest filter are one rule written twice; this pins

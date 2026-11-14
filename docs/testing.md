@@ -570,7 +570,9 @@ of memory, **lower both to 1** before weakening the test.
 **The GPU naming rule.** A test group selects tests by name, so the name says whether
 a test renders:
 
-- an **integration** test that renders lives under `tests/gpu/` (path `gpu::…`);
+- an **integration** test that renders lives under `tests/gpu/` (path `gpu::…`; the
+  filter takes that path in the integration binary only, `kind(test)`, because
+  `rusty-render`'s own unit tests sit in its `gpu` module and share the prefix);
 - an **in-crate** test that renders has a function name starting with **`gpu_`**
   (`fn gpu_resize_tracks_the_new_size`).
 

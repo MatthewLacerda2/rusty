@@ -22,10 +22,11 @@ fn every_effect_has_every_part_in_every_layer() {
         .iter()
         .map(|(n, _)| *n)
         .collect();
-    // Without the editor there is no card to check: a registered effect counts as
-    // drawn, so only the registrars are checked.
+    // Without the editor there is no card to check: every effect the renderer has
+    // counts as drawn, so only the registrars are checked (and a missing one is
+    // reported once, as a registrar).
     #[cfg(not(feature = "editor"))]
-    let sections = api.clone();
+    let sections = crate::render::postfx::completeness::effect_names();
     #[cfg(feature = "editor")]
     let sections = sections();
     let problems = problems(&api, &sections);

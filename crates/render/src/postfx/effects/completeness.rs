@@ -77,11 +77,15 @@ pub fn problems(api: &[&str], sections: &[&str]) -> Vec<String> {
     check(&engine_with(names(api), names(sections)))
 }
 
-/// The layers as the engine has them, the two above this crate read as the
-/// renderer's own names (each effect counts as registered and drawn).
+/// The renderer's effect names: the root's test passes them for a layer its build lacks.
+pub fn effect_names() -> Vec<&'static str> {
+    POST_EFFECTS.iter().map(|e| e.name).collect()
+}
+
+/// The layers, the two above this crate read as the renderer's own names.
 #[cfg(test)]
 pub(super) fn engine() -> Layers {
-    let own: Vec<String> = POST_EFFECTS.iter().map(|e| e.name.to_string()).collect();
+    let own: Vec<String> = effect_names().into_iter().map(String::from).collect();
     engine_with(own.clone(), own)
 }
 
