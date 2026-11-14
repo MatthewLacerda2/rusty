@@ -108,7 +108,8 @@ jobs:
       contents: read
       pull-requests: write
     # One runner: a request is a file or a branch's diff, usually tens of
-    # mutants at ~2 min each. A scope too big for the budget below is stopped
+    # mutants at ~3.7 min each caught (~12.5 min for a missed one, which runs
+    # the whole suite). A scope too big for the budget below is stopped
     # by it, and the report says how many planned mutants it never reached.
     timeout-minutes: 180
     env:
@@ -225,7 +226,9 @@ jobs:
       # `--in-place` mutates this checkout, whose `target/` the baseline built,
       # so the first mutant does not rebuild the workspace in a copy. SIGINT at
       # the budget is cargo-mutants' Ctrl-C: it stops cleanly and keeps what it
-      # measured.
+      # measured. When setup and the baseline already spent the budget, no
+      # mutant runs and the run reads as stopped at its budget (124): `timeout
+      # 0s` would disable the limit, and a negative one exits 125, read as broken.
       - name: Mutate
         id: mutate
         if: steps.plan.outputs.in_scope != '0'
@@ -235,10 +238,15 @@ jobs:
           budget=$(( BUDGET_SECONDS - ($(date +%s) - JOB_STARTED) ))
           ulimit -v 8388608
           rc=0
-          timeout --signal=INT --kill-after=60s "${budget}s" \
-            cargo mutants --workspace --test-tool nextest --no-shuffle --baseline skip --in-place \
-              --timeout "$TIMEOUT" --features dev \
-              --in-diff scope.diff -- --fail-fast --test-threads 2 || rc=$?
+          if [ "$budget" -le 0 ]; then
+            echo "::warning::setup and the baseline spent the ${BUDGET_SECONDS}s budget; no mutant ran"
+            rc=124
+          else
+            timeout --signal=INT --kill-after=60s "${budget}s" \
+              cargo mutants --workspace --test-tool nextest --no-shuffle --baseline skip --in-place \
+                --timeout "$TIMEOUT" --features dev \
+                --in-diff scope.diff -- --fail-fast --test-threads 2 || rc=$?
+          fi
           echo "status=$rc" >> "$GITHUB_OUTPUT"
 
       # Red when cargo-mutants broke (any status but finished or stopped at

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """An on-request report never reads cleaner than the run was (#750).
 
-A run stopped at its budget says how much it never reached; a timed-out
+A run stopped at its budget says how much it never reached and is never clean; a timed-out
 mutant is unmeasured, never "no survivors", and a run where most time out says
 it is not a result; a broken run writes no report at all; survivors come with
 their diffs.
@@ -54,6 +54,18 @@ class Render(unittest.TestCase):
     def test_a_run_stopped_at_its_budget_names_the_gap(self) -> None:
         text = report.render("Scoped.", RUN, 10, 124)
         self.assertIn("4 of 10 planned mutants measured, 6 never reached", text)
+
+    def test_a_stopped_run_of_caught_mutants_is_not_clean(self) -> None:
+        run = {"outcomes": RUN["outcomes"][:2]}
+        text = report.render("Scoped.", run, 40, 124)
+        self.assertIn("1 of 40 planned mutants measured", text)
+        self.assertIn("that is not a clean run", text)
+        self.assertNotIn("✅", text)
+
+    def test_a_stop_before_any_mutant_is_not_nothing_in_scope(self) -> None:
+        text = report.render("Scoped.", {}, 40, 124)
+        self.assertIn("Nothing was measured before the budget ran out", text)
+        self.assertNotIn("Nothing in scope", text)
 
     def test_nothing_mutated_is_not_called_clean(self) -> None:
         text = report.render("Scoped.", {}, 0, 0)

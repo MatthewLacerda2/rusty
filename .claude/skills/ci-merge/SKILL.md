@@ -424,8 +424,10 @@ How to read a clean report:
   `crates/navigation/src`.** Elsewhere, silence means unmeasured, not clean.
 - **A scoped run names what it planned** (how many mutants, any from outside the
   scope). A `diff` with nothing to mutate says so; it is not a pass.
-- **A run stopped at its budget names what it never reached**: unmeasured; ask
-  again narrower.
+- **A run stopped at its budget names what it never reached** and is never called
+  clean: unmeasured; ask again narrower.
+- **Timeouts are unmeasured.** A run where most viable mutants timed out says it is
+  not a result: the tool broke, so read its log, don't trust its counts.
 
 ### Triaging a survivor
 
@@ -461,6 +463,7 @@ own baseline, because cargo-mutants' tests only the mutated package; `docs/testi
 *Mutation testing*, says why):
 
     git diff origin/main > branch.diff
+    cargo nextest run --no-run --workspace --features=dev   # build first, untimed
     cargo nextest run --workspace --features=dev --fail-fast --test-threads 2   # time it
     cargo mutants --workspace --test-tool nextest --baseline skip --timeout <3x secs> \
       --features dev --in-diff branch.diff -- --fail-fast --test-threads 2

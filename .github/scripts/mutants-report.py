@@ -11,7 +11,7 @@ mutants-remote` prints the answer in the terminal.
 
 Two things it never does. It never reports a mutant it did not measure as if
 it had: a run stopped at its time budget says how many planned mutants it never
-reached, because a smaller-looking run reads as a cleaner one, and a mutant that
+reached and is never called clean, whatever it measured, because a smaller-looking run reads as a cleaner one, and a mutant that
 timed out is unmeasured too, never "no survivors". And it never fails over a
 survivor — mutation is a signal, and survivors are its result.
 """
@@ -62,9 +62,11 @@ def render(scope: str, run: dict, in_scope: int, status: int) -> str:
     if survivors:
         out += ["These were mutated and no test failed. Strengthen the tests covering them,"
                 " or say why a survivor is equivalent:", "", "```", *survivors, "```"]
+    elif not done and status in STOPPED:
+        out += ["Nothing was measured before the budget ran out: not a result. ❌"]
     elif not done:
         out += ["Nothing in scope was mutated. ➖"]
-    elif counts["timeout"] or not counts["caught"]:
+    elif counts["timeout"] or not counts["caught"] or status in STOPPED:
         out += [f"No survivors among the {counts['caught']} measured; that is not a clean run."]
     else:
         out += ["No survivors. ✅"]

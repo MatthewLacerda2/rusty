@@ -47,6 +47,10 @@ matrix ceiling, and on a count of zero (the `--file` globs match nothing).
 `has-rate --reports DIR` exits 0 only when `DIR` holds a rate, so the lookup
 passes over a report that holds none and tries an older sweep.
 
+`unfinished --shards DIR --total N` is the report's verdict on each shard
+(`unfinished`): only a sweep where every shard finished marks its commit
+`sweep-complete`, and a shard whose mutants mostly timed out did not finish.
+
 `rate` is the report's half: `mutants-report` prints this run's mean and
 slowest rate beside the figure the plan used, which the next sweep sizes from.
 """
@@ -107,15 +111,40 @@ def shard_rate(shard: Path) -> tuple[int, int] | None:
         seconds = int((shard / "elapsed-seconds").read_text().strip())
     except (OSError, ValueError):
         return None
-    measured = 0
-    for kind in OUTCOMES:
-        try:
-            measured += sum(1 for line in (shard / f"{kind}.txt").read_text().splitlines() if line.strip())
-        except OSError:
-            pass
+    measured = sum(counted(shard, kind) for kind in OUTCOMES)
     if seconds <= 0 or measured < MIN_MEASURED:
         return None
     return seconds, measured
+
+
+def counted(shard: Path, kind: str) -> int:
+    """How many mutants a shard's `<kind>.txt` lists; 0 when it has none."""
+    try:
+        return sum(1 for line in (shard / f"{kind}.txt").read_text().splitlines() if line.strip())
+    except OSError:
+        return 0
+
+
+def unfinished(shard: Path) -> str:
+    """Why one shard's run is not a finished measurement, or '' when it is.
+
+    `budget`: it stopped itself at its budget (`timeout`'s 124/137). `timeouts:t/v`:
+    it finished, but most of its viable mutants timed out, so it measured the tool
+    breaking, not the code (#2164: every mutant of a moved crate timed out and the
+    report read clean). `exit:<code>`: anything else, `baseline` (its suite failed
+    unmutated) or `none` (no exit code: cut off before its run) included.
+    """
+    try:
+        rc = (shard / "exit-code").read_text().strip() or "none"
+    except OSError:
+        rc = "none"
+    if rc in ("124", "137"):
+        return "budget"
+    if rc not in ("0", "2", "3"):
+        return f"exit:{rc}"
+    timed_out = counted(shard, "timeout")
+    viable = timed_out + counted(shard, "caught") + counted(shard, "missed")
+    return f"timeouts:{timed_out}/{viable}" if timed_out * 2 > viable else ""
 
 
 def calibrate(reports: Path | None, source: str = "") -> Rate:
@@ -213,8 +242,15 @@ def main() -> None:
     measured = sub.add_parser("rate", help="this run's measured minutes a mutant")
     measured.add_argument("--reports", type=Path, required=True, help="this run's shard reports")
     measured.add_argument("--sized-at", type=float, help="the minutes the plan sized by")
+    unfin = sub.add_parser("unfinished", help="print ` k(why)` for each shard that did not finish")
+    unfin.add_argument("--shards", type=Path, required=True, help="one `mutants-shard-<k>` dir a shard")
+    unfin.add_argument("--total", type=int, required=True, help="the matrix's shard count")
     args = parser.parse_args()
 
+    if args.command == "unfinished":
+        whys = ((k, unfinished(args.shards / f"mutants-shard-{k}")) for k in range(args.total))
+        print("".join(f" {k}({why})" for k, why in whys if why))
+        return
     if args.command == "has-rate":
         sys.exit(0 if calibrate(args.reports).measured else 1)
     if args.command == "rate":

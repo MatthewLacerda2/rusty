@@ -387,7 +387,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v7   # for mutants-shards.py's rate
+      - uses: actions/checkout@v7   # for mutants-shards.py's rate and shard verdicts
       - name: Download every shard's report
         uses: actions/download-artifact@v8
         with:
@@ -413,15 +413,9 @@ jobs:
             cat shards/*/"$kind".txt 2>/dev/null | sort > "mutants.out/$kind.txt" || true
           done
           total=$(cat shards/*/shard-total 2>/dev/null | head -n1 || true)
-          unfinished=''
-          for k in $(seq 0 $(( ${total:-0} - 1 ))); do
-            rc=$(cat "shards/mutants-shard-$k/exit-code" 2>/dev/null || echo none)
-            case "$rc" in
-              0|2|3) ;;
-              124|137) unfinished="$unfinished $k(budget)" ;;
-              *) unfinished="$unfinished $k(exit:$rc)" ;;
-            esac
-          done
+          # Each shard's verdict (`mutants-shards.py`, `unfinished`): stopped at
+          # its budget, broken, lost, or mostly timed out (#2164) is not finished.
+          unfinished=$(python3 .github/scripts/mutants-shards.py unfinished --shards shards --total "${total:-0}")
           count() { grep -c . "mutants.out/$1.txt" || true; }
           measured=$(cat mutants.out/{caught,missed,timeout,unviable}.txt | grep -c . || true)
           {
@@ -438,7 +432,7 @@ jobs:
             if [ -z "$total" ]; then
               echo '> ❌ No shard uploaded a report — nothing was measured.'
             elif [ -n "$unfinished" ]; then
-              echo "> ⚠️ Shards that did not finish (of $total):$unfinished — their remaining mutants are unmeasured, not clean. \`budget\` means the shard stopped itself before the 6 h ceiling: the matrix was sized too small for its slowest shard; the next sweep sizes from the rate above. \`exit:none\` means it was cut off or failed before its run: check its log for a lost runner (\`received a shutdown signal\`, a one-off unless it recurs)."
+              echo "> ⚠️ Shards that did not finish (of $total):$unfinished — their remaining mutants are unmeasured, not clean. \`budget\` means the shard stopped itself before the 6 h ceiling: the matrix was sized too small for its slowest shard; the next sweep sizes from the rate above. \`exit:baseline\` means its unmutated suite failed: \`main\`'s tests are broken (or flaky) on this commit, so no mutant was measured. \`timeouts:t/v\` means most of its viable mutants timed out: the run measured the tool breaking, not the code; read its log. \`exit:none\` means it was cut off or failed before its run: check its log for a lost runner (\`received a shutdown signal\`, a one-off unless it recurs)."
             else
               echo "> All $total shards finished."
               # The marker `mutants-plan` looks for (#506): this commit is covered.
