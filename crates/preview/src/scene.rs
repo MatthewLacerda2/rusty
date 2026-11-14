@@ -19,7 +19,7 @@ use std::path::Path;
 use glam::{Quat, Vec3};
 
 use rusty_components::{MaterialAsset, MaterialComponent};
-use rusty_scene::authoring::{self, Primitive};
+use rusty_edit::authoring::{self, Primitive};
 use rusty_scene::{LightComponent, LightType, Scene};
 
 /// The bundled preview mesh (#352): a hardcoded `.obj`, never a project asset — it

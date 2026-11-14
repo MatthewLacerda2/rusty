@@ -7,7 +7,7 @@
 use std::collections::BTreeMap;
 
 use rusty_ecs::World;
-use rusty_scene::authoring::material as mat_ops;
+use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::MaterialAsset;
 
 /// Draw entity `id`'s slot list when it has more than one slot, and return the key

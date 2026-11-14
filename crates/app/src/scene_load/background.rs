@@ -15,8 +15,8 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
+use rusty_edit::load::prepare::{staged, PreparedScene, SceneSidecars};
 use rusty_navigation::NavigationGraph;
-use rusty_scene::edit_side::load::prepare::{staged, PreparedScene, SceneSidecars};
 use rusty_scene::serialize::RehydratedScene;
 
 use super::super::game::GameWorld;

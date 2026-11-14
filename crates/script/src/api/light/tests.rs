@@ -12,7 +12,7 @@ fn scene_with_light() -> (Rc<RefCell<Scene>>, u32) {
     let id = scene.add_entity("Lamp".to_string());
     scene
         .world
-        .set_light(id, Some(rusty_scene::authoring::default_light()));
+        .set_light(id, Some(rusty_edit::authoring::default_light()));
     (Rc::new(RefCell::new(scene)), id)
 }
 

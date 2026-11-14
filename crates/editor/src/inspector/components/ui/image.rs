@@ -1,18 +1,18 @@
 //! The Image inspector card (#418): tint, texture, image type and the per-type
 //! fields (9-slice border, fill, preserve aspect), the raycast target, and the
 //! look (#425): a gradient tint and the blend mode. Widgets
-//! edit a snapshot; every write routes through `scene::authoring::ui::image`.
+//! edit a snapshot; every write routes through `edit::authoring::ui::image`.
 
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use super::look::{blend_row, gradient_editor};
 use super::{combo, vec4_row};
 use crate::inspector::components::card::component_card;
 use rusty_asset::MapRef;
 use rusty_components::{FillMethod, FillOrigin, ImageComponent, ImageType};
-use rusty_scene::authoring::ui::image as image_ops;
+use rusty_edit::authoring::ui::image as image_ops;
 
 /// Image card. A THIN client (#287): widgets edit a snapshot and the changed
 /// snapshot is written back field by field through the shared ops; remove detaches.

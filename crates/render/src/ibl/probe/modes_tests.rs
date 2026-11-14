@@ -5,7 +5,7 @@
 use glam::Vec3;
 
 use rusty_components::{LightComponent, LightMode, MaterialAsset};
-use rusty_scene::authoring::{primitive_mesh_component, Primitive};
+use rusty_scene::create::{primitive_mesh_component, Primitive};
 use rusty_scene::lighting::sh::Sh9;
 use rusty_scene::{MaterialComponent, Scene};
 
@@ -45,7 +45,7 @@ fn floor_scene(mode: Option<LightMode>) -> Scene {
             inner_cone: 0.0,
             outer_cone: 0.0,
             mode,
-            ..rusty_scene::authoring::default_light()
+            ..rusty_scene::create::default_light()
         };
         scene.world.set_light(lamp, Some(light));
     }

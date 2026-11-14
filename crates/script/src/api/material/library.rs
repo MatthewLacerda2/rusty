@@ -4,7 +4,7 @@
 
 use super::{put, Reg};
 use crate::api::ApiCell;
-use rusty_scene::authoring::material as mat_ops;
+use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::Scene;
 
 /// Register `DeleteAsset` onto the `Material` `table`.

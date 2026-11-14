@@ -5,7 +5,7 @@
 //! plus the scale factor those produce on the current screen, and the world /
 //! camera canvas knobs (#429): pixels per unit, plane distance, tilt and sway. Every
 //! setter routes
-//! through the shared `scene::authoring::ui::layout::canvas` ops the inspector card uses.
+//! through the shared `edit::authoring::ui::layout::canvas` ops the inspector card uses.
 //! Getters return a neutral default when the entity has no canvas.
 
 use glam::Vec2;
@@ -17,7 +17,7 @@ use crate::api::ApiCell;
 use rusty_components::CanvasComponent;
 use rusty_components::CanvasRenderMode;
 use rusty_core::settings::video::VideoSettings;
-use rusty_scene::authoring::ui::layout::canvas as canvas_ops;
+use rusty_edit::authoring::ui::layout::canvas as canvas_ops;
 use rusty_scene::Scene;
 use rusty_ui::ScreenSize;
 

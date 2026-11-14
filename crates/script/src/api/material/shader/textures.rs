@@ -8,7 +8,7 @@
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
-use rusty_scene::authoring::material as mat_ops;
+use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::Scene;
 
 /// Register `SetShaderTexture` onto the `Material` `table`.
@@ -38,7 +38,7 @@ mod tests {
     use std::rc::Rc;
 
     use super::*;
-    use rusty_scene::authoring::{create_entity, Primitive};
+    use rusty_edit::authoring::{create_entity, Primitive};
 
     fn run(scene: &Rc<RefCell<Scene>>, script: &str) -> mlua::Result<()> {
         let lua = Lua::new();
@@ -58,7 +58,7 @@ mod tests {
             &format!(r#"Material.SetShaderTexture({id}, "mask", "n.png")"#),
         )
         .unwrap();
-        let key = rusty_scene::authoring::material::entity_material_key(id);
+        let key = rusty_edit::authoring::material::entity_material_key(id);
         let mask = |s: &Rc<RefCell<Scene>>| {
             s.borrow().materials[&key]
                 .shader_textures

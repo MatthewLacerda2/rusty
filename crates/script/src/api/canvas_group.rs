@@ -3,7 +3,7 @@
 //! Get/Set over an entity's `CanvasGroupComponent`: the subtree `Alpha` (multiplied
 //! into every graphic below) and the `Interactable` / `BlocksRaycasts` flags
 //! pointer dispatch reads (#420). Setters route through the shared
-//! `scene::authoring::ui::layout::canvas_group` ops the inspector card uses. Getters return
+//! `edit::authoring::ui::layout::canvas_group` ops the inspector card uses. Getters return
 //! `1` / `false` without a CanvasGroup; setters are then no-ops.
 
 use mlua::Lua;
@@ -12,7 +12,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::CanvasGroupComponent;
-use rusty_scene::authoring::ui::layout::canvas_group as group_ops;
+use rusty_edit::authoring::ui::layout::canvas_group as group_ops;
 use rusty_scene::Scene;
 
 type BoolGet = fn(&CanvasGroupComponent) -> bool;

@@ -1,12 +1,12 @@
 //! The RectTransform card's anchor-preset picker (#423): Unity's 4×4 grid in a
 //! popup. A click re-anchors without moving the element; held **Shift** also
 //! sets the pivot, held **Alt** also snaps the element onto its anchors. The cell
-//! is applied through `scene::authoring::ui::layout::rect_transform::apply_anchor_preset`, the
+//! is applied through `edit::authoring::ui::layout::rect_transform::apply_anchor_preset`, the
 //! op `RectTransform.SetAnchorPreset` calls.
 
 use egui::{Rect, Sense, Stroke, StrokeKind};
 use rusty_components::RectTransformComponent;
-use rusty_scene::authoring::ui::layout::rect_transform::{AnchorPreset, AxisPreset};
+use rusty_edit::authoring::ui::layout::rect_transform::{AnchorPreset, AxisPreset};
 
 /// Rows top to bottom, then stretch — Unity's order.
 const ROWS: [AxisPreset; 4] = [

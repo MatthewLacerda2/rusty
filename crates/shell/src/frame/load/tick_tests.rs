@@ -4,7 +4,7 @@
 use super::frame_tests::playing_world;
 use super::*;
 use rusty_core::paths;
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_edit::authoring::{create_entity, Primitive};
 use rusty_scene::{Scene, ScriptComponent};
 
 /// A level whose one script moves `Survivor` 1 m up on `Start` (a teleport the
@@ -25,7 +25,7 @@ fn write_level(tag: &str) -> String {
         ..Default::default()
     }];
     let path = paths::to_slash(&dir.join("level.scene"));
-    rusty_scene::save_to_file(&level, &path).unwrap();
+    rusty_edit::save_to_file(&level, &path).unwrap();
     path
 }
 

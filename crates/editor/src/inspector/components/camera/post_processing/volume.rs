@@ -7,7 +7,7 @@
 use super::{count_row, quality_row, slider_row, Section};
 use rusty_components::SsaoSettings;
 use rusty_core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
-use rusty_scene::authoring::rendering::post_processing as vc_ops;
+use rusty_edit::authoring::rendering::post_processing as vc_ops;
 use rusty_scene::PostProcessingComponent;
 
 pub(super) const SHADOWS: Section = Section {

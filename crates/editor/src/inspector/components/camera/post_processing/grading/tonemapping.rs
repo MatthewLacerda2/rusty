@@ -1,7 +1,7 @@
 //! Tonemapping: the operator, then the display-gamma tweak.
 
 use super::super::{knob, knob_row, Section, COLOR_CORRECTION};
-use rusty_scene::authoring::rendering::post_processing::grading::tonemapping;
+use rusty_edit::authoring::rendering::post_processing::grading::tonemapping;
 use rusty_scene::{PostProcessingComponent, Tonemap};
 
 pub(in super::super) const SECTION: Section = Section {

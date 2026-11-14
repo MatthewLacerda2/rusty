@@ -80,9 +80,21 @@ pub const LAYERS: &[Layer] = &[
     sim("ecs", &["components"]).uses(&["hecs"]),
     // A sim `Resource` stepped by sim time; its device thread never reads a clock.
     sim("audio", &["asset", "components", "core"]).uses(&["kira"]),
+    sim("scene", &["asset", "components", "core", "ecs"]),
+    // The verbs that write a scene and the paths that build one from files (authoring,
+    // prefabs, save / load, the snapshot around Play), apart from the `Scene` they
+    // write, so an authoring edit rebuilds only the crates that edit a scene.
     sim(
-        "scene",
-        &["asset", "components", "core", "ecs", "procgen", "shadergen"],
+        "edit",
+        &[
+            "asset",
+            "components",
+            "core",
+            "ecs",
+            "procgen",
+            "scene",
+            "shadergen",
+        ],
     ),
     // The lighting bakes, apart from the data they write (`scene::lighting`), so an
     // edit to a bake rebuilds only what runs one. The lightmap bake traces rays
@@ -118,6 +130,7 @@ pub const LAYERS: &[Layer] = &[
             "components",
             "core",
             "ecs",
+            "edit",
             "lighting",
             "navigation",
             "physics",
@@ -137,6 +150,7 @@ pub const LAYERS: &[Layer] = &[
             "audio",
             "components",
             "core",
+            "edit",
             "navigation",
             "physics",
             "scene",
@@ -148,7 +162,7 @@ pub const LAYERS: &[Layer] = &[
     // The platform layer: real time, the GPU, windows and the editor live here.
     // The process logger (#1139): stderr, plus engine warnings for the console.
     platform("logging", &["core", "script"]).uses(&["env_logger"]),
-    platform("preview", &["asset", "components", "core", "scene"]),
+    platform("preview", &["asset", "components", "core", "edit", "scene"]),
     platform(
         "render",
         &[
@@ -173,6 +187,7 @@ pub const LAYERS: &[Layer] = &[
             "asset",
             "components",
             "core",
+            "edit",
             "lighting",
             "logging",
             "navigation",
@@ -203,6 +218,7 @@ pub const LAYERS: &[Layer] = &[
             "core",
             "dev",
             "ecs",
+            "edit",
             "lighting",
             "navigation",
             "preview",
@@ -224,6 +240,7 @@ pub const LAYERS: &[Layer] = &[
             "core",
             "dev",
             "ecs",
+            "edit",
             "editor",
             "logging",
             "navigation",

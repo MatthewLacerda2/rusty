@@ -6,7 +6,7 @@ use glam::Vec3;
 
 use super::{scene_size, PixelSize, RenderScale, RenderView};
 use crate::{readback, Renderer, OFFSCREEN_FORMAT};
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
 #[test]

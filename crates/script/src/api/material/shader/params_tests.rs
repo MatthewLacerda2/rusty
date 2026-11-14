@@ -9,7 +9,7 @@ use std::rc::Rc;
 use mlua::Lua;
 
 use crate::api::bind;
-use rusty_scene::authoring::material as mat_ops;
+use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::Scene;
 use rusty_shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};

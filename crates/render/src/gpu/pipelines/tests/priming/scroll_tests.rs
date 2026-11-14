@@ -8,7 +8,8 @@ use glam::{Quat, Vec3};
 
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_components::RenderMode;
-use rusty_scene::authoring::{create_entity, default_post_processing, material, Primitive};
+use rusty_edit::authoring::material;
+use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::{Camera, Scene};
 use rusty_shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};

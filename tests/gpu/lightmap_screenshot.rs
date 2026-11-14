@@ -14,7 +14,7 @@ use glam::{Quat, Vec3};
 use rusty::components::{LightComponent, LightType};
 use rusty::dev::bake::lightmap::bake_scene_lightmaps;
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::{primitive_mesh_component, Primitive};
+use rusty::edit::authoring::{primitive_mesh_component, Primitive};
 use rusty::scene::lighting::settings::BakeSettings;
 use rusty::scene::{Camera, Scene};
 
@@ -59,7 +59,7 @@ fn scene(ambient: f32) -> Scene {
             range: 20.0,
             inner_cone: 15.0,
             outer_cone: 20.0,
-            ..rusty::scene::authoring::default_light()
+            ..rusty::edit::authoring::default_light()
         }),
     );
     let mut t = scene.world.transform_mut(spot).unwrap();

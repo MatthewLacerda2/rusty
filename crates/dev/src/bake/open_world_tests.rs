@@ -14,7 +14,7 @@ use crate::capture::CaptureHost;
 use crate::screenshot::capture_into;
 use rusty_asset::LightmapUvSettings;
 use rusty_components::{LightComponent, LightMode, LightType};
-use rusty_scene::asset_instance::{instantiate_asset, set_lightmap_uv_settings};
+use rusty_edit::asset_instance::{instantiate_asset, set_lightmap_uv_settings};
 use rusty_scene::{Camera, Scene};
 use rusty_test_support::models::quad_file as quad_model;
 
@@ -56,13 +56,13 @@ fn floor_under_a_baked_sun() -> (Scene, String, String) {
         light_type: LightType::Directional,
         intensity: 3.0,
         mode: LightMode::Baked,
-        ..rusty_scene::authoring::default_light()
+        ..rusty_edit::authoring::default_light()
     };
     scene.world.set_light(sun, Some(light));
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-1.2);
     let s = &mut scene.lighting_settings.lightmaps;
     (s.texels_per_unit, s.samples, s.bounces, s.max_lightmap_size) = (2.0, 8, 1, 32);
-    rusty_scene::save_to_file(&scene, &path).unwrap();
+    rusty_edit::save_to_file(&scene, &path).unwrap();
     (scene, model, path)
 }
 
@@ -96,9 +96,9 @@ fn gpu_a_bake_after_a_lightmap_uv_reimport_lights_the_open_world() {
     );
     let open = brightness(&mut editor, &scene, "open").unwrap();
 
-    rusty_scene::save_to_file(&scene, &path).unwrap();
+    rusty_edit::save_to_file(&scene, &path).unwrap();
     let mut fresh = Scene::new();
-    rusty_scene::load_from_file(&mut fresh, &path).unwrap();
+    rusty_edit::load_from_file(&mut fresh, &path).unwrap();
     let loaded = brightness(&mut CaptureHost::new(), &fresh, "fresh").unwrap();
     eprintln!("[1540] before={dark:.1} open={open:.1} fresh load={loaded:.1}");
     assert!(

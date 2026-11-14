@@ -123,9 +123,9 @@ fn the_field_survives_save_and_load() {
     scene.world.set_particles(id, Some(cfg));
     let path = crate::temp::dir().join("rusty_particle_space.scene");
     let path = path.to_string_lossy().into_owned();
-    rusty::scene::save_to_file(&scene, &path).unwrap();
+    rusty::edit::save_to_file(&scene, &path).unwrap();
     let mut loaded = Scene::new();
-    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
+    rusty::edit::load_from_file(&mut loaded, &path).unwrap();
     let e = loaded.world.entity_document(id).unwrap();
     let space = e.particles.as_ref().unwrap().simulation_space;
     assert_eq!(space, SimulationSpace::Local);

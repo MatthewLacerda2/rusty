@@ -4,7 +4,7 @@
 use super::path_field::{self, DIRT};
 use super::{count_row, knob, knob_row, quality_row, toggle, Section};
 use rusty_core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
-use rusty_scene::authoring::rendering::post_processing::bloom;
+use rusty_edit::authoring::rendering::post_processing::bloom;
 use rusty_scene::PostProcessingComponent;
 
 pub(super) const SECTION: Section = Section {

@@ -16,8 +16,8 @@ use mlua::Table;
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
+use rusty_edit::authoring::nav::agent as nav_ops;
 use rusty_navigation::{area_index, NavMeshSettings, NavigationGraph};
-use rusty_scene::authoring::nav::agent as nav_ops;
 use rusty_scene::Scene;
 
 /// Apply `edit` to the scene's area table and hand the new costs to the graph,

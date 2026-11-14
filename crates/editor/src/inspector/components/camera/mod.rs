@@ -18,7 +18,7 @@ mod target;
 pub use post_processing::{commit_abandoned_paths, draw_post_processing};
 
 use crate::inspector::components::card::component_card;
-use rusty_scene::authoring::{self, rendering::camera as camera_ops, ComponentKind};
+use rusty_edit::authoring::{self, rendering::camera as camera_ops, ComponentKind};
 use rusty_scene::{CameraComponent, ClearFlags};
 
 /// Camera Component panel. `named_layers` are the `(index, label)` slots offered in

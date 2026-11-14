@@ -5,7 +5,7 @@ edition.workspace = true
 publish.workspace = true
 
 [features]
-dev = ["dep:rusty-dev", "rusty-app/dev", "rusty-asset/dev", "rusty-core/dev", "rusty-dev?/dev", "rusty-editor?/dev", "rusty-navigation/dev", "rusty-render/dev", "rusty-scene/dev", "rusty-script/dev"]
+dev = ["dep:rusty-dev", "rusty-app/dev", "rusty-asset/dev", "rusty-core/dev", "rusty-dev?/dev", "rusty-editor?/dev", "rusty-navigation/dev", "rusty-render/dev", "rusty-edit/dev", "rusty-scene/dev", "rusty-script/dev"]
 editor = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:notify", "dep:rusty-editor", "rusty-app/editor", "rusty-asset/editor", "rusty-core/editor", "rusty-editor?/editor", "rusty-render/editor"]
 
 [lints]
@@ -22,6 +22,7 @@ rusty-editor = { workspace = true, optional = true }
 rusty-logging = { workspace = true }
 rusty-navigation = { workspace = true }
 rusty-render = { workspace = true }
+rusty-edit = { workspace = true }
 rusty-scene = { workspace = true }
 rusty-script = { workspace = true }
 rusty-time = { workspace = true }

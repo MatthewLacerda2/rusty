@@ -26,9 +26,9 @@ fn round_trip(scene: &Scene, name: &str) -> Scene {
         .join(format!("rusty_{name}_{}.json", std::process::id()))
         .to_string_lossy()
         .into_owned();
-    rusty::scene::save_to_file(scene, &path).unwrap();
+    rusty::edit::save_to_file(scene, &path).unwrap();
     let mut loaded = Scene::new();
-    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
+    rusty::edit::load_from_file(&mut loaded, &path).unwrap();
     let _ = std::fs::remove_file(&path);
     loaded
 }

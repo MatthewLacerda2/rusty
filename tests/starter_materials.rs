@@ -6,17 +6,18 @@
 //! through `SceneData` as named library entries an entity references by key.
 
 use rusty::asset::{build_manifest, import_file};
-use rusty::scene::authoring::material_asset_from_import;
-use rusty::scene::{apply_scene_data, to_scene_data, MaterialComponent, Scene};
+use rusty::edit::authoring::material_asset_from_import;
+use rusty::edit::{apply_scene_data, to_scene_data};
+use rusty::scene::{MaterialComponent, Scene};
 use std::path::PathBuf;
 
-use rusty::scene::bundled::STARTER_MATERIALS_PATH as STARTER;
+use rusty::edit::bundled::STARTER_MATERIALS_PATH as STARTER;
 
 /// A project seeded the way every project is, so the starter file is where a game
 /// finds it.
 fn seeded_project(name: &str) -> PathBuf {
     let root = crate::temp::dir().join(name);
-    rusty::scene::seed_workspace(&root, None);
+    rusty::edit::seed_workspace(&root, None);
     root
 }
 

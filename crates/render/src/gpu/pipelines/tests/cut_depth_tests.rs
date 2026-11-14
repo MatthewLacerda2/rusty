@@ -10,7 +10,8 @@ use glam::{Quat, Vec3};
 use super::mask_tests::Dissolve;
 use super::params_tests::{set_param, set_texture};
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_scene::authoring::{create_entity, default_post_processing, material, Primitive};
+use rusty_edit::authoring::material;
+use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// Fine enough for SSAO to resolve a crate's contact shadow.

@@ -19,7 +19,7 @@ fn one_per_mode(light_type: LightType) -> Scene {
             inner_cone: 20.0,
             outer_cone: 30.0,
             mode,
-            ..rusty_scene::authoring::default_light()
+            ..rusty_scene::create::default_light()
         };
         scene.world.set_light(id, Some(light));
     }

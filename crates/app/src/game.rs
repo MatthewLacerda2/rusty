@@ -17,8 +17,9 @@ use std::rc::Rc;
 use glam::Vec3;
 
 use rusty_core::input::{CursorState, InputState};
+use rusty_edit::SceneSnapshot;
 use rusty_navigation::NavigationGraph;
-use rusty_scene::{Camera, Scene, SceneSnapshot};
+use rusty_scene::{Camera, Scene};
 use rusty_script::scripting::{ConsoleLogs, ScriptManager};
 use rusty_time::Time;
 

@@ -9,8 +9,8 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use rusty::app::GameWorld;
+use rusty::edit::authoring::default_camera;
 use rusty::render::build_camera_stack;
-use rusty::scene::authoring::default_camera;
 use rusty::scene::{game_camera_from_scene, Camera, Scene};
 
 use crate::play::{attach_script, playing, run};

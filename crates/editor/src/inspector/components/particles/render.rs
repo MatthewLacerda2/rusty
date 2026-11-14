@@ -6,7 +6,7 @@ use super::widgets::{clamped, combo, drag_u32};
 use super::{apply, Cx};
 use rusty_asset::MapRef;
 use rusty_components::{Flipbook, ParticleRenderMode, TaaReactive};
-use rusty_scene::authoring::particles as particle_ops;
+use rusty_edit::authoring::particles as particle_ops;
 use rusty_scene::{ParticleBlend, ParticleEmitterComponent};
 
 /// Blend, texture, render mode and its mode-specific settings, then the look.

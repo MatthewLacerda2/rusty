@@ -50,7 +50,7 @@ fn a_crate_falls_when_the_planks_mesh_is_deleted_and_comes_back_with_it() {
     world.step(&mut scene, DT);
     assert!(!world.id_to_collider.contains_key(&floor), "no shape");
     scene.define_mesh("plank", plank(-2.0, 2.0)).unwrap();
-    rusty_scene::edit_side::mesh::set_shared_mesh(&mut scene, floor, "plank").unwrap();
+    rusty_edit::mesh::set_shared_mesh(&mut scene, floor, "plank").unwrap();
     world.step(&mut scene, DT);
     assert!(world.id_to_collider.contains_key(&floor), "built again");
 }
@@ -60,7 +60,7 @@ fn a_crate_falls_when_the_plank_draws_a_primitive_instead() {
     for always_full in [false, true] {
         // A unit Box at the plank's centre: the crate, at x = 1.5, is past it.
         let (after, shaped) = rest_then(always_full, |s, floor| {
-            rusty_scene::edit_side::mesh::set_shared_mesh(s, floor, "Box").unwrap();
+            rusty_edit::mesh::set_shared_mesh(s, floor, "Box").unwrap();
         });
         assert!(after < -1.0 && shaped, "{after} ({always_full})");
     }
@@ -111,7 +111,7 @@ fn a_mesh_replaced_as_its_body_turns_dynamic_gets_convex_pieces() {
         // Both sync paths meet on one collider: a new mesh and a new body class.
         scene.define_mesh("plank", cube()).unwrap();
         scene.world.set_static(floor, false);
-        let rb = rusty_scene::authoring::defaults::default_rigidbody();
+        let rb = rusty_scene::create::defaults::default_rigidbody();
         let rb = rusty_components::RigidBodyComponent {
             is_kinematic: false,
             ..rb

@@ -4,7 +4,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use rusty::scene::authoring::default_camera;
+use rusty::edit::authoring::default_camera;
 use rusty::scene::Scene;
 
 use crate::play::{attach_script, playing, run};

@@ -10,7 +10,7 @@ use glam::{Mat4, Vec3};
 
 use super::super::fixture::{yard, RES};
 use crate::Renderer;
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
 /// A short point-light face at `x` along the yard's row, looking down.

@@ -7,7 +7,7 @@ use glam::{Quat, Vec3};
 
 use rusty_components::mesh::Vertex;
 use rusty_components::{ColliderComponent, MeshComponent};
-use rusty_scene::authoring::{primitive_geometry, Primitive};
+use rusty_scene::create::{primitive_geometry, Primitive};
 use rusty_scene::Scene;
 
 /// `off_centre_cylinder` as a convex mesh collider on an entity posed the way

@@ -9,7 +9,7 @@
 //! post-processing volume: fog is the scene's atmosphere, it must hold with no
 //! volume in the scene, and the sky it blends into is scene-level too.
 //!
-//! Pure data. Every write goes through `scene::authoring::fog`, the one place its
+//! Pure data. Every write goes through `edit::authoring::fog`, the one place its
 //! clamps live, shared by the Scene Settings panel and `Graphics.SetFog*`.
 
 use glam::Vec3;

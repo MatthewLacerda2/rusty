@@ -3,8 +3,8 @@
 //! shows must leave the Undo history as it was, whatever the entity carries.
 
 use super::EditorUi;
+use rusty_edit::authoring::{add_component, create_entity, ComponentKind, Primitive};
 use rusty_navigation::NavigationGraph;
-use rusty_scene::authoring::{add_component, create_entity, ComponentKind, Primitive};
 use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 

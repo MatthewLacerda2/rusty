@@ -2,7 +2,7 @@
 //! tune its `CameraComponent` (#430): projection, culling mask (#827), occlusion
 //! culling (#1714) and render-texture target, plus the lens and stacking fields
 //! (`lens`, #1341). Every
-//! setter routes through `scene::authoring::rendering::camera`, the ops the inspector's Camera
+//! setter routes through `edit::authoring::rendering::camera`, the ops the inspector's Camera
 //! card uses. Getters return `nil` without a camera; setters are then no-ops.
 
 use std::cell::RefCell;
@@ -11,7 +11,7 @@ use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use crate::api::{put, Reg};
 use rusty_components::{CameraComponent, Projection};
-use rusty_scene::authoring::rendering::camera as camera_ops;
+use rusty_edit::authoring::rendering::camera as camera_ops;
 use rusty_scene::Scene;
 
 /// Register the per-entity camera functions onto the `Camera` table.

@@ -13,7 +13,7 @@ use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::dev::capture::CaptureHost;
 use rusty::dev::screenshot::capture_into;
-use rusty::scene::authoring::{create_entity, default_post_processing, Primitive};
+use rusty::edit::authoring::{create_entity, default_post_processing, Primitive};
 use rusty::scene::{Camera, Scene};
 
 /// A polished white metal sphere (metallic 1.0, roughness 0.2), no lights, a blue sky;

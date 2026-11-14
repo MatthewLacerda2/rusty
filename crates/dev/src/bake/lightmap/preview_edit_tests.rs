@@ -28,7 +28,7 @@ fn an_entity_deleted_during_a_bake_is_gone_from_the_save_and_the_cancel() {
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
     assert!(scene.lightmaps.get(floor).is_none(), "the next pass too");
-    let saved = rusty_scene::to_scene_data(&scene).lightmaps;
+    let saved = rusty_edit::to_scene_data(&scene).lightmaps;
     assert!(
         saved.get(floor).is_none(),
         "a save meanwhile has no entry for it"
@@ -58,7 +58,7 @@ fn lightmaps_cleared_during_a_bake_stay_cleared_on_save_and_cancel() {
     // What `Lighting.ClearLightmaps()` does.
     scene.lightmaps.clear();
     assert!(scene.lightmaps.saved().is_empty());
-    let saved = rusty_scene::to_scene_data(&scene).lightmaps;
+    let saved = rusty_edit::to_scene_data(&scene).lightmaps;
     assert!(
         saved.is_empty() && saved.pages.is_empty(),
         "a save writes none"
@@ -71,7 +71,7 @@ fn lightmaps_cleared_during_a_bake_stay_cleared_on_save_and_cancel() {
 
 /// The wall's entry in the save of `scene`.
 fn saved(scene: &Scene, wall: u32) -> Option<rusty_scene::lighting::lightmap_set::LightmapEntry> {
-    rusty_scene::to_scene_data(scene)
+    rusty_edit::to_scene_data(scene)
         .lightmaps
         .get(wall)
         .cloned()

@@ -4,7 +4,7 @@
 use super::super::super::Reg;
 use super::knobs::{register_count, register_flag, register_quality};
 use crate::api::ApiCell;
-use rusty_scene::authoring::rendering::post_processing::ssr;
+use rusty_edit::authoring::rendering::post_processing::ssr;
 use rusty_scene::Scene;
 
 /// The switch, the quality level and the knobs (a new volume's values without an

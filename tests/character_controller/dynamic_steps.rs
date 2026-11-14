@@ -13,7 +13,7 @@ fn make_dynamic(scene: &mut Scene, id: u32) {
     scene.world.set_static(id, false);
     let body = rusty::components::RigidBodyComponent {
         mass: 1000.0,
-        ..rusty::scene::authoring::default_rigidbody()
+        ..rusty::edit::authoring::default_rigidbody()
     };
     scene.world.set_rigidbody(id, Some(body));
 }

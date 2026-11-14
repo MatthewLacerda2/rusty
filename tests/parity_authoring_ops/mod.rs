@@ -1,4 +1,4 @@
-//! Editor↔Lua-API convergence over the shared `scene::authoring` ops (#287).
+//! Editor↔Lua-API convergence over the shared `edit::authoring` ops (#287).
 //!
 //! Each first-class component whose card was routed through a shared op has its Lua
 //! `*.Set*` bindings AND the shared op driven against two sibling entities; the

@@ -15,7 +15,7 @@ fn harness_graph_is_the_from_scene_bake_of_its_scene() {
     let nav = world.nav().borrow();
 
     let mut demo = Scene::new();
-    rusty::scene::default_scene::build(&mut demo, "");
+    rusty::edit::default_scene::build(&mut demo, "");
     let fresh = NavigationGraph::from_scene(&demo);
 
     assert_eq!(nav.bounds(), fresh.bounds());
@@ -30,7 +30,7 @@ fn harness_graph_is_the_from_scene_bake_of_its_scene() {
 #[test]
 fn default_scene_bakes_over_its_own_bounds() {
     let mut scene = Scene::new();
-    rusty::scene::default_scene::build(&mut scene, "");
+    rusty::edit::default_scene::build(&mut scene, "");
     let nav = NavigationGraph::from_scene(&scene);
     let b = nav.bounds();
     eprintln!("default scene bounds: {b:?}");

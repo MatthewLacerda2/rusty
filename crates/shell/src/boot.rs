@@ -28,7 +28,7 @@ pub const ASSET_ROOT: &str = rusty_core::project::ASSETS_DIR;
 
 /// Import what arrived in the project since the last look (Unity's asset refresh):
 /// today that is MP3 → WAV. Runs when the editor opens a project
-/// (`scene::seed_project`) and on its window's focus (`focus`); never in the
+/// (`edit::seed_project`) and on its window's focus (`focus`); never in the
 /// player.
 pub fn refresh_assets() -> rusty_asset::audio::Refresh {
     rusty_asset::audio::refresh(std::path::Path::new(ASSET_ROOT))

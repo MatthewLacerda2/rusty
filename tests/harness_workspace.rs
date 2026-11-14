@@ -3,7 +3,7 @@
 //! never reaches a test.
 
 use rusty::dev::harness::Harness;
-use rusty::scene::default_scene::PLAYER_CONTROLLER_SCRIPT;
+use rusty::edit::default_scene::PLAYER_CONTROLLER_SCRIPT;
 
 /// A wrong controller: it announces itself and leaves the Player inert.
 const STALE: &str = r#"print("[stale] the workspace copy ran"); return {}"#;

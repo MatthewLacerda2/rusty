@@ -12,10 +12,10 @@ use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
 use glam::Vec3;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use crate::inspector::components::card::component_card;
-use rusty_scene::authoring::physics::rigidbody as rigidbody_ops;
+use rusty_edit::authoring::physics::rigidbody as rigidbody_ops;
 use rusty_scene::CollisionDetection;
 
 /// A checkbox row that routes its write through a shared rigidbody op (#287).

@@ -11,7 +11,7 @@ use super::groups::err;
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_audio::{AudioMaestro, OcclusionSettings};
-use rusty_scene::authoring::audio::source as audio_ops;
+use rusty_edit::authoring::audio::source as audio_ops;
 use rusty_scene::Scene;
 
 /// The keys `SetOcclusionSettings` takes.

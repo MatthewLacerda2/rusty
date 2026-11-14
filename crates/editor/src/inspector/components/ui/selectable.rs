@@ -1,18 +1,18 @@
 //! The Selectable inspector card (#420): interactable, the transition with its
 //! target graphic and per-state colours / sprites, and navigation with its explicit
 //! targets. Widgets edit a snapshot; every write routes through
-//! `scene::authoring::ui::selectable`.
+//! `edit::authoring::ui::selectable`.
 
 use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use super::{combo, entity_row};
 use crate::inspector::components::card::component_card;
 use rusty_asset::MapRef;
 use rusty_components::{NavigationMode, SelectableComponent, SelectableTransition, SelectionState};
-use rusty_scene::authoring::ui::selectable as ops;
+use rusty_edit::authoring::ui::selectable as ops;
 
 /// Selectable card. A THIN client (#287): widgets edit a snapshot and the changed
 /// snapshot is written back through the shared ops; remove detaches.

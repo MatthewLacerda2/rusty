@@ -13,7 +13,7 @@ use super::collider::combine_mode;
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::PhysicsMaterial;
-use rusty_scene::authoring::physics::collider as collider_ops;
+use rusty_edit::authoring::physics::collider as collider_ops;
 use rusty_scene::physics_material;
 use rusty_scene::Scene;
 

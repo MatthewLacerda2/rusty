@@ -14,7 +14,7 @@ use super::super::material::shader::params::floats;
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
-use rusty_scene::authoring::ui::shader as ops;
+use rusty_edit::authoring::ui::shader as ops;
 use rusty_scene::Scene;
 
 /// Register the four verbs onto the `UI` `table`.

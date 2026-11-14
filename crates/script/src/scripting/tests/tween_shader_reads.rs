@@ -64,7 +64,7 @@ fn a_wrong_arity_target_names_the_path() {
 #[test]
 fn a_graphics_tween_racks_the_depth_of_field_focus() {
     let (mut m, id) = rig("tween_dof", &counted(""));
-    let vc = rusty_scene::authoring::default_post_processing();
+    let vc = rusty_edit::authoring::default_post_processing();
     let camera = rusty_components::CameraComponent::default();
     let mut scene = m.cells.scene.borrow_mut();
     scene.world.set_post_processing(id, Some(vc));
@@ -93,7 +93,7 @@ fn a_graphics_tween_racks_the_depth_of_field_focus() {
 #[test]
 fn every_effect_knob_tweens_by_its_path() {
     let (mut m, id) = rig("tween_knobs", &counted(""));
-    let vc = rusty_scene::authoring::default_post_processing();
+    let vc = rusty_edit::authoring::default_post_processing();
     let mut scene = m.cells.scene.borrow_mut();
     scene.world.set_post_processing(id, Some(vc));
     scene.world.set_camera(id, Some(Default::default()));

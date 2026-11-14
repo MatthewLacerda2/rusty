@@ -132,9 +132,9 @@ fn canvas_and_rect_transform_survive_save_and_load() {
         .join(format!("rusty_ui_api_{}.json", std::process::id()))
         .to_string_lossy()
         .into_owned();
-    rusty::scene::save_to_file(&scene, &path).unwrap();
+    rusty::edit::save_to_file(&scene, &path).unwrap();
     let mut loaded = Scene::new();
-    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
+    rusty::edit::load_from_file(&mut loaded, &path).unwrap();
     std::fs::remove_file(&path).ok();
     let rt = loaded.world.rect_transform(child).map(|r| r.clone());
     assert_eq!(rt.unwrap().anchored_position, Vec2::new(12.0, -4.0));

@@ -24,7 +24,7 @@ fn driven_spine() -> (Scene, PhysicsWorld, u32, u32) {
         };
         let c = ColliderComponent {
             shape,
-            ..rusty_scene::authoring::default_collider()
+            ..rusty_scene::create::default_collider()
         };
         scene.world.set_collider(hb, Some(c));
     }
@@ -112,10 +112,10 @@ fn a_rebuilt_joint_gets_its_motors_back() {
     let door = scene.add_entity("Door".to_string());
     let collider = ColliderComponent {
         shape: ColliderShape::Box { size: Vec3::ONE },
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_scene::create::default_collider()
     };
     scene.world.set_collider(door, Some(collider));
-    let rb = rusty_scene::authoring::defaults::default_rigidbody();
+    let rb = rusty_scene::create::defaults::default_rigidbody();
     scene.world.set_rigidbody(door, Some(rb));
     let joint = rusty_components::JointComponent {
         kind: rusty_components::JointKind::Hinge,

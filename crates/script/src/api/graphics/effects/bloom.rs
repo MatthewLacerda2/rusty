@@ -5,7 +5,7 @@
 use super::super::super::{put, Reg};
 use super::super::state::{with_vc, with_vc_mut};
 use crate::api::ApiCell;
-use rusty_scene::authoring::rendering::post_processing::bloom;
+use rusty_edit::authoring::rendering::post_processing::bloom;
 use rusty_scene::Scene;
 
 /// The switch (`false` without an active volume), the dirt texture (`nil` without

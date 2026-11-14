@@ -23,7 +23,7 @@ use crate::api::ApiCell;
 use crate::api::{put, Reg};
 use rusty_components::{EmitFrom, EmitShape, SubEmitTrigger};
 use rusty_core::curve::{ColorRange, Range};
-use rusty_scene::authoring::particles as particle_ops;
+use rusty_edit::authoring::particles as particle_ops;
 use rusty_scene::Scene;
 
 /// Register the `Particles` namespace onto `lua`.

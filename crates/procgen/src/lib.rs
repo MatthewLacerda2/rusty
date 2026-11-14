@@ -9,7 +9,7 @@
 //!
 //! This is the first of the #174 authoring legs, so it also stands up the **shared
 //! spine** — recipe / op-runner / bake — that the material (#271) and shader (#272)
-//! legs reuse. It is distinct from `scene::authoring` (a module above this crate),
+//! legs reuse. It is distinct from `edit::authoring` (a module above this crate),
 //! which authors *entities/components*; this authors *textures*.
 //!
 //! Module layout:

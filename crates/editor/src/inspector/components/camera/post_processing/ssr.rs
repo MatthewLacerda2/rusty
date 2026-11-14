@@ -4,7 +4,7 @@
 use super::{count_row, knob, knob_row, quality_row, toggle, Section};
 use rusty_components::Ssr;
 use rusty_core::settings::quality::EffectQuality;
-use rusty_scene::authoring::rendering::post_processing::ssr;
+use rusty_edit::authoring::rendering::post_processing::ssr;
 use rusty_scene::PostProcessingComponent;
 
 pub(super) const SECTION: Section = Section {

@@ -13,7 +13,7 @@ use crate::motion::gpu_fixture::{H, W};
 use rusty_components::{
     CameraComponent, MaterialAsset, MaterialComponent, RenderMode, TaaReactive,
 };
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{ClearFlags, Scene};
 
 /// The viewmodel's layer: only the overlay camera draws it, so the window lies

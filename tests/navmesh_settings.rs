@@ -34,7 +34,7 @@ fn a_scene_without_nav_settings_loads_with_defaults() {
     std::fs::write(&path, minimal).unwrap();
 
     let mut loaded = Scene::new();
-    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
+    rusty::edit::load_from_file(&mut loaded, &path).unwrap();
     assert_eq!(loaded.nav_settings, NavMeshSettings::default());
 }
 
@@ -67,10 +67,10 @@ fn nav_settings_survive_round_trip() {
         },
     };
     let path = tmp("rusty_nav_settings_roundtrip.scene");
-    rusty::scene::save_to_file(&scene, &path).unwrap();
+    rusty::edit::save_to_file(&scene, &path).unwrap();
 
     let mut loaded = Scene::new();
-    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
+    rusty::edit::load_from_file(&mut loaded, &path).unwrap();
     assert_eq!(loaded.nav_settings.agent_radius, 0.8);
     assert_eq!(loaded.nav_settings.agent_height, 1.8);
     assert_eq!(loaded.nav_settings.max_slope, 0.6);
@@ -93,7 +93,7 @@ fn partial_nav_settings_block_fills_missing_fields() {
     std::fs::write(&path, partial).unwrap();
 
     let mut loaded = Scene::new();
-    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
+    rusty::edit::load_from_file(&mut loaded, &path).unwrap();
     assert_eq!(loaded.nav_settings.max_step, 0.25, "authored value kept");
     assert_eq!(
         loaded.nav_settings.max_slope, 1.0,

@@ -22,8 +22,8 @@
 use mlua::Lua;
 
 use crate::bake::generate_lighting::refuse_while_baking;
+use rusty_edit::LIGHTING_IN_PLAY;
 use rusty_scene::lighting::bake_status::BakeStatus;
-use rusty_scene::LIGHTING_IN_PLAY;
 use rusty_script::api::{global_table, put, ApiCtx, Reg};
 
 /// Why a host that steps no background bake refuses `GenerateAsync`.

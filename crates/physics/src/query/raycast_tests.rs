@@ -21,7 +21,7 @@ fn add_box(scene: &mut Scene, pos: Vec3, size: Vec3) -> u32 {
         id,
         Some(ColliderComponent {
             shape,
-            ..rusty_scene::authoring::default_collider()
+            ..rusty_scene::create::default_collider()
         }),
     );
     id

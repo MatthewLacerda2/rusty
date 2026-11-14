@@ -12,7 +12,7 @@ use std::rc::Rc;
 use glam::Vec3;
 use rusty::app::GameWorld;
 use rusty::components::{AIPerceptionComponent, ColliderComponent, ColliderShape};
-use rusty::scene::authoring::default_collider;
+use rusty::edit::authoring::default_collider;
 use rusty::scene::Scene;
 
 use crate::play::{attach_script, playing, run};

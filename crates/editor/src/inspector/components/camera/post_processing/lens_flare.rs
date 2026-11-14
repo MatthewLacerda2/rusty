@@ -3,7 +3,7 @@
 
 use super::{knob, knob_row, toggle, Section};
 use rusty_components::rendering::post_processing::LensFlare;
-use rusty_scene::authoring::rendering::post_processing::lens_flare;
+use rusty_edit::authoring::rendering::post_processing::lens_flare;
 use rusty_scene::PostProcessingComponent;
 
 pub(super) const SECTION: Section = Section {

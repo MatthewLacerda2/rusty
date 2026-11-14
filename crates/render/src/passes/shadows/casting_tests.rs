@@ -12,7 +12,8 @@ use crate::gpu::pipelines::surface::cut_depth_tests::{ground_at, ground_halves};
 use crate::lod::LodSelection;
 use crate::{Frustum, Renderer};
 use rusty_components::{RenderMode, ShadowCasting};
-use rusty_scene::authoring::{create_entity, material, Primitive};
+use rusty_edit::authoring::material;
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// A 6 x 6 one-sided `Plane` at y = 3 casting by `mode`; `face_down` turns its

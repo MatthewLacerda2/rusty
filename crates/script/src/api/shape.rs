@@ -5,7 +5,7 @@
 //! `Arc`, `Thickness`, `Dash`), the fill (`Color`, `Gradient`), `Border`, the
 //! `Shadow` and `Glow` effects, `Blend` and `RaycastTarget`. Multi-value accessors
 //! travel as flat number lists, colours last. Every setter routes through the
-//! shared `scene::authoring::ui::shape` ops the inspector card uses. Getters return a
+//! shared `edit::authoring::ui::shape` ops the inspector card uses. Getters return a
 //! neutral default without a Shape; setters are then no-ops. Whether a shape exists
 //! is `Scene.AddComponent(id, "Shape")` / `RemoveComponent`.
 
@@ -18,7 +18,7 @@ use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::ShapeComponent;
 use rusty_components::{ShapeCorner, ShapeKind};
-use rusty_scene::authoring::ui::shape as ops;
+use rusty_edit::authoring::ui::shape as ops;
 use rusty_scene::Scene;
 
 type NumsGet = fn(&ShapeComponent) -> Vec<f32>;

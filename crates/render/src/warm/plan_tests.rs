@@ -6,8 +6,8 @@ use super::{Item, Warming};
 use crate::gpu::textures::TextureKind;
 use rusty_asset::MapRef;
 use rusty_components::{MaterialComponent, MeshRevision};
-use rusty_scene::authoring::{primitive_mesh_component, Primitive};
-use rusty_scene::edit_side::serialize::to_scene_data;
+use rusty_edit::serialize::to_scene_data;
+use rusty_scene::create::{primitive_mesh_component, Primitive};
 use rusty_scene::serialize::SceneData;
 use rusty_scene::{MaterialAsset, Scene};
 

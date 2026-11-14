@@ -134,9 +134,9 @@ fn shapes_and_looks_survive_save_and_load() {
     };
     scene.world.set_image(id, Some(image.clone()));
     let path = crate::temp::dir().join("rusty_425_look.scene.json");
-    rusty::scene::save_to_file(&scene, path.to_str().unwrap()).expect("save");
+    rusty::edit::save_to_file(&scene, path.to_str().unwrap()).expect("save");
     let mut loaded = Scene::new();
-    rusty::scene::load_from_file(&mut loaded, path.to_str().unwrap()).expect("load");
+    rusty::edit::load_from_file(&mut loaded, path.to_str().unwrap()).expect("load");
     assert_eq!(loaded.world.shape(id).map(|s| s.clone()), Some(shape));
     assert_eq!(loaded.world.image(id).map(|i| i.clone()), Some(image));
 }

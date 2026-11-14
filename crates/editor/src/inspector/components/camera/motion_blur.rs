@@ -6,7 +6,7 @@
 
 use super::post_processing::quality_row;
 use rusty_core::settings::quality::EffectQuality;
-use rusty_scene::authoring::rendering::camera as camera_ops;
+use rusty_edit::authoring::rendering::camera as camera_ops;
 use rusty_scene::CameraComponent;
 
 /// The quality dropdown (#1522).

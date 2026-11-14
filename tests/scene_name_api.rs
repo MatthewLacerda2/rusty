@@ -77,8 +77,8 @@ fn a_rename_is_saved_with_the_scene() {
     let dir = crate::temp::dir();
     let path = dir.join("rusty_scene_name.scene");
     let path = path.to_string_lossy().into_owned();
-    rusty::scene::save_to_file(&scene.borrow(), &path).unwrap();
+    rusty::edit::save_to_file(&scene.borrow(), &path).unwrap();
     let mut loaded = Scene::new();
-    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
+    rusty::edit::load_from_file(&mut loaded, &path).unwrap();
     assert_eq!(loaded.find_entity_by_name("Crate_3"), Some(id));
 }

@@ -24,7 +24,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_core::settings::video::VideoSettings;
-use rusty_scene::authoring::ui::widgets::{create_ui, UiWidget};
+use rusty_edit::authoring::ui::widgets::{create_ui, UiWidget};
 use rusty_scene::{Camera, Scene};
 use rusty_ui::space::{rect_screen_bounds, space_of, CanvasSpace};
 use rusty_ui::{layout, ScreenSize, UiRect, UiView};

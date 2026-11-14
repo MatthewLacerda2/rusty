@@ -10,8 +10,9 @@ use crate::lua::eval;
 use glam::{Vec2, Vec3};
 use mlua::Lua;
 use rusty::components::{Entity, JointComponent, JointKind};
-use rusty::scene::prefab::extract_prefab;
-use rusty::scene::{instantiate_prefab, Scene};
+use rusty::edit::instantiate_prefab;
+use rusty::edit::prefab::extract_prefab;
+use rusty::scene::Scene;
 use rusty::script::api::bind;
 
 fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
@@ -91,9 +92,9 @@ fn a_joint_survives_save_and_load() {
         .join(format!("rusty_joint_{}.json", std::process::id()))
         .to_string_lossy()
         .into_owned();
-    rusty::scene::save_to_file(&scene, &path).unwrap();
+    rusty::edit::save_to_file(&scene, &path).unwrap();
     let mut loaded = Scene::new();
-    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
+    rusty::edit::load_from_file(&mut loaded, &path).unwrap();
     let _ = std::fs::remove_file(&path);
     assert_eq!(loaded.world.joint(body).map(|j| j.clone()), Some(joint));
 }

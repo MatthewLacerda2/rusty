@@ -3286,6 +3286,7 @@ dependencies = [
  "rusty-core",
  "rusty-dev",
  "rusty-ecs",
+ "rusty-edit",
  "rusty-editor",
  "rusty-lighting",
  "rusty-logging",
@@ -3329,6 +3330,7 @@ dependencies = [
  "rusty-audio",
  "rusty-components",
  "rusty-core",
+ "rusty-edit",
  "rusty-navigation",
  "rusty-physics",
  "rusty-scene",
@@ -3419,6 +3421,7 @@ dependencies = [
  "rusty-asset",
  "rusty-components",
  "rusty-core",
+ "rusty-edit",
  "rusty-lighting",
  "rusty-logging",
  "rusty-navigation",
@@ -3448,6 +3451,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "rusty-edit"
+version = "0.1.0"
+dependencies = [
+ "glam 0.33.12",
+ "image",
+ "log",
+ "rusty-asset",
+ "rusty-components",
+ "rusty-core",
+ "rusty-ecs",
+ "rusty-procgen",
+ "rusty-scene",
+ "rusty-shadergen",
+ "rusty-test-support",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "rusty-editor"
 version = "0.1.0"
 dependencies = [
@@ -3462,6 +3484,7 @@ dependencies = [
  "rusty-core",
  "rusty-dev",
  "rusty-ecs",
+ "rusty-edit",
  "rusty-lighting",
  "rusty-navigation",
  "rusty-preview",
@@ -3484,6 +3507,7 @@ dependencies = [
  "rusty-asset",
  "rusty-components",
  "rusty-core",
+ "rusty-edit",
  "rusty-procgen",
  "rusty-scene",
  "rusty-test-support",
@@ -3511,6 +3535,7 @@ dependencies = [
  "rusty-components",
  "rusty-core",
  "rusty-ecs",
+ "rusty-edit",
  "rusty-lighting",
  "rusty-physics",
  "rusty-scene",
@@ -3530,6 +3555,7 @@ dependencies = [
  "rusty-components",
  "rusty-core",
  "rusty-ecs",
+ "rusty-edit",
  "rusty-scene",
  "rusty-test-support",
  "rusty-time",
@@ -3544,6 +3570,7 @@ dependencies = [
  "rusty-asset",
  "rusty-components",
  "rusty-core",
+ "rusty-edit",
  "rusty-scene",
  "rusty-test-support",
 ]
@@ -3576,6 +3603,7 @@ dependencies = [
  "rusty-components",
  "rusty-core",
  "rusty-ecs",
+ "rusty-edit",
  "rusty-lighting",
  "rusty-physics",
  "rusty-procgen",
@@ -3597,8 +3625,6 @@ dependencies = [
  "rusty-components",
  "rusty-core",
  "rusty-ecs",
- "rusty-procgen",
- "rusty-shadergen",
  "rusty-test-support",
  "serde",
  "serde_json",
@@ -3619,6 +3645,7 @@ dependencies = [
  "rusty-components",
  "rusty-core",
  "rusty-ecs",
+ "rusty-edit",
  "rusty-lighting",
  "rusty-navigation",
  "rusty-physics",
@@ -3670,6 +3697,7 @@ dependencies = [
  "rusty-core",
  "rusty-dev",
  "rusty-ecs",
+ "rusty-edit",
  "rusty-editor",
  "rusty-logging",
  "rusty-navigation",

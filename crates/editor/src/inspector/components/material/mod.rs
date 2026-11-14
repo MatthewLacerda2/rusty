@@ -21,7 +21,7 @@ pub(in crate::inspector) use library::apply as apply_action;
 pub use library::{MaterialAction, MaterialDelete};
 
 use crate::inspector::components::card::remove_component;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 use std::collections::BTreeMap;
 
 use egui_phosphor::regular as icon;
@@ -30,8 +30,8 @@ use crate::inspector::components::card::component_card;
 use crate::inspector::preview::{self, PreviewSubject};
 use crate::EditorUi;
 use rusty_asset::MapRef;
-use rusty_scene::authoring::material::FACTOR_RANGE;
-use rusty_scene::authoring::material::{
+use rusty_edit::authoring::material::FACTOR_RANGE;
+use rusty_edit::authoring::material::{
     self as mat_ops, COORDINATE_FIELDS, FACE_FIELDS, SURFACE_FIELDS,
 };
 use rusty_scene::{MaterialAsset, RenderMode};

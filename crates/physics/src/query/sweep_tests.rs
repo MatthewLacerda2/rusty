@@ -28,7 +28,7 @@ fn field() -> (PhysicsWorld, Vec<u32>) {
             scene.world.set_static(id, true);
             let collider = ColliderComponent {
                 shape: ColliderShape::Box { size: Vec3::ONE },
-                ..rusty_scene::authoring::default_collider()
+                ..rusty_scene::create::default_collider()
             };
             scene.world.set_collider(id, Some(collider));
             ids.push(id);

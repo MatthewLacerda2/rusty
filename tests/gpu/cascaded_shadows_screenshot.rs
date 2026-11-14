@@ -5,7 +5,7 @@
 
 use glam::{Quat, Vec3};
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::{create_entity, default_post_processing, Primitive};
+use rusty::edit::authoring::{create_entity, default_post_processing, Primitive};
 use rusty::scene::{Camera, Scene};
 
 const FAR_OUT: Vec3 = Vec3::new(100.0, 0.0, -40.0);

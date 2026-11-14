@@ -94,10 +94,10 @@ impl Default for EditorCaptureOptions {
 /// reads the open project's, tests take the engine's defaults. Neither the sim nor
 /// any script runs.
 pub fn default_world(project: ProjectSource) -> GameWorld {
-    rusty_scene::seed_default_scripts();
-    rusty_scene::default_scene::seed_default_assets();
+    rusty_edit::seed_default_scripts();
+    rusty_edit::default_scene::seed_default_assets();
     let mut scene = Scene::new();
-    rusty_scene::default_scene::build(&mut scene, rusty_scene::default_scene::BOT_SCRIPT);
+    rusty_edit::default_scene::build(&mut scene, rusty_edit::default_scene::BOT_SCRIPT);
     let nav = NavigationGraph::from_scene(&scene);
     let game = GameWorld::new(
         Rc::new(RefCell::new(scene)),

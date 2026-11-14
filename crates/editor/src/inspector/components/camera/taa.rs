@@ -6,7 +6,7 @@
 
 use crate::inspector::components::particles::widgets::combo;
 use rusty_components::{CameraComponent, TaaQuality};
-use rusty_scene::authoring::rendering::camera as camera_ops;
+use rusty_edit::authoring::rendering::camera as camera_ops;
 
 pub(super) fn draw_taa(
     ui: &mut egui::Ui,

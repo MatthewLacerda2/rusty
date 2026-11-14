@@ -8,7 +8,7 @@ use super::fixture::{frame, linear, paint, pixel, renderer, rgb, tuned, Surface}
 use super::fixture::{MIRROR, REFLECTING};
 use crate::Renderer;
 use rusty_components::{RenderMode, Tonemap};
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 use rusty_shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};

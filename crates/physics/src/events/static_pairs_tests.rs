@@ -20,7 +20,7 @@ fn boxed(scene: &mut Scene, pos: Vec3, size: Vec3, is_static: bool, trigger: boo
     let collider = ColliderComponent {
         shape: ColliderShape::Box { size },
         is_trigger: trigger,
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_scene::create::default_collider()
     };
     scene.world.set_collider(id, Some(collider));
     id

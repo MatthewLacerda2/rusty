@@ -3,7 +3,7 @@
 use super::super::super::super::{put, Reg};
 use super::super::super::state::{with_vc, with_vc_mut};
 use crate::api::ApiCell;
-use rusty_scene::authoring::rendering::post_processing::grading::white_balance;
+use rusty_edit::authoring::rendering::post_processing::grading::white_balance;
 use rusty_scene::Scene;
 
 /// The pair; neutral without an active volume, as a new volume starts.

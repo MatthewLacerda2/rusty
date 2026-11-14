@@ -28,7 +28,7 @@ use glam::{Quat, Vec3};
 use rusty::components::{LightComponent, LightMode, LightType, MaterialAsset, MaterialComponent};
 use rusty::dev::bake::lightmap::bake_scene_lightmaps;
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::{primitive_mesh_component, Primitive};
+use rusty::edit::authoring::{primitive_mesh_component, Primitive};
 use rusty::scene::lighting::settings::BakeSettings;
 use rusty::scene::{Camera, Scene};
 
@@ -92,7 +92,7 @@ pub(super) fn point(mode: LightMode) -> LightComponent {
         intensity: 1.0,
         range: 8.0,
         mode,
-        ..rusty::scene::authoring::default_light()
+        ..rusty::edit::authoring::default_light()
     }
 }
 

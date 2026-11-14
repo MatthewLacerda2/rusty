@@ -2,7 +2,7 @@
 //!
 //! The single source of truth for the values the inspector's "Add Component" menu
 //! and the hierarchy toolbar's light primitives use. Both the editor and the
-//! `Scene.AddComponent` API read these (through `scene::authoring`'s re-exports), so
+//! `Scene.AddComponent` API read these (through `edit::authoring`'s re-exports), so
 //! a component added either way is identical; the base builds with them too (a
 //! ragdoll's bodies, a primitive's collider).
 

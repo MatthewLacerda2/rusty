@@ -23,7 +23,7 @@
 //! (`api::component::value`, #1369) walks its table by hand, so a whole-number
 //! float is an integer, a list keeps the entries after a `nil` hole, and a nested
 //! `{}` is an empty list where a list is expected. The field table's ops it writes
-//! through (`scene::authoring::fields`) call `core::naming::variant_case::decode` directly,
+//! through (`edit::authoring::fields`) call `core::naming::variant_case::decode` directly,
 //! since `scene` sits below `api`.
 
 use mlua::{Lua, LuaSerdeExt, Value};

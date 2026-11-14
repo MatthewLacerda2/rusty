@@ -7,7 +7,7 @@ use super::assert_common;
 use crate::bake::report::probes::{report, scene_fingerprint, Timeline, FAR};
 use crate::bake::report::Kind;
 use crate::bake::steps::Stage;
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_edit::authoring::{create_entity, Primitive};
 use rusty_scene::Scene;
 
 #[test]

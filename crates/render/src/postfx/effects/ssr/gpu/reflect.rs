@@ -9,7 +9,7 @@ use glam::Vec3;
 use super::fixture::{frame, pixel, renderer, rgb, scene, MIRROR, RED, REFLECTING, ROUGH};
 use super::fixture::{H, W};
 use rusty_components::CameraComponent;
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{ClearFlags, Scene};
 
 /// The largest per-channel difference between two frames at `p`.

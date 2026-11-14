@@ -9,7 +9,7 @@
 //! 1. `package.preload`, Lua's own first searcher;
 //! 2. the project's scripts folder: `<workspace>/assets/scripts/ui/range_axis.lua`,
 //!    then `…/ui/range_axis/init.lua`;
-//! 3. the engine's bundled scripts (`scene::edit_side::io::bundled`), so a widget's helper is
+//! 3. the engine's bundled scripts (`edit::io::bundled`), so a widget's helper is
 //!    found even where the project holds no copy;
 //! 4. `package.path`, Lua's stock search, which a game may extend.
 //!
@@ -30,7 +30,7 @@ use mlua::{Function, IntoLuaMulti, Lua, MultiValue, Table, Value};
 use crate::scripting::console::ConsoleLogs;
 use rusty_core::paths::{self, to_slash};
 use rusty_core::project::SCRIPTS_DIR;
-use rusty_scene::edit_side::io::bundled;
+use rusty_edit::io::bundled;
 
 /// The project root the VM reads against, and the outside paths it already warned
 /// about.

@@ -12,7 +12,7 @@
 //! white, the ground a quarter of the zenith), so the defaults draw today's sky
 //! exactly and a scripted ambient (a day cycle) still tints it every frame.
 //!
-//! Pure data. Every write goes through `scene::authoring::environment`, shared by the
+//! Pure data. Every write goes through `edit::authoring::environment`, shared by the
 //! Scene Settings panel and `Lighting.Set*`.
 
 use glam::Vec3;

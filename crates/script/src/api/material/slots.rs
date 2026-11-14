@@ -14,7 +14,7 @@ use std::cell::RefCell;
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
-use rusty_scene::authoring::material as mat_ops;
+use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::Scene;
 
 /// Register the slot verbs onto the `Material` `table`.

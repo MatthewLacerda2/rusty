@@ -10,8 +10,8 @@ use crate::inspector::components::card::{component_card, remove_component};
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
 use rusty_components::AIPerceptionComponent as Perception;
-use rusty_scene::authoring::ai::perception as ops;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ai::perception as ops;
+use rusty_edit::authoring::ComponentKind;
 use std::ops::RangeInclusive;
 
 /// A shared scalar setter, one per drag row.

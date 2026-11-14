@@ -10,9 +10,9 @@ use super::gpu_tests::{offscreen, shot, words, H, W};
 use crate::Renderer;
 use rusty_components::mesh::{MeshRevision, Vertex};
 use rusty_components::RenderFace;
+use rusty_edit::authoring::material;
 use rusty_lighting::occlusion::test_level::block;
-use rusty_scene::authoring::{create_entity, material, Primitive};
-use rusty_scene::{Camera, Scene};
+use rusty_scene::{create::create_entity, create::Primitive, Camera, Scene};
 
 /// Quads per side of a test panel: 8192 triangles, about 70 clusters.
 const N: u32 = 64;

@@ -5,7 +5,7 @@ use super::super::super::super::{put, Reg};
 use super::super::super::state::{with_vc, with_vc_mut};
 use crate::api::ApiCell;
 use rusty_components::{ColorWheel, Wheel};
-use rusty_scene::authoring::rendering::post_processing::grading::lift_gamma_gain;
+use rusty_edit::authoring::rendering::post_processing::grading::lift_gamma_gain;
 use rusty_scene::Scene;
 
 /// Every wheel's pair; neutral without an active volume, as a new volume starts.

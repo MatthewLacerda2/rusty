@@ -46,7 +46,7 @@ pub(super) fn run(tag: &str, body: &str, first: &str) -> Option<PathBuf> {
     let out_lua = rusty::core::paths::to_slash(&out) + "/";
     let lua = format!("local OUT = {out_lua:?}\n{PRELUDE}{body}");
     std::fs::write(&scenario, lua).unwrap();
-    let mut harness = Harness::new(&out, rusty::scene::default_scene::BOT_SCRIPT);
+    let mut harness = Harness::new(&out, rusty::edit::default_scene::BOT_SCRIPT);
     harness.set_size(160, 90);
     let report = rusty::dev::scenario::run_file(harness, &scenario).expect("the scenario runs");
     if !out.join(first).exists() {

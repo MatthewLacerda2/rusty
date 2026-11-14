@@ -10,7 +10,7 @@ use crate::Renderer;
 use rusty_components::mesh::MeshRevision;
 use rusty_components::{LightComponent, MaterialComponent, RenderMode};
 use rusty_ecs::changes::ops::{apply, Op};
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::lighting::lightmap_set::LightmapEntry;
 use rusty_scene::Scene;
 

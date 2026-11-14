@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use mlua::Lua;
 use rusty::components::ParticleEmitterComponent;
-use rusty::scene::authoring::particles as particle_ops;
+use rusty::edit::authoring::particles as particle_ops;
 use rusty::scene::Scene;
 use rusty::script::api::bind;
 

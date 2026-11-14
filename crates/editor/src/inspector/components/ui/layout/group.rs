@@ -1,19 +1,19 @@
 //! The Layout Group inspector card (#421): the kind, padding, spacing and child
 //! alignment; the row/column control and force-expand flags; the grid's cell
 //! size, constraint, start corner and axis. Widgets edit a snapshot; every write
-//! routes through `scene::authoring::ui::layout::group`.
+//! routes through `edit::authoring::ui::layout::group`.
 
 use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use super::super::{combo, vec2_row, vec4_row};
 use crate::inspector::components::card::component_card;
 use rusty_components::{
     LayoutConstraint, LayoutCorner, LayoutGroupComponent, LayoutKind, TextAlignment,
 };
-use rusty_scene::authoring::ui::layout::group as ops;
+use rusty_edit::authoring::ui::layout::group as ops;
 
 /// Layout Group card. A THIN client (#287): widgets edit a snapshot and the
 /// changed snapshot is written back through the shared ops; remove detaches.

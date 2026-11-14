@@ -2,7 +2,7 @@
 
 use super::super::{Section, COLOR_CORRECTION};
 use rusty_components::Wheel;
-use rusty_scene::authoring::rendering::post_processing::grading::lift_gamma_gain;
+use rusty_edit::authoring::rendering::post_processing::grading::lift_gamma_gain;
 use rusty_scene::PostProcessingComponent;
 
 pub(in super::super) const SECTION: Section = Section {

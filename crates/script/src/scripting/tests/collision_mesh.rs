@@ -4,9 +4,9 @@
 //! `colliders`, the model inspector's sub-object rows.
 
 use super::collider::manager_with_collider;
+use rusty_edit::asset_instance::collision::chair::write as write_chair;
+use rusty_edit::asset_instance::instantiate_asset;
 use rusty_physics::collider_world_triangles;
-use rusty_scene::asset_instance::collision::chair::write as write_chair;
-use rusty_scene::asset_instance::instantiate_asset;
 
 #[test]
 fn a_script_names_the_collision_mesh() {
@@ -88,7 +88,7 @@ fn the_assets_api_writes_a_sub_objects_collider() {
 
 #[test]
 fn a_name_on_a_mesh_from_no_model_is_kept() {
-    use rusty_scene::authoring::{add_component, ComponentKind};
+    use rusty_edit::authoring::{add_component, ComponentKind};
     let (m, scene, id) = manager_with_collider();
     assert!(add_component(
         &mut scene.borrow_mut(),

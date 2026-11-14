@@ -78,7 +78,8 @@ class Markers(unittest.TestCase):
         # Hand-coded formats (`.occlusion`, `.navmesh`) no lint rule can see: their
         # markers are held here, read straight from the files.
         for owner in ["crates/scene/src/lighting/occlusion/mod.rs", "crates/navigation/src/bake/saved/mod.rs",
-                      "crates/scene/src/serialize.rs", "crates/scene/src/io/mod.rs", "crates/scene/src/prefab/mod.rs",
+                      "crates/scene/src/serialize.rs", "crates/scene/src/io/mod.rs", "crates/edit/src/prefab/mod.rs",
+                      "crates/edit/src/serialize.rs", "crates/edit/src/io/mod.rs",
                       "crates/core/src/storage.rs", "crates/asset/src/sidecar/mod.rs", "crates/asset/src/convert/mod.rs",
                       "crates/asset/src/import_cache/mod.rs", "crates/asset/src/animation_graph/mod.rs",
                       "crates/shadergen/src/lib.rs", "crates/dev/src/demo/mod.rs", "crates/scene/src/lighting/io.rs",

@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use mlua::Lua;
 use rusty::components::{CameraComponent, DofMode};
-use rusty::scene::authoring::default_post_processing;
+use rusty::edit::authoring::default_post_processing;
 use rusty::scene::Scene;
 use rusty::script::api::bind;
 

@@ -5,7 +5,7 @@
 use super::super::state::{with_cam, with_cam_mut};
 use crate::api::ApiCell;
 use crate::api::{put, Reg};
-use rusty_scene::authoring::rendering::camera as camera_ops;
+use rusty_edit::authoring::rendering::camera as camera_ops;
 use rusty_scene::Scene;
 
 /// FXAA: the anti-aliasing pass at the end of the post-FX chain (#360), over the

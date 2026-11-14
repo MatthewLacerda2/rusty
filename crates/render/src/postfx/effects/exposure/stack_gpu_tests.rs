@@ -7,8 +7,8 @@ use glam::Vec3;
 
 use crate::{RenderView, OFFSCREEN_FORMAT};
 use rusty_components::ExposureMode;
-use rusty_scene::authoring::default_post_processing;
-use rusty_scene::authoring::rendering::post_processing as ops;
+use rusty_edit::authoring::rendering::post_processing as ops;
+use rusty_scene::create::default_post_processing;
 use rusty_scene::{Camera, Scene};
 
 /// Pin the volume's target at `ev`.

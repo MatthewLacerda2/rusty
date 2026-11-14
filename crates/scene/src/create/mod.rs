@@ -1,7 +1,7 @@
 //! crates/scene/src/create/mod.rs — a new GameObject: the Create menu's primitives,
 //! the "Add Component" defaults, and the one verb that makes an entity from them.
 //!
-//! These sit below `scene::authoring` because the base builds with them too (a
+//! These sit below `edit::authoring` because the base builds with them too (a
 //! ragdoll's bodies, a camera's default lens, the state inventory's marks), and
 //! `authoring` re-exports every item here, so the editor and the API reach them
 //! through its one entry point.

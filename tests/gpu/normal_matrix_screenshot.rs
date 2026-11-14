@@ -7,7 +7,7 @@
 use glam::{Quat, Vec3};
 use rusty::components::{LightComponent, LightType, MaterialAsset, MaterialComponent};
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::{create_entity, default_light, Primitive};
+use rusty::edit::authoring::{create_entity, default_light, Primitive};
 use rusty::scene::{Camera, Scene};
 
 const SIZE: u32 = 128;

@@ -6,7 +6,7 @@ use glam::{Mat4, Vec3};
 use super::{SsaoFrame, SsaoPlan};
 use rusty_core::settings::quality::{EffectQuality, QualityPresets, QualityValues};
 use rusty_core::settings::GraphicsSettings;
-use rusty_scene::authoring::default_post_processing;
+use rusty_scene::create::default_post_processing;
 use rusty_scene::Scene;
 
 fn scene_with(edit: impl FnOnce(&mut rusty_components::PostProcessingComponent)) -> Scene {

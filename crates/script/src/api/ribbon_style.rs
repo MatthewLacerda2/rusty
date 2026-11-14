@@ -2,7 +2,7 @@
 //!
 //! Both components carry one `RibbonStyle`, so their namespaces register the
 //! same width / colour / texture / blend verbs from here, each routed through the
-//! shared `scene::authoring::ribbon` ops the inspector cards call. Without the
+//! shared `edit::authoring::ribbon` ops the inspector cards call. Without the
 //! component, getters return a neutral default and setters are no-ops.
 
 use std::cell::RefCell;
@@ -15,7 +15,7 @@ use crate::api::ApiCell;
 use rusty_asset::MapRef;
 use rusty_components::{ParticleBlend, RibbonStyle, TextureMode};
 use rusty_core::curve::{Curve, Gradient};
-use rusty_scene::authoring::ribbon as ops;
+use rusty_edit::authoring::ribbon as ops;
 use rusty_scene::Scene;
 
 type Rgba = (f32, f32, f32, f32);

@@ -7,7 +7,7 @@ use super::super::super::{put, Reg};
 use super::super::state::{with_vc, with_vc_mut};
 use crate::api::ApiCell;
 use rusty_components::ExposureMode;
-use rusty_scene::authoring::rendering::post_processing as vc_ops;
+use rusty_edit::authoring::rendering::post_processing as vc_ops;
 use rusty_scene::Scene;
 
 /// The mode, the automatic mode's paired knobs, and the knobs on their own (the

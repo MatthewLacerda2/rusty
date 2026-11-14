@@ -3,8 +3,8 @@
 
 use super::{chain, W};
 use rusty_components::{PostProcessingComponent, Tonemap};
-use rusty_scene::authoring::default_post_processing;
-use rusty_scene::authoring::rendering::post_processing as ops;
+use rusty_edit::authoring::rendering::post_processing as ops;
+use rusty_scene::create::default_post_processing;
 
 /// The default volume under ACES at `saturation`: a per-channel curve, so a channel the grade emptied stays black (Neutral's highlight rolloff lifts it towards white).
 fn at(saturation: f32) -> PostProcessingComponent {

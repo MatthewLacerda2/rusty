@@ -7,7 +7,7 @@
 use glam::Vec3;
 
 use crate::EditorUi;
-use rusty_scene::authoring::environment as env_ops;
+use rusty_edit::authoring::environment as env_ops;
 use rusty_scene::{AmbientMode, AmbientSettings, Scene};
 
 /// A gradient colour's label, its value and its op.

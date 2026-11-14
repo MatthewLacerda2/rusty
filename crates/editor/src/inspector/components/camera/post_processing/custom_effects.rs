@@ -8,7 +8,7 @@
 use egui_phosphor::regular as icon;
 
 use super::Section;
-use rusty_scene::authoring::rendering::post_processing as vc_ops;
+use rusty_edit::authoring::rendering::post_processing as vc_ops;
 use rusty_scene::PostProcessingComponent;
 
 pub(super) const SECTION: Section = Section {

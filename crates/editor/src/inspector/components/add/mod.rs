@@ -4,8 +4,8 @@
 use egui_phosphor::regular as icon;
 
 use rusty_components::registry::first_class;
-use rusty_scene::authoring::{self, ComponentKind};
-use rusty_scene::DEFAULT_SCRIPTS_DEST_DIR;
+use rusty_edit::authoring::{self, ComponentKind};
+use rusty_edit::DEFAULT_SCRIPTS_DEST_DIR;
 
 /// 3F. Add Component — Unity-style full-width pill that opens the component menu.
 /// A pick marks the scene unsaved, as every card's Remove does (#992).

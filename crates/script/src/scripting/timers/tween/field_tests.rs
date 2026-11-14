@@ -9,7 +9,7 @@ use rusty_components::{
     AudioSourceComponent, CanvasGroupComponent, ImageComponent, RectTransformComponent,
     TextComponent,
 };
-use rusty_scene::authoring::{default_camera, default_light};
+use rusty_edit::authoring::{default_camera, default_light};
 use rusty_scene::Scene;
 
 /// An entity carrying every component a tween can drive.

@@ -116,7 +116,7 @@ fn gpu_the_probe_step_runs_across_frames() {
         let i = scene.reflection_probes.add(at, glam::Vec3::splat(2.0));
         scene.reflection_probes.edit(i, |p| p.manual = true);
     }
-    rusty_scene::save_to_file(&scene, &path).unwrap();
+    rusty_edit::save_to_file(&scene, &path).unwrap();
     let mut console = ConsoleLogs::new();
     start(&mut editor, &mut scene, &mut console);
     let nav = NavigationGraph::new(-8.0, 8.0, -8.0, 8.0, 1.0);

@@ -340,7 +340,7 @@ its check and its command changed to match).
   a new field then breaks only the tests that use it (#663; e.g.
   `TextureRecipe::new(res, nodes).with_seed(7)`). For the first-class components
   `make rules` holds it (`full-literal`, #976): build one from its default
-  (`..CameraComponent::default()`, `..scene::authoring::default_light()`) or a
+  (`..CameraComponent::default()`, `..edit::authoring::default_light()`) or a
   constructor (`MeshComponent::new(primitive, vertices, indices)`), or say why every
   field is the point with `// lint: allow(full-literal) <why>`.
 

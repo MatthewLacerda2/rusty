@@ -7,7 +7,7 @@ use rusty_components::rendering::post_processing::LensFlare;
 use rusty_components::PostProcessingComponent;
 use rusty_core::settings::graphics_options::GraphicsOption;
 use rusty_core::settings::GraphicsSettings;
-use rusty_scene::authoring::default_post_processing;
+use rusty_scene::create::default_post_processing;
 
 fn cx(vc: &PostProcessingComponent, graphics: GraphicsSettings) -> EffectCx<'_> {
     EffectCx {

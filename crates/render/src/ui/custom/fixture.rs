@@ -6,7 +6,7 @@ use glam::{Vec2, Vec3, Vec4};
 
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_components::{CanvasComponent, ImageComponent, RectTransformComponent, UiShader};
-use rusty_scene::authoring::ui::shader as ops;
+use rusty_edit::authoring::ui::shader as ops;
 use rusty_scene::{Camera, Scene};
 use rusty_shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};

@@ -61,7 +61,7 @@ fn a_probe_does_not_change_the_sim() {
     build().into_schedule().run_frame(&mut w, &mut r);
     assert_eq!(r.play_frame(), r_probed.play_frame());
     let data = |w: &World| {
-        serde_json::to_string(&rusty_scene::to_scene_data(&w.scene.borrow())).expect("json")
+        serde_json::to_string(&rusty_edit::to_scene_data(&w.scene.borrow())).expect("json")
     };
     assert_eq!(
         data(&w),

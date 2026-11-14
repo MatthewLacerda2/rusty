@@ -143,7 +143,7 @@ in every layer. The vignette, the smallest real effect, is the worked example: g
   that struct's `Default` (the compiler asks for it: the volume applies by default, so
   the impl is written out). A camera effect keeps its knobs on `CameraComponent`,
   named `<effect>_…`.
-- **Ops** — `scene/authoring/rendering/post_processing/<effect>.rs`: its ops, its
+- **Ops** — `edit/authoring/rendering/post_processing/<effect>.rs`: its ops, its
   `Effect` (its field-table row through `effect!`, and its `Knob`s, which give the
   Inspector's sliders, `Graphics.Get/Set<api>` pairs and the `Graphics.<effect>.<knob>`
   tween paths) and its row in `EFFECTS`.

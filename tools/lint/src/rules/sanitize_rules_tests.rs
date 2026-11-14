@@ -2,7 +2,7 @@ use super::{defined, resolved, unheld, Rule};
 use crate::rules::sanitize::check;
 
 const RULES: &str = "crates/scene/src/rules/sanitize.rs";
-const SETTER: &str = "src/scene/authoring/a.rs";
+const SETTER: &str = "src/edit/authoring/a.rs";
 
 /// The rules `source` defines, resolved as if it were the rules folder's one file.
 fn of(source: &str) -> Vec<Rule> {
@@ -66,7 +66,7 @@ fn only_bare_pub_fns_before_the_tests_are_rules() {
                pub const fn at(v: f32) -> f32 {\n    v\n}\n#[cfg(test)]\nmod tests {\n    pub fn t() {}\n}\n";
     let names: Vec<String> = defined(RULES, src).into_iter().map(|r| r.name).collect();
     assert_eq!(names, ["at"]);
-    let elsewhere = [("crates/scene/src/authoring/a.rs", FINITE_OR)];
+    let elsewhere = [("crates/edit/src/authoring/a.rs", FINITE_OR)];
     assert!(
         resolved(elsewhere.into_iter()).is_empty(),
         "outside the rules folder"

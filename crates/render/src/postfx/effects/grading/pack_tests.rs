@@ -6,7 +6,7 @@ use glam::Vec3;
 
 use super::super::{grade_layout, grade_slots, GradeCx};
 use rusty_components::{ColorWheel, PostProcessingComponent, Tonemap, WhiteBalance};
-use rusty_scene::authoring::default_post_processing;
+use rusty_scene::create::default_post_processing;
 
 fn close(a: Vec3, b: Vec3) -> bool {
     (a - b).abs().max_element() < 1e-3

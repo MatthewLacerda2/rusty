@@ -4,7 +4,7 @@
 //! its points all at once (`SetPositions`, e.g. a grenade arc each frame) or one
 //! at a time (0-based, like `Probe` and `Reflection`), choose world or local space
 //! and looping, and restyle it with the verbs it shares with `Trail`
-//! (`ribbon_style`). Setters route through `scene::authoring::ribbon::line` / `ribbon`.
+//! (`ribbon_style`). Setters route through `edit::authoring::ribbon::line` / `ribbon`.
 //! Without a Line, getters return a neutral default; setters no-op.
 
 use std::cell::RefCell;
@@ -17,7 +17,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::LineComponent;
-use rusty_scene::authoring::ribbon::line as ops;
+use rusty_edit::authoring::ribbon::line as ops;
 use rusty_scene::Scene;
 
 /// `(id, index, x, y, z)`.

@@ -24,7 +24,7 @@ const MARK: f32 = 0.125;
 fn saved_and_loaded(name: &str, stale: bool) -> GameWorld {
     let path = saved(name, stale);
     let mut loaded = Scene::new();
-    rusty_scene::load_from_file(&mut loaded, &path).unwrap();
+    rusty_edit::load_from_file(&mut loaded, &path).unwrap();
     world(loaded)
 }
 
@@ -44,7 +44,7 @@ fn saved(name: &str, stale: bool) -> String {
     let dir = rusty_test_support::temp::dir().join("rusty_play_navmesh");
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join(name).to_string_lossy().into_owned();
-    rusty_scene::save_to_file(&scene, &path).unwrap();
+    rusty_edit::save_to_file(&scene, &path).unwrap();
     path
 }
 
@@ -115,7 +115,7 @@ fn stop_restores_the_saved_navmesh() {
 fn boot_restores_the_saved_navmesh() {
     let path = saved("boot.scene", false);
     let mut scene = Scene::new();
-    rusty_scene::load_from_file(&mut scene, &path).unwrap();
+    rusty_edit::load_from_file(&mut scene, &path).unwrap();
     let nav = NavigationGraph::from_scene(&scene);
     assert_eq!(nav.spans[0].y, MARK, "restored at boot");
 }

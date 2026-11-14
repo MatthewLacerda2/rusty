@@ -8,8 +8,8 @@ use crate::bake::lightmap::bake_scene_lightmaps;
 use rusty_components::{
     LightComponent, LightMode, LightType, MaterialAsset, MaterialComponent, Tonemap,
 };
+use rusty_edit::authoring::{create_entity, default_light, default_post_processing, Primitive};
 use rusty_render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_scene::authoring::{create_entity, default_light, default_post_processing, Primitive};
 use rusty_scene::lighting::settings::BakeSettings;
 use rusty_scene::lighting::MixedLightingMode;
 use rusty_scene::{Camera, Scene};

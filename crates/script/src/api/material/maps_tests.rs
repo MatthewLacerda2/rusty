@@ -9,7 +9,7 @@ use std::rc::Rc;
 use mlua::Lua;
 
 use crate::api::bind;
-use rusty_scene::authoring::material::MAPS_DIR;
+use rusty_edit::authoring::material::MAPS_DIR;
 use rusty_scene::Scene;
 
 /// A multi-output checker recipe: albedo and a packed metallic-roughness map.

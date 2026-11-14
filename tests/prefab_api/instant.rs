@@ -3,8 +3,9 @@
 
 use super::{fixture, pos_of, run};
 use glam::Vec3;
-use rusty::scene::snapshot::SceneSnapshot;
-use rusty::scene::{apply_scene_data, to_scene_data, Scene, SceneData};
+use rusty::edit::snapshot::SceneSnapshot;
+use rusty::edit::{apply_scene_data, to_scene_data};
+use rusty::scene::{Scene, SceneData};
 
 /// `scene` saved to JSON and loaded back into a fresh one, as a scene file is.
 fn reload(scene: &Scene) -> Scene {

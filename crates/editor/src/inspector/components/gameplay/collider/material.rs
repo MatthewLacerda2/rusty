@@ -18,7 +18,7 @@
 use crate::widgets::DragRange;
 use rusty_components::{ColliderComponent, CombineMode, PhysicsMaterial};
 use rusty_ecs::World;
-use rusty_scene::authoring::physics::collider as collider_ops;
+use rusty_edit::authoring::physics::collider as collider_ops;
 use rusty_scene::physics_material;
 use rusty_scene::Scene;
 

@@ -10,7 +10,7 @@ use mlua::Lua;
 use super::register;
 use crate::api::bind;
 use rusty_components::UiShader;
-use rusty_scene::authoring::{add_component, ComponentKind};
+use rusty_edit::authoring::{add_component, ComponentKind};
 use rusty_scene::Scene;
 
 /// Run each chunk in turn over entities `id` (every Add Component kind) and `other`

@@ -11,7 +11,7 @@
 //! ([`MaterialDelete::keep_scene`]).
 
 use crate::EditorUi;
-use rusty_scene::authoring::material as mat_ops;
+use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::{Scene, SceneId};
 
 /// The editor's delete state across frames.
@@ -159,7 +159,7 @@ mod tests {
         scene
             .world
             .set_material(id, Some(MaterialComponent::new("tile")));
-        let before = rusty_scene::to_scene_data(&scene);
+        let before = rusty_edit::to_scene_data(&scene);
 
         scene.begin_edits();
         let delete = MaterialAction::Delete("tile".into());
@@ -167,7 +167,7 @@ mod tests {
         scene.commit_edits(None);
         scene.undo();
         assert_eq!(scene.world.material(id).unwrap().first(), "tile");
-        let after = rusty_scene::to_scene_data(&scene);
+        let after = rusty_edit::to_scene_data(&scene);
         assert_eq!(
             serde_json::to_value(after).ok(),
             serde_json::to_value(before).ok()

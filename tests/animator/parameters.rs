@@ -8,7 +8,8 @@ use std::rc::Rc;
 
 use mlua::Lua;
 use rusty::components::AnimatorParameter;
-use rusty::scene::{apply_scene_data, to_scene_data, Scene};
+use rusty::edit::{apply_scene_data, to_scene_data};
+use rusty::scene::Scene;
 use rusty::script::api::bind;
 use rusty::script::scripting::ConsoleLogs;
 

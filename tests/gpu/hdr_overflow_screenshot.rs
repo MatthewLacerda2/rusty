@@ -15,7 +15,7 @@
 use glam::Vec3;
 use rusty::components::{LightComponent, MaterialAsset, MaterialComponent};
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::{create_entity, default_post_processing, Primitive};
+use rusty::edit::authoring::{create_entity, default_post_processing, Primitive};
 use rusty::scene::{Camera, Scene};
 
 const SIZE: u32 = 64;
@@ -45,7 +45,7 @@ fn scene() -> Scene {
         intensity: 3.5,
         range: 4.0,
         cast_shadows: false,
-        ..rusty::scene::authoring::default_light()
+        ..rusty::edit::authoring::default_light()
     };
     scene.world.set_light(lamp, Some(light));
     let volume = create_entity(&mut scene, "Volume", None);

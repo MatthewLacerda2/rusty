@@ -9,7 +9,7 @@ use super::super::super::material::shader::params::floats;
 use super::super::super::{put, Reg};
 use super::super::state::{with_vc, with_vc_mut};
 use crate::api::ApiCell;
-use rusty_scene::authoring::rendering::post_processing as vc_ops;
+use rusty_edit::authoring::rendering::post_processing as vc_ops;
 use rusty_scene::Scene;
 use rusty_shadergen::post_params::catalog_default;
 

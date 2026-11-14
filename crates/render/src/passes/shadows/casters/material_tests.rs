@@ -62,7 +62,8 @@ fn gpu_cutouts_differing_only_in_tint_share_one_caster_batch() {
     use super::{batch_casters, CasterData, CasterKey};
     use crate::gpu::pipelines::winding::Facing;
     use rusty_components::RenderMode;
-    use rusty_scene::authoring::{create_entity, material, Primitive};
+    use rusty_edit::authoring::material;
+    use rusty_scene::create::{create_entity, Primitive};
     let Some(mut r) = crate::test_gpu::headless_or_skip(16, 16) else {
         return;
     };

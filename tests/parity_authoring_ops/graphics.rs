@@ -7,7 +7,7 @@ use mlua::Lua;
 use rusty::components::{CameraComponent, ExposureMode, PostProcessingComponent, Tonemap, Wheel};
 use rusty::core::settings::quality::EffectQuality;
 use rusty::core::settings::GraphicsSettings;
-use rusty::scene::authoring::{
+use rusty::edit::authoring::{
     rendering::camera as camera_ops, rendering::post_processing as vc_ops,
 };
 use rusty::scene::Scene;
@@ -17,7 +17,7 @@ use rusty::script::api::bind;
 fn scene_with_volume_and_cam() -> (Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("PostFx".to_string());
-    let mut vc: PostProcessingComponent = rusty::scene::authoring::default_post_processing();
+    let mut vc: PostProcessingComponent = rusty::edit::authoring::default_post_processing();
     (vc.bloom.active, vc.bloom.threshold) = (false, 1.0);
     vc.ssr.active = false;
     vc.ssr.quality = EffectQuality::Low;

@@ -18,7 +18,7 @@ fn static_box(scene: &mut Scene, pos: Vec3, size: Vec3) -> u32 {
         id,
         Some(ColliderComponent {
             shape: ColliderShape::Box { size },
-            ..rusty::scene::authoring::default_collider()
+            ..rusty::edit::authoring::default_collider()
         }),
     );
     id

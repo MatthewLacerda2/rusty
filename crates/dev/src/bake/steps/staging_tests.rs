@@ -19,7 +19,7 @@ pub(super) fn lit_room() -> Scene {
     let size = Vec3::new(20.0, 6.0, 20.0);
     let collider = ColliderComponent {
         shape: ColliderShape::Box { size },
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_edit::authoring::default_collider()
     };
     scene.world.set_collider(id, Some(collider));
     for x in [-2.0, 2.0] {

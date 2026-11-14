@@ -93,7 +93,7 @@ fn inside(c: &[Vec2; 4], p: Vec2) -> bool {
     !(pos && neg)
 }
 
-/// The values a drag writes back, each through its `scene::authoring` setter.
+/// The values a drag writes back, each through its `edit::authoring` setter.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RectEdit {
     pub anchored_position: Vec2,

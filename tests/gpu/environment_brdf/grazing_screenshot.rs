@@ -4,7 +4,7 @@
 
 use glam::{Quat, Vec3};
 use rusty::components::MaterialAsset;
-use rusty::scene::authoring::Primitive;
+use rusty::edit::authoring::Primitive;
 
 use super::{black_plastic, reflectance, scene};
 

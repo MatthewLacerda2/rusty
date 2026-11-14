@@ -1,5 +1,5 @@
 //! The ambient source (#1647): the drawn rule and the radiance function. Its
-//! save and load is `edit_side::base_tests::settings::ambient`.
+//! save and load is `rusty_edit`'s `base_tests::settings::ambient`.
 
 use glam::Vec3;
 

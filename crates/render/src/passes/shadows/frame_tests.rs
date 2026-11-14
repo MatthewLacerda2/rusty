@@ -9,7 +9,7 @@ use glam::{Quat, Vec3};
 use super::{frame_cascades, live_sun};
 use crate::{RenderView, OFFSCREEN_FORMAT};
 use rusty_components::{CameraComponent, LightMode, RenderTarget, ShadowSettings};
-use rusty_scene::authoring::{create_entity, default_post_processing, Primitive};
+use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// Spawn a light primitive turned by `rotation`; return its id.

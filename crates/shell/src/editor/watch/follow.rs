@@ -15,7 +15,7 @@
 //!   engine last read or wrote there (`Scene::is_disk_text`) is skipped: the echo of
 //!   a Save, Generate Lighting rewriting its fields (whose unsaved edits stay
 //!   unsaved, #832), a `touch`, a rescan, the same bytes written again.
-//! - **"Unsaved" is computed, not a flag** (`scene::has_unsaved_edits`), and only
+//! - **"Unsaved" is computed, not a flag** (`edit::has_unsaved_edits`), and only
 //!   picks the console line: info, or a warning that edits were discarded.
 //! - **A half-written file is retried.** A read or parse failure keeps the path
 //!   pending, so the next frame reads it again, until it loads or a newer note comes;
@@ -29,7 +29,8 @@
 use crate::editor::EditorFrontend;
 use rusty_app::GameWorld;
 use rusty_core::fs::written::{written_since, Stale};
-use rusty_scene::{load_parsed, parse_scene_text, Scene};
+use rusty_edit::load_parsed;
+use rusty_scene::{parse_scene_text, Scene};
 use rusty_script::scripting::ConsoleLogs;
 
 /// What the follow needs to remember between frames.
@@ -114,7 +115,7 @@ impl SceneFollow {
                 return false;
             }
         };
-        let unsaved = rusty_scene::has_unsaved_edits(scene, path);
+        let unsaved = rusty_edit::has_unsaved_edits(scene, path);
         let keep = selected.and_then(|id| name_path(scene, id));
         // Only the sidecar can fail now, after the World was replaced: it is still a
         // reload, with its selection remapped, and the error is a warning (#1374).

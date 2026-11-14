@@ -7,7 +7,7 @@ use glam::Vec3;
 use mlua::Lua;
 use rusty::components::{LineComponent, ParticleBlend, TextureMode, TrailComponent};
 use rusty::core::curve::{Curve, Gradient};
-use rusty::scene::authoring::{
+use rusty::edit::authoring::{
     ribbon as ribbon_ops, ribbon::line as line_ops, ribbon::trail as trail_ops,
 };
 use rusty::scene::Scene;

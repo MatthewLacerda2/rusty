@@ -9,7 +9,7 @@ use glam::Vec3;
 use rusty::components::{LightComponent, LightMode};
 use rusty::dev::bake::lightmap::bake_scene_lightmaps;
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::{primitive_mesh_component, Primitive};
+use rusty::edit::authoring::{primitive_mesh_component, Primitive};
 use rusty::scene::lighting::settings::BakeSettings;
 use rusty::scene::lighting::DiffuseModel;
 use rusty::scene::{Camera, Scene};
@@ -36,7 +36,7 @@ fn scene(model: DiffuseModel, mode: LightMode) -> Scene {
         range: 20.0,
         cast_shadows: false,
         mode,
-        ..rusty::scene::authoring::default_light()
+        ..rusty::edit::authoring::default_light()
     };
     scene.world.set_light(lamp, Some(light));
     scene

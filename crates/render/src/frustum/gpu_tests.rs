@@ -9,7 +9,7 @@ use crate::{RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_asset::{JointTransform, SkinData};
 use rusty_components::mesh::primitives::generate_sphere;
 use rusty_components::MeshComponent;
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
 const W: u32 = 64;

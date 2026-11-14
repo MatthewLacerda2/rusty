@@ -45,7 +45,7 @@ pub(in crate::postfx) fn chain() -> Option<Chain> {
 /// A volume exposing the image by `ev` in `mode` (its grade is not what a run bakes:
 /// [`Chain::run`] bakes the grade it is given).
 pub(in crate::postfx) fn exposure(ev: f32, mode: ExposureMode) -> PostProcessingComponent {
-    let mut vc = rusty_scene::authoring::default_post_processing();
+    let mut vc = rusty_scene::create::default_post_processing();
     (vc.exposure.fixed_ev, vc.exposure.mode) = (ev, mode);
     vc
 }

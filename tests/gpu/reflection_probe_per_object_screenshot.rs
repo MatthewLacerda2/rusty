@@ -9,7 +9,7 @@ use rusty::asset::lightmap_page::bc6h_level;
 use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::dev::capture::CaptureHost;
 use rusty::dev::screenshot::capture_into;
-use rusty::scene::authoring::{create_entity, Primitive};
+use rusty::edit::authoring::{create_entity, Primitive};
 use rusty::scene::{Camera, Scene};
 
 /// A one-mip `size`² BC6H KTX2 cubemap (what the bake writes, #1885), every face

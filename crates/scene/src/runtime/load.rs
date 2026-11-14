@@ -2,7 +2,7 @@
 //!
 //! Play-mode `Scene.Load(path)` only records the request ([`Scene::request_load`]);
 //! the tick's scene-load phase (after the destroy phase) takes it, runs the outgoing
-//! scene's teardown callbacks, then swaps the new scene in (`edit_side::load`'s
+//! scene's teardown callbacks, then swaps the new scene in (`rusty_edit::load`'s
 //! `swap_in`) — so the World is never replaced mid-dispatch and a replay swaps on the
 //! same tick every time.
 //!

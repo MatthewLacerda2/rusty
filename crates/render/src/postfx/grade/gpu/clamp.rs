@@ -4,8 +4,8 @@
 
 use super::{chain, W};
 use rusty_components::{PostProcessingComponent, Tonemap, Wheel};
-use rusty_scene::authoring::default_post_processing;
-use rusty_scene::authoring::rendering::post_processing as ops;
+use rusty_edit::authoring::rendering::post_processing as ops;
+use rusty_scene::create::default_post_processing;
 
 /// A volume with `tonemap` and the `which` wheel set to `color` and `offset`.
 fn wheel(tonemap: Tonemap, which: Wheel, color: [f32; 3], offset: f32) -> PostProcessingComponent {

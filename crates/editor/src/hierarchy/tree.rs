@@ -78,7 +78,7 @@ impl Rows<'_> {
 }
 
 /// Extract `entity_id`'s subtree to `assets/prefabs/{name}.prefab` via the shared
-/// `scene::save_prefab` verb (the same path `Scene.SavePrefab` takes). The folder is
+/// `edit::save_prefab` verb (the same path `Scene.SavePrefab` takes). The folder is
 /// created on demand; the entity name is sanitised into a filesystem-safe stem.
 fn save_as_prefab(scene: &Scene, entity_id: u32, name: &str) {
     let dir = std::path::Path::new(rusty_core::project::ASSETS_DIR).join("prefabs");
@@ -88,8 +88,8 @@ fn save_as_prefab(scene: &Scene, entity_id: u32, name: &str) {
         .map(|c| if c.is_alphanumeric() { c } else { '_' })
         .collect();
     let stem = if stem.is_empty() { "Prefab" } else { &stem };
-    let path = dir.join(format!("{stem}.{}", rusty_scene::PREFAB_EXTENSION));
-    let _ = rusty_scene::save_prefab(scene, entity_id, &path.to_string_lossy());
+    let path = dir.join(format!("{stem}.{}", rusty_edit::PREFAB_EXTENSION));
+    let _ = rusty_edit::save_prefab(scene, entity_id, &path.to_string_lossy());
 }
 
 /// How a hierarchy glyph is tinted, resolved against the theme when drawn.

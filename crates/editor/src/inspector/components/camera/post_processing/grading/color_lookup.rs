@@ -3,7 +3,7 @@
 
 use super::super::path_field::{self, LUT};
 use super::super::{knob, knob_row, Section, COLOR_CORRECTION};
-use rusty_scene::authoring::rendering::post_processing::grading::color_lookup;
+use rusty_edit::authoring::rendering::post_processing::grading::color_lookup;
 use rusty_scene::PostProcessingComponent;
 
 pub(in super::super) const SECTION: Section = Section {

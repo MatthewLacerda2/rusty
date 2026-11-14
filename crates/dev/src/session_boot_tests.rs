@@ -13,7 +13,7 @@ fn saved(tag: &str) -> String {
     let path = dir.join("boot.scene").to_string_lossy().into_owned();
     let mut scene = Scene::new();
     scene.add_entity("Booted".into());
-    rusty_scene::save_to_file(&scene, &path).unwrap();
+    rusty_edit::save_to_file(&scene, &path).unwrap();
     path
 }
 

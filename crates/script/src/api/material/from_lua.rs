@@ -34,8 +34,8 @@ use mlua::Value;
 
 use crate::api::lua_json::{decode, recipe_json};
 use rusty_components::MaterialAsset;
+use rusty_edit::authoring::material::{material_fields, SurfaceField, SurfaceKind, SurfaceValue};
 use rusty_procgen::TextureRecipe;
-use rusty_scene::authoring::material::{material_fields, SurfaceField, SurfaceKind, SurfaceValue};
 
 /// The validation-bearing fields lifted out of the recipe so the caller applies them
 /// through the shared `set_*` ops. `None` means "not authored" — leave the asset's
@@ -114,7 +114,7 @@ fn asset_from_json_value(
     let mut asset: MaterialAsset = decode(value)?;
     asset.maps_recipe = maps;
     asset.decal = asset.decal.clamped();
-    rusty_scene::authoring::material::clamp_detail(&mut asset);
+    rusty_edit::authoring::material::clamp_detail(&mut asset);
     Ok((asset, validated))
 }
 

@@ -5,7 +5,7 @@ use glam::{Quat, Vec3};
 
 use crate::PhysicsWorld;
 use rusty_components::{ColliderComponent, ColliderShape, RigidBodyComponent};
-use rusty_scene::authoring::{
+use rusty_scene::create::{
     create_entity, default_collider, defaults::default_rigidbody, Primitive,
 };
 use rusty_scene::Scene;

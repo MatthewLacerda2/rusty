@@ -230,7 +230,7 @@ fn interaction_groups_encode_layer_bit_and_filter() {
 fn is_kinematic_only_for_non_static_bodies_without_a_dynamic_rigidbody() {
     let dynamic = RigidBodyComponent {
         collision_detection: rusty_components::CollisionDetection::Discrete,
-        ..rusty_scene::authoring::default_rigidbody()
+        ..rusty_scene::create::default_rigidbody()
     };
     let kinematic = |s, rb| matches!(classify(s, rb), BodyClass::Kinematic);
     assert!(!kinematic(true, None), "static is not kinematic");
@@ -257,7 +257,7 @@ fn collider_inputs_respects_the_active_flag() {
         Some(ColliderComponent {
             active: false,
             shape: ColliderShape::Box { size: Vec3::ONE },
-            ..rusty_scene::authoring::default_collider()
+            ..rusty_scene::create::default_collider()
         }),
     );
     assert!(

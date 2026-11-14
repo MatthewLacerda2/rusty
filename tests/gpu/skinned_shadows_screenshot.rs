@@ -11,7 +11,7 @@
 use glam::{Mat4, Quat, Vec3};
 use rusty::asset::SkinData;
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::{create_entity, Primitive};
+use rusty::edit::authoring::{create_entity, Primitive};
 use rusty::scene::{Camera, MeshComponent, Scene};
 
 const SHIFT: f32 = 10.0;

@@ -6,7 +6,7 @@ use glam::Vec3;
 
 use super::super::{put, Reg};
 use crate::api::ApiCell;
-use rusty_scene::authoring::fog as fog_ops;
+use rusty_edit::authoring::fog as fog_ops;
 use rusty_scene::{FogMode, FogSettings, Scene};
 
 /// Mode, colour, and the five scalar knobs.

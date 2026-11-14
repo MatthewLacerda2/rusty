@@ -7,7 +7,7 @@ use super::super::state::{with_vc, with_vc_mut};
 use super::knobs::{register_count, register_flag, register_quality};
 use crate::api::ApiCell;
 use rusty_components::VolumetricFog;
-use rusty_scene::authoring::rendering::post_processing::volumetric_fog as fog;
+use rusty_edit::authoring::rendering::post_processing::volumetric_fog as fog;
 use rusty_scene::Scene;
 
 /// The switch, the quality level, its `Custom` counts, the albedo and the knobs (a

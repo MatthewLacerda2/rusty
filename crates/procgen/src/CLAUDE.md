@@ -104,7 +104,7 @@ Some(Lit::Text("…")), ..choice("output", &[…]) }`.
 - **Graphs are expanded before anything runs**. `op = "graph"` is an
   `OpKind` variant outside `catalog!` and `OPS`; `graph::expand` pastes its nodes
   into one flat recipe, and the runner refuses an instance left in one. A caller
-  that evaluates a recipe goes through `scene::authoring::material::load_recipe`
+  that evaluates a recipe goes through `edit::authoring::material::load_recipe`
   and runs the `Loaded` recipe it returns, never the one it was handed. A new op
   needs nothing for graphs: placeholders, id prefixes, link rewrites and seed
   folding all work on its serde form (a top-level `seed` key is folded, a

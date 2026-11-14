@@ -6,7 +6,7 @@ use std::rc::Rc;
 use glam::Vec3;
 use mlua::Lua;
 use rusty::components::CollisionDetection;
-use rusty::scene::authoring::physics::rigidbody as rb_ops;
+use rusty::edit::authoring::physics::rigidbody as rb_ops;
 use rusty::scene::Scene;
 use rusty::script::api::bind;
 
@@ -15,7 +15,7 @@ fn entity_with_rb(scene: &mut Scene, name: &str) -> u32 {
     let id = scene.add_entity(name.to_string());
     scene
         .world
-        .set_rigidbody(id, Some(rusty::scene::authoring::default_rigidbody()));
+        .set_rigidbody(id, Some(rusty::edit::authoring::default_rigidbody()));
     id
 }
 
@@ -63,7 +63,7 @@ fn physics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>
 fn mass_gravity_and_trigger_reach_their_ops() -> Result<(), Box<dyn std::error::Error>> {
     let scene = Rc::new(RefCell::new(Scene::new()));
     let id = entity_with_rb(&mut scene.borrow_mut(), "Body");
-    let collider = rusty::scene::authoring::default_collider();
+    let collider = rusty::edit::authoring::default_collider();
     scene.borrow_mut().world.set_collider(id, Some(collider));
 
     let lua = Lua::new();
@@ -83,7 +83,7 @@ fn mass_gravity_and_trigger_reach_their_ops() -> Result<(), Box<dyn std::error::
         .eval()
     })?;
 
-    let mut expected = rusty::scene::authoring::default_rigidbody();
+    let mut expected = rusty::edit::authoring::default_rigidbody();
     rb_ops::set_mass(&mut expected, 5000.0);
     assert_eq!(read, (1.0, expected.mass, false, true, 0.0));
     assert_eq!(expected.mass, 1000.0, "the card's clamp");

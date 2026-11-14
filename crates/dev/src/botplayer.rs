@@ -9,7 +9,7 @@
 //! only documents the pattern and hosts the small shared helpers the harness needs to
 //! wire a bot onto the Player at run time.
 
-use rusty_scene::authoring::add_script;
+use rusty_edit::authoring::add_script;
 use rusty_scene::Scene;
 
 /// Canonical path to the example bot-player script (attached to the Player).

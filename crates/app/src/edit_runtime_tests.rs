@@ -71,11 +71,11 @@ fn a_scene_reloaded_from_disk_is_what_eval_sees() {
     let path = rusty_core::paths::to_slash(&dir.join("disk.scene"));
     let mut on_disk = Scene::new();
     on_disk.add_entity("FromDisk".to_string());
-    rusty_scene::save_to_file(&on_disk, &path).unwrap();
+    rusty_edit::save_to_file(&on_disk, &path).unwrap();
     let gw = edit_world();
     eval(&gw, "Scene.CreateEntity(\"Unsaved\")");
     // What the editor's follow-the-file reload does to the shared cell (#1340).
-    rusty_scene::load_from_file(&mut gw.scene().borrow_mut(), &path).unwrap();
+    rusty_edit::load_from_file(&mut gw.scene().borrow_mut(), &path).unwrap();
     assert_ne!(find(&gw, "FromDisk"), "nil");
     assert_eq!(find(&gw, "Unsaved"), "nil");
 }

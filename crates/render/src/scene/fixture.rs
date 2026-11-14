@@ -8,7 +8,7 @@ use super::{RenderObject, RenderScene};
 use crate::gpu::uniforms::ObjectData;
 use crate::{MaterialData, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_components::{MaterialAsset, MaterialComponent, RenderMode};
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
 pub(super) const RES: u32 = 32;

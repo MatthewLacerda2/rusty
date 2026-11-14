@@ -14,7 +14,7 @@ fn write_scene(tag: &str) -> String {
     let path = paths::to_slash(&dir.join("keep.scene"));
     let mut scene = Scene::new();
     scene.add_entity("Keep".to_string());
-    rusty_scene::save_to_file(&scene, &path).unwrap();
+    rusty_edit::save_to_file(&scene, &path).unwrap();
     path
 }
 

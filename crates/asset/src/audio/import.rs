@@ -1,7 +1,7 @@
 //! crates/asset/src/audio/import.rs — MP3 arrives, WAV stays (#385).
 //!
 //! Two doors in: [`refresh`] sweeps a project tree for `.mp3` files (every authoring
-//! open runs it, `scene::seed_project`, and the editor again whenever its window
+//! open runs it, `edit::seed_project`, and the editor again whenever its window
 //! regains focus, Unity's auto-refresh; the shipped player never does, #1653;
 //! scripts call it as `Assets.Refresh()`), and [`import_mp3_bytes`] takes a provider's
 //! response body straight to a `.wav`. Both trim encoder delay and padding through

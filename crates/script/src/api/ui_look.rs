@@ -5,7 +5,7 @@
 //! gradient travels as a table — `{ kind = "Linear"|"Radial", angle = deg,
 //! center = {x, y}, radius = r, stops = { { t = 0, color = {r, g, b, a} }, … } }`
 //! (omitted keys default) — or the same document as a JSON string; `nil` clears
-//! it. Writes route through the namespace's shared `scene::authoring` op, which
+//! it. Writes route through the namespace's shared `edit::authoring` op, which
 //! sanitizes the gradient once (`ui_look::sanitize_gradient`).
 
 use mlua::{Table, Value};

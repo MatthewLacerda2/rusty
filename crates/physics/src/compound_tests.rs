@@ -25,7 +25,7 @@ fn add(scene: &mut Scene, parent: Option<u32>, pos: Vec3, collider: bool) -> u32
         let shape = ColliderShape::Box { size: Vec3::ONE };
         let c = ColliderComponent {
             shape,
-            ..rusty_scene::authoring::default_collider()
+            ..rusty_scene::create::default_collider()
         };
         scene.world.set_collider(id, Some(c));
     }
@@ -38,7 +38,7 @@ fn rigidbody(scene: &mut Scene, id: u32, kinematic: bool, velocity: Vec3) {
         is_kinematic: kinematic,
         velocity,
         use_gravity: false,
-        ..rusty_scene::authoring::default_rigidbody()
+        ..rusty_scene::create::default_rigidbody()
     };
     scene.world.set_rigidbody(id, Some(rb));
 }

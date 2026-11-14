@@ -5,8 +5,8 @@
 use glam::{EulerRot, Mat3, Mat4, Quat, Vec3};
 use proptest::prelude::*;
 use proptest::test_runner::{Config, RngSeed};
-use rusty::scene::authoring::default_collider;
-use rusty::scene::{apply_scene_data, to_scene_data, Scene};
+use rusty::edit::{apply_scene_data, authoring::default_collider, to_scene_data};
+use rusty::scene::Scene;
 
 #[derive(Clone, Debug)]
 struct Node {

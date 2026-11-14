@@ -8,7 +8,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use rusty::components::AnimatorComponent;
-use rusty::scene::{prefab, Scene};
+use rusty::edit::prefab;
+use rusty::scene::Scene;
 use rusty::script::scripting::ConsoleLogs;
 
 const GRAPH: &str = r#"{

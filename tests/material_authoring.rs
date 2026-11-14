@@ -7,7 +7,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::scene::{apply_scene_data, to_scene_data, MaterialComponent, RenderMode, Scene};
+use rusty::edit::{apply_scene_data, to_scene_data};
+use rusty::scene::{MaterialComponent, RenderMode, Scene};
 use rusty::script::api::bind;
 
 /// Register the `Material` namespace against `scene` and run `script`.

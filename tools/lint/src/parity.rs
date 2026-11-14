@@ -2,7 +2,7 @@
 //!
 //! A first-class component is authored from two places that must never drift: the
 //! editor's inspector card and the Lua API namespace. PR-1 made them siblings over a
-//! shared `scene::authoring` op (the editor card AND the Lua binding both call it, so
+//! shared `edit::authoring` op (the editor card AND the Lua binding both call it, so
 //! the write + its validation live once). This gate keeps *migrated* cards honest:
 //! a card that has been routed through a shared op must stay routed — reintroducing a
 //! direct field mutation fails the build.
@@ -21,7 +21,7 @@
 //!
 //! Post-#344 the cards reach components through the accessor facade, so the signal
 //! is facade-shaped: a card file that takes a mutable accessor (`.<field>_mut(`)
-//! without importing any `scene::authoring` ops is mutating fields directly;
+//! without importing any `edit::authoring` ops is mutating fields directly;
 //! a routed card only ever takes the guard to hand `&mut c` into a shared op.
 //! Detach on remove (`.set_<field>(id, None)`) is not a field mutation.
 //!
@@ -88,7 +88,7 @@ fn violation(field: &str, card: Card) -> Option<String> {
     match card {
         Card::Direct => Some(format!(
             "PARITY_DRIFT `{field}` card mutates the component directly \
-             (`{field}_mut` without its `scene::authoring` ops) — route it through a \
+             (`{field}_mut` without its `edit::authoring` ops) — route it through a \
              shared op"
         )),
         Card::Routed | Card::None => None,
@@ -111,7 +111,7 @@ fn classify_all(field: &str, sources: &[String]) -> Card {
 /// A card "exists" when the file touches the component through the #344 facade
 /// (mirrors the completeness gate's inspector axis). It is **direct** when it takes
 /// the mutable accessor (`.<field>_mut(`) in a file that imports no
-/// `scene::authoring` ops — a routed card only takes the guard to hand `&mut c`
+/// `edit::authoring` ops — a routed card only takes the guard to hand `&mut c`
 /// into a shared op it imported, whatever that op module is called (`nav::agent`
 /// for `nav_agent`, `backdrop` for `backdrop_filter`), and a read-only-plus-remove
 /// card never takes it at all. Judged per file: the old whole-tree name match
@@ -124,7 +124,7 @@ fn classify(field: &str, src: &str) -> Card {
     if !exists {
         return Card::None;
     }
-    if takes_mut && !src.contains("scene::authoring::") {
+    if takes_mut && !src.contains("edit::authoring::") {
         Card::Direct
     } else {
         Card::Routed
@@ -172,7 +172,7 @@ fn report(violations: &[String]) {
         eprint!("{body}");
         eprintln!(
             "\n{} editor-card parity issue(s). Route the card through a shared \
-             `scene::authoring` op — see docs/linting.md.",
+             `edit::authoring` op — see docs/linting.md.",
             violations.len()
         );
     }
@@ -186,7 +186,7 @@ mod tests {
     /// routed; a direct snippet (mutable accessor, no ops) as direct.
     #[test]
     fn classify_separates_routed_from_direct() {
-        let routed = "use crate::scene::authoring::light as light_ops;\n\
+        let routed = "use crate::edit::authoring::light as light_ops;\n\
                       if let Some(mut c) = world.light_mut(id) {\n\
                           light_ops::set_color(&mut c, rgb);\n\
                       }";
@@ -195,6 +195,15 @@ mod tests {
         let direct = "let mut l = world.light_mut(id).unwrap();\n\
                       l.color = Vec3::new(r, g, b);";
         assert_eq!(classify("light", direct), Card::Direct);
+
+        // A member crate spells the ops through the edit crate; the base's own
+        // re-exported builders are no ops.
+        let member = "use rusty_edit::authoring::light as light_ops;\n\
+                      if let Some(mut c) = world.light_mut(id) { light_ops::set_color(&mut c, rgb); }";
+        assert_eq!(classify("light", member), Card::Routed);
+        let base = "use rusty_scene::create::default_light;\n\
+                    let mut l = world.light_mut(id).unwrap(); *l = default_light();";
+        assert_eq!(classify("light", base), Card::Direct);
 
         // Read-only + detach-on-remove (the mesh card's shape) stays routed.
         let read_only = "if world.has_mesh(id) { world.set_mesh(id, None); }";
@@ -205,7 +214,7 @@ mod tests {
     /// not excused by a routed one elsewhere.
     #[test]
     fn routing_is_judged_per_file() {
-        let routed = "use crate::scene::authoring::nav::agent as nav_ops;\n\
+        let routed = "use crate::edit::authoring::nav::agent as nav_ops;\n\
                       if let Some(mut a) = world.nav_agent_mut(id) { nav_ops::set(&mut a); }";
         assert_eq!(classify("nav_agent", routed), Card::Routed);
         let direct = "let mut a = world.nav_agent_mut(id).unwrap(); a.speed = 2.0;";

@@ -1,7 +1,8 @@
 //! Sharing one library material, authoring add/remove, and the scene-data round trip.
 
-use rusty::scene::authoring::{add_component, create_entity, ComponentKind};
-use rusty::scene::{apply_scene_data, to_scene_data, MaterialAsset, MaterialComponent, Scene};
+use rusty::edit::authoring::{add_component, create_entity, ComponentKind};
+use rusty::edit::{apply_scene_data, to_scene_data};
+use rusty::scene::{MaterialAsset, MaterialComponent, Scene};
 
 /// Build an entity referencing `key`, inserting `key`'s material if `material` is
 /// `Some`. Returns the new entity id.
@@ -51,7 +52,7 @@ fn authoring_add_creates_library_asset_remove_keeps_it() {
     assert_eq!(scene.materials.len(), 1);
     assert!(scene.world.has_material(id));
     // Remove drops only the reference; the library asset is left for other users.
-    rusty::scene::authoring::remove_component(&mut scene, id, ComponentKind::Texture);
+    rusty::edit::authoring::remove_component(&mut scene, id, ComponentKind::Texture);
     assert!(!scene.world.has_material(id));
     assert_eq!(
         scene.materials.len(),

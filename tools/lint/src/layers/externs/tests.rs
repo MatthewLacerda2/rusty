@@ -36,7 +36,7 @@ fn ignores_what_is_not_the_crate() {
 fn a_local_item_shadows_the_crate() {
     assert!(found("pub mod image;\nfn f() { image::draw(); }").is_empty());
     assert!(found("use super::image;\nfn f() { image::draw(); }").is_empty());
-    let aliased = "use crate::scene::authoring::{audio, image as img};\nfn f() { image::open(); }";
+    let aliased = "use crate::edit::authoring::{audio, image as img};\nfn f() { image::open(); }";
     assert_eq!(found(aliased), ["image"]);
 }
 

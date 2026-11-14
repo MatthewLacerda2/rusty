@@ -3,7 +3,7 @@
 //! link's source is, and the part a destroy takes out of a model instance
 //! (`removed`, Unity's *Removed GameObject* override).
 //!
-//! The prefab verbs (`scene::prefab`: extract, stamp, propagate, apply, revert)
+//! The prefab verbs (`edit::prefab`: extract, stamp, propagate, apply, revert)
 //! build on these, and `prefab` re-exports `instance`, the extension and the
 //! source tests under its own paths (`prefab::source`); `removed` is named here
 //! only. They sit below that layer because the base reaches them in live code (a

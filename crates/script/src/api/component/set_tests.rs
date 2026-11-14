@@ -8,7 +8,7 @@ use mlua::Lua;
 
 use super::register;
 use crate::api::bind;
-use rusty_scene::authoring::{add_component, ComponentKind};
+use rusty_edit::authoring::{add_component, ComponentKind};
 use rusty_scene::Scene;
 
 /// Run `chunk` over entity `id` carrying every Add Component kind, after `prep`.

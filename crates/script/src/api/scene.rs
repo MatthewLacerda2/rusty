@@ -2,7 +2,7 @@
 //!
 //! The structural-authoring surface, mirroring the editor's GameObject menu and
 //! the inspector's Add Component menu (issue #181). Every verb routes through the
-//! shared `scene::authoring` module so the API and the editor can never drift:
+//! shared `edit::authoring` module so the API and the editor can never drift:
 //!
 //!   - `FindEntityByName(name)` — lookup, `nil` if absent (Unity's `GameObject.Find` returns `null`).
 //!   - `CreateEntity(name, [primitive])` — the GameObject menu's primitive set.
@@ -30,7 +30,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::ScriptFieldValue;
-use rusty_scene::authoring::{self, ComponentKind, Primitive};
+use rusty_edit::authoring::{self, ComponentKind, Primitive};
 use rusty_scene::Scene;
 
 /// Register the `Scene` namespace onto `lua`.
@@ -246,7 +246,7 @@ fn register_save(
                     ))
                 }
             };
-            rusty_scene::save_to_file(&scene.borrow(), &target)
+            rusty_edit::save_to_file(&scene.borrow(), &target)
                 .map_err(|e| mlua::Error::RuntimeError(format!("Scene.Save: {e}")))?;
             *scene_path.borrow_mut() = Some(target.clone());
             Ok(target)

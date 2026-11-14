@@ -9,7 +9,7 @@ use std::rc::Rc;
 use glam::Vec3;
 use rusty::app::GameWorld;
 use rusty::components::{CanvasComponent, RectTransformComponent};
-use rusty::scene::authoring::default_camera;
+use rusty::edit::authoring::default_camera;
 use rusty::scene::camera::set_view_fov;
 use rusty::scene::Scene;
 use rusty::script::scripting::ConsoleLogs;

@@ -27,7 +27,7 @@ fn raycast_matches_engine_cast_through_rapier() {
             shape: ColliderShape::Box {
                 size: Vec3::splat(2.0),
             },
-            ..rusty_scene::authoring::default_collider()
+            ..rusty_edit::authoring::default_collider()
         }),
     );
     let scene = Rc::new(RefCell::new(raw));
@@ -75,7 +75,7 @@ fn manager_with_dynamic_body() -> (ScriptManager, Rc<RefCell<Option<PhysicsWorld
         id,
         Some(RigidBodyComponent {
             use_gravity: false,
-            ..rusty_scene::authoring::default_rigidbody()
+            ..rusty_edit::authoring::default_rigidbody()
         }),
     );
     let scene = Rc::new(RefCell::new(raw));

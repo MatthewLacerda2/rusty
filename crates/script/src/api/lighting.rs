@@ -31,7 +31,7 @@ use mlua::Lua;
 
 use super::{put, Reg};
 use crate::api::ApiCell;
-use rusty_scene::authoring::environment as env_ops;
+use rusty_edit::authoring::environment as env_ops;
 use rusty_scene::Scene;
 
 /// Register the `Lighting` namespace table, with the environment's getters and

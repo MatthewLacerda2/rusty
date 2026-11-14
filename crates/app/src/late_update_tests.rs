@@ -43,7 +43,7 @@ fn falling_body_world() -> GameWorld {
         Some(RigidBodyComponent {
             velocity: Vec3::new(0.0, -12.0, 0.0),
             use_gravity: false,
-            ..rusty_scene::authoring::default_rigidbody()
+            ..rusty_edit::authoring::default_rigidbody()
         }),
     );
     // A collider gives the dynamic body mass so rapier integrates it (a
@@ -54,7 +54,7 @@ fn falling_body_world() -> GameWorld {
             shape: ColliderShape::Box {
                 size: Vec3::splat(1.0),
             },
-            ..rusty_scene::authoring::default_collider()
+            ..rusty_edit::authoring::default_collider()
         }),
     );
     *s.world.scripts_mut(id).unwrap() = vec![ScriptComponent {

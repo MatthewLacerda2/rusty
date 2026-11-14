@@ -7,7 +7,7 @@ pub(crate) use crate::query::convex_fixture::off_centre_cylinder;
 use crate::PhysicsWorld;
 use rusty_components::mesh::{MeshComponent, Vertex};
 use rusty_components::{ColliderComponent, ColliderShape, RigidBodyComponent};
-use rusty_scene::authoring::{default_collider, default_rigidbody};
+use rusty_scene::create::{default_collider, default_rigidbody};
 use rusty_scene::Scene;
 
 /// One mesh made of closed boxes, each `(min, max)`, wound outward: a concave

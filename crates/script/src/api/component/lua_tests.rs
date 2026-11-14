@@ -9,8 +9,8 @@ use serde_json::Value;
 use super::register;
 use super::value::from_lua;
 use crate::api::bind;
-use rusty_scene::authoring::fields::{Skip, KINDS};
-use rusty_scene::authoring::{add_component, ComponentKind};
+use rusty_edit::authoring::fields::{Skip, KINDS};
+use rusty_edit::authoring::{add_component, ComponentKind};
 use rusty_scene::Scene;
 
 /// Run `chunk` with `Component` registered over a scene holding entity `id` (a

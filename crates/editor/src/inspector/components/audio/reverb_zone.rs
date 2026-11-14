@@ -9,12 +9,12 @@
 use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use crate::inspector::components::card::component_card;
 use rusty_components::audio::reverb_zone::{DECAY_RANGE, MAX_PRE_DELAY};
 use rusty_components::{ReverbParams, ReverbPreset, ReverbZoneComponent as Zone};
-use rusty_scene::authoring::audio::reverb_zone as ops;
+use rusty_edit::authoring::audio::reverb_zone as ops;
 
 /// Route one edit through the shared ops and mark the scene dirty.
 fn write(world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool, op: impl FnOnce(&mut Zone)) {

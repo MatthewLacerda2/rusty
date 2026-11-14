@@ -4,7 +4,7 @@
 //! (#2059). This file holds the per-renderer settings of an entity's `MeshComponent` that have a verb of
 //! their own: the small-object cull's max draw distance (Unreal's *Max Draw
 //! Distance*) and min screen size (Unity `LODGroup`'s relative height). Every
-//! setter routes through the shared `scene::authoring::rendering::mesh` ops the
+//! setter routes through the shared `edit::authoring::rendering::mesh` ops the
 //! Inspector's Mesh card uses; `Component.Set(id, "Mesh", { … })` writes the same
 //! fields. Getters return `0` (off) without a Mesh; setters are then no-ops. Whether
 //! a camera culled the mesh this frame is the renderer's and is not readable here:
@@ -18,7 +18,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::MeshComponent;
-use rusty_scene::authoring::rendering::mesh as ops;
+use rusty_edit::authoring::rendering::mesh as ops;
 use rusty_scene::Scene;
 
 /// Register the `Mesh` namespace onto `lua`.

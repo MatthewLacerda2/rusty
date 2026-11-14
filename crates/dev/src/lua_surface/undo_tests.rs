@@ -16,14 +16,14 @@ fn run(s: &mut Session, line: &str) -> String {
 /// undone create's id stays retired, so the allocator may only have moved on.
 fn document(s: &Session) -> String {
     let scene = s.world().world.scene.borrow();
-    let mut data = rusty_scene::to_scene_data(&scene);
+    let mut data = rusty_edit::to_scene_data(&scene);
     data.next_entity_id = 0;
     serde_json::to_string(&data).expect("a scene serializes")
 }
 
 /// The id allocator as saved.
 fn next_id(s: &Session) -> u32 {
-    rusty_scene::to_scene_data(&s.world().world.scene.borrow()).next_entity_id
+    rusty_edit::to_scene_data(&s.world().world.scene.borrow()).next_entity_id
 }
 
 #[test]

@@ -100,7 +100,7 @@ fn draw_entity_inspector(
         // Reconcile declared component dependencies (#359): drop any component whose
         // requirement was cleared out from under it (e.g. a Camera removed via its
         // card, orphaning a PostProcessing). Declaration-driven, not hand-written.
-        rusty_scene::authoring::reconcile_requirements(world, selected_id);
+        rusty_edit::authoring::reconcile_requirements(world, selected_id);
 
         draw_object_header(
             ui,

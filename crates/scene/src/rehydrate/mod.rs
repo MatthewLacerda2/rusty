@@ -6,7 +6,7 @@
 //! cap. GPU buffers are never stored on disk, only rebuilt here.
 //!
 //! Rebuilding what a written model changed (`reimport`, `model_writes`) is the edit
-//! side's (`edit_side::rehydrate`): it re-baselines prefab instances.
+//! side's (`rusty_edit::rehydrate`): it re-baselines prefab instances.
 
 mod collider;
 mod warned;
@@ -232,7 +232,7 @@ pub fn bounds_of(positions: impl Iterator<Item = [f32; 3]>) -> Option<(Vec3, Vec
 }
 
 /// Put `sub`'s geometry and rig, imported at `revision`, on `mesh`: what a reimport
-/// rebuilds a mesh drawing a written model with (`edit_side::rehydrate`).
+/// rebuilds a mesh drawing a written model with (`rusty_edit::rehydrate`).
 pub fn install_sub_mesh(mesh: &mut crate::MeshComponent, sub: &SubMesh, revision: MeshRevision) {
     install(mesh, RehydratedMesh::from_sub_mesh(sub, revision));
 }

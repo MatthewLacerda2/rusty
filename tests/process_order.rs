@@ -14,7 +14,7 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use rusty::components::{CharacterControllerComponent, ColliderShape};
-use rusty::scene::authoring::{add_component, create_entity, ComponentKind, Primitive};
+use rusty::edit::authoring::{add_component, create_entity, ComponentKind, Primitive};
 use rusty::scene::Scene;
 
 use crate::play::{attach_script, playing, run};

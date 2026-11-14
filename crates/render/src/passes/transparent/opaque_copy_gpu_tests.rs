@@ -5,7 +5,7 @@ use glam::Vec3;
 
 use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_components::{MaterialAsset, MaterialComponent, RefractionModel, RenderMode};
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// A scene holding one transparent box at `z` drawn with `glass`.

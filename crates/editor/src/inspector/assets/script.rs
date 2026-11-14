@@ -1,6 +1,6 @@
 use crate::EditorUi;
 use egui_phosphor::regular as icon;
-use rusty_scene::authoring;
+use rusty_edit::authoring;
 use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 use std::path::Path;

@@ -33,7 +33,7 @@ fn an_imported_packed_orm_keeps_raw_averaged_mips_through_the_cache() {
     let orm = dir.join("orm.png");
     checker.save(&orm).unwrap();
     // What a model's material import does to the map it names in that slot
-    // (`scene::authoring::import`, whose own test holds that it does).
+    // (`edit::authoring::import`, whose own test holds that it does).
     crate::sidecar::fit_data_slot(&orm);
     let settings = crate::sidecar::texture(&orm);
     assert!(is_linear(&settings), "the data slot turned sRGB off");

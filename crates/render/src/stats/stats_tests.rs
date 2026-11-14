@@ -8,7 +8,7 @@ fn light(light_type: LightType) -> LightComponent {
         intensity: 1.0,
         inner_cone: 20.0,
         outer_cone: 30.0,
-        ..rusty_scene::authoring::default_light()
+        ..rusty_scene::create::default_light()
     }
 }
 

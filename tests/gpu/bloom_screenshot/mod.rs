@@ -10,7 +10,7 @@ use crate::gpu::mean_brightness;
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::defaults::default_post_processing;
+use rusty::edit::authoring::defaults::default_post_processing;
 use rusty::scene::{Camera, MeshComponent, Scene};
 
 /// A unit box scaled to `size` at `pos`, lit only by its own `emissive` term.

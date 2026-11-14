@@ -11,7 +11,7 @@ use super::OUTLINE_PX;
 use crate::{readback, RenderView, OFFSCREEN_FORMAT};
 use rusty_components::material::RenderMode;
 use rusty_components::{MaterialAsset, MaterialComponent};
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// A unit box at the origin, scaled by `scale`, selected.

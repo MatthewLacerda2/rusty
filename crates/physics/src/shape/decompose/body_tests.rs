@@ -8,7 +8,7 @@ use crate::shape::fixture::{arch, bowl, floor, prop, steps};
 
 use crate::PhysicsWorld;
 use rusty_components::{ColliderComponent, ColliderShape, RigidBodyComponent};
-use rusty_scene::authoring::{default_collider, default_rigidbody};
+use rusty_scene::create::{default_collider, default_rigidbody};
 use rusty_scene::Scene;
 
 #[test]

@@ -1,10 +1,10 @@
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
 use glam::Vec3;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use crate::inspector::components::card::component_card;
-use rusty_scene::authoring::rendering::light as light_ops;
+use rusty_edit::authoring::rendering::light as light_ops;
 use rusty_scene::{LightComponent, LightMode, LightType};
 
 /// 3C. Light configuration. A THIN client (#287): every widget reads the field into

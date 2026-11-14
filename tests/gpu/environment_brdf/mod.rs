@@ -19,7 +19,7 @@ use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::dev::capture::CaptureHost;
 use rusty::dev::screenshot::capture_into;
-use rusty::scene::authoring::{create_entity, Primitive};
+use rusty::edit::authoring::{create_entity, Primitive};
 use rusty::scene::{Camera, Scene};
 
 /// A uniform grey panorama, bright enough that a 4% reflection stays above the

@@ -9,8 +9,8 @@ use super::{chain, W};
 use crate::{RenderView, OFFSCREEN_FORMAT};
 use rusty_components::{PostProcessingComponent, Tonemap, Wheel};
 use rusty_core::color::linear_to_srgb;
-use rusty_scene::authoring::default_post_processing;
-use rusty_scene::authoring::rendering::post_processing as ops;
+use rusty_edit::authoring::rendering::post_processing as ops;
+use rusty_scene::create::default_post_processing;
 use rusty_scene::{Camera, Scene};
 
 /// A grey ramp over the HDR range a frame holds: 0, then 0.001 to 40, log-spaced.

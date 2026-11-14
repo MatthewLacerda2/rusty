@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::scene::authoring::material as mat_ops;
+use rusty::edit::authoring::material as mat_ops;
 use rusty::scene::{RenderMode, Scene};
 use rusty::script::api::bind;
 

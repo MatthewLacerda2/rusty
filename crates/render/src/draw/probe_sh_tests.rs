@@ -5,7 +5,7 @@ use glam::Vec3;
 
 use super::entity_probe_sh;
 use crate::ibl::cubemap_capture::CaptureMode;
-use rusty_scene::authoring::{primitive_mesh_component, Primitive};
+use rusty_scene::create::{primitive_mesh_component, Primitive};
 use rusty_scene::Scene;
 
 #[test]

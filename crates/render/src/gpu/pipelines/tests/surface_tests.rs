@@ -7,8 +7,8 @@ use std::collections::BTreeMap;
 use glam::Vec3;
 
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_scene::authoring::{create_entity, material as mat_ops, Primitive};
-use rusty_scene::{Camera, RenderMode, Scene};
+use rusty_edit::authoring::material as mat_ops;
+use rusty_scene::{create::create_entity, create::Primitive, Camera, RenderMode, Scene};
 use rusty_shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir};
 

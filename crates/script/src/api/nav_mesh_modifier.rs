@@ -4,7 +4,7 @@
 //! by default its children's. `OverrideArea` bakes them as an area (`1`,
 //! `NotWalkable`, takes a tabletop off the navmesh while the table still blocks the
 //! floor under it); `IgnoreFromBuild` leaves them out entirely. Every setter routes
-//! through the shared `scene::authoring::nav::object_modifier` ops the inspector card
+//! through the shared `edit::authoring::nav::object_modifier` ops the inspector card
 //! and `Component.Set` use; the next navmesh sync rebakes the covered colliders'
 //! cells. Getters return a neutral default without a modifier; setters are then
 //! no-ops. Attach one with `Scene.AddComponent(id, "NavMeshModifier")`.
@@ -17,7 +17,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::NavMeshModifierComponent as Modifier;
-use rusty_scene::authoring::nav::object_modifier as ops;
+use rusty_edit::authoring::nav::object_modifier as ops;
 use rusty_scene::Scene;
 
 const NS: &str = "NavMeshModifier";

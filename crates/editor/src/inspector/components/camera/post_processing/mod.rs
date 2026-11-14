@@ -13,8 +13,8 @@ use egui_phosphor::regular as icon;
 use crate::inspector::components::card::{component_card, remove_component};
 use crate::inspector::components::particles::widgets::combo;
 use rusty_core::settings::quality::EffectQuality;
-use rusty_scene::authoring::rendering::post_processing::{self as vc_ops, Knob};
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::rendering::post_processing::{self as vc_ops, Knob};
+use rusty_edit::authoring::ComponentKind;
 use rusty_scene::PostProcessingComponent;
 
 // sorted: one module per section (or family of sections); none reads another

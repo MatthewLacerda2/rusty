@@ -82,7 +82,7 @@ fn fxaa(scene: &Scene, camera: Option<u32>) -> bool {
 }
 
 fn vc() -> PostProcessingComponent {
-    let mut vc = rusty_scene::authoring::default_post_processing();
+    let mut vc = rusty_scene::create::default_post_processing();
     (vc.bloom.intensity, vc.bloom.threshold) = (2.0, 0.7);
     vc.exposure.fixed_ev = 1.5;
     vc.ssr.quality = EffectQuality::Low;

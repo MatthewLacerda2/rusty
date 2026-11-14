@@ -54,14 +54,14 @@ fn add_box(scene: &mut Scene, pos: Vec3, script: &str) {
         id,
         Some(ColliderComponent {
             shape,
-            ..rusty::scene::authoring::default_collider()
+            ..rusty::edit::authoring::default_collider()
         }),
     );
     scene.world.set_rigidbody(
         id,
         Some(RigidBodyComponent {
             angular_velocity: Vec3::new(0.3, 0.0, 0.2),
-            ..rusty::scene::authoring::default_rigidbody()
+            ..rusty::edit::authoring::default_rigidbody()
         }),
     );
     scene.world.scripts_mut(id).unwrap().push(ScriptComponent {

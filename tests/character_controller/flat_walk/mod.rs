@@ -10,7 +10,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use glam::Vec3;
-use rusty::scene::authoring::Primitive;
+use rusty::edit::authoring::Primitive;
 use rusty::scene::Scene;
 
 use super::{pos_of, DT};

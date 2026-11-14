@@ -17,7 +17,7 @@ pub use textures::{checker, half_alpha, ripples};
 use glam::{Quat, Vec3};
 use rusty::components::{MaterialAsset, MaterialComponent, RenderMode};
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::{create_entity, default_post_processing, Primitive};
+use rusty::edit::authoring::{create_entity, default_post_processing, Primitive};
 use rusty::scene::{Camera, PostProcessingComponent, Scene};
 
 /// The capture size.

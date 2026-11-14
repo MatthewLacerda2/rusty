@@ -12,8 +12,8 @@ use crate::GameWorld;
 use rusty_audio::ReverbState;
 use rusty_components::{ReverbPreset, ReverbZoneComponent};
 use rusty_core::input::InputState;
+use rusty_edit::authoring::audio::reverb_zone as ops;
 use rusty_navigation::NavigationGraph;
-use rusty_scene::authoring::audio::reverb_zone as ops;
 use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 

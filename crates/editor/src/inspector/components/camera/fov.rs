@@ -4,7 +4,7 @@
 //! stays vertical; every write routes through the shared ops.
 
 use rusty_components::{CameraComponent, FovAxis};
-use rusty_scene::authoring::rendering::camera as camera_ops;
+use rusty_edit::authoring::rendering::camera as camera_ops;
 
 /// The aspect (width / height) the card converts at: the camera's render
 /// texture's when it has one, else `view` (the editor viewport's, which the Scene

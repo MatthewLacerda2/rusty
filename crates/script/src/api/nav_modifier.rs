@@ -4,7 +4,7 @@
 //! that assigns a navigation area to the walkable surface inside it at bake time;
 //! area `1` (`NotWalkable`) removes the surface. Look an area's id up with
 //! `Navigation.GetAreaFromName`. Every setter routes through the shared
-//! `scene::authoring::nav::modifier` ops the inspector card uses; the volume is a
+//! `edit::authoring::nav::modifier` ops the inspector card uses; the volume is a
 //! bake input, so the next navmesh sync rebakes the cells it covers. Getters return
 //! a neutral default without a volume; setters are then no-ops. Attach one with
 //! `Scene.AddComponent(id, "NavMeshModifierVolume")`.
@@ -18,7 +18,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::NavMeshModifierVolumeComponent as Volume;
-use rusty_scene::authoring::nav::modifier as ops;
+use rusty_edit::authoring::nav::modifier as ops;
 use rusty_scene::Scene;
 
 /// Register the `NavMeshModifierVolume` namespace onto `lua`.

@@ -10,7 +10,7 @@ use super::statics_key;
 use crate::gpu::pipelines::surface::cut_depth_tests::ground_halves;
 use crate::Renderer;
 use rusty_components::{RenderFace, ShadowCasting};
-use rusty_scene::authoring::material;
+use rusty_edit::authoring::material;
 
 /// The ground's brightness under each half of a card drawing `face`, its front up
 /// toward the sun or, with `down`, away from it; none for `None`.

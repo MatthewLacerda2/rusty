@@ -57,7 +57,7 @@ fn a_static_mesh_given_a_rigidbody_in_play_is_decomposed() {
     steps(&mut scene, &mut world, 1);
     assert!(shape_of(&world, id).as_trimesh().is_some(), "static: exact");
     scene.world.set_static(id, false);
-    let rb = rusty_scene::authoring::default_rigidbody();
+    let rb = rusty_scene::create::default_rigidbody();
     scene.world.set_rigidbody(id, Some(rb));
     steps(&mut scene, &mut world, 1);
     assert!(

@@ -76,7 +76,7 @@ pub use demo::DemoRequest;
 pub use gizmos::{Gizmo, GizmoRow, SceneGizmos};
 
 /// The startup scene when none is configured: the seeded demo scene. Kept equal to
-/// `scene::DEFAULT_SCENE_PATH` (a unit test pins it) without `core` importing `scene`.
+/// `edit::DEFAULT_SCENE_PATH` (a unit test pins it) without `core` importing `edit`.
 pub const DEFAULT_STARTUP_SCENE: &str = "assets/scenes/default.scene";
 
 /// The product name when none is configured.

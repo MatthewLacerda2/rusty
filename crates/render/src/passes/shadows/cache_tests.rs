@@ -9,7 +9,7 @@ use glam::Vec3;
 use super::statics_key;
 use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_components::ShadowCasting;
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// One static box under the default sun, and nothing that moves.
@@ -84,7 +84,7 @@ fn only_a_mode_that_changes_the_shadow_moves_the_bake_key() {
 #[test]
 fn a_static_cutouts_mapping_moves_the_bake_key() {
     use rusty_components::{RenderMode, UvMapping};
-    use rusty_scene::authoring::material;
+    use rusty_edit::authoring::material;
     let mut scene = static_yard();
     let crate_id = scene.world.find_by_name("Crate").expect("the crate");
     let key = material::ensure_material_key(&mut scene, crate_id).unwrap();
@@ -112,7 +112,7 @@ fn a_static_cutouts_mapping_moves_the_bake_key() {
 #[test]
 fn a_cutouts_slot_index_counts_unresolved_slots() {
     use rusty_components::RenderMode;
-    use rusty_scene::authoring::material;
+    use rusty_edit::authoring::material;
     let mut scene = static_yard();
     let crate_id = scene.world.find_by_name("Crate").expect("the crate");
     let key = material::ensure_material_key(&mut scene, crate_id).unwrap();
@@ -133,7 +133,7 @@ fn gpu_a_cutouts_colour_edit_keeps_its_bake_and_a_cutoff_edit_re_bakes() {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 48, 32);
     let mut scene = static_yard();
     let id = scene.world.ids_with_mesh()[0];
-    let key = rusty_scene::authoring::material::ensure_material_key(&mut scene, id).unwrap();
+    let key = rusty_edit::authoring::material::ensure_material_key(&mut scene, id).unwrap();
     scene.materials.get_mut(&key).unwrap().render_mode = rusty_components::RenderMode::Cutout;
     let home = Vec3::new(0.0, 2.0, 6.0);
     let mut draws = |s: &Scene| shadow_draws(&mut r, &mut view, s, home);

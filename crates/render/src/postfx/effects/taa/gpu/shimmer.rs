@@ -7,7 +7,7 @@ use glam::{Quat, Vec3};
 
 use super::fixture::{eye, frame, renderer, taa_scene, view};
 use rusty_components::{LightComponent, MaterialAsset, MaterialComponent};
-use rusty_scene::authoring::{create_entity, default_light, Primitive};
+use rusty_scene::create::{create_entity, default_light, Primitive};
 use rusty_scene::Scene;
 
 /// Frames to settle, then frames measured.

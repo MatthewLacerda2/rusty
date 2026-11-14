@@ -69,7 +69,7 @@ fn resting_sphere() -> Scene {
     let size = Vec3::new(20.0, 1.0, 20.0);
     let collider = |shape| ColliderComponent {
         shape,
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_scene::create::default_collider()
     };
     let box_shape = ColliderShape::Box { size };
     scene.world.set_collider(floor, Some(collider(box_shape)));
@@ -79,7 +79,7 @@ fn resting_sphere() -> Scene {
     scene.world.set_collider(ball, Some(collider(sphere)));
     let body = RigidBodyComponent {
         is_kinematic: false,
-        ..rusty_scene::authoring::defaults::default_rigidbody()
+        ..rusty_scene::create::defaults::default_rigidbody()
     };
     scene.world.set_rigidbody(ball, Some(body));
     scene

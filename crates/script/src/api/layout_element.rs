@@ -5,7 +5,7 @@
 //! overrides as `(width, height)` pairs where `nil` means "use the content's
 //! size", and the content fitter per axis (`Unconstrained` / `MinSize` /
 //! `PreferredSize`). Every setter routes through the shared
-//! `scene::authoring::ui::layout::element` ops the inspector card uses. Getters return
+//! `edit::authoring::ui::layout::element` ops the inspector card uses. Getters return
 //! a neutral default without the component; setters are then no-ops.
 
 use mlua::{FromLuaMulti, IntoLuaMulti, Lua, Table};
@@ -14,7 +14,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::{LayoutAxisFit, LayoutElementComponent};
-use rusty_scene::authoring::ui::layout::element::{self as ops, SizeKind};
+use rusty_edit::authoring::ui::layout::element::{self as ops, SizeKind};
 use rusty_scene::Scene;
 
 type E = LayoutElementComponent;

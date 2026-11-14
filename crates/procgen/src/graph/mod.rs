@@ -22,7 +22,7 @@
 //! instance's values and the instance's `seed` folds into every inner seed. The
 //! runner only ever sees that flat graph, and refuses an instance left in one. This
 //! module reads no files: the loader beside the `image` sources does
-//! (`scene::authoring::material::sources`).
+//! (`edit::authoring::material::sources`).
 
 mod bind;
 mod expand;

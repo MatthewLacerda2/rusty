@@ -2,7 +2,8 @@
 
 use super::SceneFollow;
 use rusty_core::fs::written::note_written;
-use rusty_scene::{save_lighting, Scene};
+use rusty_edit::save_lighting;
+use rusty_scene::Scene;
 use rusty_script::scripting::{ConsoleLogs, LogLevel};
 
 /// `names` saved at `path` by "someone outside the editor", noted as the watch does.
@@ -11,7 +12,7 @@ fn write_outside(path: &str, names: &[&str]) {
     for name in names {
         scene.add_entity(name.to_string());
     }
-    rusty_scene::save_to_file(&scene, path).unwrap();
+    rusty_edit::save_to_file(&scene, path).unwrap();
     note_written(path);
 }
 
@@ -22,7 +23,7 @@ fn open(tag: &str) -> (String, Scene, SceneFollow) {
     let path = dir.join("level.scene").to_string_lossy().into_owned();
     write_outside(&path, &["Kept", "Gone"]);
     let mut scene = Scene::new();
-    rusty_scene::load_from_file(&mut scene, &path).unwrap();
+    rusty_edit::load_from_file(&mut scene, &path).unwrap();
     let mut follow = SceneFollow::new();
     assert!(!frame(&mut follow, &mut scene, &path).0);
     (path, scene, follow)
@@ -93,7 +94,7 @@ fn a_file_that_does_not_parse_yet_is_read_again() {
     );
     let mut done = Scene::new();
     done.add_entity("Kept".into());
-    rusty_scene::save_to_file(&done, &path).unwrap(); // finished writing; not noted again
+    rusty_edit::save_to_file(&done, &path).unwrap(); // finished writing; not noted again
     assert!(frame(&mut follow, &mut scene, &path).0);
     assert!(scene.find_entity_by_name("Gone").is_none());
 }

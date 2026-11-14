@@ -14,7 +14,7 @@ use mlua::{IntoLua, Value};
 use super::{put, with_material, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
-use rusty_scene::authoring::material::{
+use rusty_edit::authoring::material::{
     self as mat_ops, material_fields, SurfaceField, SurfaceKind, SurfaceValue,
 };
 use rusty_scene::Scene;

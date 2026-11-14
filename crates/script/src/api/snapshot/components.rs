@@ -130,7 +130,7 @@ pub(crate) fn camera_component_value(c: &CameraComponent) -> Value {
         "culling_mask": c.culling_mask,
         "use_occlusion_culling": c.use_occlusion_culling,
         "render_order": c.render_order,
-        "projection": rusty_scene::authoring::rendering::camera::projection_name(c.projection),
+        "projection": rusty_edit::authoring::rendering::camera::projection_name(c.projection),
         "target_texture": c.target_texture.as_ref().map(|t| t.path()),
     })
 }

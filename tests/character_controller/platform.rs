@@ -5,8 +5,8 @@
 //! walk on a resting one (#2061).
 
 use glam::{Quat, Vec3};
+use rusty::edit::authoring::default_rigidbody;
 use rusty::physics::{self, PhysicsWorld};
-use rusty::scene::authoring::default_rigidbody;
 use rusty::scene::Scene;
 
 use super::{add_box, add_character, pos_of, DT};

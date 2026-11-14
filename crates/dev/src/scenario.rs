@@ -30,7 +30,7 @@ use super::harness::Harness;
 use rusty_core::project::ProjectSettings;
 
 /// Default enemy brain used by the default scene when running scenarios.
-const DEFAULT_BOT_SCRIPT: &str = rusty_scene::default_scene::BOT_SCRIPT;
+const DEFAULT_BOT_SCRIPT: &str = rusty_edit::default_scene::BOT_SCRIPT;
 
 /// Outcome of a scenario run.
 pub struct RunReport {

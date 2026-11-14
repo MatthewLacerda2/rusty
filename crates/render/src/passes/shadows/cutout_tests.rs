@@ -5,7 +5,7 @@
 
 use crate::gpu::pipelines::surface::cut_depth_tests::{ground_halves, slab_yard};
 use rusty_components::RenderMode;
-use rusty_scene::authoring::material;
+use rusty_edit::authoring::material;
 
 #[test]
 fn gpu_a_cutout_caster_casts_no_shadow_where_its_texels_are_clear() {

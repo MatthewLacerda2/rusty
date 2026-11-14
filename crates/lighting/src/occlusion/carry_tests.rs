@@ -6,8 +6,9 @@ use std::sync::Arc;
 
 use crate::occlusion::test_level::corridors;
 use crate::occlusion::{bake_occlusion, fingerprint};
+use rusty_edit::to_scene_data;
 use rusty_scene::lighting::occlusion::save_sidecar;
-use rusty_scene::{to_scene_data, Scene};
+use rusty_scene::Scene;
 
 #[test]
 fn a_carried_player_keeps_the_next_levels_culling_on() {
@@ -31,8 +32,7 @@ fn a_carried_player_keeps_the_next_levels_culling_on() {
     };
     s.dont_destroy_on_load(player);
     let survivors = s.load_survivors();
-    rusty_scene::edit_side::load::swap_in(&mut s, to_scene_data(&level), &path, &survivors)
-        .unwrap();
+    rusty_edit::load::swap_in(&mut s, to_scene_data(&level), &path, &survivors).unwrap();
 
     let pvs = s.occlusion.as_deref().expect("the level's bake loaded");
     assert!(

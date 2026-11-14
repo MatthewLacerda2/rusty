@@ -67,9 +67,9 @@ fn layout_components_round_trip_and_lay_out_identically_after_reload() {
         .join(format!("rusty_ui_layout_{}.json", std::process::id()))
         .to_string_lossy()
         .into_owned();
-    rusty::scene::save_to_file(&scene, &path).unwrap();
+    rusty::edit::save_to_file(&scene, &path).unwrap();
     let mut loaded = Scene::new();
-    rusty::scene::load_from_file(&mut loaded, &path).unwrap();
+    rusty::edit::load_from_file(&mut loaded, &path).unwrap();
     std::fs::remove_file(&path).ok();
     for &id in &ids {
         let a = scene.world.layout_element(id).map(|e| e.clone());

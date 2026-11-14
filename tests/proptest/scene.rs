@@ -58,16 +58,16 @@ proptest! {
                     Some(LightComponent {
                         area_size: glam::Vec2::ONE,
 intensity,
-..rusty::scene::authoring::default_light()
+..rusty::edit::authoring::default_light()
 }),
                 );
             }
         }
 
         let path = tmp(tag);
-        rusty::scene::save_to_file(&scene, &path).unwrap();
+        rusty::edit::save_to_file(&scene, &path).unwrap();
         let mut loaded = Scene::new();
-        rusty::scene::load_from_file(&mut loaded, &path).unwrap();
+        rusty::edit::load_from_file(&mut loaded, &path).unwrap();
         let _ = std::fs::remove_file(&path);
 
         prop_assert_eq!(loaded.entity_count(), specs.len());

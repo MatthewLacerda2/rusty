@@ -17,8 +17,9 @@ use super::mask_tests::Dissolve;
 use crate::{readback, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_components::{CameraComponent, MaterialAsset, MaterialComponent};
 use rusty_core::settings::render_scale::RenderScale;
-use rusty_scene::authoring::Primitive;
-use rusty_scene::authoring::{create_entity, default_light, default_post_processing, material};
+use rusty_edit::authoring::material;
+use rusty_scene::create::Primitive;
+use rusty_scene::create::{create_entity, default_light, default_post_processing};
 use rusty_scene::{Camera, Scene};
 
 const W: u32 = 288;

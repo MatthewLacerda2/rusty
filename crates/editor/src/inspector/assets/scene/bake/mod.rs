@@ -84,7 +84,7 @@ enum Step {
         job: OcclusionBakeJob,
         lightmaps: usize,
         probes: LightingBakeReport,
-        saved: rusty_scene::LightingSave,
+        saved: rusty_edit::LightingSave,
         path: String,
     },
     /// Bake Occlusion (#1958): the PVS alone, on its worker, written to `path`.

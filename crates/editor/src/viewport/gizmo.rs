@@ -123,7 +123,7 @@ fn ray_segment_distance(ray: Ray, origin: Vec3, axis: Vec3, len: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rusty_scene::authoring::{self, Primitive};
+    use rusty_edit::authoring::{self, Primitive};
     use rusty_scene::Scene;
 
     fn ray(origin: Vec3, dir: Vec3) -> Ray {

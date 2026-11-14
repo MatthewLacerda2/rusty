@@ -76,7 +76,7 @@ fn collision_fires_at_the_hit_point_once() {
         shape: ColliderShape::Box {
             size: Vec3::new(1.0, 4.0, 4.0),
         },
-        ..rusty::scene::authoring::default_collider()
+        ..rusty::edit::authoring::default_collider()
     };
     scene.world.set_collider(wall, Some(collider));
     let dust = child(&mut scene, "Dust", 1);

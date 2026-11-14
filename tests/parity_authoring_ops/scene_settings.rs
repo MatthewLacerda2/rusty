@@ -8,8 +8,8 @@ use std::rc::Rc;
 use glam::Vec3;
 use mlua::Lua;
 use rusty::core::settings::GraphicsSettings;
-use rusty::scene::authoring::environment as env_ops;
-use rusty::scene::authoring::fog as fog_ops;
+use rusty::edit::authoring::environment as env_ops;
+use rusty::edit::authoring::fog as fog_ops;
 use rusty::scene::{FogMode, Scene};
 use rusty::script::api::bind;
 

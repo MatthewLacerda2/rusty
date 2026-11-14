@@ -10,7 +10,7 @@ use mlua::Lua;
 use rusty::components::{CameraComponent, PostProcessingComponent, Tonemap};
 use rusty::core::settings::quality::EffectQuality;
 use rusty::core::settings::GraphicsSettings;
-use rusty::scene::authoring::default_post_processing;
+use rusty::edit::authoring::default_post_processing;
 use rusty::scene::Scene;
 use rusty::script::api::bind;
 

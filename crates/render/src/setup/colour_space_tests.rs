@@ -37,7 +37,7 @@ fn mid_grey_scene() -> Scene {
             ..MaterialAsset::default()
         },
     );
-    let mut vc = rusty_scene::authoring::defaults::default_post_processing();
+    let mut vc = rusty_scene::create::defaults::default_post_processing();
     vc.active = true;
     vc.bloom.active = false;
     vc.ssr.active = false;
@@ -101,6 +101,6 @@ fn every_final_target_format_is_srgb() {
 /// A neutral volume (the defaults a new one is created with) leaves the image alone.
 #[test]
 fn a_new_volume_is_display_gamma_neutral() {
-    let vc: PostProcessingComponent = rusty_scene::authoring::defaults::default_post_processing();
+    let vc: PostProcessingComponent = rusty_scene::create::defaults::default_post_processing();
     assert_eq!(vc.tonemapping.display_gamma, 1.0);
 }

@@ -6,7 +6,7 @@ use glam::Vec3;
 use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_components::PostProcessingComponent;
 use rusty_core::settings::quality::{EffectQuality, QualityPresets};
-use rusty_scene::authoring::{create_entity, default_post_processing, Primitive};
+use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::{Camera, ClearFlags, Scene};
 
 /// A crate under a post-processing volume with AO `on`.

@@ -5,7 +5,7 @@
 //! detail. A sub-object belongs to a set when its glTF **node** name (the Blender
 //! object name) or, failing that, its sub-object id (the mesh name) ends in
 //! `_LOD<n>` (case-insensitive). The scene layer turns each set into one entity
-//! carrying an `LODGroup` (`scene::lod_instance`). Pure: names in, sets out.
+//! carrying an `LODGroup` (`edit::lod_instance`). Pure: names in, sets out.
 
 use super::ImportedAsset;
 

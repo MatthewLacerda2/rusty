@@ -3,7 +3,7 @@
 //! The editor follows its open scene's file on disk (`shell::editor::watch::follow`):
 //! a file that changed outside the engine reloads. "Outside" is decided against this
 //! record, the exact text of the last `load_from_file`, `save_to_file` or
-//! `save_lighting` at that path (`edit_side::io`). A file holding that text is the engine's own write (a save's echo,
+//! `save_lighting` at that path (`rusty_edit::io`). A file holding that text is the engine's own write (a save's echo,
 //! Generate Lighting rewriting its fields, #832) or no change at all (a `touch`, a
 //! rescan, the same bytes written again), never a reason to reload.
 //!
@@ -74,7 +74,7 @@ impl Scene {
     }
 
     /// Remember that the scene's file at `path` now holds `text`: what a save
-    /// wrote or a load read (`edit_side::io`).
+    /// wrote or a load read (`rusty_edit::io`).
     pub fn record_disk_text(&self, path: &str, text: String) {
         self.disk_text.record(path, text);
     }

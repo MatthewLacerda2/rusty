@@ -5,7 +5,7 @@
 //! scene file is finite and in range before it is stored, and NaN or `±inf` takes
 //! the field's fallback) and the bounds the base holds a value to as well (a lens, a
 //! joint drive). Setters kept skipping them (#993, #1341, #1342), so a `set_*` under
-//! `src/scene/authoring/` with any `pub` visibility that takes a float-carrying
+//! `src/edit/authoring/` with any `pub` visibility that takes a float-carrying
 //! parameter is a finding unless each such parameter is passed whole to a rule (a
 //! bare `pub fn` under `src/scene/rules/`) at a position that rule holds, or to
 //! another `set_*` of the same file, which this rule checks in turn. Which
@@ -31,7 +31,7 @@ use crate::code::{code_lines, is_ident};
 pub const RULE: &str = "sanitize";
 
 /// Where the setters live.
-const DIR: &str = "src/scene/authoring/";
+const DIR: &str = "src/edit/authoring/";
 
 /// Parameter types that can carry a NaN or an infinity: the float scalars, glam's
 /// vectors, and the float structs the setters take.

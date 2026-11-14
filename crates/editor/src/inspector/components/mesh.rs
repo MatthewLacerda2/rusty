@@ -10,8 +10,8 @@ use super::particles::widgets::combo;
 use crate::widgets::DragRange;
 use rusty_components::mesh::primitives::MAX_PLANE_SUBDIVISIONS;
 use rusty_components::ShadowCasting;
-use rusty_scene::authoring::rendering::mesh as mesh_ops;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::rendering::mesh as mesh_ops;
+use rusty_edit::authoring::ComponentKind;
 
 /// The skinned-mesh tools a Mesh card button asks for, deferred because they need
 /// the Scene.

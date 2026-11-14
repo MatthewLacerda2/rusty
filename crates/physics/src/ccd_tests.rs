@@ -30,7 +30,7 @@ fn add_wall(scene: &mut Scene, moving: bool) {
             Some(RigidBodyComponent {
                 is_kinematic: true,
                 use_gravity: false,
-                ..rusty_scene::authoring::defaults::default_rigidbody()
+                ..rusty_scene::create::defaults::default_rigidbody()
             }),
         );
     } else {
@@ -42,7 +42,7 @@ fn add_wall(scene: &mut Scene, moving: bool) {
             shape: ColliderShape::Box {
                 size: Vec3::new(0.2, 4.0, 4.0),
             },
-            ..rusty_scene::authoring::default_collider()
+            ..rusty_scene::create::default_collider()
         }),
     );
 }
@@ -61,7 +61,7 @@ fn wall_and_projectile(mode: CollisionDetection, moving: bool) -> (Scene, Physic
         sphere,
         Some(ColliderComponent {
             shape: ColliderShape::Sphere { radius: 0.25 },
-            ..rusty_scene::authoring::default_collider()
+            ..rusty_scene::create::default_collider()
         }),
     );
     scene.world.set_rigidbody(
@@ -72,7 +72,7 @@ fn wall_and_projectile(mode: CollisionDetection, moving: bool) -> (Scene, Physic
             velocity: Vec3::new(300.0, 0.0, 0.0),
             use_gravity: false,
             collision_detection: mode,
-            ..rusty_scene::authoring::default_rigidbody()
+            ..rusty_scene::create::default_rigidbody()
         }),
     );
 

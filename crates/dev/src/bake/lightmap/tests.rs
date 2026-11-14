@@ -4,8 +4,8 @@
 use std::path::Path;
 
 use super::*;
+use rusty_edit::authoring::{primitive_mesh_component, Primitive};
 use rusty_lighting::lightmap::bake;
-use rusty_scene::authoring::{primitive_mesh_component, Primitive};
 
 /// A scene with a static floor Plane, a static Sphere stripped of its lightmap UV (an
 /// imported mesh without `TEXCOORD_1`) and a dynamic Box; returns it with the floor's
@@ -114,9 +114,9 @@ fn references_survive_a_save_and_load() {
     let (mut scene, floor, _) = scene();
     let path = scene_path("save");
     bake_scene_lightmaps(&mut scene, Some(&path), &quick()).unwrap();
-    rusty_scene::save_to_file(&scene, &path).unwrap();
+    rusty_edit::save_to_file(&scene, &path).unwrap();
     let mut loaded = Scene::new();
-    rusty_scene::load_from_file(&mut loaded, &path).unwrap();
+    rusty_edit::load_from_file(&mut loaded, &path).unwrap();
     assert_eq!(loaded.lightmaps, scene.lightmaps);
     assert!(loaded.lightmaps.get(floor).is_some());
 }

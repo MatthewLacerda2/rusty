@@ -17,8 +17,8 @@ use rusty_components::{
     LightProbeProxyVolumeComponent as Volume, ProxyBoundsMode, ProxyQuality, ProxyResolutionMode,
 };
 use rusty_ecs::World;
-use rusty_scene::authoring::rendering::light_probe_proxy_volume as ops;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::rendering::light_probe_proxy_volume as ops;
+use rusty_edit::authoring::ComponentKind;
 
 /// Route one edit through the shared ops and mark the scene dirty.
 fn write(world: &mut World, id: u32, is_dirty: &mut bool, op: impl FnOnce(&mut Volume)) {

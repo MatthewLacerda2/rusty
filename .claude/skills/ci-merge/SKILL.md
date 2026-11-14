@@ -374,7 +374,7 @@ Each backed by a gate that otherwise fails at merge time:
 - **A new first-class component satisfies all four axes** (the `Entity` field, the
   Add Component entry, an inspector card, a documented `crates/script/src/api/` namespace) or
   gets a `WAIVERS` row in `tools/lint/src/components/waivers.rs` with a reason.
-- **An inspector card routes through `scene::authoring`**: `--parity` fails on a
+- **An inspector card routes through `edit::authoring`**: `--parity` fails on a
   direct field write.
 
 A new crate owes the coverage ratchet nothing:

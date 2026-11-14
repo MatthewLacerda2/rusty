@@ -5,7 +5,7 @@
 //! Transform), whether it runs both ways, its path cost and area (#460), and whether
 //! it is active;
 //! plus `IsConnected`, whether both ends found the navmesh at the last rebake.
-//! Every setter routes through the shared `scene::authoring::nav::offmesh_link` ops the
+//! Every setter routes through the shared `edit::authoring::nav::offmesh_link` ops the
 //! inspector card uses. Getters return a neutral default without a link; setters
 //! are then no-ops. Attach one with `Scene.AddComponent(id, "OffMeshLink")`.
 
@@ -18,8 +18,8 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::OffMeshLinkComponent as Link;
+use rusty_edit::authoring::nav::offmesh_link as ops;
 use rusty_navigation::NavigationGraph;
-use rusty_scene::authoring::nav::offmesh_link as ops;
 use rusty_scene::Scene;
 
 /// Register the `OffMeshLink` namespace onto `lua`.

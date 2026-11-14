@@ -40,12 +40,12 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Dependency locks | cargo-deny (`deny.toml`) | **hard gate**: every git dependency is pinned by `rev` (`required-git-spec`); `nalgebra` only through the physics stack and no `cgmath` — glam is the one math crate (#975) |
 | Directory size | `tools/lint -- --rules` (`dir-size`) | **hard gate**: no directory under `src/` holds more than 12 source files directly in it (tests and its `mod.rs` aside); cluster by responsibility into subfolders, or a flat registry of one file per public unit says so with an inline `// lint: allow(dir-size) <why>` in its `mod.rs` (`crates/script/src/api/`). The ≲10 aim prints as a signal (#1367) |
 | Docs name what exists | `make docrefs` (`.github/scripts/docrefs.py`) | **hard gate**: every `src/`, `tests/`, `tools/`, `docs/` or `.github/` path in a tracked `*.md`'s inline code is tracked, every `` `make <verb>` `` is a target, and CLAUDE.md's namespaces each have a `docs/api/` page; placeholders pass, anything else takes `<!-- docrefs: allow <why> -->`. Runs on Markdown-only PRs too (#973) |
-| Editor↔API parity per op | `tools/lint -- --rules` (`api-parity`) | **hard gate**: every `scene::authoring::<module>::set_*` op a non-test line of `crates/editor/src/` names is also named from the API side — a named setter's call in `crates/script/src/api/`, an `op!`/`with!`/`group!` row of the field table `Component.Set` writes through (`scene::authoring::fields`), or a post effect's own row or knob table (#1467) — so anything the inspector writes, Lua can; an editor-only op takes `// lint: allow(api-parity) <why>` at its `fn`, and an allow on an op Lua reaches or no inspector names is stale and fails (#1368) |
-| Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard) |
+| Editor↔API parity per op | `tools/lint -- --rules` (`api-parity`) | **hard gate**: every `edit::authoring::<module>::set_*` op a non-test line of `crates/editor/src/` names is also named from the API side — a named setter's call in `crates/script/src/api/`, an `op!`/`with!`/`group!` row of the field table `Component.Set` writes through (`edit::authoring::fields`), or a post effect's own row or knob table (#1467) — so anything the inspector writes, Lua can; an editor-only op takes `// lint: allow(api-parity) <why>` at its `fn`, and an allow on an op Lua reaches or no inspector names is stale and fails (#1368) |
+| Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `edit::authoring` op (never direct field writes through the #344 accessor guard) |
 | Entity ids from Lua | `tools/lint -- --rules` (`entity-arg`) | **hard gate**: in `crates/script/src/api/`, a Lua callback never takes an entity (`id`, `…_id`, `parent`, `child`, `target`, `entity`, `body`, `canvas`) as a bare `u32` or `Option<u32>`: it takes `api::entity_arg::EntityArg`, so a `nil` id reads as a missing entity and fails a write with the verb's name (#1383) |
 | Every ECS write is stamped | `tools/lint -- --rules` (`ecs-write`) | **hard gate**: a non-test line of `crates/ecs/src/` that borrows a hecs column mutably (`get::<&mut …>`, `query_one::<(&mut …)>`, `query_mut`) or reshapes the store through `inner.` (`spawn`, `despawn`, `insert`, `remove`, `clear`, …) fails, since a write that skips `World::touch` stamps no change and every change-log consumer misses it; each funnel line, and `World::derived_mut`, takes `// lint: allow(ecs-write) <why>` (#1705) |
 | File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py`, `.lua` or `.wgsl` one (docstrings, comments and blank lines free, #926, #1015); nothing grandfathered |
-| Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `crates/scene/src/authoring/` that takes a float (an `f32`/`f64`, a glam vector, or a float struct such as `Curve`) passes it to a `scene::rules` function (a bare `pub fn`: a `rules::sanitize` helper or a bound such as `rules::lens::hold_fov`) at a position that rule holds, or a sibling setter of its file; a rule taking floats and holding none (a pass-through) fails too, so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
+| Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `crates/edit/src/authoring/` that takes a float (an `f32`/`f64`, a glam vector, or a float struct such as `Curve`) passes it to a `scene::rules` function (a bare `pub fn`: a `rules::sanitize` helper or a bound such as `rules::lens::hold_fov`) at a position that rule holds, or a sibling setter of its file; a rule taking floats and holding none (a pass-through) fails too, so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
 | Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix (#934) |
 | Full component literals in tests | `tools/lint -- --rules` (`full-literal`) | **hard gate**: test code builds a first-class component with `..rest` or a constructor, never a literal naming every field (#663, #976) |
 | Function ("endpoint") length | clippy `too_many_lines` + `tools/lint -- --determinism` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]`; its one exception, `Renderer::assemble`, is locked (`ESCAPE`, #961) |
@@ -73,7 +73,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `crates/editor/src` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); an editor slider is built by `editor::widgets::slider`, never a bare `egui::Slider::new(`, whose default clamping does the same (#1444); a real need takes `// lint: allow(drag-range) <why>` |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
 | Rust files are compiled | `tools/lint -- --rules` (`orphan-module`) | **hard gate**: every scanned `.rs` file is a crate root (a target's `src_path` in `cargo metadata` of the root, `fuzz/` and `tools/lint/` workspaces, so a `path =` target counts), is reached from one by `mod` as rustc resolves it (`name.rs` or `name/mod.rs`, under `a/` for a declaring `a.rs`, inline `mod a { mod b; }`, `#[path]`, a `mod` under `#[cfg]` included), or is named by `include!` / `include_str!`; rustc, clippy and rustfmt are silent about a file no `mod` names, and its tests stop running; a file built another way says why on its first line with `// lint: allow(orphan-module) <why>` |
-| Self-naming headers | `tools/lint -- --rules` (`self-path`) | **hard gate**: a source file's first `//!` line (a shader's first `//` line) that opens with a path under `src/`, `crates/`, `tests/`, `tools/`, `fuzz/`, `engine/` or `.github/` (a bare word too, when it names a directory of scanned files) names the file itself; a `mod.rs` may name its directory (`crates/scene/src/prefab/`). No header, or one opening with prose, is fine (#1654) |
+| Self-naming headers | `tools/lint -- --rules` (`self-path`) | **hard gate**: a source file's first `//!` line (a shader's first `//` line) that opens with a path under `src/`, `crates/`, `tests/`, `tools/`, `fuzz/`, `engine/` or `.github/` (a bare word too, when it names a directory of scanned files) names the file itself; a `mod.rs` may name its directory (`crates/edit/src/prefab/`). No header, or one opening with prose, is fine (#1654) |
 | Shared process | `make test-one-process` (`cargo test --features dev --tests`) | **signal**, never a gate: the `dev` suite with every test of a binary in one process, so a test leaking process-wide state (a moved working directory, a `static` left set), which nextest's process per test hides, is named (it broke the mutation baseline four times while cargo-mutants ran `cargo test`, #1844). Nightly on `main` in `cargo-test.yml` (both feature sets), filed by `main-health` when red; `gh workflow run cargo-test.yml --ref <branch>` runs it on a branch (#1338) |
 | Shipped platforms only | `tools/lint -- --rules` (`platform-cfg`) | **hard gate**: no `cfg(…)` / `cfg!(…)` / `cfg_attr(…)` in a scanned `.rs` file names `windows` or `unix` (bare, `target_os = "windows"`, or as a `target_family` value) — rusty ships for macOS and Linux, so the code is written unconditionally and a real split names `target_os = "macos"` / `"linux"` |
 | Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
@@ -304,18 +304,18 @@ new flag, gate, CI step or baseline.
   `ecs::bundle::Core` keeps inside `crates/ecs/src/`.
 - **`api-parity`** (#1368) — "anything the editor does, the API does"
   (`docs/game-agent.md`), field by field. `--parity` holds that the inspector writes
-  through a shared `scene::authoring` op; this rule holds that Lua reaches the same
+  through a shared `edit::authoring` op; this rule holds that Lua reaches the same
   op: every `authoring::<module>::set_*` op a non-test line of `crates/editor/src/` names
   must be named from the API side too, by a named setter in `crates/script/src/api/`
   (`Physics.SetMass`) or by the field table (`op!("mass", rb::set_mass)`, which
   `Component.Set` dispatches through), so editor and Lua share one validation. A post effect's
   field-table row and knob table sit beside its ops, in its own module under
-  `scene::authoring::rendering::post_processing` (#1467), so there an op the module
+  `edit::authoring::rendering::post_processing` (#1467), so there an op the module
   calls by its bare name (`set_intensity(c, v.intensity)`) counts as reached too.
   Ops are matched by
-  path, from the root a file spells `scene::authoring` by: `crate::authoring` inside
-  `rusty-scene`, `rusty_scene::authoring` in another member crate,
-  `crate::scene::authoring` in the root package. Each file's `use` trees from that
+  path, from the root a file spells `edit::authoring` by: `crate::authoring` inside
+  `rusty-edit`, `rusty_edit::authoring` in another member crate,
+  `crate::edit::authoring` in the root package. Each file's `use` trees from that
   root give its aliases
   (`rigidbody as rb`, `{self as ops, …}`, `nav::{agent, …}`, a setter imported by
   name and called bare), so the finding names `nav::agent::set_speed` however a file
@@ -328,7 +328,7 @@ new flag, gate, CI step or baseline.
   and an op reached only through a helper in another module. On the API side that
   reads as unreached (call the op from the binding instead); on the **editor side
   the rule fails open**: an op the inspector writes that way is never asked about.
-  The field table lives in `scene::authoring::fields`, below `api` in the layer
+  The field table lives in `edit::authoring::fields`, below `api` in the layer
   table, since #1418 had scene and prefab loads hold their values through it, so
   that directory counts as the API side too.
 - **`asset-write`** (#1220) — a file a path-keyed cache reads is written through
@@ -404,7 +404,7 @@ new flag, gate, CI step or baseline.
   The fix is to cluster by responsibility into subfolders; a directory of
   first-class components clusters by Unity's *Add Component* categories
   (`audio/`, `nav/`, `physics/`, `rendering/`, `ui/layout/`), the same in
-  `components/`, `scene/authoring/` and the inspector. The one exception is a flat
+  `components/`, `edit/authoring/` and the inspector. The one exception is a flat
   registry, one file per public unit, which says so on a plain `//` comment line
   anywhere in its owner file (`mod.rs`, or the `<dir>.rs` beside it):
   `// lint: allow(dir-size) <why>`; a doc comment (`///`, `//!`) quoting that
@@ -591,7 +591,7 @@ new flag, gate, CI step or baseline.
   hold inside a binary that links the provider layer. Nothing excuses it
   (`Allow::Never`: its finding sits on a manifest, `rules/key_guard.rs`).
 - **`sanitize`** — every authoring setter refuses a non-finite float (#1361).
-  A `pub fn set_*` (any `pub` visibility) under `crates/scene/src/authoring/` (test code
+  A `pub fn set_*` (any `pub` visibility) under `crates/edit/src/authoring/` (test code
   aside) that takes a float-carrying parameter fails unless each such parameter is
   passed whole to a rule at a position the rule holds: a bare `pub fn` a file under
   `crates/scene/src/rules/` defines outside its tests, the float helpers of
@@ -621,8 +621,8 @@ new flag, gate, CI step or baseline.
   the file is, and the directory regroupings `dir-size` drives leave it behind: the
   #1650 doc audit fixed about 35 by hand. When a file's first `//!` line (a `.wgsl`
   shader's first line, `// …`) opens with a path under a repository root, that path
-  must be the file's own, or for a `mod.rs` its directory, `crates/scene/src/prefab/` or
-  `crates/scene/src/prefab/mod.rs`. A path has an extension (a file) or a trailing `/` (a
+  must be the file's own, or for a `mod.rs` its directory, `crates/edit/src/prefab/` or
+  `crates/edit/src/prefab/mod.rs`. A path has an extension (a file) or a trailing `/` (a
   directory), or is a bare word naming a directory that holds scanned files, at its
   real path or its module path (`tools/lint`, or a crate's `src/<m>`),
   so a stale `//! src/<m> — …` in a crate's `lib.rs` is caught; a word naming no such
@@ -911,10 +911,10 @@ neither list — it is the gate's first fully-green component, satisfied on all 
 ## Editor↔shared-op parity (`--parity`)
 A first-class component is authored from two places that must never drift: the
 editor's inspector card and the Lua API namespace. The fix is to make them siblings
-over **one shared `scene::authoring` op** — the card AND the Lua binding both call it,
+over **one shared `edit::authoring` op** — the card AND the Lua binding both call it,
 so the field write and its validation live once and can't diverge. The `material`
 card is the first migrated capability (#287): its widgets read fields immutably and
-route every change through `scene::authoring::material::*`, the same ops the
+route every change through `edit::authoring::material::*`, the same ops the
 `Material.*` Lua API calls.
 
 This gate keeps migrated cards honest. It discovers components the same way
@@ -926,12 +926,12 @@ that has an inspector card, classifies the card as:
   #344) is only ever taken to hand `&mut c` into a shared op. Detaching on remove
   (`world.set_<field>(id, None)`) is *not* a field mutation, so a routed card may
   still do it; a read-only card (e.g. `mesh`) trivially qualifies.
-- **direct** — takes the component's mutable accessor with no `scene::authoring`
+- **direct** — takes the component's mutable accessor with no `edit::authoring`
   ops for that component in scope, and writes fields through egui widgets — the
   regression shape this gate exists to stop.
 
 The detection signal is facade-shaped (#344) and judged per card file: a file that
-takes `.<field>_mut(` and imports no `scene::authoring` ops marks a direct card,
+takes `.<field>_mut(` and imports no `edit::authoring` ops marks a direct card,
 whatever the ops module is called (`nav::agent` serves `nav_agent`, `backdrop`
 serves `backdrop_filter`). Coarse substring scan, matching the other gates.
 

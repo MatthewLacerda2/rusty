@@ -5,7 +5,7 @@
 //! None of the fixed `"Component.field"` paths starts with those three words, so a
 //! path is one or the other. The shader's layout (its `<name>.params.json`
 //! sidecar, or a volume's chain of them) is read **once**, at `Tween.To`; every
-//! step then reads and writes through the same `scene::authoring` ops as
+//! step then reads and writes through the same `edit::authoring` ops as
 //! `Material.SetShaderParam` (the entity's own override, #670), `UI.SetShaderParam`
 //! and `Graphics.SetPostParam`, so a name is checked and a value coerced in one
 //! place.
@@ -16,7 +16,7 @@
 
 use glam::Vec4;
 
-use rusty_scene::authoring::{
+use rusty_edit::authoring::{
     material, rendering::camera as camera_ops, rendering::post_processing as vc_ops,
     ui::shader as ui_shader,
 };

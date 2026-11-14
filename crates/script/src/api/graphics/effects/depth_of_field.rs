@@ -7,7 +7,7 @@ use super::super::super::{put, Reg};
 use super::super::state::{with_vc, with_vc_mut};
 use crate::api::ApiCell;
 use rusty_components::DofMode;
-use rusty_scene::authoring::rendering::post_processing as vc_ops;
+use rusty_edit::authoring::rendering::post_processing as vc_ops;
 use rusty_scene::Scene;
 
 /// The mode and every knob. Without an active volume the getters report what a new
@@ -61,7 +61,7 @@ mod tests {
 
     #[test]
     fn every_knob_reads_the_field_its_op_writes() {
-        let mut vc = rusty_scene::authoring::default_post_processing();
+        let mut vc = rusty_edit::authoring::default_post_processing();
         for (i, knob) in vc_ops::depth_of_field::EFFECT.knobs.iter().enumerate() {
             // Values inside every knob's range, distinct per knob, rising so the
             // Gaussian end never sits below its start.

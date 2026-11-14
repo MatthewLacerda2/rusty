@@ -4,7 +4,7 @@
 //! editor, a text editor) without a restart. rusty's caches already follow every
 //! file the engine writes through one log, `core::fs::written`: the renderer's
 //! textures and surface/UI shaders, the import cache's dependencies, the entities
-//! using a model (`scene::model_writes`), the script inspector's schemas. So the
+//! using a model (`edit::model_writes`), the script inspector's schemas. So the
 //! watch adds no second mechanism: each change `notify` reports under a watched
 //! root is **noted in that log as if the engine had written it**, and every cache
 //! reloads it the way it reloads a bake.

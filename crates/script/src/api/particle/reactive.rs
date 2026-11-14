@@ -1,13 +1,13 @@
 //! crates/script/src/api/particle/reactive.rs — the `Particles` TAA reactivity pair (#1845):
 //! `SetReactive` / `GetReactive`. The setter is a field write routed through the
-//! shared `scene::authoring::particles` op the inspector calls.
+//! shared `edit::authoring::particles` op the inspector calls.
 
 use super::with_emitter;
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use crate::api::{put, Reg};
 use rusty_components::TaaReactive;
-use rusty_scene::authoring::particles as particle_ops;
+use rusty_edit::authoring::particles as particle_ops;
 use rusty_scene::Scene;
 
 /// Register the reactivity pair onto the `Particles` table.

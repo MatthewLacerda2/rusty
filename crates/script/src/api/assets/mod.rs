@@ -119,7 +119,7 @@ pub fn register_reimport(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
             s.hard_angle = t.get::<Option<f32>>("hardAngle")?.unwrap_or(s.hard_angle);
             s.pack_margin = t.get::<Option<f32>>("packMargin")?.unwrap_or(s.pack_margin);
             let mut scene = scene.borrow_mut();
-            rusty_scene::asset_instance::set_lightmap_uv_settings(&mut scene, &path, s)
+            rusty_edit::asset_instance::set_lightmap_uv_settings(&mut scene, &path, s)
                 .map_err(mlua::Error::RuntimeError)
         }),
     )?;
@@ -137,7 +137,7 @@ pub fn register_reimport(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
                 }
             }
             let mut scene = scene.borrow_mut();
-            rusty_scene::asset_instance::set_model_scale_factor(&mut scene, &path, scale)
+            rusty_edit::asset_instance::set_model_scale_factor(&mut scene, &path, scale)
                 .map_err(mlua::Error::RuntimeError)
         }),
     )?;

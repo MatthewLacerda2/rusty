@@ -15,9 +15,10 @@ use rusty_dev::bake::generate_lighting::{apply_occlusion, finish, start_probes, 
 use rusty_dev::bake::lightmap::BakeOutcome;
 use rusty_dev::bake::occlusion::OcclusionBakeJob;
 use rusty_dev::bake::steps::PROBES_CHANGED;
+use rusty_edit::LightingSave;
 use rusty_navigation::NavigationGraph;
 use rusty_scene::lighting::bake_status::BakeStatus;
-use rusty_scene::{LightingSave, Scene};
+use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
 /// How often the editor repaints while the lightmaps bake, so the bar moves on its

@@ -110,7 +110,7 @@ fn add_force_applies_dt_scaled_velocity() {
             Some(rusty_components::RigidBodyComponent {
                 mass: 2.0,
                 collision_detection: rusty_components::CollisionDetection::Discrete,
-                ..rusty_scene::authoring::default_rigidbody()
+                ..rusty_edit::authoring::default_rigidbody()
             }),
         );
     }

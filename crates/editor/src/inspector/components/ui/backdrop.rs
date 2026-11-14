@@ -1,12 +1,12 @@
 //! The Backdrop Filter inspector card (#426): blur radius, tint, saturation and
-//! brightness. Every write routes through `scene::authoring::ui::backdrop`.
+//! brightness. Every write routes through `edit::authoring::ui::backdrop`.
 
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
-use rusty_scene::authoring::ComponentKind;
+use rusty_edit::authoring::ComponentKind;
 
 use crate::inspector::components::card::component_card;
-use rusty_scene::authoring::ui::backdrop as ops;
+use rusty_edit::authoring::ui::backdrop as ops;
 
 /// Backdrop Filter card. A THIN client (#287): widgets read a snapshot and route
 /// each write through a shared op; remove detaches the component.

@@ -11,6 +11,7 @@ workspace = true
 rusty-asset = { workspace = true }
 rusty-components = { workspace = true }
 rusty-core = { workspace = true }
+rusty-edit = { workspace = true }
 rusty-scene = { workspace = true }
 glam = { workspace = true }
 

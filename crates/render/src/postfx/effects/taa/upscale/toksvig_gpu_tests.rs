@@ -10,7 +10,7 @@ use glam::Vec3;
 use super::gpu_tests::{scaled, upscales};
 use crate::postfx::effects::taa::gpu::fixture::{eye, frame, renderer, taa_scene};
 use rusty_components::{LightComponent, MaterialAsset, MaterialComponent};
-use rusty_scene::authoring::{create_entity, default_light, Primitive};
+use rusty_scene::create::{create_entity, default_light, Primitive};
 use rusty_scene::Scene;
 
 /// A 224² busy normal map (blue its z, or 255 for the twin): about 0.7 texels a

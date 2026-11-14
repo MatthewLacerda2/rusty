@@ -10,14 +10,14 @@ use rusty::scene::Scene;
 fn box_collider(size: Vec3) -> ColliderComponent {
     ColliderComponent {
         shape: ColliderShape::Box { size },
-        ..rusty::scene::authoring::default_collider()
+        ..rusty::edit::authoring::default_collider()
     }
 }
 
 fn dynamic_body(use_gravity: bool) -> RigidBodyComponent {
     RigidBodyComponent {
         use_gravity,
-        ..rusty::scene::authoring::default_rigidbody()
+        ..rusty::edit::authoring::default_rigidbody()
     }
 }
 

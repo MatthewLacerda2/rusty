@@ -5,7 +5,7 @@
 use glam::Vec3;
 
 use rusty_components::{MaterialAsset, MaterialComponent};
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
 /// A 32×32 texture of seeded grey noise (sRGB 90 to 165) in the temp dir.

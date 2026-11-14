@@ -9,7 +9,7 @@ use glam::Vec3;
 use super::gpu_tests::{scaled, upscales};
 use crate::postfx::effects::taa::gpu::fixture::{eye, frame, renderer, taa_scene};
 use rusty_components::{MaterialAsset, MaterialComponent};
-use rusty_scene::authoring::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
 /// The first upscaled frame's checker contrast must be this many times the

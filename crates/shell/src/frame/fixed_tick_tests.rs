@@ -5,7 +5,7 @@ use glam::Vec3;
 
 use super::frame_tests::playing_world;
 use super::*;
-use rusty_scene::authoring::{create_entity, default_collider, default_rigidbody, Primitive};
+use rusty_edit::authoring::{create_entity, default_collider, default_rigidbody, Primitive};
 
 /// A world about to enter Play with one box falling from 10 m.
 pub(super) fn falling() -> (GameWorld, u32) {

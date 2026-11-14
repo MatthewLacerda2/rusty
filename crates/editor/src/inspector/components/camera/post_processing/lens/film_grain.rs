@@ -1,7 +1,7 @@
 //! Film Grain: on/off, intensity and response.
 
 use super::super::{knob, knob_row, toggle, Section, LENS_EFFECTS};
-use rusty_scene::authoring::rendering::post_processing::lens::film_grain;
+use rusty_edit::authoring::rendering::post_processing::lens::film_grain;
 use rusty_scene::PostProcessingComponent;
 
 pub(in super::super) const SECTION: Section = Section {

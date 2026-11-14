@@ -3,7 +3,7 @@
 //! Unity's `NavMeshObstacle`: the shape (box or upright capsule), whether it
 //! carves the navmesh and how (only once stationary, the move threshold, the time
 //! to stationary), plus what the play tick found (`IsCarving`, `GetVelocity`).
-//! Every setter routes through the shared `scene::authoring::nav::obstacle` ops the
+//! Every setter routes through the shared `edit::authoring::nav::obstacle` ops the
 //! inspector card uses. Getters return a neutral default without an obstacle;
 //! setters are then no-ops. Attach one with
 //! `Scene.AddComponent(id, "NavMeshObstacle")`.
@@ -17,7 +17,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use rusty_components::{NavMeshObstacleComponent as Obstacle, ObstacleShape};
-use rusty_scene::authoring::nav::obstacle as ops;
+use rusty_edit::authoring::nav::obstacle as ops;
 use rusty_scene::Scene;
 
 /// A field's reader and its shared-op writer.

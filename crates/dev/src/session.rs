@@ -159,7 +159,7 @@ impl Session {
 ///     (`core::project::boot_scene`: the editor's last scene, then the startup
 ///     scene, then an empty one).
 ///
-/// Whichever form, the project is seeded first (`scene::seed_project`: the bundled
+/// Whichever form, the project is seeded first (`edit::seed_project`: the bundled
 /// scripts, the default scene, which a new project gets once, #1618, and the audio
 /// refresh). `--project` may sit anywhere; it is taken out first and the rest is
 /// read as the scene argument.
@@ -175,7 +175,7 @@ pub fn boot_from_args(args: &[String]) -> (BootPlan, ProjectSource) {
     (plan, ProjectSource::bound(&opened))
 }
 
-/// Seed the open project (`scene::seed_project`: the bundled scripts, the default
+/// Seed the open project (`edit::seed_project`: the bundled scripts, the default
 /// scene where due, the audio refresh), then plan the scene it boots on, as the
 /// editor does (`shell::editor::start`): `session`, `session-mcp` and a
 /// `bench_open` switch all open a project here. A `boot_scene` error (a Run's,
@@ -185,10 +185,10 @@ pub(crate) fn seeded_boot_scene(opened: &rusty_core::project::Opened) -> BootPla
     boot_scene(opened)
 }
 
-/// Seed the open project (`scene::seed_project`) and print what its audio refresh
+/// Seed the open project (`edit::seed_project`) and print what its audio refresh
 /// did: every session boots on a project brought up to date, as the editor does.
 fn seed() {
-    rusty_scene::print_refresh(&rusty_scene::seed_project());
+    rusty_edit::print_refresh(&rusty_edit::seed_project());
 }
 
 /// The scene `opened` boots on (`core::project::boot_scene`), or an empty one.

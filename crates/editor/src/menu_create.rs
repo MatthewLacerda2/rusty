@@ -9,15 +9,15 @@
 //! job (show + select the tree).
 //!
 //! Every entry routes through the SAME shared create path the `Scene.CreateEntity`
-//! API uses (`scene::authoring::create_entity`), so editor and API can never drift:
+//! API uses (`edit::authoring::create_entity`), so editor and API can never drift:
 //! there is no second creation path, just a new entry point that then selects the
 //! new entity and marks the scene dirty.
 
 use egui_phosphor::regular as icon;
 
 use crate::EditorUi;
-use rusty_scene::authoring::ui::widgets::{self, UiWidget};
-use rusty_scene::authoring::{self, Primitive};
+use rusty_edit::authoring::ui::widgets::{self, UiWidget};
+use rusty_edit::authoring::{self, Primitive};
 use rusty_scene::Scene;
 
 /// Draw the top-level **GameObject** menu button into the menu bar.

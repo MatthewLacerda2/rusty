@@ -35,12 +35,12 @@ fn hinge(parent_scale: Vec3, pos: Vec3, scale: Vec3, axis: Vec3) -> (Scene, u32)
     }
     let collider = ColliderComponent {
         shape: ColliderShape::Box { size: Vec3::ONE },
-        ..rusty_scene::authoring::default_collider()
+        ..rusty_scene::create::default_collider()
     };
     scene.world.set_collider(id, Some(collider));
     let rb = RigidBodyComponent {
         is_kinematic: false,
-        ..rusty_scene::authoring::defaults::default_rigidbody()
+        ..rusty_scene::create::defaults::default_rigidbody()
     };
     scene.world.set_rigidbody(id, Some(rb));
     let joint = JointComponent {
