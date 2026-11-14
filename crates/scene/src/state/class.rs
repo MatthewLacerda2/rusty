@@ -149,7 +149,7 @@ pub enum Keyed {
     Restored,
 }
 
-/// One field of [`Scene`], classified.
+/// One field of [`Scene`](crate::Scene), classified.
 #[derive(Clone, Copy, Debug)]
 pub struct Field {
     /// The field's name on `Scene`.
