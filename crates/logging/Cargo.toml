@@ -1,0 +1,17 @@
+[package]
+name = "rusty-logging"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+rusty-core = { workspace = true }
+rusty-script = { workspace = true }
+env_logger = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+rusty-test-support = { workspace = true }

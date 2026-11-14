@@ -32,6 +32,7 @@ pub fn environment() -> Environment {
 
 /// Whether this process is a test, so [`environment`] hands out no keys (#974).
 pub fn keys_blanked() -> bool {
+    // lint: allow(cfg-test-switch) `dev` is still the root's module, whose tests are the only `cfg!(test)` callers; the `dev` crate move makes this a test hook
     cfg!(test) || std::env::var_os("NEXTEST").is_some()
 }
 

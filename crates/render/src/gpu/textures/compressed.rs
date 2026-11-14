@@ -105,6 +105,7 @@ pub(super) fn upload(
     let (format, data_format) = formats(texture.format, srgb);
     let size = super::extent(texture.width, texture.height);
     let mut usage = wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST;
+    // lint: allow(cfg-test-switch) only render's own unit tests read a loaded texture back
     if cfg!(test) {
         // Tests read the blocks back.
         usage |= wgpu::TextureUsages::COPY_SRC;

@@ -30,6 +30,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Active in the hierarchy | `tools/lint -- --rules` (`active-self`) | **hard gate**: outside `crates/ecs/src/`, no non-test line of `src/` calls `is_active_self(` — systems ask `World::is_active_in_hierarchy`, so an inactive parent hides its subtree; what shows or stores the own flag takes `// lint: allow(active-self) <why>` (#1363) |
 | Agent docs keep their shape | `tools/lint` (the size gate: `claude-md`, `skill`, `history`) | **hard gate**: every tracked `CLAUDE.md` is ≤ 300 lines and every tracked file of a skill folder (`.claude/skills/<folder>/`) ≤ 500, every line counted; a `SKILL.md` opens with the frontmatter Claude Code loads it by (`name` = its folder, ≤ 64 of `[a-z0-9-]`; `description` non-empty, ≤ 1024 characters), and a skill folder has one; no issue or PR number (`#123`, `owner/repo#123`, `…/issues/123`, `…/pull/123`) or `YYYY-MM-DD` date in them. Runs on Markdown-only PRs too; exceptions are `<!-- lint: allow(<rule>) <why> -->` (*Agent docs*, below) |
 | Asset writes tell the caches | `tools/lint -- --rules` (`asset-write`) | **hard gate**: a non-test line of `src/` outside `crates/core/src/fs/` that calls `fs::write(`, `File::create(`, `.save(<arg>)` or any `write_atomic(` (#2005; a whole identifier, outside string literals) has a `note_written` later in its function, or `// lint: allow(asset-write) <why>` (a file no path-keyed cache reads) (#1220) |
+| `cfg!(test)` is no switch | `tools/lint -- --rules` (`cfg-test-switch`) | **hard gate**: no production line of `src/` (a moved crate's too) holds a `cfg!(…)` naming `test` — it is true only in the crate's own unit tests, so every other crate's tests and `tests/` silently get the shipped behaviour; a switch another crate's tests need is a test hook armed at run time (`crates/CLAUDE.md`, *Test hooks*), and one only the crate's own tests need takes `// lint: allow(cfg-test-switch) <why>` |
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (default, `--features dev`, and `--no-default-features` — the editor-free player build), plus `tools/lint` itself (#935) |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), or a written waiver (`WAIVERS`) |
 | Converters report, never log | `tools/lint -- --rules` (`converter-log`) | **hard gate**: no code line of a converter under `crates/asset/src/convert/` (every module, folder or single file, but the cache's own `mod`, `converter`, `depends`, `fingerprint`, `gate`, `lock`, `record`, `stage`, `stale`, `texture_ref` and `tests`) names `log::` or a bare logging macro — a converter returns what it skipped in `Converted` and fails on anything else, and `convert::refresh` alone warns; each converter's root carries `#![deny(clippy::let_underscore_must_use, clippy::unused_result_ok, clippy::print_stdout, clippy::print_stderr)]`, wrapped or not, so clippy refuses a dropped `Result` and a print there (#1172) |
@@ -345,6 +346,18 @@ new flag, gate, CI step or baseline.
   `ControllerBodies::retype`, the three lines that carry
   `// lint: allow(body-table) <why>`, besides the copy's own retype of its
   kinematic bodies (`rules/body_table.rs`).
+- **`cfg-test-switch`** — `cfg!(test)` is true only while a crate builds its own
+  unit tests; another crate's tests, and the root's integration binary under
+  `tests/`, link its normal build, where it is false. Split one crate per module,
+  every such switch has callers in another crate that silently get the shipped
+  behaviour (a logger drain that takes every thread's records, keys left live).
+  So a `cfg!(…)` whose predicate names `test`, on a line `test_code.rs` does not
+  call test code, of a file under `src/` or a crate's `src/`, fails. A switch
+  another crate's tests rely on becomes a test hook, compiled in every build and
+  off until a test arms it (`logging::init_for_tests`; `crates/CLAUDE.md`, *Test
+  hooks*); one that only the crate's own tests need takes
+  `// lint: allow(cfg-test-switch) <why>` saying so. A `#[cfg(test)]` gate is not
+  a switch, and comment text never counts (`rules/cfg_test_switch.rs`).
 - **`converter-log`** (#1172) — a converter that logs a failure and carries on
   returns `Ok`, and the import cache stamps a `.glb` missing a part as current
   (#1168); one that logs a skip is heard once, then never again from the cache. So
@@ -445,7 +458,7 @@ new flag, gate, CI step or baseline.
   (MatthewLacerda2/scorsese#872). It takes **no allow**: anchor the pattern
   (`/out/`, not `out/`) or move the file. A failed `git` call is a finding too.
 - **`log-tag`** (#1139) — engine warnings reach the console and the session and
-  MCP replies (`src/logging`), so a reader must see where each came from. In
+  MCP replies (`crates/logging`), so a reader must see where each came from. In
   `src/`, a warning or error call whose message literal does not open with
   `[Module]` (`[Asset] …`, `[Render] …`) fails. The calls read are `log::warn!` and
   `log::error!` (a space before the parenthesis included), the bare `warn!` /

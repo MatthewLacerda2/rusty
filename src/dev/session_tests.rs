@@ -134,7 +134,7 @@ fn debug_snapshot_round_trips_authored_state() {
 #[test]
 fn engine_warnings_ride_along_with_the_reply() {
     // #1139: a `log::warn!` from engine code reaches the agent driving the session.
-    crate::logging::init();
+    crate::logging::init_for_tests();
     let mut s = session();
     log::warn!("[Test] session: an asset was skipped");
     let mut out = Vec::new();
@@ -159,7 +159,7 @@ fn a_capture_in_the_session_hears_the_steps_it_ran() {
     // clocks the offline mixer, so the capture holds the stepped time (#1579). Every
     // step runs paused, so a playing one-shot is held: the capture is silent and
     // says so (a scenario's capture, which ticks unpaused, hears it: `audio_capture`).
-    crate::logging::init();
+    crate::logging::init_for_tests();
     let mut s = session();
     let dir = crate::test_temp::dir();
     let at = |name: &str| crate::core::paths::to_slash(&dir.join(name));

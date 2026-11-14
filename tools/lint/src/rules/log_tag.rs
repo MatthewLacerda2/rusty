@@ -1,7 +1,7 @@
 //! `log-tag`: an engine warning names where it came from (#1139).
 //!
 //! Engine `warn!` / `error!` records reach the console, the session's replies and the
-//! MCP results beside Lua's own output (`src/logging`), so each message opens with
+//! MCP results beside Lua's own output (`crates/logging`), so each message opens with
 //! its module in brackets, `[Asset]`, `[Physics]`, as Unity's Console entries carry
 //! their source. In `src/`, a warning or error call whose message literal does not
 //! start with `[` is a finding. The calls read are `log::warn!`, `log::error!`, the

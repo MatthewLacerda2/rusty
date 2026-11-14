@@ -170,6 +170,7 @@ pub(super) fn upload(
 ) -> wgpu::Texture {
     let (width, height) = image.dimensions();
     let mut usage = wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST;
+    // lint: allow(cfg-test-switch) only render's own unit tests read a loaded texture back
     if cfg!(test) {
         // Tests read the mips back.
         usage |= wgpu::TextureUsages::COPY_SRC;

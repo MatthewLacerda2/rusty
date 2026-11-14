@@ -3,8 +3,8 @@ use std::cell::RefCell;
 use super::*;
 
 // Every assertion looks for its own tag with `contains`: under plain `cargo test`
-// other tests share the buffer (each drain takes only its own thread's records,
-// `take_mine`), and the console may hold their entries.
+// other tests share the buffer (`init_for_tests` makes each drain take only its own
+// thread's records, `take_mine`), and the console may hold their entries.
 
 fn console() -> RefCell<ConsoleLogs> {
     RefCell::new(ConsoleLogs::new())
@@ -17,7 +17,7 @@ fn has(console: &RefCell<ConsoleLogs>, text: &str, level: LogLevel) -> bool {
 
 #[test]
 fn an_engine_warning_lands_in_the_console() {
-    init();
+    init_for_tests();
     log::warn!("[Test] lands: a mesh collider was skipped");
     log::error!("[Test] lands: a texture did not load");
 
@@ -37,7 +37,7 @@ fn an_engine_warning_lands_in_the_console() {
 
 #[test]
 fn a_workspace_crates_warning_lands_in_the_console() {
-    init();
+    init_for_tests();
     log::warn!(target: "rusty_asset::convert", "[Test] crate: a converter skipped a part");
     log::warn!(target: "rustyline::edit", "[Dep] crate: a lookalike's quirk");
 
@@ -52,7 +52,7 @@ fn a_workspace_crates_warning_lands_in_the_console() {
 
 #[test]
 fn info_and_dependency_warnings_stay_out_of_the_console() {
-    init();
+    init_for_tests();
     log::info!("[Test] out: routine progress");
     log::warn!(target: "wgpu_hal::vulkan", "[Dep] out: a driver quirk");
 
@@ -65,7 +65,7 @@ fn info_and_dependency_warnings_stay_out_of_the_console() {
 
 #[test]
 fn a_warning_raised_every_frame_is_one_entry() {
-    init();
+    init_for_tests();
     for _ in 0..250 {
         log::warn!("[Test] collapse: per-frame warning");
     }
@@ -89,8 +89,8 @@ fn the_buffer_keeps_only_the_newest_records() {
 
 #[test]
 fn a_quiet_stretch_says_nothing() {
-    init();
-    crate::core::quiet::quietly(|| log::warn!("[Test] quiet: a staged copy's warning"));
+    init_for_tests();
+    rusty_core::quiet::quietly(|| log::warn!("[Test] quiet: a staged copy's warning"));
     log::warn!("[Test] quiet: the real one");
     let forwarded = forward(&console());
     assert!(!forwarded.iter().any(|m| m.contains("a staged copy's")));

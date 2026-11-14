@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn engine_warnings_come_back_as_a_second_block() {
-        crate::logging::init();
+        crate::logging::init_for_tests();
         let s = session();
         log::warn!("[Test] mcp: a mesh collider was skipped");
         let result = tools_call(&s, &json!({ "name": "snapshot" })).expect("snapshot ok");

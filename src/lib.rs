@@ -9,7 +9,6 @@
 
 #[cfg(feature = "editor")]
 pub mod editor;
-pub mod logging;
 pub mod shell;
 
 // The modules already moved into crates of their own (crates/CLAUDE.md), under their
@@ -22,6 +21,7 @@ pub use rusty_audio as audio;
 pub use rusty_components as components;
 pub use rusty_core as core;
 pub use rusty_ecs as ecs;
+pub use rusty_logging as logging;
 pub use rusty_navigation as navigation;
 pub use rusty_physics as physics;
 pub use rusty_preview as preview;

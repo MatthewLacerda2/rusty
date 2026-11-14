@@ -19,7 +19,7 @@ half moved for many PRs, and everything must work that way. This is the recipe.
 ## Moving a module, step by step
 `make move-crate MODULE=<m>` makes steps 1–4 and prints, as *by hand*, what a text
 edit cannot settle (a `crate::<x>` naming a module the row does not list, a
-`crate::{…}` group, `CARGO_MANIFEST_DIR`, a string path from the checkout's root, an optional dependency no single `dev` /
+`crate::{…}` group, `CARGO_MANIFEST_DIR`, a `cfg!(test)` in live code, a string path from the checkout's root, an optional dependency no single `dev` /
 `editor` feature turns on, a feature other than those two, and every tracked file
 outside the crate still naming `src/<m>/`). Read its diff: it is the recipe below, run.
 1. `git mv src/<m> crates/<m>/src`, then `git mv crates/<m>/src/mod.rs
@@ -75,7 +75,9 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
   dev-dependency (a proptest strategy) is a `#[doc(hidden)] #[macro_export]` macro,
   expanded in the caller's test against the caller's dev-dependency
   (`rusty_ecs::edit_ops!`). Instrumentation kept under `#[cfg(test)]` (a counter a
-  test reads) is compiled in too, off until a test arms it (`ecs::world::walks`), or
+  test reads) is compiled in too, off until a test arms it (`ecs::world::walks`,
+  `logging::init_for_tests`; a `cfg!(test)` switch is false for other crates'
+  tests, `cfg-test-switch`), or
   off unless the value was built counting (`scene::lighting::lightmap::Rays::counted`). A
   whole file that is test fixture (`ecs::changes::ops`) goes in `.cargo/mutants.toml`'s
   `exclude_globs`, so mutation never asks a test of it.
@@ -86,8 +88,8 @@ outside the crate still naming `src/<m>/`). Read its diff: it is the recipe belo
   contract (`rebakes::follows_rebakes`), the embedded model files (`models`,
   `models::anim`, `models::quad_file` on disk), a sky panorama on disk
   (`panorama::fixture`), `.cube` lookups as text (`luts`) and the warnings a test logged
-  (`logs::init`, `logs::take`, `logs::take_leveled` with each record's level: the
-  root's `logging` sits above every member), and a path in the temp dir spelled as a
+  (`logs::init`, `logs::take`, `logs::take_leveled` with each record's level:
+  `rusty-logging` needs `script`, so it sits above most members), and a path in the temp dir spelled as a
   script passes it (`temp::lua_path`). A crate's tests call it directly; the root
   keeps `crate::test_temp` as a re-export. A fixture that is plain data moves here; one built on a
   crate's types is a test hook instead.
