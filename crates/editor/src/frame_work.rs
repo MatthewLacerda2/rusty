@@ -30,6 +30,10 @@ impl EditorUi {
     /// request and waits on its own while the scene plays). `playing` is what
     /// `draw`'s `is_playing` is. Called once a frame, by `draw` on a drawn frame
     /// and by the shell on an undrawn one.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "distinct mutable borrows, as `draw`"
+    )]
     pub fn frame_work(
         &mut self,
         ctx: &egui::Context,

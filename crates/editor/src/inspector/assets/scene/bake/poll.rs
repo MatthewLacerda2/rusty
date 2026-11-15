@@ -50,7 +50,7 @@ pub fn poll(
 }
 
 /// [`poll`] on a frame the window cannot draw (a locked screen): nothing is
-/// painted, so the probe stage takes steps for [`UNDRAWN_PROBE_BUDGET`] instead
+/// painted, so the probe stage takes steps for `UNDRAWN_PROBE_BUDGET` (80 ms) instead
 /// of one.
 pub fn poll_undrawn(
     editor: &mut EditorUi,
