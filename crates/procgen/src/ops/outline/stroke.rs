@@ -98,7 +98,8 @@ fn segments(subpaths: &[Subpath], scale: Vec2, r: f32) -> Vec<[Vec2; 2]> {
     let mut out = Vec::new();
     for s in subpaths {
         let mut points: Vec<Vec2> = s.points.iter().map(|p| *p * scale).collect();
-        if s.closed && points.len() > 1 && points.first() != points.last() {
+        // Closed back to its start; a closed lone point is a zero-length run, a dot.
+        if s.closed && (points.len() == 1 || points.first() != points.last()) {
             points.extend(points.first().copied());
         }
         let pairs = points.windows(2).map(|w| [w[0], w[1]]);

@@ -63,6 +63,11 @@ fn a_stroke_wraps_and_a_closed_one_strokes_its_closing_edge() {
         1.0,
         "a zero-length run is a dot"
     );
+    assert_eq!(
+        stroke("M.5 .5 Z", 0.1, 64)[32 * 64 + 32],
+        1.0,
+        "so is a closed point"
+    );
 }
 
 #[test]

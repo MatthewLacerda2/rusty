@@ -30,13 +30,7 @@ pub fn glyphs(font: &FontData, text: &str, layout: Layout) -> Vec<Shape> {
     let s = layout.size / upem;
     let lines: Vec<Line> = text
         .split('\n')
-        .map(|l| {
-            line(
-                font,
-                l.strip_suffix('\r').unwrap_or(l),
-                layout.tracking * upem,
-            )
-        })
+        .map(|l| line(font, l, layout.tracking * upem))
         .collect();
     let block = lines.iter().map(|l| l.1).fold(0.0, f32::max) * s;
     let left = 0.5 - block / 2.0;
@@ -55,6 +49,10 @@ pub fn glyphs(font: &FontData, text: &str, layout: Layout) -> Vec<Shape> {
         };
         let origin = Vec2::new(x, top + ascent + pitch * i as f32);
         for &(glyph, pen) in glyphs {
+            // A glyph the font lacks advances but stamps no box.
+            if glyph == GlyphId::NOTDEF {
+                continue;
+            }
             let outline = outlines
                 .entry(glyph)
                 .or_insert_with(|| font.outline(glyph, upem));
@@ -77,15 +75,22 @@ pub fn glyphs(font: &FontData, text: &str, layout: Layout) -> Vec<Shape> {
 /// advance width.
 type Line = (Vec<(GlyphId, Vec2)>, f32);
 
-/// `text` shaped as one line, `tracking` font units between glyphs that advance.
+/// `text` shaped as one line, `tracking` font units after each cluster but the
+/// last, so a mark keeps its place on its base (as the UI's `Text` spaces). A tab
+/// shapes as a space and a stray `\r` is dropped, as the UI's `Text` reads them.
 fn line(font: &FontData, text: &str, tracking: f32) -> Line {
+    let text: String = text
+        .chars()
+        .filter(|&c| c != '\r')
+        .map(|c| if c == '\t' { ' ' } else { c })
+        .collect();
     let mut pen = 0.0;
-    let shaped = rusty_font::shape(font, text, &[]);
+    let shaped = rusty_font::shape(font, &text, &[]);
     let mut out = Vec::with_capacity(shaped.len());
     for (i, g) in shaped.iter().enumerate() {
         out.push((g.glyph, Vec2::new(pen, 0.0) + g.offset));
         pen += g.advance;
-        if i + 1 < shaped.len() && g.advance != 0.0 {
+        if shaped.get(i + 1).is_some_and(|n| n.cluster != g.cluster) {
             pen += tracking;
         }
     }

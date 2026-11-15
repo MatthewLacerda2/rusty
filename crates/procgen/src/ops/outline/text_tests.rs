@@ -70,3 +70,25 @@ fn a_crlf_line_break_draws_as_a_newline() {
     let crlf = glyphs(&f, "EXIT\r\nNO 3", layout(Align::Center));
     assert_eq!(lf, crlf, "no `\\r` glyph, and the same centring");
 }
+
+#[test]
+fn tracking_widens_a_cluster_once_so_a_mark_stays_on_its_letter() {
+    let f = rusty_font::default_font();
+    let tracked = Layout {
+        tracking: 0.2,
+        ..layout(Align::Center)
+    };
+    let mark = glyphs(&f, "q\u{301}", tracked);
+    assert_eq!(mark.len(), 2, "the font draws the combining acute");
+    assert_eq!(mark, glyphs(&f, "q\u{301}", layout(Align::Center)));
+}
+
+#[test]
+fn a_tab_is_a_space_and_a_missing_glyph_stamps_nothing() {
+    let f = rusty_font::default_font();
+    let spaced = glyphs(&f, "EXIT 2", layout(Align::Center));
+    assert_eq!(glyphs(&f, "EXIT\t2", layout(Align::Center)), spaced);
+    assert_eq!(glyphs(&f, "EX\rIT 2", layout(Align::Center)), spaced);
+    // A private-use code point the font has no glyph for: no `.notdef` box.
+    assert_eq!(glyphs(&f, "A\u{E000}", layout(Align::Center)).len(), 1);
+}

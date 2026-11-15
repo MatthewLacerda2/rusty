@@ -1,6 +1,6 @@
 //! The outline fill at the tile's edge: a stretch ending a rounding error past
-//! x = 0, a shape wrapped across the left edge, and `evenodd` on a shape wider
-//! than the tile.
+//! x = 0, a shape wrapped across the left edge, `evenodd` on a shape wider than
+//! the tile, moving shapes over the seam, and an edge too flat to divide by.
 
 use glam::Vec2;
 
@@ -59,4 +59,70 @@ fn evenodd_never_cancels_a_shape_against_its_own_wrapped_copy() {
     let c = coverage(&[stripe], Size::new(32, 32), FillRule::Evenodd);
     let edge = &c[13 * 32..14 * 32];
     assert!(edge.iter().all(|v| (v - edge[0]).abs() < 1e-5), "{edge:?}");
+}
+
+/// The closed polygon through `p`, moved by `d`.
+fn poly(p: &[(f32, f32)], d: Vec2) -> Shape {
+    let p: Vec<Vec2> = p.iter().map(|&q| Vec2::from(q) + d).collect();
+    (0..p.len()).map(|i| [p[i], p[(i + 1) % p.len()]]).collect()
+}
+
+#[test]
+fn moving_shapes_over_the_seam_only_rolls_the_mask() {
+    let shapes: [&[(f32, f32)]; 4] = [
+        &[(0.05, 0.4), (0.3, 0.4), (0.3, 0.6), (0.05, 0.6)],
+        &[(0.9, 0.45), (1.2, 0.45), (1.2, 0.55), (0.9, 0.55)],
+        &[(0.7, -0.2), (1.1, 0.3), (0.6, 0.25)],
+        &[(-0.3, 0.7), (1.4, 0.7), (1.4, 0.8), (-0.3, 0.8)],
+    ];
+    let size = Size::new(40, 40);
+    let draw = |moves: [(f32, f32); 4], px: Vec2| {
+        let set: Vec<Shape> = shapes
+            .iter()
+            .zip(moves)
+            .map(|(p, m)| poly(p, Vec2::from(m) + px / 40.0))
+            .collect();
+        coverage(&set, size, FillRule::Evenodd)
+    };
+    let base = draw([(0.0, 0.0); 4], Vec2::ZERO);
+    // The two bars cut each other across the seam: u = 0.1 sits in both.
+    assert!(base[20 * 40 + 4] < 1e-5, "{}", base[20 * 40 + 4]);
+    for moves in [
+        [(0.0, 0.0), (-1.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
+        [(1.0, 0.0), (0.0, 1.0), (-1.0, 1.0), (2.0, -1.0)],
+    ] {
+        for shift in [Vec2::ZERO, Vec2::new(3.0, 0.0), Vec2::new(-5.0, 7.0)] {
+            let moved = draw(moves, shift);
+            let (sx, sy) = (shift.x as i64, shift.y as i64);
+            for y in 0..40i64 {
+                for x in 0..40i64 {
+                    let a = base[(y * 40 + x) as usize];
+                    let at = ((y + sy).rem_euclid(40) * 40 + (x + sx).rem_euclid(40)) as usize;
+                    let b = moved[at];
+                    assert!(
+                        (a - b).abs() < 1e-3,
+                        "{moves:?} {shift}: ({x}, {y}) {a} against {b}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn an_edge_too_flat_to_divide_by_winds_nothing() {
+    // Its height divides to an infinite slope: no NaN may reach the row's sum,
+    // whichever way the edge runs.
+    let size = Size::new(256, 256);
+    for x in [0.0, 0.5] {
+        let sliver = poly(&[(x, 0.0), (0.5 - x, 1e-40), (0.5 - x, 0.5)], Vec2::ZERO);
+        let flat = poly(&[(x, 0.0), (0.5 - x, 0.0), (0.5 - x, 0.5)], Vec2::ZERO);
+        let (a, b) = (
+            coverage(&[sliver], size, FillRule::Nonzero),
+            coverage(&[flat], size, FillRule::Nonzero),
+        );
+        for (i, (a, b)) in a.iter().zip(&b).enumerate() {
+            assert!((a - b).abs() < 1e-5, "x = {x}, pixel {i}: {a} against {b}");
+        }
+    }
 }

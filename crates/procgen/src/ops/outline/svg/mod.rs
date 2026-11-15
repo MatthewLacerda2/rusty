@@ -49,7 +49,11 @@ pub fn parse(d: &str) -> Result<Vec<Subpath>, String> {
     };
     p.run()
         .map_err(|(at, what)| format!("at byte {at}: {what}"))?;
-    Ok(p.out.into_iter().filter(|s| s.points.len() > 1).collect())
+    // A lone point is dropped unless `Z` closed it: stroked, that is a dot.
+    Ok(p.out
+        .into_iter()
+        .filter(|s| s.points.len() > 1 || s.closed)
+        .collect())
 }
 
 type Fault = (usize, String);

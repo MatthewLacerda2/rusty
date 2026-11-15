@@ -989,7 +989,9 @@ and jumps back at the wrap; every other island ramps across the edge as one.
 glyph or contour that crosses the tile's edge carries on from the opposite edge, so
 the map tiles even when the lettering is wider than the tile. A wrapped copy is the
 same shape again, not another contour of it, so under `evenodd` a shape wider than
-the tile never cuts a hole where it overlaps its own copy.
+the tile never cuts a hole where it overlaps its own copy, while two different
+subpaths cut each other wherever they overlap, across the seam as anywhere: moving
+a subpath by whole tiles never changes the mask.
 
 ### Units
 

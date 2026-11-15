@@ -13,8 +13,6 @@
 //! contours: a glyph, a subpath) that crosses the tile's edge wraps onto the
 //! torus, as every map tiles: each copy whose box meets the tile is drawn.
 
-use std::collections::BTreeSet;
-
 use glam::Vec2;
 
 use crate::catalog::generators::outline::path::FillRule;
@@ -29,36 +27,54 @@ pub type Shape = Vec<Edge>;
 /// The coverage of `shapes` under `rule`, one value in `[0, 1]` per pixel,
 /// row-major at `size`.
 ///
-/// A wrapped copy is the same outline again, not another contour of it, so the
-/// rule folds each copy's winding on its own and each pixel then takes the most
-/// any copy gives it: under `evenodd` a shape wider than the tile never cancels
-/// against its own copy, and its edge reads the same where two copies overlap.
-/// Copies of a shape narrower than the tile never share a pixel, so the most is
-/// exact there. Under `nonzero` folding first or last reads the same, so every
-/// copy goes into one pass.
+/// The windings of all shapes add, then the rule folds the sum, so under `evenodd`
+/// two shapes cut each other wherever they overlap, the tile's seam included:
+/// moving any shape by whole tiles never changes the mask. A wrapped copy is the
+/// same outline again, not another contour of it, so where copies of one shape
+/// overlap (it is wider or taller than the tile) the shape winds as the copy that
+/// winds most does: it never cancels against itself, and its edge reads the same
+/// share where two copies overlap. Copies of a shape no larger than the tile never
+/// overlap, so they all go into one shared pass; only a larger shape pays a pass
+/// per copy.
 pub fn coverage(shapes: &[Shape], size: Size, rule: FillRule) -> Vec<f32> {
     let (w, h) = (size.width as usize, size.height as usize);
-    let mut acc = Accumulator::new(w, h);
+    let mut shared = Accumulator::new(w, h);
+    // The summed winding of the shapes larger than the tile, and the scratch one
+    // of them is drawn in, a copy at a time.
+    let mut large: Option<(Vec<f32>, Vec<f32>, Accumulator)> = None;
+    for shape in shapes {
+        let at = offsets(shape);
+        if !larger_than_tile(shape) {
+            for &k in &at {
+                shared.copy(shape, k);
+            }
+            continue;
+        }
+        let (sum, most, copy) = large
+            .get_or_insert_with(|| (vec![0.0; w * h], vec![0.0; w * h], Accumulator::new(w, h)));
+        most.fill(0.0);
+        for &k in &at {
+            copy.cells.fill(0.0);
+            copy.copy(shape, k);
+            copy.windings(|i, v| {
+                if v.abs() > most[i].abs() {
+                    most[i] = v;
+                }
+            });
+        }
+        for (s, m) in sum.iter_mut().zip(most.iter()) {
+            *s += m;
+        }
+    }
     let mut out = vec![0.0; w * h];
-    let offsets: BTreeSet<(i64, i64)> = match rule {
-        FillRule::Nonzero => BTreeSet::new(),
-        FillRule::Evenodd => shapes.iter().flat_map(offsets).collect(),
-    };
-    if offsets.is_empty() {
-        for shape in shapes {
-            acc.copies(shape, |_| true);
-        }
-        acc.resolve_into(rule, &mut out);
-        return out;
-    }
-    for &k in &offsets {
-        for shape in shapes {
-            acc.copies(shape, |at| at == k);
-        }
-        acc.resolve_into(rule, &mut out);
-        acc.cells.fill(0.0);
-    }
+    let sum = large.as_ref().map(|l| &l.0);
+    shared.windings(|i, v| out[i] = fold(v + sum.map_or(0.0, |s| s[i]), rule));
     out
+}
+
+/// Whether copies of `shape` can overlap: its box is wider or taller than a tile.
+fn larger_than_tile(shape: &Shape) -> bool {
+    bounds(shape).is_some_and(|(lo, hi)| hi.x - lo.x > 1.0 || hi.y - lo.y > 1.0)
 }
 
 /// Every whole-tile offset `(kx, ky)` at which a copy of `shape` meets the tile.
@@ -94,14 +110,12 @@ struct Accumulator {
 }
 
 impl Accumulator {
-    /// Add each copy of `shape` (tile units) whose offset `keep` takes.
-    fn copies(&mut self, shape: &Shape, keep: impl Fn((i64, i64)) -> bool) {
+    /// Add the copy of `shape` (tile units) moved by the whole tiles `(kx, ky)`.
+    fn copy(&mut self, shape: &Shape, (kx, ky): (i64, i64)) {
         let scale = Vec2::new(self.w as f32, self.h as f32);
-        for (kx, ky) in offsets(shape).into_iter().filter(|&k| keep(k)) {
-            let k = Vec2::new(kx as f32, ky as f32);
-            for &[a, b] in shape {
-                self.edge((a + k) * scale, (b + k) * scale);
-            }
+        let k = Vec2::new(kx as f32, ky as f32);
+        for &[a, b] in shape {
+            self.edge((a + k) * scale, (b + k) * scale);
         }
     }
 
@@ -147,8 +161,12 @@ impl Accumulator {
     }
 
     /// An edge inside the image, `a` above `b`, winding `dir`.
+    /// One whose height is too small to divide by is flat: it winds nothing.
     fn inside(&mut self, a: Vec2, b: Vec2, dir: f32) {
         let dxdy = (b.x - a.x) / (b.y - a.y);
+        if !dxdy.is_finite() {
+            return;
+        }
         let stride = self.w + 2;
         let first = a.y.floor().max(0.0) as usize;
         let last = (b.y.ceil() as usize).min(self.h);
@@ -166,16 +184,15 @@ impl Accumulator {
         }
     }
 
-    /// Each pixel's coverage, the running sum of its row's cells under `rule`, into
-    /// `out` where it is more than `out` holds.
-    fn resolve_into(&self, rule: FillRule, out: &mut [f32]) {
+    /// Each pixel's winding, the running sum of its row's cells, to `f` with the
+    /// pixel's row-major index.
+    fn windings(&self, mut f: impl FnMut(usize, f32)) {
         let stride = self.w + 2;
-        let rows = self.cells.chunks(stride.max(1)).take(self.h);
-        for (row, px) in rows.zip(out.chunks_mut(self.w.max(1))) {
+        for (y, row) in self.cells.chunks(stride.max(1)).take(self.h).enumerate() {
             let mut winding = 0.0;
-            for (cell, p) in row[..self.w].iter().zip(px) {
+            for (x, cell) in row[..self.w].iter().enumerate() {
                 winding += cell;
-                *p = p.max(fold(winding, rule));
+                f(y * self.w + x, winding);
             }
         }
     }
