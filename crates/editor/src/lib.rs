@@ -114,6 +114,8 @@ pub struct EditorUi {
     /// `Editor.SetGizmo` through the shell. `Gizmo::Ui` is the UI overlay: screen
     /// canvases drawn, the rect tool live (#423).
     pub gizmos: rusty_core::application::SceneGizmos,
+    /// What the Game view's Stats overlay shows, while on (`viewport::stats`, #2205).
+    pub stats: Option<viewport::stats::Readout>,
     /// Live rect-tool drag on a UI element's handle (#423).
     pub rect_drag: Option<viewport::rect_tool::RectDrag>,
     /// The Scene tab's own camera and what the pointer is doing with it (#745).
@@ -176,6 +178,7 @@ impl EditorUi {
             ui_textures: Default::default(),
             gizmo_drag: None,
             gizmos: Default::default(),
+            stats: None,
             rect_drag: None,
             scene_view: Default::default(),
 
@@ -219,8 +222,7 @@ impl EditorUi {
         self.theme.apply(ctx);
     }
 
-    // The live engine state (scene, console, nav, play flag) plus the frame's HUD
-    // metrics: distinct mutable borrows. Legacy signature, pending App/Resources.
+    /// Draw the editor over the scene, console, navmesh and play flag it borrows.
     #[expect(clippy::too_many_arguments, reason = "distinct mutable borrows")]
     pub fn draw(
         &mut self,
@@ -229,8 +231,6 @@ impl EditorUi {
         console: &mut ConsoleLogs,
         nav: &mut NavigationGraph,
         is_playing: &mut bool,
-        _fps: f32,
-        _frame_time: f32,
         viewport_texture: Option<egui::TextureId>,
     ) -> ViewportInteraction {
         self.apply_theme(ctx, *is_playing);

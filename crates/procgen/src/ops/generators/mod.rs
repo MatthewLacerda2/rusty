@@ -55,6 +55,17 @@ pub fn finite(x: f32, fallback: f32) -> f32 {
     }
 }
 
+/// `x` clamped to `lo..=hi`, or `default` when it is NaN (an infinity is clamped):
+/// how a plain number param reads a malformed value.
+#[inline]
+pub fn clamp_or(x: f32, default: f32, lo: f32, hi: f32) -> f32 {
+    if x.is_nan() {
+        default
+    } else {
+        x.clamp(lo, hi)
+    }
+}
+
 /// The most periods per tile a count takes: 2²⁰, far past one cell per pixel at
 /// the largest bake, so no real recipe meets it, and small enough that a lattice
 /// index and its neighbour stay in range (`1e30` would overflow them).
