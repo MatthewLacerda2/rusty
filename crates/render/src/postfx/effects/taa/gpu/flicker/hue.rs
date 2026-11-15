@@ -14,7 +14,8 @@ const FRAMES: u32 = 16;
 const AT: u32 = 4;
 /// How far a tile's hue ([`co`]) may sit from URP's on any frame, as a share of
 /// the turn's own swing: ours, the luma the hold keeps shifting the perceptual
-/// blend a little. Measured on lavapipe: 0.4 % (3.5 of a swing of 911); a hold of
+/// blend a little. Measured on lavapipe: 0.4 % (3.5 of a swing of 911), on an RTX
+/// 2060 0.4 % (3.4 of 919); a hold of
 /// the whole colour sits 89 % off (813).
 const SAME: f32 = 0.01;
 

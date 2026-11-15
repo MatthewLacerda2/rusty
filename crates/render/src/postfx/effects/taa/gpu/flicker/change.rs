@@ -16,7 +16,7 @@ const AT: u32 = 6;
 const CALM: f32 = 0.5;
 /// How far a calm tile under the hold may sit from URP's through a lone flash, in
 /// 255ths: a level, a calm pixel's own sub-level blinks (lighting's rounding)
-/// holding that little of the flash's end. Measured: lavapipe 0.5.
+/// holding that little of the flash's end. Measured: lavapipe 0.5, RTX 2060 0.5.
 const SAME: f32 = 1.0;
 
 /// The largest difference between two runs' tiles, over every frame.
@@ -106,7 +106,7 @@ fn slide(s: &mut Scene, f: u32) {
 }
 
 /// How much more trail the hold may leave than URP's, in 255ths: a level.
-/// Measured: lavapipe 3.1 held, 3.9 URP's.
+/// Measured: lavapipe 3.1 held, 3.9 URP's; RTX 2060 the same.
 const TRAIL: f32 = 1.0;
 
 #[test]

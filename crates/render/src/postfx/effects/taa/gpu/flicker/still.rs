@@ -13,7 +13,7 @@ const FRAMES: u32 = 54;
 /// The largest step a tile of the still view may take between two frames with
 /// the anti-flicker on, in 255ths of perceptual luma: ours, a still view's blinks
 /// reduced to near the scene's own (without SSR the bulb's edge under the jitter
-/// steps 5). Measured: lavapipe 26 at 0 (URP's), 9 on.
+/// steps 5). Measured: lavapipe 26 at 0 (URP's), 9 on; RTX 2060 26.2, 8.8.
 const STILL: f32 = 12.0;
 
 #[test]

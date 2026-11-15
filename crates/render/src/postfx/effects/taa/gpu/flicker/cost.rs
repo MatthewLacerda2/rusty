@@ -47,7 +47,8 @@ fn survival(r: &mut Renderer, period: u32) -> Vec<f32> {
 /// two flashes at least [`FIRST`] (no hold before a blink recurs); from the fourth
 /// on, flashes `period` frames apart keep [`HELD`]'s share, within [`BAND`].
 /// Measured on lavapipe, flash by flash: every 6 frames 100 % 100 % 10 % 9 % 9 %
-/// 9 %; every 10, 100 % 100 % 40 % 25 % 25 % 25 %.
+/// 9 %; every 10, 100 % 100 % 40 % 25 % 25 % 25 %. RTX 2060: the same, to the
+/// percent.
 const FIRST: f32 = 0.95;
 const HELD: [(u32, f32); 2] = [(6, 0.09), (10, 0.25)];
 const BAND: f32 = 0.1;
@@ -122,7 +123,8 @@ fn afterglow(r: &mut Renderer, scale: f32) -> (Vec<f32>, Vec<f32>) {
 /// How many frames after a lone flash the noise ceiling's held tiles may still sit
 /// a level over URP's (`Graphics.md`): ours, the measure plus a margin. Measured
 /// on lavapipe: 32 frames at render scale 1 (29 levels the frame after, against
-/// URP's 9), 39 at 0.67 (20 against 9).
+/// URP's 9), 39 at 0.67 (20 against 9); on an RTX 2060, 30 (25 against 8) and
+/// 38 (20 against 9).
 const AFTERGLOW: usize = 44;
 
 #[test]
