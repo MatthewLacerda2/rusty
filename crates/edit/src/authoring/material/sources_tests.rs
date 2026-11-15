@@ -2,6 +2,7 @@
 
 use super::*;
 use rusty_procgen::recipe::{ImageEncoding, ImageTexture, Node, OpKind};
+use std::path::Path;
 
 fn image_recipe(path: &str) -> TextureRecipe {
     let op = OpKind::Image(ImageTexture {
@@ -27,7 +28,7 @@ fn a_path_is_read_from_the_root() {
     let root = rusty_test_support::temp::dir().join("rusty_sources_root_1491");
     std::fs::create_dir_all(root.join("textures")).unwrap();
     write_png(&root.join("textures").join("red.png"));
-    let sources = load_recipe(&image_recipe("textures/red.png"), &root)
+    let sources = load_recipe(&image_recipe("textures/red.png"), &ContentRoots::new(&root))
         .unwrap()
         .sources;
     assert!(sources.get("textures/red.png").is_none(), "decoded lazily");
@@ -40,7 +41,11 @@ fn a_path_is_read_from_the_root() {
 fn a_missing_file_is_an_error_naming_the_node_and_the_path() {
     let root = rusty_test_support::temp::dir().join("rusty_sources_missing_1491");
     std::fs::create_dir_all(&root).unwrap();
-    let err = load_recipe(&image_recipe("textures/nope.png"), &root).unwrap_err();
+    let err = load_recipe(
+        &image_recipe("textures/nope.png"),
+        &ContentRoots::new(&root),
+    )
+    .unwrap_err();
     assert!(
         err.contains("'photo'") && err.contains("textures/nope.png"),
         "{err}"
@@ -52,7 +57,7 @@ fn a_file_that_does_not_decode_fails_the_bake_naming_the_node() {
     let root = rusty_test_support::temp::dir().join("rusty_sources_corrupt_2002");
     std::fs::create_dir_all(root.join("textures")).unwrap();
     std::fs::write(root.join("textures").join("cut.png"), b"\x89PNG trunc").unwrap();
-    let loaded = load_recipe(&image_recipe("textures/cut.png"), &root).unwrap();
+    let loaded = load_recipe(&image_recipe("textures/cut.png"), &ContentRoots::new(&root)).unwrap();
     let err = rusty_procgen::evaluate_with(&loaded.recipe, &loaded.sources).unwrap_err();
     let err = err.to_string();
     assert!(
@@ -70,7 +75,7 @@ fn a_file_beside_the_root_is_outside_it() {
     write_png(&file);
     assert!(outside_root(&file, &root).is_some());
     // Read all the same: outside is allowed, it only warns.
-    assert!(load_recipe(&image_recipe("../shared.png"), &root).is_ok());
+    assert!(load_recipe(&image_recipe("../shared.png"), &ContentRoots::new(&root)).is_ok());
 }
 
 #[test]
@@ -81,6 +86,6 @@ fn a_broken_recipe_is_reported_before_any_file_is_read() {
         op: OpKind::Invert,
         inputs: vec!["nowhere".into()],
     });
-    let err = load_recipe(&recipe, Path::new("")).unwrap_err();
+    let err = load_recipe(&recipe, &ContentRoots::new(Path::new(""))).unwrap_err();
     assert!(err.contains("unknown input \"nowhere\""), "{err}");
 }

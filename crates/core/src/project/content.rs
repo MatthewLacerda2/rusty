@@ -1,0 +1,137 @@
+//! crates/core/src/project/content.rs — the `engine/…` spelling a stored path takes to
+//! name the engine's own content (#2185).
+//!
+//! A path a project stores (a texture recipe's graph or image, a bloom dirt) is
+//! read from the project root, except one that starts with [`ENGINE_PREFIX`]: that
+//! one is read from the engine's content folder ([`super::engine_dir`]), which ships
+//! beside every install. The stored path keeps the `engine/…` spelling, so it names
+//! the same file on every machine. The engine wins: a project folder named
+//! `engine/` is unreachable through such a path, since a fallback would make one
+//! path mean two files. A path is matched as it is stored ([`crate::paths::stored`]:
+//! trimmed, no leading `./`), each run of `/` taken as one, so `./engine/a.png` and
+//! `engine//a.png` name the engine's `a.png` too.
+
+use std::path::{Path, PathBuf};
+
+/// What a stored path starts with to name a file under the engine's content folder.
+pub const ENGINE_PREFIX: &str = "engine/";
+
+/// `path` without [`ENGINE_PREFIX`], when it names engine content: matched as it
+/// is stored, each run of `/` taken as one (the module doc), so what is left never
+/// starts with `/` and never joins as the filesystem root.
+pub fn engine_relative(path: &str) -> Option<String> {
+    let stored = crate::paths::stored(path);
+    let parts: Vec<&str> = stored.split('/').filter(|p| !p.is_empty()).collect();
+    let relative = parts.join("/");
+    let normal = if stored.starts_with('/') {
+        format!("/{relative}")
+    } else {
+        relative
+    };
+    normal.strip_prefix(ENGINE_PREFIX).map(str::to_string)
+}
+
+/// The two folders a stored path is read from: the project root, and the engine's
+/// content folder for an `engine/…` path. Tests hand it a temp engine folder;
+/// everything else takes [`ContentRoots::new`], the running engine's.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ContentRoots {
+    pub project: PathBuf,
+    pub engine: PathBuf,
+}
+
+impl ContentRoots {
+    /// `project` with the running engine's content folder ([`super::engine_dir`]).
+    pub fn new(project: &Path) -> Self {
+        Self::with_engine(project, super::engine_dir())
+    }
+
+    pub fn with_engine(project: &Path, engine: &Path) -> Self {
+        Self {
+            project: project.to_path_buf(),
+            engine: engine.to_path_buf(),
+        }
+    }
+
+    /// The folder `path` is named from: the engine's for an `engine/…` path, else
+    /// the project's. A file outside it is outside what the seed covers.
+    pub fn base(&self, path: &str) -> &Path {
+        if engine_relative(path).is_some() {
+            &self.engine
+        } else {
+            &self.project
+        }
+    }
+
+    /// The file `path` names.
+    pub fn file(&self, path: &str) -> PathBuf {
+        match engine_relative(path) {
+            Some(relative) => self.engine.join(relative),
+            None => self.project.join(path),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_engine_path_reads_from_the_engine_and_any_other_from_the_project() {
+        let roots = ContentRoots::with_engine(Path::new("/game"), Path::new("/install/engine"));
+        let engine = roots.file("engine/textures/library/rust.graph.json");
+        assert_eq!(
+            engine,
+            Path::new("/install/engine/textures/library/rust.graph.json")
+        );
+        assert_eq!(roots.base("engine/a.png"), Path::new("/install/engine"));
+        assert_eq!(roots.file("assets/a.png"), Path::new("/game/assets/a.png"));
+        // Only the prefix counts: a folder merely named like it is the project's.
+        assert_eq!(
+            roots.file("engines/a.png"),
+            Path::new("/game/engines/a.png")
+        );
+        assert_eq!(
+            roots.file("assets/engine/a.png"),
+            Path::new("/game/assets/engine/a.png")
+        );
+    }
+
+    #[test]
+    fn an_engine_path_is_matched_as_stored_and_never_joins_the_filesystem_root() {
+        let roots = ContentRoots::with_engine(Path::new("/game"), Path::new("/install/engine"));
+        let want = Path::new("/install/engine/textures/a.png");
+        assert_eq!(roots.file("engine//textures/a.png"), want);
+        assert_eq!(roots.file("./engine/textures/a.png"), want);
+        assert_eq!(roots.file(" engine/textures//a.png"), want);
+        assert_eq!(
+            roots.base("./engine/textures/a.png"),
+            Path::new("/install/engine")
+        );
+        // A rooted path is not `engine/…`, however it is spelled.
+        assert_eq!(engine_relative("/engine/a.png"), None);
+        assert_eq!(engine_relative("//engine/a.png"), None);
+    }
+
+    #[test]
+    fn an_empty_project_root_leaves_a_project_path_as_written() {
+        let roots = ContentRoots::with_engine(Path::new(""), Path::new("/e"));
+        assert_eq!(roots.file("assets/dirt.png"), Path::new("assets/dirt.png"));
+        assert_eq!(roots.file("engine/dirt.png"), Path::new("/e/dirt.png"));
+    }
+
+    #[test]
+    fn a_shipped_layout_reads_an_engine_graph_from_the_engine_beside_the_player() {
+        let ship = rusty_test_support::temp::dir().join("rusty_content_ship_2185");
+        let engine = ship.join("engine");
+        std::fs::create_dir_all(engine.join("shaders")).unwrap();
+        std::fs::create_dir_all(engine.join("textures/library")).unwrap();
+        std::fs::write(engine.join("shaders/common.wgsl"), "").unwrap();
+        std::fs::write(engine.join("textures/library/rust.graph.json"), "{}").unwrap();
+        // The player's lookup (`engine_dir`) from the shipped executable's folder.
+        let found = super::super::locate::find_engine_dir(&ship).unwrap();
+        let roots = ContentRoots::with_engine(&ship.join("project"), &found);
+        let file = roots.file("engine/textures/library/rust.graph.json");
+        assert!(file.is_file(), "{}", file.display());
+    }
+}
