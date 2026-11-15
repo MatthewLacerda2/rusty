@@ -5,7 +5,7 @@
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use super::*;
-use crate::recipe::{sample_op, WhiteNoise, OPS, SAMPLE_PATH};
+use crate::recipe::{reading_sample_op, WhiteNoise, OPS, SAMPLE_PATH};
 use crate::source::{Source, Sources};
 
 const RES: Size = Size::new(8, 8);
@@ -41,7 +41,7 @@ fn eval(op: &OpKind, inputs: &[Image]) -> Image {
 #[test]
 fn every_op_runs_on_its_arity_and_needs_its_minimum() {
     for info in OPS {
-        let (op, arity) = (sample_op(info), info.inputs);
+        let (op, arity) = (reading_sample_op(info), info.inputs);
         let (min, max) = (usize::from(arity.min), usize::from(arity.max));
         eval(&op, &images(max));
         eval(&op, &images(min));
@@ -57,7 +57,7 @@ fn every_op_runs_on_its_arity_and_needs_its_minimum() {
 #[test]
 fn every_optional_input_is_read() {
     for info in OPS.iter().filter(|info| info.inputs.max > info.inputs.min) {
-        let op = sample_op(info);
+        let op = reading_sample_op(info);
         let mut inputs = images(usize::from(info.inputs.max));
         let before = eval(&op, &inputs);
         let last = inputs.len() - 1;

@@ -7,7 +7,7 @@
 //! finding; the fix is `fullscreen::triangle` / `fullscreen::uv`. A shader that must
 //! stand alone says why with `// lint: allow(fullscreen-triangle) <why>`.
 //!
-//! The rule reads `engine/**/*.wgsl` itself: `Scan` holds only Rust, so `rules::run`
+//! The rule reads `engine/**/*.wgsl` itself (`Scan::shaders`): `Scan` holds only Rust, so `rules::verdict`
 //! cannot see a shader's allow. The rule applies the allow (and reports one with no
 //! reason) on its own files, via [`finding::allowed`] / [`finding::unexplained`].
 //! Shaders written
@@ -16,8 +16,6 @@
 
 use super::finding::{self, Finding};
 use super::scan::Scan;
-use std::fs;
-use std::path::Path;
 
 pub const RULE: &str = "fullscreen-triangle";
 const HOME: &str = "engine/shaders/fullscreen.wgsl";
@@ -48,14 +46,10 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
 }
 
 /// The rule over every shader under `engine/`.
-pub fn run(_: &Scan) -> Vec<Finding> {
-    crate::size::shaders_in(Path::new("engine"))
+pub fn run(scan: &Scan) -> Vec<Finding> {
+    scan.shaders()
         .iter()
-        .flat_map(|p| {
-            let path = p.to_string_lossy().into_owned();
-            let source = fs::read_to_string(p).unwrap_or_default();
-            judged(&path, &source)
-        })
+        .flat_map(|(path, source)| judged(path, source))
         .collect()
 }
 

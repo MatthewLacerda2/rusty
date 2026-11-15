@@ -15,9 +15,9 @@
 //! **Nothing is grandfathered** (#926). A file over its cap is split, never excused;
 //! the burn-down list this gate once read emptied and was retired.
 
+use crate::gates::Verdict;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::exit;
 
 mod listing;
 mod lua;
@@ -44,7 +44,6 @@ pub(crate) const SCAN_ROOTS: &[&str] = &["src", "crates", "tests", "fuzz", "tool
 const SIZE_ROOTS: &[&str] = &[
     "src", "crates", "tests", "fuzz", "tools", ".github", "engine",
 ];
-const REPORT: &str = ".lint/report.txt";
 
 /// The languages the size gate measures.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -78,44 +77,68 @@ impl Lang {
     }
 }
 
-/// Entry point: check `args` (explicit files) or, when empty, every size root.
-pub fn run(args: &[String]) {
+/// The gate over the repository at `base`: `args` (explicit files, relative to it)
+/// or, when empty, every size root; and the agent docs among them. Each file is
+/// judged and named by its path relative to `base`. Where git can't list the tree,
+/// the body says so.
+pub fn verdict(base: &Path, args: &[String]) -> Verdict {
+    let mut notes = Vec::new();
     let files: Vec<PathBuf> = if args.is_empty() {
-        full_scan(Path::new(""))
+        let (files, note) = full_scan(base);
+        notes.extend(note);
+        files
     } else {
-        args.iter().map(PathBuf::from).collect()
+        args.iter().map(|a| base.join(a)).collect()
     };
 
-    let violations: Vec<String> = files.iter().filter_map(|p| check_file(p)).collect();
-    let docs = crate::agent_docs::gate(args);
-    report(&violations, &docs);
-    if violations.is_empty() && docs.is_empty() {
-        println!("lint: ok");
-    } else {
-        exit(1);
+    let violations: Vec<String> = files.iter().filter_map(|p| check_file(base, p)).collect();
+    let (docs, note) = crate::agent_docs::gate(base, args);
+    notes.extend(note);
+    let (over, unshaped) = (violations.len(), docs.len());
+    let findings: Vec<String> = violations.into_iter().chain(docs).collect();
+    let mut verdict = Verdict::listed("lint", findings, |_| {
+        let mut advice = String::new();
+        if over > 0 {
+            advice.push_str(&format!(
+                "\n{over} file(s) over the size cap. Split them by responsibility; nothing \
+                 is grandfathered (see docs/linting.md).\n"
+            ));
+        }
+        if unshaped > 0 {
+            advice.push_str(&format!(
+                "\n{unshaped} agent-doc finding(s) (`CLAUDE.md`, skill files and \
+                 `.claude/agents/` definitions; docs/linting.md, *Agent docs*).\n"
+            ));
+        }
+        advice
+    });
+    for note in notes {
+        verdict.body.push_str(&note);
+        verdict.body.push('\n');
     }
+    verdict
 }
 
 /// Every measured file under [`SIZE_ROOTS`] in the repository at `base`: the
 /// committable ones git lists, or, where git can't list them (a tarball with no
-/// `.git`), every file on disk, build output aside, and a note on stderr saying so.
-fn full_scan(base: &Path) -> Vec<PathBuf> {
+/// `.git`), every file on disk, build output aside, with a note saying so.
+fn full_scan(base: &Path) -> (Vec<PathBuf>, Option<String>) {
     match listing::committable(base, SIZE_ROOTS) {
         Ok(files) => {
-            return files
-                .into_iter()
-                .filter(|p| Lang::of(p).is_some())
-                .collect()
+            let files = files.into_iter().filter(|p| Lang::of(p).is_some());
+            (files.collect(), None)
         }
-        Err(why) => eprintln!("{}", fallback_note(&why)),
+        Err(why) => {
+            let files = SIZE_ROOTS
+                .iter()
+                .flat_map(|root| measured_in(&base.join(root)))
+                .collect();
+            (files, Some(fallback_note(&why)))
+        }
     }
-    SIZE_ROOTS
-        .iter()
-        .flat_map(|root| measured_in(&base.join(root)))
-        .collect()
 }
 
-/// The stderr note for the disk walk: one line saying so, then git's own message
+/// The note for the disk walk: one line saying so, then git's own message
 /// (several lines for "dubious ownership") on lines of its own.
 fn fallback_note(why: &str) -> String {
     format!(
@@ -182,8 +205,11 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>, wanted: &dyn Fn(&Path) -> bool) {
 /// AND such a sibling, purely to fit the tight cap, fragments that unit — so the
 /// sibling carries the source cap ([`MAX_FILE_LINES`]), letting all of one source's
 /// tests live in one place. (See issue #211.) Only a real sibling earns it (#960).
-fn limit_for(path: &Path) -> usize {
-    let p = normalize(path);
+///
+/// `path` is the file on disk; it is judged by its part under `base`, so a
+/// `tests/` above the repository gives nothing the test cap.
+fn limit_for(base: &Path, path: &Path) -> usize {
+    let p = normalize(relative(base, path));
     let name = path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
@@ -238,12 +264,13 @@ fn is_tests_sibling(path: &Path) -> bool {
     dir.join(format!("{stem}.rs")).is_file() || dir.join(stem).is_dir()
 }
 
-/// The violation line for `path`, or `None` when it fits (or is not measured).
-fn check_file(path: &Path) -> Option<String> {
+/// The violation line for `path` (on disk, under `base`), or `None` when it fits
+/// (or is not measured).
+fn check_file(base: &Path, path: &Path) -> Option<String> {
     let lang = Lang::of(path)?;
     let content = fs::read_to_string(path).ok()?;
     let lines = lang.measure(&content);
-    let limit = limit_for(path);
+    let limit = limit_for(base, path);
     if lines <= limit {
         return None;
     }
@@ -255,42 +282,15 @@ fn check_file(path: &Path) -> Option<String> {
     };
     Some(format!(
         "FILE_TOO_LONG {} {lines}/{limit}{unit}",
-        normalize(path)
+        normalize(relative(base, path))
     ))
+}
+
+/// `path` with `base` stripped: what the repository at `base` calls it.
+fn relative<'a>(base: &Path, path: &'a Path) -> &'a Path {
+    path.strip_prefix(base).unwrap_or(path)
 }
 
 fn normalize(path: &Path) -> String {
     path.to_string_lossy().trim_start_matches("./").to_string()
-}
-
-fn report(violations: &[String], docs: &[String]) {
-    let mut body = if violations.is_empty() && docs.is_empty() {
-        String::from("lint: ok\n")
-    } else {
-        String::from("lint: FAILED\n")
-    };
-    for v in violations.iter().chain(docs) {
-        body.push_str(v);
-        body.push('\n');
-    }
-    fs::create_dir_all(".lint").ok();
-    fs::write(REPORT, &body).ok();
-    if violations.is_empty() && docs.is_empty() {
-        return;
-    }
-    eprint!("{}", body);
-    if !violations.is_empty() {
-        eprintln!(
-            "\n{} file(s) over the size cap. Split them by responsibility; nothing is \
-             grandfathered (see docs/linting.md).",
-            violations.len()
-        );
-    }
-    if !docs.is_empty() {
-        eprintln!(
-            "\n{} agent-doc finding(s) (`CLAUDE.md`, skill files and `.claude/agents/` \
-             definitions; docs/linting.md, *Agent docs*).",
-            docs.len()
-        );
-    }
 }

@@ -17,7 +17,12 @@ fn defaults_follow_unity() {
         "Unity's Game view starts without"
     );
     let game: Vec<_> = Gizmo::ALL.iter().filter(|g| g.row().game).collect();
-    assert_eq!(game, [&Gizmo::GameGizmos], "the Game tab's one toggle");
+    assert_eq!(
+        game,
+        [&Gizmo::GameGizmos, &Gizmo::Stats],
+        "the Game tab's toggles"
+    );
+    assert!(!set.on(Gizmo::Stats), "Unity's Stats starts closed");
 }
 
 /// Every row's name finds its own gizmo, and the names are unique.

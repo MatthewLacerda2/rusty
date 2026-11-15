@@ -3,11 +3,15 @@
 
 use super::finding::Finding;
 use super::test_code;
+use std::cell::OnceCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 pub struct Scan {
+    /// The repository scanned, `""` for the working directory: what a rule
+    /// reading past the scanned files (a manifest, a shader, git) reads under.
+    pub base: PathBuf,
     /// Every `.rs` file under [`crate::size::SCAN_ROOTS`], `/`-separated.
     pub files: Vec<String>,
     sources: BTreeMap<String, String>,
@@ -16,16 +20,13 @@ pub struct Scan {
     test_lines: BTreeMap<String, Vec<bool>>,
     /// The layer table's sim modules (`src/<module>`).
     pub sim_dirs: Vec<String>,
+    /// [`Scan::shaders`], walked and read on first ask.
+    shaders: OnceCell<Vec<(String, String)>>,
 }
 
 impl Scan {
-    /// Walk [`crate::size::SCAN_ROOTS`] and read every file once.
-    pub fn load() -> Self {
-        Self::at(Path::new(""))
-    }
-
-    /// [`Scan::load`] for the files of the repository at `base`; paths stay
-    /// relative to it. `sim_dirs` still comes from this build's layer table, not
+    /// Walk [`crate::size::SCAN_ROOTS`] of the repository at `base` (`""` for the
+    /// working directory) and read every file once; paths stay relative to it. `sim_dirs` still comes from this build's layer table, not
     /// from `base`: the table is code, compiled in.
     pub fn at(base: &Path) -> Self {
         let found: Vec<PathBuf> = crate::size::SCAN_ROOTS
@@ -60,11 +61,39 @@ impl Scan {
             })
             .collect();
         Self {
+            base: base.to_path_buf(),
             files,
             sources,
             test_lines,
             sim_dirs: crate::layers::sim_dirs(),
+            shaders: OnceCell::new(),
         }
+    }
+
+    /// [`Scan::base`] as a directory to list or run git in: `.` for the working
+    /// directory, since `read_dir("")` fails.
+    pub fn root(&self) -> &Path {
+        if self.base.as_os_str().is_empty() {
+            Path::new(".")
+        } else {
+            &self.base
+        }
+    }
+
+    /// Every `.wgsl` shader under `engine/`, by its path relative to [`Scan::base`],
+    /// with its text: what the shader rules read, beside the scanned `.rs` files.
+    /// Walked and read once, however many rules ask.
+    pub fn shaders(&self) -> &[(String, String)] {
+        self.shaders.get_or_init(|| {
+            crate::size::shaders_in(&self.base.join("engine"))
+                .iter()
+                .map(|p| {
+                    let rel = p.strip_prefix(&self.base).unwrap_or(p);
+                    let text = fs::read_to_string(p).unwrap_or_default();
+                    (rel.to_string_lossy().into_owned(), text)
+                })
+                .collect()
+        })
     }
 
     /// The text of a scanned file; empty for any other path.

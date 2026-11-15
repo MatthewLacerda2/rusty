@@ -51,6 +51,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Function ("endpoint") length | clippy `too_many_lines` + `tools/lint -- --determinism` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]`; its one exception, `Renderer::assemble`, is locked (`ESCAPE`, #961) |
 | Fuzz target compiles | `make fuzz-check` (`.github/scripts/fuzz_gate.py check`: `cargo check --manifest-path fuzz/Cargo.toml --locked --target-dir target/fuzz`) | **hard gate**: `fuzz/` is its own workspace, so no other gate builds it; this checks it on the pinned stable toolchain, `--locked` to a `fuzz/Cargo.lock` it first derives from the root `Cargo.lock` (`make fuzz-lock`; gitignored, so nothing drifts), and fails if that derivation moves a shared package off the root's version. A second cold engine build, so CI's `fuzz-check` job and `make gates` build only when the diff matches `ci.yml`'s `fuzz` filter (the one list both read; nightly always), and say they skipped otherwise; `make fuzz-check` by name always builds. The fuzz-only crates (`libfuzzer-sys`, `arbitrary`) are pinned exactly in `fuzz/Cargo.toml` |
 | Lint exceptions carry a reason | clippy `allow_attributes` + `allow_attributes_without_reason` | **hard gate**: an exception is `#[expect(lint, reason = "…")]` (outer `#[allow]` is denied; a module-root `#![allow]` still needs its `reason`), and an expectation that no longer fires fails too (#961) |
+| Lint gates and rules are wired | `make test-lint` (`gates_tests.rs`, `rules/wiring.rs`) | **hard gate**: every row of `gates::GATES` and of `rules::RULES` is run, through the entry point the tool dispatches, over a scratch repository it must flag, and must report the planted file; a row with no such case fails naming it, so a gate emptied to "no findings" or no longer reached cannot stay green |
 | Local gate = CI gate | `unittest` (`make scripts`, `test_gate_mirror.py`) | **hard gate**: every command a `GATES` recipe runs appears in a step of `ci.yml`/`lint.yml`, and every clippy run passes nothing after `--` but `-D warnings` (#964) |
 | Merge helpers | `unittest` (`make scripts`) | **hard gate**: `.github/scripts/tests` pass — `make mergeable` judges every merge, and the ruleset's required checks (`make ruleset`, #491) cannot tell a draft's run from a ready one (#486) |
 | Module layering | `tools/lint -- --layers` | **hard gate**: the declared table (`tools/lint/src/layers/table.rs`) equals the workspace's manifests (each row's `deps` and `uses` are its crate's `[dependencies]`), rows run bottom-up, no sim crate depends on a platform one or names a display crate (the `wgpu` and `egui` families: `wgpu`, `wgpu_*`, `egui`, `egui_*`), not even as a dev-dependency, no sim crate's dev-dependency is a platform sibling, no dev-dependency reaches up, `test-support` names no sibling and no display crate, and nothing declared is unused (#724, #938, #494) |
@@ -121,7 +122,10 @@ untracked ones `.gitignore` doesn't exclude (`git ls-files --cached --others
 --exclude-standard`), so what the engine seeds into a gitignored folder (the UI
 kit's scripts and the default shader it copies into the fixture project's
 `assets/`) never counts, and a new file is measured before it is added. Where git
-can't list them (a tarball with no `.git`) it walks the disk and says so on stderr.
+can't list them (a tarball with no `.git`) it walks the disk and says so in its
+report, as it does when the agent docs go unchecked for the same reason. Each file
+is judged and named by its path in the repository, so a checkout under a `tests/`
+folder gives no source file the test cap.
 The code gates (rules, layers, determinism, components, parity) keep
 walking the disk: they check what cargo compiles, and an ignored `.rs` file is
 compiled all the same, which is the file the `ignored` rule flags.
@@ -289,9 +293,9 @@ inline comment, on the flagged line or in the comment/attribute lines right abov
 ```
 
 The reason is required; an allow without one is itself a finding (`[allow]`). A new
-rule is a module with its own `<rule>_tests.rs`, one line in the sorted `mod` list
-and one row in the sorted `RULES` table of `tools/lint/src/rules/mod.rs` (#911): no
-new flag, gate, CI step or baseline.
+rule is a module with its own `<rule>_tests.rs`, one line in the sorted `mod` list,
+one row in the sorted `RULES` table of `tools/lint/src/rules/mod.rs` (#911) and its
+must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
 
 <!-- sorted: each rule is one section, so two branches adding a rule land on different lines (#1409) -->
 - **`active-self`** (#1363) — every system read an entity's own `active` flag, so

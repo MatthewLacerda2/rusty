@@ -96,9 +96,9 @@ pub fn check_source(path: &str, test: &[bool]) -> Option<Finding> {
     })
 }
 
-/// The rule over the root manifest and every root `src/` file.
+/// The rule over the root manifest (under `scan.base`) and every root `src/` file.
 pub fn run(scan: &Scan) -> Vec<Finding> {
-    let text = std::fs::read_to_string(MANIFEST).unwrap_or_default();
+    let text = std::fs::read_to_string(scan.base.join(MANIFEST)).unwrap_or_default();
     let mut found = check_manifest(&text);
     found.extend(
         scan.files

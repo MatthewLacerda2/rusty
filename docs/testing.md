@@ -854,12 +854,19 @@ Harness.AssertBudget{ draw_calls = 2000, lights_dropped = 0, fixed_update_ms = 4
   `triangles`, `lights_dropped`, `entities`, …) for a regression guard that must hold on
   every machine. A `_ms` budget measures *this* machine — CI runners are slow software
   adapters — so keep it generous or for local profiling only.
-- **Where the numbers land:** `results.json` gains a `stats` block with the counts only,
-  so a replay stays byte-identical; `<out_dir>/stats.json` holds everything, per-system
+- **Where the numbers land:** `results.json` gains a `stats` block with the counts only
+  (`frames`, `drawn_frames` and the count metrics), so a replay stays byte-identical; `<out_dir>/stats.json` holds everything, per-system
   timings included.
 - Budgets are **opt-in per scenario**, never a CI gate of their own.
 - `Harness.Render()` draws the current frame without writing a PNG — the cheap way to
   get render counters and GPU time (`gpu_ms`, `gpu_passes`, #835) every tick.
+- **The live window is measured too** (#2205): in a `dev` build every frame the
+  editor or the player draws records its render counters, `renderer_ms`, GPU time
+  and its wall-clock `wall_ms` / `fps`, so an agent attached with `session-mcp
+  --attach` profiles the frame the operator is looking at with
+  `Debug.Stats{ window = 120 }` (the last 120 drawn frames, edit mode's too), the
+  table the Game view's **Stats** overlay shows; `Debug.Stats()` keeps Play's frames
+  alone. No second process, no scenario file.
 
 ## Benchmark: `make bench` (#835)
 Measure before optimising: `make bench` runs

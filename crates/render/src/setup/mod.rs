@@ -59,8 +59,8 @@ impl Renderer {
         // 3. Create Device & Queue
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
-                // What the GPU has of `limits::OPTIONAL`.
-                required_features: adapter.features() & limits::OPTIONAL,
+                // What the GPU has of `limits::OPTIONAL`, and a dev build's timestamps.
+                required_features: adapter.features() & limits::WINDOW,
                 required_limits: limits::device_limits(),
                 label: None,
                 ..Default::default()

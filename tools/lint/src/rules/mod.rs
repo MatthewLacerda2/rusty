@@ -1,10 +1,11 @@
 //! The rules gate (#934): every check that reports a [`Finding`] and honours the
 //! shared inline allow (`finding.rs`). A new rule is a module with its own
-//! `<rule>_tests.rs`, plus one line in the sorted `mod` list and one row in the
-//! sorted [`RULES`] (#911): not a new flag, gate or baseline.
+//! `<rule>_tests.rs`, plus one line in the sorted `mod` list, one row in the
+//! sorted [`RULES`] (#911) and its must-flag case in `wiring.rs`: not a new flag,
+//! gate or baseline.
 //!
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --rules`
-//! Exit code 1 on any finding; report mirrored to `.lint/report.txt`.
+//! Exit code 1 on any finding; report mirrored to `.lint/report.txt` (`gates.rs`).
 
 mod finding;
 mod scan;
@@ -49,21 +50,20 @@ mod test_shape;
 mod unwrap;
 mod world_space;
 
+use crate::gates::Verdict;
 pub use finding::{allowed, allowed_in, unexplained, Finding};
 use scan::Scan;
 use std::collections::BTreeMap;
-use std::fs;
-use std::process::exit;
-
-const REPORT: &str = ".lint/report.txt";
+use std::path::Path;
 
 /// Whether an inline `lint: allow(<rule>) <why>` may excuse a rule's findings.
 #[derive(PartialEq)]
 enum Allow {
     Inline,
     /// Nothing may excuse it: `ignored` and `orphan-seeds`, whose fixes are a
-    /// `.gitignore` pattern and a moved file, and `key-guard`, whose finding sits on a
-    /// manifest, where no inline allow can go.
+    /// `.gitignore` pattern and a moved file, `key-guard`, whose finding sits on a
+    /// manifest, where no inline allow can go, and `root-tests`, whose fix is the
+    /// manifest key or a moved test.
     Never,
     /// The rule reads its own allows, so it can report a stale one
     /// (`api-parity`, whose allow sits on the op, not on the finding's cause;
@@ -76,69 +76,79 @@ enum Allow {
 /// A rule: every finding it has over the scan.
 type Rule = fn(&Scan) -> Vec<Finding>;
 
-/// Every rule. A new rule is one row, in its sorted place.
-const RULES: &[(Rule, Allow)] = &[
+/// Every rule, by the name its findings carry (a rule reporting several names,
+/// `test-shape`'s, goes by one). A new rule is one row, in its sorted place, and a
+/// must-flag case in `wiring.rs`, whose test fails naming any row without one.
+const RULES: &[(&str, Rule, Allow)] = &[
     // sorted: rules are independent; allows apply to each rule's own findings
-    (active_self::run, Allow::Inline),
-    (api_parity::run, Allow::Own),
-    (asset_write::run, Allow::Inline),
-    (atomic_write::run, Allow::Inline),
-    (body_table::run, Allow::Inline),
-    (cfg_test_switch::run, Allow::Inline),
-    (converter_log::run, Allow::Inline),
-    (dir_size::run, Allow::Own),
-    (drag_range::run, Allow::Inline),
-    (ecs_write::run, Allow::Inline),
-    (engine_spawn::run, Allow::Inline),
-    (entity_arg::run, Allow::Inline),
-    (full_literal::run, Allow::Inline),
-    (fullscreen_triangle::run, Allow::Inline),
-    (ignored::run, Allow::Never),
-    (key_guard::run, Allow::Never),
-    (log_tag::run, Allow::Inline),
-    (markers::run, Allow::Inline),
-    (named_enum::run, Allow::Inline),
-    (orphan_module::run, Allow::Own),
-    (orphan_seeds::run, Allow::Never),
-    (physics_borrow::run, Allow::Inline),
-    (platform_cfg::run, Allow::Inline),
-    (prefix::run, Allow::Inline),
-    (read_keys::run, Allow::Inline),
-    (root_tests::run, Allow::Never),
-    (sanitize::run, Allow::Inline),
-    (self_path::run, Allow::Inline),
-    (skip::run, Allow::Inline),
-    (sorted::run, Allow::Inline),
-    (stored_format::run, Allow::Inline),
-    (subprocess::run, Allow::Inline),
-    (temp_dir::run, Allow::Inline),
-    (test_shape::run, Allow::Inline),
-    (unwrap::run, Allow::Inline),
-    (world_space::run, Allow::Inline),
+    (active_self::RULE, active_self::run, Allow::Inline),
+    (api_parity::RULE, api_parity::run, Allow::Own),
+    (asset_write::RULE, asset_write::run, Allow::Inline),
+    (atomic_write::RULE, atomic_write::run, Allow::Inline),
+    (body_table::RULE, body_table::run, Allow::Inline),
+    (cfg_test_switch::RULE, cfg_test_switch::run, Allow::Inline),
+    (converter_log::RULE, converter_log::run, Allow::Inline),
+    (dir_size::RULE, dir_size::run, Allow::Own),
+    (drag_range::RULE, drag_range::run, Allow::Inline),
+    (ecs_write::RULE, ecs_write::run, Allow::Inline),
+    (engine_spawn::RULE, engine_spawn::run, Allow::Inline),
+    (entity_arg::RULE, entity_arg::run, Allow::Inline),
+    (full_literal::RULE, full_literal::run, Allow::Inline),
+    (
+        fullscreen_triangle::RULE,
+        fullscreen_triangle::run,
+        Allow::Inline,
+    ),
+    (ignored::RULE, ignored::run, Allow::Never),
+    (key_guard::RULE, key_guard::run, Allow::Never),
+    (log_tag::RULE, log_tag::run, Allow::Inline),
+    (markers::RULE, markers::run, Allow::Inline),
+    (named_enum::RULE, named_enum::run, Allow::Inline),
+    (orphan_module::RULE, orphan_module::run, Allow::Own),
+    (orphan_seeds::RULE, orphan_seeds::run, Allow::Never),
+    (physics_borrow::RULE, physics_borrow::run, Allow::Inline),
+    (platform_cfg::RULE, platform_cfg::run, Allow::Inline),
+    (prefix::RULE, prefix::run, Allow::Inline),
+    (read_keys::RULE, read_keys::run, Allow::Inline),
+    (root_tests::RULE, root_tests::run, Allow::Never),
+    (sanitize::RULE, sanitize::run, Allow::Inline),
+    (self_path::RULE, self_path::run, Allow::Inline),
+    (skip::RULE, skip::run, Allow::Inline),
+    (sorted::RULE, sorted::run, Allow::Inline),
+    (stored_format::RULE, stored_format::run, Allow::Inline),
+    (subprocess::RULE, subprocess::run, Allow::Inline),
+    (temp_dir::RULE, temp_dir::run, Allow::Inline),
+    (test_shape::INNER_CFG, test_shape::run, Allow::Inline),
+    (unwrap::RULE, unwrap::run, Allow::Inline),
+    (world_space::RULE, world_space::run, Allow::Inline),
 ];
 
-/// Entry point: run every rule over [`crate::size::SCAN_ROOTS`].
-pub fn run() {
-    let scan = Scan::load();
+/// The gate over the repository at `base`: every rule over
+/// [`crate::size::SCAN_ROOTS`], each allow it honours applied.
+pub fn verdict(base: &Path, _: &[String]) -> Verdict {
+    let scan = Scan::at(base);
+    let findings = all(&scan);
+    let body = render(&findings, &crowded(&scan.dirs()));
+    Verdict {
+        findings: findings.iter().map(ToString::to_string).collect(),
+        body,
+        advice: String::new(),
+    }
+}
+
+/// Every rule's findings over `scan`, minus what an inline allow excuses, plus
+/// every allow without a reason.
+fn all(scan: &Scan) -> Vec<Finding> {
     let mut findings = Vec::new();
-    for (rule, allow) in RULES {
-        let mut found = rule(&scan);
+    for (_, rule, allow) in RULES {
+        let mut found = rule(scan);
         if *allow == Allow::Inline {
             found.retain(|f| !finding::allowed(scan.source(&f.path), f.line, f.rule));
         }
         findings.extend(found);
     }
     findings.extend(scan.each_file(finding::unexplained));
-
-    let body = render(&findings, &crowded(&scan.dirs()));
-    fs::create_dir_all(".lint").ok();
-    fs::write(REPORT, &body).ok();
-    if findings.is_empty() {
-        print!("{body}");
-    } else {
-        eprint!("{body}");
-        exit(1);
-    }
+    findings
 }
 
 /// Directories past the ≲10-files aim, most crowded first, counted as `dir-size`
@@ -183,3 +193,5 @@ fn render(findings: &[Finding], crowded: &[(&str, usize)]) -> String {
 
 #[cfg(test)]
 mod lockfile_tests;
+#[cfg(test)]
+mod wiring;

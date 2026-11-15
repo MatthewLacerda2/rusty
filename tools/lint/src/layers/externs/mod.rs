@@ -74,7 +74,9 @@ fn uses(tree: &Tree, crates: &BTreeSet<String>) -> Vec<Use> {
         let Some(module) = tree.owner(file) else {
             continue;
         };
-        let norm = file.to_string_lossy().into_owned();
+        // As the repository names it: a confinement is judged by module path.
+        let at = file.strip_prefix(&tree.root).unwrap_or(file);
+        let norm = at.to_string_lossy().into_owned();
         for r in find::crate_refs(content, crates) {
             out.push(Use {
                 module: module.clone(),

@@ -287,7 +287,8 @@ list below is a summary of it. Each entry has the `op` tag, its `category`
 (`min_inputs` to `max_inputs`; a node outside that range is an error), and its
 `params`. Each param has a
 `name`, a `type` (`number` | `integer` | `bool` | `color` | `vec2` |
-`enum` | `stops` | `path`, a project-relative file path), `required`, a `default` when it has one (absent when required),
+`enum` | `stops` | `path`, a project-relative file path | `text`, an `expression`
+formula), `required`, a `default` when it has one (absent when required),
 `socket` (whether it takes a link to another node, *Linked params* below), and for an
 `enum` the accepted `values`. Units and rounding are the ones *Tiling*
 and *Units* below describe. A unit test holds the catalog to the recipe parser, so
@@ -419,6 +420,36 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   crack rims. A pixel the line only partly covers reads the share it covers, so a
   line thinner than a pixel at a low `resolution` fades rather than vanishing, and
   the map's mean holds across resolutions. A mask with no edge reads black.
+- `expression {expr="0", r="", g="", b="", a_out="", k1=0, k2=0, k3=0, k4=0}` (*math*,
+  0 to 4 inputs, exactly the ones its formulas name): each pixel from a formula,
+  Substance's *Pixel Processor*: `{ op = "expression", expr = "0.5 + 0.5 * sin(tau *
+  (8 * u + 0.3 * a))", inputs = {"warp"} }`. `expr` writes R, G and B (grayscale,
+  alpha 1); `r`, `g` and `b` each replace it on their channel (a channel left blank
+  reads `expr`, 0 by default), and `a_out` writes alpha (1 when blank). A formula
+  reads `u` and `v` (the pixel centre, what `coordinates` writes), `pi`, `tau`, the
+  inputs `a`, `b`, `c`, `d` in wiring order (a bare name is red; `a.r`, `a.g`, `a.b`,
+  `a.a` pick a channel) and `k1`–`k4`, numbers a link or a graph param can drive. It
+  has `+ - * /`, `^` (power, binding right and tighter than unary minus: `-a ^ 2` is
+  `-(a ^ 2)`), parentheses, the comparisons `< <= > >= == !=` (1 or 0), and `min max
+  abs floor ceil round fract mod sqrt pow exp log sin cos tan atan2 clamp mix step
+  smoothstep sign` (radians, as `math`; `mod` and `step`/`smoothstep` as GLSL's). The
+  functions `math` also has are `math`'s, edges included, so a formula bakes the bytes
+  of its `math` chain: `x / 0` is 0, `sqrt` of a negative is 0, and `^` reads a
+  negative base as 0 and raises that (`(-2) ^ 0` is 1, `(a - 0.5) ^ -1` is `inf`
+  wherever `a <= 0.5`); `log` of x ≤ 0 and `mod` by 0 are 0. `exp` of a large value,
+  `tan` near a pole and a negative power of 0 give `inf`, which the bake keeps: a PNG
+  clamps it to white (black for `-inf`), and an op reading it may make NaN of it
+  (`inf - inf`), which a PNG writes as 0. A zero's sign comes out the same on every
+  platform (`min`, `max`, `clamp` and the rest compare it explicitly). The formulas
+  compile when the recipe is parsed: a typo, an input named but not wired, a wired one
+  never named (each refused by its letter), `c` named without `b`, or `expr` written
+  beside all of `r`, `g` and `b` is refused naming the node, the field, the column and
+  the fix. A formula can be a graph's `text` param (`expr = { param = "f" }`): it
+  compiles when the instance passes it. A formula is at most 4096 characters and nests
+  at most 64 deep. A formula of `u` and `v` tiles only when it is periodic in them
+  (`sin(tau * 3 * u)` does, `u` does not), as `coordinates` says of itself. No
+  sampling inside a formula: compute the coordinates here and feed them to
+  `sample_at`, which filters by the footprint.
 - `flood_bbox {output="size"|"center_x"|"center_y"}` (*filter*, 1 input:
   `flood_fill`'s): one flat grey per island from its bounding box, like Substance's
   *Flood Fill to BBox Size / Position*: `size` is the box's longer side in tiles,
@@ -528,6 +559,35 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   its average instead of aliasing. A jump in the coordinates (a `fract` wrap) is not
   taken as a footprint, so it stays sharp. `sample_at` of `coordinates` is A
   unchanged.
+- `scatter {amount=32, scale=0.2, scale_jitter=0, rotation=0, rotation_jitter=0,
+  value_jitter=0, spacing=0, density=1, output="stamp"|"random"|"index",
+  blend="max"|"add"|"over", seed=0}` (*vector*, 1–8 inputs, each a stamp): free
+  placement off any grid, Substance Designer's *Shape Splatter*: gravel, aggregate,
+  pebbles on sand, leaves, debris, clumped here and bare there. Places `amount`
+  stamps (a whole count, 0–65 536) at seeded points over the tile, each one of the
+  inputs picked by hash (three pebble shapes in one pass), `scale` tiles across
+  times `1 ± scale_jitter/2` (scale up to 1, jitter 0–1), turned `rotation` turns
+  plus up to ±`rotation_jitter`/2 (0–1). Each input is read as **one stamp**, as
+  `tile` reads its one. `density` (0–1) is the chance a stamp is drawn: link a mask
+  to clump or clear. `density`, `scale` and `rotation` are read once per stamp at
+  its centre, wrapped. `spacing` (0–1): at 0 the points are purely random (clumps
+  and overlaps); toward 1 each stamp keeps away from the earlier ones, its centre at
+  least `spacing ×` the smaller of `scale` (its largest, if linked) and
+  `√(0.5 / amount)` from theirs, the first of 32 seeded candidates that is; a stamp
+  with no such candidate is left out. `output`, `value_jitter` and `blend` mean what
+  they do on `tile`, `"index"` being `(i + 1) / amount` and `over` laying the stamps
+  in index order. Stamp `i`'s place and draws come from the seed and `i` alone, each
+  from its own hash stream, so raising `amount` adds stamps and moves none (but
+  under `"index"`, and under `spacing` once `√(0.5 / amount)` is the smaller), and
+  adding a param reshuffles nothing. A NaN number reads its default, an
+  out-of-range one is clamped; a stamp whose `density` or `scale` reads NaN, or
+  whose scale is 0 or less, is not drawn. Tiles at any resolution. Cost follows how many
+  stamps can cover a texel, not the largest stamp: each is filed in buckets of its
+  own size. Measured in the dev container (release build, one core, 2048²): about
+  0.35 s at the defaults, 1.6 s for 2000 turned pebbles 0.03 across, 4.4 s for
+  65 536 stamps 0.01 across, 1.7 s for 500 stamps 0.1 across under `over`, and
+  8.5 s for 65 536 stamps 0.01 across with `scale` linked to a map that makes a few
+  dozen of them up to a tile wide (the worst measured: those few cover every texel).
 - `separate_rgb {channel=0..3}` (*vector*, 1 input).
 - `shape {kind="circle"|"rect"|"rounded_rect"|"line"|"polygon"|"star", size=[w,h],
   roundness=0.25, softness=0, sides=6, points=5, inner_radius=0.5,
@@ -565,18 +625,24 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   running off a shape: a noise through `slope_blur` on a `shape`'s height runs down its
   sides. The reach caps at one tile. `samples + 5` reads a pixel: an estimate of
   about 1–2 s of one core at 2048² with 8 samples.
-- `tile {count, jitter=0, rotation_jitter=0, scale_jitter=0, value_jitter=0,
-  probability=1, output="stamp"|"random"|"index", blend="max"|"add"|"over", seed=0}`
-  (*vector*, 1–3 inputs: the stamp, then an optional mask, then an optional size
-  map): Substance Designer's *Tile Sampler* essentials. Stamps input 1 once per cell
-  of a `count`×`count` grid; each cell is seeded from the recipe and node `seed` with
+- `tile {count, aspect={1,1}, offset=0, jitter=0, rotation_jitter=0, scale_jitter=0,
+  value_jitter=0, probability=1, output="stamp"|"random"|"index", blend="max"|"add"|"over",
+  seed=0}` (*vector*, 1–3 inputs: the stamp, then an optional mask, then an optional
+  size map): Substance Designer's *Tile Sampler* essentials. Stamps input 1 once per
+  cell of a `count × aspect` grid, across and down, each rounded on its own:
+  `count = 4, aspect = {1, 4}` is 4 × 16 cells, and a stamp fills its cell's shape
+  (a square stamp becomes a plank). `offset` (0–1) shifts every other row by that
+  share of a cell, 0.5 a running bond (shingles, staggered lugs, a bond of any
+  stamp); with an offset the row count rounds to even, so the stagger closes at
+  the wrap. Offsets are in cells; a turn is rigid in the tile, the stamp stretched
+  to its cell's shape and then turned, so a jittered plank tilts rather than skews. Each cell is seeded from the recipe and node `seed` with
   an offset of up to ±`jitter`/2 cells, a turn of up to ±`rotation_jitter`/2 turns
   and a scale in `1 ± scale_jitter/2`, each jitter clamped to 0–1. The input is read
   as **one stamp** — the unit square, nothing outside it — so give it empty margins
   (a `shape` smaller than the tile); a stamp pushed over its cell's border is drawn
   into the neighbour cell. `output = "random"` fills each stamp with the input's red
   times its own seeded grey (per-rivet tint, per-pebble height); `"index"` with the
-  red times the cell's row-major index `(i + 1) / count²`. `value_jitter` (0–2)
+  red times the cell's row-major index `(i + 1) / cells`. `value_jitter` (0–2)
   multiplies each stamp by `1 ± value_jitter/2`. `probability` (0–1) is the chance a
   cell gets a stamp. Input 2, the mask: no stamp in a cell whose centre reads below
   0.5 red. Input 3, the size map: the red at the cell's centre scales that stamp
@@ -650,17 +716,19 @@ number.
 - `bump_to_normal.strength`: read at each pixel.
 - `curvature.strength`: read at each pixel.
 - `distance.radius`: read at each pixel.
+- `expression.k1`, `expression.k2`, `expression.k3`, `expression.k4`: read at each pixel.
 - `gamma.gamma`: read at each pixel.
 - `histogram_scan.position`, `histogram_scan.contrast`: read at each pixel.
 - `hue_sat_value.hue`, `hue_sat_value.sat`, `hue_sat_value.value`: read at each pixel.
 - `noise.gain`: read at each pixel.
 - `normal_blend.strength`: read at each pixel.
+- `scatter.density`, `scatter.scale`, `scatter.rotation`: read once per stamp, at its centre.
 - `shape.softness`: read at each pixel.
 - `tile.jitter`, `tile.rotation_jitter`, `tile.scale_jitter`: read once per cell.
 - `voronoi.randomness`: read once per cell.
 - `warp.strength`: read at each pixel.
 
-A param read **once per cell** is read at the cell's centre, wrapped, so each cell
+A param read **once per cell** (or per stamp) is read at the cell's (or stamp's) centre, wrapped, so each cell
 keeps one stamp or one point and the result still tiles. A blur's radius varies
 smoothly: sharp where the link is dark, soft where it is bright, each pixel averaging
 its own window in constant time whatever its width. A Gaussian is still three
@@ -669,7 +737,7 @@ rounded to a whole pixel as a number's box is (a rounded radius would step visib
 across the map), so it matches the number only at whole-pixel radii.
 
 **What never links:** a whole count (`scale`, `octaves`, `lacunarity`, `rows`,
-`cols`, `tiles`, `count`, `frequency`). A count that changed from pixel to pixel
+`cols`, `tiles`, `count`, `amount`, `frequency`). A count that changed from pixel to pixel
 could not stay whole, so it would open seams or cut visibly where it stepped. Nor do
 `mapping`'s params (a per-pixel translation is `warp`, and a per-pixel scale or
 rotation would break the tiling), enums, colours or `size`. `mix.factor` and
@@ -768,11 +836,11 @@ file is refused. Every recipe may be one; two optional fields give it an interfa
 - **`params`**: name → `{ type, default, min?, max? }`, `type` one of `number`,
   `integer`, `bool`, `color`, `text` (`min`/`max` for the first two). Any node value
   may be the placeholder `{ param = "age" }`, a whole param (a number, a colour, an
-  enum or an `image` node's path as `text`, a seed), whether the param takes a link
-  or not. An instance's own `path` is the one value that takes none, and is refused:
-  the graph files are read before any param has a value. A recipe
-  with `params` baked on its own bakes at the defaults, and `Texture.ToJson` writes
-  the placeholders back.
+  enum, an `image` node's path or an `expression` formula as `text`, a seed), whether
+  the param takes a link or not. An instance's own `path` is the one value that takes
+  none, and is refused: the graph files are read before any param has a value. A
+  recipe with `params` baked on its own bakes at the defaults, and `Texture.ToJson`
+  writes the placeholders back.
 - **`inputs`**: an ordered list of names inner nodes read like node ids (in
   `inputs` and in links). A graph with inputs bakes only through an instance.
 - **Outputs** are the recipe's own `output` (or its last node) and `outputs`. An
@@ -835,7 +903,9 @@ field stays a number, so `4.5` is accepted — it bakes as `5`), and capped at 2
 | anisotropic_noise | `angle` | the nearest tiling direction, see its bullet |
 | brick | `cols` | nearest whole number ≥ 1 |
 | brick | `rows` | nearest **even** number ≥ 2 (the half-brick offset must close at the wrap) |
-| tile | `count` | nearest whole number ≥ 1 |
+| tile | `count × aspect`, per axis | nearest whole number ≥ 1, across and down on their own |
+| tile (`offset > 0`) | `count × aspect` down | nearest **even** number ≥ 2 (the stagger must close at the wrap) |
+| scatter | `amount` | nearest whole number ≥ 0 (placement is free: any count tiles) |
 | checker | `tiles` | up to **even** (an odd count puts two same-colour squares together at the wrap) |
 | mapping (`tiling = true`) | `scale` | nearest whole number ≥ 1 per axis |
 | mapping (`tiling = true`) | `rotation` | nearest quarter turn |
@@ -845,7 +915,8 @@ maps that are never tiled; it opens a seam. `gradient linear` (0→1 left to rig
 `coordinates` (the same ramp on each axis) are the generators that do **not** tile —
 each has a hard edge at the wrap; use one under a mask, or use `linear_tiling` (0→1→0)
 for a seamless ramp. `coordinates` is meant for `sample_at`, whose output tiles when
-the function of the coordinates does (`sin` and `cos` of `2π u` do). `gradient radial` and
+the function of the coordinates does (`sin` and `cos` of `2π u` do). So does `expression`'s
+output when its formula is periodic in `u` and `v`. `gradient radial` and
 `wave rings` meet the edge mirror-symmetrically: continuous across the seam, and so
 does `shape` (a shape larger than the tile is clipped at the edge, symmetrically;
 a `polygon` or `star`, which an odd count leaves lopsided top to bottom, is instead
@@ -871,6 +942,9 @@ and 2048² (iterate at a low `resolution`, ship at a high one):
   slopes the same across and down, as on a mesh mapped at an even texel density.
 - `shape.size` and `shape.softness` are in tiles (`size = [0.5, 0.5]` is half the
   tile each way); under `tile`, that is a fraction of one cell.
+- `scatter.scale` is a stamp's size in tiles; `scatter.rotation` and
+  `.rotation_jitter` are in turns; `scatter.spacing` is a share of the gap its
+  bullet derives, in tiles. `tile.offset` is a share of one cell.
 - `distance.radius` is in tiles: the distance from the edge that reads 1.
 - `cavity.radius` is a tile fraction like `blur.radius`; `curvature.radius` is a
   distance in tiles, sampled bilinearly (so sub-pixel radii stay smooth).

@@ -87,9 +87,11 @@ fn register_logging(
     )
 }
 
-/// `Debug.Stats()` — the frame stats (#433) as a table: `frames`, each metric's
+/// `Debug.Stats([opts])` — the frame stats (#433) as a table: `frames`, each metric's
 /// `{last, min, avg, max, samples}`, and `systems` (per-system CPU ms). Filled by the
-/// dev layer's schedule probe; empty (`frames = 0`) where none is installed.
+/// dev layer's schedule probe; empty (`frames = 0`) where none is installed. With
+/// `opts.window = n`, each metric over the samples it took within the newest `n`
+/// drawn frames and the newest `n` ticks only (#2205).
 fn register_stats(
     lua: &mlua::Lua,
     table: &Table,
@@ -98,8 +100,12 @@ fn register_stats(
     put(
         table,
         "Stats",
-        lua.create_function(move |lua, ()| {
-            stats.with(lua, |stats| crate::stats::to_lua(lua, &stats.borrow()))
+        lua.create_function(move |lua, opts: Option<Table>| {
+            let window = crate::stats::window_opt(opts)?;
+            stats.with(lua, |stats| match window {
+                Some(n) => crate::stats::to_lua(lua, &stats.borrow().window(n)),
+                None => crate::stats::to_lua(lua, &stats.borrow()),
+            })
         }),
     )
 }
