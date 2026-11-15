@@ -217,10 +217,15 @@ fn kept(repo: &Repo, name: &str, path: &str) -> usize {
         .count()
 }
 
-/// Every row's `Allow` is the one the gate applies: an inline allow above its
-/// must-flag finding excuses an `Inline` row's, and an `Own` row's as the rule
-/// itself reads it, never a `Never` row's. (`ignored`'s planted file is scanned,
-/// so the shared filter could reach it; a manifest's or a seed file's it cannot.)
+/// The rules nothing may excuse, said here apart from `RULES`' `Allow` column so
+/// that switching a row's mode disagrees with it.
+const UNEXCUSABLE: &[&str] = &["ignored", "key-guard", "orphan-seeds"];
+
+/// Every row's `Allow` is the one meant: an inline allow above its must-flag
+/// finding excuses it (through the shared filter, or as an `Own` rule reads it)
+/// unless the rule is [`UNEXCUSABLE`], and only a `Never` row's survives it. A
+/// manifest's or a seed file's finding is one the shared filter cannot read, so
+/// `Inline` on `key-guard` fails the second half.
 #[test]
 fn an_inline_allow_on_each_row_s_finding_is_honoured_by_its_mode() {
     let mut broken = Vec::new();
@@ -245,7 +250,7 @@ fn an_inline_allow_on_each_row_s_finding_is_honoured_by_its_mode() {
         repo.file(&hit.path, &(lines.join("\n") + "\n"));
         let after = kept(&repo, name, &hit.path);
         let excused = after < before;
-        if excused == (*allow == Allow::Never) {
+        if excused == UNEXCUSABLE.contains(name) || excused == (*allow == Allow::Never) {
             broken.push(format!(
                 "`{name}`: an inline allow above it: {before} kept, then {after}"
             ));

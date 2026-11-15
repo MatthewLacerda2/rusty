@@ -121,7 +121,10 @@ untracked ones `.gitignore` doesn't exclude (`git ls-files --cached --others
 --exclude-standard`), so what the engine seeds into a gitignored folder (the UI
 kit's scripts and the default shader it copies into the fixture project's
 `assets/`) never counts, and a new file is measured before it is added. Where git
-can't list them (a tarball with no `.git`) it walks the disk and says so on stderr.
+can't list them (a tarball with no `.git`) it walks the disk and says so in its
+report, as it does when the agent docs go unchecked for the same reason. Each file
+is judged and named by its path in the repository, so a checkout under a `tests/`
+folder gives no source file the test cap.
 The code gates (rules, layers, determinism, components, parity) keep
 walking the disk: they check what cargo compiles, and an ignored `.rs` file is
 compiled all the same, which is the file the `ignored` rule flags.

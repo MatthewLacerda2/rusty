@@ -18,10 +18,12 @@ file is what a coder changing the tool must keep.
 ## Gates are rows
 - **Every gate `main` dispatches is a row of `gates::GATES`**: a pure
   `verdict(base, args)` over the repository at `base`, which returns what it found and
-  its report and never prints or exits; `gates::report` does both for all of them. A
-  new gate is a row and its must-flag cases in `gates_tests.rs`, one per pass it
-  runs; `make test-lint` fails naming a row without one. `--dead-pub` is a signal,
-  not a row: it builds the workspace and fails only when it cannot.
+  its report (a note too, such as git failing to list the tree) and never prints or
+  exits; `gates::report` does both for all of them. It judges and names a file by its
+  path under `base`. A new gate is a row and its must-flag cases in `gates_tests.rs`,
+  one per pass it runs; `make test-lint` fails naming a row without one. One call
+  runs one gate: two gate flags are refused. `--dead-pub` is a signal, not a row: it
+  builds the workspace and fails only when it cannot.
 - **A scanner you write or touch advances by what it consumes** (a shrinking slice,
   an iterator's `next`), not an index a step may forget to move, so it ends on any
   input, and a mutated increment fails a test instead of timing out.
@@ -46,7 +48,8 @@ file is what a coder changing the tool must keep.
   the working directory, so the wiring test can run it over a scratch repository.
   Its row says `Allow::Inline` when an inline allow may excuse it, `Allow::Never` when nothing may: `ignored` (its fix is the
   `.gitignore` pattern), `orphan-seeds` (its fix is moving the file) and `key-guard`
-  (its finding sits on a manifest, where no inline allow can go). `Allow::Own` is for
+  (its finding sits on a manifest, where no inline allow can go), each also named in
+  `wiring.rs`'s `UNEXCUSABLE`, which the wiring test holds the column to. `Allow::Own` is for
   a rule that reads its own allows, so the shared filter is skipped: `api-parity`, whose allow sits on the op
   rather than on the finding's cause, and must be reported when it goes stale,
   `dir-size`, whose allow sits anywhere in the directory's owner file, and
