@@ -24,18 +24,21 @@ mod stamp;
 pub use stamp::{Jitter, Jitters};
 
 use over::Hits;
-use stamp::{centre, Draws, Stamp, MAX_SIZE};
+use stamp::{Draws, Grid, Stamp, MAX_SIZE};
 
 use super::super::catalog::vector::tile::{TileBlend, TileOutput};
 use super::super::image_buf::{Image, Rgba};
 use super::super::recipe::Tile;
 use super::field::{Field, Links, PerCell};
-use super::generators::count;
 
 /// Everything a scatter reads besides its stamp image.
 #[derive(Clone, Copy, Debug)]
 pub struct Scatter<'a> {
     pub count: f32,
+    /// `count` times this across and down, each rounded on its own.
+    pub aspect: [f32; 2],
+    /// Every other row shifted by this share of a cell; 0–1.
+    pub offset: f32,
     pub jitters: Jitters<'a>,
     pub output: TileOutput,
     /// Each stamp's value is multiplied by `1 ± value_jitter / 2`; 0–2.
@@ -69,6 +72,8 @@ impl<'a> Scatter<'a> {
         Self {
             value_jitter: finite_or(p.value_jitter, 0.0).clamp(0.0, 2.0),
             probability: finite_or(p.probability, 1.0).clamp(0.0, 1.0),
+            aspect: p.aspect,
+            offset: p.offset,
             output: p.output,
             blend: p.blend,
             mask,
@@ -81,6 +86,8 @@ impl<'a> Scatter<'a> {
     pub fn plain(cells: f32, jitters: Jitters<'a>, seed: u64) -> Self {
         Self {
             count: cells,
+            aspect: [1.0, 1.0],
+            offset: 0.0,
             jitters,
             output: TileOutput::Stamp,
             value_jitter: 0.0,
@@ -119,37 +126,49 @@ fn red(img: Option<&Image>, fallback: f32) -> Field<'_> {
     })
 }
 
-/// Scatter `img` over `s`'s `count`×`count` grid (rounded to a whole count ≥ 1).
+/// Scatter `img` over `s`'s grid: `count × aspect` cells across and down (each
+/// rounded to a whole count ≥ 1), every odd row shifted by `offset`.
 pub fn tile(img: &Image, s: &Scatter) -> Image {
-    let n = count(s.count);
-    let per = n as i64;
+    let grid = Grid::new(s.count, s.aspect, s.offset);
+    let ((nx, ny), per) = (grid.n, grid.per);
     let (mask, size) = (red(s.mask, 1.0), red(s.size_map, 1.0));
     let reach = s.jitters.reach(size.max().clamp(0.0, MAX_SIZE));
     let draws = s.draws();
     let j = s.jitters;
     let stamps = PerCell::for_pixels(per, img.size().pixels(), |cell| {
-        let (u, v) = centre(cell, n);
+        let (u, v) = grid.centre(cell);
         let m = mask.at_uv(u, v);
         if m.is_nan() || m < 0.5 {
             return None;
         }
-        Stamp::of(cell, per, j.at(cell, n), size.at_uv(u, v), draws, s.seed)
+        Stamp::of(
+            cell,
+            per,
+            j.at(cell, &grid),
+            size.at_uv(u, v),
+            draws,
+            s.seed,
+        )
     });
     let grey = draws.output != TileOutput::Stamp;
     Image::fill_uv(img.size(), |u, v| {
-        let (px, py) = (u * n, v * n);
-        let (gx, gy) = (px.floor() as i64, py.floor() as i64);
+        let (px, py) = (u * nx, v * ny);
+        let gy = py.floor() as i64;
         let mut out: Rgba = [0.0, 0.0, 0.0, 1.0];
         // Only `over` keeps the stamps it meets; `max` and `add` fold as they go.
         let mut hits = (s.blend == TileBlend::Over).then(Hits::default);
         for dy in -reach..=reach {
+            let cy = gy + dy;
+            // A staggered row's cells start `shift` along: the nearest is its own.
+            let shift = grid.shift(cy);
+            let gx = (px - shift).floor() as i64;
             for dx in -reach..=reach {
-                let (cx, cy) = (gx + dx, gy + dy);
-                let wrapped = (cx.rem_euclid(per), cy.rem_euclid(per));
+                let cx = gx + dx;
+                let wrapped = (cx.rem_euclid(per.0), cy.rem_euclid(per.1));
                 let Some(stamp) = stamps.get(wrapped) else {
                     continue;
                 };
-                let (su, sv) = stamp.local(px - cx as f32 - 0.5, py - cy as f32 - 0.5);
+                let (su, sv) = stamp.local(px - cx as f32 - 0.5 - shift, py - cy as f32 - 0.5);
                 if (0.0..1.0).contains(&su) && (0.0..1.0).contains(&sv) {
                     let p = img.sample_bilinear_wrapped(su, sv);
                     let colour = fill(p, stamp.value, grey);

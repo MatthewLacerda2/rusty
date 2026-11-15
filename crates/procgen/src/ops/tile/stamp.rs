@@ -5,6 +5,7 @@
 use super::super::super::catalog::vector::tile::TileOutput;
 use super::super::super::hash;
 use super::super::field::Field;
+use super::super::generators::count;
 
 /// The hash channels a cell's offset x/y, rotation and scale draw from (clear of
 /// Voronoi's 1–5 and brick's 16).
@@ -75,9 +76,9 @@ impl<'a> Jitters<'a> {
         }
     }
 
-    /// The jitter of the (wrapped) cell `cell` of an `n`-cell grid.
-    pub(super) fn at(&self, cell: (i64, i64), n: f32) -> Jitter {
-        let (u, v) = centre(cell, n);
+    /// The jitter of the (wrapped) cell `cell` of `grid`.
+    pub(super) fn at(&self, cell: (i64, i64), grid: &Grid) -> Jitter {
+        let (u, v) = grid.centre(cell);
         Jitter::new(
             self.offset.at_uv(u, v),
             self.rotation.at_uv(u, v),
@@ -115,7 +116,7 @@ impl Stamp {
     /// 1 without one), or `None` when the cell's draw or its size leaves it empty.
     pub fn of(
         cell: (i64, i64),
-        per: i64,
+        per: (i64, i64),
         j: Jitter,
         size: f32,
         d: Draws,
@@ -159,18 +160,61 @@ impl Stamp {
     }
 }
 
-/// The `(u, v)` centre of cell `cell` of an `n`-cell grid: where a linked param,
-/// a mask and a size map are read.
-pub(super) fn centre(cell: (i64, i64), n: f32) -> (f32, f32) {
-    ((cell.0 as f32 + 0.5) / n, (cell.1 as f32 + 0.5) / n)
+/// A tile grid: `n.0` cells across and `n.1` down (whole counts, as floats and as
+/// integers), every odd row shifted `shift` of a cell to the right.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Grid {
+    pub n: (f32, f32),
+    pub per: (i64, i64),
+    pub shift: f32,
 }
 
-/// Cell `cell`'s row-major index in a `per`×`per` grid as `(i + 1) / per²`, so the
-/// first cell isn't lost against the black between stamps. In `f64`, so a large
+impl Grid {
+    /// `count × aspect` cells per axis, each rounded on its own, and the rows
+    /// staggered by `offset` (0–1 of a cell; NaN reads 0). A staggered grid's row
+    /// count rounds to an even one, so the stagger closes at the wrap.
+    pub fn new(cells: f32, aspect: [f32; 2], offset: f32) -> Self {
+        let shift = if offset.is_nan() {
+            0.0
+        } else {
+            offset.clamp(0.0, 1.0)
+        };
+        let across = count(cells * aspect[0]);
+        let down = match shift > 0.0 {
+            true => count(cells * aspect[1] / 2.0) * 2.0,
+            false => count(cells * aspect[1]),
+        };
+        Self {
+            n: (across, down),
+            per: (across as i64, down as i64),
+            shift,
+        }
+    }
+
+    /// How far row `row` (wrapped or not: the row count is even when staggered)
+    /// is shifted right, in cells.
+    #[inline]
+    pub fn shift(&self, row: i64) -> f32 {
+        match row.rem_euclid(2) {
+            1 => self.shift,
+            _ => 0.0,
+        }
+    }
+
+    /// The `(u, v)` centre of cell `cell`, its row's shift included: where a
+    /// linked param, a mask and a size map are read.
+    pub fn centre(&self, cell: (i64, i64)) -> (f32, f32) {
+        let x = cell.0 as f32 + 0.5 + self.shift(cell.1);
+        (x / self.n.0, (cell.1 as f32 + 0.5) / self.n.1)
+    }
+}
+
+/// Cell `cell`'s row-major index in a `per.0`×`per.1` grid as `(i + 1) / cells`, so
+/// the first cell isn't lost against the black between stamps. In `f64`, so a large
 /// grid neither overflows nor collapses neighbouring indices.
-fn index((x, y): (i64, i64), per: i64) -> f32 {
-    let per = per as f64;
-    ((y as f64 * per + x as f64 + 1.0) / (per * per)) as f32
+fn index((x, y): (i64, i64), per: (i64, i64)) -> f32 {
+    let (w, h) = (per.0 as f64, per.1 as f64);
+    ((y as f64 * w + x as f64 + 1.0) / (w * h)) as f32
 }
 
 #[cfg(test)]
@@ -188,8 +232,9 @@ mod tests {
 
     #[test]
     fn the_index_counts_row_major_from_one() {
-        assert_eq!(index((0, 0), 2), 0.25);
-        assert_eq!(index((1, 0), 2), 0.5);
-        assert_eq!(index((1, 1), 2), 1.0);
+        assert_eq!(index((0, 0), (2, 2)), 0.25);
+        assert_eq!(index((1, 0), (2, 2)), 0.5);
+        assert_eq!(index((1, 1), (2, 2)), 1.0);
+        assert_eq!(index((0, 1), (2, 4)), 0.375);
     }
 }

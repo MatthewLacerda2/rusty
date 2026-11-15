@@ -134,17 +134,16 @@ impl<T: Copy, F: Fn((i64, i64)) -> T> PerCell<T, F> {
     /// value each pixel reads once per neighbour cell it looks at (`tile`'s
     /// stamps, #1742), working it out once per cell is cheaper; the quarter keeps
     /// the table well under the image's own size.
-    pub fn for_pixels(per: i64, pixels: usize, value: F) -> Self {
+    /// The grid is `per.0`×`per.1`, a count per axis (`tile`'s `aspect`).
+    pub fn for_pixels(per: (i64, i64), pixels: usize, value: F) -> Self {
         let fits = per
-            .checked_mul(per)
+            .0
+            .checked_mul(per.1)
             .and_then(|c| c.checked_mul(4))
             .is_some_and(|c| c as usize <= pixels);
-        let table = fits.then(|| (0..per * per).map(|i| value((i % per, i / per))).collect());
-        Self {
-            per: (per, per),
-            table,
-            value,
-        }
+        let (w, n) = (per.0, per.0 * per.1);
+        let table = fits.then(|| (0..n).map(|i| value((i % w, i / w))).collect());
+        Self { per, table, value }
     }
 
     /// The value of the wrapped cell `cell` (each coordinate in `0..` its axis' count).
@@ -218,11 +217,11 @@ mod tests {
             "81 cells don't"
         );
         assert!(
-            PerCell::for_pixels(4, 64, read).table.is_some(),
+            PerCell::for_pixels((4, 4), 64, read).table.is_some(),
             "16 × 4 ≤ 64"
         );
         assert!(
-            PerCell::for_pixels(5, 64, read).table.is_none(),
+            PerCell::for_pixels((5, 5), 64, read).table.is_none(),
             "25 × 4 > 64"
         );
     }

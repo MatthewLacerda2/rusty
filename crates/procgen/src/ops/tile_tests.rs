@@ -3,6 +3,7 @@
 
 use super::*;
 use crate::hash;
+use crate::ops::generators::count;
 
 /// A white square filling the whole stamp, so a stamp covers its cell exactly.
 fn full(size: u32) -> Image {
@@ -91,7 +92,13 @@ fn each_cell_reads_its_own_jitter_from_a_link() {
     };
     for (cx, cy) in (0..4).flat_map(|y| (0..4).map(move |x| (x, y))) {
         let want = (cx + 4 * cy) as f32 / 16.0;
-        assert_eq!(jitters.at((cx, cy), 4.0).offset, want, "cell ({cx}, {cy})");
+        assert_eq!(
+            jitters
+                .at((cx, cy), &Grid::new(4.0, [1.0, 1.0], 0.0))
+                .offset,
+            want,
+            "cell ({cx}, {cy})"
+        );
     }
 }
 
