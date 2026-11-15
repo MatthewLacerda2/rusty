@@ -120,46 +120,8 @@ impl Parser<'_> {
                 let y = self.number()? + origin.y;
                 self.line(Vec2::new(self.pen.x, y))?;
             }
-            b'C' | b'S' => {
-                let c1 = match cmd.to_ascii_uppercase() {
-                    b'C' => origin + self.pair()?,
-                    _ => self.reflected(true),
-                };
-                let c2 = origin + self.pair()?;
-                let to = origin + self.pair()?;
-                self.cubic(c1, c2, to)?;
-                control = Some((c2, true));
-            }
-            b'Q' | b'T' => {
-                let c = match cmd.to_ascii_uppercase() {
-                    b'Q' => origin + self.pair()?,
-                    _ => self.reflected(false),
-                };
-                let to = origin + self.pair()?;
-                self.quad(c, to)?;
-                control = Some((c, false));
-            }
-            b'A' => {
-                let radii = self.pair()?;
-                let rotation = self.number()?;
-                let large = self.flag()?;
-                let sweep = self.flag()?;
-                let to = origin + self.pair()?;
-                self.arc(radii, rotation, (large, sweep), to)?;
-            }
-            b'Z' => {
-                if let Some(s) = self.out.last_mut() {
-                    s.closed = true;
-                }
-                let start = self.start;
-                self.pen = start;
-                // A command after `Z` starts a new subpath at the same point.
-                self.out.push(Subpath {
-                    points: vec![start],
-                    closed: false,
-                });
-                self.points += 1;
-            }
+            kind @ (b'C' | b'S' | b'Q' | b'T' | b'A') => control = self.curve(kind, origin)?,
+            b'Z' => self.close(),
             _ => {
                 self.at -= 1;
                 return Err(self.fault(&format!("unknown command `{}`", cmd as char)));
@@ -167,6 +129,21 @@ impl Parser<'_> {
         }
         self.last_control = control;
         Ok(())
+    }
+
+    /// `Z`: close the subpath, and start the next at the same point, which a
+    /// command after it draws from.
+    fn close(&mut self) {
+        if let Some(s) = self.out.last_mut() {
+            s.closed = true;
+        }
+        let start = self.start;
+        self.pen = start;
+        self.out.push(Subpath {
+            points: vec![start],
+            closed: false,
+        });
+        self.points += 1;
     }
 
     /// The pen reflected through the last curve's control point, when it was the

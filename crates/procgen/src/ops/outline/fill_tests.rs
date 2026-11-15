@@ -7,7 +7,7 @@ use super::*;
 /// The axis-aligned rectangle from `lo` to `hi`, wound by `ccw`.
 fn rect(lo: [f32; 2], hi: [f32; 2], ccw: bool) -> Shape {
     let (lo, hi) = (Vec2::from(lo), Vec2::from(hi));
-    let mut p = vec![lo, Vec2::new(hi.x, lo.y), hi, Vec2::new(lo.x, hi.y)];
+    let mut p = [lo, Vec2::new(hi.x, lo.y), hi, Vec2::new(lo.x, hi.y)];
     if ccw {
         p.reverse();
     }
@@ -24,7 +24,7 @@ fn a_square_covers_exactly_its_area_at_any_resolution() {
     let square = rect([0.213, 0.301], [0.713, 0.801], false);
     for side in [7, 16, 33, 128] {
         let size = Size::new(side, side);
-        let c = coverage(&[square.clone()], size, FillRule::Nonzero);
+        let c = coverage(std::slice::from_ref(&square), size, FillRule::Nonzero);
         let area = sum(&c) / (side * side) as f32;
         assert!((area - 0.25).abs() < 1e-4, "{side}: {area}");
         assert!(c.iter().all(|v| (0.0..=1.0).contains(v)));

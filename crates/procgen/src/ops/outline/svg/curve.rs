@@ -11,7 +11,42 @@ const CHORD: f32 = 1.0 / 2048.0;
 const MAX_CHORDS: u32 = 2048;
 
 impl Parser<'_> {
-    pub(super) fn quad(&mut self, c: Vec2, to: Vec2) -> Result<(), Fault> {
+    /// A curve or arc command (`kind` upper-case, its coordinates from `origin`):
+    /// its second control point and whether it was cubic, for a smooth one after it.
+    pub(super) fn curve(&mut self, kind: u8, origin: Vec2) -> Result<Option<(Vec2, bool)>, Fault> {
+        match kind {
+            b'C' | b'S' => {
+                let c1 = match kind {
+                    b'C' => origin + self.pair()?,
+                    _ => self.reflected(true),
+                };
+                let c2 = origin + self.pair()?;
+                let to = origin + self.pair()?;
+                self.cubic(c1, c2, to)?;
+                Ok(Some((c2, true)))
+            }
+            b'Q' | b'T' => {
+                let c = match kind {
+                    b'Q' => origin + self.pair()?,
+                    _ => self.reflected(false),
+                };
+                let to = origin + self.pair()?;
+                self.quad(c, to)?;
+                Ok(Some((c, false)))
+            }
+            _ => {
+                let radii = self.pair()?;
+                let rotation = self.number()?;
+                let large = self.flag()?;
+                let sweep = self.flag()?;
+                let to = origin + self.pair()?;
+                self.arc(radii, rotation, (large, sweep), to)?;
+                Ok(None)
+            }
+        }
+    }
+
+    fn quad(&mut self, c: Vec2, to: Vec2) -> Result<(), Fault> {
         let p0 = self.pen;
         let n = chords(p0.distance(c) + c.distance(to));
         for i in 1..=n {
@@ -22,7 +57,7 @@ impl Parser<'_> {
         Ok(())
     }
 
-    pub(super) fn cubic(&mut self, c1: Vec2, c2: Vec2, to: Vec2) -> Result<(), Fault> {
+    fn cubic(&mut self, c1: Vec2, c2: Vec2, to: Vec2) -> Result<(), Fault> {
         let p0 = self.pen;
         let n = chords(p0.distance(c1) + c1.distance(c2) + c2.distance(to));
         for i in 1..=n {
@@ -36,7 +71,7 @@ impl Parser<'_> {
 
     /// SVG's endpoint arc (its implementation notes, F.6.5): radii scaled up when
     /// they cannot reach, a zero radius a straight line.
-    pub(super) fn arc(
+    fn arc(
         &mut self,
         radii: Vec2,
         degrees: f32,
