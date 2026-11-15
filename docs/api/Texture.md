@@ -26,7 +26,7 @@ wall-clock or unseeded RNG).
 | `Texture.ToJson` | `(recipe)` | the recipe's canonical JSON string |
 | `Texture.Stats` | `(recipe, [resolution])` | `{ [node_id] = { min, max, mean, std, p1, p99 }, … }` for **every** node, each field an `{r, g, b, a}` array |
 | `Texture.Preview` | `(recipe, path, [size = 128])` | `{ path, columns, order = { node ids } }` — a PNG contact sheet of every node |
-| `Texture.Ops` | `()` | the op catalog: `{ {op, category, min_inputs, max_inputs, params = { {name, type, default, required, values} } }, … }`, then the project's graphs (`op = "graph"`, with `path` and `inputs`; *Graphs* below) |
+| `Texture.Ops` | `()` | the op catalog: `{ {op, category, min_inputs, max_inputs, params = { {name, type, default, required, values} } }, … }`, then the project's graphs and the engine's (`op = "graph"`, with `path` and `inputs`; *Graphs* below) |
 
 `recipe` is a table **or** its serialized JSON string (from `Texture.ToJson`, or a
 saved `.json`) — both forms decode alike, with the same errors. `slot` names the target map and selects the **glTF encoding** applied on the
@@ -287,7 +287,7 @@ list below is a summary of it. Each entry has the `op` tag, its `category`
 (`min_inputs` to `max_inputs`; a node outside that range is an error), and its
 `params`. Each param has a
 `name`, a `type` (`number` | `integer` | `bool` | `color` | `vec2` |
-`enum` | `stops` | `path`, a project-relative file path), `required`, a `default` when it has one (absent when required),
+`enum` | `stops` | `path`, a project-relative file path or an `engine/…` one), `required`, a `default` when it has one (absent when required),
 `socket` (whether it takes a link to another node, *Linked params* below), and for an
 `enum` the accepted `values`. Units and rounding are the ones *Tiling*
 and *Units* below describe. A unit test holds the catalog to the recipe parser, so
@@ -705,6 +705,11 @@ imported model, a provider-generated image, an earlier bake, a hand-made mask or
 - `path` is taken from the **project root**, as `require` takes its scripts. A file
   outside the project is read, but warns once per file in the console: it is an
   input the seed doesn't cover, and may be missing on another machine.
+- A `path` that starts **`engine/`** names a file the engine ships
+  (`engine/textures/…`), read from the engine's content folder wherever it is
+  installed, and never warns: that content ships beside every install. The recipe
+  stores the `engine/…` spelling, the same on every machine. The engine wins: a
+  project folder named `engine/` is unreachable from a recipe.
 - `encoding = "srgb"` (the default, a colour image) decodes RGB from sRGB to linear;
   `"linear"` (a mask, a height, a normal map) reads every channel as stored. Alpha is
   always as stored. 16-bit files keep their precision. png, jpeg and tga are read;
@@ -743,7 +748,11 @@ material with its `age`, `tint` and `mortar_width` knobs.
 **The file.** A graph is a recipe saved as `<name>.graph.json` (the
 `Texture.ToJson` form), anywhere in the project, named by its path from the project
 root as an `image` node names its file (outside the project it is read, with a
-once-per-file warning). The extension is what makes it a graph: instancing any other
+once-per-file warning). A graph the **engine ships** is named by its `engine/…` path
+(the library lives under `engine/textures/library/`), read from the engine's content
+folder by the `image` node's rule, nested instances inside it included; an engine
+upgrade may change one, so a material instancing it can bake differently after. The
+extension is what makes it a graph: instancing any other
 file is refused. Every recipe may be one; two optional fields give it an interface:
 
 ```json
@@ -815,8 +824,9 @@ graphs it was in). Two nodes sharing an id in one recipe or one graph are refuse
 an instance's id included, and every error from inside an instance names its graph
 file.
 
-**`Texture.Ops()`** lists the project's graphs after the ops, each as `op = "graph"`
-with its `path`, `category = "graph"`, `min_inputs` = `max_inputs` = its input count,
+**`Texture.Ops()`** lists the project's graphs after the ops, then the engine's (any
+`engine/**/*.graph.json`, by its `engine/…` path), each as `op = "graph"` with its
+`path`, `category = "graph"`, `min_inputs` = `max_inputs` = its input count,
 its `inputs` names and its `params` (`name`, `type`, `default`, `min`, `max`). A graph
 file that does not parse is left out, with a warning naming it.
 

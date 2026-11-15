@@ -26,10 +26,11 @@
 //! - `Texture.Ops()` — the op catalog: each op's tag, category, input count and
 //!   params with their types and defaults (#411), so the agent discovers the op-set
 //!   from the engine rather than the docs; then the project's `.graph.json` graphs,
-//!   each as `op = "graph"` with its path, inputs and params (#1744).
+//!   each as `op = "graph"` with its path, inputs and params (#1744), and the
+//!   engine's, by their `engine/…` paths (#2185).
 //!
 //! A recipe's graph instances (#1744) and `image` nodes read their files from the
-//! project root before any verb evaluates it (`edit::authoring::material::load_recipe`,
+//! project root (an `engine/…` path from the engine's content folder) before any verb evaluates it (`edit::authoring::material::load_recipe`,
 //! #1491): procgen itself reads no files. Each verb evaluates the expanded recipe,
 //! so `Stats` and `Preview` show an instance's nodes under their prefixed ids
 //! (`brick/mortar`); `ToJson` writes the recipe as given, instances unexpanded.
@@ -60,6 +61,7 @@ use mlua::{Lua, Value};
 
 use super::{put, Reg};
 use from_lua::parse_recipe;
+use rusty_core::project::ContentRoots;
 use rusty_edit::authoring::material::{load_recipe, Loaded};
 use rusty_procgen::{bake_recipe, bake_set, check_set, Slot, TextureRecipe};
 
@@ -102,7 +104,9 @@ pub fn register(lua: &Lua) -> Reg {
     put(
         &table,
         "Ops",
-        lua.create_function(|lua, ()| ops::ops_table(lua, &rusty_core::project::root())),
+        lua.create_function(|lua, ()| {
+            ops::ops_table(lua, &ContentRoots::new(&rusty_core::project::root()))
+        }),
     )?;
 
     lua.globals()
@@ -143,7 +147,8 @@ fn load_set(recipe: &TextureRecipe) -> mlua::Result<Loaded> {
 /// `recipe` ready to run: its graphs expanded and its images decoded, from the
 /// project root.
 fn load(recipe: &TextureRecipe) -> mlua::Result<Loaded> {
-    load_recipe(recipe, &rusty_core::project::root()).map_err(mlua::Error::RuntimeError)
+    load_recipe(recipe, &ContentRoots::new(&rusty_core::project::root()))
+        .map_err(mlua::Error::RuntimeError)
 }
 
 #[cfg(test)]
