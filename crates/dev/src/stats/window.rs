@@ -45,7 +45,7 @@ const OPTIONS: &[&str] = &["window"];
 
 /// `Debug.Stats`'s `opts.window`: the newest frames to summarise, a whole number
 /// of at least 1 (more than [`RECENT`] reads the [`RECENT`] kept). `None` without one:
-/// the whole session. A key other than [`OPTIONS`]' raises, naming them.
+/// the whole session. Any other key raises, naming the one option.
 pub fn window_opt(opts: Option<mlua::Table>) -> mlua::Result<Option<usize>> {
     let Some(opts) = opts else {
         return Ok(None);

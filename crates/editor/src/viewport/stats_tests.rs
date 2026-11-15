@@ -19,15 +19,17 @@ fn lines_read_the_windowed_table() {
     stats.record("gpu_ms", 12.5);
     stats.record("draw_calls", 1234.0);
     stats.record("triangles", 2_500_000.0);
-    for (pass, ms) in [
-        ("ui", 0.1),
-        ("forward", 8.0),
-        ("ssr", 3.0),
-        ("taa", 1.0),
-        ("ssao", 0.4),
-    ] {
-        stats.record_gpu_pass(pass, ms);
-    }
+    stats.record_frame(true, |frame| {
+        for (pass, ms) in [
+            ("ui", 0.1),
+            ("forward", 8.0),
+            ("ssr", 3.0),
+            ("taa", 1.0),
+            ("ssao", 0.4),
+        ] {
+            frame.record_gpu_pass(pass, ms);
+        }
+    });
     let got = lines(Some(&stats), clock());
     assert_eq!(
         got[0], "60 FPS   frame 16.00 ms",
