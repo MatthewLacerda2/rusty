@@ -17,7 +17,10 @@ fn soft(size: u32) -> Image {
 fn bake(stamp: &Image, tile: Tile, size: Option<&Image>) -> Image {
     let white = Image::fill_uv(stamp.size(), |_, _| [1.0; 4]);
     let mask = size.map(|_| &white);
-    super::super::tile(stamp, &Scatter::of(&tile, &Links::default(), mask, size, 3))
+    super::super::tile(
+        stamp,
+        &Settings::of(&tile, &Links::default(), mask, size, 3),
+    )
 }
 
 #[test]
