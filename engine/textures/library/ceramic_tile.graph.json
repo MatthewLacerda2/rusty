@@ -16,9 +16,8 @@
     { "id": "picked", "op": "expression", "expr": "step(1 - 0.18 * k1, a) * step(0.02, a)", "k1": { "param": "wear" }, "inputs": ["tile_id"] },
     { "id": "crack_cells", "op": "voronoi", "scale": 14, "output": "edges", "seed": 103 },
     { "id": "cracks", "op": "expression", "expr": "(1 - smoothstep(0.0, 0.02, a)) * b * step(0.5, c)", "inputs": ["crack_cells", "picked", "tiles"] },
-    { "id": "chip_band", "op": "distance", "radius": 0.02, "inputs": ["tiles"] },
-    { "id": "chip_noise", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 20 }, "seed": 104 },
-    { "id": "chips", "op": "expression", "expr": "step(0.86 - 0.2 * k1, b + 0.25 * (1 - a)) * step(0.02, a) * (1 - smoothstep(0.5, 1, a)) * step(0.6 + 0.35 * (1 - k1), c)", "k1": { "param": "wear" }, "inputs": ["chip_band", "chip_noise", "tile_id"] },
+    { "id": "edge_chips", "op": "graph", "path": "engine/textures/library/parts/edge_wear.graph.json", "params": { "amount": { "param": "wear" }, "width": 0.025, "breakup": 20 }, "inputs": ["pillow"], "seed": 104 },
+    { "id": "chips", "op": "expression", "expr": "a * step(0.6 + 0.35 * (1 - k1), b)", "k1": { "param": "wear" }, "inputs": ["edge_chips", "tile_id"] },
 
     { "id": "relief", "op": "expression", "expr": "a * (0.6 + 0.15 * b + 0.1 * c) - 0.25 * d", "inputs": ["pillow", "tilt", "tile_id", "chips"] },
     { "id": "cracked", "op": "expression", "expr": "a - 0.08 * b", "inputs": ["relief", "cracks"] },

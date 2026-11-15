@@ -3,8 +3,9 @@
 //! is covered with nothing added here. Parts (`parts/`) are building blocks with no
 //! fixed interface: each bakes, deterministically and seamlessly, and that is all.
 //!
-//! Cost: each material is baked five times at 256² (wear 0, 0.3 twice, 1, another
-//! seed), the materials side by side on their own threads.
+//! Cost: each material is baked three times at [`RES`] (wear 0, 0.3, 1), the bakes
+//! the bar measures, and three times at [`QUICK`] (wear 0.3 twice and another seed),
+//! the bakes it only compares; the materials side by side on their own threads.
 
 mod bar;
 mod maps;
@@ -17,7 +18,11 @@ use rusty::procgen::recipe::TextureRecipe;
 use rusty::procgen::{runner::evaluate_many, Image};
 use serde_json::{json, Value};
 
-pub const RES: u32 = 256;
+/// The size of a bake the bar measures: small enough to stay fast, large enough that a
+/// thin feature (a plank gap, a grout line) still shows in its percentiles.
+pub const RES: u32 = 128;
+/// The size of a bake that is only compared with another (determinism, the seed).
+pub const QUICK: u32 = 32;
 /// Every material's named outputs; `metallic` is the one a material may add.
 pub const OUTPUTS: [&str; 5] = ["base_color", "normal", "roughness", "height", "occlusion"];
 
@@ -48,9 +53,9 @@ pub fn doc(path: &str) -> Value {
     serde_json::from_str(&text).unwrap_or_else(|e| panic!("{path}: not JSON: {e}"))
 }
 
-/// `path` instanced once at 256² with `params` and `seed`, each of `outputs` baked
+/// `path` instanced once at `res`² with `params` and `seed`, each of `outputs` baked
 /// (the graph's own `output` for `""`).
-pub fn bake(path: &str, params: Value, seed: u64, outputs: &[&str]) -> Vec<Image> {
+pub fn bake(path: &str, params: Value, seed: u64, outputs: &[&str], res: u32) -> Vec<Image> {
     // A declared input reads a tiling noise: a part's inputs are a height or a mask.
     let wired = doc(path)["inputs"].as_array().map_or(0, Vec::len);
     let probe = json!({ "id": "probe", "op": "noise", "kind": "fbm", "scale": 6, "octaves": 4 });
@@ -70,7 +75,7 @@ pub fn bake(path: &str, params: Value, seed: u64, outputs: &[&str]) -> Vec<Image
             (key.to_string(), Value::String(at))
         })
         .collect();
-    let outer = json!({ "resolution": RES, "nodes": [probe, node], "outputs": named });
+    let outer = json!({ "resolution": res, "nodes": [probe, node], "outputs": named });
     let recipe: TextureRecipe = serde_json::from_value(outer).expect("the instance parses");
     let roots = ContentRoots::new(&crate::temp::dir());
     let loaded = load_recipe(&recipe, &roots).unwrap_or_else(|e| panic!("{path}: {e}"));
@@ -95,7 +100,11 @@ fn every_library_material_meets_the_bar() {
             .map(|path| s.spawn(move || bar::material(path)))
             .collect();
         runs.into_iter()
-            .flat_map(|r| r.join().unwrap_or_else(|_| vec!["panicked".into()]))
+            .zip(&materials)
+            .flat_map(|(r, path)| {
+                r.join()
+                    .unwrap_or_else(|_| vec![format!("{path}: panicked")])
+            })
             .collect()
     });
     assert!(
@@ -108,8 +117,8 @@ fn every_library_material_meets_the_bar() {
 #[test]
 fn every_part_bakes_deterministically_and_tiles() {
     for path in graphs_in(&library().join("parts")) {
-        let a = bake(&path, json!({}), 0, &[""]).remove(0);
-        let b = bake(&path, json!({}), 0, &[""]).remove(0);
+        let a = bake(&path, json!({}), 0, &[""], RES).remove(0);
+        let b = bake(&path, json!({}), 0, &[""], RES).remove(0);
         assert!(a.pixels() == b.pixels(), "{path}: two bakes differ");
         if let Some(seam) = maps::seam(&a) {
             panic!("{path}: {seam}");

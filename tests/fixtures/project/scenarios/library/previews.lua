@@ -2,11 +2,13 @@
 -- `make library-previews OUT=<dir>`: every material of the engine's graph library
 -- (engine/textures/library/, found through Texture.Ops()) baked at 1024² and
 -- rendered with Debug.PreviewMaterial at 1024², on the sphere and on the plane with
--- `repeats = 3`, at wear 0.3 and 1. Writes <OUT>/<material>_<mesh>_wear<w>.png.
+-- `repeats = 3`, at wear 0.3 and 1. Writes <OUT>/<material>_wear<w>_<mesh>.png,
+-- <mesh> being `sphere` or `plane`.
 --
 -- The make verb runs it on a throwaway copy of the fixture project (the bakes land
 -- in that project's assets/textures/) and sets OUT and ONLY above this file. ONLY,
--- when set, names the one material to render.
+-- when set, names the one material to render. It raises when nothing would be
+-- rendered: ONLY names no library material, or the machine has no GPU.
 
 local LIBRARY = "engine/textures/library/"
 -- Metres one repeat covers: the material's world_size (docs/api/Texture.md, *The library*).
@@ -21,26 +23,44 @@ local function materials()
   for _, o in ipairs(Texture.Ops()) do
     local name = o.path and o.path:match("^" .. LIBRARY .. "([%w_]+)%.graph%.json$")
     if name and (ONLY == nil or ONLY == name) then
-      found[#found + 1] = { name = name, path = o.path, metallic = false }
+      found[#found + 1] = { name = name, path = o.path }
     end
+  end
+  if #found == 0 then
+    error("library-previews: no library material is named " .. tostring(ONLY))
   end
   return found
 end
 
+-- Whether the graph at `path` has a `metallic` output. Only that answer is caught:
+-- any other failure of the probe is a broken graph, and raises.
+local function has_metallic(path)
+  local ok, err = pcall(Texture.Stats, { resolution = 16, nodes = {
+    { id = "m", op = "graph", path = path } }, output = "m.metallic" }, 16)
+  if ok then return true end
+  if tostring(err):find('has no output "metallic"', 1, true) then return false end
+  error(err, 0)
+end
+
+local function preview(id, file, opts)
+  if Debug.PreviewMaterial(id, file, opts) == nil then
+    error("library-previews: no GPU on this machine, nothing rendered")
+  end
+end
+
 for _, m in ipairs(materials()) do
+  local metallic = has_metallic(m.path)
   for _, wear in ipairs({ 0.3, 1 }) do
     local id = m.name .. "_wear" .. wear
     local outputs = { base_color = "m", normal = "m.normal", roughness = "m.roughness",
       occlusion = "m.occlusion" }
+    if metallic then outputs.metallic = "m.metallic" end
     local recipe = { resolution = 1024, outputs = outputs, nodes = {
       { id = "m", op = "graph", path = m.path, params = { wear = wear } } } }
-    local ok = pcall(Texture.Stats, { resolution = 16, nodes = {
-      { id = "m", op = "graph", path = m.path } }, output = "m.metallic" })
-    if ok then outputs.metallic = "m.metallic" end
     Material.DefineAsset(id, { uv_mapping = "Triplanar", world_size = WORLD[m.name] or 1,
       maps = recipe })
-    Debug.PreviewMaterial(id, OUT .. "/" .. id .. "_sphere.png", { resolution = 1024 })
-    Debug.PreviewMaterial(id, OUT .. "/" .. id .. "_plane.png",
+    preview(id, OUT .. "/" .. id .. "_sphere.png", { resolution = 1024 })
+    preview(id, OUT .. "/" .. id .. "_plane.png",
       { mesh = "plane", repeats = 3, resolution = 1024 })
     Harness.Log("previewed " .. id)
   end

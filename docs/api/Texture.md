@@ -950,14 +950,36 @@ height ranges.
 `metal_painted_worn` also takes two mesh maps as `text` params, `curvature_map` and
 `ao_map`: paths to maps `Texture.BakeMeshMaps` baked from a model's UV0, so its chips
 follow the model's real edges and its grime the real recesses. Left out, they read
-two flat engine maps (no edges, nothing occluded).
+two flat engine maps (no edges, nothing occluded). A material fed baked mesh maps is
+**mapped by the model's UV0** (`uv_mapping = "UV0"`, no `world_size`), unlike the
+`Triplanar` example below: the maps are that one model's UV0 atlas, which a
+world-space projection would tile by position and scatter its edges over the wrong
+faces.
+
+```lua no-run
+local maps = Texture.BakeMeshMaps("assets/models/kolvik/generator.blend::Generator",
+  { "curvature", "ao" }, "assets/textures/kolvik/generator_", 1024)
+Material.DefineAsset("generator_paint", {
+  uv_mapping = "UV0",                            -- the mesh maps are this model's atlas
+  maps = { resolution = 1024, nodes = {
+      { id = "m", op = "graph", path = "engine/textures/library/metal_painted_worn.graph.json",
+        params = { wear = 0.6, curvature_map = maps.curvature, ao_map = maps.ao } } },
+    outputs = { base_color = "m", normal = "m.normal", roughness = "m.roughness",
+                metallic = "m.metallic", occlusion = "m.occlusion" } },
+})
+```
 
 **The parts** (`engine/textures/library/parts/`) are what the materials share, each a
 graph a game may instance too: `grunge` (`scale`, `warp`: a soft blotchy 0–1 field),
 `edge_wear` (input `height`; `amount`, `width`, `breakup`: convex edges chipped by a
 grunge), `crevice_dirt` (input `height`; `amount`, `radius`, `breakup`: dirt in the
 cavities) and `scratches` (`amount`, `scale`, `angle`: fine crossing scratches).
-Each `amount` is 0–1, none at 0.
+Each `amount` is 0–1, none at 0. `brick_wall` and `ceramic_tile` chip their edges
+with `edge_wear` (its `amount` is their `wear`), and `grunge` breaks up all ten.
+`metal_painted_worn` chips its own way: its edges are a model's baked
+`curvature_map`, which is curvature already, not a height for `edge_wear` to take
+curvature of, and it strips two layers from one field, the paint first, then the
+primer down to steel.
 
 ```lua no-run
 local tile = "engine/textures/library/brick_wall.graph.json"

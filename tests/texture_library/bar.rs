@@ -6,7 +6,7 @@
 use serde_json::{json, Value};
 
 use super::maps::{maps_fail, seam};
-use super::{bake, doc, OUTPUTS};
+use super::{bake, doc, OUTPUTS, QUICK, RES};
 
 /// `(material, rule, why)`: a rule this material is excused from. Empty today.
 const EXCUSED: &[(&str, &str, &str)] = &[];
@@ -50,17 +50,19 @@ pub fn material(path: &str) -> Vec<String> {
         return report(path, found);
     }
     let mut fail = |rule: &'static str, what: String| found.push((rule, what));
-    let set = |wear: f32, seed: u64| bake(path, json!({ "wear": wear }), seed, &names);
-    let typical = set(0.3, 0);
-    if typical != set(0.3, 0) {
+    let set = |wear: f32, seed: u64| bake(path, json!({ "wear": wear }), seed, &names, RES);
+    // What only compares two bakes runs at the small size: equal or not, any size tells.
+    let quick = |wear: f32, seed: u64| bake(path, json!({ "wear": wear }), seed, &names, QUICK);
+    let first = quick(0.3, 0);
+    if first != quick(0.3, 0) {
         fail("deterministic", "two bakes at wear 0.3 differ".into());
     }
-    let (new, derelict) = (set(0.0, 0), set(1.0, 0));
+    if first == quick(0.3, 7) {
+        fail("seed", "the instance seed changes nothing".into());
+    }
+    let (new, typical, derelict) = (set(0.0, 0), set(0.3, 0), set(1.0, 0));
     if new == derelict {
         fail("wear", "wear 0 and wear 1 bake alike".into());
-    }
-    if typical == set(0.3, 7) {
-        fail("seed", "the instance seed changes nothing".into());
     }
     for (wear, maps) in [(0.0, &new), (0.3, &typical), (1.0, &derelict)] {
         for (name, img) in names.iter().zip(maps.iter()) {

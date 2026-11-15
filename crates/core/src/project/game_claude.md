@@ -15,8 +15,9 @@ session.
 
 **Start a wall, floor or ground from the engine's material library**
 (`engine/textures/library/`, listed by `Texture.Ops()`): set its `wear`, `tint` and
-`seed`, and its tile size as `world_size`. Write a new graph only when no library
-material is near.
+`seed`, and its tile size as `world_size` (but `uv_mapping = "UV0"` and no
+`world_size` when it reads a model's baked mesh maps). Write a new graph only when no
+library material is near.
 
 **Look at a material before it goes into a level.** Read `Texture.Stats` before
 tuning a ramp, then render the material with `Debug.PreviewMaterial` on the mesh that
