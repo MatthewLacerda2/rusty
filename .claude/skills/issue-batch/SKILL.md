@@ -263,8 +263,11 @@ exits non-zero, or says *unconfirmed*. Its exit statuses are in `ci-merge`.
   merges, the supervisor's and the watch's stops, a held Dependabot PR, every PR
   turning ready, going back to draft or closing (one that turned ready or closed
   between two watches is said by the next, once; with no kept board, each ready,
-  unlabelled one is said `is ready and unqueued`), and coders' `Standing
-  down` comments on their issues, and **exits 1 when the supervisor is not
+  unlabelled one is said `is ready and unqueued`), and every comment a coder
+  posts on its open briefed issue (`STANDING DOWN #N` for a stand-down, `COMMENT
+  #N` for any other wording; `Brief`s and comments opening `Context update` are
+  skipped as yours, so head a note of your own `Context update`, never `Brief`,
+  which the dispatch tooling would read as a re-brief), and **exits 1 when the supervisor is not
   running**, so a dead queue is an event. Put the `Monitor` on it, never on the
   watch itself (a `Monitor` dies at 30 minutes and takes its command with it);
   re-arm it the same way.

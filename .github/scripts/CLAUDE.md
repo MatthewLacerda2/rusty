@@ -25,7 +25,7 @@ coder *changing* it must know.
   `merging/watch/` is `--watch`'s loop (order, aging, hand-backs, the lock, how it
   ends, and the trains across passes, `watch/trains.py`). `merging/view/` is the
   orchestrator's read of it (`make queue-status`'s liveness from the supervisor's
-  worktree lock, `make queue-events`'s filtered log and stand-down poll); the watch
+  worktree lock, `make queue-events`'s filtered log and its poll of coders' comments); the watch
   never imports it. `mergeable.py`, `merge-queue.py` and `queue-view.py` are only the
   command lines. A new concern is a new module, not a longer one.
 - **`.github/scripts/dispatch/` is the batch's dispatch steps**: the brief, the coder's

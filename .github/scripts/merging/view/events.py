@@ -26,7 +26,8 @@ hand-typed `tail -n 30 -F queue.log | grep` it replaced, and why:
   checked at the start and every [`LIVENESS_SECONDS`], and a supervisor that is
   not running ends the stream with one line and status 1.
 
-Coders' *Standing down* comments come from a light poll beside it ([`standing`]).
+Coders' comments on their batch issues (a stand-down, a hand-back) come
+from a light poll beside it ([`standing`]).
 """
 
 from __future__ import annotations
@@ -118,7 +119,7 @@ def follow(tail: Tail, running: Callable[[], tuple[bool, list[str]]], comments: 
     """Stream until the supervisor is not running; then say why and return 1.
 
     `running()` is [`status.read`]'s verdict, `comments()` the new *Standing
-    down* lines ([`standing.Poll`]), `clock` a monotonic time in seconds."""
+    down* and coder-comment lines ([`standing.Poll`]), `clock` a monotonic time in seconds."""
     merged: set[int] = set()
     for line in tail.start():
         if keep(line, merged):
