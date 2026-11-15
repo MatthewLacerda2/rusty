@@ -31,6 +31,9 @@ fn scene() -> Scene {
     scene
 }
 
+/// A selection applied to a fresh editor before `open`.
+type Select = Box<dyn FnOnce(&mut EditorUi, &Scene)>;
+
 /// `open` over a fresh editor with `select` applied first.
 fn open_on(select: impl FnOnce(&mut EditorUi, &Scene)) -> (EditorUi, Result<(), String>) {
     let (mut ui, scene) = (EditorUi::new(Default::default()), scene());
@@ -49,7 +52,7 @@ fn a_card_without_the_tab_is_an_error_and_the_tab_stays_shut() {
     let asset = |path: &'static str| {
         move |ui: &mut EditorUi, _: &Scene| ui.selected_asset_path = Some(path.to_string())
     };
-    let cases: [(&str, Box<dyn FnOnce(&mut EditorUi, &Scene)>); 3] = [
+    let cases: [(&str, Select); 3] = [
         (
             "nothing is selected",
             Box::new(|_: &mut EditorUi, _: &Scene| {}),
@@ -71,7 +74,7 @@ fn preview_opens_the_tab_on_the_mesh() {
         ui.selected_entity_id = scene.find_entity_by_name("Player");
     };
     for select in [
-        Box::new(named) as Box<dyn FnOnce(&mut EditorUi, &Scene)>,
+        Box::new(named) as Select,
         Box::new(|ui: &mut EditorUi, _: &Scene| ui.selected_asset_path = Some("a.png".into())),
     ] {
         let (ui, result) = open_on(select);
