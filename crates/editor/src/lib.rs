@@ -222,6 +222,7 @@ impl EditorUi {
 
     /// Draw the editor over the live engine state: the scene, console, navmesh and
     /// play flag, distinct mutable borrows.
+    #[expect(clippy::too_many_arguments, reason = "distinct mutable borrows")]
     pub fn draw(
         &mut self,
         ctx: &egui::Context,

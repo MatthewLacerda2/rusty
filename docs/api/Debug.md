@@ -145,7 +145,8 @@ other. The Game view's **Stats** overlay (`Editor.SetGizmo("Stats", true)`,
 
 ```lua
 local s = Debug.Stats{ window = 120 }   -- the last two seconds of a 60 Hz window
-print(s.fps and s.fps.avg, s.wall_ms and s.wall_ms.max, s.gpu_ms and s.gpu_ms.avg)
+if s.wall_ms then print(s.drawn_frames, s.fps.avg, s.wall_ms.max) end  -- a window's
+if s.gpu_ms then print(s.gpu_ms.avg) end                                -- timestamps
 ```
 
 | Metric | What it counts |
