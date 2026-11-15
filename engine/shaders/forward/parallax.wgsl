@@ -34,6 +34,11 @@ const LOD_THRESHOLD: f32 = 5.0;
 // skimming the surface reads far along it, never infinitely far.
 const MIN_COS: f32 = 0.01;
 const HALF_PI: f32 = 1.5707963;
+const UV0: u32 = 0u;
+// The cosines between a face's normal and world Y (Planar's axis) past which the
+// shift is kept whole (about 45°) and dropped (about 72°): `projection_fade`.
+const PLANAR_FULL: f32 = 0.7;
+const PLANAR_NONE: f32 = 0.3;
 
 // The height field at `uv`, 1 the surface and 0 the deepest point, at mip `lod`.
 fn height_at(uv: vec2<f32>, lod: f32) -> f32 {
@@ -66,6 +71,18 @@ fn march(uv: vec2<f32>, lod: f32, max_offset: vec2<f32>, steps: i32) -> vec2<f32
     return offset - below / max(below + above, 1e-6) * per_step;
 }
 
+// How much of the shift a face keeps under its mapping: all of it under UV0;
+// under Planar (projected along world Y) all of it within `PLANAR_FULL` of the
+// projection axis, none past `PLANAR_NONE`, so a steep face, where the projection
+// stretches one repeat across the whole face, draws as Planar without a height map
+// does: stretched, never a march along the stretch.
+fn projection_fade(mapping: u32, n: vec3<f32>) -> f32 {
+    if (mapping == UV0) {
+        return 1.0;
+    }
+    return smoothstep(PLANAR_NONE, PLANAR_FULL, abs(n.y));
+}
+
 // `c` (UV0 or Planar, its one lookup in `uv`) shifted by the height map, at world
 // `position` with geometric world normal `n` (turned toward the viewer); as given
 // for a material without one. Takes derivatives: call it in uniform control flow,
@@ -80,10 +97,9 @@ fn displace(c: MapCoords, position: vec3<f32>, n: vec3<f32>) -> MapCoords {
     // UV changes along the surface, in repeats per metre.
     let dp1 = dpdx(position);
     let dp2 = dpdy(position);
+    // Every map is read at `c`'s own derivatives, the unshifted coordinates'
+    // (`MapCoords`).
     var out = c;
-    // Every map is read at these, the unshifted coordinates' (`MapCoords`).
-    out.dx = dpdx(c.uv);
-    out.dy = dpdy(c.uv);
     let lod = level_at(vec2<f32>(textureDimensions(t_height)), out.dx, out.dy) + camera.lod.x;
     let dp2perp = cross(dp2, n);
     let dp1perp = cross(n, dp1);
@@ -95,9 +111,10 @@ fn displace(c: MapCoords, position: vec3<f32>, n: vec3<f32>) -> MapCoords {
     let duv2 = out.dy;
     let grad_u = (dp2perp * duv1.x + dp1perp * duv2.x) / det;
     let grad_v = (dp2perp * duv1.y + dp1perp * duv2.y) / det;
-    // The depth in metres: `height_scale` of one repeat's width, the mean of its
-    // two sides.
-    let width = 0.5 * (1.0 / max(length(grad_u), 1e-6) + 1.0 / max(length(grad_v), 1e-6));
+    // The depth in metres: `height_scale` of one repeat's width, its narrower side.
+    // A side the surface does not cross (Planar's projection on a face along Y, a
+    // degenerate UV axis) has no width; the narrower one stays finite.
+    let width = 1.0 / max(max(length(grad_u), length(grad_v)), 1e-6);
     let depth = m.height_scale * width;
     let v = normalize(camera.camera_pos - position);
     let cos_view = max(dot(v, n), MIN_COS);
@@ -109,7 +126,13 @@ fn displace(c: MapCoords, position: vec3<f32>, n: vec3<f32>) -> MapCoords {
     let steps = i32(mix(MIN_STEPS, MAX_STEPS, unit_angle));
     // Into the surface, away from the eye.
     let max_offset = -lateral / cos_view;
-    let offset = march(c.uv, lod, max_offset, steps) * (1.0 - saturate(lod - LOD_THRESHOLD));
+    // Past the fade (a far surface, a steep Planar face) the march is not paid for;
+    // it samples at an explicit level, so this per-pixel branch is safe.
+    let fade = (1.0 - saturate(lod - LOD_THRESHOLD)) * projection_fade(m.uv_mapping, n);
+    if (fade <= 0.0) {
+        return out;
+    }
+    let offset = march(c.uv, lod, max_offset, steps) * fade;
     out.shift = offset;
     out.uv = c.uv + offset;
     out.x = out.uv;

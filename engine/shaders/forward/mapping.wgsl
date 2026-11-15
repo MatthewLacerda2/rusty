@@ -30,11 +30,13 @@ const TRIPLANAR: u32 = 2u;
 
 // Where one surface point reads its maps. `uv` is the one lookup of UV0 and
 // Planar; `x`, `y`, `z` are Triplanar's three projections (along world X, Y and
-// Z), blended by `weights`. Under the height map's parallax (`displaced`), `uv` is
-// shifted by `shift` and read with `dx` and `dy`, the screen derivatives of the
-// unshifted `uv` (`forward::parallax::displace`): the shift bends sharply where the
-// ray crosses a ridge, and its own derivatives would pick a far mip there. All
-// three are zero otherwise.
+// Z), blended by `weights`. `dx` and `dy` are the screen derivatives of `uv` as
+// `coords_with` built it, so they travel with the coordinates: under the height
+// map's parallax (`displaced`) `uv` is shifted by `shift` and still read with the
+// unshifted `uv`'s `dx` and `dy` (`forward::parallax::displace`): the shift bends
+// sharply where the ray crosses a ridge, and its own derivatives would pick a far
+// mip there. Coordinates that skip `displace` (a surface block's, a clip's) read
+// at their own. `shift` is zero unless displaced.
 struct MapCoords {
     uv: vec2<f32>,
     x: vec2<f32>,
@@ -82,7 +84,9 @@ fn coords(uv: vec2<f32>, position: vec3<f32>, normal: vec3<f32>) -> MapCoords {
     return coords_with(material_mapping(), uv, position, normal);
 }
 
-// `coords` under terms `m`. UV0 does no projection maths; Planar projects once
+// `coords` under terms `m`. Takes derivatives (`MapCoords::dx`): every caller
+// builds its coordinates in uniform control flow, as the implicit-LOD lookup each
+// then makes of them needs anyway. UV0 does no projection maths; Planar projects once
 // (along Y). Triplanar's projections follow Ben Golus's "Normal Mapping for a
 // Triplanar Shader" (zy, xz, xy), which `sample_normal`'s whiteout blend expects.
 // UV0 and Planar fill all three projections with their one lookup, its weight all
@@ -96,8 +100,8 @@ fn coords_with(m: Mapping, uv: vec2<f32>, position: vec3<f32>, normal: vec3<f32>
     c.z = c.uv;
     c.weights = vec3<f32>(0.0, 1.0, 0.0);
     c.shift = vec2<f32>(0.0);
-    c.dx = vec2<f32>(0.0);
-    c.dy = vec2<f32>(0.0);
+    c.dx = dpdx(c.uv);
+    c.dy = dpdy(c.uv);
     if (m.uv_mapping == TRIPLANAR) {
         c.x = tile_with(m, p.zy);
         c.z = tile_with(m, p.xy);
@@ -135,8 +139,8 @@ fn lookup(t: texture_2d<f32>, s: sampler, uv: vec2<f32>) -> vec4<f32> {
 }
 
 // Map `t` at `c`'s one lookup (UV0's and Planar's), with the camera's mip bias:
-// at the unshifted coordinates' derivatives under the parallax (`MapCoords`), the
-// bias scaling them, else [`lookup`].
+// at `c`'s own derivatives under the parallax (`MapCoords`: the unshifted ones when
+// `c` was displaced), the bias scaling them, else [`lookup`].
 fn lookup_uv(t: texture_2d<f32>, s: sampler, c: MapCoords) -> vec4<f32> {
     if (displaced()) {
         let k = exp2(camera.lod.x);
@@ -194,15 +198,12 @@ fn level_at(size: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>) -> f32 {
 }
 
 // The level of normal map `t` one pixel's footprint covers at `c` (`level_at`):
-// UV0's and Planar's one lookup's, Triplanar's three projections' blended by their
+// UV0's and Planar's one lookup's (at `c`'s own derivatives), Triplanar's three projections' blended by their
 // weights, plus the mip bias [`lookup`] reads it with. Takes derivatives: call it in
 // uniform control flow (a branch on `material()` is).
 fn normal_level(t: texture_2d<f32>, c: MapCoords) -> f32 {
     let size = vec2<f32>(textureDimensions(t));
-    var level = level_at(size, dpdx(c.uv), dpdy(c.uv));
-    if (displaced()) {
-        level = level_at(size, c.dx, c.dy);
-    }
+    var level = level_at(size, c.dx, c.dy);
     if (material().uv_mapping == TRIPLANAR) {
         let x = level_at(size, dpdx(c.x), dpdy(c.x));
         let y = level_at(size, dpdx(c.y), dpdy(c.y));

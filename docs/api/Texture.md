@@ -54,7 +54,9 @@ keeps slopes under about 0.004 that 8 bits round flat (a mirror-polished stone).
 loads it as a material map like any other PNG, but uploads every map at 8 bits per
 channel at most today (and block-compressed below that once the import cache has
 made its copy, unless its `compression` is `"None"`; see `Assets.md`), so the extra precision serves what reads the file itself (an
-`image` node, a terrain or displacement bake), not what the GPU draws.
+`image` node, a terrain or displacement bake), not what the GPU draws. A `height` map's
+parallax reads it as uploaded, BC4 by default, which marches without visible terracing
+(`Material.md`, `SetHeightMap`).
 
 `orm` is only another name for the glTF metallic-roughness packing, not an
 occlusion-roughness-metallic map: nothing is written to R, so bake occlusion as its

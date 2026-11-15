@@ -2,7 +2,7 @@
 //!
 //! The runner produces a linear `[f32; 4]` buffer; the bake turns it into an RGBA
 //! `.png` the renderer's `load_texture` already consumes: 8 bits per channel for
-//! every slot but `data`, which bakes 16 (#1491) so a height field used as
+//! every slot but `data` and `height`, which bake 16 (#1491) so a height field used as
 //! displacement or a terrain heightmap doesn't terrace into 256 steps, and
 //! `normal16`, a normal map at 16 (#2002) for relief subtler than one 8-bit step. The crucial step is
 //! **per-slot encoding**, so a baked map drops straight into a glTF material slot
@@ -18,7 +18,9 @@
 //!   level is linear and its R is copied to every channel, since glTF reads it
 //!   from A (#2151).
 //! - **Height** is linear at 16 bits, its R copied to RGB and A opaque (#2191): the
-//!   material's parallax marches its red, and 8 bits would terrace the march.
+//!   file keeps the field's precision for what reads it (a terrain or displacement
+//!   bake); the material's parallax marches its red as uploaded (BC4 by default),
+//!   which draws no terracing the march's own slices don't.
 //! - **Normal** maps are tangent-space (produced by [`super::ops::vector::bump_to_normal`]).
 //!
 //! The agent picks the slot when baking, so it declares *what kind of map* it is
