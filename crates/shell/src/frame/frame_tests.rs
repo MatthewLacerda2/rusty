@@ -35,8 +35,16 @@ fn clock_reports_the_delta_and_counts_fps_per_second() {
     for i in 2..=31 {
         clock.tick(start + Duration::from_millis(16 * i));
     }
+    assert_eq!(
+        clock.fps(),
+        None,
+        "no reading before the first second is up"
+    );
     clock.tick(start + Duration::from_millis(1000));
-    assert_eq!(clock.fps(), 32.0);
+    assert_eq!(clock.fps(), Some(32.0));
+    // An editor drawing on demand: one frame 15 s later reads 1/15 a second.
+    clock.tick(start + Duration::from_secs(16));
+    assert!((clock.fps().unwrap() - 1.0 / 15.0).abs() < 1e-6);
 }
 
 #[test]

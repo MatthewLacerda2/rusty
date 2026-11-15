@@ -102,8 +102,11 @@ class FakeMachine(reclaim.Machine):
             out = "0"
         return subprocess.CompletedProcess(argv, code, out, "")
 
-    def cwds(self):
-        return [(42, TREES / "queue" / "sub"), (7, Path("/tmp"))]
+    def processes(self):
+        return [(42, TREES / "queue" / "sub", "python3"), (7, Path("/tmp"), "sh")]
+
+    def written(self, tree, idle_minutes):
+        return None  # nothing written lately: the real probe would stat these made-up paths
 
     def free(self, path):
         return 10 * 2**30

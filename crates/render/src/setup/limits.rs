@@ -22,6 +22,14 @@
 pub(crate) const OPTIONAL: wgpu::Features =
     crate::gpu::textures::compressed::FEATURE.union(crate::passes::hiz::FEATURE);
 
+/// What the window's device takes where its adapter has it: [`OPTIONAL`], and in a
+/// `dev` build the timestamps that time its live frames for `Debug.Stats()` (#2205).
+/// A shipped game reads no GPU times, so it asks for none.
+pub(crate) const WINDOW: wgpu::Features = match cfg!(feature = "dev") {
+    true => OPTIONAL.union(wgpu::Features::TIMESTAMP_QUERY),
+    false => OPTIONAL,
+};
+
 /// The most sampled textures one stage binds: the forward fragment stage's.
 pub(crate) const SAMPLED_TEXTURES_PER_STAGE: u32 = 19;
 

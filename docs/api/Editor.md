@@ -23,7 +23,7 @@ Unity's `EditorApplication` doesn't exist in a player: there `EnterPlay` and
 | `Editor.Redo` | `()` | the name of the step it redid; `nil` when there was none, or in Play |
 | `Editor.UndoName` | `()` | the name of the step `Undo` would revert, or `nil` |
 | `Editor.RedoName` | `()` | the name of the step `Redo` would re-apply, or `nil` |
-| `Editor.SetGizmo` | `(name, on)` | `true` when it set gizmo `name` (a Scene-view one, or the Game view's `"GameGizmos"`) on or off; `false` (a no-op, warned) for an unknown name or outside the editor window |
+| `Editor.SetGizmo` | `(name, on)` | `true` when it set gizmo `name` (a Scene-view one, or the Game view's `"GameGizmos"` or `"Stats"`) on or off; `false` (a no-op, warned) for an unknown name or outside the editor window |
 | `Editor.GetGizmo` | `(name)` | whether gizmo `name` is drawn; `nil` (warned) for an unknown name |
 
 ### Scene-view gizmos
@@ -42,6 +42,7 @@ flag, `docs/testing.md`).
 | `"Colliders"` | **Colliders** | every collider's real shape (box, sphere, capsule, cylinder, hull and mesh edges) in Unity's green, triggers paler; the **selected** object's colliders draw with it off too, as Unity's do (#1882) | off |
 | `"NavMesh"` | **NavMesh** | the baked navmesh as translucent cyan over the floor: one quad per walkable span, on its floor plane (ramps tilt), holes where the agent radius erodes it; kept on the GPU in 32-cell tiles: a rebake (a dragged crate, a moving carving obstacle) re-uploads only the tiles it changed, and a full bake, an area-cost edit or a restored navmesh rebuilds it whole (#1910). Scene view only, as Unity's | off |
 | `"GameGizmos"` | **Gizmos**, on the **Game** tab's strip | Unity's Game-view Gizmos: every collider and the `Debug.Draw*` lines over the game frame, through the main (base) camera of its stack (#1882) | off |
+| `"Stats"` | **Stats**, on the **Game** tab's strip | Unity's Game-view Stats (#2205): over the image's top-right, the frame's FPS and frame ms, the sim's ms per tick, the renderer's CPU ms, the GPU ms (or, while its first times are still on their way, "not measured yet", and on an adapter without timestamps, that it has none), draw calls, triangles and the four heaviest `gpu_passes`: the table `Debug.Stats{ window = 60 }` returns ([`Debug.md`](Debug.md)). It folds that table only on frames it shows (the toggle on and the Game tab open), so closed or behind the Scene tab it folds nothing; the frames are recorded either way. Without the `dev` layer only the FPS and frame ms show | off |
 
 - Names are exact (case-sensitive). The set lasts the editor session, as Unity's
   does per user; a new editor starts from the defaults above.
