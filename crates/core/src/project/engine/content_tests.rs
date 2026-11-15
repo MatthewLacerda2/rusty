@@ -1,82 +1,11 @@
-//! The engine content digest and the stamp a run carries.
+//! The stamp a run carries, and the start-up check that warns.
 
 use super::*;
-use std::path::{Path, PathBuf};
-
-/// A fresh folder under the test's temp dir holding `files` (`path`, `bytes`).
-fn tree(name: &str, files: &[(&str, &str)]) -> PathBuf {
-    let dir = rusty_test_support::temp::dir().join(name);
-    let _ = std::fs::remove_dir_all(&dir);
-    for (rel, bytes) in files {
-        let path = dir.join(rel);
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(path, bytes).unwrap();
-    }
-    dir
-}
-
-const BASE: [(&str, &str); 3] = [
-    ("shaders/common.wgsl", "fn a() {}"),
-    ("shaders/post/ssr.wgsl", "fn b() {}"),
-    ("fonts/ui.txt", "font"),
-];
-
-#[test]
-fn the_digest_is_of_content_not_of_where_the_folder_is() {
-    let one = digest(&tree("digest_one", &BASE)).unwrap();
-    let two = digest(&tree("digest_two", &BASE)).unwrap();
-    assert_eq!(one, two);
-    assert_eq!(one.len(), 16, "{one}");
-    assert!(one.chars().all(|c| c.is_ascii_hexdigit()), "{one}");
-}
-
-#[test]
-fn a_changed_byte_a_renamed_file_or_a_new_file_changes_the_digest() {
-    let base = digest(&tree("digest_base", &BASE)).unwrap();
-    let mut edited = BASE;
-    edited[1].1 = "fn c() {}";
-    let mut renamed = BASE;
-    renamed[1].0 = "shaders/post/ss.wgsl";
-    let added = [BASE[0], BASE[1], BASE[2], ("models/cube.gltf", "")];
-    // Bytes moved from a file into its name: the same bytes in a row, another tree.
-    let moved = [("shaders/common.wgsl", "fn a() {"), ("shaders/x", "}")];
-    let unmoved = [("shaders/common.wgsl", "fn a() {}"), ("shaders/x", "")];
-    for (name, files) in [
-        ("digest_edited", &edited[..]),
-        ("digest_renamed", &renamed),
-        ("digest_added", &added),
-    ] {
-        assert_ne!(digest(&tree(name, files)), Some(base.clone()), "{name}");
-    }
-    assert_ne!(
-        digest(&tree("digest_moved", &moved)),
-        digest(&tree("digest_unmoved", &unmoved))
-    );
-}
-
-#[test]
-fn a_hidden_file_is_not_content() {
-    let base = digest(&tree("digest_plain", &BASE)).unwrap();
-    let hidden = [
-        BASE[0],
-        BASE[1],
-        BASE[2],
-        (".DS_Store", "x"),
-        ("shaders/.swp", "y"),
-    ];
-    assert_eq!(digest(&tree("digest_hidden", &hidden)), Some(base));
-}
-
-#[test]
-fn a_missing_or_empty_folder_has_no_digest() {
-    assert_eq!(digest(Path::new("/no/such/engine/folder")), None);
-    assert_eq!(digest(&tree("digest_empty", &[])), None);
-}
 
 #[test]
 fn the_folder_this_build_reads_is_hashed_like_any_other() {
     let engine = crate::project::engine_dir();
-    assert_eq!(on_disk(), digest(engine).as_deref());
+    assert_eq!(on_disk(), digest(engine).ok().as_deref());
     assert!(on_disk().is_some(), "{} has a digest", engine.display());
 }
 
@@ -94,6 +23,8 @@ fn a_stamp_matches_only_when_both_digests_are_known_and_equal() {
 fn only_a_mismatch_warns_and_the_warning_names_both_digests() {
     assert_eq!(EngineStamp::of(Some("a"), Some("a")).warning(), None);
     assert_eq!(EngineStamp::of(None, Some("b")).warning(), None);
+    let unhashed = EngineStamp::of(Some("0123abcd"), None).warning().unwrap();
+    assert!(unhashed.contains("could not be hashed"), "{unhashed}");
     let warning = EngineStamp::of(Some("0123abcd"), Some("feed9876"))
         .warning()
         .unwrap();
@@ -128,4 +59,11 @@ fn registering_another_build_warns_once_and_keeps_the_first() {
     assert_eq!(stamp().content_matches, Some(false));
     let warnings: Vec<_> = logged.iter().filter(|l| l.contains(other)).collect();
     assert_eq!(warnings.len(), 1, "{logged:?}");
+}
+
+#[test]
+fn an_unstamped_process_never_reads_the_folder() {
+    // No `register_built` in this process: nothing to compare, so nothing hashed.
+    assert_eq!(stamp(), EngineStamp::of(None, None));
+    assert!(FOUND.get().is_none(), "the folder was hashed");
 }

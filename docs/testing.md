@@ -732,7 +732,10 @@ the folder it reads holds other content**, and every run report says which conte
 it used: `results.json`'s `engine` (`commit`, `content_built`, `content_found`,
 `content_matches`), the bench report's `engine` line and `bench.json`, and
 `editor-capture`'s `wrote` line. Check `content_matches` is `true` on both sides
-before trusting a pair. A cargo build re-stamps on any change under `engine/`, so
+before trusting a pair; the bench table warns on its own when the run it compares
+against had `content_matches: false`. A folder that cannot be hashed (an unreadable
+file, a dangling link) is said once at start-up, and its runs' `content_found` is
+`null`. A cargo build re-stamps on any change under `engine/`, so
 `cargo run` and `make` never warn, and the editor's shader hot reload follows edits
 made after start-up; the warning is for a binary run directly against a tree it was
 not built from. In a debug build `commit` is the checkout's at run time, so after a

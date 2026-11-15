@@ -305,6 +305,9 @@ rusty-time = { workspace = true }
 # A feature pin, never `use`d: why is beside its version above.
 getrandom = { workspace = true, optional = true }
 
+[build-dependencies]
+xxhash-rust = { workspace = true }
+
 [dev-dependencies]
 # The integration tests' shared helpers (`tests/temp.rs`), a crate of their own so
 # every member's tests reach them (crates/test-support).

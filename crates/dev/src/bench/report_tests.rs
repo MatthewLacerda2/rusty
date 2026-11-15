@@ -99,6 +99,38 @@ fn the_table_names_the_engine_content_and_the_last_runs_when_it_moved() {
     let line = same.lines().find(|l| l.starts_with("engine ")).unwrap();
     assert!(line.ends_with("content aaaa"), "{line}");
     let moved = run("bbbb").render(Some(&run("aaaa")));
-    assert!(moved.contains("content bbbb (last run: aaaa)"), "{moved}");
+    assert!(
+        moved.contains("content bbbb (last run: content aaaa)"),
+        "{moved}"
+    );
     assert!(!Report::default().render(None).contains("engine "));
+}
+
+#[test]
+fn a_last_run_that_mixed_builds_is_flagged_even_when_the_tree_is_the_same() {
+    // A kept binary built from A, run on the branch's tree B: the "before".
+    let before = Report {
+        engine: Some(EngineStamp::of(Some("aaaa"), Some("bbbb"))),
+        ..Report::default()
+    };
+    // The branch's own build, on the same tree B: the "after".
+    let after = Report {
+        engine: Some(EngineStamp::of(Some("bbbb"), Some("bbbb"))),
+        ..Report::default()
+    };
+    let table = after.render(Some(&before));
+    assert!(
+        table.contains("content bbbb (last run: content bbbb, built aaaa)"),
+        "{table}"
+    );
+    assert!(
+        table.contains("warning: the last run was not built"),
+        "{table}"
+    );
+    // Must pass: two matched runs on one tree print neither.
+    let clean = after.render(Some(&after));
+    assert!(
+        !clean.contains("last run") && !clean.contains("warning"),
+        "{clean}"
+    );
 }

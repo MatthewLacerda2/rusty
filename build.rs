@@ -6,7 +6,8 @@
 //! `engine/` it was built with as `RUSTY_ENGINE_CONTENT`; `rusty::init` registers it
 //! and warns once when the folder on disk differs
 //! (`core::project::engine_content`). `rerun-if-changed=engine` re-stamps on any
-//! change under the folder, so a cargo build is never stale.
+//! change under the folder, so a cargo build is never stale; a hidden file the
+//! digest skips (a swap file, `.DS_Store`) re-runs it too, with an unchanged stamp.
 //!
 //! It is the root package's script, not `rusty-core`'s: a changed stamp rebuilds
 //! every target of the package that prints it, and only the root package (the
@@ -29,7 +30,9 @@ fn main() {
     // A directory is scanned whole: any file added, removed or written under it.
     println!("cargo:rerun-if-changed=engine");
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    if let Some(content) = digest::digest(&root.join("engine")) {
-        println!("cargo:rustc-env=RUSTY_ENGINE_CONTENT={content}");
+    match digest::digest(&root.join("engine")) {
+        Ok(content) => println!("cargo:rustc-env=RUSTY_ENGINE_CONTENT={content}"),
+        // Unstamped, the binary cannot check its engine content: say so at build time.
+        Err(why) => println!("cargo:warning=engine/ was not stamped ({why})"),
     }
 }

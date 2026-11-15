@@ -36,7 +36,7 @@ pub use rusty_editor as editor;
 
 /// Start a binary: the logger, then, in a `dev` build, the engine-content check
 /// (`build.rs`): one warning when the `engine/` folder on disk is not the one this
-/// binary was built with. Every binary calls it first.
+/// binary was built with. Every binary calls it first (the `binary-init` lint).
 pub fn init() {
     logging::init();
     #[cfg(feature = "dev")]
