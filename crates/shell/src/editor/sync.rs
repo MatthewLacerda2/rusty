@@ -5,6 +5,17 @@
 use super::EditorFrontend;
 use crate::Shell;
 use rusty_app::GameWorld;
+use rusty_core::application::Application;
+
+/// What the editor window can do for a script, marked once when it is built, before
+/// its first frame drains a command (drawn or not, a locked screen's included): it
+/// has a Scene view, so `Editor.SetGizmo` is welcome (#1909), and its frames step
+/// Generate Lighting's job, drawn or not (`EditorUi::frame_work`), so
+/// `Lighting.GenerateAsync()` is (#1999). Both only ever turn on.
+pub(super) fn mark_host(app: &mut Application) {
+    app.mark_gizmo_viewer();
+    app.mark_bake_host();
+}
 
 impl EditorFrontend {
     /// Each frame, after the editor drew: every setting it shares with the game.
@@ -44,15 +55,15 @@ impl EditorFrontend {
         self.editor_ui.speaker_mode = audio.speaker_mode();
     }
 
-    /// The Scene view's gizmos (#1909): this window has a Scene view, so a script's
-    /// `Editor.SetGizmo` is welcome; take what it asked, then mirror the toggles back
-    /// for `Editor.GetGizmo`.
+    /// The Scene view's gizmos (#1909): take what a script's `Editor.SetGizmo`
+    /// asked (welcome here, `mark_host`), then mirror the toggles back for
+    /// `Editor.GetGizmo`.
     fn sync_gizmos(&mut self, game: &GameWorld) {
         let mut app = game.resources.application.borrow_mut();
-        app.mark_gizmo_viewer();
-        // Its inspector steps Generate Lighting's job, so `Lighting.GenerateAsync()`
-        // is welcome here (#1999).
-        app.mark_bake_host();
         app.sync_gizmos(&mut self.editor_ui.gizmos);
     }
 }
+
+#[cfg(all(test, feature = "dev"))]
+#[path = "sync_tests.rs"]
+mod tests;

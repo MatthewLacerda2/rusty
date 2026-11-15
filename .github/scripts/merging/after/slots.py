@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
-import os
 import secrets
 from pathlib import Path
+
+from merging import state as files
 
 # Where the requests live, under the checkout's git directory beside the
 # hand-back memory, so a relaunched watch picks up what the last one left.
@@ -79,15 +80,8 @@ def readable(key: str, entry: object) -> bool:
 
 
 def save(path: Path, state: dict) -> str | None:
-    """Write the requests whole (a temporary file, then a rename); why not, if it failed."""
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        part = path.with_suffix(".part")
-        part.write_text(json.dumps(state, indent=1, sort_keys=True))
-        os.replace(part, path)
-    except OSError as failed:
-        return str(failed)
-    return None
+    """Write the requests whole ([`merging.state.write`], #2215); why not, if it failed."""
+    return files.write(path, state)
 
 
 def known(state: dict, pr: int) -> bool:
