@@ -3,6 +3,7 @@
 
 use super::*;
 use crate::hash;
+use crate::ops::generators::count;
 
 /// A white square filling the whole stamp, so a stamp covers its cell exactly.
 fn full(size: u32) -> Image {
@@ -17,9 +18,9 @@ fn dot(size: u32) -> Image {
     })
 }
 
-/// `tile`'s scatter with its mask and size map, nothing linked, seed 7.
-fn scatter<'a>(tile: &Tile, mask: Option<&'a Image>, size: Option<&'a Image>) -> Scatter<'a> {
-    Scatter::of(tile, &Links::default(), mask, size, 7)
+/// `tile`'s settings with its mask and size map, nothing linked, seed 7.
+fn settings<'a>(tile: &Tile, mask: Option<&'a Image>, size: Option<&'a Image>) -> Settings<'a> {
+    Settings::of(tile, &Links::default(), mask, size, 7)
 }
 
 fn jittered() -> Tile {
@@ -33,7 +34,7 @@ fn jittered() -> Tile {
 fn legacy(img: &Image, cells: f32, j: Jitter, seed: u64) -> Image {
     let n = count(cells);
     let per = n as i64;
-    let reach = j.reach(1.0);
+    let reach = j.reach(1.0, 1.0).0;
     Image::fill_uv(img.size(), |u, v| {
         let (px, py) = (u * n, v * n);
         let (gx, gy) = (px.floor() as i64, py.floor() as i64);
@@ -68,7 +69,7 @@ fn the_defaults_bake_what_the_scatter_did_before_them() {
         scale_jitter: 0.8.into(),
         ..Tile::new(5.0)
     };
-    let new = super::tile(&src, &scatter(&tile, None, None));
+    let new = super::tile(&src, &settings(&tile, None, None));
     assert!(new == legacy(&src, 5.0, Jitter::new(0.6, 0.4, 0.8), 7));
 }
 
@@ -91,7 +92,13 @@ fn each_cell_reads_its_own_jitter_from_a_link() {
     };
     for (cx, cy) in (0..4).flat_map(|y| (0..4).map(move |x| (x, y))) {
         let want = (cx + 4 * cy) as f32 / 16.0;
-        assert_eq!(jitters.at((cx, cy), 4.0).offset, want, "cell ({cx}, {cy})");
+        assert_eq!(
+            jitters
+                .at((cx, cy), &Grid::new(4.0, [1.0, 1.0], 0.0))
+                .offset,
+            want,
+            "cell ({cx}, {cy})"
+        );
     }
 }
 
@@ -100,7 +107,7 @@ fn no_jitter_repeats_the_input_exactly() {
     let src = Image::fill_uv(8, |u, v| [u, v, 0.0, 1.0]);
     let out = super::tile(
         &src,
-        &Scatter::plain(2.0, Jitters::uniform(0.0, 0.0, 0.0), 1),
+        &Settings::plain(2.0, Jitters::uniform(0.0, 0.0, 0.0), 1),
     );
     for (x, y) in (0..8).flat_map(|y| (0..8).map(move |x| (x, y))) {
         let at = |c: i64| ((c % 4) as f32 + 0.5) / 4.0;
@@ -124,9 +131,9 @@ fn random_fills_about_half_the_cells_each_with_its_own_flat_grey() {
         probability: 0.5,
         ..Tile::new(8.0)
     };
-    let out = super::tile(&full(64), &scatter(&tile, None, None));
+    let out = super::tile(&full(64), &settings(&tile, None, None));
     assert!(
-        out == super::tile(&full(64), &scatter(&tile, None, None)),
+        out == super::tile(&full(64), &settings(&tile, None, None)),
         "deterministic"
     );
     for (x, y) in (0..64).flat_map(|y| (0..64).map(move |x| (x, y))) {
@@ -143,13 +150,13 @@ fn random_fills_about_half_the_cells_each_with_its_own_flat_grey() {
 
 #[test]
 fn probability_and_value_jitter_keep_every_stamp_where_it_was() {
-    let base = super::tile(&dot(32), &scatter(&jittered(), None, None));
+    let base = super::tile(&dot(32), &settings(&jittered(), None, None));
     let sparse = Tile {
         probability: 0.5,
         value_jitter: 0.5,
         ..jittered()
     };
-    let out = super::tile(&dot(32), &scatter(&sparse, None, None));
+    let out = super::tile(&dot(32), &settings(&sparse, None, None));
     let (mut kept, mut dropped) = (0, 0);
     for (b, o) in base.pixels().iter().zip(out.pixels()) {
         match (b[1] > 0.0, o[1] > 0.0) {
@@ -179,7 +186,7 @@ fn a_mask_and_a_size_map_read_at_the_cell_centre_at_any_resolution() {
     // Probe each cell a third of a cell off its centre: inside a full stamp, outside a half one.
     let bake = |res: u32| {
         let (m, s) = (mask(res), size(res));
-        let out = super::tile(&full(res), &scatter(&Tile::new(8.0), Some(&m), Some(&s)));
+        let out = super::tile(&full(res), &settings(&Tile::new(8.0), Some(&m), Some(&s)));
         let r = res as i64;
         let at = |c: i64| c * r / 8 + r / 16 + r / 24;
         (0..64)
@@ -203,7 +210,7 @@ fn blends_differ_only_where_stamps_overlap() {
             blend,
             ..Tile::new(4.0)
         };
-        super::tile(&full(64), &scatter(&tile, None, Some(&grown)))
+        super::tile(&full(64), &settings(&tile, None, Some(&grown)))
     };
     let index_max = bake(TileOutput::Index, TileBlend::Max);
     // Index rises in row-major order, so the latest stamp is the brightest.
@@ -224,7 +231,7 @@ fn blends_differ_only_where_stamps_overlap() {
 
 #[test]
 fn out_of_range_params_are_capped_or_ignored() {
-    let base = super::tile(&dot(16), &scatter(&jittered(), None, None));
+    let base = super::tile(&dot(16), &settings(&jittered(), None, None));
     for (p, vj) in [(f32::NAN, f32::NAN), (f32::INFINITY, 0.0), (1e30, -1e30)] {
         let tile = Tile {
             probability: p,
@@ -232,7 +239,7 @@ fn out_of_range_params_are_capped_or_ignored() {
             ..jittered()
         };
         assert!(
-            super::tile(&dot(16), &scatter(&tile, None, None)) == base,
+            super::tile(&dot(16), &settings(&tile, None, None)) == base,
             "{p} {vj}"
         );
     }
@@ -244,5 +251,5 @@ fn out_of_range_params_are_capped_or_ignored() {
         probability: f32::INFINITY,
         ..Tile::new(1e9)
     };
-    super::tile(&dot(16), &scatter(&tile, Some(&huge), Some(&huge)));
+    super::tile(&dot(16), &settings(&tile, Some(&huge), Some(&huge)));
 }

@@ -183,3 +183,18 @@ fn a_nested_workspace_header_may_carry_a_comment() {
     dir.file("tools/n/src/m.rs", "");
     assert_eq!(found(&dir), Vec::<String>::new());
 }
+
+#[test]
+fn a_manifest_without_a_workspace_header_is_no_workspace() {
+    // a fixture crate cargo can't read: not a workspace, so never asked about
+    let dir = repo("fixture-manifest", "");
+    dir.file(
+        "tests/fixtures/broken/Cargo.toml",
+        "[package\nname = \"b\"\n",
+    );
+    dir.file(
+        "tests/fixtures/broken/src/lib.rs",
+        "// lint: allow(orphan-module) a fixture, compiled by no target\n",
+    );
+    assert_eq!(found(&dir), Vec::<String>::new());
+}

@@ -70,7 +70,7 @@ fn small_components_and_reasoned_exceptions_pass() {
     let src = "// lint: allow(full-literal) every field is what the round-trip compares\n\
                let c = ColliderComponent { shape, is_trigger, active };\n";
     assert_eq!(lines("tests/a.rs", src), [2]);
-    assert!(allowed(src, 2, RULE), "`rules::run` applies the allow");
+    assert!(allowed(src, 2, RULE), "`rules::verdict` applies the allow");
 }
 
 #[test]

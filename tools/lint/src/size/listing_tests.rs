@@ -5,6 +5,7 @@ use super::super::{check_file, fallback_note, full_scan, MAX_TEST_FILE_LINES};
 use super::committable;
 use crate::repo::scaffold::Repo;
 use std::fs;
+use std::path::Path;
 
 /// One line over the fixture cap, in Lua.
 fn too_long() -> String {
@@ -23,9 +24,12 @@ fn a_seeded_ignored_fixture_passes_and_an_untracked_new_file_is_flagged() {
     let tracked = repo.file("src/a.rs", "//\n");
     repo.git(&["add", "src/a.rs"]);
     let new = repo.file("tests/new.lua", &too_long());
-    let found = full_scan(&repo.0);
+    let found = full_scan(&repo.0).0;
     assert_eq!(found, vec![tracked, new.clone()]);
-    let flagged: Vec<_> = found.iter().filter_map(|p| check_file(p)).collect();
+    let flagged: Vec<_> = found
+        .iter()
+        .filter_map(|p| check_file(Path::new(""), p))
+        .collect();
     assert_eq!(flagged.len(), 1, "{flagged:?}");
     assert!(flagged[0].contains("tests/new.lua"), "{}", flagged[0]);
 }
@@ -49,7 +53,7 @@ fn without_a_repository_the_scan_walks_the_disk() {
     assert!(why.contains("not a git repository"), "{why}");
     let seeded = dir.file("tests/fixtures/project/assets/kit.lua", &too_long());
     dir.file("tests/target/gen.rs", "//\n");
-    assert_eq!(full_scan(&dir.0), vec![seeded]);
+    assert_eq!(full_scan(&dir.0).0, vec![seeded]);
 }
 
 #[test]

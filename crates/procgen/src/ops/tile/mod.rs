@@ -1,4 +1,4 @@
-//! The `tile` scatter op (#407): stamp the input once per cell of a whole-count grid,
+//! The `tile` op (#407): stamp the input once per cell of a whole-count grid,
 //! each cell nudged, turned and scaled by values hashed from its wrapped index and
 //! the recipe seed. Rivets are `shape circle` → `tile`. A linked jitter varies by
 //! cell (#1494): an ordered grid that grows chaotic over a damage mask. #1742 adds
@@ -21,21 +21,27 @@
 mod over;
 mod stamp;
 
+pub(super) use over::over;
+
 pub use stamp::{Jitter, Jitters};
 
 use over::Hits;
-use stamp::{centre, Draws, Stamp, MAX_SIZE};
+use stamp::{stretch, Draws, Grid, Stamp, MAX_SIZE};
 
 use super::super::catalog::vector::tile::{TileBlend, TileOutput};
 use super::super::image_buf::{Image, Rgba};
 use super::super::recipe::Tile;
 use super::field::{Field, Links, PerCell};
-use super::generators::count;
+use super::generators::clamp_or;
 
-/// Everything a scatter reads besides its stamp image.
+/// Everything a `tile` bake reads besides its stamp image.
 #[derive(Clone, Copy, Debug)]
-pub struct Scatter<'a> {
+pub struct Settings<'a> {
     pub count: f32,
+    /// `count` times this across and down, each rounded on its own.
+    pub aspect: [f32; 2],
+    /// Every other row shifted by this share of a cell; 0–1.
+    pub offset: f32,
     pub jitters: Jitters<'a>,
     pub output: TileOutput,
     /// Each stamp's value is multiplied by `1 ± value_jitter / 2`; 0–2.
@@ -50,8 +56,8 @@ pub struct Scatter<'a> {
     pub seed: u64,
 }
 
-impl<'a> Scatter<'a> {
-    /// The `tile` op's scatter: its params resolved against its `links`, its
+impl<'a> Settings<'a> {
+    /// The `tile` op's settings: its params resolved against its `links`, its
     /// optional mask and size map, and its node seed. A NaN `probability` or
     /// `value_jitter` is ignored (the default); any other value is clamped.
     pub fn of(
@@ -67,8 +73,10 @@ impl<'a> Scatter<'a> {
             scale: links.field(&p.scale_jitter),
         };
         Self {
-            value_jitter: finite_or(p.value_jitter, 0.0).clamp(0.0, 2.0),
-            probability: finite_or(p.probability, 1.0).clamp(0.0, 1.0),
+            value_jitter: clamp_or(p.value_jitter, 0.0, 0.0, 2.0),
+            probability: clamp_or(p.probability, 1.0, 0.0, 1.0),
+            aspect: p.aspect,
+            offset: p.offset,
             output: p.output,
             blend: p.blend,
             mask,
@@ -77,10 +85,12 @@ impl<'a> Scatter<'a> {
         }
     }
 
-    /// A `cells`×`cells` scatter under `jitters`, every other setting at its default.
+    /// A `cells`×`cells` grid under `jitters`, every other setting at its default.
     pub fn plain(cells: f32, jitters: Jitters<'a>, seed: u64) -> Self {
         Self {
             count: cells,
+            aspect: [1.0, 1.0],
+            offset: 0.0,
             jitters,
             output: TileOutput::Stamp,
             value_jitter: 0.0,
@@ -101,15 +111,6 @@ impl<'a> Scatter<'a> {
     }
 }
 
-/// `v`, or `default` when it is NaN (an infinity is left for the clamp).
-fn finite_or(v: f32, default: f32) -> f32 {
-    if v.is_nan() {
-        default
-    } else {
-        v
-    }
-}
-
 /// A mask or size map as a field of its red, or `fallback` everywhere without one.
 fn red(img: Option<&Image>, fallback: f32) -> Field<'_> {
     img.map_or(Field::Const(fallback), |img| Field::Map {
@@ -119,37 +120,38 @@ fn red(img: Option<&Image>, fallback: f32) -> Field<'_> {
     })
 }
 
-/// Scatter `img` over `s`'s `count`×`count` grid (rounded to a whole count ≥ 1).
-pub fn tile(img: &Image, s: &Scatter) -> Image {
-    let n = count(s.count);
-    let per = n as i64;
+/// Stamp `img` over `s`'s grid: `count × aspect` cells across and down (each
+/// rounded to a whole count ≥ 1), every odd row shifted by `offset`.
+pub fn tile(img: &Image, s: &Settings) -> Image {
+    let grid = Grid::new(s.count, s.aspect, s.offset);
+    let ((nx, ny), per) = (grid.n, grid.per);
     let (mask, size) = (red(s.mask, 1.0), red(s.size_map, 1.0));
-    let reach = s.jitters.reach(size.max().clamp(0.0, MAX_SIZE));
+    let reach = s
+        .jitters
+        .reach(size.max().clamp(0.0, MAX_SIZE), stretch(per));
     let draws = s.draws();
-    let j = s.jitters;
     let stamps = PerCell::for_pixels(per, img.size().pixels(), |cell| {
-        let (u, v) = centre(cell, n);
-        let m = mask.at_uv(u, v);
-        if m.is_nan() || m < 0.5 {
-            return None;
-        }
-        Stamp::of(cell, per, j.at(cell, n), size.at_uv(u, v), draws, s.seed)
+        cell_stamp(s, &grid, (mask, size), draws, cell)
     });
     let grey = draws.output != TileOutput::Stamp;
     Image::fill_uv(img.size(), |u, v| {
-        let (px, py) = (u * n, v * n);
-        let (gx, gy) = (px.floor() as i64, py.floor() as i64);
+        let (px, py) = (u * nx, v * ny);
+        let gy = py.floor() as i64;
         let mut out: Rgba = [0.0, 0.0, 0.0, 1.0];
         // Only `over` keeps the stamps it meets; `max` and `add` fold as they go.
         let mut hits = (s.blend == TileBlend::Over).then(Hits::default);
-        for dy in -reach..=reach {
-            for dx in -reach..=reach {
-                let (cx, cy) = (gx + dx, gy + dy);
-                let wrapped = (cx.rem_euclid(per), cy.rem_euclid(per));
+        for dy in -reach.1..=reach.1 {
+            let cy = gy + dy;
+            // A staggered row's cells start `shift` along: the nearest is its own.
+            let shift = grid.shift(cy);
+            let gx = (px - shift).floor() as i64;
+            for dx in -reach.0..=reach.0 {
+                let cx = gx + dx;
+                let wrapped = (cx.rem_euclid(per.0), cy.rem_euclid(per.1));
                 let Some(stamp) = stamps.get(wrapped) else {
                     continue;
                 };
-                let (su, sv) = stamp.local(px - cx as f32 - 0.5, py - cy as f32 - 0.5);
+                let (su, sv) = stamp.local(px - cx as f32 - 0.5 - shift, py - cy as f32 - 0.5);
                 if (0.0..1.0).contains(&su) && (0.0..1.0).contains(&sv) {
                     let p = img.sample_bilinear_wrapped(su, sv);
                     let colour = fill(p, stamp.value, grey);
@@ -169,10 +171,28 @@ pub fn tile(img: &Image, s: &Scatter) -> Image {
     })
 }
 
+/// Cell `cell`'s stamp, or `None` where `mask` reads below 0.5 at its centre (or
+/// NaN) or its own draws leave it empty; `size` scales it.
+fn cell_stamp(
+    s: &Settings,
+    grid: &Grid,
+    (mask, size): (Field, Field),
+    draws: Draws,
+    cell: (i64, i64),
+) -> Option<Stamp> {
+    let (u, v) = grid.centre(cell);
+    let m = mask.at_uv(u, v);
+    if m.is_nan() || m < 0.5 {
+        return None;
+    }
+    let j = s.jitters.at(cell, grid);
+    Stamp::of(cell, grid.per, j, size.at_uv(u, v), draws, s.seed)
+}
+
 /// Fold `colour` into `out` under `max` or `add` (`over` keeps its stamps in
 /// [`Hits`] instead): the brighter per channel, or the sum with alpha the larger.
 #[inline]
-fn fold(mode: TileBlend, out: &mut Rgba, colour: Rgba) {
+pub(super) fn fold(mode: TileBlend, out: &mut Rgba, colour: Rgba) {
     *out = match mode {
         TileBlend::Add => std::array::from_fn(|c| match c {
             3 => out[3].max(colour[3]),
@@ -184,7 +204,7 @@ fn fold(mode: TileBlend, out: &mut Rgba, colour: Rgba) {
 
 /// A stamp's colour: the input times `value`, or its red times `value` as a grey;
 /// alpha is the input's.
-fn fill(p: Rgba, value: f32, grey: bool) -> Rgba {
+pub(super) fn fill(p: Rgba, value: f32, grey: bool) -> Rgba {
     match grey {
         true => [p[0] * value, p[0] * value, p[0] * value, p[3]],
         false => [p[0] * value, p[1] * value, p[2] * value, p[3]],
@@ -194,7 +214,7 @@ fn fill(p: Rgba, value: f32, grey: bool) -> Rgba {
 /// How much of what is under a stamp sample `p` covers under `over`: its red in
 /// the grey outputs (the colour comes from red alone), its brightest channel in
 /// `output = "stamp"`, times its alpha, in 0–1.
-fn coverage(p: Rgba, grey: bool) -> f32 {
+pub(super) fn coverage(p: Rgba, grey: bool) -> f32 {
     let bright = match grey {
         true => p[0],
         false => p[0].max(p[1]).max(p[2]),
@@ -205,3 +225,11 @@ fn coverage(p: Rgba, grey: bool) -> f32 {
 #[cfg(test)]
 #[path = "../tile_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "grid_tests.rs"]
+mod grid_tests;
+
+#[cfg(test)]
+#[path = "pinned_tests.rs"]
+mod pinned_tests;
