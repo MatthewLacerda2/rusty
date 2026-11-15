@@ -260,6 +260,7 @@ fn run_frame<F: Frontend>(
         // The window cannot show a frame (a locked screen, an occluded window): the
         // frame's other work still runs, so nothing asked of it waits on a redraw.
         frontend.undrawn(shell, game);
+        frame::stats::undrawn(shell, game);
         shell.pacer.skipped(Instant::now());
         return;
     };

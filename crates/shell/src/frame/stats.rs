@@ -5,7 +5,8 @@
 //! this adds what only the window knows, per drawn frame: its wall-clock frame time
 //! and rate, and what the renderer drew for the screen (`rusty_dev::stats::WindowFrame`).
 //! [`measured`] wraps each frame's draw, once per frame the loop draws, and hands
-//! the same frame to the rolling frame log on disk when one runs (#2206).
+//! the same frame to the rolling frame log on disk when one runs (#2206), which
+//! [`undrawn`] also feeds on a frame the window could not show.
 
 use rusty_app::GameWorld;
 #[cfg(feature = "dev")]
@@ -35,11 +36,25 @@ pub fn measured(
         let stats = game.script_manager().stats_cell();
         rusty_dev::stats::record_window(&mut stats.borrow_mut(), &frame, in_play);
         if let Some(log) = shell.frame_log.as_mut() {
-            log.frame(game, &frame);
+            log.frame(game, &frame, shell.renderer.times_gpu());
         }
     }
     #[cfg(not(feature = "dev"))]
     let _ = frames_before;
+}
+
+/// A frame the window could not show (a locked screen): the stats keep only drawn
+/// frames, but the frame log on disk (#2206) writes it, with its console lines,
+/// so a bake run while the screen is locked can still be looked back at.
+pub fn undrawn(shell: &mut Shell, game: &GameWorld) {
+    #[cfg(feature = "dev")]
+    if let Some(log) = shell.frame_log.as_mut() {
+        let frames = shell.renderer.frame_cost().frames;
+        let frame = window_frame(&mut shell.renderer, &shell.clock, frames);
+        log.frame(game, &frame, shell.renderer.times_gpu());
+    }
+    #[cfg(not(feature = "dev"))]
+    let _ = (shell, game);
 }
 
 /// What this frame cost: the clock's reading, and the renderer's frame if it drew

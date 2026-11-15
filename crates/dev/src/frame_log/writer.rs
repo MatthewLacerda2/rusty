@@ -79,6 +79,17 @@ impl Writer {
     }
 }
 
+impl Writer {
+    /// Count `n` records lost before they reached the writer (console lines past
+    /// a frame's cap), said in the next drop note like the writer's own.
+    pub fn lost(&mut self, n: u64, tick: u64) {
+        if n > 0 {
+            self.dropped.tick.store(tick, Ordering::Relaxed);
+            self.dropped.records.fetch_add(n, Ordering::Relaxed);
+        }
+    }
+}
+
 impl Drop for Writer {
     /// Close the channel and wait for the thread to write what is queued.
     fn drop(&mut self) {

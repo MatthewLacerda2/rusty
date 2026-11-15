@@ -2,10 +2,12 @@
 //! `Debug.SetLogChannels` and `Debug.GetLogChannels` (#2206): the rolling frame log
 //! read back, and its channels switched.
 //!
-//! The read goes to the files (`frame_log::read`), so it answers during Play, after
+//! The read goes to the files and the frames the running log still holds
+//! (`frame_log::read`), so it answers during Play, after
 //! Stop, and in a session that never wrote a frame (it reads what the editor
 //! wrote). The channels are the project's (`Application::set_log_channels`), so a
-//! switch is kept in `project.rusty` and the running log follows it next frame.
+//! switch is kept in `project.rusty` (when a project is open) and the running log
+//! follows it next frame.
 
 use std::path::Path;
 

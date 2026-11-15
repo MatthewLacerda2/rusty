@@ -8,14 +8,16 @@ use serde_json::{json, Map, Value};
 use rusty_app::GameWorld;
 use rusty_core::frame_stats::{FrameStats, Series};
 use rusty_core::settings::logs::LogChannels;
+use rusty_render::GpuTimes;
 use rusty_scene::game_camera_from_scene;
-use rusty_script::scripting::LogLevel;
+use rusty_script::scripting::{FileLine, LogLevel};
 
 use super::SYSTEM_MS;
 use crate::stats::WindowFrame;
 
 /// What places a record: the wall-clock time, the tick, Play or not, the active
 /// scene, and the game camera's position and facing.
+#[derive(Clone)]
 pub(super) struct Place {
     t: u64,
     tick: u64,
@@ -34,6 +36,16 @@ impl Place {
         rest.insert("fwd".into(), round3(json!(cam.forward().to_array())));
         let tick = game.play_frame();
         Self { t, tick, rest }
+    }
+
+    /// A place with no world: test hook for the writer's tests.
+    #[cfg(test)]
+    pub(super) fn fixed(t: u64, tick: u64) -> Self {
+        Self {
+            t,
+            tick,
+            rest: Map::new(),
+        }
     }
 
     /// A record of channel `ch`: the head ([`line`]), then the place and `body`.
@@ -74,21 +86,62 @@ pub(super) fn line(
     out
 }
 
-/// The frame's record: its index (`frame`), its clock, the ticks it ran and their
-/// CPU ms (`sim_ms`), what the renderer drew and cost, and, per channel, its
-/// systems over [`SYSTEM_MS`]. The GPU times that resolved this frame ride on it
-/// under `gpu_frame`, the index of the earlier frame they measure: the reader
-/// moves them onto that frame's record (`read`).
+/// A frame's record before its own wall time and GPU times are in: the writer
+/// holds it ([`super::held`]) and writes it whole ([`FrameRecord::line`]).
+pub(super) struct FrameRecord {
+    place: Place,
+    /// The renderer's drawn-frame count after this frame (`WindowFrame::frame`).
+    pub(super) frame: u64,
+    /// The renderer's CPU ms: `Some` when the frame drew.
+    pub(super) cpu_ms: Option<f64>,
+    body: Map<String, Value>,
+    gpu_passes: bool,
+}
+
+impl FrameRecord {
+    /// The line, opening `frame`, `ms` and `cpu_ms` in that order (`head`), with
+    /// `gpu`'s times when they are this frame's. `ms` or GPU times that never
+    /// arrived are named in `unresolved` (`gpu` only when `wants_gpu`).
+    pub(super) fn line(&self, ms: Option<f64>, gpu: Option<&GpuTimes>, wants_gpu: bool) -> String {
+        let mut head = vec![("frame", json!(self.frame))];
+        if let Some(ms) = ms {
+            head.push(("ms", round3(json!(ms))));
+        }
+        if let Some(cpu) = self.cpu_ms {
+            head.push(("cpu_ms", round3(json!(cpu))));
+        }
+        let mut body = self.body.clone();
+        if let Some(gpu) = gpu {
+            body.insert("gpu_ms".into(), round3(json!(gpu.total_ms())));
+            if self.gpu_passes {
+                let mut passes = BTreeMap::<&str, f64>::new();
+                for (pass, ms) in &gpu.passes {
+                    *passes.entry(pass.name()).or_default() += ms;
+                }
+                body.insert("gpu_passes".into(), rounded(passes));
+            }
+        }
+        let missing_gpu = wants_gpu && gpu.is_none();
+        let unresolved: Vec<&str> = [("ms", ms.is_none()), ("gpu", missing_gpu)]
+            .into_iter()
+            .filter_map(|(name, missing)| missing.then_some(name))
+            .collect();
+        if !unresolved.is_empty() {
+            body.insert("unresolved".into(), json!(unresolved));
+        }
+        self.place.record("frames", &head, body)
+    }
+}
+
+/// The frame's record, held until its wall time and GPU times are in: its index
+/// (`frame`), its clock rate, the ticks it ran and their CPU ms (`sim_ms`), what
+/// the renderer drew and cost, and, per channel, its systems over [`SYSTEM_MS`].
 pub(super) fn frame(
-    place: &Place,
+    place: Place,
     frame: &WindowFrame,
     last: &FrameStats,
     channels: LogChannels,
-) -> String {
-    let mut head = vec![
-        ("frame", json!(frame.frame)),
-        ("ms", round3(json!(frame.wall_ms))),
-    ];
+) -> FrameRecord {
     let mut body = Map::new();
     if let Some(fps) = frame.fps {
         body.insert("fps".into(), round3(json!(fps)));
@@ -99,20 +152,6 @@ pub(super) fn frame(
     }
     if let Some(render) = &frame.render {
         let c = &render.counters;
-        if let Some(gpu) = &render.gpu {
-            head.push(("gpu_frame", json!(gpu.frame)));
-        }
-        head.push(("cpu_ms", round3(json!(render.cpu_ms))));
-        if let Some(gpu) = &render.gpu {
-            body.insert("gpu_ms".into(), round3(json!(gpu.total_ms())));
-            if channels.gpu_passes {
-                let mut passes = BTreeMap::<&str, f64>::new();
-                for (pass, ms) in &gpu.passes {
-                    *passes.entry(pass.name()).or_default() += ms;
-                }
-                body.insert("gpu_passes".into(), rounded(passes));
-            }
-        }
         body.insert("draws".into(), json!(c.draw_calls));
         body.insert("tris".into(), json!(c.triangles));
         body.insert("visible".into(), json!(c.visible_entities));
@@ -129,7 +168,13 @@ pub(super) fn frame(
             body.insert("systems".into(), rounded(heavy));
         }
     }
-    place.record("frames", &head, body)
+    FrameRecord {
+        place,
+        frame: frame.frame,
+        cpu_ms: frame.render.as_ref().map(|r| r.cpu_ms),
+        body,
+        gpu_passes: channels.gpu_passes,
+    }
 }
 
 /// A load that finished this frame: its total and each step's ms.
@@ -149,8 +194,10 @@ pub(super) fn load(place: &Place, last: &FrameStats) -> Option<String> {
     Some(place.record("loads", &[], body))
 }
 
-/// A console line, with its level.
-pub(super) fn console(place: &Place, msg: &str, level: &LogLevel) -> String {
+/// A console line, with its level and, for a record that arrived several times
+/// in a row this frame, how many (`times`).
+pub(super) fn console(place: &Place, line: &FileLine) -> String {
+    let (msg, level) = (&line.msg, &line.level);
     let level = match level {
         LogLevel::Info => "info",
         LogLevel::Warning => "warn",
@@ -159,13 +206,23 @@ pub(super) fn console(place: &Place, msg: &str, level: &LogLevel) -> String {
     let mut body = Map::new();
     body.insert("level".into(), json!(level));
     body.insert("msg".into(), json!(msg));
+    if line.times > 1 {
+        body.insert("times".into(), json!(line.times));
+    }
     place.short("console", body)
 }
 
-/// An audio event, as `Debug.AudioEvents` returns it.
+/// An audio event, as `Debug.AudioEvents` returns it, its own `tick` (the sim
+/// tick it played on, which differs from the line's when a frame ran several)
+/// renamed `event_tick` so the line has one `tick` key.
 pub(super) fn audio(place: &Place, event: &impl serde::Serialize) -> Option<String> {
     match serde_json::to_value(event).ok()? {
-        Value::Object(body) => Some(place.short("audio", body)),
+        Value::Object(mut body) => {
+            if let Some(tick) = body.remove("tick") {
+                body.insert("event_tick".into(), tick);
+            }
+            Some(place.short("audio", body))
+        }
         _ => None,
     }
 }
@@ -193,4 +250,36 @@ fn rounded(map: BTreeMap<&str, f64>) -> Value {
             .map(|(k, v)| (k.to_string(), round3(json!(v))))
             .collect(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An audio record has one `tick`, the line's: the event's own is `event_tick`,
+    /// so `serde_json`, `jq` and a strict parser read the same line.
+    #[test]
+    fn an_audio_record_has_one_tick_key() {
+        let event = json!({ "seq": 4, "tick": 7, "kind": "play" });
+        let line = audio(&Place::fixed(1, 9), &event).unwrap();
+        assert_eq!(line.matches("\"tick\":").count(), 1, "{line}");
+        let parsed: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(
+            (parsed["tick"].as_u64(), parsed["event_tick"].as_u64()),
+            (Some(9), Some(7))
+        );
+    }
+
+    /// A record folded `times` times in a row says so; a single one does not.
+    #[test]
+    fn a_repeated_console_line_says_how_many_times() {
+        let line = |times| FileLine {
+            msg: "[Physics] skipped".into(),
+            level: LogLevel::Warning,
+            times,
+        };
+        let place = Place::fixed(1, 2);
+        assert!(console(&place, &line(3)).ends_with(r#""times":3}"#));
+        assert!(!console(&place, &line(1)).contains("times"));
+    }
 }

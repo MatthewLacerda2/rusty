@@ -135,49 +135,5 @@ fn a_look_back_is_whole_and_a_cut_is_counted() {
     assert_eq!((ts(&got), got.skipped), (vec![700, 802], 1));
 }
 
-/// GPU times ride on a later frame's line under `gpu_frame`; the read puts them
-/// on the frame they measure, so a hitch names its own heaviest pass. A drawn
-/// frame whose times are not in the log says so, and an earlier session's frame
-/// of the same index never takes a later session's times.
-#[test]
-fn gpu_times_are_joined_onto_the_frame_they_measure() {
-    let dir = rusty_test_support::temp::dir();
-    let f = |t: u64, frame: u64, ms: u64, gpu: &str| {
-        let head = format!(r#"{{"ch":"frames","t":{t},"tick":0,"frame":{frame},"ms":{ms}"#);
-        format!("{head}{gpu}}}")
-    };
-    // As `record::frame` writes them: `gpu_frame` and `cpu_ms` in the head.
-    let gpu = |of: u64, pass: &str| {
-        format!(r#","gpu_frame":{of},"cpu_ms":1,"gpu_ms":9,"gpu_passes":{{"{pass}":9}}"#)
-    };
-    let drew = r#","cpu_ms":1"#;
-    let lines = [
-        f(1, 1, 40, drew),               // an earlier session's frame 1
-        f(2, 1, 40, drew),               // this session: frame 1 hitches
-        f(3, 2, 16, &gpu(1, "shadows")), // its times, a frame late
-        f(4, 3, 16, &gpu(2, "forward")),
-    ];
-    segment(
-        &dir,
-        0,
-        &lines.iter().map(String::as_str).collect::<Vec<_>>(),
-    );
-    let q = LogQuery {
-        over_ms: Some(33.0),
-        ..LogQuery::default()
-    };
-    let got = read(&dir, &q, 10);
-    assert_eq!(ts(&got), [1, 2]);
-    let (old, hitch) = (&got.records[0], &got.records[1]);
-    assert_eq!(hitch["heaviest_pass"], "shadows", "{hitch}");
-    assert_eq!(hitch["gpu_passes"], serde_json::json!({ "shadows": 9 }));
-    assert!(hitch.get("gpu_frame").is_none(), "{hitch}");
-    assert_eq!(old["gpu_resolved"], false, "{old}");
-    let all = read(&dir, &LogQuery::default(), 10);
-    let newest = &all.records[3];
-    assert_eq!(newest["gpu_resolved"], false, "not resolved yet: {newest}");
-    assert_eq!(
-        all.records[2]["gpu_passes"],
-        serde_json::json!({ "forward": 9 })
-    );
-}
+#[path = "read_span_tests.rs"]
+mod span;

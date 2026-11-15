@@ -1,8 +1,8 @@
 //! A line's head, read without parsing the line (#2206): what a read filters on.
 //!
 //! The writer opens every line with `{"ch":…,"t":…,"tick":…` and, on a `frames`
-//! record, `"frame"`, `"ms"`, `"gpu_frame"` (when GPU times rode on it) and
-//! `"cpu_ms"` (when it drew), in that order (`record::line`). Reading those few
+//! record, `"frame"`, `"ms"` (unless unresolved) and `"cpu_ms"` (when it drew),
+//! in that order (`record::line`). Reading those few
 //! bytes is enough to drop a line a query does not want, so a read over the whole
 //! budget parses only the lines it keeps. A line written another way falls back to a full parse.
 
@@ -10,7 +10,7 @@ use std::borrow::Cow;
 
 use serde_json::{Map, Value};
 
-/// The fields a read filters and joins on.
+/// The fields a read filters on.
 #[derive(Debug, PartialEq)]
 pub(super) struct Head<'a> {
     pub ch: Cow<'a, str>,
@@ -19,8 +19,6 @@ pub(super) struct Head<'a> {
     pub frame: Option<u64>,
     /// A `frames` record's wall ms.
     pub ms: Option<f64>,
-    /// The frame whose GPU times ride on this `frames` record.
-    pub gpu_frame: Option<u64>,
     /// A `frames` record's renderer CPU ms: present when the frame drew.
     pub cpu_ms: Option<f64>,
 }
@@ -37,13 +35,11 @@ impl<'a> Head<'a> {
             t,
             frame: None,
             ms: None,
-            gpu_frame: None,
             cpu_ms: None,
         };
         if ch == "frames" {
             head.frame = scalar(&mut rest, "frame").and_then(|v| v.parse().ok());
             head.ms = scalar(&mut rest, "ms").and_then(|v| v.parse().ok());
-            head.gpu_frame = scalar(&mut rest, "gpu_frame").and_then(|v| v.parse().ok());
             head.cpu_ms = scalar(&mut rest, "cpu_ms").and_then(|v| v.parse().ok());
         }
         Some(head)
@@ -57,7 +53,6 @@ impl<'a> Head<'a> {
             t: record.get("t").and_then(Value::as_u64).unwrap_or(0),
             frame: record.get("frame").and_then(Value::as_u64),
             ms: record.get("ms").and_then(Value::as_f64),
-            gpu_frame: record.get("gpu_frame").and_then(Value::as_u64),
             cpu_ms: record.get("cpu_ms").and_then(Value::as_f64),
         }
     }
@@ -82,20 +77,16 @@ mod tests {
 
     #[test]
     fn a_written_head_is_read_and_another_line_is_not() {
-        let line = r#"{"ch":"frames","t":12,"tick":3,"frame":7,"ms":16.5,"gpu_frame":5,"cpu_ms":2,"cam":[0]}"#;
+        let line = r#"{"ch":"frames","t":12,"tick":3,"frame":7,"ms":16.5,"cpu_ms":2,"cam":[0]}"#;
         let head = Head::of(line).unwrap();
-        let want = (Some(7), Some(16.5), Some(5), Some(2.0), 12);
-        assert_eq!(
-            (head.frame, head.ms, head.gpu_frame, head.cpu_ms, head.t),
-            want
-        );
+        let want = (Some(7), Some(16.5), Some(2.0), 12);
+        assert_eq!((head.frame, head.ms, head.cpu_ms, head.t), want);
         let console = Head::of(r#"{"ch":"console","t":1,"tick":0,"level":"info"}"#).unwrap();
         assert_eq!((console.ch.as_ref(), console.frame), ("console", None));
-        let no_gpu = Head::of(r#"{"ch":"frames","t":1,"tick":0,"frame":2,"ms":9}"#).unwrap();
-        assert_eq!(
-            (no_gpu.ms, no_gpu.gpu_frame, no_gpu.cpu_ms),
-            (Some(9.0), None, None)
-        );
+        let undrawn = Head::of(r#"{"ch":"frames","t":1,"tick":0,"frame":2,"ms":9}"#).unwrap();
+        assert_eq!((undrawn.ms, undrawn.cpu_ms), (Some(9.0), None));
+        let open = Head::of(r#"{"ch":"frames","t":1,"tick":0,"frame":2,"cpu_ms":1}"#).unwrap();
+        assert_eq!((open.ms, open.cpu_ms), (None, Some(1.0)), "ms unresolved");
         assert!(Head::of(r#"{"cam":[0],"ch":"frames","t":1}"#).is_none());
         assert!(Head::of(r#"{"ch":"fra"#).is_none(), "a cut line");
     }

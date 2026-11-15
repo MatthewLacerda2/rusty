@@ -3,6 +3,7 @@
 
 use super::*;
 use crate::stats::{record_window, WindowFrame};
+use rusty_script::scripting::LogLevel::Warning;
 
 /// One frame of a world, written and read back: its place, sim time and heavy
 /// system, and the console lines beside it (one logged before the first frame
@@ -28,7 +29,7 @@ fn a_frame_of_a_world_is_written_with_what_was_logged() {
         record_window(&mut stats, &frame, true);
         drop(stats);
         game.console().borrow_mut().info(msg.into());
-        log.frame(game, &frame);
+        log.frame(game, &frame, false);
     };
     run(&mut log, "logged before the first frame");
     run(&mut log, "hello");
@@ -97,13 +98,13 @@ fn a_play_load_is_one_record_and_an_edit_load_none() {
     let frame = WindowFrame::default();
     rusty_edit::load_from_file(&mut gw.scene().borrow_mut(), &level).unwrap();
     gw.edit_frame();
-    log.frame(&gw, &frame);
+    log.frame(&gw, &frame, false);
     gw.set_playing(true);
     gw.tick(1.0 / 60.0);
-    log.frame(&gw, &frame);
+    log.frame(&gw, &frame, false);
     gw.scene().borrow_mut().request_load(level);
     gw.tick(1.0 / 60.0);
-    log.frame(&gw, &frame);
+    log.frame(&gw, &frame, false);
     drop(log);
     let loads = LogQuery {
         channel: Some("loads".into()),
@@ -116,4 +117,33 @@ fn a_play_load_is_one_record_and_an_edit_load_none() {
         .map(|r| r["tick"].as_u64().unwrap())
         .collect();
     assert_eq!(ticks, [2], "the Play load alone, on its own tick");
+}
+
+/// Every console line reaches the file, past the 100-line buffer; a warning
+/// repeated every frame is written on each frame with its count.
+#[test]
+fn every_console_line_is_written_and_a_repeat_each_frame() {
+    let dir = rusty_test_support::temp::dir();
+    let session = crate::session::Session::new("").unwrap();
+    let game = session.world();
+    let (mut log, frame) = (
+        FrameLog::start(&dir, Default::default()).unwrap(),
+        WindowFrame::default(),
+    );
+    log.frame(game, &frame, false);
+    for i in 0..150 {
+        game.console().borrow_mut().info(format!("load step {i}"));
+    }
+    for _ in 0..3 {
+        let msg = "[Physics] skipped".to_string();
+        game.console().borrow_mut().repeated(msg, Warning, 2);
+        log.frame(game, &frame, false);
+    }
+    drop(log);
+    let got = read(&dir, &LogQuery::default(), now_ms()).records;
+    let warns: Vec<_> = got.iter().filter(|r| r["level"] == "warn").collect();
+    let infos = got.iter().filter(|r| r["level"] == "info").count();
+    assert_eq!(infos, 150, "past the buffer");
+    assert_eq!(warns.len(), 3, "one per frame that saw it");
+    assert!(warns.iter().all(|w| w["times"] == 2), "{warns:?}");
 }

@@ -85,7 +85,7 @@ fn gpu_a_window_frame_reaches_the_frame_log() {
         let frame = window_frame(&mut r, &clock, before);
         let stats = game.script_manager().stats_cell();
         rusty_dev::stats::record_window(&mut stats.borrow_mut(), &frame, false);
-        log.frame(game, &frame);
+        log.frame(game, &frame, r.times_gpu());
     }
     drop(log);
     let got = read(&dir, &LogQuery::default(), now_ms());

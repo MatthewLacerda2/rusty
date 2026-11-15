@@ -17,7 +17,7 @@ pub struct LogSettings {
     /// `0` writes no log.
     pub budget_mb: u32,
     /// A second, optional bound: a segment whose newest record is older than this
-    /// many minutes is dropped. `None` bounds the log by size alone.
+    /// many minutes is dropped. `None` (or `0`) bounds the log by size alone.
     pub minutes: Option<u32>,
     /// Whether the editor writes it (on by default: a look-back needs no arming).
     pub editor: bool,
@@ -36,6 +36,16 @@ impl Default for LogSettings {
             player: false,
             channels: LogChannels::default(),
         }
+    }
+}
+
+impl LogSettings {
+    /// The period in ms, `None` when the log is bounded by size alone: `minutes`
+    /// unset or `0` (a period of nothing would delete every closed segment).
+    pub fn period_ms(&self) -> Option<u64> {
+        self.minutes
+            .filter(|m| *m > 0)
+            .map(|m| u64::from(m) * 60_000)
     }
 }
 
@@ -140,5 +150,15 @@ mod tests {
         assert_eq!(read.budget_mb, 5);
         assert!(read.editor && !read.player && read.minutes.is_none());
         assert!(!read.channels.audio && read.channels.frames);
+    }
+
+    #[test]
+    fn zero_minutes_is_no_period() {
+        let mut settings = LogSettings::default();
+        assert_eq!(settings.period_ms(), None);
+        settings.minutes = Some(0);
+        assert_eq!(settings.period_ms(), None, "0 deletes nothing by age");
+        settings.minutes = Some(2);
+        assert_eq!(settings.period_ms(), Some(120_000));
     }
 }

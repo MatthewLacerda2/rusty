@@ -1,28 +1,26 @@
 //! Reading the frame log back (#2206): the slice `Debug.FrameLog{ … }` returns, so
 //! an agent never parses the files by hand.
 //!
-//! * **Newest first, stopping early.** Segments and their lines are read newest
-//!   first; a look-back stops at the first line older than it, and a `limit`
-//!   stops parsing once it is full (the lines past it are only counted, from
-//!   their head, into `truncated`).
+//! * **Newest first, stopping early.** The frames the running log still holds
+//!   (`held`) are read first, as they stand, then the segments and their lines
+//!   newest first; a look-back stops at the first line older than it, and a read
+//!   whose answer is full stops at the end of the segment it filled in, counting
+//!   only that segment's further matches into `truncated` (so it says "at least").
 //! * **Filtered before parsed.** Each line's head (`head::Head`) says its channel,
 //!   time, frame index and wall ms, so a line the query drops is never parsed.
-//! * **GPU times joined by frame.** A frame's GPU times resolve a frame or two
-//!   after it drew, so they ride on a later `frames` record under `gpu_frame`, the
-//!   index of the frame they measure. The read moves them onto that frame's own
-//!   record (matching `frame`), so `over_ms`' heaviest pass is the hitching
-//!   frame's. A drawn frame whose times are not in the log (not resolved yet, or
-//!   never) says `gpu_resolved = false` rather than borrowing a neighbour's.
 //! * **A bad line is counted, never fatal.** A line that does not parse, or is
-//!   not UTF-8 (a segment cut inside a character), is skipped and counted.
+//!   not UTF-8 (a segment cut inside a character), is skipped and counted when
+//!   the next older line shows it lies inside the look-back.
+//!
+//! A line is whole on disk (`held`): its own `ms` and GPU times, so nothing is
+//! joined at read time.
 
 use std::path::Path;
-use std::rc::Rc;
 
 use serde_json::{json, Map, Value};
 
 use super::head::Head;
-use super::join::{carried, join, Carrier, Carriers};
+use super::held;
 use super::segments::numbered;
 
 /// The records a read keeps when it names neither a `limit` nor a look-back: the
@@ -54,9 +52,10 @@ impl LogQuery {
     }
 }
 
-/// What a read found: the records oldest first; the lines it skipped; the
-/// records the query matched past its limit, left out; and the records the
-/// writer dropped in the span read (the `dropped` lines' sum).
+/// What a read found: the records oldest first; the lines it skipped; at least
+/// how many records the query matched past its limit, left out; and the records
+/// the writer dropped in the span of the records returned (the `dropped` lines'
+/// sum from the oldest returned record's time on, or the look-back's start).
 #[derive(Debug, Default, PartialEq)]
 pub struct LogRead {
     pub records: Vec<Value>,
@@ -75,16 +74,21 @@ pub fn read(dir: &Path, query: &LogQuery, now: u64) -> LogRead {
         limit: query.limit(),
         out: LogRead::default(),
         newest_first: Vec::new(),
-        carriers: Carriers::default(),
+        drops: Vec::new(),
+        unplaced: 0,
     };
+    let mut more = reader.segment(held::lines(dir).join("\n").as_bytes());
     for (_, path) in numbered(dir).into_iter().rev() {
-        // lint: allow(stored-format) the frame log's format is `frame_log::record`'s
-        let Ok(bytes) = std::fs::read(&path) else {
-            continue;
-        };
-        if !reader.segment(&Rc::new(bytes)) {
+        if !more {
             break;
         }
+        // lint: allow(stored-format) the frame log's format is `frame_log::record`'s
+        if let Ok(bytes) = std::fs::read(&path) {
+            more = reader.segment(&bytes);
+        }
+    }
+    if more {
+        reader.out.skipped += reader.unplaced; // nothing older: count them in
     }
     reader.finish()
 }
@@ -96,79 +100,76 @@ struct Reader<'q> {
     limit: usize,
     out: LogRead,
     newest_first: Vec<Map<String, Value>>,
-    carriers: Carriers,
+    /// The drop notes met while the answer was not full: their time and count.
+    drops: Vec<(u64, u64)>,
+    /// Bad lines not yet known to lie inside the look-back.
+    unplaced: usize,
 }
 
 impl Reader<'_> {
-    /// Read one segment's lines; `false` once a line is older than the look-back.
-    fn segment(&mut self, bytes: &Rc<Vec<u8>>) -> bool {
-        let base = bytes.as_ptr() as usize;
+    /// Read one segment's lines; `false` once a line is older than the look-back
+    /// or the answer is full.
+    fn segment(&mut self, bytes: &[u8]) -> bool {
         for (raw, line) in lines_newest_first(bytes) {
             if raw.iter().all(u8::is_ascii_whitespace) {
                 continue;
             }
             let Some((head, parsed)) = line.and_then(head_of) else {
-                self.out.skipped += 1;
+                self.unplaced += 1;
                 continue;
             };
             if self.since.is_some_and(|since| head.t < since) {
                 return false;
             }
-            let start = raw.as_ptr() as usize - base;
-            let at = (Rc::clone(bytes), start..start + raw.len());
-            let line = line.unwrap_or_default();
-            self.line(&head, line, parsed, at);
+            self.out.skipped += std::mem::take(&mut self.unplaced);
+            self.line(&head, line.unwrap_or_default(), parsed);
         }
-        true
+        self.newest_first.len() < self.limit
     }
 
-    /// One line in the look-back: counted, carried, or kept as `query` asks.
-    fn line(&mut self, head: &Head<'_>, line: &str, parsed: Option<Record>, at: Carrier) {
-        if head.ch == "dropped" {
+    /// One line in the look-back: counted or kept as `query` asks.
+    fn line(&mut self, head: &Head<'_>, line: &str, parsed: Option<Record>) {
+        let full = self.newest_first.len() >= self.limit;
+        if head.ch == "dropped" && !full {
             let records = |r: &Record| r.get("records").and_then(Value::as_u64);
             let n = match &parsed {
                 Some(record) => records(record),
                 None => parse(line).as_ref().and_then(records),
             };
-            self.out.dropped += n.unwrap_or(0);
+            self.drops.push((head.t, n.unwrap_or(0)));
         }
-        let taken = self.carriers.see(head, at);
-        // A line with no frame index (not the writer's) keeps its own times.
-        let carrier = match head.frame {
-            Some(_) => taken.as_ref().map(carried),
-            None => Some(line),
-        };
-        if !wanted(head, line, carrier, self.query) {
+        if !wanted(head, line, self.query) {
             return;
         }
-        if self.newest_first.len() >= self.limit {
+        if full {
             self.out.truncated += 1;
             return;
         }
-        let Some(mut record) = parsed.or_else(|| parse(line)) else {
+        let Some(record) = parsed.or_else(|| parse(line)) else {
             self.out.skipped += 1;
             return;
         };
-        if head.ch == "frames" && head.frame.is_some() {
-            join(&mut record, carrier.and_then(parse));
-        }
         if let Some(record) = kept(record, self.query) {
             self.newest_first.push(record);
         }
     }
 
-    /// The records oldest first; a drawn frame without its GPU times says so,
-    /// when the log has GPU times at all.
+    /// The records oldest first, and the drops in their span.
     fn finish(mut self) -> LogRead {
-        if self.carriers.seen {
-            for record in &mut self.newest_first {
-                let frame = record.get("ch").and_then(Value::as_str) == Some("frames");
-                let drew = record.contains_key("cpu_ms");
-                if frame && drew && !record.contains_key("gpu_ms") {
-                    record.insert("gpu_resolved".into(), json!(false));
-                }
-            }
-        }
+        let t = |r: &Record| r.get("t").and_then(Value::as_u64);
+        let oldest = self.newest_first.last().and_then(t);
+        let full = self.out.truncated > 0;
+        let from = match (oldest, self.since) {
+            (Some(oldest), Some(since)) if !full => oldest.min(since),
+            (Some(oldest), _) => oldest,
+            (None, since) => since.unwrap_or(u64::MAX),
+        };
+        self.out.dropped = self
+            .drops
+            .iter()
+            .filter(|(t, _)| *t >= from)
+            .map(|(_, n)| n)
+            .sum();
         self.newest_first.reverse();
         let records = self.newest_first.into_iter().map(Value::Object);
         self.out.records = records.collect();
@@ -209,13 +210,13 @@ fn parse(line: &str) -> Option<Record> {
 }
 
 /// Whether a line may be kept, from its head (and, for a channel that is a
-/// field, the line's or its GPU carrier's text) alone: exact for every query.
-fn wanted(head: &Head<'_>, line: &str, carrier: Option<&str>, query: &LogQuery) -> bool {
+/// field, the line's text) alone: exact for every query.
+fn wanted(head: &Head<'_>, line: &str, query: &LogQuery) -> bool {
     if let Some(want) = query.channel.as_deref() {
-        let field = |text: &str| text.contains(&format!("\"{want}\":"));
         let ok = match want {
-            "gpu_passes" => head.ch == "frames" && carrier.is_some_and(field),
-            "systems" => head.ch == "frames" && field(line),
+            "gpu_passes" | "systems" => {
+                head.ch == "frames" && line.contains(&format!("\"{want}\":"))
+            }
             _ => head.ch == want,
         };
         if !ok {
