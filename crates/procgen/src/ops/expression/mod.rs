@@ -143,3 +143,5 @@ const FUNCS: &[(&str, Func)] = &[
 mod eval_tests;
 #[cfg(test)]
 mod parse_tests;
+#[cfg(test)]
+mod zero_tests;

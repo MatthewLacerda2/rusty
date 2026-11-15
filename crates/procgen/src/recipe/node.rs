@@ -35,6 +35,7 @@ impl Node {
         }
         Err(self.error(Fault::Arity {
             func: self.op.func(),
+            fix: self.op.arity_fix(self.inputs.len()),
             given: self.inputs.len(),
             accepts,
         }))
@@ -71,6 +72,8 @@ pub enum Fault {
     Arity {
         /// The `math` func, whose arity narrows the op's (a unary func takes one input).
         func: Option<String>,
+        /// What to do, when the node's params decide its inputs (`expression`).
+        fix: Option<String>,
         given: usize,
         accepts: Arity,
     },
@@ -97,6 +100,7 @@ impl std::fmt::Display for NodeError {
             Fault::Parse(message) => f.write_str(message),
             Fault::Arity {
                 func,
+                fix,
                 given,
                 accepts,
             } => {
@@ -104,7 +108,8 @@ impl std::fmt::Display for NodeError {
                 if let Some(func) = func {
                     write!(f, "func {func:?} ")?;
                 }
-                write!(f, "takes {accepts} {noun}, but {given} given")
+                write!(f, "takes {accepts} {noun}, but {given} given")?;
+                fix.as_ref().map_or(Ok(()), |fix| write!(f, "; {fix}"))
             }
             Fault::UnknownInput(input) => write!(f, "references unknown input {input:?}"),
             Fault::UnknownLink { param, link } => {

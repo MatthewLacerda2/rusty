@@ -206,4 +206,9 @@ impl OpKind {
     pub fn func(&self) -> Option<String> {
         self.op().func()
     }
+
+    /// What an arity error about this node, wired with `given` inputs, says to do.
+    pub fn arity_fix(&self, given: usize) -> Option<String> {
+        self.op().arity_fix(given)
+    }
 }

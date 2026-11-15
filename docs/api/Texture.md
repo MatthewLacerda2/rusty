@@ -420,28 +420,36 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   crack rims. A pixel the line only partly covers reads the share it covers, so a
   line thinner than a pixel at a low `resolution` fades rather than vanishing, and
   the map's mean holds across resolutions. A mask with no edge reads black.
-- `expression {expr="0", r, g, b, a_out, k1=0, k2=0, k3=0, k4=0}` (*math*, 0 to 4
-  inputs, exactly the ones its formulas name): each pixel from a formula, Substance's
-  *Pixel Processor*: `{ op = "expression", expr = "0.5 + 0.5 * sin(tau * (8 * u + 0.3
-  * a))", inputs = {"warp"} }`. `expr` writes R, G and B (grayscale, alpha 1); `r`,
-  `g` and `b` each replace it on their channel (a channel left out reads `expr`, 0 by
-  default), and `a_out` writes alpha. A formula reads `u` and `v` (the pixel centre,
-  what `coordinates` writes), `pi`, `tau`, the inputs `a`, `b`, `c`, `d` in wiring
-  order (a bare name is red; `a.r`, `a.g`, `a.b`, `a.a` pick a channel) and `k1`–`k4`,
-  numbers a link or a graph param can drive. It has `+ - * /`, `^` (power, binding
-  right and tighter than unary minus: `-a ^ 2` is `-(a ^ 2)`), parentheses, the
-  comparisons `< <= > >= == !=` (1 or 0), and `min max abs floor ceil round fract mod
-  sqrt pow exp log sin cos tan atan2 clamp mix step smoothstep sign` (radians, as
-  `math`; `mod` and `step`/`smoothstep` as GLSL's). The functions `math` also has are
-  `math`'s, edges included, so a formula bakes the bytes of its `math` chain: `x / 0`,
-  `sqrt` or `^` of a negative base read 0, and so do `log` of x ≤ 0 and `mod` by 0.
-  The formulas compile when the recipe is parsed: a typo, an input named but not
-  wired, a wired one never named, `c` named without `b`, or `expr` beside all of `r`,
-  `g` and `b` is refused naming the node, the field, the column and the fix. A formula
-  is at most 4096 characters and nests at most 64 deep. A formula of `u` and `v` tiles
-  only when it is periodic in them (`sin(tau * 3 * u)` does, `u` does not), as
-  `coordinates` says of itself. No sampling inside a formula: compute the coordinates
-  here and feed them to `sample_at`, which filters by the footprint.
+- `expression {expr="0", r="", g="", b="", a_out="", k1=0, k2=0, k3=0, k4=0}` (*math*,
+  0 to 4 inputs, exactly the ones its formulas name): each pixel from a formula,
+  Substance's *Pixel Processor*: `{ op = "expression", expr = "0.5 + 0.5 * sin(tau *
+  (8 * u + 0.3 * a))", inputs = {"warp"} }`. `expr` writes R, G and B (grayscale,
+  alpha 1); `r`, `g` and `b` each replace it on their channel (a channel left blank
+  reads `expr`, 0 by default), and `a_out` writes alpha (1 when blank). A formula
+  reads `u` and `v` (the pixel centre, what `coordinates` writes), `pi`, `tau`, the
+  inputs `a`, `b`, `c`, `d` in wiring order (a bare name is red; `a.r`, `a.g`, `a.b`,
+  `a.a` pick a channel) and `k1`–`k4`, numbers a link or a graph param can drive. It
+  has `+ - * /`, `^` (power, binding right and tighter than unary minus: `-a ^ 2` is
+  `-(a ^ 2)`), parentheses, the comparisons `< <= > >= == !=` (1 or 0), and `min max
+  abs floor ceil round fract mod sqrt pow exp log sin cos tan atan2 clamp mix step
+  smoothstep sign` (radians, as `math`; `mod` and `step`/`smoothstep` as GLSL's). The
+  functions `math` also has are `math`'s, edges included, so a formula bakes the bytes
+  of its `math` chain: `x / 0` is 0, `sqrt` of a negative is 0, and `^` reads a
+  negative base as 0 and raises that (`(-2) ^ 0` is 1, `(a - 0.5) ^ -1` is `inf`
+  wherever `a <= 0.5`); `log` of x ≤ 0 and `mod` by 0 are 0. `exp` of a large value,
+  `tan` near a pole and a negative power of 0 give `inf`, which the bake keeps: a PNG
+  clamps it to white (black for `-inf`), and an op reading it may make NaN of it
+  (`inf - inf`), which a PNG writes as 0. A zero's sign comes out the same on every
+  platform (`min`, `max`, `clamp` and the rest compare it explicitly). The formulas
+  compile when the recipe is parsed: a typo, an input named but not wired, a wired one
+  never named (each refused by its letter), `c` named without `b`, or `expr` written
+  beside all of `r`, `g` and `b` is refused naming the node, the field, the column and
+  the fix. A formula can be a graph's `text` param (`expr = { param = "f" }`): it
+  compiles when the instance passes it. A formula is at most 4096 characters and nests
+  at most 64 deep. A formula of `u` and `v` tiles only when it is periodic in them
+  (`sin(tau * 3 * u)` does, `u` does not), as `coordinates` says of itself. No
+  sampling inside a formula: compute the coordinates here and feed them to
+  `sample_at`, which filters by the footprint.
 - `flood_bbox {output="size"|"center_x"|"center_y"}` (*filter*, 1 input:
   `flood_fill`'s): one flat grey per island from its bounding box, like Substance's
   *Flood Fill to BBox Size / Position*: `size` is the box's longer side in tiles,
@@ -792,11 +800,11 @@ file is refused. Every recipe may be one; two optional fields give it an interfa
 - **`params`**: name → `{ type, default, min?, max? }`, `type` one of `number`,
   `integer`, `bool`, `color`, `text` (`min`/`max` for the first two). Any node value
   may be the placeholder `{ param = "age" }`, a whole param (a number, a colour, an
-  enum or an `image` node's path as `text`, a seed), whether the param takes a link
-  or not. An instance's own `path` is the one value that takes none, and is refused:
-  the graph files are read before any param has a value. A recipe
-  with `params` baked on its own bakes at the defaults, and `Texture.ToJson` writes
-  the placeholders back.
+  enum, an `image` node's path or an `expression` formula as `text`, a seed), whether
+  the param takes a link or not. An instance's own `path` is the one value that takes
+  none, and is refused: the graph files are read before any param has a value. A
+  recipe with `params` baked on its own bakes at the defaults, and `Texture.ToJson`
+  writes the placeholders back.
 - **`inputs`**: an ordered list of names inner nodes read like node ids (in
   `inputs` and in links). A graph with inputs bakes only through an instance.
 - **Outputs** are the recipe's own `output` (or its last node) and `outputs`. An

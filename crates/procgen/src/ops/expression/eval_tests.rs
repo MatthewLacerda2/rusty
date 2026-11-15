@@ -98,7 +98,7 @@ fn numeric_edges_follow_math() {
     assert_eq!(value("log(0)"), 0.0);
     assert_eq!(value("log(-1)"), 0.0);
     assert_eq!(value("mod(3, 0)"), 0.0);
-    // inf − inf is NaN; `math`'s sqrt reads it as 0 (`NaN.max(0)`), as does `^`.
+    // inf − inf is NaN; `math`'s sqrt reads it as 0, as `^` does its base.
     assert!(value("exp(100) - exp(100)").is_nan());
     assert_eq!(value("sqrt(exp(100) - exp(100))"), 0.0);
     assert!(

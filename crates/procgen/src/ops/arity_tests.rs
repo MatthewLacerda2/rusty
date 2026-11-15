@@ -5,7 +5,7 @@
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use super::*;
-use crate::recipe::{sample_op, WhiteNoise, OPS, SAMPLE_PATH};
+use crate::recipe::{reading_sample_op, WhiteNoise, OPS, SAMPLE_PATH};
 use crate::source::{Source, Sources};
 
 const RES: Size = Size::new(8, 8);
@@ -41,7 +41,7 @@ fn eval(op: &OpKind, inputs: &[Image]) -> Image {
 #[test]
 fn every_op_runs_on_its_arity_and_needs_its_minimum() {
     for info in OPS {
-        let (op, arity) = (sample_op(info), info.inputs);
+        let (op, arity) = (reading_sample_op(info), info.inputs);
         let (min, max) = (usize::from(arity.min), usize::from(arity.max));
         eval(&op, &images(max));
         eval(&op, &images(min));
@@ -56,14 +56,9 @@ fn every_op_runs_on_its_arity_and_needs_its_minimum() {
 
 #[test]
 fn every_optional_input_is_read() {
-    // The sample node's own arity: an `expression` accepts exactly the inputs its
-    // formula names, so its row's `0 to 4` is no optional input.
-    for (info, op) in OPS.iter().map(|info| (info, sample_op(info))) {
-        let accepts = op.arity();
-        if accepts.max == accepts.min {
-            continue;
-        }
-        let mut inputs = images(usize::from(accepts.max));
+    for info in OPS.iter().filter(|info| info.inputs.max > info.inputs.min) {
+        let op = reading_sample_op(info);
+        let mut inputs = images(usize::from(info.inputs.max));
         let before = eval(&op, &inputs);
         let last = inputs.len() - 1;
         let noise = OpKind::WhiteNoise(WhiteNoise::default());
