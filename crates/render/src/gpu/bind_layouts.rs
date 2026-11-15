@@ -36,10 +36,10 @@ pub(crate) fn camera_lighting_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
         // Vertex-visible too: lit particles shade per vertex (#440).
         uniform_entry(1, wgpu::ShaderStages::VERTEX_FRAGMENT),
         // The sky's prefiltered reflection cube (#1553).
+        // Bindings 3, 5 and 15 are free: the cubes and the lightmap pages read
+        // through the one sampler at 18.
         texture_entry(2, Cube),
-        sampler_entry(3),
         texture_entry(4, CubeArray),
-        sampler_entry(5),
         // Vertex-visible too, for lit particles (#440).
         storage_entry(7, wgpu::ShaderStages::VERTEX_FRAGMENT),
         storage_entry(8, wgpu::ShaderStages::VERTEX_FRAGMENT),
@@ -49,7 +49,6 @@ pub(crate) fn camera_lighting_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
         texture_entry(12, D2Array),
         sampler_entry(13),
         texture_entry(14, D2Array),
-        sampler_entry(15),
         texture_entry(16, D2Array),
         // The integrated volumetric fog (#1703); vertex-visible too: particles
         // fog per vertex.
@@ -57,6 +56,8 @@ pub(crate) fn camera_lighting_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
             visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
             ..texture_entry(17, D3)
         },
+        // The linear clamp sampler every engine-owned texture here reads through
+        // but the decal atlas (`gpu::linear_clamp`), the fog's among them.
         wgpu::BindGroupLayoutEntry {
             visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
             ..sampler_entry(18)

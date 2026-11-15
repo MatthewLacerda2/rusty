@@ -13,16 +13,20 @@ use crate::gpu::lightmaps::LightmapBinding;
 pub(crate) struct GlobalGroup<'a> {
     pub camera: &'a wgpu::Buffer,
     pub lighting: &'a wgpu::Buffer,
-    /// The sky's reflection cube and its sampler (#1553).
-    pub skybox: (&'a wgpu::TextureView, &'a wgpu::Sampler),
-    pub cube: (&'a wgpu::TextureView, &'a wgpu::Sampler),
+    /// The sky's reflection cube (#1553).
+    pub skybox: &'a wgpu::TextureView,
+    /// The resident reflection probes' cube array (#1206).
+    pub cube: &'a wgpu::TextureView,
     pub clusters: &'a ClusterBuffers,
     pub decals: &'a DecalBuffers,
     /// The baked lightmap pages (#438), their direction (#810) and shadowmask
-    /// (#1695) pages and the sampler they read through.
+    /// (#1695) pages.
     pub lightmaps: LightmapBinding<'a>,
-    /// The integrated volumetric fog and its sampler (#1703).
-    pub fog_volume: (&'a wgpu::TextureView, &'a wgpu::Sampler),
+    /// The integrated volumetric fog (#1703).
+    pub fog_volume: &'a wgpu::TextureView,
+    /// The one sampler all of the above but the decal atlas read through
+    /// ([`super::linear_clamp`]).
+    pub linear_clamp: &'a wgpu::Sampler,
 }
 
 impl GlobalGroup<'_> {
@@ -36,10 +40,8 @@ impl GlobalGroup<'_> {
         let resources = [
             (0, self.camera.as_entire_binding()),
             (1, self.lighting.as_entire_binding()),
-            (2, TextureView(self.skybox.0)),
-            (3, Sampler(self.skybox.1)),
-            (4, TextureView(self.cube.0)),
-            (5, Sampler(self.cube.1)),
+            (2, TextureView(self.skybox)),
+            (4, TextureView(self.cube)),
             (7, lights.as_entire_binding()),
             (8, ranges.as_entire_binding()),
             (9, indices.as_entire_binding()),
@@ -48,10 +50,9 @@ impl GlobalGroup<'_> {
             (12, TextureView(&self.decals.atlas.data_view)),
             (13, Sampler(&self.decals.atlas.sampler)),
             (14, TextureView(self.lightmaps.pages)),
-            (15, Sampler(self.lightmaps.sampler)),
             (16, TextureView(self.lightmaps.directions)),
-            (17, TextureView(self.fog_volume.0)),
-            (18, Sampler(self.fog_volume.1)),
+            (17, TextureView(self.fog_volume)),
+            (18, Sampler(self.linear_clamp)),
             (19, TextureView(self.lightmaps.masks)),
         ];
         let entries: Vec<_> = resources

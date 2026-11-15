@@ -255,13 +255,13 @@ pub struct Renderer {
     /// The in-game UI pass (#418), drawn over the finished frame after post-FX.
     ui_renderer: ui::UiRenderer,
 
-    /// The frame's decals and their atlas (#638), bound in group 0 and folded into
-    /// the forward pass's material inputs.
+    /// The frame's decals and their atlas (#638), in group 0 and the forward material inputs.
     decals: decals::DecalBuffers,
 
-    /// The integrated volumetric fog (#1703), bound in group 0: written by each base
-    /// camera running it, before it draws.
+    /// The volumetric fog (#1703) in group 0, written by each base camera running it.
     fog_volume: postfx::effects::volumetric_fog::SharedVolume,
+    /// Group 0's one sampler for its cubes, lightmaps and fog (`gpu::linear_clamp`).
+    linear_clamp: wgpu::Sampler,
 
     /// The scene-depth layout the soft particles sample the depth target through.
     scene_depth_layout: wgpu::BindGroupLayout,

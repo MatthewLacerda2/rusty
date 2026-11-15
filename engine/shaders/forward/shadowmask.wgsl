@@ -18,7 +18,7 @@
 #define_import_path forward::shadowmask
 
 #import common::LocalLight
-#import forward::bindings::{lighting, objects, s_lightmaps, t_lightmap_masks}
+#import forward::bindings::{lighting, objects, s_linear_clamp, t_lightmap_masks}
 #import forward::local_shadow::local_shadow_parts
 
 // The pixel's baked occlusion per channel: a lightmapped surface's shadowmask
@@ -35,7 +35,7 @@ fn baked_occlusion(uv: vec2<f32>, page: u32, lod: f32, object: u32) -> vec4<f32>
     }
     if (page > 0u) {
         if (lighting.masks_bound > 0.5) {
-            return textureSampleLevel(t_lightmap_masks, s_lightmaps, uv, page - 1u, lod);
+            return textureSampleLevel(t_lightmap_masks, s_linear_clamp, uv, page - 1u, lod);
         }
         return vec4<f32>(1.0);
     }
