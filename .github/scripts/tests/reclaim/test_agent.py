@@ -47,7 +47,7 @@ def branch(name: str, tip: str) -> tuple[str, str]:
 
 def detached(head: str, locked: str | None = None, busy: list[int] | None = None) -> tuple[str, str]:
     wt = Worktree(MAIN / ".claude" / "worktrees" / "agent-x", head, locked=locked)
-    facts = machine().facts(wt, MAIN, cwds=[(pid, wt.path) for pid in busy or []])
+    facts = machine().facts(wt, MAIN, procs=[(pid, wt.path, "x") for pid in busy or []])
     return reclaim.verdict(wt, facts)
 
 

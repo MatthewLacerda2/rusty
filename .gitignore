@@ -28,6 +28,8 @@ auxmd.md
 # A developer's local game project: what every binary opens when no `--project`
 # is given (#829). Games live in their own folders and repos, never in this one.
 /project/
+# Derived from the root Cargo.lock on every `make fuzz-check` (`make fuzz-lock`).
+/fuzz/Cargo.lock
 
 # The test-fixture project (#829): only its committed fixtures are tracked, never
 # what the engine seeds into it when it is opened.
