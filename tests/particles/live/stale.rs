@@ -1,7 +1,7 @@
 //! The pair across a tick, in the play loop: a table read in `Update` and
 //! written in `LateUpdate` is stale (the tick moved every age on), and an
 //! inactive `Local` emitter written by another script keeps every particle under
-//! one frame.
+//! one frame. A `GetArrays` table is refused after anything changed its emitter.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -11,7 +11,9 @@ use rusty::components::particle::{Flipbook, ParticleRenderMode, SimulationSpace}
 use rusty::core::curve::Range;
 use rusty::scene::Scene;
 
+use super::arrays::refused;
 use super::play::{burst, particles, world};
+use super::scene;
 use crate::play::{attach_script, playing, run};
 
 #[test]
@@ -58,7 +60,7 @@ fn an_inactive_local_emitter_keeps_its_particles_under_one_frame() {
           done = true
           local ps = Particles.GetParticles({id})
           local x, y, z = Transform.GetPosition({id})
-          ps[#ps + 1] = {{ position = {{ x = x, y = y + 1, z = z }} }}
+          ps[#ps + 1] = {{ x = x, y = y + 1, z = z }}
           Particles.SetParticles({id}, ps) end }}"
     );
     attach_script(&mut scene, driver, "rusty_2171_inactive.lua", &add);
@@ -84,4 +86,37 @@ fn an_inactive_local_emitter_keeps_its_particles_under_one_frame() {
         "{:?} at {at}",
         live[2]
     );
+}
+
+#[test]
+fn a_write_after_anything_changed_the_emitter_is_refused() {
+    // Each step changes the emitter; the arrays' `vy = 9` must not land.
+    for code in [
+        "local a = Particles.GetArrays(ID, { 'vy' }); Particles.Emit(ID, 1)
+          Particles.SetArrays(ID, a)",
+        "local a = Particles.GetArrays(ID, { 'vy' })
+          local n = 0; Particles.ForEach(ID, function() n = n + 1; return n ~= 2 end)
+          Particles.SetArrays(ID, a)",
+        // Same count and the same ages after (every particle is born at age 0),
+        // but particle 3 is gone and the last is new.
+        "local a = Particles.GetArrays(ID, { 'vy' })
+          local n = 0; Particles.ForEach(ID, function() n = n + 1; return n ~= 3 end)
+          Particles.Emit(ID, 1)
+          Particles.SetArrays(ID, a)",
+        "local a = Particles.GetArrays(ID, { 'vy' })
+          local ps, rev = Particles.GetParticles(ID), {}
+          for i = #ps, 1, -1 do rev[#rev + 1] = ps[i] end
+          Particles.SetParticles(ID, rev)
+          Particles.SetArrays(ID, a)",
+    ] {
+        let code = code.replace(
+            "Particles.SetArrays",
+            "for i = 1, #a.vy do a.vy[i] = 9 end\n  Particles.SetArrays",
+        );
+        let (scene, id) = scene(3);
+        refused(&scene, id, &code, "from an older read");
+        let s = scene.borrow();
+        let live = &s.world.particles(id).unwrap().runtime.particles;
+        assert!(live.iter().all(|p| p.velocity.y != 9.0), "{code}");
+    }
 }

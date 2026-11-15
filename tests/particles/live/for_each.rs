@@ -13,11 +13,11 @@ fn edits_are_written_back_and_false_kills() {
             "local seen
              local live = Particles.ForEach({id}, function(p)
                seen = seen == nil and p or (seen == p and seen or false)
-               if p.custom[1] == 0 and p.age == 0 then p.custom[1] = p.size end
-               p.velocity.y = 4
+               if p.custom1 == 0 and p.age == 0 then p.custom1 = p.size end
+               p.vy = 4
                if p.size < 0 then return false end
              end)
-             local n = Particles.ForEach({id}, function(p) return p.custom[1] < 0.3 end)
+             local n = Particles.ForEach({id}, function(p) return p.custom1 < 0.3 end)
              return n, seen ~= false"
         ),
     )
@@ -37,8 +37,8 @@ fn edits_are_written_back_and_false_kills() {
 fn for_each_and_the_pair_give_the_same_state() {
     // Kills the smaller particles, so survivors move up the list.
     const RULE: &str = "local function rule(p)
-      p.velocity.x = p.velocity.x * 0.5 + p.position.y
-      p.custom[2] = p.custom[2] + 1; p.rotation = p.rotation + 10
+      p.vx = p.vx * 0.5 + p.y
+      p.custom2 = p.custom2 + 1; p.rotation = p.rotation + 10
       if p.size < 0.3 then return false end
     end";
     let (a, id) = super::identity::hidden(6);
@@ -77,4 +77,50 @@ fn a_nil_id_is_an_error_and_no_emitter_visits_nothing() {
     )
     .unwrap();
     assert_eq!(n, 0);
+}
+
+#[test]
+fn a_table_kept_past_its_call_is_an_error_not_another_particle() {
+    let (scene, id) = scene(3);
+    for (rule, name) in [
+        ("function(p) kept = p end", "returned"),
+        ("function(p) kept = p; error('stop') end", "errored"),
+    ] {
+        let before = dump(&scene, id);
+        let first = lua::<()>(&scene, &format!("Particles.ForEach({id}, {rule})"));
+        assert_eq!(first.is_err(), name == "errored", "{name}");
+        assert_eq!(dump(&scene, id), before, "{name}: nothing changed");
+        for touch in ["return kept.x", "kept.vy = 1"] {
+            let err = lua::<()>(
+                &scene,
+                &format!("pcall(Particles.ForEach, {id}, {rule}) {touch}"),
+            )
+            .unwrap_err()
+            .to_string();
+            assert!(
+                err.contains("used after its ForEach returned"),
+                "{name}, {touch}: {err}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_view_given_a_protected_metatable_still_writes_its_edits() {
+    let (scene, id) = scene(2);
+    let live: u32 = lua(
+        &scene,
+        &format!(
+            "return Particles.ForEach({id}, function(p)
+               if not getmetatable(p) then setmetatable(p, {{ __metatable = 'locked' }}) end
+               p.vy = 7
+             end)"
+        ),
+    )
+    .unwrap();
+    assert_eq!(live, 2);
+    let s = scene.borrow();
+    for p in &s.world.particles(id).unwrap().runtime.particles {
+        assert_eq!(p.velocity.y, 7.0);
+    }
 }

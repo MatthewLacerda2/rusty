@@ -158,3 +158,20 @@ fn re_adding_a_material_keeps_the_library_asset() {
     );
     assert_eq!(scene.materials[&key].metallic, 0.6, "Material.Set* kept it");
 }
+
+#[test]
+fn an_empty_occlusion_or_specular_path_clears_the_map() {
+    let mut lib = MaterialLibrary::new();
+    lib.insert("m".into(), MaterialAsset::default());
+    set_occlusion_map(&mut lib, "m", Some("ao.png".into()));
+    set_specular_map(&mut lib, "m", Some("s.png".into()));
+    assert!(lib["m"].occlusion_map.is_some() && lib["m"].specular_map.is_some());
+    set_occlusion_map(&mut lib, "m", Some(String::new()));
+    set_specular_map(&mut lib, "m", Some(String::new()));
+    let m = &lib["m"];
+    assert_eq!(
+        (&m.occlusion_map, &m.specular_map),
+        (&None, &None),
+        "a darkening map never names nothing"
+    );
+}
