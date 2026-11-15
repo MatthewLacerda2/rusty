@@ -43,9 +43,10 @@ pub struct PreviewOptions {
     pub mesh: PreviewMesh,
     /// Edge length in pixels of the square output, clamped to a sane range.
     pub resolution: u32,
-    /// How many times the material repeats across the stand-in, multiplying its own
-    /// tiling ([`rusty_preview::stand_in::repeated`]); at least 1. Ignored for models.
-    pub repeats: u32,
+    /// How many times the material repeats across the stand-in
+    /// ([`rusty_preview::stand_in::repeated`]), or `None` to show it as authored: a
+    /// world-mapped material then shows its real scale. Ignored for models.
+    pub repeats: Option<u32>,
 }
 
 impl Default for PreviewOptions {
@@ -53,7 +54,7 @@ impl Default for PreviewOptions {
         Self {
             mesh: PreviewMesh::Sphere,
             resolution: DEFAULT_RESOLUTION,
-            repeats: 1,
+            repeats: None,
         }
     }
 }
@@ -121,7 +122,7 @@ fn capture_subject_into(
     out_png: &Path,
     options: PreviewOptions,
 ) -> Result<bool, String> {
-    let scene = rusty_preview::build_preview_scene(options.mesh, options.repeats, subject);
+    let scene = rusty_preview::build_preview_scene(options.mesh, options.repeats, subject)?;
     let resolution = options.clamped_resolution();
 
     let Some((renderer, view)) = host.frame(resolution, resolution, Default::default()) else {

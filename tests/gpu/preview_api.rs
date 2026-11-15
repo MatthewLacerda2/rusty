@@ -87,4 +87,12 @@ fn a_bad_path_or_mesh_raises_instead_of_returning_a_blank_picture() {
         format!("{no_repeats:?}").contains("repeats must be 1 or more"),
         "zero repeats must raise, got {no_repeats:?}"
     );
+
+    let too_many = sess.eval(&format!(
+        r#"return Debug.Preview({SHADER:?}, "out.png", {{ repeats = 100000 }})"#
+    ));
+    assert!(
+        format!("{too_many:?}").contains("at most 1000 repeats"),
+        "a count past the renderer's tiling range must raise, got {too_many:?}"
+    );
 }

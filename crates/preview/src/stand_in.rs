@@ -12,6 +12,7 @@
 use glam::{Quat, Vec3};
 
 use rusty_components::{MaterialAsset, UvMapping};
+use rusty_scene::rules::material::{MAP_COORD_RANGE, WORLD_SIZE_RANGE};
 
 use crate::{OrbitState, PreviewMesh, PreviewSubject};
 
@@ -79,30 +80,100 @@ pub(crate) fn light_pose(shown: Option<PreviewMesh>) -> Quat {
     }
 }
 
-/// `material` as it is drawn `repeats` times across `mesh`. Under UV0 its own tiling
-/// is multiplied by `repeats`; under a world mapping (`Planar`, `Triplanar`) its
-/// `world_size`, and its detail layer's in proportion, are set so that `repeats ×
-/// world_size` metres span the stand-in ([`extent`]): the same number of repeats shows
-/// either way, and the camera stays where it is. A detail layer under UV0 follows the
-/// base's tiled UV already. `repeats` below one is taken as one.
-pub fn repeated(mut material: MaterialAsset, mesh: PreviewMesh, repeats: u32) -> MaterialAsset {
-    let n = repeats.max(1) as f32;
+/// `material` as it is drawn `repeats` times across `mesh`, or as it is authored when
+/// `repeats` is `None` (a world-mapped material then shows its real scale: its true
+/// texel density on the stand-in). Under UV0 its own tiling is multiplied by
+/// `repeats`; under a world mapping (`Planar`, `Triplanar`) its `world_size`, and its
+/// detail layer's in proportion, are set so that `repeats × world_size` metres span
+/// the stand-in ([`extent`]): the same number of repeats shows either way, and the
+/// camera stays where it is. A detail layer under UV0 follows the base's tiled UV
+/// already.
+///
+/// Errors on `repeats = 0`, and on a count whose tiling or world size falls outside
+/// what the renderer draws ([`MAP_COORD_RANGE`], [`WORLD_SIZE_RANGE`]): it would clamp
+/// the value and show a different count than was asked for, quietly. The error names
+/// the limit and the count that fits.
+pub fn repeated(
+    mut material: MaterialAsset,
+    mesh: PreviewMesh,
+    repeats: Option<u32>,
+) -> Result<MaterialAsset, String> {
+    let Some(repeats) = repeats else {
+        return Ok(material);
+    };
+    if repeats == 0 {
+        return Err("preview repeats must be 1 or more, got 0".to_string());
+    }
+    let n = repeats as f32;
+    let on = mesh.name().to_lowercase();
     match material.uv_mapping {
-        UvMapping::Uv0 => material.tiling = material.tiling.map(|t| t * n),
+        UvMapping::Uv0 => {
+            let tiling = material.tiling.map(|t| t * n);
+            if tiling.iter().any(|t| !MAP_COORD_RANGE.contains(t)) {
+                let widest = material.tiling.iter().fold(0.0f32, |m, t| m.max(t.abs()));
+                return Err(format!(
+                    "preview repeats = {repeats} would tile the material {tiling:?} times, \
+                     outside the renderer's {}..={}; at most {} repeats fit its tiling {:?}",
+                    MAP_COORD_RANGE.start(),
+                    MAP_COORD_RANGE.end(),
+                    (MAP_COORD_RANGE.end() / widest).floor(),
+                    material.tiling,
+                ));
+            }
+            material.tiling = tiling;
+        }
         UvMapping::Planar | UvMapping::Triplanar => {
-            let world_size = extent(mesh) / n;
-            let factor = world_size / material.world_size;
-            material.world_size = world_size;
-            if let Some(detail) = material.detail.as_mut() {
-                if factor.is_finite() {
-                    detail.world_size *= factor;
-                }
+            // Each rescaled size is `k / n` metres: the base's `k` is the stand-in's
+            // extent, the detail's that times its ratio to the base.
+            let base = extent(mesh);
+            let ratio = material
+                .detail
+                .as_ref()
+                // A detail size the renderer already clamps on the material itself is
+                // the material's own, not the preview's: left as it is.
+                .filter(|d| WORLD_SIZE_RANGE.contains(&d.world_size))
+                .map(|d| d.world_size / material.world_size)
+                .filter(|r| r.is_finite());
+            let sizes = [
+                ("world_size", Some(base)),
+                ("detail world_size", ratio.map(|r| base * r)),
+            ];
+            for (what, k) in sizes {
+                let Some(k) = k else { continue };
+                check_world_size(what, k, repeats, &on)?;
+            }
+            material.world_size = base / n;
+            if let (Some(detail), Some(ratio)) = (material.detail.as_mut(), ratio) {
+                detail.world_size = base * ratio / n;
             }
         }
     }
-    material
+    Ok(material)
+}
+
+/// Refuse `repeats` when `k / repeats` metres falls outside [`WORLD_SIZE_RANGE`],
+/// naming the count that fits.
+fn check_world_size(what: &str, k: f32, repeats: u32, on: &str) -> Result<(), String> {
+    let size = k / repeats as f32;
+    if WORLD_SIZE_RANGE.contains(&size) {
+        return Ok(());
+    }
+    let (min, max) = (WORLD_SIZE_RANGE.start(), WORLD_SIZE_RANGE.end());
+    let fits = if size < *min {
+        format!("at most {} repeats fit", (k / min).floor())
+    } else {
+        format!("at least {} repeats are needed", (k / max).ceil())
+    };
+    Err(format!(
+        "preview repeats = {repeats} on the {on} would draw its {what} at {size} m, \
+         outside the renderer's {min}..={max} m; {fits}"
+    ))
 }
 
 #[cfg(test)]
 #[path = "stand_in_tests.rs"]
 mod stand_in_tests;
+
+#[cfg(test)]
+#[path = "repeats_tests.rs"]
+mod repeats_tests;

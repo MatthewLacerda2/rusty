@@ -15,7 +15,7 @@ pub mod orbit;
 pub mod scene;
 pub mod stand_in;
 
-pub use orbit::OrbitState;
+pub use orbit::{FramedOrbit, OrbitState};
 pub use scene::{build_preview_scene, PreviewMesh, PreviewSubject};
 pub use stand_in::framing;
 

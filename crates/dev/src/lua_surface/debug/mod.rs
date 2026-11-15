@@ -180,11 +180,13 @@ fn register_preview_material(
 }
 
 /// Read the optional `{ mesh = "sphere"|"cube"|"suzanne"|"plane", resolution = 512,
-/// repeats = 1 }` table, defaulting each field independently. An unknown mesh name
-/// raises rather than silently falling back, so a misspelled `"spere"` is caught at
-/// the call, not by the agent squinting at the wrong picture; so does a `repeats`
-/// below 1. (`repeat` would be the natural name, but it is a Lua keyword, so
-/// `{ repeat = 3 }` does not parse.)
+/// repeats = n }` table, defaulting each field independently (`repeats` absent: the
+/// material as authored). An unknown mesh name raises rather than silently falling
+/// back, so a misspelled `"spere"` is caught at the call, not by the agent squinting
+/// at the wrong picture; so does a `repeats` below 1, and the capture raises on one
+/// past what the renderer can show (`rusty_preview::stand_in::repeated`). (`repeat`
+/// would be the natural name, but it is a Lua keyword, so `{ repeat = 3 }` does not
+/// parse.)
 fn preview_options(opts: Option<&Table>) -> mlua::Result<PreviewOptions> {
     let defaults = PreviewOptions::default();
     let Some(opts) = opts else {
@@ -198,7 +200,7 @@ fn preview_options(opts: Option<&Table>) -> mlua::Result<PreviewOptions> {
         .get::<Option<u32>>("resolution")?
         .unwrap_or(defaults.resolution);
     let repeats = match opts.get::<Option<i64>>("repeats")? {
-        Some(n) if n >= 1 => u32::try_from(n).unwrap_or(u32::MAX),
+        Some(n) if n >= 1 => Some(u32::try_from(n).unwrap_or(u32::MAX)),
         Some(n) => {
             return Err(mlua::Error::RuntimeError(format!(
                 "preview repeats must be 1 or more, got {n}"

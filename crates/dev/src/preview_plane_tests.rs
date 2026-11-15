@@ -41,10 +41,10 @@ fn render(
     material: &MaterialAsset,
     tag: &str,
     mesh: PreviewMesh,
-    repeats: u32,
+    repeats: Option<u32>,
 ) -> Option<RgbImage> {
     let materials = BTreeMap::from([("m".to_string(), material.clone())]);
-    let out = rusty_test_support::temp::dir().join(format!("2186_{tag}_{mesh}_{repeats}.png"));
+    let out = rusty_test_support::temp::dir().join(format!("2186_{tag}_{mesh}_{repeats:?}.png"));
     let options = PreviewOptions {
         mesh,
         resolution: RES,
@@ -95,10 +95,10 @@ fn gpu_the_plane_shows_as_many_checker_periods_as_it_repeats() {
         base_color_map: Some(checker_png().as_str().into()),
         ..MaterialAsset::default()
     };
-    let Some(once) = render(&material, "checker", PreviewMesh::Plane, 1) else {
+    let Some(once) = render(&material, "checker", PreviewMesh::Plane, Some(1)) else {
         return;
     };
-    let thrice = render(&material, "checker", PreviewMesh::Plane, 3).unwrap();
+    let thrice = render(&material, "checker", PreviewMesh::Plane, Some(3)).unwrap();
     assert_eq!(cells_across_far_edge(&once), 2, "one period: two cells");
     assert_eq!(
         cells_across_far_edge(&thrice),
@@ -135,10 +135,10 @@ fn gpu_the_raking_light_reads_relief_the_front_lit_sphere_flattens() {
         normal_map: Some(grooves_png().as_str().into()),
         ..MaterialAsset::default()
     };
-    let Some(plane) = render(&material, "grooves", PreviewMesh::Plane, 3) else {
+    let Some(plane) = render(&material, "grooves", PreviewMesh::Plane, Some(3)) else {
         return;
     };
-    let sphere = render(&material, "grooves", PreviewMesh::Sphere, 3).unwrap();
+    let sphere = render(&material, "grooves", PreviewMesh::Sphere, Some(3)).unwrap();
     let (plane, sphere) = (relief_contrast(&plane), relief_contrast(&sphere));
     eprintln!("relief contrast: plane {plane:.3}, sphere {sphere:.3}");
     assert!(

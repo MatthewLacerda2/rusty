@@ -85,9 +85,14 @@ impl PreviewSubject {
 /// Build a fresh, isolated preview [`Scene`]: empty skybox path (gradient sky, #352),
 /// a hardcoded directional light (raking across the plane, a three-quarter key on
 /// every other stand-in), and the requested subject, its material drawn `repeats`
-/// times across the stand-in ([`stand_in::repeated`]). A model ignores `mesh` and
-/// `repeats`. Never mutates or reads the active editor scene.
-pub fn build_preview_scene(mesh: PreviewMesh, repeats: u32, subject: &PreviewSubject) -> Scene {
+/// times across the stand-in, or as authored for `None` ([`stand_in::repeated`],
+/// whose refusal of a count the renderer cannot show is the error). A model ignores
+/// `mesh` and `repeats`. Never mutates or reads the active editor scene.
+pub fn build_preview_scene(
+    mesh: PreviewMesh,
+    repeats: Option<u32>,
+    subject: &PreviewSubject,
+) -> Result<Scene, String> {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
 
@@ -102,19 +107,19 @@ pub fn build_preview_scene(mesh: PreviewMesh, repeats: u32, subject: &PreviewSub
                 base_color_map: Some(path.as_str().into()),
                 ..MaterialAsset::default()
             };
-            attach_material(&mut scene, id, repeated(material));
+            attach_material(&mut scene, id, repeated(material)?);
         }
         PreviewSubject::Shader(_) => {
             let id = spawn_preview_mesh(&mut scene, mesh);
-            attach_material(&mut scene, id, repeated(MaterialAsset::default()));
+            attach_material(&mut scene, id, repeated(MaterialAsset::default())?);
         }
         PreviewSubject::Material(material) => {
             let id = spawn_preview_mesh(&mut scene, mesh);
-            attach_material(&mut scene, id, repeated((**material).clone()));
+            attach_material(&mut scene, id, repeated((**material).clone())?);
         }
     }
 
-    scene
+    Ok(scene)
 }
 
 /// A single hardcoded directional light, posed for what is `shown`
@@ -141,8 +146,9 @@ fn add_key_light(scene: &mut Scene, shown: Option<PreviewMesh>) {
     );
 }
 
-/// Spawn the sphere/cube primitive or the embedded Suzanne mesh at the origin
-/// (where the orbit camera always looks), returning its entity id.
+/// Spawn the stand-in, returning its entity id: the sphere, cube or embedded Suzanne
+/// at the origin, where the default orbit looks, or the plane at
+/// [`stand_in::PLANE_CENTRE`], past the origin its own framing looks at.
 fn spawn_preview_mesh(scene: &mut Scene, mesh: PreviewMesh) -> u32 {
     match mesh {
         PreviewMesh::Sphere => {

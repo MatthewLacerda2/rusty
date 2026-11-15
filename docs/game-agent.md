@@ -140,7 +140,9 @@ use**. Read `Texture.Stats` on a recipe before tuning a `color_ramp` or `map_ran
 `Debug.PreviewMaterial` (`docs/api/Debug.md`, *The preview*) on the mesh that
 matches its use, and open the PNG: `{ mesh = "plane", repeats = 3 }` for a wall or
 floor, which shows whether a stain repeats every tile and whether the normal map's
-relief reads under a raking light; the sphere or cube for a prop. `Debug.Preview`
+relief reads under a raking light; the sphere or cube for a prop. Pass `repeats` to
+see it tile; leave it out to see its real scale (a world-mapped material at its own
+`world_size`). `Debug.Preview`
 does the same for a texture, model or shader file.
 
 ## Play-testing headlessly

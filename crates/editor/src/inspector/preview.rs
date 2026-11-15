@@ -13,7 +13,9 @@
 //! only lays out the panel and records what to render next; `main.rs` is the only place
 //! a `Renderer` is in scope.
 
-pub use rusty_preview::{build_preview_scene, framing, OrbitState, PreviewMesh, PreviewSubject};
+pub use rusty_preview::{
+    build_preview_scene, framing, FramedOrbit, OrbitState, PreviewMesh, PreviewSubject,
+};
 
 use crate::theme::{chrome, Theme};
 use crate::EditorUi;
@@ -62,14 +64,19 @@ pub fn draw_tab_strip(ui: &mut egui::Ui, active: &mut bool, t: Theme) {
 pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, subject: PreviewSubject) {
     let t = editor.theme;
     let texture = editor.preview_texture_id;
-    mesh_toggle(ui, editor, &subject);
+    mesh_toggle(ui, editor);
+    editor
+        .preview_orbit
+        .frame(framing(editor.preview_mesh, &subject));
 
     let key = format!("{:?}|{}", editor.preview_mesh, subject.cache_key());
     let stale = editor.preview_cache.as_ref().is_none_or(|c| c.key != key);
     if stale {
         editor.preview_cache = Some(PreviewCache {
             key,
-            scene: build_preview_scene(editor.preview_mesh, 1, &subject),
+            // As authored: the tab has no repeat count, so this never refuses.
+            scene: build_preview_scene(editor.preview_mesh, None, &subject)
+                .unwrap_or_else(|_| rusty_scene::Scene::new()),
         });
     }
 
@@ -85,18 +92,20 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, subject: PreviewSubject) {
         0.0
     };
     let drag = response.drag_delta();
-    editor.preview_orbit.apply_input(drag.x, drag.y, scroll);
+    let orbit = &mut editor.preview_orbit.orbit;
+    orbit.apply_input(drag.x, drag.y, scroll);
 
     editor.preview_request = Some(PreviewRequest {
-        camera: editor.preview_orbit.camera(),
+        camera: orbit.camera(),
         size: response.rect.size(),
         shader_override,
     });
 }
 
-/// The mesh toggle row, one label per [`PreviewMesh`]. Picking a mesh starts the
-/// orbit at that mesh's framing ([`framing`]): the plane's low view, or the default.
-fn mesh_toggle(ui: &mut egui::Ui, editor: &mut EditorUi, subject: &PreviewSubject) {
+/// The mesh toggle row, one label per [`PreviewMesh`]. The orbit follows the framing
+/// of what is shown ([`FramedOrbit::frame`]), so a pick that changes it starts the
+/// orbit there: the plane's low view, or the default.
+fn mesh_toggle(ui: &mut egui::Ui, editor: &mut EditorUi) {
     ui.horizontal(|ui| {
         for mesh in PreviewMesh::ALL {
             if ui
@@ -104,7 +113,6 @@ fn mesh_toggle(ui: &mut egui::Ui, editor: &mut EditorUi, subject: &PreviewSubjec
                 .clicked()
             {
                 editor.preview_mesh = mesh;
-                editor.preview_orbit = framing(mesh, subject);
             }
         }
     });
