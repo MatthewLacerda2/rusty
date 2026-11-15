@@ -121,10 +121,8 @@ fn a_straight_ramp_stays_straight() {
     for kind in [CARDINAL, B_SPLINE] {
         assert!(sweep(&flat, kind).iter().all(|v| (v - 0.6).abs() < 1e-6));
     }
-    let line: Vec<(f32, f32)> = (0..=8)
-        .map(|i| (i as f32 / 8.0, 0.1 + 0.1 * i as f32))
-        .collect();
-    let line = stops(&line);
+    let line = (0..=8).map(|i| (i as f32 / 8.0, 0.1 + 0.1 * i as f32));
+    let line = stops(&line.collect::<Vec<_>>());
     for i in 250..=750 {
         let t = i as f32 / 1000.0;
         let (got, want) = (
