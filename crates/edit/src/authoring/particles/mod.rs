@@ -23,7 +23,7 @@ mod simulation;
 
 pub use render::*;
 use simulation::Dishonoured;
-pub use simulation::{commit, draft, gpu_warnings, set_simulation};
+pub use simulation::{commit, draft, gpu_warnings, set_simulation, switch_simulation};
 
 use glam::Vec3;
 

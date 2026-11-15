@@ -203,3 +203,27 @@ fn a_change_of_space_forgets_a_gpu_emitters_particles_and_keeps_a_cpu_ones() {
     set_simulation_space(&mut gpu, SimulationSpace::Local);
     assert_eq!(gpu.live_count(), 2, "no change, nothing forgotten");
 }
+
+#[test]
+fn a_set_that_switches_to_gpu_warns_once_as_written_and_a_refused_one_not_at_all() {
+    logs::init();
+    let (mut scene, id) = emitter();
+    let kind = find("Particles").unwrap();
+    let mut bad = Map::new();
+    bad.insert("simulation".into(), json!("Gpu"));
+    bad.insert("collision".into(), json!("Bounce"));
+    bad.insert("rate".into(), json!("fast"));
+    assert!((kind.write)(&mut scene.world, id, &bad, Skip::Held).is_err());
+    assert!(logs::take().is_empty(), "a refused write says nothing");
+    set(
+        &mut scene.world,
+        id,
+        json!({"simulation": "Gpu", "collision": "Bounce", "max_particles": 3_000_000}),
+    );
+    let said = logs::take();
+    assert_eq!(
+        said.len(),
+        2,
+        "the collision and the cap, once each: {said:?}"
+    );
+}

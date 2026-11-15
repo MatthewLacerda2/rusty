@@ -95,13 +95,13 @@ pub(crate) struct GpuEmitter {
 }
 
 impl GpuEmitter {
-    /// `emitter`'s look and motion under `frame` (its frame for a `Local` emitter,
-    /// else identity), lit by `light`; the counts are the caller's.
+    /// `emitter`'s look and motion under `frame` (its `gpu_space`: identity for a
+    /// `World` emitter), lit by `light`; the counts are the caller's.
     pub(crate) fn new(emitter: &ParticleEmitterComponent, frame: Mat4, light: [f32; 4]) -> Self {
         let render = &emitter.render;
         let book = &render.flipbook;
         // Gravity is a world acceleration: a `Local` emitter's particles are stored
-        // in its own space, so it turns (and scales) into that space.
+        // under `frame`, so it turns (and scales) into that space.
         let gravity = frame
             .inverse()
             .transform_vector3(emitter.gravity)

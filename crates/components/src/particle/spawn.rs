@@ -4,7 +4,7 @@
 //! firings and the scripting `Particles.Emit`/`Burst`, so all of them draw from
 //! the same seeded stream in the same order.
 
-use glam::Vec3;
+use glam::{Mat4, Vec3};
 
 use super::runtime::{Particle, SubEmitEvent};
 use super::shape::signed;
@@ -141,15 +141,13 @@ impl ParticleEmitterComponent {
         let birth = self.sub_emitters.birth.filter(|_| births);
         let inherit = self.sub_emitters.inherit_velocity;
         let mut spawned = 0;
-        // A `Local` `Gpu` emitter's births go up in its own space: the draw places
-        // them under its frame then (`simulation`). The space is the last frame
-        // with an inverse (`anchor`, kept by `carry_to` above): a birth at scale 0
-        // is placed where the `Cpu` path leaves it, under the frame its particles
-        // were last carried to.
+        // A `Local` `Gpu` emitter's births go up under the inverse of the space
+        // its draw places them in (`gpu_space`, read after `carry_to` above), so
+        // each is drawn where it was born, and then follows the emitter.
         let to_local = (self.on_gpu() && self.simulation_space == SimulationSpace::Local)
-            .then_some(self.runtime.anchor)
-            .flatten()
-            .map(|anchor| anchor.matrix.inverse())
+            .then(|| self.gpu_space())
+            .filter(|m| *m != Mat4::IDENTITY)
+            .map(|m| m.inverse())
             .filter(|m| m.is_finite());
         for _ in 0..count {
             if self.live_count() >= cap {

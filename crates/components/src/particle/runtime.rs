@@ -110,6 +110,9 @@ pub struct EmitterRuntime {
     /// The `Local` emitter frame its live particles were last placed under
     /// (`space`); `None` until it first emits or is carried.
     pub anchor: Option<EmitterFrame>,
+    /// The first `anchor` this Play: what a `Local` `Gpu` emitter's stored
+    /// particles are relative to (`ParticleEmitterComponent::gpu_space`).
+    pub base: Option<EmitterFrame>,
     /// Bumped by everything that changes which particle sits where or what it
     /// holds outside a script's own read: a tick, an emit, a clear and each
     /// scripted write. A script's read records it, and a write against an older
@@ -129,6 +132,7 @@ impl Default for EmitterRuntime {
             initialized: false,
             pending: Vec::new(),
             anchor: None,
+            base: None,
             revision: 0,
         }
     }

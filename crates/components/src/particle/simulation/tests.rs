@@ -146,17 +146,26 @@ fn a_gpu_emitter_spawns_through_the_seeded_path_into_births_under_its_cap() {
 }
 
 #[test]
-fn a_local_gpu_emitter_keeps_its_births_in_its_own_space() {
+fn a_local_gpu_emitter_stores_its_births_relative_to_its_first_frame() {
     let mut e = ParticleEmitterComponent {
         simulation_space: super::super::SimulationSpace::Local,
         spread: 0.0,
         ..gpu_emitter(4)
     };
-    let frame = EmitterFrame::new(Vec3::new(5.0, 0.0, 0.0), glam::Quat::IDENTITY, Vec3::ONE);
-    e.emit_at(frame, 1);
-    let b = e.runtime.gpu.births().next().copied();
-    assert_eq!(b.map(|b| b.particle.position), Some(Vec3::ZERO));
-    assert_eq!(b.map(|b| b.particle.velocity), Some(Vec3::Y * 2.0));
+    let at = |x: f32| EmitterFrame::new(Vec3::X * x, glam::Quat::IDENTITY, Vec3::ONE);
+    e.emit_at(at(5.0), 1);
+    e.emit_at(at(7.0), 1);
+    let stored: Vec<_> = e.runtime.gpu.births().map(|b| b.particle).collect();
+    // Both stored in the first frame's space; drawn moved by 2 with the emitter.
+    assert_eq!(
+        stored[0].position,
+        Vec3::X * 5.0,
+        "at its first frame: as born"
+    );
+    assert!((stored[1].position - Vec3::X * 5.0).length() < 1e-5);
+    assert!((stored[1].velocity - Vec3::Y * 2.0).length() < 1e-5);
+    let drawn = e.gpu_space().transform_point3(stored[0].position);
+    assert!((drawn - Vec3::X * 7.0).length() < 1e-5, "{drawn}");
 }
 
 #[test]
@@ -233,8 +242,11 @@ fn the_running_time_is_kept_at_each_recent_step_and_at_each_birth() {
     assert_eq!(GpuSim::default().time_at(0), Some(0.0));
 }
 
-#[test]
-fn a_local_gpu_birth_at_scale_0_is_stored_under_the_last_frame_with_an_inverse() {
+/// A `Local` `Gpu` emitter and its `Cpu` twin, each carried to the scales in
+/// `before`, bursting one particle at scale 0, then carried to the scales in
+/// `after` (all at x = 10): where the `Gpu` one draws its birth, and where the
+/// `Cpu` one holds it.
+fn local_twins_at_scale_0(before: &[f32], after: &[f32]) -> (Vec3, Vec3) {
     let local = |simulation| ParticleEmitterComponent {
         simulation,
         simulation_space: super::super::SimulationSpace::Local,
@@ -245,22 +257,31 @@ fn a_local_gpu_birth_at_scale_0_is_stored_under_the_last_frame_with_an_inverse()
         local(ParticleSimulation::Gpu),
         local(ParticleSimulation::Cpu),
     );
-    let at = Vec3::new(10.0, 0.0, 0.0);
-    let scaled = |s: f32| EmitterFrame::new(at, glam::Quat::IDENTITY, Vec3::splat(s));
+    let scaled = |s: f32| EmitterFrame::new(Vec3::X * 10.0, glam::Quat::IDENTITY, Vec3::splat(s));
     for e in [&mut gpu, &mut cpu] {
-        e.carry_to(scaled(2.0));
+        before.iter().for_each(|s| e.carry_to(scaled(*s)));
         e.emit_at(scaled(0.0), 1);
-        e.carry_to(scaled(1.0));
+        after.iter().for_each(|s| e.carry_to(scaled(*s)));
     }
-    // The `Cpu` twin carries its world-space birth from the scale-2 anchor; the
-    // `Gpu` one draws its stored birth under the frame it stands in now.
     let stored = gpu.runtime.gpu.births().next().unwrap().particle;
-    let drawn = scaled(1.0).matrix.transform_point3(stored.position);
-    let carried = cpu.runtime.particles[0].position;
+    let drawn = gpu.gpu_space().transform_point3(stored.position);
+    (drawn, cpu.runtime.particles[0].position)
+}
+
+#[test]
+fn a_local_gpu_birth_at_scale_0_draws_where_its_cpu_twin_holds_it() {
+    // After a frame with an inverse: both carry it from the scale-2 frame.
+    let (drawn, carried) = local_twins_at_scale_0(&[2.0], &[1.0]);
     assert!((drawn - carried).length() < 1e-5, "{drawn} vs {carried}");
-    assert_eq!(
-        stored.position,
-        Vec3::ZERO,
-        "born on the emitter, not at the origin"
+    assert!(
+        (carried - Vec3::X * 10.0).length() < 1e-5,
+        "born on the emitter: {carried}"
     );
+    // Before any (a scale-in from 0 bursting on its first tick): it stays where
+    // it was born, on the emitter, and follows the emitter from its first frame.
+    let (drawn, carried) = local_twins_at_scale_0(&[], &[1.0]);
+    assert_eq!(carried, Vec3::new(10.0, 0.0, 0.0));
+    assert_eq!(drawn, carried, "not carried again under the first frame");
+    let (drawn, carried) = local_twins_at_scale_0(&[], &[1.0, 2.0]);
+    assert!((drawn - carried).length() < 1e-5, "{drawn} vs {carried}");
 }

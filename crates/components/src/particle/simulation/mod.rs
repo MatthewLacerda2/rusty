@@ -58,8 +58,8 @@ pub const GPU_MAX_PARTICLES: u32 = 1_000_000;
 /// One particle born on the CPU for the GPU, waiting to be uploaded.
 #[derive(Clone, Copy, Debug)]
 pub struct Birth {
-    /// The particle at birth: in world space, or in the emitter's own space for a
-    /// `Local` emitter.
+    /// The particle at birth: in world space, or for a `Local` emitter in the
+    /// space its draw places it under (`ParticleEmitterComponent::gpu_space`).
     pub particle: Particle,
     /// Its slot in the emitter's GPU buffer.
     pub slot: u32,

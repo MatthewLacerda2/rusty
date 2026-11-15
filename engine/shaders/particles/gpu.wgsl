@@ -9,7 +9,7 @@ const EMPTY: u32 = 0u;
 // Samples per over-life curve in the lookup table.
 const LUT_SIZE: u32 = 64u;
 
-// One live particle, in world space (or the emitter's own space when `Local`).
+// One live particle, in world space (or, when `Local`, the space `frame` places it in).
 struct GpuParticle {
     position: vec3<f32>,
     lifetime: f32,
@@ -35,7 +35,7 @@ struct GpuBirth {
 
 // One emitter's settings for its step and draw.
 struct GpuEmitter {
-    // Where the stored positions are drawn: the emitter's frame when `Local`, else identity.
+    // Where the stored positions are drawn: the emitter's `gpu_space` when `Local`, else identity.
     frame: mat4x4<f32>,
     // xyz: gravity in the stored space; w: the time the steps older than the
     // window took for a particle stepped at the last upload.

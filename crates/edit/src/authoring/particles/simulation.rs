@@ -13,8 +13,22 @@ use rusty_components::{
 /// other target never held them), and a switch to `Gpu` warns for each setting
 /// a `Gpu` emitter does not honour ([`gpu_warnings`]).
 pub fn set_simulation(p: &mut ParticleEmitterComponent, simulation: ParticleSimulation) {
-    if p.simulation != simulation {
-        retarget(p, simulation, p.simulation_space);
+    let was = p.simulation;
+    switch_simulation(p, simulation);
+    warn_switch(was, p);
+}
+
+/// [`set_simulation`] without its warnings: `Component.Set`'s op, which runs on a
+/// [`draft`] before the write's later fields apply and before it is known to
+/// stand, so [`commit`] warns instead, once, for the emitter as written.
+pub fn switch_simulation(p: &mut ParticleEmitterComponent, simulation: ParticleSimulation) {
+    retarget(p, simulation, p.simulation_space);
+}
+
+/// The warnings a switch from `was` to `p`'s target owes: every setting `p`
+/// does not honour, when it just went to `Gpu`.
+fn warn_switch(was: ParticleSimulation, p: &ParticleEmitterComponent) {
+    if was != p.simulation {
         for line in gpu_warnings(p) {
             log_gpu(&line);
         }
@@ -42,6 +56,7 @@ pub(super) fn retarget(
         p.clear_particles();
     }
     p.runtime.anchor = None;
+    p.runtime.base = None;
     p.simulation = simulation;
     p.simulation_space = space;
 }
@@ -54,14 +69,17 @@ pub fn draft(live: &ParticleEmitterComponent) -> ParticleEmitterComponent {
 }
 
 /// Put `Component.Set`'s finished [`draft`] in place of `live`, keeping `live`'s
-/// live state but for what the new target and space make stale (`retarget`).
+/// live state but for what the new target and space make stale (`retarget`),
+/// and warn for a switch to `Gpu` (`set_simulation`) now that every field is in.
 pub fn commit(live: &mut ParticleEmitterComponent, mut draft: ParticleEmitterComponent) {
     let (simulation, space) = (draft.simulation, draft.simulation_space);
     draft.simulation = live.simulation;
     draft.simulation_space = live.simulation_space;
     draft.runtime = std::mem::take(&mut live.runtime);
+    let was = live.simulation;
     *live = draft;
     retarget(live, simulation, space);
+    warn_switch(was, live);
 }
 
 /// A setting a `Gpu` emitter does not honour.

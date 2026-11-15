@@ -127,7 +127,10 @@ again. So `Component.Set(e, "Particles", { simulation = "Gpu", max_particles =
 emitter's simulation space forgets its live particles, as changing its target
 does: they were stored in the old space. A `Local` one at a scale of 0 holds its
 particles where they stood, under the last frame it had with a non-zero scale,
-as a `"Cpu"` one does.
+as a `"Cpu"` one does; one that emits before it ever had a non-zero scale (a
+scale-in from 0 that bursts on its first tick) keeps those particles where they
+were born, and they follow the emitter from its first non-zero frame, as a
+`"Cpu"` one's do.
 
 The over-life curves and gradient are sampled into a 64-step table per emitter,
 linear between steps. The sim keeps each live particle's birth record on the CPU

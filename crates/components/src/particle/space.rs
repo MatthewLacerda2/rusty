@@ -2,9 +2,11 @@
 //!
 //! A `Cpu` emitter's particles are always stored in world space, so the draw pass,
 //! soft particles, lighting, sorting, collisions and sub-emitters read one kind of
-//! position. (A `Local` `Gpu` emitter's births go to the renderer in the emitter's
-//! own space instead, the last frame with an inverse, which its draw places them
-//! under too, so a scale of 0 holds them as it holds a `Cpu` emitter's, #2170.) A
+//! position. (A `Local` `Gpu` emitter's births go to the renderer relative to its first
+//! frame with an inverse instead, and its draw carries them by the change from
+//! that frame to the anchor ([`ParticleEmitterComponent::gpu_space`]), so a
+//! scale of 0, before or after that frame, holds them as it holds a `Cpu`
+//! emitter's, #2170.) A
 //! `Local` emitter keeps them relative to itself by *carrying* them: the runtime
 //! remembers the emitter frame the live particles were last placed under (its
 //! anchor), and [`ParticleEmitterComponent::carry_to`] moves every live particle
@@ -105,6 +107,28 @@ impl ParticleEmitterComponent {
             }
         }
         runtime.anchor = Some(frame);
+        runtime.base.get_or_insert(frame);
+    }
+
+    /// Where a `Local` `Gpu` emitter's stored particles stand in the world: the
+    /// matrix the draw places them under, and whose inverse its births are stored
+    /// under. They are stored relative to its first frame with an inverse
+    /// (`base`), so a birth before it ever had one (a scale-in from 0 that bursts
+    /// on its first tick) is stored where it stands, as the `Cpu` path keeps it,
+    /// and draws there until the emitter moves from that first frame. Identity
+    /// for a `World` emitter, before the first such frame, and while the emitter
+    /// stands at it.
+    pub fn gpu_space(&self) -> Mat4 {
+        match (
+            self.simulation_space,
+            self.runtime.anchor,
+            self.runtime.base,
+        ) {
+            (SimulationSpace::Local, Some(anchor), Some(base)) if anchor != base => {
+                anchor.matrix * base.matrix.inverse()
+            }
+            _ => Mat4::IDENTITY,
+        }
     }
 
     /// The turn a particle born under `frame` starts with: the frame's rotation

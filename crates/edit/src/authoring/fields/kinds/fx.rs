@@ -59,7 +59,7 @@ inspect! {
         op!("max_particles", fx::set_max_particles),
         op!("looping", fx::set_looping),
         op!("simulation_space", fx::set_simulation_space),
-        op!("simulation", fx::set_simulation),
+        op!("simulation", fx::switch_simulation),
         op!("shape", fx::set_shape),
         op!("emit_from", fx::set_emit_from),
         op!("lifetime", fx::set_lifetime),
