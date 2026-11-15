@@ -64,9 +64,9 @@ fn ignored_paths(dir: &str, files: &[String]) -> Result<Vec<String>, String> {
         .collect())
 }
 
-/// The rule over every scanned file, in the repo at the working directory.
+/// The rule over every scanned file, in the repo scanned.
 pub fn run(scan: &Scan) -> Vec<Finding> {
-    check(".", &scan.files)
+    check(&scan.root().to_string_lossy(), &scan.files)
 }
 
 #[cfg(test)]

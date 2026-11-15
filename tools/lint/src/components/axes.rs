@@ -54,9 +54,9 @@ fn candidates(field: &str) -> Vec<String> {
 /// `mod`: plain `<x>.rs` files AND `<x>/mod.rs` directory modules — a namespace
 /// split into a subfolder to fit the size cap (e.g. `animator/`, `nav/`) is still
 /// one namespace unit.
-pub(super) fn api_stems() -> Vec<String> {
+pub(super) fn api_stems(base: &Path) -> Vec<String> {
     let mut out = Vec::new();
-    let Ok(entries) = fs::read_dir(crate::modules::real(Path::new(""), API_DIR)) else {
+    let Ok(entries) = fs::read_dir(crate::modules::real(base, API_DIR)) else {
         return out;
     };
     for entry in entries.flatten() {
@@ -75,21 +75,18 @@ pub(super) fn api_stems() -> Vec<String> {
 }
 
 /// Concatenate every source of the Add menu module (`ADD_MENU/**/*.rs`).
-pub(super) fn add_menu_src() -> String {
+pub(super) fn add_menu_src(base: &Path) -> String {
     let mut files = Vec::new();
-    walk(&crate::modules::real(Path::new(""), ADD_MENU), &mut files);
+    walk(&crate::modules::real(base, ADD_MENU), &mut files);
     files.iter().map(read).collect::<Vec<_>>().join("\n")
 }
 
 /// Concatenate every `src/editor/` source EXCEPT the Add menu (so an add entry does
 /// not, by itself, satisfy the separate inspector-card axis).
-pub(super) fn editor_blob() -> String {
+pub(super) fn editor_blob(base: &Path) -> String {
     let mut files = Vec::new();
-    walk(&crate::modules::real(Path::new(""), EDITOR_DIR), &mut files);
-    let add = format!(
-        "{}/",
-        normalize(&crate::modules::real(Path::new(""), ADD_MENU))
-    );
+    walk(&crate::modules::real(base, EDITOR_DIR), &mut files);
+    let add = format!("{}/", normalize(&crate::modules::real(base, ADD_MENU)));
     files
         .iter()
         .filter(|p| !normalize(p).starts_with(&add))
@@ -118,7 +115,7 @@ pub(super) fn read<P: AsRef<Path>>(path: P) -> String {
 
 /// Every `.md` file directly in `dir`, concatenated — the scripting-API reference is
 /// one file per namespace under `docs/api/` (#569).
-pub(super) fn read_md_dir(dir: &str) -> String {
+pub(super) fn read_md_dir(dir: &Path) -> String {
     let Ok(entries) = fs::read_dir(dir) else {
         return String::new();
     };
