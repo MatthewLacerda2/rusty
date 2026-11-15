@@ -22,6 +22,7 @@ mod start;
 mod sync;
 mod title;
 mod undo;
+mod undrawn;
 mod viewport;
 mod watch;
 
@@ -250,6 +251,11 @@ impl Frontend for EditorFrontend {
         self.cursor_release.on_key(key, pressed, has_input);
     }
 
+    /// The locked screen's frame: the editor's work without the paint (`undrawn`).
+    fn undrawn(&mut self, _shell: &mut Shell, game: &mut GameWorld) {
+        self.step_undrawn(game);
+    }
+
     fn draw(
         &mut self,
         shell: &mut Shell,
@@ -257,12 +263,7 @@ impl Frontend for EditorFrontend {
         _frame: &wgpu::Texture,
         target: &wgpu::TextureView,
     ) {
-        // Files changed outside the engine reach the caches before this frame draws.
-        if let Some(watch) = &mut self.watch {
-            watch.apply(game.scene().borrow().is_playing());
-        }
-        self.follow_scene_file(game);
-        self.remember_open_scene(game);
+        self.follow_files(game);
         let raw_input = self.egui_winit.take_egui_input(&shell.window);
         self.egui_ctx.begin_pass(raw_input);
 

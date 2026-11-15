@@ -92,7 +92,9 @@ caller opts in (`resetTimeoutOnProgress`); whether Claude Code sends a token at 
 is unverified. **The reliable path for a long bake** is attached to the editor:
 `Lighting.GenerateAsync()` returns at once, `Lighting.IsRunning()` reads `false`
 once it ended, and `Lighting.GetBakeStatus()` says how (done, failed with why,
-refused), each a short call of its own.
+refused), each a short call of its own. The bake runs to its end with the
+screen locked or the window minimised: the editor steps it on the frames it does
+not draw.
 
 **Engine warnings come back in-band.** When the engine warned or errored while a
 call ran (an asset it skipped, a mesh collider it dropped), the `eval` or `snapshot`

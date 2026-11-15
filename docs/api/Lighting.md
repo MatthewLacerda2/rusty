@@ -23,7 +23,10 @@ while a bake runs (the button's, or a `GenerateAsync` not yet started), and on a
 scene never saved. Only the editor window steps the job, so a host without one (the
 headless `session` and `session-mcp` without `--attach`, the player, `play`) refuses
 it with an error naming `Lighting.Generate()`, which bakes in the one call there.
-The call only asks: the window's next frame starts the job. The request belongs to
+The call only asks: the editor's next frame starts the job, within a frame of the
+call. The job runs whether or not the window draws, so a bake started from an agent
+runs to its end with the screen locked or the window minimised or covered (the
+editor still runs its frames there, only without painting). The request belongs to
 the scene it was made in, so `Scene.New()` / File ▸ New or a load before that frame
 drops it and the status reads `refused` with why; it never bakes a scene you didn't ask about. It has no cancel; the card's Cancel button
 stops the lightmap step.

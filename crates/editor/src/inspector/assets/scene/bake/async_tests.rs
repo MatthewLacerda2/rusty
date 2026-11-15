@@ -16,7 +16,7 @@ fn open_editor() -> (Session, EditorUi) {
 }
 
 /// [`open_editor`], its scene in a folder of its own.
-pub(super) fn open_editor_in(tag: &str) -> (Session, EditorUi) {
+pub(crate) fn open_editor_in(tag: &str) -> (Session, EditorUi) {
     let s = Session::new("").expect("an empty session boots");
     s.world()
         .resources
@@ -73,7 +73,7 @@ pub(super) fn run_out(
 }
 
 /// The status a script reads.
-pub(super) fn status(s: &Session) -> String {
+pub(crate) fn status(s: &Session) -> String {
     let line =
         "local st = Lighting.GetBakeStatus(); return st.state .. ' ' .. tostring(st.message)";
     s.eval(line).unwrap()

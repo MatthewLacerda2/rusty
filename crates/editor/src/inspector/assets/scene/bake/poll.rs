@@ -25,7 +25,8 @@ use rusty_script::scripting::ConsoleLogs;
 /// own; the probe step repaints at once, a step a frame.
 const PROGRESS_REPAINT: Duration = Duration::from_millis(100);
 
-/// Each frame the inspector draws: keep the UI repainting while a bake runs, apply
+/// Each editor frame (the inspector's draw, or `EditorUi::undrawn_frame` on a frame
+/// the window cannot draw): keep the UI repainting while a bake runs, apply
 /// the lightmaps once they land, then take one probe step a frame and write the
 /// lighting. Starts the button's job when a script asked (`Lighting.GenerateAsync`,
 /// #1999). Runs whether or not the scene card is showing, and waits while the

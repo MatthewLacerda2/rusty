@@ -172,6 +172,7 @@ The tools describe themselves; what they don't say:
   `Lighting.GenerateAsync()`, which returns at once, poll `Lighting.IsRunning()`
   every few minutes, then read `Lighting.GetBakeStatus()` (`done`, or `failed` /
   `refused` with why) and `Lighting.GetBakeReport(kind)` (`docs/api/Lighting.md`).
+  It runs unattended: a locked screen or a minimised window does not stop it.
   `Editor.EnterPlay()` errors until the bake ended.
   Headless, `Lighting.Generate()` is the only way; it sends progress to a client
   that asks for it (a progress token), which may or may not keep the call alive;
