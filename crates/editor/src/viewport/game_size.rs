@@ -63,3 +63,14 @@ pub fn overlay_box(
     let px = |v: f32| v.round().max(0.0) as u32;
     Some((px(x), px(y), px(w).max(1), px(h).max(1)))
 }
+
+/// The Scene tab's [`OverlayFrame`](super::rect_tool::OverlayFrame) for the image
+/// `interaction` reports, at `pixels_per_point`, boxed at the Game view's own size.
+pub fn overlay_frame(
+    interaction: &super::ViewportInteraction,
+    pixels_per_point: f32,
+    textures: &std::rc::Rc<rusty_ui::TextureSizes>,
+) -> super::rect_tool::OverlayFrame {
+    let size = glam::Vec2::new(interaction.size.x, interaction.size.y);
+    super::rect_tool::OverlayFrame::new(size, pixels_per_point, interaction.screen, textures)
+}

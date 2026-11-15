@@ -58,6 +58,23 @@ pub struct OverlayFrame {
 }
 
 impl OverlayFrame {
+    /// The frame of an image `size` points wide at `pixels_per_point`, showing the
+    /// Game view's own size `game` when it has one.
+    pub fn new(
+        size: Vec2,
+        pixels_per_point: f32,
+        game: Option<(u32, u32)>,
+        textures: &Rc<TextureSizes>,
+    ) -> Self {
+        let textures = Rc::clone(textures);
+        Self {
+            size,
+            pixels_per_point,
+            game,
+            textures,
+        }
+    }
+
     /// The screen the overlay lays out on: the Game view's own size, else the
     /// viewport target's pixel size.
     pub fn screen(&self) -> Vec2 {

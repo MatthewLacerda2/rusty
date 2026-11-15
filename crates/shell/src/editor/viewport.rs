@@ -202,12 +202,7 @@ impl EditorFrontend {
         let camera = ui.scene_view.camera.camera();
         let ray = pick::ray_from_ndc(&camera, aspect, ndc_x, ndc_y);
         let mut scene = game.scene().borrow_mut();
-        let frame = OverlayFrame {
-            size: glam::Vec2::new(size.x, size.y),
-            pixels_per_point,
-            game: interaction.screen,
-            textures: std::rc::Rc::clone(&ui.ui_textures),
-        };
+        let frame = game_size::overlay_frame(interaction, pixels_per_point, &ui.ui_textures);
         let point = glam::Vec2::new(local.x, local.y);
 
         // 1. Continue or start a rect-tool drag, else a gizmo drag, on the selection.

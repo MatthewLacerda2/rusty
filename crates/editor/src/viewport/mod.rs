@@ -103,12 +103,9 @@ pub fn draw(
                 stats::paint(ui, response.rect, &readout.lines(), t);
             }
             if tab == ViewportTab::Scene && gizmos.on(Gizmo::Ui) {
-                let frame = rect_tool::OverlayFrame {
-                    size: glam::Vec2::new(response.rect.width(), response.rect.height()),
-                    pixels_per_point: ui.ctx().pixels_per_point(),
-                    game: fit,
-                    textures: std::rc::Rc::clone(&editor.ui_textures),
-                };
+                let size = glam::Vec2::new(response.rect.width(), response.rect.height());
+                let ppp = ui.ctx().pixels_per_point();
+                let frame = rect_tool::OverlayFrame::new(size, ppp, fit, &editor.ui_textures);
                 let painter = ui.painter_at(response.rect);
                 let selected = editor.selected_entity_id;
                 let world = &scene.world;
