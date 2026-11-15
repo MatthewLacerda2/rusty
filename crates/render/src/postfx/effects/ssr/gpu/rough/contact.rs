@@ -1,9 +1,9 @@
-//! A contact reflection keeps its own blur among long faded rays (#2158): a cube
-//! standing on a satin metal floor, a far wall behind it. Most of the floor's rays
-//! run to the wall and fade out (their blur too wide to keep), but they still tell
-//! the resolve how wide a blur is around them; the rays that meet the cube's foot
-//! are short, so its reflection there stays tight against the foot, not smeared
-//! and dimmed across the long rays' blur.
+//! A contact reflection keeps its own blur among long faded rays (#2158): a cube,
+//! or a thin post, standing on a satin metal floor, a far wall behind it. Most of
+//! the floor's rays run to the wall and fade out (their blur too wide to keep), but
+//! they still tell the resolve how wide a blur is around them; the rays that meet
+//! the foot are short, so its reflection there stays tight against the foot, not
+//! smeared and dimmed across the long rays' blur, however few they are.
 
 use glam::Vec3;
 
@@ -13,10 +13,15 @@ use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
-/// [`base`]'s cube standing on a roughness-0.35 floor, with or without a `wall`
-/// 16 m out.
-fn standing(on: bool, wall: bool) -> Scene {
-    let mut s = base(on, (BRONZE, 1.0, 0.35));
+/// [`base`]'s cube standing on a floor of `roughness`, or a post 8 cm thick and
+/// 1.2 m tall in its place when `thin`, with or without a `wall` 16 m out.
+fn standing(on: bool, wall: bool, (roughness, thin): (f32, bool)) -> Scene {
+    let mut s = base(on, (BRONZE, 1.0, roughness));
+    if thin {
+        let post = s.find_entity_by_name("Cube").unwrap();
+        let (at, size) = (Vec3::new(0.0, 0.6, -6.0), Vec3::new(0.08, 1.2, 0.08));
+        place(&mut s, post, at, size);
+    }
     if !wall {
         return s;
     }
@@ -61,28 +66,54 @@ fn under_the_foot(on: &[u8], off: &[u8]) -> i32 {
         .sum()
 }
 
-/// The least share of its redness the contact reflection keeps among faded rays.
+/// The share of the redness the reflection under the foot of `what` (a floor's
+/// roughness, and whether a thin post) keeps with the far wall's faded rays around
+/// it, against none; and the redness with none.
+fn kept(r: &mut Renderer, what: (f32, bool)) -> (f32, i32) {
+    let down = Camera::new(Vec3::new(0.0, 1.0, 0.0), -90.0, -12.0);
+    let mut added = |wall| {
+        let (on, off) = (
+            shot(r, &standing(true, wall, what), &down),
+            shot(r, &standing(false, wall, what), &down),
+        );
+        under_the_foot(&on, &off)
+    };
+    let (open, walled) = (added(false), added(true));
+    (walled as f32 / open.max(1) as f32, open)
+}
+
+/// The least share of its redness a cube's contact reflection keeps among faded rays.
 const TIGHT: f32 = 0.9;
+
+/// The least share a thin post's keeps on a rougher floor (near 0.6 here, where the
+/// wall's rays meet the blur's clamp; none at all when the field's mean could not
+/// narrow below the clamp).
+const THIN: f32 = 0.4;
 
 #[test]
 fn gpu_a_satin_floor_keeps_a_standing_cubes_contact_reflection_tight() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {
         return;
     };
-    let down = Camera::new(Vec3::new(0.0, 1.0, 0.0), -90.0, -12.0);
-    let mut added = |wall| {
-        let (on, off) = (
-            shot(&mut r, &standing(true, wall), &down),
-            shot(&mut r, &standing(false, wall), &down),
-        );
-        under_the_foot(&on, &off)
-    };
-    let (open, walled) = (added(false), added(true));
-    let share = walled as f32 / open.max(1) as f32;
-    eprintln!("[ssr] a cube standing on a roughness-0.35 floor: its reflection under its foot adds {open} red, {walled} with a far wall's faded rays around it ({share:.2})");
+    let (share, open) = kept(&mut r, (0.35, false));
+    eprintln!("[ssr] a cube standing on a roughness-0.35 floor: its reflection under its foot adds {open} red, keeping {share:.2} of it with a far wall's faded rays around it");
     assert!(open > 0, "the floor reflects the cube's foot");
     assert!(
         share >= TIGHT,
         "a contact reflection is not smeared by the long rays around it"
+    );
+}
+
+#[test]
+fn gpu_a_rougher_floor_keeps_a_thin_posts_contact_reflection() {
+    let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {
+        return;
+    };
+    let (share, open) = kept(&mut r, (0.5, true));
+    eprintln!("[ssr] a thin post on a roughness-0.5 floor: its reflection under its foot adds {open} red, keeping {share:.2} of it with a far wall's faded rays around it");
+    assert!(open > 0, "the floor reflects the post's foot");
+    assert!(
+        share >= THIN,
+        "a thin post's contact reflection survives the long rays around it"
     );
 }
