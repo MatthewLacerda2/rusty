@@ -34,7 +34,7 @@ use viewport::render_viewport;
 
 pub use demo::capture_demo;
 pub(super) use paint::paint;
-pub use preview::parse_mesh;
+pub use preview::{parse_mesh, refuse_with_picker, PreviewRect};
 use rusty_app::{GameWorld, ProjectSource};
 use rusty_core::application::{GameViewSetting, SceneGizmos};
 use rusty_core::input::InputState;
@@ -124,7 +124,8 @@ pub fn default_world(project: ProjectSource) -> GameWorld {
 
 /// Capture the editor over `game`'s scene to a PNG at `path`: `Ok(false)` on a box with
 /// no GPU/software adapter, `Err` for a `select` name the scene doesn't hold, a missing
-/// `select_asset` path, both selections at once, or an I/O / encode failure.
+/// `select_asset` path, both selections at once, a `preview` whose selection has no
+/// Preview tab or whose written frame shows no rendered image, or an I/O / encode failure.
 pub fn capture(
     game: &GameWorld,
     path: impl AsRef<Path>,
@@ -140,6 +141,23 @@ pub fn capture_into(
     path: impl AsRef<Path>,
     opts: &EditorCaptureOptions,
 ) -> Result<bool, String> {
+    Ok(capture_shot(host, game, path, opts)?.is_some())
+}
+
+/// What a written capture shows beyond its PNG.
+#[derive(Clone, Copy, Debug)]
+pub struct Shot {
+    /// Under `--preview`, the Preview tab's image rect in the PNG.
+    pub preview: Option<PreviewRect>,
+}
+
+/// [`capture_into`], saying what it wrote: `Ok(None)` with no adapter.
+pub fn capture_shot(
+    host: &mut CaptureHost,
+    game: &GameWorld,
+    path: impl AsRef<Path>,
+    opts: &EditorCaptureOptions,
+) -> Result<Option<Shot>, String> {
     let ui = &mut initial_ui(game, opts)?;
     capture_with(host, game, ui, path, opts)
 }
@@ -151,11 +169,11 @@ fn capture_with(
     ui: &mut EditorUi,
     path: impl AsRef<Path>,
     opts: &EditorCaptureOptions,
-) -> Result<bool, String> {
+) -> Result<Option<Shot>, String> {
     let (width, height) = (opts.width.max(1), opts.height.max(1));
     let Some(renderer) = host.renderer(width, height) else {
         rusty_dev::capture::no_adapter("capture the editor")?;
-        return Ok(false);
+        return Ok(None);
     };
     let mut egui_renderer = egui_wgpu::Renderer::new(
         &renderer.device,
@@ -189,16 +207,17 @@ fn capture_with(
         }
         out.textures_delta.clear(); // egui asserts every delta is consumed
     }
-    if opts.preview.is_some() && !preview.shown {
-        return Err(preview::no_tab("the selection's card has no Preview tab"));
-    }
+    let shown = opts
+        .preview
+        .map(|_| preview.shown(width, height))
+        .transpose()?;
     let output = output.expect("at least one frame");
     let renderer = host.renderer(width, height).expect("probed above");
     let target = paint(renderer, &mut egui_renderer, &ctx, output, width, height);
     let pixels =
         readback::read_texture_rgba8(&renderer.device, &renderer.queue, &target, width, height);
     readback::write_png(path, width, height, &pixels)?;
-    Ok(true)
+    Ok(Some(Shot { preview: shown }))
 }
 
 /// A fresh editor with `opts`' tab, selection and framing applied.
@@ -226,7 +245,7 @@ fn initial_ui(game: &GameWorld, opts: &EditorCaptureOptions) -> Result<EditorUi,
     if let Some((center, radius)) = bounds {
         ui.scene_view.camera.frame(center, radius);
     }
-    preview::open(&mut ui, opts.preview)?;
+    preview::open(&mut ui, &game.scene().borrow(), opts.preview)?;
     Ok(ui)
 }
 

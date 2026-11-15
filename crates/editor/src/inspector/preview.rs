@@ -15,7 +15,8 @@
 //! in scope.
 
 pub use rusty_preview::{
-    build_preview_scene, framing, FramedOrbit, OrbitState, PreviewMesh, PreviewSubject,
+    build_preview_scene, framing, subject_for_path, FramedOrbit, OrbitState, PreviewMesh,
+    PreviewSubject,
 };
 
 use crate::theme::{chrome, Theme};
@@ -30,12 +31,14 @@ pub struct PreviewCache {
 }
 
 /// What `shell::editor::viewport::render_preview_scene` needs to render this frame: the orbit
-/// camera and the image rect size (to size the offscreen target). Recomputed by
+/// camera and the image rect (its size sizes the offscreen target; `editor-capture`
+/// reads where it sits). Recomputed by
 /// [`draw`] every frame the Preview tab is visible; `None` otherwise, so the
 /// front-end skips the extra render when nobody's looking at it.
 pub struct PreviewRequest {
     pub camera: Camera,
-    pub size: egui::Vec2,
+    /// The image's rect, in points, as this frame laid it out.
+    pub rect: egui::Rect,
     /// Set only for [`PreviewSubject::Shader`] — the `.wgsl` path the shell compiles
     /// a one-off pipeline from for this render (#352's shader-preview arm).
     pub shader_override: Option<String>,
@@ -98,7 +101,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, subject: PreviewSubject) {
 
     editor.preview_request = Some(PreviewRequest {
         camera: orbit.camera(),
-        size: response.rect.size(),
+        rect: response.rect,
         shader_override,
     });
 }

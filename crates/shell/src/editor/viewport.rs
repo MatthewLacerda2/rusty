@@ -66,7 +66,7 @@ pub(super) fn render_preview_scene(
     let Some(request) = ui.preview_request.take() else {
         return;
     };
-    let Some((px, py)) = target_size(request.size, pixels_per_point) else {
+    let Some((px, py)) = target_size(request.rect.size(), pixels_per_point) else {
         return;
     };
     // A preview is not the screen: it renders natively (#1498).

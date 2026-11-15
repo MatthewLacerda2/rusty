@@ -27,7 +27,7 @@
 //!                       an aspect `W:H` or a fixed size `WxH` (#2207)
 //!   --preview [<mesh>]  open the selection's Inspector Preview tab (a material
 //!                       card or an asset card) on this mesh: `Sphere` (default),
-//!                       `Cube`, `Suzanne` or `Plane` (#2239)
+//!                       `Cube`, `Suzanne` or `Plane`; not with --picker (#2239)
 //!   --picker [<page>]   the project picker the editor starts on (#854), over a
 //!                       sample recent list; <page> is `new`, `open`,
 //!                       `mismatch` (the different-engine prompt) or `focus`
@@ -164,6 +164,9 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
             "--size" => (opts.width, opts.height) = parse_size(&value()?)?,
             other => return Err(format!("unknown argument {other}")),
         }
+    }
+    if picker.is_some() {
+        capture::refuse_with_picker(opts.preview)?;
     }
     Ok((out, source, opts, picker))
 }
