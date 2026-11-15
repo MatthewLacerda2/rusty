@@ -37,12 +37,14 @@ test-group = "gpu"
 # Printed after every run, passing too, so each log carries its adapter's values: the
 # canary names the adapter the GPU suite rendered on, and each test that holds a GPU
 # tolerance prints what it measured (docs/testing.md, *Which adapters*). A new
-# tolerance test that prints its values adds itself here.
+# tolerance test that prints its values adds itself here, as the test games do with
+# their CPU time in yardsticks (docs/testing.md, *Test games*).
 [[profile.default.overrides]]
 filter = """
 test(/(^|::)test_gpu::tests::gpu_adapter_present_when_required$/)
 | test(/(^|::)reflection_prefilter::gpu::tests::gpu_prefilter_matches_the_cpu_reference/)
 | test(/(^|::)taa::gpu::shimmer::gpu_a_turning_glossy_bumpy_sphere_shimmers_less_under_taa_than_fxaa$/)
+| test(/^gpu::test_games::/)
 """
 success-output = "final"
 

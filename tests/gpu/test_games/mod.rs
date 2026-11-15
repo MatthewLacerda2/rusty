@@ -10,6 +10,7 @@
 )]
 
 mod budget;
+mod calibrate;
 mod failing;
 mod measure;
 
@@ -18,13 +19,21 @@ use std::process::{Command, Output};
 use std::time::Duration;
 
 /// How much CPU time (user + system) one game's `game --test` may use at its
-/// defaults (#2070, #2131). CPU time, not wall time: a busy machine (the nightly's
-/// one-process `cargo test`) slows a game's clock, not its work. A game past it
-/// fails by name, so the game whose defaults grew is the one fixed.
-const BUDGET: Duration = Duration::from_secs(90);
+/// defaults, in yardsticks: the CPU time of `calibrate`'s fixed workload, timed
+/// on this thread right before and after the game (#2070, #2131, #2243). Not wall
+/// time, which a busy machine stretches, nor bare CPU seconds, which a loaded
+/// machine inflates too (a shared SMT core, all-core clocks, a contended cache);
+/// the yardstick rises with them. A game past it fails by name, so the game whose
+/// defaults grew is the one fixed. Measured on lavapipe in a 4-core container
+/// (`docs/testing.md`, *Test games*, says how to re-measure): BUDGET_MEASURED.
+const BUDGET: f64 = 1e9;
 
-/// How many budgets of wall time a game may take before it is killed as hung.
-const HANG_FACTOR: u32 = 5;
+/// Yardstick samples taken before the game, and again after: 2 × 9 of about
+/// a tenth of a second each.
+const SAMPLES: usize = 9;
+
+/// Wall time after which a game is killed as hung, whatever its budget.
+const HANG: Duration = Duration::from_secs(450);
 
 /// One `#[test]` per game, named after its folder, and a test that the list and
 /// `games/` hold the same names: a folder with no line fails, naming it.
@@ -81,18 +90,29 @@ fn mismatch(found: &[String], listed: &[&str]) -> Option<String> {
 /// `game --test` on `name` passes, proves itself deterministic and stays inside
 /// [`BUDGET`].
 fn passes_within_budget(name: &str) {
-    let run = measure::run(&mut game_command(name, None), BUDGET * HANG_FACTOR);
+    let mut samples = calibrate::samples(SAMPLES);
+    let run = measure::run(&mut game_command(name, None), HANG);
+    samples.extend(calibrate::samples(SAMPLES));
+    let budget = budget::Budget {
+        units: BUDGET,
+        unit: calibrate::median(&samples),
+    };
     let stdout = String::from_utf8_lossy(&run.output.stdout);
     let stderr = String::from_utf8_lossy(&run.output.stderr);
-    if let Err(message) = budget::verdict(name, &run, BUDGET) {
+    if let Err(message) = budget::verdict(name, &run, &budget) {
         panic!("{message}\n{stdout}\n{stderr}");
     }
     assert!(run.output.status.success(), "{name}:\n{stdout}\n{stderr}");
     assert!(stdout.contains("ok   generating twice writes the same files"));
     println!(
-        "{name}: game --test used {:.1} s of CPU in {:.1} s",
+        "{name}: game --test used {:.1} s of CPU in {:.1} s: {:.0} yardsticks of {:.3} s \
+         ({:.3} to {:.3} s per sample), budget {BUDGET}",
         run.cpu.as_secs_f64(),
-        run.wall.as_secs_f64()
+        run.wall.as_secs_f64(),
+        budget.of(run.cpu),
+        budget.unit.as_secs_f64(),
+        samples.iter().min().unwrap().as_secs_f64(),
+        samples.iter().max().unwrap().as_secs_f64()
     );
 }
 
