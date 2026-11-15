@@ -4,9 +4,9 @@
 
 use glam::Vec3;
 
+use super::super::fixture::{paint, place};
+use super::super::silhouette::{at, shot, BRONZE, H, W};
 use super::edge::lifted;
-use super::fixture::{paint, place};
-use super::silhouette::{at, shot, BRONZE, H, W};
 use crate::readback::read_texture_bytes;
 use crate::{RenderView, OFFSCREEN_FORMAT};
 use rusty_core::color::f16_to_f32;

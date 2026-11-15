@@ -505,6 +505,50 @@ machine: memory pressure, or another process such as rust-analyzer's check-on-sa
 If they return, count the recompiled `.o` files as above. A spike with few recompiled
 units points to the machine, not the crate.
 
+## The link step (#2202)
+The figures below are one machine's, the operator's, whose builds wait on its disk:
+they are the reasons behind each decision here, not numbers to plan by, and another
+machine measures its own. Every root binary links the whole engine statically,
+about 190 MB each in the dev profile, eight of them per `cargo build --features dev`.
+What links them, and what was measured against it, so it is not measured twice:
+
+- **The linker is already `lld`.** rustc links `x86_64-unknown-linux-gnu` through
+  its bundled `rust-lld` (`cc -fuse-ld=lld`, the default since 1.90), so Linux dev
+  machines, cloud containers and CI's runners all use it with nothing configured
+  (`rustc --print link-args` shows it). macOS links with Apple's `ld` (the one Xcode
+  ships). `mold` is not set anywhere: a linker named in `.cargo/config.toml` would
+  have to exist on every machine that builds. Relinking `play` alone (one link,
+  warm page cache): `lld` 0.95 s and 1.05 GB peak, `gold` 4.5 s, GNU `ld` 7.7 s.
+- **Debug info is not what the linker spends time on.** Dependencies already build
+  with `debug = false` (`[profile.dev.package."*"]`); the members keep
+  `line-tables-only` for backtraces. Dropping every debug section at link time
+  (`--strip-debug`) took the same `play` link from 0.95 s to 0.89 s (178 MB to 107
+  MB). `split-debuginfo = "unpacked"` shrank `play` to 153 MB but wrote as many bytes
+  per touched build (rustc rewrites the `.dwo` beside each changed unit) and was no
+  faster. `--compress-debug-sections=zlib` cut a touched build's writes by a
+  quarter (2.07 GB to 1.59 GB) with no wall-time gain over eight interleaved pairs;
+  `zstd` compresses as well but std's backtraces then lose `file:line`.
+- **A link is about a second; a slow one is waiting on the disk.** Alone, a
+  binary's rustc run takes 1.5 s, 1.0 s of it the link. When a touched build links
+  the eight at once (four at a time on four jobs), each can take 15-17 s, stalled
+  on writes: a touched `cargo build --features dev` wrote about 2.1 GB, 1.5 GB of it
+  the eight binaries, and the same touch took anywhere from 15 s to 52 s over 14
+  runs. What a build writes, not the linker, is the lever on such a machine.
+- **The root package builds no unit-test harness.** `[lib]` and every `[[bin]]`
+  say `test = false`, and `[package]` says `autobins = false` so no binary is found
+  without its `[[bin]]`: the root's sources hold no tests, and each harness was one
+  more rustc run and link against the whole engine on every `cargo test` / `nextest
+  run`, the nine together about 2 s of a test build. The `root-tests` rule
+  (`docs/linting.md`) holds it.
+- **Dynamic linking was measured and not adopted.** A `dylib` crate re-exporting
+  the members, with `-C prefer-dynamic`, halved what a touched build wrote (0.93
+  GB) and made each binary a few hundred KB, but the shared library's own link took
+  9.7 s, so the build was no faster over four samples. It would also need
+  `RUSTFLAGS` (a second full build of every crate) and `LD_LIBRARY_PATH` for every
+  binary run outside cargo (the launcher's `rusty`, MCP's `session-mcp`).
+- **`make check` links nothing** (clippy stops at metadata), and the `make` verbs
+  that run one binary already build only it (`--bin`).
+
 ## GPU tests and the headless budget
 Tests that need a real device call `Renderer::new_headless`, which returns `None`
 when no adapter is present — so **every GPU test skips gracefully** rather than
@@ -707,6 +751,42 @@ cargo run --features dev --bin play -- --project tests/fixtures/project look_123
 Log the getter after a set (`Harness.Log(tostring(Graphics.Get…()))`) when the two
 images look alike: an effect that did not run and one that runs invisibly look the same.
 
+**Comparing two builds.** A built binary reads `engine/` (shaders, fonts, bundled
+scripts) at run time, from the folder found beside it or above it, else the
+checkout it was built in (`core::project::engine_dir`). So a binary kept across a
+`git checkout` or a pull **is not that commit's build**: it runs its own code with
+the other tree's shaders. Build each side in its own tree, or pin each binary to its
+own copy of `engine/`:
+
+```sh
+# On main: build, then pin the binary beside a copy of the engine content it was built with.
+cargo build --features dev --bin play
+mkdir -p /abs/scratch/before && cp target/debug/play /abs/scratch/before/
+cp -r engine /abs/scratch/before/engine
+git checkout <branch>                 # the branch's own build is `cargo run`, as above
+/abs/scratch/before/play --project tests/fixtures/project look_1234.lua <before_out>
+```
+
+A binary finds the `engine/` beside it first, as a shipped game does, so the pinned
+copy is the one it reads; the project, scenario and output paths are still read from
+where it is run. The other way is one worktree per build (`git worktree add`), each
+binary run in its own. Either way, a `dev` binary knows the engine content it was
+built with (`build.rs` stamps a digest of `engine/`), **warns once at start-up when
+the folder it reads holds other content**, and every run report says which content
+it used: `results.json`'s `engine` (`commit`, `content_built`, `content_found`,
+`content_matches`), the bench report's `engine` line and `bench.json`, and
+`editor-capture`'s `wrote` line. Check `content_matches` is `true` on both sides
+before trusting a pair; the bench table warns on its own when the run it compares
+against had `content_matches: false`. A folder that cannot be hashed (an unreadable
+file, a dangling link) is said once at start-up, and its runs' `content_found` is
+`null`. A cargo build re-stamps on any change under `engine/`, so
+`cargo run` and `make` never warn, and the editor's shader hot reload follows edits
+made after start-up; the warning is for a binary run directly against a tree it was
+not built from. In a debug build `commit` is the checkout's at run time, so after a
+checkout it names the new commit: the content digest is what tells a kept binary.
+A shipped `player` makes no such check: it carries no `dev` code, and its `engine/`
+is the one `make export` installed beside it.
+
 ## Test games (#2029)
 
 A **test game** is a small, complete 3D game project that a Lua recipe builds from
@@ -858,7 +938,10 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   the run's warnings, if any (below).
 - **before and after** — the report is kept in `out/bench/bench.json` (and
   `bench.txt`), and each run prints every row's change against the last one. To
-  measure an optimisation: `make bench`, change, `make bench`.
+  measure an optimisation: `make bench`, change, `make bench`. The report names the
+  engine that measured it (`engine <commit> content <digest>`, and the last run's
+  content when it moved), and warns when the binary's `engine/` is not the one it was
+  built with (*Comparing two builds*, above).
 
 It is a **release** build (the first run compiles one, a few minutes), so the numbers
 are a shipped game's. It is an **informational signal, never a gate**, and not in

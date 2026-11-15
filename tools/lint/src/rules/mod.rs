@@ -16,6 +16,7 @@ mod active_self;
 mod api_parity;
 mod asset_write;
 mod atomic_write;
+mod binary_init;
 mod body_table;
 mod cfg_test_switch;
 mod converter_log;
@@ -37,6 +38,7 @@ mod physics_borrow;
 mod platform_cfg;
 mod prefix;
 mod read_keys;
+mod root_tests;
 mod sanitize;
 mod sanitize_rules;
 mod self_path;
@@ -60,8 +62,9 @@ use std::path::Path;
 enum Allow {
     Inline,
     /// Nothing may excuse it: `ignored` and `orphan-seeds`, whose fixes are a
-    /// `.gitignore` pattern and a moved file, and `key-guard`, whose finding sits on a
-    /// manifest, where no inline allow can go.
+    /// `.gitignore` pattern and a moved file, `key-guard`, whose finding sits on a
+    /// manifest, where no inline allow can go, and `root-tests`, whose fix is the
+    /// manifest key or a moved test.
     Never,
     /// The rule reads its own allows, so it can report a stale one
     /// (`api-parity`, whose allow sits on the op, not on the finding's cause;
@@ -83,6 +86,7 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (api_parity::RULE, api_parity::run, Allow::Own),
     (asset_write::RULE, asset_write::run, Allow::Inline),
     (atomic_write::RULE, atomic_write::run, Allow::Inline),
+    (binary_init::RULE, binary_init::run, Allow::Inline),
     (body_table::RULE, body_table::run, Allow::Inline),
     (cfg_test_switch::RULE, cfg_test_switch::run, Allow::Inline),
     (converter_log::RULE, converter_log::run, Allow::Inline),
@@ -108,6 +112,7 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (platform_cfg::RULE, platform_cfg::run, Allow::Inline),
     (prefix::RULE, prefix::run, Allow::Inline),
     (read_keys::RULE, read_keys::run, Allow::Inline),
+    (root_tests::RULE, root_tests::run, Allow::Never),
     (sanitize::RULE, sanitize::run, Allow::Inline),
     (self_path::RULE, self_path::run, Allow::Inline),
     (skip::RULE, skip::run, Allow::Inline),
