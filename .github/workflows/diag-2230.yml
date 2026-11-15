@@ -1,47 +1,55 @@
-# Throwaway diagnostic for #2230: what a runaway mutant does to a hosted runner.
+# Throwaway diagnostic for #2230: what a job that needs a torn-down job reads.
 name: diag-2230
 on:
   push:
     branches: [2230-diag-runaway-mutant]
 jobs:
-  diag:
+  timed-out:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 1
+    outputs:
+      answered: ${{ steps.a.outputs.answered }}
     steps:
-      - uses: actions/checkout@v7
-      - run: rustup show
-      - name: The runner
+      - run: echo started
+      - run: sleep 150
+      - id: a
+        if: success() || failure()
+        run: echo answered=true >> "$GITHUB_OUTPUT"
+  killed:
+    runs-on: ubuntu-latest
+    outputs:
+      early: ${{ steps.e.outputs.early }}
+      answered: ${{ steps.a.outputs.answered }}
+    steps:
+      - id: e
+        run: echo early=yes >> "$GITHUB_OUTPUT"
+      - run: sleep 5; sudo pkill -9 -f Runner.Worker; sudo pkill -9 -f Runner.Listener; sleep 600
+      - id: a
+        if: success() || failure()
+        run: echo answered=true >> "$GITHUB_OUTPUT"
+  failed:
+    runs-on: ubuntu-latest
+    outputs:
+      answered: ${{ steps.a.outputs.answered }}
+    steps:
+      - run: exit 1
+      - id: a
+        if: success() || failure()
+        run: echo answered=true >> "$GITHUB_OUTPUT"
+  read:
+    needs: [timed-out, killed, failed]
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      checks: read
+    steps:
+      - env:
+          NEEDS: ${{ toJSON(needs) }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          nproc; free -m; swapon --show; df -h / /tmp
-          echo "core_pattern=$(cat /proc/sys/kernel/core_pattern)"
-          echo "core_pipe_limit=$(cat /proc/sys/kernel/core_pipe_limit)"
-          ulimit -a
-          systemctl status systemd-coredump.socket apport 2>&1 | head -20 || true
-          cat /etc/systemd/coredump.conf 2>/dev/null | grep -v '^#' || true
-          cat /proc/sys/vm/overcommit_memory
-      - name: Build the mutant
-        working-directory: tools/lint
-        run: |
-          sed -i '112s/\*i += 1;/*i *= 1;/' src/layers/externs/find.rs
-          git diff
-          cargo test --no-run -q
-      - name: Run it as the Standalone step does, sampling
-        working-directory: tools/lint
-        run: |
-          ( while true; do echo "$(date +%T) $(free -m | awk '/Mem/{print "used="$3} /Swap/{print "swap="$3}' | tr '\n' ' ') disk=$(df -m / | awk 'NR==2{print $3}')MB $(ps -eo pid,ppid,rss,etimes,stat,comm --sort=-rss | head -4 | tail -3 | awk '{printf "[%s %s %dMB %ss %s %s] ",$1,$2,$3/1024,$4,$5,$6}')"; sleep 1; done ) & MON=$!
-          start=$(date +%s)
-          (ulimit -v 8388608; ulimit -c 0; timeout 25 cargo test -q > out.txt 2>&1; echo "rc=$? after $(( $(date +%s) - start ))s") || true
-          sleep 5; kill $MON
-          tail -5 out.txt
-          ls -la /var/lib/systemd/coredump /var/crash 2>&1 || true
-          sudo journalctl --no-pager -n 30 2>&1 | grep -i -E "core|oom|apport" || true
-          sudo dmesg | tail -20 || true
-      - name: Again, a soft core limit of 0 inherited by cargo-mutants
-        if: always()
-        working-directory: tools/lint
-        run: |
-          start=$(date +%s)
-          (ulimit -S -c 0; ulimit -v 8388608; ulimit -c; timeout 25 cargo test -q > out.txt 2>&1; echo "rc=$? after $(( $(date +%s) - start ))s") || true
-          tail -3 out.txt
-          coredumpctl list --no-pager 2>&1 | tail -5 || true
-          ls -la /var/lib/systemd/coredump /var/crash 2>&1 || true
+          echo "$NEEDS"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" --jq '.jobs[] | {id,name,status,conclusion,steps:[.steps[]|"\(.number) \(.name) \(.status) \(.conclusion)"]}'
+          for id in $(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" --jq '.jobs[] | select(.name != "read") | .id'); do
+            echo "annotations of $id:"; gh api "repos/$GITHUB_REPOSITORY/check-runs/$id/annotations" --jq '.[] | "\(.annotation_level): \(.message)"'
+          done
