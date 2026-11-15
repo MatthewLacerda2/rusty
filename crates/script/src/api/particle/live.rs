@@ -84,18 +84,13 @@ fn with_carried<R>(
     Some(f(&mut emitter, &frame))
 }
 
-/// `particles` on the wire. Plain index loops: the crate builds at opt-level 0 in
-/// play-tests, where an iterator chain per float costs twice as much.
+/// `particles` on the wire.
 fn packed(particles: &[Particle]) -> Vec<u8> {
-    let mut bytes = vec![0u8; particles.len() * PARTICLE];
-    for (i, p) in particles.iter().enumerate() {
-        let f = fields(p);
-        let mut one = [0u8; PARTICLE];
-        for k in 0..FIELDS {
-            let b = f[k].to_le_bytes();
-            (one[k * 4], one[k * 4 + 1], one[k * 4 + 2], one[k * 4 + 3]) = (b[0], b[1], b[2], b[3]);
+    let mut bytes = Vec::with_capacity(particles.len() * PARTICLE);
+    for p in particles {
+        for x in fields(p) {
+            bytes.extend_from_slice(&x.to_le_bytes());
         }
-        bytes[i * PARTICLE..(i + 1) * PARTICLE].copy_from_slice(&one);
     }
     bytes
 }
@@ -115,8 +110,8 @@ fn fields(p: &Particle) -> [f32; FIELDS] {
     ]
 }
 
-/// Replace `e`'s live particles, under its frame `frame`, with `count` records (a u32 source index and
-/// [`FIELDS`] f32s each): dead ones and those past `max_particles` dropped, no
+/// Replace `e`'s live particles, under its frame `frame`, with `count` records
+/// (a u32 source index and [`FIELDS`] f32s each): dead ones and those past `max_particles` dropped, no
 /// death sub-emitter fired. Returns the number live.
 fn write_records(
     e: &mut ParticleEmitterComponent,
@@ -134,8 +129,8 @@ fn write_records(
         let at = r * RECORD;
         let src = u32::from_le_bytes(word(records, at)) as usize;
         let mut values = [0.0f32; FIELDS];
-        for k in 0..FIELDS {
-            values[k] = f32::from_le_bytes(word(records, at + 4 + k * 4));
+        for (k, v) in values.iter_mut().enumerate() {
+            *v = f32::from_le_bytes(word(records, at + 4 + k * 4));
         }
         let old = e.runtime.particles.get(src).copied();
         let mut p = old.unwrap_or_else(|| e.placed(frame));
