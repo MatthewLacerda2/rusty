@@ -1,4 +1,4 @@
-//! crates/dev/src/stats.rs — frame-stats collection (#433): the clock side of `FrameStats`.
+//! crates/dev/src/stats/mod.rs — frame-stats collection (#433): the clock side of `FrameStats`.
 //!
 //! The sim may not read a clock, so it doesn't: `app::Schedule` hands every system to
 //! an installed [`SystemProbe`], and [`TimingProbe`] — here, in the dev layer, which
@@ -13,11 +13,13 @@
 //! time is the sum of its systems' times.
 //!
 //! **Sessions.** The stats restart on the first frame of every Play session, so a
-//! windowed editor reports the current run, not every run since launch.
+//! windowed editor reports the current run, not every run since launch; a window
+//! frame drawn outside Play reaches only the recent ring a window reads
+//! ([`record_window`]), so after Stop the session holds until the next Play.
 //!
-//! Render counters come from the renderer when it draws (a harness screenshot);
-//! [`record_render`] folds them in. Headless runs without a screenshot report timings
-//! and world counters only.
+//! Render counters come from the renderer when it draws: a harness screenshot, or a
+//! frame of the window (`window`, #2205); [`record_render_into`] folds them in. Headless
+//! runs without a screenshot report timings and world counters only.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -26,8 +28,11 @@ use std::time::Instant;
 
 use super::capture::RenderedFrame;
 use rusty_app::{GameWorld, LoadProbe, Resources, Stage, SystemProbe, World};
-use rusty_core::frame_stats::{FrameStats, Series};
+use rusty_core::frame_stats::{DrawnFrame, FrameStats, Series};
 use rusty_script::scripting::ConsoleLogs;
+
+mod window;
+pub use window::{record_window, window_opt, WindowFrame};
 
 /// The metric each per-frame stage's CPU time is recorded under.
 fn stage_key(stage: Stage) -> &'static str {
@@ -111,7 +116,7 @@ impl SystemProbe for TimingProbe {
         let changes = world.scene.borrow().world.change_stats();
         let changes = changes.into_iter().map(|s| (s.name, s.logged));
         record_changes(&mut stats, changes, &mut self.logged);
-        stats.frames += 1;
+        stats.end_tick();
     }
 }
 
@@ -212,25 +217,34 @@ pub fn install(world: &mut GameWorld) -> Rc<RefCell<FrameStats>> {
     stats
 }
 
-/// Fold one rendered frame into `stats`: its counters, the CPU ms the renderer spent
-/// recording it, and — where the adapter has timestamps — its GPU ms in total
-/// (`gpu_ms`) and per pass kind (#835). Without timestamps no GPU key is written.
+/// Fold one rendered frame into `stats` as a frame of the session (a harness
+/// render): [`record_render_into`] it.
 pub fn record_render(stats: &mut FrameStats, frame: &RenderedFrame) {
+    stats.record_frame(true, |drawn| record_render_into(drawn, frame));
+}
+
+/// Fold one rendered frame into the frame being recorded: its counters, the CPU ms
+/// the renderer spent recording it, and — where the adapter has timestamps — its
+/// GPU ms in total (`gpu_ms`) and per pass kind (#835). Without timestamps no GPU
+/// key is written. It counts as a rendered frame (`drawn_frames`).
+pub fn record_render_into(drawn: &mut DrawnFrame<'_>, frame: &RenderedFrame) {
     for (key, value) in frame.counters.pairs() {
-        stats.record(key, value as f64);
+        drawn.record(key, value as f64);
     }
-    stats.record("renderer_ms", frame.cpu_ms);
+    drawn.record("renderer_ms", frame.cpu_ms);
+    drawn.rendered();
     if let Some(gpu) = &frame.gpu {
-        stats.record("gpu_ms", gpu.total_ms());
+        drawn.record("gpu_ms", gpu.total_ms());
         for (pass, ms) in &gpu.passes {
-            stats.record_gpu_pass(pass.name(), *ms);
+            drawn.record_gpu_pass(pass.name(), *ms);
         }
     }
 }
 
 /// The stats as the Lua table `Debug.Stats()` / `Harness.Stats()` return:
-/// `{ frames = n, <metric> = {last, min, avg, max, samples}, …, systems = { <name> = … },
-/// gpu_passes = { <pass> = … } }` — `gpu_passes` only where GPU time was measured.
+/// `{ frames = n, drawn_frames = n, <metric> = {last, min, avg, max, samples}, …,
+/// systems = { <name> = … }, gpu_passes = { <pass> = … } }` — `gpu_passes` only
+/// where GPU time was measured.
 pub fn to_lua(lua: &mlua::Lua, stats: &FrameStats) -> mlua::Result<mlua::Table> {
     let series = |s: &Series| -> mlua::Result<mlua::Table> {
         let t = lua.create_table()?;
@@ -243,6 +257,7 @@ pub fn to_lua(lua: &mlua::Lua, stats: &FrameStats) -> mlua::Result<mlua::Table> 
     };
     let out = lua.create_table()?;
     out.set("frames", stats.frames)?;
+    out.set("drawn_frames", stats.drawn_frames)?;
     for (key, s) in &stats.metrics {
         out.set(key.as_str(), series(s)?)?;
     }
@@ -273,8 +288,8 @@ pub fn budgets_from_lua(table: mlua::Table) -> mlua::Result<Vec<(String, f64)>> 
 }
 
 #[cfg(test)]
-#[path = "stats_load_tests.rs"]
+#[path = "load_tests.rs"]
 mod stats_load_tests;
 #[cfg(test)]
-#[path = "stats_tests.rs"]
+#[path = "tests.rs"]
 mod stats_tests;

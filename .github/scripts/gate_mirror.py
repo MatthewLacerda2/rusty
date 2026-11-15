@@ -59,7 +59,11 @@ def makefile_gates(text: str) -> dict[str, list[str]]:
     expand = lambda cmd: re.sub(r"\$\((\w+)\)", lambda m: variables.get(m[1], m[0]), cmd)
     gates = {}
     for gate in expand(variables["GATES"]).split():
-        commands = [expand(c.lstrip("@")) for c in recipes.get(gate, [])]
+        # `cmd || { …failure hint… }`: the hint is what a red gate prints, not
+        # what it checks. Only a trailing brace group goes: `a || rc=1; b || rc=1`
+        # keeps both commands, so CI dropping `b` is still flagged.
+        commands = [re.sub(r"\s*\|\|\s*\{.*\}\s*$", "", expand(c.lstrip("@"))).strip()
+                    for c in recipes.get(gate, [])]
         # `command -v tool || { …install hint… }`: a local presence check; CI installs the tool.
         gates[gate] = [c for c in commands if not c.startswith("command -v ")]
     return gates
@@ -145,9 +149,14 @@ def normalise(command: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
 
 
 def missing(gates: dict[str, list[str]], ci: list[str]) -> list[tuple[str, str]]:
-    """(gate, command) for each gate command no CI step runs; a gate with none counts."""
+    """(gate, command) for each gate command no CI step runs; a gate with none counts.
+
+    A step running `make <gate>` runs that gate's recipe itself, so it covers
+    every command in it (`fuzz-check`, whose recipe is one script)."""
     seen = {normalise(c) for c in ci}
-    gaps = [(g, c) for g, cmds in gates.items() for c in cmds if normalise(c) not in seen]
+    by_make = {g for g in gates if normalise(f"make {g}") in seen}
+    gaps = [(g, c) for g, cmds in gates.items() if g not in by_make
+            for c in cmds if normalise(c) not in seen]
     return gaps + [(g, "<no command>") for g, cmds in gates.items() if not cmds]
 
 

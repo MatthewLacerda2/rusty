@@ -1,0 +1,251 @@
+//! crates/core/src/frame_stats/mod.rs — per-frame perf counters and timings for agents (#433).
+//!
+//! An agent never *feels* the frame rate, so it needs numbers: CPU milliseconds per
+//! schedule stage and per system, render counters (draw calls, triangles, culled
+//! entities, dropped lights) and world counters (entities, bodies, agents, scripts).
+//! [`FrameStats`] is where those numbers land — a flat, name-keyed set of running
+//! [`Series`] (last / min / avg / max over the frames recorded) that `Debug.Stats()`,
+//! the harness's `results.json` and scenario budgets all read.
+//!
+//! **Now, not the session.** Beside each series its newest [`RECENT`] samples are
+//! kept, each stamped with the tick and drawn frame it was recorded at, so
+//! [`FrameStats::window`] can summarise only the newest frames: what
+//! `Debug.Stats{ window = n }` and the Game view's Stats overlay read. A metric
+//! that stopped being recorded (a pass turned off, a load long ago) leaves the
+//! window once its newest stamp is older than it. The session's series take Play
+//! alone; the ring takes every drawn frame, edit mode too.
+//!
+//! This is plain data. **Nothing here reads a clock**: the timings are measured by the
+//! dev layer (`dev::stats`) around each system and written in, and the sim never reads
+//! them back, so the determinism rule is untouched. A key [`is_timing`] names (one
+//! ending in `_ms` or `_us`, and `fps`) is wall-clock and differs run to run; every
+//! other key is a count and is deterministic for a deterministic run —
+//! [`FrameStats::to_json`] can split the two.
+
+use std::collections::{BTreeMap, VecDeque};
+
+mod recent;
+
+use recent::{bounded, fold_recent, push, Recent, Stamp};
+use serde::Serialize;
+use serde_json::{json, Value};
+
+/// A running summary of one metric over the frames it was recorded on.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
+pub struct Series {
+    pub last: f64,
+    pub min: f64,
+    pub avg: f64,
+    pub max: f64,
+    /// How many frames recorded this metric.
+    pub samples: u64,
+}
+
+impl Series {
+    /// Fold one frame's value in.
+    pub fn record(&mut self, value: f64) {
+        if self.samples == 0 {
+            (self.min, self.max) = (value, value);
+        } else {
+            self.min = self.min.min(value);
+            self.max = self.max.max(value);
+        }
+        self.samples += 1;
+        self.avg += (value - self.avg) / self.samples as f64;
+        self.last = value;
+    }
+}
+
+/// How many of each metric's newest samples are kept for [`FrameStats::window`]:
+/// ten seconds of a 60 Hz tick or window. A wider window is clamped to it.
+pub const RECENT: usize = 600;
+
+/// Every metric recorded since the stats were last reset (a Play session).
+///
+/// Two kinds of sample land here: a sim tick's ([`FrameStats::record`],
+/// [`FrameStats::record_system`], closed by [`FrameStats::end_tick`]) and a drawn
+/// frame's ([`FrameStats::record_frame`]). The session's series take every tick and
+/// the drawn frames recorded in session; the recent ring takes both kinds always.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct FrameStats {
+    /// Sim frames (ticks) recorded.
+    pub frames: u64,
+    /// Frames drawn and recorded with their render counters in session: windowed
+    /// Play frames, or headless frames something rendered. Not `frames`: a windowed
+    /// frame runs zero or several ticks, and a headless tick need not draw.
+    pub drawn_frames: u64,
+    /// Stage timings, render counters and world counters, by name.
+    pub metrics: BTreeMap<String, Series>,
+    /// Per-system CPU milliseconds, by system name — diagnostic, not budgetable.
+    pub systems: BTreeMap<String, Series>,
+    /// GPU milliseconds per render-pass kind, by its stable name (#835). Empty where
+    /// the adapter has no timestamps — absent, never zero.
+    pub gpu_passes: BTreeMap<String, Series>,
+    /// Each series' newest samples, stamped, oldest first, at most [`RECENT`].
+    recent: Recent,
+}
+
+/// Whether `key` names a wall-clock timing (non-deterministic) rather than a count:
+/// a key ending in `_ms` or `_us` (`render_extract_us`, `shadow_gather_us`), or the
+/// window's frame rate, `fps`.
+pub fn is_timing(key: &str) -> bool {
+    key.ends_with("_ms") || key.ends_with("_us") || key == "fps"
+}
+
+/// One drawn frame being recorded ([`FrameStats::record_frame`]).
+pub struct DrawnFrame<'a> {
+    stats: &'a mut FrameStats,
+    in_session: bool,
+    rendered: bool,
+}
+
+impl DrawnFrame<'_> {
+    /// Record `value` for metric `key` this frame.
+    pub fn record(&mut self, key: &str, value: f64) {
+        let at = self.stats.recent.stamp(false);
+        let session = self.in_session.then_some(&mut self.stats.metrics);
+        push(session, &mut self.stats.recent.metrics, at, key, value);
+    }
+
+    /// Record `ms` of GPU time for the render passes of kind `name` this frame.
+    pub fn record_gpu_pass(&mut self, name: &str, ms: f64) {
+        let at = self.stats.recent.stamp(false);
+        let session = self.in_session.then_some(&mut self.stats.gpu_passes);
+        push(session, &mut self.stats.recent.gpu_passes, at, name, ms);
+    }
+
+    /// Mark the frame as one the renderer drew: it counts as a drawn frame.
+    pub fn rendered(&mut self) {
+        self.rendered = true;
+    }
+}
+
+impl FrameStats {
+    /// Record `value` for metric `key` this tick.
+    pub fn record(&mut self, key: &str, value: f64) {
+        let at = self.recent.stamp(true);
+        push(
+            Some(&mut self.metrics),
+            &mut self.recent.metrics,
+            at,
+            key,
+            value,
+        );
+    }
+
+    /// Record `ms` of CPU time for the system named `name` this tick.
+    pub fn record_system(&mut self, name: &str, ms: f64) {
+        let at = self.recent.stamp(true);
+        push(
+            Some(&mut self.systems),
+            &mut self.recent.systems,
+            at,
+            name,
+            ms,
+        );
+    }
+
+    /// Close a tick: one more of `frames`, and of the ring's tick clock.
+    pub fn end_tick(&mut self) {
+        let at = self.recent.stamp(true);
+        bounded(&mut self.recent.tick_marks, at);
+        self.frames += 1;
+        self.recent.ticks += 1;
+    }
+
+    /// Record one drawn frame through `f`, then close it. With `in_session` false
+    /// (an edit-mode frame) its samples go to the recent ring alone: the session
+    /// keeps what Play recorded, and a window still reads the frame.
+    pub fn record_frame(&mut self, in_session: bool, f: impl FnOnce(&mut DrawnFrame<'_>)) {
+        let mut frame = DrawnFrame {
+            stats: self,
+            in_session,
+            rendered: false,
+        };
+        f(&mut frame);
+        if frame.rendered {
+            let at = self.recent.stamp(false);
+            bounded(&mut self.recent.drawn_marks, at);
+            self.drawn_frames += u64::from(in_session);
+        }
+        self.recent.frames += 1;
+    }
+
+    /// The stats over the newest `n` frames (at most [`RECENT`] samples a metric)
+    /// instead of the whole session. A sample is in when it was recorded within the
+    /// last `n` frames the stats recorded; a tick's sample within the last `n`
+    /// ticks too. `frames` and `drawn_frames` count the ticks and rendered frames
+    /// inside. A metric with no sample inside is absent, so a pass that stopped
+    /// running leaves. The result keeps no history.
+    pub fn window(&self, n: usize) -> FrameStats {
+        let r = &self.recent;
+        let n = n.min(RECENT) as u64;
+        let count = |marks: &VecDeque<Stamp>| {
+            let edge = marks.partition_point(|at| r.past_edge(*at, n));
+            marks.range(edge..).filter(|at| r.within(**at, n)).count()
+        };
+        FrameStats {
+            frames: count(&r.tick_marks) as u64,
+            drawn_frames: count(&r.drawn_marks) as u64,
+            metrics: fold_recent(r, &r.metrics, n),
+            systems: fold_recent(r, &r.systems, n),
+            gpu_passes: fold_recent(r, &r.gpu_passes, n),
+            recent: Recent::default(),
+        }
+    }
+
+    /// One metric's summary, if it was ever recorded.
+    pub fn get(&self, key: &str) -> Option<&Series> {
+        self.metrics.get(key)
+    }
+
+    /// Check a budget: metric `key` must never have exceeded `limit` on any recorded
+    /// frame. `Ok` carries a pass line and `Err` a failure line naming the measured
+    /// worst frame. The pass line holds no measured value, so a passing timing budget
+    /// leaves `results.json` byte-identical between runs.
+    pub fn check_budget(&self, key: &str, limit: f64) -> Result<String, String> {
+        let head = format!("budget {key} <= {limit}");
+        match self.get(key) {
+            Some(s) if s.max <= limit => Ok(head),
+            Some(s) => Err(format!(
+                "{head} exceeded: worst frame {:.3}, avg {:.3} over {} frames",
+                s.max, s.avg, s.samples
+            )),
+            None => Err(format!(
+                "{head}: `{key}` was never measured (known: {})",
+                self.metrics.keys().cloned().collect::<Vec<_>>().join(", ")
+            )),
+        }
+    }
+
+    /// The stats as JSON: `{ frames, drawn_frames, metrics: {key: series}, systems:
+    /// {…}, gpu_passes: {…} }`. With `timings` false only the deterministic counts are
+    /// kept (no metric [`is_timing`] names, no per-system or per-pass times), which is what a
+    /// replay-stable `results.json` can carry. `gpu_passes` is absent when empty.
+    pub fn to_json(&self, timings: bool) -> Value {
+        let metrics: BTreeMap<&String, &Series> = self
+            .metrics
+            .iter()
+            .filter(|(k, _)| timings || !is_timing(k))
+            .collect();
+        let mut out = json!({
+            "frames": self.frames,
+            "drawn_frames": self.drawn_frames,
+            "metrics": metrics,
+        });
+        if timings {
+            out["systems"] = json!(self.systems);
+            if !self.gpu_passes.is_empty() {
+                out["gpu_passes"] = json!(self.gpu_passes);
+            }
+        }
+        out
+    }
+}
+
+#[cfg(test)]
+#[path = "tests.rs"]
+mod frame_stats_tests;
+#[cfg(test)]
+#[path = "window_tests.rs"]
+mod window_tests;

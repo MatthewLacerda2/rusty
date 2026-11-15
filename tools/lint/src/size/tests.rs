@@ -28,15 +28,24 @@ impl Drop for Scratch {
 
 #[test]
 fn normal_files_get_the_default_cap() {
-    assert_eq!(limit_for(Path::new("src/render/mod.rs")), MAX_FILE_LINES);
+    assert_eq!(
+        limit_for(Path::new(""), Path::new("src/render/mod.rs")),
+        MAX_FILE_LINES
+    );
 }
 
 #[test]
 fn test_and_fixture_files_get_the_tight_cap() {
-    assert_eq!(limit_for(Path::new("tests/foo.rs")), MAX_TEST_FILE_LINES);
-    assert_eq!(limit_for(Path::new("src/bar_test.rs")), MAX_TEST_FILE_LINES);
     assert_eq!(
-        limit_for(Path::new("src/fixtures/baz.rs")),
+        limit_for(Path::new(""), Path::new("tests/foo.rs")),
+        MAX_TEST_FILE_LINES
+    );
+    assert_eq!(
+        limit_for(Path::new(""), Path::new("src/bar_test.rs")),
+        MAX_TEST_FILE_LINES
+    );
+    assert_eq!(
+        limit_for(Path::new(""), Path::new("src/fixtures/baz.rs")),
         MAX_TEST_FILE_LINES
     );
 }
@@ -45,21 +54,27 @@ fn test_and_fixture_files_get_the_tight_cap() {
 fn one_binary_test_layout_keeps_the_tight_cap() {
     // `tests/` is one binary (#483): its root, a module folder's `mod.rs`, and the
     // files inside that folder are all still standalone test files.
-    assert_eq!(limit_for(Path::new("tests/main.rs")), MAX_TEST_FILE_LINES);
     assert_eq!(
-        limit_for(Path::new("tests/gpu/mod.rs")),
+        limit_for(Path::new(""), Path::new("tests/main.rs")),
         MAX_TEST_FILE_LINES
     );
     assert_eq!(
-        limit_for(Path::new("tests/gpu/fxaa_screenshot.rs")),
+        limit_for(Path::new(""), Path::new("tests/gpu/mod.rs")),
+        MAX_TEST_FILE_LINES
+    );
+    assert_eq!(
+        limit_for(Path::new(""), Path::new("tests/gpu/fxaa_screenshot.rs")),
         MAX_TEST_FILE_LINES
     );
     // A `tests.rs` there is no source's sibling: it keeps the tight cap (#1367).
     assert_eq!(
-        limit_for(Path::new("tests/x/tests.rs")),
+        limit_for(Path::new(""), Path::new("tests/x/tests.rs")),
         MAX_TEST_FILE_LINES
     );
-    assert_eq!(limit_for(Path::new("src/x/tests.rs")), MAX_FILE_LINES);
+    assert_eq!(
+        limit_for(Path::new(""), Path::new("src/x/tests.rs")),
+        MAX_FILE_LINES
+    );
 }
 
 #[test]
@@ -69,13 +84,19 @@ fn tests_sibling_gets_the_source_cap_not_the_tight_one() {
     let tmp = Scratch::new("960-sibling");
     tmp.file("src/bar.rs", "//\n");
     let tests = tmp.file("src/bar_tests.rs", &"//\n".repeat(250));
-    assert_eq!(limit_for(&tests), MAX_FILE_LINES);
-    assert_eq!(check_file(&tests), None);
+    assert_eq!(limit_for(Path::new(""), &tests), MAX_FILE_LINES);
+    assert_eq!(check_file(Path::new(""), &tests), None);
     // A module directory is a source too: `<x>/` beside it (it holds `<x>/mod.rs`).
     tmp.file("src/baz/mod.rs", "//\n");
-    assert_eq!(limit_for(&tmp.file("src/baz_tests.rs", "")), MAX_FILE_LINES);
+    assert_eq!(
+        limit_for(Path::new(""), &tmp.file("src/baz_tests.rs", "")),
+        MAX_FILE_LINES
+    );
     // The standalone `_test.rs` (singular) form still gets the tight cap.
-    assert_eq!(limit_for(Path::new("src/bar_test.rs")), MAX_TEST_FILE_LINES);
+    assert_eq!(
+        limit_for(Path::new(""), Path::new("src/bar_test.rs")),
+        MAX_TEST_FILE_LINES
+    );
 }
 
 #[test]
@@ -85,12 +106,12 @@ fn an_orphan_tests_file_gets_the_tight_cap() {
     let tmp = Scratch::new("960-orphan");
     let orphan = tmp.file("src/foo_tests.rs", &"//\n".repeat(MAX_TEST_FILE_LINES + 1));
     tmp.file("src/foo_other.rs", "//\n");
-    assert_eq!(limit_for(&orphan), MAX_TEST_FILE_LINES);
-    let line = check_file(&orphan).expect("an orphan over the tight cap must fail");
+    assert_eq!(limit_for(Path::new(""), &orphan), MAX_TEST_FILE_LINES);
+    let line = check_file(Path::new(""), &orphan).expect("an orphan over the tight cap must fail");
     assert!(line.ends_with("151/150"), "{line}");
     // A bare `_tests.rs` has no source name at all.
     assert_eq!(
-        limit_for(&tmp.file("src/_tests.rs", "")),
+        limit_for(Path::new(""), &tmp.file("src/_tests.rs", "")),
         MAX_TEST_FILE_LINES
     );
 }
@@ -109,7 +130,10 @@ fn full_scan_flags_an_oversized_integration_test() {
     fs::create_dir_all(generated.parent().unwrap()).unwrap();
     fs::write(&generated, "//\n".repeat(MAX_TEST_FILE_LINES + 1)).unwrap();
     let found = scan_dir(&root.join("tests"));
-    let flagged = found.iter().filter_map(|p| check_file(p)).count();
+    let flagged = found
+        .iter()
+        .filter_map(|p| check_file(Path::new(""), p))
+        .count();
     fs::remove_dir_all(&root).ok();
     assert_eq!(found, vec![file]);
     assert_eq!(flagged, 1, "a tests/ file over the cap must fail the scan");
@@ -136,7 +160,10 @@ fn full_scan_covers_tools_but_not_its_build_output() {
     fs::create_dir_all(generated.parent().unwrap()).unwrap();
     fs::write(&generated, "//\n".repeat(MAX_FILE_LINES + 1)).unwrap();
     let found = scan_dir(&root.join("tools"));
-    let flagged = found.iter().filter_map(|p| check_file(p)).count();
+    let flagged = found
+        .iter()
+        .filter_map(|p| check_file(Path::new(""), p))
+        .count();
     fs::remove_dir_all(&root).ok();
     assert_eq!(found, vec![file]);
     assert_eq!(flagged, 1, "a tools/ file over the cap must fail the scan");
@@ -151,11 +178,17 @@ fn normalize_strips_leading_dot_slash() {
 fn python_tests_get_the_tight_cap_and_scripts_the_source_cap() {
     // #926: a `.py` test is any file under a `tests/` directory.
     let tests = ".github/scripts/tests/queue/test_taking.py";
-    assert_eq!(limit_for(Path::new(tests)), MAX_TEST_FILE_LINES);
+    assert_eq!(
+        limit_for(Path::new(""), Path::new(tests)),
+        MAX_TEST_FILE_LINES
+    );
     let fixture = ".github/scripts/tests/queue/fixtures.py";
-    assert_eq!(limit_for(Path::new(fixture)), MAX_TEST_FILE_LINES);
+    assert_eq!(
+        limit_for(Path::new(""), Path::new(fixture)),
+        MAX_TEST_FILE_LINES
+    );
     let script = ".github/scripts/merging/queue/taking.py";
-    assert_eq!(limit_for(Path::new(script)), MAX_FILE_LINES);
+    assert_eq!(limit_for(Path::new(""), Path::new(script)), MAX_FILE_LINES);
 }
 
 #[test]
@@ -163,7 +196,7 @@ fn a_python_file_over_the_cap_in_code_fails_and_says_lines_of_code() {
     // #926: `merge-queue.py` reached 1,074 lines because the gate never read `.py`.
     let tmp = Scratch::new("926-over");
     let path = tmp.file("over.py", &"x = 1\n".repeat(MAX_FILE_LINES + 1));
-    let line = check_file(&path).expect("301 lines of code must fail");
+    let line = check_file(Path::new(""), &path).expect("301 lines of code must fail");
     assert!(line.ends_with("301/300 (lines of code)"), "{line}");
 }
 
@@ -177,7 +210,7 @@ fn python_prose_does_not_count_against_the_cap() {
     );
     let tmp = Scratch::new("926-prose");
     let path = tmp.file("prose.py", &(prose + &"x = 1\n".repeat(MAX_FILE_LINES)));
-    assert_eq!(check_file(&path), None);
+    assert_eq!(check_file(Path::new(""), &path), None);
 }
 
 #[test]
@@ -207,7 +240,7 @@ fn a_shader_or_script_over_the_cap_in_code_fails_and_says_lines_of_code() {
     let shader = tmp.file("engine/shaders/s.wgsl", &"let a = 1;\n".repeat(301));
     let script = tmp.file("engine/scripts/s.lua", &"x = 1\n".repeat(301));
     for path in [shader, script] {
-        let line = check_file(&path).expect("301 lines of code must fail");
+        let line = check_file(Path::new(""), &path).expect("301 lines of code must fail");
         assert!(line.ends_with("301/300 (lines of code)"), "{line}");
     }
 }
@@ -221,14 +254,14 @@ fn shader_and_script_prose_does_not_count_against_the_cap() {
         "why\n// ".repeat(400)
     );
     let shader = tmp.file("s.wgsl", &(wgsl + &"let a = 1;\n".repeat(300)));
-    assert_eq!(check_file(&shader), None);
+    assert_eq!(check_file(Path::new(""), &shader), None);
     let lua = format!(
         "--[[\n{}]]\n-- {}\n",
         "why\n".repeat(400),
         "how\n-- ".repeat(400)
     );
     let script = tmp.file("s.lua", &(lua + &"x = 1\n".repeat(300)));
-    assert_eq!(check_file(&script), None);
+    assert_eq!(check_file(Path::new(""), &script), None);
 }
 
 #[test]

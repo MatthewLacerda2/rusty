@@ -22,6 +22,7 @@ mod start;
 mod sync;
 mod title;
 mod undo;
+mod undrawn;
 mod viewport;
 mod watch;
 
@@ -104,6 +105,7 @@ impl EditorFrontend {
             paint::EGUI_RENDERER,
         );
         let editor_ui = EditorUi::new(game.script_manager().scene_path_cell());
+        sync::mark_host(&mut game.resources.application.borrow_mut());
         Self {
             egui_ctx,
             egui_winit,
@@ -131,6 +133,9 @@ impl EditorFrontend {
         self.follow_scene_swap(game);
         // The transport asks through `set_playing`, like every other host (#1302).
         let mut playing = game.play_requested();
+        let clock = (shell.clock.fps(), shell.clock.frame_ms());
+        let timestamps = shell.renderer.times_gpu();
+        sync::sync_stats(&mut self.editor_ui, game, clock.into(), timestamps);
         let interaction = {
             let mut s = game.world.scene.borrow_mut();
             let mut c = game.resources.console.borrow_mut();
@@ -141,8 +146,6 @@ impl EditorFrontend {
                 &mut c,
                 &mut n,
                 &mut playing,
-                shell.clock.fps(),
-                shell.clock.frame_ms(),
                 self.viewport_texture_id,
             )
         };
@@ -250,6 +253,11 @@ impl Frontend for EditorFrontend {
         self.cursor_release.on_key(key, pressed, has_input);
     }
 
+    /// The locked screen's frame: the editor's work without the paint (`undrawn`).
+    fn undrawn(&mut self, _shell: &mut Shell, game: &mut GameWorld) {
+        self.step_undrawn(game);
+    }
+
     fn draw(
         &mut self,
         shell: &mut Shell,
@@ -257,12 +265,7 @@ impl Frontend for EditorFrontend {
         _frame: &wgpu::Texture,
         target: &wgpu::TextureView,
     ) {
-        // Files changed outside the engine reach the caches before this frame draws.
-        if let Some(watch) = &mut self.watch {
-            watch.apply(game.scene().borrow().is_playing());
-        }
-        self.follow_scene_file(game);
-        self.remember_open_scene(game);
+        self.follow_files(game);
         let raw_input = self.egui_winit.take_egui_input(&shell.window);
         self.egui_ctx.begin_pass(raw_input);
 

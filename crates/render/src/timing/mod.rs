@@ -19,8 +19,9 @@
 //! timestamps supports — Apple GPUs sample only at stage boundaries, so writes inside
 //! encoders or passes are out. An adapter without the feature (lavapipe, some Linux
 //! drivers) gets a disabled timer: [`GpuTimer::writes`] is always `None`, nothing is
-//! resolved, and the stats carry no GPU field at all — absent, not zero. Only the
-//! headless renderer asks for the feature: nothing reads the window's timings yet.
+//! resolved, and the stats carry no GPU field at all — absent, not zero. The
+//! headless renderer asks for the feature, and so does a `dev` build's window, whose
+//! frames feed `Debug.Stats()` (#2205; `setup::limits::WINDOW`).
 //!
 //! **Exclusive time.** A pass's timestamps bracket its vertex work to its fragment
 //! work, and GPUs overlap neighbours — a tiled GPU (Apple's) starts the next pass's
@@ -32,11 +33,13 @@
 //! light ones queued behind it.
 
 mod clock;
+mod frame;
 mod readback;
 
 use std::cell::{Cell, RefCell};
 
 pub use clock::ClockProbe;
+pub use frame::FrameCost;
 use readback::Ring;
 
 rusty_core::named_enum! {
@@ -139,6 +142,8 @@ const PAIRS: u32 = 256;
 /// lacks `TIMESTAMP_QUERY`.
 pub struct GpuTimer {
     queries: Option<Queries>,
+    /// The frame bracket's CPU side, timed whether or not the GPU is ([`FrameCost`]).
+    cpu: frame::CpuFrame,
 }
 
 /// The live half of an enabled timer.
@@ -177,18 +182,21 @@ impl GpuTimer {
             ring: Ring::new(device, u64::from(PAIRS) * 2),
             ready: None,
         };
-        Self {
-            queries: Some(queries),
-        }
+        let (queries, cpu) = (Some(queries), Default::default());
+        Self { queries, cpu }
     }
 
     /// A timer that times nothing: what a device without timestamps gets.
     pub fn disabled() -> Self {
-        Self { queries: None }
+        let cpu = Default::default();
+        Self { queries: None, cpu }
     }
 
     /// Start timing a frame's passes.
     pub(crate) fn begin_frame(&self) {
+        if !self.cpu.begin() {
+            return; // a render beside the measured frame (`Renderer::aside`)
+        }
         if let Some(q) = &self.queries {
             q.frame.borrow_mut().clear();
             q.open.set(true);
@@ -236,16 +244,17 @@ impl GpuTimer {
 
     /// Close the frame: resolve its queries into a free readback buffer and start
     /// mapping it. A frame with every buffer still in flight goes untimed.
+    /// The CPU span closes last, so it holds the resolve, its submit and the poll.
     pub(crate) fn end_frame(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
-        let Some(q) = &mut self.queries else {
-            return;
-        };
-        q.open.set(false);
-        let passes = std::mem::take(q.frame.get_mut());
-        if !passes.is_empty() {
-            q.ring.submit(device, queue, &q.set, passes);
+        if let Some(q) = &mut self.queries {
+            q.open.set(false);
+            let passes = std::mem::take(q.frame.get_mut());
+            if !passes.is_empty() {
+                q.ring.submit(device, queue, &q.set, passes);
+            }
+            q.collect(device);
         }
-        q.collect(device);
+        self.cpu.end();
     }
 
     /// The newest frame's GPU times not yet taken, polling (never waiting) for
@@ -268,20 +277,6 @@ impl Queries {
         {
             self.ready = Some(times);
         }
-    }
-}
-
-impl crate::Renderer {
-    /// The newest rendered frame's GPU time per pass not yet taken — normally a frame
-    /// or two behind, never waited for. `None` without timestamps (#835).
-    pub fn take_gpu_times(&mut self) -> Option<GpuTimes> {
-        self.gpu_timer.take(&self.device)
-    }
-
-    /// Block until the GPU has finished everything submitted so far. For offline
-    /// callers only (the harness, a bake): the live frame loop never waits.
-    pub fn wait_idle(&self) {
-        let _ = self.device.poll(wgpu::PollType::wait_indefinitely());
     }
 }
 

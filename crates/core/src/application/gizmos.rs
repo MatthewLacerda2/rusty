@@ -1,7 +1,7 @@
 //! The Scene view's gizmo set (#1909): which editor gizmos the Scene view draws,
-//! Unity's Gizmos menu and `GizmoUtility.SetGizmoEnabled`, and the Game view's one
-//! **Gizmos** toggle (`GameGizmos`, #1882), a row like the others. Here, below the editor and
-//! the renderer, because both read it: the editor owns the set and shows its
+//! Unity's Gizmos menu and `GizmoUtility.SetGizmoEnabled`, and the Game view's
+//! **Gizmos** and **Stats** toggles (`GameGizmos`, #1882; `Stats`, #2205), rows like
+//! the others. Here, below the editor and the renderer, because both read it: the editor owns the set and shows its
 //! toggles, the shell hands it to the render view, the renderer gates its gizmos on
 //! it, and `Editor.SetGizmo` names a flag by its row.
 //!
@@ -112,6 +112,16 @@ gizmos! {
         shown: true,
         game: true,
     },
+    // Unity's Game-view **Stats** (#2205): the frame's timings and counters over the
+    // last second, the table `Debug.Stats{ window = 60 }` returns. Off, as Unity's.
+    Stats => GizmoRow {
+        name: "Stats",
+        label: "Stats",
+        hover: "Show the frame's timings and counters over the last second",
+        on: false,
+        shown: true,
+        game: true,
+    },
 }
 
 impl Gizmo {
@@ -168,7 +178,7 @@ pub struct GizmoDesk {
 }
 
 impl Application {
-    /// Mark the host as one with a Scene view (the editor window).
+    /// Mark the host as one with a Scene view (the editor window, once when built).
     pub fn mark_gizmo_viewer(&mut self) {
         self.gizmos.viewer = true;
     }

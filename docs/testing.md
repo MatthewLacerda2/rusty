@@ -723,7 +723,7 @@ recipe and scripts are committed; the project is regenerable output.
 | `showroom` | Lighting and reflections in one interior room: a polished floor (SSR from a minimum smoothness of 0.1), a mirror, a clear and a tinted glass pane, a drinking glass before the mirror, a lacquered pedestal (`ior`, `KHR_materials_specular`), an emissive sign, daylight through a window, a turned box and a sphere reflection probe, six light probes and a ball rolling through them with a proxy volume. Scenarios: `load`, `ball` (its probe light rises in the sun), `probes` (the volumes drawn as gizmos), `bake` (only with `--param bake=true`: a tiny Generate Lighting, applied on load). |
 | `smoke` | The generator's own proof: a floor, a crate with a Snyder texture, a looping zimmer blip and `mover.lua` sliding it along +X, a sun, a camera; one scenario asserting the crate moved, two shots. |
 | `tetris` | A 3D falling-blocks puzzle: held/tapped input with repeat timing on the fixed tick, a HUD with layout groups (stats column, 4×4 next-piece grid), many small lit cubes spawned and moved every few ticks, cleared lines bursting as rigidbodies then despawning, a pulse light, zimmer one-shots and a loop; scenarios clear a line, play to game over, and replay one seed twice for the same board. |
-| `topple` | Physics at scale and its determinism: four levels of box and plank stacks, jointed box figures (powered joints that go limp into ragdolls on a hard hit) and explosive barrels (`Damage.ApplyRadial` with impulse) that the player topples with thrown balls; scenarios prove the levels settle, a throw clears a level, a blast reaches exactly its radius, and a replay is bit-identical. `pile=16` is a 1,498-body pile. |
+| `topple` | Physics at scale and its determinism: four levels of box and plank stacks, jointed box figures (powered joints that go limp into ragdolls on a hard hit) and explosive barrels (`Damage.ApplyRadial` with impulse) that the player topples with thrown balls; scenarios prove the levels settle, a throw clears a level, a click throws at what the cursor is over (`click`, through the input path), a blast reaches exactly its radius, and a replay is bit-identical. `pile=16` is a 1,498-body pile. |
 
 ```sh
 make game NAME=smoke                       # → target/games/smoke/ (this worktree's own)
@@ -810,12 +810,19 @@ Harness.AssertBudget{ draw_calls = 2000, lights_dropped = 0, fixed_update_ms = 4
   `triangles`, `lights_dropped`, `entities`, …) for a regression guard that must hold on
   every machine. A `_ms` budget measures *this* machine — CI runners are slow software
   adapters — so keep it generous or for local profiling only.
-- **Where the numbers land:** `results.json` gains a `stats` block with the counts only,
-  so a replay stays byte-identical; `<out_dir>/stats.json` holds everything, per-system
+- **Where the numbers land:** `results.json` gains a `stats` block with the counts only
+  (`frames`, `drawn_frames` and the count metrics), so a replay stays byte-identical; `<out_dir>/stats.json` holds everything, per-system
   timings included.
 - Budgets are **opt-in per scenario**, never a CI gate of their own.
 - `Harness.Render()` draws the current frame without writing a PNG — the cheap way to
   get render counters and GPU time (`gpu_ms`, `gpu_passes`, #835) every tick.
+- **The live window is measured too** (#2205): in a `dev` build every frame the
+  editor or the player draws records its render counters, `renderer_ms`, GPU time
+  and its wall-clock `wall_ms` / `fps`, so an agent attached with `session-mcp
+  --attach` profiles the frame the operator is looking at with
+  `Debug.Stats{ window = 120 }` (the last 120 drawn frames, edit mode's too), the
+  table the Game view's **Stats** overlay shows; `Debug.Stats()` keeps Play's frames
+  alone. No second process, no scenario file.
 
 ## Benchmark: `make bench` (#835)
 Measure before optimising: `make bench` runs
@@ -1080,7 +1087,24 @@ lavapipe and set `RUSTY_REQUIRE_GPU=1` (#785), and the nextest `gpu` group bound
 Doctests are left out: nextest doesn't run them (`make test` does), so a mutant only a
 doctest would catch survives. The runs pass `--test-threads 2`: the jobs' `ulimit -v`
 cap (#674) is per process, so it times the test processes running at once stays within
-the runner's memory (`test_gpu_config.py` holds the product).
+the runner's memory (`test_gpu_config.py` holds the product). The same `ulimit` turns
+core dumps off (`-c 0`, #2230): a mutant that allocates without bound aborts at the
+cap, and on GitHub's runners an abort writes a core as large as the cap while the
+process keeps its memory, which outlasts the test timeout and, a few mutants in a row,
+the runner; with dumps off it aborts in seconds and reads as caught
+(`test_limits.py` holds every capped `ulimit` to `-c 0`).
+
+**A torn-down job still answers.** A job whose runner died, or that was killed at its
+`timeout-minutes`, runs no step of its own, so `mutants-on-request.yml` has a second
+job, `no-answer`, which `needs:` it and runs only when the mutation job failed or timed
+out without reaching its comment (its `answered` output) and the run was not
+cancelled. It reads the step the job died in and GitHub's annotation from the jobs API
+(`mutants-torn-down.py`) and posts that line below any earlier report on the pull
+request, and as the `mutants-report` artifact. What the job measured is lost with its
+runner. A job that failed with its steps run and still wrote no report gets a line
+saying so, not "torn down". A runner that dies right after posting its report loses
+`answered` too, so the line can land below a real report; it says that report is the
+truth.
 
 **The jobs run their own baseline** (`--baseline skip`, #2164). cargo-mutants builds
 and tests its baseline with `--package` set to the mutated packages only, whatever
@@ -1118,19 +1142,31 @@ arbitrary bytes → UTF-8 → `SceneData` (serde) → `apply_scene_data` (the
 rehydration that rebuilds meshes/colliders/skeletons), surfacing panics, hangs,
 and unguarded `unwrap`s.
 
-libFuzzer is **nightly-only**, so `fuzz/` is its own workspace — deliberately
-out of the pinned-`1.95.0` build, the size/determinism gates, and `cargo-deny`.
-It is **local-first / on-demand**:
+Running libFuzzer is **nightly-only**, so `fuzz/` is its own workspace —
+deliberately out of the root build, the determinism guard and `cargo-deny` (the
+size gate and the `--rules` checks still scan it). Its build is a gate all the
+same: `make fuzz-check` compiles the target on the pinned stable toolchain, into
+`target/fuzz`, so an engine rename it imports through turns a PR red. It builds
+against `fuzz/Cargo.lock`, which is **derived, not committed** (gitignored):
+`make fuzz-lock` writes it from the root `Cargo.lock`, pruned to what `fuzz/`
+needs, and `make fuzz-check` runs that first, then checks `--locked`. So the
+target builds the versions the root's gates prove, and a root bump needs nothing
+done here; only the fuzz-only crates (`libfuzzer-sys`, `arbitrary`) come from
+outside the root lock, pinned exactly in `fuzz/Cargo.toml`. It is a second cold
+engine build, so CI's `fuzz-check` job and `make gates` run it only when the diff
+matches `ci.yml`'s `fuzz` filter (and print that they skipped otherwise); by name
+it always runs. The fuzzing itself is **local-first / on-demand**:
 
 ```
+make fuzz-lock                                      # derive fuzz/Cargo.lock first
 cargo +nightly fuzz run scene_deserialize          # fuzz until you stop it
 cargo +nightly fuzz run scene_deserialize -- -max_total_time=60   # time-boxed
 ```
 
 The committed `fuzz/corpus/scene_deserialize/` seeds the coverage-guided mutator
 with the default scene plus a couple of minimal documents; new interesting inputs
-accrete there. There is no CI gate — fuzzing is run for as long as the operator
-wants; a short time-boxed CI smoke batch could be added later as a separate
+accrete there. No CI job *runs* the fuzzer — fuzzing is run for as long as the
+operator wants; a short time-boxed CI smoke batch could be added later as a separate
 nightly workflow if regression pressure is wanted.
 
 ## Parallel agent builds & disk

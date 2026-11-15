@@ -261,7 +261,9 @@ exits non-zero, or says *unconfirmed*. Its exit statuses are in `ci-merge`.
   hand-typed `tail | grep`: it replays the log from 30 lines back (a re-arm from
   the end drops what the log said while no `Monitor` ran), passes hand-backs,
   merges, the supervisor's and the watch's stops, a held Dependabot PR, every PR
-  turning ready, going back to draft or closing unmerged, and every comment a coder
+  turning ready, going back to draft or closing (one that turned ready or closed
+  between two watches is said by the next, once; with no kept board, each ready,
+  unlabelled one is said `is ready and unqueued`), and every comment a coder
   posts on its open briefed issue (`STANDING DOWN #N` for a stand-down, `COMMENT
   #N` for any other wording; `Brief`s and comments opening `Context update` are
   skipped as yours, so head a note of your own `Context update`, never `Brief`,
@@ -304,7 +306,12 @@ Per pull request:
    order, `Cargo.lock`), or one `merge-fixer` stopped on, goes to a fresh
    routine.
 3. **After a merge:** `make reclaim` (removes merged worktrees and deletes
-   finished local branches, refuses unpushed work), then re-read the board.
+   finished local branches; keeps unpushed work, a lock, and a worktree in use:
+   a process standing in it or running a program from it, or a write in the
+   last hour), then re-read the board. A helper's worktree survives it while
+   something runs there or was written within that hour; a longer pause (a build
+   kept to read results later, a session that may die) needs
+   `git worktree lock --reason …`.
 
 ## Starting, and re-reading the board
 

@@ -31,9 +31,9 @@
 mod escapes;
 
 use crate::code::code_lines;
+use crate::gates::Verdict;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::exit;
 
 /// Every item the ban must cover, each as it appears in a `path = "…"` of `clippy.toml`.
 const BANNED: &[&str] = &[
@@ -83,46 +83,50 @@ const OPT_OUTS: &[&str] = &[
 /// the ban covers for another reason (`std::env::set_current_dir`, #977), never a clock.
 const STATEMENT_OPT_OUT: &str = "statement-opt-out";
 
-const REPORT: &str = ".lint/report.txt";
-
-/// Entry point: check the clippy config and every opt-out under `src/`.
-pub fn run() {
-    let read = |p: &str| fs::read_to_string(p).unwrap_or_default();
-    let mut violations = config_violations(&read("clippy.toml"), &read("Cargo.toml"));
+/// The gate over the repository at `base`: the clippy config and every opt-out
+/// under `src/` and the member crates, and the locked lints' escapes.
+pub fn verdict(base: &Path, _: &[String]) -> Verdict {
+    let read = |p: &Path| fs::read_to_string(p).unwrap_or_default();
+    let root_manifest = read(&base.join("Cargo.toml"));
+    let mut violations = config_violations(&read(&base.join("clippy.toml")), &root_manifest);
     // The root package (the binaries and `tests/`) inherits the policy too.
-    violations.extend(member_violations("Cargo.toml", &read("Cargo.toml")));
-    for manifest in crate::modules::member_manifests(Path::new("")) {
-        let at = manifest.to_string_lossy();
-        violations.extend(member_violations(&at, &read(&at)));
+    violations.extend(member_violations("Cargo.toml", &root_manifest));
+    for manifest in crate::modules::member_manifests(base) {
+        let at = relative(base, &manifest);
+        violations.extend(member_violations(&at, &read(&manifest)));
     }
     let roots = crate::layers::platform_roots();
     let mut files = Vec::new();
-    walk(Path::new("src"), &mut files);
-    walk(Path::new(crate::modules::CRATES), &mut files);
+    walk(&base.join("src"), &mut files);
+    walk(&base.join(crate::modules::CRATES), &mut files);
     files.sort();
     for path in files {
-        let norm = path.to_string_lossy().into_owned();
-        let content = fs::read_to_string(&path).unwrap_or_default();
-        violations.extend(opt_out_violations(&norm, &content, &roots));
+        let norm = relative(base, &path);
+        violations.extend(opt_out_violations(&norm, &read(&path), &roots));
     }
     let mut files = Vec::new();
     for root in escapes::ROOTS {
-        walk(Path::new(root), &mut files);
+        walk(&base.join(root), &mut files);
     }
     files.sort();
     for path in files {
-        let norm = path.to_string_lossy().into_owned();
-        violations.extend(escapes::violations(
-            &norm,
-            &fs::read_to_string(&path).unwrap_or_default(),
-        ));
+        violations.extend(escapes::violations(&relative(base, &path), &read(&path)));
     }
-    report(&violations);
-    if violations.is_empty() {
-        println!("determinism: ok");
-    } else {
-        exit(1);
-    }
+    Verdict::listed("determinism", violations, |n| {
+        format!(
+            "\n{n} hole(s) in the lint policy. Restore clippy.toml / Cargo.toml, move a clock \
+             read to a platform module (its root carries the allow), or fix the code a \
+             locked lint flags (docs/linting.md).\n"
+        )
+    })
+}
+
+/// `path` as the repository at `base` names it: opt-outs are judged by module path.
+fn relative(base: &Path, path: &Path) -> String {
+    path.strip_prefix(base)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// The banned items missing from `clippy.toml`, and the lints `Cargo.toml` no longer denies.
@@ -212,29 +216,6 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
         } else if path.extension().is_some_and(|e| e == "rs") {
             out.push(path);
         }
-    }
-}
-
-fn report(violations: &[String]) {
-    let mut body = if violations.is_empty() {
-        String::from("determinism: ok\n")
-    } else {
-        String::from("determinism: FAILED\n")
-    };
-    for v in violations {
-        body.push_str(v);
-        body.push('\n');
-    }
-    fs::create_dir_all(".lint").ok();
-    fs::write(REPORT, &body).ok();
-    if !violations.is_empty() {
-        eprint!("{}", body);
-        eprintln!(
-            "\n{} hole(s) in the lint policy. Restore clippy.toml / Cargo.toml, move a clock \
-             read to a platform module (its root carries the allow), or fix the code a \
-             locked lint flags (docs/linting.md).",
-            violations.len()
-        );
     }
 }
 
