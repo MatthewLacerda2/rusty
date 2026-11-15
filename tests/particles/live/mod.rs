@@ -2,6 +2,7 @@
 //! an emitter's live particles. This file and `edges` drive the pair over a bare
 //! scene; `play` runs it inside the real play loop.
 
+mod bench;
 mod edges;
 mod for_each;
 mod identity;
