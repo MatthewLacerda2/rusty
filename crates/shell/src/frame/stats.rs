@@ -47,7 +47,7 @@ pub fn measured(
 /// A frame starts: the frame clock has just read the previous frame's wall time,
 /// so it goes onto that frame's stats entry now, before this frame's work, and
 /// whatever reads `Debug.Stats` during the frame (the REPL, `session-mcp --attach`,
-/// a script's `Update`, the Stats overlay) sees it ([`rusty_dev::stats::window_ended`]).
+/// a script's `Update`, the Stats overlay) sees it (`rusty_dev::stats::window_ended`).
 pub fn started(shell: &Shell, game: &GameWorld) {
     #[cfg(feature = "dev")]
     {
