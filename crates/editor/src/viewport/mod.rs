@@ -11,8 +11,11 @@
 //! The Scene tab's **UI** toggle draws the screen-space canvases over the scene and
 //! enables the rect tool on them (`rect_tool`, #423). The Game tab's **Gizmos**
 //! toggle draws the colliders and the `Debug.Draw*` lines over the game (#1882), and
-//! its **Stats** toggle the frame's timings over the image ([`stats`], #2205).
+//! its **Stats** toggle the frame's timings over the image ([`stats`], #2205). Its
+//! size dropdown gives the Game view a resolution of its own, drawn letterboxed as
+//! a demo replay is ([`game_size`], #2207).
 
+pub mod game_size;
 pub mod gizmo;
 pub mod pick;
 pub mod rect_tool;
@@ -23,7 +26,7 @@ pub mod stats;
 use egui_phosphor::regular as icon;
 
 use crate::theme::chrome;
-use rusty_core::application::{Gizmo, SceneGizmos};
+use rusty_core::application::Gizmo;
 
 /// Which view the viewport tab strip is showing.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -45,6 +48,16 @@ pub struct ViewportInteraction {
     pub origin: egui::Pos2,
     /// The image rect's size in points (egui logical units).
     pub size: egui::Vec2,
+    /// The Game view's own pixel size, drawn letterboxed in `size` (an open demo's,
+    /// or the size dropdown's, #2207); `None` on the Scene tab or when the Game view
+    /// is the panel's own pixels.
+    pub render: Option<(u32, u32)>,
+    /// The Game view's own pixel size behind either tab (an open demo's, or the
+    /// size dropdown's): what the UI lays out at, and what the Scene tab's UI
+    /// overlay and rect tool box inside the Scene image. `None` when the Game view
+    /// is the panel's own pixels. Computed in the same draw as `render`, from the
+    /// same setting.
+    pub screen: Option<(u32, u32)>,
     /// Pointer position relative to the image's top-left, if hovering.
     pub hover_local: Option<egui::Vec2>,
     /// A click was released inside the image this frame (select / gizmo grab end).
@@ -71,21 +84,16 @@ pub fn draw(
     scene: &rusty_scene::Scene,
 ) -> ViewportInteraction {
     let t = editor.theme;
-    let mut tab = editor.viewport_tab;
-    let mut gizmos = editor.gizmos;
+    let mut fit = None;
 
     let response = egui::CentralPanel::default()
         .frame(egui::Frame::NONE.fill(t.bg_tier0))
         .show(ui, |ui| {
-            draw_tab_strip(ui, &mut tab, &mut gizmos, t);
-            #[cfg_attr(not(feature = "dev"), expect(unused_mut, reason = "a demo fits it"))]
-            let mut fit = None;
-            #[cfg(feature = "dev")]
-            if let (ViewportTab::Game, Some(demo)) = (tab, editor.dev.demo.as_mut()) {
-                crate::demo::timeline::draw(ui, demo, &t);
-                fit = Some(demo.size);
-            }
-            let response = draw_image(ui, texture, t, fit);
+            draw_tab_strip(ui, editor, t);
+            let (tab, gizmos) = (editor.viewport_tab, editor.gizmos);
+            fit = game_view_fit(editor, ui);
+            let boxed = fit.filter(|_| tab == ViewportTab::Game);
+            let response = draw_image(ui, texture, t, boxed);
             if tab == ViewportTab::Scene {
                 navigate(editor, &response, scene);
             } else {
@@ -95,11 +103,9 @@ pub fn draw(
                 stats::paint(ui, response.rect, &readout.lines(), t);
             }
             if tab == ViewportTab::Scene && gizmos.on(Gizmo::Ui) {
-                let frame = rect_tool::OverlayFrame {
-                    size: glam::Vec2::new(response.rect.width(), response.rect.height()),
-                    pixels_per_point: ui.ctx().pixels_per_point(),
-                    textures: std::rc::Rc::clone(&editor.ui_textures),
-                };
+                let size = glam::Vec2::new(response.rect.width(), response.rect.height());
+                let ppp = ui.ctx().pixels_per_point();
+                let frame = rect_tool::OverlayFrame::new(size, ppp, fit, &editor.ui_textures);
                 let painter = ui.painter_at(response.rect);
                 let selected = editor.selected_entity_id;
                 let world = &scene.world;
@@ -109,9 +115,10 @@ pub fn draw(
         })
         .inner;
 
-    editor.viewport_tab = tab;
-    editor.gizmos = gizmos;
-    let interaction = build_interaction(tab, &response, editor.scene_view.navigating);
+    let tab = editor.viewport_tab;
+    let mut interaction = build_interaction(tab, &response, editor.scene_view.navigating);
+    interaction.render = fit.filter(|_| tab == ViewportTab::Game);
+    interaction.screen = fit;
     // Record the image rect's pixel size so the front-end resizes the offscreen
     // target to match (points scaled by the egui pixels-per-point).
     editor.viewport_image_size = response.rect.size();
@@ -121,13 +128,19 @@ pub fn draw(
 /// The tab strip: Scene / Game selectors (Unity's viewport tabs), and on the Scene
 /// tab the gizmo toggles (#1909, one per shown row of `Gizmo`'s table) and the
 /// navigation help; on the Game tab its rows (`game`): **Gizmos** (#1882) and
-/// **Stats** (#2205). A control that is no gizmo joins the strip after them.
-fn draw_tab_strip(
-    ui: &mut egui::Ui,
-    tab: &mut ViewportTab,
-    gizmos: &mut SceneGizmos,
-    t: crate::theme::Theme,
-) {
+/// **Stats** (#2205), then the size dropdown (#2207, held while a demo is open). A
+/// control that is no gizmo joins the strip after the gizmo rows.
+fn draw_tab_strip(ui: &mut egui::Ui, editor: &mut crate::EditorUi, t: crate::theme::Theme) {
+    #[cfg(feature = "dev")]
+    let demo_open = editor.demo_open();
+    #[cfg(not(feature = "dev"))]
+    let demo_open = false;
+    let crate::EditorUi {
+        viewport_tab: tab,
+        gizmos,
+        game_view,
+        ..
+    } = editor;
     egui::Frame::NONE
         .fill(t.bg_tier1)
         .inner_margin(egui::vec2(t.space_sm, t.space_xs + 1.0))
@@ -151,12 +164,30 @@ fn draw_tab_strip(
                     ui.toggle_value(gizmos.flag_mut(gizmo), row.label)
                         .on_hover_text(row.hover);
                 }
-                if !game_tab {
+                if game_tab {
+                    ui.separator();
+                    game_size::dropdown(ui, game_view, !demo_open);
+                } else {
                     ui.label(egui::RichText::new(icon::QUESTION).color(t.text_secondary))
                         .on_hover_ui(navigation_help);
                 }
             });
         });
+}
+
+/// The Game view's own size, behind either tab: an open demo's, its timeline drawn
+/// on the Game tab (#1598), else the size dropdown's (#2207). `None` when the Game
+/// view is the panel's own pixels. The Game tab draws its image letterboxed at it.
+fn game_view_fit(editor: &mut crate::EditorUi, ui: &mut egui::Ui) -> Option<(u32, u32)> {
+    #[cfg(feature = "dev")]
+    if let Some(demo) = editor.dev.demo.as_mut() {
+        if editor.viewport_tab == ViewportTab::Game {
+            crate::demo::timeline::draw(ui, demo, &editor.theme);
+        }
+        return Some(demo.size);
+    }
+    let ppp = ui.ctx().pixels_per_point();
+    game_size::fit(editor.game_view, ui.available_size(), ppp)
 }
 
 /// The Scene view's navigation bindings (#1344), the tooltip of the tab strip's `?`.
@@ -172,8 +203,9 @@ fn navigation_help(ui: &mut egui::Ui) {
 }
 
 /// Draw the scene image filling the remaining space, sensing clicks + drags. Before
-/// the first offscreen frame exists, a neutral fill stands in. With `fit` (an open
-/// demo's Game view size) the image is letterboxed at that aspect ratio.
+/// the first offscreen frame exists, a neutral fill stands in. With `fit` (the Game
+/// view's own size: an open demo's, or the size dropdown's) the image is
+/// letterboxed at that aspect ratio.
 fn draw_image(
     ui: &mut egui::Ui,
     texture: Option<egui::TextureId>,
@@ -192,7 +224,8 @@ fn draw_image(
     };
     // Letterboxed: the panel black, the image centred at the size's aspect ratio.
     let (panel, _) = ui.allocate_exact_size(size, egui::Sense::hover());
-    let rect = egui::Rect::from_center_size(panel.center(), letterbox(size, (width, height)));
+    let rect =
+        egui::Rect::from_center_size(panel.center(), game_size::letterbox(size, (width, height)));
     let painter = ui.painter();
     painter.rect_filled(panel, 0.0, egui::Color32::BLACK);
     let uv = egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0));
@@ -202,16 +235,6 @@ fn draw_image(
         ui.id().with("letterboxed"),
         egui::Sense::click_and_drag(),
     )
-}
-
-/// The largest size of `width:height`'s aspect ratio that fits in `panel`.
-pub fn letterbox(panel: egui::Vec2, (width, height): (u32, u32)) -> egui::Vec2 {
-    let aspect = width.max(1) as f32 / height.max(1) as f32;
-    if panel.x / panel.y.max(f32::MIN_POSITIVE) > aspect {
-        egui::vec2(panel.y * aspect, panel.y)
-    } else {
-        egui::vec2(panel.x, panel.x / aspect)
-    }
 }
 
 /// Drive the Scene camera from this frame's input on the image (#745): the held
@@ -257,6 +280,8 @@ fn build_interaction(
         tab,
         origin,
         size: response.rect.size(),
+        render: None,
+        screen: None,
         hover_local,
         clicked: tools && response.clicked(),
         dragging: tools && response.dragged_by(egui::PointerButton::Primary),

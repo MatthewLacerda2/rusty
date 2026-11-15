@@ -206,6 +206,8 @@ impl Shell {
             // A bind failure logs to the game's console and leaves the channel `None`.
             #[cfg(feature = "dev")]
             cmd_channel: rusty_dev::command_channel::CommandChannel::start(game.console()),
+            #[cfg(feature = "dev")]
+            frame_log: None,
         };
         // Boundary read: apply the persisted settings before the first frame.
         settings::load(&mut shell, game, video_defaults);

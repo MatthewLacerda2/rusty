@@ -48,7 +48,7 @@
 #define_import_path forward::lightmap
 
 #import common::PI
-#import forward::bindings::{lighting, s_lightmaps, t_lightmap_dirs, t_lightmaps}
+#import forward::bindings::{lighting, s_linear_clamp, t_lightmap_dirs, t_lightmaps}
 #import forward::lighting::{decode_lightmap_direction, diffuse_response, lightmap_direction_rebalance, specular_response}
 
 // A lightmapped surface's baked light: `irradiance` its E / pi, the Lambert response
@@ -72,9 +72,9 @@ struct LightmapLight {
 // reshaped as the front reshapes it, and it gets no lobe: no lamp the bake saw is on
 // that side.
 fn lightmap_light(uv: vec2<f32>, layer: u32, lod: f32, directional: bool, behind: bool, N: vec3<f32>, Ng: vec3<f32>, V: vec3<f32>, F0: vec3<f32>, F90: f32, roughness: f32) -> LightmapLight {
-    var out = LightmapLight(textureSampleLevel(t_lightmaps, s_lightmaps, uv, layer, lod).rgb, vec3<f32>(0.0));
+    var out = LightmapLight(textureSampleLevel(t_lightmaps, s_linear_clamp, uv, layer, lod).rgb, vec3<f32>(0.0));
     if (directional) {
-        var dir = decode_lightmap_direction(textureSampleLevel(t_lightmap_dirs, s_lightmaps, uv, layer, lod));
+        var dir = decode_lightmap_direction(textureSampleLevel(t_lightmap_dirs, s_linear_clamp, uv, layer, lod));
         if (behind) {
             dir = vec4<f32>(reflect(dir.xyz, Ng), 0.0);
         }

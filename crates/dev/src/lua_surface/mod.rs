@@ -22,6 +22,7 @@ mod bake_report;
 mod capture;
 mod debug;
 mod editor;
+mod game_view;
 mod generate;
 mod sfx;
 mod speech;
@@ -59,6 +60,8 @@ fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
 mod bake_report_tests;
 #[cfg(test)]
 mod editor_tests;
+#[cfg(test)]
+mod game_view_tests;
 #[cfg(test)]
 mod gizmo_tests;
 #[cfg(test)]

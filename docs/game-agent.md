@@ -36,6 +36,13 @@ seed) and what reached the game tick by tick. When the developer reports a bug
 from a playtest, replay their demo headless instead of guessing a scenario
 (next section).
 
+The editor also keeps a rolling log of how each frame ran, and what the console
+said beside it, in `saved/logs/` (50 MB by default, the oldest dropped). When the
+developer says "it hitched a minute ago, by the bar", read it instead of asking them
+to reproduce it: `Debug.FrameLog{ last_seconds = 90, over_ms = 33 }` returns the
+slow frames with their tick, camera position, heaviest GPU pass and system
+(`docs/api/Debug.md`, *The frame log*).
+
 ## The project
 
 ```text

@@ -26,6 +26,11 @@ pub struct WindowFrame {
     /// a frame or two late, GPU ms where the adapter has timestamps. `None` on a
     /// frame that rendered nothing (no Game or Scene view on screen yet).
     pub render: Option<RenderedFrame>,
+    /// The renderer's drawn-frame count after this frame (`FrameCost::frames`):
+    /// this frame's index when it drew, the last drawn one's otherwise. The GPU
+    /// times in `render` carry the index of the frame they measure
+    /// (`GpuTimes::frame`), normally a frame or two before this one.
+    pub frame: u64,
 }
 
 /// Fold one window frame into `stats`: `wall_ms` and `fps` under keys of their own,
@@ -56,22 +61,36 @@ pub fn window_opt(opts: Option<mlua::Table>) -> mlua::Result<Option<usize>> {
     let Some(opts) = opts else {
         return Ok(None);
     };
+    known_keys(&opts, "Stats", OPTIONS)?;
+    let window = whole_count(&opts, "Stats", "window")?;
+    Ok(window.map(|n| n.min(RECENT)))
+}
+
+/// Raise unless every key of `opts` is one of `known`, naming them: the check
+/// each `Debug.<call>{ … }` with named options makes.
+pub fn known_keys(opts: &mlua::Table, call: &str, known: &[&str]) -> mlua::Result<()> {
     for pair in opts.pairs::<mlua::Value, mlua::Value>() {
         let (key, _) = pair?;
         let name = key.to_string()?;
-        if !OPTIONS.contains(&name.as_str()) {
+        if !known.contains(&name.as_str()) {
             return Err(mlua::Error::RuntimeError(format!(
-                "Debug.Stats: unknown option {name:?}; expected one of {}",
-                OPTIONS.join(", ")
+                "Debug.{call}: unknown option {name:?}; expected one of {}",
+                known.join(", ")
             )));
         }
     }
-    match opts.get::<Option<f64>>("window")? {
+    Ok(())
+}
+
+/// `opts[key]` as a count: a whole number of at least 1, or `math.huge` for
+/// "all" (`usize::MAX`); `None` when absent. Anything else raises.
+pub fn whole_count(opts: &mlua::Table, call: &str, key: &str) -> mlua::Result<Option<usize>> {
+    match opts.get::<Option<f64>>(key)? {
         None => Ok(None),
-        Some(n) if n == f64::INFINITY => Ok(Some(RECENT)),
-        Some(n) if n >= 1.0 && n.fract() == 0.0 => Ok(Some(n.min(RECENT as f64) as usize)),
+        Some(n) if n == f64::INFINITY => Ok(Some(usize::MAX)),
+        Some(n) if n >= 1.0 && n.fract() == 0.0 => Ok(Some(n as usize)),
         Some(n) => Err(mlua::Error::RuntimeError(format!(
-            "Debug.Stats: window must be a whole number of frames, at least 1 (got {n})"
+            "Debug.{call}: {key} must be a whole number, at least 1, or math.huge (got {n})"
         ))),
     }
 }
