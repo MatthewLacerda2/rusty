@@ -53,6 +53,14 @@ impl FontData {
     /// (truncated, another format, a zero em).
     pub fn parse(bytes: Arc<[u8]>) -> Option<Self> {
         let face = FontRef::new(&bytes).ok()?;
+        // The directory parses on its own: a truncated file still lists tables
+        // that run past its end, which would read as empty glyphs later.
+        let fits = |r: &skrifa::raw::TableRecord| {
+            (r.offset() as usize).saturating_add(r.length() as usize) <= bytes.len()
+        };
+        if !face.table_directory().table_records().iter().all(fits) {
+            return None;
+        }
         let m = face.metrics(Size::unscaled(), LocationRef::default());
         if m.units_per_em == 0 {
             return None;
@@ -122,14 +130,12 @@ mod tests {
     fn bytes_that_are_not_a_font_do_not_parse() {
         assert!(FontData::parse(Arc::from(&b"not a font"[..])).is_none());
         assert!(FontData::parse(Arc::from(&b""[..])).is_none());
-        let cut = &DEFAULT_FONT[..DEFAULT_FONT.len() / 3];
-        // A truncated face either refuses to parse or still answers without panicking.
-        if let Some(f) = FontData::parse(Arc::from(cut)) {
-            let _ = f.glyph('A');
-            if let Some(g) = f.glyph('A') {
-                let _ = f.outline(g, 100.0);
-            }
-            let _ = crate::shape(&f, "AV", &[]);
+        for keep in [2, 3, 50, 1000] {
+            let cut = &DEFAULT_FONT[..DEFAULT_FONT.len() / keep];
+            assert!(
+                FontData::parse(Arc::from(cut)).is_none(),
+                "1/{keep} of a font"
+            );
         }
     }
 

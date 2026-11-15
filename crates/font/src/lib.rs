@@ -1,4 +1,4 @@
-//! crates/font/ — fonts as data: a parsed `.ttf` / `.otf` face, its glyphs'
+//! crates/font/src/lib.rs — fonts as data: a parsed `.ttf` / `.otf` face, its glyphs'
 //! flattened outlines and shaped runs (#1328, #2190).
 //!
 //! The font-only half of text, below everything that draws one: the UI's `Text`

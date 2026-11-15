@@ -169,6 +169,22 @@ impl TextureRecipe {
         paths
     }
 
+    /// Every font file a `text` node reads (#2190), each once, in node order, with
+    /// the id of the first node that names it: the files a caller hands to
+    /// [`crate::Sources::insert_font`]. A node on the default font (`font = ""`)
+    /// names none.
+    pub fn font_paths(&self) -> Vec<(&str, &str)> {
+        let mut paths: Vec<(&str, &str)> = Vec::new();
+        for node in &self.nodes {
+            if let OpKind::Text(p) = &node.op {
+                if !p.font.is_empty() && !paths.iter().any(|&(_, seen)| seen == p.font) {
+                    paths.push((&node.id, &p.font));
+                }
+            }
+        }
+        paths
+    }
+
     /// Serialize to pretty JSON — the on-disk recipe form.
     pub fn to_json(&self) -> Result<String, String> {
         serde_json::to_string_pretty(self).map_err(|e| e.to_string())

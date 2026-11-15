@@ -76,7 +76,7 @@ pub const LAYERS: &[Layer] = &[
         "tobj",
         "ufbx",
     ]),
-    sim("procgen", &["core"]).uses(&["image"]),
+    sim("procgen", &["core", "font"]).uses(&["image"]),
     // Shader authoring; GPU-free composition lives here so `render` imports it (#722).
     sim("shadergen", &["core"]).uses(&["naga", "naga_oil"]),
     sim("components", &["asset", "core", "procgen"]).uses(&["bytemuck"]),

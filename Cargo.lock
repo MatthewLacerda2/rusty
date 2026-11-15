@@ -3594,6 +3594,7 @@ dependencies = [
  "glam 0.33.12",
  "image",
  "rusty-core",
+ "rusty-font",
  "rusty-test-support",
  "serde",
  "serde_json",

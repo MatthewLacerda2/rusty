@@ -13,6 +13,7 @@ fn sample(p: &OpParam) -> Value {
         "vec2" => json!([1.0, 1.0]),
         "enum" => json!(p.values[0]),
         "path" => json!(SAMPLE_PATH),
+        "text" => json!("A"),
         "stops" => json!([{ "pos": 0.0, "color": [0.0, 0.0, 0.0, 1.0] }]),
         other => panic!("{}: unknown param type {other}", p.name),
     }
@@ -23,11 +24,21 @@ pub fn sample_op(info: &OpInfo) -> OpKind {
     let mut doc = serde_json::Map::new();
     doc.insert("op".into(), json!(info.op));
     for p in info.params.iter().filter(|p| p.default.is_none()) {
-        doc.insert(p.name.into(), sample(p));
+        let given = REQUIRED
+            .iter()
+            .find(|(op, name, _)| *op == info.op && *name == p.name);
+        doc.insert(
+            p.name.into(),
+            given.map_or_else(|| sample(p), |(.., v)| json!(v)),
+        );
     }
     serde_json::from_value(Value::Object(doc))
         .unwrap_or_else(|e| panic!("{}: required params don't parse: {e}", info.op))
 }
+
+/// Required params whose type's sample is no valid value: a `path`'s `d` is SVG
+/// path data, not any text.
+const REQUIRED: &[(&str, &str, &str)] = &[("path", "d", "M0.25 0.25 L0.75 0.25 L0.5 0.75 Z")];
 
 /// Params a row's defaults leave unread, written so its sample reads every input and
 /// socket: an `expression` names the inputs it takes in its formula, and at `expr`'s
