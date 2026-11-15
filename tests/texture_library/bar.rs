@@ -3,7 +3,6 @@
 //! base colour); a material with a real reason to break one is excused in
 //! [`EXCUSED`], by name, with that reason, never by loosening a threshold for all.
 
-use rusty::procgen::Image;
 use serde_json::json;
 
 use super::maps::{maps_fail, seam};

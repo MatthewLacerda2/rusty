@@ -111,7 +111,7 @@ fn every_part_bakes_deterministically_and_tiles() {
         let a = bake(&path, json!({}), 0, &[""]).remove(0);
         let b = bake(&path, json!({}), 0, &[""]).remove(0);
         assert!(a.pixels() == b.pixels(), "{path}: two bakes differ");
-        if let Some(seam) = bar::seam(&a) {
+        if let Some(seam) = maps::seam(&a) {
             panic!("{path}: {seam}");
         }
     }
