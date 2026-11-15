@@ -3,6 +3,7 @@ name = "rusty-shell"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [features]
 dev = ["dep:rusty-dev", "rusty-app/dev", "rusty-asset/dev", "rusty-core/dev", "rusty-dev?/dev", "rusty-editor?/dev", "rusty-navigation/dev", "rusty-render/dev", "rusty-edit/dev", "rusty-scene/dev", "rusty-script/dev"]

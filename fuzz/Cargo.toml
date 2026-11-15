@@ -8,6 +8,8 @@ name = "rusty-fuzz"
 version = "0.0.0"
 publish = false
 edition = "2021"
+# Its own workspace, so the engine's licence is named here, not inherited.
+license = "MIT OR Apache-2.0"
 
 [package.metadata]
 cargo-fuzz = true

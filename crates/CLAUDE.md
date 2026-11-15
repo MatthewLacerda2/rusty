@@ -33,7 +33,8 @@ names (cargo builds an unused dependency without a word).
 1. `crates/<m>/src/lib.rs`, with `#![deny(clippy::unwrap_used)]` at its top for a
    sim row, or the clock opt-out for a platform row that reads real time (`make
    determinism` lets only a platform root opt out).
-2. `crates/<m>/Cargo.toml`: `version`, `edition` and `publish` `.workspace = true`;
+2. `crates/<m>/Cargo.toml`: `version`, `edition`, `publish` and `license`
+   `.workspace = true` (`make deny` fails a member without the license);
    `[lints] workspace = true` (`make determinism` fails a member without it: the
    clock ban and every deny live there); every dependency `{ workspace = true }`.
    A crate only its tests name is a `[dev-dependencies]` entry; a platform-specific

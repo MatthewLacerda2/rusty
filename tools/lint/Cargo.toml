@@ -2,6 +2,8 @@
 name = "lint"
 version = "0.1.0"
 edition = "2021"
+# Its own workspace, so the engine's licence is named here, not inherited.
+license = "MIT OR Apache-2.0"
 
 # Standalone — do not absorb into (or get absorbed by) the engine crate.
 [workspace]
