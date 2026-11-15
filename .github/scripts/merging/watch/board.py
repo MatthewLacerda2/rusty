@@ -88,10 +88,13 @@ def queued(pull: dict) -> bool:
 def recent(pulls: list[dict], since: datetime | None) -> list[dict]:
     """The pull requests opened at or after `since` (`--since`, #928): the batch's
     own, so the board lines leave older ones out. All of them without it, and a
-    pull request GitHub gave no time for is kept."""
-    if since is None:
-        return pulls
-    return [p for p in pulls if not p.get("createdAt") or datetime.fromisoformat(p["createdAt"]) >= since]
+    pull request GitHub gave no time for is kept ([`fresh`])."""
+    return [p for p in pulls if fresh(p.get("createdAt"), since)]
+
+
+def fresh(when: str | None, since: datetime | None) -> bool:
+    """Whether a pull request opened at `when` is said under `--since` ([`recent`])."""
+    return since is None or not when or datetime.fromisoformat(when) >= since
 
 
 def heads(pulls: list[dict]) -> dict[int, tuple[bool, str, bool]]:
@@ -100,36 +103,60 @@ def heads(pulls: list[dict]) -> dict[int, tuple[bool, str, bool]]:
     return {p.get("number"): (bool(p.get("isDraft")), p.get("headRefOid", ""), queued(p)) for p in pulls}
 
 
+def opened(pulls: list[dict]) -> dict[int, str | None]:
+    """When each pull request opened, what `--since` reads ([`fresh`]); kept
+    beside [`heads`] so a closed one is still filtered by it ([`kept`], #2215)."""
+    return {p.get("number"): p.get("createdAt") for p in pulls}
+
+
 def transitions(
-    before: dict[int, tuple[bool, str, bool]] | None, after: dict[int, tuple[bool, str, bool]], landed: set[int]
+    before: dict[int, tuple[bool, str, bool]] | None, after: dict[int, tuple[bool, str, bool]], landed: set[int],
+    about: set[int] | None = None, closes: dict[int, bool | None] | None = None,
 ) -> list[str]:
     """One line per pull request that changed between two [`heads`] listings
     (#909); a pull request in `landed` (this watch merged it) is not reported
     closed. Each line has its own word to grep: `opened`, `turned ready`, `back
-    to draft`, `closed`, `queued`, `unqueued` (the label, #925).
+    to draft`, `closed` or `merged`, `queued`, `unqueued` (the label, #925).
+    Only numbers in `about` are said, when given (`--since`, [`fresh`]).
 
     A watch's first listing is compared with the last one any watch told
-    ([`shown`], #2215), so what moved between two watches is said once by the
-    second. `before` is `None` only when nothing was kept (a fresh start, an
-    unreadable file): then each ready pull request without the label is said
-    to be waiting ([`waiting_line`]), and nothing else, since a draft or a
-    queued one asks nothing of the orchestrator."""
+    ([`kept`], #2215), so what moved between two watches is said once by the
+    second; `closes` holds what GitHub said of each number gone between them
+    ([`closed_line`]). `before` is `None` only when nothing was kept (a fresh
+    start, an unreadable file): then each ready pull request without the label
+    is said to be waiting ([`waiting_line`]), and nothing else, since a draft
+    or a queued one asks nothing of the orchestrator."""
+    said = (lambda number: True) if about is None else about.__contains__
     if before is None:
-        return [waiting_line(n) for n in sorted(after) if not after[n][0] and not after[n][2]]
+        return [waiting_line(n) for n in sorted(after) if said(n) and not after[n][0] and not after[n][2]]
     lines = []
     for number in sorted(before.keys() | after.keys()):
+        if not said(number):
+            continue
         if number not in before:
             lines.append(f"watch: #{number} opened as {'a draft' if after[number][0] else 'ready'}.")
         elif number not in after:
             if number not in landed:
-                lines.append(f"watch: #{number} closed, not merged by this watch.")
+                lines.append(closed_line(number, closes))
         elif before[number][0] and not after[number][0]:
             lines.append(f"watch: #{number} turned ready.")
-        elif after[number][0] and not before[number][0]:
+        elif not before[number][0] and after[number][0]:
             lines.append(f"watch: #{number} back to draft.")
         if number in before and number in after and before[number][2] != after[number][2]:
             lines.append(f"watch: #{number} {'queued' if after[number][2] else 'unqueued'}.")
     return lines
+
+
+def closed_line(number: int, closes: dict[int, bool | None] | None) -> str:
+    """A pull request gone from the listing. Inside one watch, "not merged by
+    this watch" is all it knows; between watches ([`transitions`]' `closes`)
+    GitHub was asked, since a merge while no watch ran (`make queue PRS=N`, by
+    hand) is a merge (#2215)."""
+    if closes is None or number not in closes:
+        return f"watch: #{number} closed, not merged by this watch."
+    if closes[number] is None:
+        return f"watch: #{number} closed (merged or not: GitHub did not answer)."
+    return f"watch: #{number} {'merged, not by this watch' if closes[number] else 'closed, not merged'}."
 
 
 def waiting_line(number: int) -> str:

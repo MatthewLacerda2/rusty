@@ -108,7 +108,7 @@ diff, and the hold costs nothing until one does.
 **It also says what changed on the board** (#909): one line per pull request
 that opened (as a draft or ready), turned ready, went back to draft, gained or
 lost the [`board.QUEUE_LABEL`], or closed without this watch merging it ([`board.transitions`]). The first listing after a
-launch is compared with the last listing any watch told ([`shown`], #2215), so
+launch is compared with the last listing any watch told ([`kept`], #2215), so
 a relaunch does not replay the board and what moved while no watch ran (the
 supervisor's sleep between watches) is said once; with nothing kept, it says
 each ready pull request without the label. Before this the

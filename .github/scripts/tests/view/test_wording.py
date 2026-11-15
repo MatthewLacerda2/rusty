@@ -29,8 +29,9 @@ class Wording(unittest.TestCase):
             *said,
             *(prefixed(line) for line in board.transitions(before, after, landed=set())),
             *(prefixed(line) for line in board.transitions(None, after, landed=set())),  # a fresh start (#2215)
+            *(prefixed(board.closed_line(3, {3: merged})) for merged in (True, False, None)),  # between watches
         ]
-        self.assertEqual(len(lines), 11)  # ready, draft, closed, opened as ready; two waiting on a fresh start
+        self.assertEqual(len(lines), 14)  # ready, draft, closed, opened as ready; two waiting; three between watches
         for line in lines:
             self.assertTrue(events.keep(line, set()), line)
 

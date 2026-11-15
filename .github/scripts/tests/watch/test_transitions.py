@@ -4,7 +4,7 @@
 A pull request opening (draft or ready), turning ready, going back to draft or
 closing gets its own line, so one `Monitor` on the watch's output replaces the
 orchestrator's separate `gh pr list` poller. A first listing with no kept board
-says only the ready, unlabelled ones (#2215; across watches, `test_kept_board`),
+says only the ready, unlabelled ones (#2215; across watches, `test_kept`),
 and a pull request the watch merged itself is not reported closed. Driven by the loop tests' fake world and clock.
 """
 

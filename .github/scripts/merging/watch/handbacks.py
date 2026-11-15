@@ -53,6 +53,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from merging import state
 from merging.watch import board, stalls
 
 
@@ -194,13 +195,13 @@ def greened(pulls: list[dict], memory: dict[int, str], reds: dict[int, str], ask
 
 
 def recall(path: Path) -> dict[int, str]:
-    """The remembered hand-backs; a missing or unreadable file is none."""
+    """The remembered hand-backs; a missing or unreadable file is none ([`state.read`])."""
     try:
-        return {int(n): sha for n, sha in json.loads(path.read_text()).items()}
-    except (OSError, ValueError, AttributeError):
+        return {int(n): sha for n, sha in state.read(path).items()}
+    except (ValueError, AttributeError):
         return {}
 
 
-def remember(path: Path, memory: dict[int, str]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({str(n): sha for n, sha in sorted(memory.items())}, indent=1) + "\n")
+def remember(path: Path, memory: dict[int, str]) -> str | None:
+    """Keep `memory` at `path` whole ([`state.write`], #2215); why not, if it failed."""
+    return state.write(path, {str(n): sha for n, sha in sorted(memory.items())})
