@@ -179,6 +179,7 @@ scene.entities[].camera.projection: enum Perspective|Orthographic
 scene.entities[].camera.projection<Orthographic>.size: f32
 scene.entities[].camera.render_order: i32
 scene.entities[].camera.taa_active: bool
+scene.entities[].camera.taa_anti_flicker: f32
 scene.entities[].camera.taa_base_blend_factor: f32
 scene.entities[].camera.taa_contrast_adaptive_sharpening: f32
 scene.entities[].camera.taa_jitter_scale: f32

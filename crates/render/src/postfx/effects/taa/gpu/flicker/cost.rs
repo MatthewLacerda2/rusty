@@ -29,7 +29,7 @@ fn lifts(run: &[Vec<f32>], tile: usize, period: u32) -> Vec<f32> {
 fn survival(r: &mut Renderer, period: u32) -> Vec<f32> {
     let frames = AT + FLASHES * period + 1;
     let flash = |s: &mut Scene, f: u32| {
-        let on = f >= WARM + AT && (f - WARM - AT) % period == 0 && f < WARM + frames - 1;
+        let on = f >= WARM + AT && (f - WARM - AT).is_multiple_of(period) && f < WARM + frames - 1;
         lamp(s, "Flash", on.then_some(30.0));
     };
     let held = run(r, &mut anti_flicker(dark_room(), ON), (frames, 1.0), &flash);

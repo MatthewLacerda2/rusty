@@ -90,7 +90,8 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
     // opaque pass's and the prepass's mirrored and two-sided ones (#1615) + SSR's trace
     // and resolve (#2028) and the one downsample all its pyramids share (#1736) + SSAO's occlusion, blur and upsample (#1578) + SSIL's 5 (#1750) + the motion blur's 3 tile
     // passes and gather (#1436) + TAA's resolve, its upscale (#1702) and its
-    // sharpen (#1847; one output format headless) + the depth of field's 9 (#1445) + bloom's prefilter,
+    // sharpen (#1847; one output format headless) + both resolves held, the
+    // camera's anti-flicker on (#2228) + the depth of field's 9 (#1445) + bloom's prefilter,
     // resample, downsample and upsample (#1700) + the lens flare's (#1443; the composite adds it, #1473)
     // + 2 particle + 2 ribbon, each again reactive (#1845) + one world canvas per blend mode + 2 mirrored and 2
     // two-sided shadow (#1571) + the data-mip one + the opaque copy (#1523) + the
@@ -121,6 +122,7 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
             + 1
             + 1
             + (4 + F + 2)
+            + 2
     );
     assert!(every.iter().all(|p| !p.is_built()), "headless stays lazy");
 

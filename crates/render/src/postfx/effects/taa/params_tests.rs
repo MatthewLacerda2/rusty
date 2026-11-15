@@ -48,8 +48,10 @@ fn the_lanes_are_where_the_shader_reads_them() {
     // No anti-flicker by default (#2228): the hold's scale is 0, and the camera's
     // value scales it.
     assert_eq!(p.flicker, [FLICKER_DECAY, 0.0, 0.0, 0.0]);
-    let mut cam = rusty_components::CameraComponent::default();
-    cam.taa_anti_flicker = 0.5;
+    let cam = rusty_components::CameraComponent {
+        taa_anti_flicker: 0.5,
+        ..Default::default()
+    };
     let half = TaaParams::new(
         ((64, 48), (32, 24)),
         (true, Vec2::ZERO, false),
