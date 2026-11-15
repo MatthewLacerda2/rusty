@@ -99,9 +99,9 @@ renders and lays out at:
 
 ```lua
 Editor.SetGameViewSize(1920, 1080)
-Editor.GetGameViewSize().mode   -- "Fixed"
-UI.GetScreenSize()              -- 1920, 1080 once the window has drawn it
-Editor.ResetGameViewSize()      -- back to the panel
+local view = Editor.GetGameViewSize()  -- view.mode == "Fixed", view.width == 1920
+UI.GetScreenSize()                       -- 1920, 1080 once the window has drawn it
+Editor.ResetGameViewSize()               -- back to the panel
 ```
 
 ### Undo and Redo
