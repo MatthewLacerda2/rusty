@@ -15,7 +15,7 @@ use rusty_scene::Scene;
 const WARM: u32 = 8;
 const MEASURED: u32 = 12;
 /// TAA's relative flicker must be below FXAA's by this factor. Measured (#2231):
-/// FXAA 0.0405 and TAA 0.0170 (2.4x) on lavapipe and on an RTX 2060, Metal METAL_TODO.
+/// FXAA 0.0405, TAA 0.0170 (2.4x) on lavapipe and an RTX 2060; 0.0399, 0.0170 on Metal.
 /// What TAA keeps is its own jitter's: a still sphere flickers 0 under FXAA and
 /// a little under TAA, since each jittered frame still weighs 0.1 (URP's frame
 /// influence).
