@@ -34,6 +34,12 @@ gpu = { max-threads = 2 }
 filter = '(kind(test) & test(/^gpu::/)) | test(/(^|::)gpu_[^:]*$/)'
 test-group = "gpu"
 
+# The canary names the adapter the GPU suite rendered on, printed after every run, so
+# a log says which driver its GPU results are from (docs/testing.md, *Which adapters*).
+[[profile.default.overrides]]
+filter = 'test(/(^|::)test_gpu::tests::gpu_adapter_present_when_required$/)'
+success-output = "final"
+
 # CI: the default profile plus a JUnit report for the job summary. Profiles inherit
 # `profile.default`, overrides included.
 [profile.ci]

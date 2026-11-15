@@ -5,6 +5,7 @@ use glam::Vec3;
 
 use super::super::cpu::prefilter;
 use super::super::source::encode_face;
+use crate::ibl::cube_sample::{face_uv, FaceProjections};
 use crate::{CubemapCapture, CubemapFace};
 use rusty_core::color::{f16_to_f32, linear_to_srgb};
 
@@ -27,7 +28,9 @@ const MAX_STEP: u8 = 16;
 const MEAN_STEP: f32 = 0.25;
 /// The smallest face [`MEAN_STEP`] holds on: below it, a tap or two moves the mean past it.
 const MEAN_MIN_SIZE: u32 = 4;
-/// The largest a channel may differ on the smooth capture, at any mip (RTX 2060: 1).
+/// The largest a channel may differ on the smooth capture, at any mip: what the CPU
+/// reference moves from itself with every normal nudged by 1e-7 to 1e-5, a GPU's
+/// rounding (#2231). Measured: RTX 2060 1.
 const SMOOTH_STEP: u8 = 2;
 
 /// A stored face's channels as sRGB steps of their value over `scale`, alpha left out.
@@ -94,15 +97,21 @@ fn gpu_prefilter_matches_the_cpu_reference() {
     }
 }
 
-/// Each face a gradient with no hard edge inside it, so a tap landing on its neighbour
-/// changes next to nothing, and the mips too small for a mean are still held tight.
+/// Radiance a smooth function of direction, each channel leaning on its own axis, so a
+/// tap landing on its neighbour changes next to nothing, and the mips too small for a
+/// mean are still held tight. Smooth over the whole sphere, seams too, because some
+/// taps sit on a texel edge exactly: the 1x1 mip's normal is its face's axis, so its
+/// first tap and those in the face's centre planes do at every even-sized source
+/// level, and a GPU's rounding picks the side. A gradient per face read them a
+/// quarter of its range apart at the 4x4 level, more across a seam (#2231).
 fn smooth_capture(res: u32) -> CubemapCapture {
+    let proj = FaceProjections::new();
     let faces = CubemapFace::ALL.map(|face| {
-        let f = face as u32 as f32;
-        let texel = |x: u32, y: u32| Vec3::new(x as f32, 0.16 * f * res as f32, y as f32);
-        (0..res * res)
-            .map(|i| texel(i % res, i / res) / res as f32)
-            .collect()
+        let texel = |i: u32| {
+            let (u, v) = face_uv(i % res, i / res, res);
+            Vec3::splat(0.5) + 0.25 * proj.direction(face, u, v)
+        };
+        (0..res * res).map(texel).collect()
     });
     CubemapCapture {
         resolution: res,
