@@ -16,6 +16,7 @@ mod active_self;
 mod api_parity;
 mod asset_write;
 mod atomic_write;
+mod binary_init;
 mod body_table;
 mod cfg_test_switch;
 mod converter_log;
@@ -85,6 +86,7 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (api_parity::RULE, api_parity::run, Allow::Own),
     (asset_write::RULE, asset_write::run, Allow::Inline),
     (atomic_write::RULE, atomic_write::run, Allow::Inline),
+    (binary_init::RULE, binary_init::run, Allow::Inline),
     (body_table::RULE, body_table::run, Allow::Inline),
     (cfg_test_switch::RULE, cfg_test_switch::run, Allow::Inline),
     (converter_log::RULE, converter_log::run, Allow::Inline),

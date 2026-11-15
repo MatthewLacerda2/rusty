@@ -220,9 +220,13 @@ in every layer. The vignette, the smallest real effect, is the worked example: g
   first panics, since under plain `cargo test` two such tests deadlock.
 - **They run on lavapipe** in Linux CI and in cloud sessions (the SessionStart hook
   installs it). `RUSTY_REQUIRE_GPU=1` turns "no adapter" into a failure: set it
-  to know they rendered. Metal on macOS is the one real GPU, so pair anything
+  to know they rendered. Metal on macOS is CI's one real GPU, so pair anything
   load-bearing with an adapter-free unit test of the predicate. Lavapipe has no
   `TIMESTAMP_QUERY`: GPU-timing code is measured only on a real GPU (`make bench`).
+- **A tolerance holds on lavapipe, Metal and a real desktop GPU**, and says beside it
+  what it was measured on; one added or moved runs on a desktop GPU before it merges
+  (`make test-gpu ADAPTER=<gpu>`, `docs/testing.md`, *Which adapters a GPU tolerance
+  holds on*).
 - A new GPU test that runs CI out of memory lowers both caps to 1 (the nextest `gpu`
   group and `MAX_CONCURRENT_HEADLESS`) before the test is weakened.
 

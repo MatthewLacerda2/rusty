@@ -43,6 +43,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Editor↔API parity per op | `tools/lint -- --rules` (`api-parity`) | **hard gate**: every `edit::authoring::<module>::set_*` op a non-test line of `crates/editor/src/` names is also named from the API side — a named setter's call in `crates/script/src/api/`, an `op!`/`with!`/`group!` row of the field table `Component.Set` writes through (`edit::authoring::fields`), or a post effect's own row or knob table (#1467) — so anything the inspector writes, Lua can; an editor-only op takes `// lint: allow(api-parity) <why>` at its `fn`, and an allow on an op Lua reaches or no inspector names is stale and fails (#1368) |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `edit::authoring` op (never direct field writes through the #344 accessor guard) |
 | Entity ids from Lua | `tools/lint -- --rules` (`entity-arg`) | **hard gate**: in `crates/script/src/api/`, a Lua callback never takes an entity (`id`, `…_id`, `parent`, `child`, `target`, `entity`, `body`, `canvas`) as a bare `u32` or `Option<u32>`: it takes `api::entity_arg::EntityArg`, so a `nil` id reads as a missing entity and fails a write with the verb's name (#1383) |
+| Every binary starts with `rusty::init()` | `tools/lint -- --rules` (`binary-init`) | **hard gate**: the first code line of `fn main` in `src/main.rs`, `src/bin/<name>.rs` and `src/bin/<name>/main.rs` is `rusty::init();`, which starts the logger and, in a `dev` build, warns when `engine/` is not the content the binary was built with (`core::project::engine_content`); a binary that calls `rusty::logging::init()` instead never warns and its run reports read as unstamped. A real exception takes `// lint: allow(binary-init) <why>` on its `fn main` line |
 | Every ECS write is stamped | `tools/lint -- --rules` (`ecs-write`) | **hard gate**: a non-test line of `crates/ecs/src/` that borrows a hecs column mutably (`get::<&mut …>`, `query_one::<(&mut …)>`, `query_mut`) or reshapes the store through `inner.` (`spawn`, `despawn`, `insert`, `remove`, `clear`, …) fails, since a write that skips `World::touch` stamps no change and every change-log consumer misses it; each funnel line, and `World::derived_mut`, takes `// lint: allow(ecs-write) <why>` (#1705) |
 | File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py`, `.lua` or `.wgsl` one (docstrings, comments and blank lines free, #926, #1015); nothing grandfathered |
 | Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `crates/edit/src/authoring/` that takes a float (an `f32`/`f64`, a glam vector, or a float struct such as `Curve`) passes it to a `scene::rules` function (a bare `pub fn`: a `rules::sanitize` helper or a bound such as `rules::lens::hold_fov`) at a position that rule holds, or a sibling setter of its file; a rule taking floats and holding none (a pass-through) fails too, so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
@@ -356,6 +357,14 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   moves rather than writes (the import cache's staging swap, the seed's staged
   files) carries an inline allow. Comment text never counts;
   `tests/` and `tools/` are not scanned (`rules/atomic_write.rs`).
+- **`binary-init`** — a binary starts with `rusty::init()`, the logger plus, in a
+  `dev` build, the engine-content check (`core::project::engine_content`: one
+  warning when `engine/` is not what the binary was built with). `rusty::logging::init()`
+  stays public for the library, so a new binary copying it would build, never
+  warn and write unstamped run reports. The first code line inside `fn main` of
+  each binary root (`src/main.rs`, `src/bin/<name>.rs`, `src/bin/<name>/main.rs`)
+  must be `rusty::init();`; a comment or a string literal is no call, and a root
+  without `fn main` is not judged (`rules/binary_init.rs`).
 - **`body-table`** (#2061) — the character controller's sweeps read a copy of
   the physics world's body table with every kinematic body shown fixed
   (`physics::character::bodies`), cached and remade only when an exact change

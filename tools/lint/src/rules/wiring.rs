@@ -52,6 +52,7 @@ fn case_for(rule: &str) -> Option<Case> {
         ),
         "asset-write" => one(app, "fn f() {\n    std::fs::write(p, b);\n}\n"),
         "atomic-write" => one(app, "fn f() {\n    std::fs::rename(a, b);\n}\n"),
+        "binary-init" => one("src/main.rs", "fn main() {\n    rusty::logging::init();\n}\n"),
         "body-table" => one(
             "crates/physics/src/a.rs",
             "fn f(b: &mut B) {\n    b.set_body_type(t, true);\n}\n",
