@@ -183,8 +183,8 @@ pub enum RampInterpolation {
     Constant,
     /// A smoothstep between stops: soft into and out of each colour.
     Ease,
-    /// A cardinal spline through every stop, smooth across each (it can overshoot
-    /// between them, clamped to `[0, 1]`): a curve through chosen points.
+    /// A cardinal spline through every stop, smooth across each evenly spaced one (it
+    /// can overshoot between them, clamped to `[0, 1]`): a curve through chosen points.
     Cardinal,
     /// A cubic B-spline near the stops, never past them: smoother than `cardinal`,
     /// but it rounds each stop off rather than meeting it.

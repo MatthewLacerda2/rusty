@@ -1,7 +1,8 @@
 //! `color_ramp`'s `cardinal` and `b_spline` fill against the curve each is meant to be.
 
 use super::super::super::recipe::{RampInterpolation, RampStop};
-use super::{sample_ramp, spline::weights};
+use super::sample_ramp;
+use super::spline::{weights, Spline};
 
 const CARDINAL: RampInterpolation = RampInterpolation::Cardinal;
 const B_SPLINE: RampInterpolation = RampInterpolation::BSpline;
@@ -39,7 +40,7 @@ fn profile() -> Vec<RampStop> {
 
 #[test]
 fn the_weights_are_blenders_and_sum_to_one() {
-    for kind in [CARDINAL, B_SPLINE] {
+    for kind in [Spline::Cardinal, Spline::BSpline] {
         for i in 0..=20 {
             let sum: f32 = weights(i as f32 / 20.0, kind).iter().sum();
             assert!((sum - 1.0).abs() < 1e-5, "{kind:?} at {i}/20: {sum}");
@@ -50,16 +51,16 @@ fn the_weights_are_blenders_and_sum_to_one() {
     let close = |a: [f32; 4], b: [f32; 4]| a.iter().zip(b).all(|(x, y)| (x - y).abs() < 1e-6);
     let fc8 = 0.71 / 8.0;
     assert!(close(
-        weights(0.5, CARDINAL),
+        weights(0.5, Spline::Cardinal),
         [-fc8, 0.5 + fc8, 0.5 + fc8, -fc8]
     ));
     let b = [1.0 / 48.0, 23.0 / 48.0, 23.0 / 48.0, 1.0 / 48.0];
     assert!(
-        close(weights(0.5, B_SPLINE), b),
+        close(weights(0.5, Spline::BSpline), b),
         "{:?}",
-        weights(0.5, B_SPLINE)
+        weights(0.5, Spline::BSpline)
     );
-    assert_eq!(weights(0.0, CARDINAL), [0.0, 1.0, 0.0, 0.0]);
+    assert_eq!(weights(0.0, Spline::Cardinal), [0.0, 1.0, 0.0, 0.0]);
 }
 
 #[test]

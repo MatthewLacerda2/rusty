@@ -1,6 +1,8 @@
 //! `color_ramp`'s math: a gradient of stops, looked up by binary search, and filled
 //! between them as Blender's ColorRamp (`spline` holds its `cardinal` and `b_spline`).
 
+#[cfg(test)]
+mod pinned_tests;
 mod spline;
 #[cfg(test)]
 mod spline_tests;
@@ -9,6 +11,7 @@ mod tests;
 
 use super::super::image_buf::{Image, Rgba};
 use super::super::recipe::{RampInterpolation, RampStop};
+use spline::Spline;
 
 /// Map the input's red channel through a sorted gradient of [`RampStop`]s, filled
 /// between stops by `interpolation`. With no stops the input passes through
@@ -29,28 +32,24 @@ pub fn color_ramp(mut img: Image, stops: &[RampStop], interpolation: RampInterpo
     img
 }
 
-/// Sample a sorted ramp at scalar `t`, clamping to the ends. `constant` takes the
-/// last stop at or below `t` (Blender's: a stop's colour starts at its position);
-/// `linear` and `ease` blend the bracketing stops, `ease` through a smoothstep;
-/// `cardinal` and `b_spline` weigh the four stops around `t` ([`spline::sample`]). The
-/// stops are found by binary search (#2002), so a lookup ramp of thousands of stops
-/// costs a dozen comparisons a pixel. `sorted` holds no NaN position: [`color_ramp`]
+/// Sample a sorted ramp at scalar `t`. The two families end differently, as
+/// Blender's: `linear`, `constant` and `ease` hold the end stops' colours past the
+/// ends (`constant` takes the last stop at or below `t`, a stop's colour starting at
+/// its position; `linear` and `ease` blend the bracketing stops, `ease` through a
+/// smoothstep), while `cardinal` and `b_spline` are not clamped to the ends: they
+/// weigh the four stops around `t` and run on past the end stops toward copies of
+/// them at 0 and 1 ([`spline::fill`]), so the end clamp must stay below the spline
+/// branch. The stops are found by binary search (#2002), so a lookup ramp of
+/// thousands of stops costs a dozen comparisons a pixel. `sorted` holds no NaN position: [`color_ramp`]
 /// sends such a ramp to [`scan_ramp`]'s linear walk, the two agreeing everywhere else.
 fn sample_ramp(sorted: &[RampStop], interpolation: RampInterpolation, t: f32) -> Rgba {
+    let above = |t| sorted.partition_point(|s| pos(s) <= t);
     let ease = match interpolation {
         RampInterpolation::Linear => false,
         RampInterpolation::Ease => true,
-        RampInterpolation::Constant => {
-            let at_or_below = sorted.partition_point(|s| pos(s) <= t);
-            return sorted[at_or_below.saturating_sub(1)].color;
-        }
-        RampInterpolation::Cardinal | RampInterpolation::BSpline => {
-            if t.is_nan() {
-                return sorted[sorted.len() - 1].color;
-            }
-            let above = sorted.partition_point(|s| pos(s) <= t);
-            return spline::sample(sorted, above, t, interpolation);
-        }
+        RampInterpolation::Constant => return sorted[above(t).saturating_sub(1)].color,
+        RampInterpolation::Cardinal => return spline::fill(sorted, Spline::Cardinal, t, above),
+        RampInterpolation::BSpline => return spline::fill(sorted, Spline::BSpline, t, above),
     };
     let last = sorted[sorted.len() - 1];
     if t <= sorted[0].pos {
@@ -74,6 +73,13 @@ fn blend(a: RampStop, b: RampStop, t: f32, ease: bool) -> Rgba {
 /// [`sample_ramp`] by walking the stops in order: its reference, and its path for a
 /// NaN position.
 fn scan_ramp(sorted: &[RampStop], interpolation: RampInterpolation, t: f32) -> Rgba {
+    // Blender's own walk: the first stop past `t`.
+    let above = |t| {
+        sorted
+            .iter()
+            .position(|s| pos(s) > t)
+            .unwrap_or(sorted.len())
+    };
     let ease = match interpolation {
         RampInterpolation::Linear => false,
         RampInterpolation::Ease => true,
@@ -81,15 +87,8 @@ fn scan_ramp(sorted: &[RampStop], interpolation: RampInterpolation, t: f32) -> R
             let held = sorted.iter().rev().find(|s| pos(s) <= t);
             return held.unwrap_or(&sorted[0]).color;
         }
-        RampInterpolation::Cardinal | RampInterpolation::BSpline => {
-            if t.is_nan() {
-                return sorted[sorted.len() - 1].color;
-            }
-            // Blender's own walk: the first stop past `t`.
-            let above = sorted.iter().position(|s| pos(s) > t);
-            let above = above.unwrap_or(sorted.len());
-            return spline::sample(sorted, above, t, interpolation);
-        }
+        RampInterpolation::Cardinal => return spline::fill(sorted, Spline::Cardinal, t, above),
+        RampInterpolation::BSpline => return spline::fill(sorted, Spline::BSpline, t, above),
     };
     if t <= sorted[0].pos {
         return sorted[0].color;

@@ -377,14 +377,17 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   (*color*, 1 input): as Blender's ColorRamp: `constant` holds each stop's colour from
   its position up to the next stop — hard bands for toon, stylized and posterized
   looks — and `ease` is a smoothstep between stops, soft into and out of each colour
-  (flat at every stop). `cardinal` is a smooth curve **through** every stop, Blender's
-  Float Curve or Substance's Curve with grayscale stops: a bevel's cross-section, a
-  tone S-curve, a roughness response; it can overshoot between stops. `b_spline` is
-  smoother and stays **within** the stops' range, passing near them rather than
-  through. Both weigh the four stops around a pixel, run on past the end stops to
-  copies of them at 0 and 1, as Blender's, and clamp to `[0, 1]`; evenly spaced
-  stops give the smoothest curve. Each pixel finds its stops by binary search, so a
-  lookup ramp of thousands of stops stays cheap.
+  (flat at every stop). `cardinal` is a curve **through** chosen points, as Blender's
+  ColorRamp draws it: with grayscale stops, a bevel's cross-section, a tone S-curve, a
+  roughness response; it can overshoot between stops. `b_spline` is smoother and
+  stays **within** the stops' range, passing near them rather than through. Both
+  weigh the four stops around a pixel and clamp to `[0, 1]`. They are not a Float
+  Curve's (or Substance's Curve's) points copied over, which differ twice: the
+  spline is uniform in its stops, so it is smooth across a stop only when the gaps
+  either side are equal (at uneven ones the slope jumps by their ratio: space the
+  stops evenly), and past the end stops it runs on toward copies of them at 0 and 1
+  rather than holding flat (put stops at 0 and 1 to pin the ends). Each pixel finds
+  its stops by binary search, so a lookup ramp of thousands of stops stays cheap.
 - `combine_rgb` (*vector*, 1 to 4 inputs): grayscale inputs → R, G, B and alpha (each
   input's red); a colour channel without an input reads 0, alpha without one reads 1.
 - `constant {color}` (*generator*).
@@ -419,7 +422,7 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   their own; feed it to `bump_to_normal`. Straight, it is a chamfer; through `math`
   `func = "sqrt"` (a curve steepest at the rim and flat on top) it is the one-node
   rounded, convex edge; for a chosen profile, a `cardinal` `color_ramp` through a few
-  points of the cross-section. Avoid an `ease` `color_ramp` here: it is flat at the
+  evenly spaced points of the cross-section (uneven spacing creases at a stop). Avoid an `ease` `color_ramp` here: it is flat at the
   rim too, so the edge reads as a pillow.
 - `edge_detect {width, roundness=0}` (*filter*, 1 input): mask → its outline, like
   Substance's *Edge Detect*: red above 0.5 is inside (as `distance`), and a line
