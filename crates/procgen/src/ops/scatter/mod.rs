@@ -8,9 +8,10 @@
 //! it. `density`, `scale` and `rotation` are read once per stamp at its centre,
 //! wrapped, so the map tiles and looks the same at any resolution.
 //!
-//! **Cost.** The drawn stamps are filed into buckets (`buckets`) about half as
-//! wide as the widest stamp, so a pixel visits only the stamps that can cover it;
-//! the rows are split across threads by [`Image::fill_uv`]'s bands.
+//! **Cost.** The drawn stamps are filed into buckets (`buckets`) as wide as their
+//! own size, a grid per power of two, so a pixel visits only the stamps that can
+//! cover it, whatever the spread of sizes; the rows are split across threads by
+//! [`Image::fill_uv`]'s bands.
 
 mod buckets;
 mod place;
@@ -183,7 +184,7 @@ fn draw(inputs: &[&Image], stamps: &[Stamp], s: &Settings) -> Image {
     let grey = s.output != TileOutput::Stamp;
     Image::fill_uv(inputs[0].size(), |u, v| {
         let mut out: Rgba = [0.0, 0.0, 0.0, 1.0];
-        for e in buckets.at(u, v) {
+        buckets.each(u, v, |e| {
             let st = &stamps[e.stamp as usize];
             let (x, y) = (u + f32::from(e.shift[0]), v + f32::from(e.shift[1]));
             let (su, sv) = st.local(x, y);
@@ -195,7 +196,7 @@ fn draw(inputs: &[&Image], stamps: &[Stamp], s: &Settings) -> Image {
                     _ => fold(s.blend, &mut out, colour),
                 }
             }
-        }
+        });
         out
     })
 }

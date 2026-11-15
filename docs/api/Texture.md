@@ -550,10 +550,13 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   under `"index"`, and under `spacing` once `√(0.5 / amount)` is the smaller), and
   adding a param reshuffles nothing. A NaN number reads its default, an
   out-of-range one is clamped; a stamp whose `density` or `scale` reads NaN, or
-  whose scale is 0 or less, is not drawn. Tiles at any resolution. Cost, measured in
-  the dev container (release build, one core, 2048²): about 0.25 s at the
-  defaults, 1.4 s for 2000 turned pebbles 0.03 across, 4 s for 65 536 stamps 0.01
-  across, 3 s for 500 stamps 0.1 across under `over`.
+  whose scale is 0 or less, is not drawn. Tiles at any resolution. Cost follows how many
+  stamps can cover a texel, not the largest stamp: each is filed in buckets of its
+  own size. Measured in the dev container (release build, one core, 2048²): about
+  0.35 s at the defaults, 1.6 s for 2000 turned pebbles 0.03 across, 4.4 s for
+  65 536 stamps 0.01 across, 1.7 s for 500 stamps 0.1 across under `over`, and
+  8.5 s for 65 536 stamps 0.01 across with `scale` linked to a map that makes a few
+  dozen of them up to a tile wide (the worst measured: those few cover every texel).
 - `separate_rgb {channel=0..3}` (*vector*, 1 input).
 - `shape {kind="circle"|"rect"|"rounded_rect"|"line"|"polygon"|"star", size=[w,h],
   roundness=0.25, softness=0, sides=6, points=5, inner_radius=0.5,
@@ -600,7 +603,8 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   (a square stamp becomes a plank). `offset` (0–1) shifts every other row by that
   share of a cell, 0.5 a running bond (shingles, staggered lugs, a bond of any
   stamp); with an offset the row count rounds to even, so the stagger closes at
-  the wrap. Turns and offsets are in cells. Each cell is seeded from the recipe and node `seed` with
+  the wrap. Offsets are in cells; a turn is rigid in the tile, the stamp stretched
+  to its cell's shape and then turned, so a jittered plank tilts rather than skews. Each cell is seeded from the recipe and node `seed` with
   an offset of up to ±`jitter`/2 cells, a turn of up to ±`rotation_jitter`/2 turns
   and a scale in `1 ± scale_jitter/2`, each jitter clamped to 0–1. The input is read
   as **one stamp** — the unit square, nothing outside it — so give it empty margins
