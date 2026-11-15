@@ -1,0 +1,49 @@
+{
+  "resolution": 256,
+  "params": {
+    "wear": { "type": "number", "default": 0.3, "min": 0, "max": 1 },
+    "tint": { "type": "color", "default": "#8e4a35" }
+  },
+  "nodes": [
+    { "id": "bricks", "op": "brick", "rows": 14, "cols": 4, "mortar": 0.06 },
+    { "id": "brick_id", "op": "brick", "rows": 14, "cols": 4, "mortar": 0.06, "output": "random" },
+    { "id": "edge_in", "op": "distance", "radius": 0.005, "inputs": ["bricks"] },
+    { "id": "rounded", "op": "math", "func": "sqrt", "inputs": ["edge_in"] },
+    { "id": "chip_noise", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 24 }, "seed": 41 },
+    { "id": "chip_band", "op": "distance", "radius": 0.012, "inputs": ["bricks"] },
+    { "id": "chips", "op": "expression", "expr": "step(0.86 - 0.22 * k1, b + 0.2 * (1 - a)) * (1 - smoothstep(0.4, 1.0, a)) * step(0.01, a)", "k1": { "param": "wear" }, "inputs": ["chip_band", "chip_noise"] },
+    { "id": "face_raw", "op": "noise", "kind": "fbm", "scale": 32, "octaves": 4, "seed": 42 },
+    { "id": "face", "op": "auto_levels", "inputs": ["face_raw"] },
+    { "id": "sag", "op": "expression", "expr": "0.1 * a", "inputs": ["brick_id"] },
+    { "id": "relief", "op": "expression", "expr": "a * (0.65 + d) - 0.25 * b * a + 0.05 * c", "inputs": ["rounded", "chips", "face", "sag"] },
+    { "id": "height", "op": "auto_levels", "inputs": ["relief"] },
+    { "id": "normal", "op": "bump_to_normal", "strength": 0.06, "inputs": ["relief"] },
+
+    { "id": "clay", "op": "constant", "color": { "param": "tint" } },
+    { "id": "brick_tone", "op": "hue_sat_value", "hue": { "node": "brick_id", "min": -0.025, "max": 0.025 }, "sat": { "node": "brick_id", "min": 0.8, "max": 1.15 }, "value": { "node": "brick_id", "min": 0.65, "max": 1.3 }, "inputs": ["clay"] },
+    { "id": "speckle_raw", "op": "noise", "kind": "fbm", "scale": 64, "octaves": 3, "seed": 43 },
+    { "id": "speckle", "op": "auto_levels", "inputs": ["speckle_raw"] },
+    { "id": "brick_grain", "op": "expression", "expr": "0.8 + 0.35 * a", "inputs": ["speckle"] },
+    { "id": "brick_face", "op": "mix", "mode": "multiply", "inputs": ["brick_tone", "brick_grain"] },
+    { "id": "fresh_chip", "op": "mix", "mode": "multiply", "factor": 0.35, "inputs": ["brick_face", "clay"] },
+    { "id": "brick_col", "op": "mix", "mode": "mix", "inputs": ["brick_face", "fresh_chip", "chips"] },
+    { "id": "mortar_col", "op": "color_ramp", "stops": [ { "pos": 0, "color": "#8c877e" }, { "pos": 1, "color": "#b3aea3" } ], "inputs": ["speckle"] },
+    { "id": "laid", "op": "mix", "mode": "mix", "inputs": ["mortar_col", "brick_col", "bricks"] },
+
+    { "id": "dirt", "op": "graph", "path": "engine/textures/library/parts/crevice_dirt.graph.json", "params": { "amount": { "param": "wear" }, "radius": 0.01 }, "inputs": ["relief"], "seed": 44 },
+    { "id": "soot_field", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 2 }, "seed": 45 },
+    { "id": "soot", "op": "expression", "expr": "smoothstep(0.75 - 0.4 * k1, 1.0, a) * (0.25 + 0.5 * k1)", "k1": { "param": "wear" }, "inputs": ["soot_field"] },
+    { "id": "bloom_field", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 3 }, "seed": 46 },
+    { "id": "bloom", "op": "expression", "expr": "smoothstep(0.8 - 0.35 * k1, 1.0, a) * (0.15 + 0.55 * k1) * (0.6 + 0.4 * b)", "k1": { "param": "wear" }, "inputs": ["bloom_field", "speckle"] },
+    { "id": "grime", "op": "expression", "expr": "(1 - 0.75 * a) * (1 - 0.4 * b)", "inputs": ["soot", "dirt"] },
+    { "id": "grimed", "op": "mix", "mode": "multiply", "inputs": ["laid", "grime"] },
+    { "id": "salt", "op": "constant", "color": "#d6d3ca" },
+    { "id": "base_color", "op": "mix", "mode": "mix", "inputs": ["grimed", "salt", "bloom"] },
+
+    { "id": "roughness", "op": "expression", "expr": "clamp(0.97 - c * (0.04 + 0.1 * a) - 0.06 * b + 0.05 * d, 0, 1)", "inputs": ["brick_id", "speckle", "bricks", "bloom"] },
+    { "id": "ao", "op": "ambient_occlusion", "radius": 0.012, "depth": 0.006, "quality": 8, "inputs": ["relief"] },
+    { "id": "occlusion", "op": "levels", "out_low": 0.4, "inputs": ["ao"] }
+  ],
+  "output": "base_color",
+  "outputs": { "base_color": "base_color", "normal": "normal", "roughness": "roughness", "height": "height", "occlusion": "occlusion" }
+}
