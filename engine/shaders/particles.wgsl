@@ -53,7 +53,10 @@ struct ParticleGlobals {
 @group(0) @binding(2) var<storage, read> gpu_particles: array<GpuParticle>;
 // The integrated volumetric fog (#1703), read per vertex like the scene fog.
 @group(3) @binding(17) var t_fog_volume: texture_3d<f32>;
-@group(3) @binding(18) var s_fog_volume: sampler;
+// Group 0's one linear-clamp sampler (`render::gpu::linear_clamp`), shared by the
+// sky and probe cubes, the lightmap and shadowmask pages and the fog volume; this
+// shader reads only the fog volume through it.
+@group(3) @binding(18) var s_linear_clamp: sampler;
 
 struct InstanceInput {
     @location(0) center: vec3<f32>,
@@ -228,7 +231,7 @@ fn expand(inst: InstanceInput, vid: u32) -> VsOut {
     out.world = world;
     out.soft = inst.sheet.w;
     out.reactive = inst.reactive;
-    out.air = volumetric_fog(t_fog_volume, s_fog_volume, camera.volumetric, camera.view_proj, camera.clusters.view_z, world);
+    out.air = volumetric_fog(t_fog_volume, s_linear_clamp, camera.volumetric, camera.view_proj, camera.clusters.view_z, world);
     return out;
 }
 
