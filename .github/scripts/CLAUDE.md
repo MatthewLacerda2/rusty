@@ -25,7 +25,7 @@ coder *changing* it must know.
   `merging/watch/` is `--watch`'s loop (order, aging, hand-backs, the lock, how it
   ends, and the trains across passes, `watch/trains.py`). `merging/view/` is the
   orchestrator's read of it (`make queue-status`'s liveness from the supervisor's
-  worktree lock, `make queue-events`'s filtered log and stand-down poll); the watch
+  worktree lock, `make queue-events`'s filtered log and its poll of coders' comments); the watch
   never imports it. `mergeable.py`, `merge-queue.py` and `queue-view.py` are only the
   command lines. A new concern is a new module, not a longer one.
 - **`.github/scripts/dispatch/` is the batch's dispatch steps**: the brief, the coder's
@@ -103,6 +103,14 @@ coder *changing* it must know.
   `merging` package it loaded, plus the entry script; before each take it compares
   them with `origin/main` and exits `relaunch: …` with status 5. Code the watch runs
   any other way is not tracked, so keep its code inside `merging/`.
+- **The board it told outlives it** (`merging/watch/kept.py`): each listing is kept
+  whole in `merge-queue/board.json`, `--since` applied only to what is said, and the
+  next watch's first listing is compared with it, so what moved during the
+  supervisor's sleep is said once. The queue's JSON state files are written through
+  `merging/state.py` alone (a temporary file, then a rename) and a file it cannot
+  read is absent, never a traceback: a new state file goes through it too.
+  `.github/scripts/tests/state/test_writers.py` fails on any other file write under `merging/`; an
+  append, a lock or a worktree edit takes `# state-ok: <why>` on its line.
 - **One watch at a time** (`merging/watch/lock.py`): an `fcntl.flock` on
   `.git/merge-queue.lock` in the common git directory, held for the life of the
   process; a second watch exits with status 4, naming the holder's PID. The kernel
@@ -143,7 +151,10 @@ coder *changing* it must know.
   passes a line by `HANDED BACK`, `#N: merged` (a single take's, and a train member's
   `#N: merged — landed with the train <sha>.`, said as it lands), every `supervisor:`
   line but the ones that carry on (`events.CARRIES_ON`), `watch: STOPPED:`, `HELD #N`
-  and the `watch: #N turned ready.` family of `watch.board.transitions`. A change to
+  and the `watch: #N turned ready.` family of `watch.board.transitions`, with its
+  `closed`/`merged while no watch listed it` lines and a fresh start's `watch: #N is ready
+  and unqueued`, and a state file it could not write (`handbacks.FAILED_LINE`,
+  `kept.FAILED_LINE`). A change to
   one of those lines updates `events.KEEP` and its tests
   (`.github/scripts/tests/view/test_wording.py`, built from the watch's own functions)
   in the same pull request.

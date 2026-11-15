@@ -1,4 +1,4 @@
-"""#1876: a coder's *Standing down* comment on a batch issue reaches the stream once."""
+"""#1876: a coder's *Standing down* comment on a batch issue reaches the stream once (the rest: `test_comments`)."""
 
 from __future__ import annotations
 
@@ -19,8 +19,12 @@ LISTED = [
     comment(1, 10, "Standing down\n\n#9 is still open."),
     comment(2, 11, "Standing down: blocked by #3"),  # not a batch issue
     comment(3, 10, "Standing down", assoc="NONE"),  # someone who cannot push
-    comment(4, 10, "I was not standing down"),
+    comment(4, 10, "I was not standing down"),  # any other wording: a coder's comment
 ]
+
+
+def briefed(number, pulls):
+    return standing.BRIEFED if number == 10 else False
 
 
 class Poll(unittest.TestCase):
@@ -31,42 +35,29 @@ class Poll(unittest.TestCase):
             asked.append(path)
             return LISTED if "page=1" in path else []
         with mock.patch("ghrest.slug", return_value="o/r"):
-            poll = standing.Poll(get, datetime(2026, 11, 8, 12, 0, tzinfo=timezone.utc), batch=lambda n: n == 10)
+            poll = standing.Poll(get, datetime(2026, 11, 8, 12, 0, tzinfo=timezone.utc), batch=briefed)
             first, second = poll(), poll()
-        self.assertEqual(first, ["STANDING DOWN #10 (me): Standing down https://x/1"])
+        self.assertEqual(first, ["STANDING DOWN #10 (me): Standing down https://x/1",
+                                 "COMMENT #10 (me): I was not standing down https://x/4"])
         self.assertEqual(second, [])
         self.assertIn("since=2026-11-08T11:25:00Z", asked[0])  # looks back past the stream's start
 
     def test_a_failed_answer_is_asked_again_not_read_as_not_ours(self):
-        answers = [None, True]
+        answers = [None, standing.BRIEFED]
 
         def get(path):
             return LISTED[:1] if "page=1" in path else []
         with mock.patch("ghrest.slug", return_value="o/r"):
-            poll = standing.Poll(get, datetime(2026, 11, 8, 12, 0, tzinfo=timezone.utc), batch=lambda n: answers.pop(0))
+            poll = standing.Poll(get, datetime(2026, 11, 8, 12, 0, tzinfo=timezone.utc), batch=lambda n, pulls: answers.pop(0))
             self.assertEqual(poll(), [])
             self.assertEqual(poll(), ["STANDING DOWN #10 (me): Standing down https://x/1"])
-            self.assertEqual(standing.in_batch(lambda path: None, 10), None)  # a page that did not come
+            self.assertEqual(standing.in_batch(lambda path: None, 10, lambda: None), None)  # a page that did not come
 
     def test_a_gh_call_that_hangs_is_a_failed_poll(self):
         hung = subprocess.TimeoutExpired(["gh"], standing.GH_TIMEOUT_SECONDS)
         with mock.patch("subprocess.run", side_effect=hung) as run:
             self.assertIsNone(standing.gh_get("repos/o/r/issues/comments"))
         self.assertEqual(run.call_args.kwargs["timeout"], standing.GH_TIMEOUT_SECONDS)
-
-    def test_a_batch_issue_has_a_brief_or_an_open_pull_request_closing_it(self):
-        def get(path):
-            if "page=1" not in path:
-                return []
-            if path.startswith("repos/o/r/issues/10/"):
-                return [comment(5, 10, "Brief\n\nBranch: x")]
-            if path.startswith("repos/o/r/pulls"):
-                return [{"body": "Does it.\n\nCloses #12\n"}]
-            return []
-        with mock.patch("ghrest.slug", return_value="o/r"):
-            self.assertTrue(standing.in_batch(get, 10))
-            self.assertTrue(standing.in_batch(get, 12))
-            self.assertFalse(standing.in_batch(get, 13))
 
 
 if __name__ == "__main__":

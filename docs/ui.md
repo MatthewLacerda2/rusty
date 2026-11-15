@@ -802,7 +802,8 @@ ray runs through the screen centre — look at a terminal and click — with the
 callbacks as screen UI. A world-space health bar should turn its graphics'
 `raycast_target` off, or the crosshair crossing it counts as over the UI.
 
-**World ↔ screen.** `Camera.WorldToScreen` / `ScreenToWorldRay` project through the
+**World ↔ screen.** `Camera.WorldToScreen` / `ScreenToWorldRay` (and `MouseRay`, the
+ray under the cursor) project through the
 sim's camera and screen size (`scene::camera::projection`), in UI screen pixels or a
 canvas's reference units, with a behind-the-camera flag — the same maths the markers
 and the hit-test use.

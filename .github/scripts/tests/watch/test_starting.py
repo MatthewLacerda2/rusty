@@ -54,8 +54,9 @@ class Since(unittest.TestCase):
         old, new = fakes.pr(1), fakes.pr(2)
         old["createdAt"], new["createdAt"] = "2026-10-15T10:00:00Z", "2026-10-16T20:00:00Z"
         since = cli.parse(["--watch", "--since", "2026-10-16T00:00+00:00"]).since
-        self.assertEqual(board.recent([old, new, fakes.pr(3)], since), [new, fakes.pr(3)])
-        self.assertEqual(board.recent([old], None), [old])
+        said = [p for p in (old, new, fakes.pr(3)) if board.fresh(p.get("createdAt"), since)]
+        self.assertEqual(said, [new, fakes.pr(3)])
+        self.assertTrue(board.fresh(old["createdAt"], None))
         self.assertIsNotNone(cli.since("2026-10-16").tzinfo)
         with self.assertRaises(SystemExit), unittest.mock.patch("sys.stderr"):
             cli.parse(["7", "--since", "2026-10-16"])
