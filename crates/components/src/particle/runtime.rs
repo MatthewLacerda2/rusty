@@ -31,6 +31,9 @@ pub struct Particle {
     /// then every turn it carried the particle through, #1529), applied on top of
     /// the tumble. Identity for a `World` emitter.
     pub turn: Quat,
+    /// Four numbers a script keeps per particle (Unity's *Custom Data*): zero at
+    /// birth, never read by the engine, written by `Particles.SetParticles`.
+    pub custom: [f32; 4],
 }
 
 impl Particle {
@@ -49,6 +52,7 @@ impl Particle {
             start_frame: 0,
             axis: Vec3::Y,
             turn: Quat::IDENTITY,
+            custom: [0.0; 4],
         }
     }
 
