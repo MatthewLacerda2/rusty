@@ -47,8 +47,9 @@ file is what a coder changing the tool must keep.
   scanned `.rs` files (a manifest, a shader, git) it reads under `Scan::base`, never
   the working directory, so the wiring test can run it over a scratch repository.
   Its row says `Allow::Inline` when an inline allow may excuse it, `Allow::Never` when nothing may: `ignored` (its fix is the
-  `.gitignore` pattern), `orphan-seeds` (its fix is moving the file) and `key-guard`
-  (its finding sits on a manifest, where no inline allow can go), each also named in
+  `.gitignore` pattern), `orphan-seeds` (its fix is moving the file), `key-guard`
+  (its finding sits on a manifest, where no inline allow can go) and `root-tests` (its
+  fix is the manifest key or a moved test), each also named in
   `wiring.rs`'s `UNEXCUSABLE`, which the wiring test holds the column to. `Allow::Own` is for
   a rule that reads its own allows, so the shared filter is skipped: `api-parity`, whose allow sits on the op
   rather than on the finding's cause, and must be reported when it goes stale,

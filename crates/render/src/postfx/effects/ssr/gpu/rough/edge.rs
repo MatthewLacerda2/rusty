@@ -5,8 +5,10 @@
 
 use glam::Vec3;
 
-use super::silhouette::{at, base, shot, BRONZE, H, W};
-use rusty_scene::Camera;
+use super::super::silhouette::{at, base, shot, BRONZE, H, W};
+use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
+use rusty_core::color::f16_to_f32;
+use rusty_scene::{Camera, Scene};
 
 /// How hard the edge is where the cube's reflection on the floor ends: along the
 /// redness averaged over the cube's middle columns, from just under the cube to the
@@ -54,7 +56,7 @@ fn gpu_a_rough_metal_floor_fades_the_cubes_reflection_without_a_hard_edge() {
 /// side, in the row of the floor whose middle reflects the most: near 1 is a hard
 /// outline, a soft one spreads its rise over its blur. With it, the redness the
 /// reflection adds at that row's middle.
-fn side_step(on: &[u8], off: &[u8]) -> (f32, i32) {
+pub(super) fn side_step(on: &[u8], off: &[u8]) -> (f32, i32) {
     let red = |f: &[u8], x: u32, y: u32| at(f, x, y)[0] - at(f, x, y)[2];
     let added = |y: u32, x: u32| red(on, x, y) - red(off, x, y);
     let row = (H / 2..H).max_by_key(|&y| added(y, W / 2)).unwrap();
@@ -75,8 +77,37 @@ pub(super) fn lifted(on: bool, roughness: f32) -> rusty_scene::Scene {
     s
 }
 
-/// The least redness the roughness-0.35 floor's reflection adds at its middle.
-const SATIN_RED: i32 = 3;
+/// The red of the HDR image the SSR pass resolved `scene` into, seen from `cam`.
+fn hdr_red(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<f32> {
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
+    let out = view.color_target_view().unwrap();
+    r.render(&mut view, scene, cam, &out, false);
+    let texture = &view.post_fx.scene_hdr.texture;
+    let bytes = readback::read_texture_bytes(&r.device, &r.queue, texture, (W, H), 8);
+    (0..(W * H) as usize)
+        .map(|t| f16_to_f32(u16::from_le_bytes([bytes[t * 8], bytes[t * 8 + 1]])))
+        .collect()
+}
+
+/// [`side_step`] on the HDR image's red, with the red the reflection adds at that
+/// row's middle: the lifted cube's adds a few levels of 255 at roughness 0.35, so
+/// one level of rounding in the 8-bit frame is a sixth of it, and a real GPU's
+/// rounding read a soft side as a 0.33 step.
+fn hdr_side_step(on: &[f32], off: &[f32]) -> (f32, f32) {
+    let added = |x: u32, y: u32| (on[(y * W + x) as usize] - off[(y * W + x) as usize]).abs();
+    let row = (H / 2..H)
+        .max_by(|&a, &b| added(W / 2, a).total_cmp(&added(W / 2, b)))
+        .unwrap();
+    let step = (1..=W / 2)
+        .map(|x| added(x, row) - added(x - 1, row))
+        .fold(0.0, f32::max);
+    let peak = added(W / 2, row);
+    (step / peak.max(1e-6), peak)
+}
+
+/// The least share of the mirror's red the satin floor's reflection adds at its
+/// middle (near 0.33 here; 0 with no reflection, which would pass the softness).
+const SATIN_RED: f32 = 0.1;
 
 #[test]
 fn gpu_a_satin_metal_floor_reflects_a_lifted_cube_with_soft_sides() {
@@ -85,16 +116,14 @@ fn gpu_a_satin_metal_floor_reflects_a_lifted_cube_with_soft_sides() {
     };
     let down = Camera::new(Vec3::new(0.0, 1.0, 0.0), -90.0, -12.0);
     let mut step = |roughness| {
-        let (on, off) = (
-            shot(&mut r, &lifted(true, roughness), &down),
-            shot(&mut r, &lifted(false, roughness), &down),
-        );
-        side_step(&on, &off)
+        let on = hdr_red(&mut r, &lifted(true, roughness), &down);
+        hdr_side_step(&on, &hdr_red(&mut r, &lifted(false, roughness), &down))
     };
-    let ((mirror, _), (satin, red)) = (step(0.04), step(0.35));
-    eprintln!("[ssr] the lifted cube's reflected side: at most {mirror:.2} of its redness in one pixel on a mirror, {satin:.2} at roughness 0.35, which adds {red} red at its middle");
+    let ((mirror, bright), (satin, red)) = (step(0.04), step(0.35));
+    let share = red / bright;
+    eprintln!("[ssr] the lifted cube's reflected side: at most {mirror:.2} of its redness in one pixel on a mirror, {satin:.2} at roughness 0.35, which adds {share:.2} of the mirror's red at its middle");
     assert!(mirror >= 0.5, "a mirror reflects a sharp side");
-    assert!(red >= SATIN_RED, "a satin metal reflects the cube");
+    assert!(share >= SATIN_RED, "a satin metal reflects the cube");
     assert!(
         satin <= 0.3,
         "a satin metal's reflection has no hard outline (#2028)"

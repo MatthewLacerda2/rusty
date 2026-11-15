@@ -13,9 +13,8 @@
 //! overlay gets in.
 //!
 //! The same downsample builds the trace's two pyramids the resolve reads (#2028,
-//! `super::pass`): its hits (`Rgba16Float`) and where it traced and how wide
-//! (`Rg16Float`), each [`PyramidPass`] building one format. At 1080p they add about
-//! 22 MB and 11 MB.
+//! `super::pass`): its hits, and where it traced and how wide its hits spread
+//! (#2158), both [`HDR_FORMAT`]. At 1080p they add about 22 MB each.
 
 use crate::gpu::bind_entry as entry;
 use crate::gpu::fullscreen::Fullscreen;
@@ -29,10 +28,9 @@ pub(crate) fn levels((w, h): (u32, u32)) -> u32 {
     u32::BITS - w.max(h).max(1).leading_zeros()
 }
 
-/// The downsample pipeline for one texture format and the trilinear sampler the
-/// march reads a pyramid through, shared by every view.
+/// The downsample pipeline ([`HDR_FORMAT`]) and the trilinear sampler the march
+/// reads a pyramid through, shared by every view.
 pub(crate) struct PyramidPass {
-    format: wgpu::TextureFormat,
     layout: wgpu::BindGroupLayout,
     pipeline: LazyPipeline,
     /// Linear between texels and between levels, clamped at the screen's edge.
@@ -40,17 +38,7 @@ pub(crate) struct PyramidPass {
 }
 
 impl PyramidPass {
-    /// The colour pyramid's pass ([`HDR_FORMAT`]).
     pub(crate) fn new(device: &wgpu::Device, registry: &mut ShaderRegistry) -> Self {
-        Self::of(device, registry, HDR_FORMAT)
-    }
-
-    /// A pass building pyramids of `format`.
-    pub(crate) fn of(
-        device: &wgpu::Device,
-        registry: &mut ShaderRegistry,
-        format: wgpu::TextureFormat,
-    ) -> Self {
         let shader = registry.load(device, "postfx/ssr_pyramid.wgsl", "SSR Pyramid Shader");
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("SSR Pyramid Layout"),
@@ -63,7 +51,7 @@ impl PyramidPass {
         });
         let pipeline = LazyPipeline::new(device, move |device| {
             let target = wgpu::ColorTargetState {
-                format,
+                format: HDR_FORMAT,
                 blend: None,
                 write_mask: wgpu::ColorWrites::ALL,
             };
@@ -84,7 +72,6 @@ impl PyramidPass {
             ..Default::default()
         });
         Self {
-            format,
             layout,
             pipeline,
             trilinear,
@@ -125,7 +112,7 @@ impl Pyramid {
             mip_level_count: count,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: pass.format,
+            format: HDR_FORMAT,
             usage: U::RENDER_ATTACHMENT | U::TEXTURE_BINDING | U::COPY_DST,
             view_formats: &[],
         });
