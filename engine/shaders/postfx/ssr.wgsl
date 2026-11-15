@@ -50,6 +50,9 @@ struct SsrParams {
     // x: the volume's *Minimum Smoothness* (#1736), y: the smoothness over which SSR
     // fades in above it (`ssr::fade`)
     surface: vec4<f32>,
+    // x: the volume's fixed EV, y: 1 when its exposure is Automatic, so `adapted`
+    // holds the EV the frame is shown at (`postfx/effects/exposure.wgsl`'s `hdr`)
+    exposure: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> params: SsrParams;
@@ -60,6 +63,9 @@ struct SsrParams {
 @group(0) @binding(3) var t_velocity: texture_2d<f32>;
 @group(0) @binding(4) var t_weight: texture_2d<f32>;
 @group(0) @binding(5) var t_applied: texture_2d<f32>;
+// The view's adapted exposure (`postfx/exposure.wgsl`'s `state`): x the EV the
+// meter eased to over the frames before this one, metered over the whole frame.
+@group(0) @binding(6) var<uniform> adapted: vec4<f32>;
 
 @vertex
 fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4<f32> {
@@ -194,16 +200,15 @@ const COUNT_SCALE: f32 = 64.0;
 // faint line across a satin reflection's fading edge.
 const FOUND_FLOOR: f32 = 0.4;
 
-// The least brightness a found hit's energy counts it at (`energy`): among the
-// hits of one pyramid texel, a dark one (a dim wall, a cord's sliver) weighs 50
-// times less than a bright one of the same count.
-const ENERGY_FLOOR: f32 = 0.02;
-
-// The luma a hit's brightness is judged at against the frame's mean luma: middle
-// grey, where an automatic exposure puts a frame's mean. Judged against the frame,
-// a hit's energy is the same in a dim scene as in the same scene lit 100 times
-// brighter, whatever its exposure.
-const KEY: f32 = 0.18;
+// The least brightness a found hit's energy counts it at (`energy`). At 1 every
+// hit weighs by its count alone and brightness has no say (nor the pull,
+// `texel_mean`); below it a dark hit weighs less than a bright one, down to 1/50
+// at 0.02. The two cases this trades between, on lavapipe: at 0.02 a rough
+// reflection holds still under TAA's jitter (`rough::jitter` steps 20.7, 44.5 at
+// 1), but a bright background's long rays set a dark object's contact blur
+// (`rough::contact::dark` keeps 0.69, 0.95 at 1); 0.1 gives 29.2 and 0.77, 0.3
+// gives 43.0 and 0.88. This keeps the contact.
+const ENERGY_FLOOR: f32 = 1.0;
 
 // What a found hit's radius times its energy is stored times: the most it can
 // store, `UNIT_MAX` times it, stays inside f16 (64000).
@@ -229,18 +234,28 @@ fn luma(c: vec4<f32>) -> f32 {
     return dot(c.rgb, vec3<f32>(0.25, 0.5, 0.25));
 }
 
+// The scale the composite exposes the HDR image by (`postfx/effects/exposure.wgsl`'s
+// `hdr`): the volume's fixed EV, or in Automatic the adapted one, which the meter
+// reads over the whole frame (a histogram of every pixel) and eases over time, so
+// a lamp crossing the frame or a one-frame flash moves it no faster than the
+// exposure the player sees. SSR runs before this frame is metered: the EV is the
+// one the meter left after the frame before.
+fn shown_gain() -> f32 {
+    return exp2(select(params.exposure.x, adapted.x, params.exposure.y > 0.5));
+}
+
 // What a found hit of `colour` (unpremultiplied) and count `k` weighs in its
 // pyramid texel's mean radius (#2249): its count times its brightness, at least
 // `ENERGY_FLOOR`. Its brightness is `x / (1 + x)` of its luma `x` at the exposure
-// that puts the frame's mean luma (`mean`, the colour pyramid's last level) at
-// `KEY`: under 1, so a lamp outweighs a dim wall but a lit wall by little, and
-// read against the frame, not in absolute light. By its count, not its weight: a
-// faded long ray weighed by its weight let the short rays beside it (a seam's
-// trim) set a satin ceiling's blur around them, a dark halo along the seam, and
-// the fades enter the field as they enter its count. A hit past f16's range (its
-// weight 0) is at the floor.
-fn energy(colour: vec4<f32>, k: f32, mean: f32) -> f32 {
-    let x = luma(colour) * KEY / max(mean, 1e-30);
+// the frame is shown at (`gain`, [`shown_gain`]): under 1, so a lamp outweighs a
+// dim wall but a lit wall by little, and read as the player sees it, not in
+// absolute light, so a dark scene exposed up weighs its hits as a lit one does.
+// By its count, not its weight: a faded long ray weighed by its weight let the
+// short rays beside it (a seam's trim) set a satin ceiling's blur around them, a
+// dark halo along the seam, and the fades enter the field as they enter its
+// count. A hit past f16's range (its weight 0) is at the floor.
+fn energy(colour: vec4<f32>, k: f32, gain: f32) -> f32 {
+    let x = luma(colour) * gain;
     let bright = select(0.0, x / (1.0 + x), numeric::finite4(colour) && x > 0.0);
     return k * max(bright, ENERGY_FLOOR);
 }
@@ -297,8 +312,7 @@ fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
     // mean radius is its `energy`.
     let unit = min(across(world, hit.dist, UNIT_CONE, dim) / UNIT_CONE, UNIT_MAX);
     let k = max(w, FOUND_FLOOR);
-    let mean = luma(textureLoad(t_color, vec2<i32>(0), i32(textureNumLevels(t_color)) - 1));
-    let e = energy(hit.colour, k, mean);
+    let e = energy(hit.colour, k, shown_gain());
     let found = vec4<f32>(1.0, unit * e * ENERGY_SCALE, k * COUNT_SCALE, e * (COUNT_SCALE / ENERGY_FLOOR));
     if (w <= 0.0) {
         return Traced(vec4<f32>(0.0), found);
