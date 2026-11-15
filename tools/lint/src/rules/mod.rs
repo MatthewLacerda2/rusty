@@ -36,6 +36,7 @@ mod physics_borrow;
 mod platform_cfg;
 mod prefix;
 mod read_keys;
+mod root_tests;
 mod sanitize;
 mod sanitize_rules;
 mod self_path;
@@ -103,6 +104,7 @@ const RULES: &[(Rule, Allow)] = &[
     (platform_cfg::run, Allow::Inline),
     (prefix::run, Allow::Inline),
     (read_keys::run, Allow::Inline),
+    (root_tests::run, Allow::Never),
     (sanitize::run, Allow::Inline),
     (self_path::run, Allow::Inline),
     (skip::run, Allow::Inline),

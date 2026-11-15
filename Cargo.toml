@@ -38,11 +38,18 @@ default-run = "rusty"
 [lib]
 name = "rusty"
 path = "src/lib.rs"
+# The root package builds no unit-test harness of its own (`test = false` here and on
+# every `[[bin]]`): its sources hold no tests, and each harness was one more rustc run
+# and link over the whole engine on every `cargo test` / `nextest run`, nine of them
+# running nothing. Tests go in `tests/` or in a member crate; `make rules`
+# (`root-tests`) holds both halves.
+test = false
 
 # The editor. Needs the `editor` feature (on by default).
 [[bin]]
 name = "rusty"
 path = "src/main.rs"
+test = false
 required-features = ["editor"]
 
 # The standalone player (#431): boots the project's startup scene straight into Play
@@ -51,12 +58,14 @@ required-features = ["editor"]
 [[bin]]
 name = "player"
 path = "src/bin/player.rs"
+test = false
 
 # Headless deterministic runner (the agent's hands). Dev-only: stripped from ship
 # builds. Build/run with `--features dev`.
 [[bin]]
 name = "play"
 path = "src/bin/play.rs"
+test = false
 required-features = ["dev"]
 
 # Ship a project (#1267): refresh the import cache, copy the runtime files, leave the
@@ -64,6 +73,7 @@ required-features = ["dev"]
 [[bin]]
 name = "export"
 path = "src/bin/export.rs"
+test = false
 required-features = ["dev"]
 
 # Long-lived headless EDIT-mode session + command channel (the keystone, #177).
@@ -71,6 +81,7 @@ required-features = ["dev"]
 [[bin]]
 name = "session"
 path = "src/bin/session.rs"
+test = false
 required-features = ["dev"]
 
 # MCP stdio bridge: drive the edit-mode session over the Model Context Protocol,
@@ -78,12 +89,14 @@ required-features = ["dev"]
 [[bin]]
 name = "session-mcp"
 path = "src/bin/session_mcp.rs"
+test = false
 required-features = ["dev"]
 
 # Generate and play-test a test game from `games/<name>/` (#2029): `make game`.
 [[bin]]
 name = "game"
 path = "src/bin/game.rs"
+test = false
 required-features = ["dev"]
 
 # Headless editor capture (#731): the egui editor over a scene, offscreen, to a PNG —
@@ -91,6 +104,7 @@ required-features = ["dev"]
 [[bin]]
 name = "editor-capture"
 path = "src/bin/editor_capture.rs"
+test = false
 required-features = ["dev", "editor"]
 
 # The whole integration suite. `tests/main.rs` declares every test file as a module;
