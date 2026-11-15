@@ -21,13 +21,13 @@ pub mod ticks;
 pub use ticks::FixedTicks;
 
 /// Wall-clock frame timing for the windowed loop: the raw delta handed to
-/// [`advance_sim`] and a once-a-second FPS counter the editor shows. Platform-side
+/// [`advance_sim`] and a once-a-second FPS reading the editor shows. Platform-side
 /// only — the sim never reads it (in Play it ticks on the fixed dt).
 pub struct FrameClock {
     last_frame: Instant,
     last_delta: f32,
     frame_count: u32,
-    fps: f32,
+    fps: Option<f32>,
     last_fps_update: Instant,
 }
 
@@ -38,7 +38,7 @@ impl FrameClock {
             last_frame: now,
             last_delta: 0.0,
             frame_count: 0,
-            fps: 60.0,
+            fps: None,
             last_fps_update: now,
         }
     }
@@ -48,16 +48,18 @@ impl FrameClock {
         self.last_delta = now.saturating_duration_since(self.last_frame).as_secs_f32();
         self.last_frame = now;
         self.frame_count += 1;
-        if now.saturating_duration_since(self.last_fps_update) >= Duration::from_secs(1) {
-            self.fps = self.frame_count as f32;
+        let since = now.saturating_duration_since(self.last_fps_update);
+        if since >= Duration::from_secs(1) {
+            self.fps = Some(self.frame_count as f32 / since.as_secs_f32());
             self.frame_count = 0;
             self.last_fps_update = now;
         }
         self.last_delta
     }
 
-    /// Frames counted over the last whole second.
-    pub fn fps(&self) -> f32 {
+    /// The last reading: the frames counted since the one before, over the seconds
+    /// between them (at least one). `None` until the clock's first second is up.
+    pub fn fps(&self) -> Option<f32> {
         self.fps
     }
 

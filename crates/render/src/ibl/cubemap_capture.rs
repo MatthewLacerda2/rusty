@@ -139,20 +139,23 @@ impl Renderer {
         self.capture = sky.mode();
         let lens = sky.lens();
 
+        // A capture is not the window's frame: its faces leave the frame stats be.
         let mut open: [Vec<bool>; 6] = Default::default();
-        let faces = CubemapFace::ALL.map(|face| {
-            let mut camera = face_camera(position, face);
-            (camera.near, camera.far) = (lens.near, lens.far);
-            self.render_capture_face(&mut render_view, scene, &camera, &output);
-            let hdr = &render_view.post_fx.scene_hdr.texture;
-            let size = (resolution, resolution);
-            let bytes = read_texture_bytes(&self.device, &self.queue, hdr, size, 8);
-            let mut pixels = decode_half_texels(&bytes);
-            mirror_rows(&mut pixels, resolution);
-            if sky.reads_open() {
-                open[face as usize] = self.read_open_texels(&render_view, resolution);
-            }
-            pixels
+        let faces = self.aside(|r| {
+            CubemapFace::ALL.map(|face| {
+                let mut camera = face_camera(position, face);
+                (camera.near, camera.far) = (lens.near, lens.far);
+                r.render_capture_face(&mut render_view, scene, &camera, &output);
+                let hdr = &render_view.post_fx.scene_hdr.texture;
+                let size = (resolution, resolution);
+                let bytes = read_texture_bytes(&r.device, &r.queue, hdr, size, 8);
+                let mut pixels = decode_half_texels(&bytes);
+                mirror_rows(&mut pixels, resolution);
+                if sky.reads_open() {
+                    open[face as usize] = r.read_open_texels(&render_view, resolution);
+                }
+                pixels
+            })
         });
 
         self.capture = prev;

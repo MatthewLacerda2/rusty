@@ -54,7 +54,7 @@ pub fn window_frame(
     });
     WindowFrame {
         wall_ms: f64::from(clock.frame_ms()),
-        fps: f64::from(clock.fps()),
+        fps: clock.fps().map(f64::from),
         render,
     }
 }

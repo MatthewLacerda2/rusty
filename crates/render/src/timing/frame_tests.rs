@@ -3,7 +3,8 @@ use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// A drawn frame moves the count and takes CPU time; a render inside `aside`
-/// leaves the count, the cost and the counters as the measured frame left them.
+/// or a cubemap capture leaves the count, the cost and the counters as the
+/// measured frame left them.
 #[test]
 fn gpu_a_frame_counts_and_an_aside_render_does_not() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(16, 16) else {
@@ -25,6 +26,9 @@ fn gpu_a_frame_counts_and_an_aside_render_does_not() {
     r.aside(|r| r.render(&mut view, &empty, &camera, &out, false));
     assert_eq!(r.frame_cost(), cost, "an aside render is not a frame");
     assert_eq!(r.frame_counters, counters, "nor are its counters");
+    r.capture_static_cubemap(&scene, glam::Vec3::ZERO, 4);
+    assert_eq!(r.frame_cost(), cost, "a capture's faces are not frames");
+    assert_eq!(r.frame_counters, counters, "nor are their counters");
     r.render(&mut view, &empty, &camera, &out, false);
     assert_eq!(r.frame_cost().frames, 2, "the next frame counts again");
 }

@@ -244,17 +244,17 @@ impl GpuTimer {
 
     /// Close the frame: resolve its queries into a free readback buffer and start
     /// mapping it. A frame with every buffer still in flight goes untimed.
+    /// The CPU span closes last, so it holds the resolve, its submit and the poll.
     pub(crate) fn end_frame(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
-        self.cpu.end();
-        let Some(q) = &mut self.queries else {
-            return;
-        };
-        q.open.set(false);
-        let passes = std::mem::take(q.frame.get_mut());
-        if !passes.is_empty() {
-            q.ring.submit(device, queue, &q.set, passes);
+        if let Some(q) = &mut self.queries {
+            q.open.set(false);
+            let passes = std::mem::take(q.frame.get_mut());
+            if !passes.is_empty() {
+                q.ring.submit(device, queue, &q.set, passes);
+            }
+            q.collect(device);
         }
-        q.collect(device);
+        self.cpu.end();
     }
 
     /// The newest frame's GPU times not yet taken, polling (never waiting) for

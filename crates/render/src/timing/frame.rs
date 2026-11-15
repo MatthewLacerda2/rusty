@@ -5,9 +5,9 @@
 //! times its own `render` call. [`GpuTimer`]'s frame bracket is where a frame starts
 //! and ends, so it also takes the CPU time between the two ([`FrameCost`]) and
 //! counts the frames, which is how a caller tells a frame that drew from one that
-//! didn't. A render beside the frame being measured (the Inspector's preview)
-//! goes through [`Renderer::aside`]: its counters, cost and GPU passes are not the
-//! frame's.
+//! didn't. A render beside the frame being measured (the Inspector's preview, a
+//! cubemap capture's faces) goes through [`Renderer::aside`]: its counters, cost
+//! and GPU passes are not the frame's.
 
 use std::time::Instant;
 
@@ -67,6 +67,12 @@ impl Renderer {
     /// callers only (the harness, a bake): the live frame loop never waits.
     pub fn wait_idle(&self) {
         let _ = self.device.poll(wgpu::PollType::wait_indefinitely());
+    }
+
+    /// Whether this renderer's device takes GPU timestamps: `false` means
+    /// [`Renderer::take_gpu_times`] never returns any, not that they are late.
+    pub fn times_gpu(&self) -> bool {
+        self.gpu_timer.queries.is_some()
     }
 
     /// What the last frame cost the CPU, and how many frames this renderer drew.

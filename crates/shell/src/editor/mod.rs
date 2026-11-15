@@ -134,7 +134,8 @@ impl EditorFrontend {
         // The transport asks through `set_playing`, like every other host (#1302).
         let mut playing = game.play_requested();
         let clock = (shell.clock.fps(), shell.clock.frame_ms());
-        sync::sync_stats(&mut self.editor_ui, game, clock.into());
+        let timestamps = shell.renderer.times_gpu();
+        sync::sync_stats(&mut self.editor_ui, game, clock.into(), timestamps);
         let interaction = {
             let mut s = game.world.scene.borrow_mut();
             let mut c = game.resources.console.borrow_mut();

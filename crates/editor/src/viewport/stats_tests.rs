@@ -2,7 +2,7 @@ use super::*;
 
 fn clock() -> Clock {
     Clock {
-        fps: 30.0,
+        fps: Some(30.0),
         frame_ms: 33.0,
     }
 }
@@ -30,7 +30,7 @@ fn lines_read_the_windowed_table() {
             frame.record_gpu_pass(pass, ms);
         }
     });
-    let got = lines(Some(&stats), clock());
+    let got = lines(Some(&stats), clock(), false);
     assert_eq!(
         got[0], "60 FPS   frame 16.00 ms",
         "the table, not the clock"
@@ -48,20 +48,23 @@ fn lines_read_the_windowed_table() {
     );
 }
 
-/// No GPU time is said in words, never shown as 0; no table at all (a build
-/// without `dev`) shows the window's clock.
+/// No GPU time is said in words, never shown as 0, and times not in yet are
+/// told from an adapter without timestamps; no table at all (a build without
+/// `dev`) shows the window's clock.
 #[test]
 fn a_missing_gpu_time_or_table_is_said() {
     let mut stats = FrameStats::default();
-    assert!(lines(Some(&stats), clock())[3].contains("nothing drawn yet"));
+    assert!(lines(Some(&stats), clock(), true)[3].contains("nothing drawn yet"));
     stats.drawn_frames = 1;
-    let got = lines(Some(&stats), clock());
+    let got = lines(Some(&stats), clock(), false);
     assert!(got[3].contains("no timestamps"), "{got:?}");
+    let late = lines(Some(&stats), clock(), true);
+    assert!(late[3].contains("not measured yet"), "{late:?}");
     assert!(
         got[0].starts_with("30 FPS"),
         "falls back to the clock: {got:?}"
     );
-    let bare = lines(None, clock());
+    let bare = lines(None, clock(), true);
     assert_eq!(bare[0], "30 FPS   33.00 ms");
     assert!(bare[1].contains("dev build"));
 }

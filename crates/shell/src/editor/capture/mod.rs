@@ -230,7 +230,9 @@ fn draw_ui(
     texture_id: Option<egui::TextureId>,
 ) -> egui::Vec2 {
     let mut is_playing = playing;
-    super::sync::sync_stats(ui, game, rusty_editor::viewport::stats::Clock::at(60.0));
+    // A capture records no window frames: its GPU line reads "nothing drawn yet".
+    let clock = rusty_editor::viewport::stats::Clock::at(60.0);
+    super::sync::sync_stats(ui, game, clock, false);
     let interaction = ui.draw(
         ctx,
         &mut game.world.scene.borrow_mut(),

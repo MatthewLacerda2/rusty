@@ -70,12 +70,14 @@ impl EditorFrontend {
 /// second, the table `Debug.Stats{ window = 60 }` returns, and only on a frame it
 /// shows (the toggle on, the Game tab open): otherwise it folds nothing. Without
 /// the `dev` layer nothing records them, and it shows the window's `clock` alone.
-pub(super) fn sync_stats(ui: &mut EditorUi, game: &GameWorld, clock: Clock) {
+/// `timestamps`: whether the renderer times the GPU (`Renderer::times_gpu`).
+pub(super) fn sync_stats(ui: &mut EditorUi, game: &GameWorld, clock: Clock, timestamps: bool) {
     let shown = ui.viewport_tab == rusty_editor::ViewportTab::Game;
     let on = shown && ui.gizmos.on(rusty_core::application::Gizmo::Stats);
     ui.stats = on.then(|| Readout {
         table: windowed_stats(game),
         clock,
+        timestamps,
     });
 }
 

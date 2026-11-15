@@ -90,7 +90,8 @@ fn register_logging(
 /// `Debug.Stats([opts])` — the frame stats (#433) as a table: `frames`, each metric's
 /// `{last, min, avg, max, samples}`, and `systems` (per-system CPU ms). Filled by the
 /// dev layer's schedule probe; empty (`frames = 0`) where none is installed. With
-/// `opts.window = n`, each metric over its newest `n` samples only (#2205).
+/// `opts.window = n`, each metric over the samples it took within the newest `n`
+/// drawn frames and the newest `n` ticks only (#2205).
 fn register_stats(
     lua: &mlua::Lua,
     table: &Table,

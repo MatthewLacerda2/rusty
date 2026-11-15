@@ -16,7 +16,7 @@ fn drawn(draw_calls: u32, gpu: Option<f64>) -> WindowFrame {
     };
     WindowFrame {
         wall_ms: 16.0,
-        fps: 60.0,
+        fps: Some(60.0),
         render: Some(render),
     }
 }
@@ -43,18 +43,20 @@ fn a_drawn_frame_records_wall_time_and_its_render() {
 }
 
 /// A frame that rendered nothing still records the window's clock, and no
-/// render key: absent, never zero.
+/// render key: absent, never zero. A clock with no reading yet records no `fps`.
 #[test]
 fn a_frame_without_a_render_records_only_the_clock() {
     let mut stats = FrameStats::default();
     let frame = WindowFrame {
         render: None,
+        fps: None,
         ..drawn(1, None)
     };
     record_window(&mut stats, &frame, true);
     assert_eq!(stats.drawn_frames, 0);
     assert!(stats.get("wall_ms").is_some());
     assert!(stats.get("draw_calls").is_none() && stats.get("gpu_ms").is_none());
+    assert!(stats.get("fps").is_none(), "no made-up rate");
 }
 
 /// `Debug.Stats{ window = n }`'s argument: absent is the session, a whole number
@@ -68,6 +70,7 @@ fn window_option_takes_whole_frames() {
     assert_eq!(opts("return {}").unwrap(), None);
     assert_eq!(opts("return { window = 120 }").unwrap(), Some(120));
     assert_eq!(opts("return { window = 1e9 }").unwrap(), Some(RECENT));
+    assert_eq!(opts("return { window = math.huge }").unwrap(), Some(RECENT));
     for bad in [
         "{ window = 0 }",
         "{ window = 2.5 }",

@@ -180,7 +180,10 @@ impl FrameStats {
     pub fn window(&self, n: usize) -> FrameStats {
         let r = &self.recent;
         let n = n.min(RECENT) as u64;
-        let count = |marks: &VecDeque<Stamp>| marks.iter().filter(|at| r.within(**at, n)).count();
+        let count = |marks: &VecDeque<Stamp>| {
+            let edge = marks.partition_point(|at| r.past_edge(*at, n));
+            marks.range(edge..).filter(|at| r.within(**at, n)).count()
+        };
         FrameStats {
             frames: count(&r.tick_marks) as u64,
             drawn_frames: count(&r.drawn_marks) as u64,

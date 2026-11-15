@@ -46,7 +46,14 @@ impl Recent {
     /// drawn without a tick (edit mode, after Stop). A frame's sample is held to
     /// the frame clock alone: a headless run ticks many times per frame it renders.
     pub(super) fn within(&self, at: Stamp, n: u64) -> bool {
-        n > 0 && at.frame + n >= self.frames && (!at.on_tick || at.tick + n >= self.ticks)
+        n > 0 && !self.past_edge(at, n) && (!at.on_tick || at.tick + n >= self.ticks)
+    }
+
+    /// Whether `at` is older than the newest `n` frames. Stamps in a ring only
+    /// grow, so this is false then true walking back: a ring's window starts at the
+    /// first stamp it is false for, found by a binary search.
+    pub(super) fn past_edge(&self, at: Stamp, n: u64) -> bool {
+        at.frame + n < self.frames
     }
 }
 
@@ -81,6 +88,9 @@ pub(super) fn bounded<T>(ring: &mut VecDeque<T>, item: T) {
 
 /// Each key's samples within the newest `n` frames, summarised as a fresh
 /// [`Series`]; a key with none is left out.
+///
+/// Only the samples newer than the window's frame edge are read
+/// ([`Recent::past_edge`]).
 pub(super) fn fold_recent(
     clocks: &Recent,
     recent: &BTreeMap<String, VecDeque<(Stamp, f64)>>,
@@ -88,8 +98,9 @@ pub(super) fn fold_recent(
 ) -> BTreeMap<String, Series> {
     let mut out = BTreeMap::new();
     for (key, samples) in recent {
+        let edge = samples.partition_point(|(at, _)| clocks.past_edge(*at, n));
         let mut series = Series::default();
-        for (at, value) in samples {
+        for (at, value) in samples.range(edge..) {
             if clocks.within(*at, n) {
                 series.record(*value);
             }

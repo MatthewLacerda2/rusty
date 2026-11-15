@@ -15,11 +15,12 @@ pub const STATS_WINDOW: usize = 60;
 /// GPU pass kinds listed, heaviest first.
 const PASSES: usize = 4;
 
-/// The window's clock as the shell's frame loop reads it: FPS over the last whole
-/// second, and the last frame's ms. What the overlay shows without a table.
+/// The window's clock as the shell's frame loop reads it: its last whole-second
+/// FPS reading (`None` before its first second is up), and the last frame's ms.
+/// What the overlay shows without a table.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Clock {
-    pub fps: f32,
+    pub fps: Option<f32>,
     pub frame_ms: f32,
 }
 
@@ -27,53 +28,63 @@ impl Clock {
     /// A steady clock at `fps` frames a second (a headless capture's).
     pub fn at(fps: f32) -> Self {
         let frame_ms = 1000.0 / fps.max(f32::MIN_POSITIVE);
-        Self { fps, frame_ms }
+        Self {
+            fps: Some(fps),
+            frame_ms,
+        }
     }
 }
 
-impl From<(f32, f32)> for Clock {
-    fn from((fps, frame_ms): (f32, f32)) -> Self {
+impl From<(Option<f32>, f32)> for Clock {
+    fn from((fps, frame_ms): (Option<f32>, f32)) -> Self {
         Self { fps, frame_ms }
     }
 }
 
 /// What the overlay shows this frame: the windowed frame stats (`None` without the
-/// `dev` layer, which records them) and the window's clock.
+/// `dev` layer, which records them), the window's clock, and whether the
+/// renderer's device takes GPU timestamps (`Renderer::times_gpu`).
 #[derive(Clone, Debug, Default)]
 pub struct Readout {
     pub table: Option<FrameStats>,
     pub clock: Clock,
+    pub timestamps: bool,
 }
 
 impl Readout {
     /// Its lines ([`lines`]).
     pub fn lines(&self) -> Vec<String> {
-        lines(self.table.as_ref(), self.clock)
+        lines(self.table.as_ref(), self.clock, self.timestamps)
     }
 }
 
 /// The overlay's lines, top to bottom: what [`paint`] draws, kept apart from egui
-/// so a test can read them.
-pub fn lines(stats: Option<&FrameStats>, clock: Clock) -> Vec<String> {
+/// so a test can read them. `timestamps` tells GPU times still on their way (they
+/// land a frame or two late, and Play's first tick clears the window) from an
+/// adapter that has none.
+pub fn lines(stats: Option<&FrameStats>, clock: Clock, timestamps: bool) -> Vec<String> {
+    let rate = |fps: Option<f64>| fps.map_or("—".to_string(), |fps| format!("{fps:.0}"));
     let Some(stats) = stats else {
+        let fps = rate(clock.fps.map(f64::from));
         return vec![
-            format!("{:.0} FPS   {:.2} ms", clock.fps, clock.frame_ms),
+            format!("{fps} FPS   {:.2} ms", clock.frame_ms),
             "Render, sim and GPU times need a dev build".to_string(),
         ];
     };
     let avg = |key: &str| stats.get(key).map(|s| s.avg);
     let ms = |v: Option<f64>| v.map_or("—".to_string(), |v| format!("{v:.2} ms"));
-    let fps = avg("fps").unwrap_or(f64::from(clock.fps));
+    let fps = rate(avg("fps").or(clock.fps.map(f64::from)));
     let frame = avg("wall_ms").unwrap_or(f64::from(clock.frame_ms).max(0.0));
     let last = |key: &str| stats.get(key).map_or("—".to_string(), |s| count(s.last));
     let mut out = vec![
-        format!("{fps:.0} FPS   frame {frame:.2} ms"),
+        format!("{fps} FPS   frame {frame:.2} ms"),
         format!("Sim (per tick)   {}", ms(avg("frame_ms"))),
         format!("Render CPU   {}", ms(avg("renderer_ms"))),
     ];
     out.push(match avg("gpu_ms") {
         Some(gpu) => format!("GPU   {gpu:.2} ms"),
         None if stats.drawn_frames == 0 => "GPU   — (nothing drawn yet)".to_string(),
+        None if timestamps => "GPU   — (not measured yet)".to_string(),
         None => "GPU   not measured: this adapter has no timestamps".to_string(),
     });
     out.push(format!(
