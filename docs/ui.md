@@ -836,7 +836,11 @@ Everything below has an API equivalent — the editor writes through the same
 - **UI overlay.** The Scene tab's **UI** gizmo toggle (on by default;
   `Editor.SetGizmo("UI", on)` from a script) draws the screen-space
   canvases (`ScreenSpaceOverlay`, and `ScreenSpaceCamera` — its plane fills the view)
-  over the scene, laid out on the viewport's pixel size, each canvas outlined.
+  over the scene, laid out on the screen the game lays them out on, each canvas
+  outlined: the viewport's pixel size with the Game view on *Free Aspect*, else the
+  Game view's own size, boxed in the Scene image at its aspect ratio as the Game tab
+  letterboxes it ([`Editor.md`](api/Editor.md#the-game-views-size)). The rect tool
+  and click-select read the same box.
 - **Click-select.** A click in the Scene tab selects the top-most UI element under
   it with `UI.Raycast`'s own hit-test — the overlay canvases (while shown), then
   world canvases along the camera ray in front of the nearest mesh — before falling

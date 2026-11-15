@@ -182,10 +182,14 @@ fn register_preview_material(
     )
 }
 
-/// Read the optional `{ mesh = "sphere"|"cube"|"suzanne", resolution = 512 }` table,
-/// defaulting each field independently. An unknown mesh name raises rather than
-/// silently falling back, so a misspelled `"spere"` is caught at the call, not by the
-/// agent squinting at the wrong picture.
+/// Read the optional `{ mesh = "sphere"|"cube"|"suzanne"|"plane", resolution = 512,
+/// repeats = n }` table, defaulting each field independently (`repeats` absent: the
+/// material as authored). An unknown mesh name raises rather than silently falling
+/// back, so a misspelled `"spere"` is caught at the call, not by the agent squinting
+/// at the wrong picture; so does a `repeats` below 1, and the capture raises on one
+/// past what the renderer can show (`rusty_preview::stand_in::repeated`). (`repeat`
+/// would be the natural name, but it is a Lua keyword, so `{ repeat = 3 }` does not
+/// parse.)
 fn preview_options(opts: Option<&Table>) -> mlua::Result<PreviewOptions> {
     let defaults = PreviewOptions::default();
     let Some(opts) = opts else {
@@ -198,20 +202,33 @@ fn preview_options(opts: Option<&Table>) -> mlua::Result<PreviewOptions> {
     let resolution = opts
         .get::<Option<u32>>("resolution")?
         .unwrap_or(defaults.resolution);
-    Ok(PreviewOptions { mesh, resolution })
+    let repeats = match opts.get::<Option<i64>>("repeats")? {
+        Some(n) if n >= 1 => Some(u32::try_from(n).unwrap_or(u32::MAX)),
+        Some(n) => {
+            return Err(mlua::Error::RuntimeError(format!(
+                "preview repeats must be 1 or more, got {n}"
+            )))
+        }
+        None => defaults.repeats,
+    };
+    Ok(PreviewOptions {
+        mesh,
+        resolution,
+        repeats,
+    })
 }
 
-/// Map a Lua mesh name onto [`PreviewMesh`], matching the editor toggle's three
-/// choices case-insensitively.
+/// Map a Lua mesh name onto [`PreviewMesh`], case-insensitively, the editor toggle's
+/// choices.
 fn parse_mesh(name: &str) -> mlua::Result<PreviewMesh> {
-    match name.to_lowercase().as_str() {
-        "sphere" => Ok(PreviewMesh::Sphere),
-        "cube" => Ok(PreviewMesh::Cube),
-        "suzanne" => Ok(PreviewMesh::Suzanne),
-        other => Err(mlua::Error::RuntimeError(format!(
-            "unknown preview mesh {other:?} — expected \"sphere\", \"cube\" or \"suzanne\""
-        ))),
-    }
+    PreviewMesh::parse(name).ok_or_else(|| {
+        let expected = PreviewMesh::ALL.map(|m| format!("{:?}", m.name().to_lowercase()));
+        mlua::Error::RuntimeError(format!(
+            "unknown preview mesh {:?} — expected one of {}",
+            name.to_lowercase(),
+            expected.join(", ")
+        ))
+    })
 }
 
 /// `Debug.Snapshot([opts])` (whole world) and `Debug.SnapshotEntity(id)` (one entity) —

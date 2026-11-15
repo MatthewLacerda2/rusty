@@ -24,6 +24,9 @@
 //!   save never erases it.
 //! * **The background loading priority** (#2123, Unity's `backgroundLoadingPriority`):
 //!   a frame's budget for a `Scene.LoadAsync`'s GPU warm-up, for this run (`loading`).
+//! * **The editor's mailboxes** — the demo timeline (`demo`), the gizmo toggles
+//!   (`gizmos`) and the Game view's size (`game_view`, #2207): what a dev-only
+//!   `Editor.*` call asks of the editor window, taken at its frame boundary.
 //! * **The quit request** — `Application.Quit()` only *records* that the game asked to
 //!   quit. What that means is the host's call: the player closes the window, the editor
 //!   stops Play (Unity ignores `Quit` in the editor), and the headless harness ends the
@@ -64,6 +67,7 @@ use crate::settings::quality::QualityPresets;
 use crate::settings::render_scale::ProjectGraphics;
 
 mod demo;
+mod game_view;
 mod gizmos;
 mod host;
 mod loading;
@@ -75,6 +79,7 @@ mod reread;
 pub use loading::LoadingPriority;
 
 pub use demo::DemoRequest;
+pub use game_view::{letterbox, GameViewSetting, GameViewSize, MAX_GAME_VIEW_SIDE};
 pub use gizmos::{Gizmo, GizmoRow, SceneGizmos};
 
 /// The startup scene when none is configured: the seeded demo scene. Kept equal to
@@ -161,6 +166,8 @@ pub struct Application {
     demo: demo::DemoDesk,
     /// The Scene view's gizmo mailbox (#1909).
     gizmos: gizmos::GizmoDesk,
+    /// The Game view's size mailbox (#2207).
+    game_view: game_view::GameViewDesk,
     /// Unity's `backgroundLoadingPriority` (#2123): a load's warm-up budget.
     loading_priority: LoadingPriority,
 }

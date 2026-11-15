@@ -1,11 +1,11 @@
 //! The limits every device is created with: wgpu's defaults, but for the sampled
 //! textures one shader stage may bind (#1703).
 //!
-//! The forward pass's fragment stage binds 19: the 16 of wgpu's default (the sky
+//! The forward pass's fragment stage binds 21: the 16 of wgpu's default (the sky
 //! and probe cubes, the decal atlas twice, the lightmap pages twice, the material
 //! maps, the cascades, the AO, the shadow atlas and the opaque copy, #1750), the
-//! integrated volumetric fog (#1703), the shadowmask pages (#1695) and the
-//! material's detail map (#1997). Every adapter rusty ships on has room: Metal
+//! integrated volumetric fog (#1703), the shadowmask pages (#1695), the
+//! material's detail map (#1997) and its occlusion and specular-level maps (#2151). Every adapter rusty ships on has room: Metal
 //! allows 96 sampled textures per stage on macOS GPUs and Apple6 or later, 72 on
 //! Apple4 and Apple5 (wgpu-hal's `metal/adapter.rs`), desktop Vulkan drivers and
 //! lavapipe far more. Asking for exactly what is bound costs nothing (it is a
@@ -13,8 +13,12 @@
 //! that cannot draw the forward pass, rather than the pipeline later.
 //!
 //! Samplers are the tighter budget: Metal binds at most 16 per stage, a hard cap
-//! no limit request lifts, and the forward fragment stage uses 14. The tests count
-//! both from the bind-group layouts themselves.
+//! no limit request lifts. The forward fragment stage uses 13, leaving 3 free:
+//! each material map keeps its own (#1323), while group 0's engine-owned textures
+//! (the sky and probe cubes, the lightmap pages, the fog volume) share one
+//! (`gpu::linear_clamp`), and the decal atlas, the shadow comparison and the
+//! opaque copy keep theirs. A new material map takes a free one; the tests count
+//! both from the bind-group layouts themselves, and fail naming Metal's cap.
 
 /// The features a device takes where its adapter has them: BC texture
 /// compression (#1574) and GPU occlusion culling's indirect draws (#1963). Each
@@ -31,7 +35,7 @@ pub(crate) const WINDOW: wgpu::Features = match cfg!(feature = "dev") {
 };
 
 /// The most sampled textures one stage binds: the forward fragment stage's.
-pub(crate) const SAMPLED_TEXTURES_PER_STAGE: u32 = 19;
+pub(crate) const SAMPLED_TEXTURES_PER_STAGE: u32 = 21;
 
 /// What [`super::Renderer`]'s device asks for.
 pub(crate) fn device_limits() -> wgpu::Limits {
@@ -55,9 +59,9 @@ mod tests {
     #[test]
     fn the_forward_stages_textures_fit_and_nothing_else_moves() {
         let (limits, defaults) = (device_limits(), wgpu::Limits::default());
-        assert_eq!(limits.max_sampled_textures_per_shader_stage, 19);
+        assert_eq!(limits.max_sampled_textures_per_shader_stage, 21);
         let raised = wgpu::Limits {
-            max_sampled_textures_per_shader_stage: 19,
+            max_sampled_textures_per_shader_stage: 21,
             ..defaults
         };
         assert_eq!(limits, raised);
@@ -90,6 +94,6 @@ mod tests {
             "the forward fragment stage binds {textures} sampled textures; \
              the device asks for {SAMPLED_TEXTURES_PER_STAGE} (raise it, and check Metal's 72)"
         );
-        assert_eq!((samplers, textures), (14, 19), "the counts the docs state");
+        assert_eq!((samplers, textures), (13, 21), "the counts the docs state");
     }
 }

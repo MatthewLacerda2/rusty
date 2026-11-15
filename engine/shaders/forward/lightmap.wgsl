@@ -37,8 +37,10 @@
 // put a texel up to 5° off, which a lobe that narrow drew as a sawtooth edge and a
 // dot a texel.
 //
-// No AO: the lobe stands in for direct light, which AO doesn't touch here, and the
-// static occluders' shadows are already in the bake. It is off in every bake capture
+// Its occlusion. The static occluders' shadows are already in the bake; the caller
+// (`shader.wgsl`'s `surface_color`) weighs the lobe by the specular occlusion of
+// SSAO and the material's occlusion map (#2151), as it does the probe reflections,
+// since the lobe is lightmap (indirect) data. It is off in every bake capture
 // (`lighting.baked_specular`), so no view-dependent highlight is frozen into a probe.
 // It is on for every lit, directionally lightmapped surface; a per-material switch
 // would be a `MaterialAsset` bool read here, as `forward::specular_aa` notes for its own.
@@ -46,12 +48,12 @@
 #define_import_path forward::lightmap
 
 #import common::PI
-#import forward::bindings::{lighting, s_lightmaps, t_lightmap_dirs, t_lightmaps}
+#import forward::bindings::{lighting, s_linear_clamp, t_lightmap_dirs, t_lightmaps}
 #import forward::lighting::{decode_lightmap_direction, diffuse_response, lightmap_direction_rebalance, specular_response}
 
 // A lightmapped surface's baked light: `irradiance` its E / pi, the Lambert response
 // `* albedo` gives as a realtime light's does, and `specular` the directional page's
-// lobe (zero without one), which AO does not weigh.
+// lobe (zero without one), which the caller weighs by its specular occlusion.
 struct LightmapLight {
     irradiance: vec3<f32>,
     specular: vec3<f32>,
@@ -70,9 +72,9 @@ struct LightmapLight {
 // reshaped as the front reshapes it, and it gets no lobe: no lamp the bake saw is on
 // that side.
 fn lightmap_light(uv: vec2<f32>, layer: u32, lod: f32, directional: bool, behind: bool, N: vec3<f32>, Ng: vec3<f32>, V: vec3<f32>, F0: vec3<f32>, F90: f32, roughness: f32) -> LightmapLight {
-    var out = LightmapLight(textureSampleLevel(t_lightmaps, s_lightmaps, uv, layer, lod).rgb, vec3<f32>(0.0));
+    var out = LightmapLight(textureSampleLevel(t_lightmaps, s_linear_clamp, uv, layer, lod).rgb, vec3<f32>(0.0));
     if (directional) {
-        var dir = decode_lightmap_direction(textureSampleLevel(t_lightmap_dirs, s_lightmaps, uv, layer, lod));
+        var dir = decode_lightmap_direction(textureSampleLevel(t_lightmap_dirs, s_linear_clamp, uv, layer, lod));
         if (behind) {
             dir = vec4<f32>(reflect(dir.xyz, Ng), 0.0);
         }

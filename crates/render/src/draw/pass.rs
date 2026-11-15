@@ -246,12 +246,13 @@ impl Renderer {
             GlobalGroup {
                 camera: &self.camera_buffer,
                 lighting: &self.lighting_buffer,
-                skybox: (sky.view(panorama), &sky.sampler),
-                cube: (&cube.view, &cube.sampler),
+                skybox: sky.view(panorama),
+                cube: &cube.view,
                 clusters: &self.clusters,
                 decals: &self.decals,
                 lightmaps: self.lightmaps.binding(),
-                fog_volume: (self.fog_volume.view(), &self.fog_volume.sampler),
+                fog_volume: self.fog_volume.view(),
+                linear_clamp: &self.linear_clamp,
             }
             .create(&self.device, &self.camera_lighting_layout)
         };

@@ -6,7 +6,7 @@
 //! `Editor.SetGizmo` / `Editor.GetGizmo` (#1909), Unity's
 //! `GizmoUtility.SetGizmoEnabled`: the Scene view's gizmo toggles, by the names of
 //! `core::application::Gizmo`'s table, through the same mailbox the demo verbs use
-//! (`gizmo_verbs`).
+//! (`gizmo_verbs`). The Game view's size verbs (#2207) are `game_view`'s.
 //!
 //! Unity's `EditorApplication.isPlaying`: `Editor.EnterPlay()` / `Editor.ExitPlay()`
 //! make the same transition the Play/Stop button makes, and `Editor.IsPlaying()` reads
@@ -64,6 +64,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     undo_verbs(&table, lua, scene)?;
     demo_verbs(&table, lua, app, console)?;
     gizmo_verbs(&table, lua, app, console)?;
+    super::game_view::verbs(&table, lua, app, console)?;
     lua.globals()
         .set("Editor", table)
         .map_err(|e| e.to_string())

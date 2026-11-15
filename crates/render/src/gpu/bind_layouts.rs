@@ -2,21 +2,22 @@
 //! constructors split out of `pipelines.rs` to keep each file under the size cap;
 //! `pipelines` consumes these to build the pipeline layouts (behavior unchanged).
 
-use crate::draw::materials::MAP_BINDINGS;
+use crate::draw::map_slots::all_bindings;
 use crate::passes::transparent::OpaqueViews;
 
 use super::layout_entries::{
     depth_entry, dynamic_uniform_entry, sampler_entry, storage_entry, texture_entry, uniform_entry,
 };
 
-/// Group 0: Camera (0), Lighting (1), the sky's reflection cube (2) and its sampler (3,
-/// #1553), Reflection
-/// Probe Cube Array (4), Reflection Probe Sampler (5), the light clusters (#434): the
+/// Group 0: Camera (0), Lighting (1), the sky's reflection cube (2, #1553), the
+/// Reflection Probe Cube Array (4), the light clusters (#434): the
 /// frame's point/spot lights (7), each cluster's light and decal ranges (8) and the
 /// index list (9), and the decals (#638): their records (10), the decal atlas's
-/// sRGB (11) and raw (12) views and its sampler (13), and the baked lightmap pages (14)
-/// with their sampler (15, #438) and direction pages (16, #810), and the
-/// integrated volumetric fog (17) with its sampler (18, #1703). Binding 6 is the shadow module's (see `shader.wgsl`).
+/// sRGB (11) and raw (12) views and its sampler (13), and the baked lightmap pages (14, #438)
+/// with their direction pages (16, #810), the integrated volumetric fog (17, #1703)
+/// and the shadowmask pages (19). Bindings 3, 5 and 15 are gone: 18 is the one
+/// linear-clamp sampler the sky, the probes, the lightmaps, the shadowmask pages
+/// and the fog volume all read. Binding 6 is the shadow module's (see `shader.wgsl`).
 /// The cube array holds the resident probes' baked, prefiltered cubemaps, one per layer
 /// (#245, #1206); a draw's instance names the two probes it blends (#1584), and the
 /// shader samples their layers (parallax-corrected, roughness->mip) and the sky's
@@ -36,10 +37,10 @@ pub(crate) fn camera_lighting_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
         // Vertex-visible too: lit particles shade per vertex (#440).
         uniform_entry(1, wgpu::ShaderStages::VERTEX_FRAGMENT),
         // The sky's prefiltered reflection cube (#1553).
+        // Bindings 3, 5 and 15 are free: the cubes and the lightmap pages read
+        // through the one sampler at 18.
         texture_entry(2, Cube),
-        sampler_entry(3),
         texture_entry(4, CubeArray),
-        sampler_entry(5),
         // Vertex-visible too, for lit particles (#440).
         storage_entry(7, wgpu::ShaderStages::VERTEX_FRAGMENT),
         storage_entry(8, wgpu::ShaderStages::VERTEX_FRAGMENT),
@@ -49,7 +50,6 @@ pub(crate) fn camera_lighting_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
         texture_entry(12, D2Array),
         sampler_entry(13),
         texture_entry(14, D2Array),
-        sampler_entry(15),
         texture_entry(16, D2Array),
         // The integrated volumetric fog (#1703); vertex-visible too: particles
         // fog per vertex.
@@ -57,6 +57,8 @@ pub(crate) fn camera_lighting_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
             visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
             ..texture_entry(17, D3)
         },
+        // The linear clamp sampler every engine-owned texture here reads through
+        // but the decal atlas (`gpu::linear_clamp`), the fog's among them.
         wgpu::BindGroupLayoutEntry {
             visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
             ..sampler_entry(18)
@@ -157,28 +159,15 @@ fn material_sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
     }
 }
 
-/// The detail map's group-2 binding: `materials::MAP_BINDINGS`' last.
-const DETAIL_BINDING: u32 = MAP_BINDINGS[5];
-
-// Every extra shader slot binds below the detail map, and every texture below the
-// samplers' offset, so no two group-2 bindings meet.
-const _: () = {
-    let mut i = 0;
-    while i < rusty_shadergen::textures::SLOTS.len() {
-        assert!(rusty_shadergen::textures::SLOTS[i].binding < DETAIL_BINDING);
-        i += 1;
-    }
-    assert!(DETAIL_BINDING < rusty_shadergen::textures::SAMPLER_OFFSET);
-};
-
-/// Group 2 (one per distinct material map set, #470): the maps at `MAP_BINDINGS`,
+/// Group 2 (one per distinct material map set, #470): the maps at their
+/// `map_slots::MAP_SLOTS` rows' bindings (no two textures meet, a const assert there),
 /// albedo (0) and its sampler (1), metallic (2), roughness (3), normal (4) and
 /// emissive (5); the material's runtime shader params (6, #399), a fixed
 /// `array<vec4<f32>, 16>` uniform only a surface variant with runtime params reads;
 /// one texture per extra shader slot (7 = `mask`, #400), which only a variant with a
-/// block sampling it reads; and the detail map (15, #1997). Every texture but
-/// albedo has its own sampler at `textures::sampler_binding` (16 past it), the wrap
-/// and filter of its import settings (#1323). This is the layout the forward pass's
+/// block sampling it reads; the detail map (15, #1997), the occlusion (14) and
+/// specular-level (13) maps (#2151). Every texture but albedo has its own sampler at
+/// `textures::sampler_binding` (16 past it), its import settings' wrap and filter (#1323). This is the layout the forward pass's
 /// group(2) is built against (#202, #207).
 pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -189,7 +178,7 @@ pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLa
 
 /// [`create_material_layout`]'s entries.
 pub(crate) fn material_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
-    use rusty_shadergen::textures::{sampler_binding, SLOTS};
+    use rusty_shadergen::textures::sampler_binding;
     let params = wgpu::BindGroupLayoutEntry {
         binding: rusty_shadergen::params::PARAM_BINDING,
         // The vertex stage too: a vertex block's runtime param (#1524).
@@ -201,13 +190,11 @@ pub(crate) fn material_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
         },
         count: None,
     };
-    let textures = MAP_BINDINGS
-        .into_iter()
-        .chain(SLOTS.iter().map(|s| s.binding));
     let mut entries = vec![material_sampler_entry(1), params];
-    for binding in textures {
+    for binding in all_bindings() {
         entries.push(material_texture_entry(binding));
-        if binding != MAP_BINDINGS[0] {
+        // Albedo's sampler is `s_diffuse`, at 1, pushed above.
+        if binding != 0 {
             entries.push(material_sampler_entry(sampler_binding(binding)));
         }
     }

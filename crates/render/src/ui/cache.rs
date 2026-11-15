@@ -38,6 +38,11 @@ pub struct UiViewCache {
     /// the Scene tab's UI overlay toggle (#423). Off: the Scene view shows only
     /// world canvases.
     pub screen_in_editor: bool,
+    /// Where the screen canvases lay out and draw inside the view, in target
+    /// pixels: `(x, y, width, height)`, top-left origin. `None`: the whole view.
+    /// The Scene view's UI overlay boxes them at the Game view's own size, so it
+    /// shows the layout the game does (`rect_tool::OverlayFrame` maps the same box).
+    pub screen_box: Option<(u32, u32, u32, u32)>,
     /// Clip slots, Mask textures and the backdrop blur (#426, #428).
     pub(super) effects: UiEffects,
     /// Custom-shaded batches' uniforms this frame (#427), made on first use.

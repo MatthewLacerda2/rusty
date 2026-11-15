@@ -14,7 +14,7 @@
 // slot in `lighting.refl_probes` plus one, 0 for a probe whose cube is not resident
 // (unbaked, failed to load, or past the resident count), which draws flat grey.
 
-#import forward::bindings::{camera, draw, lighting, s_refl_cube, t_refl_cube}
+#import forward::bindings::{camera, draw, lighting, s_linear_clamp, t_refl_cube}
 
 // What a probe with no resident cube shows: flat neutral grey, so it reads as unbaked.
 const UNBAKED_GREY: vec3<f32> = vec3<f32>(0.5, 0.5, 0.5);
@@ -100,7 +100,7 @@ fn fs_ball(in: BallVertex) -> BallFragment {
         // Mip 0 of the probe's chain is `mip_base` levels down the array (a smaller
         // cube shares an array of larger ones, #1584).
         let p = lighting.refl_probes[in.resident - 1u];
-        colour = textureSampleLevel(t_refl_cube, s_refl_cube, reflected, p.layer, p.mip_base).rgb;
+        colour = textureSampleLevel(t_refl_cube, s_linear_clamp, reflected, p.layer, p.mip_base).rgb;
     }
     let at = camera.view_proj * vec4<f32>(hit, 1.0);
     var out: BallFragment;

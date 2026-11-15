@@ -26,7 +26,7 @@ wall-clock or unseeded RNG).
 | `Texture.ToJson` | `(recipe)` | the recipe's canonical JSON string |
 | `Texture.Stats` | `(recipe, [resolution])` | `{ [node_id] = { min, max, mean, std, p1, p99 }, … }` for **every** node, each field an `{r, g, b, a}` array |
 | `Texture.Preview` | `(recipe, path, [size = 128])` | `{ path, columns, order = { node ids } }` — a PNG contact sheet of every node |
-| `Texture.Ops` | `()` | the op catalog: `{ {op, category, min_inputs, max_inputs, params = { {name, type, default, required, values} } }, … }`, then the project's graphs (`op = "graph"`, with `path` and `inputs`; *Graphs* below) |
+| `Texture.Ops` | `()` | the op catalog: `{ {op, category, min_inputs, max_inputs, params = { {name, type, default, required, values} } }, … }`, then the project's graphs and the engine's (`op = "graph"`, with `path` and `inputs`; *Graphs* below) |
 
 `recipe` is a table **or** its serialized JSON string (from `Texture.ToJson`, or a
 saved `.json`) — both forms decode alike, with the same errors. `slot` names the target map and selects the **glTF encoding** applied on the
@@ -42,6 +42,8 @@ lists the valid ones — a typo like `"basecolour"` never silently bakes linear 
 | `roughness` | linear | — |
 | `metallic` | linear | — |
 | `metallic_roughness` / `orm` | linear | reads **metallic from the input's R, roughness from its G** (input B is ignored), and writes them as glTF's packed map: **metallic → B, roughness → G**, R = 0 |
+| `occlusion` / `ao` | linear | — (the material reads R: an `ambient_occlusion` node's output drops straight in) |
+| `specular` | linear | the input's **R written to every channel** (the material reads the level from A, as glTF's `specularTexture`) |
 | `data` | linear, **16-bit** | — (height/masks/anything raw; the explicit way to get unencoded output) |
 
 Every slot bakes 8 bits per channel except `data` and `normal16`, which bake a
@@ -54,8 +56,8 @@ made its copy, unless its `compression` is `"None"`; see `Assets.md`), so the ex
 `image` node, a terrain or displacement bake), not what the GPU draws.
 
 `orm` is only another name for the glTF metallic-roughness packing, not an
-occlusion-roughness-metallic map: rusty's material has no occlusion map, so nothing
-is written to R.
+occlusion-roughness-metallic map: nothing is written to R, so bake occlusion as its
+own `occlusion` output (`occlusion_map`) rather than naming an `orm` file there.
 
 **The target folder.** `Bake`, `BakeSet` and `Preview` make the missing folders
 above `path` (or above `prefix`) when they lie inside the project, so a new set can bake to
@@ -101,6 +103,8 @@ and the file name use the canonical name: `albedo` → `base_color`, `orm` →
 | `roughness` | `roughness_map` |
 | `metallic` | `metallic_map` |
 | `metallic_roughness` | `metallic_map` **and** `roughness_map` (the same PNG) |
+| `occlusion` | `occlusion_map` |
+| `specular` | `specular_map` |
 | `data` | — (no material slot) |
 
 To skip the hand-off, put the whole recipe in the material as `maps`
@@ -287,8 +291,8 @@ list below is a summary of it. Each entry has the `op` tag, its `category`
 (`min_inputs` to `max_inputs`; a node outside that range is an error), and its
 `params`. Each param has a
 `name`, a `type` (`number` | `integer` | `bool` | `color` | `vec2` |
-`enum` | `stops` | `path`, a project-relative file path | `text`, an `expression`
-formula), `required`, a `default` when it has one (absent when required),
+`enum` | `stops` | `path`, a project-relative file path or an `engine/…` one |
+`text`, an `expression` formula), `required`, a `default` when it has one (absent when required),
 `socket` (whether it takes a link to another node, *Linked params* below), and for an
 `enum` the accepted `values`. Units and rounding are the ones *Tiling*
 and *Units* below describe. A unit test holds the catalog to the recipe parser, so
@@ -373,11 +377,21 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   albedo for baked occlusion, `invert` it for a dirt mask.
 - `checker {tiles, color_a, color_b}` (*generator*).
 - `clamp {min, max}` (*math*, 1 input).
-- `color_ramp {stops, interpolation="linear"|"constant"|"ease"}` (*color*, 1 input):
-  as Blender's ColorRamp: `constant` holds each stop's colour from its position up to
-  the next stop — hard bands for toon, stylized and posterized looks — and `ease` is
-  a smoothstep between stops, soft into and out of each colour. Each pixel finds its
-  stops by binary search, so a lookup ramp of thousands of stops stays cheap.
+- `color_ramp {stops, interpolation="linear"|"constant"|"ease"|"cardinal"|"b_spline"}`
+  (*color*, 1 input): as Blender's ColorRamp: `constant` holds each stop's colour from
+  its position up to the next stop — hard bands for toon, stylized and posterized
+  looks — and `ease` is a smoothstep between stops, soft into and out of each colour
+  (flat at every stop). `cardinal` is a curve **through** chosen points, as Blender's
+  ColorRamp draws it: with grayscale stops, a bevel's cross-section, a tone S-curve, a
+  roughness response; it can overshoot between stops. `b_spline` is smoother and
+  stays **within** the stops' range, passing near them rather than through. Both
+  weigh the four stops around a pixel and clamp to `[0, 1]`. They are not a Float
+  Curve's (or Substance's Curve's) points copied over, which differ twice: the
+  spline is uniform in its stops, so it is smooth across a stop only when the gaps
+  either side are equal (at uneven ones the slope jumps by their ratio: space the
+  stops evenly), and past the end stops it runs on toward copies of them at 0 and 1
+  rather than holding flat (put stops at 0 and 1 to pin the ends). Each pixel finds
+  its stops by binary search, so a lookup ramp of thousands of stops stays cheap.
 - `combine_rgb` (*vector*, 1 to 4 inputs): grayscale inputs → R, G, B and alpha (each
   input's red); a colour channel without an input reads 0, alpha without one reads 1.
 - `constant {color}` (*generator*).
@@ -410,9 +424,10 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   `radius`, clamped to 1; outside reads 0. It rounds **any** mask — a Voronoi cell, a
   thresholded noise, a stamp — the way `shape`'s `softness` and brick's `bevel` round
   their own; feed it to `bump_to_normal`. Straight, it is a chamfer; through `math`
-  `func = "sqrt"` (a curve steepest at the rim and flat on top) it is a rounded,
-  convex edge. Avoid an `ease` `color_ramp` here: it is flat at the rim too, so the
-  edge reads as a pillow.
+  `func = "sqrt"` (a curve steepest at the rim and flat on top) it is the one-node
+  rounded, convex edge; for a chosen profile, a `cardinal` `color_ramp` through a few
+  evenly spaced points of the cross-section (uneven spacing creases at a stop). Avoid an `ease` `color_ramp` here: it is flat at the
+  rim too, so the edge reads as a pillow.
 - `edge_detect {width, roundness=0}` (*filter*, 1 input): mask → its outline, like
   Substance's *Edge Detect*: red above 0.5 is inside (as `distance`), and a line
   `width` tiles wide straddles every edge. `roundness` 0 is a flat-topped line, 1 a
@@ -773,6 +788,14 @@ imported model, a provider-generated image, an earlier bake, a hand-made mask or
 - `path` is taken from the **project root**, as `require` takes its scripts. A file
   outside the project is read, but warns once per file in the console: it is an
   input the seed doesn't cover, and may be missing on another machine.
+- A `path` that starts **`engine/`** names a file the engine ships
+  (`engine/textures/…`), read from the engine's content folder wherever it is
+  installed. A file inside the engine's content folder never warns, since that
+  content ships beside every install; one an `engine/../…` path climbs out to
+  warns, as a file outside the project does. The path is matched as stored:
+  `./engine/…` and `engine//…` are the engine's too. The recipe stores the
+  `engine/…` spelling, the same on every machine. The engine wins: a project
+  folder named `engine/` is unreachable from a recipe.
 - `encoding = "srgb"` (the default, a colour image) decodes RGB from sRGB to linear;
   `"linear"` (a mask, a height, a normal map) reads every channel as stored. Alpha is
   always as stored. 16-bit files keep their precision. png, jpeg and tga are read;
@@ -811,7 +834,11 @@ material with its `age`, `tint` and `mortar_width` knobs.
 **The file.** A graph is a recipe saved as `<name>.graph.json` (the
 `Texture.ToJson` form), anywhere in the project, named by its path from the project
 root as an `image` node names its file (outside the project it is read, with a
-once-per-file warning). The extension is what makes it a graph: instancing any other
+once-per-file warning). A graph the **engine ships** is named by its `engine/…` path
+(the library lives under `engine/textures/library/`), read from the engine's content
+folder by the `image` node's rule, nested instances inside it included; an engine
+upgrade may change one, so a material instancing it can bake differently after. The
+extension is what makes it a graph: instancing any other
 file is refused. Every recipe may be one; two optional fields give it an interface:
 
 ```json
@@ -883,8 +910,9 @@ graphs it was in). Two nodes sharing an id in one recipe or one graph are refuse
 an instance's id included, and every error from inside an instance names its graph
 file.
 
-**`Texture.Ops()`** lists the project's graphs after the ops, each as `op = "graph"`
-with its `path`, `category = "graph"`, `min_inputs` = `max_inputs` = its input count,
+**`Texture.Ops()`** lists the project's graphs after the ops, then the engine's (any
+`engine/**/*.graph.json`, by its `engine/…` path), each as `op = "graph"` with its
+`path`, `category = "graph"`, `min_inputs` = `max_inputs` = its input count,
 its `inputs` names and its `params` (`name`, `type`, `default`, `min`, `max`). A graph
 file that does not parse is left out, with a warning naming it.
 

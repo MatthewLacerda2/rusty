@@ -12,17 +12,18 @@ use crate::GpuTexture;
 use rusty_asset::convert::texture_ref;
 use rusty_asset::MapRef;
 use rusty_components::is_render_texture;
-use rusty_components::rendering::post_processing::DEFAULT_DIRT_TEXTURE;
 use rusty_core::fs::freshness::Freshness;
 use rusty_core::fs::written::Stale;
 
-/// The file a dirt `setting` reads: [`DEFAULT_DIRT_TEXTURE`] is the engine's own,
-/// wherever `engine/` is; any other path as it is. Resolved only when it is read.
+/// The file a dirt `setting` reads: an `engine/…` path,
+/// [`DEFAULT_DIRT_TEXTURE`](rusty_components::rendering::post_processing::DEFAULT_DIRT_TEXTURE)
+/// among them, is the engine's own, wherever `engine/` is
+/// ([`rusty_core::project::engine_relative`]); any other path as it is. Resolved
+/// only when it is read.
 pub(crate) fn file(setting: &str) -> MapRef {
-    if setting == DEFAULT_DIRT_TEXTURE {
-        rusty_core::project::engine_path("textures/lens_dirt.png").into()
-    } else {
-        setting.into()
+    match rusty_core::project::engine_relative(setting) {
+        Some(relative) => rusty_core::project::engine_path(&relative).into(),
+        None => setting.into(),
     }
 }
 

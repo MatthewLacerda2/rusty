@@ -40,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-explore test-one-process dead-pub editor-capture game game-test export launcher bench bless-converters fuzz-lock
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture game game-test export launcher bench bless-converters fuzz-lock
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -184,13 +184,39 @@ doc: ## [gate] Rustdoc with warnings denied, both feature sets
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked --features dev
 
+# All four runs go on when one fails, as nextest does inside a run (fail-fast off), so
+# one `make test` reports every failure: each run under its own header, and the last
+# line names the runs that failed.
 test: ## [gate] Engine tests (nextest) and doctests, both feature sets, on the gates' proptest seed
 	@command -v cargo-nextest >/dev/null 2>&1 || { \
 		echo "test: cargo-nextest is not installed — cargo install --locked cargo-nextest"; exit 1; }
-	$(TEST)
-	$(TEST) --features dev
-	cargo test --doc --locked
-	cargo test --doc --locked --features dev
+	@failed=; \
+	echo "== make test: nextest (default)"; \
+	$(TEST) || failed="$$failed, nextest (default)"; \
+	echo "== make test: nextest (dev)"; \
+	$(TEST) --features dev || failed="$$failed, nextest (dev)"; \
+	echo "== make test: doctests (default)"; \
+	cargo test --doc --locked || failed="$$failed, doctests (default)"; \
+	echo "== make test: doctests (dev)"; \
+	cargo test --doc --locked --features dev || failed="$$failed, doctests (dev)"; \
+	if [ -n "$$failed" ]; then echo "make test: failed: $${failed#, }"; exit 1; fi
+
+# The GPU suite alone, on one adapter (docs/testing.md, *Which adapters a GPU
+# tolerance holds on*): lavapipe when its Vulkan driver is installed, so a red test
+# on a real GPU is told from the change in one command, else the machine's own.
+# ADAPTER=<part of a name> picks another (`nvidia`, `llvmpipe`); RUSTY_REQUIRE_GPU
+# makes "no adapter of that name" a failure, and the canary prints which one ran.
+# Both feature sets run even when the first fails, and the exit says if either did.
+ADAPTER ?= $(if $(wildcard /usr/share/vulkan/icd.d/lvp_icd*.json),llvmpipe,)
+# `group(gpu)`: the tests .config/nextest.toml puts in its gpu group, so the naming
+# rule stays written in that one file.
+GPU_TESTS := -E 'group(gpu)'
+test-gpu: ## The GPU tests alone, both feature sets, on ADAPTER (lavapipe when installed)
+	@rc=0; \
+	export RUSTY_REQUIRE_GPU=1 WGPU_ADAPTER_NAME='$(ADAPTER)'; \
+	$(TEST) $(GPU_TESTS) || rc=1; \
+	$(TEST) --features dev $(GPU_TESTS) || rc=1; \
+	exit $$rc
 
 # Fresh proptest seeds, as the nightly draws (#1852): a signal, never a gate. A case
 # it finds is written to proptest-regressions/ and committed with its fix

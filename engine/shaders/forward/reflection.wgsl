@@ -8,7 +8,7 @@
 
 #import lighting::sh::sh_basis
 #import lighting::reflection_probe::{ReflectionProbe, parallax_correct}
-#import forward::bindings::{lighting, s_refl_cube, s_skybox, t_refl_cube, t_skybox}
+#import forward::bindings::{lighting, s_linear_clamp, t_refl_cube, t_skybox}
 
 // How much of the environment a surface reflects toward `V`: Unity URP's analytic
 // environment BRDF (#1543; `BRDF.hlsl` `EnvironmentBRDFSpecular`,
@@ -84,7 +84,7 @@ fn environment_reflection(world_pos: vec3<f32>, raw_r: vec3<f32>, N: vec3<f32>, 
 fn probe_reflection(p: ReflectionProbe, world_pos: vec3<f32>, R: vec3<f32>, b: array<f32, 9>, roughness: f32, baked: vec2<f32>) -> vec3<f32> {
     let dir = select(R, parallax_correct(p, world_pos, R), p.params.y > 0.5);
     let lod = p.mip_base + roughness * (p.mip_count - 1.0);
-    let cube = textureSampleLevel(t_refl_cube, s_refl_cube, dir, p.layer, lod).rgb;
+    let cube = textureSampleLevel(t_refl_cube, s_linear_clamp, dir, p.layer, lod).rgb;
     return cube * p.params.x * probe_normalisation(p, b, baked);
 }
 
@@ -138,7 +138,7 @@ fn specular_occlusion(n_dot_v: f32, ao: f32, roughness: f32) -> f32 {
 // The sky's reflection along `R`.
 fn sky_reflection(R: vec3<f32>, roughness: f32) -> vec3<f32> {
     let lod = roughness * f32(textureNumLevels(t_skybox) - 1u);
-    let sky = textureSampleLevel(t_skybox, s_skybox, R, lod);
+    let sky = textureSampleLevel(t_skybox, s_linear_clamp, R, lod);
     if (lighting.sky_textured > 0.5) {
         return sky.rgb;
     }
