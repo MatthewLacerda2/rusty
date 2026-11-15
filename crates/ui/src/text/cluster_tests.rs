@@ -3,9 +3,9 @@
 
 use glam::Vec2;
 
-use super::font;
 use super::layout_text;
 use rusty_components::{TextComponent, TextOverflow};
+use rusty_font as font;
 
 const WIDE: Vec2 = Vec2::new(500.0, 100.0);
 

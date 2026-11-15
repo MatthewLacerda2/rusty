@@ -1,4 +1,4 @@
-//! crates/ui/src/text/shape.rs — one run of text → positioned glyphs, with `harfrust` (#1328).
+//! crates/font/src/shape.rs — one run of text → positioned glyphs, with `harfrust` (#1328).
 //!
 //! A run is text in one face at one size; shaping picks its glyphs (ligatures,
 //! contextual forms, combining marks) and positions them (GPOS kerning, mark
@@ -12,7 +12,7 @@ use glam::Vec2;
 use skrifa::instance::{LocationRef, Size};
 use skrifa::MetadataProvider;
 
-use super::font::{FontData, GlyphId};
+use crate::face::{FontData, GlyphId};
 
 /// One shaped glyph, font units.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -122,7 +122,7 @@ fn plan(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::text::font;
+    use crate::face as font;
 
     fn advance_sum(s: &str) -> f32 {
         shape(&font::default_font(), s, &[])

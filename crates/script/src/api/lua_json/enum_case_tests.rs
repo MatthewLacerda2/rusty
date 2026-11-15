@@ -7,7 +7,7 @@ use serde_json::{json, Map, Value as Json};
 
 use super::*;
 use rusty_components::{GradientKind, UiGradient};
-use rusty_procgen::recipe::{OpInfo, OpKind, OPS, SAMPLE_PATH};
+use rusty_procgen::recipe::{sample_required, OpInfo, OpKind, OPS};
 use rusty_procgen::TextureRecipe;
 use rusty_shadergen::{PassKind, ShaderRecipe};
 
@@ -32,18 +32,6 @@ fn a_gradient_kind_reads_in_any_case_from_lua() {
     );
 }
 
-/// A valid value for a required non-enum param of type `ty`.
-fn sample(ty: &str) -> Json {
-    match ty {
-        "color" => json!([0.0, 0.0, 0.0, 1.0]),
-        "vec2" => json!([1.0, 1.0]),
-        "bool" => json!(true),
-        "path" => json!(SAMPLE_PATH),
-        "stops" => json!([{ "pos": 0.0, "color": [0.0, 0.0, 0.0, 1.0] }]),
-        _ => json!(2),
-    }
-}
-
 /// `info`'s op with its required params filled and every enum param at its
 /// `round`th value, the op tag and the enum values passed through `case`.
 fn op_doc(info: &OpInfo, round: usize, case: fn(&str) -> String) -> Json {
@@ -52,7 +40,7 @@ fn op_doc(info: &OpInfo, round: usize, case: fn(&str) -> String) -> Json {
     for p in info.params {
         let value = match p.ty {
             "enum" => json!(case(p.values[round % p.values.len()])),
-            _ if p.default.is_none() => sample(p.ty),
+            _ if p.default.is_none() => sample_required(p),
             _ => continue,
         };
         doc.insert(p.name.into(), value);

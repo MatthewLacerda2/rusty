@@ -41,14 +41,16 @@ pub struct Loaded {
 }
 
 /// Read `recipe`'s graphs and expand them, check the flat recipe, then read and
-/// find every file its `image` nodes name, each path taken from `roots` (the open
-/// project's, [`rusty_core::project::root`], and the engine's). A cycle or an
-/// unknown input is reported as itself, before any image is read.
+/// find every file its `image` nodes name and read every font its `text` nodes
+/// name (`super::fonts`), each path taken from `roots` (the open project's,
+/// [`rusty_core::project::root`], and the engine's). A cycle or an unknown input
+/// is reported as itself, before any image is read.
 pub fn load_recipe(recipe: &TextureRecipe, roots: &ContentRoots) -> Result<Loaded, String> {
     let graphs = super::graphs::read_graphs(recipe, roots)?;
     let expanded = expand(recipe, &graphs)?;
     expanded.validate()?;
-    let sources = read_images(&expanded.recipe, roots)?;
+    let mut sources = read_images(&expanded.recipe, roots)?;
+    super::fonts::read_fonts(&expanded.recipe, roots, &mut sources)?;
     Ok(Loaded {
         recipe: expanded.recipe,
         sources,

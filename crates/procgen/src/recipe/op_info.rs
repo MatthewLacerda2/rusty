@@ -21,7 +21,8 @@ pub struct OpParam {
     pub name: &'static str,
     /// `number` | `integer` | `bool` | `color` (a linear RGBA array, or an sRGB
     /// `"#rrggbb"` / `"#rrggbbaa"` string) | `vec2` | `enum` | `stops` | `path` (a
-    /// project-relative file path) | `text` (an `expression` formula).
+    /// project-relative file path) | `text` (any string: an `expression` formula,
+    /// lettering, SVG path data).
     pub ty: &'static str,
     /// The accepted tags for an `enum` param; empty otherwise.
     pub values: &'static [&'static str],
@@ -30,6 +31,10 @@ pub struct OpParam {
     /// the curated, amount-like ones, never a whole count, an enum, a colour or a
     /// size ([`super::Param`]).
     pub socket: bool,
+    /// A valid value for a required param whose type's generic sample would not
+    /// parse (SVG path data is not any text): what the catalog tests and the Lua
+    /// enum-case test fill it with. `None` takes the type's sample.
+    pub sample: Option<&'static str>,
 }
 
 /// One op: its `op` tag, menu category, the inputs it accepts, and its params.
@@ -49,6 +54,7 @@ pub(crate) const fn req(name: &'static str, ty: &'static str) -> OpParam {
         values: &[],
         default: None,
         socket: false,
+        sample: None,
     }
 }
 
@@ -59,6 +65,15 @@ pub(crate) const fn opt(name: &'static str, ty: &'static str, default: Lit) -> O
         values: &[],
         default: Some(default),
         socket: false,
+        sample: None,
+    }
+}
+
+/// The required text param `name`, sampled in tests by `sample`.
+pub(crate) const fn req_sampled(name: &'static str, sample: &'static str) -> OpParam {
+    OpParam {
+        sample: Some(sample),
+        ..req(name, "text")
     }
 }
 
@@ -74,6 +89,7 @@ pub(crate) const fn choice(name: &'static str, values: &'static [&'static str]) 
         values,
         default: None,
         socket: false,
+        sample: None,
     }
 }
 
