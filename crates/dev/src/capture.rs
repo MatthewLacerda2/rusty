@@ -168,11 +168,10 @@ impl CaptureHost {
             .color_target_view()
             .ok_or_else(|| "capture view owns no colour target".to_string())?;
         // The Game view's exact render path (editor_mode = false: no grid or editor
-        // gizmos; the colliders and debug lines only with `gizmos`),
-        // timed for the frame stats: the dev layer may read the clock.
-        let start = std::time::Instant::now();
+        // gizmos; the colliders and debug lines only with `gizmos`), its CPU ms
+        // the renderer's own frame clock, as the window reads it.
         renderer.render(view, scene, camera, &target, false);
-        let cpu_ms = start.elapsed().as_secs_f64() * 1000.0;
+        let cpu_ms = renderer.frame_cost().cpu_ms;
         renderer.wait_idle();
         let exposure = view.settled_exposure(&renderer.device);
         let frame = RenderedFrame {
