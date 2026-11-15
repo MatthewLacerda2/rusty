@@ -85,6 +85,23 @@ impl ParticleEmitterComponent {
             start_frame,
             axis,
             turn: self.birth_turn(frame),
+            custom: [0.0; 4],
+        }
+    }
+
+    /// The particle a script adds by hand (`Particles.SetParticles`) before its
+    /// own fields are written: at the emitter frame `frame`'s origin, with the
+    /// start ranges' minimums, the turn a spawn there gives it, and no draw from
+    /// the seeded stream.
+    pub fn placed(&self, frame: &EmitterFrame) -> Particle {
+        Particle {
+            turn: self.birth_turn(frame),
+            ..Particle::at(
+                frame.origin(),
+                self.size.min,
+                self.color.min,
+                self.lifetime.min,
+            )
         }
     }
 
