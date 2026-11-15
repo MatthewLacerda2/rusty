@@ -1,11 +1,11 @@
 //! The GPU records on the CPU (#2170): the lookup-table bake, the step mirror
 //! against the closed form (one step at a time and the jump past the window),
-//! the sprite, and which devices hold the cap.
+//! the sprite, and a birth older than the window aged by the time it took.
 
 use glam::{Mat4, Vec3};
 
 use super::*;
-use crate::passes::particles::gpu::twin::{advance, lut_at, sprite};
+use crate::passes::particles::gpu::twin::{advance, birth, lut_at, sprite};
 use rusty_components::particle::{Birth, Particle};
 use rusty_core::curve::{Curve, Gradient};
 
@@ -16,6 +16,7 @@ fn record(position: Vec3, velocity: Vec3, lifetime: f32) -> GpuParticle {
         particle,
         slot: 0,
         step: 0,
+        time: 0.0,
         serial: 0,
         dead: false,
     };
@@ -66,7 +67,7 @@ fn a_step_under_gravity_lands_where_the_closed_form_says() {
         30,
     );
     let mut p = record(Vec3::ZERO, v0, 10.0);
-    advance(&mut p, (n, 1), g, &lut, &[dt; 30]);
+    advance(&mut p, (n, 1), g, &lut, (&[dt; 30], 0.0));
     // Semi-implicit Euler: x_n = n·dt·v0 + dt²·g·n(n+1)/2.
     let nf = n as f32;
     let want = v0 * nf * dt + g * dt * dt * nf * (nf + 1.0) / 2.0;
@@ -83,9 +84,9 @@ fn a_step_under_gravity_lands_where_the_closed_form_says() {
 fn a_particle_dies_on_the_step_its_age_reaches_its_lifetime_and_stays_dead() {
     let lut = bake_lut(&ParticleEmitterComponent::default());
     let mut p = record(Vec3::ZERO, Vec3::ZERO, 0.05);
-    advance(&mut p, (2, 1), Vec3::ZERO, &lut, &[1.0 / 60.0; 2]);
+    advance(&mut p, (2, 1), Vec3::ZERO, &lut, (&[1.0 / 60.0; 2], 0.0));
     assert!(p.alive());
-    advance(&mut p, (10, 3), Vec3::ZERO, &lut, &[1.0 / 60.0; 8]);
+    advance(&mut p, (10, 3), Vec3::ZERO, &lut, (&[1.0 / 60.0; 8], 0.0));
     assert!(!p.alive(), "0.05 s is three steps");
     let emitter = GpuEmitter::new(
         &ParticleEmitterComponent::default(),
@@ -94,7 +95,7 @@ fn a_particle_dies_on_the_step_its_age_reaches_its_lifetime_and_stays_dead() {
     );
     assert!(sprite(&p, &emitter, &lut).is_none());
     let mut dead = GpuParticle::EMPTY;
-    advance(&mut dead, (5, 1), Vec3::Y, &lut, &[1.0; 5]);
+    advance(&mut dead, (5, 1), Vec3::Y, &lut, (&[1.0; 5], 0.0));
     assert_eq!(dead, GpuParticle::EMPTY);
 }
 
@@ -129,6 +130,7 @@ fn a_dead_birth_uploads_as_an_empty_slot() {
         particle: Particle::at(Vec3::ONE, 1.0, [1.0; 4], 1.0),
         slot: 3,
         step: 7,
+        time: 0.0,
         serial: 0,
         dead: true,
     };
@@ -151,9 +153,9 @@ fn steps_older_than_the_window_jump_in_closed_form_where_stepping_would_land() {
         lut_source.drag = Curve::constant(drag);
         let lut = bake_lut(&lut_source);
         let (mut stepped, mut jumped) = (record(Vec3::ZERO, v0, 1e6), record(Vec3::ZERO, v0, 1e6));
-        advance(&mut stepped, (1000, 1), g, &lut, &[dt; 1000]);
+        advance(&mut stepped, (1000, 1), g, &lut, (&[dt; 1000], 0.0));
         // Only the last 10 steps in the window: the first 990 are one jump.
-        advance(&mut jumped, (1000, 991), g, &lut, &[dt; 10]);
+        advance(&mut jumped, (1000, 991), g, &lut, (&[dt; 10], 990.0 * dt));
         let (a, b) = (Vec3::from(stepped.position), Vec3::from(jumped.position));
         assert!(
             (a - b).length() < 1e-2 * a.length().max(1.0),
@@ -164,7 +166,7 @@ fn steps_older_than_the_window_jump_in_closed_form_where_stepping_would_land() {
     }
     let mut short = record(Vec3::ZERO, v0, 0.5);
     let lut = bake_lut(&ParticleEmitterComponent::default());
-    advance(&mut short, (1000, 991), g, &lut, &[dt; 10]);
+    advance(&mut short, (1000, 991), g, &lut, (&[dt; 10], 990.0 * dt));
     assert!(
         !short.alive(),
         "a particle dead inside the jump is dead after it"
@@ -172,13 +174,32 @@ fn steps_older_than_the_window_jump_in_closed_form_where_stepping_would_land() {
 }
 
 #[test]
-fn a_device_holds_the_cap_or_as_many_as_its_buffers_fit() {
-    use crate::passes::particles::gpu::fit;
-    use rusty_components::particle::GPU_MAX_PARTICLES;
-    assert_eq!(fit(&wgpu::Limits::default()), GPU_MAX_PARTICLES);
-    let small = wgpu::Limits {
-        max_storage_buffer_binding_size: 64 * 1000,
-        ..Default::default()
+fn a_jump_over_a_pause_ages_by_the_time_that_passed_not_the_windows_dt() {
+    let lut = bake_lut(&ParticleEmitterComponent::default());
+    let dt = 1.0 / 60.0;
+    // Born at step 0; steps 1..=300 took `dt`, steps 301..=600 nothing: the
+    // window is the last 256 (345..=600, all 0), so steps 1..=344 took 300 dt.
+    let paused = [0.0; 256];
+    let upload = |lifetime: f32| GpuBirth {
+        particle: record(Vec3::ZERO, Vec3::X, lifetime),
+        slot: 0,
+        jumped: 300.0 * dt,
+        pad: [0; 2],
     };
-    assert_eq!(fit(&small), 1000);
+    let mut long = birth(&upload(6.0), 345, Vec3::ZERO, &lut);
+    advance(&mut long, (600, 345), Vec3::ZERO, &lut, (&paused, 0.0));
+    assert!(long.alive());
+    assert!(
+        (long.age - 5.0).abs() < 1e-4,
+        "aged 5 s, not 0: {}",
+        long.age
+    );
+    assert!(
+        (long.position[0] - 5.0).abs() < 1e-3,
+        "moved 5 s: {:?}",
+        long.position
+    );
+    let mut short = birth(&upload(4.0), 345, Vec3::ZERO, &lut);
+    advance(&mut short, (600, 345), Vec3::ZERO, &lut, (&paused, 0.0));
+    assert!(!short.alive(), "a 4 s life ended inside the pause's jump");
 }

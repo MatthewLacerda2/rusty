@@ -199,3 +199,36 @@ fn a_gpu_emitter_holds_no_more_than_the_fixed_cap() {
     };
     assert_eq!(cpu.particle_cap(), u32::MAX);
 }
+
+#[test]
+fn the_running_time_is_kept_at_each_recent_step_and_at_each_birth() {
+    let mut sim = GpuSim::default();
+    sim.step(0.25);
+    sim.add(particle(1e9));
+    for _ in 0..DT_HISTORY + 10 {
+        sim.step(0.0);
+    }
+    sim.step(0.5);
+    let born = sim.births().next().unwrap();
+    assert_eq!(
+        (born.step, born.time),
+        (1, 0.25),
+        "born after the first step"
+    );
+    assert_eq!(sim.time(), 0.75);
+    let now = sim.steps();
+    assert_eq!(sim.time_at(now), Some(0.75));
+    assert_eq!(sim.time_at(now - 1), Some(0.25));
+    assert_eq!(
+        sim.time_at(now - DT_HISTORY as u64),
+        Some(0.25),
+        "the one before the kept dts"
+    );
+    assert_eq!(
+        sim.time_at(now - DT_HISTORY as u64 - 1),
+        None,
+        "older than kept"
+    );
+    assert_eq!(sim.time_at(now + 1), None, "not taken yet");
+    assert_eq!(GpuSim::default().time_at(0), Some(0.0));
+}

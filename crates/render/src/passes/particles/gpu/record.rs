@@ -66,13 +66,15 @@ impl GpuParticle {
     }
 }
 
-/// One birth upload (`GpuBirth`): the particle and its slot.
+/// One birth upload (`GpuBirth`): the particle, its slot, and the time its steps
+/// older than the uploaded window took (0 when it has none).
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct GpuBirth {
     pub(crate) particle: GpuParticle,
     pub(crate) slot: u32,
-    pub(crate) pad: [u32; 3],
+    pub(crate) jumped: f32,
+    pub(crate) pad: [u32; 2],
 }
 
 /// One emitter's uniform (`GpuEmitter`).
@@ -80,6 +82,8 @@ pub(crate) struct GpuBirth {
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct GpuEmitter {
     pub(crate) frame: [f32; 16],
+    /// Gravity in the stored space; the time the steps older than the window
+    /// took for a particle stepped at the last upload (0 when it has none).
     pub(crate) gravity: [f32; 4],
     pub(crate) light: [f32; 4],
     pub(crate) sheet: [f32; 4],

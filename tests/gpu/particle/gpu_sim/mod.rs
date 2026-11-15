@@ -6,6 +6,7 @@
 
 mod frames;
 mod motion;
+mod pause;
 mod space;
 
 use std::cell::RefCell;

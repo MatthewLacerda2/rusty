@@ -11,6 +11,9 @@ const STORAGE: wgpu::BufferUsages = wgpu::BufferUsages::STORAGE
     .union(wgpu::BufferUsages::COPY_DST)
     .union(wgpu::BufferUsages::COPY_SRC);
 
+/// A birth's record, with the step and the running time it was born at.
+type Fresh = (GpuBirth, (u64, f64));
+
 /// What the frame has to dispatch for one emitter after its upload.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Work {
@@ -30,8 +33,9 @@ pub(crate) struct EmitterBuffers {
     epoch: u64,
     /// The next birth serial to upload.
     cursor: u64,
-    /// The step the particles were last moved to; `None` since a reset.
-    done: Option<u64>,
+    /// The step the particles were last moved to and the sim's running time
+    /// after it; `None` since a reset.
+    done: Option<(u64, f64)>,
     /// The sim's [`GpuSim::emptied`] these buffers last saw.
     emptied: u64,
     pub(crate) particles: wgpu::Buffer,
@@ -49,6 +53,17 @@ pub(crate) struct EmitterBuffers {
     pub(crate) idle: u32,
 }
 
+/// The bytes of a `count`-slot buffer of `T`s.
+fn bytes<T>(count: u32) -> u64 {
+    (std::mem::size_of::<T>() as u64 * u64::from(count.max(1))).max(16)
+}
+
+/// The births buffer's slots for `count` births: rounded up to a power of two,
+/// so it grows rarely.
+fn births_slots(count: u32) -> u32 {
+    count.next_power_of_two()
+}
+
 /// A `count`-slot buffer of `T`s labelled `label`.
 fn buffer<T>(
     device: &wgpu::Device,
@@ -58,7 +73,7 @@ fn buffer<T>(
 ) -> wgpu::Buffer {
     device.create_buffer(&wgpu::BufferDescriptor {
         label: Some(label),
-        size: (std::mem::size_of::<T>() as u64 * u64::from(count.max(1))).max(16),
+        size: bytes::<T>(count),
         usage,
         mapped_at_creation: false,
     })
@@ -90,8 +105,7 @@ impl EmitterBuffers {
     }
 
     /// Bring the buffers to `sim` for an emitter whose uniform is `emitter` and
-    /// whose curves bake to `lut`, needing `wanted` slots (never more than the
-    /// device holds, the caller's clamp): grow, empty on a new epoch or once every
+    /// whose curves bake to `lut`, needing `wanted` slots: grow, empty on a new epoch or once every
     /// particle has died, upload the new births, the owed steps' `dt`s, the table
     /// when it changed and the uniform. Returns what to dispatch.
     pub(crate) fn upload(
@@ -121,19 +135,39 @@ impl EmitterBuffers {
         let (births, oldest) = self.new_births(sim);
         // Moved from the older of the last step reached and the oldest new birth's.
         let goal = sim.steps();
-        let from = match (oldest, self.done) {
+        let done = self.done.map(|(step, _)| step);
+        let from = match (oldest, done) {
             (Some(b), Some(d)) => b.min(d),
             (b, d) => b.or(d).unwrap_or(goal),
         };
         let start = (from + 1).max((goal + 1).saturating_sub(DT_HISTORY as u64));
         let dts: Vec<f32> = (start..=goal).filter_map(|s| sim.dt_of(s)).collect();
         let first = goal + 1 - dts.len() as u64;
+        // What the steps before the window took, from where each particle starts:
+        // the sim's running time, so a jump ages by the time that really passed
+        // (a pause at time scale 0 included), not by a window `dt` times the count.
+        let window_starts = sim.time_at(first - 1).unwrap_or_else(|| sim.time());
+        let jumped = |step: u64, time: f64| {
+            if step + 1 < first {
+                (window_starts - time) as f32
+            } else {
+                0.0
+            }
+        };
+        let births: Vec<GpuBirth> = births
+            .into_iter()
+            .map(|(b, born)| GpuBirth {
+                jumped: jumped(born.0, born.1),
+                ..b
+            })
+            .collect();
         let extent = sim.extent().min(self.capacity);
+        emitter.gravity[3] = self.done.map_or(0.0, |(step, time)| jumped(step, time));
         emitter.info[1] = extent;
         emitter.info[2] = goal as u32;
         emitter.info[3] = first as u32;
         emitter.counts = [births.len() as u32, dts.len() as u32, 0, 0];
-        self.done = Some(goal);
+        self.done = Some((goal, sim.time()));
         self.emitter = emitter;
         if !births.is_empty() {
             self.grow_births(device, births.len() as u32);
@@ -152,32 +186,34 @@ impl EmitterBuffers {
 
     /// The births since the last upload, one per slot (a slot reused within the
     /// upload keeps its newest birth, so the scatter never races), dead ones as
-    /// empty slots, none past the buffer; and the step the oldest live one was
-    /// born at. Reads only what is new: the sim finds the first new serial by a
-    /// binary search.
-    fn new_births(&mut self, sim: &GpuSim) -> (Vec<GpuBirth>, Option<u64>) {
+    /// empty slots, none past the buffer, each with the step and running time it
+    /// was born at; and the step the oldest live one was born at. Reads only what
+    /// is new: the sim finds the first new serial by a binary search.
+    fn new_births(&mut self, sim: &GpuSim) -> (Vec<Fresh>, Option<u64>) {
         let mut oldest = None::<u64>;
-        let mut records: Vec<GpuBirth> = sim
+        let mut records: Vec<Fresh> = sim
             .births_from(self.cursor)
             .filter(|b| b.slot < self.capacity)
             .map(|b| {
                 if !b.dead {
                     oldest = Some(oldest.map_or(b.step, |o| o.min(b.step)));
                 }
-                GpuBirth {
+                let record = GpuBirth {
                     particle: GpuParticle::born(b),
                     slot: b.slot,
-                    pad: [0; 3],
-                }
+                    jumped: 0.0,
+                    pad: [0; 2],
+                };
+                (record, (b.step, b.time))
             })
             .collect();
         self.cursor = sim.next_serial();
         // Stable, so a slot's births stay oldest first: the last of each run is kept.
-        records.sort_by_key(|r| r.slot);
-        let mut kept: Vec<GpuBirth> = Vec::with_capacity(records.len());
+        records.sort_by_key(|r| r.0.slot);
+        let mut kept: Vec<Fresh> = Vec::with_capacity(records.len());
         for r in records {
             match kept.last_mut() {
-                Some(last) if last.slot == r.slot => *last = r,
+                Some(last) if last.0.slot == r.0.slot => *last = r,
                 _ => kept.push(r),
             }
         }
@@ -213,7 +249,7 @@ impl EmitterBuffers {
         if count <= self.births_capacity {
             return;
         }
-        let size = count.next_power_of_two();
+        let size = births_slots(count);
         self.births = buffer::<GpuBirth>(device, "GPU Particle Births", size, STORAGE);
         (self.births_capacity, self.groups) = (size, None);
     }
@@ -239,10 +275,11 @@ impl EmitterBuffers {
 }
 
 /// The lookup table and the slots an emitter wants: its curves baked, and room
-/// for its cap, never more than the device's `fit`.
-pub(crate) fn wants(
-    emitter: &rusty_components::ParticleEmitterComponent,
-    fit: u32,
-) -> (Vec<[f32; 4]>, u32) {
-    (bake_lut(emitter), emitter.particle_cap().min(fit))
+/// for its cap.
+pub(crate) fn wants(emitter: &rusty_components::ParticleEmitterComponent) -> (Vec<[f32; 4]>, u32) {
+    (bake_lut(emitter), emitter.particle_cap())
 }
+
+#[cfg(test)]
+#[path = "emitter_tests.rs"]
+mod tests;

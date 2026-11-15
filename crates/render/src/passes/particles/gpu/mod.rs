@@ -21,8 +21,8 @@
 //! renderer. `twin` holds the CPU twins the tests hold its shaders to.
 //!
 //! **Capacity.** The sim caps a `Gpu` emitter at `GPU_MAX_PARTICLES` on every
-//! device; a device whose buffer limits hold fewer ([`fit`]) draws up to what fits,
-//! warned once when the renderer starts.
+//! device, and that cap's buffers fit wgpu's default limits, which every device
+//! is created with (`setup::limits::device_limits`); `emitter`'s tests hold it.
 
 pub(crate) mod emitter;
 pub(crate) mod record;
@@ -40,27 +40,15 @@ use crate::gpu::shaders::ShaderRegistry;
 use crate::passes::particles::instance::emitter_light;
 use crate::timing::GpuPass;
 use crate::Renderer;
-use rusty_components::particle::{ParticleEmitterComponent, SimulationSpace, GPU_MAX_PARTICLES};
+use rusty_components::particle::{ParticleEmitterComponent, SimulationSpace};
 use rusty_scene::{Scene, SceneId};
 
 /// Renders without a draw after which an emitter's buffers are dropped: a scene
 /// nobody renders any more (a replaced one) frees its emitters.
 const IDLE_RENDERS: u32 = 600;
 
-/// The particles one emitter's buffer holds on a device with `limits`: the
-/// sim's fixed cap, or fewer where a storage binding or a buffer is smaller.
-pub(crate) fn fit(limits: &wgpu::Limits) -> u32 {
-    let record = std::mem::size_of::<record::GpuParticle>() as u64;
-    let bytes = limits
-        .max_buffer_size
-        .min(limits.max_storage_buffer_binding_size);
-    (bytes / record).min(u64::from(GPU_MAX_PARTICLES)) as u32
-}
-
 /// Every GPU-simulated emitter's buffers, and the pipelines that step them.
 pub(crate) struct GpuParticles {
-    /// The particles one emitter's buffer holds on this device ([`fit`]).
-    pub(crate) fit: u32,
     /// The step's group: the emitter, particles (read-write), curves, `dt`s, births.
     step_layout: wgpu::BindGroupLayout,
     /// The draw's group 0: the pass globals, the emitter, particles, curves.
@@ -92,15 +80,7 @@ impl GpuParticles {
                 })
             })
         };
-        let fit = fit(&device.limits());
-        if fit < GPU_MAX_PARTICLES {
-            log::warn!(
-                "[Particles] this device's buffers hold {fit} particles per Gpu emitter, \
-                 below the cap of {GPU_MAX_PARTICLES}: an emitter past it draws {fit}"
-            );
-        }
         Self {
-            fit,
             step_layout,
             draw_layout,
             birth: pipeline("cs_birth"),
@@ -147,7 +127,7 @@ impl Renderer {
             }
             let uniform = uniform_of(scene, id, &emitter);
             let (device, queue) = (&self.device, &self.queue);
-            let wants = emitter::wants(&emitter, gpu.fit);
+            let wants = emitter::wants(&emitter);
             let buffers = gpu
                 .emitters
                 .entry(key)

@@ -23,19 +23,22 @@ struct GpuParticle {
     next: u32,
 };
 
-// What a birth upload carries: the particle and its slot.
+// What a birth upload carries: the particle, its slot, and the time its steps
+// older than the uploaded window took (0 when it has none).
 struct GpuBirth {
     particle: GpuParticle,
-    // Padded to the Rust record's 16 bytes (a vec3 pad would align to 16 and
+    slot: u32,
+    // Padded to the Rust record's 16 bytes (a vec2 pad would align to 8 and
     // make the record 96 bytes).
-    @size(16) slot: u32,
+    @size(12) jumped: f32,
 };
 
 // One emitter's settings for its step and draw.
 struct GpuEmitter {
     // Where the stored positions are drawn: the emitter's frame when `Local`, else identity.
     frame: mat4x4<f32>,
-    // xyz: gravity in the stored space.
+    // xyz: gravity in the stored space; w: the time the steps older than the
+    // window took for a particle stepped at the last upload.
     gravity: vec4<f32>,
     // The sprite's light lane, as `ParticleInstance::light`.
     light: vec4<f32>,

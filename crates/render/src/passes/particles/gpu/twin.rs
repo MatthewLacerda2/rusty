@@ -1,12 +1,13 @@
 //! crates/render/src/passes/particles/gpu/twin.rs — the CPU twins of a
-//! GPU-simulated emitter's shaders (#2170): `cs_step` ([`advance`], with its
-//! closed-form [`jump`]) and `vs_gpu` ([`sprite`]), step for step. The renderer
+//! GPU-simulated emitter's shaders (#2170): `cs_birth` ([`birth`]), `cs_step`
+//! ([`advance`], with its closed-form [`jump`]) and `vs_gpu` ([`sprite`]), step
+//! for step. The renderer
 //! never runs them (it always runs the compute pass: its other passes already need
 //! compute and vertex-stage storage); they are what the tests hold the shaders to.
 
 use glam::{Mat4, Vec3, Vec4};
 
-use super::record::{GpuEmitter, GpuParticle, EMPTY, LUT_SIZE};
+use super::record::{GpuBirth, GpuEmitter, GpuParticle, EMPTY, LUT_SIZE};
 use crate::passes::particles::instance::ParticleInstance;
 
 impl GpuParticle {
@@ -33,22 +34,34 @@ pub(crate) fn lut_at(lut: &[[f32; 4]], row: usize, t: f32) -> Vec4 {
     Vec4::from(lut[base + i]).lerp(Vec4::from(lut[base + i + 1]), x - i as f32)
 }
 
+/// `b` as `cs_birth` writes it into its slot when the window starts at step
+/// `first`: jumped to `first` by its own time when it is older.
+pub(crate) fn birth(b: &GpuBirth, first: u32, gravity: Vec3, lut: &[[f32; 4]]) -> GpuParticle {
+    let mut p = b.particle;
+    if p.alive() && p.next < first {
+        let n = first - p.next;
+        jump(&mut p, n, gravity, lut, b.jumped);
+        p.next = if is_dead(&p) { EMPTY } else { first };
+    }
+    p
+}
+
 /// Move `p` up to step `goal` by the window `dts`, whose first is step `first`'s
-/// `dt`: the shader's `cs_step`, step for step. The steps older than the window
-/// are one closed-form [`jump`] at the window's oldest `dt`; the window's own are
-/// taken one at a time, so the loop never runs more than `dts.len()` times.
+/// `dt`: the shader's `cs_step`, step for step. The steps older than the window,
+/// which took `jumped` seconds, are one closed-form [`jump`]; the window's own
+/// are taken one at a time, so the loop never runs more than `dts.len()` times.
 pub(crate) fn advance(
     p: &mut GpuParticle,
     (goal, first): (u32, u32),
     gravity: Vec3,
     lut: &[[f32; 4]],
-    dts: &[f32],
+    (dts, jumped): (&[f32], f32),
 ) {
     if !p.alive() || p.next > goal || dts.is_empty() {
         return;
     }
     if p.next < first {
-        jump(p, first - p.next, gravity, lut, dts[0]);
+        jump(p, first - p.next, gravity, lut, jumped);
         p.next = if is_dead(p) { EMPTY } else { first };
         if !p.alive() {
             return;
@@ -78,12 +91,14 @@ fn is_dead(p: &GpuParticle) -> bool {
     p.age.partial_cmp(&p.lifetime) != Some(std::cmp::Ordering::Less)
 }
 
-/// `n` steps of `dt` at once, the curves held where `p` is in its life: the
-/// sum of the step's geometric velocity series (`v ← (v + g·dt)·k`, `k` the drag
-/// factor) and of the positions it passes (the shader's `jump`).
-pub(crate) fn jump(p: &mut GpuParticle, n: u32, gravity: Vec3, lut: &[[f32; 4]], dt: f32) {
+/// `n` steps that took `span` seconds at once, the curves held where `p` is in
+/// its life: aged by `span`, moved by the sum of the step's geometric velocity
+/// series (`v ← (v + g·dt)·k`, `k` the drag factor) at the mean `dt` and of the
+/// positions it passes (the shader's `jump`).
+pub(crate) fn jump(p: &mut GpuParticle, n: u32, gravity: Vec3, lut: &[[f32; 4]], span: f32) {
     let curves = lut_at(lut, 0, p.life_t());
     let nf = n as f32;
+    let dt = span / nf;
     let k = (1.0 - curves.y * dt).max(0.0);
     let (v, x) = (Vec3::from(p.velocity), Vec3::from(p.position));
     let (v, x) = if (1.0 - k).abs() < 1e-6 {
@@ -103,8 +118,8 @@ pub(crate) fn jump(p: &mut GpuParticle, n: u32, gravity: Vec3, lut: &[[f32; 4]],
     };
     p.velocity = v.to_array();
     p.position = x.to_array();
-    p.rotation += curves.z.to_radians() * dt * nf;
-    p.age += dt * nf;
+    p.rotation += curves.z.to_radians() * span;
+    p.age += span;
 }
 
 /// The sprite `p` draws as under `e` with `lut`, or `None` for an empty slot: the

@@ -139,7 +139,7 @@ impl super::ParticleEmitterComponent {
     /// A copy of the configuration, with a fresh runtime: what an editor or an
     /// all-or-nothing write reads and edits without copying the live particles (a
     /// `Gpu` emitter keeps a birth per live particle, up to
-    /// [`GPU_MAX_PARTICLES`]). The destructuring names every field, so a new one
+    /// [`GPU_MAX_PARTICLES`](super::GPU_MAX_PARTICLES)). The destructuring names every field, so a new one
     /// is a compile error here until it is copied.
     pub fn config(&self) -> Self {
         macro_rules! copy {

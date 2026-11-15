@@ -1,4 +1,4 @@
-//! crates/components/src/particle/simulation.rs — the per-emitter **simulation
+//! crates/components/src/particle/simulation/ — the per-emitter **simulation
 //! target** (Niagara's *CPUSim* / *GPUCompute Sim*, #2170).
 //!
 //! A `Cpu` emitter keeps its live particles in `EmitterRuntime::particles` and the
@@ -14,17 +14,20 @@
 //!   together by the same `dt`s, exactly as the CPU path ages each particle
 //!   (`age += dt`, dead once `age >= lifetime`), and a cohort lets its particles
 //!   go in lifetime order. `Particles.GetCount` and the `max_particles` cap read it;
-//! - the **step** count and every step's `dt`, which the renderer's compute pass
-//!   replays one by one, so on one adapter the same run draws the same particles
-//!   whatever the frame rate.
+//! - the **step** count, every step's `dt` (replayed one by one by the renderer,
+//!   so one adapter draws the same particles whatever the frame rate) and the
+//!   running **time** (`history`), which ages a jump past the replayed window.
 //!
 //! Nothing here reads what the GPU computed, which is what keeps the sim a pure
 //! function of (seed, inputs, dt).
+
+mod history;
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::runtime::Particle;
+use history::History;
 
 rusty_core::named_enum! {
     /// Where an emitter's live particles are simulated.
@@ -43,7 +46,8 @@ rusty_core::named_enum! {
 /// How many steps' `dt`s are kept for the renderer to replay, one by one, in one
 /// dispatch: it bounds the compute step's loop. A renderer that draws less often
 /// than this (a long `Harness.Step`) moves a particle over the older steps in one
-/// closed-form jump at the oldest kept `dt`.
+/// closed-form jump, aged by the time they took ([`GpuSim::time_at`],
+/// [`Birth::time`]) and moved at their mean `dt`.
 pub const DT_HISTORY: usize = 256;
 
 /// The most particles a `Gpu` emitter holds, whatever its `max_particles`
@@ -61,6 +65,8 @@ pub struct Birth {
     pub slot: u32,
     /// The step count when it was born: its first step is step `step + 1`.
     pub step: u64,
+    /// The running time when it was born ([`GpuSim::time`] then).
+    pub time: f64,
     /// Its birth number on this emitter, counting from 0 at the last reset.
     pub serial: u64,
     /// Whether it has died since (kept until a compaction drops it): the renderer
@@ -81,11 +87,8 @@ struct Cohort {
 /// Play and by `Particles.Clear`.
 #[derive(Clone, Debug)]
 pub struct GpuSim {
-    /// Steps taken since the last reset.
-    steps: u64,
-    /// The `dt` of each of the last steps, the newest at the back; the first is
-    /// step `steps - dts.len() + 1`'s.
-    dts: VecDeque<f32>,
+    /// The steps taken since the last reset, and the last ones' `dt`s and times.
+    history: History,
     /// Particles live now.
     live: usize,
     /// Born since the last step: they age from the next one.
@@ -119,8 +122,7 @@ static EPOCHS: AtomicU64 = AtomicU64::new(1);
 impl Default for GpuSim {
     fn default() -> Self {
         Self {
-            steps: 0,
-            dts: VecDeque::new(),
+            history: History::default(),
             live: 0,
             newborn: Cohort::default(),
             cohorts: VecDeque::new(),
@@ -145,7 +147,7 @@ impl GpuSim {
 
     /// Steps taken since the last reset.
     pub fn steps(&self) -> u64 {
-        self.steps
+        self.history.steps
     }
 
     /// One past the highest slot handed out: how much of the buffer to draw.
@@ -183,9 +185,19 @@ impl GpuSim {
     /// The `dt` step `step` (1-based) took, or the oldest kept one when it is older
     /// than the history; `None` before any step.
     pub fn dt_of(&self, step: u64) -> Option<f32> {
-        let first = self.steps + 1 - self.dts.len() as u64;
-        let at = step.saturating_sub(first).min(self.dts.len() as u64);
-        self.dts.get(at as usize).or(self.dts.back()).copied()
+        self.history.dt_of(step)
+    }
+
+    /// The running time now: the `f64` sum of every step's `dt` since the last
+    /// reset, added in step order, so it is the same on every run.
+    pub fn time(&self) -> f64 {
+        self.history.time()
+    }
+
+    /// The running time after step `step` (0 is the reset), or `None` when it is
+    /// older than the kept steps (more than [`DT_HISTORY`] ago) or not taken yet.
+    pub fn time_at(&self, step: u64) -> Option<f64> {
+        self.history.time_at(step)
     }
 
     /// `true` the first time it is asked since the last reset: what a write a
@@ -212,7 +224,8 @@ impl GpuSim {
         self.births.push_back(Birth {
             particle,
             slot,
-            step: self.steps,
+            step: self.history.steps,
+            time: self.time(),
             serial,
             dead: false,
         });
@@ -223,11 +236,7 @@ impl GpuSim {
     /// reaches its lifetime (or whose lifetime is not a number) dies, freeing its
     /// slot. The CPU path's `age += dt; alive = age < lifetime`, cohort by cohort.
     pub fn step(&mut self, dt: f32) {
-        self.steps += 1;
-        if self.dts.len() == DT_HISTORY {
-            self.dts.pop_front();
-        }
-        self.dts.push_back(dt);
+        self.history.push(dt);
         if !self.newborn.members.is_empty() {
             let mut cohort = std::mem::take(&mut self.newborn);
             cohort
@@ -287,5 +296,4 @@ impl GpuSim {
 }
 
 #[cfg(test)]
-#[path = "simulation_tests.rs"]
 mod tests;
