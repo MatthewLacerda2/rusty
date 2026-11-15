@@ -42,7 +42,7 @@ mod decode;
 use std::collections::BTreeSet;
 
 use crate::debug_meshes::{has_geometry, stale_uploads, UploadCandidate};
-use crate::draw::materials::material_maps;
+use crate::draw::map_slots::material_maps;
 use crate::gpu::textures::TextureKind;
 use crate::stats::Uploads;
 use crate::{MeshId, Renderer};

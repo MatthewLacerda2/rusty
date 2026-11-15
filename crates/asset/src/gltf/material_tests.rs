@@ -1,6 +1,7 @@
 //! A glTF material's `doubleSided` on import (#1615): honoured for an authored
 //! `.gltf`, ignored for a `.blend`'s conversion; its `KHR_materials_ior` and
-//! `KHR_materials_specular` factors (#1998).
+//! `KHR_materials_specular` factors (#1998); its occlusion and specular-level
+//! textures (#2151).
 
 use super::super::import::{import, import_from};
 
@@ -57,4 +58,46 @@ fn a_gltf_without_them_keeps_the_extensions_defaults() {
         .unwrap()
         .materials[0];
     assert_eq!((m.ior, m.specular, m.specular_color), (1.5, 1.0, [1.0; 3]));
+}
+
+#[test]
+fn an_orm_gltf_names_one_image_for_occlusion_and_metallic_roughness() {
+    // Texture 0 is the ORM image (occlusion and metallic-roughness), 1 the
+    // `KHR_materials_specular` level (#2151).
+    let ext = r#"{"name":"Felt","occlusionTexture":{"index":0,"strength":0.25},
+        "pbrMetallicRoughness":{"metallicRoughnessTexture":{"index":0}},
+        "extensions":{"KHR_materials_specular":{"specularTexture":{"index":1}}}}],
+        "textures":[{"source":0},{"source":1}],
+        "images":[{"uri":"orm.png"},{"uri":"level.png"}"#;
+    let m = &import(&material_gltf("orm", ext)).unwrap().materials[0];
+    assert_eq!(
+        m.occlusion_map, m.metallic_roughness_map,
+        "one image, one path"
+    );
+    let named = |map: &Option<crate::MapRef>, file: &str| {
+        map.as_ref().is_some_and(|p| p.as_str().ends_with(file))
+    };
+    assert!(named(&m.occlusion_map, "orm.png"), "{:?}", m.occlusion_map);
+    assert!(named(&m.specular_map, "level.png"), "{:?}", m.specular_map);
+    assert_eq!(m.occlusion_strength, 0.25);
+}
+
+#[test]
+fn a_gltf_without_occlusion_keeps_its_strength_whole() {
+    let m = &import(&material_gltf("no_ao", r#"{"name":"Plain"}"#))
+        .unwrap()
+        .materials[0];
+    assert_eq!((&m.occlusion_map, m.occlusion_strength), (&None, 1.0));
+    assert_eq!(m.specular_map, None);
+}
+
+#[test]
+fn a_map_off_uv0_is_named_for_its_warning() {
+    let json = r#"{"asset":{"version":"2.0"},"materials":[{"name":"Felt",
+        "occlusionTexture":{"index":0,"texCoord":1},
+        "pbrMetallicRoughness":{"baseColorTexture":{"index":0}}}],
+        "textures":[{"source":0}],"images":[{"uri":"ao.png"}]}"#;
+    let gltf = gltf::Gltf::from_slice(json.as_bytes()).unwrap();
+    let material = gltf.materials().next().unwrap();
+    assert_eq!(super::off_uv0(&material), [("occlusion map", 1)]);
 }

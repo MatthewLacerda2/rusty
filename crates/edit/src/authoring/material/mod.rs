@@ -54,7 +54,7 @@ pub use shader_params::{
 };
 pub use slots::{keys, set_slot, slot_count};
 pub use sources::{load_recipe, Loaded};
-pub use surface::{import_reflectance, SURFACE_FIELDS};
+pub use surface::{import_field, import_reflectance, SURFACE_FIELDS};
 
 use rusty_asset::MapRef;
 use rusty_components::RenderFace;
@@ -170,6 +170,24 @@ pub fn set_normal_map(materials: &mut MaterialLibrary, key: &str, path: Option<S
     }
 }
 
+/// Set (or, with `None` or an empty path, clear) the occlusion map path (#2151);
+/// a data map, as metallic's. A map that darkens is never left naming nothing.
+pub fn set_occlusion_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
+    if let Some(m) = materials.get_mut(key) {
+        m.occlusion_map = path.filter(|p| !p.is_empty()).map(MapRef::from);
+        fit_data_slot(m.occlusion_map.as_ref());
+    }
+}
+
+/// Set (or, with `None` or an empty path, clear) the specular-level map path
+/// (#2151); a data map. A map that scales is never left naming nothing.
+pub fn set_specular_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
+    if let Some(m) = materials.get_mut(key) {
+        m.specular_map = path.filter(|p| !p.is_empty()).map(MapRef::from);
+        fit_data_slot(m.specular_map.as_ref());
+    }
+}
+
 /// Fit the import settings of every image `asset`'s slots name to the slot:
 /// [`fit_normal_slot`] and [`fit_data_slot`]. Every way a material gets its maps
 /// whole goes through it (a material document, a maps recipe, a model's import).
@@ -177,6 +195,8 @@ pub fn fit_map_slots(asset: &MaterialAsset) {
     fit_normal_slot(asset.normal_map.as_ref());
     fit_data_slot(asset.metallic_map.as_ref());
     fit_data_slot(asset.roughness_map.as_ref());
+    fit_data_slot(asset.occlusion_map.as_ref());
+    fit_data_slot(asset.specular_map.as_ref());
     fit_data_slot(asset.detail.as_ref().and_then(|d| d.map.as_ref()));
 }
 
@@ -187,8 +207,8 @@ pub fn fit_normal_slot(map: Option<&MapRef>) {
     }
 }
 
-/// [`rusty_asset::sidecar::fit_data_slot`] for the image a metallic or roughness
-/// slot names.
+/// [`rusty_asset::sidecar::fit_data_slot`] for the image a data slot (metallic,
+/// roughness, occlusion, specular level) names.
 pub fn fit_data_slot(map: Option<&MapRef>) {
     if let Some(file) = map.and_then(MapRef::file) {
         rusty_asset::sidecar::fit_data_slot(&file);

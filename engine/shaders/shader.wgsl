@@ -404,11 +404,13 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // dielectric F0's strongest channel, URP's specular-workflow
     // `ReflectivitySpecular`: what the environment takes from the diffuse (`0.96` at
     // 0.04) and the grazing weight starts from.
-    let dielectric = m.dielectric_reflectance.rgb;
-    let F0 = mix(dielectric, albedo, metallic);
+    // The specular-level map scales both per texel, as `specular` itself does
+    // (#2151, `mapping::dielectric_reflectance`).
+    let dielectric = mapping::dielectric_reflectance(maps);
+    let F0 = mix(dielectric.rgb, albedo, metallic);
     // Written as `reflectivity` is below, not `mix`: at the default F90 of 1 it is
     // exactly 1 for any `metallic`, so a default material renders as before.
-    let F90 = m.dielectric_reflectance.w + (1.0 - m.dielectric_reflectance.w) * metallic;
+    let F90 = dielectric.w + (1.0 - dielectric.w) * metallic;
     let dielectric_reflectivity = max(dielectric.r, max(dielectric.g, dielectric.b));
 
     // 1. Ambient lighting term. A lightmapped static mesh reads its lightmap (#438).
@@ -435,17 +437,21 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     } else {
         ambient_irradiance = flat_ambient(N);
     }
-    // SSAO (#436) times the decals' occlusion darkens only the indirect light: ambient
-    // here, and the env reflection below through its specular occlusion (#1697).
-    let ao = ambient_occlusion(in.clip_position.xy) * surface.occlusion;
+    // SSAO (#436) and the material's occlusion map (#2151), the darker of the two as
+    // URP's `CreateAmbientOcclusionFactor` takes them (each sees the same crevice),
+    // times the decals' occlusion, darken only the indirect light: ambient here, and
+    // the env reflection below and the lightmap's lobe through their specular
+    // occlusion (#1697), as URP's `GlobalIllumination` multiplies both indirect terms
+    // by it. Direct light is never occluded by it (glTF's and Unity's rule).
+    let ao = min(ambient_occlusion(in.clip_position.xy), mapping::occlusion(maps)) * surface.occlusion;
     // The diffuse share is URP's `albedo * oneMinusReflectivity`: what the
     // environment reflection (step 5) takes, a dielectric's reflectivity, is not
     // diffused too.
     // SSIL's bounce (#1750) is indirect diffuse too: the same response, the same AO.
     var lighting_color = (ambient_irradiance + indirect_bounce(in.clip_position.xy)) * diffuse_albedo * ((1.0 - dielectric_reflectivity) * (1.0 - metallic)) * ao;
     // The lobe is `Baked` lamps' light, so it stays out of `ssil_realtime`, as the
-    // lightmap's own light does.
-    lighting_color += lightmap_specular;
+    // lightmap's own light does. It is indirect light, so occluded as the probes are.
+    lighting_color += lightmap_specular * specular_occlusion(saturate(abs(dot(N, V))), ao, roughness);
 
     // A lightmapped surface skips `Baked` lights below: their direct light is already
     // in its lightmap (#438). Only a probe/reflection bake capture uploads them at all

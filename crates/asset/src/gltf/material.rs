@@ -19,6 +19,12 @@ pub(super) fn material_data(
 ) -> MaterialData {
     let pbr = material.pbr_metallic_roughness();
     let specular = material.specular();
+    for (map, set) in off_uv0(&material) {
+        let name = material.name().unwrap_or("<unnamed>");
+        log::warn!(
+            "[Asset] glTF material `{name}`: its {map} reads TEXCOORD_{set}, but every map is read through UV0 (TEXCOORD_0)"
+        );
+    }
     MaterialData {
         name: material.name().unwrap_or("").to_string(),
         base_color: pbr.base_color_factor(),
@@ -41,13 +47,65 @@ pub(super) fn material_data(
             .and_then(|t| texture_path(&t.texture(), base_dir, source))
             .map(MapRef::from),
         emissive: material.emissive_factor(),
+        // glTF's `occlusionTexture` (#2151): an ORM image shared with the
+        // metallic-roughness texture resolves to the same path, so one upload.
+        occlusion_map: material
+            .occlusion_texture()
+            .and_then(|t| texture_path(&t.texture(), base_dir, source))
+            .map(MapRef::from),
+        occlusion_strength: material.occlusion_texture().map_or(1.0, |t| t.strength()),
         double_sided: material.double_sided() && !from_blend(source),
-        // `KHR_materials_ior` / `KHR_materials_specular` (#1998): the factors; the
-        // engine's material has no slot for `specularTexture`/`specularColorTexture`.
+        // `KHR_materials_ior` / `KHR_materials_specular` (#1998): the factors, and
+        // `specularTexture` (#2151); the material has no `specularColorTexture` slot.
         ior: material.ior().unwrap_or(1.5),
         specular: specular.as_ref().map_or(1.0, |s| s.specular_factor()),
+        specular_map: specular
+            .as_ref()
+            .and_then(|s| s.specular_texture())
+            .and_then(|t| texture_path(&t.texture(), base_dir, source))
+            .map(MapRef::from),
         specular_color: specular.map_or([1.0; 3], |s| s.specular_color_factor()),
     }
+}
+
+/// Each texture of `material` authored on a UV set other than 0 (its `texCoord`),
+/// by the map it feeds: the renderer reads every map through UV0, so those land
+/// in the wrong places (an occlusion map on `TEXCOORD_1` most often), and the
+/// import warns once per material and map.
+pub(super) fn off_uv0(material: &gltf::Material) -> Vec<(&'static str, u32)> {
+    let pbr = material.pbr_metallic_roughness();
+    let specular = material.specular();
+    let sets = [
+        (
+            "base colour map",
+            pbr.base_color_texture().map(|t| t.tex_coord()),
+        ),
+        (
+            "metallic-roughness map",
+            pbr.metallic_roughness_texture().map(|t| t.tex_coord()),
+        ),
+        (
+            "normal map",
+            material.normal_texture().map(|t| t.tex_coord()),
+        ),
+        (
+            "occlusion map",
+            material.occlusion_texture().map(|t| t.tex_coord()),
+        ),
+        (
+            "emissive map",
+            material.emissive_texture().map(|t| t.tex_coord()),
+        ),
+        (
+            "specular map",
+            specular
+                .and_then(|s| s.specular_texture())
+                .map(|t| t.tex_coord()),
+        ),
+    ];
+    sets.into_iter()
+        .filter_map(|(map, set)| set.filter(|&s| s != 0).map(|s| (map, s)))
+        .collect()
 }
 
 /// Whether the glTF is a `.blend`'s conversion, whose `doubleSided` says nothing
