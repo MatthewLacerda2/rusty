@@ -19,11 +19,15 @@ This walks the git worktrees of the **main checkout** under
 
 A finished worktree is still **never** removed when it has uncommitted
 changes, commits on no remote (and not in its PR's head), a lock (a live
-agent session holds it), a running process standing in it, or is the one this
-runs from; those are named instead. The process check exists because the merge
-queue runs from a detached worktree here (`queue/`, its warm build in
-`target/merge-queue`): a detached HEAD on `origin/main` looks finished, and on
-the first dry run one was, while `make queue` stood in it. Kept worktrees print their `target/` size. Then `git worktree prune`,
+agent session holds it), a running process standing in it or running a
+program from it, something under it written within the idle window (an hour;
+`--idle MINUTES`, 0 for none), or is the one this runs from; those are named
+instead. The process check exists because the merge queue runs from a
+detached worktree here (`queue/`, its warm build in `target/merge-queue`): a
+detached HEAD on `origin/main` looks finished, and on the first dry run one
+was, while `make queue` stood in it. The executable and recent-write checks
+(#2217) cover a worktree in use with nothing to show git: `reclaim_use.py`
+says how, and what the bounded write probe can miss. Kept worktrees print their `target/` size. Then `git worktree prune`,
 and free disk before and after. Anything under `.claude/worktrees/` that is
 not a git worktree (`.cargo/`, tarballs) is left alone.
 
@@ -104,21 +108,22 @@ restarted into it.
 
 from __future__ import annotations
 
-import contextlib
 import json
-import os
 import re
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import ghrest
 import reclaim_branches as branches
+import reclaim_use as use
 from merging.watch import tenancy
 
-USAGE = "usage: reclaim.py [--dry-run]"
+USAGE = "usage: reclaim.py [--dry-run] [--idle MINUTES]"
+IDLE_MINUTES = 60  # a worktree written to more recently than this is in use (#2217)
 AGENT_BRANCH = "worktree-agent-"  # the harness's name for an `Agent` worktree's branch (#1510)
 REVIEWER_BRANCH = re.compile(rf"pr\d|{AGENT_BRANCH}")  # a reviewer's `pr1514…`, the harness's own (#1538)
 
@@ -140,7 +145,8 @@ class Facts:
     dirty: bool = False
     unpushed: int = 0
     current: bool = False
-    busy: list[int] | None = field(default_factory=list)  # pids standing in it; None: unknown
+    busy: list[tuple[int, str]] | None = field(default_factory=list)  # (pid, command) in it; None: unknown
+    written: int | None = None  # minutes since something under it was written, inside the idle window
     stale: int | None = None  # a lock left by a merge-queue supervisor that no longer runs: its pid
     dead_agent: int | None = None  # a harness agent's lock whose pid no longer runs (#1658)
     reviewer: bool = False  # a reviewer's checkout: judged by what it holds (#1538)
@@ -210,8 +216,10 @@ def verdict(wt: Worktree, facts: Facts) -> tuple[str, str]:
     if facts.busy is None:
         return "protect", f"{why}, but no way to tell whether a process stands in it"
     if facts.busy:
-        pids = ", ".join(map(str, facts.busy))
-        return "protect", f"{why}, but a running process stands in it (pid {pids})"
+        pids = ", ".join(f"pid {pid} (`{command or '?'}`)" for pid, command in facts.busy)
+        return "protect", f"{why}, but in use by {pids}"
+    if facts.written is not None:
+        return "protect", f"{why}, but written {facts.written} minute(s) ago; `--idle 0` to remove it anyway"
     if wt.locked is not None and facts.stale is not None:
         return "protect", (f"{why}, but locked by merge-queue supervisor pid {facts.stale}, which is not running:"
                            f" a stale lock; `git worktree unlock {wt.path}` to let reclaim remove it")
@@ -319,32 +327,24 @@ class Machine:
         done = self.run("gh", "api", path)
         return [ghrest.pull(p) for p in json.loads(done.stdout or "[]")] if done.returncode == 0 else None
 
-    def cwds(self) -> list[tuple[int, Path]] | None:
-        """Every process's working directory: /proc on Linux, lsof elsewhere."""
-        proc = Path("/proc")
-        if (proc / "self" / "cwd").exists():
-            found = []
-            for link in proc.glob("[0-9]*/cwd"):
-                with contextlib.suppress(OSError):
-                    found.append((int(link.parent.name), Path(os.readlink(link))))
-            return found
-        try:
-            done = self.run("lsof", "-d", "cwd", "-Fpn")
-        except OSError:
-            return None
-        if not done.stdout:
-            return None
-        found, pid = [], 0
-        for line in done.stdout.splitlines():
-            if line.startswith("p"):
-                pid = int(line[1:])
-            elif line.startswith("n"):
-                found.append((pid, Path(line[1:])))
-        return found
+    def processes(self) -> list[tuple[int, Path, str]] | None:
+        """(pid, a path it stands in or runs, its command) for every process: `reclaim_use`."""
+        return use.processes(self.run)
 
-    def facts(self, wt: Worktree, here: Path, cwds: list[tuple[int, Path]] | None) -> Facts:
+    def written(self, tree: Path, idle_minutes: int) -> int | None:
+        """Minutes since something under `tree` was written, when inside the idle window."""
+        if idle_minutes <= 0:
+            return None
+        now = time.time()
+        mtime = use.newest_write(tree, now - idle_minutes * 60)
+        return None if mtime is None else max(0, int((now - mtime) // 60))
+
+    def facts(self, wt: Worktree, here: Path, procs: list[tuple[int, Path, str]] | None,
+              idle_minutes: int = IDLE_MINUTES) -> Facts:
         facts = Facts(current=inside(here, wt.path), reviewer=reviewer_tree(wt))
-        facts.busy = None if cwds is None else [pid for pid, cwd in cwds if inside(cwd, wt.path)]
+        facts.busy = None if procs is None else list(dict.fromkeys(
+            (pid, command) for pid, path, command in procs if inside(path, wt.path)))
+        facts.written = self.written(wt.path, idle_minutes)
         facts.dirty = bool(self.git(wt.path, "status", "--porcelain"))
         owner = tenancy.pid_of(wt.locked)
         if owner is not None and not self.alive(owner):
@@ -406,12 +406,23 @@ def shown_target(machine: Machine, wt: Path) -> str:
     return f"target/ {gib(size)}" if size is not None else "no target/"
 
 
+def parse_args(argv: list[str]) -> tuple[bool, int]:
+    """(dry run, idle minutes); a bad argument exits with the usage."""
+    dry, idle, rest = False, IDLE_MINUTES, list(argv)
+    while rest:
+        arg = rest.pop(0)
+        if arg == "--dry-run":
+            dry = True
+        elif arg == "--idle" and rest and rest[0].isdigit():
+            idle = int(rest.pop(0))
+        else:
+            sys.exit(f"reclaim: bad argument {arg!r}; {USAGE}")
+    return dry, idle
+
+
 def main(argv: list[str], machine: Machine | None = None, here: Path | None = None) -> int:
     machine = machine or Machine()
-    unknown = [a for a in argv if a != "--dry-run"]
-    if unknown:
-        sys.exit(f"reclaim: unknown argument(s) {' '.join(unknown)}; {USAGE}")
-    dry = "--dry-run" in argv
+    dry, idle = parse_args(argv)
     here = (here or Path.cwd()).resolve()
     common = Path(machine.git(here, "rev-parse", "--path-format=absolute", "--git-common-dir"))
     main_checkout = common.parent
@@ -422,10 +433,10 @@ def main(argv: list[str], machine: Machine | None = None, here: Path | None = No
     listed = parse_worktrees(machine.git(main_checkout, "worktree", "list", "--porcelain"))
     worktrees = [wt for wt in listed if root in wt.path.parents]
     outside = [wt for wt in listed if root not in wt.path.parents and wt.path != main_checkout]
-    cwds = machine.cwds()
+    procs = machine.processes()
     removed, deleted = 0, 0
     for wt in worktrees:
-        facts = machine.facts(wt, here, cwds)
+        facts = machine.facts(wt, here, procs, idle)
         action, why = verdict(wt, facts)
         name = f"{wt.path.name} ({describe(wt)})"
         if action == "remove":

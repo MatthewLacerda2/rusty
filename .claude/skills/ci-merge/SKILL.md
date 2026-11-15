@@ -181,8 +181,8 @@ linker killed): the rest are named *not taken*. Run it from a worktree under
 **What it leaves to you.** Its local check only refuses a push, never grants a
 merge (`make gates` before readying is the author's job); it never reads the
 mutation or coverage signal; it removes no worktree and deletes no branch. The
-summary lists the merged ones: remove each worktree (several GB of `target/`)
-and branch once nobody is in it (`make reclaim`).
+summary lists the merged ones: `make reclaim` removes each worktree (several GB
+of `target/`) and branch, and keeps one something is still using.
 
 - `ARGS=--dry-run` reads everything and computes merges locally, pushing and
   merging nothing; `ARGS=--no-merge` does the update and wait and stops at green.

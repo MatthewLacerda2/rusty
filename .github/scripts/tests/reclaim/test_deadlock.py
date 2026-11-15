@@ -21,8 +21,9 @@ def judge(locked: str, alive: bool, dirty: bool = False):
         return subprocess.CompletedProcess(argv, code, out, "")
     machine = reclaim.Machine(answer)
     machine.alive = lambda pid: alive
+    machine.written = lambda tree, idle: None  # never the real disk (#2217)
     wt = Worktree(MAIN / ".claude" / "worktrees" / "agent-x", "m1", locked=locked)
-    facts = machine.facts(wt, MAIN, cwds=[])
+    facts = machine.facts(wt, MAIN, procs=[])
     return reclaim.verdict(wt, facts), facts
 
 

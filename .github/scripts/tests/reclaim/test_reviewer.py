@@ -44,13 +44,14 @@ def machine(status: str = "", github: str = "up") -> reclaim.Machine:
         return subprocess.CompletedProcess(argv, code, out, err)
     found = reclaim.Machine(answer)
     found.alive = lambda pid: True  # a lock's owner runs: never the real process table (#1658)
+    found.written = lambda tree, idle: None  # nor the real disk (#2217)
     return found
 
 
 def tree(name: str, head: str = "r1", branch: str | None = None, locked: str | None = None,
          busy: bool = False, **kw) -> tuple[str, str]:
     wt = Worktree(TREES / name, head, branch, locked)
-    facts = machine(**kw).facts(wt, MAIN, cwds=[(42, wt.path)] if busy else [])
+    facts = machine(**kw).facts(wt, MAIN, procs=[(42, wt.path, "x")] if busy else [])
     return reclaim.verdict(wt, facts)
 
 

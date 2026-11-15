@@ -6,7 +6,6 @@ What it reads (the porcelain listing, the flags) and the verdict on each worktre
 
 from __future__ import annotations
 
-import subprocess
 import unittest
 from pathlib import Path
 
@@ -41,8 +40,9 @@ class Verdict(unittest.TestCase):
         for wt, facts, says in [(self.wt, Facts(prs=["MERGED"], dirty=True), "uncommitted"),
                                 (self.wt, Facts(prs=["MERGED"], unpushed=2), "2 commit(s)"),
                                 (self.wt, Facts(prs=["MERGED"], current=True), "runs from"),
-                                (self.wt, Facts(prs=["MERGED"], busy=[42]), "pid 42"),
+                                (self.wt, Facts(prs=["MERGED"], busy=[(42, "cargo")]), "in use by pid 42 (`cargo`)"),
                                 (self.wt, Facts(prs=["MERGED"], busy=None), "no way to tell"),
+                                (self.wt, Facts(prs=["MERGED"], written=5), "written 5 minute(s) ago"),
                                 (locked, Facts(prs=["MERGED"]), "locked")]:
             action, why = reclaim.verdict(wt, facts)
             self.assertEqual(action, "protect")
@@ -73,22 +73,6 @@ class SupervisorLock(unittest.TestCase):
         other = Worktree(Path("/w/agent"), "h", locked="claude agent (pid 1)")
         self.assertIsNone(machine.facts(other, Path("/x"), []).stale)
         self.assertEqual(asked, [42, 1])  # the agent's pid is asked too (#1658), but is not `stale`
-
-
-class Cwds(unittest.TestCase):
-    def test_reads_lsof_field_output_when_there_is_no_proc(self):
-        if Path("/proc/self/cwd").exists():
-            self.skipTest("Linux reads /proc, not lsof")
-        lsof = "p12\nfcwd\nn/a/b\np13\nfcwd\nn/c\n"
-        answer = lambda argv, **_: subprocess.CompletedProcess(argv, 1, lsof, "")
-        machine = reclaim.Machine(answer)
-        self.assertEqual(machine.cwds(), [(12, Path("/a/b")), (13, Path("/c"))])
-
-    def test_no_lsof_output_is_unknown_not_empty(self):
-        if Path("/proc/self/cwd").exists():
-            self.skipTest("Linux reads /proc, not lsof")
-        answer = lambda argv, **_: subprocess.CompletedProcess(argv, 1, "", "")
-        self.assertIsNone(reclaim.Machine(answer).cwds())
 
 
 if __name__ == "__main__":
