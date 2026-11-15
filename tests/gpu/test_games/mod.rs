@@ -19,18 +19,14 @@ use std::process::{Command, Output};
 use std::time::Duration;
 
 /// How much CPU time (user + system) one game's `game --test` may use at its
-/// defaults, in yardsticks: the CPU time of `calibrate`'s fixed workload, timed
-/// on this thread right before and after the game (#2070, #2131, #2243). Not wall
+/// defaults, in yardsticks: the median CPU time of `calibrate`'s fixed workload,
+/// sampled on a test thread throughout the game's run (#2070, #2131, #2243). Not wall
 /// time, which a busy machine stretches, nor bare CPU seconds, which a loaded
 /// machine inflates too (a shared SMT core, all-core clocks, a contended cache);
 /// the yardstick rises with them. A game past it fails by name, so the game whose
 /// defaults grew is the one fixed. Measured on lavapipe in a 4-core container
 /// (`docs/testing.md`, *Test games*, says how to re-measure): BUDGET_MEASURED.
 const BUDGET: f64 = 1e9;
-
-/// Yardstick samples taken before the game, and again after: 2 × 9 of about
-/// a tenth of a second each.
-const SAMPLES: usize = 9;
 
 /// Wall time after which a game is killed as hung, whatever its budget.
 const HANG: Duration = Duration::from_secs(450);
@@ -90,9 +86,9 @@ fn mismatch(found: &[String], listed: &[&str]) -> Option<String> {
 /// `game --test` on `name` passes, proves itself deterministic and stays inside
 /// [`BUDGET`].
 fn passes_within_budget(name: &str) {
-    let mut samples = calibrate::samples(SAMPLES);
+    let sampler = calibrate::Sampler::start();
     let run = measure::run(&mut game_command(name, None), HANG);
-    samples.extend(calibrate::samples(SAMPLES));
+    let samples = sampler.finish();
     let budget = budget::Budget {
         units: BUDGET,
         unit: calibrate::median(&samples),
@@ -106,11 +102,12 @@ fn passes_within_budget(name: &str) {
     assert!(stdout.contains("ok   generating twice writes the same files"));
     println!(
         "{name}: game --test used {:.1} s of CPU in {:.1} s: {:.0} yardsticks of {:.3} s \
-         ({:.3} to {:.3} s per sample), budget {BUDGET}",
+         ({} slices, {:.3} to {:.3} s), budget {BUDGET}",
         run.cpu.as_secs_f64(),
         run.wall.as_secs_f64(),
         budget.of(run.cpu),
         budget.unit.as_secs_f64(),
+        samples.len(),
         samples.iter().min().unwrap().as_secs_f64(),
         samples.iter().max().unwrap().as_secs_f64()
     );

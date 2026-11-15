@@ -119,6 +119,15 @@ fn a_child_that_hangs_is_killed_at_the_ceiling() {
 }
 
 #[test]
+fn the_sampler_takes_slices_through_its_window() {
+    let sampler = calibrate::Sampler::start();
+    std::thread::sleep(calibrate::IDLE * 2);
+    let slices = sampler.finish();
+    assert!(slices.len() >= 3, "{} slices", slices.len());
+    assert!(slices.iter().all(|s| *s > Duration::ZERO), "{slices:?}");
+}
+
+#[test]
 fn the_yardstick_spends_cpu_on_this_thread() {
     let samples = calibrate::samples(5);
     assert_eq!(samples.len(), 5);

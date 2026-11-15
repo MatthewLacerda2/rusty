@@ -880,15 +880,25 @@ worktree writes its own `target/games/`. `gpu::test_games` runs `game --test` on
 every folder under `games/` in CI, one test per game so nextest runs them side by
 side (#2070).
 
-**Each game has a 90 s budget of CPU time** for `game --test` at its defaults
-(`BUDGET` in `tests/gpu/test_games/mod.rs`): the test reaps the `game` child itself
-and reads its user + system time, so a busy machine (the nightly's one-process
-`cargo test`, where the games share the cores with the rest of the suite) slows a
-game's clock but not its budget. A game over it fails by name with its CPU time, so
-the game whose defaults grew is the one made cheaper. Wall time is only a hang
-guard: a game still running at 5× the budget is killed and fails as hung. CPU time
-counts every thread, so a game that renders on lavapipe can use more CPU than wall
-time. Longer runs go behind a `--param`.
+**Each game has a budget of CPU time, counted in yardsticks** for `game --test` at its
+defaults (`BUDGET` in `tests/gpu/test_games/mod.rs`). The test reaps the `game` child
+itself and reads its user + system time, so a busy machine slows a game's clock but
+not its count. Bare CPU seconds still move with load (a shared SMT core, all-core
+clocks, a contended cache), so the test divides them by a **yardstick**: the median
+CPU time of a fixed single-threaded workload (`tests/gpu/test_games/calibrate.rs`),
+which a test thread samples in short slices for as long as the game runs, meeting the
+same load in the same window. The sampler costs about 7% of one core beside the game.
+A game over budget fails by name with its CPU time and its yardsticks, so the game
+whose defaults grew is the one made cheaper. Wall time is only a hang guard: a game
+still running after `HANG` (450 s) is killed and fails as hung. CPU time counts every
+thread, so a game that renders on lavapipe can use more CPU than wall time. Longer
+runs go behind a `--param`.
+
+**Re-measuring the budget:** every test game's test prints its line in each log, passing
+too (`<game>: game --test used … s of CPU … N yardsticks of … s (… slices …)`), so
+`cargo nextest run --locked --features dev -E 'test(/test_games::/)'` locally, or any
+CI log, gives each game's count. The bar sits above the heaviest game's count across
+the machines measured, and below twice it, so a game that doubles its work fails.
 
 **Adding a game** is adding its folder and its line in the sorted `games!` list of
 `tests/gpu/test_games/mod.rs`; a folder with no line fails that file's check, naming it:
