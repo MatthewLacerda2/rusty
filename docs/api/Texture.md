@@ -573,7 +573,11 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   arrowhead pointing left); an open subpath fills as if closed. `fill_rule` is SVG's:
   `evenodd` cuts a hole wherever one contour sits inside another, `nonzero` only
   where the inner one runs the other way. `stroke > 0` draws the outline that many
-  tiles wide instead (round joins and caps, at most 1). One stamp, as `shape`: feed it
+  tiles wide instead (round joins and caps, at most 1): each pixel reads its
+  distance to the outline, so the stroke's edge is anti-aliased alike along lines,
+  curves, joins and caps at any resolution (on a non-square bake the width is
+  measured along a pixel of the sides' geometric mean); a dense stroke costs under
+  a second of one core at 4096². One stamp, as `shape`: feed it
   to `tile` or `scatter`, turn it with `mapping`, bevel it with `distance` →
   `bump_to_normal`. `d` is parsed with the recipe, so a malformed one is refused
   before anything bakes, naming the node and the byte; it may be at most 64 KiB,
@@ -659,7 +663,7 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   anti-aliased by exact area like `path`. One stamp centred in the tile, as `shape`:
   feed it to `tile` or `scatter`, turn it with `mapping`, emboss or engrave it with
   `distance` → `bump_to_normal` (crate serials, door numbers, warning signs). `text`
-  breaks lines at `\n` (at most 4096 bytes and 256 lines); `size` is the font's em
+  breaks lines at `\n` or `\r\n` (at most 4096 bytes and 256 lines); `size` is the font's em
   height in tiles (at most 4), `tracking` extra advance between glyphs in ems,
   `line_spacing` the distance between baselines in ems; the block runs from the first
   line's ascent to the last line's descent, its widest line sets its width, and
@@ -983,7 +987,9 @@ an axis (a band across it) has no edge there, so its ramp runs from the tile's e
 and jumps back at the wrap; every other island ramps across the edge as one.
 `image` tiles exactly as well as its file does. `text` and `path` wrap instead: a
 glyph or contour that crosses the tile's edge carries on from the opposite edge, so
-the map tiles even when the lettering is wider than the tile.
+the map tiles even when the lettering is wider than the tile. A wrapped copy is the
+same shape again, not another contour of it, so under `evenodd` a shape wider than
+the tile never cuts a hole where it overlaps its own copy.
 
 ### Units
 

@@ -30,10 +30,12 @@ pub type Shape = Vec<Edge>;
 /// row-major at `size`.
 ///
 /// A wrapped copy is the same outline again, not another contour of it, so the
-/// rule folds each copy's winding on its own and the copies are then added, capped
-/// at 1: under `evenodd` a shape wider than the tile never cancels against its own
-/// copy. Under `nonzero` folding first or last reads the same, so every copy goes
-/// into one pass.
+/// rule folds each copy's winding on its own and each pixel then takes the most
+/// any copy gives it: under `evenodd` a shape wider than the tile never cancels
+/// against its own copy, and its edge reads the same where two copies overlap.
+/// Copies of a shape narrower than the tile never share a pixel, so the most is
+/// exact there. Under `nonzero` folding first or last reads the same, so every
+/// copy goes into one pass.
 pub fn coverage(shapes: &[Shape], size: Size, rule: FillRule) -> Vec<f32> {
     let (w, h) = (size.width as usize, size.height as usize);
     let mut acc = Accumulator::new(w, h);
@@ -164,8 +166,8 @@ impl Accumulator {
         }
     }
 
-    /// Add each pixel's coverage, the running sum of its row's cells under `rule`,
-    /// into `out`, capped at 1.
+    /// Each pixel's coverage, the running sum of its row's cells under `rule`, into
+    /// `out` where it is more than `out` holds.
     fn resolve_into(&self, rule: FillRule, out: &mut [f32]) {
         let stride = self.w + 2;
         let rows = self.cells.chunks(stride.max(1)).take(self.h);
@@ -173,7 +175,7 @@ impl Accumulator {
             let mut winding = 0.0;
             for (cell, p) in row[..self.w].iter().zip(px) {
                 winding += cell;
-                *p = (*p + fold(winding, rule)).min(1.0);
+                *p = p.max(fold(winding, rule));
             }
         }
     }

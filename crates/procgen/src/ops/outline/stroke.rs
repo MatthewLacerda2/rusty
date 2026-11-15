@@ -33,7 +33,7 @@ pub fn coverage(subpaths: &[Subpath], width: f32, size: Size) -> Vec<f32> {
     let mut out = vec![0.0; w * h];
     let scale = Vec2::new(w as f32, h as f32);
     let r = width / 2.0 * (scale.x * scale.y).sqrt();
-    if !(r > 0.0) || w == 0 || h == 0 {
+    if r.is_nan() || r <= 0.0 || w == 0 || h == 0 {
         return out;
     }
     let segments = segments(subpaths, scale, r);

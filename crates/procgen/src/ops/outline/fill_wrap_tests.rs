@@ -53,4 +53,10 @@ fn evenodd_never_cancels_a_shape_against_its_own_wrapped_copy() {
         &c[16 * 32..17 * 32]
     );
     assert!(c[..8 * 32].iter().all(|v| *v == 0.0));
+    // Off the pixel grid, its edge row reads one share all along, overlap or not.
+    let p = [(-0.25, 0.41), (1.25, 0.41), (1.25, 0.6), (-0.25, 0.6)].map(Vec2::from);
+    let stripe: Shape = (0..4).map(|i| [p[i], p[(i + 1) % 4]]).collect();
+    let c = coverage(&[stripe], Size::new(32, 32), FillRule::Evenodd);
+    let edge = &c[13 * 32..14 * 32];
+    assert!(edge.iter().all(|v| (v - edge[0]).abs() < 1e-5), "{edge:?}");
 }

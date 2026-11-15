@@ -17,7 +17,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
-use std::time::SystemTime;
+use std::time::Duration;
 
 use rusty_core::project::ContentRoots;
 use rusty_procgen::{FontHandle, Sources, TextureRecipe};
@@ -39,7 +39,10 @@ pub(super) fn read_fonts(
         let stamp = match std::fs::metadata(&file) {
             Ok(m) if m.is_file() => Stamp {
                 len: m.len(),
-                modified: m.modified().ok(),
+                modified: m
+                    .modified()
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()),
             },
             _ => return Err(fault("no such file")),
         };
@@ -65,12 +68,13 @@ pub(super) fn read_fonts(
     Ok(())
 }
 
-/// Which version of a file a kept font was parsed from. A file whose modified
-/// time can't be read is never taken from the cache.
+/// Which version of a file a kept font was parsed from: its length and modified
+/// time, compared for equality, never against a clock. A file whose modified time
+/// can't be read is never taken from the cache.
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct Stamp {
     len: u64,
-    modified: Option<SystemTime>,
+    modified: Option<Duration>,
 }
 
 /// The fonts parsed so far this process, by file.

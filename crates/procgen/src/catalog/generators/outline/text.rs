@@ -26,7 +26,7 @@ pub enum Align {
 }
 
 /// Lettering, a mask: 1 inside the glyphs, 0 outside, the block centred in the
-/// tile, one stamp as `shape` is. `text` breaks lines at `\n`; `size` is the
+/// tile, one stamp as `shape` is. `text` breaks lines at `\n` or `\r\n`; `size` is the
 /// font's em height in tiles, `tracking` extra advance between glyphs in ems,
 /// `line_spacing` the distance between baselines in ems, and `align` places each
 /// line in the block. Shaped as the UI's `Text` is: kerning and ligatures. `font`

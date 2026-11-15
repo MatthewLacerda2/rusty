@@ -86,8 +86,8 @@ adding, count the folder; today:
   `filter/test_probe.rs` (run one op on one image, roll it to show the op wraps).
 - `generators/` (12 loose files, full): a new generator goes in a cluster, never
   beside them. `generators/outline/` holds the ones that fill an outline (`text`,
-  `path`; their math in `ops/outline/`: the fill, SVG path data, glyph layout). A
-  new generator enum (`WaveProfile`, `ShapeProfile`) lives in its op file, as above.
+  `path`; their math in `ops/outline/`: the fill, the distance stroke, SVG path
+  data, glyph layout). A new generator enum (`WaveProfile`, `ShapeProfile`) lives in its op file, as above.
 - `vector/` (10): `warp`, `directional_warp`, `sample_at` (its mip chain in
   `ops/sample.rs`), `tile`, `scatter` (its math in `ops/scatter/`), ….
 
