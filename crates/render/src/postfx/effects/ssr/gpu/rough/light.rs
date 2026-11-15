@@ -61,7 +61,7 @@ fn resolved(r: &mut Renderer, scale: f32) -> Vec<f32> {
 /// The most a tile of the resolved image, divided by its light, may differ from
 /// the 1x scene's, in 255ths of perceptual luma at the 1x scene's light. Measured
 /// on an RTX 2060, lavapipe and Metal: 0.01 at 0.01x, 0.00 to 0.01 at 100x; 4.5 at
-/// 0.01x with the hits' brightness read in absolute light (RTX 2060, lavapipe).
+/// 0.01x on the RTX 2060 with the hits' brightness read in absolute light.
 const SAME: f32 = 0.5;
 
 #[test]
