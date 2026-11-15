@@ -28,7 +28,6 @@ mod kinds;
 mod node;
 mod op_info;
 mod param;
-#[cfg(test)]
 mod sample;
 
 /// The op-set, its params structs and the catalog: one file per op, in
@@ -42,6 +41,8 @@ pub use node::{Fault, Node, NodeError};
 pub(crate) use op_info::{choice, op, opt, req, socket, SEED};
 pub use op_info::{Lit, OpInfo, OpParam};
 pub use param::{Link, Param};
+#[doc(hidden)]
+pub use sample::sample_required;
 #[cfg(test)]
 pub(crate) use sample::{reading_sample_op, sample_op};
 
