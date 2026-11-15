@@ -288,7 +288,7 @@ jobs:
         id: baseline
         run: |
           set -euo pipefail
-          ulimit -v 8388608
+          ulimit -v 8388608 -c 0
           fail() { mkdir -p mutants.out; echo baseline > mutants.out/exit-code; exit 1; }
           cargo nextest run --no-run --verbose --workspace --features=dev || fail
           start=$(date +%s)
@@ -324,7 +324,11 @@ jobs:
         # the 2026-10-01 sweep: shard 1's runner got "received a shutdown
         # signal" 4 min into a mutant whose test limit was 172 s, and the shard
         # was lost with no report. Capped, the test binary dies on its own
-        # allocation and cargo-mutants counts the mutant caught.
+        # allocation and cargo-mutants counts the mutant caught, as long as
+        # core dumps are off (`-c 0`, #2230): the runner's `systemd-coredump`
+        # otherwise writes a core as large as the cap while the process holds
+        # its memory, past the test timeout, and a few in a row took a runner
+        # down. `test_limits.py` (`make scripts`) holds the two together.
         # The cap is per process, so it holds the runner only as long as the
         # processes under it can't sum past its memory: nextest runs a process
         # per test, `test-threads` of them at once (the CPU count, 4, by
@@ -337,7 +341,7 @@ jobs:
           TIMEOUT: ${{ steps.baseline.outputs.timeout }}
         run: |
           budget=$(( BUDGET_SECONDS - ($(date +%s) - JOB_STARTED) ))
-          ulimit -v 8388608
+          ulimit -v 8388608 -c 0
           set -f   # the globs are for cargo-mutants, not the shell
           files=()
           for glob in $SWEEP_FILES; do files+=(--file "$glob"); done

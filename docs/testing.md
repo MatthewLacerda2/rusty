@@ -1087,7 +1087,24 @@ lavapipe and set `RUSTY_REQUIRE_GPU=1` (#785), and the nextest `gpu` group bound
 Doctests are left out: nextest doesn't run them (`make test` does), so a mutant only a
 doctest would catch survives. The runs pass `--test-threads 2`: the jobs' `ulimit -v`
 cap (#674) is per process, so it times the test processes running at once stays within
-the runner's memory (`test_gpu_config.py` holds the product).
+the runner's memory (`test_gpu_config.py` holds the product). The same `ulimit` turns
+core dumps off (`-c 0`, #2230): a mutant that allocates without bound aborts at the
+cap, and on GitHub's runners an abort writes a core as large as the cap while the
+process keeps its memory, which outlasts the test timeout and, a few mutants in a row,
+the runner; with dumps off it aborts in seconds and reads as caught
+(`test_limits.py` holds every capped `ulimit` to `-c 0`).
+
+**A torn-down job still answers.** A job whose runner died, or that was killed at its
+`timeout-minutes`, runs no step of its own, so `mutants-on-request.yml` has a second
+job, `no-answer`, which `needs:` it and runs only when the mutation job failed or timed
+out without reaching its comment (its `answered` output) and the run was not
+cancelled. It reads the step the job died in and GitHub's annotation from the jobs API
+(`mutants-torn-down.py`) and posts that line below any earlier report on the pull
+request, and as the `mutants-report` artifact. What the job measured is lost with its
+runner. A job that failed with its steps run and still wrote no report gets a line
+saying so, not "torn down". A runner that dies right after posting its report loses
+`answered` too, so the line can land below a real report; it says that report is the
+truth.
 
 **The jobs run their own baseline** (`--baseline skip`, #2164). cargo-mutants builds
 and tests its baseline with `--package` set to the mutated packages only, whatever
