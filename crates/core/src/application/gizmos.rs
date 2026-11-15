@@ -168,7 +168,7 @@ pub struct GizmoDesk {
 }
 
 impl Application {
-    /// Mark the host as one with a Scene view (the editor window).
+    /// Mark the host as one with a Scene view (the editor window, once when built).
     pub fn mark_gizmo_viewer(&mut self) {
         self.gizmos.viewer = true;
     }

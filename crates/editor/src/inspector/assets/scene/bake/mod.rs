@@ -28,8 +28,8 @@
 //! A script's `Lighting.GenerateAsync()` (#1999, Unity's `Lightmapping.BakeAsync`)
 //! presses the button: it sets `Scene::lighting_bake_requested`, and [`poll`] starts
 //! the same job on the next frame. A frame the window cannot draw (a locked screen)
-//! still polls, through `EditorUi::undrawn_frame`, so the job starts and ends with
-//! nobody at the screen.
+//! still polls ([`poll_undrawn`], through `EditorUi::frame_work`), so the job starts
+//! and ends with nobody at the screen.
 //!
 //! **Bake Occlusion** beside it (#1958, Unity's Occlusion window) runs only the
 //! last step, the PVS on its worker, and writes it beside the scene: the same
@@ -54,7 +54,7 @@ mod outcome;
 mod poll;
 mod progress;
 mod settings;
-pub use poll::poll;
+pub use poll::{poll, poll_undrawn};
 use progress::draw_progress;
 use settings::{draw_diffuse_model, draw_mixed_mode, draw_settings};
 
@@ -283,6 +283,8 @@ fn warn_unsaved(scene: &Scene, path: &str, console: &mut ConsoleLogs) {
 
 #[cfg(test)]
 pub(crate) mod async_tests;
+#[cfg(test)]
+mod budget_tests;
 #[cfg(test)]
 mod drop_tests;
 #[cfg(test)]

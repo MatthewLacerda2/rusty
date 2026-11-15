@@ -2,7 +2,7 @@
 //! `Lighting.GenerateAsync()` starts and runs to its end with no frame ever
 //! painted (the screen locked), and an edit reaches the navmesh outside Play.
 
-use crate::EditorUi;
+use crate::{EditorUi, Paint};
 use glam::Vec3;
 use rusty_navigation::test_support::{add_box, add_floor, move_to};
 use rusty_navigation::{NavigationGraph, Rebake};
@@ -23,7 +23,14 @@ fn moved_crate() -> (Scene, NavigationGraph) {
 fn undrawn(scene: &mut Scene, nav: &mut NavigationGraph, playing: bool) {
     let mut editor = EditorUi::new(Default::default());
     let ctx = egui::Context::default();
-    editor.undrawn_frame(&ctx, scene, &mut ConsoleLogs::new(), nav, playing);
+    editor.frame_work(
+        &ctx,
+        scene,
+        &mut ConsoleLogs::new(),
+        nav,
+        playing,
+        Paint::Undrawn,
+    );
 }
 
 #[test]
@@ -56,7 +63,7 @@ fn gpu_a_requested_bake_runs_to_its_end_on_undrawn_frames() {
     let mut console = ConsoleLogs::new();
     for frame in 0..4000 {
         let mut sc = scene.borrow_mut();
-        editor.undrawn_frame(&ctx, &mut sc, &mut console, &mut nav, false);
+        editor.frame_work(&ctx, &mut sc, &mut console, &mut nav, false, Paint::Undrawn);
         drop(sc);
         if frame == 0 {
             assert!(!scene.borrow().lighting_bake_requested, "taken at once");

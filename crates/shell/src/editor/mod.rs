@@ -105,6 +105,7 @@ impl EditorFrontend {
             paint::EGUI_RENDERER,
         );
         let editor_ui = EditorUi::new(game.script_manager().scene_path_cell());
+        sync::mark_host(&mut game.resources.application.borrow_mut());
         Self {
             egui_ctx,
             egui_winit,

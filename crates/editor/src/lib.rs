@@ -15,13 +15,14 @@ pub mod build_settings;
 pub mod demo;
 #[cfg(feature = "dev")]
 mod dev_state;
+mod frame_work;
 pub mod header;
 pub mod hierarchy;
 pub mod inspector;
 mod menu_create;
 pub mod project_picker;
 pub mod theme;
-mod undrawn;
+pub use frame_work::Paint;
 pub mod viewport;
 pub mod widgets;
 
@@ -248,6 +249,10 @@ impl EditorUi {
         let ui = &mut theme::chrome::root_ui(ctx);
         // 1. TOP HEADER PANEL (Controls engine state) — ALWAYS VISIBLE
         header::draw(self, ui, scene, console, is_playing);
+        // The frame's work that paints nothing, the one list an undrawn frame runs
+        // too. Inside the pass, after the header: egui drops a delayed repaint asked
+        // before `begin_pass`, and the header reads a bake's refusal before it.
+        self.frame_work(ctx, scene, console, nav, *is_playing, Paint::Drawn);
 
         // The side/bottom authoring panels are edit-mode only; during play the runtime
         // is live and the floating dev console takes over. The viewport stays in both
@@ -260,10 +265,6 @@ impl EditorUi {
                 bottom_panel::draw_play_console(self, ctx, console);
             }
         } else {
-            // One diffing navmesh sync per edit-mode frame catches every edit since
-            // the last one, whoever made it: a card, the gizmo, the console, MCP
-            // (#992). It rebakes only changed cells; play mode has `rebake_nav`.
-            nav.sync(scene);
             // 2. LEFT PANEL: Scene Hierarchy
             hierarchy::draw(self, ui, scene);
             // 3. RIGHT PANEL: Properties Inspector

@@ -3,14 +3,15 @@
 //!
 //! The shell still runs that frame: it ticks the sim and drains the command channel,
 //! so the attach bridge keeps answering. Only the paint is skipped, and the egui
-//! pass with it, which is where the editor's per-frame work otherwise runs. This
-//! does that work without painting, so work an agent asked for never waits on a
-//! redraw: a `Lighting.GenerateAsync()` starts and steps to its end
-//! (`EditorUi::undrawn_frame`), an edit reaches the navmesh, a file changed on disk
-//! reaches the caches and the open scene follows it.
+//! pass with it. This runs the frame's work that paints nothing, so work an agent
+//! asked for never waits on a redraw: a `Lighting.GenerateAsync()` starts and steps
+//! to its end and an edit reaches the navmesh (`EditorUi::frame_work`, the list a
+//! drawn frame runs too), a file changed on disk reaches the caches and the open
+//! scene follows it.
 
 use super::EditorFrontend;
 use rusty_app::GameWorld;
+use rusty_editor::Paint;
 
 impl EditorFrontend {
     /// Files changed outside the engine reach the caches, and the open scene its
@@ -28,17 +29,14 @@ impl EditorFrontend {
     pub(super) fn step_undrawn(&mut self, game: &GameWorld) {
         self.follow_files(game);
         self.follow_scene_swap(game);
-        // This window steps the bake whether or not it draws (`sync_gizmos` marks
-        // it too, on a drawn frame).
-        #[cfg(feature = "dev")]
-        game.resources.application.borrow_mut().mark_bake_host();
         let playing = game.play_requested();
         let mut scene = game.world.scene.borrow_mut();
         let mut console = game.resources.console.borrow_mut();
         let mut nav = game.resources.nav.borrow_mut();
         let (scene, console, nav) = (&mut *scene, &mut *console, &mut *nav);
         let ctx = &self.egui_ctx;
+        let work = Paint::Undrawn;
         self.editor_ui
-            .undrawn_frame(ctx, scene, console, nav, playing);
+            .frame_work(ctx, scene, console, nav, playing, work);
     }
 }
