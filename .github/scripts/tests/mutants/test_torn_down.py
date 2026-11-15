@@ -8,8 +8,10 @@ green run, a cancelled one, or one whose mutation job already posted.
 
 from __future__ import annotations
 
+import io
 import re
 import unittest
+from contextlib import redirect_stdout
 
 from tests import SCRIPTS, load
 
@@ -38,9 +40,22 @@ class Reason(unittest.TestCase):
         self.assertEqual(torn.last_step(job(("Plan", "success"), ("Skipped", "skipped"),
                                             ("Mutate", "cancelled"), ("Render", "skipped"))), "Mutate")
 
+    def test_an_unfinished_step_is_preferred_over_an_earlier_failure(self) -> None:
+        self.assertEqual(torn.last_step(job(("Lint", "failure"), ("Mutate", None), ("Render", None))), "Mutate")
+
+    def test_a_job_that_failed_with_its_steps_run_is_not_called_torn_down(self) -> None:
+        text = torn.reason(job(("Checkout", "failure"), ("Mutate", "skipped")), [])
+        self.assertTrue(text.startswith("the mutation job failed during its `Checkout` step with its steps run"))
+        self.assertNotIn("torn down", text)
+
+    def test_the_runner_going_away_reads_as_torn_down_even_with_steps_finished(self) -> None:
+        self.assertIn("torn down", torn.reason(job(("Plan", "success")), [LOST]))
+        self.assertIn("torn down", torn.reason(job(("Plan", "success")), [
+            {"annotation_level": "failure", "message": "The runner has received a shutdown signal."}]))
+
     def test_no_step_and_no_cause_still_reads_as_unanswered(self) -> None:
         text = torn.reason(job(("Plan", "success")), [])
-        self.assertTrue(text.startswith("the mutation job was torn down, so no step"))
+        self.assertTrue(text.startswith("the mutation job failed with its steps run"))
 
 
 def no_answer_job() -> str:
@@ -66,6 +81,35 @@ class Guards(unittest.TestCase):
 
     def test_posts_below_an_earlier_report_never_over_it(self) -> None:
         self.assertIn("mutants-pr-comment.py report/report.md --append", no_answer_job())
+
+    def test_says_a_report_above_it_is_the_truth(self) -> None:
+        self.assertIn("If a report stands above this line, that report is the truth", no_answer_job())
+
+    def test_its_artifact_replaces_the_mutation_jobs_own(self) -> None:
+        keep = no_answer_job().split("- name: Keep it", 1)[1]
+        self.assertIn("name: mutants-report", keep)
+        self.assertIn("overwrite: true", keep)
+
+
+class Paging(unittest.TestCase):
+    def test_reads_every_page_of_annotations(self) -> None:
+        asked: list[str] = []
+
+        def fake(*args: str) -> object:
+            asked.append(args[0])
+            if "/jobs" in args[0]:
+                return {"jobs": [job(("Mutate", None))]}
+            page = int(args[0].rsplit("page=", 1)[1])
+            return [CANCELED] * 100 if page == 1 else [LOST]
+
+        torn.gh, real = fake, torn.gh
+        try:
+            with redirect_stdout(io.StringIO()) as out:
+                torn.main(["--repo", "o/r", "--run", "1", "--job", "mutants"])
+        finally:
+            torn.gh = real
+        self.assertIn("lost communication", out.getvalue())
+        self.assertEqual(sum("annotations" in a for a in asked), 2)
 
 
 if __name__ == "__main__":

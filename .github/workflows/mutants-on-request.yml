@@ -415,6 +415,9 @@ jobs:
   # cannot turn a green run red. Measured on a throwaway workflow: a job killed
   # at its limit reads `cancelled` with no outputs, one whose runner was killed
   # reads `failure` with none, and a failed job whose steps ran keeps them.
+  # One case no guard closes: a runner that dies after `Post the report` loses
+  # `answered` too, so this line can land below a real report; the line it
+  # posts says a report above it is the truth.
   no-answer:
     needs: mutants
     if: always() && !cancelled() && needs.mutants.result != 'success' && needs.mutants.result != 'skipped' && needs.mutants.outputs.answered != 'true'
@@ -438,6 +441,7 @@ jobs:
           why=$(python3 .github/scripts/mutants-torn-down.py --repo "$GITHUB_REPOSITORY" --run "$GITHUB_RUN_ID" --job mutants) \
             || why="the mutation job was torn down before it could write a report."
           echo "::error::$why"
+          why="$why If a report stands above this line, that report is the truth: its runner died after posting it."
           python3 .github/scripts/mutants-report.py --unanswered "$why" --out report
           cat report/report.md >> "$GITHUB_STEP_SUMMARY"
       - name: Post it on the pull request
@@ -455,4 +459,6 @@ jobs:
         with:
           name: mutants-report
           path: report/
+          # The mutation job may have uploaded its own before its runner died.
+          overwrite: true
           retention-days: 14

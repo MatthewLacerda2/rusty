@@ -1101,7 +1101,10 @@ out without reaching its comment (its `answered` output) and the run was not
 cancelled. It reads the step the job died in and GitHub's annotation from the jobs API
 (`mutants-torn-down.py`) and posts that line below any earlier report on the pull
 request, and as the `mutants-report` artifact. What the job measured is lost with its
-runner.
+runner. A job that failed with its steps run and still wrote no report gets a line
+saying so, not "torn down". A runner that dies right after posting its report loses
+`answered` too, so the line can land below a real report; it says that report is the
+truth.
 
 **The jobs run their own baseline** (`--baseline skip`, #2164). cargo-mutants builds
 and tests its baseline with `--package` set to the mutated packages only, whatever
