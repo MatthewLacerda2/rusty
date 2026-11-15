@@ -14,7 +14,9 @@ A run has one part per cargo workspace its scope reached (`mutants-scope.py`,
 #2201), each measured into `mutants-SLUG/mutants.out` with its exit status in
 `status-SLUG` beside the plan; one report covers them all, a heading per part
 when there is more than one or the one is not the engine's, and a standalone
-part's survivors named by their path in the repository.
+part's survivors and their diffs named by their path in the repository. A part
+whose cargo-mutants broke gets a section saying so, beside the parts that
+finished, and the command exits red after writing the report.
 
 A run that has no answer still says so where its asker looks (#2201):
 `--unanswered` writes the one-line report the workflow posts on the pull
@@ -67,11 +69,6 @@ def label(outcome: dict, root: str = ROOT) -> str:
     return name if root == ROOT else f"{root}/{name}"
 
 
-def render(scope: str, run: dict, in_scope: int, status: int) -> str:
-    """The Markdown report of a run with one part, the engine's."""
-    return "\n".join([HEAD, "", scope, "", *section(run, in_scope, status)]) + "\n"
-
-
 def unanswered(reason: str) -> str:
     """The report of a run that has none: what kept it from answering."""
     return f"{HEAD}\n\n❌ No answer: {reason.strip()}\n\nThe ask is unanswered; the run's log has the rest.\n"
@@ -119,8 +116,30 @@ def timeouts(counts: dict[str, int]) -> list[str]:
             " the timeout).", ""]
 
 
+def rooted(diff: str, root: str) -> str:
+    """A diff cargo-mutants wrote inside `root`, its file paths from the
+    repository's root, so it applies there and never to a same-named engine
+    file. cargo-mutants' header is `--- <file>` and `+++ <the change>`; a git
+    header's `a/`/`b/` paths are prefixed after the letter."""
+    if root == ROOT:
+        return diff
+    out = []
+    for line in diff.split("\n"):
+        mark, _, rest = line.partition(" ")
+        if mark in ("---", "+++") and rest[:2] in ("a/", "b/"):
+            line = f"{mark} {rest[:2]}{root}/{rest[2:]}"
+        elif mark == "---" and rest and rest != "/dev/null":
+            line = f"--- {root}/{rest}"
+        elif line.startswith("diff --git a/") and " b/" in line:
+            old, new = line[len("diff --git a/"):].split(" b/", 1)
+            line = f"diff --git a/{root}/{old} b/{root}/{new}"
+        out.append(line)
+    return "\n".join(out)
+
+
 def diffs(out_dir: Path, run: dict, root: str = ROOT) -> str:
-    """Each survivor's diff under a `# name` line; a missing one is named."""
+    """Each survivor's diff under a `# name` line, its paths from the
+    repository's root; a missing one is named."""
     out = []
     for o in sorted(mutants(run), key=lambda o: label(o, root)):
         if o.get("summary") != "MissedMutant":
@@ -128,40 +147,47 @@ def diffs(out_dir: Path, run: dict, root: str = ROOT) -> str:
         out.append(f"# {label(o, root)}")
         path = out_dir / o["diff_path"] if o.get("diff_path") else None
         if path is not None and path.is_file():
-            out.append(path.read_text().rstrip("\n"))
+            out.append(rooted(path.read_text().rstrip("\n"), root))
         else:
             out.append("# (cargo-mutants kept no diff for this one)")
         out.append("")
     return "\n".join(out)
 
 
-def status(here: Path, slug: str) -> int:
-    """A part's cargo-mutants exit status; a broken one leaves no honest report."""
+def status(here: Path, slug: str) -> tuple[int | None, str]:
+    """A part's cargo-mutants exit status, and the status as written. `None`
+    is a broken part: the tool or its baseline failed, which is not a result."""
     path = here / f"status-{slug}"
     text = path.read_text().strip() if path.is_file() else ""
     code = int(text) if text.lstrip("-").isdigit() else None
-    if code not in FINISHED + STOPPED:
-        sys.exit(f"mutants-report: cargo-mutants in the `{slug}` part exited {text or 'without a status'};"
-                 " that is the tool or the baseline breaking, not a result, so there is no report to write")
-    return code
+    return (code if code in FINISHED + STOPPED else None), text or "without a status"
 
 
-def report(plan: dict, scope: str, here: Path) -> tuple[str, str]:
-    """The report and the survivors' diffs over every part that planned a mutant."""
+def report(plan: dict, scope: str, here: Path) -> tuple[str, str, list[str]]:
+    """The report, the survivors' diffs and the broken parts' complaints,
+    over every part that planned a mutant. One broken part never discards
+    another's measurements (#2201): the parts that finished are rendered, the
+    broken one gets a section saying so, and the caller keeps the run red."""
     runs = [p for p in plan.get("parts", []) if p.get("planned")]
-    out, found = [HEAD, "", scope, ""], []
+    out, found, broken = [HEAD, "", scope, ""], [], []
     if not runs:
         out += ["Nothing in scope was mutated. ➖"]
     for part in runs:
-        code, mutants_out = status(here, part["slug"]), here / f"mutants-{part['slug']}" / "mutants.out"
-        outcomes = mutants_out / "outcomes.json"
-        run = json.loads(outcomes.read_text()) if outcomes.is_file() else {}
+        (code, text), mutants_out = status(here, part["slug"]), here / f"mutants-{part['slug']}" / "mutants.out"
         if len(runs) > 1 or part["root"] != ROOT:
             name = "the engine's workspace" if part["root"] == ROOT else f"`{part['root']}/`"
             out += [f"### {name}", ""]
+        if code is None:
+            why = f"cargo-mutants in the `{part['slug']}` part exited {text}"
+            broken.append(why)
+            out += [f"❌ No answer for this part: {why}, the tool or its baseline breaking, not a"
+                    f" result. Its {part['planned']} planned mutants are unmeasured; the run's log has why.", ""]
+            continue
+        outcomes = mutants_out / "outcomes.json"
+        run = json.loads(outcomes.read_text()) if outcomes.is_file() else {}
         out += section(run, part["planned"], code, part["root"]) + [""]
         found.append(diffs(mutants_out, run, part["root"]))
-    return "\n".join(out).rstrip("\n") + "\n", "".join(found)
+    return "\n".join(out).rstrip("\n") + "\n", "".join(found), broken
 
 
 def main() -> None:
@@ -178,9 +204,12 @@ def main() -> None:
         return
     if args.plan is None or args.scope is None:
         parser.error("name the plan and the scope lines, or --unanswered")
-    text, found = report(json.loads(args.plan.read_text()), args.scope.read_text().strip(), args.plan.parent)
+    text, found, broken = report(json.loads(args.plan.read_text()), args.scope.read_text().strip(), args.plan.parent)
     (args.out / "report.md").write_text(text)
     (args.out / "survivors.diff").write_text(found)
+    if broken:
+        sys.exit("mutants-report: " + "; ".join(broken) + "; that is not a result, so the run is red"
+                 " (the report covers the parts that finished)")
 
 
 if __name__ == "__main__":

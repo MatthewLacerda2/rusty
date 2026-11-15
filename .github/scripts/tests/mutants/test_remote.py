@@ -48,6 +48,12 @@ class Verdict(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("no mutants-report artifact", sentence)
 
+    def test_a_red_run_s_report_is_why_never_a_result(self) -> None:
+        ok, sentence = remote.verdict({"conclusion": "failure"}, True)
+        self.assertFalse(ok)
+        self.assertIn("what it left is below", sentence)
+        self.assertIn("not a clean result", sentence)
+
 
 if __name__ == "__main__":
     unittest.main()

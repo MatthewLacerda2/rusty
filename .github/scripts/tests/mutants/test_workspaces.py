@@ -128,18 +128,32 @@ class Report(unittest.TestCase):
         self.part("root", 0, outcome("CaughtMutant", "crates/a/src/lib.rs:1:1: replace f"))
         self.part("tools-lint", 2, outcome("MissedMutant", "src/x.rs:1:1: replace g"))
         plan = {"parts": [{**PLAN["parts"][0], "planned": 1}, {**PLAN["parts"][1], "planned": 1}]}
-        text, diffs = report.report(plan, "Scoped.", self.here)
+        text, diffs, _ = report.report(plan, "Scoped.", self.here)
         self.assertEqual(text.count("## Mutation on request"), 1)
         self.assertIn("### the engine's workspace", text)
         self.assertIn("### `tools/lint/`", text)
         self.assertIn("tools/lint/src/x.rs:1:1: replace g", text)
         self.assertIn("# tools/lint/src/x.rs:1:1: replace g", diffs)
 
-    def test_a_broken_part_leaves_no_report(self) -> None:
+    def test_a_broken_part_keeps_the_other_part_s_results(self) -> None:
+        self.part("root", 2, outcome("MissedMutant", "crates/a/src/lib.rs:1:1: replace f"))
         self.part("tools-lint", 4)
-        with self.assertRaises(SystemExit) as stop:
-            report.report({"parts": [{**PLAN["parts"][1], "planned": 3}]}, "Scoped.", self.here)
-        self.assertIn("`tools-lint` part exited 4", str(stop.exception.code))
+        plan = {"parts": [{**PLAN["parts"][0], "planned": 1}, {**PLAN["parts"][1], "planned": 3}]}
+        text, _, broken = report.report(plan, "Scoped.", self.here)
+        self.assertEqual(broken, ["cargo-mutants in the `tools-lint` part exited 4"])
+        self.assertIn("crates/a/src/lib.rs:1:1: replace f", text)
+        self.assertIn("No answer for this part", text.split("### `tools/lint/`")[1])
+
+    def test_a_standalone_survivor_s_diff_names_repository_paths(self) -> None:
+        missed = {**outcome("MissedMutant", "src/x.rs:1:1: replace g"), "diff_path": "diff/g.diff"}
+        self.part("tools-lint", 2, missed)
+        (self.here / "mutants-tools-lint/mutants.out/diff").mkdir()
+        (self.here / "mutants-tools-lint/mutants.out/diff/g.diff").write_text(
+            "--- src/x.rs\n+++ replace g with false\n@@ -1 +1 @@\n-true\n+false\n")
+        _, diffs, _ = report.report({"parts": [{**PLAN["parts"][1], "planned": 1}]}, "Scoped.", self.here)
+        self.assertIn("--- tools/lint/src/x.rs\n+++ replace g with false", diffs)
+        self.assertEqual(report.rooted("--- a/src/x.rs\n+++ b/src/x.rs", "tools/lint"),
+                         "--- a/tools/lint/src/x.rs\n+++ b/tools/lint/src/x.rs")
 
     def test_an_unanswered_run_says_why(self) -> None:
         text = report.unanswered("the scope could not be read: no tracked Rust file matches 'x,'\n")

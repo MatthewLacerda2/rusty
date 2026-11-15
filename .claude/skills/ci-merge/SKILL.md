@@ -410,7 +410,7 @@ for a scoped run with a line in its description, `Mutation: diff` or
   `merge-queue/mutants.json`, surviving a relaunch, and are dispatched as slots
   free (also by `make queue PRS=N`).
 - **The report** lands on the merged PR as one comment edited in place (a run
-  with no answer posts why, and stays red). `after:`
+  with no answer adds why below the earlier report, and stays red). `after:`
   lines in the queue's log say each dispatch, end and refusal (refused three
   times: dropped, and said; a network failure keeps its place). `make
   queue-events` passes the lines that mean a report was lost (`dropped`,

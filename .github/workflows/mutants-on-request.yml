@@ -51,7 +51,7 @@ on:
   workflow_dispatch:
     inputs:
       scope:
-        description: "`diff`, or space-separated path globs (crates/physics/src/**)"
+        description: "`diff`, or path globs separated by spaces or commas (crates/physics/src/**)"
         required: true
         type: string
       request:
@@ -205,13 +205,20 @@ jobs:
       # feature or GPU, so cargo-mutants' own baseline is the right one here
       # (#2164's mismatch is a workspace member's) and sets the timeout itself.
       # Status and outcomes land beside the plan, per part, for the report.
+      # When the engine's part has mutants too, a standalone part gets at most
+      # half of what is left (#2201): given all of it, the engine's baseline
+      # then started with no budget and overran the job's limit, and a job
+      # killed at its limit runs no later step, so nothing was posted.
       - name: Standalone workspaces
         if: steps.plan.outputs.standalone != '0'
+        env:
+          ENGINE: ${{ steps.plan.outputs.in_scope }}
         run: |
           set -uo pipefail
           ulimit -v 8388608
           python3 .github/scripts/mutants-scope.py parts plan.json --standalone --planned | while read -r slug root diff; do
             budget=$(( BUDGET_SECONDS - ($(date +%s) - JOB_STARTED) ))
+            [ "$ENGINE" = 0 ] || budget=$(( budget / 2 ))
             rc=0
             if [ "$budget" -le 0 ]; then
               echo "::warning::the ${BUDGET_SECONDS}s budget was spent before $root's mutants"
@@ -245,15 +252,33 @@ jobs:
       # `--fail-fast` overrides the profile's `fail-fast = false` (right for the
       # gate's summary) so a caught mutant stops at its first failing test.
       # Memory cap and test-thread bound as the sweep (`mutants-sweep.yml` says why).
+      #
+      # The baseline is held to the budget too (#2201): with none left, or
+      # none left once it built, no mutant can run, so the part reads as
+      # stopped at its budget (status 124, "nothing measured") rather than
+      # building on past the job's limit, where no later step runs to say so.
       - name: Baseline
         id: baseline
         if: steps.plan.outputs.in_scope != '0'
         run: |
           set -euo pipefail
           ulimit -v 8388608
-          cargo nextest run --no-run --verbose --workspace --features=dev
+          left() { echo $(( BUDGET_SECONDS - ($(date +%s) - JOB_STARTED) )); }
+          spent() {
+            echo "::warning::the ${BUDGET_SECONDS}s budget ran out $1; no engine mutant ran"
+            echo "Baseline: the budget ran out $1, so no engine mutant ran." >> "$GITHUB_STEP_SUMMARY"
+            echo 124 > status-root
+            exit 0
+          }
+          bounded() {
+            [ "$(left)" -gt 0 ] || spent "$1"
+            rc=0
+            timeout --signal=INT --kill-after=60s "$(left)s" "${@:2}" || rc=$?
+            case $rc in 0) ;; 124|137) spent "$1" ;; *) exit "$rc" ;; esac
+          }
+          bounded "before the baseline built" cargo nextest run --no-run --verbose --workspace --features=dev
           start=$(date +%s)
-          cargo nextest run --verbose --workspace --features=dev --fail-fast --test-threads 2
+          bounded "during the baseline's tests" cargo nextest run --verbose --workspace --features=dev --fail-fast --test-threads 2
           secs=$(( $(date +%s) - start ))
           timeout=$(( secs * 3 > 60 ? secs * 3 : 60 ))
           echo "Baseline: the workspace's tests in ${secs}s, so each mutant's test timeout is ${timeout}s." | tee -a "$GITHUB_STEP_SUMMARY"
@@ -274,6 +299,8 @@ jobs:
         env:
           TIMEOUT: ${{ steps.baseline.outputs.timeout }}
         run: |
+          # The baseline already wrote `status-root` when it stopped at the budget.
+          [ -n "$TIMEOUT" ] || exit 0
           budget=$(( BUDGET_SECONDS - ($(date +%s) - JOB_STARTED) ))
           ulimit -v 8388608
           rc=0
@@ -289,7 +316,8 @@ jobs:
           echo "$rc" > status-root
 
       # Red when cargo-mutants broke in any part (any status but finished or
-      # stopped at its budget): then there is no honest report to write.
+      # stopped at its budget). The report is still written, the parts that
+      # finished beside a section for the broken one (#2201), and is posted.
       - name: Render the report
         id: render
         run: |
@@ -309,11 +337,16 @@ jobs:
       # red, so neither may this. The report is still in the summary and log.
       #
       # A run with no answer says so there too (#2201): when the scope was
-      # unreadable, planned nothing, or broke, this writes a one-line report
-      # of why, which the next step posts, and the run stays red. Not on a
-      # cancel: a cancelled run's pull request closed unmerged (#1530).
+      # unreadable, planned nothing, or broke before a report was written,
+      # this writes a one-line report of why, which the next step adds below
+      # the comment's earlier report (`--append`), never over it, and the run
+      # stays red. Not on a cancel: a cancelled run was superseded by a newer
+      # dispatch or its pull request closed unmerged (#1530), and nobody reads
+      # it. A job killed at `timeout-minutes` runs no step at all, which is why
+      # the budget above stops every part, the baseline included, before it.
       - name: Say why there is no answer
-        if: failure()
+        id: why
+        if: failure() && hashFiles('report/report.md') == ''
         env:
           RESOLVE: ${{ steps.resolve.outcome }}
           PLAN: ${{ steps.plan.outcome }}
@@ -336,15 +369,18 @@ jobs:
           BRANCH: ${{ github.ref_name }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           PR: ${{ inputs.pr }}
+          APPEND: ${{ steps.why.outcome == 'success' && '--append' || '' }}
         run: |
           [ -f report/report.md ] || { echo "no report was written; nothing to post"; exit 0; }
-          python3 .github/scripts/mutants-pr-comment.py report/report.md \
+          python3 .github/scripts/mutants-pr-comment.py report/report.md $APPEND \
             --repo "$GITHUB_REPOSITORY" --branch "$BRANCH" --run-url "$RUN_URL" ${PR:+--pr "$PR"}
 
+      # On a red run too, so `make mutants-remote` prints why it has no answer.
       - name: Keep the report
+        if: success() || failure()
         uses: actions/upload-artifact@v7
         with:
           name: mutants-report
           path: report/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14

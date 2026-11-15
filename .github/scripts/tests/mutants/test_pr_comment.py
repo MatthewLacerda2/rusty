@@ -46,15 +46,15 @@ class Ours(unittest.TestCase):
     def test_finds_the_earlier_run_s_comment(self) -> None:
         comments = [{"id": 1, "user": "someone", "body": "lgtm"},
                     {"id": 2, "user": comment.BOT, "body": comment.MARKER + "\nold"}]
-        self.assertEqual(comment.ours(comments), 2)
+        self.assertEqual(comment.mine(comments)["id"], 2)
 
     def test_none_means_post_a_new_one(self) -> None:
-        self.assertIsNone(comment.ours([]))
-        self.assertIsNone(comment.ours([{"id": 3, "user": comment.BOT, "body": "ci says"}]))
+        self.assertIsNone(comment.mine([]))
+        self.assertIsNone(comment.mine([{"id": 3, "user": comment.BOT, "body": "ci says"}]))
 
     def test_a_human_quoting_the_marker_is_never_edited(self) -> None:
         quoted = [{"id": 4, "user": "someone", "body": comment.MARKER + "\nquoted"}]
-        self.assertIsNone(comment.ours(quoted))
+        self.assertIsNone(comment.mine(quoted))
 
 
 class Target(unittest.TestCase):
@@ -71,6 +71,19 @@ class Target(unittest.TestCase):
     def test_closed_unmerged_or_none_gets_nothing(self) -> None:
         self.assertIsNone(comment.target([{"number": 4, "state": "closed", "merged_at": None}]))
         self.assertIsNone(comment.target([]))
+
+
+class Appended(unittest.TestCase):
+    """A run with no answer adds its line below an earlier report (#2201)."""
+
+    def test_the_earlier_report_stays_first(self) -> None:
+        old = comment.body("## Mutation on request\n\nsurvivor a.rs:1\n", "https://x/runs/0")
+        text = comment.appended(old, "## Mutation on request\n\n❌ No answer: broke\n", URL)
+        self.assertTrue(text.startswith(comment.MARKER + "\n"))
+        self.assertEqual(text.count(comment.MARKER), 1)
+        self.assertLess(text.index("survivor a.rs:1"), text.index("No answer: broke"))
+        self.assertIn("https://x/runs/0", text)
+        self.assertTrue(text.endswith(f"From [this run]({URL}).\n"))
 
 
 class Named(unittest.TestCase):
