@@ -118,19 +118,23 @@ particles are **visual only**; what it does not do:
   themselves, a `Gpu` one by where the emitter stands.
 
 A `Gpu` emitter holds at most **1,000,000** particles, whatever its
-`max_particles`: the same cap on every machine, so `GetCount` never differs
-between them. Setting more (in the Inspector or with `Component.Set`) warns and
-stores the cap; an emitter loaded or switched to `"Gpu"` with more warns and
-behaves as the cap. A GPU whose buffers cannot hold that many (none that rusty
-ships on) draws up to what fits, warned once at start-up. Changing a `Gpu`
+`max_particles`: the same cap on every machine and every GPU, so `GetCount`
+never differs between them. A `max_particles` above it is stored as given and
+warned about (when it is set, or when the emitter switches to `"Gpu"`); the
+emitter behaves as the cap, and switching back to `"Cpu"` holds the stored value
+again. So `Component.Set(e, "Particles", { simulation = "Gpu", max_particles =
+3000000 })` and the two fields set one at a time end the same. Changing a `Gpu`
 emitter's simulation space forgets its live particles, as changing its target
-does: they were stored in the old space.
+does: they were stored in the old space. A `Local` one at a scale of 0 holds its
+particles where they stood, under the last frame it had with a non-zero scale,
+as a `"Cpu"` one does.
 
 The over-life curves and gradient are sampled into a 64-step table per emitter,
 linear between steps. The sim keeps each live particle's birth record on the CPU
 (about 100 bytes each) until it dies. The renderer replays the last 256 ticks one
 `dt` at a time; one that drew nothing for longer (a long `Harness.Step`) moves the
-particles over the older ticks in one closed-form jump at the oldest kept `dt`.
+particles over the older ticks in one closed-form jump, aged by the time those
+ticks took (a pause at `Time.timeScale` 0 included) and moved at their mean `dt`.
 In edit mode an emitter draws nothing on either target, as no tick runs.
 
 ```lua no-run

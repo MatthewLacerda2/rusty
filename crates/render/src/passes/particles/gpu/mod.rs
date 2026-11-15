@@ -29,7 +29,7 @@ pub(crate) mod record;
 #[cfg(test)]
 mod twin;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use emitter::{EmitterBuffers, Work};
 use record::GpuEmitter;
@@ -109,13 +109,13 @@ impl Renderer {
         for e in gpu.emitters.values_mut() {
             e.idle += 1;
         }
-        let mut kept = Vec::new();
+        let mut kept = HashSet::new();
         for id in scene.world.ids_with_particles() {
             let Some(emitter) = scene.world.particles(id).filter(|e| e.on_gpu()) else {
                 continue;
             };
             let key = (scene.id(), id);
-            kept.push(id);
+            kept.insert(id);
             let sim = &emitter.runtime.gpu;
             if !emitter.runtime.initialized {
                 // Not in Play (edit mode, or after Stop): nothing to keep.
