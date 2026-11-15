@@ -11,7 +11,6 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::exit;
 
 use super::axes::read;
 
@@ -19,23 +18,11 @@ use super::axes::read;
 /// `modules::real` finds the folder, `src/` or `crates/`.
 pub(super) const COMPONENTS_DIR: &str = "src/components";
 const DECL: &str = "macro_rules! first_class {";
-const REPORT: &str = ".lint/report.txt";
 
-/// Discover components from the registry's `<field>: <path> => <Kind> [...];` rows.
-/// Shared with the parity gate (`parity.rs`), so both gates enumerate first-class
-/// components from the same source. Exits 1 (`NO_REGISTRY` / `NO_COMPONENTS`) rather
-/// than ever returning an empty list.
-pub(crate) fn discover() -> Vec<String> {
-    discover_in(Path::new(".")).unwrap_or_else(|e| {
-        let body = format!("components: FAILED\n{e}\n");
-        fs::create_dir_all(".lint").ok();
-        fs::write(REPORT, &body).ok();
-        eprint!("{body}");
-        exit(1);
-    })
-}
-
-/// [`discover`] under the repo `root`, as a result (testable from any directory).
+/// Discover components from the registry's `<field>: <path> => <Kind> [...];` rows
+/// of the repo at `root`. Shared with the parity gate (`parity.rs`), so both gates
+/// enumerate first-class components from the same source. `Err` (`NO_REGISTRY` /
+/// `NO_COMPONENTS`), the gate's finding, rather than ever an empty list.
 pub(crate) fn discover_in(root: &Path) -> Result<Vec<String>, String> {
     let dir = crate::modules::real(root, COMPONENTS_DIR);
     let Some(src) = registry_source(&dir) else {

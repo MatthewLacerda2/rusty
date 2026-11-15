@@ -19,7 +19,6 @@
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::bare_lines;
-use std::path::Path;
 
 pub const RULE: &str = "key-guard";
 
@@ -56,16 +55,17 @@ pub fn check<'a>(
 /// The rule over the root package and every member crate: each manifest against the
 /// code under its `src/` and `tests/`.
 pub fn run(scan: &Scan) -> Vec<Finding> {
-    let members = crate::modules::member_manifests(Path::new(""));
+    let members = crate::modules::member_manifests(&scan.base);
     let members = members
         .iter()
+        .map(|m| m.strip_prefix(&scan.base).unwrap_or(m))
         .map(|m| m.to_string_lossy().replace('\\', "/"));
     std::iter::once(String::from("Cargo.toml"))
         .chain(members)
         .filter_map(|manifest| {
             let root = manifest.trim_end_matches("Cargo.toml");
             let dirs = [format!("{root}src/"), format!("{root}tests/")];
-            let text = std::fs::read_to_string(&manifest).unwrap_or_default();
+            let text = std::fs::read_to_string(scan.base.join(&manifest)).unwrap_or_default();
             let inside = |f: &&String| dirs.iter().any(|d| f.starts_with(d.as_str()));
             let sources = scan.files.iter().filter(inside).map(|f| scan.source(f));
             check(&manifest, &text, sources)

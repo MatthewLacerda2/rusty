@@ -31,7 +31,7 @@ pub const RULE: &str = "orphan-module";
 
 /// The rule over the repository at the working directory.
 pub fn run(scan: &Scan) -> Vec<Finding> {
-    check(Path::new("."), scan)
+    check(scan.root(), scan)
 }
 
 /// The rule over `scan`, the files of the repository at `base`.

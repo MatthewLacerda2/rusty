@@ -12,6 +12,7 @@ use super::finding::Finding;
 use super::scan::Scan;
 use std::collections::BTreeMap;
 use std::fs;
+use std::path::Path;
 
 pub const RULE: &str = "prefix-group";
 /// Siblings sharing a word before the rule fires.
@@ -75,24 +76,25 @@ pub fn anchor(owner: &str, files: &[&str]) -> Option<usize> {
 }
 
 /// The file declaring `dir`'s modules: its `mod.rs` / `main.rs` / `lib.rs`, or the
-/// `<dir>.rs` beside it.
-pub fn owner_of(dir: &str) -> Option<String> {
+/// `<dir>.rs` beside it, as found under the repository at `base`.
+pub fn owner_of(base: &Path, dir: &str) -> Option<String> {
     ["mod.rs", "main.rs", "lib.rs"]
         .iter()
         .map(|f| format!("{dir}/{f}"))
         .chain(std::iter::once(format!("{dir}.rs")))
-        .find(|p| fs::metadata(p).is_ok_and(|m| m.is_file()))
+        .find(|p| base.join(p).is_file())
 }
 
-/// The findings for one directory, given its file names.
-pub fn check_dir(dir: &str, files: &[&str]) -> Vec<Finding> {
+/// The findings for one directory of the repository at `base`, given its file names.
+pub fn check_dir(base: &Path, dir: &str, files: &[&str]) -> Vec<Finding> {
     if EXEMPT
         .iter()
         .any(|(d, _)| *d == crate::modules::module_path(dir))
     {
         return Vec::new();
     }
-    let owner = owner_of(dir).map(|p| (fs::read_to_string(&p).unwrap_or_default(), p));
+    let owner =
+        owner_of(base, dir).map(|p| (fs::read_to_string(base.join(&p)).unwrap_or_default(), p));
     groups(files)
         .into_iter()
         .map(|(w, stems)| {
@@ -123,7 +125,7 @@ pub fn check_dir(dir: &str, files: &[&str]) -> Vec<Finding> {
 pub fn run(scan: &Scan) -> Vec<Finding> {
     let dirs = scan.dirs();
     dirs.iter()
-        .flat_map(|(d, names)| check_dir(d, names))
+        .flat_map(|(d, names)| check_dir(&scan.base, d, names))
         .collect()
 }
 

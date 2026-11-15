@@ -76,3 +76,21 @@ fn the_frontmatter_opens_the_file_and_names_its_stem() {
     let bare = "---\nname: a\nmodel: opus\n---\n";
     assert!(problems("a", bare)[0].contains("`description:` is missing"));
 }
+
+#[test]
+fn an_empty_description_is_flagged() {
+    let empty = "---\nname: helper\ndescription:\nmodel: opus\n---\n";
+    let found = problems("helper", empty);
+    assert!(
+        found.iter().any(|m| m.contains("`description:`")),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn an_unknown_key_is_reported_at_its_own_line() {
+    // `---` is line 1, so the frontmatter's fourth line is the file's fifth
+    let source = def("helper", "model: opus\nmodle: x\n");
+    let at: Vec<usize> = check("helper", &source).iter().map(|(l, _)| *l).collect();
+    assert_eq!(at, [5]);
+}
