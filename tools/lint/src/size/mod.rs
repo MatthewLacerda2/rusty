@@ -15,9 +15,9 @@
 //! **Nothing is grandfathered** (#926). A file over its cap is split, never excused;
 //! the burn-down list this gate once read emptied and was retired.
 
+use crate::gates::Verdict;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::exit;
 
 mod listing;
 mod lua;
@@ -44,7 +44,6 @@ pub(crate) const SCAN_ROOTS: &[&str] = &["src", "crates", "tests", "fuzz", "tool
 const SIZE_ROOTS: &[&str] = &[
     "src", "crates", "tests", "fuzz", "tools", ".github", "engine",
 ];
-const REPORT: &str = ".lint/report.txt";
 
 /// The languages the size gate measures.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -78,21 +77,46 @@ impl Lang {
     }
 }
 
-/// Entry point: check `args` (explicit files) or, when empty, every size root.
-pub fn run(args: &[String]) {
+/// The gate over the repository at `base`: `args` (explicit files, relative to it)
+/// or, when empty, every size root; and the agent docs among them.
+pub fn verdict(base: &Path, args: &[String]) -> Verdict {
     let files: Vec<PathBuf> = if args.is_empty() {
-        full_scan(Path::new(""))
+        full_scan(base)
     } else {
-        args.iter().map(PathBuf::from).collect()
+        args.iter().map(|a| base.join(a)).collect()
     };
 
     let violations: Vec<String> = files.iter().filter_map(|p| check_file(p)).collect();
-    let docs = crate::agent_docs::gate(args);
-    report(&violations, &docs);
-    if violations.is_empty() && docs.is_empty() {
-        println!("lint: ok");
+    let docs = crate::agent_docs::gate(base, args);
+    let mut advice = String::new();
+    if !violations.is_empty() {
+        advice.push_str(&format!(
+            "\n{} file(s) over the size cap. Split them by responsibility; nothing is \
+             grandfathered (see docs/linting.md).\n",
+            violations.len()
+        ));
+    }
+    if !docs.is_empty() {
+        advice.push_str(&format!(
+            "\n{} agent-doc finding(s) (`CLAUDE.md`, skill files and `.claude/agents/` \
+             definitions; docs/linting.md, *Agent docs*).\n",
+            docs.len()
+        ));
+    }
+    let findings: Vec<String> = violations.into_iter().chain(docs).collect();
+    let mut body = String::from(if findings.is_empty() {
+        "lint: ok\n"
     } else {
-        exit(1);
+        "lint: FAILED\n"
+    });
+    for f in &findings {
+        body.push_str(f);
+        body.push('\n');
+    }
+    Verdict {
+        findings,
+        body,
+        advice,
     }
 }
 
@@ -261,36 +285,4 @@ fn check_file(path: &Path) -> Option<String> {
 
 fn normalize(path: &Path) -> String {
     path.to_string_lossy().trim_start_matches("./").to_string()
-}
-
-fn report(violations: &[String], docs: &[String]) {
-    let mut body = if violations.is_empty() && docs.is_empty() {
-        String::from("lint: ok\n")
-    } else {
-        String::from("lint: FAILED\n")
-    };
-    for v in violations.iter().chain(docs) {
-        body.push_str(v);
-        body.push('\n');
-    }
-    fs::create_dir_all(".lint").ok();
-    fs::write(REPORT, &body).ok();
-    if violations.is_empty() && docs.is_empty() {
-        return;
-    }
-    eprint!("{}", body);
-    if !violations.is_empty() {
-        eprintln!(
-            "\n{} file(s) over the size cap. Split them by responsibility; nothing is \
-             grandfathered (see docs/linting.md).",
-            violations.len()
-        );
-    }
-    if !docs.is_empty() {
-        eprintln!(
-            "\n{} agent-doc finding(s) (`CLAUDE.md`, skill files and `.claude/agents/` \
-             definitions; docs/linting.md, *Agent docs*).",
-            docs.len()
-        );
-    }
 }

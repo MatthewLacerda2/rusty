@@ -1,0 +1,92 @@
+//! Every gate `main` dispatches, one row each, and the one way a gate reports.
+//!
+//! A gate is a pure `check(base, args)` over the repository at `base`: what it
+//! found and the report it renders, never printed or exited from inside. `main`
+//! prints and exits for all of them ([`report`]), so the wiring test
+//! (`gates_tests.rs`) can run every row's real entry point over a fixture it must
+//! flag, and a gate that returns nothing, or a row that stops being reached, fails
+//! a test instead of passing silently.
+
+use std::fs;
+use std::path::Path;
+use std::process::exit;
+
+const REPORT: &str = ".lint/report.txt";
+
+/// What a gate found over one repository.
+pub struct Verdict {
+    /// One line per finding; the gate fails when there is any.
+    pub findings: Vec<String>,
+    /// The report: stdout on a pass, stderr on a failure, and `.lint/report.txt`.
+    pub body: String,
+    /// What to do about the findings: stderr only, after the body, on a failure.
+    pub advice: String,
+}
+
+impl Verdict {
+    /// The shape most gates share: `<name>: ok`, or `<name>: FAILED` and a line per
+    /// finding, with `advice` (given the count) under it.
+    pub fn listed(name: &str, findings: Vec<String>, advice: impl Fn(usize) -> String) -> Self {
+        let head = if findings.is_empty() { "ok" } else { "FAILED" };
+        let mut body = format!("{name}: {head}\n");
+        for f in &findings {
+            body.push_str(f);
+            body.push('\n');
+        }
+        let advice = if findings.is_empty() {
+            String::new()
+        } else {
+            advice(findings.len())
+        };
+        Verdict {
+            findings,
+            body,
+            advice,
+        }
+    }
+}
+
+/// A gate: everything it finds in the repository at `base`, given `main`'s
+/// arguments (the size gate takes the commit hook's explicit files).
+pub type Check = fn(&Path, &[String]) -> Verdict;
+
+/// Every gate, by the flag that selects it; `""` is the default, the size gate.
+/// A new gate is one row here and a must-flag case in `gates_tests.rs`, whose
+/// test fails naming any row without one.
+pub const GATES: &[(&str, Check)] = &[
+    // sorted: gates are independent; `main` runs the one its flag names
+    ("", crate::size::verdict),
+    ("--components", crate::components::verdict),
+    ("--determinism", crate::determinism::verdict),
+    ("--layers", crate::layers::verdict),
+    ("--parity", crate::parity::verdict),
+    ("--rules", crate::rules::verdict),
+];
+
+/// The gate `args` selects: the first row whose flag is among them, else the size
+/// gate.
+pub fn select(args: &[String]) -> Check {
+    GATES
+        .iter()
+        .find(|(flag, _)| !flag.is_empty() && args.iter().any(|a| a == flag))
+        .or_else(|| GATES.iter().find(|(flag, _)| flag.is_empty()))
+        .map_or(crate::size::verdict, |(_, check)| *check)
+}
+
+/// Print `verdict` as every gate does, mirror it to `.lint/report.txt`, and exit 1
+/// when it found anything.
+pub fn report(verdict: &Verdict) {
+    fs::create_dir_all(".lint").ok();
+    fs::write(REPORT, &verdict.body).ok();
+    if verdict.findings.is_empty() {
+        print!("{}", verdict.body);
+        return;
+    }
+    eprint!("{}", verdict.body);
+    eprint!("{}", verdict.advice);
+    exit(1);
+}
+
+#[cfg(test)]
+#[path = "gates_tests.rs"]
+mod tests;

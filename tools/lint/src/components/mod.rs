@@ -36,8 +36,8 @@
 //!
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --components`
 
-use std::fs;
-use std::process::exit;
+use crate::gates::Verdict;
+use std::path::Path;
 
 mod axes;
 mod discover;
@@ -47,31 +47,42 @@ mod waivers;
 use axes::{
     add_menu_src, api_stems, editor_blob, has_add_menu, has_api, has_inspector, read, read_md_dir,
 };
-pub(crate) use discover::discover;
+pub(crate) use discover::discover_in;
 use waivers::{stale_waivers, waived};
 
 /// The Add Component menu: a module directory, every `.rs` under it.
 const ADD_MENU: &str = "src/editor/inspector/components/add";
 const API_MOD: &str = "src/script/api/mod.rs";
 const DOCS: &str = "docs/api";
-const REPORT: &str = ".lint/report.txt";
 
 /// The checkable axes (axis 1, the registry row, is the discovery source).
 const AXES: &[&str] = &["add_menu", "inspector", "api"];
 
-/// Entry point: discover every component and fail on any unwaived missing axis.
-pub fn run() {
-    let components = discover();
-    let registry = discover::registry_source(&crate::modules::real(
-        std::path::Path::new(""),
-        discover::COMPONENTS_DIR,
-    ))
-    .unwrap_or_default();
-    let add_src = kinds::with_kind_guards(&add_menu_src(), &registry);
-    let editor_blob = editor_blob();
-    let api_stems = api_stems();
-    let api_mod = read(crate::modules::real(std::path::Path::new(""), API_MOD));
-    let docs = read_md_dir(DOCS).to_lowercase();
+/// The gate over the repository at `base`: every component discovered, each
+/// unwaived missing axis a finding, and so is a registry it cannot read.
+pub fn verdict(base: &Path, _: &[String]) -> Verdict {
+    let violations = match discover_in(base) {
+        Ok(components) => incomplete(base, &components),
+        Err(why) => vec![why],
+    };
+    Verdict::listed("components", violations, |n| {
+        format!(
+            "\n{n} component gate issue(s). Complete the axis, or waive it in \
+             `waivers::WAIVERS` with its reason (a stale waiver: delete its row) — \
+             see docs/linting.md.\n"
+        )
+    })
+}
+
+/// Every unwaived missing axis of `components`, and every stale waiver.
+fn incomplete(base: &Path, components: &[String]) -> Vec<String> {
+    let registry = discover::registry_source(&crate::modules::real(base, discover::COMPONENTS_DIR))
+        .unwrap_or_default();
+    let add_src = kinds::with_kind_guards(&add_menu_src(base), &registry);
+    let editor_blob = editor_blob(base);
+    let api_stems = api_stems(base);
+    let api_mod = read(crate::modules::real(base, API_MOD));
+    let docs = read_md_dir(&base.join(DOCS)).to_lowercase();
 
     let present = |field: &str, axis: &str| match axis {
         "add_menu" => has_add_menu(field, &add_src),
@@ -80,7 +91,7 @@ pub fn run() {
         _ => true,
     };
     let mut violations = Vec::new();
-    for field in &components {
+    for field in components {
         for axis in AXES {
             if !present(field, axis) && !waived(field, axis) {
                 violations.push(format!(
@@ -89,34 +100,6 @@ pub fn run() {
             }
         }
     }
-    violations.extend(stale_waivers(&components, present));
-    report(&violations);
-    if violations.is_empty() {
-        println!("components: ok");
-    } else {
-        exit(1);
-    }
-}
-
-fn report(violations: &[String]) {
-    let mut body = if violations.is_empty() {
-        String::from("components: ok\n")
-    } else {
-        String::from("components: FAILED\n")
-    };
-    for v in violations {
-        body.push_str(v);
-        body.push('\n');
-    }
-    fs::create_dir_all(".lint").ok();
-    fs::write(REPORT, &body).ok();
-    if !violations.is_empty() {
-        eprint!("{body}");
-        eprintln!(
-            "\n{} component gate issue(s). Complete the axis, or waive it in \
-             `waivers::WAIVERS` with its reason (a stale waiver: delete its row) — \
-             see docs/linting.md.",
-            violations.len()
-        );
-    }
+    violations.extend(stale_waivers(components, present));
+    violations
 }

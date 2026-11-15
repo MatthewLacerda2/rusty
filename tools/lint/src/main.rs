@@ -18,6 +18,7 @@ mod code;
 mod components;
 mod dead_pub;
 mod determinism;
+mod gates;
 mod layers;
 mod modules;
 mod parity;
@@ -28,50 +29,16 @@ mod size;
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
 
-    // `--determinism` runs the sim-purity guard instead of the size gate: it fails
-    // if wall-clock / unseeded-RNG calls leak into the deterministic sim modules.
-    if args.iter().any(|a| a == "--determinism") {
-        determinism::run();
-        return;
-    }
-
-    // `--layers` runs the layering lint (#724): the declared table in
-    // `layers/table.rs` must equal the workspace's manifests, sim rows must stay sim
-    // and away from the display crates, and every declared edge must be used.
-    if args.iter().any(|a| a == "--layers") {
-        layers::run();
-        return;
-    }
-
-    // `--components` runs the 4-axis component-completeness gate (#81): every
-    // first-class component must have an Entity field, an Add Component entry, an
-    // inspector card, and an API namespace, or a written waiver (`waivers.rs`).
-    if args.iter().any(|a| a == "--components") {
-        components::run();
-        return;
-    }
-
-    // `--parity` runs the editor↔shared-op parity gate (#287): every *migrated*
-    // first-class component's inspector card must route its mutations through a
-    // shared `edit::authoring` op (no direct `&mut entity.<field>`).
-    if args.iter().any(|a| a == "--parity") {
-        parity::run();
-        return;
-    }
-
-    // `--rules` runs every rule built on the shared `Finding` + inline-allow
-    // mechanism (#934): `prefix-group`, `markers`, `skip`, `ignored`, and the ≲10-files signal.
-    if args.iter().any(|a| a == "--rules") {
-        rules::run();
-        return;
-    }
-
     // `--dead-pub` prints the dead-pub signal (#1003): `pub` items nothing uses,
-    // and items only tests use. A report, never a gate.
+    // and items only tests use. A report, never a gate, so not a row of
+    // `gates::GATES`: it builds the workspace twice, and fails only when it cannot.
     if args.iter().any(|a| a == "--dead-pub") {
         dead_pub::run();
         return;
     }
 
-    size::run(&args);
+    // Every gate is a row of `gates::GATES`, chosen by its flag (`docs/linting.md`
+    // says what each holds); with no flag, the size gate.
+    let check = gates::select(&args);
+    gates::report(&check(std::path::Path::new(""), &args));
 }

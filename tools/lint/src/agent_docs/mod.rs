@@ -51,18 +51,17 @@ const SKILLS: &str = ".claude/skills/";
 const AGENTS: &str = ".claude/agents/";
 const SKILL_MD: &str = "SKILL.md";
 
-/// The size gate's pass: the report lines for the tracked tree, or, given the
-/// commit hook's explicit files, for those that are agent docs. Where git can't
-/// list the tree, a note on stderr and nothing checked.
-pub fn gate(args: &[String]) -> Vec<String> {
-    let here = Path::new("");
+/// The size gate's pass over the repository at `base`: the report lines for the
+/// tracked tree, or, given the commit hook's explicit files, for those that are
+/// agent docs. Where git can't list the tree, a note on stderr and nothing checked.
+pub fn gate(base: &Path, args: &[String]) -> Vec<String> {
     let found = if args.is_empty() {
-        tree(here).unwrap_or_else(|why| {
+        tree(base).unwrap_or_else(|why| {
             eprintln!("lint: git can't list the tracked agent docs, so they go unchecked\ngit said:\n{why}");
             Vec::new()
         })
     } else {
-        files(here, args)
+        files(base, args)
     };
     found.iter().map(ToString::to_string).collect()
 }
