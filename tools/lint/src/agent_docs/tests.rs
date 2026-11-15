@@ -140,3 +140,16 @@ fn the_tree_flags_a_pinned_definition_it_does_not_track() {
     assert_eq!(rules(&found), [AGENT], "{found:?}");
     assert_eq!(found[0].path, ".claude/agents/reviewer.md");
 }
+
+#[test]
+fn a_skill_path_needs_its_folder_and_a_file() {
+    assert!(is_agent_doc(".claude/skills/s/SKILL.md"));
+    assert!(!is_agent_doc(".claude/skills//SKILL.md"));
+    assert!(!is_agent_doc(".claude/skills/s/"));
+}
+
+#[test]
+fn a_definition_problem_is_reported_through_the_file_pass() {
+    let found = file(".claude/agents/helper.md", "---\nname: other\n---\n");
+    assert!(rules(&found).contains(&AGENT), "{found:?}");
+}

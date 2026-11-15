@@ -8,7 +8,7 @@
 //! direct field mutation fails the build.
 //!
 //! Components are DISCOVERED the same way the completeness gate does — from the
-//! registry's `first_class!` rows (`components::discover`) — so this is the same
+//! registry's `first_class!` rows (`components::discover_in`) — so this is the same
 //! non-fragile enumeration, not a fresh attempt to auto-find arbitrary editor
 //! capabilities. For each discovered component that has an inspector card, the card is
 //! classified:
@@ -38,9 +38,9 @@
 //!
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --parity`
 
+use crate::gates::Verdict;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::exit;
 
 use crate::components;
 
@@ -48,7 +48,6 @@ use crate::components;
 /// scan to this directory is exact: a grep confirms no other editor file takes a
 /// component's mutable accessor, so the cards are the sole authoring surface.
 const CARDS_DIR: &str = "src/editor/inspector/components";
-const REPORT: &str = ".lint/report.txt";
 
 /// How a component's inspector card mutates the component.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -63,23 +62,24 @@ enum Card {
     Direct,
 }
 
-/// Entry point: classify every discovered component's card and fail on drift.
-pub fn run() {
-    let components = components::discover();
-    let cards = card_sources();
-
-    let mut violations = Vec::new();
-    for field in &components {
-        if let Some(v) = violation(field, classify_all(field, &cards)) {
-            violations.push(v);
-        }
-    }
-    report(&violations);
-    if violations.is_empty() {
-        println!("parity: ok");
-    } else {
-        exit(1);
-    }
+/// The gate over the repository at `base`: every discovered component's card
+/// classified, each drift a finding, and so is a registry it cannot read.
+pub fn verdict(base: &Path, _: &[String]) -> Verdict {
+    let components = match components::discover_in(base) {
+        Ok(components) => components,
+        Err(why) => return components::unreadable_registry("parity", why),
+    };
+    let cards = card_sources(base);
+    let violations = components
+        .iter()
+        .filter_map(|field| violation(field, classify_all(field, &cards)))
+        .collect();
+    Verdict::listed("parity", violations, |n| {
+        format!(
+            "\n{n} editor-card parity issue(s). Route the card through a shared \
+             `edit::authoring` op — see docs/linting.md.\n"
+        )
+    })
 }
 
 /// The enforcement table (pure, so it is exhaustively testable): given a card's
@@ -132,9 +132,9 @@ fn classify(field: &str, src: &str) -> Card {
 }
 
 /// Every inspector-card source under [`CARDS_DIR`], one string per file.
-fn card_sources() -> Vec<String> {
+fn card_sources(base: &Path) -> Vec<String> {
     let mut files = Vec::new();
-    walk(&crate::modules::real(Path::new(""), CARDS_DIR), &mut files);
+    walk(&crate::modules::real(base, CARDS_DIR), &mut files);
     files.iter().map(read).collect()
 }
 
@@ -154,28 +154,6 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
 
 fn read<P: AsRef<Path>>(path: P) -> String {
     fs::read_to_string(path).unwrap_or_default()
-}
-
-fn report(violations: &[String]) {
-    let mut body = if violations.is_empty() {
-        String::from("parity: ok\n")
-    } else {
-        String::from("parity: FAILED\n")
-    };
-    for v in violations {
-        body.push_str(v);
-        body.push('\n');
-    }
-    fs::create_dir_all(".lint").ok();
-    fs::write(REPORT, &body).ok();
-    if !violations.is_empty() {
-        eprint!("{body}");
-        eprintln!(
-            "\n{} editor-card parity issue(s). Route the card through a shared \
-             `edit::authoring` op — see docs/linting.md.",
-            violations.len()
-        );
-    }
 }
 
 #[cfg(test)]

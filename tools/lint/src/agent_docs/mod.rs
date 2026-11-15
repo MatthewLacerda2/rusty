@@ -51,20 +51,25 @@ const SKILLS: &str = ".claude/skills/";
 const AGENTS: &str = ".claude/agents/";
 const SKILL_MD: &str = "SKILL.md";
 
-/// The size gate's pass: the report lines for the tracked tree, or, given the
-/// commit hook's explicit files, for those that are agent docs. Where git can't
-/// list the tree, a note on stderr and nothing checked.
-pub fn gate(args: &[String]) -> Vec<String> {
-    let here = Path::new("");
-    let found = if args.is_empty() {
-        tree(here).unwrap_or_else(|why| {
-            eprintln!("lint: git can't list the tracked agent docs, so they go unchecked\ngit said:\n{why}");
-            Vec::new()
-        })
+/// The size gate's pass over the repository at `base`: the report lines for the
+/// tracked tree, or, given the commit hook's explicit files, for those that are
+/// agent docs. Where git can't list the tree, nothing checked and a note saying so.
+pub fn gate(base: &Path, args: &[String]) -> (Vec<String>, Option<String>) {
+    let (found, note) = if args.is_empty() {
+        match tree(base) {
+            Ok(found) => (found, None),
+            Err(why) => (
+                Vec::new(),
+                Some(format!(
+                    "lint: git can't list the tracked agent docs, so they go unchecked\n\
+                     git said:\n{why}"
+                )),
+            ),
+        }
     } else {
-        files(here, args)
+        (files(base, args), None)
     };
-    found.iter().map(ToString::to_string).collect()
+    (found.iter().map(ToString::to_string).collect(), note)
 }
 
 /// Every finding over the tracked agent docs of the repository at `base`; `Err`

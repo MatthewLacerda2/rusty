@@ -102,7 +102,7 @@ pub fn run(scan: &Scan) -> Vec<Finding> {
             at.starts_with("src/") || at == "src"
         })
         .filter_map(|(d, names)| {
-            let owner = owner_of(d);
+            let owner = owner_of(&scan.base, d);
             let owner = owner.as_deref().map(|p| (p, scan.source(p)));
             check_dir(d, names, owner)
         })
