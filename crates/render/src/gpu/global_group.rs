@@ -24,8 +24,9 @@ pub(crate) struct GlobalGroup<'a> {
     pub lightmaps: LightmapBinding<'a>,
     /// The integrated volumetric fog (#1703).
     pub fog_volume: &'a wgpu::TextureView,
-    /// The one sampler all of the above but the decal atlas read through
-    /// ([`super::linear_clamp`]).
+    /// The one sampler the sky, the probe cubes, the lightmaps, the shadowmask pages
+    /// (binding 19) and the fog volume read through ([`super::linear_clamp`]); the
+    /// decal atlas keeps its own, so give none of them a sampler of their own.
     pub linear_clamp: &'a wgpu::Sampler,
 }
 

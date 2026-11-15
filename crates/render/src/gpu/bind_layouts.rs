@@ -9,14 +9,15 @@ use super::layout_entries::{
     depth_entry, dynamic_uniform_entry, sampler_entry, storage_entry, texture_entry, uniform_entry,
 };
 
-/// Group 0: Camera (0), Lighting (1), the sky's reflection cube (2) and its sampler (3,
-/// #1553), Reflection
-/// Probe Cube Array (4), Reflection Probe Sampler (5), the light clusters (#434): the
+/// Group 0: Camera (0), Lighting (1), the sky's reflection cube (2, #1553), the
+/// Reflection Probe Cube Array (4), the light clusters (#434): the
 /// frame's point/spot lights (7), each cluster's light and decal ranges (8) and the
 /// index list (9), and the decals (#638): their records (10), the decal atlas's
-/// sRGB (11) and raw (12) views and its sampler (13), and the baked lightmap pages (14)
-/// with their sampler (15, #438) and direction pages (16, #810), and the
-/// integrated volumetric fog (17) with its sampler (18, #1703). Binding 6 is the shadow module's (see `shader.wgsl`).
+/// sRGB (11) and raw (12) views and its sampler (13), and the baked lightmap pages (14, #438)
+/// with their direction pages (16, #810), the integrated volumetric fog (17, #1703)
+/// and the shadowmask pages (19). Bindings 3, 5 and 15 are gone: 18 is the one
+/// linear-clamp sampler the sky, the probes, the lightmaps, the shadowmask pages
+/// and the fog volume all read. Binding 6 is the shadow module's (see `shader.wgsl`).
 /// The cube array holds the resident probes' baked, prefiltered cubemaps, one per layer
 /// (#245, #1206); a draw's instance names the two probes it blends (#1584), and the
 /// shader samples their layers (parallax-corrected, roughness->mip) and the sky's

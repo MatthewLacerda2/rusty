@@ -258,7 +258,7 @@ pub struct Renderer {
     /// The frame's decals and their atlas (#638), in group 0 and the forward material inputs.
     decals: decals::DecalBuffers,
 
-    /// The volumetric fog (#1703) in group 0, written by each base camera running it.
+    /// The volumetric fog (#1703) in group 0, filled by each base camera running it before it draws.
     fog_volume: postfx::effects::volumetric_fog::SharedVolume,
     /// Group 0's one sampler for its cubes, lightmaps and fog (`gpu::linear_clamp`).
     linear_clamp: wgpu::Sampler,

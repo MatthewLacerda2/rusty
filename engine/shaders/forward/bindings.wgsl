@@ -216,12 +216,12 @@ var t_lightmap_dirs: texture_2d_array<f32>;
 // while no camera runs it, read only where `camera.volumetric.x` says so.
 @group(0) @binding(17)
 var t_fog_volume: texture_3d<f32>;
-// The one sampler every engine-owned texture above but the decal atlas reads
-// through (`render::gpu::linear_clamp`): linear min, mag and mip filters,
-// clamp-to-edge on all three axes. The sky and probe cubes, the lightmap pages
-// with their direction and shadowmask pages, and the fog volume share it, which
-// keeps the fragment stage inside Metal's 16 samplers. Bindings 3, 5 and 15 are
-// free.
+// The one sampler the sky and probe cubes, the lightmap pages with their direction
+// pages, the shadowmask pages (binding 19) and the fog volume read through
+// (`render::gpu::linear_clamp`): linear min, mag and mip filters, clamp-to-edge on
+// all three axes. Never give one of them a sampler of its own; it keeps the
+// fragment stage inside Metal's 16 samplers. The decal atlas keeps its own (13).
+// Bindings 3, 5 and 15 are free.
 @group(0) @binding(18)
 var s_linear_clamp: sampler;
 // The shadowmask pages of a `Shadowmask` bake (#1695), same layers and UVs: per
