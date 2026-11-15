@@ -64,9 +64,19 @@ def makefile_gates(text: str) -> dict[str, list[str]]:
         # keeps both commands, so CI dropping `b` is still flagged.
         commands = [re.sub(r"\s*\|\|\s*\{.*\}\s*$", "", expand(c.lstrip("@"))).strip()
                     for c in recipes.get(gate, [])]
+        commands = [part for c in commands for part in each_command(c)]
         # `command -v tool || { …install hint… }`: a local presence check; CI installs the tool.
         gates[gate] = [c for c in commands if not c.startswith("command -v ")]
     return gates
+
+
+def each_command(line: str) -> list[str]:
+    """`rc=0; a || rc=1; b || rc=1; exit $$rc`, a recipe that runs every command and
+    fails after if any did, as its commands `a` and `b`; any other line as itself."""
+    if "|| rc=1" not in line:
+        return [line]
+    parts = (re.sub(r"\s*\|\|\s*rc=1$", "", p.strip()) for p in line.split(";"))
+    return [p for p in parts if p and p != "rc=0" and not p.startswith("exit ")]
 
 
 def gates_are_the_two_lists(text: str) -> bool:

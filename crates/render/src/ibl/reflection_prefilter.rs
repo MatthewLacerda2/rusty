@@ -94,7 +94,5 @@ pub(crate) fn mip_count(base_size: u32) -> u32 {
 mod reflection_prefilter_tests;
 
 #[cfg(test)]
-mod diag_2231;
-#[cfg(test)]
 #[path = "reflection_prefilter/hdr_tests.rs"]
 mod hdr_tests;

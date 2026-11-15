@@ -30,7 +30,7 @@ const MEAN_STEP: f32 = 0.25;
 const MEAN_MIN_SIZE: u32 = 4;
 /// The largest a channel may differ on the smooth capture, at any mip: what the CPU
 /// reference moves from itself with every normal nudged by 1e-7 to 1e-5, a GPU's
-/// rounding (#2231). Measured: RTX 2060 1.
+/// rounding (#2231). Measured: RTX 2060 1, lavapipe 1, Metal 1.
 const SMOOTH_STEP: u8 = 2;
 
 /// A stored face's channels as sRGB steps of their value over `scale`, alpha left out.
