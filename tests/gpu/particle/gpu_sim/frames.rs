@@ -50,6 +50,8 @@ fn a_gpu_emitter_matches_its_cpu_twin_frame_after_frame() {
             a.iter().filter(|&&x| x).count() > 50,
             "frame {frame}: the cloud draws"
         );
+        // Measured on lavapipe (Mesa, the container): 1.0 at every frame; a
+        // desktop GPU's value is owed before merge (docs/testing.md).
         let agree = agreement(&a, &b);
         assert!(agree > 0.98, "frame {frame}: {agree}");
     }

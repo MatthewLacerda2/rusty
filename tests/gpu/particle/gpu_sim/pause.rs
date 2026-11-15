@@ -71,7 +71,7 @@ fn a_jump_over_a_pause_ages_by_the_time_that_passed() {
             a.iter().filter(|&&x| x).count() > 50,
             "frame {frame}: drawn"
         );
-        // Measured on lavapipe (Mesa, the container): see the PR's Gates line.
+        // Measured on lavapipe (Mesa, the container): 1.0 at every frame.
         let agree = agreement(&a, &b);
         assert!(agree > 0.98, "frame {frame}: {agree}");
     }
