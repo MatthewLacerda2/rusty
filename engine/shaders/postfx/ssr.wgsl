@@ -369,8 +369,8 @@ const PULL_LEVELS: f32 = 2.0;
 // around it, as `read_spread` gives them) as far as its own hits are darker than
 // those (`PULL`). A texel of a dark sliver beside a bright reflection (a cord in
 // front of a lamp) then takes the lamp's radius, however many hits it holds.
-fn texel_mean(p: vec2<i32>, level: i32, near: vec2<f32>) -> vec2<f32> {
-    let s = textureLoad(t_spread, p, level);
+fn texel_mean(p: vec2<i32>, dim: vec2<i32>, level: i32, near: vec2<f32>) -> vec2<f32> {
+    let s = textureSampleLevel(t_spread, s_color, (vec2<f32>(p) + 0.5) / vec2<f32>(dim), f32(level));
     let own = read_spread(s);
     let pull = PULL * max(near.x - DARKER * own.x, 0.0);
     return vec2<f32>(s.z / COUNT_SCALE, (own.x * own.y + pull * near.y) / (own.x + pull));
@@ -379,9 +379,12 @@ fn texel_mean(p: vec2<i32>, level: i32, near: vec2<f32>) -> vec2<f32> {
 // Level `level` of the spread pyramid around `uv`, filtered as its trilinear
 // sampler filters it (bilinear, clamped at the edge), but over each texel's
 // `texel_mean`: the hits' count (`x`) and the sum of each texel's mean radius
-// times its count (`y`).
+// times its count (`y`). The level differs from pixel to pixel, so its size is
+// the first level's halved and each texel is read through the sampler at its
+// centre: a texel fetch or size query at such a level read the wrong level on
+// lavapipe, a row of black pixels wherever the level changed.
 fn level_mean(uv: vec2<f32>, level: i32, near: vec2<f32>) -> vec2<f32> {
-    let dim = vec2<i32>(textureDimensions(t_spread, level));
+    let dim = max(vec2<i32>(textureDimensions(t_spread)) >> vec2<u32>(u32(level)), vec2<i32>(1));
     let f = uv * vec2<f32>(dim) - 0.5;
     let base = vec2<i32>(floor(f));
     let t = f - floor(f);
@@ -389,7 +392,7 @@ fn level_mean(uv: vec2<f32>, level: i32, near: vec2<f32>) -> vec2<f32> {
     for (var i = 0; i < 4; i = i + 1) {
         let o = vec2<i32>(i & 1, i >> 1u);
         let w = select(1.0 - t.x, t.x, o.x == 1) * select(1.0 - t.y, t.y, o.y == 1);
-        let m = texel_mean(clamp(base + o, vec2<i32>(0), dim - 1), level, near);
+        let m = texel_mean(clamp(base + o, vec2<i32>(0), dim - 1), dim, level, near);
         sum = sum + w * vec2<f32>(m.x, m.x * m.y);
     }
     return sum;
