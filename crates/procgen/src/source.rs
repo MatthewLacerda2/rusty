@@ -12,9 +12,16 @@
 //! the runner decodes a file only when an `image` node that reads it runs, which
 //! a requested output must need, and drops it once the last such node has run.
 //! Laziness moves memory, never bytes: the texels are the same either way.
+//!
+//! A `text` node's font (#2190) arrives the same way: the caller reads the file
+//! [`TextureRecipe::font_paths`](super::TextureRecipe::font_paths) names and hands
+//! its bytes to [`Sources::insert_font`], which parses them; an empty `font` is the
+//! engine's default, compiled in, so it needs no source.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
+
+use rusty_font::{FontData, FontHandle};
 
 use super::image_buf::Rgba;
 
@@ -88,6 +95,7 @@ pub struct Sources {
     decoded: BTreeMap<String, Source>,
     lazy: BTreeSet<String>,
     loader: Option<Loader>,
+    fonts: BTreeMap<String, FontHandle>,
 }
 
 impl std::fmt::Debug for Sources {
@@ -95,6 +103,7 @@ impl std::fmt::Debug for Sources {
         f.debug_struct("Sources")
             .field("decoded", &self.decoded.keys().collect::<Vec<_>>())
             .field("lazy", &self.lazy)
+            .field("fonts", &self.fonts.keys().collect::<Vec<_>>())
             .finish()
     }
 }
@@ -112,7 +121,35 @@ impl Sources {
             decoded: BTreeMap::new(),
             lazy: paths.into_iter().collect(),
             loader: Some(loader),
+            fonts: BTreeMap::new(),
         }
+    }
+
+    /// Parse `bytes` as the font a `text` node names `path`; an error when they
+    /// are no font (truncated, another format). Gives the parsed font back, for a
+    /// caller that keeps fonts across recipes ([`Self::insert_parsed_font`]).
+    pub fn insert_font(
+        &mut self,
+        path: impl Into<String>,
+        bytes: Vec<u8>,
+    ) -> Result<FontHandle, String> {
+        let font = FontData::parse(bytes.into())
+            .ok_or("not a .ttf / .otf font this can read (truncated, or another format)")?;
+        let font = FontHandle::new(font);
+        self.insert_parsed_font(path, font.clone());
+        Ok(font)
+    }
+
+    /// Hand in a font [`Self::insert_font`] parsed before, for the `text` nodes
+    /// that name `path`: a caller re-baking keeps fonts, so it neither re-reads nor
+    /// re-parses one, and the shaper's memo carries over.
+    pub fn insert_parsed_font(&mut self, path: impl Into<String>, font: FontHandle) {
+        self.fonts.insert(path.into(), font);
+    }
+
+    /// The font a `text` node names `path`, if the caller handed it in.
+    pub fn font(&self, path: &str) -> Option<FontHandle> {
+        self.fonts.get(path).cloned()
     }
 
     /// Add (or replace) the decoded source for `path`.
@@ -177,6 +214,15 @@ mod tests {
         assert_eq!(sources.load("a.png").unwrap().unwrap().texels(), [[1.0; 4]]);
         assert!(sources.load("b.png").unwrap().is_err());
         assert!(!sources.has("c.png") && sources.load("c.png").is_none());
+    }
+
+    #[test]
+    fn a_font_is_parsed_when_it_is_handed_in() {
+        let mut sources = Sources::new();
+        assert!(sources
+            .insert_font("x.ttf", b"not a font".to_vec())
+            .is_err());
+        assert!(sources.font("x.ttf").is_none());
     }
 
     #[test]

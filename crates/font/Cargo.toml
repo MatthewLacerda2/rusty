@@ -1,0 +1,15 @@
+[package]
+name = "rusty-font"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+rusty-core = { workspace = true }
+glam = { workspace = true }
+harfrust = { workspace = true }
+skrifa = { workspace = true }
