@@ -53,7 +53,7 @@ pub(crate) fn fit(limits: &wgpu::Limits) -> u32 {
     let record = std::mem::size_of::<record::GpuParticle>() as u64;
     let bytes = limits
         .max_buffer_size
-        .min(limits.max_storage_buffer_binding_size as u64);
+        .min(limits.max_storage_buffer_binding_size);
     (bytes / record).min(u64::from(GPU_MAX_PARTICLES)) as u32
 }
 

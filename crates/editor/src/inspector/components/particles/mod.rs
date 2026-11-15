@@ -129,6 +129,12 @@ fn draw_emission(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponen
     for line in particle_ops::gpu_warnings(p) {
         ui.colored_label(ui.visuals().warn_fg_color, line);
     }
+    draw_counts(ui, cx, p) || changed
+}
+
+/// The rate, burst count and particle cap, ranged by the simulation target.
+fn draw_counts(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {
+    let mut changed = false;
     let (rates, caps) = emission_ranges(p.simulation);
     let mut rate = p.rate;
     if clamped(ui, "Rate (per sec):", &mut rate, rates) {
