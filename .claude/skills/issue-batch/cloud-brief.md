@@ -34,8 +34,9 @@ take them, and say so in the PR. A committed copy conflicts with the original.
 Before writing code, read the issue body for "Blocked by" and check each
 blocker's state on GitHub; a blocker written only in prose slips past the
 orchestrator. If one is still open, stand down (comment on the issue, its first
-line `Standing down`, which `make queue-events` passes to the orchestrator; no
-branch) and say which issue should go first.
+line preferably `Standing down`; `make queue-events` passes every comment you
+post on your issue to the orchestrator, but not a first line `Brief` or
+`Context update`, which are the orchestrator's own; no branch) and say which issue should go first.
 
 ## Read first
 
@@ -262,6 +263,7 @@ Beyond what changed, why, the effect and the decisions:
   independent review" means the orchestrator will run one.
 - ≈3 attempts at the same failure, or a decision that is genuinely the user's:
   leave the PR as draft with the reason in its description, comment on the
-  issue with first line `Standing down` (the one line `make queue-events`
-  passes to the orchestrator; a draft that stays a draft raises no event), and
-  stop.
+  issue, its first line preferably `Standing down` (a draft that stays a draft
+  raises no event, so the comment is what `make queue-events` passes to the
+  orchestrator; never open it with `Brief` or `Context update`, which it skips
+  as the orchestrator's own), and stop.
