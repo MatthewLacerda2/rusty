@@ -49,66 +49,11 @@ struct Snapshot(Vec<Particle>);
 
 /// Register `GetParticles`, `SetParticles` and `ForEach` onto the `Particles` table.
 pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
-    let read = {
-        let scene = scene.clone();
-        lua.create_function(move |lua, (id, keep): (EntityArg, bool)| {
-            let scene = &*scene.get(lua)?;
-            let read = with_carried(&mut scene.borrow_mut(), id.read(), |e, _| {
-                let live = &e.runtime.particles;
-                (packed(live), keep.then(|| Snapshot(live.clone())))
-            });
-            let (bytes, kept) = read.unwrap_or_default();
-            let count = bytes.len() / PARTICLE;
-            let kept = kept.map(|k| lua.create_any_userdata(k)).transpose()?;
-            Ok((lua.create_string(bytes)?, count, kept))
-        })
-        .map_err(|e| e.to_string())?
+    let halves = (read(lua, scene), write(lua, scene), edit(lua, scene));
+    let (read, write, edit) = match halves {
+        (Ok(r), Ok(w), Ok(e)) => (r, w, e),
+        (Err(e), ..) | (_, Err(e), _) | (.., Err(e)) => return Err(e.to_string()),
     };
-    let edit = {
-        let scene = scene.clone();
-        lua.create_function(
-            move |lua,
-                  (id, kept, edits, kills): (
-                EntityArg,
-                Option<mlua::AnyUserData>,
-                Vec<f64>,
-                Vec<u32>,
-            )| {
-                let id = id.live("Particles", "ForEach")?;
-                let scene = &*scene.get(lua)?;
-                let Some(kept) = kept else { return Ok(0) };
-                let Snapshot(read) = kept.take::<Snapshot>()?;
-                let edited = edited(read, &edits, &kills).map_err(mlua::Error::RuntimeError)?;
-                let live = with_carried(&mut scene.borrow_mut(), id, |e, _| {
-                    let cap = e.max_particles as usize;
-                    e.runtime.particles = edited.into_iter().take(cap).collect();
-                    e.runtime.particles.len() as u32
-                });
-                Ok(live.unwrap_or(0))
-            },
-        )
-        .map_err(|e| e.to_string())?
-    };
-    let write = lua
-        .create_function(
-            move |lua, (id, verb, records): (EntityArg, String, mlua::LuaString)| {
-                let id = id.live("Particles", &verb)?;
-                let scene = &*scene.get(lua)?;
-                let records = records.as_bytes();
-                if records.len() % RECORD != 0 {
-                    return Err(mlua::Error::RuntimeError(format!(
-                        "Particles.{verb}: {} bytes of records is not a whole number of \
-                         {RECORD}-byte records (live.lua and live.rs disagree on the layout)",
-                        records.len()
-                    )));
-                }
-                let live = with_carried(&mut scene.borrow_mut(), id, |e, frame| {
-                    write_records(e, frame, &records)
-                });
-                Ok(live.unwrap_or(0))
-            },
-        )
-        .map_err(|e| e.to_string())?;
     let layout = (
         format!("<{}", "f".repeat(FIELDS)),
         format!("<I4f{}", "f".repeat(FIELDS)),
@@ -127,6 +72,63 @@ pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
         table.set(name, f).map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+/// `read(id, keep)`: the emitter's particles on the wire and their count, and,
+/// when `keep`, a [`Snapshot`] of them for `edit`.
+fn read(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<Function> {
+    lua.create_function(move |lua, (id, keep): (EntityArg, bool)| {
+        let scene = &*scene.get(lua)?;
+        let read = with_carried(&mut scene.borrow_mut(), id.read(), |e, _| {
+            let live = &e.runtime.particles;
+            (packed(live), keep.then(|| Snapshot(live.clone())))
+        });
+        let (bytes, kept) = read.unwrap_or_default();
+        let count = bytes.len() / PARTICLE;
+        let kept = kept.map(|k| lua.create_any_userdata(k)).transpose()?;
+        Ok((lua.create_string(bytes)?, count, kept))
+    })
+}
+
+/// `write(id, verb, records)`: replace the live particles with `records`.
+fn write(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<Function> {
+    lua.create_function(
+        move |lua, (id, verb, records): (EntityArg, String, mlua::LuaString)| {
+            let id = id.live("Particles", &verb)?;
+            let scene = &*scene.get(lua)?;
+            let records = records.as_bytes();
+            if records.len() % RECORD != 0 {
+                return Err(mlua::Error::RuntimeError(format!(
+                    "Particles.{verb}: {} bytes of records is not a whole number of \
+                     {RECORD}-byte records (live.lua and live.rs disagree on the layout)",
+                    records.len()
+                )));
+            }
+            let live = with_carried(&mut scene.borrow_mut(), id, |e, frame| {
+                write_records(e, frame, &records)
+            });
+            Ok(live.unwrap_or(0))
+        },
+    )
+}
+
+/// `edit(id, snapshot, edits, kills)`: replace the live particles with the
+/// `ForEach` read `snapshot`, edited ([`edited`]).
+fn edit(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<Function> {
+    type Args = (EntityArg, Option<mlua::AnyUserData>, Vec<f64>, Vec<u32>);
+    lua.create_function(move |lua, (id, kept, edits, kills): Args| {
+        let id = id.live("Particles", "ForEach")?;
+        let scene = &*scene.get(lua)?;
+        let Some(kept) = kept else { return Ok(0) };
+        let Snapshot(read) = kept.take::<Snapshot>()?;
+        let edited = edited(read, &edits, &kills).map_err(mlua::Error::RuntimeError)?;
+        let live = with_carried(&mut scene.borrow_mut(), id, |e, _| {
+            let cap = e.max_particles as usize;
+            e.runtime.particles = edited.into_iter().take(cap).collect();
+            e.runtime.particles.len() as u32
+        });
+        Ok(live.unwrap_or(0))
+    })
 }
 
 /// Run `f` on `id`'s emitter after carrying a `Local` one to where it stands,

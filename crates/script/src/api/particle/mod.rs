@@ -40,7 +40,7 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     render::register(lua, &table, scene)?;
     space::register(lua, &table, scene)?;
     reactive::register(lua, &table, scene)?;
-    live::register(lua, &table, scene.clone())?;
+    live::register(lua, &table, scene)?;
     arrays::register(lua, &table, scene)?;
 
     lua.globals()

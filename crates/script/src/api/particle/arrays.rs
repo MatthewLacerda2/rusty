@@ -32,9 +32,8 @@ const STAMP: &str = "__particles_read";
 
 /// Register `GetArrays` and `SetArrays` onto the `Particles` table.
 pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
-    let get = {
-        let scene = scene.clone();
-        lua.create_function(move |lua, (id, names): (EntityArg, Value)| {
+    let get = lua
+        .create_function(move |lua, (id, names): (EntityArg, Value)| {
             let slots = slots("GetArrays", names)?;
             let scene = &*scene.get(lua)?;
             let id = id.read();
@@ -44,51 +43,56 @@ pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
             .unwrap_or_default();
             columns(lua, id, &live, &slots)
         })
-        .map_err(|e| e.to_string())?
-    };
+        .map_err(|e| e.to_string())?;
     let set = lua
         .create_function(move |lua, (id, arrays): (EntityArg, Value)| {
             let id = id.live("Particles", "SetArrays")?;
             let Value::Table(arrays) = arrays else {
                 return Err(error("SetArrays: the arrays are not a table".into()));
             };
-            let stamp = arrays
-                .metatable()
-                .and_then(|m| m.raw_get::<AnyUserData>(STAMP).ok())
-                .ok_or_else(|| error("SetArrays: the arrays are not a GetArrays table".into()))?;
-            let stamp = stamp.borrow::<Stamp>()?;
-            if stamp.id != id {
-                return Err(error(format!(
-                    "SetArrays: the arrays were read from entity {}, not {id}",
-                    stamp.id
-                )));
-            }
-            let written = read_back(&arrays, stamp.ages.len())?;
             let scene = &*scene.get(lua)?;
-            let live = with_carried(&mut scene.borrow_mut(), id, |e, _| {
-                let ps = &mut e.runtime.particles;
-                let same = ps.len() == stamp.ages.len()
-                    && ps
-                        .iter()
-                        .zip(&stamp.ages)
-                        .all(|(p, &a)| p.age.to_bits() == a);
-                if !same {
-                    return Err(error(
-                        "SetArrays: the arrays are from an older read (the particles have ticked, \
-                         or been added, removed or aged since); read and write in the same \
-                         function"
-                            .into(),
-                    ));
-                }
-                write(ps, &written);
-                Ok(ps.len() as u32)
-            });
-            live.unwrap_or(Ok(0))
+            let live = set_arrays(&mut scene.borrow_mut(), id, &arrays);
+            live
         })
         .map_err(|e| e.to_string())?;
     table.set("GetArrays", get).map_err(|e| e.to_string())?;
     table.set("SetArrays", set).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// `SetArrays(id, arrays)` on `scene`: the number live after, or an error that
+/// changed nothing.
+fn set_arrays(scene: &mut Scene, id: u32, arrays: &Table) -> mlua::Result<u32> {
+    let stamp = arrays
+        .metatable()
+        .and_then(|m| m.raw_get::<AnyUserData>(STAMP).ok())
+        .ok_or_else(|| error("SetArrays: the arrays are not a GetArrays table".into()))?;
+    let stamp = stamp.borrow::<Stamp>()?;
+    if stamp.id != id {
+        return Err(error(format!(
+            "SetArrays: the arrays were read from entity {}, not {id}",
+            stamp.id
+        )));
+    }
+    let written = read_back(arrays, stamp.ages.len())?;
+    let live = with_carried(scene, id, |e, _| {
+        let ps = &mut e.runtime.particles;
+        let same = ps.len() == stamp.ages.len()
+            && ps
+                .iter()
+                .zip(&stamp.ages)
+                .all(|(p, &a)| p.age.to_bits() == a);
+        if !same {
+            return Err(error(
+                "SetArrays: the arrays are from an older read (the particles have ticked, or \
+                 been added, removed or aged since); read and write in the same function"
+                    .into(),
+            ));
+        }
+        write(ps, &written);
+        Ok(ps.len() as u32)
+    });
+    live.unwrap_or(Ok(0))
 }
 
 /// A `Particles.SetArrays` / `GetArrays` error.
