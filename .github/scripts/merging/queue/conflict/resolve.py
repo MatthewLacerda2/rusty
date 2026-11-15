@@ -163,7 +163,7 @@ def settle(work: str, paths: list[str], unreadable: list[str] = ()) -> dict[str,
     made = {path: None if path in unreadable else decide(path, read(os.path.join(work, path))) for path in paths}
     if paths and all(text is not None for text in made.values()):
         for path, text in made.items():
-            with open(os.path.join(work, path), "w", encoding="utf-8", newline="") as out:
+            with open(os.path.join(work, path), "w", encoding="utf-8", newline="") as out:  # state-ok: a worktree file
                 out.write(text)
     return {path: text is not None for path, text in made.items()}
 

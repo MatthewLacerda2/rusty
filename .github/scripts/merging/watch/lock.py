@@ -26,7 +26,7 @@ def hold(path: Path):
     """`(handle, None)` with the lock held while `handle` stays open, or
     `(None, pid)` naming the process that holds it."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    handle = os.fdopen(os.open(path, os.O_RDWR | os.O_CREAT, 0o644), "r+")
+    handle = os.fdopen(os.open(path, os.O_RDWR | os.O_CREAT, 0o644), "r+")  # state-ok: the flock, its PID
     try:
         fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:

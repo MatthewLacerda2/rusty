@@ -108,7 +108,10 @@ diff, and the hold costs nothing until one does.
 **It also says what changed on the board** (#909): one line per pull request
 that opened (as a draft or ready), turned ready, went back to draft, gained or
 lost the [`board.QUEUE_LABEL`], or closed without this watch merging it ([`board.transitions`]). The first listing after a
-launch says nothing, so a relaunch does not replay the board. Before this the
+launch is compared with the last listing any watch told ([`kept`], #2215), so
+a relaunch does not replay the board and what moved while no watch ran (the
+supervisor's sleep between watches) is said once; with nothing kept, it says
+each ready pull request without the label. Before this the
 orchestrator ran a second monitor, a `gh pr list` poller, to hear of a coder's
 draft or its flip to ready; with these lines one `Monitor` on the watch's
 output is the whole view.
@@ -124,7 +127,7 @@ closing summary gives the totals of the conflicts recorded during the watch.
 The watch holds an `fcntl.flock` for its whole life ([`lock.hold`]), so a second
 one exits naming the first's PID. During a take's CI wait the board is still
 listed once a poll (the `tick` [`queue.waiting.wait_for`] calls), `--since`
-keeps its lines to the batch's own pull requests ([`board.recent`]), `--for` with
+keeps its lines to the batch's own pull requests ([`board.fresh`]), `--for` with
 `--deadline` must fit in a background command's life ([`ending.over_budget`]),
 and the last line is always [`ending.RESUME`] and the command to start it again.
 
