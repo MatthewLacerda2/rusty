@@ -127,7 +127,7 @@ impl Stamp {
             return None;
         }
         // At the defaults neither draw can change the stamp (`unit2` stays below
-        // 1), so neither is hashed: every plain scatter would pay for both.
+        // 1), so neither is hashed: every plain grid would pay for both.
         if d.probability < 1.0 && unit(CHANCE) >= d.probability {
             return None;
         }

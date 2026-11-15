@@ -41,9 +41,11 @@ pub struct Scatter {
     pub seed: u32,
 }
 
-/// `amount`'s default: 32 stamps per tile.
+/// `amount`'s default: 32 stamps per tile (also what a NaN `amount` reads).
+pub(crate) const AMOUNT: f32 = 32.0;
+
 fn amount() -> f32 {
-    32.0
+    AMOUNT
 }
 
 /// `scale`'s default: a stamp a fifth of the tile across.
@@ -81,7 +83,7 @@ impl Row for Scatter {
         "vector",
         arity(1, 8),
         &[
-            opt("amount", "number", Lit::Number(32.0)),
+            opt("amount", "number", Lit::Number(AMOUNT)),
             socket(opt("scale", "number", Lit::Number(0.2))),
             opt("scale_jitter", "number", Lit::Number(0.0)),
             socket(opt("rotation", "number", Lit::Number(0.0))),

@@ -1,4 +1,4 @@
-//! The `tile` scatter op (#407): stamp the input once per cell of a whole-count grid,
+//! The `tile` op (#407): stamp the input once per cell of a whole-count grid,
 //! each cell nudged, turned and scaled by values hashed from its wrapped index and
 //! the recipe seed. Rivets are `shape circle` → `tile`. A linked jitter varies by
 //! cell (#1494): an ordered grid that grows chaotic over a damage mask. #1742 adds
@@ -32,10 +32,11 @@ use super::super::catalog::vector::tile::{TileBlend, TileOutput};
 use super::super::image_buf::{Image, Rgba};
 use super::super::recipe::Tile;
 use super::field::{Field, Links, PerCell};
+use super::generators::clamp_or;
 
-/// Everything a scatter reads besides its stamp image.
+/// Everything a `tile` bake reads besides its stamp image.
 #[derive(Clone, Copy, Debug)]
-pub struct Scatter<'a> {
+pub struct Settings<'a> {
     pub count: f32,
     /// `count` times this across and down, each rounded on its own.
     pub aspect: [f32; 2],
@@ -55,8 +56,8 @@ pub struct Scatter<'a> {
     pub seed: u64,
 }
 
-impl<'a> Scatter<'a> {
-    /// The `tile` op's scatter: its params resolved against its `links`, its
+impl<'a> Settings<'a> {
+    /// The `tile` op's settings: its params resolved against its `links`, its
     /// optional mask and size map, and its node seed. A NaN `probability` or
     /// `value_jitter` is ignored (the default); any other value is clamped.
     pub fn of(
@@ -72,8 +73,8 @@ impl<'a> Scatter<'a> {
             scale: links.field(&p.scale_jitter),
         };
         Self {
-            value_jitter: finite_or(p.value_jitter, 0.0).clamp(0.0, 2.0),
-            probability: finite_or(p.probability, 1.0).clamp(0.0, 1.0),
+            value_jitter: clamp_or(p.value_jitter, 0.0, 0.0, 2.0),
+            probability: clamp_or(p.probability, 1.0, 0.0, 1.0),
             aspect: p.aspect,
             offset: p.offset,
             output: p.output,
@@ -84,7 +85,7 @@ impl<'a> Scatter<'a> {
         }
     }
 
-    /// A `cells`×`cells` scatter under `jitters`, every other setting at its default.
+    /// A `cells`×`cells` grid under `jitters`, every other setting at its default.
     pub fn plain(cells: f32, jitters: Jitters<'a>, seed: u64) -> Self {
         Self {
             count: cells,
@@ -110,15 +111,6 @@ impl<'a> Scatter<'a> {
     }
 }
 
-/// `v`, or `default` when it is NaN (an infinity is left for the clamp).
-fn finite_or(v: f32, default: f32) -> f32 {
-    if v.is_nan() {
-        default
-    } else {
-        v
-    }
-}
-
 /// A mask or size map as a field of its red, or `fallback` everywhere without one.
 fn red(img: Option<&Image>, fallback: f32) -> Field<'_> {
     img.map_or(Field::Const(fallback), |img| Field::Map {
@@ -128,9 +120,9 @@ fn red(img: Option<&Image>, fallback: f32) -> Field<'_> {
     })
 }
 
-/// Scatter `img` over `s`'s grid: `count × aspect` cells across and down (each
+/// Stamp `img` over `s`'s grid: `count × aspect` cells across and down (each
 /// rounded to a whole count ≥ 1), every odd row shifted by `offset`.
-pub fn tile(img: &Image, s: &Scatter) -> Image {
+pub fn tile(img: &Image, s: &Settings) -> Image {
     let grid = Grid::new(s.count, s.aspect, s.offset);
     let ((nx, ny), per) = (grid.n, grid.per);
     let (mask, size) = (red(s.mask, 1.0), red(s.size_map, 1.0));
@@ -180,7 +172,7 @@ pub fn tile(img: &Image, s: &Scatter) -> Image {
 /// Cell `cell`'s stamp, or `None` where `mask` reads below 0.5 at its centre (or
 /// NaN) or its own draws leave it empty; `size` scales it.
 fn cell_stamp(
-    s: &Scatter,
+    s: &Settings,
     grid: &Grid,
     (mask, size): (Field, Field),
     draws: Draws,
@@ -235,3 +227,7 @@ mod tests;
 #[cfg(test)]
 #[path = "grid_tests.rs"]
 mod grid_tests;
+
+#[cfg(test)]
+#[path = "pinned_tests.rs"]
+mod pinned_tests;

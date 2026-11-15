@@ -55,19 +55,15 @@ pub(super) fn place(amount: u32, gap: f32, seed: u64) -> Vec<Option<[f32; 2]>> {
     let g = ((1.0 / gap) as usize).clamp(1, MAX_GRID);
     let mut cells: Vec<Vec<[f32; 2]>> = vec![Vec::new(); g * g];
     let cell = |p: [f32; 2]| p.map(|c| ((c * g as f32) as usize).min(g - 1));
-    let near = |cells: &Vec<Vec<[f32; 2]>>, p: [f32; 2]| {
-        let [x, y] = cell(p);
+    let near = |cells: &[Vec<[f32; 2]>], p: [f32; 2]| {
+        let close = |c: usize| cells[c].iter().any(|&q| dist2(p, q) < gap * gap);
         // A cell is at least `gap` wide, so only the 3 × 3 around `p` can be too
         // close; under 3 cells across those wrap onto each other, so look at all.
-        let reach: Vec<usize> = match g < 3 {
-            true => (0..g * g).collect(),
-            false => (0..9)
-                .map(|k| ((y + g + k / 3 - 1) % g) * g + (x + g + k % 3 - 1) % g)
-                .collect(),
-        };
-        reach
-            .into_iter()
-            .any(|c| cells[c].iter().any(|&q| dist2(p, q) < gap * gap))
+        if g < 3 {
+            return (0..g * g).any(close);
+        }
+        let [x, y] = cell(p);
+        (0..9).any(|k| close(((y + g + k / 3 - 1) % g) * g + (x + g + k % 3 - 1) % g))
     };
     (0..amount)
         .map(|i| {

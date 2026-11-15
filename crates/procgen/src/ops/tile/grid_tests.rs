@@ -15,7 +15,10 @@ fn index_bake(tile: Tile, size: u32) -> Image {
         output: TileOutput::Index,
         ..tile
     };
-    super::tile(&full, &Scatter::of(&tile, &Links::default(), None, None, 1))
+    super::tile(
+        &full,
+        &Settings::of(&tile, &Links::default(), None, None, 1),
+    )
 }
 
 #[test]

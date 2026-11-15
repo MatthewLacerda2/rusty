@@ -19,11 +19,13 @@ use std::f32::consts::TAU;
 
 use buckets::Buckets;
 
+use super::super::catalog::vector::scatter::AMOUNT;
 use super::super::catalog::vector::tile::{TileBlend, TileOutput};
 use super::super::hash;
 use super::super::image_buf::{Image, Rgba};
 use super::super::recipe::Scatter as Params;
 use super::field::{Field, Links};
+use super::generators::{clamp_or, finite};
 use super::tile::{coverage, fill, fold, over};
 
 /// The most stamps a tile holds: a pebble a few texels wide over a 2048² map.
@@ -65,27 +67,18 @@ pub struct Settings<'a> {
     pub seed: u64,
 }
 
-/// `v` clamped to `lo..=hi`, or `lo` when it is NaN.
-fn clamped(v: f32, lo: f32, hi: f32) -> f32 {
-    if v.is_nan() {
-        lo
-    } else {
-        v.clamp(lo, hi)
-    }
-}
-
 impl<'a> Settings<'a> {
     /// The op's params resolved against its `links`, under its node seed. A NaN
     /// number reads its default; one out of range is clamped.
     pub fn of(p: &Params, links: &Links<'a>, seed: u64) -> Self {
         Self {
-            amount: clamped(p.amount.round(), 0.0, MAX_STAMPS) as u32,
+            amount: clamp_or(p.amount, AMOUNT, 0.0, MAX_STAMPS).round() as u32,
             scale: links.field(&p.scale),
-            scale_jitter: clamped(p.scale_jitter, 0.0, 1.0),
+            scale_jitter: clamp_or(p.scale_jitter, 0.0, 0.0, 1.0),
             rotation: links.field(&p.rotation),
-            rotation_jitter: clamped(p.rotation_jitter, 0.0, 1.0),
-            value_jitter: clamped(p.value_jitter, 0.0, 2.0),
-            spacing: clamped(p.spacing, 0.0, 1.0),
+            rotation_jitter: clamp_or(p.rotation_jitter, 0.0, 0.0, 1.0),
+            value_jitter: clamp_or(p.value_jitter, 0.0, 0.0, 2.0),
+            spacing: clamp_or(p.spacing, 0.0, 0.0, 1.0),
             density: links.field(&p.density),
             output: p.output,
             blend: p.blend,
@@ -107,7 +100,8 @@ struct Stamp {
 
 impl Stamp {
     /// Stamp `i` at `centre`, or `None` when its density draw or its size leaves
-    /// it out. A draw whose setting can't change the stamp is not hashed.
+    /// it out. A draw whose setting can't change the stamp (a jitter of 0, a
+    /// density of 1, a pick from one input) is not hashed.
     fn of(i: u32, centre: [f32; 2], inputs: usize, s: &Settings) -> Option<Self> {
         let unit = |ch| hash::unit2(i64::from(i), 0, ch, s.seed);
         let [u, v] = centre;
@@ -119,8 +113,13 @@ impl Stamp {
         if scale.is_nan() || scale <= 0.0 {
             return None;
         }
-        let size = scale.min(MAX_SCALE) * (1.0 + s.scale_jitter * (unit(SIZE) - 0.5));
-        let turn = finite(s.rotation.at_uv(u, v)) + s.rotation_jitter * (unit(TURN) - 0.5);
+        // A jitter of 0 multiplies its draw away, so the draw is not hashed.
+        let jitter = |amount: f32, ch| match amount > 0.0 {
+            true => amount * (unit(ch) - 0.5),
+            false => 0.0,
+        };
+        let size = scale.min(MAX_SCALE) * (1.0 + jitter(s.scale_jitter, SIZE));
+        let turn = finite(s.rotation.at_uv(u, v), 0.0) + jitter(s.rotation_jitter, TURN);
         let angle = turn * TAU;
         let pick = match inputs > 1 {
             true => ((unit(PICK) * inputs as f32) as usize).min(inputs - 1),
@@ -131,10 +130,7 @@ impl Stamp {
             TileOutput::Random => unit(GREY),
             TileOutput::Index => ((f64::from(i) + 1.0) / f64::from(s.amount)) as f32,
         };
-        let value = match s.value_jitter > 0.0 {
-            true => base * (1.0 + s.value_jitter * (unit(VALUE) - 0.5)),
-            false => base,
-        };
+        let value = base * (1.0 + jitter(s.value_jitter, VALUE));
         Some(Self {
             centre,
             turn: (angle.cos(), angle.sin()),
@@ -158,15 +154,6 @@ impl Stamp {
         let (c, s) = self.turn;
         let (rx, ry) = (x * c + y * s, -x * s + y * c);
         (rx * self.inv_size + 0.5, ry * self.inv_size + 0.5)
-    }
-}
-
-/// `v`, or 0 when it is NaN or infinite.
-fn finite(v: f32) -> f32 {
-    if v.is_finite() {
-        v
-    } else {
-        0.0
     }
 }
 

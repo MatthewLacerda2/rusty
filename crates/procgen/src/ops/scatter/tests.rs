@@ -189,9 +189,12 @@ fn with_two_stamp_inputs_both_appear() {
 fn no_stamps_bake_black_and_bad_numbers_clamp() {
     let img = disc(16);
     let black = Image::new(16);
-    for amount in [0.0, -3.0, f32::NAN] {
+    for amount in [0.0, -3.0] {
         assert!(scatter(&[&img], &settings(&Params::new(amount))) == black);
     }
+    let nan = settings(&Params::new(f32::NAN));
+    assert_eq!(nan.amount, 32, "a NaN amount reads its default");
+    assert!(scatter(&[&img], &nan) == scatter(&[&img], &settings(&Params::new(32.0))));
     let huge = Params {
         scale: Param::Num(f32::INFINITY),
         spacing: f32::NAN,

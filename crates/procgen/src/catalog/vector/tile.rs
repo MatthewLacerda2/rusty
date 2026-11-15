@@ -37,7 +37,7 @@ pub enum TileBlend {
     Over,
 }
 
-/// Scatter: stamp the input once per cell of a `count × aspect` grid (across and
+/// Grid stamping: the input once per cell of a `count × aspect` grid (across and
 /// down, each a whole count; every odd row shifted `offset` of a cell), each cell
 /// seeded with an offset (`jitter`, in cells), a rotation (`rotation_jitter`, in
 /// turns), a scale (`scale_jitter`), a value (`value_jitter`) and a chance of
@@ -129,8 +129,8 @@ impl Row for Tile {
 
 impl Op for Tile {
     fn run(&self, cx: &Cx) -> Image {
-        let scatter = tile::Scatter::of(self, cx.links, cx.optional(1), cx.optional(2), cx.seed);
-        tile::tile(cx.input(0), &scatter)
+        let s = tile::Settings::of(self, cx.links, cx.optional(1), cx.optional(2), cx.seed);
+        tile::tile(cx.input(0), &s)
     }
 
     fn seed(&self) -> u32 {
