@@ -89,4 +89,19 @@ mod tests {
         assert_eq!(roots.file("assets/dirt.png"), Path::new("assets/dirt.png"));
         assert_eq!(roots.file("engine/dirt.png"), Path::new("/e/dirt.png"));
     }
+
+    #[test]
+    fn a_shipped_layout_reads_an_engine_graph_from_the_engine_beside_the_player() {
+        let ship = rusty_test_support::temp::dir().join("rusty_content_ship_2185");
+        let engine = ship.join("engine");
+        std::fs::create_dir_all(engine.join("shaders")).unwrap();
+        std::fs::create_dir_all(engine.join("textures/library")).unwrap();
+        std::fs::write(engine.join("shaders/common.wgsl"), "").unwrap();
+        std::fs::write(engine.join("textures/library/rust.graph.json"), "{}").unwrap();
+        // The player's lookup (`engine_dir`) from the shipped executable's folder.
+        let found = super::super::locate::find_engine_dir(&ship).unwrap();
+        let roots = ContentRoots::with_engine(&ship.join("project"), &found);
+        let file = roots.file("engine/textures/library/rust.graph.json");
+        assert!(file.is_file(), "{}", file.display());
+    }
 }
