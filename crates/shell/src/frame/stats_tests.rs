@@ -53,10 +53,7 @@ fn gpu_a_window_frame_carries_what_the_renderer_drew() {
     }
     assert_eq!(stats.drawn_frames, 1);
     let last = stats.window(1);
-    assert!(
-        last.get("wall_ms").is_none(),
-        "the newest frame's arrives next"
-    );
+    assert!(last.get("wall_ms").is_none(), "it arrives next");
     assert_eq!(stats.window(2).get("wall_ms").map(|s| s.samples), Some(1));
     assert!(
         last.get("draw_calls").is_none(),
