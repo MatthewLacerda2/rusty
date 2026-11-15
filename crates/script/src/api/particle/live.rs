@@ -8,12 +8,14 @@
 //! tables are built and read by `live.lua`; this half moves the particles across
 //! as one packed string each way (`read`, `write`), since a Rust call per field
 //! costs several times the whole Lua side, and takes `ForEach`'s changes back as
-//! a list of edits (`edit`) applied to what it read. A field written back as a
+//! a list of edits (`edit`) applied to what it read. Every write bumps the
+//! emitter's `revision` ([`touched`]), as a tick, an emit and a clear do. A field written back as a
 //! NaN or an infinity (what `live.lua` sends for one left out) keeps its value;
 //! an added particle's is `ParticleEmitterComponent::placed`'s. A table keeps
 //! the identity of the particle it was read from (`live.lua` sends its source
-//! with it), so a script that removes or reorders entries keeps each survivor's
-//! hidden fields. A `Local` emitter is carried to where it stands before every
+//! with it, and the revision of its read), so a script that removes or reorders
+//! entries keeps each survivor's hidden fields; after anything else changed the
+//! emitter, every entry is an added particle. A `Local` emitter is carried to where it stands before every
 //! read and write, so what a script reads and writes is where the particles draw
 //! now. The fastest access, whole arrays per field, is `arrays.rs`.
 
@@ -35,13 +37,14 @@ pub(super) const NAMES: [&str; FIELDS] = [
 pub(super) const FIELDS: usize = 18;
 /// The bytes of one particle on the wire, and of one record written back: a u32
 /// source (the live particle a table was read from, [`NO_SOURCE`] for one the
-/// script built) and the f32 age that particle had when it was read, first.
+/// script built) first.
 const PARTICLE: usize = FIELDS * 4;
-const RECORD: usize = 8 + PARTICLE;
+const RECORD: usize = 4 + PARTICLE;
 /// A record's source when the table did not come from the emitter's newest read.
 const NO_SOURCE: u32 = u32::MAX;
-/// An edit's key is `index * SLOTS + slot`; `live.lua` splits it the same way.
+/// An edit's key is `index * SLOTS + slot`; `live.lua` gets it as an upvalue.
 const SLOTS: u32 = 32;
+const _: () = assert!(FIELDS as u32 <= SLOTS, "an edit's slot must fit its stride");
 
 /// The particles a `ForEach` read, held until its edits come back: the write
 /// replaces what is live with them, as `SetParticles` replaces it with its list.
@@ -56,13 +59,13 @@ pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     };
     let layout = (
         format!("<{}", "f".repeat(FIELDS)),
-        format!("<I4f{}", "f".repeat(FIELDS)),
+        format!("<I4{}", "f".repeat(FIELDS)),
         NAMES.join(","),
     );
     let (get, set, for_each): (Function, Function, Function) = lua
         .load(include_str!("live.lua"))
         .set_name("=particles_live")
-        .call((read, write, edit, layout.0, layout.1, layout.2))
+        .call((read, write, edit, layout.0, layout.1, layout.2, SLOTS))
         .map_err(|e| e.to_string())?;
     for (name, f) in [
         ("GetParticles", get),
@@ -74,42 +77,55 @@ pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     Ok(())
 }
 
-/// `read(id, keep)`: the emitter's particles on the wire and their count, and,
-/// when `keep`, a [`Snapshot`] of them for `edit`.
+/// Mark `e`'s particles changed: a read before this is no longer of them.
+pub(super) fn touched(e: &mut ParticleEmitterComponent) {
+    e.runtime.revision = e.runtime.revision.wrapping_add(1);
+}
+
+/// `e`'s revision as a Lua integer (its bits; only equality is ever asked).
+pub(super) fn revision(e: &ParticleEmitterComponent) -> i64 {
+    e.runtime.revision as i64
+}
+
+/// `read(id, keep)`: the emitter's particles on the wire, their count, the
+/// emitter's revision (`nil` without one) and, when `keep`, a [`Snapshot`] of
+/// them for `edit`.
 fn read(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<Function> {
     lua.create_function(move |lua, (id, keep): (EntityArg, bool)| {
         let scene = &*scene.get(lua)?;
         let read = with_carried(&mut scene.borrow_mut(), id.read(), |e, _| {
             let live = &e.runtime.particles;
-            (packed(live), keep.then(|| Snapshot(live.clone())))
+            let kept = keep.then(|| Snapshot(live.clone()));
+            (packed(live), Some(revision(e)), kept)
         });
-        let (bytes, kept) = read.unwrap_or_default();
+        let (bytes, rev, kept) = read.unwrap_or_default();
         let count = bytes.len() / PARTICLE;
         let kept = kept.map(|k| lua.create_any_userdata(k)).transpose()?;
-        Ok((lua.create_string(bytes)?, count, kept))
+        Ok((lua.create_string(bytes)?, count, rev, kept))
     })
 }
 
-/// `write(id, verb, records)`: replace the live particles with `records`.
+/// `write(id, verb, rev, records)`: replace the live particles with `records`,
+/// their sources honoured only when `rev` is still the emitter's revision.
 fn write(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<Function> {
-    lua.create_function(
-        move |lua, (id, verb, records): (EntityArg, String, mlua::LuaString)| {
-            let id = id.live("Particles", &verb)?;
-            let scene = &*scene.get(lua)?;
-            let records = records.as_bytes();
-            if records.len() % RECORD != 0 {
-                return Err(mlua::Error::RuntimeError(format!(
-                    "Particles.{verb}: {} bytes of records is not a whole number of \
+    type Args = (EntityArg, String, Option<i64>, mlua::LuaString);
+    lua.create_function(move |lua, (id, verb, rev, records): Args| {
+        let id = id.live("Particles", &verb)?;
+        let scene = &*scene.get(lua)?;
+        let records = records.as_bytes();
+        if records.len() % RECORD != 0 {
+            return Err(mlua::Error::RuntimeError(format!(
+                "Particles.{verb}: {} bytes of records is not a whole number of \
                      {RECORD}-byte records (live.lua and live.rs disagree on the layout)",
-                    records.len()
-                )));
-            }
-            let live = with_carried(&mut scene.borrow_mut(), id, |e, frame| {
-                write_records(e, frame, &records)
-            });
-            Ok(live.unwrap_or(0))
-        },
-    )
+                records.len()
+            )));
+        }
+        let live = with_carried(&mut scene.borrow_mut(), id, |e, frame| {
+            let same = rev == Some(revision(e));
+            write_records(e, frame, &records, same)
+        });
+        Ok(live.unwrap_or(0))
+    })
 }
 
 /// `edit(id, snapshot, edits, kills)`: replace the live particles with the
@@ -125,6 +141,7 @@ fn edit(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<Function> {
         let live = with_carried(&mut scene.borrow_mut(), id, |e, _| {
             let cap = e.max_particles as usize;
             e.runtime.particles = edited.into_iter().take(cap).collect();
+            touched(e);
             e.runtime.particles.len() as u32
         });
         Ok(live.unwrap_or(0))
@@ -164,6 +181,20 @@ fn word(b: &[u8], at: usize) -> [u8; 4] {
     [b[at], b[at + 1], b[at + 2], b[at + 3]]
 }
 
+/// `p`'s field at wire `slot`, as [`fields`] has it.
+pub(super) fn field(p: &Particle, slot: usize) -> f32 {
+    match slot {
+        0..=2 => p.position[slot],
+        3..=5 => p.velocity[slot - 3],
+        6 => p.age,
+        7 => p.lifetime,
+        8 => p.size,
+        9 => p.rotation.to_degrees(),
+        10..=13 => p.color[slot - 10],
+        _ => p.custom[slot - 14],
+    }
+}
+
 /// `p`'s fields in wire order, its rotation in degrees.
 pub(super) fn fields(p: &Particle) -> [f32; FIELDS] {
     let ([px, py, pz], [vx, vy, vz]) = (p.position.to_array(), p.velocity.to_array());
@@ -176,11 +207,16 @@ pub(super) fn fields(p: &Particle) -> [f32; FIELDS] {
 
 /// Replace `e`'s live particles, under its frame `frame`, with `records` (a
 /// whole number of [`RECORD`]s): dead ones and those past `max_particles`
-/// dropped, no death sub-emitter fired. A record whose source is still the live
-/// particle it was read from (same index, same age) keeps that particle's hidden
+/// dropped, no death sub-emitter fired. When `same` (nothing changed the
+/// emitter since the read), a record with a source keeps that particle's hidden
 /// fields (`start_frame`, `axis`, `turn`), wherever it now sits in the list; any
 /// other is an added particle. Returns the number live.
-fn write_records(e: &mut ParticleEmitterComponent, frame: &EmitterFrame, records: &[u8]) -> u32 {
+fn write_records(
+    e: &mut ParticleEmitterComponent,
+    frame: &EmitterFrame,
+    records: &[u8],
+    same: bool,
+) -> u32 {
     let cap = e.max_particles as usize;
     let mut live = Vec::with_capacity((records.len() / RECORD).min(cap));
     for r in records.chunks_exact(RECORD) {
@@ -188,15 +224,13 @@ fn write_records(e: &mut ParticleEmitterComponent, frame: &EmitterFrame, records
             break;
         }
         let src = u32::from_le_bytes(word(r, 0));
-        let stamp = f32::from_le_bytes(word(r, 4));
         let mut values = [0.0f32; FIELDS];
         for (k, v) in values.iter_mut().enumerate() {
-            *v = f32::from_le_bytes(word(r, 8 + k * 4));
+            *v = f32::from_le_bytes(word(r, 4 + k * 4));
         }
-        let old = (src != NO_SOURCE)
+        let old = (same && src != NO_SOURCE)
             .then(|| e.runtime.particles.get(src as usize).copied())
-            .flatten()
-            .filter(|o| o.age.to_bits() == stamp.to_bits());
+            .flatten();
         let mut p = old.unwrap_or_else(|| e.placed(frame));
         apply(&mut p, &values);
         if p.age < p.lifetime {
@@ -204,6 +238,7 @@ fn write_records(e: &mut ParticleEmitterComponent, frame: &EmitterFrame, records
         }
     }
     e.runtime.particles = live;
+    touched(e);
     e.runtime.particles.len() as u32
 }
 

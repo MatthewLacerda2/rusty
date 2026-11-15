@@ -172,11 +172,11 @@ writing to leave that field alone. An entry left a NaN or an infinity keeps its
 value; one set to `age >= lifetime` kills its particle (no `death` sub-emitter
 fires, as below). The arrays can neither add particles nor remove one otherwise,
 so every hidden field stays with its particle. They are tied to the read: once
-the live particles are no longer the ones read (a tick aged them; an emit, a
-kill or another write added, removed or aged one), `SetArrays` refuses them, as
-it refuses an array of the wrong length or holding a non-number, and changes
-nothing. Read and
-write in the same function.
+anything has changed the emitter since (a tick, an `Emit`, `Burst` or `Clear`,
+a sub-emitter firing into it, or a write through `SetParticles`, `ForEach` or
+`SetArrays`), `SetArrays` refuses them, as it refuses an array of the wrong
+length or holding a non-number, and changes nothing. Read and write in the same
+function.
 
 ```lua
 -- sparks pulled toward a point 2 m up
@@ -210,10 +210,12 @@ emitter, at rest, aged 0, with the lifetime, size and colour ranges' minimums an
 its own fields written over them. What a script cannot set (a mesh particle's
 tumble axis, its flipbook start frame, the turn a `Local` emitter gave it) stays
 with its particle. A table is tied to its particle only until the emitter's next
-read, write or tick: one from an older `GetParticles`, from before a
-`SetParticles`, `ForEach` or `SetArrays` on that emitter, or read in `Update` and
-written in `LateUpdate` is the script's own data, and adds a particle with its
-fields and those defaults. Read and write in the same function.
+`GetParticles` or until anything changes the emitter (the same list as for the
+arrays: a tick, an emit, a clear, a write by any of the three): one from an
+older `GetParticles`, from before an `Emit` or a `SetParticles`, `ForEach` or
+`SetArrays` on that emitter, or read in `Update` and written in `LateUpdate` is
+the script's own data, and adds a particle with its fields and those defaults.
+Read and write in the same function.
 
 **`ForEach(id, fn)`** is a per-particle rule without a table per particle: `fn`
 gets one table, refilled for each particle, and only the fields it changed are

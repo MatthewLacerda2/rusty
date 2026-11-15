@@ -104,3 +104,23 @@ fn a_table_kept_past_its_call_is_an_error_not_another_particle() {
         }
     }
 }
+
+#[test]
+fn a_view_given_a_protected_metatable_still_writes_its_edits() {
+    let (scene, id) = scene(2);
+    let live: u32 = lua(
+        &scene,
+        &format!(
+            "return Particles.ForEach({id}, function(p)
+               if not getmetatable(p) then setmetatable(p, {{ __metatable = 'locked' }}) end
+               p.vy = 7
+             end)"
+        ),
+    )
+    .unwrap();
+    assert_eq!(live, 2);
+    let s = scene.borrow();
+    for p in &s.world.particles(id).unwrap().runtime.particles {
+        assert_eq!(p.velocity.y, 7.0);
+    }
+}

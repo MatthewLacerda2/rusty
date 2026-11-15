@@ -252,7 +252,10 @@ fn register_state(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -
         "Clear",
         lua.create_function(move |lua, id: EntityArg| {
             let id = id.live("Particles", "Clear")?;
-            with_emitter(&*scene.get(lua)?, id, |p| p.runtime.particles.clear());
+            with_emitter(&*scene.get(lua)?, id, |p| {
+                p.runtime.particles.clear();
+                live::touched(p);
+            });
             Ok(())
         }),
     )

@@ -7,24 +7,25 @@
 //!
 //! The arrays are index-aligned with the live particles, oldest first, so a
 //! write keeps each particle's hidden fields. They are tied to the read: the
-//! table carries the ages the particles had (in a metatable a script cannot
-//! reach), and a write to an emitter whose particles are no longer those (a
-//! tick aged them; an emit, a kill or another write added, removed or aged one)
-//! is an error that changes nothing.
+//! table carries the emitter's revision at the read (in a metatable a script
+//! cannot reach), and a write after anything bumped it (a tick, an emit, a
+//! clear, or a write through any of the live calls) is an error that changes
+//! nothing.
 
 use mlua::{AnyUserData, Lua, Table, Value};
 
-use super::live::{apply, fields, with_carried, FIELDS, NAMES};
+use super::live::{apply, field, revision, touched, with_carried, FIELDS, NAMES};
 use crate::api::entity_arg::EntityArg;
 use crate::api::{ApiCell, Reg};
 use rusty_components::particle::Particle;
 use rusty_scene::Scene;
 
-/// What a `GetArrays` table was read from: its emitter and each particle's age,
-/// bit for bit.
+/// What a `GetArrays` table was read from: its emitter, the emitter's revision
+/// then, and how many particles were live.
 struct Stamp {
     id: u32,
-    ages: Vec<u32>,
+    revision: i64,
+    count: usize,
 }
 
 /// The metatable key holding a table's [`Stamp`].
@@ -37,11 +38,21 @@ pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
             let slots = slots("GetArrays", names)?;
             let scene = &*scene.get(lua)?;
             let id = id.read();
-            let live = with_carried(&mut scene.borrow_mut(), id, |e, _| {
-                e.runtime.particles.clone()
-            })
-            .unwrap_or_default();
-            columns(lua, id, &live, &slots)
+            let mut scene = scene.borrow_mut();
+            let read = with_carried(&mut scene, id, |e, _| {
+                let stamp = Stamp {
+                    id,
+                    revision: revision(e),
+                    count: e.runtime.particles.len(),
+                };
+                columns(lua, &e.runtime.particles, &slots, stamp)
+            });
+            let stamp = Stamp {
+                id,
+                revision: -1,
+                count: 0,
+            };
+            read.unwrap_or_else(|| columns(lua, &[], &slots, stamp))
         })
         .map_err(|e| e.to_string())?;
     let set = lua
@@ -74,23 +85,18 @@ fn set_arrays(scene: &mut Scene, id: u32, arrays: &Table) -> mlua::Result<u32> {
             stamp.id
         )));
     }
-    let written = read_back(arrays, stamp.ages.len())?;
+    let written = read_back(arrays, stamp.count)?;
     let live = with_carried(scene, id, |e, _| {
-        let ps = &mut e.runtime.particles;
-        let same = ps.len() == stamp.ages.len()
-            && ps
-                .iter()
-                .zip(&stamp.ages)
-                .all(|(p, &a)| p.age.to_bits() == a);
-        if !same {
+        if revision(e) != stamp.revision || e.runtime.particles.len() != stamp.count {
             return Err(error(
                 "SetArrays: the arrays are from an older read (the particles have ticked, or \
-                 been added, removed or aged since); read and write in the same function"
+                 been emitted, cleared or written since); read and write in the same function"
                     .into(),
             ));
         }
-        write(ps, &written);
-        Ok(ps.len() as u32)
+        write(&mut e.runtime.particles, &written);
+        touched(e);
+        Ok(e.runtime.particles.len() as u32)
     });
     live.unwrap_or(Ok(0))
 }
@@ -137,17 +143,15 @@ fn slots(verb: &str, names: Value) -> mlua::Result<Vec<usize>> {
 }
 
 /// The table `GetArrays` returns: one array per slot of `slots`, keyed by its
-/// name, stamped with `live`'s ages.
-fn columns(lua: &Lua, id: u32, live: &[Particle], slots: &[usize]) -> mlua::Result<Table> {
+/// name and built from `live` for that field alone, carrying `stamp`.
+fn columns(lua: &Lua, live: &[Particle], slots: &[usize], stamp: Stamp) -> mlua::Result<Table> {
     let out = lua.create_table_with_capacity(0, slots.len())?;
-    let rows: Vec<[f32; FIELDS]> = live.iter().map(fields).collect();
     for &slot in slots {
-        let column = lua.create_sequence_from(rows.iter().map(|r| f64::from(r[slot])))?;
+        let column = lua.create_sequence_from(live.iter().map(|p| f64::from(field(p, slot))))?;
         out.raw_set(NAMES[slot], column)?;
     }
-    let ages = live.iter().map(|p| p.age.to_bits()).collect();
     let meta = lua.create_table()?;
-    meta.raw_set(STAMP, lua.create_any_userdata(Stamp { id, ages })?)?;
+    meta.raw_set(STAMP, lua.create_any_userdata(stamp)?)?;
     meta.raw_set("__metatable", false)?;
     out.set_metatable(Some(meta))?;
     Ok(out)

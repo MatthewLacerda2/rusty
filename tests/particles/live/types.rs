@@ -51,6 +51,21 @@ fn for_each_names_a_bad_field_and_a_missing_fn() {
         "{err}"
     );
     assert_eq!(dump(&scene, id), before);
+    // A table answering `<` passes the fast check; the conversion still names it.
+    let err = lua::<()>(
+        &scene,
+        &format!(
+            "local lt = setmetatable({{}}, {{ __lt = function() return true end }})
+             Particles.ForEach({id}, function(p) if p.vy then p.vy = lt end end)"
+        ),
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(
+        err.contains("Particles.ForEach: entry 1's vy is a table"),
+        "{err}"
+    );
+    assert_eq!(dump(&scene, id), before);
     let bare = scene.borrow_mut().add_entity("Bare".to_string());
     for target in [id, bare] {
         let err = lua::<()>(&scene, &format!("Particles.ForEach({target}, nil)")).unwrap_err();

@@ -97,13 +97,33 @@ fn a_bad_or_stale_write_is_an_error_that_changes_nothing() {
           Particles.SetArrays(ID, a)",
             "from an older read",
         ),
+        // Same count and the same ages after (every particle is born at age 0),
+        // but particle 3 is gone and the last is new.
+        (
+            "local a = Particles.GetArrays(ID, { 'vy' })
+          local n = 0; Particles.ForEach(ID, function() n = n + 1; return n ~= 3 end)
+          Particles.Emit(ID, 1)
+          Particles.SetArrays(ID, a)",
+            "from an older read",
+        ),
+        (
+            "local a = Particles.GetArrays(ID, { 'vy' })
+          local ps, rev = Particles.GetParticles(ID), {}
+          for i = #ps, 1, -1 do rev[#rev + 1] = ps[i] end
+          Particles.SetParticles(ID, rev)
+          Particles.SetArrays(ID, a)",
+            "from an older read",
+        ),
     ] {
         let (scene, id) = scene(3);
         let code = code.replace("ID", &id.to_string());
         let before = dump(&scene, id);
         let err = lua::<()>(&scene, &code).unwrap_err().to_string();
         assert!(err.contains(says), "{code}: {err}");
-        if !code.contains("Emit") && !code.contains("ForEach") {
+        if !["Emit", "ForEach", "SetParticles"]
+            .iter()
+            .any(|c| code.contains(c))
+        {
             assert_eq!(dump(&scene, id), before, "{code}");
         }
     }
