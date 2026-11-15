@@ -62,6 +62,7 @@ use crate::settings::audio::AudioSettings;
 use crate::settings::decals::DecalLimits;
 use crate::settings::demos::DemoSettings;
 use crate::settings::graphics_options::{GraphicsOption, GraphicsOptions};
+use crate::settings::logs::LogSettings;
 use crate::settings::quality::QualityPresets;
 use crate::settings::render_scale::ProjectGraphics;
 
@@ -70,6 +71,7 @@ mod game_view;
 mod gizmos;
 mod host;
 mod loading;
+mod logs;
 mod quality;
 mod render_scale;
 mod reread;
@@ -142,6 +144,8 @@ pub struct Application {
     demos: DemoSettings,
     /// The project's audio settings (#1749) as last read or set.
     audio: AudioSettings,
+    /// The project's rolling frame log (#2206) as last read or set.
+    logs: LogSettings,
     /// The bound file's text the budgets and presets were last parsed from, good or
     /// bad: the same text again is not re-parsed, so its warnings are not repeated.
     read_from: Option<String>,
@@ -197,8 +201,7 @@ impl Application {
         self.graphics = file.graphics;
         self.quality = file.quality;
         self.decal_limits = file.decals;
-        self.demos = file.demos;
-        self.audio = file.audio;
+        (self.demos, self.audio, self.logs) = (file.demos, file.audio, file.logs);
         Ok(())
     }
 
@@ -210,8 +213,7 @@ impl Application {
         self.graphics = settings.graphics;
         self.quality = settings.quality;
         self.decal_limits = settings.decals;
-        self.demos = settings.demos;
-        self.audio = settings.audio;
+        (self.demos, self.audio, self.logs) = (settings.demos, settings.audio, settings.logs);
     }
 
     /// The project settings this run plays under, as [`run_with`](Self::run_with)
@@ -225,6 +227,7 @@ impl Application {
             decals: self.decal_limits,
             demos: self.demos,
             audio: self.audio,
+            logs: self.logs,
         }
     }
 
@@ -288,7 +291,7 @@ impl Application {
         file.graphics_options = self.graphics_defaults;
         file.graphics = self.graphics;
         file.quality = self.quality.clone();
-        file.audio = self.audio;
+        (file.audio, file.logs) = (self.audio, self.logs);
         file.write(path)
     }
 }

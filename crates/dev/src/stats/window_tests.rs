@@ -7,6 +7,7 @@ fn drawn(draw_calls: u32, gpu: Option<f64>) -> WindowFrame {
         ..Default::default()
     };
     let gpu = gpu.map(|ms| GpuTimes {
+        frame: 1,
         passes: vec![(GpuPass::Forward, ms)],
     });
     let render = RenderedFrame {
@@ -18,6 +19,7 @@ fn drawn(draw_calls: u32, gpu: Option<f64>) -> WindowFrame {
         wall_ms: 16.0,
         fps: Some(60.0),
         render: Some(render),
+        frame: 1,
     }
 }
 

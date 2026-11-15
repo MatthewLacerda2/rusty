@@ -115,19 +115,30 @@ pub fn validate(recipe: &TextureRecipe) -> Result<(), RunError> {
     plan(recipe, &[], Scope::Every).map(|_| ())
 }
 
-/// Refuse a recipe with an `image` node whose file `sources` lacks, before anything
-/// evaluates: a missing file is an error naming it, never a black canvas (#1485).
+/// Refuse a recipe with an `image` node whose file `sources` lacks, or a `text`
+/// node whose font it lacks, before anything evaluates: a missing file is an error
+/// naming it, never a black canvas (#1485).
 fn check_sources(recipe: &TextureRecipe, sources: &Sources) -> Result<(), RunError> {
-    match recipe
+    let missing = |node: &str, op: &str, fault: Fault| {
+        Err(RunError::Node(NodeError {
+            node: node.into(),
+            op: op.into(),
+            fault,
+        }))
+    };
+    if let Some((node, path)) = recipe
         .image_paths()
         .into_iter()
         .find(|&(_, path)| !sources.has(path))
     {
-        Some((node, path)) => Err(RunError::Node(NodeError {
-            node: node.into(),
-            op: "image".into(),
-            fault: Fault::MissingSource(path.into()),
-        })),
+        return missing(node, "image", Fault::MissingSource(path.into()));
+    }
+    match recipe
+        .font_paths()
+        .into_iter()
+        .find(|&(_, path)| sources.font(path).is_none())
+    {
+        Some((node, path)) => missing(node, "text", Fault::MissingFont(path.into())),
         None => Ok(()),
     }
 }

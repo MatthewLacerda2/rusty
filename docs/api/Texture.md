@@ -294,7 +294,8 @@ list below is a summary of it. Each entry has the `op` tag, its `category`
 `params`. Each param has a
 `name`, a `type` (`number` | `integer` | `bool` | `color` | `vec2` |
 `enum` | `stops` | `path`, a project-relative file path or an `engine/…` one |
-`text`, an `expression` formula), `required`, a `default` when it has one (absent when required),
+`text`, a string: an `expression` formula, a `path`'s `d`, a `text`'s lettering),
+`required`, a `default` when it has one (absent when required),
 `socket` (whether it takes a link to another node, *Linked params* below), and for an
 `enum` the accepted `values`. Units and rounding are the ones *Tiling*
 and *Units* below describe. A unit test holds the catalog to the recipe parser, so
@@ -567,6 +568,23 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   `strength` scales the detail's tilt, 0 leaving the base; a flat normal on either
   side returns the other. Never `mix` normal maps: adding or averaging their RGB
   flattens them.
+- `path {d, fill_rule="nonzero"|"evenodd", stroke=0}` (*generator*): an outline from
+  SVG path data, a mask: 1 inside, 0 outside, each edge pixel the exact share of its
+  area the outline covers. `d` takes `M L H V C S Q T A Z`, absolute and relative,
+  in tiles with `v` down (as `coordinates` runs: `"M .2 .5 L .6 .2 L .6 .8 Z"` is an
+  arrowhead pointing left); an open subpath fills as if closed. `fill_rule` is SVG's:
+  `evenodd` cuts a hole wherever one contour sits inside another, `nonzero` only
+  where the inner one runs the other way. `stroke > 0` draws the outline that many
+  tiles wide instead (round joins and caps, at most 1): each pixel reads its
+  distance to the outline, so the stroke's edge is anti-aliased alike along lines,
+  curves, joins and caps at any resolution (on a non-square bake the width is
+  measured along a pixel of the sides' geometric mean); a dense stroke costs under
+  a second of one core at 4096². One stamp, as `shape`: feed it
+  to `tile` or `scatter`, turn it with `mapping`, bevel it with `distance` →
+  `bump_to_normal`. `d` is parsed with the recipe, so a malformed one is refused
+  before anything bakes, naming the node and the byte; it may be at most 64 KiB,
+  flatten to at most 2¹⁸ points, and reach no point past ±4 tiles. Whole SVG files
+  (groups, transforms, styles, dashes) are not read.
 - `rgb_to_bw` (*math*, 1 input).
 - `sample_at` (*vector*, 2 or 3 inputs): input A read at the domain point the other
   inputs name, in tile units and wrapped: with two inputs B's red is `u` and its
@@ -642,6 +660,21 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   running off a shape: a noise through `slope_blur` on a `shape`'s height runs down its
   sides. The reach caps at one tile. `samples + 5` reads a pixel: an estimate of
   about 1–2 s of one core at 2048² with 8 samples.
+- `text {text, font="", size=0.12, align="center"|"left"|"right", line_spacing=1.2,
+  tracking=0}` (*generator*): lettering, a mask: 1 inside the glyphs, 0 outside,
+  anti-aliased by exact area like `path`. One stamp centred in the tile, as `shape`:
+  feed it to `tile` or `scatter`, turn it with `mapping`, emboss or engrave it with
+  `distance` → `bump_to_normal` (crate serials, door numbers, warning signs). `text`
+  breaks lines at `\n` or `\r\n` (at most 4096 bytes and 256 lines); `size` is the font's em
+  height in tiles (at most 4), `tracking` extra advance between glyphs in ems,
+  `line_spacing` the distance between baselines in ems; the block runs from the first
+  line's ascent to the last line's descent, its widest line sets its width, and
+  `align` places each line in it. Shaped as the UI's `Text` is: kerning and
+  ligatures (`fi` is one glyph). `font` is a `.ttf` / `.otf` path from the project
+  root, or an `engine/…` one for a font the engine ships, read and parsed before
+  anything bakes, so a missing or unreadable font is an
+  error naming the node and the path; empty is the engine's default, Instrument Sans,
+  compiled into the engine (a shipped game needs no file for it).
 - `tile {count, aspect={1,1}, offset=0, jitter=0, rotation_jitter=0, scale_jitter=0,
   value_jitter=0, probability=1, output="stamp"|"random"|"index", blend="max"|"add"|"over",
   seed=0}` (*vector*, 1–3 inputs: the stamp, then an optional mask, then an optional
@@ -954,7 +987,13 @@ joined to its copies in the neighbouring tiles, so it tiles).
 `flood_gradient` has a seam on one kind of island: one that loops round the tile on
 an axis (a band across it) has no edge there, so its ramp runs from the tile's edge
 and jumps back at the wrap; every other island ramps across the edge as one.
-`image` tiles exactly as well as its file does.
+`image` tiles exactly as well as its file does. `text` and `path` wrap instead: a
+glyph or contour that crosses the tile's edge carries on from the opposite edge, so
+the map tiles even when the lettering is wider than the tile. A wrapped copy is the
+same shape again, not another contour of it, so under `evenodd` a shape wider than
+the tile never cuts a hole where it overlaps its own copy, while two different
+subpaths cut each other wherever they overlap, across the seam as anywhere: moving
+a subpath by whole tiles never changes the mask.
 
 ### Units
 
@@ -976,6 +1015,8 @@ and 2048² (iterate at a low `resolution`, ship at a high one):
   `.rotation_jitter` are in turns; `scatter.spacing` is a share of the gap its
   bullet derives, in tiles. `tile.offset` is a share of one cell.
 - `distance.radius` is in tiles: the distance from the edge that reads 1.
+- `text.size` is an em in tiles and `text.tracking` / `.line_spacing` are in ems;
+  `path.d`'s coordinates and `path.stroke` are in tiles.
 - `cavity.radius` is a tile fraction like `blur.radius`; `curvature.radius` is a
   distance in tiles, sampled bilinearly (so sub-pixel radii stay smooth).
 - `directional_blur.length` and `directional_warp.strength` are in tiles; `angle`

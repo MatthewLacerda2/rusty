@@ -62,7 +62,7 @@ fn gpu_times_fold_in_as_a_total_and_per_pass() {
     let mut stats = FrameStats::default();
     let passes = vec![(GpuPass::Shadows, 0.5), (GpuPass::Forward, 2.0)];
     let frame = RenderedFrame {
-        gpu: Some(GpuTimes { passes }),
+        gpu: Some(GpuTimes { frame: 1, passes }),
         ..Default::default()
     };
     record_render(&mut stats, &frame);

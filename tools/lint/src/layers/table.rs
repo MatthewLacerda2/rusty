@@ -58,6 +58,9 @@ pub const LAYERS: &[Layer] = &[
     // The data the sim runs on.
     sim("core", &[]).uses(&["rustc_hash", "xxhash_rust"]),
     sim("time", &[]),
+    // Fonts as data (#2190): a face, its glyph outlines and shaped runs, below both
+    // the UI's text and Snyder's `text` op.
+    sim("font", &["core"]).uses(&["harfrust", "skrifa"]),
     // Decoding is the asset pipeline's: models, clips through symphonia (#545; only
     // `audio` plays them) and colour lookups through `image` (#1441); textures are
     // block-compressed at import (#1574), and baked lightmap pages
@@ -73,7 +76,7 @@ pub const LAYERS: &[Layer] = &[
         "tobj",
         "ufbx",
     ]),
-    sim("procgen", &["core"]).uses(&["image"]),
+    sim("procgen", &["core", "font"]).uses(&["image"]),
     // Shader authoring; GPU-free composition lives here so `render` imports it (#722).
     sim("shadergen", &["core"]).uses(&["naga", "naga_oil"]),
     sim("components", &["asset", "core", "procgen"]).uses(&["bytemuck"]),
@@ -106,8 +109,11 @@ pub const LAYERS: &[Layer] = &[
     )
     .uses(&["rapier3d"]),
     // The in-game UI's layout runs headless inside the sim (#417).
-    sim("ui", &["asset", "components", "core", "ecs", "scene"])
-        .uses(&["harfrust", "image", "skrifa"]),
+    sim(
+        "ui",
+        &["asset", "components", "core", "ecs", "font", "scene"],
+    )
+    .uses(&["image"]),
     sim("physics", &["components", "core", "ecs", "scene", "time"]).uses(&["rapier3d"]),
     sim(
         "navigation",
@@ -170,6 +176,8 @@ pub const LAYERS: &[Layer] = &[
             "components",
             "core",
             "ecs",
+            // The UI's glyph atlas fills each glyph's outline (#2190).
+            "font",
             // The collider gizmo draws the shape physics collides with (#1882).
             "physics",
             "scene",

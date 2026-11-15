@@ -7,6 +7,8 @@
 //! op's `seed` (default 0, [`super::super::recipe::SEED`]) is folded into the
 //! recipe seed (`hash::node_seed`), so two otherwise identical nodes differ by seed
 //! alone (#1487); 0 keeps the recipe seed.
+//!
+//! The folder is full: a new generator goes in a cluster, as [`outline`]'s do.
 
 // sorted: one module per generator op; none reads another
 pub mod anisotropic_noise;
@@ -17,6 +19,7 @@ pub mod coordinates;
 pub mod gradient;
 pub mod image;
 pub mod noise;
+pub mod outline;
 pub mod shape;
 pub mod voronoi;
 pub mod wave;

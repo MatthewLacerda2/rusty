@@ -21,6 +21,7 @@ mod coordinates;
 mod detail;
 mod face;
 mod field;
+mod fonts;
 mod graphs;
 mod library;
 mod maps;
