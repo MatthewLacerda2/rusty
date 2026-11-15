@@ -34,7 +34,8 @@ fn burst(n: u32, lifetime: f32) -> ParticleEmitterComponent {
 /// Every live particle of `id`.
 fn particles(world: &GameWorld, id: u32) -> Vec<rusty::components::particle::Particle> {
     let scene = world.scene().borrow();
-    scene.world.particles(id).unwrap().runtime.particles.clone()
+    let live = scene.world.particles(id).unwrap().runtime.particles.clone();
+    live
 }
 
 #[test]

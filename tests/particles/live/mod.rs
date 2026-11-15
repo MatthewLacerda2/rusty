@@ -3,6 +3,7 @@
 //! scene; `play` runs it inside the real play loop.
 
 mod edges;
+mod for_each;
 mod play;
 
 use std::cell::RefCell;

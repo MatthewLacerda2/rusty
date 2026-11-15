@@ -1,169 +1,171 @@
-//! crates/script/src/api/particle/live.rs — the live-particle pair (#2171):
+//! crates/script/src/api/particle/live.rs — the live-particle calls (#2171):
 //! `GetParticles` / `SetParticles`, Unity's `ParticleSystem.GetParticles` /
-//! `SetParticles`, so a per-particle rule is plain Lua in a script.
+//! `SetParticles`, and `ForEach`, one reused table per particle for the hot rule.
 //!
 //! A particle table is in world space: `position` and `velocity` (`{ x, y, z }`),
 //! `age`, `lifetime`, `size` (start size), `rotation` (degrees), `color` (the
 //! `{ r, g, b, a }` start tint) and `custom` (four numbers the engine never reads).
-//! `SetParticles` matches the list to the live particles by index; a field an entry
-//! leaves out, or gives a NaN or infinite number, keeps its value (an added
-//! particle's is `ParticleEmitterComponent::placed`'s). An active `Local` emitter is
-//! carried to where it stands before either call, so what a script reads and writes
-//! is where the particles draw now, whatever moved the emitter since its tick.
+//! The tables are built and read by `live.lua`; this half moves the particles
+//! across as one packed string each way ([`read`], [`write`]), since a Rust call
+//! per field costs several times the whole Lua side. A field written back as a
+//! NaN or an infinity (what `live.lua` sends for one left out) keeps its value; an
+//! added particle's is `ParticleEmitterComponent::placed`'s. An active `Local`
+//! emitter is carried to where it stands before every read and write, so what a
+//! script reads and writes is where the particles draw now.
 
-use mlua::{IntoLua, Lua, Table};
+use mlua::{Function, Lua, Table};
 
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
-use crate::api::{put, Reg};
-use rusty_components::particle::Particle;
+use crate::api::Reg;
+use rusty_components::particle::{EmitterFrame, Particle, ParticleEmitterComponent};
 use rusty_scene::Scene;
 
-const XYZ: [&str; 3] = ["x", "y", "z"];
-const RGBA: [&str; 4] = ["r", "g", "b", "a"];
+/// The f32s of one particle on the wire (`live.lua`'s layout).
+const FIELDS: usize = 18;
+/// The bytes of one particle on the wire, and of one record written back (a u32
+/// source index first).
+const PARTICLE: usize = FIELDS * 4;
+const RECORD: usize = 4 + PARTICLE;
 
-/// Register the live-particle pair onto the `Particles` table.
+/// Register `GetParticles`, `SetParticles` and `ForEach` onto the `Particles` table.
 pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
-    // `GetParticles(id)`: one table per live particle, oldest first; `{}` without
-    // an emitter.
-    put(
-        table,
-        "GetParticles",
-        lua.create_function(move |lua, id: EntityArg| {
+    let read = lua
+        .create_function(move |lua, id: EntityArg| {
             let scene = &*scene.get(lua)?;
-            let mut scene = scene.borrow_mut();
-            let id = id.read();
-            let (frame, active) = (
-                scene.world.emitter_frame(id),
-                scene.world.is_active_in_hierarchy(id),
-            );
-            let list = lua.create_table()?;
-            let Some(mut emitter) = scene.world.particles_mut(id) else {
-                return Ok(list);
-            };
-            if active {
-                emitter.carry_to(frame);
-            }
-            for (i, p) in emitter.runtime.particles.iter().enumerate() {
-                list.raw_set(i + 1, read(lua, p)?)?;
-            }
-            Ok(list)
-        }),
-    )?;
-
-    // `SetParticles(id, list)`: the live set becomes `list` (dead entries and
-    // those past `max_particles` dropped, no death sub-emitter fired). Returns the
-    // number live; 0 without an emitter. A bad entry is an error that changes
-    // nothing.
-    put(
-        table,
-        "SetParticles",
-        lua.create_function(move |lua, (id, list): (EntityArg, Table)| {
-            let id = id.live("Particles", "SetParticles")?;
-            let scene = &*scene.get(lua)?;
-            let mut scene = scene.borrow_mut();
-            let (frame, active) = (
-                scene.world.emitter_frame(id),
-                scene.world.is_active_in_hierarchy(id),
-            );
-            let Some(mut emitter) = scene.world.particles_mut(id) else {
-                return Ok(0);
-            };
-            if active {
-                emitter.carry_to(frame);
-            }
-            let cap = emitter.max_particles as usize;
-            let mut live = Vec::with_capacity(list.raw_len().min(cap));
-            for i in 0..list.raw_len() {
-                if live.len() == cap {
-                    break;
-                }
-                let entry: Table = list.raw_get(i + 1).map_err(|_| {
-                    mlua::Error::runtime(format!(
-                        "Particles.SetParticles: entry {} is not a particle table",
-                        i + 1
-                    ))
-                })?;
-                let old = emitter.runtime.particles.get(i).copied();
-                let mut p = old.unwrap_or_else(|| emitter.placed(&frame));
-                write(&mut p, &entry)?;
-                if p.age < p.lifetime {
-                    live.push(p);
-                }
-            }
-            emitter.runtime.particles = live;
-            Ok(emitter.runtime.particles.len() as u32)
-        }),
-    )
-}
-
-/// `p` as the table `GetParticles` returns.
-fn read(lua: &Lua, p: &Particle) -> mlua::Result<Table> {
-    let t = lua.create_table_with_capacity(0, 8)?;
-    t.raw_set("position", named(lua, &XYZ, &p.position.to_array())?)?;
-    t.raw_set("velocity", named(lua, &XYZ, &p.velocity.to_array())?)?;
-    t.raw_set("age", p.age)?;
-    t.raw_set("lifetime", p.lifetime)?;
-    t.raw_set("size", p.size)?;
-    t.raw_set("rotation", p.rotation.to_degrees())?;
-    t.raw_set("color", named(lua, &RGBA, &p.color)?)?;
-    t.raw_set("custom", lua.create_sequence_from(p.custom)?)?;
-    Ok(t)
-}
-
-/// The table `{ keys[i] = xs[i] }`.
-fn named(lua: &Lua, keys: &[&str], xs: &[f32]) -> mlua::Result<Table> {
-    let t = lua.create_table_with_capacity(0, keys.len())?;
-    for (k, x) in keys.iter().zip(xs) {
-        t.raw_set(*k, *x)?;
-    }
-    Ok(t)
-}
-
-/// Write the fields `t` gives into `p`; what it leaves out, or gives a NaN or an
-/// infinity, keeps its value. `rotation` is written only when it differs from
-/// `p`'s in degrees, so a round trip keeps the radians bit for bit.
-fn write(p: &mut Particle, t: &Table) -> mlua::Result<()> {
-    let mut position = p.position.to_array();
-    components(t, "position", &XYZ, &mut position)?;
-    p.position = position.into();
-    let mut velocity = p.velocity.to_array();
-    components(t, "velocity", &XYZ, &mut velocity)?;
-    p.velocity = velocity.into();
-    number(t, "age", &mut p.age)?;
-    number(t, "lifetime", &mut p.lifetime)?;
-    number(t, "size", &mut p.size)?;
-    let mut degrees = p.rotation.to_degrees();
-    if number(t, "rotation", &mut degrees)? {
-        p.rotation = degrees.to_radians();
-    }
-    components(t, "color", &RGBA, &mut p.color)?;
-    if let Some(custom) = t.get::<Option<Table>>("custom")? {
-        for (i, slot) in p.custom.iter_mut().enumerate() {
-            number(&custom, i + 1, slot)?;
-        }
+            let bytes = with_carried(&mut scene.borrow_mut(), id.read(), |e, _| {
+                packed(&e.runtime.particles)
+            });
+            let count = bytes.as_ref().map_or(0, |b| b.len() / PARTICLE);
+            Ok((lua.create_string(bytes.unwrap_or_default())?, count))
+        })
+        .map_err(|e| e.to_string())?;
+    let write = lua
+        .create_function(
+            move |lua, (id, verb, records, count): (EntityArg, String, mlua::LuaString, usize)| {
+                let id = id.live("Particles", &verb)?;
+                let scene = &*scene.get(lua)?;
+                let records = records.as_bytes();
+                let live = with_carried(&mut scene.borrow_mut(), id, |e, frame| {
+                    write_records(e, frame, &records, count)
+                });
+                Ok(live.unwrap_or(0))
+            },
+        )
+        .map_err(|e| e.to_string())?;
+    let (get, set, for_each): (Function, Function, Function) = lua
+        .load(include_str!("live.lua"))
+        .set_name("=particles_live")
+        .call((read, write))
+        .map_err(|e| e.to_string())?;
+    for (name, f) in [
+        ("GetParticles", get),
+        ("SetParticles", set),
+        ("ForEach", for_each),
+    ] {
+        table.set(name, f).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
-/// The table at `key` of `t`, if any, written into `slots` by `keys`.
-fn components(t: &Table, key: &str, keys: &[&str], slots: &mut [f32]) -> mlua::Result<()> {
-    if let Some(v) = t.get::<Option<Table>>(key)? {
-        for (k, slot) in keys.iter().zip(slots) {
-            number(&v, *k, slot)?;
-        }
+/// Run `f` on `id`'s emitter after carrying an active `Local` one to where it
+/// stands, with its frame; `None` without an emitter.
+fn with_carried<R>(
+    scene: &mut Scene,
+    id: u32,
+    f: impl FnOnce(&mut ParticleEmitterComponent, &EmitterFrame) -> R,
+) -> Option<R> {
+    let frame = scene.world.emitter_frame(id);
+    let active = scene.world.is_active_in_hierarchy(id);
+    let mut emitter = scene.world.particles_mut(id)?;
+    if active {
+        emitter.carry_to(frame);
     }
-    Ok(())
+    Some(f(&mut emitter, &frame))
 }
 
-/// Write the finite number at `key` of `t` into `slot`; whether it changed it.
-fn number(t: &Table, key: impl IntoLua, slot: &mut f32) -> mlua::Result<bool> {
-    let x = t.get::<Option<f64>>(key)?.map(|x| x as f32);
-    match x {
-        Some(x) if x.is_finite() && x != *slot => {
-            *slot = x;
-            Ok(true)
+/// `particles` on the wire. Plain index loops: the crate builds at opt-level 0 in
+/// play-tests, where an iterator chain per float costs twice as much.
+fn packed(particles: &[Particle]) -> Vec<u8> {
+    let mut bytes = vec![0u8; particles.len() * PARTICLE];
+    for (i, p) in particles.iter().enumerate() {
+        let f = fields(p);
+        let mut one = [0u8; PARTICLE];
+        for k in 0..FIELDS {
+            let b = f[k].to_le_bytes();
+            (one[k * 4], one[k * 4 + 1], one[k * 4 + 2], one[k * 4 + 3]) = (b[0], b[1], b[2], b[3]);
         }
-        _ => Ok(false),
+        bytes[i * PARTICLE..(i + 1) * PARTICLE].copy_from_slice(&one);
     }
+    bytes
+}
+
+/// The 4 bytes at `at` of `b`.
+fn word(b: &[u8], at: usize) -> [u8; 4] {
+    [b[at], b[at + 1], b[at + 2], b[at + 3]]
+}
+
+/// `p`'s fields in wire order, its rotation in degrees.
+fn fields(p: &Particle) -> [f32; FIELDS] {
+    let ([px, py, pz], [vx, vy, vz]) = (p.position.to_array(), p.velocity.to_array());
+    let ([r, g, b, a], [c1, c2, c3, c4]) = (p.color, p.custom);
+    let rotation = p.rotation.to_degrees();
+    [
+        px, py, pz, vx, vy, vz, p.age, p.lifetime, p.size, rotation, r, g, b, a, c1, c2, c3, c4,
+    ]
+}
+
+/// Replace `e`'s live particles, under its frame `frame`, with `count` records (a u32 source index and
+/// [`FIELDS`] f32s each): dead ones and those past `max_particles` dropped, no
+/// death sub-emitter fired. Returns the number live.
+fn write_records(
+    e: &mut ParticleEmitterComponent,
+    frame: &EmitterFrame,
+    records: &[u8],
+    count: usize,
+) -> u32 {
+    let cap = e.max_particles as usize;
+    let count = count.min(records.len() / RECORD);
+    let mut live = Vec::with_capacity(count.min(cap));
+    for r in 0..count {
+        if live.len() == cap {
+            break;
+        }
+        let at = r * RECORD;
+        let src = u32::from_le_bytes(word(records, at)) as usize;
+        let mut values = [0.0f32; FIELDS];
+        for k in 0..FIELDS {
+            values[k] = f32::from_le_bytes(word(records, at + 4 + k * 4));
+        }
+        let old = e.runtime.particles.get(src).copied();
+        let mut p = old.unwrap_or_else(|| e.placed(frame));
+        apply(&mut p, &values);
+        if p.age < p.lifetime {
+            live.push(p);
+        }
+    }
+    e.runtime.particles = live;
+    e.runtime.particles.len() as u32
+}
+
+/// Write `values` (wire order) into `p`; a NaN or an infinity keeps the field.
+/// The rotation is written only when it differs from `p`'s in degrees, so a
+/// round trip keeps the radians bit for bit.
+fn apply(p: &mut Particle, values: &[f32; FIELDS]) {
+    let mut now = fields(p);
+    let degrees = now[9];
+    for (slot, &v) in now.iter_mut().zip(values) {
+        if v.is_finite() {
+            *slot = v;
+        }
+    }
+    let [px, py, pz, vx, vy, vz, age, lifetime, size, rotation, r, g, b, a, c1, c2, c3, c4] = now;
+    p.position = [px, py, pz].into();
+    p.velocity = [vx, vy, vz].into();
+    (p.age, p.lifetime, p.size) = (age, lifetime, size);
+    if rotation != degrees {
+        p.rotation = rotation.to_radians();
+    }
+    p.color = [r, g, b, a];
+    p.custom = [c1, c2, c3, c4];
 }
