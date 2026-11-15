@@ -25,6 +25,7 @@
 mod render;
 mod runtime;
 mod shape;
+mod simulation;
 mod space;
 mod spawn;
 mod sub_emitter;
@@ -32,6 +33,7 @@ mod sub_emitter;
 pub use render::{Flipbook, ParticleRender, ParticleRenderMode};
 pub use runtime::{EmitterRuntime, Particle, SubEmitEvent};
 pub use shape::{EmitFrom, EmitShape};
+pub use simulation::{Birth, GpuSim, ParticleSimulation, DT_HISTORY};
 pub use space::{EmitterFrame, SimulationSpace};
 pub use sub_emitter::{SubEmitTrigger, SubEmitters};
 
@@ -100,6 +102,10 @@ pub struct ParticleEmitterComponent {
     /// and scale with the emitter (`Local`, #1529).
     #[serde(default)]
     pub simulation_space: SimulationSpace,
+    /// Whether the live particles are simulated by the sim on the CPU (`Cpu`) or by
+    /// the renderer on the GPU (`Gpu`, visual only, #2170).
+    #[serde(default)]
+    pub simulation: ParticleSimulation,
 
     /// Where particles are born and which way they launch, around `direction`.
     #[serde(default)]
@@ -178,6 +184,7 @@ impl Default for ParticleEmitterComponent {
             max_particles: 256,
             looping: true,
             simulation_space: SimulationSpace::World,
+            simulation: ParticleSimulation::Cpu,
             shape: EmitShape::Point,
             emit_from: EmitFrom::Volume,
             lifetime: Range::constant(1.5),
@@ -202,9 +209,24 @@ impl Default for ParticleEmitterComponent {
 }
 
 impl ParticleEmitterComponent {
-    /// Number of currently live particles.
+    /// Number of currently live particles: a `Gpu` emitter's from its exact
+    /// tally (`simulation`), with no readback.
     pub fn live_count(&self) -> usize {
-        self.runtime.particles.len()
+        match self.simulation {
+            ParticleSimulation::Cpu => self.runtime.particles.len(),
+            ParticleSimulation::Gpu => self.runtime.gpu.live(),
+        }
+    }
+
+    /// Forget every live particle (`Particles.Clear`), on either target.
+    pub fn clear_particles(&mut self) {
+        self.runtime.particles.clear();
+        self.runtime.gpu.clear();
+    }
+
+    /// Whether the live particles are the renderer's (`Gpu`).
+    pub fn on_gpu(&self) -> bool {
+        self.simulation == ParticleSimulation::Gpu
     }
 
     /// A live particle's current world size: start size × the size curve, never

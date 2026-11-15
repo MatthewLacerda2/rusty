@@ -9,6 +9,10 @@
 //! *state*; the draw pass reads it. The sim never touches the GPU — that
 //! decoupling is what keeps headless play deterministic.
 //!
+//! A `Gpu` emitter (#2170) is emitted the same way, its births kept for the
+//! renderer, and only its exact live tally steps here: the renderer moves its
+//! particles, so it never collides or fires a death or collision sub-emitter.
+//!
 //! A `Local` emitter's particles are carried with it (`components::particle`'s
 //! `space`): at the head of its tick, on every spawn, and once more by
 //! [`carry_local_particles`] after `LateUpdate` and the bone pass, so a gun moved
@@ -121,7 +125,13 @@ fn simulate_emitter(
     if emitter.active {
         emit(emitter, origin, dt);
     }
-    integrate_and_collide(emitter, dt, physics);
+    if emitter.on_gpu() {
+        // The renderer moves a `Gpu` emitter's particles (#2170); the sim only ages
+        // its tally, which no collision, death sub-emitter or script reads past.
+        emitter.runtime.gpu.step(dt);
+    } else {
+        integrate_and_collide(emitter, dt, physics);
+    }
 }
 
 /// Spawn new particles for this frame per the emit mode (continuous rate or a
@@ -139,7 +149,7 @@ fn emit(emitter: &mut ParticleEmitterComponent, origin: EmitterFrame, dt: f32) {
             // previous batch has fully expired (periodic explosions); a one-shot
             // burst never re-fires. This avoids the "burst every frame" firehose.
             let can_fire = if emitter.looping {
-                emitter.runtime.particles.is_empty()
+                emitter.live_count() == 0
             } else {
                 !emitter.runtime.burst_fired
             };

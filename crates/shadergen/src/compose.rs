@@ -26,6 +26,7 @@ pub const MODULES: &[&str] = &[
     "numeric.wgsl",
     "hiz/hidden.wgsl",
     "reactive.wgsl",
+    "particles/gpu.wgsl",
     "lighting/sh.wgsl",
     "color/srgb.wgsl",
     "sky/noise.wgsl",

@@ -2,7 +2,7 @@
 //!
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `ParticleEmitterComponent` field by field: emission (`active` / `emit_mode` /
-//! `looping` / `simulation_space` / `rate` / `burst_count` / `max_particles`), rendering (`blend` /
+//! `looping` / `simulation_space` / `simulation` / `rate` / `burst_count` / `max_particles`), rendering (`blend` /
 //! `texture`), shape + per-particle motion (`shape` / `emit_from` / `lifetime` /
 //! `speed` / `direction` / `spread` / `gravity`), start size / rotation / colour
 //! ranges, the over-life curves and gradient, collision (`collision` /
@@ -19,8 +19,10 @@
 //! Pure.
 
 mod render;
+mod simulation;
 
 pub use render::*;
+pub use simulation::*;
 
 use glam::Vec3;
 
@@ -184,6 +186,9 @@ pub fn set_sub_emitter(
     target: Option<u32>,
 ) {
     p.sub_emitters.set(trigger, target);
+    if target.is_some() && trigger != SubEmitTrigger::Birth {
+        simulation::warn_gpu(p);
+    }
 }
 
 /// Set the fraction of a parent particle's velocity sub-particles inherit.
@@ -194,6 +199,9 @@ pub fn set_inherit_velocity(p: &mut ParticleEmitterComponent, fraction: f32) {
 /// Set the collision response (none / die / bounce).
 pub fn set_collision(p: &mut ParticleEmitterComponent, collision: CollisionResponse) {
     p.collision = collision;
+    if collision != CollisionResponse::None {
+        simulation::warn_gpu(p);
+    }
 }
 
 /// Set the collision bounciness (restitution).

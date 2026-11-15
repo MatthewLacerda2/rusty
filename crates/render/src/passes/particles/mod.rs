@@ -11,13 +11,17 @@
 //! uniform.
 //!
 //! The simulation owns particle *state*; this module only reads it — the invariant
-//! that keeps headless play renderer-free.
+//! that keeps headless play renderer-free. A GPU-simulated emitter (`gpu`, #2170)
+//! is the one exception by design: its live particles are render state, kept and
+//! moved here from the births the sim makes, and the sim never reads them.
 
 mod draw;
 pub(crate) use draw::ParticleDraws;
+pub(crate) mod gpu;
 pub(crate) mod instance;
 mod mesh;
 mod mesh_cache;
+mod runs;
 pub(crate) use mesh_cache::CachedMesh;
 
 use std::collections::HashMap;
@@ -44,6 +48,10 @@ pub(crate) struct SharedLayouts<'a> {
 /// Owns every GPU resource for the particle pass. One per `Renderer`.
 pub struct ParticleRenderer {
     pipelines: BlendPipelines,
+    /// The blend pipelines of a GPU-simulated emitter's draw (`vs_gpu`, #2170).
+    gpu_pipelines: BlendPipelines,
+    /// The GPU-simulated emitters' buffers and step (`gpu`).
+    pub(crate) gpu: gpu::GpuParticles,
     pub(crate) globals_buffer: wgpu::Buffer,
     pub(crate) globals_bind_group: wgpu::BindGroup,
     pub(crate) index_buffer: wgpu::Buffer,
@@ -89,7 +97,24 @@ impl ParticleRenderer {
             device,
             "Particle Pipeline",
             (&shader, &layout),
-            ParticleInstance::desc(),
+            ("vs_main", Some(ParticleInstance::desc())),
+        );
+        let gpu = gpu::GpuParticles::new(device, registry);
+        let gpu_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("GPU Particle Pipeline Layout"),
+            bind_group_layouts: &[
+                Some(&gpu.draw_layout),
+                Some(layouts.texture),
+                Some(layouts.depth),
+                Some(layouts.camera_lighting),
+            ],
+            immediate_size: 0,
+        });
+        let gpu_pipelines = BlendPipelines::new(
+            device,
+            "GPU Particle Pipeline",
+            (&shader, &gpu_layout),
+            ("vs_gpu", None),
         );
 
         // Two triangles (a quad) shared by every billboard instance.
@@ -102,6 +127,8 @@ impl ParticleRenderer {
 
         Self {
             pipelines,
+            gpu_pipelines,
+            gpu,
             globals_buffer: globals.buffer,
             globals_bind_group: globals.bind_group,
             index_buffer,
@@ -119,8 +146,19 @@ impl ParticleRenderer {
         self.pipelines.pipeline_for(blend, reactive)
     }
 
+    /// The pipeline drawing a GPU-simulated emitter's buffer for `blend` (#2170).
+    pub(crate) fn gpu_pipeline_for(
+        &self,
+        blend: ParticleBlend,
+        reactive: bool,
+    ) -> &wgpu::RenderPipeline {
+        self.gpu_pipelines.pipeline_for(blend, reactive)
+    }
+
     /// Every blend pipeline, built or not (#985).
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 4] {
-        self.pipelines.lazy()
+    pub(crate) fn lazy_pipelines(&self) -> Vec<&LazyPipeline> {
+        let mut all = self.pipelines.lazy().to_vec();
+        all.extend(self.gpu_pipelines.lazy());
+        all
     }
 }

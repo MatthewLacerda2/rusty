@@ -1,0 +1,261 @@
+//! crates/render/src/passes/particles/gpu/ — GPU-simulated emitters (#2170):
+//! Niagara's *GPUCompute Sim* on the same emitter, with no node graph.
+//!
+//! A `Gpu` emitter's live particles are render state. The sim makes its births on
+//! the CPU and keeps its exact live count (`components::particle::GpuSim`); once
+//! per frame, never per camera, [`Renderer::step_gpu_particles`] uploads what is
+//! new of each emitter ([`emitter`]: the births into their slots, the `dt` of every
+//! step since the last upload) and runs `particles_step.wgsl`: `cs_birth` scatters
+//! the births, `cs_step` moves every particle step by step up to the sim's step.
+//! Every camera then draws the same buffer (`particles.wgsl`'s `vs_gpu`, one
+//! instance per slot, an empty slot culled), so nothing per particle is rebuilt,
+//! sorted or uploaded per camera, whether a stack's or a render texture's.
+//!
+//! **Not sorted inside an emitter.** Additive sprites sum the same in any order;
+//! alpha ones draw in slot order. Emitters still sort back to front among
+//! themselves, a `Gpu` one by where it stands (no centroid is known on the CPU).
+//!
+//! **No compute** ([`supported`]): an adapter without compute shaders or storage
+//! buffers in the vertex stage keeps the particles on the CPU instead, in the
+//! emitter's `mirror`, stepped by [`record::advance`] and drawn through the CPU
+//! pass's instances, with one console warning.
+
+pub(crate) mod emitter;
+pub(crate) mod record;
+
+use std::collections::HashMap;
+
+use emitter::{EmitterBuffers, Work};
+use record::GpuEmitter;
+
+use crate::gpu::layout_entries::{storage_entry, uniform_entry};
+use crate::gpu::pipelines::LazyCompute;
+use crate::gpu::shaders::ShaderRegistry;
+use crate::passes::particles::instance::emitter_light;
+use crate::timing::GpuPass;
+use crate::Renderer;
+use rusty_components::particle::SimulationSpace;
+use rusty_scene::{Scene, SceneId};
+
+/// Renders without a draw after which an emitter's buffers are dropped: a scene
+/// nobody renders any more (a replaced one) frees its emitters.
+const IDLE_RENDERS: u32 = 600;
+
+/// Whether an adapter with `flags` runs the GPU simulation: compute shaders, and
+/// storage buffers read in the vertex stage. Vulkan and Metal always have both.
+pub(crate) fn supported(flags: wgpu::DownlevelFlags) -> bool {
+    flags.contains(wgpu::DownlevelFlags::COMPUTE_SHADERS | wgpu::DownlevelFlags::VERTEX_STORAGE)
+}
+
+/// Every GPU-simulated emitter's buffers, and the pipelines that step them.
+pub(crate) struct GpuParticles {
+    /// Whether the adapter runs the compute pass ([`supported`]).
+    pub(crate) compute: bool,
+    warned: bool,
+    /// The step's group: the emitter, particles (read-write), curves, `dt`s, births.
+    step_layout: wgpu::BindGroupLayout,
+    /// The draw's group 0: the pass globals, the emitter, particles, curves.
+    pub(crate) draw_layout: wgpu::BindGroupLayout,
+    birth: LazyCompute,
+    step: LazyCompute,
+    pub(crate) emitters: HashMap<(SceneId, u32), EmitterBuffers>,
+}
+
+impl GpuParticles {
+    pub(crate) fn new(device: &wgpu::Device, registry: &mut ShaderRegistry) -> Self {
+        let compute = wgpu::ShaderStages::COMPUTE;
+        let rw = wgpu::BindGroupLayoutEntry {
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Storage { read_only: false },
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            ..storage_entry(2, compute)
+        };
+        let step_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("GPU Particle Step Layout"),
+            entries: &[
+                uniform_entry(1, compute),
+                rw,
+                storage_entry(3, compute),
+                storage_entry(4, compute),
+                storage_entry(5, compute),
+            ],
+        });
+        let vertex = wgpu::ShaderStages::VERTEX;
+        let draw_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("GPU Particle Draw Layout"),
+            entries: &[
+                uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT),
+                uniform_entry(1, vertex),
+                storage_entry(2, vertex),
+                storage_entry(3, vertex),
+            ],
+        });
+        let shader = registry.load(device, "particles_step.wgsl", "GPU Particle Step Shader");
+        let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("GPU Particle Step Pipeline Layout"),
+            bind_group_layouts: &[Some(&step_layout)],
+            immediate_size: 0,
+        });
+        let pipeline = |entry: &'static str| {
+            let (shader, layout) = (shader.clone(), layout.clone());
+            LazyCompute::new(device, move |device| {
+                device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                    label: Some(entry),
+                    layout: Some(&layout),
+                    module: &shader,
+                    entry_point: Some(entry),
+                    compilation_options: Default::default(),
+                    cache: None,
+                })
+            })
+        };
+        Self {
+            compute: true,
+            warned: false,
+            step_layout,
+            draw_layout,
+            birth: pipeline("cs_birth"),
+            step: pipeline("cs_step"),
+            emitters: HashMap::new(),
+        }
+    }
+
+    /// Both compute pipelines, built or not.
+    pub(crate) fn lazy_computes(&self) -> [&LazyCompute; 2] {
+        [&self.birth, &self.step]
+    }
+}
+
+impl Renderer {
+    /// Bring every visible `Gpu` emitter of `scene` to the sim, once per frame:
+    /// upload, then scatter the births and step (see the module docs).
+    pub(crate) fn step_gpu_particles(&mut self, scene: &Scene) {
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("GPU Particle Step Encoder"),
+            });
+        let mut owed: Vec<((SceneId, u32), Work)> = Vec::new();
+        let gpu = &mut self.particle_renderer.gpu;
+        for e in gpu.emitters.values_mut() {
+            e.idle += 1;
+        }
+        for id in scene.world.ids_with_particles() {
+            let Some(emitter) = scene.world.particles(id).filter(|e| e.on_gpu()) else {
+                continue;
+            };
+            let key = (scene.id(), id);
+            let sim = &emitter.runtime.gpu;
+            if sim.extent() == 0 && sim.births().next().is_none() {
+                // Nothing live: nothing to keep (edit mode, a cleared emitter).
+                gpu.emitters.remove(&key);
+                continue;
+            }
+            if !scene.world.is_active_in_hierarchy(id) {
+                continue;
+            }
+            if !gpu.compute && !std::mem::replace(&mut gpu.warned, true) {
+                log::warn!(
+                    "[Particles] this adapter cannot run compute shaders: Gpu emitters \
+                     simulate on the CPU in the renderer"
+                );
+            }
+            let frame = match emitter.simulation_space {
+                SimulationSpace::Local => scene.world.emitter_frame(id).matrix,
+                SimulationSpace::World => glam::Mat4::IDENTITY,
+            };
+            let light = emitter_light(scene, &emitter, scene.world.world_position(id));
+            let uniform = GpuEmitter::new(&emitter, frame, light);
+            let (device, queue) = (&self.device, &self.queue);
+            let buffers = gpu.emitters.entry(key).or_insert_with(|| {
+                EmitterBuffers::new(device, queue, emitter.max_particles, !gpu.compute)
+            });
+            buffers.idle = 0;
+            let work = buffers.upload(
+                (device, queue, &mut encoder),
+                sim,
+                uniform,
+                emitter::wants(&emitter),
+            );
+            owed.push((key, work));
+        }
+        gpu.emitters.retain(|_, e| e.idle < IDLE_RENDERS);
+        self.encode_gpu_steps(encoder, &owed);
+    }
+
+    /// Record and submit the births' scatter and the step of each emitter in `owed`.
+    fn encode_gpu_steps(
+        &mut self,
+        mut encoder: wgpu::CommandEncoder,
+        owed: &[((SceneId, u32), Work)],
+    ) {
+        let pr = &mut self.particle_renderer;
+        let (gpu, globals) = (&mut pr.gpu, &pr.globals_buffer);
+        for (key, _) in owed {
+            if let Some(e) = gpu.emitters.get_mut(key) {
+                if e.groups.is_none() && e.mirror.is_none() {
+                    e.groups = Some(groups(
+                        &self.device,
+                        (&gpu.step_layout, &gpu.draw_layout),
+                        e,
+                        globals,
+                    ));
+                }
+            }
+        }
+        let gpu = &self.particle_renderer.gpu;
+        if owed.iter().any(|(_, w)| w.births > 0 || w.step.is_some()) {
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("GPU Particle Step"),
+                timestamp_writes: self.gpu_timer.compute_writes(GpuPass::Particles),
+            });
+            for (key, work) in owed {
+                let Some((group, _)) = gpu.emitters.get(key).and_then(|e| e.groups.as_ref()) else {
+                    continue;
+                };
+                pass.set_bind_group(0, group, &[]);
+                if work.births > 0 {
+                    pass.set_pipeline(gpu.birth.get());
+                    pass.dispatch_workgroups(work.births.div_ceil(64), 1, 1);
+                }
+                if let Some(slots) = work.step {
+                    pass.set_pipeline(gpu.step.get());
+                    pass.dispatch_workgroups(slots.div_ceil(64), 1, 1);
+                }
+            }
+        }
+        self.queue.submit(std::iter::once(encoder.finish()));
+    }
+}
+
+/// `e`'s step group (`layouts.0`) and draw group 0 (`layouts.1`, with the pass
+/// `globals`).
+fn groups(
+    device: &wgpu::Device,
+    layouts: (&wgpu::BindGroupLayout, &wgpu::BindGroupLayout),
+    e: &EmitterBuffers,
+    globals: &wgpu::Buffer,
+) -> (wgpu::BindGroup, wgpu::BindGroup) {
+    let step = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("GPU Particle Step Group"),
+        layout: layouts.0,
+        entries: &e.step_entries(),
+    });
+    let [emitter, particles, lut, ..] = e.step_entries();
+    let draw = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("GPU Particle Draw Group"),
+        layout: layouts.1,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: globals.as_entire_binding(),
+            },
+            emitter,
+            particles,
+            lut,
+        ],
+    });
+    (step, draw)
+}

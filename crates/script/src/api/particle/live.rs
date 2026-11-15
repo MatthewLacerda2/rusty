@@ -12,7 +12,8 @@
 //! added particle's is `ParticleEmitterComponent::placed`'s. A table keeps the
 //! identity of the particle it was read from (`live.lua` sends its source with
 //! it), so a script that removes or reorders entries keeps each survivor's hidden
-//! fields. A `Local` emitter is carried to where it stands before every read and
+//! fields. A `Gpu` emitter's particles are the renderer's (#2170): `GetParticles`
+//! reads none, and `SetParticles` warns once and changes nothing. A `Local` emitter is carried to where it stands before every read and
 //! write, so what a script reads and writes is where the particles draw now.
 
 use mlua::{Function, Lua, Table};
@@ -81,7 +82,17 @@ pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
                     )));
                 }
                 let live = with_carried(&mut scene.borrow_mut(), id, |e, frame| {
-                    write_records(e, frame, &records)
+                    if !e.on_gpu() {
+                        return write_records(e, frame, &records);
+                    }
+                    // A `Gpu` emitter's particles are the renderer's (#2170).
+                    if e.runtime.gpu.first_warning() {
+                        log::warn!(
+                            "[Particles] {verb}: entity {id} simulates on the GPU; its \
+                             particles cannot be written (the call does nothing)"
+                        );
+                    }
+                    e.live_count() as u32
                 });
                 Ok(live.unwrap_or(0))
             },

@@ -3,6 +3,7 @@
 
 use glam::{Quat, Vec3};
 
+use super::simulation::GpuSim;
 use super::space::EmitterFrame;
 use rusty_core::random::Random;
 
@@ -92,7 +93,11 @@ pub struct SubEmitEvent {
 /// Transient per-emitter runtime. Reset on entering Play.
 #[derive(Clone, Debug)]
 pub struct EmitterRuntime {
+    /// A `Cpu` emitter's live particles; always empty on a `Gpu` one, whose live
+    /// particles are the renderer's (#2170).
     pub particles: Vec<Particle>,
+    /// A `Gpu` emitter's births, steps and exact live count (`simulation`).
+    pub gpu: GpuSim,
     /// Accumulated fractional particles owed by continuous emission.
     pub spawn_accum: f32,
     pub rng: Random,
@@ -111,6 +116,7 @@ impl Default for EmitterRuntime {
     fn default() -> Self {
         Self {
             particles: Vec::new(),
+            gpu: GpuSim::default(),
             spawn_accum: 0.0,
             rng: Random::new(0),
             burst_fired: false,

@@ -8,7 +8,7 @@ use glam::Vec3;
 
 use super::runtime::{Particle, SubEmitEvent};
 use super::shape::signed;
-use super::space::EmitterFrame;
+use super::space::{EmitterFrame, SimulationSpace};
 use super::ParticleEmitterComponent;
 use rusty_core::curve::Range;
 use rusty_core::random::Random;
@@ -141,8 +141,13 @@ impl ParticleEmitterComponent {
         let birth = self.sub_emitters.birth.filter(|_| births);
         let inherit = self.sub_emitters.inherit_velocity;
         let mut spawned = 0;
+        // A `Local` `Gpu` emitter's births go up in its own space: the draw places
+        // them under its frame then (`simulation`).
+        let to_local = (self.on_gpu() && self.simulation_space == SimulationSpace::Local)
+            .then(|| frame.matrix.inverse())
+            .filter(|m| m.is_finite());
         for _ in 0..count {
-            if self.runtime.particles.len() >= cap {
+            if self.live_count() >= cap {
                 break;
             }
             let mut p = self.spawn_particle(&frame, origin);
@@ -154,7 +159,15 @@ impl ParticleEmitterComponent {
                     velocity: p.velocity * inherit,
                 });
             }
-            self.runtime.particles.push(p);
+            if !self.on_gpu() {
+                self.runtime.particles.push(p);
+            } else if let Some(m) = to_local {
+                p.position = m.transform_point3(p.position);
+                p.velocity = m.transform_vector3(p.velocity);
+                self.runtime.gpu.add(p);
+            } else {
+                self.runtime.gpu.add(p);
+            }
             spawned += 1;
         }
         spawned

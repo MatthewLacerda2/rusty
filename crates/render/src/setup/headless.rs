@@ -108,14 +108,16 @@ impl Renderer {
             .ok()?;
 
         // No real swapchain offscreen: only the always-available `Fifo` mode.
-        Some(Self::from_parts(
+        let mut renderer = Self::from_parts(
             device,
             queue,
             None,
             offscreen_config(width, height),
             vec![wgpu::PresentMode::Fifo],
             Some(permit),
-        ))
+        );
+        renderer.adopt_adapter(&adapter);
+        Some(renderer)
     }
 }
 

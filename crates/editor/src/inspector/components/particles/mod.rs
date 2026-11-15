@@ -1,7 +1,7 @@
 //! crates/editor/src/inspector/components/particles/ — the Particle System inspector card.
 //!
 //! Edits every serde-persisted field of `ParticleEmitterComponent`: emission mode,
-//! simulation space, blend, collision response, the rate/burst/cap counts, the shape and per-particle
+//! simulation space and target (CPU or GPU), blend, collision response, the rate/burst/cap counts, the shape and per-particle
 //! motion, the start ranges (`start.rs`), the over-life curves and gradient and
 //! the sub-emitters (`over_life.rs`), how the particles are drawn (`render.rs`),
 //! restitution, and the deterministic seed. The live particle count (transient runtime) is shown
@@ -22,9 +22,12 @@ use rusty_edit::authoring::ComponentKind;
 use widgets::{clamped, combo, drag_u32};
 
 use crate::inspector::components::card::component_card;
-use rusty_components::SimulationSpace;
+use rusty_components::{ParticleSimulation, SimulationSpace};
 use rusty_edit::authoring::particles as particle_ops;
 use rusty_scene::{CollisionResponse, EmitMode, ParticleEmitterComponent};
+
+/// The Max Particles field's ceiling: past the dense `Gpu` effects' 100k (#2170).
+const MAX_PARTICLES: u32 = 10_000_000;
 
 type Cx<'w> = (&'w mut rusty_ecs::World, u32); // world + entity id, as one param
 /// Routes a field write through the shared particle-authoring op; a no-op absent.
@@ -79,8 +82,8 @@ pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: 
     }
 }
 
-/// Emission controls: mode, looping, simulation space, rate, burst count and
-/// particle cap.
+/// Emission controls: mode, looping, simulation space and target (with what a
+/// `Gpu` emitter does not honour), rate, burst count and particle cap.
 fn draw_emission(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {
     let mut changed = false;
     let mut mode = p.emit_mode;
@@ -107,6 +110,15 @@ fn draw_emission(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponen
         apply(cx, |c| particle_ops::set_simulation_space(c, space));
         changed = true;
     }
+    let mut target = p.simulation;
+    let targets = ParticleSimulation::ALL.map(|s| (s, s.name()));
+    if combo(ui, "Simulation", &mut target, &targets) {
+        apply(cx, |c| particle_ops::set_simulation(c, target));
+        changed = true;
+    }
+    for line in particle_ops::gpu_warnings(p) {
+        ui.colored_label(ui.visuals().warn_fg_color, line);
+    }
     let mut rate = p.rate;
     if clamped(ui, "Rate (per sec):", &mut rate, 0.0..=1000.0) {
         apply(cx, |c| particle_ops::set_rate(c, rate));
@@ -118,7 +130,7 @@ fn draw_emission(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponen
         changed = true;
     }
     let mut cap = p.max_particles;
-    if drag_u32(ui, "Max Particles:", &mut cap, 1..=100_000) {
+    if drag_u32(ui, "Max Particles:", &mut cap, 1..=MAX_PARTICLES) {
         apply(cx, |c| particle_ops::set_max_particles(c, cap));
         changed = true;
     }

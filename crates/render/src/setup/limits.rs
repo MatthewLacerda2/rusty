@@ -93,3 +93,12 @@ mod tests {
         assert_eq!((samplers, textures), (14, 19), "the counts the docs state");
     }
 }
+
+impl crate::Renderer {
+    /// What the renderer takes from the adapter beside the device: whether it can
+    /// simulate particles on the GPU (`passes::particles::gpu::supported`, #2170).
+    pub(crate) fn adopt_adapter(&mut self, adapter: &wgpu::Adapter) {
+        let flags = adapter.get_downlevel_capabilities().flags;
+        self.particle_renderer.gpu.compute = crate::passes::particles::gpu::supported(flags);
+    }
+}
