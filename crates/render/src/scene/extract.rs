@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 
 use super::inputs::{Dirty, Inputs, LibraryEdits, RendererInputs};
 use super::RenderScene;
-use crate::draw::materials::material_maps;
+use crate::draw::map_slots::material_maps;
 use crate::gpu::material_cache::ParamOwner;
 use crate::passes::shadows::UnbakedCasters;
 use crate::Renderer;

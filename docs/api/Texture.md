@@ -42,6 +42,8 @@ lists the valid ones — a typo like `"basecolour"` never silently bakes linear 
 | `roughness` | linear | — |
 | `metallic` | linear | — |
 | `metallic_roughness` / `orm` | linear | reads **metallic from the input's R, roughness from its G** (input B is ignored), and writes them as glTF's packed map: **metallic → B, roughness → G**, R = 0 |
+| `occlusion` / `ao` | linear | — (the material reads R: an `ambient_occlusion` node's output drops straight in) |
+| `specular` | linear | the input's **R written to every channel** (the material reads the level from A, as glTF's `specularTexture`) |
 | `data` | linear, **16-bit** | — (height/masks/anything raw; the explicit way to get unencoded output) |
 
 Every slot bakes 8 bits per channel except `data` and `normal16`, which bake a
@@ -54,8 +56,8 @@ made its copy, unless its `compression` is `"None"`; see `Assets.md`), so the ex
 `image` node, a terrain or displacement bake), not what the GPU draws.
 
 `orm` is only another name for the glTF metallic-roughness packing, not an
-occlusion-roughness-metallic map: rusty's material has no occlusion map, so nothing
-is written to R.
+occlusion-roughness-metallic map: nothing is written to R, so bake occlusion as its
+own `occlusion` output (`occlusion_map`) rather than naming an `orm` file there.
 
 **The target folder.** `Bake`, `BakeSet` and `Preview` make the missing folders
 above `path` (or above `prefix`) when they lie inside the project, so a new set can bake to
@@ -101,6 +103,8 @@ and the file name use the canonical name: `albedo` → `base_color`, `orm` →
 | `roughness` | `roughness_map` |
 | `metallic` | `metallic_map` |
 | `metallic_roughness` | `metallic_map` **and** `roughness_map` (the same PNG) |
+| `occlusion` | `occlusion_map` |
+| `specular` | `specular_map` |
 | `data` | — (no material slot) |
 
 To skip the hand-off, put the whole recipe in the material as `maps`

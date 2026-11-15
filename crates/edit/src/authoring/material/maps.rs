@@ -101,6 +101,8 @@ fn fill_empty_maps(asset: &mut MaterialAsset, baked: &BTreeMap<String, String>) 
                 "roughness_map" => &mut asset.roughness_map,
                 "normal_map" => &mut asset.normal_map,
                 "emissive_map" => &mut asset.emissive_map,
+                "occlusion_map" => &mut asset.occlusion_map,
+                "specular_map" => &mut asset.specular_map,
                 _ => continue,
             };
             target.get_or_insert_with(|| MapRef::from(path.clone()));

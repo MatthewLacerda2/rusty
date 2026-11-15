@@ -41,11 +41,23 @@ pub(super) fn material_data(
             .and_then(|t| texture_path(&t.texture(), base_dir, source))
             .map(MapRef::from),
         emissive: material.emissive_factor(),
+        // glTF's `occlusionTexture` (#2151): an ORM image shared with the
+        // metallic-roughness texture resolves to the same path, so one upload.
+        occlusion_map: material
+            .occlusion_texture()
+            .and_then(|t| texture_path(&t.texture(), base_dir, source))
+            .map(MapRef::from),
+        occlusion_strength: material.occlusion_texture().map_or(1.0, |t| t.strength()),
         double_sided: material.double_sided() && !from_blend(source),
-        // `KHR_materials_ior` / `KHR_materials_specular` (#1998): the factors; the
-        // engine's material has no slot for `specularTexture`/`specularColorTexture`.
+        // `KHR_materials_ior` / `KHR_materials_specular` (#1998): the factors, and
+        // `specularTexture` (#2151); the material has no `specularColorTexture` slot.
         ior: material.ior().unwrap_or(1.5),
         specular: specular.as_ref().map_or(1.0, |s| s.specular_factor()),
+        specular_map: specular
+            .as_ref()
+            .and_then(|s| s.specular_texture())
+            .and_then(|t| texture_path(&t.texture(), base_dir, source))
+            .map(MapRef::from),
         specular_color: specular.map_or([1.0; 3], |s| s.specular_color_factor()),
     }
 }

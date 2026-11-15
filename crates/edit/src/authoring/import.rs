@@ -3,6 +3,7 @@
 //! The model importer's material DTO becomes the scene's [`MaterialAsset`], held by
 //! the material ops' rows (`authoring::material`).
 
+use super::material::SurfaceValue;
 use rusty_components::RenderFace;
 use rusty_scene::MaterialAsset;
 
@@ -30,6 +31,10 @@ pub fn material_asset_from_import(data: &rusty_asset::MaterialData) -> MaterialA
         normal_map: data.normal_map.clone(),
         emissive: data.emissive,
         emissive_map: data.emissive_map.clone(),
+        // glTF's `occlusionTexture` and `KHR_materials_specular`'s `specularTexture`
+        // (#2151); an ORM file's occlusion is the metallic-roughness image itself.
+        occlusion_map: data.occlusion_map.clone(),
+        specular_map: data.specular_map.clone(),
         // A double-sided glTF material draws both faces (#1615), as Unity's glTF
         // importers set *Render Face* to Both.
         render_face: match data.double_sided {
@@ -43,6 +48,9 @@ pub fn material_asset_from_import(data: &rusty_asset::MaterialData) -> MaterialA
     };
     // `KHR_materials_ior` and `KHR_materials_specular` (#1998), clamped by their rows.
     super::material::import_reflectance(&mut asset, data.ior, data.specular, data.specular_color);
+    // Its strength through its row, clamped as an authored one is.
+    let strength = SurfaceValue::Number(data.occlusion_strength);
+    super::material::import_field(&mut asset, "occlusion_strength", strength);
     super::material::fit_map_slots(&asset);
     asset
 }
@@ -64,9 +72,12 @@ mod tests {
             normal_map: Some("n.png".into()),
             emissive_map: Some("e.png".into()),
             emissive: [0.1, 0.2, 0.3],
+            occlusion_map: Some("mr.png".into()),
+            occlusion_strength: 1.5,
             double_sided: false,
             ior: 1.33,
             specular: 0.5,
+            specular_map: Some("s.png".into()),
             specular_color: [2.0, 1.0, 0.5],
         };
         let mat = material_asset_from_import(&data);
@@ -91,6 +102,13 @@ mod tests {
         assert_eq!(mat.emissive_map, Some("e.png".into()));
         assert_eq!((mat.ior, mat.specular), (1.33, 0.5));
         assert_eq!(mat.specular_color, [2.0, 1.0, 0.5]);
+        // An ORM file's occlusion names the one image; its strength lands clamped.
+        assert_eq!(mat.occlusion_map, Some("mr.png".into()));
+        assert_eq!(
+            mat.occlusion_strength, 1.0,
+            "glTF's [0, 1], clamped by the row"
+        );
+        assert_eq!(mat.specular_map, Some("s.png".into()));
     }
 
     #[test]

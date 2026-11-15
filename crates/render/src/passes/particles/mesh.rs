@@ -14,7 +14,7 @@ use glam::{Mat4, Quat, Vec3};
 
 use crate::draw::batch::sort::{view_depth, TransparentOrder};
 use crate::draw::batch::{BatchKey, DrawItem};
-use crate::draw::materials::material_maps;
+use crate::draw::map_slots::material_maps;
 use crate::draw::uniforms::{probe_occlusion_at, probe_sh_at};
 use crate::gpu::pipelines::Facing;
 use crate::gpu::uniforms::ObjectData;

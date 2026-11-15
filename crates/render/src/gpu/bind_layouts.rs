@@ -2,7 +2,7 @@
 //! constructors split out of `pipelines.rs` to keep each file under the size cap;
 //! `pipelines` consumes these to build the pipeline layouts (behavior unchanged).
 
-use crate::draw::materials::MAP_BINDINGS;
+use crate::draw::map_slots::MAP_BINDINGS;
 use crate::passes::transparent::OpaqueViews;
 
 use super::layout_entries::{
@@ -157,15 +157,15 @@ fn material_sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
     }
 }
 
-/// The detail map's group-2 binding: `materials::MAP_BINDINGS`' last.
+/// The detail map's group-2 binding: `map_slots::MAP_BINDINGS`' last.
 const DETAIL_BINDING: u32 = MAP_BINDINGS[5];
 
-// Every extra shader slot binds below the detail map, and every texture below the
-// samplers' offset, so no two group-2 bindings meet.
+// Every extra shader slot binds below the last map (counting down from the detail
+// map's, #2151), every texture below the samplers' offset: no two bindings meet.
 const _: () = {
     let mut i = 0;
     while i < rusty_shadergen::textures::SLOTS.len() {
-        assert!(rusty_shadergen::textures::SLOTS[i].binding < DETAIL_BINDING);
+        assert!(rusty_shadergen::textures::SLOTS[i].binding < MAP_BINDINGS[MAP_BINDINGS.len() - 1]);
         i += 1;
     }
     assert!(DETAIL_BINDING < rusty_shadergen::textures::SAMPLER_OFFSET);
@@ -176,9 +176,9 @@ const _: () = {
 /// emissive (5); the material's runtime shader params (6, #399), a fixed
 /// `array<vec4<f32>, 16>` uniform only a surface variant with runtime params reads;
 /// one texture per extra shader slot (7 = `mask`, #400), which only a variant with a
-/// block sampling it reads; and the detail map (15, #1997). Every texture but
-/// albedo has its own sampler at `textures::sampler_binding` (16 past it), the wrap
-/// and filter of its import settings (#1323). This is the layout the forward pass's
+/// block sampling it reads; the detail map (15, #1997), the occlusion (14) and
+/// specular-level (13) maps (#2151). Every texture but albedo has its own sampler at
+/// `textures::sampler_binding` (16 past it), its import settings' wrap and filter (#1323). This is the layout the forward pass's
 /// group(2) is built against (#202, #207).
 pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {

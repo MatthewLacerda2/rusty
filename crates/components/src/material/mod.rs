@@ -65,7 +65,8 @@ fn is_true(value: &bool) -> bool {
 /// NOTE: every field here is sampled by the renderer — `base_color`/`base_color_map`
 /// plus `metallic`/`roughness` (#201), the `metallic_map`/`roughness_map` (#202), the flat
 /// `emissive` factor (#222), and the `normal_map`/`emissive_map` (#207 — the normal map
-/// via a per-vertex tangent attribute + TBN in `fs_main`). The transparency story —
+/// via a per-vertex tangent attribute + TBN in `fs_main`), and the `occlusion_map` and
+/// `specular_map` (#2151). The transparency story —
 /// `render_mode` + `alpha` + `alpha_cutoff` (#242) — drives blend/discard. No field is a
 /// write-only no-op.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -88,6 +89,22 @@ pub struct MaterialAsset {
     pub emissive: [f32; 3],
     #[serde(default)]
     pub emissive_map: Option<MapRef>,
+    /// glTF's `occlusionTexture`, Unity's *Occlusion Map* (#2151): its red channel
+    /// darkens the indirect light, the diffuse and, as specular occlusion, the
+    /// reflections (probe, sky, SSR, a lightmap's lobe); direct light is not
+    /// occluded by it. Sampled raw, so an ORM-packed metallic-roughness image (R
+    /// occlusion) can be named here too and is uploaded once.
+    #[serde(default)]
+    pub occlusion_map: Option<MapRef>,
+    /// glTF's `occlusionTexture.strength`, Unity's occlusion slider: 0 ignores the
+    /// map, 1 (the default) applies it whole (`1 + strength × (map − 1)`).
+    #[serde(default = "default_one")]
+    pub occlusion_strength: f32,
+    /// `KHR_materials_specular`'s `specularTexture` (#2151): its alpha channel (red
+    /// for a one-channel upload) scales `specular` per texel, so a dark recess
+    /// reflects nothing head-on or at grazing angles, under the lamps as under the sky.
+    #[serde(default)]
+    pub specular_map: Option<MapRef>,
     /// Unity's *Tiling* (#1573): how many times the maps above repeat across UV0,
     /// or across `world_size` metres under a world mapping. (1, 1) by default.
     #[serde(default = "default_tiling")]

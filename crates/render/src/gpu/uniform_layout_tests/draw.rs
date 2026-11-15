@@ -1,12 +1,13 @@
 //! The forward pass's per-draw uniform and material record (#1616):
 //! `forward/bindings.wgsl`'s `DrawUniforms` and `MaterialData` against `DrawUniform`
 //! and `MaterialData`, member by member, the record's flat surface (#1523) and
-//! mapping (#1573) and detail (#1997) tails included.
+//! mapping (#1573) and detail (#1997) tails and the occlusion and specular-level
+//! flags (#2151) included.
 
 use std::mem::{offset_of, size_of};
 
 use super::{assert_members, wgsl_struct_in};
-use crate::gpu::uniforms::{DetailUniform, MappingUniform, SurfaceUniform};
+use crate::gpu::uniforms::{DetailUniform, LevelMapsUniform, MappingUniform, SurfaceUniform};
 use crate::{DrawUniform, MaterialData};
 
 const PROBE: &str = "#import forward::bindings::{draw, material}\n\
@@ -51,7 +52,10 @@ fn material_data_matches_wgsl_layout() {
         detail_st, use_detail_map, detail_world_scale, detail_albedo_scale,
         detail_normal_scale, detail_smoothness_scale,
     );
-    let pairs: Vec<_> = [&own[..], &surface, &mapping, &tail, &detail].concat();
+    let maps = members!(LevelMapsUniform, offset_of!(MaterialData, level_maps);
+        use_occlusion_map, occlusion_strength, use_specular_map,
+    );
+    let pairs: Vec<_> = [&own[..], &surface, &mapping, &tail, &detail, &maps].concat();
     let found = wgsl_struct_in(PROBE, "MaterialData");
     assert_members(found, "MaterialData", &pairs, size_of::<MaterialData>());
 }

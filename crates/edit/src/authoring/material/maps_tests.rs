@@ -65,6 +65,19 @@ fn bake_fills_each_slots_maps_and_a_packed_map_fills_both() {
 }
 
 #[test]
+fn an_occlusion_and_a_specular_output_fill_their_maps() {
+    // A graph's baked height AO has a slot to go to (#2151).
+    let dir = dir("maps_fill_ao");
+    let mut m = with_maps(recipe(8, &["ao", "specular"]));
+    bake_maps(&mut m, "felt", &dir, &dir).unwrap();
+    let ao = Some(png(&dir, "felt_occlusion.png").into());
+    assert_eq!(
+        (m.occlusion_map, m.specular_map),
+        (ao, Some(png(&dir, "felt_specular.png").into()))
+    );
+}
+
+#[test]
 fn a_hand_set_map_path_wins_over_the_bake() {
     let dir = dir("maps_explicit");
     let mut m = with_maps(recipe(8, &["base_color", "normal"]));

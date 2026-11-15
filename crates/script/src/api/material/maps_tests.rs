@@ -1,4 +1,5 @@
-//! Tests for `Material.DefineAsset { maps = … }` and `Material.Rebake` (#409).
+//! Tests for `Material.DefineAsset { maps = … }` and `Material.Rebake` (#409), and the
+//! occlusion and specular-level map setters (#2151).
 //!
 //! The binding bakes into the project texture workspace (`MAPS_DIR`), so each test
 //! names its material after itself and the process, and removes what it wrote.
@@ -9,6 +10,7 @@ use std::rc::Rc;
 use mlua::Lua;
 
 use crate::api::bind;
+use rusty_asset::MapRef;
 use rusty_edit::authoring::material::MAPS_DIR;
 use rusty_scene::Scene;
 
@@ -107,4 +109,32 @@ fn a_bad_maps_recipe_defines_nothing() {
     assert!(err.contains("maps is a texture recipe"), "{err}");
     let err = run(&scene, r#"Material.Rebake("absent")"#).unwrap_err();
     assert!(err.contains("no material named"), "{err}");
+}
+
+#[test]
+fn the_occlusion_and_specular_maps_set_through_lua_and_a_recipe() {
+    let scene = Rc::new(RefCell::new(Scene::new()));
+    let id = scene.borrow_mut().add_entity("E".into());
+    let lua = format!(
+        r#"Material.SetOcclusionMap({id}, "ao.png") Material.SetSpecularMap({id}, "s.png")
+           Material.SetOcclusionStrength({id}, 4)
+           Material.DefineAsset("felt", {{ occlusion_map = "orm.png", occlusion_strength = 0.5 }})"#
+    );
+    run(&scene, &lua).unwrap();
+    let sc = scene.borrow();
+    let path = |m: &Option<MapRef>| m.as_ref().map(|p| p.to_string());
+    let felt = &sc.materials["felt"];
+    assert_eq!(
+        (path(&felt.occlusion_map), felt.occlusion_strength),
+        (Some("orm.png".into()), 0.5)
+    );
+    let own = sc
+        .materials
+        .values()
+        .find(|m| path(&m.specular_map) == Some("s.png".into()));
+    let own = own.expect("the entity's material took the specular map");
+    assert_eq!(
+        (path(&own.occlusion_map), own.occlusion_strength),
+        (Some("ao.png".into()), 1.0)
+    );
 }
