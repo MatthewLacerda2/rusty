@@ -133,3 +133,51 @@ impl Default for EmitterRuntime {
         }
     }
 }
+
+/// The configuration apart from the runtime.
+impl super::ParticleEmitterComponent {
+    /// A copy of the configuration, with a fresh runtime: what an editor or an
+    /// all-or-nothing write reads and edits without copying the live particles (a
+    /// `Gpu` emitter keeps a birth per live particle, up to
+    /// [`GPU_MAX_PARTICLES`]). The destructuring names every field, so a new one
+    /// is a compile error here until it is copied.
+    pub fn config(&self) -> Self {
+        macro_rules! copy {
+            ($($field:ident),* $(,)?) => {{
+                let Self { runtime: _, $($field),* } = self;
+                Self { runtime: EmitterRuntime::default(), $($field: Clone::clone($field)),* }
+            }};
+        }
+        copy!(
+            active,
+            emit_mode,
+            blend,
+            collision,
+            texture,
+            rate,
+            burst_count,
+            max_particles,
+            looping,
+            simulation_space,
+            simulation,
+            shape,
+            emit_from,
+            lifetime,
+            speed,
+            direction,
+            spread,
+            gravity,
+            size,
+            rotation,
+            color,
+            size_over_life,
+            color_over_life,
+            drag,
+            rotation_speed,
+            bounciness,
+            sub_emitters,
+            seed,
+            render,
+        )
+    }
+}

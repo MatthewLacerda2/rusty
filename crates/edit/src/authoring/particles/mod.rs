@@ -22,12 +22,12 @@ mod render;
 mod simulation;
 
 pub use render::*;
-pub use simulation::*;
+use simulation::Dishonoured;
+pub use simulation::{commit, draft, gpu_warnings, set_simulation};
 
 use glam::Vec3;
 
 use rusty_asset::MapRef;
-use rusty_components::particle::GPU_MAX_PARTICLES;
 use rusty_components::{
     CollisionResponse, EmitFrom, EmitMode, EmitShape, ParticleBlend, ParticleEmitterComponent,
     SimulationSpace, SubEmitTrigger,
@@ -54,18 +54,11 @@ pub fn set_looping(p: &mut ParticleEmitterComponent, looping: bool) {
 }
 
 /// Set the simulation space (#1529). A change forgets where the live particles
-/// were last placed, so a switch never carries them by a stale matrix.
+/// were last placed, so a switch never carries them by a stale matrix; a `Gpu`
+/// emitter's live particles are stored in the old space with nothing to carry
+/// them, so it forgets them too, as a change of target does (#2170).
 pub fn set_simulation_space(p: &mut ParticleEmitterComponent, space: SimulationSpace) {
-    if p.simulation_space != space {
-        p.simulation_space = space;
-        p.runtime.anchor = None;
-        if p.on_gpu() {
-            // A `Gpu` emitter's live particles are stored in the old space, on the
-            // sim's side and in the renderer's buffer, with nothing to carry them
-            // (#2170): they are forgotten, as a change of target forgets them.
-            p.clear_particles();
-        }
-    }
+    simulation::retarget(p, p.simulation, space);
 }
 
 /// Set the continuous emission rate, clamped to `≥ 0` (matches `Particles.SetRate`).
@@ -78,14 +71,12 @@ pub fn set_burst_count(p: &mut ParticleEmitterComponent, burst_count: u32) {
     p.burst_count = burst_count;
 }
 
-/// Set the live-particle cap. A `Gpu` emitter's is clamped to
-/// [`GPU_MAX_PARTICLES`], with a warning (#2170).
+/// Set the live-particle cap, stored as given. A `Gpu` emitter holds at most
+/// `GPU_MAX_PARTICLES` whatever it is (`ParticleEmitterComponent::particle_cap`),
+/// and warns when it is above (#2170).
 pub fn set_max_particles(p: &mut ParticleEmitterComponent, max_particles: u32) {
     p.max_particles = max_particles;
-    if p.on_gpu() && max_particles > GPU_MAX_PARTICLES {
-        simulation::warn_gpu(p);
-        p.max_particles = GPU_MAX_PARTICLES;
-    }
+    Dishonoured::Cap.warn(p);
 }
 
 /// Set the blend mode (alpha / additive).
@@ -198,9 +189,7 @@ pub fn set_sub_emitter(
     target: Option<u32>,
 ) {
     p.sub_emitters.set(trigger, target);
-    if target.is_some() && trigger != SubEmitTrigger::Birth {
-        simulation::warn_gpu(p);
-    }
+    Dishonoured::SubEmitter(trigger).warn(p);
 }
 
 /// Set the fraction of a parent particle's velocity sub-particles inherit.
@@ -211,9 +200,7 @@ pub fn set_inherit_velocity(p: &mut ParticleEmitterComponent, fraction: f32) {
 /// Set the collision response (none / die / bounce).
 pub fn set_collision(p: &mut ParticleEmitterComponent, collision: CollisionResponse) {
     p.collision = collision;
-    if collision != CollisionResponse::None {
-        simulation::warn_gpu(p);
-    }
+    Dishonoured::Collision.warn(p);
 }
 
 /// Set the collision bounciness (restitution).

@@ -6,6 +6,7 @@
 use rusty_components::particle::GPU_MAX_PARTICLES;
 use rusty_components::{
     CollisionResponse, ParticleEmitterComponent, ParticleRenderMode, ParticleSimulation,
+    SimulationSpace, SubEmitTrigger,
 };
 
 /// Set the simulation target (#2170). A change forgets the live particles (the
@@ -13,146 +14,130 @@ use rusty_components::{
 /// a `Gpu` emitter does not honour ([`gpu_warnings`]).
 pub fn set_simulation(p: &mut ParticleEmitterComponent, simulation: ParticleSimulation) {
     if p.simulation != simulation {
-        p.clear_particles();
-        p.runtime.anchor = None;
-        p.simulation = simulation;
-        warn_gpu(p);
-    }
-}
-
-/// What a `Gpu` emitter does not honour of `p`'s settings, one line each: a
-/// collision response (it behaves as `None`), the death and collision
-/// sub-emitters (they never fire), the `Mesh` render mode (it draws as a
-/// billboard) and a `max_particles` above [`GPU_MAX_PARTICLES`] (it holds that
-/// many). Empty for a `Cpu` emitter.
-pub fn gpu_warnings(p: &ParticleEmitterComponent) -> Vec<String> {
-    if !p.on_gpu() {
-        return Vec::new();
-    }
-    let mut out = Vec::new();
-    if p.collision != CollisionResponse::None {
-        out.push(format!(
-            "collision {:?} is not simulated on the GPU: it behaves as None",
-            p.collision
-        ));
-    }
-    for (trigger, target) in [
-        ("death", p.sub_emitters.death),
-        ("collision", p.sub_emitters.collision),
-    ] {
-        if target.is_some() {
-            out.push(format!("the {trigger} sub-emitter never fires on the GPU"));
+        retarget(p, simulation, p.simulation_space);
+        for line in gpu_warnings(p) {
+            log_gpu(&line);
         }
     }
-    if p.render.mode == ParticleRenderMode::Mesh {
-        out.push("mesh particles are not drawn on the GPU: they draw as billboards".into());
-    }
-    if p.max_particles > GPU_MAX_PARTICLES {
-        out.push(format!(
-            "max_particles {} is above the GPU's cap: it holds {GPU_MAX_PARTICLES}",
-            p.max_particles
-        ));
-    }
-    out
 }
 
-/// Log [`gpu_warnings`].
-pub(super) fn warn_gpu(p: &ParticleEmitterComponent) {
-    for line in gpu_warnings(p) {
-        log::warn!("[Particles] Gpu emitter: {line}");
+/// Move `p` to `simulation` in `space`, forgetting what of its live state the
+/// move makes stale: any change forgets where the live particles were last placed
+/// (`anchor`), so nothing is carried by a stale matrix; a change of target forgets
+/// the live particles (the other target never held them), and so does a change of
+/// space on a `Gpu` emitter, whose particles are stored in the old space on both
+/// sides with nothing to carry them. The one rule `set_simulation`,
+/// `set_simulation_space` and `Component.Set`'s commit ([`commit`]) share.
+pub(super) fn retarget(
+    p: &mut ParticleEmitterComponent,
+    simulation: ParticleSimulation,
+    space: SimulationSpace,
+) {
+    let target = p.simulation != simulation;
+    let moved = p.simulation_space != space;
+    if !(target || moved) {
+        return;
     }
+    if target || simulation == ParticleSimulation::Gpu {
+        p.clear_particles();
+    }
+    p.runtime.anchor = None;
+    p.simulation = simulation;
+    p.simulation_space = space;
+}
+
+/// `Component.Set`'s copy of an emitter to run its ops on: its configuration,
+/// without the live state, so an edit never copies the live particles (a `Gpu`
+/// emitter's births, up to one per live particle).
+pub fn draft(live: &ParticleEmitterComponent) -> ParticleEmitterComponent {
+    live.config()
+}
+
+/// Put `Component.Set`'s finished [`draft`] in place of `live`, keeping `live`'s
+/// live state but for what the new target and space make stale ([`retarget`]).
+pub fn commit(live: &mut ParticleEmitterComponent, mut draft: ParticleEmitterComponent) {
+    let (simulation, space) = (draft.simulation, draft.simulation_space);
+    draft.simulation = live.simulation;
+    draft.simulation_space = live.simulation_space;
+    draft.runtime = std::mem::take(&mut live.runtime);
+    *live = draft;
+    retarget(live, simulation, space);
+}
+
+/// A setting a `Gpu` emitter does not honour.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum Dishonoured {
+    /// A collision response: it behaves as `None`.
+    Collision,
+    /// The sub-emitter fired at this trigger (death or collision): it never fires.
+    SubEmitter(SubEmitTrigger),
+    /// The `Mesh` render mode: it draws as a billboard.
+    Mesh,
+    /// A `max_particles` above [`GPU_MAX_PARTICLES`]: it holds that many.
+    Cap,
+}
+
+impl Dishonoured {
+    const ALL: [Self; 5] = [
+        Self::Collision,
+        Self::SubEmitter(SubEmitTrigger::Death),
+        Self::SubEmitter(SubEmitTrigger::Collision),
+        Self::Mesh,
+        Self::Cap,
+    ];
+
+    /// What `p` does not honour of this setting, or `None` when it honours it
+    /// (always, on a `Cpu` emitter).
+    fn line(self, p: &ParticleEmitterComponent) -> Option<String> {
+        if !p.on_gpu() {
+            return None;
+        }
+        match self {
+            Self::Collision => (p.collision != CollisionResponse::None).then(|| {
+                format!(
+                    "collision {:?} is not simulated on the GPU: it behaves as None",
+                    p.collision
+                )
+            }),
+            // A birth sub-emitter fires: births happen on the CPU.
+            Self::SubEmitter(SubEmitTrigger::Birth) => None,
+            Self::SubEmitter(trigger) => p
+                .sub_emitters
+                .get(trigger)
+                .map(|_| format!("the {} sub-emitter never fires on the GPU", trigger.name())),
+            Self::Mesh => (p.render.mode == ParticleRenderMode::Mesh)
+                .then(|| "mesh particles are not drawn on the GPU: they draw as billboards".into()),
+            Self::Cap => (p.max_particles > GPU_MAX_PARTICLES).then(|| {
+                format!(
+                    "max_particles {} is above the GPU's cap: it holds {GPU_MAX_PARTICLES} \
+                     (the stored value is kept, and holds again on Cpu)",
+                    p.max_particles
+                )
+            }),
+        }
+    }
+
+    /// Log this setting's line, if `p` does not honour it: what an op that just
+    /// set it says, and nothing about the others.
+    pub(super) fn warn(self, p: &ParticleEmitterComponent) {
+        if let Some(line) = self.line(p) {
+            log_gpu(&line);
+        }
+    }
+}
+
+/// What a `Gpu` emitter does not honour of `p`'s settings, one line each
+/// ([`Dishonoured`]): a collision response, the death and collision
+/// sub-emitters, the `Mesh` render mode and a `max_particles` above
+/// [`GPU_MAX_PARTICLES`]. Empty for a `Cpu` emitter.
+pub fn gpu_warnings(p: &ParticleEmitterComponent) -> Vec<String> {
+    Dishonoured::ALL.iter().filter_map(|d| d.line(p)).collect()
+}
+
+fn log_gpu(line: &str) {
+    log::warn!("[Particles] Gpu emitter: {line}");
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::authoring::particles::{set_collision, set_render_mode};
-    use rusty_test_support::logs;
-
-    #[test]
-    fn a_switch_to_gpu_warns_for_each_setting_it_does_not_honour() {
-        logs::init();
-        let mut p = ParticleEmitterComponent {
-            collision: CollisionResponse::Bounce,
-            ..Default::default()
-        };
-        p.sub_emitters.death = Some(4);
-        p.render.mode = ParticleRenderMode::Mesh;
-        p.runtime.particles.push(rusty_components::Particle::at(
-            glam::Vec3::ZERO,
-            1.0,
-            [1.0; 4],
-            1.0,
-        ));
-        assert!(
-            gpu_warnings(&p).is_empty(),
-            "a Cpu emitter honours them all"
-        );
-        set_simulation(&mut p, ParticleSimulation::Gpu);
-        assert!(
-            p.runtime.particles.is_empty(),
-            "the switch forgets the live ones"
-        );
-        let said = logs::take();
-        assert_eq!(said.len(), 3, "{said:?}");
-        assert!(said.iter().all(|s| s.contains("Gpu emitter")));
-        set_simulation(&mut p, ParticleSimulation::Gpu);
-        assert!(logs::take().is_empty(), "no change, no warning");
-    }
-
-    #[test]
-    fn setting_a_dishonoured_setting_on_a_gpu_emitter_warns_and_on_cpu_does_not() {
-        logs::init();
-        let mut p = ParticleEmitterComponent::default();
-        set_collision(&mut p, CollisionResponse::Die);
-        assert!(logs::take().is_empty());
-        set_collision(&mut p, CollisionResponse::None);
-        set_simulation(&mut p, ParticleSimulation::Gpu);
-        set_collision(&mut p, CollisionResponse::Die);
-        set_render_mode(&mut p, ParticleRenderMode::Mesh);
-        assert_eq!(logs::take().len(), 3, "collision, then collision and mesh");
-    }
-
-    #[test]
-    fn a_gpu_emitters_cap_is_clamped_with_a_warning_and_a_cpu_ones_is_not() {
-        logs::init();
-        let mut p = ParticleEmitterComponent::default();
-        crate::authoring::particles::set_max_particles(&mut p, 3_000_000);
-        assert_eq!(p.max_particles, 3_000_000);
-        assert!(logs::take().is_empty(), "a Cpu emitter keeps any cap");
-        set_simulation(&mut p, ParticleSimulation::Gpu);
-        assert_eq!(logs::take().len(), 1, "the switch warns of the cap");
-        assert_eq!(p.particle_cap(), GPU_MAX_PARTICLES, "and behaves as it");
-        crate::authoring::particles::set_max_particles(&mut p, u32::MAX);
-        assert_eq!(p.max_particles, GPU_MAX_PARTICLES);
-        assert_eq!(logs::take().len(), 1, "one warning per set");
-        crate::authoring::particles::set_max_particles(&mut p, 500_000);
-        assert!(logs::take().is_empty());
-    }
-
-    #[test]
-    fn a_change_of_space_forgets_a_gpu_emitters_particles_and_keeps_a_cpu_ones() {
-        use crate::authoring::particles::set_simulation_space;
-        use rusty_components::particle::EmitterFrame;
-        use rusty_components::SimulationSpace;
-        let mut cpu = ParticleEmitterComponent::default();
-        cpu.emit_at(EmitterFrame::IDENTITY, 5);
-        set_simulation_space(&mut cpu, SimulationSpace::Local);
-        assert_eq!(cpu.live_count(), 5);
-        let mut gpu = ParticleEmitterComponent::default();
-        set_simulation(&mut gpu, ParticleSimulation::Gpu);
-        gpu.emit_at(EmitterFrame::IDENTITY, 5);
-        let epoch = gpu.runtime.gpu.epoch();
-        set_simulation_space(&mut gpu, SimulationSpace::Local);
-        assert_eq!(gpu.live_count(), 0, "the old space's particles are gone");
-        assert_ne!(
-            gpu.runtime.gpu.epoch(),
-            epoch,
-            "and the renderer's buffer with them"
-        );
-        set_simulation_space(&mut gpu, SimulationSpace::Local);
-        gpu.emit_at(EmitterFrame::IDENTITY, 2);
-        set_simulation_space(&mut gpu, SimulationSpace::Local);
-        assert_eq!(gpu.live_count(), 2, "no change, nothing forgotten");
-    }
-}
+#[path = "simulation_tests.rs"]
+mod tests;

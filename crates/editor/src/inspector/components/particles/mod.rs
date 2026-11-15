@@ -48,7 +48,9 @@ fn apply(cx: &mut Cx<'_>, f: impl FnOnce(&mut ParticleEmitterComponent)) {
 }
 /// 3F-particles. Particle System component card.
 pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
-    let Some(p) = world.particles(id).map(|p| p.clone()) else {
+    // The configuration only: the live particles are never copied (a `Gpu`
+    // emitter keeps a birth per live particle).
+    let Some((p, live)) = world.particles(id).map(|p| (p.config(), p.live_count())) else {
         return;
     };
     let mut cx: Cx<'_> = (world, id);
@@ -64,7 +66,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: 
                 apply(&mut cx, |c| particle_ops::set_active(c, active));
                 changed = true;
             }
-            ui.label(format!("Live particles: {}", p.live_count()));
+            ui.label(format!("Live particles: {live}"));
             ui.separator();
             changed |= draw_emission(ui, &mut cx, &p);
             ui.separator();

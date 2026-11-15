@@ -8,9 +8,7 @@ use rusty_scene::rules::sanitize::non_negative;
 /// Set how the particles are drawn (billboard / stretched / flat / mesh).
 pub fn set_render_mode(p: &mut ParticleEmitterComponent, mode: ParticleRenderMode) {
     p.render.mode = mode;
-    if mode == ParticleRenderMode::Mesh {
-        super::simulation::warn_gpu(p);
-    }
+    super::Dishonoured::Mesh.warn(p);
 }
 
 /// Set the stretched-billboard length: `length_scale × size + speed_scale × speed`,

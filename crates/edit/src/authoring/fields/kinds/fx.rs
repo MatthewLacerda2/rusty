@@ -83,7 +83,7 @@ inspect! {
         }),
         op!("seed", fx::set_seed),
         with!("render", |p, v: ParticleRender| set_render(p, v)),
-    ];
+    ], draft fx::draft, fx::commit;
     AudioSourceComponent => audio, audio_mut, &[
         op!("clip", audio::set_clip),
         op!("volume", audio::set_volume),
