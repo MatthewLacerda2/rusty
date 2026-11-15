@@ -4,12 +4,11 @@
 //! ([`pyramid`](super::pyramid), #1736) and builds the rest. The trace (`fs_trace`)
 //! then marches each smooth enough pixel's ray and writes its hit into a target of
 //! its own, and into a second where it traced and, for a ray that found something,
-//! its hit's blur radius per unit cone, how much it counts and how bright it is
-//! (#2158, #2249); their pyramids are built; and the resolve (`fs_resolve`, #2028)
-//! averages each pixel's hits over a disk whose radius is the pixel's own cone
-//! times the radius field those pyramids smooth (the mean of the hits' radii around
-//! it, each weighed by `ssr.wgsl`'s `energy`, smooth among hits as across a hit
-//! and a miss), and draws them over the image, so a rough surface's reflected
+//! its hit's blur radius per unit cone and how much it counts (#2158); their pyramids
+//! are built; and the resolve (`fs_resolve`, #2028) averages each pixel's hits over
+//! a disk whose radius is the pixel's own cone times the radius field those
+//! pyramids smooth (the mean of the hits' radii around it, smooth among hits as
+//! across a hit and a miss), and draws them over the image, so a rough surface's reflected
 //! silhouette fades across its blur instead of stepping at a pixel's hit or miss.
 //! The translucents, the overlay cameras and every post effect see the reflected
 //! scene, HDRP's order.
@@ -31,7 +30,6 @@ use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::{PostFx, HDR_FORMAT};
 use crate::timing::{GpuPass, GpuTimer};
-use rusty_components::{Exposure, ExposureMode};
 use rusty_core::settings::quality::SsrQuality;
 
 /// CPU mirror of `SsrParams` in `postfx/ssr.wgsl`.
@@ -46,22 +44,12 @@ pub(crate) struct SsrParams {
     /// x: the *Minimum Smoothness* (#1736), y: the width it fades in over
     /// ([`super::fade`]).
     surface: [f32; 4],
-    /// x: the volume's fixed EV, y: `1` in Automatic, where the trace reads the
-    /// view's adapted EV (binding 6): the exposure the frame is shown at, which the
-    /// radius field judges a hit's brightness by (#2249).
-    exposure: [f32; 4],
 }
 
 impl SsrParams {
     /// The base camera's frame, marching as `m` ([`super::march`]) says, reflecting
-    /// surfaces down to `min_smoothness`, the frame shown at `exposure`.
-    pub(crate) fn new(
-        (view_proj, eye): (Mat4, Vec3),
-        m: SsrQuality,
-        min_smoothness: f32,
-        exposure: &Exposure,
-    ) -> Self {
-        let auto = exposure.mode == ExposureMode::Automatic;
+    /// surfaces down to `min_smoothness`.
+    pub(crate) fn new(view_proj: Mat4, eye: Vec3, m: SsrQuality, min_smoothness: f32) -> Self {
         Self {
             inv_view_proj: view_proj.inverse().to_cols_array(),
             view_proj: view_proj.to_cols_array(),
@@ -71,7 +59,6 @@ impl SsrParams {
                 let [min, width] = super::fade(min_smoothness);
                 [min, width, 0.0, 0.0]
             },
-            exposure: [exposure.fixed_ev, f32::from(u8::from(auto)), 0.0, 0.0],
         }
     }
 }
@@ -103,7 +90,6 @@ impl SsrPasses {
                 texture_entry(3, d2),
                 texture_entry(4, d2),
                 texture_entry(5, d2),
-                uniform_entry(6, wgpu::ShaderStages::FRAGMENT),
             ],
         });
         let traced = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -221,7 +207,6 @@ impl PostFx {
                 entry(3, view(velocity)),
                 entry(4, view(weight)),
                 entry(5, view(applied)),
-                entry(6, self.exposure.state().as_entire_binding()),
             ],
         });
         let traced = device.create_bind_group(&wgpu::BindGroupDescriptor {

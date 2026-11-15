@@ -9,6 +9,5 @@ mod packing;
 mod reach;
 mod reflect;
 mod rough;
-mod share;
 mod silhouette;
 mod transparent;

@@ -45,11 +45,7 @@ test(/(^|::)test_gpu::tests::gpu_adapter_present_when_required$/)
 | test(/(^|::)taa::gpu::shimmer::gpu_a_turning_glossy_bumpy_sphere_shimmers_less_under_taa_than_fxaa$/)
 | test(/(^|::)ssr::gpu::rough::jitter::gpu_a_still_rough_reflection_holds_under_taa_jitter$/)
 | test(/(^|::)ssr::gpu::rough::fading::gpu_a_lit_bands_fading_edge_draws_no_line$/)
-| test(/(^|::)ssr::gpu::rough::light::gpu_the_radius_field_is_the_same_in_a_dim_scene_as_in_a_bright_one$/)
-| test(/(^|::)ssr::gpu::rough::light::cross::gpu_a_lamp_crossing_the_frames_right_part_leaves_the_radius_field_alone$/)
-| test(/(^|::)ssr::gpu::rough::light::flash::gpu_a_one_frame_flash_moves_the_radius_field_no_more_than_the_exposure$/)
 | test(/(^|::)ssr::gpu::rough::contact::dark::gpu_a_dark_cubes_contact_reflection_stays_tight_before_a_glowing_wall$/)
-| test(/(^|::)ssr::gpu::share::gpu_the_spread_pyramid_keeps_a_lone_dark_hits_share_of_its_widest_window$/)
 """
 success-output = "final"
 
