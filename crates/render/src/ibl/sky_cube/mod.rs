@@ -98,8 +98,8 @@ fn bake_slot(current: usize, current_empty: bool) -> usize {
     }
 }
 
-/// The sky cubes, the bake pipeline and the sampler the forward pass reads them
-/// through.
+/// The sky cubes and the bake pipeline; the forward pass reads a cube through
+/// group 0's `gpu::linear_clamp` (trilinear, clamped: the roughness picks the mip).
 pub(crate) struct SkyReflection {
     filter: gpu::Filter,
     procedural: [Procedural; 2],
@@ -107,8 +107,6 @@ pub(crate) struct SkyReflection {
     current: usize,
     /// The panorama texture the panorama cube was baked from, and the cube.
     panorama: Option<(wgpu::Texture, gpu::Cube)>,
-    /// Trilinear, clamped: the roughness picks the mip.
-    pub sampler: wgpu::Sampler,
 }
 
 /// What [`SkyReflection::prepare`] did.
@@ -124,13 +122,6 @@ pub(crate) struct Prepared {
 
 impl SkyReflection {
     pub(crate) fn new(device: &wgpu::Device, registry: &mut ShaderRegistry) -> Self {
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("Sky Reflection Sampler"),
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::MipmapFilterMode::Linear,
-            ..Default::default()
-        });
         Self {
             filter: gpu::Filter::new(device, registry),
             procedural: std::array::from_fn(|_| Procedural {
@@ -139,7 +130,6 @@ impl SkyReflection {
             }),
             current: 0,
             panorama: None,
-            sampler,
         }
     }
 

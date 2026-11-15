@@ -9,7 +9,7 @@
 
 #define_import_path forward::transparent
 
-#import forward::bindings::{camera, material, s_fog_volume, s_opaque, t_fog_volume, t_opaque}
+#import forward::bindings::{camera, material, s_linear_clamp, s_opaque, t_fog_volume, t_opaque}
 #import common::{PI, fog_factor}
 #import fog::volumetric::volumetric_fog
 #import lighting::ssr_march
@@ -19,7 +19,7 @@
 // The volumetric fog between the eye and `world` (#1703): rgb the light it adds,
 // a what gets through. No fetch where the camera reads no volume.
 fn volumetric(world: vec3<f32>) -> vec4<f32> {
-    return volumetric_fog(t_fog_volume, s_fog_volume, camera.volumetric, camera.view_proj, camera.clusters.view_z, world);
+    return volumetric_fog(t_fog_volume, s_linear_clamp, camera.volumetric, camera.view_proj, camera.clusters.view_z, world);
 }
 
 // `lit` behind both fogs: the distance and height fog, then the volumetric fog
