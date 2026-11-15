@@ -3,7 +3,7 @@
 //! base colour); a material with a real reason to break one is excused in
 //! [`EXCUSED`], by name, with that reason, never by loosening a threshold for all.
 
-use serde_json::json;
+use serde_json::{json, Value};
 
 use super::maps::{maps_fail, seam};
 use super::{bake, doc, OUTPUTS};
@@ -20,20 +20,16 @@ fn excused(path: &str, rule: &str) -> bool {
     EXCUSED.iter().any(|(m, r, _)| *m == stem && *r == rule)
 }
 
-/// Every way `path` misses the bar, each line naming it and the rule.
-pub fn material(path: &str) -> Vec<String> {
-    let mut found: Vec<(&str, String)> = Vec::new();
-    let mut fail = |rule: &'static str, what: String| found.push((rule, what));
-    let d = doc(path);
+/// The outputs `d` declares to bake, and every way its interface is wrong.
+fn interface(d: &Value) -> (Vec<&'static str>, Vec<(&'static str, String)>) {
+    let mut found = Vec::new();
     let wear = &d["params"]["wear"];
     if *wear != json!({ "type": "number", "default": 0.3, "min": 0, "max": 1 }) {
-        fail(
-            "interface",
-            format!("`wear` must be a number 0–1, default 0.3: {wear}"),
-        );
+        let what = format!("`wear` must be a number 0–1, default 0.3: {wear}");
+        found.push(("interface", what));
     }
     if !d["params"]["tint"].is_null() && d["params"]["tint"]["type"] != "color" {
-        fail("interface", "`tint` must be a color".into());
+        found.push(("interface", "`tint` must be a color".into()));
     }
     let mut names: Vec<&str> = OUTPUTS.to_vec();
     if d["outputs"].get("metallic").is_some() {
@@ -41,14 +37,19 @@ pub fn material(path: &str) -> Vec<String> {
     }
     for name in &names {
         if d["outputs"].get(name).is_none() {
-            fail("interface", format!("no `{name}` output"));
+            found.push(("interface", format!("no `{name}` output")));
         }
     }
-    if d["outputs"].get("base_color").is_none()
-        || names.iter().any(|n| d["outputs"].get(n).is_none())
-    {
+    (names, found)
+}
+
+/// Every way `path` misses the bar, each line naming it and the rule.
+pub fn material(path: &str) -> Vec<String> {
+    let (names, mut found) = interface(&doc(path));
+    if !found.is_empty() {
         return report(path, found);
     }
+    let mut fail = |rule: &'static str, what: String| found.push((rule, what));
     let set = |wear: f32, seed: u64| bake(path, json!({ "wear": wear }), seed, &names);
     let typical = set(0.3, 0);
     if typical != set(0.3, 0) {
