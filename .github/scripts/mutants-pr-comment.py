@@ -19,6 +19,10 @@ says a signal only earns its keep where the agent acts on it.
   #1934). The queue asks for a merged pull request's run on `main`, after the
   merge, so the branch lookup has nothing to find; the run carries the number
   as an input and the report goes there.
+- **A run with no answer never hides an earlier one's** (`--append`, #2201).
+  The no-answer line of a failed re-ask is added below the comment's report
+  ([`appended`]) instead of replacing it, so a survivors list is not lost to
+  a run that measured nothing; with no earlier comment it is posted alone.
 - **No such pull request, no comment.** A by-hand run on `main` or a scratch
   branch has nowhere to post, and that is not an error.
 - **Never longer than GitHub takes.** A comment holds [`LIMIT`] characters; a
@@ -61,12 +65,20 @@ def body(report: str, run_url: str, limit: int = LIMIT) -> str:
     return head + kept + cut + foot
 
 
-def ours(comments: list[dict]) -> int | None:
-    """The id of the comment an earlier run posted, or `None` if there is none."""
+def mine(comments: list[dict]) -> dict | None:
+    """The comment an earlier run posted, or `None` if there is none."""
     for comment in comments:
         if comment.get("user") == BOT and comment.get("body", "").startswith(MARKER):
-            return comment["id"]
+            return comment
     return None
+
+
+def appended(old: str, report: str, run_url: str, limit: int = LIMIT) -> str:
+    """The earlier comment with `report` added below it: the earlier report and
+    the run it came from stay first, and a cut, when one is needed, falls at
+    the end, on the newest addition."""
+    earlier = old[len(MARKER):].strip("\n")
+    return body(f"{earlier}\n\n{report.strip()}", run_url, limit)
 
 
 def target(prs: list[dict]) -> int | None:
@@ -93,6 +105,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--repo", required=True, help="owner/name")
     parser.add_argument("--branch", required=True, help="the dispatched ref's branch name")
     parser.add_argument("--run-url", required=True)
+    parser.add_argument("--append", action="store_true",
+                        help="add the report below an earlier one rather than replace it (a run with no answer)")
     parser.add_argument("--pr", type=int, help="post on this pull request, not the branch's (the queue's runs on `main`, #1934)")
     args = parser.parse_args(argv)
 
@@ -105,14 +119,17 @@ def main(argv: list[str]) -> int:
         return 0
     lines = gh("api", "--paginate", f"repos/{args.repo}/issues/{number}/comments",
                "--jq", ".[] | {id: .id, user: .user.login, body: .body}")
-    existing = ours([json.loads(line) for line in lines.splitlines() if line.strip()])
-    payload = json.dumps({"body": body(args.report.read_text(), args.run_url)})
+    existing = mine([json.loads(line) for line in lines.splitlines() if line.strip()])
+    report = args.report.read_text()
+    text = appended(existing["body"], report, args.run_url) if existing and args.append \
+        else body(report, args.run_url)
+    payload = json.dumps({"body": text})
     if existing is None:
         gh("api", "-X", "POST", f"repos/{args.repo}/issues/{number}/comments",
            "--input", "-", stdin=payload)
         print(f"mutants-pr-comment: posted the report on #{number}")
     else:
-        gh("api", "-X", "PATCH", f"repos/{args.repo}/issues/comments/{existing}",
+        gh("api", "-X", "PATCH", f"repos/{args.repo}/issues/comments/{existing['id']}",
            "--input", "-", stdin=payload)
         print(f"mutants-pr-comment: updated the report on #{number}")
     return 0

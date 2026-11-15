@@ -3,8 +3,8 @@
 
 A run stopped at its budget says how much it never reached and is never clean; a timed-out
 mutant is unmeasured, never "no survivors", and a run where most time out says
-it is not a result; a broken run writes no report at all; survivors come with
-their diffs.
+it is not a result; a broken run is red and its report says it has no answer;
+survivors come with their diffs.
 """
 
 from __future__ import annotations
@@ -41,52 +41,64 @@ RUN = {"outcomes": [
 ]}
 
 
+def render(scope: str, run: dict, in_scope: int, status: int) -> str:
+    """The report `report.report` writes for a run with one part, the engine's,
+    from the files the workflow leaves beside the plan."""
+    with tempfile.TemporaryDirectory() as here:
+        out = Path(here, "mutants-root/mutants.out")
+        out.mkdir(parents=True)
+        (out / "outcomes.json").write_text(json.dumps(run))
+        Path(here, "status-root").write_text(f"{status}\n")
+        plan = {"parts": [{"root": ".", "slug": "root", "planned": in_scope}]}
+        return report.report(plan, scope, Path(here))[0]
+
+
 class Render(unittest.TestCase):
     def test_counts_mutants_not_the_baseline(self) -> None:
-        text = report.render("Scoped.", RUN, 4, 2)
+        text = render("Scoped.", RUN, 4, 2)
         self.assertIn("| 1 | 2 | 0 | 1 |", text)
 
     def test_survivors_are_a_sorted_worklist(self) -> None:
-        text = report.render("Scoped.", RUN, 4, 2)
+        text = render("Scoped.", RUN, 4, 2)
         self.assertLess(text.index("a.rs:1:5"), text.index("a.rs:9:5"))
         self.assertNotIn("replace f -> u32", text, "a caught mutant is not a survivor")
 
     def test_a_run_stopped_at_its_budget_names_the_gap(self) -> None:
-        text = report.render("Scoped.", RUN, 10, 124)
+        text = render("Scoped.", RUN, 10, 124)
         self.assertIn("4 of 10 planned mutants measured, 6 never reached", text)
 
     def test_a_stopped_run_of_caught_mutants_is_not_clean(self) -> None:
         run = {"outcomes": RUN["outcomes"][:2]}
-        text = report.render("Scoped.", run, 40, 124)
+        text = render("Scoped.", run, 40, 124)
         self.assertIn("1 of 40 planned mutants measured", text)
         self.assertIn("that is not a clean run", text)
         self.assertNotIn("✅", text)
 
     def test_a_stop_before_any_mutant_is_not_nothing_in_scope(self) -> None:
-        text = report.render("Scoped.", {}, 40, 124)
+        text = render("Scoped.", {}, 40, 124)
         self.assertIn("Nothing was measured before the budget ran out", text)
         self.assertNotIn("Nothing in scope", text)
 
     def test_nothing_mutated_is_not_called_clean(self) -> None:
-        text = report.render("Scoped.", {}, 0, 0)
+        text = report.report({"parts": []}, "Scoped.", Path("."))[0]
         self.assertIn("Nothing in scope was mutated", text)
         self.assertNotIn("No survivors", text)
 
     def test_a_caught_only_run_is_clean(self) -> None:
         run = {"outcomes": RUN["outcomes"][:2]}
-        self.assertIn("No survivors. ✅", report.render("Scoped.", run, 1, 0))
+        self.assertIn("No survivors. ✅", render("Scoped.", run, 1, 0))
 
     def test_an_all_timeout_run_is_not_a_result(self) -> None:
         run = {"outcomes": [outcome("Timeout", f"a.rs:{n}:1: replace x") for n in range(3)]
                + RUN["outcomes"][4:]}
-        text = report.render("Scoped.", run, 4, 3)
+        text = render("Scoped.", run, 4, 3)
         self.assertIn("3 of 3 viable mutants timed out", text)
         self.assertIn("not a result", text)
         self.assertNotIn("✅", text)
 
     def test_one_timeout_among_caught_is_named_unmeasured(self) -> None:
         run = {"outcomes": RUN["outcomes"][:2] * 2 + [outcome("Timeout", "a.rs:7:1: replace y")]}
-        text = report.render("Scoped.", run, 3, 3)
+        text = render("Scoped.", run, 3, 3)
         self.assertIn("1 of 3 viable mutants timed out: unmeasured", text)
         self.assertNotIn("not a result", text)
         self.assertNotIn("✅", text)
@@ -97,16 +109,19 @@ class Files(unittest.TestCase):
         self.dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.dir.cleanup)
         self.root = Path(self.dir.name)
-        (self.root / "mutants.out/diff").mkdir(parents=True)
-        (self.root / "mutants.out/diff/g.diff").write_text("-    x\n+    true\n")
-        (self.root / "mutants.out/outcomes.json").write_text(json.dumps(RUN))
+        out = self.root / "mutants-root/mutants.out"
+        (out / "diff").mkdir(parents=True)
+        (out / "diff/g.diff").write_text("-    x\n+    true\n")
+        (out / "outcomes.json").write_text(json.dumps(RUN))
         (self.root / "scope.txt").write_text("Scoped on request.\n")
+        plan = {"parts": [{"root": ".", "slug": "root", "planned": 4}]}
+        (self.root / "plan.json").write_text(json.dumps(plan))
 
     def cli(self, status: int) -> subprocess.CompletedProcess:
+        (self.root / "status-root").write_text(f"{status}\n")
         return subprocess.run(
-            [sys.executable, str(SCRIPT), str(self.root / "mutants.out"),
-             str(self.root / "scope.txt"), "--in-scope", "4", "--exit", str(status),
-             "--out", str(self.root / "report")],
+            [sys.executable, str(SCRIPT), str(self.root / "plan.json"),
+             str(self.root / "scope.txt"), "--out", str(self.root / "report")],
             capture_output=True, text=True, check=False)
 
     def test_each_survivor_has_its_diff_or_says_it_has_none(self) -> None:
@@ -115,11 +130,13 @@ class Files(unittest.TestCase):
         self.assertIn("+    true", diffs)
         self.assertIn("kept no diff", diffs)
 
-    def test_a_broken_run_writes_no_report(self) -> None:
+    def test_a_broken_run_is_red_and_its_report_says_so(self) -> None:
         done = self.cli(1)
         self.assertNotEqual(done.returncode, 0)
         self.assertIn("not a result", done.stderr)
-        self.assertFalse((self.root / "report/report.md").exists())
+        text = (self.root / "report/report.md").read_text()
+        self.assertIn("No answer for this part", text)
+        self.assertNotIn("No survivors", text)
 
 
 if __name__ == "__main__":
