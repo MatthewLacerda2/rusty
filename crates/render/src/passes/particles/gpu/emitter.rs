@@ -133,27 +133,8 @@ impl EmitterBuffers {
             self.baked = lut;
         }
         let (births, oldest) = self.new_births(sim);
-        // Moved from the older of the last step reached and the oldest new birth's.
         let goal = sim.steps();
-        let done = self.done.map(|(step, _)| step);
-        let from = match (oldest, done) {
-            (Some(b), Some(d)) => b.min(d),
-            (b, d) => b.or(d).unwrap_or(goal),
-        };
-        let start = (from + 1).max((goal + 1).saturating_sub(DT_HISTORY as u64));
-        let dts: Vec<f32> = (start..=goal).filter_map(|s| sim.dt_of(s)).collect();
-        let first = goal + 1 - dts.len() as u64;
-        // What the steps before the window took, from where each particle starts:
-        // the sim's running time, so a jump ages by the time that really passed
-        // (a pause at time scale 0 included), not by a window `dt` times the count.
-        let window_starts = sim.time_at(first - 1).unwrap_or_else(|| sim.time());
-        let jumped = |step: u64, time: f64| {
-            if step + 1 < first {
-                (window_starts - time) as f32
-            } else {
-                0.0
-            }
-        };
+        let (dts, first, jumped) = self.window(sim, oldest);
         let births: Vec<GpuBirth> = births
             .into_iter()
             .map(|(b, born)| GpuBirth {
@@ -182,6 +163,37 @@ impl EmitterBuffers {
             step: (!dts.is_empty() && extent > 0).then_some(extent),
             encoded,
         }
+    }
+
+    /// The steps to replay one by one, from the older of the last step reached
+    /// and `oldest` (the oldest new birth's) and at most [`DT_HISTORY`] of them:
+    /// their `dt`s, the first one's number, and what the steps before them took
+    /// for a particle that starts after step `step` at running time `time`. That
+    /// is the sim's running time, so a jump ages by the time that really passed
+    /// (a pause at time scale 0 included), not by a window `dt` times the count.
+    fn window(
+        &self,
+        sim: &GpuSim,
+        oldest: Option<u64>,
+    ) -> (Vec<f32>, u64, impl Fn(u64, f64) -> f32) {
+        let goal = sim.steps();
+        let done = self.done.map(|(step, _)| step);
+        let from = match (oldest, done) {
+            (Some(b), Some(d)) => b.min(d),
+            (b, d) => b.or(d).unwrap_or(goal),
+        };
+        let start = (from + 1).max((goal + 1).saturating_sub(DT_HISTORY as u64));
+        let dts: Vec<f32> = (start..=goal).filter_map(|s| sim.dt_of(s)).collect();
+        let first = goal + 1 - dts.len() as u64;
+        let window_starts = sim.time_at(first - 1).unwrap_or_else(|| sim.time());
+        let jumped = move |step: u64, time: f64| {
+            if step + 1 < first {
+                (window_starts - time) as f32
+            } else {
+                0.0
+            }
+        };
+        (dts, first, jumped)
     }
 
     /// The births since the last upload, one per slot (a slot reused within the

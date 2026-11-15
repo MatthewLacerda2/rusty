@@ -7,7 +7,7 @@ use rusty::components::particle::{ParticleSimulation, SimulationSpace};
 use rusty::core::curve::Range;
 use rusty::dev::capture::CaptureHost;
 
-use super::{agreement, centroid, emit, emitter, place, red, world};
+use super::{agreement, centroid, count, emit, emitter, place, red, world};
 
 #[test]
 fn a_local_gpu_emitter_carries_its_particles_and_a_world_one_leaves_them() {
@@ -103,9 +103,6 @@ fn a_local_gpu_emitter_scaling_through_0_while_emitting_matches_its_cpu_twin() {
                 .scale = Vec3::splat(scale);
             crate::play::run(game, 30);
         }
-        let count = |g: &rusty::app::GameWorld, id| {
-            g.scene().borrow().world.particles(id).unwrap().live_count()
-        };
         assert_eq!(count(&gpu, gpu_id), count(&cpu, cpu_id), "frame {frame}");
         let (Some(a), Some(b)) = (
             red(

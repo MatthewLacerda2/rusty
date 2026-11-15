@@ -5,21 +5,11 @@
 //! alive past the sim's tally.
 
 use glam::Vec3;
-use rusty::app::GameWorld;
 use rusty::components::particle::{EmitMode, EmitShape, ParticleSimulation};
 use rusty::core::curve::Range;
 use rusty::dev::capture::CaptureHost;
 
-use super::{agreement, emitter, red, world};
-
-fn count(game: &GameWorld, id: u32) -> usize {
-    game.scene()
-        .borrow()
-        .world
-        .particles(id)
-        .unwrap()
-        .live_count()
-}
+use super::{agreement, count, emitter, red, world};
 
 #[test]
 fn a_jump_over_a_pause_ages_by_the_time_that_passed() {

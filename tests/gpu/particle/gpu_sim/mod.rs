@@ -62,6 +62,16 @@ pub fn emit(game: &GameWorld, id: u32, count: u32) -> u32 {
     spawned.unwrap_or(0)
 }
 
+/// `id`'s live particle count.
+pub fn count(game: &GameWorld, id: u32) -> usize {
+    game.scene()
+        .borrow()
+        .world
+        .particles(id)
+        .unwrap()
+        .live_count()
+}
+
 /// Move `id` to `at`.
 pub fn place(game: &GameWorld, id: u32, at: Vec3) {
     game.scene()
