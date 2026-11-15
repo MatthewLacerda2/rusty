@@ -114,3 +114,53 @@ pub(crate) fn occlusion_strength(strength: f32) -> f32 {
         false => strength.clamp(0.0, 1.0),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_new_maps_are_masks_counting_down_from_the_detail_binding() {
+        let m = MaterialAsset {
+            occlusion_map: Some("orm.png".into()),
+            specular_map: Some("level.png".into()),
+            ..MaterialAsset::default()
+        };
+        let paths = material_texture_paths(Some(&m));
+        assert_eq!(paths[6], m.occlusion_map);
+        assert_eq!(paths[7], m.specular_map);
+        assert_eq!((MAP_BINDINGS[6], MAP_BINDINGS[7]), (14, 13));
+        assert!(matches!(map_kind(6), TextureKind::Mask));
+        assert!(matches!(map_kind(7), TextureKind::Mask));
+        assert!(!is_colour_map(6) && !is_colour_map(7), "data, sampled raw");
+    }
+
+    #[test]
+    fn the_level_maps_flag_what_is_named_and_hold_the_strength_in_range() {
+        let off = level_maps_uniform(None);
+        assert_eq!((off.use_occlusion_map, off.occlusion_strength), (0, 1.0));
+        let m = MaterialAsset {
+            occlusion_map: Some("ao.png".into()),
+            occlusion_strength: 0.25,
+            ..MaterialAsset::default()
+        };
+        let on = level_maps_uniform(Some(&m));
+        assert_eq!(
+            (
+                on.use_occlusion_map,
+                on.occlusion_strength,
+                on.use_specular_map
+            ),
+            (1, 0.25, 0)
+        );
+        assert_eq!(
+            occlusion_strength(f32::NAN),
+            1.0,
+            "a NaN applies the map whole"
+        );
+        assert_eq!(
+            (occlusion_strength(-2.0), occlusion_strength(9.0)),
+            (0.0, 1.0)
+        );
+    }
+}
