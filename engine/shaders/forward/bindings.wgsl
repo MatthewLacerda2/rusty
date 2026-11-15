@@ -171,16 +171,12 @@ var<uniform> lighting: LightingUniforms;
 // into a roughness mip chain like a probe's cube.
 @group(0) @binding(2)
 var t_skybox: texture_cube<f32>;
-@group(0) @binding(3)
-var s_skybox: sampler;
 
 // The resident reflection probes' prefiltered cubemaps (#245), one per layer (#1206),
 // sampled with `textureSampleLevel` (roughness -> mip) at the layer a draw's
 // `reflection_probe` names. What its probes leave samples the sky's cube instead.
 @group(0) @binding(4)
 var t_refl_cube: texture_cube_array<f32>;
-@group(0) @binding(5)
-var s_refl_cube: sampler;
 
 // Clustered lights (#434): the frame's point/spot lights, each cluster's
 // (offset, count) into `cluster_lights`, and that flat list of light indices.
@@ -210,8 +206,6 @@ var s_decal: sampler;
 // page through its scale/offset; a 1x1 black page when none are baked.
 @group(0) @binding(14)
 var t_lightmaps: texture_2d_array<f32>;
-@group(0) @binding(15)
-var s_lightmaps: sampler;
 // Their direction pages (#810), same layers and UVs: RGB the dominant incoming
 // direction scaled by its directionality, A its lamp share (#1695;
 // `decode_lightmap_direction`); a 1x1 zero page, never read, when not baked.
@@ -222,8 +216,14 @@ var t_lightmap_dirs: texture_2d_array<f32>;
 // while no camera runs it, read only where `camera.volumetric.x` says so.
 @group(0) @binding(17)
 var t_fog_volume: texture_3d<f32>;
+// The one sampler the sky and probe cubes, the lightmap pages with their direction
+// pages, the shadowmask pages (binding 19) and the fog volume read through
+// (`render::gpu::linear_clamp`): linear min, mag and mip filters, clamp-to-edge on
+// all three axes. Never give one of them a sampler of its own; it keeps the
+// fragment stage inside Metal's 16 samplers. The decal atlas keeps its own (13).
+// Bindings 3, 5 and 15 are free.
 @group(0) @binding(18)
-var s_fog_volume: sampler;
+var s_linear_clamp: sampler;
 // The shadowmask pages of a `Shadowmask` bake (#1695), same layers and UVs: per
 // channel the static occlusion of the `Mixed` light on it (1 lit); a 1x1 page,
 // never read, unless `lighting.masks_bound`.

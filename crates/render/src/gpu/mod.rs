@@ -17,6 +17,27 @@ pub(crate) fn bind_entry(
     wgpu::BindGroupEntry { binding, resource }
 }
 
+/// Group 0's one sampler for the engine-owned textures (binding 18): the sky's
+/// reflection cube, the reflection probes' cube array, the lightmap pages with their
+/// direction and shadowmask pages, and the volumetric fog volume. Linear min, mag
+/// and mip filters, clamp-to-edge on all three axes, wgpu's default LOD range, no
+/// anisotropy and no comparison: what each of them used to make for itself (the
+/// fog's nearest mip filter aside, which its one-level volume read at LOD 0 never
+/// meets). One sampler for all keeps the forward fragment stage under Metal's 16
+/// (`setup::limits`).
+pub(crate) fn linear_clamp(device: &wgpu::Device) -> wgpu::Sampler {
+    device.create_sampler(&wgpu::SamplerDescriptor {
+        label: Some("Linear Clamp Sampler"),
+        address_mode_u: wgpu::AddressMode::ClampToEdge,
+        address_mode_v: wgpu::AddressMode::ClampToEdge,
+        address_mode_w: wgpu::AddressMode::ClampToEdge,
+        mag_filter: wgpu::FilterMode::Linear,
+        min_filter: wgpu::FilterMode::Linear,
+        mipmap_filter: wgpu::MipmapFilterMode::Linear,
+        ..Default::default()
+    })
+}
+
 pub(crate) mod bind_layouts;
 pub(crate) mod draw_buffers;
 pub(crate) mod fullscreen;
