@@ -63,7 +63,7 @@ fn cases_for(flag: &str) -> Option<Vec<Case>> {
 #[test]
 fn every_gate_reports_its_must_flag_cases_through_its_row() {
     let mut broken = Vec::new();
-    for (flag, check) in GATES {
+    for (check, flag) in GATES {
         let Some(cases) = cases_for(flag) else {
             broken.push(format!(
                 "gate `{flag}` has no must-flag case in `cases_for`"
@@ -91,7 +91,7 @@ fn every_gate_reports_its_must_flag_cases_through_its_row() {
 
 #[test]
 fn a_flag_selects_its_row_and_no_flag_the_size_gate() {
-    for (flag, check) in GATES {
+    for (check, flag) in GATES {
         let args = [flag.to_string()];
         let args: &[String] = if flag.is_empty() { &[] } else { &args };
         assert_eq!(

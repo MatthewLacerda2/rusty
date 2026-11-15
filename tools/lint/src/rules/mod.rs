@@ -1,7 +1,8 @@
 //! The rules gate (#934): every check that reports a [`Finding`] and honours the
 //! shared inline allow (`finding.rs`). A new rule is a module with its own
-//! `<rule>_tests.rs`, plus one line in the sorted `mod` list and one row in the
-//! sorted [`RULES`] (#911): not a new flag, gate or baseline.
+//! `<rule>_tests.rs`, plus one line in the sorted `mod` list, one row in the
+//! sorted [`RULES`] (#911) and its must-flag case in `wiring.rs`: not a new flag,
+//! gate or baseline.
 //!
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --rules`
 //! Exit code 1 on any finding; report mirrored to `.lint/report.txt` (`gates.rs`).

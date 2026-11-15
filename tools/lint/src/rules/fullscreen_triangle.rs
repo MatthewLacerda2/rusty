@@ -7,7 +7,7 @@
 //! finding; the fix is `fullscreen::triangle` / `fullscreen::uv`. A shader that must
 //! stand alone says why with `// lint: allow(fullscreen-triangle) <why>`.
 //!
-//! The rule reads `engine/**/*.wgsl` itself: `Scan` holds only Rust, so `rules::run`
+//! The rule reads `engine/**/*.wgsl` itself (`Scan::shaders`): `Scan` holds only Rust, so `rules::verdict`
 //! cannot see a shader's allow. The rule applies the allow (and reports one with no
 //! reason) on its own files, via [`finding::allowed`] / [`finding::unexplained`].
 //! Shaders written

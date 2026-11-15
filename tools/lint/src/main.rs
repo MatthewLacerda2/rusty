@@ -5,7 +5,8 @@
 //! nothing is grandfathered (#926); it holds the agent docs to their shape too
 //! (`agent_docs`). Function-length and code-smell checks are clippy's job
 //! (see clippy.toml); without a flag this binary enforces the per-file / per-test-file
-//! size rules, and the flags below run the other gates. Dependency-free, std-only.
+//! size rules, and each flag of `gates::GATES` runs another gate. Dependency-free,
+//! std-only.
 //!
 //! Usage:
 //!   cargo run --manifest-path tools/lint/Cargo.toml                  # scan every size root

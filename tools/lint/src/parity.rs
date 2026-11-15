@@ -8,7 +8,7 @@
 //! direct field mutation fails the build.
 //!
 //! Components are DISCOVERED the same way the completeness gate does — from the
-//! registry's `first_class!` rows (`components::discover`) — so this is the same
+//! registry's `first_class!` rows (`components::discover_in`) — so this is the same
 //! non-fragile enumeration, not a fresh attempt to auto-find arbitrary editor
 //! capabilities. For each discovered component that has an inspector card, the card is
 //! classified:

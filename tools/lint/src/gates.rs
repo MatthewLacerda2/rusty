@@ -50,17 +50,17 @@ impl Verdict {
 /// arguments (the size gate takes the commit hook's explicit files).
 pub type Check = fn(&Path, &[String]) -> Verdict;
 
-/// Every gate, by the flag that selects it; `""` is the default, the size gate.
+/// Every gate, with the flag that selects it; `""` is the default, the size gate.
 /// A new gate is one row here and a must-flag case in `gates_tests.rs`, whose
 /// test fails naming any row without one.
-pub const GATES: &[(&str, Check)] = &[
+pub const GATES: &[(Check, &str)] = &[
     // sorted: gates are independent; `main` runs the one its flag names
-    ("", crate::size::verdict),
-    ("--components", crate::components::verdict),
-    ("--determinism", crate::determinism::verdict),
-    ("--layers", crate::layers::verdict),
-    ("--parity", crate::parity::verdict),
-    ("--rules", crate::rules::verdict),
+    (crate::components::verdict, "--components"),
+    (crate::determinism::verdict, "--determinism"),
+    (crate::layers::verdict, "--layers"),
+    (crate::parity::verdict, "--parity"),
+    (crate::rules::verdict, "--rules"),
+    (crate::size::verdict, ""),
 ];
 
 /// The gate `args` selects: the first row whose flag is among them, else the size
@@ -68,9 +68,9 @@ pub const GATES: &[(&str, Check)] = &[
 pub fn select(args: &[String]) -> Check {
     GATES
         .iter()
-        .find(|(flag, _)| !flag.is_empty() && args.iter().any(|a| a == flag))
-        .or_else(|| GATES.iter().find(|(flag, _)| flag.is_empty()))
-        .map_or(crate::size::verdict, |(_, check)| *check)
+        .find(|(_, flag)| !flag.is_empty() && args.iter().any(|a| a == flag))
+        .or_else(|| GATES.iter().find(|(_, flag)| flag.is_empty()))
+        .map_or(crate::size::verdict, |(check, _)| *check)
 }
 
 /// Print `verdict` as every gate does, mirror it to `.lint/report.txt`, and exit 1

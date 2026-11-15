@@ -15,6 +15,17 @@ file is what a coder changing the tool must keep.
   gate scans it too (`tools/` is a scan root).
 - **A standalone crate** with its own `[workspace]`: never fold it into the engine.
 
+## Gates are rows
+- **Every gate `main` dispatches is a row of `gates::GATES`**: a pure
+  `verdict(base, args)` over the repository at `base`, which returns what it found and
+  its report and never prints or exits; `gates::report` does both for all of them. A
+  new gate is a row and its must-flag cases in `gates_tests.rs`, one per pass it
+  runs; `make test-lint` fails naming a row without one. `--dead-pub` is a signal,
+  not a row: it builds the workspace and fails only when it cannot.
+- **A scanner you write or touch advances by what it consumes** (a shrinking slice,
+  an iterator's `next`), not an index a step may forget to move, so it ends on any
+  input, and a mutated increment fails a test instead of timing out.
+
 ## Writing a rule
 - **Every rule has a must-flag and a must-pass test**: a case it has to report and a
   case it has to leave alone, in its tests.
@@ -27,10 +38,13 @@ file is what a coder changing the tool must keep.
   `tools/lint/src/components/waivers.rs`.
 - **A new rule is a module, not a flag.** It goes in `tools/lint/src/rules/<rule>.rs`
   with `pub fn run(&Scan) -> Vec<Finding>`, mounts its own `<rule>_tests.rs` with
-  `#[path]`, and takes one line in `rules/mod.rs`'s sorted `mod` list and one row in
-  the sorted `RULES` table, so parallel rule branches touch different lines:
-  no new flag, gate, CI step or baseline. Its row says `Allow::Inline` when an inline
-  allow may excuse it, `Allow::Never` when nothing may: `ignored` (its fix is the
+  `#[path]`, and takes one line in `rules/mod.rs`'s sorted `mod` list, one row in
+  the sorted `RULES` table, by the name its findings carry, and one must-flag case in
+  `rules/wiring.rs`, so parallel rule branches touch different lines: no new flag,
+  gate, CI step or baseline. A rule reads only through its `Scan`: what lies past the
+  scanned `.rs` files (a manifest, a shader, git) it reads under `Scan::base`, never
+  the working directory, so the wiring test can run it over a scratch repository.
+  Its row says `Allow::Inline` when an inline allow may excuse it, `Allow::Never` when nothing may: `ignored` (its fix is the
   `.gitignore` pattern), `orphan-seeds` (its fix is moving the file) and `key-guard`
   (its finding sits on a manifest, where no inline allow can go). `Allow::Own` is for
   a rule that reads its own allows, so the shared filter is skipped: `api-parity`, whose allow sits on the op
