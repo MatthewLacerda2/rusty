@@ -24,9 +24,13 @@ scene never saved. Only the editor window steps the job, so a host without one (
 headless `session` and `session-mcp` without `--attach`, the player, `play`) refuses
 it with an error naming `Lighting.Generate()`, which bakes in the one call there.
 The call only asks: the editor's next frame starts the job, within a frame of the
-call. The job runs whether or not the window draws, so a bake started from an agent
-runs to its end with the screen locked or the window minimised or covered (the
-editor still runs its frames there, only without painting). The request belongs to
+call. The job runs whether or not the window draws: with the screen locked or the
+window minimised or covered, the editor still runs its frames, only without
+painting, and steps the job on them, so a bake started from an agent runs to its
+end. On macOS such a frame is skipped at once. On Linux it can wait up to a second
+for the window before it is skipped, so the bake's probe stage runs slower there;
+that the frames go on at all on a hidden Linux window rests on the GPU driver not
+blocking, which has not been tried yet. The request belongs to
 the scene it was made in, so `Scene.New()` / File ▸ New or a load before that frame
 drops it and the status reads `refused` with why; it never bakes a scene you didn't ask about. It has no cancel; the card's Cancel button
 stops the lightmap step.
