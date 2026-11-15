@@ -5,5 +5,6 @@
 // `math` is the `arithmetic` file: a module may not share its parent's name.
 pub mod arithmetic;
 pub mod clamp;
+pub mod expression;
 pub mod map_range;
 pub mod rgb_to_bw;

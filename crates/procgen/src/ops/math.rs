@@ -33,8 +33,9 @@ pub fn math(mut img: Image, rhs: Option<&Image>, op: MathOp, value: f32) -> Imag
 }
 
 /// `c op v` for one channel. Division by zero gives 0, a negative base to `power` or
-/// `sqrt` reads as 0.
-fn apply(op: MathOp, c: f32, v: f32) -> f32 {
+/// `sqrt` reads as 0. The `expression` op calls it for the functions the two share,
+/// so a formula bakes what the equivalent `math` chain does.
+pub(crate) fn apply(op: MathOp, c: f32, v: f32) -> f32 {
     match op {
         MathOp::Add => c + v,
         MathOp::Subtract => c - v,
@@ -75,16 +76,20 @@ pub fn map_range(mut img: Image, from_min: f32, from_max: f32, to_min: f32, to_m
 
 /// Clamp each RGB channel into `[min, max]`; alpha untouched.
 pub fn clamp(mut img: Image, min: f32, max: f32) -> Image {
-    let (lo, hi) = if min <= max { (min, max) } else { (max, min) };
-    img.map_in_place(|p| {
-        [
-            p[0].clamp(lo, hi),
-            p[1].clamp(lo, hi),
-            p[2].clamp(lo, hi),
-            p[3],
-        ]
-    });
+    let f = |c| clamp_value(c, min, max);
+    img.map_in_place(|p| [f(p[0]), f(p[1]), f(p[2]), p[3]]);
     img
+}
+
+/// `c` clamped into `[min, max]`, the bounds swapped when `min > max`. A NaN `c`
+/// stays NaN, as [`f32::clamp`]'s; a NaN bound is ignored rather than panicking (an
+/// `expression` can compute one). Shared with the `expression` op's `clamp`.
+pub(crate) fn clamp_value(c: f32, min: f32, max: f32) -> f32 {
+    let (lo, hi) = if min <= max { (min, max) } else { (max, min) };
+    if c.is_nan() {
+        return c;
+    }
+    c.max(lo).min(hi)
 }
 
 /// Collapse RGB to Rec. 709 luminance, written to all three channels (so the result

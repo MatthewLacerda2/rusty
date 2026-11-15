@@ -56,9 +56,14 @@ fn every_op_runs_on_its_arity_and_needs_its_minimum() {
 
 #[test]
 fn every_optional_input_is_read() {
-    for info in OPS.iter().filter(|info| info.inputs.max > info.inputs.min) {
-        let op = sample_op(info);
-        let mut inputs = images(usize::from(info.inputs.max));
+    // The sample node's own arity: an `expression` accepts exactly the inputs its
+    // formula names, so its row's `0 to 4` is no optional input.
+    for (info, op) in OPS.iter().map(|info| (info, sample_op(info))) {
+        let accepts = op.arity();
+        if accepts.max == accepts.min {
+            continue;
+        }
+        let mut inputs = images(usize::from(accepts.max));
         let before = eval(&op, &inputs);
         let last = inputs.len() - 1;
         let noise = OpKind::WhiteNoise(WhiteNoise::default());

@@ -32,6 +32,7 @@ pub mod color;
 pub mod distance;
 #[cfg(test)]
 pub mod dummy;
+pub mod expression;
 pub mod field;
 pub mod filter;
 pub mod flood;

@@ -130,6 +130,7 @@ catalog! {
     #[cfg(test)]
     Dummy(color::dummy::Dummy),
     EdgeDetect(filter::mask::edge_detect::EdgeDetect),
+    Expression(math::expression::Expression),
     FloodBbox(filter::flood::bbox::FloodBbox),
     FloodFill(filter::flood::fill::FloodFill),
     FloodGradient(filter::flood::gradient::FloodGradient),
