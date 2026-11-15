@@ -54,8 +54,12 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     (`merged(number)`) and is pumped on each pass and each poll of a take's CI
     wait (`pump()`), so a scoped mutation run is dispatched after the merge and
     a finished one's slot frees while the watch waits.
+    `was_merged(number)`, when given, asks GitHub whether a pull request gone
+    between two watches merged (`True`, `False`, `None` when it did not answer;
+    [`kept.Board.report`], #2215).
     `opts.for_minutes` (`--for`) is checked at the top of each pass, so only
-    between takes; `opts.since` (`--since`) limits the board lines ([`board.recent`]).
+    between takes; `opts.since` (`--since`) limits the board lines ([`board.fresh`],
+    applied by [`kept.Board.report`] to the kept listing too).
     """
     results, done, failed, handed, told, landed = [], set(), 0, [], set(), set()
     memory, marks = handbacks.recall(fx.memory), handbacks.recall(fx.memory.with_name(handbacks.RUNS_MEMORY))
@@ -68,7 +72,8 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     wall = getattr(fx, "wall", time.time)
     line = aging.Line()
     # The board as last reported, by this watch or the one before it (#2215).
-    told_board = kept.Board(fx.memory.with_name(kept.BOARD_MEMORY), not getattr(opts, "dry_run", False))
+    told_board = kept.Board(fx.memory.with_name(kept.BOARD_MEMORY), not getattr(opts, "dry_run", False),
+                            lambda line: fx.say(line))
     was_merged = getattr(fx, "was_merged", lambda number: None)
     after = getattr(fx, "mutants", None)  # the mutation runs merged pull requests asked for (#1934)
 
@@ -80,7 +85,7 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
             handbacks.remember(fx.memory.with_name(name), {n: v for n, v in side.items() if n in memory}) for name, side in sides
         }
         for why in sorted(failed - {None}):  # a memory lost, never the watch (#2215)
-            fx.say(f"watch: the hand-back memory could not be written: {why}")
+            fx.say(handbacks.FAILED_LINE + why)
         told_board.keep(landed)
 
     def forget(number: int) -> None:

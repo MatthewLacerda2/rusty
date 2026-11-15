@@ -127,7 +127,7 @@ closing summary gives the totals of the conflicts recorded during the watch.
 The watch holds an `fcntl.flock` for its whole life ([`lock.hold`]), so a second
 one exits naming the first's PID. During a take's CI wait the board is still
 listed once a poll (the `tick` [`queue.waiting.wait_for`] calls), `--since`
-keeps its lines to the batch's own pull requests ([`board.recent`]), `--for` with
+keeps its lines to the batch's own pull requests ([`board.fresh`]), `--for` with
 `--deadline` must fit in a background command's life ([`ending.over_budget`]),
 and the last line is always [`ending.RESUME`] and the command to start it again.
 

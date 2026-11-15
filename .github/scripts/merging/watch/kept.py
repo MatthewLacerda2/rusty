@@ -30,6 +30,9 @@ next watch's first listing is compared with it ([`Board.report`]).
   again at the next listing: the old file would make the next watch repeat
   what this one said. Only if the removal fails too (a directory nobody can
   write) does the next watch repeat a line, and every line it repeats was true.
+  The failure is said once per watch ([`FAILED_LINE`], passed by `make
+  queue-events`), not once per listing: with a full disk every watch repeats
+  its first-listing lines, and that line is the one naming why.
 - **A stale file is read as it is** (a supervisor stopped for a day): the
   differences against it are still true statements about what changed while no
   watch ran. A pull request closed meanwhile is said once, since the next
@@ -37,7 +40,9 @@ next watch's first listing is compared with it ([`Board.report`]).
 - **What this watch merged is never kept** ([`Board.keep`] drops `landed`), so
   the next watch does not ask about it or say it.
 - **A dry run writes nothing**: its lines go to a terminal, not the log the
-  stream reads, so it must not mark anything told.
+  stream reads, so it must not mark anything told. A bare `make queue
+  ARGS=--watch` does write: whoever runs it reads its output, so what it
+  printed counts as told.
 """
 
 from __future__ import annotations
@@ -49,6 +54,9 @@ from merging.watch import board
 
 # The file's name, beside `handbacks.MEMORY` in the queue's state directory.
 BOARD_MEMORY = "board.json"
+
+# How the line saying the board could not be kept begins ([`Board.keep`]).
+FAILED_LINE = "watch: the board memory could not be written: "
 
 Heads = dict[int, tuple[bool, str, bool]]
 Opened = dict[int, "str | None"]
@@ -83,10 +91,11 @@ def remember(path: Path, heads: Heads, opened: Opened) -> str | None:
 
 class Board:
     """One watch's view of the board it told: read once at launch, rewritten
-    when what it would hold changes. `enabled` is false for a dry run."""
+    when what it would hold changes. `enabled` is false for a dry run; `say`
+    hears the first write that fails ([`FAILED_LINE`])."""
 
-    def __init__(self, path: Path, enabled: bool = True):
-        self.path, self.enabled = path, enabled
+    def __init__(self, path: Path, enabled: bool = True, say=lambda line: None):
+        self.path, self.enabled, self.say, self.warned = path, enabled, say, False
         kept = recall(path)
         self.told, self.opened = kept if kept else (None, {})
         self.first = True  # the next report compares with another watch's listing
@@ -116,8 +125,12 @@ class Board:
                   {n: w for n, w in self.opened.items() if n in self.told and n not in landed})
         if record == self.saved:
             return
-        if remember(self.path, *record) is None:
+        why = remember(self.path, *record)
+        if why is None:
             self.saved = record
         else:
+            if not self.warned:
+                self.warned = True
+                self.say(FAILED_LINE + why)
             state.drop(self.path)  # a stale file would make the next watch repeat lines
             self.saved = None

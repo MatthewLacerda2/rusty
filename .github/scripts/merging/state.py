@@ -11,6 +11,13 @@ and each is taken again.
   reader sees the old contents or the new, never part of either. It returns why
   it failed instead of raising: a state file that cannot be written loses a
   memory, never the watch.
+- **One fixed temporary per state file** ([`part`], `.<name>.part`): a write cut
+  between the flush and the rename leaves it behind, and nothing sweeps the
+  directory, so a uniquely named one would pile up one per cut. The next write
+  of that file overwrites it. One watch runs at a time (`watch.lock`), so no
+  two writers share it.
+- **Nothing else under `merging/` writes a file** but the appends and locks that
+  say why inline (`# state-ok: <why>`), held by `.github/scripts/tests/state/test_writers.py`.
 - **[`read`] answers `None` for a file that is missing or is not JSON**
   (truncated, edited by hand), never a traceback. Whether what it holds has the
   right shape is the caller's question.
@@ -20,7 +27,6 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
 from pathlib import Path
 
 
@@ -29,19 +35,24 @@ def write(path: Path, data: object) -> str | None:
     text = json.dumps(data, indent=1, sort_keys=True) + "\n"
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        handle, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+        temporary = part(path)
         try:
-            with os.fdopen(handle, "w") as out:
+            with open(temporary, "w") as out:
                 out.write(text)
                 out.flush()
                 os.fsync(out.fileno())
             os.replace(temporary, path)
         except BaseException:
-            os.unlink(temporary)
+            drop(temporary)  # the next write overwrites it if this cannot
             raise
     except OSError as failed:
         return str(failed)
     return None
+
+
+def part(path: Path) -> Path:
+    """Where [`write`] puts `path`'s text before the rename."""
+    return path.with_name(f".{path.name}.part")
 
 
 def read(path: Path) -> object | None:

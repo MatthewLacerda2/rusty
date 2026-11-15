@@ -7,7 +7,7 @@ import unittest
 
 from merging.queue import outcomes
 from merging.view import events
-from merging.watch import board, ending, supervisor
+from merging.watch import board, ending, handbacks, kept, supervisor
 from tests.watch.test_supervisor import fake
 
 
@@ -30,8 +30,10 @@ class Wording(unittest.TestCase):
             *(prefixed(line) for line in board.transitions(before, after, landed=set())),
             *(prefixed(line) for line in board.transitions(None, after, landed=set())),  # a fresh start (#2215)
             *(prefixed(board.closed_line(3, {3: merged})) for merged in (True, False, None)),  # between watches
+            prefixed(handbacks.FAILED_LINE + "No space left on device"),  # a state file not written (#2215)
+            prefixed(kept.FAILED_LINE + "No space left on device"),
         ]
-        self.assertEqual(len(lines), 14)  # ready, draft, closed, opened as ready; two waiting; three between watches
+        self.assertEqual(len(lines), 16)  # ready, draft, closed, opened as ready; two waiting; three between; two writes
         for line in lines:
             self.assertTrue(events.keep(line, set()), line)
 

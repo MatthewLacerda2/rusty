@@ -8,7 +8,7 @@ from datetime import datetime
 
 
 # The listing is [`queue.pulls.open_pulls`] (REST, #970), in GraphQL's field
-# names: `files` is what [`held`] reads; `createdAt`, what [`recent`] does.
+# names: `files` is what [`held`] reads; `createdAt`, what [`fresh`] does.
 
 # The go-ahead (#925): the watch takes a ready pull request only with this label.
 QUEUE_LABEL = "queue"
@@ -85,15 +85,10 @@ def queued(pull: dict) -> bool:
     return QUEUE_LABEL in names(pull.get("labels"))
 
 
-def recent(pulls: list[dict], since: datetime | None) -> list[dict]:
-    """The pull requests opened at or after `since` (`--since`, #928): the batch's
-    own, so the board lines leave older ones out. All of them without it, and a
-    pull request GitHub gave no time for is kept ([`fresh`])."""
-    return [p for p in pulls if fresh(p.get("createdAt"), since)]
-
-
 def fresh(when: str | None, since: datetime | None) -> bool:
-    """Whether a pull request opened at `when` is said under `--since` ([`recent`])."""
+    """Whether a pull request opened at `when` is said under `--since` (#928):
+    the batch's own, so the board lines leave older ones out. Every one without
+    `--since`, and one GitHub gave no time for ([`kept.Board.report`])."""
     return since is None or not when or datetime.fromisoformat(when) >= since
 
 
@@ -151,12 +146,14 @@ def closed_line(number: int, closes: dict[int, bool | None] | None) -> str:
     """A pull request gone from the listing. Inside one watch, "not merged by
     this watch" is all it knows; between watches ([`transitions`]' `closes`)
     GitHub was asked, since a merge while no watch ran (`make queue PRS=N`, by
-    hand) is a merge (#2215)."""
+    hand) is a merge (#2215). It names no merger: a merge this watch made can
+    reach the next watch's first listing too, when power is cut between the
+    board's write and the hand-back memory's ([`kept`])."""
     if closes is None or number not in closes:
         return f"watch: #{number} closed, not merged by this watch."
     if closes[number] is None:
         return f"watch: #{number} closed (merged or not: GitHub did not answer)."
-    return f"watch: #{number} {'merged, not by this watch' if closes[number] else 'closed, not merged'}."
+    return f"watch: #{number} {'merged while no watch listed it' if closes[number] else 'closed, not merged'}."
 
 
 def waiting_line(number: int) -> str:

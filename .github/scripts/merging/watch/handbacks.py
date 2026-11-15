@@ -89,6 +89,11 @@ RED_MEMORY = "handed-back-red.json"
 # (#1951, [`view.stranded`]).
 WHY_MEMORY = "handed-back-why.json"
 
+# How the line saying one of these could not be written begins (`loop.run`'s
+# save, #2215): passed by `make queue-events`, since a watch that cannot write
+# them takes every hand-back again.
+FAILED_LINE = "watch: the hand-back memory could not be written: "
+
 
 def claim(pull: dict) -> str:
     """What a pull request claims, as one comparable string: its body and labels."""

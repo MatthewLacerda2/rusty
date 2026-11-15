@@ -60,7 +60,7 @@ class AcrossWatches(unittest.TestCase):
         self.assertEqual(said, [board.waiting_line(1)])
 
     def test_one_gone_between_watches_is_said_as_github_answers_once(self):
-        for merged, line in ((True, "watch: #1 merged, not by this watch."), (False, "watch: #1 closed, not merged."),
+        for merged, line in ((True, "watch: #1 merged while no watch listed it."), (False, "watch: #1 closed, not merged."),
                              (None, "watch: #1 closed (merged or not: GitHub did not answer).")):
             with tempfile.TemporaryDirectory() as tmp:
                 watch(tmp, [pr(1, draft=True, queued=False), pr(2, draft=True, queued=False)])
@@ -130,23 +130,27 @@ class TheFile(unittest.TestCase):
         self.assertIn(board.waiting_line(1), said)
         self.assertIn("nothing is ready and labelled `queue`", why)  # the idle end, as with a writable directory
         self.assertEqual(status, 0)
-        self.assertTrue(any(line.startswith("watch: the hand-back memory could not be written: ") for line in said))
+        self.assertTrue(any(line.startswith(handbacks.FAILED_LINE) for line in said))
+        self.assertEqual(sum(line.startswith(kept.FAILED_LINE) for line in said), 1)  # once a watch
 
     def test_a_failed_write_removes_the_old_file_and_is_tried_again(self):
         with tempfile.TemporaryDirectory() as tmp:
             watch(tmp, [pr(1, draft=True, queued=False)])
-            told = kept.Board(state(tmp))
+            said = []
+            told = kept.Board(state(tmp), say=said.append)
             failing = [True]
             real = kept.remember
             kept.remember = lambda *a: "disk full" if failing[0] else real(*a)
             try:
                 told.report([pr(1, queued=False)], set(), None, lambda n: None)
+                told.report([pr(1, draft=True, queued=False)], set(), None, lambda n: None)
                 self.assertFalse(state(tmp).exists())
                 failing[0] = False
                 told.keep(set())
             finally:
                 kept.remember = real
-            self.assertEqual(kept.recall(state(tmp))[0], board.heads([pr(1, queued=False)]))
+            self.assertEqual(kept.recall(state(tmp))[0], board.heads([pr(1, draft=True, queued=False)]))
+            self.assertEqual(said, [kept.FAILED_LINE + "disk full"])  # two failed listings, said once
 
 
 if __name__ == "__main__":

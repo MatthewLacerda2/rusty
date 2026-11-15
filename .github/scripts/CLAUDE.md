@@ -109,6 +109,8 @@ coder *changing* it must know.
   supervisor's sleep is said once. The queue's JSON state files are written through
   `merging/state.py` alone (a temporary file, then a rename) and a file it cannot
   read is absent, never a traceback: a new state file goes through it too.
+  `.github/scripts/tests/state/test_writers.py` fails on any other file write under `merging/`; an
+  append, a lock or a worktree edit takes `# state-ok: <why>` on its line.
 - **One watch at a time** (`merging/watch/lock.py`): an `fcntl.flock` on
   `.git/merge-queue.lock` in the common git directory, held for the life of the
   process; a second watch exits with status 4, naming the holder's PID. The kernel
@@ -150,8 +152,9 @@ coder *changing* it must know.
   `#N: merged — landed with the train <sha>.`, said as it lands), every `supervisor:`
   line but the ones that carry on (`events.CARRIES_ON`), `watch: STOPPED:`, `HELD #N`
   and the `watch: #N turned ready.` family of `watch.board.transitions`, with its
-  `closed`/`merged, not by this watch` lines and a fresh start's `watch: #N is ready
-  and unqueued`. A change to
+  `closed`/`merged while no watch listed it` lines and a fresh start's `watch: #N is ready
+  and unqueued`, and a state file it could not write (`handbacks.FAILED_LINE`,
+  `kept.FAILED_LINE`). A change to
   one of those lines updates `events.KEEP` and its tests
   (`.github/scripts/tests/view/test_wording.py`, built from the watch's own functions)
   in the same pull request.

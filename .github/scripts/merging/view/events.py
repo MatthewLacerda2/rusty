@@ -11,7 +11,9 @@ hand-typed `tail -n 30 -F queue.log | grep` it replaced, and why:
   Dependabot PR, and a pull request turning ready, opening ready, going back
   to draft, closing, or merging while no watch ran, and one a fresh start
   finds ready and unqueued (the watch's own `watch: #N …` lines,
-  `watch.board.transitions`, #2215). PR #1870 sat ready for 90 minutes because the
+  `watch.board.transitions`, #2215), and a state file the watch could not
+  write (`watch: the … memory could not be written:`), the one line that says
+  why a watch forgets its hand-backs or repeats its board. PR #1870 sat ready for 90 minutes because the
   hand-typed grep let no ready flip through. A mutation request lost after a
   merge (`after: …` dropped, could not, never appeared; #1934) passes, so a
   lost report is told from a slow one. A CI poll line is dropped.
@@ -63,8 +65,10 @@ KEEP = re.compile(
     r"|supervisor:.*; stopped\.$"
     r"|supervisor: (?!" + "|".join(re.escape(line) for line in CARRIES_ON) + ")"
     r"|watch: STOPPED:"
+    # A state file that cannot be written (a full disk, #2215): every watch then repeats itself.
+    r"|watch: the (?:hand-back|board) memory could not be written: "
     r"|HELD #\d+"
-    r"|watch: #\d+ (?:turned ready|opened as ready|is ready and unqueued|back to draft|closed|merged, not by this watch)"
+    r"|watch: #\d+ (?:turned ready|opened as ready|is ready and unqueued|back to draft|closed|merged while no watch listed it)"
     # A mutation request lost, never a slow one (#1934): a signal nobody hears of is no signal.
     r"|after: .*(?:dropped|could not|never appeared)"
 )

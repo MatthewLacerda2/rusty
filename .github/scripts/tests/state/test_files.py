@@ -47,6 +47,14 @@ class Writer(unittest.TestCase):
             self.assertIsNone(state.write(path, {"x": 2}))
             self.assertEqual((json.loads(path.read_text()), [p.name for p in path.parent.iterdir()]), ({"x": 2}, ["b.json"]))
 
+    def test_a_cut_write_leaves_one_fixed_temporary_the_next_write_overwrites(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp, "b.json")
+            for cut in range(3):  # what a write cut before its rename leaves, three times
+                state.part(path).write_text("{" * cut)
+            self.assertIsNone(state.write(path, {"x": 3}))
+            self.assertEqual((state.read(path), sorted(p.name for p in Path(tmp).iterdir())), ({"x": 3}, ["b.json"]))
+
     def test_a_write_that_cannot_happen_says_why_and_keeps_the_old_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp, "b.json")
