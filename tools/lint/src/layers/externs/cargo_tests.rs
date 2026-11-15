@@ -47,3 +47,9 @@ fn a_table_with_a_lookalike_name_is_not_read() {
     let text = "[dependencies-extra]\nfoo = 1\n[package.metadata.dependencies]\nbar = 1\n";
     assert!(keys(text).is_empty());
 }
+
+#[test]
+fn a_quoted_target_cfg_may_hold_a_dot() {
+    let text = "[target.'cfg(target_feature = \"sse4.1\")'.dependencies]\nwide = \"1\"\n";
+    assert_eq!(dependencies(text), ["wide"]);
+}

@@ -61,22 +61,35 @@ pub fn reached(path: &str, mod_rs: bool, text: &str, exists: impl Fn(&str) -> bo
     let toks = tokens(text);
     let (mut out, mut frames, mut depth) = (Vec::new(), Vec::new(), 0usize);
     let mut path_attr: Option<PathAttr> = None;
-    let mut i = 0;
-    while i < toks.len() {
-        let at = |k: usize| toks.get(i + k);
-        match &toks[i] {
+    // The tokens not read yet. Each step drops at least the one it read, so the
+    // scan ends on any input: a step that read nothing would loop forever.
+    let mut rest = toks.as_slice();
+    while let Some(tok) = rest.first() {
+        let at = |k: usize| rest.get(k);
+        match tok {
+            // An attribute is skipped whole, by its brackets, so a `;` or a brace
+            // inside it (`#[foo([u8; 4])]`) never ends the item a `#[path]` sits
+            // on; its `include!`s are still read.
             Tok::Punct('#') => {
-                let attr = attribute(&toks, i + 1);
-                path_attr = attr.path.or(path_attr);
-                let named = attr.includes.iter().map(|s| normal(&here.join(s)));
-                out.extend(named.map(Reach::Included));
-                i = attr.end.max(i + 1);
-                continue;
+                // `#![…]`, an inner attribute, never sets a `mod`'s path
+                let inner = rest.get(1) == Some(&Tok::Punct('!'));
+                let attr = &rest[1 + usize::from(inner)..];
+                let (found, len) = attribute(attr);
+                path_attr = found.filter(|_| !inner).or(path_attr);
+                if len > 0 {
+                    out.extend(
+                        (0..len)
+                            .filter_map(|k| included(&attr[k..len]))
+                            .map(|s| Reach::Included(normal(&here.join(s)))),
+                    );
+                    rest = &attr[len..];
+                    continue;
+                }
             }
             Tok::Ident(m) if m == "mod" => match (at(1), at(2)) {
                 (Some(Tok::Ident(name)), Some(Tok::Punct(';'))) => {
                     out.extend(external(&dir, name, path_attr.take(), &exists));
-                    i += 3;
+                    rest = &rest[3..];
                     continue;
                 }
                 (Some(Tok::Ident(name)), Some(Tok::Punct('{'))) => {
@@ -90,13 +103,13 @@ pub fn reached(path: &str, mod_rs: bool, text: &str, exists: impl Fn(&str) -> bo
                         relative: None,
                     };
                     depth += 1;
-                    i += 3;
+                    rest = &rest[3..];
                     continue;
                 }
                 _ => {}
             },
             Tok::Ident(_) => {
-                out.extend(included(&toks, i).map(|s| Reach::Included(normal(&here.join(s)))))
+                out.extend(included(rest).map(|s| Reach::Included(normal(&here.join(s)))))
             }
             Tok::Punct('{') => {
                 depth += 1;
@@ -112,7 +125,7 @@ pub fn reached(path: &str, mod_rs: bool, text: &str, exists: impl Fn(&str) -> bo
             Tok::Punct(';') => path_attr = None,
             _ => {}
         }
-        i += 1;
+        rest = &rest[1..];
     }
     out
 }
@@ -154,70 +167,52 @@ struct PathAttr {
     conditional: bool,
 }
 
-/// What one attribute holds: where it ends, the `p` of a `#[path = "p"]` (or a
-/// `cfg_attr`'s `path = "p"`), and the files `include!` / `include_str!` name in it.
-struct Attribute {
-    end: usize,
-    path: Option<PathAttr>,
-    includes: Vec<String>,
-}
-
-/// The attribute whose `#` is just before `from` (`#[…]` or `#![…]`).
-fn attribute(toks: &[Tok], from: usize) -> Attribute {
-    let mut i = from;
-    if toks.get(i) == Some(&Tok::Punct('!')) {
-        i += 1;
+/// The `p` of the `#[path = "p"]` (or a `cfg_attr`'s `path = "p"`) whose `[`
+/// opens `toks`, if that is what it is, and how many tokens the attribute spans,
+/// its closing `]` included (all of `toks` when it never closes; 0 when no `[`
+/// opens it). Every bracket kind nests, so a `;` or brace inside stays inside.
+fn attribute(toks: &[Tok]) -> (Option<PathAttr>, usize) {
+    if toks.first() != Some(&Tok::Punct('[')) {
+        return (None, 0);
     }
-    let mut out = Attribute {
-        end: from,
-        path: None,
-        includes: Vec::new(),
-    };
-    if toks.get(i) != Some(&Tok::Punct('[')) {
-        return out;
-    }
-    let name = match toks.get(i + 1) {
+    let name = match toks.get(1) {
         Some(Tok::Ident(n)) => n.as_str(),
         _ => "",
     };
-    let mut depth = 0usize;
-    while let Some(t) = toks.get(i) {
-        let before = &toks[i - 1];
+    let (mut depth, mut out) = (0usize, None);
+    for (i, t) in toks.iter().enumerate() {
         match t {
-            Tok::Punct('[' | '(') => depth += 1,
-            Tok::Punct(']' | ')') => {
-                depth -= 1;
+            Tok::Punct('[' | '(' | '{') => depth += 1,
+            Tok::Punct(']' | ')' | '}') => {
+                depth = depth.saturating_sub(1);
                 if depth == 0 {
-                    out.end = i + 1;
-                    return out;
+                    return (out, i + 1);
                 }
             }
             Tok::Ident(p) if p == "path" => {
                 let named = match name {
                     "path" => depth == 1,
-                    "cfg_attr" => depth == 2 && *before == Tok::Punct(','),
+                    "cfg_attr" => depth == 2 && toks[i - 1] == Tok::Punct(','),
                     _ => false,
                 };
                 if let (true, Some(Tok::Punct('=')), Some(Tok::Str(s))) =
                     (named, toks.get(i + 1), toks.get(i + 2))
                 {
-                    out.path = Some(PathAttr {
+                    out = Some(PathAttr {
                         path: s.clone(),
                         conditional: name == "cfg_attr",
                     });
                 }
             }
-            _ => out.includes.extend(included(toks, i)),
+            _ => {}
         }
-        i += 1;
     }
-    out.end = i;
-    out
+    (out, toks.len())
 }
 
-/// The file an `include!("…")` or `include_str!("…")` starting at `i` names.
-fn included(toks: &[Tok], i: usize) -> Option<String> {
-    match (&toks[i], toks.get(i + 1), toks.get(i + 2), toks.get(i + 3)) {
+/// The file an `include!("…")` or `include_str!("…")` opening `toks` names.
+fn included(toks: &[Tok]) -> Option<String> {
+    match (toks.first()?, toks.get(1), toks.get(2), toks.get(3)) {
         (Tok::Ident(m), Some(Tok::Punct('!')), Some(Tok::Punct('(')), Some(Tok::Str(s)))
             if m == "include" || m == "include_str" =>
         {
@@ -283,3 +278,7 @@ fn unescape(body: &str, raw: bool, out: &mut String) {
 pub fn normal(p: &Path) -> String {
     crate::layers::normalise(p).to_string_lossy().into_owned()
 }
+
+#[cfg(test)]
+#[path = "module_tree_tests.rs"]
+mod tests;

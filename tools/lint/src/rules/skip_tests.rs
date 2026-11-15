@@ -24,7 +24,7 @@ fn an_allow_with_a_reason_excuses_the_skip() {
     assert_eq!(
         found.len(),
         1,
-        "the rule reports; `rules::run` applies the allow"
+        "the rule reports; `rules::verdict` applies the allow"
     );
     assert!(crate::rules::allowed(src, found[0].line, RULE));
 }

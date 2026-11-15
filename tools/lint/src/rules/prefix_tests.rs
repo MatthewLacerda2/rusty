@@ -1,6 +1,7 @@
 use super::{anchor, check_dir, groups, RULE};
 use crate::rules::allowed;
 use std::fs;
+use std::path::Path;
 
 #[test]
 fn three_siblings_sharing_a_word_are_a_group() {
@@ -57,6 +58,7 @@ fn a_directory_is_flagged_and_an_allow_above_its_mod_line_excuses_it() {
     fs::write(dir.join("mod.rs"), owner).unwrap();
     let dir_s = dir.to_string_lossy().into_owned();
     let found = check_dir(
+        Path::new(""),
         &dir_s,
         &["mod.rs", "light.rs", "nav_a.rs", "nav_b.rs", "nav_c.rs"],
     );
@@ -70,9 +72,9 @@ fn a_directory_is_flagged_and_an_allow_above_its_mod_line_excuses_it() {
 #[test]
 fn exempt_registries_pass() {
     let files = ["scene.rs", "scene_load.rs", "scene_prefab.rs"];
-    assert!(check_dir("src/script/api", &files).is_empty());
+    assert!(check_dir(Path::new(""), "src/script/api", &files).is_empty());
     assert_eq!(
-        check_dir("src/script/api/material", &files).len(),
+        check_dir(Path::new(""), "src/script/api/material", &files).len(),
         1,
         "not its subfolders"
     );

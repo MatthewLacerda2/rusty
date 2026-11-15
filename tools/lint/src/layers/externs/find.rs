@@ -22,8 +22,9 @@ pub fn crate_refs(content: &str, crates: &BTreeSet<String>) -> Vec<CrateRef> {
     let uses = use_statements(&lines);
     let mut shadowed: BTreeSet<String> = lines.iter().filter_map(|(_, c)| mod_name(c)).collect();
     for (_, paths) in &uses {
+        // Any import but `use <crate>;` binds a name that is no longer the crate.
         for (path, binding) in paths {
-            if path.len() > 1 || path[0] != *binding {
+            if path.as_slice() != std::slice::from_ref(binding) {
                 shadowed.insert(binding.clone());
             }
         }
@@ -57,8 +58,9 @@ fn mod_name(code: &str) -> Option<String> {
         .strip_prefix("pub")
         .map_or(t, |r| r.trim_start_matches(|c| c != ' '));
     let rest = t.trim_start().strip_prefix("mod ")?;
+    // An empty name (`mod {`) shadows nothing: no crate is named "".
     let end = rest.find(|c: char| !is_ident(c)).unwrap_or(rest.len());
-    (end > 0).then(|| rest[..end].to_string())
+    Some(rest[..end].to_string())
 }
 
 /// Each `use … ;` statement: the lines it spans and its flattened paths, each with
@@ -101,38 +103,30 @@ fn use_tree_start(code: &str) -> Option<&str> {
 pub fn flatten(tree: &str) -> Paths {
     let tokens = tokenize(tree);
     let mut out = Vec::new();
-    let mut i = 0;
-    walk(&tokens, &mut i, &[], &mut out);
+    walk(&mut tokens.iter().peekable(), &[], &mut out);
     out
 }
 
-fn walk(tokens: &[String], i: &mut usize, prefix: &[String], out: &mut Paths) {
+type Tokens<'a> = std::iter::Peekable<std::slice::Iter<'a, String>>;
+
+/// One path of the tree from `tokens`, after `prefix`, onto `out`, up to the `,`
+/// or `}` that ends it (left for the group to read). Every loop takes a token
+/// each turn or stops, so a tree of any shape is read to its end.
+fn walk(tokens: &mut Tokens, prefix: &[String], out: &mut Paths) {
     let mut path = prefix.to_vec();
-    while let Some(tok) = tokens.get(*i) {
-        *i += 1;
+    while let Some(tok) = tokens.next_if(|t| *t != "," && *t != "}") {
         match tok.as_str() {
             "::" => {}
             "{" => {
-                while *i < tokens.len() && tokens[*i] != "}" {
-                    walk(tokens, i, &path, out);
-                    if tokens.get(*i).is_some_and(|t| t == ",") {
-                        *i += 1;
-                    }
-                }
-                *i += 1;
+                group(tokens, &path, out);
                 return;
             }
             "*" => return,
             "as" => {
-                if let (Some(alias), false) = (tokens.get(*i), path.is_empty()) {
-                    *i += 1;
+                if let (false, Some(alias)) = (path.is_empty(), tokens.next()) {
                     out.push((path, alias.clone()));
                 }
                 return;
-            }
-            "," | "}" => {
-                *i -= 1;
-                break;
             }
             seg if seg == "self" && !path.is_empty() => {}
             seg => path.push(seg.to_string()),
@@ -140,6 +134,18 @@ fn walk(tokens: &[String], i: &mut usize, prefix: &[String], out: &mut Paths) {
     }
     if let Some(last) = path.last().cloned() {
         out.push((path, last));
+    }
+}
+
+/// The paths of a `{…}` group whose `{` was just read, its `}` included.
+fn group(tokens: &mut Tokens, prefix: &[String], out: &mut Paths) {
+    // `{}`, or the `}` after a trailing comma, closes it with no path
+    while tokens.next_if(|t| *t == "}").is_none() {
+        walk(tokens, prefix, out);
+        if tokens.next_if(|t| *t == ",").is_none() {
+            tokens.next();
+            return;
+        }
     }
 }
 
