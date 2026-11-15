@@ -171,65 +171,78 @@ fn across(world: vec3<f32>, t: f32, c: f32, dim: vec2<f32>) -> f32 {
 // The cone a hit's radius is measured with for the resolve's field (#2158): the
 // trace stores [`spread`] per unit of cone, measured at a typical satin cone (about
 // roughness 0.4's), where the projection is close to linear, so each pixel scales
-// it by its own cone. Stored no wider than `UNIT_MAX` pixels, so a hit's
-// radius times its count stays inside f16.
+// it by its own cone. Stored no wider than `UNIT_MAX` pixels, so a hit's radius
+// times its energy, times `ENERGY_SCALE`, stays inside f16.
 const UNIT_CONE: f32 = 0.2;
 const UNIT_MAX: f32 = 16000.0;
 
 // What a hit's count is stored times, so the count of one hit in a coarse level of
-// the spread pyramid (a 4^-8 share of it at level 8) stays a normal f16, not a
-// subnormal a GPU may flush to 0 as it writes the level (#2158): the mean radius
-// of a few hits in a wide window then holds, not just a crowd's.
+// the spread pyramid (a 4^-8 share of it at level 8, the widest window a 4K frame
+// reads) stays a normal f16, not a subnormal a GPU may flush to 0 as it writes the
+// level (#2158): the mean radius of a few hits in a wide window then holds, not
+// just a crowd's.
 const COUNT_SCALE: f32 = 64.0;
 
 // What a found hit whose fades took its weight to nothing still counts for in the
-// radius field, against 1 for a hit at full weight (#2158). Little enough that the
-// long rays a rough surface fades out beside a contact reflection don't set that
-// reflection's blur; enough that the field stays well-conditioned where the weight
-// thins out: a pyramid texel of faded hits beside one of full-weight hits weighs
-// too little against it at 0.1, and the mean radius between them swings over a
-// few pixels, drawing a faint line across a satin reflection's fading edge.
+// radius field, against 1 for a hit at full weight (#2158): a hit's count `k` is
+// its weight but at least this. Little enough that the long rays a rough surface
+// fades out beside a contact reflection don't set that reflection's blur; enough
+// that the field stays well-conditioned where the weight thins out: the field
+// blends one pyramid texel into the next by their counts (`mean_unit`), and a
+// texel of faded hits beside one of full-weight hits weighs too little against it
+// at 0.1, so the mean radius between them swings over a few pixels, drawing a
+// faint line across a satin reflection's fading edge.
 const FOUND_FLOOR: f32 = 0.4;
 
-// What a found hit's energy counts for in the radius field's mean at least
-// (#2249), against 1 for a white hit at full weight: little enough that a dark hit
-// (a dim wall, a cord's or a seam's sliver) leaves the blur of a bright reflection
-// beside it alone, enough that a window of dark hits alone still takes their mean.
+// The least brightness a found hit's energy counts it at (`energy`): among the
+// hits of one pyramid texel, a dark one (a dim wall, a cord's sliver) weighs 50
+// times less than a bright one of the same count.
 const ENERGY_FLOOR: f32 = 0.02;
 
-// What a found hit's radius times its energy is stored times, so a bright hit's
-// share of a coarse level of the spread pyramid stays a normal f16; `UNIT_MAX`
-// times it stays inside f16.
+// The luma a hit's brightness is judged at against the frame's mean luma: middle
+// grey, where an automatic exposure puts a frame's mean. Judged against the frame,
+// a hit's energy is the same in a dim scene as in the same scene lit 100 times
+// brighter, whatever its exposure.
+const KEY: f32 = 0.18;
+
+// What a found hit's radius times its energy is stored times: the most it can
+// store, `UNIT_MAX` times it, stays inside f16 (64000).
 const ENERGY_SCALE: f32 = 4.0;
 
 // What the trace writes per pixel for the resolve (#2028): `hit`, the hit colour
 // times its weight and the weight (premultiplied, so a level of its pyramid
 // averages hits and misses alike); `spread`, 1 for a pixel that traced (a miss
-// included), then for a ray that found something its radius per unit cone times
-// its energy `e` (times `ENERGY_SCALE`), its count `k` (times `COUNT_SCALE`): its
-// weight, but at least `FOUND_FLOOR`, and `e` (times `COUNT_SCALE`), all 0 for a
-// miss. So a level holds how many hits it found, those that reflect something
-// first (#2158), and their mean radius weighted by the light each one adds to the
-// reflection: its weight times its brightness, at least `ENERGY_FLOOR` (#2249).
+// included), then, for a ray that found something: its radius per unit cone times
+// its energy `e` (times `ENERGY_SCALE`), its count `k` (times `COUNT_SCALE`), and
+// `e` (times `COUNT_SCALE / ENERGY_FLOOR`, so a hit's stored energy is at least
+// its stored count and as normal an f16 in a coarse level); all 0 for a
+// miss. So a texel of a level holds how many hits it found, those that reflect
+// something first (#2158), how bright they are, and their mean radius weighted by
+// their energy (#2249).
 struct Traced {
     @location(0) hit: vec4<f32>,
     @location(1) spread: vec4<f32>,
 };
 
-// What a found hit of `colour` (unpremultiplied) at weight `w` counts for in the
-// radius field's mean (#2249): the light it adds to the reflection, its weight
-// times its perceptual brightness (`l / (1 + l)` of its luma, under 1, so a lamp
-// outweighs a dim wall but a lit one by little), at least `ENERGY_FLOOR`. A plain mean let
-// the dark hits around a small bright one set its blur: around a bulb's reflection
-// in a dim room, the dim hits a sub-pixel detail gave on some of TAA's offsets and
-// not others moved the field the bulb's hits blur over, and the reflection blinked
-// with the camera still. The bright hits' radius is the blur the eye sees, so a
-// dark hit never decides it, and the field moves about as much as the reflection
-// does. A hit past f16's range has a weight of 0, and counts at the floor.
-fn energy(colour: vec4<f32>, w: f32) -> f32 {
-    let l = dot(colour.rgb, vec3<f32>(0.25, 0.5, 0.25));
-    let bright = select(0.0, l / (1.0 + l), numeric::finite4(colour) && l > 0.0);
-    return max(w * bright, ENERGY_FLOOR);
+// The luma of `c`'s colour (`0.25 r + 0.5 g + 0.25 b`).
+fn luma(c: vec4<f32>) -> f32 {
+    return dot(c.rgb, vec3<f32>(0.25, 0.5, 0.25));
+}
+
+// What a found hit of `colour` (unpremultiplied) and count `k` weighs in its
+// pyramid texel's mean radius (#2249): its count times its brightness, at least
+// `ENERGY_FLOOR`. Its brightness is `x / (1 + x)` of its luma `x` at the exposure
+// that puts the frame's mean luma (`mean`, the colour pyramid's last level) at
+// `KEY`: under 1, so a lamp outweighs a dim wall but a lit wall by little, and
+// read against the frame, not in absolute light. By its count, not its weight: a
+// faded long ray weighed by its weight let the short rays beside it (a seam's
+// trim) set a satin ceiling's blur around them, a dark halo along the seam, and
+// the fades enter the field as they enter its count. A hit past f16's range (its
+// weight 0) is at the floor.
+fn energy(colour: vec4<f32>, k: f32, mean: f32) -> f32 {
+    let x = luma(colour) * KEY / max(mean, 1e-30);
+    let bright = select(0.0, x / (1.0 + x), numeric::finite4(colour) && x > 0.0);
+    return k * max(bright, ENERGY_FLOOR);
 }
 
 // Whether pixel `px` takes SSR at all: its surface reflects, is smooth enough
@@ -280,12 +293,13 @@ fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
     // radius per unit cone, even where its weight faded to nothing (a long ray off a
     // rough surface, a hit at the screen's edge), counted at `FOUND_FLOOR`: weighted
     // by the fades alone, the mean radius thinned out exactly where the radii are
-    // widest and swung over a few pixels there. Its radius is averaged by the light
-    // it adds to the reflection (`energy`).
+    // widest and swung over a few pixels there. What it weighs in its texel's
+    // mean radius is its `energy`.
     let unit = min(across(world, hit.dist, UNIT_CONE, dim) / UNIT_CONE, UNIT_MAX);
     let k = max(w, FOUND_FLOOR);
-    let e = energy(hit.colour, w);
-    let found = vec4<f32>(1.0, unit * e * ENERGY_SCALE, k * COUNT_SCALE, e * COUNT_SCALE);
+    let mean = luma(textureLoad(t_color, vec2<i32>(0), i32(textureNumLevels(t_color)) - 1));
+    let e = energy(hit.colour, k, mean);
+    let found = vec4<f32>(1.0, unit * e * ENERGY_SCALE, k * COUNT_SCALE, e * (COUNT_SCALE / ENERGY_FLOOR));
     if (w <= 0.0) {
         return Traced(vec4<f32>(0.0), found);
     }
@@ -329,23 +343,81 @@ fn on_plane(q: vec2<f32>, world: vec3<f32>, g: vec3<f32>, fwd: vec3<f32>) -> boo
     return abs(dot(g, there - world)) <= max(ssr_march::THICKNESS, depth * ssr_march::DEPTH_SLACK);
 }
 
+// A texel of the spread pyramid as `mean_unit` reads it: `y` its hits' mean
+// radius per unit cone weighted by their energy, and `x` how bright they are (the
+// texel's stored energy over its stored count: 1 for hits all at `ENERGY_FLOOR`,
+// at most `1 / ENERGY_FLOOR`). The stored energy is at least the stored count and
+// stored alike, so it is never flushed to 0 while the count is not.
+fn read_spread(s: vec4<f32>) -> vec2<f32> {
+    let energy = max(max(s.w, s.z), 1e-20);
+    return vec2<f32>(energy / max(s.z, 1e-20), s.y * (COUNT_SCALE / (ENERGY_SCALE * ENERGY_FLOOR)) / energy);
+}
+
+// How much a texel's mean radius leans to its neighbourhood's (`texel_mean`): it
+// keeps `b / (b + PULL × max(n − DARKER × b, 0))` of its own, `b` and `n` the
+// texel's and the neighbourhood's brightness. A texel at least a third as bright
+// as the hits around it keeps all of its own (a contact reflection a little
+// darker than the wall behind it keeps its blur); one 5 times darker keeps half,
+// and one 50 times darker (a cord before a lamp) about a twenty-fifth.
+const PULL: f32 = 0.5;
+const DARKER: f32 = 3.0;
+// How many levels coarser than a texel `texel_mean` reads its neighbourhood at.
+const PULL_LEVELS: f32 = 2.0;
+
+// Texel `p` of level `level` of the spread pyramid: how many hits it holds (`x`)
+// and their mean radius per unit cone (`y`), leaning to `near`'s (the hits
+// around it, as `read_spread` gives them) as far as its own hits are darker than
+// those (`PULL`). A texel of a dark sliver beside a bright reflection (a cord in
+// front of a lamp) then takes the lamp's radius, however many hits it holds.
+fn texel_mean(p: vec2<i32>, level: i32, near: vec2<f32>) -> vec2<f32> {
+    let s = textureLoad(t_spread, p, level);
+    let own = read_spread(s);
+    let pull = PULL * max(near.x - DARKER * own.x, 0.0);
+    return vec2<f32>(s.z / COUNT_SCALE, (own.x * own.y + pull * near.y) / (own.x + pull));
+}
+
+// Level `level` of the spread pyramid around `uv`, filtered as its trilinear
+// sampler filters it (bilinear, clamped at the edge), but over each texel's
+// `texel_mean`: the hits' count (`x`) and the sum of each texel's mean radius
+// times its count (`y`).
+fn level_mean(uv: vec2<f32>, level: i32, near: vec2<f32>) -> vec2<f32> {
+    let dim = vec2<i32>(textureDimensions(t_spread, level));
+    let f = uv * vec2<f32>(dim) - 0.5;
+    let base = vec2<i32>(floor(f));
+    let t = f - floor(f);
+    var sum = vec2<f32>(0.0);
+    for (var i = 0; i < 4; i = i + 1) {
+        let o = vec2<i32>(i & 1, i >> 1u);
+        let w = select(1.0 - t.x, t.x, o.x == 1) * select(1.0 - t.y, t.y, o.y == 1);
+        let m = texel_mean(clamp(base + o, vec2<i32>(0), dim - 1), level, near);
+        sum = sum + w * vec2<f32>(m.x, m.x * m.y);
+    }
+    return sum;
+}
+
 // The mean radius per unit cone of the hits the trace found around `uv`, from
-// level `lod` of its spread pyramid, each weighted by the light it adds to the
-// reflection (`energy`). A window where hits count for `trust` of its area or less
-// leans to `fallback` instead, continuously (`trust` 0: none). One where they
-// count for less than `LONE` of one hit's pixel fades to 0 (nothing to blur): a
-// lone hit, a pixel or two in an empty window, still counts for at least a tenth
-// of one there, so it keeps the radius of its own lobe. Both read the hits' count,
-// not their energy, so how much of a window holds hits is the same in a dim scene
-// as in a bright one.
+// level `lod` of its spread pyramid (#2158, #2249). Inside a texel the hits weigh
+// by their energy, and a texel much darker than the hits around it leans to their
+// radius (`texel_mean`), so a reflection's blur is its bright hits', and dim hits
+// that come and go with a sub-pixel shift (a cord a pixel wide, under TAA's
+// jitter) don't move it. Between texels, and between the two levels `lod` falls
+// between, they blend by how many hits each holds, so the field changes no faster
+// than a mean by count does: blending them by their energy swung the field within
+// a pixel wherever a texel of dark hits sat beside one of bright hits, and drew a
+// dark line across a lit band's fading edge. A window where hits count for
+// `trust` of its area or less leans to `fallback` instead, continuously (`trust`
+// 0: none). One where they count for less than `LONE` of one hit's pixel fades to
+// 0 (nothing to blur): a lone hit, a pixel or two in an empty window, still counts
+// for at least a tenth of one there, so it keeps the radius of its own lobe. Both
+// read the hits' count, not their energy.
 fn mean_unit(uv: vec2<f32>, lod: f32, fallback: f32, trust: f32) -> f32 {
-    let s = textureSampleLevel(t_spread, s_color, uv, lod);
-    let count = s.z / COUNT_SCALE;
-    // Every hit's energy is at least `ENERGY_FLOOR` of its count, so the floor
-    // binds only where a GPU flushed a coarse level's share of a lone dark hit's
-    // energy to 0 and kept its count.
-    let mean = s.y * (COUNT_SCALE / ENERGY_SCALE) / max(s.w, ENERGY_FLOOR * s.z + 1e-20);
-    return (count * mean + trust * fallback) / max(count + trust, LONE * exp2(-2.0 * lod));
+    let top = f32(textureNumLevels(t_spread) - 1u);
+    let l = clamp(lod, 0.0, top);
+    let fine = floor(l);
+    let coarse = min(fine + 1.0, top);
+    let near = read_spread(textureSampleLevel(t_spread, s_color, uv, min(l + PULL_LEVELS, top)));
+    let s = mix(level_mean(uv, i32(fine), near), level_mean(uv, i32(coarse), near), l - fine);
+    return (s.y + trust * fallback) / max(s.x + trust, LONE * exp2(-2.0 * lod));
 }
 
 // The share of one full-count hit's pixel, at a level of the spread pyramid, under
@@ -370,8 +442,9 @@ const REFINE: i32 = 2;
 // blur among long rays; each is a filtered read of the spread pyramid, so the
 // field follows `uv` smoothly, between two hits at different distances (a bottle
 // before the shelf behind it) as across a hit and a miss. A mean weighted by the
-// light each hit adds (`energy`), never by its distance, on purpose: one pulled toward the nearest hits (a harmonic mean, or the narrower of
-// the field and the pixel's own ray) kept a thin post's contact reflection, but
+// hits' light and count (`mean_unit`), never by their distance, on purpose: one
+// pulled toward the nearest hits (a harmonic mean, or the narrower of the field
+// and the pixel's own ray) kept a thin post's contact reflection, but
 // collapsed the radius wherever a few rays were short (a seam's trim, a bottle),
 // drawing those parts crisp in a soft reflection, hard blotches that moved with the
 // camera. A contact reflection a few pixels wide among long rays takes their blur

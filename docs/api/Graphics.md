@@ -474,10 +474,13 @@ and a rough reflection's silhouette fades across its blur instead of stepping wh
 one pixel's ray hits and its neighbour's misses (up to roughness 0.05 the hit is
 read sharp at any resolution, widening to the full lobe by 0.1). Every pixel, whether
 its own ray hit or missed, takes its blur from how far away the hits around it are on
-average, each counting by the light it adds to the reflection (so the blur is a bright
-reflection's own, never set by the dim hits beside it, and a still view's reflection
-holds still under TAA's sub-pixel jitter), spread by its own lobe and no wider than
-that lobe spreads a hit at the march's reach. That average changes smoothly
+average, spread by its own lobe and no wider than that lobe spreads a hit at the
+march's reach. Among hits close together the brighter count for more (by the light
+they add, judged against the frame's own brightness, so a dim scene exposed up
+blurs as the same scene lit brighter does): a thin dark thing in front of a bright
+reflection, such as a lamp's cord, doesn't set the lamp's blur, so a still view of
+a lamp's rough reflection doesn't blink under TAA's sub-pixel jitter when the cord
+lands on one pixel or the next. That average changes smoothly
 across the frame, between two hits at different distances (a bottle in front of the
 shelf behind it) as between a hit and a miss, so a reflection's outline is as soft as
 its inside, its edge softens outwards too, and nothing inside it is drawn crisp; a

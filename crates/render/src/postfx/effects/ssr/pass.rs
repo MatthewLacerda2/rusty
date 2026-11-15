@@ -4,11 +4,12 @@
 //! ([`pyramid`](super::pyramid), #1736) and builds the rest. The trace (`fs_trace`)
 //! then marches each smooth enough pixel's ray and writes its hit into a target of
 //! its own, and into a second where it traced and, for a ray that found something,
-//! its hit's blur radius per unit cone and how much it counts (#2158); their pyramids
-//! are built; and the resolve (`fs_resolve`, #2028) averages each pixel's hits over
-//! a disk whose radius is the pixel's own cone times the radius field those
-//! pyramids smooth (the mean of the hits' radii around it, smooth among hits as
-//! across a hit and a miss), and draws them over the image, so a rough surface's reflected
+//! its hit's blur radius per unit cone, how much it counts and how bright it is
+//! (#2158, #2249); their pyramids are built; and the resolve (`fs_resolve`, #2028)
+//! averages each pixel's hits over a disk whose radius is the pixel's own cone
+//! times the radius field those pyramids smooth (the mean of the hits' radii around
+//! it, the brighter counting for more among hits close together, smooth among hits
+//! as across a hit and a miss), and draws them over the image, so a rough surface's reflected
 //! silhouette fades across its blur instead of stepping at a pixel's hit or miss.
 //! The translucents, the overlay cameras and every post effect see the reflected
 //! scene, HDRP's order.

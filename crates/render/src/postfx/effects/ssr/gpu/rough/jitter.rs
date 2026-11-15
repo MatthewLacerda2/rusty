@@ -1,9 +1,10 @@
 //! A still view's rough reflection holds still under TAA's sub-pixel jitter
-//! (#2249, #2228): a satin bronze ceiling over a small, very bright bulb in a dark
-//! room, seen from below. The resolve blurs each pixel over the mean radius of the
-//! hits around it; a plain mean let the dim hits a sub-pixel detail gives on some
-//! offsets and not others set the bulb's blur, and its reflection blinked. Measured
-//! on the SSR-resolved image (what each offset hands TAA) and after TAA's resolve.
+//! (#2249, #2228): a satin bronze ceiling over a small, very bright bulb on a 1 cm
+//! cord in a dark room, seen from below. The cord is under a pixel wide: on some
+//! of TAA's offsets its reflection lands in one column, on others the next or
+//! none. A radius field that took a plain mean let the cord's dark hits set the
+//! bulb's blur, and the bulb's reflection blinked. Measured on the SSR-resolved
+//! image (what each offset hands TAA) and after TAA's resolve.
 
 use glam::Vec3;
 
@@ -15,14 +16,15 @@ use rusty_core::color::f16_to_f32;
 use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::{Camera, Scene};
 
-const W: u32 = 320;
-const H: u32 = 240;
+pub(super) const W: u32 = 320;
+pub(super) const H: u32 = 240;
 /// A tile's side, in pixels.
-const TILE: u32 = 8;
-/// Frames before the measure, so TAA's history has settled: one cycle of the
-/// jitter's vertical (base 3) part.
+pub(super) const TILE: u32 = 8;
+/// Frames before the measure, so TAA's history has settled (its resolve keeps
+/// about a tenth of each new frame).
 const WARM: u32 = 27;
-/// Frames measured: one cycle of its horizontal (base 2) part, and more.
+/// Frames measured: offsets 28 to 63 of the jitter's 1024 (Halton 2, 3), long
+/// enough for a swing every two or three frames to show many times.
 const FRAMES: u32 = 36;
 
 /// A box at `at`, `size` across, painted `surface`.
@@ -35,7 +37,7 @@ fn block(s: &mut Scene, name: &str, (at, size): (Vec3, Vec3), surface: ([f32; 3]
 /// The room: a satin bronze ceiling 3 m up (the first box), dark walls and floor,
 /// no ambient, the bulb hanging 0.5 m under the ceiling on a cord; TAA on (for its
 /// jitter), SSR on, nothing else.
-fn room() -> Scene {
+pub(super) fn room() -> Scene {
     let mut s = Scene::new();
     (s.skybox_path, s.ambient_intensity) = (String::new(), 0.0);
     let cam = s.add_entity("Camera".to_string());
@@ -109,14 +111,14 @@ fn swing(frames: &[Vec<f32>]) -> f32 {
 /// The largest step a tile of the SSR-resolved still view may take between two
 /// jitter offsets, in 255ths of perceptual luma: near the trace's own, which
 /// without the resolve's blur steps 24 (the bulb's sharp reflection crossing a
-/// tile's edge). Measured on lavapipe: 44.5 with a plain mean radius, 24.7 with
-/// one weighted by each hit's energy (#2249).
+/// tile's edge). Measured: 44.5 with a plain mean radius (lavapipe and an RTX
+/// 2060), 20.8 with the field weighted by brightness (RTX 2060; CI's log
+/// prints lavapipe's).
 const STILL: f32 = 30.0;
 
-/// The same after TAA's resolve, URP's clamp (#2228): what the player sees. A
-/// patch that swings on its own hands each swing through the clamp, its 3×3 all
-/// moving together. Measured on lavapipe: 26.2 with a plain mean radius, 11.1
-/// with one weighted by energy.
+/// The same after TAA's resolve, URP's clamp (#2228): what the player sees, a
+/// patch swinging as a whole passing the clamp. Measured: 26.2 with a plain mean
+/// radius (lavapipe and an RTX 2060), 7.5 weighted by brightness (RTX 2060).
 const TAA_STILL: f32 = 14.0;
 
 #[test]

@@ -113,7 +113,11 @@ impl Pyramid {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: HDR_FORMAT,
-            usage: U::RENDER_ATTACHMENT | U::TEXTURE_BINDING | U::COPY_DST,
+            usage: U::RENDER_ATTACHMENT
+                | U::TEXTURE_BINDING
+                | U::COPY_DST
+                // lint: allow(cfg-test-switch) only render's own unit tests read a level back (`ssr::gpu::share`)
+                | if cfg!(test) { U::COPY_SRC } else { U::empty() },
             view_formats: &[],
         });
         let level = |mip| {

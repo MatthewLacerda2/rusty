@@ -4,8 +4,8 @@
 //! the resolve how wide a blur is around them. The rays that meet a cube's foot are
 //! enough of the mean around it to keep its reflection there tight; a thin post's
 //! are not, and its reflection fades with the long rays' (the radius field is a
-//! mean weighted by the light each hit adds, never by how near it is, smooth among
-//! hits: `docs/api/Graphics.md`).
+//! mean weighted by the hits' light and count, never by how near they are, smooth
+//! among hits: `docs/api/Graphics.md`).
 
 use glam::Vec3;
 
