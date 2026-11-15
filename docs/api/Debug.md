@@ -20,7 +20,7 @@ if Debug then Debug.Log("only in a dev build") end
 | `Debug.SnapshotEntity` | `(id)` | a pretty **JSON string**: one entity (below), or `null` if absent |
 | `Debug.Preview` | `(asset_path, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
 | `Debug.PreviewMaterial` | `(name, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
-| `Debug.Stats` | `()` | a **table**: the frame stats — timings and counters (below) |
+| `Debug.Stats` | `([opts])` | a **table**: the frame stats — timings and counters (below) of the current Play session; `opts.window = n` (a whole number ≥ 1, or `math.huge` for everything kept) summarises only the newest `n` frames, edit mode's too; any other option key raises |
 | `Debug.AudioEvents` | `([after_seq])` | an **array** of the audio event log's entries whose `seq` is greater than `after_seq` (default `0`, all), oldest first, **and** the oldest `seq` the log still holds (below) |
 | `Debug.GetAdaptedExposure` | `()` | `number` (EV): the automatic exposure the screen last applied, read back from the GPU a frame or so late (exactly, in a headless capture); `nil` before an `Automatic` frame has metered (#1444; see `Graphics.md`, *Automatic exposure*) |
 | `Debug.AudioVoices` | `()` | an **array**: one roster row per entity carrying an `AudioSource` (below) |
@@ -116,15 +116,44 @@ the call **returns `nil`** after a warning rather than failing the run.
 `Debug.Stats()` is the perf read: the numbers an agent needs to prove a rendering or
 gameplay change is cheaper, since it never *feels* the frame rate. Each metric is a
 `{ last, min, avg, max, samples }` table summarising every frame of the **current Play
-session** (the stats restart when Play starts). Until the first frame runs there is
-nothing to summarise: `frames` is `0`, `systems` is empty and every metric is absent
-(`nil`), so check `frames` before reading one:
+session**: the stats restart when Play starts, take Play's frames only, and after Stop
+hold the session that ended until the next Play. Before any Play (a fresh editor)
+there is nothing to summarise: `frames` and `drawn_frames` are `0`, `systems` is
+empty and every metric is absent (`nil`), so check `frames` before reading one:
 
 ```lua
 local s = Debug.Stats()
 if s.frames > 0 then
   print(s.frames, s.fixed_update_ms.avg, s.systems.update_scripts.max, s.entities.last)
 end
+```
+
+**Two clocks.** `frames` counts **sim ticks** (the fixed 1/60 s step) and
+`drawn_frames` counts **drawn frames**: a harness screenshot or `Harness.Render`, or a
+frame of the window (the editor's or the player's, in a `dev` build, #2205). They
+differ in a window, where one drawn frame runs zero or several ticks. The schedule's
+timings and the world counters (`frame_ms`, the stages, `systems`, `entities`, …) are
+per tick; the render counters, `renderer_ms`, `gpu_ms`, `gpu_passes`, `wall_ms` and
+`fps` are per drawn frame. Each metric's `samples` says how many of its own it holds.
+
+**Now, not the session: `Debug.Stats{ window = n }`.** The same table over the newest
+`n` frames only: a sample is in when it was recorded within the last `n` drawn
+frames, and a per-tick one within the last `n` ticks too; `frames` and
+`drawn_frames` count the ticks and drawn frames inside. A key with no sample inside
+is absent, so a pass that stopped running (SSR turned off, `taa` and `ui` on the
+Scene tab) or a load long ago leaves the window. Unlike the session, a window reads
+**every** frame the window draws, edit mode included, as Unity's Stats overlay does:
+in a fresh editor or after Stop it holds `wall_ms`, `fps` and the render keys of the
+tab on screen, while `frames` is `0` and the per-tick keys are absent once `n` frames
+were drawn without a tick. The newest 600 samples of each key are kept, so a wider
+window (`math.huge` too) reads those. It reads; it resets nothing, so two readers never disturb each
+other. Its one option is `window`: another key raises, naming it. The Game view's **Stats** overlay (`Editor.SetGizmo("Stats", true)`,
+[`Editor.md`](Editor.md)) shows `Debug.Stats{ window = 60 }`:
+
+```lua
+local s = Debug.Stats{ window = 120 }   -- the last two seconds of a 60 Hz window
+if s.wall_ms then print(s.drawn_frames, s.fps.avg, s.wall_ms.max) end  -- a window's
+if s.gpu_ms then print(s.gpu_ms.avg) end                                -- timestamps
 ```
 
 | Metric | What it counts |
@@ -173,7 +202,8 @@ end
 | `reflection_bytes` | GPU bytes of the reflection probes' cube array (#2085): every layer it is allocated with (the resident cubes and the spare slots the budget keeps), every mip, at the array's face (the largest resident cube's). The array is the only copy of a resident cube, so this is all the probe memory there is, held to `reflectionBudgetMB` except for the nearest cube and the fallback, which are kept past it (`Reflection.md`). A 128-texel BC6H cube is 128 KiB with its mips, a 512 one 2 MiB; on a GPU without BC compression eight times that. The resident total, not a per-frame count; `0` while no cube is resident |
 | `grade_lut_bakes` | views whose colour-grading LUT was rebaked this frame (#1440): a grading knob or the tonemap changed, or the view is new; `0` on every frame the grade holds |
 | `ui_mask_passes` / `ui_blur_passes` | UI `Mask` coverage textures rendered (#428) / fullscreen passes of the UI backdrop blur, its composite included — `0` with no backdrop visible (#426) |
-| `renderer_ms` | CPU ms `Renderer::render` took to record the frame |
+| `renderer_ms` | CPU ms `Renderer::render` took for the frame: recording it, resolving its GPU timestamps and submitting it. A cubemap capture (a reflection or light-probe bake) and the Inspector's preview are not the frame and are not in it |
+| `wall_ms` / `fps` | a window's frames only (#2205): wall-clock ms from the previous frame's start to this one's, the frame time a player feels (outside Play the editor draws on demand, so an idle gap counts whole), and the window clock's last whole-second reading: the frames drawn since its previous reading, over the seconds between them (at least one), so an editor redrawing on demand reads below 1. `fps` is absent for the window's first second, before the clock has a reading. Both are timings, never in a replay-stable `results.json` |
 | `render_extracted` / `render_posed` / `render_extract_us` | the retained render scene's update this frame (#1706): objects re-derived whole (every mesh entity on a first frame, a load, an Undo, a Play restore, a lightmap or light probe change, or a renderer-side one such as a re-written texture; otherwise only the meshes whose mesh, material, activity, layer, static flag, light or shader overrides changed, those naming a library material that was added, removed or edited in what a draw's key reads (render mode, shader, a map path, face, a Cutout's test), those overriding the runtime params of a material whose params were edited, and those sharing a re-uploaded geometry; an edit of a material's colour, scalars or params alone rewrites its record in place and re-derives no other object, unless it flips a term a pass is chosen by, which re-derives every user: a glass's roughness crossing the SSR threshold, `depth_postpass`, `writes_motion`, `blend_mode`) / objects only re-placed because they moved / CPU µs the update took, inside `renderer_ms` (wall-clock). `0` / `0` on a frame that changed nothing |
 | `render_upload_bytes` | bytes the frame wrote into the forward pass's per-draw arrays (#1706), every camera summed: per-draw uniforms, joint palettes (and a motion-blurred view's last-frame poses), 16 bytes per drawn instance, proxy volumes, the 192-byte record of each material (per scene and variant) that changed, and the 240-byte record of each object that moved or changed, with the unchanged records between two changed ones fewer than 32 slots apart, rewritten so the two go in one write (a static, unchanged object costs only its instance). A shadow sweep's casters are not counted |
 | `asset_uploads` / `asset_upload_bytes` | scene assets the frame uploaded (#2123), and their bytes: mesh buffers (a mesh's vertex and index data, rewritten in place or new), texture files (a material map, a UI image, a particle texture, the sky's panorama: its GPU size, every mip) and lightmap page arrays. What a windowed `Scene.LoadAsync`'s GPU warm-up made before its scene was swapped in is counted on no frame, so the new scene's first frame reads `0` for what it warmed (`Scene.md`, *Loading in the background*) |
@@ -182,8 +212,9 @@ end
 
 **GPU time per pass (#835).** Each render pass writes a GPU timestamp at its start
 and end; the renderer resolves them after the frame and reads them back without
-ever stalling it (the live loop gets them a frame or two later; the harness waits
-for its frames anyway, so each reports its own). The passes are grouped by kind,
+ever stalling it (the live loop gets them a frame or two later, so a window frame
+carries the newest times resolved, its own or one just before; the harness waits for
+its frames anyway, so each reports its own). The passes are grouped by kind,
 each kind's passes summed, under names that never change so two reports diff:
 
 | `gpu_passes` key | What it covers |
@@ -216,13 +247,15 @@ The kinds therefore add up to `gpu_ms`, and a heavy pass shows as heavy instead 
 smearing into the light ones behind it. Like every `_ms` key, these are wall-clock
 and differ run to run, and they are this GPU's: compare them on one machine.
 
-Keys ending in `_ms` or `_us` are **wall-clock** and differ run to run; everything else is a
-count and is deterministic for a deterministic run. The timings are measured *around*
+Keys ending in `_ms` or `_us`, and `fps`, are **wall-clock** and differ run to run;
+everything else is a count and is deterministic for a deterministic run. The timings are measured *around*
 the sim by the dev layer and never fed back into it, so reading them cannot change a
-replay. Render counters (and GPU times) appear only on frames something rendered through the
-headless renderer (a harness `Harness.Screenshot`, or `Harness.Render`, which draws
-without writing a PNG); a run that never renders reports timings and world counters
-only. Before any Play frame, `frames` is `0` and no metric is present.
+replay. Render counters (and GPU times) appear on drawn frames: a harness `Harness.Screenshot`,
+`Harness.Render` (which draws without writing a PNG), or every frame a `dev` build's
+window draws, editor or player (#2205). In the editor that is the tab on screen, Scene
+or Game; the Inspector's asset preview is not counted. A headless run that never
+renders reports timings and world counters only. Every harness frame is a session
+frame; a window's frame joins the session only in Play (above).
 
 Scenarios get the same table as `Harness.Stats()` and can turn it into pass/fail with
 `Harness.AssertBudget{ draw_calls = 2000, fixed_update_ms = 4 }` — see *Performance
