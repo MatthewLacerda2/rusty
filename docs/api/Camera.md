@@ -12,6 +12,7 @@
 | `Camera.VerticalToHorizontalFov` / `HorizontalToVerticalFov` | `(degrees, aspect)` | degrees: the same view's angle along the other axis at `aspect` (width / height), Unity's `VerticalToHorizontalFieldOfView` / `HorizontalToVerticalFieldOfView`. A 90° horizontal view at 16:9 is about 58.7° vertical. As in Unity, neither checks its input (an aspect of 0 or a NaN passes through); `SetFieldOfView` holds the result to 1–179 |
 | `Camera.WorldToScreen` | `(x, y, z [, canvas])` | `sx, sy, depth, onScreen` — see below |
 | `Camera.ScreenToWorldRay` | `(x, y)` | `ox, oy, oz, dx, dy, dz` — the ray's origin (on the near plane) and unit direction |
+| `Camera.MouseRay` | `()` | `ScreenToWorldRay`'s six values for the ray under the cursor — see below |
 | `Camera.ResetHistory` | `([id])` | — the next frame of camera `id`'s view (the main camera when omitted or `nil`) starts every history over; see *Teleports* |
 
 **Which pose these move (#1619).** Following Unity, where `Camera.main` is a
@@ -20,7 +21,7 @@ with the lowest render order, the one the player and the editor's Game view show
 the main view *is* that entity's Transform. `SetPosition` / `SetYaw` / `SetPitch`
 write its **world** position and rotation (rotation rebuilt from yaw and pitch, so
 any roll is dropped; each setter keeps the other angle), and every getter,
-`WorldToScreen` and `ScreenToWorldRay` read it, so moving the entity with
+`WorldToScreen`, `ScreenToWorldRay` and `MouseRay` read it, so moving the entity with
 `Transform.*` moves them too. `GetFov` / `SetFov` read and write that entity's
 field of view (Unity's `Camera.main.fieldOfView`), and the projections use its
 whole lens. The window, the Game view, headless screenshots, world-space UI
@@ -50,7 +51,9 @@ add `settle` (`Harness.Screenshot(path, { settle = 32 })`, `docs/testing.md`).
 
 **World ↔ screen (#429).** Screen points are **UI screen pixels** — bottom-left
 origin, y-up, the frame of `UI.GetRect(id).screen` and the UI pointer (Unity's
-screen space; `Input.GetMousePosition` is top-left, so flip `y`). The screen is the
+screen space). `Input.GetMousePosition` alone is top-left, y-down: pick with
+`MouseRay` rather than passing it to `ScreenToWorldRay`, which would mirror the
+aim top to bottom. The screen is the
 sim's (`UI.GetScreenSize`), so the answer is the same headless as in the window.
 
 - `WorldToScreen` projects a world point. Pass a canvas id to get that canvas's
@@ -59,12 +62,23 @@ sim's (`UI.GetScreenSize`), so the answer is the same headless as in the window.
   the point projects mirrored through the centre; `onScreen` is `true` only in front
   and inside the screen.
 - `ScreenToWorldRay` is the ray through a screen pixel — feed it to
-  `Physics.Raycast` to pick what is under the mouse, or use `UI.GetScreenSize()`'s
-  centre for a crosshair.
+  `Physics.Raycast` to pick what is under a screen point, or use
+  `UI.GetScreenSize()`'s centre for a crosshair.
+- `MouseRay` is the ray under the cursor, the one a mouse pick wants (Unity's
+  `ScreenPointToRay(Input.mousePosition)`): the pointer's position flipped into the
+  screen's frame, or the screen centre while the cursor is locked, as the UI's
+  pointer reads it. A game aimed with the cursor also frees and shows it
+  (`Input.SetCursorLocked(false)`, `Input.SetCursorVisible(true)`), since Play
+  starts it locked and hidden.
 
 ```lua no-run
 local x, y, depth, onScreen = Camera.WorldToScreen(ex, ey + 2, ez, hud)
 if onScreen then RectTransform.SetAnchoredPosition(label, x, y) end
+
+-- A click picks what is under the cursor.
+if Input.GetKeyDown("MOUSE0") then
+    local hit, picked = Physics.Raycast(Camera.MouseRay())
+end
 ```
 
 For markers that follow an entity every tick, prefer a world anchor
