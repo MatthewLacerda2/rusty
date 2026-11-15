@@ -353,7 +353,9 @@ which caches it, #1973). What it buys over `cargo test`:
 - **Each test is its own process**, so one test's panic, leaked global or stuck
   thread cannot take its neighbours with it.
 - **Every failure, summarised at the end** (`fail-fast = false`), instead of stopping
-  at the first failing binary — the list an agent reads to decide what to fix.
+  at the first failing binary — the list an agent reads to decide what to fix. `make
+  test` goes on the same way across its four runs (nextest and doctests, both feature
+  sets), and fails at the end if any did.
 - **A hang is named, not waited out**: a test is flagged SLOW after 60 s and killed
   after 5 min.
 - **A fixed proptest seed in the gates, a random one in exploring** (#1800, #1852).
