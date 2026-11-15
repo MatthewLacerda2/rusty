@@ -9,8 +9,9 @@
 //! the window's console otherwise, and `IsRunning()` alone reads `false` either way.
 //!
 //! The call only *requests* the bake (`Scene::lighting_bake_requested`): the
-//! editor's inspector takes it on its next frame (`bake::poll`) and runs the
-//! button's job, so nothing a script starts differs from what the button starts.
+//! editor takes it on its next frame (`bake::poll`), drawn or not (a locked screen
+//! still runs frames, `EditorUi::frame_work`), and runs the button's job, so
+//! nothing a script starts differs from what the button starts.
 //! It is refused where the button is (Play, a bake already running, an unsaved
 //! scene) and in a host with no frame loop to step the job (a headless session),
 //! which names `Lighting.Generate()` instead. Play counts from the moment it is

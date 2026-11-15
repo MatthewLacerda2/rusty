@@ -108,6 +108,13 @@ def head_of(repo: str, number: int) -> str | None:
     return ((quietly("api", f"repos/{repo}/pulls/{number}") or {}).get("head") or {}).get("sha")
 
 
+def merged_of(repo: str, number: int) -> bool | None:
+    """Whether pull request `number` merged, `None` when GitHub failed: what a
+    watch says of one that closed while no watch ran ([`watch.kept`], #2215)."""
+    read = quietly("api", f"repos/{repo}/pulls/{number}")
+    return None if not isinstance(read, dict) else bool(read.get("merged_at"))
+
+
 def head_runs(repo: str, sha: str) -> str | None:
     """[`watch.handbacks.attempts`] of the gating runs on `sha`, `None` when GitHub
     failed: what tells a re-run of a handed-back head from no news (#869)."""

@@ -94,7 +94,7 @@ def main(argv: list[str] | None = None) -> int:
     if opts.detach:
         log = common_dir(root) / supervisor.LOG
         log.parent.mkdir(parents=True, exist_ok=True)
-        with open(log, "a") as out:
+        with open(log, "a") as out:  # state-ok: the supervisor's log, appended
             child = subprocess.Popen(
                 [sys.executable, sys.argv[0], *(a for a in argv if a != "--detach")],
                 stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True,

@@ -68,7 +68,7 @@ or the menu bar's Stop button. The standalone player has no such override: Esc i
 | `Input.IsKeyDown` | `(key)` | `bool` — held right now |
 | `Input.GetKeyDown` | `(key)` | `bool` — went down since the previous tick (this tick only) |
 | `Input.GetKeyUp` | `(key)` | `bool` — went up since the previous tick (this tick only) |
-| `Input.GetMousePosition` | `()` | `x, y` in game-view pixels, origin top-left |
+| `Input.GetMousePosition` | `()` | `x, y` in game-view pixels, origin top-left (the screen's and `Camera.ScreenToWorldRay`'s are bottom-left: pick with `Camera.MouseRay()`) |
 | `Input.GetMouseDelta` | `()` | `dx, dy` raw motion accumulated before this tick |
 | `Input.GetScrollDelta` | `()` | wheel lines scrolled before this tick (positive = up) |
 | `Input.GetTextInput` | `()` | the characters typed before this tick, in order |
