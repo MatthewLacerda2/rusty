@@ -14,12 +14,26 @@ LINE = re.compile(r"^[ \t]*Mutation:[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 GLOB = re.compile(r"[A-Za-z0-9_.*?{}\[\],-]*(/[A-Za-z0-9_./*?{}\[\],-]*|\.rs)")
 
 
+def unlisted(word: str) -> list[str]:
+    """`word` split at its commas outside braces: a coder lists paths as
+    `a.rs, b.rs`, which the scope script's whitespace split read as a path ending
+    in `,` (#2201), while a brace glob's commas (`src/{a,b}/**`) are its own."""
+    parts, depth, start = [], 0, 0
+    for i, ch in enumerate(word):
+        depth += {"{": 1, "}": -1}.get(ch, 0)
+        if ch == "," and depth == 0:
+            parts.append(word[start:i])
+            start = i + 1
+    parts.append(word[start:])
+    return [p for p in parts if p]
+
+
 def requested(body: str | None) -> str | None:
     """`diff`, the space-separated globs, or `None` when nothing readable was asked."""
     found = LINE.search(body or "")
     if found is None:
         return None
-    words = found.group(1).replace("`", " ").split()
+    words = [w for word in found.group(1).replace("`", " ").split() for w in unlisted(word)]
     if not words:
         return None
     if words == ["diff"]:

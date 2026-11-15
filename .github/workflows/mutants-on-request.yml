@@ -17,7 +17,8 @@
 #
 # The scope is `diff` (this branch against `origin/main`) or path globs
 # (`crates/physics/src/**`), read by `.github/scripts/mutants-scope.py`, whose
-# docstring says why both become `--in-diff`. The scope and the request id
+# docstring says why both become `--in-diff`, one per cargo workspace the scope
+# reaches (the engine's, and a standalone crate such as `tools/lint`, #2201). The scope and the request id
 # `make mutants-remote` generates are in the run's name: a dispatch returns no
 # run id, so the id is how the command finds *its* run.
 #
@@ -160,30 +161,68 @@ jobs:
         with:
           tool: cargo-mutants,cargo-nextest
 
+      # One plan per cargo workspace the scope reaches (#2201): the engine's,
+      # and any directory whose `Cargo.toml` opens its own `[workspace]`
+      # (`tools/lint`), each with its own diff beside `plan.json`. Why it
+      # could not be read goes to `problem.txt`, for the comment below.
       - name: What was asked for
+        id: resolve
         env:
           SCOPE: ${{ inputs.scope }}
           COMMIT: ${{ inputs.commit }}
-        run: python3 .github/scripts/mutants-scope.py resolve "$SCOPE" --commit "$COMMIT" --out plan.json --diff scope.diff
+        run: |
+          python3 .github/scripts/mutants-scope.py resolve "$SCOPE" --commit "$COMMIT" --out plan.json 2> problem.txt \
+            || { cat problem.txt >&2; exit 1; }
 
       # `--list` builds nothing and answers in seconds, so the size of the
-      # request and what it covers are known before anything compiles.
+      # request and what it covers are known before anything compiles. A
+      # standalone part is listed inside its own root (`--dir`), whose diff
+      # names its files relative to it.
       - name: How much of it there is to mutate
         id: plan
         run: |
           set -euo pipefail
           # An empty diff (a branch that changed no Rust) plans nothing; it is
           # not handed to cargo-mutants, which refuses an empty `--in-diff`.
-          if [ -s scope.diff ]; then
-            cargo mutants --list --workspace --json --in-diff scope.diff > planned.json
-          else
-            : > planned.json
-          fi
-          python3 .github/scripts/mutants-scope.py check plan.json planned.json > scope.txt \
-            || { cat scope.txt; echo "::error::$(cat scope.txt)"; exit 1; }
+          python3 .github/scripts/mutants-scope.py parts plan.json | while read -r slug root diff; do
+            [ -s "$diff" ] || continue
+            if [ "$root" = . ]; then
+              cargo mutants --list --workspace --json --in-diff "$diff" > "planned-$slug.json"
+            else
+              cargo mutants --list --json --dir "$root" --in-diff "$diff" > "planned-$slug.json"
+            fi
+          done
+          python3 .github/scripts/mutants-scope.py check plan.json > scope.txt \
+            || { cat scope.txt; echo "::error::$(tr '\n' ' ' < scope.txt)"; exit 1; }
           cat scope.txt
-          in_scope=$(python3 -c 'import json,sys; t=open(sys.argv[1]).read().strip(); print(len(json.loads(t)) if t else 0)' planned.json)
-          echo "in_scope=$in_scope" >> "$GITHUB_OUTPUT"
+          count() { python3 -c 'import json,sys; print(sum(p.get("planned", 0) for p in json.load(open("plan.json"))["parts"] if (p["root"] == ".") == (sys.argv[1] == "root")))' "$1"; }
+          echo "in_scope=$(count root)" >> "$GITHUB_OUTPUT"
+          echo "standalone=$(count standalone)" >> "$GITHUB_OUTPUT"
+
+      # A standalone workspace's part (`tools/lint`), before the engine's so the
+      # small one is not starved by the large one's budget. It is one package
+      # with its own tests (`make test-lint`'s `cargo test`) and no `dev`
+      # feature or GPU, so cargo-mutants' own baseline is the right one here
+      # (#2164's mismatch is a workspace member's) and sets the timeout itself.
+      # Status and outcomes land beside the plan, per part, for the report.
+      - name: Standalone workspaces
+        if: steps.plan.outputs.standalone != '0'
+        run: |
+          set -uo pipefail
+          ulimit -v 8388608
+          python3 .github/scripts/mutants-scope.py parts plan.json --standalone --planned | while read -r slug root diff; do
+            budget=$(( BUDGET_SECONDS - ($(date +%s) - JOB_STARTED) ))
+            rc=0
+            if [ "$budget" -le 0 ]; then
+              echo "::warning::the ${BUDGET_SECONDS}s budget was spent before $root's mutants"
+              rc=124
+            else
+              timeout --signal=INT --kill-after=60s "${budget}s" \
+                cargo mutants --dir "$root" --no-shuffle --in-place --output "mutants-$slug" \
+                  --in-diff "$diff" || rc=$?
+            fi
+            echo "$rc" > "status-$slug"
+          done
 
       # The baseline is run here, not by cargo-mutants (`--baseline skip`, #2164):
       # cargo-mutants 27 builds and tests its own baseline with `--package` set
@@ -244,20 +283,18 @@ jobs:
           else
             timeout --signal=INT --kill-after=60s "${budget}s" \
               cargo mutants --workspace --test-tool nextest --no-shuffle --baseline skip --in-place \
-                --timeout "$TIMEOUT" --features dev \
-                --in-diff scope.diff -- --fail-fast --test-threads 2 || rc=$?
+                --timeout "$TIMEOUT" --features dev --output mutants-root \
+                --in-diff scope-root.diff -- --fail-fast --test-threads 2 || rc=$?
           fi
-          echo "status=$rc" >> "$GITHUB_OUTPUT"
+          echo "$rc" > status-root
 
-      # Red when cargo-mutants broke (any status but finished or stopped at
-      # its budget): then there is no honest report to write.
+      # Red when cargo-mutants broke in any part (any status but finished or
+      # stopped at its budget): then there is no honest report to write.
       - name: Render the report
-        env:
-          IN_SCOPE: ${{ steps.plan.outputs.in_scope }}
-          STATUS: ${{ steps.mutate.outputs.status || '0' }}
+        id: render
         run: |
-          python3 .github/scripts/mutants-report.py mutants.out scope.txt \
-            --in-scope "$IN_SCOPE" --exit "$STATUS" --out report
+          python3 .github/scripts/mutants-report.py plan.json scope.txt --out report 2> render-error.txt \
+            || { cat render-error.txt >&2; exit 1; }
           cat report/report.md >> "$GITHUB_STEP_SUMMARY"
           # And in the log, for a caller with no `gh` to download the artifact
           # (a cloud session reads the job log through its GitHub tools).
@@ -270,7 +307,29 @@ jobs:
       # `continue-on-error`: a comment that could not be posted is a lost
       # delivery, not a lost measurement, and survivors never turn this run
       # red, so neither may this. The report is still in the summary and log.
+      #
+      # A run with no answer says so there too (#2201): when the scope was
+      # unreadable, planned nothing, or broke, this writes a one-line report
+      # of why, which the next step posts, and the run stays red. Not on a
+      # cancel: a cancelled run's pull request closed unmerged (#1530).
+      - name: Say why there is no answer
+        if: failure()
+        env:
+          RESOLVE: ${{ steps.resolve.outcome }}
+          PLAN: ${{ steps.plan.outcome }}
+          BASELINE: ${{ steps.baseline.outcome }}
+          RENDER: ${{ steps.render.outcome }}
+        run: |
+          if [ "$RESOLVE" = failure ]; then why="the scope could not be read: $(cat problem.txt)"
+          elif [ "$PLAN" = failure ] && [ -s scope.txt ]; then why="$(cat scope.txt)"
+          elif [ "$BASELINE" = failure ]; then why="the engine's tests failed unmutated (the Baseline step), so no mutant could be measured."
+          elif [ "$RENDER" = failure ]; then why="$(cat render-error.txt)"
+          else why="the run broke before it could write a report."
+          fi
+          python3 .github/scripts/mutants-report.py --unanswered "$why" --out report
+
       - name: Post the report on the pull request
+        if: success() || failure()
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -278,6 +337,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           PR: ${{ inputs.pr }}
         run: |
+          [ -f report/report.md ] || { echo "no report was written; nothing to post"; exit 0; }
           python3 .github/scripts/mutants-pr-comment.py report/report.md \
             --repo "$GITHUB_REPOSITORY" --branch "$BRANCH" --run-url "$RUN_URL" ${PR:+--pr "$PR"}
 

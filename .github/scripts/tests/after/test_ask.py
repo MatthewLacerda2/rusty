@@ -12,6 +12,14 @@ class Requested(unittest.TestCase):
         self.assertEqual(ask.requested("Closes #1\n\nMutation: diff\n"), "diff")
         self.assertEqual(ask.requested("Mutation: `src/physics/**` src/a.rs"), "src/physics/** src/a.rs")
 
+    def test_a_comma_list_reads_as_the_same_globs(self) -> None:
+        for value in ("a/x.rs, b/y.rs", "a/x.rs,b/y.rs", "`a/x.rs`, `b/y.rs`,"):
+            self.assertEqual(ask.requested(f"Mutation: {value}"), "a/x.rs b/y.rs", value)
+
+    def test_a_brace_glob_keeps_its_commas(self) -> None:
+        self.assertEqual(ask.requested("Mutation: src/{a,b}/**"), "src/{a,b}/**")
+        self.assertEqual(ask.requested("Mutation: src/{a,b}/**, c/d.rs"), "src/{a,b}/** c/d.rs")
+
     def test_absent_or_empty_asks_for_nothing(self) -> None:
         for body in (None, "", "no line here", "Mutation:   ", "We said Mutation: diff inline."):
             self.assertIsNone(ask.requested(body), body)

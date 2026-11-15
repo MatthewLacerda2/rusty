@@ -12,7 +12,8 @@ group could only cap a branch, never the account.
 So the coder **asks** and the queue **dispatches, after the merge**:
 
 - **The ask is a line in the description**, `Mutation: diff` or
-  `Mutation: <globs>` ([`ask.requested`]). A line rather than a label, so a
+  `Mutation: <globs>` ([`ask.requested`]), the globs split by spaces or
+  commas outside braces (#2201). A line rather than a label, so a
   coder with no label tools can still ask; an absent or unreadable one asks
   for nothing.
 - **The run is on `main`, at the squash commit** ([`ask.inputs`]): `diff`

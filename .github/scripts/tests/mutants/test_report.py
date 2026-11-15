@@ -97,16 +97,19 @@ class Files(unittest.TestCase):
         self.dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.dir.cleanup)
         self.root = Path(self.dir.name)
-        (self.root / "mutants.out/diff").mkdir(parents=True)
-        (self.root / "mutants.out/diff/g.diff").write_text("-    x\n+    true\n")
-        (self.root / "mutants.out/outcomes.json").write_text(json.dumps(RUN))
+        out = self.root / "mutants-root/mutants.out"
+        (out / "diff").mkdir(parents=True)
+        (out / "diff/g.diff").write_text("-    x\n+    true\n")
+        (out / "outcomes.json").write_text(json.dumps(RUN))
         (self.root / "scope.txt").write_text("Scoped on request.\n")
+        plan = {"parts": [{"root": ".", "slug": "root", "planned": 4}]}
+        (self.root / "plan.json").write_text(json.dumps(plan))
 
     def cli(self, status: int) -> subprocess.CompletedProcess:
+        (self.root / "status-root").write_text(f"{status}\n")
         return subprocess.run(
-            [sys.executable, str(SCRIPT), str(self.root / "mutants.out"),
-             str(self.root / "scope.txt"), "--in-scope", "4", "--exit", str(status),
-             "--out", str(self.root / "report")],
+            [sys.executable, str(SCRIPT), str(self.root / "plan.json"),
+             str(self.root / "scope.txt"), "--out", str(self.root / "report")],
             capture_output=True, text=True, check=False)
 
     def test_each_survivor_has_its_diff_or_says_it_has_none(self) -> None:
