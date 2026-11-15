@@ -71,8 +71,8 @@ pub(crate) fn create_textures(
     }
 }
 
-/// A group(2) material bind group with all six map slots (albedo, metallic,
-/// roughness, normal, emissive, detail) pointing at the default texture and every extra
+/// A group(2) material bind group with all eight map slots (albedo, metallic,
+/// roughness, normal, emissive, detail, occlusion, specular) pointing at the default texture and every extra
 /// shader texture slot at white (#400).
 /// Bound by passes that need group(2) but never sample the maps (the editor grid
 /// and gizmos) (#202, #207).

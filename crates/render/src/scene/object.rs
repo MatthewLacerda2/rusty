@@ -6,7 +6,7 @@ use glam::{Mat4, Vec3};
 
 use crate::draw::batch::sort::TransparentOrder;
 use crate::draw::batch::BatchKey;
-use crate::draw::materials::material_texture_paths;
+use crate::draw::map_slots::material_texture_paths;
 use crate::draw::uniforms::solid_object;
 use crate::frustum::transform_aabb;
 use crate::gpu::pipelines::Facing;

@@ -65,6 +65,7 @@ mod metal_reflection_screenshot;
 mod multi_material_screenshot;
 mod normal_emissive_maps_screenshot;
 mod normal_matrix_screenshot;
+mod occlusion_specular_maps_screenshot;
 mod panorama_pole_screenshot;
 mod panorama_sky_screenshot;
 mod particle;

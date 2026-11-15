@@ -70,6 +70,7 @@ pub(crate) fn material_data(lit: bool, material: Option<&MaterialAsset>) -> Mate
         normal_variance: [0; 4],
         dielectric_reflectance: [f0[0], f0[1], f0[2], f90],
         detail: material.map_or_else(DetailUniform::default, super::detail::detail_uniform),
+        level_maps: super::map_slots::level_maps_uniform(material),
     }
 }
 

@@ -91,15 +91,22 @@ pub struct MaterialData {
     pub emissive_map: Option<MapRef>,
     /// glTF `emissiveFactor` (linear RGB, default `[0,0,0]`).
     pub emissive: [f32; 3],
+    /// Resolved path to glTF's `occlusionTexture` (#2151, R), or `None`. An ORM
+    /// file names the metallic-roughness image here too: one path, one upload.
+    pub occlusion_map: Option<MapRef>,
+    /// `occlusionTexture.strength`, 1 when absent, as glTF defaults it.
+    pub occlusion_strength: f32,
     /// glTF `doubleSided` (#1615): both faces draw. `false` by default, as in glTF,
     /// and always for a `.blend`'s conversion (`gltf::material`, Unity's way).
     pub double_sided: bool,
     /// glTF `KHR_materials_ior`'s `ior` (#1998), 1.5 when absent, as the extension
     /// defaults it.
     pub ior: f32,
-    /// `KHR_materials_specular`'s `specularFactor` (#1998), 1 when absent. Its
-    /// textures are not read: the engine's material has no specular map slots.
+    /// `KHR_materials_specular`'s `specularFactor` (#1998), 1 when absent.
     pub specular: f32,
+    /// Resolved path to `KHR_materials_specular`'s `specularTexture` (#2151, A), or
+    /// `None`. Its `specularColorTexture` is not read: the material has no slot.
+    pub specular_map: Option<MapRef>,
     /// `KHR_materials_specular`'s `specularColorFactor` (#1998), white when absent.
     pub specular_color: [f32; 3],
 }
@@ -117,9 +124,12 @@ impl Default for MaterialData {
             normal_map: None,
             emissive_map: None,
             emissive: [0.0, 0.0, 0.0],
+            occlusion_map: None,
+            occlusion_strength: 1.0,
             double_sided: false,
             ior: 1.5,
             specular: 1.0,
+            specular_map: None,
             specular_color: [1.0; 3],
         }
     }

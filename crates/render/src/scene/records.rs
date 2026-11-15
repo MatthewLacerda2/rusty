@@ -230,6 +230,7 @@ fn record_free(m: &MaterialAsset) -> MaterialAsset {
         metallic: d.metallic,
         roughness: d.roughness,
         emissive: d.emissive,
+        occlusion_strength: d.occlusion_strength,
         tiling: d.tiling,
         offset: d.offset,
         uv_mapping: d.uv_mapping,

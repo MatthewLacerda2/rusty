@@ -126,14 +126,14 @@ pub fn fit_normal_slot(source: &Path) {
     );
 }
 
-/// The image at `source`, just assigned to a material's metallic or roughness
-/// slot, set to linear (*sRGB* off) when it is a `Default` texture still marked
+/// The image at `source`, just assigned to one of a material's data slots
+/// (metallic, roughness, occlusion, specular level, detail), set to linear (*sRGB* off) when it is a `Default` texture still marked
 /// sRGB, and said so: its texels are data, so its mips average raw, as an
 /// uncompressed upload in that slot does (#1322, #1574).
 pub fn fit_data_slot(source: &Path) {
     fit_slot(
         source,
-        "data (metallic/roughness), so its sRGB is now off",
+        "a data map (metallic, roughness, occlusion, specular level, detail), so its sRGB is now off",
         |s| {
             (s.texture_type == TextureType::Default && s.srgb)
                 .then_some(TextureSettings { srgb: false, ..*s })

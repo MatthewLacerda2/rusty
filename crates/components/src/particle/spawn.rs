@@ -157,6 +157,9 @@ impl ParticleEmitterComponent {
             self.runtime.particles.push(p);
             spawned += 1;
         }
+        if spawned > 0 {
+            self.runtime.revision = self.runtime.revision.wrapping_add(1);
+        }
         spawned
     }
 }

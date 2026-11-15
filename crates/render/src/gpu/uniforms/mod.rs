@@ -20,7 +20,8 @@ mod procedural_sky_gpu_tests;
 
 pub(crate) use instance::{InstanceData, ObjectData};
 pub(crate) use material::{
-    DetailUniform, DrawUniform, MappingUniform, MaterialData, SurfaceUniform, MATERIAL_DATA_WORDS,
+    DetailUniform, DrawUniform, LevelMapsUniform, MappingUniform, MaterialData, SurfaceUniform,
+    MATERIAL_DATA_WORDS,
 };
 pub(crate) use records::{RecordTable, RecordWords};
 pub(crate) use sky::ProceduralSkyUniform;

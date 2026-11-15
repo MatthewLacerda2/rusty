@@ -93,6 +93,8 @@ pub(crate) struct MaterialData {
     pub dielectric_reflectance: [f32; 4],
     // The detail layer (#1997, HDRP's detail map).
     pub detail: DetailUniform,
+    // The occlusion and specular-level maps (#2151).
+    pub level_maps: LevelMapsUniform,
 }
 
 // The stride is a dynamic-offset alignment, not a cap the record has to fit; a storage
@@ -226,4 +228,21 @@ pub(crate) struct DetailUniform {
     /// HDRP's *Detail Smoothness Scale*.
     pub detail_smoothness_scale: f32,
     pub _pad: [u32; 3],
+}
+
+/// The occlusion and specular-level maps' terms (#2151), packed from the material
+/// (`render::draw::map_slots::level_maps_uniform`); off for a draw without one, and
+/// each flag 0 while its map has no resident texture (`Renderer::with_map_channels`).
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct LevelMapsUniform {
+    /// 1 when glTF's `occlusionTexture` (red) darkens the indirect light.
+    pub use_occlusion_map: u32,
+    /// Its strength in `[0, 1]`: `1 + strength × (map − 1)`.
+    pub occlusion_strength: f32,
+    /// `KHR_materials_specular`'s `specularTexture`: 1 scales the dielectric
+    /// reflectance by its alpha, 2 by its red (a one-channel upload, as
+    /// `use_metallic_map`'s 2).
+    pub use_specular_map: u32,
+    pub _pad: u32,
 }

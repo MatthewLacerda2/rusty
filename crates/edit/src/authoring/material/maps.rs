@@ -98,18 +98,28 @@ fn fill_empty_maps(asset: &mut MaterialAsset, baked: &BTreeMap<String, String>) 
             continue;
         };
         for field in slot.material_maps() {
-            let target = match *field {
-                "base_color_map" => &mut asset.base_color_map,
-                "metallic_map" => &mut asset.metallic_map,
-                "roughness_map" => &mut asset.roughness_map,
-                "normal_map" => &mut asset.normal_map,
-                "emissive_map" => &mut asset.emissive_map,
-                _ => continue,
-            };
-            target.get_or_insert_with(|| MapRef::from(path.clone()));
+            // Every key a slot names is a field: `maps_tests` walks `Slot::ALL`.
+            if let Some(target) = map_field(asset, field) {
+                target.get_or_insert_with(|| MapRef::from(path.clone()));
+            }
         }
     }
     super::fit_map_slots(asset);
+}
+
+/// The map field `MaterialAsset` keeps under the `DefineAsset` key `name`
+/// ([`Slot::material_maps`]' spelling), `None` for a key that is no map field.
+fn map_field<'a>(asset: &'a mut MaterialAsset, name: &str) -> Option<&'a mut Option<MapRef>> {
+    Some(match name {
+        "base_color_map" => &mut asset.base_color_map,
+        "metallic_map" => &mut asset.metallic_map,
+        "roughness_map" => &mut asset.roughness_map,
+        "normal_map" => &mut asset.normal_map,
+        "emissive_map" => &mut asset.emissive_map,
+        "occlusion_map" => &mut asset.occlusion_map,
+        "specular_map" => &mut asset.specular_map,
+        _ => return None,
+    })
 }
 
 #[cfg(test)]
