@@ -61,7 +61,7 @@ from __future__ import annotations
 # on the commit — `main-health` (a `workflow_run` on `main`, never a PR check),
 # the coverage, mutation and nightly `cargo-test` signals — is not asked about, and counting it would be the same mistake in a new costume.
 WORKFLOWS: dict[str, tuple[str, tuple[str, ...]]] = {
-    "ci": ("ci-gate", ("build-test", "build-test-cross", "blender", "deny")),
+    "ci": ("ci-gate", ("build-test", "build-test-cross", "blender", "deny", "fuzz-check")),
     "lint": ("lint-gate", ("lint",)),
 }
 

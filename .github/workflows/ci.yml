@@ -75,6 +75,9 @@ jobs:
       pull-requests: read  # paths-filter reads a PR's changed files
     outputs:
       code: ${{ steps.proved.outputs.proved == 'true' && 'false' || steps.filter.outputs.code || 'true' }}
+      # Whether the change can break the fuzz target's build (`fuzz-check`); empty
+      # off a PR or push, where that job runs regardless.
+      fuzz: ${{ steps.filter.outputs.fuzz }}
     steps:
       # On `pull_request` paths-filter reads the changed files from the API and
       # needs no clone; on `push` it diffs `github.event.before..HEAD` in a local
@@ -100,6 +103,28 @@ jobs:
               # the game CLAUDE.md template a project's edit-open embeds (#1313).
               - 'docs/game-agent.md'
               - 'crates/core/src/project/game_claude.md'
+            # What can stop `fuzz/` compiling (`fuzz-check`): the target and its
+            # manifest; the root package's manifest and re-exports (`src/lib.rs`),
+            # which it imports through; every member's manifest (a feature or
+            # dependency change) and crate root (a renamed re-export); the two crates whose API it calls
+            # (`edit::apply_scene_data`, `scene::{Scene, SceneData}`), since a
+            # signature lives in their modules, not their roots; the toolchain and
+            # cargo config every build reads; and this file. Not the root
+            # `Cargo.lock`, which the check derives its lock from: a bump that
+            # breaks the fuzz target's build breaks the engine's too, and the
+            # nightly's unconditional run bounds the rest. `make gates` reads this list too (`fuzz_gate.py`), so keep it
+            # a flat list of quoted globs.
+            fuzz:
+              - 'fuzz/**'
+              - 'Cargo.toml'
+              - 'src/lib.rs'
+              - 'crates/*/Cargo.toml'
+              - 'crates/*/src/lib.rs'
+              - 'crates/edit/src/**'
+              - 'crates/scene/src/**'
+              - 'rust-toolchain.toml'
+              - '.cargo/**'
+              - '.github/workflows/ci.yml'
       # Only a push asks, and only when it changes code: a Markdown-only merge
       # already skips. A push that changes a cache key's inputs (`Cargo.lock`,
       # the toolchain, `.github/actions/`, which pins the CI tools, #1973) runs
@@ -418,6 +443,37 @@ jobs:
           # Policy lives in deny.toml.
           command: check advisories bans sources licenses
 
+  # `fuzz/` is its own workspace (cargo-fuzz), so no other job compiles it and
+  # its target could stop building with nothing red. This checks it, on the
+  # pinned stable toolchain (only *running* libFuzzer needs nightly), against a
+  # lock derived from the root one: `make fuzz-check`, which holds the failure hint. A second
+  # cold engine build in its own target dir, so on a PR or push it runs only
+  # when `changes`' `fuzz` filter says the diff can break that build (`make
+  # gates` reads the same filter); skipped otherwise, which `ci-gate` passes.
+  # The nightly and a dispatch always run it. No rust-cache: the repository's
+  # Actions cache is past its quota, so a new entry evicts one the gating jobs
+  # need, and a cold check is short and runs on few pull requests.
+  fuzz-check:
+    needs: changes
+    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      ((github.event_name == 'push' ||
+        (github.event_name == 'pull_request' && github.event.pull_request.draft == false)) &&
+       needs.changes.outputs.code != 'false' && needs.changes.outputs.fuzz == 'true')
+    steps:
+      - uses: actions/checkout@v7
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show
+      - name: System libs for winit/wgpu builds
+        uses: ./.github/actions/system-libs
+        with:
+          packages: pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
+      - name: Check the fuzz target (stable, the root lock's versions)
+        run: make fuzz-check
+
   # The single required status check for ci.yml (issue #229). `main`'s ruleset,
   # kept as code in `.github/rulesets/main.json` (#491; `make ruleset` checks it is
   # live), requires THIS job from GitHub Actions, not build-test / build-test-cross
@@ -440,7 +496,7 @@ jobs:
   # report a run where nothing was checked as green. That happened on every
   # post-merge run until #480 (`changes` failed, `ci-gate` said success).
   ci-gate:
-    needs: [changes, build-test, build-test-cross, blender, deny]
+    needs: [changes, build-test, build-test-cross, blender, deny, fuzz-check]
     # `!cancelled()`, not `always()` (#515): a failed or skipped gating job still
     # reaches this gate and fails it, but a run cancelled because a newer push
     # superseded it (#482) leaves no red `ci-gate` beside the live one.
