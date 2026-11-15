@@ -11,7 +11,8 @@ use std::collections::HashMap;
 use glam::Vec2;
 
 use super::sdf::{glyph_field, GlyphField};
-use rusty_ui::text::font::{self, GlyphId};
+use rusty_font::GlyphId;
+use rusty_ui::text::font;
 
 pub(crate) const WIDTH: u32 = 1024;
 pub(crate) const START_HEIGHT: u32 = 256;
@@ -57,7 +58,11 @@ impl Default for GlyphAtlas {
 impl GlyphAtlas {
     /// `glyph`'s place, generating and packing it on first use. `None` for an empty
     /// glyph or a full atlas.
-    pub(crate) fn glyph(&mut self, font: &font::FontData, glyph: GlyphId) -> Option<AtlasGlyph> {
+    pub(crate) fn glyph(
+        &mut self,
+        font: &rusty_font::FontData,
+        glyph: GlyphId,
+    ) -> Option<AtlasGlyph> {
         if let Some(g) = self.glyphs.get(&glyph) {
             return *g;
         }

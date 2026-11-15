@@ -167,7 +167,7 @@ mod tests {
     #[test]
     fn faux_italic_shears_about_the_baseline_not_a_raised_origin() {
         let glyph = |y: f32| PlacedGlyph {
-            glyph: rusty_ui::text::font::GlyphId::NOTDEF,
+            glyph: rusty_font::GlyphId::NOTDEF,
             face: 0,
             origin: Vec2::new(0.0, y),
             baseline: 0.0,
