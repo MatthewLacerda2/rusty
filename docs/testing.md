@@ -742,7 +742,8 @@ buttons, an image, audio or prefab card; exclusive with `--select`), `--frame` (
 view's timeline, replayed to tick `n`, default 0; #1598), `--pointer <X>,<Y>` (the
 pointer held there, in pixels, so a hover shows), `--gizmo <Name>=on|off` (a Scene-view
 gizmo drawn or not, by its `Editor.SetGizmo` name, e.g. `--gizmo NavMesh=on`;
-repeatable, #1909), `--picker [new|open|mismatch|focus]` (the project picker the editor starts
+repeatable, #1909), `--game-view <Free|W:H|WxH>` (the Game view's size, as its
+dropdown sets it, #2207: `--game --game-view 16:9` letterboxes it in the panel), `--picker [new|open|mismatch|focus]` (the project picker the editor starts
 on, #854, over a sample recent list dated against a fixed time; the page names show
 *New Project*, *Open* and the different-engine prompt). From Rust, `capture::capture(&game,
 path, &EditorCaptureOptions { .. })` takes any `GameWorld`, and `capture_into` shares a
@@ -760,7 +761,7 @@ changes, and its coder looks at both and says what it saw in the PR; no PNG goes
 GitHub (*Looking at a change*, below). `.gitignore` ignores `editor-capture*.png` at
 the root, but a capture belongs in the session's scratchpad.
 
-The smoke test (`tests/gpu/editor_capture.rs`) checks that the default scene captures,
+The smoke test (`tests/gpu/editor_capture/panels.rs`) checks that the default scene captures,
 the image is not blank and the hierarchy, viewport and inspector sit where the editor
 puts them. **No pixel goldens** of the editor: fonts and anti-aliasing differ across
 platforms and adapters, so a golden would break on every one but the machine that made it.

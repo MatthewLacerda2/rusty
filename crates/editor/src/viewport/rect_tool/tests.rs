@@ -13,6 +13,7 @@ fn frame() -> OverlayFrame {
     OverlayFrame {
         size: Vec2::new(960.0, 540.0),
         pixels_per_point: 2.0,
+        game: None,
         textures: Default::default(),
     }
 }
@@ -48,6 +49,27 @@ fn the_frame_maps_points_to_pixels_and_canvas_units() {
         frame().delta_to_canvas(Vec2::new(3.0, 4.0), 2.0),
         Vec2::new(3.0, -4.0)
     );
+}
+
+/// With a 640x480 Game view the 960x540-point image boxes a 720x540 screen at
+/// x 120..840: the overlay lays out at the game's 640x480 and maps into that box.
+#[test]
+fn a_game_view_size_boxes_the_overlay() {
+    let boxed = OverlayFrame {
+        game: Some((640, 480)),
+        ..frame()
+    };
+    assert_eq!(boxed.screen(), Vec2::new(640.0, 480.0));
+    // The box's bottom-left corner is the screen's origin, its centre the centre.
+    assert_eq!(boxed.pixel(Vec2::new(120.0, 540.0)), Vec2::ZERO);
+    assert_eq!(
+        boxed.pixel(Vec2::new(480.0, 270.0)),
+        Vec2::new(320.0, 240.0)
+    );
+    let back = boxed.to_local(Vec2::new(320.0, 240.0), 1.0);
+    assert!((back - Vec2::new(480.0, 270.0)).length() < 1e-3, "{back}");
+    let d = boxed.delta_to_canvas(Vec2::new(9.0, 0.0), 1.0);
+    assert!((d.x - 8.0).abs() < 1e-3, "{d}");
 }
 
 #[test]

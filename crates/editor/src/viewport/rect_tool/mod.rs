@@ -41,38 +41,89 @@ use rusty_ui::{CanvasSpace, TextureSizes, UiLayout, UiPointer, UiRect, UiView};
 const HANDLE_RADIUS: f32 = 7.0;
 
 /// The Scene viewport image as the overlay sees it: its size in points, the
-/// pixels per point the offscreen target was sized with, and the texture sizes
-/// the UI lays out with (`EditorUi::ui_textures`).
+/// pixels per point the offscreen target was sized with, the Game view's own pixel
+/// size when it has one, and the texture sizes the UI lays out with
+/// (`EditorUi::ui_textures`).
+///
+/// The overlay lays the UI out at the screen the game does: the Game view's own
+/// size (`game`), boxed in the Scene image at its aspect ratio as the Game tab
+/// letterboxes it, else the image's own pixels. The renderer draws the screen
+/// canvases into the same box (`UiViewCache::screen_box`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct OverlayFrame {
     pub size: Vec2,
     pub pixels_per_point: f32,
+    pub game: Option<(u32, u32)>,
     pub textures: Rc<TextureSizes>,
 }
 
 impl OverlayFrame {
-    /// The screen the overlay lays out on: the viewport target's pixel size.
+    /// The frame of an image `size` points wide at `pixels_per_point`, showing the
+    /// Game view's own size `game` when it has one.
+    pub fn new(
+        size: Vec2,
+        pixels_per_point: f32,
+        game: Option<(u32, u32)>,
+        textures: &Rc<TextureSizes>,
+    ) -> Self {
+        let textures = Rc::clone(textures);
+        Self {
+            size,
+            pixels_per_point,
+            game,
+            textures,
+        }
+    }
+
+    /// The screen the overlay lays out on: the Game view's own size, else the
+    /// viewport target's pixel size.
     pub fn screen(&self) -> Vec2 {
-        (self.size * self.pixels_per_point).round().max(Vec2::ONE)
+        match self.game {
+            Some((w, h)) => Vec2::new(w as f32, h as f32).max(Vec2::ONE),
+            None => (self.size * self.pixels_per_point).round().max(Vec2::ONE),
+        }
+    }
+
+    /// The box the screen shows in, in viewport points: its top-left and extent.
+    fn boxed(&self) -> (Vec2, Vec2) {
+        let Some(game) = self.game else {
+            return (Vec2::ZERO, self.size);
+        };
+        let (o, e) = rusty_core::application::letterbox((self.size.x, self.size.y), game);
+        (
+            Vec2::new(o.0, o.1),
+            Vec2::new(e.0, e.1).max(Vec2::splat(1e-6)),
+        )
+    }
+
+    /// Screen pixels per viewport point, on each axis.
+    fn per_point(&self) -> Vec2 {
+        match self.game {
+            Some(_) => self.screen() / self.boxed().1,
+            None => Vec2::splat(self.pixels_per_point),
+        }
     }
 
     /// The UI screen pixel (bottom-left origin, y-up) under viewport point `p`
     /// (top-left origin, y-down).
     pub fn pixel(&self, p: Vec2) -> Vec2 {
-        Vec2::new(p.x, self.size.y - p.y) * self.pixels_per_point
+        let (origin, extent) = self.boxed();
+        let q = p - origin;
+        Vec2::new(q.x, extent.y - q.y) * self.per_point()
     }
 
     /// The viewport point showing canvas point `c` of a canvas at `scale` pixels
     /// per reference unit.
     pub fn to_local(&self, c: Vec2, scale: f32) -> Vec2 {
-        let px = c * scale / self.pixels_per_point;
-        Vec2::new(px.x, self.size.y - px.y)
+        let (origin, extent) = self.boxed();
+        let pt = c * scale / self.per_point();
+        origin + Vec2::new(pt.x, extent.y - pt.y)
     }
 
     /// A pointer move of `d` viewport points, in reference units of a canvas at
     /// `scale`.
     pub fn delta_to_canvas(&self, d: Vec2, scale: f32) -> Vec2 {
-        Vec2::new(d.x, -d.y) * self.pixels_per_point / scale.max(1e-6)
+        Vec2::new(d.x, -d.y) * self.per_point() / scale.max(1e-6)
     }
 
     /// The overlay's layout of `world` (no camera: markers sit at their anchors).

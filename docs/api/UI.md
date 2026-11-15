@@ -103,4 +103,6 @@ bottom-right; `canvas` — the root canvas id; `scale_factor`; `world` — `true
 (absent while any corner is behind the camera). `GetRect` computes on
 demand from the live scene, so it reflects a change made earlier in the same
 script, in edit mode as well as in Play. The screen size is the game view's pixel
-size in the windowed app and the `Video` resolution headless.
+size in the windowed app (in the editor, the size its dropdown gives it, *Free
+Aspect* being the panel's pixels: [`Editor.md`](Editor.md#the-game-views-size)) and
+the `Video` resolution headless.

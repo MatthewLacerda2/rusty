@@ -7,6 +7,8 @@ fn interaction(tab: ViewportTab, pressed: bool, hovering: bool) -> ViewportInter
         tab,
         origin: egui::pos2(100.0, 40.0),
         size: egui::vec2(400.0, 300.0),
+        render: None,
+        screen: None,
         hover_local: hovering.then(|| egui::vec2(10.0, 10.0)),
         clicked: false,
         dragging: false,
