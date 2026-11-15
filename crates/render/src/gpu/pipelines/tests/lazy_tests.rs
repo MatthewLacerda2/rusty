@@ -92,7 +92,8 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
     // passes and gather (#1436) + TAA's resolve, its upscale (#1702) and its
     // sharpen (#1847; one output format headless) + the depth of field's 9 (#1445) + bloom's prefilter,
     // resample, downsample and upsample (#1700) + the lens flare's (#1443; the composite adds it, #1473)
-    // + 2 particle + 2 ribbon, each again reactive (#1845) + one world canvas per blend mode + 2 mirrored and 2
+    // + 2 particle + 2 ribbon, each again reactive (#1845) + the GPU-simulated
+    // particles' 2, again reactive (#2170) + one world canvas per blend mode + 2 mirrored and 2
     // two-sided shadow (#1571) + the data-mip one + the opaque copy (#1523) + the
     // editor's line, vertex-coloured line (#1882), probe ball (#1911) and navmesh (#1910), the
     // outline's mask (one per facing), dilation and edge.
@@ -113,6 +114,7 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
             + 9
             + 4
             + 1
+            + 4
             + 4
             + 4
             + UiBlend::ALL.len()
