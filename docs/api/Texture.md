@@ -44,9 +44,10 @@ lists the valid ones — a typo like `"basecolour"` never silently bakes linear 
 | `metallic_roughness` / `orm` | linear | reads **metallic from the input's R, roughness from its G** (input B is ignored), and writes them as glTF's packed map: **metallic → B, roughness → G**, R = 0 |
 | `occlusion` / `ao` | linear | — (the material reads R: an `ambient_occlusion` node's output drops straight in) |
 | `specular` | linear | the input's **R written to every channel** (the material reads the level from A, as glTF's `specularTexture`) |
+| `height` | linear, **16-bit** | the input's **R written to RGB**, A opaque (the material's `height_map`, read from R: white the surface, black the deepest point) |
 | `data` | linear, **16-bit** | — (height/masks/anything raw; the explicit way to get unencoded output) |
 
-Every slot bakes 8 bits per channel except `data` and `normal16`, which bake a
+Every slot bakes 8 bits per channel except `data`, `normal16` and `height`, which bake a
 **16-bit** PNG (#1491, #2002): a height field used as displacement or a terrain
 heightmap keeps 65536 levels instead of terracing into 256 steps, and a normal map
 keeps slopes under about 0.004 that 8 bits round flat (a mirror-polished stone). The 16 bits are the file's: the renderer
@@ -105,6 +106,7 @@ and the file name use the canonical name: `albedo` → `base_color`, `orm` →
 | `metallic_roughness` | `metallic_map` **and** `roughness_map` (the same PNG) |
 | `occlusion` | `occlusion_map` |
 | `specular` | `specular_map` |
+| `height` | `height_map` |
 | `data` | — (no material slot) |
 
 To skip the hand-off, put the whole recipe in the material as `maps`

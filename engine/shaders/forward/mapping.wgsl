@@ -3,7 +3,9 @@
 // *Base UV Mapping*, projected from world space so a scaled primitive keeps one
 // texel density on every face. Every map lookup of the forward shader (and its
 // prepass and the selection mask) goes through `sample`, the normal map through
-// `sample_normal`, so all maps of a material agree on where they are read.
+// `sample_normal`, so all maps of a material agree on where they are read; the
+// forward pass shifts the one `MapCoords` they all read by the height map's
+// parallax first (`forward::parallax`, #2191).
 //
 // Every branch here is on `material()` (the draw's record, indexed by a per-draw
 // uniform) or on the camera's mip bias, so the implicit-LOD samples sit in uniform
