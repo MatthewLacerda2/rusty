@@ -1,9 +1,10 @@
-//! A contact reflection keeps its own blur among long faded rays (#2158): a cube,
-//! or a thin post, standing on a satin metal floor, a far wall behind it. Most of
-//! the floor's rays run to the wall and fade out (their blur too wide to keep), but
-//! they still tell the resolve how wide a blur is around them; the rays that meet
-//! the foot are short, so its reflection there stays tight against the foot, not
-//! smeared and dimmed across the long rays' blur, however few they are.
+//! A contact reflection among long faded rays (#2158): a cube, or a thin post,
+//! standing on a satin metal floor, a far wall behind it. Most of the floor's rays
+//! run to the wall and fade out (their blur too wide to keep), but they still tell
+//! the resolve how wide a blur is around them. The rays that meet a cube's foot are
+//! enough of the mean around it to keep its reflection there tight; a thin post's
+//! are not, and its reflection fades with the long rays' (the radius field is a
+//! plain mean, smooth among hits: `docs/api/Graphics.md`).
 
 use glam::Vec3;
 
@@ -85,11 +86,6 @@ fn kept(r: &mut Renderer, what: (f32, bool)) -> (f32, i32) {
 /// The least share of its redness a cube's contact reflection keeps among faded rays.
 const TIGHT: f32 = 0.9;
 
-/// The least share a thin post's keeps on a rougher floor (near 0.6 here, where the
-/// wall's rays meet the blur's clamp; none at all when the field's mean could not
-/// narrow below the clamp).
-const THIN: f32 = 0.4;
-
 #[test]
 fn gpu_a_satin_floor_keeps_a_standing_cubes_contact_reflection_tight() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {
@@ -104,8 +100,12 @@ fn gpu_a_satin_floor_keeps_a_standing_cubes_contact_reflection_tight() {
     );
 }
 
+/// What a thin post's contact reflection keeps on a rougher floor: on its own, a
+/// reflection under its foot; among a far wall's long rays, their blur, so it fades
+/// to the probe's reflection with theirs (near none of it here), never a patch
+/// brighter or darker than that reflection was.
 #[test]
-fn gpu_a_rougher_floor_keeps_a_thin_posts_contact_reflection() {
+fn gpu_a_thin_posts_contact_reflection_fades_with_the_long_rays_around_it() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {
         return;
     };
@@ -113,7 +113,7 @@ fn gpu_a_rougher_floor_keeps_a_thin_posts_contact_reflection() {
     eprintln!("[ssr] a thin post on a roughness-0.5 floor: its reflection under its foot adds {open} red, keeping {share:.2} of it with a far wall's faded rays around it");
     assert!(open > 0, "the floor reflects the post's foot");
     assert!(
-        share >= THIN,
-        "a thin post's contact reflection survives the long rays around it"
+        share.abs() <= 1.0,
+        "among long rays a thin contact fades, adding or taking no more than it had"
     );
 }

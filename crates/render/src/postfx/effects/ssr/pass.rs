@@ -7,8 +7,8 @@
 //! its hit's blur radius per unit cone and how much it counts (#2158); their pyramids
 //! are built; and the resolve (`fs_resolve`, #2028) averages each pixel's hits over
 //! a disk whose radius is the pixel's own cone times the radius field those
-//! pyramids smooth (the hits' harmonic mean around it, narrowed toward its own
-//! ray's), and draws them over the image, so a rough surface's reflected
+//! pyramids smooth (the mean of the hits' radii around it, smooth among hits as
+//! across a hit and a miss), and draws them over the image, so a rough surface's reflected
 //! silhouette fades across its blur instead of stepping at a pixel's hit or miss.
 //! The translucents, the overlay cameras and every post effect see the reflected
 //! scene, HDRP's order.
@@ -71,9 +71,8 @@ pub(crate) struct SsrPasses {
     trace: LazyPipeline,
     resolve: LazyPipeline,
     /// The downsample every SSR pyramid is built by: the colour's and the trace's
-    /// two (`postfx/ssr.wgsl`'s `Traced`: its hits, and where it traced, how much
-    /// its ray's hit counts over its radius per unit cone, and that count, #2158),
-    /// all
+    /// two (`postfx/ssr.wgsl`'s `Traced`: its hits, and where it traced, its hit's
+    /// radius per unit cone times how much it counts, and that count, #2158), all
     /// [`HDR_FORMAT`].
     pyramid: PyramidPass,
 }

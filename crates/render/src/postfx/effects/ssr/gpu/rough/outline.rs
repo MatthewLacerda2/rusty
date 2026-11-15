@@ -17,7 +17,7 @@ use rusty_scene::{Camera, Scene};
 const FOV: f32 = 40.0;
 
 /// A box named `name` centred at `at`, `size` across, painted `surface`.
-fn block(s: &mut Scene, name: &str, at: Vec3, size: Vec3, surface: Surface) -> u32 {
+pub(super) fn block(s: &mut Scene, name: &str, at: Vec3, size: Vec3, surface: Surface) -> u32 {
     let id = create_entity(s, name, Some(Primitive::Box));
     place(s, id, at, size);
     paint(s, id, name, surface);
@@ -27,7 +27,7 @@ fn block(s: &mut Scene, name: &str, at: Vec3, size: Vec3, surface: Surface) -> u
 /// A room under a bronze metal ceiling of `roughness` 3.4 m up, SSR on and the
 /// sky black: an emissive strip 2.5 m up its back wall, 4 m out, and in front of
 /// it a row of thin dark uprights 0.18 m apart.
-fn bar(roughness: f32) -> Scene {
+pub(super) fn bar(roughness: f32) -> Scene {
     let mut s = Scene::new();
     crate::test_gpu::black_sky(&mut s);
     let cam = s.add_entity("Camera".to_string());
@@ -77,7 +77,13 @@ fn eye() -> Camera {
 }
 
 /// The red of the HDR image the SSR pass resolved into, row by row, `(w, h)`.
-fn red(r: &mut Renderer, scene: &Scene, (w, h): (u32, u32)) -> Vec<f32> {
+fn red(r: &mut Renderer, scene: &Scene, size: (u32, u32)) -> Vec<f32> {
+    channel(r, scene, size, 0)
+}
+
+/// Channel `c` (0 red, 1 green, 2 blue) of the HDR image the SSR pass resolved
+/// into, row by row, `(w, h)`.
+pub(super) fn channel(r: &mut Renderer, scene: &Scene, (w, h): (u32, u32), c: usize) -> Vec<f32> {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, w, h);
     let out = view.color_target_view().unwrap();
     r.render(&mut view, scene, &eye(), &out, false);
@@ -89,7 +95,8 @@ fn red(r: &mut Renderer, scene: &Scene, (w, h): (u32, u32)) -> Vec<f32> {
         8,
     );
     (0..(w * h) as usize)
-        .map(|t| f16_to_f32(u16::from_le_bytes([bytes[t * 8], bytes[t * 8 + 1]])))
+        .map(|t| t * 8 + c * 2)
+        .map(|i| f16_to_f32(u16::from_le_bytes([bytes[i], bytes[i + 1]])))
         .collect()
 }
 

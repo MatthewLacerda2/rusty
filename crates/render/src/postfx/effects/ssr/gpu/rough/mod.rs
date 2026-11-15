@@ -7,3 +7,4 @@ mod glossy;
 mod outline;
 mod patch;
 mod resolve;
+mod shelf;

@@ -473,13 +473,18 @@ satin floor shows a soft reflection of what stands on it and a mirror a sharp on
 and a rough reflection's silhouette fades across its blur instead of stepping where
 one pixel's ray hits and its neighbour's misses (up to roughness 0.05 the hit is
 read sharp at any resolution, widening to the full lobe by 0.1). Every pixel, whether
-its own ray hit or missed, takes its blur from how far away the hits around it are,
-those that reflect something and the nearest counting most (and no wider than its own
-ray's, when that found something nearer), spread by its own lobe and no wider than
-that lobe spreads a hit at the march's reach. So a reflection's outline is as soft as
-its inside and its edge softens outwards too; a contact reflection stays tight among
-long rays, even at the foot of something as thin as a chair leg; a roughness map's detail, and a smooth surface beside a rough one, keep
-their own blur; and a mirror's stays sharp. The average counts only pixels on the
+its own ray hit or missed, takes its blur from how far away the hits around it are on
+average, those that reflect something counting most, spread by its own lobe and no
+wider than that lobe spreads a hit at the march's reach. That average changes smoothly
+across the frame, between two hits at different distances (a bottle in front of the
+shelf behind it) as between a hit and a miss, so a reflection's outline is as soft as
+its inside, its edge softens outwards too, and nothing inside it is drawn crisp; a
+roughness map's detail, and a smooth surface beside a rough one, keep their own blur;
+and a mirror's stays sharp. A contact reflection takes the average of what is around
+it too: one as wide as a box standing on a satin floor stays tight against its foot
+among a far wall's long rays, but one only a few pixels wide (a chair leg, a thin
+post) on a rough floor (about 0.35 and up) with long rays all around it is blurred as
+wide as they are, and fades to the probe reflection with them. The average counts only pixels on the
 same surface (the same plane), so a reflection mostly neither fades at a surface's border nor bleeds onto the
 surface beside it; it is an approximation, since each sample reads a mip texel half
 the blur's radius wide, and in a band about that wide at a corner it does
