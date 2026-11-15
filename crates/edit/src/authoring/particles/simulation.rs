@@ -54,7 +54,7 @@ pub fn draft(live: &ParticleEmitterComponent) -> ParticleEmitterComponent {
 }
 
 /// Put `Component.Set`'s finished [`draft`] in place of `live`, keeping `live`'s
-/// live state but for what the new target and space make stale ([`retarget`]).
+/// live state but for what the new target and space make stale (`retarget`).
 pub fn commit(live: &mut ParticleEmitterComponent, mut draft: ParticleEmitterComponent) {
     let (simulation, space) = (draft.simulation, draft.simulation_space);
     draft.simulation = live.simulation;
@@ -127,7 +127,7 @@ impl Dishonoured {
 }
 
 /// What a `Gpu` emitter does not honour of `p`'s settings, one line each
-/// ([`Dishonoured`]): a collision response, the death and collision
+/// (`Dishonoured`): a collision response, the death and collision
 /// sub-emitters, the `Mesh` render mode and a `max_particles` above
 /// [`GPU_MAX_PARTICLES`]. Empty for a `Cpu` emitter.
 pub fn gpu_warnings(p: &ParticleEmitterComponent) -> Vec<String> {
