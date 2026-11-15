@@ -1,11 +1,13 @@
-//! The symptom #1702 exists for, on lavapipe: a glossy, normal-mapped metal sphere
-//! turning a few degrees a frame under a lamp (part 1's specular-AA scene, in a
-//! view kept across frames). Its highlight sparkles from frame to frame; TAA's
-//! per-pixel frame-to-frame flicker must sit well below FXAA's.
+//! The symptom #1702 exists for: a glossy metal sphere, normal-mapped with seeded
+//! noise sampled bilinear from its one level (no mips, so specular AA's Toksvig term
+//! adds next to nothing), turning a few degrees a frame under a lamp, in a view kept
+//! across frames. Its highlight sparkles from frame to frame; TAA's per-pixel
+//! frame-to-frame flicker must sit well below FXAA's.
 
 use glam::{Quat, Vec3};
 
 use super::fixture::{eye, frame, renderer, taa_scene, view};
+use rusty_asset::sidecar::{FilterMode, TextureSettings};
 use rusty_components::{LightComponent, MaterialAsset, MaterialComponent};
 use rusty_scene::create::{create_entity, default_light, Primitive};
 use rusty_scene::Scene;
@@ -13,16 +15,21 @@ use rusty_scene::Scene;
 /// Frames to settle, then frames measured.
 const WARM: u32 = 8;
 const MEASURED: u32 = 12;
-/// TAA's relative flicker must be below FXAA's by this factor. Measured on
-/// lavapipe: FXAA 0.0146, TAA 0.0068 (2.1x). What TAA keeps is its own jitter's:
-/// a still sphere flickers 0 under FXAA and a little under TAA, since each
-/// jittered frame still weighs 0.1 (URP's frame influence).
+/// TAA's relative flicker must be below FXAA's by this factor. Measured (#2231):
+/// FXAA 0.0405, TAA 0.0170 (2.4x) on lavapipe and an RTX 2060; 0.0399, 0.0170 on Metal.
+/// What TAA keeps is its own jitter's: a still sphere flickers 0 under FXAA and
+/// a little under TAA, since each jittered frame still weighs 0.1 (URP's frame
+/// influence).
 const FACTOR: f64 = 1.5;
 /// Degrees the sphere turns a frame: slow enough that a pixel's change from one
 /// frame to the next is the highlight jumping, not the sphere's own turn.
 const STEP: f32 = 1.0;
 
-/// A 64×64 tangent-space normal map of seeded noise.
+/// A 64×64 tangent-space normal map of seeded noise, sampled bilinear from its one
+/// level. Mipped, how much its highlight sparkles is the adapter's anisotropic
+/// filtering and LOD, which Vulkan and Metal leave to the driver: FXAA's flicker was
+/// 0.0146 on lavapipe and 0.0083 on an RTX 2060, and 0.0031 there with anisotropy
+/// off, where TAA came out above it (#2231). Unmipped, every adapter sparkles alike.
 fn bumpy_normal_map() -> String {
     let mut state = 0x9e37_79b9u32;
     let mut next = || {
@@ -37,6 +44,12 @@ fn bumpy_normal_map() -> String {
     });
     let path = rusty_test_support::temp::dir().join("rusty_1702_taa_bumps.png");
     img.save(&path).unwrap();
+    let settings = TextureSettings {
+        filter_mode: FilterMode::Bilinear,
+        generate_mipmaps: false,
+        ..TextureSettings::default()
+    };
+    rusty_asset::sidecar::set_texture(&path, settings).unwrap();
     path.to_string_lossy().into_owned()
 }
 

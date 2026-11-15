@@ -34,8 +34,8 @@ use std::path::Path;
 
 use rusty_core::settings::render_scale::RenderScale;
 use rusty_render::{
-    gpu_required, readback, GpuTimes, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT,
-    REQUIRE_GPU_ENV,
+    gpu_required, readback, GpuTimes, RenderCounters, RenderView, Renderer, ADAPTER_ENV,
+    OFFSCREEN_FORMAT, REQUIRE_GPU_ENV,
 };
 use rusty_scene::{Camera, Scene};
 
@@ -46,7 +46,8 @@ use rusty_scene::{Camera, Scene};
 pub fn no_adapter(what: &str) -> Result<(), String> {
     if gpu_required() {
         return Err(format!(
-            "{REQUIRE_GPU_ENV}=1 but no GPU or software adapter was found — cannot {what}"
+            "{REQUIRE_GPU_ENV}=1 but no GPU or software adapter was found (or none \
+             matches {ADAPTER_ENV}, when set) — cannot {what}"
         ));
     }
     log::warn!("[Capture] no GPU/software adapter available — skipping {what}");
