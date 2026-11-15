@@ -40,6 +40,7 @@ pub mod generators;
 pub mod math;
 pub mod ramp;
 pub mod sample;
+pub mod scatter;
 pub mod tile;
 pub mod vector;
 
