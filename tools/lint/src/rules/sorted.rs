@@ -176,7 +176,7 @@ fn in_roots(path: &Path) -> bool {
 /// The rule over every scanned file and the Markdown under the working directory.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     let mut found = scan.each_file(check);
-    found.extend(markdown_findings(Path::new(".")));
+    found.extend(markdown_findings(scan.root()));
     found
 }
 

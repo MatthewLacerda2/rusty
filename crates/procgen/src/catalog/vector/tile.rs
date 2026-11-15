@@ -1,6 +1,6 @@
 //! The `tile` op: the seeded grid scatter (#407), grown toward Substance Designer's
 //! *Tile Sampler* (#1742): a value per stamp, fill probability, a mask, a size map
-//! and an overlap blend.
+//! and an overlap blend; then a non-square grid and staggered rows (#2187).
 
 use serde::{Deserialize, Serialize};
 
@@ -18,7 +18,8 @@ pub enum TileOutput {
     Stamp,
     /// The input's red times a seeded grey per stamp, in `[0, 1)`.
     Random,
-    /// The input's red times the cell's row-major index `(i + 1) / count²`.
+    /// The input's red times the stamp's index: under `tile` the cell's row-major
+    /// `(i + 1) / cells`, under `scatter` the stamp's own `(i + 1) / amount`.
     Index,
 }
 
@@ -31,12 +32,13 @@ pub enum TileBlend {
     Max,
     /// The colours summed (alpha keeps the larger).
     Add,
-    /// Each stamp laid over the ones before it in row-major cell order,
-    /// premultiplied, its brightness (times its alpha) read as its coverage.
+    /// Each stamp laid over the ones before it (row-major cell order under
+    /// `tile`, index order under `scatter`), premultiplied, its brightness (times its alpha) read as its coverage.
     Over,
 }
 
-/// Scatter: stamp the input once per cell of a `count`×`count` grid, each cell
+/// Grid stamping: the input once per cell of a `count × aspect` grid (across and
+/// down, each a whole count; every odd row shifted `offset` of a cell), each cell
 /// seeded with an offset (`jitter`, in cells), a rotation (`rotation_jitter`, in
 /// turns), a scale (`scale_jitter`), a value (`value_jitter`) and a chance of
 /// being stamped at all (`probability`). Optional input 2 is a mask (no stamp
@@ -45,6 +47,12 @@ pub enum TileBlend {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Tile {
     pub count: f32,
+    /// `count`'s multiplier across and down: `{1, 4}` is four times the rows.
+    #[serde(default = "square")]
+    pub aspect: [f32; 2],
+    /// Every other row shifted by this share of a cell (0–1); 0.5 is a running bond.
+    #[serde(default)]
+    pub offset: f32,
     #[serde(default)]
     pub jitter: Param,
     #[serde(default)]
@@ -63,6 +71,11 @@ pub struct Tile {
     pub seed: u32,
 }
 
+/// `aspect`'s default: as many cells down as across.
+fn square() -> [f32; 2] {
+    [1.0, 1.0]
+}
+
 /// `probability`'s default: every cell gets a stamp.
 fn always() -> f32 {
     1.0
@@ -73,6 +86,8 @@ impl Tile {
     pub fn new(count: f32) -> Self {
         Self {
             count,
+            aspect: square(),
+            offset: 0.0,
             jitter: Param::default(),
             rotation_jitter: Param::default(),
             scale_jitter: Param::default(),
@@ -92,6 +107,8 @@ impl Row for Tile {
         arity(1, 3),
         &[
             req("count", "number"),
+            opt("aspect", "vec2", Lit::Vec2([1.0, 1.0])),
+            opt("offset", "number", Lit::Number(0.0)),
             socket(opt("jitter", "number", Lit::Number(0.0))),
             socket(opt("rotation_jitter", "number", Lit::Number(0.0))),
             socket(opt("scale_jitter", "number", Lit::Number(0.0))),
@@ -112,8 +129,8 @@ impl Row for Tile {
 
 impl Op for Tile {
     fn run(&self, cx: &Cx) -> Image {
-        let scatter = tile::Scatter::of(self, cx.links, cx.optional(1), cx.optional(2), cx.seed);
-        tile::tile(cx.input(0), &scatter)
+        let s = tile::Settings::of(self, cx.links, cx.optional(1), cx.optional(2), cx.seed);
+        tile::tile(cx.input(0), &s)
     }
 
     fn seed(&self) -> u32 {

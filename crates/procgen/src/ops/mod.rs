@@ -15,7 +15,7 @@
 //!   combine/separate RGB; [`sample`] — sampling a map at given coordinates;
 //!   [`tile`] — the seeded grid scatter.
 //! - [`math`] — math (against a constant or a second image), map range, clamp,
-//!   RGB→BW.
+//!   RGB→BW; [`expression`] — a per-pixel formula, compiled from its text.
 //! - [`filter`] — neighbourhood ops: separable box or Gaussian blur, and the
 //!   height-derived masks cavity and curvature; [`distance`] — a mask's distance
 //!   from its edge, a bevel for any shape; [`flood`] — a mask's islands, each with
@@ -32,6 +32,7 @@ pub mod color;
 pub mod distance;
 #[cfg(test)]
 pub mod dummy;
+pub mod expression;
 pub mod field;
 pub mod filter;
 pub mod flood;
@@ -39,6 +40,7 @@ pub mod generators;
 pub mod math;
 pub mod ramp;
 pub mod sample;
+pub mod scatter;
 pub mod tile;
 pub mod vector;
 

@@ -24,6 +24,7 @@ mod table;
 #[cfg(test)]
 mod tests;
 
+use crate::gates::Verdict;
 /// One item's extent and what test code is, shared with the rules' test-code
 /// classifier.
 pub use extent::item_end;
@@ -35,11 +36,7 @@ pub use externs::{manifest_dependencies, manifest_dev_dependencies};
 /// The lexical path folder, shared with the `orphan-module` rule.
 pub use gate::normalise;
 pub use gate::{is_test_gate, test_only_files};
-use std::fs;
 use std::path::Path;
-use std::process::exit;
-
-const REPORT: &str = ".lint/report.txt";
 
 /// The sim modules' directories at their module paths (`src/<m>`, read as
 /// `crates/<m>/src`: `crate::modules`), derived from the table's `sim` marks.
@@ -62,39 +59,18 @@ pub fn platform_roots() -> Vec<String> {
         .collect()
 }
 
-/// Entry point: measure the module graph and check it against the table.
-pub fn run() {
-    let tree = scan::Tree::read(Path::new(""));
+/// The gate over the repository at `base`: its module graph and manifests
+/// against the table.
+pub fn verdict(base: &Path, _: &[String]) -> Verdict {
+    let tree = scan::Tree::read(base);
     let edges = graph::edges(&tree);
     let mut violations = check::all(table::LAYERS, &graph::modules(&tree), &edges);
-    violations.extend(externs::violations(table::LAYERS, Path::new(""), &tree));
-    report(&violations);
-    if violations.is_empty() {
-        println!("layers: ok");
-    } else {
-        exit(1);
-    }
-}
-
-fn report(violations: &[String]) {
-    let mut body = String::from(if violations.is_empty() {
-        "layers: ok\n"
-    } else {
-        "layers: FAILED\n"
-    });
-    for v in violations {
-        body.push_str(v);
-        body.push('\n');
-    }
-    fs::create_dir_all(".lint").ok();
-    fs::write(REPORT, &body).ok();
-    if !violations.is_empty() {
-        eprint!("{body}");
-        eprintln!(
-            "\n{} layering violation(s). The table is tools/lint/src/layers/table.rs: \
+    violations.extend(externs::violations(table::LAYERS, base, &tree));
+    Verdict::listed("layers", violations, |n| {
+        format!(
+            "\n{n} layering violation(s). The table is tools/lint/src/layers/table.rs: \
              keep it equal to the crates' Cargo.toml files, and move code down a layer rather than \
-             let a sim crate depend on the platform.",
-            violations.len()
-        );
-    }
+             let a sim crate depend on the platform.\n"
+        )
+    })
 }

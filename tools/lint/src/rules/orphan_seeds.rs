@@ -128,9 +128,9 @@ fn txt_files(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 /// The rule over the repository at the working directory.
-pub fn run(_: &Scan) -> Vec<Finding> {
+pub fn run(scan: &Scan) -> Vec<Finding> {
     // `.`, not `""`: `read_dir("")` fails, and every seed would read as orphaned.
-    check(Path::new("."))
+    check(scan.root())
 }
 
 #[cfg(test)]
