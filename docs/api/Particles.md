@@ -35,6 +35,8 @@ actually spawned (the `max_particles` cap may swallow some).
 | `Particles.GetReactive` | `(id)` | reactivity name, or `nil` without an emitter |
 | `Particles.SetSimulationSpace` | `(id, space)` | — (`"World"` or `"Local"`, any case; an unknown name is an error) |
 | `Particles.GetSimulationSpace` | `(id)` | space name, or `nil` without an emitter |
+| `Particles.GetParticles` | `(id)` | an array of particle tables, oldest first (*Custom logic*); empty without an emitter |
+| `Particles.SetParticles` | `(id, list)` | the number of particles now live (0 without an emitter); a `list` entry that is not a table is an error that changes nothing |
 
 **Ranges.** `SetLifetime`/`SetSpeed`/`SetSize` take `min, max`: each particle
 draws its start value uniformly between them from the emitter's seeded stream.
@@ -141,3 +143,53 @@ Particles.SetMesh(casings, "assets/models/casing.glb", "Brass")
 
 Over-life curves (size, colour gradient, drag, rotation speed) are authored in the
 inspector or the scene file, not scripted.
+
+**Custom logic.** `GetParticles` and `SetParticles` are Unity's pair: a rule the
+emitter's modules cannot express (sparks pulled toward a point, embers swirling,
+colour by speed, a custom kill rule) is plain Lua in a script's `Update` or
+`LateUpdate`. A particle table is in world space, for a `World` and a `Local`
+emitter alike:
+
+- `position`, `velocity` — `{ x, y, z }` (units, units/second);
+- `age`, `lifetime` — seconds; the particle dies when `age >= lifetime`;
+- `size` — its start size (the size curve still scales it over life);
+- `rotation` — degrees;
+- `color` — `{ r, g, b, a }`, its start tint (the colour gradient still scales it);
+- `custom` — four numbers, zero at birth, that the engine never reads: per-particle
+  state a rule keeps (a phase, a target, a "has bounced" flag), Unity's *Custom
+  Data*. It stays with its particle as older ones die and indices shift.
+
+`SetParticles` replaces the live particles with `list`, matched by index. A field
+an entry leaves out, or gives a NaN or infinite number, keeps its value (a vector
+or colour component by component). A shorter list kills the rest, and an entry
+with `age >= lifetime` is dropped; neither fires the `death` sub-emitter, since the
+script removed the particle and the engine never saw it die. A longer list adds
+particles up to `max_particles` (the rest are dropped; the return value says how
+many are live): an added one starts at the emitter, at rest, aged 0, with the
+lifetime, size and colour ranges' minimums and its own fields written over them.
+What a script cannot set (a mesh particle's tumble axis, its flipbook start frame,
+the turn a `Local` emitter gave it) carries over by index. The rule is
+deterministic like any script: `Update` and `LateUpdate` run inside the fixed tick.
+`Update` runs before the tick integrates the particles, so it reads last tick's
+state and the tick moves what it writes; `LateUpdate` runs after, so it reads this
+tick's and the next tick moves what it writes (the frame draws it as written). A
+`Local` emitter is carried to where it stands before either call, so a script that
+moved it reads and writes where its particles draw. Outside Play the pair reads and
+writes whatever is live, as `GetCount` and `Emit` do.
+
+```lua
+-- sparks pulled toward a point 2 m up
+return { Update = function(id, dt)
+  local ps = Particles.GetParticles(id)
+  for _, p in ipairs(ps) do
+    local v, x = p.velocity, p.position
+    v.x = v.x + (0 - x.x) * 4 * dt
+    v.y = v.y + (2 - x.y) * 4 * dt
+    v.z = v.z + (0 - x.z) * 4 * dt
+  end
+  Particles.SetParticles(id, ps)
+end }
+```
+
+The pair builds one Lua table per particle each call; a round trip over 1,000
+particles costs COST_FIGURE.
