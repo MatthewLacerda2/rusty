@@ -707,6 +707,39 @@ cargo run --features dev --bin play -- --project tests/fixtures/project look_123
 Log the getter after a set (`Harness.Log(tostring(Graphics.Get…()))`) when the two
 images look alike: an effect that did not run and one that runs invisibly look the same.
 
+**Comparing two builds.** A built binary reads `engine/` (shaders, fonts, bundled
+scripts) at run time, from the folder found beside it or above it, else the
+checkout it was built in (`core::project::engine_dir`). So a binary kept across a
+`git checkout` or a pull **is not that commit's build**: it runs its own code with
+the other tree's shaders. Build each side in its own tree, or pin each binary to its
+own copy of `engine/`:
+
+```sh
+# On main: build, then pin the binary beside a copy of the engine content it was built with.
+cargo build --features dev --bin play
+mkdir -p /abs/scratch/before && cp target/debug/play /abs/scratch/before/
+cp -r engine /abs/scratch/before/engine
+git checkout <branch>                 # the branch's own build is `cargo run`, as above
+/abs/scratch/before/play --project tests/fixtures/project look_1234.lua <before_out>
+```
+
+A binary finds the `engine/` beside it first, as a shipped game does, so the pinned
+copy is the one it reads; the project, scenario and output paths are still read from
+where it is run. The other way is one worktree per build (`git worktree add`), each
+binary run in its own. Either way, a `dev` binary knows the engine content it was
+built with (`build.rs` stamps a digest of `engine/`), **warns once at start-up when
+the folder it reads holds other content**, and every run report says which content
+it used: `results.json`'s `engine` (`commit`, `content_built`, `content_found`,
+`content_matches`), the bench report's `engine` line and `bench.json`, and
+`editor-capture`'s `wrote` line. Check `content_matches` is `true` on both sides
+before trusting a pair. A cargo build re-stamps on any change under `engine/`, so
+`cargo run` and `make` never warn, and the editor's shader hot reload follows edits
+made after start-up; the warning is for a binary run directly against a tree it was
+not built from. In a debug build `commit` is the checkout's at run time, so after a
+checkout it names the new commit: the content digest is what tells a kept binary.
+A shipped `player` makes no such check: it carries no `dev` code, and its `engine/`
+is the one `make export` installed beside it.
+
 ## Test games (#2029)
 
 A **test game** is a small, complete 3D game project that a Lua recipe builds from
@@ -851,7 +884,10 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   the run's warnings, if any (below).
 - **before and after** — the report is kept in `out/bench/bench.json` (and
   `bench.txt`), and each run prints every row's change against the last one. To
-  measure an optimisation: `make bench`, change, `make bench`.
+  measure an optimisation: `make bench`, change, `make bench`. The report names the
+  engine that measured it (`engine <commit> content <digest>`, and the last run's
+  content when it moved), and warns when the binary's `engine/` is not the one it was
+  built with (*Comparing two builds*, above).
 
 It is a **release** build (the first run compiles one, a few minutes), so the numbers
 are a shipped game's. It is an **informational signal, never a gate**, and not in

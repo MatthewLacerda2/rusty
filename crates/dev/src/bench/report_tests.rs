@@ -62,6 +62,7 @@ fn the_table_shows_the_change_against_the_last_run() {
         frames: 1,
         metrics: vec![("tick_nav".to_string(), Summary::of(&[0.5]))],
         warnings: vec!["the CPU clock moved".to_string()],
+        ..Report::default()
     };
     let line = only_now.render(Some(&run(4.0)));
     assert!(line
@@ -82,7 +83,22 @@ fn a_report_round_trips_through_json() {
             },
         )],
         warnings: vec!["noisy".to_string()],
+        engine: Some(EngineStamp::of(Some("a"), Some("b"))),
     };
     let json = serde_json::to_string(&report).unwrap();
     assert_eq!(serde_json::from_str::<Report>(&json).unwrap(), report);
+}
+
+#[test]
+fn the_table_names_the_engine_content_and_the_last_runs_when_it_moved() {
+    let run = |found: &str| Report {
+        engine: Some(EngineStamp::of(Some(found), Some(found))),
+        ..Report::default()
+    };
+    let same = run("aaaa").render(Some(&run("aaaa")));
+    let line = same.lines().find(|l| l.starts_with("engine ")).unwrap();
+    assert!(line.ends_with("content aaaa"), "{line}");
+    let moved = run("bbbb").render(Some(&run("aaaa")));
+    assert!(moved.contains("content bbbb (last run: aaaa)"), "{moved}");
+    assert!(!Report::default().render(None).contains("engine "));
 }

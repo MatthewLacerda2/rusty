@@ -26,7 +26,7 @@ const USAGE: &str =
        game --list [--games <dir>]";
 
 fn main() {
-    rusty::logging::init();
+    rusty::init();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let games = rusty::core::project::take_value(&mut args, "--games")
         .unwrap_or_else(|e| usage(&e))

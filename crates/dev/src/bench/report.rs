@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::path::Path;
 
+use rusty_core::project::EngineStamp;
 use serde::{Deserialize, Serialize};
 
 /// One metric over the measured frames.
@@ -43,6 +44,10 @@ pub struct Report {
     /// printed under the table.
     #[serde(default)]
     pub warnings: Vec<String>,
+    /// Which engine measured it (`core::project::EngineStamp`): a "before" taken
+    /// with another tree's shaders says so in its own report.
+    #[serde(default)]
+    pub engine: Option<EngineStamp>,
 }
 
 /// Per-frame samples, kept in the order metrics were first seen.
@@ -84,7 +89,7 @@ impl Samples {
         Report {
             frames: self.frames,
             metrics,
-            warnings: Vec::new(),
+            ..Report::default()
         }
     }
 }
@@ -113,6 +118,12 @@ impl Report {
                 num(s.p95)
             );
         }
+        if let Some(engine) = &self.engine {
+            out.push_str(&engine_line(
+                engine,
+                previous.and_then(|p| p.engine.as_ref()),
+            ));
+        }
         for warning in &self.warnings {
             let _ = writeln!(out, "warning: {warning}");
         }
@@ -121,6 +132,18 @@ impl Report {
         }
         out
     }
+}
+
+/// `engine <commit> content <digest>`, and the last run's content when it differs:
+/// a before-and-after pair says which trees it compared.
+fn engine_line(engine: &EngineStamp, previous: Option<&EngineStamp>) -> String {
+    let found = |e: &EngineStamp| e.content_found.clone().unwrap_or_else(|| "unknown".into());
+    let mut line = format!("engine {} content {}", engine.commit, found(engine));
+    if let Some(before) = previous.filter(|p| p.content_found != engine.content_found) {
+        let _ = write!(line, " (last run: {})", found(before));
+    }
+    line.push('\n');
+    line
 }
 
 /// A value at a precision that suits its size: ms to the microsecond, counts whole.

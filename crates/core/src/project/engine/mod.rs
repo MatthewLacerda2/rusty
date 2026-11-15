@@ -9,6 +9,8 @@
 //! rusty departs from it on the operator's say-so.)
 
 pub mod commit;
+pub mod content;
+pub mod digest;
 
 use commit::{engine_commit, engine_order, UNKNOWN_COMMIT};
 
