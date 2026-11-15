@@ -21,6 +21,8 @@
 mod over;
 mod stamp;
 
+pub(super) use over::over;
+
 pub use stamp::{Jitter, Jitters};
 
 use over::Hits;
@@ -191,7 +193,7 @@ pub fn tile(img: &Image, s: &Scatter) -> Image {
 /// Fold `colour` into `out` under `max` or `add` (`over` keeps its stamps in
 /// [`Hits`] instead): the brighter per channel, or the sum with alpha the larger.
 #[inline]
-fn fold(mode: TileBlend, out: &mut Rgba, colour: Rgba) {
+pub(super) fn fold(mode: TileBlend, out: &mut Rgba, colour: Rgba) {
     *out = match mode {
         TileBlend::Add => std::array::from_fn(|c| match c {
             3 => out[3].max(colour[3]),
@@ -203,7 +205,7 @@ fn fold(mode: TileBlend, out: &mut Rgba, colour: Rgba) {
 
 /// A stamp's colour: the input times `value`, or its red times `value` as a grey;
 /// alpha is the input's.
-fn fill(p: Rgba, value: f32, grey: bool) -> Rgba {
+pub(super) fn fill(p: Rgba, value: f32, grey: bool) -> Rgba {
     match grey {
         true => [p[0] * value, p[0] * value, p[0] * value, p[3]],
         false => [p[0] * value, p[1] * value, p[2] * value, p[3]],
@@ -213,7 +215,7 @@ fn fill(p: Rgba, value: f32, grey: bool) -> Rgba {
 /// How much of what is under a stamp sample `p` covers under `over`: its red in
 /// the grey outputs (the colour comes from red alone), its brightest channel in
 /// `output = "stamp"`, times its alpha, in 0–1.
-fn coverage(p: Rgba, grey: bool) -> f32 {
+pub(super) fn coverage(p: Rgba, grey: bool) -> f32 {
     let bright = match grey {
         true => p[0],
         false => p[0].max(p[1]).max(p[2]),
@@ -224,3 +226,7 @@ fn coverage(p: Rgba, grey: bool) -> f32 {
 #[cfg(test)]
 #[path = "../tile_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "grid_tests.rs"]
+mod grid_tests;

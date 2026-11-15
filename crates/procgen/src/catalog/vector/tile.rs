@@ -18,7 +18,8 @@ pub enum TileOutput {
     Stamp,
     /// The input's red times a seeded grey per stamp, in `[0, 1)`.
     Random,
-    /// The input's red times the cell's row-major index `(i + 1) / count²`.
+    /// The input's red times the stamp's index: under `tile` the cell's row-major
+    /// `(i + 1) / cells`, under `scatter` the stamp's own `(i + 1) / amount`.
     Index,
 }
 
@@ -31,8 +32,8 @@ pub enum TileBlend {
     Max,
     /// The colours summed (alpha keeps the larger).
     Add,
-    /// Each stamp laid over the ones before it in row-major cell order,
-    /// premultiplied, its brightness (times its alpha) read as its coverage.
+    /// Each stamp laid over the ones before it (row-major cell order under
+    /// `tile`, index order under `scatter`), premultiplied, its brightness (times its alpha) read as its coverage.
     Over,
 }
 

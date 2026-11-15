@@ -85,8 +85,8 @@ adding, count the folder; today:
   `filter/test_probe.rs` (run one op on one image, roll it to show the op wraps).
 - `generators/` (12, full): the next generator clusters the folder first. A new
   generator enum (`WaveProfile`, `ShapeProfile`) lives in its op file, as above.
-- `vector/` (9): `warp`, `directional_warp`, `sample_at` (its mip chain in
-  `ops/sample.rs`), `tile`, ….
+- `vector/` (10): `warp`, `directional_warp`, `sample_at` (its mip chain in
+  `ops/sample.rs`), `tile`, `scatter` (its math in `ops/scatter/`), ….
 
 A two-input op with an optional mask and an output mode is `dummy`'s shape:
 `arity(2, 3)`, `cx.input(0)` and `cx.input(1)` read directly, `cx.optional(2)` for

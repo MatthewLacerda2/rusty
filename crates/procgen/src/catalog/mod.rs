@@ -153,6 +153,7 @@ catalog! {
     RgbToBw = math::rgb_to_bw::RgbToBw,
     /// Sample input A at the coordinates the other inputs give, footprint-filtered.
     SampleAt = vector::sample_at::SampleAt,
+    Scatter(vector::scatter::Scatter),
     SeparateRgb(vector::separate_rgb::SeparateRgb),
     Shape(generators::shape::Shape),
     Sharpen(filter::blurs::sharpen::Sharpen),

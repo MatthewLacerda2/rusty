@@ -24,9 +24,10 @@ pub fn bake(op: Value, wired: usize, extra: Vec<Node>, size: [u32; 2]) -> Image 
         json!({ "op": "voronoi", "scale": 5, "output": "cells" }),
         json!({ "op": "gradient", "kind": "radial" }),
     ];
-    let ids = ["a", "b", "c"];
+    // Past three inputs (`scatter` takes eight) the sources repeat.
+    let ids = ["a", "b", "c", "d", "e", "f", "g", "h"];
     let mut nodes: Vec<Node> = (0..wired)
-        .map(|i| node(ids[i], sources[i].clone(), &[]))
+        .map(|i| node(ids[i], sources[i % 3].clone(), &[]))
         .collect();
     nodes.extend(extra);
     nodes.push(node("out", op, &ids[..wired]));

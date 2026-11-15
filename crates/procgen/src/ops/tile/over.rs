@@ -50,13 +50,21 @@ impl Hits {
         let hits = &mut self.hits[..self.len];
         hits.sort_unstable_by_key(|h| h.order);
         for h in hits.iter() {
-            let a = h.colour[3];
-            for (o, c) in out[..3].iter_mut().zip(&h.colour[..3]) {
-                *o = c * a + *o * (1.0 - h.coverage);
-            }
-            out[3] = out[3].max(a);
+            over(out, h.colour, h.coverage);
         }
     }
+}
+
+/// Lay one stamp's `colour` (covering `coverage` of what is under it) onto `out`,
+/// premultiplied: what [`Hits::composite`] does per stamp, and `scatter` does in its
+/// stamps' index order.
+#[inline]
+pub(in crate::ops) fn over(out: &mut Rgba, colour: Rgba, coverage: f32) {
+    let a = colour[3];
+    for (o, c) in out[..3].iter_mut().zip(&colour[..3]) {
+        *o = c * a + *o * (1.0 - coverage);
+    }
+    out[3] = out[3].max(a);
 }
 
 #[cfg(test)]

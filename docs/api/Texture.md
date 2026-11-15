@@ -528,6 +528,32 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   its average instead of aliasing. A jump in the coordinates (a `fract` wrap) is not
   taken as a footprint, so it stays sharp. `sample_at` of `coordinates` is A
   unchanged.
+- `scatter {amount=32, scale=0.2, scale_jitter=0, rotation=0, rotation_jitter=0,
+  value_jitter=0, spacing=0, density=1, output="stamp"|"random"|"index",
+  blend="max"|"add"|"over", seed=0}` (*vector*, 1–8 inputs, each a stamp): free
+  placement off any grid, Substance Designer's *Shape Splatter*: gravel, aggregate,
+  pebbles on sand, leaves, debris, clumped here and bare there. Places `amount`
+  stamps (a whole count, 0–65 536) at seeded points over the tile, each one of the
+  inputs picked by hash (three pebble shapes in one pass), `scale` tiles across
+  times `1 ± scale_jitter/2` (scale up to 1, jitter 0–1), turned `rotation` turns
+  plus up to ±`rotation_jitter`/2 (0–1). Each input is read as **one stamp**, as
+  `tile` reads its one. `density` (0–1) is the chance a stamp is drawn: link a mask
+  to clump or clear. `density`, `scale` and `rotation` are read once per stamp at
+  its centre, wrapped. `spacing` (0–1): at 0 the points are purely random (clumps
+  and overlaps); toward 1 each stamp keeps away from the earlier ones, its centre at
+  least `spacing ×` the smaller of `scale` (its largest, if linked) and
+  `√(0.5 / amount)` from theirs, the first of 32 seeded candidates that is; a stamp
+  with no such candidate is left out. `output`, `value_jitter` and `blend` mean what
+  they do on `tile`, `"index"` being `(i + 1) / amount` and `over` laying the stamps
+  in index order. Stamp `i`'s place and draws come from the seed and `i` alone, each
+  from its own hash stream, so raising `amount` adds stamps and moves none (but
+  under `"index"`, and under `spacing` once `√(0.5 / amount)` is the smaller), and
+  adding a param reshuffles nothing. A NaN number reads its default, an
+  out-of-range one is clamped; a stamp whose `density` or `scale` reads NaN, or
+  whose scale is 0 or less, is not drawn. Tiles at any resolution. Cost, measured in
+  the dev container (release build, one core, 2048²): about 0.25 s at the
+  defaults, 1.4 s for 2000 turned pebbles 0.03 across, 4 s for 65 536 stamps 0.01
+  across, 3 s for 500 stamps 0.1 across under `over`.
 - `separate_rgb {channel=0..3}` (*vector*, 1 input).
 - `shape {kind="circle"|"rect"|"rounded_rect"|"line"|"polygon"|"star", size=[w,h],
   roundness=0.25, softness=0, sides=6, points=5, inner_radius=0.5,
@@ -565,18 +591,23 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   running off a shape: a noise through `slope_blur` on a `shape`'s height runs down its
   sides. The reach caps at one tile. `samples + 5` reads a pixel: an estimate of
   about 1–2 s of one core at 2048² with 8 samples.
-- `tile {count, jitter=0, rotation_jitter=0, scale_jitter=0, value_jitter=0,
-  probability=1, output="stamp"|"random"|"index", blend="max"|"add"|"over", seed=0}`
-  (*vector*, 1–3 inputs: the stamp, then an optional mask, then an optional size
-  map): Substance Designer's *Tile Sampler* essentials. Stamps input 1 once per cell
-  of a `count`×`count` grid; each cell is seeded from the recipe and node `seed` with
+- `tile {count, aspect={1,1}, offset=0, jitter=0, rotation_jitter=0, scale_jitter=0,
+  value_jitter=0, probability=1, output="stamp"|"random"|"index", blend="max"|"add"|"over",
+  seed=0}` (*vector*, 1–3 inputs: the stamp, then an optional mask, then an optional
+  size map): Substance Designer's *Tile Sampler* essentials. Stamps input 1 once per
+  cell of a `count × aspect` grid, across and down, each rounded on its own:
+  `count = 4, aspect = {1, 4}` is 4 × 16 cells, and a stamp fills its cell's shape
+  (a square stamp becomes a plank). `offset` (0–1) shifts every other row by that
+  share of a cell, 0.5 a running bond (shingles, staggered lugs, a bond of any
+  stamp); with an offset the row count rounds to even, so the stagger closes at
+  the wrap. Turns and offsets are in cells. Each cell is seeded from the recipe and node `seed` with
   an offset of up to ±`jitter`/2 cells, a turn of up to ±`rotation_jitter`/2 turns
   and a scale in `1 ± scale_jitter/2`, each jitter clamped to 0–1. The input is read
   as **one stamp** — the unit square, nothing outside it — so give it empty margins
   (a `shape` smaller than the tile); a stamp pushed over its cell's border is drawn
   into the neighbour cell. `output = "random"` fills each stamp with the input's red
   times its own seeded grey (per-rivet tint, per-pebble height); `"index"` with the
-  red times the cell's row-major index `(i + 1) / count²`. `value_jitter` (0–2)
+  red times the cell's row-major index `(i + 1) / cells`. `value_jitter` (0–2)
   multiplies each stamp by `1 ± value_jitter/2`. `probability` (0–1) is the chance a
   cell gets a stamp. Input 2, the mask: no stamp in a cell whose centre reads below
   0.5 red. Input 3, the size map: the red at the cell's centre scales that stamp
@@ -655,12 +686,13 @@ number.
 - `hue_sat_value.hue`, `hue_sat_value.sat`, `hue_sat_value.value`: read at each pixel.
 - `noise.gain`: read at each pixel.
 - `normal_blend.strength`: read at each pixel.
+- `scatter.density`, `scatter.scale`, `scatter.rotation`: read once per stamp, at its centre.
 - `shape.softness`: read at each pixel.
 - `tile.jitter`, `tile.rotation_jitter`, `tile.scale_jitter`: read once per cell.
 - `voronoi.randomness`: read once per cell.
 - `warp.strength`: read at each pixel.
 
-A param read **once per cell** is read at the cell's centre, wrapped, so each cell
+A param read **once per cell** (or per stamp) is read at the cell's (or stamp's) centre, wrapped, so each cell
 keeps one stamp or one point and the result still tiles. A blur's radius varies
 smoothly: sharp where the link is dark, soft where it is bright, each pixel averaging
 its own window in constant time whatever its width. A Gaussian is still three
@@ -669,7 +701,7 @@ rounded to a whole pixel as a number's box is (a rounded radius would step visib
 across the map), so it matches the number only at whole-pixel radii.
 
 **What never links:** a whole count (`scale`, `octaves`, `lacunarity`, `rows`,
-`cols`, `tiles`, `count`, `frequency`). A count that changed from pixel to pixel
+`cols`, `tiles`, `count`, `amount`, `frequency`). A count that changed from pixel to pixel
 could not stay whole, so it would open seams or cut visibly where it stepped. Nor do
 `mapping`'s params (a per-pixel translation is `warp`, and a per-pixel scale or
 rotation would break the tiling), enums, colours or `size`. `mix.factor` and
@@ -835,7 +867,9 @@ field stays a number, so `4.5` is accepted — it bakes as `5`), and capped at 2
 | anisotropic_noise | `angle` | the nearest tiling direction, see its bullet |
 | brick | `cols` | nearest whole number ≥ 1 |
 | brick | `rows` | nearest **even** number ≥ 2 (the half-brick offset must close at the wrap) |
-| tile | `count` | nearest whole number ≥ 1 |
+| tile | `count × aspect`, per axis | nearest whole number ≥ 1, across and down on their own |
+| tile (`offset > 0`) | `count × aspect` down | nearest **even** number ≥ 2 (the stagger must close at the wrap) |
+| scatter | `amount` | nearest whole number ≥ 0 (placement is free: any count tiles) |
 | checker | `tiles` | up to **even** (an odd count puts two same-colour squares together at the wrap) |
 | mapping (`tiling = true`) | `scale` | nearest whole number ≥ 1 per axis |
 | mapping (`tiling = true`) | `rotation` | nearest quarter turn |
@@ -871,6 +905,9 @@ and 2048² (iterate at a low `resolution`, ship at a high one):
   slopes the same across and down, as on a mesh mapped at an even texel density.
 - `shape.size` and `shape.softness` are in tiles (`size = [0.5, 0.5]` is half the
   tile each way); under `tile`, that is a fraction of one cell.
+- `scatter.scale` is a stamp's size in tiles; `scatter.rotation` and
+  `.rotation_jitter` are in turns; `scatter.spacing` is a share of the gap its
+  bullet derives, in tiles. `tile.offset` is a share of one cell.
 - `distance.radius` is in tiles: the distance from the edge that reads 1.
 - `cavity.radius` is a tile fraction like `blur.radius`; `curvature.radius` is a
   distance in tiles, sampled bilinearly (so sub-pixel radii stay smooth).
