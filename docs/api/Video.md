@@ -30,6 +30,16 @@ surface renders the scene at the 1× pixel count, and the UI stays sharp; a proj
 default of `"match_display"` (`Graphics.SetDefaultRenderScale`) does it on every
 HiDPI display.
 
+**In the editor, the Game view's size is the editor's, not `SetResolution`'s.**
+`SetResolution` there resizes the whole editor window, and the Game view stays the
+panel it sits in. To play at the size the game ships at, give the Game view a size of
+its own: its dropdown on the Game tab's strip, or
+[`Editor.SetGameViewSize`](Editor.md#the-game-views-size) (Unity's Game view
+resolution menu). The scene, the post chain, TAA's output, the UI and the mouse
+position then all use that size, drawn letterboxed in the panel. With its "1x on
+HiDPI" choice the Game view is sized by the panel's points, and `GetDisplayScale`
+reads `1` there.
+
 **`GetDisplayScale`** (#1715; Unity reads the same through `Screen.dpi`) tells a
 Retina 2940×1388 from a 1× monitor of the same pixels. The window reports it each
 frame, so moving the window to another monitor changes it the next frame. Like

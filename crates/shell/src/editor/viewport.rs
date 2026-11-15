@@ -7,7 +7,7 @@ use rusty_app::GameWorld;
 use rusty_core::application::Gizmo;
 use rusty_ecs::World;
 use rusty_editor::viewport::rect_tool::{self, OverlayFrame};
-use rusty_editor::viewport::{gizmo, pick};
+use rusty_editor::viewport::{game_size, gizmo, pick};
 use rusty_editor::{EditorUi, ViewportInteraction, ViewportTab};
 use rusty_render::RenderView;
 use rusty_scene::Scene;
@@ -67,14 +67,14 @@ impl EditorFrontend {
             return;
         };
         let scene_tab = interaction.tab == ViewportTab::Scene;
-        let (px, py) = match self.demo_size() {
-            // A demo replays on the size it recorded, drawn letterboxed (#1598).
-            Some(size) if !scene_tab => size,
-            _ => panel,
-        };
+        // The Game view's own size, letterboxed: a demo's (#1598) or the dropdown's (#2207).
+        let (px, py) = interaction.render.unwrap_or(panel);
         if self.demo_size().is_none() {
-            // The UI lays out on the game view's pixel size (#417) — a sim input.
-            game.resources.screen.borrow_mut().set_game_view(px, py);
+            // The UI lays out on the game view's pixel size (#417), a sim input: its
+            // own size behind the Scene tab too (#2207).
+            let own = game_size::fit(self.editor_ui.game_view, interaction.size, pixels_per_point);
+            let (sx, sy) = own.filter(|_| scene_tab).unwrap_or((px, py));
+            game.resources.screen.borrow_mut().set_game_view(sx, sy);
         }
         // Create-or-resize this tab's own view. A view's resize guard checks its own
         // size, so it never fights the other tab's or the preview's (#355). The Game

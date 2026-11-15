@@ -90,3 +90,39 @@ fn mailbox_round_trips() {
     app.sync_game_view(&mut editor);
     assert_eq!(app.game_view_setting().size, GameViewSize::Free, "mirrored");
 }
+
+/// The capture's spelling: `Free`, `W:H`, `WxH`; nonsense and a 0 are refused.
+#[test]
+fn parse_reads_the_three_spellings() {
+    assert_eq!(GameViewSize::parse("Free"), Some(GameViewSize::Free));
+    assert_eq!(
+        GameViewSize::parse("16:9"),
+        Some(GameViewSize::Aspect(16, 9))
+    );
+    assert_eq!(
+        GameViewSize::parse(" 1280x720 "),
+        Some(GameViewSize::Fixed(1280, 720))
+    );
+    for bad in [
+        "", "free", "16", "0x720", "16:0", "1x2:3", "-1x5", "9000x10", "axb",
+    ] {
+        assert_eq!(GameViewSize::parse(bad), None, "{bad:?}");
+    }
+}
+
+/// "1x on HiDPI" reports a display scale of 1 for `Free` and an aspect, never for
+/// a fixed size or with the toggle off.
+#[test]
+fn display_scale_follows_the_density() {
+    assert_eq!(setting(GameViewSize::Free, true).display_scale(2.0), 1.0);
+    assert_eq!(
+        setting(GameViewSize::Aspect(4, 3), true).display_scale(2.0),
+        1.0
+    );
+    assert_eq!(
+        setting(GameViewSize::Fixed(800, 600), true).display_scale(2.0),
+        2.0
+    );
+    assert_eq!(setting(GameViewSize::Free, false).display_scale(2.0), 2.0);
+    assert_eq!(setting(GameViewSize::Free, true).display_scale(0.5), 0.5);
+}

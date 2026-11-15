@@ -17,6 +17,7 @@ fn click(tab: ViewportTab, inside: bool) -> ViewportInteraction {
         tab,
         origin: egui::pos2(0.0, 0.0),
         size: egui::vec2(400.0, 300.0),
+        render: None,
         hover_local: inside.then(|| egui::vec2(10.0, 10.0)),
         clicked: false,
         dragging: false,

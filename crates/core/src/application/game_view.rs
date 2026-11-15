@@ -57,6 +57,23 @@ impl GameViewSize {
         }
     }
 
+    /// `"Free"`, `"W:H"` (an aspect) or `"WxH"` (a fixed size), as
+    /// [`label`](Self::label) writes a custom one; `None` for anything else or a
+    /// size [`is_valid`](Self::is_valid) refuses.
+    pub fn parse(text: &str) -> Option<GameViewSize> {
+        let text = text.trim();
+        if text == "Free" {
+            return Some(GameViewSize::Free);
+        }
+        let sides = |(w, h): (&str, &str)| Some((w.trim().parse().ok()?, h.trim().parse().ok()?));
+        let size = match (text.split_once(':'), text.split_once('x')) {
+            (Some(pair), None) => sides(pair).map(|(w, h)| GameViewSize::Aspect(w, h)),
+            (None, Some(pair)) => sides(pair).map(|(w, h)| GameViewSize::Fixed(w, h)),
+            _ => None,
+        };
+        size.filter(|size| size.is_valid())
+    }
+
     /// The label the dropdown shows: a preset's, else `"W:H"` or `"WxH"`.
     pub fn label(self) -> String {
         if let Some((_, label)) = Self::PRESETS.iter().find(|(size, _)| *size == self) {
@@ -104,6 +121,17 @@ impl GameViewSetting {
             GameViewSize::Fixed(w, h) => (w.max(1), h.max(1)),
         };
         Some(size)
+    }
+
+    /// The display scale the game sees (`Video.GetDisplayScale`) on a `window`
+    /// scale: 1 while "1x on HiDPI" sizes the view by points (`Free` or an aspect),
+    /// else the window's.
+    pub fn display_scale(self, window: f32) -> f32 {
+        let by_points = !matches!(self.size, GameViewSize::Fixed(..));
+        match self.low_resolution && by_points && window > 1.0 {
+            true => 1.0,
+            false => window,
+        }
     }
 }
 

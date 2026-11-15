@@ -692,7 +692,8 @@ buttons, an image, audio or prefab card; exclusive with `--select`), `--frame` (
 view's timeline, replayed to tick `n`, default 0; #1598), `--pointer <X>,<Y>` (the
 pointer held there, in pixels, so a hover shows), `--gizmo <Name>=on|off` (a Scene-view
 gizmo drawn or not, by its `Editor.SetGizmo` name, e.g. `--gizmo NavMesh=on`;
-repeatable, #1909), `--picker [new|open|mismatch|focus]` (the project picker the editor starts
+repeatable, #1909), `--game-view <Free|W:H|WxH>` (the Game view's size, as its
+dropdown sets it, #2207: `--game --game-view 16:9` letterboxes it in the panel), `--picker [new|open|mismatch|focus]` (the project picker the editor starts
 on, #854, over a sample recent list dated against a fixed time; the page names show
 *New Project*, *Open* and the different-engine prompt). From Rust, `capture::capture(&game,
 path, &EditorCaptureOptions { .. })` takes any `GameWorld`, and `capture_into` shares a
