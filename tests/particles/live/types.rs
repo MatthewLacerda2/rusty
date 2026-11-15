@@ -7,10 +7,10 @@ use super::{dump, lua, scene};
 fn a_field_that_is_not_a_number_is_an_error_that_changes_nothing() {
     for (edit, names) in [
         ("ps[2].age = false", "entry 2's age is a boolean"),
-        ("ps[1].position = 'up'", "entry 1's position is a string"),
+        ("ps[1].x = 'up'", "entry 1's x is a string"),
         ("ps[2].size = '2'", "entry 2's size is a string"),
-        ("ps[1].color = { r = {} }", "entry 1's color.r is a table"),
-        ("ps[2].custom[3] = true", "entry 2's custom.3 is a boolean"),
+        ("ps[1].r = {}", "entry 1's r is a table"),
+        ("ps[2].custom3 = true", "entry 2's custom3 is a boolean"),
     ] {
         let (scene, id) = scene(2);
         let before = dump(&scene, id);
@@ -48,6 +48,21 @@ fn for_each_names_a_bad_field_and_a_missing_fn() {
     .to_string();
     assert!(
         err.contains("Particles.ForEach: entry 1's lifetime is a string"),
+        "{err}"
+    );
+    assert_eq!(dump(&scene, id), before);
+    // A table answering `<` passes the fast check; the conversion still names it.
+    let err = lua::<()>(
+        &scene,
+        &format!(
+            "local lt = setmetatable({{}}, {{ __lt = function() return true end }})
+             Particles.ForEach({id}, function(p) if p.vy then p.vy = lt end end)"
+        ),
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(
+        err.contains("Particles.ForEach: entry 1's vy is a table"),
         "{err}"
     );
     assert_eq!(dump(&scene, id), before);
