@@ -77,9 +77,8 @@ pub struct Shell {
     /// Whether the window has OS focus: raw mouse motion arrives even when it does
     /// not, and must not reach the game then.
     pub window_focused: bool,
-    /// Dev-only socket command channel (#282): an external process drives this
-    /// running playtest through the same evaluator the console uses. `None` if the
-    /// socket failed to bind — the window keeps running without it.
+    /// Dev-only socket command channel (#282): an external process drives this playtest
+    /// through the console's evaluator. `None` if the socket failed to bind.
     #[cfg(feature = "dev")]
     pub cmd_channel: Option<rusty_dev::command_channel::CommandChannel>,
 }
@@ -134,9 +133,8 @@ pub trait Frontend {
     /// A physical key changed state, after the shell wrote it into the sim.
     fn on_key(&mut self, _game: &mut GameWorld, _key: KeyCode, _pressed: bool) {}
 
-    /// Draw this frame into the swapchain `target` — the default view of `frame`,
-    /// the swapchain texture itself (for a frontend needing another view of it, like
-    /// the player's UI pass, #418).
+    /// Draw this frame into the swapchain `target`, the default view of `frame` (the
+    /// swapchain texture, for a frontend needing another view of it: the UI, #418).
     fn draw(
         &mut self,
         shell: &mut Shell,
@@ -205,7 +203,7 @@ pub(crate) fn handle_window_event<F: Frontend>(
 }
 
 /// One frame: advance the sim, warm a pending `Scene.LoadAsync`, act on play
-/// transitions and a quit request, apply scripted video settings, then draw.
+/// transitions and a quit request, apply scripted video settings, then draw (and record what it cost).
 fn run_frame<F: Frontend>(
     elwt: &ActiveEventLoop,
     shell: &mut Shell,
@@ -255,7 +253,9 @@ fn run_frame<F: Frontend>(
     let target = surface
         .texture
         .create_view(&wgpu::TextureViewDescriptor::default());
-    frontend.draw(shell, game, &surface.texture, &target);
+    frame::stats::measured(shell, game, |s, g| {
+        frontend.draw(s, g, &surface.texture, &target)
+    });
     shell.renderer.queue.present(surface);
     shell.pacer.drew();
 }

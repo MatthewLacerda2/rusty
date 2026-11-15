@@ -7,13 +7,19 @@
 //! [`Series`] (last / min / avg / max over the frames recorded) that `Debug.Stats()`,
 //! the harness's `results.json` and scenario budgets all read.
 //!
+//! **Now, not the session.** Beside each series the last [`RECENT`] values are kept,
+//! so [`FrameStats::window`] can summarise only the newest frames: what
+//! `Debug.Stats{ window = n }` and the Game view's Stats overlay read. A window
+//! counts each metric's own samples: a render counter's are drawn frames, a stage
+//! timing's are sim ticks (a windowed frame runs zero or several).
+//!
 //! This is plain data. **Nothing here reads a clock**: the timings are measured by the
 //! dev layer (`dev::stats`) around each system and written in, and the sim never reads
 //! them back, so the determinism rule is untouched. Keys ending in `_ms` are
 //! wall-clock timings and differ run to run; every other key is a count and is
 //! deterministic for a deterministic run — [`FrameStats::to_json`] can split the two.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -44,11 +50,19 @@ impl Series {
     }
 }
 
+/// How many of each metric's newest values are kept for [`FrameStats::window`]:
+/// ten seconds of a 60 Hz tick or window. A wider window is clamped to it.
+pub const RECENT: usize = 600;
+
 /// Every metric recorded since the stats were last reset (a Play session).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FrameStats {
-    /// Sim frames recorded.
+    /// Sim frames (ticks) recorded.
     pub frames: u64,
+    /// Frames drawn and recorded with their render counters: windowed frames, or
+    /// headless frames something rendered. Not `frames`: a windowed frame runs zero
+    /// or several ticks, and a headless tick need not draw.
+    pub drawn_frames: u64,
     /// Stage timings, render counters and world counters, by name.
     pub metrics: BTreeMap<String, Series>,
     /// Per-system CPU milliseconds, by system name — diagnostic, not budgetable.
@@ -56,28 +70,55 @@ pub struct FrameStats {
     /// GPU milliseconds per render-pass kind, by its stable name (#835). Empty where
     /// the adapter has no timestamps — absent, never zero.
     pub gpu_passes: BTreeMap<String, Series>,
+    /// Each series' newest values, oldest first, at most [`RECENT`].
+    recent: Recent,
+}
+
+/// The newest values of every series in [`FrameStats`]' three maps.
+#[derive(Clone, Debug, Default, PartialEq)]
+struct Recent {
+    metrics: BTreeMap<String, VecDeque<f64>>,
+    systems: BTreeMap<String, VecDeque<f64>>,
+    gpu_passes: BTreeMap<String, VecDeque<f64>>,
 }
 
 /// Whether `key` names a wall-clock timing (non-deterministic) rather than a count:
-/// milliseconds or microseconds (`render_extract_us`, `shadow_gather_us`).
+/// milliseconds or microseconds (`render_extract_us`, `shadow_gather_us`), and the
+/// window's frame rate (`fps`).
 fn is_timing(key: &str) -> bool {
-    key.ends_with("_ms") || key.ends_with("_us")
+    key.ends_with("_ms") || key.ends_with("_us") || key == "fps"
 }
 
 impl FrameStats {
     /// Record `value` for metric `key` this frame.
     pub fn record(&mut self, key: &str, value: f64) {
-        record_into(&mut self.metrics, key, value);
+        record_into(&mut self.metrics, &mut self.recent.metrics, key, value);
     }
 
     /// Record `ms` of CPU time for the system named `name` this frame.
     pub fn record_system(&mut self, name: &str, ms: f64) {
-        record_into(&mut self.systems, name, ms);
+        record_into(&mut self.systems, &mut self.recent.systems, name, ms);
     }
 
     /// Record `ms` of GPU time for the render passes of kind `name` this frame.
     pub fn record_gpu_pass(&mut self, name: &str, ms: f64) {
-        record_into(&mut self.gpu_passes, name, ms);
+        record_into(&mut self.gpu_passes, &mut self.recent.gpu_passes, name, ms);
+    }
+
+    /// The stats over each metric's newest `n` samples (at most [`RECENT`]) instead
+    /// of the whole session: `frames` and `drawn_frames` are capped at `n` too. A
+    /// metric not recorded within them is absent. The result keeps no history.
+    pub fn window(&self, n: usize) -> FrameStats {
+        let n = n.min(RECENT);
+        let cap = n as u64;
+        FrameStats {
+            frames: self.frames.min(cap),
+            drawn_frames: self.drawn_frames.min(cap),
+            metrics: fold_recent(&self.recent.metrics, n),
+            systems: fold_recent(&self.recent.systems, n),
+            gpu_passes: fold_recent(&self.recent.gpu_passes, n),
+            recent: Recent::default(),
+        }
     }
 
     /// One metric's summary, if it was ever recorded.
@@ -125,11 +166,39 @@ impl FrameStats {
     }
 }
 
-fn record_into(map: &mut BTreeMap<String, Series>, key: &str, value: f64) {
+fn record_into(
+    map: &mut BTreeMap<String, Series>,
+    recent: &mut BTreeMap<String, VecDeque<f64>>,
+    key: &str,
+    value: f64,
+) {
     match map.get_mut(key) {
         Some(series) => series.record(value),
         None => map.entry(key.to_string()).or_default().record(value),
     }
+    let values = match recent.get_mut(key) {
+        Some(values) => values,
+        None => recent.entry(key.to_string()).or_default(),
+    };
+    if values.len() == RECENT {
+        values.pop_front();
+    }
+    values.push_back(value);
+}
+
+/// Each key's newest `n` values summarised as a fresh [`Series`]; a key with none
+/// (`n` is 0) is left out.
+fn fold_recent(recent: &BTreeMap<String, VecDeque<f64>>, n: usize) -> BTreeMap<String, Series> {
+    let mut out = BTreeMap::new();
+    for (key, values) in recent {
+        let skip = values.len().saturating_sub(n);
+        let mut series = Series::default();
+        values.iter().skip(skip).for_each(|v| series.record(*v));
+        if series.samples > 0 {
+            out.insert(key.clone(), series);
+        }
+    }
+    out
 }
 
 #[cfg(test)]

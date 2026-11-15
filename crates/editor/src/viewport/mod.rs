@@ -10,13 +10,15 @@
 //! in, and reads the returned [`ViewportInteraction`] back to drive picking/gizmo.
 //! The Scene tab's **UI** toggle draws the screen-space canvases over the scene and
 //! enables the rect tool on them (`rect_tool`, #423). The Game tab's **Gizmos**
-//! toggle draws the colliders and the `Debug.Draw*` lines over the game (#1882).
+//! toggle draws the colliders and the `Debug.Draw*` lines over the game (#1882), and
+//! its **Stats** toggle the frame's timings over the image ([`stats`], #2205).
 
 pub mod gizmo;
 pub mod pick;
 pub mod rect_tool;
 pub mod scene_camera;
 pub mod scene_nav;
+pub mod stats;
 
 use egui_phosphor::regular as icon;
 
@@ -89,6 +91,9 @@ pub fn draw(
             } else {
                 editor.scene_view.looking = false;
             }
+            if let Some(readout) = editor.stats.as_ref().filter(|_| tab == ViewportTab::Game) {
+                stats::paint(ui, response.rect, &readout.lines(), t);
+            }
             if tab == ViewportTab::Scene && gizmos.on(Gizmo::Ui) {
                 let frame = rect_tool::OverlayFrame {
                     size: glam::Vec2::new(response.rect.width(), response.rect.height()),
@@ -115,8 +120,8 @@ pub fn draw(
 
 /// The tab strip: Scene / Game selectors (Unity's viewport tabs), and on the Scene
 /// tab the gizmo toggles (#1909, one per shown row of `Gizmo`'s table) and the
-/// navigation help; on the Game tab its one **Gizmos** toggle (#1882), the
-/// `GameGizmos` row.
+/// navigation help; on the Game tab its rows (`game`): **Gizmos** (#1882) and
+/// **Stats** (#2205). A control that is no gizmo joins the strip after them.
 fn draw_tab_strip(
     ui: &mut egui::Ui,
     tab: &mut ViewportTab,

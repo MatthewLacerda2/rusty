@@ -15,6 +15,7 @@ use rusty_time::FIXED_DELTA_TIME;
 use wgpu::CurrentSurfaceTexture;
 
 pub mod load;
+pub mod stats;
 pub mod ticks;
 pub use ticks::FixedTicks;
 

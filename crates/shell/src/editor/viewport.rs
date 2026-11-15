@@ -156,7 +156,7 @@ impl EditorFrontend {
         let Some(cache) = &self.editor_ui.preview_cache else {
             return;
         };
-        match &request.shader_override {
+        renderer.aside(|renderer| match &request.shader_override {
             Some(path) => renderer.render_preview_with_shader(
                 view,
                 &cache.scene,
@@ -165,7 +165,7 @@ impl EditorFrontend {
                 path,
             ),
             None => renderer.render(view, &cache.scene, &request.camera, &target_view, false),
-        }
+        });
         rebind_egui_texture(
             &mut self.egui_renderer,
             &renderer.device,

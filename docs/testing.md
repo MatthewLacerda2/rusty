@@ -816,6 +816,12 @@ Harness.AssertBudget{ draw_calls = 2000, lights_dropped = 0, fixed_update_ms = 4
 - Budgets are **opt-in per scenario**, never a CI gate of their own.
 - `Harness.Render()` draws the current frame without writing a PNG — the cheap way to
   get render counters and GPU time (`gpu_ms`, `gpu_passes`, #835) every tick.
+- **The live window is measured too** (#2205): in a `dev` build every frame the
+  editor or the player draws records its render counters, `renderer_ms`, GPU time
+  and its wall-clock `wall_ms` / `fps`, so an agent attached with `session-mcp
+  --attach` profiles the frame the operator is looking at with
+  `Debug.Stats{ window = 120 }` (the last 120 drawn frames), the table the Game
+  view's **Stats** overlay shows. No second process, no scenario file.
 
 ## Benchmark: `make bench` (#835)
 Measure before optimising: `make bench` runs

@@ -1,10 +1,12 @@
 //! crates/shell/src/editor/sync.rs — the settings the editor's menus share with the game:
 //! the quality preset, the speaker mode and the Scene view's gizmos, each read and
-//! written both ways.
+//! written both ways, and the frame stats the Game view's Stats overlay shows.
 
 use super::EditorFrontend;
 use crate::Shell;
 use rusty_app::GameWorld;
+use rusty_editor::viewport::stats::{Clock, Readout};
+use rusty_editor::EditorUi;
 
 impl EditorFrontend {
     /// Each frame, after the editor drew: every setting it shares with the game.
@@ -55,4 +57,30 @@ impl EditorFrontend {
         app.mark_bake_host();
         app.sync_gizmos(&mut self.editor_ui.gizmos);
     }
+}
+
+/// The Game view's **Stats** overlay (#2205) reads the frame stats over the last
+/// second, the table `Debug.Stats{ window = 60 }` returns, and only while it is on:
+/// a closed overlay folds nothing. Without the `dev` layer nothing records them,
+/// and it shows the window's `clock` alone.
+pub(super) fn sync_stats(ui: &mut EditorUi, game: &GameWorld, clock: Clock) {
+    let on = ui.gizmos.on(rusty_core::application::Gizmo::Stats);
+    ui.stats = on.then(|| Readout {
+        table: windowed_stats(game),
+        clock,
+    });
+}
+
+#[cfg(feature = "dev")]
+fn windowed_stats(game: &GameWorld) -> Option<rusty_core::frame_stats::FrameStats> {
+    let stats = game.script_manager().stats_cell();
+    let window = stats
+        .borrow()
+        .window(rusty_editor::viewport::stats::STATS_WINDOW);
+    Some(window)
+}
+
+#[cfg(not(feature = "dev"))]
+fn windowed_stats(_game: &GameWorld) -> Option<rusty_core::frame_stats::FrameStats> {
+    None
 }

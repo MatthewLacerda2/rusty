@@ -230,14 +230,13 @@ fn draw_ui(
     texture_id: Option<egui::TextureId>,
 ) -> egui::Vec2 {
     let mut is_playing = playing;
+    super::sync::sync_stats(ui, game, rusty_editor::viewport::stats::Clock::at(60.0));
     let interaction = ui.draw(
         ctx,
         &mut game.world.scene.borrow_mut(),
         &mut game.resources.console.borrow_mut(),
         &mut game.resources.nav.borrow_mut(),
         &mut is_playing,
-        60.0,
-        1000.0 / 60.0,
         texture_id,
     );
     interaction.size
