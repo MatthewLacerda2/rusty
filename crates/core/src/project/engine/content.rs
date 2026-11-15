@@ -4,7 +4,7 @@
 //! from [`engine_dir`](crate::project::engine_dir): in a dev build, the checkout it
 //! was built in. Check that checkout out at another commit, or keep a binary across
 //! a pull, and the binary runs its own code with the other tree's shaders. So a
-//! `dev` binary is stamped with the [`digest`] of the `engine/` it was built with
+//! `dev` binary is stamped with the `digest` of the `engine/` it was built with
 //! (the root package's `build.rs`, `RUSTY_ENGINE_CONTENT`), registers it at start-up
 //! ([`register_built`]), and this module compares it with the folder on disk:
 //! [`register_built`] warns once when they differ, and every run report
@@ -59,7 +59,7 @@ impl EngineStamp {
             return None;
         }
         Some(format!(
-            "[Engine] this binary was built with engine content {}, but {} holds {}: \
+            "this binary was built with engine content {}, but {} holds {}: \
              its shaders and engine files are not the ones this binary was built with \
              (another commit checked out, or files edited since the build). Rebuild it \
              (cargo build; cargo run and make do) before trusting a picture or a timing \
@@ -93,7 +93,7 @@ pub fn register_built(built: &str) {
         return;
     }
     if let Some(warning) = stamp().warning() {
-        log::warn!("{warning}");
+        log::warn!("[Engine] {warning}");
     }
 }
 
