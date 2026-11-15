@@ -50,7 +50,7 @@ def machine(status: str = "", github: str = "up") -> reclaim.Machine:
 def tree(name: str, head: str = "r1", branch: str | None = None, locked: str | None = None,
          busy: bool = False, **kw) -> tuple[str, str]:
     wt = Worktree(TREES / name, head, branch, locked)
-    facts = machine(**kw).facts(wt, MAIN, cwds=[(42, wt.path)] if busy else [])
+    facts = machine(**kw).facts(wt, MAIN, procs=[(42, wt.path, "x")] if busy else [])
     return reclaim.verdict(wt, facts)
 
 
