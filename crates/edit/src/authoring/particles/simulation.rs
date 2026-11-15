@@ -54,3 +54,54 @@ pub(super) fn warn_gpu(p: &ParticleEmitterComponent) {
         log::warn!("[Particles] Gpu emitter: {line}");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::authoring::particles::{set_collision, set_render_mode};
+    use rusty_test_support::logs;
+
+    #[test]
+    fn a_switch_to_gpu_warns_for_each_setting_it_does_not_honour() {
+        logs::init();
+        let mut p = ParticleEmitterComponent {
+            collision: CollisionResponse::Bounce,
+            ..Default::default()
+        };
+        p.sub_emitters.death = Some(4);
+        p.render.mode = ParticleRenderMode::Mesh;
+        p.runtime.particles.push(rusty_components::Particle::at(
+            glam::Vec3::ZERO,
+            1.0,
+            [1.0; 4],
+            1.0,
+        ));
+        assert!(
+            gpu_warnings(&p).is_empty(),
+            "a Cpu emitter honours them all"
+        );
+        set_simulation(&mut p, ParticleSimulation::Gpu);
+        assert!(
+            p.runtime.particles.is_empty(),
+            "the switch forgets the live ones"
+        );
+        let said = logs::take();
+        assert_eq!(said.len(), 3, "{said:?}");
+        assert!(said.iter().all(|s| s.contains("Gpu emitter")));
+        set_simulation(&mut p, ParticleSimulation::Gpu);
+        assert!(logs::take().is_empty(), "no change, no warning");
+    }
+
+    #[test]
+    fn setting_a_dishonoured_setting_on_a_gpu_emitter_warns_and_on_cpu_does_not() {
+        logs::init();
+        let mut p = ParticleEmitterComponent::default();
+        set_collision(&mut p, CollisionResponse::Die);
+        assert!(logs::take().is_empty());
+        set_collision(&mut p, CollisionResponse::None);
+        set_simulation(&mut p, ParticleSimulation::Gpu);
+        set_collision(&mut p, CollisionResponse::Die);
+        set_render_mode(&mut p, ParticleRenderMode::Mesh);
+        assert_eq!(logs::take().len(), 3, "collision, then collision and mesh");
+    }
+}

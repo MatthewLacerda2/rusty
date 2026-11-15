@@ -26,8 +26,9 @@ struct GpuParticle {
 // What a birth upload carries: the particle and its slot.
 struct GpuBirth {
     particle: GpuParticle,
-    slot: u32,
-    _pad: vec3<u32>,
+    // Padded to the Rust record's 16 bytes (a vec3 pad would align to 16 and
+    // make the record 96 bytes).
+    @size(16) slot: u32,
 };
 
 // One emitter's settings for its step and draw.
