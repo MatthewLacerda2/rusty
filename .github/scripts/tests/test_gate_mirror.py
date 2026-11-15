@@ -101,6 +101,16 @@ class Mirror(unittest.TestCase):
                          ["cargo deny check bans", "cargo deny check licenses"])
         self.assertEqual(gaps(makefile=makefile), [("deny", "cargo deny check licenses")])
 
+    def test_a_labelled_run_on_recipe_is_its_commands(self):
+        recipe = ('\t@failed=; \\\n\techo "== bans"; \\\n'
+                  '\tcargo deny check bans || failed="$$failed, bans"; \\\n'
+                  '\tcargo deny check licenses || failed="$$failed, licenses"; \\\n'
+                  '\tif [ -n "$$failed" ]; then echo "failed: $${failed#, }"; exit 1; fi')
+        makefile = MAKEFILE.replace("\tcargo deny check bans", recipe)
+        self.assertEqual(gate_mirror.makefile_gates(makefile)["deny"],
+                         ["cargo deny check bans", "cargo deny check licenses"])
+        self.assertEqual(gaps(makefile=makefile), [("deny", "cargo deny check licenses")])
+
     def test_a_ci_step_running_make_gate_covers_its_recipe(self):
         workflow = WORKFLOW.replace("run: cargo run --manifest-path tools/lint/Cargo.toml --verbose", "run: make size")
         self.assertEqual(gaps(workflow=workflow), [])

@@ -114,7 +114,8 @@ pub(crate) fn run_probe(
 mod tests {
     /// The one GPU test that refuses to skip, and only where asked to. Without it, a
     /// CI runner that lost its software driver would put every GPU test back on the
-    /// silent `None` path and still report green — the state #489 fixed. It also
+    /// silent `None` path and still report green — the state #489 fixed. A name in
+    /// `WGPU_ADAPTER_NAME` that matches nothing fails it too, wherever it runs. It also
     /// names the adapter the suite rendered on, which nextest prints at the end of
     /// every run (`.config/nextest.toml`), so a log says which driver a result is from.
     #[test]
@@ -128,16 +129,22 @@ mod tests {
                 info.name, info.backend
             );
         }
+        // An adapter asked for by name is required: a typo must not skip every test green.
+        if let Some(name) = crate::setup::headless::wanted_adapter() {
+            let env = crate::ADAPTER_ENV;
+            assert!(
+                renderer.is_some(),
+                "{env}={name} matches no adapter: fix or unset it"
+            );
+        }
         if !crate::gpu_required() {
             return;
         }
         assert!(
             renderer.is_some(),
-            "{}=1 but no GPU or software adapter was found (or none matches {}, when \
-             set): on Linux install Mesa's lavapipe (`mesa-vulkan-drivers`), or unset \
-             the variable to skip GPU tests",
-            crate::REQUIRE_GPU_ENV,
-            crate::ADAPTER_ENV
+            "{}=1 but no GPU or software adapter was found: on Linux install Mesa's \
+             lavapipe (`mesa-vulkan-drivers`), or unset the variable to skip GPU tests",
+            crate::REQUIRE_GPU_ENV
         );
     }
 }

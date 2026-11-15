@@ -70,13 +70,21 @@ def makefile_gates(text: str) -> dict[str, list[str]]:
     return gates
 
 
+#: What a run-on recipe does besides its commands: the flag it keeps, a header it
+#: prints, and the verdict at the end.
+BOOKKEEPING = re.compile(r"^(rc=0|failed=.*|echo .*|exit .*|if .*|then .*|fi)$")
+#: How a run-on command notes its failure, then goes on.
+NOTE_FAILURE = re.compile(r'\s*\|\|\s*(rc=1|failed="[^"]*")$')
+
+
 def each_command(line: str) -> list[str]:
     """`rc=0; a || rc=1; b || rc=1; exit $$rc`, a recipe that runs every command and
-    fails after if any did, as its commands `a` and `b`; any other line as itself."""
-    if "|| rc=1" not in line:
+    fails after if any did (or notes each failure in `failed=`, its headers echoed),
+    as its commands `a` and `b`; any other line as itself."""
+    if not re.search(r"\|\|\s*(rc=1|failed=)", line):
         return [line]
-    parts = (re.sub(r"\s*\|\|\s*rc=1$", "", p.strip()) for p in line.split(";"))
-    return [p for p in parts if p and p != "rc=0" and not p.startswith("exit ")]
+    parts = (NOTE_FAILURE.sub("", p.strip()) for p in line.split(";"))
+    return [p for p in parts if p and not BOOKKEEPING.match(p)]
 
 
 def gates_are_the_two_lists(text: str) -> bool:

@@ -593,19 +593,25 @@ seen failing on the third, by whoever runs `make test` there next.
   an adapter's name, case ignored) picks another. Under it sits wgpu's own
   `WGPU_ADAPTER_NAME`, which every headless renderer honours
   (`render::setup::headless::ADAPTER_ENV`): set on any command, only that adapter is
-  used, and none of that name is "no adapter" (a skip, or a failure under
-  `RUSTY_REQUIRE_GPU=1`). A test red on a real GPU and green on lavapipe, on the same
-  commit, is the driver, not the change.
-- **Every run names its adapter**: the canary
+  used. None of that name skips each GPU test but fails the canary, whatever
+  `RUSTY_REQUIRE_GPU` says, so a mistyped name is never a green run that rendered
+  nothing. A test red on a real GPU and green on lavapipe, on the same commit, is the
+  driver, not the change. The variable steers every headless renderer, not only the
+  tests: the probe and reflection bakes, `dev::capture`'s screenshots and
+  `Debug.Preview`. The windowed renderer ignores it, so left exported in a shell, an
+  editor draws its window on the real GPU and bakes on the named adapter.
+- **Every run names its adapter and its values**: the canary
   (`render::test_gpu::tests::gpu_adapter_present_when_required`) prints
-  `[gpu] adapter: <name> (<backend>, <driver>)`, which nextest shows after every run,
-  CI's included.
+  `[gpu] adapter: <name> (<backend>, <driver>)`, and a test that holds a tolerance
+  prints what it measured (`eprintln!`, as the prefilter and TAA shimmer tests do).
+  nextest shows both after every run, passing too, CI's included, for the tests its
+  `success-output` override in `.config/nextest.toml` lists; a new tolerance test adds
+  itself there.
 - **Before a new or moved GPU tolerance merges**, it is run on a real desktop GPU:
   `make test-gpu ADAPTER=<gpu>` on the branch's head, on the operator's machine (a
   local coder, or the orchestrator for a cloud branch), and the PR's `Gates` line names
-  the adapter and the value. Metal's value comes from CI's macOS leg; nextest prints
-  only a failing test's output, so a passing test's numbers are read from a draft run
-  of a throwaway commit that fails the test with them in its message, reverted after.
+  the adapter and the value. Lavapipe's and Metal's values are read from CI's log of
+  the branch's run (`build-test`, `build-test-cross`).
 
 **Concurrency is capped.** A `Renderer` is a device, the full pipeline set and shadow
 maps, and a software adapter (lavapipe) allocates all of that in system RAM shared with rustc — so

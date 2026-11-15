@@ -31,12 +31,15 @@ pub fn gpu_required() -> bool {
 /// renderer on that adapter alone: `llvmpipe` for lavapipe beside a real GPU, or
 /// `nvidia`, so one machine tells a change from its driver (`make test-gpu`). It is
 /// wgpu's own variable (`wgpu::util::initialize_adapter_from_env`), matched the same
-/// way. No adapter of that name is "no adapter": a skip, or a failure under
-/// [`REQUIRE_GPU_ENV`]. Unset or empty, the usual pick stands.
+/// way. No adapter of that name is "no adapter": a skip for each test, and a failure
+/// of the adapter canary (`render::test_gpu`) whatever [`REQUIRE_GPU_ENV`] says, since
+/// a name asked for is an adapter required. Unset or empty, the usual pick stands. It
+/// steers every headless renderer (the bakes, `dev::capture`, `Debug.Preview`), never
+/// the windowed one.
 pub const ADAPTER_ENV: &str = "WGPU_ADAPTER_NAME";
 
 /// The adapter [`ADAPTER_ENV`] asks for, lowercased, when it asks for one.
-fn wanted_adapter() -> Option<String> {
+pub(crate) fn wanted_adapter() -> Option<String> {
     let name = std::env::var(ADAPTER_ENV).ok()?.trim().to_lowercase();
     (!name.is_empty()).then_some(name)
 }

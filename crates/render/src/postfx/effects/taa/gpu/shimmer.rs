@@ -1,7 +1,8 @@
-//! The symptom #1702 exists for: a glossy, normal-mapped metal sphere
-//! turning a few degrees a frame under a lamp (part 1's specular-AA scene, in a
-//! view kept across frames). Its highlight sparkles from frame to frame; TAA's
-//! per-pixel frame-to-frame flicker must sit well below FXAA's.
+//! The symptom #1702 exists for: a glossy metal sphere, normal-mapped with seeded
+//! noise sampled bilinear from its one level (no mips, so specular AA's Toksvig term
+//! adds next to nothing), turning a few degrees a frame under a lamp, in a view kept
+//! across frames. Its highlight sparkles from frame to frame; TAA's per-pixel
+//! frame-to-frame flicker must sit well below FXAA's.
 
 use glam::{Quat, Vec3};
 

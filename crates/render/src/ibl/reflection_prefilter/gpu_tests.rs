@@ -85,15 +85,13 @@ fn gpu_prefilter_matches_the_cpu_reference() {
     assert_eq!(gpu.level_count(), cpu.level_count());
     for level in 0..cpu.level_count() {
         let size = capture.resolution >> level;
-        for face in 0..6 {
-            let (cpu, gpu) = (&cpu.mips[level][face], &gpu.mips[level][face]);
-            let (max, mean) = difference(cpu, gpu, BAR);
-            assert!(max <= MAX_STEP, "mip {level} face {face}: max {max}");
-            assert!(
-                size < MEAN_MIN_SIZE || mean <= MEAN_STEP,
-                "mip {level} face {face}: mean {mean:.3}"
-            );
-        }
+        let faces = (0..6).map(|f| difference(&cpu.mips[level][f], &gpu.mips[level][f], BAR));
+        let (max, mean) = faces.fold((0, 0.0f32), |(m, a), (x, y)| (m.max(x), a.max(y)));
+        // Printed on every run (.config/nextest.toml): each adapter's values in its log.
+        eprintln!("[prefilter] hard capture, mip {level}: max {max}, worst face mean {mean:.3}");
+        assert!(max <= MAX_STEP, "mip {level}: max {max}");
+        let held = size < MEAN_MIN_SIZE || mean <= MEAN_STEP;
+        assert!(held, "mip {level}: a face's mean {mean:.3}");
     }
 }
 
@@ -126,11 +124,13 @@ fn gpu_prefilter_matches_the_cpu_reference_at_every_mip_of_a_smooth_capture() {
     };
     let capture = smooth_capture(32);
     let (cpu, gpu) = (prefilter(&capture), r.prefilter_gpu(&capture));
-    for level in 0..cpu.level_count() {
-        for face in 0..6 {
-            let (max, _) = difference(&cpu.mips[level][face], &gpu.mips[level][face], 1.0);
-            assert!(max <= SMOOTH_STEP, "mip {level} face {face}: max {max}");
-        }
+    let step = |l: usize, f: usize| difference(&cpu.mips[l][f], &gpu.mips[l][f], 1.0).0;
+    let per_mip: Vec<u8> = (0..cpu.level_count())
+        .map(|l| (0..6).map(|f| step(l, f)).max().unwrap_or(0))
+        .collect();
+    eprintln!("[prefilter] smooth capture, largest step per mip: {per_mip:?}");
+    for (level, max) in per_mip.iter().enumerate() {
+        assert!(*max <= SMOOTH_STEP, "mip {level}: max {max}");
     }
 }
 
