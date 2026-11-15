@@ -261,8 +261,10 @@ exits non-zero, or says *unconfirmed*. Its exit statuses are in `ci-merge`.
   hand-typed `tail | grep`: it replays the log from 30 lines back (a re-arm from
   the end drops what the log said while no `Monitor` ran), passes hand-backs,
   merges, the supervisor's and the watch's stops, a held Dependabot PR, every PR
-  turning ready, going back to draft or closing unmerged, and coders' `Standing
-  down` comments on their issues, and **exits 1 when the supervisor is not
+  turning ready, going back to draft or closing unmerged, and every comment a coder
+  posts on its briefed issue (`STANDING DOWN #N` for a stand-down, `COMMENT
+  #N` for any other wording; the orchestrator's own `Brief` and `Context
+  update` comments are skipped, so open a note of yours with one of those), and **exits 1 when the supervisor is not
   running**, so a dead queue is an event. Put the `Monitor` on it, never on the
   watch itself (a `Monitor` dies at 30 minutes and takes its command with it);
   re-arm it the same way.

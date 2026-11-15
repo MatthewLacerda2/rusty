@@ -1,4 +1,4 @@
-"""#1876: a coder's *Standing down* comment on a batch issue reaches the stream once."""
+"""#1876: a coder's *Standing down* comment on a batch issue reaches the stream once (the rest: `test_comments`)."""
 
 from __future__ import annotations
 
@@ -53,20 +53,6 @@ class Poll(unittest.TestCase):
         with mock.patch("subprocess.run", side_effect=hung) as run:
             self.assertIsNone(standing.gh_get("repos/o/r/issues/comments"))
         self.assertEqual(run.call_args.kwargs["timeout"], standing.GH_TIMEOUT_SECONDS)
-
-    def test_a_batch_issue_has_a_brief_or_an_open_pull_request_closing_it(self):
-        def get(path):
-            if "page=1" not in path:
-                return []
-            if path.startswith("repos/o/r/issues/10/"):
-                return [comment(5, 10, "Brief\n\nBranch: x")]
-            if path.startswith("repos/o/r/pulls"):
-                return [{"body": "Does it.\n\nCloses #12\n"}]
-            return []
-        with mock.patch("ghrest.slug", return_value="o/r"):
-            self.assertTrue(standing.in_batch(get, 10))
-            self.assertTrue(standing.in_batch(get, 12))
-            self.assertFalse(standing.in_batch(get, 13))
 
 
 if __name__ == "__main__":
