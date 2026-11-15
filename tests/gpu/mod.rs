@@ -45,10 +45,6 @@ mod diffuse_model_screenshot;
 mod directional_lightmap_screenshot;
 #[cfg(feature = "editor")]
 mod editor_capture;
-#[cfg(feature = "editor")]
-mod editor_capture_demo;
-#[cfg(feature = "editor")]
-mod editor_capture_game_view;
 mod emissive_factor_screenshot;
 mod environment_brdf;
 mod fallback_probe_screenshot;

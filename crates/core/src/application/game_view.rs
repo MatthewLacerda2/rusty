@@ -38,6 +38,7 @@ pub enum GameViewSize {
 
 impl GameViewSize {
     /// The dropdown's presets, in its order, with their labels: Unity's common set.
+    // lint: allow(named-enum) the variants carry sizes: a preset list, not a name table
     pub const PRESETS: &[(GameViewSize, &'static str)] = &[
         (GameViewSize::Free, "Free Aspect"),
         (GameViewSize::Aspect(16, 9), "16:9"),

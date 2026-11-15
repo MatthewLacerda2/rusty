@@ -711,7 +711,7 @@ changes, and its coder looks at both and says what it saw in the PR; no PNG goes
 GitHub (*Looking at a change*, below). `.gitignore` ignores `editor-capture*.png` at
 the root, but a capture belongs in the session's scratchpad.
 
-The smoke test (`tests/gpu/editor_capture.rs`) checks that the default scene captures,
+The smoke test (`tests/gpu/editor_capture/panels.rs`) checks that the default scene captures,
 the image is not blank and the hierarchy, viewport and inspector sit where the editor
 puts them. **No pixel goldens** of the editor: fonts and anti-aliasing differ across
 platforms and adapters, so a golden would break on every one but the machine that made it.
