@@ -2,7 +2,7 @@
 //!
 //! [`build_preview_scene`] is the single entry point: given a mesh choice and a
 //! preview subject, it returns a brand-new [`Scene`] — never the active editor
-//! World — carrying the preview mesh (or the model itself), a hardcoded key light,
+//! World — carrying the preview mesh (or the model itself), a hardcoded light,
 //! and an empty `skybox_path` so the renderer's existing panorama/gradient fallback
 //! (`render/ibl/skybox.rs`) draws a procedural sky with no new baking step. The
 //! scene is thrown away and rebuilt whenever the subject or mesh choice changes

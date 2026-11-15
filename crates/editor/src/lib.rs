@@ -125,7 +125,7 @@ pub struct EditorUi {
     /// (#352). One shared flag: entity and asset selection are mutually exclusive,
     /// so only one card is ever showing it at a time.
     pub preview_tab_active: bool,
-    /// The Preview tab's mesh toggle (sphere/cube/Suzanne).
+    /// The Preview tab's mesh toggle (sphere, cube, Suzanne or plane).
     pub preview_mesh: PreviewMesh,
     /// The Preview tab's orbit-camera state, persisted across frames.
     pub preview_orbit: OrbitState,

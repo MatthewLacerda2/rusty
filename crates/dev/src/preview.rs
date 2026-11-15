@@ -181,3 +181,7 @@ fn resolve_subject(asset_path: &str) -> Result<PreviewSubject, String> {
 #[cfg(test)]
 #[path = "preview_tests.rs"]
 mod preview_tests;
+
+#[cfg(test)]
+#[path = "preview_plane_tests.rs"]
+mod preview_plane_tests;
