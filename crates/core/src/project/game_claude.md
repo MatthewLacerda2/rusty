@@ -13,6 +13,12 @@ becomes an issue on `MatthewLacerda2/rusty` (the `agent` label, and a `Kind:` li
 the game guide says), and the game carries on. Never edit the engine from a game
 session.
 
+**Look at a material before it goes into a level.** Read `Texture.Stats` before
+tuning a ramp, then render the material with `Debug.PreviewMaterial` on the mesh that
+matches its use (`{ mesh = "plane", repeats = 3 }` for a wall or floor, the sphere or
+cube for a prop) and open the PNG. Pass `repeats` to see it tile; leave it out to see
+its real scale.
+
 This file is the game's: the engine wrote it once and never touches it again.
 
 ## This game
