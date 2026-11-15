@@ -13,16 +13,7 @@ fn draw_frame(editor: &mut EditorUi, scene: &mut Scene) {
     let mut console = ConsoleLogs::new();
     let mut playing = false;
     ctx.begin_pass(egui::RawInput::default());
-    editor.draw(
-        &ctx,
-        scene,
-        &mut console,
-        &mut nav,
-        &mut playing,
-        60.0,
-        16.0,
-        None,
-    );
+    editor.draw(&ctx, scene, &mut console, &mut nav, &mut playing, None);
     ctx.end_pass().textures_delta.clear();
 }
 

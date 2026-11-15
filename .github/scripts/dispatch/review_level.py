@@ -67,7 +67,7 @@ TABLE: dict[str, tuple[str, ...]] = {
         # which `Debug.Stats` keys are wall-clock and stay out of the harness's
         # `results.json`: a timing key let through makes two runs of one seed differ
         # (#1872 found `render_extract_us` leaking, and read `medium`)
-        "crates/core/src/frame_stats.rs",
+        "crates/core/src/frame_stats/",
     ),
     "scripting sandbox": (
         "crates/script/src/scripting/sandbox/",  # the gameplay VM's stdlib: no os/io, require's reach
