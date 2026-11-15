@@ -43,6 +43,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Editor↔API parity per op | `tools/lint -- --rules` (`api-parity`) | **hard gate**: every `edit::authoring::<module>::set_*` op a non-test line of `crates/editor/src/` names is also named from the API side — a named setter's call in `crates/script/src/api/`, an `op!`/`with!`/`group!` row of the field table `Component.Set` writes through (`edit::authoring::fields`), or a post effect's own row or knob table (#1467) — so anything the inspector writes, Lua can; an editor-only op takes `// lint: allow(api-parity) <why>` at its `fn`, and an allow on an op Lua reaches or no inspector names is stale and fails (#1368) |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `edit::authoring` op (never direct field writes through the #344 accessor guard) |
 | Entity ids from Lua | `tools/lint -- --rules` (`entity-arg`) | **hard gate**: in `crates/script/src/api/`, a Lua callback never takes an entity (`id`, `…_id`, `parent`, `child`, `target`, `entity`, `body`, `canvas`) as a bare `u32` or `Option<u32>`: it takes `api::entity_arg::EntityArg`, so a `nil` id reads as a missing entity and fails a write with the verb's name (#1383) |
+| Every binary starts with `rusty::init()` | `tools/lint -- --rules` (`binary-init`) | **hard gate**: the first code line of `fn main` in `src/main.rs`, `src/bin/<name>.rs` and `src/bin/<name>/main.rs` is `rusty::init();`, which starts the logger and, in a `dev` build, warns when `engine/` is not the content the binary was built with (`core::project::engine_content`); a binary that calls `rusty::logging::init()` instead never warns and its run reports read as unstamped. A real exception takes `// lint: allow(binary-init) <why>` on its `fn main` line |
 | Every ECS write is stamped | `tools/lint -- --rules` (`ecs-write`) | **hard gate**: a non-test line of `crates/ecs/src/` that borrows a hecs column mutably (`get::<&mut …>`, `query_one::<(&mut …)>`, `query_mut`) or reshapes the store through `inner.` (`spawn`, `despawn`, `insert`, `remove`, `clear`, …) fails, since a write that skips `World::touch` stamps no change and every change-log consumer misses it; each funnel line, and `World::derived_mut`, takes `// lint: allow(ecs-write) <why>` (#1705) |
 | File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py`, `.lua` or `.wgsl` one (docstrings, comments and blank lines free, #926, #1015); nothing grandfathered |
 | Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `crates/edit/src/authoring/` that takes a float (an `f32`/`f64`, a glam vector, or a float struct such as `Curve`) passes it to a `scene::rules` function (a bare `pub fn`: a `rules::sanitize` helper or a bound such as `rules::lens::hold_fov`) at a position that rule holds, or a sibling setter of its file; a rule taking floats and holding none (a pass-through) fails too, so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
@@ -51,6 +52,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Function ("endpoint") length | clippy `too_many_lines` + `tools/lint -- --determinism` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]`; its one exception, `Renderer::assemble`, is locked (`ESCAPE`, #961) |
 | Fuzz target compiles | `make fuzz-check` (`.github/scripts/fuzz_gate.py check`: `cargo check --manifest-path fuzz/Cargo.toml --locked --target-dir target/fuzz`) | **hard gate**: `fuzz/` is its own workspace, so no other gate builds it; this checks it on the pinned stable toolchain, `--locked` to a `fuzz/Cargo.lock` it first derives from the root `Cargo.lock` (`make fuzz-lock`; gitignored, so nothing drifts), and fails if that derivation moves a shared package off the root's version. A second cold engine build, so CI's `fuzz-check` job and `make gates` build only when the diff matches `ci.yml`'s `fuzz` filter (the one list both read; nightly always), and say they skipped otherwise; `make fuzz-check` by name always builds. The fuzz-only crates (`libfuzzer-sys`, `arbitrary`) are pinned exactly in `fuzz/Cargo.toml` |
 | Lint exceptions carry a reason | clippy `allow_attributes` + `allow_attributes_without_reason` | **hard gate**: an exception is `#[expect(lint, reason = "…")]` (outer `#[allow]` is denied; a module-root `#![allow]` still needs its `reason`), and an expectation that no longer fires fails too (#961) |
+| Lint gates and rules are wired | `make test-lint` (`gates_tests.rs`, `rules/wiring.rs`) | **hard gate**: every row of `gates::GATES` and of `rules::RULES` is run, through the entry point the tool dispatches, over a scratch repository it must flag, and must report the planted file; a row with no such case fails naming it, so a gate emptied to "no findings" or no longer reached cannot stay green |
 | Local gate = CI gate | `unittest` (`make scripts`, `test_gate_mirror.py`) | **hard gate**: every command a `GATES` recipe runs appears in a step of `ci.yml`/`lint.yml`, and every clippy run passes nothing after `--` but `-D warnings` (#964) |
 | Merge helpers | `unittest` (`make scripts`) | **hard gate**: `.github/scripts/tests` pass — `make mergeable` judges every merge, and the ruleset's required checks (`make ruleset`, #491) cannot tell a draft's run from a ready one (#486) |
 | Module layering | `tools/lint -- --layers` | **hard gate**: the declared table (`tools/lint/src/layers/table.rs`) equals the workspace's manifests (each row's `deps` and `uses` are its crate's `[dependencies]`), rows run bottom-up, no sim crate depends on a platform one or names a display crate (the `wgpu` and `egui` families: `wgpu`, `wgpu_*`, `egui`, `egui_*`), not even as a dev-dependency, no sim crate's dev-dependency is a platform sibling, no dev-dependency reaches up, `test-support` names no sibling and no display crate, and nothing declared is unused (#724, #938, #494) |
@@ -72,6 +74,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Provider keys stay out of tests | `tools/lint -- --rules` (`read-keys`, `engine-spawn`, `key-guard`) | **hard gate**: `dev::providers::read_keys()` is called only by the editor, `session` and `session-mcp`, each still calls it, and `KEY_READERS` names the same three; a test starts an engine binary only through `tests/spawn.rs`, which tells it to read no key; every package whose manifest names `rusty-dev` expands `rusty_dev::no_provider_keys!()` once, a sample of one test binary per package (#974) |
 | Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
 | Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `crates/editor/src` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); an editor slider is built by `editor::widgets::slider`, never a bare `egui::Slider::new(`, whose default clamping does the same (#1444); a real need takes `// lint: allow(drag-range) <why>` |
+| Root targets build no test harness | `tools/lint -- --rules` (`root-tests`) | **hard gate**: the root `Cargo.toml`'s `[lib]` and every `[[bin]]` say `test = false` and its `[package]` says `autobins = false` (a binary cargo found under `src/bin/` on its own would get a harness; undeclared, `orphan-module` names it), and no root `src/` file holds a test gate (`#[cfg(test)]`, `#[test]`), since no harness would build it; each harness was one more rustc run and link against the whole engine on every `cargo test`, running nothing; the root's tests are `tests/`; no allow (#2202) |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
 | Rust files are compiled | `tools/lint -- --rules` (`orphan-module`) | **hard gate**: every scanned `.rs` file is a crate root (a target's `src_path` in `cargo metadata` of the root, `fuzz/` and `tools/lint/` workspaces, so a `path =` target counts), is reached from one by `mod` as rustc resolves it (`name.rs` or `name/mod.rs`, under `a/` for a declaring `a.rs`, inline `mod a { mod b; }`, `#[path]`, a `mod` under `#[cfg]` included), or is named by `include!` / `include_str!`; rustc, clippy and rustfmt are silent about a file no `mod` names, and its tests stop running; a file built another way says why on its first line with `// lint: allow(orphan-module) <why>` |
 | Self-naming headers | `tools/lint -- --rules` (`self-path`) | **hard gate**: a source file's first `//!` line (a shader's first `//` line) that opens with a path under `src/`, `crates/`, `tests/`, `tools/`, `fuzz/`, `engine/` or `.github/` (a bare word too, when it names a directory of scanned files) names the file itself; a `mod.rs` may name its directory (`crates/edit/src/prefab/`). No header, or one opening with prose, is fine (#1654) |
@@ -120,7 +123,10 @@ untracked ones `.gitignore` doesn't exclude (`git ls-files --cached --others
 --exclude-standard`), so what the engine seeds into a gitignored folder (the UI
 kit's scripts and the default shader it copies into the fixture project's
 `assets/`) never counts, and a new file is measured before it is added. Where git
-can't list them (a tarball with no `.git`) it walks the disk and says so on stderr.
+can't list them (a tarball with no `.git`) it walks the disk and says so in its
+report, as it does when the agent docs go unchecked for the same reason. Each file
+is judged and named by its path in the repository, so a checkout under a `tests/`
+folder gives no source file the test cap.
 The code gates (rules, layers, determinism, components, parity) keep
 walking the disk: they check what cargo compiles, and an ignored `.rs` file is
 compiled all the same, which is the file the `ignored` rule flags.
@@ -288,9 +294,9 @@ inline comment, on the flagged line or in the comment/attribute lines right abov
 ```
 
 The reason is required; an allow without one is itself a finding (`[allow]`). A new
-rule is a module with its own `<rule>_tests.rs`, one line in the sorted `mod` list
-and one row in the sorted `RULES` table of `tools/lint/src/rules/mod.rs` (#911): no
-new flag, gate, CI step or baseline.
+rule is a module with its own `<rule>_tests.rs`, one line in the sorted `mod` list,
+one row in the sorted `RULES` table of `tools/lint/src/rules/mod.rs` (#911) and its
+must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
 
 <!-- sorted: each rule is one section, so two branches adding a rule land on different lines (#1409) -->
 - **`active-self`** (#1363) — every system read an entity's own `active` flag, so
@@ -351,6 +357,14 @@ new flag, gate, CI step or baseline.
   moves rather than writes (the import cache's staging swap, the seed's staged
   files) carries an inline allow. Comment text never counts;
   `tests/` and `tools/` are not scanned (`rules/atomic_write.rs`).
+- **`binary-init`** — a binary starts with `rusty::init()`, the logger plus, in a
+  `dev` build, the engine-content check (`core::project::engine_content`: one
+  warning when `engine/` is not what the binary was built with). `rusty::logging::init()`
+  stays public for the library, so a new binary copying it would build, never
+  warn and write unstamped run reports. The first code line inside `fn main` of
+  each binary root (`src/main.rs`, `src/bin/<name>.rs`, `src/bin/<name>/main.rs`)
+  must be `rusty::init();`; a comment or a string literal is no call, and a root
+  without `fn main` is not judged (`rules/binary_init.rs`).
 - **`body-table`** (#2061) — the character controller's sweeps read a copy of
   the physics world's body table with every kinematic body shown fixed
   (`physics::character::bodies`), cached and remade only when an exact change
@@ -591,6 +605,18 @@ new flag, gate, CI step or baseline.
   `NEXTEST` backstop are what keep every test process keyless; the sample proves they
   hold inside a binary that links the provider layer. Nothing excuses it
   (`Allow::Never`: its finding sits on a manifest, `rules/key_guard.rs`).
+- **`root-tests`** (#2202) — the root package (the binaries and the integration
+  suite; its lib only re-exports the members) builds no unit-test harness of its
+  own. Cargo would otherwise build one per target on every `cargo test` and
+  `nextest run`: nine more rustc runs and links against the whole engine, running
+  no test. So the rule fails a `[lib]` or `[[bin]]` section of the root
+  `Cargo.toml` without `test = false` (a new binary's harness would come back), a
+  `[package]` without `autobins = false` (cargo would build a binary it found under
+  `src/bin/` with a harness; with discovery off, an undeclared one is not compiled
+  and `orphan-module` names it), and the first test line (`rules/test_code.rs`) of any root `src/` file, a test no
+  harness builds. A root test goes in `tests/`; a member's in its crate. Nothing
+  excuses it (`Allow::Never`: the fix is the manifest line or a moved test,
+  `rules/root_tests.rs`).
 - **`sanitize`** — every authoring setter refuses a non-finite float (#1361).
   A `pub fn set_*` (any `pub` visibility) under `crates/edit/src/authoring/` (test code
   aside) that takes a float-carrying parameter fails unless each such parameter is

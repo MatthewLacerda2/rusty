@@ -30,11 +30,13 @@
 //! checkout.
 //!
 //! The engine's own content (shaders, bundled scripts, the preview model) is not the
-//! project's: it is found by [`engine_dir`], wherever the project is.
+//! project's: it is found by [`engine_dir`], wherever the project is. A stored path
+//! that starts `engine/` names a file there ([`ContentRoots`]).
 
 mod agent;
 pub mod bench;
 mod boot;
+mod content;
 mod engine;
 mod file;
 mod locate;
@@ -44,9 +46,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 pub use agent::{CLAUDE_FILE, MCP_FILE};
 pub use boot::{boot_scene, remember_scene, scene_to_remember, BootPlan, LAST_SCENE_PATH};
+pub use content::{engine_relative, ContentRoots, ENGINE_PREFIX};
 #[doc(hidden)]
 pub use engine::commit::pin as pin_engine;
 pub use engine::commit::{engine_commit, engine_order, UNKNOWN_COMMIT};
+pub use engine::content::{self as engine_content, EngineStamp};
 pub use engine::{EngineCheck, Verdict};
 pub use file::{ProjectFile, ProjectSettings, PROJECT_FILE};
 pub use locate::{checkout, engine_dir, engine_path, locate};

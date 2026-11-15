@@ -199,6 +199,10 @@ What cloud coders' run logs taught; each one cost a coder real time.
   invariance): `gh workflow run ci.yml --ref <branch>`, quoted in the PR.
   Lavapipe and x86_64 can pass where Metal or aarch64 fails. Never commit a
   golden hash taken on one platform (`docs/testing.md`).
+- **A GPU tolerance you add or move says what it was measured on**, and needs a
+  desktop GPU's value before it merges, which a container has not: put
+  `- [ ] make test-gpu ADAPTER=<gpu> on the head` under *For a human*
+  (`docs/testing.md`, *Which adapters a GPU tolerance holds on*).
 - Never fall back to `cargo test`: CI runs nextest, and its per-test process
   isolation and the `gpu` test group are what the gate measures.
 - Don't run `cargo mutants` locally; ask for a scoped run (above).

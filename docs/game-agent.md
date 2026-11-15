@@ -89,6 +89,10 @@ Run that `git log`, read what changed, and bring the game up to date (scenes,
 scripts, prefabs) before carrying on. Only an **older** engine, or a branch build,
 warns and asks before it opens.
 
+An upgrade may also change a texture graph the engine ships (an `engine/…` path
+in a recipe, listed by `Texture.Ops()`), so a material instancing one can bake
+differently after it: rebake (`Material.Rebake`) and look before carrying on.
+
 ## Enemy AI: the animation graph is the state machine
 
 Build an enemy's decisions the way the animation is built, with no behaviour
@@ -130,6 +134,20 @@ function M.OnTakeDamage(id, amount)
 end
 return M
 ```
+
+## Look at a material before it goes into a level
+
+You never see a texture or a material unless you render it, so **look before you
+use**. Read `Texture.Stats` on a recipe before tuning a `color_ramp` or `map_range`
+(a noise does not span 0–1), and `Texture.Preview` for its intermediate maps
+(`docs/api/Texture.md`). Then render the finished material with
+`Debug.PreviewMaterial` (`docs/api/Debug.md`, *The preview*) on the mesh that
+matches its use, and open the PNG: `{ mesh = "plane", repeats = 3 }` for a wall or
+floor, which shows whether a stain repeats every tile and whether the normal map's
+relief reads under a raking light; the sphere or cube for a prop. Pass `repeats` to
+see it tile; leave it out to see its real scale (a world-mapped material at its own
+`world_size`). `Debug.Preview`
+does the same for a texture, model or shader file.
 
 ## Play-testing headlessly
 

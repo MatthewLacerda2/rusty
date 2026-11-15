@@ -353,7 +353,9 @@ which caches it, #1973). What it buys over `cargo test`:
 - **Each test is its own process**, so one test's panic, leaked global or stuck
   thread cannot take its neighbours with it.
 - **Every failure, summarised at the end** (`fail-fast = false`), instead of stopping
-  at the first failing binary — the list an agent reads to decide what to fix.
+  at the first failing binary — the list an agent reads to decide what to fix. `make
+  test` goes on the same way across its four runs (nextest and doctests, both feature
+  sets), and fails at the end if any did.
 - **A hang is named, not waited out**: a test is flagged SLOW after 60 s and killed
   after 5 min.
 - **A fixed proptest seed in the gates, a random one in exploring** (#1800, #1852).
@@ -505,6 +507,50 @@ machine: memory pressure, or another process such as rust-analyzer's check-on-sa
 If they return, count the recompiled `.o` files as above. A spike with few recompiled
 units points to the machine, not the crate.
 
+## The link step (#2202)
+The figures below are one machine's, the operator's, whose builds wait on its disk:
+they are the reasons behind each decision here, not numbers to plan by, and another
+machine measures its own. Every root binary links the whole engine statically,
+about 190 MB each in the dev profile, eight of them per `cargo build --features dev`.
+What links them, and what was measured against it, so it is not measured twice:
+
+- **The linker is already `lld`.** rustc links `x86_64-unknown-linux-gnu` through
+  its bundled `rust-lld` (`cc -fuse-ld=lld`, the default since 1.90), so Linux dev
+  machines, cloud containers and CI's runners all use it with nothing configured
+  (`rustc --print link-args` shows it). macOS links with Apple's `ld` (the one Xcode
+  ships). `mold` is not set anywhere: a linker named in `.cargo/config.toml` would
+  have to exist on every machine that builds. Relinking `play` alone (one link,
+  warm page cache): `lld` 0.95 s and 1.05 GB peak, `gold` 4.5 s, GNU `ld` 7.7 s.
+- **Debug info is not what the linker spends time on.** Dependencies already build
+  with `debug = false` (`[profile.dev.package."*"]`); the members keep
+  `line-tables-only` for backtraces. Dropping every debug section at link time
+  (`--strip-debug`) took the same `play` link from 0.95 s to 0.89 s (178 MB to 107
+  MB). `split-debuginfo = "unpacked"` shrank `play` to 153 MB but wrote as many bytes
+  per touched build (rustc rewrites the `.dwo` beside each changed unit) and was no
+  faster. `--compress-debug-sections=zlib` cut a touched build's writes by a
+  quarter (2.07 GB to 1.59 GB) with no wall-time gain over eight interleaved pairs;
+  `zstd` compresses as well but std's backtraces then lose `file:line`.
+- **A link is about a second; a slow one is waiting on the disk.** Alone, a
+  binary's rustc run takes 1.5 s, 1.0 s of it the link. When a touched build links
+  the eight at once (four at a time on four jobs), each can take 15-17 s, stalled
+  on writes: a touched `cargo build --features dev` wrote about 2.1 GB, 1.5 GB of it
+  the eight binaries, and the same touch took anywhere from 15 s to 52 s over 14
+  runs. What a build writes, not the linker, is the lever on such a machine.
+- **The root package builds no unit-test harness.** `[lib]` and every `[[bin]]`
+  say `test = false`, and `[package]` says `autobins = false` so no binary is found
+  without its `[[bin]]`: the root's sources hold no tests, and each harness was one
+  more rustc run and link against the whole engine on every `cargo test` / `nextest
+  run`, the nine together about 2 s of a test build. The `root-tests` rule
+  (`docs/linting.md`) holds it.
+- **Dynamic linking was measured and not adopted.** A `dylib` crate re-exporting
+  the members, with `-C prefer-dynamic`, halved what a touched build wrote (0.93
+  GB) and made each binary a few hundred KB, but the shared library's own link took
+  9.7 s, so the build was no faster over four samples. It would also need
+  `RUSTFLAGS` (a second full build of every crate) and `LD_LIBRARY_PATH` for every
+  binary run outside cargo (the launcher's `rusty`, MCP's `session-mcp`).
+- **`make check` links nothing** (clippy stops at metadata), and the `make` verbs
+  that run one binary already build only it (`--bin`).
+
 ## GPU tests and the headless budget
 Tests that need a real device call `Renderer::new_headless`, which returns `None`
 when no adapter is present — so **every GPU test skips gracefully** rather than
@@ -560,8 +606,56 @@ build ran every GPU test there.
 
 Linux CI's adapter is a software renderer, so a green run there proves the render
 path is correct on a conformant driver, not that it performs or behaves identically on
-real hardware — Metal on macOS is the one real GPU. Pair anything load-bearing with an
-adapter-free unit test on the underlying predicate so the rule is pinned everywhere.
+real hardware — Metal on macOS is the one real GPU CI has. Pair anything load-bearing
+with an adapter-free unit test on the underlying predicate so the rule is pinned
+everywhere.
+
+### Which adapters a GPU tolerance holds on
+
+A GPU test that holds a number (a step count against a CPU reference, a ratio, a
+mean) holds it on **three adapters**: **lavapipe** (Linux CI, cloud sessions),
+**Metal** (CI's macOS leg) and a **real desktop GPU** (the operator's machine, a
+discrete Vulkan driver). CI runs only the first two, so a number tuned there is first
+seen failing on the third, by whoever runs `make test` there next.
+
+- **A tolerance says what it was measured against**: a comment beside it with the
+  adapters and the values they gave (`Measured: RTX 2060 1, lavapipe 1, Metal 1`), and
+  what the bar stands for. It moves only with the reason written there; "widened until
+  green" is not one. No check holds this: a tolerance is a constant like any other in
+  a test's text, so the review does.
+- **Find the difference before moving a number.** For a GPU path held to a CPU
+  reference, nudge the reference's own inputs by a GPU's rounding (1e-7 to 1e-5) and
+  see how far it moves from itself. A tolerance below that is a coin toss on some
+  adapter; a fixture where it is large tests ties (a tap exactly on a texel edge, a
+  seam), not the code, and wants a fixture without them, not a wider bar. For a ratio
+  between two renders, take it on every adapter first: its spread is what the bar must
+  sit under.
+- **One adapter, one command**: `make test-gpu` runs the GPU group alone, both feature
+  sets, on lavapipe when its Vulkan driver is installed (`lvp_icd` under
+  `/usr/share/vulkan/icd.d/`: Arch's `vulkan-swrast`, Debian's `mesa-vulkan-drivers`),
+  else on the machine's own; `ADAPTER=nvidia` (any part of
+  an adapter's name, case ignored) picks another. Under it sits wgpu's own
+  `WGPU_ADAPTER_NAME`, which every headless renderer honours
+  (`render::setup::headless::ADAPTER_ENV`): set on any command, only that adapter is
+  used. None of that name skips each GPU test but fails the canary, whatever
+  `RUSTY_REQUIRE_GPU` says, so a mistyped name is never a green run that rendered
+  nothing. A test red on a real GPU and green on lavapipe, on the same commit, is the
+  driver, not the change. The variable steers every headless renderer, not only the
+  tests: the probe and reflection bakes, `dev::capture`'s screenshots and
+  `Debug.Preview`. The windowed renderer ignores it, so left exported in a shell, an
+  editor draws its window on the real GPU and bakes on the named adapter.
+- **Every run names its adapter and its values**: the canary
+  (`render::test_gpu::tests::gpu_adapter_present_when_required`) prints
+  `[gpu] adapter: <name> (<backend>, <driver>)`, and a test that holds a tolerance
+  prints what it measured (`eprintln!`, as the prefilter and TAA shimmer tests do).
+  nextest shows both after every run, passing too, CI's included, for the tests its
+  `success-output` override in `.config/nextest.toml` lists; a new tolerance test adds
+  itself there.
+- **Before a new or moved GPU tolerance merges**, it is run on a real desktop GPU:
+  `make test-gpu ADAPTER=<gpu>` on the branch's head, on the operator's machine (a
+  local coder, or the orchestrator for a cloud branch), and the PR's `Gates` line names
+  the adapter and the value. Lavapipe's and Metal's values are read from CI's log of
+  the branch's run (`build-test`, `build-test-cross`).
 
 **Concurrency is capped.** A `Renderer` is a device, the full pipeline set and shadow
 maps, and a software adapter (lavapipe) allocates all of that in system RAM shared with rustc — so
@@ -706,6 +800,42 @@ cargo run --features dev --bin play -- --project tests/fixtures/project look_123
 
 Log the getter after a set (`Harness.Log(tostring(Graphics.Get…()))`) when the two
 images look alike: an effect that did not run and one that runs invisibly look the same.
+
+**Comparing two builds.** A built binary reads `engine/` (shaders, fonts, bundled
+scripts) at run time, from the folder found beside it or above it, else the
+checkout it was built in (`core::project::engine_dir`). So a binary kept across a
+`git checkout` or a pull **is not that commit's build**: it runs its own code with
+the other tree's shaders. Build each side in its own tree, or pin each binary to its
+own copy of `engine/`:
+
+```sh
+# On main: build, then pin the binary beside a copy of the engine content it was built with.
+cargo build --features dev --bin play
+mkdir -p /abs/scratch/before && cp target/debug/play /abs/scratch/before/
+cp -r engine /abs/scratch/before/engine
+git checkout <branch>                 # the branch's own build is `cargo run`, as above
+/abs/scratch/before/play --project tests/fixtures/project look_1234.lua <before_out>
+```
+
+A binary finds the `engine/` beside it first, as a shipped game does, so the pinned
+copy is the one it reads; the project, scenario and output paths are still read from
+where it is run. The other way is one worktree per build (`git worktree add`), each
+binary run in its own. Either way, a `dev` binary knows the engine content it was
+built with (`build.rs` stamps a digest of `engine/`), **warns once at start-up when
+the folder it reads holds other content**, and every run report says which content
+it used: `results.json`'s `engine` (`commit`, `content_built`, `content_found`,
+`content_matches`), the bench report's `engine` line and `bench.json`, and
+`editor-capture`'s `wrote` line. Check `content_matches` is `true` on both sides
+before trusting a pair; the bench table warns on its own when the run it compares
+against had `content_matches: false`. A folder that cannot be hashed (an unreadable
+file, a dangling link) is said once at start-up, and its runs' `content_found` is
+`null`. A cargo build re-stamps on any change under `engine/`, so
+`cargo run` and `make` never warn, and the editor's shader hot reload follows edits
+made after start-up; the warning is for a binary run directly against a tree it was
+not built from. In a debug build `commit` is the checkout's at run time, so after a
+checkout it names the new commit: the content digest is what tells a kept binary.
+A shipped `player` makes no such check: it carries no `dev` code, and its `engine/`
+is the one `make export` installed beside it.
 
 ## Test games (#2029)
 
@@ -858,7 +988,10 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   the run's warnings, if any (below).
 - **before and after** — the report is kept in `out/bench/bench.json` (and
   `bench.txt`), and each run prints every row's change against the last one. To
-  measure an optimisation: `make bench`, change, `make bench`.
+  measure an optimisation: `make bench`, change, `make bench`. The report names the
+  engine that measured it (`engine <commit> content <digest>`, and the last run's
+  content when it moved), and warns when the binary's `engine/` is not the one it was
+  built with (*Comparing two builds*, above).
 
 It is a **release** build (the first run compiles one, a few minutes), so the numbers
 are a shipped game's. It is an **informational signal, never a gate**, and not in
@@ -1087,7 +1220,24 @@ lavapipe and set `RUSTY_REQUIRE_GPU=1` (#785), and the nextest `gpu` group bound
 Doctests are left out: nextest doesn't run them (`make test` does), so a mutant only a
 doctest would catch survives. The runs pass `--test-threads 2`: the jobs' `ulimit -v`
 cap (#674) is per process, so it times the test processes running at once stays within
-the runner's memory (`test_gpu_config.py` holds the product).
+the runner's memory (`test_gpu_config.py` holds the product). The same `ulimit` turns
+core dumps off (`-c 0`, #2230): a mutant that allocates without bound aborts at the
+cap, and on GitHub's runners an abort writes a core as large as the cap while the
+process keeps its memory, which outlasts the test timeout and, a few mutants in a row,
+the runner; with dumps off it aborts in seconds and reads as caught
+(`test_limits.py` holds every capped `ulimit` to `-c 0`).
+
+**A torn-down job still answers.** A job whose runner died, or that was killed at its
+`timeout-minutes`, runs no step of its own, so `mutants-on-request.yml` has a second
+job, `no-answer`, which `needs:` it and runs only when the mutation job failed or timed
+out without reaching its comment (its `answered` output) and the run was not
+cancelled. It reads the step the job died in and GitHub's annotation from the jobs API
+(`mutants-torn-down.py`) and posts that line below any earlier report on the pull
+request, and as the `mutants-report` artifact. What the job measured is lost with its
+runner. A job that failed with its steps run and still wrote no report gets a line
+saying so, not "torn down". A runner that dies right after posting its report loses
+`answered` too, so the line can land below a real report; it says that report is the
+truth.
 
 **The jobs run their own baseline** (`--baseline skip`, #2164). cargo-mutants builds
 and tests its baseline with `--package` set to the mutated packages only, whatever

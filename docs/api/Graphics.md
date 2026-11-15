@@ -472,16 +472,25 @@ HDRP's neighbour reuse made deterministic: the average reads mips of the hits), 
 satin floor shows a soft reflection of what stands on it and a mirror a sharp one,
 and a rough reflection's silhouette fades across its blur instead of stepping where
 one pixel's ray hits and its neighbour's misses (up to roughness 0.05 the hit is
-read sharp at any resolution, widening to the full lobe by 0.1). A pixel whose own
-ray missed takes the blur of the hits around it, but no wider than its own lobe
-spreads one, so a reflection's edge softens outwards too and a mirror's stays sharp
-beside a satin surface. The average counts only pixels on the same surface (the same
-plane), so a reflection mostly neither fades at a surface's border nor bleeds onto the
+read sharp at any resolution, widening to the full lobe by 0.1). Every pixel, whether
+its own ray hit or missed, takes its blur from how far away the hits around it are on
+average, those that reflect something counting most, spread by its own lobe and no
+wider than that lobe spreads a hit at the march's reach. That average changes smoothly
+across the frame, between two hits at different distances (a bottle in front of the
+shelf behind it) as between a hit and a miss, so a reflection's outline is as soft as
+its inside, its edge softens outwards too, and nothing inside it is drawn crisp; a
+roughness map's detail, and a smooth surface beside a rough one, keep their own blur;
+and a mirror's stays sharp. A contact reflection takes the average of what is around
+it too: one as wide as a box standing on a satin floor stays tight against its foot
+among a far wall's long rays, but one only a few pixels wide (a chair leg, a thin
+post) on a rough floor (about 0.35 and up) with long rays all around it is blurred as
+wide as they are, and fades to the probe reflection with them. The average counts only pixels on the
+same surface (the same plane), so a reflection mostly neither fades at a surface's border nor bleeds onto the
 surface beside it; it is an approximation, since each sample reads a mip texel half
 the blur's radius wide, and in a band about that wide at a corner it does
 (no history, so it is stable with no accumulation; the pyramid of the opaque image
 adds a third of an `Rgba16Float` frame to the copy SSR already held, and the hits'
-two pyramids at 1080p about 22 MB and 11 MB more). A `receive_ssr` transparent reads
+two pyramids at 1080p about 22 MB each). A `receive_ssr` transparent reads
 its hit sharp, with no such average. A hit fades by its
 confidence (the screen's edge, wider the blurrier it is, and the march's last fifth of
 reach) and a miss keeps the sky or probe reflection, so a weak hit falls back to it
@@ -561,8 +570,10 @@ fading the bloom's intensity fades the smudges too). The image covers the screen
 without stretching, centred, its overflow cropped, as Unity places it. It needs both
 a **dirt texture** and a **dirt intensity** above `0`, and shows nothing while bloom
 is off. The texture is loaded whenever a volume names one, even at a dirt intensity of
-`0`, so tweening the intensity up never loads it mid-effect. `engine/textures/lens_dirt.png`
-names the engine's own neutral smudges, for a game with no art of its own; an
+`0`, so tweening the intensity up never loads it mid-effect. A path that starts
+`engine/` names a file the engine ships, wherever it is installed (the rule texture
+recipes follow, `docs/api/Texture.md` *Image files*): `engine/textures/lens_dirt.png`
+is the engine's own neutral smudges, for a game with no art of its own; an
 `rt:<name>` render texture works too. A missing or unreadable file is logged once and
 draws no dirt (a missing one is picked up when it appears, an unreadable one when it
 is written again). A new volume starts with no dirt texture and a dirt intensity of `0`.

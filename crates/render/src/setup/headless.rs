@@ -27,6 +27,28 @@ pub fn gpu_required() -> bool {
     std::env::var(REQUIRE_GPU_ENV).as_deref() == Ok("1")
 }
 
+/// Set to an adapter's name, or part of it (case ignored), to put every headless
+/// renderer on that adapter alone: `llvmpipe` for lavapipe beside a real GPU, or
+/// `nvidia`, so one machine tells a change from its driver (`make test-gpu`). It is
+/// wgpu's own variable (`wgpu::util::initialize_adapter_from_env`), matched the same
+/// way. No adapter of that name is "no adapter": a skip for each test, and a failure
+/// of the adapter canary (`render::test_gpu`) whatever [`REQUIRE_GPU_ENV`] says, since
+/// a name asked for is an adapter required. Unset or empty, the usual pick stands. It
+/// steers every headless renderer (the bakes, `dev::capture`, `Debug.Preview`), never
+/// the windowed one.
+pub const ADAPTER_ENV: &str = "WGPU_ADAPTER_NAME";
+
+/// The adapter [`ADAPTER_ENV`] asks for, lowercased, when it asks for one.
+pub(crate) fn wanted_adapter() -> Option<String> {
+    let name = std::env::var(ADAPTER_ENV).ok()?.trim().to_lowercase();
+    (!name.is_empty()).then_some(name)
+}
+
+/// Whether an adapter called `name` is the one asked for (`wanted`, lowercased).
+fn is_wanted(name: &str, wanted: &str) -> bool {
+    name.to_lowercase().contains(wanted)
+}
+
 /// The backends a headless renderer may use: Vulkan, Metal and DX12 — never GL.
 ///
 /// Every headless renderer creates its own `wgpu::Instance`, and several live at
@@ -70,28 +92,7 @@ impl Renderer {
             ..wgpu::InstanceDescriptor::new_without_display_handle()
         });
 
-        // No `compatible_surface` — pure offscreen. Allow a software/fallback
-        // adapter (lavapipe) so headless containers can still render.
-        let adapter = match instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::HighPerformance,
-                compatible_surface: None,
-                force_fallback_adapter: false,
-                apply_limit_buckets: false,
-            })
-            .await
-        {
-            Ok(a) => a,
-            Err(_) => instance
-                .request_adapter(&wgpu::RequestAdapterOptions {
-                    power_preference: wgpu::PowerPreference::LowPower,
-                    compatible_surface: None,
-                    force_fallback_adapter: true,
-                    apply_limit_buckets: false,
-                })
-                .await
-                .ok()?,
-        };
+        let adapter = pick_adapter(&instance).await?;
 
         // Timestamps where the adapter has them: the frame stats' GPU time (#835).
         // And the rest of `limits::OPTIONAL`.
@@ -119,6 +120,34 @@ impl Renderer {
     }
 }
 
+/// The adapter a headless renderer runs on: the one [`ADAPTER_ENV`] names, else the
+/// high-performance one, else a software fallback (lavapipe), so headless containers
+/// still render. No `compatible_surface`: pure offscreen.
+async fn pick_adapter(instance: &wgpu::Instance) -> Option<wgpu::Adapter> {
+    if let Some(wanted) = wanted_adapter() {
+        let adapters = instance.enumerate_adapters(HEADLESS_BACKENDS).await;
+        let found = (adapters.into_iter()).find(|a| is_wanted(&a.get_info().name, &wanted));
+        if found.is_none() {
+            log::warn!("[Render] no adapter matches {ADAPTER_ENV}={wanted}");
+        }
+        return found;
+    }
+    let options = |power_preference, force_fallback_adapter| wgpu::RequestAdapterOptions {
+        power_preference,
+        compatible_surface: None,
+        force_fallback_adapter,
+        apply_limit_buckets: false,
+    };
+    let high = options(wgpu::PowerPreference::HighPerformance, false);
+    match instance.request_adapter(&high).await {
+        Ok(a) => Some(a),
+        Err(_) => (instance)
+            .request_adapter(&options(wgpu::PowerPreference::LowPower, true))
+            .await
+            .ok(),
+    }
+}
+
 /// A surface-shaped config so depth/pipeline creation matches the windowed path;
 /// there is no real swapchain to configure offscreen.
 fn offscreen_config(width: u32, height: u32) -> wgpu::SurfaceConfiguration {
@@ -137,7 +166,15 @@ fn offscreen_config(width: u32, height: u32) -> wgpu::SurfaceConfiguration {
 
 #[cfg(test)]
 mod tests {
-    use super::HEADLESS_BACKENDS;
+    use super::{is_wanted, HEADLESS_BACKENDS};
+
+    #[test]
+    fn an_adapter_is_picked_by_any_part_of_its_name_in_any_case() {
+        let lavapipe = "llvmpipe (LLVM 20.1.8, 256 bits)";
+        assert!(is_wanted(lavapipe, "llvmpipe"));
+        assert!(is_wanted("NVIDIA GeForce RTX 2060", "rtx 2060"));
+        assert!(!is_wanted(lavapipe, "nvidia"));
+    }
 
     #[test]
     fn headless_renderers_never_bring_up_the_gl_backend() {

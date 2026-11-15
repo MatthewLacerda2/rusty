@@ -147,3 +147,47 @@ fn a_display_entry_no_manifest_depends_on_is_unknown() {
         ["UNKNOWN_CRATE eguii — not a dependency in Cargo.toml"]
     );
 }
+
+#[test]
+fn only_use_of_the_crate_itself_keeps_its_name() {
+    assert_eq!(
+        found("use image;\nfn f() { image::open(); }"),
+        ["image", "image"]
+    );
+    // a restricted or public re-export, and a restricted `mod`, still shadow it
+    for code in [
+        "pub(crate) use super::image;\nfn f() { image::draw(); }",
+        "pub use super::image;\nfn f() { image::draw(); }",
+        "pub(crate) mod image;\nfn f() { image::draw(); }",
+    ] {
+        assert!(found(code).is_empty(), "{code}");
+    }
+}
+
+#[test]
+fn a_use_tree_of_any_shape_flattens_to_its_end() {
+    let flat = |tree: &str| -> Vec<String> {
+        let paths = super::flatten(tree);
+        paths
+            .into_iter()
+            .map(|(p, b)| format!("{}={b}", p.join("::")))
+            .collect()
+    };
+    assert_eq!(flat("a::{b::{c}, d}"), ["a::b::c=c", "a::d=d"]);
+    assert_eq!(flat("a::{self, b as c, d::*,}"), ["a=a", "a::b=c"]);
+    assert_eq!(flat("a::{}"), Vec::<String>::new());
+    // malformed: an open group, a stray close, an `as` with nothing after it
+    assert_eq!(flat("a::{b"), ["a::b=b"]);
+    assert_eq!(flat("a::{b}}, c"), ["a::b=b"]);
+    assert_eq!(flat("a as"), Vec::<String>::new());
+}
+
+#[test]
+fn a_crate_another_row_uses_is_still_stale_in_this_one() {
+    let uses = [at("scene", "wgpu", "crates/scene/src/x.rs")];
+    let v = check::all(ROWS, &TIGHT, &deps(), &uses);
+    assert!(
+        v.iter().any(|m| m.starts_with("STALE_CRATE render → wgpu")),
+        "{v:?}"
+    );
+}

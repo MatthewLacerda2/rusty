@@ -14,6 +14,10 @@
 //! the tick), so a scenario replays identically every run.
 //!
 //! A run produces: <out_dir>/results.json + <out_dir>/console.log + <out_dir>/stats.json.
+//! `results.json`'s `engine` says which engine ran it: the commit, and the
+//! `engine/` content the binary was built with against what the folder held
+//! (`core::project::EngineStamp`), so a capture taken with another tree's shaders
+//! says so in its own run's file.
 //! The rendering verbs (`Screenshot`, `Render`) live in `render`; recording the
 //! final audio mix (`RecordAudio`, `StopAudio`, #1579) in `audio`.
 //!
@@ -187,6 +191,7 @@ impl Harness {
             "logs": self.logs,
             "final_snapshot": self.snapshot(),
             "stats": self.stats.borrow().to_json(false),
+            "engine": rusty_core::project::engine_content::stamp(),
         });
 
         let results_path = self.out_dir.join("results.json");

@@ -47,7 +47,7 @@ use rusty::shell::editor::capture_picker;
 mod sample_picker;
 
 fn main() {
-    rusty::logging::init();
+    rusty::init();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let project = rusty::core::project::take_flag(&mut args).unwrap_or_else(|e| fail(&e));
     let (out, source, opts, page) = parse(&args).unwrap_or_else(|e| fail(&e));
@@ -82,13 +82,26 @@ fn main() {
 
 fn report(written: Result<bool, String>, out: &str) {
     match written {
-        Ok(true) => println!("editor-capture: wrote {out}"),
+        Ok(true) => println!("editor-capture: wrote {out} ({})", engine_note()),
         Ok(false) => {
             eprintln!("editor-capture: no GPU/software adapter (install mesa-vulkan-drivers)");
             exit(1);
         }
         Err(e) => fail(&e),
     }
+}
+
+/// Which engine drew it, as `results.json`'s `engine` says it: the commit, the
+/// `engine/` content read, and whether it is the content this binary was built with.
+fn engine_note() -> String {
+    let stamp = rusty::core::project::engine_content::stamp();
+    let found = stamp.content_found.as_deref().unwrap_or("unknown");
+    let built = match stamp.content_matches {
+        Some(true) => "as built",
+        Some(false) => "NOT the content this binary was built with",
+        None => "build content unknown",
+    };
+    format!("engine {}, content {found}, {built}", stamp.commit)
 }
 
 /// What the command line asked for: `(out, scene, options, picker page)`.

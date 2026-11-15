@@ -62,6 +62,7 @@ fn the_table_shows_the_change_against_the_last_run() {
         frames: 1,
         metrics: vec![("tick_nav".to_string(), Summary::of(&[0.5]))],
         warnings: vec!["the CPU clock moved".to_string()],
+        ..Report::default()
     };
     let line = only_now.render(Some(&run(4.0)));
     assert!(line
@@ -82,7 +83,54 @@ fn a_report_round_trips_through_json() {
             },
         )],
         warnings: vec!["noisy".to_string()],
+        engine: Some(EngineStamp::of(Some("a"), Some("b"))),
     };
     let json = serde_json::to_string(&report).unwrap();
     assert_eq!(serde_json::from_str::<Report>(&json).unwrap(), report);
+}
+
+#[test]
+fn the_table_names_the_engine_content_and_the_last_runs_when_it_moved() {
+    let run = |found: &str| Report {
+        engine: Some(EngineStamp::of(Some(found), Some(found))),
+        ..Report::default()
+    };
+    let same = run("aaaa").render(Some(&run("aaaa")));
+    let line = same.lines().find(|l| l.starts_with("engine ")).unwrap();
+    assert!(line.ends_with("content aaaa"), "{line}");
+    let moved = run("bbbb").render(Some(&run("aaaa")));
+    assert!(
+        moved.contains("content bbbb (last run: content aaaa)"),
+        "{moved}"
+    );
+    assert!(!Report::default().render(None).contains("engine "));
+}
+
+#[test]
+fn a_last_run_that_mixed_builds_is_flagged_even_when_the_tree_is_the_same() {
+    // A kept binary built from A, run on the branch's tree B: the "before".
+    let before = Report {
+        engine: Some(EngineStamp::of(Some("aaaa"), Some("bbbb"))),
+        ..Report::default()
+    };
+    // The branch's own build, on the same tree B: the "after".
+    let after = Report {
+        engine: Some(EngineStamp::of(Some("bbbb"), Some("bbbb"))),
+        ..Report::default()
+    };
+    let table = after.render(Some(&before));
+    assert!(
+        table.contains("content bbbb (last run: content bbbb, built aaaa)"),
+        "{table}"
+    );
+    assert!(
+        table.contains("warning: the last run was not built"),
+        "{table}"
+    );
+    // Must pass: two matched runs on one tree print neither.
+    let clean = after.render(Some(&after));
+    assert!(
+        !clean.contains("last run") && !clean.contains("warning"),
+        "{clean}"
+    );
 }
