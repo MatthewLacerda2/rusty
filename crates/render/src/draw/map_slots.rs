@@ -1,37 +1,176 @@
-//! The material's map slots (#202, #207, #1997, #2151): which asset field each
-//! group-2 texture comes from, at which binding, holding what, and the record's
-//! flags for the occlusion and specular-level maps. `materials` builds the bind
-//! group from them; a new map is one entry in each list here (PR #2151's *Seam*).
+//! The material's map slots (#202, #207, #1997, #2151): one table, [`MAP_SLOTS`],
+//! whose rows say which asset field each group-2 texture comes from, at which
+//! binding, holding what, and which record flag goes off while it has no texture.
+//! `materials` builds the bind group from it; a new map is one [`Map`] and one row
+//! (PR #2151's *Seam*).
 
 use crate::gpu::material_cache::{MATERIAL_MAPS, MATERIAL_TEXTURES};
 use crate::gpu::textures::TextureKind;
 use crate::gpu::uniforms::LevelMapsUniform;
+use crate::MaterialData;
 use rusty_asset::MapRef;
 use rusty_components::MaterialAsset;
 use rusty_shadergen::textures;
 
-/// Each map's group-2 binding, in [`material_texture_paths`] order: albedo,
-/// metallic, roughness, normal and emissive at 0 and 2–5 (#202, #207), the detail
-/// map at 15 (#1997), the last texture binding below the samplers' offset, then
-/// occlusion at 14 and specular level at 13 (#2151), counting down from it, so the
-/// extra shader slots keep the bindings after the param uniform (7, …) and a new map
-/// takes the next one down (12).
-pub(crate) const MAP_BINDINGS: [u32; MATERIAL_MAPS] = [0, 2, 3, 4, 5, 15, 14, 13];
+/// A material map, by its row of [`MAP_SLOTS`] (`map as usize`, which a const
+/// assert holds).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Map {
+    Albedo,
+    Metallic,
+    Roughness,
+    Normal,
+    Emissive,
+    Detail,
+    Occlusion,
+    Specular,
+}
+
+/// One group-2 material map: everything the renderer knows about it, in one row.
+pub(crate) struct MapSlot {
+    pub map: Map,
+    /// Its texture's group-2 binding; its sampler's is [`map_sampler_binding`].
+    pub binding: u32,
+    /// What it holds, which decides its view (sRGB for `Colour`, raw otherwise,
+    /// glTF 2.0, #647), how an uncompressed upload's mips average (#1322) and which
+    /// compressed formats it can read (#1574).
+    pub kind: TextureKind,
+    /// The asset field naming its texture.
+    pub path: fn(&MaterialAsset) -> Option<&MapRef>,
+    /// The record flag that goes to 0 while the map has no resident texture
+    /// (missing, mistyped, loading, an empty path), so the surface draws as if
+    /// unmapped rather than over the checker its slot binds meanwhile: set for
+    /// every map that darkens or scales a term (the detail map, #1997; occlusion
+    /// and specular level, #2151). `None` keeps the flag, the checker showing.
+    pub off_while_missing: Option<fn(&mut MaterialData) -> &mut u32>,
+}
+
+/// Every material map, in [`Map`] order. Albedo, metallic, roughness, normal and
+/// emissive at 0 and 2–5 (#202, #207); the detail map at 15 (#1997), the last
+/// texture binding below the samplers' offset, then occlusion at 14 and specular
+/// level at 13 (#2151), counting down, so the extra shader slots keep the bindings
+/// after the param uniform (7, …) and a new map takes the next one down (12).
+pub(crate) const MAP_SLOTS: [MapSlot; MATERIAL_MAPS] = [
+    MapSlot {
+        map: Map::Albedo,
+        binding: 0,
+        kind: TextureKind::Colour,
+        path: |m| m.base_color_map.as_ref(),
+        off_while_missing: None,
+    },
+    MapSlot {
+        map: Map::Metallic,
+        binding: 2,
+        kind: TextureKind::Mask,
+        path: |m| m.metallic_map.as_ref(),
+        off_while_missing: None,
+    },
+    MapSlot {
+        map: Map::Roughness,
+        binding: 3,
+        kind: TextureKind::Mask,
+        path: |m| m.roughness_map.as_ref(),
+        off_while_missing: None,
+    },
+    MapSlot {
+        map: Map::Normal,
+        binding: 4,
+        kind: TextureKind::Normal,
+        path: |m| m.normal_map.as_ref(),
+        off_while_missing: None,
+    },
+    MapSlot {
+        map: Map::Emissive,
+        binding: 5,
+        kind: TextureKind::Colour,
+        path: |m| m.emissive_map.as_ref(),
+        off_while_missing: None,
+    },
+    MapSlot {
+        map: Map::Detail,
+        binding: 15,
+        kind: TextureKind::Data,
+        path: |m| m.detail.as_ref().and_then(|d| d.map.as_ref()),
+        off_while_missing: Some(detail_flag),
+    },
+    MapSlot {
+        map: Map::Occlusion,
+        binding: 14,
+        kind: TextureKind::Mask,
+        path: |m| m.occlusion_map.as_ref(),
+        off_while_missing: Some(occlusion_flag),
+    },
+    MapSlot {
+        map: Map::Specular,
+        binding: 13,
+        kind: TextureKind::Mask,
+        path: |m| m.specular_map.as_ref(),
+        off_while_missing: Some(specular_flag),
+    },
+];
+
+fn detail_flag(record: &mut MaterialData) -> &mut u32 {
+    &mut record.detail.use_detail_map
+}
+
+fn occlusion_flag(record: &mut MaterialData) -> &mut u32 {
+    &mut record.level_maps.use_occlusion_map
+}
+
+fn specular_flag(record: &mut MaterialData) -> &mut u32 {
+    &mut record.level_maps.use_specular_map
+}
+
+// Each row sits at its `Map`'s index, and no two textures (maps and extra shader
+// slots) share a binding, all below the samplers' offset.
+const _: () = {
+    let bindings = all_bindings();
+    let mut i = 0;
+    while i < MATERIAL_TEXTURES {
+        if i < MATERIAL_MAPS {
+            assert!(MAP_SLOTS[i].map as usize == i, "a row out of `Map` order");
+        }
+        assert!(bindings[i] < textures::SAMPLER_OFFSET);
+        let mut j = i + 1;
+        while j < MATERIAL_TEXTURES {
+            assert!(
+                bindings[i] != bindings[j],
+                "two group-2 textures share a binding"
+            );
+            j += 1;
+        }
+        i += 1;
+    }
+};
+
+/// Every group-2 texture binding, in [`material_texture_paths`] order: the maps'
+/// rows, then each extra shader slot's (#400).
+pub(crate) const fn all_bindings() -> [u32; MATERIAL_TEXTURES] {
+    let mut out = [0; MATERIAL_TEXTURES];
+    let mut i = 0;
+    while i < MATERIAL_TEXTURES {
+        out[i] = match i < MATERIAL_MAPS {
+            true => MAP_SLOTS[i].binding,
+            false => textures::SLOTS[i - MATERIAL_MAPS].binding,
+        };
+        i += 1;
+    }
+    out
+}
 
 /// The binding of the sampler paired with the material texture at `binding`:
 /// albedo's `s_diffuse` at 1, every other at `textures::sampler_binding` (#1323).
-pub(super) fn map_sampler_binding(binding: u32) -> u32 {
+pub(crate) fn map_sampler_binding(binding: u32) -> u32 {
     match binding {
         0 => 1,
         b => textures::sampler_binding(b),
     }
 }
 
-/// Whether the map at `index` (in [`material_texture_paths`] order) holds colour —
-/// albedo or emissive, sampled through the sRGB-decoding view. Every other map and
-/// shader texture slot holds data and samples its texels raw (glTF 2.0, #647).
-pub(crate) fn is_colour_map(index: usize) -> bool {
-    matches!(index, 0 | 4)
+/// What the group-2 texture at `index` (in [`material_texture_paths`] order) holds:
+/// its row's kind, and data for an extra shader texture slot.
+pub(crate) fn map_kind(index: usize) -> TextureKind {
+    MAP_SLOTS.get(index).map_or(TextureKind::Data, |s| s.kind)
 }
 
 /// Every texture `material` samples (as [`material_texture_paths`]), each with what
@@ -46,23 +185,9 @@ pub(crate) fn material_maps(
         .filter_map(|(i, path)| Some((path?, map_kind(i))))
 }
 
-/// What the map at `index` holds, which decides how an uncompressed upload's mips
-/// average (#1322) and which compressed formats it can read (#1574): metallic,
-/// roughness, occlusion and specular level (#2151) are masks, the normal map a normal
-/// map, the detail map (#1997) and the shader texture slots data.
-pub(super) fn map_kind(index: usize) -> TextureKind {
-    match index {
-        1 | 2 | 6 | 7 => TextureKind::Mask,
-        3 => TextureKind::Normal,
-        i if is_colour_map(i) => TextureKind::Colour,
-        _ => TextureKind::Data,
-    }
-}
-
 /// Every texture path `material`'s group 2 binds, in [`MapSignature`] order: the
-/// eight maps (the detail map, occlusion and specular level last, #1997, #2151), then the texture each extra shader slot
-/// names (#400). Also the list
-/// of textures to upload before the group is built.
+/// maps, in [`MAP_SLOTS`] order, then the texture each extra shader slot names
+/// (#400). Also the list of textures to upload before the group is built.
 ///
 /// [`MapSignature`]: crate::gpu::material_cache::MapSignature
 pub(crate) fn material_texture_paths(
@@ -71,25 +196,17 @@ pub(crate) fn material_texture_paths(
     let Some(m) = material else {
         return Default::default();
     };
-    let maps = [
-        &m.base_color_map,
-        &m.metallic_map,
-        &m.roughness_map,
-        &m.normal_map,
-        &m.emissive_map,
-        &m.detail.as_ref().and_then(|d| d.map.clone()),
-        &m.occlusion_map,
-        &m.specular_map,
-    ];
+    let maps = MAP_SLOTS.iter().map(|s| (s.path)(m));
     let slots = textures::SLOTS
         .iter()
         .map(|s| m.shader_textures.get(s.name));
-    let mut paths = maps.into_iter().map(Option::as_ref).chain(slots);
+    let mut paths = maps.chain(slots);
     std::array::from_fn(|_| paths.next().flatten().cloned())
 }
 
-/// The record's occlusion and specular-level terms (#2151): each map's flag (the
-/// specular one raised to 2 for a one-channel upload by `with_map_channels`) and
+/// The record's occlusion and specular-level terms (#2151): each map's flag, on
+/// where a path is named (the specular one raised to 2 for a one-channel upload, and
+/// either turned off while its texture is not resident, by `with_map_channels`), and
 /// the occlusion strength, all off without a material.
 pub(crate) fn level_maps_uniform(material: Option<&MaterialAsset>) -> LevelMapsUniform {
     let Some(m) = material else {
@@ -116,51 +233,5 @@ pub(crate) fn occlusion_strength(strength: f32) -> f32 {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_new_maps_are_masks_counting_down_from_the_detail_binding() {
-        let m = MaterialAsset {
-            occlusion_map: Some("orm.png".into()),
-            specular_map: Some("level.png".into()),
-            ..MaterialAsset::default()
-        };
-        let paths = material_texture_paths(Some(&m));
-        assert_eq!(paths[6], m.occlusion_map);
-        assert_eq!(paths[7], m.specular_map);
-        assert_eq!((MAP_BINDINGS[6], MAP_BINDINGS[7]), (14, 13));
-        assert!(matches!(map_kind(6), TextureKind::Mask));
-        assert!(matches!(map_kind(7), TextureKind::Mask));
-        assert!(!is_colour_map(6) && !is_colour_map(7), "data, sampled raw");
-    }
-
-    #[test]
-    fn the_level_maps_flag_what_is_named_and_hold_the_strength_in_range() {
-        let off = level_maps_uniform(None);
-        assert_eq!((off.use_occlusion_map, off.occlusion_strength), (0, 1.0));
-        let m = MaterialAsset {
-            occlusion_map: Some("ao.png".into()),
-            occlusion_strength: 0.25,
-            ..MaterialAsset::default()
-        };
-        let on = level_maps_uniform(Some(&m));
-        assert_eq!(
-            (
-                on.use_occlusion_map,
-                on.occlusion_strength,
-                on.use_specular_map
-            ),
-            (1, 0.25, 0)
-        );
-        assert_eq!(
-            occlusion_strength(f32::NAN),
-            1.0,
-            "a NaN applies the map whole"
-        );
-        assert_eq!(
-            (occlusion_strength(-2.0), occlusion_strength(9.0)),
-            (0.0, 1.0)
-        );
-    }
-}
+#[path = "map_slots_tests.rs"]
+mod tests;

@@ -90,3 +90,14 @@ fn a_gltf_without_occlusion_keeps_its_strength_whole() {
     assert_eq!((&m.occlusion_map, m.occlusion_strength), (&None, 1.0));
     assert_eq!(m.specular_map, None);
 }
+
+#[test]
+fn a_map_off_uv0_is_named_for_its_warning() {
+    let json = r#"{"asset":{"version":"2.0"},"materials":[{"name":"Felt",
+        "occlusionTexture":{"index":0,"texCoord":1},
+        "pbrMetallicRoughness":{"baseColorTexture":{"index":0}}}],
+        "textures":[{"source":0}],"images":[{"uri":"ao.png"}]}"#;
+    let gltf = gltf::Gltf::from_slice(json.as_bytes()).unwrap();
+    let material = gltf.materials().next().unwrap();
+    assert_eq!(super::off_uv0(&material), [("occlusion map", 1)]);
+}

@@ -62,7 +62,9 @@ impl MapKind {
 
 /// A "Use X Map" checkbox that, when ticked, reveals an editable map-path field.
 /// Toggling the checkbox enables (empty path) or clears the optional map; edits route
-/// through the shared op.
+/// through the shared op. A setter that drops an empty path (a map that darkens or
+/// scales: occlusion, specular level) leaves the field `None` until a path is typed,
+/// so the tick is also kept in egui's memory, per material and map, meanwhile.
 fn optional_map(
     ui: &mut egui::Ui,
     label: &str,
@@ -70,17 +72,25 @@ fn optional_map(
     key: &str,
     kind: MapKind,
 ) {
+    let ticked = ui.id().with(("optional_map", key, label));
+    let pending = ui.data(|d| d.get_temp::<bool>(ticked)).unwrap_or(false);
     let current = kind.get(&materials[key]).clone();
-    let mut enabled = current.is_some();
+    let mut enabled = current.is_some() || pending;
     if ui.checkbox(&mut enabled, label).changed() {
+        ui.data_mut(|d| d.insert_temp(ticked, enabled));
         kind.set(materials, key, enabled.then(String::new));
     }
-    if let Some(mut path) = kind.get(&materials[key]).as_ref().map(MapRef::to_string) {
-        ui.horizontal(|ui| {
-            ui.label("  Path:");
-            if ui.text_edit_singleline(&mut path).changed() {
-                kind.set(materials, key, Some(path));
-            }
-        });
+    if !enabled {
+        return;
     }
+    let mut path = kind
+        .get(&materials[key])
+        .as_ref()
+        .map_or_else(String::new, MapRef::to_string);
+    ui.horizontal(|ui| {
+        ui.label("  Path:");
+        if ui.text_edit_singleline(&mut path).changed() {
+            kind.set(materials, key, Some(path));
+        }
+    });
 }

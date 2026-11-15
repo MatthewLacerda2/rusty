@@ -231,7 +231,8 @@ pub(crate) struct DetailUniform {
 }
 
 /// The occlusion and specular-level maps' terms (#2151), packed from the material
-/// (`render::draw::map_slots::level_maps_uniform`); off for a draw without one.
+/// (`render::draw::map_slots::level_maps_uniform`); off for a draw without one, and
+/// each flag 0 while its map has no resident texture (`Renderer::with_map_channels`).
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct LevelMapsUniform {

@@ -57,6 +57,22 @@ pub enum Slot {
 }
 
 impl Slot {
+    /// Every slot, in declaration order: what a caller walks to check each one
+    /// (`edit::authoring::material::maps`' test that every map key it fills is a
+    /// field). `bake_tests` holds it whole by an exhaustive `match`.
+    pub const ALL: [Slot; 10] = [
+        Slot::BaseColor,
+        Slot::Emissive,
+        Slot::Normal,
+        Slot::Normal16,
+        Slot::Roughness,
+        Slot::Metallic,
+        Slot::MetallicRoughness,
+        Slot::Occlusion,
+        Slot::Specular,
+        Slot::Data,
+    ];
+
     /// The canonical slot names, as an unknown-slot error lists them.
     const NAMES: &'static str =
         "base_color (albedo), emissive, normal, normal16, roughness, metallic, metallic_roughness (orm), occlusion (ao), specular, data";

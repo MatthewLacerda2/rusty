@@ -15,6 +15,20 @@ fn slot_parse_is_case_and_separator_insensitive() {
 }
 
 #[test]
+fn every_slot_is_in_all_and_parses_back_from_its_name() {
+    // Exhaustive: a new variant fails to build here until it joins `ALL`.
+    let listed = |s: Slot| match s {
+        Slot::BaseColor | Slot::Emissive | Slot::Normal | Slot::Normal16 => Slot::ALL.contains(&s),
+        Slot::Roughness | Slot::Metallic | Slot::MetallicRoughness => Slot::ALL.contains(&s),
+        Slot::Occlusion | Slot::Specular | Slot::Data => Slot::ALL.contains(&s),
+    };
+    for s in Slot::ALL {
+        assert!(listed(s));
+        assert_eq!(Slot::parse(s.name()), Ok(s), "{s:?}");
+    }
+}
+
+#[test]
 fn an_unknown_slot_is_refused_by_name() {
     let err = Slot::parse("basecolour").unwrap_err();
     assert!(err.contains("\"basecolour\""), "{err}");

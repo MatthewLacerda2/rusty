@@ -170,19 +170,20 @@ pub fn set_normal_map(materials: &mut MaterialLibrary, key: &str, path: Option<S
     }
 }
 
-/// Set (or, with `None`, clear) the occlusion map path (#2151); a data map, as
-/// metallic's.
+/// Set (or, with `None` or an empty path, clear) the occlusion map path (#2151);
+/// a data map, as metallic's. A map that darkens is never left naming nothing.
 pub fn set_occlusion_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
     if let Some(m) = materials.get_mut(key) {
-        m.occlusion_map = path.map(MapRef::from);
+        m.occlusion_map = path.filter(|p| !p.is_empty()).map(MapRef::from);
         fit_data_slot(m.occlusion_map.as_ref());
     }
 }
 
-/// Set (or, with `None`, clear) the specular-level map path (#2151); a data map.
+/// Set (or, with `None` or an empty path, clear) the specular-level map path
+/// (#2151); a data map. A map that scales is never left naming nothing.
 pub fn set_specular_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
     if let Some(m) = materials.get_mut(key) {
-        m.specular_map = path.map(MapRef::from);
+        m.specular_map = path.filter(|p| !p.is_empty()).map(MapRef::from);
         fit_data_slot(m.specular_map.as_ref());
     }
 }

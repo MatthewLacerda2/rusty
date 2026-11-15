@@ -5,6 +5,7 @@
 //!     nothing: direct light is never occluded by it.
 //!   - Specular level: a map whose alpha is 0 shades like `specular = 0`, and unlike
 //!     the unmapped plane, whose lamp highlight it takes away.
+//!   - A map with no texture (a missing file, an empty path) draws as unmapped.
 //!
 //! No adapter: `frame` returns `None` and the test passes without asserting.
 
@@ -93,4 +94,24 @@ fn a_zero_specular_level_map_shades_like_specular_zero() {
     };
     assert!(d[0] < SAME, "alpha 0 reads as specular 0: {:.3}", d[0]);
     assert!(d[1] > SAME, "and takes the highlight away: {:.3}", d[1]);
+}
+
+#[test]
+fn a_map_with_no_texture_switches_itself_off() {
+    // A missing file and an empty path: the slots bind the checker meanwhile, which
+    // must never darken the surface or scale its reflectance.
+    let missing = crate::temp::dir().join("rusty_2151_no_such_map.png");
+    let unloaded = |occlusion: &str, specular: &str| {
+        grey(|m| {
+            m.occlusion_map = Some(occlusion.to_owned().into());
+            m.specular_map = Some(specular.to_owned().into());
+        })
+    };
+    let missing = missing.to_string_lossy().into_owned();
+    let ambient = [grey(|_| {}), unloaded(&missing, &missing), unloaded("", "")];
+    let Some(d) = diffs("unloaded", ambient.map(ambient_scene).into()) else {
+        return;
+    };
+    assert!(d[0] < SAME, "a missing map draws as unmapped: {:.3}", d[0]);
+    assert!(d[1] < SAME, "so does an empty path: {:.3}", d[1]);
 }

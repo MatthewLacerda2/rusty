@@ -160,3 +160,19 @@ fn the_recipe_travels_with_the_asset_as_maps() {
     let plain = serde_json::to_value(MaterialAsset::default()).unwrap();
     assert!(plain.get("maps").is_none(), "{plain}");
 }
+
+#[test]
+fn every_map_key_a_slot_fills_is_the_field_of_that_name() {
+    for slot in Slot::ALL {
+        for &name in slot.material_maps() {
+            let mut m = MaterialAsset::default();
+            let field = map_field(&mut m, name).unwrap_or_else(|| panic!("{slot:?}: {name}"));
+            *field = Some("x.png".into());
+            let json = serde_json::to_value(&m).unwrap();
+            assert_eq!(
+                json[name], "x.png",
+                "{slot:?}: {name} is the field it writes"
+            );
+        }
+    }
+}

@@ -1,6 +1,6 @@
 //! crates/render/src/draw/materials.rs — the material bind-group cache: a material's eight
-//! maps (the detail map, then occlusion and specular level, last, #1997, #2151) resolved to resident textures and folded into one shared group-2 bind group
-//! per distinct signature (#202, #207, #470). Used by the entity solids and by mesh
+//! maps (`map_slots::MAP_SLOTS`, #1997, #2151) resolved to resident textures and
+//! folded into one shared group-2 bind group per distinct signature (#202, #207, #470). Used by the entity solids and by mesh
 //! particles (#440), so the same material always binds the same group. A material
 //! whose surface shader has runtime params (#399) gets its own group over its own
 //! param buffer, rewritten here when its values change. The extra shader texture
@@ -11,7 +11,7 @@
 use std::rc::Rc;
 
 use super::map_slots::{
-    is_colour_map, map_kind, map_sampler_binding, material_texture_paths, MAP_BINDINGS,
+    all_bindings, map_kind, map_sampler_binding, material_texture_paths, MAP_SLOTS,
 };
 use crate::gpu::material_cache::{ParamOwner, MATERIAL_MAPS, MATERIAL_TEXTURES};
 use crate::gpu::textures::TextureKind;
@@ -20,7 +20,6 @@ use rusty_asset::MapRef;
 use rusty_components::MaterialAsset;
 use rusty_scene::shader_overrides::ParamValues;
 use rusty_scene::{Scene, SceneId};
-use rusty_shadergen::textures;
 
 /// One drawn entity's own param values (#670): its scene, its id, the material slot
 /// drawn (#1285), its overrides.
@@ -109,9 +108,13 @@ impl Renderer {
     /// resident and of Texture Type `SingleChannel` (#1574), BC4 or not yet: the
     /// shader then reads its red channel instead of glTF's packed blue and green,
     /// so the look does not change when the compressed copy lands. Its normal flag
-    /// is 2 where the bound normal map is BC5, its table in the record (#1702), its
-    /// detail flag 0 while the detail map is not resident (#1997), and its specular
-    /// flag 2 where that map is `SingleChannel` (red, not glTF's alpha, #2151).
+    /// is 2 where the bound normal map is BC5, its table in the record (#1702), and
+    /// its specular flag 2 where that map is `SingleChannel` (red, not glTF's alpha,
+    /// #2151). Every map whose row switches off while missing
+    /// ([`MapSlot::off_while_missing`]: detail, occlusion, specular level) has its
+    /// flag 0 while its texture is not resident.
+    ///
+    /// [`MapSlot::off_while_missing`]: super::map_slots::MapSlot::off_while_missing
     pub(crate) fn with_map_channels(
         &self,
         mut record: MaterialData,
@@ -139,14 +142,17 @@ impl Renderer {
             record.use_normal_map = 2;
             record.normal_variance = pack_variance(table);
         }
-        // A detail map not resident (missing, loading, an empty path) draws no
-        // detail, never the checker its slot binds meanwhile (#1997).
-        let detail = m.detail.as_ref().and_then(|d| d.map.as_ref());
-        if detail
-            .and_then(|p| self.texture_for(p, TextureKind::Data))
-            .is_none()
-        {
-            record.detail.use_detail_map = 0;
+        // A map that darkens or scales and is not resident (missing, loading, an
+        // empty path) draws as unmapped, never over the checker its slot binds
+        // meanwhile (#1997, #2151).
+        for slot in &MAP_SLOTS {
+            let Some(flag) = slot.off_while_missing else {
+                continue;
+            };
+            let path = (slot.path)(m);
+            if path.and_then(|p| self.texture_for(p, slot.kind)).is_none() {
+                *flag(&mut record) = 0;
+            }
         }
         record
     }
@@ -163,9 +169,11 @@ impl Renderer {
         }
     }
 
-    /// Build a group(2) material bind group from the resolved textures (albedo,
-    /// metallic, roughness, normal, emissive, then the extra slots — that order),
-    /// against `material_layout`. Maps bind at `MAP_BINDINGS` (#202, #207, #1997), each extra
+    /// Build a group(2) material bind group from the resolved textures (the eight
+    /// maps in `MAP_SLOTS` order: albedo, metallic, roughness, normal, emissive,
+    /// detail, occlusion, specular level; then the extra slots), against
+    /// `material_layout`. Each map binds at its row's binding (#202, #207, #1997,
+    /// #2151), each extra
     /// slot at its own binding (7, #400), and each texture's own sampler — its
     /// import settings' wrap and filter (#1323) — beside it: albedo's at 1, the
     /// rest at `textures::sampler_binding`. `owner`'s param buffer (or the shared
@@ -199,10 +207,8 @@ pub(crate) fn material_group(
     params: &wgpu::Buffer,
 ) -> wgpu::BindGroup {
     let mut entries = Vec::with_capacity(2 * MATERIAL_TEXTURES + 1);
-    let slots = textures::SLOTS.iter().map(|slot| slot.binding);
-    let bindings = MAP_BINDINGS.into_iter().chain(slots);
-    for (i, (map, binding)) in maps.into_iter().zip(bindings).enumerate() {
-        let view = match is_colour_map(i) {
+    for (i, (map, binding)) in maps.into_iter().zip(all_bindings()).enumerate() {
+        let view = match map_kind(i) == TextureKind::Colour {
             true => &map.view,
             false => &map.data_view,
         };
