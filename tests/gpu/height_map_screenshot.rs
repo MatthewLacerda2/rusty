@@ -13,7 +13,7 @@
 use glam::Vec3;
 use rusty::components::MaterialAsset;
 use rusty::dev::screenshot::capture;
-use rusty::scene::{Camera, Scene};
+use rusty::scene::Camera;
 
 use super::linear_data_maps_screenshot::{diff, SAME};
 use super::normal_emissive_maps_screenshot::scene;
