@@ -7,7 +7,7 @@ use super::room::{eye, H, W, WARM};
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_core::color::f16_to_f32;
 use rusty_core::settings::render_scale::RenderScale;
-use rusty_scene::Scene;
+use rusty_scene::{Camera, Scene};
 
 /// A tile's side, in pixels.
 const TILE: u32 = 8;
@@ -51,9 +51,20 @@ pub(super) fn run(
 pub(super) fn run_by(
     r: &mut Renderer,
     scene: &mut Scene,
-    (n, scale): (u32, f32),
+    frames: (u32, f32),
     step: &dyn Fn(&mut Scene, u32),
     measure: fn([f32; 3]) -> f32,
+) -> Vec<Vec<f32>> {
+    run_from(r, scene, frames, step, (&|_| eye(), measure))
+}
+
+/// [`run_by`], frame `f` seen from `seat(f)`.
+pub(super) fn run_from(
+    r: &mut Renderer,
+    scene: &mut Scene,
+    (n, scale): (u32, f32),
+    step: &dyn Fn(&mut Scene, u32),
+    (seat, measure): (&dyn Fn(u32) -> Camera, fn([f32; 3]) -> f32),
 ) -> Vec<Vec<f32>> {
     let mut v = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     if scale != 1.0 {
@@ -64,7 +75,7 @@ pub(super) fn run_by(
     for f in 0..WARM + n {
         step(scene, f);
         let target = v.color_target_view().unwrap();
-        r.render(&mut v, scene, &eye(), &target, false);
+        r.render(&mut v, scene, &seat(f), &target, false);
         if f >= WARM {
             out.push(tiles(r, &v, measure));
         }
@@ -78,4 +89,13 @@ pub(super) fn swing(frames: &[Vec<f32>]) -> f32 {
         .windows(2)
         .flat_map(|w| w[0].iter().zip(&w[1]).map(|(a, b)| (a - b).abs()));
     steps.fold(0.0, f32::max)
+}
+
+/// The largest one-frame blink of any tile over `frames`: half a tile's second
+/// difference, so a tile a pan carries at an even pace reads none of its motion.
+pub(super) fn blinks(frames: &[Vec<f32>]) -> f32 {
+    let bends = frames.windows(3).flat_map(|w| {
+        (0..w[0].len()).map(move |t| (w[0][t] - 2.0 * w[1][t] + w[2][t]).abs() / 2.0)
+    });
+    bends.fold(0.0, f32::max)
 }

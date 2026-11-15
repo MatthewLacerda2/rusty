@@ -20,7 +20,7 @@ const CALM: f32 = 0.5;
 const SAME: f32 = 1.0;
 
 /// The largest difference between two runs' tiles, over every frame.
-fn apart(a: &[Vec<f32>], b: &[Vec<f32>]) -> f32 {
+pub(super) fn apart(a: &[Vec<f32>], b: &[Vec<f32>]) -> f32 {
     let pairs = a
         .iter()
         .zip(b)

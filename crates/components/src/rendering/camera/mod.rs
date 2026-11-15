@@ -152,8 +152,11 @@ pub struct CameraComponent {
     pub taa_contrast_adaptive_sharpening: f32,
     /// TAA's *Anti-Flicker* (#2228, HDRP's): how far a still pixel whose frame keeps
     /// blinking under the jitter holds its history against the blinks, `0`..`1`.
-    /// `0` (default) is URP's resolve exactly; above it, a one-frame change repeated
-    /// on a still pixel (a strobe, a fast gun's flashes on a wall) is softened too.
+    /// `0` (default) is URP's resolve exactly. At `1`, a one-frame change repeated
+    /// on a still pixel (a strobe, a fast gun's flashes on a wall) shows fully its
+    /// first two times, then is nearly removed: flashes 6 frames apart keep about
+    /// 9 % of themselves from the third, 10 frames apart a quarter
+    /// (`docs/api/Graphics.md`, *Anti-Flicker*).
     #[serde(default)]
     pub taa_anti_flicker: f32,
     /// Perspective (the default) or orthographic — a top-down minimap (#430).

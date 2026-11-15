@@ -7,11 +7,12 @@
 //! it. What the scene is: `room`; how a run is measured: `measure`; what the
 //! anti-flicker leaves alone (a lone flash on a calm ceiling, a moving cube's
 //! trail): `change`; a hue change at equal luma: `hue`; what it costs (a repeated
-//! flash, a lone flash on a blinking ceiling, TAAU): `cost`.
+//! flash, a lone flash on a blinking ceiling, TAAU): `cost`; a slow pan: `pan`.
 
 mod change;
 mod cost;
 mod hue;
 mod measure;
+mod pan;
 mod room;
 mod still;

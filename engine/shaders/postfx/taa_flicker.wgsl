@@ -17,8 +17,10 @@
 // off frames later: no blink), and a lone muzzle flash (one blink, recurring only
 // as far as the pixel blinked before: a pixel already blinking holds that much of
 // its end). A one-frame change repeated is held as a flicker is, from its third
-// time. A moving or revealed pixel keeps no hold and forgets its flicker; a
-// reactive one keeps no hold. Luma is URP's perceptual `y / (1 + y)` throughout,
+// time. A pixel's hold and flicker fall off with its motion (`taa.wgsl`'s
+// `flicker_of`: all of them still, none from `MOVING_PIXELS` a frame), so a slow
+// pan keeps part of them; a revealed pixel keeps no hold and forgets its flicker;
+// a reactive one keeps no hold. Luma is URP's perceptual `y / (1 + y)` throughout,
 // so a bright pixel's blink counts as the eye sees it.
 
 #define_import_path postfx::taa_flicker

@@ -852,7 +852,14 @@ luma may sit up to four times (at `1`; the setting scales it) its recurring
 blinks outside the box, so they average away (on the case that found it, a still
 view's worst blink drops from 26 levels to 9). Its hue and saturation are the
 clamp's, as URP's are, so a light turning from red to blue at the same
-brightness shows the new hue as fast. A moving, revealed or reactive pixel is never held. At `0` the
+brightness shows the new hue as fast. **The hold is for a still view**: it
+falls off as a pixel moves, from all of it at 0.05 pixels a frame to none at 2
+(the ramp of *A moving pixel trusts its history less*, above). On the case that
+found it, a panning view's worst one-frame blink at `1` against URP's (RTX
+2060): a quarter of a pixel a frame, 8 levels against 13; half a pixel, 7
+against 9; a pixel, 13 against 14; from 2 pixels a frame, the same as URP's. What it costs a pixel-a-frame pan: the image sits within 2 levels
+of URP's, with no trail behind the bulb's edge. A revealed or reactive pixel is
+never held. At `0` the
 resolve is URP's, bit for bit, and costs nothing more; on, each TAA camera keeps
 16 bytes a pixel more (83 MB in all at 1920×1080).
 
@@ -868,7 +875,7 @@ blinking under the jitter (a textured surface, an edge; more of the image while 
 upscales), a lone flash's end lingers: on a noise ceiling it sits a level or more
 over URP's for 32 frames after the flash (39 at render scale `0.67`), starting at 29
 levels against URP's 9. So turn it on for a view that must hold still (a menu
-scene, a slow walk past glossy reflections), and leave it at `0` where flashes and
+scene, a held aim at glossy reflections), and leave it at `0` where flashes and
 strobes are the point.
 
 Unity's camera has **one anti-aliasing mode**, so with both on, TAA runs and the
