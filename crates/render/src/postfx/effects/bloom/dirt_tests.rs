@@ -59,4 +59,7 @@ fn the_default_dirt_reads_from_the_engine_folder_and_a_path_as_it_is() {
     let want = rusty_core::project::engine_path("textures/lens_dirt.png");
     assert_eq!(file(DEFAULT_DIRT_TEXTURE).as_str(), want);
     assert_eq!(file("assets/dirt.png").as_str(), "assets/dirt.png");
+    // Any `engine/…` path is the engine's, by the one rule texture recipes use too.
+    let other = rusty_core::project::engine_path("textures/other.png");
+    assert_eq!(file("engine/textures/other.png").as_str(), other);
 }

@@ -570,8 +570,10 @@ fading the bloom's intensity fades the smudges too). The image covers the screen
 without stretching, centred, its overflow cropped, as Unity places it. It needs both
 a **dirt texture** and a **dirt intensity** above `0`, and shows nothing while bloom
 is off. The texture is loaded whenever a volume names one, even at a dirt intensity of
-`0`, so tweening the intensity up never loads it mid-effect. `engine/textures/lens_dirt.png`
-names the engine's own neutral smudges, for a game with no art of its own; an
+`0`, so tweening the intensity up never loads it mid-effect. A path that starts
+`engine/` names a file the engine ships, wherever it is installed (the rule texture
+recipes follow, `docs/api/Texture.md` *Image files*): `engine/textures/lens_dirt.png`
+is the engine's own neutral smudges, for a game with no art of its own; an
 `rt:<name>` render texture works too. A missing or unreadable file is logged once and
 draws no dirt (a missing one is picked up when it appears, an unreadable one when it
 is written again). A new volume starts with no dirt texture and a dirt intensity of `0`.

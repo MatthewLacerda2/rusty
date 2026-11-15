@@ -89,6 +89,10 @@ Run that `git log`, read what changed, and bring the game up to date (scenes,
 scripts, prefabs) before carrying on. Only an **older** engine, or a branch build,
 warns and asks before it opens.
 
+An upgrade may also change a texture graph the engine ships (an `engine/…` path
+in a recipe, listed by `Texture.Ops()`), so a material instancing one can bake
+differently after it: rebake (`Material.Rebake`) and look before carrying on.
+
 ## Enemy AI: the animation graph is the state machine
 
 Build an enemy's decisions the way the animation is built, with no behaviour
