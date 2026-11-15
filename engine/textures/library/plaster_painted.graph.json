@@ -1,0 +1,57 @@
+{
+  "resolution": 256,
+  "params": {
+    "wear": { "type": "number", "default": 0.3, "min": 0, "max": 1 },
+    "tint": { "type": "color", "default": "#b9c2b0" }
+  },
+  "nodes": [
+    { "id": "trowel_body", "op": "noise", "kind": "fbm", "scale": 4, "octaves": 5, "seed": 51 },
+    { "id": "trowel_sweep", "op": "anisotropic_noise", "scale": 10, "anisotropy": 4, "angle": 0.08, "seed": 52 },
+    { "id": "trowel_mix", "op": "mix", "mode": "mix", "factor": 0.2, "inputs": ["trowel_body", "trowel_sweep"] },
+    { "id": "trowel", "op": "auto_levels", "inputs": ["trowel_mix"] },
+
+    { "id": "crack_cells", "op": "voronoi", "scale": 5, "output": "edges", "seed": 53 },
+    { "id": "wobble_x", "op": "noise", "kind": "fbm", "scale": 12, "octaves": 3, "seed": 54 },
+    { "id": "wobble_y", "op": "noise", "kind": "fbm", "scale": 12, "octaves": 3, "seed": 55 },
+    { "id": "wobble", "op": "combine_rgb", "inputs": ["wobble_x", "wobble_y"] },
+    { "id": "crack_lines", "op": "warp", "strength": 0.08, "inputs": ["crack_cells", "wobble"] },
+    { "id": "crack_zone", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 3 }, "seed": 56 },
+    { "id": "cracks", "op": "expression", "expr": "(1 - smoothstep(0.0, 0.012, a)) * smoothstep(0.75 - 0.35 * k1, 0.95 - 0.3 * k1, b)", "k1": { "param": "wear" }, "inputs": ["crack_lines", "crack_zone"] },
+
+    { "id": "peel_field", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 3, "warp": 0.8 }, "seed": 57 },
+    { "id": "peel_edge", "op": "noise", "kind": "fbm", "scale": 48, "octaves": 3, "seed": 58 },
+    { "id": "peeled", "op": "expression", "expr": "smoothstep(1.02 - 0.4 * k1, 1.025 - 0.4 * k1, a + 0.15 * (b - 0.5))", "k1": { "param": "wear" }, "inputs": ["peel_field", "peel_edge"] },
+    { "id": "paint", "op": "invert", "inputs": ["peeled"] },
+    { "id": "lip", "op": "edge_detect", "width": 0.005, "roundness": 1, "inputs": ["paint"] },
+    { "id": "paint_lip", "op": "expression", "expr": "a * b", "inputs": ["lip", "paint"] },
+
+    { "id": "relief", "op": "expression", "expr": "0.6 * a + 0.08 * b + 0.1 * c - 0.12 * d", "inputs": ["trowel", "paint", "paint_lip", "cracks"] },
+    { "id": "height", "op": "auto_levels", "inputs": ["relief"] },
+    { "id": "normal", "op": "bump_to_normal", "strength": 0.045, "inputs": ["relief"] },
+
+    { "id": "scuff_fibres", "op": "anisotropic_noise", "scale": 36, "anisotropy": 10, "angle": 0.02, "seed": 59 },
+    { "id": "scuff_zone", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 4 }, "seed": 60 },
+    { "id": "scuffs", "op": "expression", "expr": "smoothstep(0.6, 0.85, a) * smoothstep(0.55 - 0.3 * k1, 0.9, b) * (0.3 + 0.7 * k1)", "k1": { "param": "wear" }, "inputs": ["scuff_fibres", "scuff_zone"] },
+    { "id": "grime_field", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 2 }, "seed": 61 },
+    { "id": "grime", "op": "expression", "expr": "smoothstep(0.6, 1.0, a) * (0.1 + 0.4 * k1)", "k1": { "param": "wear" }, "inputs": ["grime_field"] },
+
+    { "id": "paint_col", "op": "constant", "color": { "param": "tint" } },
+    { "id": "paint_shade", "op": "expression", "expr": "0.93 + 0.1 * a", "inputs": ["trowel"] },
+    { "id": "paint_face", "op": "mix", "mode": "multiply", "inputs": ["paint_col", "paint_shade"] },
+    { "id": "plaster_grain_raw", "op": "noise", "kind": "fbm", "scale": 64, "octaves": 3, "seed": 62 },
+    { "id": "plaster_grain", "op": "auto_levels", "inputs": ["plaster_grain_raw"] },
+    { "id": "plaster_col", "op": "color_ramp", "stops": [ { "pos": 0, "color": "#a99f8c" }, { "pos": 1, "color": "#cdc4b1" } ], "inputs": ["plaster_grain"] },
+    { "id": "surface", "op": "mix", "mode": "mix", "inputs": ["plaster_col", "paint_face", "paint"] },
+    { "id": "shade", "op": "expression", "expr": "(1 - 0.6 * a) * (1 - 0.35 * b) * (1 - 0.5 * c)", "inputs": ["cracks", "scuffs", "grime"] },
+    { "id": "base_color", "op": "mix", "mode": "multiply", "inputs": ["surface", "shade"] },
+
+    { "id": "stipple_raw", "op": "noise", "kind": "fbm", "scale": 160, "octaves": 2, "seed": 63 },
+    { "id": "stipple", "op": "auto_levels", "inputs": ["stipple_raw"] },
+    { "id": "sheen", "op": "expression", "expr": "0.62 + 0.2 * (a - 0.5) - 0.08 * b", "inputs": ["stipple", "trowel"] },
+    { "id": "roughness", "op": "expression", "expr": "clamp(mix(0.92 + 0.05 * (b - 0.5), d, a) - 0.12 * c, 0, 1)", "inputs": ["paint", "plaster_grain", "scuffs", "sheen"] },
+    { "id": "ao", "op": "ambient_occlusion", "radius": 0.008, "depth": 0.003, "quality": 8, "inputs": ["relief"] },
+    { "id": "occlusion", "op": "levels", "out_low": 0.5, "inputs": ["ao"] }
+  ],
+  "output": "base_color",
+  "outputs": { "base_color": "base_color", "normal": "normal", "roughness": "roughness", "height": "height", "occlusion": "occlusion" }
+}
