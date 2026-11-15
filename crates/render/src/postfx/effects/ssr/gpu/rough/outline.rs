@@ -37,38 +37,18 @@ fn bar(roughness: f32) -> Scene {
     (volume.ssr.active, volume.ssr.min_smoothness) = (true, 0.3);
     (volume.bloom.active, volume.ssao.active) = (false, false);
     s.world.set_post_processing(cam, Some(volume));
-    let wide = |y: f32| Vec3::new(12.0, y, 12.0);
     let bronze = ([0.8, 0.55, 0.35], 1.0, roughness);
-    block(
-        &mut s,
-        "ceiling",
-        Vec3::new(0.0, 3.45, -3.0),
-        wide(0.1),
-        bronze,
-    );
-    block(
-        &mut s,
-        "floor",
-        Vec3::new(0.0, -0.05, -3.0),
-        wide(0.1),
-        ([0.3; 3], 0.0, 1.0),
-    );
-    let wall = Vec3::new(12.0, 3.4, 0.1);
-    block(
-        &mut s,
-        "wall",
-        Vec3::new(0.0, 1.7, -4.05),
-        wall,
-        ([0.2; 3], 0.0, 1.0),
-    );
-    let strip = Vec3::new(12.0, 0.15, 0.04);
-    let id = block(
-        &mut s,
-        "strip",
-        Vec3::new(0.0, 2.5, -3.97),
-        strip,
-        ([1.0; 3], 0.0, 1.0),
-    );
+    let [matte, grey, white] = [0.3, 0.2, 1.0].map(|c| ([c; 3], 0.0, 1.0));
+    let room = [
+        ("ceiling", 3.45, -3.0, [12.0, 0.1, 12.0], bronze),
+        ("floor", -0.05, -3.0, [12.0, 0.1, 12.0], matte),
+        ("wall", 1.7, -4.05, [12.0, 3.4, 0.1], grey),
+        ("strip", 2.5, -3.97, [12.0, 0.15, 0.04], white),
+    ];
+    for (name, y, z, size, surface) in room {
+        block(&mut s, name, Vec3::new(0.0, y, z), size.into(), surface);
+    }
+    let id = s.find_entity_by_name("strip").unwrap();
     let led = MaterialAsset {
         emissive: [24.0, 20.0, 14.0],
         ..s.materials["strip"].clone()
