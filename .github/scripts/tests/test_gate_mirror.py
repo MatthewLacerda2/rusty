@@ -73,7 +73,7 @@ class Today(unittest.TestCase):
         text = (gate_mirror.ROOT / "Makefile").read_text()
         brief = (gate_mirror.ROOT / ".claude/skills/issue-batch/cloud-brief.md").read_text()
         self.assertEqual(gate_mirror.brief_misses_heavy(text, brief), [])
-        self.assertEqual(gate_mirror.brief_misses_heavy(text, brief.replace("make doc deny", "make deny")), ["doc"])
+        self.assertEqual(gate_mirror.brief_misses_heavy(text, brief.replace("make doc fuzz-check deny", "make fuzz-check deny")), ["doc"])
 
     def test_clippy_adds_only_deny_warnings(self):
         gates, ci = gate_mirror.load()
@@ -84,6 +84,11 @@ class Today(unittest.TestCase):
 class Mirror(unittest.TestCase):
     def test_flag_order_env_steps_and_output_flags_pass(self):
         self.assertEqual(gaps(), [])
+
+    def test_a_failure_hint_is_not_part_of_the_command(self):
+        makefile = MAKEFILE.replace("\tcargo deny check bans", "\tcargo deny check bans || { echo hint; exit 1; }")
+        self.assertEqual(gate_mirror.makefile_gates(makefile)["deny"], ["cargo deny check bans"])
+        self.assertEqual(gaps(makefile=makefile), [])
 
     def test_the_tool_presence_check_is_not_a_command(self):
         self.assertEqual(gate_mirror.makefile_gates(MAKEFILE)["deny"], ["cargo deny check bans"])

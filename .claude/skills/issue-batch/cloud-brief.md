@@ -126,7 +126,7 @@ What cloud coders' run logs taught; each one cost a coder real time.
      Makefile's `QUICK_GATES`. It is a Makefile fact, not a list copied here, so a
      gate added to the Makefile is run;
   2. `make clippy`;
-  3. `make doc deny`;
+  3. `make doc fuzz-check deny`;
   4. `cargo nextest run --locked --no-run` (warms the default test build);
   5. `cargo nextest run --locked --features dev --no-run` (warms the `dev` one);
   6. `make test` (now only runs: a few minutes).

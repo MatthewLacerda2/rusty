@@ -33,14 +33,14 @@ export PROPTEST_RNG_SEED ?= $(PROPTEST_SEED)
 # so a code failure reports first. GATES is exactly the two lists joined —
 # `make scripts` (test_gate_mirror.py) fails when it is anything else.
 QUICK_GATES := fmt size rules layers determinism components parity test-lint scripts feature-split player-tree docrefs
-HEAVY_GATES := clippy doc test deny
+HEAVY_GATES := clippy doc test fuzz-check deny
 GATES := $(QUICK_GATES) $(HEAVY_GATES)
 # Checks on the gate runner itself, run before any gate.
 SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-explore test-one-process dead-pub editor-capture game game-test export launcher bench bless-converters
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-explore test-one-process dead-pub editor-capture game game-test export launcher bench bless-converters fuzz-lock
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -209,6 +209,23 @@ bless-converters: ## Re-bless crates/asset/src/convert/fingerprints.txt after a 
 	@if command -v "$${RUSTY_BLENDER:-blender}" >/dev/null 2>&1; then \
 		RUSTY_BLESS_CONVERTERS=1 $(TEST) --run-ignored only -E 'test(converter_fingerprints)'; \
 	else echo "bless-converters: no Blender found, its rows left as they are"; fi
+
+# `fuzz/` is its own workspace, so no other gate compiles it: this one does, on the
+# pinned stable toolchain (a check builds libfuzzer-sys; only *running* it needs
+# nightly, docs/testing.md). `--locked` holds `fuzz/Cargo.lock`: a dependency a
+# member's manifest adds or bumps fails here until `make fuzz-lock` re-resolves it.
+fuzz-check: ## [gate] The fuzz target (fuzz/, its own workspace) still compiles, against its committed lock
+	@cargo check --manifest-path fuzz/Cargo.toml --locked || { \
+		echo "fuzz-check: fuzz/ does not build. A lock error: run \`make fuzz-lock\` and commit fuzz/Cargo.lock."; \
+		echo "  A compile error: fix fuzz/fuzz_targets/ to the engine's current API (src/lib.rs re-exports it)."; \
+		exit 1; }
+
+# Seeded from the root lock, then pruned to what fuzz/ needs, so the target builds
+# the very versions the root's gates (and cargo-deny) prove; only the fuzz-only
+# crates (libfuzzer-sys, arbitrary) are resolved fresh.
+fuzz-lock: ## Re-resolve fuzz/Cargo.lock from the root Cargo.lock, after a member's dependencies change
+	cp Cargo.lock fuzz/Cargo.lock
+	cargo check --manifest-path fuzz/Cargo.toml
 
 # The git CLI fetches the advisory DB: cargo-deny's built-in fetcher can't get
 # through the cloud sessions' proxy, and the CLI works everywhere else too.

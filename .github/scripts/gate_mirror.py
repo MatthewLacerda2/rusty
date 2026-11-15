@@ -59,7 +59,9 @@ def makefile_gates(text: str) -> dict[str, list[str]]:
     expand = lambda cmd: re.sub(r"\$\((\w+)\)", lambda m: variables.get(m[1], m[0]), cmd)
     gates = {}
     for gate in expand(variables["GATES"]).split():
-        commands = [expand(c.lstrip("@")) for c in recipes.get(gate, [])]
+        # `cmd || { …failure hint… }`: the hint is what a red gate prints, not
+        # what it checks; `workflow_commands` drops a step's `||` tail the same way.
+        commands = [expand(c.lstrip("@")).split("||")[0].strip() for c in recipes.get(gate, [])]
         # `command -v tool || { …install hint… }`: a local presence check; CI installs the tool.
         gates[gate] = [c for c in commands if not c.startswith("command -v ")]
     return gates

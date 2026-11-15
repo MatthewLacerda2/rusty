@@ -1113,9 +1113,15 @@ arbitrary bytes → UTF-8 → `SceneData` (serde) → `apply_scene_data` (the
 rehydration that rebuilds meshes/colliders/skeletons), surfacing panics, hangs,
 and unguarded `unwrap`s.
 
-libFuzzer is **nightly-only**, so `fuzz/` is its own workspace — deliberately
-out of the pinned-`1.95.0` build, the size/determinism gates, and `cargo-deny`.
-It is **local-first / on-demand**:
+Running libFuzzer is **nightly-only**, so `fuzz/` is its own workspace —
+deliberately out of the root build, the determinism guard and `cargo-deny` (the
+size gate and the `--rules` checks still scan it). Its build is a gate all the
+same: `make fuzz-check` compiles the target on the pinned stable toolchain against
+the committed `fuzz/Cargo.lock` (`--locked`), in `make gates` and in CI's
+`fuzz-check` job, so an engine rename it imports through turns a PR red. When a
+member's dependencies change, `make fuzz-lock` re-resolves that lock from the root
+one, so the target builds the versions the root's gates prove. The fuzzing itself
+is **local-first / on-demand**:
 
 ```
 cargo +nightly fuzz run scene_deserialize          # fuzz until you stop it
@@ -1124,8 +1130,8 @@ cargo +nightly fuzz run scene_deserialize -- -max_total_time=60   # time-boxed
 
 The committed `fuzz/corpus/scene_deserialize/` seeds the coverage-guided mutator
 with the default scene plus a couple of minimal documents; new interesting inputs
-accrete there. There is no CI gate — fuzzing is run for as long as the operator
-wants; a short time-boxed CI smoke batch could be added later as a separate
+accrete there. No CI job *runs* the fuzzer — fuzzing is run for as long as the
+operator wants; a short time-boxed CI smoke batch could be added later as a separate
 nightly workflow if regression pressure is wanted.
 
 ## Parallel agent builds & disk
