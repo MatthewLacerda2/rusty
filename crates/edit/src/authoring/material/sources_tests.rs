@@ -2,6 +2,7 @@
 
 use super::*;
 use rusty_procgen::recipe::{ImageEncoding, ImageTexture, Node, OpKind};
+use std::path::Path;
 
 fn image_recipe(path: &str) -> TextureRecipe {
     let op = OpKind::Image(ImageTexture {

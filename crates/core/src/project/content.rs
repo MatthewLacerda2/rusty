@@ -7,16 +7,28 @@
 //! beside every install. The stored path keeps the `engine/…` spelling, so it names
 //! the same file on every machine. The engine wins: a project folder named
 //! `engine/` is unreachable through such a path, since a fallback would make one
-//! path mean two files.
+//! path mean two files. A path is matched as it is stored ([`crate::paths::stored`]:
+//! trimmed, no leading `./`), each run of `/` taken as one, so `./engine/a.png` and
+//! `engine//a.png` name the engine's `a.png` too.
 
 use std::path::{Path, PathBuf};
 
 /// What a stored path starts with to name a file under the engine's content folder.
 pub const ENGINE_PREFIX: &str = "engine/";
 
-/// `path` without [`ENGINE_PREFIX`], when it names engine content.
-pub fn engine_relative(path: &str) -> Option<&str> {
-    path.strip_prefix(ENGINE_PREFIX)
+/// `path` without [`ENGINE_PREFIX`], when it names engine content: matched as it
+/// is stored, each run of `/` taken as one (the module doc), so what is left never
+/// starts with `/` and never joins as the filesystem root.
+pub fn engine_relative(path: &str) -> Option<String> {
+    let stored = crate::paths::stored(path);
+    let parts: Vec<&str> = stored.split('/').filter(|p| !p.is_empty()).collect();
+    let relative = parts.join("/");
+    let normal = if stored.starts_with('/') {
+        format!("/{relative}")
+    } else {
+        relative
+    };
+    normal.strip_prefix(ENGINE_PREFIX).map(str::to_string)
 }
 
 /// The two folders a stored path is read from: the project root, and the engine's
@@ -53,8 +65,10 @@ impl ContentRoots {
 
     /// The file `path` names.
     pub fn file(&self, path: &str) -> PathBuf {
-        let relative = engine_relative(path).unwrap_or(path);
-        self.base(path).join(relative)
+        match engine_relative(path) {
+            Some(relative) => self.engine.join(relative),
+            None => self.project.join(path),
+        }
     }
 }
 
@@ -81,6 +95,22 @@ mod tests {
             roots.file("assets/engine/a.png"),
             Path::new("/game/assets/engine/a.png")
         );
+    }
+
+    #[test]
+    fn an_engine_path_is_matched_as_stored_and_never_joins_the_filesystem_root() {
+        let roots = ContentRoots::with_engine(Path::new("/game"), Path::new("/install/engine"));
+        let want = Path::new("/install/engine/textures/a.png");
+        assert_eq!(roots.file("engine//textures/a.png"), want);
+        assert_eq!(roots.file("./engine/textures/a.png"), want);
+        assert_eq!(roots.file(" engine/textures//a.png"), want);
+        assert_eq!(
+            roots.base("./engine/textures/a.png"),
+            Path::new("/install/engine")
+        );
+        // A rooted path is not `engine/…`, however it is spelled.
+        assert_eq!(engine_relative("/engine/a.png"), None);
+        assert_eq!(engine_relative("//engine/a.png"), None);
     }
 
     #[test]

@@ -43,7 +43,7 @@ pub fn read_graph(path: &str, roots: &ContentRoots) -> Result<TextureRecipe, Str
     }
     let file = roots.file(path);
     let text = std::fs::read_to_string(&file).map_err(|e| e.to_string())?;
-    super::sources::warn_if_outside(&file, roots.base(path), "graph", path);
+    super::sources::warn_if_outside(roots, "graph", path);
     decode(serde_json::from_str(&text).map_err(|e| e.to_string())?)
 }
 
@@ -60,20 +60,28 @@ pub fn listed_graphs(roots: &ContentRoots) -> Vec<String> {
 /// are skipped, and so is the root's `engine/`, which an `engine/…` path never
 /// reaches (the engine's folder wins). A symlinked folder is not followed.
 pub fn project_graphs(root: &Path) -> Vec<String> {
+    graphs_under(root, true)
+}
+
+/// Every `.graph.json` under the engine's content folder `engine`, as its
+/// `engine/…` path, sorted. Only hidden folders are skipped (the project's
+/// `target/` and `engine/` rules are its own), and a symlinked folder is not
+/// followed.
+pub fn engine_graphs(engine: &Path) -> Vec<String> {
+    let found = graphs_under(engine, false).into_iter();
+    found.map(|path| format!("{ENGINE_PREFIX}{path}")).collect()
+}
+
+/// Every `.graph.json` under `root`, sorted; `project` adds the project root's own
+/// skips ([`skipped`]).
+fn graphs_under(root: &Path, project: bool) -> Vec<String> {
     let mut found = Vec::new();
-    walk(root, root, &mut found);
+    walk(root, root, project, &mut found);
     found.sort();
     found
 }
 
-/// Every `.graph.json` under the engine's content folder `engine`, as its
-/// `engine/…` path, sorted.
-pub fn engine_graphs(engine: &Path) -> Vec<String> {
-    let found = project_graphs(engine).into_iter();
-    found.map(|path| format!("{ENGINE_PREFIX}{path}")).collect()
-}
-
-fn walk(dir: &Path, root: &Path, found: &mut Vec<String>) {
+fn walk(dir: &Path, root: &Path, project: bool, found: &mut Vec<String>) {
     let Ok(read) = std::fs::read_dir(dir) else {
         return;
     };
@@ -81,8 +89,8 @@ fn walk(dir: &Path, root: &Path, found: &mut Vec<String>) {
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().into_owned();
         match entry.file_type() {
-            Ok(kind) if kind.is_dir() && !skipped(dir == root, &name) => {
-                walk(&path, root, found);
+            Ok(kind) if kind.is_dir() && !skipped(project && dir == root, &name) => {
+                walk(&path, root, project, found);
             }
             Ok(kind) if kind.is_file() && name.ends_with(EXTENSION) => {
                 if let Ok(relative) = path.strip_prefix(root) {
@@ -94,7 +102,7 @@ fn walk(dir: &Path, root: &Path, found: &mut Vec<String>) {
     }
 }
 
-/// A hidden folder anywhere, and the root's own `target/` and `engine/`.
+/// A hidden folder anywhere, and the project root's own `target/` and `engine/`.
 fn skipped(at_root: bool, name: &str) -> bool {
     let engine = ENGINE_PREFIX.trim_end_matches('/');
     name.starts_with('.') || (at_root && (name == "target" || name == engine))

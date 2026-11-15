@@ -13,14 +13,14 @@
 //! [`ContentRoots`]): a file outside the folder its path is named from is read, but
 //! warns once per file, since it is an input the seed doesn't cover and may be
 //! missing on another machine. The engine's own content ships beside every
-//! install, so an `engine/…` file inside it never warns. A file that isn't there is an error
-//! naming the node and the path, before anything runs. An image is read and decoded
-//! only when the node that reads it runs, and freed after its last reader (#2002),
-//! so one that can't be decoded is the bake's error then. Every bake re-reads the
-//! files, so a rebake picks up an edited graph or source.
+//! install, so a file inside the engine's content folder never warns. A file that
+//! isn't there is an error naming the node and the path, before anything runs. An
+//! image is read and decoded only when the node that reads it runs, and freed after
+//! its last reader (#2002), so one that can't be decoded is the bake's error then.
+//! Every bake re-reads the files, so a rebake picks up an edited graph or source.
 
 use std::collections::BTreeSet;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use rusty_core::paths::{outside_root, shown};
@@ -66,7 +66,7 @@ fn read_images(recipe: &TextureRecipe, roots: &ContentRoots) -> Result<Sources, 
                 "image node '{node}' can't read {path:?}: no such file"
             ));
         }
-        warn_if_outside(&file, roots.base(path), "image", path);
+        warn_if_outside(roots, "image", path);
         paths.push(path.to_string());
     }
     let roots = roots.clone();
@@ -77,11 +77,17 @@ fn read_images(recipe: &TextureRecipe, roots: &ContentRoots) -> Result<Sources, 
     Ok(Sources::lazy(paths, loader))
 }
 
-/// Warn, once per file, when `file` (named `written` by a `kind` node) lies outside
-/// `base`, the folder its path is named from ([`ContentRoots::base`]). Returns
+/// Warn, once per file, when the file `written` names (by a `kind` node) lies
+/// outside the folder that path is named from ([`ContentRoots::base`]). Returns
 /// whether it lies outside, warned already or not.
-pub(super) fn warn_if_outside(file: &Path, base: &Path, kind: &str, written: &str) -> bool {
-    let Some(real) = outside_root(file, base) else {
+pub(super) fn warn_if_outside(roots: &ContentRoots, kind: &str, written: &str) -> bool {
+    let engine = rusty_core::project::engine_relative(written).is_some();
+    let folder = if engine {
+        "engine's content folder"
+    } else {
+        "project"
+    };
+    let Some(real) = outside_root(&roots.file(written), roots.base(written)) else {
         return false;
     };
     let shown = shown(&real);
@@ -90,20 +96,10 @@ pub(super) fn warn_if_outside(file: &Path, base: &Path, kind: &str, written: &st
         log::warn!(
             "[Texture] {kind} {written:?} reads {shown}, outside the {folder}: the texture \
              now depends on a file that may not exist on another machine, and the seed \
-             does not cover it",
-            folder = folder(written)
+             does not cover it"
         );
     }
     true
-}
-
-/// What the folder `written` is named from is called in a warning.
-fn folder(written: &str) -> &'static str {
-    if rusty_core::project::engine_relative(written).is_some() {
-        "engine's content folder"
-    } else {
-        "project"
-    }
 }
 
 #[cfg(test)]

@@ -165,14 +165,8 @@ fn an_engine_graph_is_read_from_the_engine_folder_nested_ones_too_and_nothing_wa
         [0.0, 1.0, 0.0, 1.0],
         "the engine's file, not the project's"
     );
-    let outside = |path: &str| {
-        crate::authoring::material::sources::warn_if_outside(
-            &roots.file(path),
-            roots.base(path),
-            "graph",
-            path,
-        )
-    };
+    let outside =
+        |path: &str| crate::authoring::material::sources::warn_if_outside(&roots, "graph", path);
     assert!(!outside(RUST));
     // A path that climbs out of the engine's folder is outside it, and warns.
     assert!(outside(
@@ -234,9 +228,16 @@ fn the_engine_graphs_are_listed_after_the_projects_by_their_engine_path() {
         ],
         &[
             ("textures/library/rust.graph.json", doc.clone()),
-            ("materials/b.graph.json", doc),
+            ("materials/b.graph.json", doc.clone()),
+            // The project root's `target/` skip is the project's, not the engine's.
+            ("target/t.graph.json", doc),
         ],
     );
-    let want = ["a.graph.json", "engine/materials/b.graph.json", RUST];
+    let want = [
+        "a.graph.json",
+        "engine/materials/b.graph.json",
+        "engine/target/t.graph.json",
+        RUST,
+    ];
     assert_eq!(listed_graphs(&roots), want);
 }

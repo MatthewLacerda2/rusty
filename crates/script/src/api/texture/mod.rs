@@ -30,10 +30,11 @@
 //!   engine's, by their `engine/…` paths (#2185).
 //!
 //! A recipe's graph instances (#1744) and `image` nodes read their files from the
-//! project root (an `engine/…` path from the engine's content folder) before any verb evaluates it (`edit::authoring::material::load_recipe`,
-//! #1491): procgen itself reads no files. Each verb evaluates the expanded recipe,
-//! so `Stats` and `Preview` show an instance's nodes under their prefixed ids
-//! (`brick/mortar`); `ToJson` writes the recipe as given, instances unexpanded.
+//! project root (an `engine/…` path from the engine's content folder) before any
+//! verb evaluates it (`edit::authoring::material::load_recipe`, #1491): procgen
+//! itself reads no files. Each verb evaluates the expanded recipe, so `Stats` and
+//! `Preview` show an instance's nodes under their prefixed ids (`brick/mortar`);
+//! `ToJson` writes the recipe as given, instances unexpanded.
 //!
 //! `Bake` and `BakeSet` make the missing folders above their target inside the
 //! project (`folder`, #1850), and a failed write names the verb and the path.

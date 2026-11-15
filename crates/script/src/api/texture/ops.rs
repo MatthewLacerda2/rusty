@@ -173,7 +173,10 @@ mod tests {
 
     #[test]
     fn ops_lists_the_projects_graphs_with_their_interface() {
-        let root = rusty_test_support::temp::dir().join("rusty_texture_ops_graphs_1744");
+        let base = rusty_test_support::temp::dir().join("rusty_texture_ops_graphs_1744");
+        let root = base.join("game");
+        // An empty engine folder: the engine's own graphs would follow the project's.
+        let roots = ContentRoots::with_engine(&root, &base.join("engine"));
         std::fs::create_dir_all(root.join("textures")).unwrap();
         let graph = serde_json::json!({
             "resolution": 8, "inputs": ["mask"],
@@ -184,12 +187,8 @@ mod tests {
         std::fs::write(file, graph.to_string()).unwrap();
         std::fs::write(root.join("broken.graph.json"), "{").unwrap();
         let lua = Lua::new();
-        lua.globals()
-            .set(
-                "OPS",
-                super::ops_table(&lua, &ContentRoots::new(&root)).unwrap(),
-            )
-            .unwrap();
+        let ops = super::ops_table(&lua, &roots).unwrap();
+        lua.globals().set("OPS", ops).unwrap();
         let (count, path, inputs, name, max): (usize, String, u8, String, f64) = lua
             .load(
                 r#"local g = OPS[#OPS]

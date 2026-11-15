@@ -775,9 +775,12 @@ imported model, a provider-generated image, an earlier bake, a hand-made mask or
   input the seed doesn't cover, and may be missing on another machine.
 - A `path` that starts **`engine/`** names a file the engine ships
   (`engine/textures/…`), read from the engine's content folder wherever it is
-  installed, and never warns: that content ships beside every install. The recipe
-  stores the `engine/…` spelling, the same on every machine. The engine wins: a
-  project folder named `engine/` is unreachable from a recipe.
+  installed. A file inside the engine's content folder never warns, since that
+  content ships beside every install; one an `engine/../…` path climbs out to
+  warns, as a file outside the project does. The path is matched as stored:
+  `./engine/…` and `engine//…` are the engine's too. The recipe stores the
+  `engine/…` spelling, the same on every machine. The engine wins: a project
+  folder named `engine/` is unreachable from a recipe.
 - `encoding = "srgb"` (the default, a colour image) decodes RGB from sRGB to linear;
   `"linear"` (a mask, a height, a normal map) reads every channel as stored. Alpha is
   always as stored. 16-bit files keep their precision. png, jpeg and tga are read;

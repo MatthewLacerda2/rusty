@@ -11,8 +11,9 @@
 //! rebake writes to the same paths, so the fields it filled before already point at
 //! them, and a hand-set path stays put — one rule serves define and rebake alike.
 //! A recipe's graph instances and `image` nodes read their files from the project
-//! root (an `engine/…` path from the engine's content folder) on every bake ([`super::load_recipe`], #1491, #1744), so a rebake picks up
-//! an edited graph or source. The asset keeps the recipe as written, instances and
+//! root (an `engine/…` path from the engine's content folder) on every bake
+//! ([`super::load_recipe`], #1491, #1744), so a rebake picks up an edited graph or
+//! source. The asset keeps the recipe as written, instances and
 //! all, never its expansion.
 
 use std::collections::BTreeMap;

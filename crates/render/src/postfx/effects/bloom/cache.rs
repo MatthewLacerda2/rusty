@@ -6,7 +6,6 @@
 //! cache is its own, so a bad dirt never drops the materials' bind groups.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
 use std::rc::Rc;
 
 use crate::GpuTexture;
@@ -15,17 +14,17 @@ use rusty_asset::MapRef;
 use rusty_components::is_render_texture;
 use rusty_core::fs::freshness::Freshness;
 use rusty_core::fs::written::Stale;
-use rusty_core::paths::to_slash;
-use rusty_core::project::ContentRoots;
 
 /// The file a dirt `setting` reads: an `engine/…` path,
 /// [`DEFAULT_DIRT_TEXTURE`](rusty_components::rendering::post_processing::DEFAULT_DIRT_TEXTURE)
 /// among them, is the engine's own, wherever `engine/` is
-/// ([`rusty_core::project::ContentRoots`]); any other path as it is. Resolved only
-/// when it is read.
+/// ([`rusty_core::project::engine_relative`]); any other path as it is. Resolved
+/// only when it is read.
 pub(crate) fn file(setting: &str) -> MapRef {
-    let roots = ContentRoots::new(Path::new(""));
-    to_slash(&roots.file(setting)).into()
+    match rusty_core::project::engine_relative(setting) {
+        Some(relative) => rusty_core::project::engine_path(&relative).into(),
+        None => setting.into(),
+    }
 }
 
 /// One setting's read: the file it resolved to, and its upload (`None`: failed).
