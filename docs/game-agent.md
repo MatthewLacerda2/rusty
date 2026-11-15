@@ -135,6 +135,18 @@ end
 return M
 ```
 
+## Start a surface from the engine's library
+
+The engine ships ten tiling materials as texture graphs (concrete, brick, painted
+plaster, worn painted metal, tread plate, wood planks, ceramic tile, asphalt, sand
+with pebbles, carpet), listed by `Texture.Ops()` under `engine/textures/library/`.
+For a wall, floor or ground, **start from the nearest one**: instance it in the
+material's `maps`, set its `wear` (0 new, 1 derelict), its `tint` where it has one
+and the instance `seed` (two walls that are not copies), and give the material the
+tile's real size as `world_size` (`docs/api/Texture.md`, *The library*). Write a new
+graph only when no library material is near, and build it from the library's parts
+(`grunge`, `edge_wear`, `crevice_dirt`, `scratches`) where they fit.
+
 ## Look at a material before it goes into a level
 
 You never see a texture or a material unless you render it, so **look before you

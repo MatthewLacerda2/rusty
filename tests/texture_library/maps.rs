@@ -107,7 +107,7 @@ fn the_seam_check_flags_a_ramp_and_passes_a_tiling_noise() {
 }
 
 #[test]
-fn the_albedo_rule_flags_coal_and_passes_concrete() {
+fn the_rules_flag_coal_and_flat_maps_and_pass_mid_grey() {
     let flat = |v: f32| Image::filled(16, [v, v, v, 1.0]);
     let set = |b: f32| {
         vec![
@@ -129,4 +129,7 @@ fn the_albedo_rule_flags_coal_and_passes_concrete() {
         "a near-black dielectric fails"
     );
     assert!(!rules(0.2).contains(&"albedo"), "a mid-grey one passes");
+    for flat_map in ["roughness", "normal", "height"] {
+        assert!(rules(0.2).contains(&flat_map), "a flat {flat_map} fails");
+    }
 }
