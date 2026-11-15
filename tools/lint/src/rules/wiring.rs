@@ -158,6 +158,16 @@ fn case_for(rule: &str) -> Option<Case> {
             "crates/app/src/x/mod.rs",
         ),
         "read-keys" => one(app, "fn f() {\n    dev::providers::read_keys();\n}\n"),
+        "root-tests" => case(
+            &[
+                (
+                    "Cargo.toml",
+                    "[package]\nname = \"t\"\nautobins = false\n\n[[bin]]\nname = \"b\"\n",
+                ),
+                ("src/main.rs", ""),
+            ],
+            "Cargo.toml",
+        ),
         "sanitize" => one(
             "crates/edit/src/authoring/a.rs",
             "pub fn set_x(c: &mut C, v: f32) {\n    c.x = v;\n}\n",
@@ -219,7 +229,7 @@ fn kept(repo: &Repo, name: &str, path: &str) -> usize {
 
 /// The rules nothing may excuse, said here apart from `RULES`' `Allow` column so
 /// that switching a row's mode disagrees with it.
-const UNEXCUSABLE: &[&str] = &["ignored", "key-guard", "orphan-seeds"];
+const UNEXCUSABLE: &[&str] = &["ignored", "key-guard", "orphan-seeds", "root-tests"];
 
 /// Every row's `Allow` is the one meant: an inline allow above its must-flag
 /// finding excuses it (through the shared filter, or as an `Own` rule reads it)

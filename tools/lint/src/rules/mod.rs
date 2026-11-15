@@ -37,6 +37,7 @@ mod physics_borrow;
 mod platform_cfg;
 mod prefix;
 mod read_keys;
+mod root_tests;
 mod sanitize;
 mod sanitize_rules;
 mod self_path;
@@ -60,8 +61,9 @@ use std::path::Path;
 enum Allow {
     Inline,
     /// Nothing may excuse it: `ignored` and `orphan-seeds`, whose fixes are a
-    /// `.gitignore` pattern and a moved file, and `key-guard`, whose finding sits on a
-    /// manifest, where no inline allow can go.
+    /// `.gitignore` pattern and a moved file, `key-guard`, whose finding sits on a
+    /// manifest, where no inline allow can go, and `root-tests`, whose fix is the
+    /// manifest key or a moved test.
     Never,
     /// The rule reads its own allows, so it can report a stale one
     /// (`api-parity`, whose allow sits on the op, not on the finding's cause;
@@ -108,6 +110,7 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (platform_cfg::RULE, platform_cfg::run, Allow::Inline),
     (prefix::RULE, prefix::run, Allow::Inline),
     (read_keys::RULE, read_keys::run, Allow::Inline),
+    (root_tests::RULE, root_tests::run, Allow::Never),
     (sanitize::RULE, sanitize::run, Allow::Inline),
     (self_path::RULE, self_path::run, Allow::Inline),
     (skip::RULE, skip::run, Allow::Inline),
