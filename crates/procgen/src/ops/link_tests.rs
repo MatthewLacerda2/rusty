@@ -5,16 +5,16 @@
 use serde_json::{json, Value};
 
 use super::test_graph::{bake as bake_op, bits, node};
-use crate::recipe::{sample_op, OpInfo, OPS};
+use crate::recipe::{reading_sample_op, OpInfo, OPS};
 use crate::Image;
 
 /// `info`'s sample op with `param` set to `value`, fed by busy inputs, baked at
 /// `size`. The constant `k` rides along either way, so both recipes hold the same
 /// nodes.
 fn bake(info: &OpInfo, param: &str, value: Value, v: f32, size: [u32; 2]) -> Image {
-    let mut op = serde_json::to_value(sample_op(info)).unwrap();
+    let mut op = serde_json::to_value(reading_sample_op(info)).unwrap();
     op[param] = value;
-    let wired = sample_op(info).arity().max as usize;
+    let wired = reading_sample_op(info).arity().max as usize;
     let k = node(
         "k",
         json!({ "op": "constant", "color": [v, v, v, 1.0] }),

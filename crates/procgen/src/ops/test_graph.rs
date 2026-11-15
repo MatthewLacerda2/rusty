@@ -23,8 +23,9 @@ pub fn bake(op: Value, wired: usize, extra: Vec<Node>, size: [u32; 2]) -> Image 
         json!({ "op": "noise", "kind": "fbm", "scale": 4, "octaves": 3 }),
         json!({ "op": "voronoi", "scale": 5, "output": "cells" }),
         json!({ "op": "gradient", "kind": "radial" }),
+        json!({ "op": "wave", "kind": "rings", "frequency": 3 }),
     ];
-    let ids = ["a", "b", "c"];
+    let ids = ["a", "b", "c", "d"];
     let mut nodes: Vec<Node> = (0..wired)
         .map(|i| node(ids[i], sources[i].clone(), &[]))
         .collect();
