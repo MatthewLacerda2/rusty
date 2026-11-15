@@ -17,6 +17,7 @@ rusty-asset = { workspace = true }
 rusty-components = { workspace = true }
 rusty-core = { workspace = true }
 rusty-ecs = { workspace = true }
+rusty-font = { workspace = true }
 rusty-physics = { workspace = true }
 rusty-scene = { workspace = true }
 rusty-shadergen = { workspace = true }

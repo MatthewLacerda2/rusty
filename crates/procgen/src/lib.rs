@@ -50,6 +50,7 @@ pub use bands::with_bands;
 pub use image_buf::{Image, Size};
 pub use recipe::TextureRecipe;
 pub use runner::{evaluate, evaluate_with, validate, RunError};
+pub use rusty_font::FontHandle;
 pub use source::{Source, Sources};
 
 /// Evaluate `recipe` over `sources` and bake it to a `.png` at `path` for the named

@@ -11,10 +11,10 @@ use std::ops::Range;
 
 use glam::{Vec2, Vec4};
 
-use super::font::{self, FontHandle, GlyphId};
+use super::font;
 use super::rich::{self, Style};
-use super::shape;
 use rusty_components::TextComponent;
+use rusty_font::{shape, FontHandle, GlyphId};
 
 /// Extra advance a synthesized bold adds, in ems (the dilated stroke is wider).
 const FAUX_BOLD_ADVANCE: f32 = 0.03;
@@ -187,7 +187,7 @@ impl<'a> Measurer<'a> {
             .collect();
         let starts: Vec<usize> = text.char_indices().map(|(i, _)| i).collect();
         let scale = size / font.units_per_em();
-        let glyphs = shape::shape(font, &text, &style_changes(run, &starts, text.len()));
+        let glyphs = shape(font, &text, &style_changes(run, &starts, text.len()));
         for (i, g) in glyphs.iter().enumerate() {
             let at = starts.partition_point(|&b| b <= g.cluster as usize).max(1) - 1;
             let (ch, style) = run[at];

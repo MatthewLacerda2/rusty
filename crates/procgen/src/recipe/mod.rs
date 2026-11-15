@@ -28,7 +28,6 @@ mod kinds;
 mod node;
 mod op_info;
 mod param;
-#[cfg(test)]
 mod sample;
 
 /// The op-set, its params structs and the catalog: one file per op, in
@@ -39,9 +38,11 @@ pub(crate) use arity::{arity, ONE, SOURCE};
 pub(crate) use extent::power_of_two_sides;
 pub use kinds::*;
 pub use node::{Fault, Node, NodeError};
-pub(crate) use op_info::{choice, op, opt, req, socket, SEED};
+pub(crate) use op_info::{choice, op, opt, req, req_sampled, socket, SEED};
 pub use op_info::{Lit, OpInfo, OpParam};
 pub use param::{Link, Param};
+#[doc(hidden)]
+pub use sample::sample_required;
 #[cfg(test)]
 pub(crate) use sample::{reading_sample_op, sample_op};
 
@@ -163,6 +164,22 @@ impl TextureRecipe {
             if let OpKind::Image(p) = &node.op {
                 if !paths.iter().any(|&(_, seen)| seen == p.path) {
                     paths.push((&node.id, &p.path));
+                }
+            }
+        }
+        paths
+    }
+
+    /// Every font file a `text` node reads (#2190), each once, in node order, with
+    /// the id of the first node that names it: the files a caller hands to
+    /// [`crate::Sources::insert_font`]. A node on the default font (`font = ""`)
+    /// names none.
+    pub fn font_paths(&self) -> Vec<(&str, &str)> {
+        let mut paths: Vec<(&str, &str)> = Vec::new();
+        for node in &self.nodes {
+            if let OpKind::Text(p) = &node.op {
+                if !p.font.is_empty() && !paths.iter().any(|&(_, seen)| seen == p.font) {
+                    paths.push((&node.id, &p.font));
                 }
             }
         }

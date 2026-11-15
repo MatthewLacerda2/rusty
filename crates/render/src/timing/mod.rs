@@ -13,7 +13,9 @@
 //! polled, and a frame that finds every readback buffer still in flight is simply
 //! not timed. A caller that has waited for the GPU anyway (the harness, which reads
 //! its frames back) gets the frame's times on the next `take`; otherwise they land a
-//! frame or two later.
+//! frame or two later. Each resolved [`GpuTimes`] carries the drawn frame it measures
+//! (`frame`, the renderer's [`FrameCost::frames`] count at that frame's end), so a
+//! caller pairs it with its frame by index, never by when it arrived.
 //!
 //! **Only `TIMESTAMP_QUERY`.** Pass-boundary writes are the form every adapter with
 //! timestamps supports — Apple GPUs sample only at stage boundaries, so writes inside
@@ -103,6 +105,10 @@ rusty_core::named_enum! {
 /// with no pass that frame is left out.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct GpuTimes {
+    /// The drawn frame these times measure: the [`FrameCost::frames`] count that
+    /// frame ended with. They arrive a frame or two later, so a caller pairing them
+    /// with a frame pairs them by this, never by arrival.
+    pub frame: u64,
     pub passes: Vec<(GpuPass, f64)>,
 }
 
@@ -131,7 +137,7 @@ impl GpuTimes {
             .zip(ms)
             .filter_map(|(pass, ms)| Some((*pass, ms?)))
             .collect();
-        Self { passes }
+        Self { frame: 0, passes }
     }
 }
 
@@ -246,11 +252,13 @@ impl GpuTimer {
     /// mapping it. A frame with every buffer still in flight goes untimed.
     /// The CPU span closes last, so it holds the resolve, its submit and the poll.
     pub(crate) fn end_frame(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+        // The count `cpu.end` below moves to: this frame's index.
+        let frame = self.cost().frames.wrapping_add(1);
         if let Some(q) = &mut self.queries {
             q.open.set(false);
             let passes = std::mem::take(q.frame.get_mut());
             if !passes.is_empty() {
-                q.ring.submit(device, queue, &q.set, passes);
+                q.ring.submit(device, queue, &q.set, passes, frame);
             }
             q.collect(device);
         }
@@ -271,11 +279,11 @@ impl Queries {
     fn collect(&mut self, device: &wgpu::Device) {
         let _ = device.poll(wgpu::PollType::Poll);
         let period = self.period_ns;
-        if let Some(times) = self
+        if let Some((frame, times)) = self
             .ring
             .read_finished(|ticks, passes| GpuTimes::from_ticks(ticks, passes, period))
         {
-            self.ready = Some(times);
+            self.ready = Some(GpuTimes { frame, ..times });
         }
     }
 }

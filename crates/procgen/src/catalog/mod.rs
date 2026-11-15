@@ -150,6 +150,7 @@ catalog! {
     Mix(color::mix::Mix),
     Noise(generators::noise::Noise),
     NormalBlend(vector::normal_blend::NormalBlend),
+    Path(generators::outline::path::Path),
     /// Collapse RGB to luminance (Rec. 709), written to all of RGB.
     RgbToBw = math::rgb_to_bw::RgbToBw,
     /// Sample input A at the coordinates the other inputs give, footprint-filtered.
@@ -159,6 +160,7 @@ catalog! {
     Shape(generators::shape::Shape),
     Sharpen(filter::blurs::sharpen::Sharpen),
     SlopeBlur(filter::blurs::slope_blur::SlopeBlur),
+    Text(generators::outline::text::Text),
     Tile(vector::tile::Tile),
     Voronoi(generators::voronoi::Voronoi),
     Warp(vector::warp::Warp),
