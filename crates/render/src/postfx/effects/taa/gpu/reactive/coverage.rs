@@ -5,7 +5,9 @@
 
 use glam::Vec3;
 
+use super::super::super::params::Rules;
 use super::super::fixture::{diff, eye, frame, pixel, project, renderer, taa_scene, view};
+use super::super::still::keep;
 use super::super::wall::noisy_wall;
 use rusty_components::particle::{Particle, ParticleEmitterComponent};
 use rusty_components::TaaReactive;
@@ -52,8 +54,17 @@ fn sprite_over_wall(reactive: TaaReactive) -> Option<Vec<u8>> {
     noisy_wall(&mut scene, -6.0);
     flash(&mut scene, AT, 2.0, reactive);
     let mut v = view(&r);
-    let mut last = Vec::new();
-    for _ in 0..8 {
+    let mut last = frame(&mut r, &mut v, &scene, &eye(0.0));
+    // The mask alone: the flicker hold (#2228) holds the jittered noise under an
+    // `Off` sprite near its average, which a `Full` one's frame weight leaves.
+    keep(
+        &mut v,
+        Rules {
+            flicker: false,
+            ..Rules::default()
+        },
+    );
+    for _ in 1..8 {
         last = frame(&mut r, &mut v, &scene, &eye(0.0));
     }
     Some(last)

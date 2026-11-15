@@ -11,7 +11,8 @@
 
 use glam::Vec3;
 
-use super::fixture::{eye, frame, renderer, settle, taa_scene, tilted_cube, view};
+use super::super::params::Rules;
+use super::fixture::{eye, frame, renderer, taa_scene, tilted_cube, view};
 use super::still::{differing, run, NO_REVEAL};
 use super::wall::{luma, noisy_wall};
 use crate::motion::gpu_fixture::{H, W};
@@ -22,9 +23,12 @@ use rusty_scene::{Camera, Scene};
 const STEP: f32 = 1.5;
 /// Frames turned, ending at yaw 0, and frames the still view settles.
 const FRAMES: u32 = 16;
-/// The turning frame's sharpness over the still one's must reach this. Measured
+/// The turning frame's sharpness over URP's still one's must reach this. Measured
 /// on lavapipe: 0.93 with the moving weight, 0.76 with URP's fixed one (the
-/// moving weight set to URP's).
+/// moving weight set to URP's). The still frame is URP's, the flicker hold off
+/// (#2228): the hold keeps a still noise wall nearer its supersampled image
+/// (lavapipe: a mean error of 0.8 against URP's 1.5), sharper than URP's clamp
+/// leaves it, which no turning frame reaches.
 const KEPT: f32 = 0.85;
 
 /// The mean luma step between neighbouring pixels across the frame's middle,
@@ -60,7 +64,17 @@ fn gpu_a_turning_camera_keeps_the_still_frames_sharpness() {
     let Some(mut r) = renderer() else { return };
     let scene = wall_scene();
     let mut still_view = view(&r);
-    let still = settle(&mut r, &mut still_view, &scene, &eye(0.0), FRAMES);
+    let urp = Rules {
+        flicker: false,
+        ..Rules::default()
+    };
+    let still = run(
+        &mut r,
+        &mut still_view,
+        (&scene, &|_| eye(0.0)),
+        FRAMES,
+        urp,
+    );
     let mut turning_view = view(&r);
     let turning = turned(&mut r, &mut turning_view, &scene);
     let (s, t) = (sharpness(&still), sharpness(&turning));

@@ -40,10 +40,12 @@ fn the_lanes_are_where_the_shader_reads_them() {
     assert_eq!(p.rejection, rejection);
     // The quality's steps ride `levels`: `High` (the default) is URP's (2, 2, 2, 0).
     assert_eq!(p.levels, [2.0, 2.0, 2.0, 0.0]);
+    assert_eq!(p.flicker, [FLICKER_DECAY, FLICKER_HOLD, 0.0, 0.0]);
     let wgsl = shader();
     for read in [
         "(pixels - taa.knobs.w) / (taa.rejection.y - taa.knobs.w)",
-        "mix(taa.knobs.x, taa.rejection.x, moving)",
+        "mix(taa.knobs.x, taa.rejection.x, change.x)",
+        "taa.flicker.xy",
         "taa.rejection.w - taa.rejection.z",
         "(mismatch - taa.rejection.z) / span",
         "taa.levels.x",
@@ -73,11 +75,12 @@ fn the_struct_and_the_camera_count_match_the_shader() {
         "jitter",
         "levels",
         "rejection",
+        "flicker",
         "lenses",
     ];
     assert_eq!(fields, rust);
     assert!(wgsl.contains(&format!("const MAX_CAMERAS: u32 = {MAX_CAMERAS}u;")));
-    assert_eq!(std::mem::size_of::<TaaParams>(), (6 + MAX_CAMERAS) * 16);
+    assert_eq!(std::mem::size_of::<TaaParams>(), (7 + MAX_CAMERAS) * 16);
 }
 
 #[test]
@@ -86,6 +89,7 @@ fn the_ramps_the_shader_divides_by_are_positive() {
     let off = params().without(Rules {
         moving: false,
         reveal: false,
+        flicker: false,
     });
     assert_eq!(off.rejection[0], FRAME_INFLUENCE);
     assert!(off.rejection[2] < off.rejection[3], "a span to divide by");

@@ -17,9 +17,11 @@
 // last frame's there, or a camera higher in the stack drew there and no longer does
 // (a reveal). Where a translucent drew this frame (#1845, its reactive mask, FSR2's)
 // the frame weighs more again, so a moving translucent, which writes no motion and
-// is reprojected with what is behind it, keeps its detail.
+// is reprojected with what is behind it, keeps its detail. A still pixel whose
+// frame keeps blinking under the jitter holds its history against the next blink
+// (#2228, `taa_flicker.wgsl`), which a clamp to this frame's own box would hand through.
 // Its output is what the rest of the chain reads and next frame's history
-// (colour, and its own surface: distance and camera, `ResolveOut`).
+// (colour, its own surface: distance and camera, and its flicker, `ResolveOut`).
 // `fs_upscale` is the same resolve upscaling (TAAU, #1702 part 3,
 // `render/postfx/effects/taa/upscale/`): a scaled view's scene-size frame into an
 // output-size history, at the same place in the chain, so what follows it runs at
@@ -34,6 +36,8 @@
 
 #import fullscreen
 #import numeric
+#import postfx::taa_flicker
+#import postfx::ycocg
 
 struct TaaParams {
     // xy: the history's size in pixels (the scene's, or the output's when
@@ -55,6 +59,10 @@ struct TaaParams {
     // x: a moving pixel's frame influence, y: the history pixels a frame it applies
     // at; z, w: the relative depth gap the history starts to fade at, and is gone
     rejection: vec4<f32>,
+    // The flicker hold (#2228, `params::FLICKER_DECAY`): x, what a pixel's flicker
+    // keeps of itself a frame; y, how many times its flicker the history may sit
+    // outside the box (0: the hold is off); zw: unused
+    flicker: vec4<f32>,
     // Each camera of the stack by its index (the velocity's `.w`; a camera past the
     // last slot reads the last): xy, the view-space offset per NDC unit at one unit
     // of view depth (perspective) or at any (orthographic); z, 1 for perspective.
@@ -76,10 +84,16 @@ const MAX_CAMERAS: u32 = 8u;
 // topmost camera that drew a translucent there, plus how much of the pixel that
 // camera's translucents laid down (below 1); 0 where none drew.
 @group(0) @binding(6) var t_reactive: texture_2d<f32>;
+// Last resolve's flicker per history pixel (`ResolveOut::flicker`, #2228,
+// `taa_flicker.wgsl`): its frame's perceptual luma, its last step (signed), its
+// flicker and how much of it recurs.
+@group(0) @binding(7) var t_flicker_history: texture_2d<f32>;
 
 struct ResolveOut { // what the resolve writes: next frame's history, colour and surface
     @location(0) color: vec4<f32>,
     @location(1) surface: vec2<f32>,
+    // the frame's luma, then its step, flicker and recurring flicker (`taa_flicker`)
+    @location(2) flicker: vec4<f32>,
 };
 
 // What the resolve reads of a pixel's velocity ([`surface_of`] for a surface): its
@@ -96,19 +110,6 @@ const MAX_HDR: f32 = 65504.0;
 @vertex
 fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4<f32> {
     return fullscreen::triangle(vid);
-}
-
-fn rgb_to_ycocg(c: vec3<f32>) -> vec3<f32> {
-    return vec3<f32>(
-        dot(c, vec3<f32>(0.25, 0.5, 0.25)),
-        dot(c, vec3<f32>(0.5, 0.0, -0.5)),
-        dot(c, vec3<f32>(-0.25, 0.5, -0.25)),
-    );
-}
-
-fn ycocg_to_rgb(c: vec3<f32>) -> vec3<f32> {
-    let t = c.x - c.z;
-    return vec3<f32>(t + c.y, c.x + c.z, t - c.y);
 }
 
 // The current frame at pixel `p` (clamped to the image): a non-finite pixel reads
@@ -262,7 +263,7 @@ fn fs_resolve(@builtin(position) pos: vec4<f32>) -> ResolveOut {
     } else {
         here = current(p);
     }
-    let center = rgb_to_ycocg(here.rgb);
+    let center = ycocg::from_rgb(here.rgb);
 
     // The neighbourhood box and its moments: the 3×3, or URP's 5-tap cross at
     // clamp quality 0.
@@ -274,7 +275,7 @@ fn fs_resolve(@builtin(position) pos: vec4<f32>) -> ResolveOut {
     for (var y = -1; y <= 1; y++) {
         for (var x = -1; x <= 1; x++) {
             if ((x != 0 || y != 0) && !(cross && x != 0 && y != 0)) {
-                let c = rgb_to_ycocg(current(p + vec2<i32>(x, y)).rgb);
+                let c = ycocg::from_rgb(current(p + vec2<i32>(x, y)).rgb);
                 lo = min(lo, c);
                 hi = max(hi, c);
                 m1 += c;
@@ -332,21 +333,40 @@ struct Frame {
     reactive: f32,
 };
 
-// The frame's weight: the frame influence, raised toward a moving pixel's as its
-// motion goes from `knobs.w` to `rejection.y` history pixels, times the frame's trust,
-// then toward 1 as surface `now` is a reveal ([`depth_mismatch`]), then toward 1
-// by the frame's reactivity (FSR2 scales the history's share by `1 - reactive`). A
-// still, unrevealed pixel no translucent drew weighs exactly `knobs.x` × trust.
-fn frame_weight(frame: Frame, motion: vec2<f32>, prev_uv: vec2<f32>, now: vec2<f32>) -> f32 {
+// How far a pixel moves (`.x`) and is a reveal (`.y`), each 0 to 1 (#1846): moving
+// as its motion goes from `knobs.w` to `rejection.y` history pixels, revealed as
+// surface `now` is farther than last frame's around `prev_uv` ([`depth_mismatch`]).
+fn change_of(motion: vec2<f32>, prev_uv: vec2<f32>, now: vec2<f32>) -> vec2<f32> {
     let pixels = length(motion * 0.5 * taa.size.xy);
     let moving = clamp((pixels - taa.knobs.w) / (taa.rejection.y - taa.knobs.w), 0.0, 1.0);
-    let influence = mix(taa.knobs.x, taa.rejection.x, moving) * frame.trust;
     let mismatch = depth_mismatch(prev_uv * taa.size.xy, now);
     let span = taa.rejection.w - taa.rejection.z;
     let revealed = clamp((mismatch - taa.rejection.z) / span, 0.0, 1.0);
-    let weight = mix(influence, 1.0, revealed);
+    return vec2<f32>(moving, revealed);
+}
+
+// The frame's weight: the frame influence, raised toward a moving pixel's by
+// `change.x`, times the frame's trust, then toward 1 as the pixel is a reveal,
+// then toward 1 by the frame's reactivity (FSR2 scales the history's share by
+// `1 - reactive`). A still, unrevealed pixel no translucent drew weighs exactly
+// `knobs.x` × trust.
+fn frame_weight(frame: Frame, change: vec2<f32>) -> f32 {
+    let influence = mix(taa.knobs.x, taa.rejection.x, change.x) * frame.trust;
+    let weight = mix(influence, 1.0, change.y);
     // Exactly the weight where no translucent drew.
     return select(weight, mix(weight, 1.0, frame.reactive), frame.reactive > 0.0);
+}
+
+// [`taa_flicker::Flicker`] at the pixel whose history is read at `prev_uv` (#2228):
+// last frame's flicker texel there, the pixel's stillness and reactivity, its
+// frame's perceptual `luma`, and its history's luma before (`raw`) and after its
+// clamp (`boxed`).
+fn flicker_of(prev_uv: vec2<f32>, luma: f32, raw: f32, boxed: f32, change: vec2<f32>, reactive: f32) -> taa_flicker::Flicker {
+    let last = vec2<i32>(textureDimensions(t_flicker_history)) - 1;
+    let at = clamp(vec2<i32>(floor(prev_uv * taa.size.xy)), vec2<i32>(0), last);
+    let then = textureLoad(t_flicker_history, at, 0);
+    let still = (1.0 - change.x) * (1.0 - change.y);
+    return taa_flicker::next(then, luma, vec2<f32>(still, still * (1.0 - reactive)), vec2<f32>(raw, boxed), taa.flicker.xy);
 }
 
 // The pixel at history `uv` (`front`: its frontmost surface's NDC motion and that
@@ -354,7 +374,9 @@ fn frame_weight(frame: Frame, motion: vec2<f32>, prev_uv: vec2<f32>, now: vec2<f
 // clamped into the frame's box and lerped toward the frame by [`frame_weight`] in
 // URP's perceptual space; the frame alone, exactly, with no history to blend.
 fn blend(frame: Frame, uv: vec2<f32>, front: Front) -> ResolveOut {
-    let alone = ResolveOut(frame.here, front.own);
+    let center = ycocg::from_rgb(frame.here.rgb);
+    let luma = ycocg::perceptual(center.x);
+    let alone = ResolveOut(frame.here, front.own, taa_flicker::texel(luma, taa_flicker::NONE));
     // NDC y points up, uv down.
     let prev_uv = uv - front.motion * vec2<f32>(0.5, -0.5);
     // Bicubic history (URP's history quality 2); one bilinear read below it. A
@@ -369,18 +391,23 @@ fn blend(frame: Frame, uv: vec2<f32>, front: Front) -> ResolveOut {
     if (taa.knobs.z < 0.5 || !inside || !numeric::finite3(sampled)) {
         return alone;
     }
-    let weight = frame_weight(frame, front.motion, prev_uv, front.near);
-    let center = rgb_to_ycocg(frame.here.rgb);
-    let history = into_box(rgb_to_ycocg(max(sampled, vec3<f32>(0.0))), frame.lo, frame.hi);
+    let change = change_of(front.motion, prev_uv, front.near);
+    let weight = frame_weight(frame, change);
+    let raw = ycocg::from_rgb(max(sampled, vec3<f32>(0.0)));
+    let boxed = into_box(raw, frame.lo, frame.hi);
+    // A blinking still pixel keeps its history up to `flicker.y` times its blinks
+    // outside the box, along the line to where it was ([`flicker_of`]).
+    let flicker = flicker_of(prev_uv, luma, raw.x, boxed.x, change, frame.reactive);
+    let history = mix(boxed, raw, flicker.hold);
 
     // Lerp in perceptual space: each colour over 1 + its luma, and back.
     let a = history / (1.0 + history.x);
     let b = center / (1.0 + center.x);
     let mixed = mix(a, b, weight);
-    let rgb = ycocg_to_rgb(mixed / max(1.0 - mixed.x, 1.0 / MAX_HDR));
+    let rgb = ycocg::to_rgb(mixed / max(1.0 - mixed.x, 1.0 / MAX_HDR));
     let out = clamp(rgb, vec3<f32>(0.0), vec3<f32>(MAX_HDR));
     let color = vec4<f32>(select(frame.here.rgb, out, numeric::finite3(rgb)), frame.here.a);
-    return ResolveOut(color, front.own);
+    return ResolveOut(color, front.own, taa_flicker::texel(luma, flicker));
 }
 
 // The history `h` brought into the box `lo`..`hi` (YCoCg): clamped per channel, or
@@ -434,11 +461,11 @@ fn fs_upscale(@builtin(position) pos: vec4<f32>) -> ResolveOut {
             sum += c * w;
             weights += w;
             nearest = max(nearest, w);
-            let ycocg = rgb_to_ycocg(c);
-            lo = min(lo, ycocg);
-            hi = max(hi, ycocg);
-            m1 += ycocg;
-            m2 += ycocg * ycocg;
+            let v = ycocg::from_rgb(c);
+            lo = min(lo, v);
+            hi = max(hi, v);
+            m1 += v;
+            m2 += v * v;
         }
     }
     let here = vec4<f32>(sum / max(weights, 1e-6), current(base).a);

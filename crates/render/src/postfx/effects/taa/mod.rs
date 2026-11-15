@@ -15,7 +15,9 @@
 //!   frame's history;
 //! - **the history** ([`TaaHistory`], [`history`]), the view's, in [`super::Targets`]:
 //!   two HDR targets read and written in turn, each with the surfaces its
-//!   resolve saw, distance and camera (what tells a reveal, #1846). It is dropped on a resize, a
+//!   resolve saw, distance and camera (what tells a reveal, #1846), and each
+//!   pixel's flicker (what holds a still pixel blinking under the jitter, #2228,
+//!   [`params`]). It is dropped on a resize, a
 //!   render-scale change and when TAA stops; it holds no frame after a cut the
 //!   motion history names (a scene load, Play or Stop, a camera switch,
 //!   `MotionVectors::reset`), so the first frame after one is the current frame
@@ -87,6 +89,7 @@ impl TaaPasses {
                 sampler_entry(4),
                 texture_entry(5, wgpu::TextureViewDimension::D2),
                 texture_entry(6, wgpu::TextureViewDimension::D2),
+                texture_entry(7, wgpu::TextureViewDimension::D2),
             ],
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -125,8 +128,8 @@ impl TaaPasses {
     }
 
     /// The resolve's bind group: `h`'s params, this frame's `current` image, the
-    /// history frame `read` (its colour and its surfaces), the `velocity` target
-    /// and the reactive mask (#1845).
+    /// history frame `read` (its colour, its surfaces and its flickers), the
+    /// `velocity` target and the reactive mask (#1845).
     fn group(
         &self,
         device: &wgpu::Device,
@@ -149,6 +152,10 @@ impl TaaPasses {
                     wgpu::BindingResource::TextureView(&h.surfaces[read].view),
                 ),
                 entry(6, wgpu::BindingResource::TextureView(&h.reactive.view)),
+                entry(
+                    7,
+                    wgpu::BindingResource::TextureView(&h.flickers[read].view),
+                ),
             ],
         })
     }
@@ -197,7 +204,11 @@ impl PostFx {
             &passes.resolve
         };
         let timed = (pipeline.get(), timer.writes(GpuPass::Taa));
-        let into = [&h.frames[write].view, &h.surfaces[write].view];
+        let into = [
+            &h.frames[write].view,
+            &h.surfaces[write].view,
+            &h.flickers[write].view,
+        ];
         PostFx::fullscreen_into(&mut encoder, timed, &[&group], into);
         if drawn {
             reactive::clear(&mut encoder, &h.reactive);

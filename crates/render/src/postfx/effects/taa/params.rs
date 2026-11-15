@@ -32,8 +32,32 @@
 //!   turn starts or stops, the input a keyboard-turned game sends all the time, so
 //!   the depth test stands in for it.
 //!
-//! A still pixel (under [`STILL_PIXELS`] of motion, nothing revealed) blends
-//! exactly as URP's does.
+//! **A flickering still pixel holds its history (#2228)**, after HDRP's
+//! anti-flicker and Unreal TSR's flickering luminance. URP's box is built from
+//! the current frame alone, so where some jitter offsets give a patch a very
+//! different value (an SSR reflection whose blur reaches a bright bulb on some
+//! offsets and not others, a specular glint), the patch is its own neighbourhood
+//! and the clamp hands that one frame to the output at nearly full depth: a still
+//! view blinks. The resolve keeps each pixel's frame luma (URP's perceptual
+//! `y / (1 + y)`) and its *flicker* in a history target of its own: a *blink* is a
+//! step undone on the very next frame (the smaller of the two), the flicker is the
+//! largest blink lately, and what holds is the part of a blink an earlier one
+//! already reached (its *recurring* flicker), each keeping [`FLICKER_DECAY`] of
+//! itself a frame. A still pixel's history may then sit up to [`FLICKER_HOLD`]
+//! times its recurring flicker outside the box (in perceptual luma, along the line
+//! from its clamp to where it was), so a blink that keeps coming back averages
+//! into the history as a still frame's jitter does. A lone change is clamped as
+//! URP's is, both ways: a light switched on, a shadow or a reflection crossing a
+//! still floor (on, then off frames later: no blink), a lone muzzle flash (one
+//! blink, recurring only as far as the pixel blinked before: an edge already
+//! blinking under the jitter keeps that much of the flash's end). What the hold
+//! costs is a one-frame change repeated within half a second on a still pixel (a
+//! strobe, a fast gun's flashes on a wall), softened from its second time as a
+//! flicker is. A moving or revealed pixel keeps no hold and forgets its flicker,
+//! a reactive one keeps no hold, so nothing that moves ghosts more.
+//!
+//! A still pixel (under [`STILL_PIXELS`] of motion, nothing revealed) that has not
+//! flickered blends exactly as URP's does.
 
 use glam::Vec2;
 
@@ -70,6 +94,16 @@ pub(crate) const DISOCCLUSION_START: f32 = 0.1;
 /// The relative distance gap at which the history is dropped: a crate 1 m in
 /// front of a wall 5 m away (25 %) reveals the wall with no trace of itself.
 pub(crate) const DISOCCLUSION_FULL: f32 = 0.25;
+/// What a pixel's flicker keeps of itself each frame (#2228): ours. A jitter
+/// outlier recurs within the Halton (2, 3) sequence's 2- and 3-frame cycles (8
+/// times in 27 frames, at most 5 apart, on the case that found it); at 0.9 a
+/// swing still counts for 59 % five frames on, and for under 4 % after 31 frames,
+/// half a second.
+pub(crate) const FLICKER_DECAY: f32 = 0.9;
+/// How many times its flicker a still pixel's history may sit outside the box
+/// (#2228): ours, measured on the primitive case (`gpu/flicker/`): 2 left half
+/// the swing, 4 a third of it, a few levels over the scene's own without SSR.
+pub(crate) const FLICKER_HOLD: f32 = 4.0;
 
 // The shader divides by both ramps' spans, and a moving pixel weighs more than a
 // still one at URP's default: a constant edited out of order fails the build. A
@@ -78,6 +112,8 @@ pub(crate) const DISOCCLUSION_FULL: f32 = 0.25;
 const _: () = assert!(STILL_PIXELS < MOVING_PIXELS);
 const _: () = assert!(DISOCCLUSION_START < DISOCCLUSION_FULL);
 const _: () = assert!(FRAME_INFLUENCE < MOVING_FRAME_INFLUENCE && MOVING_FRAME_INFLUENCE <= 1.0);
+// A flicker that never decayed would hold a still pixel's history for good.
+const _: () = assert!(0.0 <= FLICKER_DECAY && FLICKER_DECAY < 1.0 && FLICKER_HOLD >= 0.0);
 
 /// The resolve's uniform, `TaaParams` in `postfx/taa.wgsl`.
 #[repr(C)]
@@ -89,6 +125,7 @@ pub(super) struct TaaParams {
     jitter: [f32; 4],
     levels: [f32; 4],
     rejection: [f32; 4],
+    flicker: [f32; 4],
     lenses: [[f32; 4]; MAX_CAMERAS],
 }
 
@@ -201,12 +238,14 @@ impl TaaParams {
                 DISOCCLUSION_START,
                 DISOCCLUSION_FULL,
             ],
+            flicker: [FLICKER_DECAY, FLICKER_HOLD, 0.0, 0.0],
             lenses,
         }
     }
 
-    /// The same frame with #1846's two rules off, for a test: a moving pixel weighs
-    /// a still one's, `moving` false, and no gap reads as a reveal, `reveal` false.
+    /// The same frame with rules off, for a test: a moving pixel weighs a still
+    /// one's, `moving` false; no gap reads as a reveal, `reveal` false; no flicker
+    /// holds a history, `flicker` false (#2228).
     #[cfg(test)]
     pub(super) fn without(mut self, rules: Rules) -> Self {
         if !rules.moving {
@@ -216,17 +255,22 @@ impl TaaParams {
             // Out of reach of any gap, yet a finite span to divide by.
             self.rejection[2..4].copy_from_slice(&[1e30, 2e30]);
         }
+        if !rules.flicker {
+            self.flicker[1] = 0.0;
+        }
         self
     }
 }
 
-/// Which of #1846's rules a view's resolve keeps, for a test that compares a frame
-/// with one ([`TaaParams::without`]).
+/// Which of the resolve's rules beyond URP's (#1846's two, #2228's flicker hold) a
+/// view's resolve keeps, for a test that compares a frame with one
+/// ([`TaaParams::without`]).
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Rules {
     pub moving: bool,
     pub reveal: bool,
+    pub flicker: bool,
 }
 
 #[cfg(test)]
@@ -235,6 +279,7 @@ impl Default for Rules {
         Self {
             moving: true,
             reveal: true,
+            flicker: true,
         }
     }
 }
