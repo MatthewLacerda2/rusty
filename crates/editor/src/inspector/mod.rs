@@ -26,8 +26,6 @@ pub fn draw(
     console: &mut ConsoleLogs,
     nav: &mut NavigationGraph,
 ) {
-    #[cfg(feature = "dev")]
-    assets::scene::bake::poll(editor, ui.ctx(), scene, console, nav);
     // A post-processing path field (the Color Lookup, the bloom dirt, #1441, #1442)
     // typed and left by selecting something else.
     editor.is_dirty |= camera::commit_abandoned_paths(ui.ctx(), scene);

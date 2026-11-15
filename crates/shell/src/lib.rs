@@ -133,6 +133,12 @@ pub trait Frontend {
     /// A physical key changed state, after the shell wrote it into the sim.
     fn on_key(&mut self, _game: &mut GameWorld, _key: KeyCode, _pressed: bool) {}
 
+    /// The swapchain refused this frame (a locked screen, a hidden or occluded
+    /// window): do what [`Self::draw`] does besides painting, so work asked for
+    /// through the command channel never waits on a redraw (the editor steps a
+    /// `Lighting.GenerateAsync()`). The player's `draw` only paints.
+    fn undrawn(&mut self, _shell: &mut Shell, _game: &mut GameWorld) {}
+
     /// Draw this frame into the swapchain `target`, the default view of `frame` (the
     /// swapchain texture, for a frontend needing another view of it: the UI, #418).
     fn draw(
@@ -239,7 +245,7 @@ fn run_frame<F: Frontend>(
         }
         QuitAction::None => {}
     }
-    drain_commands(shell, game);
+    frame::drain_commands(shell, game);
     rusty_logging::forward(game.console());
 
     // Apply any video setting (resolution / vsync / fullscreen) a script wrote
@@ -247,6 +253,9 @@ fn run_frame<F: Frontend>(
     settings::apply_pending(shell, game);
 
     let Some(surface) = frame::acquire_frame(&mut shell.renderer) else {
+        // The window cannot show a frame (a locked screen, an occluded window): the
+        // frame's other work still runs, so nothing asked of it waits on a redraw.
+        frontend.undrawn(shell, game);
         shell.pacer.skipped(Instant::now());
         return;
     };
@@ -276,25 +285,6 @@ fn capture_clipboard(shell: &mut Shell, game: &GameWorld) {
         input::clipboard::capture(clipboard, &mut game.input().borrow_mut());
     }
 }
-
-/// Drain socket-delivered commands (#282) through the one live evaluator, so a
-/// windowed playtest — editor or player — answers an external agent exactly like the
-/// headless session does. A command outside Play may have moved static geometry, so
-/// the static shadow bake is dropped (#1339). Dev builds only.
-#[cfg(feature = "dev")]
-fn drain_commands(shell: &mut Shell, game: &GameWorld) {
-    let Some(channel) = shell.cmd_channel.as_ref() else {
-        return;
-    };
-    let ran = channel.drain(game.script_manager(), &game.resources.console);
-    if ran > 0 && !game.scene().borrow().is_playing() {
-        shell.renderer.shadow_renderer.invalidate_static_cache();
-    }
-}
-
-/// No command channel in ship builds.
-#[cfg(not(feature = "dev"))]
-fn drain_commands(_shell: &mut Shell, _game: &GameWorld) {}
 
 #[cfg(all(test, feature = "dev"))] // the provider-key tripwire (`key-guard`)
 rusty_dev::no_provider_keys!();

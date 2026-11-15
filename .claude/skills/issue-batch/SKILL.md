@@ -261,7 +261,9 @@ exits non-zero, or says *unconfirmed*. Its exit statuses are in `ci-merge`.
   hand-typed `tail | grep`: it replays the log from 30 lines back (a re-arm from
   the end drops what the log said while no `Monitor` ran), passes hand-backs,
   merges, the supervisor's and the watch's stops, a held Dependabot PR, every PR
-  turning ready, going back to draft or closing unmerged, and every comment a coder
+  turning ready, going back to draft or closing (one that turned ready or closed
+  between two watches is said by the next, once; with no kept board, each ready,
+  unlabelled one is said `is ready and unqueued`), and every comment a coder
   posts on its open briefed issue (`STANDING DOWN #N` for a stand-down, `COMMENT
   #N` for any other wording; `Brief`s and comments opening `Context update` are
   skipped as yours, so head a note of your own `Context update`, never `Brief`,

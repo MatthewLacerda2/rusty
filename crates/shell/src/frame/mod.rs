@@ -1,8 +1,9 @@
 //! crates/shell/src/frame/mod.rs — the frame clock, the sim advance, quit semantics, and
-//! swapchain acquisition: the per-frame logic both frontends share, and a
-//! `Scene.LoadAsync`'s worker and GPU warm-up while frames go on (`load`, #2123).
+//! swapchain acquisition: the per-frame logic both frontends share, the command
+//! channel's drain, and a `Scene.LoadAsync`'s worker and GPU warm-up while frames go
+//! on (`load`, #2123).
 //!
-//! Everything but [`acquire_frame`] is window- and GPU-free, so it is unit-tested
+//! Everything but [`acquire_frame`] and `drain_commands` is window- and GPU-free, so it is unit-tested
 //! directly (`frame_tests.rs`).
 
 use std::time::{Duration, Instant};
@@ -206,6 +207,25 @@ pub fn acquire_frame(renderer: &mut Renderer) -> Option<wgpu::SurfaceTexture> {
         | CurrentSurfaceTexture::Validation => None,
     }
 }
+
+/// Drain socket-delivered commands (#282) through the one live evaluator, so a
+/// windowed playtest — editor or player — answers an external agent exactly like the
+/// headless session does. A command outside Play may have moved static geometry, so
+/// the static shadow bake is dropped (#1339). Dev builds only.
+#[cfg(feature = "dev")]
+pub(crate) fn drain_commands(shell: &mut crate::Shell, game: &GameWorld) {
+    let Some(channel) = shell.cmd_channel.as_ref() else {
+        return;
+    };
+    let ran = channel.drain(game.script_manager(), &game.resources.console);
+    if ran > 0 && !game.scene().borrow().is_playing() {
+        shell.renderer.shadow_renderer.invalidate_static_cache();
+    }
+}
+
+/// No command channel in ship builds.
+#[cfg(not(feature = "dev"))]
+pub(crate) fn drain_commands(_shell: &mut crate::Shell, _game: &GameWorld) {}
 
 /// One frame through [`advance_sim`] with a fresh accumulator: each frame's ticks
 /// are its own whole ticks (a test of a single frame needs nothing kept).

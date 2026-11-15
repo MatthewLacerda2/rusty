@@ -53,6 +53,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from merging import state
 from merging.watch import board, stalls
 
 
@@ -87,6 +88,11 @@ RED_MEMORY = "handed-back-red.json"
 # `make queue-status` can name one passed over for long with a green head
 # (#1951, [`view.stranded`]).
 WHY_MEMORY = "handed-back-why.json"
+
+# How the line saying one of these could not be written begins (`loop.run`'s
+# save, #2215): passed by `make queue-events`, since a watch that cannot write
+# them takes every hand-back again.
+FAILED_LINE = "watch: the hand-back memory could not be written: "
 
 
 def claim(pull: dict) -> str:
@@ -194,13 +200,13 @@ def greened(pulls: list[dict], memory: dict[int, str], reds: dict[int, str], ask
 
 
 def recall(path: Path) -> dict[int, str]:
-    """The remembered hand-backs; a missing or unreadable file is none."""
+    """The remembered hand-backs; a missing or unreadable file is none ([`state.read`])."""
     try:
-        return {int(n): sha for n, sha in json.loads(path.read_text()).items()}
-    except (OSError, ValueError, AttributeError):
+        return {int(n): sha for n, sha in state.read(path).items()}
+    except (ValueError, AttributeError):
         return {}
 
 
-def remember(path: Path, memory: dict[int, str]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({str(n): sha for n, sha in sorted(memory.items())}, indent=1) + "\n")
+def remember(path: Path, memory: dict[int, str]) -> str | None:
+    """Keep `memory` at `path` whole ([`state.write`], #2215); why not, if it failed."""
+    return state.write(path, {str(n): sha for n, sha in sorted(memory.items())})
