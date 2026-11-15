@@ -9,6 +9,7 @@ use super::*;
 use crate::input::write_cursor_moved;
 use rusty_core::application::{GameViewSetting, GameViewSize};
 use rusty_core::input::InputState;
+use rusty_editor::viewport::game_size;
 use rusty_editor::EditorUi;
 use rusty_navigation::NavigationGraph;
 use rusty_scene::Scene;
@@ -16,9 +17,14 @@ use rusty_script::scripting::ConsoleLogs;
 
 /// The editor drawn on a 1600x900 window at 1x, Game tab open, with `size`.
 fn drawn(size: GameViewSize) -> ViewportInteraction {
+    drawn_on(ViewportTab::Game, size)
+}
+
+/// The editor drawn on a 1600x900 window at 1x, `tab` open, with `size`.
+fn drawn_on(tab: ViewportTab, size: GameViewSize) -> ViewportInteraction {
     let ctx = egui::Context::default();
     let mut ui = EditorUi::new(Rc::new(RefCell::new(None)));
-    ui.viewport_tab = ViewportTab::Game;
+    ui.viewport_tab = tab;
     ui.game_view = GameViewSetting {
         size,
         low_resolution: false,
@@ -99,4 +105,22 @@ fn an_aspect_fills_the_panel_and_free_is_the_panel() {
     let image = (free.size.x * 2.0).round() as u32;
     assert_eq!(rect.render.0, image, "the image's physical pixels");
     assert!(free.size.x > free.size.y, "the whole panel, unboxed");
+}
+
+/// Behind the Scene tab the same draw carries the Game view's size (what the UI
+/// lays out at), renders nothing boxed, and boxes the UI overlay at its aspect.
+#[test]
+fn the_scene_tab_carries_the_game_views_size_from_its_draw() {
+    let scene = drawn_on(ViewportTab::Scene, GameViewSize::Fixed(640, 480));
+    assert_eq!((scene.render, scene.screen), (None, Some((640, 480))));
+    let panel = (scene.size.x.round() as u32, scene.size.y.round() as u32);
+    let (x, y, w, h) = game_size::overlay_box(&scene, panel).expect("boxed");
+    assert!((w as f32 / h as f32 - 4.0 / 3.0).abs() < 0.01, "{w}x{h}");
+    assert!(
+        y == 0 && (x * 2 + w).abs_diff(panel.0) <= 1,
+        "centred: {x}, {y}"
+    );
+    let free = drawn_on(ViewportTab::Scene, GameViewSize::Free);
+    assert_eq!(free.screen, None);
+    assert_eq!(game_size::overlay_box(&free, panel), None);
 }

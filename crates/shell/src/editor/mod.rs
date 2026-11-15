@@ -162,7 +162,8 @@ impl EditorFrontend {
         }
         if self.demo_size().is_none() {
             // Before `sync_quality` resolves the render scale on it (#1715); an open
-            // demo replays the scale it recorded; "1x on HiDPI" reports 1 (#2207).
+            // demo replays the scale it recorded; a fixed size and "1x on HiDPI"
+            // report 1 (#2207), from the setting this frame drew with.
             let scale =
                 (self.editor_ui.game_view).display_scale(shell.window.scale_factor() as f32);
             game.resources.screen.borrow_mut().set_display_scale(scale);

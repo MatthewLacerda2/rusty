@@ -70,10 +70,8 @@ impl EditorFrontend {
         // The Game view's own size, letterboxed: a demo's (#1598) or the dropdown's (#2207).
         let (px, py) = interaction.render.unwrap_or(panel);
         if self.demo_size().is_none() {
-            // The UI lays out on the game view's pixel size (#417), a sim input: its
-            // own size behind the Scene tab too (#2207).
-            let own = game_size::fit(self.editor_ui.game_view, interaction.size, pixels_per_point);
-            let (sx, sy) = own.filter(|_| scene_tab).unwrap_or((px, py));
+            // The UI lays out on the Game view's own size (#417), behind either tab.
+            let (sx, sy) = interaction.screen.unwrap_or(panel);
             game.resources.screen.borrow_mut().set_game_view(sx, sy);
         }
         // Create-or-resize this tab's own view. A view's resize guard checks its own
@@ -100,6 +98,7 @@ impl EditorFrontend {
         }
         view.game_gizmos = !scene_tab && view.gizmos.on(Gizmo::GameGizmos);
         view.ui.screen_in_editor = scene_tab && view.gizmos.on(Gizmo::Ui);
+        view.ui.screen_box = game_size::overlay_box(interaction, (px, py));
         view.set_pixel_scale(pixels_per_point);
         let camera = viewport_camera(&self.editor_ui, game, &scene, interaction.tab);
         renderer.set_ui_textures(std::rc::Rc::clone(
@@ -206,6 +205,7 @@ impl EditorFrontend {
         let frame = OverlayFrame {
             size: glam::Vec2::new(size.x, size.y),
             pixels_per_point,
+            game: interaction.screen,
             textures: std::rc::Rc::clone(&ui.ui_textures),
         };
         let point = glam::Vec2::new(local.x, local.y);

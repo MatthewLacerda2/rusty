@@ -119,10 +119,33 @@ fn display_scale_follows_the_density() {
         setting(GameViewSize::Aspect(4, 3), true).display_scale(2.0),
         1.0
     );
-    assert_eq!(
-        setting(GameViewSize::Fixed(800, 600), true).display_scale(2.0),
-        2.0
-    );
+    // A fixed size is a pixel count: 1 on a Retina window, toggle or not.
+    for low in [true, false] {
+        let fixed = setting(GameViewSize::Fixed(800, 600), low);
+        assert_eq!(fixed.display_scale(2.0), 1.0);
+    }
     assert_eq!(setting(GameViewSize::Free, false).display_scale(2.0), 2.0);
     assert_eq!(setting(GameViewSize::Free, true).display_scale(0.5), 0.5);
+}
+
+#[test]
+fn letterbox_centres_the_aspect() {
+    // A 16:9 image in a square panel: full width, bars above and below.
+    let ((x, y), (w, h)) = super::letterbox((160.0, 160.0), (16, 9));
+    assert_eq!((x, w, h), (0.0, 160.0, 90.0));
+    assert_eq!(y, 35.0);
+    // A 4:3 image in a wide panel: full height, bars left and right.
+    let ((x, y), (w, h)) = super::letterbox((400.0, 120.0), (4, 3));
+    assert_eq!((y, w, h), (0.0, 160.0, 120.0));
+    assert_eq!(x, 120.0);
+}
+
+/// The issue's own case: a 1920x1080 Game view on a Retina window under the
+/// `"match_display"` default renders at its whole pixel count, not half of it.
+#[test]
+fn a_fixed_size_matches_the_display_at_scale_1() {
+    use crate::settings::render_scale::RenderScaleDefault;
+    let fixed = setting(GameViewSize::Fixed(1920, 1080), false);
+    let scale = RenderScaleDefault::MatchDisplay.resolve(fixed.display_scale(2.0));
+    assert_eq!(scale.get(), 1.0);
 }

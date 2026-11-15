@@ -77,7 +77,7 @@ mod reread;
 pub use loading::LoadingPriority;
 
 pub use demo::DemoRequest;
-pub use game_view::{GameViewSetting, GameViewSize, MAX_GAME_VIEW_SIDE};
+pub use game_view::{letterbox, GameViewSetting, GameViewSize, MAX_GAME_VIEW_SIDE};
 pub use gizmos::{Gizmo, GizmoRow, SceneGizmos};
 
 /// The startup scene when none is configured: the seeded demo scene. Kept equal to

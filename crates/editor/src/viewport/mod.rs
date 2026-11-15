@@ -52,6 +52,12 @@ pub struct ViewportInteraction {
     /// or the size dropdown's, #2207); `None` on the Scene tab or when the Game view
     /// is the panel's own pixels.
     pub render: Option<(u32, u32)>,
+    /// The Game view's own pixel size behind either tab (an open demo's, or the
+    /// size dropdown's): what the UI lays out at, and what the Scene tab's UI
+    /// overlay and rect tool box inside the Scene image. `None` when the Game view
+    /// is the panel's own pixels. Computed in the same draw as `render`, from the
+    /// same setting.
+    pub screen: Option<(u32, u32)>,
     /// Pointer position relative to the image's top-left, if hovering.
     pub hover_local: Option<egui::Vec2>,
     /// A click was released inside the image this frame (select / gizmo grab end).
@@ -86,7 +92,8 @@ pub fn draw(
             draw_tab_strip(ui, editor, t);
             let (tab, gizmos) = (editor.viewport_tab, editor.gizmos);
             fit = game_view_fit(editor, ui);
-            let response = draw_image(ui, texture, t, fit);
+            let boxed = fit.filter(|_| tab == ViewportTab::Game);
+            let response = draw_image(ui, texture, t, boxed);
             if tab == ViewportTab::Scene {
                 navigate(editor, &response, scene);
             } else {
@@ -99,6 +106,7 @@ pub fn draw(
                 let frame = rect_tool::OverlayFrame {
                     size: glam::Vec2::new(response.rect.width(), response.rect.height()),
                     pixels_per_point: ui.ctx().pixels_per_point(),
+                    game: fit,
                     textures: std::rc::Rc::clone(&editor.ui_textures),
                 };
                 let painter = ui.painter_at(response.rect);
@@ -113,6 +121,7 @@ pub fn draw(
     let tab = editor.viewport_tab;
     let mut interaction = build_interaction(tab, &response, editor.scene_view.navigating);
     interaction.render = fit.filter(|_| tab == ViewportTab::Game);
+    interaction.screen = fit;
     // Record the image rect's pixel size so the front-end resizes the offscreen
     // target to match (points scaled by the egui pixels-per-point).
     editor.viewport_image_size = response.rect.size();
@@ -169,16 +178,15 @@ fn draw_tab_strip(ui: &mut egui::Ui, editor: &mut crate::EditorUi, t: crate::the
         });
 }
 
-/// The Game tab's own size, the image drawn letterboxed at it: an open demo's,
-/// under its timeline (#1598), else the size dropdown's (#2207). `None` on the
-/// Scene tab or when the Game view is the panel's own pixels.
+/// The Game view's own size, behind either tab: an open demo's, its timeline drawn
+/// on the Game tab (#1598), else the size dropdown's (#2207). `None` when the Game
+/// view is the panel's own pixels. The Game tab draws its image letterboxed at it.
 fn game_view_fit(editor: &mut crate::EditorUi, ui: &mut egui::Ui) -> Option<(u32, u32)> {
-    if editor.viewport_tab != ViewportTab::Game {
-        return None;
-    }
     #[cfg(feature = "dev")]
     if let Some(demo) = editor.dev.demo.as_mut() {
-        crate::demo::timeline::draw(ui, demo, &editor.theme);
+        if editor.viewport_tab == ViewportTab::Game {
+            crate::demo::timeline::draw(ui, demo, &editor.theme);
+        }
         return Some(demo.size);
     }
     let ppp = ui.ctx().pixels_per_point();
@@ -276,6 +284,7 @@ fn build_interaction(
         origin,
         size: response.rect.size(),
         render: None,
+        screen: None,
         hover_local,
         clicked: tools && response.clicked(),
         dragging: tools && response.dragged_by(egui::PointerButton::Primary),

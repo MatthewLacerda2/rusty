@@ -25,7 +25,7 @@ Unity's `EditorApplication` doesn't exist in a player: there `EnterPlay` and
 | `Editor.RedoName` | `()` | the name of the step `Redo` would re-apply, or `nil` |
 | `Editor.SetGizmo` | `(name, on)` | `true` when it set gizmo `name` (a Scene-view one, or the Game view's `"GameGizmos"` or `"Stats"`) on or off; `false` (a no-op, warned) for an unknown name or outside the editor window |
 | `Editor.GetGizmo` | `(name)` | whether gizmo `name` is drawn; `nil` (warned) for an unknown name |
-| `Editor.SetGameViewSize` | `(width, height)` | `true` when it gave the Game view a fixed size of `width × height` pixels; `false` (a no-op, warned) for a side that is not a whole number from 1 to 8192, or outside the editor window |
+| `Editor.SetGameViewSize` | `(width, height)` | `true` when it gave the Game view a fixed size of `width × height` pixels; `false` (a no-op, warned) for a side that is not a whole number from 1 to 8192 (NaN included), or outside the editor window; a missing or non-numeric argument is an error, as `SetGizmo`'s |
 | `Editor.SetGameViewAspect` | `(width, height)` | `true` when it gave the Game view the largest `width:height` size inside its panel; `false` as `SetGameViewSize` |
 | `Editor.SetGameViewLowResolution` | `(on)` | `true` when it set "1x on HiDPI" (Unity's *Low Resolution Aspect Ratios*) on or off; `false` (warned) outside the editor window |
 | `Editor.ResetGameViewSize` | `()` | `true` when it put the Game view back to *Free Aspect* with "1x on HiDPI" off; `false` (warned) outside the editor window |
@@ -86,14 +86,23 @@ renders and lays out at:
   `UI.GetScreenSize` and the UI layout, `Input.GetMousePosition` and
   `Camera.MouseRay` all use the Game view's size, so a click on the letterboxed
   image lands where it is drawn, and a click on a bar is outside the screen.
-- With **1x on HiDPI** on (and not a fixed size), `Video.GetDisplayScale` reads `1`,
-  so a `"match_display"` render scale renders natively at that size.
+- **A fixed size is a pixel count**: `Video.GetDisplayScale` reads `1` for it (a
+  game pixel is whatever the letterbox makes it on the panel, not the window's
+  density), and so it does with **1x on HiDPI** on. A `"match_display"` render
+  scale then renders natively at that size: `1920x1080` on a Retina panel runs the
+  scene at 1920x1080, not at half of it.
 - **The editor's, not the project's**: the setting lasts the editor session, as
   Unity's per-user Game view does, and nothing is saved. A demo open on the
   timeline replays on the size it recorded; the dropdown waits until it closes.
 - `Editor.GetGameViewSize` reads a set back at once; the window takes it at its
   next frame boundary and draws at it on the frame after, so a script reads the new
-  `UI.GetScreenSize` a frame or two later. The Scene view is never affected.
+  `UI.GetScreenSize` a frame or two later.
+- **The Scene view renders as before**, at its own panel. Its **UI** overlay (and
+  the rect tool on it) lays the screen canvases out at the Game view's size, as
+  Unity draws the canvas at the Game view's resolution: boxed in the Scene image at
+  that aspect ratio, so an element anchored to an edge is drawn and dragged where
+  the game shows it. A canvas backdrop blur in that box samples the whole Scene
+  image, not the box.
 - `make editor-capture ARGS="--game --game-view 16:9"` captures it
   (`docs/testing.md`).
 

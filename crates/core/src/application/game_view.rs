@@ -125,15 +125,30 @@ impl GameViewSetting {
     }
 
     /// The display scale the game sees (`Video.GetDisplayScale`) on a `window`
-    /// scale: 1 while "1x on HiDPI" sizes the view by points (`Free` or an aspect),
-    /// else the window's.
+    /// scale: 1 for a fixed size (a pixel count: a game pixel is whatever the
+    /// letterbox makes it on the panel, not the window's density) and while "1x on
+    /// HiDPI" sizes the view by points (`Free` or an aspect), else the window's.
     pub fn display_scale(self, window: f32) -> f32 {
-        let by_points = !matches!(self.size, GameViewSize::Fixed(..));
-        match self.low_resolution && by_points && window > 1.0 {
+        let fixed = matches!(self.size, GameViewSize::Fixed(..));
+        match fixed || (self.low_resolution && window > 1.0) {
             true => 1.0,
             false => window,
         }
     }
+}
+
+/// Where an image of `size`'s aspect ratio sits letterboxed in a `panel`: its
+/// top-left offset and its extent, in the panel's units, centred. The Game view's
+/// image and the Scene view's UI overlay box the same way.
+pub fn letterbox(panel: (f32, f32), (width, height): (u32, u32)) -> ((f32, f32), (f32, f32)) {
+    let aspect = width.max(1) as f32 / height.max(1) as f32;
+    let extent = if panel.0 / panel.1.max(f32::MIN_POSITIVE) > aspect {
+        (panel.1 * aspect, panel.1)
+    } else {
+        (panel.0, panel.0 / aspect)
+    };
+    let offset = ((panel.0 - extent.0) / 2.0, (panel.1 - extent.1) / 2.0);
+    (offset, extent)
 }
 
 /// The mailbox: a script's settings in, the editor's choice mirrored out.
@@ -141,7 +156,9 @@ impl GameViewSetting {
 pub struct GameViewDesk {
     viewer: bool,
     setting: GameViewSetting,
-    requests: Vec<GameViewSetting>,
+    /// A script's newest set, not yet taken by the editor: each is a whole setting,
+    /// so only the last counts.
+    request: Option<GameViewSetting>,
 }
 
 impl Application {
@@ -165,13 +182,13 @@ impl Application {
     /// next frame.
     pub fn request_game_view(&mut self, setting: GameViewSetting) {
         self.game_view.setting = setting;
-        self.game_view.requests.push(setting);
+        self.game_view.request = Some(setting);
     }
 
-    /// The editor's frame: the newest script request (each is a whole setting)
-    /// replaces its `setting`, and the result is mirrored here.
+    /// The editor's frame: the newest script request replaces its `setting`, and
+    /// the result is mirrored here.
     pub fn sync_game_view(&mut self, setting: &mut GameViewSetting) {
-        if let Some(last) = std::mem::take(&mut self.game_view.requests).pop() {
+        if let Some(last) = self.game_view.request.take() {
             *setting = last;
         }
         self.game_view.setting = *setting;

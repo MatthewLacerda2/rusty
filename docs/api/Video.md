@@ -36,9 +36,10 @@ panel it sits in. To play at the size the game ships at, give the Game view a si
 its own: its dropdown on the Game tab's strip, or
 [`Editor.SetGameViewSize`](Editor.md#the-game-views-size) (Unity's Game view
 resolution menu). The scene, the post chain, TAA's output, the UI and the mouse
-position then all use that size, drawn letterboxed in the panel. With its "1x on
-HiDPI" choice the Game view is sized by the panel's points, and `GetDisplayScale`
-reads `1` there.
+position then all use that size, drawn letterboxed in the panel. A fixed size is a
+pixel count, so `GetDisplayScale` reads `1` there (a `"match_display"` render scale
+renders it natively); with its "1x on HiDPI" choice the Game view is sized by the
+panel's points, and `GetDisplayScale` reads `1` too.
 
 **`GetDisplayScale`** (#1715; Unity reads the same through `Screen.dpi`) tells a
 Retina 2940×1388 from a 1× monitor of the same pixels. The window reports it each

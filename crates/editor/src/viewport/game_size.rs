@@ -42,11 +42,24 @@ pub fn fit(
 }
 
 /// The largest size of `width:height`'s aspect ratio that fits in `panel`.
-pub fn letterbox(panel: egui::Vec2, (width, height): (u32, u32)) -> egui::Vec2 {
-    let aspect = width.max(1) as f32 / height.max(1) as f32;
-    if panel.x / panel.y.max(f32::MIN_POSITIVE) > aspect {
-        egui::vec2(panel.y * aspect, panel.y)
-    } else {
-        egui::vec2(panel.x, panel.x / aspect)
-    }
+pub fn letterbox(panel: egui::Vec2, size: (u32, u32)) -> egui::Vec2 {
+    let (_, (w, h)) = rusty_core::application::letterbox((panel.x, panel.y), size);
+    egui::vec2(w, h)
+}
+
+/// Where the Scene tab's UI overlay draws the screen canvases in its image of
+/// `panel` pixels: the Game view's own size (`interaction.screen`) boxed at its
+/// aspect ratio, as the Game tab letterboxes it and `rect_tool::OverlayFrame` maps
+/// it, as `(x, y, width, height)`. `None` on the Game tab or with the panel's own
+/// size.
+pub fn overlay_box(
+    interaction: &super::ViewportInteraction,
+    panel: (u32, u32),
+) -> Option<(u32, u32, u32, u32)> {
+    let scene_tab = interaction.tab == super::ViewportTab::Scene;
+    let game = interaction.screen.filter(|_| scene_tab)?;
+    let panel = (panel.0 as f32, panel.1 as f32);
+    let ((x, y), (w, h)) = rusty_core::application::letterbox(panel, game);
+    let px = |v: f32| v.round().max(0.0) as u32;
+    Some((px(x), px(y), px(w).max(1), px(h).max(1)))
 }

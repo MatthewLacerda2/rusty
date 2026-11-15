@@ -265,8 +265,7 @@ fn render_viewport(
     }
     if ui.demo_size().is_none() {
         // The Game view's own size behind the Scene tab too, as the window's (#2207).
-        let own = rusty_editor::viewport::game_size::fit(ui.game_view, size, 1.0);
-        let (sx, sy) = own.filter(|_| scene_tab).unwrap_or((px, py));
+        let (sx, sy) = drawn.screen.unwrap_or(panel);
         game.resources.screen.borrow_mut().set_game_view(sx, sy);
     }
     // The settings first: the Game view's scene renders at the render scale (#1498).
@@ -291,6 +290,7 @@ fn render_viewport(
         super::navmesh::hand(renderer, &view.gizmos, &game.resources.nav.borrow());
     }
     view.ui.screen_in_editor = scene_tab && ui.gizmos.on(Gizmo::Ui);
+    view.ui.screen_box = rusty_editor::viewport::game_size::overlay_box(&drawn, (px, py));
     view.game_gizmos = !scene_tab && ui.gizmos.on(Gizmo::GameGizmos);
     let camera = super::viewport::viewport_camera(ui, game, &scene, ui.viewport_tab);
     renderer.set_ui_textures(Rc::clone(&ui.ui_textures));
