@@ -2,8 +2,8 @@
 //! cube on it, which goes where the cube goes; a near-mirror (0.05) stays sharp; a
 //! floor rougher than 0.7 is left alone; and the pyramid follows a resize.
 
-use super::fixture::{draw, eye, frame, pixel, renderer, rgb, scene, Surface};
-use super::fixture::{RED, REFLECTING, W};
+use super::super::fixture::{draw, eye, frame, pixel, renderer, rgb, scene, Surface};
+use super::super::fixture::{RED, REFLECTING, W};
 use crate::postfx::effects::ssr::pyramid::levels;
 use crate::readback;
 use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
