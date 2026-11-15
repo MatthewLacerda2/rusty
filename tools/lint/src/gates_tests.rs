@@ -219,7 +219,7 @@ fn a_flag_selects_its_row_and_no_flag_the_size_gate() {
 fn two_gate_flags_are_refused() {
     for pair in [["--rules", "--dead-pub"], ["--layers", "--rules"]] {
         let args: Vec<String> = pair.iter().map(|a| a.to_string()).collect();
-        let why = super::select(&args).err().expect("two flags");
+        let why = super::select(&args).expect_err("two flags");
         assert!(why.contains(pair[0]) && why.contains(pair[1]), "{why}");
     }
     let dead = [super::DEAD_PUB.to_string()];
