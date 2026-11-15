@@ -15,7 +15,7 @@
 use rusty::core::project::{self, Access};
 
 fn main() {
-    rusty::logging::init();
+    rusty::init();
     // The editor is an authoring binary: with `dev` it may spend on a provider.
     #[cfg(feature = "dev")]
     rusty::dev::providers::read_keys();

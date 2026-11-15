@@ -21,7 +21,7 @@ use rusty::core::project::Access;
 const USAGE: &str = "usage: export [--project <dir>] --out <dir>";
 
 fn main() {
-    rusty::logging::init();
+    rusty::init();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let project = rusty::core::project::take_flag(&mut args);
     let (Ok(project), [flag, out]) = (project, args.as_slice()) else {

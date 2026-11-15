@@ -1,6 +1,6 @@
 //! src/lib.rs — the `rusty` library crate.
 //!
-//! Holds no code of its own: it re-exports every workspace crate (`crates/<module>/`,
+//! Holds no code of its own but [`init`]: it re-exports every workspace crate (`crates/<module>/`,
 //! crates/CLAUDE.md) under its module's name, so the binaries (`main.rs`, `bin/`)
 //! and the integration tests (`tests/`) name one surface, `rusty::core::…`. Two Cargo
 //! features strip layers from a build: `dev` (the harness, console/REPL, `Debug.*`)
@@ -33,3 +33,14 @@ pub use rusty_ui as ui;
 pub use rusty_dev as dev;
 #[cfg(feature = "editor")]
 pub use rusty_editor as editor;
+
+/// Start a binary: the logger, then, in a `dev` build, the engine-content check
+/// (`build.rs`): one warning when the `engine/` folder on disk is not the one this
+/// binary was built with. Every binary calls it first (the `binary-init` lint).
+pub fn init() {
+    logging::init();
+    #[cfg(feature = "dev")]
+    if let Some(built) = option_env!("RUSTY_ENGINE_CONTENT") {
+        core::project::engine_content::register_built(built);
+    }
+}

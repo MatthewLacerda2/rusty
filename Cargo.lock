@@ -3304,6 +3304,7 @@ dependencies = [
  "rusty-ui",
  "serde",
  "serde_json",
+ "xxhash-rust",
 ]
 
 [[package]]

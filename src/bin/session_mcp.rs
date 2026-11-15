@@ -37,7 +37,7 @@ use rusty::dev::mcp::{self, attach::SocketClient, embed::Embedded, EvalBackend};
 use rusty::dev::session::{self, Session};
 
 fn main() {
-    rusty::logging::init();
+    rusty::init();
     // An authoring binary: it may spend on a provider (docs/providers.md).
     rusty::dev::providers::read_keys();
     let args: Vec<String> = std::env::args().skip(1).collect();

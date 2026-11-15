@@ -47,6 +47,7 @@ pub use boot::{boot_scene, remember_scene, scene_to_remember, BootPlan, LAST_SCE
 #[doc(hidden)]
 pub use engine::commit::pin as pin_engine;
 pub use engine::commit::{engine_commit, engine_order, UNKNOWN_COMMIT};
+pub use engine::content::{self as engine_content, EngineStamp};
 pub use engine::{EngineCheck, Verdict};
 pub use file::{ProjectFile, ProjectSettings, PROJECT_FILE};
 pub use locate::{checkout, engine_dir, engine_path, locate};

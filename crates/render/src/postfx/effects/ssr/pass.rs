@@ -3,9 +3,12 @@
 //! `postfx/ssr.wgsl`. It copies the image into the first level of its colour pyramid
 //! ([`pyramid`](super::pyramid), #1736) and builds the rest. The trace (`fs_trace`)
 //! then marches each smooth enough pixel's ray and writes its hit into a target of
-//! its own, with where it traced and how wide its cone spreads it; their pyramids
+//! its own, and into a second where it traced and, for a ray that found something,
+//! its hit's blur radius per unit cone and how much it counts (#2158); their pyramids
 //! are built; and the resolve (`fs_resolve`, #2028) averages each pixel's hits over
-//! that spread and draws them over the image, so a rough surface's reflected
+//! a disk whose radius is the pixel's own cone times the radius field those
+//! pyramids smooth (the mean of the hits' radii around it, smooth among hits as
+//! across a hit and a miss), and draws them over the image, so a rough surface's reflected
 //! silhouette fades across its blur instead of stepping at a pixel's hit or miss.
 //! The translucents, the overlay cameras and every post effect see the reflected
 //! scene, HDRP's order.
@@ -60,10 +63,6 @@ impl SsrParams {
     }
 }
 
-/// The format of the trace's `spread` target (`postfx/ssr.wgsl`'s `Traced`): whether
-/// a pixel traced, and its hit's radius times its weight.
-const SPREAD_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg16Float;
-
 /// The SSR pipelines and their pyramids', shared by every view.
 pub(crate) struct SsrPasses {
     layout: wgpu::BindGroupLayout,
@@ -71,8 +70,11 @@ pub(crate) struct SsrPasses {
     traced: wgpu::BindGroupLayout,
     trace: LazyPipeline,
     resolve: LazyPipeline,
+    /// The downsample every SSR pyramid is built by: the colour's and the trace's
+    /// two (`postfx/ssr.wgsl`'s `Traced`: its hits, and where it traced, its hit's
+    /// radius per unit cone times how much it counts, and that count, #2158), all
+    /// [`HDR_FORMAT`].
     pyramid: PyramidPass,
-    spread: PyramidPass,
 }
 
 impl SsrPasses {
@@ -98,7 +100,7 @@ impl SsrPasses {
         let resolve_layout = pipeline_layout(device, &[&layout, &traced]);
         let shader2 = shader.clone();
         let trace = LazyPipeline::new(device, move |device| {
-            let targets = [HDR_FORMAT, SPREAD_FORMAT].map(|f| Some(opaque_target(f)));
+            let targets = [HDR_FORMAT; 2].map(|f| Some(opaque_target(f)));
             Fullscreen {
                 label: "SSR Trace Pipeline",
                 shader: &shader,
@@ -124,18 +126,12 @@ impl SsrPasses {
             trace,
             resolve,
             pyramid: PyramidPass::new(device, registry),
-            spread: PyramidPass::of(device, registry, SPREAD_FORMAT),
         }
     }
 
     /// The pipelines, for warming (`Renderer::lazy_pipelines`).
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 4] {
-        [
-            &self.trace,
-            &self.resolve,
-            self.pyramid.lazy_pipeline(),
-            self.spread.lazy_pipeline(),
-        ]
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 3] {
+        [&self.trace, &self.resolve, self.pyramid.lazy_pipeline()]
     }
 }
 
@@ -159,7 +155,7 @@ impl SsrTargets {
             size,
             pyramid: Pyramid::new(device, &passes.pyramid, size),
             hits: Pyramid::new(device, &passes.pyramid, size),
-            spread: Pyramid::new(device, &passes.spread, size),
+            spread: Pyramid::new(device, &passes.pyramid, size),
             params: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("SSR Params"),
                 size: std::mem::size_of::<SsrParams>() as u64,
@@ -256,7 +252,7 @@ fn trace_and_resolve(
         pass.draw(0..3, 0..1);
     }
     t.hits.build(encoder, &passes.pyramid);
-    t.spread.build(encoder, &passes.spread);
+    t.spread.build(encoder, &passes.pyramid);
     {
         // Loaded: a pixel that gets no SSR is discarded, left as it was.
         let targets = [(scene, wgpu::LoadOp::Load)];

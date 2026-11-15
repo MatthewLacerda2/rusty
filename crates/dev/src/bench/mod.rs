@@ -143,6 +143,9 @@ fn sample(samples: &mut Samples, stats: &FrameStats, frame: Option<&RenderedFram
 /// kept in `out_dir`, and keep this one there instead. Returns the report.
 pub fn run(harness: &mut Harness, ticks: u32) -> Report {
     let mut report = measure(harness, ticks);
+    let engine = rusty_core::project::engine_content::stamp();
+    report.warnings.extend(engine.warning());
+    report.engine = Some(engine);
     let out_dir = harness.out_dir().to_path_buf();
     let previous = read(&out_dir);
     report
