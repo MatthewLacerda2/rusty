@@ -30,16 +30,18 @@ jobs:
         run: |
           ( while true; do echo "$(date +%T) $(free -m | awk '/Mem/{print "used="$3} /Swap/{print "swap="$3}' | tr '\n' ' ') disk=$(df -m / | awk 'NR==2{print $3}')MB $(ps -eo pid,ppid,rss,etimes,stat,comm --sort=-rss | head -4 | tail -3 | awk '{printf "[%s %s %dMB %ss %s %s] ",$1,$2,$3/1024,$4,$5,$6}')"; sleep 1; done ) & MON=$!
           start=$(date +%s)
-          (ulimit -v 8388608; timeout 25 cargo test -q > out.txt 2>&1; echo "rc=$? after $(( $(date +%s) - start ))s")
-          sleep 20; kill $MON
+          (ulimit -v 8388608; ulimit -c 0; timeout 25 cargo test -q > out.txt 2>&1; echo "rc=$? after $(( $(date +%s) - start ))s") || true
+          sleep 5; kill $MON
           tail -5 out.txt
           ls -la /var/lib/systemd/coredump /var/crash 2>&1 || true
           sudo journalctl --no-pager -n 30 2>&1 | grep -i -E "core|oom|apport" || true
           sudo dmesg | tail -20 || true
-      - name: Again with no core dump
+      - name: Again, a soft core limit of 0 inherited by cargo-mutants
+        if: always()
         working-directory: tools/lint
         run: |
           start=$(date +%s)
-          (ulimit -v 8388608; ulimit -c 0; timeout 25 cargo test -q > out.txt 2>&1; echo "rc=$? after $(( $(date +%s) - start ))s")
+          (ulimit -S -c 0; ulimit -v 8388608; ulimit -c; timeout 25 cargo test -q > out.txt 2>&1; echo "rc=$? after $(( $(date +%s) - start ))s") || true
           tail -3 out.txt
+          coredumpctl list --no-pager 2>&1 | tail -5 || true
           ls -la /var/lib/systemd/coredump /var/crash 2>&1 || true
