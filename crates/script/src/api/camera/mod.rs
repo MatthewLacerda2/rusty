@@ -2,7 +2,8 @@
 //!
 //! Get/Set for position, yaw, pitch and fov of the main view, plus `GetForward`/`GetRight` basis vectors so a controller
 //! script can move and aim relative to where the camera looks, and the world ↔
-//! screen projections (`WorldToScreen`, `ScreenToWorldRay`, #429). The pose is the
+//! screen projections (`WorldToScreen`, `ScreenToWorldRay`, #429; `MouseRay`, the
+//! ray under the cursor, so a mouse pick never flips `y` by hand). The pose is the
 //! main camera entity's Transform and the fov its lens when the scene has one, else
 //! the free view camera's (`scene::camera::view`, #1619); the per-entity functions (`component`) tune a camera *entity's*
 //! projection and render-texture target (#430), lens and stacking (`lens`, #1341).
@@ -154,9 +155,12 @@ fn register_fov(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Reg {
 /// `WorldToScreen(x, y, z [, canvas])` → `sx, sy, depth, onScreen` — UI screen
 /// pixels (bottom-left, y-up), or the canvas's reference units when a canvas id is
 /// given; `depth` ≤ 0 is behind the camera. `ScreenToWorldRay(x, y)` → the ray's
-/// origin and unit direction through a UI screen pixel.
+/// origin and unit direction through a UI screen pixel; `MouseRay()` the same
+/// through the cursor (`Input`'s top-left position flipped, the screen centre while
+/// the cursor is locked, as the UI pointer reads it).
 fn register_projection(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Reg {
     let (camera, scene, screen, video) = (ctx.camera, ctx.scene, ctx.screen, ctx.video);
+    let input = ctx.input;
     let px = move |lua: &mlua::Lua| -> mlua::Result<_> {
         let (screen, video) = (screen.get(lua)?, video.get(lua)?);
         let px = screen.borrow().pixels(&video.borrow());
@@ -190,6 +194,24 @@ fn register_projection(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Re
         lua.create_function(move |lua, (x, y): (f32, f32)| {
             let (o, d) =
                 view(&*camera.get(lua)?, &*scene.get(lua)?).screen_ray(Vec2::new(x, y), px(lua)?);
+            Ok((o.x, o.y, o.z, d.x, d.y, d.z))
+        }),
+    )?;
+    put(
+        table,
+        "MouseRay",
+        lua.create_function(move |lua, ()| {
+            let screen = px(lua)?;
+            let at = {
+                let input = input.get(lua)?;
+                let input = input.borrow();
+                let (x, y) = input.mouse_position();
+                match input.cursor().locked {
+                    true => screen / 2.0,
+                    false => Vec2::new(x as f32, screen.y - y as f32),
+                }
+            };
+            let (o, d) = view(&*camera.get(lua)?, &*scene.get(lua)?).screen_ray(at, screen);
             Ok((o.x, o.y, o.z, d.x, d.y, d.z))
         }),
     )
