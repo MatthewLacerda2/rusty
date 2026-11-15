@@ -1,7 +1,7 @@
 //! TAA's GPU tests (#1702, #1846), on lavapipe: what they share (`fixture`,
-//! `wall`'s noise wall and `still`'s switch for the resolve's rules), then one file
+//! `wall`'s noise wall and `still`'s switch for #1846's rules), then one file
 //! per behaviour (`reactive`: #1845's moving translucent; `knobs`: #1847's camera
-//! settings; `flicker`: #2228's still view under a jittered SSR outlier). TAAU's
+//! settings; `flicker`: #2228's anti-flicker over a jittered SSR outlier). TAAU's
 //! are in `upscale/`.
 
 mod bob;

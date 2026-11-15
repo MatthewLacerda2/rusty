@@ -1,6 +1,7 @@
 //! The Camera card's TAA widgets (#1702; its knobs #1847): the toggle, and, while
 //! TAA is on, URP's camera TAA settings — the quality level, Base Blend Factor,
-//! Variance Clamp Scale, Jitter Scale, Mip Bias and Contrast Adaptive Sharpening.
+//! Variance Clamp Scale, Jitter Scale, Mip Bias, Contrast Adaptive Sharpening and
+//! HDRP's Anti-Flicker (#2228).
 //! Writes go through the shared camera ops, so this card, `Graphics.SetTaa*` and a
 //! `Graphics.taa.<knob>` tween are one path. TAA replaces FXAA while it runs.
 

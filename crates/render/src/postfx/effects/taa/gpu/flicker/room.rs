@@ -1,23 +1,20 @@
-//! The flicker case's scene (`super`) and its measure: the resolve's own output
-//! (its HDR history) per 8×8 tile, as perceptual luma (`y / (1 + y)`) in 255ths,
-//! so a tile's swing reads as a byte would before the tonemap and the exposure.
+//! The flicker case's scene (`super`): a dark room under a satin bronze ceiling
+//! with a small bright bulb, TAA and SSR on; how a run is measured: `measure`.
 
 use glam::Vec3;
 
-use super::super::super::params::Rules;
-use super::super::still::keep;
-use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
+use crate::Renderer;
 use rusty_components::{CameraComponent, MaterialAsset, MaterialComponent, Ssr};
-use rusty_core::color::f16_to_f32;
 use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::{Camera, Scene};
 
 pub(super) const W: u32 = 320;
 pub(super) const H: u32 = 240;
-/// A tile's side, in pixels.
-const TILE: u32 = 8;
 /// Frames before the measure: one cycle of the jitter's vertical (base 3) part.
 pub(super) const WARM: u32 = 27;
+/// The camera's anti-flicker the tests turn on: its full strength. URP's resolve
+/// is 0, every camera's default.
+pub(super) const ON: f32 = 1.0;
 
 /// A headless renderer of the case's size, or `None`.
 pub(super) fn renderer() -> Option<Renderer> {
@@ -114,52 +111,9 @@ pub(super) fn room() -> Scene {
     s
 }
 
-/// The resolve's last output in `v`, per tile, in 255ths of perceptual luma.
-pub(super) fn tiles(r: &Renderer, v: &RenderView) -> Vec<f32> {
-    let texture = v.post_fx.taa_latest().expect("TAA ran");
-    let bytes = readback::read_texture_bytes(&r.device, &r.queue, texture, (W, H), 8);
-    let half = |i: usize| f16_to_f32(u16::from_le_bytes([bytes[i], bytes[i + 1]]));
-    let luma = |x: u32, y: u32| {
-        let i = ((y * W + x) * 8) as usize;
-        let l = 0.25 * half(i) + 0.5 * half(i + 2) + 0.25 * half(i + 4);
-        255.0 * l / (1.0 + l)
-    };
-    let tile = |tx: u32, ty: u32| {
-        let px = (0..TILE * TILE).map(|k| luma(tx * TILE + k % TILE, ty * TILE + k / TILE));
-        px.sum::<f32>() / (TILE * TILE) as f32
-    };
-    let (cols, rows) = (W / TILE, H / TILE);
-    (0..cols * rows).map(|t| tile(t % cols, t / cols)).collect()
-}
-
-/// Each frame's tiles, `n` frames of `scene` after [`WARM`], frame `f` of it
-/// changed by `step(f)` first, the resolve keeping `rules` from its second frame.
-pub(super) fn run(
-    r: &mut Renderer,
-    scene: &mut Scene,
-    (n, rules): (u32, Rules),
-    step: &dyn Fn(&mut Scene, u32),
-) -> Vec<Vec<f32>> {
-    let mut v = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
-    let mut out = Vec::new();
-    for f in 0..WARM + n {
-        step(scene, f);
-        let target = v.color_target_view().unwrap();
-        r.render(&mut v, scene, &eye(), &target, false);
-        if f == 0 {
-            keep(&mut v, rules);
-        }
-        if f >= WARM {
-            out.push(tiles(r, &v));
-        }
-    }
-    out
-}
-
-/// The largest step any tile takes between two frames of `frames`.
-pub(super) fn swing(frames: &[Vec<f32>]) -> f32 {
-    let steps = frames
-        .windows(2)
-        .flat_map(|w| w[0].iter().zip(&w[1]).map(|(a, b)| (a - b).abs()));
-    steps.fold(0.0, f32::max)
+/// `s` with its camera's anti-flicker at `value` (#2228).
+pub(super) fn anti_flicker(mut s: Scene, value: f32) -> Scene {
+    let cam = s.find_entity_by_name("Camera").unwrap();
+    s.world.camera_mut(cam).unwrap().taa_anti_flicker = value;
+    s
 }

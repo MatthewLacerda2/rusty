@@ -1,21 +1,169 @@
-//! What the resolve's pipelines write (`ResolveOut` in `postfx/taa.wgsl`): the
-//! history's colour, surface and flicker frames at once, so next frame reads them
-//! all from the same resolve (#1846, #2228). `PostFx::fullscreen_into` draws into
-//! them.
+//! The resolve's pipelines and what they write (`ResolveOut` and `HeldOut` in
+//! `postfx/taa.wgsl`): the history's colour and surface frames at once, so next
+//! frame reads both from the same resolve (#1846), and with the camera's
+//! anti-flicker on (#2228) each pixel's flicker as a third. `PostFx::fullscreen_into`
+//! draws into them. A camera at anti-flicker 0 resolves through the plain
+//! pipelines, whose layout has no flicker binding: URP's resolve, nothing of the
+//! hold read or written.
 
-use super::history::{FLICKER_FORMAT, SURFACE_FORMAT};
+use super::history::{TaaHistory, FLICKER_FORMAT, SURFACE_FORMAT};
+use crate::gpu::bind_entry as entry;
+use crate::gpu::fullscreen::Fullscreen;
+use crate::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
+use crate::gpu::pipelines::LazyPipeline;
+use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::HDR_FORMAT;
 
-/// What the resolve's pipelines write: the colour frame, its surfaces, its flickers.
-pub(super) fn targets() -> [Option<wgpu::ColorTargetState>; 3] {
-    let target = |format| wgpu::ColorTargetState {
-        format,
-        blend: None,
-        write_mask: wgpu::ColorWrites::ALL,
+/// The resolve's pipelines, shared by every view: the scene-size resolve and the
+/// upscaling one (TAAU), each plain and `held` (the anti-flicker on), all into an
+/// HDR history target.
+pub(crate) struct TaaPasses {
+    layout: wgpu::BindGroupLayout,
+    held_layout: wgpu::BindGroupLayout,
+    sampler: wgpu::Sampler,
+    pub(super) resolve: LazyPipeline,
+    pub(super) upscale: LazyPipeline,
+    pub(super) resolve_held: LazyPipeline,
+    pub(super) upscale_held: LazyPipeline,
+    /// The contrast-adaptive sharpen after the composite (#1847), into each output
+    /// format a view writes.
+    pub(crate) sharpen: super::Sharpen,
+}
+
+/// What a resolve writes: the colour frame and its surfaces, then, `held`, its
+/// flickers.
+fn targets(held: bool) -> Vec<Option<wgpu::ColorTargetState>> {
+    let target = |format| {
+        Some(wgpu::ColorTargetState {
+            format,
+            blend: None,
+            write_mask: wgpu::ColorWrites::ALL,
+        })
     };
-    [
-        Some(target(HDR_FORMAT)),
-        Some(target(SURFACE_FORMAT)),
-        Some(target(FLICKER_FORMAT)),
-    ]
+    let mut out = vec![target(HDR_FORMAT), target(SURFACE_FORMAT)];
+    if held {
+        out.push(target(FLICKER_FORMAT));
+    }
+    out
+}
+
+/// The resolve's bind group layout: the params, the current frame, the history's
+/// colour, the velocity, the sampler, the history's surfaces and the reactive mask,
+/// then, `held`, the history's flickers.
+fn layout(device: &wgpu::Device, held: bool) -> wgpu::BindGroupLayout {
+    let mut entries = vec![
+        uniform_entry(0, wgpu::ShaderStages::FRAGMENT),
+        texture_entry(1, wgpu::TextureViewDimension::D2),
+        texture_entry(2, wgpu::TextureViewDimension::D2),
+        texture_entry(3, wgpu::TextureViewDimension::D2),
+        sampler_entry(4),
+        texture_entry(5, wgpu::TextureViewDimension::D2),
+        texture_entry(6, wgpu::TextureViewDimension::D2),
+    ];
+    if held {
+        entries.push(texture_entry(7, wgpu::TextureViewDimension::D2));
+    }
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some(if held {
+            "TAA Held Layout"
+        } else {
+            "TAA Layout"
+        }),
+        entries: &entries,
+    })
+}
+
+impl TaaPasses {
+    /// The resolves, and the sharpen into each of `output_formats`.
+    pub(crate) fn new(
+        device: &wgpu::Device,
+        registry: &mut ShaderRegistry,
+        output_formats: &[wgpu::TextureFormat],
+    ) -> Self {
+        let shader = registry.load(device, "postfx/taa.wgsl", "TAA Shader");
+        let (plain, held) = (layout(device, false), layout(device, true));
+        let pipeline = |fs: &'static str, label: &'static str, held: Option<&_>| {
+            let group = held.unwrap_or(&plain);
+            let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("TAA Pipeline Layout"),
+                bind_group_layouts: &[Some(group)],
+                immediate_size: 0,
+            });
+            let (shader, targets) = (shader.clone(), targets(held.is_some()));
+            LazyPipeline::new(device, move |device| {
+                Fullscreen {
+                    label,
+                    shader: &shader,
+                    layout: &layout,
+                    vs: "vs_fullscreen",
+                    fs,
+                }
+                .colour(device, &targets)
+            })
+        };
+        let resolve = pipeline("fs_resolve", "TAA Resolve", None);
+        let upscale = pipeline("fs_upscale", "TAA Upscale", None);
+        let resolve_held = pipeline("fs_resolve_held", "TAA Resolve Held", Some(&held));
+        let upscale_held = pipeline("fs_upscale_held", "TAA Upscale Held", Some(&held));
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("TAA History Sampler"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+        Self {
+            layout: plain,
+            held_layout: held,
+            sampler,
+            resolve,
+            upscale,
+            resolve_held,
+            upscale_held,
+            sharpen: super::Sharpen::new(device, registry, output_formats),
+        }
+    }
+
+    /// The resolve's bind group: `h`'s params, this frame's `current` image, the
+    /// history frame `read` (its colour, its surfaces and, when `h` holds them, its
+    /// flickers: the held layout), the `velocity` target and the reactive mask (#1845).
+    pub(super) fn group(
+        &self,
+        device: &wgpu::Device,
+        h: &TaaHistory,
+        read: usize,
+        current: &wgpu::TextureView,
+        velocity: &wgpu::TextureView,
+    ) -> wgpu::BindGroup {
+        let view = wgpu::BindingResource::TextureView;
+        let mut entries = vec![
+            entry(0, h.params.as_entire_binding()),
+            entry(1, view(current)),
+            entry(2, view(&h.frames[read].view)),
+            entry(3, view(velocity)),
+            entry(4, wgpu::BindingResource::Sampler(&self.sampler)),
+            entry(5, view(&h.surfaces[read].view)),
+            entry(6, view(&h.reactive.view)),
+        ];
+        if let Some(flickers) = &h.flickers {
+            entries.push(entry(7, view(&flickers[read].view)));
+        }
+        let layout = match h.flickers {
+            Some(_) => &self.held_layout,
+            None => &self.layout,
+        };
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("TAA Bind Group"),
+            layout,
+            entries: &entries,
+        })
+    }
+
+    /// The pipelines, for warming (`Renderer::lazy_pipelines`).
+    pub(crate) fn lazy_pipelines(&self) -> impl Iterator<Item = &LazyPipeline> {
+        let resolves = [&self.resolve, &self.upscale];
+        resolves
+            .into_iter()
+            .chain([&self.resolve_held, &self.upscale_held])
+            .chain(self.sharpen.lazy_pipelines())
+    }
 }

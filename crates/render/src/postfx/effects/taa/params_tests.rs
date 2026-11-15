@@ -7,9 +7,14 @@ use glam::{Vec2, Vec3};
 use super::*;
 use rusty_scene::Camera;
 
+/// The resolve's source: `postfx/taa.wgsl` and the modules it reads its uniform
+/// and its surfaces from.
 fn shader() -> String {
-    let path = format!("{}/postfx/taa.wgsl", rusty_shadergen::engine_shader_dir());
-    std::fs::read_to_string(path).unwrap()
+    let dir = rusty_shadergen::engine_shader_dir();
+    let read = |f: &str| std::fs::read_to_string(format!("{dir}/postfx/{f}")).unwrap();
+    ["taa.wgsl", "taa/io.wgsl", "taa/surface.wgsl"]
+        .map(read)
+        .concat()
 }
 
 fn camera() -> Camera {
@@ -40,7 +45,18 @@ fn the_lanes_are_where_the_shader_reads_them() {
     assert_eq!(p.rejection, rejection);
     // The quality's steps ride `levels`: `High` (the default) is URP's (2, 2, 2, 0).
     assert_eq!(p.levels, [2.0, 2.0, 2.0, 0.0]);
-    assert_eq!(p.flicker, [FLICKER_DECAY, FLICKER_HOLD, 0.0, 0.0]);
+    // No anti-flicker by default (#2228): the hold's scale is 0, and the camera's
+    // value scales it.
+    assert_eq!(p.flicker, [FLICKER_DECAY, 0.0, 0.0, 0.0]);
+    let mut cam = rusty_components::CameraComponent::default();
+    cam.taa_anti_flicker = 0.5;
+    let half = TaaParams::new(
+        ((64, 48), (32, 24)),
+        (true, Vec2::ZERO, false),
+        TaaTune::from_camera(&cam),
+        lenses(&[camera()], 1.0),
+    );
+    assert_eq!(half.flicker[1], 0.5 * FLICKER_HOLD);
     let wgsl = shader();
     for read in [
         "(pixels - taa.knobs.w) / (taa.rejection.y - taa.knobs.w)",
@@ -89,7 +105,6 @@ fn the_ramps_the_shader_divides_by_are_positive() {
     let off = params().without(Rules {
         moving: false,
         reveal: false,
-        flicker: false,
     });
     assert_eq!(off.rejection[0], FRAME_INFLUENCE);
     assert!(off.rejection[2] < off.rejection[3], "a span to divide by");

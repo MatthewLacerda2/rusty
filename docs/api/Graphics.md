@@ -117,6 +117,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetSsrStepLength` / `SetSsrStepLength` | `()` / `(units)` | `number`: the `Custom` march's step, world units (clamped 0.05–2, **default `0.375`**) |
 | `Graphics.GetSsrSteps` / `SetSsrSteps` | `()` / `(n)` | `number`: the `Custom` march's step count (clamped 1–256, **default `32`**) |
 | `Graphics.GetTaaActive` / `SetTaaActive` | `()` / `(bool)` | `bool` (**default `false`**; `false` with no screen camera; see *TAA*) |
+| `Graphics.GetTaaAntiFlicker` / `SetTaaAntiFlicker` | `()` / `(value)` | `number`: HDRP's *Anti-Flicker*, how far a still pixel blinking under the jitter holds its history (clamped 0–1, **default `0`**: URP's resolve; see *TAA*, *Anti-Flicker* for what it softens) |
 | `Graphics.GetTaaBaseBlendFactor` / `SetTaaBaseBlendFactor` | `()` / `(value)` | `number`: URP's *Base Blend Factor*, the history's share for a still pixel (frame influence is `1 - base`; clamped 0.6–0.98, **default `0.9`**; see *TAA*) |
 | `Graphics.GetTaaContrastAdaptiveSharpening` / `SetTaaContrastAdaptiveSharpening` | `()` / `(value)` | `number`: RCAS strength, on the tonemapped image after the resolve (clamped 0–1, **default `0`**: no sharpen; see *TAA*) |
 | `Graphics.GetTaaJitterScale` / `SetTaaJitterScale` | `()` / `(value)` | `number`: URP's *Jitter Scale* on the sub-pixel jitter (clamped 0–1, **default `1`**; see *TAA*) |
@@ -834,23 +835,38 @@ history fades, gone at 25 %. So a reveal shows no smear of what covered it, even
 when both are the same grey, which the colour clamp alone cannot tell apart. The
 distance, not the depth along the view axis, so a fast flick of the camera is no
 reveal. Across a camera stack the order decides: where a viewmodel's gun moves off
-a wall the wall is a reveal, and where it arrives over one nothing is.
+a wall the wall is a reveal, and where it arrives over one nothing is. A still
+pixel blends exactly as URP's. These are fixed constants for now. The distances
+cost each TAA camera half again its history memory: 50 MB in all at 1920×1080.
 
-A third goes beyond URP's (#2228, HDRP's anti-flicker, Unreal TSR's flickering
-luminance): **a still pixel that keeps blinking under the jitter holds its
-history.** URP's colour box is the current frame's own, so where some sub-pixel
-offsets give a patch a very different value (a glossy SSR reflection near a small
-bright bulb, a specular glint) the patch is its own box and each blink reaches the
-screen: a still view flickers. A blink is a change undone on the very next frame;
-once a pixel has blinked twice, its history may sit up to four times its blinks
-outside the box, so the blinks average away. A lone change stays as sharp as URP's
-(a light switched on, a muzzle flash and its end, a shadow or a reflection
-crossing a still floor), and a moving or revealed pixel is never held, so nothing
-that moves ghosts more. What it softens is a one-frame change repeated on a still
-pixel within half a second (a strobe, a fast gun's flashes on a wall), from its
-second time on. A still pixel that never blinked blends exactly as URP's. These are
-fixed constants for now. The distances and the blinks cost each TAA camera 24 bytes
-a pixel beside its 16 of colour: 83 MB in all at 1920×1080.
+**Anti-Flicker** (#2228, HDRP's; off by default). URP's colour box is the
+current frame's own, so where some sub-pixel offsets give a patch a very
+different value (a glossy SSR reflection near a small bright bulb, a specular
+glint) the patch is its own box and each blink reaches the screen: a still view
+flickers. With `taa_anti_flicker` above `0` (`0`..`1`), a **still** pixel that
+keeps blinking holds its history's luma against the blinks: a blink is a change
+undone on the very next frame, and once a pixel's blinks recur, its history's
+luma may sit up to four times (at `1`; the setting scales it) its recurring
+blinks outside the box, so they average away (on the case that found it, a still
+view's worst blink drops from 26 levels to 9). Its colour (hue) is clamped as
+URP's is, so a light turning from red to blue at the same brightness shows the
+new hue as fast. A moving, revealed or reactive pixel is never held. At `0` the
+resolve is URP's, bit for bit, and costs nothing more; on, each TAA camera keeps
+16 bytes a pixel more (83 MB in all at 1920×1080).
+
+**What it softens**, measured at `1` on a still view (lavapipe; in rendered
+frames, so the time scales with the frame rate): a one-frame flash repeated on a
+still pixel shows fully its first two times, about 80 % its third, then about a
+third of itself every 6 frames apart (58 % every 10 frames); a strobe, a flickering
+light, or a fast gun's flashes lighting a wall or the viewmodel are dimmed so. A
+lone change on a pixel that was not blinking (a light switched on, a single muzzle
+flash, a shadow crossing a calm floor) is as sharp as URP's. On a pixel already
+blinking under the jitter (a textured surface, an edge; more of the image while TAA
+upscales), a lone flash's end lingers: on a noise ceiling it sits a level or more
+over URP's for 32 frames after the flash (39 at render scale `0.67`), starting at 29
+levels against URP's 9. So turn it on for a view that must hold still (a menu
+scene, a slow walk past glossy reflections), and leave it at `0` where flashes and
+strobes are the point.
 
 Unity's camera has **one anti-aliasing mode**, so with both on, TAA runs and the
 FXAA pass is skipped; `fxaa_active` keeps its value for when TAA is turned off. TAA
@@ -951,7 +967,8 @@ added to the negative bias TAAU applies). The float ranges (Base Blend Factor
 `0.6`..`0.98`, Variance Clamp Scale `0.6`..`1.2`, Jitter Scale `0`..`1`, Mip Bias
 `-1`..`0`, sharpening `0`..`1`) are URP's Camera Inspector bounds, which every
 setter here clamps to; URP's own script setters accept wider values. #1846's moving
-and reveal rules and #2228's flicker hold stay fixed constants.
+and reveal rules stay fixed constants. **Anti-Flicker** (`0`..`1`, default `0`) is
+HDRP's camera setting of that name; see *Anti-Flicker* above.
 
 **Quality** (URP's `VeryLow`…`VeryHigh`, default `High`) picks URP's
 `DoTemporalAA(clamp, motion, history, central)` for each level:
@@ -967,8 +984,8 @@ and reveal rules and #2228's flicker hold stay fixed constants.
 `High` is what the resolve always did. Where rusty differs from URP: a history that
 reprojects off the image is dropped at every level (URP's `VeryLow` keeps it);
 while TAA upscales, the box is always the 3×3 the reconstruction reads, narrowed
-by the variance from `Medium` up; and rusty's reveal, reactive and flicker rules run
-at every level.
+by the variance from `Medium` up; and rusty's reveal and reactive rules, and the
+anti-flicker, run at every level.
 
 **Contrast Adaptive Sharpening** (#1847, URP's TAA *Contrast Adaptive Sharpening*)
 runs AMD's RCAS where URP does, in the final post pass: on the tonemapped image
@@ -978,7 +995,7 @@ blur read the unsharpened scene. Its strength is `0`..`1`; `0` (the default) run
 no pass and leaves the frame byte-identical, so a game turns it on only where it
 wants it. It runs only on a frame TAA resolved.
 
-Tween paths (the float knobs, through the camera entity): `Graphics.taa.base_blend_factor`, `Graphics.taa.variance_clamp_scale`, `Graphics.taa.jitter_scale`, `Graphics.taa.mip_bias`, `Graphics.taa.contrast_adaptive_sharpening` (the quality, a mode, does not tween).
+Tween paths (the float knobs, through the camera entity): `Graphics.taa.base_blend_factor`, `Graphics.taa.variance_clamp_scale`, `Graphics.taa.jitter_scale`, `Graphics.taa.mip_bias`, `Graphics.taa.contrast_adaptive_sharpening`, `Graphics.taa.anti_flicker` (the quality, a mode, does not tween).
 
 ### Lighting settings
 

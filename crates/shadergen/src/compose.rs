@@ -26,6 +26,8 @@ pub const MODULES: &[&str] = &[
     "numeric.wgsl",
     "postfx/ycocg.wgsl",
     "postfx/taa_flicker.wgsl",
+    "postfx/taa/io.wgsl",
+    "postfx/taa/surface.wgsl",
     "hiz/hidden.wgsl",
     "reactive.wgsl",
     "lighting/sh.wgsl",

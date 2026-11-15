@@ -1,11 +1,11 @@
-//! What the hold (`super`) must leave alone: a lone flash on a still wall is
-//! clamped as URP's is, on and off, and a cube moving under the flickering
-//! ceiling leaves no more trail than under URP's resolve.
+//! What the anti-flicker (`super`) leaves alone: a lone flash on a calm still
+//! ceiling is clamped as URP's is, on and off, and a cube moving under the
+//! flickering ceiling leaves no more trail than under URP's resolve.
 
 use glam::Vec3;
 
-use super::super::super::params::Rules;
-use super::room::{block, matte, renderer, room, run, WARM};
+use super::measure::run;
+use super::room::{anti_flicker, block, matte, renderer, room, ON, WARM};
 use rusty_scene::create::default_light;
 use rusty_scene::Scene;
 
@@ -18,12 +18,6 @@ const CALM: f32 = 0.5;
 /// 255ths: a level, a calm pixel's own sub-level blinks (lighting's rounding)
 /// holding that little of the flash's end. Measured: lavapipe 0.5.
 const SAME: f32 = 1.0;
-/// URP's resolve: the hold off.
-const URP: Rules = Rules {
-    moving: true,
-    reveal: true,
-    flicker: false,
-};
 
 /// The largest difference between two runs' tiles, over every frame.
 fn apart(a: &[Vec<f32>], b: &[Vec<f32>]) -> f32 {
@@ -36,8 +30,8 @@ fn apart(a: &[Vec<f32>], b: &[Vec<f32>]) -> f32 {
 
 /// The room with its bulb hidden under the floor and SSR off, so nothing in it
 /// blinks: a pixel that blinks already holds a lone change's end as far as its
-/// own flicker reaches (`params::FLICKER_HOLD`).
-fn dark_room() -> Scene {
+/// own flicker reaches (`params::FLICKER_HOLD`): `cost`'s noise ceiling.
+pub(super) fn dark_room() -> Scene {
     let mut s = room();
     let bulb = s.find_entity_by_name("Bulb").unwrap();
     s.world.transform_mut(bulb).unwrap().position.y = -5.0;
@@ -46,23 +40,31 @@ fn dark_room() -> Scene {
     s
 }
 
+/// Point light `name` 0.6 m under the ceiling's middle, lit at `intensity` or off.
+pub(super) fn lamp(s: &mut Scene, name: &str, intensity: Option<f32>) {
+    let id = s.find_entity_by_name(name).unwrap_or_else(|| {
+        let id = s.add_entity(name.to_string());
+        s.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 2.4, -4.0);
+        id
+    });
+    let light = intensity.map(|intensity| rusty_components::LightComponent {
+        intensity,
+        ..default_light()
+    });
+    s.world.set_light(id, light);
+}
+
 #[test]
 fn gpu_a_lone_flash_on_a_still_ceiling_is_clamped_as_urps() {
     let Some(mut r) = renderer() else { return };
-    let flash = |s: &mut Scene, f: u32| {
-        let lamp = s.find_entity_by_name("Flash").unwrap_or_else(|| {
-            let id = s.add_entity("Flash".to_string());
-            s.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 2.4, -4.0);
-            id
-        });
-        let light = rusty_components::LightComponent {
-            intensity: 30.0,
-            ..default_light()
-        };
-        s.world.set_light(lamp, (f == WARM + AT).then_some(light));
-    };
-    let held = run(&mut r, &mut dark_room(), (FRAMES, Rules::default()), &flash);
-    let urp = run(&mut r, &mut dark_room(), (FRAMES, URP), &flash);
+    let flash = |s: &mut Scene, f: u32| lamp(s, "Flash", (f == WARM + AT).then_some(30.0));
+    let held = run(
+        &mut r,
+        &mut anti_flicker(dark_room(), ON),
+        (FRAMES, 1.0),
+        &flash,
+    );
+    let urp = run(&mut r, &mut dark_room(), (FRAMES, 1.0), &flash);
     let lit = held[AT as usize]
         .iter()
         .zip(&held[AT as usize - 1])
@@ -111,13 +113,23 @@ const TRAIL: f32 = 1.0;
 fn gpu_a_cube_moving_under_a_flickering_ceiling_leaves_no_more_trail_than_urps() {
     let Some(mut r) = renderer() else { return };
     let none = &|_: &mut Scene, _: u32| {};
-    let mut trail = |rules| {
-        let moved = run(&mut r, &mut room(), (FRAMES, rules), &slide);
-        let empty = run(&mut r, &mut room(), (FRAMES, rules), none);
+    let mut trail = |value| {
+        let moved = run(
+            &mut r,
+            &mut anti_flicker(room(), value),
+            (FRAMES, 1.0),
+            &slide,
+        );
+        let empty = run(
+            &mut r,
+            &mut anti_flicker(room(), value),
+            (FRAMES, 1.0),
+            none,
+        );
         let last = moved.len() - 1;
         apart(&moved[last..], &empty[last..])
     };
-    let (held, urp) = (trail(Rules::default()), trail(URP));
+    let (held, urp) = (trail(ON), trail(0.0));
     eprintln!("[taa] the cube's trail, 4 frames after it left: {held:.1} held, {urp:.1} URP's");
     assert!(
         held <= urp + TRAIL,

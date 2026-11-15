@@ -1,7 +1,9 @@
-// engine/shaders/postfx/taa_flicker.wgsl — TAA's flicker hold (#2228), after HDRP's
+// engine/shaders/postfx/taa_flicker.wgsl — TAA's flicker hold (#2228), what the
+// camera's anti-flicker runs (`taa.wgsl`'s `_held` entry points), after HDRP's
 // anti-flicker and Unreal TSR's flickering luminance: a still pixel whose frame
 // keeps blinking under the jitter (an SSR or a specular outlier on some sub-pixel
-// offsets) keeps its history against the next blink instead of being clamped to it.
+// offsets) keeps its history's luma against the next blink instead of being
+// clamped to it.
 // The resolve's box is built from this frame alone (`taa.wgsl`), so an outlier as
 // wide as its own 3×3 is its own box, and a clamp hands it to the output at nearly
 // full depth.
@@ -10,10 +12,12 @@
 // A pixel's flicker is its largest blink lately, and what holds is the part of a
 // blink an earlier one already reached (its recurring flicker), each keeping
 // `decay` of itself a frame (`render::postfx::effects::taa::params`). So a lone
-// change is clamped as URP's is, both ways: a light switched on, a shadow or a
-// reflection crossing a still floor (on, then off frames later: no blink), and a
-// lone muzzle flash (one blink, recurring only as far as the pixel blinked
-// before). A moving or revealed pixel keeps no hold and forgets its flicker; a
+// change on a pixel that was not blinking is clamped as URP's is, both ways: a
+// light switched on, a shadow or a reflection crossing a still floor (on, then
+// off frames later: no blink), and a lone muzzle flash (one blink, recurring only
+// as far as the pixel blinked before: a pixel already blinking holds that much of
+// its end). A one-frame change repeated is held as a flicker is, from its third
+// time. A moving or revealed pixel keeps no hold and forgets its flicker; a
 // reactive one keeps no hold. Luma is URP's perceptual `y / (1 + y)` throughout,
 // so a bright pixel's blink counts as the eye sees it.
 

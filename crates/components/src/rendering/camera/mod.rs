@@ -150,6 +150,12 @@ pub struct CameraComponent {
     /// `0`..`1`; `0` (default) runs no sharpen, leaving the frame untouched.
     #[serde(default)]
     pub taa_contrast_adaptive_sharpening: f32,
+    /// TAA's *Anti-Flicker* (#2228, HDRP's): how far a still pixel whose frame keeps
+    /// blinking under the jitter holds its history against the blinks, `0`..`1`.
+    /// `0` (default) is URP's resolve exactly; above it, a one-frame change repeated
+    /// on a still pixel (a strobe, a fast gun's flashes on a wall) is softened too.
+    #[serde(default)]
+    pub taa_anti_flicker: f32,
     /// Perspective (the default) or orthographic — a top-down minimap (#430).
     #[serde(default)]
     pub projection: Projection,
@@ -239,6 +245,7 @@ impl Default for CameraComponent {
             taa_jitter_scale: default_taa_jitter_scale(),
             taa_mip_bias: 0.0,
             taa_contrast_adaptive_sharpening: 0.0,
+            taa_anti_flicker: 0.0,
             projection: Projection::Perspective,
             use_occlusion_culling: default_use_occlusion_culling(),
             target_texture: None,

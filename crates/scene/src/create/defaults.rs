@@ -156,6 +156,7 @@ pub fn default_camera() -> CameraComponent {
         taa_jitter_scale: 1.0,
         taa_mip_bias: 0.0,
         taa_contrast_adaptive_sharpening: 0.0,
+        taa_anti_flicker: 0.0,
         projection: Default::default(),
         use_occlusion_culling: true,
         target_texture: None,

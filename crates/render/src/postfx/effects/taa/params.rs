@@ -32,32 +32,29 @@
 //!   turn starts or stops, the input a keyboard-turned game sends all the time, so
 //!   the depth test stands in for it.
 //!
-//! **A flickering still pixel holds its history (#2228)**, after HDRP's
-//! anti-flicker and Unreal TSR's flickering luminance. URP's box is built from
-//! the current frame alone, so where some jitter offsets give a patch a very
-//! different value (an SSR reflection whose blur reaches a bright bulb on some
-//! offsets and not others, a specular glint), the patch is its own neighbourhood
-//! and the clamp hands that one frame to the output at nearly full depth: a still
-//! view blinks. The resolve keeps each pixel's frame luma (URP's perceptual
-//! `y / (1 + y)`) and its *flicker* in a history target of its own: a *blink* is a
-//! step undone on the very next frame (the smaller of the two), the flicker is the
-//! largest blink lately, and what holds is the part of a blink an earlier one
-//! already reached (its *recurring* flicker), each keeping [`FLICKER_DECAY`] of
-//! itself a frame. A still pixel's history may then sit up to [`FLICKER_HOLD`]
-//! times its recurring flicker outside the box (in perceptual luma, along the line
-//! from its clamp to where it was), so a blink that keeps coming back averages
-//! into the history as a still frame's jitter does. A lone change is clamped as
-//! URP's is, both ways: a light switched on, a shadow or a reflection crossing a
-//! still floor (on, then off frames later: no blink), a lone muzzle flash (one
-//! blink, recurring only as far as the pixel blinked before: an edge already
-//! blinking under the jitter keeps that much of the flash's end). What the hold
-//! costs is a one-frame change repeated within half a second on a still pixel (a
-//! strobe, a fast gun's flashes on a wall), softened from its second time as a
-//! flicker is. A moving or revealed pixel keeps no hold and forgets its flicker,
-//! a reactive one keeps no hold, so nothing that moves ghosts more.
+//! A still pixel (under [`STILL_PIXELS`] of motion, nothing revealed) blends
+//! exactly as URP's does.
 //!
-//! A still pixel (under [`STILL_PIXELS`] of motion, nothing revealed) that has not
-//! flickered blends exactly as URP's does.
+//! **With the camera's anti-flicker on (#2228, HDRP's *Anti-Flicker*), a
+//! flickering still pixel holds its history**, after HDRP's anti-flicker and Unreal
+//! TSR's flickering luminance. URP's box is built from the current frame alone, so
+//! where some jitter offsets give a patch a very different value (an SSR
+//! reflection whose blur reaches a bright bulb on some offsets and not others, a
+//! specular glint), the patch is its own neighbourhood and the clamp hands that one
+//! frame to the output at nearly full depth: a still view blinks. The held resolve
+//! keeps each pixel's frame luma (URP's perceptual `y / (1 + y)`) and its *flicker*
+//! in a history target of its own: a *blink* is a step undone on the very next frame
+//! (the smaller of the two), the flicker is the largest blink lately, and what holds
+//! is the part of a blink an earlier one already reached (its *recurring*
+//! flicker), each keeping [`FLICKER_DECAY`] of itself a frame. A still pixel's
+//! history luma may then sit up to [`FLICKER_HOLD`] × the anti-flicker times its
+//! recurring flicker outside the box (in perceptual luma, along the line from its
+//! clamp to where it was); its chroma stays the box's. A moving or revealed pixel
+//! keeps no hold and forgets its flicker, a reactive one keeps no hold. What it
+//! costs, a one-frame change repeated on a still pixel (a strobe, a fast gun's
+//! flashes on a wall) held as a flicker is, is measured in `gpu/flicker/` and told
+//! in `docs/api/Graphics.md`, *Anti-Flicker*. At 0 (the default) the plain resolve
+//! runs, reading and writing none of it.
 
 use glam::Vec2;
 
@@ -97,12 +94,13 @@ pub(crate) const DISOCCLUSION_FULL: f32 = 0.25;
 /// What a pixel's flicker keeps of itself each frame (#2228): ours. A jitter
 /// outlier recurs within the Halton (2, 3) sequence's 2- and 3-frame cycles (8
 /// times in 27 frames, at most 5 apart, on the case that found it); at 0.9 a
-/// swing still counts for 59 % five frames on, and for under 4 % after 31 frames,
-/// half a second.
+/// swing still counts for 59 % five frames on, and for under 4 % after 31
+/// rendered frames.
 pub(crate) const FLICKER_DECAY: f32 = 0.9;
-/// How many times its flicker a still pixel's history may sit outside the box
-/// (#2228): ours, measured on the primitive case (`gpu/flicker/`): 2 left half
-/// the swing, 4 a third of it, a few levels over the scene's own without SSR.
+/// How many times its recurring flicker a still pixel's history luma may sit
+/// outside the box at anti-flicker 1 (#2228; the camera's value scales it): ours,
+/// measured on the primitive case (`gpu/flicker/`): 2 left half the swing, 4 a
+/// third of it, a few levels over the scene's own without SSR.
 pub(crate) const FLICKER_HOLD: f32 = 4.0;
 
 // The shader divides by both ramps' spans, and a moving pixel weighs more than a
@@ -150,14 +148,16 @@ pub(super) fn lenses(stack: &[Camera], aspect: f32) -> [[f32; 4]; MAX_CAMERAS] {
 
 /// The camera's TAA knobs the resolve reads (#1847): the still pixel's frame
 /// influence (`1 - base_blend`), the variance clamp scale and the quality level's
-/// steps ([`levels`]). URP's defaults reduce to the constants [`FRAME_INFLUENCE`],
-/// [`VARIANCE_CLAMP_SCALE`] and `High`, so a camera left at its defaults resolves
-/// bit for bit as before (#1847).
+/// steps ([`levels`]), and the anti-flicker (#2228), `0`..`1`. URP's defaults
+/// reduce to the constants [`FRAME_INFLUENCE`], [`VARIANCE_CLAMP_SCALE`], `High`
+/// and no anti-flicker, so a camera left at its defaults resolves bit for bit as
+/// before (#1847).
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct TaaTune {
     pub frame_influence: f32,
     pub variance_clamp_scale: f32,
     pub levels: [f32; 4],
+    pub anti_flicker: f32,
 }
 
 impl TaaTune {
@@ -167,6 +167,7 @@ impl TaaTune {
             frame_influence: (1.0 - cam.taa_base_blend_factor).clamp(0.0, 1.0),
             variance_clamp_scale: cam.taa_variance_clamp_scale,
             levels: levels(cam.taa_quality),
+            anti_flicker: cam.taa_anti_flicker.clamp(0.0, 1.0),
         }
     }
 }
@@ -178,6 +179,7 @@ impl Default for TaaTune {
             frame_influence: FRAME_INFLUENCE,
             variance_clamp_scale: VARIANCE_CLAMP_SCALE,
             levels: levels(rusty_components::TaaQuality::default()),
+            anti_flicker: 0.0,
         }
     }
 }
@@ -238,14 +240,13 @@ impl TaaParams {
                 DISOCCLUSION_START,
                 DISOCCLUSION_FULL,
             ],
-            flicker: [FLICKER_DECAY, FLICKER_HOLD, 0.0, 0.0],
+            flicker: [FLICKER_DECAY, FLICKER_HOLD * tune.anti_flicker, 0.0, 0.0],
             lenses,
         }
     }
 
-    /// The same frame with rules off, for a test: a moving pixel weighs a still
-    /// one's, `moving` false; no gap reads as a reveal, `reveal` false; no flicker
-    /// holds a history, `flicker` false (#2228).
+    /// The same frame with #1846's two rules off, for a test: a moving pixel weighs
+    /// a still one's, `moving` false, and no gap reads as a reveal, `reveal` false.
     #[cfg(test)]
     pub(super) fn without(mut self, rules: Rules) -> Self {
         if !rules.moving {
@@ -255,22 +256,17 @@ impl TaaParams {
             // Out of reach of any gap, yet a finite span to divide by.
             self.rejection[2..4].copy_from_slice(&[1e30, 2e30]);
         }
-        if !rules.flicker {
-            self.flicker[1] = 0.0;
-        }
         self
     }
 }
 
-/// Which of the resolve's rules beyond URP's (#1846's two, #2228's flicker hold) a
-/// view's resolve keeps, for a test that compares a frame with one
-/// ([`TaaParams::without`]).
+/// Which of #1846's rules a view's resolve keeps, for a test that compares a frame
+/// with one ([`TaaParams::without`]).
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Rules {
     pub moving: bool,
     pub reveal: bool,
-    pub flicker: bool,
 }
 
 #[cfg(test)]
@@ -279,7 +275,6 @@ impl Default for Rules {
         Self {
             moving: true,
             reveal: true,
-            flicker: true,
         }
     }
 }

@@ -37,18 +37,21 @@ pub(crate) struct TaaFrame {
 pub(crate) const SURFACE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg16Float;
 
 /// What [`TaaHistory::flickers`] holds: four half floats a pixel, what holds a
-/// flickering still pixel's history (#2228, [`super::params::FLICKER_DECAY`]): its
-/// frame's perceptual luma, its last step, its flicker and how much of it recurs.
+/// flickering still pixel's history under the camera's anti-flicker (#2228,
+/// [`super::params::FLICKER_DECAY`]): its frame's perceptual luma, its last step,
+/// its flicker and how much of it recurs.
 pub(crate) const FLICKER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
 /// One view's TAA state while it runs: the two history targets, where the jitter
 /// sequence is and whether the history holds a resolved frame.
 ///
 /// **Memory, per TAA camera** at the history's size (the output's when
-/// upscaling): two HDR colour frames (8 bytes a pixel each), two surface
-/// frames (4 bytes each, #1846) and two flicker frames (8 bytes each, #2228), 40
-/// bytes a pixel: 83 MB at 1920×1080, 332 MB at 3840×2160; and at the scene's size the reactive mask (2 bytes a pixel, #1845):
-/// 4 MB at 1920×1080. The level's size (a Dust2-sized map or a room) changes none of it.
+/// upscaling): two HDR colour frames (8 bytes a pixel each) and two surface
+/// frames (4 bytes each, #1846), 24 bytes a pixel: 50 MB at 1920×1080, 199 MB at
+/// 3840×2160; with the camera's anti-flicker on, two flicker frames (8 bytes each,
+/// #2228) more, 40 bytes a pixel: 83 MB at 1920×1080; and at the scene's size the
+/// reactive mask (2 bytes a pixel, #1845): 4 MB at 1920×1080. The level's size (a
+/// Dust2-sized map or a room) changes none of it.
 pub(crate) struct TaaHistory {
     /// The history's size: the scene's when resolving, the output's when upscaling.
     pub(super) size: (u32, u32),
@@ -67,9 +70,10 @@ pub(crate) struct TaaHistory {
     pub(super) surfaces: [PfxTarget; 2],
     /// Beside each of `frames`, each pixel's flicker as that resolve left it
     /// ([`FLICKER_FORMAT`]): what lets a still pixel whose frame keeps blinking
-    /// under the jitter hold its history (#2228). Made, dropped and reset with
-    /// `frames`, as `surfaces` are.
-    pub(super) flickers: [PfxTarget; 2],
+    /// under the jitter hold its history (#2228). Held only while the camera's
+    /// anti-flicker is on ([`TaaHistory::hold_flickers`]); dropped with `frames`,
+    /// and a cut resets it as it does them (the first resolve after writes none).
+    pub(super) flickers: Option<[PfxTarget; 2]>,
     /// The reactive mask the translucents write this frame, at the scene's size
     /// ([`super::reactive`], #1845); cleared after each resolve.
     pub(super) reactive: PfxTarget,
@@ -103,7 +107,6 @@ impl TaaHistory {
     ) -> Self {
         let frame = |label| PostFx::target(device, w, h, label, HDR_FORMAT);
         let surface = |label| PostFx::target(device, w, h, label, SURFACE_FORMAT);
-        let flicker = |label| PostFx::target(device, w, h, label, FLICKER_FORMAT);
         Self {
             size: (w, h),
             upscale,
@@ -111,7 +114,7 @@ impl TaaHistory {
             pixels: Vec2::ZERO,
             frames: [frame("TAA History A"), frame("TAA History B")],
             surfaces: [surface("TAA Surfaces A"), surface("TAA Surfaces B")],
-            flickers: [flicker("TAA Flickers A"), flicker("TAA Flickers B")],
+            flickers: None,
             reactive: super::reactive::create(device, scene),
             scene,
             reactive_drawn: Default::default(),
@@ -127,6 +130,21 @@ impl TaaHistory {
             ran: false,
             #[cfg(test)]
             rules: Default::default(),
+        }
+    }
+
+    /// Hold the flicker frames when `on` (the camera's anti-flicker above 0), made
+    /// at the history's size and starting at zero (no flicker yet); drop them when
+    /// not, so a camera at 0 pays nothing for them.
+    pub(super) fn hold_flickers(&mut self, device: &wgpu::Device, on: bool) {
+        match (on, self.flickers.is_some()) {
+            (true, false) => {
+                let (w, h) = self.size;
+                let flicker = |label| PostFx::target(device, w, h, label, FLICKER_FORMAT);
+                self.flickers = Some([flicker("TAA Flickers A"), flicker("TAA Flickers B")]);
+            }
+            (false, true) => self.flickers = None,
+            _ => {}
         }
     }
 

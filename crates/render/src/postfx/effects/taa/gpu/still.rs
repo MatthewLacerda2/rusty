@@ -15,18 +15,15 @@ use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_core::settings::render_scale::RenderScale;
 use rusty_scene::{Camera, Scene};
 
-/// #1846's two rules off: URP's resolve, with #2228's flicker hold as on both
-/// sides of a comparison.
+/// Both rules off: URP's resolve.
 pub(crate) const OFF: Rules = Rules {
     moving: false,
     reveal: false,
-    flicker: true,
 };
 /// The reveal test off, the moving pixel's weight kept.
 pub(super) const NO_REVEAL: Rules = Rules {
     moving: true,
     reveal: false,
-    flicker: true,
 };
 
 /// The last of `n` frames of `scene` in `v`, frame `f` through `cam(f)`, the

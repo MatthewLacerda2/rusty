@@ -61,6 +61,7 @@ fn the_taa_camera_knobs_round_trip_through_save_and_load() {
         taa_jitter_scale: 0.5,
         taa_mip_bias: -0.5,
         taa_contrast_adaptive_sharpening: 0.7,
+        taa_anti_flicker: 0.4,
         ..CameraComponent::default()
     };
     scene.world.set_camera(id, Some(cam.clone()));
@@ -76,6 +77,7 @@ fn the_taa_camera_knobs_round_trip_through_save_and_load() {
     assert_eq!(held.taa_jitter_scale, 0.5);
     assert_eq!(held.taa_mip_bias, -0.5);
     assert_eq!(held.taa_contrast_adaptive_sharpening, 0.7);
+    assert_eq!(held.taa_anti_flicker, 0.4);
 }
 
 #[test]
