@@ -3,7 +3,8 @@
 # cargo-deny never see it: running libFuzzer is nightly-only. Its compile is
 # still a gate, on the pinned stable toolchain: `make fuzz-check` (CI's
 # `fuzz-check` job), against `Cargo.lock` here, which `make fuzz-lock`
-# re-resolves from the root lock. Run it on demand:
+# re-resolves from the root lock and `make fuzz-lock-sync` holds in step with
+# it. Run it on demand:
 #   cargo +nightly fuzz run scene_deserialize
 [package]
 name = "rusty-fuzz"

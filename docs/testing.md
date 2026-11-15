@@ -1117,10 +1117,14 @@ Running libFuzzer is **nightly-only**, so `fuzz/` is its own workspace —
 deliberately out of the root build, the determinism guard and `cargo-deny` (the
 size gate and the `--rules` checks still scan it). Its build is a gate all the
 same: `make fuzz-check` compiles the target on the pinned stable toolchain against
-the committed `fuzz/Cargo.lock` (`--locked`), in `make gates` and in CI's
-`fuzz-check` job, so an engine rename it imports through turns a PR red. When a
-member's dependencies change, `make fuzz-lock` re-resolves that lock from the root
-one, so the target builds the versions the root's gates prove. The fuzzing itself
+the committed `fuzz/Cargo.lock` (`--locked`), into `target/fuzz`, so an engine
+rename it imports through turns a PR red. It is a second cold engine build, so CI's
+`fuzz-check` job and `make gates` run it only when the diff matches `ci.yml`'s
+`fuzz` filter (and print that they skipped otherwise); by name it always runs.
+`make fuzz-lock-sync` (a quick gate, no build) fails when the fuzz lock pins a
+version the root lock no longer does, as after a lockfile-only Dependabot bump;
+`make fuzz-lock` then re-resolves it from the root one, so the target builds the
+versions the root's gates prove. The fuzzing itself
 is **local-first / on-demand**:
 
 ```

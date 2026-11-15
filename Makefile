@@ -32,7 +32,7 @@ export PROPTEST_RNG_SEED ?= $(PROPTEST_SEED)
 # `deny` sits last: its failures are about dependencies (and it needs the network),
 # so a code failure reports first. GATES is exactly the two lists joined —
 # `make scripts` (test_gate_mirror.py) fails when it is anything else.
-QUICK_GATES := fmt size rules layers determinism components parity test-lint scripts feature-split player-tree docrefs
+QUICK_GATES := fmt size rules layers determinism components parity test-lint scripts feature-split player-tree docrefs fuzz-lock-sync
 HEAVY_GATES := clippy doc test fuzz-check deny
 GATES := $(QUICK_GATES) $(HEAVY_GATES)
 # Checks on the gate runner itself, run before any gate.
@@ -77,6 +77,9 @@ compile-cache: ## Switch the worktrees' compile cache on (needs sccache); rerun 
 		'SCCACHE_CACHE_SIZE = "$(CACHE_SIZE)"' > "$(CACHE_CONFIG)" && \
 	echo "compile-cache: on for every worktree ($(CACHE_CONFIG), cap $(CACHE_SIZE))"
 
+# Under `make gates`, `fuzz-check` builds only when the diff can break the fuzz
+# build, as CI's job does; `make fuzz-check` by name always builds.
+gates: FUZZ_CHECK := --if-changed
 gates: $(SELF_CHECKS) $(GATES) ## Everything CI blocks on, fastest-failing first
 	@echo "gates: all green"
 
@@ -212,20 +215,23 @@ bless-converters: ## Re-bless crates/asset/src/convert/fingerprints.txt after a 
 
 # `fuzz/` is its own workspace, so no other gate compiles it: this one does, on the
 # pinned stable toolchain (a check builds libfuzzer-sys; only *running* it needs
-# nightly, docs/testing.md). `--locked` holds `fuzz/Cargo.lock`: a dependency a
-# member's manifest adds or bumps fails here until `make fuzz-lock` re-resolves it.
+# nightly, docs/testing.md), against `fuzz/Cargo.lock` (`--locked`), into
+# `target/fuzz`. `FUZZ_CHECK=--if-changed` (what `make gates` sets) skips it unless
+# the branch's diff matches ci.yml's `fuzz` filter. The script holds the hint.
 fuzz-check: ## [gate] The fuzz target (fuzz/, its own workspace) still compiles, against its committed lock
-	@cargo check --manifest-path fuzz/Cargo.toml --locked || { \
-		echo "fuzz-check: fuzz/ does not build. A lock error: run \`make fuzz-lock\` and commit fuzz/Cargo.lock."; \
-		echo "  A compile error: fix fuzz/fuzz_targets/ to the engine's current API (src/lib.rs re-exports it)."; \
-		exit 1; }
+	python3 .github/scripts/fuzz_gate.py check $(FUZZ_CHECK)
 
-# Seeded from the root lock, then pruned to what fuzz/ needs, so the target builds
-# the very versions the root's gates (and cargo-deny) prove; only the fuzz-only
-# crates (libfuzzer-sys, arbitrary) are resolved fresh.
+# Build-free: Dependabot's lockfile-only bumps edit the root lock alone.
+fuzz-lock-sync: ## [gate] fuzz/Cargo.lock pins only versions the root Cargo.lock pins (else `make fuzz-lock`)
+	python3 .github/scripts/fuzz_gate.py sync
+
+# Seeded from the root lock, then pruned to what fuzz/ needs (`cargo metadata`
+# re-resolves without compiling), so the target builds the very versions the
+# root's gates (and cargo-deny) prove; only the fuzz-only crates (libfuzzer-sys,
+# arbitrary) are resolved fresh.
 fuzz-lock: ## Re-resolve fuzz/Cargo.lock from the root Cargo.lock, after a member's dependencies change
 	cp Cargo.lock fuzz/Cargo.lock
-	cargo check --manifest-path fuzz/Cargo.toml
+	cargo metadata --manifest-path fuzz/Cargo.toml --format-version 1 >/dev/null
 
 # The git CLI fetches the advisory DB: cargo-deny's built-in fetcher can't get
 # through the cloud sessions' proxy, and the CLI works everywhere else too.

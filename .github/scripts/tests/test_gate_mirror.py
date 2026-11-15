@@ -90,6 +90,16 @@ class Mirror(unittest.TestCase):
         self.assertEqual(gate_mirror.makefile_gates(makefile)["deny"], ["cargo deny check bans"])
         self.assertEqual(gaps(makefile=makefile), [])
 
+    def test_a_command_after_an_or_on_the_same_line_is_still_held(self):
+        makefile = MAKEFILE.replace("\tcargo deny check bans", "\tcargo deny check bans || rc=1; cargo deny check licenses || rc=1")
+        self.assertEqual(len(gaps(makefile=makefile)), 1)
+
+    def test_a_ci_step_running_make_gate_covers_its_recipe(self):
+        workflow = WORKFLOW.replace("run: cargo run --manifest-path tools/lint/Cargo.toml --verbose", "run: make size")
+        self.assertEqual(gaps(workflow=workflow), [])
+        self.assertEqual(gaps(workflow=workflow.replace("run: make size", "run: make sizes")), [
+            ("size", "cargo run --quiet --manifest-path tools/lint/Cargo.toml")])
+
     def test_the_tool_presence_check_is_not_a_command(self):
         self.assertEqual(gate_mirror.makefile_gates(MAKEFILE)["deny"], ["cargo deny check bans"])
 

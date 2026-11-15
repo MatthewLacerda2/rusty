@@ -147,6 +147,12 @@ jobs:
       - name: Player tree (the --no-default-features build links no editor, dev or HTTP crate)
         if: needs.changes.outputs.code != 'false'
         run: python3 .github/scripts/player_tree.py
+      # Dependabot's lockfile-only bumps edit the root lock alone, and ci.yml's
+      # `fuzz` filter does not list it: this is what makes such a PR say
+      # `make fuzz-lock` instead of leaving fuzz/ on the old versions. Reads two files.
+      - name: Fuzz lock in step (fuzz/Cargo.lock pins only versions the root lock pins)
+        if: needs.changes.outputs.code != 'false'
+        run: python3 .github/scripts/fuzz_gate.py sync
       # Clippy is a HARD gate: every warning fails CI, for every feature set.
       # The 50-line function cap (clippy::too_many_lines, threshold in clippy.toml)
       # is denied crate-wide in Cargo.toml's [lints] table (#485). The legacy burn-down
