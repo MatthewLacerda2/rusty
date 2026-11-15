@@ -7,7 +7,7 @@ use rusty_app::GameWorld;
 use rusty_core::application::Gizmo;
 use rusty_ecs::World;
 use rusty_editor::viewport::rect_tool::{self, OverlayFrame};
-use rusty_editor::viewport::{gizmo, pick};
+use rusty_editor::viewport::{game_size, gizmo, pick};
 use rusty_editor::{EditorUi, ViewportInteraction, ViewportTab};
 use rusty_render::RenderView;
 use rusty_scene::Scene;
@@ -67,14 +67,12 @@ impl EditorFrontend {
             return;
         };
         let scene_tab = interaction.tab == ViewportTab::Scene;
-        let (px, py) = match self.demo_size() {
-            // A demo replays on the size it recorded, drawn letterboxed (#1598).
-            Some(size) if !scene_tab => size,
-            _ => panel,
-        };
+        // The Game view's own size, letterboxed: a demo's (#1598) or the dropdown's (#2207).
+        let (px, py) = interaction.render.unwrap_or(panel);
         if self.demo_size().is_none() {
-            // The UI lays out on the game view's pixel size (#417) — a sim input.
-            game.resources.screen.borrow_mut().set_game_view(px, py);
+            // The UI lays out on the Game view's own size (#417), behind either tab.
+            let (sx, sy) = interaction.screen.unwrap_or(panel);
+            game.resources.screen.borrow_mut().set_game_view(sx, sy);
         }
         // Create-or-resize this tab's own view. A view's resize guard checks its own
         // size, so it never fights the other tab's or the preview's (#355). The Game
@@ -100,6 +98,7 @@ impl EditorFrontend {
         }
         view.game_gizmos = !scene_tab && view.gizmos.on(Gizmo::GameGizmos);
         view.ui.screen_in_editor = scene_tab && view.gizmos.on(Gizmo::Ui);
+        view.ui.screen_box = game_size::overlay_box(interaction, (px, py));
         view.set_pixel_scale(pixels_per_point);
         let camera = viewport_camera(&self.editor_ui, game, &scene, interaction.tab);
         renderer.set_ui_textures(std::rc::Rc::clone(
@@ -203,11 +202,7 @@ impl EditorFrontend {
         let camera = ui.scene_view.camera.camera();
         let ray = pick::ray_from_ndc(&camera, aspect, ndc_x, ndc_y);
         let mut scene = game.scene().borrow_mut();
-        let frame = OverlayFrame {
-            size: glam::Vec2::new(size.x, size.y),
-            pixels_per_point,
-            textures: std::rc::Rc::clone(&ui.ui_textures),
-        };
+        let frame = game_size::overlay_frame(interaction, pixels_per_point, &ui.ui_textures);
         let point = glam::Vec2::new(local.x, local.y);
 
         // 1. Continue or start a rect-tool drag, else a gizmo drag, on the selection.

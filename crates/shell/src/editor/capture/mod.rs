@@ -29,7 +29,7 @@ use std::{cell::RefCell, path::Path, rc::Rc};
 pub use demo::capture_demo;
 pub(super) use paint::paint;
 use rusty_app::{GameWorld, ProjectSource};
-use rusty_core::application::{Gizmo, SceneGizmos};
+use rusty_core::application::{GameViewSetting, Gizmo, SceneGizmos};
 use rusty_core::input::InputState;
 use rusty_dev::capture::CaptureHost;
 use rusty_editor::{viewport::scene_nav::selection_bounds, EditorUi, ViewportTab};
@@ -69,6 +69,8 @@ pub struct EditorCaptureOptions {
     pub pointer: Option<(f32, f32)>,
     /// The Scene view's gizmos (#1909), as its toggles or `Editor.SetGizmo` set them.
     pub gizmos: SceneGizmos,
+    /// The Game view's size (#2207), as its dropdown or `Editor.SetGameViewSize` sets it.
+    pub game_view: GameViewSetting,
 }
 
 impl Default for EditorCaptureOptions {
@@ -84,6 +86,7 @@ impl Default for EditorCaptureOptions {
             tab: ViewportTab::Scene,
             pointer: None,
             gizmos: SceneGizmos::default(),
+            game_view: GameViewSetting::default(),
         }
     }
 }
@@ -160,8 +163,8 @@ fn capture_with(
                 .push(egui::Event::PointerMoved(egui::pos2(x, y)));
         }
         ctx.begin_pass(input);
-        let size = draw_ui(ui, &ctx, game, opts.playing, texture_id);
-        render_viewport(host, &mut egui_renderer, game, ui, size, &mut texture_id);
+        let drawn = draw_ui(ui, &ctx, game, opts.playing, texture_id);
+        render_viewport(host, &mut egui_renderer, game, ui, drawn, &mut texture_id);
         output = Some(ctx.end_pass());
         // Upload font atlas / image deltas every frame: egui sends each only once.
         let renderer = host.renderer(width, height).expect("probed above");
@@ -188,7 +191,7 @@ fn initial_ui(game: &GameWorld, opts: &EditorCaptureOptions) -> Result<EditorUi,
     game.refresh_ui_textures();
     super::sync_ui_textures(&mut ui, game);
     ui.viewport_tab = opts.tab;
-    ui.gizmos = opts.gizmos;
+    (ui.gizmos, ui.game_view) = (opts.gizmos, opts.game_view);
     if let Some(name) = &opts.select {
         let id = game.scene().borrow().find_entity_by_name(name);
         ui.selected_entity_id = Some(id.ok_or_else(|| format!("no entity named {name:?}"))?);
@@ -221,27 +224,26 @@ pub(super) fn raw_input(width: u32, height: u32, frame: u32) -> egui::RawInput {
     }
 }
 
-/// Run the editor's own draw over the live cells; returns the viewport rect's size.
+/// Run the editor's own draw over the live cells; returns the viewport's interaction.
 fn draw_ui(
     ui: &mut EditorUi,
     ctx: &egui::Context,
     game: &GameWorld,
     playing: bool,
     texture_id: Option<egui::TextureId>,
-) -> egui::Vec2 {
+) -> rusty_editor::ViewportInteraction {
     let mut is_playing = playing;
     // A capture records no window frames: its GPU line reads "nothing drawn yet".
     let clock = rusty_editor::viewport::stats::Clock::at(60.0);
     super::sync::sync_stats(ui, game, clock, false);
-    let interaction = ui.draw(
+    ui.draw(
         ctx,
         &mut game.world.scene.borrow_mut(),
         &mut game.resources.console.borrow_mut(),
         &mut game.resources.nav.borrow_mut(),
         &mut is_playing,
         texture_id,
-    );
-    interaction.size
+    )
 }
 
 /// `shell::editor`'s `render_viewport_scene` against the capture host: draw, then bind.
@@ -250,19 +252,21 @@ fn render_viewport(
     egui_renderer: &mut egui_wgpu::Renderer,
     game: &GameWorld,
     ui: &EditorUi,
-    size: egui::Vec2,
+    drawn: rusty_editor::ViewportInteraction,
     texture_id: &mut Option<egui::TextureId>,
 ) {
     let scene_tab = ui.viewport_tab == ViewportTab::Scene;
-    let (px, py) = match ui.demo_size() {
-        Some(size) if !scene_tab => size, // the demo's own, letterboxed (#1598)
-        _ => (size.x.round() as u32, size.y.round() as u32),
-    };
+    // The Game view's own size, letterboxed: a demo's (#1598) or the dropdown's (#2207).
+    let size = drawn.size;
+    let panel = (size.x.round() as u32, size.y.round() as u32);
+    let (px, py) = drawn.render.unwrap_or(panel);
     if px == 0 || py == 0 {
         return;
     }
     if ui.demo_size().is_none() {
-        game.resources.screen.borrow_mut().set_game_view(px, py);
+        // The Game view's own size behind the Scene tab too, as the window's (#2207).
+        let (sx, sy) = drawn.screen.unwrap_or(panel);
+        game.resources.screen.borrow_mut().set_game_view(sx, sy);
     }
     // The settings first: the Game view's scene renders at the render scale (#1498).
     let Some(renderer) = host.renderer(px, py) else {
@@ -286,6 +290,7 @@ fn render_viewport(
         super::navmesh::hand(renderer, &view.gizmos, &game.resources.nav.borrow());
     }
     view.ui.screen_in_editor = scene_tab && ui.gizmos.on(Gizmo::Ui);
+    view.ui.screen_box = rusty_editor::viewport::game_size::overlay_box(&drawn, (px, py));
     view.game_gizmos = !scene_tab && ui.gizmos.on(Gizmo::GameGizmos);
     let camera = super::viewport::viewport_camera(ui, game, &scene, ui.viewport_tab);
     renderer.set_ui_textures(Rc::clone(&ui.ui_textures));
