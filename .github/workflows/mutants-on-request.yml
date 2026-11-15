@@ -108,6 +108,10 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    # Read by `no-answer`, below: set once this job reached its comment, so a
+    # job that ran its steps never gets a second line from there.
+    outputs:
+      answered: ${{ steps.post.outputs.answered }}
     # One runner: a request is a file or a branch's diff, usually tens of
     # mutants at ~3.7 min each caught (~12.5 min for a missed one, which runs
     # the whole suite). A scope too big for the budget below is stopped
@@ -209,13 +213,17 @@ jobs:
       # half of what is left (#2201): given all of it, the engine's baseline
       # then started with no budget and overran the job's limit, and a job
       # killed at its limit runs no later step, so nothing was posted.
+      # The memory cap and core dumps off as in every mutation step
+      # (`mutants-sweep.yml` says why): a scanner mutant that loops pushing
+      # onto a `Vec` reaches the cap in seconds, and with a core to write it
+      # outlived its timeout and took the runner down (#2230).
       - name: Standalone workspaces
         if: steps.plan.outputs.standalone != '0'
         env:
           ENGINE: ${{ steps.plan.outputs.in_scope }}
         run: |
           set -uo pipefail
-          ulimit -v 8388608
+          ulimit -v 8388608 -c 0
           python3 .github/scripts/mutants-scope.py parts plan.json --standalone --planned | while read -r slug root diff; do
             budget=$(( BUDGET_SECONDS - ($(date +%s) - JOB_STARTED) ))
             [ "$ENGINE" = 0 ] || budget=$(( budget / 2 ))
@@ -262,7 +270,7 @@ jobs:
         if: steps.plan.outputs.in_scope != '0'
         run: |
           set -euo pipefail
-          ulimit -v 8388608
+          ulimit -v 8388608 -c 0
           left() { echo $(( BUDGET_SECONDS - ($(date +%s) - JOB_STARTED) )); }
           spent() {
             echo "::warning::the ${BUDGET_SECONDS}s budget ran out $1; no engine mutant ran"
@@ -302,7 +310,7 @@ jobs:
           # The baseline already wrote `status-root` when it stopped at the budget.
           [ -n "$TIMEOUT" ] || exit 0
           budget=$(( BUDGET_SECONDS - ($(date +%s) - JOB_STARTED) ))
-          ulimit -v 8388608
+          ulimit -v 8388608 -c 0
           rc=0
           if [ "$budget" -le 0 ]; then
             echo "::warning::setup and the baseline spent the ${BUDGET_SECONDS}s budget; no mutant ran"
@@ -342,8 +350,9 @@ jobs:
       # the comment's earlier report (`--append`), never over it, and the run
       # stays red. Not on a cancel: a cancelled run was superseded by a newer
       # dispatch or its pull request closed unmerged (#1530), and nobody reads
-      # it. A job killed at `timeout-minutes` runs no step at all, which is why
-      # the budget above stops every part, the baseline included, before it.
+      # it. A job killed at `timeout-minutes`, or whose runner died, runs no
+      # later step at all: the budget above stops every part, the baseline
+      # included, before the limit, and the `no-answer` job covers the rest.
       - name: Say why there is no answer
         id: why
         if: failure() && hashFiles('report/report.md') == ''
@@ -362,6 +371,7 @@ jobs:
           python3 .github/scripts/mutants-report.py --unanswered "$why" --out report
 
       - name: Post the report on the pull request
+        id: post
         if: success() || failure()
         continue-on-error: true
         env:
@@ -372,6 +382,7 @@ jobs:
           APPEND: ${{ steps.why.outcome == 'success' && '--append' || '' }}
         run: |
           [ -f report/report.md ] || { echo "no report was written; nothing to post"; exit 0; }
+          echo answered=true >> "$GITHUB_OUTPUT"
           python3 .github/scripts/mutants-pr-comment.py report/report.md $APPEND \
             --repo "$GITHUB_REPOSITORY" --branch "$BRANCH" --run-url "$RUN_URL" ${PR:+--pr "$PR"}
 
@@ -383,4 +394,71 @@ jobs:
           name: mutants-report
           path: report/
           if-no-files-found: warn
+          retention-days: 14
+
+  # A torn-down mutation job still answers (#2230). When its runner dies (a
+  # mutant that grew without bound took its memory, "lost communication with
+  # the server") or it is killed at `timeout-minutes`, no step of its own runs,
+  # so `Say why there is no answer` cannot. A job that `needs:` it still runs,
+  # and reads what happened from outside: the run's jobs and their annotations
+  # (`mutants-torn-down.py`), then posts that line on the pull request, below
+  # any earlier report, and keeps it as the `mutants-report` artifact
+  # `make mutants-remote` prints.
+  #
+  # It tells a torn-down job from one whose steps ran by the `answered` output:
+  # a torn-down job has no outputs at all, whatever it set before it died, and
+  # one that reached its comment step set it. Never on a green run (the
+  # mutation job's result) and never on a cancelled run (`!cancelled()`: a
+  # superseded dispatch or a pull request closed unmerged, read by nobody). A
+  # job past `timeout-minutes` reads `cancelled` too, but the run is not
+  # cancelled, so it is covered. The run is red already when this runs, so it
+  # cannot turn a green run red. Measured on a throwaway workflow: a job killed
+  # at its limit reads `cancelled` with no outputs, one whose runner was killed
+  # reads `failure` with none, and a failed job whose steps ran keeps them.
+  # One case no guard closes: a runner that dies after `Post the report` loses
+  # `answered` too, so this line can land below a real report; the line it
+  # posts says a report above it is the truth.
+  no-answer:
+    needs: mutants
+    if: always() && !cancelled() && needs.mutants.result != 'success' && needs.mutants.result != 'skipped' && needs.mutants.outputs.answered != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      checks: read
+      pull-requests: write
+    steps:
+      # The workflow's own commit (the default ref), not `inputs.commit`: these
+      # are the scripts that know this job.
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+      - name: Say why there is no answer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          why=$(python3 .github/scripts/mutants-torn-down.py --repo "$GITHUB_REPOSITORY" --run "$GITHUB_RUN_ID" --job mutants) \
+            || why="the mutation job was torn down before it could write a report."
+          echo "::error::$why"
+          why="$why If a report stands above this line, that report is the truth: its runner died after posting it."
+          python3 .github/scripts/mutants-report.py --unanswered "$why" --out report
+          cat report/report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Post it on the pull request
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PR: ${{ inputs.pr }}
+        run: |
+          python3 .github/scripts/mutants-pr-comment.py report/report.md --append \
+            --repo "$GITHUB_REPOSITORY" --branch "$BRANCH" --run-url "$RUN_URL" ${PR:+--pr "$PR"}
+      - name: Keep it
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutants-report
+          path: report/
+          # The mutation job may have uploaded its own before its runner died.
+          overwrite: true
           retention-days: 14
