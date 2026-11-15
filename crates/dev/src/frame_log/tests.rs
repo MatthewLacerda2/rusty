@@ -26,12 +26,8 @@ fn a_cut_last_line_is_skipped() {
     let dir = rusty_test_support::temp::dir();
     segment(&dir, 0, &[r#"{"ch":"frames","t":1,"ms":16}"#]);
     let mut out = std::fs::File::create(writer::segment_path(&dir, 1)).unwrap();
-    write!(
-        out,
-        "{}\n{}",
-        r#"{"ch":"frames","t":2,"ms":16}"#, r#"{"ch":"fra"#
-    )
-    .unwrap();
+    let cut = concat!(r#"{"ch":"frames","t":2,"ms":16}"#, "\n", r#"{"ch":"fra"#);
+    out.write_all(cut.as_bytes()).unwrap();
     let got = read(&dir, &LogQuery::default(), 10);
     assert_eq!((ts(&got), got.skipped), (vec![1, 2], 1));
 }

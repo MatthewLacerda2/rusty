@@ -64,12 +64,13 @@ where
             return;
         };
         window.set_title(&launch.title);
-        #[cfg_attr(not(feature = "dev"), allow(unused_mut))]
-        let mut shell = Shell::new(window, renderer, &self.game, launch.video_defaults);
+        let shell = Shell::new(window, renderer, &self.game, launch.video_defaults);
+        // The frame log needs the host, which only the frontend's type knows (#2206).
         #[cfg(feature = "dev")]
-        {
-            shell.frame_log = super::frame::stats::start_log(F::HOST, &self.game);
-        }
+        let shell = Shell {
+            frame_log: super::frame::stats::start_log(F::HOST, &self.game),
+            ..shell
+        };
         let frontend = (launch.frontend)(&shell, &self.game);
         self.running = Some((shell, frontend));
     }

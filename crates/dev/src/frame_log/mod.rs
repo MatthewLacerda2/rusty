@@ -5,7 +5,7 @@
 //! default; a `player` dev build, off by default), one JSON line per drawn frame and
 //! per console line, audio event and finished load goes under the project's
 //! `saved/logs/`, so "a minute ago, by the bar" can be found after the fact with
-//! nothing armed beforehand. `Debug.FrameLog{ … }` reads a slice back ([`read`]).
+//! nothing armed beforehand. `Debug.FrameLog{ … }` reads a slice back ([`read()`]).
 //!
 //! * **Channels** (`LogChannels`, kept in `project.rusty`): `frames` (one record a
 //!   drawn frame), `gpu_passes` and `systems` (fields on it), `console`, `loads`,
