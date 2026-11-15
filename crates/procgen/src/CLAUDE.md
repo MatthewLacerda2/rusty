@@ -32,9 +32,10 @@ its rows.
     says how many inputs it accepts; optional inputs are the trailing ones;
   - its **`Op`**: `run(&self, cx: &Cx) -> Image`, and, only when it needs them,
     `seed` (it has a `seed` param), `sockets` (every `socket` param, by name, in
-    row order), `arity` (a param narrows the row's arity, as `math`'s unary funcs)
-    and `func` (what an arity error names). `Cx` gives `input(i)` for a required
-    input, `optional(i)` for a trailing one, `own()` for a copy of the first to edit
+    row order), `arity` (a param narrows the row's arity, as `math`'s unary funcs),
+    `func` (what an arity error names) and `arity_fix` (what it says to do, when a
+    param decides the inputs, as `expression`'s formulas). `Cx` gives `input(i)` for
+    a required input, `optional(i)` for a trailing one, `own()` for a copy of the first to edit
     in place, `field(&param)` for a socketable value, `paint(sampler)` for a
     generator, `px(radius)` for a tile-unit radius in pixels, and `seed`, `size`,
     `sources`.

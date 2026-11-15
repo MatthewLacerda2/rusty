@@ -26,7 +26,8 @@ pub struct ParamDecl {
 }
 
 /// What a param's values are. A `color` is a linear RGB(A) array or an sRGB
-/// `"#rrggbb"` string, as a node's colours are; a `text` fills an enum or a path.
+/// `"#rrggbb"` string, as a node's colours are; a `text` fills an enum, a path or
+/// an `expression` formula.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ParamType {

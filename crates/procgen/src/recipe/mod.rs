@@ -43,7 +43,7 @@ pub(crate) use op_info::{choice, op, opt, req, socket, SEED};
 pub use op_info::{Lit, OpInfo, OpParam};
 pub use param::{Link, Param};
 #[cfg(test)]
-pub(crate) use sample::sample_op;
+pub(crate) use sample::{reading_sample_op, sample_op};
 
 /// The file a sampled `path` param names; tests that evaluate a sampled `image` op
 /// hand procgen a source under this key. A test hook: the root's Lua enum-case test

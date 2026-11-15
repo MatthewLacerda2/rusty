@@ -26,16 +26,7 @@ fn draw_frame(scene: &mut Scene, nav: &mut NavigationGraph, mut playing: bool) {
     let mut editor = EditorUi::new(Default::default());
     let mut console = ConsoleLogs::new();
     ctx.begin_pass(egui::RawInput::default());
-    editor.draw(
-        &ctx,
-        scene,
-        &mut console,
-        nav,
-        &mut playing,
-        60.0,
-        16.0,
-        None,
-    );
+    editor.draw(&ctx, scene, &mut console, nav, &mut playing, None);
     ctx.end_pass().textures_delta.clear();
 }
 

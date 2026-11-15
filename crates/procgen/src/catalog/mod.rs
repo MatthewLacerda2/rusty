@@ -130,6 +130,7 @@ catalog! {
     #[cfg(test)]
     Dummy(color::dummy::Dummy),
     EdgeDetect(filter::mask::edge_detect::EdgeDetect),
+    Expression(math::expression::Expression),
     FloodBbox(filter::flood::bbox::FloodBbox),
     FloodFill(filter::flood::fill::FloodFill),
     FloodGradient(filter::flood::gradient::FloodGradient),
@@ -205,5 +206,10 @@ impl OpKind {
     /// The sub-function an arity error about this node names (`math`'s `func`).
     pub fn func(&self) -> Option<String> {
         self.op().func()
+    }
+
+    /// What an arity error about this node, wired with `given` inputs, says to do.
+    pub fn arity_fix(&self, given: usize) -> Option<String> {
+        self.op().arity_fix(given)
     }
 }

@@ -21,7 +21,7 @@ pub struct OpParam {
     pub name: &'static str,
     /// `number` | `integer` | `bool` | `color` (a linear RGBA array, or an sRGB
     /// `"#rrggbb"` / `"#rrggbbaa"` string) | `vec2` | `enum` | `stops` | `path` (a
-    /// project-relative file path).
+    /// project-relative file path) | `text` (an `expression` formula).
     pub ty: &'static str,
     /// The accepted tags for an `enum` param; empty otherwise.
     pub values: &'static [&'static str],
