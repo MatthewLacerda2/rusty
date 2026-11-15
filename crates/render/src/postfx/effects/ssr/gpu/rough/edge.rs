@@ -5,7 +5,7 @@
 
 use glam::Vec3;
 
-use super::silhouette::{at, base, shot, BRONZE, H, W};
+use super::super::silhouette::{at, base, shot, BRONZE, H, W};
 use rusty_scene::Camera;
 
 /// How hard the edge is where the cube's reflection on the floor ends: along the
