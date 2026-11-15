@@ -35,8 +35,8 @@ fn a_gpu_particle_under_gravity_lands_where_the_closed_form_says() {
         centroid(&gpu).expect("drawn"),
         centroid(&want).expect("drawn"),
     );
-    // Measured on lavapipe (Mesa, the container): centroids 0.0 px apart and the
-    // masks agree at 1.0; a desktop GPU's values are owed before merge.
+    // Measured on lavapipe (Mesa, the container) and on an NVIDIA RTX 2060 (Vulkan): centroids
+    // 0.0 px apart and the masks agree at 1.0.
     assert!(
         (g.0 - w.0).abs() < 0.75 && (g.1 - w.1).abs() < 0.75,
         "{g:?} vs {w:?}"
@@ -76,6 +76,6 @@ fn a_gpu_and_a_cpu_emitter_of_one_seed_cover_the_same_pixels() {
         return;
     };
     assert!(a.iter().filter(|&&x| x).count() > 100, "the cloud draws");
-    // Measured on lavapipe (Mesa, the container): 1.0.
+    // Measured: 1.0 on lavapipe (Mesa) and on an NVIDIA RTX 2060 (Vulkan).
     assert!(agreement(&a, &b) > 0.98, "{}", agreement(&a, &b));
 }

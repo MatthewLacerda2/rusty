@@ -26,7 +26,8 @@ fn a_local_gpu_emitter_carries_its_particles_and_a_world_one_leaves_them() {
         };
         seen.push(centroid(&mask).expect("drawn").0);
     }
-    // Measured on lavapipe (Mesa, the container): Local at x 60.5, World at 31.5.
+    // Measured on lavapipe (Mesa, the container) and on an NVIDIA RTX 2060 (Vulkan): Local at
+    // x 60.5, World at 31.5.
     assert!(
         seen[0] > 40.0,
         "Local moved right with the emitter: {seen:?}"
@@ -122,7 +123,7 @@ fn a_local_gpu_emitter_scaling_through_0_while_emitting_matches_its_cpu_twin() {
             b.iter().filter(|&&x| x).count() > 30,
             "frame {frame}: drawn"
         );
-        // Measured on lavapipe (Mesa, the container): 1.0 at every frame.
+        // Measured: 1.0 at every frame on lavapipe (Mesa) and on an NVIDIA RTX 2060 (Vulkan).
         let agree = agreement(&a, &b);
         assert!(agree > 0.98, "frame {frame}: {agree}");
     }
