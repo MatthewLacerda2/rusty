@@ -30,14 +30,28 @@ const TRIPLANAR: u32 = 2u;
 
 // Where one surface point reads its maps. `uv` is the one lookup of UV0 and
 // Planar; `x`, `y`, `z` are Triplanar's three projections (along world X, Y and
-// Z), blended by `weights`.
+// Z), blended by `weights`. Under the height map's parallax (`displaced`), `uv` is
+// shifted by `shift` and read with `dx` and `dy`, the screen derivatives of the
+// unshifted `uv` (`forward::parallax::displace`): the shift bends sharply where the
+// ray crosses a ridge, and its own derivatives would pick a far mip there. All
+// three are zero otherwise.
 struct MapCoords {
     uv: vec2<f32>,
     x: vec2<f32>,
     y: vec2<f32>,
     z: vec2<f32>,
     weights: vec3<f32>,
+    shift: vec2<f32>,
+    dx: vec2<f32>,
+    dy: vec2<f32>,
 };
+
+// Whether the draw's maps are read through the height map's parallax (#2191): a
+// uniform, so a branch on it keeps the samples in uniform control flow.
+fn displaced() -> bool {
+    let m = material();
+    return m.use_height_map != 0u && m.height_scale > 0.0;
+}
 
 // A material's mapping terms: `render::gpu::uniforms::MappingUniform` byte-for-byte.
 // The forward draws read theirs from `material()`; a shadow caster carries its own per
@@ -81,6 +95,9 @@ fn coords_with(m: Mapping, uv: vec2<f32>, position: vec3<f32>, normal: vec3<f32>
     c.y = c.uv;
     c.z = c.uv;
     c.weights = vec3<f32>(0.0, 1.0, 0.0);
+    c.shift = vec2<f32>(0.0);
+    c.dx = vec2<f32>(0.0);
+    c.dy = vec2<f32>(0.0);
     if (m.uv_mapping == TRIPLANAR) {
         c.x = tile_with(m, p.zy);
         c.z = tile_with(m, p.xy);
@@ -117,10 +134,21 @@ fn lookup(t: texture_2d<f32>, s: sampler, uv: vec2<f32>) -> vec4<f32> {
     return textureSampleBias(t, s, uv, bias);
 }
 
+// Map `t` at `c`'s one lookup (UV0's and Planar's), with the camera's mip bias:
+// at the unshifted coordinates' derivatives under the parallax (`MapCoords`), the
+// bias scaling them, else [`lookup`].
+fn lookup_uv(t: texture_2d<f32>, s: sampler, c: MapCoords) -> vec4<f32> {
+    if (displaced()) {
+        let k = exp2(camera.lod.x);
+        return textureSampleGrad(t, s, c.uv, c.dx * k, c.dy * k);
+    }
+    return lookup(t, s, c.uv);
+}
+
 // Map `t` at `c`.
 fn sample(t: texture_2d<f32>, s: sampler, c: MapCoords) -> vec4<f32> {
     if (material().uv_mapping != TRIPLANAR) {
-        return lookup(t, s, c.uv);
+        return lookup_uv(t, s, c);
     }
     return lookup(t, s, c.x) * c.weights.x
         + lookup(t, s, c.y) * c.weights.y
@@ -172,6 +200,9 @@ fn level_at(size: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>) -> f32 {
 fn normal_level(t: texture_2d<f32>, c: MapCoords) -> f32 {
     let size = vec2<f32>(textureDimensions(t));
     var level = level_at(size, dpdx(c.uv), dpdy(c.uv));
+    if (displaced()) {
+        level = level_at(size, c.dx, c.dy);
+    }
     if (material().uv_mapping == TRIPLANAR) {
         let x = level_at(size, dpdx(c.x), dpdy(c.x));
         let y = level_at(size, dpdx(c.y), dpdy(c.y));
@@ -209,7 +240,7 @@ const WHOLE_BELOW_Z: f32 = 0.25;
 // blend (Golus), and Planar is Triplanar with all the weight on the Y projection.
 fn sample_normal(t: texture_2d<f32>, s: sampler, c: MapCoords, n: vec3<f32>, tangent: vec4<f32>) -> NormalSample {
     let mapping = material().uv_mapping;
-    let texel_y = lookup(t, s, c.uv);
+    let texel_y = lookup_uv(t, s, c);
     if (mapping == UV0) {
         let T = normalize(tangent.xyz);
         let B = cross(n, T) * tangent.w;

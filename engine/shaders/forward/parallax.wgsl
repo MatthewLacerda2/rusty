@@ -24,7 +24,7 @@
 #define_import_path forward::parallax
 
 #import forward::bindings::{camera, material, s_height, t_height}
-#import forward::mapping::{MapCoords, level_at}
+#import forward::mapping::{MapCoords, displaced, level_at}
 
 // HDRP Lit's `_PPDMinSamples`, `_PPDMaxSamples` and `_PPDLodThreshold` defaults.
 const MIN_STEPS: f32 = 5.0;
@@ -71,24 +71,28 @@ fn march(uv: vec2<f32>, lod: f32, max_offset: vec2<f32>, steps: i32) -> vec2<f32
 // for a material without one. Takes derivatives: call it in uniform control flow,
 // before any per-pixel branch (the branch here is on `material()`).
 fn displace(c: MapCoords, position: vec3<f32>, n: vec3<f32>) -> MapCoords {
-    let m = material();
-    if (m.use_height_map == 0u || m.height_scale <= 0.0) {
+    if (!displaced()) {
         return c;
     }
+    let m = material();
     // The world-to-UV mapping on the surface (Schüler, "Followup: Normal Mapping
     // Without Precomputed Tangents"): `grad_u` and `grad_v` are how fast the tiled
     // UV changes along the surface, in repeats per metre.
     let dp1 = dpdx(position);
     let dp2 = dpdy(position);
-    let duv1 = dpdx(c.uv);
-    let duv2 = dpdy(c.uv);
-    let lod = level_at(vec2<f32>(textureDimensions(t_height)), duv1, duv2) + camera.lod.x;
+    var out = c;
+    // Every map is read at these, the unshifted coordinates' (`MapCoords`).
+    out.dx = dpdx(c.uv);
+    out.dy = dpdy(c.uv);
+    let lod = level_at(vec2<f32>(textureDimensions(t_height)), out.dx, out.dy) + camera.lod.x;
     let dp2perp = cross(dp2, n);
     let dp1perp = cross(n, dp1);
     let det = dot(dp1, dp2perp);
     if (lod >= LOD_THRESHOLD + 1.0 || abs(det) < 1e-20) {
-        return c;
+        return out;
     }
+    let duv1 = out.dx;
+    let duv2 = out.dy;
     let grad_u = (dp2perp * duv1.x + dp1perp * duv2.x) / det;
     let grad_v = (dp2perp * duv1.y + dp1perp * duv2.y) / det;
     // The depth in metres: `height_scale` of one repeat's width, the mean of its
@@ -106,7 +110,7 @@ fn displace(c: MapCoords, position: vec3<f32>, n: vec3<f32>) -> MapCoords {
     // Into the surface, away from the eye.
     let max_offset = -lateral / cos_view;
     let offset = march(c.uv, lod, max_offset, steps) * (1.0 - saturate(lod - LOD_THRESHOLD));
-    var out = c;
+    out.shift = offset;
     out.uv = c.uv + offset;
     out.x = out.uv;
     out.y = out.uv;
