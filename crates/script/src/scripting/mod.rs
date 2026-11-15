@@ -28,7 +28,7 @@ mod schema;
 mod shared;
 mod timers;
 
-pub use console::{ConsoleLogs, DemoFeed, LogLevel, Mark};
+pub use console::{ConsoleLogs, DemoFeed, FileFeed, FileLine, LogLevel, Mark, FILE_FEED_CAP};
 pub use discovery::{monobehaviour_scripts, script_label};
 pub use journal::{HostCall, HostJournal, Plain};
 pub use lifecycle::dispatch_controller_hits;

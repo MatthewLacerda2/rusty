@@ -13,10 +13,12 @@
 //! that cannot draw the forward pass, rather than the pipeline later.
 //!
 //! Samplers are the tighter budget: Metal binds at most 16 per stage, a hard cap
-//! no limit request lifts, and the forward fragment stage uses all 16 (each
-//! material map has its own, #1323). A new material map therefore frees a sampler
-//! first (group 0's fixed ones are candidates to share); the tests count both from
-//! the bind-group layouts themselves, and fail naming Metal's cap.
+//! no limit request lifts. The forward fragment stage uses 13, leaving 3 free:
+//! each material map keeps its own (#1323), while group 0's engine-owned textures
+//! (the sky and probe cubes, the lightmap pages, the fog volume) share one
+//! (`gpu::linear_clamp`), and the decal atlas, the shadow comparison and the
+//! opaque copy keep theirs. A new material map takes a free one; the tests count
+//! both from the bind-group layouts themselves, and fail naming Metal's cap.
 
 /// The features a device takes where its adapter has them: BC texture
 /// compression (#1574) and GPU occlusion culling's indirect draws (#1963). Each
@@ -92,6 +94,6 @@ mod tests {
             "the forward fragment stage binds {textures} sampled textures; \
              the device asks for {SAMPLED_TEXTURES_PER_STAGE} (raise it, and check Metal's 72)"
         );
-        assert_eq!((samplers, textures), (16, 21), "the counts the docs state");
+        assert_eq!((samplers, textures), (13, 21), "the counts the docs state");
     }
 }

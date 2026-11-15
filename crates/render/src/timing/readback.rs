@@ -20,7 +20,8 @@ struct Slot {
     buffer: wgpu::Buffer,
     /// The frame's timed passes, one per query pair.
     passes: Vec<GpuPass>,
-    /// The frame's place in submission order, so the newest finished one wins.
+    /// The drawn frame it measures (`FrameCost::frames` at its end), which is also
+    /// its place in submission order, so the newest finished one wins.
     frame: u64,
     /// `FREE` / `MAPPING` / `MAPPED`, set by the map callback from wgpu's thread.
     state: Arc<AtomicU8>,
@@ -30,7 +31,6 @@ pub(super) struct Ring {
     /// The query set resolves here first: a resolve target cannot be mapped.
     resolve: wgpu::Buffer,
     slots: Vec<Slot>,
-    submitted: u64,
 }
 
 impl Ring {
@@ -60,21 +60,18 @@ impl Ring {
                 state: Arc::new(AtomicU8::new(FREE)),
             })
             .collect();
-        Self {
-            resolve,
-            slots,
-            submitted: 0,
-        }
+        Self { resolve, slots }
     }
 
-    /// Resolve the first `passes.len()` query pairs of `set` into a free slot and
-    /// start mapping it. No free slot: the frame goes untimed.
+    /// Resolve the first `passes.len()` query pairs of `set`, drawn frame `frame`'s,
+    /// into a free slot and start mapping it. No free slot: the frame goes untimed.
     pub fn submit(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         set: &wgpu::QuerySet,
         passes: Vec<GpuPass>,
+        frame: u64,
     ) {
         let Some(slot) = self
             .slots
@@ -91,8 +88,7 @@ impl Ring {
         encoder.copy_buffer_to_buffer(&self.resolve, 0, &slot.buffer, 0, Some(bytes));
         queue.submit(Some(encoder.finish()));
 
-        self.submitted += 1;
-        slot.frame = self.submitted;
+        slot.frame = frame;
         slot.passes = passes;
         slot.state.store(MAPPING, Ordering::Release);
         let state = Arc::clone(&slot.state);
@@ -103,8 +99,8 @@ impl Ring {
     }
 
     /// Read every mapped slot through `read` (its ticks and passes), free them, and
-    /// return the newest frame's result.
-    pub fn read_finished<T>(&mut self, read: impl Fn(&[u64], &[GpuPass]) -> T) -> Option<T> {
+    /// return the newest frame's result with that frame's index.
+    pub fn read_finished<T>(&mut self, read: impl Fn(&[u64], &[GpuPass]) -> T) -> Option<(u64, T)> {
         let mut newest: Option<(u64, T)> = None;
         for slot in &mut self.slots {
             if slot.state.load(Ordering::Acquire) != MAPPED {
@@ -131,6 +127,6 @@ impl Ring {
                 newest = Some((slot.frame, result));
             }
         }
-        newest.map(|(_, r)| r)
+        newest
     }
 }

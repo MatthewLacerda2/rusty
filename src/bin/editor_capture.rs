@@ -23,6 +23,11 @@
 //!                       (`UI`, `LightProbes`, `ReflectionProbes`, `Colliders`,
 //!                       `NavMesh`; `GameGizmos` or `Stats` over `--game`);
 //!                       repeatable (#1909)
+//!   --game-view <size>  the Game view's size, as its dropdown sets it: `Free`,
+//!                       an aspect `W:H` or a fixed size `WxH` (#2207)
+//!   --preview [<mesh>]  open the selection's Inspector Preview tab (a material
+//!                       card or an asset card) on this mesh: `Sphere` (default),
+//!                       `Cube`, `Suzanne` or `Plane`; not with --picker (#2239)
 //!   --picker [<page>]   the project picker the editor starts on (#854), over a
 //!                       sample recent list; <page> is `new`, `open`,
 //!                       `mismatch` (the different-engine prompt) or `focus`
@@ -35,7 +40,7 @@
 use std::process::exit;
 
 use rusty::app::ProjectSource;
-use rusty::core::application::Gizmo;
+use rusty::core::application::{GameViewSize, Gizmo};
 use rusty::core::project::{Access, BootPlan};
 use rusty::core::settings::video::parse_size;
 use rusty::dev::session::Session;
@@ -127,6 +132,11 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
             picker = Some(page.map_or("projects", |v| v.as_str()).to_string());
             continue;
         }
+        if flag == "--preview" {
+            let mesh = it.next_if(|v| !v.starts_with("--"));
+            opts.preview = Some(mesh.map_or(Ok(Default::default()), |m| capture::parse_mesh(m))?);
+            continue;
+        }
         let mut value = || it.next().cloned().ok_or(format!("{flag} needs a value"));
         match flag.as_str() {
             "--out" => out = value()?,
@@ -141,6 +151,11 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
                 let (gizmo, on) = parse_gizmo(&value()?)?;
                 opts.gizmos.set(gizmo, on);
             }
+            "--game-view" => {
+                let text = value()?;
+                opts.game_view.size = GameViewSize::parse(&text)
+                    .ok_or(format!("--game-view wants Free, W:H or WxH, got {text:?}"))?;
+            }
             "--select" => opts.select = Some(value()?),
             "--select-asset" => opts.select_asset = Some(value()?),
             "--frame" => opts.frame_selected = true,
@@ -149,6 +164,9 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
             "--size" => (opts.width, opts.height) = parse_size(&value()?)?,
             other => return Err(format!("unknown argument {other}")),
         }
+    }
+    if picker.is_some() {
+        capture::refuse_with_picker(opts.preview)?;
     }
     Ok((out, source, opts, picker))
 }

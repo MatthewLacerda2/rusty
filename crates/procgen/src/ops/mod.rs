@@ -8,7 +8,8 @@
 //! - [`generators`] — sources with no input (constant, noise and its fBM / ridged /
 //!   turbulence family, Voronoi F1 / F2 / edges, gradient,
 //!   wave, brick, shape, checker, white noise, the pixel's own coordinates, and an
-//!   image file).
+//!   image file); [`outline`] — outlines filled into a mask, for the `text` and
+//!   `path` generators.
 //! - [`color`] — mix (blend modes), invert, bright/contrast, HSV, gamma, auto
 //!   levels; [`ramp`] — the color ramp.
 //! - [`vector`] — domain mapping, domain warp, bump→normal, normal blend,
@@ -38,6 +39,7 @@ pub mod filter;
 pub mod flood;
 pub mod generators;
 pub mod math;
+pub mod outline;
 pub mod ramp;
 pub mod sample;
 pub mod scatter;

@@ -29,6 +29,10 @@ pub(super) struct Recent {
     /// One stamp per tick, and one per frame that rendered: a window's counts.
     pub(super) tick_marks: VecDeque<Stamp>,
     pub(super) drawn_marks: VecDeque<Stamp>,
+    /// The newest recorded frame's stamp, and whether it joined the session,
+    /// until what is known only once it ended arrives
+    /// ([`FrameStats::frame_ended`](super::FrameStats::frame_ended)).
+    pub(super) open: Option<(Stamp, bool)>,
 }
 
 impl Recent {
@@ -86,8 +90,8 @@ pub(super) fn bounded<T>(ring: &mut VecDeque<T>, item: T) {
     ring.push_back(item);
 }
 
-/// Each key's samples within the newest `n` frames, summarised as a fresh
-/// [`Series`]; a key with none is left out.
+/// Each key's samples within the newest `n` frames that `keep` takes, summarised
+/// as a fresh [`Series`]; a key with none is left out.
 ///
 /// Only the samples newer than the window's frame edge are read
 /// ([`Recent::past_edge`]).
@@ -95,13 +99,14 @@ pub(super) fn fold_recent(
     clocks: &Recent,
     recent: &BTreeMap<String, VecDeque<(Stamp, f64)>>,
     n: u64,
+    keep: &impl Fn(Stamp) -> bool,
 ) -> BTreeMap<String, Series> {
     let mut out = BTreeMap::new();
     for (key, samples) in recent {
         let edge = samples.partition_point(|(at, _)| clocks.past_edge(*at, n));
         let mut series = Series::default();
         for (at, value) in samples.range(edge..) {
-            if clocks.within(*at, n) {
+            if keep(*at) {
                 series.record(*value);
             }
         }

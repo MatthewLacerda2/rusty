@@ -1,0 +1,45 @@
+{
+  "resolution": 256,
+  "params": {
+    "wear": { "type": "number", "default": 0.3, "min": 0, "max": 1 }
+  },
+  "nodes": [
+    { "id": "lug", "op": "shape", "kind": "rounded_rect", "size": [0.78, 0.2], "roundness": 1, "profile": "paraboloid" },
+    { "id": "lug_coords", "op": "expression",
+      "r": "clamp(0.5 + 0.7071 * ((fract(16 * u) - 0.5) + (2 * mod(floor(16 * u) + floor(16 * v), 2) - 1) * (fract(16 * v) - 0.5)), 0, 1)",
+      "g": "clamp(0.5 + 0.7071 * ((fract(16 * v) - 0.5) - (2 * mod(floor(16 * u) + floor(16 * v), 2) - 1) * (fract(16 * u) - 0.5)), 0, 1)",
+      "b": "0" },
+    { "id": "lugs", "op": "sample_at", "inputs": ["lug", "lug_coords"] },
+    { "id": "lug_round", "op": "math", "func": "sqrt", "inputs": ["lugs"] },
+    { "id": "lug_mask", "op": "levels", "in_low": 0.02, "in_high": 0.15, "inputs": ["lugs"] },
+    { "id": "lug_top", "op": "levels", "in_low": 0.75, "in_high": 0.95, "inputs": ["lug_round"] },
+    { "id": "plate_wave_raw", "op": "noise", "kind": "fbm", "scale": 2, "octaves": 3, "seed": 81 },
+    { "id": "plate_wave", "op": "auto_levels", "inputs": ["plate_wave_raw"] },
+    { "id": "grain", "op": "anisotropic_noise", "scale": 96, "anisotropy": 20, "angle": 0, "seed": 82 },
+    { "id": "grain_n", "op": "auto_levels", "inputs": ["grain"] },
+    { "id": "scratches", "op": "graph", "path": "engine/textures/library/parts/scratches.graph.json", "params": { "amount": { "param": "wear" }, "scale": 80, "angle": 0.1 }, "seed": 83 },
+    { "id": "relief", "op": "expression", "expr": "0.25 * a + 0.7 * b + 0.01 * c - 0.03 * d", "inputs": ["plate_wave", "lug_round", "grain_n", "scratches"] },
+    { "id": "height", "op": "auto_levels", "inputs": ["relief"] },
+    { "id": "detail", "op": "expression", "expr": "a - 0.24 * b", "inputs": ["relief", "plate_wave"] },
+    { "id": "normal", "op": "bump_to_normal", "strength": 0.05, "inputs": ["detail"] },
+
+    { "id": "dirt_packed", "op": "graph", "path": "engine/textures/library/parts/crevice_dirt.graph.json", "params": { "amount": { "param": "wear" }, "radius": 0.012, "breakup": 8 }, "inputs": ["detail"], "seed": 84 },
+    { "id": "rust_field", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 5 }, "seed": 85 },
+    { "id": "lug_spread", "op": "blur", "radius": 0.012, "inputs": ["lug_mask"] },
+    { "id": "lug_foot", "op": "expression", "expr": "clamp(2.5 * (a - b), 0, 1) * smoothstep(0.35, 0.75, c) * (0.45 + 0.55 * k1)", "k1": { "param": "wear" }, "inputs": ["lug_spread", "lug_mask", "rust_field"] },
+    { "id": "dirt", "op": "expression", "expr": "clamp(max(a, d) * (1 - 0.8 * b) + smoothstep(0.92 - 0.25 * k1, 1.0, c), 0, 1)", "k1": { "param": "wear" }, "inputs": ["dirt_packed", "lug_mask", "rust_field", "lug_foot"] },
+    { "id": "steel", "op": "color_ramp", "stops": [ { "pos": 0, "color": "#b6b8ba" }, { "pos": 1, "color": "#cbcdcf" } ], "inputs": ["grain_n"] },
+    { "id": "polish", "op": "constant", "color": "#dcdee0" },
+    { "id": "worn_tops", "op": "expression", "expr": "a * (0.4 + 0.6 * k1)", "k1": { "param": "wear" }, "inputs": ["lug_top"] },
+    { "id": "steel_worn", "op": "mix", "mode": "mix", "inputs": ["steel", "polish", "worn_tops"] },
+    { "id": "grime_col", "op": "color_ramp", "stops": [ { "pos": 0, "color": "#3d3326" }, { "pos": 1, "color": "#6a4a2e" } ], "inputs": ["rust_field"] },
+    { "id": "grime_cover", "op": "expression", "expr": "smoothstep(0.1, 0.5, a)", "inputs": ["dirt"] },
+    { "id": "base_color", "op": "mix", "mode": "mix", "inputs": ["steel_worn", "grime_col", "grime_cover"] },
+    { "id": "metallic", "op": "expression", "expr": "1 - smoothstep(0.05, 0.15, a)", "inputs": ["dirt"] },
+    { "id": "roughness", "op": "expression", "expr": "clamp(mix(0.42 + 0.14 * (a - 0.5) - 0.25 * b, 0.85, c), 0, 1)", "inputs": ["grain_n", "worn_tops", "grime_cover"] },
+    { "id": "ao", "op": "ambient_occlusion", "radius": 0.02, "depth": 0.004, "quality": 8, "inputs": ["detail"] },
+    { "id": "occlusion", "op": "levels", "out_low": 0.4, "inputs": ["ao"] }
+  ],
+  "output": "base_color",
+  "outputs": { "base_color": "base_color", "normal": "normal", "roughness": "roughness", "metallic": "metallic", "height": "height", "occlusion": "occlusion" }
+}

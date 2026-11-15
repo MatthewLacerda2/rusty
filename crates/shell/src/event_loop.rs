@@ -65,6 +65,12 @@ where
         };
         window.set_title(&launch.title);
         let shell = Shell::new(window, renderer, &self.game, launch.video_defaults);
+        // The frame log needs the host, which only the frontend's type knows (#2206).
+        #[cfg(feature = "dev")]
+        let shell = Shell {
+            frame_log: super::frame::stats::start_log(F::HOST, &self.game),
+            ..shell
+        };
         let frontend = (launch.frontend)(&shell, &self.game);
         self.running = Some((shell, frontend));
     }

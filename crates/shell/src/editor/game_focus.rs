@@ -28,6 +28,17 @@ pub fn next_focus(
     was_focused
 }
 
+/// Where the Game tab's image sits, for mapping the pointer: its rect in window
+/// pixels, rendered at the Game view's own size (a demo's or the dropdown's, #2207,
+/// letterboxed in the panel) or else the image's pixels. `None` on the Scene tab.
+pub fn game_view(interaction: &ViewportInteraction, ppp: f32) -> Option<GameViewRect> {
+    let image = || super::viewport::target_size(interaction.size, ppp);
+    let render = (interaction.tab == ViewportTab::Game).then(|| interaction.render.or_else(image));
+    render
+        .flatten()
+        .map(|render| game_view_rect(interaction, ppp, render))
+}
+
 /// The Game view's rect in physical window pixels, rendered at `render` pixels.
 pub fn game_view_rect(
     interaction: &ViewportInteraction,
@@ -84,3 +95,7 @@ impl EditorFrontend {
 #[cfg(test)]
 #[path = "game_focus_tests.rs"]
 mod game_focus_tests;
+
+#[cfg(test)]
+#[path = "game_view_tests.rs"]
+mod game_view_tests;

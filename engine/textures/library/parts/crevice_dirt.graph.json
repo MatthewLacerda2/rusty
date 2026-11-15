@@ -1,0 +1,20 @@
+{
+  "resolution": 256,
+  "params": {
+    "amount": { "type": "number", "default": 0.3, "min": 0, "max": 1 },
+    "radius": { "type": "number", "default": 0.02, "min": 0.001, "max": 0.25 },
+    "breakup": { "type": "number", "default": 6, "min": 1, "max": 256 }
+  },
+  "inputs": ["height"],
+  "nodes": [
+    { "id": "amount", "op": "expression", "expr": "k1", "k1": { "param": "amount" } },
+    { "id": "cavity", "op": "cavity", "radius": { "param": "radius" }, "inputs": ["height"] },
+    { "id": "deep", "op": "invert", "inputs": ["cavity"] },
+    { "id": "deep_n", "op": "auto_levels", "inputs": ["deep"] },
+    { "id": "breakup", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": { "param": "breakup" } }, "seed": 5 },
+    { "id": "lumpy", "op": "mix", "mode": "multiply", "factor": 0.6, "inputs": ["deep_n", "breakup"] },
+    { "id": "spread", "op": "auto_levels", "inputs": ["lumpy"] },
+    { "id": "dirt", "op": "histogram_scan", "position": { "node": "amount", "min": 0, "max": 0.8 }, "contrast": 0.5, "inputs": ["spread"] }
+  ],
+  "output": "dirt"
+}

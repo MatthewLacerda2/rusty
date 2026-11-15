@@ -66,7 +66,6 @@ pub(super) type CubeCopy = (String, CubeShape, usize, u32);
 pub(crate) struct ProbeArray {
     texture: wgpu::Texture,
     pub view: wgpu::TextureView,
-    pub sampler: wgpu::Sampler,
     /// The array's face size and mip count, and how many cubes it holds.
     face: u32,
     mips: u32,
@@ -100,17 +99,9 @@ impl ProbeArray {
             true => CUBE_FORMAT,
             false => wgpu::TextureFormat::Rgba16Float,
         };
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("Reflection Probe Sampler"),
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::MipmapFilterMode::Linear,
-            ..Default::default()
-        });
         Self {
             texture,
             view,
-            sampler,
             face: 1,
             mips: 1,
             cubes: 1,
