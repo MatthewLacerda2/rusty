@@ -20,7 +20,7 @@ if Debug then Debug.Log("only in a dev build") end
 | `Debug.SnapshotEntity` | `(id)` | a pretty **JSON string**: one entity (below), or `null` if absent |
 | `Debug.Preview` | `(asset_path, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
 | `Debug.PreviewMaterial` | `(name, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
-| `Debug.Stats` | `([opts])` | a **table**: the frame stats — timings and counters (below); `opts.window = n` (a whole number ≥ 1) summarises only each metric's newest `n` samples |
+| `Debug.Stats` | `([opts])` | a **table**: the frame stats — timings and counters (below) of the current Play session; `opts.window = n` (a whole number ≥ 1) summarises only the newest `n` frames, edit mode's too; any other option key raises |
 | `Debug.AudioEvents` | `([after_seq])` | an **array** of the audio event log's entries whose `seq` is greater than `after_seq` (default `0`, all), oldest first, **and** the oldest `seq` the log still holds (below) |
 | `Debug.GetAdaptedExposure` | `()` | `number` (EV): the automatic exposure the screen last applied, read back from the GPU a frame or so late (exactly, in a headless capture); `nil` before an `Automatic` frame has metered (#1444; see `Graphics.md`, *Automatic exposure*) |
 | `Debug.AudioVoices` | `()` | an **array**: one roster row per entity carrying an `AudioSource` (below) |
@@ -116,9 +116,10 @@ the call **returns `nil`** after a warning rather than failing the run.
 `Debug.Stats()` is the perf read: the numbers an agent needs to prove a rendering or
 gameplay change is cheaper, since it never *feels* the frame rate. Each metric is a
 `{ last, min, avg, max, samples }` table summarising every frame of the **current Play
-session** (the stats restart when Play starts). Until the first frame runs there is
-nothing to summarise: `frames` is `0`, `systems` is empty and every metric is absent
-(`nil`), so check `frames` before reading one:
+session**: the stats restart when Play starts, take Play's frames only, and after Stop
+hold the session that ended until the next Play. Before any Play (a fresh editor)
+there is nothing to summarise: `frames` and `drawn_frames` are `0`, `systems` is
+empty and every metric is absent (`nil`), so check `frames` before reading one:
 
 ```lua
 local s = Debug.Stats()
@@ -135,12 +136,18 @@ timings and the world counters (`frame_ms`, the stages, `systems`, `entities`, �
 per tick; the render counters, `renderer_ms`, `gpu_ms`, `gpu_passes`, `wall_ms` and
 `fps` are per drawn frame. Each metric's `samples` says how many of its own it holds.
 
-**Now, not the session: `Debug.Stats{ window = n }`.** The same table over each
-metric's newest `n` samples only: the last `n` drawn frames for a per-frame key, the
-last `n` ticks for a per-tick one (`frames` and `drawn_frames` are capped at `n`). The
-newest 600 of each are kept, so a wider window reads those. A key none of them
-recorded is absent. It reads; it resets nothing, so two readers never disturb each
-other. The Game view's **Stats** overlay (`Editor.SetGizmo("Stats", true)`,
+**Now, not the session: `Debug.Stats{ window = n }`.** The same table over the newest
+`n` frames only: a sample is in when it was recorded within the last `n` drawn
+frames, and a per-tick one within the last `n` ticks too; `frames` and
+`drawn_frames` count the ticks and drawn frames inside. A key with no sample inside
+is absent, so a pass that stopped running (SSR turned off, `taa` and `ui` on the
+Scene tab) or a load long ago leaves the window. Unlike the session, a window reads
+**every** frame the window draws, edit mode included, as Unity's Stats overlay does:
+in a fresh editor or after Stop it holds `wall_ms`, `fps` and the render keys of the
+tab on screen, while `frames` is `0` and the per-tick keys are absent once `n` frames
+were drawn without a tick. The newest 600 samples of each key are kept, so a wider
+window reads those. It reads; it resets nothing, so two readers never disturb each
+other. Its one option is `window`: another key raises, naming it. The Game view's **Stats** overlay (`Editor.SetGizmo("Stats", true)`,
 [`Editor.md`](Editor.md)) shows `Debug.Stats{ window = 60 }`:
 
 ```lua
@@ -240,15 +247,15 @@ The kinds therefore add up to `gpu_ms`, and a heavy pass shows as heavy instead 
 smearing into the light ones behind it. Like every `_ms` key, these are wall-clock
 and differ run to run, and they are this GPU's: compare them on one machine.
 
-Keys ending in `_ms` or `_us` are **wall-clock** and differ run to run; everything else is a
-count and is deterministic for a deterministic run. The timings are measured *around*
+Keys ending in `_ms` or `_us`, and `fps`, are **wall-clock** and differ run to run;
+everything else is a count and is deterministic for a deterministic run. The timings are measured *around*
 the sim by the dev layer and never fed back into it, so reading them cannot change a
 replay. Render counters (and GPU times) appear on drawn frames: a harness `Harness.Screenshot`,
 `Harness.Render` (which draws without writing a PNG), or every frame a `dev` build's
 window draws, editor or player (#2205). In the editor that is the tab on screen, Scene
 or Game; the Inspector's asset preview is not counted. A headless run that never
-renders reports timings and world counters only. Before any Play frame, `frames` is
-`0` and no metric is present.
+renders reports timings and world counters only. Every harness frame is a session
+frame; a window's frame joins the session only in Play (above).
 
 Scenarios get the same table as `Harness.Stats()` and can turn it into pass/fail with
 `Harness.AssertBudget{ draw_calls = 2000, fixed_update_ms = 4 }` — see *Performance

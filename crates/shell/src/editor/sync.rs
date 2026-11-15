@@ -60,11 +60,12 @@ impl EditorFrontend {
 }
 
 /// The Game view's **Stats** overlay (#2205) reads the frame stats over the last
-/// second, the table `Debug.Stats{ window = 60 }` returns, and only while it is on:
-/// a closed overlay folds nothing. Without the `dev` layer nothing records them,
-/// and it shows the window's `clock` alone.
+/// second, the table `Debug.Stats{ window = 60 }` returns, and only on a frame it
+/// shows (the toggle on, the Game tab open): otherwise it folds nothing. Without
+/// the `dev` layer nothing records them, and it shows the window's `clock` alone.
 pub(super) fn sync_stats(ui: &mut EditorUi, game: &GameWorld, clock: Clock) {
-    let on = ui.gizmos.on(rusty_core::application::Gizmo::Stats);
+    let shown = ui.viewport_tab == rusty_editor::ViewportTab::Game;
+    let on = shown && ui.gizmos.on(rusty_core::application::Gizmo::Stats);
     ui.stats = on.then(|| Readout {
         table: windowed_stats(game),
         clock,

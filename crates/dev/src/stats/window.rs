@@ -7,7 +7,7 @@
 //! [`record_window`]; a second consumer of the same frame (a frame log on disk)
 //! takes the same value there instead of measuring again.
 
-use super::{record_render, RenderedFrame};
+use super::{record_render_into, RenderedFrame};
 use rusty_core::frame_stats::{FrameStats, RECENT};
 
 /// What one frame of the window cost.
@@ -26,23 +26,41 @@ pub struct WindowFrame {
 }
 
 /// Fold one window frame into `stats`: `wall_ms` and `fps` under keys of their own,
-/// and its render as a harness frame's ([`record_render`]).
-pub fn record_window(stats: &mut FrameStats, frame: &WindowFrame) {
-    stats.record("wall_ms", frame.wall_ms);
-    stats.record("fps", frame.fps);
-    if let Some(render) = &frame.render {
-        record_render(stats, render);
-    }
+/// and its render as a harness frame's ([`record_render_into`]). A frame drawn in
+/// Play (`in_play`) joins the session's series; any other reaches only the recent
+/// ring, so `Debug.Stats()` keeps the last Play session after Stop while a window
+/// and the Stats overlay read the editor's frames.
+pub fn record_window(stats: &mut FrameStats, frame: &WindowFrame, in_play: bool) {
+    stats.record_frame(in_play, |drawn| {
+        drawn.record("wall_ms", frame.wall_ms);
+        drawn.record("fps", frame.fps);
+        if let Some(render) = &frame.render {
+            record_render_into(drawn, render);
+        }
+    });
 }
+
+/// The option keys `Debug.Stats` takes.
+const OPTIONS: &[&str] = &["window"];
 
 /// `Debug.Stats`'s `opts.window`: the newest frames to summarise, a whole number
 /// of at least 1 (more than [`RECENT`] reads the [`RECENT`] kept). `None` without one:
-/// the whole session.
+/// the whole session. A key other than [`OPTIONS`]' raises, naming them.
 pub fn window_opt(opts: Option<mlua::Table>) -> mlua::Result<Option<usize>> {
-    let Some(window) = opts.map(|o| o.get::<Option<f64>>("window")).transpose()? else {
+    let Some(opts) = opts else {
         return Ok(None);
     };
-    match window {
+    for pair in opts.pairs::<mlua::Value, mlua::Value>() {
+        let (key, _) = pair?;
+        let name = key.to_string()?;
+        if !OPTIONS.contains(&name.as_str()) {
+            return Err(mlua::Error::RuntimeError(format!(
+                "Debug.Stats: unknown option {name:?}; expected one of {}",
+                OPTIONS.join(", ")
+            )));
+        }
+    }
+    match opts.get::<Option<f64>>("window")? {
         None => Ok(None),
         Some(n) if n >= 1.0 && n.fract() == 0.0 => Ok(Some(n.min(RECENT as f64) as usize)),
         Some(n) => Err(mlua::Error::RuntimeError(format!(

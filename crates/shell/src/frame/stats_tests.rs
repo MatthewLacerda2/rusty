@@ -45,13 +45,17 @@ fn gpu_a_window_frame_carries_what_the_renderer_drew() {
 
     let mut stats = FrameStats::default();
     for frame in [&drew, &aside] {
-        rusty_dev::stats::record_window(&mut stats, frame);
+        rusty_dev::stats::record_window(&mut stats, frame, true);
     }
     assert_eq!(stats.drawn_frames, 1);
     let last = stats.window(1);
     assert_eq!(last.get("wall_ms").map(|s| s.samples), Some(1));
     assert!(
-        last.get("draw_calls").is_some(),
-        "the last drawn frame's counters"
+        last.get("draw_calls").is_none(),
+        "the last frame drew nothing"
+    );
+    assert_eq!(
+        stats.window(2).get("draw_calls").map(|s| s.samples),
+        Some(1)
     );
 }

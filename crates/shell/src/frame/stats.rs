@@ -15,7 +15,8 @@ use {super::FrameClock, rusty_render::Renderer};
 use crate::Shell;
 
 /// Run the frontend's `draw` of this frame, then assemble its `WindowFrame` and
-/// fold it into the stats `Debug.Stats()` reads. A frame the renderer drew carries
+/// fold it into the stats `Debug.Stats()` reads: a Play frame into the session, any
+/// frame into the recent ring a window reads. A frame the renderer drew carries
 /// its counters, its CPU ms and the GPU times resolved since the last one; GPU
 /// times wait for a frame that drew. A frame log on disk attaches here, to the
 /// same `WindowFrame`.
@@ -29,8 +30,9 @@ pub fn measured(
     #[cfg(feature = "dev")]
     {
         let frame = window_frame(&mut shell.renderer, &shell.clock, frames_before);
+        let in_play = game.scene().borrow().is_playing();
         let stats = game.script_manager().stats_cell();
-        rusty_dev::stats::record_window(&mut stats.borrow_mut(), &frame);
+        rusty_dev::stats::record_window(&mut stats.borrow_mut(), &frame, in_play);
     }
     #[cfg(not(feature = "dev"))]
     let _ = frames_before;

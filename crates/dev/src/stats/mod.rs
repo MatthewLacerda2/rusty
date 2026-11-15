@@ -13,10 +13,12 @@
 //! time is the sum of its systems' times.
 //!
 //! **Sessions.** The stats restart on the first frame of every Play session, so a
-//! windowed editor reports the current run, not every run since launch.
+//! windowed editor reports the current run, not every run since launch; a window
+//! frame drawn outside Play reaches only the recent ring a window reads
+//! ([`record_window`]), so after Stop the session holds until the next Play.
 //!
 //! Render counters come from the renderer when it draws: a harness screenshot, or a
-//! frame of the window (`window`, #2205); [`record_render`] folds them in. Headless
+//! frame of the window (`window`, #2205); [`record_render_into`] folds them in. Headless
 //! runs without a screenshot report timings and world counters only.
 
 use std::cell::RefCell;
@@ -26,7 +28,7 @@ use std::time::Instant;
 
 use super::capture::RenderedFrame;
 use rusty_app::{GameWorld, LoadProbe, Resources, Stage, SystemProbe, World};
-use rusty_core::frame_stats::{FrameStats, Series};
+use rusty_core::frame_stats::{DrawnFrame, FrameStats, Series};
 use rusty_script::scripting::ConsoleLogs;
 
 mod window;
@@ -114,7 +116,7 @@ impl SystemProbe for TimingProbe {
         let changes = world.scene.borrow().world.change_stats();
         let changes = changes.into_iter().map(|s| (s.name, s.logged));
         record_changes(&mut stats, changes, &mut self.logged);
-        stats.frames += 1;
+        stats.end_tick();
     }
 }
 
@@ -215,20 +217,26 @@ pub fn install(world: &mut GameWorld) -> Rc<RefCell<FrameStats>> {
     stats
 }
 
-/// Fold one rendered frame into `stats`: its counters, the CPU ms the renderer spent
-/// recording it, and — where the adapter has timestamps — its GPU ms in total
-/// (`gpu_ms`) and per pass kind (#835). Without timestamps no GPU key is written.
-/// It counts as one of the stats' `drawn_frames`.
+/// Fold one rendered frame into `stats` as a frame of the session (a harness
+/// render): [`record_render_into`] it.
 pub fn record_render(stats: &mut FrameStats, frame: &RenderedFrame) {
+    stats.record_frame(true, |drawn| record_render_into(drawn, frame));
+}
+
+/// Fold one rendered frame into the frame being recorded: its counters, the CPU ms
+/// the renderer spent recording it, and — where the adapter has timestamps — its
+/// GPU ms in total (`gpu_ms`) and per pass kind (#835). Without timestamps no GPU
+/// key is written. It counts as a rendered frame (`drawn_frames`).
+pub fn record_render_into(drawn: &mut DrawnFrame<'_>, frame: &RenderedFrame) {
     for (key, value) in frame.counters.pairs() {
-        stats.record(key, value as f64);
+        drawn.record(key, value as f64);
     }
-    stats.record("renderer_ms", frame.cpu_ms);
-    stats.drawn_frames += 1;
+    drawn.record("renderer_ms", frame.cpu_ms);
+    drawn.rendered();
     if let Some(gpu) = &frame.gpu {
-        stats.record("gpu_ms", gpu.total_ms());
+        drawn.record("gpu_ms", gpu.total_ms());
         for (pass, ms) in &gpu.passes {
-            stats.record_gpu_pass(pass.name(), *ms);
+            drawn.record_gpu_pass(pass.name(), *ms);
         }
     }
 }
