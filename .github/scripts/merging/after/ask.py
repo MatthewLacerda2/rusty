@@ -15,16 +15,22 @@ GLOB = re.compile(r"[A-Za-z0-9_.*?{}\[\],-]*(/[A-Za-z0-9_./*?{}\[\],-]*|\.rs)")
 
 
 def requested(body: str | None) -> str | None:
-    """`diff`, the space-separated globs, or `None` when nothing readable was asked."""
+    """`diff`, the globs, or `None` when nothing readable was asked.
+
+    Commas pass through as written: `mutants-scope.py::words` is the one place
+    a scope is split, so `a.rs, b.rs` here and in `make mutants-remote` read
+    alike (#2201). A word is checked without its trailing commas, and a lone
+    `,` is a separator, not a word."""
     found = LINE.search(body or "")
     if found is None:
         return None
     words = found.group(1).replace("`", " ").split()
-    if not words:
+    named = [w.rstrip(",") for w in words if w.strip(",")]
+    if not named:
         return None
-    if words == ["diff"]:
+    if named == ["diff"]:
         return "diff"
-    return " ".join(words) if all(GLOB.fullmatch(w) for w in words) else None
+    return " ".join(words) if all(GLOB.fullmatch(w) for w in named) else None
 
 
 def rust(files: list[str]) -> bool:

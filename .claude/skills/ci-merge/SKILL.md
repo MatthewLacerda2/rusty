@@ -404,11 +404,13 @@ for a scoped run with a line in its description, `Mutation: diff` or
 - **What runs:** `mutants-on-request.yml` on `main` at the squash commit (input
   `commit`); `diff` is that commit's Rust change against its parent
   (`mutants-scope.py --commit`). A `diff` ask whose commit changed no Rust is not
-  dispatched; globs pass as written; an unreadable line asks for nothing.
+  dispatched; globs (spaces or commas) pass as written, one plan per cargo
+  workspace (`tools/lint` is its own); an unreadable line asks for nothing.
 - **The cap:** two at once (`merging/after/slots.CAP`); the rest wait in
   `merge-queue/mutants.json`, surviving a relaunch, and are dispatched as slots
   free (also by `make queue PRS=N`).
-- **The report** lands on the merged PR as one comment edited in place. `after:`
+- **The report** lands on the merged PR as one comment edited in place (a run
+  with no answer adds why below the earlier report, and stays red). `after:`
   lines in the queue's log say each dispatch, end and refusal (refused three
   times: dropped, and said; a network failure keeps its place). `make
   queue-events` passes the lines that mean a report was lost (`dropped`,
