@@ -6,9 +6,13 @@ and this is what the workflow asks to make sense of it. Two spellings:
 
 - **`diff`** — the Rust this branch changed against `origin/main`: "would
   anything notice if what I just wrote were wrong?"
-- **anything else** — one or more git pathspec globs, space-separated
-  (`crates/physics/src/query/through.rs`, `'crates/navigation/src/**'`). `**` crosses
-  directories and `*` does not, git's own `:(glob)` rules.
+- **anything else** — one or more git pathspec globs, separated by spaces or
+  commas (`crates/physics/src/query/through.rs`, `'crates/navigation/src/**'`,
+  `a.rs, b.rs`). `**` crosses directories and `*` does not, git's own `:(glob)`
+  rules. Braces (`crates/{core,physics}/src/**`) are expanded here, since git's
+  glob magic does not expand them and would match nothing; a comma inside `{}`
+  or `[]` belongs to the glob. [`words`] is the one place a scope is split: the
+  queue's `Mutation:` parser passes commas through to it (#2201).
 
 A third form is the merge queue's (#1934): **`diff` with `--commit SHA`**, the
 Rust one squash commit changed against its parent. The queue dispatches a
@@ -71,21 +75,57 @@ def git(*args: str, ok: tuple[int, ...] = (0,)) -> str:
     return done.stdout
 
 
+def words(scope: str) -> list[str]:
+    """`scope` split at whitespace and at commas outside `{}` and `[]`: a coder
+    lists paths as `a.rs, b.rs`, which a whitespace split read as a path
+    ending in `,` that matched nothing (#2201)."""
+    out, depth, word = [], 0, ""
+    for ch in scope + " ":
+        depth += {"{": 1, "[": 1, "}": -1, "]": -1}.get(ch, 0)
+        if ch.isspace() or (ch == "," and depth <= 0):
+            out, word = out + [word] if word else out, ""
+        else:
+            word += ch
+    return out
+
+
 def kind(scope: str) -> str:
     """Which spelling `scope` is. Empty is an error, never a default."""
-    words = scope.split()
-    if not words:
+    named = words(scope)
+    if not named:
         sys.exit("mutants-scope: the scope is empty -- name `diff` or path globs")
-    return "diff" if words == ["diff"] else "paths"
+    return "diff" if named == ["diff"] else "paths"
+
+
+def expand(glob: str) -> list[str]:
+    """`glob` with its first `{a,b}` expanded, recursively, as a shell would.
+    git's `:(glob)` magic has no braces, so `src/{a,b}/**` passed through would
+    match nothing, ever; an unbalanced brace is refused for the same reason."""
+    start = glob.find("{")
+    if start < 0:
+        if "}" in glob:
+            sys.exit(f"mutants-scope: {glob!r} closes a brace it never opened")
+        return [glob]
+    depth, cuts = 0, [start]
+    for i in range(start, len(glob)):
+        depth += {"{": 1, "}": -1}.get(glob[i], 0)
+        if (glob[i] == "," and depth == 1) or depth == 0:
+            cuts.append(i)
+        if depth == 0:
+            break
+    else:
+        sys.exit(f"mutants-scope: {glob!r} opens a brace it never closes")
+    head, tail = glob[:start], glob[cuts[-1] + 1:]
+    return [e for a, b in zip(cuts, cuts[1:]) for e in expand(head + glob[a + 1:b] + tail)]
 
 
 def matching(globs: list[str]) -> list[str]:
     """The tracked Rust files the globs name, in git's glob dialect. One glob
-    that matches nothing is refused, not only all of them: a module moved to
-    `crates/<m>/src/` leaves its old `src/<m>/**` glob naming nothing, and the
-    other globs would hide it."""
+    (or one alternative of a brace) that matches nothing is refused, not only
+    all of them: a module moved to `crates/<m>/src/` leaves its old
+    `src/<m>/**` glob naming nothing, and the other globs would hide it."""
     found: set[str] = set()
-    for g in globs:
+    for g in (e for w in globs for e in expand(w)):
         listed = git("ls-files", "-z", "--", f":(glob){g}")
         rust = {p for p in listed.split("\0") if p.endswith(".rs")}
         if not rust:
@@ -157,10 +197,16 @@ def fork_point(base: str) -> str:
     return git("merge-base", base, "HEAD").strip()
 
 
-def changed(fork: str, root: str, files: list[str]) -> str:
-    """What this branch changed in `files` since `fork`, relative to `root`."""
-    rel = [] if root == ROOT else [f"--relative={root}/"]
-    return git("diff", *rel, fork, "HEAD", "--", *files)
+def changed(fork: str, root: str, roots: list[str]) -> str:
+    """What this branch changed in `root`'s Rust since `fork`, relative to
+    `root`. A pathspec per workspace, never the list of files: a diff limited
+    to the new names hides each moved file's old one from rename detection, so
+    a moved file with one edited line read as wholly added and planned every
+    mutant in it. The engine's part is all Rust less the standalone `roots`."""
+    if root == ROOT:
+        spec = ["*.rs", *(f":(exclude){r}/" for r in roots if r != ROOT)]
+        return git("diff", "-M", fork, "HEAD", "--", *spec)
+    return git("diff", "-M", f"--relative={root}/", fork, "HEAD", "--", f"{root}/*.rs")
 
 
 def resolve(scope: str, base: str, commit: str | None = None) -> tuple[dict, dict[str, str]]:
@@ -173,7 +219,7 @@ def resolve(scope: str, base: str, commit: str | None = None) -> tuple[dict, dic
         fork = fork_point(base)
         files = sorted(git("diff", "--name-only", fork, "HEAD", "--", "*.rs").split())
     else:
-        files = matching(scope.split())
+        files = matching(words(scope))
         if not files:
             sys.exit(f"mutants-scope: no tracked Rust file matches {scope!r}")
     roots: dict[str, list[str]] = {}
@@ -186,7 +232,7 @@ def resolve(scope: str, base: str, commit: str | None = None) -> tuple[dict, dic
         if root != ROOT and (why := idle(root)):
             part["idle"] = why
         else:
-            diffs[name] = changed(fork, root, mine) if which == "diff" else whole(root, mine)
+            diffs[name] = changed(fork, root, list(roots)) if which == "diff" else whole(root, mine)
         parts.append(part)
     plan = {"kind": which, "scope": scope, "base": base, "files": files, "parts": parts}
     if commit:
@@ -266,7 +312,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="mutants-scope.py", description=__doc__.split("\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
     res = sub.add_parser("resolve", help="turn a scope into a plan and one diff per workspace")
-    res.add_argument("scope", help="`diff`, or space-separated path globs")
+    res.add_argument("scope", help="`diff`, or path globs separated by spaces or commas")
     res.add_argument("--base", default=BASE, help="what a `diff` scope compares against")
     res.add_argument("--commit", help="the checked-out commit a `diff` is that commit's own change (#1934)")
     res.add_argument("--out", type=Path, required=True, help="where the plan JSON goes; the diffs go beside it")
@@ -281,7 +327,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "globs":
-        print(f"mutants-scope: {len(matching(args.glob))} files")
+        print(f"mutants-scope: {len(matching(words(' '.join(args.glob))))} files")
         return
     if args.command == "resolve":
         plan, diffs = resolve(args.scope, args.base, args.commit or None)

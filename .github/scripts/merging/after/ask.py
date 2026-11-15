@@ -14,31 +14,23 @@ LINE = re.compile(r"^[ \t]*Mutation:[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 GLOB = re.compile(r"[A-Za-z0-9_.*?{}\[\],-]*(/[A-Za-z0-9_./*?{}\[\],-]*|\.rs)")
 
 
-def unlisted(word: str) -> list[str]:
-    """`word` split at its commas outside braces: a coder lists paths as
-    `a.rs, b.rs`, which the scope script's whitespace split read as a path ending
-    in `,` (#2201), while a brace glob's commas (`src/{a,b}/**`) are its own."""
-    parts, depth, start = [], 0, 0
-    for i, ch in enumerate(word):
-        depth += {"{": 1, "}": -1}.get(ch, 0)
-        if ch == "," and depth == 0:
-            parts.append(word[start:i])
-            start = i + 1
-    parts.append(word[start:])
-    return [p for p in parts if p]
-
-
 def requested(body: str | None) -> str | None:
-    """`diff`, the space-separated globs, or `None` when nothing readable was asked."""
+    """`diff`, the globs, or `None` when nothing readable was asked.
+
+    Commas pass through as written: `mutants-scope.py::words` is the one place
+    a scope is split, so `a.rs, b.rs` here and in `make mutants-remote` read
+    alike (#2201). A word is checked without its trailing commas, and a lone
+    `,` is a separator, not a word."""
     found = LINE.search(body or "")
     if found is None:
         return None
-    words = [w for word in found.group(1).replace("`", " ").split() for w in unlisted(word)]
-    if not words:
+    words = found.group(1).replace("`", " ").split()
+    named = [w.rstrip(",") for w in words if w.strip(",")]
+    if not named:
         return None
-    if words == ["diff"]:
+    if named == ["diff"]:
         return "diff"
-    return " ".join(words) if all(GLOB.fullmatch(w) for w in words) else None
+    return " ".join(words) if all(GLOB.fullmatch(w) for w in named) else None
 
 
 def rust(files: list[str]) -> bool:
