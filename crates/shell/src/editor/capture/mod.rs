@@ -19,20 +19,27 @@
 //!
 //! No adapter → `Ok(false)`, the same skip contract as every headless capture.
 //! [`capture_demo`] captures the editor with a demo open on the Game view's
-//! timeline (#1598).
+//! timeline (#1598). The Inspector's Preview tab renders through the window's own
+//! call (`preview`, #2239).
 
 mod demo;
 mod paint;
+mod preview;
+mod viewport;
 
 use std::{cell::RefCell, path::Path, rc::Rc};
 
+use preview::PreviewTarget;
+use viewport::render_viewport;
+
 pub use demo::capture_demo;
 pub(super) use paint::paint;
+pub use preview::{parse_mesh, refuse_with_picker, PreviewRect};
 use rusty_app::{GameWorld, ProjectSource};
-use rusty_core::application::{Gizmo, SceneGizmos};
+use rusty_core::application::{GameViewSetting, SceneGizmos};
 use rusty_core::input::InputState;
 use rusty_dev::capture::CaptureHost;
-use rusty_editor::{viewport::scene_nav::selection_bounds, EditorUi, ViewportTab};
+use rusty_editor::{viewport::scene_nav::selection_bounds, EditorUi, PreviewMesh, ViewportTab};
 use rusty_navigation::NavigationGraph;
 use rusty_render::{readback, OFFSCREEN_FORMAT};
 use rusty_scene::Scene;
@@ -69,6 +76,10 @@ pub struct EditorCaptureOptions {
     pub pointer: Option<(f32, f32)>,
     /// The Scene view's gizmos (#1909), as its toggles or `Editor.SetGizmo` set them.
     pub gizmos: SceneGizmos,
+    /// The Game view's size (#2207), as its dropdown or `Editor.SetGameViewSize` sets it.
+    pub game_view: GameViewSetting,
+    /// Open the selection's Inspector Preview tab on this mesh (#2239): `--preview`.
+    pub preview: Option<PreviewMesh>,
 }
 
 impl Default for EditorCaptureOptions {
@@ -84,6 +95,8 @@ impl Default for EditorCaptureOptions {
             tab: ViewportTab::Scene,
             pointer: None,
             gizmos: SceneGizmos::default(),
+            game_view: GameViewSetting::default(),
+            preview: None,
         }
     }
 }
@@ -111,7 +124,8 @@ pub fn default_world(project: ProjectSource) -> GameWorld {
 
 /// Capture the editor over `game`'s scene to a PNG at `path`: `Ok(false)` on a box with
 /// no GPU/software adapter, `Err` for a `select` name the scene doesn't hold, a missing
-/// `select_asset` path, both selections at once, or an I/O / encode failure.
+/// `select_asset` path, both selections at once, a `preview` whose selection has no
+/// Preview tab or whose written frame shows no rendered image, or an I/O / encode failure.
 pub fn capture(
     game: &GameWorld,
     path: impl AsRef<Path>,
@@ -127,6 +141,23 @@ pub fn capture_into(
     path: impl AsRef<Path>,
     opts: &EditorCaptureOptions,
 ) -> Result<bool, String> {
+    Ok(capture_shot(host, game, path, opts)?.is_some())
+}
+
+/// What a written capture shows beyond its PNG.
+#[derive(Clone, Copy, Debug)]
+pub struct Shot {
+    /// Under `--preview`, the Preview tab's image rect in the PNG.
+    pub preview: Option<PreviewRect>,
+}
+
+/// [`capture_into`], saying what it wrote: `Ok(None)` with no adapter.
+pub fn capture_shot(
+    host: &mut CaptureHost,
+    game: &GameWorld,
+    path: impl AsRef<Path>,
+    opts: &EditorCaptureOptions,
+) -> Result<Option<Shot>, String> {
     let ui = &mut initial_ui(game, opts)?;
     capture_with(host, game, ui, path, opts)
 }
@@ -138,11 +169,11 @@ fn capture_with(
     ui: &mut EditorUi,
     path: impl AsRef<Path>,
     opts: &EditorCaptureOptions,
-) -> Result<bool, String> {
+) -> Result<Option<Shot>, String> {
     let (width, height) = (opts.width.max(1), opts.height.max(1));
     let Some(renderer) = host.renderer(width, height) else {
         rusty_dev::capture::no_adapter("capture the editor")?;
-        return Ok(false);
+        return Ok(None);
     };
     let mut egui_renderer = egui_wgpu::Renderer::new(
         &renderer.device,
@@ -151,7 +182,7 @@ fn capture_with(
     );
     let ctx = egui::Context::default();
     let mut texture_id = None;
-    let mut output = None;
+    let (mut output, mut preview) = (None, PreviewTarget::default());
     for frame in 0..opts.frames.max(1) {
         let mut input = raw_input(width, height, frame);
         if let Some((x, y)) = opts.pointer {
@@ -160,8 +191,11 @@ fn capture_with(
                 .push(egui::Event::PointerMoved(egui::pos2(x, y)));
         }
         ctx.begin_pass(input);
-        let size = draw_ui(ui, &ctx, game, opts.playing, texture_id);
-        render_viewport(host, &mut egui_renderer, game, ui, size, &mut texture_id);
+        preview.bind(ui);
+        let drawn = draw_ui(ui, &ctx, game, opts.playing, texture_id);
+        render_viewport(host, &mut egui_renderer, game, ui, drawn, &mut texture_id);
+        let renderer = host.renderer(width, height).expect("probed above");
+        preview.render((renderer, &mut egui_renderer), ui);
         output = Some(ctx.end_pass());
         // Upload font atlas / image deltas every frame: egui sends each only once.
         let renderer = host.renderer(width, height).expect("probed above");
@@ -173,13 +207,17 @@ fn capture_with(
         }
         out.textures_delta.clear(); // egui asserts every delta is consumed
     }
+    let shown = opts
+        .preview
+        .map(|_| preview.shown(width, height))
+        .transpose()?;
     let output = output.expect("at least one frame");
     let renderer = host.renderer(width, height).expect("probed above");
     let target = paint(renderer, &mut egui_renderer, &ctx, output, width, height);
     let pixels =
         readback::read_texture_rgba8(&renderer.device, &renderer.queue, &target, width, height);
     readback::write_png(path, width, height, &pixels)?;
-    Ok(true)
+    Ok(Some(Shot { preview: shown }))
 }
 
 /// A fresh editor with `opts`' tab, selection and framing applied.
@@ -188,7 +226,7 @@ fn initial_ui(game: &GameWorld, opts: &EditorCaptureOptions) -> Result<EditorUi,
     game.refresh_ui_textures();
     super::sync_ui_textures(&mut ui, game);
     ui.viewport_tab = opts.tab;
-    ui.gizmos = opts.gizmos;
+    (ui.gizmos, ui.game_view) = (opts.gizmos, opts.game_view);
     if let Some(name) = &opts.select {
         let id = game.scene().borrow().find_entity_by_name(name);
         ui.selected_entity_id = Some(id.ok_or_else(|| format!("no entity named {name:?}"))?);
@@ -207,6 +245,7 @@ fn initial_ui(game: &GameWorld, opts: &EditorCaptureOptions) -> Result<EditorUi,
     if let Some((center, radius)) = bounds {
         ui.scene_view.camera.frame(center, radius);
     }
+    preview::open(&mut ui, &game.scene().borrow(), opts.preview)?;
     Ok(ui)
 }
 
@@ -221,74 +260,24 @@ pub(super) fn raw_input(width: u32, height: u32, frame: u32) -> egui::RawInput {
     }
 }
 
-/// Run the editor's own draw over the live cells; returns the viewport rect's size.
+/// Run the editor's own draw over the live cells; returns the viewport's interaction.
 fn draw_ui(
     ui: &mut EditorUi,
     ctx: &egui::Context,
     game: &GameWorld,
     playing: bool,
     texture_id: Option<egui::TextureId>,
-) -> egui::Vec2 {
+) -> rusty_editor::ViewportInteraction {
     let mut is_playing = playing;
     // A capture records no window frames: its GPU line reads "nothing drawn yet".
     let clock = rusty_editor::viewport::stats::Clock::at(60.0);
     super::sync::sync_stats(ui, game, clock, false);
-    let interaction = ui.draw(
+    ui.draw(
         ctx,
         &mut game.world.scene.borrow_mut(),
         &mut game.resources.console.borrow_mut(),
         &mut game.resources.nav.borrow_mut(),
         &mut is_playing,
         texture_id,
-    );
-    interaction.size
-}
-
-/// `shell::editor`'s `render_viewport_scene` against the capture host: draw, then bind.
-fn render_viewport(
-    host: &mut CaptureHost,
-    egui_renderer: &mut egui_wgpu::Renderer,
-    game: &GameWorld,
-    ui: &EditorUi,
-    size: egui::Vec2,
-    texture_id: &mut Option<egui::TextureId>,
-) {
-    let scene_tab = ui.viewport_tab == ViewportTab::Scene;
-    let (px, py) = match ui.demo_size() {
-        Some(size) if !scene_tab => size, // the demo's own, letterboxed (#1598)
-        _ => (size.x.round() as u32, size.y.round() as u32),
-    };
-    if px == 0 || py == 0 {
-        return;
-    }
-    if ui.demo_size().is_none() {
-        game.resources.screen.borrow_mut().set_game_view(px, py);
-    }
-    // The settings first: the Game view's scene renders at the render scale (#1498).
-    let Some(renderer) = host.renderer(px, py) else {
-        return;
-    };
-    let display_scale = game.resources.screen.borrow().display_scale();
-    renderer.apply_graphics(
-        *game.script_manager().graphics_cell().borrow(),
-        display_scale,
-    );
-    let scale = renderer.render_scale(scene_tab);
-    let Some((renderer, view)) = host.frame(px, py, scale) else {
-        return;
-    };
-    let Some(target) = view.color_target_view() else {
-        return;
-    };
-    let scene = game.scene().borrow();
-    view.gizmos = ui.gizmos;
-    if scene_tab {
-        super::navmesh::hand(renderer, &view.gizmos, &game.resources.nav.borrow());
-    }
-    view.ui.screen_in_editor = scene_tab && ui.gizmos.on(Gizmo::Ui);
-    view.game_gizmos = !scene_tab && ui.gizmos.on(Gizmo::GameGizmos);
-    let camera = super::viewport::viewport_camera(ui, game, &scene, ui.viewport_tab);
-    renderer.set_ui_textures(Rc::clone(&ui.ui_textures));
-    renderer.render(view, &scene, &camera, &target, scene_tab);
-    super::viewport::rebind_egui_texture(egui_renderer, &renderer.device, texture_id, view);
+    )
 }

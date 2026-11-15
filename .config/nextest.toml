@@ -9,9 +9,9 @@ fail-fast = false
 # No retries. A retried pass is reported as FLAKY but still green, and a flaky test
 # is a bug to root-cause, not something to paper over.
 retries = 0
-# A test past a minute is flagged SLOW; past five it is killed. Nothing in the suite
-# comes close (the slowest is seconds), so a kill means a hang — better a named
-# timeout than a CI job silently running to GitHub's six-hour ceiling.
+# A test past a minute is flagged SLOW; past five it is killed. A test is meant to
+# take seconds, so a SLOW flag is worth a look and a kill means a hang — better a
+# named timeout than a CI job silently running to GitHub's six-hour ceiling.
 slow-timeout = { period = "60s", terminate-after = 5 }
 # Print only tests worth reading (slow, retried, failed) plus the summary, not a PASS
 # line per test: ~1,800 lines of passes per `make test` is output an agent pays for.

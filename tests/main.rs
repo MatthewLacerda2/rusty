@@ -74,6 +74,7 @@ mod sound_song_api;
 mod starter_materials;
 mod static_flag_api;
 mod texture_api;
+mod texture_library;
 mod transform_api;
 mod ui;
 mod video_api;

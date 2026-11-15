@@ -107,6 +107,7 @@ fn gpu_bench_reports_frame_render_and_counter_rows() {
 fn gpu_rows_are_scaled_by_the_frame_clock_speed() {
     use rusty_render::{GpuPass, GpuTimes};
     let gpu = GpuTimes {
+        frame: 1,
         passes: vec![(GpuPass::Shadows, 2.0), (GpuPass::Forward, 6.0)],
     };
     let frame = RenderedFrame {

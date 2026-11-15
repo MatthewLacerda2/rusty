@@ -178,18 +178,31 @@ impl FrameStats {
     /// inside. A metric with no sample inside is absent, so a pass that stopped
     /// running leaves. The result keeps no history.
     pub fn window(&self, n: usize) -> FrameStats {
-        let r = &self.recent;
         let n = n.min(RECENT) as u64;
+        self.folded(n, |at| self.recent.within(at, n))
+    }
+
+    /// The newest recorded frame alone, every tick it ran included (where
+    /// [`window`](Self::window)`(1)` keeps only the newest tick): what the frame log
+    /// writes per drawn frame (#2206). A tick metric's `samples` counts its ticks,
+    /// so `avg * samples` is the frame's total.
+    pub fn last_frame(&self) -> FrameStats {
+        self.folded(1, |at| !self.recent.past_edge(at, 1))
+    }
+
+    /// The samples within the newest `n` frames that `keep` also takes, folded.
+    fn folded(&self, n: u64, keep: impl Fn(Stamp) -> bool) -> FrameStats {
+        let r = &self.recent;
         let count = |marks: &VecDeque<Stamp>| {
             let edge = marks.partition_point(|at| r.past_edge(*at, n));
-            marks.range(edge..).filter(|at| r.within(**at, n)).count()
+            marks.range(edge..).filter(|at| keep(**at)).count()
         };
         FrameStats {
             frames: count(&r.tick_marks) as u64,
             drawn_frames: count(&r.drawn_marks) as u64,
-            metrics: fold_recent(r, &r.metrics, n),
-            systems: fold_recent(r, &r.systems, n),
-            gpu_passes: fold_recent(r, &r.gpu_passes, n),
+            metrics: fold_recent(r, &r.metrics, n, &keep),
+            systems: fold_recent(r, &r.systems, n, &keep),
+            gpu_passes: fold_recent(r, &r.gpu_passes, n, &keep),
             recent: Recent::default(),
         }
     }

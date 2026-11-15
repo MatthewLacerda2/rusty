@@ -93,3 +93,28 @@ fn gpu_the_scene_view_draws_the_screen_ui_with_its_overlay_on() {
     renderer.render(&mut view, &scene, &cam, &target, true);
     assert_eq!(view.ui.last_drawn(), 1, "the Scene tab's UI toggle (#423)");
 }
+
+/// A stretched white image with the screen boxed in the left half of a 32×16
+/// view: it covers that box and nothing right of it.
+#[test]
+fn gpu_a_screen_box_confines_the_screen_ui() {
+    let Some(mut renderer) = crate::test_gpu::headless_or_skip(32, 16) else {
+        return;
+    };
+    let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
+    let (mut scene, bar) = hud();
+    let mut rt = scene.world.rect_transform_mut(bar).expect("rect");
+    (rt.anchor_min, rt.anchor_max) = (Vec2::ZERO, Vec2::ONE);
+    drop(rt);
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 32, 16);
+    let target = view.color_target_view().expect("target");
+    view.ui.screen_in_editor = true;
+    view.ui.screen_box = Some((0, 0, 16, 16));
+    renderer.render(&mut view, &scene, &cam, &target, true);
+    let texture = view.color_target().expect("texture");
+    let img =
+        crate::readback::read_texture_rgba8(&renderer.device, &renderer.queue, texture, 32, 16);
+    let white = |x: usize, y: usize| img[(y * 32 + x) * 4..][..3].iter().all(|&c| c > 240);
+    assert!(white(4, 8) && white(12, 8), "the box is covered");
+    assert!(!white(20, 8) && !white(28, 8), "right of the box is not");
+}

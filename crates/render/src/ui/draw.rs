@@ -46,8 +46,8 @@ impl Renderer {
         editor_mode: bool,
     ) {
         (view.ui.uploads, view.ui.drawn) = (0, 0);
-        let size = view.size();
-        let screen = Vec2::new(size.width as f32, size.height as f32);
+        let (_, _, w, h) = screen_box(view);
+        let screen = Vec2::new(w as f32, h as f32);
         let textures = Rc::clone(&self.ui_renderer.texture_sizes);
         let ui_view = UiView::with_camera(screen, camera.clone(), textures);
         let layout = UiLayout::compute_in(&scene.world, &ui_view);
@@ -105,7 +105,7 @@ impl Renderer {
         self.ui_renderer.ensure_pipeline(&self.device, format);
         self.ui_renderer.shaders.ensure_screen(&self.device, format);
         self.run_backdrop_blur(view);
-        self.encode_ui(&view.ui, &target, format, view.size());
+        self.encode_ui(&view.ui, &target, format, screen_box(view));
     }
 
     /// Record and submit the UI pass over `target`.
@@ -114,7 +114,7 @@ impl Renderer {
         cache: &UiViewCache,
         target: &wgpu::TextureView,
         format: wgpu::TextureFormat,
-        size: crate::PixelSize,
+        (x, y, width, height): (u32, u32, u32, u32),
     ) {
         let ui = &self.ui_renderer;
         let screen = || {
@@ -137,6 +137,7 @@ impl Renderer {
                 target,
                 wgpu::LoadOp::Load,
             );
+            pass.set_viewport(x as f32, y as f32, width as f32, height as f32, 0.0, 1.0);
             let mut bound = None;
             for (i, canvas) in screen() {
                 pass.set_vertex_buffer(0, canvas.buffer.slice(..));
@@ -151,14 +152,26 @@ impl Renderer {
                     let s = batch
                         .clip
                         .rect
-                        .map_or((0, 0, size.width, size.height), |s| (s.x, s.y, s.w, s.h));
-                    pass.set_scissor_rect(s.0, s.1, s.2, s.3);
+                        .map_or((0, 0, width, height), |s| (s.x, s.y, s.w, s.h));
+                    pass.set_scissor_rect(x + s.0, y + s.1, s.2, s.3);
                     pass.draw(batch.range.clone(), 0..1);
                 }
             }
         }
         self.queue.submit(Some(encoder.finish()));
     }
+}
+
+/// The rect the screen canvases lay out and draw in: the view's `screen_box`,
+/// kept inside the view, else the whole view.
+fn screen_box(view: &RenderView) -> (u32, u32, u32, u32) {
+    let size = view.size();
+    let Some((x, y, w, h)) = view.ui.screen_box else {
+        return (0, 0, size.width, size.height);
+    };
+    let (sw, sh) = (size.width.max(1), size.height.max(1));
+    let (x, y) = (x.min(sw - 1), y.min(sh - 1));
+    (x, y, w.clamp(1, sw - x), h.clamp(1, sh - y))
 }
 
 /// Every texture path an active, laid-out Image samples — gathered first so the

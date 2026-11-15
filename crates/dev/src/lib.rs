@@ -25,6 +25,7 @@
 //!   bake        — the bakes; Generate Lighting: lightmaps, then probes, then written (#832)
 //!   lua_surface — `Debug.*` and the `*.Bake` verbs, installed onto the Lua surface (#737)
 //!   stats       — frame stats: the schedule timing probe + render counters (#433)
+//!   frame_log   — the rolling frame and console log under `saved/logs/` (#2206)
 //!   bench       — the stress scene and report behind `make bench` (#835)
 //!   export      — ship a project: runtime files and the import cache, no sources (#1267)
 //!   game        — test games: a Lua recipe builds a small game project headless (#2029)
@@ -53,6 +54,7 @@ pub mod command_channel;
 pub mod console;
 pub mod demo;
 pub mod export;
+pub mod frame_log;
 pub mod game;
 pub mod harness;
 pub mod lua_surface;
