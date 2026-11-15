@@ -82,7 +82,7 @@ fn mesh_position(scene: &Scene) -> Vec3 {
 #[test]
 fn every_mesh_choice_spawns_a_mesh_entity() {
     for mesh in PreviewMesh::ALL {
-        let scene = build_preview_scene(mesh, &PreviewSubject::Texture("none.png".to_string()));
+        let scene = build_preview_scene(mesh, 1, &PreviewSubject::Texture("none.png".to_string()));
         let meshed = scene.world.ids_with_mesh().len();
         assert_eq!(
             meshed,
@@ -97,6 +97,7 @@ fn every_mesh_choice_spawns_a_mesh_entity() {
 fn scene_has_no_baked_skybox_and_one_directional_light() {
     let scene = build_preview_scene(
         PreviewMesh::Sphere,
+        1,
         &PreviewSubject::Material(Box::default()),
     );
     assert!(
@@ -115,6 +116,7 @@ fn scene_has_no_baked_skybox_and_one_directional_light() {
 fn texture_subject_sets_base_color_map() {
     let scene = build_preview_scene(
         PreviewMesh::Sphere,
+        1,
         &PreviewSubject::Texture("assets/textures/rock.png".to_string()),
     );
     let material = scene
@@ -136,6 +138,7 @@ fn material_subject_is_applied_verbatim() {
     };
     let scene = build_preview_scene(
         PreviewMesh::Cube,
+        1,
         &PreviewSubject::Material(Box::new(custom.clone())),
     );
     let material = scene.materials.get("preview::material").unwrap();
@@ -146,7 +149,7 @@ fn material_subject_is_applied_verbatim() {
 #[test]
 fn model_subject_instantiates_every_sub_object_at_the_origin() {
     let path = write_temp_obj("preview_scene_test_quad.obj");
-    let scene = build_preview_scene(PreviewMesh::Sphere, &PreviewSubject::Model(path));
+    let scene = build_preview_scene(PreviewMesh::Sphere, 1, &PreviewSubject::Model(path));
     // The fixture's single named object ("Quad") becomes one entity carrying its own
     // Asset-referenced mesh, not the sphere placeholder.
     assert_eq!(scene.world.ids_with_mesh().len(), 1);
@@ -158,7 +161,7 @@ fn an_off_origin_model_is_recentred_where_the_camera_looks() {
     // used to render as empty sky — present in the scene, never in shot (#353 found
     // this by looking at the bundled Suzanne's preview).
     let path = write_obj("preview_scene_test_offset.obj", OFFSET_QUAD_OBJ);
-    let scene = build_preview_scene(PreviewMesh::Sphere, &PreviewSubject::Model(path));
+    let scene = build_preview_scene(PreviewMesh::Sphere, 1, &PreviewSubject::Model(path));
     // The fixture's own bounds centre, scaled with the subject to fit the frame.
     let scale = fit_scale(Vec3::new(9.0, 5.0, -1.0), Vec3::new(11.0, 5.0, 1.0));
     let expected = -Vec3::new(10.0, 5.0, 0.0) * scale;
@@ -175,7 +178,7 @@ fn a_multi_part_model_shares_one_offset_so_its_layout_survives() {
     // each part independently would stack them all at the origin and silently
     // rearrange the model. Also the only path that unions two sets of bounds together.
     let path = write_obj("preview_scene_test_two_part.obj", TWO_PART_OBJ);
-    let scene = build_preview_scene(PreviewMesh::Sphere, &PreviewSubject::Model(path));
+    let scene = build_preview_scene(PreviewMesh::Sphere, 1, &PreviewSubject::Model(path));
 
     let meshes = scene.world.ids_with_mesh();
     assert_eq!(meshes.len(), 2, "both sub-objects spawn");
@@ -194,7 +197,7 @@ fn a_centimetre_model_is_scaled_up_to_fill_the_frame() {
     // An FBX in its default unit, the centimetre, imports a hundredth of a metre
     // across: at the fixed camera distance it was a sub-pixel speck (#1280).
     let path = write_obj("preview_scene_test_tiny.obj", TINY_QUAD_OBJ);
-    let scene = build_preview_scene(PreviewMesh::Sphere, &PreviewSubject::Model(path));
+    let scene = build_preview_scene(PreviewMesh::Sphere, 1, &PreviewSubject::Model(path));
     let id = subject(&scene, scene.world.ids_with_mesh()[0]);
     let scale = scene.world.transform(id).unwrap().scale;
     let radius = Vec3::new(0.02, 0.0, 0.02).length() * 0.5 * scale.x;
@@ -220,6 +223,7 @@ fn the_bundled_suzanne_is_pulled_into_frame() {
     // far enough off-origin that spawning at `Vec3::ZERO` shows nothing at all.
     let scene = build_preview_scene(
         PreviewMesh::Suzanne,
+        1,
         &PreviewSubject::Shader("unused.wgsl".to_string()),
     );
     let position = mesh_position(&scene);
@@ -235,6 +239,7 @@ fn the_bundled_suzanne_is_fitted_like_a_model() {
     // as a model showed at two sizes (#1287).
     let scene = build_preview_scene(
         PreviewMesh::Suzanne,
+        1,
         &PreviewSubject::Shader("unused.wgsl".to_string()),
     );
     let asset = rusty_asset::import_and_sync_sidecar(Path::new(&suzanne_path())).unwrap();

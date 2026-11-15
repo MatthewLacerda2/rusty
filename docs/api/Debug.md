@@ -62,7 +62,7 @@ end
 
 `Debug.Snapshot` is the structured read; **`Debug.Preview` is the visual one**. It
 renders an asset in the same isolated preview scene the editor's Inspector "Preview"
-tab shows a human — one stand-in mesh, a procedural sky, one key light — and writes it
+tab shows a human — one stand-in mesh, a procedural sky, one light — and writes it
 to a PNG, **headlessly**. That closes the authoring loop for shaders in particular:
 `Shader.Bake` proves a module *compiles*, and this shows what it *renders*.
 
@@ -97,17 +97,41 @@ Material.DefineAsset("brick", { base_color_map = "brick_albedo.png", roughness =
 Debug.PreviewMaterial("brick", "out/brick_mat.png", { mesh = "cube" })
 ```
 
-**Options** (all optional): `mesh` is `"sphere"` (default), `"cube"` or `"suzanne"` and
-is ignored for models; `resolution` is the square output's edge in pixels (default
-`512`, clamped to `16`–`4096`).
+**Options** (all optional; `mesh` and `repeats` are ignored for models):
 
-The framing is **fixed** — there are deliberately no camera parameters. Orbit/zoom is
+| Option | Values | Default | What it does |
+|---|---|---|---|
+| `mesh` | `"sphere"`, `"cube"`, `"suzanne"`, `"plane"` | `"sphere"` | the stand-in the subject is drawn on |
+| `repeats` | a whole number, 1 or more | `1` | how many times the material repeats across the stand-in |
+| `resolution` | pixels | `512` | the square output's edge, clamped to `16`–`4096` |
+
+The sphere, cube and Suzanne are a **prop's** view: a three-quarter key light, the
+subject in the middle of the frame. The **plane** is a **tiling surface's** view (Unity's
+quad preview, tilted): a flat 4 m square seen from about 25° above its surface, filling
+the bottom of the frame with its far edge high in it, under a light raking across it at
+about 20°. That is how a player sees a floor or a corridor wall, and the angle at which
+a normal map's relief (mortar depth, grain, bevels) shows: the faces turned toward the
+light catch it, the ones turned away go dark. `repeats` multiplies the material's own
+`tiling`, so a stain or crack that comes back every tile shows as a pattern. Under a
+world mapping (`uv_mapping` `Planar` or `Triplanar`) the preview's copy of the material
+has its `world_size` (and its detail layer's, in proportion) set so that `repeats ×
+world_size` metres span the stand-in: the same number of repeats shows either way, and
+the camera never moves. The library's own asset is not changed.
+
+```lua no-run
+-- a wall or floor material: three repeats on the plane, to judge repetition and relief
+Debug.PreviewMaterial("brick", "out/brick_plane.png", { mesh = "plane", repeats = 3 })
+```
+
+`repeat` is a Lua keyword, so the option is spelled `repeats`.
+
+The framing is **fixed**, one per mesh — there are deliberately no camera parameters. Orbit/zoom is
 the human affordance in the editor; an agent needs the shot reproducible so two
 captures of the same asset are comparable pixel-for-pixel. Parent directories of
 `out_png` are created for you.
 
 Errors are raised for a caller mistake (a path that doesn't exist, an extension with no
-preview story, an unknown `mesh` name) so a typo can't quietly return a picture of an
+preview story, an unknown `mesh` name, a `repeats` below 1) so a typo can't quietly return a picture of an
 empty sky. The one non-error miss is a machine with no GPU or software adapter, where
 the call **returns `nil`** after a warning rather than failing the run.
 

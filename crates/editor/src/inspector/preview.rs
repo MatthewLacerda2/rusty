@@ -13,7 +13,7 @@
 //! only lays out the panel and records what to render next; `main.rs` is the only place
 //! a `Renderer` is in scope.
 
-pub use rusty_preview::{build_preview_scene, OrbitState, PreviewMesh, PreviewSubject};
+pub use rusty_preview::{build_preview_scene, framing, OrbitState, PreviewMesh, PreviewSubject};
 
 use crate::theme::{chrome, Theme};
 use crate::EditorUi;
@@ -62,14 +62,14 @@ pub fn draw_tab_strip(ui: &mut egui::Ui, active: &mut bool, t: Theme) {
 pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, subject: PreviewSubject) {
     let t = editor.theme;
     let texture = editor.preview_texture_id;
-    mesh_toggle(ui, editor);
+    mesh_toggle(ui, editor, &subject);
 
     let key = format!("{:?}|{}", editor.preview_mesh, subject.cache_key());
     let stale = editor.preview_cache.as_ref().is_none_or(|c| c.key != key);
     if stale {
         editor.preview_cache = Some(PreviewCache {
             key,
-            scene: build_preview_scene(editor.preview_mesh, &subject),
+            scene: build_preview_scene(editor.preview_mesh, 1, &subject),
         });
     }
 
@@ -94,8 +94,9 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, subject: PreviewSubject) {
     });
 }
 
-/// The sphere/cube/Suzanne toggle row.
-fn mesh_toggle(ui: &mut egui::Ui, editor: &mut EditorUi) {
+/// The mesh toggle row, one label per [`PreviewMesh`]. Picking a mesh starts the
+/// orbit at that mesh's framing ([`framing`]): the plane's low view, or the default.
+fn mesh_toggle(ui: &mut egui::Ui, editor: &mut EditorUi, subject: &PreviewSubject) {
     ui.horizontal(|ui| {
         for mesh in PreviewMesh::ALL {
             if ui
@@ -103,6 +104,7 @@ fn mesh_toggle(ui: &mut egui::Ui, editor: &mut EditorUi) {
                 .clicked()
             {
                 editor.preview_mesh = mesh;
+                editor.preview_orbit = framing(mesh, subject);
             }
         }
     });
