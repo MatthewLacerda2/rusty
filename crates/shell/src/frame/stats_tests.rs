@@ -32,7 +32,11 @@ fn gpu_a_window_frame_carries_what_the_renderer_drew() {
         render.counters.draw_calls > 0 && render.cpu_ms > 0.0,
         "{render:?}"
     );
-    assert!((drew.wall_ms - 16.0).abs() < 0.5, "{}", drew.wall_ms);
+    assert!(
+        (drew.last_wall_ms - 16.0).abs() < 0.5,
+        "{}",
+        drew.last_wall_ms
+    );
 
     let before = r.frame_cost().frames;
     assert!(
@@ -49,7 +53,11 @@ fn gpu_a_window_frame_carries_what_the_renderer_drew() {
     }
     assert_eq!(stats.drawn_frames, 1);
     let last = stats.window(1);
-    assert_eq!(last.get("wall_ms").map(|s| s.samples), Some(1));
+    assert!(
+        last.get("wall_ms").is_none(),
+        "the newest frame's arrives next"
+    );
+    assert_eq!(stats.window(2).get("wall_ms").map(|s| s.samples), Some(1));
     assert!(
         last.get("draw_calls").is_none(),
         "the last frame drew nothing"

@@ -44,14 +44,18 @@ pub fn measured(
 }
 
 /// A frame the window could not show (a locked screen): the stats keep only drawn
-/// frames, but the frame log on disk (#2206) writes it, with its console lines,
+/// frames, so it only ends the frame before it (its wall time goes there), but the frame log on disk (#2206) writes it, with its console lines,
 /// so a bake run while the screen is locked can still be looked back at.
 pub fn undrawn(shell: &mut Shell, game: &GameWorld) {
     #[cfg(feature = "dev")]
-    if let Some(log) = shell.frame_log.as_mut() {
+    {
         let frames = shell.renderer.frame_cost().frames;
         let frame = window_frame(&mut shell.renderer, &shell.clock, frames);
-        log.frame(game, &frame, shell.renderer.times_gpu());
+        let stats = game.script_manager().stats_cell();
+        rusty_dev::stats::window_ended(&mut stats.borrow_mut(), &frame);
+        if let Some(log) = shell.frame_log.as_mut() {
+            log.frame(game, &frame, shell.renderer.times_gpu());
+        }
     }
     #[cfg(not(feature = "dev"))]
     let _ = (shell, game);
@@ -72,7 +76,7 @@ pub fn window_frame(
         gpu: renderer.take_gpu_times(),
     });
     WindowFrame {
-        wall_ms: f64::from(clock.frame_ms()),
+        last_wall_ms: f64::from(clock.frame_ms()),
         fps: clock.fps().map(f64::from),
         render,
         frame: cost.frames,
