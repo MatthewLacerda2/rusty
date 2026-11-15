@@ -577,7 +577,8 @@ seen failing on the third, by whoever runs `make test` there next.
 - **A tolerance says what it was measured against**: a comment beside it with the
   adapters and the values they gave (`Measured: RTX 2060 1, lavapipe 1, Metal 1`), and
   what the bar stands for. It moves only with the reason written there; "widened until
-  green" is not one.
+  green" is not one. No check holds this: a tolerance is a constant like any other in
+  a test's text, so the review does.
 - **Find the difference before moving a number.** For a GPU path held to a CPU
   reference, nudge the reference's own inputs by a GPU's rounding (1e-7 to 1e-5) and
   see how far it moves from itself. A tolerance below that is a coin toss on some
