@@ -16,7 +16,7 @@ wrong; these are the two fixed commands instead:
   ([`stranded`], #1951) each ready, labelled pull request the watch has
   passed over for more than an hour on a green head, with why.
 - [`events`]: the log from 30 lines back, filtered to what the orchestrator
-  acts on, plus coders' *Standing down* comments ([`standing`]), and an exit
+  acts on, plus coders' comments on their batch issues ([`standing`]), and an exit
   with status 1 the moment the supervisor is not running, so a dead queue is
   an event and not a silence.
 
