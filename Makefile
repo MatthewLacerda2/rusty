@@ -33,14 +33,14 @@ export PROPTEST_RNG_SEED ?= $(PROPTEST_SEED)
 # so a code failure reports first. GATES is exactly the two lists joined —
 # `make scripts` (test_gate_mirror.py) fails when it is anything else.
 QUICK_GATES := fmt size rules layers determinism components parity test-lint scripts feature-split player-tree docrefs
-HEAVY_GATES := clippy doc test deny
+HEAVY_GATES := clippy doc test fuzz-check deny
 GATES := $(QUICK_GATES) $(HEAVY_GATES)
 # Checks on the gate runner itself, run before any gate.
 SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-explore test-one-process dead-pub editor-capture game game-test export launcher bench bless-converters
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-explore test-one-process dead-pub editor-capture game game-test export launcher bench bless-converters fuzz-lock
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -77,6 +77,9 @@ compile-cache: ## Switch the worktrees' compile cache on (needs sccache); rerun 
 		'SCCACHE_CACHE_SIZE = "$(CACHE_SIZE)"' > "$(CACHE_CONFIG)" && \
 	echo "compile-cache: on for every worktree ($(CACHE_CONFIG), cap $(CACHE_SIZE))"
 
+# Under `make gates`, `fuzz-check` builds only when the diff can break the fuzz
+# build, as CI's job does; `make fuzz-check` by name always builds.
+gates: FUZZ_CHECK := --if-changed
 gates: $(SELF_CHECKS) $(GATES) ## Everything CI blocks on, fastest-failing first
 	@echo "gates: all green"
 
@@ -209,6 +212,23 @@ bless-converters: ## Re-bless crates/asset/src/convert/fingerprints.txt after a 
 	@if command -v "$${RUSTY_BLENDER:-blender}" >/dev/null 2>&1; then \
 		RUSTY_BLESS_CONVERTERS=1 $(TEST) --run-ignored only -E 'test(converter_fingerprints)'; \
 	else echo "bless-converters: no Blender found, its rows left as they are"; fi
+
+# `fuzz/` is its own workspace, so no other gate compiles it: this one does, on the
+# pinned stable toolchain (a check builds libfuzzer-sys; only *running* it needs
+# nightly, docs/testing.md), against a lock it first derives from the root one
+# (`make fuzz-lock`), `--locked`, into `target/fuzz`. `FUZZ_CHECK=--if-changed`
+# (what `make gates` sets) skips it unless the branch's diff matches ci.yml's
+# `fuzz` filter. The script holds the hint.
+fuzz-check: ## [gate] The fuzz target (fuzz/, its own workspace) still compiles, against the root lock's versions
+	python3 .github/scripts/fuzz_gate.py check $(FUZZ_CHECK)
+
+# The derived, gitignored fuzz/Cargo.lock: the root lock, pruned to what fuzz/
+# needs (`cargo metadata` resolves without compiling), so the target builds the
+# very versions the root's gates (and cargo-deny) prove; only what the fuzz-only
+# crates pull in is resolved fresh, and fuzz/Cargo.toml pins those exactly.
+# `make fuzz-check` runs it first; run it yourself before `cargo +nightly fuzz run`.
+fuzz-lock: ## Derive fuzz/Cargo.lock (gitignored) from the root Cargo.lock; run it before `cargo +nightly fuzz run`
+	python3 .github/scripts/fuzz_gate.py seed
 
 # The git CLI fetches the advisory DB: cargo-deny's built-in fetcher can't get
 # through the cloud sessions' proxy, and the CLI works everywhere else too.
