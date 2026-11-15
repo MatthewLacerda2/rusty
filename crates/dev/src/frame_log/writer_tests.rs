@@ -2,6 +2,7 @@
 //! period, and a writer that falls behind.
 
 use super::*;
+use crate::frame_log::segments::{numbered, segment_path, Segments};
 
 fn line(i: usize) -> String {
     format!(r#"{{"ch":"frames","t":{},"i":{i:04}}}"#, now_ms())
@@ -43,6 +44,7 @@ fn a_restart_continues_after_the_newest_segment() {
     let mut second = Segments::open(&dir, 10_000, None).unwrap();
     second.write(&line(1));
     second.flush();
+    drop(second);
     let numbers: Vec<u64> = files(&dir).into_iter().map(|(n, _)| n).collect();
     assert_eq!(numbers, [0, 1], "the earlier session's segment is kept");
     assert_eq!(
@@ -74,18 +76,17 @@ fn the_period_drops_a_stale_segment() {
 fn a_writer_behind_drops_and_counts() {
     let dir = rusty_test_support::temp::dir();
     let (tx, rx) = sync_channel(QUEUE);
-    let dropped = Arc::new(AtomicU64::new(0));
+    let dropped = Arc::new(Dropped::default());
     let mut writer = Writer {
-        dir: dir.clone(),
         tx: Some(tx),
         dropped: Arc::clone(&dropped),
-        dropped_total: 0,
         thread: None,
     };
     for i in 0..QUEUE + 2 {
-        writer.send(vec![line(i), line(i)]);
+        writer.send(vec![line(i), line(i)], i as u64);
     }
-    assert_eq!(writer.dropped(), 4, "two frames of two lines");
+    let records = dropped.records.load(Ordering::Relaxed);
+    assert_eq!(records, 4, "two frames of two lines");
     drop(writer);
     drain(rx, Segments::open(&dir, 1 << 20, None).unwrap(), &dropped);
     let text: String = numbered(&dir)
@@ -94,7 +95,9 @@ fn a_writer_behind_drops_and_counts() {
         .collect();
     let first = text.lines().next().unwrap();
     assert!(
-        first.contains(r#""ch":"dropped""#) && first.contains(r#""records":4"#),
+        first.starts_with(r#"{"ch":"dropped","t":"#)
+            && first.contains(&format!(r#","tick":{},"#, QUEUE + 1))
+            && first.contains(r#""records":4"#),
         "{first}"
     );
     assert_eq!(text.lines().count(), 1 + 2 * QUEUE);
@@ -104,12 +107,26 @@ fn a_writer_behind_drops_and_counts() {
 #[test]
 fn a_dropped_writer_has_written_everything() {
     let dir = rusty_test_support::temp::dir();
-    let mut writer = Writer::start(dir.clone(), 1 << 20, None).unwrap();
+    let mut writer = Writer::start(&dir, 1 << 20, None).unwrap();
     for i in 0..50 {
-        writer.send(vec![line(i)]);
+        writer.send(vec![line(i)], 0);
     }
-    writer.send(Vec::new());
+    writer.send(Vec::new(), 0);
     drop(writer);
     let text = std::fs::read_to_string(segment_path(&dir, 0)).unwrap();
     assert_eq!(text.lines().count(), 50);
+}
+
+/// A second log on a folder another one writes logs nothing and says why; once
+/// the first ends, the folder is free.
+#[test]
+fn a_second_writer_on_one_folder_is_refused() {
+    let dir = rusty_test_support::temp::dir();
+    let first = Writer::start(&dir, 1 << 20, None).unwrap();
+    let Err(err) = Writer::start(&dir, 1 << 20, None) else {
+        panic!("a second writer started");
+    };
+    assert!(err.to_string().contains("another rusty process"), "{err}");
+    drop(first);
+    assert!(Writer::start(&dir, 1 << 20, None).is_ok());
 }

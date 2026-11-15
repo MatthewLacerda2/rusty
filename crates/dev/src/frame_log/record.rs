@@ -17,7 +17,9 @@ use crate::stats::WindowFrame;
 /// What places a record: the wall-clock time, the tick, Play or not, the active
 /// scene, and the game camera's position and facing.
 pub(super) struct Place {
-    head: Map<String, Value>,
+    t: u64,
+    tick: u64,
+    rest: Map<String, Value>,
 }
 
 impl Place {
@@ -25,48 +27,69 @@ impl Place {
         let scene = game.scene().borrow();
         let cam = game_camera_from_scene(&game.camera().borrow(), &scene);
         let path = game.script_manager().scene_path_cell().borrow().clone();
-        let mut head = Map::new();
-        head.insert("t".into(), json!(t));
-        head.insert("tick".into(), json!(game.play_frame()));
-        head.insert("play".into(), json!(scene.is_playing()));
-        head.insert("scene".into(), json!(path.unwrap_or_default()));
-        head.insert("cam".into(), round3(json!(cam.position.to_array())));
-        head.insert("fwd".into(), round3(json!(cam.forward().to_array())));
-        Self { head }
+        let mut rest = Map::new();
+        rest.insert("play".into(), json!(scene.is_playing()));
+        rest.insert("scene".into(), json!(path.unwrap_or_default()));
+        rest.insert("cam".into(), round3(json!(cam.position.to_array())));
+        rest.insert("fwd".into(), round3(json!(cam.forward().to_array())));
+        let tick = game.play_frame();
+        Self { t, tick, rest }
     }
 
-    /// A record of channel `ch`: the place, then `body`'s fields.
-    fn record(&self, ch: &str, body: Map<String, Value>) -> String {
-        let mut out = Map::new();
-        out.insert("ch".into(), json!(ch));
-        out.extend(self.head.clone());
-        out.extend(body);
-        Value::Object(out).to_string()
+    /// A record of channel `ch`: the head ([`line`]), then the place and `body`.
+    fn record(&self, ch: &str, head: &[(&str, Value)], body: Map<String, Value>) -> String {
+        let mut rest = self.rest.clone();
+        rest.extend(body);
+        line(ch, self.t, self.tick, head, rest)
     }
 
-    /// The place's wall-clock time and tick alone: a line that is no frame.
+    /// The wall-clock time and tick alone: a line that is no frame.
     fn short(&self, ch: &str, body: Map<String, Value>) -> String {
-        let mut out = Map::new();
-        out.insert("ch".into(), json!(ch));
-        for key in ["t", "tick"] {
-            out.insert(key.into(), self.head[key].clone());
-        }
-        out.extend(body);
-        Value::Object(out).to_string()
+        line(ch, self.t, self.tick, &[], body)
     }
 }
 
-/// The frame's record: its clock, the ticks it ran and their CPU ms (`sim_ms`),
-/// what the renderer drew and cost, and, per channel, its GPU passes and its
-/// systems over [`SYSTEM_MS`].
+/// One line: its head, `{"ch":…,"t":…,"tick":…` then `head`'s scalars in order,
+/// written first so a reader can filter on them without parsing the line
+/// (`read::Head`), then `body`'s fields.
+pub(super) fn line(
+    ch: &str,
+    t: u64,
+    tick: u64,
+    head: &[(&str, Value)],
+    body: Map<String, Value>,
+) -> String {
+    use std::fmt::Write;
+    let mut out = format!(r#"{{"ch":{},"t":{t},"tick":{tick}"#, json!(ch));
+    for (key, value) in head {
+        let _ = write!(out, r#","{key}":{value}"#);
+    }
+    let body = Value::Object(body).to_string();
+    if body.len() > 2 {
+        out.push(',');
+        out.push_str(&body[1..]);
+    } else {
+        out.push('}');
+    }
+    out
+}
+
+/// The frame's record: its index (`frame`), its clock, the ticks it ran and their
+/// CPU ms (`sim_ms`), what the renderer drew and cost, and, per channel, its
+/// systems over [`SYSTEM_MS`]. The GPU times that resolved this frame ride on it
+/// under `gpu_frame`, the index of the earlier frame they measure: the reader
+/// moves them onto that frame's record (`read`).
 pub(super) fn frame(
     place: &Place,
     frame: &WindowFrame,
     last: &FrameStats,
     channels: LogChannels,
 ) -> String {
+    let mut head = vec![
+        ("frame", json!(frame.frame)),
+        ("ms", round3(json!(frame.wall_ms))),
+    ];
     let mut body = Map::new();
-    body.insert("ms".into(), round3(json!(frame.wall_ms)));
     if let Some(fps) = frame.fps {
         body.insert("fps".into(), round3(json!(fps)));
     }
@@ -76,7 +99,10 @@ pub(super) fn frame(
     }
     if let Some(render) = &frame.render {
         let c = &render.counters;
-        body.insert("cpu_ms".into(), round3(json!(render.cpu_ms)));
+        if let Some(gpu) = &render.gpu {
+            head.push(("gpu_frame", json!(gpu.frame)));
+        }
+        head.push(("cpu_ms", round3(json!(render.cpu_ms))));
         if let Some(gpu) = &render.gpu {
             body.insert("gpu_ms".into(), round3(json!(gpu.total_ms())));
             if channels.gpu_passes {
@@ -103,7 +129,7 @@ pub(super) fn frame(
             body.insert("systems".into(), rounded(heavy));
         }
     }
-    place.record("frames", body)
+    place.record("frames", &head, body)
 }
 
 /// A load that finished this frame: its total and each step's ms.
@@ -120,7 +146,7 @@ pub(super) fn load(place: &Place, last: &FrameStats) -> Option<String> {
     let mut body = Map::new();
     body.insert("load_ms".into(), round3(json!(total_ms.last)));
     body.insert("steps".into(), rounded(steps));
-    Some(place.record("loads", body))
+    Some(place.record("loads", &[], body))
 }
 
 /// A console line, with its level.

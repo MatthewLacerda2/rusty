@@ -60,6 +60,7 @@ pub fn window_frame(
         wall_ms: f64::from(clock.frame_ms()),
         fps: clock.fps().map(f64::from),
         render,
+        frame: cost.frames,
     }
 }
 

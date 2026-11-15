@@ -9,10 +9,15 @@
 //!
 //! * **Channels** (`LogChannels`, kept in `project.rusty`): `frames` (one record a
 //!   drawn frame), `gpu_passes` and `systems` (fields on it), `console`, `loads`,
-//!   `audio` (records of their own). Read each frame, so a switch takes effect at once.
+//!   `audio` (records of their own). Read from the `Application` each frame, so a
+//!   switch through `Debug.SetLogChannels` or the Build Settings checkbox takes
+//!   effect the next frame; a hand edit of `project.rusty` takes effect at the
+//!   next reread of the file, as every project setting does.
 //! * **Bounded**: numbered segments `frames-<n>.jsonl`, a tenth of the budget each;
 //!   past the budget (or, when set, the period) the oldest segment is deleted
 //!   ([`writer`]). The budget is read when the log starts.
+//! * **One writer per folder**: a second process on the project finds the
+//!   folder's lock held, warns once and logs nothing ([`writer`]).
 //! * **Never stalls a frame**: the frame hands its lines to a writer thread through
 //!   a bounded channel; when the writer is behind, the frame's lines are dropped and
 //!   counted, and the next write says how many (`{"ch":"dropped",…}`).
@@ -21,19 +26,25 @@
 //! * **Display-side**: wall-clock time is written here, in the dev layer, and nothing
 //!   the sim reads changes.
 //!
-//! One record (a frame, wrapped here):
+//! One record (a frame, wrapped here). Every line opens with `ch`, `t` and `tick`,
+//! and a frame's with `frame`, `ms`, `gpu_frame` and `cpu_ms`, so a read filters on them
+//! without parsing the line (`head`). `frame` is the renderer's drawn-frame count;
+//! `gpu_frame` is the earlier frame whose GPU times (`gpu_ms`, `gpu_passes`)
+//! resolved during this one and ride on it, which the read moves back onto that
+//! frame's record ([`read()`]):
 //!
 //! ```json
-//! {"ch":"frames","t":1763190000123,"tick":812,"play":true,"scene":"assets/scenes/a.scene",
-//!  "cam":[1.0,1.7,-4.2],"fwd":[0.0,0.0,1.0],"ms":16.7,"fps":60.0,"ticks":1,"sim_ms":2.1,
-//!  "cpu_ms":3.0,"gpu_ms":5.2,"draws":412,"tris":180344,"visible":300,"culled":120,
-//!  "gpu_passes":{"forward":2.1,"shadow":1.4},"systems":{"step_physics":0.9}}
+//! {"ch":"frames","t":1763190000123,"tick":812,"frame":9031,"ms":16.7,"gpu_frame":9029,
+//!  "cpu_ms":3.0,"cam":[1.0,1.7,-4.2],"culled":120,"draws":412,"fps":60.0,
+//!  "fwd":[0.0,0.0,1.0],"gpu_ms":5.2,"gpu_passes":{"forward":2.1,"shadows":1.4},
+//!  "play":true,"scene":"assets/scenes/a.scene","sim_ms":2.1,
+//!  "systems":{"step_physics":0.9},"ticks":1,"tris":180344,"visible":300}
 //! ```
 //!
 //! stored-format: `saved/logs/frames-<n>.jsonl`, the rolling frame log
 
 use std::cell::OnceCell;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use rusty_app::GameWorld;
@@ -41,8 +52,10 @@ use rusty_core::settings::logs::LogSettings;
 
 use crate::stats::WindowFrame;
 
+mod head;
 pub mod read;
 mod record;
+mod segments;
 pub mod writer;
 
 pub use read::{read, LogQuery, LogRead};
@@ -65,7 +78,10 @@ pub enum LogHost {
 /// and audio event to one record.
 pub struct FrameLog {
     writer: writer::Writer,
-    console_mark: Option<u64>,
+    /// The console's `logged` count already written; 0 at the start, so the
+    /// lines logged before the first drawn frame (a boot scene's script error)
+    /// are written with it.
+    console_mark: u64,
     audio_seq: u64,
 }
 
@@ -89,10 +105,10 @@ impl FrameLog {
         }
         let budget = u64::from(settings.budget_mb) * 1024 * 1024;
         let period = settings.minutes.map(|m| u64::from(m) * 60_000);
-        match writer::Writer::start(dir.to_path_buf(), budget, period) {
+        match writer::Writer::start(dir, budget, period) {
             Ok(writer) => Some(Self {
                 writer,
-                console_mark: None,
+                console_mark: 0,
                 audio_seq: 0,
             }),
             Err(err) => {
@@ -100,16 +116,6 @@ impl FrameLog {
                 None
             }
         }
-    }
-
-    /// The folder this log writes.
-    pub fn dir(&self) -> &PathBuf {
-        self.writer.dir()
-    }
-
-    /// Records the writer dropped so far because it was behind.
-    pub fn dropped(&self) -> u64 {
-        self.writer.dropped()
     }
 
     /// Log one drawn frame of `game`: its record (when `frames` is on), and the
@@ -131,8 +137,8 @@ impl FrameLog {
             }
         }
         let console = game.console().borrow();
-        let mark = self.console_mark.replace(console.logged());
-        if let (true, Some(mark)) = (channels.console, mark) {
+        let mark = std::mem::replace(&mut self.console_mark, console.logged());
+        if channels.console {
             lines.extend(
                 console
                     .since(mark)
@@ -147,7 +153,7 @@ impl FrameLog {
                 lines.extend(events.iter().filter_map(|e| record::audio(place(), e)));
             }
         }
-        self.writer.send(lines);
+        self.writer.send(lines, game.play_frame());
     }
 }
 

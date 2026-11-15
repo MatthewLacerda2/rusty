@@ -12,8 +12,8 @@ fn session() -> Session {
 fn frame_log_returns_its_path_and_records() {
     let s = session();
     let line = "local l = Debug.FrameLog{ last_seconds = 60 }
-        return l.path .. ' ' .. type(l.records) .. ' ' .. l.skipped";
-    assert_eq!(s.eval(line).unwrap(), "saved/logs table 0");
+        return l.path .. ' ' .. type(l.records) .. ' ' .. l.skipped .. ' ' .. l.truncated .. ' ' .. l.dropped";
+    assert_eq!(s.eval(line).unwrap(), "saved/logs table 0 0 0");
 }
 
 #[test]
@@ -44,7 +44,7 @@ fn options_become_the_query() {
     assert_eq!((q.last_seconds, q.over_ms), (Some(10.0), Some(33.0)));
     assert_eq!(
         (q.channel.as_deref(), q.limit),
-        (Some("console"), usize::MAX)
+        (Some("console"), Some(usize::MAX))
     );
     assert_eq!(query(None).unwrap(), crate::frame_log::LogQuery::default());
 }

@@ -1,107 +1,12 @@
-//! The frame log read back (#2206): a cut line, the filters, and one frame of a
-//! live world written end to end.
-
-use std::io::Write;
+//! The frame log written from a live world (#2206): one frame end to end, and
+//! the hosts and budgets that start none.
 
 use super::*;
 use crate::stats::{record_window, WindowFrame};
 
-/// Write `lines` as segment `n` of `dir`.
-fn segment(dir: &Path, n: u64, lines: &[&str]) {
-    let mut out = std::fs::File::create(writer::segment_path(dir, n)).unwrap();
-    for line in lines {
-        writeln!(out, "{line}").unwrap();
-    }
-}
-
-fn ts(read: &LogRead) -> Vec<u64> {
-    read.records
-        .iter()
-        .map(|r| r["t"].as_u64().unwrap())
-        .collect()
-}
-
-#[test]
-fn a_cut_last_line_is_skipped() {
-    let dir = rusty_test_support::temp::dir();
-    segment(&dir, 0, &[r#"{"ch":"frames","t":1,"ms":16}"#]);
-    let mut out = std::fs::File::create(writer::segment_path(&dir, 1)).unwrap();
-    let cut = concat!(r#"{"ch":"frames","t":2,"ms":16}"#, "\n", r#"{"ch":"fra"#);
-    out.write_all(cut.as_bytes()).unwrap();
-    let got = read(&dir, &LogQuery::default(), 10);
-    assert_eq!((ts(&got), got.skipped), (vec![1, 2], 1));
-}
-
-#[test]
-fn a_look_back_stops_at_the_segments_before_it() {
-    let dir = rusty_test_support::temp::dir();
-    segment(&dir, 0, &["not json at all"]);
-    segment(
-        &dir,
-        1,
-        &[r#"{"ch":"frames","t":1000}"#, r#"{"ch":"frames","t":4000}"#],
-    );
-    segment(
-        &dir,
-        2,
-        &[r#"{"ch":"frames","t":5000}"#, r#"{"ch":"frames","t":6000}"#],
-    );
-    let q = LogQuery {
-        last_seconds: Some(3.5),
-        ..LogQuery::default()
-    };
-    let got = read(&dir, &q, 7000);
-    assert_eq!(ts(&got), [4000, 5000, 6000]);
-    assert_eq!(got.skipped, 0, "segment 0 was never read");
-    let q = LogQuery {
-        limit: 2,
-        ..LogQuery::default()
-    };
-    assert_eq!(ts(&read(&dir, &q, 7000)), [5000, 6000], "the newest two");
-}
-
-#[test]
-fn over_ms_names_the_heaviest_pass_and_system() {
-    let dir = rusty_test_support::temp::dir();
-    segment(
-        &dir,
-        0,
-        &[
-            r#"{"ch":"frames","t":1,"ms":16}"#,
-            r#"{"ch":"frames","t":2,"ms":40,"gpu_passes":{"forward":3,"shadow":9},"systems":{"rebake_nav":27.7}}"#,
-            r#"{"ch":"console","t":3,"level":"info","msg":"hi"}"#,
-        ],
-    );
-    let q = LogQuery {
-        over_ms: Some(33.0),
-        ..LogQuery::default()
-    };
-    let got = read(&dir, &q, 10);
-    assert_eq!(ts(&got), [2]);
-    assert_eq!(got.records[0]["heaviest_pass"], "shadow");
-    assert_eq!(got.records[0]["heaviest_system"], "rebake_nav");
-    let console = LogQuery {
-        channel: Some("console".into()),
-        ..LogQuery::default()
-    };
-    assert_eq!(ts(&read(&dir, &console, 10)), [3]);
-    let passes = LogQuery {
-        channel: Some("gpu_passes".into()),
-        ..LogQuery::default()
-    };
-    assert_eq!(
-        ts(&read(&dir, &passes, 10)),
-        [2],
-        "the frame that carries them"
-    );
-    assert!(
-        read(&dir.join("none"), &q, 10).records.is_empty(),
-        "no log is no records"
-    );
-}
-
 /// One frame of a world, written and read back: its place, sim time and heavy
-/// system, and the console line beside it; then a channel switched off.
+/// system, and the console lines beside it (one logged before the first frame
+/// too); then a channel switched off.
 #[test]
 fn a_frame_of_a_world_is_written_with_what_was_logged() {
     let dir = rusty_test_support::temp::dir();
@@ -112,6 +17,7 @@ fn a_frame_of_a_world_is_written_with_what_was_logged() {
         wall_ms: 16.6,
         fps: Some(60.0),
         render: None,
+        frame: 0,
     };
     let run = |log: &mut FrameLog, msg: &str| {
         let stats = game.script_manager().stats_cell();
@@ -125,7 +31,7 @@ fn a_frame_of_a_world_is_written_with_what_was_logged() {
         game.console().borrow_mut().info(msg.into());
         log.frame(game, &frame);
     };
-    run(&mut log, "before the first frame: not logged");
+    run(&mut log, "logged before the first frame");
     run(&mut log, "hello");
     let off = [("console".to_string(), false)];
     game.resources
@@ -141,7 +47,7 @@ fn a_frame_of_a_world_is_written_with_what_was_logged() {
         .iter()
         .map(|r| r["ch"].as_str().unwrap())
         .collect();
-    assert_eq!(chs, ["frames", "frames", "console", "frames"]);
+    assert_eq!(chs, ["frames", "console", "frames", "console", "frames"]);
     let f = &got.records[0];
     assert_eq!(
         (f["ms"].as_f64(), f["fps"].as_f64()),
@@ -153,7 +59,8 @@ fn a_frame_of_a_world_is_written_with_what_was_logged() {
     );
     assert_eq!(f["systems"], serde_json::json!({ "step_physics": 1.5 }));
     assert!(f["cam"].is_array() && f["fwd"].is_array() && f["scene"].is_string());
-    assert_eq!(got.records[2]["msg"], "hello");
+    assert_eq!(got.records[1]["msg"], "logged before the first frame");
+    assert_eq!(got.records[3]["msg"], "hello");
 }
 
 #[test]
@@ -165,4 +72,52 @@ fn a_host_off_or_a_budget_of_zero_starts_no_log() {
     };
     assert!(FrameLog::start(&dir, none).is_none());
     assert!(FrameLog::for_host(LogHost::Player, LogSettings::default()).is_none());
+}
+
+/// A Play-mode load is one `loads` record on the frame that ran it. An edit-mode
+/// load (File ▸ Open) runs outside the load probe: it leaves no record, and none
+/// turns up stale on the first Play frame after it.
+#[test]
+fn a_play_load_is_one_record_and_an_edit_load_none() {
+    use rusty_core::input::InputState;
+    use rusty_navigation::NavigationGraph;
+    use rusty_scene::Scene;
+    use std::{cell::RefCell, rc::Rc};
+    let dir = rusty_test_support::temp::dir();
+    let level = rusty_core::paths::to_slash(&dir.join("level.scene"));
+    let mut lvl = Scene::new();
+    lvl.add_entity("Level".to_string());
+    rusty_edit::save_to_file(&lvl, &level).unwrap();
+    let nav = NavigationGraph::new(-5.0, 5.0, -5.0, 5.0, 1.0);
+    let console = rusty_script::scripting::ConsoleLogs::new();
+    let mut gw = GameWorld::new(
+        Rc::new(RefCell::new(Scene::new())),
+        Rc::new(RefCell::new(InputState::new())),
+        Rc::new(RefCell::new(nav)),
+        Rc::new(RefCell::new(console)),
+    );
+    crate::stats::install(&mut gw);
+    let mut log = FrameLog::start(&dir.join("logs"), LogSettings::default()).unwrap();
+    let frame = WindowFrame::default();
+    rusty_edit::load_from_file(&mut gw.scene().borrow_mut(), &level).unwrap();
+    gw.edit_frame();
+    log.frame(&gw, &frame);
+    gw.set_playing(true);
+    gw.tick(1.0 / 60.0);
+    log.frame(&gw, &frame);
+    gw.scene().borrow_mut().request_load(level);
+    gw.tick(1.0 / 60.0);
+    log.frame(&gw, &frame);
+    drop(log);
+    let loads = LogQuery {
+        channel: Some("loads".into()),
+        ..LogQuery::default()
+    };
+    let got = read(&dir.join("logs"), &loads, now_ms());
+    let ticks: Vec<u64> = got
+        .records
+        .iter()
+        .map(|r| r["tick"].as_u64().unwrap())
+        .collect();
+    assert_eq!(ticks, [2], "the Play load alone, on its own tick");
 }

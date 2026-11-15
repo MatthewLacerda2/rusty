@@ -12,6 +12,7 @@ use std::path::Path;
 use mlua::{Lua, Table, Value};
 
 use crate::frame_log::{now_ms, read, LogQuery, LOGS_DIR};
+use crate::stats::{known_keys, whole_count};
 use rusty_core::settings::logs::LogChannels;
 use rusty_script::api::lua_json::to_lua;
 use rusty_script::api::{put, ApiCtx, Reg};
@@ -31,6 +32,8 @@ pub fn register(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Reg {
             out.set("path", LOGS_DIR)?;
             out.set("records", to_lua(lua, &found.records)?)?;
             out.set("skipped", found.skipped)?;
+            out.set("truncated", found.truncated)?;
+            out.set("dropped", found.dropped)?;
             Ok(out)
         }),
     )?;
@@ -75,15 +78,7 @@ fn query(opts: Option<Table>) -> mlua::Result<LogQuery> {
     let Some(opts) = opts else {
         return Ok(query);
     };
-    for pair in opts.pairs::<Value, Value>() {
-        let name = pair?.0.to_string()?;
-        if !OPTIONS.contains(&name.as_str()) {
-            let known = OPTIONS.join(", ");
-            return Err(err(&format!(
-                "FrameLog: unknown option {name:?}; expected one of {known}"
-            )));
-        }
-    }
+    known_keys(&opts, "FrameLog", OPTIONS)?;
     let positive = |key: &str| -> mlua::Result<Option<f64>> {
         match opts.get::<Option<f64>>(key)? {
             Some(v) if v.is_nan() || v < 0.0 => Err(err(&format!(
@@ -94,18 +89,7 @@ fn query(opts: Option<Table>) -> mlua::Result<LogQuery> {
     };
     query.last_seconds = positive("last_seconds")?;
     query.over_ms = positive("over_ms")?;
-    if let Some(limit) = positive("limit")? {
-        if limit < 1.0 || (limit.fract() != 0.0 && limit.is_finite()) {
-            return Err(err(&format!(
-                "FrameLog: limit must be a whole number, at least 1 (got {limit})"
-            )));
-        }
-        query.limit = if limit.is_finite() {
-            limit as usize
-        } else {
-            usize::MAX
-        };
-    }
+    query.limit = whole_count(&opts, "FrameLog", "limit")?;
     query.channel = opts.get::<Option<String>>("channel")?;
     if let Some(ch) = &query.channel {
         if !LogChannels::NAMES.contains(&ch.as_str()) && ch != "dropped" {
