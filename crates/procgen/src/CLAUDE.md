@@ -32,9 +32,10 @@ its rows.
     says how many inputs it accepts; optional inputs are the trailing ones;
   - its **`Op`**: `run(&self, cx: &Cx) -> Image`, and, only when it needs them,
     `seed` (it has a `seed` param), `sockets` (every `socket` param, by name, in
-    row order), `arity` (a param narrows the row's arity, as `math`'s unary funcs)
-    and `func` (what an arity error names). `Cx` gives `input(i)` for a required
-    input, `optional(i)` for a trailing one, `own()` for a copy of the first to edit
+    row order), `arity` (a param narrows the row's arity, as `math`'s unary funcs),
+    `func` (what an arity error names) and `arity_fix` (what it says to do, when a
+    param decides the inputs, as `expression`'s formulas). `Cx` gives `input(i)` for
+    a required input, `optional(i)` for a trailing one, `own()` for a copy of the first to edit
     in place, `field(&param)` for a socketable value, `paint(sampler)` for a
     generator, `px(radius)` for a tile-unit radius in pixels, and `seed`, `size`,
     `sources`.
@@ -85,8 +86,8 @@ adding, count the folder; today:
   `filter/test_probe.rs` (run one op on one image, roll it to show the op wraps).
 - `generators/` (12, full): the next generator clusters the folder first. A new
   generator enum (`WaveProfile`, `ShapeProfile`) lives in its op file, as above.
-- `vector/` (9): `warp`, `directional_warp`, `sample_at` (its mip chain in
-  `ops/sample.rs`), `tile`, ….
+- `vector/` (10): `warp`, `directional_warp`, `sample_at` (its mip chain in
+  `ops/sample.rs`), `tile`, `scatter` (its math in `ops/scatter/`), ….
 
 A two-input op with an optional mask and an output mode is `dummy`'s shape:
 `arity(2, 3)`, `cx.input(0)` and `cx.input(1)` read directly, `cx.optional(2)` for

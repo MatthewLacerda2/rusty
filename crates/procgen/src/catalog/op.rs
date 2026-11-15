@@ -46,6 +46,13 @@ pub trait Op {
     fn func(&self) -> Option<String> {
         None
     }
+
+    /// What an arity error tells the author to do, when this node's params decide
+    /// its inputs (an `expression` takes the inputs its formulas name); `given` is
+    /// how many are wired.
+    fn arity_fix(&self, _given: usize) -> Option<String> {
+        None
+    }
 }
 
 /// What a node runs with: its inputs (already evaluated, in the node's order), the

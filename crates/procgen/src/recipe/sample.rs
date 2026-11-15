@@ -28,3 +28,22 @@ pub fn sample_op(info: &OpInfo) -> OpKind {
     serde_json::from_value(Value::Object(doc))
         .unwrap_or_else(|e| panic!("{}: required params don't parse: {e}", info.op))
 }
+
+/// Params a row's defaults leave unread, written so its sample reads every input and
+/// socket: an `expression` names the inputs it takes in its formula, and at `expr`'s
+/// default of 0 it would take none and read no `k`.
+const READING: &[(&str, &str, &str)] =
+    &[("expression", "expr", "a + b * c - d + k1 + k2 * k3 - k4")];
+
+/// [`sample_op`], with [`READING`]'s params written: the op at its widest wiring and
+/// reading every socket, for the tests that wire inputs or link params.
+pub fn reading_sample_op(info: &OpInfo) -> OpKind {
+    let Value::Object(mut doc) = serde_json::to_value(sample_op(info)).expect("serializes") else {
+        unreachable!("an op serializes to an object")
+    };
+    for (_, name, value) in READING.iter().filter(|(op, ..)| *op == info.op) {
+        doc.insert((*name).into(), json!(value));
+    }
+    serde_json::from_value(Value::Object(doc))
+        .unwrap_or_else(|e| panic!("{}: its reading sample doesn't parse: {e}", info.op))
+}
