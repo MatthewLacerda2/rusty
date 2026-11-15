@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
-"""`make fuzz-check` and `make fuzz-lock-sync`: the fuzz target's build gate.
+"""`make fuzz-check` and `make fuzz-lock`: the fuzz target's build gate.
 
 `fuzz/` is its own workspace (cargo-fuzz), so no other gate compiles it and its
-target could stop building with nothing red (#2200). Two checks hold it:
+target could stop building with nothing red (#2200).
 
-- **`check`** (`make fuzz-check`) compiles it on the pinned stable toolchain
-  against its committed lock, into `target/fuzz` so the tooling that measures and
-  sweeps `target/` covers it. It is a second cold build of the engine, so under
-  `make gates` it runs only when the branch's diff touches what can break that
-  build: the paths of `ci.yml`'s `fuzz` filter, read from there so the local gate
-  and CI's `fuzz-check` job ask the same question of one list. Run by name it
-  always runs. CI's job calls `make fuzz-check` itself, so the failure hint
-  exists once, here.
-- **`sync`** (`make fuzz-lock-sync`, a quick gate) is build-free: every
-  package `fuzz/Cargo.lock` pins is at a version the root `Cargo.lock` also
-  pins, where the root has that package at all. Dependabot's monthly cargo
-  update is lockfile-only and edits the root lock alone; the `fuzz` filter does
-  not list it, so without this the fuzz lock would silently keep the old
-  versions and a later PR using a bumped API would turn the nightly red. With it
-  the Dependabot PR itself fails, naming `make fuzz-lock`.
+- **`seed`** (`make fuzz-lock`) derives `fuzz/Cargo.lock` from the root
+  `Cargo.lock`: a copy, pruned and completed by `cargo metadata` (no compile).
+  The lock is derived, so it is gitignored, never committed: nothing drifts and a
+  root bump (Dependabot's) needs nothing done here. Only what the fuzz-only crates
+  alone pull in is resolved fresh, and `fuzz/Cargo.toml` pins those exactly. A
+  shared package the resolve moved off the root's version fails the seed: the
+  target would no longer build what the root's gates prove.
+- **`check`** (`make fuzz-check`) seeds, then compiles the target on the pinned
+  stable toolchain, `--locked` to the seeded lock, into `target/fuzz` so the
+  tooling that measures and sweeps `target/` covers it. It is a second cold build
+  of the engine, so under `make gates` it runs only when the branch's diff touches
+  what can break that build: the paths of `ci.yml`'s `fuzz` filter, read from
+  there so the local gate and CI's `fuzz-check` job ask the same question of one
+  list. Run by name it always runs. CI's job calls `make fuzz-check` itself, so
+  the failure hint exists once, here.
 
-Stdlib only; `check` shells out to `git` and `cargo`, `sync` reads two files.
+Stdlib only; it shells out to `git` and `cargo`.
 """
 
 from __future__ import annotations
@@ -32,11 +32,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 FILTER = "fuzz"
-CHECK = ["cargo", "check", "--manifest-path", "fuzz/Cargo.toml", "--locked", "--target-dir", "target/fuzz"]
+MANIFEST = ["--manifest-path", "fuzz/Cargo.toml"]
+RESOLVE = ["cargo", "metadata", *MANIFEST, "--format-version", "1"]
+CHECK = ["cargo", "check", *MANIFEST, "--locked", "--target-dir", "target/fuzz"]
 HINT = (
-    "fuzz-check: fuzz/ does not build.\n"
-    "  A lock error: run `make fuzz-lock` and commit fuzz/Cargo.lock.\n"
-    "  A compile error: fix fuzz/fuzz_targets/ to the engine's current API (src/lib.rs re-exports it)."
+    "fuzz-check: fuzz/ does not build against the root Cargo.lock's versions.\n"
+    "  A compile error: fix fuzz/fuzz_targets/ to the engine's current API (src/lib.rs re-exports it).\n"
+    "  A resolve error: fuzz/Cargo.toml asks for a version the root lock does not pin; match it to the root's."
 )
 
 
@@ -99,13 +101,19 @@ def drift(root_lock: str, fuzz_lock: str) -> list[str]:
                   for n in fuzz.keys() & root.keys() for v in fuzz[n] - root[n])
 
 
-def sync() -> int:
-    stale = drift((ROOT / "Cargo.lock").read_text(), (ROOT / "fuzz/Cargo.lock").read_text())
-    if not stale:
+def seed() -> int:
+    """Derive `fuzz/Cargo.lock` from the root lock; 1 when it cannot keep the root's versions."""
+    root = (ROOT / "Cargo.lock").read_text()
+    (ROOT / "fuzz/Cargo.lock").write_text(root)
+    if subprocess.run(RESOLVE, cwd=ROOT, stdout=subprocess.DEVNULL).returncode != 0:
+        return 1
+    moved = drift(root, (ROOT / "fuzz/Cargo.lock").read_text())
+    if not moved:
         return 0
-    print("fuzz-lock-sync: fuzz/Cargo.lock pins versions the root Cargo.lock no longer does:")
-    print("".join(f"  {line}\n" for line in stale), end="")
-    print("  Run `make fuzz-lock` and commit fuzz/Cargo.lock.")
+    print("fuzz-lock: resolving fuzz/ moved packages off the root Cargo.lock's versions:")
+    print("".join(f"  {line}\n" for line in moved), end="")
+    print("  A fuzz-only dependency needs newer versions than the engine pins: pin it in fuzz/Cargo.toml"
+          " to one the root lock satisfies.")
     return 1
 
 
@@ -117,18 +125,18 @@ def check(if_changed: bool) -> int:
             print(f"fuzz-check: skipped, nothing in this branch's diff matches ci.yml's `{FILTER}` filter "
                   "(run `make fuzz-check` to build it anyway).")
             return 0
-    if subprocess.run(CHECK, cwd=ROOT).returncode == 0:
+    if seed() == 0 and subprocess.run(CHECK, cwd=ROOT).returncode == 0:
         return 0
     print(HINT)
     return 1
 
 
 def main(argv: list[str]) -> int:
-    if argv[:1] == ["sync"]:
-        return sync()
+    if argv[:1] == ["seed"]:
+        return seed()
     if argv[:1] == ["check"]:
         return check("--if-changed" in argv[1:])
-    print("usage: fuzz_gate.py sync | check [--if-changed]")
+    print("usage: fuzz_gate.py seed | check [--if-changed]")
     return 2
 
 

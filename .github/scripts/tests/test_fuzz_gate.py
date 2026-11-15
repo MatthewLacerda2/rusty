@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""#2200: the fuzz lock stays in step with the root lock, and the local
+"""#2200: the derived fuzz lock keeps the root lock's versions, and the local
 `fuzz-check` asks ci.yml's `fuzz` filter whether to build."""
 
 from __future__ import annotations
@@ -17,12 +17,7 @@ ROOT = lock(("serde", "1.0.2"), ("bitflags", "1.3.2"), ("bitflags", "2.9.0"), ("
 
 
 class Drift(unittest.TestCase):
-    def test_today_the_locks_agree(self):
-        root = (fuzz_gate.ROOT / "Cargo.lock").read_text()
-        fuzz = (fuzz_gate.ROOT / "fuzz/Cargo.lock").read_text()
-        self.assertEqual(fuzz_gate.drift(root, fuzz), [], "run `make fuzz-lock` and commit fuzz/Cargo.lock")
-
-    def test_a_root_bump_the_fuzz_lock_missed_is_flagged(self):
+    def test_a_shared_package_the_resolve_moved_is_flagged(self):
         self.assertEqual(fuzz_gate.drift(ROOT, lock(("serde", "1.0.1"))), ["serde 1.0.1 (root: 1.0.2)"])
 
     def test_a_pruned_subset_and_fuzz_only_crates_pass(self):

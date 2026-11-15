@@ -1116,18 +1116,20 @@ and unguarded `unwrap`s.
 Running libFuzzer is **nightly-only**, so `fuzz/` is its own workspace —
 deliberately out of the root build, the determinism guard and `cargo-deny` (the
 size gate and the `--rules` checks still scan it). Its build is a gate all the
-same: `make fuzz-check` compiles the target on the pinned stable toolchain against
-the committed `fuzz/Cargo.lock` (`--locked`), into `target/fuzz`, so an engine
-rename it imports through turns a PR red. It is a second cold engine build, so CI's
-`fuzz-check` job and `make gates` run it only when the diff matches `ci.yml`'s
-`fuzz` filter (and print that they skipped otherwise); by name it always runs.
-`make fuzz-lock-sync` (a quick gate, no build) fails when the fuzz lock pins a
-version the root lock no longer does, as after a lockfile-only Dependabot bump;
-`make fuzz-lock` then re-resolves it from the root one, so the target builds the
-versions the root's gates prove. The fuzzing itself
-is **local-first / on-demand**:
+same: `make fuzz-check` compiles the target on the pinned stable toolchain, into
+`target/fuzz`, so an engine rename it imports through turns a PR red. It builds
+against `fuzz/Cargo.lock`, which is **derived, not committed** (gitignored):
+`make fuzz-lock` writes it from the root `Cargo.lock`, pruned to what `fuzz/`
+needs, and `make fuzz-check` runs that first, then checks `--locked`. So the
+target builds the versions the root's gates prove, and a root bump needs nothing
+done here; only the fuzz-only crates (`libfuzzer-sys`, `arbitrary`) come from
+outside the root lock, pinned exactly in `fuzz/Cargo.toml`. It is a second cold
+engine build, so CI's `fuzz-check` job and `make gates` run it only when the diff
+matches `ci.yml`'s `fuzz` filter (and print that they skipped otherwise); by name
+it always runs. The fuzzing itself is **local-first / on-demand**:
 
 ```
+make fuzz-lock                                      # derive fuzz/Cargo.lock first
 cargo +nightly fuzz run scene_deserialize          # fuzz until you stop it
 cargo +nightly fuzz run scene_deserialize -- -max_total_time=60   # time-boxed
 ```
