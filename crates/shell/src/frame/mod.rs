@@ -3,7 +3,7 @@
 //! channel's drain, and a `Scene.LoadAsync`'s worker and GPU warm-up while frames go
 //! on (`load`, #2123).
 //!
-//! Everything but [`acquire_frame`] and [`drain_commands`] is window- and GPU-free, so it is unit-tested
+//! Everything but [`acquire_frame`] and `drain_commands` is window- and GPU-free, so it is unit-tested
 //! directly (`frame_tests.rs`).
 
 use std::time::{Duration, Instant};
