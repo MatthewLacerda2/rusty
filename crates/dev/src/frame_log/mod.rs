@@ -34,7 +34,7 @@
 //! on them without parsing the line (`head`). `frame` is the renderer's drawn-frame
 //! count. A line is whole on disk: `ms` is the frame's own wall time, from its
 //! start to the next one's, and `gpu_ms` and `gpu_passes` its own GPU times, the
-//! writer holding the frame until they are in ([`held`]); what never arrived is
+//! writer holding the frame until they are in (`held`); what never arrived is
 //! named in `unresolved`:
 //!
 //! ```json
@@ -81,7 +81,7 @@ pub enum LogHost {
     Player,
 }
 
-/// A running log: the writer thread, the frames held until whole ([`held`]), and
+/// A running log: the writer thread, the frames held until whole (`held`), and
 /// the cursor that keeps each audio event to one record.
 pub struct FrameLog {
     writer: writer::Writer,
@@ -130,7 +130,7 @@ impl FrameLog {
     /// (this one's `wall_ms`) and any GPU times resolved go onto the frames they
     /// belong to; then this frame's record (when `frames` is on) and the console
     /// lines, audio events and loads since the last one, per the project's
-    /// channels as they stand now, are held until whole ([`held`]). `times_gpu`
+    /// channels as they stand now, are held until whole (`held`). `times_gpu`
     /// says whether the adapter takes timestamps, so a frame waits on its GPU
     /// times only where they come. Call it after the frame's stats were recorded,
     /// so the newest frame of the stats is this one.
