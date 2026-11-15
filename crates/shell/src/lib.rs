@@ -81,6 +81,10 @@ pub struct Shell {
     /// through the console's evaluator. `None` if the socket failed to bind.
     #[cfg(feature = "dev")]
     pub cmd_channel: Option<rusty_dev::command_channel::CommandChannel>,
+    /// The rolling frame log under `saved/logs/` (#2206), when the project has
+    /// this host write one ([`frame::stats::start_log`]).
+    #[cfg(feature = "dev")]
+    pub frame_log: Option<rusty_dev::frame_log::FrameLog>,
 }
 
 /// What one binary adds on top of the shell. See the module docs.
@@ -256,6 +260,7 @@ fn run_frame<F: Frontend>(
         // The window cannot show a frame (a locked screen, an occluded window): the
         // frame's other work still runs, so nothing asked of it waits on a redraw.
         frontend.undrawn(shell, game);
+        frame::stats::undrawn(shell, game);
         shell.pacer.skipped(Instant::now());
         return;
     };
