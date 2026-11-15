@@ -39,7 +39,7 @@ use super::{frame::Host, pace::Pace, Frontend, Shell};
 use crate::input::GameViewRect;
 use rusty_app::{GameWorld, PlayTransition};
 use rusty_core::input::CursorState;
-use rusty_editor::{EditorUi, ViewportInteraction, ViewportTab};
+use rusty_editor::{EditorUi, ViewportInteraction};
 use rusty_render::RenderView;
 use rusty_scene::SceneId;
 
