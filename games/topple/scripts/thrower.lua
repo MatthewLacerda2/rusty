@@ -18,6 +18,9 @@ local MASS = 2.0    -- kilograms
 
 function Thrower.Start(id)
     Thrower.left = Thrower.balls
+    -- Aimed with the cursor: free it and show it (Play starts it locked, hidden).
+    Input.SetCursorLocked(false)
+    Input.SetCursorVisible(true)
 end
 
 -- Throw a ball from the camera so that it reaches `x, y, z`: aimed straight at
@@ -51,8 +54,7 @@ function Thrower.Update(id, dt)
         return
     end
     if not Input.GetKeyDown("Mouse0") or UI.IsPointerConsumed() then return end
-    local mx, my = Input.GetMousePosition()
-    local ox, oy, oz, dx, dy, dz = Camera.ScreenToWorldRay(mx, my)
+    local ox, oy, oz, dx, dy, dz = Camera.MouseRay()
     local hit, _, dist = Physics.Raycast(ox, oy, oz, dx, dy, dz, nil, nil, 60)
     if not hit then dist = 30 end
     Thrower.ThrowAt(ox + dx * dist, oy + dy * dist, oz + dz * dist)
