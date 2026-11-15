@@ -1,0 +1,60 @@
+{
+  "resolution": 256,
+  "params": {
+    "wear": { "type": "number", "default": 0.3, "min": 0, "max": 1 },
+    "tint": { "type": "color", "default": "#4a5e48" },
+    "curvature_map": { "type": "text", "default": "engine/textures/library/maps/flat_curvature.png" },
+    "ao_map": { "type": "text", "default": "engine/textures/library/maps/open_ao.png" }
+  },
+  "nodes": [
+    { "id": "mesh_curvature", "op": "image", "path": { "param": "curvature_map" }, "encoding": "linear" },
+    { "id": "mesh_ao", "op": "image", "path": { "param": "ao_map" }, "encoding": "linear" },
+    { "id": "edges", "op": "levels", "in_low": 0.55, "in_high": 0.8, "inputs": ["mesh_curvature"] },
+
+    { "id": "chip_field", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 6, "warp": 0.3 }, "seed": 71 },
+    { "id": "chip_grit", "op": "noise", "kind": "fbm", "scale": 40, "octaves": 3, "seed": 72 },
+    { "id": "chip_drive", "op": "expression", "expr": "0.75 * a + 0.25 * b + 0.45 * c", "inputs": ["chip_field", "chip_grit", "edges"] },
+    { "id": "paint_gone", "op": "expression", "expr": "smoothstep(0.82 - 0.3 * k1, 0.83 - 0.3 * k1, a)", "k1": { "param": "wear" }, "inputs": ["chip_drive"] },
+    { "id": "primer_gone", "op": "expression", "expr": "smoothstep(0.9 - 0.3 * k1, 0.91 - 0.3 * k1, a)", "k1": { "param": "wear" }, "inputs": ["chip_drive"] },
+    { "id": "scratches", "op": "graph", "path": "engine/textures/library/parts/scratches.graph.json", "params": { "amount": { "param": "wear" }, "scale": 160 }, "seed": 73 },
+    { "id": "steel_open", "op": "expression", "expr": "max(a, step(0.5, b))", "inputs": ["primer_gone", "scratches"] },
+
+    { "id": "rust_seed", "op": "blur", "radius": 0.006, "inputs": ["steel_open"] },
+    { "id": "rust_drop", "op": "mapping", "translation": [0, 0.04], "inputs": ["rust_seed"] },
+    { "id": "rust_run", "op": "directional_blur", "length": 0.08, "angle": 0.25, "inputs": ["rust_drop"] },
+    { "id": "rust_field", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 8 }, "seed": 74 },
+    { "id": "rust", "op": "expression", "expr": "clamp((0.8 * a + 1.6 * b) * smoothstep(0.75 - 0.5 * k1, 1.0, c) * (0.2 + 0.8 * k1), 0, 1)", "k1": { "param": "wear" }, "inputs": ["rust_seed", "rust_run", "rust_field"] },
+
+    { "id": "peel_raw", "op": "noise", "kind": "fbm", "scale": 120, "octaves": 2, "seed": 75 },
+    { "id": "orange_peel", "op": "auto_levels", "inputs": ["peel_raw"] },
+    { "id": "dent_raw", "op": "noise", "kind": "fbm", "scale": 3, "octaves": 4, "seed": 76 },
+    { "id": "dents", "op": "auto_levels", "inputs": ["dent_raw"] },
+    { "id": "relief", "op": "expression", "expr": "0.5 * a + 0.25 * (1 - b) + 0.15 * (1 - c) + 0.02 * d", "inputs": ["dents", "paint_gone", "primer_gone", "orange_peel"] },
+    { "id": "pitted", "op": "expression", "expr": "a + 0.06 * b * (c - 0.5) - 0.08 * d", "inputs": ["relief", "rust", "chip_grit", "scratches"] },
+    { "id": "height", "op": "auto_levels", "inputs": ["pitted"] },
+    { "id": "detail", "op": "expression", "expr": "a - 0.48 * b", "inputs": ["pitted", "dents"] },
+    { "id": "normal", "op": "bump_to_normal", "strength": 0.08, "inputs": ["detail"] },
+
+    { "id": "paint_col", "op": "constant", "color": { "param": "tint" } },
+    { "id": "paint_fade", "op": "expression", "expr": "0.9 + 0.15 * a + 0.12 * k1 * b", "k1": { "param": "wear" }, "inputs": ["dents", "chip_field"] },
+    { "id": "paint_face", "op": "mix", "mode": "multiply", "inputs": ["paint_col", "paint_fade"] },
+    { "id": "primer_col", "op": "constant", "color": "#7a3b2b" },
+    { "id": "brushed", "op": "anisotropic_noise", "scale": 64, "anisotropy": 16, "angle": 0, "seed": 77 },
+    { "id": "brushed_n", "op": "auto_levels", "inputs": ["brushed"] },
+    { "id": "steel_col", "op": "color_ramp", "stops": [ { "pos": 0, "color": "#b4b6b8" }, { "pos": 1, "color": "#c8cacc" } ], "inputs": ["brushed_n"] },
+    { "id": "rust_col", "op": "color_ramp", "stops": [ { "pos": 0, "color": "#4f2816" }, { "pos": 0.6, "color": "#7d3f1f" }, { "pos": 1, "color": "#a35f2c" } ], "inputs": ["chip_grit"] },
+    { "id": "primed", "op": "mix", "mode": "mix", "inputs": ["paint_face", "primer_col", "paint_gone"] },
+    { "id": "bared", "op": "mix", "mode": "mix", "inputs": ["primed", "steel_col", "steel_open"] },
+    { "id": "rusted", "op": "mix", "mode": "mix", "inputs": ["bared", "rust_col", "rust"] },
+    { "id": "grime", "op": "expression", "expr": "1 - (1 - a) * (0.4 + 0.4 * k1)", "k1": { "param": "wear" }, "inputs": ["mesh_ao"] },
+    { "id": "base_color", "op": "mix", "mode": "multiply", "inputs": ["rusted", "grime"] },
+
+    { "id": "metallic", "op": "expression", "expr": "smoothstep(0.9, 0.97, a) * (1 - smoothstep(0.02, 0.1, b))", "inputs": ["steel_open", "rust"] },
+    { "id": "roughness", "op": "expression", "expr": "clamp(mix(mix(0.34 + 0.2 * c, 0.72, a), 0.3 + 0.12 * d, b), 0, 1)", "inputs": ["paint_gone", "steel_open", "orange_peel", "brushed_n"] },
+    { "id": "roughness_r", "op": "expression", "expr": "mix(a, 0.9, b)", "inputs": ["roughness", "rust"] },
+    { "id": "ao_self", "op": "ambient_occlusion", "radius": 0.01, "depth": 0.003, "quality": 8, "inputs": ["detail"] },
+    { "id": "occlusion", "op": "expression", "expr": "a * (0.6 + 0.4 * b)", "inputs": ["mesh_ao", "ao_self"] }
+  ],
+  "output": "base_color",
+  "outputs": { "base_color": "base_color", "normal": "normal", "roughness": "roughness_r", "metallic": "metallic", "height": "height", "occlusion": "occlusion" }
+}

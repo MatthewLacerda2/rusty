@@ -1,0 +1,19 @@
+{
+  "resolution": 256,
+  "params": {
+    "amount": { "type": "number", "default": 0.3, "min": 0, "max": 1 },
+    "scale": { "type": "number", "default": 24, "min": 1, "max": 512 },
+    "angle": { "type": "number", "default": 0, "min": -1, "max": 1 }
+  },
+  "nodes": [
+    { "id": "amount", "op": "expression", "expr": "k1", "k1": { "param": "amount" } },
+    { "id": "along", "op": "anisotropic_noise", "scale": { "param": "scale" }, "anisotropy": 24, "angle": { "param": "angle" }, "seed": 1 },
+    { "id": "across", "op": "anisotropic_noise", "scale": { "param": "scale" }, "anisotropy": 24, "angle": 0.19, "seed": 2 },
+    { "id": "along_n", "op": "auto_levels", "inputs": ["along"] },
+    { "id": "across_n", "op": "auto_levels", "inputs": ["across"] },
+    { "id": "lines", "op": "expression", "expr": "max(smoothstep(0.8, 0.9, a), 0.7 * smoothstep(0.84, 0.94, b))", "inputs": ["along_n", "across_n"] },
+    { "id": "zone", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 3 }, "seed": 3 },
+    { "id": "scratches", "op": "expression", "expr": "a * smoothstep(1.0 - 0.9 * b, 1.1 - 0.9 * b, c)", "inputs": ["lines", "amount", "zone"] }
+  ],
+  "output": "scratches"
+}
