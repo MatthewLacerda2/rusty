@@ -3,7 +3,8 @@
 //! The layout is a pure function of (scene, screen size), so the screen size is a
 //! **sim input**, like the seed and the inputs: same (seed, inputs, dt, screen size)
 //! ⇒ same layout. The windowed platform writes the game view's pixel size here every
-//! frame; a headless run never writes it and falls back to the `VideoSettings`
+//! frame (in the editor the size the Game view's dropdown gives it, #2207, whichever
+//! tab shows); a headless run never writes it and falls back to the `VideoSettings`
 //! resolution, so the harness lays out exactly as a window of that size would.
 //!
 //! The display's backing scale rides with the size (#1715, `Video.GetDisplayScale`):

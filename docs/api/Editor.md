@@ -91,15 +91,16 @@ renders and lays out at:
 - **The editor's, not the project's**: the setting lasts the editor session, as
   Unity's per-user Game view does, and nothing is saved. A demo open on the
   timeline replays on the size it recorded; the dropdown waits until it closes.
-- A set takes effect at the next frame, as a pick in the dropdown does, and
-  `Editor.GetGameViewSize` reads it back at once. The Scene view is never affected.
+- `Editor.GetGameViewSize` reads a set back at once; the window takes it at its
+  next frame boundary and draws at it on the frame after, so a script reads the new
+  `UI.GetScreenSize` a frame or two later. The Scene view is never affected.
 - `make editor-capture ARGS="--game --game-view 16:9"` captures it
   (`docs/testing.md`).
 
 ```lua
 Editor.SetGameViewSize(1920, 1080)
 Editor.GetGameViewSize().mode   -- "Fixed"
-UI.GetScreenSize()              -- 1920, 1080 from the next frame
+UI.GetScreenSize()              -- 1920, 1080 once the window has drawn it
 Editor.ResetGameViewSize()      -- back to the panel
 ```
 
