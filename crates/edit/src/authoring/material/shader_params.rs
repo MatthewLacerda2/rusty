@@ -149,3 +149,32 @@ pub fn clear_entity_shader_param(
     scene.shader_overrides.clear(id, Some(&canonical));
     Ok(())
 }
+
+/// Set the authored surface shader by module name (#396); an empty name clears it
+/// back to the standard forward shader. Whether the module exists is the renderer's
+/// call (it falls back, logging once), so a shader baked later still binds.
+pub fn set_shader(materials: &mut MaterialLibrary, key: &str, name: String) {
+    if let Some(m) = materials.get_mut(key) {
+        m.shader = (!name.is_empty()).then_some(name);
+    }
+}
+
+/// Point material `key`'s extra shader texture `slot` (#400) at `path`; `None` or
+/// `""` clears it back to white. An unknown slot is an error naming it and the
+/// slots there are (#395). The path is not checked: a missing file samples white,
+/// and a texture made later binds when it appears.
+pub fn set_shader_texture(
+    materials: &mut MaterialLibrary,
+    key: &str,
+    slot: &str,
+    path: Option<String>,
+) -> Result<(), String> {
+    rusty_shadergen::textures::slot(slot)?;
+    if let Some(m) = materials.get_mut(key) {
+        match path.filter(|p| !p.is_empty()) {
+            Some(p) => m.shader_textures.insert(slot.to_owned(), p.into()),
+            None => m.shader_textures.remove(slot),
+        };
+    }
+    Ok(())
+}

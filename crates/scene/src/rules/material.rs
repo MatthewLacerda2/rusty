@@ -18,3 +18,5 @@ pub const MAP_COORD_RANGE: RangeInclusive<f32> = -1000.0..=1000.0;
 pub const WORLD_SIZE_RANGE: RangeInclusive<f32> = 0.01..=100.0;
 /// `blend_sharpness`, the power the normal is raised to.
 pub const BLEND_SHARPNESS_RANGE: RangeInclusive<f32> = 1.0..=64.0;
+/// `height_scale` (#2191): the height map's depth as a fraction of one repeat's width.
+pub const HEIGHT_SCALE_RANGE: RangeInclusive<f32> = 0.0..=rusty_components::HEIGHT_SCALE_MAX;

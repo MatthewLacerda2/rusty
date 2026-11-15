@@ -1,4 +1,4 @@
-//! The material's map slots (#202, #207, #1997, #2151): one table, [`MAP_SLOTS`],
+//! The material's map slots (#202, #207, #1997, #2151, #2191): one table, [`MAP_SLOTS`],
 //! whose rows say which asset field each group-2 texture comes from, at which
 //! binding, holding what, and which record flag goes off while it has no texture.
 //! `materials` builds the bind group from it; a new map is one [`Map`] and one row
@@ -24,6 +24,7 @@ pub(crate) enum Map {
     Detail,
     Occlusion,
     Specular,
+    Height,
 }
 
 /// One group-2 material map: everything the renderer knows about it, in one row.
@@ -48,8 +49,9 @@ pub(crate) struct MapSlot {
 /// Every material map, in [`Map`] order. Albedo, metallic, roughness, normal and
 /// emissive at 0 and 2–5 (#202, #207); the detail map at 15 (#1997), the last
 /// texture binding below the samplers' offset, then occlusion at 14 and specular
-/// level at 13 (#2151), counting down, so the extra shader slots keep the bindings
-/// after the param uniform (7, …) and a new map takes the next one down (12).
+/// level at 13 (#2151) and height at 12 (#2191), counting down, so the extra shader
+/// slots keep the bindings after the param uniform (7, …) and a new map takes the
+/// next one down (11).
 pub(crate) const MAP_SLOTS: [MapSlot; MATERIAL_MAPS] = [
     MapSlot {
         map: Map::Albedo,
@@ -107,6 +109,13 @@ pub(crate) const MAP_SLOTS: [MapSlot; MATERIAL_MAPS] = [
         path: |m| m.specular_map.as_ref(),
         off_while_missing: Some(specular_flag),
     },
+    MapSlot {
+        map: Map::Height,
+        binding: 12,
+        kind: TextureKind::Mask,
+        path: |m| m.height_map.as_ref(),
+        off_while_missing: Some(height_flag),
+    },
 ];
 
 fn detail_flag(record: &mut MaterialData) -> &mut u32 {
@@ -119,6 +128,10 @@ fn occlusion_flag(record: &mut MaterialData) -> &mut u32 {
 
 fn specular_flag(record: &mut MaterialData) -> &mut u32 {
     &mut record.level_maps.use_specular_map
+}
+
+fn height_flag(record: &mut MaterialData) -> &mut u32 {
+    &mut record.level_maps.use_height_map
 }
 
 // Each row sits at its `Map`'s index, and no two textures (maps and extra shader
@@ -204,10 +217,11 @@ pub(crate) fn material_texture_paths(
     std::array::from_fn(|_| paths.next().flatten().cloned())
 }
 
-/// The record's occlusion and specular-level terms (#2151): each map's flag, on
-/// where a path is named (the specular one raised to 2 for a one-channel upload, and
-/// either turned off while its texture is not resident, by `with_map_channels`), and
-/// the occlusion strength, all off without a material.
+/// The record's occlusion, specular-level (#2151) and height (#2191) terms: each
+/// map's flag, on where a path is named (the specular one raised to 2 for a
+/// one-channel upload, and each turned off while its texture is not resident, by
+/// `with_map_channels`; the height one only where it applies, else warned of once),
+/// the occlusion strength and the height's depth, all off without a material.
 pub(crate) fn level_maps_uniform(material: Option<&MaterialAsset>) -> LevelMapsUniform {
     let Some(m) = material else {
         return LevelMapsUniform {
@@ -219,8 +233,27 @@ pub(crate) fn level_maps_uniform(material: Option<&MaterialAsset>) -> LevelMapsU
         use_occlusion_map: u32::from(m.occlusion_map.is_some()),
         occlusion_strength: occlusion_strength(m.occlusion_strength),
         use_specular_map: u32::from(m.specular_map.is_some()),
-        _pad: 0,
+        use_height_map: u32::from(height_applies(m)),
+        height_scale: m.height_depth(),
+        _pad: [0; 3],
     }
+}
+
+/// Whether `m`'s height map displaces it ([`MaterialAsset::height_applies`]); a map
+/// it ignores (`Cutout`, `Transparent`, `Triplanar`) is said once in the console.
+fn height_applies(m: &MaterialAsset) -> bool {
+    let applies = m.height_applies();
+    if let (false, Some(path)) = (applies, m.height_map.as_ref()) {
+        let why = match m.uv_mapping {
+            rusty_components::UvMapping::Triplanar => "under Triplanar".to_string(),
+            _ => format!("on a {:?} material", m.render_mode),
+        };
+        let key = format!("height-map-ignored:{path}:{why}");
+        rusty_scene::rehydrate::warn_once_of(&key, || {
+            format!("height map '{path}' is ignored {why}: only an Opaque UV0 or Planar material is displaced")
+        });
+    }
+    applies
 }
 
 /// An occlusion map's strength as the shader reads it (#2151): in `[0, 1]`, glTF's
