@@ -130,11 +130,11 @@ pub struct EditorUi {
     pub preview_orbit: FramedOrbit,
     /// The isolated preview scene, rebuilt only when the subject/mesh choice changes.
     pub preview_cache: Option<PreviewCache>,
-    /// This frame's render request for `main.rs`'s `render_preview_scene`; `None`
-    /// when the Preview tab isn't showing (skips the extra offscreen render).
+    /// This frame's render request for `shell::editor::viewport::render_preview_scene`;
+    /// `None` when the Preview tab isn't showing (skips the extra offscreen render).
     pub preview_request: Option<PreviewRequest>,
     /// Stable egui texture id for the offscreen preview target (#352), set by
-    /// `main.rs` before `draw` runs — mirrors `Frontend::viewport_texture_id`.
+    /// the shell before `draw` runs — mirrors `Frontend::viewport_texture_id`.
     pub preview_texture_id: Option<egui::TextureId>,
     /// The Material card's delete confirm (#1576).
     pub material_delete: inspector::components::material::MaterialDelete,
