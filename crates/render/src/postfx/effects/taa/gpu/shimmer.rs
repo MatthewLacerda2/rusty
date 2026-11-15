@@ -152,10 +152,19 @@ fn gpu_diag_2231_taa() {
         let t = relative_flicker(&lumas_at(true, STEP, warm, measured));
         eprintln!("DIAG2231 taa warm {warm} measured {measured}: FXAA {f:.5} TAA {t:.5} ratio {:.2} still-TAA {still:.5} floored ratio {:.2}", f / t, f / (t - still));
     }
-    eprintln!(
-        "DIAG2231 adapter {:?}",
-        renderer().unwrap().device.adapter_info().name
-    );
+    use rusty_asset::sidecar::{FilterMode, TextureSettings};
+    let png = rusty_test_support::temp::dir().join("rusty_1702_taa_bumps.png");
+    for (label, filter) in [("bilinear-nomip", FilterMode::Bilinear)] {
+        let settings = TextureSettings { filter_mode: filter, generate_mipmaps: false, ..TextureSettings::default() };
+        rusty_asset::sidecar::set_texture(&png, settings).unwrap();
+        for (warm, measured) in [(WARM, MEASURED), (16, 24)] {
+            let still = relative_flicker(&lumas_at(true, 0.0, warm, measured));
+            let f = relative_flicker(&lumas_at(false, STEP, warm, measured));
+            let t = relative_flicker(&lumas_at(true, STEP, warm, measured));
+            eprintln!("DIAG2231 {label} taa warm {warm} measured {measured}: FXAA {f:.5} TAA {t:.5} ratio {:.2} still-TAA {still:.5} floored ratio {:.2}", f / t, f / (t - still));
+        }
+    }
+    eprintln!("DIAG2231 adapter {:?}", renderer().unwrap().device.adapter_info().name);
     panic!("diagnostic");
 }
 // DIAG-2231-END

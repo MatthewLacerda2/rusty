@@ -497,4 +497,6 @@ lowering one needs an inline `# reason:` (`make scripts` fails otherwise).
 The platform layer (`shell`, `render`, `dev`) is unfloored. GPU tests run on both
 CI OSes, Linux on lavapipe and macOS on Metal, with `RUSTY_REQUIRE_GPU=1`, so a
 green run means they rendered. Lavapipe is a software adapter: a change that
-depends on real-GPU behaviour is proven on macOS's Metal.
+depends on real-GPU behaviour is proven on macOS's Metal, and a GPU tolerance added
+or moved on a desktop GPU too (`make test-gpu ADAPTER=<gpu>` on the operator's
+machine, `docs/testing.md`, *Which adapters a GPU tolerance holds on*).

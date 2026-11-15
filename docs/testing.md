@@ -560,8 +560,49 @@ build ran every GPU test there.
 
 Linux CI's adapter is a software renderer, so a green run there proves the render
 path is correct on a conformant driver, not that it performs or behaves identically on
-real hardware — Metal on macOS is the one real GPU. Pair anything load-bearing with an
-adapter-free unit test on the underlying predicate so the rule is pinned everywhere.
+real hardware — Metal on macOS is the one real GPU CI has. Pair anything load-bearing
+with an adapter-free unit test on the underlying predicate so the rule is pinned
+everywhere.
+
+### Which adapters a GPU tolerance holds on
+
+A GPU test that holds a number (a step count against a CPU reference, a ratio, a
+mean) holds it on **three adapters**: **lavapipe** (Linux CI, cloud sessions),
+**Metal** (CI's macOS leg) and a **real desktop GPU** (the operator's machine, a
+discrete Vulkan driver). CI runs only the first two, so a number tuned there is first
+seen failing on the third, by whoever runs `make test` there next.
+
+- **A tolerance says what it was measured against**: a comment beside it with the
+  adapters and the values they gave (`Measured: RTX 2060 1, lavapipe 1, Metal 1`), and
+  what the bar stands for. It moves only with the reason written there; "widened until
+  green" is not one.
+- **Find the difference before moving a number.** For a GPU path held to a CPU
+  reference, nudge the reference's own inputs by a GPU's rounding (1e-7 to 1e-5) and
+  see how far it moves from itself. A tolerance below that is a coin toss on some
+  adapter; a fixture where it is large tests ties (a tap exactly on a texel edge, a
+  seam), not the code, and wants a fixture without them, not a wider bar. For a ratio
+  between two renders, take it on every adapter first: its spread is what the bar must
+  sit under.
+- **One adapter, one command**: `make test-gpu` runs the GPU group alone, both feature
+  sets, on lavapipe when its Vulkan driver is installed (`lvp_icd` under
+  `/usr/share/vulkan/icd.d/`: Arch's `vulkan-swrast`, Debian's `mesa-vulkan-drivers`),
+  else on the machine's own; `ADAPTER=nvidia` (any part of
+  an adapter's name, case ignored) picks another. Under it sits wgpu's own
+  `WGPU_ADAPTER_NAME`, which every headless renderer honours
+  (`render::setup::headless::ADAPTER_ENV`): set on any command, only that adapter is
+  used, and none of that name is "no adapter" (a skip, or a failure under
+  `RUSTY_REQUIRE_GPU=1`). A test red on a real GPU and green on lavapipe, on the same
+  commit, is the driver, not the change.
+- **Every run names its adapter**: the canary
+  (`render::test_gpu::tests::gpu_adapter_present_when_required`) prints
+  `[gpu] adapter: <name> (<backend>, <driver>)`, which nextest shows after every run,
+  CI's included.
+- **Before a new or moved GPU tolerance merges**, it is run on a real desktop GPU:
+  `make test-gpu ADAPTER=<gpu>` on the branch's head, on the operator's machine (a
+  local coder, or the orchestrator for a cloud branch), and the PR's `Gates` line names
+  the adapter and the value. Metal's value comes from CI's macOS leg; nextest prints
+  only a failing test's output, so a passing test's numbers are read from a draft run
+  of a throwaway commit that fails the test with them in its message, reverted after.
 
 **Concurrency is capped.** A `Renderer` is a device, the full pipeline set and shadow
 maps, and a software adapter (lavapipe) allocates all of that in system RAM shared with rustc — so

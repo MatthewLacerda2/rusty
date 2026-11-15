@@ -184,13 +184,17 @@ doc: ## [gate] Rustdoc with warnings denied, both feature sets
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked --features dev
 
+# All four runs go on when one fails, as nextest does inside a run (fail-fast off), so
+# one `make test` reports every failure; the exit says if any run failed.
 test: ## [gate] Engine tests (nextest) and doctests, both feature sets, on the gates' proptest seed
 	@command -v cargo-nextest >/dev/null 2>&1 || { \
 		echo "test: cargo-nextest is not installed — cargo install --locked cargo-nextest"; exit 1; }
-	$(TEST)
-	$(TEST) --features dev
-	cargo test --doc --locked
-	cargo test --doc --locked --features dev
+	@rc=0; \
+	$(TEST) || rc=1; \
+	$(TEST) --features dev || rc=1; \
+	cargo test --doc --locked || rc=1; \
+	cargo test --doc --locked --features dev || rc=1; \
+	exit $$rc
 
 # The GPU suite alone, on one adapter (docs/testing.md, *Which adapters a GPU
 # tolerance holds on*): lavapipe when its Vulkan driver is installed, so a red test
