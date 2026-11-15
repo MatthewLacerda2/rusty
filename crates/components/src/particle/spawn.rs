@@ -142,9 +142,14 @@ impl ParticleEmitterComponent {
         let inherit = self.sub_emitters.inherit_velocity;
         let mut spawned = 0;
         // A `Local` `Gpu` emitter's births go up in its own space: the draw places
-        // them under its frame then (`simulation`).
+        // them under its frame then (`simulation`). The space is the last frame
+        // with an inverse (`anchor`, kept by `carry_to` above): a birth at scale 0
+        // is placed where the `Cpu` path leaves it, under the frame its particles
+        // were last carried to.
         let to_local = (self.on_gpu() && self.simulation_space == SimulationSpace::Local)
-            .then(|| frame.matrix.inverse())
+            .then_some(self.runtime.anchor)
+            .flatten()
+            .map(|anchor| anchor.matrix.inverse())
             .filter(|m| m.is_finite());
         for _ in 0..count {
             if self.live_count() >= cap {

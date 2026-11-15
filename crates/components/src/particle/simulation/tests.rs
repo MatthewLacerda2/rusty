@@ -232,3 +232,35 @@ fn the_running_time_is_kept_at_each_recent_step_and_at_each_birth() {
     assert_eq!(sim.time_at(now + 1), None, "not taken yet");
     assert_eq!(GpuSim::default().time_at(0), Some(0.0));
 }
+
+#[test]
+fn a_local_gpu_birth_at_scale_0_is_stored_under_the_last_frame_with_an_inverse() {
+    let local = |simulation| ParticleEmitterComponent {
+        simulation,
+        simulation_space: super::super::SimulationSpace::Local,
+        shape: super::super::EmitShape::Sphere { radius: 1.0 },
+        ..gpu_emitter(4)
+    };
+    let (mut gpu, mut cpu) = (
+        local(ParticleSimulation::Gpu),
+        local(ParticleSimulation::Cpu),
+    );
+    let at = Vec3::new(10.0, 0.0, 0.0);
+    let scaled = |s: f32| EmitterFrame::new(at, glam::Quat::IDENTITY, Vec3::splat(s));
+    for e in [&mut gpu, &mut cpu] {
+        e.carry_to(scaled(2.0));
+        e.emit_at(scaled(0.0), 1);
+        e.carry_to(scaled(1.0));
+    }
+    // The `Cpu` twin carries its world-space birth from the scale-2 anchor; the
+    // `Gpu` one draws its stored birth under the frame it stands in now.
+    let stored = gpu.runtime.gpu.births().next().unwrap().particle;
+    let drawn = scaled(1.0).matrix.transform_point3(stored.position);
+    let carried = cpu.runtime.particles[0].position;
+    assert!((drawn - carried).length() < 1e-5, "{drawn} vs {carried}");
+    assert_eq!(
+        stored.position,
+        Vec3::ZERO,
+        "born on the emitter, not at the origin"
+    );
+}

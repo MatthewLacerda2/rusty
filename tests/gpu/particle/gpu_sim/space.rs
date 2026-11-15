@@ -1,12 +1,13 @@
-//! A `Local` GPU emitter's particles follow it, and a dead particle's slot draws
-//! nothing while a live one keeps the slots in use.
+//! A `Local` GPU emitter's particles follow it (through a scale of 0 as its `Cpu`
+//! twin does), and a dead particle's slot draws nothing while a live one keeps the
+//! slots in use.
 
 use glam::Vec3;
 use rusty::components::particle::{ParticleSimulation, SimulationSpace};
 use rusty::core::curve::Range;
 use rusty::dev::capture::CaptureHost;
 
-use super::{centroid, emit, emitter, place, red, world};
+use super::{agreement, centroid, emit, emitter, place, red, world};
 
 #[test]
 fn a_local_gpu_emitter_carries_its_particles_and_a_world_one_leaves_them() {
@@ -68,4 +69,62 @@ fn a_dead_particle_is_not_drawn_beside_a_live_one() {
             .live_count(),
         1
     );
+}
+
+#[test]
+fn a_local_gpu_emitter_scaling_through_0_while_emitting_matches_its_cpu_twin() {
+    let mut host = CaptureHost::new();
+    let config = |simulation| {
+        let mut e = emitter(simulation);
+        e.simulation_space = SimulationSpace::Local;
+        e.shape = rusty::components::particle::EmitShape::Sphere { radius: 1.0 };
+        e.speed = Range::new(0.2, 0.6);
+        e.size = Range::constant(0.8);
+        e.lifetime = Range::new(2.0, 3.0);
+        e.emit_mode = rusty::components::particle::EmitMode::Continuous;
+        e.rate = 60.0;
+        e
+    };
+    let (mut gpu, gpu_id) = world(config(ParticleSimulation::Gpu));
+    let (mut cpu, cpu_id) = world(config(ParticleSimulation::Cpu));
+    // Off the origin, so a birth stored in world space but drawn under the frame
+    // lands twice as far (behind the wall), and a frame of scale 0 collapses
+    // what it draws onto the emitter.
+    let at = Vec3::new(3.0, 0.0, -10.0);
+    for (frame, scale) in [1.0, 0.0, 1.0].into_iter().enumerate() {
+        for (game, id) in [(&mut gpu, gpu_id), (&mut cpu, cpu_id)] {
+            place(game, id, at);
+            game.scene()
+                .borrow_mut()
+                .world
+                .transform_mut(id)
+                .unwrap()
+                .scale = Vec3::splat(scale);
+            crate::play::run(game, 30);
+        }
+        let count = |g: &rusty::app::GameWorld, id| {
+            g.scene().borrow().world.particles(id).unwrap().live_count()
+        };
+        assert_eq!(count(&gpu, gpu_id), count(&cpu, cpu_id), "frame {frame}");
+        let (Some(a), Some(b)) = (
+            red(
+                &mut host,
+                &gpu.scene().borrow(),
+                &format!("scale_gpu_{frame}"),
+            ),
+            red(
+                &mut host,
+                &cpu.scene().borrow(),
+                &format!("scale_cpu_{frame}"),
+            ),
+        ) else {
+            return;
+        };
+        assert!(
+            b.iter().filter(|&&x| x).count() > 30,
+            "frame {frame}: drawn"
+        );
+        let agree = agreement(&a, &b);
+        assert!(agree > 0.98, "frame {frame}: {agree}");
+    }
 }

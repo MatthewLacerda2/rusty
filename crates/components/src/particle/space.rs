@@ -3,7 +3,8 @@
 //! A `Cpu` emitter's particles are always stored in world space, so the draw pass,
 //! soft particles, lighting, sorting, collisions and sub-emitters read one kind of
 //! position. (A `Local` `Gpu` emitter's births go to the renderer in the emitter's
-//! own space instead, and its draw places them under the frame, #2170.) A
+//! own space instead, the last frame with an inverse, which its draw places them
+//! under too, so a scale of 0 holds them as it holds a `Cpu` emitter's, #2170.) A
 //! `Local` emitter keeps them relative to itself by *carrying* them: the runtime
 //! remembers the emitter frame the live particles were last placed under (its
 //! anchor), and [`ParticleEmitterComponent::carry_to`] moves every live particle

@@ -261,11 +261,14 @@ fn layouts(device: &wgpu::Device) -> (wgpu::BindGroupLayout, wgpu::BindGroupLayo
 }
 
 /// Entity `id`'s emitter `e` as its uniform: under its frame when `Local`, lit
-/// where it stands.
+/// where it stands. The frame is the last one with an inverse (the sim's
+/// `anchor`, which its births are stored under), so an emitter at scale 0 draws
+/// its particles where they last stood, as the `Cpu` path leaves them, and none
+/// collapses onto the emitter; identity before it ever had one.
 fn uniform_of(scene: &Scene, id: u32, e: &ParticleEmitterComponent) -> GpuEmitter {
-    let frame = match e.simulation_space {
-        SimulationSpace::Local => scene.world.emitter_frame(id).matrix,
-        SimulationSpace::World => glam::Mat4::IDENTITY,
+    let frame = match (e.simulation_space, e.runtime.anchor) {
+        (SimulationSpace::Local, Some(anchor)) => anchor.matrix,
+        _ => glam::Mat4::IDENTITY,
     };
     GpuEmitter::new(
         e,
