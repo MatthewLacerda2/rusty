@@ -9,7 +9,7 @@
 //! bands like every op.
 //!
 //! The functions it shares with the `math` op are `math`'s own
-//! ([`super::math::apply`]), so a formula and the equivalent `math` chain bake the
+//! (`ops::math::apply`), so a formula and the equivalent `math` chain bake the
 //! same bytes by construction.
 
 mod eval;
