@@ -38,7 +38,7 @@ pub(crate) use arity::{arity, ONE, SOURCE};
 pub(crate) use extent::power_of_two_sides;
 pub use kinds::*;
 pub use node::{Fault, Node, NodeError};
-pub(crate) use op_info::{choice, op, opt, req, socket, SEED};
+pub(crate) use op_info::{choice, op, opt, req, req_sampled, socket, SEED};
 pub use op_info::{Lit, OpInfo, OpParam};
 pub use param::{Link, Param};
 #[doc(hidden)]

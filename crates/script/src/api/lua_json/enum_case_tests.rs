@@ -40,7 +40,7 @@ fn op_doc(info: &OpInfo, round: usize, case: fn(&str) -> String) -> Json {
     for p in info.params {
         let value = match p.ty {
             "enum" => json!(case(p.values[round % p.values.len()])),
-            _ if p.default.is_none() => sample_required(info, p),
+            _ if p.default.is_none() => sample_required(p),
             _ => continue,
         };
         doc.insert(p.name.into(), value);

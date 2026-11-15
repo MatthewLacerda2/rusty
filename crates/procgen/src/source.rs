@@ -126,12 +126,25 @@ impl Sources {
     }
 
     /// Parse `bytes` as the font a `text` node names `path`; an error when they
-    /// are no font (truncated, another format).
-    pub fn insert_font(&mut self, path: impl Into<String>, bytes: Vec<u8>) -> Result<(), String> {
+    /// are no font (truncated, another format). Gives the parsed font back, for a
+    /// caller that keeps fonts across recipes ([`Self::insert_parsed_font`]).
+    pub fn insert_font(
+        &mut self,
+        path: impl Into<String>,
+        bytes: Vec<u8>,
+    ) -> Result<FontHandle, String> {
         let font = FontData::parse(bytes.into())
             .ok_or("not a .ttf / .otf font this can read (truncated, or another format)")?;
-        self.fonts.insert(path.into(), FontHandle::new(font));
-        Ok(())
+        let font = FontHandle::new(font);
+        self.insert_parsed_font(path, font.clone());
+        Ok(font)
+    }
+
+    /// Hand in a font [`Self::insert_font`] parsed before, for the `text` nodes
+    /// that name `path`: a caller re-baking keeps fonts, so it neither re-reads nor
+    /// re-parses one, and the shaper's memo carries over.
+    pub fn insert_parsed_font(&mut self, path: impl Into<String>, font: FontHandle) {
+        self.fonts.insert(path.into(), font);
     }
 
     /// The font a `text` node names `path`, if the caller handed it in.

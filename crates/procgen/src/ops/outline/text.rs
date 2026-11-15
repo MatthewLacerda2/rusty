@@ -8,6 +8,7 @@
 //! its width, and it is centred in the tile, each line aligned within it.
 
 use glam::Vec2;
+use rusty_core::collections::Map;
 use rusty_font::{FontData, GlyphId};
 
 use super::fill::Shape;
@@ -29,7 +30,13 @@ pub fn glyphs(font: &FontData, text: &str, layout: Layout) -> Vec<Shape> {
     let s = layout.size / upem;
     let lines: Vec<Line> = text
         .split('\n')
-        .map(|l| line(font, l, layout.tracking * upem))
+        .map(|l| {
+            line(
+                font,
+                l.strip_suffix('\r').unwrap_or(l),
+                layout.tracking * upem,
+            )
+        })
         .collect();
     let block = lines.iter().map(|l| l.1).fold(0.0, f32::max) * s;
     let left = 0.5 - block / 2.0;
@@ -37,6 +44,8 @@ pub fn glyphs(font: &FontData, text: &str, layout: Layout) -> Vec<Shape> {
     let pitch = layout.size * layout.line_spacing;
     let height = ascent + descent + pitch * (lines.len() - 1) as f32;
     let top = 0.5 - height / 2.0;
+    // Each distinct glyph is flattened once, however often the text draws it.
+    let mut outlines: Map<GlyphId, Option<Vec<rusty_font::Segment>>> = Map::default();
     let mut shapes = Vec::new();
     for (i, (glyphs, w)) in lines.iter().enumerate() {
         let x = match layout.align {
@@ -46,7 +55,10 @@ pub fn glyphs(font: &FontData, text: &str, layout: Layout) -> Vec<Shape> {
         };
         let origin = Vec2::new(x, top + ascent + pitch * i as f32);
         for &(glyph, pen) in glyphs {
-            let Some(outline) = font.outline(glyph, upem) else {
+            let outline = outlines
+                .entry(glyph)
+                .or_insert_with(|| font.outline(glyph, upem));
+            let Some(outline) = outline else {
                 continue;
             };
             let place = |p: Vec2| origin + Vec2::new(pen.x + p.x, -(pen.y + p.y)) * s;

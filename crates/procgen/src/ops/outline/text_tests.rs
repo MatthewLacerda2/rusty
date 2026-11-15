@@ -62,3 +62,11 @@ fn ligatures_are_shaped() {
     let f = rusty_font::default_font();
     assert_eq!(glyphs(&f, "fi", layout(Align::Center)).len(), 1);
 }
+
+#[test]
+fn a_crlf_line_break_draws_as_a_newline() {
+    let f = rusty_font::default_font();
+    let lf = glyphs(&f, "EXIT\nNO 3", layout(Align::Center));
+    let crlf = glyphs(&f, "EXIT\r\nNO 3", layout(Align::Center));
+    assert_eq!(lf, crlf, "no `\\r` glyph, and the same centring");
+}

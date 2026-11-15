@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use crate::catalog::{Cx, Op, Row};
 use crate::image_buf::Image;
 use crate::ops::generators::clamp_or;
-use crate::ops::outline::{self, fill, svg};
-use crate::recipe::{choice, op, opt, req, Lit, OpInfo, OpParam, SOURCE};
+use crate::ops::outline::{self, fill, stroke, svg};
+use crate::recipe::{choice, op, opt, req_sampled, Lit, OpInfo, OpParam, SOURCE};
 
 /// Widest stroke, tiles.
 const MAX_STROKE: f32 = 1.0;
@@ -27,8 +27,10 @@ pub enum FillRule {
 /// the exact share of each pixel it covers. `d` takes `M L H V C S Q T A Z`,
 /// absolute and relative, in tile units with `v` down, as `coordinates` runs;
 /// an open subpath fills as if closed. `stroke` above 0 draws the outline that
-/// many tiles wide instead (round joins and caps), under `nonzero`. A shape that
-/// crosses the tile's edge wraps. `d` is parsed with the recipe, so a malformed
+/// many tiles wide instead (round joins and caps, each pixel's coverage from its
+/// distance to the outline). A shape that crosses the tile's edge wraps; under
+/// `evenodd` each wrapped copy is folded on its own, so a shape wider than the
+/// tile never cuts a hole in itself. `d` is parsed with the recipe, so a malformed
 /// one is refused, naming the byte, before anything bakes.
 ///
 /// The fields are private: the parsed outline is built once from them.
@@ -72,7 +74,7 @@ impl Row for Path {
         "generator",
         SOURCE,
         &[
-            req("d", "text"),
+            req_sampled("d", "M0.25 0.25 L0.75 0.25 L0.5 0.75 Z"),
             OpParam {
                 default: Some(Lit::Text("nonzero")),
                 ..choice("fill_rule", &["nonzero", "evenodd"])
@@ -85,17 +87,21 @@ impl Row for Path {
 impl Op for Path {
     fn run(&self, cx: &Cx) -> Image {
         let width = clamp_or(self.stroke, 0.0, 0.0, MAX_STROKE);
-        let (shapes, rule) = match width > 0.0 {
-            true => (outline::stroke(&self.subpaths, width), FillRule::Nonzero),
-            false => (outline::filled(&self.subpaths), self.fill_rule),
+        let cover = match width > 0.0 {
+            true => stroke::coverage(&self.subpaths, width, cx.size),
+            false => fill::coverage(&outline::filled(&self.subpaths), cx.size, self.fill_rule),
         };
-        mask(&shapes, cx, rule)
+        gray(cover, cx)
     }
 }
 
 /// `shapes` filled under `rule` at the node's extent, as a gray image.
 pub(crate) fn mask(shapes: &[fill::Shape], cx: &Cx, rule: FillRule) -> Image {
-    let cover = fill::coverage(shapes, cx.size, rule);
+    gray(fill::coverage(shapes, cx.size, rule), cx)
+}
+
+/// One coverage value per pixel as a gray image at the node's extent.
+fn gray(cover: Vec<f32>, cx: &Cx) -> Image {
     let mut img = Image::new(cx.size);
     for (p, c) in img.pixels_mut().iter_mut().zip(cover) {
         *p = [c, c, c, 1.0];

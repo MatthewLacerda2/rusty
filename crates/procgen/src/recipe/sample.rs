@@ -5,18 +5,18 @@
 use serde_json::{json, Value};
 
 #[cfg(test)]
+use super::OpInfo;
+#[cfg(test)]
 use super::OpKind;
-use super::{OpInfo, OpParam, SAMPLE_PATH};
+use super::{OpParam, SAMPLE_PATH};
 
-/// A valid value for `info`'s required param `p`. A test hook: the script crate's
+/// A valid value for the required param `p`: its row's own
+/// [`OpParam::sample`], else its type's. A test hook: the script crate's
 /// enum-case test fills each op's required params with it, so a new param type or
 /// op is sampled in one place.
 #[doc(hidden)]
-pub fn sample_required(info: &OpInfo, p: &OpParam) -> Value {
-    let given = REQUIRED
-        .iter()
-        .find(|(op, name, _)| *op == info.op && *name == p.name);
-    given.map_or_else(|| sample(p), |(.., v)| json!(v))
+pub fn sample_required(p: &OpParam) -> Value {
+    p.sample.map_or_else(|| sample(p), |v| json!(v))
 }
 
 /// A valid value for a required param of type `p.ty`.
@@ -40,15 +40,11 @@ pub fn sample_op(info: &OpInfo) -> OpKind {
     let mut doc = serde_json::Map::new();
     doc.insert("op".into(), json!(info.op));
     for p in info.params.iter().filter(|p| p.default.is_none()) {
-        doc.insert(p.name.into(), sample_required(info, p));
+        doc.insert(p.name.into(), sample_required(p));
     }
     serde_json::from_value(Value::Object(doc))
         .unwrap_or_else(|e| panic!("{}: required params don't parse: {e}", info.op))
 }
-
-/// Required params whose type's sample is no valid value: a `path`'s `d` is SVG
-/// path data, not any text.
-const REQUIRED: &[(&str, &str, &str)] = &[("path", "d", "M0.25 0.25 L0.75 0.25 L0.5 0.75 Z")];
 
 /// Params a row's defaults leave unread, written so its sample reads every input and
 /// socket: an `expression` names the inputs it takes in its formula, and at `expr`'s

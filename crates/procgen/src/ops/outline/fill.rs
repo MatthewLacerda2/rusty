@@ -13,6 +13,8 @@
 //! contours: a glyph, a subpath) that crosses the tile's edge wraps onto the
 //! torus, as every map tiles: each copy whose box meets the tile is drawn.
 
+use std::collections::BTreeSet;
+
 use glam::Vec2;
 
 use crate::catalog::generators::outline::path::FillRule;
@@ -26,24 +28,45 @@ pub type Shape = Vec<Edge>;
 
 /// The coverage of `shapes` under `rule`, one value in `[0, 1]` per pixel,
 /// row-major at `size`.
+///
+/// A wrapped copy is the same outline again, not another contour of it, so the
+/// rule folds each copy's winding on its own and the copies are then added, capped
+/// at 1: under `evenodd` a shape wider than the tile never cancels against its own
+/// copy. Under `nonzero` folding first or last reads the same, so every copy goes
+/// into one pass.
 pub fn coverage(shapes: &[Shape], size: Size, rule: FillRule) -> Vec<f32> {
     let (w, h) = (size.width as usize, size.height as usize);
     let mut acc = Accumulator::new(w, h);
-    let scale = Vec2::new(w as f32, h as f32);
-    for shape in shapes {
-        let Some((lo, hi)) = bounds(shape) else {
-            continue;
-        };
-        for ky in copies(lo.y, hi.y) {
-            for kx in copies(lo.x, hi.x) {
-                let k = Vec2::new(kx as f32, ky as f32);
-                for &[a, b] in shape {
-                    acc.edge((a + k) * scale, (b + k) * scale);
-                }
-            }
+    let mut out = vec![0.0; w * h];
+    let offsets: BTreeSet<(i64, i64)> = match rule {
+        FillRule::Nonzero => BTreeSet::new(),
+        FillRule::Evenodd => shapes.iter().flat_map(offsets).collect(),
+    };
+    if offsets.is_empty() {
+        for shape in shapes {
+            acc.copies(shape, |_| true);
         }
+        acc.resolve_into(rule, &mut out);
+        return out;
     }
-    acc.resolve(rule)
+    for &k in &offsets {
+        for shape in shapes {
+            acc.copies(shape, |at| at == k);
+        }
+        acc.resolve_into(rule, &mut out);
+        acc.cells.fill(0.0);
+    }
+    out
+}
+
+/// Every whole-tile offset `(kx, ky)` at which a copy of `shape` meets the tile.
+fn offsets(shape: &Shape) -> Vec<(i64, i64)> {
+    let Some((lo, hi)) = bounds(shape) else {
+        return Vec::new();
+    };
+    copies(lo.y, hi.y)
+        .flat_map(|ky| copies(lo.x, hi.x).map(move |kx| (kx, ky)))
+        .collect()
 }
 
 /// The box of `shape`'s finite points; `None` when it has none.
@@ -69,6 +92,17 @@ struct Accumulator {
 }
 
 impl Accumulator {
+    /// Add each copy of `shape` (tile units) whose offset `keep` takes.
+    fn copies(&mut self, shape: &Shape, keep: impl Fn((i64, i64)) -> bool) {
+        let scale = Vec2::new(self.w as f32, self.h as f32);
+        for (kx, ky) in offsets(shape).into_iter().filter(|&k| keep(k)) {
+            let k = Vec2::new(kx as f32, ky as f32);
+            for &[a, b] in shape {
+                self.edge((a + k) * scale, (b + k) * scale);
+            }
+        }
+    }
+
     fn new(w: usize, h: usize) -> Self {
         Self {
             w,
@@ -130,18 +164,18 @@ impl Accumulator {
         }
     }
 
-    /// Each pixel's coverage: the running sum of its row's cells, under `rule`.
-    fn resolve(self, rule: FillRule) -> Vec<f32> {
+    /// Add each pixel's coverage, the running sum of its row's cells under `rule`,
+    /// into `out`, capped at 1.
+    fn resolve_into(&self, rule: FillRule, out: &mut [f32]) {
         let stride = self.w + 2;
-        let mut out = Vec::with_capacity(self.w * self.h);
-        for row in self.cells.chunks(stride.max(1)).take(self.h) {
+        let rows = self.cells.chunks(stride.max(1)).take(self.h);
+        for (row, px) in rows.zip(out.chunks_mut(self.w.max(1))) {
             let mut winding = 0.0;
-            for cell in &row[..self.w] {
+            for (cell, p) in row[..self.w].iter().zip(px) {
                 winding += cell;
-                out.push(fold(winding, rule));
+                *p = (*p + fold(winding, rule)).min(1.0);
             }
         }
-        out
     }
 }
 
@@ -164,7 +198,13 @@ fn fold(winding: f32, rule: FillRule) -> f32 {
 /// Spread one row's stretch of an edge, from `x0` to `x1` and `d` tall (signed by
 /// winding), over `line`: each cell gets the share of `d` the edge leaves to the
 /// left of the pixel's right side, less the share already given to its left.
+///
+/// Both ends are clamped into the row first: an end recomputed from a piece the
+/// caller clipped to `x = 0` can land a rounding error below it, and a `lo` a hair
+/// under 0 would floor to −1 and spread the whole stretch one cell off.
 fn span(line: &mut [f32], x0: f32, x1: f32, d: f32) {
+    let right = line.len().saturating_sub(2) as f32;
+    let (x0, x1) = (x0.clamp(0.0, right), x1.clamp(0.0, right));
     let (lo, hi) = if x0 < x1 { (x0, x1) } else { (x1, x0) };
     let lo_floor = lo.floor();
     let i = lo_floor as usize;
@@ -199,3 +239,7 @@ fn span(line: &mut [f32], x0: f32, x1: f32, d: f32) {
 #[cfg(test)]
 #[path = "fill_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "fill_wrap_tests.rs"]
+mod wrap_tests;
