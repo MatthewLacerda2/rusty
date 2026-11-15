@@ -3,9 +3,7 @@
 //! the sim: the births since the last upload, the `dt` of every step since, the
 //! lookup table when the curves changed, the uniform.
 
-use glam::Vec3;
-
-use super::record::{advance, bake_lut, GpuBirth, GpuEmitter, GpuParticle, LUT_SIZE};
+use super::record::{bake_lut, GpuBirth, GpuEmitter, GpuParticle, LUT_SIZE};
 use rusty_components::particle::{GpuSim, DT_HISTORY};
 
 /// The usages of a buffer the frame writes and a pass reads.
@@ -20,6 +18,8 @@ pub(crate) struct Work {
     pub(crate) births: u32,
     /// Slots to step (the extent), when any step is owed.
     pub(crate) step: Option<u32>,
+    /// Whether the upload recorded a command (a clear, a copy) the frame must submit.
+    pub(crate) encoded: bool,
 }
 
 /// One emitter's GPU state: its particle buffer (one slot per particle, sized by
@@ -32,6 +32,8 @@ pub(crate) struct EmitterBuffers {
     cursor: u64,
     /// The step the particles were last moved to; `None` since a reset.
     done: Option<u64>,
+    /// The sim's [`GpuSim::emptied`] these buffers last saw.
+    emptied: u64,
     pub(crate) particles: wgpu::Buffer,
     pub(crate) capacity: u32,
     births: wgpu::Buffer,
@@ -43,8 +45,6 @@ pub(crate) struct EmitterBuffers {
     pub(crate) emitter: GpuEmitter,
     /// The bind groups, rebuilt when a buffer they hold grew.
     pub(crate) groups: Option<(wgpu::BindGroup, wgpu::BindGroup)>,
-    /// The fallback's particles, on the CPU, for an adapter with no compute.
-    pub(crate) mirror: Option<Vec<GpuParticle>>,
     /// The renders since the sim last had this emitter's buffers drawn.
     pub(crate) idle: u32,
 }
@@ -65,26 +65,17 @@ fn buffer<T>(
 }
 
 impl EmitterBuffers {
-    /// Empty buffers for `capacity` slots; `mirror` keeps them on the CPU instead.
-    pub(crate) fn new(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        capacity: u32,
-        mirror: bool,
-    ) -> Self {
+    /// Empty buffers for `capacity` slots (wgpu zeroes a new buffer, and an
+    /// all-zero slot is empty).
+    pub(crate) fn new(device: &wgpu::Device, capacity: u32) -> Self {
         let capacity = capacity.max(1);
-        let particles = buffer::<GpuParticle>(device, "GPU Particles", capacity, STORAGE);
-        queue.write_buffer(
-            &particles,
-            0,
-            bytemuck::cast_slice(&vec![GpuParticle::EMPTY; capacity as usize]),
-        );
         let uniform_usage = wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST;
         Self {
             epoch: 0,
             cursor: 0,
             done: None,
-            particles,
+            emptied: 0,
+            particles: buffer::<GpuParticle>(device, "GPU Particles", capacity, STORAGE),
             capacity,
             births: buffer::<GpuBirth>(device, "GPU Particle Births", 64, STORAGE),
             births_capacity: 64,
@@ -94,15 +85,15 @@ impl EmitterBuffers {
             uniform: buffer::<GpuEmitter>(device, "GPU Particle Emitter", 1, uniform_usage),
             emitter: bytemuck::Zeroable::zeroed(),
             groups: None,
-            mirror: mirror.then(Vec::new),
             idle: 0,
         }
     }
 
     /// Bring the buffers to `sim` for an emitter whose uniform is `emitter` and
-    /// whose curves bake to `lut`, needing `wanted` slots: grow, empty on a new
-    /// epoch, upload the new births, the owed steps' `dt`s, the table when it
-    /// changed and the uniform. Returns what to dispatch.
+    /// whose curves bake to `lut`, needing `wanted` slots (never more than the
+    /// device holds, the caller's clamp): grow, empty on a new epoch or once every
+    /// particle has died, upload the new births, the owed steps' `dt`s, the table
+    /// when it changed and the uniform. Returns what to dispatch.
     pub(crate) fn upload(
         &mut self,
         (device, queue, encoder): (&wgpu::Device, &wgpu::Queue, &mut wgpu::CommandEncoder),
@@ -110,10 +101,19 @@ impl EmitterBuffers {
         mut emitter: GpuEmitter,
         (lut, wanted): (Vec<[f32; 4]>, u32),
     ) -> Work {
+        let mut encoded = false;
         if self.epoch != sim.epoch() {
-            self.reset(queue, sim.epoch());
+            self.reset(encoder, sim.epoch());
+            encoded = true;
+        } else if self.emptied != sim.emptied() {
+            // Every particle died since the last upload, so whatever a slot holds is
+            // stale: a birth the upload never saw (born and dead in between) left an
+            // older particle in its slot, unstepped while the extent was 0.
+            encoder.clear_buffer(&self.particles, 0, None);
+            encoded = true;
         }
-        self.grow(device, queue, encoder, wanted.max(sim.extent()));
+        self.emptied = sim.emptied();
+        encoded |= self.grow(device, encoder, wanted);
         if lut != self.baked {
             queue.write_buffer(&self.lut, 0, bytemuck::cast_slice(&lut));
             self.baked = lut;
@@ -128,16 +128,13 @@ impl EmitterBuffers {
         let start = (from + 1).max((goal + 1).saturating_sub(DT_HISTORY as u64));
         let dts: Vec<f32> = (start..=goal).filter_map(|s| sim.dt_of(s)).collect();
         let first = goal + 1 - dts.len() as u64;
-        emitter.info[1] = sim.extent();
+        let extent = sim.extent().min(self.capacity);
+        emitter.info[1] = extent;
         emitter.info[2] = goal as u32;
         emitter.info[3] = first as u32;
         emitter.counts = [births.len() as u32, dts.len() as u32, 0, 0];
         self.done = Some(goal);
         self.emitter = emitter;
-        if self.mirror.is_some() {
-            self.step_mirror(&births, &dts, sim.extent());
-            return Work::default();
-        }
         if !births.is_empty() {
             self.grow_births(device, births.len() as u32);
             queue.write_buffer(&self.births, 0, bytemuck::cast_slice(&births));
@@ -148,92 +145,67 @@ impl EmitterBuffers {
         queue.write_buffer(&self.uniform, 0, bytemuck::bytes_of(&emitter));
         Work {
             births: births.len() as u32,
-            step: (!dts.is_empty() && sim.extent() > 0).then_some(sim.extent()),
-        }
-    }
-
-    /// The CPU fallback's upload and step: the shader's scatter of `births`, then
-    /// its step over the first `extent` slots by the window `dts`.
-    fn step_mirror(&mut self, births: &[GpuBirth], dts: &[f32], extent: u32) {
-        let Some(mirror) = &mut self.mirror else {
-            return;
-        };
-        mirror.resize(self.capacity as usize, GpuParticle::EMPTY);
-        for b in births {
-            mirror[b.slot as usize] = b.particle;
-        }
-        if dts.is_empty() {
-            return;
-        }
-        let [_, _, goal, first] = self.emitter.info;
-        let gravity = Vec3::from_slice(&self.emitter.gravity[..3]);
-        let dt_of = |s: u32| {
-            // As the shader: a step older than the window takes its oldest `dt`.
-            let at = s.wrapping_sub(first);
-            let at = if at >= 0x8000_0000 { 0 } else { at as usize };
-            dts[at.min(dts.len() - 1)]
-        };
-        for p in mirror.iter_mut().take(extent as usize) {
-            advance(p, goal, gravity, &self.baked, dt_of);
+            step: (!dts.is_empty() && extent > 0).then_some(extent),
+            encoded,
         }
     }
 
     /// The births since the last upload, one per slot (a slot reused within the
     /// upload keeps its newest birth, so the scatter never races), dead ones as
-    /// empty slots; and the step the oldest live one was born at.
+    /// empty slots, none past the buffer; and the step the oldest live one was
+    /// born at. Reads only what is new: the sim finds the first new serial by a
+    /// binary search.
     fn new_births(&mut self, sim: &GpuSim) -> (Vec<GpuBirth>, Option<u64>) {
-        let mut by_slot: Vec<GpuBirth> = Vec::new();
-        let mut seen = std::collections::HashMap::new();
         let mut oldest = None::<u64>;
-        for b in sim.births().filter(|b| b.serial >= self.cursor) {
-            if !b.dead {
-                oldest = Some(oldest.map_or(b.step, |o| o.min(b.step)));
-            }
-            let record = GpuBirth {
-                particle: GpuParticle::born(b),
-                slot: b.slot,
-                pad: [0; 3],
-            };
-            match seen.get(&b.slot) {
-                Some(&at) => by_slot[at] = record,
-                None => {
-                    seen.insert(b.slot, by_slot.len());
-                    by_slot.push(record);
+        let mut records: Vec<GpuBirth> = sim
+            .births_from(self.cursor)
+            .filter(|b| b.slot < self.capacity)
+            .map(|b| {
+                if !b.dead {
+                    oldest = Some(oldest.map_or(b.step, |o| o.min(b.step)));
                 }
+                GpuBirth {
+                    particle: GpuParticle::born(b),
+                    slot: b.slot,
+                    pad: [0; 3],
+                }
+            })
+            .collect();
+        self.cursor = sim.next_serial();
+        // Stable, so a slot's births stay oldest first: the last of each run is kept.
+        records.sort_by_key(|r| r.slot);
+        let mut kept: Vec<GpuBirth> = Vec::with_capacity(records.len());
+        for r in records {
+            match kept.last_mut() {
+                Some(last) if last.slot == r.slot => *last = r,
+                _ => kept.push(r),
             }
         }
-        self.cursor = sim.next_serial();
-        (by_slot, oldest)
+        (kept, oldest)
     }
 
-    /// Empty every slot for the sim reset `epoch`.
-    fn reset(&mut self, queue: &wgpu::Queue, epoch: u64) {
-        let empty = vec![GpuParticle::EMPTY; self.capacity as usize];
-        queue.write_buffer(&self.particles, 0, bytemuck::cast_slice(&empty));
-        if let Some(mirror) = &mut self.mirror {
-            mirror.clear();
-        }
+    /// Empty every slot for the sim reset `epoch`: a GPU clear, nothing built on the CPU.
+    fn reset(&mut self, encoder: &mut wgpu::CommandEncoder, epoch: u64) {
+        encoder.clear_buffer(&self.particles, 0, None);
         (self.epoch, self.cursor, self.done) = (epoch, 0, None);
     }
 
-    /// Hold at least `slots` particles: a bigger buffer, the old slots copied in
-    /// and the new ones empty.
+    /// Hold at least `slots` particles: a bigger buffer (zeroed, so its new slots
+    /// are empty) with the old slots copied in. Whether it recorded the copy.
     fn grow(
         &mut self,
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         slots: u32,
-    ) {
+    ) -> bool {
         if slots <= self.capacity {
-            return;
+            return false;
         }
         let bigger = buffer::<GpuParticle>(device, "GPU Particles", slots, STORAGE);
-        let tail = vec![GpuParticle::EMPTY; (slots - self.capacity) as usize];
         let old = u64::from(self.capacity) * std::mem::size_of::<GpuParticle>() as u64;
-        queue.write_buffer(&bigger, old, bytemuck::cast_slice(&tail));
         encoder.copy_buffer_to_buffer(&self.particles, 0, &bigger, 0, old);
         (self.particles, self.capacity, self.groups) = (bigger, slots, None);
+        true
     }
 
     /// Hold at least `count` births.
@@ -244,11 +216,6 @@ impl EmitterBuffers {
         let size = count.next_power_of_two();
         self.births = buffer::<GpuBirth>(device, "GPU Particle Births", size, STORAGE);
         (self.births_capacity, self.groups) = (size, None);
-    }
-
-    /// The lookup table last uploaded.
-    pub(crate) fn baked(&self) -> &[[f32; 4]] {
-        &self.baked
     }
 
     /// The buffers the step's group binds, in binding order 1..=5.
@@ -272,7 +239,10 @@ impl EmitterBuffers {
 }
 
 /// The lookup table and the slots an emitter wants: its curves baked, and room
-/// for `max_particles`.
-pub(crate) fn wants(emitter: &rusty_components::ParticleEmitterComponent) -> (Vec<[f32; 4]>, u32) {
-    (bake_lut(emitter), emitter.max_particles)
+/// for its cap, never more than the device's `fit`.
+pub(crate) fn wants(
+    emitter: &rusty_components::ParticleEmitterComponent,
+    fit: u32,
+) -> (Vec<[f32; 4]>, u32) {
+    (bake_lut(emitter), emitter.particle_cap().min(fit))
 }

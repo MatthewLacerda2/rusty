@@ -33,13 +33,13 @@ actually spawned (the `max_particles` cap may swallow some).
 | `Particles.SetLit` | `(id, lit)` | — |
 | `Particles.SetReactive` | `(id, name)` | — (`"Auto"`, `"Off"` or `"Full"`, any case; an unknown name is an error): the sprites' reactivity under TAA (`Graphics.md` → *TAA*, #1845); `Auto`, the default, from their alpha (Alpha) or what they add (Additive). Mesh particles take their material's |
 | `Particles.GetReactive` | `(id)` | reactivity name, or `nil` without an emitter |
-| `Particles.SetSimulationSpace` | `(id, space)` | — (`"World"` or `"Local"`, any case; an unknown name is an error) |
+| `Particles.SetSimulationSpace` | `(id, space)` | — (`"World"` or `"Local"`, any case; an unknown name is an error); a change forgets a `Gpu` emitter's live particles (*Simulation*) |
 | `Particles.GetSimulationSpace` | `(id)` | space name, or `nil` without an emitter |
 | `Particles.SetSimulation` | `(id, target)` | — (`"Cpu"` or `"Gpu"`, any case; an unknown name is an error): where the live particles are simulated (*Simulation*); a change forgets the live particles |
 | `Particles.GetSimulation` | `(id)` | target name, or `nil` without an emitter |
 | `Particles.GetParticles` | `(id)` | an array of particle tables, oldest first (*Custom logic*); empty without an emitter, and always empty on a `Gpu` emitter |
 | `Particles.SetParticles` | `(id, list)` | the number of particles now live (0 without an emitter); on a `Gpu` emitter it changes nothing and warns once; an entry that is not a table, or a field of the wrong type, is an error that changes nothing |
-| `Particles.ForEach` | `(id, fn)` | the number of particles now live (`fn` not a function is an error): `fn(p)` runs once per live particle, oldest first, on **one reused table** whose edits are written back; returning `false` kills the particle |
+| `Particles.ForEach` | `(id, fn)` | the number of particles now live (`fn` not a function is an error): `fn(p)` runs once per live particle, oldest first, on **one reused table** whose edits are written back; returning `false` kills the particle. On a `Gpu` emitter `fn` never runs, and nothing is written or warned |
 
 **Ranges.** `SetLifetime`/`SetSpeed`/`SetSize` take `min, max`: each particle
 draws its start value uniformly between them from the emitter's seeded stream.
@@ -114,15 +114,26 @@ particles are **visual only**; what it does not do:
   in the order of their buffer slots. Emitters still sort back to front among
   themselves, a `Gpu` one by where the emitter stands.
 
+A `Gpu` emitter holds at most **1,000,000** particles, whatever its
+`max_particles`: the same cap on every machine, so `GetCount` never differs
+between them. Setting more (in the Inspector or with `Component.Set`) warns and
+stores the cap; an emitter loaded or switched to `"Gpu"` with more warns and
+behaves as the cap. A GPU whose buffers cannot hold that many (none that rusty
+ships on) draws up to what fits, warned once at start-up. Changing a `Gpu`
+emitter's simulation space forgets its live particles, as changing its target
+does: they were stored in the old space.
+
 The over-life curves and gradient are sampled into a 64-step table per emitter,
 linear between steps. The sim keeps each live particle's birth record on the CPU
-(about 100 bytes each) until it dies. An adapter that cannot run compute shaders
-(rusty ships on Vulkan and Metal, which always can) simulates a `Gpu` emitter's
-particles on the CPU in the renderer instead, with one console warning. In edit
-mode an emitter draws nothing on either target, as no tick runs.
+(about 100 bytes each) until it dies. The renderer replays the last 256 ticks one
+`dt` at a time; one that drew nothing for longer (a long `Harness.Step`) moves the
+particles over the older ticks in one closed-form jump at the oldest kept `dt`.
+In edit mode an emitter draws nothing on either target, as no tick runs.
 
 ```lua no-run
 Particles.SetSimulation(smoke, "Gpu")
+Component.Set(smoke, "Particles", { max_particles = 100000 })
+Particles.SetLifetime(smoke, 2)
 Particles.SetRate(smoke, 50000) -- 100k live at a 2 s lifetime
 ```
 

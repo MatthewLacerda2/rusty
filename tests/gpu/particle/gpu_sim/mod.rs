@@ -4,6 +4,7 @@
 //! particle is not drawn. Shared here: a play world over the particle wall scene,
 //! and the red pixels of a shot.
 
+mod frames;
 mod motion;
 mod space;
 

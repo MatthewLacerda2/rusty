@@ -22,12 +22,22 @@ use rusty_edit::authoring::ComponentKind;
 use widgets::{clamped, combo, drag_u32};
 
 use crate::inspector::components::card::component_card;
+use rusty_components::particle::GPU_MAX_PARTICLES;
 use rusty_components::{ParticleSimulation, SimulationSpace};
 use rusty_edit::authoring::particles as particle_ops;
 use rusty_scene::{CollisionResponse, EmitMode, ParticleEmitterComponent};
 
-/// The Max Particles field's ceiling: past the dense `Gpu` effects' 100k (#2170).
-const MAX_PARTICLES: u32 = 10_000_000;
+/// The Rate and Max Particles fields' ranges for an emitter simulated on
+/// `simulation`: a `Cpu` emitter's gameplay counts, or as many as a `Gpu` one's
+/// fixed cap holds (#2170), a rate that fills it in a second included.
+fn emission_ranges(
+    simulation: ParticleSimulation,
+) -> (std::ops::RangeInclusive<f32>, std::ops::RangeInclusive<u32>) {
+    match simulation {
+        ParticleSimulation::Cpu => (0.0..=1000.0, 1..=100_000),
+        ParticleSimulation::Gpu => (0.0..=GPU_MAX_PARTICLES as f32, 1..=GPU_MAX_PARTICLES),
+    }
+}
 
 type Cx<'w> = (&'w mut rusty_ecs::World, u32); // world + entity id, as one param
 /// Routes a field write through the shared particle-authoring op; a no-op absent.
@@ -119,8 +129,9 @@ fn draw_emission(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponen
     for line in particle_ops::gpu_warnings(p) {
         ui.colored_label(ui.visuals().warn_fg_color, line);
     }
+    let (rates, caps) = emission_ranges(p.simulation);
     let mut rate = p.rate;
-    if clamped(ui, "Rate (per sec):", &mut rate, 0.0..=1000.0) {
+    if clamped(ui, "Rate (per sec):", &mut rate, rates) {
         apply(cx, |c| particle_ops::set_rate(c, rate));
         changed = true;
     }
@@ -130,7 +141,7 @@ fn draw_emission(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponen
         changed = true;
     }
     let mut cap = p.max_particles;
-    if drag_u32(ui, "Max Particles:", &mut cap, 1..=MAX_PARTICLES) {
+    if drag_u32(ui, "Max Particles:", &mut cap, caps) {
         apply(cx, |c| particle_ops::set_max_particles(c, cap));
         changed = true;
     }
@@ -182,4 +193,21 @@ impl crate::inspector::components::add::AddEntry for rusty_components::ParticleE
         crate::inspector::components::add::Category::Effects;
     const LABEL: &'static str = "Particle System";
     const ICON: &'static str = egui_phosphor::regular::SPARKLE;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_gpu_emitters_fields_reach_its_cap_and_a_cpu_ones_stay_at_gameplay_counts() {
+        let (rates, caps) = emission_ranges(ParticleSimulation::Gpu);
+        assert_eq!(*caps.end(), GPU_MAX_PARTICLES);
+        assert!(
+            *rates.end() >= GPU_MAX_PARTICLES as f32,
+            "a rate that fills the cap in 1 s"
+        );
+        let (rates, caps) = emission_ranges(ParticleSimulation::Cpu);
+        assert_eq!((*rates.end(), *caps.end()), (1000.0, 100_000));
+    }
 }

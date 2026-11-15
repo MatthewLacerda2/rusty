@@ -35,7 +35,7 @@ mod sub_emitter;
 pub use render::{Flipbook, ParticleRender, ParticleRenderMode};
 pub use runtime::{EmitterRuntime, Particle, SubEmitEvent};
 pub use shape::{EmitFrom, EmitShape};
-pub use simulation::{Birth, GpuSim, ParticleSimulation, DT_HISTORY};
+pub use simulation::{Birth, GpuSim, ParticleSimulation, DT_HISTORY, GPU_MAX_PARTICLES};
 pub use space::{EmitterFrame, SimulationSpace};
 pub use sub_emitter::{SubEmitTrigger, SubEmitters};
 
@@ -224,6 +224,15 @@ impl ParticleEmitterComponent {
     pub fn clear_particles(&mut self) {
         self.runtime.particles.clear();
         self.runtime.gpu.clear();
+    }
+
+    /// The most particles live at once: `max_particles`, and on a `Gpu` emitter
+    /// never more than [`GPU_MAX_PARTICLES`].
+    pub fn particle_cap(&self) -> u32 {
+        match self.simulation {
+            ParticleSimulation::Cpu => self.max_particles,
+            ParticleSimulation::Gpu => self.max_particles.min(GPU_MAX_PARTICLES),
+        }
     }
 
     /// Whether the live particles are the renderer's (`Gpu`).

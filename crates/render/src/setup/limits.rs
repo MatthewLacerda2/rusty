@@ -44,15 +44,6 @@ pub(crate) fn device_limits() -> wgpu::Limits {
     }
 }
 
-impl crate::Renderer {
-    /// What the renderer takes from the adapter beside the device: whether it can
-    /// simulate particles on the GPU (`passes::particles::gpu::supported`, #2170).
-    pub(crate) fn adopt_adapter(&mut self, adapter: &wgpu::Adapter) {
-        let flags = adapter.get_downlevel_capabilities().flags;
-        self.particle_renderer.gpu.compute = crate::passes::particles::gpu::supported(flags);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -137,7 +137,7 @@ impl ParticleEmitterComponent {
     ) -> u32 {
         self.ensure_initialized();
         self.carry_to(frame);
-        let cap = self.max_particles as usize;
+        let cap = self.particle_cap() as usize;
         let birth = self.sub_emitters.birth.filter(|_| births);
         let inherit = self.sub_emitters.inherit_velocity;
         let mut spawned = 0;

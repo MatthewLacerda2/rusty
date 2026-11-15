@@ -79,12 +79,12 @@ impl Renderer {
             config.view_formats = vec![alias];
         }
         surface.configure(&device, &config);
+
         let present_modes = surface_caps.present_modes.clone();
         // No budget permit: there is exactly one windowed renderer and it is the
         // application itself, so it never queues behind the headless budget (#366).
         let mut renderer =
             Self::from_parts(device, queue, Some(surface), config, present_modes, None);
-        renderer.adopt_adapter(&adapter);
         // A game must not compile a pipeline mid-frame; only headless stays lazy (#985).
         renderer.warm_pipelines(cfg!(feature = "editor"));
         Ok(renderer)

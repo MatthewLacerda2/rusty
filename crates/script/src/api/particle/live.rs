@@ -13,8 +13,8 @@
 //! identity of the particle it was read from (`live.lua` sends its source with
 //! it), so a script that removes or reorders entries keeps each survivor's hidden
 //! fields. A `Gpu` emitter's particles are the renderer's (#2170): `GetParticles`
-//! reads none, and `SetParticles` warns once and changes nothing. A `Local` emitter is carried to where it stands before every read and
-//! write, so what a script reads and writes is where the particles draw now.
+//! and `ForEach` see none, and `SetParticles` warns once and changes nothing. A
+//! `Local` emitter is carried to where it stands before every read and write, so what a script reads and writes is where the particles draw now.
 
 use mlua::{Function, Lua, Table};
 
@@ -83,7 +83,7 @@ pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
                 }
                 let live = with_carried(&mut scene.borrow_mut(), id, |e, frame| match e.on_gpu() {
                     false => write_records(e, frame, &records),
-                    true => refuse(e, &verb, id),
+                    true => refuse(e, (&verb, records.is_empty()), id),
                 });
                 Ok(live.unwrap_or(0))
             },
@@ -153,9 +153,12 @@ fn fields(p: &Particle) -> [f32; FIELDS] {
 }
 
 /// A `Gpu` emitter's particles are the renderer's (#2170): a write changes
-/// nothing, warns the first time, and returns the number live.
-fn refuse(e: &mut ParticleEmitterComponent, verb: &str, id: u32) -> u32 {
-    if e.runtime.gpu.first_warning() {
+/// nothing, warns the first time, and returns the number live. A `ForEach`, which
+/// saw no particle (`GetParticles` reads none), wrote nothing: it warns nothing
+/// and keeps the one warning for a `SetParticles`.
+fn refuse(e: &mut ParticleEmitterComponent, (verb, empty): (&str, bool), id: u32) -> u32 {
+    let wrote = !(empty && verb == "ForEach");
+    if wrote && e.runtime.gpu.first_warning() {
         log::warn!(
             "[Particles] {verb}: entity {id} simulates on the GPU; its particles cannot \
              be written (the call does nothing)"
@@ -217,4 +220,35 @@ fn apply(p: &mut Particle, values: &[f32; FIELDS]) {
     }
     p.color = [r, g, b, a];
     p.custom = [c1, c2, c3, c4];
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusty_components::ParticleSimulation;
+    use rusty_test_support::logs;
+
+    #[test]
+    fn a_for_each_over_a_gpu_emitter_keeps_the_one_warning_for_set_particles() {
+        logs::init();
+        let mut e = ParticleEmitterComponent {
+            simulation: ParticleSimulation::Gpu,
+            ..Default::default()
+        };
+        e.emit_at(EmitterFrame::IDENTITY, 3);
+        assert_eq!(
+            refuse(&mut e, ("ForEach", true), 1),
+            3,
+            "it saw none, wrote none"
+        );
+        assert!(logs::take().is_empty());
+        assert_eq!(refuse(&mut e, ("SetParticles", true), 1), 3);
+        assert_eq!(
+            logs::take().len(),
+            1,
+            "SetParticles warns, even with an empty list"
+        );
+        refuse(&mut e, ("SetParticles", false), 1);
+        assert!(logs::take().is_empty(), "once");
+    }
 }

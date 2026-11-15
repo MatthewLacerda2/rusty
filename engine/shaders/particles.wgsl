@@ -24,7 +24,7 @@
 #import common::{CameraUniforms, Fog, LightingUniforms, LocalLight, cluster_index, fog_factor, local_light_radiance}
 #import fog::volumetric::{through_volume, volumetric_fog}
 #import reactive
-#import particles::gpu::{GpuParticle, DEAD, gpu_emitter, life_t, lut_at}
+#import particles::gpu::{GpuParticle, EMPTY, gpu_emitter, life_t, lut_at}
 
 struct ParticleGlobals {
     view_proj: mat4x4<f32>,
@@ -184,7 +184,7 @@ fn gpu_frame(p: GpuParticle, sheet: vec4<f32>) -> f32 {
 @vertex
 fn vs_gpu(@builtin(vertex_index) vid: u32, @builtin(instance_index) slot: u32) -> VsOut {
     let p = gpu_particles[slot];
-    if (p.done == DEAD) {
+    if (p.next == EMPTY) {
         // An empty slot: outside the clip volume, so nothing rasterises.
         var out: VsOut;
         out.clip_position = vec4<f32>(2.0, 2.0, 2.0, 1.0);

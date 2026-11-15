@@ -167,3 +167,35 @@ fn only_the_first_warning_is_owed() {
     sim.clear();
     assert!(sim.first_warning());
 }
+
+#[test]
+fn the_extent_going_back_to_0_is_counted_and_new_births_are_found_by_serial() {
+    let mut sim = GpuSim::default();
+    sim.step(0.1);
+    assert_eq!(sim.emptied(), 0, "nothing ever lived: nothing to empty");
+    for _ in 0..3 {
+        sim.add(particle(0.05));
+    }
+    sim.add(particle(1.0));
+    let from: Vec<u64> = sim.births_from(2).map(|b| b.serial).collect();
+    assert_eq!(from, vec![2, 3]);
+    sim.step(0.1);
+    assert_eq!(sim.emptied(), 0, "one still lives");
+    for _ in 0..10 {
+        sim.step(0.1);
+    }
+    assert_eq!((sim.emptied(), sim.extent()), (1, 0));
+    sim.step(0.1);
+    assert_eq!(sim.emptied(), 1, "counted once per emptying");
+}
+
+#[test]
+fn a_gpu_emitter_holds_no_more_than_the_fixed_cap() {
+    let e = gpu_emitter(u32::MAX);
+    assert_eq!(e.particle_cap(), GPU_MAX_PARTICLES);
+    let cpu = ParticleEmitterComponent {
+        simulation: ParticleSimulation::Cpu,
+        ..e
+    };
+    assert_eq!(cpu.particle_cap(), u32::MAX);
+}

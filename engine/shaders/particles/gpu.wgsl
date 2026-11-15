@@ -4,8 +4,8 @@
 // The Rust twins are `render::passes::particles::gpu::record`'s, field for field.
 #define_import_path particles::gpu
 
-// A slot's `done` when nothing lives in it.
-const DEAD: u32 = 0xffffffffu;
+// A slot's `next` when nothing lives in it: zero, so an all-zero buffer is empty.
+const EMPTY: u32 = 0u;
 // Samples per over-life curve in the lookup table.
 const LUT_SIZE: u32 = 64u;
 
@@ -19,8 +19,8 @@ struct GpuParticle {
     size: f32,
     rotation: f32,
     start_frame: u32,
-    // The step it has been moved to, or DEAD.
-    done: u32,
+    // The first step it has yet to take (steps count from 1), or EMPTY.
+    next: u32,
 };
 
 // What a birth upload carries: the particle and its slot.

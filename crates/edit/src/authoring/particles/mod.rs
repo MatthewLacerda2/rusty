@@ -27,6 +27,7 @@ pub use simulation::*;
 use glam::Vec3;
 
 use rusty_asset::MapRef;
+use rusty_components::particle::GPU_MAX_PARTICLES;
 use rusty_components::{
     CollisionResponse, EmitFrom, EmitMode, EmitShape, ParticleBlend, ParticleEmitterComponent,
     SimulationSpace, SubEmitTrigger,
@@ -58,6 +59,12 @@ pub fn set_simulation_space(p: &mut ParticleEmitterComponent, space: SimulationS
     if p.simulation_space != space {
         p.simulation_space = space;
         p.runtime.anchor = None;
+        if p.on_gpu() {
+            // A `Gpu` emitter's live particles are stored in the old space, on the
+            // sim's side and in the renderer's buffer, with nothing to carry them
+            // (#2170): they are forgotten, as a change of target forgets them.
+            p.clear_particles();
+        }
     }
 }
 
@@ -71,9 +78,14 @@ pub fn set_burst_count(p: &mut ParticleEmitterComponent, burst_count: u32) {
     p.burst_count = burst_count;
 }
 
-/// Set the live-particle cap.
+/// Set the live-particle cap. A `Gpu` emitter's is clamped to
+/// [`GPU_MAX_PARTICLES`], with a warning (#2170).
 pub fn set_max_particles(p: &mut ParticleEmitterComponent, max_particles: u32) {
     p.max_particles = max_particles;
+    if p.on_gpu() && max_particles > GPU_MAX_PARTICLES {
+        simulation::warn_gpu(p);
+        p.max_particles = GPU_MAX_PARTICLES;
+    }
 }
 
 /// Set the blend mode (alpha / additive).

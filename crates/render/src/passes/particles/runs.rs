@@ -1,11 +1,7 @@
 //! crates/render/src/passes/particles/runs.rs — what each visible sprite emitter
 //! draws for one camera, farthest emitter first: a `Cpu` emitter's instances, or a
-//! GPU-simulated one's buffer (#2170), or that one's CPU fallback as instances.
+//! GPU-simulated one's buffer (#2170).
 
-use glam::Vec3;
-
-use super::gpu::emitter::EmitterBuffers;
-use super::gpu::record::{sprite, GpuParticle};
 use super::gpu::GpuParticles;
 use super::instance::{emitter_instances, emitter_light, Eye, ParticleInstance};
 use crate::draw::batch::sort::{back_to_front, view_depth};
@@ -16,7 +12,7 @@ use rusty_scene::{Scene, SceneId};
 
 /// What one emitter draws from.
 pub(super) enum Sprites {
-    /// Instances built this frame (a `Cpu` emitter, or a `Gpu` one's CPU fallback).
+    /// Instances built this frame (a `Cpu` emitter).
     Instances(Vec<ParticleInstance>),
     /// A GPU-simulated emitter's buffer (#2170): its key and slots in use, and the
     /// live particles it holds (for the counters).
@@ -56,19 +52,16 @@ pub(super) fn collect_runs(
             let Some(buffers) = gpu.emitters.get(&(scene.id(), id)) else {
                 continue;
             };
-            let sprites = match &buffers.mirror {
-                Some(mirror) => {
-                    Sprites::Instances(mirror_instances(mirror, buffers, eye, emitter.blend))
-                }
-                None => {
-                    let slots = emitter.runtime.gpu.extent().min(buffers.capacity);
-                    Sprites::Gpu((scene.id(), id), slots, emitter.live_count() as u32)
-                }
-            };
+            let slots = emitter.runtime.gpu.extent().min(buffers.capacity);
+            if slots == 0 {
+                // An idle emitter draws nothing, and so costs no draw and splits
+                // no batch, as an empty `Cpu` one.
+                continue;
+            }
             let run = EmitterRun {
                 blend: emitter.blend,
                 texture: emitter.texture.clone(),
-                sprites,
+                sprites: Sprites::Gpu((scene.id(), id), slots, emitter.live_count() as u32),
             };
             runs.push((run, view_depth(origin, eye.pos, eye.fwd)));
             continue;
@@ -87,26 +80,4 @@ pub(super) fn collect_runs(
     }
     back_to_front(&mut runs);
     runs.into_iter().map(|(run, _)| run).collect()
-}
-
-/// A GPU-simulated emitter's CPU fallback as instances, alpha ones back to front.
-fn mirror_instances(
-    mirror: &[GpuParticle],
-    buffers: &EmitterBuffers,
-    eye: Eye,
-    blend: ParticleBlend,
-) -> Vec<ParticleInstance> {
-    let mut keyed: Vec<(ParticleInstance, f32)> = mirror
-        .iter()
-        .take(buffers.emitter.info[1] as usize)
-        .filter_map(|p| sprite(p, &buffers.emitter, buffers.baked()))
-        .map(|i| {
-            let depth = view_depth(Vec3::from(i.center), eye.pos, eye.fwd);
-            (i, depth)
-        })
-        .collect();
-    if blend == ParticleBlend::Alpha {
-        back_to_front(&mut keyed);
-    }
-    keyed.into_iter().map(|(i, _)| i).collect()
 }

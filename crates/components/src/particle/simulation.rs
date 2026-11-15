@@ -40,9 +40,16 @@ rusty_core::named_enum! {
     }
 }
 
-/// How many steps' `dt`s are kept for the renderer to replay: a renderer that
-/// draws less often than this replays the older steps at the oldest kept `dt`.
-pub const DT_HISTORY: usize = 4096;
+/// How many steps' `dt`s are kept for the renderer to replay, one by one, in one
+/// dispatch: it bounds the compute step's loop. A renderer that draws less often
+/// than this (a long `Harness.Step`) moves a particle over the older steps in one
+/// closed-form jump at the oldest kept `dt`.
+pub const DT_HISTORY: usize = 256;
+
+/// The most particles a `Gpu` emitter holds, whatever its `max_particles`
+/// (`ParticleEmitterComponent::particle_cap`): fixed, so the sim's cap, and
+/// `Particles.GetCount`, are the same on every device. 64 MB of particle buffer.
+pub const GPU_MAX_PARTICLES: u32 = 1_000_000;
 
 /// One particle born on the CPU for the GPU, waiting to be uploaded.
 #[derive(Clone, Copy, Debug)]
@@ -98,6 +105,10 @@ pub struct GpuSim {
     /// Which reset this state is: a fresh number on every reset, from a process
     /// counter, so the renderer knows to forget its buffer. The sim never reads it.
     epoch: u64,
+    /// How many times every particle has died and the extent gone back to 0: the
+    /// renderer empties its buffer when it changed, so a slot a birth it never saw
+    /// was handed is not left holding an older particle.
+    emptied: u64,
     /// Whether a script's write of the live particles was warned about yet.
     warned: bool,
 }
@@ -119,6 +130,7 @@ impl Default for GpuSim {
             serial: 0,
             dead: 0,
             epoch: EPOCHS.fetch_add(1, Ordering::Relaxed),
+            emptied: 0,
             warned: false,
         }
     }
@@ -146,6 +158,11 @@ impl GpuSim {
         self.epoch
     }
 
+    /// How many times the extent has gone back to 0 (see the field).
+    pub fn emptied(&self) -> u64 {
+        self.emptied
+    }
+
     /// The next birth's serial: every birth below it has been made.
     pub fn next_serial(&self) -> u64 {
         self.serial
@@ -154,6 +171,13 @@ impl GpuSim {
     /// The births kept, oldest first (each one at most once per serial).
     pub fn births(&self) -> impl Iterator<Item = &Birth> {
         self.births.iter()
+    }
+
+    /// The births kept whose serial is `from` or later, oldest first: found by a
+    /// binary search, so a caller reading only what is new pays for what is new.
+    pub fn births_from(&self, from: u64) -> impl Iterator<Item = &Birth> {
+        let at = self.births.partition_point(|b| b.serial < from);
+        self.births.range(at..)
     }
 
     /// The `dt` step `step` (1-based) took, or the oldest kept one when it is older
@@ -232,10 +256,11 @@ impl GpuSim {
             self.live -= 1;
             self.forget(serial);
         }
-        if self.live == 0 {
+        if self.live == 0 && self.extent > 0 {
             // Nothing alive: slots start again from 0, and the buffer's extent with them.
             self.free.clear();
             self.extent = 0;
+            self.emptied += 1;
         }
     }
 

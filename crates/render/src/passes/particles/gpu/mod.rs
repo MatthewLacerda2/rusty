@@ -15,13 +15,19 @@
 //! alpha ones draw in slot order. Emitters still sort back to front among
 //! themselves, a `Gpu` one by where it stands (no centroid is known on the CPU).
 //!
-//! **No compute** ([`supported`]): an adapter without compute shaders or storage
-//! buffers in the vertex stage keeps the particles on the CPU instead, in the
-//! emitter's `mirror`, stepped by [`record::advance`] and drawn through the CPU
-//! pass's instances, with one console warning.
+//! **Compute is a requirement**, not a choice made here: the renderer's other
+//! passes already bind storage buffers in the vertex stage and warm compute
+//! pipelines (the Hi-Z cull, the fog), so an adapter without them never builds a
+//! renderer. `twin` holds the CPU twins the tests hold its shaders to.
+//!
+//! **Capacity.** The sim caps a `Gpu` emitter at `GPU_MAX_PARTICLES` on every
+//! device; a device whose buffer limits hold fewer ([`fit`]) draws up to what fits,
+//! warned once when the renderer starts.
 
 pub(crate) mod emitter;
 pub(crate) mod record;
+#[cfg(test)]
+mod twin;
 
 use std::collections::HashMap;
 
@@ -34,24 +40,27 @@ use crate::gpu::shaders::ShaderRegistry;
 use crate::passes::particles::instance::emitter_light;
 use crate::timing::GpuPass;
 use crate::Renderer;
-use rusty_components::particle::{ParticleEmitterComponent, SimulationSpace};
+use rusty_components::particle::{ParticleEmitterComponent, SimulationSpace, GPU_MAX_PARTICLES};
 use rusty_scene::{Scene, SceneId};
 
 /// Renders without a draw after which an emitter's buffers are dropped: a scene
 /// nobody renders any more (a replaced one) frees its emitters.
 const IDLE_RENDERS: u32 = 600;
 
-/// Whether an adapter with `flags` runs the GPU simulation: compute shaders, and
-/// storage buffers read in the vertex stage. Vulkan and Metal always have both.
-pub(crate) fn supported(flags: wgpu::DownlevelFlags) -> bool {
-    flags.contains(wgpu::DownlevelFlags::COMPUTE_SHADERS | wgpu::DownlevelFlags::VERTEX_STORAGE)
+/// The particles one emitter's buffer holds on a device with `limits`: the
+/// sim's fixed cap, or fewer where a storage binding or a buffer is smaller.
+pub(crate) fn fit(limits: &wgpu::Limits) -> u32 {
+    let record = std::mem::size_of::<record::GpuParticle>() as u64;
+    let bytes = limits
+        .max_buffer_size
+        .min(limits.max_storage_buffer_binding_size as u64);
+    (bytes / record).min(u64::from(GPU_MAX_PARTICLES)) as u32
 }
 
 /// Every GPU-simulated emitter's buffers, and the pipelines that step them.
 pub(crate) struct GpuParticles {
-    /// Whether the adapter runs the compute pass ([`supported`]).
-    pub(crate) compute: bool,
-    warned: bool,
+    /// The particles one emitter's buffer holds on this device ([`fit`]).
+    pub(crate) fit: u32,
     /// The step's group: the emitter, particles (read-write), curves, `dt`s, births.
     step_layout: wgpu::BindGroupLayout,
     /// The draw's group 0: the pass globals, the emitter, particles, curves.
@@ -83,9 +92,15 @@ impl GpuParticles {
                 })
             })
         };
+        let fit = fit(&device.limits());
+        if fit < GPU_MAX_PARTICLES {
+            log::warn!(
+                "[Particles] this device's buffers hold {fit} particles per Gpu emitter, \
+                 below the cap of {GPU_MAX_PARTICLES}: an emitter past it draws {fit}"
+            );
+        }
         Self {
-            compute: true,
-            warned: false,
+            fit,
             step_layout,
             draw_layout,
             birth: pipeline("cs_birth"),
@@ -130,24 +145,15 @@ impl Renderer {
             if !scene.world.is_active_in_hierarchy(id) {
                 continue;
             }
-            if !gpu.compute && !std::mem::replace(&mut gpu.warned, true) {
-                log::warn!(
-                    "[Particles] this adapter cannot run compute shaders: Gpu emitters \
-                     simulate on the CPU in the renderer"
-                );
-            }
             let uniform = uniform_of(scene, id, &emitter);
             let (device, queue) = (&self.device, &self.queue);
-            let buffers = gpu.emitters.entry(key).or_insert_with(|| {
-                EmitterBuffers::new(device, queue, emitter.max_particles, !gpu.compute)
-            });
+            let wants = emitter::wants(&emitter, gpu.fit);
+            let buffers = gpu
+                .emitters
+                .entry(key)
+                .or_insert_with(|| EmitterBuffers::new(device, wants.1));
             buffers.idle = 0;
-            let work = buffers.upload(
-                (device, queue, &mut encoder),
-                sim,
-                uniform,
-                emitter::wants(&emitter),
-            );
+            let work = buffers.upload((device, queue, &mut encoder), sim, uniform, wants);
             owed.push((key, work));
         }
         // An emitter gone or back on the CPU frees its buffers now; another
@@ -158,17 +164,23 @@ impl Renderer {
         self.encode_gpu_steps(encoder, &owed);
     }
 
-    /// Record and submit the births' scatter and the step of each emitter in `owed`.
+    /// Record and submit the births' scatter and the step of each emitter in `owed`;
+    /// nothing at all when nothing is owed (a scene with no `Gpu` emitter, a
+    /// capture face, a frame whose emitters took no step and had no birth).
     fn encode_gpu_steps(
         &mut self,
         mut encoder: wgpu::CommandEncoder,
         owed: &[((SceneId, u32), Work)],
     ) {
+        let dispatches = owed.iter().any(|(_, w)| w.births > 0 || w.step.is_some());
+        if !dispatches && !owed.iter().any(|(_, w)| w.encoded) {
+            return;
+        }
         let pr = &mut self.particle_renderer;
         let (gpu, globals) = (&mut pr.gpu, &pr.globals_buffer);
         for (key, _) in owed {
             if let Some(e) = gpu.emitters.get_mut(key) {
-                if e.groups.is_none() && e.mirror.is_none() {
+                if e.groups.is_none() {
                     e.groups = Some(groups(
                         &self.device,
                         (&gpu.step_layout, &gpu.draw_layout),
@@ -179,7 +191,7 @@ impl Renderer {
             }
         }
         let gpu = &self.particle_renderer.gpu;
-        if owed.iter().any(|(_, w)| w.births > 0 || w.step.is_some()) {
+        if dispatches {
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("GPU Particle Step"),
                 timestamp_writes: self.gpu_timer.compute_writes(GpuPass::Particles),
