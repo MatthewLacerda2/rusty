@@ -64,6 +64,26 @@ fn steepest(red: &[f32], ceiling: &[bool], (w, h): (u32, u32), inset: u32) -> (f
         }
     }
     let peak = pairs.iter().map(|p| p.0).fold(1e-3, f32::max);
+    let mut worst = (0.0f32, 0u32, 0u32);
+    for y in 0..h - 1 {
+        for x in w / 10..w * 9 / 10 {
+            if open(x, y) {
+                let (a0, r0, d0) = (at(x, y), at(x + 1, y), at(x, y + 1));
+                let st = (r0 - a0).abs().max((d0 - a0).abs());
+                if st > worst.0 {
+                    worst = (st, x, y);
+                }
+            }
+        }
+    }
+    let (_, wx, wy) = worst;
+    let row: Vec<f32> = (wx.saturating_sub(4)..(wx + 5).min(w))
+        .map(|x| at(x, wy))
+        .collect();
+    let col: Vec<f32> = (wy.saturating_sub(4)..(wy + 5).min(h))
+        .map(|y| at(wx, y))
+        .collect();
+    eprintln!("DEBUG2249 shelf {w}x{h} steepest at ({wx},{wy}) step {} peak {peak}: row {row:?} col {col:?}", worst.0);
     let step = pairs
         .iter()
         .map(|&(a, r, d)| (r - a).abs().max((d - a).abs()))
