@@ -33,7 +33,7 @@ use rusty_navigation::NavigationGraph;
 use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
-pub use inspector::preview::{OrbitState, PreviewCache, PreviewMesh, PreviewRequest};
+pub use inspector::preview::{FramedOrbit, PreviewCache, PreviewMesh, PreviewRequest};
 
 #[cfg(feature = "dev")]
 pub use dev_state::DevEditorState;
@@ -125,10 +125,10 @@ pub struct EditorUi {
     /// (#352). One shared flag: entity and asset selection are mutually exclusive,
     /// so only one card is ever showing it at a time.
     pub preview_tab_active: bool,
-    /// The Preview tab's mesh toggle (sphere/cube/Suzanne).
+    /// The Preview tab's mesh toggle (sphere, cube, Suzanne or plane).
     pub preview_mesh: PreviewMesh,
-    /// The Preview tab's orbit-camera state, persisted across frames.
-    pub preview_orbit: OrbitState,
+    /// The Preview tab's orbit camera and the framing it started from.
+    pub preview_orbit: FramedOrbit,
     /// The isolated preview scene, rebuilt only when the subject/mesh choice changes.
     pub preview_cache: Option<PreviewCache>,
     /// This frame's render request for `main.rs`'s `render_preview_scene`; `None`
@@ -184,7 +184,7 @@ impl EditorUi {
 
             preview_tab_active: false,
             preview_mesh: PreviewMesh::default(),
-            preview_orbit: OrbitState::default(),
+            preview_orbit: FramedOrbit::default(),
             preview_cache: None,
             preview_request: None,
             preview_texture_id: None,

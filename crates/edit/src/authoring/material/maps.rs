@@ -11,8 +11,9 @@
 //! rebake writes to the same paths, so the fields it filled before already point at
 //! them, and a hand-set path stays put — one rule serves define and rebake alike.
 //! A recipe's graph instances and `image` nodes read their files from the project
-//! root on every bake ([`super::load_recipe`], #1491, #1744), so a rebake picks up
-//! an edited graph or source. The asset keeps the recipe as written, instances and
+//! root (an `engine/…` path from the engine's content folder) on every bake
+//! ([`super::load_recipe`], #1491, #1744), so a rebake picks up an edited graph or
+//! source. The asset keeps the recipe as written, instances and
 //! all, never its expansion.
 
 use std::collections::BTreeMap;
@@ -21,6 +22,7 @@ use std::path::Path;
 use super::MaterialLibrary;
 use rusty_asset::MapRef;
 use rusty_core::paths::to_slash;
+use rusty_core::project::ContentRoots;
 use rusty_procgen::{bake_set, check_set, Slot};
 use rusty_scene::MaterialAsset;
 
@@ -30,7 +32,8 @@ pub const MAPS_DIR: &str = rusty_core::project::TEXTURES_DIR;
 
 /// Bake `asset`'s maps recipe (named `name`) into `dir` and fill its empty map
 /// fields with the written paths, its `image` nodes reading their files from
-/// `root` (the open project's, [`rusty_core::project::root`]). A material with no
+/// `root` (the open project's, [`rusty_core::project::root`]) and an `engine/…`
+/// path from the engine's ([`rusty_core::project::ContentRoots`]). A material with no
 /// recipe is left as is. On error nothing is filled, and the recipe is checked
 /// before any file is read or written.
 pub fn bake_maps(
@@ -49,7 +52,7 @@ pub fn bake_maps(
     }
     let in_error = |e: String| format!("material {name:?} maps: {e}");
     check_set(recipe).map_err(in_error)?;
-    let loaded = super::load_recipe(recipe, root).map_err(in_error)?;
+    let loaded = super::load_recipe(recipe, &ContentRoots::new(root)).map_err(in_error)?;
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     // `/`-spelled, `dir` included: the paths land in the scene file, which stores
     // `/` (`core::paths::to_slash`).
@@ -95,18 +98,28 @@ fn fill_empty_maps(asset: &mut MaterialAsset, baked: &BTreeMap<String, String>) 
             continue;
         };
         for field in slot.material_maps() {
-            let target = match *field {
-                "base_color_map" => &mut asset.base_color_map,
-                "metallic_map" => &mut asset.metallic_map,
-                "roughness_map" => &mut asset.roughness_map,
-                "normal_map" => &mut asset.normal_map,
-                "emissive_map" => &mut asset.emissive_map,
-                _ => continue,
-            };
-            target.get_or_insert_with(|| MapRef::from(path.clone()));
+            // Every key a slot names is a field: `maps_tests` walks `Slot::ALL`.
+            if let Some(target) = map_field(asset, field) {
+                target.get_or_insert_with(|| MapRef::from(path.clone()));
+            }
         }
     }
     super::fit_map_slots(asset);
+}
+
+/// The map field `MaterialAsset` keeps under the `DefineAsset` key `name`
+/// ([`Slot::material_maps`]' spelling), `None` for a key that is no map field.
+fn map_field<'a>(asset: &'a mut MaterialAsset, name: &str) -> Option<&'a mut Option<MapRef>> {
+    Some(match name {
+        "base_color_map" => &mut asset.base_color_map,
+        "metallic_map" => &mut asset.metallic_map,
+        "roughness_map" => &mut asset.roughness_map,
+        "normal_map" => &mut asset.normal_map,
+        "emissive_map" => &mut asset.emissive_map,
+        "occlusion_map" => &mut asset.occlusion_map,
+        "specular_map" => &mut asset.specular_map,
+        _ => return None,
+    })
 }
 
 #[cfg(test)]

@@ -220,10 +220,12 @@ impl ParticleEmitterComponent {
         }
     }
 
-    /// Forget every live particle (`Particles.Clear`), on either target.
+    /// Forget every live particle (`Particles.Clear`), on either target: a
+    /// script's read before it is stale (the revision moves).
     pub fn clear_particles(&mut self) {
         self.runtime.particles.clear();
         self.runtime.gpu.clear();
+        self.runtime.revision = self.runtime.revision.wrapping_add(1);
     }
 
     /// The most particles live at once: `max_particles`, and on a `Gpu` emitter

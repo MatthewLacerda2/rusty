@@ -106,6 +106,14 @@ struct MaterialData {
     detail_pad_a: u32,
     detail_pad_b: u32,
     detail_pad_c: u32,
+    // The occlusion map (#2151): 1 when its red channel darkens the indirect light
+    // (`shader.wgsl`'s `surface_color`), by `occlusion_strength`.
+    use_occlusion_map: u32,
+    occlusion_strength: f32,
+    // The specular-level map (#2151): 1 scales the dielectric reflectance by its
+    // alpha, 2 by its red (a one-channel upload).
+    use_specular_map: u32,
+    maps_pad: u32,
 };
 
 // One object a kept scene draws (#1706), at its slot of `objects`: what the object
@@ -350,6 +358,17 @@ var s_emissive: sampler;
 var t_detail: texture_2d<f32>;
 @group(2) @binding(31)
 var s_detail: sampler;
+// The occlusion (#2151, glTF's `occlusionTexture`, R) and specular-level
+// (`KHR_materials_specular`'s `specularTexture`, A) maps, raw texels, counting down
+// from the detail map's binding, so the extra shader slots keep theirs.
+@group(2) @binding(14)
+var t_occlusion: texture_2d<f32>;
+@group(2) @binding(30)
+var s_occlusion: sampler;
+@group(2) @binding(13)
+var t_specular: texture_2d<f32>;
+@group(2) @binding(29)
+var s_specular: sampler;
 
 // The sun's cascaded shadow maps (#435): `lighting::cascades`.
 @group(3) @binding(0)
@@ -374,7 +393,7 @@ var<storage, read> shadow_tiles: array<ShadowTile>;
 // transparent one with a surface that refracts or absorbs. Linear, clamped sampler.
 // In the opaque pass of a base camera running SSIL (`camera.ssil.x`, #1750), which
 // reads no opaque copy, it holds SSIL's bounce instead, one texel per pixel, so
-// the stage binds no texture more than `render::setup::limits` allows (19).
+// the stage binds no texture more than `render::setup::limits` allows (21).
 @group(3) @binding(6)
 var t_opaque: texture_2d<f32>;
 @group(3) @binding(7)

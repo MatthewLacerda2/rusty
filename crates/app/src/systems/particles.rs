@@ -121,6 +121,8 @@ fn simulate_emitter(
 ) {
     emitter.ensure_initialized();
     emitter.carry_to(origin);
+    // Every particle ages, so a script's earlier read is stale.
+    emitter.runtime.revision = emitter.runtime.revision.wrapping_add(1);
 
     if emitter.active {
         emit(emitter, origin, dt);

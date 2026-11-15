@@ -37,8 +37,10 @@
 // put a texel up to 5° off, which a lobe that narrow drew as a sawtooth edge and a
 // dot a texel.
 //
-// No AO: the lobe stands in for direct light, which AO doesn't touch here, and the
-// static occluders' shadows are already in the bake. It is off in every bake capture
+// Its occlusion. The static occluders' shadows are already in the bake; the caller
+// (`shader.wgsl`'s `surface_color`) weighs the lobe by the specular occlusion of
+// SSAO and the material's occlusion map (#2151), as it does the probe reflections,
+// since the lobe is lightmap (indirect) data. It is off in every bake capture
 // (`lighting.baked_specular`), so no view-dependent highlight is frozen into a probe.
 // It is on for every lit, directionally lightmapped surface; a per-material switch
 // would be a `MaterialAsset` bool read here, as `forward::specular_aa` notes for its own.
@@ -51,7 +53,7 @@
 
 // A lightmapped surface's baked light: `irradiance` its E / pi, the Lambert response
 // `* albedo` gives as a realtime light's does, and `specular` the directional page's
-// lobe (zero without one), which AO does not weigh.
+// lobe (zero without one), which the caller weighs by its specular occlusion.
 struct LightmapLight {
     irradiance: vec3<f32>,
     specular: vec3<f32>,

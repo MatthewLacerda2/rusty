@@ -25,7 +25,10 @@ impl Row for ColorRamp {
             req("stops", "stops"),
             OpParam {
                 default: Some(Lit::Text("linear")),
-                ..choice("interpolation", &["linear", "constant", "ease"])
+                ..choice(
+                    "interpolation",
+                    &["linear", "constant", "ease", "cardinal", "b_spline"],
+                )
             },
         ],
     );

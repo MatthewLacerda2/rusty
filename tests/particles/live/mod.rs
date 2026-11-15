@@ -2,6 +2,7 @@
 //! an emitter's live particles. This file and `edges` drive the pair over a bare
 //! scene; `play` runs it inside the real play loop.
 
+mod arrays;
 mod bench;
 mod edges;
 mod for_each;
@@ -105,7 +106,7 @@ fn a_table_reads_in_world_space_and_degrees() {
         &scene,
         &format!(
             "local p = Particles.GetParticles({id})[1]
-             return p.position.x, p.rotation, p.color.a, p.custom[1]"
+             return p.x, p.rotation, p.a, p.custom1"
         ),
     )
     .unwrap();

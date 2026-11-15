@@ -6,6 +6,7 @@ pub(crate) mod batch;
 pub(crate) mod camera;
 mod detail;
 mod lighting;
+pub(crate) mod map_slots;
 pub(crate) mod materials;
 mod overlays;
 pub(crate) mod pass;
@@ -276,6 +277,6 @@ pub(crate) fn material_map_paths(
         .into_iter()
         .filter(|&id| admit(id))
         .flat_map(|id| scene.material_assets_of(id))
-        .flat_map(|m| materials::material_maps(Some(m)))
+        .flat_map(|m| map_slots::material_maps(Some(m)))
         .collect()
 }

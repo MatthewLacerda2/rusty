@@ -97,6 +97,16 @@ fn the_lua_pair_round_trips_and_a_gpu_emitter_answers_emit_count_and_clear_exact
         (60, 60),
         "SetParticles changes nothing"
     );
+    let arrays = format!(
+        "local a = Particles.GetArrays({id}, {{ 'x', 'vy' }})
+         return #a.x, Particles.SetArrays({id}, a), Particles.ForEach({id}, function() end)"
+    );
+    let (read, set, each) = lua::<(u32, u32, u32)>(&scene, &arrays).unwrap();
+    assert_eq!(
+        (read, set, each),
+        (0, 60, 60),
+        "an empty read; writes change nothing"
+    );
     lua::<()>(&scene, &format!("Particles.Clear({id})")).unwrap();
     assert_eq!(count(&scene, id), 0);
 }

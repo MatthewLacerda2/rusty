@@ -42,7 +42,7 @@ pub(super) fn particles(world: &GameWorld, id: u32) -> Vec<rusty::components::pa
 fn a_velocity_written_in_update_is_the_one_integrated_that_tick() {
     const UP: &str = "return { Update = function(id)
       local ps = Particles.GetParticles(id)
-      for _, p in ipairs(ps) do p.velocity = { x = 0, y = 10, z = 0 } end
+      for _, p in ipairs(ps) do p.vx, p.vy, p.vz = 0, 10, 0 end
       Particles.SetParticles(id, ps) end }";
     let (mut world, id) = world(burst(3, 100.0), UP, "rusty_2171_up.lua");
     run(&mut world, 1);
@@ -86,7 +86,7 @@ fn custom_survives_ticks_and_an_older_particle_dying() {
       if done or #ps < 2 then return end
       done = true
       ps[1].lifetime = ps[1].age + 0.05
-      ps[2].custom = { 7, 8, 9, 10 }
+      ps[2].custom1, ps[2].custom2, ps[2].custom3, ps[2].custom4 = 7, 8, 9, 10
       Particles.SetParticles(id, ps) end }";
     let (mut world, id) = world(burst(2, 100.0), TAG, "rusty_2171_tag.lua");
     run(&mut world, 30);
@@ -103,7 +103,7 @@ fn a_local_emitter_moved_in_late_update_round_trips_in_world_space() {
       x = x + 1
       Transform.SetPosition(id, x, 0, 0)
       local ps = Particles.GetParticles(id)
-      for _, p in ipairs(ps) do p.position = { x = x, y = 1, z = 0 } end
+      for _, p in ipairs(ps) do p.x, p.y, p.z = x, 1, 0 end
       Particles.SetParticles(id, ps) end }";
     let mut cfg = burst(3, 100.0);
     cfg.simulation_space = SimulationSpace::Local;
@@ -118,16 +118,18 @@ fn a_local_emitter_moved_in_late_update_round_trips_in_world_space() {
     }
 }
 
-/// The doc's attractor: sparks pulled toward a point, in `Update`.
-const ATTRACT: &str = "return { Update = function(id, dt)
-  local ps = Particles.GetParticles(id)
-  for _, p in ipairs(ps) do
-    local v, x = p.velocity, p.position
-    v.x = v.x + (0 - x.x) * 4 * dt
-    v.y = v.y + (2 - x.y) * 4 * dt
-    v.z = v.z + (0 - x.z) * 4 * dt
+/// The doc's attractor: sparks pulled toward a point, in `Update`, over arrays.
+const ATTRACT: &str = "local FIELDS = { 'x', 'y', 'z', 'vx', 'vy', 'vz' }
+return { Update = function(id, dt)
+  local a = Particles.GetArrays(id, FIELDS)
+  local x, y, z, vx, vy, vz = a.x, a.y, a.z, a.vx, a.vy, a.vz
+  for i = 1, #x do
+    vx[i] = vx[i] + (0 - x[i]) * 4 * dt
+    vy[i] = vy[i] + (2 - y[i]) * 4 * dt
+    vz[i] = vz[i] + (0 - z[i]) * 4 * dt
   end
-  Particles.SetParticles(id, ps) end }";
+  a.x, a.y, a.z = nil, nil, nil
+  Particles.SetArrays(id, a) end }";
 
 #[test]
 fn a_scripted_attractor_replays_bit_for_bit() {

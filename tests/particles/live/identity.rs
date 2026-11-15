@@ -1,7 +1,8 @@
 //! A table `GetParticles` handed out keeps its particle's identity: removing or
 //! filtering entries leaves each survivor its own hidden fields (a mesh
 //! particle's tumble axis and turn, a flipbook particle's start frame), and a
-//! table from an older read is the script's own data.
+//! table from an older read, or read before any other write, is the script's
+//! own data.
 
 use glam::{Quat, Vec3};
 use rusty::components::particle::{Flipbook, ParticleRenderMode};
@@ -89,6 +90,34 @@ fn a_table_from_an_older_read_takes_the_hidden_defaults() {
     .unwrap();
     let s = scene.borrow();
     for p in &s.world.particles(id).unwrap().runtime.particles {
+        assert_eq!(
+            (p.axis, p.start_frame, p.turn),
+            (Vec3::Y, 0, Quat::IDENTITY)
+        );
+    }
+}
+
+#[test]
+fn a_write_through_the_arrays_makes_an_earlier_read_the_scripts_own_data() {
+    // Every particle of the burst has age 0, so only the emitter's revision
+    // tells the read in `ps` from the particles after the arrays' kill.
+    let (scene, id) = hidden(3);
+    lua::<()>(
+        &scene,
+        &format!(
+            "local ps = Particles.GetParticles({id})
+             local a = Particles.GetArrays({id}, {{ 'age', 'lifetime' }})
+             a.age[1] = a.lifetime[1]
+             Particles.SetArrays({id}, a)
+             table.remove(ps, 1)
+             Particles.SetParticles({id}, ps)"
+        ),
+    )
+    .unwrap();
+    let s = scene.borrow();
+    let live = &s.world.particles(id).unwrap().runtime.particles;
+    assert_eq!(live.len(), 2);
+    for p in live {
         assert_eq!(
             (p.axis, p.start_frame, p.turn),
             (Vec3::Y, 0, Quat::IDENTITY)

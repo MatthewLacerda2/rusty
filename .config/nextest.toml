@@ -34,6 +34,18 @@ gpu = { max-threads = 2 }
 filter = '(kind(test) & test(/^gpu::/)) | test(/(^|::)gpu_[^:]*$/)'
 test-group = "gpu"
 
+# Printed after every run, passing too, so each log carries its adapter's values: the
+# canary names the adapter the GPU suite rendered on, and each test that holds a GPU
+# tolerance prints what it measured (docs/testing.md, *Which adapters*). A new
+# tolerance test that prints its values adds itself here.
+[[profile.default.overrides]]
+filter = """
+test(/(^|::)test_gpu::tests::gpu_adapter_present_when_required$/)
+| test(/(^|::)reflection_prefilter::gpu::tests::gpu_prefilter_matches_the_cpu_reference/)
+| test(/(^|::)taa::gpu::shimmer::gpu_a_turning_glossy_bumpy_sphere_shimmers_less_under_taa_than_fxaa$/)
+"""
+success-output = "final"
+
 # CI: the default profile plus a JUnit report for the job summary. Profiles inherit
 # `profile.default`, overrides included.
 [profile.ci]
