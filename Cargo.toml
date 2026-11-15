@@ -32,6 +32,9 @@ license.workspace = true
 # Integration tests build as ONE binary, not one per `tests/*.rs` (#483): each of those
 # linked the whole engine (wgpu, egui, rapier, Lua). See the `[[test]]` target below.
 autotests = false
+# Every binary is a `[[bin]]` below, with `test = false` (see `[lib]`): cargo finds none
+# under `src/bin/` on its own, which would build it a test harness.
+autobins = false
 # A plain `cargo run` opens the editor; the other binaries are named with `--bin`.
 default-run = "rusty"
 
@@ -40,8 +43,8 @@ name = "rusty"
 path = "src/lib.rs"
 # The root package builds no unit-test harness of its own (`test = false` here and on
 # every `[[bin]]`): its sources hold no tests, and each harness was one more rustc run
-# and link over the whole engine on every `cargo test` / `nextest run`, nine of them
-# running nothing. Tests go in `tests/` or in a member crate; `make rules`
+# and link against the whole engine on every `cargo test` / `nextest run`, nine of
+# them running nothing. Tests go in `tests/` or in a member crate; `make rules`
 # (`root-tests`) holds both halves.
 test = false
 

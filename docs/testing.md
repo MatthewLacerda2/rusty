@@ -506,9 +506,11 @@ If they return, count the recompiled `.o` files as above. A spike with few recom
 units points to the machine, not the crate.
 
 ## The link step (#2202)
-Every root binary links the whole engine statically: about 190 MB each in the dev
-profile, eight of them per `cargo build --features dev`. What links them, and what
-was measured against it, so it is not measured twice:
+The figures below are one machine's, the operator's, whose builds wait on its disk:
+they are the reasons behind each decision here, not numbers to plan by, and another
+machine measures its own. Every root binary links the whole engine statically,
+about 190 MB each in the dev profile, eight of them per `cargo build --features dev`.
+What links them, and what was measured against it, so it is not measured twice:
 
 - **The linker is already `lld`.** rustc links `x86_64-unknown-linux-gnu` through
   its bundled `rust-lld` (`cc -fuse-ld=lld`, the default since 1.90), so Linux dev
@@ -530,13 +532,14 @@ was measured against it, so it is not measured twice:
   binary's rustc run takes 1.5 s, 1.0 s of it the link. When a touched build links
   the eight at once (four at a time on four jobs), each can take 15-17 s, stalled
   on writes: a touched `cargo build --features dev` wrote about 2.1 GB, 1.5 GB of it
-  the eight binaries, and the same touch took anywhere from 16 s to 48 s on one
-  machine. What a build writes, not the linker, is the lever on such a machine.
+  the eight binaries, and the same touch took anywhere from 15 s to 52 s over 14
+  runs. What a build writes, not the linker, is the lever on such a machine.
 - **The root package builds no unit-test harness.** `[lib]` and every `[[bin]]`
-  say `test = false`: the root's sources hold no tests, and the nine harnesses were
-  nine rustc runs and links (small binaries, since the linker drops the unused
-  engine) on every `cargo test` / `nextest run`, about 2 s of a test build. The
-  `root-tests` rule (`docs/linting.md`) holds it.
+  say `test = false`, and `[package]` says `autobins = false` so no binary is found
+  without its `[[bin]]`: the root's sources hold no tests, and each harness was one
+  more rustc run and link against the whole engine on every `cargo test` / `nextest
+  run`, the nine together about 2 s of a test build. The `root-tests` rule
+  (`docs/linting.md`) holds it.
 - **Dynamic linking was measured and not adopted.** A `dylib` crate re-exporting
   the members, with `-C prefer-dynamic`, halved what a touched build wrote (0.93
   GB) and made each binary a few hundred KB, but the shared library's own link took

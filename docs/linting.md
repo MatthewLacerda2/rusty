@@ -72,7 +72,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Provider keys stay out of tests | `tools/lint -- --rules` (`read-keys`, `engine-spawn`, `key-guard`) | **hard gate**: `dev::providers::read_keys()` is called only by the editor, `session` and `session-mcp`, each still calls it, and `KEY_READERS` names the same three; a test starts an engine binary only through `tests/spawn.rs`, which tells it to read no key; every package whose manifest names `rusty-dev` expands `rusty_dev::no_provider_keys!()` once, a sample of one test binary per package (#974) |
 | Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
 | Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `crates/editor/src` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); an editor slider is built by `editor::widgets::slider`, never a bare `egui::Slider::new(`, whose default clamping does the same (#1444); a real need takes `// lint: allow(drag-range) <why>` |
-| Root targets build no test harness | `tools/lint -- --rules` (`root-tests`) | **hard gate**: the root `Cargo.toml`'s `[lib]` and every `[[bin]]` say `test = false`, and no root `src/` file holds a test gate (`#[cfg(test)]`, `#[test]`), since no harness would build it; each harness was one more rustc run and link over the whole engine on every `cargo test`, running nothing; the root's tests are `tests/`; no allow (#2202) |
+| Root targets build no test harness | `tools/lint -- --rules` (`root-tests`) | **hard gate**: the root `Cargo.toml`'s `[lib]` and every `[[bin]]` say `test = false` and its `[package]` says `autobins = false` (a binary cargo found under `src/bin/` on its own would get a harness; undeclared, `orphan-module` names it), and no root `src/` file holds a test gate (`#[cfg(test)]`, `#[test]`), since no harness would build it; each harness was one more rustc run and link against the whole engine on every `cargo test`, running nothing; the root's tests are `tests/`; no allow (#2202) |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
 | Rust files are compiled | `tools/lint -- --rules` (`orphan-module`) | **hard gate**: every scanned `.rs` file is a crate root (a target's `src_path` in `cargo metadata` of the root, `fuzz/` and `tools/lint/` workspaces, so a `path =` target counts), is reached from one by `mod` as rustc resolves it (`name.rs` or `name/mod.rs`, under `a/` for a declaring `a.rs`, inline `mod a { mod b; }`, `#[path]`, a `mod` under `#[cfg]` included), or is named by `include!` / `include_str!`; rustc, clippy and rustfmt are silent about a file no `mod` names, and its tests stop running; a file built another way says why on its first line with `// lint: allow(orphan-module) <why>` |
 | Self-naming headers | `tools/lint -- --rules` (`self-path`) | **hard gate**: a source file's first `//!` line (a shader's first `//` line) that opens with a path under `src/`, `crates/`, `tests/`, `tools/`, `fuzz/`, `engine/` or `.github/` (a bare word too, when it names a directory of scanned files) names the file itself; a `mod.rs` may name its directory (`crates/edit/src/prefab/`). No header, or one opening with prose, is fine (#1654) |
@@ -595,10 +595,12 @@ new flag, gate, CI step or baseline.
 - **`root-tests`** (#2202) — the root package (the binaries and the integration
   suite; its lib only re-exports the members) builds no unit-test harness of its
   own. Cargo would otherwise build one per target on every `cargo test` and
-  `nextest run`: nine more rustc runs and links over the whole engine, running no
-  test. So the rule fails a `[lib]` or `[[bin]]` section of the root
-  `Cargo.toml` without `test = false` (a new binary's harness would come back), and
-  the first test line (`rules/test_code.rs`) of any root `src/` file, a test no
+  `nextest run`: nine more rustc runs and links against the whole engine, running
+  no test. So the rule fails a `[lib]` or `[[bin]]` section of the root
+  `Cargo.toml` without `test = false` (a new binary's harness would come back), a
+  `[package]` without `autobins = false` (cargo would build a binary it found under
+  `src/bin/` with a harness; with discovery off, an undeclared one is not compiled
+  and `orphan-module` names it), and the first test line (`rules/test_code.rs`) of any root `src/` file, a test no
   harness builds. A root test goes in `tests/`; a member's in its crate. Nothing
   excuses it (`Allow::Never`: the fix is the manifest line or a moved test,
   `rules/root_tests.rs`).
