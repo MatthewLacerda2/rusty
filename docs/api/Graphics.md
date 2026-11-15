@@ -473,10 +473,13 @@ satin floor shows a soft reflection of what stands on it and a mirror a sharp on
 and a rough reflection's silhouette fades across its blur instead of stepping where
 one pixel's ray hits and its neighbour's misses (up to roughness 0.05 the hit is
 read sharp at any resolution, widening to the full lobe by 0.1). Every pixel, whether
-its own ray hit or missed, takes the blur of the hits around it, but no wider than
-its own lobe spreads one, so a reflection's outline is as soft as its inside, its
-edge softens outwards too, and a mirror's stays sharp beside a satin surface. The average counts only pixels on the same surface (the same
-plane), so a reflection mostly neither fades at a surface's border nor bleeds onto the
+its own ray hit or missed, takes its blur from how far away the hits around it are,
+those that reflect something counting most, spread by its own lobe and no wider than
+that lobe spreads a hit at the march's reach. So a reflection's outline is as soft as
+its inside and its edge softens outwards too; a contact reflection stays tight among
+long rays; a roughness map's detail, and a smooth surface beside a rough one, keep
+their own blur; and a mirror's stays sharp. The average counts only pixels on the
+same surface (the same plane), so a reflection mostly neither fades at a surface's border nor bleeds onto the
 surface beside it; it is an approximation, since each sample reads a mip texel half
 the blur's radius wide, and in a band about that wide at a corner it does
 (no history, so it is stable with no accumulation; the pyramid of the opaque image

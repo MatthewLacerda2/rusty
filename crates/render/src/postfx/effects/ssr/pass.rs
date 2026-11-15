@@ -69,7 +69,8 @@ pub(crate) struct SsrPasses {
     resolve: LazyPipeline,
     /// The downsample every SSR pyramid is built by: the colour's and the trace's
     /// two (`postfx/ssr.wgsl`'s `Traced`: its hits, and where it traced, its hit's
-    /// radius and whether its ray found one, #2158), all [`HDR_FORMAT`].
+    /// radius per unit cone and how much its ray's hit counts, #2158), all
+    /// [`HDR_FORMAT`].
     pyramid: PyramidPass,
 }
 

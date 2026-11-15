@@ -54,7 +54,7 @@ fn gpu_a_rough_metal_floor_fades_the_cubes_reflection_without_a_hard_edge() {
 /// side, in the row of the floor whose middle reflects the most: near 1 is a hard
 /// outline, a soft one spreads its rise over its blur. With it, the redness the
 /// reflection adds at that row's middle.
-fn side_step(on: &[u8], off: &[u8]) -> (f32, i32) {
+pub(super) fn side_step(on: &[u8], off: &[u8]) -> (f32, i32) {
     let red = |f: &[u8], x: u32, y: u32| at(f, x, y)[0] - at(f, x, y)[2];
     let added = |y: u32, x: u32| red(on, x, y) - red(off, x, y);
     let row = (H / 2..H).max_by_key(|&y| added(y, W / 2)).unwrap();

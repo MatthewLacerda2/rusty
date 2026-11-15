@@ -151,24 +151,46 @@ fn geometric_normal(px: vec2<i32>, world: vec3<f32>, fwd: vec3<f32>, n: vec3<f32
 // the mirror from `d0 + t` away (the reflected point's virtual image), so the
 // radius on the surface is `c × t × d0 / (d0 + t)` at the eye distance `d0`.
 fn spread(world: vec3<f32>, t: f32, c: f32, dim: vec2<f32>) -> f32 {
+    return min(across(world, t, c, dim), ssr_march::BLUR_FADE_END * min(dim.x, dim.y));
+}
+
+// [`spread`] before its cap at `BLUR_FADE_END`.
+fn across(world: vec3<f32>, t: f32, c: f32, dim: vec2<f32>) -> f32 {
     let eye = params.camera_pos.xyz;
     let d0 = distance(world, eye);
-    var across = cross(world - eye, vec3<f32>(0.0, 1.0, 0.0));
-    if (dot(across, across) < 1e-10) {
-        across = cross(world - eye, vec3<f32>(1.0, 0.0, 0.0));
+    var side = cross(world - eye, vec3<f32>(0.0, 1.0, 0.0));
+    if (dot(side, side) < 1e-10) {
+        side = cross(world - eye, vec3<f32>(1.0, 0.0, 0.0));
     }
     let f = ssr_march::Frame(params.view_proj, eye, vec3<f32>(0.0), vec4<f32>(0.0));
     let a = ssr_march::project(f, world).xy;
-    let b = ssr_march::project(f, world + normalize(across) * (c * t * d0 / max(d0 + t, 1e-4))).xy;
-    return min(length((b - a) * dim), ssr_march::BLUR_FADE_END * min(dim.x, dim.y));
+    let b = ssr_march::project(f, world + normalize(side) * (c * t * d0 / max(d0 + t, 1e-4))).xy;
+    return length((b - a) * dim);
 }
+
+// The cone a hit's radius is measured with for the resolve's field (#2158): the
+// trace stores [`spread`] per unit of cone, measured at a typical satin cone (about
+// roughness 0.4's), where the projection is close to linear, so each pixel scales
+// it by its own cone. Stored no wider than `UNIT_MAX` pixels, well inside f16.
+const UNIT_CONE: f32 = 0.2;
+const UNIT_MAX: f32 = 16384.0;
+
+// What a found hit whose fades took its weight to nothing still counts for in the
+// radius field, against 1 for a hit at full weight (#2158). Little enough that the
+// long rays a rough surface fades out beside a contact reflection don't set that
+// reflection's blur; enough that the field stays well-conditioned where the weight
+// thins out: a pyramid texel of faded hits beside one of full-weight hits weighs
+// too little against it at 0.1, and the mean radius between them swings over a
+// few pixels, drawing a faint line across a satin reflection's fading edge.
+const FOUND_FLOOR: f32 = 0.4;
 
 // What the trace writes per pixel for the resolve (#2028): `hit`, the hit colour
 // times its weight and the weight (premultiplied, so a level of its pyramid
 // averages hits and misses alike); `spread`, 1 for a pixel that traced (a miss
-// included), then for a ray that found something its `spread` radius and 1,
-// whatever its weight (0 and 0 for a miss), so a level averages the radius over
-// the hits found (#2158).
+// included), then for a ray that found something its radius per unit cone times
+// its count `k`, and `k`: its weight, but at least `FOUND_FLOOR` (0 and 0 for a
+// miss), so a level averages the radius over the hits found, those that reflect
+// something first (#2158).
 struct Traced {
     @location(0) hit: vec4<f32>,
     @location(1) spread: vec4<f32>,
@@ -210,20 +232,23 @@ fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
     let c = cone(s.roughness);
     // Read sharp: the resolve blurs the hits by the cone, colour and edge alike.
     let hit = ssr_march::trace_hit(f, t_velocity, t_color, s_color, origin, r, i32(params.march.x), params.march.y, c, 0.0);
-    let w = hit.colour.w;
     if (hit.dist <= 0.0) {
         return missed;
     }
-    // A ray that found something tells the resolve how wide its blur is even where
-    // its weight faded to nothing (a long ray off a rough surface, a hit at the
-    // screen's edge): weighted by the fades, the mean radius thinned out exactly
-    // where the radii are widest and swung over a few pixels there.
-    let found = vec4<f32>(1.0, spread(world, hit.dist, c, dim), 1.0, 0.0);
     // The colour is read from the image's first level, which the pyramid's filter
     // (`ssr_pyramid.wgsl`) never touches: an emissive past f16's range is `inf`
     // there. Such a hit reflects nothing, as its texel is nothing to the pyramid's
     // levels.
-    if (w <= 0.0 || !numeric::finite4(hit.colour)) {
+    let w = select(0.0, hit.colour.w, numeric::finite4(hit.colour));
+    // A ray that found something tells the resolve how far its hit is, as a blur
+    // radius per unit cone, even where its weight faded to nothing (a long ray off a
+    // rough surface, a hit at the screen's edge), counted at `FOUND_FLOOR`: weighted
+    // by the fades alone, the mean radius thinned out exactly where the radii are
+    // widest and swung over a few pixels there.
+    let unit = min(across(world, hit.dist, UNIT_CONE, dim) / UNIT_CONE, UNIT_MAX);
+    let k = max(w, FOUND_FLOOR);
+    let found = vec4<f32>(1.0, unit * k, k, 0.0);
+    if (w <= 0.0) {
         return Traced(vec4<f32>(0.0), found);
     }
     return Traced(vec4<f32>(hit.colour.rgb * w, w), found);
@@ -234,11 +259,11 @@ fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
 // cone spreads a reflection across. A hit's colour was already read at the cone's
 // width; what the average adds is where rays stop hitting: a rough surface's
 // reflected silhouette fades across its blur, not at one pixel's hit or miss,
-// which drew it as a stepped outline. Every pixel, hit or miss, takes the radius
-// of the hits around it (`blur_radius`), so an edge softens out as well as in,
-// capped by the widest its own cone spreads (0 for a mirror, whose misses stay
-// misses). Only taps whose centre lies on
-// the same plane count, and the average is over pixels that traced, so a
+// which drew it as a stepped outline. Every pixel, hit or miss, takes its radius
+// from how far the hits around it are, at its own cone (`blur_radius`), so an edge
+// softens out as well as in, capped by the widest its own cone spreads (0 for a
+// mirror, whose misses stay misses). Only taps whose centre lies on the same
+// plane count, and the average is over pixels that traced, so a
 // surface's border or a neighbouring surface mostly neither fades nor bleeds into
 // it: an approximation, since a tap reads a mip texel `radius / 2` wide that can
 // average in the surface beside it, so a band about that wide at a corner does.
@@ -266,34 +291,45 @@ fn on_plane(q: vec2<f32>, world: vec3<f32>, g: vec3<f32>, fwd: vec3<f32>) -> boo
     return abs(dot(g, there - world)) <= max(ssr_march::THICKNESS, depth * ssr_march::DEPTH_SLACK);
 }
 
-// The mean radius of the hits the trace found around `uv`, from level `lod` of
-// its spread pyramid. A window where hits cover `trust` of its area or less leans
-// to `fallback` instead, continuously (`trust` 0: none).
-fn mean_radius(uv: vec2<f32>, lod: f32, fallback: f32, trust: f32) -> f32 {
+// The mean radius per unit cone of the hits the trace found around `uv`, from
+// level `lod` of its spread pyramid. A window where hits count for `trust` of its
+// area or less leans to `fallback` instead, continuously (`trust` 0: none).
+fn mean_unit(uv: vec2<f32>, lod: f32, fallback: f32, trust: f32) -> f32 {
     let s = textureSampleLevel(t_spread, s_color, uv, lod);
     return (s.y + trust * fallback) / max(s.z + trust, 1e-4);
 }
 
 // How much of a radius-wide window must hold hits before its mean radius is
-// trusted over the widest one (`blur_radius`).
+// trusted over the previous, wider window's (`blur_radius`).
 const RADIUS_TRUST: f32 = 0.02;
+// How many times `blur_radius` narrows its window to the radius it last found.
+const REFINE: i32 = 2;
 
-// The radius, in pixels, the pixel at `uv` resolves over (#2158): one field,
-// smooth across the frame, hit and miss alike. The disk a pixel averages must
-// grow and shrink no faster than the pixel moves: where the radius jumps (a hit
-// taking its own ray's, its missing neighbour the hits' mean around it) or swings
-// over a few pixels, the disks stop nesting and the blur draws that line sharp,
-// a reflected silhouette's outline crisp around a soft inside. So every pixel takes
-// the mean radius of the hits found as far around as any blur reaches, then again
-// over a window as wide as that, so a contact reflection keeps its narrower blur;
-// both are filtered reads of the spread pyramid, so the field follows `uv`
-// smoothly. No wider than this pixel's own cone spreads a hit as far out as the
-// march reaches: a mirror's (0) stays sharp beside a satin wall's wide hits.
+// The radius, in pixels, the pixel at `uv` resolves over (#2158): this pixel's
+// own cone times one field, smooth across the frame, hit and miss alike. The disk
+// a pixel averages must grow and shrink no faster than the pixel moves: where the
+// radius jumps (a hit taking its own ray's, its missing neighbour the hits' mean
+// around it) or swings over a few pixels, the disks stop nesting and the blur
+// draws that line sharp, a reflected silhouette's outline crisp around a soft
+// inside. So the field is the mean radius per unit cone of the hits found around
+// the pixel, read as wide as its blur can reach, then `REFINE` times over a window
+// as wide as the radius last found, so a contact reflection keeps its narrower
+// blur among long rays; each is a filtered read of the spread pyramid, so the
+// field follows `uv` smoothly. Scaled by the pixel's own cone, a roughness map's
+// detail and a smooth floor beside a rough wall keep their own blur. No wider
+// than this pixel's cone spreads a hit as far out as the march reaches: a
+// mirror's (0) is sharp, and pays for no read.
 fn blur_radius(uv: vec2<f32>, world: vec3<f32>, roughness: f32, dim: vec2<f32>) -> f32 {
-    let wide = mean_radius(uv, log2(ssr_march::BLUR_FADE_END * min(dim.x, dim.y)), 0.0, 0.0);
-    let local = mean_radius(uv, max(log2(wide), 0.0), wide, RADIUS_TRUST);
-    let reach = params.march.x * params.march.y;
-    return min(local, spread(world, reach, cone(roughness), dim));
+    let c = cone(roughness);
+    let cap = spread(world, params.march.x * params.march.y, c, dim);
+    if (cap < SHARP) {
+        return 0.0;
+    }
+    var unit = mean_unit(uv, log2(cap), 0.0, 0.0);
+    for (var i = 0; i < REFINE; i = i + 1) {
+        unit = mean_unit(uv, log2(max(min(c * unit, cap), 1.0)), unit, RADIUS_TRUST);
+    }
+    return min(c * unit, cap);
 }
 
 @fragment

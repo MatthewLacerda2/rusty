@@ -96,7 +96,8 @@ fn red(r: &mut Renderer, scene: &Scene, (w, h): (u32, u32)) -> Vec<f32> {
 /// Down every column of the frame's middle, over the ceiling (its top 60%), the
 /// largest share of the column's brightest red one row adds or takes: near 1 is a
 /// hard edge; a fade spreads it over its width, so it halves at twice the size.
-fn steepest(red: &[f32], (w, h): (u32, u32)) -> f32 {
+/// With it, the brightest red of any of those columns.
+fn steepest(red: &[f32], (w, h): (u32, u32)) -> (f32, f32) {
     let column = |x: u32| (0..h * 6 / 10).map(move |y| red[(y * w + x) as usize]);
     (w * 3 / 10..w * 7 / 10)
         .map(|x| {
@@ -106,9 +107,9 @@ fn steepest(red: &[f32], (w, h): (u32, u32)) -> f32 {
                 .windows(2)
                 .map(|p| (p[1] - p[0]).abs())
                 .fold(0.0, f32::max);
-            step / peak
+            (step / peak, peak)
         })
-        .fold(0.0, f32::max)
+        .fold((0.0, 0.0), |a, b| (a.0.max(b.0), a.1.max(b.1)))
 }
 
 /// The least width, as a share of the frame's height, over which the satin
@@ -117,17 +118,24 @@ fn steepest(red: &[f32], (w, h): (u32, u32)) -> f32 {
 /// rose within 0.017 at 360 rows and 0.009 at 720.
 const SOFT: f32 = 0.025;
 
+/// The least share of the mirror's brightest red the satin band reaches (near
+/// 0.09 here, 0 with SSR off): its blur spreads the strip's light thin, but a
+/// band that is not there at all would pass `SOFT`.
+const BAND: f32 = 0.03;
+
 #[test]
 fn gpu_a_satin_ceiling_reflects_a_strip_behind_uprights_with_a_soft_outline() {
     for size in [(640, 360), (1280, 720)] {
         let Some(mut r) = crate::test_gpu::headless_or_skip(size.0, size.1) else {
             return;
         };
-        let mirror = steepest(&red(&mut r, &bar(0.04), size), size);
-        let satin = steepest(&red(&mut r, &bar(0.35), size), size);
+        let (mirror, bright) = steepest(&red(&mut r, &bar(0.04), size), size);
+        let (satin, peak) = steepest(&red(&mut r, &bar(0.35), size), size);
         let width = 1.0 / (satin * size.1 as f32);
-        eprintln!("[ssr] at {size:?}, a mirror's reflected band steps {mirror:.2} of its peak in a row; at roughness 0.35 it rises over {width:.3} of the height");
+        let share = peak / bright;
+        eprintln!("[ssr] at {size:?}, a mirror's reflected band steps {mirror:.2} of its peak in a row; at roughness 0.35 it rises over {width:.3} of the height, as bright as {share:.2} of the mirror's");
         assert!(mirror >= 0.5, "a mirror reflects the strip's edge sharp");
+        assert!(share >= BAND, "the satin ceiling reflects the strip");
         assert!(
             width >= SOFT,
             "a satin reflection's outline is as soft as its inside (#2158)"
