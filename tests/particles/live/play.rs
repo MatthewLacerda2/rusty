@@ -14,7 +14,7 @@ use rusty::scene::Scene;
 use crate::play::{attach_script, playing, run, DT};
 
 /// A playing world whose one emitter `cfg` runs `script`, and the emitter's id.
-fn world(cfg: ParticleEmitterComponent, script: &str, file: &str) -> (GameWorld, u32) {
+pub(super) fn world(cfg: ParticleEmitterComponent, script: &str, file: &str) -> (GameWorld, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Sparks".to_string());
     scene.world.set_particles(id, Some(cfg));
@@ -23,7 +23,7 @@ fn world(cfg: ParticleEmitterComponent, script: &str, file: &str) -> (GameWorld,
 }
 
 /// A one-shot point burst of `n` particles living `lifetime`, launched along +X.
-fn burst(n: u32, lifetime: f32) -> ParticleEmitterComponent {
+pub(super) fn burst(n: u32, lifetime: f32) -> ParticleEmitterComponent {
     let mut cfg = super::emitter(n);
     cfg.shape = EmitShape::Point;
     cfg.lifetime = Range::constant(lifetime);
@@ -32,7 +32,7 @@ fn burst(n: u32, lifetime: f32) -> ParticleEmitterComponent {
 }
 
 /// Every live particle of `id`.
-fn particles(world: &GameWorld, id: u32) -> Vec<rusty::components::particle::Particle> {
+pub(super) fn particles(world: &GameWorld, id: u32) -> Vec<rusty::components::particle::Particle> {
     let scene = world.scene().borrow();
     let live = scene.world.particles(id).unwrap().runtime.particles.clone();
     live

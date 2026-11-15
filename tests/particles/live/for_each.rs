@@ -35,24 +35,31 @@ fn edits_are_written_back_and_false_kills() {
 
 #[test]
 fn for_each_and_the_pair_give_the_same_state() {
-    const RULE: &str = "p.velocity.x = p.velocity.x * 0.5 + p.position.y
-      p.custom[2] = p.custom[2] + 1; p.rotation = p.rotation + 10";
-    let (a, id) = scene(5);
-    let (b, _) = scene(5);
-    lua::<()>(
-        &a,
-        &format!("Particles.ForEach({id}, function(p) {RULE} end)"),
-    )
-    .unwrap();
+    // Kills the smaller particles, so survivors move up the list.
+    const RULE: &str = "local function rule(p)
+      p.velocity.x = p.velocity.x * 0.5 + p.position.y
+      p.custom[2] = p.custom[2] + 1; p.rotation = p.rotation + 10
+      if p.size < 0.3 then return false end
+    end";
+    let (a, id) = super::identity::hidden(6);
+    let (b, _) = super::identity::hidden(6);
+    lua::<()>(&a, &format!("{RULE} Particles.ForEach({id}, rule)")).unwrap();
     lua::<()>(
         &b,
         &format!(
-            "local ps = Particles.GetParticles({id})
-             for _, p in ipairs(ps) do {RULE} end
-             Particles.SetParticles({id}, ps)"
+            "{RULE} local keep = {{}}
+             for _, p in ipairs(Particles.GetParticles({id})) do
+               if rule(p) ~= false then keep[#keep + 1] = p end
+             end
+             Particles.SetParticles({id}, keep)"
         ),
     )
     .unwrap();
+    let live = a.borrow().world.particles(id).unwrap().live_count();
+    assert!(
+        (1..6).contains(&live),
+        "the rule kills some, not all: {live}"
+    );
     assert_eq!(dump(&a, id), dump(&b, id));
 }
 

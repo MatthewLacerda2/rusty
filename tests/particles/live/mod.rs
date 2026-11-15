@@ -4,7 +4,10 @@
 
 mod edges;
 mod for_each;
+mod identity;
 mod play;
+mod stale;
+mod types;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -47,9 +50,14 @@ fn emitter(n: u32) -> ParticleEmitterComponent {
 
 /// A scene holding one emitter that has burst `n` particles.
 fn scene(n: u32) -> (Rc<RefCell<Scene>>, u32) {
+    scene_with(emitter(n))
+}
+
+/// A scene holding the emitter `cfg`, burst once.
+fn scene_with(cfg: ParticleEmitterComponent) -> (Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Sparks".to_string());
-    scene.world.set_particles(id, Some(emitter(n)));
+    scene.world.set_particles(id, Some(cfg));
     let scene = Rc::new(RefCell::new(scene));
     lua::<()>(&scene, &format!("Particles.Burst({id})")).unwrap();
     (scene, id)
