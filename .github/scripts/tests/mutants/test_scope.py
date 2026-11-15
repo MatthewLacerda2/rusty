@@ -48,13 +48,15 @@ class Repo(unittest.TestCase):
         self.dir.cleanup()
 
     def test_diff_is_the_branch_rust_against_the_base(self) -> None:
-        plan, diff = scope.resolve("diff", "main")
+        plan, diffs = scope.resolve("diff", "main")
+        diff = diffs["scope-root.diff"]
         self.assertEqual(plan["files"], ["src/physics/a.rs"])
         self.assertIn("+fn f() -> u32 { 2 }", diff)
         self.assertNotIn("notes.md", diff)
 
     def test_globs_add_the_named_files_whole(self) -> None:
-        plan, diff = scope.resolve("src/navigation/*", "main")
+        plan, diffs = scope.resolve("src/navigation/*", "main")
+        diff = diffs["scope-root.diff"]
         self.assertEqual(plan["files"], ["src/navigation/b.rs"], "`*` stops at a directory")
         self.assertIn("--- /dev/null", diff)
         self.assertIn("+++ b/src/navigation/b.rs", diff)
@@ -73,10 +75,10 @@ class Repo(unittest.TestCase):
 
     def test_a_commit_diff_is_that_commit_s_rust_whatever_the_base(self) -> None:
         sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
-        plan, diff = scope.resolve("diff", "origin/absent", commit=sha)
+        plan, diffs = scope.resolve("diff", "origin/absent", commit=sha)
         self.assertEqual((plan["files"], plan["commit"]), (["src/physics/a.rs"], sha))
-        self.assertIn("+fn f() -> u32 { 2 }", diff)
-        line, go = scope.check(plan, [{"file": "src/physics/a.rs"}])
+        self.assertIn("+fn f() -> u32 { 2 }", diffs["scope-root.diff"])
+        line, go = scope.check(plan, {"root": [{"file": "src/physics/a.rs"}]})
         self.assertTrue(go)
         self.assertIn(f"commit `{sha[:9]}`", line)
 
@@ -87,24 +89,25 @@ class Repo(unittest.TestCase):
 
 class Check(unittest.TestCase):
     PATHS = {"kind": "paths", "scope": "src/physics/**", "base": "origin/main",
-             "files": ["src/physics/a.rs"]}
+             "files": ["src/physics/a.rs"],
+             "parts": [{"root": ".", "slug": "root", "files": ["src/physics/a.rs"]}]}
 
     def test_counts_what_was_planned(self) -> None:
-        line, go = scope.check(self.PATHS, [{"file": "src/physics/a.rs"}] * 3)
+        line, go = scope.check(self.PATHS, {"root": [{"file": "src/physics/a.rs"}] * 3})
         self.assertTrue(go)
         self.assertIn("3 mutants planned", line)
         self.assertNotIn("outside", line)
 
     def test_names_mutants_from_outside_the_scope(self) -> None:
-        line, _ = scope.check(self.PATHS, [{"file": "src/physics/a.rs"}, {"file": "src/app/x.rs"}])
+        line, _ = scope.check(self.PATHS, {"root": [{"file": "src/physics/a.rs"}, {"file": "src/app/x.rs"}]})
         self.assertIn("outside that scope (`src/app/x.rs`)", line)
 
     def test_named_paths_with_nothing_to_mutate_are_refused(self) -> None:
-        _, go = scope.check(self.PATHS, [])
+        _, go = scope.check(self.PATHS, {})
         self.assertFalse(go)
 
     def test_a_diff_with_nothing_to_mutate_is_an_answer(self) -> None:
-        line, go = scope.check({**self.PATHS, "kind": "diff", "files": []}, [])
+        line, go = scope.check({**self.PATHS, "kind": "diff", "files": [], "parts": []}, {})
         self.assertTrue(go)
         self.assertIn("0 mutants planned", line)
 

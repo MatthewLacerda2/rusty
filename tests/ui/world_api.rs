@@ -1,5 +1,5 @@
 //! World-space UI through the Lua surface in a real Play session (#429):
-//! `Camera.WorldToScreen` / `ScreenToWorldRay`, a marker pinned with
+//! `Camera.WorldToScreen` / `ScreenToWorldRay` / `MouseRay`, a marker pinned with
 //! `RectTransform.SetWorldAnchor`, and a `WorldSpace` terminal clicked through the
 //! screen centre while the cursor is locked.
 
@@ -94,6 +94,20 @@ fn camera_projects_world_points_in_pixels_and_canvas_units() {
         eval(&game, ray),
         "true",
         "the centre ray is the view direction"
+    );
+    // The cursor's ray: `Input`'s top-left row 0 is the screen's top edge; locked, the centre.
+    let up = "Input.SetCursorLocked(false) Input.MoveMouse(640, 0) \
+              local _, _, _, x, y = Camera.MouseRay() return math.abs(x) < 1e-4 and y > 0.3, Input.IsCursorLocked()";
+    assert_eq!(
+        eval(&game, up),
+        "true, false",
+        "a free cursor at the top looks up"
+    );
+    let locked = "Input.SetCursorLocked(true) local _, _, _, _, y = Camera.MouseRay() return math.abs(y) < 1e-4";
+    assert_eq!(
+        eval(&game, locked),
+        "true",
+        "a locked cursor's ray is the centre's"
     );
 }
 

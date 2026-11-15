@@ -21,7 +21,9 @@ Three rules, each a way a signal learns to lie:
   local head is not the pushed head is refused before dispatch.
 - **No report is never zero survivors.** A run that ends red, cancelled or
   timed out, or green without its artifact, exits 1 and says which.
-  Survivors are a result: they exit 0.
+  Survivors are a result: they exit 0. A red run still prints the report it
+  left (#2201): the one-line reason it has no answer, or the parts that
+  finished beside the one that broke, so the caller learns why here.
 """
 
 from __future__ import annotations
@@ -84,7 +86,8 @@ def verdict(result: dict, have_report: bool) -> tuple[bool, str]:
     conclusion = result.get("conclusion") or "unfinished"
     url = result.get("url", "")
     if conclusion != "success":
-        return False, (f"the run ended {conclusion}, with no report to read: {url}. That is"
+        left = "what it left is below" if have_report else "with no report to read"
+        return False, (f"the run ended {conclusion}, {left}: {url}. That is"
                        " not a clean result; nothing about the code is known from it.")
     if not have_report:
         return False, f"the run passed but left no mutants-report artifact: {url}"
@@ -136,7 +139,7 @@ def show(out: Path) -> None:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="mutants-remote.py", description=__doc__.split("\n")[0])
-    parser.add_argument("scope", help="`diff`, or space-separated path globs")
+    parser.add_argument("scope", help="`diff`, or path globs separated by spaces or commas")
     parser.add_argument("--out", type=Path, default=Path("target/mutants-remote"))
     parser.add_argument("--poll", type=int, default=30, help="seconds between status checks")
     args = parser.parse_args(argv)
@@ -159,15 +162,14 @@ def main(argv: list[str]) -> int:
     say(f"run {run_id}: {started['url']}")
     result = finished(run_id, args.poll)
     out = args.out / str(run_id)
-    have = result.get("conclusion") == "success" and run(
+    have = run(
         "gh", "run", "download", str(run_id), "-n", "mutants-report", "-D", str(out)
     ).returncode == 0 and (out / "report.md").is_file()
     ok, sentence = verdict(result, have)
     say(sentence)
-    if not ok:
-        return 1
-    show(out)
-    return 0
+    if have:
+        show(out)
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":

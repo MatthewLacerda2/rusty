@@ -73,6 +73,7 @@ def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
             stopping.drain([number], lambda n: taking.take(repo, n, opts, tick=tick))[0]
         ),
         head=functools.partial(pulls.head_of, repo),
+        was_merged=functools.partial(pulls.merged_of, repo),  # one closed between watches (#2215)
         attempts=lambda number, sha: pulls.head_runs(repo, sha),
         stalled=functools.partial(pulls.head_reading, repo),
         reddened=functools.partial(pulls.head_reading, repo, early=True),  # a red hand-back, read cheaply (#1951)

@@ -121,7 +121,7 @@ class Mutations:
         cannot be taken is said and gone without: one signal, never a stopped queue."""
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            handle = open(self.path.with_suffix(".lock"), "a")
+            handle = open(self.path.with_suffix(".lock"), "a")  # state-ok: a lock, never read
         except OSError as failed:
             self.say(f"after: could not lock the mutation requests: {failed}")
             handle = None

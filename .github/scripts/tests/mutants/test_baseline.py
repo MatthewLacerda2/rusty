@@ -56,7 +56,9 @@ def phases(own: str, test_args: str, config: dict) -> tuple[str, str]:
 
 def problems(text: str, config: dict) -> list[str]:
     """What keeps the workflow's baseline from being its mutants' baseline."""
-    found = MUTATE.search(text)
+    # The `Mutat…` step's run; a standalone workspace's run in another step has
+    # cargo-mutants' own baseline, being one package (#2201).
+    found = MUTATE.search(step(text, "Mutat"))
     if not found:
         return ["no `cargo mutants` run"]
     mutate = " ".join(found[0].replace("\\\n", " ").split())

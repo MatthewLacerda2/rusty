@@ -55,7 +55,7 @@ class Pull(unittest.TestCase):
         self.assertEqual(pull["author"], {"login": "dependabot[bot]"})
         self.assertEqual(pull["labels"], [{"name": "bug"}])
         # The watch's `--since` drops a pull opened before it (#928); one with no time is kept.
-        self.assertEqual(board.recent([pull], datetime.fromisoformat("2026-10-17T21:00:00+00:00")), [])
+        self.assertFalse(board.fresh(pull["createdAt"], datetime.fromisoformat("2026-10-17T21:00:00+00:00")))
         self.assertEqual(pull["closingIssuesReferences"], [{"number": 5}, {"number": 6}])
         self.assertEqual(pull["files"], [{"path": "a.png", "status": "removed", "additions": 0, "deletions": 0}])
 

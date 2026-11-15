@@ -82,7 +82,7 @@ def note(path: Path, pull: int, head: str, main: str, paths: dict[str, bool], en
     line = {"at": when, "pull": pull, "main": main, "head": head, "paths": paths, "ended": ended}
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a") as out:
+        with path.open("a") as out:  # state-ok: JSONL, a cut line loses one record
             out.write(json.dumps(line, sort_keys=True) + "\n")
     except OSError:
         return False
