@@ -12,9 +12,9 @@
 //! varied it by half again between idle runs. One slice is short and noisy, so
 //! the yardstick is the median of many.
 //!
-//! **The sampler's own cost**: one slice (about 0.07 s of CPU in the test
-//! profile on a 4-vCPU container core) per [`IDLE`] of sleep, so about 7% of
-//! one core, competing with the game it measures.
+//! **The sampler's own cost**: one slice (0.06 to 0.1 s of CPU in the test
+//! profile, beside a game, on a 4-vCPU container and CI's runners) per [`IDLE`]
+//! of sleep, so 7 to 10% of one core, competing with the game it measures.
 
 use std::sync::mpsc;
 use std::thread::JoinHandle;
@@ -27,7 +27,7 @@ const WORDS: usize = 1 << 18;
 /// profile on a 4-vCPU container core, 0.065 to 0.11 s on CI's runners.
 const STEPS: u32 = 1 << 23;
 
-/// Sleep between two slices: with a slice of about 0.07 s, a duty of about 7%.
+/// Sleep between two slices: with a slice of 0.06 to 0.1 s, a duty of 7 to 10%.
 pub(super) const IDLE: Duration = Duration::from_millis(900);
 
 /// Slices a run always gets, taken after the game when it ends sooner (the

@@ -887,7 +887,8 @@ not its count. Bare CPU seconds still move with load (a shared SMT core, all-cor
 clocks, a contended cache), so the test divides them by a **yardstick**: the median
 CPU time of a fixed single-threaded workload (`tests/gpu/test_games/calibrate.rs`),
 which a test thread samples in short slices for as long as the game runs, meeting the
-same load in the same window. The sampler costs about 7% of one core beside the game.
+same load in the same window. The sampler sleeps 0.9 s between slices of 0.06 to 0.1 s, so it costs 7 to 10% of
+one core beside the game.
 A game over budget fails by name with its CPU time and its yardsticks, so the game
 whose defaults grew is the one made cheaper. Wall time is only a hang guard: a game
 still running after `HANG` (450 s) is killed and fails as hung. CPU time counts every
@@ -898,7 +899,8 @@ runs go behind a `--param`.
 too (`<game>: game --test used … s of CPU … N yardsticks of … s (… slices …)`), so
 `cargo nextest run --locked --features dev -E 'test(/test_games::/)'` locally, or any
 CI log, gives each game's count. The bar sits above the heaviest game's count across
-the machines measured, and below twice it, so a game that doubles its work fails.
+the machines measured, and under twice the lowest machine's count, so a game that
+doubles its work fails on every one.
 
 **Adding a game** is adding its folder and its line in the sorted `games!` list of
 `tests/gpu/test_games/mod.rs`; a folder with no line fails that file's check, naming it:

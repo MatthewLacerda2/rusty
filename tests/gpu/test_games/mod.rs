@@ -23,10 +23,15 @@ use std::time::Duration;
 /// sampled on a test thread throughout the game's run (#2070, #2131, #2243). Not wall
 /// time, which a busy machine stretches, nor bare CPU seconds, which a loaded
 /// machine inflates too (a shared SMT core, all-core clocks, a contended cache);
-/// the yardstick rises with them. A game past it fails by name, so the game whose
-/// defaults grew is the one fixed. Measured on lavapipe in a 4-core container
-/// (`docs/testing.md`, *Test games*, says how to re-measure): BUDGET_MEASURED.
-const BUDGET: f64 = 1e9;
+/// which the yardstick, sampled in the same window, meets too. A game past it fails by name, so the game whose
+/// defaults grew is the one fixed. The heaviest game, `runner`, reads 375 on CI's
+/// ubuntu lavapipe, 443 on its macOS Metal and 505 to 567 in a 4-vCPU lavapipe
+/// container (alone, beside spinners, a build or the whole `make test`); with its
+/// work doubled it reads 1038 (1.96×) in that container. 700 is 23% over the
+/// highest count and under a doubling of the lowest (about 735), so a doubled
+/// game fails on every machine measured (`docs/testing.md`, *Test games*, says
+/// how to re-measure).
+const BUDGET: f64 = 700.0;
 
 /// Wall time after which a game is killed as hung, whatever its budget.
 const HANG: Duration = Duration::from_secs(450);
