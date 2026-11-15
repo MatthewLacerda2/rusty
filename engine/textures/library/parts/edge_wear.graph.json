@@ -1,0 +1,19 @@
+{
+  "resolution": 256,
+  "params": {
+    "amount": { "type": "number", "default": 0.3, "min": 0, "max": 1 },
+    "width": { "type": "number", "default": 0.006, "min": 0.001, "max": 0.1 },
+    "breakup": { "type": "number", "default": 16, "min": 1, "max": 256 }
+  },
+  "inputs": ["height"],
+  "nodes": [
+    { "id": "amount", "op": "expression", "expr": "k1", "k1": { "param": "amount" } },
+    { "id": "curv", "op": "curvature", "radius": { "param": "width" }, "strength": 6, "inputs": ["height"] },
+    { "id": "edge", "op": "levels", "in_low": 0.5, "in_high": 0.8, "inputs": ["curv"] },
+    { "id": "breakup", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": { "param": "breakup" } }, "seed": 3 },
+    { "id": "rough_edge", "op": "mix", "mode": "multiply", "inputs": ["edge", "breakup"] },
+    { "id": "spread", "op": "auto_levels", "inputs": ["rough_edge"] },
+    { "id": "wear", "op": "histogram_scan", "position": { "node": "amount", "min": 0, "max": 0.75 }, "contrast": 0.85, "inputs": ["spread"] }
+  ],
+  "output": "wear"
+}

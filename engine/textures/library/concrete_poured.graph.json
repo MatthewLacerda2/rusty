@@ -1,0 +1,50 @@
+{
+  "resolution": 256,
+  "params": {
+    "wear": { "type": "number", "default": 0.3, "min": 0, "max": 1 }
+  },
+  "nodes": [
+    { "id": "panel_stamp", "op": "shape", "kind": "rect", "size": [0.994, 0.997] },
+    { "id": "panels", "op": "tile", "count": 2, "aspect": [1, 0.5], "inputs": ["panel_stamp"] },
+    { "id": "panel_step", "op": "tile", "count": 2, "aspect": [1, 0.5], "output": "random", "inputs": ["panel_stamp"] },
+    { "id": "seams", "op": "edge_detect", "width": 0.004, "roundness": 1, "inputs": ["panels"] },
+    { "id": "tie_stamp", "op": "shape", "kind": "circle", "size": [0.09, 0.09], "profile": "cone" },
+    { "id": "ties", "op": "tile", "count": 4, "inputs": ["tie_stamp"] },
+    { "id": "pit_stamp", "op": "shape", "kind": "circle", "size": [0.8, 0.8], "profile": "hemisphere" },
+    { "id": "pit_clumps", "op": "noise", "kind": "fbm", "scale": 4, "octaves": 4, "seed": 21 },
+    { "id": "pit_density", "op": "expression", "expr": "clamp((a - 0.55 + 0.2 * k1) * 6, 0.05, 1)", "k1": { "param": "wear" }, "inputs": ["pit_clumps"] },
+    { "id": "pits", "op": "scatter", "amount": 900, "scale": 0.006, "scale_jitter": 0.9, "density": { "node": "pit_density" }, "seed": 22, "inputs": ["pit_stamp"] },
+    { "id": "undulation_raw", "op": "noise", "kind": "fbm", "scale": 3, "octaves": 5, "seed": 23 },
+    { "id": "undulation", "op": "auto_levels", "inputs": ["undulation_raw"] },
+    { "id": "grain_raw", "op": "noise", "kind": "fbm", "scale": 96, "octaves": 3, "seed": 24 },
+    { "id": "grain", "op": "auto_levels", "inputs": ["grain_raw"] },
+    { "id": "surface", "op": "expression", "expr": "0.5 * a + 0.05 * b + 0.04 * c + 0.012 * d", "inputs": ["undulation", "panel_step", "seams", "grain"] },
+    { "id": "relief", "op": "expression", "expr": "a - 0.15 * b - 0.12 * c", "inputs": ["surface", "ties", "pits"] },
+    { "id": "height", "op": "auto_levels", "inputs": ["relief"] },
+    { "id": "detail", "op": "expression", "expr": "a - 0.45 * b", "inputs": ["relief", "undulation"] },
+    { "id": "normal", "op": "bump_to_normal", "strength": 0.25, "inputs": ["detail"] },
+
+    { "id": "stains", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 3 }, "seed": 31 },
+    { "id": "stain_mask", "op": "expression", "expr": "smoothstep(0.72 - 0.35 * k1, 1.0, a)", "k1": { "param": "wear" }, "inputs": ["stains"] },
+    { "id": "streak_fibres", "op": "anisotropic_noise", "scale": 32, "anisotropy": 14, "angle": 0.25, "seed": 32 },
+    { "id": "streak_run", "op": "directional_blur", "length": 0.12, "angle": 0.25, "inputs": ["streak_fibres"] },
+    { "id": "streak_n", "op": "auto_levels", "inputs": ["streak_run"] },
+    { "id": "streak_zone", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 2 }, "seed": 33 },
+    { "id": "streak_mask", "op": "expression", "expr": "clamp((a - 0.6 + 0.3 * k1) * 3, 0, 1) * smoothstep(0.3, 0.8, b)", "k1": { "param": "wear" }, "inputs": ["streak_n", "streak_zone"] },
+    { "id": "mottle_raw", "op": "noise", "kind": "fbm", "scale": 16, "octaves": 5, "seed": 34 },
+    { "id": "mottle", "op": "auto_levels", "inputs": ["mottle_raw"] },
+    { "id": "cement", "op": "color_ramp", "stops": [ { "pos": 0, "color": "#7f7e79" }, { "pos": 1, "color": "#a8a7a1" } ], "inputs": ["mottle"] },
+    { "id": "shade", "op": "expression", "expr": "(1 - 0.45 * a) * (1 - 0.35 * b) * (1 - 0.45 * c) * (1 - 0.5 * d)", "inputs": ["stain_mask", "streak_mask", "pits", "ties"] },
+    { "id": "base_color", "op": "mix", "mode": "multiply", "inputs": ["cement", "shade"] },
+
+    { "id": "sand_raw", "op": "white_noise", "seed": 35 },
+    { "id": "sand", "op": "blur", "radius": 0.0015, "inputs": ["sand_raw"] },
+    { "id": "sand_n", "op": "auto_levels", "inputs": ["sand"] },
+    { "id": "roughness", "op": "expression", "expr": "clamp(0.8 + 0.18 * (a - 0.5) + 0.1 * c - 0.12 * b, 0, 1)", "inputs": ["sand_n", "streak_mask", "pits"] },
+
+    { "id": "ao", "op": "ambient_occlusion", "radius": 0.01, "depth": 0.004, "quality": 8, "inputs": ["detail"] },
+    { "id": "occlusion", "op": "levels", "out_low": 0.55, "inputs": ["ao"] }
+  ],
+  "output": "base_color",
+  "outputs": { "base_color": "base_color", "normal": "normal", "roughness": "roughness", "height": "height", "occlusion": "occlusion" }
+}
