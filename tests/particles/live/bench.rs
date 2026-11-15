@@ -2,6 +2,12 @@
 //! (read, change each velocity, write back), the figure the 1 ms bar is held to
 //! in the build games are played on.
 
+#![allow(
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    reason = "the measurement times the calls with the wall clock; the sim never reads it"
+)]
+
 use std::time::Instant;
 
 use mlua::{Function, Lua};
