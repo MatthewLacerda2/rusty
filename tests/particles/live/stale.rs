@@ -58,7 +58,7 @@ fn an_inactive_local_emitter_keeps_its_particles_under_one_frame() {
           done = true
           local ps = Particles.GetParticles({id})
           local x, y, z = Transform.GetPosition({id})
-          ps[#ps + 1] = {{ position = {{ x = x, y = y + 1, z = z }} }}
+          ps[#ps + 1] = {{ x = x, y = y + 1, z = z }}
           Particles.SetParticles({id}, ps) end }}"
     );
     attach_script(&mut scene, driver, "rusty_2171_inactive.lua", &add);

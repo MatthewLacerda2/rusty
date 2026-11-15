@@ -1,19 +1,21 @@
 //! crates/script/src/api/particle/live.rs — the live-particle calls (#2171):
 //! `GetParticles` / `SetParticles`, Unity's `ParticleSystem.GetParticles` /
-//! `SetParticles`, and `ForEach`, one reused table per particle for the hot rule.
+//! `SetParticles`, and `ForEach`, one reused table refilled per particle.
 //!
-//! A particle table is in world space: `position` and `velocity` (`{ x, y, z }`),
-//! `age`, `lifetime`, `size` (start size), `rotation` (degrees), `color` (the
-//! `{ r, g, b, a }` start tint) and `custom` (four numbers the engine never reads).
-//! The tables are built and read by `live.lua`; this half moves the particles
-//! across as one packed string each way ([`read`], [`write`]), since a Rust call
-//! per field costs several times the whole Lua side. A field written back as a
-//! NaN or an infinity (what `live.lua` sends for one left out) keeps its value; an
-//! added particle's is `ParticleEmitterComponent::placed`'s. A table keeps the
-//! identity of the particle it was read from (`live.lua` sends its source with
-//! it), so a script that removes or reorders entries keeps each survivor's hidden
-//! fields. A `Local` emitter is carried to where it stands before every read and
-//! write, so what a script reads and writes is where the particles draw now.
+//! A particle table is flat and in world space: `x, y, z`, `vx, vy, vz`, `age`,
+//! `lifetime`, `size` (start size), `rotation` (degrees), `r, g, b, a` (the start
+//! tint) and `custom1` to `custom4` (four numbers the engine never reads). The
+//! tables are built and read by `live.lua`; this half moves the particles across
+//! as one packed string each way (`read`, `write`), since a Rust call per field
+//! costs several times the whole Lua side, and takes `ForEach`'s changes back as
+//! a list of edits (`edit`) applied to what it read. A field written back as a
+//! NaN or an infinity (what `live.lua` sends for one left out) keeps its value;
+//! an added particle's is `ParticleEmitterComponent::placed`'s. A table keeps
+//! the identity of the particle it was read from (`live.lua` sends its source
+//! with it), so a script that removes or reorders entries keeps each survivor's
+//! hidden fields. A `Local` emitter is carried to where it stands before every
+//! read and write, so what a script reads and writes is where the particles draw
+//! now. The fastest access, whole arrays per field, is `arrays.rs`.
 
 use mlua::{Function, Lua, Table};
 
@@ -26,27 +28,11 @@ use rusty_scene::Scene;
 /// The f32s of one particle on the wire, named in wire order. `live.lua` gets
 /// the names and the two formats below as upvalues and refuses to load if its
 /// own order differs, so this list is the layout's one source.
-const NAMES: [&str; FIELDS] = [
-    "position.x",
-    "position.y",
-    "position.z",
-    "velocity.x",
-    "velocity.y",
-    "velocity.z",
-    "age",
-    "lifetime",
-    "size",
-    "rotation",
-    "color.r",
-    "color.g",
-    "color.b",
-    "color.a",
-    "custom.1",
-    "custom.2",
-    "custom.3",
-    "custom.4",
+pub(super) const NAMES: [&str; FIELDS] = [
+    "x", "y", "z", "vx", "vy", "vz", "age", "lifetime", "size", "rotation", "r", "g", "b", "a",
+    "custom1", "custom2", "custom3", "custom4",
 ];
-const FIELDS: usize = 18;
+pub(super) const FIELDS: usize = 18;
 /// The bytes of one particle on the wire, and of one record written back: a u32
 /// source (the live particle a table was read from, [`NO_SOURCE`] for one the
 /// script built) and the f32 age that particle had when it was read, first.
@@ -54,19 +40,55 @@ const PARTICLE: usize = FIELDS * 4;
 const RECORD: usize = 8 + PARTICLE;
 /// A record's source when the table did not come from the emitter's newest read.
 const NO_SOURCE: u32 = u32::MAX;
+/// An edit's key is `index * SLOTS + slot`; `live.lua` splits it the same way.
+const SLOTS: u32 = 32;
+
+/// The particles a `ForEach` read, held until its edits come back: the write
+/// replaces what is live with them, as `SetParticles` replaces it with its list.
+struct Snapshot(Vec<Particle>);
 
 /// Register `GetParticles`, `SetParticles` and `ForEach` onto the `Particles` table.
 pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
-    let read = lua
-        .create_function(move |lua, id: EntityArg| {
+    let read = {
+        let scene = scene.clone();
+        lua.create_function(move |lua, (id, keep): (EntityArg, bool)| {
             let scene = &*scene.get(lua)?;
-            let bytes = with_carried(&mut scene.borrow_mut(), id.read(), |e, _| {
-                packed(&e.runtime.particles)
+            let read = with_carried(&mut scene.borrow_mut(), id.read(), |e, _| {
+                let live = &e.runtime.particles;
+                (packed(live), keep.then(|| Snapshot(live.clone())))
             });
-            let count = bytes.as_ref().map_or(0, |b| b.len() / PARTICLE);
-            Ok((lua.create_string(bytes.unwrap_or_default())?, count))
+            let (bytes, kept) = read.unwrap_or_default();
+            let count = bytes.len() / PARTICLE;
+            let kept = kept.map(|k| lua.create_any_userdata(k)).transpose()?;
+            Ok((lua.create_string(bytes)?, count, kept))
         })
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?
+    };
+    let edit = {
+        let scene = scene.clone();
+        lua.create_function(
+            move |lua,
+                  (id, kept, edits, kills): (
+                EntityArg,
+                Option<mlua::AnyUserData>,
+                Vec<f64>,
+                Vec<u32>,
+            )| {
+                let id = id.live("Particles", "ForEach")?;
+                let scene = &*scene.get(lua)?;
+                let Some(kept) = kept else { return Ok(0) };
+                let Snapshot(read) = kept.take::<Snapshot>()?;
+                let edited = edited(read, &edits, &kills).map_err(mlua::Error::RuntimeError)?;
+                let live = with_carried(&mut scene.borrow_mut(), id, |e, _| {
+                    let cap = e.max_particles as usize;
+                    e.runtime.particles = edited.into_iter().take(cap).collect();
+                    e.runtime.particles.len() as u32
+                });
+                Ok(live.unwrap_or(0))
+            },
+        )
+        .map_err(|e| e.to_string())?
+    };
     let write = lua
         .create_function(
             move |lua, (id, verb, records): (EntityArg, String, mlua::LuaString)| {
@@ -95,7 +117,7 @@ pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     let (get, set, for_each): (Function, Function, Function) = lua
         .load(include_str!("live.lua"))
         .set_name("=particles_live")
-        .call((read, write, layout.0, layout.1, layout.2))
+        .call((read, write, edit, layout.0, layout.1, layout.2))
         .map_err(|e| e.to_string())?;
     for (name, f) in [
         ("GetParticles", get),
@@ -113,7 +135,7 @@ pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
 /// particle `f` adds is placed under the current frame, so its siblings must be
 /// under it as well, and the carry is idempotent, so reactivation moves them all
 /// by what is left of the change.
-fn with_carried<R>(
+pub(super) fn with_carried<R>(
     scene: &mut Scene,
     id: u32,
     f: impl FnOnce(&mut ParticleEmitterComponent, &EmitterFrame) -> R,
@@ -141,7 +163,7 @@ fn word(b: &[u8], at: usize) -> [u8; 4] {
 }
 
 /// `p`'s fields in wire order, its rotation in degrees.
-fn fields(p: &Particle) -> [f32; FIELDS] {
+pub(super) fn fields(p: &Particle) -> [f32; FIELDS] {
     let ([px, py, pz], [vx, vy, vz]) = (p.position.to_array(), p.velocity.to_array());
     let ([r, g, b, a], [c1, c2, c3, c4]) = (p.color, p.custom);
     let rotation = p.rotation.to_degrees();
@@ -183,10 +205,39 @@ fn write_records(e: &mut ParticleEmitterComponent, frame: &EmitterFrame, records
     e.runtime.particles.len() as u32
 }
 
+/// `read` with `edits` (`key, value` pairs, the key `index * SLOTS + slot`)
+/// applied and the particles at `kills` and those dead after the edits
+/// dropped; an error when a key is past the read (the two halves disagree).
+fn edited(mut read: Vec<Particle>, edits: &[f64], kills: &[u32]) -> Result<Vec<Particle>, String> {
+    for pair in edits.chunks_exact(2) {
+        let key = pair[0] as u32;
+        let (index, slot) = ((key / SLOTS) as usize, (key % SLOTS) as usize);
+        let (Some(p), true) = (read.get_mut(index), slot < FIELDS) else {
+            return Err(format!(
+                "Particles.ForEach: edit {key} is past the {} particles read \
+                 (live.lua and live.rs disagree on the layout)",
+                read.len()
+            ));
+        };
+        let mut values = [f32::NAN; FIELDS];
+        values[slot] = pair[1] as f32;
+        apply(p, &values);
+    }
+    let mut killed = vec![false; read.len()];
+    for &k in kills {
+        if let Some(slot) = killed.get_mut(k as usize) {
+            *slot = true;
+        }
+    }
+    let mut killed = killed.into_iter();
+    read.retain(|p| !killed.next().unwrap_or(false) && p.age < p.lifetime);
+    Ok(read)
+}
+
 /// Write `values` (wire order) into `p`; a NaN or an infinity keeps the field.
 /// The rotation is written only when it differs from `p`'s in degrees, so a
 /// round trip keeps the radians bit for bit.
-fn apply(p: &mut Particle, values: &[f32; FIELDS]) {
+pub(super) fn apply(p: &mut Particle, values: &[f32; FIELDS]) {
     let mut now = fields(p);
     let degrees = now[9];
     for (slot, &v) in now.iter_mut().zip(values) {

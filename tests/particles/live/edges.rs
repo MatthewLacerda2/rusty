@@ -13,8 +13,8 @@ fn a_nan_or_an_infinity_leaves_the_field_as_it_was() {
         &scene,
         &format!(
             "local ps = Particles.GetParticles({id})
-             ps[1].position.x = 0/0; ps[1].age = 1/0; ps[1].rotation = -1/0
-             ps[2].color = {{ r = 0/0 }}; ps[2].custom = {{ 0/0, 1/0 }}
+             ps[1].x = 0/0; ps[1].age = 1/0; ps[1].rotation = -1/0
+             ps[2].r = 0/0; ps[2].custom1, ps[2].custom2 = 0/0, 1/0
              Particles.SetParticles({id}, ps)"
         ),
     )
@@ -29,7 +29,7 @@ fn a_longer_list_adds_particles_up_to_max_particles() {
         &scene,
         &format!(
             "local ps = Particles.GetParticles({id})
-             for i = 1, 10 do ps[#ps + 1] = {{ position = {{ x = i, y = 0, z = 0 }} }} end
+             for i = 1, 10 do ps[#ps + 1] = {{ x = i, y = 0, z = 0 }} end
              return Particles.SetParticles({id}, ps)"
         ),
     )
