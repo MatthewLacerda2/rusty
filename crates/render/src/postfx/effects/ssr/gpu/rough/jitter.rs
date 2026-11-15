@@ -112,13 +112,13 @@ fn swing(frames: &[Vec<f32>]) -> f32 {
 /// jitter offsets, in 255ths of perceptual luma: near the trace's own, which
 /// without the resolve's blur steps 24 (the bulb's sharp reflection crossing a
 /// tile's edge). Measured: 44.5 with a plain mean radius (lavapipe and an RTX
-/// 2060), 20.8 with the field weighted by brightness (RTX 2060; CI's log
-/// prints lavapipe's).
+/// 2060), 20.8 with the field weighted by brightness (RTX 2060, lavapipe, Metal).
 const STILL: f32 = 30.0;
 
 /// The same after TAA's resolve, URP's clamp (#2228): what the player sees, a
 /// patch swinging as a whole passing the clamp. Measured: 26.2 with a plain mean
-/// radius (lavapipe and an RTX 2060), 7.5 weighted by brightness (RTX 2060).
+/// radius (lavapipe and an RTX 2060), 7.5 weighted by brightness (RTX 2060,
+/// lavapipe, Metal).
 const TAA_STILL: f32 = 14.0;
 
 #[test]

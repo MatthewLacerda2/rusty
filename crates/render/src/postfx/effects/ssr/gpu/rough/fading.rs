@@ -40,9 +40,10 @@ fn sharpest_bend(red: &[f32], (w, h): (u32, u32)) -> f32 {
 }
 
 /// The most a lit band may bend in one row where it fades, in [`sharpest_bend`]'s
-/// units. Measured on an RTX 2060: 3.6 to 7.0 with the field as it is, 5.5 to 8.9
-/// with a plain mean by count, 17 to 20 with texels blended by their brightness or
-/// with the fade floor at 0.1.
+/// units. Measured with the field as it is: 3.6 to 7.0 on an RTX 2060, 3.4 to 5.5 on
+/// lavapipe, 3.6 to 6.1 on Metal. On the RTX 2060, 5.5 to 8.9 with a plain mean by
+/// count, 17 to 20 with texels blended by their brightness or with the fade floor
+/// at 0.1.
 const BEND: f32 = 12.0;
 
 #[test]
