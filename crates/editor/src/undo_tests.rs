@@ -15,16 +15,7 @@ fn idle_frame(editor: &mut EditorUi, scene: &mut Scene) {
     let (mut console, mut playing) = (ConsoleLogs::new(), false);
     scene.begin_edits(); // the strict path: the scene level is compared too
     ctx.begin_pass(egui::RawInput::default());
-    editor.draw(
-        &ctx,
-        scene,
-        &mut console,
-        &mut nav,
-        &mut playing,
-        60.0,
-        16.0,
-        None,
-    );
+    editor.draw(&ctx, scene, &mut console, &mut nav, &mut playing, None);
     ctx.end_pass().textures_delta.clear();
     scene.commit_edits(None);
 }
