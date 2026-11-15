@@ -75,7 +75,10 @@ fn a_zero_specular_level_map_shades_like_specular_zero() {
         .expect("write png");
     let glossy = |edit: fn(&mut MaterialAsset), map: Option<&std::path::Path>| {
         grey(|m| {
-            m.roughness = 0.3;
+            // Dark and glossy, so the lamp's highlight and the sky's reflection are
+            // most of the frame.
+            m.base_color = [0.02; 3];
+            m.roughness = 0.15;
             m.specular_map = map.map(|p| p.to_string_lossy().into_owned().into());
             edit(m);
         })
