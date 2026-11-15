@@ -136,21 +136,8 @@ pub fn tile(img: &Image, s: &Scatter) -> Image {
     let (mask, size) = (red(s.mask, 1.0), red(s.size_map, 1.0));
     let reach = s.jitters.reach(size.max().clamp(0.0, MAX_SIZE));
     let draws = s.draws();
-    let j = s.jitters;
     let stamps = PerCell::for_pixels(per, img.size().pixels(), |cell| {
-        let (u, v) = grid.centre(cell);
-        let m = mask.at_uv(u, v);
-        if m.is_nan() || m < 0.5 {
-            return None;
-        }
-        Stamp::of(
-            cell,
-            per,
-            j.at(cell, &grid),
-            size.at_uv(u, v),
-            draws,
-            s.seed,
-        )
+        cell_stamp(s, &grid, (mask, size), draws, cell)
     });
     let grey = draws.output != TileOutput::Stamp;
     Image::fill_uv(img.size(), |u, v| {
@@ -188,6 +175,24 @@ pub fn tile(img: &Image, s: &Scatter) -> Image {
         }
         out
     })
+}
+
+/// Cell `cell`'s stamp, or `None` where `mask` reads below 0.5 at its centre (or
+/// NaN) or its own draws leave it empty; `size` scales it.
+fn cell_stamp(
+    s: &Scatter,
+    grid: &Grid,
+    (mask, size): (Field, Field),
+    draws: Draws,
+    cell: (i64, i64),
+) -> Option<Stamp> {
+    let (u, v) = grid.centre(cell);
+    let m = mask.at_uv(u, v);
+    if m.is_nan() || m < 0.5 {
+        return None;
+    }
+    let j = s.jitters.at(cell, grid);
+    Stamp::of(cell, grid.per, j, size.at_uv(u, v), draws, s.seed)
 }
 
 /// Fold `colour` into `out` under `max` or `add` (`over` keeps its stamps in

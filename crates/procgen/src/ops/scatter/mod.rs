@@ -1,6 +1,6 @@
 //! The `scatter` op's math (#2187): stamps placed freely over the torus, off any
 //! grid. Each stamp's place and draws come from its index and the node seed, each
-//! from its own hash stream ([`place`] for the place, the channels below for the
+//! from its own hash stream (`place` for the place, the channels below for the
 //! rest), so raising `amount` adds stamps without moving the others and a param
 //! added later reshuffles nothing.
 //!
@@ -8,7 +8,7 @@
 //! it. `density`, `scale` and `rotation` are read once per stamp at its centre,
 //! wrapped, so the map tiles and looks the same at any resolution.
 //!
-//! **Cost.** The drawn stamps are filed into buckets ([`buckets`]) at least as
+//! **Cost.** The drawn stamps are filed into buckets (`buckets`) about half as
 //! wide as the widest stamp, so a pixel visits only the stamps that can cover it;
 //! the rows are split across threads by [`Image::fill_uv`]'s bands.
 
@@ -56,7 +56,7 @@ pub struct Settings<'a> {
     pub rotation_jitter: f32,
     /// Each stamp's value times `1 ± value_jitter / 2`; 0–2.
     pub value_jitter: f32,
-    /// 0 places stamps purely at random; toward 1 they keep apart ([`place::gap`]).
+    /// 0 places stamps purely at random; toward 1 they keep apart (`place::gap`).
     pub spacing: f32,
     /// The chance a stamp is drawn, read at its centre.
     pub density: Field<'a>,
