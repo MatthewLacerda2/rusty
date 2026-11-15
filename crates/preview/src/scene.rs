@@ -60,7 +60,7 @@ pub enum PreviewSubject {
     Texture(String),
     /// A `.wgsl` shader file: the preview mesh with default material maps, shaded by
     /// this module. The scene itself carries only the default material; the render
-    /// call swaps the pipeline's shader (see `render_preview_scene` in `main.rs`).
+    /// call swaps the pipeline's shader (see `shell::editor::viewport::render_preview_scene`).
     Shader(String),
     /// An already-resolved material asset — from the entity's `MaterialComponent`
     /// card, or looked up by name by `Debug.PreviewMaterial` (#404) — since materials

@@ -949,6 +949,88 @@ file.
 its `inputs` names and its `params` (`name`, `type`, `default`, `min`, `max`). A graph
 file that does not parse is left out, with a warning naming it.
 
+### The library — `engine/textures/library/`
+
+The engine ships ten tiling materials as graphs, the surfaces a shooter's levels are
+mostly made of. Start from one before writing a graph: instance it, set `wear`,
+`tint` and the instance `seed`, and give the material the tile's real size as its
+`world_size`, so texel density matches across a level. `Texture.Ops()` lists them
+(`op = "graph"`, `path = "engine/textures/library/<name>.graph.json"`).
+
+| Graph | Tile covers (`world_size`) | `tint` | Reads as |
+|---|---|---|---|
+| `concrete_poured` | 2 m | — | formwork panel seams and tie holes, pitting, stains, water streaks |
+| `brick_wall` | 1 m, running bond | brick clay | per-brick tone, chipped edges, recessed mortar, soot and efflorescence |
+| `plaster_painted` | 2 m | paint | trowel undulation, hairline cracks, paint peeling to plaster with a raised lip, scuffs |
+| `metal_painted_worn` | 1 m | paint | chips through primer to bare steel, scratches, rust blooming and running down |
+| `steel_tread_plate` | 0.5 m | — | raised lugs at ±45°, polished tops, dirt packed round their feet, brushed grain |
+| `wood_planks` | 2 m | wood | planks of varying length, staggered joints, grain and knots per plank, a worn walked centre |
+| `ceramic_tile` | 1 m, 8 × 8 tiles | glaze | glossy pillowed tiles, per-tile tone and tilt, grimy grout, cracked and chipped tiles |
+| `asphalt` | 2 m | — | mixed aggregate in dark binder, polished stone tops, cracks and tar patches |
+| `ground_sand_pebbles` | 2 m | — | packed undulating sand, clumped half-buried pebbles with sand banked against them |
+| `fabric_carpet` | 0.5 m | yarn | loop pile in the normal map, fibre fuzz in roughness, trodden paths and stains |
+
+**The interface, all ten.** `wear` (0–1, default 0.3): 0 is new, 1 is derelict.
+`tint` (a colour) where the table names one. Named outputs `normal`, `roughness`,
+`height` and `occlusion`, plus `metallic` on `metal_painted_worn` and
+`steel_tread_plate`; the graph's own output, also named `base_color`, is the albedo.
+`height` is there for a material slot that reads one; today a material bakes it as
+`data` or leaves it out. Every material is held by one test
+(`tests/texture_library/`): it bakes, tiles, changes with `wear` and the seed, keeps
+base colour in a physically plausible range, and uses its roughness, normal and
+height ranges.
+
+`metal_painted_worn` also takes two mesh maps as `text` params, `curvature_map` and
+`ao_map`: paths to maps `Texture.BakeMeshMaps` baked from a model's UV0, so its chips
+follow the model's real edges and its grime the real recesses. Left out, they read
+two flat engine maps (no edges, nothing occluded). A material fed baked mesh maps is
+**mapped by the model's UV0** (`uv_mapping = "UV0"`, no `world_size`), unlike the
+`Triplanar` example below: the maps are that one model's UV0 atlas, which a
+world-space projection would tile by position and scatter its edges over the wrong
+faces.
+
+```lua no-run
+local maps = Texture.BakeMeshMaps("assets/models/kolvik/generator.blend::Generator",
+  { "curvature", "ao" }, "assets/textures/kolvik/generator_", 1024)
+Material.DefineAsset("generator_paint", {
+  uv_mapping = "UV0",                            -- the mesh maps are this model's atlas
+  maps = { resolution = 1024, nodes = {
+      { id = "m", op = "graph", path = "engine/textures/library/metal_painted_worn.graph.json",
+        params = { wear = 0.6, curvature_map = maps.curvature, ao_map = maps.ao } } },
+    outputs = { base_color = "m", normal = "m.normal", roughness = "m.roughness",
+                metallic = "m.metallic", occlusion = "m.occlusion" } },
+})
+```
+
+**The parts** (`engine/textures/library/parts/`) are what the materials share, each a
+graph a game may instance too: `grunge` (`scale`, `warp`: a soft blotchy 0–1 field),
+`edge_wear` (input `height`; `amount`, `width`, `breakup`: convex edges chipped by a
+grunge), `crevice_dirt` (input `height`; `amount`, `radius`, `breakup`: dirt in the
+cavities) and `scratches` (`amount`, `scale`, `angle`: fine crossing scratches).
+Each `amount` is 0–1, none at 0. `brick_wall` and `ceramic_tile` chip their edges
+with `edge_wear` (its `amount` is their `wear`), and `grunge` breaks up all ten.
+`metal_painted_worn` chips its own way: its edges are a model's baked
+`curvature_map`, which is curvature already, not a height for `edge_wear` to take
+curvature of, and it strips two layers from one field, the paint first, then the
+primer down to steel.
+
+```lua no-run
+local tile = "engine/textures/library/brick_wall.graph.json"
+Material.DefineAsset("alley_brick", {
+  uv_mapping = "Triplanar", world_size = 1,     -- one repeat is one metre of wall
+  maps = { resolution = 1024, nodes = {
+      { id = "wall", op = "graph", path = tile, seed = 4,
+        params = { wear = 0.7, tint = "#7a3f2c" } } },
+    outputs = { base_color = "wall", normal = "wall.normal", roughness = "wall.roughness",
+                occlusion = "wall.occlusion" } },
+})
+Debug.PreviewMaterial("alley_brick", "out/alley_brick.png", { mesh = "plane", repeats = 3 })
+```
+
+`make library-previews OUT=<dir>` renders every library material from the engine
+checkout (the sphere, and the plane with `repeats = 3`, at `wear` 0.3 and 1);
+`ONLY=<name>` renders one.
+
 ### Tiling
 
 Every periodic param is a **count of repeats per tile**, rounded at evaluation (the

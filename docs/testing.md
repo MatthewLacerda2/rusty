@@ -743,7 +743,7 @@ view's timeline, replayed to tick `n`, default 0; #1598), `--pointer <X>,<Y>` (t
 pointer held there, in pixels, so a hover shows), `--gizmo <Name>=on|off` (a Scene-view
 gizmo drawn or not, by its `Editor.SetGizmo` name, e.g. `--gizmo NavMesh=on`;
 repeatable, #1909), `--game-view <Free|W:H|WxH>` (the Game view's size, as its
-dropdown sets it, #2207: `--game --game-view 16:9` letterboxes it in the panel), `--picker [new|open|mismatch|focus]` (the project picker the editor starts
+dropdown sets it, #2207: `--game --game-view 16:9` letterboxes it in the panel), `--preview [<mesh>]` (the selection's Inspector **Preview** tab open on `Sphere`, `Cube`, `Suzanne` or `Plane`, default the tab's own; a material entity or a model, texture or shader asset, else an error; never beside `--picker`, #2239), `--picker [new|open|mismatch|focus]` (the project picker the editor starts
 on, #854, over a sample recent list dated against a fixed time; the page names show
 *New Project*, *Open* and the different-engine prompt). From Rust, `capture::capture(&game,
 path, &EditorCaptureOptions { .. })` takes any `GameWorld`, and `capture_into` shares a
@@ -778,6 +778,7 @@ plainly wrong. The PR carries a **`Looked at`** line saying what scene, what was
 rendered and what was seen, and what was not checked (motion, Metal, cost, taste:
 those stay *For a human*). It carries no image: none is committed, attached or hosted.
 The images are scratch files, named with the issue number, kept outside the checkout.
+The Inspector's Preview tab is looked at the same way: `make editor-capture ARGS="--select <entity> --preview Plane"` renders the tab's image through the window's own preview call, and fails rather than writing a frame where the image never rendered.
 The rule and the PR line: `.claude/skills/issue-batch/cloud-brief.md`.
 
 A pair is one command: a short scenario run by `play` on the fixture project, with

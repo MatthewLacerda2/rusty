@@ -147,12 +147,16 @@ mod tests {
             u8,
         ) = lua
             .load(
-                r#"local ops, by_op = Texture.Ops(), {}
-                   for _, o in ipairs(ops) do by_op[o.op] = o end
+                r#"local ops, by_op, count = Texture.Ops(), {}, 0
+                   for _, o in ipairs(ops) do
+                     by_op[o.op] = o
+                     -- the engine's graphs follow the ops: count the ops alone
+                     if o.op ~= "graph" then count = count + 1 end
+                   end
                    local o, mix = by_op.noise, by_op.mix
                    local by = {}
                    for _, p in ipairs(o.params) do by[p.name] = p end
-                   return #ops, o.category, o.max_inputs, by.octaves.default,
+                   return count, o.category, o.max_inputs, by.octaves.default,
                      by.scale.required, table.concat(by.kind.values, "|"),
                      mix.min_inputs, mix.max_inputs"#,
             )
