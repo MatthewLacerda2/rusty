@@ -14,10 +14,13 @@ use rusty_core::frame_stats::{FrameStats, RECENT};
 /// What one frame of the window cost.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct WindowFrame {
-    /// Wall-clock ms from the previous frame's start to this one's (the shell's
-    /// `FrameClock::frame_ms`): the frame time a player feels. Outside Play the
-    /// editor draws on demand, so an idle gap between two frames counts whole.
-    pub wall_ms: f64,
+    /// The previous window frame's wall time: ms from its start to this one's (the
+    /// shell's `FrameClock::frame_ms`, read as this frame starts), the frame time a
+    /// player feels. It is the previous frame's, not this one's: the shell records
+    /// it on that frame as this one starts ([`window_ended`]), as the frame log
+    /// does. Outside Play the editor draws on demand, so an idle gap between two
+    /// frames counts whole.
+    pub last_wall_ms: f64,
     /// The clock's last whole-second reading (`FrameClock::fps`): the frames drawn
     /// since its previous reading, over the seconds between them. `None` until the
     /// window's first second is up, so no made-up rate is recorded.
@@ -33,14 +36,15 @@ pub struct WindowFrame {
     pub frame: u64,
 }
 
-/// Fold one window frame into `stats`: `wall_ms` and `fps` under keys of their own,
-/// and its render as a harness frame's ([`record_render_into`]). A frame drawn in
-/// Play (`in_play`) joins the session's series; any other reaches only the recent
-/// ring, so `Debug.Stats()` keeps the last Play session after Stop while a window
-/// and the Stats overlay read the editor's frames.
+/// Fold one window frame into `stats`: its `fps` and its render, as a harness
+/// frame's ([`record_render_into`]). Its `wall_ms` is not known yet: the shell
+/// records it on this frame when the next one starts ([`window_ended`]), so the
+/// newest frame has none. A frame drawn in Play (`in_play`) joins the session's
+/// series; any other reaches only the recent ring, so `Debug.Stats()` keeps the
+/// last Play session after Stop while a window and the Stats overlay read the
+/// editor's frames.
 pub fn record_window(stats: &mut FrameStats, frame: &WindowFrame, in_play: bool) {
     stats.record_frame(in_play, |drawn| {
-        drawn.record("wall_ms", frame.wall_ms);
         if let Some(fps) = frame.fps {
             drawn.record("fps", fps);
         }
@@ -48,6 +52,16 @@ pub fn record_window(stats: &mut FrameStats, frame: &WindowFrame, in_play: bool)
             record_render_into(drawn, render);
         }
     });
+}
+
+/// A window frame starts, and `last_wall_ms` (the frame clock's reading) is the
+/// previous one's wall time: it goes onto the newest recorded frame as `wall_ms`,
+/// before this frame's work, so anything reading the stats during the frame (the
+/// REPL, a script's `Update`, the Stats overlay) sees it. A frame the window could
+/// not show records no entry, so the time of such a frame, ended when the next
+/// starts, finds that entry already ended and is dropped.
+pub fn window_ended(stats: &mut FrameStats, last_wall_ms: f64) {
+    stats.frame_ended("wall_ms", last_wall_ms);
 }
 
 /// The option keys `Debug.Stats` takes.

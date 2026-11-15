@@ -29,6 +29,10 @@ pub(super) struct Recent {
     /// One stamp per tick, and one per frame that rendered: a window's counts.
     pub(super) tick_marks: VecDeque<Stamp>,
     pub(super) drawn_marks: VecDeque<Stamp>,
+    /// The newest recorded frame's stamp, and whether it joined the session,
+    /// until what is known only once it ended arrives
+    /// ([`FrameStats::frame_ended`](super::FrameStats::frame_ended)).
+    pub(super) open: Option<(Stamp, bool)>,
 }
 
 impl Recent {

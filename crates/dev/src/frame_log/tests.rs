@@ -15,7 +15,7 @@ fn a_frame_of_a_world_is_written_with_what_was_logged() {
     let game = session.world();
     let mut log = FrameLog::start(&dir, LogSettings::default()).unwrap();
     let frame = WindowFrame {
-        wall_ms: 16.6,
+        last_wall_ms: 16.6,
         fps: Some(60.0),
         ..WindowFrame::default()
     };

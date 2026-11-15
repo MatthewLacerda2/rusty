@@ -157,6 +157,7 @@ impl FrameStats {
     /// (an edit-mode frame) its samples go to the recent ring alone: the session
     /// keeps what Play recorded, and a window still reads the frame.
     pub fn record_frame(&mut self, in_session: bool, f: impl FnOnce(&mut DrawnFrame<'_>)) {
+        let opened = self.recent.stamp(false);
         let mut frame = DrawnFrame {
             stats: self,
             in_session,
@@ -168,7 +169,20 @@ impl FrameStats {
             bounded(&mut self.recent.drawn_marks, at);
             self.drawn_frames += u64::from(in_session);
         }
+        self.recent.open = Some((opened, in_session));
         self.recent.frames += 1;
+    }
+
+    /// The newest recorded frame ended: record `value` as its `key`, stamped at
+    /// that frame and in the session when that frame was, for what is known only
+    /// once the next frame starts (its wall time). Once per frame: a second call,
+    /// or one with no frame recorded since the stats were made, records nothing,
+    /// so a window's newest frame has no such sample yet (absent, never zero).
+    pub fn frame_ended(&mut self, key: &str, value: f64) {
+        if let Some((at, in_session)) = self.recent.open.take() {
+            let session = in_session.then_some(&mut self.metrics);
+            push(session, &mut self.recent.metrics, at, key, value);
+        }
     }
 
     /// The stats over the newest `n` frames (at most [`RECENT`] samples a metric)

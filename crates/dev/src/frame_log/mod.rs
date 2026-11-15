@@ -127,7 +127,7 @@ impl FrameLog {
     }
 
     /// Log one window frame of `game`, drawn or not: the last frame's wall time
-    /// (this one's `wall_ms`) and any GPU times resolved go onto the frames they
+    /// (this one's `last_wall_ms`) and any GPU times resolved go onto the frames they
     /// belong to; then this frame's record (when `frames` is on) and the console
     /// lines, audio events and loads since the last one, per the project's
     /// channels as they stand now, are held until whole (`held`). `times_gpu`
@@ -162,7 +162,7 @@ impl FrameLog {
         self.writer.lost(lost, tick);
         let entry = held::Entry::new(record, times_gpu, rest, tick);
         let mut held = self.held.lock().unwrap_or_else(PoisonError::into_inner);
-        held.ended(frame.wall_ms);
+        held.ended(frame.last_wall_ms);
         if let Some(gpu) = frame.render.as_ref().and_then(|r| r.gpu.clone()) {
             held.gpu(gpu);
         }
