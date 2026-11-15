@@ -57,7 +57,7 @@ impl Application {
     }
 
     /// Mark the host as one whose frame loop steps the editor's background bake
-    /// (the editor window, each frame, #1999).
+    /// (the editor window, marked once when it is built, #1999).
     pub fn mark_bake_host(&mut self) {
         self.bake_host = true;
     }

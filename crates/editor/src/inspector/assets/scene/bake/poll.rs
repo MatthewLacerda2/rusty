@@ -6,7 +6,7 @@
 //! once committed, the PVS never. A failure before the lighting is written leaves
 //! it unwritten, so it marks the scene unsaved.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use super::outcome::{done, dropped, fail, fail_occlusion, verb};
 use super::Step;
@@ -25,10 +25,16 @@ use rusty_script::scripting::ConsoleLogs;
 /// own; the probe step repaints at once, a step a frame.
 const PROGRESS_REPAINT: Duration = Duration::from_millis(100);
 
-/// Each frame the inspector draws: keep the UI repainting while a bake runs, apply
-/// the lightmaps once they land, then take one probe step a frame and write the
-/// lighting. Starts the button's job when a script asked (`Lighting.GenerateAsync`,
-/// #1999). Runs whether or not the scene card is showing, and waits while the
+/// How long a frame the window cannot draw spends on probe steps ([`poll_undrawn`]).
+/// Such frames come at the pacer's 100 ms retry, where a step each would run the
+/// probe stage at ten steps a second; 80 ms keeps it near the drawn pace and leaves
+/// the retry room for the frame's other work, so a bridge command waits <0.1 s more.
+pub const UNDRAWN_PROBE_BUDGET: Duration = Duration::from_millis(80);
+
+/// Each drawn editor frame (`EditorUi::frame_work`): keep the UI repainting while
+/// a bake runs, apply the lightmaps once they land, then take one probe step a
+/// frame and write the lighting. Starts the button's job when a script asked
+/// (`Lighting.GenerateAsync`, #1999). Runs whether or not the scene card is showing, and waits while the
 /// scene plays. Tells the scene whether a bake is running and how far, so a
 /// script's bake waits its turn and Play says why it waits (#2042). The frame a
 /// bake ends, is dropped or never starts repaints at once: the header read the
@@ -40,9 +46,35 @@ pub fn poll(
     log: &mut ConsoleLogs,
     nav: &NavigationGraph,
 ) {
+    paced(editor, ctx, scene, log, nav, None);
+}
+
+/// [`poll`] on a frame the window cannot draw (a locked screen): nothing is
+/// painted, so the probe stage takes steps for `UNDRAWN_PROBE_BUDGET` (80 ms) instead
+/// of one.
+pub fn poll_undrawn(
+    editor: &mut EditorUi,
+    ctx: &egui::Context,
+    scene: &mut Scene,
+    log: &mut ConsoleLogs,
+    nav: &NavigationGraph,
+) {
+    paced(editor, ctx, scene, log, nav, Some(UNDRAWN_PROBE_BUDGET));
+}
+
+/// [`poll`], taking probe steps until `budget` ran out (`None`: one step).
+pub(super) fn paced(
+    editor: &mut EditorUi,
+    ctx: &egui::Context,
+    scene: &mut Scene,
+    log: &mut ConsoleLogs,
+    nav: &NavigationGraph,
+    budget: Option<Duration>,
+) {
     let was_busy = scene.bake_busy();
     super::take_request(editor, scene, log);
-    drive(editor, ctx, scene, log, nav);
+    let until = budget.map(|b| Instant::now() + b);
+    drive(editor, ctx, scene, log, nav, until);
     scene.lighting_bake_running = editor.dev.lightmap_bake.is_some();
     if let Some(active) = &editor.dev.lightmap_bake {
         // How far it is, for the Play button's refusal (#2042).
@@ -60,6 +92,7 @@ fn drive(
     scene: &mut Scene,
     log: &mut ConsoleLogs,
     nav: &NavigationGraph,
+    until: Option<Instant>,
 ) {
     let open = editor.current_scene_path();
     let Some(active) = &mut editor.dev.lightmap_bake else {
@@ -88,14 +121,21 @@ fn drive(
         editor.dev.lightmap_bake = None;
         return;
     }
-    match advance(&mut active.step, scene, log, nav) {
-        Some(needs_save) => {
-            editor.dev.lightmap_bake = None;
-            // A file that could not take the lighting alone needs the whole scene saved.
-            editor.is_dirty |= needs_save;
+    loop {
+        match advance(&mut active.step, scene, log, nav) {
+            Some(needs_save) => {
+                editor.dev.lightmap_bake = None;
+                // A file that could not take the lighting alone needs the whole scene
+                // saved.
+                editor.is_dirty |= needs_save;
+                return;
+            }
+            // An undrawn frame's budget left: another probe step.
+            None if matches!(active.step, Step::Probes { .. })
+                && until.is_some_and(|t| Instant::now() < t) => {}
+            None if matches!(active.step, Step::Probes { .. }) => return ctx.request_repaint(),
+            None => return ctx.request_repaint_after(PROGRESS_REPAINT),
         }
-        None if matches!(active.step, Step::Probes { .. }) => ctx.request_repaint(),
-        None => ctx.request_repaint_after(PROGRESS_REPAINT),
     }
 }
 

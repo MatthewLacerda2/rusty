@@ -123,7 +123,9 @@ class DocsThatAreCode(unittest.TestCase):
     """`CODE_DOCS` are code in ci.yml's path filter, `mergeable`, and the queue."""
 
     def test_ci_path_filter_reincludes_exactly_the_code_docs(self):
-        body = jobs("ci.yml")["changes"]
+        # The `code` filter alone: the filters after it (`fuzz`) list paths of their own.
+        body = jobs("ci.yml")["changes"].split("            code:\n", 1)[1]
+        body = re.split(r"^            \w+:$", body, maxsplit=1, flags=re.M)[0]
         reincluded = re.findall(r"^\s+- '([^'!][^']*)'$", body, flags=re.M)
         self.assertEqual(sorted(reincluded), sorted(map(changes.code_doc_filter, changes.CODE_DOCS)))
 
