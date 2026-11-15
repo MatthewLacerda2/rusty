@@ -81,6 +81,10 @@ pub struct Shell {
     /// through the console's evaluator. `None` if the socket failed to bind.
     #[cfg(feature = "dev")]
     pub cmd_channel: Option<rusty_dev::command_channel::CommandChannel>,
+    /// The rolling frame log under `saved/logs/` (#2206), when the project has
+    /// this host write one ([`frame::stats::start_log`]).
+    #[cfg(feature = "dev")]
+    pub frame_log: Option<rusty_dev::frame_log::FrameLog>,
 }
 
 /// What one binary adds on top of the shell. See the module docs.

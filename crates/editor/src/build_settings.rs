@@ -18,6 +18,10 @@
 //! with, written through `Application::set_speed_of_sound` (the op
 //! `Audio.SetDefaultSpeedOfSound` calls) once a drag or a typed edit ends, and
 //! applied to the audio on entering Play.
+//!
+//! In a dev build, the frame log's channels (#2206): one checkbox per channel of
+//! the rolling log under `saved/logs/`, written through
+//! `Application::set_log_channels`, the op `Debug.SetLogChannels` calls.
 
 use egui_phosphor::regular as icon;
 
@@ -63,6 +67,11 @@ pub fn draw(
             render_scale_default(ui, app, &mut live.render_scale, console);
             ui.separator();
             audio(ui, app, console);
+            #[cfg(feature = "dev")]
+            {
+                ui.separator();
+                frame_log(ui, app, console);
+            }
         });
     if save {
         match app.set_build(draft.clone()) {
@@ -192,6 +201,25 @@ fn audio(ui: &mut egui::Ui, app: &mut Application, console: &mut ConsoleLogs) {
             ui.data_mut(|d| d.remove::<f32>(id));
             if let Err(err) = app.set_speed_of_sound(c) {
                 console.error(err);
+            }
+        }
+    });
+}
+
+/// The rolling frame log's channels (dev builds): a checkbox each, written to
+/// `project.rusty` the moment it changes; the running log follows next frame.
+#[cfg(feature = "dev")]
+fn frame_log(ui: &mut egui::Ui, app: &mut Application, console: &mut ConsoleLogs) {
+    use rusty_core::settings::logs::LogChannels;
+    ui.label("Frame log channels (saved/logs/)");
+    let channels = app.log_settings().channels;
+    ui.horizontal_wrapped(|ui| {
+        for name in LogChannels::NAMES {
+            let mut on = channels.get(name).unwrap_or(false);
+            if ui.checkbox(&mut on, name).changed() {
+                if let Err(err) = app.set_log_channels(&[(name.to_string(), on)]) {
+                    console.error(err);
+                }
             }
         }
     });

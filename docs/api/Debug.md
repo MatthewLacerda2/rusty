@@ -21,6 +21,9 @@ if Debug then Debug.Log("only in a dev build") end
 | `Debug.Preview` | `(asset_path, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
 | `Debug.PreviewMaterial` | `(name, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
 | `Debug.Stats` | `([opts])` | a **table**: the frame stats — timings and counters (below) of the current Play session; `opts.window = n` (a whole number ≥ 1, or `math.huge` for everything kept) summarises only the newest `n` frames, edit mode's too; any other option key raises |
+| `Debug.FrameLog` | `([opts])` | a **table** `{ path, records, skipped }`: a slice of the rolling frame log on disk (below), oldest first; `opts` are `last_seconds`, `over_ms`, `channel` and `limit` (default 600, the newest); any other key raises |
+| `Debug.SetLogChannels` | `(switches)` | — : turns the frame log's named channels on or off (`{ audio = false }`), kept in `project.rusty`; an unknown channel raises and changes nothing |
+| `Debug.GetLogChannels` | `()` | a **table**: each channel's name → `true` / `false` |
 | `Debug.AudioEvents` | `([after_seq])` | an **array** of the audio event log's entries whose `seq` is greater than `after_seq` (default `0`, all), oldest first, **and** the oldest `seq` the log still holds (below) |
 | `Debug.GetAdaptedExposure` | `()` | `number` (EV): the automatic exposure the screen last applied, read back from the GPU a frame or so late (exactly, in a headless capture); `nil` before an `Automatic` frame has metered (#1444; see `Graphics.md`, *Automatic exposure*) |
 | `Debug.AudioVoices` | `()` | an **array**: one roster row per entity carrying an `AudioSource` (below) |
@@ -260,6 +263,62 @@ frame; a window's frame joins the session only in Play (above).
 Scenarios get the same table as `Harness.Stats()` and can turn it into pass/fail with
 `Harness.AssertBudget{ draw_calls = 2000, fixed_update_ms = 4 }` — see *Performance
 budgets* in `docs/testing.md`.
+
+### The frame log — looking back at a minute ago (#2206)
+
+`Debug.Stats` answers *now*; the frame log answers *then*. While a `dev` build's
+window runs — the **editor, on by default**, a `player` dev build only when the
+project says so — every drawn frame writes one JSON line under the project's
+`saved/logs/`, beside what the console said, so "a minute ago, by the bar" can be
+found after the fact with nothing armed beforehand (Unity's `Editor.log` plus the
+Profiler's ring of frames, as files an agent reads). It works during Play, after
+Stop, and from `session-mcp --attach`; a plain headless session reads what the
+editor last wrote. A headless harness run writes none.
+
+```lua
+local log = Debug.FrameLog{ last_seconds = 60 }      -- the last minute, every channel
+local slow = Debug.FrameLog{ over_ms = 33 }          -- frames past 33 ms, newest 600
+for _, f in ipairs(slow.records) do
+  print(f.tick, f.ms, f.heaviest_pass, f.heaviest_system, f.cam[1], f.cam[3])
+end
+Debug.FrameLog{ channel = "console", last_seconds = 10 }   -- what was logged
+Debug.SetLogChannels{ audio = false }                -- kept in project.rusty
+```
+
+**Records.** Each line has `ch` (its channel), `t` (wall-clock ms since the Unix
+epoch) and `tick` (the Play tick, `0` in edit mode). A `frames` record also places
+itself — `play`, `scene` (the open scene's path), `cam` and `fwd` (the game
+camera's position and facing) — and says what the frame cost: `ms` (its wall time),
+`fps`, `ticks` (sim ticks it ran) and `sim_ms` (their CPU ms), and, when it drew,
+`cpu_ms` (the renderer's), `gpu_ms`, `draws`, `tris`, `visible` and `culled`.
+
+| Channel | What it writes |
+|---|---|
+| `frames` | one record per drawn frame (above) |
+| `gpu_passes` | `gpu_passes = { <pass> = ms }` on a frame record, where the adapter has timestamps |
+| `systems` | `systems = { <name> = ms }` on a frame record: the systems whose CPU time over the frame's ticks reached 0.25 ms |
+| `console` | a record per console line: `level` (`info`, `warn`, `error`) and `msg`. A line the console folds into a repeat (`msg (×3)`) is written once |
+| `loads` | a record per finished scene load: `load_ms` and `steps = { <step> = ms }` |
+| `audio` | a record per audio event, the fields `Debug.AudioEvents` returns |
+
+**The read.** `last_seconds` keeps the records from the last that many seconds of
+the wall clock; `over_ms` keeps the frame records slower than that and names each
+one's `heaviest_pass` and `heaviest_system`; `channel` keeps one channel (`gpu_passes`
+and `systems` keep the frames that carry them; `dropped`, the writer's drop notes);
+`limit` keeps the newest that many (`math.huge` for all). `path` is the folder, to
+open with `jq` or `grep`. A line that does not parse — the last one, cut by a
+power cut or still being written — is skipped and counted in `skipped`.
+
+**Bounded.** The log is numbered segments, `frames-<n>.jsonl`, each a tenth of the
+budget (`project.rusty`, `"logs"`: `budget_mb`, default 50). Past the budget the
+oldest segment is deleted; `minutes` (optional) also deletes a segment whose newest
+record is older. A restart numbers on, keeping the earlier session's segments under
+the same budget. `editor` and `player` say which hosts write it; `budget_mb = 0`
+writes none. The budget is read when the window opens; a channel switch takes effect
+the next frame. The Build Settings window (File → Build Settings) has a checkbox per
+channel. A frame never waits on the disk: it hands its lines to a writer thread, and
+when that falls behind the lines are dropped and a `{ ch = "dropped", records = n }`
+line says how many.
 
 ### The audio reads — what played, where, and by whom (#1247)
 

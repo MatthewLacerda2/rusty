@@ -4,7 +4,8 @@
 //! `Debug.Stats()` reads what the dev layer's schedule probe records per sim tick;
 //! this adds what only the window knows, per drawn frame: its wall-clock frame time
 //! and rate, and what the renderer drew for the screen (`rusty_dev::stats::WindowFrame`).
-//! [`measured`] wraps each frame's draw, once per frame the loop draws.
+//! [`measured`] wraps each frame's draw, once per frame the loop draws, and hands
+//! the same frame to the rolling frame log on disk when one runs (#2206).
 
 use rusty_app::GameWorld;
 #[cfg(feature = "dev")]
@@ -18,8 +19,8 @@ use crate::Shell;
 /// fold it into the stats `Debug.Stats()` reads: a Play frame into the session, any
 /// frame into the recent ring a window reads. A frame the renderer drew carries
 /// its counters, its CPU ms and the GPU times resolved since the last one; GPU
-/// times wait for a frame that drew. A frame log on disk attaches here, to the
-/// same `WindowFrame`.
+/// times wait for a frame that drew. The frame log on disk (#2206) then writes the
+/// same `WindowFrame`, after the stats, so their newest frame is this one.
 pub fn measured(
     shell: &mut Shell,
     game: &mut GameWorld,
@@ -33,6 +34,9 @@ pub fn measured(
         let in_play = game.scene().borrow().is_playing();
         let stats = game.script_manager().stats_cell();
         rusty_dev::stats::record_window(&mut stats.borrow_mut(), &frame, in_play);
+        if let Some(log) = shell.frame_log.as_mut() {
+            log.frame(game, &frame);
+        }
     }
     #[cfg(not(feature = "dev"))]
     let _ = frames_before;
@@ -57,6 +61,18 @@ pub fn window_frame(
         fps: clock.fps().map(f64::from),
         render,
     }
+}
+
+/// Start the frame log (#2206) when the project has `host` write one: the
+/// editor by default, a `player` dev build only when its settings say so.
+#[cfg(feature = "dev")]
+pub fn start_log(host: super::Host, game: &GameWorld) -> Option<rusty_dev::frame_log::FrameLog> {
+    use rusty_dev::frame_log::{FrameLog, LogHost};
+    let host = match host {
+        super::Host::Editor => LogHost::Editor,
+        super::Host::Player => LogHost::Player,
+    };
+    FrameLog::for_host(host, game.resources.application.borrow().log_settings())
 }
 
 #[cfg(all(test, feature = "dev"))]

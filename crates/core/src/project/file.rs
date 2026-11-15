@@ -8,7 +8,8 @@
 //!   "graphics_options": { "motion_blur": true, … }, "graphics": { "render_scale": 1 },
 //!   "quality": { "default": "Medium", "presets": [ { "name": "Low", … }, … ] },
 //!   "decals": { "max_per_owner": 256, "max_world": 1024, "max_total": 4096 },
-//!   "demos": { "keep": 20 }, "audio": { "speed_of_sound": 343 } }
+//!   "demos": { "keep": 20 }, "audio": { "speed_of_sound": 343 },
+//!   "logs": { "budget_mb": 50, "editor": true, "player": false, "channels": { … } } }
 //! ```
 //!
 //! * **`engine_commit`** — the engine build the project was last opened with, so a
@@ -34,6 +35,9 @@
 //!   ([`DemoSettings`], #1581; default 20).
 //! * **`audio`** — the speed of sound doppler resolves with ([`AudioSettings`],
 //!   #1749), applied to the audio on entering Play.
+//! * **`logs`** — the rolling frame log a dev build keeps in `saved/logs/`
+//!   ([`LogSettings`], #2206): its size budget, an optional period, which hosts
+//!   write it and which channels record.
 //!
 //! stored-format: `project.rusty`, the project file
 
@@ -48,6 +52,7 @@ use crate::settings::audio::AudioSettings;
 use crate::settings::decals::DecalLimits;
 use crate::settings::demos::DemoSettings;
 use crate::settings::graphics_options::GraphicsOptions;
+use crate::settings::logs::LogSettings;
 use crate::settings::quality::QualityPresets;
 use crate::settings::render_scale::ProjectGraphics;
 
@@ -80,6 +85,8 @@ pub struct ProjectFile {
     pub demos: DemoSettings,
     /// The game's audio settings (#1749).
     pub audio: AudioSettings,
+    /// The rolling frame log a dev build keeps (#2206).
+    pub logs: LogSettings,
 }
 
 impl Default for ProjectFile {
@@ -94,6 +101,7 @@ impl Default for ProjectFile {
             decals: DecalLimits::default(),
             demos: DemoSettings::default(),
             audio: AudioSettings::default(),
+            logs: LogSettings::default(),
         }
     }
 }
@@ -113,6 +121,7 @@ pub struct ProjectSettings {
     pub decals: DecalLimits,
     pub demos: DemoSettings,
     pub audio: AudioSettings,
+    pub logs: LogSettings,
 }
 
 impl From<ProjectFile> for ProjectSettings {
@@ -125,6 +134,7 @@ impl From<ProjectFile> for ProjectSettings {
             decals: file.decals,
             demos: file.demos,
             audio: file.audio,
+            logs: file.logs,
         }
     }
 }

@@ -59,3 +59,41 @@ fn gpu_a_window_frame_carries_what_the_renderer_drew() {
         Some(1)
     );
 }
+
+/// A drawn window frame reaches the frame log on disk (#2206) with what the
+/// renderer drew, beside the stats, as `measured` hands it over.
+#[test]
+fn gpu_a_window_frame_reaches_the_frame_log() {
+    use rusty_dev::frame_log::{now_ms, read, FrameLog, LogQuery};
+    let Some(mut r) = rusty_render::test_gpu::headless_or_skip(16, 16) else {
+        return;
+    };
+    let session = rusty_dev::session::Session::new("").unwrap();
+    let game = session.world();
+    let dir = rusty_test_support::temp::dir();
+    let mut log = FrameLog::start(&dir, Default::default()).unwrap();
+    let mut scene = Scene::new();
+    scene.skybox_path = String::new();
+    create_entity(&mut scene, "Box", Some(Primitive::Box));
+    let camera = Camera::new(glam::Vec3::new(0.0, 0.0, 4.0), -90.0, 0.0);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 16, 16);
+    let out = view.color_target_view().unwrap();
+    let clock = FrameClock::new(Instant::now());
+    for _ in 0..2 {
+        let before = r.frame_cost().frames;
+        r.render(&mut view, &scene, &camera, &out, false);
+        let frame = window_frame(&mut r, &clock, before);
+        let stats = game.script_manager().stats_cell();
+        rusty_dev::stats::record_window(&mut stats.borrow_mut(), &frame, false);
+        log.frame(game, &frame);
+    }
+    drop(log);
+    let got = read(&dir, &LogQuery::default(), now_ms());
+    assert_eq!(got.records.len(), 2, "{:?}", got.records);
+    let f = &got.records[1];
+    assert!(
+        f["draws"].as_u64().unwrap() > 0 && f["cpu_ms"].as_f64().unwrap() > 0.0,
+        "{f}"
+    );
+    assert_eq!(f["play"], false);
+}

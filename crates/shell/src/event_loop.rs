@@ -64,7 +64,12 @@ where
             return;
         };
         window.set_title(&launch.title);
-        let shell = Shell::new(window, renderer, &self.game, launch.video_defaults);
+        #[cfg_attr(not(feature = "dev"), allow(unused_mut))]
+        let mut shell = Shell::new(window, renderer, &self.game, launch.video_defaults);
+        #[cfg(feature = "dev")]
+        {
+            shell.frame_log = super::frame::stats::start_log(F::HOST, &self.game);
+        }
         let frontend = (launch.frontend)(&shell, &self.game);
         self.running = Some((shell, frontend));
     }
