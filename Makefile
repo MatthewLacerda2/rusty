@@ -33,14 +33,14 @@ export PROPTEST_RNG_SEED ?= $(PROPTEST_SEED)
 # so a code failure reports first. GATES is exactly the two lists joined —
 # `make scripts` (test_gate_mirror.py) fails when it is anything else.
 QUICK_GATES := fmt size rules layers determinism components parity test-lint scripts feature-split player-tree docrefs
-HEAVY_GATES := clippy doc test deny
+HEAVY_GATES := clippy doc test fuzz-check deny
 GATES := $(QUICK_GATES) $(HEAVY_GATES)
 # Checks on the gate runner itself, run before any gate.
 SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-explore test-one-process dead-pub editor-capture game game-test export launcher bench bless-converters
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-explore test-one-process dead-pub editor-capture game game-test export launcher bench bless-converters fuzz-lock
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -77,6 +77,9 @@ compile-cache: ## Switch the worktrees' compile cache on (needs sccache); rerun 
 		'SCCACHE_CACHE_SIZE = "$(CACHE_SIZE)"' > "$(CACHE_CONFIG)" && \
 	echo "compile-cache: on for every worktree ($(CACHE_CONFIG), cap $(CACHE_SIZE))"
 
+# Under `make gates`, `fuzz-check` builds only when the diff can break the fuzz
+# build, as CI's job does; `make fuzz-check` by name always builds.
+gates: FUZZ_CHECK := --if-changed
 gates: $(SELF_CHECKS) $(GATES) ## Everything CI blocks on, fastest-failing first
 	@echo "gates: all green"
 
@@ -210,6 +213,23 @@ bless-converters: ## Re-bless crates/asset/src/convert/fingerprints.txt after a 
 		RUSTY_BLESS_CONVERTERS=1 $(TEST) --run-ignored only -E 'test(converter_fingerprints)'; \
 	else echo "bless-converters: no Blender found, its rows left as they are"; fi
 
+# `fuzz/` is its own workspace, so no other gate compiles it: this one does, on the
+# pinned stable toolchain (a check builds libfuzzer-sys; only *running* it needs
+# nightly, docs/testing.md), against a lock it first derives from the root one
+# (`make fuzz-lock`), `--locked`, into `target/fuzz`. `FUZZ_CHECK=--if-changed`
+# (what `make gates` sets) skips it unless the branch's diff matches ci.yml's
+# `fuzz` filter. The script holds the hint.
+fuzz-check: ## [gate] The fuzz target (fuzz/, its own workspace) still compiles, against the root lock's versions
+	python3 .github/scripts/fuzz_gate.py check $(FUZZ_CHECK)
+
+# The derived, gitignored fuzz/Cargo.lock: the root lock, pruned to what fuzz/
+# needs (`cargo metadata` resolves without compiling), so the target builds the
+# very versions the root's gates (and cargo-deny) prove; only what the fuzz-only
+# crates pull in is resolved fresh, and fuzz/Cargo.toml pins those exactly.
+# `make fuzz-check` runs it first; run it yourself before `cargo +nightly fuzz run`.
+fuzz-lock: ## Derive fuzz/Cargo.lock (gitignored) from the root Cargo.lock; run it before `cargo +nightly fuzz run`
+	python3 .github/scripts/fuzz_gate.py seed
+
 # The git CLI fetches the advisory DB: cargo-deny's built-in fetcher can't get
 # through the cloud sessions' proxy, and the CLI works everywhere else too.
 deny: ## [gate] Advisories, bans, sources, licenses (cargo-deny)
@@ -269,7 +289,7 @@ queue-stop: ## Ask the watch and its supervisor to stop, between pull requests
 queue-status: ## Does the queue's supervisor run (its lock's PID, checked alive)? Plus the log's last line and age, and green PRs passed over for an hour
 	@python3 .github/scripts/queue-view.py status
 
-queue-events: ## The stream a Monitor runs: hand-backs, merges, ready flips, stand-downs; exits 1 once the supervisor is gone
+queue-events: ## The stream a Monitor runs: hand-backs, merges, ready flips, coders' issue comments; exits 1 once the supervisor is gone
 	@python3 .github/scripts/queue-view.py events
 
 # "Blocked by #N" written in an issue body but never recorded as a GitHub
@@ -305,10 +325,11 @@ conflicts: ## Conflicts with main the queue met since then. make conflicts SINCE
 # Each worktree's target/ holds GBs, and removing it by hand per merged branch
 # gets skipped under load (#913). Removes every worktree under .claude/worktrees/
 # whose PR merged or closed, target/ first; never one with uncommitted changes,
-# unpushed commits or a lock, which it names. Prints the rest's target/ sizes and
+# unpushed commits, a lock, a process standing in it or running a program from it,
+# or a write within the idle window (ARGS="--idle MINUTES"), which it names. Prints the rest's target/ sizes and
 # free disk before and after; a linked worktree outside .claude/worktrees/ is
 # named OUTSIDE, never touched (#982). ARGS=--dry-run lists without deleting.
-reclaim: ## Remove merged worktrees (and their target/) and finished local branches, report disk. ARGS=--dry-run lists only
+reclaim: ## Remove merged worktrees nothing is using (and their target/) and finished local branches, report disk. ARGS=--dry-run lists only; ARGS="--idle MINUTES" (default 60, 0 off) sets how recent a write keeps one
 	@python3 .github/scripts/reclaim.py $(ARGS)
 
 # A batch's two dispatch steps, scripted (#1569). `coder` reads the newest

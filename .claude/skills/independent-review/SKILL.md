@@ -58,11 +58,12 @@ And on demand: when the user asks for a PR to be reviewed, open or merged
   that moves other agents' branches and leaves `prNNNN` branches behind. When
   the Agent tool does not list `reviewer` (the session started before the
   definition existed), restart the session rather than fall back to another
-  type. Remove a reviewer's worktree only after its report is in, by its own
-  path, never by a pattern (an `agent-*` sweep removes a running reviewer's
-  checkout and loses its report). The harness locks it for the orchestrator's
-  whole session, so `make reclaim` leaves it as `PROTECTED` and a plain `git
-  worktree remove` refuses: once the report is in, `git worktree remove -f -f
+  type. `make reclaim` keeps a reviewer's worktree while the harness's lock's
+  session lives, while a process runs in it, and for an hour after its last
+  write, so it is the way to clear them. To free one sooner by hand, wait for
+  its report and remove it by its own path, never by a pattern (an `agent-*`
+  sweep removes a running reviewer's checkout and loses its report): the lock
+  makes a plain `git worktree remove` refuse, so `git worktree remove -f -f
   <its path>`.
 - **Read-only, and no build.** It reads the PR, the repository and the issue,
   and runs read-only commands (`gh pr view`, `gh pr diff`, `gh issue view`,

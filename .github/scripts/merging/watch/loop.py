@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 
 from merging.queue import outcomes
-from merging.watch import aging, board, ending, handbacks, mainline, order, stalls
+from merging.watch import aging, board, ending, handbacks, kept, mainline, order, stalls
 
 
 def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
@@ -54,8 +54,12 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     (`merged(number)`) and is pumped on each pass and each poll of a take's CI
     wait (`pump()`), so a scoped mutation run is dispatched after the merge and
     a finished one's slot frees while the watch waits.
+    `was_merged(number)`, when given, asks GitHub whether a pull request gone
+    between two watches merged (`True`, `False`, `None` when it did not answer;
+    [`kept.Board.report`], #2215).
     `opts.for_minutes` (`--for`) is checked at the top of each pass, so only
-    between takes; `opts.since` (`--since`) limits the board lines ([`board.recent`]).
+    between takes; `opts.since` (`--since`) limits the board lines ([`board.fresh`],
+    applied by [`kept.Board.report`] to the kept listing too).
     """
     results, done, failed, handed, told, landed = [], set(), 0, [], set(), set()
     memory, marks = handbacks.recall(fx.memory), handbacks.recall(fx.memory.with_name(handbacks.RUNS_MEMORY))
@@ -67,29 +71,31 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     whys = handbacks.recall(fx.memory.with_name(handbacks.WHY_MEMORY))
     wall = getattr(fx, "wall", time.time)
     line = aging.Line()
-    shown = [None]  # the board as last reported; `None` until the first listing
+    # The board as last reported, by this watch or the one before it (#2215).
+    told_board = kept.Board(fx.memory.with_name(kept.BOARD_MEMORY), not getattr(opts, "dry_run", False),
+                            lambda line: fx.say(line))
+    was_merged = getattr(fx, "was_merged", lambda number: None)
     after = getattr(fx, "mutants", None)  # the mutation runs merged pull requests asked for (#1934)
 
     def save() -> None:
-        handbacks.remember(fx.memory, memory)
-        handbacks.remember(fx.memory.with_name(handbacks.RUNS_MEMORY), {n: m for n, m in marks.items() if n in memory})
-        handbacks.remember(fx.memory.with_name(handbacks.CLAIMS_MEMORY), {n: c for n, c in claims.items() if n in memory})
-        handbacks.remember(fx.memory.with_name(handbacks.ISSUES_MEMORY), {n: i for n, i in issues.items() if n in memory})
-        handbacks.remember(fx.memory.with_name(handbacks.REVIEWS_MEMORY), {n: r for n, r in reviews.items() if n in memory})
-        handbacks.remember(fx.memory.with_name(handbacks.STALLS_MEMORY), {n: s for n, s in stalled.items() if n in memory})
-        handbacks.remember(fx.memory.with_name(handbacks.RED_MEMORY), {n: r for n, r in reds.items() if n in memory})
-        handbacks.remember(fx.memory.with_name(handbacks.WHY_MEMORY), {n: w for n, w in whys.items() if n in memory})
+        sides = ((handbacks.RUNS_MEMORY, marks), (handbacks.CLAIMS_MEMORY, claims), (handbacks.ISSUES_MEMORY, issues),
+                 (handbacks.REVIEWS_MEMORY, reviews), (handbacks.STALLS_MEMORY, stalled), (handbacks.RED_MEMORY, reds),
+                 (handbacks.WHY_MEMORY, whys))
+        failed = {handbacks.remember(fx.memory, memory)} | {
+            handbacks.remember(fx.memory.with_name(name), {n: v for n, v in side.items() if n in memory}) for name, side in sides
+        }
+        for why in sorted(failed - {None}):  # a memory lost, never the watch (#2215)
+            fx.say(handbacks.FAILED_LINE + why)
+        told_board.keep(landed)
 
     def forget(number: int) -> None:
         """Drop everything remembered against `number`: it is back in line."""
-        for kept in (memory, marks, claims, issues, reviews, stalled, reds, whys):
-            kept.pop(number, None)
+        for side in (memory, marks, claims, issues, reviews, stalled, reds, whys):
+            side.pop(number, None)
 
     def report(pulls: list[dict]) -> None:
-        now = board.heads(board.recent(pulls, getattr(opts, "since", None)))
-        for said in board.transitions(shown[0], now, landed):
+        for said in told_board.report(pulls, landed, getattr(opts, "since", None), was_merged):
             fx.say(said)
-        shown[0] = now
 
     def tick() -> None:
         if after:

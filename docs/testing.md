@@ -764,7 +764,7 @@ recipe and scripts are committed; the project is regenerable output.
 | `showroom` | Lighting and reflections in one interior room: a polished floor (SSR from a minimum smoothness of 0.1), a mirror, a clear and a tinted glass pane, a drinking glass before the mirror, a lacquered pedestal (`ior`, `KHR_materials_specular`), an emissive sign, daylight through a window, a turned box and a sphere reflection probe, six light probes and a ball rolling through them with a proxy volume. Scenarios: `load`, `ball` (its probe light rises in the sun), `probes` (the volumes drawn as gizmos), `bake` (only with `--param bake=true`: a tiny Generate Lighting, applied on load). |
 | `smoke` | The generator's own proof: a floor, a crate with a Snyder texture, a looping zimmer blip and `mover.lua` sliding it along +X, a sun, a camera; one scenario asserting the crate moved, two shots. |
 | `tetris` | A 3D falling-blocks puzzle: held/tapped input with repeat timing on the fixed tick, a HUD with layout groups (stats column, 4×4 next-piece grid), many small lit cubes spawned and moved every few ticks, cleared lines bursting as rigidbodies then despawning, a pulse light, zimmer one-shots and a loop; scenarios clear a line, play to game over, and replay one seed twice for the same board. |
-| `topple` | Physics at scale and its determinism: four levels of box and plank stacks, jointed box figures (powered joints that go limp into ragdolls on a hard hit) and explosive barrels (`Damage.ApplyRadial` with impulse) that the player topples with thrown balls; scenarios prove the levels settle, a throw clears a level, a blast reaches exactly its radius, and a replay is bit-identical. `pile=16` is a 1,498-body pile. |
+| `topple` | Physics at scale and its determinism: four levels of box and plank stacks, jointed box figures (powered joints that go limp into ragdolls on a hard hit) and explosive barrels (`Damage.ApplyRadial` with impulse) that the player topples with thrown balls; scenarios prove the levels settle, a throw clears a level, a click throws at what the cursor is over (`click`, through the input path), a blast reaches exactly its radius, and a replay is bit-identical. `pile=16` is a 1,498-body pile. |
 
 ```sh
 make game NAME=smoke                       # → target/games/smoke/ (this worktree's own)
@@ -1087,7 +1087,7 @@ request** (#750). Two ways in:
 
 | Run | Trigger | Scope | Where it lands |
 |---|---|---|---|
-| **On request** (`mutants-on-request.yml`) | a PR's `Mutation: diff` (or globs) line, which the merge queue dispatches on `main` after the merge, two at a time (#1934); `make mutants-remote SCOPE=...`; or a dispatch with a `scope` input | `diff` (the branch against `origin/main`, or with `commit` the merged squash commit against its parent) or path globs, turned into one `--in-diff` by `.github/scripts/mutants-scope.py`; one runner, a 2 h 45 budget; one run per branch, a newer dispatch cancelling the older and an unmerged close of the PR cancelling what is left, while a merged PR's run finishes (`mutants-cancel.yml`, #1530) | printed in the terminal by `make mutants-remote`; the run summary and a `mutants-report` artifact (`report.md`, `survivors.diff`); `report.md` also as one comment on the branch's open PR, or its merged one (the `pr` input for the queue's runs), edited in place by later runs (#912) |
+| **On request** (`mutants-on-request.yml`) | a PR's `Mutation: diff` (or globs) line, which the merge queue dispatches on `main` after the merge, two at a time (#1934); `make mutants-remote SCOPE=...`; or a dispatch with a `scope` input | `diff` (the branch against `origin/main`, or with `commit` the merged squash commit against its parent) or path globs (separated by spaces or commas; a brace such as `crates/{core,physics}/src/**` is expanded, since git's glob dialect has none), turned by `.github/scripts/mutants-scope.py` into one `--in-diff` per cargo workspace the scope reaches: the engine's, and each directory whose `Cargo.toml` opens its own `[workspace]` (`tools/lint`, run inside it with its own `cargo test`; a cargo-fuzz crate such as `fuzz/` is named as having nothing to run), in one report (#2201); one runner, a 2 h 45 budget; one run per branch, a newer dispatch cancelling the older and an unmerged close of the PR cancelling what is left, while a merged PR's run finishes (`mutants-cancel.yml`, #1530) | printed in the terminal by `make mutants-remote`; the run summary and a `mutants-report` artifact (`report.md`, `survivors.diff`); `report.md` also as one comment on the branch's open PR, or its merged one (the `pr` input for the queue's runs), edited in place by later runs (#912), except that a run with no answer adds its line below the earlier report rather than replacing it (#2201) |
 | **Full sweep** (`mutants-sweep.yml`, sharded) | weekly `schedule` (Saturdays) + `workflow_dispatch` (`force` re-sweeps a covered commit); `main` only, a dispatch on any other ref is refused red (#972); skipped by `mutants-plan` when a finished sweep already covered `main`'s head (#506); one sweep at a time (#705) | the full `--file` sim scope over a matrix `mutants-plan` sizes each run from the mutant count (`cargo mutants --list`, `.github/scripts/mutants-shards.py`: ≈ 4 h a shard at the slowest per-shard rate the previous sweep measured (a shard under `MIN_MEASURED` mutants ignored, the slowest capped at `OUTLIER_CAP` × the mean), `MINUTES_PER_MUTANT` only when none can be read, and a `max-parallel` of at most 10 chosen to end by Sunday 23:59 UTC; red past GitHub's 256-job ceiling, #1684), each shard stopping itself at a 5 h 40 budget under GitHub's 6 h limit (#749) | `mutants-report` job: merged job summary (totals, measured of planned, the run's mean and slowest measured minutes a mutant against the sizing figure, and each shard's seconds and outcome lists under `shards/` for the next plan, unfinished shards, survivors) and the merged `mutants-report` artifact |
 
 Why this shape: mutation is a signal, and a per-PR job held runners the merge
@@ -1095,8 +1095,13 @@ queue was waiting on for a report that could not change whether anything merged.
 Whoever writes tricky mechanism asks for exactly that code to be mutated before
 readying it, and reads the answer; the weekly sweep re-examines everything else and
 tracks the survivor backlog. An on-request run goes red only when it has no honest
-answer (a path with nothing to mutate, a baseline that does not build); survivors
-are a result. A run stopped at its budget says how many planned mutants it never
+answer (a path with nothing to mutate, a baseline that does not build, a part whose
+cargo-mutants broke, reported beside the parts that finished), and then still says
+why on the pull request and in `make mutants-remote`'s output, so an unanswered ask is
+visible where it was made (#2201); survivors are a result. **The sweep never reaches
+`tools/lint`**: it mutates the engine's sim modules in the root workspace, so the lint
+tool is audited only by scoped runs, which is why a branch adding a lint rule asks for
+one. A run stopped at its budget says how many planned mutants it never
 reached and is never called clean, however its measured mutants fared; a mutant that
 timed out is unmeasured too: the report never calls a run with a timeout clean, and
 says a run where most viable mutants timed out is not a result. In the sweep, a shard
@@ -1154,19 +1159,31 @@ arbitrary bytes → UTF-8 → `SceneData` (serde) → `apply_scene_data` (the
 rehydration that rebuilds meshes/colliders/skeletons), surfacing panics, hangs,
 and unguarded `unwrap`s.
 
-libFuzzer is **nightly-only**, so `fuzz/` is its own workspace — deliberately
-out of the pinned-`1.95.0` build, the size/determinism gates, and `cargo-deny`.
-It is **local-first / on-demand**:
+Running libFuzzer is **nightly-only**, so `fuzz/` is its own workspace —
+deliberately out of the root build, the determinism guard and `cargo-deny` (the
+size gate and the `--rules` checks still scan it). Its build is a gate all the
+same: `make fuzz-check` compiles the target on the pinned stable toolchain, into
+`target/fuzz`, so an engine rename it imports through turns a PR red. It builds
+against `fuzz/Cargo.lock`, which is **derived, not committed** (gitignored):
+`make fuzz-lock` writes it from the root `Cargo.lock`, pruned to what `fuzz/`
+needs, and `make fuzz-check` runs that first, then checks `--locked`. So the
+target builds the versions the root's gates prove, and a root bump needs nothing
+done here; only the fuzz-only crates (`libfuzzer-sys`, `arbitrary`) come from
+outside the root lock, pinned exactly in `fuzz/Cargo.toml`. It is a second cold
+engine build, so CI's `fuzz-check` job and `make gates` run it only when the diff
+matches `ci.yml`'s `fuzz` filter (and print that they skipped otherwise); by name
+it always runs. The fuzzing itself is **local-first / on-demand**:
 
 ```
+make fuzz-lock                                      # derive fuzz/Cargo.lock first
 cargo +nightly fuzz run scene_deserialize          # fuzz until you stop it
 cargo +nightly fuzz run scene_deserialize -- -max_total_time=60   # time-boxed
 ```
 
 The committed `fuzz/corpus/scene_deserialize/` seeds the coverage-guided mutator
 with the default scene plus a couple of minimal documents; new interesting inputs
-accrete there. There is no CI gate — fuzzing is run for as long as the operator
-wants; a short time-boxed CI smoke batch could be added later as a separate
+accrete there. No CI job *runs* the fuzzer — fuzzing is run for as long as the
+operator wants; a short time-boxed CI smoke batch could be added later as a separate
 nightly workflow if regression pressure is wanted.
 
 ## Parallel agent builds & disk

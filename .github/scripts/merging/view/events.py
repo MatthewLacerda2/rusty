@@ -9,8 +9,11 @@ hand-typed `tail -n 30 -F queue.log | grep` it replaced, and why:
 - **Only what someone acts on** ([`keep`]): hand-backs, merges (a train's
   too), every line that ends the supervisor's run ([`CARRIES_ON`]), a held
   Dependabot PR, and a pull request turning ready, opening ready, going back
-  to draft or closing unmerged (the watch's own `watch: #N …` lines,
-  `watch.board.transitions`). PR #1870 sat ready for 90 minutes because the
+  to draft, closing, or merging while no watch ran, and one a fresh start
+  finds ready and unqueued (the watch's own `watch: #N …` lines,
+  `watch.board.transitions`, #2215), and a state file the watch could not
+  write (`watch: the … memory could not be written:`), the one line that says
+  why a watch forgets its hand-backs or repeats its board. PR #1870 sat ready for 90 minutes because the
   hand-typed grep let no ready flip through. A mutation request lost after a
   merge (`after: …` dropped, could not, never appeared; #1934) passes, so a
   lost report is told from a slow one. A CI poll line is dropped.
@@ -25,7 +28,8 @@ hand-typed `tail -n 30 -F queue.log | grep` it replaced, and why:
   checked at the start and every [`LIVENESS_SECONDS`], and a supervisor that is
   not running ends the stream with one line and status 1.
 
-Coders' *Standing down* comments come from a light poll beside it ([`standing`]).
+Coders' comments on their batch issues (a stand-down, a hand-back) come
+from a light poll beside it ([`standing`]).
 """
 
 from __future__ import annotations
@@ -61,8 +65,10 @@ KEEP = re.compile(
     r"|supervisor:.*; stopped\.$"
     r"|supervisor: (?!" + "|".join(re.escape(line) for line in CARRIES_ON) + ")"
     r"|watch: STOPPED:"
+    # A state file that cannot be written (a full disk, #2215): every watch then repeats itself.
+    r"|watch: the (?:hand-back|board) memory could not be written: "
     r"|HELD #\d+"
-    r"|watch: #\d+ (?:turned ready|opened as ready|back to draft|closed, not merged)"
+    r"|watch: #\d+ (?:turned ready|opened as ready|is ready and unqueued|back to draft|closed|merged while no watch listed it)"
     # A mutation request lost, never a slow one (#1934): a signal nobody hears of is no signal.
     r"|after: .*(?:dropped|could not|never appeared)"
 )
@@ -117,7 +123,7 @@ def follow(tail: Tail, running: Callable[[], tuple[bool, list[str]]], comments: 
     """Stream until the supervisor is not running; then say why and return 1.
 
     `running()` is [`status.read`]'s verdict, `comments()` the new *Standing
-    down* lines ([`standing.Poll`]), `clock` a monotonic time in seconds."""
+    down* and coder-comment lines ([`standing.Poll`]), `clock` a monotonic time in seconds."""
     merged: set[int] = set()
     for line in tail.start():
         if keep(line, merged):

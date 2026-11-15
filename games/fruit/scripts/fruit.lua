@@ -162,6 +162,9 @@ function Fruit.Start(id)
     Fruit.max_lives = Fruit.lives
     if Fruit.auto == nil then Fruit.auto = true end
     hud = View.find()
+    -- Swiped with the cursor: free it and show it (Play starts it locked, hidden).
+    Input.SetCursorLocked(false)
+    Input.SetCursorVisible(true)
     Fruit.Restart()
 end
 
