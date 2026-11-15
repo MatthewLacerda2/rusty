@@ -65,16 +65,15 @@ enum Card {
 /// The gate over the repository at `base`: every discovered component's card
 /// classified, each drift a finding, and so is a registry it cannot read.
 pub fn verdict(base: &Path, _: &[String]) -> Verdict {
-    let violations = match components::discover_in(base) {
-        Ok(components) => {
-            let cards = card_sources(base);
-            components
-                .iter()
-                .filter_map(|field| violation(field, classify_all(field, &cards)))
-                .collect()
-        }
-        Err(why) => vec![why],
+    let components = match components::discover_in(base) {
+        Ok(components) => components,
+        Err(why) => return components::unreadable_registry("parity", why),
     };
+    let cards = card_sources(base);
+    let violations = components
+        .iter()
+        .filter_map(|field| violation(field, classify_all(field, &cards)))
+        .collect();
     Verdict::listed("parity", violations, |n| {
         format!(
             "\n{n} editor-card parity issue(s). Route the card through a shared \

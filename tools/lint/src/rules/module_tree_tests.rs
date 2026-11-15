@@ -92,3 +92,11 @@ fn an_attribute_ends_at_its_own_bracket() {
     let paths: Vec<Reach> = reach(two);
     assert_eq!(paths, [module("src/x.rs", true), module("src/y.rs", true)]);
 }
+
+#[test]
+fn a_semicolon_or_brace_inside_an_attribute_keeps_the_path() {
+    for between in ["#[foo([u8; 4])]", "#[foo{ a; }]", "#![foo(;)]"] {
+        let text = format!("#[path = \"x.rs\"]\n{between}\nmod m;\n");
+        assert_eq!(first(&text), module("src/x.rs", true), "{between}");
+    }
+}

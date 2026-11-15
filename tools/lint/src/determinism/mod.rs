@@ -92,7 +92,7 @@ pub fn verdict(base: &Path, _: &[String]) -> Verdict {
     // The root package (the binaries and `tests/`) inherits the policy too.
     violations.extend(member_violations("Cargo.toml", &root_manifest));
     for manifest in crate::modules::member_manifests(base) {
-        let at = manifest.to_string_lossy();
+        let at = relative(base, &manifest);
         violations.extend(member_violations(&at, &read(&manifest)));
     }
     let roots = crate::layers::platform_roots();

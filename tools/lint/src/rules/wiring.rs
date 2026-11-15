@@ -7,7 +7,7 @@
 //! naming the rule.
 
 use super::scan::Scan;
-use super::RULES;
+use super::{Allow, RULES};
 use crate::repo::scaffold::Repo;
 
 /// A rule's must-flag case: the files of a scratch repository, and the one file
@@ -198,10 +198,72 @@ fn every_rule_reports_its_must_flag_case_through_its_row() {
         }
         repo.git(&["add", "-A"]);
         let found = rule(&Scan::at(&repo.0));
-        if !found.iter().any(|f| f.path.ends_with(case.flags)) {
+        if !found
+            .iter()
+            .any(|f| f.path.ends_with(case.flags) && f.rule == *name)
+        {
             let got: Vec<String> = found.iter().map(ToString::to_string).collect();
             broken.push(format!("`{name}` did not report `{}`: {got:?}", case.flags));
         }
     }
     assert!(broken.is_empty(), "{}", broken.join("\n"));
+}
+
+/// The findings `all` keeps of rule `name` on `path`, over `repo`.
+fn kept(repo: &Repo, name: &str, path: &str) -> usize {
+    let all = super::all(&Scan::at(&repo.0));
+    all.iter()
+        .filter(|f| f.path == path && f.rule == name)
+        .count()
+}
+
+/// Every row's `Allow` is the one the gate applies: an inline allow above its
+/// must-flag finding excuses an `Inline` row's, and an `Own` row's as the rule
+/// itself reads it, never a `Never` row's. (`ignored`'s planted file is scanned,
+/// so the shared filter could reach it; a manifest's or a seed file's it cannot.)
+#[test]
+fn an_inline_allow_on_each_row_s_finding_is_honoured_by_its_mode() {
+    let mut broken = Vec::new();
+    for (name, rule, allow) in RULES {
+        let Some(case) = case_for(name) else { continue };
+        let repo = Repo::new(&format!("wiring-allow-{name}"), true);
+        for (path, body) in &case.files {
+            repo.file(path, body);
+        }
+        repo.git(&["add", "-A"]);
+        let Some(hit) = rule(&Scan::at(&repo.0))
+            .into_iter()
+            .find(|f| f.path.ends_with(case.flags) && f.rule == *name)
+        else {
+            continue; // the test above names it
+        };
+        let before = kept(&repo, name, &hit.path);
+        let text = std::fs::read_to_string(repo.0.join(&hit.path)).unwrap_or_default();
+        let mut lines: Vec<String> = text.lines().map(String::from).collect();
+        let at = (hit.line.max(1) - 1).min(lines.len());
+        lines.insert(at, format!("// lint: allow({name}) wiring"));
+        repo.file(&hit.path, &(lines.join("\n") + "\n"));
+        let after = kept(&repo, name, &hit.path);
+        let excused = after < before;
+        if excused == (*allow == Allow::Never) {
+            broken.push(format!(
+                "`{name}`: an inline allow above it: {before} kept, then {after}"
+            ));
+        }
+    }
+    assert!(broken.is_empty(), "{}", broken.join("\n"));
+}
+
+/// An `Own` row skips the shared filter, so what the rule reports about its own
+/// allows survives one: `api-parity`'s stale allow, on an op no inspector writes.
+#[test]
+fn an_own_row_s_report_on_its_own_allow_is_not_excused_by_it() {
+    let repo = Repo::new("wiring-own", true);
+    let op = "crates/edit/src/authoring/light.rs";
+    repo.file(
+        op,
+        "pub fn set_range(c: &mut C) {} // lint: allow(api-parity) why\n",
+    );
+    repo.git(&["add", "-A"]);
+    assert_eq!(kept(&repo, "api-parity", op), 1);
 }

@@ -30,16 +30,19 @@ mod size;
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
 
+    // Every gate is a row of `gates::GATES`, chosen by its flag (`docs/linting.md`
+    // says what each holds); with no flag, the size gate. Two flags are refused.
+    let check = gates::select(&args).unwrap_or_else(|why| {
+        eprintln!("{why}");
+        std::process::exit(2);
+    });
+
     // `--dead-pub` prints the dead-pub signal (#1003): `pub` items nothing uses,
     // and items only tests use. A report, never a gate, so not a row of
     // `gates::GATES`: it builds the workspace twice, and fails only when it cannot.
-    if args.iter().any(|a| a == "--dead-pub") {
+    if args.iter().any(|a| a == gates::DEAD_PUB) {
         dead_pub::run();
         return;
     }
-
-    // Every gate is a row of `gates::GATES`, chosen by its flag (`docs/linting.md`
-    // says what each holds); with no flag, the size gate.
-    let check = gates::select(&args);
     gates::report(&check(std::path::Path::new(""), &args));
 }

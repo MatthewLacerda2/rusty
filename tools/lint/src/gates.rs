@@ -1,6 +1,6 @@
 //! Every gate `main` dispatches, one row each, and the one way a gate reports.
 //!
-//! A gate is a pure `check(base, args)` over the repository at `base`: what it
+//! A gate is a pure `verdict(base, args)` over the repository at `base`: what it
 //! found and the report it renders, never printed or exited from inside. `main`
 //! prints and exits for all of them ([`report`]), so the wiring test
 //! (`gates_tests.rs`) can run every row's real entry point over a fixture it must
@@ -63,14 +63,29 @@ pub const GATES: &[(Check, &str)] = &[
     (crate::size::verdict, ""),
 ];
 
-/// The gate `args` selects: the first row whose flag is among them, else the size
-/// gate.
-pub fn select(args: &[String]) -> Check {
-    GATES
+/// The flag of the one report that is not a row: `--dead-pub` (`main`).
+pub const DEAD_PUB: &str = "--dead-pub";
+
+/// The gate `args` selects: the row whose flag is among them, else the size gate.
+/// `Err` when they name two (a gate's flag, or [`DEAD_PUB`], twice over): `main`
+/// runs one, and which would be a guess.
+pub fn select(args: &[String]) -> Result<Check, String> {
+    let named: Vec<&str> = args
         .iter()
-        .find(|(_, flag)| !flag.is_empty() && args.iter().any(|a| a == flag))
-        .or_else(|| GATES.iter().find(|(_, flag)| flag.is_empty()))
-        .map_or(crate::size::verdict, |(check, _)| *check)
+        .map(String::as_str)
+        .filter(|a| *a == DEAD_PUB || GATES.iter().any(|(_, f)| !f.is_empty() && f == a))
+        .collect();
+    if let [_, _, ..] = named.as_slice() {
+        return Err(format!(
+            "lint: {} name more than one gate; run one gate per call",
+            named.join(" ")
+        ));
+    }
+    let flag = named.first().copied().unwrap_or("");
+    Ok(GATES
+        .iter()
+        .find(|(_, f)| *f == flag)
+        .map_or(crate::size::verdict, |(check, _)| *check))
 }
 
 /// Print `verdict` as every gate does, mirror it to `.lint/report.txt`, and exit 1

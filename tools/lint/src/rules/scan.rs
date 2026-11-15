@@ -3,6 +3,7 @@
 
 use super::finding::Finding;
 use super::test_code;
+use std::cell::OnceCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -19,6 +20,8 @@ pub struct Scan {
     test_lines: BTreeMap<String, Vec<bool>>,
     /// The layer table's sim modules (`src/<module>`).
     pub sim_dirs: Vec<String>,
+    /// [`Scan::shaders`], walked and read on first ask.
+    shaders: OnceCell<Vec<(String, String)>>,
 }
 
 impl Scan {
@@ -63,6 +66,7 @@ impl Scan {
             sources,
             test_lines,
             sim_dirs: crate::layers::sim_dirs(),
+            shaders: OnceCell::new(),
         }
     }
 
@@ -78,15 +82,18 @@ impl Scan {
 
     /// Every `.wgsl` shader under `engine/`, by its path relative to [`Scan::base`],
     /// with its text: what the shader rules read, beside the scanned `.rs` files.
-    pub fn shaders(&self) -> Vec<(String, String)> {
-        crate::size::shaders_in(&self.base.join("engine"))
-            .iter()
-            .map(|p| {
-                let rel = p.strip_prefix(&self.base).unwrap_or(p);
-                let text = fs::read_to_string(p).unwrap_or_default();
-                (rel.to_string_lossy().into_owned(), text)
-            })
-            .collect()
+    /// Walked and read once, however many rules ask.
+    pub fn shaders(&self) -> &[(String, String)] {
+        self.shaders.get_or_init(|| {
+            crate::size::shaders_in(&self.base.join("engine"))
+                .iter()
+                .map(|p| {
+                    let rel = p.strip_prefix(&self.base).unwrap_or(p);
+                    let text = fs::read_to_string(p).unwrap_or_default();
+                    (rel.to_string_lossy().into_owned(), text)
+                })
+                .collect()
+        })
     }
 
     /// The text of a scanned file; empty for any other path.

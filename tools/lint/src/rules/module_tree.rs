@@ -67,9 +67,25 @@ pub fn reached(path: &str, mod_rs: bool, text: &str, exists: impl Fn(&str) -> bo
     while let Some(tok) = rest.first() {
         let at = |k: usize| rest.get(k);
         match tok {
-            // An attribute's own tokens are read on, like any others: they hold
-            // no `mod`, and its `include!`s are found as anywhere else.
-            Tok::Punct('#') => path_attr = attribute(&rest[1..]).or(path_attr),
+            // An attribute is skipped whole, by its brackets, so a `;` or a brace
+            // inside it (`#[foo([u8; 4])]`) never ends the item a `#[path]` sits
+            // on; its `include!`s are still read.
+            Tok::Punct('#') => {
+                // `#![…]`, an inner attribute, never sets a `mod`'s path
+                let inner = rest.get(1) == Some(&Tok::Punct('!'));
+                let attr = &rest[1 + usize::from(inner)..];
+                let (found, len) = attribute(attr);
+                path_attr = found.filter(|_| !inner).or(path_attr);
+                if len > 0 {
+                    out.extend(
+                        (0..len)
+                            .filter_map(|k| included(&attr[k..len]))
+                            .map(|s| Reach::Included(normal(&here.join(s)))),
+                    );
+                    rest = &attr[len..];
+                    continue;
+                }
+            }
             Tok::Ident(m) if m == "mod" => match (at(1), at(2)) {
                 (Some(Tok::Ident(name)), Some(Tok::Punct(';'))) => {
                     out.extend(external(&dir, name, path_attr.take(), &exists));
@@ -152,10 +168,12 @@ struct PathAttr {
 }
 
 /// The `p` of the `#[path = "p"]` (or a `cfg_attr`'s `path = "p"`) whose `[`
-/// opens `toks`, if that is what it is; `#![…]`, an inner one, never is.
-fn attribute(toks: &[Tok]) -> Option<PathAttr> {
+/// opens `toks`, if that is what it is, and how many tokens the attribute spans,
+/// its closing `]` included (all of `toks` when it never closes; 0 when no `[`
+/// opens it). Every bracket kind nests, so a `;` or brace inside stays inside.
+fn attribute(toks: &[Tok]) -> (Option<PathAttr>, usize) {
     if toks.first() != Some(&Tok::Punct('[')) {
-        return None;
+        return (None, 0);
     }
     let name = match toks.get(1) {
         Some(Tok::Ident(n)) => n.as_str(),
@@ -164,11 +182,11 @@ fn attribute(toks: &[Tok]) -> Option<PathAttr> {
     let (mut depth, mut out) = (0usize, None);
     for (i, t) in toks.iter().enumerate() {
         match t {
-            Tok::Punct('[' | '(') => depth += 1,
-            Tok::Punct(']' | ')') => {
-                depth -= 1;
+            Tok::Punct('[' | '(' | '{') => depth += 1,
+            Tok::Punct(']' | ')' | '}') => {
+                depth = depth.saturating_sub(1);
                 if depth == 0 {
-                    break;
+                    return (out, i + 1);
                 }
             }
             Tok::Ident(p) if p == "path" => {
@@ -189,7 +207,7 @@ fn attribute(toks: &[Tok]) -> Option<PathAttr> {
             _ => {}
         }
     }
-    out
+    (out, toks.len())
 }
 
 /// The file an `include!("…")` or `include_str!("…")` opening `toks` names.

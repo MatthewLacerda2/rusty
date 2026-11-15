@@ -4,8 +4,9 @@
 //! emptied to "no findings", or a pass it stopped calling, fails here.
 //!
 //! The cases are keyed by the row's flag, so a new row with no case fails the test
-//! naming the gate. A gate with several passes (the size gate's files and agent
-//! docs, the layer gate's table and its external crates) has a case per pass.
+//! naming the gate. A gate with several passes has a case per pass. Every scratch
+//! repository sits under a `tests/` directory, and a finding naming the repository's
+//! own path fails: a gate judges and names a file by its path relative to `base`.
 
 use super::GATES;
 use crate::repo::scaffold::Repo;
@@ -14,50 +15,113 @@ use crate::repo::scaffold::Repo;
 /// gate's findings must contain.
 type Case = (Vec<(&'static str, String)>, &'static str);
 
+const REGISTRY: (&str, &str) = (
+    "crates/components/src/registry.rs",
+    "macro_rules! first_class {\n    collider: physics::ColliderComponent => Collider [];\n}\n",
+);
+
+fn files(list: &[(&'static str, &str)]) -> Vec<(&'static str, String)> {
+    list.iter().map(|(p, b)| (*p, b.to_string())).collect()
+}
+
 /// The must-flag cases of the gate selected by `flag`, `None` when it has none.
 fn cases_for(flag: &str) -> Option<Vec<Case>> {
+    let no_registry = (files(&[("README.md", "")]), "NO_REGISTRY");
     Some(match flag {
         "" => vec![
-            (vec![("src/long.rs", "\n".repeat(301))], "src/long.rs"),
             (
-                vec![("CLAUDE.md", "# CLAUDE.md\n\nFixed on 2026-01-02.\n".into())],
-                "CLAUDE.md",
+                vec![("src/long.rs", "\n".repeat(301))],
+                "FILE_TOO_LONG src/long.rs ",
+            ),
+            (
+                files(&[("CLAUDE.md", "# CLAUDE.md\n\nFixed on 2026-01-02.\n")]),
+                "CLAUDE.md:3: [history]",
             ),
         ],
-        "--components" => vec![(vec![("README.md", "".into())], "NO_REGISTRY")],
-        "--determinism" => vec![(
-            vec![(
-                "crates/app/src/lib.rs",
-                "#![allow(clippy::disallowed_methods)]\n".into(),
-            )],
-            "crates/app/src/lib.rs",
-        )],
+        "--components" => vec![
+            no_registry,
+            (files(&[REGISTRY]), "INCOMPLETE_COMPONENT `collider`"),
+        ],
+        "--determinism" => vec![
+            (
+                files(&[(
+                    "crates/app/src/lib.rs",
+                    "#![allow(clippy::disallowed_methods)]\n",
+                )]),
+                "OPT_OUT crates/app/src/lib.rs:1",
+            ),
+            (
+                files(&[("crates/app/Cargo.toml", "[package]\nname = \"app\"\n")]),
+                "UNINHERITED crates/app/Cargo.toml ",
+            ),
+            (
+                files(&[(
+                    "crates/app/src/lib.rs",
+                    "#[expect(clippy::unwrap_used, reason = \"r\")]\nfn f() {}\n",
+                )]),
+                "ESCAPE crates/app/src/lib.rs:1",
+            ),
+        ],
         "--layers" => vec![
             // the table against the tree: a declared module that is absent
             (
-                vec![("Cargo.toml", "[package]\nname = \"t\"\n".into())],
+                files(&[("Cargo.toml", "[package]\nname = \"t\"\n")]),
                 "MISSING_MODULE physics",
             ),
             // `externs`: a confined crate named outside its confinement, which
             // only reading the code (`uses`) finds
             (
-                vec![
+                files(&[
                     (
                         "Cargo.toml",
-                        "[package]\nname = \"t\"\n\n[dependencies]\negui = \"1\"\n".into(),
+                        "[package]\nname = \"t\"\n\n[dependencies]\negui = \"1\"\n",
                     ),
-                    ("crates/physics/src/lib.rs", "use egui::Ui;\n".into()),
-                ],
+                    ("crates/physics/src/lib.rs", "use egui::Ui;\n"),
+                ]),
                 "CONFINED_CRATE crates/physics/src/lib.rs:1",
             ),
         ],
-        "--parity" => vec![(vec![("README.md", "".into())], "NO_REGISTRY")],
-        "--rules" => vec![(
-            vec![("src/a.rs", "fn f() {} // lint: allow(markers)\n".into())],
-            "src/a.rs",
-        )],
+        "--parity" => vec![
+            no_registry,
+            (
+                files(&[
+                    REGISTRY,
+                    (
+                        "src/editor/inspector/components/c.rs",
+                        "let c = w.collider_mut(id);\n",
+                    ),
+                ]),
+                "PARITY_DRIFT `collider`",
+            ),
+        ],
+        "--rules" => vec![
+            // the allow with no reason (`finding::unexplained`)
+            (
+                files(&[("src/a.rs", "fn f() {} // lint: allow(markers)\n")]),
+                "src/a.rs:1: [allow]",
+            ),
+            // a rule's own finding, through the `RULES` loop
+            (
+                files(&[("crates/app/src/b.rs", concat!("// TO", "DO: later\n"))]),
+                "crates/app/src/b.rs:1: [markers]",
+            ),
+        ],
         _ => return None,
     })
+}
+
+/// A scratch git repository holding `files`, at a path with a `tests` segment of
+/// its own; `holder` owns the directory above it.
+fn plant(tag: &str, files: &[(&str, String)]) -> (Repo, Repo) {
+    let holder = Repo::new(tag, false);
+    let repo = Repo(holder.0.join("tests"));
+    std::fs::create_dir_all(&repo.0).expect("repo dir");
+    repo.git(&["init", "-q"]);
+    for (path, body) in files {
+        repo.file(path, body);
+    }
+    repo.git(&["add", "-A"]);
+    (repo, holder)
 }
 
 #[test]
@@ -71,17 +135,19 @@ fn every_gate_reports_its_must_flag_cases_through_its_row() {
             continue;
         };
         for (i, (files, names)) in cases.iter().enumerate() {
-            let tag = format!("gate{}-{i}", flag.trim_start_matches('-'));
-            let repo = Repo::new(&tag, true);
-            for (path, body) in files {
-                repo.file(path, body);
-            }
-            repo.git(&["add", "-A"]);
+            let (repo, _holder) =
+                plant(&format!("gate{}-{i}", flag.trim_start_matches('-')), files);
             let verdict = check(&repo.0, &[]);
             if !verdict.findings.iter().any(|f| f.contains(names)) {
                 broken.push(format!(
                     "gate `{flag}` did not report `{names}`: {:?}",
                     verdict.findings
+                ));
+            }
+            let base = repo.0.to_string_lossy().into_owned();
+            for f in verdict.findings.iter().filter(|f| f.contains(&base)) {
+                broken.push(format!(
+                    "gate `{flag}` named the repository's own path: {f}"
                 ));
             }
         }
@@ -90,14 +156,72 @@ fn every_gate_reports_its_must_flag_cases_through_its_row() {
 }
 
 #[test]
+fn a_file_is_capped_by_its_path_under_base_not_above_it() {
+    // under `<tmp>/tests/`, a 200-line source file is still source, not a test
+    let (repo, _holder) = plant("gate-base-cap", &[("src/mid.rs", "\n".repeat(200))]);
+    for args in [vec![], vec!["src/mid.rs".to_string()]] {
+        let found = crate::size::verdict(&repo.0, &args).findings;
+        assert!(
+            !found.iter().any(|f| f.contains("FILE_TOO_LONG")),
+            "{found:?}"
+        );
+    }
+}
+
+#[test]
+fn where_git_cannot_list_the_tree_the_report_says_so() {
+    let dir = Repo::new("gate-no-git", false);
+    let verdict = crate::size::verdict(&dir.0, &[]);
+    assert!(
+        verdict.body.contains("committable files"),
+        "{}",
+        verdict.body
+    );
+    assert!(
+        verdict.body.contains("agent docs, so they go unchecked"),
+        "{}",
+        verdict.body
+    );
+}
+
+#[test]
+fn a_missing_registry_is_advised_as_that_alone() {
+    let (repo, _holder) = plant("gate-no-registry", &[]);
+    for check in [crate::components::verdict, crate::parity::verdict] {
+        let advice = check(&repo.0, &[]).advice;
+        assert!(advice.contains("discover.rs"), "{advice}");
+        assert!(
+            !advice.contains("waive") && !advice.contains("Route"),
+            "{advice}"
+        );
+    }
+}
+
+#[test]
 fn a_flag_selects_its_row_and_no_flag_the_size_gate() {
     for (check, flag) in GATES {
         let args = [flag.to_string()];
         let args: &[String] = if flag.is_empty() { &[] } else { &args };
+        let picked = super::select(args).expect("one flag");
         assert_eq!(
-            super::select(args) as usize,
-            *check as usize,
+            picked as usize, *check as usize,
             "`{flag}` selects another gate"
         );
     }
+    let files = ["a.rs".to_string()];
+    assert_eq!(
+        super::select(&files).expect("files") as usize,
+        crate::size::verdict as super::Check as usize
+    );
+}
+
+#[test]
+fn two_gate_flags_are_refused() {
+    for pair in [["--rules", "--dead-pub"], ["--layers", "--rules"]] {
+        let args: Vec<String> = pair.iter().map(|a| a.to_string()).collect();
+        let why = super::select(&args).err().expect("two flags");
+        assert!(why.contains(pair[0]) && why.contains(pair[1]), "{why}");
+    }
+    let dead = [super::DEAD_PUB.to_string()];
+    assert!(super::select(&dead).is_ok());
 }

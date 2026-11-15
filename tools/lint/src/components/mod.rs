@@ -61,16 +61,26 @@ const AXES: &[&str] = &["add_menu", "inspector", "api"];
 /// The gate over the repository at `base`: every component discovered, each
 /// unwaived missing axis a finding, and so is a registry it cannot read.
 pub fn verdict(base: &Path, _: &[String]) -> Verdict {
-    let violations = match discover_in(base) {
-        Ok(components) => incomplete(base, &components),
-        Err(why) => vec![why],
-    };
-    Verdict::listed("components", violations, |n| {
-        format!(
-            "\n{n} component gate issue(s). Complete the axis, or waive it in \
-             `waivers::WAIVERS` with its reason (a stale waiver: delete its row) — \
-             see docs/linting.md.\n"
-        )
+    match discover_in(base) {
+        Ok(components) => Verdict::listed("components", incomplete(base, &components), |n| {
+            format!(
+                "\n{n} component gate issue(s). Complete the axis, or waive it in \
+                 `waivers::WAIVERS` with its reason (a stale waiver: delete its row) — \
+                 see docs/linting.md.\n"
+            )
+        }),
+        Err(why) => unreadable_registry("components", why),
+    }
+}
+
+/// The verdict of a gate that could not read the registry it discovers
+/// components from: that one finding, and the fix for it alone.
+pub(crate) fn unreadable_registry(gate: &str, why: String) -> Verdict {
+    Verdict::listed(gate, vec![why], |_| {
+        "\nThe component registry could not be read, so no component was checked: \
+         point `components/discover.rs` at the registry's `first_class!` rows \
+         (docs/linting.md).\n"
+            .to_string()
     })
 }
 

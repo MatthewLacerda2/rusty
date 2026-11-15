@@ -123,7 +123,7 @@ pub fn run(scan: &Scan) -> Vec<Finding> {
     let paths: Vec<String> = wgsl.iter().map(|(p, _)| p.clone()).collect();
     let dirs = scanned_dirs(&scan.files, &paths);
     let mut found = scan.each_file(|path, source| check(path, source, &dirs));
-    found.extend(shaders(&wgsl, &dirs));
+    found.extend(shaders(wgsl, &dirs));
     found
 }
 
