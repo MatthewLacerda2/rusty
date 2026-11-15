@@ -123,3 +123,39 @@ fn gpu_a_turning_glossy_bumpy_sphere_shimmers_less_under_taa_than_fxaa() {
         "TAA shimmers {t:.5}, not {FACTOR}x below FXAA's {f:.5}"
     );
 }
+
+// DIAG-2231-BEGIN (never committed)
+fn lumas_at(taa: bool, step: f32, warm: u32, measured: u32) -> Vec<Vec<f64>> {
+    let mut r = renderer().unwrap();
+    let (mut scene, id) = sphere_scene(taa);
+    let mut v = view(&r);
+    let mut out = Vec::new();
+    for f in 0..warm + measured {
+        let turn = Quat::from_rotation_y((f as f32 * step).to_radians());
+        scene.world.transform_mut(id).unwrap().rotation = turn;
+        let rgba = frame(&mut r, &mut v, &scene, &eye(0.0));
+        let luma = rgba
+            .chunks(4)
+            .map(|p| 0.2126 * p[0] as f64 + 0.7152 * p[1] as f64 + 0.0722 * p[2] as f64);
+        if f >= warm {
+            out.push(luma.collect());
+        }
+    }
+    out
+}
+
+#[test]
+fn gpu_diag_2231_taa() {
+    for (warm, measured) in [(WARM, MEASURED), (16, 24)] {
+        let still = relative_flicker(&lumas_at(true, 0.0, warm, measured));
+        let f = relative_flicker(&lumas_at(false, STEP, warm, measured));
+        let t = relative_flicker(&lumas_at(true, STEP, warm, measured));
+        eprintln!("DIAG2231 taa warm {warm} measured {measured}: FXAA {f:.5} TAA {t:.5} ratio {:.2} still-TAA {still:.5} floored ratio {:.2}", f / t, f / (t - still));
+    }
+    eprintln!(
+        "DIAG2231 adapter {:?}",
+        renderer().unwrap().device.adapter_info().name
+    );
+    panic!("diagnostic");
+}
+// DIAG-2231-END
