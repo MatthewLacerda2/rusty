@@ -34,7 +34,7 @@ fn jittered() -> Tile {
 fn legacy(img: &Image, cells: f32, j: Jitter, seed: u64) -> Image {
     let n = count(cells);
     let per = n as i64;
-    let reach = j.reach(1.0);
+    let reach = j.reach(1.0, 1.0).0;
     Image::fill_uv(img.size(), |u, v| {
         let (px, py) = (u * n, v * n);
         let (gx, gy) = (px.floor() as i64, py.floor() as i64);

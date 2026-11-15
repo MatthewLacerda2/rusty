@@ -26,7 +26,7 @@ pub(super) use over::over;
 pub use stamp::{Jitter, Jitters};
 
 use over::Hits;
-use stamp::{Draws, Grid, Stamp, MAX_SIZE};
+use stamp::{stretch, Draws, Grid, Stamp, MAX_SIZE};
 
 use super::super::catalog::vector::tile::{TileBlend, TileOutput};
 use super::super::image_buf::{Image, Rgba};
@@ -126,7 +126,9 @@ pub fn tile(img: &Image, s: &Settings) -> Image {
     let grid = Grid::new(s.count, s.aspect, s.offset);
     let ((nx, ny), per) = (grid.n, grid.per);
     let (mask, size) = (red(s.mask, 1.0), red(s.size_map, 1.0));
-    let reach = s.jitters.reach(size.max().clamp(0.0, MAX_SIZE));
+    let reach = s
+        .jitters
+        .reach(size.max().clamp(0.0, MAX_SIZE), stretch(per));
     let draws = s.draws();
     let stamps = PerCell::for_pixels(per, img.size().pixels(), |cell| {
         cell_stamp(s, &grid, (mask, size), draws, cell)
@@ -138,12 +140,12 @@ pub fn tile(img: &Image, s: &Settings) -> Image {
         let mut out: Rgba = [0.0, 0.0, 0.0, 1.0];
         // Only `over` keeps the stamps it meets; `max` and `add` fold as they go.
         let mut hits = (s.blend == TileBlend::Over).then(Hits::default);
-        for dy in -reach..=reach {
+        for dy in -reach.1..=reach.1 {
             let cy = gy + dy;
             // A staggered row's cells start `shift` along: the nearest is its own.
             let shift = grid.shift(cy);
             let gx = (px - shift).floor() as i64;
-            for dx in -reach..=reach {
+            for dx in -reach.0..=reach.0 {
                 let cx = gx + dx;
                 let wrapped = (cx.rem_euclid(per.0), cy.rem_euclid(per.1));
                 let Some(stamp) = stamps.get(wrapped) else {

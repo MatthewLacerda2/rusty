@@ -4,7 +4,9 @@
 use super::super::super::image_buf::Rgba;
 use super::stamp::MAX_REACH;
 
-/// The most stamps a pixel can meet: one per neighbour cell it looks at.
+/// The stamps a pixel keeps on the stack: one per neighbour cell it looks at in a
+/// square grid. A turned stamp in a flat cell reaches more rows, and a pixel
+/// meeting more than this spills the rest to the heap.
 const SLOTS: usize = ((2 * MAX_REACH + 1) * (2 * MAX_REACH + 1)) as usize;
 
 /// One stamp's sample at a pixel: its draw order, its colour (alpha unscaled) and
@@ -16,10 +18,12 @@ struct Hit {
     coverage: f32,
 }
 
-/// The stamps one pixel meets, on the stack: nothing is allocated per pixel.
+/// The stamps one pixel meets, on the stack: nothing is allocated per pixel
+/// unless it meets more than [`SLOTS`] of them.
 pub(super) struct Hits {
     hits: [Hit; SLOTS],
     len: usize,
+    spill: Vec<Hit>,
 }
 
 impl Default for Hits {
@@ -27,6 +31,7 @@ impl Default for Hits {
         Self {
             hits: [Hit::default(); SLOTS],
             len: 0,
+            spill: Vec::new(),
         }
     }
 }
@@ -34,12 +39,18 @@ impl Default for Hits {
 impl Hits {
     /// Note a stamp's sample; `order` sorts it (lower is drawn first).
     pub fn push(&mut self, order: [i64; 4], colour: Rgba, coverage: f32) {
-        self.hits[self.len] = Hit {
+        let hit = Hit {
             order,
             colour,
             coverage,
         };
-        self.len += 1;
+        match self.len < SLOTS {
+            true => {
+                self.hits[self.len] = hit;
+                self.len += 1;
+            }
+            false => self.spill.push(hit),
+        }
     }
 
     /// Lay every noted stamp onto `out` in order: premultiplied over,
@@ -47,7 +58,13 @@ impl Hits {
     /// stamp's mask (it is the input times a value), so a lerp by coverage would
     /// darken a soft edge twice. Alpha keeps the larger, as `max` and `add` do.
     pub fn composite(&mut self, out: &mut Rgba) {
-        let hits = &mut self.hits[..self.len];
+        let hits = match self.spill.is_empty() {
+            true => &mut self.hits[..self.len],
+            false => {
+                self.spill.extend_from_slice(&self.hits[..self.len]);
+                &mut self.spill[..]
+            }
+        };
         hits.sort_unstable_by_key(|h| h.order);
         for h in hits.iter() {
             over(out, h.colour, h.coverage);

@@ -97,3 +97,52 @@ fn a_staggered_jittered_grid_reads_its_params_from_a_recipe_and_is_seeded() {
     assert!(bits(&a) == bits(&bake(doc(1), 1, vec![], [64, 32])));
     assert!(bits(&a) != bits(&bake(doc(2), 1, vec![], [64, 32])));
 }
+
+/// `s`'s bake the slow way: every cell's stamp, and its copies a tile over, at
+/// every pixel, folded under `max`.
+fn brute(img: &Image, s: &Settings) -> Image {
+    let grid = Grid::new(s.count, s.aspect, s.offset);
+    let ((nx, ny), per) = (grid.n, grid.per);
+    let field = Field::Const(1.0);
+    let cells: Vec<_> = (0..per.1)
+        .flat_map(|y| (0..per.0).map(move |x| (x, y)))
+        .filter_map(|c| Some((c, cell_stamp(s, &grid, (field, field), s.draws(), c)?)))
+        .collect();
+    Image::fill_uv(img.size(), |u, v| {
+        let mut out: Rgba = [0.0, 0.0, 0.0, 1.0];
+        for &((cx, cy), stamp) in &cells {
+            for (tx, ty) in (-1..=1).flat_map(|y| (-1..=1).map(move |x| (x, y))) {
+                let (x, y) = ((u + tx as f32) * nx, (v + ty as f32) * ny);
+                let local = stamp.local(x - cx as f32 - 0.5 - grid.shift(cy), y - cy as f32 - 0.5);
+                if (0.0..1.0).contains(&local.0) && (0.0..1.0).contains(&local.1) {
+                    let p = img.sample_bilinear_wrapped(local.0, local.1);
+                    fold(TileBlend::Max, &mut out, fill(p, stamp.value, false));
+                }
+            }
+        }
+        out
+    })
+}
+
+#[test]
+fn turned_planks_in_a_staggered_grid_lose_no_texel_to_the_reach() {
+    let plank = Image::fill_uv(64, |u, v| {
+        let inside = (0.1..0.9).contains(&u) && (0.2..0.8).contains(&v);
+        [f32::from(inside), u, v, 1.0]
+    });
+    for rotation in [0.05, 0.3, 1.0] {
+        let tile = Tile {
+            aspect: [1.0, 4.0],
+            offset: 0.5,
+            jitter: 0.4.into(),
+            rotation_jitter: rotation.into(),
+            scale_jitter: 0.5.into(),
+            ..Tile::new(3.0)
+        };
+        let s = Settings::of(&tile, &Links::default(), None, None, 4);
+        assert!(
+            super::tile(&plank, &s) == brute(&plank, &s),
+            "rotation {rotation}"
+        );
+    }
+}

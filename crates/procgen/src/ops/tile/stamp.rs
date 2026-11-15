@@ -42,17 +42,33 @@ impl Jitter {
         }
     }
 
-    /// How many neighbour cells out a stamp can reach a pixel from: its farthest
-    /// point from its cell centre, against a pixel's ≤ ½ cell from its own, with a
-    /// size map scaling it by up to `size`.
-    pub(super) fn reach(self, size: f32) -> i64 {
-        let corner = if self.rotation > 0.0 {
-            std::f32::consts::FRAC_1_SQRT_2
-        } else {
-            0.5
+    /// How many neighbour cells out, across and down, a stamp can reach a pixel
+    /// from: its farthest point from its cell centre on each axis, against a
+    /// pixel's ≤ ½ cell from its own, with a size map scaling it by up to `size`,
+    /// in cells `stretch` times as tall as wide (in the tile). A turned stamp is
+    /// turned rigidly in the tile, so a flat cell's stamp reaches more rows.
+    pub(super) fn reach(self, size: f32, stretch: f32) -> (i64, i64) {
+        // The stamp's half-extents in cell widths, and the most it turns.
+        let k = 0.5 * (1.0 + 0.5 * self.scale) * size;
+        let (a, b) = (k, k * stretch);
+        let most = self.rotation * std::f32::consts::PI;
+        // The farthest a half-extent box `(a, b)` reaches along an axis as it turns
+        // up to `most`: `a cos θ + b sin θ` peaks at `atan2(b, a)` on the box's corner.
+        // A turned bound is taken a hair over, so a libm's last bit cannot cut it.
+        let along = |a: f32, b: f32| {
+            if most <= 0.0 {
+                a
+            } else if most >= b.atan2(a) {
+                a.hypot(b) * (1.0 + 1e-4)
+            } else {
+                (a * most.cos() + b * most.sin()) * (1.0 + 1e-4)
+            }
         };
-        let extent = 0.5 * self.offset + corner * (1.0 + 0.5 * self.scale) * size;
-        ((extent + 0.5).ceil() as i64 - 1).max(0)
+        let cells = |extent: f32| {
+            let extent = 0.5 * self.offset + extent;
+            ((extent + 0.5).ceil() as i64 - 1).max(0)
+        };
+        (cells(along(a, b)), cells(along(b, a) / stretch))
     }
 }
 
@@ -86,19 +102,22 @@ impl<'a> Jitters<'a> {
         )
     }
 
-    /// The reach of the widest jitter any cell takes, at a size of up to `size`.
-    pub(super) fn reach(&self, size: f32) -> i64 {
-        Jitter::new(self.offset.max(), self.rotation.max(), self.scale.max()).reach(size)
+    /// The reach of the widest jitter any cell takes, at a size of up to `size`,
+    /// in cells `stretch` times as tall as wide.
+    pub(super) fn reach(&self, size: f32, stretch: f32) -> (i64, i64) {
+        Jitter::new(self.offset.max(), self.rotation.max(), self.scale.max()).reach(size, stretch)
     }
 }
 
 /// One cell's stamp: centre offset (cells), `(cos, sin)` of its turn, `1 / scale`,
-/// and the value its colour is multiplied by.
+/// its cell's height over its width in the tile, and the value its colour is
+/// multiplied by.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Stamp {
     offset: [f32; 2],
     turn: (f32, f32),
     inv_scale: f32,
+    stretch: f32,
     pub value: f32,
 }
 
@@ -147,15 +166,20 @@ impl Stamp {
             offset: [j.offset * r(0), j.offset * r(1)],
             turn: (angle.cos(), angle.sin()),
             inv_scale: 1.0 / ((1.0 + j.scale * r(3)) * size),
+            stretch: stretch(per),
             value,
         })
     }
 
-    /// The stamp-space point for `(x, y)`, relative to this stamp's cell centre.
+    /// The stamp-space point for `(x, y)` (cells), relative to this stamp's cell
+    /// centre. The stamp fills its cell's shape and is then turned rigidly in the
+    /// tile, as a real plank is: the turn runs in cell widths on both axes, so a
+    /// round stamp in a flat cell turns as an ellipse, never skews. In a square
+    /// cell the stretch is exactly 1 and drops out.
     pub fn local(&self, x: f32, y: f32) -> (f32, f32) {
-        let (x, y) = (x - self.offset[0], y - self.offset[1]);
+        let (x, y) = (x - self.offset[0], (y - self.offset[1]) * self.stretch);
         let (c, s) = self.turn;
-        let (rx, ry) = (x * c + y * s, -x * s + y * c);
+        let (rx, ry) = (x * c + y * s, (-x * s + y * c) / self.stretch);
         (rx * self.inv_scale + 0.5, ry * self.inv_scale + 0.5)
     }
 }
@@ -209,6 +233,11 @@ impl Grid {
     }
 }
 
+/// A `per.0`×`per.1` grid's cell height over its width, in the tile.
+pub(super) fn stretch(per: (i64, i64)) -> f32 {
+    per.0 as f32 / per.1 as f32
+}
+
 /// Cell `cell`'s row-major index in a `per.0`×`per.1` grid as `(i + 1) / cells`, so
 /// the first cell isn't lost against the black between stamps. In `f64`, so a large
 /// grid neither overflows nor collapses neighbouring indices.
@@ -218,23 +247,5 @@ fn index((x, y): (i64, i64), per: (i64, i64)) -> f32 {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn reach_grows_with_the_jitter_and_the_size() {
-        assert_eq!(Jitter::new(0.0, 0.0, 0.0).reach(1.0), 0);
-        assert_eq!(Jitter::new(1.0, 0.0, 0.0).reach(1.0), 1);
-        assert_eq!(Jitter::new(1.0, 1.0, 1.0).reach(1.0), 2);
-        assert_eq!(Jitter::new(0.0, 0.0, 0.0).reach(2.0), 1);
-        assert_eq!(Jitter::new(1.0, 1.0, 1.0).reach(MAX_SIZE), MAX_REACH);
-    }
-
-    #[test]
-    fn the_index_counts_row_major_from_one() {
-        assert_eq!(index((0, 0), (2, 2)), 0.25);
-        assert_eq!(index((1, 0), (2, 2)), 0.5);
-        assert_eq!(index((1, 1), (2, 2)), 1.0);
-        assert_eq!(index((0, 1), (2, 4)), 0.375);
-    }
-}
+#[path = "stamp_tests.rs"]
+mod tests;
