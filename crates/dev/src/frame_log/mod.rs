@@ -53,6 +53,7 @@ use rusty_core::settings::logs::LogSettings;
 use crate::stats::WindowFrame;
 
 mod head;
+mod join;
 pub mod read;
 mod record;
 mod segments;

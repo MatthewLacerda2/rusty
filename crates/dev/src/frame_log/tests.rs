@@ -16,8 +16,7 @@ fn a_frame_of_a_world_is_written_with_what_was_logged() {
     let frame = WindowFrame {
         wall_ms: 16.6,
         fps: Some(60.0),
-        render: None,
-        frame: 0,
+        ..WindowFrame::default()
     };
     let run = |log: &mut FrameLog, msg: &str| {
         let stats = game.script_manager().stats_cell();
@@ -34,11 +33,8 @@ fn a_frame_of_a_world_is_written_with_what_was_logged() {
     run(&mut log, "logged before the first frame");
     run(&mut log, "hello");
     let off = [("console".to_string(), false)];
-    game.resources
-        .application
-        .borrow_mut()
-        .set_log_channels(&off)
-        .unwrap();
+    let app = &game.resources.application;
+    app.borrow_mut().set_log_channels(&off).unwrap();
     run(&mut log, "console is off");
     drop(log);
     let got = read(&dir, &LogQuery::default(), now_ms());
