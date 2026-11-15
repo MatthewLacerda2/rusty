@@ -1,11 +1,13 @@
 //! The spread pyramid keeps a lone dark hit's share of its widest window (#2249):
-//! the trace stores a found hit's radius times its energy, and a dark hit's energy
-//! is `ENERGY_FLOOR` (0.02) of its count, so in a coarse level the radius sum of
+//! the trace stores a found hit's radius times its energy, and with `ENERGY_FLOOR`
+//! at 0.02 a dark hit's energy is 0.02 of its count (at 1.0 it is its count, and
+//! stays a normal f16), so in a coarse level the radius sum of
 //! a lone dark hit with a short ray is an f16 subnormal (at level 8, the widest
 //! window a 4K frame reads, for a radius under 50 pixels per unit cone at full
 //! count). A GPU that flushed subnormals as it wrote a level would read that
 //! window's mean radius as 0 (`postfx/ssr.wgsl`, `read_spread`). Run on each
-//! adapter the GPU suite runs on, this holds that it keeps them.
+//! adapter the GPU suite runs on, this holds that it keeps them, read back by a
+//! texture copy (not through the resolve's sampler).
 
 use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::effects::ssr::pyramid::{Pyramid, PyramidPass};
@@ -16,7 +18,7 @@ use rusty_core::color::{f16_to_f32, f32_to_f16};
 const SIDE: u32 = 256;
 const WIDEST: u32 = 8;
 
-/// The spread of one found hit at the floor, as `fs_trace` writes it: traced, a
+/// The spread of one found hit at the 0.02 floor, as `fs_trace` writes it: traced, a
 /// radius of 10 pixels per unit cone times its energy (times `ENERGY_SCALE` 4), its
 /// count 0.4 (`FOUND_FLOOR`, times `COUNT_SCALE` 64), and its energy, 0.02 of its
 /// count (times `COUNT_SCALE / ENERGY_FLOOR`).
