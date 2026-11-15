@@ -82,38 +82,15 @@ impl ParticleRenderer {
             std::mem::size_of::<ParticleGlobals>() as u64,
         );
 
-        let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Particle Pipeline Layout"),
-            bind_group_layouts: &[
-                Some(&globals.layout),
-                Some(layouts.texture),
-                Some(layouts.depth),
-                Some(layouts.camera_lighting),
-            ],
-            immediate_size: 0,
-        });
-
-        let pipelines = BlendPipelines::new(
-            device,
-            "Particle Pipeline",
-            (&shader, &layout),
-            ("vs_main", Some(ParticleInstance::desc())),
-        );
+        let shared = (&shader, &layouts);
+        let instances = ("vs_main", Some(ParticleInstance::desc()));
+        let pipelines = blend_pipelines(device, "Particle", shared, &globals.layout, instances);
         let gpu = gpu::GpuParticles::new(device, registry);
-        let gpu_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("GPU Particle Pipeline Layout"),
-            bind_group_layouts: &[
-                Some(&gpu.draw_layout),
-                Some(layouts.texture),
-                Some(layouts.depth),
-                Some(layouts.camera_lighting),
-            ],
-            immediate_size: 0,
-        });
-        let gpu_pipelines = BlendPipelines::new(
+        let gpu_pipelines = blend_pipelines(
             device,
-            "GPU Particle Pipeline",
-            (&shader, &gpu_layout),
+            "GPU Particle",
+            shared,
+            &gpu.draw_layout,
             ("vs_gpu", None),
         );
 
@@ -161,4 +138,27 @@ impl ParticleRenderer {
         all.extend(self.gpu_pipelines.lazy());
         all
     }
+}
+
+/// The blend pipelines of `shader`'s vertex entry point `vertex.0` (drawing the
+/// `vertex.1` buffer, if any) over `group0`, the sprite, the scene depth and the
+/// camera + lighting groups.
+fn blend_pipelines(
+    device: &wgpu::Device,
+    label: &'static str,
+    (shader, layouts): (&wgpu::ShaderModule, &SharedLayouts),
+    group0: &wgpu::BindGroupLayout,
+    vertex: (&'static str, Option<wgpu::VertexBufferLayout<'static>>),
+) -> BlendPipelines {
+    let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some(label),
+        bind_group_layouts: &[
+            Some(group0),
+            Some(layouts.texture),
+            Some(layouts.depth),
+            Some(layouts.camera_lighting),
+        ],
+        immediate_size: 0,
+    });
+    BlendPipelines::new(device, label, (shader, &layout), vertex)
 }

@@ -34,7 +34,7 @@ use crate::gpu::shaders::ShaderRegistry;
 use crate::passes::particles::instance::emitter_light;
 use crate::timing::GpuPass;
 use crate::Renderer;
-use rusty_components::particle::SimulationSpace;
+use rusty_components::particle::{ParticleEmitterComponent, SimulationSpace};
 use rusty_scene::{Scene, SceneId};
 
 /// Renders without a draw after which an emitter's buffers are dropped: a scene
@@ -63,35 +63,7 @@ pub(crate) struct GpuParticles {
 
 impl GpuParticles {
     pub(crate) fn new(device: &wgpu::Device, registry: &mut ShaderRegistry) -> Self {
-        let compute = wgpu::ShaderStages::COMPUTE;
-        let rw = wgpu::BindGroupLayoutEntry {
-            ty: wgpu::BindingType::Buffer {
-                ty: wgpu::BufferBindingType::Storage { read_only: false },
-                has_dynamic_offset: false,
-                min_binding_size: None,
-            },
-            ..storage_entry(2, compute)
-        };
-        let step_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("GPU Particle Step Layout"),
-            entries: &[
-                uniform_entry(1, compute),
-                rw,
-                storage_entry(3, compute),
-                storage_entry(4, compute),
-                storage_entry(5, compute),
-            ],
-        });
-        let vertex = wgpu::ShaderStages::VERTEX;
-        let draw_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("GPU Particle Draw Layout"),
-            entries: &[
-                uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT),
-                uniform_entry(1, vertex),
-                storage_entry(2, vertex),
-                storage_entry(3, vertex),
-            ],
-        });
+        let (step_layout, draw_layout) = layouts(device);
         let shader = registry.load(device, "particles_step.wgsl", "GPU Particle Step Shader");
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("GPU Particle Step Pipeline Layout"),
@@ -142,14 +114,16 @@ impl Renderer {
         for e in gpu.emitters.values_mut() {
             e.idle += 1;
         }
+        let mut kept = Vec::new();
         for id in scene.world.ids_with_particles() {
             let Some(emitter) = scene.world.particles(id).filter(|e| e.on_gpu()) else {
                 continue;
             };
             let key = (scene.id(), id);
+            kept.push(id);
             let sim = &emitter.runtime.gpu;
-            if sim.extent() == 0 && sim.births().next().is_none() {
-                // Nothing live: nothing to keep (edit mode, a cleared emitter).
+            if !emitter.runtime.initialized {
+                // Not in Play (edit mode, or after Stop): nothing to keep.
                 gpu.emitters.remove(&key);
                 continue;
             }
@@ -162,12 +136,7 @@ impl Renderer {
                      simulate on the CPU in the renderer"
                 );
             }
-            let frame = match emitter.simulation_space {
-                SimulationSpace::Local => scene.world.emitter_frame(id).matrix,
-                SimulationSpace::World => glam::Mat4::IDENTITY,
-            };
-            let light = emitter_light(scene, &emitter, scene.world.world_position(id));
-            let uniform = GpuEmitter::new(&emitter, frame, light);
+            let uniform = uniform_of(scene, id, &emitter);
             let (device, queue) = (&self.device, &self.queue);
             let buffers = gpu.emitters.entry(key).or_insert_with(|| {
                 EmitterBuffers::new(device, queue, emitter.max_particles, !gpu.compute)
@@ -181,7 +150,11 @@ impl Renderer {
             );
             owed.push((key, work));
         }
-        gpu.emitters.retain(|_, e| e.idle < IDLE_RENDERS);
+        // An emitter gone or back on the CPU frees its buffers now; another
+        // scene's after `IDLE_RENDERS` renders without it.
+        let this = scene.id();
+        gpu.emitters
+            .retain(|k, e| (k.0 != this || kept.contains(&k.1)) && e.idle < IDLE_RENDERS);
         self.encode_gpu_steps(encoder, &owed);
     }
 
@@ -258,4 +231,53 @@ fn groups(
         ],
     });
     (step, draw)
+}
+
+/// The step's group layout (the emitter, particles read-write, curves, `dt`s,
+/// births) and the draw's group 0 (the pass globals, the emitter, particles, curves).
+fn layouts(device: &wgpu::Device) -> (wgpu::BindGroupLayout, wgpu::BindGroupLayout) {
+    let compute = wgpu::ShaderStages::COMPUTE;
+    let rw = wgpu::BindGroupLayoutEntry {
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Storage { read_only: false },
+            has_dynamic_offset: false,
+            min_binding_size: None,
+        },
+        ..storage_entry(2, compute)
+    };
+    let step_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("GPU Particle Step Layout"),
+        entries: &[
+            uniform_entry(1, compute),
+            rw,
+            storage_entry(3, compute),
+            storage_entry(4, compute),
+            storage_entry(5, compute),
+        ],
+    });
+    let vertex = wgpu::ShaderStages::VERTEX;
+    let draw_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("GPU Particle Draw Layout"),
+        entries: &[
+            uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT),
+            uniform_entry(1, vertex),
+            storage_entry(2, vertex),
+            storage_entry(3, vertex),
+        ],
+    });
+    (step_layout, draw_layout)
+}
+
+/// Entity `id`'s emitter `e` as its uniform: under its frame when `Local`, lit
+/// where it stands.
+fn uniform_of(scene: &Scene, id: u32, e: &ParticleEmitterComponent) -> GpuEmitter {
+    let frame = match e.simulation_space {
+        SimulationSpace::Local => scene.world.emitter_frame(id).matrix,
+        SimulationSpace::World => glam::Mat4::IDENTITY,
+    };
+    GpuEmitter::new(
+        e,
+        frame,
+        emitter_light(scene, e, scene.world.world_position(id)),
+    )
 }

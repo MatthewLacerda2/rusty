@@ -192,7 +192,8 @@ pub(crate) fn advance(
         position += velocity * dt;
         p.age += dt;
         p.done = step;
-        if !(p.age < p.lifetime) {
+        // `age < lifetime` failing, a NaN lifetime included, as on the CPU.
+        if p.age.partial_cmp(&p.lifetime) != Some(std::cmp::Ordering::Less) {
             p.done = DEAD;
             break;
         }

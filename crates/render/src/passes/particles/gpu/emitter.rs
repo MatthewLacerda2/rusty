@@ -134,23 +134,8 @@ impl EmitterBuffers {
         emitter.counts = [births.len() as u32, dts.len() as u32, 0, 0];
         self.done = Some(goal);
         self.emitter = emitter;
-        if let Some(mirror) = &mut self.mirror {
-            mirror.resize(self.capacity as usize, GpuParticle::EMPTY);
-            for b in &births {
-                mirror[b.slot as usize] = b.particle;
-            }
-            let gravity = Vec3::from_slice(&emitter.gravity[..3]);
-            let dt_of = |s: u32| {
-                // As the shader: a step older than the window takes its oldest `dt`.
-                let at = s.wrapping_sub(first as u32);
-                let at = if at >= 0x8000_0000 { 0 } else { at as usize };
-                dts[at.min(dts.len() - 1)]
-            };
-            if !dts.is_empty() {
-                for p in mirror.iter_mut().take(sim.extent() as usize) {
-                    advance(p, goal as u32, gravity, &self.baked, dt_of);
-                }
-            }
+        if self.mirror.is_some() {
+            self.step_mirror(&births, &dts, sim.extent());
             return Work::default();
         }
         if !births.is_empty() {
@@ -164,6 +149,32 @@ impl EmitterBuffers {
         Work {
             births: births.len() as u32,
             step: (!dts.is_empty() && sim.extent() > 0).then_some(sim.extent()),
+        }
+    }
+
+    /// The CPU fallback's upload and step: the shader's scatter of `births`, then
+    /// its step over the first `extent` slots by the window `dts`.
+    fn step_mirror(&mut self, births: &[GpuBirth], dts: &[f32], extent: u32) {
+        let Some(mirror) = &mut self.mirror else {
+            return;
+        };
+        mirror.resize(self.capacity as usize, GpuParticle::EMPTY);
+        for b in births {
+            mirror[b.slot as usize] = b.particle;
+        }
+        if dts.is_empty() {
+            return;
+        }
+        let [_, _, goal, first] = self.emitter.info;
+        let gravity = Vec3::from_slice(&self.emitter.gravity[..3]);
+        let dt_of = |s: u32| {
+            // As the shader: a step older than the window takes its oldest `dt`.
+            let at = s.wrapping_sub(first);
+            let at = if at >= 0x8000_0000 { 0 } else { at as usize };
+            dts[at.min(dts.len() - 1)]
+        };
+        for p in mirror.iter_mut().take(extent as usize) {
+            advance(p, goal, gravity, &self.baked, dt_of);
         }
     }
 

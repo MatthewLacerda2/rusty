@@ -69,9 +69,8 @@ impl BlendPipelines {
         device: &wgpu::Device,
         label: &'static str,
         (shader, layout): (&wgpu::ShaderModule, &wgpu::PipelineLayout),
-        vertex: (&'static str, Option<wgpu::VertexBufferLayout<'static>>),
+        (entry, vertex): (&'static str, Option<wgpu::VertexBufferLayout<'static>>),
     ) -> Self {
-        let (entry, vertex) = vertex;
         let lazy = |blend, fragment_entry: &'static str, reactive: bool| {
             let (shader, layout, vertex) = (shader.clone(), layout.clone(), vertex.clone());
             LazyPipeline::new(device, move |device| {

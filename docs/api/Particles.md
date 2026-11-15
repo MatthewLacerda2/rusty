@@ -35,8 +35,10 @@ actually spawned (the `max_particles` cap may swallow some).
 | `Particles.GetReactive` | `(id)` | reactivity name, or `nil` without an emitter |
 | `Particles.SetSimulationSpace` | `(id, space)` | — (`"World"` or `"Local"`, any case; an unknown name is an error) |
 | `Particles.GetSimulationSpace` | `(id)` | space name, or `nil` without an emitter |
-| `Particles.GetParticles` | `(id)` | an array of particle tables, oldest first (*Custom logic*); empty without an emitter |
-| `Particles.SetParticles` | `(id, list)` | the number of particles now live (0 without an emitter); an entry that is not a table, or a field of the wrong type, is an error that changes nothing |
+| `Particles.SetSimulation` | `(id, target)` | — (`"Cpu"` or `"Gpu"`, any case; an unknown name is an error): where the live particles are simulated (*Simulation*); a change forgets the live particles |
+| `Particles.GetSimulation` | `(id)` | target name, or `nil` without an emitter |
+| `Particles.GetParticles` | `(id)` | an array of particle tables, oldest first (*Custom logic*); empty without an emitter, and always empty on a `Gpu` emitter |
+| `Particles.SetParticles` | `(id, list)` | the number of particles now live (0 without an emitter); on a `Gpu` emitter it changes nothing and warns once; an entry that is not a table, or a field of the wrong type, is an error that changes nothing |
 | `Particles.ForEach` | `(id, fn)` | the number of particles now live (`fn` not a function is an error): `fn(p)` runs once per live particle, oldest first, on **one reused table** whose edits are written back; returning `false` kills the particle |
 
 **Ranges.** `SetLifetime`/`SetSpeed`/`SetSize` take `min, max`: each particle
@@ -83,6 +85,45 @@ by value.
 ```lua no-run
 Particles.SetSimulationSpace(muzzle_flash, "Local")
 Particles.Burst(muzzle_flash) -- stays on the gun while the player turns
+```
+
+**Simulation.** Niagara's per-emitter *sim target*. `"Cpu"` (the default): the
+sim moves the live particles, so they collide, fire every sub-emitter and a
+script reads and rewrites them; the right choice for gameplay particles. `"Gpu"`:
+the renderer keeps the live particles in a GPU buffer, moves them in a compute
+pass and draws them straight from it, so one emitter holds 100,000 particles and
+more (a room of smoke, an explosion's debris, rain) with nothing per particle
+rebuilt, sorted or uploaded per camera. Births still happen on the CPU, through
+the same seeded path, so `Emit`/`Burst` return exact counts, every shape and
+start range works as on `"Cpu"`, and `GetCount` and the `max_particles` cap are
+exact and deterministic (each particle's lifetime is known at birth: no readback).
+Each sim tick moves the particles one step of that tick's `dt` (gravity, the drag
+and rotation-speed curves, velocity, age), so the same run draws the same
+particles on one GPU whatever the frame rate; across GPUs the floats may differ,
+which only the picture sees. Both simulation spaces work. A `Gpu` emitter's
+particles are **visual only**; what it does not do:
+
+- collide: a `Die` or `Bounce` collision response behaves as `None` (a warning
+  says so when one is set);
+- fire the `death` or `collision` sub-emitter (warned too); the `birth` one
+  fires, and a `Gpu` emitter can be any sub-emitter's target;
+- draw `"mesh"` particles: they draw as billboards (warned);
+- let a script read or write its particles: `GetParticles` and `ForEach` see
+  none, and `SetParticles` changes nothing;
+- sort its own sprites: additive ones sum the same in any order, alpha ones draw
+  in the order of their buffer slots. Emitters still sort back to front among
+  themselves, a `Gpu` one by where the emitter stands.
+
+The over-life curves and gradient are sampled into a 64-step table per emitter,
+linear between steps. The sim keeps each live particle's birth record on the CPU
+(about 100 bytes each) until it dies. An adapter that cannot run compute shaders
+(rusty ships on Vulkan and Metal, which always can) simulates a `Gpu` emitter's
+particles on the CPU in the renderer instead, with one console warning. In edit
+mode an emitter draws nothing on either target, as no tick runs.
+
+```lua no-run
+Particles.SetSimulation(smoke, "Gpu")
+Particles.SetRate(smoke, 50000) -- 100k live at a 2 s lifetime
 ```
 
 **Sub-emitters.** `trigger` is `"birth"`, `"death"` or `"collision"`; `target` is

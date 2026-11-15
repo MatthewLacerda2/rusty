@@ -12,7 +12,9 @@
 //! PRNG and pending sub-emitter events, all `#[serde(skip)]`). The simulation in
 //! `app::systems::particles` owns the runtime, a script may rewrite its live
 //! particles (`Particles.SetParticles`, #2171, which draws nothing from the PRNG),
-//! and the draw pass in `render::passes::particles` only reads it.
+//! and the draw pass in `render::passes::particles` only reads it. A `Gpu` emitter
+//! (`simulation`, #2170) keeps only its births and an exact live tally here: its
+//! live particles are the renderer's.
 //!
 //! Determinism: every random draw comes from a per-emitter [`Random`] stream (the
 //! engine's seeded generator, `core::random`, #443) restarted from `seed` on

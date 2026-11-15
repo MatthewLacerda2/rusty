@@ -81,18 +81,9 @@ pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
                         records.len()
                     )));
                 }
-                let live = with_carried(&mut scene.borrow_mut(), id, |e, frame| {
-                    if !e.on_gpu() {
-                        return write_records(e, frame, &records);
-                    }
-                    // A `Gpu` emitter's particles are the renderer's (#2170).
-                    if e.runtime.gpu.first_warning() {
-                        log::warn!(
-                            "[Particles] {verb}: entity {id} simulates on the GPU; its \
-                             particles cannot be written (the call does nothing)"
-                        );
-                    }
-                    e.live_count() as u32
+                let live = with_carried(&mut scene.borrow_mut(), id, |e, frame| match e.on_gpu() {
+                    false => write_records(e, frame, &records),
+                    true => refuse(e, &verb, id),
                 });
                 Ok(live.unwrap_or(0))
             },
@@ -159,6 +150,18 @@ fn fields(p: &Particle) -> [f32; FIELDS] {
     [
         px, py, pz, vx, vy, vz, p.age, p.lifetime, p.size, rotation, r, g, b, a, c1, c2, c3, c4,
     ]
+}
+
+/// A `Gpu` emitter's particles are the renderer's (#2170): a write changes
+/// nothing, warns the first time, and returns the number live.
+fn refuse(e: &mut ParticleEmitterComponent, verb: &str, id: u32) -> u32 {
+    if e.runtime.gpu.first_warning() {
+        log::warn!(
+            "[Particles] {verb}: entity {id} simulates on the GPU; its particles cannot \
+             be written (the call does nothing)"
+        );
+    }
+    e.live_count() as u32
 }
 
 /// Replace `e`'s live particles, under its frame `frame`, with `records` (a

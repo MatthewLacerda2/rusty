@@ -1,6 +1,7 @@
 //! crates/render/src/passes/particles/draw.rs — per-frame sprite particle draws.
 //!
-//! Turns every visible sprite emitter into a run of instances, orders the emitters
+//! Turns every visible sprite emitter into a run of instances (a GPU-simulated one
+//! into one draw of its buffer, #2170, `runs`), orders the emitters
 //! back to front (so smoke in front of fire composites over it), merges neighbours
 //! that share a blend + texture into one draw, uploads the instances + globals, and
 //! records a pass into the HDR scene target (after solids/skybox/transparents,
