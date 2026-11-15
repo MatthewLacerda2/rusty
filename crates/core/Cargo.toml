@@ -3,6 +3,7 @@ name = "rusty-core"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [features]
 # Code the `dev` and `editor` builds hold and the player does not (the kept hull

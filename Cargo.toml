@@ -14,9 +14,13 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+# The Rust ecosystem's standard dual licence, the same one scorsese carries
+# (`LICENSE-MIT`, `LICENSE-APACHE`). Every member inherits it with
+# `license.workspace = true`, and `make deny` fails one that does not: the license
+# gate reads our own crates too (`deny.toml`, `[licenses]`).
+license = "MIT OR Apache-2.0"
 # This is the engine application itself, not a library we publish to crates.io.
-# `publish = false` also lets the cargo-deny license gate skip our own crates
-# (via `[licenses] private.ignore`) while still gating every dependency.
+# Licensing is not publishing.
 publish = false
 
 [package]
@@ -24,6 +28,7 @@ name = "rusty"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 # Integration tests build as ONE binary, not one per `tests/*.rs` (#483): each of those
 # linked the whole engine (wgpu, egui, rapier, Lua). See the `[[test]]` target below.
 autotests = false

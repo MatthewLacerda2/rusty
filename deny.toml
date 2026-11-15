@@ -49,9 +49,10 @@ allow = [
   "OFL-1.1", "Ubuntu-font-1.0",
 ]
 confidence-threshold = 0.8
-# Skip our own unpublished crate (`publish = false`); it has no license field and
-# we never ship it to a registry. Dependencies are still fully gated.
-private = { ignore = true }
+# Our own crates are read too, unpublished as they are: a member without
+# `license.workspace = true` in its `[package]` fails here as unlicensed, so the
+# whole tree stays under the workspace's `MIT OR Apache-2.0` (root `Cargo.toml`).
+private = { ignore = false }
 # `midly` (Standard MIDI File parsing, pulled in by zimmer, #413) is released under
 # the Unlicense — an OSI-approved public-domain dedication. Allowed for that one
 # crate rather than added to the list above, so a new Unlicense dependency is still

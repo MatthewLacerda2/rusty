@@ -3,6 +3,7 @@ name = "rusty-navigation"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [features]
 dev = ["rusty-core/dev", "rusty-lighting/dev", "rusty-physics/dev", "rusty-edit/dev", "rusty-scene/dev"]

@@ -3,6 +3,7 @@ name = "rusty-physics"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [features]
 dev = ["rusty-core/dev", "rusty-edit/dev", "rusty-scene/dev", "rusty-asset/dev"]
