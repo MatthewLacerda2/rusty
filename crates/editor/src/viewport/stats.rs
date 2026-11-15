@@ -74,8 +74,8 @@ pub fn lines(stats: Option<&FrameStats>, clock: Clock, timestamps: bool) -> Vec<
     let avg = |key: &str| stats.get(key).map(|s| s.avg);
     let ms = |v: Option<f64>| v.map_or("—".to_string(), |v| format!("{v:.2} ms"));
     let fps = rate(avg("fps").or(clock.fps.map(f64::from)));
-    // The mean over the window's completed frames (the newest one's wall time
-    // arrives a frame later); before any, the clock's: the newest completed frame's.
+    // Drawn mid-frame, so every frame in the window has its wall time (it lands
+    // as the next frame starts); before any frame, the clock's reading.
     let frame = avg("wall_ms").unwrap_or(f64::from(clock.frame_ms).max(0.0));
     let last = |key: &str| stats.get(key).map_or("—".to_string(), |s| count(s.last));
     let mut out = vec![

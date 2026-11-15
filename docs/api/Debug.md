@@ -181,10 +181,15 @@ Scene tab) or a load long ago leaves the window. Unlike the session, a window re
 in a fresh editor or after Stop it holds `wall_ms`, `fps` and the render keys of the
 tab on screen, while `frames` is `0` and the per-tick keys are absent once `n` frames
 were drawn without a tick. The newest 600 samples of each key are kept, so a wider
-window (`math.huge` too) reads those. It reads; it resets nothing, so two readers never disturb each
+window (`math.huge` too) reads those. `wall_ms` is the one key a frame gets late,
+once the next frame starts (its row, below), and before that frame's work: so a read
+during a frame (a script, the REPL, `session-mcp --attach`, the overlay) finds it on
+all `n` frames, the newest being the one before. Only a read between a frame's draw
+and the next frame's start would find the newest without it, and then a window's
+`wall_ms` covers `n - 1` frames while every other metric still covers `n`. It reads; it resets nothing, so two readers never disturb each
 other. Its one option is `window`: another key raises, naming it. The Game view's **Stats** overlay (`Editor.SetGizmo("Stats", true)`,
 [`Editor.md`](Editor.md)) shows `Debug.Stats{ window = 60 }`, its frame time the
-mean over the completed frames in it (the newest one's wall time arrives a frame later):
+mean `wall_ms` over those 60 frames:
 
 ```lua
 local s = Debug.Stats{ window = 120 }   -- the last two seconds of a 60 Hz window
@@ -239,7 +244,7 @@ if s.gpu_ms then print(s.gpu_ms.avg) end                                -- times
 | `grade_lut_bakes` | views whose colour-grading LUT was rebaked this frame (#1440): a grading knob or the tonemap changed, or the view is new; `0` on every frame the grade holds |
 | `ui_mask_passes` / `ui_blur_passes` | UI `Mask` coverage textures rendered (#428) / fullscreen passes of the UI backdrop blur, its composite included — `0` with no backdrop visible (#426) |
 | `renderer_ms` | CPU ms `Renderer::render` took for the frame: recording it, resolving its GPU timestamps and submitting it. A cubemap capture (a reflection or light-probe bake) and the Inspector's preview are not the frame and are not in it |
-| `wall_ms` / `fps` | a window's frames only (#2205): wall-clock ms from a frame's start to the next one's, the frame time a player feels, recorded on the frame that took it (as the frame log's `ms`), so it arrives one frame late: the newest frame has none yet, and a window's figures (`Debug.Stats{ window = n }`'s mean, worst) are over the `n - 1` frames before it; a frame the window could not show records none, and the drawn frame before it keeps its own (outside Play the editor draws on demand, so an idle gap counts whole); `fps` is the window clock's last whole-second reading: the frames drawn since its previous reading, over the seconds between them (at least one), so an editor redrawing on demand reads below 1. `fps` is absent for the window's first second, before the clock has a reading. Both are timings, never in a replay-stable `results.json` |
+| `wall_ms` / `fps` | a window's frames only (#2205): wall-clock ms from a frame's start to the next one's, the frame time a player feels, recorded on the frame that took it (as the frame log's `ms`) as the next frame starts, so it arrives one frame late (*Now, not the session*, above, says what a window sees); a frame the window could not show has no entry, so its time is dropped (the frame log keeps it) and the drawn frame before it keeps its own (outside Play the editor draws on demand, so an idle gap counts whole); `fps` is the window clock's last whole-second reading: the frames drawn since its previous reading, over the seconds between them (at least one), so an editor redrawing on demand reads below 1. `fps` is absent for the window's first second, before the clock has a reading. Both are timings, never in a replay-stable `results.json` |
 | `render_extracted` / `render_posed` / `render_extract_us` | the retained render scene's update this frame (#1706): objects re-derived whole (every mesh entity on a first frame, a load, an Undo, a Play restore, a lightmap or light probe change, or a renderer-side one such as a re-written texture; otherwise only the meshes whose mesh, material, activity, layer, static flag, light or shader overrides changed, those naming a library material that was added, removed or edited in what a draw's key reads (render mode, shader, a map path, face, a Cutout's test), those overriding the runtime params of a material whose params were edited, and those sharing a re-uploaded geometry; an edit of a material's colour, scalars or params alone rewrites its record in place and re-derives no other object, unless it flips a term a pass is chosen by, which re-derives every user: a glass's roughness crossing the SSR threshold, `depth_postpass`, `writes_motion`, `blend_mode`) / objects only re-placed because they moved / CPU µs the update took, inside `renderer_ms` (wall-clock). `0` / `0` on a frame that changed nothing |
 | `render_upload_bytes` | bytes the frame wrote into the forward pass's per-draw arrays (#1706), every camera summed: per-draw uniforms, joint palettes (and a motion-blurred view's last-frame poses), 16 bytes per drawn instance, proxy volumes, the 192-byte record of each material (per scene and variant) that changed, and the 240-byte record of each object that moved or changed, with the unchanged records between two changed ones fewer than 32 slots apart, rewritten so the two go in one write (a static, unchanged object costs only its instance). A shadow sweep's casters are not counted |
 | `asset_uploads` / `asset_upload_bytes` | scene assets the frame uploaded (#2123), and their bytes: mesh buffers (a mesh's vertex and index data, rewritten in place or new), texture files (a material map, a UI image, a particle texture, the sky's panorama: its GPU size, every mip) and lightmap page arrays. What a windowed `Scene.LoadAsync`'s GPU warm-up made before its scene was swapped in is counted on no frame, so the new scene's first frame reads `0` for what it warmed (`Scene.md`, *Loading in the background*) |
@@ -308,7 +313,8 @@ Profiler's ring of frames, as files an agent reads). It works during Play, after
 Stop, and from `session-mcp --attach`; a plain headless session reads what the
 editor last wrote. A headless harness run writes none. Every window frame is
 written, a frame the window could not show (a locked screen, an occluded window)
-included, since the sim and a bake still run then.
+included, since the sim and a bake still run then; `Debug.Stats` keeps no entry
+for such a frame, so its `ms` is in the log alone.
 
 ```lua
 local log = Debug.FrameLog{ last_seconds = 60 }      -- the whole last minute, every channel

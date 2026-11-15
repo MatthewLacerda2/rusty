@@ -48,9 +48,9 @@ fn gpu_a_window_frame_carries_what_the_renderer_drew() {
     assert!(aside.render.is_none(), "an aside render is not the frame");
 
     let mut stats = FrameStats::default();
-    for frame in [&drew, &aside] {
-        rusty_dev::stats::record_window(&mut stats, frame, true);
-    }
+    rusty_dev::stats::record_window(&mut stats, &drew, true);
+    rusty_dev::stats::window_ended(&mut stats, aside.last_wall_ms);
+    rusty_dev::stats::record_window(&mut stats, &aside, true);
     assert_eq!(stats.drawn_frames, 1);
     let last = stats.window(1);
     assert!(last.get("wall_ms").is_none(), "it arrives next");

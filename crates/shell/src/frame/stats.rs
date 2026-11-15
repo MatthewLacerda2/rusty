@@ -6,7 +6,8 @@
 //! and rate, and what the renderer drew for the screen (`rusty_dev::stats::WindowFrame`).
 //! [`measured`] wraps each frame's draw, once per frame the loop draws, and hands
 //! the same frame to the rolling frame log on disk when one runs (#2206), which
-//! [`undrawn`] also feeds on a frame the window could not show.
+//! [`undrawn`] also feeds on a frame the window could not show. [`started`] ends
+//! the frame before as each frame starts, with its wall time.
 
 use rusty_app::GameWorld;
 #[cfg(feature = "dev")]
@@ -43,19 +44,31 @@ pub fn measured(
     let _ = frames_before;
 }
 
-/// A frame the window could not show (a locked screen): the stats keep only drawn
-/// frames, so it only ends the frame before it (its wall time goes there), but the frame log on disk (#2206) writes it, with its console lines,
-/// so a bake run while the screen is locked can still be looked back at.
-pub fn undrawn(shell: &mut Shell, game: &GameWorld) {
+/// A frame starts: the frame clock has just read the previous frame's wall time,
+/// so it goes onto that frame's stats entry now, before this frame's work, and
+/// whatever reads `Debug.Stats` during the frame (the REPL, `session-mcp --attach`,
+/// a script's `Update`, the Stats overlay) sees it ([`rusty_dev::stats::window_ended`]).
+pub fn started(shell: &Shell, game: &GameWorld) {
     #[cfg(feature = "dev")]
     {
+        let stats = game.script_manager().stats_cell();
+        let last_wall_ms = f64::from(shell.clock.frame_ms());
+        rusty_dev::stats::window_ended(&mut stats.borrow_mut(), last_wall_ms);
+    }
+    #[cfg(not(feature = "dev"))]
+    let _ = (shell, game);
+}
+
+/// A frame the window could not show (a locked screen): the stats keep only drawn
+/// frames, so it records none there, and its wall time, ended as the next frame
+/// starts, is dropped. The frame log on disk (#2206) still writes it, with its
+/// console lines, so a bake run while the screen is locked can be looked back at.
+pub fn undrawn(shell: &mut Shell, game: &GameWorld) {
+    #[cfg(feature = "dev")]
+    if let Some(log) = shell.frame_log.as_mut() {
         let frames = shell.renderer.frame_cost().frames;
         let frame = window_frame(&mut shell.renderer, &shell.clock, frames);
-        let stats = game.script_manager().stats_cell();
-        rusty_dev::stats::window_ended(&mut stats.borrow_mut(), &frame);
-        if let Some(log) = shell.frame_log.as_mut() {
-            log.frame(game, &frame, shell.renderer.times_gpu());
-        }
+        log.frame(game, &frame, shell.renderer.times_gpu());
     }
     #[cfg(not(feature = "dev"))]
     let _ = (shell, game);
