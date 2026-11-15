@@ -58,13 +58,16 @@ pub(super) fn run_by(
     run_from(r, scene, frames, step, (&|_| eye(), measure))
 }
 
+/// Where frame `f` is seen from.
+type Seat<'a> = &'a dyn Fn(u32) -> Camera;
+
 /// [`run_by`], frame `f` seen from `seat(f)`.
 pub(super) fn run_from(
     r: &mut Renderer,
     scene: &mut Scene,
     (n, scale): (u32, f32),
     step: &dyn Fn(&mut Scene, u32),
-    (seat, measure): (&dyn Fn(u32) -> Camera, fn([f32; 3]) -> f32),
+    (seat, measure): (Seat, fn([f32; 3]) -> f32),
 ) -> Vec<Vec<f32>> {
     let mut v = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     if scale != 1.0 {
