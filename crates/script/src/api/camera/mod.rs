@@ -29,6 +29,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     register_orientation(lua, &table, ctx)?;
     register_fov(lua, &table, ctx)?;
     register_projection(lua, &table, ctx)?;
+    register_rays(lua, &table, ctx)?;
     register_reset_history(lua, &table, ctx)?;
     component::register(lua, &table, ctx.scene)?;
 
@@ -152,20 +153,18 @@ fn register_fov(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Reg {
     )
 }
 
+/// The sim's screen size in pixels (`UI.GetScreenSize`), the frame every
+/// projection speaks.
+fn screen_px(ctx: &ApiCtx) -> impl Fn(&Lua) -> mlua::Result<Vec2> + Copy + 'static {
+    let (screen, video) = (ctx.screen, ctx.video);
+    move |lua: &Lua| Ok(screen.get(lua)?.borrow().pixels(&video.get(lua)?.borrow()))
+}
+
 /// `WorldToScreen(x, y, z [, canvas])` → `sx, sy, depth, onScreen` — UI screen
 /// pixels (bottom-left, y-up), or the canvas's reference units when a canvas id is
-/// given; `depth` ≤ 0 is behind the camera. `ScreenToWorldRay(x, y)` → the ray's
-/// origin and unit direction through a UI screen pixel; `MouseRay()` the same
-/// through the cursor (`Input`'s top-left position flipped, the screen centre while
-/// the cursor is locked, as the UI pointer reads it).
+/// given; `depth` ≤ 0 is behind the camera.
 fn register_projection(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Reg {
-    let (camera, scene, screen, video) = (ctx.camera, ctx.scene, ctx.screen, ctx.video);
-    let input = ctx.input;
-    let px = move |lua: &mlua::Lua| -> mlua::Result<_> {
-        let (screen, video) = (screen.get(lua)?, video.get(lua)?);
-        let px = screen.borrow().pixels(&video.borrow());
-        Ok(px)
-    };
+    let (camera, scene, px) = (ctx.camera, ctx.scene, screen_px(ctx));
     put(
         table,
         "WorldToScreen",
@@ -187,7 +186,15 @@ fn register_projection(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Re
             let at = p.position / scale;
             Ok((at.x, at.y, p.depth, on_screen))
         }),
-    )?;
+    )
+}
+
+/// `ScreenToWorldRay(x, y)` → the ray's origin and unit direction through a UI
+/// screen pixel; `MouseRay()` the same through the cursor (`Input`'s top-left
+/// position flipped, the screen centre while the cursor is locked, as the UI
+/// pointer reads it).
+fn register_rays(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Reg {
+    let (camera, scene, input, px) = (ctx.camera, ctx.scene, ctx.input, screen_px(ctx));
     put(
         table,
         "ScreenToWorldRay",
@@ -206,9 +213,10 @@ fn register_projection(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Re
                 let input = input.get(lua)?;
                 let input = input.borrow();
                 let (x, y) = input.mouse_position();
-                match input.cursor().locked {
-                    true => screen / 2.0,
-                    false => Vec2::new(x as f32, screen.y - y as f32),
+                if input.cursor().locked {
+                    screen / 2.0
+                } else {
+                    Vec2::new(x as f32, screen.y - y as f32)
                 }
             };
             let (o, d) = view(&*camera.get(lua)?, &*scene.get(lua)?).screen_ray(at, screen);
