@@ -31,26 +31,20 @@ const DARK_HIT: [f32; 4] = [
 /// a share of it: a subnormal near 5e-6 is held to about 1% by f16's last step.
 const KEPT: f32 = 0.05;
 
-#[test]
-fn gpu_the_spread_pyramid_keeps_a_lone_dark_hits_share_of_its_widest_window() {
-    let Some(r) = crate::test_gpu::headless_or_skip(SIDE, SIDE) else {
-        return;
-    };
-    let mut registry = ShaderRegistry::new(rusty_shadergen::engine_shader_dir());
-    let pass = PyramidPass::new(&r.device, &mut registry);
-    let pyramid = Pyramid::new(&r.device, &pass, (SIDE, SIDE));
-    let texel: Vec<u8> = DARK_HIT
+/// Write `texel` into the top-left texel of `texture`'s first level (`Rgba16Float`).
+fn write_corner(queue: &wgpu::Queue, texture: &wgpu::Texture, texel: &[f32; 4]) {
+    let bytes: Vec<u8> = texel
         .iter()
         .flat_map(|&c| f32_to_f16(c).to_le_bytes())
         .collect();
-    r.queue.write_texture(
+    queue.write_texture(
         wgpu::TexelCopyTextureInfo {
-            texture: &pyramid.texture,
+            texture,
             mip_level: 0,
             origin: wgpu::Origin3d::ZERO,
             aspect: wgpu::TextureAspect::All,
         },
-        &texel,
+        &bytes,
         wgpu::TexelCopyBufferLayout {
             offset: 0,
             bytes_per_row: Some(8),
@@ -62,6 +56,17 @@ fn gpu_the_spread_pyramid_keeps_a_lone_dark_hits_share_of_its_widest_window() {
             depth_or_array_layers: 1,
         },
     );
+}
+
+#[test]
+fn gpu_the_spread_pyramid_keeps_a_lone_dark_hits_share_of_its_widest_window() {
+    let Some(r) = crate::test_gpu::headless_or_skip(SIDE, SIDE) else {
+        return;
+    };
+    let mut registry = ShaderRegistry::new(rusty_shadergen::engine_shader_dir());
+    let pass = PyramidPass::new(&r.device, &mut registry);
+    let pyramid = Pyramid::new(&r.device, &pass, (SIDE, SIDE));
+    write_corner(&r.queue, &pyramid.texture, &DARK_HIT);
     let mut encoder = r.device.create_command_encoder(&Default::default());
     pyramid.build(&mut encoder, &pass);
     r.queue.submit([encoder.finish()]);
