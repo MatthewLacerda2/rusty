@@ -1,18 +1,16 @@
 //! A still view's rough reflection holds still under TAA's sub-pixel jitter
-//! (#2249): a satin bronze ceiling over a small, very bright bulb in a dark room,
-//! seen from below. The resolve's blur radius is a field read from the trace's
-//! spread pyramid around each pixel; around a cluster of hits as small as the
-//! bulb's, a field that thresholds the hits' count reached them on some offsets
-//! and not others, so a patch of the reflection blinked between dark and bright
-//! with the camera still. Measured on the SSR-resolved image itself, before TAA
-//! blends frames: what each offset hands TAA.
+//! (#2249, #2228): a satin bronze ceiling over a small, very bright bulb in a dark
+//! room, seen from below. The resolve blurs each pixel over the mean radius of the
+//! hits around it; a plain mean let the dim hits a sub-pixel detail gives on some
+//! offsets and not others set the bulb's blur, and its reflection blinked. Measured
+//! on the SSR-resolved image (what each offset hands TAA) and after TAA's resolve.
 
 use glam::Vec3;
 
 use super::super::fixture::{paint, place};
 use crate::readback::read_texture_bytes;
 use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_components::{CameraComponent, MaterialAsset, MaterialComponent, Ssr};
+use rusty_components::{CameraComponent, MaterialAsset, MaterialComponent};
 use rusty_core::color::f16_to_f32;
 use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::{Camera, Scene};
@@ -21,8 +19,10 @@ const W: u32 = 320;
 const H: u32 = 240;
 /// A tile's side, in pixels.
 const TILE: u32 = 8;
-/// Frames measured: one cycle of the jitter's vertical (base 3) part, and more,
-/// so its horizontal (base 2) one turns over too.
+/// Frames before the measure, so TAA's history has settled: one cycle of the
+/// jitter's vertical (base 3) part.
+const WARM: u32 = 27;
+/// Frames measured: one cycle of its horizontal (base 2) part, and more.
 const FRAMES: u32 = 36;
 
 /// A box at `at`, `size` across, painted `surface`.
@@ -32,9 +32,9 @@ fn block(s: &mut Scene, name: &str, (at, size): (Vec3, Vec3), surface: ([f32; 3]
     paint(s, id, name, surface);
 }
 
-/// The room: a satin bronze ceiling 3 m up, dark walls and floor, no ambient, the
-/// bulb hanging 0.5 m under the ceiling on a cord; TAA on (for its jitter), SSR
-/// on, nothing else.
+/// The room: a satin bronze ceiling 3 m up (the first box), dark walls and floor,
+/// no ambient, the bulb hanging 0.5 m under the ceiling on a cord; TAA on (for its
+/// jitter), SSR on, nothing else.
 fn room() -> Scene {
     let mut s = Scene::new();
     (s.skybox_path, s.ambient_intensity) = (String::new(), 0.0);
@@ -46,20 +46,11 @@ fn room() -> Scene {
     };
     s.world.set_camera(cam, Some(camera));
     let mut volume = default_post_processing();
-    volume.ssr = Ssr {
-        active: true,
-        ..Default::default()
-    };
+    volume.ssr.active = true;
     (volume.bloom.active, volume.ssao.active) = (false, false);
     s.world.set_post_processing(cam, Some(volume));
-    let bronze = ([0.8, 0.55, 0.35], 1.0, 0.35);
-    block(
-        &mut s,
-        "Ceiling",
-        (Vec3::new(0.0, 3.05, -4.0), Vec3::new(12.0, 0.1, 12.0)),
-        bronze,
-    );
     let shell = [
+        (Vec3::new(0.0, 3.05, -4.0), Vec3::new(12.0, 0.1, 12.0)),
         (Vec3::new(0.0, -0.05, -4.0), Vec3::new(12.0, 0.1, 12.0)),
         (Vec3::new(0.0, 1.5, -10.0), Vec3::new(12.0, 3.0, 0.1)),
         (Vec3::new(-6.0, 1.5, -4.0), Vec3::new(0.1, 3.0, 12.0)),
@@ -68,7 +59,13 @@ fn room() -> Scene {
         (Vec3::new(0.0, 2.8, -3.0), Vec3::new(0.01, 0.5, 0.01)),
     ];
     for (i, place) in shell.into_iter().enumerate() {
-        block(&mut s, &format!("Shell{i}"), place, ([0.03; 3], 0.0, 1.0));
+        let bronze = ([0.8, 0.55, 0.35], 1.0, 0.35);
+        let surface = if i == 0 {
+            bronze
+        } else {
+            ([0.03; 3], 0.0, 1.0)
+        };
+        block(&mut s, &format!("Shell{i}"), place, surface);
     }
     let bulb = create_entity(&mut s, "Bulb", Some(Primitive::Sphere));
     place(&mut s, bulb, Vec3::new(0.0, 2.55, -3.0), Vec3::splat(0.08));
@@ -82,15 +79,11 @@ fn room() -> Scene {
     s
 }
 
-/// Seated, looking up at the ceiling.
-fn eye() -> Camera {
-    Camera::new(Vec3::new(0.0, 1.6, 0.0), -90.0, 30.0)
-}
-
-/// The SSR-resolved HDR image per 8×8 tile, in 255ths of perceptual luma
-/// (`l / (1 + l)`), so a tile's swing reads as a byte would before the tonemap.
-fn tiles(r: &Renderer, v: &RenderView) -> Vec<f32> {
-    let bytes = read_texture_bytes(&r.device, &r.queue, &v.post_fx.scene_hdr.texture, (W, H), 8);
+/// `texture` (an `Rgba16Float` image of the view's size) per 8×8 tile, in 255ths
+/// of perceptual luma (`l / (1 + l)`), so a tile's swing reads as a byte would
+/// before the tonemap.
+fn tiles(r: &Renderer, texture: &wgpu::Texture) -> Vec<f32> {
+    let bytes = read_texture_bytes(&r.device, &r.queue, texture, (W, H), 8);
     let half = |i: usize| f16_to_f32(u16::from_le_bytes([bytes[i], bytes[i + 1]]));
     let luma = |x: u32, y: u32| {
         let i = ((y * W + x) * 8) as usize;
@@ -105,20 +98,26 @@ fn tiles(r: &Renderer, v: &RenderView) -> Vec<f32> {
     (0..cols * rows).map(|t| tile(t % cols, t / cols)).collect()
 }
 
-/// The largest step any tile takes between two frames of `frames`, and the tile.
-fn swing(frames: &[Vec<f32>]) -> (f32, usize) {
-    let steps = frames.windows(2).flat_map(|w| {
-        let pairs = w[0].iter().zip(&w[1]).enumerate();
-        pairs.map(|(t, (a, b))| ((a - b).abs(), t))
-    });
-    steps.fold((0.0, 0), |a, b| if b.0 > a.0 { b } else { a })
+/// The largest step any tile takes between two frames of `frames`.
+fn swing(frames: &[Vec<f32>]) -> f32 {
+    let steps = frames
+        .windows(2)
+        .flat_map(|w| w[0].iter().zip(&w[1]).map(|(a, b)| (a - b).abs()));
+    steps.fold(0.0, f32::max)
 }
 
 /// The largest step a tile of the SSR-resolved still view may take between two
-/// jitter offsets, in 255ths of perceptual luma. Near the scene's own: with SSR
-/// off the bulb's edge under the jitter steps 18 (lavapipe). Measured on
-/// lavapipe: 46 before the field was made continuous (#2249), MEASURED after.
-const STILL: f32 = 28.0;
+/// jitter offsets, in 255ths of perceptual luma: near the trace's own, which
+/// without the resolve's blur steps 24 (the bulb's sharp reflection crossing a
+/// tile's edge). Measured on lavapipe: 44.5 with a plain mean radius, 24.7 with
+/// one weighted by each hit's energy (#2249).
+const STILL: f32 = 30.0;
+
+/// The same after TAA's resolve, URP's clamp (#2228): what the player sees. A
+/// patch that swings on its own hands each swing through the clamp, its 3×3 all
+/// moving together. Measured on lavapipe: 26.2 with a plain mean radius, 11.1
+/// with one weighted by energy.
+const TAA_STILL: f32 = 14.0;
 
 #[test]
 fn gpu_a_still_rough_reflection_holds_under_taa_jitter() {
@@ -127,21 +126,25 @@ fn gpu_a_still_rough_reflection_holds_under_taa_jitter() {
     };
     let scene = room();
     let mut v = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
-    let frames: Vec<Vec<f32>> = (0..FRAMES)
-        .map(|_| {
-            let target = v.color_target_view().unwrap();
-            r.render(&mut v, &scene, &eye(), &target, false);
-            tiles(&r, &v)
-        })
-        .collect();
-    let (step, t) = swing(&frames);
-    let series: Vec<String> = frames.iter().map(|f| format!("{:.0}", f[t])).collect();
-    eprintln!(
-        "[ssr] a still view's largest tile step under jitter: {step:.1} (tile {t}: {})",
-        series.join(" ")
+    // Seated, looking up at the ceiling.
+    let eye = Camera::new(Vec3::new(0.0, 1.6, 0.0), -90.0, 30.0);
+    let (mut ssr, mut taa) = (Vec::new(), Vec::new());
+    for f in 0..WARM + FRAMES {
+        let target = v.color_target_view().unwrap();
+        r.render(&mut v, &scene, &eye, &target, false);
+        if f >= WARM {
+            ssr.push(tiles(&r, &v.post_fx.scene_hdr.texture));
+            taa.push(tiles(&r, v.post_fx.taa_latest().expect("TAA ran")));
+        }
+    }
+    let (ssr, taa) = (swing(&ssr), swing(&taa));
+    eprintln!("[ssr] a still view's largest tile step under jitter: {ssr:.1} resolved, {taa:.1} after TAA");
+    assert!(
+        ssr <= STILL,
+        "a still rough reflection blinks under the jitter: a tile steps {ssr:.1}"
     );
     assert!(
-        step <= STILL,
-        "a still rough reflection blinks under the jitter: a tile steps {step:.1}"
+        taa <= TAA_STILL,
+        "a still view blinks under TAA: a tile steps {taa:.1}"
     );
 }

@@ -174,7 +174,7 @@ fn across(world: vec3<f32>, t: f32, c: f32, dim: vec2<f32>) -> f32 {
 // it by its own cone. Stored no wider than `UNIT_MAX` pixels, so a hit's
 // radius times its count stays inside f16.
 const UNIT_CONE: f32 = 0.2;
-const UNIT_MAX: f32 = 16384.0;
+const UNIT_MAX: f32 = 16000.0;
 
 // What a hit's count is stored times, so the count of one hit in a coarse level of
 // the spread pyramid (a 4^-8 share of it at level 8) stays a normal f16, not a
@@ -191,17 +191,46 @@ const COUNT_SCALE: f32 = 64.0;
 // few pixels, drawing a faint line across a satin reflection's fading edge.
 const FOUND_FLOOR: f32 = 0.4;
 
+// What a found hit's energy counts for in the radius field's mean at least
+// (#2249), against 1 for a white hit at full weight: little enough that a dark hit
+// (a dim wall, a cord's or a seam's sliver) leaves the blur of a bright reflection
+// beside it alone, enough that a window of dark hits alone still takes their mean.
+const ENERGY_FLOOR: f32 = 0.02;
+
+// What a found hit's radius times its energy is stored times, so a bright hit's
+// share of a coarse level of the spread pyramid stays a normal f16; `UNIT_MAX`
+// times it stays inside f16.
+const ENERGY_SCALE: f32 = 4.0;
+
 // What the trace writes per pixel for the resolve (#2028): `hit`, the hit colour
 // times its weight and the weight (premultiplied, so a level of its pyramid
 // averages hits and misses alike); `spread`, 1 for a pixel that traced (a miss
 // included), then for a ray that found something its radius per unit cone times
-// its count `k`, and `k` (times `COUNT_SCALE`): its weight, but at least
-// `FOUND_FLOOR` (0 and 0 for a miss), so a level averages the radius over the hits
-// found, those that reflect something first (#2158).
+// its energy `e` (times `ENERGY_SCALE`), its count `k` (times `COUNT_SCALE`): its
+// weight, but at least `FOUND_FLOOR`, and `e` (times `COUNT_SCALE`), all 0 for a
+// miss. So a level holds how many hits it found, those that reflect something
+// first (#2158), and their mean radius weighted by the light each one adds to the
+// reflection: its weight times its brightness, at least `ENERGY_FLOOR` (#2249).
 struct Traced {
     @location(0) hit: vec4<f32>,
     @location(1) spread: vec4<f32>,
 };
+
+// What a found hit of `colour` (unpremultiplied) at weight `w` counts for in the
+// radius field's mean (#2249): the light it adds to the reflection, its weight
+// times its perceptual brightness (`l / (1 + l)` of its luma, under 1, so a lamp
+// outweighs a dim wall but a lit one by little), at least `ENERGY_FLOOR`. A plain mean let
+// the dark hits around a small bright one set its blur: around a bulb's reflection
+// in a dim room, the dim hits a sub-pixel detail gave on some of TAA's offsets and
+// not others moved the field the bulb's hits blur over, and the reflection blinked
+// with the camera still. The bright hits' radius is the blur the eye sees, so a
+// dark hit never decides it, and the field moves about as much as the reflection
+// does. A hit past f16's range has a weight of 0, and counts at the floor.
+fn energy(colour: vec4<f32>, w: f32) -> f32 {
+    let l = dot(colour.rgb, vec3<f32>(0.25, 0.5, 0.25));
+    let bright = select(0.0, l / (1.0 + l), numeric::finite4(colour) && l > 0.0);
+    return max(w * bright, ENERGY_FLOOR);
+}
 
 // Whether pixel `px` takes SSR at all: its surface reflects, is smooth enough
 // (`fade` above 0) and is not the sky. Both passes ask the same.
@@ -251,10 +280,12 @@ fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
     // radius per unit cone, even where its weight faded to nothing (a long ray off a
     // rough surface, a hit at the screen's edge), counted at `FOUND_FLOOR`: weighted
     // by the fades alone, the mean radius thinned out exactly where the radii are
-    // widest and swung over a few pixels there.
+    // widest and swung over a few pixels there. Its radius is averaged by the light
+    // it adds to the reflection (`energy`).
     let unit = min(across(world, hit.dist, UNIT_CONE, dim) / UNIT_CONE, UNIT_MAX);
     let k = max(w, FOUND_FLOOR);
-    let found = vec4<f32>(1.0, unit * k, k * COUNT_SCALE, 0.0);
+    let e = energy(hit.colour, w);
+    let found = vec4<f32>(1.0, unit * e * ENERGY_SCALE, k * COUNT_SCALE, e * COUNT_SCALE);
     if (w <= 0.0) {
         return Traced(vec4<f32>(0.0), found);
     }
@@ -299,15 +330,22 @@ fn on_plane(q: vec2<f32>, world: vec3<f32>, g: vec3<f32>, fwd: vec3<f32>) -> boo
 }
 
 // The mean radius per unit cone of the hits the trace found around `uv`, from
-// level `lod` of its spread pyramid. A window where hits count for `trust` of its
-// area or less leans to `fallback` instead, continuously (`trust` 0: none). One
-// where they count for less than `LONE` of one hit's pixel fades to 0 (nothing to
-// blur): a lone hit, a pixel or two in an empty window, still counts for at least
-// a tenth of one there, so it keeps the radius of its own lobe.
+// level `lod` of its spread pyramid, each weighted by the light it adds to the
+// reflection (`energy`). A window where hits count for `trust` of its area or less
+// leans to `fallback` instead, continuously (`trust` 0: none). One where they
+// count for less than `LONE` of one hit's pixel fades to 0 (nothing to blur): a
+// lone hit, a pixel or two in an empty window, still counts for at least a tenth
+// of one there, so it keeps the radius of its own lobe. Both read the hits' count,
+// not their energy, so how much of a window holds hits is the same in a dim scene
+// as in a bright one.
 fn mean_unit(uv: vec2<f32>, lod: f32, fallback: f32, trust: f32) -> f32 {
     let s = textureSampleLevel(t_spread, s_color, uv, lod);
-    let count = s.z / COUNT_SCALE + trust;
-    return (s.y + trust * fallback) / max(count, LONE * exp2(-2.0 * lod));
+    let count = s.z / COUNT_SCALE;
+    // Every hit's energy is at least `ENERGY_FLOOR` of its count, so the floor
+    // binds only where a GPU flushed a coarse level's share of a lone dark hit's
+    // energy to 0 and kept its count.
+    let mean = s.y * (COUNT_SCALE / ENERGY_SCALE) / max(s.w, ENERGY_FLOOR * s.z + 1e-20);
+    return (count * mean + trust * fallback) / max(count + trust, LONE * exp2(-2.0 * lod));
 }
 
 // The share of one full-count hit's pixel, at a level of the spread pyramid, under
@@ -331,8 +369,8 @@ const REFINE: i32 = 2;
 // as wide as the radius last found, so a contact reflection keeps its narrower
 // blur among long rays; each is a filtered read of the spread pyramid, so the
 // field follows `uv` smoothly, between two hits at different distances (a bottle
-// before the shelf behind it) as across a hit and a miss. A plain mean, on
-// purpose: one pulled toward the nearest hits (a harmonic mean, or the narrower of
+// before the shelf behind it) as across a hit and a miss. A mean weighted by the
+// light each hit adds (`energy`), never by its distance, on purpose: one pulled toward the nearest hits (a harmonic mean, or the narrower of
 // the field and the pixel's own ray) kept a thin post's contact reflection, but
 // collapsed the radius wherever a few rays were short (a seam's trim, a bottle),
 // drawing those parts crisp in a soft reflection, hard blotches that moved with the
