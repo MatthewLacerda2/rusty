@@ -7,9 +7,9 @@ use rusty_app::GameWorld;
 use rusty_core::application::Gizmo;
 use rusty_ecs::World;
 use rusty_editor::viewport::rect_tool::{self, OverlayFrame};
-use rusty_editor::viewport::{gizmo, pick};
+use rusty_editor::viewport::{game_size, gizmo, pick};
 use rusty_editor::{EditorUi, ViewportInteraction, ViewportTab};
-use rusty_render::RenderView;
+use rusty_render::{RenderView, Renderer};
 use rusty_scene::Scene;
 
 /// (Re)bind a freshly-rendered offscreen `view` to a stable egui texture id so the
@@ -51,6 +51,44 @@ pub(super) fn target_size(size: egui::Vec2, pixels_per_point: f32) -> Option<(u3
     (px > 0 && py > 0).then_some((px, py))
 }
 
+/// Render the Inspector Preview tab's isolated scene into its own offscreen `view`
+/// and rebind it to `texture_id`: the viewport's two-phase contract, against
+/// `EditorUi::preview_request`/`preview_cache` instead of the game world. The window
+/// and the headless capture both call this one function, so they cannot drift. The
+/// rendered `Scene` is `preview_cache`'s freestanding value, never the live scene
+/// (#352). A no-op when the Preview tab isn't showing or the rect is degenerate.
+pub(super) fn render_preview_scene(
+    (renderer, egui_renderer): (&mut Renderer, &mut egui_wgpu::Renderer),
+    ui: &mut EditorUi,
+    (view, texture_id): (&mut Option<RenderView>, &mut Option<egui::TextureId>),
+    pixels_per_point: f32,
+) {
+    let Some(request) = ui.preview_request.take() else {
+        return;
+    };
+    let Some((px, py)) = target_size(request.rect.size(), pixels_per_point) else {
+        return;
+    };
+    // A preview is not the screen: it renders natively (#1498).
+    let format = renderer.config.format;
+    let view =
+        RenderView::ensure_offscreen(view, &renderer.device, format, (px, py), Default::default());
+    let (Some(target_view), Some(cache)) = (view.color_target_view(), &ui.preview_cache) else {
+        return;
+    };
+    renderer.aside(|renderer| match &request.shader_override {
+        Some(path) => renderer.render_preview_with_shader(
+            view,
+            &cache.scene,
+            &request.camera,
+            &target_view,
+            path,
+        ),
+        None => renderer.render(view, &cache.scene, &request.camera, &target_view, false),
+    });
+    rebind_egui_texture(egui_renderer, &renderer.device, texture_id, view);
+}
+
 impl EditorFrontend {
     /// Render the 3D scene into the offscreen viewport target sized to the panel's
     /// image rect, then (re)bind it to the stable egui texture id (#183). The active
@@ -67,14 +105,12 @@ impl EditorFrontend {
             return;
         };
         let scene_tab = interaction.tab == ViewportTab::Scene;
-        let (px, py) = match self.demo_size() {
-            // A demo replays on the size it recorded, drawn letterboxed (#1598).
-            Some(size) if !scene_tab => size,
-            _ => panel,
-        };
+        // The Game view's own size, letterboxed: a demo's (#1598) or the dropdown's (#2207).
+        let (px, py) = interaction.render.unwrap_or(panel);
         if self.demo_size().is_none() {
-            // The UI lays out on the game view's pixel size (#417) — a sim input.
-            game.resources.screen.borrow_mut().set_game_view(px, py);
+            // The UI lays out on the Game view's own size (#417), behind either tab.
+            let (sx, sy) = interaction.screen.unwrap_or(panel);
+            game.resources.screen.borrow_mut().set_game_view(sx, sy);
         }
         // Create-or-resize this tab's own view. A view's resize guard checks its own
         // size, so it never fights the other tab's or the preview's (#355). The Game
@@ -100,6 +136,7 @@ impl EditorFrontend {
         }
         view.game_gizmos = !scene_tab && view.gizmos.on(Gizmo::GameGizmos);
         view.ui.screen_in_editor = scene_tab && view.gizmos.on(Gizmo::Ui);
+        view.ui.screen_box = game_size::overlay_box(interaction, (px, py));
         view.set_pixel_scale(pixels_per_point);
         let camera = viewport_camera(&self.editor_ui, game, &scene, interaction.tab);
         renderer.set_ui_textures(std::rc::Rc::clone(
@@ -121,57 +158,19 @@ impl EditorFrontend {
         );
     }
 
+    /// This frame's Inspector preview, through [`render_preview_scene`].
+    pub(super) fn render_preview(&mut self, shell: &mut Shell, pixels_per_point: f32) {
+        let gpu = (&mut shell.renderer, &mut self.egui_renderer);
+        let target = (&mut self.preview_view, &mut self.preview_texture_id);
+        render_preview_scene(gpu, &mut self.editor_ui, target, pixels_per_point);
+    }
+
     /// The size of the Game view an open demo replays on; `None` with none open.
     pub(super) fn demo_size(&self) -> Option<(u32, u32)> {
         #[cfg(feature = "dev")]
         return self.editor_ui.demo_size();
         #[cfg(not(feature = "dev"))]
         None
-    }
-
-    /// Render the Inspector Preview tab's isolated scene into its own offscreen target
-    /// and rebind it — the viewport's two-phase contract, against
-    /// `EditorUi::preview_request`/`preview_cache` instead of the game world. The
-    /// rendered `Scene` is `preview_cache`'s freestanding value, never the live scene
-    /// (#352). A no-op when the Preview tab isn't showing or the rect is degenerate.
-    pub(super) fn render_preview_scene(&mut self, shell: &mut Shell, pixels_per_point: f32) {
-        let Some(request) = self.editor_ui.preview_request.take() else {
-            return;
-        };
-        let Some((px, py)) = target_size(request.size, pixels_per_point) else {
-            return;
-        };
-        let renderer = &mut shell.renderer;
-        // A preview is not the screen: it renders natively (#1498).
-        let view = RenderView::ensure_offscreen(
-            &mut self.preview_view,
-            &renderer.device,
-            renderer.config.format,
-            (px, py),
-            Default::default(),
-        );
-        let Some(target_view) = view.color_target_view() else {
-            return;
-        };
-        let Some(cache) = &self.editor_ui.preview_cache else {
-            return;
-        };
-        renderer.aside(|renderer| match &request.shader_override {
-            Some(path) => renderer.render_preview_with_shader(
-                view,
-                &cache.scene,
-                &request.camera,
-                &target_view,
-                path,
-            ),
-            None => renderer.render(view, &cache.scene, &request.camera, &target_view, false),
-        });
-        rebind_egui_texture(
-            &mut self.egui_renderer,
-            &renderer.device,
-            &mut self.preview_texture_id,
-            view,
-        );
     }
 
     /// Apply the Scene-tab pointer interaction: with the UI overlay on, a drag on the
@@ -203,11 +202,7 @@ impl EditorFrontend {
         let camera = ui.scene_view.camera.camera();
         let ray = pick::ray_from_ndc(&camera, aspect, ndc_x, ndc_y);
         let mut scene = game.scene().borrow_mut();
-        let frame = OverlayFrame {
-            size: glam::Vec2::new(size.x, size.y),
-            pixels_per_point,
-            textures: std::rc::Rc::clone(&ui.ui_textures),
-        };
+        let frame = game_size::overlay_frame(interaction, pixels_per_point, &ui.ui_textures);
         let point = glam::Vec2::new(local.x, local.y);
 
         // 1. Continue or start a rect-tool drag, else a gizmo drag, on the selection.

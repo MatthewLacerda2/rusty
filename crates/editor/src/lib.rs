@@ -33,7 +33,7 @@ use rusty_navigation::NavigationGraph;
 use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
-pub use inspector::preview::{OrbitState, PreviewCache, PreviewMesh, PreviewRequest};
+pub use inspector::preview::{FramedOrbit, PreviewCache, PreviewMesh, PreviewRequest};
 
 #[cfg(feature = "dev")]
 pub use dev_state::DevEditorState;
@@ -63,7 +63,6 @@ pub struct EditorUi {
     /// The window title's `*` (#1914).
     pub is_dirty: bool,
 
-    // Custom asset inspector properties
     pub asset_script_content: String,
 
     /// Whether the About dialog (File-bar → About) is currently open.
@@ -72,8 +71,7 @@ pub struct EditorUi {
     pub show_build_settings: bool,
     pub build_settings_draft: Option<rusty_core::application::BuildSettings>,
 
-    /// Whether each dockable panel is expanded. Collapsing shrinks the panel to a
-    /// thin rail with a caret that brings it back. Pure runtime UI state.
+    /// Whether each dockable panel is expanded (collapsed: a rail with a caret).
     pub hierarchy_open: bool,
     pub inspector_open: bool,
     pub bottom_open: bool,
@@ -100,8 +98,7 @@ pub struct EditorUi {
     /// Which viewport tab is showing — Scene (editor cam + gizmos) or Game (the
     /// active camera's view). Both are reachable in edit and play mode (#183).
     pub viewport_tab: ViewportTab,
-    /// The scene image's last drawn size in egui points, recorded each frame so the
-    /// front-end can size the offscreen render target to match the displayed rect.
+    /// The scene image's last drawn size in egui points, recorded each frame.
     pub viewport_image_size: egui::Vec2,
     /// The texture sizes the UI lays out with (#1221): the sim's own table
     /// (`ScreenSize::textures`), handed over each frame by the shell, so the
@@ -114,6 +111,8 @@ pub struct EditorUi {
     /// `Editor.SetGizmo` through the shell. `Gizmo::Ui` is the UI overlay: screen
     /// canvases drawn, the rect tool live (#423).
     pub gizmos: rusty_core::application::SceneGizmos,
+    /// The Game view's size (#2207): its dropdown, and `Editor.SetGameViewSize`.
+    pub game_view: rusty_core::application::GameViewSetting,
     /// What the Game view's Stats overlay shows, while on (`viewport::stats`, #2205).
     pub stats: Option<viewport::stats::Readout>,
     /// Live rect-tool drag on a UI element's handle (#423).
@@ -125,17 +124,17 @@ pub struct EditorUi {
     /// (#352). One shared flag: entity and asset selection are mutually exclusive,
     /// so only one card is ever showing it at a time.
     pub preview_tab_active: bool,
-    /// The Preview tab's mesh toggle (sphere/cube/Suzanne).
+    /// The Preview tab's mesh toggle (sphere, cube, Suzanne or plane).
     pub preview_mesh: PreviewMesh,
-    /// The Preview tab's orbit-camera state, persisted across frames.
-    pub preview_orbit: OrbitState,
+    /// The Preview tab's orbit camera and the framing it started from.
+    pub preview_orbit: FramedOrbit,
     /// The isolated preview scene, rebuilt only when the subject/mesh choice changes.
     pub preview_cache: Option<PreviewCache>,
-    /// This frame's render request for `main.rs`'s `render_preview_scene`; `None`
-    /// when the Preview tab isn't showing (skips the extra offscreen render).
+    /// This frame's render request for `shell::editor::viewport::render_preview_scene`;
+    /// `None` when the Preview tab isn't showing (skips the extra offscreen render).
     pub preview_request: Option<PreviewRequest>,
     /// Stable egui texture id for the offscreen preview target (#352), set by
-    /// `main.rs` before `draw` runs — mirrors `Frontend::viewport_texture_id`.
+    /// the shell before `draw` runs — mirrors `Frontend::viewport_texture_id`.
     pub preview_texture_id: Option<egui::TextureId>,
     /// The Material card's delete confirm (#1576).
     pub material_delete: inspector::components::material::MaterialDelete,
@@ -178,13 +177,14 @@ impl EditorUi {
             ui_textures: Default::default(),
             gizmo_drag: None,
             gizmos: Default::default(),
+            game_view: Default::default(),
             stats: None,
             rect_drag: None,
             scene_view: Default::default(),
 
             preview_tab_active: false,
             preview_mesh: PreviewMesh::default(),
-            preview_orbit: OrbitState::default(),
+            preview_orbit: FramedOrbit::default(),
             preview_cache: None,
             preview_request: None,
             preview_texture_id: None,

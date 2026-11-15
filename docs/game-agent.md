@@ -36,6 +36,13 @@ seed) and what reached the game tick by tick. When the developer reports a bug
 from a playtest, replay their demo headless instead of guessing a scenario
 (next section).
 
+The editor also keeps a rolling log of how each frame ran, and what the console
+said beside it, in `saved/logs/` (50 MB by default, the oldest dropped). When the
+developer says "it hitched a minute ago, by the bar", read it instead of asking them
+to reproduce it: `Debug.FrameLog{ last_seconds = 90, over_ms = 33 }` returns the
+slow frames with their tick, camera position, heaviest GPU pass and system
+(`docs/api/Debug.md`, *The frame log*).
+
 ## The project
 
 ```text
@@ -89,6 +96,10 @@ Run that `git log`, read what changed, and bring the game up to date (scenes,
 scripts, prefabs) before carrying on. Only an **older** engine, or a branch build,
 warns and asks before it opens.
 
+An upgrade may also change a texture graph the engine ships (an `engine/…` path
+in a recipe, listed by `Texture.Ops()`), so a material instancing one can bake
+differently after it: rebake (`Material.Rebake`) and look before carrying on.
+
 ## Enemy AI: the animation graph is the state machine
 
 Build an enemy's decisions the way the animation is built, with no behaviour
@@ -130,6 +141,35 @@ function M.OnTakeDamage(id, amount)
 end
 return M
 ```
+
+## Start a surface from the engine's library
+
+The engine ships ten tiling materials as texture graphs (concrete, brick, painted
+plaster, worn painted metal, tread plate, wood planks, ceramic tile, asphalt, sand
+with pebbles, carpet), listed by `Texture.Ops()` under `engine/textures/library/`.
+For a wall, floor or ground, **start from the nearest one**: instance it in the
+material's `maps`, set its `wear` (0 new, 1 derelict), its `tint` where it has one
+and the instance `seed` (two walls that are not copies), and give the material the
+tile's real size as `world_size` (`docs/api/Texture.md`, *The library*). The one
+exception is `metal_painted_worn` fed a model's `Texture.BakeMeshMaps` maps: those
+are that model's UV0 atlas, so its material maps by `uv_mapping = "UV0"`, with no
+`world_size`. Write a new graph only when no library material is near, and build it
+from the library's parts (`grunge`, `edge_wear`, `crevice_dirt`, `scratches`) where
+they fit.
+
+## Look at a material before it goes into a level
+
+You never see a texture or a material unless you render it, so **look before you
+use**. Read `Texture.Stats` on a recipe before tuning a `color_ramp` or `map_range`
+(a noise does not span 0–1), and `Texture.Preview` for its intermediate maps
+(`docs/api/Texture.md`). Then render the finished material with
+`Debug.PreviewMaterial` (`docs/api/Debug.md`, *The preview*) on the mesh that
+matches its use, and open the PNG: `{ mesh = "plane", repeats = 3 }` for a wall or
+floor, which shows whether a stain repeats every tile and whether the normal map's
+relief reads under a raking light; the sphere or cube for a prop. Pass `repeats` to
+see it tile; leave it out to see its real scale (a world-mapped material at its own
+`world_size`). `Debug.Preview`
+does the same for a texture, model or shader file.
 
 ## Play-testing headlessly
 

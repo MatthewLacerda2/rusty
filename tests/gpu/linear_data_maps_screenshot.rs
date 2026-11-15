@@ -17,10 +17,10 @@ use rusty::scene::{Camera, Scene};
 
 /// The mean absolute per-channel difference (0–255) two frames may differ by and
 /// still read as the same shading: the 128 → 0.502 quantisation, nothing more.
-const SAME: f64 = 1.5;
+pub(super) const SAME: f64 = 1.5;
 
 /// Write a 2x2 solid-RGB PNG (alpha 255) and return its path.
-fn png(name: &str, rgb: [u8; 3]) -> String {
+pub(super) fn png(name: &str, rgb: [u8; 3]) -> String {
     let path = crate::temp::dir().join(name);
     let img = image::RgbaImage::from_pixel(2, 2, image::Rgba([rgb[0], rgb[1], rgb[2], 255]));
     img.save(&path).expect("write png");
@@ -29,7 +29,7 @@ fn png(name: &str, rgb: [u8; 3]) -> String {
 
 /// An ambient- and lamp-lit up-facing plane carrying `material`; the lamp's
 /// highlight is what roughness spreads.
-fn scene(material: MaterialAsset) -> Scene {
+pub(super) fn scene(material: MaterialAsset) -> Scene {
     let mut s = super::normal_emissive_maps_screenshot::scene(material);
     let lamp = s.add_entity("Lamp".to_string());
     s.world.transform_mut(lamp).expect("transform").position = Vec3::new(1.0, 3.0, 0.0);
@@ -45,7 +45,7 @@ fn scene(material: MaterialAsset) -> Scene {
 }
 
 /// Render `scene` to `name`; `None` when no adapter exists.
-fn frame(scene: &Scene, name: &str) -> Option<image::RgbImage> {
+pub(super) fn frame(scene: &Scene, name: &str) -> Option<image::RgbImage> {
     let cam = Camera::new(Vec3::new(0.0, 12.0, 0.0), 0.0, -90.0);
     let path = crate::temp::dir().join(name);
     capture(scene, &cam, &path, 96, 96)
@@ -55,7 +55,7 @@ fn frame(scene: &Scene, name: &str) -> Option<image::RgbImage> {
 }
 
 /// Mean absolute per-channel difference between two frames.
-fn diff(a: &image::RgbImage, b: &image::RgbImage) -> f64 {
+pub(super) fn diff(a: &image::RgbImage, b: &image::RgbImage) -> f64 {
     let sum: u64 = a
         .as_raw()
         .iter()

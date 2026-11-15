@@ -13,6 +13,7 @@
 
 mod detail;
 mod library;
+mod maps;
 mod shader_params;
 mod slots;
 mod surface;
@@ -94,10 +95,7 @@ fn draw_material(
     component_card(ui, icon::PAINT_BRUSH, "Material", Some(&mut remove), |ui| {
         draw_material_factors(ui, materials, key, is_dirty);
 
-        optional_map(ui, "Use Metallic Map", materials, key, MapKind::Metallic);
-        optional_map(ui, "Use Roughness Map", materials, key, MapKind::Roughness);
-        optional_map(ui, "Use Normal Map", materials, key, MapKind::Normal);
-        optional_map(ui, "Use Emissive Map", materials, key, MapKind::Emissive);
+        maps::draw(ui, materials, key);
         surface::draw_fields(ui, COORDINATE_FIELDS, materials, key, is_dirty);
         detail::draw(ui, materials, key, is_dirty);
 
@@ -226,63 +224,6 @@ fn factor_slider(ui: &mut egui::Ui, label: &str, mut value: f32) -> Option<f32> 
     })
     .inner
     .then_some(value)
-}
-
-/// Which optional map a checkbox controls — selects the shared setter + the field to
-/// read the current path from.
-#[derive(Clone, Copy)]
-enum MapKind {
-    Metallic,
-    Roughness,
-    Normal,
-    Emissive,
-}
-
-impl MapKind {
-    /// Read this map's current path from the asset.
-    fn get(self, m: &MaterialAsset) -> &Option<MapRef> {
-        match self {
-            MapKind::Metallic => &m.metallic_map,
-            MapKind::Roughness => &m.roughness_map,
-            MapKind::Normal => &m.normal_map,
-            MapKind::Emissive => &m.emissive_map,
-        }
-    }
-
-    /// Route a new path (or `None`) through the matching shared op.
-    fn set(self, materials: &mut BTreeMap<String, MaterialAsset>, key: &str, path: Option<String>) {
-        match self {
-            MapKind::Metallic => mat_ops::set_metallic_map(materials, key, path),
-            MapKind::Roughness => mat_ops::set_roughness_map(materials, key, path),
-            MapKind::Normal => mat_ops::set_normal_map(materials, key, path),
-            MapKind::Emissive => mat_ops::set_emissive_map(materials, key, path),
-        }
-    }
-}
-
-/// A "Use X Map" checkbox that, when ticked, reveals an editable map-path field.
-/// Toggling the checkbox enables (empty path) or clears the optional map; edits route
-/// through the shared op.
-fn optional_map(
-    ui: &mut egui::Ui,
-    label: &str,
-    materials: &mut BTreeMap<String, MaterialAsset>,
-    key: &str,
-    kind: MapKind,
-) {
-    let current = kind.get(&materials[key]).clone();
-    let mut enabled = current.is_some();
-    if ui.checkbox(&mut enabled, label).changed() {
-        kind.set(materials, key, enabled.then(String::new));
-    }
-    if let Some(mut path) = kind.get(&materials[key]).as_ref().map(MapRef::to_string) {
-        ui.horizontal(|ui| {
-            ui.label("  Path:");
-            if ui.text_edit_singleline(&mut path).changed() {
-                kind.set(materials, key, Some(path));
-            }
-        });
-    }
 }
 
 impl crate::inspector::components::add::AddEntry for rusty_components::MaterialComponent {

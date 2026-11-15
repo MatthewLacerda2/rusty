@@ -3,30 +3,31 @@
 //! Straight from [`rusty_procgen::recipe::OPS`], so what the agent reads is what
 //! the parser accepts, which params take a link included. After the ops come the
 //! project's graphs (#1744), each `.graph.json` under the project root as one
-//! `op = "graph"` entry with its `path`, its inputs and its declared params.
-
-use std::path::Path;
+//! `op = "graph"` entry with its `path`, its inputs and its declared params, then
+//! the engine's (#2185), each by its `engine/…` path, listed the same way.
 
 use mlua::{Lua, Table, Value};
 
 use crate::api::lua_json::to_lua;
-use rusty_edit::authoring::material::{project_graphs, read_graph};
+use rusty_core::project::ContentRoots;
+use rusty_edit::authoring::material::{listed_graphs, read_graph};
 use rusty_procgen::graph::ParamDecl;
 use rusty_procgen::recipe::{Lit, OpInfo, OpParam, OPS};
 use rusty_procgen::TextureRecipe;
 
 /// `{ {op, category, min_inputs, max_inputs, params = { {name, type, default, required, socket, values?} } }, … }`.
 /// `socket` says whether the param takes a link to another node as well as a
-/// number (#1494). The graphs under `root` follow, each with `path` and `inputs`
-/// (the names it wires, in order) too, its params carrying `min` / `max` when
-/// declared. A graph file that doesn't parse is left out, with a warning naming it.
-pub fn ops_table(lua: &Lua, root: &Path) -> mlua::Result<Table> {
+/// number (#1494). The graphs under the project root and then the engine's
+/// follow ([`listed_graphs`]), each with `path` and `inputs` (the names it wires,
+/// in order) too, its params carrying `min` / `max` when declared. A graph file
+/// that doesn't parse is left out, with a warning naming it.
+pub fn ops_table(lua: &Lua, roots: &ContentRoots) -> mlua::Result<Table> {
     let mut rows = OPS
         .iter()
         .map(|info| op_table(lua, info))
         .collect::<mlua::Result<Vec<_>>>()?;
-    for path in project_graphs(root) {
-        match read_graph(&path, root) {
+    for path in listed_graphs(roots) {
+        match read_graph(&path, roots) {
             Ok(graph) => rows.push(graph_table(lua, &path, &graph)?),
             Err(e) => log::warn!("[Texture] Ops() leaves out graph {path:?}: {e}"),
         }
@@ -112,6 +113,7 @@ fn lit(lua: &Lua, l: Lit) -> mlua::Result<Value> {
 #[cfg(test)]
 mod tests {
     use mlua::Lua;
+    use rusty_core::project::ContentRoots;
 
     #[test]
     fn ops_reports_which_params_take_a_link() {
@@ -145,12 +147,16 @@ mod tests {
             u8,
         ) = lua
             .load(
-                r#"local ops, by_op = Texture.Ops(), {}
-                   for _, o in ipairs(ops) do by_op[o.op] = o end
+                r#"local ops, by_op, count = Texture.Ops(), {}, 0
+                   for _, o in ipairs(ops) do
+                     by_op[o.op] = o
+                     -- the engine's graphs follow the ops: count the ops alone
+                     if o.op ~= "graph" then count = count + 1 end
+                   end
                    local o, mix = by_op.noise, by_op.mix
                    local by = {}
                    for _, p in ipairs(o.params) do by[p.name] = p end
-                   return #ops, o.category, o.max_inputs, by.octaves.default,
+                   return count, o.category, o.max_inputs, by.octaves.default,
                      by.scale.required, table.concat(by.kind.values, "|"),
                      mix.min_inputs, mix.max_inputs"#,
             )
@@ -171,7 +177,10 @@ mod tests {
 
     #[test]
     fn ops_lists_the_projects_graphs_with_their_interface() {
-        let root = rusty_test_support::temp::dir().join("rusty_texture_ops_graphs_1744");
+        let base = rusty_test_support::temp::dir().join("rusty_texture_ops_graphs_1744");
+        let root = base.join("game");
+        // An empty engine folder: the engine's own graphs would follow the project's.
+        let roots = ContentRoots::with_engine(&root, &base.join("engine"));
         std::fs::create_dir_all(root.join("textures")).unwrap();
         let graph = serde_json::json!({
             "resolution": 8, "inputs": ["mask"],
@@ -182,9 +191,8 @@ mod tests {
         std::fs::write(file, graph.to_string()).unwrap();
         std::fs::write(root.join("broken.graph.json"), "{").unwrap();
         let lua = Lua::new();
-        lua.globals()
-            .set("OPS", super::ops_table(&lua, &root).unwrap())
-            .unwrap();
+        let ops = super::ops_table(&lua, &roots).unwrap();
+        lua.globals().set("OPS", ops).unwrap();
         let (count, path, inputs, name, max): (usize, String, u8, String, f64) = lua
             .load(
                 r#"local g = OPS[#OPS]
@@ -200,5 +208,28 @@ mod tests {
         );
         assert_eq!(path, "textures/wear.graph.json");
         assert_eq!((inputs, name.as_str(), max), (1, "mask/age", 1.0));
+    }
+
+    #[test]
+    fn ops_lists_the_engines_graphs_by_their_engine_path() {
+        let base = rusty_test_support::temp::dir().join("rusty_texture_ops_engine_2185");
+        let roots = ContentRoots::with_engine(&base.join("game"), &base.join("engine"));
+        let library = roots.engine.join("textures").join("library");
+        std::fs::create_dir_all(&library).unwrap();
+        std::fs::create_dir_all(&roots.project).unwrap();
+        let graph = serde_json::json!({
+            "resolution": 8, "inputs": ["mask"],
+            "nodes": [{ "id": "i", "op": "invert", "inputs": ["mask"] }]
+        });
+        std::fs::write(library.join("rust.graph.json"), graph.to_string()).unwrap();
+        let lua = Lua::new();
+        let ops = super::ops_table(&lua, &roots).unwrap();
+        lua.globals().set("OPS", ops).unwrap();
+        let (op, path, input): (String, String, String) = lua
+            .load(r#"local g = OPS[#OPS] return g.op, g.path, g.inputs[1]"#)
+            .eval()
+            .unwrap();
+        let want = ("graph", "engine/textures/library/rust.graph.json", "mask");
+        assert_eq!((op.as_str(), path.as_str(), input.as_str()), want);
     }
 }

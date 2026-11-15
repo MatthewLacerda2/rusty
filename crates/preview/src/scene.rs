@@ -2,7 +2,7 @@
 //!
 //! [`build_preview_scene`] is the single entry point: given a mesh choice and a
 //! preview subject, it returns a brand-new [`Scene`] — never the active editor
-//! World — carrying the preview mesh (or the model itself), a hardcoded key light,
+//! World — carrying the preview mesh (or the model itself), a hardcoded light,
 //! and an empty `skybox_path` so the renderer's existing panorama/gradient fallback
 //! (`render/ibl/skybox.rs`) draws a procedural sky with no new baking step. The
 //! scene is thrown away and rebuilt whenever the subject or mesh choice changes
@@ -16,11 +16,13 @@
 
 use std::path::Path;
 
-use glam::{Quat, Vec3};
+use glam::Vec3;
 
 use rusty_components::{MaterialAsset, MaterialComponent};
 use rusty_edit::authoring::{self, Primitive};
 use rusty_scene::{LightComponent, LightType, Scene};
+
+use crate::stand_in;
 
 /// The bundled preview mesh (#352): a hardcoded `.obj`, never a project asset — it
 /// lives in the engine's own content (`engine/`, found from any project), never in
@@ -38,6 +40,9 @@ rusty_core::named_enum! {
         Sphere = "Sphere",
         Cube = "Cube",
         Suzanne = "Suzanne",
+        /// A flat square seen from a low angle under a raking light: the view a
+        /// tiling wall or floor is judged at ([`crate::stand_in`]).
+        Plane = "Plane",
     }
 }
 
@@ -55,7 +60,7 @@ pub enum PreviewSubject {
     Texture(String),
     /// A `.wgsl` shader file: the preview mesh with default material maps, shaded by
     /// this module. The scene itself carries only the default material; the render
-    /// call swaps the pipeline's shader (see `render_preview_scene` in `main.rs`).
+    /// call swaps the pipeline's shader (see `shell::editor::viewport::render_preview_scene`).
     Shader(String),
     /// An already-resolved material asset — from the entity's `MaterialComponent`
     /// card, or looked up by name by `Debug.PreviewMaterial` (#404) — since materials
@@ -78,13 +83,21 @@ impl PreviewSubject {
 }
 
 /// Build a fresh, isolated preview [`Scene`]: empty skybox path (gradient sky, #352),
-/// a hardcoded directional key light, and the requested subject. Never mutates or
-/// reads the active editor scene.
-pub fn build_preview_scene(mesh: PreviewMesh, subject: &PreviewSubject) -> Scene {
+/// a hardcoded directional light (raking across the plane, a three-quarter key on
+/// every other stand-in), and the requested subject, its material drawn `repeats`
+/// times across the stand-in, or as authored for `None` ([`stand_in::repeated`],
+/// whose refusal of a count the renderer cannot show is the error). A model ignores
+/// `mesh` and `repeats`. Never mutates or reads the active editor scene.
+pub fn build_preview_scene(
+    mesh: PreviewMesh,
+    repeats: Option<u32>,
+    subject: &PreviewSubject,
+) -> Result<Scene, String> {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
 
-    add_key_light(&mut scene);
+    add_key_light(&mut scene, stand_in::stand_in(mesh, subject));
+    let repeated = |material| stand_in::repeated(material, mesh, repeats);
 
     match subject {
         PreviewSubject::Model(path) => spawn_model(&mut scene, path),
@@ -94,31 +107,27 @@ pub fn build_preview_scene(mesh: PreviewMesh, subject: &PreviewSubject) -> Scene
                 base_color_map: Some(path.as_str().into()),
                 ..MaterialAsset::default()
             };
-            attach_material(&mut scene, id, material);
+            attach_material(&mut scene, id, repeated(material)?);
         }
         PreviewSubject::Shader(_) => {
             let id = spawn_preview_mesh(&mut scene, mesh);
-            attach_material(&mut scene, id, MaterialAsset::default());
+            attach_material(&mut scene, id, repeated(MaterialAsset::default())?);
         }
         PreviewSubject::Material(material) => {
             let id = spawn_preview_mesh(&mut scene, mesh);
-            attach_material(&mut scene, id, (**material).clone());
+            attach_material(&mut scene, id, repeated((**material).clone())?);
         }
     }
 
-    scene
+    Ok(scene)
 }
 
-/// A single hardcoded directional light, angled like a classic 3/4 key light.
-fn add_key_light(scene: &mut Scene) {
+/// A single hardcoded directional light, posed for what is `shown`
+/// ([`stand_in::light_pose`]).
+fn add_key_light(scene: &mut Scene, shown: Option<PreviewMesh>) {
     let id = scene.add_entity("PreviewLight".to_string());
     if let Some(mut transform) = scene.world.transform_mut(id) {
-        transform.rotation = Quat::from_euler(
-            glam::EulerRot::YXZ,
-            (-40.0f32).to_radians(),
-            (-35.0f32).to_radians(),
-            0.0,
-        );
+        transform.rotation = stand_in::light_pose(shown);
     }
     scene.world.set_light(
         id,
@@ -137,8 +146,9 @@ fn add_key_light(scene: &mut Scene) {
     );
 }
 
-/// Spawn the sphere/cube primitive or the embedded Suzanne mesh at the origin
-/// (where the orbit camera always looks), returning its entity id.
+/// Spawn the stand-in, returning its entity id: the sphere, cube or embedded Suzanne
+/// at the origin, where the default orbit looks, or the plane at
+/// [`stand_in::PLANE_CENTRE`], past the origin its own framing looks at.
 fn spawn_preview_mesh(scene: &mut Scene, mesh: PreviewMesh) -> u32 {
     match mesh {
         PreviewMesh::Sphere => {
@@ -148,6 +158,34 @@ fn spawn_preview_mesh(scene: &mut Scene, mesh: PreviewMesh) -> u32 {
             authoring::create_drawn_entity(scene, "PreviewMesh", Some(Primitive::Box))
         }
         PreviewMesh::Suzanne => spawn_suzanne(scene),
+        PreviewMesh::Plane => spawn_plane(scene),
+    }
+}
+
+/// The stock `Plane` primitive, scaled to [`stand_in::PLANE_SIZE`] and placed at
+/// [`stand_in::PLANE_CENTRE`]; its UVs span it once, as a quad's do.
+fn spawn_plane(scene: &mut Scene) -> u32 {
+    let id = authoring::create_drawn_entity(scene, "PreviewMesh", Some(Primitive::Plane));
+    let native = plane_primitive_edge();
+    if let Some(mut transform) = scene.world.transform_mut(id) {
+        let edge = stand_in::PLANE_SIZE / native;
+        transform.position = stand_in::PLANE_CENTRE;
+        transform.scale = Vec3::new(edge, 1.0, edge);
+    }
+    id
+}
+
+/// The stock `Plane` primitive's own edge in metres, read off its geometry so the
+/// preview follows the primitive if its size ever changes.
+pub(crate) fn plane_primitive_edge() -> f32 {
+    let (vertices, _) =
+        rusty_scene::create::primitive_geometry(Primitive::Plane).unwrap_or_default();
+    let xs = vertices.iter().map(|v| v.position[0]);
+    let (min, max) = xs.fold((f32::MAX, f32::MIN), |(lo, hi), x| (lo.min(x), hi.max(x)));
+    if max > min {
+        max - min
+    } else {
+        1.0
     }
 }
 

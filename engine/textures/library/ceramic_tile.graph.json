@@ -1,0 +1,47 @@
+{
+  "resolution": 256,
+  "params": {
+    "wear": { "type": "number", "default": 0.3, "min": 0, "max": 1 },
+    "tint": { "type": "color", "default": "#cfd6d2" }
+  },
+  "nodes": [
+    { "id": "tile_stamp", "op": "shape", "kind": "rounded_rect", "size": [0.93, 0.93], "roundness": 0.12 },
+    { "id": "tiles", "op": "tile", "count": 8, "inputs": ["tile_stamp"] },
+    { "id": "tile_id", "op": "tile", "count": 8, "output": "random", "seed": 101, "inputs": ["tile_stamp"] },
+    { "id": "islands", "op": "flood_fill", "inputs": ["tiles"] },
+    { "id": "tilt", "op": "flood_gradient", "angle": 0, "angle_jitter": 1, "seed": 102, "inputs": ["islands"] },
+    { "id": "edge_in", "op": "distance", "radius": 0.007, "inputs": ["tiles"] },
+    { "id": "pillow", "op": "math", "func": "sqrt", "inputs": ["edge_in"] },
+
+    { "id": "picked", "op": "expression", "expr": "step(1 - 0.18 * k1, a) * step(0.02, a)", "k1": { "param": "wear" }, "inputs": ["tile_id"] },
+    { "id": "crack_cells", "op": "voronoi", "scale": 14, "output": "edges", "seed": 103 },
+    { "id": "cracks", "op": "expression", "expr": "(1 - smoothstep(0.0, 0.02, a)) * b * step(0.5, c)", "inputs": ["crack_cells", "picked", "tiles"] },
+    { "id": "edge_chips", "op": "graph", "path": "engine/textures/library/parts/edge_wear.graph.json", "params": { "amount": { "param": "wear" }, "width": 0.012, "breakup": 20 }, "inputs": ["tiles"], "seed": 104 },
+    { "id": "chips", "op": "expression", "expr": "a * step(0.45 + 0.45 * (1 - k1), b)", "k1": { "param": "wear" }, "inputs": ["edge_chips", "tile_id"] },
+
+    { "id": "relief", "op": "expression", "expr": "a * (0.6 + 0.15 * b + 0.1 * c) - 0.25 * d", "inputs": ["pillow", "tilt", "tile_id", "chips"] },
+    { "id": "cracked", "op": "expression", "expr": "a - 0.08 * b", "inputs": ["relief", "cracks"] },
+    { "id": "height", "op": "auto_levels", "inputs": ["cracked"] },
+    { "id": "normal", "op": "bump_to_normal", "strength": 0.08, "inputs": ["cracked"] },
+
+    { "id": "glaze", "op": "constant", "color": { "param": "tint" } },
+    { "id": "tile_tone", "op": "hue_sat_value", "hue": { "node": "tile_id", "min": -0.01, "max": 0.01 }, "sat": { "node": "tile_id", "min": 0.9, "max": 1.1 }, "value": { "node": "tile_id", "min": 0.9, "max": 1.06 }, "inputs": ["glaze"] },
+    { "id": "biscuit", "op": "constant", "color": "#b8ab98" },
+    { "id": "glazed", "op": "mix", "mode": "mix", "inputs": ["tile_tone", "biscuit", "chips"] },
+    { "id": "grout_grain_raw", "op": "noise", "kind": "fbm", "scale": 64, "octaves": 3, "seed": 105 },
+    { "id": "grout_grain", "op": "auto_levels", "inputs": ["grout_grain_raw"] },
+    { "id": "grout_col", "op": "color_ramp", "stops": [ { "pos": 0, "color": "#7f7a70" }, { "pos": 1, "color": "#a19b8f" } ], "inputs": ["grout_grain"] },
+    { "id": "laid", "op": "mix", "mode": "mix", "inputs": ["grout_col", "glazed", "tiles"] },
+    { "id": "grime", "op": "graph", "path": "engine/textures/library/parts/crevice_dirt.graph.json", "params": { "amount": { "param": "wear" }, "radius": 0.012, "breakup": 6 }, "inputs": ["cracked"], "seed": 106 },
+    { "id": "shade", "op": "expression", "expr": "(1 - 0.55 * a) * (1 - 0.6 * b)", "inputs": ["grime", "cracks"] },
+    { "id": "base_color", "op": "mix", "mode": "multiply", "inputs": ["laid", "shade"] },
+
+    { "id": "glaze_wear", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 4 }, "seed": 107 },
+    { "id": "roughness", "op": "expression", "expr": "clamp(mix(0.88 + 0.08 * (d - 0.5), 0.06 + 0.04 * b + 0.2 * c * k1, a), 0, 1)", "k1": { "param": "wear" }, "inputs": ["tiles", "tile_id", "glaze_wear", "grout_grain"] },
+    { "id": "roughness_c", "op": "expression", "expr": "max(a, 0.75 * max(b, c))", "inputs": ["roughness", "cracks", "chips"] },
+    { "id": "ao", "op": "ambient_occlusion", "radius": 0.012, "depth": 0.004, "quality": 8, "inputs": ["cracked"] },
+    { "id": "occlusion", "op": "levels", "out_low": 0.4, "inputs": ["ao"] }
+  ],
+  "output": "base_color",
+  "outputs": { "base_color": "base_color", "normal": "normal", "roughness": "roughness_c", "height": "height", "occlusion": "occlusion" }
+}

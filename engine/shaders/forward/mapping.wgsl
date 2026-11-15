@@ -20,7 +20,7 @@
 
 #define_import_path forward::mapping
 
-#import forward::bindings::{camera, material}
+#import forward::bindings::{camera, material, s_occlusion, s_specular, t_occlusion, t_specular}
 #import forward::maps::{map_factor, unpack_normal}
 
 const UV0: u32 = 0u;
@@ -133,6 +133,22 @@ fn mask(on: u32, t: texture_2d<f32>, s: sampler, c: MapCoords, packed: u32) -> f
         return 1.0;
     }
     return map_factor(sample(t, s, c), on, packed);
+}
+
+// The occlusion map's factor at `c` (#2151, glTF's `occlusionTexture`): its red,
+// lerped from 1 by the material's strength (`1 + strength * (occlusion - 1)`); 1
+// without a map, which is then never fetched.
+fn occlusion(c: MapCoords) -> f32 {
+    let m = material();
+    return 1.0 + m.occlusion_strength * (mask(m.use_occlusion_map, t_occlusion, s_occlusion, c, 0u) - 1.0);
+}
+
+// The dielectric's reflectance at `c`: its F0 in rgb and F90 in w (#1998), both
+// scaled by the specular-level map (#2151, `KHR_materials_specular`'s
+// `specularTexture`: alpha, red at 2), as the per-material `specular` scales them.
+fn dielectric_reflectance(c: MapCoords) -> vec4<f32> {
+    let m = material();
+    return m.dielectric_reflectance * mask(m.use_specular_map, t_specular, s_specular, c, 3u);
 }
 
 // The mip level whose texel covers as many texels of a `size`-texel texture as one

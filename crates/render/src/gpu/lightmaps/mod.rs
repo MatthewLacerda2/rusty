@@ -1,5 +1,6 @@
 //! Baked lightmaps on the GPU (#438, #1694): the scene's atlas pages as one 2D
-//! texture array at group 0, binding 14, with a clamped trilinear sampler at 15.
+//! texture array at group 0, binding 14, read through group 0's linear clamp sampler
+//! (18, `gpu::linear_clamp`).
 //! Each lightmapped instance carries its page and the scale/offset into it, so
 //! lightmapped copies of a prop still draw as one instanced call (Unity's lightmap
 //! index + scale/offset).
@@ -241,8 +242,8 @@ impl Lightmaps {
         self.masks.is_some()
     }
 
-    /// The bound colour, direction and shadowmask views and their sampler (the
-    /// fallback's when none is).
+    /// The bound colour, direction and shadowmask views (the fallback's when none
+    /// is).
     pub(crate) fn binding(&self) -> LightmapBinding<'_> {
         let array = self.current.as_deref().unwrap_or(&self.fallback);
         let directions = self.directions.as_deref().unwrap_or(&self.fallback);
@@ -251,18 +252,17 @@ impl Lightmaps {
             pages: &array.view,
             directions: &directions.view,
             masks: &masks.view,
-            sampler: &array.sampler,
         }
     }
 }
 
 /// What group 0 binds of the lightmaps: the colour (14), direction (16) and
-/// shadowmask (19) arrays, and the sampler all three read through (15).
+/// shadowmask (19) arrays, all three read through group 0's linear clamp sampler
+/// (18, `gpu::linear_clamp`).
 pub(crate) struct LightmapBinding<'a> {
     pub pages: &'a wgpu::TextureView,
     pub directions: &'a wgpu::TextureView,
     pub masks: &'a wgpu::TextureView,
-    pub sampler: &'a wgpu::Sampler,
 }
 
 /// Whether two bindings are the same array (or both none).

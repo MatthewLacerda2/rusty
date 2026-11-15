@@ -24,6 +24,9 @@
 //!   save never erases it.
 //! * **The background loading priority** (#2123, Unity's `backgroundLoadingPriority`):
 //!   a frame's budget for a `Scene.LoadAsync`'s GPU warm-up, for this run (`loading`).
+//! * **The editor's mailboxes** — the demo timeline (`demo`), the gizmo toggles
+//!   (`gizmos`) and the Game view's size (`game_view`, #2207): what a dev-only
+//!   `Editor.*` call asks of the editor window, taken at its frame boundary.
 //! * **The quit request** — `Application.Quit()` only *records* that the game asked to
 //!   quit. What that means is the host's call: the player closes the window, the editor
 //!   stops Play (Unity ignores `Quit` in the editor), and the headless harness ends the
@@ -59,13 +62,16 @@ use crate::settings::audio::AudioSettings;
 use crate::settings::decals::DecalLimits;
 use crate::settings::demos::DemoSettings;
 use crate::settings::graphics_options::{GraphicsOption, GraphicsOptions};
+use crate::settings::logs::LogSettings;
 use crate::settings::quality::QualityPresets;
 use crate::settings::render_scale::ProjectGraphics;
 
 mod demo;
+mod game_view;
 mod gizmos;
 mod host;
 mod loading;
+mod logs;
 mod quality;
 mod render_scale;
 mod reread;
@@ -73,6 +79,7 @@ mod reread;
 pub use loading::LoadingPriority;
 
 pub use demo::DemoRequest;
+pub use game_view::{letterbox, GameViewSetting, GameViewSize, MAX_GAME_VIEW_SIDE};
 pub use gizmos::{Gizmo, GizmoRow, SceneGizmos};
 
 /// The startup scene when none is configured: the seeded demo scene. Kept equal to
@@ -137,6 +144,8 @@ pub struct Application {
     demos: DemoSettings,
     /// The project's audio settings (#1749) as last read or set.
     audio: AudioSettings,
+    /// The project's rolling frame log (#2206) as last read or set.
+    logs: LogSettings,
     /// The bound file's text the budgets and presets were last parsed from, good or
     /// bad: the same text again is not re-parsed, so its warnings are not repeated.
     read_from: Option<String>,
@@ -157,6 +166,8 @@ pub struct Application {
     demo: demo::DemoDesk,
     /// The Scene view's gizmo mailbox (#1909).
     gizmos: gizmos::GizmoDesk,
+    /// The Game view's size mailbox (#2207).
+    game_view: game_view::GameViewDesk,
     /// Unity's `backgroundLoadingPriority` (#2123): a load's warm-up budget.
     loading_priority: LoadingPriority,
 }
@@ -190,8 +201,7 @@ impl Application {
         self.graphics = file.graphics;
         self.quality = file.quality;
         self.decal_limits = file.decals;
-        self.demos = file.demos;
-        self.audio = file.audio;
+        (self.demos, self.audio, self.logs) = (file.demos, file.audio, file.logs);
         Ok(())
     }
 
@@ -203,8 +213,7 @@ impl Application {
         self.graphics = settings.graphics;
         self.quality = settings.quality;
         self.decal_limits = settings.decals;
-        self.demos = settings.demos;
-        self.audio = settings.audio;
+        (self.demos, self.audio, self.logs) = (settings.demos, settings.audio, settings.logs);
     }
 
     /// The project settings this run plays under, as [`run_with`](Self::run_with)
@@ -218,6 +227,7 @@ impl Application {
             decals: self.decal_limits,
             demos: self.demos,
             audio: self.audio,
+            logs: self.logs,
         }
     }
 
@@ -281,7 +291,7 @@ impl Application {
         file.graphics_options = self.graphics_defaults;
         file.graphics = self.graphics;
         file.quality = self.quality.clone();
-        file.audio = self.audio;
+        (file.audio, file.logs) = (self.audio, self.logs);
         file.write(path)
     }
 }

@@ -1,5 +1,6 @@
 //! The surface fields of a material (#1523): URP Lit's blending and shadow toggles,
-//! glTF's `KHR_materials_ior` and `KHR_materials_specular` reflectance (#1998), and
+//! glTF's `KHR_materials_ior` and `KHR_materials_specular` reflectance (#1998), the
+//! occlusion map's strength (#2151), and
 //! HDRP Lit's refraction, absorption, sorting priority (#2039), depth postpass, motion vectors,
 //! SSR (opaque and transparent, #2004) and thin translucency, and TAA's reactivity (#1845), as rows of the material field table (`field.rs`).
 //!
@@ -133,6 +134,17 @@ pub static SURFACE_FIELDS: &[SurfaceField] = &[
         put: |m, v| m.specular_color = color(v),
     },
     SurfaceField {
+        key: "occlusion_strength",
+        api: "OcclusionStrength",
+        label: "Occlusion Strength",
+        // glTF's `occlusionTexture.strength` (#2151): how much of the map applies.
+        kind: SurfaceKind::Number(0.0..=1.0),
+        shown: |m| m.occlusion_map.is_some(),
+        get: |m| SurfaceValue::Number(m.occlusion_strength),
+        hint: no_hint,
+        put: |m, v| m.occlusion_strength = number(v),
+    },
+    SurfaceField {
         key: "thickness",
         api: "Thickness",
         label: "Thickness",
@@ -257,17 +269,19 @@ pub fn import_reflectance(m: &mut MaterialAsset, ior: f32, specular: f32, color:
     } else {
         (ior, color)
     };
-    for (key, value) in [
-        ("ior", SurfaceValue::Number(ior)),
-        ("specular", SurfaceValue::Number(specular)),
-        ("specular_color", SurfaceValue::Color(color)),
-    ] {
-        let Some(field) = SURFACE_FIELDS.iter().find(|f| f.key == key) else {
-            continue;
-        };
-        if let Ok(value) = field.check(value) {
-            (field.put)(m, value);
-        }
+    import_field(m, "ior", SurfaceValue::Number(ior));
+    import_field(m, "specular", SurfaceValue::Number(specular));
+    import_field(m, "specular_color", SurfaceValue::Color(color));
+}
+
+/// Write an imported value into `m` through the row `key` names, clamped as an
+/// authored one is; a value of the wrong kind is dropped.
+pub fn import_field(m: &mut MaterialAsset, key: &str, value: SurfaceValue) {
+    let Some(field) = SURFACE_FIELDS.iter().find(|f| f.key == key) else {
+        return;
+    };
+    if let Ok(value) = field.check(value) {
+        (field.put)(m, value);
     }
 }
 

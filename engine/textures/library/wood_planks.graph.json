@@ -1,0 +1,54 @@
+{
+  "resolution": 256,
+  "params": {
+    "wear": { "type": "number", "default": 0.3, "min": 0, "max": 1 },
+    "tint": { "type": "color", "default": "#8a5a36" }
+  },
+  "nodes": [
+    { "id": "full", "op": "constant", "color": [1, 1, 1, 1] },
+    { "id": "row_shift", "op": "tile", "count": 1, "aspect": [1, 16], "output": "random", "seed": 91, "inputs": ["full"] },
+    { "id": "row_split", "op": "tile", "count": 1, "aspect": [1, 16], "output": "random", "seed": 92, "inputs": ["full"] },
+    { "id": "joints", "op": "expression", "expr": "max(1 - smoothstep(0.0, 0.0025 * (1 + floor(3 * b)), fract((1 + floor(3 * b)) * u + a)), 1 - smoothstep(0.0, 0.0025 * (1 + floor(3 * b)), 1 - fract((1 + floor(3 * b)) * u + a)))", "inputs": ["row_shift", "row_split"] },
+    { "id": "seams", "op": "expression", "expr": "max(1 - smoothstep(0.0, 0.045, fract(16 * v)), 1 - smoothstep(0.0, 0.045, 1 - fract(16 * v)))" },
+    { "id": "boards", "op": "expression", "expr": "(1 - a) * (1 - b)", "inputs": ["joints", "seams"] },
+    { "id": "islands", "op": "flood_fill", "threshold": 0.5, "inputs": ["boards"] },
+    { "id": "board_id", "op": "flood_random", "seed": 93, "inputs": ["islands"] },
+    { "id": "board_id2", "op": "flood_random", "seed": 94, "inputs": ["islands"] },
+
+    { "id": "rings", "op": "wave", "kind": "bands", "frequency": 40, "profile": "sine", "distortion": 6, "detail": 4, "seed": 95 },
+    { "id": "rings_along", "op": "mapping", "rotation": 0.25, "inputs": ["rings"] },
+    { "id": "fibres", "op": "anisotropic_noise", "scale": 128, "anisotropy": 24, "angle": 0, "seed": 96 },
+    { "id": "knot", "op": "shape", "kind": "circle", "size": [0.8, 0.8], "profile": "paraboloid" },
+    { "id": "knots", "op": "scatter", "amount": 10, "scale": 0.035, "scale_jitter": 0.6, "spacing": 0.5, "seed": 97, "inputs": ["knot"] },
+    { "id": "knot_halo", "op": "blur", "radius": 0.02, "inputs": ["knots"] },
+    { "id": "grain_bent", "op": "directional_warp", "strength": 0.05, "angle": 0.25, "inputs": ["rings_along", "knot_halo"] },
+    { "id": "grain_sheet", "op": "expression", "expr": "clamp(0.65 * a + 0.35 * b - 0.8 * c, 0, 1)", "inputs": ["grain_bent", "fibres", "knots"] },
+    { "id": "board_coords", "op": "expression", "r": "u + 0.61 * a", "g": "v + 0.37 * b", "b": "0", "inputs": ["board_id", "board_id2"] },
+    { "id": "grain", "op": "sample_at", "inputs": ["grain_sheet", "board_coords"] },
+
+    { "id": "walk", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 3 }, "seed": 98 },
+    { "id": "traffic", "op": "expression", "expr": "clamp((1 - smoothstep(0.05, 0.3, abs(v - 0.5))) * (0.55 + 0.6 * a) * k1 * 1.3, 0, 1)", "k1": { "param": "wear" }, "inputs": ["walk"] },
+
+    { "id": "relief", "op": "expression", "expr": "0.75 * a + 0.06 * b + 0.04 * c - 0.03 * d", "inputs": ["boards", "board_id", "grain", "traffic"] },
+    { "id": "board_level", "op": "expression", "expr": "0.55 * a + 0.35 * b + 0.1 * c", "inputs": ["board_id", "grain", "board_id2"] },
+    { "id": "board_level_n0", "op": "auto_levels", "inputs": ["board_level"] },
+    { "id": "board_level_n", "op": "levels", "in_low": 0.4, "in_high": 0.95, "inputs": ["board_level_n0"] },
+    { "id": "height", "op": "mix", "mode": "multiply", "inputs": ["board_level_n", "boards"] },
+    { "id": "normal", "op": "bump_to_normal", "strength": 0.03, "inputs": ["relief"] },
+
+    { "id": "wood", "op": "constant", "color": { "param": "tint" } },
+    { "id": "board_tone", "op": "hue_sat_value", "hue": { "node": "board_id", "min": -0.02, "max": 0.02 }, "sat": { "node": "board_id2", "min": 0.85, "max": 1.15 }, "value": { "node": "board_id", "min": 0.7, "max": 1.25 }, "inputs": ["wood"] },
+    { "id": "grain_shade", "op": "expression", "expr": "0.5 + 0.75 * a", "inputs": ["grain"] },
+    { "id": "figured", "op": "mix", "mode": "multiply", "inputs": ["board_tone", "grain_shade"] },
+    { "id": "bleached", "op": "hue_sat_value", "hue": 0, "sat": 0.55, "value": 1.35, "inputs": ["figured"] },
+    { "id": "walked", "op": "mix", "mode": "mix", "inputs": ["figured", "bleached", "traffic"] },
+    { "id": "gap_col", "op": "constant", "color": "#2a2018" },
+    { "id": "base_color", "op": "mix", "mode": "mix", "inputs": ["gap_col", "walked", "boards"] },
+
+    { "id": "roughness", "op": "expression", "expr": "clamp(mix(0.92, 0.48 + 0.14 * b + 0.3 * c, a), 0, 1)", "inputs": ["boards", "grain", "traffic"] },
+    { "id": "ao", "op": "ambient_occlusion", "radius": 0.006, "depth": 0.002, "quality": 8, "inputs": ["relief"] },
+    { "id": "occlusion", "op": "levels", "out_low": 0.45, "inputs": ["ao"] }
+  ],
+  "output": "base_color",
+  "outputs": { "base_color": "base_color", "normal": "normal", "roughness": "roughness", "height": "height", "occlusion": "occlusion" }
+}

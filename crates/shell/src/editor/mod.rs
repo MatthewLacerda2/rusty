@@ -39,7 +39,7 @@ use super::{frame::Host, pace::Pace, Frontend, Shell};
 use crate::input::GameViewRect;
 use rusty_app::{GameWorld, PlayTransition};
 use rusty_core::input::CursorState;
-use rusty_editor::{EditorUi, ViewportInteraction, ViewportTab};
+use rusty_editor::{EditorUi, ViewportInteraction};
 use rusty_render::RenderView;
 use rusty_scene::SceneId;
 
@@ -162,8 +162,11 @@ impl EditorFrontend {
         }
         if self.demo_size().is_none() {
             // Before `sync_quality` resolves the render scale on it (#1715); an open
-            // demo replays the scale it recorded.
-            crate::settings::report_display_scale(shell, game);
+            // demo replays the scale it recorded; a fixed size and "1x on HiDPI"
+            // report 1 (#2207), from the setting this frame drew with.
+            let scale =
+                (self.editor_ui.game_view).display_scale(shell.window.scale_factor() as f32);
+            game.resources.screen.borrow_mut().set_display_scale(scale);
         }
         self.sync_shared(shell, game);
         self.title.sync(&shell.window, &mut self.editor_ui, game);
@@ -278,14 +281,11 @@ impl Frontend for EditorFrontend {
         // known, before egui paints) so the `egui::Image` samples this frame's render.
         let ppp = shell.window.scale_factor() as f32;
         self.update_game_focus(game, &interaction);
-        self.game_view = (interaction.tab == ViewportTab::Game)
-            .then(|| viewport::target_size(interaction.size, ppp))
-            .flatten()
-            .map(|render| game_focus::game_view_rect(&interaction, ppp, render));
+        self.game_view = game_focus::game_view(&interaction, ppp);
         self.render_viewport_scene(shell, game, &interaction, ppp);
         self.recorded_viewport_interaction(game, &interaction, ppp);
         // Only when the Inspector's Preview tab requested one this frame (#352).
-        self.render_preview_scene(shell, ppp);
+        self.render_preview(shell, ppp);
 
         self.paint(shell, target);
     }

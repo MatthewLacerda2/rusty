@@ -40,6 +40,8 @@ pub(crate) struct GlobalBindings {
     pub sky_reflection: SkyReflection,
     /// The integrated volumetric fog group 0 binds (#1703).
     pub fog_volume: SharedVolume,
+    /// The sampler group 0 reads its cubes, lightmap pages and fog volume through.
+    pub linear_clamp: wgpu::Sampler,
 }
 
 /// The forward-lit, line, outline and skybox passes — everything that draws into
@@ -216,15 +218,17 @@ fn create_global_bindings(
     let lightmaps = Lightmaps::new(device, false);
     let sky_reflection = SkyReflection::new(device, registry);
     let fog_volume = SharedVolume::new(device);
+    let linear_clamp = crate::gpu::linear_clamp(device);
     let global_bind_group = GlobalGroup {
         camera: &camera_buffer,
         lighting: &lighting_buffer,
-        skybox: (sky_reflection.view(None), &sky_reflection.sampler),
-        cube: (&reflection_probes.view, &reflection_probes.sampler),
+        skybox: sky_reflection.view(None),
+        cube: &reflection_probes.view,
         clusters: &clusters,
         decals: &decals,
         lightmaps: lightmaps.binding(),
-        fog_volume: (fog_volume.view(), &fog_volume.sampler),
+        fog_volume: fog_volume.view(),
+        linear_clamp: &linear_clamp,
     }
     .create(device, camera_lighting_layout);
 
@@ -238,6 +242,7 @@ fn create_global_bindings(
         reflection_probes,
         sky_reflection,
         fog_volume,
+        linear_clamp,
     }
 }
 

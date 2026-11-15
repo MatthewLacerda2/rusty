@@ -21,6 +21,9 @@ if Debug then Debug.Log("only in a dev build") end
 | `Debug.Preview` | `(asset_path, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
 | `Debug.PreviewMaterial` | `(name, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
 | `Debug.Stats` | `([opts])` | a **table**: the frame stats — timings and counters (below) of the current Play session; `opts.window = n` (a whole number ≥ 1, or `math.huge` for everything kept) summarises only the newest `n` frames, edit mode's too; any other option key raises |
+| `Debug.FrameLog` | `([opts])` | a **table** `{ path, records, skipped, truncated, dropped }`: a slice of the rolling frame log on disk (below), oldest first; `opts` are `last_seconds`, `over_ms`, `channel` and `limit` (a look-back is returned whole; without one, the newest 600); `truncated` is at least how many matches a limit left out; any other key raises |
+| `Debug.SetLogChannels` | `(switches)` | — : turns the frame log's named channels on or off (`{ audio = false }`), kept in `project.rusty` when a project is open; an unknown channel raises and changes nothing |
+| `Debug.GetLogChannels` | `()` | a **table**: each channel's name → `true` / `false` |
 | `Debug.AudioEvents` | `([after_seq])` | an **array** of the audio event log's entries whose `seq` is greater than `after_seq` (default `0`, all), oldest first, **and** the oldest `seq` the log still holds (below) |
 | `Debug.GetAdaptedExposure` | `()` | `number` (EV): the automatic exposure the screen last applied, read back from the GPU a frame or so late (exactly, in a headless capture); `nil` before an `Automatic` frame has metered (#1444; see `Graphics.md`, *Automatic exposure*) |
 | `Debug.AudioVoices` | `()` | an **array**: one roster row per entity carrying an `AudioSource` (below) |
@@ -62,7 +65,7 @@ end
 
 `Debug.Snapshot` is the structured read; **`Debug.Preview` is the visual one**. It
 renders an asset in the same isolated preview scene the editor's Inspector "Preview"
-tab shows a human — one stand-in mesh, a procedural sky, one key light — and writes it
+tab shows a human — one stand-in mesh, a procedural sky, one light — and writes it
 to a PNG, **headlessly**. That closes the authoring loop for shaders in particular:
 `Shader.Bake` proves a module *compiles*, and this shows what it *renders*.
 
@@ -97,17 +100,49 @@ Material.DefineAsset("brick", { base_color_map = "brick_albedo.png", roughness =
 Debug.PreviewMaterial("brick", "out/brick_mat.png", { mesh = "cube" })
 ```
 
-**Options** (all optional): `mesh` is `"sphere"` (default), `"cube"` or `"suzanne"` and
-is ignored for models; `resolution` is the square output's edge in pixels (default
-`512`, clamped to `16`–`4096`).
+**Options** (all optional; `mesh` and `repeats` are ignored for models):
 
-The framing is **fixed** — there are deliberately no camera parameters. Orbit/zoom is
+| Option | Values | Default | What it does |
+|---|---|---|---|
+| `mesh` | `"sphere"`, `"cube"`, `"suzanne"`, `"plane"` | `"sphere"` | the stand-in the subject is drawn on |
+| `repeats` | a whole number, 1 or more, up to what the renderer can show | left out: the material as authored | how many times the material repeats across the stand-in |
+| `resolution` | pixels | `512` | the square output's edge, clamped to `16`–`4096` |
+
+The sphere, cube and Suzanne are a **prop's** view: a three-quarter key light, the
+subject in the middle of the frame. The **plane** is a **tiling surface's** view (Unity's
+quad preview, tilted): a flat 4 m square seen from about 25° above its surface, filling
+the bottom of the frame with its far edge high in it, under a light raking across it at
+about 20°. That is how a player sees a floor or a corridor wall, and the angle at which
+a normal map's relief (mortar depth, grain, bevels) shows: the faces turned toward the
+light catch it, the ones turned away go dark.
+
+Pass `repeats` to see the material tile; leave it out to see its real scale. Left out,
+the material is drawn as authored: a UV-mapped one once across the stand-in (times its
+own `tiling`), a world-mapped one (`uv_mapping` `Planar` or `Triplanar`) at its own
+`world_size`, which shows its true texel density (the stand-ins are about 1 m across,
+the plane 4 m). Given, `repeats` multiplies a UV-mapped material's `tiling`, so a stain
+or crack that comes back every tile shows as a pattern; under a world mapping the
+preview's copy of the material has its `world_size` (and its detail layer's, in
+proportion) set so that `repeats × world_size` metres span the stand-in: the same
+number of repeats shows either way, and the camera never moves. The library's own asset
+is not changed. A count the renderer would clamp raises, naming the count that fits:
+`tiling` past ±1000, or a `world_size` outside 0.01–100 m (at most 400 repeats on the
+plane, 100 on the others, fewer with a fine detail layer).
+
+```lua no-run
+-- a wall or floor material: three repeats on the plane, to judge repetition and relief
+Debug.PreviewMaterial("brick", "out/brick_plane.png", { mesh = "plane", repeats = 3 })
+```
+
+`repeat` is a Lua keyword, so the option is spelled `repeats`.
+
+The framing is **fixed**, one per mesh — there are deliberately no camera parameters. Orbit/zoom is
 the human affordance in the editor; an agent needs the shot reproducible so two
 captures of the same asset are comparable pixel-for-pixel. Parent directories of
 `out_png` are created for you.
 
 Errors are raised for a caller mistake (a path that doesn't exist, an extension with no
-preview story, an unknown `mesh` name) so a typo can't quietly return a picture of an
+preview story, an unknown `mesh` name, a `repeats` below 1 or past what the renderer can show) so a typo can't quietly return a picture of an
 empty sky. The one non-error miss is a machine with no GPU or software adapter, where
 the call **returns `nil`** after a warning rather than failing the run.
 
@@ -146,9 +181,15 @@ Scene tab) or a load long ago leaves the window. Unlike the session, a window re
 in a fresh editor or after Stop it holds `wall_ms`, `fps` and the render keys of the
 tab on screen, while `frames` is `0` and the per-tick keys are absent once `n` frames
 were drawn without a tick. The newest 600 samples of each key are kept, so a wider
-window (`math.huge` too) reads those. It reads; it resets nothing, so two readers never disturb each
+window (`math.huge` too) reads those. `wall_ms` is the one key a frame gets late,
+once the next frame starts (its row, below), and before that frame's work: so a read
+during a frame (a script, the REPL, `session-mcp --attach`, the overlay) finds it on
+all `n` frames, the newest being the one before. Only a read between a frame's draw
+and the next frame's start would find the newest without it, and then a window's
+`wall_ms` covers `n - 1` frames while every other metric still covers `n`. It reads; it resets nothing, so two readers never disturb each
 other. Its one option is `window`: another key raises, naming it. The Game view's **Stats** overlay (`Editor.SetGizmo("Stats", true)`,
-[`Editor.md`](Editor.md)) shows `Debug.Stats{ window = 60 }`:
+[`Editor.md`](Editor.md)) shows `Debug.Stats{ window = 60 }`, its frame time the
+mean `wall_ms` over those 60 frames:
 
 ```lua
 local s = Debug.Stats{ window = 120 }   -- the last two seconds of a 60 Hz window
@@ -203,7 +244,7 @@ if s.gpu_ms then print(s.gpu_ms.avg) end                                -- times
 | `grade_lut_bakes` | views whose colour-grading LUT was rebaked this frame (#1440): a grading knob or the tonemap changed, or the view is new; `0` on every frame the grade holds |
 | `ui_mask_passes` / `ui_blur_passes` | UI `Mask` coverage textures rendered (#428) / fullscreen passes of the UI backdrop blur, its composite included — `0` with no backdrop visible (#426) |
 | `renderer_ms` | CPU ms `Renderer::render` took for the frame: recording it, resolving its GPU timestamps and submitting it. A cubemap capture (a reflection or light-probe bake) and the Inspector's preview are not the frame and are not in it |
-| `wall_ms` / `fps` | a window's frames only (#2205): wall-clock ms from the previous frame's start to this one's, the frame time a player feels (outside Play the editor draws on demand, so an idle gap counts whole), and the window clock's last whole-second reading: the frames drawn since its previous reading, over the seconds between them (at least one), so an editor redrawing on demand reads below 1. `fps` is absent for the window's first second, before the clock has a reading. Both are timings, never in a replay-stable `results.json` |
+| `wall_ms` / `fps` | a window's frames only (#2205): wall-clock ms from a frame's start to the next one's, the frame time a player feels, recorded on the frame that took it (as the frame log's `ms`) as the next frame starts, so it arrives one frame late (*Now, not the session*, above, says what a window sees); a frame the window could not show has no entry, so its time is dropped (the frame log keeps it) and the drawn frame before it keeps its own (outside Play the editor draws on demand, so an idle gap counts whole); `fps` is the window clock's last whole-second reading: the frames drawn since its previous reading, over the seconds between them (at least one), so an editor redrawing on demand reads below 1. `fps` is absent for the window's first second, before the clock has a reading. Both are timings, never in a replay-stable `results.json` |
 | `render_extracted` / `render_posed` / `render_extract_us` | the retained render scene's update this frame (#1706): objects re-derived whole (every mesh entity on a first frame, a load, an Undo, a Play restore, a lightmap or light probe change, or a renderer-side one such as a re-written texture; otherwise only the meshes whose mesh, material, activity, layer, static flag, light or shader overrides changed, those naming a library material that was added, removed or edited in what a draw's key reads (render mode, shader, a map path, face, a Cutout's test), those overriding the runtime params of a material whose params were edited, and those sharing a re-uploaded geometry; an edit of a material's colour, scalars or params alone rewrites its record in place and re-derives no other object, unless it flips a term a pass is chosen by, which re-derives every user: a glass's roughness crossing the SSR threshold, `depth_postpass`, `writes_motion`, `blend_mode`) / objects only re-placed because they moved / CPU µs the update took, inside `renderer_ms` (wall-clock). `0` / `0` on a frame that changed nothing |
 | `render_upload_bytes` | bytes the frame wrote into the forward pass's per-draw arrays (#1706), every camera summed: per-draw uniforms, joint palettes (and a motion-blurred view's last-frame poses), 16 bytes per drawn instance, proxy volumes, the 192-byte record of each material (per scene and variant) that changed, and the 240-byte record of each object that moved or changed, with the unchanged records between two changed ones fewer than 32 slots apart, rewritten so the two go in one write (a static, unchanged object costs only its instance). A shadow sweep's casters are not counted |
 | `asset_uploads` / `asset_upload_bytes` | scene assets the frame uploaded (#2123), and their bytes: mesh buffers (a mesh's vertex and index data, rewritten in place or new), texture files (a material map, a UI image, a particle texture, the sky's panorama: its GPU size, every mip) and lightmap page arrays. What a windowed `Scene.LoadAsync`'s GPU warm-up made before its scene was swapped in is counted on no frame, so the new scene's first frame reads `0` for what it warmed (`Scene.md`, *Loading in the background*) |
@@ -260,6 +301,99 @@ frame; a window's frame joins the session only in Play (above).
 Scenarios get the same table as `Harness.Stats()` and can turn it into pass/fail with
 `Harness.AssertBudget{ draw_calls = 2000, fixed_update_ms = 4 }` — see *Performance
 budgets* in `docs/testing.md`.
+
+### The frame log — looking back at a minute ago (#2206)
+
+`Debug.Stats` answers *now*; the frame log answers *then*. While a `dev` build's
+window runs — the **editor, on by default**, a `player` dev build only when the
+project says so — every drawn frame writes one JSON line under the project's
+`saved/logs/`, beside what the console said, so "a minute ago, by the bar" can be
+found after the fact with nothing armed beforehand (Unity's `Editor.log` plus the
+Profiler's ring of frames, as files an agent reads). It works during Play, after
+Stop, and from `session-mcp --attach`; a plain headless session reads what the
+editor last wrote. A headless harness run writes none. Every window frame is
+written, a frame the window could not show (a locked screen, an occluded window)
+included, since the sim and a bake still run then; `Debug.Stats` keeps no entry
+for such a frame, so its `ms` is in the log alone.
+
+```lua
+local log = Debug.FrameLog{ last_seconds = 60 }      -- the whole last minute, every channel
+local slow = Debug.FrameLog{ over_ms = 33 }          -- frames past 33 ms, newest 600
+print(slow.truncated)                                -- at least how many older ones the 600 left out
+for _, f in ipairs(slow.records) do
+  print(f.tick, f.ms, f.heaviest_pass, f.heaviest_system, f.cam[1], f.cam[3])
+end
+Debug.FrameLog{ channel = "console", last_seconds = 10 }   -- what was logged
+Debug.SetLogChannels{ audio = false }                -- kept in project.rusty, when a project is open
+```
+
+**Records.** Each line has `ch` (its channel), `t` (wall-clock ms since the Unix
+epoch) and `tick` (the Play tick, `0` in edit mode), written first. A `frames`
+record also has `frame`, the renderer's count of drawn frames (this frame's index
+when it drew, the last drawn one's when it drew nothing; it restarts with the
+window), places itself — `play`, `scene` (the open scene's path), `cam` and `fwd`
+(the game camera's position and facing) — and says what the frame cost: `ms` (its
+wall time), `fps`, `ticks` (sim ticks it ran) and `sim_ms` (their CPU ms), and,
+when it drew, `cpu_ms` (the renderer's), `gpu_ms`, `draws`, `tris`, `visible` and
+`culled`.
+
+**A line is whole: its own times.** `ms` is the frame's own wall time, from its
+start to the next frame's, so it holds its sim, its draw and any wait before the
+next; `gpu_ms` and `gpu_passes` are its own GPU times. Both arrive after the frame
+(its wall time when the next starts, its GPU times a frame or two after it drew),
+so the writer holds a frame's line, and the console, load and audio lines logged
+with it, until they are in, or for at most 4 later frames; whatever is missing
+then is named in `unresolved` (`"ms"`, `"gpu"`) instead of borrowing a
+neighbour's. An adapter without timestamps writes no GPU field and waits on none.
+The frames still held are the newest of the log, and `Debug.FrameLog` returns
+them from memory as they stand (the newest saying `unresolved = { "ms", "gpu" }`);
+when the window closes they are written as they stand. The files read the same
+with `jq` or `grep` as through `Debug.FrameLog`.
+
+| Channel | What it writes |
+|---|---|
+| `frames` | one record per drawn frame (above) |
+| `gpu_passes` | `gpu_passes = { <pass> = ms }` on a frame record, where the adapter has timestamps |
+| `systems` | `systems = { <name> = ms }` on a frame record: the systems whose CPU time over the frame's ticks reached 0.25 ms |
+| `console` | a record per console line: `level` (`info`, `warn`, `error`) and `msg`, every line as it came, past the console's 100-line buffer. A warning repeated within a frame is one line with `times` (how many); one repeated every frame is one line per frame, so it is found in any look-back |
+| `loads` | a record per finished Play-mode scene load (`Scene.Load`, `Scene.LoadAsync`): `load_ms` and `steps = { <step> = ms }`. An edit-mode load (File → Open) is not timed step by step: its frame's `ms` shows it, beside its `Scene loaded from …` console line |
+| `audio` | a record per audio event, the fields `Debug.AudioEvents` returns, its own `tick` (the sim tick it played on) as `event_tick` |
+
+**The read.** `last_seconds` keeps the records from the last that many seconds of
+the wall clock; `over_ms` keeps the frame records slower than that and names each
+one's `heaviest_pass` and `heaviest_system`; `channel` keeps one channel (`gpu_passes`
+and `systems` keep the frames that carry them; `dropped`, the writer's drop notes);
+`limit` keeps the newest that many (`math.huge` for all; without a `limit`, a
+`last_seconds` read returns every record in its span, and a read without either
+the newest 600). A read whose answer is full stops at the end of the segment that
+filled it, so `truncated` is *at least* how many matching records it left out (those
+in that segment). `dropped` sums the records dropped in the span of the records
+returned (from the oldest one's time, or the look-back's start). `path` is the
+folder, to open with `jq` or `grep`. A line that does not parse or is not UTF-8 —
+the last one, cut by a power cut or still being written — is skipped and counted
+in `skipped` (one older than the look-back is not). The read runs on the calling
+thread (the editor's, from a session) and parses only the lines it keeps. On a
+full 50 MB log (about 150 000 frames) from the page cache, in a dev build, the
+default read (the newest 600) took about 40 ms, a filter nothing matches (every
+segment read, no line parsed) about 0.3 s, and the worst case, a look-back that
+covers the whole log and returns every line, about 2 s before its table reaches
+Lua: ask for a span, or a `limit`.
+
+**Bounded.** The log is numbered segments, `frames-<n>.jsonl`, each a tenth of the
+budget (`project.rusty`, `"logs"`: `budget_mb`, default 50). Past the budget the
+oldest segment is deleted; `minutes` (optional) also deletes a segment whose newest
+record is older (`0`, like leaving it out, bounds the log by size alone). A restart numbers on, keeping the earlier session's segments under
+the same budget. `editor` and `player` say which hosts write it; `budget_mb = 0`
+writes none. The budget is read when the window opens; a channel switch through
+`Debug.SetLogChannels` or the checkbox takes effect the next frame (and is kept in
+`project.rusty` when a project is open; a host with none keeps it for the session), a hand edit of
+`project.rusty` at the next reread of the file. One process writes a project's log:
+a second (another editor, or a dev `player` with its log on) finds the folder's
+`.lock` held, warns once and writes nothing. The Build Settings window (File → Build Settings) has a checkbox per
+channel. A frame never waits on the disk: it hands its lines to a writer thread, and
+when that falls behind the lines are dropped and a `{ ch = "dropped", tick, records = n }`
+line says how many (`tick` is the newest dropped frame's); a frame that logs more
+than 1024 console lines drops the rest the same way.
 
 ### The audio reads — what played, where, and by whom (#1247)
 

@@ -8,12 +8,16 @@
 //! widget that turns pointer input into orbit updates. The machinery it draws lives in
 //! [`rusty_preview`]: the isolated scene builder and the camera rig, shared verbatim
 //! with the headless `Debug.Preview` capture (#353) so the agent sees what the human
-//! sees. The actual GPU render happens in `main.rs` (`render_preview_scene`), the same
-//! two-phase split the Scene/Game viewport uses (`editor/viewport/mod.rs`): this module
-//! only lays out the panel and records what to render next; `main.rs` is the only place
-//! a `Renderer` is in scope.
+//! sees. The actual GPU render happens in `shell::editor::viewport::render_preview_scene`
+//! (called by the window and by `editor-capture` alike), the same two-phase split the
+//! Scene/Game viewport uses (`editor/viewport/mod.rs`): this module only lays out the
+//! panel and records what to render next; the shell is the only place a `Renderer` is
+//! in scope.
 
-pub use rusty_preview::{build_preview_scene, OrbitState, PreviewMesh, PreviewSubject};
+pub use rusty_preview::{
+    build_preview_scene, framing, subject_for_path, FramedOrbit, OrbitState, PreviewMesh,
+    PreviewSubject,
+};
 
 use crate::theme::{chrome, Theme};
 use crate::EditorUi;
@@ -26,14 +30,16 @@ pub struct PreviewCache {
     pub scene: rusty_scene::Scene,
 }
 
-/// What `main.rs`'s `render_preview_scene` needs to render this frame: the orbit
-/// camera and the image rect size (to size the offscreen target). Recomputed by
+/// What `shell::editor::viewport::render_preview_scene` needs to render this frame: the orbit
+/// camera and the image rect (its size sizes the offscreen target; `editor-capture`
+/// reads where it sits). Recomputed by
 /// [`draw`] every frame the Preview tab is visible; `None` otherwise, so the
 /// front-end skips the extra render when nobody's looking at it.
 pub struct PreviewRequest {
     pub camera: Camera,
-    pub size: egui::Vec2,
-    /// Set only for [`PreviewSubject::Shader`] — the `.wgsl` path `main.rs` compiles
+    /// The image's rect, in points, as this frame laid it out.
+    pub rect: egui::Rect,
+    /// Set only for [`PreviewSubject::Shader`] — the `.wgsl` path the shell compiles
     /// a one-off pipeline from for this render (#352's shader-preview arm).
     pub shader_override: Option<String>,
 }
@@ -57,19 +63,24 @@ pub fn draw_tab_strip(ui: &mut egui::Ui, active: &mut bool, t: Theme) {
 /// drag (orbit) and scroll (zoom). Rebuilds the isolated scene when `subject`'s
 /// identity or the mesh choice changed since last frame; otherwise reuses the
 /// cached one. Reads `editor.preview_texture_id` — the previous frame's rendered
-/// preview (`None` before the first render), set by `main.rs` before `EditorUi::draw`
+/// preview (`None` before the first render), set by the shell before `EditorUi::draw`
 /// runs — same one-frame-behind contract as the main viewport's `viewport_texture`.
 pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, subject: PreviewSubject) {
     let t = editor.theme;
     let texture = editor.preview_texture_id;
     mesh_toggle(ui, editor);
+    editor
+        .preview_orbit
+        .frame(framing(editor.preview_mesh, &subject));
 
     let key = format!("{:?}|{}", editor.preview_mesh, subject.cache_key());
     let stale = editor.preview_cache.as_ref().is_none_or(|c| c.key != key);
     if stale {
         editor.preview_cache = Some(PreviewCache {
             key,
-            scene: build_preview_scene(editor.preview_mesh, &subject),
+            // As authored: the tab has no repeat count, so this never refuses.
+            scene: build_preview_scene(editor.preview_mesh, None, &subject)
+                .unwrap_or_else(|_| rusty_scene::Scene::new()),
         });
     }
 
@@ -85,16 +96,19 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, subject: PreviewSubject) {
         0.0
     };
     let drag = response.drag_delta();
-    editor.preview_orbit.apply_input(drag.x, drag.y, scroll);
+    let orbit = &mut editor.preview_orbit.orbit;
+    orbit.apply_input(drag.x, drag.y, scroll);
 
     editor.preview_request = Some(PreviewRequest {
-        camera: editor.preview_orbit.camera(),
-        size: response.rect.size(),
+        camera: orbit.camera(),
+        rect: response.rect,
         shader_override,
     });
 }
 
-/// The sphere/cube/Suzanne toggle row.
+/// The mesh toggle row, one label per [`PreviewMesh`]. The orbit follows the framing
+/// of what is shown ([`FramedOrbit::frame`]), so a pick that changes it starts the
+/// orbit there: the plane's low view, or the default.
 fn mesh_toggle(ui: &mut egui::Ui, editor: &mut EditorUi) {
     ui.horizontal(|ui| {
         for mesh in PreviewMesh::ALL {

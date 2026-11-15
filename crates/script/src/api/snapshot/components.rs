@@ -33,6 +33,8 @@ pub(crate) fn material_value(m: &MaterialAsset) -> Value {
         "metallic_map": m.metallic_map,
         "roughness_map": m.roughness_map,
         "normal_map": m.normal_map,
+        "occlusion_map": m.occlusion_map,
+        "specular_map": m.specular_map,
         "emissive": m.emissive,
         "render_mode": format!("{:?}", m.render_mode),
         "alpha": m.alpha,

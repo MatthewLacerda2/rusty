@@ -6,7 +6,7 @@
 //! an agent can close the authoring loop it currently can't: **bake → preview → look →
 //! iterate**. `Shader.Bake` proves a `.wgsl` compiles; only this shows what it renders.
 //!
-//! Framing is **fixed** ([`OrbitState::default`]) rather than parameterised: the orbit
+//! Framing is **fixed** ([`rusty_preview::framing`], one per mesh) rather than parameterised: the orbit
 //! drag is the human affordance, while an agent needs two shots of the same asset to be
 //! diffable pixel-for-pixel. Same reason the resolution defaults to a constant.
 //!
@@ -24,7 +24,7 @@ use std::path::Path;
 
 use super::capture::CaptureHost;
 use rusty_components::MaterialAsset;
-use rusty_preview::{OrbitState, PreviewMesh, PreviewSubject};
+use rusty_preview::{PreviewMesh, PreviewSubject};
 
 /// Default edge length of a preview shot. Square, like every reference engine's
 /// material-preview thumbnail, and big enough to judge shading detail.
@@ -43,6 +43,10 @@ pub struct PreviewOptions {
     pub mesh: PreviewMesh,
     /// Edge length in pixels of the square output, clamped to a sane range.
     pub resolution: u32,
+    /// How many times the material repeats across the stand-in
+    /// ([`rusty_preview::stand_in::repeated`]), or `None` to show it as authored: a
+    /// world-mapped material then shows its real scale. Ignored for models.
+    pub repeats: Option<u32>,
 }
 
 impl Default for PreviewOptions {
@@ -50,6 +54,7 @@ impl Default for PreviewOptions {
         Self {
             mesh: PreviewMesh::Sphere,
             resolution: DEFAULT_RESOLUTION,
+            repeats: None,
         }
     }
 }
@@ -117,7 +122,7 @@ fn capture_subject_into(
     out_png: &Path,
     options: PreviewOptions,
 ) -> Result<bool, String> {
-    let scene = rusty_preview::build_preview_scene(options.mesh, subject);
+    let scene = rusty_preview::build_preview_scene(options.mesh, options.repeats, subject)?;
     let resolution = options.clamped_resolution();
 
     let Some((renderer, view)) = host.frame(resolution, resolution, Default::default()) else {
@@ -127,7 +132,7 @@ fn capture_subject_into(
     let Some(target_view) = view.color_target_view() else {
         return Err("preview view owns no colour target".to_string());
     };
-    let camera = OrbitState::default().camera();
+    let camera = rusty_preview::framing(options.mesh, subject).camera();
 
     // The shader arm draws with the previewed module as this view's forward pipeline —
     // the same call the editor tab makes; every other subject renders the stock one.
@@ -177,3 +182,7 @@ fn resolve_subject(asset_path: &str) -> Result<PreviewSubject, String> {
 #[cfg(test)]
 #[path = "preview_tests.rs"]
 mod preview_tests;
+
+#[cfg(test)]
+#[path = "preview_plane_tests.rs"]
+mod preview_plane_tests;

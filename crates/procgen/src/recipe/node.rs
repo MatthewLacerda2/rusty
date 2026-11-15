@@ -85,6 +85,8 @@ pub enum Fault {
     Cycle,
     /// An `image` node whose file was not handed in (#1491).
     MissingSource(String),
+    /// A `text` node whose font file was not handed in (#2190).
+    MissingFont(String),
     /// An `image` node whose file the caller's loader could not read or decode when
     /// the node ran (#2002).
     Unreadable { path: String, error: String },
@@ -117,6 +119,7 @@ impl std::fmt::Display for NodeError {
             }
             Fault::Cycle => f.write_str("is on a cycle"),
             Fault::MissingSource(path) => write!(f, "has no image loaded for {path:?}"),
+            Fault::MissingFont(path) => write!(f, "has no font loaded for {path:?}"),
             Fault::Unreadable { path, error } => write!(f, "can't read {path:?}: {error}"),
             Fault::Unexpanded(path) => write!(
                 f,

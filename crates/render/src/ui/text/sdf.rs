@@ -11,7 +11,7 @@
 
 use glam::Vec2;
 
-use rusty_ui::text::font::{FontData, GlyphId};
+use rusty_font::{FontData, GlyphId};
 
 /// The em size glyphs are generated at, in atlas pixels.
 pub(crate) const BASE_SIZE: f32 = 48.0;

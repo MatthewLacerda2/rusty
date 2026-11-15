@@ -1,6 +1,7 @@
 //! crates/shell/src/editor/sync.rs — the settings the editor's menus share with the game:
-//! the quality preset, the speaker mode and the Scene view's gizmos, each read and
-//! written both ways, and the frame stats the Game view's Stats overlay shows.
+//! the quality preset, the speaker mode, the Scene view's gizmos and the Game view's
+//! size, each read and written both ways, and the frame stats the Game view's Stats
+//! overlay shows.
 
 use super::EditorFrontend;
 use crate::Shell;
@@ -11,11 +12,13 @@ use rusty_editor::EditorUi;
 
 /// What the editor window can do for a script, marked once when it is built, before
 /// its first frame drains a command (drawn or not, a locked screen's included): it
-/// has a Scene view, so `Editor.SetGizmo` is welcome (#1909), and its frames step
-/// Generate Lighting's job, drawn or not (`EditorUi::frame_work`), so
-/// `Lighting.GenerateAsync()` is (#1999). Both only ever turn on.
+/// has a Scene view, so `Editor.SetGizmo` is welcome (#1909), a Game view whose size
+/// `Editor.SetGameViewSize` sets (#2207), and its frames step Generate Lighting's
+/// job, drawn or not (`EditorUi::frame_work`), so `Lighting.GenerateAsync()` is
+/// (#1999). Each only ever turns on.
 pub(super) fn mark_host(app: &mut Application) {
     app.mark_gizmo_viewer();
+    app.mark_game_view_host();
     app.mark_bake_host();
 }
 
@@ -63,6 +66,8 @@ impl EditorFrontend {
     fn sync_gizmos(&mut self, game: &GameWorld) {
         let mut app = game.resources.application.borrow_mut();
         app.sync_gizmos(&mut self.editor_ui.gizmos);
+        // The Game view's size (#2207), the same way: a script's set, then mirrored.
+        app.sync_game_view(&mut self.editor_ui.game_view);
     }
 }
 

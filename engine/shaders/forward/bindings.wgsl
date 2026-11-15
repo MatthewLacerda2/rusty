@@ -106,6 +106,14 @@ struct MaterialData {
     detail_pad_a: u32,
     detail_pad_b: u32,
     detail_pad_c: u32,
+    // The occlusion map (#2151): 1 when its red channel darkens the indirect light
+    // (`shader.wgsl`'s `surface_color`), by `occlusion_strength`.
+    use_occlusion_map: u32,
+    occlusion_strength: f32,
+    // The specular-level map (#2151): 1 scales the dielectric reflectance by its
+    // alpha, 2 by its red (a one-channel upload).
+    use_specular_map: u32,
+    maps_pad: u32,
 };
 
 // One object a kept scene draws (#1706), at its slot of `objects`: what the object
@@ -163,16 +171,12 @@ var<uniform> lighting: LightingUniforms;
 // into a roughness mip chain like a probe's cube.
 @group(0) @binding(2)
 var t_skybox: texture_cube<f32>;
-@group(0) @binding(3)
-var s_skybox: sampler;
 
 // The resident reflection probes' prefiltered cubemaps (#245), one per layer (#1206),
 // sampled with `textureSampleLevel` (roughness -> mip) at the layer a draw's
 // `reflection_probe` names. What its probes leave samples the sky's cube instead.
 @group(0) @binding(4)
 var t_refl_cube: texture_cube_array<f32>;
-@group(0) @binding(5)
-var s_refl_cube: sampler;
 
 // Clustered lights (#434): the frame's point/spot lights, each cluster's
 // (offset, count) into `cluster_lights`, and that flat list of light indices.
@@ -202,8 +206,6 @@ var s_decal: sampler;
 // page through its scale/offset; a 1x1 black page when none are baked.
 @group(0) @binding(14)
 var t_lightmaps: texture_2d_array<f32>;
-@group(0) @binding(15)
-var s_lightmaps: sampler;
 // Their direction pages (#810), same layers and UVs: RGB the dominant incoming
 // direction scaled by its directionality, A its lamp share (#1695;
 // `decode_lightmap_direction`); a 1x1 zero page, never read, when not baked.
@@ -214,8 +216,14 @@ var t_lightmap_dirs: texture_2d_array<f32>;
 // while no camera runs it, read only where `camera.volumetric.x` says so.
 @group(0) @binding(17)
 var t_fog_volume: texture_3d<f32>;
+// The one sampler the sky and probe cubes, the lightmap pages with their direction
+// pages, the shadowmask pages (binding 19) and the fog volume read through
+// (`render::gpu::linear_clamp`): linear min, mag and mip filters, clamp-to-edge on
+// all three axes. Never give one of them a sampler of its own; it keeps the
+// fragment stage inside Metal's 16 samplers. The decal atlas keeps its own (13).
+// Bindings 3, 5 and 15 are free.
 @group(0) @binding(18)
-var s_fog_volume: sampler;
+var s_linear_clamp: sampler;
 // The shadowmask pages of a `Shadowmask` bake (#1695), same layers and UVs: per
 // channel the static occlusion of the `Mixed` light on it (1 lit); a 1x1 page,
 // never read, unless `lighting.masks_bound`.
@@ -350,6 +358,17 @@ var s_emissive: sampler;
 var t_detail: texture_2d<f32>;
 @group(2) @binding(31)
 var s_detail: sampler;
+// The occlusion (#2151, glTF's `occlusionTexture`, R) and specular-level
+// (`KHR_materials_specular`'s `specularTexture`, A) maps, raw texels, counting down
+// from the detail map's binding, so the extra shader slots keep theirs.
+@group(2) @binding(14)
+var t_occlusion: texture_2d<f32>;
+@group(2) @binding(30)
+var s_occlusion: sampler;
+@group(2) @binding(13)
+var t_specular: texture_2d<f32>;
+@group(2) @binding(29)
+var s_specular: sampler;
 
 // The sun's cascaded shadow maps (#435): `lighting::cascades`.
 @group(3) @binding(0)
@@ -374,7 +393,7 @@ var<storage, read> shadow_tiles: array<ShadowTile>;
 // transparent one with a surface that refracts or absorbs. Linear, clamped sampler.
 // In the opaque pass of a base camera running SSIL (`camera.ssil.x`, #1750), which
 // reads no opaque copy, it holds SSIL's bounce instead, one texel per pixel, so
-// the stage binds no texture more than `render::setup::limits` allows (19).
+// the stage binds no texture more than `render::setup::limits` allows (21).
 @group(3) @binding(6)
 var t_opaque: texture_2d<f32>;
 @group(3) @binding(7)

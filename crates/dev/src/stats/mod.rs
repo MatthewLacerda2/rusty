@@ -32,7 +32,7 @@ use rusty_core::frame_stats::{DrawnFrame, FrameStats, Series};
 use rusty_script::scripting::ConsoleLogs;
 
 mod window;
-pub use window::{record_window, window_opt, WindowFrame};
+pub use window::{known_keys, record_window, whole_count, window_ended, window_opt, WindowFrame};
 
 /// The metric each per-frame stage's CPU time is recorded under.
 fn stage_key(stage: Stage) -> &'static str {
@@ -293,3 +293,6 @@ mod stats_load_tests;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod stats_tests;
+#[cfg(test)]
+#[path = "wall_tests.rs"]
+mod stats_wall_tests;

@@ -2,9 +2,10 @@
 //!
 //! Pure math + state: no egui, no GPU types, so it's unit-testable without a window
 //! and usable from the headless capture. The Inspector tab feeds it pointer deltas
-//! (`editor/inspector/preview.rs`); the agent-facing capture never moves it at all
-//! and renders [`OrbitState::default`], which is what makes `Debug.Preview`'s framing
-//! deterministic and its before/after shots comparable (#353).
+//! (`editor/inspector/preview.rs`), starting from the fixed framing of what it shows;
+//! the agent-facing capture never moves it at all and renders that framing
+//! ([`crate::framing`]: the plane's low view, [`OrbitState::default`] otherwise), which
+//! is what makes `Debug.Preview`'s shots deterministic and comparable (#353).
 //!
 //! Mirrors a standard asset-preview orbit rig: drag rotates around a fixed target,
 //! wheel zooms distance in/out. The camera always looks at the target — there is no
@@ -23,9 +24,10 @@ const MIN_DISTANCE: f32 = 0.5;
 const MAX_DISTANCE: f32 = 20.0;
 
 /// Orbit-camera state for the preview scene, persisted on the editor's `EditorUi`
-/// (`crates/editor/src/lib.rs`) across frames so drag/zoom accumulate. Always orbits the world origin — the
-/// preview mesh is always placed there (see [`super::scene::build_preview_scene`]).
-#[derive(Clone, Copy, Debug)]
+/// (`crates/editor/src/lib.rs`) across frames so drag/zoom accumulate. Always orbits the
+/// world origin: the sphere, cube and Suzanne sit there, and the plane lies past it,
+/// so its framing looks across it (see [`super::scene::build_preview_scene`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct OrbitState {
     pub yaw: f32,
     pub pitch: f32,
@@ -36,7 +38,7 @@ impl Default for OrbitState {
     fn default() -> Self {
         // A pleasant default 3/4 view, matching the material-preview convention of
         // every reference engine (slightly above and to the side). This is also the
-        // fixed framing every headless `Debug.Preview` shot uses.
+        // fixed framing of every headless `Debug.Preview` shot but the plane's.
         Self {
             yaw: -30.0,
             pitch: -20.0,
@@ -62,6 +64,31 @@ impl OrbitState {
         let mut camera = Camera::new(Vec3::ZERO, self.yaw, self.pitch);
         camera.position = -camera.forward() * self.distance;
         camera
+    }
+}
+
+/// The Inspector tab's orbit and the fixed framing it started from. The framing
+/// depends on the mesh *and* the subject ([`crate::framing`]): picking the plane, or
+/// selecting a model while the plane is picked, changes it. [`Self::frame`] starts the
+/// orbit over only then, so a hand-tuned orbit survives a click that changes nothing
+/// it is framed for.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct FramedOrbit {
+    /// The orbit the tab draws, moved by drag and wheel.
+    pub orbit: OrbitState,
+    framing: OrbitState,
+}
+
+impl FramedOrbit {
+    /// Follow `framing`, this frame's fixed framing for what is shown: when it differs
+    /// from the one the orbit started at, the orbit starts over there.
+    pub fn frame(&mut self, framing: OrbitState) {
+        if self.framing != framing {
+            *self = Self {
+                orbit: framing,
+                framing,
+            };
+        }
     }
 }
 
@@ -99,8 +126,29 @@ mod tests {
     }
 
     #[test]
+    fn a_framed_orbit_starts_over_only_when_its_framing_changes() {
+        let low = OrbitState {
+            yaw: -90.0,
+            pitch: -25.0,
+            distance: 2.0,
+        };
+        let mut framed = FramedOrbit::default();
+        framed.orbit.apply_input(50.0, 0.0, 0.0);
+        let tuned = framed.orbit;
+        framed.frame(OrbitState::default());
+        assert_eq!(
+            framed.orbit, tuned,
+            "the same framing keeps a hand-tuned orbit"
+        );
+        framed.frame(low);
+        assert_eq!(framed.orbit, low, "a new framing starts the orbit there");
+        framed.frame(OrbitState::default());
+        assert_eq!(framed.orbit, OrbitState::default(), "and back");
+    }
+
+    #[test]
     fn default_framing_is_stable_so_headless_shots_are_comparable() {
-        // `Debug.Preview` renders `OrbitState::default()` every time (#353): two
+        // `Debug.Preview` renders a fixed framing every time (#353): two
         // captures of the same asset must agree on the camera exactly.
         let a = OrbitState::default().camera();
         let b = OrbitState::default().camera();

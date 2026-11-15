@@ -48,7 +48,7 @@ pub fn capture_demo(
     if at.map(|(current, _)| current) != Some(tick) {
         return Err(format!("the replay stands at {at:?}, not tick {tick}"));
     }
-    capture_with(&mut CaptureHost::new(), game, &mut ui, path, opts)
+    Ok(capture_with(&mut CaptureHost::new(), game, &mut ui, path, opts)?.is_some())
 }
 
 /// A console line the timeline writes when it refuses to open or seek.

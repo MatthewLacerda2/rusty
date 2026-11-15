@@ -154,6 +154,7 @@ workspace = true
 # The workspace's own crates, named the same way by the members that depend on them.
 rusty-core = { path = "crates/core" }
 rusty-time = { path = "crates/time" }
+rusty-font = { path = "crates/font" }
 rusty-asset = { path = "crates/asset" }
 rusty-procgen = { path = "crates/procgen" }
 rusty-shadergen = { path = "crates/shadergen" }
@@ -318,6 +319,7 @@ rusty-shadergen = { workspace = true }
 rusty-procgen = { workspace = true }
 rusty-asset = { workspace = true }
 rusty-core = { workspace = true }
+rusty-font = { workspace = true }
 rusty-time = { workspace = true }
 # A feature pin, never `use`d: why is beside its version above.
 getrandom = { workspace = true, optional = true }
