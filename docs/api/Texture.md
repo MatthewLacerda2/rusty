@@ -287,7 +287,8 @@ list below is a summary of it. Each entry has the `op` tag, its `category`
 (`min_inputs` to `max_inputs`; a node outside that range is an error), and its
 `params`. Each param has a
 `name`, a `type` (`number` | `integer` | `bool` | `color` | `vec2` |
-`enum` | `stops` | `path`, a project-relative file path), `required`, a `default` when it has one (absent when required),
+`enum` | `stops` | `path`, a project-relative file path | `text`, an `expression`
+formula), `required`, a `default` when it has one (absent when required),
 `socket` (whether it takes a link to another node, *Linked params* below), and for an
 `enum` the accepted `values`. Units and rounding are the ones *Tiling*
 and *Units* below describe. A unit test holds the catalog to the recipe parser, so
@@ -419,6 +420,28 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   crack rims. A pixel the line only partly covers reads the share it covers, so a
   line thinner than a pixel at a low `resolution` fades rather than vanishing, and
   the map's mean holds across resolutions. A mask with no edge reads black.
+- `expression {expr="0", r, g, b, a_out, k1=0, k2=0, k3=0, k4=0}` (*math*, 0 to 4
+  inputs, exactly the ones its formulas name): each pixel from a formula, Substance's
+  *Pixel Processor*: `{ op = "expression", expr = "0.5 + 0.5 * sin(tau * (8 * u + 0.3
+  * a))", inputs = {"warp"} }`. `expr` writes R, G and B (grayscale, alpha 1); `r`,
+  `g` and `b` each replace it on their channel (a channel left out reads `expr`, 0 by
+  default), and `a_out` writes alpha. A formula reads `u` and `v` (the pixel centre,
+  what `coordinates` writes), `pi`, `tau`, the inputs `a`, `b`, `c`, `d` in wiring
+  order (a bare name is red; `a.r`, `a.g`, `a.b`, `a.a` pick a channel) and `k1`–`k4`,
+  numbers a link or a graph param can drive. It has `+ - * /`, `^` (power, binding
+  right and tighter than unary minus: `-a ^ 2` is `-(a ^ 2)`), parentheses, the
+  comparisons `< <= > >= == !=` (1 or 0), and `min max abs floor ceil round fract mod
+  sqrt pow exp log sin cos tan atan2 clamp mix step smoothstep sign` (radians, as
+  `math`; `mod` and `step`/`smoothstep` as GLSL's). The functions `math` also has are
+  `math`'s, edges included, so a formula bakes the bytes of its `math` chain: `x / 0`,
+  `sqrt` or `^` of a negative base read 0, and so do `log` of x ≤ 0 and `mod` by 0.
+  The formulas compile when the recipe is parsed: a typo, an input named but not
+  wired, a wired one never named, `c` named without `b`, or `expr` beside all of `r`,
+  `g` and `b` is refused naming the node, the field, the column and the fix. A formula
+  is at most 4096 characters and nests at most 64 deep. A formula of `u` and `v` tiles
+  only when it is periodic in them (`sin(tau * 3 * u)` does, `u` does not), as
+  `coordinates` says of itself. No sampling inside a formula: compute the coordinates
+  here and feed them to `sample_at`, which filters by the footprint.
 - `flood_bbox {output="size"|"center_x"|"center_y"}` (*filter*, 1 input:
   `flood_fill`'s): one flat grey per island from its bounding box, like Substance's
   *Flood Fill to BBox Size / Position*: `size` is the box's longer side in tiles,
@@ -650,6 +673,7 @@ number.
 - `bump_to_normal.strength`: read at each pixel.
 - `curvature.strength`: read at each pixel.
 - `distance.radius`: read at each pixel.
+- `expression.k1`, `expression.k2`, `expression.k3`, `expression.k4`: read at each pixel.
 - `gamma.gamma`: read at each pixel.
 - `histogram_scan.position`, `histogram_scan.contrast`: read at each pixel.
 - `hue_sat_value.hue`, `hue_sat_value.sat`, `hue_sat_value.value`: read at each pixel.
@@ -845,7 +869,8 @@ maps that are never tiled; it opens a seam. `gradient linear` (0→1 left to rig
 `coordinates` (the same ramp on each axis) are the generators that do **not** tile —
 each has a hard edge at the wrap; use one under a mask, or use `linear_tiling` (0→1→0)
 for a seamless ramp. `coordinates` is meant for `sample_at`, whose output tiles when
-the function of the coordinates does (`sin` and `cos` of `2π u` do). `gradient radial` and
+the function of the coordinates does (`sin` and `cos` of `2π u` do). So does `expression`'s
+output when its formula is periodic in `u` and `v`. `gradient radial` and
 `wave rings` meet the edge mirror-symmetrically: continuous across the seam, and so
 does `shape` (a shape larger than the tile is clipped at the edge, symmetrically;
 a `polygon` or `star`, which an odd count leaves lopsided top to bottom, is instead

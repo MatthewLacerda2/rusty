@@ -82,9 +82,11 @@ pub fn clamp(mut img: Image, min: f32, max: f32) -> Image {
 }
 
 /// `c` clamped into `[min, max]`, the bounds swapped when `min > max`. A NaN `c`
-/// stays NaN, as [`f32::clamp`]'s; a NaN bound is ignored rather than panicking (an
+/// stays NaN, as [`f32::clamp`]'s; a NaN bound is no bound, rather than a panic (an
 /// `expression` can compute one). Shared with the `expression` op's `clamp`.
 pub(crate) fn clamp_value(c: f32, min: f32, max: f32) -> f32 {
+    let min = if min.is_nan() { f32::NEG_INFINITY } else { min };
+    let max = if max.is_nan() { f32::INFINITY } else { max };
     let (lo, hi) = if min <= max { (min, max) } else { (max, min) };
     if c.is_nan() {
         return c;

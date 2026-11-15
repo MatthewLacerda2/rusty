@@ -193,5 +193,8 @@ fn zero() -> String {
 }
 
 #[cfg(test)]
+#[path = "expression_refuse_tests.rs"]
+mod refuse_tests;
+#[cfg(test)]
 #[path = "expression_tests.rs"]
 mod tests;
