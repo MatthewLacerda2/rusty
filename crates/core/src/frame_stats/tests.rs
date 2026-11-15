@@ -88,3 +88,30 @@ fn last_frame_holds_all_its_ticks() {
         "an edit frame ticked nothing"
     );
 }
+
+/// A frame's ended value goes onto that frame, once, into the session only when
+/// that frame was in it; with no frame recorded there is none to end.
+#[test]
+fn an_ended_value_lands_on_its_own_frame_once() {
+    let mut stats = FrameStats::default();
+    stats.frame_ended("wall_ms", 1.0);
+    stats.record_frame(false, |_| {});
+    stats.record_frame(true, |_| {});
+    assert!(stats.window(1).get("wall_ms").is_none());
+    stats.frame_ended("wall_ms", 16.0);
+    stats.frame_ended("wall_ms", 99.0);
+    assert_eq!(
+        stats.get("wall_ms").map(|s| (s.samples, s.last)),
+        Some((1, 16.0))
+    );
+    let edit = stats.window(2).get("wall_ms").copied();
+    assert_eq!(edit.map(|s| s.samples), Some(1), "the edit frame had none");
+    stats.record_frame(false, |_| {});
+    stats.frame_ended("wall_ms", 5.0);
+    assert_eq!(
+        stats.get("wall_ms").unwrap().samples,
+        1,
+        "an edit frame stays out"
+    );
+    assert_eq!(stats.window(1).get("wall_ms").unwrap().last, 5.0);
+}
