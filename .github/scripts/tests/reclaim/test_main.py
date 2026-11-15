@@ -22,7 +22,6 @@ class Unpushed(unittest.TestCase):
             code = 1 if "--is-ancestor" in argv and not in_pr else 0
             return subprocess.CompletedProcess(argv, code, out, "")
         machine = reclaim.Machine(answer)
-        machine.written = lambda tree, idle: None  # never the real disk (#2217)
         return machine.facts(Worktree(Path("/w"), "h", "9-x"), Path("/repo"), procs=[])
 
     def test_commits_stranded_by_a_deleted_remote_branch_are_safe_in_the_pr(self):

@@ -18,7 +18,7 @@ from pathlib import Path
 import reclaim_use as use
 from tests.reclaim.fixtures import Worktree, reclaim
 
-HOUR_AGO = time.time() - 2 * 3600
+TWO_HOURS_AGO = time.time() - 2 * 3600
 
 
 def age(tree: Path, when: float) -> None:
@@ -35,15 +35,19 @@ class InUse(unittest.TestCase):
         (self.tree / "target" / "release" / "deps").mkdir(parents=True)
         (self.tree / "src").mkdir()
         (self.tree / "src" / "main.rs").write_text("fn main() {}\n")
-        age(self.tree, HOUR_AGO)
+        age(self.tree, TWO_HOURS_AGO)
         self.wt = Worktree(self.tree, "aaaa")  # detached at a commit on origin/main: finished
 
-    def judge(self, locked: str | None = None) -> tuple[str, str]:
+    def machine(self) -> reclaim.Machine:
         clean = lambda argv, **_: subprocess.CompletedProcess(argv, 0, "", "")
         machine = reclaim.Machine(clean)
         machine.alive = lambda pid: True
+        return machine
+
+    def judge(self, locked: str | None = None, machine: reclaim.Machine | None = None) -> tuple[str, str]:
+        machine = machine or self.machine()
         self.wt.locked = locked
-        return reclaim.verdict(self.wt, machine.facts(self.wt, self.root, machine.processes()))
+        return machine.judge(self.wt, self.root, machine.processes())[1:]
 
     def spawn(self, program: str, cwd: Path) -> subprocess.Popen:
         child = subprocess.Popen([program, "30"], cwd=cwd)
@@ -71,8 +75,17 @@ class InUse(unittest.TestCase):
 
     def test_written_five_minutes_ago_is_kept(self):
         age(self.tree / "src", time.time() - 5 * 60)
-        self.assertEqual(self.judge(), ("protect", "detached at a commit on origin/main, but written 5 minute(s)"
-                                        " ago; `--idle 0` to remove it anyway"))
+        self.assertEqual(self.judge(), ("protect", "detached at a commit on origin/main, but something under it"
+                                        " was written within the last 60 minute(s); `--idle 0` to remove it anyway"))
+
+    def test_a_future_mtime_is_kept_and_named_as_such(self):
+        age(self.tree / "src", time.time() + 3600)
+        self.assertIn("an mtime in the future", self.judge()[1])
+
+    def test_the_disk_is_walked_only_for_a_worktree_otherwise_removed(self):
+        machine = self.machine()
+        machine.written = lambda tree, idle: self.fail("probed a worktree its lock already keeps")
+        self.assertEqual(self.judge(locked="by hand", machine=machine)[0], "protect")
 
     def test_a_build_landing_in_a_bulk_directory_shows(self):
         (self.tree / "target" / "release" / "deps" / "libx-1.rlib").write_bytes(b"")
@@ -85,11 +98,11 @@ class InUse(unittest.TestCase):
         deep = self.tree / "out" / "run" / "1" / "2"
         deep.mkdir(parents=True)
         (deep / "log.txt").write_text("x")
-        age(self.tree, HOUR_AGO)
+        age(self.tree, TWO_HOURS_AGO)
         os.utime(deep / "log.txt")  # rewritten in place, five levels down: the documented miss
-        self.assertIsNone(use.newest_write(self.tree, time.time() - 60))
+        self.assertIsNone(use.recent_write(self.tree, time.time() - 60))
         os.utime(deep)  # a file created or removed four levels down shows
-        self.assertIsNotNone(use.newest_write(self.tree, time.time() - 60))
+        self.assertIsNotNone(use.recent_write(self.tree, time.time() - 60))
 
 
 class Arguments(unittest.TestCase):
@@ -98,7 +111,7 @@ class Arguments(unittest.TestCase):
         self.assertEqual(reclaim.parse_args(["--idle", "0", "--dry-run"]), (True, 0))
 
     def test_a_bad_argument_is_refused(self):
-        for argv in (["--idle"], ["--idle", "soon"], ["--force"]):
+        for argv in (["--idle"], ["--idle", "soon"], ["--idle", "\u00b2"], ["--force"]):
             with self.assertRaises(SystemExit, msg=argv):
                 reclaim.parse_args(argv)
 

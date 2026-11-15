@@ -42,7 +42,7 @@ class Verdict(unittest.TestCase):
                                 (self.wt, Facts(prs=["MERGED"], current=True), "runs from"),
                                 (self.wt, Facts(prs=["MERGED"], busy=[(42, "cargo")]), "in use by pid 42 (`cargo`)"),
                                 (self.wt, Facts(prs=["MERGED"], busy=None), "no way to tell"),
-                                (self.wt, Facts(prs=["MERGED"], written=5), "written 5 minute(s) ago"),
+                                (self.wt, Facts(prs=["MERGED"], written="something under it was written"), "it was written"),
                                 (locked, Facts(prs=["MERGED"]), "locked")]:
             action, why = reclaim.verdict(wt, facts)
             self.assertEqual(action, "protect")

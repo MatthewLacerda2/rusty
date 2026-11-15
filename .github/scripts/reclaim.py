@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`reclaim.py [--dry-run]` — free the disk and branches finished work left behind (#913).
+"""`reclaim.py [--dry-run] [--idle MINUTES]` — free the disk and branches finished work left behind (#913).
 
 Every branch gets its own worktree under `.claude/worktrees/`, and each one
 compiles into its own `target/` (several GB). `issue-batch` says to remove a
@@ -124,6 +124,7 @@ from merging.watch import tenancy
 
 USAGE = "usage: reclaim.py [--dry-run] [--idle MINUTES]"
 IDLE_MINUTES = 60  # a worktree written to more recently than this is in use (#2217)
+SKEW = 60  # seconds past now an mtime may read before it is "in the future": a write landing mid-probe
 AGENT_BRANCH = "worktree-agent-"  # the harness's name for an `Agent` worktree's branch (#1510)
 REVIEWER_BRANCH = re.compile(rf"pr\d|{AGENT_BRANCH}")  # a reviewer's `pr1514…`, the harness's own (#1538)
 
@@ -146,7 +147,7 @@ class Facts:
     unpushed: int = 0
     current: bool = False
     busy: list[tuple[int, str]] | None = field(default_factory=list)  # (pid, command) in it; None: unknown
-    written: int | None = None  # minutes since something under it was written, inside the idle window
+    written: str | None = None  # what recent write keeps it (`Machine.written`); probed only for a removal
     stale: int | None = None  # a lock left by a merge-queue supervisor that no longer runs: its pid
     dead_agent: int | None = None  # a harness agent's lock whose pid no longer runs (#1658)
     reviewer: bool = False  # a reviewer's checkout: judged by what it holds (#1538)
@@ -219,7 +220,7 @@ def verdict(wt: Worktree, facts: Facts) -> tuple[str, str]:
         pids = ", ".join(f"pid {pid} (`{command or '?'}`)" for pid, command in facts.busy)
         return "protect", f"{why}, but in use by {pids}"
     if facts.written is not None:
-        return "protect", f"{why}, but written {facts.written} minute(s) ago; `--idle 0` to remove it anyway"
+        return "protect", f"{why}, but {facts.written}; `--idle 0` to remove it anyway"
     if wt.locked is not None and facts.stale is not None:
         return "protect", (f"{why}, but locked by merge-queue supervisor pid {facts.stale}, which is not running:"
                            f" a stale lock; `git worktree unlock {wt.path}` to let reclaim remove it")
@@ -331,20 +332,33 @@ class Machine:
         """(pid, a path it stands in or runs, its command) for every process: `reclaim_use`."""
         return use.processes(self.run)
 
-    def written(self, tree: Path, idle_minutes: int) -> int | None:
-        """Minutes since something under `tree` was written, when inside the idle window."""
+    def written(self, tree: Path, idle_minutes: int) -> str | None:
+        """What under `tree` was written inside the idle window, as `verdict` names it; `None` if nothing."""
         if idle_minutes <= 0:
             return None
         now = time.time()
-        mtime = use.newest_write(tree, now - idle_minutes * 60)
-        return None if mtime is None else max(0, int((now - mtime) // 60))
+        mtime = use.recent_write(tree, now - idle_minutes * 60)
+        if mtime is None:
+            return None
+        if mtime > now + SKEW:
+            return "something under it has an mtime in the future (clock skew, an extracted archive?)"
+        return f"something under it was written within the last {idle_minutes} minute(s)"
 
-    def facts(self, wt: Worktree, here: Path, procs: list[tuple[int, Path, str]] | None,
-              idle_minutes: int = IDLE_MINUTES) -> Facts:
+    def judge(self, wt: Worktree, here: Path, procs: list[tuple[int, Path, str]] | None,
+              idle_minutes: int = IDLE_MINUTES) -> tuple[Facts, str, str]:
+        """`facts` and `verdict`; the write probe walks the disk only for a worktree otherwise removed."""
+        facts = self.facts(wt, here, procs)
+        action, why = verdict(wt, facts)
+        if action == "remove":
+            facts.written = self.written(wt.path, idle_minutes)
+            if facts.written is not None:
+                action, why = verdict(wt, facts)
+        return facts, action, why
+
+    def facts(self, wt: Worktree, here: Path, procs: list[tuple[int, Path, str]] | None) -> Facts:
         facts = Facts(current=inside(here, wt.path), reviewer=reviewer_tree(wt))
         facts.busy = None if procs is None else list(dict.fromkeys(
             (pid, command) for pid, path, command in procs if inside(path, wt.path)))
-        facts.written = self.written(wt.path, idle_minutes)
         facts.dirty = bool(self.git(wt.path, "status", "--porcelain"))
         owner = tenancy.pid_of(wt.locked)
         if owner is not None and not self.alive(owner):
@@ -413,7 +427,7 @@ def parse_args(argv: list[str]) -> tuple[bool, int]:
         arg = rest.pop(0)
         if arg == "--dry-run":
             dry = True
-        elif arg == "--idle" and rest and rest[0].isdigit():
+        elif arg == "--idle" and rest and rest[0].isdecimal():
             idle = int(rest.pop(0))
         else:
             sys.exit(f"reclaim: bad argument {arg!r}; {USAGE}")
@@ -436,8 +450,7 @@ def main(argv: list[str], machine: Machine | None = None, here: Path | None = No
     procs = machine.processes()
     removed, deleted = 0, 0
     for wt in worktrees:
-        facts = machine.facts(wt, here, procs, idle)
-        action, why = verdict(wt, facts)
+        facts, action, why = machine.judge(wt, here, procs, idle)
         name = f"{wt.path.name} ({describe(wt)})"
         if action == "remove":
             if not dry:

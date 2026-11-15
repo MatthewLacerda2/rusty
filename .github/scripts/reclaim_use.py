@@ -16,9 +16,11 @@ worktree must lock it", a convention nobody checks. So reclaim checks:
   `<path> (deleted)`, and still counts); elsewhere (macOS) `lsof -d cwd,txt`,
   where `txt` is the program and what it maps. Neither answering means the
   process check is unknown, and the worktree is kept and says so.
-- **A recent write** (`newest_write`): an entry modified within the idle window,
+- **A recent write** (`recent_write`): an entry modified within the idle window,
   an hour by default (`reclaim.py --idle MINUTES`; 0 turns it off, for a run by
-  hand that means it).
+  hand that means it). An mtime in the future (clock skew after a reboot, an
+  extracted archive) also keeps it, and is named as such so it can be spotted.
+  The probe runs only for a worktree every other check would remove.
 
 The write probe is bounded, because reclaim runs after every merge and a
 worktree's `target/` holds tens of thousands of build files. It stats the
@@ -80,8 +82,8 @@ def parse_lsof(out: str) -> list[tuple[int, Path, str]]:
     return found
 
 
-def newest_write(tree: Path, since: float) -> float | None:
-    """The mtime of an entry under `tree` written after `since`, the first found; `None` if none."""
+def recent_write(tree: Path, since: float) -> float | None:
+    """The mtime of the first entry found under `tree` written after `since` (not the newest); `None` if none."""
     with contextlib.suppress(OSError):
         mtime = tree.stat().st_mtime
         if mtime > since:

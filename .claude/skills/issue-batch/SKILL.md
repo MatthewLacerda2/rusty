@@ -306,8 +306,10 @@ Per pull request:
 3. **After a merge:** `make reclaim` (removes merged worktrees and deletes
    finished local branches; keeps unpushed work, a lock, and a worktree in use:
    a process standing in it or running a program from it, or a write in the
-   last hour), then re-read the board. A helper's worktree needs no lock of its
-   own to survive it.
+   last hour), then re-read the board. A helper's worktree survives it while
+   something runs there or was written within that hour; a longer pause (a build
+   kept to read results later, a session that may die) needs
+   `git worktree lock --reason …`.
 
 ## Starting, and re-reading the board
 

@@ -44,7 +44,6 @@ def machine(status: str = "", github: str = "up") -> reclaim.Machine:
         return subprocess.CompletedProcess(argv, code, out, err)
     found = reclaim.Machine(answer)
     found.alive = lambda pid: True  # a lock's owner runs: never the real process table (#1658)
-    found.written = lambda tree, idle: None  # nor the real disk (#2217)
     return found
 
 

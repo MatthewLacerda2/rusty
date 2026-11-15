@@ -305,7 +305,8 @@ conflicts: ## Conflicts with main the queue met since then. make conflicts SINCE
 # Each worktree's target/ holds GBs, and removing it by hand per merged branch
 # gets skipped under load (#913). Removes every worktree under .claude/worktrees/
 # whose PR merged or closed, target/ first; never one with uncommitted changes,
-# unpushed commits or a lock, which it names. Prints the rest's target/ sizes and
+# unpushed commits, a lock, a process standing in it or running a program from it,
+# or a write within the idle window (ARGS="--idle MINUTES"), which it names. Prints the rest's target/ sizes and
 # free disk before and after; a linked worktree outside .claude/worktrees/ is
 # named OUTSIDE, never touched (#982). ARGS=--dry-run lists without deleting.
 reclaim: ## Remove merged worktrees nothing is using (and their target/) and finished local branches, report disk. ARGS=--dry-run lists only; ARGS="--idle MINUTES" (default 60, 0 off) sets how recent a write keeps one
