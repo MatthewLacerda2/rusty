@@ -1,0 +1,52 @@
+{
+  "resolution": 256,
+  "params": {
+    "wear": { "type": "number", "default": 0.3, "min": 0, "max": 1 }
+  },
+  "nodes": [
+    { "id": "dune_raw", "op": "noise", "kind": "fbm", "scale": 3, "octaves": 5, "seed": 121 },
+    { "id": "dune", "op": "auto_levels", "inputs": ["dune_raw"] },
+    { "id": "sand_grain_raw", "op": "white_noise", "seed": 122 },
+    { "id": "sand_grain", "op": "blur", "radius": 0.001, "inputs": ["sand_grain_raw"] },
+    { "id": "sand_grain_n", "op": "auto_levels", "inputs": ["sand_grain"] },
+
+    { "id": "pebble_egg", "op": "shape", "kind": "circle", "size": [0.9, 0.62], "profile": "hemisphere" },
+    { "id": "pebble_flat", "op": "shape", "kind": "rounded_rect", "size": [0.85, 0.6], "roundness": 1, "profile": "paraboloid" },
+    { "id": "pebble_lump", "op": "shape", "kind": "polygon", "sides": 7, "size": [0.85, 0.8], "profile": "paraboloid" },
+    { "id": "clumps", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 3 }, "seed": 123 },
+    { "id": "density", "op": "levels", "in_low": 0.25, "in_high": 0.85, "inputs": ["clumps"] },
+    { "id": "pebbles_big", "op": "scatter", "amount": 220, "scale": 0.035, "scale_jitter": 0.8, "rotation_jitter": 1, "value_jitter": 0.4, "spacing": 0.3, "density": { "node": "density" }, "seed": 124, "inputs": ["pebble_egg", "pebble_flat", "pebble_lump"] },
+    { "id": "pebbles_small", "op": "scatter", "amount": 1400, "scale": 0.012, "scale_jitter": 0.8, "rotation_jitter": 1, "value_jitter": 0.5, "density": { "node": "density" }, "seed": 125, "inputs": ["pebble_egg", "pebble_flat", "pebble_lump"] },
+    { "id": "pebbles", "op": "mix", "mode": "lighten", "inputs": ["pebbles_big", "pebbles_small"] },
+    { "id": "pebble_id_big", "op": "scatter", "amount": 220, "scale": 0.035, "scale_jitter": 0.8, "rotation_jitter": 1, "value_jitter": 0.4, "spacing": 0.3, "density": { "node": "density" }, "output": "random", "seed": 124, "inputs": ["pebble_egg", "pebble_flat", "pebble_lump"] },
+    { "id": "pebble_id_small", "op": "scatter", "amount": 1400, "scale": 0.012, "scale_jitter": 0.8, "rotation_jitter": 1, "value_jitter": 0.5, "density": { "node": "density" }, "output": "random", "seed": 125, "inputs": ["pebble_egg", "pebble_flat", "pebble_lump"] },
+    { "id": "pebble_id", "op": "mix", "mode": "lighten", "inputs": ["pebble_id_big", "pebble_id_small"] },
+
+    { "id": "bank", "op": "blur", "radius": 0.012, "inputs": ["pebbles"] },
+    { "id": "sand_h", "op": "expression", "expr": "0.35 * a + (0.3 - 0.15 * k1) * b + 0.015 * c", "k1": { "param": "wear" }, "inputs": ["dune", "bank", "sand_grain_n"] },
+    { "id": "stone_h", "op": "expression", "expr": "0.35 * b + 0.6 * a - 0.24 + 0.2 * k1", "k1": { "param": "wear" }, "inputs": ["pebbles", "dune"] },
+    { "id": "relief", "op": "mix", "mode": "lighten", "inputs": ["sand_h", "stone_h"] },
+    { "id": "exposed", "op": "expression", "expr": "smoothstep(0.0, 0.02, b - a) * step(0.02, c)", "inputs": ["sand_h", "stone_h", "pebbles"] },
+    { "id": "height", "op": "auto_levels", "inputs": ["relief"] },
+    { "id": "detail", "op": "expression", "expr": "a - 0.3 * b", "inputs": ["relief", "dune"] },
+    { "id": "normal", "op": "bump_to_normal", "strength": 0.05, "inputs": ["detail"] },
+
+    { "id": "damp", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 2 }, "seed": 126 },
+    { "id": "sand_col", "op": "color_ramp", "stops": [ { "pos": 0, "color": "#a48c6a" }, { "pos": 1, "color": "#c9b38d" } ], "inputs": ["sand_grain_n"] },
+    { "id": "sand_shade", "op": "expression", "expr": "0.82 + 0.25 * a - 0.12 * smoothstep(0.55, 1.0, b) * (1 - k1)", "k1": { "param": "wear" }, "inputs": ["dune", "damp"] },
+    { "id": "sand_face", "op": "mix", "mode": "multiply", "inputs": ["sand_col", "sand_shade"] },
+    { "id": "pebble_col", "op": "color_ramp", "interpolation": "constant", "stops": [ { "pos": 0, "color": "#6f6a63" }, { "pos": 0.3, "color": "#8b7f70" }, { "pos": 0.55, "color": "#a29d94" }, { "pos": 0.75, "color": "#5e5247" }, { "pos": 0.9, "color": "#b0a493" } ], "inputs": ["pebble_id"] },
+    { "id": "pebble_shade", "op": "expression", "expr": "0.75 + 0.35 * a", "inputs": ["pebbles"] },
+    { "id": "pebble_face", "op": "mix", "mode": "multiply", "inputs": ["pebble_col", "pebble_shade"] },
+    { "id": "dusted", "op": "mix", "mode": "mix", "factor": 0.25, "inputs": ["pebble_face", "sand_face"] },
+    { "id": "pebble_dust", "op": "expression", "expr": "0.6 * (1 - k1)", "k1": { "param": "wear" } },
+    { "id": "pebble_surface", "op": "mix", "mode": "mix", "inputs": ["pebble_face", "dusted", "pebble_dust"] },
+    { "id": "base_color", "op": "mix", "mode": "mix", "inputs": ["sand_face", "pebble_surface", "exposed"] },
+
+    { "id": "roughness", "op": "expression", "expr": "clamp(mix(0.93 + 0.06 * (b - 0.5), 0.62 + 0.25 * c, a), 0, 1)", "inputs": ["exposed", "sand_grain_n", "pebble_id"] },
+    { "id": "ao", "op": "ambient_occlusion", "radius": 0.012, "depth": 0.005, "quality": 8, "inputs": ["detail"] },
+    { "id": "occlusion", "op": "levels", "out_low": 0.45, "inputs": ["ao"] }
+  ],
+  "output": "base_color",
+  "outputs": { "base_color": "base_color", "normal": "normal", "roughness": "roughness", "height": "height", "occlusion": "occlusion" }
+}
