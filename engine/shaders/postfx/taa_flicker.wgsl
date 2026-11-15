@@ -3,7 +3,7 @@
 // anti-flicker and Unreal TSR's flickering luminance: a still pixel whose frame
 // keeps blinking under the jitter (an SSR or a specular outlier on some sub-pixel
 // offsets) keeps its history's luma against the next blink instead of being
-// clamped to it.
+// clamped to it; its hue and saturation stay the clamp's.
 // The resolve's box is built from this frame alone (`taa.wgsl`), so an outlier as
 // wide as its own 3×3 is its own box, and a clamp hands it to the output at nearly
 // full depth.

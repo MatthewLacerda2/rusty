@@ -46,10 +46,10 @@ fn survival(r: &mut Renderer, period: u32) -> Vec<f32> {
 /// How much of a repeated flash the anti-flicker keeps, against URP's: the first
 /// two flashes at least [`FIRST`] (no hold before a blink recurs); from the fourth
 /// on, flashes `period` frames apart keep [`HELD`]'s share, within [`BAND`].
-/// Measured on lavapipe, flash by flash: every 6 frames 100 % 100 % 80 % 35 % 33 %
-/// 34 %; every 10, 100 % 100 % 81 % 58 % 58 % 58 %.
+/// Measured on lavapipe, flash by flash: every 6 frames 100 % 100 % 10 % 9 % 9 %
+/// 9 %; every 10, 100 % 100 % 40 % 25 % 25 % 25 %.
 const FIRST: f32 = 0.95;
-const HELD: [(u32, f32); 2] = [(6, 0.34), (10, 0.58)];
+const HELD: [(u32, f32); 2] = [(6, 0.09), (10, 0.25)];
 const BAND: f32 = 0.1;
 
 #[test]

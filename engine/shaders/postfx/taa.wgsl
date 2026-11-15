@@ -310,8 +310,8 @@ fn blend(px: Pixel) -> ResolveOut {
 
 // [`blend`] with the anti-flicker on (#2228): a blinking still pixel's history
 // keeps its luma up to `flicker.y` times its recurring blinks outside the box,
-// along the line to where it was ([`flicker_of`]); its chroma stays the box's, so
-// a hue change is clamped as URP's is.
+// along the line to where it was ([`flicker_of`]); its hue and saturation stay the
+// box's, so a hue change is clamped as URP's is.
 fn blend_held(px: Pixel) -> HeldOut {
     let luma = ycocg::perceptual(ycocg::from_rgb(px.frame.here.rgb).x);
     let past = past_of(px);
@@ -320,7 +320,10 @@ fn blend_held(px: Pixel) -> HeldOut {
     }
     let boxed = into_box(past.raw, px.frame.lo, px.frame.hi);
     let f = flicker_of(past.prev_uv, luma, past.raw.x, boxed.x, past.change, px.frame.reactive);
-    let history = vec3<f32>(mix(boxed.x, past.raw.x, f.hold), boxed.yz);
+    // The box's colour at the held luma: its chroma scales with it (YCoCg's chroma
+    // is in light, not a ratio), so the hue and saturation stay the clamp's.
+    let held = mix(boxed.x, past.raw.x, f.hold);
+    let history = vec3<f32>(held, boxed.yz * select(0.0, held / boxed.x, boxed.x > 1e-6));
     let color = mixed(px.frame, history, past.weight);
     return HeldOut(color, px.front.own, taa_flicker::texel(luma, f));
 }

@@ -49,7 +49,8 @@
 //! flicker), each keeping [`FLICKER_DECAY`] of itself a frame. A still pixel's
 //! history luma may then sit up to [`FLICKER_HOLD`] × the anti-flicker times its
 //! recurring flicker outside the box (in perceptual luma, along the line from its
-//! clamp to where it was); its chroma stays the box's. A moving or revealed pixel
+//! clamp to where it was); its hue and saturation stay the box's (its chroma scaled
+//! with the held luma). A moving or revealed pixel
 //! keeps no hold and forgets its flicker, a reactive one keeps no hold. What it
 //! costs, a one-frame change repeated on a still pixel (a strobe, a fast gun's
 //! flashes on a wall) held as a flicker is, is measured in `gpu/flicker/` and told

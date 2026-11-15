@@ -848,17 +848,18 @@ keeps blinking holds its history's luma against the blinks: a blink is a change
 undone on the very next frame, and once a pixel's blinks recur, its history's
 luma may sit up to four times (at `1`; the setting scales it) its recurring
 blinks outside the box, so they average away (on the case that found it, a still
-view's worst blink drops from 26 levels to 9). Its colour (hue) is clamped as
-URP's is, so a light turning from red to blue at the same brightness shows the
-new hue as fast. A moving, revealed or reactive pixel is never held. At `0` the
+view's worst blink drops from 26 levels to 9). Its hue and saturation are the
+clamp's, as URP's are, so a light turning from red to blue at the same
+brightness shows the new hue as fast. A moving, revealed or reactive pixel is never held. At `0` the
 resolve is URP's, bit for bit, and costs nothing more; on, each TAA camera keeps
 16 bytes a pixel more (83 MB in all at 1920×1080).
 
 **What it softens**, measured at `1` on a still view (lavapipe; in rendered
 frames, so the time scales with the frame rate): a one-frame flash repeated on a
-still pixel shows fully its first two times, about 80 % its third, then about a
-third of itself every 6 frames apart (58 % every 10 frames); a strobe, a flickering
-light, or a fast gun's flashes lighting a wall or the viewmodel are dimmed so. A
+still pixel shows fully its first two times; from its third, flashes 6 frames
+apart show about a tenth of themselves, and 10 frames apart 40 % the third time,
+then a quarter. A strobe, a flickering light, or a fast gun's flashes lighting a
+wall or the viewmodel are nearly removed so. A
 lone change on a pixel that was not blinking (a light switched on, a single muzzle
 flash, a shadow crossing a calm floor) is as sharp as URP's. On a pixel already
 blinking under the jitter (a textured surface, an edge; more of the image while TAA
