@@ -34,22 +34,7 @@ fn sharpest_bend(red: &[f32], (w, h): (u32, u32)) -> f32 {
                 .windows(3)
                 .map(|p| (p[2] - 2.0 * p[1] + p[0]).abs())
                 .fold(0.0, f32::max);
-            let b = bend / peak * (h * h) as f32 / 1000.0;
-            if b > 12.0 {
-                let y = (1..c.len() - 1)
-                    .max_by(|&i, &j| {
-                        let f = |k: usize| (c[k + 1] - 2.0 * c[k] + c[k - 1]).abs();
-                        f(i).total_cmp(&f(j))
-                    })
-                    .unwrap();
-                let lo = y.saturating_sub(6);
-                let hi = (y + 7).min(c.len());
-                eprintln!(
-                    "DEBUG2249 fading col {x} row {y} peak {peak} bend {b}: {:?}",
-                    &c[lo..hi]
-                );
-            }
-            b
+            bend / peak * (h * h) as f32 / 1000.0
         })
         .fold(0.0, f32::max)
 }
