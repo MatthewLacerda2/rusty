@@ -74,12 +74,25 @@ fn a_bad_path_or_mesh_raises_instead_of_returning_a_blank_picture() {
     let bad_mesh = sess.eval(&format!(
         r#"return Debug.Preview({SHADER:?}, "out.png", {{ mesh = "spere" }})"#
     ));
+    let message = format!("{bad_mesh:?}");
     assert!(
-        bad_mesh.is_err()
-            || bad_mesh
-                .as_deref()
-                .unwrap_or("")
-                .contains("unknown preview mesh"),
-        "a misspelled mesh must surface as an error, got {bad_mesh:?}"
+        message.contains("unknown preview mesh") && message.contains("plane"),
+        "a misspelled mesh must raise, listing every mesh, got {bad_mesh:?}"
+    );
+
+    let no_repeats = sess.eval(&format!(
+        r#"return Debug.Preview({SHADER:?}, "out.png", {{ repeats = 0 }})"#
+    ));
+    assert!(
+        format!("{no_repeats:?}").contains("repeats must be 1 or more"),
+        "zero repeats must raise, got {no_repeats:?}"
+    );
+
+    let too_many = sess.eval(&format!(
+        r#"return Debug.Preview({SHADER:?}, "out.png", {{ repeats = 100000 }})"#
+    ));
+    assert!(
+        format!("{too_many:?}").contains("at most 1000 repeats"),
+        "a count past the renderer's tiling range must raise, got {too_many:?}"
     );
 }

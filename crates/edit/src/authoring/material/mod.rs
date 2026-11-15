@@ -42,7 +42,7 @@ pub use face::FACE_FIELDS;
 pub use field::{
     material_fields, set_surface, surface_field, SurfaceField, SurfaceKind, SurfaceValue,
 };
-pub use graphs::{project_graphs, read_graph};
+pub use graphs::{engine_graphs, listed_graphs, project_graphs, read_graph};
 pub use library::{
     delete_asset, describe, describe_all, drop_unused, entity_keys, restore_asset, users,
     DeletedMaterial, MaterialUser,

@@ -30,8 +30,8 @@ pub enum Align {
 /// font's em height in tiles, `tracking` extra advance between glyphs in ems,
 /// `line_spacing` the distance between baselines in ems, and `align` places each
 /// line in the block. Shaped as the UI's `Text` is: kerning and ligatures. `font`
-/// is a `.ttf` / `.otf` path from the project root, read by the caller (procgen
-/// reads no files); empty is the engine's default, Instrument Sans. A glyph that
+/// is a `.ttf` / `.otf` path from the project root (or an `engine/…` one), read by
+/// the caller (procgen reads no files); empty is the engine's default, Instrument Sans. A glyph that
 /// crosses the tile's edge wraps.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "Written")]
