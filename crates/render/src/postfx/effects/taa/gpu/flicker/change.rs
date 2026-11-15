@@ -15,8 +15,8 @@ const AT: u32 = 6;
 /// A tile's largest step before the flash, in 255ths, for it to count as calm.
 const CALM: f32 = 0.5;
 /// How far a calm tile under the hold may sit from URP's through a lone flash, in
-/// 255ths: a level. Lavapipe measures 0.5, a calm pixel's own sub-level blinks
-/// (lighting's rounding) holding that little of the flash's end.
+/// 255ths: a level, a calm pixel's own sub-level blinks (lighting's rounding)
+/// holding that little of the flash's end. Measured: lavapipe 0.5.
 const SAME: f32 = 1.0;
 /// URP's resolve: the hold off.
 const URP: Rules = Rules {
@@ -103,6 +103,10 @@ fn slide(s: &mut Scene, f: u32) {
     s.world.transform_mut(cube).unwrap().position = Vec3::new(x, y, -3.2);
 }
 
+/// How much more trail the hold may leave than URP's, in 255ths: a level.
+/// Measured: lavapipe 3.1 held, 3.9 URP's.
+const TRAIL: f32 = 1.0;
+
 #[test]
 fn gpu_a_cube_moving_under_a_flickering_ceiling_leaves_no_more_trail_than_urps() {
     let Some(mut r) = renderer() else { return };
@@ -116,7 +120,7 @@ fn gpu_a_cube_moving_under_a_flickering_ceiling_leaves_no_more_trail_than_urps()
     let (held, urp) = (trail(Rules::default()), trail(URP));
     eprintln!("[taa] the cube's trail, 4 frames after it left: {held:.1} held, {urp:.1} URP's");
     assert!(
-        held <= urp + 1.0,
+        held <= urp + TRAIL,
         "the hold leaves a trail: {held:.1} against {urp:.1}"
     );
 }

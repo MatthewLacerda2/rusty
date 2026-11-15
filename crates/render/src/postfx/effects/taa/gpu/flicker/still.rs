@@ -7,8 +7,9 @@ use super::room::{renderer, room, run, swing};
 /// horizontal one turns over too.
 const FRAMES: u32 = 54;
 /// The largest step a tile of the still view may take between two frames, in
-/// 255ths of perceptual luma: ours. Lavapipe measures 26 without the hold, 9 with
-/// it; the scene without SSR (the bulb's own edge under the jitter) steps 5.
+/// 255ths of perceptual luma: ours, a still view's blinks reduced to near the
+/// scene's own (without SSR the bulb's edge under the jitter steps 5). Measured:
+/// lavapipe 26 without the hold, 9 with it.
 const STILL: f32 = 12.0;
 
 #[test]
