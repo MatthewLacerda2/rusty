@@ -26,7 +26,7 @@ pub mod stats;
 use egui_phosphor::regular as icon;
 
 use crate::theme::chrome;
-use rusty_core::application::{Gizmo, SceneGizmos};
+use rusty_core::application::Gizmo;
 
 /// Which view the viewport tab strip is showing.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -78,33 +78,14 @@ pub fn draw(
     scene: &rusty_scene::Scene,
 ) -> ViewportInteraction {
     let t = editor.theme;
-    let mut tab = editor.viewport_tab;
-    let mut gizmos = editor.gizmos;
-    let mut game_view = editor.game_view;
-    #[cfg(feature = "dev")]
-    let demo_open = editor.demo_open();
-    #[cfg(not(feature = "dev"))]
-    let demo_open = false;
     let mut fit = None;
 
     let response = egui::CentralPanel::default()
         .frame(egui::Frame::NONE.fill(t.bg_tier0))
         .show(ui, |ui| {
-            let strip = Strip {
-                tab: &mut tab,
-                gizmos: &mut gizmos,
-                game_view: &mut game_view,
-            };
-            draw_tab_strip(ui, strip, demo_open, t);
-            #[cfg(feature = "dev")]
-            if let (ViewportTab::Game, Some(demo)) = (tab, editor.dev.demo.as_mut()) {
-                crate::demo::timeline::draw(ui, demo, &t);
-                fit = Some(demo.size);
-            }
-            if tab == ViewportTab::Game && fit.is_none() {
-                let ppp = ui.ctx().pixels_per_point();
-                fit = game_size::fit(game_view, ui.available_size(), ppp);
-            }
+            draw_tab_strip(ui, editor, t);
+            let (tab, gizmos) = (editor.viewport_tab, editor.gizmos);
+            fit = game_view_fit(editor, ui);
             let response = draw_image(ui, texture, t, fit);
             if tab == ViewportTab::Scene {
                 navigate(editor, &response, scene);
@@ -129,9 +110,7 @@ pub fn draw(
         })
         .inner;
 
-    editor.viewport_tab = tab;
-    editor.gizmos = gizmos;
-    editor.game_view = game_view;
+    let tab = editor.viewport_tab;
     let mut interaction = build_interaction(tab, &response, editor.scene_view.navigating);
     interaction.render = fit.filter(|_| tab == ViewportTab::Game);
     // Record the image rect's pixel size so the front-end resizes the offscreen
@@ -145,12 +124,17 @@ pub fn draw(
 /// navigation help; on the Game tab its rows (`game`): **Gizmos** (#1882) and
 /// **Stats** (#2205), then the size dropdown (#2207, held while a demo is open). A
 /// control that is no gizmo joins the strip after the gizmo rows.
-fn draw_tab_strip(ui: &mut egui::Ui, strip: Strip, demo_open: bool, t: crate::theme::Theme) {
-    let Strip {
-        tab,
+fn draw_tab_strip(ui: &mut egui::Ui, editor: &mut crate::EditorUi, t: crate::theme::Theme) {
+    #[cfg(feature = "dev")]
+    let demo_open = editor.demo_open();
+    #[cfg(not(feature = "dev"))]
+    let demo_open = false;
+    let crate::EditorUi {
+        viewport_tab: tab,
         gizmos,
         game_view,
-    } = strip;
+        ..
+    } = editor;
     egui::Frame::NONE
         .fill(t.bg_tier1)
         .inner_margin(egui::vec2(t.space_sm, t.space_xs + 1.0))
@@ -185,11 +169,20 @@ fn draw_tab_strip(ui: &mut egui::Ui, strip: Strip, demo_open: bool, t: crate::th
         });
 }
 
-/// What the tab strip edits: the tab, the gizmo toggles and the Game view's size.
-struct Strip<'a> {
-    tab: &'a mut ViewportTab,
-    gizmos: &'a mut SceneGizmos,
-    game_view: &'a mut rusty_core::application::GameViewSetting,
+/// The Game tab's own size, the image drawn letterboxed at it: an open demo's,
+/// under its timeline (#1598), else the size dropdown's (#2207). `None` on the
+/// Scene tab or when the Game view is the panel's own pixels.
+fn game_view_fit(editor: &mut crate::EditorUi, ui: &mut egui::Ui) -> Option<(u32, u32)> {
+    if editor.viewport_tab != ViewportTab::Game {
+        return None;
+    }
+    #[cfg(feature = "dev")]
+    if let Some(demo) = editor.dev.demo.as_mut() {
+        crate::demo::timeline::draw(ui, demo, &editor.theme);
+        return Some(demo.size);
+    }
+    let ppp = ui.ctx().pixels_per_point();
+    game_size::fit(editor.game_view, ui.available_size(), ppp)
 }
 
 /// The Scene view's navigation bindings (#1344), the tooltip of the tab strip's `?`.
