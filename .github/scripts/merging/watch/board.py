@@ -104,12 +104,18 @@ def transitions(
     before: dict[int, tuple[bool, str, bool]] | None, after: dict[int, tuple[bool, str, bool]], landed: set[int]
 ) -> list[str]:
     """One line per pull request that changed between two [`heads`] listings
-    (#909). `before` is `None` on the first listing, which announces nothing;
-    a pull request in `landed` (this watch merged it) is not reported closed.
-    Each line has its own word to grep: `opened`, `turned ready`, `back to
-    draft`, `closed`, `queued`, `unqueued` (the label, #925)."""
+    (#909); a pull request in `landed` (this watch merged it) is not reported
+    closed. Each line has its own word to grep: `opened`, `turned ready`, `back
+    to draft`, `closed`, `queued`, `unqueued` (the label, #925).
+
+    A watch's first listing is compared with the last one any watch told
+    ([`shown`], #2215), so what moved between two watches is said once by the
+    second. `before` is `None` only when nothing was kept (a fresh start, an
+    unreadable file): then each ready pull request without the label is said
+    to be waiting ([`waiting_line`]), and nothing else, since a draft or a
+    queued one asks nothing of the orchestrator."""
     if before is None:
-        return []
+        return [waiting_line(n) for n in sorted(after) if not after[n][0] and not after[n][2]]
     lines = []
     for number in sorted(before.keys() | after.keys()):
         if number not in before:
@@ -124,3 +130,9 @@ def transitions(
         if number in before and number in after and before[number][2] != after[number][2]:
             lines.append(f"watch: #{number} {'queued' if after[number][2] else 'unqueued'}.")
     return lines
+
+
+def waiting_line(number: int) -> str:
+    """A ready, unlabelled pull request a fresh start found: whether it was
+    ever announced is unknown, so it is said now ([`transitions`], #2215)."""
+    return f"watch: #{number} is ready and unqueued; no earlier listing was kept to compare."

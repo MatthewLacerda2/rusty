@@ -28,8 +28,9 @@ class Wording(unittest.TestCase):
             prefixed(board.held_line({"number": 9}, [".github/workflows/ci.yml"])),
             *said,
             *(prefixed(line) for line in board.transitions(before, after, landed=set())),
+            *(prefixed(line) for line in board.transitions(None, after, landed=set())),  # a fresh start (#2215)
         ]
-        self.assertEqual(len(lines), 9)  # ready, draft, closed, opened as ready
+        self.assertEqual(len(lines), 11)  # ready, draft, closed, opened as ready; two waiting on a fresh start
         for line in lines:
             self.assertTrue(events.keep(line, set()), line)
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 
 from merging.queue import outcomes
-from merging.watch import aging, board, ending, handbacks, mainline, order, stalls
+from merging.watch import aging, board, ending, handbacks, mainline, order, shown as kept_board, stalls
 
 
 def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
@@ -67,7 +67,9 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     whys = handbacks.recall(fx.memory.with_name(handbacks.WHY_MEMORY))
     wall = getattr(fx, "wall", time.time)
     line = aging.Line()
-    shown = [None]  # the board as last reported; `None` until the first listing
+    # The board as last reported, by this watch or the one before it (#2215).
+    told_board = kept_board.Kept(fx.memory.with_name(kept_board.BOARD_MEMORY), not getattr(opts, "dry_run", False))
+    shown = [told_board.first()]
     after = getattr(fx, "mutants", None)  # the mutation runs merged pull requests asked for (#1934)
 
     def save() -> None:
@@ -79,6 +81,7 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         handbacks.remember(fx.memory.with_name(handbacks.STALLS_MEMORY), {n: s for n, s in stalled.items() if n in memory})
         handbacks.remember(fx.memory.with_name(handbacks.RED_MEMORY), {n: r for n, r in reds.items() if n in memory})
         handbacks.remember(fx.memory.with_name(handbacks.WHY_MEMORY), {n: w for n, w in whys.items() if n in memory})
+        told_board.write(shown[0], landed)
 
     def forget(number: int) -> None:
         """Drop everything remembered against `number`: it is back in line."""
@@ -90,6 +93,7 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         for said in board.transitions(shown[0], now, landed):
             fx.say(said)
         shown[0] = now
+        told_board.write(now, landed)
 
     def tick() -> None:
         if after:

@@ -62,7 +62,7 @@ KEEP = re.compile(
     r"|supervisor: (?!" + "|".join(re.escape(line) for line in CARRIES_ON) + ")"
     r"|watch: STOPPED:"
     r"|HELD #\d+"
-    r"|watch: #\d+ (?:turned ready|opened as ready|back to draft|closed, not merged)"
+    r"|watch: #\d+ (?:turned ready|opened as ready|is ready and unqueued|back to draft|closed, not merged)"
     # A mutation request lost, never a slow one (#1934): a signal nobody hears of is no signal.
     r"|after: .*(?:dropped|could not|never appeared)"
 )

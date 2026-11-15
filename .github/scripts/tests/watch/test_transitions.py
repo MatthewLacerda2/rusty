@@ -3,9 +3,9 @@
 
 A pull request opening (draft or ready), turning ready, going back to draft or
 closing gets its own line, so one `Monitor` on the watch's output replaces the
-orchestrator's separate `gh pr list` poller. The first listing says nothing (a
-relaunch does not replay the board), and a pull request the watch merged itself
-is not reported closed. Driven by the loop tests' fake world and clock.
+orchestrator's separate `gh pr list` poller. A first listing with no kept board
+says only the ready, unlabelled ones (#2215; across watches, `test_kept_board`),
+and a pull request the watch merged itself is not reported closed. Driven by the loop tests' fake world and clock.
 """
 
 from __future__ import annotations
@@ -24,8 +24,9 @@ def listed(*pulls) -> dict:
 
 
 class Lines(unittest.TestCase):
-    def test_the_first_listing_announces_nothing(self):
-        self.assertEqual(board.transitions(None, listed(pr(1), pr(2, draft=True)), set()), [])
+    def test_with_nothing_kept_only_a_ready_unlabelled_one_is_announced(self):
+        after = listed(pr(1), pr(2, draft=True), pr(3, queued=False), pr(4, draft=True, queued=False))
+        self.assertEqual(board.transitions(None, after, set()), [board.waiting_line(3)])
 
     def test_each_transition_has_its_line(self):
         before = listed(pr(1, draft=True), pr(2), pr(3))
