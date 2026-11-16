@@ -45,7 +45,8 @@ struct SsrParams {
     // xyz: the base camera's eye
     camera_pos: vec4<f32>,
     // x: the march's step count, y: its step length in world units, from the
-    // volume's quality (`render::postfx::effects::ssr::march`)
+    // volume's quality (`render::postfx::effects::ssr::march`); z: the levels of
+    // `t_hiz`
     march: vec4<f32>,
     // x: the volume's *Minimum Smoothness* (#1736), y: the smoothness over which SSR
     // fades in above it (`ssr::fade`)
@@ -60,6 +61,10 @@ struct SsrParams {
 @group(0) @binding(3) var t_velocity: texture_2d<f32>;
 @group(0) @binding(4) var t_weight: texture_2d<f32>;
 @group(0) @binding(5) var t_applied: texture_2d<f32>;
+// The min-depth pyramid of the velocity target's depth (`render::postfx::effects::
+// ssr::hiz`, #2228), `params.march.z` levels: the march steps over nothing thinner
+// than a step.
+@group(0) @binding(6) var t_hiz: texture_2d<f32>;
 
 @vertex
 fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4<f32> {
@@ -238,7 +243,7 @@ fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
     let f = ssr_march::Frame(params.view_proj, params.camera_pos.xyz, fwd, vec4<f32>(0.0, 0.0, 1.0, 0.0));
     let c = cone(s.roughness);
     // Read sharp: the resolve blurs the hits by the cone, colour and edge alike.
-    let hit = ssr_march::trace_hit(f, t_velocity, t_color, s_color, origin, r, i32(params.march.x), params.march.y, c, 0.0);
+    let hit = ssr_march::trace_hit(f, t_velocity, t_hiz, i32(params.march.z), t_color, s_color, origin, r, i32(params.march.x), params.march.y, c, 0.0);
     if (hit.dist <= 0.0) {
         return missed;
     }

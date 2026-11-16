@@ -102,6 +102,10 @@ impl Pyramid {
     ) -> Self {
         use wgpu::TextureUsages as U;
         let count = levels((width, height));
+        let usage = U::RENDER_ATTACHMENT | U::TEXTURE_BINDING | U::COPY_DST;
+        // A test reads the trace's hits back (`PostFx::ssr_hits`).
+        #[cfg(test)]
+        let usage = usage | U::COPY_SRC;
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("SSR Pyramid"),
             size: wgpu::Extent3d {
@@ -113,7 +117,7 @@ impl Pyramid {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: HDR_FORMAT,
-            usage: U::RENDER_ATTACHMENT | U::TEXTURE_BINDING | U::COPY_DST,
+            usage,
             view_formats: &[],
         });
         let level = |mip| {

@@ -10,4 +10,5 @@ mod reach;
 mod reflect;
 mod rough;
 mod silhouette;
+mod thin;
 mod transparent;

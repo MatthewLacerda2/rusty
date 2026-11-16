@@ -16,6 +16,7 @@
 //! ([`march`], #1521, #1522). A transparent surface that opts in traces its own
 //! reflection in the transparent pass ([`transparent`], #1570).
 
+mod hiz;
 pub(crate) mod pass;
 pub(crate) mod pyramid;
 mod record;
@@ -115,6 +116,9 @@ pub(crate) fn run(
     view.post_fx
         .run_ssr(gpu, &r.post_passes.ssr, params, &r.gpu_timer);
 }
+
+#[cfg(test)]
+mod hooks;
 
 #[cfg(test)]
 mod poison;

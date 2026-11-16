@@ -1,7 +1,9 @@
 //! The SSR pass (#1526): two fullscreen passes over the base camera's opaque image,
 //! run right after its opaque pass (`render::draw::camera`'s `ssr` stage), in
 //! `postfx/ssr.wgsl`. It copies the image into the first level of its colour pyramid
-//! ([`pyramid`](super::pyramid), #1736) and builds the rest. The trace (`fs_trace`)
+//! ([`pyramid`](super::pyramid), #1736) and builds the rest, and builds the
+//! min-depth pyramid of the velocity target's depth ([`hiz`](super::hiz), #2228)
+//! the march steps by. The trace (`fs_trace`)
 //! then marches each smooth enough pixel's ray and writes its hit into a target of
 //! its own, and into a second where it traced and, for a ray that found something,
 //! its hit's blur radius per unit cone and how much it counts (#2158); their pyramids
@@ -16,10 +18,12 @@
 //! The pipelines are the renderer's ([`SsrPasses`], built on first use and warmed
 //! with the rest); the pyramids and the params uniform are each view's
 //! ([`SsrTargets`]), held only while it runs SSR. The GPU timer's `ssr` pass spans
-//! the trace, the trace's pyramids and the resolve; the colour pyramid is untimed.
+//! the trace, the trace's pyramids and the resolve; the colour and depth pyramids
+//! are untimed.
 
 use glam::{Mat4, Vec3};
 
+use super::hiz::{Hiz, HizPass};
 use super::pyramid::{Pyramid, PyramidPass};
 use super::record::{begin, opaque_target, pipeline_layout, split};
 use super::surface;
@@ -39,7 +43,8 @@ pub(crate) struct SsrParams {
     inv_view_proj: [f32; 16],
     view_proj: [f32; 16],
     camera_pos: [f32; 4],
-    /// x: step count, y: step length (world units).
+    /// x: step count, y: step length (world units), z: the levels of the min-depth
+    /// pyramid it reads ([`super::hiz`]).
     march: [f32; 4],
     /// x: the *Minimum Smoothness* (#1736), y: the width it fades in over
     /// ([`super::fade`]).
@@ -61,6 +66,12 @@ impl SsrParams {
             },
         }
     }
+
+    /// The same, the march reading a min-depth pyramid of `levels` levels.
+    fn with_hiz(mut self, levels: u32) -> Self {
+        self.march[2] = levels as f32;
+        self
+    }
 }
 
 /// The SSR pipelines and their pyramids', shared by every view.
@@ -75,6 +86,8 @@ pub(crate) struct SsrPasses {
     /// radius per unit cone times how much it counts, and that count, #2158), all
     /// [`HDR_FORMAT`].
     pyramid: PyramidPass,
+    /// The min-reduce the march's depth pyramid is built by ([`super::hiz`]).
+    hiz: HizPass,
 }
 
 impl SsrPasses {
@@ -90,6 +103,7 @@ impl SsrPasses {
                 texture_entry(3, d2),
                 texture_entry(4, d2),
                 texture_entry(5, d2),
+                texture_entry(6, d2),
             ],
         });
         let traced = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -126,23 +140,32 @@ impl SsrPasses {
             trace,
             resolve,
             pyramid: PyramidPass::new(device, registry),
+            hiz: HizPass::new(device, registry),
         }
     }
 
     /// The pipelines, for warming (`Renderer::lazy_pipelines`).
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 3] {
-        [&self.trace, &self.resolve, self.pyramid.lazy_pipeline()]
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 5] {
+        let [first, rest] = self.hiz.lazy_pipelines();
+        [
+            &self.trace,
+            &self.resolve,
+            self.pyramid.lazy_pipeline(),
+            first,
+            rest,
+        ]
     }
 }
 
 /// One view's SSR state: the pyramid of the opaque image the march reads, the
-/// trace's two pyramids the resolve reads, and the params uniform, kept while the
-/// view's size holds.
+/// min-depth pyramid it steps by ([`super::hiz`]), the trace's two pyramids the
+/// resolve reads, and the params uniform, kept while the view's size holds.
 pub(crate) struct SsrTargets {
-    size: (u32, u32),
-    pyramid: Pyramid,
-    hits: Pyramid,
+    pub(super) size: (u32, u32),
+    pub(super) pyramid: Pyramid,
+    pub(super) hits: Pyramid,
     spread: Pyramid,
+    hiz: Hiz,
     params: wgpu::Buffer,
     /// Test-only: overwrite the image's upper half with `inf` before tracing.
     #[cfg(test)]
@@ -156,6 +179,7 @@ impl SsrTargets {
             pyramid: Pyramid::new(device, &passes.pyramid, size),
             hits: Pyramid::new(device, &passes.pyramid, size),
             spread: Pyramid::new(device, &passes.pyramid, size),
+            hiz: Hiz::new(device, &passes.hiz, size),
             params: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("SSR Params"),
                 size: std::mem::size_of::<SsrParams>() as u64,
@@ -193,6 +217,7 @@ impl PostFx {
         let t = self.targets.get::<SsrTargets>().expect("fitted above");
         let velocity = self.motion.target_view().expect("checked above");
         let [weight, applied] = surface::views(self).expect("checked above");
+        let params = params.with_hiz(t.hiz.levels());
         queue.write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
         #[cfg(test)]
         super::poison::write(t.poisoned, queue, &self.scene_hdr.texture);
@@ -207,6 +232,7 @@ impl PostFx {
                 entry(3, view(velocity)),
                 entry(4, view(weight)),
                 entry(5, view(applied)),
+                entry(6, view(&t.hiz.view)),
             ],
         });
         let traced = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -222,6 +248,7 @@ impl PostFx {
         let (from, to) = (&self.scene_hdr.texture, &t.pyramid.texture);
         encoder.copy_texture_to_texture(from.as_image_copy(), to.as_image_copy(), extent);
         t.pyramid.build(&mut encoder, &passes.pyramid);
+        t.hiz.build(device, &mut encoder, &passes.hiz, velocity);
         let groups = [&group, &traced];
         trace_and_resolve(&mut encoder, passes, t, groups, &self.scene_hdr.view, timer);
         queue.submit(std::iter::once(encoder.finish()));
@@ -261,19 +288,5 @@ fn trace_and_resolve(
         pass.set_bind_group(0, group, &[]);
         pass.set_bind_group(1, traced, &[]);
         pass.draw(0..3, 0..1);
-    }
-}
-
-#[cfg(test)]
-impl PostFx {
-    /// Whether the view holds SSR's state (it ran this frame).
-    pub(crate) fn holds_ssr(&self) -> bool {
-        self.targets.get::<SsrTargets>().is_some()
-    }
-
-    /// The size and level count of the pyramid SSR read this frame, if it ran.
-    pub(crate) fn ssr_pyramid(&self) -> Option<((u32, u32), u32)> {
-        let t = self.targets.get::<SsrTargets>()?;
-        Some((t.size, t.pyramid.levels()))
     }
 }

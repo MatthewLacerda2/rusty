@@ -3,7 +3,9 @@
 // surface that traces its own (`forward/transparent.wgsl`'s `reflect_ssr`, #1570).
 // One march, two depth sources: the SSR pass reads each pixel's depth along the view
 // axis from the velocity target's `.z`; a transparent reads the eye distance in the
-// opaque copy's `.a` (`opaque_copy.wgsl`). A `Frame` says which.
+// opaque copy's `.a` (`opaque_copy.wgsl`). A `Frame` says which. The SSR pass also
+// hands it a min-depth pyramid of its depth (`postfx/ssr_hiz.wgsl`, #2228), so no
+// step passes over a surface thinner than itself (`clear`); a transparent has none.
 //
 // No derivatives here (crates/render/src/CLAUDE.md, *Shaders*): every read is a
 // `textureLoad` or an explicit-LOD sample, so a caller may march in a per-pixel branch.
@@ -169,6 +171,149 @@ fn refine(f: Frame, t_depth: texture_2d<f32>, a: vec3<f32>, b: vec3<f32>, start:
     return go;
 }
 
+// How many texels `deep` looks at each side of a hit for the object it is on.
+const EXTENT_TAPS: i32 = 8;
+// How deep a narrow object is taken to be, as a fraction of its depth (#2228):
+// HDRP's default *Object Thickness*, 1%.
+const THIN_SLACK: f32 = 0.01;
+
+// How far behind the object a hit at `p` (seen at `uv`) is on a ray may pass and
+// still hit it (#2228): `slack` for an object wider on screen, along the ray's
+// screen direction `dir` (texels, unit), than `2 × EXTENT_TAPS` texels (its texels
+// those around `uv` whose depths run on within `slack` of each other), and
+// `THIN_SLACK` of its depth for a narrower one. The depth target holds only front
+// faces, so a ray passing behind an object hits it only within its thickness; a
+// fixed `THICKNESS` drew a 6 mm strip's reflection as wide as a 15 cm deep one's
+// once the march stopped stepping over it. A fraction of the depth, not the
+// object's width on screen: a width in texels moves by a texel between TAA's
+// offsets, and the reflection's edge with it, the whole strip at once.
+fn deep(f: Frame, t_depth: texture_2d<f32>, p: vec3<f32>, uv: vec2<f32>, dir: vec2<f32>) -> f32 {
+    let dim = vec2<f32>(textureDimensions(t_depth));
+    let tol = slack(f, p);
+    let d0 = dot(texel(t_depth, uv), f.channel);
+    var count = 1;
+    for (var side = -1.0; side <= 1.0; side = side + 2.0) {
+        var last = d0;
+        for (var k = 1; k <= EXTENT_TAPS; k = k + 1) {
+            let q = uv + dir * (side * f32(k)) / dim;
+            if (any(q < vec2<f32>(0.0)) || any(q > vec2<f32>(1.0))) {
+                break;
+            }
+            let d = dot(texel(t_depth, q), f.channel);
+            if (abs(d - last) > tol) {
+                break;
+            }
+            last = d;
+            count = count + 1;
+        }
+    }
+    return select(min(depth_of(f, p) * THIN_SLACK, tol), tol, count > 2 * EXTENT_TAPS);
+}
+
+// A step shorter than this many texels on screen is probed at its end alone, and
+// one `clear` finds something nearer under is probed every this many: any texel
+// the ray's path runs through for at least this long holds a probe.
+const PROBE: f32 = 0.5;
+// The most a march spends in `clear` on one step, in its cell reads and probes'
+// rounds: past it the step's end alone is probed, as without a pyramid.
+const CLEAR_ROUNDS: i32 = 32;
+
+// A point's position on the screen of `dim`, in texels, from its clip position `c`.
+fn texels(c: vec4<f32>, dim: vec2<f32>) -> vec2<f32> {
+    let s = c.xy / c.w;
+    return vec2<f32>(s.x * 0.5 + 0.5, 0.5 - s.y * 0.5) * dim;
+}
+
+// The world fraction along a segment whose ends have clip `w`s `wa` and `wb` at
+// screen fraction `u` along it (perspective: the screen fraction is not the world's).
+fn world_fraction(u: f32, wa: f32, wb: f32) -> f32 {
+    return u * wa / max((1.0 - u) * wb + u * wa, 1e-6);
+}
+
+// The nearest depth over the texels of `dim` from `lo` to `hi` (a box no wider than
+// one cell of `level`, 2^level texels, so it spans at most 2×2 cells), from the
+// min-depth pyramid `t_hiz`, whose mip `level - 1` holds that level's cells. Each
+// read through the sampler at a cell's centre: a mip level varying per pixel reads
+// the wrong level through `textureLoad` on lavapipe (crates/render/src/CLAUDE.md).
+fn nearest(t_hiz: texture_2d<f32>, s: sampler, level: i32, dim: vec2<f32>, lo: vec2<f32>, hi: vec2<f32>) -> f32 {
+    let size = exp2(f32(level));
+    let cells = max(floor(dim / size), vec2<f32>(1.0));
+    let a = clamp(floor(lo / size), vec2<f32>(0.0), cells - 1.0);
+    let b = clamp(floor(hi / size), vec2<f32>(0.0), cells - 1.0);
+    var m = textureSampleLevel(t_hiz, s, (a + 0.5) / cells, f32(level - 1)).r;
+    if (b.x > a.x) {
+        m = min(m, textureSampleLevel(t_hiz, s, (vec2<f32>(b.x, a.y) + 0.5) / cells, f32(level - 1)).r);
+    }
+    if (b.y > a.y) {
+        m = min(m, textureSampleLevel(t_hiz, s, (vec2<f32>(a.x, b.y) + 0.5) / cells, f32(level - 1)).r);
+        if (b.x > a.x) {
+            m = min(m, textureSampleLevel(t_hiz, s, (b + 0.5) / cells, f32(level - 1)).r);
+        }
+    }
+    return m;
+}
+
+// Where along the step from `a` to `b`, which starts in front of the scene, the
+// march must look (#2228): `.y` the world fraction of the first point that may not
+// be in front (1: the step's end, as a march without a pyramid), `.x` that of the
+// last point it probed in front (0: none), where a refinement starts. HDRP's Hi-Z
+// traversal, within one step: the min-depth pyramid `t_hiz` of `levels` levels
+// (0: none) proves a span of the step's screen path in front of every texel under
+// it when the ray's farthest depth on the span is nearer than their nearest, in a
+// cell's 2×2 reads; a span it cannot prove is halved down to 2-texel cells, whose
+// span is then probed every `PROBE` texels. So a 1 px line the ray passes behind
+// is probed wherever the ray crosses it, on every sub-pixel offset of TAA's jitter,
+// where a probe at the step's end alone found it on some and missed it on others.
+// The ray's depth is taken as the larger at a span's ends, true of a depth along
+// the view axis (`f.fwd`, the SSR pass), not of an eye distance (a transparent's
+// march, which has no pyramid).
+fn clear(f: Frame, t_depth: texture_2d<f32>, t_hiz: texture_2d<f32>, s: sampler, levels: i32, a: vec3<f32>, b: vec3<f32>) -> vec2<f32> {
+    let ca = f.view_proj * vec4<f32>(a, 1.0);
+    let cb = f.view_proj * vec4<f32>(b, 1.0);
+    if (levels <= 0 || ca.w <= 0.0 || cb.w <= 0.0) {
+        return vec2<f32>(0.0, 1.0);
+    }
+    let dim = vec2<f32>(textureDimensions(t_depth));
+    let ua = texels(ca, dim);
+    let ub = texels(cb, dim);
+    let n = length(ub - ua);
+    if (n <= PROBE) {
+        return vec2<f32>(0.0, 1.0);
+    }
+    let top = clamp(i32(ceil(log2(n))), 1, levels);
+    var level = top;
+    var u = 0.0;
+    var front = 0.0;
+    for (var k = 0; k < CLEAR_ROUNDS && u < 1.0; k = k + 1) {
+        let v = min(u + exp2(f32(level)) / n, 1.0);
+        let near_end = depth_of(f, mix(a, b, world_fraction(u, ca.w, cb.w)));
+        let far = max(near_end, depth_of(f, mix(a, b, world_fraction(v, ca.w, cb.w))));
+        let pa = mix(ua, ub, u);
+        let pb = mix(ua, ub, v);
+        if (far < nearest(t_hiz, s, level, dim, min(pa, pb), max(pa, pb))) {
+            u = v;
+            level = min(level + 1, top);
+            continue;
+        }
+        if (level > 1) {
+            level = level - 1;
+            continue;
+        }
+        let count = i32(ceil((v - u) * n / PROBE));
+        for (var j = 1; j <= count; j = j + 1) {
+            let w = world_fraction(min(u + f32(j) * PROBE / n, v), ca.w, cb.w);
+            let q = mix(a, b, w);
+            if (state(f, probe(f, t_depth, q), q) != FRONT) {
+                return vec2<f32>(front, w);
+            }
+            front = w;
+        }
+        u = v;
+        level = min(level + 1, top);
+    }
+    return vec2<f32>(front, 1.0);
+}
+
 // March the reflected ray `r` from `origin` in `steps` steps of at most `step`
 // world units (and at most `step_cap` on screen), against `t_depth`'s
 // depths as `f` measures them. Each point is in front of the scene, on it (behind
@@ -186,7 +331,7 @@ fn refine(f: Frame, t_depth: texture_2d<f32>, a: vec3<f32>, b: vec3<f32>, start:
 // on-screen width there, so a rough surface reflects a blur of what it sees (cone
 // tracing, as Frostbite and UE do). A `t_color` with one level reads sharp.
 fn trace(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_color: sampler, origin: vec3<f32>, r: vec3<f32>, steps: i32, step: f32, cone: f32) -> vec4<f32> {
-    return trace_hit(f, t_depth, t_color, s_color, origin, r, steps, step, cone, 1.0).colour;
+    return trace_hit(f, t_depth, t_depth, 0, t_color, s_color, origin, r, steps, step, cone, 1.0).colour;
 }
 
 // What `trace_hit` found: `trace`'s colour and weight, and `dist`, how far the ray
@@ -199,28 +344,42 @@ struct Hit {
 
 // `trace`, with the hit's distance, reading the hit's colour at `blur` times the
 // cone's width (0: the pyramid's first level, for a caller that blurs the hits
-// itself; the fades still count the whole cone).
-fn trace_hit(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_color: sampler, origin: vec3<f32>, r: vec3<f32>, steps: i32, step: f32, cone: f32, blur_scale: f32) -> Hit {
+// itself; the fades still count the whole cone), and stepping past nothing thinner
+// than a step by `t_hiz`, a min-depth pyramid of `t_depth` of `hiz_levels` levels
+// (0: none, each step probed at its end; `clear`). A step `clear` cuts short at
+// something that turns out not to be a hit counts for the share of it marched, so
+// the march's reach is its steps' whatever it probed on the way.
+fn trace_hit(f: Frame, t_depth: texture_2d<f32>, t_hiz: texture_2d<f32>, hiz_levels: i32, t_color: texture_2d<f32>, s_color: sampler, origin: vec3<f32>, r: vec3<f32>, steps: i32, step: f32, cone: f32, blur_scale: f32) -> Hit {
     let depth_dim = vec2<f32>(textureDimensions(t_depth));
     let cap = step_cap(steps, depth_dim);
     var prev = origin;
     var prev_uv = project(f, origin).xy;
     var was = FRONT;
-    for (var i = 0; i < steps; i = i + 1) {
+    // How many steps' worth the march has gone; the rounds are bounded too, at
+    // twice the steps, for a ray cut short again and again.
+    var gone = 0.0;
+    for (var i = 0; i < 2 * steps && gone < f32(steps); i = i + 1) {
         var len = step;
         let ahead = project(f, prev + r * step);
         let moved = length((ahead.xy - prev_uv) * depth_dim);
         if (ahead.z > 0.0 && moved > cap) {
             len = step * cap / moved;
         }
-        let p = prev + r * len;
+        var p = prev + r * len;
+        // Where a refinement starts: the last point known to be in `was`'s state.
+        var start = prev;
+        if (was == FRONT) {
+            let cut = clear(f, t_depth, t_hiz, s_color, hiz_levels, prev, p);
+            start = mix(prev, p, cut.x);
+            p = mix(prev, p, cut.y);
+        }
         let here = probe(f, t_depth, p);
         if (!here.on_screen) {
             break;
         }
         let now = state(f, here, p);
         if (now != was) {
-            var back = refine(f, t_depth, prev, p, was);
+            var back = refine(f, t_depth, start, p, was);
             var hit = probe(f, t_depth, back);
             // The halving can settle on another boundary than the one the step
             // crossed (two edges between its ends): a step that landed on the scene
@@ -229,7 +388,11 @@ fn trace_hit(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_col
                 back = p;
                 hit = here;
             }
-            if (state(f, hit, back) == ON) {
+            // On the scene, and no further behind it than its object is deep.
+            var ray_dir = (project(f, p).xy - project(f, start).xy) * depth_dim;
+            ray_dir = select(vec2<f32>(0.0, 1.0), normalize(ray_dir), dot(ray_dir, ray_dir) > 1e-8);
+            let lands = state(f, hit, back) == ON && hit.behind <= deep(f, t_depth, back, hit.uv, ray_dir);
+            if (lands) {
                 let dim = vec2<f32>(textureDimensions(t_color));
                 let t = distance(origin, back);
                 let width = footprint(f, back, r, t, cone, hit.uv, dim);
@@ -237,7 +400,7 @@ fn trace_hit(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_col
                 let lod = clamp(log2(max(width * blur_scale, 1.0)), 0.0, top);
                 let edge = min(min(hit.uv.x, 1.0 - hit.uv.x), min(hit.uv.y, 1.0 - hit.uv.y));
                 let blur = 0.5 * width / min(dim.x, dim.y);
-                let done = f32(i) + distance(prev, back) / len;
+                let done = gone + distance(prev, back) / len;
                 let far = clamp((f32(steps) - done) / (f32(steps) * REACH_FADE), 0.0, 1.0);
                 let wide = clamp((BLUR_FADE_END - blur) / (BLUR_FADE_END - BLUR_FADE_START), 0.0, 1.0);
                 // Explicit-LOD sample: a gradient instruction inside this break-bounded
@@ -250,9 +413,12 @@ fn trace_hit(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_col
                 return Hit(vec4<f32>(colour, clamp(edge / (SCREEN_FADE + blur), 0.0, 1.0) * far * wide), t);
             }
         }
+        gone = gone + distance(prev, p) / len;
         prev = p;
         prev_uv = here.uv;
-        was = now;
+        // A change that hit nothing passed behind a thin object: the march goes on
+        // behind it, as behind one too far in front to touch.
+        was = select(now, BEYOND, now == ON);
     }
     return Hit(vec4<f32>(0.0), 0.0);
 }
