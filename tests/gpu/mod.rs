@@ -67,6 +67,7 @@ mod occlusion_specular_maps_screenshot;
 mod panorama_pole_screenshot;
 mod panorama_sky_screenshot;
 mod particle;
+mod play_restore;
 mod postfx;
 mod preview_api;
 mod preview_material;

@@ -17,7 +17,7 @@
 //! `edit::authoring`), the `Graphics.*` registrars (`api`) and the Inspector's
 //! sections (`editor`), so the root's test hands them in ([`problems`], the
 //! authoring layer as an [`Authored`]). The gate's own must-pass and must-flag
-//! cases sit in the integration suite too (`tests/post_effect_cases.rs`), since
+//! cases sit in the integration suite too (`tests/post_effect_cases/`), since
 //! the authoring layer is above this crate: they build the layers with
 //! [`engine_from`], the other two with the renderer's names, and check them with
 //! [`check`]. A test hook, compiled into every build for that.
@@ -91,7 +91,7 @@ pub fn effect_names() -> Vec<&'static str> {
 
 /// The layers, the authoring one as `authored`, the registrars and the Inspector's
 /// sections read as the renderer's own names: a test hook, the integration
-/// suite's must-flag cases build their layers with it (`tests/post_effect_cases.rs`).
+/// suite's must-flag cases build their layers with it (`tests/post_effect_cases/`).
 pub fn engine_from(authored: Authored) -> Layers {
     let own: Vec<String> = effect_names().into_iter().map(String::from).collect();
     engine_with(authored, own.clone(), own)

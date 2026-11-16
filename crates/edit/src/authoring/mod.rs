@@ -42,8 +42,7 @@ pub use crate::authoring::script::add_script;
 pub use rusty_scene::create::{
     attach_default_material, create_drawn_entity, create_entity, default_animator, default_camera,
     default_collider, default_light, default_material, default_nav_agent, default_post_processing,
-    default_rigidbody, primitive_collider, primitive_geometry, primitive_mesh_component,
-    primitive_revision, subdivided_geometry, Primitive,
+    default_rigidbody, primitive_collider, primitive_geometry, primitive_mesh_component, Primitive,
 };
 
 // The Add/Remove-Component verbs + their `ComponentKind` enum live in

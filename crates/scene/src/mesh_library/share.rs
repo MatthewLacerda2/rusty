@@ -49,15 +49,3 @@ pub fn put_shared(scene: &mut Scene, id: u32, fresh: MeshComponent) {
     }
     super::refit(scene, id);
 }
-
-/// Point entity `id`'s Mesh at `reference` ([`resolve_shared`], [`put_shared`]),
-/// giving an entity with no Mesh the bare one; an error names a missing entity or
-/// mesh and changes nothing.
-pub fn set_shared_mesh(scene: &mut Scene, id: u32, reference: &str) -> Result<(), String> {
-    if !scene.world.contains(id) {
-        return Err(format!("no entity {id}"));
-    }
-    let fresh = resolve_shared(scene, reference)?;
-    put_shared(scene, id, fresh);
-    Ok(())
-}

@@ -86,7 +86,7 @@ fn scene(s: &Scroll) -> Scene {
     m.base_color_map = Some(MapRef::from(s.albedo.clone()));
     m.alpha_cutoff = 0.5;
     m.render_mode = RenderMode::Cutout;
-    m.shader = Some(s.shader.clone());
+    m.shader = (!s.shader.is_empty()).then(|| s.shader.clone());
     let volume = create_entity(&mut scene, "Volume", None);
     let mut vc = default_post_processing();
     vc.ssao.active = true;

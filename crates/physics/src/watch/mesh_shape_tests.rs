@@ -6,7 +6,7 @@ use super::mesh_keys_tests::{plank, scene, y, DT};
 use crate::shape::fit::DECOMPOSED;
 use crate::PhysicsWorld;
 use rusty_components::mesh::MeshData;
-use rusty_scene::Scene;
+use rusty_scene::{mesh_library, Scene};
 
 /// The plank entity of `mesh_keys_tests::scene`.
 fn floor(scene: &Scene) -> u32 {
@@ -50,7 +50,8 @@ fn a_crate_falls_when_the_planks_mesh_is_deleted_and_comes_back_with_it() {
     world.step(&mut scene, DT);
     assert!(!world.id_to_collider.contains_key(&floor), "no shape");
     scene.define_mesh("plank", plank(-2.0, 2.0)).unwrap();
-    rusty_scene::mesh_library::set_shared_mesh(&mut scene, floor, "plank").unwrap();
+    let fresh = mesh_library::resolve_shared(&scene, "plank").unwrap();
+    mesh_library::put_shared(&mut scene, floor, fresh);
     world.step(&mut scene, DT);
     assert!(world.id_to_collider.contains_key(&floor), "built again");
 }
@@ -60,7 +61,8 @@ fn a_crate_falls_when_the_plank_draws_a_primitive_instead() {
     for always_full in [false, true] {
         // A unit Box at the plank's centre: the crate, at x = 1.5, is past it.
         let (after, shaped) = rest_then(always_full, |s, floor| {
-            rusty_scene::mesh_library::set_shared_mesh(s, floor, "Box").unwrap();
+            let fresh = mesh_library::resolve_shared(s, "Box").unwrap();
+            mesh_library::put_shared(s, floor, fresh);
         });
         assert!(after < -1.0 && shaped, "{after} ({always_full})");
     }

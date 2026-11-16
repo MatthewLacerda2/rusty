@@ -7,7 +7,7 @@ use glam::Vec3;
 use crate::PhysicsWorld;
 use rusty_components::mesh::MeshData;
 use rusty_components::{ColliderComponent, ColliderShape, RigidBodyComponent};
-use rusty_scene::Scene;
+use rusty_scene::{mesh_library, Scene};
 
 pub(super) const DT: f32 = 1.0 / 60.0;
 
@@ -33,7 +33,8 @@ pub(super) fn scene() -> (Scene, u32) {
     let floor = scene.add_entity("Plank".into());
     let collider = ColliderComponent::from_mesh_bounds(false, Vec3::ZERO, Vec3::ZERO);
     scene.world.set_collider(floor, Some(collider));
-    rusty_scene::mesh_library::set_shared_mesh(&mut scene, floor, "plank").unwrap();
+    let fresh = mesh_library::resolve_shared(&scene, "plank").unwrap();
+    mesh_library::put_shared(&mut scene, floor, fresh);
     scene.world.set_static(floor, true);
     let crate_ = scene.add_entity("Crate".into());
     scene.world.transform_mut(crate_).unwrap().position = Vec3::new(1.5, 0.3, 0.0);

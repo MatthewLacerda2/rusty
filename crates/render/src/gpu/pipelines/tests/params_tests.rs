@@ -62,7 +62,8 @@ pub(super) fn sphere(scene: &mut Scene, x: f32, shader: &str) -> u32 {
         (t.position, t.scale) = (Vec3::new(x, 0.0, 0.0), Vec3::splat(2.0));
     }
     let key = scene.ensure_material_key(id).unwrap();
-    scene.materials.get_mut(&key).unwrap().shader = Some(shader.to_string());
+    scene.materials.get_mut(&key).unwrap().shader =
+        (!shader.is_empty()).then(|| shader.to_string());
     id
 }
 

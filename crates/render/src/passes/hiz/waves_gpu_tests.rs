@@ -38,7 +38,8 @@ fn pool(water: Option<&str>) -> Scene {
         (t.position, t.scale) = (Vec3::new(0.0, 0.0, -4.0), Vec3::new(0.2, 1.0, 0.2)); // a 10 m Plane, made 2 m
         drop(t);
         let key = scene.ensure_material_key(id).unwrap();
-        scene.materials.get_mut(&key).unwrap().shader = Some(shader.to_string());
+        scene.materials.get_mut(&key).unwrap().shader =
+            (!shader.is_empty()).then(|| shader.to_string());
     }
     scene
 }

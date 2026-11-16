@@ -24,7 +24,8 @@ fn block(scene: &mut Scene, position: Vec3, scale: Vec3, shader: Option<&str>) -
     drop(t);
     if let Some(shader) = shader {
         let key = scene.ensure_material_key(id).unwrap();
-        scene.materials.get_mut(&key).unwrap().shader = Some(shader.to_owned());
+        scene.materials.get_mut(&key).unwrap().shader =
+            (!shader.is_empty()).then(|| shader.to_owned());
     }
     id
 }

@@ -78,7 +78,8 @@ fn walls(d: &Dissolve, blur: bool) -> (Rc<RefCell<Scene>>, u32) {
     let front = (Vec3::new(0.0, 1.0, -4.0), Vec3::new(3.0, 2.0, 0.2));
     let cut = block(&mut scene, front.0, front.1, [0.9; 3]);
     let key = scene.ensure_material_key(cut).unwrap();
-    scene.materials.get_mut(&key).unwrap().shader = Some(d.shader.clone());
+    scene.materials.get_mut(&key).unwrap().shader =
+        (!d.shader.is_empty()).then(|| d.shader.clone());
 
     let volume = create_entity(&mut scene, "Volume", None);
     let mut vc = default_post_processing();
