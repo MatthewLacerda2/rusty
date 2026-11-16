@@ -709,6 +709,8 @@
       "occlusion_map": null,
       "occlusion_strength": 1.0,
       "specular_map": null,
+      "height_map": null,
+      "height_scale": 0.02,
       "tiling": [
         1.0,
         1.0

@@ -131,6 +131,7 @@ fn map_field<'a>(asset: &'a mut MaterialAsset, name: &str) -> Option<&'a mut Opt
         "emissive_map" => &mut asset.emissive_map,
         "occlusion_map" => &mut asset.occlusion_map,
         "specular_map" => &mut asset.specular_map,
+        "height_map" => &mut asset.height_map,
         _ => return None,
     })
 }

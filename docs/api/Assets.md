@@ -280,11 +280,13 @@ clamped sampler.
   |---|---|---|
   | `"Default"` | BC7 (a byte a texel), alpha kept, mips averaged in linear light (raw with `sRGB` off) | colour, packed data (glTF's occlusion-roughness-metallic, with `sRGB` off) |
   | `"NormalMap"` | BC5 (a byte a texel): x and y; the shader rebuilds z. A 16-bit file (`Texture.Bake`'s `normal16`) is never compressed: it uploads as half floats (`Rgba16Float`, eight bytes a texel), whose x and y step about every 0.056° near flat where 8 bits (and BC5) step every 0.45° | tangent-space normal maps |
-  | `"SingleChannel"` | BC4 (half a byte): red only | roughness, metallic, masks |
+  | `"SingleChannel"` | BC4 (half a byte): red only | roughness, metallic, masks, height maps |
 
   Assigning a `"Default"` image to a material's normal slot (`Material.SetNormalMap`,
   a material document, a maps recipe, the inspector) sets it to `"NormalMap"` and
-  says so in the console, Unity's *Fix now* done for you; never during Play. A
+  says so in the console, Unity's *Fix now* done for you; never during Play. One
+  assigned to its height slot (`Material.SetHeightMap`, and the same paths) is set
+  to `"SingleChannel"` the same way, since the parallax march reads its red. A
   `"Default"` texture is sampled as sRGB colour in a colour slot and raw in a data
   slot. A texture drawn in a slot its type cannot serve (a normal map as albedo, a
   single-channel map as colour) is uploaded uncompressed for that use, with one

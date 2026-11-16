@@ -20,7 +20,7 @@ fn every_slot_is_in_all_and_parses_back_from_its_name() {
     let listed = |s: Slot| match s {
         Slot::BaseColor | Slot::Emissive | Slot::Normal | Slot::Normal16 => Slot::ALL.contains(&s),
         Slot::Roughness | Slot::Metallic | Slot::MetallicRoughness => Slot::ALL.contains(&s),
-        Slot::Occlusion | Slot::Specular | Slot::Data => Slot::ALL.contains(&s),
+        Slot::Occlusion | Slot::Specular | Slot::Height | Slot::Data => Slot::ALL.contains(&s),
     };
     for s in Slot::ALL {
         assert!(listed(s));
@@ -115,6 +115,28 @@ fn normal16_keeps_a_slope_8_bits_round_flat() {
     assert_eq!(
         Slot::parse("normal16").unwrap().material_maps(),
         ["normal_map"]
+    );
+    std::fs::remove_file(path).ok();
+}
+
+#[test]
+fn height_bakes_its_red_at_16_bits_into_the_height_map() {
+    let img = Image::filled(2, [0.25 + 1.0 / 1024.0, 0.9, 0.1, 0.0]);
+    let path = rusty_test_support::temp::dir().join("rusty_bake_height_2191.png");
+    bake_to_png(&img, Slot::Height, path.to_str().unwrap()).unwrap();
+    let back = image::open(&path).unwrap();
+    assert_eq!(
+        back.color(),
+        image::ColorType::Rgba16,
+        "height bakes 16-bit"
+    );
+    let texel = back.to_rgba16().get_pixel(0, 0).0;
+    let red = f32::from(texel[0]) / 65535.0;
+    assert!((red - img.pixels()[0][0]).abs() <= 0.5 / 65535.0, "{red}");
+    assert_eq!([texel[1], texel[2], texel[3]], [texel[0], texel[0], 65535]);
+    assert_eq!(
+        Slot::parse("height").unwrap().material_maps(),
+        ["height_map"]
     );
     std::fs::remove_file(path).ok();
 }

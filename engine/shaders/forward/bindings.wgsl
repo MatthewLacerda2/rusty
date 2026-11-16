@@ -113,7 +113,13 @@ struct MaterialData {
     // The specular-level map (#2151): 1 scales the dielectric reflectance by its
     // alpha, 2 by its red (a one-channel upload).
     use_specular_map: u32,
-    maps_pad: u32,
+    // The height map (#2191): 1 when its red displaces every map's UV
+    // (`forward::parallax`), `height_scale` deep as a fraction of one repeat.
+    use_height_map: u32,
+    height_scale: f32,
+    maps_pad_a: u32,
+    maps_pad_b: u32,
+    maps_pad_c: u32,
 };
 
 // One object a kept scene draws (#1706), at its slot of `objects`: what the object
@@ -369,6 +375,12 @@ var s_occlusion: sampler;
 var t_specular: texture_2d<f32>;
 @group(2) @binding(29)
 var s_specular: sampler;
+// The height map (#2191, HDRP's *Displacement Mode: Pixel*): R, white the surface,
+// black the deepest point, raw texels; marched by `forward::parallax`.
+@group(2) @binding(12)
+var t_height: texture_2d<f32>;
+@group(2) @binding(28)
+var s_height: sampler;
 
 // The sun's cascaded shadow maps (#435): `lighting::cascades`.
 @group(3) @binding(0)
@@ -393,7 +405,7 @@ var<storage, read> shadow_tiles: array<ShadowTile>;
 // transparent one with a surface that refracts or absorbs. Linear, clamped sampler.
 // In the opaque pass of a base camera running SSIL (`camera.ssil.x`, #1750), which
 // reads no opaque copy, it holds SSIL's bounce instead, one texel per pixel, so
-// the stage binds no texture more than `render::setup::limits` allows (21).
+// the stage binds no texture more than `render::setup::limits` allows (22).
 @group(3) @binding(6)
 var t_opaque: texture_2d<f32>;
 @group(3) @binding(7)
