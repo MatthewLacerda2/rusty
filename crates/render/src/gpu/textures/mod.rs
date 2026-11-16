@@ -46,6 +46,9 @@ pub struct GpuTexture {
     /// A BC5 normal map's lost spread per mip level, from the import cache (#1702):
     /// the shader reads it in place of the length BC5 cannot keep.
     pub normal_variance: Option<VarianceTable>,
+    /// Its file is a normal map kept at 16 bits (`texture_import::keeps_deep`): a
+    /// normal slot needs a [`deep::DEEP_FORMAT`] upload of it (`deep::serves`).
+    pub deep_normal: bool,
 }
 
 impl Renderer {
@@ -145,6 +148,7 @@ impl Renderer {
             source_size: (size.width, size.height),
             single_channel: false,
             normal_variance: None,
+            deep_normal: false,
         }
     }
 }
@@ -261,6 +265,8 @@ mod compressed_gpu_tests;
 mod data_map_tests;
 #[cfg(test)]
 mod deep_gpu_tests;
+#[cfg(test)]
+mod deep_tests;
 #[cfg(test)]
 mod formats_tests;
 #[cfg(test)]

@@ -25,18 +25,21 @@
 //! image under a folder (what Play's refresh, `convert::refresh_sources`, and an
 //! export run before they go on), and [`queue`] hands images to a worker thread,
 //! so the editor stays responsive while it encodes (an image added, its settings
-//! changed, a project opened). A draw that finds no current cache uploads RGBA8 for
-//! now ([`load`]); the worker's note (`core::fs::written`) swaps it for the
-//! compressed copy once made.
+//! changed, a project opened). A draw that finds no current cache uploads it
+//! uncompressed for now ([`load`]); the worker's note (`core::fs::written`) swaps
+//! it for the compressed copy once made.
 //!
 //! **Where it lives.** In the import cache beside converted models
 //! (`convert::cache_location_as`), `<source>.bctex`, stamped with a digest of the
 //! source's bytes, the settings and [`ENCODER_VERSION`]; any difference re-encodes
 //! (`cache`). An export ships it (`dev::export`), so a shipped game never encodes.
 //!
+//! stored-format: the `<source>.bctex` compressed copies in the import cache (`cache`)
+//!
 //! **What it skips**: a baked lightmap page (`asset::lightmap_page`, #1694), which
-//! is not a colour texture. A cache whose source is gone, or is such a page, is
-//! deleted by the next [`refresh_all`] (`orphans`).
+//! is not a colour texture, and a normal map kept at 16 bits ([`is_deep_normal`]).
+//! A cache whose source is gone, or is either of those, is deleted by the next
+//! [`refresh_all`] (`orphans`).
 //!
 //! **When it is not compressed**: *Compression* `None`, an image whose fitted
 //! size is not a multiple of 4 on both sides (a BC texture's base level must be;
@@ -158,6 +161,10 @@ pub fn fits(texture_type: TextureType, kind: TextureKind) -> bool {
 pub struct Loaded {
     pub texels: Texels,
     pub source_size: (u32, u32),
+    /// The source is a normal map kept at 16 bits ([`keeps_deep`]), whatever slot
+    /// it was read for: a normal slot wants it at 16 bits even when this read,
+    /// for another slot, is 8-bit.
+    pub deep_normal: bool,
 }
 
 /// A texture's texels as uploaded.
@@ -172,41 +179,56 @@ pub enum Texels {
 /// when `compress` (the caller checked the GPU and [`fits`]) and there is one,
 /// else decoded and fitted for `kind`. Never encodes: a missing or stale cache
 /// is made by [`refresh`]. Whether the cache is current costs a `stat` of the
-/// source once its digest is known (`convert::source_digest`). `None` when it
-/// cannot be read.
+/// source once its digest is known (`convert::source_digest`). A normal map kept
+/// at 16 bits ([`keeps_deep`]) is never current: [`refresh`] writes it no cache,
+/// and one made before (8-bit, or another Texture Type) is stamped with other
+/// bytes or settings. `None` when it cannot be read.
 pub fn load(
     source: &Path,
     settings: &TextureSettings,
     kind: TextureKind,
     compress: bool,
 ) -> Option<Loaded> {
-    let cached = compress && format_of(settings).is_some() && !is_deep_normal(source, settings);
+    let cached = compress && format_of(settings).is_some();
     if let Some(blocks) = cached.then(|| current(source, settings)).flatten() {
         let source_size = open(source).ok()?.into_dimensions().ok()?;
         return Some(Loaded {
             texels: Texels::Blocks(blocks),
             source_size,
+            deep_normal: false,
         });
     }
     let image = open(source).ok()?.decode().ok()?;
     let source_size = (image.width(), image.height());
+    let deep_normal = keeps_deep(settings, image.color());
     Some(Loaded {
         texels: Texels::Image(fit(image, settings.max_size, kind.reading(settings))),
         source_size,
+        deep_normal,
     })
 }
 
-/// Whether the image at `source`, imported with `settings`, is a normal map kept at
-/// 16 bits: a `NormalMap` whose file stores more than 8 bits a channel
+/// Whether an image whose file stores `color`, imported with `settings`, is a
+/// normal map kept at 16 bits: a `NormalMap` of more than 8 bits a channel
 /// (`Texture.Bake`'s `normal16`). It is never block-compressed (BC5 would round it
-/// to 8 bits, the terraces the file was made to avoid); the renderer uploads it at
-/// 16 bits a channel. Found from the file's header, without decoding it.
+/// to 8 bits, the terraces the file was made to avoid), and a normal slot uploads
+/// it at 16 bits a channel (`render::gpu::textures::deep`). The one test of it, for
+/// the importer and the renderer alike: the Texture Type is the import's word on
+/// what the file holds, so a 16-bit `Default` image in a normal slot (assigned
+/// during Play, before `sidecar::fit_normal_slot` may retype it) reads at 8 bits,
+/// BC7 or RGBA8, as every `Default` texture does.
+pub fn keeps_deep(settings: &TextureSettings, color: image::ColorType) -> bool {
+    settings.texture_type == TextureType::NormalMap && is_deep(color)
+}
+
+/// [`keeps_deep`] for the image file at `source`, found from its header without
+/// decoding it; `false` when it cannot be read.
 pub fn is_deep_normal(source: &Path, settings: &TextureSettings) -> bool {
     use image::ImageDecoder;
     settings.texture_type == TextureType::NormalMap
         && open(source)
             .and_then(|r| r.into_decoder())
-            .is_ok_and(|d| is_deep(d.color_type()))
+            .is_ok_and(|d| keeps_deep(settings, d.color_type()))
 }
 
 /// Whether `color` stores more than 8 bits a channel (16-bit or float).

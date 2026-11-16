@@ -288,7 +288,11 @@ clamped sampler.
   `"Default"` texture is sampled as sRGB colour in a colour slot and raw in a data
   slot. A texture drawn in a slot its type cannot serve (a normal map as albedo, a
   single-channel map as colour) is uploaded uncompressed for that use, with one
-  console warning, so it never loses a channel.
+  console warning, so it never loses a channel. A 16-bit file stays 16-bit only as a
+  `"NormalMap"`: a `"Default"` one in a normal slot (assigned during Play, before
+  its type is fixed) reads at 8 bits, as every `"Default"` texture does. A 16-bit
+  normal map reaches every normal slot at 16 bits, even when another slot (a detail
+  map, read at 8 bits) loaded the file first.
 - `sRGB` — Unity's *sRGB (Color Texture)*, read for a `"Default"` texture only (the
   inspector shows it then): on (the default), its texels are sRGB colour, mips and
   a `maxSize` downscale average in linear light; off, they are data stored raw (a

@@ -74,3 +74,56 @@ fn a_copy_made_while_8_bit_is_an_orphan_once_16_bit() {
     }
     assert_eq!(orphans(&cache, &sources), [cache.join("tile.png.bctex")]);
 }
+
+#[test]
+fn a_16_bit_data_image_fits_and_encodes_as_its_8_bit_twin() {
+    let dir = rusty_test_support::temp::dir();
+    let speckle = |x: u32, y: u32| ((x * 7919 + y * 104_729) % 65_536) as u16;
+    let img = ImageBuffer::from_fn(64, 64, |x, y| {
+        Rgba([speckle(x, y), speckle(y, x), 0, 65535])
+    });
+    let deep = DynamicImage::ImageRgba16(img);
+    let data = TextureSettings {
+        srgb: false,
+        max_size: 32,
+        ..Default::default()
+    };
+    let (deep_path, flat_path) = (dir.join("data16.png"), dir.join("data8.png"));
+    deep.save(&deep_path).unwrap();
+    deep.to_rgba8().save(&flat_path).unwrap();
+    for path in [&deep_path, &flat_path] {
+        set_texture(path, data).unwrap();
+        assert_eq!(refresh(path, ""), Ok(true), "{}", path.display());
+    }
+    let blocks = |path: &Path| match load(path, &data, TextureKind::Data, true).unwrap().texels {
+        Texels::Blocks(blocks) => blocks,
+        Texels::Image(_) => panic!("{} has no cache", path.display()),
+    };
+    assert_eq!(blocks(&deep_path), blocks(&flat_path), "fitted at 8 bits");
+    let fitted = fit(deep.clone(), 32, TextureKind::Data);
+    assert_eq!(
+        fitted,
+        fit(
+            DynamicImage::ImageRgba8(deep.to_rgba8()),
+            32,
+            TextureKind::Data
+        )
+    );
+}
+
+#[test]
+fn only_a_normal_map_reads_as_kept_at_16_bits() {
+    use image::ColorType;
+    assert!(keeps_deep(&normal_map(2048), ColorType::Rgba16));
+    assert!(keeps_deep(&normal_map(2048), ColorType::Rgb32F));
+    assert!(!keeps_deep(&normal_map(2048), ColorType::Rgba8));
+    assert!(
+        !keeps_deep(&TextureSettings::default(), ColorType::Rgba16),
+        "Default"
+    );
+    let single = TextureSettings {
+        texture_type: TextureType::SingleChannel,
+        ..Default::default()
+    };
+    assert!(!keeps_deep(&single, ColorType::L16));
+}

@@ -102,3 +102,27 @@ fn gpu_a_16_bit_normal_map_keeps_the_slopes_8_bits_terrace() {
         "16 bits keep the slopes: {deep_facets} against {flat_facets}"
     );
 }
+
+#[test]
+fn gpu_a_normal_slot_gets_16_bits_whichever_slot_loaded_the_file_first() {
+    let Some(mut renderer) = crate::test_gpu::headless_or_skip(16, 16) else {
+        return;
+    };
+    let path = ripple("detail_first_2257", Slot::Normal16, Compression::None);
+    let map = MapRef::from(path.as_str());
+    let detail = renderer.load_texture_as(&map, TextureKind::Data);
+    assert_ne!(
+        detail.texture.format(),
+        DEEP_FORMAT,
+        "a detail slot reads 8 bits"
+    );
+    let normal = renderer.load_texture_as(&map, TextureKind::Normal);
+    assert_eq!(
+        normal.texture.format(),
+        DEEP_FORMAT,
+        "a normal slot reads 16"
+    );
+    let bound = |kind| renderer.texture_for(&map, kind).unwrap().texture.format();
+    assert_eq!(bound(TextureKind::Normal), DEEP_FORMAT);
+    assert_ne!(bound(TextureKind::Data), DEEP_FORMAT);
+}
