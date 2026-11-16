@@ -34,6 +34,30 @@
 //!
 //! A still pixel (under [`STILL_PIXELS`] of motion, nothing revealed) blends
 //! exactly as URP's does.
+//!
+//! **With the camera's anti-flicker on (#2228, HDRP's *Anti-Flicker*), a
+//! flickering still pixel holds its history**, after HDRP's anti-flicker and Unreal
+//! TSR's flickering luminance. URP's box is built from the current frame alone, so
+//! where some jitter offsets give a patch a very different value (an SSR
+//! reflection whose blur reaches a bright bulb on some offsets and not others, a
+//! specular glint), the patch is its own neighbourhood and the clamp hands that one
+//! frame to the output at nearly full depth: a still view blinks. The held resolve
+//! keeps each pixel's frame luma (URP's perceptual `y / (1 + y)`) and its *flicker*
+//! in a history target of its own: a *blink* is a step undone on the very next frame
+//! (the smaller of the two), the flicker is the largest blink lately, and what holds
+//! is the part of a blink an earlier one already reached (its *recurring*
+//! flicker), each keeping [`FLICKER_DECAY`] of itself a frame. A still pixel's
+//! history luma may then sit up to [`FLICKER_HOLD`] × the anti-flicker times its
+//! recurring flicker outside the box (in perceptual luma, along the line from its
+//! clamp to where it was); its hue and saturation stay the box's (its chroma scaled
+//! with the held luma). A pixel's hold and flicker fall off with its motion, all
+//! of them at [`STILL_PIXELS`] a frame and none from [`MOVING_PIXELS`], so a slow
+//! pan keeps part of them; a revealed pixel keeps no hold and forgets its flicker,
+//! a reactive one keeps no hold. What it
+//! costs, a one-frame change repeated on a still pixel (a strobe, a fast gun's
+//! flashes on a wall) held as a flicker is, is measured in `gpu/flicker/` and told
+//! in `docs/api/Graphics.md`, *Anti-Flicker*. At 0 (the default) the plain resolve
+//! runs, reading and writing none of it.
 
 use glam::Vec2;
 
@@ -70,6 +94,17 @@ pub(crate) const DISOCCLUSION_START: f32 = 0.1;
 /// The relative distance gap at which the history is dropped: a crate 1 m in
 /// front of a wall 5 m away (25 %) reveals the wall with no trace of itself.
 pub(crate) const DISOCCLUSION_FULL: f32 = 0.25;
+/// What a pixel's flicker keeps of itself each frame (#2228): ours. A jitter
+/// outlier recurs within the Halton (2, 3) sequence's 2- and 3-frame cycles (8
+/// times in 27 frames, at most 5 apart, on the case that found it); at 0.9 a
+/// swing still counts for 59 % five frames on, and for under 4 % after 31
+/// rendered frames.
+pub(crate) const FLICKER_DECAY: f32 = 0.9;
+/// How many times its recurring flicker a still pixel's history luma may sit
+/// outside the box at anti-flicker 1 (#2228; the camera's value scales it): ours,
+/// measured on the primitive case (`gpu/flicker/`): 2 left half the swing, 4 a
+/// third of it, a few levels over the scene's own without SSR.
+pub(crate) const FLICKER_HOLD: f32 = 4.0;
 
 // The shader divides by both ramps' spans, and a moving pixel weighs more than a
 // still one at URP's default: a constant edited out of order fails the build. A
@@ -78,6 +113,8 @@ pub(crate) const DISOCCLUSION_FULL: f32 = 0.25;
 const _: () = assert!(STILL_PIXELS < MOVING_PIXELS);
 const _: () = assert!(DISOCCLUSION_START < DISOCCLUSION_FULL);
 const _: () = assert!(FRAME_INFLUENCE < MOVING_FRAME_INFLUENCE && MOVING_FRAME_INFLUENCE <= 1.0);
+// A flicker that never decayed would hold a still pixel's history for good.
+const _: () = assert!(0.0 <= FLICKER_DECAY && FLICKER_DECAY < 1.0 && FLICKER_HOLD >= 0.0);
 
 /// The resolve's uniform, `TaaParams` in `postfx/taa.wgsl`.
 #[repr(C)]
@@ -89,6 +126,7 @@ pub(super) struct TaaParams {
     jitter: [f32; 4],
     levels: [f32; 4],
     rejection: [f32; 4],
+    flicker: [f32; 4],
     lenses: [[f32; 4]; MAX_CAMERAS],
 }
 
@@ -113,14 +151,16 @@ pub(super) fn lenses(stack: &[Camera], aspect: f32) -> [[f32; 4]; MAX_CAMERAS] {
 
 /// The camera's TAA knobs the resolve reads (#1847): the still pixel's frame
 /// influence (`1 - base_blend`), the variance clamp scale and the quality level's
-/// steps ([`levels`]). URP's defaults reduce to the constants [`FRAME_INFLUENCE`],
-/// [`VARIANCE_CLAMP_SCALE`] and `High`, so a camera left at its defaults resolves
-/// bit for bit as before (#1847).
+/// steps ([`levels`]), and the anti-flicker (#2228), `0`..`1`. URP's defaults
+/// reduce to the constants [`FRAME_INFLUENCE`], [`VARIANCE_CLAMP_SCALE`], `High`
+/// and no anti-flicker, so a camera left at its defaults resolves bit for bit as
+/// before (#1847).
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct TaaTune {
     pub frame_influence: f32,
     pub variance_clamp_scale: f32,
     pub levels: [f32; 4],
+    pub anti_flicker: f32,
 }
 
 impl TaaTune {
@@ -130,6 +170,7 @@ impl TaaTune {
             frame_influence: (1.0 - cam.taa_base_blend_factor).clamp(0.0, 1.0),
             variance_clamp_scale: cam.taa_variance_clamp_scale,
             levels: levels(cam.taa_quality),
+            anti_flicker: cam.taa_anti_flicker.clamp(0.0, 1.0),
         }
     }
 }
@@ -141,6 +182,7 @@ impl Default for TaaTune {
             frame_influence: FRAME_INFLUENCE,
             variance_clamp_scale: VARIANCE_CLAMP_SCALE,
             levels: levels(rusty_components::TaaQuality::default()),
+            anti_flicker: 0.0,
         }
     }
 }
@@ -201,6 +243,7 @@ impl TaaParams {
                 DISOCCLUSION_START,
                 DISOCCLUSION_FULL,
             ],
+            flicker: [FLICKER_DECAY, FLICKER_HOLD * tune.anti_flicker, 0.0, 0.0],
             lenses,
         }
     }
