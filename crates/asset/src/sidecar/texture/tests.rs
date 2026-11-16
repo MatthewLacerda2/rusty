@@ -13,6 +13,7 @@ fn settings_round_trip_through_the_sidecar_and_a_missing_one_is_the_default() {
         srgb: false,
         compression: Compression::HighQuality,
         max_size: 512,
+        max_size_chosen: true,
     };
     set_texture(&png, set).unwrap();
     assert_eq!(texture(&png), set);

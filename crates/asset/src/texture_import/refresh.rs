@@ -50,8 +50,9 @@ fn refresh_on(source: &Path, progress: &str, cores: Cores) -> Result<bool, Strin
     if keeps_deep(&settings, header.color_type()) {
         return Ok(false);
     }
-    let (w, h) = header.dimensions();
-    let (w, h) = shrink::fitted_size(w, h, settings.max_size);
+    let size = header.dimensions();
+    shrink::warn_if_shrunk(source, size, settings.max_size);
+    let (w, h) = shrink::fitted_size(size.0, size.1, settings.max_size);
     if w % 4 != 0 || h % 4 != 0 {
         return Ok(false);
     }

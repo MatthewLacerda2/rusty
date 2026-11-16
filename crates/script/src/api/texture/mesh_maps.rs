@@ -19,6 +19,7 @@ use serde::Deserialize;
 
 use super::{folder, put};
 use crate::api::Reg;
+use rusty_asset::sidecar::{check_bake_size, prepare_bake};
 use rusty_asset::SubMesh;
 use rusty_lighting::mesh_maps::{bake, MeshMap, MeshSource, Settings, MAX_RESOLUTION};
 use rusty_procgen::bake::bake_to_png;
@@ -126,10 +127,20 @@ pub(super) fn bake_mesh_maps(
         .map_err(fail)?;
     let source = load(model).map_err(fail)?;
     // `<prefix>` may end in a folder of its own (`maps/`): make it before the bake.
-    folder::make_parents(&format!("{prefix}{}.png", maps[0].name()), root).map_err(fail)?;
+    let path = |map: &MeshMap| format!("{prefix}{}.png", map.name());
+    let paths: Vec<String> = maps.iter().map(path).collect();
+    let Size { width, height } = settings.size;
+    check_bake_size((width, height)).map_err(fail)?;
+    folder::make_parents(&paths[0], root).map_err(fail)?;
     let mut out = BTreeMap::new();
     bake(&source, &maps, settings, |map, image| {
-        let path = format!("{prefix}{}.png", map.name());
+        // Readied once the baker has checked the settings and the mesh, before
+        // the first map is written.
+        if out.is_empty() {
+            let all = paths.iter().map(String::as_str);
+            prepare_bake("Texture.BakeMeshMaps", (width, height), all)?;
+        }
+        let path = path(&map);
         let slot = match map {
             MeshMap::Id => Slot::Normal,
             _ => Slot::Data,

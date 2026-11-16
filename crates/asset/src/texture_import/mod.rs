@@ -47,6 +47,8 @@
 //! ([`is_deep_normal`]): BC5 keeps 8 bits of x and y, one step every 0.45°, so a
 //! gentler slope would bake as terraces. A downscale to *Max Size* rounds
 //! its sides to multiples of 4, so only an image already that small is left so.
+//! A file it shrinks is warned of once (`shrink::warn_if_shrunk`); a bake raises
+//! a Max Size the engine chose to its own size instead (`sidecar::prepare_bake`).
 
 mod cache;
 mod encode;
@@ -65,7 +67,7 @@ pub(crate) use encode::banded;
 pub use encode::blocks_len;
 pub use encode::{full_chain_len, BlockFormat, Compressed};
 pub use refresh::{images, queue, queue_changed, refresh, refresh_all, Refreshed};
-pub use shrink::fit;
+pub use shrink::{fit, fitted_size};
 
 use super::convert::{source_digest, Seen};
 use super::sidecar::{Compression, TextureSettings, TextureType};
@@ -175,6 +177,17 @@ pub enum Texels {
     Image(image::DynamicImage),
 }
 
+/// The size of the image file at `source` and the size it is imported at under
+/// `settings`' *Max Size*, found from its header: what the image inspector shows.
+/// `None` when it cannot be read.
+pub fn imported_size(
+    source: &Path,
+    settings: &TextureSettings,
+) -> Option<((u32, u32), (u32, u32))> {
+    let (w, h) = open(source).ok()?.into_dimensions().ok()?;
+    Some(((w, h), fitted_size(w, h, settings.max_size)))
+}
+
 /// The image at `source` for a slot holding `kind`: its current compressed cache
 /// when `compress` (the caller checked the GPU and [`fits`]) and there is one,
 /// else decoded and fitted for `kind`. Never encodes: a missing or stale cache
@@ -192,6 +205,7 @@ pub fn load(
     let cached = compress && format_of(settings).is_some();
     if let Some(blocks) = cached.then(|| current(source, settings)).flatten() {
         let source_size = open(source).ok()?.into_dimensions().ok()?;
+        shrink::warn_if_shrunk(source, source_size, settings.max_size);
         return Some(Loaded {
             texels: Texels::Blocks(blocks),
             source_size,
@@ -200,6 +214,7 @@ pub fn load(
     }
     let image = open(source).ok()?.decode().ok()?;
     let source_size = (image.width(), image.height());
+    shrink::warn_if_shrunk(source, source_size, settings.max_size);
     let deep_normal = keeps_deep(settings, image.color());
     Some(Loaded {
         texels: Texels::Image(fit(image, settings.max_size, kind.reading(settings))),
@@ -275,6 +290,8 @@ mod deep_tests;
 mod load_tests;
 #[cfg(test)]
 mod orphans_tests;
+#[cfg(test)]
+mod shrink_tests;
 #[cfg(test)]
 mod srgb_tests;
 #[cfg(test)]

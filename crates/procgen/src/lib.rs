@@ -45,7 +45,7 @@ pub mod runner;
 mod source;
 
 pub use bake::Slot;
-pub use bake_set::{bake_set, check_set};
+pub use bake_set::{bake_set, check_set, set_paths};
 pub use bands::with_bands;
 pub use image_buf::{Image, Size};
 pub use recipe::TextureRecipe;
