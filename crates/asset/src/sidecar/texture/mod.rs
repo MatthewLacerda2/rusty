@@ -51,7 +51,7 @@ pub struct TextureSettings {
     /// `Assets.SetTextureImportSettings`, a hand edit that also sets this key).
     /// Only a deliberate act sets it, so a missing key (every sidecar the engine
     /// writes, a sparse hand-written block) means the engine's Max Size, which a
-    /// bake moves to its size ([`baked`]); a chosen one no bake touches. Written to
+    /// bake moves to its size ([`prepare_bake`]); a chosen one no bake touches. Written to
     /// the file only when true.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub max_size_chosen: bool,
