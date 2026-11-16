@@ -5,10 +5,9 @@
 use glam::Vec3;
 
 use super::gpu_tests::{drawn, offscreen, shot, H, W};
-use rusty_edit::authoring::material;
-use rusty_edit::authoring::rendering::mesh::set_subdivisions;
 use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::create::{create_entity, Primitive};
+use rusty_scene::rules::mesh::set_subdivisions;
 use rusty_scene::{Camera, Scene};
 use rusty_shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
@@ -38,8 +37,9 @@ fn pool(water: Option<&str>) -> Scene {
         let mut t = scene.world.transform_mut(id).unwrap();
         (t.position, t.scale) = (Vec3::new(0.0, 0.0, -4.0), Vec3::new(0.2, 1.0, 0.2)); // a 10 m Plane, made 2 m
         drop(t);
-        let key = material::ensure_material_key(&mut scene, id).unwrap();
-        material::set_shader(&mut scene.materials, &key, shader.to_string());
+        let key = scene.ensure_material_key(id).unwrap();
+        scene.materials.get_mut(&key).unwrap().shader =
+            (!shader.is_empty()).then(|| shader.to_string());
     }
     scene
 }

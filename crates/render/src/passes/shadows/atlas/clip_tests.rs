@@ -9,8 +9,8 @@ use glam::{Quat, Vec3};
 
 use crate::gpu::pipelines::surface::cut_depth_tests::{dissolve, ground_halves, slab_yard};
 use crate::gpu::pipelines::surface::mask_tests::Dissolve;
+use rusty_asset::MapRef;
 use rusty_components::RenderMode;
-use rusty_edit::authoring::material;
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
@@ -44,12 +44,12 @@ fn gpu_a_cutout_caster_clips_its_atlas_shadow() {
         return;
     };
     let (mut scene, slab) = under_a_spotlight(None);
-    let key = material::ensure_material_key(&mut scene, slab).unwrap();
+    let key = scene.ensure_material_key(slab).unwrap();
     let map = path.to_string_lossy().into_owned();
-    material::set_base_color_map(&mut scene.materials, &key, map);
-    material::set_alpha_cutoff(&mut scene.materials, &key, 0.5);
+    scene.materials.get_mut(&key).unwrap().base_color_map = Some(MapRef::from(map));
+    scene.materials.get_mut(&key).unwrap().alpha_cutoff = 0.5;
     let mut halves = |mode| {
-        material::set_render_mode(&mut scene.materials, &key, mode);
+        scene.materials.get_mut(&key).unwrap().render_mode = mode;
         ground_halves(&mut r, &scene)
     };
     let opaque = halves(RenderMode::Opaque);

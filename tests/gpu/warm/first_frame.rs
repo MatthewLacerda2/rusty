@@ -7,21 +7,20 @@ use std::collections::BTreeSet;
 
 use glam::Vec3;
 
-use super::Warming;
-use crate::stats::Uploads;
-use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_asset::MapRef;
-use rusty_components::MaterialComponent;
-use rusty_edit::load::prepare::PreparedScene;
-use rusty_scene::create::{primitive_mesh_component, Primitive};
-use rusty_scene::{Camera, MaterialAsset, Scene};
+use rusty::asset::MapRef;
+use rusty::components::MaterialComponent;
+use rusty::edit::load::prepare::PreparedScene;
+use rusty::render::warm::Warming;
+use rusty::render::{RenderView, Renderer, Uploads, OFFSCREEN_FORMAT};
+use rusty::scene::create::{primitive_mesh_component, Primitive};
+use rusty::scene::{Camera, MaterialAsset, Scene};
 
 const W: u32 = 32;
 
 /// `<tmp>/rusty_2123_warm/<tag>.scene`: `props` wearing a material mapped with a
 /// map of its own.
 fn level(tag: &str, props: [Primitive; 2]) -> String {
-    let dir = rusty_test_support::temp::dir().join("rusty_2123_warm");
+    let dir = crate::temp::dir().join("rusty_2123_warm");
     std::fs::create_dir_all(&dir).unwrap();
     let map = dir.join(format!("{tag}.png"));
     image::RgbaImage::from_pixel(8, 8, image::Rgba([200, 90, 40, 255]))
@@ -44,8 +43,8 @@ fn level(tag: &str, props: [Primitive; 2]) -> String {
         ..MaterialAsset::default()
     };
     scene.materials.insert("mapped".into(), mapped);
-    let path = rusty_core::paths::to_slash(&dir.join(format!("{tag}.scene")));
-    rusty_edit::save_to_file(&scene, &path).unwrap();
+    let path = rusty::core::paths::to_slash(&dir.join(format!("{tag}.scene")));
+    rusty::edit::save_to_file(&scene, &path).unwrap();
     path
 }
 
@@ -64,14 +63,14 @@ pub(super) fn first_frame(
     scene: &mut Scene,
     prepared: PreparedScene,
 ) -> Uploads {
-    rusty_edit::load::swap_in_prepared(scene, prepared, &BTreeSet::new()).unwrap();
+    rusty::edit::load::swap_in_prepared(scene, prepared, &BTreeSet::new()).unwrap();
     render(renderer, scene)
 }
 
 /// `path` read and prepared at once, as the background load prepares it bar the
 /// navmesh bake, which uploads nothing (`app::prepare_in_background`).
 pub(super) fn prepare(path: &str) -> PreparedScene {
-    PreparedScene::from_data(rusty_scene::read_scene_file(path).unwrap(), path)
+    PreparedScene::from_data(rusty::scene::read_scene_file(path).unwrap(), path)
 }
 
 /// Warm `prepared` to the end, as frames would, a step at a time, waiting while a
@@ -91,7 +90,7 @@ pub(super) fn warm(renderer: &mut Renderer, prepared: &PreparedScene) -> Uploads
 
 #[test]
 fn gpu_a_warmed_scene_uploads_nothing_on_its_first_frame() {
-    let Some(mut renderer) = crate::test_gpu::headless_or_skip(W, W) else {
+    let Some(mut renderer) = rusty::render::test_gpu::headless_or_skip(W, W) else {
         return;
     };
     let path = level("first", [Primitive::Box, Primitive::Sphere]);

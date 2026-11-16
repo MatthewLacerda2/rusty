@@ -10,7 +10,6 @@ use super::gpu_tests::{offscreen, shot, words, H, W};
 use crate::Renderer;
 use rusty_components::mesh::{MeshRevision, Vertex};
 use rusty_components::RenderFace;
-use rusty_edit::authoring::material;
 use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::{create::create_entity, create::Primitive, Camera, Scene};
 
@@ -141,8 +140,8 @@ fn gpu_a_panel_facing_away_is_dropped_by_its_cones_unless_two_sided() {
     let (one_sided, drawn, same) = on_and_off(&mut r, &scene, &cam);
     assert!(same, "cone culling moved pixels");
     assert_eq!(drawn, 0, "every cluster faces away");
-    let key = material::ensure_material_key(&mut scene, id).unwrap();
-    material::set_render_face(&mut scene.materials, &key, RenderFace::Both);
+    let key = scene.ensure_material_key(id).unwrap();
+    scene.materials.get_mut(&key).unwrap().render_face = RenderFace::Both;
     let (two_sided, drawn, same) = on_and_off(&mut r, &scene, &cam);
     assert!(same, "cluster culling moved a two-sided panel's pixels");
     assert_eq!(drawn, ALL, "a two-sided panel has no cone test");

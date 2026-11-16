@@ -138,6 +138,19 @@ pub struct NavMeshAgentComponent {
 }
 
 impl NavMeshAgentComponent {
+    /// Set the areas the agent may enter (#460, Unity's `areaMask`). Its cached path
+    /// was planned under the old mask, so it is dropped and the agent re-plans next
+    /// tick; so is a request already being searched under the old mask (#2087). The
+    /// authoring op (`edit::authoring::nav::agent::set_area_mask`) stores through it.
+    pub fn set_area_mask(&mut self, mask: u32) {
+        if self.area_mask != mask {
+            self.area_mask = mask;
+            self.cached_path.clear();
+            self.path_planned = false;
+            self.path_request = 0;
+        }
+    }
+
     /// Where the agent's feet are when its Transform is at `position`.
     pub fn feet(&self, position: Vec3) -> Vec3 {
         position - Vec3::Y * self.base_offset

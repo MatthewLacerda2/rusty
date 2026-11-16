@@ -7,8 +7,8 @@
 use glam::{Quat, Vec3};
 
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
+use rusty_asset::MapRef;
 use rusty_components::RenderMode;
-use rusty_edit::authoring::material;
 use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::{Camera, Scene};
 use rusty_shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
@@ -81,12 +81,12 @@ fn scene(s: &Scroll) -> Scene {
         Vec3::new(0.0, 0.0, -4.0),
         Vec3::new(4.0, 4.0, 0.2),
     );
-    let key = material::ensure_material_key(&mut scene, front).unwrap();
-    let m = &mut scene.materials;
-    material::set_base_color_map(m, &key, s.albedo.clone());
-    material::set_alpha_cutoff(m, &key, 0.5);
-    material::set_render_mode(m, &key, RenderMode::Cutout);
-    material::set_shader(m, &key, s.shader.clone());
+    let key = scene.ensure_material_key(front).unwrap();
+    let m = scene.materials.get_mut(&key).unwrap();
+    m.base_color_map = Some(MapRef::from(s.albedo.clone()));
+    m.alpha_cutoff = 0.5;
+    m.render_mode = RenderMode::Cutout;
+    m.shader = (!s.shader.is_empty()).then(|| s.shader.clone());
     let volume = create_entity(&mut scene, "Volume", None);
     let mut vc = default_post_processing();
     vc.ssao.active = true;

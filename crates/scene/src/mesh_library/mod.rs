@@ -204,6 +204,8 @@ impl Scene {
 }
 
 mod delete;
+mod share;
 mod sync;
 
+pub use share::{put_shared, resolve_shared};
 pub use sync::refit;

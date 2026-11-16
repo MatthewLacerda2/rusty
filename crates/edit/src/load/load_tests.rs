@@ -116,5 +116,5 @@ fn a_re_rooted_survivors_bounds_stand_where_it_is_now() {
     crate::load::swap_in(&mut s, to_scene_data(&level()), NO_SIDECAR, &survivors).unwrap();
     let (min, max) = s.world.collider_bounds(crate_).unwrap();
     assert!((min + max).abs().max_element() < 1e-4, "{min} {max}");
-    // The nav bake sees it there too: `navigation::load_bounds_tests`.
+    // The nav bake sees it there too: `tests/nav/load_bounds.rs`.
 }

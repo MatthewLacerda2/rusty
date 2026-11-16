@@ -1,18 +1,16 @@
-//! crates/physics/src/shape/shared_mesh_tests.rs — a Mesh-shaped collider outlives its
-//! entity's Mesh (#1657): `Scene.RemoveComponent(id, "Mesh")` hands the Mesh to the
+//! A Mesh-shaped collider outlives its entity's Mesh (#1657): `Scene.RemoveComponent(id, "Mesh")` hands the Mesh to the
 //! collider (`ColliderComponent::shared_mesh`, Unity's `MeshCollider.sharedMesh`),
 //! so physics and the navmesh still read it, after a save and load too.
 
 use glam::Vec3;
 
-use super::build::collider_inputs;
-use super::triangles::collider_world_triangles;
-use rusty_components::mesh::{MeshComponent, Vertex};
-use rusty_components::ColliderComponent;
-use rusty_edit::authoring::{add_component, remove_component, ComponentKind};
-use rusty_edit::serialize::{apply_scene_data, to_scene_data};
-use rusty_scene::create::{create_entity, Primitive};
-use rusty_scene::Scene;
+use rusty::components::mesh::{MeshComponent, Vertex};
+use rusty::components::ColliderComponent;
+use rusty::edit::authoring::{add_component, remove_component, ComponentKind};
+use rusty::edit::serialize::{apply_scene_data, to_scene_data};
+use rusty::physics::collider_world_triangles;
+use rusty::scene::create::{create_entity, Primitive};
+use rusty::scene::Scene;
 
 /// An imported-style part: an `"Asset"` mesh (a 2×1×1 slab, not a
 /// primitive) under the collider `instantiate_asset` gives it.
@@ -72,8 +70,8 @@ fn an_imported_part_keeps_colliding_without_its_mesh() {
         Some("models/missing.glb::Slab")
     );
     assert_eq!((shared.positions.len(), shared.indices.len()), (8, 36));
-    assert!(collider_inputs(&scene.world, id).is_some_and(|i| i.mesh_geom.is_some()));
-    // The same triangles: physics and the navmesh (both read these) lose nothing.
+    // The same triangles, built from the kept Mesh: physics and the navmesh (both
+    // read these) lose nothing.
     assert_eq!(x_extent(&scene, id), Some(before));
     assert_eq!(before, (-1.0, 1.0));
 }

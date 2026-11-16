@@ -94,16 +94,10 @@ pub fn set_auto_traverse_off_mesh_link(a: &mut NavMeshAgentComponent, auto: bool
     a.auto_traverse_off_mesh_link = auto;
 }
 
-/// Set the areas the agent may enter (#460, Unity's `areaMask`). Its cached path was
-/// planned under the old mask, so it is dropped and the agent re-plans next tick;
-/// so is a request already being searched under the old mask (#2087).
+/// Set the areas the agent may enter (#460, Unity's `areaMask`), dropping a path
+/// planned under the old mask: [`NavMeshAgentComponent::set_area_mask`].
 pub fn set_area_mask(a: &mut NavMeshAgentComponent, mask: u32) {
-    if a.area_mask != mask {
-        a.area_mask = mask;
-        a.cached_path.clear();
-        a.path_planned = false;
-        a.path_request = 0;
-    }
+    a.set_area_mask(mask);
 }
 
 #[cfg(test)]

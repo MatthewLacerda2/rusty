@@ -12,7 +12,6 @@ use crate::gpu::pipelines::surface::cut_depth_tests::{ground_at, ground_halves};
 use crate::lod::LodSelection;
 use crate::{Frustum, Renderer};
 use rusty_components::{RenderMode, ShadowCasting};
-use rusty_edit::authoring::material;
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
@@ -28,9 +27,9 @@ pub(super) fn card(scene: &mut Scene, mode: ShadowCasting, face_down: bool, cuto
     drop(t);
     scene.world.mesh_mut(plane).unwrap().cast_shadows = mode;
     if cutout {
-        let key = material::ensure_material_key(scene, plane).unwrap();
-        material::set_render_mode(&mut scene.materials, &key, RenderMode::Cutout);
-        material::set_alpha_cutoff(&mut scene.materials, &key, 0.5);
+        let key = scene.ensure_material_key(plane).unwrap();
+        scene.materials.get_mut(&key).unwrap().render_mode = RenderMode::Cutout;
+        scene.materials.get_mut(&key).unwrap().alpha_cutoff = 0.5;
     }
     plane
 }

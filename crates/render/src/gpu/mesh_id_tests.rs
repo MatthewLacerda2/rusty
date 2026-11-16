@@ -52,8 +52,8 @@ fn a_subdivided_plane_keys_apart_from_the_single_quad() {
 /// own buffer with its own index count, whichever is visited first.
 #[test]
 fn gpu_planes_with_different_subdivisions_upload_two_meshes() {
-    use rusty_edit::authoring::rendering::mesh::set_subdivisions;
     use rusty_scene::create::{create_entity, Primitive};
+    use rusty_scene::rules::mesh::set_subdivisions;
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(16, 16) else {
         return;
     };

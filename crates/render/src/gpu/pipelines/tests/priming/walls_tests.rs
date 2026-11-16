@@ -17,7 +17,6 @@ use super::mask_tests::Dissolve;
 use crate::{readback, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_components::{CameraComponent, MaterialAsset, MaterialComponent};
 use rusty_core::settings::render_scale::RenderScale;
-use rusty_edit::authoring::material;
 use rusty_scene::create::Primitive;
 use rusty_scene::create::{create_entity, default_light, default_post_processing};
 use rusty_scene::{Camera, Scene};
@@ -78,8 +77,9 @@ fn walls(d: &Dissolve, blur: bool) -> (Rc<RefCell<Scene>>, u32) {
     scene.world.set_light(unlit, Some(light));
     let front = (Vec3::new(0.0, 1.0, -4.0), Vec3::new(3.0, 2.0, 0.2));
     let cut = block(&mut scene, front.0, front.1, [0.9; 3]);
-    let key = material::ensure_material_key(&mut scene, cut).unwrap();
-    material::set_shader(&mut scene.materials, &key, d.shader.clone());
+    let key = scene.ensure_material_key(cut).unwrap();
+    scene.materials.get_mut(&key).unwrap().shader =
+        (!d.shader.is_empty()).then(|| d.shader.clone());
 
     let volume = create_entity(&mut scene, "Volume", None);
     let mut vc = default_post_processing();

@@ -6,14 +6,13 @@ use super::analytic::analytic;
 use super::{chain, f16_value, W};
 use rusty_components::{PostProcessingComponent, Tonemap};
 use rusty_core::color::linear_to_srgb;
-use rusty_edit::authoring::rendering::post_processing as ops;
 use rusty_scene::create::default_post_processing;
 
 /// The default volume under ACES at `contrast`: ACEScc's pivot is exactly the 0.18 grey card (under the others, LogC's sits near 0.22, as in URP).
 fn at(contrast: f32) -> PostProcessingComponent {
     let mut vc = default_post_processing();
     vc.tonemapping.mode = Tonemap::Aces;
-    ops::grading::color_adjustments::set_contrast(&mut vc, contrast);
+    vc.color_adjustments.contrast = contrast;
     vc
 }
 
@@ -75,7 +74,7 @@ fn gpu_contrast_one_is_the_analytic_tonemap_under_either_log_space() {
         // Bake a contrast first, so the neutral one below is a rebake, not a cache hit.
         c.run(&row, 0.0, Some(&vc));
         vc.tonemapping.mode = tonemap;
-        ops::grading::color_adjustments::set_contrast(&mut vc, 1.0);
+        vc.color_adjustments.contrast = 1.0;
         let out = c.run(&row, 0.0, Some(&vc));
         let worst = xs
             .iter()

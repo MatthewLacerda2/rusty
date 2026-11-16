@@ -6,8 +6,8 @@ use super::{Item, Warming};
 use crate::gpu::textures::TextureKind;
 use rusty_asset::MapRef;
 use rusty_components::{MaterialComponent, MeshRevision};
-use rusty_edit::serialize::to_scene_data;
 use rusty_scene::create::{primitive_mesh_component, Primitive};
+use rusty_scene::parse_scene_text;
 use rusty_scene::serialize::SceneData;
 use rusty_scene::{MaterialAsset, Scene};
 
@@ -35,8 +35,21 @@ fn scene() -> Scene {
     scene
 }
 
+/// A scene file with nothing in it: every other block at its default.
+const SPARSE: &str = r#"{"entities": [], "next_entity_id": 1, "selected_entity_id": null}"#;
+
+/// `scene`'s document as the load prepares it: its entities, library and sky,
+/// each block a save writes left at a sparse file's default.
+fn document(scene: &Scene) -> SceneData {
+    let mut data = parse_scene_text(SPARSE, "plan.scene").unwrap();
+    data.entities = scene.world.collect_entities();
+    data.materials = (*scene.materials).clone();
+    data.skybox_path = scene.skybox_path.clone();
+    data
+}
+
 fn data() -> SceneData {
-    to_scene_data(&scene())
+    document(&scene())
 }
 
 #[test]
@@ -92,7 +105,7 @@ fn a_sky_and_lightmap_pages_are_listed_and_progress_counts_what_is_made() {
 fn a_scene_with_nothing_to_draw_is_warm_at_once() {
     let mut empty = Scene::new();
     empty.skybox_path = String::new();
-    let warming = Warming::plan(&to_scene_data(&empty));
+    let warming = Warming::plan(&document(&empty));
     assert!(warming.is_empty() && warming.is_done());
     assert_eq!(warming.progress(), 1.0);
 }
