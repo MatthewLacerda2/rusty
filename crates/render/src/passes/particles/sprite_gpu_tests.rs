@@ -4,14 +4,14 @@
 
 use std::rc::Rc;
 
-use super::EmitterRun;
+use super::{EmitterRun, Sprites};
 use rusty_components::particle::ParticleBlend;
 
 fn run(texture: Option<&str>) -> EmitterRun {
     EmitterRun {
         blend: ParticleBlend::Alpha,
         texture: texture.map(|t| t.to_string().into()),
-        instances: Vec::new(),
+        sprites: Sprites::Instances(Vec::new()),
     }
 }
 
@@ -21,7 +21,7 @@ fn gpu_no_texture_binds_the_soft_disc_and_a_missing_file_the_checker() {
         return;
     };
     let runs = vec![run(None), run(Some("no/such/sprite_2052.png")), run(None)];
-    let (_, batches) = r.batch_runs(runs);
+    let (_, batches, _) = r.batch_runs(runs);
     assert_eq!(batches.len(), 3, "a different texture splits the draw");
     let sprite = &r.particle_renderer.default_sprite;
     assert!(

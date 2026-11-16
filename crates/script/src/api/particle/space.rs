@@ -1,17 +1,19 @@
-//! crates/script/src/api/particle/space.rs — the `Particles` simulation-space pair (#1529):
-//! `SetSimulationSpace` / `GetSimulationSpace`. The setter is a field write routed
-//! through the shared `edit::authoring::particles` op the inspector calls.
+//! crates/script/src/api/particle/space.rs — the `Particles` simulation pairs: the
+//! space, `SetSimulationSpace` / `GetSimulationSpace` (#1529), and the target,
+//! `SetSimulation` / `GetSimulation` (#2170). The setters are field writes routed
+//! through the shared `edit::authoring::particles` ops the inspector calls.
 
 use super::with_emitter;
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use crate::api::{put, Reg};
-use rusty_components::SimulationSpace;
+use rusty_components::{ParticleSimulation, SimulationSpace};
 use rusty_edit::authoring::particles as particle_ops;
 use rusty_scene::Scene;
 
-/// Register the simulation-space pair onto the `Particles` table.
+/// Register the simulation pairs onto the `Particles` table.
 pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
+    register_target(lua, table, scene)?;
     // `SetSimulationSpace(id, "World"|"Local")`; an unknown name is an error.
     put(
         table,
@@ -41,6 +43,41 @@ pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scen
                 .particles(id.read())
                 .map(|p| p.simulation_space.name());
             Ok(space)
+        }),
+    )
+}
+
+/// `SetSimulation(id, "Cpu"|"Gpu")` (any case; an unknown name is an error) and
+/// `GetSimulation(id)`.
+fn register_target(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
+    put(
+        table,
+        "SetSimulation",
+        lua.create_function(move |lua, (id, name): (EntityArg, String)| {
+            let id = id.live("Particles", "SetSimulation")?;
+            let target = ParticleSimulation::parse(&name).ok_or_else(|| {
+                mlua::Error::RuntimeError(format!(
+                    "SetSimulation: unknown simulation {name:?} (want one of {})",
+                    ParticleSimulation::names()
+                ))
+            })?;
+            with_emitter(&*scene.get(lua)?, id, |p| {
+                particle_ops::set_simulation(p, target)
+            });
+            Ok(())
+        }),
+    )?;
+    put(
+        table,
+        "GetSimulation",
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
+            let scene = scene.borrow();
+            let target = scene
+                .world
+                .particles(id.read())
+                .map(|p| p.simulation.name());
+            Ok(target)
         }),
     )
 }

@@ -3,6 +3,7 @@
 
 use glam::{Quat, Vec3};
 
+use super::simulation::GpuSim;
 use super::space::EmitterFrame;
 use rusty_core::random::Random;
 
@@ -92,7 +93,11 @@ pub struct SubEmitEvent {
 /// Transient per-emitter runtime. Reset on entering Play.
 #[derive(Clone, Debug)]
 pub struct EmitterRuntime {
+    /// A `Cpu` emitter's live particles; always empty on a `Gpu` one, whose live
+    /// particles are the renderer's (#2170).
     pub particles: Vec<Particle>,
+    /// A `Gpu` emitter's births, steps and exact live count (`simulation`).
+    pub gpu: GpuSim,
     /// Accumulated fractional particles owed by continuous emission.
     pub spawn_accum: f32,
     pub rng: Random,
@@ -105,6 +110,9 @@ pub struct EmitterRuntime {
     /// The `Local` emitter frame its live particles were last placed under
     /// (`space`); `None` until it first emits or is carried.
     pub anchor: Option<EmitterFrame>,
+    /// The first `anchor` this Play: what a `Local` `Gpu` emitter's stored
+    /// particles are relative to (`ParticleEmitterComponent::gpu_space`).
+    pub base: Option<EmitterFrame>,
     /// Bumped by everything that changes which particle sits where or what it
     /// holds outside a script's own read: a tick, an emit, a clear and each
     /// scripted write. A script's read records it, and a write against an older
@@ -117,13 +125,63 @@ impl Default for EmitterRuntime {
     fn default() -> Self {
         Self {
             particles: Vec::new(),
+            gpu: GpuSim::default(),
             spawn_accum: 0.0,
             rng: Random::new(0),
             burst_fired: false,
             initialized: false,
             pending: Vec::new(),
             anchor: None,
+            base: None,
             revision: 0,
         }
+    }
+}
+
+/// The configuration apart from the runtime.
+impl super::ParticleEmitterComponent {
+    /// A copy of the configuration, with a fresh runtime: what an editor or an
+    /// all-or-nothing write reads and edits without copying the live particles (a
+    /// `Gpu` emitter keeps a birth per live particle, up to
+    /// [`GPU_MAX_PARTICLES`](super::GPU_MAX_PARTICLES)). The destructuring names every field, so a new one
+    /// is a compile error here until it is copied.
+    pub fn config(&self) -> Self {
+        macro_rules! copy {
+            ($($field:ident),* $(,)?) => {{
+                let Self { runtime: _, $($field),* } = self;
+                Self { runtime: EmitterRuntime::default(), $($field: Clone::clone($field)),* }
+            }};
+        }
+        copy!(
+            active,
+            emit_mode,
+            blend,
+            collision,
+            texture,
+            rate,
+            burst_count,
+            max_particles,
+            looping,
+            simulation_space,
+            simulation,
+            shape,
+            emit_from,
+            lifetime,
+            speed,
+            direction,
+            spread,
+            gravity,
+            size,
+            rotation,
+            color,
+            size_over_life,
+            color_over_life,
+            drag,
+            rotation_speed,
+            bounciness,
+            sub_emitters,
+            seed,
+            render,
+        )
     }
 }

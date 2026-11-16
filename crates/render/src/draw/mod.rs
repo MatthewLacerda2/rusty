@@ -91,6 +91,8 @@ impl Renderer {
         // Every decal and its maps, once for the whole frame (#638); each camera
         // bins them into its clusters.
         self.upload_decals(scene);
+        // The GPU-simulated emitters' births and steps, once for every camera (#2170).
+        self.step_gpu_particles(scene);
     }
 
     /// Renders the 3D scene into `view` (a per-view target/depth/post-FX bundle, #355),

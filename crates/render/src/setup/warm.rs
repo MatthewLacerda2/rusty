@@ -29,6 +29,7 @@ impl Renderer {
     pub(crate) fn lazy_computes(&self) -> Vec<&LazyCompute> {
         let mut all = self.post_passes.lazy_computes();
         all.extend(self.hiz.lazy_computes());
+        all.extend(self.particle_renderer.gpu.lazy_computes());
         all
     }
 

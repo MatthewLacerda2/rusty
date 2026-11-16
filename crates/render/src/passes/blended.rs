@@ -58,9 +58,10 @@ pub(crate) struct BlendPipelines {
 }
 
 impl BlendPipelines {
-    /// Prepare both from `shader`'s `vs_main` and its `fs_alpha` / `fs_additive`
-    /// (and the reactive twins from its `fs_alpha_reactive` / `fs_additive_reactive`),
-    /// drawing `vertex` buffers into the HDR target. Both faces are drawn, and the
+    /// Prepare both from `shader`'s vertex entry point `vertex.0` and its `fs_alpha` /
+    /// `fs_additive` (and the reactive twins from its `fs_alpha_reactive` /
+    /// `fs_additive_reactive`), drawing the `vertex.1` buffer, if any, into the HDR
+    /// target. Both faces are drawn, and the
     /// scene depth is tested but never written: overlapping translucent sprites and
     /// strips must all blend, not z-fight, and the same depth can also be bound as a
     /// texture (soft particles).
@@ -68,7 +69,7 @@ impl BlendPipelines {
         device: &wgpu::Device,
         label: &'static str,
         (shader, layout): (&wgpu::ShaderModule, &wgpu::PipelineLayout),
-        vertex: wgpu::VertexBufferLayout<'static>,
+        (entry, vertex): (&'static str, Option<wgpu::VertexBufferLayout<'static>>),
     ) -> Self {
         let lazy = |blend, fragment_entry: &'static str, reactive: bool| {
             let (shader, layout, vertex) = (shader.clone(), layout.clone(), vertex.clone());
@@ -78,9 +79,9 @@ impl BlendPipelines {
                     layout: Some(&layout),
                     vertex: wgpu::VertexState {
                         module: &shader,
-                        entry_point: Some("vs_main"),
+                        entry_point: Some(entry),
                         compilation_options: Default::default(),
-                        buffers: &[Some(vertex.clone())],
+                        buffers: &[vertex.clone()][..usize::from(vertex.is_some())],
                     },
                     fragment: Some(wgpu::FragmentState {
                         module: &shader,

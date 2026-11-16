@@ -10,10 +10,12 @@
 //! table carries the emitter's revision at the read (in a metatable a script
 //! cannot reach), and a write after anything bumped it (a tick, an emit, a
 //! clear, or a write through any of the live calls) is an error that changes
-//! nothing.
+//! nothing. A `Gpu` emitter's particles are the renderer's (#2170): `GetArrays`
+//! reads empty arrays, and `SetArrays` changes nothing and warns once.
 
 use mlua::{AnyUserData, Lua, Table, Value};
 
+use super::gpu::refuse;
 use super::live::{apply, field, revision, touched, with_carried, FIELDS, NAMES};
 use crate::api::entity_arg::EntityArg;
 use crate::api::{ApiCell, Reg};
@@ -87,6 +89,9 @@ fn set_arrays(scene: &mut Scene, id: u32, arrays: &Table) -> mlua::Result<u32> {
     }
     let written = read_back(arrays, stamp.count)?;
     let live = with_carried(scene, id, |e, _| {
+        if e.on_gpu() {
+            return Ok(refuse(e, "SetArrays", id));
+        }
         if revision(e) != stamp.revision || e.runtime.particles.len() != stamp.count {
             return Err(error(
                 "SetArrays: the arrays are from an older read (the particles have ticked, or \

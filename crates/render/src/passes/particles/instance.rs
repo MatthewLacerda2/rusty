@@ -75,7 +75,7 @@ pub(crate) struct Eye {
 }
 
 /// The shader's code for a sprite mode (`Mesh` never reaches the sprite pass).
-fn mode_code(mode: ParticleRenderMode) -> u32 {
+pub(crate) fn mode_code(mode: ParticleRenderMode) -> u32 {
     match mode {
         ParticleRenderMode::Billboard | ParticleRenderMode::Mesh => 0,
         ParticleRenderMode::Stretched => 1,
