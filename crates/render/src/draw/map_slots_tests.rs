@@ -15,6 +15,7 @@ fn every_map() -> MaterialAsset {
         }),
         occlusion_map: Some("occlusion_map".into()),
         specular_map: Some("specular_map".into()),
+        height_map: Some("height_map".into()),
         ..MaterialAsset::default()
     }
 }
@@ -31,6 +32,7 @@ fn each_row_reads_its_own_field_at_its_own_binding() {
         (Map::Detail, "detail", 15, TextureKind::Data),
         (Map::Occlusion, "occlusion_map", 14, TextureKind::Mask),
         (Map::Specular, "specular_map", 13, TextureKind::Mask),
+        (Map::Height, "height_map", 12, TextureKind::Mask),
     ];
     assert_eq!(expected.len(), MATERIAL_MAPS);
     for (map, field, binding, kind) in expected {
@@ -54,7 +56,10 @@ fn only_the_maps_that_darken_or_scale_switch_off_while_missing() {
         .filter(|s| s.off_while_missing.is_some())
         .map(|s| s.map)
         .collect();
-    assert_eq!(off, [Map::Detail, Map::Occlusion, Map::Specular]);
+    assert_eq!(
+        off,
+        [Map::Detail, Map::Occlusion, Map::Specular, Map::Height]
+    );
     let mut record = MaterialData::flat([1.0; 4]);
     for s in &MAP_SLOTS {
         if let Some(flag) = s.off_while_missing {
@@ -65,8 +70,9 @@ fn only_the_maps_that_darken_or_scale_switch_off_while_missing() {
         record.detail.use_detail_map,
         record.level_maps.use_occlusion_map,
         record.level_maps.use_specular_map,
+        record.level_maps.use_height_map,
     );
-    assert_eq!(flags, (7, 7, 7), "each row names its own flag");
+    assert_eq!(flags, (7, 7, 7, 7), "each row names its own flag");
 }
 
 #[test]
@@ -92,4 +98,22 @@ fn the_level_maps_flag_what_is_named_and_hold_the_strength_in_range() {
     );
     let ends = (occlusion_strength(-2.0), occlusion_strength(9.0));
     assert_eq!(ends, (0.0, 1.0));
+}
+
+#[test]
+fn the_height_map_flags_only_where_it_applies_and_holds_its_depth() {
+    let off = level_maps_uniform(None);
+    assert_eq!((off.use_height_map, off.height_scale), (0, 0.0));
+    let mut m = MaterialAsset {
+        height_map: Some("h.png".into()),
+        height_scale: 0.5,
+        ..MaterialAsset::default()
+    };
+    let on = level_maps_uniform(Some(&m));
+    assert_eq!((on.use_height_map, on.height_scale), (1, 0.2), "clamped");
+    m.render_mode = rusty_components::RenderMode::Cutout;
+    assert_eq!(level_maps_uniform(Some(&m)).use_height_map, 0, "Cutout");
+    m.render_mode = rusty_components::RenderMode::Opaque;
+    m.uv_mapping = rusty_components::UvMapping::Triplanar;
+    assert_eq!(level_maps_uniform(Some(&m)).use_height_map, 0, "Triplanar");
 }

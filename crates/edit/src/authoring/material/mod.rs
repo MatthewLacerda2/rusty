@@ -35,7 +35,7 @@ use std::collections::BTreeMap;
 pub use rusty_components::material::entity_material_key;
 
 pub use coordinates::{
-    BLEND_SHARPNESS_RANGE, COORDINATE_FIELDS, MAP_COORD_RANGE, WORLD_SIZE_RANGE,
+    BLEND_SHARPNESS_RANGE, COORDINATE_FIELDS, HEIGHT_SCALE_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE,
 };
 pub use detail::{clamp_detail, set_detail_map, DETAIL_FIELDS, DETAIL_SCALE_RANGE};
 pub use face::FACE_FIELDS;
@@ -50,8 +50,8 @@ pub use library::{
 pub use maps::{bake_maps, rebake_maps, MAPS_DIR};
 pub use shader_params::{
     clear_entity_shader_param, entity_shader_param, entity_shader_param_with,
-    set_entity_shader_param, set_entity_shader_param_with, set_shader_param, shader_layout,
-    shader_param,
+    set_entity_shader_param, set_entity_shader_param_with, set_shader, set_shader_param,
+    set_shader_texture, shader_layout, shader_param,
 };
 pub use slots::{keys, set_slot, slot_count};
 pub use sources::{load_recipe, Loaded};
@@ -159,23 +159,46 @@ pub fn set_normal_map(materials: &mut MaterialLibrary, key: &str, path: Option<S
 /// Set (or, with `None` or an empty path, clear) the occlusion map path (#2151);
 /// a data map, as metallic's. A map that darkens is never left naming nothing.
 pub fn set_occlusion_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
-    if let Some(m) = materials.get_mut(key) {
-        m.occlusion_map = path.filter(|p| !p.is_empty()).map(MapRef::from);
-        fit_data_slot(m.occlusion_map.as_ref());
-    }
+    set_level_map(
+        materials,
+        key,
+        path,
+        |m| &mut m.occlusion_map,
+        fit_data_slot,
+    );
 }
 
 /// Set (or, with `None` or an empty path, clear) the specular-level map path
 /// (#2151); a data map. A map that scales is never left naming nothing.
 pub fn set_specular_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
+    set_level_map(materials, key, path, |m| &mut m.specular_map, fit_data_slot);
+}
+
+/// Set (or, with `None` or an empty path, clear) the height map path (#2191); a
+/// `Default` image becomes `SingleChannel` ([`fit_height_slot`]). A map that
+/// displaces is never left naming nothing.
+pub fn set_height_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
+    set_level_map(materials, key, path, |m| &mut m.height_map, fit_height_slot);
+}
+
+/// Write a data map that darkens, scales or displaces into the `field` of `key`,
+/// an empty path clearing it, and `fit` its image's import settings.
+fn set_level_map(
+    materials: &mut MaterialLibrary,
+    key: &str,
+    path: Option<String>,
+    field: fn(&mut MaterialAsset) -> &mut Option<MapRef>,
+    fit: fn(Option<&MapRef>),
+) {
     if let Some(m) = materials.get_mut(key) {
-        m.specular_map = path.filter(|p| !p.is_empty()).map(MapRef::from);
-        fit_data_slot(m.specular_map.as_ref());
+        let slot = field(m);
+        *slot = path.filter(|p| !p.is_empty()).map(MapRef::from);
+        fit(slot.as_ref());
     }
 }
 
 /// Fit the import settings of every image `asset`'s slots name to the slot:
-/// [`fit_normal_slot`] and [`fit_data_slot`]. Every way a material gets its maps
+/// [`fit_normal_slot`], [`fit_data_slot`] and [`fit_height_slot`]. Every way a material gets its maps
 /// whole goes through it (a material document, a maps recipe, a model's import).
 pub fn fit_map_slots(asset: &MaterialAsset) {
     fit_normal_slot(asset.normal_map.as_ref());
@@ -183,6 +206,7 @@ pub fn fit_map_slots(asset: &MaterialAsset) {
     fit_data_slot(asset.roughness_map.as_ref());
     fit_data_slot(asset.occlusion_map.as_ref());
     fit_data_slot(asset.specular_map.as_ref());
+    fit_height_slot(asset.height_map.as_ref());
     fit_data_slot(asset.detail.as_ref().and_then(|d| d.map.as_ref()));
 }
 
@@ -190,6 +214,13 @@ pub fn fit_map_slots(asset: &MaterialAsset) {
 pub fn fit_normal_slot(map: Option<&MapRef>) {
     if let Some(file) = map.and_then(MapRef::file) {
         rusty_asset::sidecar::fit_normal_slot(&file);
+    }
+}
+
+/// [`rusty_asset::sidecar::fit_height_slot`] for the image a height slot names.
+pub fn fit_height_slot(map: Option<&MapRef>) {
+    if let Some(file) = map.and_then(MapRef::file) {
+        rusty_asset::sidecar::fit_height_slot(&file);
     }
 }
 
@@ -244,35 +275,6 @@ pub fn set_alpha_cutoff(materials: &mut MaterialLibrary, key: &str, value: f32) 
     if let Some(m) = materials.get_mut(key) {
         m.alpha_cutoff = unit(value);
     }
-}
-
-/// Set the authored surface shader by module name (#396); an empty name clears it
-/// back to the standard forward shader. Whether the module exists is the renderer's
-/// call (it falls back, logging once), so a shader baked later still binds.
-pub fn set_shader(materials: &mut MaterialLibrary, key: &str, name: String) {
-    if let Some(m) = materials.get_mut(key) {
-        m.shader = (!name.is_empty()).then_some(name);
-    }
-}
-
-/// Point material `key`'s extra shader texture `slot` (#400) at `path`; `None` or
-/// `""` clears it back to white. An unknown slot is an error naming it and the
-/// slots there are (#395). The path is not checked: a missing file samples white,
-/// and a texture made later binds when it appears.
-pub fn set_shader_texture(
-    materials: &mut MaterialLibrary,
-    key: &str,
-    slot: &str,
-    path: Option<String>,
-) -> Result<(), String> {
-    rusty_shadergen::textures::slot(slot)?;
-    if let Some(m) = materials.get_mut(key) {
-        match path.filter(|p| !p.is_empty()) {
-            Some(p) => m.shader_textures.insert(slot.to_owned(), p.into()),
-            None => m.shader_textures.remove(slot),
-        };
-    }
-    Ok(())
 }
 
 #[cfg(test)]

@@ -8,7 +8,7 @@
 #import lighting::ssr_surface
 #import forward::transparent
 #import forward::mapping
-#import forward::detail
+#import forward::{detail, parallax}
 #import forward::reflection::{baked_diffuse, environment_brdf, environment_reflection, specular_occlusion}
 #import forward::lighting::{ambient_occlusion, sun_shadow_parts, flat_ambient, fold_decals, indirect_bounce, lamp, lightmap_level, probe_irradiance, ssil_realtime, with_ssil_share}
 #import forward::shadowmask::{baked_occlusion, directional_shadows, local_shadows}
@@ -317,8 +317,8 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // branch too; `roughness` below is widened by it. Taken before the two-sided flip:
     // a flip inside a pixel quad (a pane seen edge-on) is not a curved surface.
     var specular_kernel = specular_aa::kernel(normalize(in.world_normal));
-    // Where every map below is read (#1573): UV0 tiled, or projected from world space.
-    let maps = mapping::coords(in.tex_coords, in.world_position, geometric);
+    // Where every map below is read (#1573, #2191): UV0 or world-projected, then parallax-shifted.
+    let maps = parallax::displace(mapping::coords(in.tex_coords, in.world_position, geometric), in.world_position, geometric);
     var base_color = m.color_tint;
     if (m.use_texture == 1u) {
         base_color *= mapping::sample(t_diffuse, s_diffuse, maps);

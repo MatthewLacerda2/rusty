@@ -166,7 +166,7 @@ fn material_sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
 /// `array<vec4<f32>, 16>` uniform only a surface variant with runtime params reads;
 /// one texture per extra shader slot (7 = `mask`, #400), which only a variant with a
 /// block sampling it reads; the detail map (15, #1997), the occlusion (14) and
-/// specular-level (13) maps (#2151). Every texture but albedo has its own sampler at
+/// specular-level (13) maps (#2151) and the height map (12, #2191). Every texture but albedo has its own sampler at
 /// `textures::sampler_binding` (16 past it), its import settings' wrap and filter (#1323). This is the layout the forward pass's
 /// group(2) is built against (#202, #207).
 pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {

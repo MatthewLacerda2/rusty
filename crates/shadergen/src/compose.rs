@@ -50,6 +50,7 @@ pub const MODULES: &[&str] = &[
     "forward/maps.wgsl",
     "forward/mapping.wgsl",
     "forward/detail.wgsl",
+    "forward/parallax.wgsl",
     "forward/facing.wgsl",
     "forward/specular_aa.wgsl",
     "forward/motion.wgsl",
