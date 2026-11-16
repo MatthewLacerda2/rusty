@@ -23,11 +23,20 @@ use std::process::exit;
 
 use rusty::dev::session::{self, Session};
 
+const USAGE: &str = "usage: session [--project <dir>] [<scene>|--empty]
+  (no scene)       boot the project's boot scene
+  <scene>          boot this scene
+  --empty          start from an empty scene
+  --project <dir>  the game project (default ./project)
+  -h, --help       print this and exit
+Reads one Lua line per command on stdin, writes one JSON line per answer on stdout.";
+
 fn main() {
     rusty::init();
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    rusty::core::project::answer_help(&args, USAGE);
     // An authoring binary: it may spend on a provider (docs/providers.md).
     rusty::dev::providers::read_keys();
-    let args: Vec<String> = std::env::args().skip(1).collect();
 
     // `--project <dir>` chdirs first; then `--empty` starts blank, an explicit path
     // boots that scene, and no argument boots the project's boot scene

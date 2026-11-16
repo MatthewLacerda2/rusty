@@ -36,11 +36,22 @@ use std::process::exit;
 use rusty::dev::mcp::{self, attach::SocketClient, embed::Embedded, EvalBackend};
 use rusty::dev::session::{self, Session};
 
+const USAGE: &str = "usage: session-mcp [--project <dir>] [<scene>|--empty]
+       session-mcp --attach [<addr>]
+  (no scene)       embed: boot the project's boot scene
+  <scene>          embed: boot this scene
+  --empty          embed: start from an empty scene
+  --project <dir>  embed: the game project (default ./project)
+  --attach [<addr>]  forward to a running window's command socket instead
+  -h, --help       print this and exit
+Speaks MCP (newline-delimited JSON-RPC 2.0) on stdin/stdout; see docs/mcp.md.";
+
 fn main() {
     rusty::init();
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    rusty::core::project::answer_help(&args, USAGE);
     // An authoring binary: it may spend on a provider (docs/providers.md).
     rusty::dev::providers::read_keys();
-    let args: Vec<String> = std::env::args().skip(1).collect();
 
     // Pick the backend: `--attach [<addr>]` forwards to a running window's socket;
     // otherwise boot an in-process headless world (honouring `--project` / scene args).
