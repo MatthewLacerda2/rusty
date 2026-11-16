@@ -34,6 +34,7 @@
 //! that starts `engine/` names a file there ([`ContentRoots`]).
 
 mod agent;
+mod args;
 pub mod bench;
 mod boot;
 mod content;
@@ -45,6 +46,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 pub use agent::{CLAUDE_FILE, MCP_FILE};
+pub use args::{answer_help, take_flag, take_value};
 pub use boot::{boot_scene, remember_scene, scene_to_remember, BootPlan, LAST_SCENE_PATH};
 pub use content::{engine_relative, ContentRoots, ENGINE_PREFIX};
 #[doc(hidden)]
@@ -64,9 +66,6 @@ pub const SAVED_DIR: &str = "saved";
 /// The project a binary opens when none is named: `./project`, the folder the
 /// engine used before projects could live anywhere.
 pub const DEFAULT_PROJECT_DIR: &str = "project";
-/// The command-line flag every binary takes to name its project.
-const PROJECT_FLAG: &str = "--project";
-
 /// Where a project keeps its Lua scripts, relative to the root.
 pub const SCRIPTS_DIR: &str = "assets/scripts";
 /// Where a project keeps its textures (baked material maps included).
@@ -232,35 +231,6 @@ pub fn is_project(dir: &Path) -> bool {
 /// (The in-process tests never open one; for them it is wherever they run.)
 pub fn root() -> PathBuf {
     std::env::current_dir().unwrap_or_default()
-}
-
-/// Remove `--project <dir>` (or `--project=<dir>`) from `args` and return the
-/// directory. `Err` when the flag has no value.
-pub fn take_flag(args: &mut Vec<String>) -> Result<Option<PathBuf>, String> {
-    Ok(take_value(args, PROJECT_FLAG)?.map(PathBuf::from))
-}
-
-/// Remove `<flag> <value>` (or `<flag>=<value>`) from `args` and return the value;
-/// `Ok(None)` when the flag is absent. `Err` when it has no value: nothing follows
-/// it, another flag does, or `<flag>=` is empty.
-pub fn take_value(args: &mut Vec<String>, flag: &str) -> Result<Option<String>, String> {
-    let joined = format!("{flag}=");
-    let Some(at) = args
-        .iter()
-        .position(|a| a == flag || a.starts_with(&joined))
-    else {
-        return Ok(None);
-    };
-    let taken = args.remove(at);
-    let value = match taken.strip_prefix(&joined) {
-        Some(value) => value.to_string(),
-        None if at < args.len() && !args[at].starts_with("--") => args.remove(at),
-        None => String::new(),
-    };
-    if value.is_empty() {
-        return Err(format!("{flag} needs a value"));
-    }
-    Ok(Some(value))
 }
 
 /// What every binary does first: take `--project` from `args`, find the project

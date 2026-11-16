@@ -285,7 +285,7 @@ impl Frontend for EditorFrontend {
         self.render_viewport_scene(shell, game, &interaction, ppp);
         self.recorded_viewport_interaction(game, &interaction, ppp);
         // Only when the Inspector's Preview tab requested one this frame (#352).
-        self.render_preview_scene(shell, ppp);
+        self.render_preview(shell, ppp);
 
         self.paint(shell, target);
     }

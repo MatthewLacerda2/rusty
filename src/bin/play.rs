@@ -41,6 +41,7 @@ const USAGE: &str =
 fn main() {
     rusty::init();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
+    rusty::core::project::answer_help(&args, USAGE);
     let project = rusty::core::project::take_flag(&mut args);
     let scene = rusty::core::project::take_value(&mut args, "--scene");
     let demo = rusty::core::project::take_value(&mut args, "--demo");

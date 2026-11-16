@@ -66,10 +66,10 @@ pub fn write<C: Inspect>(
     }
     let mut outcome = Ok(());
     let found = C::update(world, id, &mut |live| {
-        let mut draft = live.clone();
+        let mut draft = C::draft(live);
         outcome = apply(&mut draft, changes, skip);
         if outcome.is_ok() {
-            *live = draft;
+            C::commit(live, draft);
         }
     });
     outcome.map(|()| found)

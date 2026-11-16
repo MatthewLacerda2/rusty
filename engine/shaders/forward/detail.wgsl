@@ -21,7 +21,7 @@
 #define_import_path forward::detail
 
 #import forward::bindings::{material, s_detail, t_detail}
-#import forward::mapping::{MapCoords, Mapping, coords_with, lookup, whiteout}
+#import forward::mapping::{MapCoords, Mapping, coords_with, displaced, lookup, lookup_uv, whiteout}
 
 const UV0: u32 = 0u;
 const TRIPLANAR: u32 = 2u;
@@ -39,7 +39,28 @@ struct Detailed {
 fn coords(main: MapCoords, position: vec3<f32>, normal: vec3<f32>) -> MapCoords {
     let m = material();
     let terms = Mapping(m.detail_st, m.uv_mapping, m.detail_world_scale, m.blend_sharpness, 0u);
-    return coords_with(terms, main.uv, position, normal);
+    var c = coords_with(terms, main.uv, position, normal);
+    if (!displaced()) {
+        return c;
+    }
+    // The height map's parallax (#2191, UV0 or Planar): the main maps' shift and
+    // derivatives in the detail's repeats. Under UV0 its UV is the shifted main one
+    // already; under Planar it is projected afresh from the world, so it takes the
+    // shift here, scaled from the main repeats to its own.
+    var ratio = m.detail_st.xy;
+    if (m.uv_mapping != UV0) {
+        let main_repeats = m.uv_st.xy * m.world_scale;
+        let safe = select(main_repeats, vec2<f32>(1.0), abs(main_repeats) < vec2<f32>(1e-6));
+        ratio = m.detail_st.xy * m.detail_world_scale / safe;
+        c.uv += main.shift * ratio;
+    }
+    c.x = c.uv;
+    c.y = c.uv;
+    c.z = c.uv;
+    c.shift = main.shift * ratio;
+    c.dx = main.dx * ratio;
+    c.dy = main.dy * ratio;
+    return c;
 }
 
 // HDRP's detail normal from a texel: x from alpha, y from green, z rebuilt, then x
@@ -65,7 +86,7 @@ fn apply(c: MapCoords, in_albedo: vec3<f32>, in_roughness: f32, n: vec3<f32>, ta
         return Detailed(in_albedo, in_roughness, n);
     }
     // One fetch per projection serves all four channels; UV0 and Planar read one.
-    let ty = lookup(t_detail, s_detail, c.uv);
+    let ty = lookup_uv(t_detail, s_detail, c);
     var tx = ty;
     var tz = ty;
     var w = vec3<f32>(0.0, 1.0, 0.0);

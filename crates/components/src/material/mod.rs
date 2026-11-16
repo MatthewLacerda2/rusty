@@ -11,6 +11,7 @@ mod component;
 mod decal;
 mod defaults;
 mod detail;
+mod height;
 mod mapping;
 mod surface;
 mod temporal;
@@ -21,7 +22,12 @@ use serde::{Deserialize, Serialize};
 
 pub use component::{entity_material_key, MaterialComponent};
 pub use decal::DecalBlend;
+use defaults::{
+    default_alpha, default_alpha_cutoff, default_base_color, default_roughness, default_true,
+};
 pub use detail::DetailLayer;
+use height::default_height_scale;
+pub use height::HEIGHT_SCALE_MAX;
 pub use mapping::UvMapping;
 use mapping::{default_blend_sharpness, default_tiling};
 use rusty_asset::MapRef;
@@ -33,26 +39,6 @@ pub use temporal::{TaaReactive, MAX_REACTIVE};
 /// How far a material's [`MaterialAsset::sorting_priority`] reaches either way:
 /// HDRP's `HDRenderQueue.sortingPriorityRange`.
 pub const SORTING_PRIORITY_RANGE: i32 = 50;
-
-fn default_base_color() -> [f32; 3] {
-    [1.0, 1.0, 1.0]
-}
-
-fn default_roughness() -> f32 {
-    0.5
-}
-
-fn default_alpha() -> f32 {
-    1.0
-}
-
-fn default_alpha_cutoff() -> f32 {
-    0.5
-}
-
-fn default_true() -> bool {
-    true
-}
 
 fn is_true(value: &bool) -> bool {
     *value
@@ -66,7 +52,7 @@ fn is_true(value: &bool) -> bool {
 /// plus `metallic`/`roughness` (#201), the `metallic_map`/`roughness_map` (#202), the flat
 /// `emissive` factor (#222), and the `normal_map`/`emissive_map` (#207 — the normal map
 /// via a per-vertex tangent attribute + TBN in `fs_main`), and the `occlusion_map` and
-/// `specular_map` (#2151). The transparency story —
+/// `specular_map` (#2151), and the `height_map` (#2191). The transparency story —
 /// `render_mode` + `alpha` + `alpha_cutoff` (#242) — drives blend/discard. No field is a
 /// write-only no-op.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -105,6 +91,17 @@ pub struct MaterialAsset {
     /// reflects nothing head-on or at grazing angles, under the lamps as under the sky.
     #[serde(default)]
     pub specular_map: Option<MapRef>,
+    /// HDRP Lit's *Displacement Mode: Pixel* height map (#2191): its red channel,
+    /// white the surface and black the deepest point, displaces every map by
+    /// parallax occlusion mapping. Read on `Opaque` materials under `UV0` or
+    /// `Planar` only ([`MaterialAsset::height_applies`]).
+    #[serde(default)]
+    pub height_map: Option<MapRef>,
+    /// How deep the height map's black lies, as a fraction of one repeat's width
+    /// (0.02 by default, `[0, HEIGHT_SCALE_MAX]`): scale-free, so the relief keeps
+    /// its look at any `tiling`.
+    #[serde(default = "default_height_scale")]
+    pub height_scale: f32,
     /// Unity's *Tiling* (#1573): how many times the maps above repeat across UV0,
     /// or across `world_size` metres under a world mapping. (1, 1) by default.
     #[serde(default = "default_tiling")]

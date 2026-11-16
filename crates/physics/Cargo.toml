@@ -6,7 +6,7 @@ publish.workspace = true
 license.workspace = true
 
 [features]
-dev = ["rusty-core/dev", "rusty-edit/dev", "rusty-scene/dev", "rusty-asset/dev"]
+dev = ["rusty-core/dev", "rusty-scene/dev", "rusty-asset/dev"]
 editor = ["rusty-core/editor", "rusty-asset/editor"]
 
 [lints]
@@ -23,7 +23,6 @@ log = { workspace = true }
 rapier3d = { workspace = true }
 
 [dev-dependencies]
-rusty-edit = { workspace = true }
 rusty-asset = { workspace = true }
 rusty-test-support = { workspace = true }
 proptest = { workspace = true }

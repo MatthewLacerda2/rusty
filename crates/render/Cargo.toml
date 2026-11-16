@@ -6,7 +6,7 @@ publish.workspace = true
 license.workspace = true
 
 [features]
-dev = ["rusty-asset/dev", "rusty-core/dev", "rusty-lighting/dev", "rusty-physics/dev", "rusty-edit/dev", "rusty-scene/dev", "rusty-shadergen/dev"]
+dev = ["rusty-asset/dev", "rusty-core/dev", "rusty-lighting/dev", "rusty-physics/dev", "rusty-scene/dev", "rusty-shadergen/dev"]
 editor = ["rusty-asset/editor", "rusty-core/editor", "rusty-physics/editor", "rusty-shadergen/editor"]
 
 [lints]
@@ -17,6 +17,7 @@ rusty-asset = { workspace = true }
 rusty-components = { workspace = true }
 rusty-core = { workspace = true }
 rusty-ecs = { workspace = true }
+rusty-font = { workspace = true }
 rusty-physics = { workspace = true }
 rusty-scene = { workspace = true }
 rusty-shadergen = { workspace = true }
@@ -31,7 +32,6 @@ pollster = { workspace = true }
 wgpu = { workspace = true }
 
 [dev-dependencies]
-rusty-edit = { workspace = true }
 rusty-test-support = { workspace = true }
 # The tests bake (lightmaps, the PVS, the probes' direct light); live code reads
 # what a bake stored through `rusty-scene`, so a bake edit never rebuilds it.

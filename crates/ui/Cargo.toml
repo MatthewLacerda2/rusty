@@ -13,12 +13,11 @@ rusty-asset = { workspace = true }
 rusty-components = { workspace = true }
 rusty-core = { workspace = true }
 rusty-ecs = { workspace = true }
+rusty-font = { workspace = true }
 rusty-scene = { workspace = true }
 glam = { workspace = true }
-harfrust = { workspace = true }
 image = { workspace = true }
 log = { workspace = true }
-skrifa = { workspace = true }
 
 [dev-dependencies]
 rusty-procgen = { workspace = true }

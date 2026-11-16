@@ -45,11 +45,12 @@ pub mod runner;
 mod source;
 
 pub use bake::Slot;
-pub use bake_set::{bake_set, check_set};
+pub use bake_set::{bake_set, check_set, set_paths};
 pub use bands::with_bands;
 pub use image_buf::{Image, Size};
 pub use recipe::TextureRecipe;
 pub use runner::{evaluate, evaluate_with, validate, RunError};
+pub use rusty_font::FontHandle;
 pub use source::{Source, Sources};
 
 /// Evaluate `recipe` over `sources` and bake it to a `.png` at `path` for the named

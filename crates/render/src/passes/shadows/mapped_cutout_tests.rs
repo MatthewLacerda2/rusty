@@ -7,7 +7,6 @@
 
 use crate::gpu::pipelines::surface::cut_depth_tests::{ground_halves, slab_yard};
 use rusty_components::{MaterialAsset, RenderMode, UvMapping};
-use rusty_edit::authoring::material;
 
 /// `[-X, +X]` ground brightness under the Cutout slab, mapped by `map`.
 fn halves_mapped(name: &str, map: impl Fn(&mut MaterialAsset)) -> Option<[f32; 2]> {
@@ -20,7 +19,7 @@ fn halves_mapped(name: &str, map: impl Fn(&mut MaterialAsset)) -> Option<[f32; 2
     albedo.save(&path).expect("albedo written");
     let mut r = crate::test_gpu::headless_or_skip(32, 32)?;
     let (mut scene, slab) = slab_yard(None);
-    let key = material::ensure_material_key(&mut scene, slab).unwrap();
+    let key = scene.ensure_material_key(slab).unwrap();
     let asset = scene.materials.get_mut(&key).unwrap();
     asset.base_color_map = Some(path.to_string_lossy().into_owned().into());
     (asset.alpha_cutoff, asset.render_mode) = (0.5, RenderMode::Cutout);

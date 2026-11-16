@@ -4,11 +4,11 @@
 // with one exception by stage: `instances` is `VERTEX`-only (the fragment stage is at
 // its 8 storage buffers), so a fragment block reads its instance through
 // `in.instance` and its object record through `objects[in.instance.x]`.
-#import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, draw, instances, lighting, local_lights, material, normal_to_world, objects, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, tangent_to_world, vertex_to_world, vertex_to_world_prev}
+#import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, draw, instances, lighting, local_lights, material, normal_to_world, objects, s_decal, s_diffuse, s_emissive, s_metallic, s_normal, s_roughness, s_shadow, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, tangent_to_world, vertex_to_world, vertex_to_world_prev}
 #import lighting::ssr_surface
 #import forward::transparent
 #import forward::mapping
-#import forward::detail
+#import forward::{detail, parallax}
 #import forward::reflection::{baked_diffuse, environment_brdf, environment_reflection, specular_occlusion}
 #import forward::lighting::{ambient_occlusion, sun_shadow_parts, flat_ambient, fold_decals, indirect_bounce, lamp, lightmap_level, probe_irradiance, ssil_realtime, with_ssil_share}
 #import forward::shadowmask::{baked_occlusion, directional_shadows, local_shadows}
@@ -317,8 +317,8 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // branch too; `roughness` below is widened by it. Taken before the two-sided flip:
     // a flip inside a pixel quad (a pane seen edge-on) is not a curved surface.
     var specular_kernel = specular_aa::kernel(normalize(in.world_normal));
-    // Where every map below is read (#1573): UV0 tiled, or projected from world space.
-    let maps = mapping::coords(in.tex_coords, in.world_position, geometric);
+    // Where every map below is read (#1573, #2191): UV0 or world-projected, then parallax-shifted.
+    let maps = parallax::displace(mapping::coords(in.tex_coords, in.world_position, geometric), in.world_position, geometric);
     var base_color = m.color_tint;
     if (m.use_texture == 1u) {
         base_color *= mapping::sample(t_diffuse, s_diffuse, maps);

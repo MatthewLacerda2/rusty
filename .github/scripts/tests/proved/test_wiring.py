@@ -37,10 +37,10 @@ class Wiring(unittest.TestCase):
     def test_built_names_match_the_workflows(self):
         for workflow, jobs in proved_tree.BUILT.items():
             text = body(workflow)
-            for base, name in jobs.items():
+            for base, names in jobs.items():
                 with self.subTest(workflow=workflow, job=base):
                     self.assertIn(f"\n  {base}:\n", text)
-                    if name:
+                    for name in names:
                         self.assertIn(f"- name: {name}\n", job(text, base))
 
     def test_each_changes_job_asks_and_folds_the_answer_into_code(self):

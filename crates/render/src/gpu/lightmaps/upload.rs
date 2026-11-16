@@ -10,7 +10,6 @@ pub(crate) struct LightmapArray {
     pub bytes: u64,
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
-    pub sampler: wgpu::Sampler,
 }
 
 /// The most bytes one lightmap page array may take on the GPU, every level of
@@ -104,7 +103,7 @@ pub(crate) fn upload(device: &wgpu::Device, queue: &wgpu::Queue, loaded: &Loaded
 }
 
 /// A zeroed `edge`² array of `layers` pages and `levels` mips in `format`, its
-/// view and its clamped trilinear sampler.
+/// view (read through group 0's `gpu::linear_clamp`).
 pub(crate) fn create(
     device: &wgpu::Device,
     format: wgpu::TextureFormat,
@@ -131,20 +130,10 @@ pub(crate) fn create(
         dimension: Some(wgpu::TextureViewDimension::D2Array),
         ..Default::default()
     });
-    let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-        label: Some("Lightmap Sampler"),
-        address_mode_u: wgpu::AddressMode::ClampToEdge,
-        address_mode_v: wgpu::AddressMode::ClampToEdge,
-        mag_filter: wgpu::FilterMode::Linear,
-        min_filter: wgpu::FilterMode::Linear,
-        mipmap_filter: wgpu::MipmapFilterMode::Linear,
-        ..Default::default()
-    });
     LightmapArray {
         shape: (edge, layers),
         bytes: 0,
         texture,
         view,
-        sampler,
     }
 }

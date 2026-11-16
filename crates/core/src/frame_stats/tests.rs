@@ -53,3 +53,65 @@ fn json_without_timings_drops_ms_metrics_and_systems() {
     assert!(full["metrics"].get("update_ms").is_some());
     assert!(full["systems"].get("tick_nav").is_some());
 }
+
+/// The last frame holds every tick it ran, and no tick of a frame before it.
+#[test]
+fn last_frame_holds_all_its_ticks() {
+    let mut stats = FrameStats::default();
+    stats.record("frame_ms", 9.0);
+    stats.end_tick();
+    stats.record_frame(true, |f| f.record("wall_ms", 16.0));
+    for ms in [2.0, 3.0] {
+        stats.record("frame_ms", ms);
+        stats.record_system("step_physics", ms);
+        stats.end_tick();
+    }
+    stats.record_frame(true, |f| f.record("wall_ms", 17.0));
+    let last = stats.last_frame();
+    let sim = last.get("frame_ms").unwrap();
+    assert_eq!(
+        (last.frames, sim.samples),
+        (2, 2),
+        "both ticks, not the older one"
+    );
+    assert!((sim.avg * sim.samples as f64 - 5.0).abs() < 1e-9);
+    assert_eq!(last.systems["step_physics"].samples, 2);
+    assert_eq!(last.get("wall_ms").unwrap().last, 17.0);
+    assert_eq!(
+        stats.window(1).frames,
+        1,
+        "a window of one keeps the newest tick only"
+    );
+    stats.record_frame(false, |_| {});
+    assert!(
+        stats.last_frame().get("frame_ms").is_none(),
+        "an edit frame ticked nothing"
+    );
+}
+
+/// A frame's ended value goes onto that frame, once, into the session only when
+/// that frame was in it; with no frame recorded there is none to end.
+#[test]
+fn an_ended_value_lands_on_its_own_frame_once() {
+    let mut stats = FrameStats::default();
+    stats.frame_ended("wall_ms", 1.0);
+    stats.record_frame(false, |_| {});
+    stats.record_frame(true, |_| {});
+    assert!(stats.window(1).get("wall_ms").is_none());
+    stats.frame_ended("wall_ms", 16.0);
+    stats.frame_ended("wall_ms", 99.0);
+    assert_eq!(
+        stats.get("wall_ms").map(|s| (s.samples, s.last)),
+        Some((1, 16.0))
+    );
+    let edit = stats.window(2).get("wall_ms").copied();
+    assert_eq!(edit.map(|s| s.samples), Some(1), "the edit frame had none");
+    stats.record_frame(false, |_| {});
+    stats.frame_ended("wall_ms", 5.0);
+    assert_eq!(
+        stats.get("wall_ms").unwrap().samples,
+        1,
+        "an edit frame stays out"
+    );
+    assert_eq!(stats.window(1).get("wall_ms").unwrap().last, 5.0);
+}

@@ -1,0 +1,73 @@
+{
+  "resolution": 256,
+  "params": {
+    "scale": {
+      "type": "number",
+      "default": 4,
+      "min": 1,
+      "max": 256
+    },
+    "warp": {
+      "type": "number",
+      "default": 0.5,
+      "min": 0,
+      "max": 8
+    }
+  },
+  "nodes": [
+    {
+      "id": "body",
+      "op": "noise",
+      "kind": "fbm",
+      "scale": {
+        "param": "scale"
+      },
+      "octaves": 6,
+      "distortion": {
+        "param": "warp"
+      }
+    },
+    {
+      "id": "body_n",
+      "op": "auto_levels",
+      "inputs": [
+        "body"
+      ]
+    },
+    {
+      "id": "blots",
+      "op": "noise",
+      "kind": "turbulence",
+      "scale": {
+        "param": "scale"
+      },
+      "octaves": 5,
+      "seed": 11
+    },
+    {
+      "id": "blots_n",
+      "op": "auto_levels",
+      "inputs": [
+        "blots"
+      ]
+    },
+    {
+      "id": "both",
+      "op": "mix",
+      "mode": "overlay",
+      "factor": 0.7,
+      "inputs": [
+        "body_n",
+        "blots_n"
+      ]
+    },
+    {
+      "id": "grunge",
+      "op": "auto_levels",
+      "inputs": [
+        "both"
+      ]
+    }
+  ],
+  "output": "grunge"
+}

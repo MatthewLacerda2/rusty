@@ -103,3 +103,23 @@ fn inside_the_project_a_file_in_the_way_names_the_folder() {
         "{err}"
     );
 }
+
+#[test]
+fn a_refused_bake_into_new_folders_makes_none() {
+    let root = rusty_test_support::temp::dir();
+    let lua = Lua::new();
+    let wide = SET.replace("resolution = 8", "size = { 16384, 4 }");
+    let wide = parse_recipe(&lua.load(&wide).eval().unwrap()).unwrap();
+    let path = root.join("new").join("deep").join("a.png");
+    let err = bake(&wide, path.to_str().unwrap(), "base_color", &root).unwrap_err();
+    assert!(
+        err.to_string().contains("larger than the largest Max Size"),
+        "{err}"
+    );
+    let prefix = root.join("set").join("deep").join("brick");
+    assert!(bake_whole_set(&wide, prefix.to_str().unwrap(), &root).is_err());
+    assert!(
+        !root.join("new").exists() && !root.join("set").exists(),
+        "no folder made"
+    );
+}

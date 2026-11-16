@@ -60,18 +60,21 @@ import sys
 from typing import Callable
 
 import ghrest
+from merging.verdict.runlist import base as job_base
 
-#: Per workflow, the jobs a run must have built in, each with the step that does
-#: the building (`None`: the job's own `success` is the proof; it is skipped
-#: whole when there is nothing to build). A matrix job matches by base name.
-BUILT: dict[str, dict[str, str | None]] = {
+#: Per workflow, the jobs a run must have built in, each with the steps that do
+#: the building (empty: the job's own `success` is the proof; it is skipped
+#: whole when there is nothing to build). A matrix job matches by base name, and
+#: its entries may split the steps between them: `build-test`'s default entry
+#: runs the default suite and its two `dev` shards the `dev` one (#2264).
+BUILT: dict[str, dict[str, tuple[str, ...]]] = {
     "ci.yml": {
-        "build-test": "Test (engine, default)",
-        "build-test-cross": "Test (engine, dev features)",
-        "blender": "Test (the .blend import, through Blender)",
-        "deny": None,
+        "build-test": ("Test (engine, default)", "Test (engine, dev features)"),
+        "build-test-cross": ("Test (engine, dev features)",),
+        "blender": ("Test (the .blend import, through Blender)",),
+        "deny": (),
     },
-    "lint.yml": {"lint": "Clippy (hard gate, default features)"},
+    "lint.yml": {"lint": ("Clippy (hard gate, default features)",)},
 }
 
 #: What `Swatinem/rust-cache` hashes into its key, by path or file name.
@@ -122,13 +125,16 @@ def key_change(get: Get, repo: str, before: str, sha: str, workflow: str) -> str
 
 
 def built(jobs: list[dict], workflow: str) -> bool:
-    """Whether every job [`BUILT`] names concluded `success` with its step run."""
-    for base, step in BUILT[workflow].items():
-        mine = [j for j in jobs if j.get("name", "").split(" (", 1)[0] == base]
+    """Whether every job [`BUILT`] names concluded `success` having built: each
+    of its entries ran one of its steps to `success`, and each step succeeded
+    in one entry at least."""
+    for base, steps in BUILT[workflow].items():
+        mine = [j for j in jobs if job_base(j.get("name", "")) == base]
         if not mine or any(j.get("conclusion") != "success" for j in mine):
             return False
-        if step and not all(any(s.get("name") == step and s.get("conclusion") == "success"
-                                for s in j.get("steps") or []) for j in mine):
+        ran = [{s.get("name") for s in j.get("steps") or [] if s.get("conclusion") == "success"} & set(steps)
+               for j in mine]
+        if steps and (not all(ran) or set(steps) - set().union(*ran)):
             return False
     return True
 

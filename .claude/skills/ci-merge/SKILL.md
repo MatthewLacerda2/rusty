@@ -298,7 +298,7 @@ What `make mergeable` asks:
   push that lost its run (push an empty commit). An invalid workflow produces a
   `startup_failure` run.
 - **A Markdown-only change to a `CODE_DOCS` file** needs `build-test`'s dev test
-  step to have really run.
+  step to have really run, and passed in each `dev` shard that ran it.
 
 It ignores what is not a gate: `main-health`, coverage, mutation and `cargo-test`,
 and jobs outside a gate's `needs:` (a `ci` run counts as settled once `ci-gate`

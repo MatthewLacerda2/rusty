@@ -256,9 +256,3 @@ impl Renderer {
 #[cfg(test)]
 #[path = "plan_tests.rs"]
 mod plan_tests;
-#[cfg(test)]
-#[path = "prefab_gpu_tests.rs"]
-mod prefab_gpu_tests;
-#[cfg(test)]
-#[path = "warm_gpu_tests.rs"]
-mod warm_gpu_tests;

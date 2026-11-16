@@ -157,6 +157,7 @@ impl FrameStats {
     /// (an edit-mode frame) its samples go to the recent ring alone: the session
     /// keeps what Play recorded, and a window still reads the frame.
     pub fn record_frame(&mut self, in_session: bool, f: impl FnOnce(&mut DrawnFrame<'_>)) {
+        let opened = self.recent.stamp(false);
         let mut frame = DrawnFrame {
             stats: self,
             in_session,
@@ -168,7 +169,20 @@ impl FrameStats {
             bounded(&mut self.recent.drawn_marks, at);
             self.drawn_frames += u64::from(in_session);
         }
+        self.recent.open = Some((opened, in_session));
         self.recent.frames += 1;
+    }
+
+    /// The newest recorded frame ended: record `value` as its `key`, stamped at
+    /// that frame and in the session when that frame was, for what is known only
+    /// once the next frame starts (its wall time). Once per frame: a second call,
+    /// or one with no frame recorded since the stats were made, records nothing,
+    /// so a window's newest frame has no such sample yet (absent, never zero).
+    pub fn frame_ended(&mut self, key: &str, value: f64) {
+        if let Some((at, in_session)) = self.recent.open.take() {
+            let session = in_session.then_some(&mut self.metrics);
+            push(session, &mut self.recent.metrics, at, key, value);
+        }
     }
 
     /// The stats over the newest `n` frames (at most [`RECENT`] samples a metric)
@@ -178,18 +192,31 @@ impl FrameStats {
     /// inside. A metric with no sample inside is absent, so a pass that stopped
     /// running leaves. The result keeps no history.
     pub fn window(&self, n: usize) -> FrameStats {
-        let r = &self.recent;
         let n = n.min(RECENT) as u64;
+        self.folded(n, |at| self.recent.within(at, n))
+    }
+
+    /// The newest recorded frame alone, every tick it ran included (where
+    /// [`window`](Self::window)`(1)` keeps only the newest tick): what the frame log
+    /// writes per drawn frame (#2206). A tick metric's `samples` counts its ticks,
+    /// so `avg * samples` is the frame's total.
+    pub fn last_frame(&self) -> FrameStats {
+        self.folded(1, |at| !self.recent.past_edge(at, 1))
+    }
+
+    /// The samples within the newest `n` frames that `keep` also takes, folded.
+    fn folded(&self, n: u64, keep: impl Fn(Stamp) -> bool) -> FrameStats {
+        let r = &self.recent;
         let count = |marks: &VecDeque<Stamp>| {
             let edge = marks.partition_point(|at| r.past_edge(*at, n));
-            marks.range(edge..).filter(|at| r.within(**at, n)).count()
+            marks.range(edge..).filter(|at| keep(**at)).count()
         };
         FrameStats {
             frames: count(&r.tick_marks) as u64,
             drawn_frames: count(&r.drawn_marks) as u64,
-            metrics: fold_recent(r, &r.metrics, n),
-            systems: fold_recent(r, &r.systems, n),
-            gpu_passes: fold_recent(r, &r.gpu_passes, n),
+            metrics: fold_recent(r, &r.metrics, n, &keep),
+            systems: fold_recent(r, &r.systems, n, &keep),
+            gpu_passes: fold_recent(r, &r.gpu_passes, n, &keep),
             recent: Recent::default(),
         }
     }

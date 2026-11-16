@@ -9,9 +9,9 @@ fail-fast = false
 # No retries. A retried pass is reported as FLAKY but still green, and a flaky test
 # is a bug to root-cause, not something to paper over.
 retries = 0
-# A test past a minute is flagged SLOW; past five it is killed. Nothing in the suite
-# comes close (the slowest is seconds), so a kill means a hang — better a named
-# timeout than a CI job silently running to GitHub's six-hour ceiling.
+# A test past a minute is flagged SLOW; past five it is killed. A test is meant to
+# take seconds, so a SLOW flag is worth a look and a kill means a hang — better a
+# named timeout than a CI job silently running to GitHub's six-hour ceiling.
 slow-timeout = { period = "60s", terminate-after = 5 }
 # Print only tests worth reading (slow, retried, failed) plus the summary, not a PASS
 # line per test: ~1,800 lines of passes per `make test` is output an agent pays for.
@@ -44,6 +44,11 @@ filter = """
 test(/(^|::)test_gpu::tests::gpu_adapter_present_when_required$/)
 | test(/(^|::)reflection_prefilter::gpu::tests::gpu_prefilter_matches_the_cpu_reference/)
 | test(/(^|::)taa::gpu::shimmer::gpu_a_turning_glossy_bumpy_sphere_shimmers_less_under_taa_than_fxaa$/)
+| (kind(test) & test(/^gpu::height_map::/))
+| test(/(^|::)taa::gpu::flicker::/)
+| test(/(^|::)ssr::gpu::rough::jitter::gpu_a_still_rough_reflection_holds_under_taa_jitter$/)
+| test(/(^|::)ssr::gpu::rough::fading::gpu_a_lit_bands_fading_edge_draws_no_line$/)
+| test(/(^|::)ssr::gpu::rough::contact::dark::gpu_a_dark_cubes_contact_reflection_stays_tight_before_a_glowing_wall$/)
 | test(/^gpu::test_games::/)
 """
 success-output = "final"

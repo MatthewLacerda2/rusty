@@ -1,0 +1,51 @@
+{
+  "resolution": 256,
+  "params": {
+    "wear": { "type": "number", "default": 0.3, "min": 0, "max": 1 }
+  },
+  "nodes": [
+    { "id": "stone_hex", "op": "shape", "kind": "polygon", "sides": 6, "size": [0.9, 0.72], "profile": "paraboloid" },
+    { "id": "stone_pent", "op": "shape", "kind": "polygon", "sides": 5, "size": [0.85, 0.85], "profile": "paraboloid" },
+    { "id": "stone_round", "op": "shape", "kind": "circle", "size": [0.9, 0.7], "profile": "hemisphere" },
+    { "id": "coarse", "op": "scatter", "amount": 2400, "scale": 0.013, "scale_jitter": 0.7, "rotation_jitter": 1, "value_jitter": 0.6, "seed": 111, "inputs": ["stone_hex", "stone_pent", "stone_round"] },
+    { "id": "coarse_id", "op": "scatter", "amount": 2400, "scale": 0.013, "scale_jitter": 0.7, "rotation_jitter": 1, "value_jitter": 0.6, "output": "random", "seed": 111, "inputs": ["stone_hex", "stone_pent", "stone_round"] },
+    { "id": "fines", "op": "scatter", "amount": 9000, "scale": 0.005, "scale_jitter": 0.8, "rotation_jitter": 1, "value_jitter": 0.8, "seed": 112, "inputs": ["stone_hex", "stone_pent", "stone_round"] },
+    { "id": "binder_raw", "op": "noise", "kind": "fbm", "scale": 24, "octaves": 4, "seed": 113 },
+    { "id": "binder", "op": "auto_levels", "inputs": ["binder_raw"] },
+    { "id": "aggregate", "op": "expression", "expr": "max(max(0.25 + 0.15 * c, 0.55 * a + 0.3), 0.4 * b + 0.25)", "inputs": ["coarse", "fines", "binder"] },
+
+    { "id": "crack_cells", "op": "voronoi", "scale": 4, "output": "edges", "seed": 114 },
+    { "id": "wobble_x", "op": "noise", "kind": "fbm", "scale": 10, "octaves": 4, "seed": 115 },
+    { "id": "wobble_y", "op": "noise", "kind": "fbm", "scale": 10, "octaves": 4, "seed": 116 },
+    { "id": "wobble", "op": "combine_rgb", "inputs": ["wobble_x", "wobble_y"] },
+    { "id": "crack_lines", "op": "warp", "strength": 0.1, "inputs": ["crack_cells", "wobble"] },
+    { "id": "crack_zone", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 3 }, "seed": 117 },
+    { "id": "cracks", "op": "expression", "expr": "(1 - smoothstep(0.0, 0.025, a)) * smoothstep(0.85 - 0.45 * k1, 1.0 - 0.4 * k1, b)", "k1": { "param": "wear" }, "inputs": ["crack_lines", "crack_zone"] },
+    { "id": "patch_field", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 2, "warp": 0.2 }, "seed": 118 },
+    { "id": "patches", "op": "expression", "expr": "smoothstep(1.02 - 0.3 * k1, 1.03 - 0.3 * k1, a)", "k1": { "param": "wear" }, "inputs": ["patch_field"] },
+    { "id": "sealant", "op": "blur", "radius": 0.006, "inputs": ["cracks"] },
+    { "id": "tar", "op": "expression", "expr": "clamp(max(a, smoothstep(0.08, 0.2, b) * step(0.6, k1 + 0.2 * c)), 0, 1)", "k1": { "param": "wear" }, "inputs": ["patches", "sealant", "crack_zone"] },
+
+    { "id": "relief", "op": "expression", "expr": "mix(a, 0.5 + 0.03 * c, b) - 0.35 * d", "inputs": ["aggregate", "tar", "binder", "cracks"] },
+    { "id": "height", "op": "auto_levels", "inputs": ["relief"] },
+    { "id": "normal", "op": "bump_to_normal", "strength": 0.06, "inputs": ["relief"] },
+
+    { "id": "stone_col", "op": "color_ramp", "stops": [ { "pos": 0, "color": "#5d5a55" }, { "pos": 0.5, "color": "#7b766d" }, { "pos": 1, "color": "#9a9389" } ], "inputs": ["coarse_id"] },
+    { "id": "binder_col", "op": "color_ramp", "stops": [ { "pos": 0, "color": "#2a2927" }, { "pos": 1, "color": "#3a3835" } ], "inputs": ["binder"] },
+    { "id": "stone_cover", "op": "expression", "expr": "smoothstep(0.02, 0.12, a)", "inputs": ["coarse"] },
+    { "id": "fine_cover", "op": "expression", "expr": "smoothstep(0.05, 0.3, a) * 0.6", "inputs": ["fines"] },
+    { "id": "with_fines", "op": "mix", "mode": "mix", "inputs": ["binder_col", "stone_col", "fine_cover"] },
+    { "id": "laid", "op": "mix", "mode": "mix", "inputs": ["with_fines", "stone_col", "stone_cover"] },
+    { "id": "tar_col", "op": "constant", "color": "#2b2927" },
+    { "id": "patched", "op": "mix", "mode": "mix", "inputs": ["laid", "tar_col", "tar"] },
+    { "id": "crack_shade", "op": "expression", "expr": "1 - 0.35 * a", "inputs": ["cracks"] },
+    { "id": "base_color", "op": "mix", "mode": "multiply", "inputs": ["patched", "crack_shade"] },
+
+    { "id": "stone_top", "op": "levels", "in_low": 0.5, "in_high": 0.9, "inputs": ["coarse"] },
+    { "id": "roughness", "op": "expression", "expr": "clamp(mix(0.92 - 0.06 * c - 0.42 * a * (0.5 + 0.5 * k1), 0.55, b), 0, 1)", "k1": { "param": "wear" }, "inputs": ["stone_top", "tar", "binder"] },
+    { "id": "ao", "op": "ambient_occlusion", "radius": 0.008, "depth": 0.003, "quality": 8, "inputs": ["relief"] },
+    { "id": "occlusion", "op": "levels", "out_low": 0.35, "inputs": ["ao"] }
+  ],
+  "output": "base_color",
+  "outputs": { "base_color": "base_color", "normal": "normal", "roughness": "roughness", "height": "height", "occlusion": "occlusion" }
+}

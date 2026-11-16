@@ -163,6 +163,7 @@ fn sim_set_is_pinned() {
         "core",
         "ecs",
         "edit",
+        "font",
         "lighting",
         "navigation",
         "physics",

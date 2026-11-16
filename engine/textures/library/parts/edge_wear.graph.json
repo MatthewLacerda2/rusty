@@ -1,0 +1,17 @@
+{
+  "resolution": 256,
+  "params": {
+    "amount": { "type": "number", "default": 0.3, "min": 0, "max": 1 },
+    "width": { "type": "number", "default": 0.006, "min": 0.001, "max": 0.1 },
+    "breakup": { "type": "number", "default": 16, "min": 1, "max": 256 }
+  },
+  "inputs": ["height"],
+  "nodes": [
+    { "id": "curv", "op": "curvature", "radius": { "param": "width" }, "strength": 6, "inputs": ["height"] },
+    { "id": "edge", "op": "levels", "in_low": 0.5, "in_high": 0.8, "inputs": ["curv"] },
+    { "id": "breakup_raw", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": { "param": "breakup" } }, "seed": 3 },
+    { "id": "breakup", "op": "auto_levels", "inputs": ["breakup_raw"] },
+    { "id": "wear", "op": "expression", "expr": "smoothstep(1.3 - 0.45 * k1 ^ 0.3, 1.32 - 0.45 * k1 ^ 0.3, b + 0.3 * a) * step(0.05, a)", "k1": { "param": "amount" }, "inputs": ["edge", "breakup"] }
+  ],
+  "output": "wear"
+}

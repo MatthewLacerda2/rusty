@@ -6,17 +6,24 @@
 //! `path::SubObject`, or a bare model path when the file holds one mesh. The ID map
 //! is an 8-bit PNG (its colours are labels, not values); every other map is a 16-bit
 //! `data` PNG, so a gradient read from it never terraces.
+//!
+//! The fourth argument is the resolution or a settings table (#2260,
+//! [`settings`]): `resolution` or `size = {w, h}`, `curvature_radius`, `ao_rays`,
+//! `thickness_rays`, each defaulting to what a call naming none bakes.
 
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use mlua::{Lua, Table};
+use mlua::{Lua, Table, Value};
+use serde::Deserialize;
 
 use super::{folder, put};
 use crate::api::Reg;
+use rusty_asset::sidecar::{check_bake_size, prepare_bake};
 use rusty_asset::SubMesh;
-use rusty_lighting::mesh_maps::{bake, MeshMap, MeshSource};
+use rusty_lighting::mesh_maps::{bake, MeshMap, MeshSource, Settings, MAX_RESOLUTION};
 use rusty_procgen::bake::bake_to_png;
+use rusty_procgen::image_buf::Size;
 use rusty_procgen::Slot;
 
 /// The resolution a call that names none bakes at.
@@ -28,10 +35,12 @@ pub(super) fn register(lua: &Lua, table: &Table) -> Reg {
         table,
         "BakeMeshMaps",
         lua.create_function(
-            |lua, (model, maps, prefix, size): (String, Vec<String>, String, Option<u32>)| {
-                let size = size.unwrap_or(DEFAULT_RESOLUTION);
+            |lua, (model, maps, prefix, options): (String, Vec<String>, String, Value)| {
+                let settings = settings(&options)
+                    .map_err(|e| format!("Texture.BakeMeshMaps: {model}: {e}"))
+                    .map_err(mlua::Error::RuntimeError)?;
                 let root = rusty_core::project::root();
-                let written = bake_mesh_maps(&model, &maps, &prefix, size, &root)
+                let written = bake_mesh_maps(&model, &maps, &prefix, &settings, &root)
                     .map_err(mlua::Error::RuntimeError)?;
                 lua.create_table_from(written)
             },
@@ -39,7 +48,64 @@ pub(super) fn register(lua: &Lua, table: &Table) -> Reg {
     )
 }
 
-/// Bake `maps` of `model` at `resolution`² and write each to `<prefix><map>.png`
+/// The settings table's fields, as a script writes them; every one optional.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Options {
+    resolution: Option<u32>,
+    size: Option<[u32; 2]>,
+    curvature_radius: Option<f32>,
+    ao_rays: Option<u32>,
+    thickness_rays: Option<u32>,
+}
+
+/// The bake settings the fourth argument names: `nil` (the defaults), a number
+/// (the square resolution) or a settings table. A table naming both `resolution`
+/// and `size`, or a field the table doesn't know, is an error, and so is a `size`
+/// side out of range (named as `size`); every other range is the baker's to check.
+pub(super) fn settings(options: &Value) -> Result<Settings, String> {
+    let table = match options {
+        Value::Nil => return Ok(Settings::new(DEFAULT_RESOLUTION)),
+        Value::Integer(n) => return Ok(Settings::new(side(*n)?)),
+        Value::Number(n) if n.fract() == 0.0 => return Ok(Settings::new(side(*n as i64)?)),
+        Value::Table(_) => crate::api::lua_json::lua_to_json(options)?,
+        other => {
+            return Err(format!(
+                "the fourth argument is a resolution or a settings table, got {}",
+                other.type_name()
+            ))
+        }
+    };
+    let o: Options = serde_json::from_value(table).map_err(|e| format!("settings: {e}"))?;
+    let size = match (o.resolution, o.size) {
+        (Some(_), Some(_)) => return Err("settings name both resolution and size".into()),
+        (_, Some([w, h])) => {
+            // A square `size` would reach the baker as a resolution and be refused
+            // under that name: the field the script wrote is the one an error names.
+            if ![w, h].iter().all(|s| (1..=MAX_RESOLUTION).contains(s)) {
+                return Err(format!(
+                    "size {{{w}, {h}}} has a side outside 1..={MAX_RESOLUTION}"
+                ));
+            }
+            Size::new(w, h)
+        }
+        (r, None) => Size::from(r.unwrap_or(DEFAULT_RESOLUTION)),
+    };
+    let defaults = Settings::new(size);
+    Ok(Settings {
+        curvature_radius: o.curvature_radius,
+        ao_rays: o.ao_rays.unwrap_or(defaults.ao_rays),
+        thickness_rays: o.thickness_rays.unwrap_or(defaults.thickness_rays),
+        ..defaults
+    })
+}
+
+/// A resolution as a side, or why it can't be one (the baker checks the range).
+fn side(n: i64) -> Result<u32, String> {
+    u32::try_from(n).map_err(|_| format!("resolution {n} is outside 1..={MAX_RESOLUTION}"))
+}
+
+/// Bake `maps` of `model` as `settings` says and write each to `<prefix><map>.png`
 /// as it is baked, the folders above the first made before the bake when inside
 /// `root`. Returns map → path. An error names the verb and the model; a map that
 /// failed to write stops the bake, the maps before it stay written.
@@ -47,7 +113,7 @@ pub(super) fn bake_mesh_maps(
     model: &str,
     maps: &[String],
     prefix: &str,
-    resolution: u32,
+    settings: &Settings,
     root: &Path,
 ) -> Result<BTreeMap<String, String>, String> {
     let fail = |e: String| format!("Texture.BakeMeshMaps: {model}: {e}");
@@ -61,10 +127,20 @@ pub(super) fn bake_mesh_maps(
         .map_err(fail)?;
     let source = load(model).map_err(fail)?;
     // `<prefix>` may end in a folder of its own (`maps/`): make it before the bake.
-    folder::make_parents(&format!("{prefix}{}.png", maps[0].name()), root).map_err(fail)?;
+    let path = |map: &MeshMap| format!("{prefix}{}.png", map.name());
+    let paths: Vec<String> = maps.iter().map(path).collect();
+    let Size { width, height } = settings.size;
+    check_bake_size((width, height)).map_err(fail)?;
+    folder::make_parents(&paths[0], root).map_err(fail)?;
     let mut out = BTreeMap::new();
-    bake(&source, &maps, resolution, |map, image| {
-        let path = format!("{prefix}{}.png", map.name());
+    bake(&source, &maps, settings, |map, image| {
+        // Readied once the baker has checked the settings and the mesh, before
+        // the first map is written.
+        if out.is_empty() {
+            let all = paths.iter().map(String::as_str);
+            prepare_bake("Texture.BakeMeshMaps", (width, height), all)?;
+        }
+        let path = path(&map);
         let slot = match map {
             MeshMap::Id => Slot::Normal,
             _ => Slot::Data,

@@ -8,7 +8,6 @@ use glam::Vec3;
 
 use super::params_tests::{sphere, RES};
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 use rusty_shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
@@ -48,7 +47,7 @@ fn checkered_sphere(shader: &str) -> Scene {
     scene.skybox_path = String::new();
     create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
     let id = sphere(&mut scene, 0.0, shader);
-    let key = mat_ops::ensure_material_key(&mut scene, id).unwrap();
+    let key = scene.ensure_material_key(id).unwrap();
     let mat = scene.materials.get_mut(&key).unwrap();
     mat.base_color_map = Some("definitely/missing_401.png".into());
     if shader.is_empty() {

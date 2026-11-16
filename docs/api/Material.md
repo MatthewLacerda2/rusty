@@ -39,6 +39,7 @@ conversion wrote into the import cache is a reference (#1072).
 | `Material.SetEmissiveMap` | `(id, path)` — sampled by the renderer; modulates the emissive factor (`factor × map.rgb`) |
 | `Material.SetOcclusionMap` | `(id, path)` — glTF's `occlusionTexture`, Unity's *Occlusion Map*: the map's **red** channel darkens the **indirect** light only, the ambient (probe, lightmap, sky gradient, SSIL's bounce) and, as specular occlusion, the reflections (reflection probes, the sky, screen-space reflections, a directional lightmap's lobe). Direct light from a live lamp or the sun is never darkened by it, as in glTF and Unity (a `Baked` lamp's highlight on a directionally lightmapped surface is that lobe, lightmap data, so it is): a recess that must not catch a lamp's highlight takes a specular map (below). Where the camera runs SSAO, the darker of the two applies (URP's rule), so a crevice both see is not darkened twice. `OcclusionStrength` (in the surface table below) lerps it from none (0) to whole (1, the default). A packed ORM image (R occlusion, G roughness, B metallic) can be named here and in the metallic and roughness maps: it is uploaded once |
 | `Material.SetSpecularMap` | `(id, path)` — `KHR_materials_specular`'s `specularTexture`: the map's **alpha** channel (its red when the image is imported `SingleChannel`) scales `Specular` per texel, so the dielectric reflectance head-on and at grazing angles, from lamps, the sun and the environment alike: a black recess in an albedo map that should not reflect the sky or a lamp at 4 % takes 0 here. A metal's reflectance is untouched, as the extension leaves it |
+| `Material.SetHeightMap` | `(id, path)` — HDRP Lit's *Displacement Mode: Pixel*, parallax occlusion mapping: the map's **red** channel is a height field, **white the surface and black the deepest point**, `HeightScale` deep (in the coordinate table below), and the view ray is marched through it so every map of the surface (base colour, metallic, roughness, normal, emissive, occlusion, specular level, the detail layer) is read where the ray meets it: mortar, grout and plank gaps keep their relief at a grazing angle, where a normal map alone slides flat. The march is HDRP's (5 to 15 steps by how steeply the view crosses the height field, then one refinement between the last two). The field's steepness grows with the depth, so the default 0.02 marches 5 steps down to about 6° above the surface and 8 at 2°, and the 0.2 cap marches 7 at 30°, 11 at 6° and 13 at 2° (computed from the shader's step formula). A deep scale seen low can therefore show the slices as steps on a slope. The march fades out over distance (past HDRP's *Lod Threshold*, mip 5 of the height map, over one level), so a far surface costs nothing and does not shimmer. Only the look moves: the surface's depth is the flat surface's, so its outline, the shadows it casts and receives, decals, SSAO, SSR and motion vectors see it flat (no depth offset, no self-shadowing), and a lightmap is read at UV1, never shifted. It applies to an `Opaque` material under `UV0` or `Planar`. Under `Planar`, which projects along world Y, a face keeps the whole shift up to about 45° from level and none past about 72°, so a steep face, where the projection stretches across it, draws as it does without a height map; on a `Cutout` or `Transparent` material, or under `Triplanar`, it is ignored, said once in the console. `""` clears it; a file that is missing or not loaded yet draws as no height map. A `Default` image named here becomes `SingleChannel` (`Assets.md`, `textureType`). Bake one with `Texture.Bake`'s `height` slot (`Texture.md`). The map uploads as its import says, which is `SingleChannel`, so **BC4** under the default `compression` (8-bit endpoints, eight levels in each 4×4 block), or uncompressed 8 bits with `compression = "None"`. Tested on a smooth bump field at 0.05 and at the 0.2 cap, seen 6° and 15° above it, the two draw alike (about 1% of pixels differ, by where a line falls within a pixel) and neither terraces: the steps that show at a deep scale are the march's slices, not the map's levels. A glTF has no height texture, so an import never fills it |
 | `Material.SetTexture` | `(id, path)` — the albedo map (sampled today) |
 | `Material.SetRenderMode` | `(id, mode)` — `"Opaque"` (default), `"Cutout"`, or `"Transparent"` (case-insensitive; an unknown name falls back to Opaque) |
 | `Material.SetRenderFace` / `GetRenderFace` | `(id, face)` [`render_face`] — URP Lit's *Render Face*, which faces of the mesh draw: `"Front"` (default, for opaque, cutout and transparent alike: back faces are culled, so a closed mesh never shows its inside), `"Back"` (only the faces turned away: the inside of a dome or a sky sphere) or `"Both"` (foliage cards, a glass pane, water seen from below). A face seen from behind is shaded with its normal flipped toward the viewer, so a `Both` plane is lit from whichever side it is seen. Every pass honours it: the opaque and transparent passes, the depth prepass and postpass, the shadow casters (a `Both` material casts from both faces, as `ShadowCasting` `"TwoSided"` does) and the selection outline. A mesh with a mirroring scale (one negative axis) keeps the same faces. Case-insensitive; an unknown name is an error naming the three. A `.gltf`/`.glb` material marked `doubleSided` imports as `"Both"` (as Unity's glTFast reads it); a `.blend` imports `"Front"`, whatever its Backface Culling, as Unity's `.blend` import does (Blender's glTF exporter marks every material whose Backface Culling is off, Blender's default, `doubleSided`), and an `.fbx` imports `"Front"`. Saved with the material; the Inspector's Material card shows it under the render mode |
@@ -68,6 +69,7 @@ in brackets, and shown in the Inspector's Material card under the maps.
 | `Material.SetUvMapping` / `GetUvMapping` | `(id, mode)` [`uv_mapping`] — HDRP's *Base UV Mapping*: `"UV0"` (default: the mesh's UVs), `"Planar"` (projected straight down world Y: floors and terrain tile over world X and Z, walls stretch) or `"Triplanar"` (projected along each world axis and blended by the surface normal: every face of any mesh shows the texture at the same size in metres, however the entity is scaled) |
 | `Material.SetWorldSize` / `GetWorldSize` | `(id, metres)` [`world_size`] — how many metres one repeat of the texture covers under `Planar` and `Triplanar`, in `[0.01, 100]` (default 1; HDRP's *World Scale* is its inverse). Ignored under `UV0` |
 | `Material.SetBlendSharpness` / `GetBlendSharpness` | `(id, power)` [`blend_sharpness`] — how sharply `Triplanar` turns from one projection to the next across a rounded face, in `[1, 64]` (default 4): the normal's components are raised to this power before they weight the three projections, so 1 blends widely and 64 is a hard seam |
+| `Material.SetHeightScale` / `GetHeightScale` | `(id, depth)` [`height_scale`] — how deep the height map's black lies, as a **fraction of one repeat's width** (its narrower side, where `tiling` differs per axis), in `[0, 0.2]` (default 0.02; HDRP's *Amplitude*). It is scale-free, like Snyder's tile units: a material keeps its look at any `tiling`, and under a world mapping it is `height_scale × world_size / tiling` metres (one repeat is `world_size / tiling` metres wide), as the shader marches it (HDRP's amplitude in centimetres needs the mesh's real size, which a UV0 material does not know). 0 draws as no height map; the Inspector shows it while the material has one |
 
 Under `Planar` and `Triplanar` the normal map has no mesh tangents to lean on: each
 projection's sample is reoriented onto its world axis (the *whiteout* blend), so a
@@ -276,10 +278,12 @@ Material.DefineAsset("brick", {
   occlusion_map = "brick_ao.png",      -- glTF occlusion→R (its own `occlusion` bake)
   occlusion_strength = 1.0,            -- in [0,1]
   specular_map = "brick_spec.png",     -- KHR_materials_specular level→A
-  render_mode  = "Cutout",             -- "Opaque" (default) / "Cutout" / "Transparent"
+  height_map   = "brick_h.png",        -- parallax height→R (Opaque only)
+  height_scale = 0.03,                 -- depth as a fraction of one repeat, in [0,0.2]
+  render_mode  = "Opaque",             -- "Opaque" (default) / "Cutout" / "Transparent"
   render_face  = "Both",               -- "Front" (default) / "Back" / "Both"
   alpha        = 1.0,                  -- base-color alpha in [0,1]
-  alpha_cutoff = 0.4,                  -- alpha-test threshold in [0,1]
+  alpha_cutoff = 0.4,                  -- alpha-test threshold in [0,1] (read under "Cutout")
   shader       = "brick_toon",         -- authored surface shader ("" / omitted = standard)
 })
 
@@ -296,7 +300,7 @@ The map slots point at any PNG — typically one baked by `Texture.Bake` (e.g.
 takes its own `occlusion` bake: the `metallic_roughness` slot writes red 0, which as
 an occlusion map would black out every ambient and reflected light on the surface. As in glTF
 2.0, `base_color_map` and `emissive_map` are colour and decode as **sRGB**; the
-metallic, roughness, normal, occlusion and specular maps and every `shader_textures`
+metallic, roughness, normal, occlusion, specular and height maps and every `shader_textures`
 slot hold data and are sampled **raw** (#647) — so bake those with their linear `Texture.Bake` slot. One PNG
 named in both roles is uploaded once and read each way. The factors +
 maps decode through the asset's serde derive, while the validated fields are applied
@@ -365,7 +369,10 @@ Material.Rebake("rusty_panel", 2048)          -- iterate at 256, ship at 2048
   recipe with a `size` (a non-square bake) keeps its aspect, its longer side
   becoming `resolution` (`Texture`, *Non-square bakes*). It is an
   error when `name` is absent or has no `maps`. The next frame draws the new maps
-  (#689).
+  (#689). A rebake moves each map's Max Size the engine chose to fit the new size,
+  never below 2048 (the next of 2048, 4096 or 8192); one the developer chose no
+  bake touches; a rebake above 8192 is refused (`Texture`,
+  *A bake ships at its size*).
 - A map key the material **already holds** is never overwritten by a bake — set by
   hand in the recipe, it wins; one the bake filled points at the same file next time.
 - Everything is checked before a file is written or the library changes: a bad `maps`

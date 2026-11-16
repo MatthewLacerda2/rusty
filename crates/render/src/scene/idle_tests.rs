@@ -2,15 +2,14 @@
 //! changed nothing walks no object and no mesh column, shadows included (probe
 //! field, library and lightmaps included), a colour edit no object and a key edit
 //! that material's users alone, a
-//! move re-places only what moved, and a load, an Undo or a Play restore rebuilds,
-//! then holds what a fresh build holds.
+//! move re-places only what moved, and a load or an Undo rebuilds, then holds what a
+//! fresh build holds (a Play restore: `tests/gpu/play_restore.rs`).
 
 use glam::Vec3;
 
 use super::fixture::{frame, fresh, held, yard, RES};
 use crate::RenderCounters;
 use rusty_components::RenderMode;
-use rusty_edit::snapshot::SceneSnapshot;
 
 fn extracted(c: &RenderCounters) -> (u32, u32) {
     (c.render_extracted, c.render_posed)
@@ -79,7 +78,7 @@ fn gpu_a_move_re_places_the_moved_subtree_alone() {
 }
 
 #[test]
-fn gpu_an_undo_a_load_and_a_play_restore_rebuild_what_a_fresh_build_holds() {
+fn gpu_an_undo_and_a_load_rebuild_what_a_fresh_build_holds() {
     let Some((mut r, pair)) = crate::test_gpu::headless_pair_or_skip(RES, RES) else {
         return;
     };
@@ -92,15 +91,6 @@ fn gpu_an_undo_a_load_and_a_play_restore_rebuild_what_a_fresh_build_holds() {
     let (_, undone) = frame(&mut r, &scene);
     assert_eq!(extracted(&undone), (6, 0), "an Undo rebuilds");
     assert_eq!(held(&r, &scene), fresh(&mut r, &scene));
-    // Play, then Stop: the snapshot replaces the World.
-    let snapshot = SceneSnapshot::capture(&scene);
-    let gone = scene.world.ids_with_mesh()[0];
-    scene.world.despawn(gone);
-    frame(&mut r, &scene);
-    snapshot.restore(&mut scene);
-    let (restored, stopped) = frame(&mut r, &scene);
-    assert_eq!(stopped.render_extracted, 6, "Stop rebuilds: {stopped:?}");
-    assert_eq!(held(&r, &scene), fresh(&mut r, &scene));
     // A load: a new World under a new identity draws what a new renderer draws.
     let mut loaded = yard(6);
     loaded.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 2.0, -3.0);
@@ -110,11 +100,6 @@ fn gpu_an_undo_a_load_and_a_play_restore_rebuild_what_a_fresh_build_holds() {
         after_load,
         frame(&mut other, &loaded).0,
         "a load draws its own World"
-    );
-    assert_eq!(
-        restored,
-        frame(&mut other, &scene).0,
-        "the restore draws the edit World"
     );
 }
 

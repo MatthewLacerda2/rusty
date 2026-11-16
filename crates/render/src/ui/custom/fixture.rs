@@ -6,7 +6,6 @@ use glam::{Vec2, Vec3, Vec4};
 
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_components::{CanvasComponent, ImageComponent, RectTransformComponent, UiShader};
-use rusty_edit::authoring::ui::shader as ops;
 use rusty_scene::{Camera, Scene};
 use rusty_shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
@@ -100,14 +99,18 @@ pub(super) fn shade(scene: &mut Scene, id: u32, shader: Option<&str>) {
     });
 }
 
-/// `UI.SetShaderParam(id, name, value)` on the fixture's image, through the scene
-/// op the API wraps (the API's own tests hold the Lua side); returns the value the
-/// image now draws with, as `UI.GetShaderParam` reads it.
+/// `UI.SetShaderParam(id, name, value)` on the fixture's image: the value stored as
+/// the op the API wraps stores it, checked against the shader's baked layout (the
+/// op's and the API's own tests hold the authoring and Lua sides); returns the
+/// value the image now draws with.
 pub(super) fn set_param(scene: &mut Scene, id: u32, name: &str, value: f32) -> Vec<f32> {
     let mut image = scene.world.image_mut(id).expect("the fixture's image");
-    let layout = ops::layout(&image.shader).expect("a baked layout");
-    ops::set_param(&mut image.shader, &layout, name, vec![value]).expect("a known param");
-    ops::param(&image.shader, &layout, name).expect("a known param")
+    let shader = image.shader.as_mut().expect("a ui shader");
+    let layout = rusty_shadergen::params::load(&shader.name).expect("a baked layout");
+    let slot = layout.resolve(name).expect("a known param");
+    let value = layout.coerce(slot, vec![value]).expect("a fitting value");
+    shader.params.insert(layout.name(slot), value.clone());
+    value
 }
 
 /// A rendered frame's pixels, RGBA, addressed bottom-up like the canvas.

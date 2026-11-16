@@ -179,6 +179,7 @@ scene.entities[].camera.projection: enum Perspective|Orthographic
 scene.entities[].camera.projection<Orthographic>.size: f32
 scene.entities[].camera.render_order: i32
 scene.entities[].camera.taa_active: bool
+scene.entities[].camera.taa_anti_flicker: f32
 scene.entities[].camera.taa_base_blend_factor: f32
 scene.entities[].camera.taa_contrast_adaptive_sharpening: f32
 scene.entities[].camera.taa_jitter_scale: f32
@@ -568,6 +569,7 @@ scene.entities[].particles.shape<Cone>.angle: f32
 scene.entities[].particles.shape<Cone>.radius: f32
 scene.entities[].particles.shape<Hemisphere>.radius: f32
 scene.entities[].particles.shape<Sphere>.radius: f32
+scene.entities[].particles.simulation: enum Cpu|Gpu
 scene.entities[].particles.simulation_space: enum World|Local
 scene.entities[].particles.size: any
 scene.entities[].particles.size_over_life.keys: seq
@@ -958,6 +960,9 @@ scene.materials{}.emissive: tuple(3)
 scene.materials{}.emissive[]: f32
 scene.materials{}.emissive_map: option
 scene.materials{}.emissive_map: string
+scene.materials{}.height_map: option
+scene.materials{}.height_map: string
+scene.materials{}.height_scale: f32
 scene.materials{}.ior: f32
 scene.materials{}.maps.inputs: seq
 scene.materials{}.maps.inputs[]: string

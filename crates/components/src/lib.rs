@@ -44,7 +44,8 @@ pub use entity::{
 };
 pub use material::{
     BlendMode, DecalBlend, DetailLayer, MaterialAsset, MaterialComponent, RefractionModel,
-    RenderFace, RenderMode, TaaReactive, UvMapping, MAX_REACTIVE, SORTING_PRIORITY_RANGE,
+    RenderFace, RenderMode, TaaReactive, UvMapping, HEIGHT_SCALE_MAX, MAX_REACTIVE,
+    SORTING_PRIORITY_RANGE,
 };
 pub use mesh::{MeshComponent, MeshRevision, ShadowCasting};
 pub use nav::agent::{NavMeshAgentComponent, NavPathStatus, MAX_AVOIDANCE_PRIORITY};
@@ -56,8 +57,8 @@ pub use nav::offmesh_link::{
 };
 pub use particle::{
     CollisionResponse, EmitFrom, EmitMode, EmitShape, Flipbook, Particle, ParticleBlend,
-    ParticleEmitterComponent, ParticleRender, ParticleRenderMode, SimulationSpace, SubEmitTrigger,
-    SubEmitters,
+    ParticleEmitterComponent, ParticleRender, ParticleRenderMode, ParticleSimulation,
+    SimulationSpace, SubEmitTrigger, SubEmitters,
 };
 pub use physics::character_controller::CharacterControllerComponent;
 pub use physics::collider::{

@@ -2,9 +2,28 @@
 //! scene's library (#1285): the first one (Unity's `sharedMaterial`), the one in a
 //! given slot, and all of them.
 
-use crate::{MaterialAsset, Scene};
+use crate::{MaterialAsset, MaterialComponent, Scene};
 
 impl Scene {
+    /// Resolve the library key for entity `id`'s first material, creating a default
+    /// material (under `entity_material_key`) and attaching the reference if it has
+    /// none yet. A library asset already under the key is kept, never overwritten:
+    /// the rule every attach path shares (#997). `None` only when the entity does
+    /// not exist. The authoring setters (`edit::authoring::material`) resolve
+    /// through it.
+    pub fn ensure_material_key(&mut self, id: u32) -> Option<String> {
+        if !self.world.contains(id) {
+            return None;
+        }
+        if !self.world.has_material(id) {
+            self.world
+                .set_material(id, Some(MaterialComponent::for_entity(id)));
+        }
+        let key = self.world.material(id)?.first().to_string();
+        self.materials.entry(key.clone()).or_default();
+        Some(key)
+    }
+
     /// Entity `id`'s first material; `None` without a Material or for a missing key.
     pub fn material_asset_of(&self, id: u32) -> Option<&MaterialAsset> {
         self.material_entry_of(id).map(|(_, asset)| asset)

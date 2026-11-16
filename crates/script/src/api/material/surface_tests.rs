@@ -1,5 +1,6 @@
 //! `Material.Set<Field>` / `Get<Field>` and the recipe keys for the table-driven
-//! fields (the transparent surface, #1523; the map coordinates, #1573), through a
+//! fields (the transparent surface, #1523; the map coordinates, #1573; the height
+//! map and its scale, #2191), through a
 //! real Lua VM.
 
 use std::cell::RefCell;
@@ -125,4 +126,33 @@ fn a_nested_detail_table_refuses_a_typo_and_reads_back_clamped() {
     .unwrap();
     let detail = scene.borrow().materials["rug"].detail.clone().unwrap();
     assert_eq!(detail.albedo_scale, 2.0, "the GPU's clamp, read back");
+}
+
+#[test]
+fn the_height_map_and_its_scale_set_through_lua_and_a_recipe() {
+    let scene = Rc::new(RefCell::new(Scene::new()));
+    let id = scene.borrow_mut().add_entity("E".into());
+    let scale: f32 = eval(
+        &scene,
+        &format!(
+            r#"Material.SetHeightMap({id}, "h.png") Material.SetHeightScale({id}, 9)
+               Material.DefineAsset("bricks", {{ height_map = "b.png", height_scale = 0.05 }})
+               return Material.GetHeightScale({id})"#
+        ),
+    )
+    .unwrap();
+    assert_eq!(scale, 0.2, "clamped to the row's range");
+    let sc = scene.borrow();
+    let bricks = &sc.materials["bricks"];
+    let named = bricks.height_map.as_ref().map(|p| p.to_string());
+    assert_eq!(
+        (named.as_deref(), bricks.height_scale),
+        (Some("b.png"), 0.05)
+    );
+    let key = sc.world.material(id).unwrap().first().to_string();
+    let own = sc.materials[&key]
+        .height_map
+        .as_ref()
+        .map(|p| p.to_string());
+    assert_eq!(own.as_deref(), Some("h.png"));
 }

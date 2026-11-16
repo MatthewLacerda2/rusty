@@ -3,8 +3,8 @@
 use glam::Vec2;
 
 use super::*;
-use crate::text::font;
 use rusty_components::{TextAlignment, TextOverflow};
+use rusty_font as font;
 
 fn text(s: &str, size: f32) -> TextComponent {
     TextComponent {

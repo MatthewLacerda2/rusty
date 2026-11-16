@@ -1,8 +1,8 @@
 //! The forward pass's per-draw uniform and material record (#1616):
 //! `forward/bindings.wgsl`'s `DrawUniforms` and `MaterialData` against `DrawUniform`
 //! and `MaterialData`, member by member, the record's flat surface (#1523) and
-//! mapping (#1573) and detail (#1997) tails and the occlusion and specular-level
-//! flags (#2151) included.
+//! mapping (#1573) and detail (#1997) tails and the occlusion, specular-level
+//! (#2151) and height (#2191) terms included.
 
 use std::mem::{offset_of, size_of};
 
@@ -53,7 +53,8 @@ fn material_data_matches_wgsl_layout() {
         detail_normal_scale, detail_smoothness_scale,
     );
     let maps = members!(LevelMapsUniform, offset_of!(MaterialData, level_maps);
-        use_occlusion_map, occlusion_strength, use_specular_map,
+        use_occlusion_map, occlusion_strength, use_specular_map, use_height_map,
+        height_scale,
     );
     let pairs: Vec<_> = [&own[..], &surface, &mapping, &tail, &detail, &maps].concat();
     let found = wgsl_struct_in(PROBE, "MaterialData");

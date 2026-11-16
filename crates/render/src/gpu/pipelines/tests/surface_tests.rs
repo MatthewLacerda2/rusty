@@ -7,7 +7,6 @@ use std::collections::BTreeMap;
 use glam::Vec3;
 
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::{create::create_entity, create::Primitive, Camera, RenderMode, Scene};
 use rusty_shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir};
@@ -44,10 +43,11 @@ fn sphere(shader: &str, mode: RenderMode) -> Scene {
     let id = create_entity(&mut scene, "Ball", Some(Primitive::Sphere));
     // Diameter 2: the thresholds below were set on that size.
     scene.world.transform_mut(id).unwrap().scale = Vec3::splat(2.0);
-    let key = mat_ops::ensure_material_key(&mut scene, id).unwrap();
-    mat_ops::set_shader(&mut scene.materials, &key, shader.to_string());
-    mat_ops::set_render_mode(&mut scene.materials, &key, mode);
-    mat_ops::set_alpha(&mut scene.materials, &key, 0.8);
+    let key = scene.ensure_material_key(id).unwrap();
+    scene.materials.get_mut(&key).unwrap().shader =
+        (!shader.is_empty()).then(|| shader.to_string());
+    scene.materials.get_mut(&key).unwrap().render_mode = mode;
+    scene.materials.get_mut(&key).unwrap().alpha = 0.8;
     scene
 }
 

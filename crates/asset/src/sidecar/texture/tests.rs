@@ -13,6 +13,7 @@ fn settings_round_trip_through_the_sidecar_and_a_missing_one_is_the_default() {
         srgb: false,
         compression: Compression::HighQuality,
         max_size: 512,
+        max_size_chosen: true,
     };
     set_texture(&png, set).unwrap();
     assert_eq!(texture(&png), set);
@@ -90,4 +91,22 @@ fn a_default_image_in_a_data_slot_turns_srgb_off_and_others_stay() {
     set_texture(&single, set).unwrap();
     fit_data_slot(&single);
     assert_eq!(texture(&single), set, "only a Default texture is changed");
+}
+
+#[test]
+fn a_default_image_in_the_height_slot_becomes_single_channel_and_others_stay() {
+    let dir = rusty_test_support::temp::dir();
+    let png = dir.join("height_2191.png");
+    image::RgbaImage::new(4, 4).save(&png).unwrap();
+    fit_height_slot(&png);
+    assert_eq!(texture(&png).texture_type, TextureType::SingleChannel);
+    let normal = dir.join("height_normal_2191.png");
+    image::RgbaImage::new(4, 4).save(&normal).unwrap();
+    let set = TextureSettings {
+        texture_type: TextureType::NormalMap,
+        ..Default::default()
+    };
+    set_texture(&normal, set).unwrap();
+    fit_height_slot(&normal);
+    assert_eq!(texture(&normal), set, "a type set by hand is kept");
 }

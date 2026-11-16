@@ -2,7 +2,7 @@
 //!
 //! The runner produces a linear `[f32; 4]` buffer; the bake turns it into an RGBA
 //! `.png` the renderer's `load_texture` already consumes: 8 bits per channel for
-//! every slot but `data`, which bakes 16 (#1491) so a height field used as
+//! every slot but `data` and `height`, which bake 16 (#1491) so a height field used as
 //! displacement or a terrain heightmap doesn't terrace into 256 steps, and
 //! `normal16`, a normal map at 16 (#2002) for relief subtler than one 8-bit step. The crucial step is
 //! **per-slot encoding**, so a baked map drops straight into a glTF material slot
@@ -17,6 +17,10 @@
 //! - **Occlusion** is linear and passed through (glTF reads its R); a **specular**
 //!   level is linear and its R is copied to every channel, since glTF reads it
 //!   from A (#2151).
+//! - **Height** is linear at 16 bits, its R copied to RGB and A opaque (#2191): the
+//!   file keeps the field's precision for what reads it (a terrain or displacement
+//!   bake); the material's parallax marches its red as uploaded (BC4 by default),
+//!   which draws no terracing the march's own slices don't.
 //! - **Normal** maps are tangent-space (produced by [`super::ops::vector::bump_to_normal`]).
 //!
 //! The agent picks the slot when baking, so it declares *what kind of map* it is
@@ -52,6 +56,9 @@ pub enum Slot {
     /// Linear specular level (#2151), `KHR_materials_specular`'s `specularTexture`:
     /// the buffer's red written to every channel, the material reading A.
     Specular,
+    /// Linear height (#2191), the material's `height_map`: 16 bits, the buffer's red
+    /// in RGB (white the surface, black the deepest point) and A opaque.
+    Height,
     /// Generic linear data/height map — no encoding, no repack.
     Data,
 }
@@ -60,7 +67,7 @@ impl Slot {
     /// Every slot, in declaration order: what a caller walks to check each one
     /// (`edit::authoring::material::maps`' test that every map key it fills is a
     /// field). `bake_tests` holds it whole by an exhaustive `match`.
-    pub const ALL: [Slot; 10] = [
+    pub const ALL: [Slot; 11] = [
         Slot::BaseColor,
         Slot::Emissive,
         Slot::Normal,
@@ -70,12 +77,13 @@ impl Slot {
         Slot::MetallicRoughness,
         Slot::Occlusion,
         Slot::Specular,
+        Slot::Height,
         Slot::Data,
     ];
 
     /// The canonical slot names, as an unknown-slot error lists them.
     const NAMES: &'static str =
-        "base_color (albedo), emissive, normal, normal16, roughness, metallic, metallic_roughness (orm), occlusion (ao), specular, data";
+        "base_color (albedo), emissive, normal, normal16, roughness, metallic, metallic_roughness (orm), occlusion (ao), specular, height, data";
 
     /// Parse a slot name (case-insensitive, `-`/`_` ignored). An unknown name is an
     /// error listing the valid ones (#395): a typo like `basecolour` must not
@@ -93,6 +101,7 @@ impl Slot {
                 "metallicroughness" | "mr" | "orm" => Slot::MetallicRoughness,
                 "occlusion" | "ao" => Slot::Occlusion,
                 "specular" => Slot::Specular,
+                "height" => Slot::Height,
                 "data" => Slot::Data,
                 _ => {
                     return Err(format!(
@@ -117,6 +126,7 @@ impl Slot {
             Slot::MetallicRoughness => "metallic_roughness",
             Slot::Occlusion => "occlusion",
             Slot::Specular => "specular",
+            Slot::Height => "height",
             Slot::Data => "data",
         }
     }
@@ -134,6 +144,7 @@ impl Slot {
             Slot::MetallicRoughness => &["metallic_map", "roughness_map"],
             Slot::Occlusion => &["occlusion_map"],
             Slot::Specular => &["specular_map"],
+            Slot::Height => &["height_map"],
             Slot::Data => &[],
         }
     }
@@ -183,8 +194,8 @@ fn to_u8(v: f32) -> u8 {
 }
 
 /// Encode `img` for `slot` into an 8-bit RGBA [`ImageBuffer`] — the in-memory PNG
-/// pixels, before writing, for every slot but [`Slot::Data`] and [`Slot::Normal16`],
-/// which bake through [`encode_data`]. Exposed so tests can assert bytes without disk I/O.
+/// pixels, before writing, for every slot but [`Slot::Data`], [`Slot::Normal16`] and
+/// [`Slot::Height`], which bake through [`encode_data`] ([`height_of`] first). Exposed so tests can assert bytes without disk I/O.
 pub fn encode(img: &Image, slot: Slot) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
     let w = img.width();
     let mut buf = ImageBuffer::new(w, img.height());
@@ -207,12 +218,22 @@ pub fn encode_data(img: &Image) -> ImageBuffer<Rgba<u16>, Vec<u16>> {
     ImageBuffer::from_raw(img.width(), img.height(), raw).expect("one RGBA texel per pixel")
 }
 
+/// `img` as a [`Slot::Height`] map holds it: its red in RGB, alpha 1.
+pub fn height_of(img: &Image) -> Image {
+    let mut out = img.clone();
+    for p in out.pixels_mut() {
+        *p = [p[0], p[0], p[0], 1.0];
+    }
+    out
+}
+
 /// Bake `img` to a `.png` at `path`, encoded for `slot`, and note the write in
 /// [`rusty_core::fs::written`] so a renderer that already drew the old file re-reads
 /// it (#689). Returns the path.
 pub fn bake_to_png(img: &Image, slot: Slot, path: &str) -> Result<String, String> {
     match slot {
         Slot::Data | Slot::Normal16 => encode_data(img).save(path),
+        Slot::Height => encode_data(&height_of(img)).save(path),
         _ => encode(img, slot).save(path),
     }
     .map_err(|e| format!("cannot write {path}: {e}"))?;

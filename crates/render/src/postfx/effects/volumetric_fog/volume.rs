@@ -1,5 +1,6 @@
-//! The renderer's one integrated volume (#1703): what group 0 binds at 17 and 18
-//! and every fogging pass reads. Each base camera running volumetric fog writes it
+//! The renderer's one integrated volume (#1703): what group 0 binds at 17 (read
+//! through its linear clamp sampler at 18, `gpu::linear_clamp`) and every fogging
+//! pass reads. Each base camera running volumetric fog writes it
 //! right before its own passes (the camera's work is submitted in order, as its
 //! camera uniform is), so one texture serves every view and render texture.
 //! While none runs it, it is one texel no pass reads; a grid of another size replaces it
@@ -14,7 +15,6 @@ pub(crate) const FROXEL_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba1
 pub(crate) struct SharedVolume {
     texture: wgpu::Texture,
     view: wgpu::TextureView,
-    pub(crate) sampler: wgpu::Sampler,
     /// The grid it holds; `None` for the stand-in.
     grid: Option<[u32; 3]>,
     /// Whether a camera wrote it since the last [`Self::tick`].
@@ -25,19 +25,9 @@ pub(crate) struct SharedVolume {
 impl SharedVolume {
     pub(crate) fn new(device: &wgpu::Device) -> Self {
         let texture = stand_in(device);
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("Volumetric Fog Sampler"),
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            ..Default::default()
-        });
         Self {
             view: texture.create_view(&Default::default()),
             texture,
-            sampler,
             grid: None,
             used: false,
             idle: 0,

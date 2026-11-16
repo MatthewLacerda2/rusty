@@ -18,11 +18,26 @@ def job(name: str, step: str | None, conclusion: str = "success", step_concl: st
     return {"name": name, "conclusion": conclusion, "steps": steps}
 
 
+DEFAULT, DEV = "Test (engine, default)", "Test (engine, dev features)"
+
+
+def shards(dev_2: str = "success") -> list[dict]:
+    """`build-test`'s matrix as the jobs API lists it (#2264): the default suite
+    in one entry, the `dev` one in two, the other's step skipped in each."""
+    return [{"name": name, "conclusion": "success",
+             "steps": [{"name": DEFAULT, "conclusion": ran if suite == DEFAULT else "skipped"},
+                       {"name": DEV, "conclusion": ran if suite == DEV else "skipped"}]}
+            for name, suite, ran in (("build-test (default, 1/1)", DEFAULT, "success"),
+                                     ("build-test (dev, 1/2)", DEV, "success"),
+                                     ("build-test (dev, 2/2)", DEV, dev_2))]
+
+
 def built_jobs(**over) -> list[dict]:
-    jobs = {base: job(f"{base} (macos-26)" if base == "build-test-cross" else base, step)
-            for base, step in proved_tree.BUILT["ci.yml"].items()}
+    jobs = {base: job(f"{base} (macos-26)" if base == "build-test-cross" else base, steps[0] if steps else None)
+            for base, steps in proved_tree.BUILT["ci.yml"].items() if base != "build-test"}
     jobs.update(over)
-    return list(jobs.values())
+    found = [j for v in jobs.values() for j in (v if isinstance(v, list) else [v])]
+    return found + ([] if "build-test" in over else shards())
 
 
 class Fake:
@@ -96,6 +111,14 @@ class RunsInFull(unittest.TestCase):
         skipped = {b: job(b, None, "skipped") for b in ("build-test-cross", "blender", "deny")}
         skipped["build-test"] = job("build-test", "Test (engine, default)", step_concl="skipped")
         self.assert_runs(Fake(jobs=built_jobs(**skipped)))
+
+    def test_a_shard_that_built_nothing(self):
+        # A `dev` shard whose test step skipped proves nothing of its share.
+        self.assert_runs(Fake(jobs=built_jobs(**{"build-test": shards(dev_2="skipped")})))
+
+    def test_a_feature_set_no_shard_ran(self):
+        default_only = [j for j in shards() if "default" in j["name"]]
+        self.assert_runs(Fake(jobs=built_jobs(**{"build-test": default_only})))
 
     def test_a_draft_run_whose_gating_jobs_skipped(self):
         self.assert_runs(Fake(jobs=[job("changes", None), job("ci-gate", None)]))

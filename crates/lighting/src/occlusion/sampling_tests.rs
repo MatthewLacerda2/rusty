@@ -18,9 +18,12 @@ const DOORS: [f32; 3] = [3.37, -6.91, 8.53];
 
 #[test]
 fn a_long_wall_seen_through_a_door_is_kept_at_any_length() {
-    // The 200 m wall at one door: the slowest bake, and the same lattice.
+    // The long wall at one door: 120 m is the longest the bake still lays 2 m
+    // cells for (past it the cells grow and the bake costs several times more),
+    // and a lattice whose step grew with the wall (a fixed count per triangle,
+    // 24 steps) already leaves this door blind on it.
     let short = DOORS.map(|x| (20.0, x)).into_iter();
-    let cases = short.chain([(200.0, DOORS[0])]);
+    let cases = short.chain([(120.0, DOORS[1])]);
     for (length, x) in cases {
         let (scene, door, wall) = gap(length, x);
         let data = bake_occlusion(&scene, 4)

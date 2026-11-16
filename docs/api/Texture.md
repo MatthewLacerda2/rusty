@@ -22,7 +22,7 @@ wall-clock or unseeded RNG).
 |---|---|---|
 | `Texture.Bake` | `(recipe, path, slot)` | the written `path` |
 | `Texture.BakeSet` | `(recipe, prefix)` | `{ [slot] = path, … }` — one PNG per entry of the recipe's `outputs` |
-| `Texture.BakeMeshMaps` | `(model, maps, prefix, [resolution = 1024])` | `{ [map] = path, … }` — one PNG per mesh map, baked from a model's UV0 |
+| `Texture.BakeMeshMaps` | `(model, maps, prefix, [resolution = 1024 \| settings])` | `{ [map] = path, … }` — one PNG per mesh map, baked from a model's UV0 |
 | `Texture.ToJson` | `(recipe)` | the recipe's canonical JSON string |
 | `Texture.Stats` | `(recipe, [resolution])` | `{ [node_id] = { min, max, mean, std, p1, p99 }, … }` for **every** node, each field an `{r, g, b, a}` array |
 | `Texture.Preview` | `(recipe, path, [size = 128])` | `{ path, columns, order = { node ids } }` — a PNG contact sheet of every node |
@@ -44,16 +44,23 @@ lists the valid ones — a typo like `"basecolour"` never silently bakes linear 
 | `metallic_roughness` / `orm` | linear | reads **metallic from the input's R, roughness from its G** (input B is ignored), and writes them as glTF's packed map: **metallic → B, roughness → G**, R = 0 |
 | `occlusion` / `ao` | linear | — (the material reads R: an `ambient_occlusion` node's output drops straight in) |
 | `specular` | linear | the input's **R written to every channel** (the material reads the level from A, as glTF's `specularTexture`) |
+| `height` | linear, **16-bit** | the input's **R written to RGB**, A opaque (the material's `height_map`, read from R: white the surface, black the deepest point) |
 | `data` | linear, **16-bit** | — (height/masks/anything raw; the explicit way to get unencoded output) |
 
-Every slot bakes 8 bits per channel except `data` and `normal16`, which bake a
+Every slot bakes 8 bits per channel except `data`, `normal16` and `height`, which bake a
 **16-bit** PNG (#1491, #2002): a height field used as displacement or a terrain
 heightmap keeps 65536 levels instead of terracing into 256 steps, and a normal map
-keeps slopes under about 0.004 that 8 bits round flat (a mirror-polished stone). The 16 bits are the file's: the renderer
-loads it as a material map like any other PNG, but uploads every map at 8 bits per
-channel at most today (and block-compressed below that once the import cache has
-made its copy, unless its `compression` is `"None"`; see `Assets.md`), so the extra precision serves what reads the file itself (an
-`image` node, a terrain or displacement bake), not what the GPU draws.
+keeps slopes under about 0.004 that 8 bits round flat (a mirror-polished stone, a
+glazed tile tilted a fraction of a degree). A `data` map is uploaded at 8 bits per
+channel at most (block-compressed below that once the import cache has made its
+copy, unless its `compression` is `"None"`; see `Assets.md`), so its extra precision
+serves what reads the file itself (an `image` node, a terrain or displacement bake).
+A `normal16` map in a material's normal slot keeps it on the GPU too: a 16-bit
+`"NormalMap"` is never block-compressed and uploads as half floats, at eight bytes
+a texel (twice an 8-bit map, eight times BC5; `Assets.md`, `textureType`), so bake
+`normal16` for the subtle relief that needs it and `normal` for the rest.
+A `height` map's parallax reads the file as uploaded, BC4 by default, which marches
+without visible terracing (`Material.md`, `SetHeightMap`).
 
 `orm` is only another name for the glTF metallic-roughness packing, not an
 occlusion-roughness-metallic map: nothing is written to R, so bake occlusion as its
@@ -64,6 +71,18 @@ above `path` (or above `prefix`) when they lie inside the project, so a new set 
 `assets/textures/<new set>/brick` at once (#1850). A target outside the project is
 written only into a folder that already exists. A write that still fails names the
 verb and the path: `Texture.BakeSet: cannot write <path>: <os error>`.
+
+**A bake ships at its size.** The importer downsizes an image to its *Max Size*
+(2048 by default, `Assets.SetTextureImportSettings`). Every texture bake
+(`Bake`, `BakeSet`, `BakeMeshMaps`, a material's `maps`) raises or lowers a Max Size
+the engine chose to fit its longer side (the next of 2048, 4096 or 8192), writing
+the `.meta` before the PNG, and never touches one the developer chose (Assets'
+`maxSizeChosen`: set by changing `maxSize` there or in the inspector): that file is
+warned of once on import when it is shrunk. A `.meta` without that key, such as
+the one a material slot writes, holds the engine's. A bake whose longer side is
+above 8192, the largest Max Size, is refused before it writes anything, a folder included (`Texture.Bake: a 16384x16384 bake is larger than the largest Max Size,
+8192, …`). Nothing is written to a `.meta` during Play. `Material.DefineAsset`'s
+`maps` and `Material.Rebake` bake the same way.
 
 The returned `path` drops straight into a material slot, e.g.
 `Material.SetTexture(id, Texture.Bake(recipe, "out/albedo.png", "base_color"))`.
@@ -105,6 +124,7 @@ and the file name use the canonical name: `albedo` → `base_color`, `orm` →
 | `metallic_roughness` | `metallic_map` **and** `roughness_map` (the same PNG) |
 | `occlusion` | `occlusion_map` |
 | `specular` | `specular_map` |
+| `height` | `height_map` |
 | `data` | — (no material slot) |
 
 To skip the hand-off, put the whole recipe in the material as `maps`
@@ -141,30 +161,55 @@ Texture.Bake({ resolution = 1024, nodes = {
 - `maps` lists any of the names below (case-insensitive; a map named twice bakes
   once). Each is written to `<prefix><map>.png` as soon as it is baked, the folders
   above it made first as `Bake` makes them (a `prefix` ending in `/` names a folder
-  of its own). `resolution` is the square map's edge, 1 to 8192. Memory grows with
-  its square: at most about 1.2 GiB at 4096 and 4.6 GiB at 8192 (every texel
-  covered), whatever the number of maps, since one map is held at a time.
+  of its own). The fourth argument is the square map's edge (1 to 8192) or a
+  settings table (below). Memory grows with the texel count: at most about 1.2 GiB
+  at 4096² and 4.6 GiB at 8192² (every texel covered), whatever the number of maps,
+  since one map is held at a time. More rays cost time, not memory.
 - Every map but `id` is a 16-bit `data` PNG; `id` is 8-bit.
+
+The settings table follows Substance Painter's *Bake Mesh Maps* panel (#2260).
+Every field is optional, and one left out bakes as a call naming none does, byte
+for byte. A field the table doesn't know, or one out of its range, is an error
+naming it.
+
+| Field | Default | What it sets |
+|---|---|---|
+| `resolution` | `1024` | the square map's edge, 1 to 8192 |
+| `size` | — | `{w, h}` instead of `resolution`, each side 1 to 8192: UV0's unit square stretches over it, as `Texture.Bake`'s `size` does, so a long thin model (a strip light) fills a wide map. Naming both is an error |
+| `curvature_radius` | 2 % of the bounds diagonal | how far from a crease the `curvature` band reaches, in the model's own units (metres at import scale): `0.003` keeps a 3 mm chip on a 12 mm door edge. It is never narrower than three of the mesh's average texels, and one above the model's bounds diagonal is refused |
+| `ao_rays` | `64` (Substance's *Secondary Rays*) | rays per texel for `ao`, 1 to 1024: the grain falls with the square root (256 rays, half the grain of 64), and the time grows with the count: at 1024 a fully covered 4096² map takes about half an hour on 4 cores |
+| `thickness_rays` | `64` | rays per texel for `thickness`, 1 to 1024 |
+
+```lua no-run
+Texture.BakeMeshMaps("assets/models/pool_fixtures.blend::Locker_Bank",
+  { "curvature", "ao" }, "assets/textures/pool/locker_",
+  { resolution = 4096, curvature_radius = 0.004, ao_rays = 256 })
+```
 
 | Map | What a texel holds | Off the islands |
 |---|---|---|
-| `curvature` | 0.5 flat; brighter towards a convex edge (1 on a right-angled one), darker towards a concave one (0) | 0.5 |
-| `ao` | the share of 64 cosine-weighted rays that meet no part of the model within its bounds' diagonal: 1 open, 0 enclosed | 1 |
+| `curvature` | 0.5 flat; brighter towards a convex edge (1 on a right-angled one), darker towards a concave one (0), fading to flat at `curvature_radius` | 0.5 |
+| `ao` | the share of `ao_rays` (64) cosine-weighted rays that meet no part of the model within its bounds' diagonal: 1 open, 0 enclosed | 1 |
 | `world_normal` | the surface normal, `n * 0.5 + 0.5` per axis (Y up) | 0.5 |
 | `position` | the surface point, normalised per axis to the model's bounds (a flat axis reads 0.5) | 0 |
-| `thickness` | how far 64 rays cast into the model (around the inverted normal) travel before they leave it, averaged, over the bounds' diagonal; a ray that never leaves counts the whole diagonal: 1 thick, towards 0 thin | 1 |
+| `thickness` | how far `thickness_rays` (64) rays cast into the model (around the inverted normal) travel before they leave it, averaged, over the bounds' diagonal; a ray that never leaves counts the whole diagonal: 1 thick, towards 0 thin | 1 |
 | `id` | one fully saturated colour per material, hues a golden-ratio step apart (a triangle with no material red, then the model's materials in order); two runs drawn with one material share its colour | black |
 
-The bake's settings are Substance's defaults and are **fixed today**: no argument
-or recipe changes them. They are 64 rays per texel, an occluder distance of the
-whole bounds diagonal, and a **16-texel margin** around every UV island (a
+The settings table sets the size, the curvature band and the ray counts; the
+rest is Substance's defaults and no argument changes it: an occluder distance of
+the whole bounds diagonal, and a **16-texel margin** around every UV island (a
 continuous map's margin averages its border, the ID map's copies it, so no margin
 holds a colour between two materials). Rays are drawn around the interpolated
 normal, and one that would leave under the triangle's own face is dropped, so on a
-smooth low-poly mesh no ray starts under the face it leaves; a face wound
+smooth low-poly mesh no ray starts under the face it leaves; a texel whose every
+ray is dropped (few rays, a normal leaning far off its face) reads the map's
+neutral 1, open and thick. A face wound
 against its normals (an `.obj` face listed clockwise from its `vn`) draws them
-around its face normal instead. A `curvature` crease lights a band 2%
-of the bounds diagonal wide, never narrower than 3 texels: each edge two faces
+around its face normal instead. A `curvature` crease lights a band reaching
+`curvature_radius` (2% of the bounds diagonal by default; a radius past the
+diagonal is refused, since the band would cover the whole model), never narrower
+than 3 texels (a texel measured by its world area, so a stretched non-square map
+counts its real texels): each edge two faces
 share is a crease of strength `angle / 90°` (capped at 1), corners welded by
 position first so a UV or normal seam never breaks one. A texel sums the convex
 creases within the band (each fading to nothing at its edge), and apart the
@@ -292,7 +337,8 @@ list below is a summary of it. Each entry has the `op` tag, its `category`
 `params`. Each param has a
 `name`, a `type` (`number` | `integer` | `bool` | `color` | `vec2` |
 `enum` | `stops` | `path`, a project-relative file path or an `engine/…` one |
-`text`, an `expression` formula), `required`, a `default` when it has one (absent when required),
+`text`, a string: an `expression` formula, a `path`'s `d`, a `text`'s lettering),
+`required`, a `default` when it has one (absent when required),
 `socket` (whether it takes a link to another node, *Linked params* below), and for an
 `enum` the accepted `values`. Units and rounding are the ones *Tiling*
 and *Units* below describe. A unit test holds the catalog to the recipe parser, so
@@ -565,6 +611,23 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   `strength` scales the detail's tilt, 0 leaving the base; a flat normal on either
   side returns the other. Never `mix` normal maps: adding or averaging their RGB
   flattens them.
+- `path {d, fill_rule="nonzero"|"evenodd", stroke=0}` (*generator*): an outline from
+  SVG path data, a mask: 1 inside, 0 outside, each edge pixel the exact share of its
+  area the outline covers. `d` takes `M L H V C S Q T A Z`, absolute and relative,
+  in tiles with `v` down (as `coordinates` runs: `"M .2 .5 L .6 .2 L .6 .8 Z"` is an
+  arrowhead pointing left); an open subpath fills as if closed. `fill_rule` is SVG's:
+  `evenodd` cuts a hole wherever one contour sits inside another, `nonzero` only
+  where the inner one runs the other way. `stroke > 0` draws the outline that many
+  tiles wide instead (round joins and caps, at most 1): each pixel reads its
+  distance to the outline, so the stroke's edge is anti-aliased alike along lines,
+  curves, joins and caps at any resolution (on a non-square bake the width is
+  measured along a pixel of the sides' geometric mean); a dense stroke costs under
+  a second of one core at 4096². One stamp, as `shape`: feed it
+  to `tile` or `scatter`, turn it with `mapping`, bevel it with `distance` →
+  `bump_to_normal`. `d` is parsed with the recipe, so a malformed one is refused
+  before anything bakes, naming the node and the byte; it may be at most 64 KiB,
+  flatten to at most 2¹⁸ points, and reach no point past ±4 tiles. Whole SVG files
+  (groups, transforms, styles, dashes) are not read.
 - `rgb_to_bw` (*math*, 1 input).
 - `sample_at` (*vector*, 2 or 3 inputs): input A read at the domain point the other
   inputs name, in tile units and wrapped: with two inputs B's red is `u` and its
@@ -640,6 +703,21 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   running off a shape: a noise through `slope_blur` on a `shape`'s height runs down its
   sides. The reach caps at one tile. `samples + 5` reads a pixel: an estimate of
   about 1–2 s of one core at 2048² with 8 samples.
+- `text {text, font="", size=0.12, align="center"|"left"|"right", line_spacing=1.2,
+  tracking=0}` (*generator*): lettering, a mask: 1 inside the glyphs, 0 outside,
+  anti-aliased by exact area like `path`. One stamp centred in the tile, as `shape`:
+  feed it to `tile` or `scatter`, turn it with `mapping`, emboss or engrave it with
+  `distance` → `bump_to_normal` (crate serials, door numbers, warning signs). `text`
+  breaks lines at `\n` or `\r\n` (at most 4096 bytes and 256 lines); `size` is the font's em
+  height in tiles (at most 4), `tracking` extra advance between glyphs in ems,
+  `line_spacing` the distance between baselines in ems; the block runs from the first
+  line's ascent to the last line's descent, its widest line sets its width, and
+  `align` places each line in it. Shaped as the UI's `Text` is: kerning and
+  ligatures (`fi` is one glyph). `font` is a `.ttf` / `.otf` path from the project
+  root, or an `engine/…` one for a font the engine ships, read and parsed before
+  anything bakes, so a missing or unreadable font is an
+  error naming the node and the path; empty is the engine's default, Instrument Sans,
+  compiled into the engine (a shipped game needs no file for it).
 - `tile {count, aspect={1,1}, offset=0, jitter=0, rotation_jitter=0, scale_jitter=0,
   value_jitter=0, probability=1, output="stamp"|"random"|"index", blend="max"|"add"|"over",
   seed=0}` (*vector*, 1–3 inputs: the stamp, then an optional mask, then an optional
@@ -916,6 +994,88 @@ file.
 its `inputs` names and its `params` (`name`, `type`, `default`, `min`, `max`). A graph
 file that does not parse is left out, with a warning naming it.
 
+### The library — `engine/textures/library/`
+
+The engine ships ten tiling materials as graphs, the surfaces a shooter's levels are
+mostly made of. Start from one before writing a graph: instance it, set `wear`,
+`tint` and the instance `seed`, and give the material the tile's real size as its
+`world_size`, so texel density matches across a level. `Texture.Ops()` lists them
+(`op = "graph"`, `path = "engine/textures/library/<name>.graph.json"`).
+
+| Graph | Tile covers (`world_size`) | `tint` | Reads as |
+|---|---|---|---|
+| `concrete_poured` | 2 m | — | formwork panel seams and tie holes, pitting, stains, water streaks |
+| `brick_wall` | 1 m, running bond | brick clay | per-brick tone, chipped edges, recessed mortar, soot and efflorescence |
+| `plaster_painted` | 2 m | paint | trowel undulation, hairline cracks, paint peeling to plaster with a raised lip, scuffs |
+| `metal_painted_worn` | 1 m | paint | chips through primer to bare steel, scratches, rust blooming and running down |
+| `steel_tread_plate` | 0.5 m | — | raised lugs at ±45°, polished tops, dirt packed round their feet, brushed grain |
+| `wood_planks` | 2 m | wood | planks of varying length, staggered joints, grain and knots per plank, a worn walked centre |
+| `ceramic_tile` | 1 m, 8 × 8 tiles | glaze | glossy pillowed tiles, per-tile tone and tilt, grimy grout, cracked and chipped tiles |
+| `asphalt` | 2 m | — | mixed aggregate in dark binder, polished stone tops, cracks and tar patches |
+| `ground_sand_pebbles` | 2 m | — | packed undulating sand, clumped half-buried pebbles with sand banked against them |
+| `fabric_carpet` | 0.5 m | yarn | loop pile in the normal map, fibre fuzz in roughness, trodden paths and stains |
+
+**The interface, all ten.** `wear` (0–1, default 0.3): 0 is new, 1 is derelict.
+`tint` (a colour) where the table names one. Named outputs `normal`, `roughness`,
+`height` and `occlusion`, plus `metallic` on `metal_painted_worn` and
+`steel_tread_plate`; the graph's own output, also named `base_color`, is the albedo.
+`height` is there for a material slot that reads one; today a material bakes it as
+`data` or leaves it out. Every material is held by one test
+(`tests/texture_library/`): it bakes, tiles, changes with `wear` and the seed, keeps
+base colour in a physically plausible range, and uses its roughness, normal and
+height ranges.
+
+`metal_painted_worn` also takes two mesh maps as `text` params, `curvature_map` and
+`ao_map`: paths to maps `Texture.BakeMeshMaps` baked from a model's UV0, so its chips
+follow the model's real edges and its grime the real recesses. Left out, they read
+two flat engine maps (no edges, nothing occluded). A material fed baked mesh maps is
+**mapped by the model's UV0** (`uv_mapping = "UV0"`, no `world_size`), unlike the
+`Triplanar` example below: the maps are that one model's UV0 atlas, which a
+world-space projection would tile by position and scatter its edges over the wrong
+faces.
+
+```lua no-run
+local maps = Texture.BakeMeshMaps("assets/models/kolvik/generator.blend::Generator",
+  { "curvature", "ao" }, "assets/textures/kolvik/generator_", 1024)
+Material.DefineAsset("generator_paint", {
+  uv_mapping = "UV0",                            -- the mesh maps are this model's atlas
+  maps = { resolution = 1024, nodes = {
+      { id = "m", op = "graph", path = "engine/textures/library/metal_painted_worn.graph.json",
+        params = { wear = 0.6, curvature_map = maps.curvature, ao_map = maps.ao } } },
+    outputs = { base_color = "m", normal = "m.normal", roughness = "m.roughness",
+                metallic = "m.metallic", occlusion = "m.occlusion" } },
+})
+```
+
+**The parts** (`engine/textures/library/parts/`) are what the materials share, each a
+graph a game may instance too: `grunge` (`scale`, `warp`: a soft blotchy 0–1 field),
+`edge_wear` (input `height`; `amount`, `width`, `breakup`: convex edges chipped by a
+grunge), `crevice_dirt` (input `height`; `amount`, `radius`, `breakup`: dirt in the
+cavities) and `scratches` (`amount`, `scale`, `angle`: fine crossing scratches).
+Each `amount` is 0–1, none at 0. `brick_wall` and `ceramic_tile` chip their edges
+with `edge_wear` (its `amount` is their `wear`), and `grunge` breaks up all ten.
+`metal_painted_worn` chips its own way: its edges are a model's baked
+`curvature_map`, which is curvature already, not a height for `edge_wear` to take
+curvature of, and it strips two layers from one field, the paint first, then the
+primer down to steel.
+
+```lua no-run
+local tile = "engine/textures/library/brick_wall.graph.json"
+Material.DefineAsset("alley_brick", {
+  uv_mapping = "Triplanar", world_size = 1,     -- one repeat is one metre of wall
+  maps = { resolution = 1024, nodes = {
+      { id = "wall", op = "graph", path = tile, seed = 4,
+        params = { wear = 0.7, tint = "#7a3f2c" } } },
+    outputs = { base_color = "wall", normal = "wall.normal", roughness = "wall.roughness",
+                occlusion = "wall.occlusion" } },
+})
+Debug.PreviewMaterial("alley_brick", "out/alley_brick.png", { mesh = "plane", repeats = 3 })
+```
+
+`make library-previews OUT=<dir>` renders every library material from the engine
+checkout (the sphere, and the plane with `repeats = 3`, at `wear` 0.3 and 1);
+`ONLY=<name>` renders one.
+
 ### Tiling
 
 Every periodic param is a **count of repeats per tile**, rounded at evaluation (the
@@ -952,7 +1112,13 @@ joined to its copies in the neighbouring tiles, so it tiles).
 `flood_gradient` has a seam on one kind of island: one that loops round the tile on
 an axis (a band across it) has no edge there, so its ramp runs from the tile's edge
 and jumps back at the wrap; every other island ramps across the edge as one.
-`image` tiles exactly as well as its file does.
+`image` tiles exactly as well as its file does. `text` and `path` wrap instead: a
+glyph or contour that crosses the tile's edge carries on from the opposite edge, so
+the map tiles even when the lettering is wider than the tile. A wrapped copy is the
+same shape again, not another contour of it, so under `evenodd` a shape wider than
+the tile never cuts a hole where it overlaps its own copy, while two different
+subpaths cut each other wherever they overlap, across the seam as anywhere: moving
+a subpath by whole tiles never changes the mask.
 
 ### Units
 
@@ -974,6 +1140,8 @@ and 2048² (iterate at a low `resolution`, ship at a high one):
   `.rotation_jitter` are in turns; `scatter.spacing` is a share of the gap its
   bullet derives, in tiles. `tile.offset` is a share of one cell.
 - `distance.radius` is in tiles: the distance from the edge that reads 1.
+- `text.size` is an em in tiles and `text.tracking` / `.line_spacing` are in ems;
+  `path.d`'s coordinates and `path.stroke` are in tiles.
 - `cavity.radius` is a tile fraction like `blur.radius`; `curvature.radius` is a
   distance in tiles, sampled bilinearly (so sub-pixel radii stay smooth).
 - `directional_blur.length` and `directional_warp.strength` are in tiles; `angle`

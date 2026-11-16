@@ -280,8 +280,16 @@ its check and its command changed to match).
   branch, which lavapipe hides and Metal does not.
 - CI (`.github/workflows/ci.yml`) and `make test` run the engine suite with
   **cargo-nextest** plus `cargo test --doc`, both feature sets; the lint xtask keeps
-  plain `cargo test`. The macOS leg (`build-test-cross`) runs the nextest suite with
-  `dev` only, the superset, and the doctests with both (#1976). See *The test runner* below.
+  plain `cargo test`. On Linux, `build-test` is a matrix of three parallel jobs
+  (#2264): `build-test (default, 1/1)` runs the default suite, and `build-test (dev,
+  1/2)` and `(dev, 2/2)` split the `dev` one with nextest's `--partition count:k/2`;
+  each prints its twenty slowest tests (step *Slowest tests*), and each runs the GPU and
+  OIDN canaries again on its own runner (step *Canaries*), since a partition puts each
+  canary in one shard only. The macOS leg (`build-test-cross`) runs the nextest suite with
+  `dev` only, the superset (#1976), split in two, `build-test-cross (macos-26, 1/2)` and
+  `(macos-26, 2/2)`, each with the canaries; 2/2 also runs the `dev` doctests and the lint
+  xtask's tests, and the default doctests run on Linux only (#2276). A job past three quarters of its `timeout-minutes`
+  on `main` files an issue by itself (`ci_headroom.py`, `docs/linting.md`). See *The test runner* below.
 - A test never reads a developer's game project (#782). `Harness::new` runs in a
   workspace of its own, `<out_dir>/workspace`, seeded fresh from the test-fixture
   project's scripts and the bundled ones, and the scene's relative script paths
@@ -399,8 +407,8 @@ anywhere else. That lint is the primary guard; the backstop is nextest's `NEXTES
 variable, which every test process and every child it starts inherits, and which
 blanks the keys too, so a spawn the lint cannot see (`cargo run --bin`, a built path)
 holds none under nextest. Doctests stay on `cargo test --doc`, which nextest
-cannot run. CI's `ci` profile additionally writes JUnit, rendered as the
-`build-test` job summary.
+cannot run. CI's `ci` profile additionally writes JUnit, rendered as each
+`build-test` job's summary.
 
 Handy forms: `cargo nextest run -E 'test(physics_)'` (filter by name),
 `cargo nextest list` (what would run), `cargo nextest show-config test-groups`
@@ -743,7 +751,7 @@ view's timeline, replayed to tick `n`, default 0; #1598), `--pointer <X>,<Y>` (t
 pointer held there, in pixels, so a hover shows), `--gizmo <Name>=on|off` (a Scene-view
 gizmo drawn or not, by its `Editor.SetGizmo` name, e.g. `--gizmo NavMesh=on`;
 repeatable, #1909), `--game-view <Free|W:H|WxH>` (the Game view's size, as its
-dropdown sets it, #2207: `--game --game-view 16:9` letterboxes it in the panel), `--picker [new|open|mismatch|focus]` (the project picker the editor starts
+dropdown sets it, #2207: `--game --game-view 16:9` letterboxes it in the panel), `--preview [<mesh>]` (the selection's Inspector **Preview** tab open on `Sphere`, `Cube`, `Suzanne` or `Plane`, default the tab's own; a material entity or a model, texture or shader asset, else an error; never beside `--picker`, #2239), `--picker [new|open|mismatch|focus]` (the project picker the editor starts
 on, #854, over a sample recent list dated against a fixed time; the page names show
 *New Project*, *Open* and the different-engine prompt). From Rust, `capture::capture(&game,
 path, &EditorCaptureOptions { .. })` takes any `GameWorld`, and `capture_into` shares a
@@ -778,6 +786,7 @@ plainly wrong. The PR carries a **`Looked at`** line saying what scene, what was
 rendered and what was seen, and what was not checked (motion, Metal, cost, taste:
 those stay *For a human*). It carries no image: none is committed, attached or hosted.
 The images are scratch files, named with the issue number, kept outside the checkout.
+The Inspector's Preview tab is looked at the same way: `make editor-capture ARGS="--select <entity> --preview Plane"` renders the tab's image through the window's own preview call, and fails rather than writing a frame where the image never rendered.
 The rule and the PR line: `.claude/skills/issue-batch/cloud-brief.md`.
 
 A pair is one command: a short scenario run by `play` on the fixture project, with

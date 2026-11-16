@@ -7,6 +7,7 @@ fn drawn(draw_calls: u32, gpu: Option<f64>) -> WindowFrame {
         ..Default::default()
     };
     let gpu = gpu.map(|ms| GpuTimes {
+        frame: 1,
         passes: vec![(GpuPass::Forward, ms)],
     });
     let render = RenderedFrame {
@@ -15,9 +16,10 @@ fn drawn(draw_calls: u32, gpu: Option<f64>) -> WindowFrame {
         gpu,
     };
     WindowFrame {
-        wall_ms: 16.0,
+        last_wall_ms: 16.0,
         fps: Some(60.0),
         render: Some(render),
+        frame: 1,
     }
 }
 
@@ -27,9 +29,14 @@ fn drawn(draw_calls: u32, gpu: Option<f64>) -> WindowFrame {
 fn a_drawn_frame_records_wall_time_and_its_render() {
     let mut stats = FrameStats::default();
     record_window(&mut stats, &drawn(7, Some(4.0)), true);
+    window_ended(&mut stats, 16.0);
     record_window(&mut stats, &drawn(9, None), true);
     assert_eq!((stats.drawn_frames, stats.frames), (2, 0));
-    assert_eq!(stats.get("wall_ms").unwrap().samples, 2);
+    assert_eq!(
+        stats.get("wall_ms").unwrap().samples,
+        1,
+        "the newest frame's wall time arrives with the next"
+    );
     assert_eq!(stats.get("fps").unwrap().last, 60.0);
     assert_eq!(stats.get("draw_calls").unwrap().max, 9.0);
     assert_eq!(stats.get("renderer_ms").unwrap().avg, 1.5);
@@ -42,8 +49,9 @@ fn a_drawn_frame_records_wall_time_and_its_render() {
     assert_eq!(stats.gpu_passes["forward"].samples, 1);
 }
 
-/// A frame that rendered nothing still records the window's clock, and no
-/// render key: absent, never zero. A clock with no reading yet records no `fps`.
+/// A frame that rendered nothing still records the window's clock (its wall time
+/// once the next frame starts), and no render key: absent, never zero. A clock
+/// with no reading yet records no `fps`.
 #[test]
 fn a_frame_without_a_render_records_only_the_clock() {
     let mut stats = FrameStats::default();
@@ -53,6 +61,8 @@ fn a_frame_without_a_render_records_only_the_clock() {
         ..drawn(1, None)
     };
     record_window(&mut stats, &frame, true);
+    assert!(stats.get("wall_ms").is_none(), "not ended yet");
+    window_ended(&mut stats, 16.0);
     assert_eq!(stats.drawn_frames, 0);
     assert!(stats.get("wall_ms").is_some());
     assert!(stats.get("draw_calls").is_none() && stats.get("gpu_ms").is_none());

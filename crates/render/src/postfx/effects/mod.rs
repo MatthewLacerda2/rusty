@@ -130,9 +130,10 @@ pub(crate) fn read_history(cx: &HistoryCx) -> bool {
     (POST_EFFECTS.iter()).any(|e| matches!(e.history, History::Reads(runs) if runs(cx)))
 }
 
-/// Where an effect's settings live.
+/// Where an effect's settings live. Public for the completeness gate's layers
+/// (`completeness::Layers`), which the integration suite's cases build.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Owner {
+pub enum Owner {
     /// A field of the post-processing volume.
     Volume,
     /// The camera's own component (motion blur, FXAA and TAA, Unity's camera properties).

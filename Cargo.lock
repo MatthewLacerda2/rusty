@@ -3288,6 +3288,7 @@ dependencies = [
  "rusty-ecs",
  "rusty-edit",
  "rusty-editor",
+ "rusty-font",
  "rusty-lighting",
  "rusty-logging",
  "rusty-navigation",
@@ -3499,6 +3500,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rusty-font"
+version = "0.1.0"
+dependencies = [
+ "glam 0.33.12",
+ "harfrust",
+ "rusty-core",
+ "skrifa",
+]
+
+[[package]]
 name = "rusty-lighting"
 version = "0.1.0"
 dependencies = [
@@ -3508,7 +3519,6 @@ dependencies = [
  "rusty-asset",
  "rusty-components",
  "rusty-core",
- "rusty-edit",
  "rusty-procgen",
  "rusty-scene",
  "rusty-test-support",
@@ -3536,7 +3546,6 @@ dependencies = [
  "rusty-components",
  "rusty-core",
  "rusty-ecs",
- "rusty-edit",
  "rusty-lighting",
  "rusty-physics",
  "rusty-scene",
@@ -3556,7 +3565,6 @@ dependencies = [
  "rusty-components",
  "rusty-core",
  "rusty-ecs",
- "rusty-edit",
  "rusty-scene",
  "rusty-test-support",
  "rusty-time",
@@ -3583,6 +3591,7 @@ dependencies = [
  "glam 0.33.12",
  "image",
  "rusty-core",
+ "rusty-font",
  "rusty-test-support",
  "serde",
  "serde_json",
@@ -3604,7 +3613,7 @@ dependencies = [
  "rusty-components",
  "rusty-core",
  "rusty-ecs",
- "rusty-edit",
+ "rusty-font",
  "rusty-lighting",
  "rusty-physics",
  "rusty-procgen",
@@ -3730,18 +3739,17 @@ name = "rusty-ui"
 version = "0.1.0"
 dependencies = [
  "glam 0.33.12",
- "harfrust",
  "image",
  "log",
  "rusty-asset",
  "rusty-components",
  "rusty-core",
  "rusty-ecs",
+ "rusty-font",
  "rusty-procgen",
  "rusty-scene",
  "rusty-test-support",
  "rusty-time",
- "skrifa",
 ]
 
 [[package]]

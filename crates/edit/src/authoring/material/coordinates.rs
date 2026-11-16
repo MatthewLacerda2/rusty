@@ -1,6 +1,7 @@
 //! The map-coordinate fields of a material (#1573): Unity Lit's *Tiling* and
-//! *Offset*, and HDRP Lit's *Base UV Mapping* with its world size and triplanar
-//! blend, as rows of the same table the transparent-surface fields use
+//! *Offset*, HDRP Lit's *Base UV Mapping* with its world size and triplanar blend,
+//! and the height map's depth (#2191), whose parallax shifts where the maps are
+//! read, as rows of the same table the transparent-surface fields use
 //! (`surface.rs`), so the Lua adapter, `DefineAsset`'s recipe and the Inspector take
 //! them with no code of their own.
 //!
@@ -10,7 +11,9 @@ use super::field::{no_hint, SurfaceField, SurfaceKind, SurfaceValue};
 use super::surface::{choice, number};
 use rusty_components::{MaterialAsset, UvMapping};
 
-pub use rusty_scene::rules::material::{BLEND_SHARPNESS_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE};
+pub use rusty_scene::rules::material::{
+    BLEND_SHARPNESS_RANGE, HEIGHT_SCALE_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE,
+};
 
 /// A pair the row's `check` clamped.
 fn pair(value: SurfaceValue) -> [f32; 2] {
@@ -104,5 +107,18 @@ pub static COORDINATE_FIELDS: &[SurfaceField] = &[
         get: |m| SurfaceValue::Number(m.blend_sharpness),
         hint: no_hint,
         put: |m, v| m.blend_sharpness = number(v),
+    },
+    SurfaceField {
+        key: "height_scale",
+        api: "HeightScale",
+        label: "Height Scale",
+        // HDRP's *Amplitude*, as a fraction of one repeat's width (#2191).
+        kind: SurfaceKind::Number(HEIGHT_SCALE_RANGE),
+        shown: |m| m.height_map.is_some(),
+        get: |m| SurfaceValue::Number(m.height_scale),
+        hint: |_| {
+            Some("How deep the height map's black lies, as a fraction of one repeat's width.")
+        },
+        put: |m, v| m.height_scale = number(v),
     },
 ];

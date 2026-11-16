@@ -4,11 +4,11 @@
 //! firings and the scripting `Particles.Emit`/`Burst`, so all of them draw from
 //! the same seeded stream in the same order.
 
-use glam::Vec3;
+use glam::{Mat4, Vec3};
 
 use super::runtime::{Particle, SubEmitEvent};
 use super::shape::signed;
-use super::space::EmitterFrame;
+use super::space::{EmitterFrame, SimulationSpace};
 use super::ParticleEmitterComponent;
 use rusty_core::curve::Range;
 use rusty_core::random::Random;
@@ -137,12 +137,20 @@ impl ParticleEmitterComponent {
     ) -> u32 {
         self.ensure_initialized();
         self.carry_to(frame);
-        let cap = self.max_particles as usize;
+        let cap = self.particle_cap() as usize;
         let birth = self.sub_emitters.birth.filter(|_| births);
         let inherit = self.sub_emitters.inherit_velocity;
         let mut spawned = 0;
+        // A `Local` `Gpu` emitter's births go up under the inverse of the space
+        // its draw places them in (`gpu_space`, read after `carry_to` above), so
+        // each is drawn where it was born, and then follows the emitter.
+        let to_local = (self.on_gpu() && self.simulation_space == SimulationSpace::Local)
+            .then(|| self.gpu_space())
+            .filter(|m| *m != Mat4::IDENTITY)
+            .map(|m| m.inverse())
+            .filter(|m| m.is_finite());
         for _ in 0..count {
-            if self.runtime.particles.len() >= cap {
+            if self.live_count() >= cap {
                 break;
             }
             let mut p = self.spawn_particle(&frame, origin);
@@ -154,7 +162,15 @@ impl ParticleEmitterComponent {
                     velocity: p.velocity * inherit,
                 });
             }
-            self.runtime.particles.push(p);
+            if !self.on_gpu() {
+                self.runtime.particles.push(p);
+            } else if let Some(m) = to_local {
+                p.position = m.transform_point3(p.position);
+                p.velocity = m.transform_vector3(p.velocity);
+                self.runtime.gpu.add(p);
+            } else {
+                self.runtime.gpu.add(p);
+            }
             spawned += 1;
         }
         if spawned > 0 {

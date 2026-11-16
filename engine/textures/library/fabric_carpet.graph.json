@@ -1,0 +1,43 @@
+{
+  "resolution": 256,
+  "params": {
+    "wear": { "type": "number", "default": 0.3, "min": 0, "max": 1 },
+    "tint": { "type": "color", "default": "#5f6672" }
+  },
+  "nodes": [
+    { "id": "loop", "op": "shape", "kind": "rounded_rect", "size": [0.86, 0.62], "roundness": 1, "profile": "hemisphere" },
+    { "id": "loops", "op": "tile", "count": 96, "offset": 0.5, "jitter": 0.12, "value_jitter": 0.35, "seed": 131, "inputs": ["loop"] },
+    { "id": "loop_id", "op": "tile", "count": 96, "offset": 0.5, "jitter": 0.12, "output": "random", "seed": 131, "inputs": ["loop"] },
+    { "id": "fuzz", "op": "anisotropic_noise", "scale": 256, "anisotropy": 3, "angle": 0.125, "seed": 132 },
+    { "id": "fuzz_n", "op": "auto_levels", "inputs": ["fuzz"] },
+    { "id": "nap_raw", "op": "noise", "kind": "fbm", "scale": 6, "octaves": 5, "seed": 133 },
+    { "id": "nap", "op": "auto_levels", "inputs": ["nap_raw"] },
+
+    { "id": "paths", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 2, "warp": 1 }, "seed": 134 },
+    { "id": "trodden", "op": "expression", "expr": "clamp(smoothstep(0.7 - 0.45 * k1, 1.0 - 0.3 * k1, a) * (0.15 + 0.85 * k1), 0, 1)", "k1": { "param": "wear" }, "inputs": ["paths"] },
+    { "id": "stain_field", "op": "graph", "path": "engine/textures/library/parts/grunge.graph.json", "params": { "scale": 3 }, "seed": 135 },
+    { "id": "stain_edge", "op": "noise", "kind": "fbm", "scale": 24, "octaves": 3, "seed": 136 },
+    { "id": "stains", "op": "expression", "expr": "smoothstep(1.0 - 0.25 * k1, 1.04 - 0.25 * k1, a + 0.2 * (b - 0.5))", "k1": { "param": "wear" }, "inputs": ["stain_field", "stain_edge"] },
+
+    { "id": "pile", "op": "expression", "expr": "(0.7 * a + 0.12 * b) * (1 - 0.6 * c) + 0.18 * d", "inputs": ["loops", "fuzz_n", "trodden", "nap"] },
+    { "id": "height", "op": "auto_levels", "inputs": ["pile"] },
+    { "id": "detail", "op": "expression", "expr": "a - 0.16 * b", "inputs": ["pile", "nap"] },
+    { "id": "normal", "op": "bump_to_normal", "strength": 0.012, "inputs": ["detail"] },
+
+    { "id": "yarn", "op": "constant", "color": { "param": "tint" } },
+    { "id": "heather", "op": "hue_sat_value", "hue": { "node": "loop_id", "min": -0.015, "max": 0.015 }, "sat": { "node": "loop_id", "min": 0.8, "max": 1.2 }, "value": { "node": "loop_id", "min": 0.75, "max": 1.2 }, "inputs": ["yarn"] },
+    { "id": "pile_shade", "op": "expression", "expr": "0.55 + 0.45 * a + 0.1 * (b - 0.5)", "inputs": ["loops", "nap"] },
+    { "id": "shaded", "op": "mix", "mode": "multiply", "inputs": ["heather", "pile_shade"] },
+    { "id": "matted", "op": "hue_sat_value", "hue": 0, "sat": 0.7, "value": 1.25, "inputs": ["shaded"] },
+    { "id": "walked", "op": "mix", "mode": "mix", "inputs": ["shaded", "matted", "trodden"] },
+    { "id": "stain_col", "op": "constant", "color": "#4a3a28" },
+    { "id": "stained", "op": "mix", "mode": "multiply", "factor": 0.7, "inputs": ["walked", "stain_col", "stains"] },
+    { "id": "base_color", "op": "expression", "r": "max(a.r, 0.018)", "g": "max(a.g, 0.018)", "b": "max(a.b, 0.018)", "inputs": ["stained"] },
+
+    { "id": "roughness", "op": "expression", "expr": "clamp(0.86 + 0.14 * (a - 0.5) - 0.18 * b + 0.05 * c, 0, 1)", "inputs": ["fuzz_n", "trodden", "stains"] },
+    { "id": "ao", "op": "ambient_occlusion", "radius": 0.006, "depth": 0.002, "quality": 8, "inputs": ["detail"] },
+    { "id": "occlusion", "op": "levels", "out_low": 0.4, "inputs": ["ao"] }
+  ],
+  "output": "base_color",
+  "outputs": { "base_color": "base_color", "normal": "normal", "roughness": "roughness", "height": "height", "occlusion": "occlusion" }
+}

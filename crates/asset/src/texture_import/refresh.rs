@@ -9,7 +9,7 @@ use std::sync::mpsc::{channel, Sender};
 use std::sync::Mutex;
 
 use super::encode::{self, Cores};
-use super::{cache, cache_file, fit, format_of, open, reader, shrink, TextureKind};
+use super::{cache, cache_file, fit, format_of, keeps_deep, open, reader, shrink, TextureKind};
 use crate::convert::{self, Seen};
 use crate::lightmap_page::is_baked;
 use crate::{is_image_path, sidecar};
@@ -29,6 +29,7 @@ pub fn refresh(source: &Path, progress: &str) -> Result<bool, String> {
 /// source (its digest is remembered by length and mtime, `convert::source_digest`)
 /// and a read of the cache's head; only an encode reads either whole.
 fn refresh_on(source: &Path, progress: &str, cores: Cores) -> Result<bool, String> {
+    use image::ImageDecoder;
     let settings = sidecar::texture(source);
     if format_of(&settings).is_none() {
         return Ok(false);
@@ -43,10 +44,15 @@ fn refresh_on(source: &Path, progress: &str, cores: Cores) -> Result<bool, Strin
     if cache::is_current(&out, cache::stamp(digest, &settings)) {
         return Ok(false);
     }
-    let (w, h) = open(source)
-        .and_then(|r| r.into_dimensions())
+    let header = open(source)
+        .and_then(|r| r.into_decoder())
         .map_err(|e| named(&e))?;
-    let (w, h) = shrink::fitted_size(w, h, settings.max_size);
+    if keeps_deep(&settings, header.color_type()) {
+        return Ok(false);
+    }
+    let size = header.dimensions();
+    shrink::warn_if_shrunk(source, size, settings.max_size);
+    let (w, h) = shrink::fitted_size(size.0, size.1, settings.max_size);
     if w % 4 != 0 || h % 4 != 0 {
         return Ok(false);
     }
@@ -104,8 +110,8 @@ pub struct Refreshed {
 /// `core::fs::written`, so a renderer holding it uncompressed swaps it. An image
 /// that fails is warned of and the rest still run: it draws (and ships)
 /// uncompressed, as Unity builds with an import error logged. Last, the caches
-/// whose source is gone (or is a baked lightmap page) are deleted
-/// (`orphans`, #1694). `Assets.Refresh` runs it on request. Nothing while imports
+/// whose source is gone, is a baked lightmap page or is a normal map kept at 16
+/// bits are deleted (`orphans`, #1694). `Assets.Refresh` runs it on request. Nothing while imports
 /// are refused (Play, `convert::conversion_allowed`).
 pub fn refresh_all(root: &Path) -> Refreshed {
     let mut done = Refreshed::default();

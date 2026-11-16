@@ -8,7 +8,6 @@ use std::cell::RefCell;
 use glam::Vec3;
 
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 use rusty_shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
@@ -62,8 +61,9 @@ pub(super) fn sphere(scene: &mut Scene, x: f32, shader: &str) -> u32 {
         // Diameter 2: the thresholds below were set on that size.
         (t.position, t.scale) = (Vec3::new(x, 0.0, 0.0), Vec3::splat(2.0));
     }
-    let key = mat_ops::ensure_material_key(scene, id).unwrap();
-    mat_ops::set_shader(&mut scene.materials, &key, shader.to_string());
+    let key = scene.ensure_material_key(id).unwrap();
+    scene.materials.get_mut(&key).unwrap().shader =
+        (!shader.is_empty()).then(|| shader.to_string());
     id
 }
 

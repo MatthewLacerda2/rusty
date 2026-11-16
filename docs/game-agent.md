@@ -36,6 +36,13 @@ seed) and what reached the game tick by tick. When the developer reports a bug
 from a playtest, replay their demo headless instead of guessing a scenario
 (next section).
 
+The editor also keeps a rolling log of how each frame ran, and what the console
+said beside it, in `saved/logs/` (50 MB by default, the oldest dropped). When the
+developer says "it hitched a minute ago, by the bar", read it instead of asking them
+to reproduce it: `Debug.FrameLog{ last_seconds = 90, over_ms = 33 }` returns the
+slow frames with their tick, camera position, heaviest GPU pass and system
+(`docs/api/Debug.md`, *The frame log*).
+
 ## The project
 
 ```text
@@ -134,6 +141,21 @@ function M.OnTakeDamage(id, amount)
 end
 return M
 ```
+
+## Start a surface from the engine's library
+
+The engine ships ten tiling materials as texture graphs (concrete, brick, painted
+plaster, worn painted metal, tread plate, wood planks, ceramic tile, asphalt, sand
+with pebbles, carpet), listed by `Texture.Ops()` under `engine/textures/library/`.
+For a wall, floor or ground, **start from the nearest one**: instance it in the
+material's `maps`, set its `wear` (0 new, 1 derelict), its `tint` where it has one
+and the instance `seed` (two walls that are not copies), and give the material the
+tile's real size as `world_size` (`docs/api/Texture.md`, *The library*). The one
+exception is `metal_painted_worn` fed a model's `Texture.BakeMeshMaps` maps: those
+are that model's UV0 atlas, so its material maps by `uv_mapping = "UV0"`, with no
+`world_size`. Write a new graph only when no library material is near, and build it
+from the library's parts (`grunge`, `edge_wear`, `crevice_dirt`, `scratches`) where
+they fit.
 
 ## Look at a material before it goes into a level
 

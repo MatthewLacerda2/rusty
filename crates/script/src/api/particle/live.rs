@@ -17,7 +17,8 @@
 //! entries keeps each survivor's hidden fields; after anything else changed the
 //! emitter, every entry is an added particle. A `Local` emitter is carried to where it stands before every
 //! read and write, so what a script reads and writes is where the particles draw
-//! now. The fastest access, whole arrays per field, is `arrays.rs`.
+//! now. The fastest access, whole arrays per field, is `arrays.rs`. A `Gpu`
+//! emitter's particles are the renderer's: its guard is `gpu.rs`.
 
 use mlua::{Function, Lua, Table};
 
@@ -121,6 +122,9 @@ fn write(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<Function> {
             )));
         }
         let live = with_carried(&mut scene.borrow_mut(), id, |e, frame| {
+            if e.on_gpu() {
+                return super::gpu::refuse(e, &verb, id);
+            }
             let same = rev == Some(revision(e));
             write_records(e, frame, &records, same)
         });
@@ -142,7 +146,7 @@ fn edit(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<Function> {
             let cap = e.max_particles as usize;
             e.runtime.particles = edited.into_iter().take(cap).collect();
             touched(e);
-            e.runtime.particles.len() as u32
+            e.live_count() as u32
         });
         Ok(live.unwrap_or(0))
     })

@@ -9,10 +9,10 @@
 
 use glam::{Vec2, Vec4};
 
-use super::font::GlyphId;
 use super::lines::{block_height, break_lines, clip, pitch, Line, EPS};
 use super::measure::Measurer;
 use rusty_components::TextComponent;
+use rusty_font::GlyphId;
 
 /// Binary-search steps auto-size takes between its bounds (a fixed count, so the
 /// chosen size is a pure function of the inputs).

@@ -86,6 +86,7 @@ inspect! {
             "taa_contrast_adaptive_sharpening",
             camera::set_taa_contrast_adaptive_sharpening
         ),
+        op!("taa_anti_flicker", camera::set_taa_anti_flicker),
         op!("projection", camera::set_projection),
         op!("use_occlusion_culling", camera::set_use_occlusion_culling),
         with!("target_texture", |c, v: Option<RenderTarget>| set_target(c, v)),

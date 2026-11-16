@@ -40,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture game game-test export launcher bench bless-converters fuzz-lock
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export launcher bench bless-converters fuzz-lock
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -438,6 +438,12 @@ editor-capture: ## Render the editor to a PNG headlessly. make editor-capture OU
 GAME_OUT = $(if $(filter command line environment,$(origin OUT)),--out $(OUT))
 game: ## Generate a test game. make game NAME=smoke [OUT=<dir>] [ARGS="--param size=30"]
 	cargo run --quiet --locked --features dev --bin game -- $(NAME) $(GAME_OUT) $(ARGS)
+
+library-previews: ## Render every engine library material (sphere; plane, repeats = 3; wear 0.3 and 1) into OUT. ONLY=<name> for one
+	@test -n "$(OUT)" || { echo "library-previews: name the folder, make library-previews OUT=<dir>"; exit 2; }
+	rm -rf $(OUT)/project && mkdir -p $(OUT) && cp -r tests/fixtures/project $(OUT)/project
+	{ echo 'OUT = "$(abspath $(OUT))"'; $(if $(ONLY),echo 'ONLY = "$(ONLY)"';) cat tests/fixtures/project/scenarios/library/previews.lua; } > $(OUT)/project/previews.lua
+	cargo run --release --quiet --locked --features dev --bin play -- --project $(OUT)/project $(OUT)/project/previews.lua $(OUT)/run
 
 game-test: ## Generate a test game, check it is deterministic, run its scenarios and shots
 	cargo run --quiet --locked --features dev --bin game -- $(NAME) $(GAME_OUT) --test $(ARGS)

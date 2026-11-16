@@ -3,10 +3,14 @@
 //! how large it may be (#1574). Stored in the image's
 //! `.meta` sidecar beside the model settings, read by the renderer's upload
 //! (`render::gpu::textures`), and written by the image inspector and
-//! `Assets.SetTextureImportSettings` through [`set_texture`].
+//! `Assets.SetTextureImportSettings` through [`set_texture`]. A Max Size the
+//! engine chose follows the size of the latest bake; one the developer set is
+//! never changed by a bake (`baked`).
 
+mod baked;
 mod modes;
 
+pub use baked::{check_bake_size, prepare_bake};
 pub use modes::{Compression, FilterMode, TextureType, WrapMode};
 
 use serde::{Deserialize, Serialize};
@@ -43,6 +47,26 @@ pub struct TextureSettings {
     pub compression: Compression,
     /// The longest side it is uploaded at, one of [`MAX_SIZES`] (#1574).
     pub max_size: u32,
+    /// Whether the developer chose `max_size` (the inspector's combo,
+    /// `Assets.SetTextureImportSettings`, a hand edit that also sets this key).
+    /// Only a deliberate act sets it, so a missing key (every sidecar the engine
+    /// writes, a sparse hand-written block) means the engine's Max Size, which a
+    /// bake moves to its size ([`prepare_bake`]); a chosen one no bake touches. Written to
+    /// the file only when true.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub max_size_chosen: bool,
+}
+
+impl TextureSettings {
+    /// These settings with Max Size `size`, set by the developer (the inspector,
+    /// `Assets.SetTextureImportSettings`), so no bake changes it.
+    pub fn chosen(self, size: u32) -> Self {
+        Self {
+            max_size: size,
+            max_size_chosen: true,
+            ..self
+        }
+    }
 }
 
 impl Default for TextureSettings {
@@ -55,6 +79,7 @@ impl Default for TextureSettings {
             srgb: true,
             compression: Compression::default(),
             max_size: DEFAULT_MAX_SIZE,
+            max_size_chosen: false,
         }
     }
 }
@@ -141,13 +166,28 @@ pub fn fit_data_slot(source: &Path) {
     );
 }
 
+/// The image at `source`, just assigned to a material's height slot (#2191), set to
+/// [`TextureType::SingleChannel`] when it is still `Default`, and said so: the
+/// parallax march reads its red alone, raw, as Unity's *Single Channel* keeps it.
+pub fn fit_height_slot(source: &Path) {
+    fit_slot(
+        source,
+        "a height map, so its Texture Type is now SingleChannel",
+        |s| {
+            (s.texture_type == TextureType::Default).then_some(TextureSettings {
+                texture_type: TextureType::SingleChannel,
+                ..*s
+            })
+        },
+    );
+}
+
 /// Apply `fix` to the import settings of `source` when it asks for a change, and
 /// log it as `used` (what it was used as, and what changed). Only an image on disk, and only while imports may change (never
 /// in Play, `convert::conversion_allowed`). A texture a converted model's cache
 /// holds is left alone: those are never compressed.
 fn fit_slot(source: &Path, used: &str, fix: impl Fn(&TextureSettings) -> Option<TextureSettings>) {
-    use crate::convert::{conversion_allowed, is_import_cache};
-    if !conversion_allowed() || is_import_cache(source) || !source.is_file() {
+    if !engine_may_write(source) {
         return;
     }
     let Some(fixed) = fix(&texture(source)) else {
@@ -157,6 +197,20 @@ fn fit_slot(source: &Path, used: &str, fix: impl Fn(&TextureSettings) -> Option<
         Ok(()) => log::info!("[Import] {}: used as {used}", source.display()),
         Err(e) => log::warn!("[Import] {}: {e}", source.display()),
     }
+}
+
+/// Whether the engine may change the sidecar of the image at `source` on its own
+/// (a slot fix): only an image on disk, outside a converted model's cache, and
+/// only while imports may change (never in Play).
+fn engine_may_write(source: &Path) -> bool {
+    source.is_file() && engine_may_write_beside(source)
+}
+
+/// [`engine_may_write`] without the file on disk: a bake writes the sidecar of
+/// the image it is about to write.
+fn engine_may_write_beside(source: &Path) -> bool {
+    use crate::convert::{conversion_allowed, is_import_cache};
+    conversion_allowed() && !is_import_cache(source)
 }
 
 #[cfg(test)]
