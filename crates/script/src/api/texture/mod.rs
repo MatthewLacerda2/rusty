@@ -37,10 +37,11 @@
 //! `Preview` show an instance's nodes under their prefixed ids (`brick/mortar`);
 //! `ToJson` writes the recipe as given, instances unexpanded.
 //!
-//! A bake moves a Max Size the engine chose to its own size, and never one the
-//! developer set (`asset::sidecar::keep_baked_size`), so a recipe's `resolution`
-//! is what ships; a bake larger than 8192, the largest Max Size, is refused
-//! before it writes.
+//! Every bake verb (`Bake`, `BakeSet`, `BakeMeshMaps`) readies its files through
+//! `asset::sidecar::prepare_bake` before it writes: a Max Size the engine chose
+//! moves to the bake's size, one the developer chose never does, so a recipe's
+//! `resolution` is what ships; a bake larger than 8192, the largest Max Size, is
+//! refused before anything is written.
 //!
 //! `Bake` and `BakeSet` make the missing folders above their target inside the
 //! project (`folder`, #1850), and a failed write names the verb and the path.
@@ -68,10 +69,10 @@ use mlua::{Lua, Value};
 
 use super::{put, Reg};
 use from_lua::parse_recipe;
-use rusty_asset::sidecar::{check_bake_size, keep_baked_sizes};
+use rusty_asset::sidecar::prepare_bake;
 use rusty_core::project::ContentRoots;
 use rusty_edit::authoring::material::{load_recipe, Loaded};
-use rusty_procgen::{bake_recipe, bake_set, check_set, Slot, TextureRecipe};
+use rusty_procgen::{bake_recipe, bake_set, check_set, set_paths, Slot, TextureRecipe};
 
 /// Register the `Texture` namespace onto `lua`.
 pub fn register(lua: &Lua) -> Reg {
@@ -127,19 +128,11 @@ pub fn register(lua: &Lua) -> Reg {
 fn bake(recipe: &TextureRecipe, path: &str, slot: &str, root: &Path) -> mlua::Result<String> {
     let slot = Slot::parse(slot).map_err(mlua::Error::RuntimeError)?;
     let loaded = load(recipe)?;
-    fits_max_size("Texture.Bake", &loaded.recipe)?;
-    let written = folder::make_parents(path, root)
+    let size = loaded.recipe.extent();
+    folder::make_parents(path, root)
+        .and_then(|()| prepare_bake("Texture.Bake", (size.width, size.height), [path]))
         .and_then(|()| bake_recipe(&loaded.recipe, &loaded.sources, slot, path))
-        .map_err(|e| mlua::Error::RuntimeError(format!("Texture.Bake: {e}")))?;
-    keep_baked_sizes("Texture.Bake", [written.as_str()]);
-    Ok(written)
-}
-
-/// Refuse, as `verb`, a recipe that bakes larger than the largest Max Size.
-fn fits_max_size(verb: &str, recipe: &TextureRecipe) -> mlua::Result<()> {
-    let size = recipe.extent();
-    check_bake_size(size.width, size.height)
-        .map_err(|e| mlua::Error::RuntimeError(format!("{verb}: {e}")))
+        .map_err(|e| mlua::Error::RuntimeError(format!("Texture.Bake: {e}")))
 }
 
 /// `Texture.BakeSet`'s body: every output of `recipe` to `<prefix>_<slot>.png`,
@@ -150,12 +143,13 @@ fn bake_whole_set(
     root: &Path,
 ) -> mlua::Result<BTreeMap<String, String>> {
     let loaded = load_set(recipe)?;
-    fits_max_size("Texture.BakeSet", &loaded.recipe)?;
-    let written = folder::make_parents(prefix, root)
+    let size = loaded.recipe.extent();
+    let paths = set_paths(&loaded.recipe, prefix).map_err(mlua::Error::RuntimeError)?;
+    let extent = (size.width, size.height);
+    folder::make_parents(prefix, root)
+        .and_then(|()| prepare_bake("Texture.BakeSet", extent, paths.iter().map(String::as_str)))
         .and_then(|()| bake_set(&loaded.recipe, &loaded.sources, prefix))
-        .map_err(|e| mlua::Error::RuntimeError(format!("Texture.BakeSet: {e}")))?;
-    keep_baked_sizes("Texture.BakeSet", written.values().map(String::as_str));
-    Ok(written)
+        .map_err(|e| mlua::Error::RuntimeError(format!("Texture.BakeSet: {e}")))
 }
 
 /// [`load`] for a set bake: its `outputs` are checked first, so a recipe with

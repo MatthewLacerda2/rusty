@@ -38,14 +38,15 @@ fn a_file_larger_than_the_default_warns_once_across_reimports() {
 }
 
 #[test]
-fn a_sidecar_kept_at_2048_keeps_it_and_warns_once() {
+fn a_chosen_2048_is_kept_by_a_bake_and_warns_once() {
     rusty_test_support::logs::init();
     let dir = rusty_test_support::temp::dir();
     let wall = dir.join("wall.png");
     RgbaImage::new(4096, 4).save(&wall).unwrap();
     let meta = crate::sidecar::meta_path(&wall);
-    std::fs::write(&meta, r#"{"texture": {"max_size": 2048}}"#).unwrap();
-    crate::sidecar::keep_baked_size(&wall).unwrap();
+    let chosen = r#"{"texture": {"max_size": 2048, "max_size_chosen": true}}"#;
+    std::fs::write(&meta, chosen).unwrap();
+    crate::sidecar::prepare_bake("test", (4096, 4), [wall.to_str().unwrap()]).unwrap();
     assert_eq!(
         imported_size(&wall, &texture(&wall)),
         Some(((4096, 4), (2048, 4)))
@@ -70,4 +71,17 @@ fn a_file_that_fits_never_warns() {
     RgbaImage::new(2048, 8).save(&tile).unwrap();
     reimport(&tile);
     assert_eq!(shrunk_warnings(&tile), 0);
+}
+
+#[test]
+fn a_file_no_max_size_holds_is_told_to_be_saved_smaller() {
+    rusty_test_support::logs::init();
+    let dir = rusty_test_support::temp::dir();
+    let long = dir.join("long.png");
+    RgbaImage::new(16384, 4).save(&long).unwrap();
+    shrink::warn_if_shrunk(&long, (16384, 4), 2048);
+    let logged = rusty_test_support::logs::take();
+    let advice = logged.iter().find(|m| m.contains("long.png")).unwrap();
+    assert!(advice.contains("save the file smaller"), "{advice}");
+    assert!(!advice.contains("raise Max Size"), "{advice}");
 }

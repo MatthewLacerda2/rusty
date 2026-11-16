@@ -71,9 +71,10 @@ pub(super) fn warn_if_shrunk(source: &Path, size: (u32, u32), max_size: u32) {
     if !warned.insert((source.to_path_buf(), size, max_size)) {
         return;
     }
-    let advice = match MAX_SIZES.iter().any(|&s| s > max_size) {
+    let largest = MAX_SIZES[MAX_SIZES.len() - 1];
+    let advice = match fitted_size(w, h, largest) == size {
         true => "raise Max Size in its .meta (Assets.SetTextureImportSettings) to keep its size",
-        false => "that is the largest Max Size, so save the file smaller to keep its detail",
+        false => "no Max Size holds it, so save the file smaller to keep its detail",
     };
     log::warn!(
         "[Import] {}: {w}x{h} is larger than its Max Size {max_size}, so it is \

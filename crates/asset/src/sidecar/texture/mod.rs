@@ -10,7 +10,7 @@
 mod baked;
 mod modes;
 
-pub use baked::{check_bake_size, keep_baked_size, keep_baked_sizes};
+pub use baked::prepare_bake;
 pub use modes::{Compression, FilterMode, TextureType, WrapMode};
 
 use serde::{Deserialize, Serialize};
@@ -47,14 +47,14 @@ pub struct TextureSettings {
     pub compression: Compression,
     /// The longest side it is uploaded at, one of [`MAX_SIZES`] (#1574).
     pub max_size: u32,
-    /// The Max Size the engine chose itself: the default a fresh sidecar is
-    /// written with (by a slot fix, say), or the size a bake raised it to
-    /// ([`keep_baked_size`]). While `max_size` equals it, a later bake moves both
-    /// to the bake's size. Once they differ, or it is absent from the file (a
-    /// hand-written texture block), Max Size is the developer's and no bake
-    /// touches it. A developer setter clears it ([`TextureSettings::chosen`]).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub engine_max_size: Option<u32>,
+    /// Whether the developer chose `max_size` (the inspector's combo,
+    /// `Assets.SetTextureImportSettings`, a hand edit that also sets this key).
+    /// Only a deliberate act sets it, so a missing key (every sidecar the engine
+    /// writes, a sparse hand-written block) means the engine's Max Size, which a
+    /// bake moves to its size ([`baked`]); a chosen one no bake touches. Written to
+    /// the file only when true.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub max_size_chosen: bool,
 }
 
 impl TextureSettings {
@@ -63,14 +63,9 @@ impl TextureSettings {
     pub fn chosen(self, size: u32) -> Self {
         Self {
             max_size: size,
-            engine_max_size: None,
+            max_size_chosen: true,
             ..self
         }
-    }
-
-    /// Whether the engine, not the developer, chose this Max Size.
-    pub fn max_size_is_engines(&self) -> bool {
-        self.engine_max_size == Some(self.max_size)
     }
 }
 
@@ -84,7 +79,7 @@ impl Default for TextureSettings {
             srgb: true,
             compression: Compression::default(),
             max_size: DEFAULT_MAX_SIZE,
-            engine_max_size: Some(DEFAULT_MAX_SIZE),
+            max_size_chosen: false,
         }
     }
 }
@@ -189,11 +184,17 @@ fn fit_slot(source: &Path, used: &str, fix: impl Fn(&TextureSettings) -> Option<
 }
 
 /// Whether the engine may change the sidecar of the image at `source` on its own
-/// (a slot fix, a bake): only an image on disk, outside a converted model's
-/// cache, and only while imports may change (never in Play).
+/// (a slot fix): only an image on disk, outside a converted model's cache, and
+/// only while imports may change (never in Play).
 fn engine_may_write(source: &Path) -> bool {
+    source.is_file() && engine_may_write_beside(source)
+}
+
+/// [`engine_may_write`] without the file on disk: a bake writes the sidecar of
+/// the image it is about to write.
+fn engine_may_write_beside(source: &Path) -> bool {
     use crate::convert::{conversion_allowed, is_import_cache};
-    conversion_allowed() && !is_import_cache(source) && source.is_file()
+    conversion_allowed() && !is_import_cache(source)
 }
 
 #[cfg(test)]

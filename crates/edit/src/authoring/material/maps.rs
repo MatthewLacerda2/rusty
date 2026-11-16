@@ -20,10 +20,11 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use super::MaterialLibrary;
+use rusty_asset::sidecar::prepare_bake;
 use rusty_asset::MapRef;
 use rusty_core::paths::to_slash;
 use rusty_core::project::ContentRoots;
-use rusty_procgen::{bake_set, check_set, Slot};
+use rusty_procgen::{bake_set, check_set, set_paths, Slot};
 use rusty_scene::MaterialAsset;
 
 /// Where `Material.DefineAsset` / `Material.Rebake` write baked maps: the project's
@@ -53,14 +54,23 @@ pub fn bake_maps(
     let in_error = |e: String| format!("material {name:?} maps: {e}");
     check_set(recipe).map_err(in_error)?;
     let loaded = super::load_recipe(recipe, &ContentRoots::new(root)).map_err(in_error)?;
-    let size = loaded.recipe.extent();
-    rusty_asset::sidecar::check_bake_size(size.width, size.height).map_err(in_error)?;
-    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     // `/`-spelled, `dir` included: the paths land in the scene file, which stores
     // `/` (`core::paths::to_slash`).
     let prefix = format!("{}/{name}", to_slash(dir).trim_end_matches('/'));
+    let size = loaded.recipe.extent();
+    let paths = set_paths(&loaded.recipe, &prefix).map_err(in_error)?;
+    let paths = paths.iter().map(String::as_str);
+    let extent = (size.width, size.height);
+    // The folder comes first, for the sidecars; a refused bake leaves none it made.
+    let made = !dir.exists();
+    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    prepare_bake("Material maps", extent, paths).map_err(|e| {
+        if made {
+            let _ = std::fs::remove_dir(dir);
+        }
+        in_error(e)
+    })?;
     let baked = bake_set(&loaded.recipe, &loaded.sources, &prefix).map_err(in_error)?;
-    rusty_asset::sidecar::keep_baked_sizes("Material maps", baked.values().map(String::as_str));
     fill_empty_maps(asset, &baked);
     Ok(())
 }

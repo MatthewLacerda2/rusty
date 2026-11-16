@@ -1,7 +1,8 @@
 //! A rebake moves the Max Size the engine chose and never the developer's
 //! (#2259), seen from Lua: `Texture.Bake` again at a larger size ships at it, a
 //! `maxSize` set through `Assets.SetTextureImportSettings` holds, the import
-//! warning once that the file is shrunk, and a bake above 8192 is refused.
+//! warning once that the file is shrunk, a get-edit-set round-trip keeps the
+//! engine's, `BakeMeshMaps` ships at its size, and a bake above 8192 is refused.
 
 use std::path::Path;
 
@@ -72,4 +73,56 @@ fn a_bake_above_the_largest_max_size_is_refused() {
         "{err}"
     );
     assert!(!path.exists(), "nothing written");
+}
+
+#[test]
+fn a_get_edit_set_round_trip_leaves_max_size_the_engines() {
+    let (lua, path) = lua("rusty_texture_round_trip.png");
+    bake(&lua, 256).unwrap();
+    let edit = r#"local s = Assets.GetTextureImportSettings(OUT)
+        s.wrapMode = "Clamp"
+        Assets.SetTextureImportSettings(OUT, s)"#;
+    lua.load(edit).exec().unwrap();
+    bake(&lua, 4096).unwrap();
+    assert_eq!(max_size(&path), 4096, "the round trip chose nothing");
+    lua.load("Assets.SetTextureImportSettings(OUT, { maxSize = 1024 })")
+        .exec()
+        .unwrap();
+    let chosen: bool = lua
+        .load("return Assets.GetTextureImportSettings(OUT).maxSizeChosen")
+        .eval()
+        .unwrap();
+    assert!(chosen, "a changed maxSize is the developer's");
+    lua.load("Assets.SetTextureImportSettings(OUT, { maxSizeChosen = false })")
+        .exec()
+        .unwrap();
+    bake(&lua, 8192).unwrap();
+    assert_eq!(max_size(&path), 8192, "handed back to the engine");
+}
+
+#[test]
+fn a_4096_mesh_map_bake_ships_at_4096() {
+    let (lua, path) = lua("rusty_mesh_maps_size/l_position.png");
+    let dir = path.parent().unwrap();
+    std::fs::create_dir_all(dir).unwrap();
+    let quad = "v 0 0 0\nv 1 0 0\nv 1 0 1\nv 0 0 1\nvt 0 0\nvt 1 0\nvt 1 1\nvt 0 1\n\
+                vn 0 1 0\nf 1/1/1 3/3/1 2/2/1\nf 1/1/1 4/4/1 3/3/1\n";
+    std::fs::write(dir.join("l.obj"), quad).unwrap();
+    let globals = lua.globals();
+    globals
+        .set("MODEL", dir.join("l.obj").to_str().unwrap())
+        .unwrap();
+    globals
+        .set("PREFIX", format!("{}/l_", dir.to_str().unwrap()))
+        .unwrap();
+    let bake = r#"Texture.BakeMeshMaps(MODEL, { "position" }, PREFIX, { size = { 4096, 4 } })"#;
+    lua.load(bake).exec().unwrap();
+    assert_eq!(max_size(&path), 4096);
+    let imported =
+        rusty_asset::texture_import::imported_size(&path, &rusty_asset::sidecar::texture(&path));
+    assert_eq!(
+        imported,
+        Some(((4096, 4), (4096, 4))),
+        "imported at its size"
+    );
 }

@@ -32,7 +32,7 @@ pub fn bake_set(
 
     let mut written = BTreeMap::new();
     for ((name, (slot, _)), img) in slots.iter().zip(&images) {
-        let path = bake_to_png(img, *slot, &format!("{prefix}_{name}.png"))?;
+        let path = bake_to_png(img, *slot, &set_path(prefix, name))?;
         written.insert(name.to_string(), path);
     }
     Ok(written)
@@ -43,6 +43,19 @@ pub fn bake_set(
 /// with no `outputs` is reported as that, not as a file it couldn't read.
 pub fn check_set(recipe: &TextureRecipe) -> Result<(), String> {
     set_slots(recipe).map(|_| ())
+}
+
+/// The paths [`bake_set`] writes for `recipe` under `prefix`, checked as
+/// [`check_set`] does: a caller readies them before the bake (their sidecars,
+/// `asset::sidecar::prepare_bake`).
+pub fn set_paths(recipe: &TextureRecipe, prefix: &str) -> Result<Vec<String>, String> {
+    let slots = set_slots(recipe)?;
+    Ok(slots.keys().map(|name| set_path(prefix, name)).collect())
+}
+
+/// Where [`bake_set`] writes slot `name` under `prefix`.
+fn set_path(prefix: &str, name: &str) -> String {
+    format!("{prefix}_{name}.png")
 }
 
 /// `recipe.outputs` by canonical slot name: each slot and the node it bakes.

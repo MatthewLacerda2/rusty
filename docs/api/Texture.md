@@ -70,13 +70,14 @@ written only into a folder that already exists. A write that still fails names t
 verb and the path: `Texture.BakeSet: cannot write <path>: <os error>`.
 
 **A bake ships at its size.** The importer downsizes an image to its *Max Size*
-(2048 by default, `Assets.SetTextureImportSettings`). A bake raises or lowers a Max
-Size the engine chose (no `.meta`, the default one a material slot writes, or an
-earlier bake's) to fit its longer side (the next of 2048, 4096 or 8192), and never
-touches one the developer set (`SetTextureImportSettings`' `maxSize`, the inspector,
-a hand-edited `.meta`): that file is warned of once on import when it is shrunk. A
-bake whose longer side is above 8192, the largest Max Size, is refused before it
-writes (`Texture.Bake: a 16384x16384 bake is larger than the largest Max Size,
+(2048 by default, `Assets.SetTextureImportSettings`). Every texture bake
+(`Bake`, `BakeSet`, `BakeMeshMaps`, a material's `maps`) raises or lowers a Max Size
+the engine chose to fit its longer side (the next of 2048, 4096 or 8192), writing
+the `.meta` before the PNG, and never touches one the developer chose (Assets'
+`maxSizeChosen`: set by changing `maxSize` there or in the inspector): that file is
+warned of once on import when it is shrunk. A `.meta` without that key, such as
+the one a material slot writes, holds the engine's. A bake whose longer side is
+above 8192, the largest Max Size, is refused before it writes (`Texture.Bake: a 16384x16384 bake is larger than the largest Max Size,
 8192, …`). Nothing is written to a `.meta` during Play. `Material.DefineAsset`'s
 `maps` and `Material.Rebake` bake the same way.
 

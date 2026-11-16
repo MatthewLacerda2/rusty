@@ -28,11 +28,9 @@ use super::{global_table, put, Reg};
 
 mod colliders;
 mod humanoid;
+mod texture;
 use crate::api::ApiCell;
 use rusty_asset::audio::{refresh, Refresh};
-use rusty_asset::sidecar::{
-    parse_max_size, Compression, FilterMode, TextureSettings, TextureType, WrapMode,
-};
 use rusty_asset::{build_manifest, AssetEntry, SubObjectEntry};
 use rusty_asset::{sidecar, LightmapUvSettings};
 use rusty_core::paths::to_slash;
@@ -81,7 +79,7 @@ pub fn register(lua: &Lua) -> Reg {
         "GetTextureImportSettings",
         lua.create_function(|lua, path: String| {
             let stored = sidecar::load(Path::new(&path)).map_err(runtime)?;
-            texture_table(lua, &stored.texture)
+            texture::table(lua, &stored.texture)
         }),
     )?;
     put(
@@ -90,7 +88,7 @@ pub fn register(lua: &Lua) -> Reg {
         lua.create_function(|_, (path, t): (String, Table)| {
             let path = Path::new(&path);
             let stored = sidecar::load(path).map_err(runtime)?.texture;
-            let s = texture_settings(stored, &t)?;
+            let s = texture::settings(stored, &t)?;
             sidecar::set_texture(path, s).map_err(runtime)
         }),
     )?;
@@ -160,45 +158,6 @@ fn model_import_table(lua: &Lua, path: &str) -> mlua::Result<Table> {
     t.raw_set("scaleFactor", stored.scale)?;
     t.raw_set("colliders", colliders::table(lua, &stored.colliders)?)?;
     Ok(t)
-}
-
-/// `{ wrapMode, filterMode, generateMipmaps, textureType, sRGB, compression, maxSize }`.
-fn texture_table(lua: &Lua, s: &TextureSettings) -> mlua::Result<Table> {
-    let t = lua.create_table()?;
-    t.raw_set("wrapMode", s.wrap_mode.name())?;
-    t.raw_set("filterMode", s.filter_mode.name())?;
-    t.raw_set("generateMipmaps", s.generate_mipmaps)?;
-    t.raw_set("textureType", s.texture_type.name())?;
-    t.raw_set("sRGB", s.srgb)?;
-    t.raw_set("compression", s.compression.name())?;
-    t.raw_set("maxSize", s.max_size)?;
-    Ok(t)
-}
-
-/// `stored` with the keys `t` names replaced; an unknown mode name or a max size
-/// outside Unity's list is an error. A `maxSize` named is the developer's, so no
-/// bake changes it (`sidecar::keep_baked_size`).
-fn texture_settings(mut s: TextureSettings, t: &Table) -> mlua::Result<TextureSettings> {
-    if let Some(name) = t.get::<Option<String>>("wrapMode")? {
-        s.wrap_mode = WrapMode::parse(&name).map_err(runtime)?;
-    }
-    if let Some(name) = t.get::<Option<String>>("filterMode")? {
-        s.filter_mode = FilterMode::parse(&name).map_err(runtime)?;
-    }
-    let mipmaps = t.get::<Option<bool>>("generateMipmaps")?;
-    s.generate_mipmaps = mipmaps.unwrap_or(s.generate_mipmaps);
-    if let Some(name) = t.get::<Option<String>>("textureType")? {
-        s.texture_type = TextureType::parse(&name).map_err(runtime)?;
-    }
-    s.srgb = t.get::<Option<bool>>("sRGB")?.unwrap_or(s.srgb);
-    if let Some(name) = t.get::<Option<String>>("compression")? {
-        s.compression = Compression::parse(&name).map_err(runtime)?;
-    }
-    if let Some(size) = t.get::<Option<u32>>("maxSize")? {
-        // Named here, so it is the developer's: no bake changes it.
-        s = s.chosen(parse_max_size(size).map_err(runtime)?);
-    }
-    Ok(s)
 }
 
 fn runtime(e: impl ToString) -> mlua::Error {

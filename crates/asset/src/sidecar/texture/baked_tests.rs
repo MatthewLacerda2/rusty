@@ -1,10 +1,15 @@
 //! A bake moves an engine-chosen Max Size to its size and never a developer's
-//! (`keep_baked_size`, #2259); a bake above the largest Max Size is refused.
+//! (`prepare_bake`, #2259); a bake above the largest Max Size is refused.
 
 use std::path::{Path, PathBuf};
 
 use super::super::{fit_data_slot, meta_path, set_texture, texture, TextureSettings};
 use super::*;
+
+/// `prepare_bake` for one `side`×4 image at `path`.
+fn prepare(path: &Path, side: u32) -> Result<(), String> {
+    prepare_bake("test", (side, 4), [path.to_str().unwrap()])
+}
 
 /// A `w`-wide, 4-tall PNG at `dir/name`, thin so a large side costs little.
 fn png(dir: &Path, name: &str, w: u32) -> PathBuf {
@@ -17,37 +22,41 @@ fn png(dir: &Path, name: &str, w: u32) -> PathBuf {
 fn a_bake_with_no_sidecar_ships_at_its_size_and_one_that_fits_writes_none() {
     let dir = rusty_test_support::temp::dir();
     for (side, kept) in [(4096, 4096), (3000, 4096), (8192, 8192)] {
-        let baked = png(&dir, &format!("wall_{side}.png"), side);
-        assert_eq!(keep_baked_size(&baked), Ok(true));
+        // Not on disk yet: the sidecar is written before the PNG.
+        let baked = dir.join(format!("wall_{side}.png"));
+        prepare(&baked, side).unwrap();
         assert_eq!(texture(&baked).max_size, kept, "a {side} bake");
     }
-    let small = png(&dir, "small.png", 2048);
-    assert_eq!(keep_baked_size(&small), Ok(false));
+    let small = dir.join("small.png");
+    prepare(&small, 2048).unwrap();
     assert!(!meta_path(&small).exists(), "a bake that fits writes none");
 }
 
 #[test]
 fn an_engine_max_size_follows_every_rebake() {
     let dir = rusty_test_support::temp::dir();
-    let path = png(&dir, "wall.png", 4096);
-    keep_baked_size(&path).unwrap();
-    for (side, kept) in [(8192, 8192), (1024, 2048), (4096, 4096)] {
-        png(&dir, "wall.png", side);
-        keep_baked_size(&path).unwrap();
-        assert_eq!(texture(&path).max_size, kept, "rebaked at {side}");
+    let path = dir.join("wall.png");
+    for (side, kept) in [(4096, 4096), (8192, 8192), (1024, 2048), (4096, 4096)] {
+        prepare(&path, side).unwrap();
+        assert_eq!(texture(&path).max_size, kept, "baked at {side}");
+        assert!(!texture(&path).max_size_chosen, "still the engine's");
     }
 }
 
 #[test]
-fn a_slot_fixs_default_sidecar_is_raised_and_keeps_the_rest() {
+fn a_slot_fixs_sidecar_and_a_sparse_hand_written_one_are_the_engines() {
     let dir = rusty_test_support::temp::dir();
-    let path = png(&dir, "rough.png", 256);
-    fit_data_slot(&path);
-    assert!(meta_path(&path).exists() && !texture(&path).srgb);
-    png(&dir, "rough.png", 4096);
-    assert_eq!(keep_baked_size(&path), Ok(true));
-    let s = texture(&path);
-    assert_eq!((s.max_size, s.srgb), (4096, false));
+    let rough = png(&dir, "rough.png", 256);
+    fit_data_slot(&rough);
+    assert!(meta_path(&rough).exists() && !texture(&rough).srgb);
+    // A sparse block without the key, as a sidecar written before it existed.
+    let hand = png(&dir, "hand.png", 256);
+    std::fs::write(meta_path(&hand), r#"{"texture": {"max_size": 1024}}"#).unwrap();
+    for path in [&rough, &hand] {
+        prepare(path, 4096).unwrap();
+        assert_eq!(texture(path).max_size, 4096, "{}", path.display());
+    }
+    assert!(!texture(&rough).srgb, "the rest is kept");
 }
 
 #[test]
@@ -60,26 +69,46 @@ fn a_developers_max_size_is_never_changed_by_a_bake() {
     let default = png(&dir, "default.png", 4096);
     set_texture(&default, TextureSettings::default().chosen(2048)).unwrap();
     let hand = png(&dir, "hand.png", 4096);
-    std::fs::write(meta_path(&hand), r#"{"texture": {"max_size": 2048}}"#).unwrap();
+    let text = r#"{"texture": {"max_size": 2048, "max_size_chosen": true}}"#;
+    std::fs::write(meta_path(&hand), text).unwrap();
     for (path, kept) in [(&set, 1024), (&default, 2048), (&hand, 2048)] {
-        assert_eq!(keep_baked_size(path), Ok(false), "{}", path.display());
+        prepare(path, 4096).unwrap();
         assert_eq!(texture(path).max_size, kept, "{}", path.display());
     }
     assert_eq!(texture(&set), chosen, "nothing else changes either");
 }
 
 #[test]
+fn the_choice_is_stored_only_when_made() {
+    let dir = rusty_test_support::temp::dir();
+    let path = png(&dir, "a.png", 4);
+    set_texture(
+        &path,
+        TextureSettings {
+            srgb: false,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let text = std::fs::read_to_string(meta_path(&path)).unwrap();
+    assert!(!text.contains("max_size_chosen"), "{text}");
+    set_texture(&path, TextureSettings::default().chosen(512)).unwrap();
+    let text = std::fs::read_to_string(meta_path(&path)).unwrap();
+    assert!(text.contains("\"max_size_chosen\": true"), "{text}");
+}
+
+#[test]
 fn nothing_is_written_during_play_or_in_the_import_cache() {
     let dir = rusty_test_support::temp::dir();
-    let playing = png(&dir, "playing.png", 4096);
+    let playing = dir.join("playing.png");
     let hold = crate::convert::PlayHold::take();
-    assert_eq!(keep_baked_size(&playing), Ok(false));
+    prepare(&playing, 4096).unwrap();
     drop(hold);
     assert!(!meta_path(&playing).exists(), "Play writes no sidecar");
     let cache = dir.join(crate::convert::IMPORT_CACHE_DIR);
     std::fs::create_dir_all(&cache).unwrap();
-    let cached = png(&cache, "albedo.png", 4096);
-    assert_eq!(keep_baked_size(&cached), Ok(false));
+    let cached = cache.join("albedo.png");
+    prepare(&cached, 4096).unwrap();
     assert!(
         !meta_path(&cached).exists(),
         "the import cache is left alone"
@@ -87,9 +116,16 @@ fn nothing_is_written_during_play_or_in_the_import_cache() {
 }
 
 #[test]
-fn a_bake_above_the_largest_max_size_is_refused() {
-    assert_eq!(check_bake_size(8192, 4), Ok(()));
-    assert_eq!(check_bake_size(4, 8192), Ok(()));
-    let err = check_bake_size(16384, 64).unwrap_err();
+fn a_bake_above_the_largest_max_size_is_refused_before_anything_is_written() {
+    let dir = rusty_test_support::temp::dir();
+    let tall = dir.join("tall.png");
+    assert_eq!(
+        prepare_bake("t", (4, 8192), [tall.to_str().unwrap()]),
+        Ok(())
+    );
+    assert_eq!(texture(&tall).max_size, 8192, "either side counts");
+    let huge = dir.join("huge.png");
+    let err = prepare_bake("t", (16384, 64), [huge.to_str().unwrap()]).unwrap_err();
     assert!(err.contains("16384x64") && err.contains("8192"), "{err}");
+    assert!(!meta_path(&huge).exists(), "refused before its sidecar");
 }
