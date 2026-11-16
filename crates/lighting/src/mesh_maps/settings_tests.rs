@@ -1,10 +1,11 @@
 //! What each bake setting changes (#2260): the curvature band's reach, the AO ray
-//! count's grain, a non-square size; and that the defaults are the old constants.
+//! count's grain, a non-square size, a texel's measure, a ray-less texel; and that
+//! the defaults are the old constants.
 
 use glam::{Vec2, Vec3};
 
-use super::fixtures::{bake_with, cell, cube, l_shape};
-use super::{curvature, rays, MeshMap, MeshSource, Settings};
+use super::fixtures::{bake_with, cell, cube, l_shape, quad};
+use super::{curvature, rays, Baked, MeshMap, MeshSource, Settings};
 use rusty_procgen::image_buf::{Image, Size};
 
 /// The one map `map` of `mesh` baked with `settings`.
@@ -135,7 +136,7 @@ fn a_setting_out_of_range_is_refused_naming_it() {
         size: Size::new(8, 0),
         ..base
     })
-    .contains("height 0"));
+    .contains("size {8, 0}"));
     assert!(err(Settings { ao_rays: 0, ..base }).contains("ao_rays 0"));
     assert!(err(Settings {
         thickness_rays: 5000,
@@ -148,5 +149,64 @@ fn a_setting_out_of_range_is_refused_naming_it() {
             ..base
         });
         assert!(e.contains("curvature_radius"), "{e}");
+    }
+    // The cube's diagonal is √3 m: a radius past it (millimetres typed as metres)
+    // is refused naming the limit, one inside it bakes.
+    let wide = |r| Settings {
+        curvature_radius: Some(r),
+        ..base
+    };
+    let e = bake_with(&cube(), &[MeshMap::Curvature], &wide(2.0)).unwrap_err();
+    assert!(
+        e.contains("curvature_radius 2 is above") && e.contains("1.73"),
+        "{e}"
+    );
+    assert!(bake_with(&cube(), &[MeshMap::Curvature], &wide(1.7)).is_ok());
+}
+
+/// A flat quad `w × h` metres facing +Z, its UV0 the whole square, every normal
+/// `normal`.
+fn sheet(w: f32, h: f32, normal: Vec3) -> MeshSource {
+    let mut m = MeshSource::default();
+    let c = [Vec3::ZERO, Vec3::X * w, Vec3::new(w, h, 0.0), Vec3::Y * h];
+    quad(&mut m, c, (Vec2::ZERO, Vec2::ONE), 0);
+    m.normals.fill(normal.normalize());
+    m
+}
+
+#[test]
+fn a_texel_is_measured_by_its_area_so_a_strip_floors_at_three_real_texels() {
+    // A 64 m × 1 m strip at 4096×64: each texel is 1/64 m square, so the curvature
+    // band's three-texel floor (`3 × texel_world`) is three of them, not 3/64 of
+    // the strip's height (which the shorter side would give: 24 texels along it).
+    let strip = sheet(64.0, 1.0, Vec3::Z);
+    let baked = Baked::new(&strip, &Settings::new(Size::new(4096, 64))).unwrap();
+    assert!(
+        (baked.texel_world() * 64.0 - 1.0).abs() < 1e-5,
+        "{}",
+        baked.texel_world()
+    );
+    // A square map divides by its edge exactly, as before it could be non-square.
+    let cube = cube();
+    let baked = Baked::new(&cube, &Settings::new(48)).unwrap();
+    let per_uv = crate::lightmap::world_per_uv(&cube.surface()).unwrap();
+    assert_eq!(baked.texel_world(), per_uv / 48.0);
+}
+
+#[test]
+fn a_texel_whose_every_ray_is_dropped_reads_the_neutral_value() {
+    // Normals leaning nearly flat off a lone sheet: about half of a texel's one ray
+    // falls under the face and is dropped. Nothing can occlude the sheet nor stop
+    // a ray through it, so every texel reads 1, dropped or not.
+    let leaning = sheet(1.0, 1.0, Vec3::new(1.0, 0.0, 0.05));
+    let settings = Settings {
+        ao_rays: 1,
+        thickness_rays: 1,
+        ..Settings::new(16)
+    };
+    for map in [MeshMap::Ao, MeshMap::Thickness] {
+        let img = one(&leaning, map, settings);
+        let low = img.pixels().iter().filter(|p| p[0] < 1.0).count();
+        assert_eq!(low, 0, "{map:?}: {low} texels below 1");
     }
 }

@@ -127,25 +127,7 @@ pub fn bake(
     settings: &Settings,
     mut sink: impl FnMut(MeshMap, Image) -> Result<(), String>,
 ) -> Result<(), String> {
-    settings.check()?;
-    source.check()?;
-    let Size { width, height } = settings.size;
-    let points = rasterize_surface(&source.surface(), width, height);
-    if points.is_empty() {
-        return Err("has no triangle inside UV0's 0..1 square".into());
-    }
-    let (min, max) = source.positions.iter().fold(
-        (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN)),
-        |(lo, hi), &p| (lo.min(p), hi.max(p)),
-    );
-    let baked = Baked {
-        source,
-        settings: *settings,
-        points,
-        min,
-        extent: max - min,
-        diagonal: (max - min).length(),
-    };
+    let baked = Baked::new(source, settings)?;
     let mut tracer = None;
     let mut done = Vec::new();
     for &map in maps {
@@ -175,7 +157,33 @@ pub fn bake(
     Ok(())
 }
 
-impl Baked<'_> {
+impl<'a> Baked<'a> {
+    /// The covered texels and bounds of `source` at `settings`, or why they can't
+    /// be baked (the settings, the mesh, or no triangle inside UV0).
+    fn new(source: &'a MeshSource, settings: &Settings) -> Result<Self, String> {
+        settings.check()?;
+        source.check()?;
+        let Size { width, height } = settings.size;
+        let points = rasterize_surface(&source.surface(), width, height);
+        if points.is_empty() {
+            return Err("has no triangle inside UV0's 0..1 square".into());
+        }
+        let (min, max) = source.positions.iter().fold(
+            (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN)),
+            |(lo, hi), &p| (lo.min(p), hi.max(p)),
+        );
+        let diagonal = (max - min).length();
+        settings.check_reach(diagonal)?;
+        Ok(Baked {
+            source,
+            settings: *settings,
+            points,
+            min,
+            extent: max - min,
+            diagonal,
+        })
+    }
+
     /// `p` in the bounds, 0..1 per axis; a flat axis reads 0.5.
     fn normalised(&self, p: Vec3) -> Vec3 {
         let span = |d: f32, e: f32| if e > 0.0 { d / e } else { 0.5 };
@@ -187,11 +195,14 @@ impl Baked<'_> {
         )
     }
 
-    /// World units one texel spans, on average over the mesh, along the map's
-    /// shorter side (the coarser texel of a non-square map).
+    /// World units one texel spans, on average over the mesh: the root of a
+    /// texel's world area, so a non-square map whose model is as long as its UV is
+    /// stretched (a strip light at 4096×64) measures its real, square texel. A
+    /// square map divides by its edge exactly (the product is taken in `f64`).
     fn texel_world(&self) -> f32 {
         let Size { width, height } = self.settings.size;
-        world_per_uv(&self.source.surface()).unwrap_or(self.diagonal) / width.min(height) as f32
+        let texels = (f64::from(width) * f64::from(height)).sqrt() as f32;
+        world_per_uv(&self.source.surface()).unwrap_or(self.diagonal) / texels
     }
 }
 

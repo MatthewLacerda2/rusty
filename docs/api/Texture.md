@@ -156,8 +156,8 @@ naming it.
 |---|---|---|
 | `resolution` | `1024` | the square map's edge, 1 to 8192 |
 | `size` | — | `{w, h}` instead of `resolution`, each side 1 to 8192: UV0's unit square stretches over it, as `Texture.Bake`'s `size` does, so a long thin model (a strip light) fills a wide map. Naming both is an error |
-| `curvature_radius` | 2 % of the bounds diagonal | how far from a crease the `curvature` band reaches, in the model's own units (metres at import scale): `0.003` keeps a 3 mm chip on a 12 mm door edge. It is never narrower than three of the mesh's average texels |
-| `ao_rays` | `64` (Substance's *Secondary Rays*) | rays per texel for `ao`, 1 to 1024: the grain falls with the square root (256 rays, half the grain of 64) |
+| `curvature_radius` | 2 % of the bounds diagonal | how far from a crease the `curvature` band reaches, in the model's own units (metres at import scale): `0.003` keeps a 3 mm chip on a 12 mm door edge. It is never narrower than three of the mesh's average texels, and one above the model's bounds diagonal is refused |
+| `ao_rays` | `64` (Substance's *Secondary Rays*) | rays per texel for `ao`, 1 to 1024: the grain falls with the square root (256 rays, half the grain of 64), and the time grows with the count: at 1024 a fully covered 4096² map takes about half an hour on 4 cores |
 | `thickness_rays` | `64` | rays per texel for `thickness`, 1 to 1024 |
 
 ```lua no-run
@@ -175,16 +175,21 @@ Texture.BakeMeshMaps("assets/models/pool_fixtures.blend::Locker_Bank",
 | `thickness` | how far `thickness_rays` (64) rays cast into the model (around the inverted normal) travel before they leave it, averaged, over the bounds' diagonal; a ray that never leaves counts the whole diagonal: 1 thick, towards 0 thin | 1 |
 | `id` | one fully saturated colour per material, hues a golden-ratio step apart (a triangle with no material red, then the model's materials in order); two runs drawn with one material share its colour | black |
 
-The bake's settings are Substance's defaults and are **fixed today**: no argument
-or recipe changes them. They are 64 rays per texel, an occluder distance of the
-whole bounds diagonal, and a **16-texel margin** around every UV island (a
+The settings table sets the size, the curvature band and the ray counts; the
+rest is Substance's defaults and no argument changes it: an occluder distance of
+the whole bounds diagonal, and a **16-texel margin** around every UV island (a
 continuous map's margin averages its border, the ID map's copies it, so no margin
 holds a colour between two materials). Rays are drawn around the interpolated
 normal, and one that would leave under the triangle's own face is dropped, so on a
-smooth low-poly mesh no ray starts under the face it leaves; a face wound
+smooth low-poly mesh no ray starts under the face it leaves; a texel whose every
+ray is dropped (few rays, a normal leaning far off its face) reads the map's
+neutral 1, open and thick. A face wound
 against its normals (an `.obj` face listed clockwise from its `vn`) draws them
-around its face normal instead. A `curvature` crease lights a band 2%
-of the bounds diagonal wide, never narrower than 3 texels: each edge two faces
+around its face normal instead. A `curvature` crease lights a band reaching
+`curvature_radius` (2% of the bounds diagonal by default; a radius past the
+diagonal is refused, since the band would cover the whole model), never narrower
+than 3 texels (a texel measured by its world area, so a stretched non-square map
+counts its real texels): each edge two faces
 share is a crease of strength `angle / 90°` (capped at 1), corners welded by
 position first so a UV or normal seam never breaks one. A texel sums the convex
 creases within the band (each fading to nothing at its edge), and apart the

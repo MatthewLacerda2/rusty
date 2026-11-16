@@ -46,7 +46,8 @@ impl MeshRays {
 
     /// Ambient occlusion of the texel at `p` (`i` its place in the bake): the share
     /// of `Settings::ao_rays` cosine rays off the surface that meet no triangle within
-    /// [`MAX_DISTANCE`]. 1 is open, 0 enclosed.
+    /// [`MAX_DISTANCE`]. 1 is open, 0 enclosed; a texel whose every ray `rays_off`
+    /// dropped reads 1.
     pub(super) fn ao(&self, baked: &Baked, i: usize, p: &TexelPoint) -> Vec4 {
         let reach = MAX_DISTANCE * baked.diagonal;
         let mut rng = Rng::new(0, AO_STREAM, i as u64);
@@ -56,13 +57,20 @@ impl MeshRays {
             cast += 1;
             open += u32::from(!self.rays.occluded_by(origin, dir, (0.0, reach), |_| true));
         }
-        Vec3::splat(open as f32 / cast.max(1) as f32).extend(1.0)
+        // Every ray dropped (a normal leaning far off its face, few rays): no
+        // occlusion was seen, so the texel reads open, as the map's background.
+        let open = if cast == 0 {
+            1.0
+        } else {
+            open as f32 / cast as f32
+        };
+        Vec3::splat(open).extend(1.0)
     }
 
     /// Thickness of the texel at `p`: how far `Settings::thickness_rays` cosine rays cast into the
     /// mesh (around the inverted normal) travel before they leave it, averaged, as a
     /// share of [`MAX_DISTANCE`]; a ray that meets nothing counts the whole distance.
-    /// 1 is thick, towards 0 thin.
+    /// 1 is thick, towards 0 thin; a texel whose every ray was dropped reads 1.
     pub(super) fn thickness(&self, baked: &Baked, i: usize, p: &TexelPoint) -> Vec4 {
         let reach = MAX_DISTANCE * baked.diagonal;
         let mut rng = Rng::new(0, THICKNESS_STREAM, i as u64);
@@ -73,7 +81,14 @@ impl MeshRays {
             cast += 1;
             travelled += self.distance(origin, dir, reach);
         }
-        Vec3::splat(travelled / (cast.max(1) as f32 * reach)).extend(1.0)
+        // Every ray dropped: nothing was measured, so the texel reads thick, the
+        // map's background, not 0 (as thin as a texel can read).
+        let thick = if cast == 0 {
+            1.0
+        } else {
+            travelled / (cast as f32 * reach)
+        };
+        Vec3::splat(thick).extend(1.0)
     }
 
     /// How far `origin + t * dir` goes before it meets a triangle, at most `reach`.

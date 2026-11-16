@@ -156,6 +156,8 @@ fn a_settings_table_names_size_band_and_rays() {
         ("return { ao_ray = 8 }", "ao_ray"),
         ("return \"big\"", "string"),
         ("return -4", "resolution -4"),
+        ("return { size = {0, 0} }", "size {0, 0}"),
+        ("return { size = {16, 9000} }", "size {16, 9000}"),
     ] {
         let e = settings_of(bad).unwrap_err();
         assert!(e.contains(says), "{bad}: {e}");

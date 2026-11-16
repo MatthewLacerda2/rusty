@@ -60,8 +60,8 @@ struct Options {
 
 /// The bake settings the fourth argument names: `nil` (the defaults), a number
 /// (the square resolution) or a settings table. A table naming both `resolution`
-/// and `size`, or a field the table doesn't know, is an error. The ranges are the
-/// baker's to check.
+/// and `size`, or a field the table doesn't know, is an error, and so is a `size`
+/// side out of range (named as `size`); every other range is the baker's to check.
 pub(super) fn settings(options: &Value) -> Result<Settings, String> {
     let table = match options {
         Value::Nil => return Ok(Settings::new(DEFAULT_RESOLUTION)),
@@ -78,7 +78,16 @@ pub(super) fn settings(options: &Value) -> Result<Settings, String> {
     let o: Options = serde_json::from_value(table).map_err(|e| format!("settings: {e}"))?;
     let size = match (o.resolution, o.size) {
         (Some(_), Some(_)) => return Err("settings name both resolution and size".into()),
-        (_, Some([w, h])) => Size::new(w, h),
+        (_, Some([w, h])) => {
+            // A square `size` would reach the baker as a resolution and be refused
+            // under that name: the field the script wrote is the one an error names.
+            if ![w, h].iter().all(|s| (1..=MAX_RESOLUTION).contains(s)) {
+                return Err(format!(
+                    "size {{{w}, {h}}} has a side outside 1..={MAX_RESOLUTION}"
+                ));
+            }
+            Size::new(w, h)
+        }
         (r, None) => Size::from(r.unwrap_or(DEFAULT_RESOLUTION)),
     };
     let defaults = Settings::new(size);
