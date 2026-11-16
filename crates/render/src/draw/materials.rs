@@ -36,8 +36,8 @@ pub(crate) fn entity_params(scene: &Scene, id: u32, slot: usize) -> Option<Entit
 
 impl Renderer {
     /// The material cache index for `material` — `(library key, asset)` of scene
-    /// `scene`'s library — drawn with pipeline `pipeline`: its eight maps (albedo, metallic, roughness, normal,
-    /// emissive, detail, occlusion, specular), building the bind group on first use. The key is the *resolved*
+    /// `scene`'s library — drawn with pipeline `pipeline`: its nine maps (albedo, metallic, roughness, normal,
+    /// emissive, detail, occlusion, specular, height), building the bind group on first use. The key is the *resolved*
     /// signature, so a late-loaded texture gets a fresh group (#207). When the
     /// pipeline's shader has runtime params, the material's values are packed into
     /// its own param buffer first (#399).
@@ -111,7 +111,7 @@ impl Renderer {
     /// is 2 where the bound normal map is BC5, its table in the record (#1702), and
     /// its specular flag 2 where that map is `SingleChannel` (red, not glTF's alpha,
     /// #2151). Every map whose row switches off while missing
-    /// ([`MapSlot::off_while_missing`]: detail, occlusion, specular level) has its
+    /// ([`MapSlot::off_while_missing`]: detail, occlusion, specular level, height) has its
     /// flag 0 while its texture is not resident.
     ///
     /// [`MapSlot::off_while_missing`]: super::map_slots::MapSlot::off_while_missing
@@ -169,11 +169,11 @@ impl Renderer {
         }
     }
 
-    /// Build a group(2) material bind group from the resolved textures (the eight
+    /// Build a group(2) material bind group from the resolved textures (the nine
     /// maps in `MAP_SLOTS` order: albedo, metallic, roughness, normal, emissive,
-    /// detail, occlusion, specular level; then the extra slots), against
+    /// detail, occlusion, specular level, height; then the extra slots), against
     /// `material_layout`. Each map binds at its row's binding (#202, #207, #1997,
-    /// #2151), each extra
+    /// #2151, #2191), each extra
     /// slot at its own binding (7, #400), and each texture's own sampler — its
     /// import settings' wrap and filter (#1323) — beside it: albedo's at 1, the
     /// rest at `textures::sampler_binding`. `owner`'s param buffer (or the shared

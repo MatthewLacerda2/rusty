@@ -3,10 +3,30 @@
 use std::collections::BTreeMap;
 
 use super::{
-    default_alpha, default_alpha_cutoff, default_base_color, default_blend_sharpness, default_ior,
-    default_one, default_roughness, default_tiling, white, BlendMode, DecalBlend, MaterialAsset,
-    RefractionModel, RenderFace, RenderMode, TaaReactive, UvMapping,
+    default_blend_sharpness, default_height_scale, default_ior, default_one, default_tiling, white,
+    BlendMode, DecalBlend, MaterialAsset, RefractionModel, RenderFace, RenderMode, TaaReactive,
+    UvMapping,
 };
+
+pub(super) fn default_base_color() -> [f32; 3] {
+    [1.0, 1.0, 1.0]
+}
+
+pub(super) fn default_roughness() -> f32 {
+    0.5
+}
+
+pub(super) fn default_alpha() -> f32 {
+    1.0
+}
+
+pub(super) fn default_alpha_cutoff() -> f32 {
+    0.5
+}
+
+pub(super) fn default_true() -> bool {
+    true
+}
 
 impl Default for MaterialAsset {
     fn default() -> Self {
@@ -23,6 +43,8 @@ impl Default for MaterialAsset {
             occlusion_map: None,
             occlusion_strength: default_one(),
             specular_map: None,
+            height_map: None,
+            height_scale: default_height_scale(),
             tiling: default_tiling(),
             offset: [0.0; 2],
             uv_mapping: UvMapping::Uv0,

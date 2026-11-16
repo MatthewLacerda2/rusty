@@ -93,7 +93,7 @@ pub(crate) struct MaterialData {
     pub dielectric_reflectance: [f32; 4],
     // The detail layer (#1997, HDRP's detail map).
     pub detail: DetailUniform,
-    // The occlusion and specular-level maps (#2151).
+    // The occlusion, specular-level (#2151) and height (#2191) maps.
     pub level_maps: LevelMapsUniform,
 }
 
@@ -230,9 +230,10 @@ pub(crate) struct DetailUniform {
     pub _pad: [u32; 3],
 }
 
-/// The occlusion and specular-level maps' terms (#2151), packed from the material
-/// (`render::draw::map_slots::level_maps_uniform`); off for a draw without one, and
-/// each flag 0 while its map has no resident texture (`Renderer::with_map_channels`).
+/// The occlusion, specular-level (#2151) and height (#2191) maps' terms, packed from
+/// the material (`render::draw::map_slots::level_maps_uniform`); off for a draw without
+/// one, and each flag 0 while its map has no resident texture
+/// (`Renderer::with_map_channels`).
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct LevelMapsUniform {
@@ -244,5 +245,10 @@ pub(crate) struct LevelMapsUniform {
     /// reflectance by its alpha, 2 by its red (a one-channel upload, as
     /// `use_metallic_map`'s 2).
     pub use_specular_map: u32,
-    pub _pad: u32,
+    /// 1 when the height map (red) displaces every map's UV by parallax occlusion
+    /// mapping: named, and the material `Opaque` under UV0 or Planar.
+    pub use_height_map: u32,
+    /// The height map's depth, as a fraction of one repeat's width (`[0, 0.2]`).
+    pub height_scale: f32,
+    pub _pad: [u32; 3],
 }

@@ -43,7 +43,7 @@ fn all() -> Vec<String> {
 fn every_map_is_written_beside_the_prefix_in_a_new_folder() {
     let (dir, model) = project("mesh_maps_all");
     let prefix = format!("{}/maps/l_", dir.to_str().unwrap());
-    let written = bake_mesh_maps(&model, &all(), &prefix, 16, &dir).unwrap();
+    let written = bake_mesh_maps(&model, &all(), &prefix, &Settings::new(16), &dir).unwrap();
     assert_eq!(written.len(), 6);
     for (map, path) in &written {
         assert_eq!(path, &format!("{prefix}{map}.png"));
@@ -57,7 +57,14 @@ fn every_map_is_written_beside_the_prefix_in_a_new_folder() {
 fn a_prefix_ending_in_a_slash_gets_its_folder_made() {
     let (dir, model) = project("mesh_maps_slash");
     let prefix = format!("{}/maps/kolvik/", dir.to_str().unwrap());
-    let written = bake_mesh_maps(&model, &["id".to_string()], &prefix, 8, &dir).unwrap();
+    let written = bake_mesh_maps(
+        &model,
+        &["id".to_string()],
+        &prefix,
+        &Settings::new(8),
+        &dir,
+    )
+    .unwrap();
     assert!(Path::new(&written["id"]).is_file(), "{written:?}");
     assert!(written["id"].ends_with("/maps/kolvik/id.png"));
     std::fs::remove_dir_all(dir).ok();
@@ -67,8 +74,9 @@ fn a_prefix_ending_in_a_slash_gets_its_folder_made() {
 fn a_bad_call_names_the_verb_and_the_model() {
     let (dir, model) = project("mesh_maps_bad");
     let prefix = format!("{}/l_", dir.to_str().unwrap());
-    let bad =
-        |model: &str, maps: &[String]| bake_mesh_maps(model, maps, &prefix, 8, &dir).unwrap_err();
+    let bad = |model: &str, maps: &[String]| {
+        bake_mesh_maps(model, maps, &prefix, &Settings::new(8), &dir).unwrap_err()
+    };
     let e = bad(&model, &["dirt".to_string()]);
     assert!(
         e.starts_with(&format!("Texture.BakeMeshMaps: {model}:")),
@@ -109,5 +117,72 @@ fn a_recipe_reads_a_baked_map_through_the_image_op() {
     // u ≈ 0.39, v ≈ 0.92 (the .obj flips v): the floor, by its x = 0 edge.
     let (x, y) = (12, 29);
     assert!(img.get_pixel(x, y)[0] < 30_000, "{:?}", img.get_pixel(x, y));
+    std::fs::remove_dir_all(dir).ok();
+}
+
+/// `settings` on the Lua value `src` evaluates to.
+fn settings_of(src: &str) -> Result<Settings, String> {
+    settings(&Lua::new().load(src).eval::<mlua::Value>().unwrap())
+}
+
+#[test]
+fn nil_a_number_and_a_resolution_field_are_the_same_settings() {
+    assert_eq!(
+        settings_of("return nil"),
+        Ok(Settings::new(DEFAULT_RESOLUTION))
+    );
+    assert_eq!(settings_of("return 64"), Ok(Settings::new(64)));
+    assert_eq!(
+        settings_of("return { resolution = 64 }"),
+        Ok(Settings::new(64))
+    );
+    assert_eq!(
+        settings_of("return {}"),
+        Ok(Settings::new(DEFAULT_RESOLUTION))
+    );
+}
+
+#[test]
+fn a_settings_table_names_size_band_and_rays() {
+    let s = settings_of(
+        "return { size = {64, 16}, curvature_radius = 0.003, ao_rays = 256, thickness_rays = 8 }",
+    )
+    .unwrap();
+    assert_eq!(s.size, rusty_procgen::image_buf::Size::new(64, 16));
+    assert_eq!(s.curvature_radius, Some(0.003));
+    assert_eq!((s.ao_rays, s.thickness_rays), (256, 8));
+    for (bad, says) in [
+        ("return { resolution = 8, size = {8, 8} }", "both"),
+        ("return { ao_ray = 8 }", "ao_ray"),
+        ("return \"big\"", "string"),
+        ("return -4", "resolution -4"),
+        ("return { size = {0, 0} }", "size {0, 0}"),
+        ("return { size = {16, 9000} }", "size {16, 9000}"),
+    ] {
+        let e = settings_of(bad).unwrap_err();
+        assert!(e.contains(says), "{bad}: {e}");
+    }
+}
+
+#[test]
+fn a_non_square_bake_writes_that_shape_and_the_baker_checks_the_ranges() {
+    let (dir, model) = project("mesh_maps_settings");
+    let lua = Lua::new();
+    super::super::register(&lua).unwrap();
+    lua.globals().set("MODEL", model).unwrap();
+    lua.globals()
+        .set("PREFIX", format!("{}/l_", dir.to_str().unwrap()))
+        .unwrap();
+    let script = r#"return Texture.BakeMeshMaps(MODEL, { "ao" }, PREFIX,
+        { size = { 32, 8 }, ao_rays = 4 }).ao"#;
+    let path: String = lua.load(script).eval().unwrap();
+    let img = image::open(&path).unwrap();
+    assert_eq!(image::GenericImageView::dimensions(&img), (32, 8));
+    let bad = r#"return Texture.BakeMeshMaps(MODEL, { "ao" }, PREFIX, { ao_rays = 0 })"#;
+    let e = lua.load(bad).eval::<mlua::Value>().unwrap_err().to_string();
+    assert!(
+        e.contains("Texture.BakeMeshMaps:") && e.contains("ao_rays 0"),
+        "{e}"
+    );
     std::fs::remove_dir_all(dir).ok();
 }
