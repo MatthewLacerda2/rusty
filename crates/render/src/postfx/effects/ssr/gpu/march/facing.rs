@@ -4,6 +4,9 @@
 //! thin pole before it is hit from behind (the depth target holds only its front)
 //! somewhere in such a step, and its hit is judged give or take the step's depth:
 //! by the object's thickness alone, a column of the pole's image goes missing.
+//! The rays the mirror sends past the pole's foot pass a few centimetres behind
+//! it, further than its 3 cm at the default thickness, on their way to the floor
+//! behind it: they keep the floor's hit.
 
 use glam::{Vec2, Vec3};
 
@@ -64,5 +67,37 @@ fn gpu_a_thin_pole_before_a_mirror_seen_head_on_keeps_its_reflection() {
     assert!(
         (COVER.0..=COVER.1).contains(&cover),
         "a thin pole's reflection seen head-on covers {cover:.2} of its image"
+    );
+}
+
+/// The most mirror pixels between the pole's foot and its image's that may hit
+/// nothing. Measured (lavapipe): 0; a ray behind the pole taken as past it for
+/// good, which the next refinement collapsed back onto the pole, 25: a dotted line
+/// of misses from the foot to the image's foot.
+const LOST: usize = 2;
+
+#[test]
+fn gpu_a_ray_passing_behind_a_thin_pole_keeps_the_floor_behind_it() {
+    let Some(mut r) = crate::test_gpu::headless_or_skip(SIZE.0, SIZE.1) else {
+        return;
+    };
+    let (scene, cam) = pole_before_a_mirror();
+    let hits = Hits::of(&mut r, &scene, &cam, SIZE);
+    // The pole's foot, the mirror's foot and the image's foot, on screen.
+    let pole = pixel(&cam, Vec3::new(0.01, 0.0, -3.0));
+    let (foot, image) = (
+        pixel(&cam, Vec3::new(0.0, 0.0, -4.0)),
+        pixel(&cam, Vec3::new(0.0, 0.0, -5.0)),
+    );
+    let rows = (image.y.ceil() as u32 + 1)..(foot.y.floor() as u32);
+    let columns = (pole.x.ceil() as u32 + 1)..(image.x.floor() as u32);
+    let lost = rows
+        .flat_map(|y| columns.clone().map(move |x| (x, y)))
+        .filter(|&(x, y)| hits.at(x, y).iter().all(|c| *c < 0.01))
+        .count();
+    eprintln!("[ssr] a 2 cm pole before a mirror, head-on: {lost} pixels of the floor behind its foot hit nothing");
+    assert!(
+        lost <= LOST,
+        "rays passing behind a thin pole lose the floor behind it: {lost} pixels"
     );
 }

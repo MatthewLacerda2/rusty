@@ -3,6 +3,7 @@
 //! what it hits.
 
 mod facing;
+mod fraction;
 mod hits;
 mod hugging;
 mod placing;

@@ -142,8 +142,9 @@ fn project(f: Frame, p: vec3<f32>) -> vec3<f32> {
 
 // How far behind the scene at `p` a point may lie and still be on it: the march
 // without a pyramid's whole test, and the one with a pyramid's before `object`.
-fn slack(f: Frame, p: vec3<f32>) -> f32 {
-    return max(max(THICKNESS, depth_of(f, p) * DEPTH_SLACK), object(f, p));
+fn slack(f: Frame, here: Probe, p: vec3<f32>) -> f32 {
+    let d = depth_of(f, p);
+    return max(max(THICKNESS, d * DEPTH_SLACK), object(f, d - here.behind));
 }
 
 // How far behind the object a hit at `p` may lie and still hit it, in a march with
@@ -158,9 +159,12 @@ fn slack(f: Frame, p: vec3<f32>) -> f32 {
 // thin thing (a 6 mm strip drawn as deep as the setting), a thin one lets an
 // object's hidden side leak (a crate's far side in a mirror behind it shows
 // the floor along its silhouette). It is the same on every jitter offset, and
-// at every resolution and field of view: it reads no width on screen.
-fn object(f: Frame, p: vec3<f32>) -> f32 {
-    return f.thickness * depth_of(f, p);
+// at every resolution and field of view: it reads no width on screen. `surface`
+// is the depth of the surface the ray is behind, not the ray's own: HDRP's
+// `behind ≤ thickness × z`, so at 0.5 an object is taken half its depth deep, at 1
+// all of it.
+fn object(f: Frame, surface: f32) -> f32 {
+    return f.thickness * surface;
 }
 
 // Where a march point stands against the scene: in front of it (or over the sky),
@@ -173,7 +177,7 @@ fn state(f: Frame, here: Probe, p: vec3<f32>) -> i32 {
     if (!here.valid || here.behind <= 0.0) {
         return FRONT;
     }
-    return select(BEYOND, ON, here.behind <= slack(f, p));
+    return select(BEYOND, ON, here.behind <= slack(f, here, p));
 }
 
 // Where a refinement settled: `go`, the point on the far side of the boundary,
@@ -326,6 +330,41 @@ fn clear(f: Frame, t_depth: texture_2d<f32>, t_hiz: texture_2d<f32>, s: sampler,
     return vec2<f32>(front, select(world_fraction(u, ca.w, cb.w), 1.0, u >= 1.0));
 }
 
+// Whether a ray point `p`, probed as `hit`, hits what it is behind: on the scene,
+// and no further behind it than its object is deep, give or take where the
+// refinement could place it (`placed`): a step `clear` walked is bracketed within
+// a probe's spacing, so its hit is judged by the object's depth alone; one it did
+// not (one under a texel, one behind an object) may span a metre, and its hit is
+// not lost for lying deeper than the ray went. The march without a pyramid (a
+// transparent's, #2268, `levels` 0) keeps `slack` alone: it still steps over a
+// thin line, and finds it mostly from behind, where `object` would drop it.
+fn lands(f: Frame, t_depth: texture_2d<f32>, levels: i32, hit: Probe, p: vec3<f32>, placed: f32) -> bool {
+    if (state(f, hit, p) != ON) {
+        return false;
+    }
+    if (levels <= 0) {
+        return true;
+    }
+    let surface = depth_of(f, p) - hit.behind;
+    return hit.behind <= object(f, surface) + placed;
+}
+
+// Whether a refinement from ON (`keep` behind the scene, `go` in front of it)
+// came out in front of the surface it was behind: the surface at `go` no deeper
+// than the one at `keep` and its object (`object`) and texel's slack
+// (`DEPTH_SLACK`), so the ray crossed that surface's front, not a texel's edge to
+// a farther one.
+fn crosses(f: Frame, t_depth: texture_2d<f32>, b: Bracket) -> bool {
+    let kept = probe(f, t_depth, b.keep);
+    let gone = probe(f, t_depth, b.go);
+    if (!kept.valid || !gone.valid) {
+        return false;
+    }
+    let behind = depth_of(f, b.keep) - kept.behind;
+    let front = depth_of(f, b.go) - gone.behind;
+    return front <= behind + max(object(f, behind), behind * DEPTH_SLACK);
+}
+
 // March the reflected ray `r` from `origin` in `steps` steps of at most `step`
 // world units (and at most `step_cap` on screen), against `t_depth`'s
 // depths as `f` measures them. Each point is in front of the scene, on it (behind
@@ -400,7 +439,9 @@ fn trace_hit(f: Frame, t_depth: texture_2d<f32>, t_hiz: texture_2d<f32>, s_hiz: 
             break;
         }
         let now = state(f, here, p);
-        if (now != was) {
+        // A point still ON (behind a thin object by more than `object`, within
+        // `slack`) is judged again: the next ON point may be a surface behind it.
+        if (now != was || now == ON) {
             let found = refine(f, t_depth, start, p, was);
             var back = found.go;
             var hit = probe(f, t_depth, back);
@@ -408,23 +449,25 @@ fn trace_hit(f: Frame, t_depth: texture_2d<f32>, t_hiz: texture_2d<f32>, s_hiz: 
             // from where it is placed alone: the ray's depth across the bracket.
             var placed = abs(depth_of(f, back) - depth_of(f, found.keep));
             // The halving can settle on another boundary than the one the step
-            // crossed (two edges between its ends): a step that landed on the scene
-            // still hits there, placed only to within the step.
-            if (state(f, hit, back) != ON && now == ON) {
+            // crossed (two edges between its ends, or the thin object a ray just
+            // passed behind): a step that landed on the scene still hits there,
+            // placed only to within the step.
+            let placed_p = abs(depth_of(f, p) - depth_of(f, start));
+            if (!lands(f, t_depth, hiz_levels, hit, back, placed) && lands(f, t_depth, hiz_levels, here, p, placed_p)) {
                 back = p;
                 hit = here;
-                placed = abs(depth_of(f, p) - depth_of(f, start));
+                placed = placed_p;
             }
-            // On the scene, and no further behind it than its object is deep, give
-            // or take where the refinement could place it: a step `clear` walked is
-            // bracketed within a probe's spacing, so its hit is judged by the
-            // object's depth alone; one it did not (one under a texel, one behind
-            // an object) may span a metre, and its hit is not lost for lying
-            // deeper than the ray went. The march without a pyramid (a
-            // transparent's, #2268) keeps `slack` alone: it still steps over a thin
-            // line, and finds it mostly from behind, where `object` would drop it.
-            let lands = state(f, hit, back) == ON && (hiz_levels <= 0 || hit.behind <= object(f, back) + placed);
-            if (lands) {
+            // From ON (behind an object by more than `object`), a ray that comes
+            // out in front of the same surface crossed its front within the
+            // bracket: a hit there. One that comes out in front of a farther
+            // surface beside it passed behind the object, and marches on.
+            let crossed = was == ON && now == FRONT && crosses(f, t_depth, found);
+            if (crossed) {
+                back = found.keep;
+                hit = probe(f, t_depth, back);
+            }
+            if (crossed || lands(f, t_depth, hiz_levels, hit, back, placed)) {
                 let dim = vec2<f32>(textureDimensions(t_color));
                 let t = distance(origin, back);
                 let width = footprint(f, back, r, t, cone, hit.uv, dim);
@@ -449,8 +492,10 @@ fn trace_hit(f: Frame, t_depth: texture_2d<f32>, t_hiz: texture_2d<f32>, s_hiz: 
         prev = p;
         prev_uv = here.uv;
         // A change that hit nothing passed behind a thin object: the march goes on
-        // behind it, as behind one too far in front to touch.
-        was = select(now, BEYOND, now == ON);
+        // behind it, still ON while within `slack` of it, so that a surface behind
+        // it the next step lands on is a hit, not a boundary refined back onto the
+        // object.
+        was = now;
     }
     return Hit(vec4<f32>(0.0), 0.0);
 }
