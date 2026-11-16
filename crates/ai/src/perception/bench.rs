@@ -10,7 +10,7 @@ use glam::Vec3;
 
 use super::{step, SightRays};
 use crate::perception::test_world::target;
-use crate::query::bench::level;
+use crate::query::bench::blocks;
 use rusty_components::AIPerceptionComponent;
 use rusty_physics::PhysicsWorld;
 use rusty_scene::Scene;
@@ -22,7 +22,8 @@ const BOT: u8 = 4;
 /// body, looking for `sight_mask` (the target's layer, or `u32::MAX`), one target
 /// standing in room (2, 2), and its physics world.
 pub fn level_with_perceivers(n: usize, sight_mask: u32) -> (Scene, PhysicsWorld, Vec<u32>) {
-    let (mut scene, _nav, _) = level(n, 1.0);
+    // Perception reads the colliders only: no navmesh is baked.
+    let mut scene = blocks(n);
     let mut bots = Vec::new();
     for i in 0..30 {
         let at = Vec3::new(

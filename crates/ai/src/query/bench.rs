@@ -13,8 +13,8 @@ use rusty_physics::PhysicsWorld;
 use rusty_scene::test_levels::rooms::rooms;
 use rusty_scene::{Camera, ColliderComponent, Scene};
 
-/// The bench level with a box collider on every block, baked at `cell` metres.
-pub fn level(n: usize, cell: f32) -> (Scene, NavigationGraph, PhysicsWorld) {
+/// The bench level's `n × n` rooms with a box collider on every block, unbaked.
+pub fn blocks(n: usize) -> Scene {
     let mut scene = rooms(n);
     let ids: Vec<u32> = scene.world.ids_with_mesh();
     for id in ids {
@@ -22,6 +22,12 @@ pub fn level(n: usize, cell: f32) -> (Scene, NavigationGraph, PhysicsWorld) {
         col.shape = ColliderShape::Box { size: Vec3::ONE };
         scene.world.set_collider(id, Some(col));
     }
+    scene
+}
+
+/// The bench level ([`blocks`]) baked at `cell` metres, and its physics world.
+pub fn level(n: usize, cell: f32) -> (Scene, NavigationGraph, PhysicsWorld) {
+    let mut scene = blocks(n);
     scene.nav_settings.grid_spacing = cell;
     let mut nav = NavigationGraph::new(0.0, 0.0, 0.0, 0.0, cell);
     nav.bake(&scene);

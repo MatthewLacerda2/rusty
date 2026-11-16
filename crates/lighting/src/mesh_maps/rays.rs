@@ -6,7 +6,8 @@ use glam::{Vec3, Vec4};
 use super::{Baked, MeshSource};
 use crate::lightmap::{cosine_sample, Rays, Rng, TexelPoint, Tri};
 
-/// Rays per texel: Substance's default *Secondary Rays*.
+/// Rays per texel by default: Substance's default *Secondary Rays*
+/// (`Settings::ao_rays`, `Settings::thickness_rays`).
 pub const SAMPLES: u32 = 64;
 
 /// How far a ray looks for an occluder, as a share of the mesh's bounds diagonal:
@@ -44,34 +45,50 @@ impl MeshRays {
     }
 
     /// Ambient occlusion of the texel at `p` (`i` its place in the bake): the share
-    /// of [`SAMPLES`] cosine rays off the surface that meet no triangle within
-    /// [`MAX_DISTANCE`]. 1 is open, 0 enclosed.
+    /// of `Settings::ao_rays` cosine rays off the surface that meet no triangle within
+    /// [`MAX_DISTANCE`]. 1 is open, 0 enclosed; a texel whose every ray `rays_off`
+    /// dropped reads 1.
     pub(super) fn ao(&self, baked: &Baked, i: usize, p: &TexelPoint) -> Vec4 {
         let reach = MAX_DISTANCE * baked.diagonal;
         let mut rng = Rng::new(0, AO_STREAM, i as u64);
-        let (origin, dirs) = rays_off(baked, p, 1.0, &mut rng);
+        let (origin, dirs) = rays_off(baked, p, 1.0, baked.settings.ao_rays, &mut rng);
         let (mut open, mut cast) = (0u32, 0u32);
         for dir in dirs {
             cast += 1;
             open += u32::from(!self.rays.occluded_by(origin, dir, (0.0, reach), |_| true));
         }
-        Vec3::splat(open as f32 / cast.max(1) as f32).extend(1.0)
+        // Every ray dropped (a normal leaning far off its face, few rays): no
+        // occlusion was seen, so the texel reads open, as the map's background.
+        let open = if cast == 0 {
+            1.0
+        } else {
+            open as f32 / cast as f32
+        };
+        Vec3::splat(open).extend(1.0)
     }
 
-    /// Thickness of the texel at `p`: how far [`SAMPLES`] cosine rays cast into the
+    /// Thickness of the texel at `p`: how far `Settings::thickness_rays` cosine rays cast into the
     /// mesh (around the inverted normal) travel before they leave it, averaged, as a
     /// share of [`MAX_DISTANCE`]; a ray that meets nothing counts the whole distance.
-    /// 1 is thick, towards 0 thin.
+    /// 1 is thick, towards 0 thin; a texel whose every ray was dropped reads 1.
     pub(super) fn thickness(&self, baked: &Baked, i: usize, p: &TexelPoint) -> Vec4 {
         let reach = MAX_DISTANCE * baked.diagonal;
         let mut rng = Rng::new(0, THICKNESS_STREAM, i as u64);
-        let (origin, dirs) = rays_off(baked, p, -1.0, &mut rng);
+        let n = baked.settings.thickness_rays;
+        let (origin, dirs) = rays_off(baked, p, -1.0, n, &mut rng);
         let (mut travelled, mut cast) = (0.0f32, 0u32);
         for dir in dirs {
             cast += 1;
             travelled += self.distance(origin, dir, reach);
         }
-        Vec3::splat(travelled / (cast.max(1) as f32 * reach)).extend(1.0)
+        // Every ray dropped: nothing was measured, so the texel reads thick, the
+        // map's background, not 0 (as thin as a texel can read).
+        let thick = if cast == 0 {
+            1.0
+        } else {
+            travelled / (cast as f32 * reach)
+        };
+        Vec3::splat(thick).extend(1.0)
     }
 
     /// How far `origin + t * dir` goes before it meets a triangle, at most `reach`.
@@ -85,7 +102,7 @@ impl MeshRays {
     }
 }
 
-/// The origin and the [`SAMPLES`] cosine directions a texel casts, `side` 1 out of
+/// The origin and the `samples` cosine directions a texel casts, `side` 1 out of
 /// the surface, -1 into it. They are drawn around the interpolated normal, and a
 /// direction on the wrong side of the triangle's own face is dropped, so on a
 /// smooth low-poly mesh no ray starts under the face it leaves. A shading normal
@@ -96,6 +113,7 @@ fn rays_off<'r>(
     baked: &Baked,
     p: &TexelPoint,
     side: f32,
+    samples: u32,
     rng: &'r mut Rng,
 ) -> (Vec3, impl Iterator<Item = Vec3> + 'r) {
     let face = baked.source.face_normal(p.tri()).unwrap_or(p.normal);
@@ -106,7 +124,7 @@ fn rays_off<'r>(
     } * side;
     let face = face * side;
     let origin = p.position + face * OFFSET * baked.diagonal;
-    let dirs = (0..SAMPLES)
+    let dirs = (0..samples)
         .map(move |_| cosine_sample(around, rng))
         .filter(move |d| d.dot(face) > 0.0);
     (origin, dirs)

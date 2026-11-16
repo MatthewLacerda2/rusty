@@ -14,9 +14,10 @@
 //! - `Texture.BakeSet(recipe, prefix)` — bake every entry of the recipe's
 //!   `outputs` (slot → node id) from one evaluation to `<prefix>_<slot>.png`
 //!   (#403). Returns a table canonical slot → path.
-//! - `Texture.BakeMeshMaps(model, maps, prefix, [resolution])` — bake a model's
-//!   mesh maps (curvature, AO, world normal, position, thickness, ID) in its UV0 to
-//!   `<prefix><map>.png` (`mesh_maps`, #1849). Returns a table map → path.
+//! - `Texture.BakeMeshMaps(model, maps, prefix, [resolution | settings])` — bake a
+//!   model's mesh maps (curvature, AO, world normal, position, thickness, ID) in
+//!   its UV0 to `<prefix><map>.png` (`mesh_maps`, #1849); `settings` sets the size,
+//!   the curvature band and the ray counts (#2260). Returns a table map → path.
 //! - `Texture.ToJson(recipe)` — serialize a recipe to its canonical JSON for
 //!   saving / diffing.
 //! - `Texture.Stats(recipe, [resolution])` — every node's min / max / mean / std /

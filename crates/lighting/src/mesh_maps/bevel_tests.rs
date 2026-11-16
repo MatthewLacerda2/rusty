@@ -7,7 +7,7 @@ use glam::{Vec2, Vec3};
 
 use super::curvature::Curvature;
 use super::fixtures::quad;
-use super::{Baked, MeshSource};
+use super::{Baked, MeshSource, Settings};
 use crate::lightmap::TexelPoint;
 
 /// The bevel's width beside the band (the band is 2 % of the √3 diagonal, ~0.035).
@@ -47,7 +47,7 @@ fn peak(segments: u32) -> f32 {
     let (min, max) = (Vec3::new(-1.0, -1.0, 0.0), Vec3::new(0.0, 0.0, 1.0));
     let baked = Baked {
         source: &source,
-        size: 1024,
+        settings: Settings::new(1024),
         points: Vec::new(),
         min,
         extent: max - min,
