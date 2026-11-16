@@ -169,12 +169,12 @@ fn depth(hits: &[Vec<f32>]) -> f32 {
 const HITS_DIP: f32 = 18.0;
 /// The most a tile of TAA's output may dip, for the 12 mm line: the 6 mm one is
 /// under a pixel tall, gone from the frame itself on some offsets, so TAA's
-/// output dips on its own aliasing (2.4; without a pyramid 1.6). Measured: 1.2
+/// output dips on its own aliasing (2.2; without a pyramid 1.6). Measured: 1.2
 /// (lavapipe); the march without a pyramid 13.9.
 const TAA_DIP: f32 = 5.0;
 /// The most rows deep the line's reflection may be, on average: a ray passing
 /// behind a line hits it within the volume's `thickness` of its depth (1%,
-/// `ssr_march.wgsl`'s `object`), not `THICKNESS`'s 15 cm. Measured: 4.4 and
+/// `ssr_march.wgsl`'s `object`), not `THICKNESS`'s 15 cm. Measured: 4.5 and
 /// 4.5 (lavapipe); the march without a pyramid, its curves of stray hits, 7.1 for the 6 mm line.
 const ROWS: f32 = 6.0;
 

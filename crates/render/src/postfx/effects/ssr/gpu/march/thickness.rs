@@ -39,12 +39,13 @@ fn crate_and_mirror(thickness: f32) -> (Scene, Camera) {
 /// The fewest red pixels the crate's reflection may hold at `thickness` 0.15
 /// (45 cm at its 3 m): a band of the floor along its silhouette, where its far
 /// side should be, takes them where a ray passes behind it further than that.
-/// Measured (lavapipe): 6045 (a fixed 15 cm, the march without a pyramid's, 4954).
+/// Measured (lavapipe): 6034 (a fixed 15 cm, the march without a pyramid's, 4954).
 const CRATE: usize = 4850;
 /// The same at the default `thickness`, 0.01 (3 cm): HDRP's, which lets the
 /// crate's hidden side leak, the trade for a thin strip's reflection as thin as
-/// it. Measured (lavapipe): 2942.
-const CRATE_DEFAULT: usize = 2700;
+/// it. Measured (lavapipe): 4089; 2942 with a ray behind the crate by more than
+/// its object taken as past it for good.
+const CRATE_DEFAULT: usize = 3800;
 
 /// The crate's reflection in red pixels, at `thickness`.
 fn crate_reflection(thickness: f32) -> Option<usize> {
@@ -73,7 +74,7 @@ fn gpu_the_default_thickness_leaks_no_more_of_a_crates_hidden_side_than_measured
     };
     assert!(
         red >= CRATE_DEFAULT,
-        "the crate's reflection at the default thickness: {red} px, measured 2942"
+        "the crate's reflection at the default thickness: {red} px, measured 4089"
     );
 }
 

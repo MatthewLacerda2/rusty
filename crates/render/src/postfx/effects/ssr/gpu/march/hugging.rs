@@ -4,7 +4,9 @@
 //! wall nearer than they are and is probed texel by texel. Out of rounds, the step
 //! ends where the walk got to and the next walks on from there; a step taken as
 //! clear to its end instead is probed only there, and a thin rod on the wall in
-//! the stretch it skipped is missed.
+//! the stretch it skipped is missed. The wall's own reflection is counted too:
+//! a ray hugging it is behind its texels by more than its object at times, and
+//! still lands on it, or on the rod beside it.
 
 use glam::Vec3;
 
@@ -17,7 +19,7 @@ use rusty_scene::{Camera, Scene};
 const SIZE: (u32, u32) = (1920, 1080);
 const GREEN: usize = 1;
 
-/// A dull wall in the plane x = 0 down the -Z axis on the fixture's mirror floor,
+/// A dull blue wall in the plane x = 0 down the -Z axis on the fixture's mirror floor,
 /// a green rod 1 cm tall standing 2 cm out of it 0.4 m up, under a black sky; the
 /// eye 1 m up, 10 cm from the wall's plane, looking 2° away from it and 5° down.
 fn wall_and_rod() -> (Scene, Camera) {
@@ -28,7 +30,7 @@ fn wall_and_rod() -> (Scene, Camera) {
     let wall = create_entity(&mut s, "Wall", Some(Primitive::Box));
     let (at, size) = (Vec3::new(-0.05, 1.5, -10.0), Vec3::new(0.1, 3.0, 20.0));
     place(&mut s, wall, at, size);
-    paint(&mut s, wall, "wall", ([0.3; 3], 0.0, 1.0));
+    paint(&mut s, wall, "wall", ([0.1, 0.1, 0.9], 0.0, 1.0));
     let rod = create_entity(&mut s, "Rod", Some(Primitive::Box));
     let (at, size) = (Vec3::new(0.01, 0.4, -10.0), Vec3::new(0.02, 0.01, 16.0));
     place(&mut s, rod, at, size);
@@ -36,9 +38,15 @@ fn wall_and_rod() -> (Scene, Camera) {
     (s, Camera::new(Vec3::new(0.1, 1.0, 0.0), -92.0, -5.0))
 }
 
-/// The fewest rows the rod's reflection may span. Measured (lavapipe): 433, and
-/// 429 at 8 rounds; a step out of rounds taken as clear to its end, 381.
+/// The fewest rows the rod's reflection may span. Measured (lavapipe): 550, and
+/// 433 with a ray behind the rod by more than its object taken as past it for good;
+/// a step out of rounds taken as clear to its end, 381.
 const ROWS: usize = 410;
+/// The fewest pixels the wall's and the rod's reflections may hold together.
+/// Measured (lavapipe): 13530, 13528 without the grazing allowance (`grazes`), and
+/// 12821 with a ray behind the rod taken as past it for good.
+const REFLECTION: usize = 13200;
+const BLUE: usize = 2;
 
 #[test]
 fn gpu_a_ray_hugging_a_wall_past_its_walks_rounds_finds_a_thin_rod() {
@@ -46,10 +54,16 @@ fn gpu_a_ray_hugging_a_wall_past_its_walks_rounds_finds_a_thin_rod() {
         return;
     };
     let (scene, cam) = wall_and_rod();
-    let rows = Hits::of(&mut r, &scene, &cam, SIZE).rows(GREEN).len();
-    eprintln!("[ssr] a rod on a wall the rays hug: its reflection spans {rows} rows");
+    let hits = Hits::of(&mut r, &scene, &cam, SIZE);
+    let rows = hits.rows(GREEN).len();
+    let both = hits.count(GREEN) + hits.count(BLUE);
+    eprintln!("[ssr] a rod on a wall the rays hug: its reflection spans {rows} rows, the wall's and the rod's {both} px");
     assert!(
         rows >= ROWS,
         "a ray hugging a wall misses a thin rod past its walk's rounds: {rows} rows"
+    );
+    assert!(
+        both >= REFLECTION,
+        "a ray hugging a wall loses the wall's reflection: {both} px"
     );
 }

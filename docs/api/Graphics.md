@@ -518,6 +518,8 @@ front faces, so a ray that meets an object's unseen back is taken to hit it, and
 that passes further behind it marches on rather than smearing it. How far behind is
 the volume's `thickness` (HDRP's *Object Thickness*, HDRP's model): every object is
 taken that fraction of its depth from the camera deep, 1% by default, so 3 cm at 3 m.
+A surface seen near grazing, whose texels each span more depth than that, still keeps
+its hits, down to about 3° from the line of sight at 1080p.
 It reads nothing of the object's shape, so it is the same on every one of TAA's
 offsets and at any resolution or field of view. It trades one way or the other: a
 thin strip's reflection is about as thick as the strip at the default, and drawn as a

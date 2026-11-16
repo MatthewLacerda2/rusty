@@ -4,6 +4,7 @@
 
 mod facing;
 mod fraction;
+mod grazing;
 mod hits;
 mod hugging;
 mod placing;

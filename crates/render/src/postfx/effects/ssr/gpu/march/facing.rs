@@ -45,7 +45,7 @@ fn pixel(cam: &Camera, p: Vec3) -> Vec2 {
 /// The least share of the pole's mirror image (its rows times its width on
 /// screen) its reflection may cover, and the most: its raster edges round out by
 /// a pixel, a band past them is a thin thing over-reflected. Measured (lavapipe):
-/// 1.11; judged by the object's thickness alone, without the step's depth
+/// 1.16; judged by the object's thickness alone, without the step's depth
 /// (`placed`), 0.68, a column of the image lost down its length.
 const COVER: (f32, f32) = (0.85, 1.5);
 

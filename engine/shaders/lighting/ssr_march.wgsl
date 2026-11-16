@@ -116,8 +116,13 @@ fn step_cap(steps: i32, dim: vec2<f32>) -> f32 {
 // is how deep an object is taken to be (a bottle, a pole, a crate's edge), and a ray
 // further behind passes it. The march with a pyramid takes it thinner, as the
 // volume's `thickness` says (`object`). `DEPTH_SLACK`, a fraction of the depth, is a texel's
-// own depth on a surface seen near grazing: 2% holds a floor down to a few degrees
-// at 1080p (a texel's depth there is about `depth × 0.001 / tan(angle)`).
+// own depth on a surface seen near grazing: a texel's depth there is about
+// `depth × 0.001 / tan(angle)` at 1080p, so 2% holds a surface seen down to about
+// 3° (a floor 8 m out from an eye 0.45 m up); below that a ray entering a texel
+// lies behind it by more, and misses. Both marches take it in `slack`; the march
+// with a pyramid takes it in a hit only where a neighbouring texel of the same
+// surface reaches the ray's depth (`grazes`), so a ray passing behind a thin
+// object is not taken for one meeting a surface at grazing.
 const THICKNESS: f32 = 0.15;
 const DEPTH_SLACK: f32 = 0.02;
 
@@ -346,7 +351,36 @@ fn lands(f: Frame, t_depth: texture_2d<f32>, levels: i32, hit: Probe, p: vec3<f3
         return true;
     }
     let surface = depth_of(f, p) - hit.behind;
-    return hit.behind <= object(f, surface) + placed;
+    return hit.behind <= object(f, surface) + placed || grazes(f, t_depth, hit, surface);
+}
+
+// Whether a ray behind the surface it hit by more than its object, but within a
+// texel's own depth on a surface seen near grazing (`DEPTH_SLACK`), reached that
+// surface: one of the texel's eight neighbours lies at least as deep as the ray
+// (less its object) and within `DEPTH_SLACK` of the texel, so the surface runs on
+// from the texel to the ray's depth. A ray entering a row of a floor seen at 2°
+// is behind its depth by the row's step, a few hundredths of the depth, and the
+// next row holds the floor's depth past it. A ray passing behind a thin object
+// is not: the object's neighbours are its own front, no deeper than the texel,
+// or the surface far behind it, past `DEPTH_SLACK`.
+fn grazes(f: Frame, t_depth: texture_2d<f32>, hit: Probe, surface: f32) -> bool {
+    let slack = surface * DEPTH_SLACK;
+    if (hit.behind > slack) {
+        return false;
+    }
+    let ray = surface + hit.behind - object(f, surface);
+    let dim = vec2<i32>(textureDimensions(t_depth));
+    let c = vec2<i32>(clamp(hit.uv, vec2<f32>(0.0), vec2<f32>(0.999999)) * vec2<f32>(dim));
+    for (var dy = -1; dy <= 1; dy = dy + 1) {
+        for (var dx = -1; dx <= 1; dx = dx + 1) {
+            let n = clamp(c + vec2<i32>(dx, dy), vec2<i32>(0), dim - 1);
+            let d = dot(textureLoad(t_depth, n, 0), f.channel);
+            if (d >= ray && d <= surface + slack) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 // Whether a refinement from ON (`keep` behind the scene, `go` in front of it)
@@ -360,9 +394,9 @@ fn crosses(f: Frame, t_depth: texture_2d<f32>, b: Bracket) -> bool {
     if (!kept.valid || !gone.valid) {
         return false;
     }
-    let behind = depth_of(f, b.keep) - kept.behind;
-    let front = depth_of(f, b.go) - gone.behind;
-    return front <= behind + max(object(f, behind), behind * DEPTH_SLACK);
+    let was_behind = depth_of(f, b.keep) - kept.behind;
+    let now_before = depth_of(f, b.go) - gone.behind;
+    return now_before <= was_behind + max(object(f, was_behind), was_behind * DEPTH_SLACK);
 }
 
 // March the reflected ray `r` from `origin` in `steps` steps of at most `step`
@@ -371,8 +405,11 @@ fn crosses(f: Frame, t_depth: texture_2d<f32>, b: Bracket) -> bool {
 // by at most `slack`: an object `THICKNESS` deep) or beyond it. A step that
 // leaves the front, or comes back from beyond, is refined by bisection to where it
 // changed (`refine`), and hits only if that point is on the scene, no further
-// behind it than its object is deep (`object`, with a pyramid): one that went behind a thin
-// object's edge, or came out beside it, marches on. Returns the
+// behind it than its object is deep (`lands`: `object`, with a pyramid, or a
+// surface at grazing): one that went behind a thin object's edge, or came out
+// beside it, marches on, ON while within `slack` of it, so the next point is
+// judged again (a surface behind the object it lands on, or the object's front
+// it comes out through, `crosses`). Returns the
 // colour of `t_color` it hits and, in `.w`, how much the hit counts (0: a miss):
 // faded at the screen's edge, wider by the blur's radius, over the march's last
 // `REACH_FADE` of its steps, and out where the blur is too wide to hide a hard
