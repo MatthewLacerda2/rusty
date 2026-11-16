@@ -83,13 +83,15 @@ fn warn_misfit(path: &str, import: &TextureSettings, kind: TextureKind) {
     }
 }
 
-/// Whether the upload `texture` reads right in a slot holding `kind`: an
-/// uncompressed or BC7 one everywhere, BC5 only as a normal map, BC4 only as a mask.
-pub(crate) fn reads_as(texture: &wgpu::Texture, kind: TextureKind) -> bool {
+/// Whether an upload stored as `format` reads right in a slot holding `kind`: an
+/// 8-bit or BC7 one everywhere, BC5 only as a normal map, BC4 only as a mask, a
+/// 16-bit normal map (`super::deep`, no sRGB view) in any slot but colour.
+pub(crate) fn reads_as(format: wgpu::TextureFormat, kind: TextureKind) -> bool {
     use wgpu::TextureFormat as F;
-    match texture.format() {
+    match format {
         F::Bc5RgUnorm => kind == TextureKind::Normal,
         F::Bc4RUnorm => kind == TextureKind::Mask,
+        super::deep::DEEP_FORMAT => !kind.is_colour(),
         _ => true,
     }
 }

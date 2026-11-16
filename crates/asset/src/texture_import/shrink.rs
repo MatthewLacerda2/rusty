@@ -11,11 +11,18 @@ use rusty_core::color::{linear_to_srgb, srgb_to_linear};
 
 /// `image` downscaled, its aspect kept, until its longer side is at most
 /// `max_size` (Unity's *Max Size*); unchanged when it already fits. Averaged in
-/// linear light for colour.
+/// linear light for colour. An image of more than 8 bits a channel fitted for a
+/// normal slot stays 16-bit, so a normal map kept at 16 bits ([`super::keeps_deep`])
+/// keeps its slopes; every other kind is fitted at 8 bits, so the import's encoder
+/// (which never fits for a normal slot) sees the bytes it always has.
 pub fn fit(image: DynamicImage, max_size: u32, kind: TextureKind) -> DynamicImage {
     let (w, h) = fitted_size(image.width(), image.height(), max_size);
     if (w, h) == (image.width(), image.height()) {
         return image;
+    }
+    if kind == TextureKind::Normal && super::is_deep(image.color()) {
+        let resized = resize(&image.to_rgba32f(), w, h, FilterType::Triangle);
+        return DynamicImage::ImageRgba16(DynamicImage::ImageRgba32F(resized).to_rgba16());
     }
     let working = to_working(&image.to_rgba8(), kind);
     DynamicImage::ImageRgba8(to_bytes(
