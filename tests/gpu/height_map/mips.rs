@@ -76,8 +76,8 @@ fn a_surface_blocks_lookup_under_a_height_map_reads_its_mip() {
     };
     let d = diff(&mipped, &marched);
     eprintln!("[height-map] the boost, far, under the height map: {d:.3}");
-    // Measured on lavapipe (the container's Mesa): 0.000, and 8.331 before
-    // `coords_with` filled the derivatives.
+    // Measured: RTX 2060 0.000, lavapipe 0.000 (8.331 before `coords_with` filled
+    // the derivatives).
     assert!(
         d < SAME,
         "the boost reads the mip it reads without the map: {d:.3}"

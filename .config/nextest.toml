@@ -43,6 +43,7 @@ filter = """
 test(/(^|::)test_gpu::tests::gpu_adapter_present_when_required$/)
 | test(/(^|::)reflection_prefilter::gpu::tests::gpu_prefilter_matches_the_cpu_reference/)
 | test(/(^|::)taa::gpu::shimmer::gpu_a_turning_glossy_bumpy_sphere_shimmers_less_under_taa_than_fxaa$/)
+| (kind(test) & test(/^gpu::height_map::/))
 """
 success-output = "final"
 

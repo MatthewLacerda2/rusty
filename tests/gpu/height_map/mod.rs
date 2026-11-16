@@ -89,7 +89,7 @@ fn the_upper_steps_hide_more_of_the_lower_as_the_view_grazes() {
         eprintln!("[height-map] {degrees}°: black share flat {a:.3}, marched {b:.3}");
         drops.push(a - b);
     }
-    // Measured on lavapipe (the container's Mesa): drops of 0.070 and 0.150.
+    // Measured: drops of RTX 2060 0.066 and 0.157, lavapipe 0.070 and 0.150.
     assert!(
         drops[0] > 0.02,
         "the lower steps are partly hidden: {drops:?}"
@@ -116,7 +116,7 @@ fn head_on_at_zero_scale_and_without_a_map_it_draws_flat() {
     };
     let (head_on, zero) = (diff(&f[0], &f[1]), diff(&f[2], &f[3]));
     eprintln!("[height-map] head-on {head_on:.3}, scale 0 {zero:.3}");
-    // Measured on lavapipe (the container's Mesa): 1.014 head-on.
+    // Measured head-on: RTX 2060 0.808, lavapipe 1.014.
     assert!(head_on < SAME, "head-on it matches the flat: {head_on:.3}");
     assert_eq!(zero, 0.0, "a scale of 0 draws byte-identically");
     assert_eq!(diff(&f[3], &f[4]), 0.0, "so does a map with no texture");
@@ -145,6 +145,6 @@ fn past_the_fade_distance_it_draws_flat() {
     };
     let d = diff(&flat, &marched);
     eprintln!("[height-map] past the fade: {d:.3}");
-    // Measured on lavapipe (the container's Mesa): 0.000.
+    // Measured: RTX 2060 0.000, lavapipe 0.000.
     assert!(d < SAME, "a far surface is not displaced: {d:.3}");
 }
