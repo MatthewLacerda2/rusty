@@ -259,6 +259,9 @@ jobs:
             "https://github.com/RenderKit/oidn/releases/download/v${OIDN_VERSION}/oidn-${OIDN_VERSION}.x86_64.linux.tar.gz"
           echo "${OIDN_SHA256}  $RUNNER_TEMP/oidn.tgz" | sha256sum -c -
           mkdir -p "$RUSTY_OIDN" && tar -xzf "$RUNNER_TEMP/oidn.tgz" -C "$RUSTY_OIDN" --strip-components=1
+      - name: TEMPORARY make OIDN unopenable on dev shards (#2264 proof)
+        if: matrix.features == 'dev'
+        run: echo "RUSTY_OIDN=$RUNNER_TEMP/no-oidn-here" >> "$GITHUB_ENV"
       - name: Install cargo-nextest
         if: needs.changes.outputs.code != 'false'
         uses: ./.github/actions/install-tool
