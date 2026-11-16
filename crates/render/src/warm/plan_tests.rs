@@ -35,10 +35,13 @@ fn scene() -> Scene {
     scene
 }
 
+/// A scene file with nothing in it: every other block at its default.
+const SPARSE: &str = r#"{"entities": [], "next_entity_id": 1, "selected_entity_id": null}"#;
+
 /// `scene`'s document as the load prepares it: its entities, library and sky,
 /// each block a save writes left at a sparse file's default.
 fn document(scene: &Scene) -> SceneData {
-    let mut data = parse_scene_text("{\"entities\": []}", "plan.scene").unwrap();
+    let mut data = parse_scene_text(SPARSE, "plan.scene").unwrap();
     data.entities = scene.world.collect_entities();
     data.materials = (*scene.materials).clone();
     data.skybox_path = scene.skybox_path.clone();
