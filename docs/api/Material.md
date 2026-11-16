@@ -365,9 +365,9 @@ Material.Rebake("rusty_panel", 2048)          -- iterate at 256, ship at 2048
   recipe with a `size` (a non-square bake) keeps its aspect, its longer side
   becoming `resolution` (`Texture`, *Non-square bakes*). It is an
   error when `name` is absent or has no `maps`. The next frame draws the new maps
-  (#689). A map baked larger than 2048 ships at its size only while its `.meta` has
-  not pinned a smaller Max Size (`Texture`, *A bake ships at its size*): raise it
-  there when a rebake outgrows it, as the import's warning says.
+  (#689). A rebake moves every map's Max Size to its new size unless the developer
+  set that Max Size, which no bake touches; one above 8192 is refused (`Texture`,
+  *A bake ships at its size*).
 - A map key the material **already holds** is never overwritten by a bake — set by
   hand in the recipe, it wins; one the bake filled points at the same file next time.
 - Everything is checked before a file is written or the library changes: a bad `maps`

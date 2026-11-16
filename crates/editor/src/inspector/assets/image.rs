@@ -59,6 +59,10 @@ fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
     );
     ui.checkbox(&mut s.generate_mipmaps, "Generate Mipmaps");
     draw_compression(ui, &mut s);
+    if s.max_size != stored.max_size {
+        // Picked here, so it is the developer's: no bake changes it.
+        s = s.chosen(s.max_size);
+    }
     draw_size(ui, source, &s);
     if s != stored {
         let _ = sidecar::set_texture(source, s);

@@ -13,6 +13,7 @@ use image::imageops::{resize, FilterType};
 use image::{DynamicImage, Rgba32FImage, RgbaImage};
 
 use super::TextureKind;
+use crate::sidecar::MAX_SIZES;
 use rusty_core::color::{linear_to_srgb, srgb_to_linear};
 
 /// `image` downscaled, its aspect kept, until its longer side is at most
@@ -67,16 +68,20 @@ pub(super) fn warn_if_shrunk(source: &Path, size: (u32, u32), max_size: u32) {
         return;
     }
     let mut warned = WARNED.lock().unwrap_or_else(|e| e.into_inner());
-    if warned.insert((source.to_path_buf(), size, max_size)) {
-        log::warn!(
-            "[Import] {}: {w}x{h} is larger than its Max Size {max_size}, so it is \
-             imported at {}x{}; raise Max Size in its .meta \
-             (Assets.SetTextureImportSettings) to keep its size",
-            source.display(),
-            fitted.0,
-            fitted.1,
-        );
+    if !warned.insert((source.to_path_buf(), size, max_size)) {
+        return;
     }
+    let advice = match MAX_SIZES.iter().any(|&s| s > max_size) {
+        true => "raise Max Size in its .meta (Assets.SetTextureImportSettings) to keep its size",
+        false => "that is the largest Max Size, so save the file smaller to keep its detail",
+    };
+    log::warn!(
+        "[Import] {}: {w}x{h} is larger than its Max Size {max_size}, so it is \
+         imported at {}x{}; {advice}",
+        source.display(),
+        fitted.0,
+        fitted.1,
+    );
 }
 
 /// The next mip level of `level`: half its size on each side, at least 1.

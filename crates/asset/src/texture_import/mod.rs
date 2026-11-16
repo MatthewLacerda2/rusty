@@ -48,7 +48,7 @@
 //! gentler slope would bake as terraces. A downscale to *Max Size* rounds
 //! its sides to multiples of 4, so only an image already that small is left so.
 //! A file it shrinks is warned of once (`shrink::warn_if_shrunk`); a bake raises
-//! its own Max Size instead (`sidecar::keep_baked_size`).
+//! a Max Size the engine chose to its own size instead (`sidecar::keep_baked_size`).
 
 mod cache;
 mod encode;

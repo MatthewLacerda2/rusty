@@ -3,11 +3,14 @@
 //! how large it may be (#1574). Stored in the image's
 //! `.meta` sidecar beside the model settings, read by the renderer's upload
 //! (`render::gpu::textures`), and written by the image inspector and
-//! `Assets.SetTextureImportSettings` through [`set_texture`]; a bake larger than
-//! the default Max Size writes a fresh one at its size ([`keep_baked_size`]).
+//! `Assets.SetTextureImportSettings` through [`set_texture`]. A Max Size the
+//! engine chose follows the size of the latest bake; one the developer set is
+//! never changed by a bake (`baked`).
 
+mod baked;
 mod modes;
 
+pub use baked::{check_bake_size, keep_baked_size, keep_baked_sizes};
 pub use modes::{Compression, FilterMode, TextureType, WrapMode};
 
 use serde::{Deserialize, Serialize};
@@ -44,6 +47,31 @@ pub struct TextureSettings {
     pub compression: Compression,
     /// The longest side it is uploaded at, one of [`MAX_SIZES`] (#1574).
     pub max_size: u32,
+    /// The Max Size the engine chose itself: the default a fresh sidecar is
+    /// written with (by a slot fix, say), or the size a bake raised it to
+    /// ([`keep_baked_size`]). While `max_size` equals it, a later bake moves both
+    /// to the bake's size. Once they differ, or it is absent from the file (a
+    /// hand-written texture block), Max Size is the developer's and no bake
+    /// touches it. A developer setter clears it ([`TextureSettings::chosen`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engine_max_size: Option<u32>,
+}
+
+impl TextureSettings {
+    /// These settings with Max Size `size`, set by the developer (the inspector,
+    /// `Assets.SetTextureImportSettings`), so no bake changes it.
+    pub fn chosen(self, size: u32) -> Self {
+        Self {
+            max_size: size,
+            engine_max_size: None,
+            ..self
+        }
+    }
+
+    /// Whether the engine, not the developer, chose this Max Size.
+    pub fn max_size_is_engines(&self) -> bool {
+        self.engine_max_size == Some(self.max_size)
+    }
 }
 
 impl Default for TextureSettings {
@@ -56,6 +84,7 @@ impl Default for TextureSettings {
             srgb: true,
             compression: Compression::default(),
             max_size: DEFAULT_MAX_SIZE,
+            engine_max_size: Some(DEFAULT_MAX_SIZE),
         }
     }
 }
@@ -111,45 +140,6 @@ pub fn set_texture(source: &Path, settings: TextureSettings) -> Result<(), Impor
     save(source, &stored)
 }
 
-/// The image a bake just wrote at `source` (`Texture.Bake`, `Texture.BakeSet`),
-/// kept at the size it was baked at: with no `.meta` yet, one is written with Max
-/// Size raised to the smallest of [`MAX_SIZES`] at or above its longer side (the
-/// largest when none is), so a recipe's `resolution` is what the game gets. Only
-/// when that is above [`DEFAULT_MAX_SIZE`]: a bake that already fits writes no
-/// sidecar, so a later, larger rebake still finds none. An existing sidecar is
-/// never touched, whoever set its Max Size; the import says once that a larger
-/// file is shrunk (`texture_import`). Returns whether it wrote one.
-pub fn keep_baked_size(source: &Path) -> Result<bool, ImportError> {
-    if meta_path(source).exists() {
-        return Ok(false);
-    }
-    let (w, h) =
-        image::image_dimensions(source).map_err(|e| ImportError::Sidecar(e.to_string()))?;
-    let longer = w.max(h);
-    if longer <= DEFAULT_MAX_SIZE {
-        return Ok(false);
-    }
-    let largest = MAX_SIZES[MAX_SIZES.len() - 1];
-    let max_size = MAX_SIZES
-        .into_iter()
-        .find(|&s| s >= longer)
-        .unwrap_or(largest);
-    let mut stored = load(source)?;
-    stored.texture.max_size = max_size;
-    save(source, &stored)?;
-    Ok(true)
-}
-
-/// [`keep_baked_size`] for each image `verb` just baked: a bake stands when its
-/// sidecar cannot be written, warned of, and imports at the default Max Size.
-pub fn keep_baked_sizes<'a>(verb: &str, baked: impl IntoIterator<Item = &'a str>) {
-    for path in baked {
-        if let Err(e) = keep_baked_size(Path::new(path)) {
-            log::warn!("[Import] {verb}: {path}: cannot keep its baked size in its .meta: {e}");
-        }
-    }
-}
-
 /// The image at `source`, just assigned to a material's normal slot, set to
 /// [`TextureType::NormalMap`] when it is still `Default`, and said so: Unity's
 /// *Fix now*, done for the agent (#1574).
@@ -186,8 +176,7 @@ pub fn fit_data_slot(source: &Path) {
 /// in Play, `convert::conversion_allowed`). A texture a converted model's cache
 /// holds is left alone: those are never compressed.
 fn fit_slot(source: &Path, used: &str, fix: impl Fn(&TextureSettings) -> Option<TextureSettings>) {
-    use crate::convert::{conversion_allowed, is_import_cache};
-    if !conversion_allowed() || is_import_cache(source) || !source.is_file() {
+    if !engine_may_write(source) {
         return;
     }
     let Some(fixed) = fix(&texture(source)) else {
@@ -197,6 +186,14 @@ fn fit_slot(source: &Path, used: &str, fix: impl Fn(&TextureSettings) -> Option<
         Ok(()) => log::info!("[Import] {}: used as {used}", source.display()),
         Err(e) => log::warn!("[Import] {}: {e}", source.display()),
     }
+}
+
+/// Whether the engine may change the sidecar of the image at `source` on its own
+/// (a slot fix, a bake): only an image on disk, outside a converted model's
+/// cache, and only while imports may change (never in Play).
+fn engine_may_write(source: &Path) -> bool {
+    use crate::convert::{conversion_allowed, is_import_cache};
+    conversion_allowed() && !is_import_cache(source) && source.is_file()
 }
 
 #[cfg(test)]

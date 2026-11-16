@@ -70,13 +70,15 @@ written only into a folder that already exists. A write that still fails names t
 verb and the path: `Texture.BakeSet: cannot write <path>: <os error>`.
 
 **A bake ships at its size.** The importer downsizes an image to its *Max Size*
-(2048 by default, `Assets.SetTextureImportSettings`), so a bake larger than 2048
-with no `.meta` yet writes one with Max Size raised to its longer side (the next of
-4096 or 8192), and the game gets the `resolution` the recipe asked for. A `.meta`
-already there is kept as it is, whoever set it: lower Max Size in it to ship
-smaller, raise it by hand when a rebake outgrows it (the import warns once that a
-file larger than its Max Size is shrunk). `Material.DefineAsset`'s `maps` and
-`Material.Rebake` bake the same way.
+(2048 by default, `Assets.SetTextureImportSettings`). A bake raises or lowers a Max
+Size the engine chose (no `.meta`, the default one a material slot writes, or an
+earlier bake's) to fit its longer side (the next of 2048, 4096 or 8192), and never
+touches one the developer set (`SetTextureImportSettings`' `maxSize`, the inspector,
+a hand-edited `.meta`): that file is warned of once on import when it is shrunk. A
+bake whose longer side is above 8192, the largest Max Size, is refused before it
+writes (`Texture.Bake: a 16384x16384 bake is larger than the largest Max Size,
+8192, …`). Nothing is written to a `.meta` during Play. `Material.DefineAsset`'s
+`maps` and `Material.Rebake` bake the same way.
 
 The returned `path` drops straight into a material slot, e.g.
 `Material.SetTexture(id, Texture.Bake(recipe, "out/albedo.png", "base_color"))`.

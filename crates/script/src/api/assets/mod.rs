@@ -176,7 +176,8 @@ fn texture_table(lua: &Lua, s: &TextureSettings) -> mlua::Result<Table> {
 }
 
 /// `stored` with the keys `t` names replaced; an unknown mode name or a max size
-/// outside Unity's list is an error.
+/// outside Unity's list is an error. A `maxSize` named is the developer's, so no
+/// bake changes it (`sidecar::keep_baked_size`).
 fn texture_settings(mut s: TextureSettings, t: &Table) -> mlua::Result<TextureSettings> {
     if let Some(name) = t.get::<Option<String>>("wrapMode")? {
         s.wrap_mode = WrapMode::parse(&name).map_err(runtime)?;
@@ -194,7 +195,8 @@ fn texture_settings(mut s: TextureSettings, t: &Table) -> mlua::Result<TextureSe
         s.compression = Compression::parse(&name).map_err(runtime)?;
     }
     if let Some(size) = t.get::<Option<u32>>("maxSize")? {
-        s.max_size = parse_max_size(size).map_err(runtime)?;
+        // Named here, so it is the developer's: no bake changes it.
+        s = s.chosen(parse_max_size(size).map_err(runtime)?);
     }
     Ok(s)
 }

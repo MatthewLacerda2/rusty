@@ -53,6 +53,8 @@ pub fn bake_maps(
     let in_error = |e: String| format!("material {name:?} maps: {e}");
     check_set(recipe).map_err(in_error)?;
     let loaded = super::load_recipe(recipe, &ContentRoots::new(root)).map_err(in_error)?;
+    let size = loaded.recipe.extent();
+    rusty_asset::sidecar::check_bake_size(size.width, size.height).map_err(in_error)?;
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     // `/`-spelled, `dir` included: the paths land in the scene file, which stores
     // `/` (`core::paths::to_slash`).
@@ -126,3 +128,7 @@ fn map_field<'a>(asset: &'a mut MaterialAsset, name: &str) -> Option<&'a mut Opt
 #[cfg(test)]
 #[path = "maps_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "maps_size_tests.rs"]
+mod size_tests;
