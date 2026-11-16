@@ -17,6 +17,13 @@ A gate that runs locally but not in CI is a false green on every pull request, s
   (`brief_misses_heavy`): a hand-copied gate list had drifted and `docrefs` went
   unrun before CI (#1179, PR #1177).
 
+- a suite CI splits across a matrix runs whole (`shard_gaps`, #2264):
+  `normalise` drops `--partition <value>` ([`NEUTRAL_WITH_VALUE`]) so a shard's
+  command matches its gate, and in exchange every split lists each shard of
+  `1..n` once, and every `--partition` reads `count:${{ matrix.shard }}` in a
+  job whose one-line `- { …, shard: k/n }` entries it read complete. A
+  `--partition` whose split it cannot read is flagged, never passed.
+
 The comparison is one way: CI may run more than `make gates` (the macOS build,
 the JUnit copies), never less. Stdlib only, a text parser for the narrow YAML
 the workflows use; no build.
@@ -39,6 +46,10 @@ NEUTRAL = {
     ("--quiet",),
     ("--verbose",),
 }
+#: A flag dropped with whatever value follows it. `--partition count:k/n`: CI
+#: splits one suite across a matrix's shards (#2264), and `test_shards` holds
+#: that every shard of each split is an entry, so together they run it whole.
+NEUTRAL_WITH_VALUE = ("--partition",)
 
 
 def makefile_gates(text: str) -> dict[str, list[str]]:
@@ -158,6 +169,10 @@ def normalise(command: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
         tokens = command.split()
     before, after = (tokens, []) if "--" not in tokens else (
         tokens[: tokens.index("--")], tokens[tokens.index("--") + 1 :])
+    for flag in NEUTRAL_WITH_VALUE:
+        while flag in before[:-1]:
+            at = before.index(flag)
+            del before[at : at + 2]
     for flag in NEUTRAL:
         for i in range(len(before) - len(flag) + 1):
             if tuple(before[i : i + len(flag)]) == flag:
@@ -176,6 +191,56 @@ def missing(gates: dict[str, list[str]], ci: list[str]) -> list[tuple[str, str]]
     gaps = [(g, c) for g, cmds in gates.items() if g not in by_make
             for c in cmds if normalise(c) not in seen]
     return gaps + [(g, "<no command>") for g, cmds in gates.items() if not cmds]
+
+
+#: A matrix entry that names a shard, written as a flow mapping on one line.
+SHARD_ENTRY = re.compile(r"^\s*- \{(?P<body>[^}]*\bshard: (?P<k>\d+)/(?P<n>\d+)\b[^}]*)\}\s*$", re.M)
+#: A job's key under `jobs:` (two spaces in, nothing after the colon).
+JOB = re.compile(r"^  (?P<name>[\w-]+):\s*$", re.M)
+#: The one `--partition` value that follows the matrix: each entry runs its shard.
+SHARDED = ("count:${{ matrix.shard }}", '"count:${{ matrix.shard }}"', "'count:${{ matrix.shard }}'")
+
+
+def _jobs(text: str) -> list[tuple[str, str]]:
+    """Each job's name and body, `#` comment lines dropped."""
+    code = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
+    marks = list(JOB.finditer(code))
+    return [(m["name"], code[m.end(): nxt.start() if nxt else len(code)])
+            for m, nxt in zip(marks, marks[1:] + [None])]
+
+
+def _split_gaps(job: str, body: str) -> tuple[bool, list[str]]:
+    """Whether the job's matrix names shards, and each split that leaves one out:
+    a split (the entry's other keys bar the per-entry flags) runs every `k` of
+    `1..n` once."""
+    splits: dict[tuple[str, int], list[int]] = {}
+    for m in SHARD_ENTRY.finditer(body):
+        keys = [kv.strip() for kv in m["body"].split(",") if kv.strip() and not kv.strip().startswith("shard:")]
+        split = (", ".join(k for k in keys if not k.endswith((": true", ": false"))), int(m["n"]))
+        splits.setdefault(split, []).append(int(m["k"]))
+    return bool(splits), [f"{job}: {name or 'shards'} of {n} has {sorted(ks)}; list each shard of 1..{n} once"
+                          for (name, n), ks in splits.items() if sorted(ks) != list(range(1, n + 1))]
+
+
+def shard_gaps(text: str) -> list[str]:
+    """What keeps a workflow's split suites from running whole (#2264). `missing`
+    drops `--partition`, so this holds instead that each split lists every shard
+    once, and that every `--partition` sits in a job whose split it saw complete
+    and reads `count:${{ matrix.shard }}`. A split it cannot read (a block-YAML
+    matrix) is a gap, not a pass: it cannot vouch for what it did not see."""
+    gaps: list[str] = []
+    for job, body in _jobs(text):
+        found, bad = _split_gaps(job, body)
+        gaps += bad
+        for m in re.finditer(r"--partition\b[ =]?", body):
+            value = body[m.end():].split("\n", 1)[0].split(" ||", 1)[0].strip()
+            if not found:
+                gaps.append(f"{job}: `--partition` with no matrix split found; write each entry on one line "
+                            f"as `- {{ features: …, shard: k/n }}`")
+            elif not bad and not value.startswith(SHARDED):
+                gaps.append(f"{job}: `--partition {value}` does not follow the matrix; "
+                            f"write `--partition \"count:${{{{ matrix.shard }}}}\"`")
+    return gaps
 
 
 def clippy_extras(commands: list[str]) -> list[str]:

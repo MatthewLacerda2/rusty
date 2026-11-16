@@ -280,7 +280,12 @@ its check and its command changed to match).
   branch, which lavapipe hides and Metal does not.
 - CI (`.github/workflows/ci.yml`) and `make test` run the engine suite with
   **cargo-nextest** plus `cargo test --doc`, both feature sets; the lint xtask keeps
-  plain `cargo test`. The macOS leg (`build-test-cross`) runs the nextest suite with
+  plain `cargo test`. On Linux, `build-test` is a matrix of three parallel jobs
+  (#2264): `build-test (default, 1/1)` runs the default suite, and `build-test (dev,
+  1/2)` and `(dev, 2/2)` split the `dev` one with nextest's `--partition count:k/2`;
+  each prints its twenty slowest tests (step *Slowest tests*), and each runs the GPU and
+  OIDN canaries again on its own runner (step *Canaries*), since a partition puts each
+  canary in one shard only. The macOS leg (`build-test-cross`) runs the nextest suite with
   `dev` only, the superset, and the doctests with both (#1976). See *The test runner* below.
 - A test never reads a developer's game project (#782). `Harness::new` runs in a
   workspace of its own, `<out_dir>/workspace`, seeded fresh from the test-fixture
@@ -399,8 +404,8 @@ anywhere else. That lint is the primary guard; the backstop is nextest's `NEXTES
 variable, which every test process and every child it starts inherits, and which
 blanks the keys too, so a spawn the lint cannot see (`cargo run --bin`, a built path)
 holds none under nextest. Doctests stay on `cargo test --doc`, which nextest
-cannot run. CI's `ci` profile additionally writes JUnit, rendered as the
-`build-test` job summary.
+cannot run. CI's `ci` profile additionally writes JUnit, rendered as each
+`build-test` job's summary.
 
 Handy forms: `cargo nextest run -E 'test(physics_)'` (filter by name),
 `cargo nextest list` (what would run), `cargo nextest show-config test-groups`

@@ -4,8 +4,9 @@
 The macOS leg ran past its 30-minute timeout on 2026-11-09, and finding what to
 speed up meant per-test timings nobody could read: the job summary
 `test-summary/action` writes is not served by the REST API a cloud session reads,
-and nextest's log names only tests past a minute. So the job prints the top ten
-from the report it already writes, in the log, where an agent reads them.
+and nextest's log names only tests past a minute. So each suite job prints its
+slowest tests (the count is the step's argument; ten when none is given) from
+the report it already writes, in the log, where an agent reads them.
 
 Usage: `slowest_tests.py <junit.xml> [count]`. A missing or unreadable report
 prints why and exits 0: this step informs, it never gates (the suite's own step
