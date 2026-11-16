@@ -5,33 +5,7 @@
 //!   cargo run --bin editor-capture --features dev -- [options]
 //!   make editor-capture OUT=before.png ARGS="--select Player"
 //!
-//! Options (all optional):
-//!   --project <dir>     the game project to open (default `./project`, #829)
-//!   --out <png>         where to write, from the launch directory
-//!                       (default `editor-capture.png`)
-//!   --scene <path>      a `.scene` file in the project (default: the built-in default)
-//!   --select <name>     select this entity first (the Inspector shows its cards)
-//!   --select-asset <p>  an asset file in the project to select first (its card)
-//!   --frame             frame the selection in the Scene view (the F key)
-//!   --play              draw the Play-mode chrome (the sim is not stepped)
-//!   --game              show the Game tab instead of the Scene tab
-//!   --size <W>x<H>      capture size (default 1600x900)
-//!   --demo <file>       open this demo on the Game view's timeline (#1598)
-//!   --demo-tick <n>     replay the demo to tick n first (default 0)
-//!   --pointer <X>,<Y>   hold the pointer here, in pixels (a hover label shows)
-//!   --gizmo <Name>=on|off  draw a gizmo or not, as `Editor.SetGizmo` names it
-//!                       (`UI`, `LightProbes`, `ReflectionProbes`, `Colliders`,
-//!                       `NavMesh`; `GameGizmos` or `Stats` over `--game`);
-//!                       repeatable (#1909)
-//!   --game-view <size>  the Game view's size, as its dropdown sets it: `Free`,
-//!                       an aspect `W:H` or a fixed size `WxH` (#2207)
-//!   --preview [<mesh>]  open the selection's Inspector Preview tab (a material
-//!                       card or an asset card) on this mesh: `Sphere` (default),
-//!                       `Cube`, `Suzanne` or `Plane`; not with --picker (#2239)
-//!   --picker [<page>]   the project picker the editor starts on (#854), over a
-//!                       sample recent list; <page> is `new`, `open`,
-//!                       `mismatch` (the different-engine prompt) or `focus`
-//!                       (a focused row); without one, the project list
+//! Options: `editor-capture --help` prints them (`USAGE`, below).
 //! ```
 //!
 //! Deterministic: a fixed size, scale and frame count. Exits 0 when written, 1 when the
@@ -51,9 +25,40 @@ use rusty::shell::editor::capture_picker;
 #[path = "editor_capture/sample_picker.rs"]
 mod sample_picker;
 
+const USAGE: &str = "usage: editor-capture [options]
+options (all optional):
+  --project <dir>     the game project to open (default `./project`)
+  --out <png>         where to write, from the launch directory
+                      (default `editor-capture.png`)
+  --scene <path>      a `.scene` file in the project (default: the built-in default)
+  --select <name>     select this entity first (the Inspector shows its cards)
+  --select-asset <p>  an asset file in the project to select first (its card)
+  --frame             frame the selection in the Scene view (the F key)
+  --play              draw the Play-mode chrome (the sim is not stepped)
+  --game              show the Game tab instead of the Scene tab
+  --size <W>x<H>      capture size (default 1600x900)
+  --demo <file>       open this demo on the Game view's timeline
+  --demo-tick <n>     replay the demo to tick n first (default 0)
+  --pointer <X>,<Y>   hold the pointer here, in pixels (a hover label shows)
+  --gizmo <Name>=on|off  draw a gizmo or not, as `Editor.SetGizmo` names it
+                      (`UI`, `LightProbes`, `ReflectionProbes`, `Colliders`,
+                      `NavMesh`; `GameGizmos` or `Stats` over `--game`);
+                      repeatable
+  --game-view <size>  the Game view's size, as its dropdown sets it: `Free`,
+                      an aspect `W:H` or a fixed size `WxH`
+  --preview [<mesh>]  open the selection's Inspector Preview tab (a material
+                      card or an asset card) on this mesh: `Sphere` (default),
+                      `Cube`, `Suzanne` or `Plane`; not with --picker
+  --picker [<page>]   the project picker the editor starts on, over a
+                      sample recent list; <page> is `new`, `open`,
+                      `mismatch` (the different-engine prompt) or `focus`
+                      (a focused row); without one, the project list
+  -h, --help          print this and exit";
+
 fn main() {
     rusty::init();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
+    rusty::core::project::answer_help(&args, USAGE);
     let project = rusty::core::project::take_flag(&mut args).unwrap_or_else(|e| fail(&e));
     let (out, source, opts, page) = parse(&args).unwrap_or_else(|e| fail(&e));
     // `--out` is named from the launch directory; opening the project moves it.

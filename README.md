@@ -144,6 +144,9 @@ the game for you, and only open a window when you want to.
   Code over MCP (see [`docs/mcp.md`](docs/mcp.md)).
 - `cargo doc --no-deps` — the Rust API reference.
 
+Every binary prints its options for `--help` (or `-h`) and exits, without opening a
+window or a project.
+
 ## Game projects
 
 A game is a **project folder** that lives anywhere — its own directory, its own git
