@@ -28,6 +28,10 @@ pub(crate) const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R16Float;
 /// rest from the level above), shared by every view.
 pub(crate) struct HizPass {
     layout: wgpu::BindGroupLayout,
+    /// Nearest within a level and between levels: the march reads a cell whole,
+    /// through a sampler, as a level varying per pixel must be read
+    /// (crates/render/src/CLAUDE.md), and a filtering read costs more for nothing.
+    pub(crate) nearest: wgpu::Sampler,
     first: LazyPipeline,
     rest: LazyPipeline,
 }
@@ -62,7 +66,12 @@ impl HizPass {
                 .colour(device, &[Some(target)])
             })
         };
+        let nearest = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("SSR Hi-Z Sampler"),
+            ..Default::default()
+        });
         Self {
+            nearest,
             first: pipeline("fs_first"),
             rest: pipeline("fs_min"),
             layout,

@@ -104,6 +104,7 @@ impl SsrPasses {
                 texture_entry(4, d2),
                 texture_entry(5, d2),
                 texture_entry(6, d2),
+                sampler_entry(7),
             ],
         });
         let traced = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -233,6 +234,7 @@ impl PostFx {
                 entry(4, view(weight)),
                 entry(5, view(applied)),
                 entry(6, view(&t.hiz.view)),
+                entry(7, wgpu::BindingResource::Sampler(&passes.hiz.nearest)),
             ],
         });
         let traced = device.create_bind_group(&wgpu::BindGroupDescriptor {

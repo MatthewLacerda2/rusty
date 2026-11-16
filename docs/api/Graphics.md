@@ -500,15 +500,24 @@ without a seam. A hit on something brighter than a half float holds (an emissive
 rough, bumpy floor seen at a grazing angle) is a miss too, rather than reflecting the
 floor it leaves: the hits around it may fill it, within its own lobe's blur, and where
 none reach it keeps the probe reflection. The march (#2004) takes steps of at most `step_length`
-and at most 1/64 of the screen's shorter side (1/`steps` of it for fewer than 64 steps,
-so any count can still cross the screen's height), so it sees anything on screen wider
-than that (a bottle, a pole) and spends its reach where the ray crosses the screen fast;
-where a step goes behind the scene, or comes back out, it halves the step four times to
-find where, so a reflected silhouette is drawn to the texel, not in stairs of a step.
-A point counts as a hit only on a surface or up to 0.15 m behind it (or 2% of its depth,
-for a floor seen near grazing): the depth holds only front faces, so a ray that meets
-an object's unseen back is taken to hit it, and one that passes further behind it
-marches on rather than smearing it. A hit whose blur on screen is wide (its cone's
+and, counted toward its reach, at most 1/64 of the screen's shorter side (1/`steps` of
+it for fewer than 64 steps, so any count can still cross the screen's height), so it
+spends its reach where the ray crosses the screen fast. It steps over nothing however
+thin (#2228): a min-depth pyramid of the view's depth (half its size and down, 1.4 MB
+at 1080p) proves a step in front of everything it passes over, cell by cell (HDRP's
+Hi-Z traversal), and where something nearer lies under it the march probes every half
+texel, so a 1 px line (an LED strip, a cable) is reflected wherever the ray crosses it,
+on every one of TAA's sub-pixel offsets; in front of the scene a step so may span four
+of those lengths, and the first step from the surface is probed at its end alone. Where
+a step goes behind the scene, or comes back out, it halves the step four times to find
+where, so a reflected silhouette is drawn to the texel, not in stairs of a step. A
+point counts as a hit only on a surface or a little behind it: the depth holds only
+front faces, so a ray that meets an object's unseen back is taken to hit it, and one
+that passes further behind it marches on rather than smearing it. How far behind
+depends on the object's width on screen along the ray: one wider than 16 texels is
+taken 0.15 m deep (or 2% of its depth, for a floor seen near grazing), a narrower one
+1% of its depth (HDRP's default *Object Thickness*), so a thin strip's reflection is
+about as thick as the strip, not as a 15 cm deep object's. A hit whose blur on screen is wide (its cone's
 radius past 4% of the screen's shorter side, gone by 12%: a long ray from a rough
 surface) fades to the probe reflection, which an average over so wide a disk would
 only approximate; a contact reflection (a short ray) keeps it. A material with `receive_ssr` off keeps its probe

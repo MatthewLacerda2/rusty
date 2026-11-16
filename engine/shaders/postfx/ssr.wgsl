@@ -65,6 +65,8 @@ struct SsrParams {
 // ssr::hiz`, #2228), `params.march.z` levels: the march steps over nothing thinner
 // than a step.
 @group(0) @binding(6) var t_hiz: texture_2d<f32>;
+// Nearest within and between levels: a cell is read whole.
+@group(0) @binding(7) var s_hiz: sampler;
 
 @vertex
 fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4<f32> {
@@ -243,7 +245,7 @@ fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
     let f = ssr_march::Frame(params.view_proj, params.camera_pos.xyz, fwd, vec4<f32>(0.0, 0.0, 1.0, 0.0));
     let c = cone(s.roughness);
     // Read sharp: the resolve blurs the hits by the cone, colour and edge alike.
-    let hit = ssr_march::trace_hit(f, t_velocity, t_hiz, i32(params.march.z), t_color, s_color, origin, r, i32(params.march.x), params.march.y, c, 0.0);
+    let hit = ssr_march::trace_hit(f, t_velocity, t_hiz, s_hiz, i32(params.march.z), t_color, s_color, origin, r, i32(params.march.x), params.march.y, c, 0.0);
     if (hit.dist <= 0.0) {
         return missed;
     }
