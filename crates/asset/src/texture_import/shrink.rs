@@ -11,11 +11,17 @@ use rusty_core::color::{linear_to_srgb, srgb_to_linear};
 
 /// `image` downscaled, its aspect kept, until its longer side is at most
 /// `max_size` (Unity's *Max Size*); unchanged when it already fits. Averaged in
-/// linear light for colour.
+/// linear light for colour. A data image of more than 8 bits a channel (a 16-bit
+/// normal map, [`super::is_deep_normal`]) stays 16-bit, so the fit keeps its
+/// precision.
 pub fn fit(image: DynamicImage, max_size: u32, kind: TextureKind) -> DynamicImage {
     let (w, h) = fitted_size(image.width(), image.height(), max_size);
     if (w, h) == (image.width(), image.height()) {
         return image;
+    }
+    if super::is_deep(image.color()) && !kind.is_colour() {
+        let resized = resize(&image.to_rgba32f(), w, h, FilterType::Triangle);
+        return DynamicImage::ImageRgba16(DynamicImage::ImageRgba32F(resized).to_rgba16());
     }
     let working = to_working(&image.to_rgba8(), kind);
     DynamicImage::ImageRgba8(to_bytes(

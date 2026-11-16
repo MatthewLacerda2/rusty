@@ -279,7 +279,7 @@ clamped sampler.
   | type | format | for |
   |---|---|---|
   | `"Default"` | BC7 (a byte a texel), alpha kept, mips averaged in linear light (raw with `sRGB` off) | colour, packed data (glTF's occlusion-roughness-metallic, with `sRGB` off) |
-  | `"NormalMap"` | BC5 (a byte a texel): x and y; the shader rebuilds z | tangent-space normal maps |
+  | `"NormalMap"` | BC5 (a byte a texel): x and y; the shader rebuilds z. A 16-bit file (`Texture.Bake`'s `normal16`) is never compressed: it uploads as half floats (`Rgba16Float`, eight bytes a texel), whose x and y step about every 0.056° near flat where 8 bits (and BC5) step every 0.45° | tangent-space normal maps |
   | `"SingleChannel"` | BC4 (half a byte): red only | roughness, metallic, masks |
 
   Assigning a `"Default"` image to a material's normal slot (`Material.SetNormalMap`,
@@ -307,8 +307,8 @@ clamped sampler.
   `"NormalMap"` copy also keeps how much each mip level's normals spread, which BC5's
   two channels cannot, for the renderer's specular AA, #1702), and made
   again only when the image, its type, `sRGB`, compression, max size or mipmaps, or
-  the encoder change. A copy whose image is gone is deleted by the next refresh
-  (#1694). A baked lightmap page (a file in a scene's `<scene>.lightmaps/` folder) is
+  the encoder change. A copy whose image is gone, or is a 16-bit normal map, is
+  deleted by the next refresh (#1694). A baked lightmap page (a file in a scene's `<scene>.lightmaps/` folder) is
   not imported at all: the bake writes the page the renderer loads. The editor makes them in the background when an image is added,
   its settings change or the project opens (the console says each one); entering
   Play waits for any still stale, as it waits for models; an export makes and ships

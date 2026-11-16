@@ -1,7 +1,7 @@
 //! Collecting the import cache's orphaned compressed textures (#1694): a `.bctex`
-//! whose source image is gone, or whose source is a baked lightmap page (which
-//! the importer no longer compresses, `asset::lightmap_page::is_baked`), is
-//! deleted on refresh ([`super::refresh_all`]). Without it, every rebake left a
+//! whose source image is gone, or whose source the importer no longer compresses
+//! (a baked lightmap page, `asset::lightmap_page::is_baked`, or a normal map kept at
+//! 16 bits, `texture_import::is_deep_normal`), is deleted on refresh ([`super::refresh_all`]). Without it, every rebake left a
 //! cache per page name behind: a game held 842 MB of them for 158 page names.
 //!
 //! Only what the refresh proves orphaned goes: a `.bctex` file under the import
@@ -42,7 +42,8 @@ pub(super) fn collect(root: &Path) -> usize {
 }
 
 /// The `.bctex` files under `cache_dir` (the cache of the images under
-/// `sources`) whose source is gone or is a baked lightmap page, sorted.
+/// `sources`) whose source is gone, is a baked lightmap page or is a normal map
+/// kept at 16 bits, sorted.
 pub(super) fn orphans(cache_dir: &Path, sources: &Path) -> Vec<PathBuf> {
     let mut found = Vec::new();
     walk(cache_dir, &mut |cache| {
@@ -53,7 +54,8 @@ pub(super) fn orphans(cache_dir: &Path, sources: &Path) -> Vec<PathBuf> {
             return;
         };
         let source = sources.join(name);
-        if is_baked(&source) || is_gone(&source) {
+        let deep = || super::is_deep_normal(&source, &crate::sidecar::texture(&source));
+        if is_baked(&source) || is_gone(&source) || deep() {
             found.push(cache.to_path_buf());
         }
     });

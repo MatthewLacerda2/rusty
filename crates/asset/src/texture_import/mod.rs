@@ -38,9 +38,11 @@
 //! is not a colour texture. A cache whose source is gone, or is such a page, is
 //! deleted by the next [`refresh_all`] (`orphans`).
 //!
-//! **When it is not compressed**: *Compression* `None`, or an image whose fitted
+//! **When it is not compressed**: *Compression* `None`, an image whose fitted
 //! size is not a multiple of 4 on both sides (a BC texture's base level must be;
-//! Unity leaves such a texture uncompressed too). A downscale to *Max Size* rounds
+//! Unity leaves such a texture uncompressed too), or a normal map kept at 16 bits
+//! ([`is_deep_normal`]): BC5 keeps 8 bits of x and y, one step every 0.45°, so a
+//! gentler slope would bake as terraces. A downscale to *Max Size* rounds
 //! its sides to multiples of 4, so only an image already that small is left so.
 
 mod cache;
@@ -178,7 +180,7 @@ pub fn load(
     kind: TextureKind,
     compress: bool,
 ) -> Option<Loaded> {
-    let cached = compress && format_of(settings).is_some();
+    let cached = compress && format_of(settings).is_some() && !is_deep_normal(source, settings);
     if let Some(blocks) = cached.then(|| current(source, settings)).flatten() {
         let source_size = open(source).ok()?.into_dimensions().ok()?;
         return Some(Loaded {
@@ -192,6 +194,24 @@ pub fn load(
         texels: Texels::Image(fit(image, settings.max_size, kind.reading(settings))),
         source_size,
     })
+}
+
+/// Whether the image at `source`, imported with `settings`, is a normal map kept at
+/// 16 bits: a `NormalMap` whose file stores more than 8 bits a channel
+/// (`Texture.Bake`'s `normal16`). It is never block-compressed (BC5 would round it
+/// to 8 bits, the terraces the file was made to avoid); the renderer uploads it at
+/// 16 bits a channel. Found from the file's header, without decoding it.
+pub fn is_deep_normal(source: &Path, settings: &TextureSettings) -> bool {
+    use image::ImageDecoder;
+    settings.texture_type == TextureType::NormalMap
+        && open(source)
+            .and_then(|r| r.into_decoder())
+            .is_ok_and(|d| is_deep(d.color_type()))
+}
+
+/// Whether `color` stores more than 8 bits a channel (16-bit or float).
+pub fn is_deep(color: image::ColorType) -> bool {
+    color.bytes_per_pixel() > color.channel_count()
 }
 
 /// The cache of the image at `source`, when it is current.
@@ -227,6 +247,8 @@ pub const CACHE_SUFFIX: &str = ".bctex";
 
 #[cfg(test)]
 mod cache_tests;
+#[cfg(test)]
+mod deep_tests;
 #[cfg(test)]
 mod load_tests;
 #[cfg(test)]

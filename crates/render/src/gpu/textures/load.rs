@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use image::GenericImageView;
 
-use super::{compressed, sampler, upload, MipSettings, TextureKind, DATA_FORMAT};
+use super::{compressed, deep, sampler, upload, MipSettings, TextureKind, DATA_FORMAT};
 use crate::{GpuTexture, Renderer};
 use rusty_asset::sidecar::{TextureSettings, TextureType};
 use rusty_asset::texture_import::{self, Texels};
@@ -162,7 +162,8 @@ impl Renderer {
     }
 
     /// Uploads a decoded image holding `kind`, with the mips and the sampler its
-    /// import settings ask for (#1323).
+    /// import settings ask for (#1323); a normal map of more than 8 bits a channel
+    /// at 16 (`deep`, #2257).
     fn upload_image_texture(
         &self,
         path_str: &str,
@@ -175,14 +176,22 @@ impl Renderer {
         let levels = settings.levels(width, height);
         let gpu = (&self.device, &self.queue);
         let srgb = !texture_import::is_linear(import);
-        let texture = upload(gpu, path_str, &img.to_rgba8(), (levels, srgb));
-        let kind = settings.kind;
+        let (texture, data_format) = match deep::wanted(img, settings.kind) {
+            true => {
+                let texture = deep::upload(gpu, path_str, &img.to_rgba32f(), levels);
+                (texture, deep::DEEP_FORMAT)
+            }
+            false => (
+                upload(gpu, path_str, &img.to_rgba8(), (levels, srgb)),
+                DATA_FORMAT,
+            ),
+        };
         self.mip_generator
-            .generate(&self.device, &self.queue, &texture, kind);
+            .generate(&self.device, &self.queue, &texture, settings.kind);
         Self::finalize_texture(
             &self.device,
             &self.texture_layout,
-            (texture, DATA_FORMAT),
+            (texture, data_format),
             (sampler(&self.device, import), import.filter_mode),
             Some(path_str),
         )

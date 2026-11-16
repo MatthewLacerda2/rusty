@@ -9,7 +9,7 @@ use std::sync::mpsc::{channel, Sender};
 use std::sync::Mutex;
 
 use super::encode::{self, Cores};
-use super::{cache, cache_file, fit, format_of, open, reader, shrink, TextureKind};
+use super::{cache, cache_file, fit, format_of, is_deep_normal, open, reader, shrink, TextureKind};
 use crate::convert::{self, Seen};
 use crate::lightmap_page::is_baked;
 use crate::{is_image_path, sidecar};
@@ -30,7 +30,7 @@ pub fn refresh(source: &Path, progress: &str) -> Result<bool, String> {
 /// and a read of the cache's head; only an encode reads either whole.
 fn refresh_on(source: &Path, progress: &str, cores: Cores) -> Result<bool, String> {
     let settings = sidecar::texture(source);
-    if format_of(&settings).is_none() {
+    if format_of(&settings).is_none() || is_deep_normal(source, &settings) {
         return Ok(false);
     }
     let named = |e: &dyn std::fmt::Display| format!("{}: {e}", source.display());

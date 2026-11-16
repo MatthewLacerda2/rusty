@@ -1,4 +1,5 @@
 pub(crate) mod compressed;
+pub(crate) mod deep;
 pub(crate) mod freshness;
 pub(crate) mod kind_watch;
 mod load;
@@ -169,6 +170,27 @@ pub(super) fn upload(
     (levels, srgb): (u32, bool),
 ) -> wgpu::Texture {
     let (width, height) = image.dimensions();
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some(label),
+        size: extent(width, height),
+        mip_level_count: levels,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: if srgb { IMAGE_FORMAT } else { DATA_FORMAT },
+        usage: usage(levels),
+        view_formats: if srgb {
+            &[DATA_FORMAT]
+        } else {
+            &[IMAGE_FORMAT]
+        },
+    });
+    write_base(queue, &texture, image, 4);
+    texture
+}
+
+/// What an uploaded image of `levels` mips is used as: sampled and written, and
+/// drawn into when the mip pass draws its levels.
+fn usage(levels: u32) -> wgpu::TextureUsages {
     let mut usage = wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST;
     // lint: allow(cfg-test-switch) only render's own unit tests read a loaded texture back
     if cfg!(test) {
@@ -179,36 +201,27 @@ pub(super) fn upload(
         // The mip pass draws each level.
         usage |= wgpu::TextureUsages::RENDER_ATTACHMENT;
     }
-    let texture = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some(label),
-        size: extent(width, height),
-        mip_level_count: levels,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: if srgb { IMAGE_FORMAT } else { DATA_FORMAT },
-        usage,
-        view_formats: if srgb {
-            &[DATA_FORMAT]
-        } else {
-            &[IMAGE_FORMAT]
-        },
-    });
+    usage
+}
+
+/// Write `bytes`, `texel` bytes a texel, to `texture`'s whole base level.
+fn write_base(queue: &wgpu::Queue, texture: &wgpu::Texture, bytes: &[u8], texel: u32) {
+    let size = texture.size();
     queue.write_texture(
         wgpu::TexelCopyTextureInfo {
-            texture: &texture,
+            texture,
             mip_level: 0,
             origin: wgpu::Origin3d::ZERO,
             aspect: wgpu::TextureAspect::All,
         },
-        image,
+        bytes,
         wgpu::TexelCopyBufferLayout {
             offset: 0,
-            bytes_per_row: Some(4 * width),
-            rows_per_image: Some(height),
+            bytes_per_row: Some(texel * size.width),
+            rows_per_image: Some(size.height),
         },
-        extent(width, height),
+        extent(size.width, size.height),
     );
-    texture
 }
 
 fn extent(width: u32, height: u32) -> wgpu::Extent3d {
@@ -246,6 +259,8 @@ pub(crate) fn soft_disc(side: u32) -> image::RgbaImage {
 mod compressed_gpu_tests;
 #[cfg(test)]
 mod data_map_tests;
+#[cfg(test)]
+mod deep_gpu_tests;
 #[cfg(test)]
 mod formats_tests;
 #[cfg(test)]
