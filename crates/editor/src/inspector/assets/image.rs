@@ -32,7 +32,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
 
 /// Texture import settings (#1323): wrap mode, filter mode, mipmap generation,
 /// texture type, compression and max size (#1574), kept in the image's `.meta`
-/// sidecar. An edit goes through the setter
+/// sidecar, then the file's size and the size it is imported at. An edit goes through the setter
 /// `Assets.SetTextureImportSettings` uses, so the renderer re-uploads the texture.
 fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
     ui.heading("Texture Import Settings");
@@ -59,6 +59,7 @@ fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
     );
     ui.checkbox(&mut s.generate_mipmaps, "Generate Mipmaps");
     draw_compression(ui, &mut s);
+    draw_size(ui, source, &s);
     if s != stored {
         let _ = sidecar::set_texture(source, s);
     }
@@ -96,6 +97,18 @@ fn draw_compression(ui: &mut egui::Ui, s: &mut TextureSettings) {
         Compression::ALL,
         names,
     );
+}
+
+/// The file's size and, when its Max Size shrinks it, the size it is imported at,
+/// as Unity's inspector shows the original beside the imported one.
+fn draw_size(ui: &mut egui::Ui, source: &Path, s: &TextureSettings) {
+    let Some(((w, h), (iw, ih))) = rusty_asset::texture_import::imported_size(source, s) else {
+        return;
+    };
+    match (w, h) == (iw, ih) {
+        true => ui.label(format!("Size: {w}x{h}")),
+        false => ui.label(format!("Size: {w}x{h}, imported at {iw}x{ih} (Max Size)")),
+    };
 }
 
 /// One labelled drop-down: `value` picked from `options`, each shown by `name`.

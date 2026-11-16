@@ -3,7 +3,8 @@
 //! how large it may be (#1574). Stored in the image's
 //! `.meta` sidecar beside the model settings, read by the renderer's upload
 //! (`render::gpu::textures`), and written by the image inspector and
-//! `Assets.SetTextureImportSettings` through [`set_texture`].
+//! `Assets.SetTextureImportSettings` through [`set_texture`]; a bake larger than
+//! the default Max Size writes a fresh one at its size ([`keep_baked_size`]).
 
 mod modes;
 
@@ -108,6 +109,45 @@ pub fn set_texture(source: &Path, settings: TextureSettings) -> Result<(), Impor
     }
     stored.texture = settings;
     save(source, &stored)
+}
+
+/// The image a bake just wrote at `source` (`Texture.Bake`, `Texture.BakeSet`),
+/// kept at the size it was baked at: with no `.meta` yet, one is written with Max
+/// Size raised to the smallest of [`MAX_SIZES`] at or above its longer side (the
+/// largest when none is), so a recipe's `resolution` is what the game gets. Only
+/// when that is above [`DEFAULT_MAX_SIZE`]: a bake that already fits writes no
+/// sidecar, so a later, larger rebake still finds none. An existing sidecar is
+/// never touched, whoever set its Max Size; the import says once that a larger
+/// file is shrunk (`texture_import`). Returns whether it wrote one.
+pub fn keep_baked_size(source: &Path) -> Result<bool, ImportError> {
+    if meta_path(source).exists() {
+        return Ok(false);
+    }
+    let (w, h) =
+        image::image_dimensions(source).map_err(|e| ImportError::Sidecar(e.to_string()))?;
+    let longer = w.max(h);
+    if longer <= DEFAULT_MAX_SIZE {
+        return Ok(false);
+    }
+    let largest = MAX_SIZES[MAX_SIZES.len() - 1];
+    let max_size = MAX_SIZES
+        .into_iter()
+        .find(|&s| s >= longer)
+        .unwrap_or(largest);
+    let mut stored = load(source)?;
+    stored.texture.max_size = max_size;
+    save(source, &stored)?;
+    Ok(true)
+}
+
+/// [`keep_baked_size`] for each image `verb` just baked: a bake stands when its
+/// sidecar cannot be written, warned of, and imports at the default Max Size.
+pub fn keep_baked_sizes<'a>(verb: &str, baked: impl IntoIterator<Item = &'a str>) {
+    for path in baked {
+        if let Err(e) = keep_baked_size(Path::new(path)) {
+            log::warn!("[Import] {verb}: {path}: cannot keep its baked size in its .meta: {e}");
+        }
+    }
 }
 
 /// The image at `source`, just assigned to a material's normal slot, set to

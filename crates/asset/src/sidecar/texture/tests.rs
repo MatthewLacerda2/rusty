@@ -91,3 +91,41 @@ fn a_default_image_in_a_data_slot_turns_srgb_off_and_others_stay() {
     fit_data_slot(&single);
     assert_eq!(texture(&single), set, "only a Default texture is changed");
 }
+
+/// A `w`×`h` PNG at `dir/name`, thin so a large side costs little.
+fn png(dir: &Path, name: &str, (w, h): (u32, u32)) -> PathBuf {
+    let path = dir.join(name);
+    image::RgbaImage::new(w, h).save(&path).unwrap();
+    path
+}
+
+#[test]
+fn a_bake_larger_than_the_default_with_no_sidecar_keeps_its_size() {
+    let dir = rusty_test_support::temp::dir();
+    for (side, kept) in [(4096, 4096), (3000, 4096), (9000, 8192)] {
+        let baked = png(&dir, &format!("wall_{side}.png"), (side, 4));
+        assert_eq!(keep_baked_size(&baked), Ok(true));
+        assert_eq!(texture(&baked).max_size, kept, "a {side} bake");
+    }
+    let small = png(&dir, "small.png", (2048, 4));
+    assert_eq!(keep_baked_size(&small), Ok(false));
+    assert!(!meta_path(&small).exists(), "a bake that fits writes none");
+}
+
+#[test]
+fn a_bake_over_a_sidecar_already_there_keeps_its_max_size() {
+    let dir = rusty_test_support::temp::dir();
+    let baked = png(&dir, "set.png", (4096, 4));
+    let set = TextureSettings {
+        max_size: 2048,
+        srgb: false,
+        ..Default::default()
+    };
+    set_texture(&baked, set).unwrap();
+    assert_eq!(keep_baked_size(&baked), Ok(false));
+    assert_eq!(
+        texture(&baked),
+        set,
+        "the developer's sidecar is never touched"
+    );
+}

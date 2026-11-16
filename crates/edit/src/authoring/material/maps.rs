@@ -58,6 +58,7 @@ pub fn bake_maps(
     // `/` (`core::paths::to_slash`).
     let prefix = format!("{}/{name}", to_slash(dir).trim_end_matches('/'));
     let baked = bake_set(&loaded.recipe, &loaded.sources, &prefix).map_err(in_error)?;
+    rusty_asset::sidecar::keep_baked_sizes("Material maps", baked.values().map(String::as_str));
     fill_empty_maps(asset, &baked);
     Ok(())
 }

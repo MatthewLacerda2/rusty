@@ -331,7 +331,10 @@ clamped sampler.
   downscaled at import, its aspect kept (colour in linear light); the file on disk
   is never changed. A UI image still measures its slices and tiling in the source
   image's pixels. Another number is an error naming the list; a sidecar holding one
-  is warned of once and read as 2048.
+  is warned of once and read as 2048. A file larger than its Max Size is warned
+  of once on import, naming both sizes (the image inspector shows them too); a
+  texture bake larger than 2048 writes its own `.meta` at its size when it has none
+  (`Texture.md`, *A bake ships at its size*).
 
 `SetTextureImportSettings` changes only the keys it is given, writes the sidecar (a
 file with none gets one), and the texture is re-uploaded with the new settings on the
