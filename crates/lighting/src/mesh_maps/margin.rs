@@ -9,7 +9,7 @@ use glam::Vec4;
 
 use super::{Baked, MeshMap, MARGIN};
 use crate::lightmap::{run_pool, BakeProgress, TexelPoint};
-use rusty_procgen::image_buf::{Image, Rgba};
+use rusty_procgen::image_buf::{Image, Rgba, Size};
 
 /// Points evaluated per block: the values buffer a map holds before they are
 /// written into its image (16 bytes each).
@@ -26,7 +26,7 @@ fn background(map: MeshMap) -> Vec4 {
 }
 
 /// `f(i, point)` of every covered texel (`i` its place in `baked.points`) as a
-/// `size`² image. A continuous map's margin averages its filled neighbours, ring by
+/// `width × height` image. A continuous map's margin averages its filled neighbours, ring by
 /// ring, as the lightmap's does; the ID map's copies one neighbour instead, so a
 /// margin never holds a colour between two materials' that no material has.
 pub(super) fn image(
@@ -34,9 +34,9 @@ pub(super) fn image(
     baked: &Baked,
     f: impl Fn(usize, &TexelPoint) -> Vec4 + Sync,
 ) -> Image {
-    let size = baked.size;
+    let size = baked.settings.size;
     let mut out = Image::filled(size, background(map).to_array());
-    let mut filled = vec![false; (size as usize) * (size as usize)];
+    let mut filled = vec![false; size.pixels()];
     let px = out.pixels_mut();
     for (b, block) in baked.points.chunks(BLOCK).enumerate() {
         let values = per_texel(block, |k, p| f(b * BLOCK + k, p));
@@ -86,17 +86,17 @@ const NEIGHBOURS: [(i64, i64); 8] = [
 /// Fill each empty texel bordering filled ones, `passes` rings deep: with the mean
 /// of its filled neighbours when `average`, else with the first of them. A ring is
 /// read whole before it is written, so a texel never reads one filled in its pass.
-fn grow(px: &mut [Rgba], filled: &mut [bool], size: u32, passes: u32, average: bool) {
-    let s = size as i64;
+fn grow(px: &mut [Rgba], filled: &mut [bool], size: Size, passes: u32, average: bool) {
+    let (w, h) = (size.width as i64, size.height as i64);
     for _ in 0..passes {
         let mut ring: Vec<(usize, Vec4)> = Vec::new();
         for (i, _) in filled.iter().enumerate().filter(|(_, f)| !**f) {
-            let (x, y) = (i as i64 % s, i as i64 / s);
+            let (x, y) = (i as i64 % w, i as i64 / w);
             let near = NEIGHBOURS
                 .iter()
                 .map(|&(dx, dy)| (x + dx, y + dy))
-                .filter(|&(nx, ny)| (0..s).contains(&nx) && (0..s).contains(&ny))
-                .map(|(nx, ny)| (ny * s + nx) as usize)
+                .filter(|&(nx, ny)| (0..w).contains(&nx) && (0..h).contains(&ny))
+                .map(|(nx, ny)| (ny * w + nx) as usize)
                 .filter(|&j| filled[j]);
             let (mut sum, mut n) = (Vec4::ZERO, 0.0f32);
             for j in near {
