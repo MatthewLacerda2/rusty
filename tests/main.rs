@@ -141,10 +141,3 @@ mod tweens;
 // Kept under one `gpu::` path so a runner can tell them apart by name alone.
 #[cfg(feature = "dev")]
 mod gpu;
-
-// TEMPORARY (#2264 proof, reverted next commit): one red test in one `dev` shard.
-#[cfg(feature = "dev")]
-#[test]
-fn deliberately_red_in_one_dev_shard() {
-    panic!("#2264: a red shard must turn ci-gate red");
-}
