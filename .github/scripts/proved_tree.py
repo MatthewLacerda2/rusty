@@ -60,6 +60,7 @@ import sys
 from typing import Callable
 
 import ghrest
+from merging.verdict.runlist import base as job_base
 
 #: Per workflow, the jobs a run must have built in, each with the steps that do
 #: the building (empty: the job's own `success` is the proof; it is skipped
@@ -128,7 +129,7 @@ def built(jobs: list[dict], workflow: str) -> bool:
     of its entries ran one of its steps to `success`, and each step succeeded
     in one entry at least."""
     for base, steps in BUILT[workflow].items():
-        mine = [j for j in jobs if j.get("name", "").split(" (", 1)[0] == base]
+        mine = [j for j in jobs if job_base(j.get("name", "")) == base]
         if not mine or any(j.get("conclusion") != "success" for j in mine):
             return False
         ran = [{s.get("name") for s in j.get("steps") or [] if s.get("conclusion") == "success"} & set(steps)

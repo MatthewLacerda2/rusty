@@ -11,6 +11,8 @@ run on such a head is accepted here too, and a test pins that.
 
 from __future__ import annotations
 
+from merging.verdict.runlist import base
+
 
 # Markdown that is code for merge purposes: code or tests read it (CLAUDE.md).
 # Path prefixes: the scripting-API reference is one file per namespace (#569); a
@@ -73,7 +75,7 @@ def drift_ran(run: dict, jobs: dict[int, list[dict]]) -> bool:
     """Whether this `ci` run's `build-test` really ran the dev-feature tests:
     some entry ran the step, and none that ran it failed."""
     ran = [step.get("conclusion")
-           for job in jobs.get(run.get("id"), []) if job.get("name", "").split(" (", 1)[0] == DRIFT_JOB
+           for job in jobs.get(run.get("id"), []) if base(job.get("name", "")) == DRIFT_JOB
            for step in job.get("steps") or []
            if all(w in step.get("name", "").lower() for w in DRIFT_STEP_WORDS) and step.get("conclusion") != "skipped"]
     return bool(ran) and all(c == "success" for c in ran)
