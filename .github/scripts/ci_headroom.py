@@ -10,7 +10,11 @@ workflow file the run came from, never copied here. A job that used more than
 [`SHARE`] of it is told on the board.
 
 It is an informational signal (CLAUDE.md, *Gates vs. signals*): it never fails
-a run, never blocks a merge, and exits 0 on anything it cannot read.
+the `ci` run nor blocks a merge. What it cannot read (the run, its jobs, the
+open issues, an issue's comments) ends it with "nothing measured" and files
+nothing, so a GitHub outage never files a duplicate. A workflow file it reads
+no limit from exits 1, so its step (`continue-on-error`) shows red instead of
+saying every job is within its limit.
 
 - One open issue per job, found by a hidden marker in its body, labelled
   `infrastructure` and `agent`. A matrix job is one job: its limit is the
@@ -27,18 +31,19 @@ DRY_RUN ('true' prints every write instead of making it).
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
 import subprocess
 import sys
 from datetime import datetime
-from pathlib import Path
 from typing import Callable
+from urllib.parse import quote
 
 import ghrest
+from gate_mirror import _jobs
 
-ROOT = Path(__file__).resolve().parents[2]
 #: The workflows measured, by name: `ci` holds the gates a merge waits on.
 MEASURED = ("ci",)
 #: The share of a job's limit past which it is told.
@@ -49,23 +54,25 @@ MOVED_MINUTES = 1.0
 MEASURED_CONCLUSIONS = ("success", "failure")
 LABELS = ("infrastructure", "agent")
 
-JOB = re.compile(r"^  (?P<name>[\w-]+):\s*$", re.M)
 TIMEOUT = re.compile(r"^    timeout-minutes: (?P<minutes>\d+)\b", re.M)
 NOTED = re.compile(r"ci-headroom:minutes=(?P<minutes>[\d.]+)")
 
 Gh = Callable[..., object]
 
 
+class Unread(Exception):
+    """A read the measure needs did not come; the run ends with nothing filed."""
+
+
+class NoLimits(Exception):
+    """The workflow file gave no `timeout-minutes`: the measure itself is broken."""
+
+
 def limits(workflow: str) -> dict[str, int]:
-    """Each job's own `timeout-minutes` (the job's key, four spaces in), by job.
-    A step's limit, deeper in, is not the job's; a job without one is left out."""
-    marks = list(JOB.finditer(workflow))
-    found: dict[str, int] = {}
-    for mark, nxt in zip(marks, marks[1:] + [None]):
-        body = workflow[mark.end(): nxt.start() if nxt else len(workflow)]
-        if limit := TIMEOUT.search(body):
-            found[mark["name"]] = int(limit["minutes"])
-    return found
+    """Each job's own `timeout-minutes` (the job's key, four spaces in), by job,
+    split by `gate_mirror._jobs` (comment lines dropped). A step's limit, deeper
+    in, is not the job's; a job without one is left out."""
+    return {name: int(limit["minutes"]) for name, body in _jobs(workflow) if (limit := TIMEOUT.search(body))}
 
 
 def seconds(job: dict) -> float | None:
@@ -116,33 +123,68 @@ def opening(base: str, text: str, workflow: str) -> str:
 
 def last_noted(gh: Gh, repo: str, issue: dict) -> float | None:
     """The minutes of the last note on `issue`, body first, then its comments."""
-    comments = ghrest.pages(lambda path: gh("api", path), f"repos/{repo}/issues/{issue['number']}/comments") or []
+    comments = ghrest.pages(lambda path: gh("api", path), f"repos/{repo}/issues/{issue['number']}/comments")
+    if comments is None:
+        raise Unread(f"#{issue['number']}'s comments")
     found = NOTED.findall("\n".join([issue.get("body") or ""] + [c.get("body") or "" for c in comments]))
     return float(found[-1]) if found else None
 
 
+def workflow_at(gh: Gh, repo: str, run: dict) -> str:
+    """The workflow file `run` ran, at its own `head_sha`, not today's `main`;
+    `""` when it could not be read."""
+    path = (run.get("path") or ".github/workflows/ci.yml").split("@", 1)[0]
+    answer = gh("api", f"repos/{repo}/contents/{quote(path)}?ref={run.get('head_sha', '')}")
+    try:
+        return base64.b64decode(answer["content"]).decode("utf-8")  # type: ignore[index]
+    except (KeyError, TypeError, ValueError):
+        return ""
+
+
 def report(gh: Gh, repo: str, run: dict, workflow_text: str, dry_run: bool = False) -> list[str]:
-    """What this run files or comments, done unless `dry_run`; each action said in a line."""
-    if run.get("name") not in MEASURED or run.get("head_branch") != "main" or run.get("event") not in ("push", "schedule"):
+    """What this run files or comments, done unless `dry_run`; each action said in a line.
+    A read that does not come ends it before any write; [`NoLimits`] is raised."""
+    if not measured(run):
         return [f"run {run.get('id')} is '{run.get('name')}' on '{run.get('head_branch')}' via "
                 f"'{run.get('event')}': not a measured main run; nothing to do"]
+    try:
+        return measure(gh, repo, run, workflow_text, dry_run)
+    except Unread as what:
+        return [f"{what} could not be read; nothing measured, nothing filed"]
+
+
+def measured(run: dict) -> bool:
+    """Whether `run` is one this measures: a `ci` push or schedule run on `main`."""
+    return run.get("name") in MEASURED and run.get("head_branch") == "main" and run.get("event") in ("push", "schedule")
+
+
+def measure(gh: Gh, repo: str, run: dict, workflow_text: str, dry_run: bool) -> list[str]:
+    """[`report`]'s body: every read, then every write."""
     jobs = ghrest.pages(lambda path: gh("api", path), f"repos/{repo}/actions/runs/{run['id']}/jobs?filter=latest", "jobs")
     if jobs is None:
-        return ["the run's jobs could not be read; nothing measured"]
-    found = over(jobs, limits(workflow_text))
+        raise Unread("the run's jobs")
+    limit_of = limits(workflow_text)
+    if not limit_of:
+        raise NoLimits(f"no `timeout-minutes` read from {run.get('path')} at {run.get('head_sha')}; nothing measured")
+    found = over(jobs, limit_of)
     if not found:
         return [f"every measured job is within {SHARE:.0%} of its limit"]
-    issues = ghrest.pages(lambda path: gh("api", path), f"repos/{repo}/issues?state=open&labels={LABELS[0]}") or []
-    said = []
+    issues = ghrest.pages(lambda path: gh("api", path), f"repos/{repo}/issues?state=open&labels={LABELS[0]}")
+    if issues is None:
+        raise Unread("the open issues")
+    # Every read comes before the first write, so a read lost halfway files nothing.
+    plans = []
     for base, (name, minutes, limit) in sorted(found.items()):
-        text = note(name, minutes, limit, run)
         open_ = next((i for i in issues if "pull_request" not in i and marker(base) in (i.get("body") or "")), None)
+        plans.append((base, name, minutes, limit, open_, last_noted(gh, repo, open_) if open_ else None))
+    said = []
+    for base, name, minutes, limit, open_, noted in plans:
+        text = note(name, minutes, limit, run)
         if open_ is None:
             payload = {"title": f"CI headroom: `{base}` ran {minutes:.0f} of its {limit} minutes on main",
                        "body": opening(base, text, run["name"]), "labels": list(LABELS)}
             path, what = f"repos/{repo}/issues", f"open an issue for `{base}`"
         else:
-            noted = last_noted(gh, repo, open_)
             if noted is not None and abs(minutes - noted) < MOVED_MINUTES:
                 said.append(f"#{open_['number']} already says {noted:.1f} min for `{base}`; nothing new")
                 continue
@@ -169,9 +211,15 @@ def main() -> int:
     if not isinstance(run, dict):
         print(f"run {run_id} could not be read; nothing measured")
         return 0
-    path = ROOT / (run.get("path") or ".github/workflows/ci.yml").split("@", 1)[0]
-    text = path.read_text(encoding="utf-8") if path.is_file() else ""
-    for line in report(gh_cli, repo, run, text, dry_run=os.environ.get("DRY_RUN") == "true"):
+    text = workflow_at(gh_cli, repo, run) if measured(run) else ""
+    try:
+        said = report(gh_cli, repo, run, text, dry_run=os.environ.get("DRY_RUN") == "true")
+    except NoLimits as broken:
+        # A broken measure, not a healthy run: the step fails (it is
+        # `continue-on-error`, so the `ci` run and this job stay green).
+        print(f"ci_headroom: {broken}", file=sys.stderr)
+        return 1
+    for line in said:
         print(line)
     return 0
 

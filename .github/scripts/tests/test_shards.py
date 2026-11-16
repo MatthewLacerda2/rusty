@@ -66,9 +66,9 @@ class Canaries(unittest.TestCase):
     def test_every_entry_runs_the_canaries_by_their_real_names(self):
         text = (gate_mirror.ROOT / ".github" / "workflows" / "ci.yml").read_text()
         sources = "\n".join(p.read_text() for p in (gate_mirror.ROOT / "crates").rglob("*.rs"))
-        for job, body in gate_mirror._jobs(text):
-            if "--partition" not in body:
-                continue
+        sharded = [(job, body) for job, body in gate_mirror._jobs(text) if "--partition" in body]
+        self.assertTrue(sharded, "no job of ci.yml holds a `--partition`: this test would hold nothing")
+        for job, body in sharded:
             with self.subTest(job=job):
                 self.assertIn("      - name: Canaries", body, "a sharded job runs the canaries (#2276)")
                 step = body[body.index("      - name: Canaries"):]

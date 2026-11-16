@@ -333,23 +333,22 @@ jobs:
   # suite on macOS (Metal), the other shipped platform, so the portability premise is
   # checked, not assumed. Separate from `build-test` to avoid renaming that
   # required check.
-  # Three shards of the `dev` suite (#2276), as `build-test` splits it on Linux
-  # (#2264): the checks are named `build-test-cross (macos-26, 1/3)` to
-  # `(macos-26, 3/3)`, and `mergeable` reads them by their base name. The job
+  # Two shards of the `dev` suite (#2276), as `build-test` splits it on Linux
+  # (#2264): the checks are named `build-test-cross (macos-26, 1/2)` and
+  # `(macos-26, 2/2)`, and `mergeable` reads them by their base name. The job
   # ran 30-35 min whole against its 35-minute limit; each shard pays the build
-  # and a third of nextest, plus one extra: the default doctests (a second,
-  # non-`dev` build, about 6 min) on 1/3, the `dev` doctests on 2/3 and the
-  # lint xtask on 3/3. Two shards left the one with the default doctests at
-  # 26.6 of 35 min (run 43947625456), past three quarters.
+  # and half of nextest. The `dev` doctests and the lint xtask (seconds each)
+  # ride on 2/2, the shard the `count:` split leaves lighter. Two shards, not
+  # three: a train's run and a PR's run then hold four macOS runners, inside
+  # the free plan's five concurrent macOS jobs, so no shard queues for one.
   build-test-cross:
     needs: changes
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { os: macos-26, shard: 1/3 }
-          - { os: macos-26, shard: 2/3 }
-          - { os: macos-26, shard: 3/3 }
+          - { os: macos-26, shard: 1/2 }
+          - { os: macos-26, shard: 2/2 }
     # A guard against a hang, not a budget the suite must fit (#1976): the job
     # took 23-29 min when it ran both suites and two green runs were cancelled
     # at 30. With the one `dev` suite it took 18.4 (run 42611428872), then crept
@@ -389,18 +388,20 @@ jobs:
       # macOS uses its native backend and needs no extra system libs; the apt
       # step is Linux-only and lives on the `build-test` job above.
       #
-      # Only the `dev` suite runs here (#1976), where `build-test` runs both.
-      # What this leg proves is Metal and the platform, and the `dev` build
-      # compiles and tests a superset of the default one: on 2026-11-09 the
-      # default list held one test the `dev` list did not
-      # (`a_ship_build_has_no_speech_namespace`, a Lua check with no platform
-      # code); no `cfg` pairs `target_os` with `not(feature = "dev")`; and the
-      # runtime `cfg!(feature = "dev")` branches (`core::project::prepare`,
-      # `core/project/agent_tests.rs`) write files, with no platform code. So the
-      # default test targets and binaries now compile only on Linux: what only
-      # they hold is feature plumbing, which Linux proves, while the doctests
-      # below still build the default library on macOS. Running both cost the
-      # leg about 9 of its 23-29 minutes and tipped it past its timeout.
+      # Only the `dev` suite and the `dev` doctests run here (#1976, #2276),
+      # where `build-test` runs both feature sets. What this leg proves is Metal
+      # and the platform, and the `dev` build compiles and tests a superset of
+      # the default one: on 2026-11-09 the default list held one test the `dev`
+      # list did not (`a_ship_build_has_no_speech_namespace`, a Lua check with
+      # no platform code); no `cfg` pairs `target_os` with `not(feature =
+      # "dev")`; and the runtime `cfg!(feature = "dev")` branches
+      # (`core::project::prepare`, `core/project/agent_tests.rs`) write files,
+      # with no platform code. So the default library, its test targets, its
+      # binaries and its doctests build only on Linux (`build-test (default,
+      # 1/1)`): what only they hold is feature plumbing, which Linux proves.
+      # The default doctests were a second, non-`dev` build of about 6 minutes
+      # here, and with them one of two shards ran 26.6 of 35 min (run
+      # 43947625456), past three quarters.
       - name: Test (engine, dev features)
         shell: bash
         run: |
@@ -421,14 +422,8 @@ jobs:
         if: always()
         continue-on-error: true
         run: python3 .github/scripts/slowest_tests.py junit-dev.xml
-      # One feature set per shard (#2276), so none pays both: the default
-      # library's doctests on 1/3, the `dev` ones on 2/3, none on 3/3 (which
-      # runs the lint xtask instead).
-      - name: Doctests (default features)
-        if: matrix.shard == '1/3'
-        run: cargo test --doc --locked
       - name: Doctests (dev features)
-        if: matrix.shard == '2/3'
+        if: matrix.shard == '2/2'
         run: cargo test --doc --features dev --locked
       - name: Test summary
         if: always()
@@ -436,7 +431,7 @@ jobs:
         with:
           paths: junit-*.xml
       - name: Test (lint xtask)
-        if: matrix.shard == '3/3'
+        if: matrix.shard == '2/2'
         run: cargo test --manifest-path tools/lint/Cargo.toml --locked
 
   # The `.blend` import through a real Blender (#1072). Its tests are `#[ignore]`d
