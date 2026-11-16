@@ -157,7 +157,8 @@ jobs:
   # which the scripts read by its base name `build-test`; `ci-gate` waits on all
   # three, so any one failing or cancelled turns it red. A shard is a whole job,
   # not a step, so the timeout below bounds each one. The doctests run once per
-  # feature set (`doctests: true`), the lint xtask once.
+  # feature set, on its first shard, and the lint xtask once, beside the default
+  # suite. The matrix holds only what names a job: every key would show in it.
   #
   # The events each gating job runs on are listed explicitly (#480). A bare
   # `github.event.pull_request.draft == false` also matches `push` and `schedule`
@@ -173,9 +174,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { features: default, shard: 1/1, doctests: true, xtask: true }
-          - { features: dev, shard: 1/2, doctests: true, xtask: false }
-          - { features: dev, shard: 2/2, doctests: false, xtask: false }
+          - { features: default, shard: 1/1 }
+          - { features: dev, shard: 1/2 }
+          - { features: dev, shard: 2/2 }
     # A guard against a hang, not a budget a shard must fit: the slowest share,
     # the default suite (one fewer split than `dev`), took about 12 minutes of
     # tests on a slow runner before the split.
@@ -293,7 +294,7 @@ jobs:
         continue-on-error: true
         run: python3 .github/scripts/slowest_tests.py "junit-${{ matrix.features }}.xml" 20
       - name: Doctests (this feature set)
-        if: needs.changes.outputs.code != 'false' && matrix.doctests
+        if: needs.changes.outputs.code != 'false' && startsWith(matrix.shard, '1/')
         run: |
           if [ "${{ matrix.features }}" = dev ]; then
             cargo test --doc --features dev --locked
@@ -306,7 +307,7 @@ jobs:
         with:
           paths: junit-*.xml
       - name: Test (lint xtask)
-        if: needs.changes.outputs.code != 'false' && matrix.xtask
+        if: needs.changes.outputs.code != 'false' && matrix.features == 'default'
         run: cargo test --manifest-path tools/lint/Cargo.toml --locked
       # The "Free runner disk" step that ran first here (#329/#332) is gone (#930):
       # since #487 both feature sets fit the stock runner, and since #2264 each

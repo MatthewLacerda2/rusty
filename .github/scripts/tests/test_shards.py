@@ -13,7 +13,7 @@ import gate_mirror
 
 
 def entries(*shards: str) -> str:
-    return "\n".join(f"          - {{ features: dev, shard: {s}, doctests: false }}" for s in shards)
+    return "\n".join(f"          - {{ features: dev, shard: {s} }}" for s in shards)
 
 
 class Shards(unittest.TestCase):
@@ -24,7 +24,7 @@ class Shards(unittest.TestCase):
                 self.assertEqual(gate_mirror.shard_gaps(text), [])
 
     def test_a_whole_split_and_one_per_feature_set_pass(self):
-        whole = entries("1/2", "2/2") + "\n          - { features: default, shard: 1/1, doctests: true }"
+        whole = entries("1/2", "2/2") + "\n          - { features: default, shard: 1/1 }"
         self.assertEqual(gate_mirror.shard_gaps(whole), [])
 
     def test_flags_a_missing_repeated_or_out_of_range_shard(self):
