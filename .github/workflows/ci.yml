@@ -333,17 +333,24 @@ jobs:
   # suite on macOS (Metal), the other shipped platform, so the portability premise is
   # checked, not assumed. Separate from `build-test` to avoid renaming that
   # required check.
-  # A one-entry matrix, so the check is named `build-test-cross (macos-26)`;
-  # `mergeable` reads it by its base name.
+  # Two shards of the `dev` suite (#2276), as `build-test` splits it on Linux
+  # (#2264): the checks are named `build-test-cross (macos-26, 1/2)` and
+  # `(macos-26, 2/2)`, and `mergeable` reads them by their base name. The job
+  # ran 30-35 min whole against its 35-minute limit; each shard pays the build
+  # and half of nextest, and one of the two doctest feature sets.
   build-test-cross:
     needs: changes
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-26]
+        include:
+          - { os: macos-26, shard: 1/2 }
+          - { os: macos-26, shard: 2/2 }
     # A guard against a hang, not a budget the suite must fit (#1976): the job
     # took 23-29 min when it ran both suites and two green runs were cancelled
-    # at 30. With the one `dev` suite it took 18.4 (run 42611428872). It must
+    # at 30. With the one `dev` suite it took 18.4 (run 42611428872), then crept
+    # to 30-35 and was sharded (#2276); `ci_headroom.py` tells the board when a
+    # shard passes three quarters of this again. It must
     # stay below the merge queue's `DEADLINE_MINUTES` (45, in
     # `merging/queue/cli.py`), so a hung job is a cancelled run the queue re-runs
     # (#869), not a stall hand-back; `tests/queue/test_macos_timeout.py` holds it.
@@ -394,26 +401,39 @@ jobs:
         shell: bash
         run: |
           rc=0
-          cargo nextest run --profile ci --features dev --locked || rc=$?
+          cargo nextest run --profile ci --features dev --locked --partition "count:${{ matrix.shard }}" || rc=$?
           cp target/nextest/ci/junit.xml junit-dev.xml || true
           exit "$rc"
+      # A partition puts each canary in one shard only, so every shard runs them
+      # again (#2264, #2276): a shard that lost Metal or OIDN fails, never skips.
+      - name: Canaries (this runner's GPU and OIDN)
+        run: >-
+          cargo nextest run --locked --features dev
+          -E 'test(=test_gpu::tests::gpu_adapter_present_when_required)
+          | test(=bake::denoise::tests::oidn_is_present_where_ci_requires_it)'
       # The ten slowest tests, in the log where an agent reads them (#1976): the
       # job summary is not served by the REST API a cloud session reads.
       - name: Slowest tests
         if: always()
         continue-on-error: true
         run: python3 .github/scripts/slowest_tests.py junit-dev.xml
-      - name: Doctests (both feature sets)
+      # One feature set per shard (#2276), so neither pays both: the default
+      # library's doctests on 1/2, the `dev` ones on 2/2.
+      - name: Doctests (this shard's feature set)
         shell: bash
         run: |
-          cargo test --doc --locked
-          cargo test --doc --features dev --locked
+          if [ "${{ matrix.shard }}" = 1/2 ]; then
+            cargo test --doc --locked
+          else
+            cargo test --doc --features dev --locked
+          fi
       - name: Test summary
         if: always()
         uses: test-summary/action@v2
         with:
           paths: junit-*.xml
       - name: Test (lint xtask)
+        if: matrix.shard == '1/2'
         run: cargo test --manifest-path tools/lint/Cargo.toml --locked
 
   # The `.blend` import through a real Blender (#1072). Its tests are `#[ignore]`d
