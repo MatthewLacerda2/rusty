@@ -3,9 +3,7 @@
 //! of the main UV and white on the other. Head-on and at a grazing view, the black
 //! half draws as the plane without the detail does and the white half as the plane
 //! with it, unmasked; a mask without a detail map draws no detail, and a missing
-//! mask file applies the detail everywhere.
-//!
-//! No adapter: `frame` returns `None` and the test passes without asserting.
+//! mask file applies the detail everywhere. No adapter: `frame` returns `None`.
 
 use glam::Vec3;
 use rusty::components::{DetailLayer, MaterialAsset};
@@ -132,6 +130,8 @@ fn the_masks_black_half_draws_no_detail_and_its_white_half_the_whole_detail() {
         let shows = half(&full, &plain, false).min(half(&full, &plain, true));
         let (lone, unread) = (whole(&lone, &plain), whole(&unread, &full));
         eprintln!("[mask] grazing {grazing}: to plain {to_plain:.2}, to full {to_full:.2}, detail shows {shows:.2}, lone {lone:.2}, missing {unread:.2}");
+        // Measured: `shows` lavapipe 25.74 / 27.14 (head-on / grazing), Metal 26.30 /
+        // 25.92; every `< 0.5` value 0.00 on both.
         assert!(shows > 4.0, "the detail shows on both halves ({shows:.2})");
         assert!(
             to_plain < 0.5,
