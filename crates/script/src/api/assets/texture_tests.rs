@@ -1,0 +1,73 @@
+//! Who holds an image's Max Size after a get-edit-set through Lua (#2259): a
+//! changed `maxSize` is the developer's even when the Get table carries
+//! `maxSizeChosen = false` back, any other edit leaves it the engine's, and a
+//! `maxSizeChosen = false` that flips the stored flag hands it back.
+
+use std::path::{Path, PathBuf};
+
+use mlua::Lua;
+
+/// A Lua VM with `Texture` and `Assets`, `OUT` a 256×4 bake at a fresh `file`.
+fn baked(file: &str) -> (Lua, PathBuf) {
+    let lua = Lua::new();
+    crate::api::texture::register(&lua).unwrap();
+    super::super::register(&lua).unwrap();
+    let path = rusty_test_support::temp::dir().join(file);
+    lua.globals().set("OUT", path.to_str().unwrap()).unwrap();
+    bake(&lua, 256);
+    (lua, path)
+}
+
+/// `Texture.Bake` of a one-colour `w`×4 recipe to `OUT`.
+fn bake(lua: &Lua, w: u32) {
+    let script = format!(
+        r#"Texture.Bake({{ size = {{{w}, 4}}, nodes = {{ {{ id = "c", op = "constant",
+            color = {{1, 0, 0, 1}} }} }} }}, OUT, "base_color")"#
+    );
+    lua.load(script).exec().unwrap();
+}
+
+/// Get `OUT`'s settings, run `edit` on them as `s`, and set them back.
+fn round_trip(lua: &Lua, edit: &str) {
+    let script = format!(
+        "local s = Assets.GetTextureImportSettings(OUT) {edit} \
+         Assets.SetTextureImportSettings(OUT, s)"
+    );
+    lua.load(script).exec().unwrap();
+}
+
+fn max_size(path: &Path) -> u32 {
+    rusty_asset::sidecar::texture(path).max_size
+}
+
+#[test]
+fn a_max_size_changed_in_a_round_trip_holds_through_a_bake() {
+    let (lua, path) = baked("rusty_round_trip_max_size.png");
+    round_trip(&lua, "s.maxSize = 1024");
+    assert!(rusty_asset::sidecar::texture(&path).max_size_chosen);
+    bake(&lua, 4096);
+    assert_eq!(max_size(&path), 1024, "the developer's Max Size is kept");
+}
+
+#[test]
+fn a_round_trip_editing_another_setting_leaves_max_size_the_engines() {
+    let (lua, path) = baked("rusty_round_trip_wrap.png");
+    round_trip(&lua, r#"s.wrapMode = "Clamp""#);
+    assert!(!rusty_asset::sidecar::texture(&path).max_size_chosen);
+    bake(&lua, 4096);
+    assert_eq!(
+        max_size(&path),
+        4096,
+        "the engine's Max Size follows the bake"
+    );
+}
+
+#[test]
+fn max_size_chosen_false_hands_a_chosen_max_size_back() {
+    let (lua, path) = baked("rusty_round_trip_hand_back.png");
+    round_trip(&lua, "s.maxSize = 1024");
+    round_trip(&lua, "s.maxSizeChosen = false");
+    assert!(!rusty_asset::sidecar::texture(&path).max_size_chosen);
+    bake(&lua, 4096);
+    assert_eq!(max_size(&path), 4096, "handed back to the engine");
+}
