@@ -2,8 +2,6 @@
 //! larger than a first, small bake raises every map's Max Size, the ones the slot
 //! fixes wrote default sidecars for included; one above 8192 is refused.
 
-use std::path::PathBuf;
-
 use rusty_asset::sidecar::texture;
 use rusty_asset::MapRef;
 use rusty_procgen::catalog::Constant;
@@ -40,7 +38,7 @@ fn sizes(m: &MaterialAsset) -> Vec<(u32, u32)> {
         &m.metallic_map,
         &m.occlusion_map,
     ];
-    let file = |map: &Option<MapRef>| PathBuf::from(map.as_ref().unwrap().file().unwrap());
+    let file = |map: &Option<MapRef>| map.as_ref().unwrap().file().unwrap();
     maps.map(|map| {
         let file = file(map);
         (
