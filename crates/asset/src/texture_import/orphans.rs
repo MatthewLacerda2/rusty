@@ -1,12 +1,16 @@
 //! Collecting the import cache's orphaned compressed textures (#1694): a `.bctex`
-//! whose source image is gone, or whose source is a baked lightmap page (which
-//! the importer no longer compresses, `asset::lightmap_page::is_baked`), is
-//! deleted on refresh ([`super::refresh_all`]). Without it, every rebake left a
-//! cache per page name behind: a game held 842 MB of them for 158 page names.
+//! whose source image is gone, or whose source the importer no longer compresses
+//! (a baked lightmap page, `asset::lightmap_page::is_baked`, or a normal map kept
+//! at 16 bits, `texture_import::is_deep_normal`), is deleted on refresh
+//! ([`super::refresh_all`]). Without it, every rebake left a cache per page name
+//! behind: a game held 842 MB of them for 158 page names.
 //!
 //! Only what the refresh proves orphaned goes: a `.bctex` file under the import
-//! cache's own folder for the refreshed root, whose source path answers
-//! *not found*. A source that exists but cannot be read is not gone, and nothing
+//! cache's own folder for the refreshed root, whose source path answers *not
+//! found*, is a baked page by its path, or is a `NormalMap` (by its sidecar) whose
+//! copy is not current and whose file's header says 16 bits. A current copy is
+//! never one of those, so it costs a `stat` and the cache's head, never the
+//! source's header. A source that exists but cannot be read is not gone, and nothing
 //! outside the import cache (the system temp folder a non-project caches in) is
 //! ever walked. A model's cache is never touched: an exported project ships it
 //! without its source, on purpose (`convert::served_from_cache`).
@@ -14,8 +18,9 @@
 use std::path::{Path, PathBuf};
 
 use super::CACHE_SUFFIX;
-use crate::convert;
+use crate::convert::{self, Seen};
 use crate::lightmap_page::is_baked;
+use crate::sidecar::TextureType;
 
 /// Delete the orphaned compressed textures of the images under `root` (see the
 /// module doc) and return how many went. Nothing outside a project, whose caches
@@ -42,7 +47,8 @@ pub(super) fn collect(root: &Path) -> usize {
 }
 
 /// The `.bctex` files under `cache_dir` (the cache of the images under
-/// `sources`) whose source is gone or is a baked lightmap page, sorted.
+/// `sources`) whose source is gone, is a baked lightmap page or is a normal map
+/// kept at 16 bits, sorted.
 pub(super) fn orphans(cache_dir: &Path, sources: &Path) -> Vec<PathBuf> {
     let mut found = Vec::new();
     walk(cache_dir, &mut |cache| {
@@ -53,12 +59,30 @@ pub(super) fn orphans(cache_dir: &Path, sources: &Path) -> Vec<PathBuf> {
             return;
         };
         let source = sources.join(name);
-        if is_baked(&source) || is_gone(&source) {
+        let deep = || deep_orphan(cache, &source);
+        if is_baked(&source) || is_gone(&source) || deep() {
             found.push(cache.to_path_buf());
         }
     });
     found.sort();
     found
+}
+
+/// Whether `cache`, the copy of the existing image at `source`, is a 16-bit normal
+/// map's: a `NormalMap` whose copy is stale ([`super::current`] would refuse it)
+/// and whose header says more than 8 bits a channel (the module doc).
+fn deep_orphan(cache: &Path, source: &Path) -> bool {
+    let settings = crate::sidecar::texture(source);
+    if settings.texture_type != TextureType::NormalMap {
+        return false;
+    }
+    let current = match convert::source_digest(source) {
+        Seen::Read(digest) => {
+            super::cache::is_current(cache, super::cache::stamp(digest, &settings))
+        }
+        _ => false,
+    };
+    !current && super::is_deep_normal(source, &settings)
 }
 
 /// Whether nothing is at `path`: the OS says *not found*. Any other failure (a

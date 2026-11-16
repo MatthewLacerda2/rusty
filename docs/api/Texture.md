@@ -49,11 +49,15 @@ lists the valid ones — a typo like `"basecolour"` never silently bakes linear 
 Every slot bakes 8 bits per channel except `data` and `normal16`, which bake a
 **16-bit** PNG (#1491, #2002): a height field used as displacement or a terrain
 heightmap keeps 65536 levels instead of terracing into 256 steps, and a normal map
-keeps slopes under about 0.004 that 8 bits round flat (a mirror-polished stone). The 16 bits are the file's: the renderer
-loads it as a material map like any other PNG, but uploads every map at 8 bits per
-channel at most today (and block-compressed below that once the import cache has
-made its copy, unless its `compression` is `"None"`; see `Assets.md`), so the extra precision serves what reads the file itself (an
-`image` node, a terrain or displacement bake), not what the GPU draws.
+keeps slopes under about 0.004 that 8 bits round flat (a mirror-polished stone, a
+glazed tile tilted a fraction of a degree). A `data` map is uploaded at 8 bits per
+channel at most (block-compressed below that once the import cache has made its
+copy, unless its `compression` is `"None"`; see `Assets.md`), so its extra precision
+serves what reads the file itself (an `image` node, a terrain or displacement bake).
+A `normal16` map in a material's normal slot keeps it on the GPU too: a 16-bit
+`"NormalMap"` is never block-compressed and uploads as half floats, at eight bytes
+a texel (twice an 8-bit map, eight times BC5; `Assets.md`, `textureType`), so bake
+`normal16` for the subtle relief that needs it and `normal` for the rest.
 
 `orm` is only another name for the glTF metallic-roughness packing, not an
 occlusion-roughness-metallic map: nothing is written to R, so bake occlusion as its
