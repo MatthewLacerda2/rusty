@@ -3,17 +3,27 @@
 
 use glam::{Vec2, Vec3};
 
-use super::{bake, MeshMap, MeshSource};
+use super::{bake, MeshMap, MeshSource, Settings};
 use rusty_procgen::image_buf::Image;
 
-/// Every map `maps` of `mesh` at `size`², in the order baked.
+/// Every map `maps` of `mesh` at `size`² with the default settings, in the order
+/// baked.
 pub(super) fn bake_all(
     mesh: &MeshSource,
     maps: &[MeshMap],
     size: u32,
 ) -> Result<Vec<(MeshMap, Image)>, String> {
+    bake_with(mesh, maps, &Settings::new(size))
+}
+
+/// Every map `maps` of `mesh` baked with `settings`, in the order baked.
+pub(super) fn bake_with(
+    mesh: &MeshSource,
+    maps: &[MeshMap],
+    settings: &Settings,
+) -> Result<Vec<(MeshMap, Image)>, String> {
     let mut out = Vec::new();
-    bake(mesh, maps, size, |map, img| {
+    bake(mesh, maps, settings, |map, img| {
         out.push((map, img));
         Ok(())
     })?;

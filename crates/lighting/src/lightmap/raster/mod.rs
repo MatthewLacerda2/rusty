@@ -129,19 +129,20 @@ struct UvTri {
 /// share goes to the first in index order, and the first pass never yields to the
 /// second, so a centre-covered texel bakes exactly as it would without the second.
 pub(super) fn rasterize(mesh: &BakeMesh, size: u32) -> Vec<TexelPoint> {
-    rasterize_surface(&mesh.surface(), size)
+    rasterize_surface(&mesh.surface(), size, size)
 }
 
-/// [`rasterize`] over any [`Surface`]: its own UV set, scaled to a `size`² image.
-pub(crate) fn rasterize_surface(mesh: &Surface, size: u32) -> Vec<TexelPoint> {
-    let tris = uv_triangles(mesh, size as f32);
-    let mut taken = vec![false; (size * size) as usize];
+/// [`rasterize`] over any [`Surface`]: its own UV set, scaled to a `width × height`
+/// image (U across, V down), so a non-square map stretches the unit square.
+pub(crate) fn rasterize_surface(mesh: &Surface, width: u32, height: u32) -> Vec<TexelPoint> {
+    let tris = uv_triangles(mesh, Vec2::new(width as f32, height as f32));
+    let mut taken = vec![false; width as usize * height as usize];
     let mut out = Vec::new();
     for conservative in [false, true] {
         for t in &tris {
             let clipper = conservative.then(|| Clipper::new(t));
-            for (x, y) in texels_under(t, size) {
-                let index = (y * size + x) as usize;
+            for (x, y) in texels_under(t, width, height) {
+                let index = (y * width + x) as usize;
                 if taken[index] {
                     continue;
                 }
@@ -160,7 +161,7 @@ pub(crate) fn rasterize_surface(mesh: &Surface, size: u32) -> Vec<TexelPoint> {
 
 /// `mesh`'s triangles in texel space, those without UV area (or with a non-finite
 /// UV) left out.
-fn uv_triangles(mesh: &Surface, scale: f32) -> Vec<UvTri> {
+fn uv_triangles(mesh: &Surface, scale: Vec2) -> Vec<UvTri> {
     mesh.indices
         .chunks_exact(3)
         .enumerate()
@@ -179,9 +180,10 @@ fn uv_triangles(mesh: &Surface, scale: f32) -> Vec<UvTri> {
         .collect()
 }
 
-/// The texels of a `size`² image that `t`'s bounding box overlaps, row by row.
-fn texels_under(t: &UvTri, size: u32) -> impl Iterator<Item = (u32, u32)> {
-    let scale = Vec2::splat(size as f32);
+/// The texels of a `width × height` image that `t`'s bounding box overlaps, row by
+/// row.
+fn texels_under(t: &UvTri, width: u32, height: u32) -> impl Iterator<Item = (u32, u32)> {
+    let scale = Vec2::new(width as f32, height as f32);
     let lo = t.uv[0].min(t.uv[1]).min(t.uv[2]).floor().max(Vec2::ZERO);
     let hi = t.uv[0].max(t.uv[1]).max(t.uv[2]).ceil().min(scale);
     let (x0, x1) = (lo.x as u32, hi.x as u32);
