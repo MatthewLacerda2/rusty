@@ -8,7 +8,7 @@ use glam::Vec3;
 
 use super::block;
 use crate::Scene;
-use rusty_components::mesh::{primitives, MeshRevision};
+use rusty_components::mesh::{primitives, MeshRevision, Vertex};
 
 const ROOM: f32 = 10.0;
 const STOREY: f32 = 4.0;
@@ -20,6 +20,9 @@ pub fn rooms(n: usize) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     let extent = n as f32 * ROOM;
+    // One sphere for every statue: generating it (its lightmap unwrap) is most of
+    // the level's build time when done once per room.
+    let sphere = primitives::generate_sphere(0.5, 24, 24);
     for storey in 0..2 {
         let y = storey as f32 * STOREY;
         for (i, j) in (0..n).flat_map(|i| (0..n).map(move |j| (i, j))) {
@@ -28,7 +31,7 @@ pub fn rooms(n: usize) -> Scene {
             if storey == 0 || (i * n + j) % 7 != 3 {
                 block(&mut scene, "Floor", lo, lo + Vec3::new(ROOM, WALL, ROOM));
             }
-            props(&mut scene, lo + Vec3::Y * WALL, i + j + storey);
+            props(&mut scene, lo + Vec3::Y * WALL, i + j + storey, &sphere);
         }
         for k in 0..=n {
             let at = k as f32 * ROOM;
@@ -82,8 +85,9 @@ fn wall(
     }
 }
 
-/// Two crates and a dense 1.5 m sphere in the room whose floor corner is `lo`.
-fn props(scene: &mut Scene, lo: Vec3, k: usize) {
+/// Two crates and a dense 1.5 m statue (`sphere`'s vertices and indices) in the
+/// room whose floor corner is `lo`.
+fn props(scene: &mut Scene, lo: Vec3, k: usize, sphere: &(Vec<Vertex>, Vec<u32>)) {
     let shift = (k % 4) as f32;
     for at in [
         Vec3::new(2.0 + shift, 0.5, 2.5),
@@ -99,8 +103,7 @@ fn props(scene: &mut Scene, lo: Vec3, k: usize) {
         at - Vec3::splat(0.75),
         at + Vec3::splat(0.75),
     );
-    let (vertices, indices) = primitives::generate_sphere(0.5, 24, 24);
     let mut mesh = scene.world.mesh_mut(id).expect("a box");
-    (mesh.vertices, mesh.indices) = (vertices, indices);
+    (mesh.vertices, mesh.indices) = sphere.clone();
     mesh.revision = MeshRevision::next();
 }
