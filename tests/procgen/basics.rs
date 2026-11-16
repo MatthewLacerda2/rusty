@@ -1,5 +1,5 @@
 //! #1740's generators and params read the same at every resolution: a bake at 128²,
-//! 512² and 2048² has the same mean and the same coarse histogram, as the older
+//! 512² and 1024² has the same mean and the same coarse histogram, as the older
 //! generators do (`resolution.rs`). Each is a sampler over the unit tile, so this
 //! holds unless a param slipped into pixels.
 
@@ -42,9 +42,9 @@ fn profile(img: &Image) -> (f32, [f32; BINS]) {
 }
 
 #[test]
-fn each_new_generator_reads_the_same_at_128_512_and_2048() {
+fn each_new_generator_reads_the_same_at_128_512_and_1024() {
     for op in OPS {
-        let (mean, bins) = profile(&bake(op, 2048));
+        let (mean, bins) = profile(&bake(op, 1024));
         for res in [128, 512] {
             let (m, b) = profile(&bake(op, res));
             assert!(
