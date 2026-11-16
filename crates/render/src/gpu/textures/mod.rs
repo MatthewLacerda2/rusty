@@ -47,7 +47,7 @@ pub struct GpuTexture {
     /// the shader reads it in place of the length BC5 cannot keep.
     pub normal_variance: Option<VarianceTable>,
     /// Its file is a normal map kept at 16 bits (`texture_import::keeps_deep`): a
-    /// normal slot needs a [`deep::DEEP_FORMAT`] upload of it (`deep::serves`).
+    /// normal slot needs a 16-bit (`deep::DEEP_FORMAT`) upload of it (`deep::serves`).
     pub deep_normal: bool,
 }
 
