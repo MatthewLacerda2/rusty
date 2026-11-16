@@ -1,5 +1,5 @@
 //! crates/edit/src/authoring/rendering/camera/mod.rs — Shared camera-authoring ops (the
-//! TAA ops and knob table in `taa`).
+//! TAA ops and knob table are `rusty_scene::rules::taa`'s, re-exported here).
 //!
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `CameraComponent` field by field: the projection (`fov` / `near` / `far`, and
@@ -29,8 +29,7 @@ use rusty_core::settings::quality::EffectQuality;
 use rusty_scene::rules::lens;
 use rusty_scene::rules::sanitize::saturated;
 
-mod taa;
-pub use taa::{
+pub use rusty_scene::rules::taa::{
     camera_knob, set_taa_active, set_taa_anti_flicker, set_taa_base_blend_factor,
     set_taa_contrast_adaptive_sharpening, set_taa_jitter_scale, set_taa_mip_bias, set_taa_quality,
     set_taa_variance_clamp_scale, CameraKnob, TAA_EFFECT, TAA_KNOBS,

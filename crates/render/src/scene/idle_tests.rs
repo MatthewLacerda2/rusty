@@ -7,10 +7,9 @@
 
 use glam::Vec3;
 
-use super::fixture::{frame, fresh, held, yard, RES};
+use super::fixture::{fill, frame, fresh, held, yard, RES};
 use crate::RenderCounters;
 use rusty_components::RenderMode;
-use rusty_edit::snapshot::SceneSnapshot;
 
 fn extracted(c: &RenderCounters) -> (u32, u32) {
     (c.render_extracted, c.render_posed)
@@ -92,12 +91,14 @@ fn gpu_an_undo_a_load_and_a_play_restore_rebuild_what_a_fresh_build_holds() {
     let (_, undone) = frame(&mut r, &scene);
     assert_eq!(extracted(&undone), (6, 0), "an Undo rebuilds");
     assert_eq!(held(&r, &scene), fresh(&mut r, &scene));
-    // Play, then Stop: the snapshot replaces the World.
-    let snapshot = SceneSnapshot::capture(&scene);
+    // Play, then Stop: the snapshot's restore clears the World and spawns the edit
+    // one back under the same ids (`edit::snapshot`, whose own tests hold that).
     let gone = scene.world.ids_with_mesh()[0];
     scene.world.despawn(gone);
     frame(&mut r, &scene);
-    snapshot.restore(&mut scene);
+    scene.world.clear();
+    fill(&mut scene, 6);
+    scene.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 2.0, -3.0);
     let (restored, stopped) = frame(&mut r, &scene);
     assert_eq!(stopped.render_extracted, 6, "Stop rebuilds: {stopped:?}");
     assert_eq!(held(&r, &scene), fresh(&mut r, &scene));

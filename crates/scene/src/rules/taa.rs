@@ -1,5 +1,7 @@
-//! crates/edit/src/authoring/rendering/camera/taa.rs — the camera's TAA ops (#1847) and
-//! its numeric knobs.
+//! crates/scene/src/rules/taa.rs — the camera's TAA ops (#1847) and its numeric
+//! knobs, below `edit::authoring` (which re-exports them from
+//! `authoring::rendering::camera`) so a renderer test reads the knob table without
+//! the authoring layer.
 //!
 //! The ONE place TAA's camera fields are mutated (#287): the editor's Camera card,
 //! the `Graphics.Set/GetTaa*` functions, a loaded file's hold and a
@@ -12,8 +14,8 @@
 //!
 //! Pure.
 
+use super::sanitize::saturated;
 use rusty_components::{CameraComponent, TaaQuality};
-use rusty_scene::rules::sanitize::saturated;
 
 /// Set the camera's TAA flag — temporal anti-aliasing (#1702), which replaces FXAA
 /// while it runs. Shared by the editor's Camera card and `Graphics.SetTaaActive`.

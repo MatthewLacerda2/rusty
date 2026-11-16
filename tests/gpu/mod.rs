@@ -91,4 +91,5 @@ mod toksvig;
 mod transparent_sorting_screenshot;
 mod transparent_surfaces;
 mod ui;
+mod warm;
 mod world_ui;

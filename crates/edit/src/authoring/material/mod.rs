@@ -60,7 +60,7 @@ pub use surface::{import_field, import_reflectance, SURFACE_FIELDS};
 use rusty_asset::MapRef;
 use rusty_components::RenderFace;
 use rusty_scene::rules::sanitize::{finite_array_or, non_negative, unit};
-use rusty_scene::{MaterialAsset, MaterialComponent, RenderMode, Scene};
+use rusty_scene::{MaterialAsset, RenderMode, Scene};
 
 pub use rusty_scene::rules::material::FACTOR_RANGE;
 
@@ -94,26 +94,11 @@ pub fn fold_pending(materials: &mut MaterialLibrary, key: &str, pending: Materia
     materials.entry(key.to_string()).or_insert(pending);
 }
 
-/// Resolve the library key for entity `id`'s first material, creating a default material
-/// (under [`entity_material_key`]) and attaching the reference if it has none yet.
-/// A library asset already under the key is kept, never overwritten: the rule every
-/// attach path shares (#997).
-/// Returns `None` only when the entity does not exist. This is the shared
-/// resolve-or-create the API's setters use before applying an op; the editor card
-/// already has a key in hand (it only edits an existing reference), so it does not
-/// need it.
+/// Resolve the library key for entity `id`'s first material, creating a default
+/// one if it has none: [`Scene::ensure_material_key`]. `None` only when the entity
+/// does not exist. The API's setters resolve through it before applying an op.
 pub fn ensure_material_key(scene: &mut Scene, id: u32) -> Option<String> {
-    if !scene.world.contains(id) {
-        return None;
-    }
-    if !scene.world.has_material(id) {
-        scene
-            .world
-            .set_material(id, Some(MaterialComponent::for_entity(id)));
-    }
-    let key = scene.world.material(id)?.first().to_string();
-    scene.materials.entry(key.clone()).or_default();
-    Some(key)
+    scene.ensure_material_key(id)
 }
 
 /// Set the base-color (albedo tint) factor.

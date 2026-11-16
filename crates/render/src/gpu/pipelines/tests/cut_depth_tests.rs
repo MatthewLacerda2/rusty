@@ -10,7 +10,6 @@ use glam::{Quat, Vec3};
 use super::mask_tests::Dissolve;
 use super::params_tests::{set_param, set_texture};
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_edit::authoring::material;
 use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::{Camera, Scene};
 
@@ -24,8 +23,8 @@ fn block(scene: &mut Scene, position: Vec3, scale: Vec3, shader: Option<&str>) -
     (t.position, t.scale) = (position, scale);
     drop(t);
     if let Some(shader) = shader {
-        let key = material::ensure_material_key(scene, id).unwrap();
-        material::set_shader(&mut scene.materials, &key, shader.to_owned());
+        let key = scene.ensure_material_key(id).unwrap();
+        scene.materials.get_mut(&key).unwrap().shader = Some(shader.to_owned());
     }
     id
 }

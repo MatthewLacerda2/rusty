@@ -8,42 +8,9 @@
 //!
 //! Pure.
 
-use crate::authoring::{primitive_revision, subdivided_geometry, Primitive};
-use rusty_components::mesh::primitives::MAX_PLANE_SUBDIVISIONS;
 use rusty_components::{MeshComponent, ShadowCasting};
-pub use rusty_scene::rules::mesh::{hold_scale_in_lightmap, hold_subdivisions};
+pub use rusty_scene::rules::mesh::{hold_scale_in_lightmap, hold_subdivisions, set_subdivisions};
 use rusty_scene::rules::sanitize::{self, clamped, non_negative};
-
-/// Cut a `Plane` into `subdivisions` quads per side and rebuild its geometry.
-/// Refuses a count outside `1..=`[`MAX_PLANE_SUBDIVISIONS`], and any count but 1 on
-/// a mesh that isn't a `Plane`.
-pub fn set_subdivisions(mesh: &mut MeshComponent, subdivisions: u32) -> Result<(), String> {
-    if !(1..=MAX_PLANE_SUBDIVISIONS).contains(&subdivisions) {
-        return Err(format!(
-            "subdivisions must be 1..={MAX_PLANE_SUBDIVISIONS}, got {subdivisions}"
-        ));
-    }
-    if mesh.primitive_type != "Plane" && subdivisions == 1 {
-        mesh.subdivisions = 1; // clears a stray count; the shape ignores it anyway
-        return Ok(());
-    }
-    if subdivisions == mesh.subdivisions {
-        return Ok(());
-    }
-    if mesh.primitive_type != "Plane" {
-        return Err(format!(
-            "subdivisions shapes a Plane; a {} mesh keeps 1",
-            mesh.primitive_type
-        ));
-    }
-    let (vertices, indices) =
-        subdivided_geometry(Primitive::Plane, subdivisions).expect("a Plane has geometry");
-    mesh.subdivisions = subdivisions;
-    mesh.vertices = vertices;
-    mesh.indices = indices;
-    mesh.revision = primitive_revision(Primitive::Plane, subdivisions);
-    Ok(())
-}
 
 /// Set how the mesh casts shadows (#1571): every shadow path reads it on its next
 /// frame or bake, a static one's cached shadow included.
@@ -84,7 +51,8 @@ pub fn set_scale_in_lightmap(mesh: &mut MeshComponent, scale: f32) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::authoring::primitive_mesh_component;
+    use crate::authoring::{primitive_mesh_component, Primitive};
+    use rusty_components::mesh::primitives::MAX_PLANE_SUBDIVISIONS;
 
     #[test]
     fn a_subdivided_plane_has_a_vertex_per_grid_corner() {

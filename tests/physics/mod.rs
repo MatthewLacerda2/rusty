@@ -11,3 +11,5 @@ mod queries;
 mod rapier;
 mod shape_casts;
 mod shape_volumes;
+mod shared_mesh;
+mod zero_scale;

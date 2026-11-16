@@ -7,7 +7,6 @@ use super::super::super::test_support::{add_box, add_floor};
 use super::super::super::{NavBounds, NavigationGraph, ALL_AREAS};
 use super::{agent, level, spawn, sync_path, DT};
 use rusty_components::NavPathStatus;
-use rusty_edit::authoring::nav::agent::set_area_mask;
 use rusty_scene::Scene;
 
 #[test]
@@ -28,7 +27,11 @@ fn a_mask_changed_mid_search_plans_with_the_new_mask() {
     g.set_pathfinding_iterations_per_frame(7);
     g.tick_nav_agents(&mut scene, DT);
     assert!(g.requests.borrow().active.is_some(), "mid-flight");
-    set_area_mask(&mut scene.world.nav_agent_mut(id).expect("agent"), mask);
+    scene
+        .world
+        .nav_agent_mut(id)
+        .expect("agent")
+        .set_area_mask(mask);
     for _ in 0..2000 {
         g.tick_nav_agents(&mut scene, DT);
         if agent(&scene, id).path_planned {

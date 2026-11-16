@@ -18,7 +18,14 @@ pub(super) const RES: u32 = 32;
 pub(super) fn yard(n: u32) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    fill(&mut scene, n);
+    scene
+}
+
+/// [`yard`]'s entities and library, added to `scene`: into a cleared World, the
+/// same ids again.
+pub(super) fn fill(scene: &mut Scene, n: u32) {
+    create_entity(scene, "Sun", Some(Primitive::DirectionalLight));
     let red = MaterialAsset {
         base_color: [0.9, 0.1, 0.1],
         ..MaterialAsset::default()
@@ -32,7 +39,7 @@ pub(super) fn yard(n: u32) -> Scene {
     scene.materials.insert("glass".into(), glass);
     for i in 0..n {
         let kind = [Primitive::Box, Primitive::Sphere, Primitive::Plane][i as usize % 3];
-        let id = create_entity(&mut scene, &format!("Prop_{i}"), Some(kind));
+        let id = create_entity(scene, &format!("Prop_{i}"), Some(kind));
         scene.world.transform_mut(id).unwrap().position = Vec3::new(i as f32 - 2.0, 0.0, -4.0);
         let material = match i {
             i if i % 5 == 4 => Some("glass"),
@@ -42,7 +49,6 @@ pub(super) fn yard(n: u32) -> Scene {
         let material = material.map(|m| MaterialComponent::new(m.to_string()));
         scene.world.set_material(id, material);
     }
-    scene
 }
 
 /// The camera every test looks through: down the row.

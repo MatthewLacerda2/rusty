@@ -7,14 +7,13 @@ use glam::Vec3;
 
 use crate::{RenderView, OFFSCREEN_FORMAT};
 use rusty_components::ExposureMode;
-use rusty_edit::authoring::rendering::post_processing as ops;
 use rusty_scene::create::default_post_processing;
 use rusty_scene::{Camera, Scene};
 
 /// Pin the volume's target at `ev`.
 fn target(scene: &mut Scene, id: u32, ev: f32) {
     let mut vc = scene.world.post_processing_mut(id).unwrap();
-    ops::exposure::set_limits(&mut vc, ev, ev);
+    (vc.exposure.automatic.min_ev, vc.exposure.automatic.max_ev) = (ev, ev);
 }
 
 #[test]
@@ -28,7 +27,7 @@ fn gpu_a_rendered_view_eases_in_play_holds_when_paused_and_snaps_in_edit() {
     let id = scene.add_entity("Camera".to_string());
     scene.world.set_camera(id, Some(Default::default()));
     let mut vc = default_post_processing();
-    ops::exposure::set_mode(&mut vc, ExposureMode::Automatic);
+    vc.exposure.mode = ExposureMode::Automatic;
     scene.world.set_post_processing(id, Some(vc));
     let cam = Camera::new(Vec3::ZERO, -90.0, 0.0);
     let out = view.color_target_view().unwrap();

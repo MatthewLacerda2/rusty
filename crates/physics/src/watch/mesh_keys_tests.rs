@@ -33,7 +33,7 @@ pub(super) fn scene() -> (Scene, u32) {
     let floor = scene.add_entity("Plank".into());
     let collider = ColliderComponent::from_mesh_bounds(false, Vec3::ZERO, Vec3::ZERO);
     scene.world.set_collider(floor, Some(collider));
-    rusty_edit::mesh::set_shared_mesh(&mut scene, floor, "plank").unwrap();
+    rusty_scene::mesh_library::set_shared_mesh(&mut scene, floor, "plank").unwrap();
     scene.world.set_static(floor, true);
     let crate_ = scene.add_entity("Crate".into());
     scene.world.transform_mut(crate_).unwrap().position = Vec3::new(1.5, 0.3, 0.0);

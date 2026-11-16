@@ -1,10 +1,9 @@
 //! The post effects' completeness gate (`render::postfx::completeness`) over every
 //! layer, the three above `render`'s live code included: the authoring layer
-//! (`edit::authoring`'s field tables, effect rows and knob tables, read here as
-//! `render`'s own tests read them), and each effect has its `Graphics.*`
-//! registrar (`script::api::graphics::effects::REGISTRARS`) and its Inspector section, and
-//! neither lists an effect the renderer lacks. The gate's own cases are `render`'s
-//! tests.
+//! (`edit::authoring`'s field tables, effect rows and knob tables), and each effect
+//! has its `Graphics.*` registrar (`script::api::graphics::effects::REGISTRARS`) and
+//! its Inspector section, and neither lists an effect the renderer lacks. The
+//! gate's own cases are `post_effect_cases`.
 
 use rusty::edit::authoring::rendering::post_processing::authored;
 use rusty::render::postfx::completeness::problems;

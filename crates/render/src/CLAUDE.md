@@ -213,10 +213,10 @@ in every layer. The vignette, the smallest real effect, is the worked example: g
   effect's part, or a composite texture it declares isn't bound and passed at its place in its own function's call. Pixels of every other effect stay byte-identical: no other offset or
   struct moved. Three layers sit above this crate's live code: the authoring layer
   (the field tables, `EFFECTS`, the camera's knob tables), handed in as an `Authored`,
-  and the `Graphics.*` registrars and the Inspector's sections, which render's own test
-  fills with the renderer's effect names and so cannot see either one missing: the
-  integration suite's `tests/post_effect_layers.rs` hands the real ones in, and is what
-  catches a missing registrar or Inspector section.
+  and the `Graphics.*` registrars and the Inspector's sections. The gate's own cases
+  (`tests/post_effect_cases/`) fill those two with the renderer's effect names and so
+  cannot see either one missing: `tests/post_effect_layers.rs` hands the real ones in,
+  and is what catches a missing registrar or Inspector section.
 
 ## GPU tests
 - **The name says it renders**: in-crate tests are named `gpu_*`, integration tests

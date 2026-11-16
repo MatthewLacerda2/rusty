@@ -4,14 +4,14 @@
 
 use super::{chain, W};
 use rusty_components::{PostProcessingComponent, Tonemap, Wheel};
-use rusty_edit::authoring::rendering::post_processing as ops;
 use rusty_scene::create::default_post_processing;
 
 /// A volume with `tonemap` and the `which` wheel set to `color` and `offset`.
 fn wheel(tonemap: Tonemap, which: Wheel, color: [f32; 3], offset: f32) -> PostProcessingComponent {
     let mut vc = default_post_processing();
     vc.tonemapping.mode = tonemap;
-    ops::grading::lift_gamma_gain::set_wheel(&mut vc, which, color, offset);
+    let wheel = vc.lift_gamma_gain.wheel_mut(which);
+    (wheel.color, wheel.offset) = (color, offset);
     vc
 }
 

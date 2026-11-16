@@ -16,12 +16,15 @@
 //! component field tables, the volume's effect rows, the camera's knob tables:
 //! `edit::authoring`), the `Graphics.*` registrars (`api`) and the Inspector's
 //! sections (`editor`), so the root's test hands them in ([`problems`], the
-//! authoring layer as an [`Authored`]); this crate's own tests fill the authoring
-//! layer the same way, the other two with the renderer's names, and check the rest.
-//! A test hook, compiled into every build for that.
+//! authoring layer as an [`Authored`]). The gate's own must-pass and must-flag
+//! cases sit in the integration suite too (`tests/post_effect_cases.rs`), since
+//! the authoring layer is above this crate: they build the layers with
+//! [`engine_from`], the other two with the renderer's names, and check them with
+//! [`check`]. A test hook, compiled into every build for that.
 
 use super::textures::{composite_textures, PlacedTexture, GROUP};
-use super::{assemble, History, Owner, PostEffect, POST_EFFECTS};
+pub use super::Owner;
+use super::{assemble, History, PostEffect, POST_EFFECTS};
 use rusty_components::PostProcessingComponent;
 use rusty_core::settings::graphics_options::GraphicsOption;
 
@@ -31,7 +34,7 @@ pub use rusty_scene::authored::Authored;
 
 /// What one layer of the engine lists, by effect name.
 #[derive(Clone, Default)]
-pub(super) struct Layers {
+pub struct Layers {
     /// The renderer's effects: name, owner, the name of the option that gates it.
     pub render: Vec<(String, Owner, Option<String>)>,
     /// Each effect's history declaration (#2092): `None` when it reads one, else
@@ -62,7 +65,7 @@ pub(super) struct Layers {
 
 /// One declared composite texture, as the gate expects the composite to use it.
 #[derive(Clone)]
-pub(super) struct TextureUse {
+pub struct TextureUse {
     pub effect: String,
     /// Its name in the composite.
     pub name: String,
@@ -87,9 +90,9 @@ pub fn effect_names() -> Vec<&'static str> {
 }
 
 /// The layers, the authoring one as `authored`, the registrars and the Inspector's
-/// sections read as the renderer's own names.
-#[cfg(test)]
-pub(super) fn engine_from(authored: Authored) -> Layers {
+/// sections read as the renderer's own names: a test hook, the integration
+/// suite's must-flag cases build their layers with it (`tests/post_effect_cases.rs`).
+pub fn engine_from(authored: Authored) -> Layers {
     let own: Vec<String> = effect_names().into_iter().map(String::from).collect();
     engine_with(authored, own.clone(), own)
 }
@@ -156,7 +159,7 @@ fn has(list: &[String], name: &str) -> bool {
 }
 
 /// Every part missing, or listed for no effect, as one line each.
-pub(super) fn check(l: &Layers) -> Vec<String> {
+pub fn check(l: &Layers) -> Vec<String> {
     let mut problems = Vec::new();
     for (name, owner, option) in &l.render {
         let lacks = |part: &str| format!("`{name}` has no {part}");
@@ -279,11 +282,3 @@ fn unknown(l: &Layers) -> Vec<String> {
     }
     problems
 }
-
-#[cfg(test)]
-#[path = "completeness_authored.rs"]
-mod authored;
-
-#[cfg(test)]
-#[path = "completeness_tests.rs"]
-mod tests;
