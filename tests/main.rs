@@ -141,11 +141,3 @@ mod tweens;
 // Kept under one `gpu::` path so a runner can tell them apart by name alone.
 #[cfg(feature = "dev")]
 mod gpu;
-
-// TEMPORARY (#2264 proof, reverted next commit): one red test in one Linux `dev`
-// shard only, so the macOS leg stays green and the gate's red is the shard's.
-#[cfg(all(feature = "dev", target_os = "linux"))]
-#[test]
-fn deliberately_red_in_one_linux_dev_shard() {
-    panic!("#2264: a red shard must turn ci-gate red");
-}
