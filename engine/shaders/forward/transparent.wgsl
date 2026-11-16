@@ -128,7 +128,7 @@ fn reflect_ssr(reflection: vec3<f32>, weight: vec3<f32>, world: vec3<f32>, N: ve
     if (material().receive_ssr == 0u || camera.ssr.x < 1.0 || fade <= 0.0) {
         return reflection;
     }
-    let f = ssr_march::Frame(camera.view_proj, camera.camera_pos, vec3<f32>(0.0), vec4<f32>(0.0, 0.0, 0.0, 1.0));
+    let f = ssr_march::Frame(camera.view_proj, camera.camera_pos, vec3<f32>(0.0), vec4<f32>(0.0, 0.0, 0.0, 1.0), 0.0);
     // Off the side the ray leaves from: both faces are drawn.
     let origin = world + faceForward(N, -R, N) * 0.02;
     let hit = ssr_march::trace(f, t_opaque, t_opaque, s_opaque, origin, R, i32(camera.ssr.x), camera.ssr.y, 0.0);

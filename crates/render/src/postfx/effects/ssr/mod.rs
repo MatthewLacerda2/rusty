@@ -110,7 +110,7 @@ pub(crate) fn run(
         .filter(|_| ssr_enabled(post, graphics, full))
         .map(|vc| {
             let m = march(&vc.ssr, graphics);
-            SsrParams::new(view_proj, eye, m, vc.ssr.min_smoothness)
+            SsrParams::new(view_proj, eye, m, &vc.ssr)
         });
     let gpu = (&r.device, &r.queue);
     view.post_fx

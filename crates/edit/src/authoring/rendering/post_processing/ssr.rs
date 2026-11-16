@@ -1,6 +1,7 @@
 //! Screen-space reflections' ops: the switch, the quality level (#1522) and the
 //! `Custom` march, its step count and its step length (a knob: a count is no
-//! tween), and the *Minimum Smoothness* (a knob, #1736).
+//! tween), the *Minimum Smoothness* (a knob, #1736) and the *Object Thickness* (a
+//! knob, #2228).
 
 use super::{Effect, Knob};
 use crate::authoring::fields::table::effect;
@@ -33,6 +34,11 @@ pub fn set_min_smoothness(vc: &mut PostProcessingComponent, smoothness: f32) {
     vc.ssr.min_smoothness = clamped(smoothness, 0.0, 1.0);
 }
 
+/// Set the *Object Thickness*, a fraction of the depth, clamped to `0..=1`.
+pub fn set_thickness(vc: &mut PostProcessingComponent, thickness: f32) {
+    vc.ssr.thickness = clamped(thickness, 0.0, Ssr::MAX_THICKNESS);
+}
+
 pub const EFFECT: Effect = Effect {
     name: "ssr",
     field: effect!(ssr, |c, v: Ssr| {
@@ -41,6 +47,7 @@ pub const EFFECT: Effect = Effect {
         set_steps(c, v.steps);
         set_step_length(c, v.step_length);
         set_min_smoothness(c, v.min_smoothness);
+        set_thickness(c, v.thickness);
     }),
     knobs: &[
         Knob {
@@ -54,6 +61,12 @@ pub const EFFECT: Effect = Effect {
             api: Some("SsrMinSmoothness"),
             get: |vc| vc.ssr.min_smoothness,
             set: set_min_smoothness,
+        },
+        Knob {
+            field: "thickness",
+            api: Some("SsrThickness"),
+            get: |vc| vc.ssr.thickness,
+            set: set_thickness,
         },
     ],
 };

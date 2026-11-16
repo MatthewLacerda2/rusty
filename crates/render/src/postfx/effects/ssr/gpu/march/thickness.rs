@@ -1,7 +1,9 @@
-//! How deep the march takes what it hits (#2228, `ssr_march.wgsl`'s `deep`): a
-//! crate keeps its hidden side in a mirror behind it, a thin pole over a mirror
-//! floor reflects no further than its own mirror image, and a march of steep
-//! 1 m steps, which no pyramid walk narrows, leaves no holes in it.
+//! How deep the march takes what it hits (#2228, `ssr_march.wgsl`'s `object`:
+//! the volume's `thickness`, a fraction of the depth): a crate keeps its hidden
+//! side in a mirror behind it at a thick setting and leaks it at the default, a
+//! thin pole over a mirror floor reflects no further than its own mirror image,
+//! and a march of steep 1 m steps, which no pyramid walk narrows, leaves no holes
+//! in it.
 
 use glam::{Vec2, Vec3};
 
@@ -15,10 +17,12 @@ const SIZE: (u32, u32) = (640, 360);
 const GREEN: usize = 1;
 
 /// A 50 cm red crate on a dull floor, a mirror wall 35 cm behind it, seen from
-/// the side and above: the mirror shows the crate's far side, which the depth
-/// target never holds.
-fn crate_and_mirror() -> (Scene, Camera) {
-    let (mut s, _) = tuned(true, ([0.3; 3], 0.0, 1.0), RED, |_| {});
+/// the side and above, the volume's `thickness` at `thickness`: the mirror shows
+/// the crate's far side, which the depth target never holds.
+fn crate_and_mirror(thickness: f32) -> (Scene, Camera) {
+    let (mut s, _) = tuned(true, ([0.3; 3], 0.0, 1.0), RED, |v| {
+        v.ssr.thickness = thickness;
+    });
     let cube = s.find_entity_by_name("Cube").unwrap();
     place(&mut s, cube, Vec3::new(0.0, 0.25, -3.0), Vec3::splat(0.5));
     let wall = create_entity(&mut s, "Mirror", Some(Primitive::Box));
@@ -32,22 +36,44 @@ fn crate_and_mirror() -> (Scene, Camera) {
     (s, Camera::new(Vec3::new(0.9, 1.1, -1.2), -105.0, -20.0))
 }
 
-/// The fewest red pixels the crate's reflection may hold: a band of the floor
-/// along its silhouette, where its far side should be, takes them. Measured
-/// (lavapipe): 5009 (`main` 4954; a crate taken 1% deep at its edges 4697).
+/// The fewest red pixels the crate's reflection may hold at `thickness` 0.15
+/// (45 cm at its 3 m): a band of the floor along its silhouette, where its far
+/// side should be, takes them where a ray passes behind it further than that.
+/// Measured (lavapipe): 6045 (a fixed 15 cm, the march without a pyramid's, 4954).
 const CRATE: usize = 4850;
+/// The same at the default `thickness`, 0.01 (3 cm): HDRP's, which lets the
+/// crate's hidden side leak, the trade for a thin strip's reflection as thin as
+/// it. Measured (lavapipe): 2942.
+const CRATE_DEFAULT: usize = 2700;
+
+/// The crate's reflection in red pixels, at `thickness`.
+fn crate_reflection(thickness: f32) -> Option<usize> {
+    let mut r = crate::test_gpu::headless_or_skip(SIZE.0, SIZE.1)?;
+    let (scene, cam) = crate_and_mirror(thickness);
+    let red = Hits::of(&mut r, &scene, &cam, SIZE).count(0);
+    eprintln!("[ssr] the crate's reflection at thickness {thickness}: {red} px");
+    Some(red)
+}
 
 #[test]
-fn gpu_a_crate_keeps_its_hidden_side_in_a_mirror_behind_it() {
-    let Some(mut r) = crate::test_gpu::headless_or_skip(SIZE.0, SIZE.1) else {
+fn gpu_a_thick_setting_keeps_a_crates_hidden_side_in_a_mirror_behind_it() {
+    let Some(red) = crate_reflection(0.15) else {
         return;
     };
-    let (scene, cam) = crate_and_mirror();
-    let red = Hits::of(&mut r, &scene, &cam, SIZE).count(0);
-    eprintln!("[ssr] the crate's reflection: {red} px");
     assert!(
         red >= CRATE,
-        "the crate's far side drops out of its reflection: {red} px"
+        "the crate's far side drops out of its reflection at thickness 0.15: {red} px"
+    );
+}
+
+#[test]
+fn gpu_the_default_thickness_leaks_no_more_of_a_crates_hidden_side_than_measured() {
+    let Some(red) = crate_reflection(0.01) else {
+        return;
+    };
+    assert!(
+        red >= CRATE_DEFAULT,
+        "the crate's reflection at the default thickness: {red} px, measured 2942"
     );
 }
 
@@ -98,7 +124,7 @@ fn reflection(step: f32) -> Option<(i64, usize)> {
 
 /// The most rows a thin pole's reflection may reach past its mirror image: rays
 /// passing over its top that count as hitting it from behind. Measured
-/// (lavapipe): -2 at either step (`main` -5 and -2: the image's far end fades).
+/// (lavapipe): -2 at either step (the march without a pyramid -5 and -2: the image's far end fades).
 const PAST: i64 = 2;
 /// The most rows of its image the reflection may leave out: the one at its foot,
 /// where the pole meets the floor. Measured (lavapipe): 1 at either step.

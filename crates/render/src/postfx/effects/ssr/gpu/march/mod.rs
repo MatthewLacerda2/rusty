@@ -2,7 +2,9 @@
 //! thin line under TAA's jitter, where it places a hit, and how deep it takes
 //! what it hits.
 
+mod facing;
 mod hits;
+mod hugging;
 mod placing;
 mod thickness;
 mod thin;

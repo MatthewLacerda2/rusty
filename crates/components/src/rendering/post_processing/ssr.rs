@@ -32,6 +32,12 @@ pub struct Ssr {
     /// From 0.96, the smoothest any surface gets, the view runs no SSR. The default
     /// 0.3 reflects up to roughness 0.7, fully to 0.5.
     pub min_smoothness: f32,
+    /// HDRP's *Object Thickness*, `0..=1`: how deep the march takes an object a
+    /// ray passes behind, as a fraction of its depth from the camera (the depth
+    /// target holds only front faces). Thick over-reflects thin things (a strip,
+    /// a cable drawn as a band); thin lets an object's hidden side leak (a crate's
+    /// far side in a mirror shows what is behind it). Default 0.01, HDRP's.
+    pub thickness: f32,
 }
 
 impl Ssr {
@@ -44,11 +50,14 @@ impl Ssr {
     /// most (HDRP's *Smoothness Fade Start* is `min_smoothness` plus this, up to 0.9:
     /// `render::postfx::effects::ssr::fade`).
     pub const SMOOTHNESS_FADE: f32 = 0.2;
+    /// The thickest `thickness` a write accepts.
+    pub const MAX_THICKNESS: f32 = 1.0;
 }
 
 impl Default for Ssr {
     /// On, at the preset's `Medium` level; `Custom` starts at HDRP's Medium march,
-    /// 32 steps of 0.375 m; reflecting up to roughness 0.7.
+    /// 32 steps of 0.375 m; reflecting up to roughness 0.7; objects 1% of their
+    /// depth deep.
     fn default() -> Self {
         Self {
             active: true,
@@ -56,6 +65,7 @@ impl Default for Ssr {
             steps: 32,
             step_length: 0.375,
             min_smoothness: 0.3,
+            thickness: 0.01,
         }
     }
 }

@@ -114,6 +114,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetSsrActive` / `SetSsrActive` | `()` / `(bool)` | `bool` |
 | `Graphics.GetSsrMinSmoothness` / `SetSsrMinSmoothness` | `()` / `(smoothness)` | `number`: HDRP's *Minimum Smoothness*, below which a surface keeps its probe or sky reflection (clamped 0–1, **default `0.3`**: reflects up to roughness 0.7, fully to 0.5; whole by smoothness 0.9 whatever the minimum; from `0.96` no surface reflects and SSR does not run) |
 | `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | which march it runs (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
+| `Graphics.GetSsrThickness` / `SetSsrThickness` | `()` / `(fraction)` | `number`: HDRP's *Object Thickness*, how deep the march takes an object a ray passes behind, as a fraction of its depth from the camera (clamped 0–1, **default `0.01`**). Thicker over-reflects thin things (a strip or cable drawn as a band); thinner lets an object's hidden side leak (a crate's far side in a mirror shows the floor along its outline) |
 | `Graphics.GetSsrStepLength` / `SetSsrStepLength` | `()` / `(units)` | `number`: the `Custom` march's step, world units (clamped 0.05–2, **default `0.375`**) |
 | `Graphics.GetSsrSteps` / `SetSsrSteps` | `()` / `(n)` | `number`: the `Custom` march's step count (clamped 1–256, **default `32`**) |
 | `Graphics.GetTaaActive` / `SetTaaActive` | `()` / `(bool)` | `bool` (**default `false`**; `false` with no screen camera; see *TAA*) |
@@ -514,14 +515,17 @@ a step goes behind the scene, or comes back out, it halves the step four times t
 where, so a reflected silhouette is drawn to the texel, not in stairs of a step. A
 point counts as a hit only on a surface or a little behind it: the depth holds only
 front faces, so a ray that meets an object's unseen back is taken to hit it, and one
-that passes further behind it marches on rather than smearing it. How far behind
-depends on the object's shape on screen, across its rows and columns: a line (narrower
-than 2% of its depth one way, running on past twice that the other: a strip, a cable,
-a pole) is taken 1% of its depth deep (HDRP's default *Object Thickness*), so a thin
-strip's reflection is about as thick as the strip, not as a 15 cm deep object's;
-anything else (a crate, a wall, a bulb, a wider pole) is taken 0.15 m deep (or 2% of
-its depth, for a floor seen near grazing). A `receive_ssr` transparent's march, which
-has no pyramid yet, takes every object 0.15 m deep. A hit whose blur on screen is wide (its cone's
+that passes further behind it marches on rather than smearing it. How far behind is
+the volume's `thickness` (HDRP's *Object Thickness*, HDRP's model): every object is
+taken that fraction of its depth from the camera deep, 1% by default, so 3 cm at 3 m.
+It reads nothing of the object's shape, so it is the same on every one of TAA's
+offsets and at any resolution or field of view. It trades one way or the other: a
+thin strip's reflection is about as thick as the strip at the default, and drawn as a
+band at a thick setting; a deep object a ray passes behind (a 50 cm crate before a
+mirror) shows what is behind it along its reflected outline at the default, and keeps
+its hidden side at a thick one (0.15 holds a 50 cm crate 3 m away). A `receive_ssr`
+transparent's march, which has no pyramid yet, takes every object 0.15 m deep (or 2%
+of its depth, for a floor seen near grazing), whatever the setting. A hit whose blur on screen is wide (its cone's
 radius past 4% of the screen's shorter side, gone by 12%: a long ray from a rough
 surface) fades to the probe reflection, which an average over so wide a disk would
 only approximate; a contact reflection (a short ray) keeps it. A material with `receive_ssr` off keeps its probe
@@ -541,7 +545,7 @@ the seeded `Medium` preset marches 16, 32 or 64 steps at its `Low`, `Medium` and
 `High` preset 32, 64 and 128, reaching 25.6 m; less where the ray crosses the screen
 fast), and `Custom` marches `steps` steps of at most `step_length` world units. No preset turns it off. The player's `ssr` option gates
 it. A new volume starts with SSR on at the `Medium` quality.
-Tween paths: `Graphics.ssr.step_length`, `Graphics.ssr.min_smoothness` (a count, as
+Tween paths: `Graphics.ssr.step_length`, `Graphics.ssr.min_smoothness`, `Graphics.ssr.thickness` (a count, as
 `steps`, does not tween).
 
 <!-- effect: bloom -->

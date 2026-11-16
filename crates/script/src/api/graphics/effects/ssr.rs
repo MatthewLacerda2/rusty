@@ -1,5 +1,6 @@
 //! `Graphics.{Get,Set}Ssr{Active,Quality}` and the `Custom` march's knobs,
-//! `Graphics.{Get,Set}Ssr{Steps,StepLength}` (#1522), over the active volume.
+//! `Graphics.{Get,Set}Ssr{Steps,StepLength}` (#1522), over the active volume; the
+//! knobs (`SsrMinSmoothness`, `SsrThickness`) come from the effect's table.
 
 use super::super::super::Reg;
 use super::knobs::{register_count, register_flag, register_quality};

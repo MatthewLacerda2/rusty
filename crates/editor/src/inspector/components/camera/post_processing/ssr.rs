@@ -1,5 +1,5 @@
 //! The Screen Space Reflections section: the switch and, while on, the *Minimum
-//! Smoothness* (#1736), the quality level and, at `Custom`, the march's knobs (#1522).
+//! Smoothness* (#1736), the *Object Thickness* (#2228), the quality level and, at `Custom`, the march's knobs (#1522).
 
 use super::{count_row, knob, knob_row, quality_row, toggle, Section};
 use rusty_components::Ssr;
@@ -40,6 +40,9 @@ fn draw(
         knob(ssr::EFFECT.knobs, "min_smoothness"),
     );
     *is_dirty |= knob_row(ui, (&mut *world, id), row, vc, 0.0..=1.0);
+    let row = ("  Object Thickness:", knob(ssr::EFFECT.knobs, "thickness"));
+    let range = 0.0..=Ssr::MAX_THICKNESS;
+    *is_dirty |= knob_row(ui, (&mut *world, id), row, vc, range);
     if let Some(quality) = quality_row(ui, "SSR Quality", vc.ssr.quality) {
         if let Some(mut c) = world.post_processing_mut(id) {
             ssr::set_quality(&mut c, quality);

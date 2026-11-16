@@ -46,7 +46,8 @@ struct SsrParams {
     camera_pos: vec4<f32>,
     // x: the march's step count, y: its step length in world units, from the
     // volume's quality (`render::postfx::effects::ssr::march`); z: the levels of
-    // `t_hiz`
+    // `t_hiz`; w: the volume's `thickness`, a fraction of the depth
+    // (`ssr_march::object`)
     march: vec4<f32>,
     // x: the volume's *Minimum Smoothness* (#1736), y: the smoothness over which SSR
     // fades in above it (`ssr::fade`)
@@ -169,7 +170,7 @@ fn across(world: vec3<f32>, t: f32, c: f32, dim: vec2<f32>) -> f32 {
     if (dot(side, side) < 1e-10) {
         side = cross(world - eye, vec3<f32>(1.0, 0.0, 0.0));
     }
-    let f = ssr_march::Frame(params.view_proj, eye, vec3<f32>(0.0), vec4<f32>(0.0));
+    let f = ssr_march::Frame(params.view_proj, eye, vec3<f32>(0.0), vec4<f32>(0.0), 0.0);
     let a = ssr_march::project(f, world).xy;
     let b = ssr_march::project(f, world + normalize(side) * (c * t * d0 / max(d0 + t, 1e-4))).xy;
     return length((b - a) * dim);
@@ -242,7 +243,7 @@ fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
         return missed;
     }
     let origin = world + s.normal * 0.02;
-    let f = ssr_march::Frame(params.view_proj, params.camera_pos.xyz, fwd, vec4<f32>(0.0, 0.0, 1.0, 0.0));
+    let f = ssr_march::Frame(params.view_proj, params.camera_pos.xyz, fwd, vec4<f32>(0.0, 0.0, 1.0, 0.0), params.march.w);
     let c = cone(s.roughness);
     // Read sharp: the resolve blurs the hits by the cone, colour and edge alike.
     let hit = ssr_march::trace_hit(f, t_velocity, t_hiz, s_hiz, i32(params.march.z), t_color, s_color, origin, r, i32(params.march.x), params.march.y, c, 0.0);

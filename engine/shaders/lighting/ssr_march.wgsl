@@ -30,6 +30,9 @@ struct Frame {
     eye: vec3<f32>,
     fwd: vec3<f32>,
     channel: vec4<f32>,
+    // How deep an object is taken to be, as a fraction of its depth: the volume's
+    // `thickness` (`object`); 0 for a march without a pyramid, which keeps `slack`.
+    thickness: f32,
 };
 
 fn texel(t: texture_2d<f32>, uv: vec2<f32>) -> vec4<f32> {
@@ -111,7 +114,8 @@ fn step_cap(steps: i32, dim: vec2<f32>) -> f32 {
 // it passed. The depth target holds only front faces, so a ray that meets an
 // object's unseen back is behind its front by the object's own depth: `THICKNESS`
 // is how deep an object is taken to be (a bottle, a pole, a crate's edge), and a ray
-// further behind passes it; a line is taken thinner (`deep`). `DEPTH_SLACK`, a fraction of the depth, is a texel's
+// further behind passes it. The march with a pyramid takes it thinner, as the
+// volume's `thickness` says (`object`). `DEPTH_SLACK`, a fraction of the depth, is a texel's
 // own depth on a surface seen near grazing: 2% holds a floor down to a few degrees
 // at 1080p (a texel's depth there is about `depth × 0.001 / tan(angle)`).
 const THICKNESS: f32 = 0.15;
@@ -136,9 +140,27 @@ fn project(f: Frame, p: vec3<f32>) -> vec3<f32> {
     return vec3<f32>(s.x * 0.5 + 0.5, 0.5 - s.y * 0.5, clip.w);
 }
 
-// How far behind the scene at `p` a point may lie and still be on it.
+// How far behind the scene at `p` a point may lie and still be on it: the march
+// without a pyramid's whole test, and the one with a pyramid's before `object`.
 fn slack(f: Frame, p: vec3<f32>) -> f32 {
-    return max(THICKNESS, depth_of(f, p) * DEPTH_SLACK);
+    return max(max(THICKNESS, depth_of(f, p) * DEPTH_SLACK), object(f, p));
+}
+
+// How far behind the object a hit at `p` may lie and still hit it, in a march with
+// a pyramid (#2228): HDRP's thickness model, a linear function of the depth,
+// `f.thickness` of it (the volume's `thickness`, HDRP's *Object Thickness*,
+// default 0.01). HDRP's `ScreenSpaceReflections.compute` takes the back of the
+// depth texel whose front is at linear depth `z` at `(1 + thickness) × z` (ll.
+// 494–500: `bounds.w = bounds.z * _SsrThicknessScale + _SsrThicknessBias`, that
+// line written in device depth, whose bias is only the mapping's: in view depth
+// the bias is 0). The depth target holds only front faces, so a ray passing
+// behind an object hits it only within this: a thick setting over-reflects a
+// thin thing (a 6 mm strip drawn as deep as the setting), a thin one lets an
+// object's hidden side leak (a crate's far side in a mirror behind it shows
+// the floor along its silhouette). It is the same on every jitter offset, and
+// at every resolution and field of view: it reads no width on screen.
+fn object(f: Frame, p: vec3<f32>) -> f32 {
+    return f.thickness * depth_of(f, p);
 }
 
 // Where a march point stands against the scene: in front of it (or over the sky),
@@ -178,96 +200,6 @@ fn refine(f: Frame, t_depth: texture_2d<f32>, a: vec3<f32>, b: vec3<f32>, start:
         }
     }
     return Bracket(keep, go);
-}
-
-// How deep a line is taken to be, as a fraction of its depth (#2228):
-// HDRP's default *Object Thickness*, 1%.
-const THIN_SLACK: f32 = 0.01;
-// How wide on screen, as a fraction of its depth, a line is at most: twice
-// `THIN_SLACK`, so a strip whose height in texels moves by one between TAA's
-// offsets stays a line on every offset.
-const THIN_WIDE: f32 = 0.02;
-// The most texels `deep` looks at each side of a hit (1080p needs 38: past it, a
-// line must be that long, not twice its bound).
-const EXTENT_TAPS: i32 = 24;
-// What `extent` returns for an object that runs on past its taps.
-const OPEN: f32 = 1.0e9;
-
-// How far, in texels along `axis` (texels, unit) each way from `uv`, the object
-// seen there runs on: `.x` back, `.y` ahead, counting the texels whose depths run
-// on within `tol` of each other; `OPEN` on a side that runs on for all `taps`, and
-// then the other side is not looked at (0).
-fn extent(f: Frame, t_depth: texture_2d<f32>, uv: vec2<f32>, axis: vec2<f32>, tol: f32, taps: i32) -> vec2<f32> {
-    let dim = vec2<f32>(textureDimensions(t_depth));
-    let d0 = dot(texel(t_depth, uv), f.channel);
-    var run = vec2<f32>(0.0);
-    for (var i = 0; i < 2; i = i + 1) {
-        let side = f32(2 * i - 1);
-        var last = d0;
-        var k = 1;
-        for (; k <= taps; k = k + 1) {
-            let q = uv + axis * (side * f32(k)) / dim;
-            if (any(q < vec2<f32>(0.0)) || any(q > vec2<f32>(1.0))) {
-                break;
-            }
-            let d = dot(texel(t_depth, q), f.channel);
-            if (abs(d - last) > tol) {
-                break;
-            }
-            last = d;
-        }
-        if (k > taps) {
-            // Run on: what `deep` asks of this axis is settled.
-            run[i] = OPEN;
-            return run;
-        }
-        run[i] = f32(k - 1);
-    }
-    return run;
-}
-
-// The world size of one texel of `dim` across the line of sight at `p`.
-fn texel_size(f: Frame, p: vec3<f32>, dim: vec2<f32>) -> f32 {
-    let sight = p - f.eye;
-    var across = cross(sight, vec3<f32>(0.0, 1.0, 0.0));
-    if (dot(across, across) < 1e-10) {
-        across = cross(sight, vec3<f32>(1.0, 0.0, 0.0));
-    }
-    let moved = length((project(f, p + normalize(across) * 0.01).xy - project(f, p).xy) * dim);
-    return 0.01 / max(moved, 1e-6);
-}
-
-// How far behind the object a hit at `p` (seen at `uv`) may lie and still hit it
-// (#2228): `THIN_SLACK` of its depth for a line, an object narrower on screen than
-// `THIN_WIDE` of its depth one way that runs on for twice that the other (a strip,
-// a cable, a pole), and `slack`, `main`'s, for any other (a crate, a wall, a
-// grazing floor, a wider pole, a bulb). The two ways are the screen's rows and its
-// columns, through the hit, not along the ray: a vertical pole over a mirror
-// floor runs on along its ray. The depth target holds only front faces, so a ray
-// passing behind an object hits it only within its thickness: a fixed `THICKNESS`
-// drew a 6 mm strip's reflection as wide as a 15 cm deep one's once the march
-// stopped stepping over it. What it cannot judge keeps `THICKNESS`:
-// - a thickness in proportion to the width moves by a texel's worth between TAA's
-//   offsets, and a strip's reflected edge with it, the whole strip at once (a
-//   12 mm strip's TAA dip 12.0 at 1.5 widths deep, against 1.2);
-// - a leaning 8 cm pole taken one width deep lost rows of its far side;
-// - a small round object (an 8 cm bulb) is as wide as `THIN_WIDE` on some offsets
-//   and wider on others, and a bright one blinked (a pan's dip 49, against 16 at
-//   `THICKNESS` and 8 at 1%): a line is told by its length, which a jitter of a
-//   texel does not move across the bound.
-fn deep(f: Frame, t_depth: texture_2d<f32>, p: vec3<f32>, uv: vec2<f32>) -> f32 {
-    let tol = slack(f, p);
-    let dim = vec2<f32>(textureDimensions(t_depth));
-    let depth = depth_of(f, p);
-    let wide = THIN_WIDE * depth / texel_size(f, p, dim);
-    let taps = clamp(i32(ceil(2.0 * wide)), 1, EXTENT_TAPS);
-    let x = extent(f, t_depth, uv, vec2<f32>(1.0, 0.0), tol, taps);
-    let y = extent(f, t_depth, uv, vec2<f32>(0.0, 1.0), tol, taps);
-    let x_runs = max(x.x, x.y) >= OPEN;
-    let y_runs = max(y.x, y.y) >= OPEN;
-    let across = select(y, x, y_runs);
-    let line = x_runs != y_runs && 1.0 + across.x + across.y <= wide;
-    return select(tol, min(depth * THIN_SLACK, tol), line);
 }
 
 // A step shorter than this many texels on screen is probed at its end alone, and
@@ -348,6 +280,12 @@ fn clear(f: Frame, t_depth: texture_2d<f32>, t_hiz: texture_2d<f32>, s: sampler,
         let edge = floor(ua) + select(vec2<f32>(0.0), vec2<f32>(1.0), path > vec2<f32>(0.0));
         let exits = select(vec2<f32>(2.0), (edge - ua) / path, abs(path) > vec2<f32>(1e-6));
         u = min(min(exits.x, exits.y), 1.0);
+        if (u >= 1.0) {
+            // A step that stays in its own texel (under about 1.4 texels):
+            // nothing to walk, and a refinement from its start may still find a
+            // short contact hit at its end.
+            return vec2<f32>(0.0, 1.0);
+        }
     }
     var near_end = depth_of(f, mix(a, b, world_fraction(u, ca.w, cb.w)));
     var front = world_fraction(u, ca.w, cb.w);
@@ -394,7 +332,7 @@ fn clear(f: Frame, t_depth: texture_2d<f32>, t_hiz: texture_2d<f32>, s: sampler,
 // by at most `slack`: an object `THICKNESS` deep) or beyond it. A step that
 // leaves the front, or comes back from beyond, is refined by bisection to where it
 // changed (`refine`), and hits only if that point is on the scene, no further
-// behind it than its object is deep (`deep`): one that went behind a thin
+// behind it than its object is deep (`object`, with a pyramid): one that went behind a thin
 // object's edge, or came out beside it, marches on. Returns the
 // colour of `t_color` it hits and, in `.w`, how much the hit counts (0: a miss):
 // faded at the screen's edge, wider by the blur's radius, over the march's last
@@ -482,10 +420,10 @@ fn trace_hit(f: Frame, t_depth: texture_2d<f32>, t_hiz: texture_2d<f32>, s_hiz: 
             // bracketed within a probe's spacing, so its hit is judged by the
             // object's depth alone; one it did not (one under a texel, one behind
             // an object) may span a metre, and its hit is not lost for lying
-            // deeper than the ray went. A march with no pyramid (a transparent's,
-            // #2268) keeps `slack` alone, as before: it still steps over a thin
-            // line, and finds it mostly from behind, where `deep` would drop it.
-            let lands = state(f, hit, back) == ON && (hiz_levels <= 0 || hit.behind <= deep(f, t_depth, back, hit.uv) + placed);
+            // deeper than the ray went. The march without a pyramid (a
+            // transparent's, #2268) keeps `slack` alone: it still steps over a thin
+            // line, and finds it mostly from behind, where `object` would drop it.
+            let lands = state(f, hit, back) == ON && (hiz_levels <= 0 || hit.behind <= object(f, back) + placed);
             if (lands) {
                 let dim = vec2<f32>(textureDimensions(t_color));
                 let t = distance(origin, back);

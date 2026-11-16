@@ -34,6 +34,7 @@ use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::{PostFx, HDR_FORMAT};
 use crate::timing::{GpuPass, GpuTimer};
+use rusty_components::Ssr;
 use rusty_core::settings::quality::SsrQuality;
 
 /// CPU mirror of `SsrParams` in `postfx/ssr.wgsl`.
@@ -44,7 +45,8 @@ pub(crate) struct SsrParams {
     view_proj: [f32; 16],
     camera_pos: [f32; 4],
     /// x: step count, y: step length (world units), z: the levels of the min-depth
-    /// pyramid it reads ([`super::hiz`]).
+    /// pyramid it reads ([`super::hiz`]), w: the volume's `thickness`, a fraction
+    /// of the depth (`ssr_march.wgsl`'s `object`).
     march: [f32; 4],
     /// x: the *Minimum Smoothness* (#1736), y: the width it fades in over
     /// ([`super::fade`]).
@@ -53,15 +55,16 @@ pub(crate) struct SsrParams {
 
 impl SsrParams {
     /// The base camera's frame, marching as `m` ([`super::march`]) says, reflecting
-    /// surfaces down to `min_smoothness`.
-    pub(crate) fn new(view_proj: Mat4, eye: Vec3, m: SsrQuality, min_smoothness: f32) -> Self {
+    /// surfaces down to `ssr`'s `min_smoothness` and taking objects its
+    /// `thickness` deep.
+    pub(crate) fn new(view_proj: Mat4, eye: Vec3, m: SsrQuality, ssr: &Ssr) -> Self {
         Self {
             inv_view_proj: view_proj.inverse().to_cols_array(),
             view_proj: view_proj.to_cols_array(),
             camera_pos: eye.extend(0.0).to_array(),
-            march: [m.steps as f32, m.step_length, 0.0, 0.0],
+            march: [m.steps as f32, m.step_length, 0.0, ssr.thickness],
             surface: {
-                let [min, width] = super::fade(min_smoothness);
+                let [min, width] = super::fade(ssr.min_smoothness);
                 [min, width, 0.0, 0.0]
             },
         }

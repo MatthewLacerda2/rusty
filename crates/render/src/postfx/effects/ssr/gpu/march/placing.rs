@@ -43,7 +43,7 @@ fn pixel(cam: &Camera, p: Vec3) -> Vec2 {
 
 /// The most a reflected edge may lie from its mirror image's, in rows: the
 /// image's own rasterisation and a refinement placed within a texel. Measured
-/// (lavapipe): 0.2, as on `main`.
+/// (lavapipe): 0.2, as the march without a pyramid.
 const EDGE: f32 = 1.0;
 
 #[test]
@@ -79,7 +79,7 @@ fn gpu_a_reflected_edge_lands_within_a_texel_of_its_image() {
 /// A green rod 1 cm tall and 4 cm deep, 0.3 m over the fixture's mirror floor
 /// and 8 m out, under a black sky, the eye 12 cm up: the floor's rays skim it at a
 /// grazing angle for tens of texels before they reach the rod's height. On
-/// `main` 266 of its 434 columns reflected it (lavapipe).
+/// the march without a pyramid 266 of its 434 columns reflected it (lavapipe).
 fn skim() -> (Scene, Camera) {
     let (mut s, _) = tuned(true, MIRROR, RED, |_| {});
     crate::test_gpu::black_sky(&mut s);
