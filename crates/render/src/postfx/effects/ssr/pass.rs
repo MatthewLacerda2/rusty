@@ -94,19 +94,7 @@ impl SsrPasses {
     pub(crate) fn new(device: &wgpu::Device, registry: &mut ShaderRegistry) -> Self {
         let shader = registry.load(device, "postfx/ssr.wgsl", "SSR Shader");
         let d2 = wgpu::TextureViewDimension::D2;
-        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("SSR Layout"),
-            entries: &[
-                uniform_entry(0, wgpu::ShaderStages::FRAGMENT),
-                texture_entry(1, d2),
-                sampler_entry(2),
-                texture_entry(3, d2),
-                texture_entry(4, d2),
-                texture_entry(5, d2),
-                texture_entry(6, d2),
-                sampler_entry(7),
-            ],
-        });
+        let layout = shared_layout(device);
         let traced = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("SSR Resolve Layout"),
             entries: &[texture_entry(0, d2), texture_entry(1, d2)],
@@ -156,6 +144,21 @@ impl SsrPasses {
             rest,
         ]
     }
+}
+
+/// Both passes' first group (`postfx/ssr.wgsl`'s group 0): the params, the colour
+/// pyramid and its sampler, the velocity and surface targets, and the min-depth
+/// pyramid with its sampler.
+fn shared_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    let d2 = wgpu::TextureViewDimension::D2;
+    let textures = [1, 3, 4, 5, 6].map(|b| texture_entry(b, d2));
+    let mut entries = vec![uniform_entry(0, wgpu::ShaderStages::FRAGMENT)];
+    entries.extend(textures);
+    entries.extend([sampler_entry(2), sampler_entry(7)]);
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("SSR Layout"),
+        entries: &entries,
+    })
 }
 
 /// One view's SSR state: the pyramid of the opaque image the march reads, the
