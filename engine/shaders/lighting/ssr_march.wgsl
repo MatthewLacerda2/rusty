@@ -111,7 +111,7 @@ fn step_cap(steps: i32, dim: vec2<f32>) -> f32 {
 // it passed. The depth target holds only front faces, so a ray that meets an
 // object's unseen back is behind its front by the object's own depth: `THICKNESS`
 // is how deep an object is taken to be (a bottle, a pole, a crate's edge), and a ray
-// further behind passes it; a narrow one is taken thinner (`deep`). `DEPTH_SLACK`, a fraction of the depth, is a texel's
+// further behind passes it; a line is taken thinner (`deep`). `DEPTH_SLACK`, a fraction of the depth, is a texel's
 // own depth on a surface seen near grazing: 2% holds a floor down to a few degrees
 // at 1080p (a texel's depth there is about `depth × 0.001 / tan(angle)`).
 const THICKNESS: f32 = 0.15;
@@ -180,12 +180,12 @@ fn refine(f: Frame, t_depth: texture_2d<f32>, a: vec3<f32>, b: vec3<f32>, start:
     return Bracket(keep, go);
 }
 
-// How deep a narrow object is taken to be, as a fraction of its depth (#2228):
+// How deep a line is taken to be, as a fraction of its depth (#2228):
 // HDRP's default *Object Thickness*, 1%.
 const THIN_SLACK: f32 = 0.01;
-// How wide on screen, as a fraction of its depth, an object is at most to count as
-// narrow: twice `THIN_SLACK`, so a strip whose height in texels moves by one
-// between TAA's offsets stays narrow on every offset.
+// How wide on screen, as a fraction of its depth, a line is at most: twice
+// `THIN_SLACK`, so a strip whose height in texels moves by one between TAA's
+// offsets stays a line on every offset.
 const THIN_WIDE: f32 = 0.02;
 // The most texels `deep` looks at each side of a hit (1080p needs 38: past it, a
 // line must be that long, not twice its bound).
@@ -474,10 +474,12 @@ fn trace_hit(f: Frame, t_depth: texture_2d<f32>, t_hiz: texture_2d<f32>, s_hiz: 
             // On the scene, and no further behind it than its object is deep, give
             // or take where the refinement could place it: a step `clear` walked is
             // bracketed within a probe's spacing, so its hit is judged by the
-            // object's depth alone; one it did not (one under a texel,
-            // one behind an object, every step of a march with no pyramid) may span
-            // a metre, and its hit is not lost for lying deeper than the ray went.
-            let lands = state(f, hit, back) == ON && hit.behind <= deep(f, t_depth, back, hit.uv) + placed;
+            // object's depth alone; one it did not (one under a texel, one behind
+            // an object) may span a metre, and its hit is not lost for lying
+            // deeper than the ray went. A march with no pyramid (a transparent's,
+            // #2268) keeps `slack` alone, as before: it still steps over a thin
+            // line, and finds it mostly from behind, where `deep` would drop it.
+            let lands = state(f, hit, back) == ON && (hiz_levels <= 0 || hit.behind <= deep(f, t_depth, back, hit.uv) + placed);
             if (lands) {
                 let dim = vec2<f32>(textureDimensions(t_color));
                 let t = distance(origin, back);

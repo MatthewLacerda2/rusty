@@ -173,7 +173,7 @@ const HITS_DIP: f32 = 18.0;
 /// 1.2 (lavapipe); `main` 13.9.
 const TAA_DIP: f32 = 5.0;
 /// The most rows deep the line's reflection may be, on average: a ray passing
-/// behind a narrow object hits it within 1% of its depth (`deep`), not
+/// behind a line hits it within 1% of its depth (`deep`), not
 /// `THICKNESS`'s 15 cm. Measured: 4.4 and 4.5 (lavapipe); `main`, its curves of
 /// stray hits, 7.1 for the 6 mm line.
 const ROWS: f32 = 6.0;
