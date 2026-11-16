@@ -11,7 +11,9 @@
 // onto the main shading normal in world space: by the mesh's tangent frame
 // re-orthogonalised against it under UV0, by the whiteout blend per projection
 // under a world mapping, as the main normal map does (`mapping::sample_normal`).
-// HDRP's detail mask is left out: rusty has no mask map.
+// HDRP's *Detail Mask* (#2258) is a texture of its own (rusty has no mask map):
+// its red, read at the main maps' coordinates as HDRP reads it with the main UVs
+// (the height map's parallax shift included), scales all three pushes per texel.
 //
 // The layer shares the material's mapping. Under UV0 its coordinates are the main
 // maps' tiled UV under its own scale/offset (HDRP's *Link Details with Base*);
@@ -20,8 +22,8 @@
 
 #define_import_path forward::detail
 
-#import forward::bindings::{material, s_detail, t_detail}
-#import forward::mapping::{MapCoords, Mapping, coords_with, displaced, lookup, lookup_uv, whiteout}
+#import forward::bindings::{material, s_detail, s_detail_mask, t_detail, t_detail_mask}
+#import forward::mapping::{MapCoords, Mapping, coords_with, displaced, lookup, lookup_uv, sample, whiteout}
 
 const UV0: u32 = 0u;
 const TRIPLANAR: u32 = 2u;
@@ -63,6 +65,17 @@ fn coords(main: MapCoords, position: vec3<f32>, normal: vec3<f32>) -> MapCoords 
     return c;
 }
 
+// How much of the detail applies at the point whose main coordinates are `main`:
+// the mask's red, under every mapping the main maps use; 1 without a mask (or a
+// detail map), which is then never fetched.
+fn mask(main: MapCoords) -> f32 {
+    let m = material();
+    if (m.use_detail_map == 0u || m.use_detail_mask == 0u) {
+        return 1.0;
+    }
+    return saturate(sample(t_detail_mask, s_detail_mask, main).r);
+}
+
 // HDRP's detail normal from a texel: x from alpha, y from green, z rebuilt, then x
 // and y scaled (`UnpackNormalAG`).
 fn unpack(texel: vec4<f32>, scale: f32) -> vec3<f32> {
@@ -76,11 +89,13 @@ fn toward(value: f32, d: f32, amount: f32) -> f32 {
     return mix(value, select(1.0, 0.0, d < 0.0), amount);
 }
 
-// The albedo, roughness and normal `in_*` with the detail at `c` applied, or as
-// given when the material has no detail map; the roughness kept in [0.04, 1], the
+// The albedo, roughness and normal `in_*` with the detail at `c` applied, each
+// lerped back toward its input by `1 - amount` (HDRP's `detailMask`, from
+// `mask`), or as given when the material has
+// no detail map; the roughness kept in [0.04, 1], the
 // range `fs_main` shades with. `tangent` is the mesh's (`w` its
 // handedness), read under UV0 only.
-fn apply(c: MapCoords, in_albedo: vec3<f32>, in_roughness: f32, n: vec3<f32>, tangent: vec4<f32>) -> Detailed {
+fn apply(c: MapCoords, amount: f32, in_albedo: vec3<f32>, in_roughness: f32, n: vec3<f32>, tangent: vec4<f32>) -> Detailed {
     let m = material();
     if (m.use_detail_map == 0u) {
         return Detailed(in_albedo, in_roughness, n);
@@ -103,11 +118,12 @@ fn apply(c: MapCoords, in_albedo: vec3<f32>, in_roughness: f32, n: vec3<f32>, ta
     let push = saturate(abs(d_albedo) * m.detail_albedo_scale);
     let end = select(vec3<f32>(1.0), vec3<f32>(0.0), d_albedo < 0.0);
     let overlay = mix(sqrt(max(in_albedo, vec3<f32>(0.0))), end, push * push);
-    let albedo = saturate(overlay * overlay);
+    // HDRP's `detailMask` lerps the result back toward the base colour.
+    let albedo = mix(in_albedo, saturate(overlay * overlay), amount);
 
     // Smoothness (HDRP): toward 0 or 1, linearly.
     let d_smooth = texel.b * 2.0 - 1.0;
-    let smooth_push = saturate(abs(d_smooth) * m.detail_smoothness_scale);
+    let smooth_push = saturate(abs(d_smooth) * m.detail_smoothness_scale) * amount;
     let roughness = clamp(1.0 - toward(1.0 - in_roughness, d_smooth, smooth_push), 0.04, 1.0);
 
     // Normal: onto the main shading normal `n`.
@@ -121,5 +137,6 @@ fn apply(c: MapCoords, in_albedo: vec3<f32>, in_roughness: f32, n: vec3<f32>, ta
     } else {
         normal = whiteout(unpack(tx, scale), unpack(ty, scale), unpack(tz, scale), w, n);
     }
-    return Detailed(albedo, roughness, normal);
+    // HDRP lerps the blended normal back toward the main one by the mask.
+    return Detailed(albedo, roughness, normalize(mix(n, normal, amount)));
 }

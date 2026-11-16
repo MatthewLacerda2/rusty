@@ -122,9 +122,21 @@ smoothness (1 − roughness), **A** the normal's X, each neutral at 0.5 (128). R
 push the albedo and smoothness toward black/white or 0/1 by their distance from
 0.5 times their scale (the albedo in HDRP's square-root space); G and A are a
 tangent-space normal bent onto the main shading normal (the main normal map's
-bumps included). There is no detail mask: rusty has no mask map, so the layer
-covers the whole surface. A file that is not loaded (or a path with no file) reads
-the default checker, as every map does.
+bumps included). No detail is drawn while the map's file is missing or still
+loading.
+
+A **detail mask** (HDRP Lit's *Detail Mask*, which HDRP reads from its mask map's
+blue; rusty has no mask map, so it is a texture of its own) limits where the layer
+applies: its **red** channel, read raw, **white full detail and black none**, lerps
+each of the three results (albedo, smoothness, normal) back toward the surface's own
+value per texel, as HDRP's `detailMask` does. A wall's glossy skirting tiles in a
+render's texture keep no grain under a mask that is black on them. It is read at the
+**main maps' coordinates** (not the detail's tiling), under every UV Mapping, and
+through the height map's parallax shift like the other main maps, so it lines up
+with the base colour it was painted over. No mask applies the detail everywhere, and
+so does a mask file that is missing or still loading; a mask without a detail map
+draws nothing. A `Default` image named as a mask becomes `SingleChannel` (`Assets.md`,
+`textureType`).
 
 The layer shares the material's **UV Mapping**: under `UV0` it is read at the main
 maps' tiled UV times `detail_tiling` plus `detail_offset` (HDRP's *Link Details
@@ -134,14 +146,16 @@ detail Tiling of `{8, 8}` repeats the detail 32 times across the mesh; under
 repeat per `detail_world_size` metres, then tiled and offset by its own values.
 Each field below is saved with the material in its `detail` table (absent until
 one is set), taken by `DefineAsset` either by the key in brackets or nested as
-`detail = { map = "d.png", tiling = {8, 8}, world_size = 0.5, albedo_scale = 1,
-normal_scale = 1, smoothness_scale = 1 }`, and shown in the Inspector's Material
-card under *Detail Map* (a path field: empty is no map). `Get` returns `nil` for an entity without a material
+`detail = { map = "d.png", mask = "m.png", tiling = {8, 8}, world_size = 0.5,
+albedo_scale = 1, normal_scale = 1, smoothness_scale = 1 }` (`mask` is written only
+when set), and shown in the Inspector's Material card under *Detail Map* (a path
+field: empty is no map) and, once a map is set, *Detail Mask* (empty is no mask). `Get` returns `nil` for an entity without a material
 and the default for a material without a detail layer.
 
 | Function | Signature |
 |---|---|
 | `Material.SetDetailMap` | `(id, path)` — the packed detail map; `""` clears it (the layer's other fields are kept; on a material with no layer it writes nothing). No detail is drawn without one, nor while its image is missing or still loading. A nested `detail` table in `DefineAsset` refuses a key it has no field for, naming it, and clamps each value to the range below |
+| `Material.SetDetailMask` / `GetDetailMask` | `(id, path)` — the detail mask (above): red scales the detail per texel, read at the main maps' coordinates; `""` clears it (the layer's other fields are kept; on a material with no layer it writes nothing). `GetDetailMask` returns the path, or `nil` without a material, a detail layer or a mask |
 | `Material.SetDetailTiling` / `GetDetailTiling` | `(id, {x, y})` [`detail_tiling`] — repeats of the detail per repeat of the main maps under `UV0`, or across `detail_world_size` metres under a world mapping. Default `{1, 1}`; each lane clamped to `[-1000, 1000]` |
 | `Material.SetDetailOffset` / `GetDetailOffset` | `(id, {x, y})` [`detail_offset`] — in detail repeats, added after the detail tiling, with `SetOffset`'s sign under each mapping. Default `{0, 0}` |
 | `Material.SetDetailWorldSize` / `GetDetailWorldSize` | `(id, metres)` [`detail_world_size`] — how many metres one repeat of the detail covers under `Planar` and `Triplanar`, in `[0.01, 100]` (default 1). Ignored under `UV0` |

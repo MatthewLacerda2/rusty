@@ -358,7 +358,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let surface_metallic = clamp(m.metallic * mapping::mask(m.use_metallic_map, t_metallic, s_metallic, maps, 2u), 0.0, 1.0);
     let main_roughness = clamp(m.roughness * mapping::mask(m.use_roughness_map, t_roughness, s_roughness, maps, 1u), 0.04, 1.0);
     // The detail layer (#1997, `forward::detail`): albedo, roughness and normal, before any light.
-    let detailed = detail::apply(detail::coords(maps, in.world_position, geometric), base_color.rgb, main_roughness, N, facing_tangent(in.world_tangent, behind));
+    let detailed = detail::apply(detail::coords(maps, in.world_position, geometric), detail::mask(maps), base_color.rgb, main_roughness, N, facing_tangent(in.world_tangent, behind));
     N = detailed.normal;
 
     // 0. Surface decals (#638): this cluster's decals change the material inputs

@@ -157,6 +157,22 @@ pub fn fit_height_slot(source: &Path) {
     );
 }
 
+/// The image at `source`, just assigned to a material's detail mask (#2258), set to
+/// [`TextureType::SingleChannel`] when it is still `Default`, and said so: the
+/// detail layer reads its red alone, raw, as the height map's.
+pub fn fit_detail_mask_slot(source: &Path) {
+    fit_slot(
+        source,
+        "a detail mask, so its Texture Type is now SingleChannel",
+        |s| {
+            (s.texture_type == TextureType::Default).then_some(TextureSettings {
+                texture_type: TextureType::SingleChannel,
+                ..*s
+            })
+        },
+    );
+}
+
 /// Apply `fix` to the import settings of `source` when it asks for a change, and
 /// log it as `used` (what it was used as, and what changed). Only an image on disk, and only while imports may change (never
 /// in Play, `convert::conversion_allowed`). A texture a converted model's cache

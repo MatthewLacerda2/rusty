@@ -285,8 +285,9 @@ clamped sampler.
   Assigning a `"Default"` image to a material's normal slot (`Material.SetNormalMap`,
   a material document, a maps recipe, the inspector) sets it to `"NormalMap"` and
   says so in the console, Unity's *Fix now* done for you; never during Play. One
-  assigned to its height slot (`Material.SetHeightMap`, and the same paths) is set
-  to `"SingleChannel"` the same way, since the parallax march reads its red. A
+  assigned to its height slot (`Material.SetHeightMap`, and the same paths) or as
+  a detail mask (`Material.SetDetailMask`) is set to `"SingleChannel"` the same
+  way, since the parallax march and the detail layer read its red. A
   `"Default"` texture is sampled as sRGB colour in a colour slot and raw in a data
   slot. A texture drawn in a slot its type cannot serve (a normal map as albedo, a
   single-channel map as colour) is uploaded uncompressed for that use, with one

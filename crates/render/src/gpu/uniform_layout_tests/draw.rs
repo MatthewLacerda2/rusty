@@ -50,7 +50,7 @@ fn material_data_matches_wgsl_layout() {
     let tail = members!(MaterialData, 0; normal_variance, dielectric_reflectance);
     let detail = members!(DetailUniform, offset_of!(MaterialData, detail);
         detail_st, use_detail_map, detail_world_scale, detail_albedo_scale,
-        detail_normal_scale, detail_smoothness_scale,
+        detail_normal_scale, detail_smoothness_scale, use_detail_mask,
     );
     let maps = members!(LevelMapsUniform, offset_of!(MaterialData, level_maps);
         use_occlusion_map, occlusion_strength, use_specular_map, use_height_map,

@@ -37,7 +37,9 @@ pub use rusty_components::material::entity_material_key;
 pub use coordinates::{
     BLEND_SHARPNESS_RANGE, COORDINATE_FIELDS, HEIGHT_SCALE_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE,
 };
-pub use detail::{clamp_detail, set_detail_map, DETAIL_FIELDS, DETAIL_SCALE_RANGE};
+pub use detail::{
+    clamp_detail, detail_mask, set_detail_map, set_detail_mask, DETAIL_FIELDS, DETAIL_SCALE_RANGE,
+};
 pub use face::FACE_FIELDS;
 pub use field::{
     material_fields, set_surface, surface_field, SurfaceField, SurfaceKind, SurfaceValue,
@@ -198,7 +200,8 @@ fn set_level_map(
 }
 
 /// Fit the import settings of every image `asset`'s slots name to the slot:
-/// [`fit_normal_slot`], [`fit_data_slot`] and [`fit_height_slot`]. Every way a material gets its maps
+/// [`fit_normal_slot`], [`fit_data_slot`], [`fit_height_slot`] and
+/// [`fit_detail_mask_slot`]. Every way a material gets its maps
 /// whole goes through it (a material document, a maps recipe, a model's import).
 pub fn fit_map_slots(asset: &MaterialAsset) {
     fit_normal_slot(asset.normal_map.as_ref());
@@ -208,6 +211,7 @@ pub fn fit_map_slots(asset: &MaterialAsset) {
     fit_data_slot(asset.specular_map.as_ref());
     fit_height_slot(asset.height_map.as_ref());
     fit_data_slot(asset.detail.as_ref().and_then(|d| d.map.as_ref()));
+    fit_detail_mask_slot(asset.detail.as_ref().and_then(|d| d.mask.as_ref()));
 }
 
 /// [`rusty_asset::sidecar::fit_normal_slot`] for the image a normal slot names.
@@ -221,6 +225,13 @@ pub fn fit_normal_slot(map: Option<&MapRef>) {
 pub fn fit_height_slot(map: Option<&MapRef>) {
     if let Some(file) = map.and_then(MapRef::file) {
         rusty_asset::sidecar::fit_height_slot(&file);
+    }
+}
+
+/// [`rusty_asset::sidecar::fit_detail_mask_slot`] for the image a detail mask names.
+pub fn fit_detail_mask_slot(map: Option<&MapRef>) {
+    if let Some(file) = map.and_then(MapRef::file) {
+        rusty_asset::sidecar::fit_detail_mask_slot(&file);
     }
 }
 
