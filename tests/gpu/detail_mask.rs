@@ -2,7 +2,8 @@
 //! 16 m plane carries a busy detail map and a mask whose red is black on one half
 //! of the main UV and white on the other. Head-on and at a grazing view, the black
 //! half draws as the plane without the detail does and the white half as the plane
-//! with it, unmasked; a mask without a detail map draws no detail.
+//! with it, unmasked; a mask without a detail map draws no detail, and a missing
+//! mask file applies the detail everywhere.
 //!
 //! No adapter: `frame` returns `None` and the test passes without asserting.
 
@@ -14,8 +15,7 @@ use rusty::scene::Camera;
 use crate::gpu::linear_data_maps_screenshot::scene;
 
 const SIZE: u32 = 96;
-/// The lines either side of the frame's centre left out of a half: where the
-/// mask's edge falls, blurred by its mip.
+/// The lines either side of the centre left out: the mask's edge, blurred by its mip.
 const SEAM: u32 = 8;
 
 /// A 64² PNG at a fresh path `name`, each texel `texel(x, y)`.
@@ -37,9 +37,8 @@ fn busy() -> String {
 
 /// The mask: red black for the first half of `u`, white after.
 fn half_mask() -> String {
-    png("rusty_2258_mask.png", |x, _| match x < 32 {
-        true => [0, 0, 0, 255],
-        false => [255, 255, 255, 255],
+    png("rusty_2258_mask.png", |x, _| {
+        [if x < 32 { 0 } else { 255 }; 4]
     })
 }
 
@@ -107,10 +106,11 @@ fn half_diff(a: &image::RgbImage, b: &image::RgbImage, rows: bool, far: bool) ->
 
 #[test]
 fn the_masks_black_half_draws_no_detail_and_its_white_half_the_whole_detail() {
-    let (map, mask) = (busy(), half_mask());
+    let (map, mask) = (Some(busy()), Some(half_mask()));
+    let missing = Some("rusty_2258_no_such_mask.png".to_string());
     for grazing in [false, true] {
         let cam = camera(grazing);
-        let shot = |d, name: &str| {
+        let shot = |d, name| {
             frame(
                 material(d),
                 &cam,
@@ -120,17 +120,16 @@ fn the_masks_black_half_draws_no_detail_and_its_white_half_the_whole_detail() {
         let Some(plain) = shot(None, "plain") else {
             return;
         };
-        let full = shot(Some((Some(map.clone()), None)), "full").expect("rendered once");
-        let masked =
-            shot(Some((Some(map.clone()), Some(mask.clone()))), "masked").expect("rendered");
-        let lone = shot(Some((None, Some(mask.clone()))), "lone").expect("rendered");
+        let full = shot(Some((map.clone(), None)), "full").expect("rendered");
+        let masked = shot(Some((map.clone(), mask.clone())), "masked").expect("rendered");
+        let lone = shot(Some((None, mask.clone())), "lone").expect("rendered");
+        let unread = shot(Some((map.clone(), missing.clone())), "missing").expect("rendered");
         // The mask's black half is the frame's first: the top rows head-on, the left
         // columns at the grazing view.
-        let (rows, black) = (!grazing, false);
-        let half = |a, b, far| half_diff(a, b, rows, far);
-        let to_plain = half(&masked, &plain, black);
-        let to_full = half(&masked, &full, !black);
-        let shows = half(&full, &plain, black).min(half(&full, &plain, !black));
+        let half = |a, b, far| half_diff(a, b, !grazing, far);
+        let whole = |a, b| half(a, b, false) + half(a, b, true);
+        let (to_plain, to_full) = (half(&masked, &plain, false), half(&masked, &full, true));
+        let shows = half(&full, &plain, false).min(half(&full, &plain, true));
         eprintln!("[mask] grazing {grazing}: to plain {to_plain:.2}, to full {to_full:.2}, detail shows {shows:.2}");
         assert!(shows > 4.0, "the detail shows on both halves ({shows:.2})");
         assert!(
@@ -139,9 +138,13 @@ fn the_masks_black_half_draws_no_detail_and_its_white_half_the_whole_detail() {
         );
         assert!(
             to_full < 0.5,
-            "the white half draws the whole detail ({to_full:.2})"
+            "the white half draws all of it ({to_full:.2})"
         );
-        let lone = half(&lone, &plain, true) + half(&lone, &plain, false);
+        let (lone, unread) = (whole(&lone, &plain), whole(&unread, &full));
         assert!(lone < 0.5, "a mask alone draws nothing ({lone:.2})");
+        assert!(
+            unread < 0.5,
+            "a missing mask applies it everywhere ({unread:.2})"
+        );
     }
 }
