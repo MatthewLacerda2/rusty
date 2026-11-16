@@ -195,7 +195,8 @@ const OPEN: f32 = 1.0e9;
 
 // How far, in texels along `axis` (texels, unit) each way from `uv`, the object
 // seen there runs on: `.x` back, `.y` ahead, counting the texels whose depths run
-// on within `tol` of each other; `OPEN` on a side that runs on for all `taps`.
+// on within `tol` of each other; `OPEN` on a side that runs on for all `taps`, and
+// then the other side is not looked at (0).
 fn extent(f: Frame, t_depth: texture_2d<f32>, uv: vec2<f32>, axis: vec2<f32>, tol: f32, taps: i32) -> vec2<f32> {
     let dim = vec2<f32>(textureDimensions(t_depth));
     let d0 = dot(texel(t_depth, uv), f.channel);
@@ -215,7 +216,12 @@ fn extent(f: Frame, t_depth: texture_2d<f32>, uv: vec2<f32>, axis: vec2<f32>, to
             }
             last = d;
         }
-        run[i] = select(f32(k - 1), OPEN, k > taps);
+        if (k > taps) {
+            // Run on: what `deep` asks of this axis is settled.
+            run[i] = OPEN;
+            return run;
+        }
+        run[i] = f32(k - 1);
     }
     return run;
 }
