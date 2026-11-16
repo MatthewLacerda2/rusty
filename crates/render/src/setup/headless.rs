@@ -51,15 +51,35 @@ fn is_wanted(name: &str, wanted: &str) -> bool {
 
 /// The backends a headless renderer may use: Vulkan, Metal and DX12 — never GL.
 ///
-/// Every headless renderer creates its own `wgpu::Instance`, and several live at
-/// once (parallel tests, a bake beside a preview). On Linux, `Backends::all()` also
-/// brings up wgpu-hal's GLES/EGL backend, whose EGL display is shared process-wide:
-/// dropping one instance terminates it under another thread's `make_current`, a
-/// `NotInitialized` panic (#518). Every adapter a headless render runs on — a real
-/// GPU, lavapipe on Linux CI, Metal on macOS — is a primary
-/// backend, so leaving GL out costs no coverage. The windowed renderer keeps
-/// `all()`: it owns one instance per process, and GL-only machines need it.
+/// Every headless renderer in a process shares one `wgpu::Instance` (`instance`);
+/// each still requests its own adapter and device. Leaving GL out is what makes that
+/// sharing safe: on Linux, `Backends::all()` also brings up wgpu-hal's GLES/EGL
+/// backend, whose EGL display is process-wide state that several live renderers race
+/// on (#518). Bringing GL back would need that revisited. Every adapter a headless
+/// render runs on — a real GPU, lavapipe on Linux CI, Metal on macOS — is a primary
+/// backend, so leaving GL out costs no coverage. The windowed renderer keeps `all()`:
+/// it owns one instance per process, and GL-only machines need it.
 pub(crate) const HEADLESS_BACKENDS: wgpu::Backends = wgpu::Backends::PRIMARY;
+
+/// The one `wgpu::Instance` every headless renderer in this process requests its
+/// adapter from, made on first use and never dropped.
+///
+/// One instance per renderer meant one load and unload of the Vulkan loader and its
+/// drivers per renderer (wgpu-hal's Vulkan instance owns its `ash::Entry`, so dropping
+/// the last handle destroys the `VkInstance` and unloads `libvulkan`). NVIDIA's Linux
+/// driver stops listing any adapter after about nineteen such cycles in one process, so
+/// the twentieth bake of an editor session skipped (#2236). An instance holds no
+/// per-renderer state — the adapter, device and queue do — so sharing it changes
+/// nothing a renderer sees.
+fn instance() -> &'static wgpu::Instance {
+    static INSTANCE: std::sync::OnceLock<wgpu::Instance> = std::sync::OnceLock::new();
+    INSTANCE.get_or_init(|| {
+        wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: HEADLESS_BACKENDS,
+            ..wgpu::InstanceDescriptor::new_without_display_handle()
+        })
+    })
+}
 
 impl Renderer {
     /// Build a headless renderer at `width` x `height`. Returns `None` (after a
@@ -87,12 +107,7 @@ impl Renderer {
     ) -> Option<Self> {
         let width = width.max(1);
         let height = height.max(1);
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: HEADLESS_BACKENDS,
-            ..wgpu::InstanceDescriptor::new_without_display_handle()
-        });
-
-        let adapter = pick_adapter(&instance).await?;
+        let adapter = pick_adapter(instance()).await?;
 
         // Timestamps where the adapter has them: the frame stats' GPU time (#835).
         // And the rest of `limits::OPTIONAL`.
@@ -167,6 +182,39 @@ fn offscreen_config(width: u32, height: u32) -> wgpu::SurfaceConfiguration {
 #[cfg(test)]
 mod tests {
     use super::{is_wanted, HEADLESS_BACKENDS};
+
+    /// More renderers than NVIDIA's Linux driver survived with an instance each (19),
+    /// built, rendered through and dropped one after another in one process, as a long
+    /// editor session's bakes are. Each must find an adapter and draw a frame.
+    #[test]
+    fn gpu_more_headless_renderers_than_the_driver_cap_each_render_in_one_process() {
+        const RENDERERS: usize = 32;
+        let scene = rusty_scene::Scene::new();
+        let cam = rusty_scene::Camera::new(glam::Vec3::ZERO, -90.0, 0.0);
+        for i in 0..RENDERERS {
+            let Some(mut renderer) = crate::test_gpu::headless_or_skip(4, 4) else {
+                // No adapter at all is the usual skip; losing it part-way is the bug.
+                assert_eq!(i, 0, "renderer {i} of {RENDERERS} found no adapter");
+                return;
+            };
+            let mut view =
+                crate::RenderView::offscreen(&renderer.device, super::OFFSCREEN_FORMAT, 4, 4);
+            let out = view.color_target_view().unwrap();
+            renderer.render(&mut view, &scene, &cam, &out, false);
+            let texture = view.color_target().unwrap();
+            let px = crate::readback::read_texture_rgba8(
+                &renderer.device,
+                &renderer.queue,
+                texture,
+                4,
+                4,
+            );
+            assert!(
+                px.chunks(4).all(|p| p[3] == 255),
+                "renderer {i} of {RENDERERS} drew no opaque frame"
+            );
+        }
+    }
 
     #[test]
     fn an_adapter_is_picked_by_any_part_of_its_name_in_any_case() {
