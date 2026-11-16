@@ -39,6 +39,10 @@ NEUTRAL = {
     ("--quiet",),
     ("--verbose",),
 }
+#: A flag dropped with whatever value follows it. `--partition count:k/n`: CI
+#: splits one suite across a matrix's shards (#2264), and `test_shards` holds
+#: that every shard of each split is an entry, so together they run it whole.
+NEUTRAL_WITH_VALUE = ("--partition",)
 
 
 def makefile_gates(text: str) -> dict[str, list[str]]:
@@ -158,6 +162,10 @@ def normalise(command: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
         tokens = command.split()
     before, after = (tokens, []) if "--" not in tokens else (
         tokens[: tokens.index("--")], tokens[tokens.index("--") + 1 :])
+    for flag in NEUTRAL_WITH_VALUE:
+        while flag in before[:-1]:
+            at = before.index(flag)
+            del before[at : at + 2]
     for flag in NEUTRAL:
         for i in range(len(before) - len(flag) + 1):
             if tuple(before[i : i + len(flag)]) == flag:
@@ -176,6 +184,23 @@ def missing(gates: dict[str, list[str]], ci: list[str]) -> list[tuple[str, str]]
     gaps = [(g, c) for g, cmds in gates.items() if g not in by_make
             for c in cmds if normalise(c) not in seen]
     return gaps + [(g, "<no command>") for g, cmds in gates.items() if not cmds]
+
+
+#: A matrix entry that names a shard, written as a flow mapping on one line.
+SHARD_ENTRY = re.compile(r"^\s*- \{(?P<body>[^}]*\bshard: (?P<k>\d+)/(?P<n>\d+)\b[^}]*)\}\s*$", re.M)
+
+
+def shard_gaps(text: str) -> list[str]:
+    """The shards a workflow's matrices leave out: for each split (the entry's
+    other keys bar the per-entry flags), every `k` of `1..n` once (#2264). A
+    split missing a shard skips part of a suite while its gate reads green."""
+    splits: dict[tuple[str, int], list[int]] = {}
+    for m in SHARD_ENTRY.finditer(text):
+        keys = [kv.strip() for kv in m["body"].split(",") if kv.strip() and not kv.strip().startswith("shard:")]
+        split = (", ".join(k for k in keys if not k.endswith((": true", ": false"))), int(m["n"]))
+        splits.setdefault(split, []).append(int(m["k"]))
+    return [f"{name or 'shards'} of {n}: has {sorted(ks)}, needs each of 1..{n} once"
+            for (name, n), ks in splits.items() if sorted(ks) != list(range(1, n + 1))]
 
 
 def clippy_extras(commands: list[str]) -> list[str]:

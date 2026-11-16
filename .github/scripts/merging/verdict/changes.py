@@ -31,7 +31,9 @@ def code_doc_filter(prefix: str) -> str:
 # Where the doc-drift tests run: a `build-test` step whose name says it runs
 # the tests with the dev features (`Test (engine, dev features)` today). Matched
 # on words rather than the exact name so a rename that keeps the meaning
-# (#484's nextest) keeps working; a test holds ci.yml to it.
+# (#484's nextest) keeps working; a test holds ci.yml to it. The job is a matrix
+# (#2264), so it is matched by base name, and every entry that ran the step
+# must have passed it: each `dev` shard holds part of the suite.
 DRIFT_JOB = "build-test"
 
 DRIFT_STEP_WORDS = ("test", "dev")
@@ -68,12 +70,10 @@ def needs_drift_run(files: list[str]) -> bool:
 
 
 def drift_ran(run: dict, jobs: dict[int, list[dict]]) -> bool:
-    """Whether this `ci` run's `build-test` really ran the dev-feature tests."""
-    for job in jobs.get(run.get("id"), []):
-        if job.get("name") != DRIFT_JOB:
-            continue
-        for step in job.get("steps") or []:
-            name = step.get("name", "").lower()
-            if all(w in name for w in DRIFT_STEP_WORDS) and step.get("conclusion") == "success":
-                return True
-    return False
+    """Whether this `ci` run's `build-test` really ran the dev-feature tests:
+    some entry ran the step, and none that ran it failed."""
+    ran = [step.get("conclusion")
+           for job in jobs.get(run.get("id"), []) if job.get("name", "").split(" (", 1)[0] == DRIFT_JOB
+           for step in job.get("steps") or []
+           if all(w in step.get("name", "").lower() for w in DRIFT_STEP_WORDS) and step.get("conclusion") != "skipped"]
+    return bool(ran) and all(c == "success" for c in ran)
