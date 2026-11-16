@@ -17,6 +17,11 @@ name: main-health
 # run, so it can read every job's conclusion (a job inside the run cannot see
 # the jobs that finish after it), and it keeps this off the files other CI work
 # edits.
+#
+# The same job also measures each `ci` job's wall time against its own
+# `timeout-minutes` (#2276, `.github/scripts/ci_headroom.py`): a job past three
+# quarters of its limit files an `infrastructure` issue before it creeps into a
+# cancelled run. An informational signal: it never fails this job.
 on:
   workflow_run:
     workflows: [ci, lint, mutants-sweep, coverage, cargo-test]
@@ -64,3 +69,12 @@ jobs:
           RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
         run: .github/scripts/main-health.sh
+      - name: File or update a CI-headroom issue
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: python3 .github/scripts/ci_headroom.py

@@ -60,19 +60,24 @@ class Shards(unittest.TestCase):
 
 class Canaries(unittest.TestCase):
     """Each shard proves its own runner's GPU and OIDN: a `--partition` puts each
-    canary in one shard, so the canary step runs on every entry, by names that exist."""
+    canary in one shard, so every sharded job (`build-test`, and the macOS leg
+    since #2276) runs the canary step on every entry, by names that exist."""
 
     def test_every_entry_runs_the_canaries_by_their_real_names(self):
         text = (gate_mirror.ROOT / ".github" / "workflows" / "ci.yml").read_text()
-        step = text[text.index("      - name: Canaries"):]
-        step = step[: step.index("\n      - name:", 1)]
-        self.assertNotIn("matrix.", step.split("run:", 1)[0], "the canaries run on every matrix entry")
-        names = re.findall(r"test\(=([\w:]+)\)", step)
-        self.assertEqual(len(names), 2, step)
         sources = "\n".join(p.read_text() for p in (gate_mirror.ROOT / "crates").rglob("*.rs"))
-        for name in names:
-            with self.subTest(canary=name):
-                self.assertRegex(sources, rf"#\[test\]\s*fn {name.rsplit('::', 1)[1]}\(")
+        sharded = [(job, body) for job, body in gate_mirror._jobs(text) if "--partition" in body]
+        self.assertTrue(sharded, "no job of ci.yml holds a `--partition`: this test would hold nothing")
+        for job, body in sharded:
+            with self.subTest(job=job):
+                self.assertIn("      - name: Canaries", body, "a sharded job runs the canaries (#2276)")
+                step = body[body.index("      - name: Canaries"):]
+                step = step[: step.index("\n      - name:", 1)]
+                self.assertNotIn("matrix.", step.split("run:", 1)[0], "the canaries run on every matrix entry")
+                names = re.findall(r"test\(=([\w:]+)\)", step)
+                self.assertEqual(len(names), 2, step)
+                for name in names:
+                    self.assertRegex(sources, rf"#\[test\]\s*fn {name.rsplit('::', 1)[1]}\(")
 
 
 if __name__ == "__main__":
