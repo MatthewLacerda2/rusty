@@ -28,6 +28,7 @@ const USAGE: &str =
 fn main() {
     rusty::init();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
+    rusty::core::project::answer_help(&args, USAGE);
     let games = rusty::core::project::take_value(&mut args, "--games")
         .unwrap_or_else(|e| usage(&e))
         .map_or_else(game::games_dir, |dir| {
