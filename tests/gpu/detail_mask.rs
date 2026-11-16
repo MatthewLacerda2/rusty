@@ -131,7 +131,7 @@ fn the_masks_black_half_draws_no_detail_and_its_white_half_the_whole_detail() {
         let (lone, unread) = (whole(&lone, &plain), whole(&unread, &full));
         eprintln!("[mask] grazing {grazing}: to plain {to_plain:.2}, to full {to_full:.2}, detail shows {shows:.2}, lone {lone:.2}, missing {unread:.2}");
         // Measured: `shows` lavapipe 25.74 / 27.14 (head-on / grazing), Metal 26.30 /
-        // 25.92; every `< 0.5` value 0.00 on both.
+        // 25.92, RTX 2060 (Vulkan) 24.76 / 22.71; every `< 0.5` value 0.00 on all three.
         assert!(shows > 4.0, "the detail shows on both halves ({shows:.2})");
         assert!(
             to_plain < 0.5,
