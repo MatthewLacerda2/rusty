@@ -49,12 +49,13 @@ class Workflows(unittest.TestCase):
         # rusty ships for macOS and Linux only: no job asks for another runner.
         for file in sorted(WORKFLOW_DIR.glob("*.yml")):
             with self.subTest(file=file.name):
-                self.assertNotRegex(file.read_text(), r"runs-on:.*windows|os: \[.*windows")
+                self.assertNotRegex(file.read_text(), r"runs-on:.*windows|\bos: \[?[^\n]*windows")
 
     def test_macos_still_gates(self):
         # The other shipped platform: in `ci-gate`'s `needs:` and on its runner.
         self.assertIn("build-test-cross", gate_needs("ci.yml", "ci-gate"))
-        self.assertRegex((WORKFLOW_DIR / "ci.yml").read_text(), r"os: \[macos-\d+\]")
+        # A list (`os: [macos-26]`) or one-line matrix entries (`- { os: macos-26, shard: 1/2 }`, #2276).
+        self.assertRegex((WORKFLOW_DIR / "ci.yml").read_text(), r"\bos: (?:\[macos-\d+\]|macos-\d+,)")
 
     def test_build_test_still_has_the_step_the_drift_check_looks_for(self):
         text = (WORKFLOW_DIR / "ci.yml").read_text()

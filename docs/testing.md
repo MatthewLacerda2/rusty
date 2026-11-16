@@ -286,7 +286,10 @@ its check and its command changed to match).
   each prints its twenty slowest tests (step *Slowest tests*), and each runs the GPU and
   OIDN canaries again on its own runner (step *Canaries*), since a partition puts each
   canary in one shard only. The macOS leg (`build-test-cross`) runs the nextest suite with
-  `dev` only, the superset, and the doctests with both (#1976). See *The test runner* below.
+  `dev` only, the superset (#1976), split in two, `build-test-cross (macos-26, 1/2)` and
+  `(macos-26, 2/2)`, each with the canaries; 2/2 also runs the `dev` doctests and the lint
+  xtask's tests, and the default doctests run on Linux only (#2276). A job past three quarters of its `timeout-minutes`
+  on `main` files an issue by itself (`ci_headroom.py`, `docs/linting.md`). See *The test runner* below.
 - A test never reads a developer's game project (#782). `Harness::new` runs in a
   workspace of its own, `<out_dir>/workspace`, seeded fresh from the test-fixture
   project's scripts and the bundled ones, and the scene's relative script paths
