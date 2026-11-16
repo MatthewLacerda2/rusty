@@ -154,11 +154,18 @@ fn state(f: Frame, here: Probe, p: vec3<f32>) -> i32 {
     return select(BEYOND, ON, here.behind <= slack(f, p));
 }
 
-// Where between `a` (of state `start`) and `b` the ray first changes state: the
-// point on `b`'s side of the boundary after `REFINE` halvings. From in front, the
-// boundary is where it goes behind the scene; from beyond, where it comes back
-// within `slack` (or in front).
-fn refine(f: Frame, t_depth: texture_2d<f32>, a: vec3<f32>, b: vec3<f32>, start: i32) -> vec3<f32> {
+// Where a refinement settled: `go`, the point on the far side of the boundary,
+// and `keep`, the last on the near side. The boundary lies between them, so a hit
+// at `go` is placed only to within the ray's depth between the two.
+struct Bracket {
+    keep: vec3<f32>,
+    go: vec3<f32>,
+};
+
+// Where between `a` (of state `start`) and `b` the ray first changes state, after
+// `REFINE` halvings. From in front, the boundary is where it goes behind the
+// scene; from beyond, where it comes back within `slack` (or in front).
+fn refine(f: Frame, t_depth: texture_2d<f32>, a: vec3<f32>, b: vec3<f32>, start: i32) -> Bracket {
     var keep = a;
     var go = b;
     for (var j = 0; j < REFINE; j = j + 1) {
@@ -170,34 +177,34 @@ fn refine(f: Frame, t_depth: texture_2d<f32>, a: vec3<f32>, b: vec3<f32>, start:
             go = mid;
         }
     }
-    return go;
+    return Bracket(keep, go);
 }
 
-// How many texels `deep` looks at each side of a hit for the object it is on.
-const EXTENT_TAPS: i32 = 8;
 // How deep a narrow object is taken to be, as a fraction of its depth (#2228):
 // HDRP's default *Object Thickness*, 1%.
 const THIN_SLACK: f32 = 0.01;
+// How wide on screen, as a fraction of its depth, an object is at most to count as
+// narrow: twice `THIN_SLACK`, so a strip whose height in texels moves by one
+// between TAA's offsets stays narrow on every offset.
+const THIN_WIDE: f32 = 0.02;
+// The most texels `deep` looks at each side of a hit (a 4K view; 1080p needs 19).
+const EXTENT_TAPS: i32 = 24;
+// What `extent` returns for an object that runs on past its taps.
+const OPEN: f32 = 1.0e9;
 
-// How far behind the object a hit at `p` (seen at `uv`) is on a ray may pass and
-// still hit it (#2228): `slack` for an object wider on screen, along the ray's
-// screen direction `dir` (texels, unit), than `2 × EXTENT_TAPS` texels (its texels
-// those around `uv` whose depths run on within `slack` of each other), and
-// `THIN_SLACK` of its depth for a narrower one. The depth target holds only front
-// faces, so a ray passing behind an object hits it only within its thickness; a
-// fixed `THICKNESS` drew a 6 mm strip's reflection as wide as a 15 cm deep one's
-// once the march stopped stepping over it. A fraction of the depth, not the
-// object's width on screen: a width in texels moves by a texel between TAA's
-// offsets, and the reflection's edge with it, the whole strip at once.
-fn deep(f: Frame, t_depth: texture_2d<f32>, p: vec3<f32>, uv: vec2<f32>, dir: vec2<f32>) -> f32 {
+// How many texels, through `uv` along `axis` (texels, unit), the object seen there
+// spans: the texel and those each side of it whose depths run on within `tol` of
+// each other; `OPEN` when it runs on for all `taps` on either side, so a hit on a
+// wide object's edge, whose outer side reads the background, still finds it wide.
+fn extent(f: Frame, t_depth: texture_2d<f32>, uv: vec2<f32>, axis: vec2<f32>, tol: f32, taps: i32) -> f32 {
     let dim = vec2<f32>(textureDimensions(t_depth));
-    let tol = slack(f, p);
     let d0 = dot(texel(t_depth, uv), f.channel);
     var count = 1;
     for (var side = -1.0; side <= 1.0; side = side + 2.0) {
         var last = d0;
-        for (var k = 1; k <= EXTENT_TAPS; k = k + 1) {
-            let q = uv + dir * (side * f32(k)) / dim;
+        var k = 1;
+        for (; k <= taps; k = k + 1) {
+            let q = uv + axis * (side * f32(k)) / dim;
             if (any(q < vec2<f32>(0.0)) || any(q > vec2<f32>(1.0))) {
                 break;
             }
@@ -206,10 +213,51 @@ fn deep(f: Frame, t_depth: texture_2d<f32>, p: vec3<f32>, uv: vec2<f32>, dir: ve
                 break;
             }
             last = d;
-            count = count + 1;
         }
+        if (k > taps) {
+            return OPEN;
+        }
+        count = count + k - 1;
     }
-    return select(min(depth_of(f, p) * THIN_SLACK, tol), tol, count > 2 * EXTENT_TAPS);
+    return f32(count);
+}
+
+// The world size of one texel of `dim` across the line of sight at `p`.
+fn texel_size(f: Frame, p: vec3<f32>, dim: vec2<f32>) -> f32 {
+    let sight = p - f.eye;
+    var across = cross(sight, vec3<f32>(0.0, 1.0, 0.0));
+    if (dot(across, across) < 1e-10) {
+        across = cross(sight, vec3<f32>(1.0, 0.0, 0.0));
+    }
+    let moved = length((project(f, p + normalize(across) * 0.01).xy - project(f, p).xy) * dim);
+    return 0.01 / max(moved, 1e-6);
+}
+
+// How far behind the object a hit at `p` (seen at `uv`) may lie and still hit it
+// (#2228): `THIN_SLACK` of its depth for an object narrower on screen than
+// `THIN_WIDE` of its depth (a strip, a cable, a thin pole), `slack` for any other
+// (a crate, a wall, a grazing floor, a wider pole), as before. Its width is the
+// narrower of its `extent`s along the screen's rows and its columns, not along the
+// ray: a vertical pole over a mirror floor runs on along its ray. The depth target
+// holds only front faces, so a ray passing behind an object hits it only within
+// its thickness: a fixed `THICKNESS` drew a 6 mm strip's reflection as wide as a
+// 15 cm deep one's once the march stopped stepping over it. Two thicknesses, not
+// one in proportion to the width: a width in texels moves by one between TAA's
+// offsets, and a thickness scaled by it moves a strip's reflected edge with it,
+// the whole strip at once (a 12 mm strip's TAA dip: 12.0 at 1.5 widths deep,
+// against 1.2), while a leaning 8 cm pole lost rows of its far side at one width
+// deep. So what is wider than `THIN_WIDE` keeps `THICKNESS`, which it judges no
+// better than `main` did.
+fn deep(f: Frame, t_depth: texture_2d<f32>, p: vec3<f32>, uv: vec2<f32>) -> f32 {
+    let tol = slack(f, p);
+    let dim = vec2<f32>(textureDimensions(t_depth));
+    let depth = depth_of(f, p);
+    let size = texel_size(f, p, dim);
+    let wide = THIN_WIDE * depth / size;
+    let taps = clamp(i32(ceil(wide)), 1, EXTENT_TAPS);
+    let rows = extent(f, t_depth, uv, vec2<f32>(1.0, 0.0), tol, taps);
+    let across = min(rows, select(OPEN, extent(f, t_depth, uv, vec2<f32>(0.0, 1.0), tol, taps), rows > wide));
+    return select(tol, min(depth * THIN_SLACK, tol), across <= wide);
 }
 
 // A step shorter than this many texels on screen is probed at its end alone, and
@@ -290,6 +338,7 @@ fn clear(f: Frame, t_depth: texture_2d<f32>, t_hiz: texture_2d<f32>, s: sampler,
         if (max(near_end, far_end) < cell_min(t_hiz, s, level, dim, cell)) {
             u = v;
             near_end = far_end;
+            front = world_fraction(v, ca.w, cb.w);
             level = min(level + 1, top);
             continue;
         }
@@ -310,7 +359,9 @@ fn clear(f: Frame, t_depth: texture_2d<f32>, t_hiz: texture_2d<f32>, s: sampler,
         near_end = far_end;
         level = min(level + 1, top);
     }
-    return vec2<f32>(front, 1.0);
+    // Out of rounds: the step ends where the walk got to, all of it seen, and the
+    // march goes on from there with a step of its own.
+    return vec2<f32>(front, select(world_fraction(u, ca.w, cb.w), 1.0, u >= 1.0));
 }
 
 // March the reflected ray `r` from `origin` in `steps` steps of at most `step`
@@ -390,19 +441,27 @@ fn trace_hit(f: Frame, t_depth: texture_2d<f32>, t_hiz: texture_2d<f32>, s_hiz: 
         }
         let now = state(f, here, p);
         if (now != was) {
-            var back = refine(f, t_depth, start, p, was);
+            let found = refine(f, t_depth, start, p, was);
+            var back = found.go;
             var hit = probe(f, t_depth, back);
+            // How much deeper than where the ray changed state the hit may lie,
+            // from where it is placed alone: the ray's depth across the bracket.
+            var placed = abs(depth_of(f, back) - depth_of(f, found.keep));
             // The halving can settle on another boundary than the one the step
             // crossed (two edges between its ends): a step that landed on the scene
-            // still hits there.
+            // still hits there, placed only to within the step.
             if (state(f, hit, back) != ON && now == ON) {
                 back = p;
                 hit = here;
+                placed = abs(depth_of(f, p) - depth_of(f, start));
             }
-            // On the scene, and no further behind it than its object is deep.
-            var ray_dir = (project(f, p).xy - project(f, start).xy) * depth_dim;
-            ray_dir = select(vec2<f32>(0.0, 1.0), normalize(ray_dir), dot(ray_dir, ray_dir) > 1e-8);
-            let lands = state(f, hit, back) == ON && hit.behind <= deep(f, t_depth, back, hit.uv, ray_dir);
+            // On the scene, and no further behind it than its object is deep, give
+            // or take where the refinement could place it: a step `clear` walked is
+            // bracketed within a probe's spacing, so its hit is judged by the
+            // object's depth alone; one it did not (the first, one under a texel,
+            // one behind an object, every step of a march with no pyramid) may span
+            // a metre, and its hit is not lost for lying deeper than the ray went.
+            let lands = state(f, hit, back) == ON && hit.behind <= deep(f, t_depth, back, hit.uv) + placed;
             if (lands) {
                 let dim = vec2<f32>(textureDimensions(t_color));
                 let t = distance(origin, back);
