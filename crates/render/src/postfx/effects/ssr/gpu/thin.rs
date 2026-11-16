@@ -169,7 +169,7 @@ fn depth(hits: &[Vec<f32>]) -> f32 {
 const HITS_DIP: f32 = 18.0;
 /// The most a tile of TAA's output may dip, for the 12 mm line: the 6 mm one is
 /// under a pixel tall, gone from the frame itself on some offsets, so TAA's
-/// output dips on its own aliasing as `main`'s did (4.0; `main` 1.6). Measured:
+/// output dips on its own aliasing as `main`'s did (2.4; `main` 1.6). Measured:
 /// 1.2 (lavapipe); `main` 13.9.
 const TAA_DIP: f32 = 5.0;
 /// The most rows deep the line's reflection may be, on average: a ray passing
