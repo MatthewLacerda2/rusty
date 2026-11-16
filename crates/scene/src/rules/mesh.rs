@@ -4,11 +4,14 @@
 //! The field table leaves these fields `unheld!` (a load's generic hold would copy
 //! the mesh's whole geometry to hold one number), so rehydration runs these on
 //! every scene load and prefab instantiation. The Mesh ops
-//! (`authoring::rendering::mesh`) hold the same bounds on a write.
+//! (`authoring::rendering::mesh`) hold the same bounds on a write; the subdivision
+//! op itself is [`set_subdivisions`], here so a renderer test can cut a Plane
+//! without the authoring layer.
 //!
 //! Pure.
 
 use super::sanitize;
+use crate::create::{primitive_revision, subdivided_geometry, Primitive};
 use rusty_components::mesh::primitives::MAX_PLANE_SUBDIVISIONS;
 use rusty_components::MeshComponent;
 
@@ -46,4 +49,35 @@ pub fn hold_subdivisions(mesh: &mut MeshComponent) -> Option<String> {
             mesh.primitive_type
         )
     })
+}
+
+/// Cut a `Plane` into `subdivisions` quads per side and rebuild its geometry.
+/// Refuses a count outside `1..=`[`MAX_PLANE_SUBDIVISIONS`], and any count but 1 on
+/// a mesh that isn't a `Plane`. The Mesh op (`authoring::rendering::mesh`) is this.
+pub fn set_subdivisions(mesh: &mut MeshComponent, subdivisions: u32) -> Result<(), String> {
+    if !(1..=MAX_PLANE_SUBDIVISIONS).contains(&subdivisions) {
+        return Err(format!(
+            "subdivisions must be 1..={MAX_PLANE_SUBDIVISIONS}, got {subdivisions}"
+        ));
+    }
+    if mesh.primitive_type != "Plane" && subdivisions == 1 {
+        mesh.subdivisions = 1; // clears a stray count; the shape ignores it anyway
+        return Ok(());
+    }
+    if subdivisions == mesh.subdivisions {
+        return Ok(());
+    }
+    if mesh.primitive_type != "Plane" {
+        return Err(format!(
+            "subdivisions shapes a Plane; a {} mesh keeps 1",
+            mesh.primitive_type
+        ));
+    }
+    let (vertices, indices) =
+        subdivided_geometry(Primitive::Plane, subdivisions).expect("a Plane has geometry");
+    mesh.subdivisions = subdivisions;
+    mesh.vertices = vertices;
+    mesh.indices = indices;
+    mesh.revision = primitive_revision(Primitive::Plane, subdivisions);
+    Ok(())
 }

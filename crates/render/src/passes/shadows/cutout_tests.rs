@@ -4,8 +4,8 @@
 //! Opaque, it shadows both (the control). Skips with no adapter.
 
 use crate::gpu::pipelines::surface::cut_depth_tests::{ground_halves, slab_yard};
+use rusty_asset::MapRef;
 use rusty_components::RenderMode;
-use rusty_edit::authoring::material;
 
 #[test]
 fn gpu_a_cutout_caster_casts_no_shadow_where_its_texels_are_clear() {
@@ -20,13 +20,13 @@ fn gpu_a_cutout_caster_casts_no_shadow_where_its_texels_are_clear() {
         return;
     };
     let (mut scene, slab) = slab_yard(None);
-    let key = material::ensure_material_key(&mut scene, slab).unwrap();
+    let key = scene.ensure_material_key(slab).unwrap();
     let map = path.to_string_lossy().into_owned();
-    material::set_base_color_map(&mut scene.materials, &key, map);
-    material::set_alpha_cutoff(&mut scene.materials, &key, 0.5);
+    scene.materials.get_mut(&key).unwrap().base_color_map = Some(MapRef::from(map));
+    scene.materials.get_mut(&key).unwrap().alpha_cutoff = 0.5;
 
     let mut halves = |mode| {
-        material::set_render_mode(&mut scene.materials, &key, mode);
+        scene.materials.get_mut(&key).unwrap().render_mode = mode;
         ground_halves(&mut r, &scene)
     };
     let opaque = halves(RenderMode::Opaque);

@@ -4,11 +4,11 @@
 
 use std::sync::Arc;
 
-use crate::occlusion::test_level::corridors;
-use crate::occlusion::{bake_occlusion, fingerprint};
-use rusty_edit::to_scene_data;
-use rusty_scene::lighting::occlusion::save_sidecar;
-use rusty_scene::Scene;
+use rusty::edit::to_scene_data;
+use rusty::lighting::occlusion::test_level::corridors;
+use rusty::lighting::occlusion::{bake_occlusion, fingerprint};
+use rusty::scene::lighting::occlusion::save_sidecar;
+use rusty::scene::Scene;
 
 #[test]
 fn a_carried_player_keeps_the_next_levels_culling_on() {
@@ -17,7 +17,7 @@ fn a_carried_player_keeps_the_next_levels_culling_on() {
     let wall = data.objects.iter().find(|o| o.occluder).expect("a wall");
     let wall_id = wall.entity;
     *level.occlusion = Some(Arc::new(data));
-    let dir = rusty_test_support::temp::dir().join("occlusion_carry");
+    let dir = crate::temp::dir().join("occlusion_carry");
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("level.scene").to_string_lossy().into_owned();
     save_sidecar(&level, &path).unwrap();
@@ -32,7 +32,7 @@ fn a_carried_player_keeps_the_next_levels_culling_on() {
     };
     s.dont_destroy_on_load(player);
     let survivors = s.load_survivors();
-    rusty_edit::load::swap_in(&mut s, to_scene_data(&level), &path, &survivors).unwrap();
+    rusty::edit::load::swap_in(&mut s, to_scene_data(&level), &path, &survivors).unwrap();
 
     let pvs = s.occlusion.as_deref().expect("the level's bake loaded");
     assert!(

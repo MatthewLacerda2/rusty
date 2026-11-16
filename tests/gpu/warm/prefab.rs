@@ -2,18 +2,18 @@
 //! instance from its source, and its primitives carry their one revision, so the
 //! warm-up's meshes are what the first frame draws and it uploads nothing.
 
-use super::warm_gpu_tests::{first_frame, prepare, render, warm};
-use crate::stats::Uploads;
-use rusty_edit::{load_and_instantiate_linked, save_prefab};
-use rusty_scene::create::{create_entity, Primitive};
-use rusty_scene::Scene;
+use super::first_frame::{first_frame, prepare, render, warm};
+use rusty::edit::{load_and_instantiate_linked, save_prefab};
+use rusty::render::Uploads;
+use rusty::scene::create::{create_entity, Primitive};
+use rusty::scene::Scene;
 
 /// `<tmp>/rusty_2123_prefab/level.scene`: two linked instances of a Capsule
 /// holding a Cylinder.
 fn level() -> String {
-    let dir = rusty_test_support::temp::dir().join("rusty_2123_prefab");
+    let dir = crate::temp::dir().join("rusty_2123_prefab");
     std::fs::create_dir_all(&dir).unwrap();
-    let prefab = rusty_core::paths::to_slash(&dir.join("prop.prefab"));
+    let prefab = rusty::core::paths::to_slash(&dir.join("prop.prefab"));
     let mut source = Scene::new();
     let root = create_entity(&mut source, "Prop", Some(Primitive::Capsule));
     let child = create_entity(&mut source, "Lamp", Some(Primitive::Cylinder));
@@ -26,14 +26,14 @@ fn level() -> String {
         let place = &mut scene.world.transform_mut(id).unwrap().position;
         *place = glam::Vec3::new(x, 0.0, -4.0);
     }
-    let path = rusty_core::paths::to_slash(&dir.join("level.scene"));
-    rusty_edit::save_to_file(&scene, &path).unwrap();
+    let path = rusty::core::paths::to_slash(&dir.join("level.scene"));
+    rusty::edit::save_to_file(&scene, &path).unwrap();
     path
 }
 
 #[test]
 fn gpu_a_level_of_linked_prefabs_uploads_nothing_on_its_first_frame() {
-    let Some(mut renderer) = crate::test_gpu::headless_or_skip(32, 32) else {
+    let Some(mut renderer) = rusty::render::test_gpu::headless_or_skip(32, 32) else {
         return;
     };
     let path = level();

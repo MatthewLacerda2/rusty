@@ -1,6 +1,7 @@
 mod api;
 mod collision;
 mod determinism;
+mod gpu_sim;
 mod live;
 mod modules;
 mod parented;

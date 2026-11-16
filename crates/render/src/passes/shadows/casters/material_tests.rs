@@ -62,7 +62,6 @@ fn gpu_cutouts_differing_only_in_tint_share_one_caster_batch() {
     use super::{batch_casters, CasterData, CasterKey};
     use crate::gpu::pipelines::winding::Facing;
     use rusty_components::RenderMode;
-    use rusty_edit::authoring::material;
     use rusty_scene::create::{create_entity, Primitive};
     let Some(mut r) = crate::test_gpu::headless_or_skip(16, 16) else {
         return;
@@ -75,7 +74,7 @@ fn gpu_cutouts_differing_only_in_tint_share_one_caster_batch() {
     let mut scene = rusty_scene::Scene::new();
     let leaves = [[0.2, 0.8, 0.2], [0.6, 0.9, 0.1]].map(|rgb| {
         let id = create_entity(&mut scene, "Leaf", Some(Primitive::Plane));
-        let key = material::ensure_material_key(&mut scene, id).unwrap();
+        let key = scene.ensure_material_key(id).unwrap();
         let asset = scene.materials.get_mut(&key).unwrap();
         asset.base_color_map = Some(map.to_string_lossy().into_owned().into());
         (asset.base_color, asset.render_mode) = (rgb, RenderMode::Cutout);

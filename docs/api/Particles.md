@@ -33,13 +33,15 @@ actually spawned (the `max_particles` cap may swallow some).
 | `Particles.SetLit` | `(id, lit)` | — |
 | `Particles.SetReactive` | `(id, name)` | — (`"Auto"`, `"Off"` or `"Full"`, any case; an unknown name is an error): the sprites' reactivity under TAA (`Graphics.md` → *TAA*, #1845); `Auto`, the default, from their alpha (Alpha) or what they add (Additive). Mesh particles take their material's |
 | `Particles.GetReactive` | `(id)` | reactivity name, or `nil` without an emitter |
-| `Particles.SetSimulationSpace` | `(id, space)` | — (`"World"` or `"Local"`, any case; an unknown name is an error) |
+| `Particles.SetSimulationSpace` | `(id, space)` | — (`"World"` or `"Local"`, any case; an unknown name is an error); a change forgets a `Gpu` emitter's live particles (*Simulation*) |
 | `Particles.GetSimulationSpace` | `(id)` | space name, or `nil` without an emitter |
-| `Particles.GetParticles` | `(id)` | an array of particle tables, oldest first (*Custom logic*); empty without an emitter |
-| `Particles.SetParticles` | `(id, list)` | the number of particles now live (0 without an emitter); an entry that is not a table, or a field of the wrong type, is an error that changes nothing |
-| `Particles.ForEach` | `(id, fn)` | the number of particles now live (`fn` not a function is an error): `fn(p)` runs once per live particle, oldest first, on **one reused table** whose edits are written back; returning `false` kills the particle |
-| `Particles.GetArrays` | `(id, fields)` | a table holding one array of numbers per name in `fields` (`{ "x", "vy" }`), index-aligned with the live particles, oldest first; empty arrays without an emitter; an unknown name is an error |
-| `Particles.SetArrays` | `(id, arrays)` | the number of particles now live (0 without an emitter): writes back the arrays a `GetArrays` table still holds; a stale, short or non-number array is an error that changes nothing |
+| `Particles.SetSimulation` | `(id, target)` | — (`"Cpu"` or `"Gpu"`, any case; an unknown name is an error): where the live particles are simulated (*Simulation*); a change forgets the live particles |
+| `Particles.GetSimulation` | `(id)` | target name, or `nil` without an emitter |
+| `Particles.GetParticles` | `(id)` | an array of particle tables, oldest first (*Custom logic*); empty without an emitter, and always empty on a `Gpu` emitter |
+| `Particles.SetParticles` | `(id, list)` | the number of particles now live (0 without an emitter); on a `Gpu` emitter it changes nothing and warns once; an entry that is not a table, or a field of the wrong type, is an error that changes nothing |
+| `Particles.ForEach` | `(id, fn)` | the number of particles now live (`fn` not a function is an error): `fn(p)` runs once per live particle, oldest first, on **one reused table** whose edits are written back; returning `false` kills the particle. On a `Gpu` emitter `fn` never runs, and nothing is written or warned |
+| `Particles.GetArrays` | `(id, fields)` | a table holding one array of numbers per name in `fields` (`{ "x", "vy" }`), index-aligned with the live particles, oldest first; empty arrays without an emitter, and always empty on a `Gpu` emitter; an unknown name is an error |
+| `Particles.SetArrays` | `(id, arrays)` | the number of particles now live (0 without an emitter): writes back the arrays a `GetArrays` table still holds; on a `Gpu` emitter it changes nothing and warns once (with `SetParticles`, one warning between them); a stale, short or non-number array is an error that changes nothing |
 
 **Ranges.** `SetLifetime`/`SetSpeed`/`SetSize` take `min, max`: each particle
 draws its start value uniformly between them from the emitter's seeded stream.
@@ -85,6 +87,64 @@ by value.
 ```lua no-run
 Particles.SetSimulationSpace(muzzle_flash, "Local")
 Particles.Burst(muzzle_flash) -- stays on the gun while the player turns
+```
+
+**Simulation.** Niagara's per-emitter *sim target*. `"Cpu"` (the default): the
+sim moves the live particles, so they collide, fire every sub-emitter and a
+script reads and rewrites them; the right choice for gameplay particles. `"Gpu"`:
+the renderer keeps the live particles in a GPU buffer, moves them in a compute
+pass and draws them straight from it, so one emitter holds 100,000 particles and
+more (a room of smoke, an explosion's debris, rain) with nothing per particle
+rebuilt, sorted or uploaded per camera. Births still happen on the CPU, through
+the same seeded path, so `Emit`/`Burst` return exact counts, every shape and
+start range works as on `"Cpu"`, and `GetCount` and the `max_particles` cap are
+exact and deterministic (each particle's lifetime is known at birth: no readback).
+Each sim tick moves the particles one step of that tick's `dt` (gravity, the drag
+and rotation-speed curves, velocity, age), so the same run draws the same
+particles on one GPU whatever the frame rate; across GPUs the floats may differ,
+which only the picture sees. Both simulation spaces work. A `Gpu` emitter's
+particles are **visual only**; what it does not do:
+
+- collide: a `Die` or `Bounce` collision response behaves as `None` (a warning
+  says so when one is set);
+- fire the `death` or `collision` sub-emitter (warned too); the `birth` one
+  fires, and a `Gpu` emitter can be any sub-emitter's target;
+- draw `"mesh"` particles: they draw as billboards (warned);
+- let a script read or write its particles: `GetParticles`, `GetArrays` and
+  `ForEach` see none, and `SetParticles` and `SetArrays` change nothing (one
+  warning);
+- sort its own sprites: additive ones sum the same in any order, alpha ones draw
+  in the order of their buffer slots. Emitters still sort back to front among
+  themselves, a `Gpu` one by where the emitter stands.
+
+A `Gpu` emitter holds at most **1,000,000** particles, whatever its
+`max_particles`: the same cap on every machine and every GPU, so `GetCount`
+never differs between them. A `max_particles` above it is stored as given and
+warned about (when it is set, or when the emitter switches to `"Gpu"`); the
+emitter behaves as the cap, and switching back to `"Cpu"` holds the stored value
+again. So `Component.Set(e, "Particles", { simulation = "Gpu", max_particles =
+3000000 })` and the two fields set one at a time end the same. Changing a `Gpu`
+emitter's simulation space forgets its live particles, as changing its target
+does: they were stored in the old space. A `Local` one at a scale of 0 holds its
+particles where they stood, under the last frame it had with a non-zero scale,
+as a `"Cpu"` one does; one that emits before it ever had a non-zero scale (a
+scale-in from 0 that bursts on its first tick) keeps those particles where they
+were born, and they follow the emitter from its first non-zero frame, as a
+`"Cpu"` one's do.
+
+The over-life curves and gradient are sampled into a 64-step table per emitter,
+linear between steps. The sim keeps each live particle's birth record on the CPU
+(about 100 bytes each) until it dies. The renderer replays the last 256 ticks one
+`dt` at a time; one that drew nothing for longer (a long `Harness.Step`) moves the
+particles over the older ticks in one closed-form jump, aged by the time those
+ticks took (a pause at `Time.timeScale` 0 included) and moved at their mean `dt`.
+In edit mode an emitter draws nothing on either target, as no tick runs.
+
+```lua no-run
+Particles.SetSimulation(smoke, "Gpu")
+Component.Set(smoke, "Particles", { max_particles = 100000 })
+Particles.SetLifetime(smoke, 2)
+Particles.SetRate(smoke, 50000) -- 100k live at a 2 s lifetime
 ```
 
 **Sub-emitters.** `trigger` is `"birth"`, `"death"` or `"collision"`; `target` is

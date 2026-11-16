@@ -59,6 +59,7 @@ inspect! {
         op!("max_particles", fx::set_max_particles),
         op!("looping", fx::set_looping),
         op!("simulation_space", fx::set_simulation_space),
+        op!("simulation", fx::switch_simulation),
         op!("shape", fx::set_shape),
         op!("emit_from", fx::set_emit_from),
         op!("lifetime", fx::set_lifetime),
@@ -82,7 +83,7 @@ inspect! {
         }),
         op!("seed", fx::set_seed),
         with!("render", |p, v: ParticleRender| set_render(p, v)),
-    ];
+    ], draft fx::draft, fx::commit;
     AudioSourceComponent => audio, audio_mut, &[
         op!("clip", audio::set_clip),
         op!("volume", audio::set_volume),

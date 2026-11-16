@@ -12,7 +12,9 @@
 //! PRNG and pending sub-emitter events, all `#[serde(skip)]`). The simulation in
 //! `app::systems::particles` owns the runtime, a script may rewrite its live
 //! particles (`Particles.SetParticles`, #2171, which draws nothing from the PRNG),
-//! and the draw pass in `render::passes::particles` only reads it.
+//! and the draw pass in `render::passes::particles` only reads it. A `Gpu` emitter
+//! (`simulation`, #2170) keeps only its births and an exact live tally here: its
+//! live particles are the renderer's.
 //!
 //! Determinism: every random draw comes from a per-emitter [`Random`] stream (the
 //! engine's seeded generator, `core::random`, #443) restarted from `seed` on
@@ -25,6 +27,7 @@
 mod render;
 mod runtime;
 mod shape;
+mod simulation;
 mod space;
 mod spawn;
 mod sub_emitter;
@@ -32,6 +35,7 @@ mod sub_emitter;
 pub use render::{Flipbook, ParticleRender, ParticleRenderMode};
 pub use runtime::{EmitterRuntime, Particle, SubEmitEvent};
 pub use shape::{EmitFrom, EmitShape};
+pub use simulation::{Birth, GpuSim, ParticleSimulation, DT_HISTORY, GPU_MAX_PARTICLES};
 pub use space::{EmitterFrame, SimulationSpace};
 pub use sub_emitter::{SubEmitTrigger, SubEmitters};
 
@@ -100,6 +104,10 @@ pub struct ParticleEmitterComponent {
     /// and scale with the emitter (`Local`, #1529).
     #[serde(default)]
     pub simulation_space: SimulationSpace,
+    /// Whether the live particles are simulated by the sim on the CPU (`Cpu`) or by
+    /// the renderer on the GPU (`Gpu`, visual only, #2170).
+    #[serde(default)]
+    pub simulation: ParticleSimulation,
 
     /// Where particles are born and which way they launch, around `direction`.
     #[serde(default)]
@@ -178,6 +186,7 @@ impl Default for ParticleEmitterComponent {
             max_particles: 256,
             looping: true,
             simulation_space: SimulationSpace::World,
+            simulation: ParticleSimulation::Cpu,
             shape: EmitShape::Point,
             emit_from: EmitFrom::Volume,
             lifetime: Range::constant(1.5),
@@ -202,9 +211,35 @@ impl Default for ParticleEmitterComponent {
 }
 
 impl ParticleEmitterComponent {
-    /// Number of currently live particles.
+    /// Number of currently live particles: a `Gpu` emitter's from its exact
+    /// tally (`simulation`), with no readback.
     pub fn live_count(&self) -> usize {
-        self.runtime.particles.len()
+        match self.simulation {
+            ParticleSimulation::Cpu => self.runtime.particles.len(),
+            ParticleSimulation::Gpu => self.runtime.gpu.live(),
+        }
+    }
+
+    /// Forget every live particle (`Particles.Clear`), on either target: a
+    /// script's read before it is stale (the revision moves).
+    pub fn clear_particles(&mut self) {
+        self.runtime.particles.clear();
+        self.runtime.gpu.clear();
+        self.runtime.revision = self.runtime.revision.wrapping_add(1);
+    }
+
+    /// The most particles live at once: `max_particles`, and on a `Gpu` emitter
+    /// never more than [`GPU_MAX_PARTICLES`].
+    pub fn particle_cap(&self) -> u32 {
+        match self.simulation {
+            ParticleSimulation::Cpu => self.max_particles,
+            ParticleSimulation::Gpu => self.max_particles.min(GPU_MAX_PARTICLES),
+        }
+    }
+
+    /// Whether the live particles are the renderer's (`Gpu`).
+    pub fn on_gpu(&self) -> bool {
+        self.simulation == ParticleSimulation::Gpu
     }
 
     /// A live particle's current world size: start size × the size curve, never

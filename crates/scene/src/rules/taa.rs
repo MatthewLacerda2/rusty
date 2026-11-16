@@ -1,5 +1,7 @@
-//! crates/edit/src/authoring/rendering/camera/taa.rs — the camera's TAA ops (#1847) and
-//! its numeric knobs.
+//! crates/scene/src/rules/taa.rs — the camera's TAA ops (#1847) and its numeric
+//! knobs, below `edit::authoring` (which re-exports them from
+//! `authoring::rendering::camera`) so a renderer test reads the knob table without
+//! the authoring layer.
 //!
 //! The ONE place TAA's camera fields are mutated (#287): the editor's Camera card,
 //! the `Graphics.Set/GetTaa*` functions, a loaded file's hold and a
@@ -12,8 +14,8 @@
 //!
 //! Pure.
 
+use super::sanitize::saturated;
 use rusty_components::{CameraComponent, TaaQuality};
-use rusty_scene::rules::sanitize::saturated;
 
 /// Set the camera's TAA flag — temporal anti-aliasing (#1702), which replaces FXAA
 /// while it runs. Shared by the editor's Camera card and `Graphics.SetTaaActive`.
@@ -59,6 +61,12 @@ pub fn set_taa_mip_bias(c: &mut CameraComponent, value: f32) {
 /// `0..=1`; `0` runs no sharpen.
 pub fn set_taa_contrast_adaptive_sharpening(c: &mut CameraComponent, value: f32) {
     c.taa_contrast_adaptive_sharpening = saturated(value, 0.0, 1.0);
+}
+
+/// Set TAA's *Anti-Flicker* (#2228, HDRP's), clamped to `0..=1`; `0` is URP's
+/// resolve, holding no history against a blink.
+pub fn set_taa_anti_flicker(c: &mut CameraComponent, value: f32) {
+    c.taa_anti_flicker = saturated(value, 0.0, 1.0);
 }
 
 /// One numeric TAA knob (#1847): the counterpart of a volume effect's `Knob`, but
@@ -129,6 +137,14 @@ pub const TAA_KNOBS: &[CameraKnob] = &[
         get: |c| c.taa_contrast_adaptive_sharpening,
         set: set_taa_contrast_adaptive_sharpening,
     },
+    CameraKnob {
+        field: "anti_flicker",
+        api: "TaaAntiFlicker",
+        label: "Anti-Flicker",
+        range: (0.0, 1.0),
+        get: |c| c.taa_anti_flicker,
+        set: set_taa_anti_flicker,
+    },
 ];
 
 /// The TAA knob a `Graphics.<effect>.<knob>` tween path names (`effect` must be
@@ -148,7 +164,7 @@ mod tests {
     fn knobs_round_trip_through_their_ops_with_clamps() {
         let mut c = CameraComponent::default();
         // A value inside every knob's own range round-trips exactly.
-        for (knob, value) in TAA_KNOBS.iter().zip([0.7, 0.9, 0.5, -0.5, 0.5]) {
+        for (knob, value) in TAA_KNOBS.iter().zip([0.7, 0.9, 0.5, -0.5, 0.5, 0.5]) {
             (knob.set)(&mut c, value);
             assert_eq!(
                 (knob.get)(&c),
@@ -174,6 +190,8 @@ mod tests {
         assert_eq!(c.taa_mip_bias, CameraComponent::MIN_TAA_MIP_BIAS);
         set_taa_contrast_adaptive_sharpening(&mut c, 9.0);
         assert_eq!(c.taa_contrast_adaptive_sharpening, 1.0);
+        set_taa_anti_flicker(&mut c, -2.0);
+        assert_eq!(c.taa_anti_flicker, 0.0);
     }
 
     #[test]

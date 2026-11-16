@@ -28,8 +28,6 @@ mod bake_tests;
 #[doc(hidden)]
 pub mod bench;
 #[cfg(test)]
-mod carry_tests;
-#[cfg(test)]
 mod dense_tests;
 #[cfg(test)]
 mod file_tests;
@@ -45,7 +43,5 @@ mod tessellated_tests;
 pub mod test_gap;
 #[doc(hidden)]
 pub mod test_level;
-#[cfg(test)]
-mod unsaved_tests;
 #[cfg(test)]
 mod window_tests;

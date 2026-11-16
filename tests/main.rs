@@ -52,11 +52,13 @@ mod mesh_culling;
 mod nav;
 mod navigation_layered;
 mod navmesh_settings;
+mod occlusion;
 mod parity_authoring_ops;
 mod particles;
 mod perception;
 mod physics;
 mod plane_subdivisions;
+mod post_effect_cases;
 mod post_effect_layers;
 mod prefab_api;
 mod process_order;
@@ -86,6 +88,8 @@ mod api_doc_drift;
 mod application_quit;
 #[cfg(feature = "dev")]
 mod audio_capture;
+#[cfg(feature = "dev")]
+mod bin_help;
 #[cfg(feature = "dev")]
 mod bot_player_session;
 #[cfg(feature = "dev")]

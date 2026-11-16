@@ -2,6 +2,7 @@
 //! library (#2059).
 
 use super::fixture::{frame, yard, RES};
+use rusty_scene::mesh_library;
 
 /// `Mesh.DeleteAsset` (#2059) frees the deleted library mesh's buffers on the next
 /// frame, and a mesh made again under its name uploads afresh.
@@ -18,7 +19,8 @@ fn gpu_a_deleted_library_mesh_frees_its_buffers() {
     };
     let id = scene.add_entity("Piece".into());
     scene.define_mesh("piece", triangle.clone()).unwrap();
-    rusty_edit::mesh::set_shared_mesh(&mut scene, id, "piece").unwrap();
+    let fresh = mesh_library::resolve_shared(&scene, "piece").unwrap();
+    mesh_library::put_shared(&mut scene, id, fresh);
     let key = crate::MeshId("Scene|piece".into());
     frame(&mut r, &scene);
     assert!(r.gpu_meshes.contains_key(&key), "drawn, so uploaded");
@@ -26,7 +28,8 @@ fn gpu_a_deleted_library_mesh_frees_its_buffers() {
     frame(&mut r, &scene);
     assert!(!r.gpu_meshes.contains_key(&key), "freed with the entry");
     scene.define_mesh("piece", triangle).unwrap();
-    rusty_edit::mesh::set_shared_mesh(&mut scene, id, "piece").unwrap();
+    let fresh = mesh_library::resolve_shared(&scene, "piece").unwrap();
+    mesh_library::put_shared(&mut scene, id, fresh);
     frame(&mut r, &scene);
     assert!(
         r.gpu_meshes.contains_key(&key),

@@ -5,12 +5,12 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::occlusion::test_level::corridors;
-use crate::occlusion::{bake_occlusion, fingerprint, unsaved_materials};
-use rusty_components::RenderFace;
-use rusty_edit::authoring::material::define_asset;
-use rusty_scene::lighting::occlusion::save_sidecar;
-use rusty_scene::{parse_scene_text, MaterialAsset, MaterialComponent, Scene};
+use rusty::components::RenderFace;
+use rusty::edit::authoring::material::define_asset;
+use rusty::lighting::occlusion::test_level::corridors;
+use rusty::lighting::occlusion::{bake_occlusion, fingerprint, unsaved_materials};
+use rusty::scene::lighting::occlusion::save_sidecar;
+use rusty::scene::{parse_scene_text, MaterialAsset, MaterialComponent, Scene};
 
 /// The library of the scene file at `path`.
 fn file_materials(path: &str) -> BTreeMap<String, MaterialAsset> {
@@ -21,7 +21,7 @@ fn file_materials(path: &str) -> BTreeMap<String, MaterialAsset> {
 /// How many of the PVS's objects a fresh load of `path` reads as changed.
 fn stale_on_load(path: &str) -> usize {
     let mut fresh = Scene::new();
-    rusty_edit::load_from_file(&mut fresh, path).unwrap();
+    rusty::edit::load_from_file(&mut fresh, path).unwrap();
     let pvs = fresh.occlusion.as_deref().expect("the bake loaded");
     let objects = pvs.objects.iter();
     objects
@@ -31,7 +31,7 @@ fn stale_on_load(path: &str) -> usize {
 
 #[test]
 fn a_material_the_file_lacks_is_named_and_a_save_that_writes_it_makes_the_load_match() {
-    let dir = rusty_test_support::temp::dir().join("occlusion_unsaved_material");
+    let dir = crate::temp::dir().join("occlusion_unsaved_material");
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("level.scene").to_string_lossy().into_owned();
     let mut level = corridors();
@@ -41,10 +41,10 @@ fn a_material_the_file_lacks_is_named_and_a_save_that_writes_it_makes_the_load_m
             .set_material(id, Some(MaterialComponent::new("glass")));
     }
     level.materials.remove("glass");
-    rusty_edit::save_to_file(&level, &path).unwrap();
+    rusty::edit::save_to_file(&level, &path).unwrap();
 
     let mut baking = Scene::new();
-    rusty_edit::load_from_file(&mut baking, &path).unwrap();
+    rusty::edit::load_from_file(&mut baking, &path).unwrap();
     let default_like = MaterialAsset::default();
     define_asset(&mut baking.materials, "glass", default_like);
     assert!(
@@ -63,7 +63,7 @@ fn a_material_the_file_lacks_is_named_and_a_save_that_writes_it_makes_the_load_m
     save_sidecar(&baking, &path).unwrap();
     assert!(stale_on_load(&path) > 0, "the file draws glass one-sided");
 
-    rusty_edit::save_to_file(&baking, &path).unwrap();
+    rusty::edit::save_to_file(&baking, &path).unwrap();
     assert!(unsaved_materials(&baking, &file_materials(&path)).is_empty());
     assert_eq!(stale_on_load(&path), 0, "saved with its materials");
 }

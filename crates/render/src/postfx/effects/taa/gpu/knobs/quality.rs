@@ -11,7 +11,7 @@ use super::super::still::differing;
 use super::super::wall::{luma, noisy_wall};
 use crate::Renderer;
 use rusty_components::{CameraComponent, TaaQuality};
-use rusty_edit::authoring::rendering::camera::TAA_KNOBS;
+use rusty_scene::rules::taa::TAA_KNOBS;
 use rusty_scene::Scene;
 
 /// Frames turned, 1.5° each, ending at yaw 0.

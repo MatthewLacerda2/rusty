@@ -5,7 +5,6 @@
 use glam::Vec3;
 
 use super::gpu_tests::{drawn, offscreen, shot, H, W};
-use rusty_edit::authoring::material;
 use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::{Camera, Scene};
 
@@ -25,9 +24,9 @@ fn boxes() -> Scene {
         );
         let id = block(&mut scene, "Box", at, at + Vec3::splat(0.3));
         let colour = if i < 300 { i % 200 } else { 200 + i % 50 };
-        let key = material::ensure_material_key(&mut scene, id).unwrap();
+        let key = scene.ensure_material_key(id).unwrap();
         let b = colour as f32 / 250.0;
-        material::set_base_color(&mut scene.materials, &key, [b, 1.0 - b, 0.5]);
+        scene.materials.get_mut(&key).unwrap().base_color = [b, 1.0 - b, 0.5];
         if i >= 300 {
             scene.world.set_layer(id, LATER);
         }

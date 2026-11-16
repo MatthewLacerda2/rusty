@@ -5,6 +5,7 @@ mod avoidance_door;
 #[cfg(feature = "dev")]
 mod bounds_boot;
 mod eqs_sliced;
+mod load_bounds;
 mod obstacle_door;
 mod off_floor;
 mod turn;

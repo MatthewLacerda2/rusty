@@ -10,7 +10,6 @@ use super::statics_key;
 use crate::gpu::pipelines::surface::cut_depth_tests::ground_halves;
 use crate::Renderer;
 use rusty_components::{RenderFace, ShadowCasting};
-use rusty_edit::authoring::material;
 
 /// The ground's brightness under each half of a card drawing `face`, its front up
 /// toward the sun or, with `down`, away from it; none for `None`.
@@ -18,7 +17,7 @@ fn shade(r: &mut Renderer, face: Option<RenderFace>, down: bool) -> [f32; 2] {
     let mut scene = sun_yard();
     if let Some(face) = face {
         let id = card(&mut scene, ShadowCasting::On, down, false);
-        let key = material::ensure_material_key(&mut scene, id).unwrap();
+        let key = scene.ensure_material_key(id).unwrap();
         scene.materials.get_mut(&key).unwrap().render_face = face;
     }
     ground_halves(r, &scene)
@@ -58,7 +57,7 @@ fn a_static_cards_render_face_moves_the_bake_key() {
     let mut scene = sun_yard();
     let id = card(&mut scene, ShadowCasting::On, false, false);
     scene.world.set_static(id, true);
-    let key = material::ensure_material_key(&mut scene, id).unwrap();
+    let key = scene.ensure_material_key(id).unwrap();
     let mut key_as = |face| {
         scene.materials.get_mut(&key).unwrap().render_face = face;
         statics_key(&scene)

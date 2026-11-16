@@ -9,7 +9,6 @@ use glam::{Quat, Vec3};
 
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_components::{MaterialAsset, RefractionModel, RenderFace, RenderMode};
-use rusty_edit::authoring::material;
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
@@ -38,7 +37,7 @@ fn diff(a: &[u8], b: &[u8]) -> f32 {
 
 /// Entity `id`'s own material, to edit.
 pub(super) fn asset(scene: &mut Scene, id: u32) -> &mut MaterialAsset {
-    let key = material::ensure_material_key(scene, id).unwrap();
+    let key = scene.ensure_material_key(id).unwrap();
     scene.materials.get_mut(&key).unwrap()
 }
 

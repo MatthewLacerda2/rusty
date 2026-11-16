@@ -22,7 +22,7 @@ wall-clock or unseeded RNG).
 |---|---|---|
 | `Texture.Bake` | `(recipe, path, slot)` | the written `path` |
 | `Texture.BakeSet` | `(recipe, prefix)` | `{ [slot] = path, … }` — one PNG per entry of the recipe's `outputs` |
-| `Texture.BakeMeshMaps` | `(model, maps, prefix, [resolution = 1024])` | `{ [map] = path, … }` — one PNG per mesh map, baked from a model's UV0 |
+| `Texture.BakeMeshMaps` | `(model, maps, prefix, [resolution = 1024 \| settings])` | `{ [map] = path, … }` — one PNG per mesh map, baked from a model's UV0 |
 | `Texture.ToJson` | `(recipe)` | the recipe's canonical JSON string |
 | `Texture.Stats` | `(recipe, [resolution])` | `{ [node_id] = { min, max, mean, std, p1, p99 }, … }` for **every** node, each field an `{r, g, b, a}` array |
 | `Texture.Preview` | `(recipe, path, [size = 128])` | `{ path, columns, order = { node ids } }` — a PNG contact sheet of every node |
@@ -50,13 +50,17 @@ lists the valid ones — a typo like `"basecolour"` never silently bakes linear 
 Every slot bakes 8 bits per channel except `data`, `normal16` and `height`, which bake a
 **16-bit** PNG (#1491, #2002): a height field used as displacement or a terrain
 heightmap keeps 65536 levels instead of terracing into 256 steps, and a normal map
-keeps slopes under about 0.004 that 8 bits round flat (a mirror-polished stone). The 16 bits are the file's: the renderer
-loads it as a material map like any other PNG, but uploads every map at 8 bits per
-channel at most today (and block-compressed below that once the import cache has
-made its copy, unless its `compression` is `"None"`; see `Assets.md`), so the extra precision serves what reads the file itself (an
-`image` node, a terrain or displacement bake), not what the GPU draws. A `height` map's
-parallax reads it as uploaded, BC4 by default, which marches without visible terracing
-(`Material.md`, `SetHeightMap`).
+keeps slopes under about 0.004 that 8 bits round flat (a mirror-polished stone, a
+glazed tile tilted a fraction of a degree). A `data` map is uploaded at 8 bits per
+channel at most (block-compressed below that once the import cache has made its
+copy, unless its `compression` is `"None"`; see `Assets.md`), so its extra precision
+serves what reads the file itself (an `image` node, a terrain or displacement bake).
+A `normal16` map in a material's normal slot keeps it on the GPU too: a 16-bit
+`"NormalMap"` is never block-compressed and uploads as half floats, at eight bytes
+a texel (twice an 8-bit map, eight times BC5; `Assets.md`, `textureType`), so bake
+`normal16` for the subtle relief that needs it and `normal` for the rest.
+A `height` map's parallax reads the file as uploaded, BC4 by default, which marches
+without visible terracing (`Material.md`, `SetHeightMap`).
 
 `orm` is only another name for the glTF metallic-roughness packing, not an
 occlusion-roughness-metallic map: nothing is written to R, so bake occlusion as its
@@ -145,30 +149,55 @@ Texture.Bake({ resolution = 1024, nodes = {
 - `maps` lists any of the names below (case-insensitive; a map named twice bakes
   once). Each is written to `<prefix><map>.png` as soon as it is baked, the folders
   above it made first as `Bake` makes them (a `prefix` ending in `/` names a folder
-  of its own). `resolution` is the square map's edge, 1 to 8192. Memory grows with
-  its square: at most about 1.2 GiB at 4096 and 4.6 GiB at 8192 (every texel
-  covered), whatever the number of maps, since one map is held at a time.
+  of its own). The fourth argument is the square map's edge (1 to 8192) or a
+  settings table (below). Memory grows with the texel count: at most about 1.2 GiB
+  at 4096² and 4.6 GiB at 8192² (every texel covered), whatever the number of maps,
+  since one map is held at a time. More rays cost time, not memory.
 - Every map but `id` is a 16-bit `data` PNG; `id` is 8-bit.
+
+The settings table follows Substance Painter's *Bake Mesh Maps* panel (#2260).
+Every field is optional, and one left out bakes as a call naming none does, byte
+for byte. A field the table doesn't know, or one out of its range, is an error
+naming it.
+
+| Field | Default | What it sets |
+|---|---|---|
+| `resolution` | `1024` | the square map's edge, 1 to 8192 |
+| `size` | — | `{w, h}` instead of `resolution`, each side 1 to 8192: UV0's unit square stretches over it, as `Texture.Bake`'s `size` does, so a long thin model (a strip light) fills a wide map. Naming both is an error |
+| `curvature_radius` | 2 % of the bounds diagonal | how far from a crease the `curvature` band reaches, in the model's own units (metres at import scale): `0.003` keeps a 3 mm chip on a 12 mm door edge. It is never narrower than three of the mesh's average texels, and one above the model's bounds diagonal is refused |
+| `ao_rays` | `64` (Substance's *Secondary Rays*) | rays per texel for `ao`, 1 to 1024: the grain falls with the square root (256 rays, half the grain of 64), and the time grows with the count: at 1024 a fully covered 4096² map takes about half an hour on 4 cores |
+| `thickness_rays` | `64` | rays per texel for `thickness`, 1 to 1024 |
+
+```lua no-run
+Texture.BakeMeshMaps("assets/models/pool_fixtures.blend::Locker_Bank",
+  { "curvature", "ao" }, "assets/textures/pool/locker_",
+  { resolution = 4096, curvature_radius = 0.004, ao_rays = 256 })
+```
 
 | Map | What a texel holds | Off the islands |
 |---|---|---|
-| `curvature` | 0.5 flat; brighter towards a convex edge (1 on a right-angled one), darker towards a concave one (0) | 0.5 |
-| `ao` | the share of 64 cosine-weighted rays that meet no part of the model within its bounds' diagonal: 1 open, 0 enclosed | 1 |
+| `curvature` | 0.5 flat; brighter towards a convex edge (1 on a right-angled one), darker towards a concave one (0), fading to flat at `curvature_radius` | 0.5 |
+| `ao` | the share of `ao_rays` (64) cosine-weighted rays that meet no part of the model within its bounds' diagonal: 1 open, 0 enclosed | 1 |
 | `world_normal` | the surface normal, `n * 0.5 + 0.5` per axis (Y up) | 0.5 |
 | `position` | the surface point, normalised per axis to the model's bounds (a flat axis reads 0.5) | 0 |
-| `thickness` | how far 64 rays cast into the model (around the inverted normal) travel before they leave it, averaged, over the bounds' diagonal; a ray that never leaves counts the whole diagonal: 1 thick, towards 0 thin | 1 |
+| `thickness` | how far `thickness_rays` (64) rays cast into the model (around the inverted normal) travel before they leave it, averaged, over the bounds' diagonal; a ray that never leaves counts the whole diagonal: 1 thick, towards 0 thin | 1 |
 | `id` | one fully saturated colour per material, hues a golden-ratio step apart (a triangle with no material red, then the model's materials in order); two runs drawn with one material share its colour | black |
 
-The bake's settings are Substance's defaults and are **fixed today**: no argument
-or recipe changes them. They are 64 rays per texel, an occluder distance of the
-whole bounds diagonal, and a **16-texel margin** around every UV island (a
+The settings table sets the size, the curvature band and the ray counts; the
+rest is Substance's defaults and no argument changes it: an occluder distance of
+the whole bounds diagonal, and a **16-texel margin** around every UV island (a
 continuous map's margin averages its border, the ID map's copies it, so no margin
 holds a colour between two materials). Rays are drawn around the interpolated
 normal, and one that would leave under the triangle's own face is dropped, so on a
-smooth low-poly mesh no ray starts under the face it leaves; a face wound
+smooth low-poly mesh no ray starts under the face it leaves; a texel whose every
+ray is dropped (few rays, a normal leaning far off its face) reads the map's
+neutral 1, open and thick. A face wound
 against its normals (an `.obj` face listed clockwise from its `vn`) draws them
-around its face normal instead. A `curvature` crease lights a band 2%
-of the bounds diagonal wide, never narrower than 3 texels: each edge two faces
+around its face normal instead. A `curvature` crease lights a band reaching
+`curvature_radius` (2% of the bounds diagonal by default; a radius past the
+diagonal is refused, since the band would cover the whole model), never narrower
+than 3 texels (a texel measured by its world area, so a stretched non-square map
+counts its real texels): each edge two faces
 share is a crease of strength `angle / 90°` (capped at 1), corners welded by
 position first so a UV or normal seam never breaks one. A texel sums the convex
 creases within the band (each fading to nothing at its edge), and apart the

@@ -279,7 +279,7 @@ clamped sampler.
   | type | format | for |
   |---|---|---|
   | `"Default"` | BC7 (a byte a texel), alpha kept, mips averaged in linear light (raw with `sRGB` off) | colour, packed data (glTF's occlusion-roughness-metallic, with `sRGB` off) |
-  | `"NormalMap"` | BC5 (a byte a texel): x and y; the shader rebuilds z | tangent-space normal maps |
+  | `"NormalMap"` | BC5 (a byte a texel): x and y; the shader rebuilds z. A 16-bit file (`Texture.Bake`'s `normal16`) is never compressed: it uploads as half floats (`Rgba16Float`, eight bytes a texel), whose x and y step about every 0.056° near flat where 8 bits (and BC5) step every 0.45° | tangent-space normal maps |
   | `"SingleChannel"` | BC4 (half a byte): red only | roughness, metallic, masks, height maps |
 
   Assigning a `"Default"` image to a material's normal slot (`Material.SetNormalMap`,
@@ -290,7 +290,11 @@ clamped sampler.
   `"Default"` texture is sampled as sRGB colour in a colour slot and raw in a data
   slot. A texture drawn in a slot its type cannot serve (a normal map as albedo, a
   single-channel map as colour) is uploaded uncompressed for that use, with one
-  console warning, so it never loses a channel.
+  console warning, so it never loses a channel. A 16-bit file stays 16-bit only as a
+  `"NormalMap"`: a `"Default"` one in a normal slot (assigned during Play, before
+  its type is fixed) reads at 8 bits, as every `"Default"` texture does. A 16-bit
+  normal map reaches every normal slot at 16 bits, even when another slot (a detail
+  map, read at 8 bits) loaded the file first.
 - `sRGB` — Unity's *sRGB (Color Texture)*, read for a `"Default"` texture only (the
   inspector shows it then): on (the default), its texels are sRGB colour, mips and
   a `maxSize` downscale average in linear light; off, they are data stored raw (a
@@ -309,8 +313,8 @@ clamped sampler.
   `"NormalMap"` copy also keeps how much each mip level's normals spread, which BC5's
   two channels cannot, for the renderer's specular AA, #1702), and made
   again only when the image, its type, `sRGB`, compression, max size or mipmaps, or
-  the encoder change. A copy whose image is gone is deleted by the next refresh
-  (#1694). A baked lightmap page (a file in a scene's `<scene>.lightmaps/` folder) is
+  the encoder change. A copy whose image is gone, or is a 16-bit normal map, is
+  deleted by the next refresh (#1694). A baked lightmap page (a file in a scene's `<scene>.lightmaps/` folder) is
   not imported at all: the bake writes the page the renderer loads. The editor makes them in the background when an image is added,
   its settings change or the project opens (the console says each one); entering
   Play waits for any still stale, as it waits for models; an export makes and ships

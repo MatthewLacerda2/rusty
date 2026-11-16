@@ -119,6 +119,11 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   wrap and filter are its import settings', takes a new one.
 - `render::gpu::shaders::ShaderRegistry` reads shaders from disk at runtime, so a
   shader edit needs no Rust rebuild.
+- **A mip level that varies from pixel to pixel is read through a sampler**
+  (`textureSampleLevel` at the texel's centre), and its size is the first level's
+  halved: `textureLoad` and `textureDimensions` at such a level read the wrong level
+  on lavapipe while NVIDIA and Metal read the right one. A level uniform across
+  the draw may use either.
 - wgpu, naga and naga_oil upgrade as a unit (`Cargo.toml`).
 
 ## Reuse `render::gpu`
@@ -208,10 +213,10 @@ in every layer. The vignette, the smallest real effect, is the worked example: g
   effect's part, or a composite texture it declares isn't bound and passed at its place in its own function's call. Pixels of every other effect stay byte-identical: no other offset or
   struct moved. Three layers sit above this crate's live code: the authoring layer
   (the field tables, `EFFECTS`, the camera's knob tables), handed in as an `Authored`,
-  and the `Graphics.*` registrars and the Inspector's sections, which render's own test
-  fills with the renderer's effect names and so cannot see either one missing: the
-  integration suite's `tests/post_effect_layers.rs` hands the real ones in, and is what
-  catches a missing registrar or Inspector section.
+  and the `Graphics.*` registrars and the Inspector's sections. The gate's own cases
+  (`tests/post_effect_cases/`) fill those two with the renderer's effect names and so
+  cannot see either one missing: `tests/post_effect_layers.rs` hands the real ones in,
+  and is what catches a missing registrar or Inspector section.
 
 ## GPU tests
 - **The name says it renders**: in-crate tests are named `gpu_*`, integration tests

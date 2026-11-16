@@ -11,7 +11,6 @@ use glam::{Quat, Vec3};
 use crate::gpu::pipelines::surface::cut_depth_tests::{ground_halves, slab_yard};
 use crate::Renderer;
 use rusty_components::RenderMode;
-use rusty_edit::authoring::material;
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
@@ -24,9 +23,9 @@ fn card(scene: &mut Scene, mirrored: bool, cutout: bool) {
     (t.position, t.scale) = (Vec3::Y * 3.0, Vec3::new(0.4 * sign, 1.0, 0.4));
     drop(t);
     if cutout {
-        let key = material::ensure_material_key(scene, plane).unwrap();
-        material::set_render_mode(&mut scene.materials, &key, RenderMode::Cutout);
-        material::set_alpha_cutoff(&mut scene.materials, &key, 0.5);
+        let key = scene.ensure_material_key(plane).unwrap();
+        scene.materials.get_mut(&key).unwrap().render_mode = RenderMode::Cutout;
+        scene.materials.get_mut(&key).unwrap().alpha_cutoff = 0.5;
     }
 }
 

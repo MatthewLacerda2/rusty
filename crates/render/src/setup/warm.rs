@@ -29,6 +29,7 @@ impl Renderer {
     pub(crate) fn lazy_computes(&self) -> Vec<&LazyCompute> {
         let mut all = self.post_passes.lazy_computes();
         all.extend(self.hiz.lazy_computes());
+        all.extend(self.particle_renderer.gpu.lazy_computes());
         all
     }
 
@@ -50,7 +51,7 @@ impl Renderer {
         all.extend(self.ribbon_renderer.lazy_pipelines());
         all.extend(self.ui_renderer.lazy_pipelines());
         all.extend(self.shadow_renderer.lazy_pipelines());
-        all.push(self.mip_generator.lazy_pipeline());
+        all.extend(self.mip_generator.lazy_pipelines());
         all.push(self.opaque_copy.lazy_pipeline());
         // The authored surface shaders built so far: their facing pipelines (#1615).
         all.extend(self.surface_shaders.lazy_pipelines());

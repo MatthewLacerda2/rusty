@@ -2,7 +2,8 @@
 //! the mesh's own edges. Every edge two triangles share is a crease with a signed
 //! strength: its dihedral angle over 90° (capped at 1), positive where the surface
 //! folds away (convex), negative where it folds in (concave). A texel sums the
-//! convex creases within [`RADIUS`] of its point, and apart the concave ones, each
+//! convex creases within the band's reach of its point (`Settings::curvature_radius`,
+//! by default [`RADIUS`] of the bounds diagonal), and apart the concave ones, each
 //! fading linearly to nothing at the radius and each sum held to 1, and stores
 //! `0.5 + 0.5 × (convex + concave)`: 0.5 flat, 1 on a right-angled convex edge,
 //! 0 in a right-angled concave one. Summing makes the read follow the shape, not
@@ -24,8 +25,9 @@ use super::{Baked, MeshSource};
 use crate::lightmap::TexelPoint;
 use rusty_core::collections::Map;
 
-/// The band a crease lights, as a share of the mesh's bounds diagonal (at least
-/// [`MIN_TEXELS`] texels wide, so a low resolution still shows it).
+/// The band a crease lights when the bake names no `curvature_radius`, as a share
+/// of the mesh's bounds diagonal (at least [`MIN_TEXELS`] texels wide, so a low
+/// resolution still shows it).
 pub const RADIUS: f32 = 0.02;
 
 /// The narrowest band, in texels.
@@ -66,7 +68,10 @@ impl Curvature {
         let weld = source.weld();
         let surfaces = source.components(&weld);
         let creases = creases(source, &weld, &surfaces);
-        let radius = (RADIUS * baked.diagonal).max(MIN_TEXELS * baked.texel_world());
+        let radius = baked
+            .settings
+            .curvature_reach(baked.diagonal)
+            .max(MIN_TEXELS * baked.texel_world());
         let grid = Grid::new(&creases, radius);
         Self {
             creases,

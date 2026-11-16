@@ -51,10 +51,13 @@ fn a_nan_a_bad_area_or_a_wrong_format_is_refused() {
 fn no_single_byte_flip_panics() {
     let (scene, _) = level();
     let (_, bytes) = saved(&scene);
-    for i in (0..bytes.len()).step_by(3) {
+    // One graph for every flip: `restore` reads only the scene and the bytes
+    // (a refusal leaves the graph as it was, a success replaces it whole), and
+    // building it is a full bake, which per flip was the sweep's whole cost.
+    let mut g = NavigationGraph::from_scene(&scene);
+    for i in 0..bytes.len() {
         let mut b = bytes.clone();
         b[i] ^= 0xA5;
-        let mut g = NavigationGraph::from_scene(&scene);
         let _ = g.restore(&scene, &b);
     }
 }

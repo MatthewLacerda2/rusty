@@ -94,7 +94,7 @@ fn hold_one<C: Inspect>(
     if held.is_empty() {
         return Ok(());
     }
-    let mut draft = live.clone();
+    let mut draft = C::draft(live);
     run_ops(&mut draft, &held, refused)?;
     let after = serialized(&draft)?;
     let moved: Map<String, Value> = held

@@ -166,6 +166,7 @@ pub(crate) fn particle_value(p: &ParticleEmitterComponent) -> Value {
         "rate": p.rate,
         "max_particles": p.max_particles,
         "simulation_space": p.simulation_space,
+        "simulation": p.simulation,
         "lifetime": p.lifetime,
         "speed": p.speed,
         "direction": vec3(p.direction),
