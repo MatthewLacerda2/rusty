@@ -64,13 +64,15 @@ pub(crate) const HEADLESS_BACKENDS: wgpu::Backends = wgpu::Backends::PRIMARY;
 /// The one `wgpu::Instance` every headless renderer in this process requests its
 /// adapter from, made on first use and never dropped.
 ///
-/// One instance per renderer meant one load and unload of the Vulkan loader and its
-/// drivers per renderer (wgpu-hal's Vulkan instance owns its `ash::Entry`, so dropping
-/// the last handle destroys the `VkInstance` and unloads `libvulkan`). NVIDIA's Linux
-/// driver stops listing any adapter after about nineteen such cycles in one process, so
-/// the twentieth bake of an editor session skipped (#2236). An instance holds no
-/// per-renderer state — the adapter, device and queue do — so sharing it changes
-/// nothing a renderer sees.
+/// One instance per renderer meant, per renderer, one Vulkan instance created and
+/// destroyed and, where no other instance held the loader, one load and unload of
+/// `libvulkan` and its drivers (wgpu-hal's Vulkan instance owns its `ash::Entry`).
+/// NVIDIA's Linux driver stops listing any adapter after about nineteen of those in
+/// one process, so the twentieth bake of an editor session skipped (#2236); which of
+/// the two trips it is not known, and the shared instance removes both. An instance
+/// holds no per-renderer state — the adapter, device and queue do — so sharing it
+/// changes nothing a renderer sees. The adapters it can see are fixed when it is first
+/// made, so a driver or ICD installed later shows only after a restart.
 fn instance() -> &'static wgpu::Instance {
     static INSTANCE: std::sync::OnceLock<wgpu::Instance> = std::sync::OnceLock::new();
     INSTANCE.get_or_init(|| {
@@ -107,21 +109,7 @@ impl Renderer {
     ) -> Option<Self> {
         let width = width.max(1);
         let height = height.max(1);
-        let adapter = pick_adapter(instance()).await?;
-
-        // Timestamps where the adapter has them: the frame stats' GPU time (#835).
-        // And the rest of `limits::OPTIONAL`.
-        let wanted = wgpu::Features::TIMESTAMP_QUERY | super::limits::OPTIONAL;
-        let features = adapter.features() & wanted;
-        let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor {
-                required_features: features,
-                required_limits: super::limits::device_limits(),
-                label: Some("Headless Screenshot Device"),
-                ..Default::default()
-            })
-            .await
-            .ok()?;
+        let (device, queue) = device().await?;
 
         // No real swapchain offscreen: only the always-available `Fifo` mode.
         Some(Self::from_parts(
@@ -133,6 +121,23 @@ impl Renderer {
             Some(permit),
         ))
     }
+}
+
+/// A headless renderer's device and queue, on the adapter [`pick_adapter`] finds in
+/// the shared [`instance`], or `None` when there is no adapter or it refuses a device.
+async fn device() -> Option<(wgpu::Device, wgpu::Queue)> {
+    let adapter = pick_adapter(instance()).await?;
+    // Timestamps where the adapter has them: the frame stats' GPU time (#835).
+    // And the rest of `limits::OPTIONAL`.
+    let wanted = wgpu::Features::TIMESTAMP_QUERY | super::limits::OPTIONAL;
+    let features = adapter.features() & wanted;
+    let descriptor = wgpu::DeviceDescriptor {
+        required_features: features,
+        required_limits: super::limits::device_limits(),
+        label: Some("Headless Screenshot Device"),
+        ..Default::default()
+    };
+    adapter.request_device(&descriptor).await.ok()
 }
 
 /// The adapter a headless renderer runs on: the one [`ADAPTER_ENV`] names, else the
@@ -183,37 +188,43 @@ fn offscreen_config(width: u32, height: u32) -> wgpu::SurfaceConfiguration {
 mod tests {
     use super::{is_wanted, HEADLESS_BACKENDS};
 
-    /// More renderers than NVIDIA's Linux driver survived with an instance each (19),
-    /// built, rendered through and dropped one after another in one process, as a long
-    /// editor session's bakes are. Each must find an adapter and draw a frame.
+    /// More adapters and devices than NVIDIA's Linux driver survived with an instance
+    /// each (19), requested and dropped one after another in one process, as a long
+    /// editor session's bakes are; a frame is rendered through the last. Losing the
+    /// adapter part-way is the bug.
     #[test]
-    fn gpu_more_headless_renderers_than_the_driver_cap_each_render_in_one_process() {
-        const RENDERERS: usize = 32;
-        let scene = rusty_scene::Scene::new();
-        let cam = rusty_scene::Camera::new(glam::Vec3::ZERO, -90.0, 0.0);
-        for i in 0..RENDERERS {
-            let Some(mut renderer) = crate::test_gpu::headless_or_skip(4, 4) else {
-                // No adapter at all is the usual skip; losing it part-way is the bug.
-                assert_eq!(i, 0, "renderer {i} of {RENDERERS} found no adapter");
+    fn gpu_more_headless_devices_than_the_driver_cap_each_find_an_adapter_in_one_process() {
+        const DEVICES: usize = 32;
+        let lost = |i: usize| format!("device {i} of {DEVICES} found no adapter");
+        {
+            let _permit = crate::setup::budget::acquire_headless();
+            for i in 0..DEVICES - 1 {
+                if pollster::block_on(super::device()).is_some() {
+                    continue;
+                }
+                // No adapter at all is the usual skip, unless one is required or named.
+                let required = crate::gpu_required() || super::wanted_adapter().is_some();
+                assert!(i == 0 && !required, "{}", lost(i));
                 return;
-            };
-            let mut view =
-                crate::RenderView::offscreen(&renderer.device, super::OFFSCREEN_FORMAT, 4, 4);
-            let out = view.color_target_view().unwrap();
-            renderer.render(&mut view, &scene, &cam, &out, false);
-            let texture = view.color_target().unwrap();
-            let px = crate::readback::read_texture_rgba8(
-                &renderer.device,
-                &renderer.queue,
-                texture,
-                4,
-                4,
-            );
-            assert!(
-                px.chunks(4).all(|p| p[3] == 255),
-                "renderer {i} of {RENDERERS} drew no opaque frame"
-            );
+            }
         }
+        let mut renderer = crate::test_gpu::headless_or_skip(4, 4)
+            .unwrap_or_else(|| panic!("{}", lost(DEVICES - 1)));
+        let (scene, cam) = (
+            rusty_scene::Scene::new(),
+            rusty_scene::Camera::new(glam::Vec3::ZERO, -90.0, 0.0),
+        );
+        let mut view =
+            crate::RenderView::offscreen(&renderer.device, super::OFFSCREEN_FORMAT, 4, 4);
+        let out = view.color_target_view().unwrap();
+        renderer.render(&mut view, &scene, &cam, &out, false);
+        let texture = view.color_target().unwrap();
+        let px =
+            crate::readback::read_texture_rgba8(&renderer.device, &renderer.queue, texture, 4, 4);
+        assert!(
+            px.chunks(4).all(|p| p[3] == 255),
+            "the last device drew no opaque frame"
+        );
     }
 
     #[test]
