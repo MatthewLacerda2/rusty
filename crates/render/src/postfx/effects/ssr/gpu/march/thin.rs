@@ -9,7 +9,7 @@
 
 use glam::Vec3;
 
-use super::fixture::{paint, place, Surface};
+use super::super::fixture::{paint, place, Surface};
 use crate::readback::read_texture_bytes;
 use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_components::{CameraComponent, MaterialAsset, MaterialComponent};

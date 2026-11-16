@@ -5,7 +5,7 @@
 
 use glam::{Vec2, Vec3};
 
-use super::fixture::{paint, place, tuned, MIRROR, RED};
+use super::super::fixture::{paint, place, tuned, MIRROR, RED};
 use super::hits::Hits;
 use rusty_core::settings::quality::EffectQuality;
 use rusty_scene::create::{create_entity, Primitive};
