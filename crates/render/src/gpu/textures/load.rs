@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use image::GenericImageView;
 
-use super::{compressed, sampler, upload, MipSettings, TextureKind, DATA_FORMAT};
+use super::{compressed, deep, sampler, upload, MipSettings, TextureKind, DATA_FORMAT};
 use crate::{GpuTexture, Renderer};
 use rusty_asset::sidecar::{TextureSettings, TextureType};
 use rusty_asset::texture_import::{self, Texels};
@@ -24,14 +24,15 @@ impl Renderer {
     /// [`Self::load_texture`] for a texture holding `kind`, which decides how an
     /// uncompressed upload's mips average. The first load of a file decides it:
     /// the cache keeps one upload per file, and a later request of the other kind
-    /// warns once ([`kind_watch::KindWatch`]). A compressed upload a later slot
-    /// cannot read (`compressed::reads_as`) is joined by an uncompressed copy
-    /// for it, so no use loses a channel (#1574).
+    /// warns once ([`kind_watch::KindWatch`]). An upload a later slot cannot read
+    /// (`deep::serves`: a compressed one, or an 8-bit copy of a normal map kept at
+    /// 16 bits for a normal slot) is joined by a copy made for it, so no use loses
+    /// a channel or its precision (#1574, #2257).
     pub(crate) fn load_texture_as(&mut self, map: &MapRef, kind: TextureKind) -> Rc<GpuTexture> {
         let path_str = map.as_str();
         if let Some(tex) = self.gpu_textures.get(path_str) {
             self.texture_kinds.requested(path_str, kind, "material");
-            if compressed::reads_as(&tex.texture, kind) {
+            if deep::serves(tex, kind) {
                 return Rc::clone(tex);
             }
             return self.fallback(map, kind);
@@ -57,18 +58,21 @@ impl Renderer {
     }
 
     /// The texture `map` names for a slot holding `kind`, when its cached upload is
-    /// one [`Self::load_texture_as`] already made: that upload, or its
-    /// uncompressed copy where the slot cannot read its format. What a material
-    /// bind group binds.
+    /// one [`Self::load_texture_as`] already made: that upload, or the copy made
+    /// where it does not serve the slot (`deep::serves`). What a material bind
+    /// group binds.
     pub(crate) fn texture_for(&self, map: &MapRef, kind: TextureKind) -> Option<Rc<GpuTexture>> {
         let tex = self.gpu_textures.get(map)?;
-        match compressed::reads_as(&tex.texture, kind) {
+        match deep::serves(tex, kind) {
             true => Some(Rc::clone(tex)),
             false => self.texture_fallbacks.get(map).cloned(),
         }
     }
 
-    /// The uncompressed copy of `map` for `kind`, made on first need.
+    /// The copy of `map` for `kind`, made on first need: uncompressed, at 16 bits
+    /// for a normal slot of a normal map kept at 16 bits. One per map: the cached
+    /// upload serves every slot but one kind of slot (colour, or the slots its
+    /// block format lacks, or a normal slot), and the copy serves that kind.
     fn fallback(&mut self, map: &MapRef, kind: TextureKind) -> Rc<GpuTexture> {
         if let Some(tex) = self.texture_fallbacks.get(map) {
             return Rc::clone(tex);
@@ -154,6 +158,7 @@ impl Renderer {
         };
         texture.source_size = loaded.source_size;
         texture.single_channel = import.texture_type == TextureType::SingleChannel;
+        texture.deep_normal = loaded.deep_normal;
         texture.normal_variance = match &loaded.texels {
             Texels::Blocks(b) if b.format == texture_import::BlockFormat::Bc5 => Some(b.variance),
             _ => None,
@@ -162,7 +167,8 @@ impl Renderer {
     }
 
     /// Uploads a decoded image holding `kind`, with the mips and the sampler its
-    /// import settings ask for (#1323).
+    /// import settings ask for (#1323); a normal map of more than 8 bits a channel
+    /// at 16 (`deep`, #2257).
     fn upload_image_texture(
         &self,
         path_str: &str,
@@ -175,14 +181,30 @@ impl Renderer {
         let levels = settings.levels(width, height);
         let gpu = (&self.device, &self.queue);
         let srgb = !texture_import::is_linear(import);
-        let texture = upload(gpu, path_str, &img.to_rgba8(), (levels, srgb));
-        let kind = settings.kind;
+        let (texture, data_format) = match deep::wanted(import, img, kind) {
+            true => {
+                let converted;
+                let image = match img.as_rgba16() {
+                    Some(image) => image,
+                    None => {
+                        converted = img.to_rgba16();
+                        &converted
+                    }
+                };
+                let texture = deep::upload(gpu, path_str, image, levels);
+                (texture, deep::DEEP_FORMAT)
+            }
+            false => (
+                upload(gpu, path_str, &img.to_rgba8(), (levels, srgb)),
+                DATA_FORMAT,
+            ),
+        };
         self.mip_generator
-            .generate(&self.device, &self.queue, &texture, kind);
+            .generate(&self.device, &self.queue, &texture, settings.kind);
         Self::finalize_texture(
             &self.device,
             &self.texture_layout,
-            (texture, DATA_FORMAT),
+            (texture, data_format),
             (sampler(&self.device, import), import.filter_mode),
             Some(path_str),
         )

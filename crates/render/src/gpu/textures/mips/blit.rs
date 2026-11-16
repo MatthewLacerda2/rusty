@@ -1,6 +1,7 @@
 //! Drawing a texture's mip chain on the GPU (#1322), `mips.wgsl`: each level is a
 //! fullscreen triangle box-filtering the level above (`textureLoad`, odd sides
-//! weighted by overlap) through the views of the texture's [`TextureKind`].
+//! weighted by overlap) through the views of the texture's [`TextureKind`], or
+//! through its own format for a 16-bit normal map (`textures::deep`).
 //!
 //! Done on the GPU because the CPU box filter it replaced cost about 42 ms per 2K
 //! texture in an optimised build and 670 ms in the unoptimised dev build the editor
@@ -11,14 +12,16 @@ use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::texture_entry;
 use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
+use crate::gpu::textures::deep::DEEP_FORMAT;
 
 /// The downsample pass: one pipeline per view format. The colour one is built
 /// with the renderer, whose default checker draws its mips with it; the data one
-/// waits for the first data map.
+/// waits for the first data map, the deep one for the first 16-bit normal map.
 pub(crate) struct MipGenerator {
     layout: wgpu::BindGroupLayout,
     colour: wgpu::RenderPipeline,
     data: LazyPipeline,
+    deep: LazyPipeline,
 }
 
 impl MipGenerator {
@@ -33,7 +36,7 @@ impl MipGenerator {
             bind_group_layouts: &[Some(&layout)],
             immediate_size: 0,
         });
-        let pipeline = |kind: TextureKind| {
+        let pipeline = |format: wgpu::TextureFormat| {
             let (shader, pipeline_layout) = (shader.clone(), pipeline_layout.clone());
             move |device: &wgpu::Device| {
                 let pass = Fullscreen {
@@ -43,24 +46,26 @@ impl MipGenerator {
                     vs: "vs_fullscreen",
                     fs: "fs_downsample",
                 };
-                pass.colour(device, &[Some(view_format(kind).into())])
+                pass.colour(device, &[Some(format.into())])
             }
         };
         Self {
-            colour: pipeline(TextureKind::Colour)(device),
-            data: LazyPipeline::new(device, pipeline(TextureKind::Data)),
+            colour: pipeline(view_format(TextureKind::Colour))(device),
+            data: LazyPipeline::new(device, pipeline(view_format(TextureKind::Data))),
+            deep: LazyPipeline::new(device, pipeline(DEEP_FORMAT)),
             layout,
         }
     }
 
-    /// The data pipeline, for the windowed renderer to build before its first frame.
-    pub(crate) fn lazy_pipeline(&self) -> &LazyPipeline {
-        &self.data
+    /// The data and deep pipelines, for the windowed renderer to build before its
+    /// first frame.
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
+        [&self.data, &self.deep]
     }
 
     /// Draw every level of `texture` below its base from the one above; nothing
     /// for a texture of one level. The texture needs `RENDER_ATTACHMENT` usage and
-    /// `kind`'s view format.
+    /// `kind`'s view format, or be a [`DEEP_FORMAT`] one.
     pub(crate) fn generate(
         &self,
         device: &wgpu::Device,
@@ -84,13 +89,15 @@ impl MipGenerator {
         if texture.mip_level_count() == 1 {
             return;
         }
-        let pipeline = match kind {
-            TextureKind::Colour => &self.colour,
-            _ => self.data.get(),
+        let deep = texture.format() == DEEP_FORMAT;
+        let (pipeline, format) = match kind {
+            _ if deep => (self.deep.get(), DEEP_FORMAT),
+            TextureKind::Colour => (&self.colour, view_format(kind)),
+            _ => (self.data.get(), view_format(kind)),
         };
         let level = |mip| {
             texture.create_view(&wgpu::TextureViewDescriptor {
-                format: Some(view_format(kind)),
+                format: Some(format),
                 dimension: Some(wgpu::TextureViewDimension::D2),
                 base_mip_level: mip,
                 mip_level_count: Some(1),

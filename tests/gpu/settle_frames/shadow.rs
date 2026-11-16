@@ -7,8 +7,9 @@ use super::{png, run};
 
 /// A shadow-casting spot light over the origin; the camera stands inside its range
 /// (it wants the largest tile) for long enough to settle there, then jumps forty
-/// metres off (it wants the smallest), cut, and takes a shot settled 32 frames
-/// both ways.
+/// metres off (it wants the smallest), cut, and takes a shot settled 16 frames
+/// both ways: one past the 15 frames in a row the atlas holds a resize back, so
+/// the resize lands inside the settle.
 const JUMP: &str = r#"
 Graphics.SetTaaActive(false)
 local lamp = Scene.CreateEntity("Lamp")
@@ -21,13 +22,13 @@ Transform.SetPosition(lamp, 0, 3, 0)
 local function near()
   Camera.SetPosition(0, 3, 1)
   Camera.SetYaw(-90)
-  for _ = 1, 20 do Harness.Render() end
+  for _ = 1, 16 do Harness.Render() end
   Camera.SetPosition(0, 3, 40)
 end
 near()
-shot("settled.png", { settle = 32 }, 33)
+shot("settled.png", { settle = 16 }, 17)
 near()
-full("full.png", 32)
+full("full.png", 16)
 "#;
 
 #[test]
