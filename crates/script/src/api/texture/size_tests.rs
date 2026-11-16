@@ -63,3 +63,45 @@ fn a_side_that_is_not_a_power_of_two_is_refused() {
     );
     assert!(!path.exists(), "nothing written");
 }
+
+/// A one-colour recipe `{w}`×4, cheap at any width; `outputs` for a set bake.
+fn strip(w: u32) -> String {
+    format!(
+        r#"{{ size = {{{w}, 4}}, nodes = {{ {{ id = "c", op = "constant", color = {{1, 0, 0, 1}} }} }},
+        outputs = {{ base_color = "c", roughness = "c" }} }}"#
+    )
+}
+
+/// The Max Size the import reads for `path`, and whether it has a sidecar.
+fn max_size(path: &std::path::Path) -> (u32, bool) {
+    let meta = rusty_asset::sidecar::meta_path(path).exists();
+    (rusty_asset::sidecar::texture(path).max_size, meta)
+}
+
+#[test]
+fn a_bake_larger_than_the_default_ships_at_its_size() {
+    let (lua, path) = lua("rusty_texture_wide.png");
+    let script = format!(r#"return Texture.Bake({}, OUT, "base_color")"#, strip(4096));
+    lua.load(script).exec().unwrap();
+    assert_eq!(max_size(&path), (4096, true), "no .meta before, 4096 after");
+    let small = path.with_file_name("rusty_texture_narrow.png");
+    lua.globals().set("OUT", small.to_str().unwrap()).unwrap();
+    let script = format!(r#"return Texture.Bake({}, OUT, "base_color")"#, strip(64));
+    lua.load(script).exec().unwrap();
+    assert_eq!(
+        max_size(&small),
+        (2048, false),
+        "a bake that fits writes none"
+    );
+}
+
+#[test]
+fn a_set_bake_keeps_every_output_at_its_size() {
+    let (lua, _) = lua("rusty_texture_wide_set");
+    let script = format!("return Texture.BakeSet({}, OUT)", strip(8192));
+    let paths: Table = lua.load(script).eval().unwrap();
+    for slot in ["base_color", "roughness"] {
+        let out = std::path::PathBuf::from(paths.get::<String>(slot).unwrap());
+        assert_eq!(max_size(&out), (8192, true), "{slot}");
+    }
+}

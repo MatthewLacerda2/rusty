@@ -20,10 +20,11 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use super::MaterialLibrary;
+use rusty_asset::sidecar::{check_bake_size, prepare_bake};
 use rusty_asset::MapRef;
 use rusty_core::paths::to_slash;
 use rusty_core::project::ContentRoots;
-use rusty_procgen::{bake_set, check_set, Slot};
+use rusty_procgen::{bake_set, check_set, set_paths, Slot};
 use rusty_scene::MaterialAsset;
 
 /// Where `Material.DefineAsset` / `Material.Rebake` write baked maps: the project's
@@ -53,10 +54,18 @@ pub fn bake_maps(
     let in_error = |e: String| format!("material {name:?} maps: {e}");
     check_set(recipe).map_err(in_error)?;
     let loaded = super::load_recipe(recipe, &ContentRoots::new(root)).map_err(in_error)?;
-    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     // `/`-spelled, `dir` included: the paths land in the scene file, which stores
     // `/` (`core::paths::to_slash`).
     let prefix = format!("{}/{name}", to_slash(dir).trim_end_matches('/'));
+    let size = loaded.recipe.extent();
+    let paths = set_paths(&loaded.recipe, &prefix).map_err(in_error)?;
+    let paths = paths.iter().map(String::as_str);
+    let extent = (size.width, size.height);
+    // The size check comes before the folder, so a refused bake makes none; the
+    // folder before the sidecars, which need it.
+    check_bake_size(extent).map_err(in_error)?;
+    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    prepare_bake("Material maps", extent, paths).map_err(in_error)?;
     let baked = bake_set(&loaded.recipe, &loaded.sources, &prefix).map_err(in_error)?;
     fill_empty_maps(asset, &baked);
     Ok(())
@@ -126,3 +135,7 @@ fn map_field<'a>(asset: &'a mut MaterialAsset, name: &str) -> Option<&'a mut Opt
 #[cfg(test)]
 #[path = "maps_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "maps_size_tests.rs"]
+mod size_tests;

@@ -13,7 +13,9 @@
 // under a world mapping, as the main normal map does (`mapping::sample_normal`).
 // HDRP's *Detail Mask* (#2258) is a texture of its own (rusty has no mask map):
 // its red, read at the main maps' coordinates as HDRP reads it with the main UVs
-// (the height map's parallax shift included), scales all three pushes per texel.
+// (the height map's parallax shift included), blends each detailed result (albedo,
+// smoothness, normal) back toward the surface's own value per texel, as HDRP's
+// `lerp(base, detailed, detailMask)`.
 //
 // The layer shares the material's mapping. Under UV0 its coordinates are the main
 // maps' tiled UV under its own scale/offset (HDRP's *Link Details with Base*);

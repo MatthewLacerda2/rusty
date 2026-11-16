@@ -130,7 +130,8 @@ fn the_masks_black_half_draws_no_detail_and_its_white_half_the_whole_detail() {
         let whole = |a, b| half(a, b, false) + half(a, b, true);
         let (to_plain, to_full) = (half(&masked, &plain, false), half(&masked, &full, true));
         let shows = half(&full, &plain, false).min(half(&full, &plain, true));
-        eprintln!("[mask] grazing {grazing}: to plain {to_plain:.2}, to full {to_full:.2}, detail shows {shows:.2}");
+        let (lone, unread) = (whole(&lone, &plain), whole(&unread, &full));
+        eprintln!("[mask] grazing {grazing}: to plain {to_plain:.2}, to full {to_full:.2}, detail shows {shows:.2}, lone {lone:.2}, missing {unread:.2}");
         assert!(shows > 4.0, "the detail shows on both halves ({shows:.2})");
         assert!(
             to_plain < 0.5,
@@ -140,7 +141,6 @@ fn the_masks_black_half_draws_no_detail_and_its_white_half_the_whole_detail() {
             to_full < 0.5,
             "the white half draws all of it ({to_full:.2})"
         );
-        let (lone, unread) = (whole(&lone, &plain), whole(&unread, &full));
         assert!(lone < 0.5, "a mask alone draws nothing ({lone:.2})");
         assert!(
             unread < 0.5,

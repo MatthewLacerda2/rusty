@@ -12,7 +12,7 @@
 use super::coordinates::{MAP_COORD_RANGE, WORLD_SIZE_RANGE};
 use super::field::{no_hint, SurfaceField, SurfaceKind, SurfaceValue};
 use super::surface::number;
-use super::{fit_data_slot, fit_detail_mask_slot, MaterialLibrary};
+use super::{fit_data_slot, fit_single_channel_slot, MaterialLibrary};
 use rusty_asset::MapRef;
 use rusty_components::{DetailLayer, MaterialAsset, UvMapping};
 
@@ -40,7 +40,7 @@ pub fn set_detail_map(materials: &mut MaterialLibrary, key: &str, path: Option<S
 /// (#2258, HDRP's *Detail Mask*): the rule `Material.SetDetailMask` and the
 /// Inspector's path field share. As [`set_detail_map`], the layer's other fields are
 /// kept and clearing a material with no layer writes nothing. A `Default` image
-/// becomes `SingleChannel` ([`fit_detail_mask_slot`]): its red is read raw.
+/// becomes `SingleChannel` ([`fit_single_channel_slot`]): its red is read raw.
 pub fn set_detail_mask(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
     let Some(m) = materials.get_mut(key) else {
         return;
@@ -49,7 +49,7 @@ pub fn set_detail_mask(materials: &mut MaterialLibrary, key: &str, path: Option<
     if mask.is_none() && m.detail.is_none() {
         return;
     }
-    fit_detail_mask_slot(mask.as_ref());
+    fit_single_channel_slot(mask.as_ref(), "a detail mask");
     layer_mut(m).mask = mask;
 }
 
@@ -62,11 +62,13 @@ pub fn detail_mask(materials: &MaterialLibrary, key: &str) -> Option<String> {
 
 /// `m`'s detail layer, if any, with every field clamped as its row's `check`
 /// clamps a write (NaN to the range's floor): what a recipe's nested `detail`
-/// table is put through, so it reads back as the GPU draws it.
+/// table is put through, so it reads back as the GPU draws it. An empty `mask`
+/// is no mask, as `set_detail_mask`'s `""`.
 pub fn clamp_detail(m: &mut MaterialAsset) {
-    if m.detail.is_none() {
+    let Some(layer) = m.detail.as_mut() else {
         return;
-    }
+    };
+    layer.mask = layer.mask.take().filter(|p| *p != "");
     for row in DETAIL_FIELDS {
         if let Ok(v) = row.check((row.get)(m)) {
             (row.put)(m, v);

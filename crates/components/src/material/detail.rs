@@ -28,8 +28,10 @@ pub struct DetailLayer {
     /// neutral), read raw (its import's sRGB off). `None` draws no detail.
     #[serde(default)]
     pub map: Option<MapRef>,
-    /// HDRP Lit's *Detail Mask* (#2258): its **red** scales all three pushes per
-    /// texel, white full detail and black none, read raw at the main maps'
+    /// HDRP Lit's *Detail Mask* (#2258): its **red** lerps each detailed result
+    /// (albedo, smoothness, normal) back toward the surface's own value per texel
+    /// (HDRP's `lerp(base, detailed, mask)`), white full detail and black none,
+    /// read raw at the main maps'
     /// coordinates (not the detail's tiling). `None` (or a file not loaded yet)
     /// applies the detail everywhere. Inert without `map`.
     #[serde(default, skip_serializing_if = "Option::is_none")]

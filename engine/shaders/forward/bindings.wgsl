@@ -96,7 +96,8 @@ struct MaterialData {
     // The detail layer (#1997, `forward/detail.wgsl`): `DetailUniform` flat. Its
     // scale/offset (under UV0 over the main maps' tiled UV, under a world mapping
     // over the projection at `detail_world_scale`), 1 when the map is sampled, and
-    // HDRP's three detail scales, and 1 when the detail mask (#2258) scales them.
+    // HDRP's three detail scales, and 1 when the detail mask (#2258) lerps
+    // each detailed result back toward the surface's own value.
     detail_st: vec4<f32>,
     use_detail_map: u32,
     detail_world_scale: f32,

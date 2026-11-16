@@ -228,8 +228,9 @@ pub(crate) struct DetailUniform {
     pub detail_normal_scale: f32,
     /// HDRP's *Detail Smoothness Scale*.
     pub detail_smoothness_scale: f32,
-    /// 1 when the detail mask (#2258, red) scales the three pushes per texel; 0
-    /// applies them everywhere, and so does a mask not resident yet.
+    /// 1 when the detail mask (#2258, red) lerps each detailed result back toward
+    /// the surface's own value per texel; 0 applies the detail everywhere, and so
+    /// does a mask not resident yet.
     pub use_detail_mask: u32,
     pub _pad: [u32; 2],
 }

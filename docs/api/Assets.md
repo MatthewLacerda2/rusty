@@ -31,8 +31,8 @@ one by its source path still works.
 | `Assets.SetModelImportSettings` | `(path, { scaleFactor?, colliders? })` | how many of the scene's meshes it re-imported |
 | `Assets.GetHumanoid` | `(path)` | `{ bones = { Hips = name, ... }, clipsFrom = { path, ... }, problems = { text, ... } }` — a model's humanoid map, resolved (below) |
 | `Assets.SetHumanoid` | `(path, { bones?, clipsFrom? })` | how many of the scene's meshes took new clips |
-| `Assets.GetTextureImportSettings` | `(path)` | `{ wrapMode, filterMode, generateMipmaps, textureType, sRGB, compression, maxSize }` — an image's import settings (below) |
-| `Assets.SetTextureImportSettings` | `(path, { wrapMode?, filterMode?, generateMipmaps?, textureType?, sRGB?, compression?, maxSize? })` | nothing |
+| `Assets.GetTextureImportSettings` | `(path)` | `{ wrapMode, filterMode, generateMipmaps, textureType, sRGB, compression, maxSize, maxSizeChosen }` — an image's import settings (below) |
+| `Assets.SetTextureImportSettings` | `(path, { wrapMode?, filterMode?, generateMipmaps?, textureType?, sRGB?, compression?, maxSize?, maxSizeChosen? })` | nothing |
 
 Returned shape (Lua, 1-indexed arrays):
 
@@ -334,7 +334,21 @@ clamped sampler.
   downscaled at import, its aspect kept (colour in linear light); the file on disk
   is never changed. A UI image still measures its slices and tiling in the source
   image's pixels. Another number is an error naming the list; a sidecar holding one
-  is warned of once and read as 2048.
+  is warned of once and read as 2048. A file larger than its Max Size is warned
+  of once on import, naming both sizes (the image inspector shows them too).
+- `maxSizeChosen` — whether the developer chose `maxSize`. A texture bake moves a
+  Max Size the engine chose to fit its own size, and never a chosen one
+  (`Texture.md`, *A bake ships at its size*). It becomes `true` when the inspector's
+  Max Size or a `maxSize` given here changes the value; a `maxSize` equal to the
+  stored one changes nothing, so a get-edit-set round-trip keeps the choice as it
+  was. A value different from the stored one sets it outright, `false` handing Max
+  Size back to the engine; the value a Get table carries back changes nothing, so
+  get → `s.maxSize = 1024` → set keeps 1024 as the developer's. The inspector's Max
+  Size row says who holds it (*chosen* or *follows bakes*), and its *Follow bakes*
+  button hands a chosen one back. In
+  the `.meta` it is `"max_size_chosen": true`, written only when true; a Max Size
+  edited into the `.meta` by hand is the engine's (a bake moves it) unless that
+  key is there too.
 
 `SetTextureImportSettings` changes only the keys it is given, writes the sidecar (a
 file with none gets one), and the texture is re-uploaded with the new settings on the

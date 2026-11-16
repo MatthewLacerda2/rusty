@@ -37,6 +37,12 @@
 //! `Preview` show an instance's nodes under their prefixed ids (`brick/mortar`);
 //! `ToJson` writes the recipe as given, instances unexpanded.
 //!
+//! Every bake verb (`Bake`, `BakeSet`, `BakeMeshMaps`) readies its files through
+//! `asset::sidecar::prepare_bake` before it writes: a Max Size the engine chose
+//! moves to the bake's size, one the developer chose never does, so a recipe's
+//! `resolution` is what ships; a bake larger than 8192, the largest Max Size, is
+//! refused before anything is written.
+//!
 //! `Bake` and `BakeSet` make the missing folders above their target inside the
 //! project (`folder`, #1850), and a failed write names the verb and the path.
 //!
@@ -63,9 +69,10 @@ use mlua::{Lua, Value};
 
 use super::{put, Reg};
 use from_lua::parse_recipe;
+use rusty_asset::sidecar::{check_bake_size, prepare_bake};
 use rusty_core::project::ContentRoots;
 use rusty_edit::authoring::material::{load_recipe, Loaded};
-use rusty_procgen::{bake_recipe, bake_set, check_set, Slot, TextureRecipe};
+use rusty_procgen::{bake_recipe, bake_set, check_set, set_paths, Slot, TextureRecipe};
 
 /// Register the `Texture` namespace onto `lua`.
 pub fn register(lua: &Lua) -> Reg {
@@ -117,24 +124,34 @@ pub fn register(lua: &Lua) -> Reg {
 }
 
 /// Evaluate + bake a parsed recipe for the named slot, surfacing any error to Lua.
-/// The missing folders above `path` are made first when they lie inside `root`.
+/// The missing folders above `path` are made, after the size check, when they lie
+/// inside `root`.
 fn bake(recipe: &TextureRecipe, path: &str, slot: &str, root: &Path) -> mlua::Result<String> {
     let slot = Slot::parse(slot).map_err(mlua::Error::RuntimeError)?;
     let loaded = load(recipe)?;
-    folder::make_parents(path, root)
+    let size = loaded.recipe.extent();
+    let extent = (size.width, size.height);
+    check_bake_size(extent)
+        .and_then(|()| folder::make_parents(path, root))
+        .and_then(|()| prepare_bake("Texture.Bake", extent, [path]))
         .and_then(|()| bake_recipe(&loaded.recipe, &loaded.sources, slot, path))
         .map_err(|e| mlua::Error::RuntimeError(format!("Texture.Bake: {e}")))
 }
 
 /// `Texture.BakeSet`'s body: every output of `recipe` to `<prefix>_<slot>.png`,
-/// the folder above `prefix` made first when it lies inside `root`.
+/// the folder above `prefix` made, after the size check, when it lies inside `root`.
 fn bake_whole_set(
     recipe: &TextureRecipe,
     prefix: &str,
     root: &Path,
 ) -> mlua::Result<BTreeMap<String, String>> {
     let loaded = load_set(recipe)?;
-    folder::make_parents(prefix, root)
+    let size = loaded.recipe.extent();
+    let paths = set_paths(&loaded.recipe, prefix).map_err(mlua::Error::RuntimeError)?;
+    let extent = (size.width, size.height);
+    check_bake_size(extent)
+        .and_then(|()| folder::make_parents(prefix, root))
+        .and_then(|()| prepare_bake("Texture.BakeSet", extent, paths.iter().map(String::as_str)))
         .and_then(|()| bake_set(&loaded.recipe, &loaded.sources, prefix))
         .map_err(|e| mlua::Error::RuntimeError(format!("Texture.BakeSet: {e}")))
 }
@@ -155,6 +172,8 @@ fn load(recipe: &TextureRecipe) -> mlua::Result<Loaded> {
 
 #[cfg(test)]
 mod bake_set_tests;
+#[cfg(test)]
+mod bake_size_tests;
 #[cfg(test)]
 mod image_tests;
 #[cfg(test)]

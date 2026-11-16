@@ -32,7 +32,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
 
 /// Texture import settings (#1323): wrap mode, filter mode, mipmap generation,
 /// texture type, compression and max size (#1574), kept in the image's `.meta`
-/// sidecar. An edit goes through the setter
+/// sidecar, then the file's size and the size it is imported at. An edit goes through the setter
 /// `Assets.SetTextureImportSettings` uses, so the renderer re-uploads the texture.
 fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
     ui.heading("Texture Import Settings");
@@ -59,6 +59,11 @@ fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
     );
     ui.checkbox(&mut s.generate_mipmaps, "Generate Mipmaps");
     draw_compression(ui, &mut s);
+    if s.max_size != stored.max_size {
+        // Picked here, so it is the developer's: no bake changes it.
+        s = s.chosen(s.max_size);
+    }
+    draw_size(ui, source, &s);
     if s != stored {
         let _ = sidecar::set_texture(source, s);
     }
@@ -80,14 +85,7 @@ fn draw_compression(ui: &mut egui::Ui, s: &mut TextureSettings) {
         // Unity shows *sRGB (Color Texture)* for a Default texture only.
         ui.checkbox(&mut s.srgb, "sRGB (Color Texture)");
     }
-    let names = |size: &u32| size.to_string();
-    combo(
-        ui,
-        ("Max Size:", "ImgMaxSize"),
-        &mut s.max_size,
-        MAX_SIZES,
-        names,
-    );
+    draw_max_size(ui, s);
     let names = |c: &Compression| c.name().to_owned();
     combo(
         ui,
@@ -96,6 +94,47 @@ fn draw_compression(ui: &mut egui::Ui, s: &mut TextureSettings) {
         Compression::ALL,
         names,
     );
+}
+
+/// The Max Size drop-down and who holds it: the developer ("chosen", with a
+/// button handing it back, as `maxSizeChosen = false` does) or the engine
+/// ("follows bakes", `sidecar::prepare_bake`).
+fn draw_max_size(ui: &mut egui::Ui, s: &mut TextureSettings) {
+    ui.horizontal(|ui| {
+        ui.label("Max Size:");
+        egui::ComboBox::from_id_salt("ImgMaxSize")
+            .selected_text(s.max_size.to_string())
+            .show_ui(ui, |ui| {
+                for size in MAX_SIZES {
+                    ui.selectable_value(&mut s.max_size, size, size.to_string());
+                }
+            });
+        let muted = crate::theme::from_ui(ui).text_secondary;
+        if !s.max_size_chosen {
+            ui.colored_label(muted, "follows bakes");
+            return;
+        }
+        ui.colored_label(muted, "chosen");
+        let back = ui.small_button("Follow bakes");
+        if back
+            .on_hover_text("Hand Max Size back to the engine: a bake sets it to fit")
+            .clicked()
+        {
+            s.max_size_chosen = false;
+        }
+    });
+}
+
+/// The file's size and, when its Max Size shrinks it, the size it is imported at,
+/// as Unity's inspector shows the original beside the imported one.
+fn draw_size(ui: &mut egui::Ui, source: &Path, s: &TextureSettings) {
+    let Some(((w, h), (iw, ih))) = rusty_asset::texture_import::imported_size(source, s) else {
+        return;
+    };
+    match (w, h) == (iw, ih) {
+        true => ui.label(format!("Size: {w}x{h}")),
+        false => ui.label(format!("Size: {w}x{h}, imported at {iw}x{ih} (Max Size)")),
+    };
 }
 
 /// One labelled drop-down: `value` picked from `options`, each shown by `name`.

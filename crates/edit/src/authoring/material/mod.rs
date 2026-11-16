@@ -177,10 +177,16 @@ pub fn set_specular_map(materials: &mut MaterialLibrary, key: &str, path: Option
 }
 
 /// Set (or, with `None` or an empty path, clear) the height map path (#2191); a
-/// `Default` image becomes `SingleChannel` ([`fit_height_slot`]). A map that
+/// `Default` image becomes `SingleChannel` ([`fit_single_channel_slot`]). A map that
 /// displaces is never left naming nothing.
 pub fn set_height_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
-    set_level_map(materials, key, path, |m| &mut m.height_map, fit_height_slot);
+    set_level_map(
+        materials,
+        key,
+        path,
+        |m| &mut m.height_map,
+        |map| fit_single_channel_slot(map, "a height map"),
+    );
 }
 
 /// Write a data map that darkens, scales or displaces into the `field` of `key`,
@@ -200,8 +206,8 @@ fn set_level_map(
 }
 
 /// Fit the import settings of every image `asset`'s slots name to the slot:
-/// [`fit_normal_slot`], [`fit_data_slot`], [`fit_height_slot`] and
-/// [`fit_detail_mask_slot`]. Every way a material gets its maps
+/// [`fit_normal_slot`], [`fit_data_slot`] and [`fit_single_channel_slot`]
+/// (the height map and the detail mask). Every way a material gets its maps
 /// whole goes through it (a material document, a maps recipe, a model's import).
 pub fn fit_map_slots(asset: &MaterialAsset) {
     fit_normal_slot(asset.normal_map.as_ref());
@@ -209,9 +215,12 @@ pub fn fit_map_slots(asset: &MaterialAsset) {
     fit_data_slot(asset.roughness_map.as_ref());
     fit_data_slot(asset.occlusion_map.as_ref());
     fit_data_slot(asset.specular_map.as_ref());
-    fit_height_slot(asset.height_map.as_ref());
+    fit_single_channel_slot(asset.height_map.as_ref(), "a height map");
     fit_data_slot(asset.detail.as_ref().and_then(|d| d.map.as_ref()));
-    fit_detail_mask_slot(asset.detail.as_ref().and_then(|d| d.mask.as_ref()));
+    fit_single_channel_slot(
+        asset.detail.as_ref().and_then(|d| d.mask.as_ref()),
+        "a detail mask",
+    );
 }
 
 /// [`rusty_asset::sidecar::fit_normal_slot`] for the image a normal slot names.
@@ -221,17 +230,11 @@ pub fn fit_normal_slot(map: Option<&MapRef>) {
     }
 }
 
-/// [`rusty_asset::sidecar::fit_height_slot`] for the image a height slot names.
-pub fn fit_height_slot(map: Option<&MapRef>) {
+/// [`rusty_asset::sidecar::fit_single_channel_slot`] for the image a red-only slot
+/// names (the height map, the detail mask); `used` names the slot in the log.
+pub fn fit_single_channel_slot(map: Option<&MapRef>, used: &str) {
     if let Some(file) = map.and_then(MapRef::file) {
-        rusty_asset::sidecar::fit_height_slot(&file);
-    }
-}
-
-/// [`rusty_asset::sidecar::fit_detail_mask_slot`] for the image a detail mask names.
-pub fn fit_detail_mask_slot(map: Option<&MapRef>) {
-    if let Some(file) = map.and_then(MapRef::file) {
-        rusty_asset::sidecar::fit_detail_mask_slot(&file);
+        rusty_asset::sidecar::fit_single_channel_slot(&file, used);
     }
 }
 

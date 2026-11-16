@@ -42,3 +42,27 @@ fn a_detail_mask_sets_reads_back_and_clears_through_lua_and_a_recipe() {
     let detail = scene.borrow().materials["tiles"].detail.clone().unwrap();
     assert_eq!(detail.mask.map(|m| m.to_string()).as_deref(), Some("m.png"));
 }
+
+#[test]
+fn a_recipes_empty_mask_reads_back_as_no_mask() {
+    let scene = Rc::new(RefCell::new(Scene::new()));
+    let id = scene.borrow_mut().add_entity("E".into());
+    let mask: Option<String> = eval(
+        &scene,
+        &format!(
+            r#"Material.DefineAsset("bare", {{ detail = {{ map = "d.png", mask = "" }} }})
+               Material.Set({id}, "bare")
+               return Material.GetDetailMask({id})"#
+        ),
+    )
+    .unwrap();
+    assert_eq!(mask, None);
+    assert_eq!(
+        scene.borrow().materials["bare"]
+            .detail
+            .clone()
+            .unwrap()
+            .mask,
+        None
+    );
+}
