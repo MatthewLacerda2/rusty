@@ -5,11 +5,13 @@
 //! `dev`, which every binary but `rusty` and `player` needs to be built.
 
 use std::process::{Command, Output, Stdio};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-/// How long a binary may take to print its usage: far more than it needs, far less
-/// than a window or a session that never returns.
-const LIMIT: Duration = Duration::from_secs(60);
+/// How often a running binary is checked on, and how many checks it gets: about a
+/// minute, far more than printing its usage needs, far less than a window or a
+/// session that never returns. Counted, not timed: tests read no wall clock.
+const POLL: Duration = Duration::from_millis(50);
+const POLLS: u32 = 1200;
 
 /// Each binary by its Cargo target name, as `spawn::engine_bin!` starts it.
 fn binaries() -> Vec<(&'static str, Command)> {
@@ -26,7 +28,7 @@ fn binaries() -> Vec<(&'static str, Command)> {
     ]
 }
 
-/// Run `command` with `args` and no stdin, killing it past [`LIMIT`].
+/// Run `command` with `args` and no stdin, killing it after [`POLLS`] checks.
 fn run(name: &str, mut command: Command, args: &[&str]) -> Output {
     let mut child = command
         .args(args)
@@ -35,16 +37,17 @@ fn run(name: &str, mut command: Command, args: &[&str]) -> Output {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap_or_else(|e| panic!("{name}: cannot start: {e}"));
-    let started = Instant::now();
+    let mut polls = 0;
     while child.try_wait().expect("wait").is_none() {
-        if started.elapsed() > LIMIT {
+        polls += 1;
+        if polls > POLLS {
             child.kill().ok();
             panic!(
-                "`{name} {}` did not return within {LIMIT:?}",
+                "`{name} {}` did not return in about a minute",
                 args.join(" ")
             );
         }
-        std::thread::sleep(Duration::from_millis(50));
+        std::thread::sleep(POLL);
     }
     child.wait_with_output().expect("output")
 }
