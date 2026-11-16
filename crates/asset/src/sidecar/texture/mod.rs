@@ -10,7 +10,7 @@
 mod baked;
 mod modes;
 
-pub use baked::prepare_bake;
+pub use baked::{check_bake_size, prepare_bake};
 pub use modes::{Compression, FilterMode, TextureType, WrapMode};
 
 use serde::{Deserialize, Serialize};

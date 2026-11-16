@@ -340,7 +340,11 @@ clamped sampler.
   (`Texture.md`, *A bake ships at its size*). It becomes `true` when the inspector's
   Max Size or a `maxSize` given here changes the value; a `maxSize` equal to the
   stored one changes nothing, so a get-edit-set round-trip keeps the choice as it
-  was. Give it outright to set it, `false` handing Max Size back to the engine. In
+  was. A value different from the stored one sets it outright, `false` handing Max
+  Size back to the engine; the value a Get table carries back changes nothing, so
+  get → `s.maxSize = 1024` → set keeps 1024 as the developer's. The inspector's Max
+  Size row says who holds it (*chosen* or *follows bakes*), and its *Follow bakes*
+  button hands a chosen one back. In
   the `.meta` it is `"max_size_chosen": true`, written only when true; a Max Size
   edited into the `.meta` by hand is the engine's (a bake moves it) unless that
   key is there too.

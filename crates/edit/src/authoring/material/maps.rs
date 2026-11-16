@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use super::MaterialLibrary;
-use rusty_asset::sidecar::prepare_bake;
+use rusty_asset::sidecar::{check_bake_size, prepare_bake};
 use rusty_asset::MapRef;
 use rusty_core::paths::to_slash;
 use rusty_core::project::ContentRoots;
@@ -61,15 +61,11 @@ pub fn bake_maps(
     let paths = set_paths(&loaded.recipe, &prefix).map_err(in_error)?;
     let paths = paths.iter().map(String::as_str);
     let extent = (size.width, size.height);
-    // The folder comes first, for the sidecars; a refused bake leaves none it made.
-    let made = !dir.exists();
+    // The size check comes before the folder, so a refused bake makes none; the
+    // folder before the sidecars, which need it.
+    check_bake_size(extent).map_err(in_error)?;
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    prepare_bake("Material maps", extent, paths).map_err(|e| {
-        if made {
-            let _ = std::fs::remove_dir(dir);
-        }
-        in_error(e)
-    })?;
+    prepare_bake("Material maps", extent, paths).map_err(in_error)?;
     let baked = bake_set(&loaded.recipe, &loaded.sources, &prefix).map_err(in_error)?;
     fill_empty_maps(asset, &baked);
     Ok(())

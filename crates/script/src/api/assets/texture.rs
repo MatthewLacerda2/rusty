@@ -28,9 +28,11 @@ pub(super) fn table(lua: &Lua, s: &TextureSettings) -> mlua::Result<Table> {
 /// outside Unity's list is an error. A `maxSize` that changes the stored one is
 /// the developer's choice, so no bake changes it (`sidecar::prepare_bake`); one
 /// equal to it changes nothing, so a get-edit-set round-trip keeps the choice as
-/// it was. `maxSizeChosen` sets the choice outright: `false` hands Max Size back
-/// to the engine.
+/// it was. A `maxSizeChosen` that differs from the stored flag sets the choice
+/// outright (`false` hands Max Size back to the engine); one equal to it, as a Get
+/// table carries back, changes nothing.
 pub(super) fn settings(mut s: TextureSettings, t: &Table) -> mlua::Result<TextureSettings> {
+    let stored_chosen = s.max_size_chosen;
     if let Some(name) = t.get::<Option<String>>("wrapMode")? {
         s.wrap_mode = WrapMode::parse(&name).map_err(runtime)?;
     }
@@ -52,7 +54,16 @@ pub(super) fn settings(mut s: TextureSettings, t: &Table) -> mlua::Result<Textur
             s = s.chosen(size);
         }
     }
-    let chosen = t.get::<Option<bool>>("maxSizeChosen")?;
-    s.max_size_chosen = chosen.unwrap_or(s.max_size_chosen);
+    // Only a `maxSizeChosen` that differs from the stored flag says anything: the
+    // one a Get table carries back must not undo a changed `maxSize`'s mark.
+    if let Some(chosen) = t.get::<Option<bool>>("maxSizeChosen")? {
+        if chosen != stored_chosen {
+            s.max_size_chosen = chosen;
+        }
+    }
     Ok(s)
 }
+
+#[cfg(test)]
+#[path = "texture_tests.rs"]
+mod tests;

@@ -25,7 +25,7 @@ pub fn prepare_bake<'a>(
     (width, height): (u32, u32),
     paths: impl IntoIterator<Item = &'a str>,
 ) -> Result<(), String> {
-    check_bake_size(width, height)?;
+    check_bake_size((width, height))?;
     let max_size = fitting(width.max(height));
     for path in paths {
         if let Err(e) = keep_baked_size(Path::new(path), max_size) {
@@ -36,7 +36,9 @@ pub fn prepare_bake<'a>(
 }
 
 /// Refuse a `width`×`height` bake whose longer side is above the largest Max Size.
-fn check_bake_size(width: u32, height: u32) -> Result<(), String> {
+/// [`prepare_bake`] runs it too; a verb calls it first on its own, before it makes
+/// any folder, so a refused bake leaves the project as it was.
+pub fn check_bake_size((width, height): (u32, u32)) -> Result<(), String> {
     let longer = width.max(height);
     if longer <= LARGEST {
         return Ok(());

@@ -69,7 +69,7 @@ use mlua::{Lua, Value};
 
 use super::{put, Reg};
 use from_lua::parse_recipe;
-use rusty_asset::sidecar::prepare_bake;
+use rusty_asset::sidecar::{check_bake_size, prepare_bake};
 use rusty_core::project::ContentRoots;
 use rusty_edit::authoring::material::{load_recipe, Loaded};
 use rusty_procgen::{bake_recipe, bake_set, check_set, set_paths, Slot, TextureRecipe};
@@ -124,19 +124,22 @@ pub fn register(lua: &Lua) -> Reg {
 }
 
 /// Evaluate + bake a parsed recipe for the named slot, surfacing any error to Lua.
-/// The missing folders above `path` are made first when they lie inside `root`.
+/// The missing folders above `path` are made, after the size check, when they lie
+/// inside `root`.
 fn bake(recipe: &TextureRecipe, path: &str, slot: &str, root: &Path) -> mlua::Result<String> {
     let slot = Slot::parse(slot).map_err(mlua::Error::RuntimeError)?;
     let loaded = load(recipe)?;
     let size = loaded.recipe.extent();
-    folder::make_parents(path, root)
-        .and_then(|()| prepare_bake("Texture.Bake", (size.width, size.height), [path]))
+    let extent = (size.width, size.height);
+    check_bake_size(extent)
+        .and_then(|()| folder::make_parents(path, root))
+        .and_then(|()| prepare_bake("Texture.Bake", extent, [path]))
         .and_then(|()| bake_recipe(&loaded.recipe, &loaded.sources, slot, path))
         .map_err(|e| mlua::Error::RuntimeError(format!("Texture.Bake: {e}")))
 }
 
 /// `Texture.BakeSet`'s body: every output of `recipe` to `<prefix>_<slot>.png`,
-/// the folder above `prefix` made first when it lies inside `root`.
+/// the folder above `prefix` made, after the size check, when it lies inside `root`.
 fn bake_whole_set(
     recipe: &TextureRecipe,
     prefix: &str,
@@ -146,7 +149,8 @@ fn bake_whole_set(
     let size = loaded.recipe.extent();
     let paths = set_paths(&loaded.recipe, prefix).map_err(mlua::Error::RuntimeError)?;
     let extent = (size.width, size.height);
-    folder::make_parents(prefix, root)
+    check_bake_size(extent)
+        .and_then(|()| folder::make_parents(prefix, root))
         .and_then(|()| prepare_bake("Texture.BakeSet", extent, paths.iter().map(String::as_str)))
         .and_then(|()| bake_set(&loaded.recipe, &loaded.sources, prefix))
         .map_err(|e| mlua::Error::RuntimeError(format!("Texture.BakeSet: {e}")))

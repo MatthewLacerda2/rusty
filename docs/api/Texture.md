@@ -80,7 +80,7 @@ the `.meta` before the PNG, and never touches one the developer chose (Assets'
 `maxSizeChosen`: set by changing `maxSize` there or in the inspector): that file is
 warned of once on import when it is shrunk. A `.meta` without that key, such as
 the one a material slot writes, holds the engine's. A bake whose longer side is
-above 8192, the largest Max Size, is refused before it writes (`Texture.Bake: a 16384x16384 bake is larger than the largest Max Size,
+above 8192, the largest Max Size, is refused before it writes anything, a folder included (`Texture.Bake: a 16384x16384 bake is larger than the largest Max Size,
 8192, …`). Nothing is written to a `.meta` during Play. `Material.DefineAsset`'s
 `maps` and `Material.Rebake` bake the same way.
 
