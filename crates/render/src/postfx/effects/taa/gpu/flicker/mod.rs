@@ -12,7 +12,7 @@
 mod change;
 mod cost;
 mod hue;
-mod measure;
+pub(in crate::postfx::effects) mod measure;
 mod pan;
-mod room;
+pub(in crate::postfx::effects) mod room;
 mod still;

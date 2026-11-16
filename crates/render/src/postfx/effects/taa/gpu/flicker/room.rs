@@ -8,10 +8,10 @@ use rusty_components::{CameraComponent, MaterialAsset, MaterialComponent, Ssr};
 use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::{Camera, Scene};
 
-pub(super) const W: u32 = 320;
-pub(super) const H: u32 = 240;
+pub(in crate::postfx::effects) const W: u32 = 320;
+pub(in crate::postfx::effects) const H: u32 = 240;
 /// Frames before the measure: one cycle of the jitter's vertical (base 3) part.
-pub(super) const WARM: u32 = 27;
+pub(in crate::postfx::effects) const WARM: u32 = 27;
 /// The camera's anti-flicker the tests turn on: its full strength. URP's resolve
 /// is 0, every camera's default.
 pub(super) const ON: f32 = 1.0;
@@ -22,7 +22,7 @@ pub(super) fn renderer() -> Option<Renderer> {
 }
 
 /// Seated, looking up at the ceiling.
-pub(super) fn eye() -> Camera {
+pub(in crate::postfx::effects) fn eye() -> Camera {
     Camera::new(Vec3::new(0.0, 1.6, 0.0), -90.0, 30.0)
 }
 
@@ -59,7 +59,7 @@ pub(super) fn matte(grey: f32) -> MaterialAsset {
 
 /// The room: a satin bronze ceiling 3 m up, dark walls and floor, no ambient,
 /// the bulb hanging 0.5 m under the ceiling on a cord; TAA on, SSR on, nothing else.
-pub(super) fn room() -> Scene {
+pub(in crate::postfx::effects) fn room() -> Scene {
     let mut s = Scene::new();
     (s.skybox_path, s.ambient_intensity) = (String::new(), 0.0);
     let cam = s.add_entity("Camera".to_string());

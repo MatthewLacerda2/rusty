@@ -13,13 +13,23 @@ use rusty_scene::{Camera, Scene};
 const TILE: u32 = 8;
 
 /// A pixel's perceptual luma in 255ths, from its YCoCg: [`run`]'s measure.
-pub(super) fn luma(ycocg: [f32; 3]) -> f32 {
+pub(in crate::postfx::effects) fn luma(ycocg: [f32; 3]) -> f32 {
     255.0 * ycocg[0].max(0.0) / (1.0 + ycocg[0].max(0.0))
 }
 
 /// The resolve's last output in `v`, per tile, by `measure` of each pixel's YCoCg.
 pub(super) fn tiles(r: &Renderer, v: &RenderView, measure: fn([f32; 3]) -> f32) -> Vec<f32> {
     let texture = v.post_fx.taa_latest().expect("TAA ran");
+    tiles_of(r, texture, measure)
+}
+
+/// `texture` (an `Rgba16Float` image of the case's size) per tile, by `measure`
+/// of each pixel's YCoCg: SSR's jitter test reads the SSR-resolved image so.
+pub(in crate::postfx::effects) fn tiles_of(
+    r: &Renderer,
+    texture: &wgpu::Texture,
+    measure: fn([f32; 3]) -> f32,
+) -> Vec<f32> {
     let bytes = readback::read_texture_bytes(&r.device, &r.queue, texture, (W, H), 8);
     let half = |i: usize| f16_to_f32(u16::from_le_bytes([bytes[i], bytes[i + 1]]));
     let pixel = |x: u32, y: u32| {
@@ -87,7 +97,7 @@ pub(super) fn run_from(
 }
 
 /// The largest step any tile takes between two frames of `frames`.
-pub(super) fn swing(frames: &[Vec<f32>]) -> f32 {
+pub(in crate::postfx::effects) fn swing(frames: &[Vec<f32>]) -> f32 {
     let steps = frames
         .windows(2)
         .flat_map(|w| w[0].iter().zip(&w[1]).map(|(a, b)| (a - b).abs()));

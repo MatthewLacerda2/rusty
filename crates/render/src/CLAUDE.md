@@ -119,6 +119,11 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   wrap and filter are its import settings', takes a new one.
 - `render::gpu::shaders::ShaderRegistry` reads shaders from disk at runtime, so a
   shader edit needs no Rust rebuild.
+- **A mip level that varies from pixel to pixel is read through a sampler**
+  (`textureSampleLevel` at the texel's centre), and its size is the first level's
+  halved: `textureLoad` and `textureDimensions` at such a level read the wrong level
+  on lavapipe while NVIDIA and Metal read the right one. A level uniform across
+  the draw may use either.
 - wgpu, naga and naga_oil upgrade as a unit (`Cargo.toml`).
 
 ## Reuse `render::gpu`

@@ -69,7 +69,7 @@ impl RibbonRenderer {
                 device,
                 "Ribbon Pipeline",
                 (&shader, &layout),
-                RibbonVertex::desc(),
+                ("vs_main", Some(RibbonVertex::desc())),
             ),
             globals_buffer: globals.buffer,
             globals_bind_group: globals.bind_group,

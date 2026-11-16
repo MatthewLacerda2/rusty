@@ -1,6 +1,7 @@
 //! crates/render/src/passes/particles/draw.rs — per-frame sprite particle draws.
 //!
-//! Turns every visible sprite emitter into a run of instances, orders the emitters
+//! Turns every visible sprite emitter into a run of instances (a GPU-simulated one
+//! into one draw of its buffer, #2170, `runs`), orders the emitters
 //! back to front (so smoke in front of fire composites over it), merges neighbours
 //! that share a blend + texture into one draw, uploads the instances + globals, and
 //! records a pass into the HDR scene target (after solids/skybox/transparents,
@@ -11,17 +12,15 @@ use std::rc::Rc;
 use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
-use super::instance::{emitter_instances, emitter_light, Eye, ParticleGlobals, ParticleInstance};
-use crate::draw::batch::sort::back_to_front;
+use super::instance::{Eye, ParticleGlobals, ParticleInstance};
+use super::runs::{collect_runs, EmitterRun, Sprites};
 use crate::gpu::uniforms::FogUniform;
 use crate::postfx::effects::taa;
 use crate::timing::GpuPass;
 use crate::{GpuTexture, RenderView, Renderer};
-use rusty_asset::MapRef;
 use rusty_components::particle::ParticleBlend;
-use rusty_components::ParticleRenderMode;
 use rusty_scene::Camera;
-use rusty_scene::Scene;
+use rusty_scene::{Scene, SceneId};
 
 /// Camera-facing billboard basis (right, up). Derived from the camera forward, with
 /// a fallback when the camera looks near straight up/down — there `forward × Y`
@@ -39,18 +38,14 @@ fn billboard_basis(camera: &Camera) -> (Vec3, Vec3) {
     (right, up)
 }
 
-/// One emitter's sprites, before textures are resolved.
-struct EmitterRun {
-    blend: ParticleBlend,
-    texture: Option<MapRef>,
-    instances: Vec<ParticleInstance>,
-}
-
-/// A draw call: a slice of the frame's instance buffer sharing blend + texture.
+/// A draw call: a slice of the frame's instance buffer sharing blend + texture, or
+/// one GPU-simulated emitter's slots.
 struct ParticleBatch {
     blend: ParticleBlend,
     texture: Rc<GpuTexture>,
     instances: std::ops::Range<u32>,
+    /// The GPU-simulated emitter it draws, by key, else the instance buffer.
+    gpu: Option<(SceneId, u32)>,
 }
 
 /// What the sprite pass drew for one camera, for the frame counters (#433).
@@ -73,7 +68,7 @@ impl Renderer {
             pos: camera.position,
             fwd: camera.forward(),
         };
-        let runs = collect_runs(scene, camera.culling_mask, eye);
+        let runs = collect_runs(scene, camera.culling_mask, eye, &self.particle_renderer.gpu);
         if runs.is_empty() {
             return ParticleDraws::default();
         }
@@ -93,19 +88,21 @@ impl Renderer {
             bytemuck::bytes_of(&globals),
         );
 
-        let (all, batches) = self.batch_runs(runs);
-        let instance_buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Particle Instances"),
-                contents: bytemuck::cast_slice(&all),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+        let (all, batches, drawn) = self.batch_runs(runs);
+        // Only `Gpu` emitters: no instance is built, and no buffer either.
+        let instance_buffer = (!all.is_empty()).then(|| {
+            self.device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Particle Instances"),
+                    contents: bytemuck::cast_slice(&all),
+                    usage: wgpu::BufferUsages::VERTEX,
+                })
+        });
         self.ensure_scene_depth_bind_group(view);
-        self.encode_particle_pass(view, &batches, &instance_buffer);
+        self.encode_particle_pass(view, &batches, instance_buffer.as_ref());
         ParticleDraws {
             draw_calls: batches.len() as u32,
-            instances: all.len() as u32,
+            instances: drawn,
         }
     }
 
@@ -128,30 +125,54 @@ impl Renderer {
     }
 
     /// Pack the (already back-to-front) runs into one instance array, merging
-    /// neighbouring runs with the same blend + texture into one draw.
-    fn batch_runs(&mut self, runs: Vec<EmitterRun>) -> (Vec<ParticleInstance>, Vec<ParticleBatch>) {
+    /// neighbouring runs with the same blend + texture into one draw; a
+    /// GPU-simulated emitter is a draw of its own. Also the particles drawn.
+    fn batch_runs(
+        &mut self,
+        runs: Vec<EmitterRun>,
+    ) -> (Vec<ParticleInstance>, Vec<ParticleBatch>, u32) {
         let mut all: Vec<ParticleInstance> = Vec::new();
         let mut batches: Vec<ParticleBatch> = Vec::new();
+        let mut drawn = 0;
         for run in runs {
             let texture = match &run.texture {
                 Some(path) => self.load_texture(path),
                 None => Rc::clone(&self.particle_renderer.default_sprite),
             };
+            let instances = match run.sprites {
+                Sprites::Gpu(key, slots, live) => {
+                    drawn += live;
+                    batches.push(ParticleBatch {
+                        blend: run.blend,
+                        texture,
+                        instances: 0..slots,
+                        gpu: Some(key),
+                    });
+                    continue;
+                }
+                Sprites::Instances(instances) => instances,
+            };
             let start = all.len() as u32;
-            all.extend_from_slice(&run.instances);
+            all.extend_from_slice(&instances);
             let end = all.len() as u32;
+            drawn += end - start;
             match batches.last_mut() {
-                Some(last) if last.blend == run.blend && Rc::ptr_eq(&last.texture, &texture) => {
+                Some(last)
+                    if last.gpu.is_none()
+                        && last.blend == run.blend
+                        && Rc::ptr_eq(&last.texture, &texture) =>
+                {
                     last.instances.end = end;
                 }
                 _ => batches.push(ParticleBatch {
                     blend: run.blend,
                     texture,
                     instances: start..end,
+                    gpu: None,
                 }),
             }
         }
-        (all, batches)
+        (all, batches, drawn)
     }
 
     /// Record the particle render pass: load the HDR colour, bind the scene depth
@@ -161,7 +182,7 @@ impl Renderer {
         &self,
         view: &RenderView,
         batches: &[ParticleBatch],
-        instance_buffer: &wgpu::Buffer,
+        instance_buffer: Option<&wgpu::Buffer>,
     ) {
         let pr = &self.particle_renderer;
         let depth_bg = view
@@ -194,46 +215,29 @@ impl Renderer {
             pass.set_bind_group(2, depth_bg, &[]);
             pass.set_bind_group(3, &self.global_bind_group, &[]);
             pass.set_index_buffer(pr.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            pass.set_vertex_buffer(0, instance_buffer.slice(..));
+            if let Some(instances) = instance_buffer {
+                pass.set_vertex_buffer(0, instances.slice(..));
+            }
             for batch in batches {
-                pass.set_pipeline(pr.pipeline_for(batch.blend, reactive));
                 pass.set_bind_group(1, &batch.texture.bind_group, &[]);
-                pass.draw_indexed(0..6, 0, batch.instances.clone());
+                let group = batch.gpu.and_then(|key| pr.gpu.emitters.get(&key));
+                match group.and_then(|e| e.groups.as_ref()) {
+                    Some((_, draw)) => {
+                        pass.set_pipeline(pr.gpu_pipeline_for(batch.blend, reactive));
+                        pass.set_bind_group(0, draw, &[]);
+                        pass.draw_indexed(0..6, 0, batch.instances.clone());
+                        pass.set_bind_group(0, &pr.globals_bind_group, &[]);
+                    }
+                    None if batch.gpu.is_some() => {}
+                    None => {
+                        pass.set_pipeline(pr.pipeline_for(batch.blend, reactive));
+                        pass.draw_indexed(0..6, 0, batch.instances.clone());
+                    }
+                }
             }
         }
         self.queue.submit(std::iter::once(encoder.finish()));
     }
-}
-
-/// Every active, visible sprite emitter's instances, farthest emitter first.
-fn collect_runs(scene: &Scene, culling_mask: u32, eye: Eye) -> Vec<EmitterRun> {
-    let mut runs: Vec<(EmitterRun, f32)> = Vec::new();
-    for id in scene.world.ids_with_particles() {
-        // Inactive emitters, and those on a layer the camera culls (#92), don't draw.
-        if !scene.world.is_active_in_hierarchy(id)
-            || !rusty_scene::layer_in_mask(scene.world.layer(id), culling_mask)
-        {
-            continue;
-        }
-        let emitter = scene
-            .world
-            .particles(id)
-            .expect("id came from ids_with_particles");
-        if emitter.runtime.particles.is_empty() || emitter.render.mode == ParticleRenderMode::Mesh {
-            continue;
-        }
-        let origin = scene.world.world_position(id);
-        let light = emitter_light(scene, &emitter, origin);
-        let (instances, depth) = emitter_instances(&emitter, light, eye);
-        let run = EmitterRun {
-            blend: emitter.blend,
-            texture: emitter.texture.clone(),
-            instances,
-        };
-        runs.push((run, depth));
-    }
-    back_to_front(&mut runs);
-    runs.into_iter().map(|(run, _)| run).collect()
 }
 
 #[cfg(test)]

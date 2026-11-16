@@ -129,7 +129,7 @@ impl PostFx {
 }
 
 #[cfg(test)]
-mod gpu;
+pub(in crate::postfx::effects) mod gpu;
 
 /// The jitter `view` drew its last frame with (zero when it runs no TAA), for a
 /// test. A pass never reads it: every camera's jittered matrix is

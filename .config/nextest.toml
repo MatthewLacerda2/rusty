@@ -44,6 +44,9 @@ test(/(^|::)test_gpu::tests::gpu_adapter_present_when_required$/)
 | test(/(^|::)reflection_prefilter::gpu::tests::gpu_prefilter_matches_the_cpu_reference/)
 | test(/(^|::)taa::gpu::shimmer::gpu_a_turning_glossy_bumpy_sphere_shimmers_less_under_taa_than_fxaa$/)
 | test(/(^|::)taa::gpu::flicker::/)
+| test(/(^|::)ssr::gpu::rough::jitter::gpu_a_still_rough_reflection_holds_under_taa_jitter$/)
+| test(/(^|::)ssr::gpu::rough::fading::gpu_a_lit_bands_fading_edge_draws_no_line$/)
+| test(/(^|::)ssr::gpu::rough::contact::dark::gpu_a_dark_cubes_contact_reflection_stays_tight_before_a_glowing_wall$/)
 """
 success-output = "final"
 

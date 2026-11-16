@@ -9,6 +9,10 @@
 //   3 vertical   — faces the camera but stays upright, spun in its plane.
 // (Mesh particles never reach this pass — they draw through the forward path.)
 //
+// Two vertex entry points expand the same sprite (`expand`): `vs_main` from a CPU
+// emitter's instances, `vs_gpu` from a GPU-simulated emitter's particle buffer
+// (#2170), one instance per slot, evaluating the over-life curves itself.
+//
 // A flipbook picks one cell of a `columns × rows` sprite sheet per particle. Lit
 // particles are shaded per vertex against the same lighting uniform the forward
 // pass reads (normal-free: a smoke puff is as bright as a matte surface turned
@@ -20,6 +24,7 @@
 #import common::{CameraUniforms, Fog, LightingUniforms, LocalLight, cluster_index, fog_factor, local_light_radiance}
 #import fog::volumetric::{through_volume, volumetric_fog}
 #import reactive
+#import particles::gpu::{GpuParticle, EMPTY, gpu_emitter, life_t, lut_at}
 
 struct ParticleGlobals {
     view_proj: mat4x4<f32>,
@@ -43,9 +48,15 @@ struct ParticleGlobals {
 @group(3) @binding(7) var<storage, read> local_lights: array<LocalLight>;
 @group(3) @binding(8) var<storage, read> cluster_ranges: array<vec2<u32>>;
 @group(3) @binding(9) var<storage, read> cluster_lights: array<u32>;
+// A GPU-simulated emitter's particles (#2170), beside its uniform and curves
+// (`particles::gpu`), in its draw's group 0.
+@group(0) @binding(2) var<storage, read> gpu_particles: array<GpuParticle>;
 // The integrated volumetric fog (#1703), read per vertex like the scene fog.
 @group(3) @binding(17) var t_fog_volume: texture_3d<f32>;
-@group(3) @binding(18) var s_fog_volume: sampler;
+// Group 0's one linear-clamp sampler (`render::gpu::linear_clamp`), shared by the
+// sky and probe cubes, the lightmap and shadowmask pages and the fog volume; this
+// shader reads only the fog volume through it.
+@group(3) @binding(18) var s_linear_clamp: sampler;
 
 struct InstanceInput {
     @location(0) center: vec3<f32>,
@@ -159,6 +170,49 @@ fn particle_light(world: vec3<f32>, light: vec4<f32>, near: f32) -> vec3<f32> {
 
 @vertex
 fn vs_main(@builtin(vertex_index) vid: u32, inst: InstanceInput) -> VsOut {
+    return expand(inst, vid);
+}
+
+// The flipbook frame `p` shows, as `Flipbook::frame_of`.
+fn gpu_frame(p: GpuParticle, sheet: vec4<f32>) -> f32 {
+    let frames = u32(sheet.x * sheet.y);
+    if (frames <= 1u) {
+        return 0.0;
+    }
+    let t = min(life_t(p), 0.99999);
+    let played = u32(floor(t * sheet.z * f32(frames)));
+    return f32((played + p.start_frame) % frames);
+}
+
+@vertex
+fn vs_gpu(@builtin(vertex_index) vid: u32, @builtin(instance_index) slot: u32) -> VsOut {
+    let p = gpu_particles[slot];
+    if (p.next == EMPTY) {
+        // An empty slot: outside the clip volume, so nothing rasterises.
+        var out: VsOut;
+        out.clip_position = vec4<f32>(2.0, 2.0, 2.0, 1.0);
+        return out;
+    }
+    let e = gpu_emitter;
+    let t = life_t(p);
+    let size = max(p.size * lut_at(0u, t).x, 0.0);
+    let velocity = (e.frame * vec4<f32>(p.velocity, 0.0)).xyz;
+    let speed = length(velocity);
+    var inst: InstanceInput;
+    inst.center = (e.frame * vec4<f32>(p.position, 1.0)).xyz;
+    inst.size = size;
+    inst.rotation = p.rotation;
+    inst.color = p.color * lut_at(1u, t);
+    inst.stretch = vec4<f32>(select(vec3<f32>(0.0), velocity / speed, speed > 0.0), size * e.stretch.x + speed * e.stretch.y);
+    inst.light = e.light;
+    inst.sheet = vec4<f32>(e.sheet.x, e.sheet.y, gpu_frame(p, e.sheet), e.sheet.w);
+    inst.mode = e.info.x;
+    inst.reactive = e.stretch.z;
+    return expand(inst, vid);
+}
+
+// The sprite `inst`'s corner `vid` (both entry points).
+fn expand(inst: InstanceInput, vid: u32) -> VsOut {
     let corner = corner_of(vid);
     // UV: x follows the +0.5 side, y is flipped so the sprite is upright.
     let uv = vec2<f32>(corner.x + 0.5, 0.5 - corner.y);
@@ -177,7 +231,7 @@ fn vs_main(@builtin(vertex_index) vid: u32, inst: InstanceInput) -> VsOut {
     out.world = world;
     out.soft = inst.sheet.w;
     out.reactive = inst.reactive;
-    out.air = volumetric_fog(t_fog_volume, s_fog_volume, camera.volumetric, camera.view_proj, camera.clusters.view_z, world);
+    out.air = volumetric_fog(t_fog_volume, s_linear_clamp, camera.volumetric, camera.view_proj, camera.clusters.view_z, world);
     return out;
 }
 

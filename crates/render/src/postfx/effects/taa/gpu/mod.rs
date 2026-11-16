@@ -7,7 +7,7 @@
 mod bob;
 mod cut;
 pub(super) mod fixture;
-mod flicker;
+pub(in crate::postfx::effects) mod flicker;
 mod ghost;
 mod knobs;
 mod reactive;
