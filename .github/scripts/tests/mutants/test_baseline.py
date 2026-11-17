@@ -19,7 +19,10 @@ the baseline runs under the same `ulimit -v` as the mutants it times.
 What only narrows a mutant's tests is left out of the comparison: nextest's
 `-E` filter and a `--tool-config-file` (the on-request run's `rdeps(=P)` and
 its priority, #2283). A mutant then runs a subset of the baseline's tests, in
-another order, so the whole suite's time still bounds it.
+another order, so the whole suite's time still bounds it. Only those two
+forms, exactly as the workflow writes them, are left out, and then only when
+the step's `cargo nextest list` checks the same two before any mutant runs: a
+filter nextest refuses would otherwise report every mutant caught.
 """
 
 from __future__ import annotations
@@ -33,7 +36,9 @@ from tests import SCRIPTS
 WORKFLOWS = SCRIPTS.parent / "workflows"
 CONFIG = SCRIPTS.parent.parent / ".cargo" / "mutants.toml"
 #: Test arguments that only narrow or reorder the tests a mutant runs.
-NARROWING = re.compile(r'\s(?:-E|--tool-config-file)\s+(?:"[^"]*"|\S+)')
+NARROWING = ('-E "$filter"', '--tool-config-file "$config"')
+#: The check that the narrowed tests exist: the same two forms, `\`-continued.
+LISTED = re.compile(r"cargo nextest list (?:[^\n]*\\\n)*[^\n]*")
 #: A `cargo mutants` run (not `--list`) and its `\`-continued lines.
 MUTATE = re.compile(r"cargo mutants (?!--list\b)(?:[^\n]*\\\n)*[^\n]*")
 ULIMIT = re.compile(r"ulimit -v (\d+)")
@@ -70,7 +75,14 @@ def problems(text: str, config: dict) -> list[str]:
         return ["no `cargo mutants` run"]
     mutate = " ".join(found[0].replace("\\\n", " ").split())
     own, _, test_args = mutate.partition(" -- ")
-    test_args = NARROWING.sub("", " " + test_args.split(" || ")[0]).strip()
+    test_args = test_args.split(" || ")[0]
+    if all(f in test_args for f in NARROWING):
+        listed = [" ".join(m.replace("\\\n", " ").split()) for m in LISTED.findall(step(text, "Mutat"))]
+        if not any(all(f in m for f in NARROWING) for m in listed):
+            return [f"`cargo nextest list` with {' and '.join(NARROWING)} must run before the mutants"]
+        for form in NARROWING:
+            test_args = test_args.replace(form, "")
+        test_args = " ".join(test_args.split())
     base = step(text, "Baseline")
     ran = [" ".join(line.split()) for line in re.findall(r"cargo nextest run[^|\n]*", base)]
     bad = [f"`cargo mutants` lacks `{flag}`" for flag in ("--baseline skip", "--in-place")
@@ -149,10 +161,15 @@ class Cases(unittest.TestCase):
     def test_a_filter_that_narrows_a_mutants_tests_still_matches(self) -> None:
         """`-E` and a tool config narrow a mutant's tests, which the whole baseline bounds."""
         mutate = "--in-diff scope.diff -- --fail-fast --test-threads 2"
-        text = GOOD.replace(mutate, mutate + ' \\\n            -E "rdeps(=$p)" --tool-config-file "m:$f"')
-        self.assertIn("rdeps", text)
-        self.assertEqual(problems(text, WORKSPACE), [])
-        self.assertTrue(problems(text.replace("--tool-config-file", "--test-threads 4 --x"), WORKSPACE))
+        forms = ' -E "$filter" --tool-config-file "$config"'
+        text = GOOD.replace(mutate, mutate + " \\\n           " + forms)
+        listed = text.replace("          cargo mutants", "          cargo nextest list --workspace \\\n           "
+                              + forms + "\n          cargo mutants")
+        self.assertEqual(problems(listed, WORKSPACE), [])
+        self.assertTrue(any("`cargo nextest list`" in p for p in problems(text, WORKSPACE)))
+        self.assertTrue(problems(listed.replace('-E "$filter" --tool', '-E "$other" --tool', 1)
+                                 .replace('-E "$filter" --tool', '-E "$other" --tool'), WORKSPACE))
+        self.assertTrue(problems(listed.replace("-- --fail-fast", "-- -E 'all()' --fail-fast"), WORKSPACE))
 
     def test_a_hard_coded_timeout_is_flagged(self) -> None:
         text = GOOD.replace('--timeout "$TIMEOUT"', "--timeout 300")

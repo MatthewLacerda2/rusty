@@ -31,19 +31,33 @@ baseline built it, so a mutant rebuilds only what depends on P.
   The merge queue runs two requests at once (`merging/after/slots.CAP`), so
   mutation holds at most eight runners, below the sweep's ten and clear of
   the gating CI the batch waits on; a plan past the cap runs at the cap and
-  its report says what it never reached. Every shard runs the same
-  per-package invocations with `--shard K/N --sharding round-robin`, so each
-  package's mutants spread over every runner.
+  its report says what it never reached. A standalone part runs on shard 0
+  before the engine's share, so its mutants count toward the sizing too.
+  Every shard runs the same per-package invocations with `--shard J/N
+  --sharding round-robin`, where `J = (K - offset) mod N` for shard K and
+  the package's offset in the plan ([`packages`]), so the whole plan is dealt
+  round-robin as one list.
+- **A package is checked before it is mutated** ([`tests`]): `cargo nextest
+  list` with exactly the filter and tool config its mutants get must succeed
+  and select a test. cargo-mutants counts any non-zero nextest exit as a
+  caught mutant, so a filter nextest refuses would otherwise report every
+  mutant caught.
 - **One report from every shard** ([`merge`]): each part's outcomes, from every
   shard and package, become the single-run layout `mutants-report.py` reads,
-  `mutants-SLUG/mutants.out/outcomes.json` and `status-SLUG`. A shard that
-  uploaded nothing (its runner died, its job hit `timeout-minutes`) is
-  printed as `slug shard` for the workflow to name the cause
-  (`mutants-torn-down.py`); its mutants count as never reached.
+  `mutants-SLUG/mutants.out/outcomes.json` and `status-SLUG`. What went
+  unmeasured is a line in `lost-SLUG.txt`, its mutants counted as never
+  reached and the run red, beside what the rest measured (#2201's rule): a
+  package or shard whose cargo-mutants (or baseline, or check) broke, written
+  by `merge`; and a shard that uploaded nothing (its runner died, its job hit
+  `timeout-minutes`), printed as `slug shard` for the workflow to name the
+  cause (`mutants-torn-down.py`). Each shard's artifact is downloaded by name
+  into its own directory: `download-artifact` unpacks a lone match of a
+  `pattern` flat, which made a one-shard run's only shard read as lost.
 
     mutants-request.py shards --planned 114 --budget-seconds 9900
     mutants-request.py packages planned-root.json
     mutants-request.py priority rusty-shell > priority.toml
+    cargo nextest list ... --message-format json | mutants-request.py tests
     mutants-request.py merge plan.json --shards shards/ --total 4
 """
 
@@ -72,14 +86,17 @@ FINISHED, STOPPED = (0, 2, 3), (124, 137)
 ROOT = "root"
 
 
-def shards(planned: int, budget_seconds: int, minutes: float = MINUTES_PER_MUTANT) -> tuple[int, str]:
-    """How many runners a plan of `planned` engine mutants gets, and why."""
+def shards(planned: int, budget_seconds: int, minutes: float = MINUTES_PER_MUTANT,
+           standalone: int = 0) -> tuple[int, str]:
+    """How many runners a plan of `planned` engine mutants gets, and why. A
+    standalone part's mutants run on shard 0 first, so they count too."""
     usable = budget_seconds / 60 - SETUP_MINUTES
     if planned <= 0 or usable <= 0:
         return 1, f"{planned} engine mutants: one runner"
-    want = math.ceil(planned * minutes / usable)
+    want = math.ceil((planned + standalone) * minutes / usable)
     n = max(1, min(want, MAX_SHARDS))
-    why = (f"{planned} engine mutants at {minutes:g} min each over {usable:.0f} min a runner:"
+    extra = f" and {standalone} standalone" if standalone else ""
+    why = (f"{planned} engine{extra} mutants at {minutes:g} min each over {usable:.0f} min a runner:"
            f" {n} {'runner' if n == 1 else 'runners'}")
     if want > MAX_SHARDS:
         why += f" (capped from {want}; the report names what it never reached)"
@@ -110,39 +127,57 @@ def priority(package: str) -> str:
     return f"[[profile.default.overrides]]\nfilter = 'package(={package})'\npriority = 100\n"
 
 
-def entries(shard: Path, slug: str) -> list[tuple[Path, str]]:
+def tests(listed: dict) -> int:
+    """How many tests a `cargo nextest list --message-format json` selects."""
+    return sum(1 for suite in listed.get("rust-suites", {}).values()
+               for case in suite.get("testcases", {}).values()
+               if case.get("filter-match", {}).get("status") == "matches" and not case.get("ignored"))
+
+
+def entries(shard: Path, slug: str) -> list[tuple[Path, str, str]]:
     """Each measured run of the part `slug` a shard holds, as its output
-    directory and its status text: `status-SLUG` beside `mutants-SLUG/` (a
-    standalone part, or an engine part that never reached its mutants), and
-    `mutants-SLUG/<package>/status` per package of the engine's part."""
+    directory, its status text and what ran: `status-SLUG` beside
+    `mutants-SLUG/` (a standalone part, or an engine part that never reached
+    its mutants), and `mutants-SLUG/<package>/status` per package of the
+    engine's part."""
     out, top = [], shard / f"status-{slug}"
     if top.is_file():
-        out.append((shard / f"mutants-{slug}" / "mutants.out", top.read_text().strip()))
+        out.append((shard / f"mutants-{slug}" / "mutants.out", top.read_text().strip(), ""))
     for status in sorted((shard / f"mutants-{slug}").glob("*/status")):
-        out.append((status.parent / "mutants.out", status.read_text().strip()))
+        out.append((status.parent / "mutants.out", status.read_text().strip(), status.parent.name))
     return out
 
 
-def combined(texts: list[tuple[int, str]], total: int) -> str:
-    """One status for a part from each run's `(shard, text)`: the first broken
-    one as written (and where, when sharded), else stopped if any stopped,
-    else the highest finished status (survivors, timeouts)."""
-    codes = []
-    for k, text in texts:
-        code = int(text) if text.lstrip("-").isdigit() else None
-        if code not in FINISHED + STOPPED:
-            return text + (f" in shard {k}" if total > 1 else "")
-        codes.append(code)
+def code(text: str) -> int | None:
+    """A status text's exit code when it is one that finished or stopped."""
+    value = int(text) if text.lstrip("-").isdigit() else None
+    return value if value in FINISHED + STOPPED else None
+
+
+def combined(codes: list[int]) -> str:
+    """One status for a part from its runs that finished or stopped: stopped
+    if any stopped, else the highest finished status (survivors, timeouts).
+    A broken run is not among them: it is a `lost-SLUG.txt` line instead."""
     stopped = [c for c in codes if c in STOPPED]
     return str(stopped[0] if stopped else max(codes, default=0))
 
 
+def broke(part: dict, package: str, k: int, total: int, text: str) -> str:
+    """The `lost-SLUG.txt` line of a run that broke: what, where, and how."""
+    what = f"`{package}`" if package else (
+        "the engine's part" if part["slug"] == ROOT else f"`{part['root']}/`")
+    where = f" in shard {k}" if total > 1 else ""
+    how = f"cargo-mutants exited {text}" if text.lstrip("-").isdigit() else text
+    return f"{what}{where}: {how}; its mutants are unmeasured"
+
+
 def merge(plan: dict, here: Path, shard_dir: Path, total: int) -> list[str]:
-    """Write each planned part's merged outcomes and status beside the plan;
-    return `slug shard` for each shard that left that part nothing at all."""
+    """Write each planned part's merged outcomes, status and broken runs
+    beside the plan; return `slug shard` for each shard that left that part
+    nothing at all. One broken run never hides what the others measured."""
     lost = []
     for part in (p for p in plan.get("parts", []) if p.get("planned")):
-        slug, runs, texts = part["slug"], [], []
+        slug, runs, codes, broken = part["slug"], [], [], []
         expected = range(total) if slug == ROOT else range(1)
         for k in expected:
             shard = shard_dir / f"mutants-shard-{k}"
@@ -150,10 +185,13 @@ def merge(plan: dict, here: Path, shard_dir: Path, total: int) -> list[str]:
             if not shard.is_dir():
                 lost.append(f"{slug} {k}")
             elif not found:
-                texts.append((k, "without a status"))
-            for out_dir, text in found:
-                texts.append((k, text))
+                broken.append(broke(part, "", k, total, "left no status"))
+            for out_dir, text, package in found:
                 runs.append(out_dir)
+                if code(text) is None:
+                    broken.append(broke(part, package, k, total, text))
+                else:
+                    codes.append(code(text))
         outcomes = []
         for out_dir in runs:
             path = out_dir / "outcomes.json"
@@ -164,10 +202,8 @@ def merge(plan: dict, here: Path, shard_dir: Path, total: int) -> list[str]:
         merged = here / f"mutants-{slug}" / "mutants.out"
         merged.mkdir(parents=True, exist_ok=True)
         (merged / "outcomes.json").write_text(json.dumps({"outcomes": outcomes}))
-        if texts:
-            (here / f"status-{slug}").write_text(combined(texts, total) + "\n")
-        else:
-            (here / f"status-{slug}").write_text(f"{STOPPED[0]}\n")
+        (here / f"status-{slug}").write_text(combined(codes) + "\n")
+        (here / f"lost-{slug}.txt").write_text("".join(line + "\n" for line in broken))
     return lost
 
 
@@ -177,6 +213,8 @@ def main() -> None:
     size = sub.add_parser("shards", help="print `shards=[...]` for the matrix; why on stderr")
     size.add_argument("--planned", type=int, required=True, help="the engine part's planned mutants")
     size.add_argument("--budget-seconds", type=int, required=True)
+    size.add_argument("--standalone", type=int, default=0, help="the standalone parts' planned mutants")
+    sub.add_parser("tests", help="how many tests the `cargo nextest list` JSON on stdin selects")
     pkgs = sub.add_parser("packages", help="`package offset` for each package a `--list --json` file mutates")
     pkgs.add_argument("listed", type=Path)
     pri = sub.add_parser("priority", help="print the nextest tool config that runs PACKAGE's tests first")
@@ -188,13 +226,16 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "shards":
-        n, why = shards(args.planned, args.budget_seconds)
+        n, why = shards(args.planned, args.budget_seconds, standalone=args.standalone)
         print(f"shards={json.dumps(list(range(n)))}")
         print(why, file=sys.stderr)
     elif args.command == "packages":
         text = args.listed.read_text().strip() if args.listed.is_file() else ""
         for name, offset in packages(json.loads(text) if text else []):
             print(name, offset)
+    elif args.command == "tests":
+        text = sys.stdin.read().strip()
+        print(tests(json.loads(text)) if text else 0)
     elif args.command == "priority":
         print(priority(args.package), end="")
     else:

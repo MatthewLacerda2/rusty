@@ -1244,9 +1244,14 @@ package's integration binary first and then every crate alphabetically, so a mut
 of its plan before its budget. `mutants-on-request.yml` now runs one cargo-mutants
 invocation per mutated package `P`: tested by nextest's `-E 'rdeps(=P)'` (P and every
 package depending on it, dev-dependencies included), with a tool config raising
-`package(=P)`'s priority so its tests run first. A plan too large for one runner is
-dealt round-robin over up to four shards (`mutants-request.py`), whose outcomes the
-`report` job merges into one report.
+`package(=P)`'s priority so its tests run first. Before P is mutated, `cargo nextest
+list` with that filter and config must succeed and select a test: cargo-mutants counts
+any failing nextest run as a caught mutant, so a filter nextest refuses would report
+every mutant caught. A package that fails the check is reported as unmeasured. A plan
+too large for one runner (a standalone part's mutants counted in) is dealt round-robin
+over up to four shards (`mutants-request.py`), whose outcomes the `report` job merges
+into one report. A shard or package whose run broke is named there, its mutants counted
+as never reached and the run red, beside what the rest measured.
 
 **A torn-down job still answers.** A job whose runner died, or that was killed at its
 `timeout-minutes`, runs no step of its own, so `mutants-on-request.yml`'s `report` job,

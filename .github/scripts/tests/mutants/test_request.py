@@ -14,9 +14,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests import load
+from tests import SCRIPTS, load
 
 request = load("mutants-request.py")
+WORKFLOW = SCRIPTS.parent / "workflows" / "mutants-on-request.yml"
 report = load("mutants-report.py")
 
 
@@ -48,6 +49,26 @@ class Shards(unittest.TestCase):
         self.assertEqual(n, request.MAX_SHARDS)
         self.assertIn("capped", why)
 
+    def test_a_standalone_part_counts_toward_the_size(self) -> None:
+        usable = 9900 / 60 - request.SETUP_MINUTES
+        engine = int(usable // 3)
+        self.assertEqual(request.shards(engine, 9900, minutes=3)[0], 1)
+        self.assertEqual(request.shards(engine, 9900, minutes=3, standalone=5)[0], 2)
+
+    def test_the_report_downloads_every_possible_shard_by_name(self) -> None:
+        """`download-artifact` unpacks a lone `pattern` match flat, losing a one-shard run's shard."""
+        text = WORKFLOW.read_text()
+        self.assertNotIn("pattern: mutants-shard-", text)
+        for k in range(request.MAX_SHARDS):
+            self.assertIn(f"name: mutants-shard-{k}\n          path: run/shards/mutants-shard-{k}\n", text)
+
+    def test_the_tests_a_nextest_list_selects(self) -> None:
+        case = lambda status, ignored=False: {"filter-match": {"status": status}, "ignored": ignored}
+        listed = {"rust-suites": {"a": {"testcases": {"x": case("matches"), "y": case("mismatch"),
+                                                      "z": case("matches", True)}}}}
+        self.assertEqual(request.tests(listed), 1)
+        self.assertEqual(request.tests({"rust-suites": {}}), 0)
+
 
 class Packages(unittest.TestCase):
     def test_each_package_with_the_mutants_before_it(self) -> None:
@@ -77,6 +98,9 @@ class Merge(unittest.TestCase):
         run = json.loads((self.dir / "mutants-root" / "mutants.out" / "outcomes.json").read_text())
         return lost, run, (self.dir / "status-root").read_text().strip()
 
+    def unmeasured(self) -> list[str]:
+        return (self.dir / "lost-root.txt").read_text().splitlines()
+
     def test_every_shard_and_package_becomes_one_run(self) -> None:
         out = shard(self.dir, 0, "a", "2", [outcome("a.rs:1: x", "MissedMutant", "diff/x.diff")])
         (out / "mutants.out" / "diff" / "x.diff").write_text("--- a.rs\n+++ x\n")
@@ -92,10 +116,16 @@ class Merge(unittest.TestCase):
         shard(self.dir, 1, "a", "124", [])
         self.assertEqual(self.merged(2)[2], "124")
 
-    def test_a_broken_shard_is_named(self) -> None:
-        shard(self.dir, 0, "a", "0", [])
-        shard(self.dir, 1, "a", "4", [])
-        self.assertEqual(self.merged(2)[2], "4 in shard 1")
+    def test_a_broken_package_is_named_and_the_others_still_count(self) -> None:
+        shard(self.dir, 0, "a", "2", [outcome("a.rs:1: x", "MissedMutant")])
+        shard(self.dir, 1, "b", "4", [outcome("b.rs:1: y", "CaughtMutant")])
+        _, run, status = self.merged(2)
+        self.assertEqual((status, len(run["outcomes"])), ("2", 2))
+        self.assertEqual(self.unmeasured(), ["`b` in shard 1: cargo-mutants exited 4; its mutants are unmeasured"])
+        text, _, broken = report.report(PLAN, "Scoped.", self.dir)
+        self.assertIn("a.rs:1: x", text)
+        self.assertIn("2 of 4 planned mutants measured, 2 never reached", text)
+        self.assertTrue(broken)
 
     def test_a_shard_that_uploaded_nothing_is_lost_and_the_report_says_so(self) -> None:
         shard(self.dir, 0, "a", "0", [outcome("a.rs:1: x", "CaughtMutant")])
@@ -103,20 +133,31 @@ class Merge(unittest.TestCase):
         self.assertEqual((lost, status), (["root 1"], "0"))
         (self.dir / "lost-root.txt").write_text("shard 1: the mutation job was torn down\n")
         text, _, broken = report.report(PLAN, "Scoped.", self.dir)
-        self.assertIn("Not every shard reported: 1 of 4 planned mutants measured, 3 never reached", text)
-        self.assertIn("A shard left no report: shard 1: the mutation job was torn down", text)
+        self.assertIn("Not every shard or package reported: 1 of 4 planned mutants measured, 3 never reached", text)
+        self.assertIn("Unmeasured: shard 1: the mutation job was torn down", text)
         self.assertNotIn("✅", text)
         self.assertTrue(broken)
 
+    def test_every_shard_lost_never_blames_the_budget(self) -> None:
+        lost, _, status = self.merged(2)
+        self.assertEqual((lost, status), (["root 0", "root 1"], "0"))
+        (self.dir / "lost-root.txt").write_text("shard 0 left no report: x\nshard 1 left no report: y\n")
+        text, _, broken = report.report(PLAN, "Scoped.", self.dir)
+        self.assertNotIn("budget", text)
+        self.assertIn("Nothing was measured: not a result.", text)
+        self.assertEqual(len(broken), 2)
+
     def test_a_shard_with_no_status_for_the_part_is_broken(self) -> None:
         (self.dir / "shards" / "mutants-shard-0").mkdir(parents=True)
-        self.assertEqual(self.merged(1)[2], "without a status")
+        self.merged(1)
+        self.assertIn("left no status", self.unmeasured()[0])
 
     def test_a_failed_baseline_reads_as_broken(self) -> None:
         top = self.dir / "shards" / "mutants-shard-0"
         top.mkdir(parents=True)
         (top / "status-root").write_text("after the unmutated tests failed (the Baseline step)\n")
-        _, _, broken = report.report(PLAN, "Scoped.", self.dir) if self.merged(1) else (0, 0, [])
+        self.merged(1)
+        _, _, broken = report.report(PLAN, "Scoped.", self.dir)
         self.assertTrue(any("Baseline" in b for b in broken))
 
 
