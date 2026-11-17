@@ -24,6 +24,7 @@ from merging.verdict import changes
 
 SCRIPTS = Path(__file__).resolve().parents[1]
 WORKFLOW_DIR = SCRIPTS.parent / "workflows"
+ACTIONS_DIR = SCRIPTS.parent / "actions"
 GATING = ("ci.yml", "lint.yml")
 
 
@@ -165,10 +166,19 @@ SPLIT = "      - name: Split\n        run: python3 .github/scripts/artifact-dirs
 class PatternDownloads(unittest.TestCase):
     """A lone match of `pattern:` unpacks flat (#2284, #2288): every such download is split."""
 
-    def test_every_workflow_splits_its_pattern_downloads(self):
-        for workflow in sorted(WORKFLOW_DIR.glob("*.yml")):
-            with self.subTest(workflow=workflow.name):
-                self.assertEqual(artifact_dirs.unsplit_downloads(workflow.read_text()), [])
+    def test_every_workflow_and_action_splits_its_pattern_downloads(self):
+        paths = sorted(WORKFLOW_DIR.glob("*.yml")) + sorted(ACTIONS_DIR.glob("*/action.yml"))
+        self.assertTrue(any(p.name == "action.yml" for p in paths), "no composite action found")
+        for path in paths:
+            with self.subTest(path=str(path.relative_to(SCRIPTS.parent))):
+                self.assertEqual(artifact_dirs.unsplit_downloads(path.read_text()), [])
+
+    def test_a_composite_action_is_read(self):
+        action = ("runs:\n  using: composite\n  steps:\n    - uses: actions/download-artifact@v8\n"
+                  "      with:\n        pattern: shard-*\n        path: shards\n")
+        self.assertEqual(len(artifact_dirs.unsplit_downloads(action)), 1)
+        split = "    - run: python3 .github/scripts/artifact-dirs.py shards\n      shell: bash\n"
+        self.assertEqual(artifact_dirs.unsplit_downloads(action + split), [])
 
     def test_a_download_followed_by_the_split_passes(self):
         self.assertEqual(artifact_dirs.unsplit_downloads(DOWNLOAD.format(extra="", after=SPLIT)), [])
@@ -184,6 +194,9 @@ class PatternDownloads(unittest.TestCase):
             "the split of another path": DOWNLOAD.format(extra="", after=SPLIT.replace("shards", "other")),
             "the split a step later": DOWNLOAD.format(extra="", after="      - run: true\n" + SPLIT),
             "merge-multiple without a reason": DOWNLOAD.format(extra="\n          merge-multiple: true", after=""),
+            "a comment on the `steps:` line": DOWNLOAD.replace("    steps:\n      - name: Download",
+                                                               "    steps:   # the report\n      - name: Download",
+                                                               1).format(extra="", after=""),
         }
         for case, text in cases.items():
             with self.subTest(case=case):

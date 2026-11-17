@@ -402,9 +402,13 @@ jobs:
           path: shards
       # A pattern matching one artifact unpacks it flat into `shards/`, where
       # the merge below, reading `shards/mutants-shard-*/`, would drop it (#2288).
+      # Both run under `always()`: a failed download or split still leaves the
+      # merge to report what it can find.
       - name: One directory per shard
+        if: always()
         run: python3 .github/scripts/artifact-dirs.py shards
       - name: Merge shards and summarize
+        if: always()
         env:
           PLANNED: ${{ needs.mutants-plan.outputs.mutants }}
           SIZED_AT: ${{ needs.mutants-plan.outputs.minutes }}

@@ -66,11 +66,12 @@ def jobs_steps(workflow: str) -> list[list[str]]:
 
     Indentation alone, no YAML parser (the scripts are stdlib only): a step is an
     item `- ` at the list's first item's indent, until the next one or a line at
-    or left of `steps:` itself. Comment lines are dropped.
+    or left of `steps:` itself. Comment lines are dropped, and so is a trailing
+    comment on the `steps:` line (`steps:  # why`), which still opens a list.
     """
     blocks, lines = [], workflow.splitlines()
     for i, line in enumerate(lines):
-        if line.strip() != "steps:":
+        if re.sub(r"\s#.*$", "", line).strip() != "steps:":
             continue
         depth, item, block = len(line) - len(line.lstrip()), None, []
         for body in lines[i + 1:]:
