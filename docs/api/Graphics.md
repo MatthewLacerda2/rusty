@@ -838,8 +838,11 @@ when both are the same grey, which the colour clamp alone cannot tell apart. The
 distance, not the depth along the view axis, so a fast flick of the camera is no
 reveal. Across a camera stack the order decides: where a viewmodel's gun moves off
 a wall the wall is a reveal, and where it arrives over one nothing is. A still
-pixel blends exactly as URP's. These are fixed constants for now. The distances
-cost each TAA camera half again its history memory: 50 MB in all at 1920×1080.
+pixel blends as URP's except where the *Anti-Flicker* below holds one that keeps
+blinking (on by default; at `0` a still pixel blends exactly as URP's). These are
+fixed constants for now. The distances cost each TAA camera half again its colour
+history: 24 bytes a pixel, 50 MB at 1920×1080, before the Anti-Flicker's frames
+(83 MB in all by default, below).
 
 **Anti-Flicker** (#2228, HDRP's; on by default at HDRP's `0.5`). URP's colour box is the
 current frame's own, so where some sub-pixel offsets give a patch a very
@@ -971,7 +974,8 @@ first frame. To compare shots pixel for pixel, or to judge a scene's edges, turn
 for the capture (`Graphics.SetTaaActive(false)`: FXAA then runs, if it is on).
 
 **Camera TAA settings** (#1847, URP's `taaSettings`). The resolve's strength is on
-the camera, by URP's names and defaults; the Inspector's Camera card edits the same
+the camera, by URP's names and defaults, and HDRP's Anti-Flicker at HDRP's default;
+the Inspector's Camera card edits the same
 fields, saved with the scene. **Base Blend Factor** is the history's share for a
 still pixel (frame influence `1 - base`; `0.9` is URP's 0.1 influence). A moving
 pixel's weight (0.25, #1846) never drops below the still one's, so a low Base Blend

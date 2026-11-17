@@ -153,9 +153,10 @@ pub(super) fn lenses(stack: &[Camera], aspect: f32) -> [[f32; 4]; MAX_CAMERAS] {
 /// The camera's TAA knobs the resolve reads (#1847): the still pixel's frame
 /// influence (`1 - base_blend`), the variance clamp scale and the quality level's
 /// steps ([`levels`]), and the anti-flicker (#2228), `0`..`1`. URP's defaults
-/// reduce to the constants [`FRAME_INFLUENCE`], [`VARIANCE_CLAMP_SCALE`] and
-/// `High`, so a camera left at its defaults blends as URP's (#1847); its
-/// anti-flicker starts at HDRP's `0.5`, and at `0` the resolve is URP's bit for bit.
+/// reduce to the constants [`FRAME_INFLUENCE`] (to an `f32` rounding),
+/// [`VARIANCE_CLAMP_SCALE`] and `High`, so a camera left at its defaults blends as
+/// URP's (#1847); its anti-flicker starts at HDRP's `0.5`, and at `0` the resolve
+/// is URP's. A view with no camera takes a default camera's tune.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct TaaTune {
     pub frame_influence: f32,
@@ -179,12 +180,7 @@ impl TaaTune {
 impl Default for TaaTune {
     /// A default camera's tune: URP's blend constants and HDRP's anti-flicker.
     fn default() -> Self {
-        Self {
-            frame_influence: FRAME_INFLUENCE,
-            variance_clamp_scale: VARIANCE_CLAMP_SCALE,
-            levels: levels(rusty_components::TaaQuality::default()),
-            anti_flicker: rusty_components::CameraComponent::DEFAULT_TAA_ANTI_FLICKER,
-        }
+        Self::from_camera(&rusty_components::CameraComponent::default())
     }
 }
 

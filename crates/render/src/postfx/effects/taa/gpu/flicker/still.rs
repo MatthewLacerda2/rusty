@@ -4,11 +4,8 @@
 
 use super::super::super::TaaHistory;
 use super::measure::{run, swing};
-use super::room::{anti_flicker, renderer, room, H, ON, W};
+use super::room::{anti_flicker, renderer, room, DEFAULT, H, ON, W};
 use crate::{RenderView, OFFSCREEN_FORMAT};
-
-/// A camera's anti-flicker unless a game sets it: HDRP's.
-const DEFAULT: f32 = rusty_components::CameraComponent::DEFAULT_TAA_ANTI_FLICKER;
 
 /// Frames measured: two of the jitter's 27-frame cycles, so its 32-frame
 /// horizontal one turns over too.
@@ -16,7 +13,8 @@ const FRAMES: u32 = 54;
 /// The largest step a tile of the still view may take between two frames with
 /// the anti-flicker on, in 255ths of perceptual luma: ours, a still view's blinks
 /// reduced to near the scene's own (without SSR the bulb's edge under the jitter
-/// steps 5). Measured: lavapipe 26 at 0 (URP's), 9 on; RTX 2060 26.2, 8.8.
+/// steps 5). Measured at 0 (URP's), 0.5 (the default) and 1: lavapipe 26.2, 11.3,
+/// 8.8; Metal 26.1, 11.2, 8.7; RTX 2060 26.2 and 8.8 at 0 and 1, not yet at 0.5.
 const STILL: f32 = 12.0;
 
 #[test]

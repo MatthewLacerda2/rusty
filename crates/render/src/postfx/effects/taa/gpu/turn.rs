@@ -42,13 +42,13 @@ fn sharpness(rgba: &[u8]) -> f32 {
     sum / n
 }
 
-/// The noise wall under URP's resolve: the anti-flicker at 0, since it holds a
-/// still textured view's blinking texels and so sharpens the still frame (lavapipe:
-/// 10.19 at 0, 12.17 at the default 0.5, 12.21 at 1) while a turn of this speed
-/// holds nothing (9.45 at each), and the measure is the moving weight's alone.
+/// The noise wall under the fixture's URP resolve (the anti-flicker at 0): the
+/// anti-flicker holds a still textured view's blinking texels and so sharpens the
+/// still frame (lavapipe: 10.19 at 0, 12.17 at the default 0.5, 12.21 at 1) while
+/// a turn of this speed holds nothing (9.45 at each); the measure is the moving
+/// weight's alone.
 fn wall_scene() -> Scene {
-    let (mut scene, cam) = taa_scene(true, true);
-    scene.world.camera_mut(cam).unwrap().taa_anti_flicker = 0.0;
+    let (mut scene, _) = taa_scene(true, true);
     noisy_wall(&mut scene, -7.0);
     scene
 }

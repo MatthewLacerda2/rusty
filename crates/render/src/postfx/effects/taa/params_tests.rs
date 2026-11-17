@@ -21,6 +21,14 @@ fn camera() -> Camera {
     Camera::new(Vec3::ZERO, 0.0, 0.0)
 }
 
+/// A default camera's still frame influence: URP's `1 - 0.9`, which in `f32` sits a
+/// rounding off [`FRAME_INFLUENCE`].
+fn influence() -> f32 {
+    let still = 1.0 - rusty_components::CameraComponent::default().taa_base_blend_factor;
+    assert!((still - FRAME_INFLUENCE).abs() < 1e-6, "URP's 0.1: {still}");
+    still
+}
+
 fn params() -> TaaParams {
     let lenses = lenses(&[camera()], 1.0);
     TaaParams::new(
@@ -34,7 +42,7 @@ fn params() -> TaaParams {
 #[test]
 fn the_lanes_are_where_the_shader_reads_them() {
     let p = params();
-    let knobs = [FRAME_INFLUENCE, VARIANCE_CLAMP_SCALE, 1.0, STILL_PIXELS];
+    let knobs = [influence(), VARIANCE_CLAMP_SCALE, 1.0, STILL_PIXELS];
     assert_eq!(p.knobs, knobs);
     let rejection = [
         MOVING_FRAME_INFLUENCE,
@@ -113,7 +121,7 @@ fn the_ramps_the_shader_divides_by_are_positive() {
         moving: false,
         reveal: false,
     });
-    assert_eq!(off.rejection[0], FRAME_INFLUENCE);
+    assert_eq!(off.rejection[0], influence());
     assert!(off.rejection[2] < off.rejection[3], "a span to divide by");
 }
 

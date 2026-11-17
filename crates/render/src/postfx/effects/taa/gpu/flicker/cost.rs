@@ -6,7 +6,7 @@
 
 use super::change::{dark_room, lamp};
 use super::measure::run;
-use super::room::{anti_flicker, renderer, ON, WARM};
+use super::room::{anti_flicker, renderer, DEFAULT, ON, WARM};
 use crate::Renderer;
 use rusty_components::MaterialAsset;
 use rusty_scene::Scene;
@@ -53,8 +53,8 @@ fn survival(r: &mut Renderer, period: u32, value: f32) -> Vec<f32> {
 /// every 10 100 % 100 % 70 % 59 % 58 % 58 %.
 const FIRST: f32 = 0.95;
 const HELD: [(f32, u32, f32); 4] = [
-    (0.5, 6, 0.12),
-    (0.5, 10, 0.58),
+    (DEFAULT, 6, 0.12),
+    (DEFAULT, 10, 0.58),
     (ON, 6, 0.09),
     (ON, 10, 0.25),
 ];
@@ -95,8 +95,8 @@ pub(super) fn noise_room() -> Scene {
 
 /// How long a lone flash's end stays on the noise ceiling at render `scale`: per
 /// frame after the flash, the most any tile still sits off the flash-free run,
-/// held and URP's.
-fn afterglow(r: &mut Renderer, scale: f32) -> (Vec<f32>, Vec<f32>) {
+/// held at `value` and URP's.
+fn afterglow(r: &mut Renderer, scale: f32, value: f32) -> (Vec<f32>, Vec<f32>) {
     let frames = AT + 48;
     let flash = |s: &mut Scene, f: u32| lamp(s, "Flash", (f == WARM + AT).then_some(30.0));
     let none = |_: &mut Scene, _: u32| {};
@@ -119,7 +119,7 @@ fn afterglow(r: &mut Renderer, scale: f32) -> (Vec<f32>, Vec<f32>) {
             .map(|f| off(f).fold(0.0, f32::max))
             .collect::<Vec<f32>>()
     };
-    (glow(ON), glow(0.0))
+    (glow(value), glow(0.0))
 }
 
 /// How many frames after a lone flash the noise ceiling's held tiles may still sit
@@ -127,21 +127,24 @@ fn afterglow(r: &mut Renderer, scale: f32) -> (Vec<f32>, Vec<f32>) {
 /// on lavapipe: 32 frames at render scale 1 (29 levels the frame after, against
 /// URP's 9), 39 at 0.67 (20 against 9); on an RTX 2060, 30 (25 against 8) and
 /// 38 (20 against 9). At 0.5 (the default) less: lavapipe 29 frames (23 against 9)
-/// and 35 (18 against 9), so the bound is held at 1 alone.
+/// and 35 (18 against 9); the one bound holds both.
 const AFTERGLOW: usize = 44;
 
 #[test]
 fn gpu_a_lone_flash_on_a_blinking_ceiling_under_anti_flicker() {
     let Some(mut r) = renderer() else { return };
-    for scale in [1.0, 0.67] {
-        let (held, urp) = afterglow(&mut r, scale);
+    let cases = [1.0, 0.67]
+        .into_iter()
+        .flat_map(|s| [(s, DEFAULT), (s, ON)]);
+    for (scale, value) in cases {
+        let (held, urp) = afterglow(&mut r, scale, value);
         let over: Vec<f32> = held.iter().zip(&urp).map(|(h, u)| h - u).collect();
         let lasts = over.iter().rposition(|&o| o > 1.0).map_or(0, |i| i + 1);
         eprintln!(
-            "[taa] scale {scale}: a lone flash's end on a blinking ceiling, the frame after: \
+            "[taa] scale {scale}, at {value}: a lone flash's end on a blinking ceiling, the frame after: \
              {:.1} held, {:.1} URP's; held over URP's by a level for {lasts} frames",
             held[0], urp[0]
         );
-        assert!(lasts <= AFTERGLOW, "at scale {scale}: {over:?}");
+        assert!(lasts <= AFTERGLOW, "at scale {scale}, {value}: {over:?}");
     }
 }

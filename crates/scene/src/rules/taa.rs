@@ -164,7 +164,7 @@ mod tests {
     fn knobs_round_trip_through_their_ops_with_clamps() {
         let mut c = CameraComponent::default();
         // A value inside every knob's own range round-trips exactly.
-        for (knob, value) in TAA_KNOBS.iter().zip([0.7, 0.9, 0.5, -0.5, 0.5, 0.5]) {
+        for (knob, value) in TAA_KNOBS.iter().zip([0.7, 0.9, 0.5, -0.5, 0.5, 0.3]) {
             (knob.set)(&mut c, value);
             assert_eq!(
                 (knob.get)(&c),

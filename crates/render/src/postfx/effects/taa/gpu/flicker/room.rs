@@ -16,6 +16,8 @@ pub(in crate::postfx::effects) const WARM: u32 = 27;
 /// camera starts at 0, URP's resolve, so every comparison has URP's beside it; a
 /// camera's own default is HDRP's 0.5 (`CameraComponent::DEFAULT_TAA_ANTI_FLICKER`).
 pub(super) const ON: f32 = 1.0;
+/// A camera's anti-flicker unless a game sets it: HDRP's.
+pub(super) const DEFAULT: f32 = CameraComponent::DEFAULT_TAA_ANTI_FLICKER;
 
 /// A headless renderer of the case's size, or `None`.
 pub(super) fn renderer() -> Option<Renderer> {
