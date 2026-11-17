@@ -138,7 +138,7 @@ impl Report {
 /// it differs, and the last run's when either moved; then a warning when the last
 /// run itself mixed a build with another tree's files, since every change above is
 /// measured against that run. A before-and-after pair says which trees it compared.
-fn engine_line(engine: &EngineStamp, previous: Option<&EngineStamp>) -> String {
+pub(super) fn engine_line(engine: &EngineStamp, previous: Option<&EngineStamp>) -> String {
     let mut line = format!("engine {} {}", engine.commit, trees(engine));
     let moved = |p: &&EngineStamp| {
         (&p.content_found, &p.content_built) != (&engine.content_found, &engine.content_built)
@@ -170,7 +170,7 @@ fn trees(e: &EngineStamp) -> String {
 }
 
 /// A value at a precision that suits its size: ms to the microsecond, counts whole.
-fn num(v: f64) -> String {
+pub(super) fn num(v: f64) -> String {
     if v.fract() == 0.0 {
         format!("{v:.0}")
     } else {
@@ -179,7 +179,7 @@ fn num(v: f64) -> String {
 }
 
 /// `+0.123 (+4.5%)`; `=` when unchanged.
-fn change(before: f64, after: f64) -> String {
+pub(super) fn change(before: f64, after: f64) -> String {
     let d = after - before;
     if d == 0.0 {
         return "=".to_string();

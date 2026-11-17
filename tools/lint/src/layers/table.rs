@@ -185,7 +185,15 @@ pub const LAYERS: &[Layer] = &[
             "ui",
         ],
     )
-    .uses(&["bytemuck", "image", "ktx2", "naga_oil", "pollster", "wgpu"]),
+    .uses(&[
+        "bytemuck",
+        "image",
+        "ktx2",
+        "naga_oil",
+        "objc2_metal",
+        "pollster",
+        "wgpu",
+    ]),
     // The dev-only Lua namespaces (`Debug.*`, the provider ones) bind here because
     // `api` is sim and may not import `dev` (#737); the harness drives the VM too.
     platform(
@@ -212,6 +220,7 @@ pub const LAYERS: &[Layer] = &[
         "bytemuck",
         "image",
         "libloading",
+        "mach2",
         "mlua",
         "pollster",
         "scorsese_core",

@@ -287,7 +287,9 @@ impl RenderCounters {
 }
 
 mod frame;
+mod memory;
 mod uploads;
+pub use memory::{gpu_memory, GpuMemory};
 pub use uploads::Uploads;
 
 #[cfg(test)]

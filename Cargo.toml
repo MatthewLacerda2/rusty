@@ -71,6 +71,14 @@ path = "src/bin/play.rs"
 test = false
 required-features = ["dev"]
 
+# Bench a game project's own scenes (`make bench-scenes`): load time, memory and
+# `Harness.Bench`'s rows from deterministic viewpoints. Dev-only, like `play`.
+[[bin]]
+name = "bench-scenes"
+path = "src/bin/bench_scenes.rs"
+test = false
+required-features = ["dev"]
+
 # Ship a project (#1267): refresh the import cache, copy the runtime files, leave the
 # convertible sources behind. Dev-only, since it may run Blender.
 [[bin]]
@@ -285,6 +293,11 @@ getrandom = { version = "0.4.3", features = ["std", "sys_rng"] }
 objc2 = "0.6.4"
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData"] }
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSApplication", "NSImage", "NSResponder"] }
+# `make bench-scenes`' GPU memory on Metal (the device's `currentAllocatedSize`) and
+# peak memory footprint (`task_info(TASK_VM_INFO)`): the versions wgpu-hal already
+# brings into the tree.
+objc2-metal = { version = "0.3.2", default-features = false, features = ["std", "MTLDevice"] }
+mach2 = "0.6.0"
 # The Wayland half of the clipboard (#612), on the window's own `wl_display`; also
 # already in the tree through egui-winit. Pinned to 0.7.2: 0.7.3 only moves to SCTK 0.20,
 # which duplicates winit 0.30's SCTK 0.19 stack (5 crates). Remove the pin when winit moves

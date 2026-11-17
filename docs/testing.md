@@ -1018,6 +1018,47 @@ starts. `Harness.Bench(n)` works on any scenario: it steps and renders `n` frame
 prints the report, keeps it in the run's out dir and returns `{ frames, metrics =
 { <row> = { avg, p95 } }, warnings = { <text>, … } }`.
 
+### A project's own scenes: `make bench-scenes`
+`make bench` measures one synthetic yard; an optimisation also needs numbers from
+real levels. `make bench-scenes PROJECT=<dir> [SCENES=a,b] [RES=WxH]` benches a game
+project's own scenes, wherever the project is on disk (`bench-scenes`,
+`dev::bench::scenes`). `SCENES` names scenes by file stem; by default every
+`assets/scenes/*.scene` is benched. Each scene runs in a process of its own, so its
+load is a cold one and its peak memory is its own. The project is opened read-only
+and never seeded, and nothing is written into it.
+
+- **the viewpoints**, deterministic and unauthored, in this order: every active
+  screen camera the scene holds, at its own transform, as the only screen camera;
+  the player's spawn (the entity named `PlayerSpawn`, else `Player`), at eye height
+  (1.7 m) over the floor under it, looking the way it faces; then points on the
+  navmesh at eye height, drawn from a fixed seed until the cameras, the spawn and
+  the points make 8, each looking along yaws 0, 90, 180 and 270°. A scene with no
+  navmesh uses its cameras alone. A scene with neither looks along +Z from the
+  centre of its entities' positions. The report warns in both cases. A pose is held
+  after every sim step, whatever the scripts move.
+- **the run**: the scene loads, steps once and draws once (`load_ms`). Then each
+  viewpoint warms up 60 frames and measures 300, at 1920x1080 unless `RES` says
+  otherwise. The scene's scripts run as in Play, with no input.
+- **the report**: every `Harness.Bench` row over the viewpoints (the average of
+  their averages, the worst p95 and the viewpoint it came from), plus:
+  - `load_ms`: the load to the first rendered frame, wall clock;
+  - `rss_peak_mb`: the process's peak resident memory (Linux `VmHWM`; macOS
+    `task_info(TASK_VM_INFO)`'s `ledger_phys_footprint_peak`);
+  - `gpu_mb`: the renderer's GPU memory after the run. Vulkan (Linux) and DX12 read
+    it from wgpu's allocator report; Metal (macOS) from the device's
+    `currentAllocatedSize`. The report names its source, and without one (GL) the
+    row is absent and the report says so.
+
+  It is kept as `out/bench/scenes/<project>/<scene>.json` (and `.txt`) and printed
+  with each row's change against that scene's last run, under the same engine line
+  and warnings as `make bench`. A scene with no lightmaps, light probes or baked
+  reflection probes benches as it is, with a warning naming what is missing: its
+  lighting cost is not the shipped one. The run ends with a summary table of one
+  line per scene: `frame_ms`, `gpu_ms`, `load_ms`, `rss_peak_mb`, `gpu_mb`.
+
+Like `make bench`, it is a release build and a signal, never a gate: it is not in
+`make gates` or CI.
+
 ### GPU time and the GPU clock (#862)
 A laptop GPU does not run at one speed. On Apple silicon the governor re-picks the
 clock many times a second from how busy the GPU has been: an M4 moves between 338

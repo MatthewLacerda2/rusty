@@ -25,11 +25,15 @@
 //! CI runner's software GPU makes them meaningless. Only the counts are portable.
 //! The scene is deterministic (fixed dt, seeded scripts, no RNG in placement), so
 //! two runs on one machine measure the same frames.
+//!
+//! `make bench-scenes` ([`scenes`]) measures a game project's own scenes the same
+//! way, from deterministic viewpoints, with load time and memory beside.
 
 mod clock;
 mod lua;
 mod report;
 mod rig;
+pub mod scenes;
 pub mod stress;
 
 pub use lua::register;
@@ -60,6 +64,16 @@ const SYSTEMS: [&str; 4] = ["update_scripts", "tick_nav", "step_physics", "anima
 /// The CPU probe runs right before and right after each sim step, the GPU probe
 /// right before and right after each frame's GPU work: both outside what they scale.
 pub fn measure(harness: &mut Harness, ticks: u32) -> Report {
+    measure_posed(harness, ticks, &mut |_| {})
+}
+
+/// [`measure`], with `pose` called after each sim step and before its frame is
+/// drawn: `make bench-scenes` holds its viewpoint there, whatever the scripts did.
+pub(crate) fn measure_posed(
+    harness: &mut Harness,
+    ticks: u32,
+    pose: &mut dyn FnMut(&mut Harness),
+) -> Report {
     let mut samples = Samples::default();
     let probe = harness.renderer().and_then(|r| ClockProbe::new(r));
     // The first dispatch pays for setting the pipeline up: not a reading.
@@ -72,6 +86,7 @@ pub fn measure(harness: &mut Harness, ticks: u32) -> Report {
         let cpu_before = clock::cpu_probe_ms();
         harness.step(1);
         let cpu = clock::cpu_speed(cpu_before, clock::cpu_probe_ms());
+        pose(harness);
         let before = time_probe(probe.as_ref(), harness);
         let frame = harness.render_frame();
         let after = time_probe(probe.as_ref(), harness);
