@@ -71,7 +71,10 @@ fn bench_one(project: &Path, scene: &str, out: &Path, opts: Options) {
 /// Bench each scene in a child process, then print the summary of those that ran.
 fn bench_all(project: &Path, list: Option<&str>, out: &Path, opts: Options) {
     let names: Vec<String> = match list {
-        Some(list) => list.split(',').map(|s| s.trim().to_string()).collect(),
+        Some(list) => list
+            .split(',')
+            .map(|s| s.trim().trim_end_matches(".scene").to_string())
+            .collect(),
         None => scenes::project_scenes(project),
     };
     if names.is_empty() {
