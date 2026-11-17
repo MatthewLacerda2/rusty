@@ -4,22 +4,27 @@
 
 use glam::Vec2;
 
+use super::curvature::Curvature;
 use super::fixtures::{cell, cube};
-use super::floor::{Radii, MIN_TEXELS};
+use super::floor::{sig, Radii, Raised, MIN_TEXELS};
 use super::{Baked, MeshMap, MeshSource, Settings};
 use rusty_procgen::image_buf::Image;
 
 const SIZE: u32 = 64;
 
 /// The unit cube with its +Z face (vertices 16..20, cell 4) packed into a UV
-/// square a quarter of its cell's side: four times coarser texels there.
-fn packed_cube() -> MeshSource {
+/// square `shrink` of its cell's side: `1 / shrink` times coarser texels there.
+fn packed(shrink: f32) -> MeshSource {
     let mut m = cube();
     let (lo, _) = cell(4);
     for uv in &mut m.uvs[16..20] {
-        *uv = lo + (*uv - lo) * 0.25;
+        *uv = lo + (*uv - lo) * shrink;
     }
     m
+}
+
+fn packed_cube() -> MeshSource {
+    packed(0.25)
 }
 
 /// The three-texel floor at [`SIZE`] of one 1 m² cube face packed into a cell
@@ -38,7 +43,7 @@ fn settings(radius: f32) -> Settings {
 }
 
 /// The curvature of `mesh` at `radius`, and the islands the bake raised.
-fn curvature(mesh: &MeshSource, radius: f32) -> (Image, Option<super::Raised>) {
+fn curvature(mesh: &MeshSource, radius: f32) -> (Image, Option<Raised>) {
     let mut out = None;
     let raised = super::bake(mesh, &[MeshMap::Curvature], &settings(radius), |_, img| {
         out = Some(img);
@@ -90,7 +95,7 @@ fn a_radius_between_two_islands_floors_holds_on_the_roomy_one() {
     assert!((raised.low - small).abs() < 1e-4, "{raised:?}");
     let told = raised.to_string();
     assert!(
-        told.contains(&format!("curvature_radius {between}")) && told.contains("1 of 6"),
+        told.contains(&format!("curvature_radius {} ", sig(between))) && told.contains("1 of 6"),
         "{told}"
     );
 }
@@ -105,7 +110,7 @@ fn a_radius_above_every_floor_is_used_as_asked_and_says_nothing() {
     assert!(MIN_TEXELS * baked.texel_world() < r);
     let radii = Radii::new(&baked);
     assert!(radii.per_tri.iter().all(|&x| x == r), "{:?}", radii.per_tri);
-    assert_eq!(radii.widest, r);
+    assert_eq!(radii.reach, r);
     assert_eq!(radii.raised, None);
     assert_eq!(curvature(&mesh, r).1, None);
 }
@@ -113,6 +118,12 @@ fn a_radius_above_every_floor_is_used_as_asked_and_says_nothing() {
 #[test]
 fn a_bake_naming_no_radius_reports_nothing_raised() {
     // At 4² every island's floor is past 2 % of the diagonal: wider, but not asked.
+    let radii = Radii::new(&Baked::new(&packed_cube(), &Settings::new(4)).unwrap());
+    assert!(
+        radii.per_tri.iter().all(|&r| r > radii.reach),
+        "{:?}",
+        radii.per_tri
+    );
     let raised = super::bake(
         &packed_cube(),
         &[MeshMap::Curvature],
@@ -125,4 +136,38 @@ fn a_bake_naming_no_radius_reports_nothing_raised() {
         Ok(())
     });
     assert_eq!(ao, Ok(None));
+}
+
+#[test]
+fn an_island_packed_to_nearly_nothing_keeps_the_grid_at_the_reach() {
+    let mesh = packed(1e-3);
+    let r = cell_floor(1.0) * 1.5;
+    let baked = Baked::new(&mesh, &settings(r)).unwrap();
+    let (c, raised) = Curvature::new(&baked);
+    assert_eq!(c.cell(), r);
+    let raised = raised.expect("the packed island was raised");
+    assert!(raised.high > 100.0 * r && raised.islands == 1, "{raised:?}");
+}
+
+#[test]
+fn an_island_whose_uvs_enclose_no_area_is_not_raised() {
+    let (_, raised) = curvature(&packed(0.0), cell_floor(1.0) * 1.5);
+    assert_eq!(raised, None);
+}
+
+#[test]
+fn the_warning_prints_three_figures_and_one_value_when_they_print_alike() {
+    assert_eq!(
+        [sig(0.0099996), sig(0.004), sig(0.0)],
+        ["0.0100", "0.00400", "0"]
+    );
+    let told = Raised {
+        requested: 0.004,
+        low: 0.00531,
+        high: 0.005312,
+        islands: 2,
+        of: 9,
+    };
+    let told = told.to_string();
+    assert!(told.starts_with("curvature_radius 0.00400 is") && told.contains("at 0.00531;"));
 }

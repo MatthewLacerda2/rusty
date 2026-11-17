@@ -5,7 +5,8 @@
 //! radius asked for. A radius at or above every island's floor is used as asked.
 //!
 //! An island whose UVs enclose no area takes the mesh's average texel instead: it
-//! covers next to no texel, so its floor only keeps it from reading nothing.
+//! covers no texel, so its floor only keeps it from reading nothing, and it is
+//! never reported as raised (faces collapsed on purpose need no UV space).
 
 use std::fmt;
 
@@ -16,17 +17,18 @@ use rusty_core::collections::Map;
 /// The narrowest band, in the island's texels.
 pub(super) const MIN_TEXELS: f32 = 3.0;
 
-/// The band's radius for each triangle, the widest of them, and what the floor
-/// raised.
+/// The band's radius for each triangle, the reach asked for (the narrowest of
+/// them), and what the floor raised.
 pub(super) struct Radii {
     pub per_tri: Vec<f32>,
-    pub widest: f32,
+    pub reach: f32,
     pub raised: Option<Raised>,
 }
 
 /// The UV islands whose floor raised the `curvature_radius` a bake named: the
 /// radius asked for, the narrowest and widest radius those islands baked at, how
-/// many were raised and of how many. A bake that names no radius reports none.
+/// many were raised and of how many islands that cover texels. A bake that names
+/// no radius reports none.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Raised {
     pub requested: f32,
@@ -47,27 +49,30 @@ impl Radii {
         }
         let reach = baked.settings.curvature_reach(baked.diagonal);
         let average = baked.texel_world();
-        let floor = |a: &Areas| {
-            MIN_TEXELS
-                * a.world_per_uv()
-                    .map_or(average, |w| baked.texel_world_of(w))
-        };
-        let floors: Map<u32, f32> = areas.iter().map(|(&k, a)| (k, floor(a))).collect();
-        let per_tri: Vec<f32> = islands.iter().map(|k| reach.max(floors[k])).collect();
-        let widest = per_tri.iter().copied().fold(reach, f32::max);
+        // Per island, its floor and whether its UVs enclose any area.
+        let floors: Map<u32, (f32, bool)> = areas
+            .iter()
+            .map(|(&k, a)| {
+                let own = a.world_per_uv();
+                let per_uv = own.map_or(average, |w| baked.texel_world_of(w));
+                (k, (MIN_TEXELS * per_uv, own.is_some()))
+            })
+            .collect();
+        let per_tri: Vec<f32> = islands.iter().map(|k| reach.max(floors[k].0)).collect();
         let raised = baked.settings.curvature_radius.and_then(|requested| {
-            let up: Vec<f32> = floors.values().copied().filter(|&f| f > reach).collect();
+            let covered = || floors.values().filter(|&&(_, own)| own);
+            let up: Vec<f32> = covered().map(|&(f, _)| f).filter(|&f| f > reach).collect();
             (!up.is_empty()).then(|| Raised {
                 requested,
                 low: up.iter().copied().fold(f32::MAX, f32::min),
                 high: up.iter().copied().fold(0.0, f32::max),
                 islands: up.len(),
-                of: floors.len(),
+                of: covered().count(),
             })
         });
         Self {
             per_tri,
-            widest,
+            reach,
             raised,
         }
     }
@@ -75,23 +80,35 @@ impl Radii {
 
 impl fmt::Display for Raised {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let effective = if self.low == self.high {
-            sig(self.low)
+        let (low, high) = (sig(self.low), sig(self.high));
+        let effective = if low == high {
+            low
         } else {
-            format!("{}..{}", sig(self.low), sig(self.high))
+            format!("{low}..{high}")
         };
         write!(
             f,
             "curvature_radius {} is narrower than three texels on {} of {} UV islands, \
              so they bake at {effective}; raise the resolution or give those islands \
              more UV space to keep it",
-            self.requested, self.islands, self.of,
+            sig(self.requested),
+            self.islands,
+            self.of,
         )
     }
 }
 
-/// `x` to three significant figures.
-fn sig(x: f32) -> String {
-    let digits = (2 - x.abs().log10().floor() as i32).max(0) as usize;
-    format!("{x:.digits$}")
+/// `x` to three significant figures, rounded first so a value that rounds up to
+/// the next power of ten keeps three (0.0099996 is `0.0100`). Zero and a value
+/// that is not finite print as they are.
+pub(super) fn sig(x: f32) -> String {
+    if x == 0.0 || !x.is_finite() {
+        return format!("{x}");
+    }
+    let x = f64::from(x);
+    let exponent = |v: f64| v.abs().log10().floor() as i32;
+    let scale = 10f64.powi(2 - exponent(x));
+    let rounded = (x * scale).round() / scale;
+    let digits = (2 - exponent(rounded)).max(0) as usize;
+    format!("{rounded:.digits$}")
 }

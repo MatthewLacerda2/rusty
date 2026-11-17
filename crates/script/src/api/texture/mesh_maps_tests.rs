@@ -209,7 +209,7 @@ fn a_radius_the_texels_cannot_hold_is_told_once_per_bake() {
     let raised = told(0.001, &["curvature", "ao"]);
     assert_eq!(raised.len(), 1, "{raised:?}");
     assert!(
-        raised[0].contains(&format!("{model}: curvature_radius 0.001")),
+        raised[0].contains(&format!("{model}: curvature_radius 0.00100 ")),
         "{raised:?}"
     );
     assert!(raised[0].contains("on 2 of 2 UV islands"), "{raised:?}");

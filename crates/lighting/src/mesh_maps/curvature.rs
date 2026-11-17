@@ -71,8 +71,9 @@ impl Curvature {
         let surfaces = source.components(&weld);
         let creases = creases(source, &weld, &surfaces);
         let radii = Radii::new(baked);
-        // Cubes as wide as the widest band, so every radius finds its creases.
-        let grid = Grid::new(&creases, radii.widest);
+        // Cubes as wide as the reach asked for: a texel on an island whose floor
+        // is wider reads more cubes around it, so only those texels pay for it.
+        let grid = Grid::new(&creases, radii.reach);
         let curvature = Self {
             creases,
             grid,
@@ -82,6 +83,12 @@ impl Curvature {
         (curvature, radii.raised)
     }
 
+    /// The width of the crease grid's cubes.
+    #[cfg(test)]
+    pub(super) fn cell(&self) -> f32 {
+        self.grid.cell
+    }
+
     /// The curvature of the texel at `p`.
     pub(super) fn texel(&self, p: &TexelPoint) -> Vec4 {
         let surface = self.surfaces[p.tri() / 3];
@@ -89,7 +96,7 @@ impl Curvature {
         // A crease can be entered in several of the cubes read: each counts once,
         // summed in crease order so the bytes never depend on the grid's.
         let mut near: Vec<(u32, f32)> = Vec::new();
-        for &k in self.grid.near(p.position) {
+        for k in self.grid.near(p.position, radius) {
             let c = &self.creases[k as usize];
             if c.surface != surface {
                 continue;
@@ -157,12 +164,14 @@ fn segment_distance(p: Vec3, a: Vec3, b: Vec3) -> f32 {
     p.distance(a + ab * t)
 }
 
-/// Creases bucketed in cubes `radius` wide (at least any texel's band), so a texel looks only at those near it.
-/// A crease is entered in every cube a point sampled along it each half radius lands
-/// in, so one within `radius` of a point is in a cube at most two away from it.
+/// Creases bucketed in cubes `cell` wide (the reach asked for, the narrowest band),
+/// so a texel looks only at those near it. A crease is entered in every cube a
+/// point sampled along it each half cell lands in, so one within `r` of a point is
+/// in a cube at most `ceil(r / cell) + 1` away from it.
 struct Grid {
     cell: f32,
     cells: Map<[i32; 3], Vec<u32>>,
+    creases: u32,
 }
 
 impl Grid {
@@ -178,20 +187,36 @@ impl Grid {
                 }
             }
         }
-        Self { cell, cells }
+        let creases = creases.len() as u32;
+        Self {
+            cell,
+            cells,
+            creases,
+        }
     }
 
     fn key(p: Vec3, cell: f32) -> [i32; 3] {
         (p / cell).floor().as_ivec3().to_array()
     }
 
-    /// The creases entered within two cubes of `p` (a crease may come up more than
-    /// once: the texel's read removes the duplicates).
-    fn near(&self, p: Vec3) -> impl Iterator<Item = &u32> {
+    /// The creases entered in the cubes within `radius` of `p`, or every crease
+    /// when those cubes outnumber them (a crease may come up more than once: the
+    /// texel's read removes the duplicates).
+    fn near(&self, p: Vec3, radius: f32) -> Box<dyn Iterator<Item = u32> + '_> {
+        let n = ((radius / self.cell).ceil().min(1e3) as i32).saturating_add(1);
+        let side = f64::from(2 * n + 1);
+        if side * side * side >= f64::from(self.creases) {
+            return Box::new(0..self.creases);
+        }
         let [x, y, z] = Self::key(p, self.cell);
-        (-2..=2)
-            .flat_map(move |dx| (-2..=2).flat_map(move |dy| (-2..=2).map(move |dz| [dx, dy, dz])))
-            .filter_map(move |[dx, dy, dz]| self.cells.get(&[x + dx, y + dy, z + dz]))
-            .flatten()
+        Box::new(
+            (-n..=n)
+                .flat_map(move |dx| {
+                    (-n..=n).flat_map(move |dy| (-n..=n).map(move |dz| [dx, dy, dz]))
+                })
+                .filter_map(move |[dx, dy, dz]| self.cells.get(&[x + dx, y + dy, z + dz]))
+                .flatten()
+                .copied(),
+        )
     }
 }
