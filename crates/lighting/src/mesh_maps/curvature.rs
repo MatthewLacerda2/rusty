@@ -3,7 +3,8 @@
 //! strength: its dihedral angle over 90° (capped at 1), positive where the surface
 //! folds away (convex), negative where it folds in (concave). A texel sums the
 //! convex creases within the band's reach of its point (`Settings::curvature_radius`,
-//! by default [`RADIUS`] of the bounds diagonal), and apart the concave ones, each
+//! by default [`RADIUS`] of the bounds diagonal, never under three of its UV
+//! island's own texels: `floor`), and apart the concave ones, each
 //! fading linearly to nothing at the radius and each sum held to 1, and stores
 //! `0.5 + 0.5 × (convex + concave)`: 0.5 flat, 1 on a right-angled convex edge,
 //! 0 in a right-angled concave one. Summing makes the read follow the shape, not
@@ -20,18 +21,16 @@ use std::f32::consts::FRAC_PI_2;
 
 use glam::{Vec3, Vec4};
 
+use super::floor::{Radii, Raised};
 use super::source::Weld;
 use super::{Baked, MeshSource};
 use crate::lightmap::TexelPoint;
 use rusty_core::collections::Map;
 
 /// The band a crease lights when the bake names no `curvature_radius`, as a share
-/// of the mesh's bounds diagonal (at least [`MIN_TEXELS`] texels wide, so a low
-/// resolution still shows it).
+/// of the mesh's bounds diagonal (at least `floor::MIN_TEXELS` of the island's
+/// texels wide, so a low resolution still shows it).
 pub const RADIUS: f32 = 0.02;
-
-/// The narrowest band, in texels.
-const MIN_TEXELS: f32 = 3.0;
 
 /// A dihedral angle below this (radians) is no crease: a quad's diagonal, float
 /// noise on a flat face.
@@ -57,44 +56,54 @@ type Side = (Vec3, Vec3, u32);
 pub(super) struct Curvature {
     creases: Vec<Crease>,
     grid: Grid,
-    radius: f32,
+    /// Per triangle, the band's radius on its UV island.
+    radii: Vec<f32>,
     /// Per triangle, its connected surface.
     surfaces: Vec<u32>,
 }
 
 impl Curvature {
-    pub(super) fn new(baked: &Baked) -> Self {
+    /// The creases of `baked`'s mesh, and the islands whose floor raised the
+    /// radius the bake named.
+    pub(super) fn new(baked: &Baked) -> (Self, Option<Raised>) {
         let source = baked.source;
         let weld = source.weld();
         let surfaces = source.components(&weld);
         let creases = creases(source, &weld, &surfaces);
-        let radius = baked
-            .settings
-            .curvature_reach(baked.diagonal)
-            .max(MIN_TEXELS * baked.texel_world());
-        let grid = Grid::new(&creases, radius);
-        Self {
+        let radii = Radii::new(baked);
+        // Cubes as wide as the reach asked for: a texel on an island whose floor
+        // is wider reads more cubes around it, so only those texels pay for it.
+        let grid = Grid::new(&creases, radii.reach);
+        let curvature = Self {
             creases,
             grid,
-            radius,
+            radii: radii.per_tri,
             surfaces,
-        }
+        };
+        (curvature, radii.raised)
+    }
+
+    /// The width of the crease grid's cubes.
+    #[cfg(test)]
+    pub(super) fn cell(&self) -> f32 {
+        self.grid.cell
     }
 
     /// The curvature of the texel at `p`.
     pub(super) fn texel(&self, p: &TexelPoint) -> Vec4 {
         let surface = self.surfaces[p.tri() / 3];
+        let radius = self.radii[p.tri() / 3];
         // A crease can be entered in several of the cubes read: each counts once,
         // summed in crease order so the bytes never depend on the grid's.
         let mut near: Vec<(u32, f32)> = Vec::new();
-        for &k in self.grid.near(p.position) {
+        for k in self.grid.near(p.position, radius) {
             let c = &self.creases[k as usize];
             if c.surface != surface {
                 continue;
             }
             let d = segment_distance(p.position, c.a, c.b);
-            if d < self.radius {
-                near.push((k, c.strength * (1.0 - d / self.radius)));
+            if d < radius {
+                near.push((k, c.strength * (1.0 - d / radius)));
             }
         }
         near.sort_unstable_by_key(|&(k, _)| k);
@@ -155,12 +164,14 @@ fn segment_distance(p: Vec3, a: Vec3, b: Vec3) -> f32 {
     p.distance(a + ab * t)
 }
 
-/// Creases bucketed in cubes `radius` wide, so a texel looks only at those near it.
-/// A crease is entered in every cube a point sampled along it each half radius lands
-/// in, so one within `radius` of a point is in a cube at most two away from it.
+/// Creases bucketed in cubes `cell` wide (the reach asked for, the narrowest band),
+/// so a texel looks only at those near it. A crease is entered in every cube a
+/// point sampled along it each half cell lands in, so one within `r` of a point is
+/// in a cube at most `ceil(r / cell) + 1` away from it.
 struct Grid {
     cell: f32,
     cells: Map<[i32; 3], Vec<u32>>,
+    creases: u32,
 }
 
 impl Grid {
@@ -176,20 +187,36 @@ impl Grid {
                 }
             }
         }
-        Self { cell, cells }
+        let creases = creases.len() as u32;
+        Self {
+            cell,
+            cells,
+            creases,
+        }
     }
 
     fn key(p: Vec3, cell: f32) -> [i32; 3] {
         (p / cell).floor().as_ivec3().to_array()
     }
 
-    /// The creases entered within two cubes of `p` (a crease may come up more than
-    /// once: the texel's read removes the duplicates).
-    fn near(&self, p: Vec3) -> impl Iterator<Item = &u32> {
+    /// The creases entered in the cubes within `radius` of `p`, or every crease
+    /// when those cubes outnumber them (a crease may come up more than once: the
+    /// texel's read removes the duplicates).
+    fn near(&self, p: Vec3, radius: f32) -> Box<dyn Iterator<Item = u32> + '_> {
+        let n = ((radius / self.cell).ceil().min(1e3) as i32).saturating_add(1);
+        let side = f64::from(2 * n + 1);
+        if side * side * side >= f64::from(self.creases) {
+            return Box::new(0..self.creases);
+        }
         let [x, y, z] = Self::key(p, self.cell);
-        (-2..=2)
-            .flat_map(move |dx| (-2..=2).flat_map(move |dy| (-2..=2).map(move |dz| [dx, dy, dz])))
-            .filter_map(move |[dx, dy, dz]| self.cells.get(&[x + dx, y + dy, z + dz]))
-            .flatten()
+        Box::new(
+            (-n..=n)
+                .flat_map(move |dx| {
+                    (-n..=n).flat_map(move |dy| (-n..=n).map(move |dz| [dx, dy, dz]))
+                })
+                .filter_map(move |[dx, dy, dz]| self.cells.get(&[x + dx, y + dy, z + dz]))
+                .flatten()
+                .copied(),
+        )
     }
 }

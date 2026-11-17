@@ -40,7 +40,7 @@ fn recorded() -> (Scene, u32, u32) {
 }
 
 fn probe_lights(scene: &Scene) -> Vec<Option<u8>> {
-    let mut statics = BakeScene::gather(scene, &|_| None);
+    let mut statics = BakeScene::gather(scene, &|_, _| None);
     statics.use_recorded_channels(scene);
     statics.lights.iter().map(|l| l.mask_channel).collect()
 }
@@ -56,7 +56,7 @@ fn a_probe_bake_after_a_light_is_removed_keeps_the_recorded_channel() {
         "afresh: 0"
     );
     assert_eq!(probe_lights(&scene), [Some(1)], "the record's");
-    let mut statics = BakeScene::gather(&scene, &|_| None);
+    let mut statics = BakeScene::gather(&scene, &|_, _| None);
     statics.use_recorded_channels(&scene);
     let behind = mixed_occlusion(&statics, &[Vec3::new(2.0, 1.0, 0.0)]);
     assert_eq!(
@@ -71,7 +71,7 @@ fn a_light_the_record_gave_no_channel_writes_no_occlusion() {
     let (mut scene, _, _) = recorded();
     scene.lightmaps.channels.clear();
     assert_eq!(probe_lights(&scene), [None, None]);
-    let mut statics = BakeScene::gather(&scene, &|_| None);
+    let mut statics = BakeScene::gather(&scene, &|_, _| None);
     statics.use_recorded_channels(&scene);
     let behind = mixed_occlusion(&statics, &[Vec3::new(2.0, 1.0, 0.0)]);
     assert_eq!(behind, [Vec4::ONE]);

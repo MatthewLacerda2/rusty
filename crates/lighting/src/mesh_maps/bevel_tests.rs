@@ -53,7 +53,7 @@ fn peak(segments: u32) -> f32 {
         extent: max - min,
         diagonal: (max - min).length(),
     };
-    let curvature = Curvature::new(&baked);
+    let (curvature, _) = Curvature::new(&baked);
     let mut best = 0.0f32;
     for (k, s) in profile.windows(2).enumerate() {
         for t in 0..=400 {

@@ -29,7 +29,7 @@ const REFERENCE: u32 = 4096;
 /// eight rooms, their direct light baked too when `direct` (Unity's `Baked` lamps),
 /// else only their bounce (`Mixed`), so the denoiser's work is all there is to see.
 fn level(direct: bool) -> BakeScene {
-    let mut scene = BakeScene::gather(&rooms(2), &|_| None);
+    let mut scene = BakeScene::gather(&rooms(2), &|_, _| None);
     scene.sky = AmbientRadiance::Hemisphere(Vec3::ZERO);
     for top in [Vec3::new(0.0, 3.4, 0.0), Vec3::new(10.0, 7.4, 10.0)] {
         let (position, center) = (

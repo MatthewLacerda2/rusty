@@ -62,7 +62,7 @@ pub(super) fn library() -> Scene {
 fn gathered(slots: Option<&[&str]>) -> (usize, Vec<(u32, f32, f32, bool)>) {
     let mut scene = library();
     panel(&mut scene, slots);
-    let baked = BakeScene::gather(&scene, &|_| None);
+    let baked = BakeScene::gather(&scene, &|_, _| None);
     let Some(mesh) = baked.meshes.first() else {
         return (0, Vec::new());
     };
@@ -135,7 +135,7 @@ fn a_shared_map_is_averaged_once() {
     scene.materials.insert("mapped".to_string(), mapped);
     panel(&mut scene, Some(&["mapped", "mapped", "mapped"]));
     let asked = Cell::new(0);
-    let baked = BakeScene::gather(&scene, &|_| {
+    let baked = BakeScene::gather(&scene, &|_, _| {
         asked.set(asked.get() + 1);
         Some(Vec3::splat(0.5))
     });
