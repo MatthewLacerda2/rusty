@@ -26,7 +26,8 @@ pub struct Settings {
     /// How far from a crease the curvature band reaches, in the model's own units
     /// (metres for a model imported at scale). `None` is 2 % of the bounds
     /// diagonal (`curvature::RADIUS`). Either way the band is at least three of
-    /// the mesh's average texels wide, so a low resolution still shows it, and an
+    /// its UV island's own texels wide, so a low resolution still shows it
+    /// (`floor`; `bake` returns the islands raised past an explicit one), and an
     /// explicit radius is at most the bounds diagonal (`Settings::check_reach`).
     pub curvature_radius: Option<f32>,
     /// Rays per texel for `ao`: Substance's *Secondary Rays*, 64 by default.
