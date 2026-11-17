@@ -468,7 +468,8 @@ export: ## Ship a project without its convertible sources. make export PROJECT=~
 
 # The shooter-shaped stress scene (#835): 50 skinned soldiers on the navmesh, 32
 # lights, a full decal registry, smoke. Prints frame / render / GPU ms (avg and p95),
-# GPU ms per pass, the counters and the heavy systems, with each row's change against
+# GPU ms per pass, the counters, every system's and renderer stage's CPU ms
+# (cpu.<system>, render.<stage>), with each row's change against
 # the last run (kept in out/bench/bench.json). A signal, never a gate: the timings are
 # this machine's. A release build, so the numbers are a shipped game's; the first run
 # compiles one. docs/testing.md has the details.
