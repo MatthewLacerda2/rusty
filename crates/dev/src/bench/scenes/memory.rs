@@ -16,10 +16,7 @@ fn peak() -> Option<u64> {
 }
 
 /// `VmHWM:   123456 kB` in a `/proc/<pid>/status` text, in bytes.
-#[cfg_attr(
-    not(target_os = "linux"),
-    expect(dead_code, reason = "read on Linux only")
-)]
+#[cfg(any(target_os = "linux", test))]
 fn vm_hwm(status: &str) -> Option<u64> {
     let line = status.lines().find(|l| l.starts_with("VmHWM:"))?;
     let kb: u64 = line.split_whitespace().nth(1)?.parse().ok()?;
