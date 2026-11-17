@@ -133,3 +133,10 @@ fn a_detail_mask_round_trips_and_is_unwritten_without_one() {
         assert_eq!(layer.map_only().unwrap().mask, layer.mask, "binds the mask");
     }
 }
+
+/// A new material's roughness is Unity's Standard default (Smoothness 0.5). Its
+/// serde default shares the function, so this pins the value both read.
+#[test]
+fn a_default_material_is_half_rough() {
+    assert_eq!(MaterialAsset::default().roughness, 0.5);
+}
