@@ -1025,7 +1025,9 @@ project's own scenes, wherever the project is on disk (`bench-scenes`,
 `dev::bench::scenes`). `SCENES` names scenes by file stem; by default every
 `assets/scenes/*.scene` is benched. Each scene runs in a process of its own, so its
 load is a cold one and its peak memory is its own. The project is opened read-only
-and never seeded, and nothing is written into it.
+(`Access::Run`, as `play` and the player open one) and never seeded, so nothing is
+written into it; a folder missing the project skeleton gets its empty folders, as
+every binary's open makes them.
 
 - **the viewpoints**, deterministic and unauthored, in this order: every active
   screen camera the scene holds, at its own transform, as the only screen camera;
