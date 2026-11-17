@@ -176,7 +176,7 @@ naming it.
 |---|---|---|
 | `resolution` | `1024` | the square map's edge, 1 to 8192 |
 | `size` | — | `{w, h}` instead of `resolution`, each side 1 to 8192: UV0's unit square stretches over it, as `Texture.Bake`'s `size` does, so a long thin model (a strip light) fills a wide map. Naming both is an error |
-| `curvature_radius` | 2 % of the bounds diagonal | how far from a crease the `curvature` band reaches, in the model's own units (metres at import scale): `0.003` keeps a 3 mm chip on a 12 mm door edge. It is never narrower than three of the mesh's average texels, and one above the model's bounds diagonal is refused |
+| `curvature_radius` | 2 % of the bounds diagonal | how far from a crease the `curvature` band reaches, in the model's own units (metres at import scale): `0.003` keeps a 3 mm chip on a 12 mm door edge. It is never narrower than three of its UV island's own texels: an island packed small in UV bakes wider, and the call warns once naming the radius asked for, the one those islands got and how many were raised. One above the model's bounds diagonal is refused |
 | `ao_rays` | `64` (Substance's *Secondary Rays*) | rays per texel for `ao`, 1 to 1024: the grain falls with the square root (256 rays, half the grain of 64), and the time grows with the count: at 1024 a fully covered 4096² map takes about half an hour on 4 cores |
 | `thickness_rays` | `64` | rays per texel for `thickness`, 1 to 1024 |
 
@@ -185,6 +185,10 @@ Texture.BakeMeshMaps("assets/models/pool_fixtures.blend::Locker_Bank",
   { "curvature", "ao" }, "assets/textures/pool/locker_",
   { resolution = 4096, curvature_radius = 0.004, ao_rays = 256 })
 ```
+
+The locker doors' faces are about 1.1 mm a texel at 4096, so their floor is about
+3.3 mm and they bake the 4 mm asked for; the faces packed into a small UV square
+behind them bake wider, and the console says so.
 
 | Map | What a texel holds | Off the islands |
 |---|---|---|
@@ -208,8 +212,9 @@ against its normals (an `.obj` face listed clockwise from its `vn`) draws them
 around its face normal instead. A `curvature` crease lights a band reaching
 `curvature_radius` (2% of the bounds diagonal by default; a radius past the
 diagonal is refused, since the band would cover the whole model), never narrower
-than 3 texels (a texel measured by its world area, so a stretched non-square map
-counts its real texels): each edge two faces
+than 3 of its UV island's own texels (an island is the faces joined by corners
+that share both position and UV; a texel measured by its world area, so a
+stretched non-square map counts its real texels): each edge two faces
 share is a crease of strength `angle / 90°` (capped at 1), corners welded by
 position first so a UV or normal seam never breaks one. A texel sums the convex
 creases within the band (each fading to nothing at its edge), and apart the

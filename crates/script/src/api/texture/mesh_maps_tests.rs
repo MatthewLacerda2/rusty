@@ -186,3 +186,34 @@ fn a_non_square_bake_writes_that_shape_and_the_baker_checks_the_ranges() {
     );
     std::fs::remove_dir_all(dir).ok();
 }
+
+#[test]
+fn a_radius_the_texels_cannot_hold_is_told_once_per_bake() {
+    rusty_test_support::logs::init();
+    let (dir, model) = project("mesh_maps_floor");
+    let prefix = format!("{}/l_", dir.to_str().unwrap());
+    let told = |radius: f32, maps: &[&str]| {
+        rusty_test_support::logs::take();
+        let maps: Vec<String> = maps.iter().map(|m| m.to_string()).collect();
+        let s = Settings {
+            curvature_radius: Some(radius),
+            ..Settings::new(16)
+        };
+        bake_mesh_maps(&model, &maps, &prefix, &s, &dir).unwrap();
+        rusty_test_support::logs::take()
+            .into_iter()
+            .filter(|m| m.contains("BakeMeshMaps") && m.contains("UV islands"))
+            .collect::<Vec<_>>()
+    };
+    // At 16² a texel of the L's 1 m faces is ~7 cm: 1 mm is far under both floors.
+    let raised = told(0.001, &["curvature", "ao"]);
+    assert_eq!(raised.len(), 1, "{raised:?}");
+    assert!(
+        raised[0].contains(&format!("{model}: curvature_radius 0.001")),
+        "{raised:?}"
+    );
+    assert!(raised[0].contains("on 2 of 2 UV islands"), "{raised:?}");
+    assert!(told(0.5, &["curvature"]).is_empty(), "a radius both hold");
+    assert!(told(0.001, &["ao"]).is_empty(), "no curvature map");
+    std::fs::remove_dir_all(dir).ok();
+}

@@ -22,7 +22,9 @@
 //! triangles share (overlapping UVs) takes the first in index order, as the
 //! lightmap walk gives it; a triangle outside UV 0..1 bakes only its part inside.
 //! [`Settings`] holds what a bake can be told (#2260): its size (square or not),
-//! the curvature band's reach and each ray-traced map's ray count.
+//! the curvature band's reach and each ray-traced map's ray count. A band is never
+//! narrower than three of its UV island's own texels (`floor`, #2292); `bake`
+//! returns the islands that floor widened past the radius asked for.
 //!
 //! The bake is a pure function of (mesh, maps, settings): each texel's rays draw
 //! from their own seeded stream, so threads never show in the bytes.
@@ -37,6 +39,7 @@
 //! memory.
 
 mod curvature;
+mod floor;
 mod margin;
 mod rays;
 mod settings;
@@ -45,6 +48,7 @@ mod source;
 use glam::{Vec3, Vec4};
 
 use super::lightmap::{rasterize_surface, world_per_uv, TexelPoint};
+pub use floor::Raised;
 use rays::MeshRays;
 use rusty_procgen::image_buf::{Image, Size};
 pub use settings::{Settings, MAX_RAYS};
@@ -118,16 +122,19 @@ struct Baked<'a> {
 
 /// Bake `maps` of `source` as `settings` says, each map once, in the order asked,
 /// handing each to `sink` as it is done: one map's image is alive at a time (its
-/// peak memory is in the module docs). An error says what is wrong with the mesh
-/// or the arguments, or is the first one `sink` returned (no later map is baked);
-/// the caller names the model.
+/// peak memory is in the module docs). Returns the UV islands whose texels were
+/// too coarse for the `curvature_radius` named, which baked wider (`floor`), for
+/// the caller to tell. An error says what is wrong with the mesh or the arguments,
+/// or is the first one `sink` returned (no later map is baked); the caller names
+/// the model.
 pub fn bake(
     source: &MeshSource,
     maps: &[MeshMap],
     settings: &Settings,
     mut sink: impl FnMut(MeshMap, Image) -> Result<(), String>,
-) -> Result<(), String> {
+) -> Result<Option<Raised>, String> {
     let baked = Baked::new(source, settings)?;
+    let mut raised = None;
     let mut tracer = None;
     let mut done = Vec::new();
     for &map in maps {
@@ -138,7 +145,8 @@ pub fn bake(
         let image = |f: &(dyn Fn(usize, &TexelPoint) -> Vec4 + Sync)| margin::image(map, &baked, f);
         let image = match map {
             MeshMap::Curvature => {
-                let c = curvature::Curvature::new(&baked);
+                let (c, floor) = curvature::Curvature::new(&baked);
+                raised = floor;
                 image(&|_, p| c.texel(p))
             }
             MeshMap::Ao | MeshMap::Thickness => {
@@ -154,7 +162,7 @@ pub fn bake(
         };
         sink(map, image)?;
     }
-    Ok(())
+    Ok(raised)
 }
 
 impl<'a> Baked<'a> {
@@ -200,9 +208,15 @@ impl<'a> Baked<'a> {
     /// stretched (a strip light at 4096×64) measures its real, square texel. A
     /// square map divides by its edge exactly (the product is taken in `f64`).
     fn texel_world(&self) -> f32 {
+        self.texel_world_of(world_per_uv(&self.source.surface()).unwrap_or(self.diagonal))
+    }
+
+    /// World units one texel spans where one unit of UV spans `per_uv` (a UV
+    /// island's measure, or the mesh's in [`Baked::texel_world`]).
+    fn texel_world_of(&self, per_uv: f32) -> f32 {
         let Size { width, height } = self.settings.size;
         let texels = (f64::from(width) * f64::from(height)).sqrt() as f32;
-        world_per_uv(&self.source.surface()).unwrap_or(self.diagonal) / texels
+        per_uv / texels
     }
 }
 
@@ -212,6 +226,8 @@ mod bevel_tests;
 mod edge_tests;
 #[cfg(test)]
 mod fixtures;
+#[cfg(test)]
+mod floor_tests;
 #[cfg(test)]
 mod settings_tests;
 #[cfg(test)]
