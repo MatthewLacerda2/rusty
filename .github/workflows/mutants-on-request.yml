@@ -432,7 +432,7 @@ jobs:
               echo "::error::cargo nextest list failed for $pkg's filter and tool config"
               echo "the unmutated \`cargo nextest list\` with its mutants' filter failed" > "$out/status"
               continue
-            elif [ "$(python3 .github/scripts/mutants-request.py tests < "$out/tests.json")" = 0 ]; then
+            elif ! [ "$(python3 .github/scripts/mutants-request.py tests < "$out/tests.json")" -gt 0 ] 2>/dev/null; then
               echo "::error::$pkg's filter selects no test"
               echo "its mutants' filter \`$filter\` selects no test" > "$out/status"
               continue
