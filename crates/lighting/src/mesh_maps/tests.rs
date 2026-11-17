@@ -134,3 +134,24 @@ fn a_thin_slab_reads_thinner_than_a_cube() {
     let (t, s) = (at(&thick, mid(0))[0], at(&slab, mid(0))[0]);
     assert!(t > 0.4 && s < 0.1, "cube {t}, slab {s}");
 }
+
+/// One margin pass on a non-square grid fills exactly the eight texels around a
+/// filled one at (4, 1) (each texel's column and row read right), nothing farther.
+#[test]
+fn one_margin_pass_fills_the_ring_around_a_texel_and_no_farther() {
+    let size = rusty_procgen::image_buf::Size {
+        width: 7,
+        height: 4,
+    };
+    let (mut px, mut filled) = (vec![[0.0; 4]; 28], vec![false; 28]);
+    (px[11], filled[11]) = ([1.0; 4], true);
+    super::margin::grow(&mut px, &mut filled, size, 1, true);
+    for (i, f) in filled.iter().enumerate() {
+        let (x, y, near) = (i % 7, i / 7, (3..=5).contains(&(i % 7)) && i / 7 <= 2);
+        assert_eq!(
+            (*f, px[i][0]),
+            (near, f32::from(u8::from(near))),
+            "({x}, {y})"
+        );
+    }
+}

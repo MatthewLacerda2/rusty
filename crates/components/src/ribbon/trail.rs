@@ -105,10 +105,15 @@ impl TrailComponent {
     }
 }
 
+/// Why a gradient's dropped key list is not the component's default.
+const GRADIENT_LIST: &str = "a gradient written without this list reads it as `Gradient` does everywhere (no alpha keys opaque, no colour keys white), not as the component's default gradient";
+
 impl crate::FirstClass for TrailComponent {
     const NAME: &'static str = "Trail";
     const ALIASES: &'static [&'static str] = &["trailrenderer"];
     const INVENTORY: &'static str = "TrailRenderer";
+    const DEFAULT_EXCEPTIONS: &'static [(&'static str, &'static str)] =
+        &[("style.color.alpha", GRADIENT_LIST)];
 }
 
 #[cfg(test)]
