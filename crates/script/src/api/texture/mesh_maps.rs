@@ -9,7 +9,9 @@
 //!
 //! The fourth argument is the resolution or a settings table (#2260,
 //! [`settings`]): `resolution` or `size = {w, h}`, `curvature_radius`, `ao_rays`,
-//! `thickness_rays`, each defaulting to what a call naming none bakes.
+//! `thickness_rays`, each defaulting to what a call naming none bakes. A
+//! `curvature_radius` narrower than three of some UV island's texels bakes those
+//! islands wider, and the call warns once saying so.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -107,7 +109,9 @@ fn side(n: i64) -> Result<u32, String> {
 
 /// Bake `maps` of `model` as `settings` says and write each to `<prefix><map>.png`
 /// as it is baked, the folders above the first made before the bake when inside
-/// `root`. Returns map → path. An error names the verb and the model; a map that
+/// `root`. Returns map → path; a `curvature_radius` some UV island's texels are too
+/// coarse to hold is said once, as a console warning naming the radius each baked
+/// at. An error names the verb and the model; a map that
 /// failed to write stops the bake, the maps before it stay written.
 pub(super) fn bake_mesh_maps(
     model: &str,
@@ -133,7 +137,7 @@ pub(super) fn bake_mesh_maps(
     check_bake_size((width, height)).map_err(fail)?;
     folder::make_parents(&paths[0], root).map_err(fail)?;
     let mut out = BTreeMap::new();
-    bake(&source, &maps, settings, |map, image| {
+    let raised = bake(&source, &maps, settings, |map, image| {
         // Readied once the baker has checked the settings and the mesh, before
         // the first map is written.
         if out.is_empty() {
@@ -150,6 +154,9 @@ pub(super) fn bake_mesh_maps(
         Ok(())
     })
     .map_err(fail)?;
+    if let Some(raised) = raised {
+        log::warn!("[Texture] BakeMeshMaps: {model}: {raised}");
+    }
     Ok(out)
 }
 

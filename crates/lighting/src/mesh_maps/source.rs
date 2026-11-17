@@ -95,7 +95,32 @@ impl MeshSource {
     /// sharing a welded corner are one surface, so a crate standing on a separate
     /// floor is two.
     pub(super) fn components(&self, weld: &Weld) -> Vec<u32> {
-        let mut parent: Vec<u32> = (0..weld.corners.len() as u32).collect();
+        self.connected(&weld.ids, weld.corners.len())
+    }
+
+    /// Per triangle, the id of its UV island: triangles sharing a corner that is
+    /// one in both position and UV0 are one island, so a UV seam splits a surface
+    /// and a normal seam does not. `-0.0` and `0.0` are one value.
+    pub(super) fn islands(&self) -> Vec<u32> {
+        let mut map: Map<[u32; 5], u32> = Map::default();
+        let ids: Vec<u32> = self
+            .positions
+            .iter()
+            .zip(&self.uvs)
+            .map(|(&p, &u)| {
+                let (p, u) = (p + Vec3::ZERO, u + Vec2::ZERO);
+                let key = [p.x, p.y, p.z, u.x, u.y].map(f32::to_bits);
+                let next = map.len() as u32;
+                *map.entry(key).or_insert(next)
+            })
+            .collect();
+        self.connected(&ids, map.len())
+    }
+
+    /// Per triangle, the root of the set its corners join when every vertex `v`
+    /// is the corner `ids[v]` of `corners`: triangles sharing a corner are one set.
+    fn connected(&self, ids: &[u32], corners: usize) -> Vec<u32> {
+        let mut parent: Vec<u32> = (0..corners as u32).collect();
         fn root(parent: &mut [u32], mut i: u32) -> u32 {
             while parent[i as usize] != i {
                 let up = parent[parent[i as usize] as usize];
@@ -104,7 +129,7 @@ impl MeshSource {
             }
             i
         }
-        let corner = |i: u32| weld.ids[i as usize];
+        let corner = |i: u32| ids[i as usize];
         for t in self.indices.chunks_exact(3) {
             let a = root(&mut parent, corner(t[0]));
             for &k in &t[1..] {
