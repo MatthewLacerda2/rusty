@@ -150,7 +150,8 @@ impl ShadowRenderer {
     /// `volumes` (light view-projections, and the PVS rows of
     /// their lights' cells), and upload every volume's
     /// batches into that sweep's one caster buffer. Returns the batches per volume,
-    /// in the order given.
+    /// in the order given. The gather is its own stage (`shadow_gather`), what the
+    /// sweep did before it `shadows` (`Renderer::lap`).
     pub(super) fn prepare_casters(
         &mut self,
         frame: &CasterFrame,
@@ -158,7 +159,6 @@ impl ShadowRenderer {
         sweep: Sweep,
         volumes: &[LightVolume],
     ) -> Vec<Vec<CasterBatch>> {
-        // What the sweep did before is `shadows`; the gather is a stage of its own.
         frame.timer.lap("shadows");
         let start = std::time::Instant::now();
         let views: Vec<Mat4> = volumes.iter().map(|v| v.view_proj).collect();
@@ -169,8 +169,7 @@ impl ShadowRenderer {
             }
             false => self.collect_casters(frame, lod, sweep, frame.objects.objects()),
         };
-        let walls = frame.objects.walls();
-        let pvs = &frame.objects.occlusion;
+        let (walls, pvs) = (frame.objects.walls(), &frame.objects.occlusion);
         let index = self.index_casters.then(|| frame.objects.caster_index());
         let reach = Reach::new(&candidates, index);
         let mut matrices = Vec::new();

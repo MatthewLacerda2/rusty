@@ -62,7 +62,7 @@ impl Recording {
 const BENCH_THREAD: &str = "com.apple.main-thread";
 
 /// The call graph of a `sample` report into folded stacks, the bench's own
-/// thread ([`BENCH_THREAD`]; the first listed when none is named so) alone, and
+/// thread (`BENCH_THREAD`; the first listed when none is named so) alone, and
 /// its root line left out (its name is no function). `sample` samples every
 /// thread every interval, running or parked, so the others (wgpu's, the audio
 /// device's, the runtime's) would fill the table with their waits

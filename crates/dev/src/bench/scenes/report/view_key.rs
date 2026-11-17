@@ -6,13 +6,13 @@ use serde::{Deserialize, Serialize};
 /// How far a viewpoint may move between two runs and still be the same one,
 /// metres: a float reordered in transform propagation or the navmesh bake moves
 /// a point by far less, a navmesh point picked elsewhere by far more.
-pub const SAME_AT_M: f32 = 1e-3;
+const SAME_AT_M: f32 = 1e-3;
 /// How far its yaw may turn and still be the same one, degrees.
-pub const SAME_YAW_DEG: f32 = 0.01;
+const SAME_YAW_DEG: f32 = 0.01;
 
 /// A viewpoint as a report keeps it: two runs benched the same viewpoint when
 /// these are equal, so a navmesh point that moved, or another camera of the same
-/// name, is not one. Equal is within [`SAME_AT_M`] and [`SAME_YAW_DEG`], so an
+/// name, is not one. Equal is within `SAME_AT_M` and `SAME_YAW_DEG`, so an
 /// optimization that moves a point by a rounding error still compares.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ViewKey {
