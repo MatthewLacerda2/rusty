@@ -5,9 +5,9 @@
 //! once, then measured from deterministic viewpoints ([`views`]): each warms up
 //! [`WARMUP`] frames (pipelines, uploads, shadow caches) and is measured for
 //! [`FRAMES`] by `bench::measure_posed`, at 1920x1080 unless told otherwise. The
-//! report ([`report`]) folds the viewpoints' rows into one ([`fold`]) and adds
+//! report ([`report`]) folds the viewpoints' rows into one (`fold`) and adds
 //! `load_ms` (the scene's own load to its first rendered frame, wall clock, the
-//! renderer's start-up off the clock: [`load`]), `rss_peak_mb` (the
+//! renderer's start-up off the clock: `load`), `rss_peak_mb` (the
 //! process's peak resident memory, [`memory`]) and `gpu_mb` (the renderer's GPU
 //! memory, `rusty_render::gpu_memory`), each compared with that scene's last run.
 //!
