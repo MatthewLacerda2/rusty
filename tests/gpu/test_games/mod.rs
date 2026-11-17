@@ -26,12 +26,15 @@ use std::time::Duration;
 /// clocks, a contended cache), as it does the yardstick sampled in the same window.
 /// A game past it fails by name, so the game whose defaults grew is the one fixed.
 /// The heaviest game, `runner`, reads 209 to 228 on CI's ubuntu lavapipe, 223
-/// to 240 on its macOS Metal and 306 to 319 in a 4-vCPU lavapipe container
-/// (alone, beside a cold `cargo build`, spinners and memory thrashers, or every
-/// other game); with its work doubled it reads 612 (1.97×) in that container, so
-/// about 412 on ubuntu. 380 is 19% over the highest count and 8% under the lowest doubling,
-/// so a doubled game fails on every machine measured (`docs/testing.md`, *Test
-/// games*, says how to re-measure).
+/// to 240 on its macOS Metal, 238 to 249 alone on an 8-core SMT desktop (RTX 2060)
+/// and 306 to 319 in a 4-vCPU lavapipe container; with its work doubled it reads
+/// 1.97× (612 in that container, so about 412 on ubuntu). 380 is 19% over the highest
+/// count and 8% under the lowest doubling, so a doubled game fails on every machine
+/// measured. The yardstick cancels about four fifths of a machine's load, not all:
+/// beside a full-parallel cold `cargo build` the desktop read 277 to 284 (1.15×)
+/// where CPU time rose 1.92×. So the bar catches a regression of about 1.6× on an
+/// idle machine and about 1.35× under heavy load (`docs/testing.md`, *Test games*,
+/// says how to re-measure).
 const BUDGET: f64 = 380.0;
 
 /// Wall time after which a game is killed as hung, whatever its budget.
