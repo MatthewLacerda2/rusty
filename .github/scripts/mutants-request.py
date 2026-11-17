@@ -55,12 +55,14 @@ import math
 import sys
 from pathlib import Path
 
-#: Minutes a mutant costs with the per-package tests above, measured by the
-#: proof run of this change (see `shards`).
-MINUTES_PER_MUTANT = 3.0
+#: Minutes a mutant costs with the per-package tests above: run 44014339190
+#: (#2269's plan re-asked) spent 282 runner-minutes on 71 mutants, 191 s a
+#: caught one and 631 s a survivor, against 7.2 min a mutant before.
+MINUTES_PER_MUTANT = 4.0
 #: What a shard spends before its first mutant: setup, the workspace's build
-#: and its timed baseline (#2282's run: 21 min, 20 of them the baseline).
-SETUP_MINUTES = 25
+#: and its timed baseline (15 to 17 min in run 44014339190, 21 in #2282's),
+#: with room for a cold cache.
+SETUP_MINUTES = 20
 #: The most runners one request takes: the queue runs two at once, and the
 #: gating CI of the batch's pull requests needs the rest of the account's.
 MAX_SHARDS = 4
