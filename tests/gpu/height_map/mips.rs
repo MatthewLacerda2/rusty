@@ -1,7 +1,8 @@
 //! Coordinates the parallax never shifted read at their own mip (#2191's review):
-//! under a height map every map lookup samples with explicit derivatives, so
-//! coordinates built outside `parallax::displace` (the `emissive_boost` surface
-//! block's) must carry theirs, or a far surface reads mip 0 and aliases.
+//! under a height map a lookup where the shift bends samples with the coordinates'
+//! explicit derivatives, so coordinates built outside `parallax::displace` (the
+//! `emissive_boost` surface block's) must carry theirs, or a far surface reads mip 0
+//! and aliases.
 
 use rusty::components::MaterialAsset;
 use rusty::shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
