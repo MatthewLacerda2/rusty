@@ -41,7 +41,7 @@ fn gpu_a_dynamic_cube_behind_baked_cover_reads_the_probes_occlusion() {
     block(&mut s, "cube", (at, Vec3::splat(0.6)), 1.0, false);
     s.probes.add_probe(at);
     // As the probe bake writes it (`ibl::probe::bounce::add_baked_direct`).
-    let occlusion = mixed_occlusion(&BakeScene::gather(&s, &|_| None), &[at]);
+    let occlusion = mixed_occlusion(&BakeScene::gather(&s, &|_, _| None), &[at]);
     assert_eq!(
         occlusion,
         [Vec4::new(0.0, 1.0, 1.0, 1.0)],

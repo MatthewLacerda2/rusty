@@ -103,7 +103,7 @@ fn the_gather_takes_the_gradient_and_an_ambient_light_overrides_it() {
     scene.ambient.mode = AmbientMode::Gradient;
     scene.ambient.sky = Vec3::new(0.1, 0.3, 1.2);
     scene.ambient_intensity = 2.0;
-    let sky = BakeScene::gather(&scene, &|_| None).sky;
+    let sky = BakeScene::gather(&scene, &|_, _| None).sky;
     let a = scene.ambient;
     let want = AmbientRadiance::Trilight {
         sky: a.sky * 2.0,
@@ -119,6 +119,6 @@ fn the_gather_takes_the_gradient_and_an_ambient_light_overrides_it() {
         ..rusty_scene::create::default_light()
     };
     scene.world.set_light(id, Some(light));
-    let sky = BakeScene::gather(&scene, &|_| None).sky;
+    let sky = BakeScene::gather(&scene, &|_, _| None).sky;
     assert_eq!(sky, AmbientRadiance::Hemisphere(Vec3::new(0.5, 0.0, 0.0)));
 }

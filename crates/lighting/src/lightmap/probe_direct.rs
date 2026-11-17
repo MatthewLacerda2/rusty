@@ -31,7 +31,7 @@ use rusty_scene::Scene;
 /// its own channel. What the renderer's probe solve adds once its bounces stop: the
 /// bake that drives the solve hands this in (`render`'s `BakedDirect`).
 pub fn probe_direct(scene: &Scene, positions: &[Vec3]) -> (Vec<Sh9>, Vec<Vec4>) {
-    let mut statics = BakeScene::gather(scene, &|_| None);
+    let mut statics = BakeScene::gather(scene, &|_, _| None);
     statics.use_recorded_channels(scene);
     (
         baked_direct_sh(&statics, positions),
