@@ -1,4 +1,4 @@
-//! The material's map slots (#202, #207, #1997, #2151, #2191): one table, [`MAP_SLOTS`],
+//! The material's map slots (#202, #207, #1997, #2151, #2191, #2258): one table, [`MAP_SLOTS`],
 //! whose rows say which asset field each group-2 texture comes from, at which
 //! binding, holding what, and which record flag goes off while it has no texture.
 //! `materials` builds the bind group from it; a new map is one [`Map`] and one row
@@ -25,6 +25,7 @@ pub(crate) enum Map {
     Occlusion,
     Specular,
     Height,
+    DetailMask,
 }
 
 /// One group-2 material map: everything the renderer knows about it, in one row.
@@ -49,9 +50,9 @@ pub(crate) struct MapSlot {
 /// Every material map, in [`Map`] order. Albedo, metallic, roughness, normal and
 /// emissive at 0 and 2–5 (#202, #207); the detail map at 15 (#1997), the last
 /// texture binding below the samplers' offset, then occlusion at 14 and specular
-/// level at 13 (#2151) and height at 12 (#2191), counting down, so the extra shader
-/// slots keep the bindings after the param uniform (7, …) and a new map takes the
-/// next one down (11).
+/// level at 13 (#2151), height at 12 (#2191) and the detail mask at 11 (#2258),
+/// counting down, so the extra shader slots keep the bindings after the param
+/// uniform (7, …) and a new map takes the next one down (10).
 pub(crate) const MAP_SLOTS: [MapSlot; MATERIAL_MAPS] = [
     MapSlot {
         map: Map::Albedo,
@@ -116,6 +117,17 @@ pub(crate) const MAP_SLOTS: [MapSlot; MATERIAL_MAPS] = [
         path: |m| m.height_map.as_ref(),
         off_while_missing: Some(height_flag),
     },
+    MapSlot {
+        map: Map::DetailMask,
+        binding: 11,
+        kind: TextureKind::Mask,
+        // Bound only beside a detail map: a mask alone draws nothing.
+        path: |m| {
+            let d = m.detail.as_ref().filter(|d| d.map.is_some())?;
+            d.mask.as_ref()
+        },
+        off_while_missing: Some(detail_mask_flag),
+    },
 ];
 
 fn detail_flag(record: &mut MaterialData) -> &mut u32 {
@@ -132,6 +144,10 @@ fn specular_flag(record: &mut MaterialData) -> &mut u32 {
 
 fn height_flag(record: &mut MaterialData) -> &mut u32 {
     &mut record.level_maps.use_height_map
+}
+
+fn detail_mask_flag(record: &mut MaterialData) -> &mut u32 {
+    &mut record.detail.use_detail_mask
 }
 
 // Each row sits at its `Map`'s index, and no two textures (maps and extra shader

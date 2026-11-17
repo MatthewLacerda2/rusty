@@ -37,13 +37,13 @@ use rusty_scene::SceneId;
 use rusty_shadergen::params::PackedParams;
 
 /// The material's own maps in group 2: albedo, metallic, roughness, normal,
-/// emissive, detail (#1997), occlusion and specular level (#2151), height (#2191).
-pub(crate) const MATERIAL_MAPS: usize = 9;
+/// emissive, detail (#1997), occlusion and specular level (#2151), height (#2191), detail mask (#2258).
+pub(crate) const MATERIAL_MAPS: usize = 10;
 
-/// Group-2 textures: the nine maps plus one per extra shader texture slot (#400).
+/// Group-2 textures: the ten maps plus one per extra shader texture slot (#400).
 pub(crate) const MATERIAL_TEXTURES: usize = MATERIAL_MAPS + rusty_shadergen::textures::SLOTS.len();
 
-/// Albedo, metallic, roughness, normal, emissive, detail, occlusion, specular and height map keys, then the
+/// Albedo, metallic, roughness, normal, emissive, detail, occlusion, specular, height and detail mask keys, then the
 /// extra shader texture slots (`mask`), in that order.
 pub(crate) type MapSignature = [String; MATERIAL_TEXTURES];
 

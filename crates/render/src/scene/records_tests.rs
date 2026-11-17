@@ -116,4 +116,20 @@ fn a_detail_value_edit_rewrites_and_its_map_rekeys() {
         !rekeys(&mapped, &layer(Some("d.png"), 0.5)),
         "a scale is a value"
     );
+    let masked = |mask: Option<&str>| MaterialAsset {
+        detail: Some(DetailLayer {
+            map: Some("d.png".into()),
+            mask: mask.map(Into::into),
+            ..DetailLayer::default()
+        }),
+        ..MaterialAsset::default()
+    };
+    assert!(
+        rekeys(&masked(None), &masked(Some("m.png"))),
+        "its mask binds (#2258)"
+    );
+    assert!(
+        rekeys(&masked(Some("m.png")), &masked(Some("n.png"))),
+        "a new mask binds"
+    );
 }

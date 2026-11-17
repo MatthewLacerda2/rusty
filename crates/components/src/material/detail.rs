@@ -5,8 +5,8 @@
 //! B the smoothness, A the normal's X, each neutral at 0.5. It changes the albedo,
 //! the roughness and the shading normal **before lighting** (HDRP's
 //! `LitDataIndividualLayer.hlsl`), so it never tints specular or reflections the way
-//! the surface block `triplanar_detail` (a multiply of the lit colour) does. There is
-//! no detail mask: rusty has no mask map, so the layer covers the whole surface.
+//! the surface block `triplanar_detail` (a multiply of the lit colour) does. An
+//! optional detail mask (HDRP's *Detail Mask*) limits where it applies.
 
 use serde::{Deserialize, Serialize};
 
@@ -28,6 +28,14 @@ pub struct DetailLayer {
     /// neutral), read raw (its import's sRGB off). `None` draws no detail.
     #[serde(default)]
     pub map: Option<MapRef>,
+    /// HDRP Lit's *Detail Mask* (#2258): its **red** lerps each detailed result
+    /// (albedo, smoothness, normal) back toward the surface's own value per texel
+    /// (HDRP's `lerp(base, detailed, mask)`), white full detail and black none,
+    /// read raw at the main maps'
+    /// coordinates (not the detail's tiling). `None` (or a file not loaded yet)
+    /// applies the detail everywhere. Inert without `map`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mask: Option<MapRef>,
     /// HDRP's detail *Tiling*: under UV0 the detail UV is the main maps' tiled UV
     /// times this (HDRP's *Link Details with Base*), so (4, 4) repeats the detail
     /// four times per repeat of the base. Under a world mapping it tiles the
@@ -58,12 +66,13 @@ pub struct DetailLayer {
 }
 
 impl DetailLayer {
-    /// The layer with its map alone, every other field at its default; `None`
-    /// without a map. What of it a material's bind group depends on.
+    /// The layer with its map and mask alone, every other field at its default;
+    /// `None` without a map. What of it a material's bind group depends on.
     pub fn map_only(&self) -> Option<Self> {
         let map = self.map.clone()?;
         Some(Self {
             map: Some(map),
+            mask: self.mask.clone(),
             ..Self::default()
         })
     }
@@ -73,6 +82,7 @@ impl Default for DetailLayer {
     fn default() -> Self {
         Self {
             map: None,
+            mask: None,
             tiling: default_tiling(),
             offset: [0.0; 2],
             world_size: default_one(),
