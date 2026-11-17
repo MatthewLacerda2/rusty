@@ -118,7 +118,11 @@ never the one-at-a-time merge. A branch goes local only when it needs the machin
 a real GPU (Metal, performance, driver races), the display, the speakers, the
 operator's files or keys, or a measurement. With the coding in the cloud, the merge
 queue is the only local work (*The orchestrator's loop*). Once the local-only proof
-is in the PR, the rest of the branch can go to the cloud. Local builds: check
+is in the PR, the rest of the branch can go to the cloud. **A bug seen only in the
+real case** (the operator's scene, this machine's driver, a load measurement) gets
+that check on the branch's first implementation, before its independent review:
+a primitive reproduction can pass while the real case still fails, and each review
+round spent before the check may be polishing the wrong fix. Local builds: check
 `free -g` and `df -h` first, and give each heavy build half the cores
 (`CARGO_BUILD_JOBS`) when another may overlap it. Never run `cargo mutants`
 locally during a batch. A local coder is the `Agent` tool's `coder` type, its
@@ -194,6 +198,11 @@ premise costs a review round. Before writing a brief:
   and when it makes state process-wide, it says which tests reset that state;
 - verify any claim about a platform or a tool in one command (what a path may
   hold, say);
+- a decision resting on a count or a limit (runners, memory, minutes) writes out
+  its arithmetic, so a reader can check it;
+- a decision that adds a second way to set one value (a flag beside the value it
+  marks, a table key beside a changed field) says which wins when a caller sends
+  both, as a Get table carried back to its Set does;
 - write "Builds on PR #N merged" only after `gh pr view N --json state` says
   `MERGED`: a coder that finds the groundwork missing stands down;
 - put no closing keyword in a routine prompt for an issue already closed: the
