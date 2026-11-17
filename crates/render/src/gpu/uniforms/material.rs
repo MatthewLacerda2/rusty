@@ -209,7 +209,8 @@ impl Default for MappingUniform {
 /// Where and how strongly a draw's detail map applies (#1997), packed from its
 /// material's `DetailLayer` (`render::draw::detail::detail_uniform`); all zero (off) for a
 /// material without one, or one without a map, and `use_detail_map` 0 while the map is
-/// not resident (`Renderer::with_map_channels`).
+/// not resident (`Renderer::with_map_channels`), as `use_detail_mask` while the mask
+/// is not.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct DetailUniform {
@@ -227,7 +228,11 @@ pub(crate) struct DetailUniform {
     pub detail_normal_scale: f32,
     /// HDRP's *Detail Smoothness Scale*.
     pub detail_smoothness_scale: f32,
-    pub _pad: [u32; 3],
+    /// 1 when the detail mask (#2258, red) lerps each detailed result back toward
+    /// the surface's own value per texel; 0 applies the detail everywhere, and so
+    /// does a mask not resident yet.
+    pub use_detail_mask: u32,
+    pub _pad: [u32; 2],
 }
 
 /// The occlusion, specular-level (#2151) and height (#2191) maps' terms, packed from

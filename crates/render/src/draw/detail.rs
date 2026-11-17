@@ -8,7 +8,8 @@ use rusty_components::{MaterialAsset, UvMapping};
 use rusty_scene::rules::material::{DETAIL_SCALE_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE};
 
 /// Where and how strongly material `c`'s detail layer applies (#1997): off (all
-/// zero) without a layer or its map. Each value clamped to its authoring row's
+/// zero) without a layer or its map, so a mask alone draws nothing (#2258); the mask
+/// flagged where one is named. Each value clamped to its authoring row's
 /// range, as `uniforms::mapping_uniform` does. Under UV0 its v lane is packed as the main
 /// one is (#1851), so a detail Tiling and Offset read Unity's way over the main
 /// maps' tiled UV; under a world mapping they apply to the projection as set.
@@ -31,7 +32,8 @@ pub(crate) fn detail_uniform(c: &MaterialAsset) -> DetailUniform {
         detail_albedo_scale: scale(d.albedo_scale),
         detail_normal_scale: scale(d.normal_scale),
         detail_smoothness_scale: scale(d.smoothness_scale),
-        _pad: [0; 3],
+        use_detail_mask: u32::from(d.mask.is_some()),
+        _pad: [0; 2],
     }
 }
 
@@ -68,10 +70,28 @@ mod tests {
     #[test]
     fn uv0_packs_unitys_v_and_a_world_mapping_packs_as_set() {
         let uv0 = detail_uniform(&with(UvMapping::Uv0, mapped()));
-        assert_eq!(uv0.use_detail_map, 1);
+        assert_eq!((uv0.use_detail_map, uv0.use_detail_mask), (1, 0));
         assert_eq!(uv0.detail_st, [4.0, 2.0, 0.25, 1.0 - 2.0 - 0.1]);
         let planar = detail_uniform(&with(UvMapping::Planar, mapped()));
         assert_eq!(planar.detail_st, [4.0, 2.0, 0.25, 0.1]);
+    }
+
+    #[test]
+    fn a_mask_is_flagged_beside_a_map_and_alone_draws_nothing() {
+        let masked = DetailLayer {
+            mask: Some("m.png".into()),
+            ..mapped()
+        };
+        assert_eq!(
+            detail_uniform(&with(UvMapping::Planar, masked)).use_detail_mask,
+            1
+        );
+        let lone = DetailLayer {
+            mask: Some("m.png".into()),
+            ..DetailLayer::default()
+        };
+        let off = detail_uniform(&with(UvMapping::Uv0, lone));
+        assert_eq!(off, DetailUniform::default());
     }
 
     #[test]

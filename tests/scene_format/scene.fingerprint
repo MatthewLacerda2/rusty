@@ -948,6 +948,8 @@ scene.materials{}.depth_postpass: bool
 scene.materials{}.detail.albedo_scale: f32
 scene.materials{}.detail.map: option
 scene.materials{}.detail.map: string
+scene.materials{}.detail.mask: option
+scene.materials{}.detail.mask: string
 scene.materials{}.detail.normal_scale: f32
 scene.materials{}.detail.offset: tuple(2)
 scene.materials{}.detail.offset[]: f32

@@ -170,3 +170,7 @@ pub fn default_camera() -> CameraComponent {
 pub fn default_post_processing() -> PostProcessingComponent {
     PostProcessingComponent::default()
 }
+
+#[cfg(test)]
+#[path = "defaults_tests.rs"]
+mod tests;

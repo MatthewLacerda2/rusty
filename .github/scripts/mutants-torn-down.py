@@ -5,8 +5,9 @@
 whose steps ran. It cannot cover a job that was torn down: a runner that died
 (out of memory, out of disk, "lost communication with the server") or a job
 killed at its `timeout-minutes` runs no later step at all, so no report is
-written and nothing reaches the pull request. The workflow's `no-answer` job,
-which `needs:` the mutation job, runs this and posts its line instead.
+written and nothing reaches the pull request. The workflow's `report` job,
+which `needs:` the others, runs this for the `plan` job or a shard (`mutants (K)`)
+that left nothing, and says its line instead (#2283).
 
     mutants-torn-down.py --repo o/r --run 123 --job mutants
 

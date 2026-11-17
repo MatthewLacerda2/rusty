@@ -40,16 +40,16 @@ class Fx:
     """The effects, each recorded or scripted. `verdicts` is what each train's
     wait ends in, in turn; `squashes[n]` what merging pull request `n` ends in."""
 
-    def __init__(self, pulls_=(), clashing=(), red_own=(), verdicts=(outcomes.GO,)):
+    def __init__(self, pulls_=(), clashing=(), red_own=(), verdicts=(outcomes.GO,), running_own=()):
         self.by = {p["number"]: p for p in pulls_}
         self.verdicts, self.squashes, self.merged, self.said = list(verdicts), {}, [], []
         self.pushed, self.deleted, self.main_moved, self.tree_override = [], [], 0, None
-        self.red_own, self.broken = set(red_own), []
+        self.red_own, self.running_own, self.broken = set(red_own), set(running_own), []
         self.main_reads, self.unknown_at = 0, set()  # which `main_state` reads (0-based) fail
         self.ns = argparse.Namespace(
             start=lambda: build.Train("main", "main"), git=git(clashing),
             files=lambda n, h: [f["path"] for f in self.by[n]["files"]],
-            green=lambda n, h: n not in self.red_own, claims=lambda n: None, check=lambda sha: self.broken,
+            green=lambda n, h: None if n in self.running_own else n not in self.red_own, claims=lambda n: None, check=lambda sha: self.broken,
             push=lambda t: self.pushed.append(t.numbers), dispatch=lambda name: None, wait=self.wait,
             delete=self.deleted.append, look=lambda n: self.by[n], squash=self.squash,
             main_state=self.main_state, say=lambda *a: self.said.append(a[0]), pause=lambda s: None, bots=pulls.BOTS,

@@ -100,32 +100,27 @@ concurrency:
   group: mutants-on-request-${{ github.ref == 'refs/heads/main' && github.run_id || github.ref }}
   cancel-in-progress: true
 
+# Three jobs (#2283): `plan` reads the scope and sizes the run, `mutants`
+# measures it on as many runners as the plan needs (one when it is small), and
+# `report` merges what they measured into the one comment the asker reads.
+env:
+  # Each shard's, measured from its job's start: slow setup leaves less, not
+  # overtime. `plan` reads it too, to size the shards.
+  BUDGET_SECONDS: 9900   # 2 h 45
+
 jobs:
-  mutants:
+  # Builds nothing: the scope, the plan's size (`cargo mutants --list` answers
+  # in seconds) and the shard count, kept as the `mutants-plan` artifact for
+  # the other two jobs. A scope it cannot read, or a path scope with nothing to
+  # mutate, writes why into that artifact's `report/` and goes red.
+  plan:
     runs-on: ubuntu-latest
-    # Job-level, so only this job's token may comment: `pull-requests: write`
-    # is for posting the report on the branch's pull request (#912).
-    permissions:
-      contents: read
-      pull-requests: write
-    # Read by `no-answer`, below: set once this job reached its comment, so a
-    # job that ran its steps never gets a second line from there.
+    timeout-minutes: 30
     outputs:
-      answered: ${{ steps.post.outputs.answered }}
-    # One runner: a request is a file or a branch's diff, usually tens of
-    # mutants at ~3.7 min each caught (~12.5 min for a missed one, which runs
-    # the whole suite). A scope too big for the budget below is stopped
-    # by it, and the report says how many planned mutants it never reached.
-    timeout-minutes: 180
-    env:
-      # Measured from the job's start: slow setup leaves less, not overtime.
-      BUDGET_SECONDS: 9900   # 2 h 45
-      # A missing adapter fails the canary test, so the baseline fails and the
-      # run goes red rather than reporting GPU-covered mutants as MISSED (#785).
-      RUSTY_REQUIRE_GPU: "1"
+      in_scope: ${{ steps.plan.outputs.in_scope }}
+      standalone: ${{ steps.plan.outputs.standalone }}
+      shards: ${{ steps.size.outputs.shards }}
     steps:
-      - name: Start the clock
-        run: echo "JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
       # Full history: a `diff` scope needs `origin/main` and the merge base.
       # A queue request checks out its squash commit: `main` may have moved since.
       - uses: actions/checkout@v7
@@ -135,40 +130,20 @@ jobs:
       # The tree is `inputs.commit`, which may predate a step this job calls
       # (`install-tool`, #1973; `system-libs`, #2101): take `.github/actions`
       # from the workflow's own commit, so a request queued before a change to
-      # them still runs. Before the first local action, which is `system-libs`.
+      # them still runs. Before the first local action.
       - name: Shared steps from the workflow's commit
         run: git checkout "$GITHUB_SHA" -- .github/actions
       - name: Toolchain (from rust-toolchain.toml)
         run: rustup show
-      - name: Cache cargo registry + target
-        uses: Swatinem/rust-cache@v2
-        with:
-          # The weekly sweep saves this key from `main`; a request only reads it.
-          shared-key: mutants
-          save-if: false
-      - name: System libs for winit/wgpu builds
-        uses: ./.github/actions/system-libs
-        with:
-          packages: pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
-      # Mesa's software Vulkan driver, as in `ci.yml` (#489, #785). Without it
-      # wgpu finds no adapter, every GPU test skips, and every mutant in code
-      # only the GPU tests reach (render, captures) reports MISSED however well
-      # it is tested. `RUSTY_REQUIRE_GPU` (job env) turns a lost driver into a
-      # failed baseline instead of that silence.
-      - name: Software Vulkan driver (lavapipe)
-        uses: ./.github/actions/system-libs
-        with:
-          packages: mesa-vulkan-drivers libvulkan1
-      # nextest too: mutants run under it (`--test-tool nextest`, below).
-      - name: Install cargo-mutants and cargo-nextest
+      - name: Install cargo-mutants
         uses: ./.github/actions/install-tool
         with:
-          tool: cargo-mutants,cargo-nextest
+          tool: cargo-mutants
 
       # One plan per cargo workspace the scope reaches (#2201): the engine's,
       # and any directory whose `Cargo.toml` opens its own `[workspace]`
       # (`tools/lint`), each with its own diff beside `plan.json`. Why it
-      # could not be read goes to `problem.txt`, for the comment below.
+      # could not be read goes to `problem.txt`, for the report.
       - name: What was asked for
         id: resolve
         env:
@@ -203,28 +178,135 @@ jobs:
           echo "in_scope=$(count root)" >> "$GITHUB_OUTPUT"
           echo "standalone=$(count standalone)" >> "$GITHUB_OUTPUT"
 
-      # A standalone workspace's part (`tools/lint`), before the engine's so the
-      # small one is not starved by the large one's budget. It is one package
-      # with its own tests (`make test-lint`'s `cargo test`) and no `dev`
-      # feature or GPU, so cargo-mutants' own baseline is the right one here
-      # (#2164's mismatch is a workspace member's) and sets the timeout itself.
-      # Status and outcomes land beside the plan, per part, for the report.
-      # When the engine's part has mutants too, a standalone part gets at most
-      # half of what is left (#2201): given all of it, the engine's baseline
-      # then started with no budget and overran the job's limit, and a job
-      # killed at its limit runs no later step, so nothing was posted.
+      # As many runners as the engine's part needs to end inside the budget,
+      # at most a handful (`mutants-request.py`'s docstring has the figures).
+      # A standalone part runs on shard 0 first, so it counts toward the size.
+      # The cap is the number of `The shards (K)` steps in `report`.
+      - name: How many runners it gets
+        id: size
+        env:
+          PLANNED: ${{ steps.plan.outputs.in_scope }}
+          STANDALONE: ${{ steps.plan.outputs.standalone }}
+        run: |
+          python3 .github/scripts/mutants-request.py shards --planned "$PLANNED" --standalone "$STANDALONE" \
+            --budget-seconds "$BUDGET_SECONDS" >> "$GITHUB_OUTPUT" 2> sizing.txt
+          echo "Shards: $(cat sizing.txt)." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # A run with no answer says so (#2201): the scope was unreadable or
+      # named nothing to mutate. `report` posts this below the comment's
+      # earlier report, never over it, and the run stays red.
+      - name: Say why there is no answer
+        if: failure()
+        env:
+          RESOLVE: ${{ steps.resolve.outcome }}
+          PLAN: ${{ steps.plan.outcome }}
+        run: |
+          if [ "$RESOLVE" = failure ]; then why="the scope could not be read: $(cat problem.txt)"
+          elif [ "$PLAN" = failure ] && [ -s scope.txt ]; then why="$(cat scope.txt)"
+          else why="the run broke before it could plan the mutants."
+          fi
+          python3 .github/scripts/mutants-report.py --unanswered "$why" --out report
+
+      - name: Keep the plan
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutants-plan
+          path: |
+            plan.json
+            scope.txt
+            scope-*.diff
+            planned-*.json
+            report/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # One shard of the plan per runner (`plan`'s matrix; one for a small plan).
+  # Each builds and times its own baseline, then mutates its share.
+  mutants:
+    needs: plan
+    if: needs.plan.result == 'success' && (needs.plan.outputs.in_scope != '0' || needs.plan.outputs.standalone != '0')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # A shard's runner: the budget below stops every step before this limit,
+    # and a job past it (or whose runner died) leaves no artifact, which
+    # `report` names as a lost shard.
+    timeout-minutes: 180
+    env:
+      # A missing adapter fails the canary test, so the baseline fails and the
+      # run goes red rather than reporting GPU-covered mutants as MISSED (#785).
+      RUSTY_REQUIRE_GPU: "1"
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+    steps:
+      - name: Start the clock
+        run: echo "JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+      # The same tree `plan` read, and its `.github/actions` from the
+      # workflow's commit (`plan` says why).
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.commit }}
+      - name: Shared steps from the workflow's commit
+        run: git checkout "$GITHUB_SHA" -- .github/actions
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          # The weekly sweep saves this key from `main`; a request only reads it.
+          shared-key: mutants
+          save-if: false
+      - name: System libs for winit/wgpu builds
+        uses: ./.github/actions/system-libs
+        with:
+          packages: pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
+      # Mesa's software Vulkan driver, as in `ci.yml` (#489, #785). Without it
+      # wgpu finds no adapter, every GPU test skips, and every mutant in code
+      # only the GPU tests reach (render, captures) reports MISSED however well
+      # it is tested. `RUSTY_REQUIRE_GPU` (job env) turns a lost driver into a
+      # failed baseline instead of that silence.
+      - name: Software Vulkan driver (lavapipe)
+        uses: ./.github/actions/system-libs
+        with:
+          packages: mesa-vulkan-drivers libvulkan1
+      # nextest too: mutants run under it (`--test-tool nextest`, below).
+      - name: Install cargo-mutants and cargo-nextest
+        uses: ./.github/actions/install-tool
+        with:
+          tool: cargo-mutants,cargo-nextest
+      - name: The plan
+        uses: actions/download-artifact@v8
+        with:
+          name: mutants-plan
+
+      # A standalone workspace's part (`tools/lint`), on the first shard only,
+      # before the engine's so the small one is not starved by the large one's
+      # budget. It is one package with its own tests (`make test-lint`'s `cargo
+      # test`) and no `dev` feature or GPU, so cargo-mutants' own baseline is
+      # the right one here (#2164's mismatch is a workspace member's) and sets
+      # the timeout itself. Status and outcomes land beside the plan, per part,
+      # for the report. When the engine's part has mutants too, a standalone
+      # part gets at most half of what is left (#2201): given all of it, the
+      # engine's baseline then started with no budget and overran the job's
+      # limit, and a job killed at its limit leaves nothing to report.
       # The memory cap and core dumps off as in every mutation step
       # (`mutants-sweep.yml` says why): a scanner mutant that loops pushing
       # onto a `Vec` reaches the cap in seconds, and with a core to write it
-      # outlived its timeout and took the runner down (#2230).
+      # outlived its timeout and took the runner down (#2230). The list is read
+      # on fd 3, so cargo-mutants never reads the rest of it as its stdin.
       - name: Standalone workspaces
-        if: steps.plan.outputs.standalone != '0'
+        if: matrix.shard == 0 && needs.plan.outputs.standalone != '0'
         env:
-          ENGINE: ${{ steps.plan.outputs.in_scope }}
+          ENGINE: ${{ needs.plan.outputs.in_scope }}
         run: |
           set -uo pipefail
           ulimit -v 8388608 -c 0
-          python3 .github/scripts/mutants-scope.py parts plan.json --standalone --planned | while read -r slug root diff; do
+          python3 .github/scripts/mutants-scope.py parts plan.json --standalone --planned > standalone.txt
+          while read -r -u 3 slug root diff; do
             budget=$(( BUDGET_SECONDS - ($(date +%s) - JOB_STARTED) ))
             [ "$ENGINE" = 0 ] || budget=$(( budget / 2 ))
             rc=0
@@ -237,19 +319,20 @@ jobs:
                   --in-diff "$diff" || rc=$?
             fi
             echo "$rc" > "status-$slug"
-          done
+          done 3< standalone.txt
 
       # The baseline is run here, not by cargo-mutants (`--baseline skip`, #2164):
       # cargo-mutants 27 builds and tests its own baseline with `--package` set
-      # to the mutated packages only, whatever `test_workspace` says, while each
-      # mutant runs the whole workspace's tests. A member crate's baseline then
-      # timed only that crate's tests and every mutant overran 3x of it (#2160),
-      # and a member without a `dev` feature failed it outright (#2155). This
-      # step runs exactly what each mutant will: the same build, then the same
-      # tests, timed, and the timeout is 3x that test time. `mutants-sweep.yml`
-      # does the same; `test_baseline.py` (`make scripts`) holds
-      # the two commands to cargo-mutants' own arguments. A baseline that fails
-      # turns the run red: there is no honest report to give.
+      # to the mutated packages only, whatever `test_workspace` says. A member
+      # crate's baseline then timed only that crate's tests and every mutant
+      # overran 3x of it (#2160), and a member without a `dev` feature failed
+      # it outright (#2155). This step runs the same build each mutant does,
+      # then the whole workspace's tests, timed, and the timeout is 3x that
+      # test time: a mutant runs a subset of them (`Mutate`), so the whole
+      # suite's time bounds every one. `mutants-sweep.yml` does the same;
+      # `test_baseline.py` (`make scripts`) holds the two commands to
+      # cargo-mutants' own arguments. A baseline that fails turns the run red:
+      # there is no honest report to give.
       #
       # Under nextest (`--test-tool nextest`, #1844), the gate's runner: a
       # process per test and the `gpu` test group, so the run covers the unit
@@ -267,7 +350,7 @@ jobs:
       # building on past the job's limit, where no later step runs to say so.
       - name: Baseline
         id: baseline
-        if: steps.plan.outputs.in_scope != '0'
+        if: needs.plan.outputs.in_scope != '0'
         run: |
           set -euo pipefail
           ulimit -v 8388608 -c 0
@@ -282,7 +365,11 @@ jobs:
             [ "$(left)" -gt 0 ] || spent "$1"
             rc=0
             timeout --signal=INT --kill-after=60s "$(left)s" "${@:2}" || rc=$?
-            case $rc in 0) ;; 124|137) spent "$1" ;; *) exit "$rc" ;; esac
+            case $rc in
+              0) ;;
+              124|137) spent "$1" ;;
+              *) echo "after the unmutated tests failed (the Baseline step)" > status-root; exit "$rc" ;;
+            esac
           }
           bounded "before the baseline built" cargo nextest run --no-run --verbose --workspace --features=dev
           start=$(date +%s)
@@ -292,86 +379,206 @@ jobs:
           echo "Baseline: the workspace's tests in ${secs}s, so each mutant's test timeout is ${timeout}s." | tee -a "$GITHUB_STEP_SUMMARY"
           echo "timeout=$timeout" >> "$GITHUB_OUTPUT"
 
+      # One cargo-mutants run per package the plan mutates (#2283;
+      # `mutants-request.py`'s docstring has the measurements): `--package P`,
+      # tested only by what can see P (`-E 'rdeps(=P)'`) and P's own tests
+      # first (the tool config `priority` writes). The build is the
+      # baseline's, `--workspace` from `.cargo/mutants.toml`'s
+      # `test_workspace`, so a mutant rebuilds only what depends on P. This
+      # shard's share of each package is `--shard`, turned by the package's
+      # offset in the plan so the whole plan is dealt round-robin.
+      #
       # `--features dev` is cargo-mutants' own flag, so it reaches the build
       # phase too: after `--` it reached only the test phase, which then
       # recompiled the workspace with `dev` inside the mutant's test timeout.
       # `--in-place` mutates this checkout, whose `target/` the baseline built,
       # so the first mutant does not rebuild the workspace in a copy. SIGINT at
       # the budget is cargo-mutants' Ctrl-C: it stops cleanly and keeps what it
-      # measured. When setup and the baseline already spent the budget, no
-      # mutant runs and the run reads as stopped at its budget (124): `timeout
-      # 0s` would disable the limit, and a negative one exits 125, read as broken.
+      # measured. A package reached with no budget left reads as stopped at
+      # its budget (124): `timeout 0s` would disable the limit, and a negative
+      # one exits 125, read as broken. The list is read on fd 3, so
+      # cargo-mutants never reads the rest of it as its stdin.
+      #
+      # Before a package is mutated, `cargo nextest list` with exactly its
+      # mutants' filter and tool config must succeed and select a test
+      # (`mutants-request.py tests`): cargo-mutants counts any non-zero nextest
+      # exit as caught, so a filter or config nextest refuses would report
+      # every mutant caught. A package that fails it is broken: its status says
+      # why, and the report counts its mutants as never reached.
       - name: Mutate
         id: mutate
-        if: steps.plan.outputs.in_scope != '0'
+        if: needs.plan.outputs.in_scope != '0'
         env:
           TIMEOUT: ${{ steps.baseline.outputs.timeout }}
+          SHARD: ${{ matrix.shard }}
+          SHARDS: ${{ strategy.job-total }}
         run: |
           # The baseline already wrote `status-root` when it stopped at the budget.
           [ -n "$TIMEOUT" ] || exit 0
-          budget=$(( BUDGET_SECONDS - ($(date +%s) - JOB_STARTED) ))
           ulimit -v 8388608 -c 0
-          rc=0
-          if [ "$budget" -le 0 ]; then
-            echo "::warning::setup and the baseline spent the ${BUDGET_SECONDS}s budget; no mutant ran"
-            rc=124
-          else
-            timeout --signal=INT --kill-after=60s "${budget}s" \
-              cargo mutants --workspace --test-tool nextest --no-shuffle --baseline skip --in-place \
-                --timeout "$TIMEOUT" --features dev --output mutants-root \
-                --in-diff scope-root.diff -- --fail-fast --test-threads 2 || rc=$?
-          fi
-          echo "$rc" > status-root
+          python3 .github/scripts/mutants-request.py packages planned-root.json > packages.txt
+          while read -r -u 3 pkg offset; do
+            out="mutants-root/$pkg"
+            mkdir -p "$out"
+            python3 .github/scripts/mutants-request.py priority "$pkg" > "$out/priority.toml"
+            budget=$(( BUDGET_SECONDS - ($(date +%s) - JOB_STARTED) ))
+            filter="rdeps(=$pkg)" config="mutants:$PWD/$out/priority.toml"
+            rc=0
+            if [ "$budget" -le 0 ]; then
+              echo "::warning::the ${BUDGET_SECONDS}s budget was spent before $pkg's mutants"
+              rc=124
+            elif ! timeout "${budget}s" cargo nextest list --workspace --features dev \
+                   -E "$filter" --tool-config-file "$config" --message-format json > "$out/tests.json"; then
+              echo "::error::cargo nextest list failed for $pkg's filter and tool config"
+              echo "the unmutated \`cargo nextest list\` with its mutants' filter failed" > "$out/status"
+              continue
+            elif ! [ "$(python3 .github/scripts/mutants-request.py tests < "$out/tests.json")" -gt 0 ] 2>/dev/null; then
+              echo "::error::$pkg's filter selects no test"
+              echo "its mutants' filter \`$filter\` selects no test" > "$out/status"
+              continue
+            else
+              timeout --signal=INT --kill-after=60s "${budget}s" \
+                cargo mutants --package "$pkg" --test-tool nextest --no-shuffle --baseline skip --in-place \
+                  --timeout "$TIMEOUT" --features dev --output "$out" \
+                  --shard "$(( ((SHARD - offset) % SHARDS + SHARDS) % SHARDS ))/$SHARDS" --sharding round-robin \
+                  --in-diff scope-root.diff -- --fail-fast --test-threads 2 \
+                  -E "$filter" --tool-config-file "$config" || rc=$?
+            fi
+            echo "$rc" > "$out/status"
+          done 3< packages.txt
 
-      # Red when cargo-mutants broke in any part (any status but finished or
-      # stopped at its budget). The report is still written, the parts that
-      # finished beside a section for the broken one (#2201), and is posted.
+      # What this shard measured, for `report` to merge: each run's status,
+      # outcomes and survivors' diffs, which is all `report` reads (the logs
+      # stay in the job's log). Without it (a runner that died, a job past its
+      # limit) `report` names the shard as lost.
+      - name: Keep this shard
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutants-shard-${{ matrix.shard }}
+          path: |
+            status-*
+            mutants-*/mutants.out/outcomes.json
+            mutants-*/mutants.out/diff/
+            mutants-*/*/status
+            mutants-*/*/mutants.out/outcomes.json
+            mutants-*/*/mutants.out/diff/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # The one report (#912): every shard's outcomes merged into the layout
+  # `mutants-report.py` reads (`mutants-request.py merge`), rendered, and
+  # posted on the branch's open pull request, or its merged one when the
+  # queue merged it first (or the one the run names, `pr`), one comment edited
+  # in place by each later run; a branch with neither (a run on `main`, a
+  # scratch branch, a PR closed unmerged) gets no comment (#912, #1530).
+  #
+  # A run with no answer says so there too (#2201, #2230): `plan`'s reason, or
+  # for a job that left nothing (torn down, past its limit) the step it died
+  # in and GitHub's annotation (`mutants-torn-down.py`), posted below the
+  # comment's earlier report (`--append`), never over it, and the run stays
+  # red. A lost shard is named in the report beside what the others measured.
+  # Never on a cancelled run (`!cancelled()`): a superseded dispatch or a pull
+  # request closed unmerged (#1530), read by nobody. A shard past
+  # `timeout-minutes` reads `cancelled` too, but the run is not cancelled, so
+  # it is covered.
+  report:
+    needs: [plan, mutants]
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+      checks: read
+      # Only this job's token may comment, for the report (#912).
+      pull-requests: write
+    steps:
+      # The workflow's own commit (the default ref), not `inputs.commit`: these
+      # are the scripts that know the jobs above.
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+      - name: The plan
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: mutants-plan
+          path: run
+      # Each shard by name into its own directory, one step per possible
+      # shard (`mutants-request.py`'s `MAX_SHARDS`, held by `test_request.py`):
+      # given a `pattern`, `download-artifact` unpacks a lone match flat, so a
+      # one-shard run's only shard read as lost.
+      - name: The shards (0)
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: mutants-shard-0
+          path: run/shards/mutants-shard-0
+      - name: The shards (1)
+        if: contains(fromJSON(needs.plan.outputs.shards || '[]'), 1)
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: mutants-shard-1
+          path: run/shards/mutants-shard-1
+      - name: The shards (2)
+        if: contains(fromJSON(needs.plan.outputs.shards || '[]'), 2)
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: mutants-shard-2
+          path: run/shards/mutants-shard-2
+      - name: The shards (3)
+        if: contains(fromJSON(needs.plan.outputs.shards || '[]'), 3)
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: mutants-shard-3
+          path: run/shards/mutants-shard-3
+
+      # Red when there is no answer, or cargo-mutants broke in any part (any
+      # status but finished or stopped at its budget), or a shard was lost.
+      # The report is still written, the parts that finished beside a section
+      # for the broken one (#2201), and is posted.
       - name: Render the report
         id: render
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLAN: ${{ needs.plan.result }}
+          SHARDS: ${{ needs.plan.outputs.shards }}
         run: |
-          python3 .github/scripts/mutants-report.py plan.json scope.txt --out report 2> render-error.txt \
-            || { cat render-error.txt >&2; exit 1; }
+          set -uo pipefail
+          s="$PWD/.github/scripts"
+          mkdir -p run && cd run
+          why() { python3 "$s/mutants-torn-down.py" --repo "$GITHUB_REPOSITORY" --run "$GITHUB_RUN_ID" --job "$1" \
+                    || echo "the $1 job left no report."; }
+          unanswered() { python3 "$s/mutants-report.py" --unanswered "$1" --out report; echo "append=--append" >> "$GITHUB_OUTPUT"; }
+          rc=0
+          if [ -f report/report.md ]; then
+            echo "append=--append" >> "$GITHUB_OUTPUT"; rc=1   # `plan` said why
+          elif [ "$PLAN" != success ] || [ ! -f plan.json ]; then
+            unanswered "$(why plan)"; rc=1
+          else
+            total=$(python3 -c 'import json,sys; print(len(json.loads(sys.argv[1] or "[0]")))' "$SHARDS")
+            python3 "$s/mutants-request.py" merge plan.json --shards shards --total "$total" > lost.txt
+            while read -r slug k; do
+              echo "shard $k left no report: $(why "mutants ($k)")" >> "lost-$slug.txt"
+            done < lost.txt
+            python3 "$s/mutants-report.py" plan.json scope.txt --out report 2> render-error.txt \
+              || { cat render-error.txt >&2; rc=1; }
+            [ -f report/report.md ] || unanswered "$(cat render-error.txt)"
+          fi
           cat report/report.md >> "$GITHUB_STEP_SUMMARY"
           # And in the log, for a caller with no `gh` to download the artifact
           # (a cloud session reads the job log through its GitHub tools).
-          cat report/report.md report/survivors.diff
+          cat report/report.md report/survivors.diff 2>/dev/null
+          exit "$rc"
 
-      # The same report on the branch's open pull request, or its merged one
-      # when the queue merged it first (or the one the run names, `pr`), one comment edited in place by each
-      # later run; a branch with neither (a run on `main`, a scratch branch, a
-      # PR closed unmerged) gets no comment (#912, #1530).
       # `continue-on-error`: a comment that could not be posted is a lost
       # delivery, not a lost measurement, and survivors never turn this run
       # red, so neither may this. The report is still in the summary and log.
-      #
-      # A run with no answer says so there too (#2201): when the scope was
-      # unreadable, planned nothing, or broke before a report was written,
-      # this writes a one-line report of why, which the next step adds below
-      # the comment's earlier report (`--append`), never over it, and the run
-      # stays red. Not on a cancel: a cancelled run was superseded by a newer
-      # dispatch or its pull request closed unmerged (#1530), and nobody reads
-      # it. A job killed at `timeout-minutes`, or whose runner died, runs no
-      # later step at all: the budget above stops every part, the baseline
-      # included, before the limit, and the `no-answer` job covers the rest.
-      - name: Say why there is no answer
-        id: why
-        if: failure() && hashFiles('report/report.md') == ''
-        env:
-          RESOLVE: ${{ steps.resolve.outcome }}
-          PLAN: ${{ steps.plan.outcome }}
-          BASELINE: ${{ steps.baseline.outcome }}
-          RENDER: ${{ steps.render.outcome }}
-        run: |
-          if [ "$RESOLVE" = failure ]; then why="the scope could not be read: $(cat problem.txt)"
-          elif [ "$PLAN" = failure ] && [ -s scope.txt ]; then why="$(cat scope.txt)"
-          elif [ "$BASELINE" = failure ]; then why="the engine's tests failed unmutated (the Baseline step), so no mutant could be measured."
-          elif [ "$RENDER" = failure ]; then why="$(cat render-error.txt)"
-          else why="the run broke before it could write a report."
-          fi
-          python3 .github/scripts/mutants-report.py --unanswered "$why" --out report
-
       - name: Post the report on the pull request
-        id: post
         if: success() || failure()
         continue-on-error: true
         env:
@@ -379,11 +586,10 @@ jobs:
           BRANCH: ${{ github.ref_name }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           PR: ${{ inputs.pr }}
-          APPEND: ${{ steps.why.outcome == 'success' && '--append' || '' }}
+          APPEND: ${{ steps.render.outputs.append }}
         run: |
-          [ -f report/report.md ] || { echo "no report was written; nothing to post"; exit 0; }
-          echo answered=true >> "$GITHUB_OUTPUT"
-          python3 .github/scripts/mutants-pr-comment.py report/report.md $APPEND \
+          [ -f run/report/report.md ] || { echo "no report was written; nothing to post"; exit 0; }
+          python3 .github/scripts/mutants-pr-comment.py run/report/report.md $APPEND \
             --repo "$GITHUB_REPOSITORY" --branch "$BRANCH" --run-url "$RUN_URL" ${PR:+--pr "$PR"}
 
       # On a red run too, so `make mutants-remote` prints why it has no answer.
@@ -392,73 +598,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: mutants-report
-          path: report/
+          path: run/report/
           if-no-files-found: warn
-          retention-days: 14
-
-  # A torn-down mutation job still answers (#2230). When its runner dies (a
-  # mutant that grew without bound took its memory, "lost communication with
-  # the server") or it is killed at `timeout-minutes`, no step of its own runs,
-  # so `Say why there is no answer` cannot. A job that `needs:` it still runs,
-  # and reads what happened from outside: the run's jobs and their annotations
-  # (`mutants-torn-down.py`), then posts that line on the pull request, below
-  # any earlier report, and keeps it as the `mutants-report` artifact
-  # `make mutants-remote` prints.
-  #
-  # It tells a torn-down job from one whose steps ran by the `answered` output:
-  # a torn-down job has no outputs at all, whatever it set before it died, and
-  # one that reached its comment step set it. Never on a green run (the
-  # mutation job's result) and never on a cancelled run (`!cancelled()`: a
-  # superseded dispatch or a pull request closed unmerged, read by nobody). A
-  # job past `timeout-minutes` reads `cancelled` too, but the run is not
-  # cancelled, so it is covered. The run is red already when this runs, so it
-  # cannot turn a green run red. Measured on a throwaway workflow: a job killed
-  # at its limit reads `cancelled` with no outputs, one whose runner was killed
-  # reads `failure` with none, and a failed job whose steps ran keeps them.
-  # One case no guard closes: a runner that dies after `Post the report` loses
-  # `answered` too, so this line can land below a real report; the line it
-  # posts says a report above it is the truth.
-  no-answer:
-    needs: mutants
-    if: always() && !cancelled() && needs.mutants.result != 'success' && needs.mutants.result != 'skipped' && needs.mutants.outputs.answered != 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      actions: read
-      checks: read
-      pull-requests: write
-    steps:
-      # The workflow's own commit (the default ref), not `inputs.commit`: these
-      # are the scripts that know this job.
-      - uses: actions/checkout@v7
-        with:
-          sparse-checkout: .github/scripts
-      - name: Say why there is no answer
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          why=$(python3 .github/scripts/mutants-torn-down.py --repo "$GITHUB_REPOSITORY" --run "$GITHUB_RUN_ID" --job mutants) \
-            || why="the mutation job was torn down before it could write a report."
-          echo "::error::$why"
-          why="$why If a report stands above this line, that report is the truth: its runner died after posting it."
-          python3 .github/scripts/mutants-report.py --unanswered "$why" --out report
-          cat report/report.md >> "$GITHUB_STEP_SUMMARY"
-      - name: Post it on the pull request
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BRANCH: ${{ github.ref_name }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          PR: ${{ inputs.pr }}
-        run: |
-          python3 .github/scripts/mutants-pr-comment.py report/report.md --append \
-            --repo "$GITHUB_REPOSITORY" --branch "$BRANCH" --run-url "$RUN_URL" ${PR:+--pr "$PR"}
-      - name: Keep it
-        uses: actions/upload-artifact@v7
-        with:
-          name: mutants-report
-          path: report/
-          # The mutation job may have uploaded its own before its runner died.
-          overwrite: true
           retention-days: 14

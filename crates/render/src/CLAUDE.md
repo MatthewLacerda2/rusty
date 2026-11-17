@@ -112,7 +112,7 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   branch leaves them undefined (on Metal they change frame to frame).
   No gate holds it: naga's validator skips the fragment stage's uniformity check, and
   a text match can't tell a per-pixel branch from a uniform one.
-- **The forward fragment stage binds 14 of Metal's 16 samplers** (a hard cap; 2
+- **The forward fragment stage binds 15 of Metal's 16 samplers** (a hard cap; 1
   free), counted from the layouts by `setup::limits`' test. A new engine-owned
   texture in group 0 reads through the shared `s_linear_clamp`
   (`gpu::linear_clamp`), not a sampler of its own; only a material map, whose

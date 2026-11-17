@@ -166,13 +166,14 @@ pub fn fit_data_slot(source: &Path) {
     );
 }
 
-/// The image at `source`, just assigned to a material's height slot (#2191), set to
-/// [`TextureType::SingleChannel`] when it is still `Default`, and said so: the
-/// parallax march reads its red alone, raw, as Unity's *Single Channel* keeps it.
-pub fn fit_height_slot(source: &Path) {
+/// The image at `source`, just assigned to a slot whose shader reads its red alone,
+/// raw (a height map's parallax march, a detail mask), set to
+/// [`TextureType::SingleChannel`] when it is still `Default`, as Unity's *Single
+/// Channel* keeps it, and said so: `used` names the slot ("a height map").
+pub fn fit_single_channel_slot(source: &Path, used: &str) {
     fit_slot(
         source,
-        "a height map, so its Texture Type is now SingleChannel",
+        &format!("{used}, so its Texture Type is now SingleChannel"),
         |s| {
             (s.texture_type == TextureType::Default).then_some(TextureSettings {
                 texture_type: TextureType::SingleChannel,
