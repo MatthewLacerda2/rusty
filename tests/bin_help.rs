@@ -25,6 +25,7 @@ fn binaries() -> Vec<(&'static str, Command)> {
         ("session-mcp", engine_bin!("session-mcp")),
         ("game", engine_bin!("game")),
         ("editor-capture", engine_bin!("editor-capture")),
+        ("bench-scenes", engine_bin!("bench-scenes")),
     ]
 }
 

@@ -40,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export launcher bench bless-converters fuzz-lock
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export launcher bench bench-scenes bless-converters fuzz-lock
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -474,3 +474,13 @@ export: ## Ship a project without its convertible sources. make export PROJECT=~
 # compiles one. docs/testing.md has the details.
 bench: ## Benchmark the stress scene (release build), with the change against the last run
 	cargo run --release --quiet --features dev --bin play -- --project tests/fixtures/project tests/fixtures/project/scenarios/bench/bench.lua out/bench
+
+# A game project's own scenes, anywhere on disk: each loaded, warmed up and measured
+# with Harness.Bench from deterministic viewpoints (its cameras, the spawn, seeded
+# navmesh points), plus load_ms, rss_peak_mb and gpu_mb, each against that scene's
+# last run (kept in out/bench/scenes/<project>/<scene>.json). SCENES names some by
+# file stem (default: every assets/scenes/*.scene); RES=WxH overrides 1920x1080.
+# Nothing is written into the project. A signal, never a gate; docs/testing.md.
+bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/games/horde [SCENES=a,b] [RES=WxH]
+	@test -n "$(PROJECT)" || { echo "bench-scenes: make bench-scenes PROJECT=<project dir> [SCENES=a,b] [RES=WxH]" >&2; exit 1; }
+	cargo run --release --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RES),--size $(RES)) out/bench/scenes
