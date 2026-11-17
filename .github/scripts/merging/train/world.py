@@ -14,18 +14,23 @@ from merging.train import build, rails, ride
 from merging.verdict import decide, github, runlist
 
 
-def own_green(repo: str, number: int, head: str) -> bool:
-    """Whether every gating workflow passed on `head` itself (#1785): the ruleset
-    requires it for the merge call anyway (`strict: false`), and it keeps a
-    known-red pull request out of a train. GitHub not answering, or a `gh`
-    refusal (`verdict.github.gh` exits on it), is *no*: an HTTP 500 while the
-    line was walked exited the watch with no `watch ended:` line (#1785's review)."""
+def own_green(repo: str, number: int, head: str) -> bool | None:
+    """Whether every gating workflow passed on `head` itself (#1785): `True`
+    when all did, `False` when one is red, `None` while one is still running or
+    unread. The ruleset requires it for the merge call anyway (`strict: false`),
+    and it keeps a known-red pull request out of a train. One read tells red from
+    running ([`verdict.decide.assess`]). GitHub not answering, or a `gh` refusal
+    (`verdict.github.gh` exits on it), is `None`: an HTTP 500 while the line was
+    walked exited the watch with no `watch ended:` line (#1785's review)."""
     try:
         runs, jobs = github.evidence(repo, head)
     except (github.Unreachable, SystemExit):
-        return False
+        return None
     tip = {"number": number, "headRefOid": head}
-    return all(decide.assess(tip, w, runlist.runs_for(runs, head, w), jobs)[0] == decide.PASSED for w in runlist.WORKFLOWS)
+    states = {decide.assess(tip, w, runlist.runs_for(runs, head, w), jobs)[0] for w in runlist.WORKFLOWS}
+    if decide.FAILED in states:
+        return False
+    return True if states == {decide.PASSED} else None
 
 
 def changed_files(repo: str, number: int) -> list[str] | None:
@@ -106,11 +111,14 @@ def effects(repo: str, opts: argparse.Namespace, git) -> argparse.Namespace:
             files[head] = got
         return files[head]
 
-    def passed(number: int, head: str) -> bool:
+    def passed(number: int, head: str) -> bool | None:
         # Only a pass is remembered: a red or unfinished head is asked again.
-        if head not in green and own_green(repo, number, head):
+        if head in green:
+            return True
+        state = own_green(repo, number, head)
+        if state:
             green.add(head)
-        return head in green
+        return state
 
     return argparse.Namespace(
         start=functools.partial(started, git, opts.root),

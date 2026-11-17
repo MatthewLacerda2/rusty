@@ -17,11 +17,11 @@ class Yard:
     def __init__(self, world: World, ends: dict[int, str], halt=None):
         self.world, self.ends, self.halt, self.rode = world, ends, halt, []
 
-    def form(self, ranked):
+    def form(self, ranked, aged=frozenset()):
         if len(ranked) < 2:
-            return [ranked[0]], None, []
+            return [ranked[0]], None, [], len(ranked)
         train = build.Train("main", "main", [build.Car(p["number"], p["headRefOid"], "t", "c") for p in ranked])
-        return ranked, train, ["watch: a note."]
+        return ranked, train, ["watch: a note."], len(ranked)
 
     def ride(self, train, tick=None):
         self.rode.append(train.numbers)
