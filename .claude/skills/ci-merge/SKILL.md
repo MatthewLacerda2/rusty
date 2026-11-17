@@ -207,14 +207,14 @@ At each take the watch builds a train of up to 4 (`train.group.CAP`): a chain
 of single-parent commits on `origin/main`, one per member, each the tree
 `git merge-tree` writes for that head on the chain so far. A PR rides only if it
 passes the take's first checks (ready, labelled, review recorded, description),
-**its own head's `ci-gate` and `lint-gate` are green**, it merges cleanly onto
-the chain, and changes no manifest (`Cargo.toml`, `Cargo.lock`, a crate's) if a
-member before it does; otherwise it waits this round and keeps its place (`watch: #N waits …`,
-a not-green first `is passed over`, taken alone only if aged or nobody can ride).
+**its own head's `ci-gate` and `lint-gate` are green**, and it merges cleanly onto
+the chain; otherwise it waits this round and keeps its place (`watch: #N waits …`).
+A manifest change rides (`board.lock_waits` keeps a second out of the line); a
+first whose own CI is still running `is passed over` unless aged or nobody can ride.
 
 These **go alone**, by the single-PR steps: the first in line when it cannot ride
 otherwise (it conflicts with `main`, even a `sorted` conflict the take resolves;
-Dependabot); a Markdown-only PR as CI's `code` filter counts it; one touching
+its own CI red or its description refused, so it is handed back; Dependabot); a Markdown-only PR as CI's `code` filter counts it; one touching
 `.github/scripts/merging/`, `.github/workflows/`, `.github/actions/`, `tools/lint/`
 (except the tables in `train.group.RIDES`), `Makefile`, `merge-queue.py` or
 `queue-daemon.py` (`watch: #N goes alone: it changes …`); one whose head was in a

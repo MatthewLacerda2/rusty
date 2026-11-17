@@ -10,9 +10,11 @@ from merging.watch import aging, board, ending, handbacks, kept, mainline, order
 
 def taking_census(in_line: int, rideable: int | None) -> str:
     """What a take line says of the line it was taken from (#2285): its size, and
-    how many in it could ride a train (`None` when no train was formed), so a
-    measurement over the log can tell a single take that had a partner from one
-    that had none. `make queue-events` drops the take line (`view.events.KEEP`)."""
+    how many in it are rideable ([`watch.trains.Yard.form`]'s count: not alone,
+    green on its own head, not red in a train; claims and a conflict with `main`
+    left out), so a measurement over the log can tell a single take that had a
+    partner from one that had none. `rideable` is `None` when the watch runs no
+    trains or the round formed none (`origin/main` unread). `make queue-events` drops the take line (`view.events.KEEP`)."""
     return f" ({in_line} in line)" if rideable is None else f" ({in_line} in line, {rideable} rideable)"
 
 

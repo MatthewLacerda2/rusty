@@ -75,10 +75,10 @@ class Effects(unittest.TestCase):
         with mock.patch.object(gitio, "git", return_value=failed), self.assertRaises(stopping.Stopped):
             world.compiles(SHA, opts)
 
-    def test_a_gh_refusal_reading_own_ci_is_not_green(self):
+    def test_a_gh_refusal_reading_own_ci_is_unread(self):
         for down in (github.Unreachable("HTTP 500"), SystemExit(1)):
             with self.subTest(down=down), mock.patch.object(github, "evidence", side_effect=down):
-                self.assertFalse(world.own_green("o/r", 1, SHA))
+                self.assertIsNone(world.own_green("o/r", 1, SHA))  # unread, not red: passed over, never handed back
 
     def test_main_is_unknown_when_the_fetch_failed(self):
         git = lambda *a: (0, "tree\n") if a[0] == "rev-parse" else (0, "0\n")

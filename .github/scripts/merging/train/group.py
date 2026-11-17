@@ -6,10 +6,11 @@ fewest conflicts, label), each candidate merged onto the train so far
 keeps its place, so aging still counts it (#928). The first in line sets the
 round: if it cannot ride, it is taken alone, through today's path, and so is a
 train that found nobody to ride with it ("a group of one is just today's path").
-The one exception (#2285) is a first refused only because its own CI is not
-green yet ([`NOT_GREEN`]): unless aging put it first, it is passed over like a
-conflicting one, and the train forms from those behind it; it is taken alone
-only when nobody behind it can ride.
+The one exception (#2285) is a first refused only because its own CI is still
+running ([`Unfinished`], the kind [`NOT_GREEN`] is): unless aging put it first,
+it is passed over like a conflicting one, and the round takes those behind it;
+it is taken alone only when nobody behind it can ride. A first whose own CI is
+red goes alone, so today's path hands it back at once.
 
 ## The measurement behind the two #2285 rules
 
@@ -26,14 +27,14 @@ took 28 trains (85 pull requests) and 271 single takes:
 Of the 232, 127 were a first whose own `ci-gate` and `lint-gate` were not both
 green, which set the round to a single take without walking the line behind it:
 hence the pass-over. 28 were a manifest (24 `Cargo.lock`, 4 `Cargo.toml`): hence
-[`MANIFESTS`] ride, at most one per train. The take line names the line's size
+a manifest change rides. At most one rides a train, held by
+[`watch.board.lock_waits`], which keeps every manifest pull request but the
+oldest out of the line, so a train never meets two. The take line names the line's size
 and how many could ride (`watch.loop`), so the next measurement can say how many
 single takes had a partner.
 """
 
 from __future__ import annotations
-
-import re
 
 from merging.train import build
 from merging.verdict import changes
@@ -58,17 +59,13 @@ ALONE_PREFIXES = (".github/actions/", ".github/scripts/merging/", ".github/workf
 ALONE_FILES = ("Makefile", ".github/scripts/merge-queue.py", ".github/scripts/queue-daemon.py")
 RIDES = ("tools/lint/src/layers/table.rs", "tools/lint/src/components/waivers.rs")
 
-# The manifests ride, but at most one member of a train changes one (#2285; the
-# table above: 28 single takes were a manifest going alone). Two members
-# resolving dependencies apart is what a textual merge cannot see; one member's
-# resolution built on the train's tree is what the train's CI proves.
-MANIFESTS = ("Cargo.toml", "Cargo.lock")
-# A workspace member's manifest is a manifest too (crates/CLAUDE.md).
-MEMBER_MANIFEST = re.compile(r"crates/[^/]+/Cargo\.toml")
+class Unfinished(str):
+    """A refusal that passes the first in line over instead of taking it alone
+    (#2285): the kind is what [`form`] keys on, never the words."""
 
-# The refusal of a pull request whose own head is not green yet ([`watch.trains.Yard.refuse`]):
-# the one refusal of the first in line that passes it over instead of taking it alone (#2285).
-NOT_GREEN = "its own head's `ci-gate` and `lint-gate` are not both green"
+
+# Why a pull request whose own head's CI is still running may not ride ([`watch.trains.Yard.refuse`]).
+NOT_GREEN = Unfinished("its own head's `ci-gate` and `lint-gate` are not both green yet")
 
 
 def alone(files: list[str]) -> str | None:
@@ -85,14 +82,9 @@ def alone(files: list[str]) -> str | None:
     return f"it changes {hit}, which goes alone" if hit else None
 
 
-def manifest(files: list[str]) -> str | None:
-    """The first manifest `files` changes ([`MANIFESTS`], a member's `Cargo.toml`), or `None`."""
-    return next((f for f in files if f in MANIFESTS or MEMBER_MANIFEST.fullmatch(f)), None)
-
-
 def form(
     line: list[dict], train: build.Train, git, refuse, cap: int = CAP,
-    aged: set[int] | frozenset[int] = frozenset(), manifest_of=lambda pull: None,
+    aged: set[int] | frozenset[int] = frozenset(),
 ) -> tuple[list[dict], build.Train | None, list[str]]:
     """The members of this round, the train they ride (`None`: one goes alone,
     today's path), and one note per pull request passed over.
@@ -100,17 +92,13 @@ def form(
     `line` is the ready pull requests in rank order; `train` is empty, on the
     `main` to land on; `refuse(pull)` says why a pull request may not ride
     ([`alone`], [`NOT_GREEN`], red in a train before), or `None`; `aged` holds
-    those aging put first ([`watch.aging.Line.aged`]); `manifest_of(pull)` is the
-    manifest it changes ([`manifest`]), or `None`.
+    those aging put first ([`watch.aging.Line.aged`]).
     """
     first, notes, members = line[0], [], []
     held = refuse(first)
-    passed = held == NOT_GREEN and first["number"] not in aged
+    passed = isinstance(held, Unfinished) and first["number"] not in aged
     if held and not passed:
         return [first], None, [f"watch: #{first['number']} goes alone: {held}."]
-    if passed:
-        notes.append(f"watch: #{first['number']} is passed over this round: {held}; it keeps its place, and the train forms from those behind it.")
-    carrier = None  # the member that changes a manifest
     for pull in line:
         if len(members) == cap:
             break
@@ -121,10 +109,6 @@ def form(
         if why:
             notes.append(f"watch: #{number} waits for a train of its own: {why}.")
             continue
-        changed = manifest_of(pull)
-        if changed and carrier:
-            notes.append(f"watch: #{number} waits for a train of its own: it changes {changed}, and #{carrier} in this train already changes a manifest.")
-            continue
         car = build.couple(train, number, pull.get("headRefOid", ""), git)
         if car is None:
             if not members and not passed:
@@ -132,12 +116,12 @@ def form(
             clash = f"it conflicts with the train so far ({', '.join(f'#{n}' for n in train.numbers)})" if members else "it does not merge cleanly onto `main`"
             notes.append(f"watch: #{number} waits: {clash}.")
             continue
-        if changed:
-            carrier = number
         train.cars.append(car)
         members.append(pull)
-    if not members:
+    if passed and not members:
         return [first], None, [*notes, f"watch: #{first['number']} goes alone: {held}, and nobody behind it can ride."]
-    if len(members) == 1:
-        return members, None, notes
-    return members, train, notes
+    if passed:
+        riders = ", ".join(f"#{p['number']}" for p in members)
+        taken = f"{riders} is taken alone" if len(members) == 1 else f"{riders} ride without it"
+        notes.insert(0, f"watch: #{first['number']} is passed over this round: {held}; it keeps its place, and {taken}.")
+    return members, (train if len(members) > 1 else None), notes

@@ -43,7 +43,7 @@ class Forming(unittest.TestCase):
         line = [pr(1), pr(2), pr(3)]
         members, train, notes = formed(Fx(line, red_own={2}), line)
         self.assertEqual(train, [1, 3])
-        self.assertIn("`ci-gate` and `lint-gate` are not both green", notes[0])
+        self.assertIn("its own head's `ci-gate` or `lint-gate` is red", notes[0])
 
     def test_a_first_that_cannot_ride_is_todays_path(self):
         line = [pr(1), pr(2)]

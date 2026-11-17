@@ -35,8 +35,10 @@ The rules of [`group`] are tuned on the queue's own log. Two weeks of trains
 takes, 232 of them a first in line that could not ride) showed most single takes
 were a first whose own CI was not green yet (127), with green, rideable pull
 requests behind it never walked, and a manifest change sent alone (28). So a
-not-yet-green first is passed over for the round unless aging put it first, and
-one manifest-changing member may ride, never two (#2285; the table is in
+first whose own CI is still running is passed over for the round unless aging
+put it first (a red one still goes alone, to be handed back), and a
+manifest-changing member rides; `watch.board.lock_waits` keeps a second out of
+the line, so a train never carries two (#2285; the table is in
 [`group`]'s docstring). Every take's line says how many were in line and how
 many could ride, which the next measurement reads.
 
