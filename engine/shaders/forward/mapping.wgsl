@@ -7,9 +7,11 @@
 // forward pass shifts the one `MapCoords` they all read by the height map's
 // parallax first (`forward::parallax`, #2191).
 //
-// Every branch here is on `material()` (the draw's record, indexed by a per-draw
-// uniform) or on the camera's mip bias, so the implicit-LOD samples sit in uniform
-// control flow.
+// Every branch here but one is on `material()` (the draw's record, indexed by a
+// per-draw uniform) or on the camera's mip bias, so the implicit-LOD samples sit in
+// uniform control flow. The one is `lookup_uv`'s, on the per-pixel `MapCoords::bend`:
+// only `textureSampleGrad`, which needs no uniform control flow, may sit inside it;
+// an implicit-LOD sample or a derivative there would be undefined.
 //
 // The mip bias (`camera.lod.x`) is TAA's: `log2(scene/output)` while it upscales
 // the view (#1702), plus the camera's TAA *Mip Bias* on every frame TAA runs
@@ -212,6 +214,13 @@ fn level_at(size: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>) -> f32 {
 // UV0's and Planar's one lookup's (at `c`'s own derivatives), Triplanar's three projections' blended by their
 // weights, plus the mip bias [`lookup`] reads it with. Takes derivatives: call it in
 // uniform control flow (a branch on `material()` is).
+//
+// Under a height map the level is the unshifted `dx`/`dy`'s, while where `bend` is 0
+// the map is read at the shifted coordinates' implicit derivatives, which may differ
+// by what `bend` lets through (`parallax::BEND_FROM`): up to 1 mip sharper (the shift
+// running against the coordinates at half their rate, halving the footprint) or
+// about 0.6 mip blurrier (running along them, 1.5 times it). Toksvig's spread is then
+// that much off for those pixels; where `bend` reaches 1 the two agree.
 fn normal_level(t: texture_2d<f32>, c: MapCoords) -> f32 {
     let size = vec2<f32>(textureDimensions(t));
     var level = level_at(size, c.dx, c.dy);
