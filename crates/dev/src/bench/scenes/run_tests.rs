@@ -36,7 +36,25 @@ const OPTS: Options = Options {
     size: (64, 64),
     warmup: 1,
     frames: 2,
+    runs: 2,
 };
+
+fn labels(report: &SceneReport) -> Vec<&str> {
+    report.views.iter().map(|k| k.label.as_str()).collect()
+}
+
+/// The one-off rows every bench adds: its load, and its memory where readable.
+fn has_load_and_memory(report: &SceneReport) {
+    assert!(report.row("frame_ms").is_some(), "{:?}", report.rows);
+    assert!(report.row("load_ms").is_some_and(|r| r.avg > 0.0));
+    if cfg!(any(target_os = "linux", target_os = "macos")) {
+        assert!(report.row("rss_peak_mb").is_some_and(|r| r.avg > 0.0));
+    }
+    if report.row("renderer_ms").is_some() && cfg!(any(target_os = "linux", target_os = "macos")) {
+        let gpu = report.row("gpu_mb");
+        assert!(gpu.is_some_and(|r| r.avg > 0.0), "{:?}", report.rows);
+    }
+}
 
 #[test]
 fn gpu_a_projects_scenes_bench_from_their_viewpoints_with_load_and_memory() {
@@ -45,16 +63,22 @@ fn gpu_a_projects_scenes_bench_from_their_viewpoints_with_load_and_memory() {
     let out = root.join("out");
     let settings = ProjectSettings::default;
 
-    let yard = bench(&root, "yard", settings(), &out, OPTS).unwrap();
+    let extra = Extra::default();
+    let yard = bench(&root, "yard", settings(), &out, OPTS, &extra).unwrap();
     assert_eq!(
         yard.views.len(),
         1 + 7 * views::YAWS.len(),
         "{:?}",
         yard.views
     );
-    assert_eq!(yard.views[0], "camera Cam");
-    let empty = bench(&root, "levels/empty", settings(), &out, OPTS).unwrap();
-    assert_eq!(empty.views, ["bounds centre"]);
+    assert_eq!(labels(&yard)[0], "camera Cam");
+    assert_eq!(
+        yard.measured,
+        2 * yard.views.len() as u32 * 2,
+        "every frame of both runs"
+    );
+    let empty = bench(&root, "levels/empty", settings(), &out, OPTS, &extra).unwrap();
+    assert_eq!(labels(&empty), ["bounds centre"]);
     assert!(empty
         .warnings
         .iter()
@@ -65,17 +89,7 @@ fn gpu_a_projects_scenes_bench_from_their_viewpoints_with_load_and_memory() {
         .any(|w| w.starts_with("not baked: lightmaps")));
 
     for report in [&yard, &empty] {
-        assert!(report.row("frame_ms").is_some(), "{:?}", report.rows);
-        assert!(report.row("load_ms").is_some_and(|r| r.avg > 0.0));
-        if cfg!(any(target_os = "linux", target_os = "macos")) {
-            assert!(report.row("rss_peak_mb").is_some_and(|r| r.avg > 0.0));
-        }
-        if report.row("renderer_ms").is_some()
-            && cfg!(any(target_os = "linux", target_os = "macos"))
-        {
-            let gpu = report.row("gpu_mb");
-            assert!(gpu.is_some_and(|r| r.avg > 0.0), "{:?}", report.rows);
-        }
+        has_load_and_memory(report);
     }
     // Nothing was written into the project but the out dir asked for.
     let mut written: Vec<_> = std::fs::read_dir(&root)
@@ -84,9 +98,13 @@ fn gpu_a_projects_scenes_bench_from_their_viewpoints_with_load_and_memory() {
         .collect();
     written.sort();
     assert_eq!(written, ["assets", "out"]);
+    assert!(
+        out.join("yard.console.log").is_file(),
+        "the console is kept"
+    );
 
     // The second run compares against the first, and picks the same viewpoints.
-    let again = bench(&root, "yard", settings(), &out, OPTS).unwrap();
+    let again = bench(&root, "yard", settings(), &out, OPTS, &extra).unwrap();
     assert_eq!(again.views, yard.views);
     let text = std::fs::read_to_string(out.join("yard.txt")).unwrap();
     assert!(!text.contains("no previous report"), "{text}");

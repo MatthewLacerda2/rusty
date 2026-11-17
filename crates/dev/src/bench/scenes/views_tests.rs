@@ -111,7 +111,9 @@ fn neither_camera_nor_navmesh_looks_along_z_from_the_bounds_centre() {
         views.views,
         [Viewpoint {
             label: "bounds centre".into(),
-            view: want
+            view: want,
+            at: Vec3::new(1.0, 2.0, 0.0),
+            yaw: 90.0,
         }]
     );
     assert_eq!(views.warnings.len(), 1);

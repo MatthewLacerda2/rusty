@@ -13,10 +13,18 @@ fn view(rows: &[(&str, f64, f64)]) -> Report {
     }
 }
 
+fn key(label: &str) -> ViewKey {
+    ViewKey {
+        label: label.into(),
+        ..ViewKey::default()
+    }
+}
+
 fn scene(frame_ms: f64) -> SceneReport {
     let mut r = SceneReport {
         scene: "pool".into(),
-        views: vec!["spawn".into()],
+        views: vec![key("spawn")],
+        runs: 1,
         frames: 300,
         size: (1920, 1080),
         rows: aggregate(&[("spawn".into(), view(&[("frame_ms", frame_ms, frame_ms)]))]),
@@ -31,7 +39,7 @@ fn scene(frame_ms: f64) -> SceneReport {
 fn the_table_shows_each_rows_change_and_what_the_adapter_lacked() {
     let first = scene(2.0).render(None);
     assert!(
-        first.contains("pool — 1 viewpoints x 300 frames at 1920x1080"),
+        first.contains("pool — 1 viewpoints x 300 frames x 1 runs at 1920x1080"),
         "{first}"
     );
     assert!(first.contains("no previous report"), "{first}");
@@ -83,6 +91,15 @@ fn the_summary_is_one_line_per_scene_with_a_dash_where_unmeasured() {
         "{text}"
     );
     assert!(lines[3].trim_end().ends_with('-'), "no gpu_mb: {text}");
+    // `IMPORT=1`: the project's one import_ms, after the scenes.
+    let mut first = scene(2.0);
+    first.push_value("import_ms", 840.0);
+    let text = summary(&[first, scene(3.0)]);
+    let last = text.lines().last().unwrap_or_default();
+    assert!(
+        last.starts_with("import_ms 840") && last.ends_with("loading pool)"),
+        "{text}"
+    );
 }
 
 #[test]
@@ -101,7 +118,7 @@ fn a_last_run_of_another_shape_is_said_once_and_gets_no_change_column() {
     );
     assert!(!text.contains("no previous report"), "{text}");
     now.size = before.size;
-    now.views.push("nav 0 yaw 0".into());
+    now.views.push(key("nav 0 yaw 0"));
     assert!(now.against(Some(&before))[0].contains("viewpoints 1 -> 2"));
 }
 

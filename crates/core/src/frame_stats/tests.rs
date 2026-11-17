@@ -115,3 +115,17 @@ fn an_ended_value_lands_on_its_own_frame_once() {
     );
     assert_eq!(stats.window(1).get("wall_ms").unwrap().last, 5.0);
 }
+
+/// `tick_systems` is the newest tick's, a name run twice summed, in run order.
+#[test]
+fn tick_systems_hold_the_newest_tick_summed_by_name() {
+    let mut stats = FrameStats::default();
+    stats.record_system("old", 9.0);
+    stats.end_tick();
+    for (name, ms) in [("b", 1.0), ("a", 2.0), ("b", 0.5)] {
+        stats.record_system(name, ms);
+    }
+    stats.end_tick();
+    let got = &stats.tick_systems;
+    assert_eq!(*got, [("b", 1.5), ("a", 2.0)]);
+}

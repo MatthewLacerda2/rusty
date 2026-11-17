@@ -89,6 +89,8 @@ pub fn window_frame(
     let render = (cost.frames != frames_before).then(|| RenderedFrame {
         counters: renderer.frame_counters,
         cpu_ms: cost.cpu_ms,
+        // The window reads no stages: none copied on every live frame.
+        stages: Vec::new(),
         gpu: renderer.take_gpu_times(),
     });
     WindowFrame {

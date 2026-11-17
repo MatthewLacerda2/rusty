@@ -11,6 +11,7 @@ fn record(n: u64, drew: bool) -> FrameRecord {
     let render = drew.then(|| crate::capture::RenderedFrame {
         counters: Default::default(),
         cpu_ms: 1.0,
+        stages: Vec::new(),
         gpu: None,
     });
     let window = WindowFrame {

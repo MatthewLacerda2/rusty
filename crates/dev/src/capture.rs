@@ -60,6 +60,8 @@ pub struct RenderedFrame {
     pub counters: RenderCounters,
     /// CPU ms `Renderer::render` took to record the frame.
     pub cpu_ms: f64,
+    /// `cpu_ms` by stage (`Renderer::frame_stages`), in the order reached.
+    pub stages: Vec<(&'static str, f64)>,
     /// GPU ms per render pass; `None` where the adapter has no timestamps.
     pub gpu: Option<GpuTimes>,
 }
@@ -141,6 +143,10 @@ impl CaptureHost {
             // is precisely why later shots may ask for any other size.
             let (width, height) = (width.max(1), height.max(1));
             self.renderer = pollster::block_on(Renderer::new_headless(width, height));
+            // A capture's frame is measured (the stats, the benches): by stage too.
+            if let Some(r) = self.renderer.as_mut() {
+                r.time_stages(true);
+            }
         }
         self.renderer.as_mut()
     }
@@ -178,6 +184,7 @@ impl CaptureHost {
         let frame = RenderedFrame {
             counters: renderer.frame_counters,
             cpu_ms,
+            stages: renderer.frame_stages().to_vec(),
             gpu: renderer.take_gpu_times(),
         };
         self.last_frame = Some(frame.clone());

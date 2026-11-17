@@ -366,3 +366,10 @@ debug = "line-tables-only"
 [profile.dev.package."*"]
 opt-level = 2
 debug = false
+
+# `make bench-scenes PROFILE=1`: a release build whose line tables let a sampling
+# profiler name each function and line (`dev::bench::scenes::profile`). Its own
+# target folder, so it never rebuilds over the plain release build.
+[profile.profiling]
+inherits = "release"
+debug = "line-tables-only"

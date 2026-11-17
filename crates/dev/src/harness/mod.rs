@@ -209,6 +209,16 @@ impl Harness {
         )?;
 
         let console_path = self.out_dir.join("console.log");
+        // lint: allow(asset-write) a harness report, not read by a path-keyed cache
+        // lint: allow(stored-format) the console log, plain text
+        std::fs::write(console_path, self.console_text())?;
+
+        Ok(results_path)
+    }
+
+    /// The console as `console.log` holds it: one `[INFO]`, `[WARN]` or
+    /// `[ERROR]` line per message, oldest first.
+    pub fn console_text(&self) -> String {
         let mut buf = String::new();
         for (msg, level) in &self.console.borrow().messages {
             let tag = match level {
@@ -218,10 +228,6 @@ impl Harness {
             };
             buf.push_str(&format!("[{}] {}\n", tag, msg));
         }
-        // lint: allow(asset-write) a harness report, not read by a path-keyed cache
-        // lint: allow(stored-format) the console log, plain text
-        std::fs::write(console_path, buf)?;
-
-        Ok(results_path)
+        buf
     }
 }

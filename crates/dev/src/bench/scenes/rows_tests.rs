@@ -1,0 +1,102 @@
+//! The time rows' parts hold their parent whole: every system the schedule runs
+//! is a `cpu.<system>` row (named by the schedule, so a fixture system of known
+//! cost shows under its own name), every renderer stage a `render.<stage>` row,
+//! and what no part holds (`cpu.other`, `render.other`) stays within timer
+//! overhead. Renders when an adapter is there (hence `gpu_`); without one the
+//! render half is skipped.
+
+use std::time::Duration;
+
+use rusty_app::{Resources, Stage, World};
+use rusty_components::{CameraComponent, LightComponent, LightType};
+use rusty_scene::Scene;
+
+use super::super::{measure, Report};
+use super::*;
+
+/// The fixture system's cost per tick.
+const NAP: Duration = Duration::from_millis(4);
+
+fn napper(_: &mut World, _: &mut Resources) {
+    std::thread::sleep(NAP);
+}
+
+fn avg(report: &Report, metric: &str) -> Option<f64> {
+    let row = report.metrics.iter().find(|(m, _)| m == metric);
+    row.map(|(_, s)| s.avg)
+}
+
+/// The sum of `prefix.*` rows, `other` included, and the `other` row alone.
+fn parts(report: &Report, prefix: &str) -> (f64, f64) {
+    let rows = report.metrics.iter().filter(|(m, _)| m.starts_with(prefix));
+    let sum = rows.map(|(_, s)| s.avg).sum();
+    (
+        sum,
+        avg(report, &format!("{prefix}other")).unwrap_or(f64::NAN),
+    )
+}
+
+/// A one-camera scene lit by a shadowing sun (so the sweeps gather casters) with
+/// [`napper`] in its schedule, measured for a few frames.
+fn measured() -> Report {
+    let root = rusty_test_support::temp::dir().join(format!("rows_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join("assets/scenes")).unwrap();
+    let mut scene = Scene::new();
+    let cam = scene.add_entity("Cam".into());
+    let camera = Some(CameraComponent::default());
+    scene.world.set_camera(cam, camera);
+    let sun = scene.add_entity("Sun".into());
+    let light = LightComponent {
+        light_type: LightType::Directional,
+        cast_shadows: true,
+        ..rusty_edit::authoring::default_light()
+    };
+    scene.world.set_light(sun, Some(light));
+    let path = root.join("assets/scenes/a.scene");
+    rusty_edit::save_to_file(&scene, &path.to_string_lossy()).unwrap();
+    let settings = ProjectSettings::default();
+    let (mut harness, _) = load(&root.join("out"), &root, "a", settings, (64, 64)).unwrap();
+    let mut world = harness.world.borrow_mut();
+    let schedule = world.resources.schedule_mut();
+    schedule.add_system(Stage::FixedUpdate, napper);
+    drop(world);
+    measure(&mut harness, 6)
+}
+
+/// `prefix.*` rows sum to `total`, and their `other` row is within 3% of it.
+fn holds_whole(report: &Report, prefix: &str, total: f64) {
+    let (sum, other) = parts(report, prefix);
+    assert!(
+        (sum - total).abs() <= total * 1e-9,
+        "{prefix} rows {sum} vs {total}"
+    );
+    assert!(
+        other.abs() <= total * 0.03,
+        "{prefix}other {other} of {total}"
+    );
+}
+
+#[test]
+fn gpu_every_system_and_render_stage_is_a_row_and_together_they_are_the_whole() {
+    let report = measured();
+    let napped = avg(&report, "cpu.napper").expect("the fixture system has its row");
+    let cpu = avg(&report, "cpu_ms").unwrap();
+    // Scaled by the same CPU clock as cpu_ms: its share is what is measured.
+    assert!(
+        napped / cpu > 0.5,
+        "the nap is most of the tick: {napped} of {cpu}"
+    );
+    let scripts = avg(&report, "cpu.update_scripts");
+    assert!(scripts.is_some(), "{:?}", report.metrics);
+    holds_whole(&report, "cpu.", cpu);
+
+    let Some(renderer) = avg(&report, "renderer_ms") else {
+        return; // no adapter: nothing rendered
+    };
+    for stage in ["extract", "shadows", "shadow_gather", "scene"] {
+        let row = avg(&report, &format!("render.{stage}"));
+        assert!(row.is_some(), "{stage}: {:?}", report.metrics);
+    }
+    holds_whole(&report, "render.", renderer);
+}

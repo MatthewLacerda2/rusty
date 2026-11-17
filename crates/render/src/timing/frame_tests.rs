@@ -32,3 +32,30 @@ fn gpu_a_frame_counts_and_an_aside_render_does_not() {
     r.render(&mut view, &empty, &camera, &out, false);
     assert_eq!(r.frame_cost().frames, 2, "the next frame counts again");
 }
+
+/// Stages are timed only when asked for, and then they hold the frame's whole
+/// CPU time, the scene pass among them.
+#[test]
+fn gpu_frame_stages_are_off_by_default_and_sum_to_the_frame_when_on() {
+    let Some(mut r) = crate::test_gpu::headless_or_skip(16, 16) else {
+        return;
+    };
+    let mut scene = Scene::new();
+    scene.skybox_path = String::new();
+    create_entity(&mut scene, "Box", Some(Primitive::Box));
+    let camera = Camera::new(glam::Vec3::new(0.0, 0.0, 4.0), -90.0, 0.0);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 16, 16);
+    let out = view.color_target_view().unwrap();
+    r.render(&mut view, &scene, &camera, &out, false);
+    assert!(r.frame_stages().is_empty(), "off unless asked for");
+    r.time_stages(true);
+    r.render(&mut view, &scene, &camera, &out, false);
+    let stages = r.frame_stages();
+    let names: Vec<_> = stages.iter().map(|(s, _)| *s).collect();
+    for want in ["setup", "extract", "shadows", "scene", "post_fx", "finish"] {
+        assert!(names.contains(&want), "{want} in {names:?}");
+    }
+    let sum: f64 = stages.iter().map(|(_, ms)| ms).sum();
+    let whole = r.frame_cost().cpu_ms;
+    assert!(sum <= whole && sum > whole * 0.97, "{sum} of {whole}");
+}

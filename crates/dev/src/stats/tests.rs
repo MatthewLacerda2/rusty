@@ -43,6 +43,7 @@ fn render_counters_fold_in_with_the_renderer_time() {
     let frame = RenderedFrame {
         counters,
         cpu_ms: 1.5,
+        stages: Vec::new(),
         gpu: None,
     };
     record_render(&mut stats, &frame);

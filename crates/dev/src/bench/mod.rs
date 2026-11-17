@@ -4,7 +4,10 @@
 //! shooter-shaped stress scene ([`stress`]) onto the default yard, warms up, then
 //! `Harness.Bench(n)` steps and renders `n` frames, sampling each one, and prints
 //! a short report — frame, render and GPU ms (average and p95), GPU ms per pass,
-//! draw calls, triangles, dropped and culled counts, and the heavy systems.
+//! draw calls, triangles, dropped and culled counts, every system's CPU ms
+//! (`cpu.<system>`, as the schedule names it) and the renderer's CPU ms by stage
+//! (`render.<stage>`, `Renderer::frame_stages`), each set with an `other` row for
+//! what none of its parts holds.
 //!
 //! **Before and after is automatic.** The report is kept as `<out_dir>/bench.json`
 //! (`out/bench/` under `make bench`) and each run prints its change against the one
@@ -57,8 +60,6 @@ const COUNTERS: [&str; 8] = [
     "decals_visible",
     "decal_cluster_refs",
 ];
-/// The systems a bench row reports, in order: the sim's heavy hitters.
-const SYSTEMS: [&str; 4] = ["update_scripts", "tick_nav", "step_physics", "animate"];
 
 /// Step and render `ticks` frames (fewer if the game quits), sampling each one.
 /// The CPU probe runs right before and right after each sim step, the GPU probe
@@ -118,43 +119,59 @@ fn time_probe(probe: Option<&ClockProbe>, harness: &mut Harness) -> Option<f64> 
     probe.time(renderer)
 }
 
-/// One frame's row values: the sim's CPU time, what rendering it cost, its
-/// counters and the heavy systems' times. Every GPU pass is sampled every frame
-/// (zero when it did not run), so the rows are the same from run to run. CPU and
-/// GPU times are scaled by the frame's clock `speed`s; a frame a probe missed has
-/// no rows of that side's scaled times.
+/// One frame's row values: the sim's CPU time and every system's share of it
+/// (`cpu.<system>`, named by the schedule), what rendering it cost and each of its
+/// stages' share (`render.<stage>`), its counters. Every GPU pass is sampled every
+/// frame (zero when it did not run), so the rows are the same from run to run.
+/// CPU and GPU times are scaled by the frame's clock `speed`s; a frame a probe
+/// missed has no rows of that side's scaled times.
 fn sample(samples: &mut Samples, stats: &FrameStats, frame: Option<&RenderedFrame>, speed: Speeds) {
     if let Some(s) = stats.get("frame_ms") {
         samples.push("frame_ms", s.last);
         if let Some(cpu) = speed.cpu {
             samples.push("cpu_ms", s.last * cpu);
             samples.push("cpu_clock_pct", cpu * 100.0);
+            let systems = stats.tick_systems.iter().copied();
+            push_parts(samples, "cpu", s.last, systems, cpu);
         }
     }
-    if let Some(frame) = frame {
-        samples.push("renderer_ms", frame.cpu_ms);
-        if let (Some(gpu), Some(speed)) = (&frame.gpu, speed.gpu) {
-            samples.push("gpu_ms", gpu.total_ms() * speed);
-            for pass in GpuPass::ALL {
-                let ms = gpu.passes.iter().find(|(p, _)| *p == pass);
-                let ms = ms.map_or(0.0, |m| m.1 * speed);
-                samples.push(&format!("gpu.{}", pass.name()), ms);
-            }
-            samples.push("gpu_raw_ms", gpu.total_ms());
-            samples.push("gpu_clock_pct", speed * 100.0);
+    let Some(frame) = frame else { return };
+    samples.push("renderer_ms", frame.cpu_ms);
+    let stages = frame.stages.iter().copied();
+    push_parts(samples, "render", frame.cpu_ms, stages, 1.0);
+    if let (Some(gpu), Some(speed)) = (&frame.gpu, speed.gpu) {
+        samples.push("gpu_ms", gpu.total_ms() * speed);
+        for pass in GpuPass::ALL {
+            let ms = gpu.passes.iter().find(|(p, _)| *p == pass);
+            let ms = ms.map_or(0.0, |m| m.1 * speed);
+            samples.push(&format!("gpu.{}", pass.name()), ms);
         }
-        for (key, value) in frame.counters.pairs() {
-            if COUNTERS.contains(&key) {
-                samples.push(key, value as f64);
-            }
+        samples.push("gpu_raw_ms", gpu.total_ms());
+        samples.push("gpu_clock_pct", speed * 100.0);
+    }
+    for (key, value) in frame.counters.pairs() {
+        if COUNTERS.contains(&key) {
+            samples.push(key, value as f64);
         }
     }
-    let Some(cpu) = speed.cpu else { return };
-    for system in SYSTEMS {
-        if let Some(s) = stats.systems.get(system) {
-            samples.push(&format!("cpu.{system}"), s.last * cpu);
-        }
+}
+
+/// A parent time's parts as `<prefix>.<part>` rows, each scaled by `scale`, and
+/// `<prefix>.other`: what of `total` no part holds (timer overhead; a stage left
+/// untimed shows here).
+fn push_parts<'a>(
+    samples: &mut Samples,
+    prefix: &str,
+    total: f64,
+    parts: impl Iterator<Item = (&'a str, f64)>,
+    scale: f64,
+) {
+    let mut sum = 0.0;
+    for (name, ms) in parts {
+        samples.push(&format!("{prefix}.{name}"), ms * scale);
+        sum += ms;
     }
+    samples.push(&format!("{prefix}.other"), (total - sum) * scale);
 }
 
 /// Measure `ticks` frames, print the report with its change against the last one
