@@ -262,10 +262,10 @@ fn surface(material: Option<&MaterialAsset>, map_average: &MapAverage<'_>) -> Ba
             .unwrap_or(Vec3::ONE)
     };
     let colour = |map: &Option<MapRef>| average(map, MapEncoding::Colour);
-    let occlusion = occlusion_factor(
-        average(&m.occlusion_map, MapEncoding::Data).x,
-        m.occlusion_strength,
-    );
+    // The forward shader's `mapping::occlusion` lerp, on the map's average red, at
+    // the strength the shader reads (`occlusion_amount`): both in 0–1, so is it.
+    let red = average(&m.occlusion_map, MapEncoding::Data).x;
+    let occlusion = 1.0 + m.occlusion_amount() * (red - 1.0);
     let albedo = Vec3::from(m.base_color) * colour(&m.base_color_map) * occlusion;
     let emissive = Vec3::from(m.emissive) * colour(&m.emissive_map);
     let blend = if m.is_transparent() {
@@ -278,17 +278,5 @@ fn surface(material: Option<&MaterialAsset>, map_average: &MapAverage<'_>) -> Ba
         albedo: albedo.clamp(Vec3::ZERO, Vec3::ONE),
         emissive: emissive * blend,
         occludes: !m.is_transparent(),
-    }
-}
-
-/// The occlusion map's factor for a map averaging `red`, as the forward shader's
-/// `mapping::occlusion` lerps it (`1 + strength × (red − 1)`), held to 0–1; 1 (no
-/// change) for a value that is not finite.
-fn occlusion_factor(red: f32, strength: f32) -> f32 {
-    let factor = 1.0 + strength * (red - 1.0);
-    if factor.is_finite() {
-        factor.clamp(0.0, 1.0)
-    } else {
-        1.0
     }
 }

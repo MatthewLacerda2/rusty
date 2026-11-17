@@ -284,6 +284,15 @@ impl MaterialAsset {
     pub fn receives_ssr(&self) -> bool {
         self.receive_ssr.unwrap_or(!self.is_transparent())
     }
+
+    /// Its `occlusion_strength` as the shader and the lightmap bake read it: in
+    /// `[0, 1]`, glTF's range; a hand-written NaN applies the map whole, as the default.
+    pub fn occlusion_amount(&self) -> f32 {
+        match self.occlusion_strength.is_nan() {
+            true => 1.0,
+            false => self.occlusion_strength.clamp(0.0, 1.0),
+        }
+    }
 }
 
 #[cfg(test)]

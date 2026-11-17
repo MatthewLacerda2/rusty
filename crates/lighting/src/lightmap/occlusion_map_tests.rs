@@ -54,10 +54,14 @@ fn the_occlusion_map_scales_the_albedo_by_its_strength() {
     let none = gathered(material("a.png", Some("ao.png"), 0.0));
     assert_eq!(none, Vec3::splat(0.8), "strength 0 ignores the map");
     assert_eq!(gathered(material("a.png", None, 1.0)), Vec3::splat(0.8));
+    // Read as the renderer reads it (`MaterialAsset::occlusion_amount`).
     let nan = gathered(material("a.png", Some("ao.png"), f32::NAN));
-    assert_eq!(nan, Vec3::splat(0.8), "a NaN strength changes nothing");
+    assert!(
+        close(nan, 0.4),
+        "a NaN strength applies the map whole: {nan}"
+    );
     let over = gathered(material("a.png", Some("ao.png"), 4.0));
-    assert_eq!(over, Vec3::ZERO, "a strength past 1 is held at black");
+    assert!(close(over, 0.4), "a strength past 1 is held at 1: {over}");
 }
 
 /// A closed 4 × 3 × 4 m room whose floor wears `floor` and whose white walls and

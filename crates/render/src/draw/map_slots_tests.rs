@@ -108,13 +108,12 @@ fn the_level_maps_flag_what_is_named_and_hold_the_strength_in_range() {
         on.use_specular_map,
     );
     assert_eq!(flags, (1, 0.25, 0));
-    assert_eq!(
-        occlusion_strength(f32::NAN),
-        1.0,
-        "a NaN applies the map whole"
-    );
-    let ends = (occlusion_strength(-2.0), occlusion_strength(9.0));
-    assert_eq!(ends, (0.0, 1.0));
+    let over = MaterialAsset {
+        occlusion_strength: 9.0,
+        ..m
+    };
+    let held = level_maps_uniform(Some(&over)).occlusion_strength;
+    assert_eq!(held, 1.0, "the strength is read through occlusion_amount");
 }
 
 #[test]
