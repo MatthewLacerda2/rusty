@@ -119,7 +119,7 @@ class Riders(unittest.TestCase):
         yard = fx.yard()
         yard.ride(yard.form(line)[1])
         fx.ns.claims = lambda n: (n, outcomes.HANDED_BACK, "a stray keyword.") if n == 2 else None
-        members, train, notes = yard.form(line)
+        members, train, notes, _ = yard.form(line)
         self.assertEqual(([p["number"] for p in members], train), ([1], None))
         self.assertIn("#2 waits for a train of its own: a stray keyword", notes[0])
 

@@ -207,19 +207,19 @@ At each take the watch builds a train of up to 4 (`train.group.CAP`): a chain
 of single-parent commits on `origin/main`, one per member, each the tree
 `git merge-tree` writes for that head on the chain so far. A PR rides only if it
 passes the take's first checks (ready, labelled, review recorded, description),
-**its own head's `ci-gate` and `lint-gate` are green**, and it merges cleanly onto
-the chain; otherwise it waits this round and keeps its place (`watch: #N waits …`),
-never updated for the train.
+**its own head's `ci-gate` and `lint-gate` are green**, it merges cleanly onto
+the chain, and changes no manifest (`Cargo.toml`, `Cargo.lock`, a crate's) if a
+member before it does; otherwise it waits this round and keeps its place (`watch: #N waits …`,
+a not-green first `is passed over`, taken alone only if aged or nobody can ride).
 
 These **go alone**, by the single-PR steps: the first in line when it cannot ride
-(it conflicts with `main`, even a `sorted` conflict the take resolves; its CI is
-not green; Dependabot); a Markdown-only PR as CI's `code` filter counts it; one
-touching `.github/scripts/merging/`, `.github/workflows/`, `.github/actions/`,
-`tools/lint/` (except the data tables in `train.group.RIDES`), `Makefile`,
-`merge-queue.py`, `queue-daemon.py`, `Cargo.toml` or `Cargo.lock`
-(`watch: #N goes alone: it changes …`); one whose head was in a red train; a
-train that found nobody to ride with its first. A train's take counts as one pass
-for those behind it in the aging count.
+otherwise (it conflicts with `main`, even a `sorted` conflict the take resolves;
+Dependabot); a Markdown-only PR as CI's `code` filter counts it; one touching
+`.github/scripts/merging/`, `.github/workflows/`, `.github/actions/`, `tools/lint/`
+(except the tables in `train.group.RIDES`), `Makefile`, `merge-queue.py` or
+`queue-daemon.py` (`watch: #N goes alone: it changes …`); one whose head was in a
+red train; a train that found nobody to ride with its first. A train's take counts
+as one pass for those behind it in the aging count.
 
 The tip is pushed to `merge-train/<main>-<a>-<b>…` (never forced) and `lint.yml`
 then `ci.yml` are dispatched on it. It is checked first as step 2 (compiled

@@ -61,8 +61,13 @@ class Yard:
         if why:
             return why
         if not self.fx.green(number, head):
-            return "its own head's `ci-gate` and `lint-gate` are not both green"
+            return group.NOT_GREEN
         return self.claimed(pull)
+
+    def manifest(self, pull: dict) -> str | None:
+        """The manifest `pull` changes ([`group.manifest`]), or `None`; files GitHub
+        did not list were refused before this is asked."""
+        return group.manifest(self.fx.files(pull["number"], pull.get("headRefOid", "")) or [])
 
     def claimed(self, pull: dict) -> str | None:
         """Why what `pull` claims now refuses it (its description, its issues'
@@ -71,17 +76,29 @@ class Yard:
         refused = self.fx.claims(pull["number"])
         return refused[2].rstrip(".") if refused else None
 
-    def form(self, ranked: list[dict]) -> tuple[list[dict], build.Train | None, list[str]]:
-        """This round's members and their train (`None`: the first goes alone), and the notes."""
+    def form(self, ranked: list[dict], aged: set[int] | frozenset[int] = frozenset()) -> tuple[list[dict], build.Train | None, list[str], int | None]:
+        """This round's members and their train (`None`: one goes alone), the
+        notes, and how many in `ranked` could ride, each asked [`refuse`] once a
+        round (`None`: unknown). `aged` is
+        who aging put first ([`watch.aging.Line.aged`])."""
         train = self.fx.start()
         if train is None:
-            return [ranked[0]], None, ["watch: git could not read `origin/main`; taking the first alone."]
-        by = {p["number"]: p for p in ranked}
-        while self.waiting:
+            return [ranked[0]], None, ["watch: git could not read `origin/main`; taking the first alone."], None
+        asked: dict[int, str | None] = {}
+
+        def refuse(pull: dict) -> str | None:  # one question per pull request a round
+            if pull["number"] not in asked:
+                asked[pull["number"]] = self.refuse(pull)
+            return asked[pull["number"]]
+
+        by, formed = {p["number"]: p for p in ranked}, None
+        while self.waiting and formed is None:
             half = [by[n] for n, head in self.waiting.pop(0) if n in by and by[n].get("headRefOid") == head]
             if half:
-                return group.form(half, train, self.fx.git, self.claimed, cap=len(half))
-        return group.form(ranked, train, self.fx.git, self.refuse)
+                formed = group.form(half, train, self.fx.git, self.claimed, cap=len(half), manifest_of=self.manifest)
+        if formed is None:
+            formed = group.form(ranked, train, self.fx.git, refuse, aged=aged, manifest_of=self.manifest)
+        return (*formed, sum(1 for pull in ranked if refuse(pull) is None))
 
     def ride(self, train: build.Train, tick=None) -> tuple[list[tuple[int, str, str]], tuple[str, int] | None]:
         """Test and land (or split) one train: the members' results, and why the

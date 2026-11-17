@@ -9,7 +9,7 @@ from tests.train.fakes import Fx, pr
 
 
 def formed(fx: Fx, line: list[dict]):
-    members, train, notes = fx.yard().form(line)
+    members, train, notes, _ = fx.yard().form(line)
     return [p["number"] for p in members], train.numbers if train else None, notes
 
 
@@ -27,8 +27,8 @@ class Forming(unittest.TestCase):
         self.assertEqual(formed(Fx(line), line)[1], [1, 2, 3, 4])
         self.assertEqual(group.CAP, 4)
 
-    def test_a_merge_path_or_manifest_change_goes_alone_first_and_waits_behind(self):
-        for path in (".github/scripts/merging/watch/loop.py", ".github/workflows/ci.yml", ".github/actions/install-tool/action.yml", "Cargo.lock", "crates/core/Cargo.toml", "Makefile", "tools/lint/src/main.rs"):
+    def test_a_merge_path_change_goes_alone_first_and_waits_behind(self):
+        for path in (".github/scripts/merging/watch/loop.py", ".github/workflows/ci.yml", ".github/actions/install-tool/action.yml", ".github/scripts/merge-queue.py", "Makefile", "tools/lint/src/main.rs"):
             with self.subTest(path=path):
                 alone = pr(1, files=(path,))
                 self.assertEqual(formed(Fx([alone, pr(2)]), [alone, pr(2)])[:2], ([1], None))
@@ -48,7 +48,6 @@ class Forming(unittest.TestCase):
     def test_a_first_that_cannot_ride_is_todays_path(self):
         line = [pr(1), pr(2)]
         self.assertEqual(formed(Fx(line, clashing={"h1"}), line)[:2], ([1], None))  # conflicts with `main`
-        self.assertEqual(formed(Fx(line, red_own={1}), line)[:2], ([1], None))
         bot = {**pr(1), "author": {"login": "dependabot[bot]"}}
         self.assertEqual(formed(Fx([bot, pr(2)]), [bot, pr(2)])[:2], ([1], None))
 

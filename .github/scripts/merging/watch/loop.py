@@ -8,6 +8,14 @@ from merging.queue import outcomes
 from merging.watch import aging, board, ending, handbacks, kept, mainline, order, stalls
 
 
+def taking_census(in_line: int, rideable: int | None) -> str:
+    """What a take line says of the line it was taken from (#2285): its size, and
+    how many in it could ride a train (`None` when no train was formed), so a
+    measurement over the log can tell a single take that had a partner from one
+    that had none. `make queue-events` drops the take line (`view.events.KEEP`)."""
+    return f" ({in_line} in line)" if rideable is None else f" ({in_line} in line, {rideable} rideable)"
+
+
 def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     """Watch until nothing is left to do. Returns the results, why it ended,
     and the exit status ([`ending.status`]).
@@ -247,18 +255,20 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
             if said:
                 fx.say(said)
         yard = getattr(fx, "trains", None)  # a merge train, when the watch runs them (#1785)
-        members, train, notes = yard.form(order.line(pulls, labels, memory, done, fx.bots, clashes, aged)) if yard else ([chosen], None, [])
+        ranked = order.line(pulls, labels, memory, done, fx.bots, clashes, aged)
+        members, train, notes, rideable = yard.form(ranked, aged) if yard else ([chosen], None, [], None)
         for note in notes:
             fx.say(note)
+        census = taking_census(len(ranked), rideable)
         if train is None:
             number = members[0]["number"]
-            fx.say(f"watch: taking #{number}.")
+            fx.say(f"watch: taking #{number}{census}.")
             line.took(number)
             rode, halt = [fx.turn(number, tick)], None
             if rode[0][1] == outcomes.REQUEUED:
                 fx.say(f"watch: #{number} goes back in line: {rode[0][2]}")
         else:
-            fx.say(f"watch: taking {', '.join(f'#{n}' for n in train.numbers)} together.")
+            fx.say(f"watch: taking {', '.join(f'#{n}' for n in train.numbers)} together{census}.")
             line.took(*train.numbers)  # one take: one pass for those behind it, none for its members
             rode, halt = yard.ride(train, tick)
         heads = {p["number"]: p.get("headRefOid", "") for p in members}
