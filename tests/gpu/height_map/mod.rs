@@ -89,7 +89,7 @@ fn the_upper_steps_hide_more_of_the_lower_as_the_view_grazes() {
         eprintln!("[height-map] {degrees}°: black share flat {a:.3}, marched {b:.3}");
         drops.push(a - b);
     }
-    // Measured: drops of RTX 2060 0.066 and 0.157 (pre-#2301), lavapipe 0.057 and 0.134.
+    // Measured: drops of RTX 2060 0.057 and 0.147, lavapipe 0.057 and 0.134 (since #2301).
     assert!(
         drops[0] > 0.02,
         "the lower steps are partly hidden: {drops:?}"

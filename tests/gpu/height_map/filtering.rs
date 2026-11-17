@@ -61,9 +61,10 @@ fn a_height_map_that_shifts_nothing_filters_as_none_does() {
     };
     let (zero, small) = (diff(&flat, &level), diff(&flat, &tiny));
     eprintln!("[height-map] against no map: level {zero:.3}, scale 3e-5 {small:.3}");
-    // Measured on lavapipe: level 0.000, scale 3e-5 0.344 (4.126 and 4.112 when every
-    // displaced read took explicit derivatives). The scale's residue is the march's
-    // real sub-texel shift beside the camera, where 4° stretches 3e-5 to a texel.
+    // Measured: lavapipe level 0.000, scale 3e-5 0.344 (4.126 and 4.112 when every
+    // displaced read took explicit derivatives); RTX 2060 (Vulkan, NVIDIA 610.57.04)
+    // 0.000 and 0.501. The scale's residue is the march's real sub-texel shift beside
+    // the camera, where 4° stretches 3e-5 to a texel.
     assert!(zero < 0.05, "a level height map shifts nothing: {zero:.3}");
     assert!(
         small < SAME,
