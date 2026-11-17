@@ -50,7 +50,7 @@ fn survival(r: &mut Renderer, period: u32, value: f32) -> Vec<f32> {
 /// [`BAND`]. Measured on lavapipe, flash by flash: at 1, every 6 frames 100 % 100 %
 /// 10 % 9 % 9 % 9 %, every 10 100 % 100 % 40 % 25 % 25 % 25 % (RTX 2060: the same,
 /// to the percent); at 0.5 (the default), every 6 100 % 100 % 30 % 12 % 12 % 13 %,
-/// every 10 100 % 100 % 70 % 59 % 58 % 58 %.
+/// every 10 100 % 100 % 70 % 59 % 58 % 58 % (RTX 2060: the same, to the percent).
 const FIRST: f32 = 0.95;
 const HELD: [(f32, u32, f32); 4] = [
     (DEFAULT, 6, 0.12),
@@ -127,7 +127,8 @@ fn afterglow(r: &mut Renderer, scale: f32, value: f32) -> (Vec<f32>, Vec<f32>) {
 /// on lavapipe: 32 frames at render scale 1 (29 levels the frame after, against
 /// URP's 9), 39 at 0.67 (20 against 9); on an RTX 2060, 30 (25 against 8) and
 /// 38 (20 against 9). At 0.5 (the default) less: lavapipe 29 frames (23 against 9)
-/// and 35 (18 against 9); the one bound holds both.
+/// and 35 (18 against 9), RTX 2060 26 (20 against 8) and 34 (16 against 9); the one
+/// bound holds both.
 const AFTERGLOW: usize = 44;
 
 #[test]

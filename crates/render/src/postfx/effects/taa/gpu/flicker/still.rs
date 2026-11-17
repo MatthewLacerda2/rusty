@@ -14,7 +14,7 @@ const FRAMES: u32 = 54;
 /// the anti-flicker on, in 255ths of perceptual luma: ours, a still view's blinks
 /// reduced to near the scene's own (without SSR the bulb's edge under the jitter
 /// steps 5). Measured at 0 (URP's), 0.5 (the default) and 1: lavapipe 26.2, 11.3,
-/// 8.8; Metal 26.1, 11.2, 8.7; RTX 2060 26.2 and 8.8 at 0 and 1, not yet at 0.5.
+/// 8.8; Metal 26.1, 11.2, 8.7; RTX 2060 26.2, 11.3, 8.8.
 const STILL: f32 = 12.0;
 
 #[test]
