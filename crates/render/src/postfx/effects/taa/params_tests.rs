@@ -42,7 +42,8 @@ fn params() -> TaaParams {
 #[test]
 fn the_lanes_are_where_the_shader_reads_them() {
     let p = params();
-    let knobs = [influence(), VARIANCE_CLAMP_SCALE, 1.0, STILL_PIXELS];
+    let clamp = rusty_components::CameraComponent::DEFAULT_TAA_VARIANCE_CLAMP_SCALE;
+    let knobs = [influence(), clamp, 1.0, STILL_PIXELS];
     assert_eq!(p.knobs, knobs);
     let rejection = [
         MOVING_FRAME_INFLUENCE,

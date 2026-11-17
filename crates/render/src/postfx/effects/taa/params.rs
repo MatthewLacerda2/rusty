@@ -68,8 +68,6 @@ use rusty_scene::Camera;
 /// URP's frame influence: the current frame's weight in the blend, for a still
 /// pixel.
 pub(crate) const FRAME_INFLUENCE: f32 = 0.1;
-/// URP's variance clamp scale: the box is the mean ± this many deviations.
-pub(crate) const VARIANCE_CLAMP_SCALE: f32 = 0.9;
 /// The frame influence of a pixel moving [`MOVING_PIXELS`] or more a frame: UE's
 /// TAA range, Post-processing Stack v2's 0.05 → 0.15 ratio (×3) scaled to URP's
 /// base weight, rounded down.
@@ -153,8 +151,8 @@ pub(super) fn lenses(stack: &[Camera], aspect: f32) -> [[f32; 4]; MAX_CAMERAS] {
 /// The camera's TAA knobs the resolve reads (#1847): the still pixel's frame
 /// influence (`1 - base_blend`), the variance clamp scale and the quality level's
 /// steps ([`levels`]), and the anti-flicker (#2228), `0`..`1`. URP's defaults
-/// reduce to the constants [`FRAME_INFLUENCE`] (to an `f32` rounding),
-/// [`VARIANCE_CLAMP_SCALE`] and `High`, so a camera left at its defaults blends as
+/// reduce to [`FRAME_INFLUENCE`] (to an `f32` rounding), a variance clamp scale
+/// of 0.9 and `High`, so a camera left at its defaults blends as
 /// URP's (#1847); its anti-flicker starts at HDRP's `0.5`, and at `0` the resolve
 /// is URP's. A view with no camera takes a default camera's tune.
 #[derive(Clone, Copy, Debug)]
