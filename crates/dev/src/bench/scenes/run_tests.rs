@@ -43,6 +43,19 @@ fn labels(report: &SceneReport) -> Vec<&str> {
     report.views.iter().map(|k| k.label.as_str()).collect()
 }
 
+/// The one-off rows every bench adds: its load, and its memory where readable.
+fn has_load_and_memory(report: &SceneReport) {
+    assert!(report.row("frame_ms").is_some(), "{:?}", report.rows);
+    assert!(report.row("load_ms").is_some_and(|r| r.avg > 0.0));
+    if cfg!(any(target_os = "linux", target_os = "macos")) {
+        assert!(report.row("rss_peak_mb").is_some_and(|r| r.avg > 0.0));
+    }
+    if report.row("renderer_ms").is_some() && cfg!(any(target_os = "linux", target_os = "macos")) {
+        let gpu = report.row("gpu_mb");
+        assert!(gpu.is_some_and(|r| r.avg > 0.0), "{:?}", report.rows);
+    }
+}
+
 #[test]
 fn gpu_a_projects_scenes_bench_from_their_viewpoints_with_load_and_memory() {
     let root = project();
@@ -76,17 +89,7 @@ fn gpu_a_projects_scenes_bench_from_their_viewpoints_with_load_and_memory() {
         .any(|w| w.starts_with("not baked: lightmaps")));
 
     for report in [&yard, &empty] {
-        assert!(report.row("frame_ms").is_some(), "{:?}", report.rows);
-        assert!(report.row("load_ms").is_some_and(|r| r.avg > 0.0));
-        if cfg!(any(target_os = "linux", target_os = "macos")) {
-            assert!(report.row("rss_peak_mb").is_some_and(|r| r.avg > 0.0));
-        }
-        if report.row("renderer_ms").is_some()
-            && cfg!(any(target_os = "linux", target_os = "macos"))
-        {
-            let gpu = report.row("gpu_mb");
-            assert!(gpu.is_some_and(|r| r.avg > 0.0), "{:?}", report.rows);
-        }
+        has_load_and_memory(report);
     }
     // Nothing was written into the project but the out dir asked for.
     let mut written: Vec<_> = std::fs::read_dir(&root)

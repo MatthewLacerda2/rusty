@@ -120,13 +120,14 @@ fn import_one(run: &Run, scene: &str, file: &Path) {
     let opened = rusty::core::project::open(&run.project, Access::Run);
     let opened = opened.unwrap_or_else(|e| fail(&format!("cannot open the copy: {e}")));
     let scratch = file.parent().unwrap_or(Path::new("."));
-    match scenes::load(scratch, &opened.root, scene, opened.settings, run.opts.size) {
-        // lint: allow(asset-write) a number handed to the parent process, deleted after
-        Ok((_, ms)) => {
-            std::fs::write(file, ms.to_string()).unwrap_or_else(|e| fail(&e.to_string()))
-        }
-        Err(e) => fail(&format!("{scene}: cold load failed: {e}")),
-    }
+    let loaded = scenes::load(scratch, &opened.root, scene, opened.settings, run.opts.size);
+    let ms = loaded.map_or_else(
+        |e| fail(&format!("{scene}: cold load failed: {e}")),
+        |l| l.1,
+    );
+    // lint: allow(asset-write) a number handed to the parent process, deleted after
+    let wrote = std::fs::write(file, ms.to_string());
+    wrote.unwrap_or_else(|e| fail(&e.to_string()));
 }
 
 /// Profile `scene` in this process.
@@ -164,28 +165,11 @@ fn bench_all(run: &Run, list: Option<&str>) {
     if let Err(e) = import::scratch(&run.project, &copy) {
         fail(&format!("cannot copy the project for import_ms: {e}"));
     }
-    let mut failed = Vec::new();
-    for scene in &names {
-        let import_ms = cold_load(run, &copy, scene);
-        let mut timed = child(run, &run.project, scene);
-        if let Some(ms) = import_ms {
-            timed.args(["--import-ms", &ms.to_string()]);
-        }
-        if let Some(before) = &run.before {
-            timed.arg("--before").arg(before);
-        }
-        let mut ok = timed.status().is_ok_and(|s| s.success());
-        if ok && run.profile {
-            let mut profiled = child(run, &run.project, scene);
-            ok = profiled
-                .arg("--profile")
-                .status()
-                .is_ok_and(|s| s.success());
-        }
-        if !ok {
-            failed.push(scene.clone());
-        }
-    }
+    let failed: Vec<String> = names
+        .iter()
+        .filter(|scene| !bench_scene(run, &copy, scene))
+        .cloned()
+        .collect();
     let _ = std::fs::remove_dir_all(&copy);
     let reports: Vec<_> = names
         .iter()
@@ -197,6 +181,28 @@ fn bench_all(run: &Run, list: Option<&str>) {
         eprintln!("bench-scenes: failed: {}", failed.join(", "));
         exit(1);
     }
+}
+
+/// Bench `scene` in its children: the cold load in `copy`, the timed run, and the
+/// profile when asked for. `false` when one failed.
+fn bench_scene(run: &Run, copy: &Path, scene: &str) -> bool {
+    let import_ms = cold_load(run, copy, scene);
+    let mut timed = child(run, &run.project, scene);
+    if let Some(ms) = import_ms {
+        timed.args(["--import-ms", &ms.to_string()]);
+    }
+    if let Some(before) = &run.before {
+        timed.arg("--before").arg(before);
+    }
+    let ok = timed.status().is_ok_and(|s| s.success());
+    if !ok || !run.profile {
+        return ok;
+    }
+    let mut profiled = child(run, &run.project, scene);
+    profiled
+        .arg("--profile")
+        .status()
+        .is_ok_and(|s| s.success())
 }
 
 /// `scene`'s load in the cache-cleared `copy`, in a child; `None` (said) when it failed.

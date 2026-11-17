@@ -57,7 +57,7 @@ fn copy_tree(from: &Path, to: &Path, (rel, skip): (&Path, &Path)) -> std::io::Re
         }
         let kind = entry.file_type()?;
         if kind.is_symlink() {
-            link(&std::fs::read_link(&src)?, &dst)?;
+            std::os::unix::fs::symlink(std::fs::read_link(&src)?, &dst)?;
         } else if kind.is_dir() {
             copy_tree(&src, &dst, (&rel, skip))?;
         } else {
@@ -65,16 +65,6 @@ fn copy_tree(from: &Path, to: &Path, (rel, skip): (&Path, &Path)) -> std::io::Re
             std::fs::copy(&src, &dst)?;
         }
     }
-    Ok(())
-}
-
-#[cfg(unix)]
-fn link(target: &Path, at: &Path) -> std::io::Result<()> {
-    std::os::unix::fs::symlink(target, at)
-}
-
-#[cfg(not(unix))]
-fn link(_target: &Path, _at: &Path) -> std::io::Result<()> {
     Ok(())
 }
 

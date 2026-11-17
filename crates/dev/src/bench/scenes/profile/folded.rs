@@ -10,6 +10,9 @@ use std::fmt::Write;
 /// How many functions each table lists.
 pub const TOP: usize = 40;
 
+/// Functions with their sample counts, most first.
+pub type Ranked = Vec<(String, u64)>;
+
 /// Samples by stack, root first, frames joined with `;`.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Folded(pub BTreeMap<String, u64>);
@@ -47,7 +50,7 @@ impl Folded {
 
     /// The functions with the most samples as the leaf, and anywhere on the
     /// stack: at most [`TOP`] each, most first, ties by name.
-    pub fn tops(&self) -> (Vec<(String, u64)>, Vec<(String, u64)>) {
+    pub fn tops(&self) -> (Ranked, Ranked) {
         let mut own: BTreeMap<&str, u64> = BTreeMap::new();
         let mut total: BTreeMap<&str, u64> = BTreeMap::new();
         for (stack, &n) in &self.0 {
@@ -81,7 +84,7 @@ impl Folded {
     }
 }
 
-fn ranked(counts: BTreeMap<&str, u64>) -> Vec<(String, u64)> {
+fn ranked(counts: BTreeMap<&str, u64>) -> Ranked {
     let mut rows: Vec<(String, u64)> = counts
         .into_iter()
         .map(|(k, n)| (k.to_string(), n))

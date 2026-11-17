@@ -40,6 +40,8 @@ impl Renderer {
     /// Per-frame work that doesn't depend on the camera stack: the view's post-FX
     /// buffers, scene assets, the resident reflection probes and the lighting uniform.
     fn prepare_frame(&mut self, view: &mut RenderView, scene: &Scene, camera: &Camera) {
+        // What the frame did before (the cameras posed, the render textures synced).
+        self.lap("setup");
         // Keep this view's scene targets sized to it — a cheap no-op unless its size
         // or render scale changed (#355); bloom sizes its own buffers as it runs.
         let size = view.size();
@@ -131,7 +133,6 @@ impl Renderer {
             false => texture_cameras(camera, scene, &self.draw_poses),
         };
         self.sync_render_textures(view, &textures);
-        self.lap("setup");
         self.prepare_frame(view, scene, camera);
 
         // The ordered camera stack (one entry in edit mode / when no scene camera).
