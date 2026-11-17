@@ -367,11 +367,14 @@ jobs:
             2|3) rc=0 ;;
           esac
           exit "$rc"
+      # `artifact-name` lets `mutants-report` give a lone shard its directory
+      # back (`artifact-dirs.py`): downloaded by `pattern:`, one match unpacks flat.
       - name: Record the shard count for the merge job
         if: always()
         run: |
           mkdir -p mutants.out
           echo '${{ strategy.job-total }}' > mutants.out/shard-total
+          echo 'mutants-shard-${{ matrix.shard }}' > mutants.out/artifact-name
       - name: Upload this shard's report
         if: always()
         uses: actions/upload-artifact@v7
@@ -397,6 +400,10 @@ jobs:
         with:
           pattern: mutants-shard-*
           path: shards
+      # A pattern matching one artifact unpacks it flat into `shards/`, where
+      # the merge below, reading `shards/mutants-shard-*/`, would drop it (#2288).
+      - name: One directory per shard
+        run: python3 .github/scripts/artifact-dirs.py shards
       - name: Merge shards and summarize
         env:
           PLANNED: ${{ needs.mutants-plan.outputs.mutants }}
