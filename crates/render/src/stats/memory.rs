@@ -1,14 +1,17 @@
 //! How much GPU memory the renderer's device holds (`make bench-scenes`' `gpu_mb`).
 //! Each backend answers from the one source it has: Vulkan and DX12 from wgpu's
-//! allocator report (the bytes live allocations take), Metal from the device's
-//! `currentAllocatedSize` (every byte the device allocated, the driver's own
-//! included). Without either (GL) there is no answer.
+//! allocator report, its `total_reserved_bytes` (the memory blocks the allocator
+//! took from the device, live allocations and their free space alike: what the
+//! device has given the process), Metal from the device's `currentAllocatedSize`
+//! (every byte the device allocated, the driver's own included). The two are
+//! close but not equal: Metal's also counts what the driver keeps for itself.
+//! Without either (GL) there is no answer.
 
 /// A device's GPU memory, and which source gave it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GpuMemory {
     pub bytes: u64,
-    /// `"allocator report"` or `"Metal currentAllocatedSize"`.
+    /// `"allocator report, reserved blocks"` or `"Metal currentAllocatedSize"`.
     pub source: &'static str,
 }
 
@@ -19,8 +22,8 @@ pub fn gpu_memory(device: &wgpu::Device) -> Option<GpuMemory> {
     let _ = device.poll(wgpu::PollType::wait_indefinitely());
     if let Some(report) = device.generate_allocator_report() {
         return Some(GpuMemory {
-            bytes: report.total_allocated_bytes,
-            source: "allocator report",
+            bytes: report.total_reserved_bytes,
+            source: "allocator report, reserved blocks",
         });
     }
     metal_allocated(device)

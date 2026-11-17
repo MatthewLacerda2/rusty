@@ -4,12 +4,17 @@
 //! Each scene is loaded as Play loads it (its scripts run, with no input), drawn
 //! once, then measured from deterministic viewpoints ([`views`]): each warms up
 //! [`WARMUP`] frames (pipelines, uploads, shadow caches) and is measured for
-//! [`FRAMES`] by `bench::measure_posed`, at 1920x1080 unless told otherwise. The
-//! report ([`report`]) folds the viewpoints' rows into one (`fold`) and adds
-//! `load_ms` (the scene's own load to its first rendered frame, wall clock, the
-//! renderer's start-up off the clock: `load`), `rss_peak_mb` (the
-//! process's peak resident memory, [`memory`]) and `gpu_mb` (the renderer's GPU
-//! memory, `rusty_render::gpu_memory`), each compared with that scene's last run.
+//! [`FRAMES`] by `bench::measure_posed`, at 1920x1080 unless told otherwise, and
+//! the whole round is run [`Options::runs`] times (`measure`). The report
+//! ([`report`]) folds the viewpoints' rows, then the runs', into one (`fold`),
+//! each row with its run-to-run spread, and adds `load_ms` (the scene's own load
+//! to its first rendered frame, wall clock, the renderer's start-up off the
+//! clock: `load`), `import_ms` (the same load of a copy of the project with its
+//! import cache cleared, [`import`]), `rss_peak_mb` (the process's peak resident
+//! memory, [`memory`]) and `gpu_mb` (the renderer's GPU memory,
+//! `rusty_render::gpu_memory`), each compared with that scene's last run or a
+//! kept baseline (`Extra::baseline`). A run with `PROFILE=1` adds a sampling
+//! profile of the measured frames ([`profile`]), in a run of its own.
 //!
 //! The project is opened read-only and never seeded: nothing is written into it.
 //! A signal, never a gate, like `make bench`. `bench-scenes` runs each scene in a
@@ -17,18 +22,23 @@
 //! its own.
 
 mod fold;
+pub mod import;
+mod measure;
 pub mod memory;
+mod notes;
+pub mod profile;
 pub mod report;
 pub mod views;
 
-use std::path::Path;
+use std::collections::BTreeSet;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use rusty_core::project::ProjectSettings;
 use rusty_render::ClockProbe;
-use rusty_scene::{Scene, Sh9};
 
 use super::super::harness::Harness;
+pub use notes::unbaked;
 pub use report::SceneReport;
 
 /// The size a scene is benched at unless told otherwise.
@@ -37,6 +47,8 @@ pub const DEFAULT_SIZE: (u32, u32) = (1920, 1080);
 pub const WARMUP: u32 = 60;
 /// Frames measured at each viewpoint.
 pub const FRAMES: u32 = 300;
+/// How many times each scene's viewpoints are measured unless told otherwise.
+pub const RUNS: u32 = 3;
 
 /// How a scene is benched.
 #[derive(Clone, Copy, Debug)]
@@ -44,6 +56,8 @@ pub struct Options {
     pub size: (u32, u32),
     pub warmup: u32,
     pub frames: u32,
+    /// Rounds over every viewpoint, each one's averages a point of the spread.
+    pub runs: u32,
 }
 
 impl Default for Options {
@@ -52,18 +66,39 @@ impl Default for Options {
             size: DEFAULT_SIZE,
             warmup: WARMUP,
             frames: FRAMES,
+            runs: RUNS,
         }
     }
 }
 
+/// What a scene's bench is compared with and told beside its own run.
+#[derive(Clone, Debug, Default)]
+pub struct Extra {
+    /// A kept report folder to compare with instead of the last run (`BEFORE`).
+    pub baseline: Option<PathBuf>,
+    /// The project's key under the out dir ([`out_key`]), to find it in a
+    /// baseline that kept every project's folder.
+    pub key: String,
+    /// The cold load an import run measured (`import_ms`), when one ran.
+    pub import_ms: Option<f64>,
+}
+
 /// Every scene the project at `root` holds: each `.scene` under its
 /// `assets/scenes/`, subfolders included, named by its path there without the
-/// extension (`levels/a`), sorted.
+/// extension (`levels/a`), sorted. A folder linked twice (or a link back up the
+/// tree) is walked once.
 pub fn project_scenes(root: &Path) -> Vec<String> {
     let base = root.join("assets/scenes");
     let mut scenes = Vec::new();
+    let mut seen = BTreeSet::new();
     let mut dirs = vec![base.clone()];
     while let Some(dir) = dirs.pop() {
+        let Ok(real) = std::fs::canonicalize(&dir) else {
+            continue;
+        };
+        if !seen.insert(real) {
+            continue;
+        }
         let Ok(entries) = std::fs::read_dir(&dir) else {
             continue;
         };
@@ -78,6 +113,7 @@ pub fn project_scenes(root: &Path) -> Vec<String> {
         }
     }
     scenes.sort();
+    scenes.dedup();
     scenes
 }
 
@@ -101,24 +137,27 @@ pub fn out_key(project: &Path) -> String {
 
 /// Bench the scene `scene` (`assets/scenes/<scene>.scene`) of the project at
 /// `root` (opened read-only, so the working directory), print its table and keep
-/// its report in `out_dir`, beside the last one it is compared with.
+/// its report in `out_dir`, beside the last one it is compared with (or the
+/// baseline's, `extra`), and the bench's console beside it.
 pub fn bench(
     root: &Path,
     scene: &str,
     settings: ProjectSettings,
     out_dir: &Path,
     opts: Options,
+    extra: &Extra,
 ) -> Result<SceneReport, String> {
-    let path = root.join(format!("assets/scenes/{scene}.scene"));
-    let path = path.to_string_lossy();
-    let (mut harness, load_ms) = load(out_dir, &path, settings, opts.size)?;
+    let (mut harness, load_ms) = load(out_dir, root, scene, settings, opts.size)?;
 
     let probe = harness.renderer().and_then(|r| ClockProbe::new(r));
-    let mut report = measure(&mut harness, probe.as_ref(), opts);
+    let mut report = measure::all(&mut harness, probe.as_ref(), opts);
     drop(probe);
     report.scene = scene.to_string();
     report.size = opts.size;
     report.push_value("load_ms", load_ms);
+    if let Some(ms) = extra.import_ms {
+        report.push_value("import_ms", ms);
+    }
     if let Some(bytes) = memory::rss_peak_bytes() {
         report.push_value("rss_peak_mb", mb(bytes));
     }
@@ -133,11 +172,19 @@ pub fn bench(
         let world = harness.world.borrow();
         report.warnings.extend(unbaked(&world.scene().borrow()));
     }
+    let console = notes::keep_console(&harness, out_dir, scene);
+    report.warnings.extend(console);
     let engine = rusty_core::project::engine_content::stamp();
     report.warnings.extend(engine.warning());
     report.engine = Some(engine);
 
-    let previous = report::read(out_dir, scene);
+    let previous = match &extra.baseline {
+        Some(dir) => {
+            report.baseline = Some(dir.display().to_string());
+            report::read_baseline(dir, &extra.key, scene)
+        }
+        None => report::read(out_dir, scene),
+    };
     let against = report.against(previous.as_ref());
     report.warnings.extend(against);
     let text = report.render(previous.as_ref());
@@ -146,20 +193,24 @@ pub fn bench(
     Ok(report)
 }
 
-/// Load the scene at `path` as Play does and draw its first frame at `size`,
-/// (the harness's out dir `out_dir`), returning the harness and the load's wall-clock ms. The renderer starts (its
-/// device and every pipeline, warm as a game's) between the scene's load and its
-/// first frame, off the clock: what is timed is the scene's own load (its
-/// document, sidecar and navmesh bake) and its first frame (uploads, the first
-/// sim step), not the engine's start-up.
-fn load(
+/// Load `scene` of the project at `root` as Play does and draw its first frame
+/// at `size` (the harness's out dir `out_dir`), returning the harness and the
+/// load's wall-clock ms. Timed: the harness's own set-up (its Lua VM and API, the
+/// stats), the scene's document, sidecar and navmesh bake, Play's refresh of the
+/// project's converted sources (a cache check when the import cache is warm, the
+/// conversions when it is not: `import_ms`), then its first frame (uploads, the
+/// first sim step). The renderer starts (its device and every pipeline, warm as a
+/// game's) between the load and the first frame, off the clock.
+pub fn load(
     out_dir: &Path,
-    path: &str,
+    root: &Path,
+    scene: &str,
     settings: ProjectSettings,
     size: (u32, u32),
 ) -> Result<(Harness, f64), String> {
+    let path = root.join(format!("assets/scenes/{scene}.scene"));
     let start = Instant::now();
-    let mut harness = Harness::on_project_scene(out_dir, path, settings)?;
+    let mut harness = Harness::on_project_scene(out_dir, &path.to_string_lossy(), settings)?;
     let loaded = start.elapsed();
     harness.set_size(size.0, size.1);
     if let Some(renderer) = harness.renderer() {
@@ -172,80 +223,6 @@ fn load(
     Ok((harness, load.as_secs_f64() * 1000.0))
 }
 
-/// Measure every viewpoint of the harness's scene, in order, into one report.
-fn measure(harness: &mut Harness, probe: Option<&ClockProbe>, opts: Options) -> SceneReport {
-    let views = {
-        let world = harness.world.borrow();
-        let scene = world.scene().borrow();
-        let nav = world.resources.nav.borrow();
-        views::pick(&scene, &nav)
-    };
-    let mut measured = Vec::new();
-    let mut spreads = Vec::new();
-    for viewpoint in &views.views {
-        let mut turned_off = Vec::new();
-        let mut pose = |h: &mut Harness| {
-            let world = h.world.borrow();
-            let mut scene = world.scene().borrow_mut();
-            let mut camera = world.resources.camera.borrow_mut();
-            turned_off.extend(views::apply(&mut scene, &mut camera, &viewpoint.view));
-        };
-        for _ in 0..opts.warmup {
-            harness.step(1);
-            pose(harness);
-            harness.render_frame();
-        }
-        let (report, samples) = super::measure_posed(harness, opts.frames, probe, &mut pose);
-        {
-            let world = harness.world.borrow();
-            views::restore(&mut world.scene().borrow_mut(), &turned_off);
-        }
-        spreads.push((viewpoint.label.clone(), super::clock::cpu_spreads(&samples)));
-        measured.push((viewpoint.label.clone(), report));
-    }
-    let mut warnings = views.warnings;
-    warnings.extend(fold::spread_warnings(&spreads));
-    SceneReport {
-        views: views.views.into_iter().map(|v| v.label).collect(),
-        frames: opts.frames,
-        rows: fold::aggregate(&measured),
-        warnings,
-        ..SceneReport::default()
-    }
-}
-
-/// The warning for a scene benched without its baked lighting, naming what is
-/// missing from what it places: no lightmaps; light probes placed whose SH never
-/// loaded (every one zero: no sidecar, or one that failed); reflection probes
-/// placed with no cube on disk. What a scene does not place is not missing.
-pub fn unbaked(scene: &Scene) -> Option<String> {
-    let mut missing = Vec::new();
-    if !scene.lightmaps.holds_bake() {
-        missing.push("lightmaps".to_string());
-    }
-    let probes = scene.probes.probes();
-    if !probes.is_empty() && probes.iter().all(|p| p.sh == Sh9::zero()) {
-        missing.push("light probes (placed, no baked SH loaded)".into());
-    }
-    let reflections = &scene.reflection_probes.probes;
-    let no_cube = reflections
-        .iter()
-        .filter(|p| p.cubemap_path.is_empty() || !Path::new(&p.cubemap_path).is_file())
-        .count();
-    if no_cube > 0 {
-        missing.push(format!(
-            "reflection probes ({no_cube} of {} with no cube on disk)",
-            reflections.len()
-        ));
-    }
-    (!missing.is_empty()).then(|| {
-        format!(
-            "not baked: {} (its lighting cost is not the shipped one)",
-            missing.join(", ")
-        )
-    })
-}
-
 fn mb(bytes: u64) -> f64 {
     (bytes as f64 / (1024.0 * 1024.0) * 10.0).round() / 10.0
 }
@@ -253,3 +230,7 @@ fn mb(bytes: u64) -> f64 {
 #[cfg(test)]
 #[path = "run_tests.rs"]
 mod run_tests;
+
+#[cfg(test)]
+#[path = "rows_tests.rs"]
+mod rows_tests;

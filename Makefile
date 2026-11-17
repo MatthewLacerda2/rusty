@@ -477,10 +477,16 @@ bench: ## Benchmark the stress scene (release build), with the change against th
 
 # A game project's own scenes, anywhere on disk: each loaded, warmed up and measured
 # with Harness.Bench from deterministic viewpoints (its cameras, the spawn, seeded
-# navmesh points), plus load_ms, rss_peak_mb and gpu_mb, each against that scene's
-# last run (kept in out/bench/scenes/<project>/<scene>.json). SCENES names some by
-# file stem (default: every assets/scenes/*.scene); RES=WxH overrides 1920x1080.
-# Nothing is written into the project. A signal, never a gate; docs/testing.md.
-bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/games/horde [SCENES=a,b] [RES=WxH]
-	@test -n "$(PROJECT)" || { echo "bench-scenes: make bench-scenes PROJECT=<project dir> [SCENES=a,b] [RES=WxH]" >&2; exit 1; }
-	cargo run --release --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RES),--size $(RES)) out/bench/scenes
+# navmesh points), RUNS times (default 3), every row with its run-to-run spread; plus
+# load_ms (import cache as the project holds it), import_ms (the same load with the
+# cache cleared, in a copy), rss_peak_mb and gpu_mb. Each is compared with that
+# scene's last run (kept in out/bench/scenes/<project>-<hash>/<scene>.json), or with
+# the kept report in BEFORE=<dir>; a change inside the spread reads unresolved.
+# SCENES names some by their path under assets/scenes/ without .scene (default:
+# every one, subfolders included); RES=WxH overrides 1920x1080. PROFILE=1 adds a
+# sampling profile of the measured frames (perf on Linux, sample on macOS) as
+# <scene>.profile.txt and .folded, on a release build with line tables. Nothing is
+# written into the project. A signal, never a gate; docs/testing.md.
+bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/games/horde [SCENES=a,b] [RES=WxH] [RUNS=n] [BEFORE=dir] [PROFILE=1]
+	@test -n "$(PROJECT)" || { echo "bench-scenes: make bench-scenes PROJECT=<project dir> [SCENES=a,b] [RES=WxH] [RUNS=n] [BEFORE=dir] [PROFILE=1]" >&2; exit 1; }
+	cargo run $(if $(filter 1,$(PROFILE)),--profile profiling,--release) --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RES),--size $(RES)) $(if $(RUNS),--runs $(RUNS)) $(if $(BEFORE),--before $(BEFORE)) $(if $(filter 1,$(PROFILE)),--profile) out/bench/scenes

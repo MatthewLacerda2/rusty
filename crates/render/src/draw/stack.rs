@@ -125,10 +125,15 @@ impl Renderer {
         };
         let history = reads_history(view, (&pass, graphics, taa_on), &shared);
         self.frame_counters.history_passes += u32::from(history);
+        self.lap("stack");
+        // Each pass's CPU time is a lap of its table name, summed over the
+        // cameras of every stack (the render textures' too).
         for idx in 0..pass.stack.len() {
             let mut ctx = CameraCtx::new(scene, &pass, &shared, idx);
-            for (_, stage) in CAMERA_PASSES {
+            self.lap("stack");
+            for (name, stage) in CAMERA_PASSES {
                 stage(self, view, &mut ctx);
+                self.lap(*name);
             }
         }
         view.post_fx.motion.history.end();
