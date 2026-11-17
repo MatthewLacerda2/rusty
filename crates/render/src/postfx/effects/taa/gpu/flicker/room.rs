@@ -12,8 +12,9 @@ pub(in crate::postfx::effects) const W: u32 = 320;
 pub(in crate::postfx::effects) const H: u32 = 240;
 /// Frames before the measure: one cycle of the jitter's vertical (base 3) part.
 pub(in crate::postfx::effects) const WARM: u32 = 27;
-/// The camera's anti-flicker the tests turn on: its full strength. URP's resolve
-/// is 0, every camera's default.
+/// The camera's anti-flicker the tests turn on: its full strength. The room's
+/// camera starts at 0, URP's resolve, so every comparison has URP's beside it; a
+/// camera's own default is HDRP's 0.5 (`CameraComponent::DEFAULT_TAA_ANTI_FLICKER`).
 pub(super) const ON: f32 = 1.0;
 
 /// A headless renderer of the case's size, or `None`.
@@ -58,7 +59,8 @@ pub(super) fn matte(grey: f32) -> MaterialAsset {
 }
 
 /// The room: a satin bronze ceiling 3 m up, dark walls and floor, no ambient,
-/// the bulb hanging 0.5 m under the ceiling on a cord; TAA on, SSR on, nothing else.
+/// the bulb hanging 0.5 m under the ceiling on a cord; TAA on (URP's resolve: the
+/// anti-flicker at 0), SSR on, nothing else.
 pub(in crate::postfx::effects) fn room() -> Scene {
     let mut s = Scene::new();
     (s.skybox_path, s.ambient_intensity) = (String::new(), 0.0);
@@ -66,6 +68,7 @@ pub(in crate::postfx::effects) fn room() -> Scene {
     let camera = CameraComponent {
         taa_active: true,
         fxaa_active: false,
+        taa_anti_flicker: 0.0,
         ..Default::default()
     };
     s.world.set_camera(cam, Some(camera));

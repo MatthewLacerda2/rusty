@@ -26,13 +26,14 @@ fn lifts(run: &[Vec<f32>], tile: usize, period: u32) -> Vec<f32> {
 
 /// What of each flash survives the anti-flicker, against URP's, on the tile the
 /// first flash lit most.
-fn survival(r: &mut Renderer, period: u32) -> Vec<f32> {
+fn survival(r: &mut Renderer, period: u32, value: f32) -> Vec<f32> {
     let frames = AT + FLASHES * period + 1;
     let flash = |s: &mut Scene, f: u32| {
         let on = f >= WARM + AT && (f - WARM - AT).is_multiple_of(period) && f < WARM + frames - 1;
         lamp(s, "Flash", on.then_some(30.0));
     };
-    let held = run(r, &mut anti_flicker(dark_room(), ON), (frames, 1.0), &flash);
+    let scene = &mut anti_flicker(dark_room(), value);
+    let held = run(r, scene, (frames, 1.0), &flash);
     let urp = run(r, &mut dark_room(), (frames, 1.0), &flash);
     let first = |t: usize| urp[AT as usize][t] - urp[AT as usize - 1][t];
     let tile = (0..urp[0].len())
@@ -45,33 +46,34 @@ fn survival(r: &mut Renderer, period: u32) -> Vec<f32> {
 
 /// How much of a repeated flash the anti-flicker keeps, against URP's: the first
 /// two flashes at least [`FIRST`] (no hold before a blink recurs); from the fourth
-/// on, flashes `period` frames apart keep [`HELD`]'s share, within [`BAND`].
-/// Measured on lavapipe, flash by flash: every 6 frames 100 % 100 % 10 % 9 % 9 %
-/// 9 %; every 10, 100 % 100 % 40 % 25 % 25 % 25 %. RTX 2060: the same, to the
-/// percent.
+/// on, flashes `period` frames apart under `value` keep [`HELD`]'s share, within
+/// [`BAND`]. Measured on lavapipe, flash by flash: at 1, every 6 frames 100 % 100 %
+/// 10 % 9 % 9 % 9 %, every 10 100 % 100 % 40 % 25 % 25 % 25 % (RTX 2060: the same,
+/// to the percent); at 0.5 (the default), every 6 100 % 100 % 30 % 12 % 12 % 13 %,
+/// every 10 100 % 100 % 70 % 59 % 58 % 58 %.
 const FIRST: f32 = 0.95;
-const HELD: [(u32, f32); 2] = [(6, 0.09), (10, 0.25)];
+const HELD: [(f32, u32, f32); 4] = [
+    (0.5, 6, 0.12),
+    (0.5, 10, 0.58),
+    (ON, 6, 0.09),
+    (ON, 10, 0.25),
+];
 const BAND: f32 = 0.1;
 
 #[test]
 fn gpu_a_repeated_flash_is_held_from_its_third_time_under_anti_flicker() {
     let Some(mut r) = renderer() else { return };
-    for (period, held) in HELD {
-        let kept = survival(&mut r, period);
+    for (value, period, held) in HELD {
+        let kept = survival(&mut r, period, value);
         let shown: Vec<String> = kept.iter().map(|k| format!("{:.0}%", 100.0 * k)).collect();
         eprintln!(
-            "[taa] a flash every {period} frames, kept flash by flash: {}",
+            "[taa] at {value}, a flash every {period} frames, kept flash by flash: {}",
             shown.join(" ")
         );
-        assert!(
-            kept[..2].iter().all(|&k| k >= FIRST),
-            "every {period}: {shown:?}"
-        );
+        let at = format!("at {value}, every {period}");
+        assert!(kept[..2].iter().all(|&k| k >= FIRST), "{at}: {shown:?}");
         let later = kept[3..].iter().all(|&k| (k - held).abs() <= BAND);
-        assert!(
-            later,
-            "every {period}, from the fourth: {shown:?}, not ~{held}"
-        );
+        assert!(later, "{at}, from the fourth: {shown:?}, not ~{held}");
     }
 }
 
@@ -124,7 +126,8 @@ fn afterglow(r: &mut Renderer, scale: f32) -> (Vec<f32>, Vec<f32>) {
 /// a level over URP's (`Graphics.md`): ours, the measure plus a margin. Measured
 /// on lavapipe: 32 frames at render scale 1 (29 levels the frame after, against
 /// URP's 9), 39 at 0.67 (20 against 9); on an RTX 2060, 30 (25 against 8) and
-/// 38 (20 against 9).
+/// 38 (20 against 9). At 0.5 (the default) less: lavapipe 29 frames (23 against 9)
+/// and 35 (18 against 9), so the bound is held at 1 alone.
 const AFTERGLOW: usize = 44;
 
 #[test]

@@ -117,7 +117,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetSsrStepLength` / `SetSsrStepLength` | `()` / `(units)` | `number`: the `Custom` march's step, world units (clamped 0.05–2, **default `0.375`**) |
 | `Graphics.GetSsrSteps` / `SetSsrSteps` | `()` / `(n)` | `number`: the `Custom` march's step count (clamped 1–256, **default `32`**) |
 | `Graphics.GetTaaActive` / `SetTaaActive` | `()` / `(bool)` | `bool` (**default `false`**; `false` with no screen camera; see *TAA*) |
-| `Graphics.GetTaaAntiFlicker` / `SetTaaAntiFlicker` | `()` / `(value)` | `number`: HDRP's *Anti-Flicker*, how far a still pixel blinking under the jitter holds its history (clamped 0–1, **default `0`**: URP's resolve; see *TAA*, *Anti-Flicker* for what it softens) |
+| `Graphics.GetTaaAntiFlicker` / `SetTaaAntiFlicker` | `()` / `(value)` | `number`: HDRP's *Anti-Flicker*, how far a still pixel blinking under the jitter holds its history (clamped 0–1, **default `0.5`**, HDRP's; `0` is URP's resolve; see *TAA*, *Anti-Flicker* for what it softens) |
 | `Graphics.GetTaaBaseBlendFactor` / `SetTaaBaseBlendFactor` | `()` / `(value)` | `number`: URP's *Base Blend Factor*, the history's share for a still pixel (frame influence is `1 - base`; clamped 0.6–0.98, **default `0.9`**; see *TAA*) |
 | `Graphics.GetTaaContrastAdaptiveSharpening` / `SetTaaContrastAdaptiveSharpening` | `()` / `(value)` | `number`: RCAS strength, on the tonemapped image after the resolve (clamped 0–1, **default `0`**: no sharpen; see *TAA*) |
 | `Graphics.GetTaaJitterScale` / `SetTaaJitterScale` | `()` / `(value)` | `number`: URP's *Jitter Scale* on the sub-pixel jitter (clamped 0–1, **default `1`**; see *TAA*) |
@@ -841,7 +841,7 @@ a wall the wall is a reveal, and where it arrives over one nothing is. A still
 pixel blends exactly as URP's. These are fixed constants for now. The distances
 cost each TAA camera half again its history memory: 50 MB in all at 1920×1080.
 
-**Anti-Flicker** (#2228, HDRP's; off by default). URP's colour box is the
+**Anti-Flicker** (#2228, HDRP's; on by default at HDRP's `0.5`). URP's colour box is the
 current frame's own, so where some sub-pixel offsets give a patch a very
 different value (a glossy SSR reflection near a small bright bulb, a specular
 glint) the patch is its own box and each blink reaches the screen: a still view
@@ -850,7 +850,8 @@ keeps blinking holds its history's luma against the blinks: a blink is a change
 undone on the very next frame, and once a pixel's blinks recur, its history's
 luma may sit up to four times (at `1`; the setting scales it) its recurring
 blinks outside the box, so they average away (on the case that found it, a still
-view's worst blink drops from 26 levels to 9). Its hue and saturation are the
+view's worst blink drops from 26 levels to 11 at the default `0.5` and to 9 at `1`;
+lavapipe). Its hue and saturation are the
 clamp's, as URP's are, so a light turning from red to blue at the same
 brightness shows the new hue as fast. **The hold is for a still view**: it
 falls off as a pixel moves, from all of it at 0.05 pixels a frame to none at 2
@@ -859,24 +860,28 @@ found it, a panning view's worst one-frame blink at `1` against URP's (RTX
 2060): a quarter of a pixel a frame, 8 levels against 13; half a pixel, 7
 against 9; a pixel, 13 against 14; from 2 pixels a frame, the same as URP's. What it costs a pixel-a-frame pan: the image sits within 2 levels
 of URP's, with no trail behind the bulb's edge. A revealed or reactive pixel is
-never held. At `0` the
-resolve is URP's, bit for bit, and costs nothing more; on, each TAA camera keeps
-16 bytes a pixel more (83 MB in all at 1920×1080).
+never held. On (the default), each TAA camera keeps 16 bytes a pixel more (83 MB
+in all at 1920×1080); at `0` the resolve is URP's, bit for bit, and costs nothing
+more.
 
-**What it softens**, measured at `1` on a still view (lavapipe; in rendered
-frames, so the time scales with the frame rate): a one-frame flash repeated on a
-still pixel shows fully its first two times; from its third, flashes 6 frames
-apart show about a tenth of themselves, and 10 frames apart 40 % the third time,
-then a quarter. A strobe, a flickering light, or a fast gun's flashes lighting a
-wall or the viewmodel are nearly removed so. A
+**What it softens**, measured on a still view (lavapipe; in rendered frames, so
+the time scales with the frame rate): a one-frame flash repeated on a still pixel
+shows fully its first two times. From its third, at the default `0.5`, flashes 6
+frames apart show 30 % the third time, then about an eighth (12 %), and 10 frames
+apart 70 %, then 58 %; at `1`, 6 frames apart about a tenth of themselves, and 10
+frames apart 40 % the third time, then a quarter. A strobe, a flickering light, or a fast gun's flashes lighting a
+wall or the viewmodel are softened so, the faster the more, and nearly removed at
+`1`. A
 lone change on a pixel that was not blinking (a light switched on, a single muzzle
 flash, a shadow crossing a calm floor) is as sharp as URP's. On a pixel already
 blinking under the jitter (a textured surface, an edge; more of the image while TAA
 upscales), a lone flash's end lingers: on a noise ceiling it sits a level or more
-over URP's for 32 frames after the flash (39 at render scale `0.67`), starting at 29
-levels against URP's 9. So turn it on for a view that must hold still (a menu
-scene, a held aim at glossy reflections), and leave it at `0` where flashes and
-strobes are the point.
+over URP's for 29 frames after the flash at `0.5` (35 at render scale `0.67`),
+starting at 23 levels against URP's 9; at `1`, 32 frames (39), starting at 29. So
+the default holds a still view (a held aim at glossy reflections, a menu scene)
+and softens a fast gun's muzzle flashes on a wall from the third shot: a shooter
+whose flashes and strobes are the point lowers it, or sets `0` for URP's resolve;
+a view that still blinks at `0.5` raises it toward `1`.
 
 Unity's camera has **one anti-aliasing mode**, so with both on, TAA runs and the
 FXAA pass is skipped; `fxaa_active` keeps its value for when TAA is turned off. TAA
@@ -977,7 +982,7 @@ added to the negative bias TAAU applies). The float ranges (Base Blend Factor
 `0.6`..`0.98`, Variance Clamp Scale `0.6`..`1.2`, Jitter Scale `0`..`1`, Mip Bias
 `-1`..`0`, sharpening `0`..`1`) are URP's Camera Inspector bounds, which every
 setter here clamps to; URP's own script setters accept wider values. #1846's moving
-and reveal rules stay fixed constants. **Anti-Flicker** (`0`..`1`, default `0`) is
+and reveal rules stay fixed constants. **Anti-Flicker** (`0`..`1`, default `0.5`) is
 HDRP's camera setting of that name; see *Anti-Flicker* above.
 
 **Quality** (URP's `VeryLow`…`VeryHigh`, default `High`) picks URP's

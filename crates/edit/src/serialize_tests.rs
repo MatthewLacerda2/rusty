@@ -1,7 +1,8 @@
 //! crates/edit/src/serialize_tests.rs — what applying a loaded document holds: a one-sided
 //! parent link (PR #1774's review, #1805): a child naming a parent whose `children`
 //! lacks it is listed there as it loads, so switching the parent off hides the child;
-//! and the bake settings are held to their ranges (#1704).
+//! a camera's TAA knobs survive a save, and one left out takes its default; and the
+//! bake settings are held to their ranges (#1704).
 
 use crate::{apply_scene_data, to_scene_data};
 use rusty_scene::Scene;
@@ -78,6 +79,33 @@ fn the_taa_camera_knobs_round_trip_through_save_and_load() {
     assert_eq!(held.taa_mip_bias, -0.5);
     assert_eq!(held.taa_contrast_adaptive_sharpening, 0.7);
     assert_eq!(held.taa_anti_flicker, 0.4);
+}
+
+#[test]
+fn a_camera_saved_without_anti_flicker_loads_hdrps_default_and_a_saved_zero_stays_off() {
+    use rusty_components::CameraComponent;
+    let load = |value: Option<f32>| {
+        let mut doc = serde_json::to_value(CameraComponent::default()).unwrap();
+        let fields = doc.as_object_mut().unwrap();
+        match value {
+            Some(v) => fields.insert("taa_anti_flicker".into(), v.into()),
+            None => fields.remove("taa_anti_flicker"),
+        };
+        serde_json::from_value::<CameraComponent>(doc)
+            .unwrap()
+            .taa_anti_flicker
+    };
+    assert_eq!(load(None), CameraComponent::DEFAULT_TAA_ANTI_FLICKER);
+    assert_eq!(
+        CameraComponent::DEFAULT_TAA_ANTI_FLICKER,
+        0.5,
+        "HDRP's default"
+    );
+    assert_eq!(
+        load(Some(0.0)),
+        0.0,
+        "0 is a value a scene saves: URP's resolve"
+    );
 }
 
 #[test]

@@ -45,20 +45,25 @@ fn the_lanes_are_where_the_shader_reads_them() {
     assert_eq!(p.rejection, rejection);
     // The quality's steps ride `levels`: `High` (the default) is URP's (2, 2, 2, 0).
     assert_eq!(p.levels, [2.0, 2.0, 2.0, 0.0]);
-    // No anti-flicker by default (#2228): the hold's scale is 0, and the camera's
-    // value scales it.
-    assert_eq!(p.flicker, [FLICKER_DECAY, 0.0, 0.0, 0.0]);
-    let cam = rusty_components::CameraComponent {
-        taa_anti_flicker: 0.5,
-        ..Default::default()
+    // The anti-flicker starts at HDRP's 0.5 (#2228), and the camera's value scales
+    // the hold; at 0 its scale is 0.
+    assert_eq!(p.flicker, [FLICKER_DECAY, 0.5 * FLICKER_HOLD, 0.0, 0.0]);
+    let tuned = |value: f32| {
+        let cam = rusty_components::CameraComponent {
+            taa_anti_flicker: value,
+            ..Default::default()
+        };
+        let tune = TaaTune::from_camera(&cam);
+        TaaParams::new(
+            ((64, 48), (32, 24)),
+            (true, Vec2::ZERO, false),
+            tune,
+            lenses(&[camera()], 1.0),
+        )
     };
-    let half = TaaParams::new(
-        ((64, 48), (32, 24)),
-        (true, Vec2::ZERO, false),
-        TaaTune::from_camera(&cam),
-        lenses(&[camera()], 1.0),
-    );
-    assert_eq!(half.flicker[1], 0.5 * FLICKER_HOLD);
+    assert_eq!(tuned(0.5).flicker[1], 0.5 * FLICKER_HOLD);
+    assert_eq!(tuned(0.0).flicker[1], 0.0);
+    assert_eq!(tuned(1.0).flicker[1], FLICKER_HOLD);
     let wgsl = shader();
     for read in [
         "(pixels - taa.knobs.w) / (taa.rejection.y - taa.knobs.w)",

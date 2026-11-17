@@ -7,6 +7,9 @@ use super::measure::{run, swing};
 use super::room::{anti_flicker, renderer, room, H, ON, W};
 use crate::{RenderView, OFFSCREEN_FORMAT};
 
+/// A camera's anti-flicker unless a game sets it: HDRP's.
+const DEFAULT: f32 = rusty_components::CameraComponent::DEFAULT_TAA_ANTI_FLICKER;
+
 /// Frames measured: two of the jitter's 27-frame cycles, so its 32-frame
 /// horizontal one turns over too.
 const FRAMES: u32 = 54;
@@ -20,22 +23,29 @@ const STILL: f32 = 12.0;
 fn gpu_a_still_view_under_taa_holds_a_jittered_reflection_still_with_anti_flicker() {
     let Some(mut r) = renderer() else { return };
     let none = &|_: &mut _, _| {};
-    let held = swing(&run(
-        &mut r,
-        &mut anti_flicker(room(), ON),
-        (FRAMES, 1.0),
-        none,
-    ));
-    let clamped = swing(&run(&mut r, &mut room(), (FRAMES, 1.0), none));
-    eprintln!("[taa] a still view's largest tile step: {clamped:.1} URP's, {held:.1} held");
+    let mut step = |value| {
+        swing(&run(
+            &mut r,
+            &mut anti_flicker(room(), value),
+            (FRAMES, 1.0),
+            none,
+        ))
+    };
+    let (clamped, default, held) = (step(0.0), step(DEFAULT), step(ON));
+    eprintln!(
+        "[taa] a still view's largest tile step: {clamped:.1} URP's, {default:.1} at the \
+         default {DEFAULT}, {held:.1} at {ON}"
+    );
     assert!(
         clamped > 2.0 * STILL,
         "the case flickers under URP's resolve: {clamped:.1}"
     );
-    assert!(
-        held <= STILL,
-        "a still view blinks under the anti-flicker: a tile steps {held:.1}"
-    );
+    for (value, step) in [(DEFAULT, default), (ON, held)] {
+        assert!(
+            step <= STILL,
+            "a still view blinks under the anti-flicker at {value}: a tile steps {step:.1}"
+        );
+    }
 }
 
 #[test]

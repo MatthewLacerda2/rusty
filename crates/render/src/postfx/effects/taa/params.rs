@@ -56,8 +56,9 @@
 //! a reactive one keeps no hold. What it
 //! costs, a one-frame change repeated on a still pixel (a strobe, a fast gun's
 //! flashes on a wall) held as a flicker is, is measured in `gpu/flicker/` and told
-//! in `docs/api/Graphics.md`, *Anti-Flicker*. At 0 (the default) the plain resolve
-//! runs, reading and writing none of it.
+//! in `docs/api/Graphics.md`, *Anti-Flicker*. A camera starts at HDRP's `0.5`
+//! (`CameraComponent::DEFAULT_TAA_ANTI_FLICKER`); at 0 the plain resolve runs,
+//! reading and writing none of it.
 
 use glam::Vec2;
 
@@ -152,9 +153,9 @@ pub(super) fn lenses(stack: &[Camera], aspect: f32) -> [[f32; 4]; MAX_CAMERAS] {
 /// The camera's TAA knobs the resolve reads (#1847): the still pixel's frame
 /// influence (`1 - base_blend`), the variance clamp scale and the quality level's
 /// steps ([`levels`]), and the anti-flicker (#2228), `0`..`1`. URP's defaults
-/// reduce to the constants [`FRAME_INFLUENCE`], [`VARIANCE_CLAMP_SCALE`], `High`
-/// and no anti-flicker, so a camera left at its defaults resolves bit for bit as
-/// before (#1847).
+/// reduce to the constants [`FRAME_INFLUENCE`], [`VARIANCE_CLAMP_SCALE`] and
+/// `High`, so a camera left at its defaults blends as URP's (#1847); its
+/// anti-flicker starts at HDRP's `0.5`, and at `0` the resolve is URP's bit for bit.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct TaaTune {
     pub frame_influence: f32,
@@ -176,13 +177,13 @@ impl TaaTune {
 }
 
 impl Default for TaaTune {
-    /// A default camera's tune: URP's defaults, so the resolve matches the constants.
+    /// A default camera's tune: URP's blend constants and HDRP's anti-flicker.
     fn default() -> Self {
         Self {
             frame_influence: FRAME_INFLUENCE,
             variance_clamp_scale: VARIANCE_CLAMP_SCALE,
             levels: levels(rusty_components::TaaQuality::default()),
-            anti_flicker: 0.0,
+            anti_flicker: rusty_components::CameraComponent::DEFAULT_TAA_ANTI_FLICKER,
         }
     }
 }
