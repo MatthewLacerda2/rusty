@@ -15,6 +15,11 @@ config's `additional_cargo_args`, and in the test phase only
 `additional_cargo_test_args` and what follows `--`. It also holds that the
 mutants' `--timeout` is the `Baseline` step's output, not a number, and that
 the baseline runs under the same `ulimit -v` as the mutants it times.
+
+What only narrows a mutant's tests is left out of the comparison: nextest's
+`-E` filter and a `--tool-config-file` (the on-request run's `rdeps(=P)` and
+its priority, #2283). A mutant then runs a subset of the baseline's tests, in
+another order, so the whole suite's time still bounds it.
 """
 
 from __future__ import annotations
@@ -27,6 +32,8 @@ from tests import SCRIPTS
 
 WORKFLOWS = SCRIPTS.parent / "workflows"
 CONFIG = SCRIPTS.parent.parent / ".cargo" / "mutants.toml"
+#: Test arguments that only narrow or reorder the tests a mutant runs.
+NARROWING = re.compile(r'\s(?:-E|--tool-config-file)\s+(?:"[^"]*"|\S+)')
 #: A `cargo mutants` run (not `--list`) and its `\`-continued lines.
 MUTATE = re.compile(r"cargo mutants (?!--list\b)(?:[^\n]*\\\n)*[^\n]*")
 ULIMIT = re.compile(r"ulimit -v (\d+)")
@@ -63,7 +70,7 @@ def problems(text: str, config: dict) -> list[str]:
         return ["no `cargo mutants` run"]
     mutate = " ".join(found[0].replace("\\\n", " ").split())
     own, _, test_args = mutate.partition(" -- ")
-    test_args = test_args.split(" || ")[0]
+    test_args = NARROWING.sub("", " " + test_args.split(" || ")[0]).strip()
     base = step(text, "Baseline")
     ran = [" ".join(line.split()) for line in re.findall(r"cargo nextest run[^|\n]*", base)]
     bad = [f"`cargo mutants` lacks `{flag}`" for flag in ("--baseline skip", "--in-place")
@@ -138,6 +145,14 @@ class Cases(unittest.TestCase):
         self.assertTrue(any("--features=dev --features=x --locked" in p for p in problems(GOOD, config)))
         text = GOOD.replace("--features=dev", "--features=dev --features=x --locked")
         self.assertEqual(problems(text, config), [])
+
+    def test_a_filter_that_narrows_a_mutants_tests_still_matches(self) -> None:
+        """`-E` and a tool config narrow a mutant's tests, which the whole baseline bounds."""
+        mutate = "--in-diff scope.diff -- --fail-fast --test-threads 2"
+        text = GOOD.replace(mutate, mutate + ' \\\n            -E "rdeps(=$p)" --tool-config-file "m:$f"')
+        self.assertIn("rdeps", text)
+        self.assertEqual(problems(text, WORKSPACE), [])
+        self.assertTrue(problems(text.replace("--tool-config-file", "--test-threads 4 --x"), WORKSPACE))
 
     def test_a_hard_coded_timeout_is_flagged(self) -> None:
         text = GOOD.replace('--timeout "$TIMEOUT"', "--timeout 300")
