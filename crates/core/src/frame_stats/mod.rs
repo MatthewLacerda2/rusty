@@ -78,6 +78,13 @@ pub struct FrameStats {
     pub metrics: BTreeMap<String, Series>,
     /// Per-system CPU milliseconds, by system name — diagnostic, not budgetable.
     pub systems: BTreeMap<String, Series>,
+    /// The newest tick's CPU milliseconds per system, summed by name, in the order
+    /// the schedule ran them: every registered system, so the bench reports each
+    /// one (`cpu.<system>`) with no list of its own.
+    pub tick_systems: Vec<(&'static str, f64)>,
+    /// A tick closed since the last system was recorded: the next one starts
+    /// [`Self::tick_systems`] afresh.
+    tick_closed: bool,
     /// GPU milliseconds per render-pass kind, by its stable name (#835). Empty where
     /// the adapter has no timestamps — absent, never zero.
     pub gpu_passes: BTreeMap<String, Series>,
@@ -133,8 +140,16 @@ impl FrameStats {
         );
     }
 
-    /// Record `ms` of CPU time for the system named `name` this tick.
-    pub fn record_system(&mut self, name: &str, ms: f64) {
+    /// Record `ms` of CPU time for the system named `name` this tick (a
+    /// schedule's names are static: the tick's list allocates none).
+    pub fn record_system(&mut self, name: &'static str, ms: f64) {
+        if std::mem::take(&mut self.tick_closed) {
+            self.tick_systems.clear();
+        }
+        match self.tick_systems.iter_mut().find(|(n, _)| *n == name) {
+            Some((_, sum)) => *sum += ms,
+            None => self.tick_systems.push((name, ms)),
+        }
         let at = self.recent.stamp(true);
         push(
             Some(&mut self.systems),
@@ -149,6 +164,7 @@ impl FrameStats {
     pub fn end_tick(&mut self) {
         let at = self.recent.stamp(true);
         bounded(&mut self.recent.tick_marks, at);
+        self.tick_closed = true;
         self.frames += 1;
         self.recent.ticks += 1;
     }
@@ -217,6 +233,8 @@ impl FrameStats {
             metrics: fold_recent(r, &r.metrics, n, &keep),
             systems: fold_recent(r, &r.systems, n, &keep),
             gpu_passes: fold_recent(r, &r.gpu_passes, n, &keep),
+            tick_systems: Vec::new(),
+            tick_closed: false,
             recent: Recent::default(),
         }
     }

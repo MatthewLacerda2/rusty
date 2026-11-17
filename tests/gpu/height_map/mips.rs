@@ -1,7 +1,8 @@
-//! Coordinates the parallax never shifted read at their own mip (#2191's review):
-//! under a height map every map lookup samples with explicit derivatives, so
-//! coordinates built outside `parallax::displace` (the `emissive_boost` surface
-//! block's) must carry theirs, or a far surface reads mip 0 and aliases.
+//! A surface block's lookup under a height map reads as it does without one (#2191's
+//! review): the `emissive_boost` block builds its coordinates with `coords_with`,
+//! outside `parallax::displace`, so they are neither shifted nor bent (`bend` 0) and
+//! are read at their own implicit derivatives, the mip a far surface needs. A far,
+//! fine checker shows any other mip as a different frame.
 
 use rusty::components::MaterialAsset;
 use rusty::shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};

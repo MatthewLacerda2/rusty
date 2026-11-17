@@ -30,7 +30,7 @@ fn a_wall_standing_on_a_floor_bakes_without_a_warning() {
         denoiser: Denoiser::None,
         ..Default::default()
     };
-    let maps = bake(&BakeScene::gather(&scene, &|_| None), &settings);
+    let maps = bake(&BakeScene::gather(&scene, &|_, _| None), &settings);
     assert_eq!(maps.len(), 2, "both boxes baked a lightmap");
     let said = rusty_test_support::logs::take();
     let lighting: Vec<_> = said.iter().filter(|l| l.contains("[Lighting]")).collect();

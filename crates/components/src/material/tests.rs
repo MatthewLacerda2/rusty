@@ -140,3 +140,11 @@ fn a_detail_mask_round_trips_and_is_unwritten_without_one() {
 fn a_default_material_is_half_rough() {
     assert_eq!(MaterialAsset::default().roughness, 0.5);
 }
+
+#[test]
+fn the_occlusion_amount_is_held_to_0_1_and_a_nan_is_whole() {
+    let mut m = MaterialAsset::default();
+    let read =
+        [-2.0, 0.25, 9.0, f32::NAN].map(|s| (m.occlusion_strength = s, m.occlusion_amount()).1);
+    assert_eq!(read, [0.0, 0.25, 1.0, 1.0]);
+}

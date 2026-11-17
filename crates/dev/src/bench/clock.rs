@@ -100,26 +100,53 @@ pub fn spread(values: &[f64]) -> f64 {
     (at(0.95) - at(0.05)) / median
 }
 
-/// The warnings one window's CPU samples earn: a clock that moved during it,
-/// and CPU times that spread past [`CPU_SPREAD`].
-pub fn cpu_warnings(samples: &Samples) -> Vec<String> {
-    let mut out = Vec::new();
+/// A way one window's CPU samples can spread too far to trust.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Spread {
+    /// `cpu_clock_pct` moved past [`CLOCK_SPREAD`] during the window.
+    Clock,
+    /// `cpu_ms` spread past [`CPU_SPREAD`].
+    Cpu,
+}
+
+impl Spread {
+    /// The warning a window spread `by` (a fraction) this way earns.
+    pub fn warning(self, by: f64) -> String {
+        let pct = by * 100.0;
+        match self {
+            Self::Clock => format!(
+                "the CPU clock moved {pct:.0}% across the window: frame_ms is unreliable, read cpu_ms"
+            ),
+            Self::Cpu => format!(
+                "cpu_ms spread {pct:.0}% across the window: compare p95 with care, and take CPU \
+                 numbers from a small-frame run (docs/testing.md)"
+            ),
+        }
+    }
+}
+
+/// How one window's CPU samples spread past their limits: a clock that moved
+/// during it, and CPU times that spread past [`CPU_SPREAD`], each with its spread.
+pub fn cpu_spreads(samples: &Samples) -> Vec<(Spread, f64)> {
     let clock = spread(samples.values("cpu_clock_pct"));
-    if clock > CLOCK_SPREAD {
-        out.push(format!(
-            "the CPU clock moved {:.0}% across the window: frame_ms is unreliable, read cpu_ms",
-            clock * 100.0
-        ));
-    }
     let cpu = spread(samples.values("cpu_ms"));
-    if cpu > CPU_SPREAD {
-        out.push(format!(
-            "cpu_ms spread {:.0}% across the window: compare p95 with care, and take CPU \
-             numbers from a small-frame run (docs/testing.md)",
-            cpu * 100.0
-        ));
-    }
-    out
+    [
+        (Spread::Clock, clock, CLOCK_SPREAD),
+        (Spread::Cpu, cpu, CPU_SPREAD),
+    ]
+    .into_iter()
+    .filter(|&(_, by, limit)| by > limit)
+    .map(|(kind, by, _)| (kind, by))
+    .collect()
+}
+
+/// The warnings one window's CPU samples earn ([`cpu_spreads`]).
+pub fn cpu_warnings(samples: &Samples) -> Vec<String> {
+    let spreads = cpu_spreads(samples);
+    spreads
+        .into_iter()
+        .map(|(kind, by)| kind.warning(by))
+        .collect()
 }
 
 /// A warning when the average CPU clock moved past [`CLOCK_DRIFT`] since the
@@ -127,9 +154,17 @@ pub fn cpu_warnings(samples: &Samples) -> Vec<String> {
 pub fn cpu_drift(now: &Report, previous: Option<&Report>) -> Option<String> {
     let clock = |r: &Report| {
         let row = r.metrics.iter().find(|(k, _)| k == "cpu_clock_pct");
-        row.map(|(_, s)| s.avg).filter(|&avg| avg > 0.0)
+        row.map(|(_, s)| s.avg)
     };
-    let (now, before) = (clock(now)?, clock(previous?)?);
+    clock_drift(clock(now)?, clock(previous?)?)
+}
+
+/// [`cpu_drift`] on the two runs' average `cpu_clock_pct`s (`None` for a clock
+/// that is not positive).
+pub fn clock_drift(now: f64, before: f64) -> Option<String> {
+    if now <= 0.0 || before <= 0.0 {
+        return None;
+    }
     let moved = (now - before) / before;
     (moved.abs() > CLOCK_DRIFT).then(|| {
         format!(

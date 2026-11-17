@@ -13,6 +13,7 @@ fn drawn(draw_calls: u32, gpu: Option<f64>) -> WindowFrame {
     let render = RenderedFrame {
         counters,
         cpu_ms: 1.5,
+        stages: Vec::new(),
         gpu,
     };
     WindowFrame {

@@ -1010,11 +1010,26 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   at a fixed reference clock, below), `gpu_raw_ms` (GPU time as measured) and
   `gpu_clock_pct` (the clock it ran at, % of the reference), `draw_calls`,
   `triangles`, `culled_entities`, `lights_dropped`, `cluster_lights_dropped`, `lights_culled`,
-  `decals_visible`, `decal_cluster_refs`, and the systems
-  `cpu.update_scripts`, `cpu.tick_nav`, `cpu.step_physics`, `cpu.animate` (at the
-  reference CPU clock). Every GPU pass prints
-  every run (0 when it did not run), so the rows are stable. Under the table come
-  the run's warnings, if any (below).
+  `decals_visible`, `decal_cluster_refs`; then where the CPU time went, by name:
+  `cpu.<system>` for every system the schedule runs, named as it registers them
+  (`update_scripts`, `step_physics`, … at the reference CPU clock, summing to
+  `cpu_ms`), and `render.<stage>` for every stage of the renderer's frame, summing
+  to `renderer_ms`: `setup`, `assets`, `prepare`, `extract` (the retained scene's
+  update), `shadows` and `shadow_gather` (the sweeps' caster gather, cull and
+  batch, a lap of its own, so absent from a frame no shadow sweep ran), `render_textures`, `ui` (its layout and its draw),
+  `stack`, then each per-camera pass by its name in
+  `render::draw::camera::CAMERA_PASSES` (`clusters`, `solids`: the per-camera cull
+  and batch, `scene`, `transparent`, `post_fx`, …), each summed over every camera
+  and render-texture camera. So `render_textures` holds only what drawing the
+  render textures does around their cameras: a render-texture camera's own passes
+  land in `scene`, `solids` and the other pass rows, beside the screen cameras'.
+  Last, `finish` (the
+  frame's counters and its GPU timestamps' resolve). Each set ends with an `other`
+  row, what no part held: timer overhead, a few microseconds; a stage left
+  untimed would show there. The stages are timed only on frames the dev layer
+  captures (`Renderer::time_stages`): the window, the editor and the player never
+  pay for them. Every GPU pass prints every run (0 when it did not run), so the
+  rows are stable. Under the table come the run's warnings, if any (below).
 - **before and after** — the report is kept in `out/bench/bench.json` (and
   `bench.txt`), and each run prints every row's change against the last one. To
   measure an optimisation: `make bench`, change, `make bench`. The report names the
@@ -1036,6 +1051,126 @@ error) and must run before the first `Step`, so the spawned scripts load when pl
 starts. `Harness.Bench(n)` works on any scenario: it steps and renders `n` frames,
 prints the report, keeps it in the run's out dir and returns `{ frames, metrics =
 { <row> = { avg, p95 } }, warnings = { <text>, … } }`.
+
+### A project's own scenes: `make bench-scenes`
+`make bench` measures one synthetic yard; an optimisation also needs numbers from
+real levels. `make bench-scenes PROJECT=<dir> [SCENES=a,b] [RES=WxH] [RUNS=n]
+[BEFORE=<dir>] [PROFILE=1] [IMPORT=1]` benches a game project's own scenes, wherever the
+project is on disk (`bench-scenes`, `dev::bench::scenes`). `SCENES` names scenes by
+their path under `assets/scenes/` without the extension (`levels/a`); by default
+every `.scene` there, subfolders included (a folder linked twice is walked once), is
+benched, in sorted order. Each scene runs in processes of its own, so its load is a
+cold one and its peak memory is its own. The project is opened read-only
+(`Access::Run`, as `play` and the player open one) and never seeded, so nothing is
+written into it; a folder missing the project skeleton gets its empty folders, as
+every binary's open makes them.
+
+- **the viewpoints**, deterministic and unauthored, in this order: every active
+  screen camera the scene holds, at its own transform, as the only screen camera;
+  the player's spawn (the entity named `PlayerSpawn`, else `Player`), at eye height
+  (1.7 m) over the floor under it, looking the way it faces; then points on the
+  navmesh at eye height, drawn from a fixed seed, each looking along yaws 0, 90,
+  180 and 270°. At most 8 positions in all: the cameras first, by entity id, then
+  the spawn, then navmesh points for what is left. When the cameras fill all 8,
+  the report names what that left out (the cameras past 8, the spawn, the navmesh
+  points), each only when the scene has it. A scene with no
+  navmesh uses its cameras and spawn alone; one with none of the three looks along
+  +Z from the centre of its entities' positions. The report warns in both cases,
+  naming the viewpoints it used. A pose is held
+  after every sim step, whatever the scripts move.
+- **the run**: the scene loads, steps once and draws once (`load_ms`). Then each
+  viewpoint warms up 60 frames and measures 300, at 1920x1080 unless `RES` says
+  otherwise, and the round over every viewpoint is run `RUNS` times (default 3).
+  The scene's scripts run as in Play, with no input. One GPU clock probe serves
+  every viewpoint of a scene. A game that calls `Application.Quit()` ends the
+  measuring: the report warns, naming the viewpoint and run, and counts the frames
+  really measured (`measured` in the report), which the rows are over.
+- **the report**: every `Harness.Bench` row (`cpu.<system>` and `render.<stage>`
+  included, *Benchmark*, above) over the viewpoints (the average of their averages,
+  the worst p95 and the viewpoint it came from), then over the runs: the average,
+  and the **spread**, the lowest to the highest run's average. Plus:
+  - `load_ms`: the scene's own load to its first rendered frame, wall clock, with
+    the import cache as the project holds it (warm once the editor or a run
+    imported it): the harness's set-up (its Lua VM and API, the stats), the
+    scene's document and lighting sidecar read, its navmesh baked and the world
+    built, Play's refresh of the project's converted sources (a check of each
+    cache), then its first sim step and frame (its uploads). The renderer's start-up
+    (the device and every pipeline, warmed as a game's renderer is) happens between
+    the two, off the clock;
+  - `import_ms`, only with `IMPORT=1`, once a run (the import is the project's,
+    not a scene's: every model source is converted, with headless Blender for a
+    `.blend`, so it is slow): the first scene's load in a copy of the project (made
+    beside the reports, deleted after) without its `cache/`, its import cache
+    (`assets/generated/imported/`: converted models and compressed textures) and
+    its `.git`: what a first load costs. A row of the first scene's report, and one
+    line under the summary. A link in the project is copied as what it points to,
+    so the copy stands alone and the project is only ever read; a link looping
+    back, and what is neither a file nor a folder, are left out. A copy or a load
+    that fails leaves the row out with a warning, and the bench goes on;
+  - `rss_peak_mb`: the process's peak resident memory (Linux `VmHWM`; macOS
+    `task_info(TASK_VM_INFO)`'s `ledger_phys_footprint_peak`);
+  - `gpu_mb`: the renderer's GPU memory after the run, once the device has
+    freed what the run dropped (the clock probe). Vulkan (Linux) and DX12 read
+    it from wgpu's allocator report, the blocks it reserved from the device
+    (`total_reserved_bytes`: live allocations and their free space); Metal (macOS)
+    from the device's `currentAllocatedSize`, which also counts what the driver
+    keeps for itself, so the two platforms' figures are close, not equal. The
+    report names its source, and without one (GL) the row is absent and the report
+    says so.
+
+  It is kept as `out/bench/scenes/<project>-<hash>/<scene>.json` (and `.txt`; the
+  project folder's name and a short hash of its canonical path, so a copy and its
+  original keep separate histories), with the bench's console beside it
+  (`<scene>.console.log`), and printed with each row's change against that
+  scene's last run, under the same engine line, clock notes and warnings as
+  `make bench`: a CPU clock that moved since the last run, and a CPU clock or
+  `cpu_ms` that spread across a window (once per kind, naming the worst viewpoint
+  and run, and how many of the measured windows had it). **A change inside the
+  spread is unresolved**: when either run has a spread and the two overlap, the
+  change column says `unresolved (inside the spread)` instead of a percentage. A
+  run of one (`RUNS=1`) has no spread, so every change prints as measured. A last
+  run of another shape (size, frames, or viewpoints: their count, or one that
+  looks from elsewhere under the same label, each kept with its position, yaw and
+  camera entity; within 1 mm and 0.01° it is the same one, so a float reordered
+  in transform propagation or the navmesh bake still compares) is said in one warning, and the scene gets no change column.
+  Console errors during the bench (a script failing every tick, a sidecar that
+  failed to load) are warned of with their count and the first one, since they
+  make a scene look cheaper than the game is. A scene benches as
+  it is when it lacks a bake, with a warning naming what is missing: no
+  lightmaps, light probes placed whose SH never loaded, or reflection probes
+  placed with no cube on disk (what a scene does not place is not missing). Its
+  lighting cost is then not the shipped one. The run ends with a summary table of
+  one line per scene: `cpu_ms` (the sim at the reference CPU clock), `frame_ms`,
+  `gpu_ms`, `load_ms`, `rss_peak_mb`, `gpu_mb`, and the run's `import_ms` under
+  it when asked for.
+- **a fixed baseline**: `BEFORE=<dir>` compares with the kept report in `<dir>`
+  instead of the last run: a copy of a project's report folder
+  (`out/bench/scenes/<project>-<hash>/`, holding `<scene>.json`), or of the whole
+  `out/bench/scenes/`. Copy the folder once before a batch of optimisations, and
+  every PR of the batch compares with the same numbers, where the last run moves
+  with every merge. The report names the folder it compared with.
+- **a sampling profile**: `PROFILE=1` adds, after each scene's timed run, a run of
+  its own (the profiler's overhead stays out of the timings) under the platform's
+  sampling profiler, recording only each viewpoint's measured frames, warm-up
+  excluded: `perf record` on Linux (user space only, `cycles:u`, or the
+  `cpu-clock:u` timer where there is no cycle counter, with DWARF call stacks),
+  `sample` on macOS (the bench's own thread, the main one, alone: `sample`
+  samples every thread, parked or not, and the others' waits would fill the
+  table). It is a release build with line tables (the `profiling`
+  cargo profile, its own target folder). Kept beside the report:
+  `<scene>.profile.txt`, the top 40 functions by self time (samples where the
+  function was running) and by total time (samples where it was on the stack), and
+  `<scene>.folded`, the raw folded stacks (`a;b;c count`) a flame graph reads. No
+  profiler on `PATH` stops the run before anything is benched, naming the package
+  (Debian `linux-perf`, Ubuntu `linux-tools-$(uname -r)`, Fedora and Arch `perf`).
+  The profiler is tried once before any scene too: `perf` refusing to record
+  stops the run there, saying why, and for `kernel.perf_event_paranoid` above 2
+  what to set (`sudo sysctl kernel.perf_event_paranoid=2`). A profile that fails
+  later is said on its own line, the scene's timings and summary row stand, and
+  the run exits non-zero.
+
+Like `make bench`, it is a release build and a signal, never a gate: it is not in
+`make gates` or CI.
 
 ### GPU time and the GPU clock (#862)
 A laptop GPU does not run at one speed. On Apple silicon the governor re-picks the
