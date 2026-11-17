@@ -86,7 +86,7 @@ const NEIGHBOURS: [(i64, i64); 8] = [
 /// Fill each empty texel bordering filled ones, `passes` rings deep: with the mean
 /// of its filled neighbours when `average`, else with the first of them. A ring is
 /// read whole before it is written, so a texel never reads one filled in its pass.
-fn grow(px: &mut [Rgba], filled: &mut [bool], size: Size, passes: u32, average: bool) {
+pub(super) fn grow(px: &mut [Rgba], filled: &mut [bool], size: Size, passes: u32, average: bool) {
     let (w, h) = (size.width as i64, size.height as i64);
     for _ in 0..passes {
         let mut ring: Vec<(usize, Vec4)> = Vec::new();

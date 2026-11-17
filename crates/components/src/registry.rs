@@ -23,7 +23,11 @@
 //!
 //! 1. Its type, in its category's folder (`pub mod` in that folder's `mod.rs`),
 //!    implementing [`FirstClass`] and, as its Add Component default, `Default`
-//!    (or an arm in `dispatch.rs`'s `added!` naming another default).
+//!    (or an arm in `dispatch.rs`'s `added!` naming another default). Every serde
+//!    default agrees with that default: this module's test drops each stored key
+//!    in turn and flags a load that differs ([`default_drift`]), less the
+//!    type's [`FirstClass::DEFAULT_EXCEPTIONS`]; a type with no `Default` takes an
+//!    arm in that test pointing at where it is checked instead.
 //! 2. Its row below. The compiler then asks for the three traits the generated
 //!    lists need, each pointing at this file: `Inspect` (an `inspect!` row in
 //!    `edit::authoring::fields::kinds::<area>`), `Snapshot` (a `snapshot!` row in
@@ -55,6 +59,11 @@ pub trait FirstClass: 'static {
     /// The name in the snapshot's component inventory (Unity's class name where it
     /// differs, `Rigidbody`, `TrailRenderer`).
     const INVENTORY: &'static str = Self::NAME;
+    /// Key paths (`a.b`) of the stored form whose absence loads something other
+    /// than the component's default on purpose, each with why: the registry's
+    /// test (`default_drift`) flags every other serde default that drifts from
+    /// it, and an exception that no longer drifts.
+    const DEFAULT_EXCEPTIONS: &'static [(&'static str, &'static str)] = &[];
 }
 
 /// Calls `$callback!` with every first-class component row (see the module doc).
@@ -107,3 +116,80 @@ macro_rules! first_class {
     };
 }
 pub use crate::first_class;
+
+/// The key paths of `reference`'s serialised form whose absence loads something
+/// other than `reference`, each with what it loaded: a serde default that drifted
+/// from the value the engine makes. A key with no serde default fails the load
+/// instead and is not listed; arrays are not entered. Test hook, as
+/// [`default_drift`] is.
+#[doc(hidden)]
+pub fn serde_drift<T: serde::Serialize + serde::de::DeserializeOwned>(
+    reference: &T,
+) -> Vec<(String, serde_json::Value)> {
+    let Ok(whole) = serde_json::to_value(reference) else {
+        return vec![("(does not serialise)".to_string(), serde_json::Value::Null)];
+    };
+    let mut paths = Vec::new();
+    key_paths(&whole, &mut Vec::new(), &mut paths);
+    paths
+        .iter()
+        .filter_map(|path| {
+            let loaded = serde_json::from_value::<T>(without(&whole, path)).ok()?;
+            let loaded = serde_json::to_value(loaded).ok()?;
+            (loaded != whole).then(|| (path.join("."), loaded))
+        })
+        .collect()
+}
+
+/// [`serde_drift`] of a first-class component against its default `reference`,
+/// less its [`FirstClass::DEFAULT_EXCEPTIONS`], plus each exception that no longer
+/// drifts: empty when its serde defaults agree with it. Test hook: the registry's
+/// test checks every component with a `Default`, and `scene::create::defaults`'
+/// tests the ones whose Add Component default lives there.
+#[doc(hidden)]
+pub fn default_drift<T: FirstClass + serde::Serialize + serde::de::DeserializeOwned>(
+    reference: &T,
+) -> Vec<String> {
+    let drift = serde_drift(reference);
+    let excepted = |path: &str| T::DEFAULT_EXCEPTIONS.iter().any(|(p, _)| *p == path);
+    let drifted = |path: &str| drift.iter().any(|(p, _)| p == path);
+    let unexplained = drift
+        .iter()
+        .filter(|(path, _)| !excepted(path))
+        .map(|(path, loaded)| format!("{}: {path} (loads {loaded})", T::NAME));
+    let stale = T::DEFAULT_EXCEPTIONS
+        .iter()
+        .filter(|(path, _)| !drifted(path))
+        .map(|(path, _)| format!("{}: {path} is excepted but loads its default", T::NAME));
+    unexplained.chain(stale).collect()
+}
+
+/// Every key path in `value`'s objects, outermost first.
+fn key_paths(value: &serde_json::Value, prefix: &mut Vec<String>, out: &mut Vec<Vec<String>>) {
+    if let serde_json::Value::Object(map) = value {
+        for (key, child) in map {
+            prefix.push(key.clone());
+            out.push(prefix.clone());
+            key_paths(child, prefix, out);
+            prefix.pop();
+        }
+    }
+}
+
+/// `value` with the key at `path` removed (`path` is one [`key_paths`] found).
+fn without(value: &serde_json::Value, path: &[String]) -> serde_json::Value {
+    let mut value = value.clone();
+    if let Some((last, parents)) = path.split_last() {
+        let parent = parents
+            .iter()
+            .try_fold(&mut value, |at, key| at.get_mut(key));
+        if let Some(map) = parent.and_then(serde_json::Value::as_object_mut) {
+            map.remove(last);
+        }
+    }
+    value
+}
+
+#[cfg(test)]
+#[path = "registry_tests.rs"]
+mod tests;
