@@ -1,3 +1,5 @@
+use super::super::super::{Report, Summary};
+use super::super::fold::aggregate;
 use super::*;
 
 fn view(rows: &[(&str, f64, f64)]) -> Report {
@@ -9,28 +11,6 @@ fn view(rows: &[(&str, f64, f64)]) -> Report {
             .collect(),
         ..Report::default()
     }
-}
-
-#[test]
-fn rows_average_the_averages_and_keep_the_worst_p95_and_where() {
-    let reports = [
-        (
-            "camera A".to_string(),
-            view(&[("frame_ms", 2.0, 3.0), ("draw_calls", 10.0, 10.0)]),
-        ),
-        (
-            "nav 0 yaw 90".to_string(),
-            view(&[("frame_ms", 4.0, 9.0), ("gpu_ms", 1.0, 1.5)]),
-        ),
-    ];
-    let rows = aggregate(&reports);
-    let names: Vec<_> = rows.iter().map(|r| r.metric.as_str()).collect();
-    assert_eq!(names, ["frame_ms", "draw_calls", "gpu_ms"]);
-    assert_eq!((rows[0].avg, rows[0].p95), (3.0, 9.0));
-    assert_eq!(rows[0].worst, "nav 0 yaw 90");
-    // A row one viewpoint lacks averages over the viewpoints that have it.
-    assert_eq!((rows[1].avg, rows[1].worst.as_str()), (10.0, "camera A"));
-    assert_eq!(rows[2].avg, 1.0);
 }
 
 fn scene(frame_ms: f64) -> SceneReport {
@@ -94,9 +74,54 @@ fn the_summary_is_one_line_per_scene_with_a_dash_where_unmeasured() {
         lines[2].starts_with("pool") && lines[2].contains("512.500"),
         "{text}"
     );
+    assert!(lines[1]
+        .trim_start_matches("scene")
+        .trim_start()
+        .starts_with("cpu_ms"));
     assert!(
         lines[3].starts_with("tower-bar") && lines[3].contains(" 5 "),
         "{text}"
     );
     assert!(lines[3].trim_end().ends_with('-'), "no gpu_mb: {text}");
+}
+
+#[test]
+fn a_last_run_of_another_shape_is_said_once_and_gets_no_change_column() {
+    let mut now = scene(3.0);
+    now.size = (1280, 720);
+    let before = scene(2.0);
+    let w = now.against(Some(&before));
+    assert_eq!(w.len(), 1, "{w:?}");
+    assert!(w[0].contains("size 1920x1080 -> 1280x720"), "{}", w[0]);
+    let text = now.render(Some(&before));
+    let line = text.lines().find(|l| l.starts_with("frame_ms")).unwrap();
+    assert!(
+        !line.contains('%'),
+        "no change against another shape: {line}"
+    );
+    assert!(!text.contains("no previous report"), "{text}");
+    now.size = before.size;
+    now.views.push("nav 0 yaw 0".into());
+    assert!(now.against(Some(&before))[0].contains("viewpoints 1 -> 2"));
+}
+
+#[test]
+fn a_cpu_clock_that_moved_since_the_last_run_is_said_with_the_clock_notes() {
+    let mut before = scene(2.0);
+    before.push_value("cpu_clock_pct", 80.0);
+    let mut now = scene(2.0);
+    now.push_value("cpu_clock_pct", 40.0);
+    now.push_value("cpu_ms", 1.0);
+    let w = now.against(Some(&before));
+    assert_eq!(w.len(), 1, "{w:?}");
+    assert!(w[0].starts_with("the CPU clock moved -50%"), "{}", w[0]);
+    assert!(
+        scene(2.0).against(Some(&before)).is_empty(),
+        "no clock now: no drift"
+    );
+    let text = now.render(Some(&before));
+    assert!(
+        text.contains("(cpu_ms, cpu.<system>: ms at the reference CPU clock"),
+        "{text}"
+    );
 }

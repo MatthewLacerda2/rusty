@@ -13,7 +13,9 @@ impl Renderer {
     /// only with `editor_overlays` (a shipped game draws none), and have each
     /// authored surface shader build its facing pipelines with it from now on: its
     /// slot is built on its first draw, after the renderer starts (#1615).
-    pub(crate) fn warm_pipelines(&mut self, editor_overlays: bool) {
+    /// `pub` for `make bench-scenes`, whose headless renderer starts warm as a
+    /// game's does, so a scene's load time holds no pipeline compile.
+    pub fn warm_pipelines(&mut self, editor_overlays: bool) {
         self.surface_shaders.warm();
         for pipeline in self.lazy_pipelines(editor_overlays) {
             pipeline.get();

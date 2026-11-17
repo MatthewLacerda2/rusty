@@ -1022,8 +1022,9 @@ prints the report, keeps it in the run's out dir and returns `{ frames, metrics 
 `make bench` measures one synthetic yard; an optimisation also needs numbers from
 real levels. `make bench-scenes PROJECT=<dir> [SCENES=a,b] [RES=WxH]` benches a game
 project's own scenes, wherever the project is on disk (`bench-scenes`,
-`dev::bench::scenes`). `SCENES` names scenes by file stem; by default every
-`assets/scenes/*.scene` is benched. Each scene runs in a process of its own, so its
+`dev::bench::scenes`). `SCENES` names scenes by their path under `assets/scenes/`
+without the extension (`levels/a`); by default every `.scene` there, subfolders
+included, is benched, in sorted order. Each scene runs in a process of its own, so its
 load is a cold one and its peak memory is its own. The project is opened read-only
 (`Access::Run`, as `play` and the player open one) and never seeded, so nothing is
 written into it; a folder missing the project skeleton gets its empty folders, as
@@ -1033,30 +1034,47 @@ every binary's open makes them.
   screen camera the scene holds, at its own transform, as the only screen camera;
   the player's spawn (the entity named `PlayerSpawn`, else `Player`), at eye height
   (1.7 m) over the floor under it, looking the way it faces; then points on the
-  navmesh at eye height, drawn from a fixed seed until the cameras, the spawn and
-  the points make 8, each looking along yaws 0, 90, 180 and 270°. A scene with no
-  navmesh uses its cameras alone. A scene with neither looks along +Z from the
-  centre of its entities' positions. The report warns in both cases. A pose is held
+  navmesh at eye height, drawn from a fixed seed, each looking along yaws 0, 90,
+  180 and 270°. At most 8 positions in all: the cameras first, by entity id (past
+  8 the rest, the spawn and the navmesh points are left out, and the report says
+  so), then the spawn, then navmesh points for what is left. A scene with no
+  navmesh uses its cameras and spawn alone; one with none of the three looks along
+  +Z from the centre of its entities' positions. The report warns in both cases,
+  naming the viewpoints it used. A pose is held
   after every sim step, whatever the scripts move.
 - **the run**: the scene loads, steps once and draws once (`load_ms`). Then each
   viewpoint warms up 60 frames and measures 300, at 1920x1080 unless `RES` says
-  otherwise. The scene's scripts run as in Play, with no input.
+  otherwise. The scene's scripts run as in Play, with no input. One GPU clock
+  probe serves every viewpoint of a scene.
 - **the report**: every `Harness.Bench` row over the viewpoints (the average of
   their averages, the worst p95 and the viewpoint it came from), plus:
-  - `load_ms`: the load to the first rendered frame, wall clock;
+  - `load_ms`: the scene's own load to its first rendered frame, wall clock: its
+    document and lighting sidecar read, its navmesh baked and the world built,
+    then its first sim step and frame (its uploads). The renderer's start-up (the
+    device and every pipeline, warmed as a game's renderer is) happens between
+    the two, off the clock;
   - `rss_peak_mb`: the process's peak resident memory (Linux `VmHWM`; macOS
     `task_info(TASK_VM_INFO)`'s `ledger_phys_footprint_peak`);
-  - `gpu_mb`: the renderer's GPU memory after the run. Vulkan (Linux) and DX12 read
+  - `gpu_mb`: the renderer's GPU memory after the run, once the device has
+    freed what the run dropped (the clock probe). Vulkan (Linux) and DX12 read
     it from wgpu's allocator report; Metal (macOS) from the device's
     `currentAllocatedSize`. The report names its source, and without one (GL) the
     row is absent and the report says so.
 
-  It is kept as `out/bench/scenes/<project>/<scene>.json` (and `.txt`) and printed
-  with each row's change against that scene's last run, under the same engine line
-  and warnings as `make bench`. A scene with no lightmaps, light probes or baked
-  reflection probes benches as it is, with a warning naming what is missing: its
-  lighting cost is not the shipped one. The run ends with a summary table of one
-  line per scene: `frame_ms`, `gpu_ms`, `load_ms`, `rss_peak_mb`, `gpu_mb`.
+  It is kept as `out/bench/scenes/<project>-<hash>/<scene>.json` (and `.txt`; the
+  project folder's name and a short hash of its canonical path, so a copy and its
+  original keep separate histories) and printed with each row's change against
+  that scene's last run, under the same engine line, clock notes and warnings as
+  `make bench`: a CPU clock that moved since the last run, and a CPU clock or
+  `cpu_ms` that spread across a window (once per kind, naming the worst viewpoint
+  and how many had it). A last run of another shape (size, viewpoints or frames)
+  is said in one warning, and the scene gets no change column. A scene benches as
+  it is when it lacks a bake, with a warning naming what is missing: no
+  lightmaps, light probes placed whose SH never loaded, or reflection probes
+  placed with no cube on disk (what a scene does not place is not missing). Its
+  lighting cost is then not the shipped one. The run ends with a summary table of
+  one line per scene: `cpu_ms` (the sim at the reference CPU clock), `frame_ms`,
+  `gpu_ms`, `load_ms`, `rss_peak_mb`, `gpu_mb`.
 
 Like `make bench`, it is a release build and a signal, never a gate: it is not in
 `make gates` or CI.

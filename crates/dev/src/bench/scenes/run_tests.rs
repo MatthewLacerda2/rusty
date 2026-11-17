@@ -8,6 +8,8 @@ use rusty_components::CameraComponent;
 use rusty_navigation::test_support::add_floor;
 use rusty_scene::Scene;
 
+use std::path::Path;
+
 use super::*;
 
 fn project() -> std::path::PathBuf {
@@ -22,7 +24,8 @@ fn project() -> std::path::PathBuf {
     yard.world
         .set_world_position(cam, Vec3::new(0.0, 2.0, -4.0));
     let empty = Scene::new();
-    for (name, scene) in [("yard", &yard), ("empty", &empty)] {
+    std::fs::create_dir_all(scenes.join("levels")).unwrap();
+    for (name, scene) in [("yard", &yard), ("levels/empty", &empty)] {
         let path = scenes.join(format!("{name}.scene"));
         rusty_edit::save_to_file(scene, &path.to_string_lossy()).unwrap();
     }
@@ -38,7 +41,7 @@ const OPTS: Options = Options {
 #[test]
 fn gpu_a_projects_scenes_bench_from_their_viewpoints_with_load_and_memory() {
     let root = project();
-    assert_eq!(project_scenes(&root), ["empty", "yard"]);
+    assert_eq!(project_scenes(&root), ["levels/empty", "yard"]);
     let out = root.join("out");
     let settings = ProjectSettings::default;
 
@@ -50,12 +53,12 @@ fn gpu_a_projects_scenes_bench_from_their_viewpoints_with_load_and_memory() {
         yard.views
     );
     assert_eq!(yard.views[0], "camera Cam");
-    let empty = bench(&root, "empty", settings(), &out, OPTS).unwrap();
+    let empty = bench(&root, "levels/empty", settings(), &out, OPTS).unwrap();
     assert_eq!(empty.views, ["bounds centre"]);
     assert!(empty
         .warnings
         .iter()
-        .any(|w| w.starts_with("no camera and no navmesh")));
+        .any(|w| w.starts_with("no camera, no spawn and no navmesh")));
     assert!(empty
         .warnings
         .iter()
@@ -87,4 +90,38 @@ fn gpu_a_projects_scenes_bench_from_their_viewpoints_with_load_and_memory() {
     assert_eq!(again.views, yard.views);
     let text = std::fs::read_to_string(out.join("yard.txt")).unwrap();
     assert!(!text.contains("no previous report"), "{text}");
+}
+
+#[test]
+fn unbaked_names_what_the_scene_places_but_never_loaded() {
+    let mut scene = Scene::new();
+    let lightmaps_only = "not baked: lightmaps (its lighting cost is not the shipped one)";
+    // Placing no probes is not missing them.
+    assert_eq!(unbaked(&scene).as_deref(), Some(lightmaps_only));
+    scene.probes.add_probe(Vec3::ZERO);
+    scene.probes.add_probe(Vec3::X);
+    let w = unbaked(&scene).unwrap();
+    assert!(
+        w.contains("light probes (placed, no baked SH loaded)"),
+        "{w}"
+    );
+    for p in scene.probes.probes_mut() {
+        p.sh.coeffs[0] = [0.5; 3];
+    }
+    assert_eq!(unbaked(&scene).as_deref(), Some(lightmaps_only));
+    scene.reflection_probes.add(Vec3::ZERO, Vec3::ONE);
+    let w = unbaked(&scene).unwrap();
+    assert!(
+        w.contains("reflection probes (1 of 1 with no cube on disk)"),
+        "{w}"
+    );
+}
+
+#[test]
+fn a_projects_key_is_its_name_and_a_hash_of_where_it_lies() {
+    let a = out_key(Path::new("/home/me/experiments/infinity-shout"));
+    let b = out_key(Path::new("/home/me/games/infinity-shout"));
+    assert!(a.starts_with("infinity-shout-") && b.starts_with("infinity-shout-"));
+    assert_ne!(a, b, "a copy and its original keep their own history");
+    assert_eq!(a, out_key(Path::new("/home/me/experiments/infinity-shout")));
 }

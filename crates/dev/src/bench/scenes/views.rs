@@ -1,11 +1,13 @@
 //! Where `make bench-scenes` looks from: deterministic viewpoints no one authors.
 //!
-//! In order: every active screen camera the scene holds, at its own transform;
-//! the player's spawn (the entity named `PlayerSpawn`, else `Player`), one view
-//! along its facing; then points on the navmesh at eye height, each looking along
-//! four yaws (0, 90, 180 and 270°), picked from a fixed seed until the cameras,
-//! the spawn and the points make [`MAX_POINTS`]. A scene with no navmesh uses its
-//! cameras alone; one with neither looks along +Z from its bounds' centre.
+//! At most [`MAX_POINTS`] positions, in order: every active screen camera the
+//! scene holds, at its own transform, by entity id (past [`MAX_POINTS`] the rest
+//! are left out, and the report says so); the player's spawn (the entity named
+//! `PlayerSpawn`, else `Player`), one view along its facing; then points on the
+//! navmesh at eye height, each looking along four yaws (0, 90, 180 and 270°),
+//! picked from a fixed seed for the positions left. A scene with no navmesh uses
+//! its cameras and spawn alone; one with none of the three looks along +Z from its
+//! bounds' centre.
 
 use glam::Vec3;
 
@@ -52,10 +54,19 @@ pub struct Views {
 /// The viewpoints for `scene` with its navmesh `nav`: see the module docs.
 pub fn pick(scene: &Scene, nav: &NavigationGraph) -> Views {
     let mut out = Views::default();
-    let cameras: Vec<u32> = active_cameras(scene)
+    let mut cameras: Vec<u32> = active_cameras(scene)
         .filter(|(_, target)| target.is_none())
         .map(|(id, _)| id)
         .collect();
+    cameras.sort_unstable();
+    if cameras.len() > MAX_POINTS {
+        out.warnings.push(format!(
+            "{} cameras, {MAX_POINTS} benched (at most {MAX_POINTS} positions): the rest, \
+             the spawn and the navmesh points are left out",
+            cameras.len()
+        ));
+        cameras.truncate(MAX_POINTS);
+    }
     for &id in &cameras {
         let name = scene.world.name(id).map_or(String::new(), |n| n.clone());
         out.views.push(Viewpoint {
@@ -63,18 +74,17 @@ pub fn pick(scene: &Scene, nav: &NavigationGraph) -> Views {
             view: View::Camera(id),
         });
     }
-    let spawn = spawn_view(scene, nav);
+    let spawn = (cameras.len() < MAX_POINTS)
+        .then(|| spawn_view(scene, nav))
+        .flatten();
     let points = cameras.len() + usize::from(spawn.is_some());
     out.views.extend(spawn);
     let floors = walkable(nav);
     if floors.is_empty() {
-        no_floor(&mut out, cameras.is_empty(), scene);
+        no_floor(&mut out, scene);
         return out;
     }
-    for (n, floor) in seeded(&floors, MAX_POINTS.saturating_sub(points))
-        .into_iter()
-        .enumerate()
-    {
+    for (n, floor) in seeded(&floors, MAX_POINTS - points).into_iter().enumerate() {
         for yaw in YAWS {
             out.views.push(Viewpoint {
                 label: format!("nav {n} yaw {yaw}"),
@@ -89,24 +99,33 @@ pub fn pick(scene: &Scene, nav: &NavigationGraph) -> Views {
     out
 }
 
-/// A scene without a navmesh: its cameras alone, or, without a camera either,
-/// one view from its bounds' centre.
-fn no_floor(out: &mut Views, no_camera: bool, scene: &Scene) {
-    if !no_camera {
-        out.warnings
-            .push("no navmesh: the scene's cameras are its only viewpoints".into());
-        return;
-    }
-    out.warnings
-        .push("no camera and no navmesh: one view from the scene bounds' centre, along +Z".into());
-    out.views.push(Viewpoint {
-        label: "bounds centre".into(),
-        view: View::Pose {
-            position: bounds_centre(scene),
-            yaw: 90.0,
-            pitch: 0.0,
-        },
-    });
+/// A scene without a navmesh: the views already picked (its cameras, its spawn)
+/// alone, or, with neither, one view from its bounds' centre.
+fn no_floor(out: &mut Views, scene: &Scene) {
+    let cameras = out.views.iter().any(|v| matches!(v.view, View::Camera(_)));
+    let spawn = out.views.iter().any(|v| v.label == "spawn");
+    let used = match (cameras, spawn) {
+        (true, true) => "the scene's cameras and its spawn are its only viewpoints",
+        (true, false) => "the scene's cameras are its only viewpoints",
+        (false, true) => "the spawn is its only viewpoint",
+        (false, false) => {
+            out.warnings.push(
+                "no camera, no spawn and no navmesh: one view from the scene bounds' centre, \
+                 along +Z"
+                    .into(),
+            );
+            out.views.push(Viewpoint {
+                label: "bounds centre".into(),
+                view: View::Pose {
+                    position: bounds_centre(scene),
+                    yaw: 90.0,
+                    pitch: 0.0,
+                },
+            });
+            return;
+        }
+    };
+    out.warnings.push(format!("no navmesh: {used}"));
 }
 
 /// The spawn's view: eye height over the floor under it (its own height without
@@ -210,3 +229,7 @@ pub fn restore(scene: &mut Scene, turned_off: &[u32]) {
 #[cfg(test)]
 #[path = "views_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "views_cap_tests.rs"]
+mod cap_tests;

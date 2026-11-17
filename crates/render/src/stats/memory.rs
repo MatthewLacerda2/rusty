@@ -12,8 +12,11 @@ pub struct GpuMemory {
     pub source: &'static str,
 }
 
-/// The GPU memory `device` holds now; `None` when its backend reports none.
+/// The GPU memory `device` holds once it has caught up with the work queued, so
+/// what was dropped before the call (a bench's clock probe) is freed and not
+/// counted; `None` when its backend reports none.
 pub fn gpu_memory(device: &wgpu::Device) -> Option<GpuMemory> {
+    let _ = device.poll(wgpu::PollType::wait_indefinitely());
     if let Some(report) = device.generate_allocator_report() {
         return Some(GpuMemory {
             bytes: report.total_allocated_bytes,

@@ -5,10 +5,12 @@
 //!   cargo run --release --features dev --bin bench-scenes -- --project <dir> [--scenes <a,b>] [--size <W>x<H>] <out_dir>
 //! ```
 //!
-//! Benches each scene (`--scenes` names them by file stem; every
-//! `assets/scenes/*.scene` of the project by default) from its deterministic
-//! viewpoints at 1920x1080 (or `--size`), keeps each report as
-//! `<out_dir>/<project>/<scene>.json` and prints it with its change against the
+//! Benches each scene (`--scenes` names them by their path under
+//! `assets/scenes/` without the extension, `levels/a`; every `.scene` there,
+//! subfolders included, by default) from its deterministic viewpoints at
+//! 1920x1080 (or `--size`), keeps each report as
+//! `<out_dir>/<project>-<hash>/<scene>.json` (the project folder's name and a
+//! short hash of its canonical path, `scenes::out_key`) and prints it with its change against the
 //! scene's last run, then a one-table summary (`dev::bench::scenes`). Each scene
 //! runs in a child process of this binary (`--scene <name>`), so its load is cold
 //! and its peak memory its own. The project is read, never written.
@@ -41,13 +43,11 @@ fn main() {
     let (Some(project), [out]) = (project, args.as_slice()) else {
         fail("bench-scenes needs --project and one out_dir")
     };
-    let project = absolute(&project).unwrap_or(project);
-    let name = project
-        .file_name()
-        .map_or("project".into(), |n| n.to_string_lossy().into_owned());
+    let project = std::fs::canonicalize(&project)
+        .unwrap_or_else(|e| fail(&format!("{}: {e}", project.display())));
     let out = absolute(out)
         .unwrap_or_else(|_| PathBuf::from(out))
-        .join(name);
+        .join(scenes::out_key(&project));
     let opts = Options {
         size: size.unwrap_or(scenes::DEFAULT_SIZE),
         ..Options::default()
@@ -79,7 +79,7 @@ fn bench_all(project: &Path, list: Option<&str>, out: &Path, opts: Options) {
     };
     if names.is_empty() {
         fail(&format!(
-            "{} has no assets/scenes/*.scene",
+            "{} has no .scene under assets/scenes/",
             project.display()
         ));
     }
