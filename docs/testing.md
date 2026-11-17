@@ -894,10 +894,13 @@ defaults (`BUDGET` in `tests/gpu/test_games/mod.rs`). The test reaps the `game` 
 itself and reads its user + system time, so a busy machine slows a game's clock but
 not its count. Bare CPU seconds still move with load (a shared SMT core, all-core
 clocks, a contended cache), so the test divides them by a **yardstick**: the median
-CPU time of a fixed single-threaded workload (`tests/gpu/test_games/calibrate.rs`),
-which a test thread samples in short slices for as long as the game runs, meeting the
-same load in the same window. The sampler sleeps 0.9 s between slices of 0.06 to 0.1 s, so it costs 7 to 10% of
-one core beside the game.
+CPU time of the engine's own work, 60 ticks of the default scene in a fresh headless
+harness (`tests/gpu/test_games/calibrate.rs`), which a test thread samples in slices
+for as long as the game runs, meeting the same load in the same window. A game's CPU
+is mostly its sim's tick, so a slice of the same code meets load as the game does,
+where a synthetic loop met it far harder. The sampler sleeps 1.5 s between slices of
+about 0.16 s (plus an untimed 0.08 s harness build), so it costs about 14% of one core
+beside the game.
 A game over budget fails by name with its CPU time and its yardsticks, so the game
 whose defaults grew is the one made cheaper. Wall time is only a hang guard: a game
 still running after `HANG` (450 s) is killed and fails as hung. CPU time counts every

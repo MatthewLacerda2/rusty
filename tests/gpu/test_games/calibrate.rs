@@ -1,34 +1,46 @@
 //! The yardstick the test games' budget is measured in: the CPU time a test
-//! thread spends on one fixed, deterministic workload, sampled in short slices
-//! for as long as the game runs ([`Sampler`]). Inside the game's own window it
-//! meets the same load the game does (a shared SMT core, all-core clocks), so a
-//! game's CPU time divided by it reads the game's own work. Slices taken only
-//! before and after the game caught moments its run never saw, and spread more
-//! than the game's raw CPU time did (#2243).
+//! thread spends stepping a fixed headless scene, sampled in slices for as long
+//! as the game runs ([`Sampler`]). Inside the game's own window it meets the same
+//! load the game does (a shared SMT core, all-core clocks, a contended cache), so
+//! a game's CPU time divided by it reads the game's own work.
 //!
-//! The workload is single-threaded integer and float work over a buffer that
-//! fits a core's L2: the shared core and the clock reach it as they reach a
-//! game, while a buffer past L2 would read the neighbours' memory traffic, which
-//! varied it by half again between idle runs. One slice is short and noisy, so
-//! the yardstick is the median of many.
+//! **Why the engine's own work.** A game's CPU is mostly its sim's fixed tick on
+//! the main thread: `runner`'s profile on lavapipe (4-vCPU container, the test
+//! profile) put about three quarters of it in the tick (physics most of all,
+//! then perception, the UI's events and the Lua scripts), a tenth in drawing its
+//! frames, and under 4% on lavapipe's own threads. So a slice is that tick and
+//! nothing else: [`TICKS`] ticks of the engine's default scene (its player, its
+//! bot with perception and a Lua brain, crates and water under physics) in a
+//! fresh [`Harness`], built untimed before each slice so every slice does the
+//! same work. A synthetic workload (an LCG walk over a 1 MiB buffer) met load
+//! far harder than the game did: on an 8-core SMT machine a cold `cargo build`
+//! swelled it 1.7 to 5.9 times while the game's CPU rose 1.3 to 1.9 times.
 //!
-//! **The sampler's own cost**: one slice (0.06 to 0.1 s of CPU in the test
-//! profile, beside a game, on a 4-vCPU container and CI's runners) per [`IDLE`]
-//! of sleep, so 7 to 10% of one core, competing with the game it measures.
+//! The yardstick is the [`median`] slice: over eight `runner` runs in the
+//! container (alone, beside a cold `cargo build`, beside spinners and memory
+//! thrashers) its count spread 1.035×, where the lower quartile's spread 1.07×
+//! and a 20% trimmed mean's 1.06×.
+//!
+//! **The sampler's own cost**: a slice of about 0.16 s of CPU plus an untimed
+//! harness build of about 0.08 s, per [`IDLE`] of sleep: about 14% of one core
+//! (4-vCPU container, the test profile), competing with the game it measures.
 
+use std::path::Path;
 use std::sync::mpsc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-/// Words in the buffer: 1 MiB, inside a desktop or server core's L2.
-const WORDS: usize = 1 << 18;
+use rusty::dev::harness::Harness;
 
-/// Scattered steps over the buffer per slice: about 0.07 s of CPU in the test
-/// profile on a 4-vCPU container core, 0.065 to 0.11 s on CI's runners.
-const STEPS: u32 = 1 << 23;
+/// The enemy brain the default scene's bot runs, as the harness tests name it.
+const BOT: &str = "assets/scripts/bot.lua";
 
-/// Sleep between two slices: with a slice of 0.06 to 0.1 s, a duty of 7 to 10%.
-pub(super) const IDLE: Duration = Duration::from_millis(900);
+/// Fixed ticks per slice: 0.13 to 0.24 s of CPU, median about 0.165 s, in the
+/// test profile on a 4-vCPU container core.
+const TICKS: u32 = 60;
+
+/// Sleep between two slices.
+pub(super) const IDLE: Duration = Duration::from_millis(1500);
 
 /// Slices a run always gets, taken after the game when it ends sooner (the
 /// `smoke` game takes two seconds), so the median is never of one or two.
@@ -44,18 +56,19 @@ impl Sampler {
     /// Start sampling, the first slice at once.
     pub fn start() -> Self {
         let (stop, stopped) = mpsc::channel::<()>();
+        // The test's temp dir is found by its thread's name, so on this thread.
+        let out = crate::temp::dir().join("yardstick");
         let thread = std::thread::spawn(move || {
-            let mut words = buffer();
             let mut taken = Vec::new();
             loop {
-                taken.push(slice(&mut words));
+                taken.push(slice(&out));
                 // A message or a dropped sender both end the window.
                 if stopped.recv_timeout(IDLE) != Err(mpsc::RecvTimeoutError::Timeout) {
                     break;
                 }
             }
             while taken.len() < MIN_SAMPLES {
-                taken.push(slice(&mut words));
+                taken.push(slice(&out));
             }
             taken
         });
@@ -69,27 +82,25 @@ impl Sampler {
     }
 }
 
-fn buffer() -> Vec<u32> {
-    (0..WORDS as u32).collect()
-}
-
-/// Thread CPU time of one run of the workload.
-fn slice(words: &mut [u32]) -> Duration {
+/// Thread CPU time of [`TICKS`] ticks of a fresh default-scene harness in `out`;
+/// building the harness is not timed.
+fn slice(out: &Path) -> Duration {
+    let harness = Harness::new(out, BOT);
     let start = thread_cpu();
-    let checksum = workload(words);
+    harness.step(TICKS);
     let spent = thread_cpu().saturating_sub(start);
-    // Kept, so the optimiser cannot drop the work.
-    assert!(
-        checksum.is_finite(),
-        "the yardstick's workload stays finite"
+    assert_eq!(
+        harness.frame(),
+        u64::from(TICKS),
+        "the yardstick's scene steps every tick"
     );
     spent
 }
 
-/// Thread CPU time of `count` runs of the workload, one each, back to back.
+/// Thread CPU time of `count` slices, back to back, on this thread.
 pub(super) fn samples(count: usize) -> Vec<Duration> {
-    let mut words = buffer();
-    (0..count).map(|_| slice(&mut words)).collect()
+    let out = crate::temp::dir().join("yardstick");
+    (0..count).map(|_| slice(&out)).collect()
 }
 
 /// The median of `samples`, which a stray stall in one or two does not move.
@@ -97,22 +108,6 @@ pub(super) fn median(samples: &[Duration]) -> Duration {
     let mut sorted = samples.to_vec();
     sorted.sort_unstable();
     sorted[sorted.len() / 2]
-}
-
-/// The fixed work: an LCG walks the buffer, each read word mixing into a float
-/// accumulator and the next write. Same steps, same addresses on every run.
-fn workload(words: &mut [u32]) -> f64 {
-    let mut state: u32 = 0x2243;
-    let mut acc = 0.0f64;
-    for _ in 0..STEPS {
-        state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
-        let at = (state >> 10) as usize & (WORDS - 1);
-        let word = words[at];
-        acc = acc * 0.999_9 + f64::from(word & 0xffff) * 1e-6;
-        words[(at ^ 0x5a5a) & (WORDS - 1)] = word.rotate_left(7) ^ state;
-    }
-    std::hint::black_box(&words);
-    acc
 }
 
 /// This thread's CPU time, from `clock_gettime(CLOCK_THREAD_CPUTIME_ID)`, which
