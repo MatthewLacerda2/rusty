@@ -78,7 +78,8 @@ pub struct MaterialAsset {
     /// glTF's `occlusionTexture`, Unity's *Occlusion Map* (#2151): its red channel
     /// darkens the indirect light, the diffuse and, as specular occlusion, the
     /// reflections (probe, sky, SSR, a lightmap's lobe); direct light is not
-    /// occluded by it. Sampled raw, so an ORM-packed metallic-roughness image (R
+    /// occluded by it. A lightmap bake darkens what the surface bounces by its
+    /// average (#2299). Sampled raw, so an ORM-packed metallic-roughness image (R
     /// occlusion) can be named here too and is uploaded once.
     #[serde(default)]
     pub occlusion_map: Option<MapRef>,
@@ -282,6 +283,15 @@ impl MaterialAsset {
     /// pixel).
     pub fn receives_ssr(&self) -> bool {
         self.receive_ssr.unwrap_or(!self.is_transparent())
+    }
+
+    /// Its `occlusion_strength` as the shader and the lightmap bake read it: in
+    /// `[0, 1]`, glTF's range; a hand-written NaN applies the map whole, as the default.
+    pub fn occlusion_amount(&self) -> f32 {
+        match self.occlusion_strength.is_nan() {
+            true => 1.0,
+            false => self.occlusion_strength.clamp(0.0, 1.0),
+        }
     }
 }
 

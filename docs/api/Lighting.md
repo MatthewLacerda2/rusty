@@ -412,7 +412,11 @@ lighting settings (above), whose defaults are the ones listed here.
   Every static mesh still shades and bounces light onto the others, as its Mesh
   `cast_shadows` allows ([`Light`](Light.md#cast-shadows), one rule for every bake):
   an `"Off"` mesh blocks no light but still bounces, emits and is lightmapped; a
-  `"ShadowsOnly"` one blocks light but bounces, emits and receives nothing. A mesh at
+  `"ShadowsOnly"` one blocks light but bounces, emits and receives nothing. A surface
+  bounces its material's colour as one average per material: the base colour times its
+  base-colour map's average, darkened by its occlusion map's average at its
+  `OcclusionStrength` ([`Material`](Material.md)), so a recess's shade bakes the same
+  bounce whether the albedo or the occlusion map carries it. A mesh at
   Scale In Lightmap `0` (below) gets no lightmap and reads the light probes. Dynamic objects keep
   the light probes; bake those with `Lighting.Bake()` so both read the same lights.
 - **What it bakes.** A deterministic CPU path tracer: `samples` (default `64`, enough for OIDN, below) paths

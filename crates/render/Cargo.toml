@@ -31,6 +31,9 @@ naga_oil = { workspace = true }
 pollster = { workspace = true }
 wgpu = { workspace = true }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-metal = { workspace = true }
+
 [dev-dependencies]
 rusty-test-support = { workspace = true }
 # The tests bake (lightmaps, the PVS, the probes' direct light); live code reads

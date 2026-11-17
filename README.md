@@ -135,6 +135,8 @@ the game for you, and only open a window when you want to.
   straight into Play, full-window, no editor (see *Shipping a build* below).
 - `cargo run --bin play --features dev -- [--project <dir>] [--scene <path>] <scenario.lua> <out_dir>` — the headless
   harness on the project's startup scene (or `--scene`); writes `results.json` + `console.log` (and any screenshots) to `<out_dir>`.
+- `make bench-scenes PROJECT=<dir>` — bench a game project's own scenes, with load
+  time and memory (see [`docs/testing.md`](docs/testing.md) § Benchmark).
 - `make editor-capture OUT=editor.png` — the editor over the default scene, headless,
   to a PNG (see [`docs/testing.md`](docs/testing.md) § Editor captures).
 - `make game NAME=smoke` / `make game-test NAME=smoke` — build a test game from its
@@ -227,8 +229,8 @@ up to date (#1319). Only an
 **older** engine, or a branch build (the same count, another commit), warns: one
 `[Project]` line on stderr, a warning in the editor console, and the picker and
 `bench_open` ask first. Then it proceeds, and the editor and the agent sessions
-(`session`, `session-mcp`) record the running engine. The player, `play` and
-`editor-capture` only check, never write. A dirty build (`<commit>-dirty`) counts as
+(`session`, `session-mcp`) record the running engine. The player, `play`,
+`bench-scenes` and `editor-capture` only check, never write. A dirty build (`<commit>-dirty`) counts as
 its commit, and a build that can't name its commit (`unknown`, no git) or count it
 (a shallow clone) can't be compared, so neither warns. A file that records no count
 reads as an upgrade. A project without the file gets it on its first edit-open.

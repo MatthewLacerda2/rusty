@@ -25,11 +25,15 @@
 //! CI runner's software GPU makes them meaningless. Only the counts are portable.
 //! The scene is deterministic (fixed dt, seeded scripts, no RNG in placement), so
 //! two runs on one machine measure the same frames.
+//!
+//! `make bench-scenes` ([`scenes`]) measures a game project's own scenes the same
+//! way, from deterministic viewpoints, with load time and memory beside.
 
 mod clock;
 mod lua;
 mod report;
 mod rig;
+pub mod scenes;
 pub mod stress;
 
 pub use lua::register;
@@ -60,10 +64,25 @@ const SYSTEMS: [&str; 4] = ["update_scripts", "tick_nav", "step_physics", "anima
 /// The CPU probe runs right before and right after each sim step, the GPU probe
 /// right before and right after each frame's GPU work: both outside what they scale.
 pub fn measure(harness: &mut Harness, ticks: u32) -> Report {
-    let mut samples = Samples::default();
     let probe = harness.renderer().and_then(|r| ClockProbe::new(r));
+    let (mut report, samples) = measure_posed(harness, ticks, probe.as_ref(), &mut |_| {});
+    report.warnings = clock::cpu_warnings(&samples);
+    report
+}
+
+/// [`measure`] with the caller's GPU clock `probe` (built once, so its setup stays
+/// out of every window it times) and `pose` called after each sim step and before
+/// its frame is drawn: `make bench-scenes` holds its viewpoint there, whatever the
+/// scripts did. Returns the report, without warnings, and the samples it summed.
+pub(crate) fn measure_posed(
+    harness: &mut Harness,
+    ticks: u32,
+    probe: Option<&ClockProbe>,
+    pose: &mut dyn FnMut(&mut Harness),
+) -> (Report, Samples) {
+    let mut samples = Samples::default();
     // The first dispatch pays for setting the pipeline up: not a reading.
-    time_probe(probe.as_ref(), harness);
+    time_probe(probe, harness);
     clock::cpu_probe_ms();
     for _ in 0..ticks {
         if harness.world.borrow().quit_requested() {
@@ -72,9 +91,10 @@ pub fn measure(harness: &mut Harness, ticks: u32) -> Report {
         let cpu_before = clock::cpu_probe_ms();
         harness.step(1);
         let cpu = clock::cpu_speed(cpu_before, clock::cpu_probe_ms());
-        let before = time_probe(probe.as_ref(), harness);
+        pose(harness);
+        let before = time_probe(probe, harness);
         let frame = harness.render_frame();
-        let after = time_probe(probe.as_ref(), harness);
+        let after = time_probe(probe, harness);
         let speed = Speeds {
             cpu,
             gpu: clock::speed(before, after),
@@ -82,9 +102,7 @@ pub fn measure(harness: &mut Harness, ticks: u32) -> Report {
         sample(&mut samples, &harness.stats.borrow(), frame.as_ref(), speed);
         samples.end_frame();
     }
-    let mut report = samples.report();
-    report.warnings = clock::cpu_warnings(&samples);
-    report
+    (samples.report(), samples)
 }
 
 /// A frame's clock speeds against the references, `None` where a probe missed.

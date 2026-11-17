@@ -247,7 +247,7 @@ pub(crate) fn level_maps_uniform(material: Option<&MaterialAsset>) -> LevelMapsU
     };
     LevelMapsUniform {
         use_occlusion_map: u32::from(m.occlusion_map.is_some()),
-        occlusion_strength: occlusion_strength(m.occlusion_strength),
+        occlusion_strength: m.occlusion_amount(),
         use_specular_map: u32::from(m.specular_map.is_some()),
         use_height_map: u32::from(height_applies(m)),
         height_scale: m.height_depth(),
@@ -270,15 +270,6 @@ fn height_applies(m: &MaterialAsset) -> bool {
         });
     }
     applies
-}
-
-/// An occlusion map's strength as the shader reads it (#2151): in `[0, 1]`, glTF's
-/// range; a hand-written NaN applies the map whole, as the default does.
-pub(crate) fn occlusion_strength(strength: f32) -> f32 {
-    match strength.is_nan() {
-        true => 1.0,
-        false => strength.clamp(0.0, 1.0),
-    }
 }
 
 #[cfg(test)]

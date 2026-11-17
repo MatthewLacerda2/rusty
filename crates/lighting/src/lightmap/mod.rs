@@ -63,7 +63,7 @@ pub use bake::{
 pub use encode::{
     decode_direction, decode_mask, decode_rgbm, encode_directions, encode_masks, encode_texels,
 };
-pub use input::{BakeLight, BakeMesh, BakeRun, BakeScene, LightShape};
+pub use input::{BakeLight, BakeMesh, BakeRun, BakeScene, LightShape, MapAverage, MapEncoding};
 pub use lights::area::AreaShape;
 pub use lights::{assign_channels, taken_lights, MaskChannels, MASK_CHANNELS};
 pub use pages::{colour_page, direction_levels, direction_page, level_count, levels, mask_levels};
@@ -107,6 +107,8 @@ mod import_tests;
 mod inset_tests;
 #[cfg(test)]
 mod mask_tests;
+#[cfg(test)]
+mod occlusion_map_tests;
 #[cfg(test)]
 mod pages_bc_tests;
 #[cfg(test)]
