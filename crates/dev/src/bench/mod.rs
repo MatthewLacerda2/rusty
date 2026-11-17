@@ -131,13 +131,14 @@ fn sample(samples: &mut Samples, stats: &FrameStats, frame: Option<&RenderedFram
         if let Some(cpu) = speed.cpu {
             samples.push("cpu_ms", s.last * cpu);
             samples.push("cpu_clock_pct", cpu * 100.0);
-            let systems = stats.tick_systems.iter().map(|(n, ms)| (n.as_str(), *ms));
+            let systems = stats.tick_systems.iter().copied();
             push_parts(samples, "cpu", s.last, systems, cpu);
         }
     }
     let Some(frame) = frame else { return };
     samples.push("renderer_ms", frame.cpu_ms);
-    push_parts(samples, "render", frame.cpu_ms, render_stages(frame), 1.0);
+    let stages = frame.stages.iter().copied();
+    push_parts(samples, "render", frame.cpu_ms, stages, 1.0);
     if let (Some(gpu), Some(speed)) = (&frame.gpu, speed.gpu) {
         samples.push("gpu_ms", gpu.total_ms() * speed);
         for pass in GpuPass::ALL {
@@ -171,17 +172,6 @@ fn push_parts<'a>(
         sum += ms;
     }
     samples.push(&format!("{prefix}.other"), (total - sum) * scale);
-}
-
-/// The frame's renderer stages, with the shadow sweeps' caster gather (a
-/// counter the sweeps keep, inside the `shadows` lap) as a stage of its own.
-fn render_stages(frame: &RenderedFrame) -> impl Iterator<Item = (&'static str, f64)> + '_ {
-    let gather = frame.counters.shadow_gather_us as f64 / 1000.0;
-    let stages = frame.stages.iter().map(move |&(stage, ms)| match stage {
-        "shadows" => (stage, (ms - gather).max(0.0)),
-        _ => (stage, ms),
-    });
-    stages.chain(std::iter::once(("shadow_gather", gather)))
 }
 
 /// Measure `ticks` frames, print the report with its change against the last one

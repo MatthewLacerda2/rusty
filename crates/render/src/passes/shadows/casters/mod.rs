@@ -158,6 +158,8 @@ impl ShadowRenderer {
         sweep: Sweep,
         volumes: &[LightVolume],
     ) -> Vec<Vec<CasterBatch>> {
+        // What the sweep did before is `shadows`; the gather is a stage of its own.
+        frame.timer.lap("shadows");
         let start = std::time::Instant::now();
         let views: Vec<Mat4> = volumes.iter().map(|v| v.view_proj).collect();
         let (candidates, joints) = match self.index_casters {
@@ -194,6 +196,7 @@ impl ShadowRenderer {
             batch.record = records.index(batch.key.clip.as_ref());
         }
         self.culls.gather_us += start.elapsed().as_micros() as u64;
+        frame.timer.lap("shadow_gather");
         let buffer = match sweep {
             Sweep::Static => &mut self.static_casters,
             Sweep::Dynamic => &mut self.dynamic_casters,

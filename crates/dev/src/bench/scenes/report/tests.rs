@@ -91,6 +91,15 @@ fn the_summary_is_one_line_per_scene_with_a_dash_where_unmeasured() {
         "{text}"
     );
     assert!(lines[3].trim_end().ends_with('-'), "no gpu_mb: {text}");
+    // `IMPORT=1`: the project's one import_ms, after the scenes.
+    let mut first = scene(2.0);
+    first.push_value("import_ms", 840.0);
+    let text = summary(&[first, scene(3.0)]);
+    let last = text.lines().last().unwrap_or_default();
+    assert!(
+        last.starts_with("import_ms 840") && last.ends_with("loading pool)"),
+        "{text}"
+    );
 }
 
 #[test]

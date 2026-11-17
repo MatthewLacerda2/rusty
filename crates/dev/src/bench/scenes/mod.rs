@@ -9,8 +9,8 @@
 //! ([`report`]) folds the viewpoints' rows, then the runs', into one (`fold`),
 //! each row with its run-to-run spread, and adds `load_ms` (the scene's own load
 //! to its first rendered frame, wall clock, the renderer's start-up off the
-//! clock: `load`), `import_ms` (the same load of a copy of the project with its
-//! import cache cleared, [`import`]), `rss_peak_mb` (the process's peak resident
+//! clock: `load`), `import_ms` (`IMPORT=1`, once a run, on its first scene: the
+//! same load of a copy of the project without its import cache, [`import`]), `rss_peak_mb` (the process's peak resident
 //! memory, [`memory`]) and `gpu_mb` (the renderer's GPU memory,
 //! `rusty_render::gpu_memory`), each compared with that scene's last run or a
 //! kept baseline (`Extra::baseline`). A run with `PROFILE=1` adds a sampling

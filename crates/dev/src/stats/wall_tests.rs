@@ -18,7 +18,7 @@ fn starts(last_wall_ms: f64, frame: u64) -> WindowFrame {
 /// One frame, as the shell runs it: the frame before ends with its wall time
 /// (`shell::frame::stats::started`), then a tick of its systems' CPU ms, then the
 /// window frame is recorded.
-fn run(stats: &mut FrameStats, systems: &[(&str, f64)], frame: &WindowFrame) {
+fn run(stats: &mut FrameStats, systems: &[(&'static str, f64)], frame: &WindowFrame) {
     window_ended(stats, frame.last_wall_ms);
     for (name, ms) in systems {
         stats.record_system(name, *ms);

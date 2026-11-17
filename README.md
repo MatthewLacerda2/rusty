@@ -137,7 +137,8 @@ the game for you, and only open a window when you want to.
   harness on the project's startup scene (or `--scene`); writes `results.json` + `console.log` (and any screenshots) to `<out_dir>`.
 - `make bench-scenes PROJECT=<dir>` — bench a game project's own scenes, with load
   time, memory, every system's and renderer stage's CPU time, the run-to-run spread,
-  a kept baseline (`BEFORE=<dir>`) and a sampling profile (`PROFILE=1`) (see
+  a kept baseline (`BEFORE=<dir>`), a sampling profile (`PROFILE=1`) and the
+  project's cold import time (`IMPORT=1`) (see
   [`docs/testing.md`](docs/testing.md) § Benchmark).
 - `make editor-capture OUT=editor.png` — the editor over the default scene, headless,
   to a PNG (see [`docs/testing.md`](docs/testing.md) § Editor captures).

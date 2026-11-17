@@ -8,8 +8,7 @@
 
 use super::super::super::clock::clock_drift;
 use super::super::super::report::{change, num};
-use super::super::views::ViewKey;
-use super::{Row, SceneReport};
+use super::{Row, SceneReport, ViewKey};
 
 impl SceneReport {
     /// What the comparison with `previous` should warn of: a run of another

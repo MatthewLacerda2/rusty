@@ -14,10 +14,10 @@ use rusty_core::project::EngineStamp;
 use serde::{Deserialize, Serialize};
 
 use super::super::report::{engine_line, num};
-use super::views::ViewKey;
-
 mod compare;
+mod view_key;
 pub use compare::{delta, spread};
+pub use view_key::ViewKey;
 
 /// One row over a scene's viewpoints and runs.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -215,7 +215,8 @@ const SUMMARY: [&str; 6] = [
     "gpu_mb",
 ];
 
-/// One line per scene: its CPU, frame, GPU and load times (averages) and its memory.
+/// One line per scene: its CPU, frame, GPU and load times (averages) and its
+/// memory; then the run's `import_ms` (`IMPORT=1`), the project's, once.
 pub fn summary(reports: &[SceneReport]) -> String {
     let mut out = format!("bench-scenes: {} scenes\n{:<20}", reports.len(), "scene");
     for metric in SUMMARY {
@@ -229,6 +230,16 @@ pub fn summary(reports: &[SceneReport]) -> String {
             let _ = write!(out, " {value:>12}");
         }
         out.push('\n');
+    }
+    let import = reports
+        .iter()
+        .find_map(|r| Some((r.row("import_ms")?, &r.scene)));
+    if let Some((row, scene)) = import {
+        let ms = num(row.avg);
+        let _ = writeln!(
+            out,
+            "import_ms {ms} (the project's cold import, loading {scene})"
+        );
     }
     out
 }

@@ -15,7 +15,8 @@ use glam::Vec3;
 use rusty_navigation::{NavigationGraph, SpanRef, NOT_WALKABLE_AREA};
 use rusty_scene::camera::{active_cameras, set_view_orientation, set_view_position};
 use rusty_scene::Scene;
-use serde::{Deserialize, Serialize};
+
+use super::report::ViewKey;
 
 /// Eye height above the floor, metres.
 pub const EYE_HEIGHT: f32 = 1.7;
@@ -77,18 +78,6 @@ impl Viewpoint {
             yaw: self.yaw,
         }
     }
-}
-
-/// A viewpoint as a report keeps it: two runs benched the same viewpoint when
-/// these are equal, so a navmesh point that moved, or another camera of the same
-/// name, is not one.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct ViewKey {
-    pub label: String,
-    /// The camera's entity id, for a camera's view.
-    pub camera: Option<u32>,
-    pub at: [f32; 3],
-    pub yaw: f32,
 }
 
 /// A scene's viewpoints, and what the report should say about how they were picked.
@@ -234,8 +223,15 @@ fn seeded(nav: &NavigationGraph, floors: usize, n: usize) -> Vec<Vec3> {
             picked.push(at);
         }
     }
-    let point = |i| walkable(nav).nth(i).map(|s| nav.span_world(s));
-    picked.into_iter().filter_map(point).collect()
+    // One walk, up to the furthest pick, each point kept in its pick's place.
+    let reach = picked.iter().max().map_or(0, |&i| i + 1);
+    let mut points = vec![None; picked.len()];
+    for (i, span) in walkable(nav).enumerate().take(reach) {
+        if let Some(k) = picked.iter().position(|&p| p == i) {
+            points[k] = Some(nav.span_world(span));
+        }
+    }
+    points.into_iter().flatten().collect()
 }
 
 /// The centre of every entity's world position (the origin in an empty scene).

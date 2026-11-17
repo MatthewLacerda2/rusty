@@ -3,7 +3,7 @@
 //! ```text
 //! Usage:
 //!   cargo run --release --features dev --bin bench-scenes -- --project <dir> [--scenes <a,b>]
-//!       [--size <W>x<H>] [--runs <n>] [--before <dir>] [--profile] <out_dir>
+//!       [--size <W>x<H>] [--runs <n>] [--before <dir>] [--profile] [--import] <out_dir>
 //! ```
 //!
 //! Benches each scene (`--scenes` names them by their path under
@@ -16,11 +16,14 @@
 //! `--before`'s folder; then a one-table summary (`dev::bench::scenes`).
 //!
 //! Each scene runs in child processes of this binary, so its load is cold and
-//! its memory peak its own: one loads it from a copy of the project with its
-//! import cache cleared (`--import-out`, `scenes::import`), one benches it
-//! (`--scene`, given that load as `--import-ms`), and with `--profile` one more
-//! samples its measured frames with the platform's profiler (`--scene
-//! --profile`, `scenes::profile`). The project is read, never written.
+//! its memory peak its own: one benches it (`--scene`), and with `--profile` one
+//! more samples its measured frames with the platform's profiler (`--scene
+//! --profile`, `scenes::profile`), whose failure leaves the timings standing; the
+//! profiler is tried once before any scene, so a refusal ends the run at once.
+//! With `--import`, once a run, one more loads the first scene from a copy of the
+//! project without its import cache (`--import-out`, `scenes::import`) and hands
+//! that load to the first scene's timed run as `--import-ms`. The project is
+//! read, never written.
 
 use std::ffi::OsString;
 use std::path::{absolute, Path, PathBuf};
@@ -33,7 +36,7 @@ use rusty::core::settings::video::parse_size;
 use rusty::dev::bench::scenes::{self, import, profile, report, Extra, Options};
 
 const USAGE: &str = "usage: bench-scenes --project <dir> [--scenes <a,b>] [--size <W>x<H>] \
-                     [--runs <n>] [--before <dir>] [--profile] <out_dir>";
+                     [--runs <n>] [--before <dir>] [--profile] [--import] <out_dir>";
 
 /// What one invocation was asked for.
 struct Run {
@@ -43,6 +46,8 @@ struct Run {
     opts: Options,
     before: Option<PathBuf>,
     profile: bool,
+    /// `--import`: measure `import_ms` once this run.
+    import: bool,
 }
 
 fn main() {
@@ -62,6 +67,7 @@ fn main() {
     let import_out = value(&mut args, "--import-out").map(PathBuf::from);
     let import_ms = value(&mut args, "--import-ms").and_then(|v| v.parse::<f64>().ok());
     let profile = take_switch(&mut args, "--profile");
+    let import = take_switch(&mut args, "--import");
     let (Some(project), [out]) = (project, args.as_slice()) else {
         fail("bench-scenes needs --project and one out_dir")
     };
@@ -83,6 +89,7 @@ fn main() {
         opts,
         before,
         profile,
+        import,
     };
     match (one, import_out) {
         (Some(scene), Some(file)) => import_one(&run, &scene, &file),
@@ -145,8 +152,11 @@ fn profile_one(run: &Run, scene: &str) {
 /// Bench each scene in child processes, then print the summary of those that ran.
 fn bench_all(run: &Run, list: Option<&str>) {
     if run.profile {
-        // Before anything is benched: a missing profiler fails at once.
-        profile::find(std::env::var_os("PATH").as_deref()).unwrap_or_else(|e| fail(&e));
+        // Before anything is benched: a missing or refused profiler fails at once.
+        let profiler = profile::find(std::env::var_os("PATH").as_deref());
+        let profiler = profiler.unwrap_or_else(|e| fail(&e));
+        let probed = profile::probe(&profiler, &run.out.join(".profile-probe"));
+        probed.unwrap_or_else(|e| refused(&e));
     }
     let names: Vec<String> = match list {
         Some(list) => list
@@ -155,38 +165,52 @@ fn bench_all(run: &Run, list: Option<&str>) {
             .collect(),
         None => scenes::project_scenes(&run.project),
     };
-    if names.is_empty() {
+    let Some(first) = names.first() else {
         fail(&format!(
             "{} has no .scene under assets/scenes/",
             run.project.display()
-        ));
+        ))
+    };
+    // The import is the project's, not a scene's: once a run, on its first scene.
+    let import_ms = run.import.then(|| cold_import(run, first)).flatten();
+    let (mut failed, mut unprofiled) = (Vec::new(), Vec::new());
+    for (n, scene) in names.iter().enumerate() {
+        match bench_scene(run, scene, import_ms.filter(|_| n == 0)) {
+            Benched::Failed => failed.push(scene.clone()),
+            Benched::Unprofiled => unprofiled.push(scene.clone()),
+            Benched::Done => {}
+        }
     }
-    let copy = run.out.join(".import-copy");
-    if let Err(e) = import::scratch(&run.project, &copy) {
-        fail(&format!("cannot copy the project for import_ms: {e}"));
-    }
-    let failed: Vec<String> = names
-        .iter()
-        .filter(|scene| !bench_scene(run, &copy, scene))
-        .cloned()
-        .collect();
-    let _ = std::fs::remove_dir_all(&copy);
     let reports: Vec<_> = names
         .iter()
         .filter(|n| !failed.contains(n))
         .filter_map(|n| report::read(&run.out, n))
         .collect();
     println!("{}", report::summary(&reports));
+    if !unprofiled.is_empty() {
+        let scenes = unprofiled.join(", ");
+        eprintln!("bench-scenes: no profile (their timings stand): {scenes}");
+    }
     if !failed.is_empty() {
         eprintln!("bench-scenes: failed: {}", failed.join(", "));
+    }
+    if !failed.is_empty() || !unprofiled.is_empty() {
         exit(1);
     }
 }
 
-/// Bench `scene` in its children: the cold load in `copy`, the timed run, and the
-/// profile when asked for. `false` when one failed.
-fn bench_scene(run: &Run, copy: &Path, scene: &str) -> bool {
-    let import_ms = cold_load(run, copy, scene);
+/// How one scene's children went.
+enum Benched {
+    Done,
+    /// The timed run failed: the scene has no report this run.
+    Failed,
+    /// The timed run stands; its profile failed.
+    Unprofiled,
+}
+
+/// Bench `scene` in its children: the timed run (given the run's `import_ms`),
+/// then the profile when asked for, whose failure leaves the timings standing.
+fn bench_scene(run: &Run, scene: &str, import_ms: Option<f64>) -> Benched {
     let mut timed = child(run, &run.project, scene);
     if let Some(ms) = import_ms {
         timed.args(["--import-ms", &ms.to_string()]);
@@ -194,35 +218,46 @@ fn bench_scene(run: &Run, copy: &Path, scene: &str) -> bool {
     if let Some(before) = &run.before {
         timed.arg("--before").arg(before);
     }
-    let ok = timed.status().is_ok_and(|s| s.success());
-    if !ok || !run.profile {
-        return ok;
+    if !timed.status().is_ok_and(|s| s.success()) {
+        return Benched::Failed;
+    }
+    if !run.profile {
+        return Benched::Done;
     }
     let mut profiled = child(run, &run.project, scene);
-    profiled
+    if profiled
         .arg("--profile")
         .status()
         .is_ok_and(|s| s.success())
+    {
+        Benched::Done
+    } else {
+        eprintln!("bench-scenes: {scene}: the profile failed; its timings stand");
+        Benched::Unprofiled
+    }
 }
 
-/// `scene`'s load in the cache-cleared `copy`, in a child; `None` (said) when it failed.
-fn cold_load(run: &Run, copy: &Path, scene: &str) -> Option<f64> {
-    if let Err(e) = import::clear(copy) {
-        eprintln!("bench-scenes: {scene}: cannot clear the copy's caches: {e}");
-        return None;
-    }
+/// `import_ms`: `scene`'s load in a cache-less copy of the project, in a child;
+/// `None` (said) when the copy or the load failed, and the bench goes on.
+fn cold_import(run: &Run, scene: &str) -> Option<f64> {
+    let copy = run.out.join(".import-copy");
     let file = copy.join(".import_ms");
-    let _ = std::fs::remove_file(&file);
-    let mut cold = child(run, copy, scene);
-    let ok = cold
-        .arg("--import-out")
-        .arg(&file)
-        .status()
-        .is_ok_and(|s| s.success());
-    let ms = std::fs::read_to_string(&file)
-        .ok()
-        .and_then(|t| t.trim().parse().ok());
-    if !ok || ms.is_none() {
+    let loaded = import::scratch(&run.project, &copy).map(|()| {
+        let mut cold = child(run, &copy, scene);
+        cold.arg("--import-out").arg(&file).status()
+    });
+    let ms = match loaded {
+        Ok(Ok(s)) if s.success() => std::fs::read_to_string(&file).ok(),
+        Ok(_) => None,
+        Err(e) => {
+            eprintln!("bench-scenes: cannot copy the project, no import_ms: {e}");
+            let _ = std::fs::remove_dir_all(&copy);
+            return None;
+        }
+    };
+    let _ = std::fs::remove_dir_all(&copy);
+    let ms = ms.and_then(|t| t.trim().parse().ok());
+    if ms.is_none() {
         eprintln!("bench-scenes: {scene}: the cold load failed: no import_ms");
     }
     ms
@@ -249,6 +284,12 @@ fn child(run: &Run, project: &Path, scene: &str) -> Command {
 fn take_switch(args: &mut Vec<String>, flag: &str) -> bool {
     let at = args.iter().position(|a| a == flag);
     at.map(|i| args.remove(i)).is_some()
+}
+
+/// The profiler would not record here: what it said, and what to set; no usage.
+fn refused(e: &str) -> ! {
+    eprintln!("bench-scenes: {e}");
+    exit(2);
 }
 
 fn fail(e: &str) -> ! {

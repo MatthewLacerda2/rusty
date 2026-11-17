@@ -997,10 +997,14 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   `cpu_ms`), and `render.<stage>` for every stage of the renderer's frame, summing
   to `renderer_ms`: `setup`, `assets`, `prepare`, `extract` (the retained scene's
   update), `shadows` and `shadow_gather` (the sweeps' caster gather, cull and
-  batch), `render_textures`, `ui` (its layout and its draw), `stack`, then each
-  per-camera pass by its name in `render::draw::camera::CAMERA_PASSES` (`clusters`,
-  `solids`: the per-camera cull and batch, `scene`, `transparent`, `post_fx`, …),
-  each summed over every camera and render-texture camera, and `finish` (the
+  batch, a lap of its own), `render_textures`, `ui` (its layout and its draw),
+  `stack`, then each per-camera pass by its name in
+  `render::draw::camera::CAMERA_PASSES` (`clusters`, `solids`: the per-camera cull
+  and batch, `scene`, `transparent`, `post_fx`, …), each summed over every camera
+  and render-texture camera. So `render_textures` holds only what drawing the
+  render textures does around their cameras: a render-texture camera's own passes
+  land in `scene`, `solids` and the other pass rows, beside the screen cameras'.
+  Last, `finish` (the
   frame's counters and its GPU timestamps' resolve). Each set ends with an `other`
   row, what no part held: timer overhead, a few microseconds; a stage left
   untimed would show there. The stages are timed only on frames the dev layer
@@ -1032,7 +1036,7 @@ prints the report, keeps it in the run's out dir and returns `{ frames, metrics 
 ### A project's own scenes: `make bench-scenes`
 `make bench` measures one synthetic yard; an optimisation also needs numbers from
 real levels. `make bench-scenes PROJECT=<dir> [SCENES=a,b] [RES=WxH] [RUNS=n]
-[BEFORE=<dir>] [PROFILE=1]` benches a game project's own scenes, wherever the
+[BEFORE=<dir>] [PROFILE=1] [IMPORT=1]` benches a game project's own scenes, wherever the
 project is on disk (`bench-scenes`, `dev::bench::scenes`). `SCENES` names scenes by
 their path under `assets/scenes/` without the extension (`levels/a`); by default
 every `.scene` there, subfolders included (a folder linked twice is walked once), is
@@ -1074,11 +1078,16 @@ every binary's open makes them.
     cache), then its first sim step and frame (its uploads). The renderer's start-up
     (the device and every pipeline, warmed as a game's renderer is) happens between
     the two, off the clock;
-  - `import_ms`: the same load of a copy of the project (made once a run, beside
-    the reports, deleted after) without its `cache/`, its import cache
+  - `import_ms`, only with `IMPORT=1`, once a run (the import is the project's,
+    not a scene's: every model source is converted, with headless Blender for a
+    `.blend`, so it is slow): the first scene's load in a copy of the project (made
+    beside the reports, deleted after) without its `cache/`, its import cache
     (`assets/generated/imported/`: converted models and compressed textures) and
-    its `.git`, cleared again before each scene: what a first load costs, every
-    model source converted. The project's own cache is never touched;
+    its `.git`: what a first load costs. A row of the first scene's report, and one
+    line under the summary. A link in the project is copied as what it points to,
+    so the copy stands alone and the project is only ever read; a link looping
+    back, and what is neither a file nor a folder, are left out. A copy or a load
+    that fails leaves the row out with a warning, and the bench goes on;
   - `rss_peak_mb`: the process's peak resident memory (Linux `VmHWM`; macOS
     `task_info(TASK_VM_INFO)`'s `ledger_phys_footprint_peak`);
   - `gpu_mb`: the renderer's GPU memory after the run, once the device has
@@ -1103,7 +1112,8 @@ every binary's open makes them.
   run of one (`RUNS=1`) has no spread, so every change prints as measured. A last
   run of another shape (size, frames, or viewpoints: their count, or one that
   looks from elsewhere under the same label, each kept with its position, yaw and
-  camera entity) is said in one warning, and the scene gets no change column.
+  camera entity; within 1 mm and 0.01° it is the same one, so a float reordered
+  in transform propagation or the navmesh bake still compares) is said in one warning, and the scene gets no change column.
   Console errors during the bench (a script failing every tick, a sidecar that
   failed to load) are warned of with their count and the first one, since they
   make a scene look cheaper than the game is. A scene benches as
@@ -1112,7 +1122,8 @@ every binary's open makes them.
   placed with no cube on disk (what a scene does not place is not missing). Its
   lighting cost is then not the shipped one. The run ends with a summary table of
   one line per scene: `cpu_ms` (the sim at the reference CPU clock), `frame_ms`,
-  `gpu_ms`, `load_ms`, `rss_peak_mb`, `gpu_mb`.
+  `gpu_ms`, `load_ms`, `rss_peak_mb`, `gpu_mb`, and the run's `import_ms` under
+  it when asked for.
 - **a fixed baseline**: `BEFORE=<dir>` compares with the kept report in `<dir>`
   instead of the last run: a copy of a project's report folder
   (`out/bench/scenes/<project>-<hash>/`, holding `<scene>.json`), or of the whole
@@ -1124,15 +1135,20 @@ every binary's open makes them.
   sampling profiler, recording only each viewpoint's measured frames, warm-up
   excluded: `perf record` on Linux (user space only, `cycles:u`, or the
   `cpu-clock:u` timer where there is no cycle counter, with DWARF call stacks),
-  `sample` on macOS. It is a release build with line tables (the `profiling`
+  `sample` on macOS (the bench's own thread, the main one, alone: `sample`
+  samples every thread, parked or not, and the others' waits would fill the
+  table). It is a release build with line tables (the `profiling`
   cargo profile, its own target folder). Kept beside the report:
   `<scene>.profile.txt`, the top 40 functions by self time (samples where the
   function was running) and by total time (samples where it was on the stack), and
   `<scene>.folded`, the raw folded stacks (`a;b;c count`) a flame graph reads. No
   profiler on `PATH` stops the run before anything is benched, naming the package
   (Debian `linux-perf`, Ubuntu `linux-tools-$(uname -r)`, Fedora and Arch `perf`).
-  `perf` refusing to record says why, and for `kernel.perf_event_paranoid` above 2
-  what to set (`sudo sysctl kernel.perf_event_paranoid=2`).
+  The profiler is tried once before any scene too: `perf` refusing to record
+  stops the run there, saying why, and for `kernel.perf_event_paranoid` above 2
+  what to set (`sudo sysctl kernel.perf_event_paranoid=2`). A profile that fails
+  later is said on its own line, the scene's timings and summary row stand, and
+  the run exits non-zero.
 
 Like `make bench`, it is a release build and a signal, never a gate: it is not in
 `make gates` or CI.

@@ -57,10 +57,19 @@ impl Recording {
     }
 }
 
-/// The call graph of a `sample` report into folded stacks, each thread's root
-/// line left out (its name is no function).
+/// The thread the bench runs on: its harness, its sim and its renderer's CPU
+/// side all run on the main thread.
+const BENCH_THREAD: &str = "com.apple.main-thread";
+
+/// The call graph of a `sample` report into folded stacks, the bench's own
+/// thread ([`BENCH_THREAD`]; the first listed when none is named so) alone, and
+/// its root line left out (its name is no function). `sample` samples every
+/// thread every interval, running or parked, so the others (wgpu's, the audio
+/// device's, the runtime's) would fill the table with their waits
+/// (`__psynch_cvwait`, `mach_msg2_trap`); the bench thread's own waits (on the
+/// GPU) are its time and stay.
 pub fn parse(text: &str) -> Folded {
-    let mut folded = Folded::default();
+    let mut threads: Vec<(String, Folded)> = Vec::new();
     // (column, name, count, children's count) from the root down.
     let mut stack: Vec<(usize, String, u64, u64)> = Vec::new();
     let graph = text
@@ -79,26 +88,38 @@ pub fn parse(text: &str) -> Folded {
             continue;
         };
         while stack.last().is_some_and(|(c, ..)| *c >= col) {
-            pop(&mut stack, &mut folded);
+            pop(&mut stack, &mut threads);
         }
-        if let Some(parent) = stack.last_mut() {
-            parent.3 += count;
+        match stack.last_mut() {
+            Some(parent) => parent.3 += count,
+            None => threads.push((symbol.to_string(), Folded::default())),
         }
         let name = symbol.split("  (in ").next().unwrap_or(symbol).trim();
         stack.push((col, name.to_string(), count, 0));
     }
     while !stack.is_empty() {
-        pop(&mut stack, &mut folded);
+        pop(&mut stack, &mut threads);
     }
-    folded
+    let bench = threads
+        .iter()
+        .position(|(root, _)| root.contains(BENCH_THREAD));
+    let mut threads = threads.into_iter();
+    let kept = match bench {
+        Some(at) => threads.nth(at),
+        None => threads.next(),
+    };
+    kept.map(|(_, folded)| folded).unwrap_or_default()
 }
 
-/// Close the deepest open node: its own samples are a stack of their own.
-fn pop(stack: &mut Vec<(usize, String, u64, u64)>, folded: &mut Folded) {
+/// Close the deepest open node: its own samples are a stack of their own, in
+/// the thread it is under (the last one opened).
+fn pop(stack: &mut Vec<(usize, String, u64, u64)>, threads: &mut [(String, Folded)]) {
     let frames: Vec<String> = (stack.iter().skip(1)).map(|(_, n, ..)| n.clone()).collect();
-    if let Some((_, _, count, children)) = stack.pop() {
-        folded.add(&frames, count.saturating_sub(children));
-    }
+    let (Some((_, _, count, children)), Some((_, folded))) = (stack.pop(), threads.last_mut())
+    else {
+        return;
+    };
+    folded.add(&frames, count.saturating_sub(children));
 }
 
 #[cfg(test)]
@@ -106,7 +127,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_call_graph_folds_each_nodes_own_samples() {
+    fn a_call_graph_folds_the_bench_threads_own_samples_and_drops_parked_threads() {
         let text = "Analysis of sampling bench-scenes (pid 42) every 1 millisecond\n\
 Call graph:\n\
     10 Thread_123   DispatchQueue_1: com.apple.main-thread  (serial)\n\
@@ -115,6 +136,9 @@ Call graph:\n\
     +     6 rusty_render::Renderer::render  (in bench-scenes) + 12  [0x200]\n\
     +     ! 4 rusty_render::draw::stack  (in bench-scenes) + 8  [0x300]\n\
     +     3 step  (in bench-scenes) + 4  [0x400]\n\
+    10 Thread_124: wgpu  (serial)\n\
+    + 10 thread_start  (in libsystem_pthread.dylib) + 8  [0x500]\n\
+    +   10 __psynch_cvwait  (in libsystem_kernel.dylib) + 8  [0x600]\n\
 \n\
 Total number in stack (recursive counted multiple times):\n";
         let f = parse(text);
@@ -127,5 +151,10 @@ Total number in stack (recursive counted multiple times):\n";
         assert_eq!(f.0.get(render), Some(&2));
         assert_eq!(f.0.get("start;main;step"), Some(&3));
         assert_eq!(f.0.get("start;main"), Some(&1));
+        assert!(
+            !f.0.keys().any(|k| k.contains("__psynch_cvwait")),
+            "a parked thread's wait: {:?}",
+            f.0
+        );
     }
 }

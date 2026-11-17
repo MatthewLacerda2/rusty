@@ -127,5 +127,5 @@ fn tick_systems_hold_the_newest_tick_summed_by_name() {
     }
     stats.end_tick();
     let got = &stats.tick_systems;
-    assert_eq!(*got, [("b".to_string(), 1.5), ("a".to_string(), 2.0)]);
+    assert_eq!(*got, [("b", 1.5), ("a", 2.0)]);
 }

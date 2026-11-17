@@ -51,6 +51,18 @@ pub fn find(path: Option<&OsStr>) -> Result<Profiler, String> {
     })
 }
 
+/// Whether `profiler` may record this process here: started and stopped once,
+/// before any scene, so a refusal (a stricter `kernel.perf_event_paranoid`)
+/// ends the run with what to set instead of failing every scene's profile.
+/// `scratch` holds the throwaway recording and is removed.
+pub fn probe(profiler: &Profiler, scratch: &Path) -> Result<(), String> {
+    std::fs::create_dir_all(scratch).map_err(|e| e.to_string())?;
+    // What a started recording folds is thrown away: the probe asks only whether it starts.
+    let stopped = profiler.start(scratch).map(|r| drop(r.stop()));
+    let _ = std::fs::remove_dir_all(scratch);
+    stopped
+}
+
 /// A profiler recording this process.
 enum Recording {
     Perf(perf::Recording),

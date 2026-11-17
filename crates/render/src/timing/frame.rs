@@ -33,6 +33,14 @@ pub struct FrameCost {
     pub frames: u64,
 }
 
+impl GpuTimer {
+    /// [`Renderer::lap`] for a pass that holds the timer, not the renderer (the
+    /// shadow sweeps' caster gather).
+    pub(crate) fn lap(&self, stage: &'static str) {
+        self.cpu.lap(stage);
+    }
+}
+
 /// The CPU side of [`GpuTimer`]'s frame bracket.
 #[derive(Default)]
 pub(super) struct CpuFrame {
@@ -134,7 +142,7 @@ impl Renderer {
 
     /// End the frame's current stage as `stage` (see the module docs).
     pub(crate) fn lap(&self, stage: &'static str) {
-        self.gpu_timer.cpu.lap(stage);
+        self.gpu_timer.lap(stage);
     }
 
     /// Run `draw` (a render beside the measured frame) without it counting as one:
