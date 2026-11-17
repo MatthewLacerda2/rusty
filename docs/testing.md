@@ -1196,7 +1196,7 @@ request** (#750). Two ways in:
 
 | Run | Trigger | Scope | Where it lands |
 |---|---|---|---|
-| **On request** (`mutants-on-request.yml`) | a PR's `Mutation: diff` (or globs) line, which the merge queue dispatches on `main` after the merge, two at a time (#1934); `make mutants-remote SCOPE=...`; or a dispatch with a `scope` input | `diff` (the branch against `origin/main`, or with `commit` the merged squash commit against its parent) or path globs (separated by spaces or commas; a brace such as `crates/{core,physics}/src/**` is expanded, since git's glob dialect has none), turned by `.github/scripts/mutants-scope.py` into one `--in-diff` per cargo workspace the scope reaches: the engine's, and each directory whose `Cargo.toml` opens its own `[workspace]` (`tools/lint`, run inside it with its own `cargo test`; a cargo-fuzz crate such as `fuzz/` is named as having nothing to run), in one report (#2201); one runner, a 2 h 45 budget; one run per branch, a newer dispatch cancelling the older and an unmerged close of the PR cancelling what is left, while a merged PR's run finishes (`mutants-cancel.yml`, #1530) | printed in the terminal by `make mutants-remote`; the run summary and a `mutants-report` artifact (`report.md`, `survivors.diff`); `report.md` also as one comment on the branch's open PR, or its merged one (the `pr` input for the queue's runs), edited in place by later runs (#912), except that a run with no answer adds its line below the earlier report rather than replacing it (#2201) |
+| **On request** (`mutants-on-request.yml`) | a PR's `Mutation: diff` (or globs) line, which the merge queue dispatches on `main` after the merge, two at a time (#1934); `make mutants-remote SCOPE=...`; or a dispatch with a `scope` input | `diff` (the branch against `origin/main`, or with `commit` the merged squash commit against its parent) or path globs (separated by spaces or commas; a brace such as `crates/{core,physics}/src/**` is expanded, since git's glob dialect has none), turned by `.github/scripts/mutants-scope.py` into one `--in-diff` per cargo workspace the scope reaches: the engine's, and each directory whose `Cargo.toml` opens its own `[workspace]` (`tools/lint`, run inside it with its own `cargo test`; a cargo-fuzz crate such as `fuzz/` is named as having nothing to run), in one report (#2201); one runner, or up to four for a plan too large for one (`mutants-request.py shards`, #2283), each with a 2 h 45 budget, merged into one report; one run per branch, a newer dispatch cancelling the older and an unmerged close of the PR cancelling what is left, while a merged PR's run finishes (`mutants-cancel.yml`, #1530) | printed in the terminal by `make mutants-remote`; the run summary and a `mutants-report` artifact (`report.md`, `survivors.diff`); `report.md` also as one comment on the branch's open PR, or its merged one (the `pr` input for the queue's runs), edited in place by later runs (#912), except that a run with no answer adds its line below the earlier report rather than replacing it (#2201) |
 | **Full sweep** (`mutants-sweep.yml`, sharded) | weekly `schedule` (Saturdays) + `workflow_dispatch` (`force` re-sweeps a covered commit); `main` only, a dispatch on any other ref is refused red (#972); skipped by `mutants-plan` when a finished sweep already covered `main`'s head (#506); one sweep at a time (#705) | the full `--file` sim scope over a matrix `mutants-plan` sizes each run from the mutant count (`cargo mutants --list`, `.github/scripts/mutants-shards.py`: ≈ 4 h a shard at the slowest per-shard rate the previous sweep measured (a shard under `MIN_MEASURED` mutants ignored, the slowest capped at `OUTLIER_CAP` × the mean), `MINUTES_PER_MUTANT` only when none can be read, and a `max-parallel` of at most 10 chosen to end by Sunday 23:59 UTC; red past GitHub's 256-job ceiling, #1684), each shard stopping itself at a 5 h 40 budget under GitHub's 6 h limit (#749) | `mutants-report` job: merged job summary (totals, measured of planned, the run's mean and slowest measured minutes a mutant against the sizing figure, and each shard's seconds and outcome lists under `shards/` for the next plan, unfinished shards, survivors) and the merged `mutants-report` artifact |
 
 Why this shape: mutation is a signal, and a per-PR job held runners the merge
@@ -1237,21 +1237,34 @@ process keeps its memory, which outlasts the test timeout and, a few mutants in 
 the runner; with dumps off it aborts in seconds and reads as caught
 (`test_limits.py` holds every capped `ulimit` to `-c 0`).
 
+**An on-request mutant is tested by what can see it, its own crate first** (#2283).
+Each mutant once ran the whole workspace's suite in nextest's order, the root
+package's integration binary first and then every crate alphabetically, so a mutant in
+`rusty-shell` waited 13 minutes for `rusty-shell`'s own tests and a run measured a fifth
+of its plan before its budget. `mutants-on-request.yml` now runs one cargo-mutants
+invocation per mutated package `P`: tested by nextest's `-E 'rdeps(=P)'` (P and every
+package depending on it, dev-dependencies included), with a tool config raising
+`package(=P)`'s priority so its tests run first. Before P is mutated, `cargo nextest
+list` with that filter and config must succeed and select a test: cargo-mutants counts
+any failing nextest run as a caught mutant, so a filter nextest refuses would report
+every mutant caught. A package that fails the check is reported as unmeasured. A plan
+too large for one runner (a standalone part's mutants counted in) is dealt round-robin
+over up to four shards (`mutants-request.py`), whose outcomes the `report` job merges
+into one report. A shard or package whose run broke is named there, its mutants counted
+as never reached and the run red, beside what the rest measured.
+
 **A torn-down job still answers.** A job whose runner died, or that was killed at its
-`timeout-minutes`, runs no step of its own, so `mutants-on-request.yml` has a second
-job, `no-answer`, which `needs:` it and runs only when the mutation job failed or timed
-out without reaching its comment (its `answered` output) and the run was not
-cancelled. It reads the step the job died in and GitHub's annotation from the jobs API
-(`mutants-torn-down.py`) and posts that line below any earlier report on the pull
-request, and as the `mutants-report` artifact. What the job measured is lost with its
-runner. A job that failed with its steps run and still wrote no report gets a line
-saying so, not "torn down". A runner that dies right after posting its report loses
-`answered` too, so the line can land below a real report; it says that report is the
-truth.
+`timeout-minutes`, runs no step of its own, so `mutants-on-request.yml`'s `report` job,
+which `needs:` the others and runs unless the run was cancelled, answers for it: for
+the `plan` job, or a shard that uploaded nothing, it reads the step the job died in and
+GitHub's annotation from the jobs API (`mutants-torn-down.py`). A lost plan's line is
+posted below any earlier report on the pull request; a lost shard is named in its
+part's section beside what the other shards measured, its mutants counted as never
+reached, and the run is red. What a lost job measured died with its runner.
 
 **The jobs run their own baseline** (`--baseline skip`, #2164). cargo-mutants builds
 and tests its baseline with `--package` set to the mutated packages only, whatever
-`test_workspace` says, while every mutant tests the whole workspace: a member crate's
+`test_workspace` says, while a mutant tests the whole workspace (or, on request, the part of it that depends on the mutated crate): a member crate's
 baseline timed only that crate's tests, so every mutant overran its timeout and a
 member with no `dev` feature failed the baseline outright. So each job's `Baseline`
 step runs what a mutant runs (the workspace build, then its tests, timed), and the

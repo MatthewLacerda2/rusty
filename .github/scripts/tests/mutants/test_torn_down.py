@@ -58,37 +58,37 @@ class Reason(unittest.TestCase):
         self.assertTrue(text.startswith("the mutation job failed with its steps run"))
 
 
-def no_answer_job() -> str:
-    return WORKFLOW.split("\n  no-answer:\n", 1)[1]
+def report_job() -> str:
+    return WORKFLOW.split("\n  report:\n", 1)[1]
 
 
 class Guards(unittest.TestCase):
-    def test_runs_only_for_a_red_or_timed_out_run_nobody_answered(self) -> None:
-        [cond] = re.findall(r"\n    if: (.+)\n", no_answer_job())
-        parts = cond.split(" && ")
+    """The `report` job, which `needs:` every other, answers for a job that
+    left nothing (#2283 folded the `no-answer` job into it)."""
+
+    def test_runs_after_any_red_or_torn_down_job_but_never_a_cancelled_run(self) -> None:
+        job = report_job()
+        [cond] = re.findall(r"\n    if: (.+)\n", job)
         # `!cancelled()`: a superseded run or a closed pull request is read by nobody;
         # a job killed at `timeout-minutes` reads `cancelled` but leaves the run uncancelled.
-        for want in ("always()", "!cancelled()", "needs.mutants.result != 'success'",
-                     "needs.mutants.result != 'skipped'", "needs.mutants.outputs.answered != 'true'"):
-            self.assertIn(want, parts)
+        self.assertEqual(cond.split(" && "), ["always()", "!cancelled()"])
+        self.assertIn("needs: [plan, mutants]", job)
 
-    def test_the_mutation_job_marks_its_answer_where_the_guard_reads_it(self) -> None:
-        mutants = WORKFLOW.split("\n  mutants:\n", 1)[1].split("\n  no-answer:\n", 1)[0]
-        self.assertIn("answered: ${{ steps.post.outputs.answered }}", mutants)
-        post = mutants.split("- name: Post the report on the pull request", 1)[1].split("\n      - name:", 1)[0]
-        self.assertIn("id: post", post)
-        self.assertIn('echo answered=true >> "$GITHUB_OUTPUT"', post)
+    def test_names_a_lost_shard_and_a_lost_plan_from_outside(self) -> None:
+        render = report_job().split("- name: Render the report", 1)[1].split("\n      - name:", 1)[0]
+        self.assertIn("mutants-torn-down.py", render)
+        self.assertIn('why "mutants ($k)"', render)
+        self.assertIn('why plan', render)
 
-    def test_posts_below_an_earlier_report_never_over_it(self) -> None:
-        self.assertIn("mutants-pr-comment.py report/report.md --append", no_answer_job())
+    def test_posts_an_unanswered_run_below_an_earlier_report_never_over_it(self) -> None:
+        job = report_job()
+        self.assertIn('echo "append=--append" >> "$GITHUB_OUTPUT"', job)
+        self.assertIn("APPEND: ${{ steps.render.outputs.append }}", job)
 
-    def test_says_a_report_above_it_is_the_truth(self) -> None:
-        self.assertIn("If a report stands above this line, that report is the truth", no_answer_job())
-
-    def test_its_artifact_replaces_the_mutation_jobs_own(self) -> None:
-        keep = no_answer_job().split("- name: Keep it", 1)[1]
-        self.assertIn("name: mutants-report", keep)
-        self.assertIn("overwrite: true", keep)
+    def test_only_the_report_job_may_comment(self) -> None:
+        jobs = WORKFLOW.split("\njobs:\n", 1)[1]
+        self.assertEqual(jobs.count("pull-requests: write"), 1)
+        self.assertIn("pull-requests: write", report_job())
 
 
 class Paging(unittest.TestCase):

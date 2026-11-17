@@ -41,8 +41,9 @@ WORKFLOW = "mutants-on-request.yml"
 #: How long a dispatched run may take to appear in the run list.
 FIND_SECONDS = 300
 
-#: The longest wait: queueing behind pull requests' CI, plus the job's limit.
-WAIT_SECONDS = 4 * 3600
+#: The longest wait: queueing behind pull requests' CI, plus every job's
+#: limit in turn (`plan` 30 min, a shard 180, `report` 15: 3 h 45, #2283).
+WAIT_SECONDS = 6 * 3600
 
 #: Past this many lines the survivors' diffs are left in the file and named.
 PRINT_DIFF_LINES = 400
