@@ -997,7 +997,7 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   `cpu_ms`), and `render.<stage>` for every stage of the renderer's frame, summing
   to `renderer_ms`: `setup`, `assets`, `prepare`, `extract` (the retained scene's
   update), `shadows` and `shadow_gather` (the sweeps' caster gather, cull and
-  batch, a lap of its own), `render_textures`, `ui` (its layout and its draw),
+  batch, a lap of its own, so absent from a frame no shadow sweep ran), `render_textures`, `ui` (its layout and its draw),
   `stack`, then each per-camera pass by its name in
   `render::draw::camera::CAMERA_PASSES` (`clusters`, `solids`: the per-camera cull
   and batch, `scene`, `transparent`, `post_fx`, …), each summed over every camera

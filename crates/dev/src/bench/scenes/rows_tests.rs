@@ -8,7 +8,7 @@
 use std::time::Duration;
 
 use rusty_app::{Resources, Stage, World};
-use rusty_components::CameraComponent;
+use rusty_components::{CameraComponent, LightComponent, LightType};
 use rusty_scene::Scene;
 
 use super::super::{measure, Report};
@@ -36,7 +36,8 @@ fn parts(report: &Report, prefix: &str) -> (f64, f64) {
     )
 }
 
-/// A one-camera scene with [`napper`] in its schedule, measured for a few frames.
+/// A one-camera scene lit by a shadowing sun (so the sweeps gather casters) with
+/// [`napper`] in its schedule, measured for a few frames.
 fn measured() -> Report {
     let root = rusty_test_support::temp::dir().join(format!("rows_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
@@ -45,6 +46,13 @@ fn measured() -> Report {
     let cam = scene.add_entity("Cam".into());
     let camera = Some(CameraComponent::default());
     scene.world.set_camera(cam, camera);
+    let sun = scene.add_entity("Sun".into());
+    let light = LightComponent {
+        light_type: LightType::Directional,
+        cast_shadows: true,
+        ..rusty_edit::authoring::default_light()
+    };
+    scene.world.set_light(sun, Some(light));
     let path = root.join("assets/scenes/a.scene");
     rusty_edit::save_to_file(&scene, &path.to_string_lossy()).unwrap();
     let settings = ProjectSettings::default();

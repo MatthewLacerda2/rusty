@@ -43,7 +43,13 @@ fn links_are_copied_as_what_they_point_to_and_a_loop_or_a_socket_is_left_out() {
     symlink(shared.join("tex.png"), project.join("assets/logo.png")).unwrap();
     symlink(&project, project.join("assets/up")).unwrap();
     symlink(root.join("gone"), project.join("assets/dangling")).unwrap();
-    let _socket = std::os::unix::net::UnixListener::bind(project.join("assets/sock")).unwrap();
+    // A socket's path must be short (SUN_LEN), so it lives in the system temp
+    // folder and the project links to it: followed, it is neither file nor folder.
+    // lint: allow(test-temp-dir) a socket path must fit SUN_LEN, which the per-test dir overruns; named by this process's pid, which nextest gives one test
+    let sock = std::env::temp_dir().join(format!("rb{}.sock", std::process::id()));
+    let _ = std::fs::remove_file(&sock);
+    let _socket = std::os::unix::net::UnixListener::bind(&sock).unwrap();
+    symlink(&sock, project.join("assets/sock")).unwrap();
     scratch(&project, &copy).unwrap();
     let textures = copy.join("assets/textures");
     assert!(
@@ -65,4 +71,5 @@ fn links_are_copied_as_what_they_point_to_and_a_loop_or_a_socket_is_left_out() {
     for left in ["up", "dangling", "sock"] {
         assert!(!copy.join("assets").join(left).exists(), "{left} copied");
     }
+    let _ = std::fs::remove_file(&sock);
 }
