@@ -68,22 +68,7 @@ pub fn pick(scene: &Scene, nav: &NavigationGraph) -> Views {
     out.views.extend(spawn);
     let floors = walkable(nav);
     if floors.is_empty() {
-        if cameras.is_empty() {
-            out.warnings.push(
-                "no camera and no navmesh: one view from the scene bounds' centre, along +Z".into(),
-            );
-            out.views.push(Viewpoint {
-                label: "bounds centre".into(),
-                view: View::Pose {
-                    position: bounds_centre(scene),
-                    yaw: 90.0,
-                    pitch: 0.0,
-                },
-            });
-        } else {
-            out.warnings
-                .push("no navmesh: the scene's cameras are its only viewpoints".into());
-        }
+        no_floor(&mut out, cameras.is_empty(), scene);
         return out;
     }
     for (n, floor) in seeded(&floors, MAX_POINTS.saturating_sub(points))
@@ -102,6 +87,26 @@ pub fn pick(scene: &Scene, nav: &NavigationGraph) -> Views {
         }
     }
     out
+}
+
+/// A scene without a navmesh: its cameras alone, or, without a camera either,
+/// one view from its bounds' centre.
+fn no_floor(out: &mut Views, no_camera: bool, scene: &Scene) {
+    if !no_camera {
+        out.warnings
+            .push("no navmesh: the scene's cameras are its only viewpoints".into());
+        return;
+    }
+    out.warnings
+        .push("no camera and no navmesh: one view from the scene bounds' centre, along +Z".into());
+    out.views.push(Viewpoint {
+        label: "bounds centre".into(),
+        view: View::Pose {
+            position: bounds_centre(scene),
+            yaw: 90.0,
+            pitch: 0.0,
+        },
+    });
 }
 
 /// The spawn's view: eye height over the floor under it (its own height without

@@ -4,7 +4,7 @@
 //! Each scene is loaded as Play loads it (its scripts run, with no input), drawn
 //! once, then measured from deterministic viewpoints ([`views`]): each warms up
 //! [`WARMUP`] frames (pipelines, uploads, shadow caches) and is measured for
-//! [`FRAMES`] by [`super::measure_posed`], at 1920x1080 unless told otherwise. The
+//! [`FRAMES`] by `bench::measure_posed`, at 1920x1080 unless told otherwise. The
 //! report ([`report`]) aggregates the viewpoints' rows and adds `load_ms` (the
 //! scene's load to its first rendered frame, wall clock), `rss_peak_mb` (the
 //! process's peak resident memory, [`memory`]) and `gpu_mb` (the renderer's GPU

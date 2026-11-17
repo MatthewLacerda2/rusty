@@ -96,6 +96,13 @@ impl SceneReport {
         for warning in &self.warnings {
             let _ = writeln!(out, "warning: {warning}");
         }
+        out.push_str(&self.notes(previous.is_none()));
+        out
+    }
+
+    /// The lines under the table that say what the run could not measure.
+    fn notes(&self, first: bool) -> String {
+        let mut out = String::new();
         let notes = [
             (
                 self.row("renderer_ms").is_none(),
@@ -110,7 +117,7 @@ impl SceneReport {
                 "(this backend reports no GPU memory: no gpu_mb)",
             ),
             (
-                previous.is_none(),
+                first,
                 "(no previous report: the next run prints its change against this one)",
             ),
         ];
