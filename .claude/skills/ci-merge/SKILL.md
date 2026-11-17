@@ -393,7 +393,7 @@ merge or runs on a pull request.
 
 | | on request | weekly |
 |---|---|---|
-| mutation | a merged PR's `Mutation: diff` (or globs) line, dispatched by the queue after the merge; by hand, `make mutants-remote SCOPE=diff` (or globs) on `mutants-on-request.yml`: one runner, report and survivors' diffs in the terminal, posted as one comment on the branch's PR (open, or merged). One run per branch: a newer dispatch cancels the older and an unmerged close cancels what is left (`mutants-cancel.yml`); on `main` each run stands alone | `mutants-sweep.yml`, Saturdays, the sim modules in as many shards as `mutants-plan` sizes, a summary and artifact; skipped when `main` has not moved since the last sweep |
+| mutation | a merged PR's `Mutation: diff` (or globs) line, dispatched by the queue after the merge; by hand, `make mutants-remote SCOPE=diff` (or globs) on `mutants-on-request.yml`: one runner, up to four for a large plan, each mutant tested by its crate and what depends on it, report and survivors' diffs in the terminal, posted as one comment on the branch's PR (open, or merged). One run per branch: a newer dispatch cancels the older and an unmerged close cancels what is left (`mutants-cancel.yml`); on `main` each run stands alone | `mutants-sweep.yml`, Saturdays, the sim modules in as many shards as `mutants-plan` sizes, a summary and artifact; skipped when `main` has not moved since the last sweep |
 | coverage | `gh workflow run coverage.yml --ref <branch>` | `coverage.yml`, Mondays, ratchet table |
 
 **A branch that adds mechanism** (arithmetic, a state machine, a boundary) asks
