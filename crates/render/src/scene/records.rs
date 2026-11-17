@@ -237,7 +237,8 @@ fn record_free(m: &MaterialAsset) -> MaterialAsset {
         uv_mapping: d.uv_mapping,
         world_size: d.world_size,
         blend_sharpness: d.blend_sharpness,
-        // The detail map binds in the material's group; the rest is record values.
+        // The detail map and its mask bind in the material's group; the rest is
+        // record values.
         detail: m
             .detail
             .as_ref()

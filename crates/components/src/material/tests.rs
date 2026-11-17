@@ -113,3 +113,23 @@ fn a_detail_layer_is_unwritten_until_set_and_its_absent_keys_default() {
     let scales = (d.albedo_scale, d.normal_scale, d.smoothness_scale);
     assert_eq!(scales, (1.0, 1.0, 1.0), "HDRP's defaults");
 }
+
+#[test]
+fn a_detail_mask_round_trips_and_is_unwritten_without_one() {
+    let unmasked = DetailLayer {
+        map: Some("d.png".into()),
+        ..DetailLayer::default()
+    };
+    let text = serde_json::to_string(&unmasked).unwrap();
+    assert!(!text.contains("mask"), "{text}");
+    let masked = DetailLayer {
+        mask: Some("m.png".into()),
+        ..unmasked.clone()
+    };
+    for layer in [unmasked, masked] {
+        let text = serde_json::to_string(&layer).unwrap();
+        let back: DetailLayer = serde_json::from_str(&text).expect("it parses");
+        assert_eq!(back, layer);
+        assert_eq!(layer.map_only().unwrap().mask, layer.mask, "binds the mask");
+    }
+}

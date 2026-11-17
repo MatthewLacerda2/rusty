@@ -11,6 +11,7 @@ fn every_map() -> MaterialAsset {
         emissive_map: Some("emissive_map".into()),
         detail: Some(DetailLayer {
             map: Some("detail".into()),
+            mask: Some("detail_mask".into()),
             ..DetailLayer::default()
         }),
         occlusion_map: Some("occlusion_map".into()),
@@ -33,6 +34,7 @@ fn each_row_reads_its_own_field_at_its_own_binding() {
         (Map::Occlusion, "occlusion_map", 14, TextureKind::Mask),
         (Map::Specular, "specular_map", 13, TextureKind::Mask),
         (Map::Height, "height_map", 12, TextureKind::Mask),
+        (Map::DetailMask, "detail_mask", 11, TextureKind::Mask),
     ];
     assert_eq!(expected.len(), MATERIAL_MAPS);
     for (map, field, binding, kind) in expected {
@@ -47,6 +49,14 @@ fn each_row_reads_its_own_field_at_its_own_binding() {
         assert_eq!(map_kind(i), kind);
     }
     assert_eq!(map_kind(MATERIAL_MAPS), TextureKind::Data, "an extra slot");
+    let mut lone = every_map();
+    lone.detail.as_mut().unwrap().map = None;
+    let paths = material_texture_paths(Some(&lone));
+    assert_eq!(
+        paths[Map::DetailMask as usize],
+        None,
+        "no mask without a map"
+    );
 }
 
 #[test]
@@ -58,7 +68,13 @@ fn only_the_maps_that_darken_or_scale_switch_off_while_missing() {
         .collect();
     assert_eq!(
         off,
-        [Map::Detail, Map::Occlusion, Map::Specular, Map::Height]
+        [
+            Map::Detail,
+            Map::Occlusion,
+            Map::Specular,
+            Map::Height,
+            Map::DetailMask
+        ]
     );
     let mut record = MaterialData::flat([1.0; 4]);
     for s in &MAP_SLOTS {
@@ -71,8 +87,9 @@ fn only_the_maps_that_darken_or_scale_switch_off_while_missing() {
         record.level_maps.use_occlusion_map,
         record.level_maps.use_specular_map,
         record.level_maps.use_height_map,
+        record.detail.use_detail_mask,
     );
-    assert_eq!(flags, (7, 7, 7, 7), "each row names its own flag");
+    assert_eq!(flags, (7, 7, 7, 7, 7), "each row names its own flag");
 }
 
 #[test]

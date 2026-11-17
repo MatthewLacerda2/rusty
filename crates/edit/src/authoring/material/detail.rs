@@ -1,7 +1,8 @@
 //! The detail layer's fields (#1997): HDRP Lit's *Detail Map* inputs, as rows of
 //! the material field table, so the Lua adapter (`Material.SetDetailTiling`, …),
 //! `DefineAsset`'s recipe and the Inspector take them with no code of their own.
-//! The map itself is a path, set by [`set_detail_map`] beside the other maps.
+//! The map itself is a path, set by [`set_detail_map`] beside the other maps, and
+//! so is its mask ([`set_detail_mask`], #2258).
 //!
 //! A row's write creates the material's [`DetailLayer`] when it has none; a read of
 //! a material without one gives the layer's default.
@@ -11,7 +12,7 @@
 use super::coordinates::{MAP_COORD_RANGE, WORLD_SIZE_RANGE};
 use super::field::{no_hint, SurfaceField, SurfaceKind, SurfaceValue};
 use super::surface::number;
-use super::{fit_data_slot, MaterialLibrary};
+use super::{fit_data_slot, fit_single_channel_slot, MaterialLibrary};
 use rusty_asset::MapRef;
 use rusty_components::{DetailLayer, MaterialAsset, UvMapping};
 
@@ -35,13 +36,39 @@ pub fn set_detail_map(materials: &mut MaterialLibrary, key: &str, path: Option<S
     layer_mut(m).map = map;
 }
 
-/// `m`'s detail layer, if any, with every field clamped as its row's `check`
-/// clamps a write (NaN to the range's floor): what a recipe's nested `detail`
-/// table is put through, so it reads back as the GPU draws it.
-pub fn clamp_detail(m: &mut MaterialAsset) {
-    if m.detail.is_none() {
+/// Set (or, with `None` or an empty path, clear) material `key`'s detail mask
+/// (#2258, HDRP's *Detail Mask*): the rule `Material.SetDetailMask` and the
+/// Inspector's path field share. As [`set_detail_map`], the layer's other fields are
+/// kept and clearing a material with no layer writes nothing. A `Default` image
+/// becomes `SingleChannel` ([`fit_single_channel_slot`]): its red is read raw.
+pub fn set_detail_mask(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
+    let Some(m) = materials.get_mut(key) else {
+        return;
+    };
+    let mask = path.filter(|p| !p.is_empty()).map(MapRef::from);
+    if mask.is_none() && m.detail.is_none() {
         return;
     }
+    fit_single_channel_slot(mask.as_ref(), "a detail mask");
+    layer_mut(m).mask = mask;
+}
+
+/// Material `key`'s detail mask path, `None` without a material, a layer or a
+/// mask: what `Material.GetDetailMask` reads.
+pub fn detail_mask(materials: &MaterialLibrary, key: &str) -> Option<String> {
+    let layer = materials.get(key)?.detail.as_ref()?;
+    layer.mask.as_ref().map(MapRef::to_string)
+}
+
+/// `m`'s detail layer, if any, with every field clamped as its row's `check`
+/// clamps a write (NaN to the range's floor): what a recipe's nested `detail`
+/// table is put through, so it reads back as the GPU draws it. An empty `mask`
+/// is no mask, as `set_detail_mask`'s `""`.
+pub fn clamp_detail(m: &mut MaterialAsset) {
+    let Some(layer) = m.detail.as_mut() else {
+        return;
+    };
+    layer.mask = layer.mask.take().filter(|p| *p != "");
     for row in DETAIL_FIELDS {
         if let Ok(v) = row.check((row.get)(m)) {
             (row.put)(m, v);
@@ -174,6 +201,24 @@ mod tests {
         set_detail_map(&mut materials, "k", None);
         let layer = materials["k"].detail.clone().unwrap();
         assert_eq!((layer.normal_scale, layer.map), (2.0, None), "kept");
+    }
+
+    #[test]
+    fn a_mask_is_set_read_and_cleared_and_a_default_image_becomes_single_channel() {
+        let dir = rusty_test_support::temp::dir();
+        let png = dir.join("mask_2258.png");
+        image::RgbaImage::new(4, 4).save(&png).unwrap();
+        let path = png.to_string_lossy().into_owned();
+        let mut materials = one();
+        set_detail_mask(&mut materials, "k", Some(String::new()));
+        assert_eq!(materials["k"].detail, None, "an empty path writes nothing");
+        set_detail_mask(&mut materials, "k", Some(path.clone()));
+        assert_eq!(detail_mask(&materials, "k"), Some(path));
+        let kind = rusty_asset::sidecar::texture(&png).texture_type;
+        assert_eq!(kind, rusty_asset::sidecar::TextureType::SingleChannel);
+        set_detail_mask(&mut materials, "k", None);
+        assert_eq!(detail_mask(&materials, "k"), None);
+        assert!(materials["k"].detail.is_some(), "the layer is kept");
     }
 
     #[test]
