@@ -52,7 +52,7 @@ fn a_shadowmask_bake_writes_mask_pages_and_records_channels_and_fallbacks() {
     assert_eq!(set.fell_back.iter().copied().collect::<Vec<_>>(), [ids[4]]);
     // The fifth bakes as `Baked`: its direct light is in the lightmap, and the
     // frame draws it as `Baked`.
-    let input = BakeScene::gather(&scene, &|_| None);
+    let input = BakeScene::gather(&scene, &|_, _| None);
     let direct: Vec<bool> = input.lights.iter().map(|l| l.bakes_direct).collect();
     assert_eq!(direct, [false, false, false, false, true]);
     let light = scene.world.light(ids[4]).unwrap().clone();

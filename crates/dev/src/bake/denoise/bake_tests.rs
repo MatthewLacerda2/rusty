@@ -15,7 +15,7 @@ use rusty_scene::lighting::settings::BakeSettings;
 #[test]
 fn a_whole_oidn_bake_repeats_its_bytes_whichever_worker_finishes_first() {
     let Some(_) = oidn_or_skip() else { return };
-    let mut scene = BakeScene::gather(&rooms(1), &|_| None);
+    let mut scene = BakeScene::gather(&rooms(1), &|_, _| None);
     let position = Vec3::new(3.0, 3.0, 3.0);
     let shape = LightShape::Point {
         position,

@@ -60,7 +60,9 @@ impl Default for BakeMesh {
 #[derive(Clone, Copy, Debug)]
 pub struct BakeRun {
     pub end: u32,
-    /// Diffuse reflectance: the material colour times its albedo map's average.
+    /// Diffuse reflectance: the material colour times its albedo map's average and
+    /// its occlusion map's factor at that map's average (#2299), so a recess's shade
+    /// bounces the same light from either map.
     pub albedo: Vec3,
     /// Emitted radiance, as the forward shader adds it (a Transparent material's
     /// scaled by its alpha, as it blends).
@@ -94,6 +96,15 @@ impl BakeMesh {
     }
 }
 
+/// How a map's texels are averaged for the bake, as the renderer uploads them: a
+/// colour map's are sRGB and averaged in linear light, a data map's (an occlusion
+/// map) are read raw, each channel 0–1.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum MapEncoding {
+    Colour,
+    Data,
+}
+
 /// Everything the bake reads.
 #[derive(Clone, Debug, Default)]
 pub struct BakeScene {
@@ -116,9 +127,10 @@ impl BakeScene {
     /// Flatten `scene`: the drawn runs of every active static mesh that is not a light
     /// gizmo, each with its own material (#1290) and the mesh's *Cast Shadows*
     /// (#1571), the active `Mixed` / `Baked` lights,
-    /// the ambient sky and the diffuse model. `map_average` turns a texture path into its average linear
-    /// colour (`None` when it cannot be read); it is asked once per path.
-    pub fn gather(scene: &Scene, map_average: &dyn Fn(&MapRef) -> Option<Vec3>) -> Self {
+    /// the ambient sky and the diffuse model. `map_average` turns a texture path into its
+    /// average, read as [`MapEncoding`] says (`None` when it cannot be read); it is
+    /// asked once per path and encoding.
+    pub fn gather(scene: &Scene, map_average: &MapAverage<'_>) -> Self {
         let map_average = once_per_path(map_average);
         let mut out = BakeScene {
             sky: scene.drawn_ambient().radiance(),
@@ -173,19 +185,23 @@ impl BakeScene {
     }
 }
 
-/// `map_average`, asked at most once per path: a map many slots or entities share is
-/// decoded once per gather.
-fn once_per_path(
-    map_average: &dyn Fn(&MapRef) -> Option<Vec3>,
-) -> impl Fn(&MapRef) -> Option<Vec3> + '_ {
+/// What [`BakeScene::gather`] asks a map's average of.
+pub type MapAverage<'a> = dyn Fn(&MapRef, MapEncoding) -> Option<Vec3> + 'a;
+
+/// `map_average`, asked at most once per path and encoding: a map many slots or
+/// entities share is decoded once per gather.
+fn once_per_path<'a>(
+    map_average: &'a MapAverage<'a>,
+) -> impl Fn(&MapRef, MapEncoding) -> Option<Vec3> + 'a {
     let cache = RefCell::new(Map::default());
-    move |map: &MapRef| {
-        let cached = cache.borrow().get(map).copied();
+    move |map: &MapRef, encoding| {
+        let key = (map.clone(), encoding);
+        let cached = cache.borrow().get(&key).copied();
         cached.unwrap_or_else(|| {
             *cache
                 .borrow_mut()
-                .entry(map.clone())
-                .or_insert_with(|| map_average(map))
+                .entry(key)
+                .or_insert_with(|| map_average(map, encoding))
         })
     }
 }
@@ -199,7 +215,7 @@ fn drawn_runs(
     scene: &Scene,
     id: u32,
     mesh: &MeshComponent,
-    map_average: &dyn Fn(&MapRef) -> Option<Vec3>,
+    map_average: &MapAverage<'_>,
 ) -> (Vec<u32>, Vec<BakeRun>) {
     let ranges = clip_runs(mesh.index_ranges(), mesh.indices.len() as u32);
     let slots = scene.world.material(id).map(|m| m.materials.len());
@@ -231,10 +247,7 @@ fn drawn_runs(
 /// A material's surface: its diffuse albedo, emitted radiance and whether it
 /// occludes; white, black and opaque with none, the forward shader's defaults.
 /// `end` is left for the caller.
-fn surface(
-    material: Option<&MaterialAsset>,
-    map_average: &dyn Fn(&MapRef) -> Option<Vec3>,
-) -> BakeRun {
+fn surface(material: Option<&MaterialAsset>, map_average: &MapAverage<'_>) -> BakeRun {
     let Some(m) = material else {
         return BakeRun {
             end: 0,
@@ -243,9 +256,18 @@ fn surface(
             occludes: true,
         };
     };
-    let average = |map: &Option<MapRef>| map.as_ref().and_then(map_average).unwrap_or(Vec3::ONE);
-    let albedo = Vec3::from(m.base_color) * average(&m.base_color_map);
-    let emissive = Vec3::from(m.emissive) * average(&m.emissive_map);
+    let average = |map: &Option<MapRef>, encoding| {
+        (map.as_ref())
+            .and_then(|map| map_average(map, encoding))
+            .unwrap_or(Vec3::ONE)
+    };
+    let colour = |map: &Option<MapRef>| average(map, MapEncoding::Colour);
+    let occlusion = occlusion_factor(
+        average(&m.occlusion_map, MapEncoding::Data).x,
+        m.occlusion_strength,
+    );
+    let albedo = Vec3::from(m.base_color) * colour(&m.base_color_map) * occlusion;
+    let emissive = Vec3::from(m.emissive) * colour(&m.emissive_map);
     let blend = if m.is_transparent() {
         m.alpha.clamp(0.0, 1.0)
     } else {
@@ -256,5 +278,17 @@ fn surface(
         albedo: albedo.clamp(Vec3::ZERO, Vec3::ONE),
         emissive: emissive * blend,
         occludes: !m.is_transparent(),
+    }
+}
+
+/// The occlusion map's factor for a map averaging `red`, as the forward shader's
+/// `mapping::occlusion` lerps it (`1 + strength × (red − 1)`), held to 0–1; 1 (no
+/// change) for a value that is not finite.
+fn occlusion_factor(red: f32, strength: f32) -> f32 {
+    let factor = 1.0 + strength * (red - 1.0);
+    if factor.is_finite() {
+        factor.clamp(0.0, 1.0)
+    } else {
+        1.0
     }
 }

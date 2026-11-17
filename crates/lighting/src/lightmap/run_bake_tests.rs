@@ -31,7 +31,7 @@ fn floor_halves(slots: &[&str]) -> (f32, f32) {
     let mut scene = library();
     scene.ambient_intensity = 0.0;
     panel(&mut scene, Some(slots));
-    let mut baked = BakeScene::gather(&scene, &|_| None);
+    let mut baked = BakeScene::gather(&scene, &|_, _| None);
     baked.meshes.push(BakeMesh {
         entity: 999,
         ..floor()
@@ -77,7 +77,7 @@ fn glass_is_lit_and_lets_light_through_to_the_floor() {
         .world
         .set_material(pane, Some(MaterialComponent { materials }));
 
-    let mut baked = BakeScene::gather(&scene, &|_| None);
+    let mut baked = BakeScene::gather(&scene, &|_, _| None);
     baked.meshes.push(BakeMesh {
         entity: 999,
         ..floor()
