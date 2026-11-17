@@ -1,17 +1,17 @@
-//! The height map's parallax occlusion (#2191). A 16 m plane carries four repeats
-//! of a step: the first half of each repeat white and high, the second black and
-//! low (a black albedo where the height is black), so where the march lands shows
-//! as how much black is left in the frame:
-//!   - At a grazing angle the upper steps hide part of the lower ones behind them,
-//!     and more of it as the angle lowers.
-//!   - Head-on, at `height_scale` 0, and with no map or a missing one, it draws as
-//!     the flat plane.
+//! The height map's parallax occlusion (#2191). A 16 m plane carries four repeats of a step: the
+//! first half of each repeat white and high, the second black and low (a black albedo where the
+//! height is black), so where the march lands shows as how much black is left in the frame:
+//!   - At a grazing angle the upper steps hide part of the lower ones, more as the angle lowers.
+//!   - Head-on, at `height_scale` 0, and with no map or a missing one, it is flat.
 //!   - Past the fade, where a repeat covers under a few pixels, it draws as flat.
+//!   - Along a ridge the maps keep the mip the flat surface reads there (`ridges`).
 //!
 //! No adapter: `frame` returns `None` and the test passes without asserting.
 
+mod filtering;
 mod mips;
 mod planar;
+mod ridges;
 
 use glam::Vec3;
 use rusty::components::MaterialAsset;
@@ -89,7 +89,7 @@ fn the_upper_steps_hide_more_of_the_lower_as_the_view_grazes() {
         eprintln!("[height-map] {degrees}°: black share flat {a:.3}, marched {b:.3}");
         drops.push(a - b);
     }
-    // Measured: drops of RTX 2060 0.066 and 0.157, lavapipe 0.070 and 0.150.
+    // Measured: drops of RTX 2060 0.057 and 0.147, lavapipe 0.057 and 0.134 (since #2301).
     assert!(
         drops[0] > 0.02,
         "the lower steps are partly hidden: {drops:?}"

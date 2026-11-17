@@ -7,9 +7,11 @@
 // forward pass shifts the one `MapCoords` they all read by the height map's
 // parallax first (`forward::parallax`, #2191).
 //
-// Every branch here is on `material()` (the draw's record, indexed by a per-draw
-// uniform) or on the camera's mip bias, so the implicit-LOD samples sit in uniform
-// control flow.
+// Every branch here but one is on `material()` (the draw's record, indexed by a
+// per-draw uniform) or on the camera's mip bias, so the implicit-LOD samples sit in
+// uniform control flow. The one is `lookup_uv`'s, on the per-pixel `MapCoords::bend`:
+// only `textureSampleGrad`, which needs no uniform control flow, may sit inside it;
+// an implicit-LOD sample or a derivative there would be undefined.
 //
 // The mip bias (`camera.lod.x`) is TAA's: `log2(scene/output)` while it upscales
 // the view (#1702), plus the camera's TAA *Mip Bias* on every frame TAA runs
@@ -32,11 +34,13 @@ const TRIPLANAR: u32 = 2u;
 // Planar; `x`, `y`, `z` are Triplanar's three projections (along world X, Y and
 // Z), blended by `weights`. `dx` and `dy` are the screen derivatives of `uv` as
 // `coords_with` built it, so they travel with the coordinates: under the height
-// map's parallax (`displaced`) `uv` is shifted by `shift` and still read with the
-// unshifted `uv`'s `dx` and `dy` (`forward::parallax::displace`): the shift bends
-// sharply where the ray crosses a ridge, and its own derivatives would pick a far
-// mip there. Coordinates that skip `displace` (a surface block's, a clip's) read
-// at their own. `shift` is zero unless displaced.
+// map's parallax (`displaced`) `uv` is shifted by `shift`, which bends sharply where
+// the ray crosses a ridge, and the shifted `uv`'s own derivatives would pick a far mip
+// there. `bend` (`forward::parallax::bend`) says where: at 0 a map is read at the
+// shifted `uv`'s implicit derivatives, as a material without a height map reads its
+// own; toward 1 at the unshifted `dx` and `dy` (`lookup_uv`). Coordinates that skip
+// `displace` (a surface block's, a clip's) read at their own. `shift` and `bend` are
+// zero unless displaced.
 struct MapCoords {
     uv: vec2<f32>,
     x: vec2<f32>,
@@ -46,6 +50,7 @@ struct MapCoords {
     shift: vec2<f32>,
     dx: vec2<f32>,
     dy: vec2<f32>,
+    bend: f32,
 };
 
 // Whether the draw's maps are read through the height map's parallax (#2191): a
@@ -102,6 +107,7 @@ fn coords_with(m: Mapping, uv: vec2<f32>, position: vec3<f32>, normal: vec3<f32>
     c.shift = vec2<f32>(0.0);
     c.dx = dpdx(c.uv);
     c.dy = dpdy(c.uv);
+    c.bend = 0.0;
     if (m.uv_mapping == TRIPLANAR) {
         c.x = tile_with(m, p.zy);
         c.z = tile_with(m, p.xy);
@@ -138,15 +144,22 @@ fn lookup(t: texture_2d<f32>, s: sampler, uv: vec2<f32>) -> vec4<f32> {
     return textureSampleBias(t, s, uv, bias);
 }
 
-// Map `t` at `c`'s one lookup (UV0's and Planar's), with the camera's mip bias:
-// at `c`'s own derivatives under the parallax (`MapCoords`: the unshifted ones when
-// `c` was displaced), the bias scaling them, else [`lookup`].
+// Map `t` at `c`'s one lookup (UV0's and Planar's), with the camera's mip bias
+// ([`lookup`]): at the coordinates' implicit derivatives, as a material without a
+// height map reads, and where the parallax bends (`MapCoords::bend`) blended toward
+// a read at the unshifted derivatives, the bias scaling them. The implicit read stays
+// in uniform control flow; the explicit one needs none, so it is paid only where the
+// shift bends. Reading every pixel of a displaced material explicitly would change
+// its filtering even where nothing shifts: a GPU may filter an explicit-gradient read
+// without the sampler's anisotropy (lavapipe does), which at a grazing angle reads a
+// sharper, shimmering mip (#2301).
 fn lookup_uv(t: texture_2d<f32>, s: sampler, c: MapCoords) -> vec4<f32> {
-    if (displaced()) {
-        let k = exp2(camera.lod.x);
-        return textureSampleGrad(t, s, c.uv, c.dx * k, c.dy * k);
+    let implicit = lookup(t, s, c.uv);
+    if (c.bend <= 0.0) {
+        return implicit;
     }
-    return lookup(t, s, c.uv);
+    let k = exp2(camera.lod.x);
+    return mix(implicit, textureSampleGrad(t, s, c.uv, c.dx * k, c.dy * k), c.bend);
 }
 
 // Map `t` at `c`.
@@ -201,6 +214,13 @@ fn level_at(size: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>) -> f32 {
 // UV0's and Planar's one lookup's (at `c`'s own derivatives), Triplanar's three projections' blended by their
 // weights, plus the mip bias [`lookup`] reads it with. Takes derivatives: call it in
 // uniform control flow (a branch on `material()` is).
+//
+// Under a height map the level is the unshifted `dx`/`dy`'s, while where `bend` is 0
+// the map is read at the shifted coordinates' implicit derivatives, which may differ
+// by what `bend` lets through (`parallax::BEND_FROM`): up to 1 mip sharper (the shift
+// running against the coordinates at half their rate, halving the footprint) or
+// about 0.6 mip blurrier (running along them, 1.5 times it). Toksvig's spread is then
+// that much off for those pixels; where `bend` reaches 1 the two agree.
 fn normal_level(t: texture_2d<f32>, c: MapCoords) -> f32 {
     let size = vec2<f32>(textureDimensions(t));
     var level = level_at(size, c.dx, c.dy);

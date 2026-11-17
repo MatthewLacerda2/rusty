@@ -64,6 +64,7 @@ fn coords(main: MapCoords, position: vec3<f32>, normal: vec3<f32>) -> MapCoords 
     c.shift = main.shift * ratio;
     c.dx = main.dx * ratio;
     c.dy = main.dy * ratio;
+    c.bend = main.bend;
     return c;
 }
 
