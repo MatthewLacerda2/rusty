@@ -90,12 +90,12 @@ pub fn export(out: &Path) -> Result<Exported, String> {
 }
 
 /// Bring the import cache of every model and image under `root` up to date in
-/// place (`asset::convert::import_all`), copying nothing: an export's first step,
+/// place (`asset::import::import_all`), copying nothing: an export's first step,
 /// and `make import` (`export --import-only`) on its own. A model that fails
 /// fails it, naming each; an image that fails is warned of and stays
 /// uncompressed.
-pub fn import(root: &Path) -> Result<rusty_asset::convert::Imported, String> {
-    let done = rusty_asset::convert::import_all(root)?;
+pub fn import(root: &Path) -> Result<rusty_asset::import::Imported, String> {
+    let done = rusty_asset::import::import_all(root)?;
     match done.failed.as_slice() {
         [] => Ok(done),
         failed => Err(failed

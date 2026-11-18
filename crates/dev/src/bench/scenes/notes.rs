@@ -83,7 +83,7 @@ pub fn unbaked(scene: &Scene) -> Option<String> {
 
 /// The warning for a scene whose textures `found` (`Renderer::uncached_textures`)
 /// were uploaded uncompressed only because the project has no current import
-/// cache for them: a headless run compresses none (`asset::convert::import_all`,
+/// cache for them: a headless run compresses none (`asset::import::import_all`,
 /// #2319), so the scene's memory and load are not what the shipped game's are.
 pub fn uncompressed(found: rusty_render::Uploads) -> Option<String> {
     let s = if found.count == 1 { "" } else { "s" };

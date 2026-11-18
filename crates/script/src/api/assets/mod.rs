@@ -176,14 +176,14 @@ fn manifest_table(lua: &Lua) -> mlua::Result<Table> {
 }
 
 /// `Assets.Refresh()`: every import brought up to date, audio, models and
-/// images (`asset::convert::import_all`), and what it did ([`refresh_table`]).
+/// images (`asset::import::import_all`), and what it did ([`refresh_table`]).
 /// Audio imports in Play too, as Unity's `AssetDatabase.Refresh` does; models and
 /// images wait for Stop (`import_all` refuses then, and nothing is listed).
 fn refresh_all(lua: &Lua) -> mlua::Result<Table> {
     let root = Path::new(ASSET_ROOT);
     let t = refresh_table(lua, &refresh(root))?;
     // Each failure was warned of in the console as it ran.
-    let imported = rusty_asset::convert::import_all(root).unwrap_or_default();
+    let imported = rusty_asset::import::import_all(root).unwrap_or_default();
     t.raw_set("compressed", imported.textures.encoded)?;
     let failed = lua.create_table()?;
     let images = imported.textures.failed.iter();

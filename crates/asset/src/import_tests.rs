@@ -1,7 +1,8 @@
 //! `import_all` (#2319): it makes an image's compressed copy where a headless
 //! load would draw it decoded, and writes nothing while a world plays.
 
-use super::super::{import_all, PlayHold};
+use super::import_all;
+use crate::convert::PlayHold;
 use crate::sidecar::TextureSettings;
 use crate::texture_import::{cache_file, load, Texels, TextureKind};
 use std::path::{Path, PathBuf};

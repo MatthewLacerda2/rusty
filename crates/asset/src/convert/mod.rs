@@ -71,7 +71,6 @@ mod fbx;
 mod fingerprint;
 mod gate;
 pub mod glb;
-mod import_all;
 mod lock;
 mod record;
 mod shipped;
@@ -86,7 +85,6 @@ pub use gate::{
     conversion_allowed, convert_held, convertible_sources, mark_standalone, refresh_changed,
     refresh_sources, PlayHold,
 };
-pub use import_all::{import_all, Imported};
 pub use lock::hold as lock_cache;
 pub use shipped::{cached_without_source, served_from_cache, with_cache_files};
 pub use stage::{textures_dirs, Staging};

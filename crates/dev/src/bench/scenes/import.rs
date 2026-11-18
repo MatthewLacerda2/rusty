@@ -20,11 +20,11 @@ use std::path::{Path, PathBuf};
 use rusty_asset::convert::IMPORT_CACHE_DIR;
 use rusty_core::project::CACHE_DIR;
 
-/// Import the open project's `assets/` (`asset::convert::import_all`), returning
+/// Import the open project's `assets/` (`asset::import::import_all`), returning
 /// its wall-clock ms: the half of `import_ms` before the load.
 pub fn import() -> Result<f64, String> {
     let start = std::time::Instant::now();
-    rusty_asset::convert::import_all(Path::new(rusty_core::project::ASSETS_DIR))?;
+    rusty_asset::import::import_all(Path::new(rusty_core::project::ASSETS_DIR))?;
     Ok(start.elapsed().as_secs_f64() * 1000.0)
 }
 
