@@ -43,6 +43,10 @@ import json
 import sys
 from pathlib import Path
 
+#: What the survivors are: questions, not defects (`ci-merge`, *Triaging a survivor*).
+SURVIVORS = ("These were mutated and no test failed. Each is a question: test the ones that"
+             " show behaviour nothing asserts, leave the rest (`ci-merge`, *Triaging a"
+             " survivor*):")
 #: Exit statuses that mean cargo-mutants finished: clean, survivors, timeouts.
 FINISHED = (0, 2, 3)
 #: `timeout`'s statuses: the run hit its budget and stopped itself.
@@ -101,8 +105,7 @@ def section(run: dict, in_scope: int, status: int, root: str = ROOT, lost: list[
     out += timeouts(counts)
     survivors = sorted(label(o, root) for o in done if o.get("summary") == "MissedMutant")
     if survivors:
-        out += ["These were mutated and no test failed. Strengthen the tests covering them,"
-                " or say why a survivor is equivalent:", "", "```", *survivors, "```"]
+        out += [SURVIVORS, "", "```", *survivors, "```"]
     elif not done and stopped and not lost:
         out += ["Nothing was measured before the budget ran out: not a result. ❌"]
     elif not done and short:
