@@ -23,7 +23,6 @@ from merging.verdict import changes
 
 SCRIPTS = Path(__file__).resolve().parents[1]
 WORKFLOW_DIR = SCRIPTS.parent / "workflows"
-ACTIONS_DIR = SCRIPTS.parent / "actions"
 GATING = ("ci.yml", "lint.yml")
 
 

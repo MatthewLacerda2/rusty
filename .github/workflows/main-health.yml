@@ -5,8 +5,9 @@ name: main-health
 # lives in .github/scripts/main-health.sh.
 #
 # Watched: `ci` and `lint`, the two workflows whose gates guard `main`; the
-# weekly `coverage` signal (#750), which files only when it fails to *run*
-# (main-health.sh says how a finding is told apart); and the nightly `cargo-test` signal (#981, #1338), which files when it goes
+# weekly `coverage` signal (#750), which files only when it fails to *run*,
+# since a coverage drop never fails the run (it stays in its own report); and
+# the nightly `cargo-test` signal (#981, #1338), which files when it goes
 # red, since its red *is* its finding: a red run
 # is a test that leans on nextest's process-per-test, and its `dead-pub` job's red
 # is that signal producing no report (#1205). There is no `docs` workflow: the rustdoc build is

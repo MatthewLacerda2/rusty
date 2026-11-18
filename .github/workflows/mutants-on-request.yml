@@ -263,9 +263,15 @@ jobs:
           # from shard 0 alone so parallel shards do not race for one key;
           # a branch's run only reads it. rust-cache skips the save on an
           # exact key hit, so the key is re-saved when `Cargo.lock` or the
-          # toolchain changes it, as for every other cache here.
+          # toolchain changes it, as for every other cache here. So only a
+          # run that builds the engine's `target/` saves it: a standalone-only
+          # plan (`in_scope` 0, Baseline and Mutate skipped) would save
+          # `~/.cargo` alone under the key, and every later run would hit it
+          # exactly and build cold. `save-if` is read when this step starts,
+          # so it tests the plan's count rather than waiting for Baseline
+          # (`test_cache_save.py` holds the expression).
           shared-key: mutants
-          save-if: ${{ github.ref == 'refs/heads/main' && matrix.shard == 0 }}
+          save-if: ${{ github.ref == 'refs/heads/main' && matrix.shard == 0 && needs.plan.outputs.in_scope != '0' }}
       - name: System libs for winit/wgpu builds
         uses: ./.github/actions/system-libs
         with:
