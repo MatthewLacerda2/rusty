@@ -583,10 +583,14 @@ The `dev` suite (#2352). The default-feature suite, `make test`'s first pass and
 target** of the default build, so a default-only build break still fails, and runs
 every test except the `gpu` group. `--features dev` only adds to the default
 features, so the `dev` run builds and draws each of those GPU tests too; what it
-cannot see is code that exists only *without* `dev`. The `gpu-default-only` lint
-(`docs/linting.md`) keeps such code off the render path: in `rusty-render` and every
-crate whose `dev` its `dev` turns on, a `cfg!` naming `feature = "dev"` or a `cfg`
-whose `not(…)` names it fails. Keep the code the same under both feature sets, or add
+cannot see is code that exists only *without* `dev`. So the split rests on `dev`
+only *adding* code, and the `gpu-default-only` lint (`docs/linting.md`) checks the
+other side: in `rusty-render`, every crate its `dev` turns on and every crate with an
+in-crate `gpu_` test, a `cfg!` naming `feature = "dev"` or a `cfg` whose `not(…)`
+names it fails, a GPU test hidden that way included. A `dev`-only *override* (a value
+or a module `path` set under `feature = "dev"`) changes what the GPU tests draw
+without hiding anything; the lint cannot tell it from an addition, so it is the
+reviewer's to catch. Keep the code the same under both feature sets, or add
 that crate's GPU tests back to the default pass by widening the filter in both
 callers, `make test`'s `DEFAULT_SUITE` and ci.yml's "Test (engine, default)", e.g.
 `-E 'not group(gpu) | (group(gpu) & package(rusty-<crate>))'` (`make scripts` fails

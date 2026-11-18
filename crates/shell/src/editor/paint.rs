@@ -131,6 +131,7 @@ pub(super) fn drain_repl(editor_ui: &mut EditorUi, game: &GameWorld) {
 }
 
 /// No REPL in ship builds.
+// lint: allow(gpu-default-only) ship stub: no REPL to drain; nothing is drawn
 #[cfg(not(feature = "dev"))]
 pub(super) fn drain_repl(_editor_ui: &mut EditorUi, _game: &GameWorld) {}
 
