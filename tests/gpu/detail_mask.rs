@@ -109,15 +109,11 @@ fn the_masks_black_half_draws_no_detail_and_its_white_half_the_whole_detail() {
     let (map, mask) = (Some(busy()), Some(half_mask()));
     let missing = Some("rusty_2258_no_such_mask.png".to_string());
     let mut host = CaptureHost::new();
-    // Where the time goes, for a desktop run to read: on lavapipe the first shot is 1.4
-    // of 1.6 s (9.0 of 9.5 with Mesa's shader cache cold), each later one 10 to 190 ms.
-    let (start, mut first) = (std::time::Instant::now(), None);
     for grazing in [false, true] {
         let mut shot = |d, name| frame(&mut host, grazing, d, name);
         let Some(plain) = shot(None, "plain") else {
             return;
         };
-        first.get_or_insert_with(|| start.elapsed());
         let full = shot(Some((map.clone(), None)), "full").expect("rendered");
         let masked = shot(Some((map.clone(), mask.clone())), "masked").expect("rendered");
         let lone = shot(Some((None, mask.clone())), "lone").expect("rendered");
@@ -143,7 +139,4 @@ fn the_masks_black_half_draws_no_detail_and_its_white_half_the_whole_detail() {
             assert!(value < 0.5, "{what} ({value:.2})");
         }
     }
-    let first = first.unwrap_or_default();
-    let rest = start.elapsed() - first;
-    eprintln!("[mask] first shot {first:.1?}, the rest {rest:.1?}");
 }
