@@ -8,8 +8,6 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 
-use glam::{Vec3, Vec4};
-
 use super::input::BakeScene;
 use super::progress::BakeProgress;
 use super::raster::{
@@ -24,6 +22,7 @@ use rusty_scene::lighting::settings::BakeSettings;
 mod assemble;
 mod denoise;
 pub(super) mod direction;
+mod map;
 pub(crate) mod pool;
 pub(super) mod progressive;
 pub(super) mod view;
@@ -31,27 +30,9 @@ pub(super) mod view;
 use assemble::assemble;
 pub use denoise::LightmapDenoiser;
 use denoise::{Chart, Cleaner};
+pub use map::Lightmap;
 pub use progressive::{bake_progressive, Pass, PassSink};
 pub use view::BakeView;
-
-/// One mesh's baked lightmap: `size`² linear texels, row-major, each the `E / π`
-/// value the forward shader multiplies by albedo (see `trace`).
-#[derive(Clone, Debug, PartialEq)]
-pub struct Lightmap {
-    pub entity: u32,
-    pub size: u32,
-    pub texels: Vec<Vec3>,
-    /// Per texel (#810), `xyz` the dominant direction its light arrives from, scaled
-    /// by its directionality (length 1 when it all comes from one way, 0 when it comes
-    /// evenly from everywhere), and `w` its lamp share (#1695: how much of it is
-    /// `Baked` lamps' direct light from one way, `direction::direction_texel`). Empty
-    /// when the bake was not [`BakeSettings::directional`].
-    pub directions: Vec<Vec4>,
-    /// Per texel (#1695), its shadowmask: per channel the static occlusion of the
-    /// `Mixed` light on it (`trace::Tracer::mask`). Empty unless the bake gave a
-    /// light a channel (`BakeScene::shadowmask`).
-    pub masks: Vec<Vec4>,
-}
 
 /// Bake every mesh in `scene` that has a usable lightmap UV and receives a lightmap
 /// ([`BakeMesh::receives_lightmap`](super::input::BakeMesh::receives_lightmap): a `ShadowsOnly` one gets none, #1571, nor one
@@ -247,13 +228,7 @@ fn lightmap(
         texel_world: layout.texel_world,
     };
     let maps = assemble(chart, &layout.labels, &light, settings, cleaner, masked);
-    let map = Lightmap {
-        entity: mesh.entity,
-        size,
-        texels: maps.texels,
-        directions: maps.directions,
-        masks: maps.masks,
-    };
+    let map = Lightmap::sparse(mesh.entity, size, maps.filled, maps.kept);
     (map, maps.orphans)
 }
 

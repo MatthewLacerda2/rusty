@@ -92,7 +92,10 @@ fn dump(maps: &[Lightmap], name: &str) {
     maps.sort_by_key(|m| std::cmp::Reverse((m.size, m.entity)));
     let byte = |c: f32| ((c / (1.0 + c)).powf(1.0 / 2.2) * 255.0) as u8;
     for (k, map) in maps.iter().take(4).enumerate() {
-        let pixels = map.texels.iter().flat_map(|v| v.to_array().map(byte));
+        let pixels = map
+            .texels()
+            .into_iter()
+            .flat_map(|v| v.to_array().map(byte));
         let image = image::RgbImage::from_raw(map.size, map.size, pixels.collect());
         let path = std::path::Path::new(&dir).join(format!("1884_{name}_{k}.png"));
         image.expect("size² texels").save(path).expect("written");

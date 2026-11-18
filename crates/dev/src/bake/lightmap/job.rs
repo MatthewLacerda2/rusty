@@ -98,6 +98,7 @@ impl LightmapBakeJob {
         let watch = Arc::clone(&progress);
         let view = view.filter(|_| settings.prioritize_view);
         let (page, taken) = (settings.page(), (lights, shadowmask));
+        let spill_beside = scene_path.clone();
         let mut encoder = Encoder::start(&previews, page, taken.clone(), Arc::clone(&progress))?;
         let worker = thread::Builder::new()
             .name("lightmap-bake".into())
@@ -108,7 +109,7 @@ impl LightmapBakeJob {
                 drop(encoder);
                 let traced = Instant::now();
                 let encoded = match baked {
-                    Some(maps) => encode_pages(&maps, page, &watch).map(|pages| {
+                    Some(maps) => encode_pages(maps, page, &watch, &spill_beside).map(|pages| {
                         let times = (traced - started, traced.elapsed());
                         pages.map(|p| (labelled(p, &taken), times.0, times.1))
                     }),

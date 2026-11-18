@@ -38,10 +38,11 @@ pub(super) fn bake_logged(
     input: &BakeScene,
     settings: &BakeSettings,
     log: &mut BakeLog,
+    scene_path: &str,
 ) -> Result<Run, String> {
     // Nobody cancels this one, so it always runs to the end.
     let run = |progress: &BakeProgress| {
-        timed(input, settings, progress)?.ok_or_else(|| "never cancelled".to_string())
+        timed((input, settings), progress, scene_path)?.ok_or_else(|| "never cancelled".to_string())
     };
     let clocks = Arc::new(MeshClocks::default());
     let (progress, oidn) = lend_denoiser(BakeProgress::observed(clocks.clone()), settings);
@@ -70,19 +71,20 @@ pub(super) fn bake_logged(
     })
 }
 
-/// Bake and encode `input` on this thread, counting into `progress`: the pages,
-/// and how long the trace and the encode took. `Ok(None)` when it was cancelled.
+/// Bake and encode `input` on this thread, counting into `progress`, its pages
+/// spilled beside `scene_path`: the pages, and how long the trace and the
+/// encode took. `Ok(None)` when it was cancelled.
 pub(super) fn timed(
-    input: &BakeScene,
-    settings: &BakeSettings,
+    (input, settings): (&BakeScene, &BakeSettings),
     progress: &BakeProgress,
+    scene_path: &str,
 ) -> Result<Option<(EncodedPages, Duration, Duration)>, String> {
     let started = Instant::now();
     let Some(maps) = bake_with_progress(input, settings, progress) else {
         return Ok(None);
     };
     let traced = Instant::now();
-    let pages = encode_pages(&maps, settings.page(), progress)?;
+    let pages = encode_pages(maps, settings.page(), progress, scene_path)?;
     Ok(pages.map(|p| (p, traced - started, traced.elapsed())))
 }
 

@@ -1,7 +1,8 @@
 //! A lightmap bake's memory is bounded by its work in flight, not by its scene
 //! (#2312): a scene of four times the meshes at the same density peaks higher only
 //! by the extra lightmaps it keeps. What is in flight is per worker, so both bakes
-//! run on [`WORKERS`]. Each test is its own process under nextest, so the peak
+//! run on [`WORKERS`]. The page stage's bound, on maps that cover a sliver of
+//! their squares: `pages_memory_tests`. Each test is its own process under nextest, so the peak
 //! (`memory::rss_peak_bytes`) is this test's bakes'. The planes and bakes here
 //! are OIDN's memory tests' too (`denoise::memory_tests`).
 
@@ -24,6 +25,15 @@ pub(crate) const SIDE: f32 = 20.0;
 /// The bake's workers: what is in flight is per worker, so the two bakes compared
 /// have as many each, and the smaller has a mesh for every one.
 pub(crate) const WORKERS: usize = 2;
+
+/// The scene sizes compared, the smaller first. macOS's allocator keeps a reserve
+/// of freed large blocks in the process's footprint until it is full, which a
+/// 2-plane bake does not fill: there the pair starts at 8 planes, so the reserve
+/// is filled at 1× and only what the scene adds is compared.
+pub(crate) const PAIR: (usize, usize) = match cfg!(target_os = "macos") {
+    true => (8, 32),
+    false => (2, 8),
+};
 
 /// Slack on top of the extra results: the allocator's and the pool's.
 pub(crate) const MARGIN: u64 = 48 << 20;
@@ -77,9 +87,8 @@ fn settings(denoiser: Denoiser) -> BakeSettings {
 }
 
 /// What finished lightmaps keep, in bytes.
-fn kept(maps: &[Lightmap]) -> u64 {
-    let one = |m: &Lightmap| m.texels.len() * 12 + (m.directions.len() + m.masks.len()) * 16;
-    maps.iter().map(one).sum::<usize>() as u64
+pub(crate) fn kept(maps: &[Lightmap]) -> u64 {
+    maps.iter().map(Lightmap::kept_bytes).sum::<usize>() as u64
 }
 
 /// Bake `n` planes of `side` units with `denoiser`, lent OIDN for it (a device per
@@ -116,10 +125,14 @@ pub(crate) fn holds(one: (u64, u64), four: (u64, u64), what: &str) {
     let mb = |b: u64| b >> 20;
     assert!(
         grew <= extra + MARGIN,
-        "{what}: four times the meshes peaked {} MB higher, but their extra lightmaps \
-         keep only {} MB: something is held per texel of the whole scene",
+        "{what}: four times the meshes peaked {} MB higher ({} MB against {} MB), but \
+         their extra lightmaps keep only {} MB: something is held per texel of the whole \
+         scene (the allocator now: {:?})",
         mb(grew),
-        mb(extra)
+        mb(four.0),
+        mb(one.0),
+        mb(extra),
+        crate::memory::heap()
     );
 }
 
@@ -128,7 +141,8 @@ fn four_times_the_meshes_peak_higher_only_by_their_lightmaps() {
     if rss_peak_bytes().is_none() {
         return;
     }
-    let one = bake(2, SIDE, Denoiser::Filter);
-    let four = bake(8, SIDE, Denoiser::Filter);
+    let (one, four) = PAIR;
+    let one = bake(one, SIDE, Denoiser::Filter);
+    let four = bake(four, SIDE, Denoiser::Filter);
     holds(one, four, "Gaussian");
 }

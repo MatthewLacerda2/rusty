@@ -3,20 +3,18 @@
 
 use glam::{Vec3, Vec4};
 
-use super::super::raster::{dilate, fill_rest, fill_within};
+use super::super::raster::fill_within;
 use super::super::trace::TexelLight;
 use super::denoise::{Chart, Cleaner};
 use super::direction::direction_texel;
+use super::map::Kept;
 use rusty_scene::lighting::settings::BakeSettings;
 
-/// Rings of empty texels dilation fills around each chart.
-const DILATE_PASSES: u32 = 3;
-
-/// A chart's maps, each `size`² texels or empty when the bake makes none.
+/// A chart's maps as a finished [`Lightmap`](super::Lightmap) keeps them: the
+/// texels its charts cover, by row-major index, and each one's values.
 pub(super) struct ChartMaps {
-    pub texels: Vec<Vec3>,
-    pub directions: Vec<Vec4>,
-    pub masks: Vec<Vec4>,
+    pub filled: Vec<u32>,
+    pub kept: Kept,
     /// How many of the chart's UV islands had no valid texel to fill the others
     /// from (#1949): their invalid texels were filled by the map's dilation.
     pub orphans: usize,
@@ -26,10 +24,10 @@ pub(super) struct ChartMaps {
 /// its direction map, and with `masked` lights its shadowmask (#1695, raw: a
 /// shadow is a direct-light term, never filtered): the bounce (and its directions)
 /// cleaned by `cleaner` (#1884: OIDN, the Gaussian or nothing), the direct light
-/// added, an invalid texel (one `labels` gives a chart but `chart.points` leaves
-/// out) filled from its own chart's valid texels (#1949, `raster::fill_within`),
-/// then each dilated past the chart's edge and the rest of the map filled from its
-/// nearest chart (`raster::fill_rest`, for the mips, #1694).
+/// added, and an invalid texel (one `labels` gives a chart but `chart.points`
+/// leaves out) filled from its own chart's valid texels (#1949,
+/// `raster::fill_within`). The dilation past the chart's edge and the fill of the
+/// rest of the square (for the mips, #1694) wait for the page (`map`).
 pub(super) fn assemble(
     chart: Chart,
     labels: &[u32],
@@ -57,27 +55,28 @@ pub(super) fn assemble(
         masks[point.at()] = light.mask;
         filled[point.at()] = true;
     }
-    for (keep, map) in [
-        (settings.directional, &mut directions),
-        (masked, &mut masks),
-    ] {
-        if keep {
-            let mut ring = filled.clone();
-            fill_within(map, &mut ring, labels, size);
-            dilate(map, &mut ring, size, DILATE_PASSES);
-            fill_rest(map, &ring, size);
-        } else {
-            // Freed, not cleared: a finished map keeps only what it carries (#2312).
-            *map = Vec::new();
-        }
-    }
+    let unfilled = filled.clone();
     let orphans = fill_within(&mut texels, &mut filled, labels, size);
-    dilate(&mut texels, &mut filled, size, DILATE_PASSES);
-    fill_rest(&mut texels, &filled, size);
+    // The square past the charts is filled when its page is composed
+    // (`Lightmap::texels`, #2312): a finished map keeps only its charts' texels.
+    let kept: Vec<u32> = (0..filled.len() as u32)
+        .filter(|&i| filled[i as usize])
+        .collect();
+    let keep = |on: bool, mut map: Vec<Vec4>| {
+        on.then(|| {
+            let mut ring = unfilled.clone();
+            fill_within(&mut map, &mut ring, labels, size);
+            // The same charts and the same texels filled: one set of indices.
+            debug_assert!(ring == filled);
+            kept.iter().map(|&i| map[i as usize]).collect()
+        })
+    };
+    let directions = keep(settings.directional, directions);
+    let masks = keep(masked, masks);
+    let texels = kept.iter().map(|&i| texels[i as usize]).collect();
     ChartMaps {
-        texels,
-        directions,
-        masks,
+        filled: kept,
+        kept: (texels, directions, masks),
         orphans,
     }
 }

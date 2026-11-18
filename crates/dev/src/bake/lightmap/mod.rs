@@ -7,8 +7,9 @@
 //! `lightmaps` at them. Saving the scene (or Generate Lighting, which writes them)
 //! then persists those references. Headless: no GPU is involved.
 //!
-//! The lightmaps are packed into atlas pages (`lightmap::atlas`) and written by
-//! `write`: each page as `<scene file>.lightmaps/lightmap_<page>_<tag>.ktx2` (BC6H
+//! The lightmaps are packed into atlas pages (`lightmap::atlas`), encoded one
+//! page at a time into the bake's scratch folder (`pages`, `spill`) and written
+//! by `write`: each page as `<scene file>.lightmaps/lightmap_<page>_<tag>.ktx2` (BC6H
 //! with its mips, #1694, what the scene references and the renderer loads) and the
 //! RGBM PNG of its base level beside it under the same name (the fallback for a GPU
 //! without BC, and what an agent can open). One folder per scene, emptied of old
@@ -51,6 +52,7 @@ pub(in crate::bake) mod logged;
 mod measure;
 mod pages;
 mod preview;
+mod spill;
 mod write;
 pub use job::{BakeOutcome, LightmapBakeJob};
 pub use pages::{encode_pages, EncodedPages};
@@ -92,7 +94,7 @@ pub fn bake_scene_lightmaps_logged(
     let input = gather_bake_input(scene);
     fits::fits(&input, settings, false)?;
     stages.lap("gather");
-    let run = logged::bake_logged(&input, settings, log)?;
+    let run = logged::bake_logged(&input, settings, log, scene_path)?;
     stages.push("trace", run.trace);
     stages.push("encode", run.encode);
     log.enter(Step::WritingLightmaps);
@@ -222,6 +224,8 @@ mod logged_tests;
 #[cfg(test)]
 pub(crate) mod memory_tests;
 #[cfg(test)]
+mod pages_memory_tests;
+#[cfg(test)]
 mod preview_edit_tests;
 #[cfg(test)]
 mod preview_tests;
@@ -229,6 +233,8 @@ mod preview_tests;
 mod report_tests;
 #[cfg(test)]
 mod shadowmask_tests;
+#[cfg(test)]
+mod spill_tests;
 #[cfg(test)]
 mod survivor_tests;
 #[cfg(test)]

@@ -54,7 +54,10 @@ mod rays;
 mod rng;
 mod trace;
 
-pub use atlas::{check_page_count, max_map_edge, pack, page_count, LightmapAtlas, MAX_PAGES, PAD};
+pub use atlas::{
+    check_page_count, max_map_edge, pack, packing, page_count, AtlasPage, LightmapAtlas, Packing,
+    MAX_PAGES, PAD,
+};
 pub(crate) use bake::pool::run as run_pool;
 // A test hook: `dev::bake::lightmap`'s memory test bakes on a fixed number of workers.
 #[doc(hidden)]

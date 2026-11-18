@@ -111,7 +111,7 @@ fn a_floor_border_at_a_single_sided_wall_reads_its_shadow_not_the_sun_behind() {
     // Mean of column `x` over the rows clear of the floor's other borders.
     let column = |x: usize| {
         (2..12)
-            .map(|y| map.texels[y * S as usize + x].x)
+            .map(|y| map.texels()[y * S as usize + x].x)
             .sum::<f32>()
             / 10.0
     };

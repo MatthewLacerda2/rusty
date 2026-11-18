@@ -37,7 +37,10 @@
 //! A directional bake (#810) packs its direction maps into a second page set with the
 //! very same layout, so one page index and scale/offset address both.
 
+mod packing;
 mod rects;
+
+pub use packing::{packing, AtlasPage, Packing};
 
 use glam::{Vec3, Vec4};
 
@@ -87,50 +90,20 @@ pub struct LightmapAtlas {
 /// [`page_edge`]). No lightmaps, no pages. A map wider than [`max_map_edge`] of
 /// that page keeps only its top-left corner of that size.
 pub fn pack(maps: &[Lightmap], max_page: u32) -> LightmapAtlas {
-    let Layout {
-        page_size,
-        sizes,
-        corners,
-        page_count,
-    } = layout(maps, max_page);
-    let mut pages = vec![vec![Vec3::ZERO; (page_size * page_size) as usize]; page_count];
-    let directional = !maps.is_empty() && maps.iter().all(|m| !m.directions.is_empty());
-    let mut directions = match directional {
-        true => vec![vec![Vec4::ZERO; (page_size * page_size) as usize]; page_count],
-        false => Vec::new(),
-    };
-    let masked = !maps.is_empty() && maps.iter().all(|m| !m.masks.is_empty());
-    // A mask's background is lit: only a chart's own texels hold a shadow.
-    let mut masks = match masked {
-        true => vec![vec![Vec4::ONE; (page_size * page_size) as usize]; page_count],
-        false => Vec::new(),
-    };
-    let mut placements = Vec::with_capacity(maps.len());
-    for (i, map) in maps.iter().enumerate() {
-        let (page, x, y) = corners[i];
-        let at = Cell {
-            page_size,
-            size: sizes[i],
-            x,
-            y,
-        };
-        at.blit(&mut pages[page as usize], &map.texels, map.size);
-        if directional {
-            at.blit(&mut directions[page as usize], &map.directions, map.size);
-        }
-        if masked {
-            at.blit(&mut masks[page as usize], &map.masks, map.size);
-        }
-        let (scale, edge) = (sizes[i] as f32 / page_size as f32, page_size as f32);
-        let (u, v) = ((x + PAD) as f32 / edge, (y + PAD) as f32 / edge);
-        placements.push((map.entity, page, [scale, scale, u, v]));
+    let packing = packing(maps, max_page);
+    let (mut pages, mut directions, mut masks) = (Vec::new(), Vec::new(), Vec::new());
+    for p in 0..packing.page_count {
+        let page = packing.page(p, &|i| &maps[i]);
+        pages.push(page.texels);
+        directions.extend(page.directions);
+        masks.extend(page.masks);
     }
     LightmapAtlas {
-        page_size,
+        page_size: packing.page_size,
         pages,
         directions,
         masks,
-        placements,
+        placements: packing.placements(maps),
     }
 }
 
