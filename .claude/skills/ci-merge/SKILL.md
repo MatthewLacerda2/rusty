@@ -17,16 +17,16 @@ The steps and the traps. `CLAUDE.md` says why merging is serialized; this is how
   user: a decision you can't make, another PR or issue that must land first, human
   or hardware help. Say why in the description. **Ready for review** once the work
   is done and nothing more is needed from the user; flip between the two as the
-  work moves. CI's gating jobs skip drafts, so readying is when anything is checked.
+  work moves. CI's gating jobs skip drafts, so readying is when anything is checked
+  (unless a dispatch already did: *Verify the run happened on the head commit*).
 - **The description** says what changed, why it belongs in rusty (the project-level
   value its label classifies, not how you got there; process only when the diff
   needs it) and the effect, and carries the PR↔issue link. Check the number in a
   closing keyword: a typo silently closes the wrong issue.
 - **Why one tree at a time:** two PRs can each be green alone and break `main`
   together (a rename, a changed signature, a moved module) with no textual
-  conflict. A branch is updated by merging `main` in: nothing is rewritten, no push
-  is forced, a conflict is resolved once. PRs are squash-merged, so the branch's
-  own history never reaches `main`.
+  conflict. A branch takes `main` by a merge: nothing rewritten or forced, a
+  conflict resolved once; the squash keeps the branch's history off `main`.
 
 ## Before marking a pull request ready
 
@@ -193,8 +193,7 @@ of `target/`) and branch, and keeps one something is still using.
   (`queue: HELD #N: Dependabot edits …`, not a hand-back): its run never
   executes the workflows it edits. Read the changelog, dispatch each touched
   workflow on the branch (`gh workflow run <file> --ref <branch>`, or MCP
-  `actions_run_trigger`; `mutants-sweep.yml` only when no batch needs the
-  runners), and once green merge it by name with `make queue PRS=N`.
+  `actions_run_trigger`), and once green merge it by name with `make queue PRS=N`.
 - **By hand**, the same loop: `git merge origin/main`, `cargo check` both feature
   sets and `make size`, a plain `git push`, wait, `make mergeable PR=N`,
   squash-merge. Prefer the queue. Never rebase a pushed branch (a force-push is
@@ -271,10 +270,8 @@ why. It is the last thing before any merge, and the queue asks it too.
 `ci-gate` and `lint-gate` required on the head from GitHub Actions, not strict.
 `make ruleset` reports drift from the live ruleset; `make ruleset ARGS=--apply`
 writes it, which the orchestrator does between merges, never a coder, after a PR
-changing the file. **The ruleset does not replace `make mergeable`:** a draft's
-run leaves both gates green with nothing built, and a draft readied without a
-push shows that run's gates until the new one's finish; nor does it read the
-description.
+changing the file. **The ruleset does not replace `make mergeable`:** it passes
+skipped jobs (below) and a readied draft's old run, and never reads the description.
 
 What `make mergeable` asks:
 
@@ -289,7 +286,9 @@ What `make mergeable` asks:
   description, a label or a relationship, and an image by a commit that deletes it. No **Gates** line passes with a warning.
 - **Both workflows on the head SHA**, `ci-gate` and `lint-gate`.
 - **A gated job itself succeeded.** The gates pass over skipped jobs, so a draft's
-  run is gate-green with nothing compiled; `changes` succeeding proves nothing.
+  run is gate-green with nothing compiled; `changes` succeeding proves nothing. A
+  ready run builds nothing either when a dispatch or push run built its test merge
+  tree (`changes` names it; it makes the head checked: no re-run, no empty commit).
 - **Every run on the commit.** A red run beside a green one refuses. A cancelled
   run is ignored only when a non-cancelled run of the same workflow on the commit
   is still going (wait) or was created no earlier; otherwise it refuses.
@@ -393,7 +392,7 @@ merge or runs on a pull request.
 
 | | on request | weekly |
 |---|---|---|
-| mutation | a merged PR's `Mutation: diff` (or globs) line, dispatched by the queue after the merge; by hand, `make mutants-remote SCOPE=diff` (or globs) on `mutants-on-request.yml`: one runner, up to four for a large plan, each mutant tested by its crate and what depends on it, report and survivors' diffs in the terminal, posted as one comment on the branch's PR (open, or merged). One run per branch: a newer dispatch cancels the older and an unmerged close cancels what is left (`mutants-cancel.yml`); on `main` each run stands alone | `mutants-sweep.yml`, Saturdays, the sim modules in as many shards as `mutants-plan` sizes, a summary and artifact; skipped when `main` has not moved since the last sweep |
+| mutation | a merged PR's `Mutation: diff` (or globs) line, dispatched by the queue after the merge; by hand, `make mutants-remote SCOPE=diff` (or globs) on `mutants-on-request.yml`: one runner, up to four for a large plan, each mutant tested by its crate and what depends on it, report and survivors' diffs in the terminal, posted as one comment on the branch's PR (open, or merged). One run per branch: a newer dispatch cancels the older and an unmerged close cancels what is left (`mutants-cancel.yml`); on `main` each run stands alone. A whole module is the same ask with its glob, by hand | never: no workflow mutates on a schedule (`test_on_request_only.py`) |
 | coverage | `gh workflow run coverage.yml --ref <branch>` | `coverage.yml`, Mondays, ratchet table |
 
 **A branch that adds mechanism** (arithmetic, a state machine, a boundary) asks
@@ -422,8 +421,8 @@ issue, and a follow-up PR off `main` when worth fixing.
 
 How to read a clean report:
 
-- **The weekly sweep covers only `crates/app/src`, `crates/script/src/scripting`, `crates/physics/src`,
-  `crates/navigation/src`.** Elsewhere, silence means unmeasured, not clean.
+- **Nothing is measured unless a run was asked for it.** Code no run named is
+  unmeasured, not clean: silence means unmeasured.
 - **A scoped run names what it planned** (how many mutants, any from outside the
   scope). A `diff` with nothing to mutate says so; it is not a pass.
 - **A run stopped at its budget names what it never reached** and is never called

@@ -3,11 +3,11 @@
 Mutation is a signal, never a gate (CLAUDE.md, *Gates vs. signals*), but in a
 batch it was costing the gates. Every cloud coder dispatched
 `mutants-on-request.yml` on its branch in the same step as readying, so on
-2026-11-08 six scoped runs held runners beside the weekly sweep's seven while
-nine `ci` and six `lint` runs queued behind them, each gating run waiting
-20-40 minutes to start with eight pull requests in the merge queue. GitHub
-cannot rank one workflow over another, and the workflow's one-run-per-branch
-group could only cap a branch, never the account.
+2026-11-08 six scoped runs held runners beside the weekly sweep's seven (a
+sweep since retired, #2369) while nine `ci` and six `lint` runs queued behind
+them, each gating run waiting 20-40 minutes to start with eight pull requests
+in the merge queue. GitHub cannot rank one workflow over another, and the
+workflow's one-run-per-branch group could only cap a branch, never the account.
 
 So the coder **asks** and the queue **dispatches, after the merge**:
 

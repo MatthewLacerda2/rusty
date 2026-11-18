@@ -1412,35 +1412,34 @@ dev-only surface); for the lines a branch changed, `cargo llvm-cov report --cobe
 ## Mutation testing
 [`cargo-mutants`](https://github.com/sourcefrog/cargo-mutants) audits whether the
 suite actually *catches* bugs — the headline guardrail against green-but-vacuous
-agent-written tests. It mutates the core of the deterministic sim (`app`,
-`scripting` (the VM half of the `script` row; `api` is left out), `physics`,
-`navigation`; a deliberate subset of the layer table's sim rows), the pure-logic part where a silent bug hurts most, and
-reports the **surviving** mutants (a change no test failed on). It is
-**non-blocking** — mutation never gates a merge — and it runs on **no pull
-request** (#750). Two ways in:
+agent-written tests. It mutates exactly the code someone names, usually what a
+branch just wrote, and reports the **surviving** mutants (a change no test failed
+on). It is **non-blocking** — mutation never gates a merge — and it runs on **no
+pull request** (#750) and **on no schedule** (#2369): a run exists only because
+someone asked for it, so code nobody asked about is unmeasured, not clean. Auditing
+a whole module is the same ask with its glob (`make mutants-remote
+SCOPE='crates/physics/src/**'`), made by hand. One way in:
 
 | Run | Trigger | Scope | Where it lands |
 |---|---|---|---|
 | **On request** (`mutants-on-request.yml`) | a PR's `Mutation: diff` (or globs) line, which the merge queue dispatches on `main` after the merge, two at a time (#1934); `make mutants-remote SCOPE=...`; or a dispatch with a `scope` input | `diff` (the branch against `origin/main`, or with `commit` the merged squash commit against its parent) or path globs (separated by spaces or commas; a brace such as `crates/{core,physics}/src/**` is expanded, since git's glob dialect has none), turned by `.github/scripts/mutants-scope.py` into one `--in-diff` per cargo workspace the scope reaches: the engine's, and each directory whose `Cargo.toml` opens its own `[workspace]` (`tools/lint`, run inside it with its own `cargo test`; a cargo-fuzz crate such as `fuzz/` is named as having nothing to run), in one report (#2201); one runner, or up to four for a plan too large for one (`mutants-request.py shards`, #2283), each with a 2 h 45 budget, merged into one report; one run per branch, a newer dispatch cancelling the older and an unmerged close of the PR cancelling what is left, while a merged PR's run finishes (`mutants-cancel.yml`, #1530) | printed in the terminal by `make mutants-remote`; the run summary and a `mutants-report` artifact (`report.md`, `survivors.diff`); `report.md` also as one comment on the branch's open PR, or its merged one (the `pr` input for the queue's runs), edited in place by later runs (#912), except that a run with no answer adds its line below the earlier report rather than replacing it (#2201) |
-| **Full sweep** (`mutants-sweep.yml`, sharded) | weekly `schedule` (Saturdays) + `workflow_dispatch` (`force` re-sweeps a covered commit); `main` only, a dispatch on any other ref is refused red (#972); skipped by `mutants-plan` when a finished sweep already covered `main`'s head (#506); one sweep at a time (#705) | the full `--file` sim scope over a matrix `mutants-plan` sizes each run from the mutant count (`cargo mutants --list`, `.github/scripts/mutants-shards.py`: ≈ 4 h a shard at the slowest per-shard rate the previous sweep measured (a shard under `MIN_MEASURED` mutants ignored, the slowest capped at `OUTLIER_CAP` × the mean), `MINUTES_PER_MUTANT` only when none can be read, and a `max-parallel` of at most 10 chosen to end by Sunday 23:59 UTC; red past GitHub's 256-job ceiling, #1684), each shard stopping itself at a 5 h 40 budget under GitHub's 6 h limit (#749) | `mutants-report` job: merged job summary (totals, measured of planned, the run's mean and slowest measured minutes a mutant against the sizing figure, and each shard's seconds and outcome lists under `shards/` for the next plan, unfinished shards, survivors) and the merged `mutants-report` artifact |
 
 Why this shape: mutation is a signal, and a per-PR job held runners the merge
 queue was waiting on for a report that could not change whether anything merged.
-Whoever writes tricky mechanism asks for exactly that code to be mutated before
-readying it, and reads the answer; the weekly sweep re-examines everything else and
-tracks the survivor backlog. An on-request run goes red only when it has no honest
-answer (a path with nothing to mutate, a baseline that does not build, a part whose
-cargo-mutants broke, reported beside the parts that finished), and then still says
-why on the pull request and in `make mutants-remote`'s output, so an unanswered ask is
-visible where it was made (#2201); survivors are a result. **The sweep never reaches
-`tools/lint`**: it mutates the engine's sim modules in the root workspace, so the lint
-tool is audited only by scoped runs, which is why a branch adding a lint rule asks for
-one. A run stopped at its budget says how many planned mutants it never
-reached and is never called clean, however its measured mutants fared; a mutant that
-timed out is unmeasured too: the report never calls a run with a timeout clean, and
-says a run where most viable mutants timed out is not a result. In the sweep, a shard
-whose mutants mostly timed out is not finished (`mutants-shards.py unfinished`), so
-that sweep does not mark its commit covered.
+Whoever writes tricky mechanism asks for exactly that code to be mutated, on the
+pull request that wrote it, where someone will act on the answer. A scheduled sweep
+of the whole sim held hundreds of runner-hours a week on the runners the gating CI
+needs, never finished, and no survivor follow-up ever came from its report, so it
+was retired (`test_on_request_only.py`, in `make scripts`, fails on any workflow
+that runs `cargo mutants` on a schedule). An on-request run goes red only when it
+has no honest answer (a path with nothing to mutate, a baseline that does not build,
+a part whose cargo-mutants broke, reported beside the parts that finished), and then
+still says why on the pull request and in `make mutants-remote`'s output, so an
+unanswered ask is visible where it was made (#2201); survivors are a result. A run
+stopped at its budget says how many planned mutants it never reached and is never
+called clean, however its measured mutants fared; a mutant that timed out is
+unmeasured too: the report never calls a run with a timeout clean, and says a run
+where most viable mutants timed out is not a result.
 
 **The mutation jobs run under nextest** (`cargo mutants --test-tool nextest`, #1844),
 the gate's runner, with `--fail-fast` so a caught mutant stops at its first failing

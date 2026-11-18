@@ -167,8 +167,8 @@ read a crate's file at its **module path**, `src/<m>/…` (`lib.rs` read as
 sets, the determinism gate, `make review-level`'s table, the `stored-format`
 markers, coverage isolation and a `SCOPE=diff` mutation run share. Write a scope
 there as a module path; a finding still names the real `crates/<m>/src/…` path.
-**A path glob does not** go through it: `mutants-sweep.yml`'s `SWEEP_FILES`, `make
-mutants-remote SCOPE='crates/<m>/src/**'` and a string path in code name the file
+**A path glob does not** go through it: `make mutants-remote
+SCOPE='crates/<m>/src/**'` and a string path in code name the file
 where it lies; `mutants-scope.py` refuses any one glob that matches nothing. Keep
 the two mirrors in step.
 
