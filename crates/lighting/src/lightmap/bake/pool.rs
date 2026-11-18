@@ -13,10 +13,13 @@
 //! The pool's own shape is [`run_batched`]: every chart already cut into its
 //! batches, each traced through `&mut`, so a caller that keeps state per item
 //! between runs (#1970's progressive bake) updates it in place and holds one copy.
-//! [`run`] cuts plain charts into batches and joins them back for its `finish`.
+//! [`run`] cuts plain charts into batches and joins them back for its `finish`,
+//! and [`run_made`] does the same for charts it makes only when the first worker
+//! reaches them (#2312), so a chart's items live from its first batch to its
+//! `finish`, never from the bake's start.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::sync::{Mutex, MutexGuard, Once, PoisonError};
 use std::thread;
 
 use super::super::progress::BakeProgress;
@@ -42,6 +45,9 @@ pub(crate) fn batches<P>(items: impl IntoIterator<Item = P>) -> Vec<Vec<P>> {
 /// and its result once the last one has.
 struct Slot<P, L, T> {
     batches: Vec<Mutex<Vec<P>>>,
+    /// Done once the batches hold the chart's items: at once for a chart cut
+    /// before the run, at its first batch for one [`run_made`] makes.
+    ready: Once,
     left: AtomicUsize,
     parts: Mutex<Vec<(usize, Vec<L>)>>,
     done: Mutex<Option<T>>,
@@ -54,12 +60,44 @@ impl<P, L, T> Slot<P, L, T> {
         if batches.is_empty() {
             batches.push(Vec::new());
         }
+        let ready = Once::new();
+        ready.call_once(|| {});
         Self {
             left: AtomicUsize::new(batches.len()),
             batches: batches.into_iter().map(Mutex::new).collect(),
+            ready,
             parts: Mutex::default(),
             done: Mutex::new(None),
         }
+    }
+
+    /// A chart of `count` items not made yet: its batches stand empty until
+    /// [`Slot::fill`].
+    fn later(count: usize) -> Self {
+        let batches = count.div_ceil(BATCH).max(1);
+        Self {
+            left: AtomicUsize::new(batches),
+            batches: (0..batches).map(|_| Mutex::new(Vec::new())).collect(),
+            ready: Once::new(),
+            parts: Mutex::default(),
+            done: Mutex::new(None),
+        }
+    }
+
+    /// The chart's batches made by `make`, once, by the first worker to reach the
+    /// chart; the others wait for it. `make` gives the count [`Slot::later`] was
+    /// told, so the batches line up.
+    fn fill(&self, make: impl FnOnce() -> Vec<P>) {
+        self.ready.call_once(|| {
+            let made = batches(make());
+            debug_assert!(
+                made.len() <= self.batches.len(),
+                "a chart made larger than counted"
+            );
+            for (slot, batch) in self.batches.iter().zip(made) {
+                *lock(slot) = batch;
+            }
+        });
     }
 
     /// Once every batch is in: the chart's batches move out (no worker holds one)
@@ -99,6 +137,41 @@ where
     run_batched(charts, threads, progress, &|_, _| false, trace, finish)
 }
 
+/// [`run`] over charts made only when the first worker reaches them (#2312):
+/// `counts` says how many items each chart has, and `make(chart)` makes them
+/// (the same count, every time). A chart's items so live from its first batch to
+/// its `finish`, so the run holds the charts in flight, never every chart at once;
+/// results are [`run`]'s.
+pub(crate) fn run_made<P, L, T>(
+    counts: &[usize],
+    make: impl Fn(usize) -> Vec<P> + Sync,
+    threads: usize,
+    progress: &BakeProgress,
+    trace: impl Fn(usize, usize, &[P]) -> Vec<L> + Sync,
+    finish: impl Fn(usize, Vec<P>, Vec<L>) -> T + Sync,
+) -> Option<Vec<T>>
+where
+    P: Send,
+    L: Send,
+    T: Send,
+{
+    let slots = counts.iter().map(|&n| Slot::later(n)).collect();
+    let trace =
+        |c: usize, b: usize, items: &mut [P]| (trace(c, b * BATCH, items), items.len() as u64);
+    let finish = |c: usize, items: Vec<Vec<P>>, out: Vec<L>| {
+        finish(c, items.into_iter().flatten().collect(), out)
+    };
+    run_slots(
+        slots,
+        &make,
+        threads,
+        progress,
+        &|_, _| false,
+        trace,
+        finish,
+    )
+}
+
 /// [`run`] over charts already cut into batches ([`batches`]), each traced as
 /// `trace(chart, batch, &mut items)` so it may update its items in place, which
 /// gives its results and the items it counts as traced (a progressive step passes
@@ -119,7 +192,35 @@ where
     L: Send,
     T: Send,
 {
-    let slots: Vec<Slot<P, L, T>> = charts.into_iter().map(Slot::new).collect();
+    let slots = charts.into_iter().map(Slot::new).collect();
+    // Every chart is made already, so nothing is ever made.
+    run_slots(
+        slots,
+        &|_| Vec::new(),
+        threads,
+        progress,
+        first,
+        trace,
+        finish,
+    )
+}
+
+/// The pool over `slots`, each chart made by `make` when its first batch is taken
+/// (a no-op for one cut before the run): [`run_batched`]'s contract.
+fn run_slots<P, L, T>(
+    slots: Vec<Slot<P, L, T>>,
+    make: &(dyn Fn(usize) -> Vec<P> + Sync),
+    threads: usize,
+    progress: &BakeProgress,
+    first: &(dyn Fn(usize, usize) -> bool + Sync),
+    trace: impl Fn(usize, usize, &mut [P]) -> (Vec<L>, u64) + Sync,
+    finish: impl Fn(usize, Vec<Vec<P>>, Vec<L>) -> T + Sync,
+) -> Option<Vec<T>>
+where
+    P: Send,
+    L: Send,
+    T: Send,
+{
     let mut queue: Vec<(usize, usize)> = (slots.iter().enumerate())
         .flat_map(|(c, slot)| (0..slot.batches.len()).map(move |b| (c, b)))
         .collect();
@@ -133,6 +234,7 @@ where
             return;
         };
         let slot = &slots[c];
+        slot.fill(|| make(c));
         let (out, traced) = trace(c, b, &mut lock(&slot.batches[b]));
         progress.advance(traced);
         lock(&slot.parts).push((b, out));

@@ -45,6 +45,7 @@ use rusty_scene::lighting::settings::BakeSettings;
 use rusty_scene::Scene;
 
 mod encoder;
+pub mod fits;
 pub mod job;
 pub(in crate::bake) mod logged;
 mod measure;
@@ -89,6 +90,7 @@ pub fn bake_scene_lightmaps_logged(
     let scene_path = scene_path.ok_or(UNSAVED)?;
     let mut stages = Stages::start();
     let input = gather_bake_input(scene);
+    fits::fits(&input, settings, false)?;
     stages.lap("gather");
     let run = logged::bake_logged(&input, settings, log)?;
     stages.push("trace", run.trace);

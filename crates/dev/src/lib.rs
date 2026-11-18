@@ -27,6 +27,7 @@
 //!   stats       — frame stats: the schedule timing probe + render counters (#433)
 //!   frame_log   — the rolling frame and console log under `saved/logs/` (#2206)
 //!   bench       — the stress scene and report behind `make bench` (#835)
+//!   memory      — the process's peak resident memory and the machine's, for the bench and the bakes
 //!   export      — ship a project: runtime files and the import cache, no sources (#1267)
 //!   game        — test games: a Lua recipe builds a small game project headless (#2029)
 //!   providers   — the boundary paid, networked calls live behind: key, budget, edit-mode only (#383)
@@ -59,6 +60,7 @@ pub mod game;
 pub mod harness;
 pub mod lua_surface;
 pub mod mcp;
+pub mod memory;
 pub mod preview;
 pub mod providers;
 pub mod scenario;

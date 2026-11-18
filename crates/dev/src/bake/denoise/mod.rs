@@ -26,6 +26,7 @@ use glam::Vec3;
 use rusty_lighting::lightmap::LightmapDenoiser;
 use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 
+pub mod budget;
 pub mod ffi;
 
 pub use ffi::{INSTALL, RUSTY_OIDN};
@@ -59,6 +60,8 @@ pub struct Oidn {
     charts: AtomicU64,
     nanos: AtomicU64,
     warned: AtomicBool,
+    /// What the charts being cleaned may hold together (#2312).
+    budget: budget::Budget,
 }
 
 impl Default for Oidn {
@@ -78,6 +81,7 @@ impl Oidn {
             charts: AtomicU64::new(0),
             nanos: AtomicU64::new(0),
             warned: AtomicBool::new(false),
+            budget: budget::Budget::default(),
         }
     }
 
@@ -128,6 +132,14 @@ impl Oidn {
 
 impl LightmapDenoiser for Oidn {
     fn denoise(&self, image: &mut [Vec3], size: u32, directional: bool) -> Result<(), String> {
+        self.budget
+            .run(image.len(), || self.clean(image, size, directional))
+    }
+}
+
+impl Oidn {
+    /// [`LightmapDenoiser::denoise`] once the budget has let it start.
+    fn clean(&self, image: &mut [Vec3], size: u32, directional: bool) -> Result<(), String> {
         let mut color: Vec<[f32; 3]> = image.iter().map(|v| v.to_array()).collect();
         let mut output = vec![[0.0; 3]; color.len()];
         let ran = self.run(&mut color, &mut output, size, directional);

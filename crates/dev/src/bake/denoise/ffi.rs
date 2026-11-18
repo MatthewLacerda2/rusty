@@ -28,6 +28,20 @@ pub const INSTALL: &str = "install Open Image Denoise 2 (macOS: `brew install \
 const OIDN_DEVICE_TYPE_CPU: c_int = 1;
 const OIDN_FORMAT_FLOAT3: c_int = 3;
 
+/// The scratch one filter may take (OIDN's `maxMemoryMB`, #2312): an image whose
+/// network needs more is cleaned in overlapping tiles. Left to OIDN, a filter took
+/// about 1.1 KB a texel, 5 GB for one 2048² chart. Fixed, never read from the
+/// machine, so where a chart is cut never depends on it; at 512 a 2048² chart
+/// cleaned no slower than untiled (measured in #2312's PR).
+pub const SCRATCH_MB: c_int = 512;
+
+/// The largest image, in texels, whose filter a device keeps for its next chart
+/// (#2312): a filter keeps the scratch of the largest image it ran, so one kept
+/// per worker after a large chart held that much on every core for the rest of
+/// the bake. A filter for a larger image is made for it and released after; making
+/// one costs about as much as cleaning a 128² chart, nothing beside a large one.
+pub const KEEP_TEXELS: usize = 128 * 128;
+
 type RawDevice = *mut c_void;
 type Filter = *mut c_void;
 
@@ -64,6 +78,7 @@ pub struct Api {
         usize,
     ),
     set_bool: unsafe extern "C" fn(Filter, *const c_char, bool),
+    set_int: unsafe extern "C" fn(Filter, *const c_char, c_int),
     commit_filter: unsafe extern "C" fn(Filter),
     execute_filter: unsafe extern "C" fn(Filter),
     release_filter: unsafe extern "C" fn(Filter),
@@ -72,9 +87,10 @@ pub struct Api {
 }
 
 /// One committed CPU device and its two `RTLightmap` filters (colour,
-/// directional), each made the first time it is asked for and then reused: making
-/// one loads its trained weights, about as long as cleaning a small chart, and a
-/// bake cleans one or two per mesh. Released when dropped.
+/// directional), each made the first time it is asked for and reused for charts up
+/// to [`KEEP_TEXELS`]: making one loads its trained weights, about as long as
+/// cleaning a small chart, and a bake cleans one or two per mesh. Released when
+/// dropped.
 pub struct Device {
     api: &'static Api,
     device: RawDevice,
@@ -145,6 +161,7 @@ impl Api {
                 new_filter: get!("oidnNewFilter"),
                 set_image: get!("oidnSetSharedFilterImage"),
                 set_bool: get!("oidnSetFilterBool"),
+                set_int: get!("oidnSetFilterInt"),
                 commit_filter: get!("oidnCommitFilter"),
                 execute_filter: get!("oidnExecuteFilter"),
                 release_filter: get!("oidnReleaseFilter"),
@@ -231,7 +248,14 @@ impl Device {
             (self.api.commit_filter)(filter);
             (self.api.execute_filter)(filter);
         }
-        self.api.error(self.device)
+        let ran = self.api.error(self.device);
+        if n * n > KEEP_TEXELS {
+            let slot = &mut self.filters[directional as usize];
+            // SAFETY: the filter is this device's own, and its slot is emptied, so
+            // nothing uses it again; the next chart makes a fresh one.
+            unsafe { (self.api.release_filter)(std::mem::replace(slot, std::ptr::null_mut())) };
+        }
+        ran
     }
 
     /// The `RTLightmap` filter for colour or for `directional` vectors, made on
@@ -248,6 +272,8 @@ impl Device {
             }
             // SAFETY: as above, on the filter just made.
             unsafe { (self.api.set_bool)(filter, c"directional".as_ptr(), directional) };
+            // SAFETY: as above.
+            unsafe { (self.api.set_int)(filter, c"maxMemoryMB".as_ptr(), SCRATCH_MB) };
             *slot = filter;
         }
         Ok(*slot)

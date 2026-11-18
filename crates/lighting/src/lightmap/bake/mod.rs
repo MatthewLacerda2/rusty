@@ -86,11 +86,11 @@ pub(super) fn bake_on(
 ) -> Option<Vec<Lightmap>> {
     let rays = Rays::build(triangles(scene));
     let tracer = Tracer::new(scene, &rays);
-    let (heads, points) = receivers(scene, settings);
-    let texels = points.iter().map(|p| p.len() as u64).sum();
+    let (heads, counts) = counted(scene, settings);
+    let texels = counts.iter().map(|&n| n as u64).sum();
     progress.set_total(texels, heads.len() as u64);
-    let sizes = heads.iter().zip(&points);
-    progress.set_meshes(sizes.map(|((i, _), p)| (scene.meshes[*i].entity, p.len() as u64)));
+    let sizes = heads.iter().zip(&counts);
+    progress.set_meshes(sizes.map(|((i, _), &n)| (scene.meshes[*i].entity, n as u64)));
     let trace = |c: usize, _: usize, batch: &[TexelPoint]| {
         let mesh = heads[c].0 as u64;
         let one = |p: &TexelPoint| texel(&tracer, settings, mesh, p);
@@ -100,7 +100,9 @@ pub(super) fn bake_on(
         progress.batch_finished(c, batch.len());
         traced
     };
-    // The pool hands each chart its points back once traced, so they die with it.
+    // A chart's points are made when its first batch is taken (#2312) and handed
+    // back to its `finish` once traced, so they live only while it is in flight.
+    let make = |c: usize| rasterize(&scene.meshes[heads[c].0], heads[c].1);
     let cleaner = Cleaner {
         denoiser: settings.denoiser,
         radius: settings.filter_radius,
@@ -115,9 +117,37 @@ pub(super) fn bake_on(
         progress.mesh_done();
         map
     };
-    let maps = pool::run(points, threads, progress, trace, finish)?;
+    let maps = pool::run_made(&counts, make, threads, progress, trace, finish)?;
     note_buried(orphans.into_inner());
     Some(maps)
+}
+
+/// [`receivers`] with each mesh's texel count instead of its texels: each is
+/// rasterized and let go at once, so a one-shot bake, which makes them again
+/// when it reaches the mesh (#2312), never holds every mesh's at once.
+fn counted(scene: &BakeScene, settings: &BakeSettings) -> (Vec<(usize, u32)>, Vec<usize>) {
+    let max = max_map_edge(settings.page());
+    lightmapped(scene, settings, max)
+        .map(|(index, size)| ((index, size), rasterize(&scene.meshes[index], size).len()))
+        .unzip()
+}
+
+/// The receiving meshes `scene` bakes at `settings`, each with its lightmap
+/// edge ([`bake`]'s rule), every lightmap fitting a `max`-edged page with its ring.
+fn lightmapped<'a>(
+    scene: &'a BakeScene,
+    settings: &'a BakeSettings,
+    max: u32,
+) -> impl Iterator<Item = (usize, u32)> + 'a {
+    scene
+        .meshes
+        .iter()
+        .enumerate()
+        .filter(|(_, mesh)| mesh.receives_lightmap())
+        .filter_map(move |(index, mesh)| {
+            let density = settings.texels_per_unit * mesh.scale_in_lightmap;
+            Some((index, lightmap_size(mesh, density, max)?))
+        })
 }
 
 /// Every receiving mesh's (index, lightmap size) and its texels, rasterized
@@ -129,16 +159,8 @@ pub(super) type Receivers = (Vec<(usize, u32)>, Vec<Vec<TexelPoint>>);
 pub(super) fn receivers(scene: &BakeScene, settings: &BakeSettings) -> Receivers {
     // Every lightmap must fit a page with its ring around it.
     let max = max_map_edge(settings.page());
-    scene
-        .meshes
-        .iter()
-        .enumerate()
-        .filter(|(_, mesh)| mesh.receives_lightmap())
-        .filter_map(|(index, mesh)| {
-            let density = settings.texels_per_unit * mesh.scale_in_lightmap;
-            let size = lightmap_size(mesh, density, max)?;
-            Some(((index, size), rasterize(mesh, size)))
-        })
+    lightmapped(scene, settings, max)
+        .map(|(index, size)| ((index, size), rasterize(&scene.meshes[index], size)))
         .unzip()
 }
 

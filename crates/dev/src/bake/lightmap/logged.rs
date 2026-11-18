@@ -53,9 +53,14 @@ pub(super) fn bake_logged(
     if let Some((charts, busy)) = denoised {
         log.denoised(charts, busy);
     }
+    let peak_memory = crate::memory::rss_peak_bytes();
+    if let Some(bytes) = peak_memory {
+        log.peak_memory(bytes);
+    }
     let measured = Measured {
         times: clocks.times(),
         denoised,
+        peak_memory,
     };
     Ok(Run {
         pages,

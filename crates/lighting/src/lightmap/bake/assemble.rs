@@ -67,7 +67,8 @@ pub(super) fn assemble(
             dilate(map, &mut ring, size, DILATE_PASSES);
             fill_rest(map, &ring, size);
         } else {
-            map.clear();
+            // Freed, not cleared: a finished map keeps only what it carries (#2312).
+            *map = Vec::new();
         }
     }
     let orphans = fill_within(&mut texels, &mut filled, labels, size);

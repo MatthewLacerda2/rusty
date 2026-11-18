@@ -87,7 +87,7 @@ pub fn apply_encoded(
     warn_fell_back(&set);
     let bytes = gpu_bytes(encoded);
     log::info!(
-        "[LightmapBake] {} lightmaps in {} page(s) of {size}²{}, {:.1} MiB on the GPU, in {}",
+        "[LightmapBake] {} lightmaps in {} page(s) of {size}²{}, {:.1} MiB on the GPU, in {}{}",
         encoded.maps,
         set.pages.len(),
         match (set.directions.is_empty(), set.masks.is_empty()) {
@@ -97,7 +97,11 @@ pub fn apply_encoded(
             (false, false) => " (directional, shadowmask)",
         },
         bytes as f64 / (1024.0 * 1024.0),
-        dir.display()
+        dir.display(),
+        // The bake's high-water mark (#2312): how close it came to the machine's.
+        crate::memory::rss_peak_bytes()
+            .map(|b| format!("; peak memory {}", crate::bake::progress::format::gb(b)))
+            .unwrap_or_default()
     );
     let keep = stems(&set);
     scene.lightmaps = set.into();

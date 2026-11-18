@@ -88,6 +88,7 @@ impl LightmapBakeJob {
         let scene_path = scene_path.ok_or(UNSAVED)?.to_string();
         let started = Instant::now();
         let input = gather_bake_input(scene);
+        super::fits::fits(&input, &settings, true)?;
         let (progress, measure) = Measure::start(&settings, started.elapsed());
         let lights = rusty_lighting::lightmap::taken_lights(scene);
         let shadowmask = input.shadowmask.clone();

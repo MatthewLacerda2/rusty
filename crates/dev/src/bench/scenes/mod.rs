@@ -11,7 +11,7 @@
 //! to its first rendered frame, wall clock, the renderer's start-up off the
 //! clock: `load`), `import_ms` (`IMPORT=1`, once a run, on its first scene: the
 //! same load of a copy of the project without its import cache, [`import`]), `rss_peak_mb` (the process's peak resident
-//! memory, [`memory`]) and `gpu_mb` (the renderer's GPU memory,
+//! memory, [`crate::memory`]) and `gpu_mb` (the renderer's GPU memory,
 //! `rusty_render::gpu_memory`), each compared with that scene's last run or a
 //! kept baseline (`Extra::baseline`). A run with `PROFILE=1` adds a sampling
 //! profile of the measured frames ([`profile`]), in a run of its own.
@@ -24,7 +24,6 @@
 mod fold;
 pub mod import;
 mod measure;
-pub mod memory;
 mod notes;
 pub mod profile;
 pub mod report;
@@ -158,7 +157,7 @@ pub fn bench(
     if let Some(ms) = extra.import_ms {
         report.push_value("import_ms", ms);
     }
-    if let Some(bytes) = memory::rss_peak_bytes() {
+    if let Some(bytes) = crate::memory::rss_peak_bytes() {
         report.push_value("rss_peak_mb", mb(bytes));
     }
     if let Some(gpu) = harness
