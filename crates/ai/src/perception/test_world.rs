@@ -3,7 +3,10 @@
 
 use glam::Vec3;
 
-use super::{drain_updates, step, SightRays};
+use std::collections::BTreeSet;
+
+use super::sight::{self, Target};
+use super::{drain_updates, perceivers, settle, step, SightRays};
 use rusty_components::{
     AIPerceptionComponent, ColliderComponent, ColliderShape, Memory, PerceptionUpdate,
 };
@@ -46,6 +49,26 @@ impl Arena {
         }
     }
 
+    /// One step on the rules before the mask prefilter, the reference the mask
+    /// tests compare with: [`reference_targets`], and the own body as the first
+    /// of them in the perceiver's lineage.
+    pub fn step_reference(&mut self) {
+        let ids = perceivers(&self.scene);
+        let targets = reference_targets(&self.scene);
+        let w = &self.scene.world;
+        let body = |p: u32| {
+            let lineage: BTreeSet<u32> = w.self_and_ancestors(p).collect();
+            let mut ids = targets.iter().map(|t| t.id);
+            ids.find(|t| lineage.contains(t)).unwrap_or(p)
+        };
+        let physics = Some(&self.physics);
+        let seen = sight::look_at(&self.scene, physics, &ids, &mut self.rays, &targets, body);
+        for (id, visible) in ids.into_iter().zip(seen) {
+            let mut c = self.scene.world.ai_perception_mut(id).expect("perceiver");
+            settle(&mut c, &visible, DT);
+        }
+    }
+
     /// Take the pending updates.
     pub fn updates(&mut self) -> Vec<(u32, PerceptionUpdate)> {
         drain_updates(&mut self.scene)
@@ -63,9 +86,11 @@ impl Arena {
         p.memory.in_sight.contains(&target)
     }
 
-    /// Move `id` to `at`.
+    /// Move `id` to `at`, and its colliders with it: one physics step pushes the
+    /// new pose to the world the rays are cast in.
     pub fn put(&mut self, id: u32, at: Vec3) {
         self.scene.world.transform_mut(id).expect("alive").position = at;
+        self.physics.step(&mut self.scene, DT);
     }
 }
 
@@ -97,4 +122,25 @@ pub fn target(scene: &mut Scene, at: Vec3) -> u32 {
 /// A 3 m high static wall over `x0..x1` × `z0..z1`.
 pub fn wall(scene: &mut Scene, (x0, x1): (f32, f32), (z0, z1): (f32, f32)) -> u32 {
     add_box(scene, Vec3::new(x0, 0.0, z0), Vec3::new(x1, 3.0, z1))
+}
+
+/// The target list before the prefilter, kept verbatim as the reference: every
+/// active, non-static Collider or CharacterController not under another one.
+fn reference_targets(scene: &Scene) -> Vec<Target> {
+    let w = &scene.world;
+    let mut ids: Vec<u32> = w.ids_with_collider();
+    ids.extend(w.ids_with_character_controller());
+    ids.sort_unstable();
+    ids.dedup();
+    ids.retain(|&id| w.is_active_in_hierarchy(id) && !w.is_static(id));
+    let bodies: BTreeSet<u32> = ids.iter().copied().collect();
+    let under = |id: u32| {
+        w.self_and_ancestors(id)
+            .skip(1)
+            .any(|a| bodies.contains(&a))
+    };
+    ids.into_iter()
+        .filter(|&id| !under(id))
+        .map(|id| Target::of(scene, id))
+        .collect()
 }
