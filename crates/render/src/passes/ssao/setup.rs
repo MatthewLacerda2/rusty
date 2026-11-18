@@ -4,6 +4,7 @@
 use super::{SsaoRenderer, Stage, AO_FORMAT};
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::{depth_entry, texture_entry, uniform_entry};
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _};
 use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::timing::GpuTimer;
@@ -58,7 +59,7 @@ impl SsaoRenderer {
         (group, target): (&wgpu::BindGroup, &wgpu::TextureView),
         timer: &GpuTimer,
     ) {
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let mut pass = encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
             multiview_mask: None,
             label: Some(stage.label()),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -88,7 +89,7 @@ impl SsaoRenderer {
         depth: &wgpu::TextureView,
         raw: &wgpu::TextureView,
     ) -> wgpu::BindGroup {
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
+        device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("SSAO Bind Group"),
             layout: &self.layout,
             entries: &[

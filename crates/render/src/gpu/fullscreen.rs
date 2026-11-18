@@ -5,6 +5,7 @@
 //! Also [`color_pass`], the timed colour-only pass the UI and the selection outline
 //! record into.
 
+use crate::gpu::ops::CountedEncoder as _;
 use crate::timing::{GpuPass, GpuTimer};
 
 /// One fullscreen pass's shader, layout and entry points.
@@ -73,7 +74,7 @@ pub(crate) fn color_pass<'e>(
     target: &'e wgpu::TextureView,
     load: wgpu::LoadOp<wgpu::Color>,
 ) -> wgpu::RenderPass<'e> {
-    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+    encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
         multiview_mask: None,
         label: Some(label),
         color_attachments: &[Some(wgpu::RenderPassColorAttachment {

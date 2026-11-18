@@ -5,6 +5,7 @@
 //! vertex + index buffer, orders the ribbons back-to-front by their centroid's
 //! view depth, and draws each with its blend pipeline and texture.
 
+use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
 use std::rc::Rc;
 
 use glam::{Mat4, Vec3};
@@ -82,7 +83,7 @@ impl Renderer {
         };
         let rr = &self.ribbon_renderer;
         self.queue
-            .write_buffer(&rr.globals_buffer, 0, bytemuck::bytes_of(&globals));
+            .counted_write_buffer(&rr.globals_buffer, 0, bytemuck::bytes_of(&globals));
         let textures: Vec<Option<Rc<GpuTexture>>> = ribbons
             .draws
             .iter()
@@ -136,7 +137,7 @@ impl Renderer {
                 pass.draw_indexed(draw.first..draw.first + draw.count, 0, 0..1);
             }
         }
-        self.queue.submit(std::iter::once(encoder.finish()));
+        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 }
 
@@ -148,7 +149,7 @@ fn effect_pass<'e>(
     view: &'e RenderView,
     timestamp_writes: Option<wgpu::RenderPassTimestampWrites<'_>>,
 ) -> wgpu::RenderPass<'e> {
-    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+    encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
         multiview_mask: None,
         label: Some("Ribbon Pass"),
         color_attachments: &taa::reactive::hdr_attachments(view),

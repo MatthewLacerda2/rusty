@@ -5,6 +5,7 @@
 //! `taa::reactive::hdr_attachments`).
 
 use crate::gpu::layout_entries::uniform_entry;
+use crate::gpu::ops::CountedDevice as _;
 use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::DEPTH_FORMAT;
 use crate::postfx::effects::taa;
@@ -31,7 +32,7 @@ impl Globals {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group = device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some(&format!("{name} Globals Bind Group")),
             layout: &layout,
             entries: &[wgpu::BindGroupEntry {

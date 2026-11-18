@@ -111,6 +111,10 @@ fn case_for(rule: &str) -> Option<Case> {
             "engine/shaders/a.wgsl",
             "fn vs(i: u32) -> f32 {\n    let x = f32((i << 1u) & 2u);\n    return x;\n}\n",
         ),
+        "gpu-ops" => one(
+            "crates/render/src/passes/a.rs",
+            "fn f(q: &wgpu::Queue) {\n    q.submit([]);\n}\n",
+        ),
         "ignored" => case(
             &[(".gitignore", "secret.rs\n"), ("crates/app/src/secret.rs", "")],
             "crates/app/src/secret.rs",

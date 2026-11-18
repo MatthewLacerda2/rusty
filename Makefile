@@ -40,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export launcher bench bench-scenes bless-converters fuzz-lock
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export import launcher bench bench-scenes bless-converters fuzz-lock
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -463,6 +463,10 @@ export: ## Ship a project without its convertible sources. make export PROJECT=~
 		echo "export: make export PROJECT=<project dir> OUT=<new or empty folder>" >&2; \
 		exit 1; }
 	cargo run --quiet --locked --features dev --bin export -- --project $(PROJECT) --out $(OUT)
+
+import: ## Bring a project's import cache up to date in place (models, compressed textures). make import PROJECT=~/games/horde
+	@test -n "$(PROJECT)" || { echo "import: make import PROJECT=<project dir>" >&2; exit 1; }
+	cargo run --quiet --locked --features dev --bin export -- --project $(PROJECT) --import-only
 
 # The shooter-shaped stress scene (#835): 50 skinned soldiers on the navmesh, 32
 # lights, a full decal registry, smoke. Prints frame / render / GPU ms (avg and p95),

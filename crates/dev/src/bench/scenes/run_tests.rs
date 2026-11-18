@@ -53,6 +53,10 @@ fn has_load_and_memory(report: &SceneReport) {
     if report.row("renderer_ms").is_some() && cfg!(any(target_os = "linux", target_os = "macos")) {
         let gpu = report.row("gpu_mb");
         assert!(gpu.is_some_and(|r| r.avg > 0.0), "{:?}", report.rows);
+        // The renderer's GPU calls and Hi-Z culls are rows too (#2341).
+        for k in ["submits", "render_passes", "hiz_tested", "cluster_culled"] {
+            assert!(report.row(k).is_some(), "{k}: {:?}", report.rows);
+        }
     }
 }
 

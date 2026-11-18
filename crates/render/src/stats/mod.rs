@@ -199,6 +199,8 @@ pub struct RenderCounters {
     pub render_upload_bytes: u64,
     /// The scene assets uploaded for this frame (`asset_uploads`, `asset_upload_bytes`).
     pub uploads: Uploads,
+    /// The GPU calls this render made, from its start to its counters' close (`gpu::ops`).
+    pub ops: OpCounts,
 }
 
 impl RenderCounters {
@@ -252,6 +254,7 @@ impl RenderCounters {
         ];
         pairs.extend(self.shadow_pairs());
         pairs.extend(self.uploads.pairs());
+        pairs.extend(self.ops.pairs());
         pairs
     }
 
@@ -275,26 +278,20 @@ impl RenderCounters {
             ("shadow_atlas_rebaked", self.shadow_atlas_rebaked.into()),
         ]
     }
-
-    /// Add a set of indexed draws — `(num_indices, instances)` per draw call — to the
-    /// counts. An instanced draw is one call but submits every instance's triangles.
-    pub(crate) fn add_draws(&mut self, draws: impl IntoIterator<Item = (u32, u32)>) {
-        for (indices, instances) in draws {
-            self.draw_calls += 1;
-            self.triangles += u64::from(indices / 3) * u64::from(instances);
-        }
-    }
 }
 
 mod frame;
 mod memory;
 mod uploads;
+pub use crate::gpu::ops::OpCounts;
 pub use memory::{gpu_memory, GpuMemory};
 pub use uploads::Uploads;
 
 #[cfg(test)]
 use frame::{count_lights, draws_of};
 
+#[cfg(test)]
+mod ops_gpu_tests;
 #[cfg(test)]
 #[path = "stats_tests.rs"]
 mod stats_tests;

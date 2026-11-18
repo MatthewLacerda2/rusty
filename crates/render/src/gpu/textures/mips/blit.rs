@@ -10,6 +10,7 @@
 use super::{view_format, TextureKind};
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::texture_entry;
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::gpu::textures::deep::DEEP_FORMAT;
@@ -115,7 +116,7 @@ impl MipGenerator {
                 [&level(mip - 1), &level(mip)],
             );
         }
-        queue.submit([encoder.finish()]);
+        queue.counted_submit([encoder.finish()]);
     }
 
     /// Record the pass drawing `target` from `above`.
@@ -126,7 +127,7 @@ impl MipGenerator {
         pipeline: &wgpu::RenderPipeline,
         [above, target]: [&wgpu::TextureView; 2],
     ) {
-        let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let group = device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Mip Source"),
             layout: &self.layout,
             entries: &[wgpu::BindGroupEntry {
@@ -134,7 +135,7 @@ impl MipGenerator {
                 resource: wgpu::BindingResource::TextureView(above),
             }],
         });
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let mut pass = encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Mip Level"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: target,

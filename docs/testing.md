@@ -1028,7 +1028,13 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   at a fixed reference clock, below), `gpu_raw_ms` (GPU time as measured) and
   `gpu_clock_pct` (the clock it ran at, % of the reference), `draw_calls`,
   `triangles`, `culled_entities`, `lights_dropped`, `cluster_lights_dropped`, `lights_culled`,
-  `decals_visible`, `decal_cluster_refs`; then where the CPU time went, by name:
+  `decals_visible`, `decal_cluster_refs`, the GPU occlusion counters `hiz_tested`,
+  `hiz_culled`, `cluster_tested`, `cluster_culled` (the two culled ones are read back
+  without waiting, so they describe a frame or so earlier, `docs/api/Debug.md`), and
+  the frame's GPU calls `render_passes`, `compute_passes`, `submits`,
+  `bind_groups_created`, `buffer_writes` (counted through `render::gpu::ops`; a
+  render-CPU fix whose timing moves inside the spread proves itself by these); then
+  where the CPU time went, by name:
   `cpu.<system>` for every system the schedule runs, named as it registers them
   (`update_scripts`, `step_physics`, … at the reference CPU clock, summing to
   `cpu_ms`), and `render.<stage>` for every stage of the renderer's frame, summing
@@ -1108,8 +1114,13 @@ every binary's open makes them.
   the worst p95 and the viewpoint it came from), then over the runs: the average,
   and the **spread**, the lowest to the highest run's average. Plus:
   - `load_ms`: the scene's own load to its first rendered frame, wall clock, with
-    the import cache as the project holds it (warm once the editor or a run
-    imported it): the harness's set-up (its Lua VM and API, the stats), the
+    the import cache as the project holds it: its converted models are warm once
+    any run converted them, its compressed textures only once the editor, an
+    export or `make import PROJECT=<dir>` made them, since a `play` or
+    `bench-scenes` run never compresses a texture. Without them every texture uploads decoded, as RGBA8,
+    and the report warns (`uploaded uncompressed: N textures, M MB`): the scene's
+    `load_ms`, `gpu_mb` and `rss_peak_mb` are then not the shipped game's. It
+    holds the harness's set-up (its Lua VM and API, the stats), the
     scene's document and lighting sidecar read, its navmesh baked and the world
     built, Play's refresh of the project's converted sources (a check of each
     cache), then its first sim step and frame (its uploads). The renderer's start-up
@@ -1117,10 +1128,12 @@ every binary's open makes them.
     the two, off the clock;
   - `import_ms`, only with `IMPORT=1`, once a run (the import is the project's,
     not a scene's: every model source is converted, with headless Blender for a
-    `.blend`, so it is slow): the first scene's load in a copy of the project (made
-    beside the reports, deleted after) without its `cache/`, its import cache
+    `.blend`, and every image compressed, so it is slow, minutes for a large
+    project): `make import` run on a copy of the project (made beside the reports,
+    deleted after) without its `cache/`, its import cache
     (`assets/generated/imported/`: converted models and compressed textures) and
-    its `.git`: what a first load costs. A row of the first scene's report, and one
+    its `.git`, then the first scene's load there: what a first import and load
+    cost, model conversion and texture encoding included. A row of the first scene's report, and one
     line under the summary. A link in the project is copied as what it points to,
     so the copy stands alone and the project is only ever read; a link looping
     back, and what is neither a file nor a folder, are left out. A copy or a load
