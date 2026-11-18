@@ -1,35 +1,45 @@
-// engine/shaders/postfx/ssr_pyramid.wgsl — one level of SSR's colour pyramid (#1736,
-// `render::postfx::effects::ssr::pyramid`): each texel the average of the 2×2 texels
-// above it (an odd level's last row or column has none below it and is left out).
-// A non-finite texel (an emissive past `f16`'s range is +inf in the HDR image) is
-// left out of the average too, so one hot pixel never turns a whole block of a
-// coarse level, and every rough reflection read from it, into inf or NaN. SSR's march
-// reads a rough surface's hit from the level whose texels are its cone's width.
+// engine/shaders/postfx/ssr_pyramid.wgsl — one level of SSR's two hit pyramids
+// (`render::postfx::effects::ssr::pyramid`): the trace's hits and its spread, each
+// texel the average of the 2×2 texels above it in its own pyramid (an odd level's
+// last row or column has none below it and is left out). A non-finite texel is left
+// out of the average too, so one hot pixel never turns a whole block of a coarse
+// level, and every blur the resolve reads from it, into inf or NaN.
+//
+// One dispatch per level writes both pyramids' level. Each dispatch binds one-level
+// views, so the level read and written is uniform across it, never per thread
+// (crates/render/src/CLAUDE.md, *Shaders*).
 
-#import fullscreen
 #import numeric
 
-// The level above, as a one-level view.
-@group(0) @binding(0) var t_src: texture_2d<f32>;
+// The level above, of each pyramid, as one-level views.
+@group(0) @binding(0) var hits_in: texture_2d<f32>;
+@group(0) @binding(1) var spread_in: texture_2d<f32>;
+// The level written, of each pyramid.
+@group(0) @binding(2) var hits_out: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(3) var spread_out: texture_storage_2d<rgba16float, write>;
 
-@vertex
-fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4<f32> {
-    return fullscreen::triangle(vid);
-}
-
-@fragment
-fn fs_downsample(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
-    let top = vec2<i32>(textureDimensions(t_src)) - 1;
-    let base = vec2<i32>(pos.xy) * 2;
+// The mean of the finite texels among the 2×2 of `src` above texel `id`.
+fn average(src: texture_2d<f32>, id: vec2<u32>) -> vec4<f32> {
+    let top = vec2<i32>(textureDimensions(src)) - 1;
+    let base = vec2<i32>(id) * 2;
     var sum = vec4<f32>(0.0);
     var count = 0.0;
     for (var i = 0; i < 4; i = i + 1) {
         let p = min(base + vec2<i32>(i & 1, i >> 1u), top);
-        let c = textureLoad(t_src, p, 0);
+        let c = textureLoad(src, p, 0);
         if (numeric::finite4(c)) {
             sum = sum + c;
             count = count + 1.0;
         }
     }
     return sum / max(count, 1.0);
+}
+
+@compute @workgroup_size(8, 8)
+fn cs_downsample(@builtin(global_invocation_id) id: vec3<u32>) {
+    if (any(id.xy >= textureDimensions(hits_out))) {
+        return;
+    }
+    textureStore(hits_out, id.xy, average(hits_in, id.xy));
+    textureStore(spread_out, id.xy, average(spread_in, id.xy));
 }

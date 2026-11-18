@@ -4,7 +4,7 @@
 
 use super::super::fixture::{draw, eye, frame, pixel, renderer, rgb, scene, Surface};
 use super::super::fixture::{RED, REFLECTING, W};
-use crate::postfx::effects::ssr::pyramid::levels;
+use crate::postfx::effects::ssr::pyramid::{hit_levels, levels};
 use crate::readback;
 use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_scene::Scene;
@@ -90,11 +90,12 @@ fn gpu_the_pyramid_follows_a_resize_from_its_first_frame() {
     let s = shifted(true, 0.4, 0.0);
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, 72);
     draw(&mut r, &mut view, &s, &eye());
-    assert_eq!(view.post_fx.ssr_pyramid(), Some(((W, 72), levels((W, 72)))));
+    let fitted = |size| Some((size, 1, hit_levels(size)));
+    assert_eq!(view.post_fx.ssr_pyramid(), fitted((W, 72)));
     view.resize(&r.device, 40, 30);
     let out = view.color_target_view().unwrap();
     r.render(&mut view, &s, &eye(), &out, false);
-    assert_eq!(view.post_fx.ssr_pyramid(), Some(((40, 30), 6)));
+    assert_eq!(view.post_fx.ssr_pyramid(), Some(((40, 30), 1, 3)));
 }
 
 #[test]
