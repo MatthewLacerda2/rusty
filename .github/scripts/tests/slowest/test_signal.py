@@ -65,6 +65,12 @@ class Signal(unittest.TestCase):
         _, out = run(PR, MAIN_1, MAIN_2)
         self.assertFalse(any("quick" in l for l in out if "over 20 s" in l))
 
+    def test_one_main_had_just_under_the_budget_is_near_not_new(self):
+        _, out = run(report(("gpu::edge", 20.2)), report(("gpu::edge", 17.7)))
+        self.assertEqual(out[:2], ["new over 20 s: none (against 1 tests of main)",
+                                   "near over 20 s: rusty::main gpu::edge 20.2 s (main: 17.7 s)"])
+        self.assertFalse(any(l.startswith("::warning") for l in out))
+
     def test_nothing_new_says_so(self):
         _, out = run(report(("gpu::known_slow", 30.0)), MAIN_1)
         self.assertEqual(out[0], "new over 20 s: none (against 2 tests of main)")

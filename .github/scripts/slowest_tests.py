@@ -35,7 +35,8 @@ the pull request that adds a slow test is the one told. Slow tests came back
 within two days of each trim, and a top N with no comparison names nobody. Each
 new one prints `new over 20 s: <test> <seconds> (main: <seconds or absent>)` and
 a `::warning::` annotation the run's checks page shows; one already over the
-budget on `main` prints once as `known`, never as new. The baseline is every
+budget on `main` prints once as `known`, and one `main` had within `NOISE` of
+it as `near`, never as new. The baseline is every
 JUnit file under the given paths (searched recursively, so a download's layout
 does not matter), all shards of the same leg together: a `--partition count:`
 split moves tests between shards whenever the test count changes, so a test
@@ -64,6 +65,11 @@ NEXTEST = Path(__file__).resolve().parents[2] / ".config" / "nextest.toml"
 #: over it now and not over it on `main`. 20 s is twenty times the GPU tests'
 #: median on Linux and ten times it on Metal (#2326's run 44315816576).
 BUDGET = 20.0
+#: How far under the budget `main`'s time must be for a test over it now to be
+#: new: a test `main` ran at 17.7 s read 20.2 s on a macOS shard of the same tree
+#: (run 44388240670), so a test that close is runner noise, listed as `near`, not
+#: annotated. 1.3 is the spread between runners and shards.
+NOISE = 1.3
 
 #: The shape of the `gpu` group's filter: integration tests (`kind(test)`) whose
 #: path matches the first regex, and any test whose name matches the second.
@@ -188,13 +194,14 @@ def signal(found: list[Case], main: dict[str, float] | None, why: str = "",
     b = f"{budget:g} s"
     if main is None:
         return [f"no baseline: {why}", *(f"over {b}: {key(c)} {c.seconds:.1f} s" for c in over)]
-    new = [c for c in over if main.get(key(c), 0.0) <= budget]
+    new = [c for c in over if main.get(key(c), 0.0) <= budget / NOISE]
     lines = [f"new over {b}: {key(c)} {c.seconds:.1f} s (main: "
              f"{f'{main[key(c)]:.1f} s' if key(c) in main else 'absent'})" for c in new]
     if not new:
         lines.append(f"new over {b}: none (against {len(main)} tests of main)")
-    lines += [f"known over {b}: {key(c)} {c.seconds:.1f} s (main: {main[key(c)]:.1f} s)"
-              for c in over if c not in new]
+    for c in (c for c in over if c not in new):
+        kind = "known" if main[key(c)] > budget else "near"
+        lines.append(f"{kind} over {b}: {key(c)} {c.seconds:.1f} s (main: {main[key(c)]:.1f} s)")
     lines += [f"::warning title=New test over {b}::{line}" for line in lines[:len(new)]]
     return lines
 

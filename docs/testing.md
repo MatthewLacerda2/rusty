@@ -297,7 +297,7 @@ its check and its command changed to match).
   tests between shards): a test over 20 s (`slowest_tests.BUDGET`) that `main` had under
   it, or lacked, prints `new over 20 s: <test> <seconds> (main: <seconds or absent>)` and
   a warning annotation on the PR's checks; one over it on both sides prints once as
-  `known`. With no baseline (expired, a renamed entry) it says `no baseline: <why>` and
+  `known`, and one `main` had within runner noise of it (`NOISE`, 1.3×) as `near`. With no baseline (expired, a renamed entry) it says `no baseline: <why>` and
   lists the tests over the budget. It informs, never gates, and exempts nothing: a test
   that needs the time says why in its PR; one that does not is trimmed against what it
   proves, still failing on the mutation it guards.
