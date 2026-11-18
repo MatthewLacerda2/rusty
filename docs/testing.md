@@ -1164,18 +1164,45 @@ every binary's open makes them.
   with every merge. The report names the folder it compared with.
 - **a sampling profile**: `PROFILE=1` adds, after each scene's timed run, a run of
   its own (the profiler's overhead stays out of the timings) under the platform's
-  sampling profiler, recording only each viewpoint's measured frames, warm-up
-  excluded: `perf record` on Linux (user space only, `cycles:u`, or the
-  `cpu-clock:u` timer where there is no cycle counter, with DWARF call stacks),
-  `sample` on macOS (the bench's own thread, the main one, alone: `sample`
-  samples every thread, parked or not, and the others' waits would fill the
-  table). It is a release build with line tables (the `profiling`
-  cargo profile, its own target folder). Kept beside the report:
-  `<scene>.profile.txt`, the top 40 functions by self time (samples where the
-  function was running) and by total time (samples where it was on the stack), and
-  `<scene>.folded`, the raw folded stacks (`a;b;c count`) a flame graph reads. No
-  profiler on `PATH` stops the run before anything is benched, naming the package
-  (Debian `linux-perf`, Ubuntu `linux-tools-$(uname -r)`, Fedora and Arch `perf`).
+  sampling profiler, keeping only the samples of each viewpoint's measured frames,
+  warm-up excluded. On Linux, one `perf record` covers the whole scene (user
+  space only, `cycles:u`, or the `cpu-clock:u` timer where there is no cycle
+  counter; every thread of the process; stamped with `CLOCK_MONOTONIC`), and its
+  samples are cut to the measured windows by timestamp. Its stacks are walked by
+  frame pointer, which the build forces on (the 16 KiB DWARF stack copies used
+  before came with recordings that lost most of their samples). A walk through
+  code built without frame pointers (libc, a GPU driver) can end a stack early,
+  or add a wrong caller where that code keeps other data in the frame register:
+  the self time is exact, the total time is approximate. A frame with no symbol
+  is named by the image it ran in (`[libnvidia-eglcore.so.…]`, `[libc.so.6]`),
+  and `[unknown]` is left for a frame with no image either; `sample`'s `???` is
+  such a frame too. On macOS, `sample` is attached for each viewpoint's
+  measured frames, the bench's own thread (the main one) alone: `sample` samples
+  every thread, parked or not, and the others' waits would fill the table. It is
+  a release build with line tables and frame pointers (the `profiling` cargo
+  profile, its own target folder). That binary runs the whole `PROFILE=1` run,
+  so the run's timed rows come from it too, and each report says *timed on the
+  profiling build*: on a desktop GPU (an RTX 2060), its `cpu_ms`, `renderer_ms`
+  and `gpu_raw_ms` measured inside the release build's spread, so a `BEFORE=`
+  comparison across the two builds reads true there. Kept beside the
+  report: `<scene>.profile.txt`, its header (samples, the measured seconds, and
+  where the samples landed by image: the bench binary, the GPU driver, libc),
+  then the top 40 functions by self time (samples where the function was
+  running) and by total time (samples where it was on the stack), and
+  `<scene>.folded`, the raw folded stacks (`a;b;c count`) a flame graph reads.
+- **a profile refuses itself** when its recording was not sound: fewer than 20%
+  of its samples land in a named function of the bench binary, or it holds
+  fewer than a tenth of the samples its measured seconds should give at the
+  sampling rate (lost or never taken). Then `<scene>.profile.txt` and the
+  console say *this profile is not to be trusted*, with each reason, its
+  numbers, what perf warned of (lost chunks) and where the samples landed, and
+  no tables or `.folded` are written; the run's closing lines list each refused
+  scene with the start of its first reason, and the exit status stays 0 (the
+  recording ran). A software renderer refuses too (lavapipe
+  spends most of a frame in its own unnamed JIT code): its profile says where a
+  CPU rasteriser spends time, not the engine. No profiler on `PATH` stops the
+  run before anything is benched, naming the package (Debian `linux-perf`,
+  Ubuntu `linux-tools-$(uname -r)`, Fedora and Arch `perf`).
   The profiler is tried once before any scene too: `perf` refusing to record
   stops the run there, saying why, and for `kernel.perf_event_paranoid` above 2
   what to set (`sudo sysctl kernel.perf_event_paranoid=2`). A profile that fails
