@@ -1,7 +1,8 @@
 //! SSR's GPU calls on a still frame (#2329, `gpu::ops`): the copy, the trace, one
-//! compute pass for both hit pyramids and the resolve, whatever the view's size,
-//! and no bind group made once its targets exist. Pinned against the same scene
-//! with SSR off, so what SSR alone adds shows.
+//! compute pass for both hit pyramids and the resolve (for a view whose shorter
+//! side is 9 px or more; at 8 px or less the pyramids are one level and no compute
+//! pass opens), and no bind group made once its targets exist. Pinned against the
+//! same scene with SSR off, so what SSR alone adds shows.
 
 use super::fixture::{eye, renderer, scene, H, MIRROR, RED, W};
 use crate::gpu::ops::OpCounts;
@@ -10,7 +11,7 @@ use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 /// What SSR adds to a still frame: the trace and the resolve, the pyramids'
 /// compute pass, its own submit and its params write. Before #2329, 20 render
 /// passes at 96×72 (each pyramid's six levels below the first) and two bind groups.
-/// Measured: lavapipe 2/1/1/0/1.
+/// Measured: lavapipe 2/1/1/0/1, Metal (CI) 2/1/1/0/1, RTX 2060 2/1/1/0/1.
 const SSR: OpCounts = OpCounts {
     render_passes: 2,
     compute_passes: 1,

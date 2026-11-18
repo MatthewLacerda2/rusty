@@ -14,7 +14,9 @@
 //! scene, HDRP's order.
 //!
 //! A frame records the copy, the trace, the pyramids' compute pass and the resolve
-//! into one encoder: two render passes and one compute pass, whatever the size.
+//! into one encoder: two render passes and one compute pass for a view whose shorter
+//! side is 9 px or more. At 8 px or less the hit pyramids are one level deep
+//! ([`hit_levels`](super::pyramid::hit_levels)) and no compute pass opens.
 //!
 //! The pipelines are the renderer's ([`SsrPasses`], built on first use and warmed
 //! with the rest); the copy, the pyramids, the params uniform and the two bind
