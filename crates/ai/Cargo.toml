@@ -25,4 +25,5 @@ rusty-scene = { workspace = true }
 glam = { workspace = true }
 
 [dev-dependencies]
+rusty-ecs = { workspace = true }
 rusty-test-support = { workspace = true }
