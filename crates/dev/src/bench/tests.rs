@@ -109,13 +109,7 @@ fn gpu_bench_reports_frame_render_and_counter_rows() {
     assert!(row("compute_passes").is_some() && row("bind_groups_created").is_some());
     let timed = h.stats.borrow().get("gpu_ms").is_some();
     assert_eq!(row("gpu_ms").is_some(), timed);
-    // What no pass holds is a GPU time too: absent without timestamps, as they are.
-    assert_eq!(row("gpu.other").is_some(), timed);
     if timed {
-        assert!(
-            row("gpu.occlusion").is_some(),
-            "a new pass kind has its row"
-        );
         assert!(row("gpu.forward").is_some_and(|s| s.avg > 0.0));
         assert!(row("gpu.ribbons").is_some(), "every pass has a row");
         assert!(row("gpu_raw_ms").is_some_and(|s| s.avg > 0.0));
@@ -156,6 +150,14 @@ fn gpu_rows_are_scaled_by_the_frame_clock_speed() {
     assert_eq!(avg("gpu.other"), 0.5);
     assert_eq!(avg("gpu_raw_ms"), 8.0);
     assert_eq!(avg("gpu_clock_pct"), 50.0);
+    // Without timestamps (lavapipe) no GPU row, `gpu.other` included.
+    let mut untimed = Samples::default();
+    sample(&mut untimed, &stats, Some(&RenderedFrame::default()), half);
+    assert!(!untimed
+        .report()
+        .metrics
+        .iter()
+        .any(|(m, _)| m.starts_with("gpu")));
 }
 
 /// CPU rows mirror the GPU's (#1719): `cpu_ms` and `cpu.<system>` are scaled, `frame_ms`

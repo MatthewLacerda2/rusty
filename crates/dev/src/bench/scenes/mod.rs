@@ -163,18 +163,8 @@ pub fn bench(
     if let Some(bytes) = memory::rss_peak_bytes() {
         report.push_value("rss_peak_mb", mb(bytes));
     }
-    if let Some(gpu) = harness
-        .renderer()
-        .and_then(|r| rusty_render::gpu_memory(&r.device))
-    {
-        report.push_value("gpu_mb", mb(gpu.bytes));
-        if let Some(bytes) = gpu.allocated {
-            report.push_value("gpu.allocated_mb", mb(bytes));
-        }
-        report.gpu_mb_source = Some(gpu.source.to_string());
-    }
     if let Some(r) = harness.renderer() {
-        push_resident(&mut report, &r.frame_counters);
+        push_gpu_memory(&mut report, r);
     }
     {
         let world = harness.world.borrow();
@@ -232,6 +222,19 @@ pub fn load(
     harness.render_frame();
     let load = loaded + start.elapsed();
     Ok((harness, load.as_secs_f64() * 1000.0))
+}
+
+/// `gpu_mb` (and `gpu.allocated_mb` where the source tells it) with its source,
+/// then the renderer's own resident bytes by kind.
+fn push_gpu_memory(report: &mut SceneReport, r: &rusty_render::Renderer) {
+    if let Some(gpu) = rusty_render::gpu_memory(&r.device) {
+        report.push_value("gpu_mb", mb(gpu.bytes));
+        if let Some(bytes) = gpu.allocated {
+            report.push_value("gpu.allocated_mb", mb(bytes));
+        }
+        report.gpu_mb_source = Some(gpu.source.to_string());
+    }
+    push_resident(report, &r.frame_counters);
 }
 
 /// The renderer's own resident GPU bytes by kind, as of the last measured frame,

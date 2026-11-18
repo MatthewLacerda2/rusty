@@ -12,7 +12,7 @@ use crate::draw::resources::SolidResources;
 use crate::gpu::draw_buffers::GROUP1_INSTANCES;
 use crate::gpu::grow_buffer::GrowBuffer;
 use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
-use crate::timing::GpuPass;
+use crate::timing::{GpuPass, GpuTimer};
 use crate::{RenderView, Renderer};
 
 /// The opaque draws a camera's passes make through the GPU's verdict: the group 1
@@ -123,6 +123,17 @@ impl CameraCull {
     }
 }
 
+/// The stage's one `occlusion` pair, as the select's opening half, then the
+/// closing half on its last pass: the compaction's, or the cluster cull's when it
+/// runs.
+fn stamps(timer: &GpuTimer, clustered: bool) -> [Option<wgpu::ComputePassTimestampWrites<'_>>; 3] {
+    let (open, close) = timer.compute_span(GpuPass::Occlusion);
+    match clustered {
+        true => [open, None, close],
+        false => [open, close, None],
+    }
+}
+
 impl Renderer {
     /// The `occlusion` stage: cull this camera's opaque instances by the GPU's
     /// depth pyramid, leaving the draws its passes make in `ctx.solids.culled`.
@@ -145,27 +156,16 @@ impl Renderer {
         // Before the timer lends out its pair: phase one draws through this group.
         self.update_global_bind_group();
         let mut encoder = self.device.create_command_encoder(&Default::default());
-        // One `occlusion` pair: the select opens it, the stage's last pass (the
-        // compaction, or the cluster cull's last run) closes it.
-        let (open, close) = self.gpu_timer.compute_span(GpuPass::Occlusion);
         let clustered = !plan.runs.is_empty();
-        let (compacted, culled) = if clustered {
-            (None, close)
-        } else {
-            (close, None)
-        };
+        let [open, compacted, culled] = stamps(&self.gpu_timer, clustered);
         self.dispatch(&mut encoder, (&self.hiz.select, &groups[0]), batches, open);
         let phase_one = ("Hi-Z Phase One", None);
         let solids = (opaque, Some(&first));
         self.record_depth(&mut encoder, &view.depth_view, solids, phase_one);
         pyramid.build(&self.device, &self.hiz, &mut encoder, &view.depth_view);
         self.dispatch(&mut encoder, (&self.hiz.test, &groups[1]), n, None);
-        self.dispatch(
-            &mut encoder,
-            (&self.hiz.compact, &groups[1]),
-            batches,
-            compacted,
-        );
+        let compact = (&self.hiz.compact, &groups[1]);
+        self.dispatch(&mut encoder, compact, batches, compacted);
         if clustered {
             let at = (&*pyramid, cam.visible.buffer(), ctx.view_proj);
             let cull = (&mut cam.clusters, &plan);
