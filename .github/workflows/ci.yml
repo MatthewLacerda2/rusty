@@ -298,13 +298,26 @@ jobs:
           cargo nextest run --locked ${{ matrix.features == 'dev' && '--features dev' || '' }}
           -E 'test(=test_gpu::tests::gpu_adapter_present_when_required)
           | test(=bake::denoise::tests::oidn_is_present_where_ci_requires_it)'
-      # The twenty slowest tests of this share, in the log where an agent reads
-      # them (#1976): the job summary is not served by the REST API a cloud
-      # session reads, and nextest's log names only tests past a minute.
+      # The twenty slowest tests of this share and where its time went (the
+      # `gpu` group against the rest, per binary), in the log where an agent
+      # reads them (#1976, #2326): the job summary is not served by the REST API
+      # a cloud session reads, and nextest's log names only tests past a minute.
       - name: Slowest tests
         if: always() && needs.changes.outputs.code != 'false'
         continue-on-error: true
         run: python3 .github/scripts/slowest_tests.py "junit-${{ matrix.features }}.xml" 20
+      # The report itself, for a week, so a shard's timings can be re-read after
+      # the job (#2326). One name per matrix entry; a shard is `1/2`, and `/`
+      # is not allowed in a name, so the entry's index stands in for it.
+      - name: Upload the JUnit report
+        if: always() && needs.changes.outputs.code != 'false'
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-build-test-${{ matrix.features }}-${{ strategy.job-index }}
+          path: junit-*.xml
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Doctests (this feature set)
         if: needs.changes.outputs.code != 'false' && startsWith(matrix.shard, '1/')
         run: |
@@ -416,12 +429,23 @@ jobs:
           cargo nextest run --locked --features dev
           -E 'test(=test_gpu::tests::gpu_adapter_present_when_required)
           | test(=bake::denoise::tests::oidn_is_present_where_ci_requires_it)'
-      # The ten slowest tests, in the log where an agent reads them (#1976): the
-      # job summary is not served by the REST API a cloud session reads.
+      # The ten slowest tests and where the shard's time went, in the log where
+      # an agent reads them (#1976, #2326): the job summary is not served by the
+      # REST API a cloud session reads. The cores are the runner's own, so the
+      # Metal leg's GPU-or-cores balance reads beside Linux's.
       - name: Slowest tests
         if: always()
         continue-on-error: true
         run: python3 .github/scripts/slowest_tests.py junit-dev.xml
+      - name: Upload the JUnit report
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-build-test-cross-${{ matrix.os }}-${{ strategy.job-index }}
+          path: junit-*.xml
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Doctests (dev features)
         if: matrix.shard == '2/2'
         run: cargo test --doc --features dev --locked

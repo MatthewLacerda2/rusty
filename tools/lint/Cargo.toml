@@ -20,3 +20,9 @@ allow_attributes_without_reason = "deny"
 dbg_macro = "deny"
 todo = "deny"
 unimplemented = "deny"
+
+# Optimised dev builds: the passes are std string iteration, several times slower at
+# opt-level 0, and `make`, the session hook, `make test-lint` and CI all share this one
+# build. Level 2 measured the smallest cold compile plus passes; 3 was no faster.
+[profile.dev]
+opt-level = 2
