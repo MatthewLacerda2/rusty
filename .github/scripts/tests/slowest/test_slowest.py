@@ -70,7 +70,7 @@ def run(xml: str, config: Path = slowest_tests.NEXTEST, cores: int = 4) -> str:
 class Accounting(unittest.TestCase):
     def test_the_group_against_the_rest_with_the_repos_own_filter_and_cap(self):
         out = run(SHARD)
-        self.assertIn("gpu: 3 tests, 20 s, S/cap 2 = 10 s; rest: 3 tests, 4 s, R/cores 4 = 1 s; "
+        self.assertIn("gpu: 3 tests, 20 s, S/cap 2 = 10 s; rest: 3 tests, 4 s, R/cores 4 = 1 s; (S+R)/cores = 6 s; "
                       "shard wall 40 s", out)
         self.assertIn("gpu tests: median 6.000 s, p10 4.000 s", out)
 

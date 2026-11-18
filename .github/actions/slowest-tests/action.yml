@@ -1,0 +1,54 @@
+# A suite job's "Slowest tests" step (#1976, #2326, #2350): where the shard's
+# time went, and the tests over `slowest_tests.BUDGET` that `main` had under it.
+#
+# The baseline is the same leg's JUnit artifacts (`patterns`, every shard: a
+# `count:` partition moves tests between shards) from the latest completed `ci`
+# run on `main` that kept them. A push to `main` whose tree a PR run proved
+# builds nothing (`changes`), so the walk goes back past those to a run that
+# tested, usually the nightly, inside the artifacts' 7-day retention. Nothing
+# found (expired, a renamed matrix entry) leaves the directory empty and the
+# script prints `no baseline: …`. Every step informs and none gates: the caller
+# is `continue-on-error`, and a `gh` failure only empties the baseline. The job
+# needs `actions: read` for the runs and their artifacts.
+name: Slowest tests
+description: Print a nextest JUnit report's slowest tests, its group accounting, and the tests newly over the budget against main.
+inputs:
+  report:
+    description: The JUnit report this job wrote.
+    required: true
+  count:
+    description: How many of the slowest tests to print.
+    default: "10"
+  patterns:
+    description: Space-separated artifact-name globs of `main`'s reports of the same leg.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Main's reports
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PATTERNS: ${{ inputs.patterns }}
+        BASE: ${{ runner.temp }}/slowest-baseline
+      run: |
+        mkdir -p "$BASE"
+        args=(); for p in $PATTERNS; do args+=(-p "$p"); done
+        runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=main&status=completed&per_page=30" \
+          --jq '.workflow_runs[] | select(.event == "push" or .event == "schedule") | .id' 2>&1) \
+          || { echo "baseline: the runs did not list: $runs"; exit 0; }
+        for id in $runs; do
+          rm -rf "$BASE" && mkdir -p "$BASE"  # a half-done download is no baseline
+          if gh run download "$id" -R "$GITHUB_REPOSITORY" -D "$BASE" "${args[@]}" >/dev/null 2>&1; then
+            echo "baseline: main's run $id ($(find "$BASE" -name '*.xml' | wc -l | tr -d ' ') reports)"; exit 0
+          fi
+        done
+        rm -rf "$BASE"
+        echo "baseline: no completed run on main keeps an artifact named $PATTERNS"
+    - name: Report
+      shell: bash
+      env:
+        BASE: ${{ runner.temp }}/slowest-baseline
+        REPORT: ${{ inputs.report }}
+        COUNT: ${{ inputs.count }}
+      run: python3 .github/scripts/slowest_tests.py "$REPORT" "$COUNT" --baseline "$BASE"

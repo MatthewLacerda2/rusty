@@ -284,13 +284,23 @@ its check and its command changed to match).
   (#2264): `build-test (default, 1/1)` runs the default suite (all but the `gpu` group,
   which the `dev` suite runs: *Which suite runs the GPU tests*), and `build-test (dev,
   1/2)` and `(dev, 2/2)` split the `dev` one with nextest's `--partition count:k/2`;
-  each prints its twenty slowest tests and where its time went, the `gpu` group's test-seconds over its cap against the rest's over the runner's cores beside the shard's wall, per binary (step *Slowest tests*; the macOS shards print ten), keeps its JUnit report as a 7-day `junit-*` artifact, and each runs the GPU and
+  each prints its twenty slowest tests and where its time went, the `gpu` group's test-seconds over its cap against the rest's over the runner's cores (and both over the cores, the bound on lavapipe, where the GPU tests are CPU work) beside the shard's wall, per binary (step *Slowest tests*; the macOS shards print ten), keeps its JUnit report as a 7-day artifact named by the shard (`junit-build-test-dev-1of2`, `junit-build-test-cross-macos-26-2of2`), and each runs the GPU and
   OIDN canaries again on its own runner (step *Canaries*), since a partition puts each
   canary in one shard only. The macOS leg (`build-test-cross`) runs the nextest suite with
   `dev` only, the superset (#1976), split in two, `build-test-cross (macos-26, 1/2)` and
   `(macos-26, 2/2)`, each with the canaries; 2/2 also runs the `dev` doctests and the lint
   xtask's tests, and the default doctests run on Linux only (#2276). A job past three quarters of its `timeout-minutes`
   on `main` files an issue by itself (`ci_headroom.py`, `docs/linting.md`). See *The test runner* below.
+- **A pull request that adds a slow test is told** (#2350). Each suite job's *Slowest
+  tests* step first compares its report with the same leg's reports from `main`'s
+  latest run that kept them (every shard together, since a `count:` partition moves
+  tests between shards): a test over 20 s (`slowest_tests.BUDGET`) that `main` had under
+  it, or lacked, prints `new over 20 s: <test> <seconds> (main: <seconds or absent>)` and
+  a warning annotation on the PR's checks; one over it on both sides prints once as
+  `known`. With no baseline (expired, a renamed entry) it says `no baseline: <why>` and
+  lists the tests over the budget. It informs, never gates, and exempts nothing: a test
+  that needs the time says why in its PR; one that does not is trimmed against what it
+  proves, still failing on the mutation it guards.
 - A test never reads a developer's game project (#782). `Harness::new` runs in a
   workspace of its own, `<out_dir>/workspace`, seeded fresh from the test-fixture
   project's scripts and the bundled ones, and the scene's relative script paths

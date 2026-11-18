@@ -168,6 +168,9 @@ jobs:
   # already built that very tree (`changes`, #1784).
   build-test:
     needs: changes
+    permissions:
+      contents: read
+      actions: read  # main's runs and their JUnit artifacts (slowest-tests)
     strategy:
       # One shard failing must not cancel the others: each one's verdict is
       # what tells a real red from a cancelled run.
@@ -307,22 +310,36 @@ jobs:
       # `gpu` group against the rest, per binary), in the log where an agent
       # reads them (#1976, #2326): the job summary is not served by the REST API
       # a cloud session reads, and nextest's log names only tests past a minute.
+      # First, the tests over the budget that `main`'s Linux reports had under
+      # it, annotated, so the PR that adds a slow test is told (#2350).
       - name: Slowest tests
         if: always() && needs.changes.outputs.code != 'false'
         continue-on-error: true
-        run: python3 .github/scripts/slowest_tests.py "junit-${{ matrix.features }}.xml" 20
+        uses: ./.github/actions/slowest-tests
+        with:
+          report: junit-${{ matrix.features }}.xml
+          count: "20"
+          patterns: junit-build-test-default-* junit-build-test-dev-*
       # The report itself, for a week, so a shard's timings can be re-read after
-      # the job (#2326). One name per matrix entry; a shard is `1/2`, and `/`
-      # is not allowed in a name, so the entry's index stands in for it.
+      # the job (#2326) and the next PR's run compares against it (#2350). Named
+      # by the shard, `1/2` as `1of2` (`/` is refused in a name), not by the
+      # entry's index, which is not the shard; a re-run job overwrites its own.
+      - name: Shard name
+        if: always() && needs.changes.outputs.code != 'false'
+        id: shard
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: echo "name=${SHARD/\//of}" >> "$GITHUB_OUTPUT"
       - name: Upload the JUnit report
         if: always() && needs.changes.outputs.code != 'false'
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
-          name: junit-build-test-${{ matrix.features }}-${{ strategy.job-index }}
+          name: junit-build-test-${{ matrix.features }}-${{ steps.shard.outputs.name }}
           path: junit-*.xml
           if-no-files-found: ignore
           retention-days: 7
+          overwrite: true
       - name: Doctests (this feature set)
         if: needs.changes.outputs.code != 'false' && startsWith(matrix.shard, '1/')
         run: |
@@ -361,6 +378,9 @@ jobs:
   # the free plan's five concurrent macOS jobs, so no shard queues for one.
   build-test-cross:
     needs: changes
+    permissions:
+      contents: read
+      actions: read  # main's runs and their JUnit artifacts (slowest-tests)
     strategy:
       fail-fast: false
       matrix:
@@ -437,20 +457,31 @@ jobs:
       # The ten slowest tests and where the shard's time went, in the log where
       # an agent reads them (#1976, #2326): the job summary is not served by the
       # REST API a cloud session reads. The cores are the runner's own, so the
-      # Metal leg's GPU-or-cores balance reads beside Linux's.
+      # Metal leg's GPU-or-cores balance reads beside Linux's. First, the tests
+      # newly over the budget against `main`'s Metal reports (#2350).
       - name: Slowest tests
         if: always()
         continue-on-error: true
-        run: python3 .github/scripts/slowest_tests.py junit-dev.xml
+        uses: ./.github/actions/slowest-tests
+        with:
+          report: junit-dev.xml
+          patterns: junit-build-test-cross-${{ matrix.os }}-*
+      - name: Shard name
+        if: always()
+        id: shard
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: echo "name=${SHARD/\//of}" >> "$GITHUB_OUTPUT"
       - name: Upload the JUnit report
         if: always()
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
-          name: junit-build-test-cross-${{ matrix.os }}-${{ strategy.job-index }}
+          name: junit-build-test-cross-${{ matrix.os }}-${{ steps.shard.outputs.name }}
           path: junit-*.xml
           if-no-files-found: ignore
           retention-days: 7
+          overwrite: true
       - name: Doctests (dev features)
         if: matrix.shard == '2/2'
         run: cargo test --doc --features dev --locked
