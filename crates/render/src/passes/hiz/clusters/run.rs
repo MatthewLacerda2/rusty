@@ -1,6 +1,7 @@
 //! One camera's cluster cull (#1968): its buffers, kept per view and stack
 //! place like the instance cull's, and the three dispatches per clustered batch.
 
+use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
 use std::sync::Arc;
 
 use glam::{Mat4, Vec4};
@@ -119,7 +120,7 @@ impl Renderer {
                 .group;
             let offset = [r as u32 * RUN_STRIDE as u32];
             let jobs = run.jobs.len() as u32;
-            let mut pass = encoder.begin_compute_pass(&Default::default());
+            let mut pass = encoder.counted_compute_pass(&Default::default());
             pass.set_bind_group(0, group, &offset);
             pass.set_bind_group(1, mesh, &[]);
             pass.set_pipeline(pipes.test.get());
@@ -180,7 +181,7 @@ impl Renderer {
             levels: pyramid.levels(),
             object_stride: stride as u32,
         };
-        queue.write_buffer(&cull.params, 0, bytemuck::bytes_of(&params));
+        queue.counted_write_buffer(&cull.params, 0, bytemuck::bytes_of(&params));
         cull.jobs
             .upload(device, queue, bytemuck::cast_slice(&plan.jobs));
         let mut runs = vec![0u32; plan.runs.len().max(1) * RUN_STRIDE as usize / 4];

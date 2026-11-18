@@ -118,8 +118,8 @@ impl Renderer {
         output: &wgpu::TextureView,
         editor_mode: bool,
     ) {
-        // The frame's CPU cost (`frame_cost`) spans the whole call.
-        self.gpu_timer.begin_frame();
+        // The frame's CPU cost (`frame_cost`) and GPU call counts span the whole call.
+        self.begin_frame_clocks();
         // The game's main view blended between the last two ticks (#1877): every
         // camera entity is posed here, by `draw_poses`, never by a frontend.
         let main = rusty_scene::camera::main_camera(scene).filter(|_| !editor_mode);
@@ -203,7 +203,7 @@ impl Renderer {
         camera: &Camera,
         output: &wgpu::TextureView,
     ) {
-        self.gpu_timer.begin_frame();
+        self.begin_frame_clocks();
         self.prepare_frame(view, scene, camera);
         let shadows = borrow_post_source(scene, rusty_scene::camera::main_camera(scene))
             .source()

@@ -25,6 +25,7 @@
 
 mod effect;
 
+use crate::gpu::ops::{CountedDevice as _, CountedQueue as _};
 pub(crate) use effect::EFFECT;
 
 use std::collections::{BTreeMap, HashMap};
@@ -126,7 +127,7 @@ impl CustomChain {
     ) {
         for e in effects.iter().filter(|e| !e.layout.params.is_empty()) {
             let packed: PackedParams = e.layout.pack(values);
-            queue.write_buffer(&e.buffer, 0, bytemuck::cast_slice(&packed));
+            queue.counted_write_buffer(&e.buffer, 0, bytemuck::cast_slice(&packed));
         }
     }
 }
@@ -215,7 +216,7 @@ impl EffectCache {
             contents: bytemuck::cast_slice(&packed),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
-        let params = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let params = device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some(name),
             layout: &self.params_layout,
             entries: &[wgpu::BindGroupEntry {

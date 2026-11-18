@@ -47,6 +47,7 @@ pub(crate) mod layout_entries;
 pub(crate) mod lightmaps;
 pub(crate) mod material_cache;
 pub mod mesh;
+pub(crate) mod ops;
 pub(crate) mod pipelines;
 pub(crate) mod shaders;
 pub(crate) mod textures;

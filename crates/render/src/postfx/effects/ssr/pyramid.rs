@@ -19,6 +19,7 @@
 use crate::gpu::bind_entry as entry;
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::texture_entry;
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _};
 use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::HDR_FORMAT;
@@ -125,7 +126,7 @@ impl Pyramid {
         };
         let steps = (1..count)
             .map(|mip| {
-                let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                let group = device.counted_bind_group(&wgpu::BindGroupDescriptor {
                     label: Some("SSR Pyramid Bind Group"),
                     layout: &pass.layout,
                     entries: &[entry(
@@ -154,7 +155,7 @@ impl Pyramid {
     /// Record every level below the first from the one above, in order.
     pub(crate) fn build(&self, encoder: &mut wgpu::CommandEncoder, pass: &PyramidPass) {
         for (target, group) in &self.steps {
-            let mut rp = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut rp = encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("SSR Pyramid Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: target,

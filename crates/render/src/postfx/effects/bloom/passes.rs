@@ -7,6 +7,7 @@ use super::chain::BloomTargets;
 use crate::gpu::bind_entry as entry;
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
+use crate::gpu::ops::CountedDevice as _;
 use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::{PfxTarget, PostFx, HDR_FORMAT};
@@ -88,7 +89,7 @@ impl BloomPasses {
         low: &wgpu::TextureView,
         high: &wgpu::TextureView,
     ) -> wgpu::BindGroup {
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
+        device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Bloom Bind Group"),
             layout: &self.layout,
             entries: &[
