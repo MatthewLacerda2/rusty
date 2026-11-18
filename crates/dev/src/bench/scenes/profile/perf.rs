@@ -1,8 +1,17 @@
-//! Linux: `perf record` attached to this process for one viewpoint's measured
-//! frames, user space only (`cycles:u`, else the `cpu-clock:u` timer where the
-//! machine has no cycle counter, a VM), so `kernel.perf_event_paranoid` up to 2
-//! lets it run unprivileged. The call stacks are unwound from DWARF (a release
-//! build keeps no frame pointers), and `perf script` prints them for [`parse`].
+//! Linux: one `perf record` attached to this process for a whole scene, user
+//! space only (`cycles:u`, else the `cpu-clock:u` timer where the machine has no
+//! cycle counter, a VM), so `kernel.perf_event_paranoid` up to 2 lets it run
+//! unprivileged. Its samples are stamped with `CLOCK_MONOTONIC`, and [`parse`]
+//! keeps those inside the viewpoints' measured windows ([`Window`]), so the
+//! warm-ups between them never count. The call stacks are walked by frame
+//! pointer (the `profiling` build forces them on), a few words a sample where
+//! the 16 KiB DWARF stack copies used before kept perf's ring buffer far busier
+//! (the recordings that held them lost most of their samples; which of their
+//! settings lost them was not isolated). A walk through code built without
+//! frame pointers (the system libraries, a GPU driver) can end a stack early,
+//! or invent a caller where that code keeps something else in the frame
+//! register; the leaf, and so the self time, is always right. An unnamed frame
+//! is named by its image ([`trust::frame_name`]).
 
 use std::path::{Path, PathBuf};
 // lint: allow(subprocess) the bench drives the platform's profiler, `perf`, attached to itself
@@ -10,10 +19,11 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
 use super::folded::Folded;
+use super::trust::{self, Tally};
+use super::window::{self, Window};
 
-/// Samples a second: enough for a few thousand samples a viewpoint, few enough
-/// that the DWARF stacks stay small.
-const HZ: &str = "499";
+/// Samples a second: a few thousand a viewpoint.
+pub const HZ: u32 = 499;
 /// The events tried in order: the cycle counter, then the kernel's timer.
 const EVENTS: [&str; 2] = ["cycles:u", "cpu-clock:u"];
 
@@ -22,29 +32,27 @@ pub struct Recording {
     perf: PathBuf,
     child: Child,
     data: PathBuf,
+    /// What perf prints while it records (lost samples, its summary).
+    log: PathBuf,
     pub event: &'static str,
 }
 
 /// Start recording this process into `data`, with the `perf` at `perf`.
 pub fn start(perf: &Path, data: &Path) -> Result<Recording, String> {
+    let log = data.with_extension("log");
     let mut refused = String::new();
     for event in EVENTS {
         let pid = std::process::id().to_string();
+        // A file, not a pipe: a pipe nobody reads until the end could fill and stall perf.
+        // lint: allow(asset-write) perf's own log, read back and deleted by this module
+        let stderr = std::fs::File::create(&log).map_err(|e| format!("{}: {e}", log.display()))?;
         let child = Command::new(perf)
-            .args([
-                "record",
-                "-q",
-                "-e",
-                event,
-                "-F",
-                HZ,
-                "--call-graph",
-                "dwarf,16384",
-            ])
+            .args(["record", "-e", event, "-F", &HZ.to_string()])
+            .args(["--call-graph", "fp", "-k", "CLOCK_MONOTONIC"])
             .args(["-p", &pid, "-o"])
             .arg(data)
             .stdout(Stdio::null())
-            .stderr(Stdio::piped())
+            .stderr(stderr)
             .spawn()
             .map_err(|e| format!("cannot run {}: {e}", perf.display()))?;
         let mut child = child;
@@ -57,18 +65,20 @@ pub fn start(perf: &Path, data: &Path) -> Result<Recording, String> {
                     perf,
                     child,
                     data,
+                    log,
                     event,
                 });
             }
-            _ => refused = stderr_of(child),
+            _ => refused = std::fs::read_to_string(&log).unwrap_or_default(),
         }
     }
     Err(refusal(&refused))
 }
 
 impl Recording {
-    /// Stop recording (perf writes its file on SIGINT) and fold what it sampled.
-    pub fn stop(mut self) -> Result<Folded, String> {
+    /// Stop recording (perf writes its file on SIGINT) and fold what it sampled
+    /// inside `windows`; a leaf in the image named `own` is the bench's own.
+    pub fn stop(mut self, windows: &[Window], own: &str) -> Result<(Folded, Tally), String> {
         // lint: allow(subprocess) SIGINT is how perf record is told to finish its file
         let sent = Command::new("kill")
             .args(["-INT", &self.child.id().to_string()])
@@ -78,24 +88,37 @@ impl Recording {
         }
         let _ = self.child.wait();
         let script = Command::new(&self.perf)
-            .args(["script", "-F", "ip,sym", "-i"])
+            .args(["script", "-F", "time,ip,sym,dso", "--no-inline", "-i"])
             .arg(&self.data)
-            .stderr(Stdio::null())
             .output()
             .map_err(|e| format!("perf script: {e}"))?;
+        let recorded = std::fs::read_to_string(&self.log).unwrap_or_default();
         let _ = std::fs::remove_file(&self.data);
+        let _ = std::fs::remove_file(&self.log);
         if !script.status.success() {
-            return Err("perf script could not read the recording".into());
+            let said = String::from_utf8_lossy(&script.stderr);
+            return Err(format!(
+                "perf script could not read the recording: {}",
+                said.trim()
+            ));
         }
-        Ok(parse(&String::from_utf8_lossy(&script.stdout)))
+        let (folded, mut tally) = parse(&String::from_utf8_lossy(&script.stdout), windows, own);
+        let said = format!("{recorded}\n{}", String::from_utf8_lossy(&script.stderr));
+        tally.warnings.extend(warnings(&said));
+        Ok((folded, tally))
     }
 }
 
-fn stderr_of(child: Child) -> String {
-    let out = child.wait_with_output();
-    out.map_or(String::new(), |o| {
-        String::from_utf8_lossy(&o.stderr).into_owned()
-    })
+/// The lines of what perf printed that say samples went missing.
+fn warnings(said: &str) -> Vec<String> {
+    let lost = |l: &&str| l.contains("lost") || l.contains("LOST");
+    let mut out: Vec<String> = said
+        .lines()
+        .filter(lost)
+        .map(|l| format!("perf: {}", l.trim()))
+        .collect();
+    out.dedup();
+    out
 }
 
 /// What to say when perf would not record, from what it printed.
@@ -118,63 +141,68 @@ fn refusal(stderr: &str) -> String {
     out
 }
 
-/// `perf script -F ip,sym` text into folded stacks: one sample per block of
-/// frame lines (`<hex ip> <symbol>`, leaf first), blocks parted by a blank line.
-pub fn parse(text: &str) -> Folded {
+/// `perf script -F time,ip,sym,dso` text into folded stacks, keeping the samples
+/// stamped inside one of `windows`. A sample is a header line (`<seconds>:`,
+/// with its one frame on it when there is no call stack) then its frame lines
+/// (`<hex ip> <symbol> (<image>)`, leaf first), parted by a blank line.
+pub fn parse(text: &str, windows: &[Window], own: &str) -> (Folded, Tally) {
     let mut folded = Folded::default();
-    let mut frames: Vec<String> = Vec::new();
-    let mut flush = |frames: &mut Vec<String>| {
-        frames.reverse();
-        folded.add(frames, 1);
+    let mut tally = Tally::default();
+    // The sample being read: whether it is kept, and its frames as (symbol, image).
+    let mut keep = false;
+    let mut frames: Vec<(String, String)> = Vec::new();
+    let mut flush = |keep: bool, frames: &mut Vec<(String, String)>| {
+        if keep && !frames.is_empty() {
+            let (sym, image) = &frames[0];
+            tally.count(image, sym, own, 1);
+            let names: Vec<String> = (frames.iter().rev())
+                .map(|(s, image)| trust::frame_name(s, image))
+                .collect();
+            folded.add(&names, 1);
+        }
         frames.clear();
     };
     for line in text.lines() {
         let line = line.trim();
         if line.is_empty() {
-            flush(&mut frames);
+            flush(keep, &mut frames);
+            keep = false;
             continue;
         }
-        let Some((ip, sym)) = line.split_once(char::is_whitespace) else {
-            continue;
+        let frame = match stamp(line) {
+            Some((t, rest)) => {
+                flush(keep, &mut frames);
+                keep = window::inside(windows, t);
+                rest
+            }
+            None => line,
         };
-        if u64::from_str_radix(ip, 16).is_ok() {
-            frames.push(sym.trim().to_string());
-        }
+        frames.extend(parse_frame(frame));
     }
-    flush(&mut frames);
-    folded
+    flush(keep, &mut frames);
+    (folded, tally)
+}
+
+/// A sample's header: its stamp in nanoseconds, and what follows on the line.
+fn stamp(line: &str) -> Option<(u64, &str)> {
+    let (head, rest) = line.split_once(':')?;
+    // Only the stamp stands before the colon: a frame's `::` follows its ip and a space.
+    let t = window::parse_stamp(head.trim())?;
+    Some((t, rest.trim()))
+}
+
+/// One frame line, `<hex ip> <symbol> (<image>)`, into (symbol, image).
+fn parse_frame(line: &str) -> Option<(String, String)> {
+    let (ip, rest) = line.split_once(char::is_whitespace)?;
+    u64::from_str_radix(ip, 16).ok()?;
+    let rest = rest.trim();
+    let (sym, image) = match rest.rfind(" (") {
+        Some(at) if rest.ends_with(')') => (&rest[..at], &rest[at + 2..rest.len() - 1]),
+        _ => (rest, ""),
+    };
+    Some((sym.trim().to_string(), image.to_string()))
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn script_blocks_fold_root_first_with_unknown_frames_kept() {
-        let text = "\t    55d0c0ffee10 rusty_render::Renderer::render\n\
-                    \t    55d0c0ffee00 rusty_dev::bench::measure_posed\n\
-                    \t    55d0c0ffe000 main\n\
-                    \n\
-                    \t    7f0000000010 [unknown]\n\
-                    \t    55d0c0ffe000 main\n\
-                    \n\
-                    \t    55d0c0ffee10 rusty_render::Renderer::render\n\
-                    \t    55d0c0ffee00 rusty_dev::bench::measure_posed\n\
-                    \t    55d0c0ffe000 main\n";
-        let f = parse(text);
-        assert_eq!(f.samples(), 3);
-        let stack = "main;rusty_dev::bench::measure_posed;rusty_render::Renderer::render";
-        assert_eq!(f.0.get(stack), Some(&2));
-        assert_eq!(f.0.get("main;[unknown]"), Some(&1));
-    }
-
-    #[test]
-    fn a_paranoid_refusal_says_what_to_set() {
-        let said =
-            refusal("Error: Access to performance monitoring is limited by perf_event_paranoid");
-        assert!(
-            said.contains("sudo sysctl kernel.perf_event_paranoid=2"),
-            "{said}"
-        );
-    }
-}
+#[path = "perf_tests.rs"]
+mod tests;
