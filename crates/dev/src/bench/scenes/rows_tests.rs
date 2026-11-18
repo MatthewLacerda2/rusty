@@ -56,7 +56,11 @@ fn measured() -> Report {
     let path = root.join("assets/scenes/a.scene");
     rusty_edit::save_to_file(&scene, &path.to_string_lossy()).unwrap();
     let settings = ProjectSettings::default();
-    let (mut harness, _) = load(&root.join("out"), &root, "a", settings, (64, 64)).unwrap();
+    let opts = Options {
+        size: (64, 64),
+        ..Options::default()
+    };
+    let (mut harness, _) = load(&root.join("out"), &root, "a", settings, opts).unwrap();
     let mut world = harness.world.borrow_mut();
     let schedule = world.resources.schedule_mut();
     schedule.add_system(Stage::FixedUpdate, napper);
