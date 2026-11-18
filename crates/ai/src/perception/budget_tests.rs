@@ -53,3 +53,20 @@ fn two_runs_know_the_same_things_every_tick() {
     };
     assert_eq!(run(), run());
 }
+
+#[test]
+fn a_step_with_colliders_and_no_perceiver_walks_no_collider() {
+    use rusty_components::ColliderComponent;
+    use rusty_ecs::world::walks;
+    let (mut a, bots, _) = row();
+    let armed = walks::of::<ColliderComponent>();
+    a.step(1);
+    let walked = walks::of::<ColliderComponent>();
+    assert!(walked > armed, "a perceiver's step walks them");
+    let before = (a.rays.clone(), walked);
+    for bot in bots {
+        a.scene.world.set_ai_perception(bot, None);
+    }
+    a.step(3);
+    assert_eq!((a.rays.clone(), walks::of::<ColliderComponent>()), before);
+}

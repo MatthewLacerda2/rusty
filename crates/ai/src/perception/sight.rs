@@ -20,8 +20,8 @@ use rusty_scene::{layer_in_mask, Scene};
 
 /// A sight target: where a ray aims at it and where it stands (its feet,
 /// [`stand::feet`]: the last-known position a script reads).
-struct Target {
-    id: u32,
+pub(super) struct Target {
+    pub(super) id: u32,
     layer: u8,
     aim: Vec3,
     position: Vec3,
@@ -33,7 +33,7 @@ struct Pair {
     target: usize,
     eye: Vec3,
     /// The perceiver's own body, which never blocks its sight: its outermost
-    /// ancestor-or-self that is a sight target's body, else itself.
+    /// ancestor-or-self that is a moving body, a target or not, else itself.
     body: u32,
     mask: u32,
     was_seen: bool,
@@ -53,21 +53,24 @@ pub(super) fn look(
         .iter()
         .filter_map(|&p| w.ai_perception(p).map(|c| c.sight_mask))
         .fold(0, |a, m| a | m);
-    look_on(scene, physics, perceivers, rays, mask)
+    let targets = targets(scene, mask);
+    look_at(scene, physics, perceivers, rays, &targets, |p| {
+        body_of(scene, p)
+    })
 }
 
-/// [`look`] with the targets cut to the layers of `mask` (all of them with
-/// `u32::MAX`: the unfiltered list, what a test compares the prefilter to).
-pub(super) fn look_on(
+/// [`look`] over a given target list, each perceiver's own body from `body`:
+/// the seam a test feeds the pre-prefilter rules through to compare the two.
+pub(super) fn look_at(
     scene: &Scene,
     physics: Option<&PhysicsWorld>,
     perceivers: &[u32],
     rays: &mut SightRays,
-    mask: u32,
+    targets: &[Target],
+    body: impl Fn(u32) -> u32,
 ) -> Vec<BTreeMap<u32, Vec3>> {
-    let targets = targets(scene, mask);
-    let pairs = pairs(scene, perceivers, &targets);
-    let traced = schedule(&pairs, perceivers, &targets, rays);
+    let pairs = pairs(scene, perceivers, targets, body);
+    let traced = schedule(&pairs, perceivers, targets, rays);
     let mut seen = vec![BTreeMap::new(); perceivers.len()];
     for (pair, traced) in pairs.iter().zip(traced) {
         let target = &targets[pair.target];
@@ -99,13 +102,20 @@ fn targets(scene: &Scene, mask: u32) -> Vec<Target> {
         .into_iter()
         .filter(|&id| w.is_active_in_hierarchy(id))
         .filter(|&id| !w.ancestors(id).any(|a| w.is_moving_body(a)))
-        .map(|id| Target {
+        .map(|id| Target::of(scene, id))
+        .collect()
+}
+
+impl Target {
+    /// `id` as a target: its layer, where a ray aims at it and where it stands.
+    pub(super) fn of(scene: &Scene, id: u32) -> Self {
+        Self {
             id,
-            layer: w.layer(id),
+            layer: scene.world.layer(id),
             aim: aim(scene, id),
             position: stand::feet(scene, id),
-        })
-        .collect()
+        }
+    }
 }
 
 /// `p`'s own body: its outermost ancestor-or-self that is a moving body, else
@@ -133,7 +143,12 @@ fn aim(scene: &Scene, id: u32) -> Vec3 {
 }
 
 /// The pairs inside range and cone, in (perceiver, target) order.
-fn pairs(scene: &Scene, perceivers: &[u32], targets: &[Target]) -> Vec<Pair> {
+fn pairs(
+    scene: &Scene,
+    perceivers: &[u32],
+    targets: &[Target],
+    body: impl Fn(u32) -> u32,
+) -> Vec<Pair> {
     let w = &scene.world;
     let mut out = Vec::new();
     for (pi, &p) in perceivers.iter().enumerate() {
@@ -144,7 +159,7 @@ fn pairs(scene: &Scene, perceivers: &[u32], targets: &[Target]) -> Vec<Pair> {
         let forward = w.world_rotation(p) * Vec3::Z;
         let half = c.sight_angle.to_radians();
         let lineage: BTreeSet<u32> = w.self_and_ancestors(p).collect();
-        let body = body_of(scene, p);
+        let body = body(p);
         for (ti, t) in targets.iter().enumerate() {
             // Its own body: under the perceiver (its hitboxes) or above it (a
             // perceiver on a `Head` child of the character).

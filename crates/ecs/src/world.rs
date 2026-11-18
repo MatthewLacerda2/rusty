@@ -267,12 +267,13 @@ fn drop_slots(order: &mut Vec<u32>, slots: &[usize]) {
     order.truncate(write);
 }
 
-/// How many times each column was walked (`ids_with_*`) on this thread: what lets a
-/// test hold that a frame walks no column it should not (the retained render
-/// scene's idle frame, #1706). A test hook: compiled in every build, since the
-/// test that reads it is another crate's, and counting only on a thread that
-/// asked [`walks::of`] once, so a build that never asks pays one thread-local
-/// read per walk.
+/// How many times each column was walked on this thread (every query built on
+/// `World::each_core_with`: `ids_with_*`, and `World::moving_bodies_on`'s Collider
+/// and CharacterController walks on each perception tick with a perceiver): what
+/// lets a test hold that a frame walks no column it should not (#1706). A test hook:
+/// compiled in every build, since the test that reads it is another crate's, and
+/// counting only on a thread that asked [`walks::of`] once, so a build that never
+/// asks pays one thread-local read per walk.
 #[doc(hidden)]
 pub mod walks {
     use std::cell::{Cell, RefCell};

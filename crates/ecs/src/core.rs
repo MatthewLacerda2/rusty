@@ -82,7 +82,10 @@ impl World {
     }
 
     /// Whether `id` is a moving body: not static, with a Collider or a
-    /// CharacterController. Activity is the caller's question.
+    /// CharacterController (what AI sight sees, and treats as one character with
+    /// its hitboxes). Not [`World::body_carrier`]'s physics body, a Rigidbody or a
+    /// CharacterController: a non-static Collider alone is a moving body here.
+    /// Activity is the caller's question.
     pub fn is_moving_body(&self, id: u32) -> bool {
         !self.is_static(id) && (self.has_collider(id) || self.has_character_controller(id))
     }
