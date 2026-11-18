@@ -109,6 +109,7 @@ fn transport(
 fn play_refusal(scene: &Scene) -> Option<String> {
     #[cfg(feature = "dev")]
     return scene.play_refusal();
+    // lint: allow(gpu-default-only) ship stub: no play refusal without dev's bakes; a value, nothing drawn
     #[cfg(not(feature = "dev"))]
     {
         let _ = scene;

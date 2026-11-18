@@ -1,5 +1,6 @@
 #[cfg(feature = "dev")]
 pub mod bake;
+// lint: allow(gpu-default-only) ship stub: the bakes are dev-only, so there is no Generate Lighting button to draw
 #[cfg(not(feature = "dev"))]
 mod bake {
     /// No Generate Lighting button in a ship build (the bakes are dev-only actions).

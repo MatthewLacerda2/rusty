@@ -63,8 +63,13 @@ jobs:
   # `main` whose tree a recent successful run already built (#1784): the squash
   # of an up-to-date head has the head's tree, which its PR run just proved.
   # `proved_tree.py` checks that mechanically, keeps the full run when the push
-  # moves a cache key (Cargo.toml/lock, the toolchain, `.cargo/`, this file), and
-  # fails toward running on any error. Skipped, the run's gating jobs report
+  # moves a cache key (Cargo.toml/lock, the toolchain, `.cargo/`,
+  # `.github/actions/`, this file) or changes the decider (the script and what it
+  # imports), and fails toward running on any error. A ready PR's run asks too
+  # (#2333): its test merge's tree, built green by a dispatch or push run (a head
+  # holding `main` that a coder proved before readying), skips the same way,
+  # under the same full-run rules; a PR that changes the decider or either
+  # gating workflow never asks (the `decider` filter). Skipped, the run's gating jobs report
   # `skipped`/`success` exactly as on a Markdown-only merge, so `ci-gate` passes.
   changes:
     timeout-minutes: 5
@@ -104,6 +109,14 @@ jobs:
               # the game CLAUDE.md template a project's edit-open embeds (#1313).
               - 'docs/game-agent.md'
               - 'crates/core/src/project/game_claude.md'
+            # What decides a skip (#2333): a PR that changes it never asks
+            # `proved_tree.py`, since the step would run the PR's own copy.
+            decider:
+              - '.github/scripts/proved_tree.py'
+              - '.github/scripts/ghrest.py'
+              - '.github/scripts/merging/verdict/**'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/lint.yml'
             # What can stop `fuzz/` compiling (`fuzz-check`): the target and its
             # manifest; the root package's manifest and re-exports (`src/lib.rs`),
             # which it imports through; every member's manifest (a feature or
@@ -130,13 +143,14 @@ jobs:
       # Markdown-only change already skips. On a PR `github.sha` is the test
       # merge, whose tree a dispatch run on a head holding `main` built. A change
       # to a cache key's inputs (`Cargo.lock`, the toolchain, `.github/actions/`,
-      # which pins the CI tools, #1973), this file or the script runs in full.
+      # which pins the CI tools, #1973), this file or the script runs in full;
+      # so does a `decider` change, held here because a PR would run its own copy.
       # A draft and the nightly never ask; a dispatch always builds. A lookup that
       # breaks (no `gh`, a hung call) must not fail `changes` and turn `main`
       # red: the step may fail or time out, and its empty output means a full run.
       - name: Was this tree already proved?
         id: proved
-        if: (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)) && steps.filter.outputs.code != 'false'
+        if: (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)) && steps.filter.outputs.code != 'false' && steps.filter.outputs.decider != 'true'
         continue-on-error: true
         timeout-minutes: 2
         env:
@@ -180,9 +194,9 @@ jobs:
           - { features: default, shard: 1/1 }
           - { features: dev, shard: 1/2 }
           - { features: dev, shard: 2/2 }
-    # A guard against a hang, not a budget a shard must fit: the slowest share,
-    # the default suite (one fewer split than `dev`), measured 303-411 s of
-    # nextest once split, on a fast runner and a slow one.
+    # A guard against a hang, not a budget a shard must fit: the slowest shares
+    # are the two `dev` shards, which run the gpu group (355 s and 562 s of nextest
+    # in run 44351591966); the default entry, which leaves that group to them, 73 s.
     timeout-minutes: 30
     runs-on: ubuntu-24.04
     if: >-
@@ -275,11 +289,16 @@ jobs:
       # below. It does not run doctests, hence the `--doc` step. A matrix entry
       # runs one of the two test steps, under its own name: the scripts look for
       # each by name (`proved_tree.BUILT`, `verdict.changes.DRIFT_STEP_WORDS`).
+      # The two steps do not run the same set: the default entry compiles every
+      # test target but runs every test except the `gpu` group (`-E 'not
+      # group(gpu)'`, as `make test`'s default pass), which the `dev` shards run,
+      # `dev` adding to the default features (docs/testing.md, *Which suite runs
+      # the GPU tests*; the `gpu-default-only` lint holds the premise).
       - name: Test (engine, default)
         if: needs.changes.outputs.code != 'false' && matrix.features == 'default'
         run: |
           rc=0
-          cargo nextest run --profile ci --locked --partition "count:${{ matrix.shard }}" || rc=$?
+          cargo nextest run --profile ci --locked -E 'not group(gpu)' --partition "count:${{ matrix.shard }}" || rc=$?
           cp target/nextest/ci/junit.xml junit-default.xml || true
           exit "$rc"
       - name: Test (engine, dev features)

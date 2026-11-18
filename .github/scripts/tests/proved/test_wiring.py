@@ -70,6 +70,27 @@ class Wiring(unittest.TestCase):
                 self.assertIn(f"- uses: actions/checkout@v7\n        if: github.event_name == 'push' || {ready}\n",
                               text)
 
+    def test_a_decider_change_never_asks_the_script(self):
+        # #2333: a PR's step runs the PR's own copy, so the YAML holds this, not the script.
+        paths = ("'.github/scripts/proved_tree.py'", "'.github/scripts/ghrest.py'",
+                 "'.github/scripts/merging/verdict/**'", "'.github/workflows/ci.yml'",
+                 "'.github/workflows/lint.yml'")
+        for workflow in proved_tree.BUILT:
+            with self.subTest(workflow=workflow):
+                text = job(body(workflow), "changes")
+                decider = re.search(r"\n            decider:\n((?:(?: {14}- | {12}#).*\n)+)", text).group(1)
+                for path in paths:
+                    self.assertIn(f"              - {path}\n", decider)
+                asks = step(text, "Was this tree already proved?")
+                self.assertIn("&& steps.filter.outputs.decider != 'true'\n", asks)
+
+    def test_the_decider_lists_what_the_script_imports(self):
+        source = (SCRIPTS / "proved_tree.py").read_text(encoding="utf-8")
+        for module in re.findall(r"^(?:import|from) (ghrest|merging\S*)", source, re.M):
+            with self.subTest(module=module):
+                path = ".github/scripts/" + module.replace(".", "/") + ".py"
+                self.assertIn(path, proved_tree.DECIDER)
+
     def test_each_workflow_has_a_nightly_its_built_jobs_run_on(self):
         for workflow, jobs in proved_tree.BUILT.items():
             text = body(workflow)

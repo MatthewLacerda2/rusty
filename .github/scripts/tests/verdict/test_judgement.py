@@ -136,6 +136,8 @@ class Markdown(unittest.TestCase):
         ok, lines = verdict(ci, lint, jobs={1: skipped, 2: built("lint")}, files=["docs/api/Physics.md"])
         self.assertFalse(ok, lines)
         self.assertIn("#525", " ".join(lines))
+        # #2333: a re-run can skip again on another commit's proof; a dispatch builds.
+        self.assertIn("Dispatch `ci` on this head", " ".join(lines))
 
     def test_the_api_doc_passes_once_the_drift_tests_really_ran(self):
         ok, lines = verdict(*both(), files=["docs/api/Physics.md", "README.md"])

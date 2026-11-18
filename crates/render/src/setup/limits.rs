@@ -30,6 +30,7 @@ pub(crate) const OPTIONAL: wgpu::Features =
 /// What the window's device takes where its adapter has it: [`OPTIONAL`], and in a
 /// `dev` build the timestamps that time its live frames for `Debug.Stats()` (#2205).
 /// A shipped game reads no GPU times, so it asks for none.
+// lint: allow(gpu-default-only) only the window's device takes it; every GPU test renders headless, which never does
 pub(crate) const WINDOW: wgpu::Features = match cfg!(feature = "dev") {
     true => OPTIONAL.union(wgpu::Features::TIMESTAMP_QUERY),
     false => OPTIONAL,
