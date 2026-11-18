@@ -113,7 +113,7 @@ pub const MIN_NORMAL_Z: f32 = 0.125;
 /// `base`). A flat input on either side returns the other. Alpha is `base`'s. A
 /// result that would tip below [`MIN_NORMAL_Z`] (a steep base turned further the
 /// same way) is lifted to it, keeping its direction across the surface
-/// ([`upper_hemisphere`]); every other texel is RNM's own.
+/// (`upper_hemisphere`); every other texel is RNM's own.
 pub fn normal_blend(base: &Image, detail: &Image, strength: Field) -> Image {
     let mut out = base.clone();
     let w = base.width() as usize;
