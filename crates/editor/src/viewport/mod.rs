@@ -133,6 +133,7 @@ pub fn draw(
 fn draw_tab_strip(ui: &mut egui::Ui, editor: &mut crate::EditorUi, t: crate::theme::Theme) {
     #[cfg(feature = "dev")]
     let demo_open = editor.demo_open();
+    // lint: allow(gpu-default-only) ship stub: no demo exists without dev, and `false` is what a dev build reads with none open
     #[cfg(not(feature = "dev"))]
     let demo_open = false;
     let crate::EditorUi {
