@@ -88,8 +88,25 @@ fn gpu_bench_reports_frame_render_and_counter_rows() {
         );
         return;
     }
-    assert!(row("draw_calls").is_some_and(|s| s.avg > 0.0));
-    assert!(row("triangles").is_some_and(|s| s.avg > 0.0));
+    // A frame draws, begins passes, submits and writes buffers (#2341).
+    for k in [
+        "draw_calls",
+        "triangles",
+        "render_passes",
+        "submits",
+        "buffer_writes",
+    ] {
+        assert!(row(k).is_some_and(|s| s.avg > 0.0), "{k}");
+    }
+    for k in [
+        "hiz_tested",
+        "hiz_culled",
+        "cluster_tested",
+        "cluster_culled",
+    ] {
+        assert!(row(k).is_some(), "{k}");
+    }
+    assert!(row("compute_passes").is_some() && row("bind_groups_created").is_some());
     let timed = h.stats.borrow().get("gpu_ms").is_some();
     assert_eq!(row("gpu_ms").is_some(), timed);
     if timed {

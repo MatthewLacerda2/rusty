@@ -1010,7 +1010,13 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   at a fixed reference clock, below), `gpu_raw_ms` (GPU time as measured) and
   `gpu_clock_pct` (the clock it ran at, % of the reference), `draw_calls`,
   `triangles`, `culled_entities`, `lights_dropped`, `cluster_lights_dropped`, `lights_culled`,
-  `decals_visible`, `decal_cluster_refs`; then where the CPU time went, by name:
+  `decals_visible`, `decal_cluster_refs`, the GPU occlusion counters `hiz_tested`,
+  `hiz_culled`, `cluster_tested`, `cluster_culled` (the two culled ones are read back
+  without waiting, so they describe a frame or so earlier, `docs/api/Debug.md`), and
+  the frame's GPU calls `render_passes`, `compute_passes`, `submits`,
+  `bind_groups_created`, `buffer_writes` (counted through `render::gpu::ops`; a
+  render-CPU fix whose timing moves inside the spread proves itself by these); then
+  where the CPU time went, by name:
   `cpu.<system>` for every system the schedule runs, named as it registers them
   (`update_scripts`, `step_physics`, … at the reference CPU clock, summing to
   `cpu_ms`), and `render.<stage>` for every stage of the renderer's frame, summing

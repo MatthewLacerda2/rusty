@@ -4,7 +4,8 @@
 //! shooter-shaped stress scene ([`stress`]) onto the default yard, warms up, then
 //! `Harness.Bench(n)` steps and renders `n` frames, sampling each one, and prints
 //! a short report — frame, render and GPU ms (average and p95), GPU ms per pass,
-//! draw calls, triangles, dropped and culled counts, every system's CPU ms
+//! draw calls, triangles, dropped and culled counts, the Hi-Z culls and the
+//! renderer's GPU calls (passes, submits, bind groups made, buffer writes), every system's CPU ms
 //! (`cpu.<system>`, as the schedule names it) and the renderer's CPU ms by stage
 //! (`render.<stage>`, `Renderer::frame_stages`), each set with an `other` row for
 //! what none of its parts holds.
@@ -50,7 +51,7 @@ use rusty_core::frame_stats::FrameStats;
 use rusty_render::{ClockProbe, GpuPass};
 
 /// The render counters a bench row reports, in order.
-const COUNTERS: [&str; 8] = [
+const COUNTERS: [&str; 17] = [
     "draw_calls",
     "triangles",
     "lights_dropped",
@@ -59,6 +60,15 @@ const COUNTERS: [&str; 8] = [
     "lights_culled",
     "decals_visible",
     "decal_cluster_refs",
+    "hiz_tested",
+    "hiz_culled",
+    "cluster_tested",
+    "cluster_culled",
+    "render_passes",
+    "compute_passes",
+    "submits",
+    "bind_groups_created",
+    "buffer_writes",
 ];
 
 /// Step and render `ticks` frames (fewer if the game quits), sampling each one.

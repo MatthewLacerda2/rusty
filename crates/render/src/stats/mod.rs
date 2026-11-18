@@ -291,5 +291,7 @@ pub use uploads::Uploads;
 use frame::{count_lights, draws_of};
 
 #[cfg(test)]
+mod ops_gpu_tests;
+#[cfg(test)]
 #[path = "stats_tests.rs"]
 mod stats_tests;
