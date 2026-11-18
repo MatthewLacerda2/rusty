@@ -100,21 +100,7 @@ pub fn parse(text: &str, own: &str) -> (Folded, Tally) {
             Some(parent) => parent.children += count,
             None => threads.push((symbol.to_string(), Folded::default(), Tally::default())),
         }
-        let (name, image) = symbol.split_once("  (in ").unwrap_or((symbol, ""));
-        let image = image.split(')').next().unwrap_or_default();
-        // `sample` prints `???` for a frame it cannot name: no symbol, as perf's `[unknown]`.
-        let name = match name.trim() {
-            "???" => UNKNOWN,
-            named => named,
-        };
-        stack.push(Node {
-            col,
-            label: frame_name(name, image),
-            name: name.to_string(),
-            image: image.to_string(),
-            count,
-            children: 0,
-        });
+        stack.push(Node::new(col, symbol, count));
     }
     while !stack.is_empty() {
         pop(&mut stack, &mut threads, own);
@@ -144,6 +130,27 @@ struct Node {
     image: String,
     count: u64,
     children: u64,
+}
+
+impl Node {
+    /// The node of a call-graph line at column `col`: `symbol  (in image) ...`, `count` samples.
+    fn new(col: usize, symbol: &str, count: u64) -> Self {
+        let (name, image) = symbol.split_once("  (in ").unwrap_or((symbol, ""));
+        let image = image.split(')').next().unwrap_or_default();
+        // `sample` prints `???` for a frame it cannot name: no symbol, as perf's `[unknown]`.
+        let name = match name.trim() {
+            "???" => UNKNOWN,
+            named => named,
+        };
+        Node {
+            col,
+            label: frame_name(name, image),
+            name: name.to_string(),
+            image: image.to_string(),
+            count,
+            children: 0,
+        }
+    }
 }
 
 /// Close the deepest open node: its own samples are a stack of their own, in
