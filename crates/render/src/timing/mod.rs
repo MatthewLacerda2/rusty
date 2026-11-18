@@ -258,7 +258,7 @@ impl GpuTimer {
             q.open.set(false);
             let passes = std::mem::take(q.frame.get_mut());
             if !passes.is_empty() {
-                q.ring.submit(device, queue, &q.set, passes, frame);
+                q.ring.resolve_frame(device, queue, &q.set, passes, frame);
             }
             q.collect(device);
         }

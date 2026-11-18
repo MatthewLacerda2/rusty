@@ -2,6 +2,8 @@
 //! its pipeline layouts and unblended targets, a pass into several targets, and the
 //! GPU timer's pair split across the trace and the resolve (#2028).
 
+use crate::gpu::ops::CountedEncoder as _;
+
 /// A pipeline layout of `groups`, in order.
 pub(super) fn pipeline_layout(
     device: &wgpu::Device,
@@ -60,7 +62,7 @@ pub(super) fn begin<'e>(
             })
         })
         .collect();
-    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+    encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
         label: Some(label),
         color_attachments: &attachments,
         depth_stencil_attachment: None,

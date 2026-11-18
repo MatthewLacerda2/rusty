@@ -16,6 +16,7 @@
 //! Reads no wall-clock and no RNG: output is a pure function of the rendered texture,
 //! so this is clean under the determinism guard (and `render` is exempt regardless).
 
+use crate::gpu::ops::CountedQueue as _;
 use std::path::Path;
 
 /// Copy `texture`'s top-left `width × height` region back to the CPU as tightly
@@ -139,7 +140,7 @@ fn submit_copy(
         },
         size,
     );
-    queue.submit(std::iter::once(encoder.finish()));
+    queue.counted_submit(std::iter::once(encoder.finish()));
 }
 
 /// Map the readback buffer (blocking) and strip the per-row padding back out.
@@ -258,7 +259,7 @@ fn submit_cube_copy(
             },
         );
     }
-    queue.submit(std::iter::once(encoder.finish()));
+    queue.counted_submit(std::iter::once(encoder.finish()));
 }
 
 /// A row of `size` texels of `texel` bytes, padded to

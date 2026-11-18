@@ -18,6 +18,7 @@
 //! ([`SsrTargets`]), held only while it runs SSR. The GPU timer's `ssr` pass spans
 //! the trace, the trace's pyramids and the resolve; the colour pyramid is untimed.
 
+use crate::gpu::ops::{CountedDevice as _, CountedQueue as _};
 use glam::{Mat4, Vec3};
 
 use super::pyramid::{Pyramid, PyramidPass};
@@ -193,11 +194,11 @@ impl PostFx {
         let t = self.targets.get::<SsrTargets>().expect("fitted above");
         let velocity = self.motion.target_view().expect("checked above");
         let [weight, applied] = surface::views(self).expect("checked above");
-        queue.write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
+        queue.counted_write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
         #[cfg(test)]
         super::poison::write(t.poisoned, queue, &self.scene_hdr.texture);
         let view = |v| wgpu::BindingResource::TextureView(v);
-        let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let group = device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("SSR Bind Group"),
             layout: &passes.layout,
             entries: &[
@@ -209,7 +210,7 @@ impl PostFx {
                 entry(5, view(applied)),
             ],
         });
-        let traced = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let traced = device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("SSR Resolve Bind Group"),
             layout: &passes.traced,
             entries: &[entry(0, view(&t.hits.view)), entry(1, view(&t.spread.view))],
@@ -224,7 +225,7 @@ impl PostFx {
         t.pyramid.build(&mut encoder, &passes.pyramid);
         let groups = [&group, &traced];
         trace_and_resolve(&mut encoder, passes, t, groups, &self.scene_hdr.view, timer);
-        queue.submit(std::iter::once(encoder.finish()));
+        queue.counted_submit(std::iter::once(encoder.finish()));
     }
 }
 

@@ -19,6 +19,7 @@
 //! falls outside — the same space the hit-test checks masks in, so what draws is
 //! what is hit. A `BackdropFilter` is not drawn here (`effects::backdrop`).
 
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use glam::Mat4;
 
 use super::cache::UiViewCache;
@@ -148,7 +149,7 @@ impl Renderer {
         let layout = &self.ui_renderer.world.layout;
         let slot = std::mem::size_of::<WorldUiUniform>() as u64;
         let bind = |buffer: &wgpu::Buffer| {
-            self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            self.device.counted_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("World UI Uniforms"),
                 layout,
                 entries: &[wgpu::BindGroupEntry {
@@ -211,7 +212,7 @@ impl Renderer {
                 }
             }
         }
-        self.queue.submit(Some(encoder.finish()));
+        self.queue.counted_submit(Some(encoder.finish()));
     }
 }
 
@@ -221,7 +222,7 @@ fn world_pass<'e>(
     view: &'e RenderView,
     timer: &GpuTimer,
 ) -> wgpu::RenderPass<'e> {
-    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+    encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
         multiview_mask: None,
         label: Some("World UI Pass"),
         color_attachments: &[Some(wgpu::RenderPassColorAttachment {

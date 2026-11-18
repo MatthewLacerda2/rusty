@@ -10,6 +10,7 @@ use super::history::{TaaHistory, FLICKER_FORMAT, SURFACE_FORMAT};
 use crate::gpu::bind_entry as entry;
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
+use crate::gpu::ops::CountedDevice as _;
 use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::HDR_FORMAT;
@@ -151,7 +152,7 @@ impl TaaPasses {
             Some(_) => &self.held_layout,
             None => &self.layout,
         };
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
+        device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("TAA Bind Group"),
             layout,
             entries: &entries,

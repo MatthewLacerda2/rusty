@@ -7,6 +7,7 @@
 //! records a pass into the HDR scene target (after solids/skybox/transparents,
 //! before post-FX). Mesh emitters are skipped here — they draw with the solids.
 
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use std::rc::Rc;
 
 use glam::{Mat4, Vec3};
@@ -82,7 +83,7 @@ impl Renderer {
             cam_fwd: eye.fwd.extend(0.0).to_array(),
             fog: FogUniform::from_settings(&scene.fog),
         };
-        self.queue.write_buffer(
+        self.queue.counted_write_buffer(
             &self.particle_renderer.globals_buffer,
             0,
             bytemuck::bytes_of(&globals),
@@ -114,7 +115,7 @@ impl Renderer {
             return;
         }
         view.scene_depth_bind_group =
-            Some(self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            Some(self.device.counted_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("Scene Depth Bind Group"),
                 layout: &self.scene_depth_layout,
                 entries: &[wgpu::BindGroupEntry {
@@ -196,7 +197,7 @@ impl Renderer {
             });
         let reactive = view.post_fx.taa_reactive().is_some();
         {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut pass = encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
                 multiview_mask: None,
                 label: Some("Particle Pass"),
                 color_attachments: &taa::reactive::hdr_attachments(view),
@@ -236,7 +237,7 @@ impl Renderer {
                 }
             }
         }
-        self.queue.submit(std::iter::once(encoder.finish()));
+        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 }
 

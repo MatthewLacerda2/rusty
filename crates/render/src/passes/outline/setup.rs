@@ -7,6 +7,7 @@ use super::{EdgeUniform, MASK_FORMAT};
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::{texture_entry, uniform_entry};
 use crate::gpu::mesh::vertex_layout;
+use crate::gpu::ops::CountedDevice as _;
 use crate::gpu::pipelines::{FacedPipeline, Facing, LazyPipeline};
 use crate::gpu::shaders::ShaderRegistry;
 
@@ -93,7 +94,7 @@ impl OutlinePasses {
         uniform: &wgpu::Buffer,
         [source, mask]: [&wgpu::TextureView; 2],
     ) -> wgpu::BindGroup {
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
+        device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Selection Edge Bind Group"),
             layout: &self.edge_layout,
             entries: &[

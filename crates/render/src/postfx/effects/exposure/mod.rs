@@ -19,6 +19,7 @@
 mod effect;
 mod params;
 
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 pub(crate) use effect::EFFECT;
 pub use params::{Clock, ExposureParams, Step};
 
@@ -199,13 +200,13 @@ impl ExposureMeter {
         params: &ExposureParams,
     ) {
         self.collect();
-        queue.write_buffer(&self.params, 0, bytemuck::bytes_of(params));
+        queue.counted_write_buffer(&self.params, 0, bytemuck::bytes_of(params));
         let bind_group = self.bind_group(device, passes, scene);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Auto Exposure"),
         });
         {
-            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            let mut pass = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("Auto Exposure"),
                 timestamp_writes: None,
             });
@@ -221,7 +222,7 @@ impl ExposureMeter {
         if read {
             encoder.copy_buffer_to_buffer(&self.state, 0, &self.staging, 0, Some(STATE_BYTES));
         }
-        queue.submit(std::iter::once(encoder.finish()));
+        queue.counted_submit(std::iter::once(encoder.finish()));
         if read {
             self.mapping.store(MAPPING, Ordering::Release);
             let mapping = Arc::clone(&self.mapping);
@@ -238,7 +239,7 @@ impl ExposureMeter {
         passes: &ExposurePasses,
         scene: &wgpu::TextureView,
     ) -> wgpu::BindGroup {
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
+        device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Auto Exposure"),
             layout: &passes.layout,
             entries: &[

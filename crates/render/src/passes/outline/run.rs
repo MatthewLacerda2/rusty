@@ -3,6 +3,7 @@
 //! and before the editor's handles. The last two are scissored to the selection's
 //! bounds on screen.
 
+use crate::gpu::ops::CountedQueue as _;
 use glam::Mat4;
 
 use super::{EdgeUniform, SelectionMask, OUTLINE_COLOR, OUTLINE_PX};
@@ -55,7 +56,7 @@ impl Renderer {
             _pad: [0.0; 3],
         };
         self.queue
-            .write_buffer(&mask.uniform, 0, bytemuck::bytes_of(&params));
+            .counted_write_buffer(&mask.uniform, 0, bytemuck::bytes_of(&params));
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -70,7 +71,7 @@ impl Renderer {
         let finished = (output, wgpu::LoadOp::Load);
         let edge = (&self.outline.edge, &mask.edge_group);
         self.scissored(&mut encoder, "Selection Edge Pass", finished, edge, rect);
-        self.queue.submit(std::iter::once(encoder.finish()));
+        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 
     /// The outlined draws into the cleared `mask`: each with the forward pass's own

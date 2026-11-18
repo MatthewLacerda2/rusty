@@ -7,6 +7,7 @@
 //! texture its effect has none of this frame is bound to one 1×1 black texel,
 //! shared by every effect ([`CompositeTextures`]).
 
+use crate::gpu::ops::CountedDevice as _;
 use std::sync::LazyLock;
 
 use super::{composite_layout, Composite, PostEffect};
@@ -97,7 +98,7 @@ impl CompositeTextures {
         let entries: Vec<_> = (views.iter().enumerate())
             .map(|(i, view)| entry(i as u32, wgpu::BindingResource::TextureView(view)))
             .collect();
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
+        device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("PostFX Effect Textures"),
             layout: &self.layout,
             entries: &entries,

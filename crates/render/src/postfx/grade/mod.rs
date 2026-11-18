@@ -14,6 +14,7 @@
 
 use super::effects::grading::color_lookup::{self, Lookup, UserLuts};
 use super::effects::{assemble, grade_slots, grade_slots_len, GradeCx};
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use crate::gpu::shaders::ShaderRegistry;
 use rusty_components::PostProcessingComponent;
 
@@ -137,7 +138,7 @@ impl GradeLut {
         {
             return false;
         }
-        queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&slots));
+        queue.counted_write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&slots));
         let group = match self.bind_group.take() {
             Some((i, group)) if i == id => group,
             _ => self.bind_group(device, &bake.pipeline, view),
@@ -155,7 +156,7 @@ impl GradeLut {
         pipeline: &wgpu::ComputePipeline,
         user: &wgpu::TextureView,
     ) -> wgpu::BindGroup {
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
+        device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Grading LUT Bake"),
             layout: &pipeline.get_bind_group_layout(0),
             entries: &[
@@ -185,7 +186,7 @@ impl GradeLut {
             label: Some("Grading LUT Bake"),
         });
         {
-            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            let mut pass = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("Grading LUT Bake"),
                 timestamp_writes: None,
             });
@@ -194,7 +195,7 @@ impl GradeLut {
             let groups = Self::SIZE.div_ceil(Self::GROUP);
             pass.dispatch_workgroups(groups, groups, groups);
         }
-        queue.submit(std::iter::once(encoder.finish()));
+        queue.counted_submit(std::iter::once(encoder.finish()));
     }
 }
 

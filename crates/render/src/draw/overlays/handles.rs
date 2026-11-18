@@ -9,6 +9,7 @@
 //! (`game`).
 
 use crate::draw::resources::Overlays;
+use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
 use crate::timing::GpuPass;
 use crate::{RenderView, Renderer};
 use rusty_scene::Scene;
@@ -42,7 +43,7 @@ impl Renderer {
                 label: Some("Editor Handles Encoder"),
             });
         {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut pass = encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
                 multiview_mask: None,
                 label: Some("Editor Handles Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -75,6 +76,6 @@ impl Renderer {
             pass.set_bind_group(3, &self.shadow_bind_group, &[]);
             self.draw_editor_overlays(&mut pass, overlays);
         }
-        self.queue.submit(std::iter::once(encoder.finish()));
+        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 }

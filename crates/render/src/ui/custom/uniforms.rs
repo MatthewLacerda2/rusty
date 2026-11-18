@@ -5,6 +5,7 @@
 //! variant's layout (#399). The clock moves every frame, so the slots are always
 //! rewritten — but a param change is only ever a buffer write, never a rebuild.
 
+use crate::gpu::ops::CountedDevice as _;
 use std::collections::HashMap;
 
 use crate::gpu::grow_buffer::GrowBuffer;
@@ -84,7 +85,7 @@ impl Renderer {
     fn upload_ui_shades(&mut self, view: &mut RenderView, bytes: &[u8], offsets: Offsets) {
         let layout = &self.ui_renderer.shaders.shade_layout;
         let bind = |buffer: &wgpu::Buffer| {
-            self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            self.device.counted_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("UI Shade Uniforms"),
                 layout,
                 entries: &[wgpu::BindGroupEntry {

@@ -13,6 +13,7 @@
 //! uses are reclaimed, and a map that still finds no room is drawn without (counted
 //! in `RenderCounters::decal_maps_dropped`).
 
+use crate::gpu::ops::CountedQueue as _;
 use std::collections::{HashMap, HashSet};
 
 use image::imageops::FilterType;
@@ -167,7 +168,7 @@ impl DecalAtlas {
             };
             encoder.copy_texture_to_texture(at(&self.texture), at(&bigger), extent);
         }
-        queue.submit(std::iter::once(encoder.finish()));
+        queue.counted_submit(std::iter::once(encoder.finish()));
         (self.color_view, self.data_view) = views(&bigger);
         self.texture = bigger;
     }

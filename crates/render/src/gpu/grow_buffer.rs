@@ -9,6 +9,8 @@
 //! [`GrowBuffer::write_at`] writes only the slots that changed; and
 //! [`GrowBuffer::reserve_kept`] grows one whose contents the GPU wrote (#1963).
 
+use crate::gpu::ops::CountedQueue as _;
+
 /// Smallest allocation, so a near-empty scene does not reallocate on its first props.
 const MIN_BYTES: u64 = 4096;
 
@@ -52,7 +54,7 @@ impl GrowBuffer {
             self.buffer = allocate(device, self.label, self.usage, size);
         }
         if !bytes.is_empty() {
-            queue.write_buffer(&self.buffer, 0, bytes);
+            queue.counted_write_buffer(&self.buffer, 0, bytes);
         }
         grown
     }
@@ -88,7 +90,7 @@ impl GrowBuffer {
         let grown = allocate(device, self.label, self.usage, size);
         let mut encoder = device.create_command_encoder(&Default::default());
         encoder.copy_buffer_to_buffer(&self.buffer, 0, &grown, 0, old);
-        queue.submit(std::iter::once(encoder.finish()));
+        queue.counted_submit(std::iter::once(encoder.finish()));
         self.buffer = grown;
         Some(old)
     }
@@ -97,7 +99,7 @@ impl GrowBuffer {
     pub(crate) fn write_at(&self, queue: &wgpu::Queue, offset: u64, bytes: &[u8]) {
         debug_assert!(offset + bytes.len() as u64 <= self.buffer.size());
         if !bytes.is_empty() {
-            queue.write_buffer(&self.buffer, offset, bytes);
+            queue.counted_write_buffer(&self.buffer, offset, bytes);
         }
     }
 }

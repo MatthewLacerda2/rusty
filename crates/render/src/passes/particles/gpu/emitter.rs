@@ -4,6 +4,7 @@
 //! lookup table when the curves changed, the uniform.
 
 use super::record::{bake_lut, GpuBirth, GpuEmitter, GpuParticle, LUT_SIZE};
+use crate::gpu::ops::CountedQueue as _;
 use rusty_components::particle::{GpuSim, DT_HISTORY};
 
 /// The usages of a buffer the frame writes and a pass reads.
@@ -129,7 +130,7 @@ impl EmitterBuffers {
         self.emptied = sim.emptied();
         encoded |= self.grow(device, encoder, wanted);
         if lut != self.baked {
-            queue.write_buffer(&self.lut, 0, bytemuck::cast_slice(&lut));
+            queue.counted_write_buffer(&self.lut, 0, bytemuck::cast_slice(&lut));
             self.baked = lut;
         }
         let (births, oldest) = self.new_births(sim);
@@ -152,12 +153,12 @@ impl EmitterBuffers {
         self.emitter = emitter;
         if !births.is_empty() {
             self.grow_births(device, births.len() as u32);
-            queue.write_buffer(&self.births, 0, bytemuck::cast_slice(&births));
+            queue.counted_write_buffer(&self.births, 0, bytemuck::cast_slice(&births));
         }
         if !dts.is_empty() {
-            queue.write_buffer(&self.dts, 0, bytemuck::cast_slice(&dts));
+            queue.counted_write_buffer(&self.dts, 0, bytemuck::cast_slice(&dts));
         }
-        queue.write_buffer(&self.uniform, 0, bytemuck::bytes_of(&emitter));
+        queue.counted_write_buffer(&self.uniform, 0, bytemuck::bytes_of(&emitter));
         Work {
             births: births.len() as u32,
             step: (!dts.is_empty() && extent > 0).then_some(extent),

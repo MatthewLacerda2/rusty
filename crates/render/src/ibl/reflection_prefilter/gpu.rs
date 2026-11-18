@@ -10,6 +10,7 @@
 //! lookup and sample count), and a GPU test holds the two within a written tolerance. At 512 texels
 //! the CPU pass is ≈ 50 M samples on one core; here it is one compute pass.
 
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use glam::Vec3;
 
 use super::source::{encode_face, source_chain};
@@ -92,7 +93,7 @@ impl ProbePrefilter {
                     usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                     mapped_at_creation: false,
                 });
-                queue.write_buffer(&buffer, 0, bytemuck::cast_slice(&params));
+                queue.counted_write_buffer(&buffer, 0, bytemuck::cast_slice(&params));
                 let out = rough.create_view(&wgpu::TextureViewDescriptor {
                     dimension: Some(wgpu::TextureViewDimension::D2Array),
                     base_mip_level: level - 1,
@@ -106,7 +107,7 @@ impl ProbePrefilter {
             label: Some("Reflection Probe Prefilter"),
         });
         {
-            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            let mut pass = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("Reflection Probe Prefilter"),
                 timestamp_writes: None,
             });
@@ -117,7 +118,7 @@ impl ProbePrefilter {
                 pass.dispatch_workgroups(n, n, 6);
             }
         }
-        queue.submit(std::iter::once(encoder.finish()));
+        queue.counted_submit(std::iter::once(encoder.finish()));
         rough
     }
 
@@ -139,7 +140,7 @@ impl ProbePrefilter {
             .zip(resources)
             .map(|(binding, resource)| wgpu::BindGroupEntry { binding, resource })
             .collect();
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
+        device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Reflection Probe Prefilter"),
             layout: &self.pipeline.get_bind_group_layout(0),
             entries: &entries,

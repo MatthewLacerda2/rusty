@@ -2,6 +2,7 @@
 //! with each batch's `Run` at a dynamic offset) and a mesh's (group 1).
 
 use crate::gpu::layout_entries::{storage_entry, uniform_entry};
+use crate::gpu::ops::CountedDevice as _;
 
 /// The stride between batches' `Run`s in their uniform buffer: the dynamic
 /// offset alignment every adapter accepts.
@@ -95,7 +96,7 @@ pub(super) fn cull_group(
         binding: 7,
         resource: wgpu::BindingResource::TextureView(pyramid),
     });
-    device.create_bind_group(&wgpu::BindGroupDescriptor {
+    device.counted_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Cluster Cull"),
         layout,
         entries: &entries,

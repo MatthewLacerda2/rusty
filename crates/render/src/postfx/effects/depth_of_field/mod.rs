@@ -26,6 +26,7 @@
 mod effect;
 mod params;
 
+use crate::gpu::ops::{CountedDevice as _, CountedQueue as _};
 pub(crate) use effect::{dof_enabled, EFFECT};
 pub(crate) use params::DofParams;
 
@@ -230,10 +231,10 @@ impl PostFx {
             *fitted = DofTargets::new(device, key);
         }
         let t = self.targets.get::<DofTargets>().expect("fitted above");
-        queue.write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
+        queue.counted_write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
         let group = |[input, coc, blur, work]: [&wgpu::TextureView; 4]| {
             let view = |v| wgpu::BindingResource::TextureView(v);
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
+            device.counted_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("DoF Bind Group"),
                 layout: &passes.layout,
                 entries: &[
@@ -259,7 +260,7 @@ impl PostFx {
             let timed = (pipeline.get(), timer.writes(GpuPass::DepthOfField));
             Self::fullscreen(&mut encoder, timed, &[bind_group], &target.view);
         }
-        queue.submit(std::iter::once(encoder.finish()));
+        queue.counted_submit(std::iter::once(encoder.finish()));
     }
 }
 

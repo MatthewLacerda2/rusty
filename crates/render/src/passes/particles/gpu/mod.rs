@@ -29,6 +29,7 @@ pub(crate) mod record;
 #[cfg(test)]
 mod twin;
 
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use std::collections::{HashMap, HashSet};
 
 use emitter::{EmitterBuffers, Work};
@@ -172,7 +173,7 @@ impl Renderer {
         }
         let gpu = &self.particle_renderer.gpu;
         if dispatches {
-            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            let mut pass = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("GPU Particle Step"),
                 timestamp_writes: self.gpu_timer.compute_writes(GpuPass::Particles),
             });
@@ -191,7 +192,7 @@ impl Renderer {
                 }
             }
         }
-        self.queue.submit(std::iter::once(encoder.finish()));
+        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 }
 
@@ -203,13 +204,13 @@ fn groups(
     e: &EmitterBuffers,
     globals: &wgpu::Buffer,
 ) -> (wgpu::BindGroup, wgpu::BindGroup) {
-    let step = device.create_bind_group(&wgpu::BindGroupDescriptor {
+    let step = device.counted_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("GPU Particle Step Group"),
         layout: layouts.0,
         entries: &e.step_entries(),
     });
     let [emitter, particles, lut, ..] = e.step_entries();
-    let draw = device.create_bind_group(&wgpu::BindGroupDescriptor {
+    let draw = device.counted_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("GPU Particle Draw Group"),
         layout: layouts.1,
         entries: &[

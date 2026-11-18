@@ -13,6 +13,7 @@
 //! no upscale target exists and the frame is the one it was before scaling existed.
 
 use super::{PixelSize, RenderView};
+use crate::gpu::ops::CountedQueue as _;
 use crate::postfx::PostFxContext;
 use crate::timing::GpuPass;
 use crate::Renderer;
@@ -128,7 +129,7 @@ impl Renderer {
             });
         let copy = (&pfx.copy_pipeline, ctx.timer.writes(GpuPass::PostFx));
         crate::postfx::PostFx::fullscreen(&mut encoder, copy, &[&io], output);
-        self.queue.submit(Some(encoder.finish()));
+        self.queue.counted_submit(Some(encoder.finish()));
     }
 }
 

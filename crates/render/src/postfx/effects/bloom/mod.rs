@@ -22,6 +22,7 @@ mod passes;
 #[cfg(test)]
 mod prefilter_gpu_tests;
 
+use crate::gpu::ops::CountedQueue as _;
 use chain::BloomParams;
 pub(crate) use chain::BloomTargets;
 pub(crate) use passes::BloomPasses;
@@ -102,11 +103,11 @@ fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let t = pfx.targets.get::<BloomTargets>().expect("made above");
     let params = BloomParams::new(&vc.bloom, t);
     r.queue
-        .write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
+        .counted_write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
         label: Some("Bloom Encoder"),
     });
     let input = (pfx.scene_color(), &pfx.sampler);
     passes.encode(device, &mut encoder, t, input, &r.gpu_timer);
-    r.queue.submit(std::iter::once(encoder.finish()));
+    r.queue.counted_submit(std::iter::once(encoder.finish()));
 }

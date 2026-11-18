@@ -23,6 +23,7 @@
 //! (no pass bound the mask, `TaaHistory::reactive_drawn`) skips the read and the
 //! clear altogether.
 
+use crate::gpu::ops::CountedEncoder as _;
 use std::sync::atomic::Ordering;
 
 use crate::postfx::{PfxTarget, PostFx};
@@ -93,7 +94,7 @@ pub(crate) fn hdr_attachments(
 
 /// Clear the target after the resolve read it, so next frame starts from zero.
 pub(super) fn clear(encoder: &mut wgpu::CommandEncoder, target: &PfxTarget) {
-    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+    encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
         multiview_mask: None,
         label: Some("TAA Reactive Clear"),
         color_attachments: &[Some(wgpu::RenderPassColorAttachment {

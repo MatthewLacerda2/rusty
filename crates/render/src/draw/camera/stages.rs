@@ -3,6 +3,7 @@
 
 use super::CameraCtx;
 use crate::draw::pass::{PassClear, ScenePassFrame};
+use crate::gpu::ops::CountedQueue as _;
 use crate::passes::ssao::SsaoFrame;
 use crate::postfx::effects::ssr;
 use crate::{RenderView, Renderer};
@@ -10,7 +11,7 @@ use rusty_scene::ClearFlags;
 
 pub(super) fn upload_camera(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
     r.queue
-        .write_buffer(&r.camera_buffer, 0, bytemuck::bytes_of(&ctx.uniform));
+        .counted_write_buffer(&r.camera_buffer, 0, bytemuck::bytes_of(&ctx.uniform));
 }
 
 /// Bin the frame's point and spot lights (#434) and its decals (#638) into this

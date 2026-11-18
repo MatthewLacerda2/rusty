@@ -12,6 +12,7 @@
 //! canvas. Rendered once per frame before the camera stack — a mask does not
 //! depend on the camera.
 
+use crate::gpu::ops::CountedQueue as _;
 use std::collections::HashMap;
 
 use super::GroupKey;
@@ -155,7 +156,7 @@ impl Renderer {
                 pass.draw(draw.range.clone(), 0..1);
             }
         }
-        self.queue.submit(Some(encoder.finish()));
+        self.queue.counted_submit(Some(encoder.finish()));
     }
 }
 

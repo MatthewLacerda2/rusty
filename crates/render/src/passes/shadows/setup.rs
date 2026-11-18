@@ -7,6 +7,7 @@ use super::cascades::MAX_CASCADES;
 use super::ShadowRenderer;
 use crate::gpu::layout_entries::{dynamic_uniform_entry, storage_entry, uniform_entry};
 use crate::gpu::mesh::vertex_layout;
+use crate::gpu::ops::CountedDevice as _;
 use crate::gpu::pipelines::winding::Facing;
 use crate::gpu::pipelines::LazyPipeline;
 
@@ -184,7 +185,7 @@ pub(super) fn global_group(
     light_space: &wgpu::Buffer,
     time_buffer: &wgpu::Buffer,
 ) -> wgpu::BindGroup {
-    device.create_bind_group(&wgpu::BindGroupDescriptor {
+    device.counted_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Shadow Global Bind Group"),
         layout,
         entries: &[

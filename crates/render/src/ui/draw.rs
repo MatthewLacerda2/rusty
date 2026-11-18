@@ -20,6 +20,7 @@
 //! canvases need them too. Right before the overlay pass, the backdrop blur runs
 //! over the finished frame (`effects::blur`, #426), only when a backdrop shows.
 
+use crate::gpu::ops::CountedQueue as _;
 use std::rc::Rc;
 
 use glam::Vec2;
@@ -158,7 +159,7 @@ impl Renderer {
                 }
             }
         }
-        self.queue.submit(Some(encoder.finish()));
+        self.queue.counted_submit(Some(encoder.finish()));
     }
 }
 

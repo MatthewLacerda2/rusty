@@ -26,6 +26,7 @@ mod hysteresis;
 mod plan;
 mod slots;
 mod sweep;
+use crate::gpu::ops::CountedQueue as _;
 pub(crate) use plan::{plan, AtlasPlan, Tile, ATLAS_SIZE, MAX_TILES};
 pub(crate) use slots::{Frame, ShadowSlots};
 
@@ -154,8 +155,8 @@ impl ShadowAtlas {
     pub(crate) fn update(&mut self, queue: &wgpu::Queue, tiles: Vec<Tile>) {
         if !tiles.is_empty() {
             let gpu: Vec<ShadowTile> = tiles.iter().map(ShadowTile::new).collect();
-            queue.write_buffer(&self.tiles, 0, bytemuck::cast_slice(&gpu));
-            queue.write_buffer(&self.light_space, 0, &light_space_bytes(&tiles));
+            queue.counted_write_buffer(&self.tiles, 0, bytemuck::cast_slice(&gpu));
+            queue.counted_write_buffer(&self.light_space, 0, &light_space_bytes(&tiles));
         }
         self.frame_tiles = tiles;
     }

@@ -8,6 +8,7 @@
 //! Albedo and emissive bind a texture's sRGB-decoding view; the data maps bind its
 //! raw view, so one upload serves a file named in both roles (#647).
 
+use crate::gpu::ops::CountedDevice as _;
 use std::rc::Rc;
 
 use super::map_slots::{
@@ -225,7 +226,7 @@ pub(crate) fn material_group(
         binding: rusty_shadergen::params::PARAM_BINDING,
         resource: params.as_entire_binding(),
     });
-    device.create_bind_group(&wgpu::BindGroupDescriptor {
+    device.counted_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Material Bind Group"),
         layout,
         entries: &entries,

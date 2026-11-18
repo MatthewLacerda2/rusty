@@ -31,6 +31,7 @@
 //! batching together. An entity's buffer and groups are released the frame after its
 //! last override is cleared, and their slots reused.
 
+use crate::gpu::ops::CountedQueue as _;
 use std::collections::HashMap;
 
 use rusty_scene::SceneId;
@@ -154,7 +155,7 @@ impl MaterialCache {
     ) {
         if let Some((buffer, last)) = self.params.get_mut(owner) {
             if *last != values {
-                queue.write_buffer(buffer, 0, bytemuck::cast_slice(&values));
+                queue.counted_write_buffer(buffer, 0, bytemuck::cast_slice(&values));
                 *last = values;
             }
             return;
@@ -165,7 +166,7 @@ impl MaterialCache {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        queue.write_buffer(&buffer, 0, bytemuck::cast_slice(&values));
+        queue.counted_write_buffer(&buffer, 0, bytemuck::cast_slice(&values));
         self.params.insert(owner.clone(), (buffer, values));
     }
 

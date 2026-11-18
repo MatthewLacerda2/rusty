@@ -20,6 +20,7 @@ pub(crate) mod blur;
 pub(crate) mod mask;
 pub(crate) mod mask_gpu;
 
+use crate::gpu::ops::CountedDevice as _;
 use std::collections::HashMap;
 
 use glam::Vec2;
@@ -200,7 +201,7 @@ impl Renderer {
                     resource: wgpu::BindingResource::Sampler(&ui.sampler),
                 },
             ];
-            let group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            let group = self.device.counted_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("UI Batch Group"),
                 layout: &ui.batch_layout,
                 entries: &entries,

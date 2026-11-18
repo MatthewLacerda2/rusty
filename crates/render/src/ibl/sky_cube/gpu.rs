@@ -2,6 +2,7 @@
 //! captures and prefilters the sky into every mip of one (`sky/prefilter.wgsl`).
 
 use super::SKY_FACE;
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use crate::gpu::shaders::ShaderRegistry;
 use crate::gpu::uniforms::ProceduralSkyUniform;
 use crate::ibl::reflection_prefilter;
@@ -165,7 +166,7 @@ impl Filter {
                     sky: *sky,
                 };
                 let buffer = &self.params[level as usize];
-                queue.write_buffer(buffer, 0, bytemuck::bytes_of(&params));
+                queue.counted_write_buffer(buffer, 0, bytemuck::bytes_of(&params));
                 let group = self.group(
                     device,
                     buffer,
@@ -179,7 +180,7 @@ impl Filter {
             label: Some("Sky Reflection Prefilter"),
         });
         {
-            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            let mut pass = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("Sky Reflection Prefilter"),
                 timestamp_writes: timer.compute_writes(GpuPass::SkyReflection),
             });
@@ -190,7 +191,7 @@ impl Filter {
                 pass.dispatch_workgroups(n, n, 6);
             }
         }
-        queue.submit(std::iter::once(encoder.finish()));
+        queue.counted_submit(std::iter::once(encoder.finish()));
     }
 
     /// One mip's bind group: its params, the source and the mip's storage view.
@@ -212,7 +213,7 @@ impl Filter {
             .zip(resources)
             .map(|(binding, resource)| wgpu::BindGroupEntry { binding, resource })
             .collect();
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
+        device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Sky Reflection Prefilter"),
             layout: &self.pipeline.get_bind_group_layout(0),
             entries: &entries,

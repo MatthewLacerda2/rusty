@@ -3,6 +3,7 @@
 //! `pipelines` consumes these to build the pipeline layouts (behavior unchanged).
 
 use crate::draw::map_slots::all_bindings;
+use crate::gpu::ops::CountedDevice as _;
 use crate::passes::transparent::OpaqueViews;
 
 use super::layout_entries::{
@@ -245,7 +246,7 @@ pub(crate) fn create_shadow_bind_group(
     ao: &wgpu::TextureView,
     opaque: OpaqueViews,
 ) -> wgpu::BindGroup {
-    device.create_bind_group(&wgpu::BindGroupDescriptor {
+    device.counted_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Main Shadow Bind Group"),
         layout,
         entries: &[

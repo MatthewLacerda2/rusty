@@ -2,6 +2,7 @@
 //! made with the mesh's buffers at upload, and the CPU's copy of where each
 //! cluster's indices start, which a batch's run is matched against.
 
+use crate::gpu::ops::CountedDevice as _;
 use std::ops::Range;
 
 use wgpu::util::DeviceExt;
@@ -49,7 +50,7 @@ impl GpuClusters {
             contents: bytemuck::cast_slice(&rows),
             usage: wgpu::BufferUsages::STORAGE,
         });
-        let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let group = device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Mesh Clusters"),
             layout,
             entries: &[

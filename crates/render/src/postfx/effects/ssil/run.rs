@@ -7,6 +7,7 @@ use super::{Previous, SsilFrame};
 use crate::draw::camera::CameraCtx;
 use crate::draw::record::Solids;
 use crate::gpu::bind_layouts::create_shadow_bind_group;
+use crate::gpu::ops::CountedQueue as _;
 use crate::passes::ssao::SsaoTargets;
 use crate::passes::transparent::OpaqueViews;
 use crate::{RenderView, Renderer};
@@ -42,7 +43,7 @@ impl Renderer {
         t.index = (t.index + 1) % 64;
         let uniform = frame.uniform(prev, t.index);
         self.queue
-            .write_buffer(&t.uniform, 0, bytemuck::bytes_of(&uniform));
+            .counted_write_buffer(&t.uniform, 0, bytemuck::bytes_of(&uniform));
         if !prepassed {
             self.record_prepass(encoder, &view.depth_view, solids);
             let prepass = solids.0.iter().filter(|b| b.key.in_prepass());
@@ -134,7 +135,7 @@ impl Renderer {
             let gpu = (&self.device, &mut encoder);
             let target = (&[&t.source.view][..], &self.gpu_timer);
             (self.post_passes.ssil).record(gpu, Stage::Source, inputs, target);
-            self.queue.submit(std::iter::once(encoder.finish()));
+            self.queue.counted_submit(std::iter::once(encoder.finish()));
             let camera = Previous {
                 view_proj: frame.view_proj,
                 eye: frame.eye,
@@ -148,6 +149,7 @@ impl Renderer {
         // read the flag set and everything after it reads it clear.
         ctx.uniform.ssil[0] = 0.0;
         let uniform = bytemuck::bytes_of(&ctx.uniform);
-        self.queue.write_buffer(&self.camera_buffer, 0, uniform);
+        self.queue
+            .counted_write_buffer(&self.camera_buffer, 0, uniform);
     }
 }

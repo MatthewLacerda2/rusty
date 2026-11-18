@@ -8,6 +8,7 @@
 
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::depth_entry;
+use crate::gpu::ops::CountedDevice as _;
 
 /// The two tile blits and the static atlas the copy reads.
 pub(super) struct TileBlit {
@@ -28,7 +29,7 @@ impl TileBlit {
             label: Some("Shadow Atlas Blit Layout"),
             entries: &[depth_entry(0, wgpu::TextureViewDimension::D2)],
         });
-        let source = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let source = device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Shadow Atlas Blit Source"),
             layout: &layout,
             entries: &[wgpu::BindGroupEntry {

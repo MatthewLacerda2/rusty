@@ -16,6 +16,7 @@ use crate::gpu::bind_entry as entry;
 use crate::gpu::bind_layouts::create_shadow_bind_group;
 use crate::gpu::fullscreen::{color_pass, Fullscreen};
 use crate::gpu::layout_entries::{depth_entry, texture_entry, uniform_entry};
+use crate::gpu::ops::{CountedDevice as _, CountedQueue as _};
 use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::{PfxTarget, PostFx, HDR_FORMAT};
@@ -173,7 +174,7 @@ impl Renderer {
     fn draw_copy(&self, view: &RenderView, target: &wgpu::TextureView) {
         let pass = &self.opaque_copy;
         let view_of = |v| wgpu::BindingResource::TextureView(v);
-        let inputs = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let inputs = self.device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Opaque Copy Inputs"),
             layout: &pass.layout,
             entries: &[
@@ -195,7 +196,7 @@ impl Renderer {
             rp.set_bind_group(0, &inputs, &[]);
             rp.draw(0..3, 0..1);
         }
-        self.queue.submit(std::iter::once(encoder.finish()));
+        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 
     /// The group 3 `view`'s transparent pass binds: its copy's this camera, else the

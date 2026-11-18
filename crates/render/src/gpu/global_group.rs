@@ -8,6 +8,7 @@
 use crate::clusters::ClusterBuffers;
 use crate::decals::DecalBuffers;
 use crate::gpu::lightmaps::LightmapBinding;
+use crate::gpu::ops::CountedDevice as _;
 
 /// What group 0 binds; see `bind_layouts::create_camera_lighting_layout`.
 pub(crate) struct GlobalGroup<'a> {
@@ -60,7 +61,7 @@ impl GlobalGroup<'_> {
             .into_iter()
             .map(|(binding, resource)| wgpu::BindGroupEntry { binding, resource })
             .collect();
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
+        device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Global Bind Group"),
             layout,
             entries: &entries,

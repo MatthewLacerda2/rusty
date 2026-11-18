@@ -5,6 +5,7 @@
 use super::cascades::Cascade;
 use super::casters::{CasterFrame, LightVolume, Sweep};
 use super::ShadowRenderer;
+use crate::gpu::ops::CountedEncoder as _;
 use crate::lod::LodSelection;
 use crate::timing::GpuPass;
 
@@ -104,7 +105,7 @@ pub(super) fn depth_pass<'a>(
     } else {
         wgpu::LoadOp::Load
     };
-    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+    encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
         multiview_mask: None,
         label: Some(label),
         color_attachments: &[],

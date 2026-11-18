@@ -45,6 +45,7 @@ pub(crate) mod reactive;
 pub(crate) mod sharpen;
 mod upscale;
 
+use crate::gpu::ops::CountedQueue as _;
 pub(crate) use effect::{runs, wanted, EFFECT};
 pub(crate) use history::{begin, chain_size, upscales, TaaFrame, TaaHistory};
 pub(crate) use sharpen::Sharpen;
@@ -84,7 +85,7 @@ impl PostFx {
         let params = TaaParams::new(sizes, frame, tune, lenses);
         #[cfg(test)]
         let params = params.without(h.rules);
-        queue.write_buffer(&h.params, 0, bytemuck::bytes_of(&params));
+        queue.counted_write_buffer(&h.params, 0, bytemuck::bytes_of(&params));
         let current = self.focused_color();
         let group = passes.group(device, h, read, current, velocity);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -108,7 +109,7 @@ impl PostFx {
         if drawn {
             reactive::clear(&mut encoder, &h.reactive);
         }
-        queue.submit(std::iter::once(encoder.finish()));
+        queue.counted_submit(std::iter::once(encoder.finish()));
         let h = self.targets.get_mut::<TaaHistory>().expect("held above");
         (h.latest, h.valid, h.ran) = (write, true, true);
     }

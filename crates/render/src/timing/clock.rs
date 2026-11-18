@@ -9,6 +9,7 @@
 //! a caller that calibrates against it depends on [`SHADER`] and [`WORKGROUPS`]
 //! staying exactly as they are.
 
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use crate::Renderer;
 
 /// The fixed load: every invocation runs a dependent multiply-add chain and writes
@@ -62,7 +63,7 @@ impl ClockProbe {
             64 * 4,
             wgpu::BufferUsages::STORAGE,
         );
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group = device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Bench clock probe"),
             layout: &pipeline.get_bind_group_layout(0),
             entries: &[wgpu::BindGroupEntry {
@@ -92,7 +93,7 @@ impl ClockProbe {
         let (device, queue) = (&renderer.device, &renderer.queue);
         let mut encoder = device.create_command_encoder(&Default::default());
         {
-            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            let mut pass = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("Bench clock probe"),
                 timestamp_writes: Some(wgpu::ComputePassTimestampWrites {
                     query_set: &self.set,
@@ -106,7 +107,7 @@ impl ClockProbe {
         }
         encoder.resolve_query_set(&self.set, 0..2, &self.resolve, 0);
         encoder.copy_buffer_to_buffer(&self.resolve, 0, &self.readback, 0, Some(16));
-        queue.submit(Some(encoder.finish()));
+        queue.counted_submit(Some(encoder.finish()));
         let slice = self.readback.slice(..);
         slice.map_async(wgpu::MapMode::Read, |_| {});
         device.poll(wgpu::PollType::wait_indefinitely()).ok()?;

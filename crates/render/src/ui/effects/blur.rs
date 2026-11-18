@@ -18,6 +18,7 @@
 //! light; the UI pass samples a result through its non-sRGB view, getting the
 //! display-encoded values it blends in.
 
+use crate::gpu::ops::CountedQueue as _;
 use std::collections::HashMap;
 
 use super::backdrop::blur_level;
@@ -211,7 +212,7 @@ impl Renderer {
         };
         view.post_fx.composite_into(&self.device, &mut encoder, ctx);
         let passes = self.encode_chain(&mut encoder, targets, deepest, &levels);
-        self.queue.submit(Some(encoder.finish()));
+        self.queue.counted_submit(Some(encoder.finish()));
         view.ui.effects.blur_passes = 1 + passes;
     }
 

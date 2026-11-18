@@ -2,6 +2,7 @@
 //! froxels scattered and integrated into the renderer's volume, submitted before the
 //! camera draws anything.
 
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use glam::Vec4;
 
 use super::params::Built;
@@ -46,7 +47,7 @@ impl Renderer {
         );
         let params = VolumetricParams::new(&plan, (t.index, probes), prev);
         self.queue
-            .write_buffer(&t.uniform, 0, bytemuck::bytes_of(&params));
+            .counted_write_buffer(&t.uniform, 0, bytemuck::bytes_of(&params));
         let built = Built {
             view_proj: ctx.view_proj,
             view_z: Vec4::from(ctx.uniform.clusters.view_z),
@@ -73,7 +74,7 @@ impl Renderer {
         let passes = &self.post_passes.volumetric_fog;
         let (out, history) = (&t.scatter[t.current], &t.scatter[1 - t.current]);
         let scatter = self.scatter_group(t, (out, history));
-        let uniforms = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let uniforms = self.device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Volumetric Integrate Uniforms"),
             layout: &passes.integrate_layouts[0],
             entries: &[
@@ -81,7 +82,7 @@ impl Renderer {
                 entry(1, self.camera_buffer.as_entire_binding()),
             ],
         });
-        let grids = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let grids = self.device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Volumetric Integrate Grids"),
             layout: &passes.integrate_layouts[1],
             entries: &[
@@ -99,7 +100,7 @@ impl Renderer {
             });
         {
             let timestamp_writes = self.gpu_timer.compute_writes(GpuPass::VolumetricFog);
-            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            let mut pass = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("Volumetric Fog"),
                 timestamp_writes,
             });
@@ -113,7 +114,7 @@ impl Renderer {
             let n = INTEGRATE_GROUP;
             pass.dispatch_workgroups(w.div_ceil(n), h.div_ceil(n), 1);
         }
-        self.queue.submit(std::iter::once(encoder.finish()));
+        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 
     /// `cs_scatter`'s group: the uniforms, this camera's lights and the `Baked`
@@ -129,7 +130,7 @@ impl Renderer {
         let [lights, ranges, indices] = self.clusters.buffers();
         let [baked, baked_ranges, baked_indices] = passes.baked.buffers();
         let shadows = &self.shadow_renderer;
-        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+        self.device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Volumetric Scatter"),
             layout: &passes.scatter_layout,
             entries: &[
