@@ -58,6 +58,28 @@ class Wiring(unittest.TestCase):
                 self.assertRegex(asks, r"timeout-minutes: [1-4]\n")
                 self.assertIn("steps.filter.outputs.code != 'false'", asks)
 
+    def test_a_ready_pull_request_asks_with_its_event_and_a_draft_does_not(self):
+        # #2333: the script reads the merge on `pull_request` only when told the event.
+        ready = "(github.event_name == 'pull_request' && !github.event.pull_request.draft)"
+        for workflow in proved_tree.BUILT:
+            with self.subTest(workflow=workflow):
+                text = job(body(workflow), "changes")
+                asks = step(text, "Was this tree already proved?")
+                self.assertIn(f"if: (github.event_name == 'push' || {ready}) &&", asks)
+                self.assertIn('--event "${{ github.event_name }}" --sha "${{ github.sha }}"', asks)
+                self.assertIn(f"- uses: actions/checkout@v7\n        if: github.event_name == 'push' || {ready}\n",
+                              text)
+
+    def test_a_pull_request_decider_change_never_asks_the_script(self):
+        # #2333: a PR's step runs the PR's own copy, so the YAML holds this, not the script;
+        # a push runs `main`'s copy, whose `keyed()` holds `DECIDER`, so the clause is PR-only.
+        # What the `decider:` filter lists is `test_decider.py`'s.
+        for workflow in proved_tree.BUILT:
+            with self.subTest(workflow=workflow):
+                asks = step(job(body(workflow), "changes"), "Was this tree already proved?")
+                self.assertIn("&& (github.event_name != 'pull_request' || steps.filter.outputs.decider != 'true')\n",
+                              asks)
+
     def test_each_workflow_has_a_nightly_its_built_jobs_run_on(self):
         for workflow, jobs in proved_tree.BUILT.items():
             text = body(workflow)

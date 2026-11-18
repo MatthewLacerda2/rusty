@@ -33,8 +33,10 @@ jobs:
   #
   # On a push to `main` the filter diffs the merge commit, as ci.yml's does, so a
   # Markdown-only merge skips too; `code` is also 'false' when a recent
-  # successful lint run already linted this very tree (#1784; ci.yml's `changes`
-  # job says how). The docrefs and size-gate steps are unguarded and still run.
+  # successful lint run already linted this very tree (#1784), and on a ready PR
+  # when a dispatch or push run linted its test merge's tree (#2333), unless the
+  # PR changes the decider (the `decider` filter). ci.yml's `changes` job says
+  # how. The docrefs and size-gate steps are unguarded and still run.
   changes:
     timeout-minutes: 5
     runs-on: ubuntu-24.04
@@ -48,7 +50,7 @@ jobs:
       # On `push` paths-filter diffs `github.event.before..HEAD` in a local repo,
       # and the script lives in it: the checkout comes first (ci.yml, #480).
       - uses: actions/checkout@v7
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)
       - uses: dorny/paths-filter@v4
         id: filter
         if: github.event_name == 'pull_request' || github.event_name == 'push'
@@ -56,18 +58,27 @@ jobs:
           filters: |
             code:
               - '!**/*.md'
-      # As in ci.yml: only a push that changes code asks, and a broken lookup
+            # What decides a skip (#2333): a PR that changes it never asks
+            # `proved_tree.py`, since the step would run the PR's own copy.
+            decider:
+              - '.github/scripts/proved_tree.py'
+              - '.github/scripts/ghrest.py'
+              - '.github/scripts/merging/__init__.py'
+              - '.github/scripts/merging/verdict/**'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/lint.yml'
+      # As in ci.yml: a push or a ready PR that changes code asks, and a broken lookup
       # fails the step, not `changes` (its empty output means a full run).
       - name: Was this tree already proved?
         id: proved
-        if: github.event_name == 'push' && steps.filter.outputs.code != 'false'
+        if: (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)) && steps.filter.outputs.code != 'false' && (github.event_name != 'pull_request' || steps.filter.outputs.decider != 'true')
         continue-on-error: true
         timeout-minutes: 2
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
           python3 .github/scripts/proved_tree.py --workflow lint.yml
-          --sha "${{ github.sha }}" --before "${{ github.event.before }}"
+          --event "${{ github.event_name }}" --sha "${{ github.sha }}" --before "${{ github.event.before }}"
 
   lint:
     needs: changes
