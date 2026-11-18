@@ -21,6 +21,16 @@ branch is gone and `diff` against `origin/main` would be empty; the commit's
 own diff is the branch's diff as it landed, so the same mutants are asked
 about as a `diff` run on the branch would have been.
 
+**Globs with `--commit` narrow that diff, never widen it** (#2371). A merged
+pull request's `Mutation: <globs>` line asks about its own change in the
+files the globs name: the commit's diff, kept to the file sections whose new
+path a glob matches ([`narrowed`]), so a line can only make the ask smaller.
+Mutating the named files whole planned 737 mutants for one such line, three
+times what a run can measure. A glob matching no file the commit changed is
+named in the scope line and plans nothing, an answer as a `diff` with nothing
+to mutate is, not a refusal. Without `--commit` (`make mutants-remote`) globs
+still mean whole files: that is how a module is audited on purpose.
+
 Both become one cargo-mutants argument, `--in-diff`: it keeps only mutants
 whose span touches a changed line. A path scope becomes a diff that adds the
 named files whole, from `/dev/null`, which touches every line of them and of
@@ -119,19 +129,42 @@ def expand(glob: str) -> list[str]:
     return [e for a, b in zip(cuts, cuts[1:]) for e in expand(head + glob[a + 1:b] + tail)]
 
 
-def matching(globs: list[str]) -> list[str]:
-    """The tracked Rust files the globs name, in git's glob dialect. One glob
+def named(globs: list[str]) -> dict[str, set[str]]:
+    """The tracked Rust files each glob names, in git's glob dialect. One glob
     (or one alternative of a brace) that matches nothing is refused, not only
     all of them: a module moved to `crates/<m>/src/` leaves its old
     `src/<m>/**` glob naming nothing, and the other globs would hide it."""
-    found: set[str] = set()
-    for g in (e for w in globs for e in expand(w)):
-        listed = git("ls-files", "-z", "--", f":(glob){g}")
-        rust = {p for p in listed.split("\0") if p.endswith(".rs")}
-        if not rust:
-            sys.exit(f"mutants-scope: no tracked Rust file matches {g!r} -- moved to crates/? (crates/CLAUDE.md)")
-        found |= rust
-    return sorted(found)
+    found: dict[str, set[str]] = {}
+    for w in globs:
+        for g in expand(w):
+            listed = git("ls-files", "-z", "--", f":(glob){g}")
+            rust = {p for p in listed.split("\0") if p.endswith(".rs")}
+            if not rust:
+                sys.exit(f"mutants-scope: no tracked Rust file matches {g!r} -- moved to crates/? (crates/CLAUDE.md)")
+            found.setdefault(w, set()).update(rust)
+    return found
+
+
+def matching(globs: list[str]) -> list[str]:
+    """Every tracked Rust file the globs name, sorted ([`named`]'s rules)."""
+    return sorted(set().union(*named(globs).values()))
+
+
+def narrowed(diff: str, keep: set[str]) -> str:
+    """`diff`'s file sections whose new path is in `keep`. A section is cut
+    whole, its `rename from` lines included, so a moved file's rename still
+    reads as one; a deleted file (`+++ /dev/null`) has nothing to mutate."""
+    sections: list[list[str]] = []
+    for line in diff.splitlines(keepends=True):
+        if line.startswith("diff --git ") or not sections:
+            sections.append([])
+        sections[-1].append(line)
+    out = []
+    for section in sections:
+        new = next((ln[6:].rstrip("\n") for ln in section if ln.startswith("+++ b/")), None)
+        if new in keep:
+            out.extend(section)
+    return "".join(out)
 
 
 #: The engine's own workspace, the repository root.
@@ -211,13 +244,18 @@ def changed(fork: str, root: str, roots: list[str]) -> str:
 
 def resolve(scope: str, base: str, commit: str | None = None) -> tuple[dict, dict[str, str]]:
     """The plan this scope asks for, and each part's diff by its file name.
-    With `commit`, a `diff` is that commit's against its parent (#1934)."""
-    which, fork = kind(scope), ""
+    With `commit`, a `diff` is that commit's against its parent (#1934), and
+    globs are that diff kept to the files they name (#2371)."""
+    which, fork, globs = kind(scope), "", None
+    if which == "paths" and commit:
+        which, globs = "diff", named(words(scope))
     if which == "diff":
         if commit:
             base = f"{commit}^"
         fork = fork_point(base)
         files = sorted(git("diff", "--name-only", fork, "HEAD", "--", "*.rs").split())
+        if globs is not None:
+            files = [f for f in files if any(f in g for g in globs.values())]
     else:
         files = matching(words(scope))
         if not files:
@@ -232,17 +270,28 @@ def resolve(scope: str, base: str, commit: str | None = None) -> tuple[dict, dic
         if root != ROOT and (why := idle(root)):
             part["idle"] = why
         else:
-            diffs[name] = changed(fork, root, list(roots)) if which == "diff" else whole(root, mine)
+            if which == "paths":
+                diffs[name] = whole(root, mine)
+            elif globs is None:
+                diffs[name] = changed(fork, root, list(roots))
+            else:
+                diffs[name] = narrowed(changed(fork, root, list(roots)), {relative(root, f) for f in mine})
         parts.append(part)
     plan = {"kind": which, "scope": scope, "base": base, "files": files, "parts": parts}
     if commit:
         plan["commit"] = commit
+    if globs is not None:
+        plan["globs"] = sorted(globs)
+        plan["unchanged"] = [w for w in globs if not set(files) & globs[w]]
     return plan, diffs
 
 
 def subject(plan: dict) -> str:
     """What the scope named, for the report's first line."""
     files = plan["files"]
+    if plan.get("globs") is not None:
+        return (f"the Rust commit `{plan['commit'][:9]}` changed in the files `{plan['scope']}` matches"
+                f" ({len(files)} files)")
     if plan["kind"] == "diff" and plan.get("commit"):
         return f"the Rust commit `{plan['commit'][:9]}` changed ({len(files)} files)"
     if plan["kind"] == "diff":
@@ -280,8 +329,9 @@ def check(plan: dict, planned: dict[str, list[dict]]) -> tuple[str, bool]:
     """
     paths = plan["kind"] != "diff"
     parts = plan["parts"]
+    unchanged = "".join(f" `{g}` matches no file the commit changed." for g in plan.get("unchanged", []))
     if not parts:
-        return f"Scoped on request to {subject(plan)}: 0 mutants planned.", True
+        return f"Scoped on request to {subject(plan)}: 0 mutants planned.{unchanged}", True
     lines = []
     for part in parts:
         if "idle" in part:
@@ -296,8 +346,8 @@ def check(plan: dict, planned: dict[str, list[dict]]) -> tuple[str, bool]:
     runnable = any("idle" not in p for p in parts)
     go = not (paths and runnable and total == 0)
     if len(parts) == 1:
-        return f"Scoped on request to {subject(plan)}: {lines[0]}", go
-    return "\n".join([f"Scoped on request to {subject(plan)}, in {len(parts)} plans:", "",
+        return f"Scoped on request to {subject(plan)}: {lines[0]}{unchanged}", go
+    return "\n".join([f"Scoped on request to {subject(plan)}, in {len(parts)} plans:{unchanged}", "",
                       *(f"- {line}" for line in lines)]), go
 
 
@@ -314,7 +364,7 @@ def main() -> None:
     res = sub.add_parser("resolve", help="turn a scope into a plan and one diff per workspace")
     res.add_argument("scope", help="`diff`, or path globs separated by spaces or commas")
     res.add_argument("--base", default=BASE, help="what a `diff` scope compares against")
-    res.add_argument("--commit", help="the checked-out commit a `diff` is that commit's own change (#1934)")
+    res.add_argument("--commit", help="the checked-out commit: `diff` is its own change, globs narrow it (#1934)")
     res.add_argument("--out", type=Path, required=True, help="where the plan JSON goes; the diffs go beside it")
     globs = sub.add_parser("globs", help="refuse any glob that names no tracked Rust file")
     globs.add_argument("glob", nargs="+")

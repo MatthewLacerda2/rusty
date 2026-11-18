@@ -30,13 +30,20 @@ baseline built it, so a mutant rebuilds only what depends on P.
   share ends inside the budget at `MINUTES_PER_MUTANT`, at most `MAX_SHARDS`.
   The merge queue runs two requests at once (`merging/after/slots.CAP`), so
   mutation holds at most eight runners, clear of the gating CI the batch waits
-  on; a plan past the cap runs at the cap and its report says what it never
-  reached. A standalone part runs on shard 0
+  on; a `diff` plan past the cap runs at the cap and its report says what it
+  never reached, since no narrower honest ask exists for it. A standalone part runs on shard 0
   before the engine's share, so its mutants count toward the sizing too.
   Every shard runs the same per-package invocations with `--shard J/N
   --sharding round-robin`, where `J = (K - offset) mod N` for shard K and
   the package's offset in the plan ([`packages`]), so the whole plan is dealt
   round-robin as one list.
+- **A hand ask too large to measure is refused** ([`refusal`], #2371): named
+  files mutated whole that plan more than [`HEADROOM`] times what `MAX_SHARDS`
+  runners measure start no shard; the `plan` job ends red with the planned
+  count, what fits one ask and each file's count, largest first, so the next
+  ask can be narrower. Run 44203600903 held four runners 166 minutes each for
+  a 737-mutant plan it measured 263 of; that it could not fit was known in
+  `plan`, minutes in.
 - **A package is checked before it is mutated** ([`tests`]): `cargo nextest
   list` with exactly the filter and tool config its mutants get must succeed
   and select a test. cargo-mutants counts any non-zero nextest exit as a
@@ -73,6 +80,10 @@ from pathlib import Path
 #: (#2269's plan re-asked) spent 282 runner-minutes on 71 mutants, 191 s a
 #: caught one and 631 s a survivor, against 7.2 min a mutant before.
 MINUTES_PER_MUTANT = 4.0
+# Kept after #2371's check against the two large runs since: 44149115191
+# (110 mutants, four shards) spent 534 runner-minutes, 454 past setup, 4.1 a
+# mutant; 44203600903 (263 measured) 666, 586 past setup, 2.2. 4.0 sits at the
+# slow end, so a plan sized by it ends inside its budget.
 #: What a shard spends before its first mutant: setup, the workspace's build
 #: and its timed baseline (15 to 17 min in run 44014339190, 21 in #2282's),
 #: with room for a cold cache.
@@ -80,6 +91,14 @@ SETUP_MINUTES = 20
 #: The most runners one request takes: the queue runs two at once, and the
 #: gating CI of the batch's pull requests needs the rest of the account's.
 MAX_SHARDS = 4
+#: How far past what fits one ask (`MAX_SHARDS` runners at `MINUTES_PER_MUTANT`)
+#: a whole-file ask may plan before it is refused: at the measured 2.2 to 4.1
+#: minutes a mutant, 1.5 x the 145 that fit at 4.0 (217) is about what four
+#: runners finish at the fast end, so a plan the runners could still measure is
+#: never turned away, and one three times past the cap is.
+HEADROOM = 1.5
+#: How many files the refusal lists by count; the rest are summed.
+LISTED = 15
 #: cargo-mutants' exit statuses that finished, and `timeout`'s at the budget.
 FINISHED, STOPPED = (0, 2, 3), (124, 137)
 #: The engine's part, as `mutants-scope.py` names it; only it is sharded.
@@ -101,6 +120,38 @@ def shards(planned: int, budget_seconds: int, minutes: float = MINUTES_PER_MUTAN
     if want > MAX_SHARDS:
         why += f" (capped from {want}; the report names what it never reached)"
     return n, why
+
+
+def fits(budget_seconds: int, minutes: float = MINUTES_PER_MUTANT) -> int:
+    """How many mutants `MAX_SHARDS` runners measure inside the budget."""
+    return max(0, int(MAX_SHARDS * (budget_seconds / 60 - SETUP_MINUTES) / minutes))
+
+
+def refusal(plan: dict, listed: dict[str, list[dict]], budget_seconds: int) -> str | None:
+    """Why a whole-file ask is refused before any shard starts, or `None`.
+    `listed` is each part's `--list --json` by slug, the plan `plan` already
+    computed. A `diff`, narrowed or not, is never refused: it runs at the cap."""
+    if plan.get("kind") != "paths":
+        return None
+    per_file: dict[str, int] = {}
+    for part in plan.get("parts", []):
+        root = part["root"]
+        for m in listed.get(part["slug"], []):
+            path = m.get("file", "?") if root == "." else f"{root}/{m.get('file', '?')}"
+            per_file[path] = per_file.get(path, 0) + 1
+    total, fit = sum(per_file.values()), fits(budget_seconds)
+    if total <= HEADROOM * fit:
+        return None
+    ranked = sorted(per_file.items(), key=lambda kv: (-kv[1], kv[0]))
+    rows = [f"- `{f}`: {n}" for f, n in ranked[:LISTED]]
+    if len(ranked) > LISTED:
+        rest = ranked[LISTED:]
+        rows.append(f"- {len(rest)} more files: {sum(n for _, n in rest)}")
+    return "\n".join([
+        f"the scope plans {total} mutants with its files mutated whole, and one ask measures about {fit}"
+        f" ({MAX_SHARDS} runners at {MINUTES_PER_MUTANT:g} min a mutant; refused past {int(HEADROOM * fit)})."
+        " No shard started. Name fewer files, or ask `diff` for what a branch changed. Mutants per file:",
+        "", *rows])
 
 
 def packages(listed: list[dict]) -> list[tuple[str, int]]:
@@ -214,6 +265,9 @@ def main() -> None:
     size.add_argument("--planned", type=int, required=True, help="the engine part's planned mutants")
     size.add_argument("--budget-seconds", type=int, required=True)
     size.add_argument("--standalone", type=int, default=0, help="the standalone parts' planned mutants")
+    ref = sub.add_parser("refuse", help="exit 1, printing why, when a whole-file plan is too large to measure")
+    ref.add_argument("plan", type=Path, help="the plan; each part's planned-SLUG.json lies beside it")
+    ref.add_argument("--budget-seconds", type=int, required=True)
     sub.add_parser("tests", help="how many tests the `cargo nextest list` JSON on stdin selects")
     pkgs = sub.add_parser("packages", help="`package offset` for each package a `--list --json` file mutates")
     pkgs.add_argument("listed", type=Path)
@@ -229,6 +283,16 @@ def main() -> None:
         n, why = shards(args.planned, args.budget_seconds, standalone=args.standalone)
         print(f"shards={json.dumps(list(range(n)))}")
         print(why, file=sys.stderr)
+    elif args.command == "refuse":
+        plan, here = json.loads(args.plan.read_text()), args.plan.parent
+        listed = {}
+        for part in plan.get("parts", []):
+            path = here / f"planned-{part['slug']}.json"
+            text = path.read_text().strip() if path.is_file() else ""
+            listed[part["slug"]] = json.loads(text) if text else []
+        if why := refusal(plan, listed, args.budget_seconds):
+            print(why)
+            sys.exit(1)
     elif args.command == "packages":
         text = args.listed.read_text().strip() if args.listed.is_file() else ""
         for name, offset in packages(json.loads(text) if text else []):

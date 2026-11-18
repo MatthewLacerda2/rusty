@@ -402,9 +402,10 @@ for a scoped run with a line in its description, `Mutation: diff` or
 
 - **What runs:** `mutants-on-request.yml` on `main` at the squash commit (input
   `commit`); `diff` is that commit's Rust change against its parent
-  (`mutants-scope.py --commit`). A `diff` ask whose commit changed no Rust is not
-  dispatched; globs (spaces or commas) pass as written, one plan per cargo
-  workspace (`tools/lint` is its own); an unreadable line asks for nothing.
+  (`--commit`), globs only narrowing it (none changed: nothing planned, green); no
+  Rust changed, no dispatch; an unreadable line asks for nothing. By hand, globs
+  mean whole files, refused red in `plan` past `HEADROOM` times what four runners
+  measure, each file's count listed; a `diff` past the cap runs at the cap.
 - **The cap:** two at once (`merging/after/slots.CAP`); the rest wait in
   `merge-queue/mutants.json`, surviving a relaunch, and are dispatched as slots
   free (also by `make queue PRS=N`).
