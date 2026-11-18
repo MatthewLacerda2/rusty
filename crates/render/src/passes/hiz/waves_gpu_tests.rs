@@ -58,7 +58,7 @@ fn gpu_a_waved_plane_behind_a_rim_still_draws_its_crests() {
         }],
     };
     bake_recipe(&recipe, engine_shader_dir(), DEFAULT_OUT_DIR).expect("bakes");
-    let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {
+    let Some(mut r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
         return;
     };
     // Low, well under the rim's top: the flat box behind it is hidden.

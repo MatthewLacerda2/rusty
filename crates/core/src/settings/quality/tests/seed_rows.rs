@@ -82,3 +82,20 @@ fn flat_means_all_three_levels_equal() {
         high: 1
     }));
 }
+
+/// The GPU occlusion cull and its cluster cull ship off in every seeded preset
+/// (#2388): on the scenes #2387 measured they cost more than they save, so a project
+/// opts in per preset.
+#[test]
+fn every_seeded_preset_ships_the_gpu_cull_off() {
+    for preset in &QualityPresets::default().presets {
+        let v = &preset.values;
+        assert!(
+            !v.gpu_occlusion_culling && !v.gpu_cluster_culling,
+            "{} seeds the GPU cull on",
+            preset.name
+        );
+    }
+    let engine = QualityValues::default();
+    assert!(!engine.gpu_occlusion_culling && !engine.gpu_cluster_culling);
+}

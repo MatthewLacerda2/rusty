@@ -5,7 +5,7 @@ use super::gpu_tests::{drawn, facing_the_wall, offscreen, shot, walled, H, W};
 
 #[test]
 fn gpu_a_box_out_from_behind_the_wall_is_drawn_the_same_frame() {
-    let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {
+    let Some(mut r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
         return;
     };
     let (mut scene, boxed) = walled();

@@ -716,8 +716,8 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
 Unity 6's *GPU Occlusion Culling* (#1963): with no bake, wherever the camera stands
 (outside the baked cells, in the editor's Scene view far from the play area), a
 camera with `use_occlusion_culling` on leaves undrawn the opaque meshes that what it
-drew hides. The quality preset's `gpu_occlusion_culling` turns it on (every seeded
-preset; [`Graphics`](Graphics.md), *Quality*). It changes no pixel: a mesh it skips
+drew hides. The quality preset's `gpu_occlusion_culling` turns it on (off in every seeded
+preset, opt-in until it is measured to pay on the project's scenes; [`Graphics`](Graphics.md), *Quality*). It changes no pixel: a mesh it skips
 is wholly behind depth the camera drew this frame.
 
 - **How.** Two phases per camera, the standard way: the meshes it drew last frame
@@ -760,7 +760,7 @@ is wholly behind depth the camera drew this frame.
   its vertices is split and reordered at import like any other, but the instance
   test never judges it, so its clusters are never tested and it keeps one
   instanced draw; mesh particles likewise. It changes no pixel either, and the preset's
-  `gpu_cluster_culling` (on in every seeded preset) turns it off. A split mesh is
+  `gpu_cluster_culling` (off in every seeded preset) turns it on. A split mesh is
   drawn once per instance, not instanced, so many copies of one big mesh cost a
   draw each; past a per-camera budget (8M indices) a batch is tested whole.
 - **Measure** with `Debug.Stats().hiz_tested` and `hiz_culled` (read back a frame
