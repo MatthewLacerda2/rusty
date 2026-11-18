@@ -21,6 +21,15 @@ fn a_raw_call_in_a_render_module_is_flagged_naming_its_helper() {
 }
 
 #[test]
+fn a_path_form_call_is_flagged_too() {
+    let path = "wgpu::Queue::submit(&q, x);\nwgpu::Device::create_bind_group(d, &desc);\n";
+    let found = check_file("crates/render/src/passes/a.rs", path);
+    assert_eq!(found.len(), 2, "{found:?}");
+    assert!(found[0].message.contains("`::submit(`"));
+    assert!(found[1].message.contains("counted_bind_group"));
+}
+
+#[test]
 fn the_helpers_tests_comments_and_other_crates_pass() {
     assert!(check_file("crates/render/src/gpu/ops.rs", PASS).is_empty());
     assert!(check_file("crates/render/src/passes/a_tests.rs", PASS).is_empty());

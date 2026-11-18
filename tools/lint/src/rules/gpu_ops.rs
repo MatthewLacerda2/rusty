@@ -19,13 +19,14 @@ pub const RULE: &str = "gpu-ops";
 const SCOPE: &str = "src/render/";
 const HOME: &str = "src/render/gpu/ops.rs";
 
-/// Each raw call and the counted helper it should be.
+/// Each raw wgpu method and the counted helper it should be. A call is flagged in
+/// its method form (`.submit(`) and its path form (`wgpu::Queue::submit(`).
 const CALLS: [(&str, &str); 5] = [
-    (".begin_render_pass(", "counted_render_pass"),
-    (".begin_compute_pass(", "counted_compute_pass"),
-    (".submit(", "counted_submit"),
-    (".create_bind_group(", "counted_bind_group"),
-    (".write_buffer(", "counted_write_buffer"),
+    ("begin_render_pass", "counted_render_pass"),
+    ("begin_compute_pass", "counted_compute_pass"),
+    ("submit", "counted_submit"),
+    ("create_bind_group", "counted_bind_group"),
+    ("write_buffer", "counted_write_buffer"),
 ];
 
 /// Every raw counted-kind wgpu call in the production code of `path` (`test`, per line).
@@ -39,8 +40,9 @@ pub fn check_file(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
         if test.get(i).copied().unwrap_or(false) {
             continue;
         }
-        for (raw, helper) in CALLS {
-            if code.contains(raw) {
+        for (name, helper) in CALLS {
+            let forms = [format!(".{name}("), format!("::{name}(")];
+            if let Some(raw) = forms.iter().find(|f| code.contains(f.as_str())) {
                 found.push(Finding {
                     path: path.to_string(),
                     line: i + 1,

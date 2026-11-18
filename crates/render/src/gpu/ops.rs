@@ -2,12 +2,19 @@
 //! and compute pass it begins, every queue submit, bind group made and buffer write
 //! goes through one of these, which counts it and forwards to wgpu unchanged.
 //!
-//! The counts are kept per thread (a renderer draws on the thread that owns it) and
-//! [`take`]n into a frame's [`crate::RenderCounters::ops`]: `Renderer::render` and
-//! `render_capture_face` drop what was counted before they start, and
-//! `finish_counters` takes what the frame did. A call outside that window (setup,
-//! a load's warm-up, the GPU timer's resolve after the counters close, a readback
-//! between frames) is counted into nothing.
+//! The counts are kept per thread and [`take`]n into a frame's
+//! [`crate::RenderCounters::ops`]: `Renderer::render` and `render_capture_face`
+//! drop what was counted before they start, and `finish_counters` takes what the
+//! frame did. A call outside that window (setup, a load's warm-up, the GPU timer's
+//! resolve after the counters close, a readback between frames) is counted into
+//! nothing.
+//!
+//! The invariant is **one open render window at a time per thread**, not one
+//! renderer per thread: two renderers on a thread (a test's headless pair, a
+//! bake's renderer beside the editor's) share the one counter, so a frame of one
+//! must not be drawn inside a frame of the other. A render nested inside a frame's
+//! window on the same renderer goes through `Renderer::aside`, which keeps the
+//! outer frame's counts ([`kept`]).
 //!
 //! `make rules`' `gpu-ops` rule holds that no file under `crates/render/src/` but
 //! this one calls the raw wgpu methods outside test code.
@@ -55,6 +62,16 @@ thread_local! {
 /// What this thread counted since the last call, and start again from zero.
 pub(crate) fn take() -> OpCounts {
     COUNTS.with(|c| c.take())
+}
+
+/// Run `f` and leave this thread's counts as they were before it: what `f` counts
+/// (a render beside the frame, `Renderer::aside`) belongs to no frame, and what the
+/// outer frame had counted survives `f`'s own [`take`]s.
+pub(crate) fn kept<R>(f: impl FnOnce() -> R) -> R {
+    let outer = take();
+    let out = f();
+    COUNTS.with(|c| c.set(outer));
+    out
 }
 
 fn bump(add: impl FnOnce(&mut OpCounts)) {

@@ -9,12 +9,12 @@ use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
-/// What each still frame after the first makes, at the default settings (measured on
-/// lavapipe, held on CI's Metal): the sun's four dynamic cascade passes, Hi-Z phase one, the
+/// What each still frame after the first makes, at the default settings: the sun's four dynamic cascade passes, Hi-Z phase one, the
 /// scene pass and two post-FX passes; the pyramid and the cull's compute passes; and
 /// three bind groups the post chain rebuilds every frame (its IO group for each of
 /// its two passes, its effect textures for one), today's number, pinned so one
 /// more shows and one fewer is a fix to re-pin.
+/// Measured: RTX 2060 8/4/4/3/22, lavapipe 8/4/4/3/22, Metal 8/4/4/3/22.
 const STILL: OpCounts = OpCounts {
     render_passes: 8,
     compute_passes: 4,
