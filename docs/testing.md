@@ -283,7 +283,7 @@ its check and its command changed to match).
   plain `cargo test`. On Linux, `build-test` is a matrix of three parallel jobs
   (#2264): `build-test (default, 1/1)` runs the default suite, and `build-test (dev,
   1/2)` and `(dev, 2/2)` split the `dev` one with nextest's `--partition count:k/2`;
-  each prints its twenty slowest tests (step *Slowest tests*), and each runs the GPU and
+  each prints its twenty slowest tests and where its time went, the `gpu` group's test-seconds over its cap against the rest's over the runner's cores beside the shard's wall, per binary (step *Slowest tests*; the macOS shards print ten), keeps its JUnit report as a 7-day `junit-*` artifact, and each runs the GPU and
   OIDN canaries again on its own runner (step *Canaries*), since a partition puts each
   canary in one shard only. The macOS leg (`build-test-cross`) runs the nextest suite with
   `dev` only, the superset (#1976), split in two, `build-test-cross (macos-26, 1/2)` and
