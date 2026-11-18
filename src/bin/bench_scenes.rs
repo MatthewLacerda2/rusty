@@ -20,9 +20,9 @@
 //! more samples its measured frames with the platform's profiler (`--scene
 //! --profile`, `scenes::profile`), whose failure leaves the timings standing; the
 //! profiler is tried once before any scene, so a refusal ends the run at once.
-//! With `--import`, once a run, one more loads the first scene from a copy of the
-//! project without its import cache (`--import-out`, `scenes::import`) and hands
-//! that load to the first scene's timed run as `--import-ms`. The project is
+//! With `--import`, once a run, one more imports a copy of the project without its
+//! import cache and loads its first scene (`--import-out`, `scenes::import`), and
+//! hands both's time to the first scene's timed run as `--import-ms`. The project is
 //! read, never written.
 
 use std::ffi::OsString;
@@ -122,15 +122,17 @@ fn bench_one(run: &Run, scene: &str, key: String, import_ms: Option<f64>) {
     }
 }
 
-/// Load `scene` of the project (a cache-cleared copy) and write the load's ms to `file`.
+/// Import the project (a cache-cleared copy), load `scene`, and write both's ms to `file`.
 fn import_one(run: &Run, scene: &str, file: &Path) {
     let opened = rusty::core::project::open(&run.project, Access::Run);
     let opened = opened.unwrap_or_else(|e| fail(&format!("cannot open the copy: {e}")));
     let scratch = file.parent().unwrap_or(Path::new("."));
+    eprintln!("{}", rusty::asset::import::notice(&opened.root));
+    let imported = import::import().unwrap_or_else(|e| fail(&format!("import failed: {e}")));
     let loaded = scenes::load(scratch, &opened.root, scene, opened.settings, run.opts.size);
     let ms = loaded.map_or_else(
         |e| fail(&format!("{scene}: cold load failed: {e}")),
-        |l| l.1,
+        |l| imported + l.1,
     );
     // lint: allow(asset-write) a number handed to the parent process, deleted after
     let wrote = std::fs::write(file, ms.to_string());
