@@ -2,7 +2,8 @@
 //! box stands against a wall beside a `Baked` lamp at 2.2 m, lit only by baked
 //! light probes (no ambient, black sky, and a `Baked` lamp is never drawn live).
 //! With its one probe sample it is one colour top to bottom; with a volume its top,
-//! by the lamp, is lit and its foot dark.
+//! by the lamp, is lit and its foot dark; with a `Custom` box over its top quarter,
+//! its foot reads the box's face (`proxy_volume_clamp`, on the same bake).
 //!
 //! Skips (passes without asserting) when no GPU / software adapter is present.
 
@@ -89,7 +90,7 @@ pub(super) fn top_and_foot(scene: &Scene, name: &str) -> (f64, f64) {
 }
 
 #[test]
-fn a_tall_locker_goes_from_a_lit_top_to_a_dark_foot_with_a_volume() {
+fn a_tall_locker_goes_from_a_lit_top_to_a_dark_foot_with_a_volume_and_clamps_to_a_box() {
     let Some((mut scene, locker)) = baked_room() else {
         eprintln!("[proxy volume] no GPU/software adapter — skipping");
         return;
@@ -118,5 +119,8 @@ fn a_tall_locker_goes_from_a_lit_top_to_a_dark_foot_with_a_volume() {
     assert!(
         v_top > top && v_foot < foot,
         "the grid spreads the one sample apart"
+    );
+    super::proxy_volume_clamp::a_foot_outside_a_custom_box_reads_the_box_s_face_not_the_single_sample(
+        &mut scene, locker, foot,
     );
 }
