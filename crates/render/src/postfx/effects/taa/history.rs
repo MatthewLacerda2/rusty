@@ -48,7 +48,7 @@ pub(crate) const FLICKER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba
 /// **Memory, per TAA camera** at the history's size (the output's when
 /// upscaling): two HDR colour frames (8 bytes a pixel each) and two surface
 /// frames (4 bytes each, #1846), 24 bytes a pixel: 50 MB at 1920×1080, 199 MB at
-/// 3840×2160; with the camera's anti-flicker on, two flicker frames (8 bytes each,
+/// 3840×2160; with the camera's anti-flicker on (its default), two flicker frames (8 bytes each,
 /// #2228) more, 40 bytes a pixel: 83 MB at 1920×1080; and at the scene's size the
 /// reactive mask (2 bytes a pixel, #1845): 4 MB at 1920×1080. The level's size (a
 /// Dust2-sized map or a room) changes none of it.
