@@ -101,6 +101,7 @@ CACHE_KEYED_DIRS = (".cargo/", ".github/actions/")
 #: by a full run. On a pull request the workflows hold this before the script
 #: runs (their `decider` filter), since the PR's own copy is what would run.
 DECIDER = (".github/scripts/proved_tree.py", ".github/scripts/ghrest.py",
+           ".github/scripts/merging/__init__.py", ".github/scripts/merging/verdict/__init__.py",
            ".github/scripts/merging/verdict/runlist.py")
 #: Per event, the events whose runs may prove it, `None` for any (#2333).
 PROOF_EVENTS: dict[str, tuple[str, ...] | None] = {
@@ -217,7 +218,7 @@ def verdict(get: Get, repo: str, workflow: str, sha: str, before: str,
         if not isinstance(commit, dict):
             return None, "runs in full: the pushed commit could not be read"
         tree = commit["commit"]["tree"]["sha"]
-        url = proving_run(get, repo, tree, workflow)
+        url = proving_run(get, repo, tree, workflow, PROOF_EVENTS["push"])
     except (KeyError, TypeError, LookupError) as error:
         return None, f"runs in full: the lookup failed ({error!r})"
     if url is None:

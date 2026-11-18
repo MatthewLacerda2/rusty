@@ -63,6 +63,7 @@ jobs:
             decider:
               - '.github/scripts/proved_tree.py'
               - '.github/scripts/ghrest.py'
+              - '.github/scripts/merging/__init__.py'
               - '.github/scripts/merging/verdict/**'
               - '.github/workflows/ci.yml'
               - '.github/workflows/lint.yml'
@@ -70,7 +71,7 @@ jobs:
       # fails the step, not `changes` (its empty output means a full run).
       - name: Was this tree already proved?
         id: proved
-        if: (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)) && steps.filter.outputs.code != 'false' && steps.filter.outputs.decider != 'true'
+        if: (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)) && steps.filter.outputs.code != 'false' && (github.event_name != 'pull_request' || steps.filter.outputs.decider != 'true')
         continue-on-error: true
         timeout-minutes: 2
         env:

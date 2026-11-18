@@ -114,6 +114,7 @@ jobs:
             decider:
               - '.github/scripts/proved_tree.py'
               - '.github/scripts/ghrest.py'
+              - '.github/scripts/merging/__init__.py'
               - '.github/scripts/merging/verdict/**'
               - '.github/workflows/ci.yml'
               - '.github/workflows/lint.yml'
@@ -144,13 +145,14 @@ jobs:
       # merge, whose tree a dispatch run on a head holding `main` built. A change
       # to a cache key's inputs (`Cargo.lock`, the toolchain, `.github/actions/`,
       # which pins the CI tools, #1973), this file or the script runs in full;
-      # so does a `decider` change, held here because a PR would run its own copy.
+      # so does a PR's `decider` change, held here because the PR would run its
+      # own copy (a push runs `main`'s, whose key check already holds `DECIDER`).
       # A draft and the nightly never ask; a dispatch always builds. A lookup that
       # breaks (no `gh`, a hung call) must not fail `changes` and turn `main`
       # red: the step may fail or time out, and its empty output means a full run.
       - name: Was this tree already proved?
         id: proved
-        if: (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)) && steps.filter.outputs.code != 'false' && steps.filter.outputs.decider != 'true'
+        if: (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)) && steps.filter.outputs.code != 'false' && (github.event_name != 'pull_request' || steps.filter.outputs.decider != 'true')
         continue-on-error: true
         timeout-minutes: 2
         env:
