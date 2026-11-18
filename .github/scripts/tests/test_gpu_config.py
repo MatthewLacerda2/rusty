@@ -13,10 +13,6 @@ Two rules written in several files and held equal by hand until now:
 - **A mutation run can't outgrow its runner.** `ulimit -v` caps each process
   (#674), and nextest runs `--test-threads` test processes at once, so the cap
   times the threads stays within the runner's memory (#1844).
-- **The default-feature suite leaves the gpu group to the dev suite** (#2352).
-  nextest refuses `group()` in a default filter, so the `default-features`
-  profile spells the group's filter out, negated; one edited alone would drop
-  or run the wrong tests.
 """
 
 from __future__ import annotations
@@ -114,35 +110,6 @@ class NextestProfile(unittest.TestCase):
         for path in [REPO / "Makefile", *sorted(WORKFLOWS.glob("*.yml"))]:
             with self.subTest(file=path.name):
                 self.assertNotRegex(path.read_text(), r"--retries\b|NEXTEST_RETRIES")
-
-
-def gpu_split_gap(config: dict) -> str | None:
-    """What keeps `default-features`' default filter from being exactly the gpu
-    group's filter negated, or None."""
-    group = [o["filter"] for o in config["profile"]["default"].get("overrides", [])
-             if o.get("test-group") == "gpu"]
-    if len(group) != 1:
-        return "`profile.default` must put the gpu group in one override"
-    want = f"not ({group[0]})"
-    got = config["profile"].get("default-features", {}).get("default-filter")
-    if got != want:
-        return (f"`profile.default-features`' default-filter is {got!r}; write {want!r}, "
-                "the gpu group's filter negated, so the default suite leaves exactly it to dev")
-    return None
-
-
-@NEEDS_TOML
-class DefaultFeatures(unittest.TestCase):
-    def test_today_the_default_suite_leaves_exactly_the_gpu_group(self):
-        self.assertIsNone(gpu_split_gap(NEXTEST))
-
-    def test_flags_a_copy_edited_alone_or_missing(self):
-        group = "(kind(test) & test(/^gpu::/))"
-        config = lambda dflt: {"profile": {"default": {"overrides": [{"filter": group, "test-group": "gpu"}]},
-                                           "default-features": {"default-filter": dflt}}}
-        self.assertIsNone(gpu_split_gap(config(f"not ({group})")))
-        self.assertIn("default-filter", gpu_split_gap(config("not (kind(test) & test(/^gpu/))")))
-        self.assertIn("default-filter", gpu_split_gap(config(None)))
 
 
 class RequireGpu(unittest.TestCase):

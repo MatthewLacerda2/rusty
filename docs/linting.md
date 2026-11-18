@@ -57,6 +57,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Local gate = CI gate | `unittest` (`make scripts`, `test_gate_mirror.py`) | **hard gate**: every command a `GATES` recipe runs appears in a step of `ci.yml`/`lint.yml`, and every clippy run passes nothing after `--` but `-D warnings` (#964); a suite CI splits with `--partition` across a matrix names every shard of the split once, each `--partition` reads `count:${{ matrix.shard }}` in a job whose one-line split it read, and every shard runs the GPU and OIDN canaries (`test_shards.py`, #2264) |
 | Merge helpers | `unittest` (`make scripts`) | **hard gate**: `.github/scripts/tests` pass — `make mergeable` judges every merge, and the ruleset's required checks (`make ruleset`, #491) cannot tell a draft's run from a ready one (#486) |
 | Module layering | `tools/lint -- --layers` | **hard gate**: the declared table (`tools/lint/src/layers/table.rs`) equals the workspace's manifests (each row's `deps` and `uses` are its crate's `[dependencies]`), rows run bottom-up, no sim crate depends on a platform one or names a display crate (the `wgpu` and `egui` families: `wgpu`, `wgpu_*`, `egui`, `egui_*`), not even as a dev-dependency, no sim crate's dev-dependency is a platform sibling, no dev-dependency reaches up, `test-support` names no sibling and no display crate, and nothing declared is unused (#724, #938, #494) |
+| No render code only without `dev` | `tools/lint -- --rules` (`gpu-default-only`) | **hard gate**: in `rusty-render` and every crate whose `dev` its `dev` turns on (`crates/render/Cargo.toml`), no production line holds a `cfg!(…)` naming `feature = "dev"` or a `cfg`/`cfg_attr` attribute whose `not(…)` names it — the default suite leaves the GPU tests to the `dev` one, so such code would be drawn by none (#2352) |
 | No shared process state | clippy `disallowed_methods` + `tools/lint -- --determinism` | **hard gate**: `std::env::{set_var, remove_var, set_current_dir}` are banned crate-wide in `clippy.toml`, tests included, since `cargo test` runs every in-crate test in one process; production opts out inline with a reason (`project::open`), and `--determinism` keeps the three on the list (#977) |
 | No subprocesses | `tools/lint -- --rules` (`subprocess`) | **hard gate**: no line of `src/` names `std::process::Command` — the engine starts no other program but Blender, to convert a `.blend` while authoring, and `git`, which a debug build asks for its checkout's commit; a real need takes `// lint: allow(subprocess) <why>` (#975) |
 | Nothing temporary | clippy `dbg_macro`/`todo`/`unimplemented` + `tools/lint -- --rules` (`markers`) | **hard gate**: the three are denied in `Cargo.toml`'s `[lints]` (and `tools/lint`'s); a marker word (`TODO`, `FIXME`, `XXX`, `HACK`) in a scanned `.rs` file fails — an unfinished thing is an issue (#935) |
@@ -484,6 +485,22 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   like any shader, and a test fixture that must stand alone (`tests/gpu/`) is not
   scanned. A shader that must stand alone says why with
   `// lint: allow(fullscreen-triangle) <why>`.
+- **`gpu-default-only`** (#2352) — the default-feature suite runs every test but
+  the `gpu` group, which the `dev` suite runs (`docs/testing.md`, *Which suite runs
+  the GPU tests*). That holds while `dev` only adds to what is drawn, so in a crate
+  on the render path (`rusty-render` and each crate named `rusty-<m>/dev` in its
+  `dev` feature, read from `crates/render/Cargo.toml`) a production line holding a
+  `cfg!(…)` that names `feature = "dev"`, or a `#[cfg(…)]` / `#[cfg_attr(…)]` whose
+  `not(…)` names it, fails: that code exists only without `dev`, and no GPU test
+  draws it any more. A `#[cfg(feature = "dev")]` only adds and passes, and so does
+  `any(feature = "dev", feature = "editor")`, true in both suites since `editor` is
+  a default feature. The fix is to keep the code the same under both feature sets,
+  or to put that crate's GPU tests back in the default pass by widening the `-E` in
+  `make test`'s `DEFAULT_SUITE` and ci.yml's "Test (engine, default)" together
+  (`-E 'not group(gpu) | (group(gpu) & package(rusty-<m>))'`; `make scripts` holds
+  the two equal). A switch no rendered path reads (the window device's GPU
+  timestamps, the agent guide a project is written) takes
+  `// lint: allow(gpu-default-only) <why>` (`rules/gpu_default_only.rs`).
 - **`gpu-ops`** (#2341) — every render or compute pass the renderer begins, every
   queue submit, bind group made and buffer write goes through
   `crates/render/src/gpu/ops.rs` (`.counted_render_pass(`, `.counted_compute_pass(`,

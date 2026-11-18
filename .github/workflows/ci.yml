@@ -177,9 +177,9 @@ jobs:
           - { features: default, shard: 1/1 }
           - { features: dev, shard: 1/2 }
           - { features: dev, shard: 2/2 }
-    # A guard against a hang, not a budget a shard must fit: the slowest share,
-    # the default suite (one fewer split than `dev`), measured 303-411 s of
-    # nextest once split, on a fast runner and a slow one.
+    # A guard against a hang, not a budget a shard must fit: the slowest shares
+    # are the two `dev` shards, which run the gpu group (355 s and 562 s of nextest
+    # in run 44351591966); the default entry, which leaves that group to them, 73 s.
     timeout-minutes: 30
     runs-on: ubuntu-24.04
     if: >-
@@ -272,15 +272,17 @@ jobs:
       # below. It does not run doctests, hence the `--doc` step. A matrix entry
       # runs one of the two test steps, under its own name: the scripts look for
       # each by name (`proved_tree.BUILT`, `verdict.changes.DRIFT_STEP_WORDS`).
-      # The default entry runs the `default-features` profile: every test target
-      # compiled, every test run but the `gpu` group, which the `dev` shards run
-      # (a superset build); its JUnit report is that profile's (#2352).
+      # The two steps do not run the same set: the default entry compiles every
+      # test target but runs every test except the `gpu` group (`-E 'not
+      # group(gpu)'`, as `make test`'s default pass), which the `dev` shards run,
+      # `dev` adding to the default features (docs/testing.md, *Which suite runs
+      # the GPU tests*; the `gpu-default-only` lint holds the premise).
       - name: Test (engine, default)
         if: needs.changes.outputs.code != 'false' && matrix.features == 'default'
         run: |
           rc=0
-          cargo nextest run --profile default-features --locked --partition "count:${{ matrix.shard }}" || rc=$?
-          cp target/nextest/default-features/junit.xml junit-default.xml || true
+          cargo nextest run --profile ci --locked -E 'not group(gpu)' --partition "count:${{ matrix.shard }}" || rc=$?
+          cp target/nextest/ci/junit.xml junit-default.xml || true
           exit "$rc"
       - name: Test (engine, dev features)
         if: needs.changes.outputs.code != 'false' && matrix.features == 'dev'

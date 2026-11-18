@@ -184,16 +184,23 @@ doc: ## [gate] Rustdoc with warnings denied, both feature sets
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked --features dev
 
+# The default feature set's tests but the gpu group, which the dev set runs: `dev`
+# adds to the default features, so it builds and draws theirs too (docs/testing.md,
+# *Which suite runs the GPU tests*; the `gpu-default-only` lint holds the premise).
+# A crate whose render path differs without `dev` widens it in both callers, e.g.
+# `-E 'not group(gpu) | (group(gpu) & package(rusty-<crate>))'`.
+DEFAULT_SUITE := -E 'not group(gpu)'
+
 # All four runs go on when one fails, as nextest does inside a run (fail-fast off), so
 # one `make test` reports every failure: each run under its own header, and the last
-# line names the runs that failed. The default pass leaves the gpu group to the dev
-# pass (`.config/nextest.toml`'s `default-features` profile, as CI's default entry).
+# line names the runs that failed. The default pass is `DEFAULT_SUITE`, as CI's
+# default entry runs it.
 test: ## [gate] Engine tests (nextest) and doctests, both feature sets (the GPU tests in dev's), on the gates' proptest seed
 	@command -v cargo-nextest >/dev/null 2>&1 || { \
 		echo "test: cargo-nextest is not installed — cargo install --locked cargo-nextest"; exit 1; }
 	@failed=; \
 	echo "== make test: nextest (default)"; \
-	$(TEST) --profile default-features || failed="$$failed, nextest (default)"; \
+	$(TEST) $(DEFAULT_SUITE) || failed="$$failed, nextest (default)"; \
 	echo "== make test: nextest (dev)"; \
 	$(TEST) --features dev || failed="$$failed, nextest (dev)"; \
 	echo "== make test: doctests (default)"; \
@@ -224,7 +231,7 @@ test-explore: ## Signal: the nextest suite, both feature sets, on random proptes
 	@command -v cargo-nextest >/dev/null 2>&1 || { \
 		echo "test-explore: cargo-nextest is not installed — cargo install --locked cargo-nextest"; exit 1; }
 	@rc=0; \
-	env -u PROPTEST_RNG_SEED $(TEST) || rc=1; \
+	env -u PROPTEST_RNG_SEED $(TEST) $(DEFAULT_SUITE) || rc=1; \
 	env -u PROPTEST_RNG_SEED $(TEST) --features dev || rc=1; \
 	exit $$rc
 

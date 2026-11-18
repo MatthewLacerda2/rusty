@@ -409,8 +409,7 @@ variable, which every test process and every child it starts inherits, and which
 blanks the keys too, so a spawn the lint cannot see (`cargo run --bin`, a built path)
 holds none under nextest. Doctests stay on `cargo test --doc`, which nextest
 cannot run. CI's `ci` profile additionally writes JUnit, rendered as each
-`build-test` job's summary; the `default-features` profile, the default-feature run's
-locally and in CI, leaves the `gpu` group to the `dev` run and writes the same report.
+`build-test` job's summary.
 
 Handy forms: `cargo nextest run -E 'test(physics_)'` (filter by name),
 `cargo nextest list` (what would run), `cargo nextest show-config test-groups`
@@ -579,18 +578,20 @@ Where they actually run is not uniform, and it is worth knowing before you rely 
 
 ### Which suite runs the GPU tests
 The `dev` suite (#2352). The default-feature suite, `make test`'s first pass and CI's
-`build-test (default, 1/1)`, runs nextest's `default-features` profile
-(`.config/nextest.toml`): it **compiles every test target** of the default build, so a
-default-only build break still fails, and runs every test except the `gpu` group.
-`--features dev` only adds to the default features, so the `dev` run builds each of
-those GPU tests too; what it cannot see is code that exists only *without* `dev`, and
-none of that reaches a rendered path (the `cfg(not(feature = "dev"))` code sits in the
-editor's and shell's UI and the script crate's namespaces; the `dev`-only render code is
-additive: test hooks, bench levels, the window's GPU timestamps). A render change that
-adds such code puts its GPU tests back in the default run. The adapter canary still runs
-in the default entry (step *Canaries*), so a runner that lost lavapipe fails there too.
-nextest refuses `group()` in a default filter, so the profile spells the group's
-filter out negated; `make scripts` fails when the two differ (`test_gpu_config.py`).
+`build-test (default, 1/1)`, runs nextest with `-E 'not group(gpu)'` (the Makefile's
+`DEFAULT_SUITE`, `make test-explore`'s default pass too): it **compiles every test
+target** of the default build, so a default-only build break still fails, and runs
+every test except the `gpu` group. `--features dev` only adds to the default
+features, so the `dev` run builds and draws each of those GPU tests too; what it
+cannot see is code that exists only *without* `dev`. The `gpu-default-only` lint
+(`docs/linting.md`) keeps such code off the render path: in `rusty-render` and every
+crate whose `dev` its `dev` turns on, a `cfg!` naming `feature = "dev"` or a `cfg`
+whose `not(…)` names it fails. Keep the code the same under both feature sets, or add
+that crate's GPU tests back to the default pass by widening the filter in both
+callers, `make test`'s `DEFAULT_SUITE` and ci.yml's "Test (engine, default)", e.g.
+`-E 'not group(gpu) | (group(gpu) & package(rusty-<crate>))'` (`make scripts` fails
+when the two differ, `test_gate_mirror.py`). The adapter canary still runs in the
+default entry (step *Canaries*), so a runner that lost lavapipe fails there too.
 
 **CI requires an adapter.** Every workflow job that runs the suite (nextest,
 `cargo test` other than `--doc`, `llvm-cov`, `mutants`) sets `RUSTY_REQUIRE_GPU=1`, and
