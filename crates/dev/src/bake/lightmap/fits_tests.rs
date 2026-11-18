@@ -50,7 +50,7 @@ fn a_bake_past_what_is_free_warns_and_runs() {
 
 #[test]
 fn the_estimate_counts_the_results_the_work_in_flight_and_the_progressive_state() {
-    let scene = |n| crate::bake::lightmap::memory_tests::planes(n);
+    let scene = |n| crate::bake::lightmap::memory_tests::planes(n, 20.0);
     let s = BakeSettings {
         texels_per_unit: 25.0,
         denoiser: Denoiser::Filter,

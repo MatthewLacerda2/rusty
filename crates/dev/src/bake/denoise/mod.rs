@@ -198,6 +198,8 @@ mod bake_tests;
 #[cfg(test)]
 mod budget_tests;
 #[cfg(test)]
+mod memory_tests;
+#[cfg(test)]
 mod quality;
 #[cfg(test)]
 mod quality_tests;

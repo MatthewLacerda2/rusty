@@ -1,15 +1,15 @@
 //! A lightmap bake's memory is bounded by its work in flight, not by its scene
 //! (#2312): a scene of four times the meshes at the same density peaks higher only
-//! by the extra lightmaps it keeps, with the Gaussian and with OIDN, whose own
-//! share is held to its budget. What is in flight is per worker, so both bakes
-//! run on [`WORKERS`]. Each test is its own process under nextest, so the
-//! peak (`memory::rss_peak_bytes`) is this test's bakes'.
+//! by the extra lightmaps it keeps. What is in flight is per worker, so both bakes
+//! run on [`WORKERS`]. Each test is its own process under nextest, so the peak
+//! (`memory::rss_peak_bytes`) is this test's bakes'. The planes and bakes here
+//! are OIDN's memory tests' too (`denoise::memory_tests`).
 
 use std::sync::Arc;
 
 use glam::{Vec2, Vec3};
 
-use crate::bake::denoise::{self, budget, Oidn};
+use crate::bake::denoise::Oidn;
 use crate::memory::rss_peak_bytes;
 use rusty_lighting::lightmap::{
     bake_on, BakeLight, BakeMesh, BakeProgress, BakeRun, BakeScene, LightShape, Lightmap,
@@ -17,24 +17,24 @@ use rusty_lighting::lightmap::{
 use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 
 /// Lightmap texels per unit: each [`SIDE`]-unit plane is a 500² map.
-const DENSITY: f32 = 25.0;
-const SIDE: f32 = 20.0;
+pub(crate) const DENSITY: f32 = 25.0;
+pub(crate) const SIDE: f32 = 20.0;
 
 /// The bake's workers: what is in flight is per worker, so the two bakes compared
 /// have as many each, and the smaller has a mesh for every one.
-const WORKERS: usize = 2;
+pub(crate) const WORKERS: usize = 2;
 
 /// Slack on top of the extra results: the allocator's and the pool's.
-const MARGIN: u64 = 48 << 20;
+pub(crate) const MARGIN: u64 = 48 << 20;
 
-/// `n` planes side by side, under a sun.
-pub(super) fn planes(n: usize) -> BakeScene {
+/// `n` planes of `side` units side by side, under a sun.
+pub(crate) fn planes(n: usize, side: f32) -> BakeScene {
     let plane = |i: usize| {
-        let x = i as f32 * (SIDE + 1.0);
+        let x = i as f32 * (side + 1.0);
         let p = |a: f32, b: f32| Vec3::new(x + a, 0.0, b);
         BakeMesh {
             entity: i as u32 + 1,
-            positions: vec![p(0.0, SIDE), p(SIDE, SIDE), p(SIDE, 0.0), p(0.0, 0.0)],
+            positions: vec![p(0.0, side), p(side, side), p(side, 0.0), p(0.0, 0.0)],
             normals: vec![Vec3::Y; 4],
             lightmap_uvs: vec![Vec2::ZERO, Vec2::X, Vec2::ONE, Vec2::Y],
             indices: vec![0, 1, 2, 0, 2, 3],
@@ -81,9 +81,9 @@ fn kept(maps: &[Lightmap]) -> u64 {
     maps.iter().map(one).sum::<usize>() as u64
 }
 
-/// Bake `n` planes with `denoiser`, lent OIDN for it (a device per worker, as a
-/// bake lends): the process's peak after, and what the maps keep.
-fn bake(n: usize, denoiser: Denoiser) -> (u64, u64) {
+/// Bake `n` planes of `side` units with `denoiser`, lent OIDN for it (a device per
+/// worker, as a bake lends): the process's peak after, and what the maps keep.
+pub(crate) fn bake(n: usize, side: f32, denoiser: Denoiser) -> (u64, u64) {
     // As every bake does before it starts (`fits::fits`).
     crate::memory::return_large_frees();
     let progress = match denoiser {
@@ -92,7 +92,7 @@ fn bake(n: usize, denoiser: Denoiser) -> (u64, u64) {
         }
         _ => BakeProgress::default(),
     };
-    let maps = bake_on(&planes(n), &settings(denoiser), &progress, WORKERS).expect("ran");
+    let maps = bake_on(&planes(n, side), &settings(denoiser), &progress, WORKERS).expect("ran");
     assert_eq!(maps.len(), n);
     (
         rss_peak_bytes().expect("read on Linux and macOS"),
@@ -100,8 +100,8 @@ fn bake(n: usize, denoiser: Denoiser) -> (u64, u64) {
     )
 }
 
-/// The 4× bake's peak past the 1× one's, against what its extra maps keep.
-fn holds(one: (u64, u64), four: (u64, u64), what: &str) {
+/// The 4× bake's peak past `one`'s, against what its extra maps keep.
+pub(crate) fn holds(one: (u64, u64), four: (u64, u64), what: &str) {
     let (grew, extra) = (four.0.saturating_sub(one.0), four.1 - one.1);
     let mb = |b: u64| b >> 20;
     assert!(
@@ -118,26 +118,7 @@ fn four_times_the_meshes_peak_higher_only_by_their_lightmaps() {
     if rss_peak_bytes().is_none() {
         return;
     }
-    let one = bake(2, Denoiser::Filter);
-    let four = bake(8, Denoiser::Filter);
+    let one = bake(2, SIDE, Denoiser::Filter);
+    let four = bake(8, SIDE, Denoiser::Filter);
     holds(one, four, "Gaussian");
-}
-
-#[test]
-fn oidn_adds_at_most_its_budget_and_holds_the_bound_too() {
-    if rss_peak_bytes().is_none() || denoise::available().is_err() {
-        // `RUSTY_REQUIRE_OIDN`'s canary is what fails a CI run without it.
-        return;
-    }
-    let filtered = bake(2, Denoiser::Filter);
-    let one = bake(2, Denoiser::Oidn);
-    let texels = (DENSITY * SIDE) as usize * (DENSITY * SIDE) as usize;
-    let added = one.0.saturating_sub(filtered.0);
-    let bound = (WORKERS as u64 * budget::cost(texels)).min(budget::BUDGET);
-    assert!(
-        added <= bound + MARGIN,
-        "OIDN added {added} bytes, past {bound}"
-    );
-    let four = bake(8, Denoiser::Oidn);
-    holds(one, four, "OIDN");
 }
