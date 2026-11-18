@@ -41,7 +41,6 @@ mod textures;
 
 use std::path::{Path, PathBuf};
 
-use rusty_asset::convert::{cached_gltf, convertible_sources};
 use rusty_core::paths;
 use rusty_core::project::{create_skeleton, is_project, ASSETS_DIR, PROJECT_FILE, SHADERS_DIR};
 use rusty_edit::io::SEED_MANIFEST_PATH;
@@ -65,13 +64,9 @@ pub fn export(out: &Path) -> Result<Exported, String> {
     let out = std::path::absolute(out).map_err(|e| format!("{}: {e}", out.display()))?;
     check(&rusty_core::project::root(), &out)?;
     seed_and_refresh_audio()?;
-    let sources = convertible_sources(Path::new(ASSETS_DIR));
-    for source in &sources {
-        cached_gltf(source).map_err(|e| format!("{}: {e}", source.display()))?;
-    }
     // An image that fails is warned of and ships uncompressed, as Unity builds
-    // with an import error logged.
-    rusty_asset::texture_import::refresh_all(Path::new(ASSETS_DIR));
+    // with an import error logged; a model that fails fails the export.
+    let sources = import(Path::new(ASSETS_DIR))?.sources;
     // A baked shader stale against this engine's shaders is re-baked from its
     // recipe, so the player loads it as shipped (#1638); one that fails is
     // warned of and ships as it is.
@@ -92,6 +87,15 @@ pub fn export(out: &Path) -> Result<Exported, String> {
             Err(e)
         }
     }
+}
+
+/// Bring the import cache of every model and image under `root` up to date in
+/// place (`asset::import::import_strict`), copying nothing: an export's first
+/// step, `make import` (`export --import-only`) on its own and `bench-scenes
+/// IMPORT=1`'s. A model that fails fails it before any image is encoded, naming
+/// each; an image that fails is warned of and stays uncompressed.
+pub fn import(root: &Path) -> Result<rusty_asset::import::Imported, String> {
+    rusty_asset::import::import_strict(root)
 }
 
 /// Bring the open project's seeded files and its audio up to date

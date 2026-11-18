@@ -38,7 +38,7 @@ use rusty_core::project::ProjectSettings;
 use rusty_render::ClockProbe;
 
 use super::super::harness::Harness;
-pub use notes::unbaked;
+pub use notes::{unbaked, uncompressed};
 pub use report::SceneReport;
 
 /// The size a scene is benched at unless told otherwise.
@@ -172,6 +172,9 @@ pub fn bench(
         let world = harness.world.borrow();
         report.warnings.extend(unbaked(&world.scene().borrow()));
     }
+    let assets = std::path::Path::new(rusty_core::project::ASSETS_DIR);
+    let uncached = harness.renderer().map(|r| r.uncached_textures(assets));
+    report.warnings.extend(uncached.and_then(uncompressed));
     let console = notes::keep_console(&harness, out_dir, scene);
     report.warnings.extend(console);
     let engine = rusty_core::project::engine_content::stamp();
