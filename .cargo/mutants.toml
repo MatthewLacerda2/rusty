@@ -1,11 +1,11 @@
 # cargo-mutants' configuration, read from here by every run (mutants-on-request.yml,
-# mutants-sweep.yml). The engine is a workspace being split one crate per module
+# and `cargo mutants` run by hand). The engine is a workspace being split one crate per module
 # (crates/CLAUDE.md), and the tests that would catch a mutant in a moved crate are
 # mostly the root package's, so every mutant runs the whole workspace's tests, as it
 # did when the engine was one crate; an on-request run narrows that to the packages
-# that depend on the mutated one (`mutants-request.py`). The workflows pass `--workspace` so mutants are
+# that depend on the mutated one (`mutants-request.py`). The workflow passes `--workspace` so mutants are
 # drawn from every member, not only the root package. cargo-mutants' own baseline
-# ignores this and tests only the mutated packages, so the workflows run their own
+# ignores this and tests only the mutated packages, so the workflow runs its own
 # (`--baseline skip`; docs/testing.md, *Mutation testing*).
 test_workspace = true
 
