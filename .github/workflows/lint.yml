@@ -48,7 +48,7 @@ jobs:
       # On `push` paths-filter diffs `github.event.before..HEAD` in a local repo,
       # and the script lives in it: the checkout comes first (ci.yml, #480).
       - uses: actions/checkout@v7
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)
       - uses: dorny/paths-filter@v4
         id: filter
         if: github.event_name == 'pull_request' || github.event_name == 'push'
@@ -56,18 +56,18 @@ jobs:
           filters: |
             code:
               - '!**/*.md'
-      # As in ci.yml: only a push that changes code asks, and a broken lookup
+      # As in ci.yml: a push or a ready PR that changes code asks, and a broken lookup
       # fails the step, not `changes` (its empty output means a full run).
       - name: Was this tree already proved?
         id: proved
-        if: github.event_name == 'push' && steps.filter.outputs.code != 'false'
+        if: (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)) && steps.filter.outputs.code != 'false'
         continue-on-error: true
         timeout-minutes: 2
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
           python3 .github/scripts/proved_tree.py --workflow lint.yml
-          --sha "${{ github.sha }}" --before "${{ github.event.before }}"
+          --event "${{ github.event_name }}" --sha "${{ github.sha }}" --before "${{ github.event.before }}"
 
   lint:
     needs: changes
