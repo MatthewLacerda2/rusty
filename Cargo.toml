@@ -298,6 +298,9 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std"
 # brings into the tree.
 objc2-metal = { version = "0.3.2", default-features = false, features = ["std", "MTLDevice"] }
 mach2 = "0.6.0"
+# `make bench-scenes PROFILE=1` on Linux: the CLOCK_MONOTONIC reading that cuts the
+# measured frames out of a perf recording (`-k CLOCK_MONOTONIC`); already in the tree.
+libc = "0.2.191"
 # The Wayland half of the clipboard (#612), on the window's own `wl_display`; also
 # already in the tree through egui-winit. Pinned to 0.7.2: 0.7.3 only moves to SCTK 0.20,
 # which duplicates winit 0.30's SCTK 0.19 stack (5 crates). Remove the pin when winit moves
