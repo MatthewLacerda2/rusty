@@ -219,6 +219,7 @@ pub const LAYERS: &[Layer] = &[
     .uses(&[
         "bytemuck",
         "image",
+        "libc",
         "libloading",
         "mach2",
         "mlua",

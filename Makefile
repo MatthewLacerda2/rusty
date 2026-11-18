@@ -492,6 +492,11 @@ bench: ## Benchmark the stress scene (release build), with the change against th
 # sampling profile of the measured frames (perf on Linux, sample on macOS) as
 # <scene>.profile.txt and .folded, on a release build with line tables. Nothing is
 # written into the project. A signal, never a gate; docs/testing.md.
+# PROFILE=1 builds the `profiling` profile with frame pointers forced on, so perf walks
+# its stacks by frame pointer (`dev::bench::scenes::profile::perf`). That one binary runs
+# the whole run, so a PROFILE=1 run's timed rows come from it too (each report says so):
+# on a desktop GPU they measured inside the release build's spread. RUSTFLAGS only
+# reaches that profile's own target folder; a run without PROFILE=1 is the release build.
 bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/games/horde [SCENES=a,b] [RES=WxH] [RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1]
 	@test -n "$(PROJECT)" || { echo "bench-scenes: make bench-scenes PROJECT=<project dir> [SCENES=a,b] [RES=WxH] [RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1]" >&2; exit 1; }
-	cargo run $(if $(filter 1,$(PROFILE)),--profile profiling,--release) --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RES),--size $(RES)) $(if $(RUNS),--runs $(RUNS)) $(if $(BEFORE),--before $(BEFORE)) $(if $(filter 1,$(PROFILE)),--profile) $(if $(filter 1,$(IMPORT)),--import) out/bench/scenes
+	$(if $(filter 1,$(PROFILE)),RUSTFLAGS="$$RUSTFLAGS -C force-frame-pointers=yes") cargo run $(if $(filter 1,$(PROFILE)),--profile profiling,--release) --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RES),--size $(RES)) $(if $(RUNS),--runs $(RUNS)) $(if $(BEFORE),--before $(BEFORE)) $(if $(filter 1,$(PROFILE)),--profile) $(if $(filter 1,$(IMPORT)),--import) out/bench/scenes
