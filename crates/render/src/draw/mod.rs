@@ -40,12 +40,15 @@ impl Renderer {
     /// Per-frame work that doesn't depend on the camera stack: the view's post-FX
     /// buffers, scene assets, the resident reflection probes and the lighting uniform.
     fn prepare_frame(&mut self, view: &mut RenderView, scene: &Scene, camera: &Camera) {
+        // What the frame did before (the cameras posed, the render textures synced).
+        self.lap("setup");
         // Keep this view's scene targets sized to it — a cheap no-op unless its size
         // or render scale changed (#355); bloom sizes its own buffers as it runs.
         let size = view.size();
         view.resize(&self.device, size.width, size.height);
 
         self.upload_scene_assets(scene);
+        self.lap("assets");
         // The Light Probe Proxy Volumes' view of the probe field (#1672), once per
         // render rather than per camera: hashing a large field is not free. A bake's
         // capture draws static geometry alone, which never reads a volume.
@@ -75,9 +78,11 @@ impl Renderer {
         // Build + write the camera-independent lighting uniform once (it starts the
         // frame's counters).
         self.upload_lighting(scene);
+        self.lap("prepare");
         // The retained objects, brought up to date once every renderer-side input
         // their keys and instances read is settled (#1706).
         self.extract_scene(scene);
+        self.lap("extract");
         // The sky's reflection cube (#1553), baked only when the sky changed: a new
         // panorama, or procedural sky settings no cube holds (#1620).
         let gpu = (&self.device, &self.queue);
@@ -93,6 +98,7 @@ impl Renderer {
         self.upload_decals(scene);
         // The GPU-simulated emitters' births and steps, once for every camera (#2170).
         self.step_gpu_particles(scene);
+        self.lap("prepare");
     }
 
     /// Renders the 3D scene into `view` (a per-view target/depth/post-FX bundle, #355),
@@ -141,11 +147,15 @@ impl Renderer {
         // render-texture camera (#430) — samples them. So do the dynamic casters' LOD
         // levels (#472): a shadow shows the level its caster shows in the main view.
         let base_lod = LodSelection::for_camera(scene, &stack[0]);
+        self.lap("setup");
         self.run_shadow_passes(scene, &stack[0], view.aspect(), &shadows, &base_lod);
+        self.lap("shadows");
         self.draw_render_textures(view, scene, &textures);
+        self.lap("render_textures");
         // Lay out and mesh the UI through the base camera (#418, #429): world
         // canvases draw inside each camera's pass below, screen canvases after it.
         self.prepare_ui(view, scene, &stack[0], editor_mode);
+        self.lap("ui");
         // A scaled view composites into its own scene-sized target and upscales it to
         // `output` after post-FX, before the UI (#1498), bilinearly. A view running
         // TAA upscales inside the chain instead (TAAU, #1702), at TAA's place, and
@@ -166,6 +176,7 @@ impl Renderer {
         self.draw_stack(view, scene, pass);
         if let Some(scaled) = scaled.as_ref() {
             self.upscale_scene(view, scaled, output);
+            self.lap("upscale");
         }
 
         // The in-game UI over the finished frame (#418): after post-FX, so a HUD
@@ -173,6 +184,7 @@ impl Renderer {
         // unless its UI overlay is on (#423).
         if !editor_mode || view.ui.screen_in_editor {
             self.draw_ui(view);
+            self.lap("ui");
         }
         self.finish_counters(view);
         self.gpu_timer.end_frame(&self.device, &self.queue);

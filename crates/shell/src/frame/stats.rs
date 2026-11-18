@@ -13,8 +13,9 @@ use rusty_app::GameWorld;
 #[cfg(feature = "dev")]
 use rusty_dev::{capture::RenderedFrame, stats::WindowFrame};
 #[cfg(feature = "dev")]
-use {super::FrameClock, rusty_render::Renderer};
+use rusty_render::Renderer;
 
+use super::FrameClock;
 use crate::Shell;
 
 /// Run the frontend's `draw` of this frame, then assemble its `WindowFrame` and
@@ -48,15 +49,17 @@ pub fn measured(
 /// so it goes onto that frame's stats entry now, before this frame's work, and
 /// whatever reads `Debug.Stats` during the frame (the REPL, `session-mcp --attach`,
 /// a script's `Update`, the Stats overlay) sees it (`rusty_dev::stats::window_ended`).
-pub fn started(shell: &Shell, game: &GameWorld) {
+/// It takes the clock and the world, not the `Shell`, so a test reaches it
+/// without a window.
+pub fn started(clock: &FrameClock, game: &GameWorld) {
     #[cfg(feature = "dev")]
     {
         let stats = game.script_manager().stats_cell();
-        let last_wall_ms = f64::from(shell.clock.frame_ms());
+        let last_wall_ms = f64::from(clock.frame_ms());
         rusty_dev::stats::window_ended(&mut stats.borrow_mut(), last_wall_ms);
     }
     #[cfg(not(feature = "dev"))]
-    let _ = (shell, game);
+    let _ = (clock, game);
 }
 
 /// A frame the window could not show (a locked screen): the stats keep only drawn
@@ -86,6 +89,8 @@ pub fn window_frame(
     let render = (cost.frames != frames_before).then(|| RenderedFrame {
         counters: renderer.frame_counters,
         cpu_ms: cost.cpu_ms,
+        // The window reads no stages: none copied on every live frame.
+        stages: Vec::new(),
         gpu: renderer.take_gpu_times(),
     });
     WindowFrame {

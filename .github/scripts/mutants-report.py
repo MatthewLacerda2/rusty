@@ -18,6 +18,12 @@ part's survivors and their diffs named by their path in the repository. A part
 whose cargo-mutants broke gets a section saying so, beside the parts that
 finished, and the command exits red after writing the report.
 
+A large plan runs on several shards (`mutants-request.py`, #2283), which
+`mutants-request.py merge` turns back into that one-run layout first; a shard
+that left a part nothing, or a shard or package whose run broke, is a line in
+`lost-SLUG.txt`, said in the part's section beside what the rest measured, its
+mutants counted as never reached, and the run red.
+
 A run that has no answer still says so where its asker looks (#2201):
 `--unanswered` writes the one-line report the workflow posts on the pull
 request when the scope was unreadable, planned nothing, or broke, so an ask
@@ -74,26 +80,36 @@ def unanswered(reason: str) -> str:
     return f"{HEAD}\n\n❌ No answer: {reason.strip()}\n\nThe ask is unanswered; the run's log has the rest.\n"
 
 
-def section(run: dict, in_scope: int, status: int, root: str = ROOT) -> list[str]:
-    """One part's counts, its gaps and its survivors."""
+def section(run: dict, in_scope: int, status: int, root: str = ROOT, lost: list[str] = ()) -> list[str]:
+    """One part's counts, its gaps and its survivors. `lost` is each run of
+    this part that measured nothing it kept (#2283): a shard that left no
+    report, or a shard or package whose run broke; its mutants count as never
+    reached and the run is not clean, but the rest's measurements stand."""
     done = mutants(run)
     counts = {k: sum(o.get("summary") == s for o in done) for k, s in KINDS}
     out = ["| caught | missed | timeout | unviable |", "|---|---|---|---|"]
     out += ["| " + " | ".join(str(counts[k]) for k, _ in KINDS) + " |", ""]
-    if status in STOPPED:
-        out += [f"> ⚠️ Stopped at its time budget: {len(done)} of {in_scope} planned mutants"
+    stopped = status in STOPPED
+    short = stopped or bool(lost)
+    if short:
+        cause = "Stopped at its time budget" if stopped else "Not every shard or package reported"
+        advice = "; ask for a narrower scope" if stopped else ""
+        out += [f"> ⚠️ {cause}: {len(done)} of {in_scope} planned mutants"
                 f" measured, {max(in_scope - len(done), 0)} never reached. Those are"
-                " unmeasured, not clean; ask for a narrower scope.", ""]
+                f" unmeasured, not clean{advice}.", ""]
+    out += [f"> ❌ Unmeasured: {why}" for why in lost] + ([""] if lost else [])
     out += timeouts(counts)
     survivors = sorted(label(o, root) for o in done if o.get("summary") == "MissedMutant")
     if survivors:
         out += ["These were mutated and no test failed. Strengthen the tests covering them,"
                 " or say why a survivor is equivalent:", "", "```", *survivors, "```"]
-    elif not done and status in STOPPED:
+    elif not done and stopped and not lost:
         out += ["Nothing was measured before the budget ran out: not a result. ❌"]
+    elif not done and short:
+        out += ["Nothing was measured: not a result. ❌"]
     elif not done:
         out += ["Nothing in scope was mutated. ➖"]
-    elif counts["timeout"] or not counts["caught"] or status in STOPPED:
+    elif counts["timeout"] or not counts["caught"] or short:
         out += [f"No survivors among the {counts['caught']} measured; that is not a clean run."]
     else:
         out += ["No survivors. ✅"]
@@ -183,9 +199,11 @@ def report(plan: dict, scope: str, here: Path) -> tuple[str, str, list[str]]:
             out += [f"❌ No answer for this part: {why}, the tool or its baseline breaking, not a"
                     f" result. Its {part['planned']} planned mutants are unmeasured; the run's log has why.", ""]
             continue
-        outcomes = mutants_out / "outcomes.json"
+        outcomes, gone = mutants_out / "outcomes.json", here / f"lost-{part['slug']}.txt"
         run = json.loads(outcomes.read_text()) if outcomes.is_file() else {}
-        out += section(run, part["planned"], code, part["root"]) + [""]
+        lost = [line for line in gone.read_text().splitlines() if line.strip()] if gone.is_file() else []
+        broken += lost
+        out += section(run, part["planned"], code, part["root"], lost) + [""]
         found.append(diffs(mutants_out, run, part["root"]))
     return "\n".join(out).rstrip("\n") + "\n", "".join(found), broken
 

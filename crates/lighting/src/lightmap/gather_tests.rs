@@ -81,7 +81,7 @@ fn gather_takes_static_meshes_and_baked_in_lights_only() {
         };
         scene.world.set_light(id, Some(light));
     }
-    let gathered = BakeScene::gather(&scene, &|_| None);
+    let gathered = BakeScene::gather(&scene, &|_, _| None);
     let entities: Vec<u32> = gathered.meshes.iter().map(|m| m.entity).collect();
     assert_eq!(entities, vec![wall], "only the static mesh is baked");
     let direct: Vec<bool> = gathered.lights.iter().map(|l| l.bakes_direct).collect();
@@ -111,7 +111,7 @@ fn the_gather_carries_each_mesh_cast_shadows() {
         scene.world.set_mesh(id, Some(mesh));
         scene.world.set_static(id, true);
     }
-    let gathered = BakeScene::gather(&scene, &|_| None);
+    let gathered = BakeScene::gather(&scene, &|_, _| None);
     let modes: Vec<ShadowCasting> = gathered.meshes.iter().map(|m| m.cast_shadows).collect();
     assert_eq!(modes, ShadowCasting::ALL);
     assert!(gathered

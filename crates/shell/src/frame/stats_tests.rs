@@ -102,3 +102,31 @@ fn gpu_a_window_frame_reaches_the_frame_log() {
     );
     assert_eq!(f["play"], false);
 }
+
+/// `started` ends the frame before: the clock's reading lands as `wall_ms` on
+/// the newest recorded frame's entry, as the next frame starts. No GPU.
+#[test]
+fn started_records_the_previous_frames_wall_time_on_its_entry() {
+    let session = rusty_dev::session::Session::new("").unwrap();
+    let game = session.world();
+    let start = Instant::now();
+    let mut clock = FrameClock::new(start);
+    clock.tick(start + Duration::from_millis(20));
+    let frame = WindowFrame {
+        last_wall_ms: 0.0,
+        fps: None,
+        render: None,
+        frame: 1,
+    };
+    let stats = game.script_manager().stats_cell();
+    rusty_dev::stats::record_window(&mut stats.borrow_mut(), &frame, false);
+    assert!(
+        stats.borrow().window(1).get("wall_ms").is_none(),
+        "not yet ended"
+    );
+    started(&clock, game);
+    let stats = stats.borrow().window(1);
+    let wall = stats.get("wall_ms").expect("the frame's wall time");
+    assert_eq!(wall.samples, 1);
+    assert!((wall.avg - 20.0).abs() < 0.5, "{}", wall.avg);
+}

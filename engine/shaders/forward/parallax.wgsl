@@ -39,6 +39,11 @@ const UV0: u32 = 0u;
 // shift is kept whole (about 45°) and dropped (about 72°): `projection_fade`.
 const PLANAR_FULL: f32 = 0.7;
 const PLANAR_NONE: f32 = 0.3;
+// How fast the shift may change against the coordinates before its maps leave the
+// implicit read (`bend`), and how fast before they are read at the unshifted
+// derivatives alone.
+const BEND_FROM: f32 = 0.5;
+const BEND_TO: f32 = 1.0;
 
 // The height field at `uv`, 1 the surface and 0 the deepest point, at mip `lod`.
 fn height_at(uv: vec2<f32>, lod: f32) -> f32 {
@@ -86,31 +91,41 @@ fn projection_fade(mapping: u32, n: vec3<f32>) -> f32 {
 // `c` (UV0 or Planar, its one lookup in `uv`) shifted by the height map, at world
 // `position` with geometric world normal `n` (turned toward the viewer); as given
 // for a material without one. Takes derivatives: call it in uniform control flow,
-// before any per-pixel branch (the branch here is on `material()`).
+// before any per-pixel branch (the branch here is on `material()`; `shift`'s own
+// per-pixel branches take none).
 fn displace(c: MapCoords, position: vec3<f32>, n: vec3<f32>) -> MapCoords {
     if (!displaced()) {
         return c;
     }
+    let offset = shift(c, position, n, dpdx(position), dpdy(position));
+    var out = c;
+    out.shift = offset;
+    out.uv = c.uv + offset;
+    out.x = out.uv;
+    out.y = out.uv;
+    out.z = out.uv;
+    out.bend = bend(offset, c.dx, c.dy);
+    return out;
+}
+
+// The shift where the march meets the height field from `c`'s one lookup, the
+// surface's screen derivatives `dp1` and `dp2` taken by the caller; zero past the
+// fade. Takes no derivatives, so its per-pixel branches are safe.
+fn shift(c: MapCoords, position: vec3<f32>, n: vec3<f32>, dp1: vec3<f32>, dp2: vec3<f32>) -> vec2<f32> {
     let m = material();
     // The world-to-UV mapping on the surface (Schüler, "Followup: Normal Mapping
     // Without Precomputed Tangents"): `grad_u` and `grad_v` are how fast the tiled
-    // UV changes along the surface, in repeats per metre.
-    let dp1 = dpdx(position);
-    let dp2 = dpdy(position);
-    // Every map is read at `c`'s own derivatives, the unshifted coordinates'
-    // (`MapCoords`).
-    var out = c;
-    let lod = level_at(vec2<f32>(textureDimensions(t_height)), out.dx, out.dy) + camera.lod.x;
+    // UV changes along the surface, in repeats per metre, from the unshifted
+    // coordinates' derivatives (`MapCoords`).
+    let lod = level_at(vec2<f32>(textureDimensions(t_height)), c.dx, c.dy) + camera.lod.x;
     let dp2perp = cross(dp2, n);
     let dp1perp = cross(n, dp1);
     let det = dot(dp1, dp2perp);
     if (lod >= LOD_THRESHOLD + 1.0 || abs(det) < 1e-20) {
-        return out;
+        return vec2<f32>(0.0);
     }
-    let duv1 = out.dx;
-    let duv2 = out.dy;
-    let grad_u = (dp2perp * duv1.x + dp1perp * duv2.x) / det;
-    let grad_v = (dp2perp * duv1.y + dp1perp * duv2.y) / det;
+    let grad_u = (dp2perp * c.dx.x + dp1perp * c.dy.x) / det;
+    let grad_v = (dp2perp * c.dx.y + dp1perp * c.dy.y) / det;
     // The depth in metres: `height_scale` of one repeat's width, its narrower side.
     // A side the surface does not cross (Planar's projection on a face along Y, a
     // degenerate UV axis) has no width; the narrower one stays finite.
@@ -130,13 +145,23 @@ fn displace(c: MapCoords, position: vec3<f32>, n: vec3<f32>) -> MapCoords {
     // it samples at an explicit level, so this per-pixel branch is safe.
     let fade = (1.0 - saturate(lod - LOD_THRESHOLD)) * projection_fade(m.uv_mapping, n);
     if (fade <= 0.0) {
-        return out;
+        return vec2<f32>(0.0);
     }
-    let offset = march(c.uv, lod, max_offset, steps) * fade;
-    out.shift = offset;
-    out.uv = c.uv + offset;
-    out.x = out.uv;
-    out.y = out.uv;
-    out.z = out.uv;
-    return out;
+    return march(c.uv, lod, max_offset, steps) * fade;
+}
+
+// How far the shift `offset` bends from pixel to pixel against the unshifted
+// coordinates' own derivatives `dx` and `dy`: 0 where it changes under half as fast
+// as they do (a smooth shift, a negligible scale, past the fade), rising to 1 where it
+// changes as fast (a ridge the ray crosses). A map is read at the shifted
+// coordinates' implicit derivatives where this is 0, so a material whose shift is zero
+// filters as it does without a height map, and at `dx`/`dy` where it is 1
+// (`mapping::lookup_uv`, #2301). Both the coarse and the fine differences are read,
+// since a GPU's implicit level may take either. Takes derivatives: call it in uniform
+// control flow.
+fn bend(offset: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>) -> f32 {
+    let along_x = max(length(dpdxCoarse(offset)), length(dpdxFine(offset)));
+    let along_y = max(length(dpdyCoarse(offset)), length(dpdyFine(offset)));
+    let ratio = max(along_x / max(length(dx), 1e-12), along_y / max(length(dy), 1e-12));
+    return smoothstep(BEND_FROM, BEND_TO, ratio);
 }

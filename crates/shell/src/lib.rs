@@ -223,7 +223,7 @@ fn run_frame<F: Frontend>(
     let delta_time = frontend
         .pace(game)
         .frame_step(shell.clock.tick(Instant::now()));
-    frame::stats::started(shell, game);
+    frame::stats::started(&shell.clock, game);
     // Like raw mouse motion, pads keep reporting while the window is unfocused.
     let pads_live = shell.window_focused && frontend.game_has_input(game);
     pump_pads(shell, game, pads_live);

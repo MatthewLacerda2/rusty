@@ -889,15 +889,34 @@ worktree writes its own `target/games/`. `gpu::test_games` runs `game --test` on
 every folder under `games/` in CI, one test per game so nextest runs them side by
 side (#2070).
 
-**Each game has a 90 s budget of CPU time** for `game --test` at its defaults
-(`BUDGET` in `tests/gpu/test_games/mod.rs`): the test reaps the `game` child itself
-and reads its user + system time, so a busy machine (the nightly's one-process
-`cargo test`, where the games share the cores with the rest of the suite) slows a
-game's clock but not its budget. A game over it fails by name with its CPU time, so
-the game whose defaults grew is the one made cheaper. Wall time is only a hang
-guard: a game still running at 5× the budget is killed and fails as hung. CPU time
-counts every thread, so a game that renders on lavapipe can use more CPU than wall
-time. Longer runs go behind a `--param`.
+**Each game has a budget of CPU time, counted in yardsticks** for `game --test` at its
+defaults (`BUDGET` in `tests/gpu/test_games/mod.rs`). The test reaps the `game` child
+itself and reads its user + system time, so a busy machine slows a game's clock but
+not its count. Bare CPU seconds still move with load (a shared SMT core, all-core
+clocks, a contended cache), so the test divides them by a **yardstick**: the median
+CPU time of the engine's own work, 60 ticks of the default scene in a fresh headless
+harness (`tests/gpu/test_games/calibrate.rs`), which a test thread samples in slices
+for as long as the game runs, meeting the same load in the same window. A game's CPU
+is mostly its sim's tick, so a slice of the same code meets load as the game does,
+where a synthetic loop met it far harder. The sampler sleeps 1.5 s between slices of
+about 0.16 s (plus an untimed 0.08 s harness build), so it costs about 14% of one core
+beside the game. **The yardstick cancels about four fifths of a machine's load, not
+all**: on an 8-core SMT desktop `runner` reads 238 to 249 yardsticks alone and 277 to
+284 beside a full-parallel cold `cargo build` (1.15×), where its CPU time rose 1.92×;
+CI reads 209 to 240. So the bar of 380 catches a regression of about 1.6× on an idle
+machine and about 1.35× under heavy load.
+A game over budget fails by name with its CPU time and its yardsticks, so the game
+whose defaults grew is the one made cheaper. Wall time is only a hang guard: a game
+still running after `HANG` (450 s) is killed and fails as hung. CPU time counts every
+thread, so a game that renders on lavapipe can use more CPU than wall time. Longer
+runs go behind a `--param`.
+
+**Re-measuring the budget:** every test game's test prints its line in each log, passing
+too (`<game>: game --test used … s of CPU … N yardsticks of … s (… slices …)`), so
+`cargo nextest run --locked --features dev -E 'test(/test_games::/)'` locally, or any
+CI log, gives each game's count. The bar sits above the heaviest game's count across
+the machines measured, and under twice the lowest machine's count, so a game that
+doubles its work fails on every one.
 
 **Adding a game** is adding its folder and its line in the sorted `games!` list of
 `tests/gpu/test_games/mod.rs`; a folder with no line fails that file's check, naming it:
@@ -991,11 +1010,26 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   at a fixed reference clock, below), `gpu_raw_ms` (GPU time as measured) and
   `gpu_clock_pct` (the clock it ran at, % of the reference), `draw_calls`,
   `triangles`, `culled_entities`, `lights_dropped`, `cluster_lights_dropped`, `lights_culled`,
-  `decals_visible`, `decal_cluster_refs`, and the systems
-  `cpu.update_scripts`, `cpu.tick_nav`, `cpu.step_physics`, `cpu.animate` (at the
-  reference CPU clock). Every GPU pass prints
-  every run (0 when it did not run), so the rows are stable. Under the table come
-  the run's warnings, if any (below).
+  `decals_visible`, `decal_cluster_refs`; then where the CPU time went, by name:
+  `cpu.<system>` for every system the schedule runs, named as it registers them
+  (`update_scripts`, `step_physics`, … at the reference CPU clock, summing to
+  `cpu_ms`), and `render.<stage>` for every stage of the renderer's frame, summing
+  to `renderer_ms`: `setup`, `assets`, `prepare`, `extract` (the retained scene's
+  update), `shadows` and `shadow_gather` (the sweeps' caster gather, cull and
+  batch, a lap of its own, so absent from a frame no shadow sweep ran), `render_textures`, `ui` (its layout and its draw),
+  `stack`, then each per-camera pass by its name in
+  `render::draw::camera::CAMERA_PASSES` (`clusters`, `solids`: the per-camera cull
+  and batch, `scene`, `transparent`, `post_fx`, …), each summed over every camera
+  and render-texture camera. So `render_textures` holds only what drawing the
+  render textures does around their cameras: a render-texture camera's own passes
+  land in `scene`, `solids` and the other pass rows, beside the screen cameras'.
+  Last, `finish` (the
+  frame's counters and its GPU timestamps' resolve). Each set ends with an `other`
+  row, what no part held: timer overhead, a few microseconds; a stage left
+  untimed would show there. The stages are timed only on frames the dev layer
+  captures (`Renderer::time_stages`): the window, the editor and the player never
+  pay for them. Every GPU pass prints every run (0 when it did not run), so the
+  rows are stable. Under the table come the run's warnings, if any (below).
 - **before and after** — the report is kept in `out/bench/bench.json` (and
   `bench.txt`), and each run prints every row's change against the last one. To
   measure an optimisation: `make bench`, change, `make bench`. The report names the
@@ -1017,6 +1051,126 @@ error) and must run before the first `Step`, so the spawned scripts load when pl
 starts. `Harness.Bench(n)` works on any scenario: it steps and renders `n` frames,
 prints the report, keeps it in the run's out dir and returns `{ frames, metrics =
 { <row> = { avg, p95 } }, warnings = { <text>, … } }`.
+
+### A project's own scenes: `make bench-scenes`
+`make bench` measures one synthetic yard; an optimisation also needs numbers from
+real levels. `make bench-scenes PROJECT=<dir> [SCENES=a,b] [RES=WxH] [RUNS=n]
+[BEFORE=<dir>] [PROFILE=1] [IMPORT=1]` benches a game project's own scenes, wherever the
+project is on disk (`bench-scenes`, `dev::bench::scenes`). `SCENES` names scenes by
+their path under `assets/scenes/` without the extension (`levels/a`); by default
+every `.scene` there, subfolders included (a folder linked twice is walked once), is
+benched, in sorted order. Each scene runs in processes of its own, so its load is a
+cold one and its peak memory is its own. The project is opened read-only
+(`Access::Run`, as `play` and the player open one) and never seeded, so nothing is
+written into it; a folder missing the project skeleton gets its empty folders, as
+every binary's open makes them.
+
+- **the viewpoints**, deterministic and unauthored, in this order: every active
+  screen camera the scene holds, at its own transform, as the only screen camera;
+  the player's spawn (the entity named `PlayerSpawn`, else `Player`), at eye height
+  (1.7 m) over the floor under it, looking the way it faces; then points on the
+  navmesh at eye height, drawn from a fixed seed, each looking along yaws 0, 90,
+  180 and 270°. At most 8 positions in all: the cameras first, by entity id, then
+  the spawn, then navmesh points for what is left. When the cameras fill all 8,
+  the report names what that left out (the cameras past 8, the spawn, the navmesh
+  points), each only when the scene has it. A scene with no
+  navmesh uses its cameras and spawn alone; one with none of the three looks along
+  +Z from the centre of its entities' positions. The report warns in both cases,
+  naming the viewpoints it used. A pose is held
+  after every sim step, whatever the scripts move.
+- **the run**: the scene loads, steps once and draws once (`load_ms`). Then each
+  viewpoint warms up 60 frames and measures 300, at 1920x1080 unless `RES` says
+  otherwise, and the round over every viewpoint is run `RUNS` times (default 3).
+  The scene's scripts run as in Play, with no input. One GPU clock probe serves
+  every viewpoint of a scene. A game that calls `Application.Quit()` ends the
+  measuring: the report warns, naming the viewpoint and run, and counts the frames
+  really measured (`measured` in the report), which the rows are over.
+- **the report**: every `Harness.Bench` row (`cpu.<system>` and `render.<stage>`
+  included, *Benchmark*, above) over the viewpoints (the average of their averages,
+  the worst p95 and the viewpoint it came from), then over the runs: the average,
+  and the **spread**, the lowest to the highest run's average. Plus:
+  - `load_ms`: the scene's own load to its first rendered frame, wall clock, with
+    the import cache as the project holds it (warm once the editor or a run
+    imported it): the harness's set-up (its Lua VM and API, the stats), the
+    scene's document and lighting sidecar read, its navmesh baked and the world
+    built, Play's refresh of the project's converted sources (a check of each
+    cache), then its first sim step and frame (its uploads). The renderer's start-up
+    (the device and every pipeline, warmed as a game's renderer is) happens between
+    the two, off the clock;
+  - `import_ms`, only with `IMPORT=1`, once a run (the import is the project's,
+    not a scene's: every model source is converted, with headless Blender for a
+    `.blend`, so it is slow): the first scene's load in a copy of the project (made
+    beside the reports, deleted after) without its `cache/`, its import cache
+    (`assets/generated/imported/`: converted models and compressed textures) and
+    its `.git`: what a first load costs. A row of the first scene's report, and one
+    line under the summary. A link in the project is copied as what it points to,
+    so the copy stands alone and the project is only ever read; a link looping
+    back, and what is neither a file nor a folder, are left out. A copy or a load
+    that fails leaves the row out with a warning, and the bench goes on;
+  - `rss_peak_mb`: the process's peak resident memory (Linux `VmHWM`; macOS
+    `task_info(TASK_VM_INFO)`'s `ledger_phys_footprint_peak`);
+  - `gpu_mb`: the renderer's GPU memory after the run, once the device has
+    freed what the run dropped (the clock probe). Vulkan (Linux) and DX12 read
+    it from wgpu's allocator report, the blocks it reserved from the device
+    (`total_reserved_bytes`: live allocations and their free space); Metal (macOS)
+    from the device's `currentAllocatedSize`, which also counts what the driver
+    keeps for itself, so the two platforms' figures are close, not equal. The
+    report names its source, and without one (GL) the row is absent and the report
+    says so.
+
+  It is kept as `out/bench/scenes/<project>-<hash>/<scene>.json` (and `.txt`; the
+  project folder's name and a short hash of its canonical path, so a copy and its
+  original keep separate histories), with the bench's console beside it
+  (`<scene>.console.log`), and printed with each row's change against that
+  scene's last run, under the same engine line, clock notes and warnings as
+  `make bench`: a CPU clock that moved since the last run, and a CPU clock or
+  `cpu_ms` that spread across a window (once per kind, naming the worst viewpoint
+  and run, and how many of the measured windows had it). **A change inside the
+  spread is unresolved**: when either run has a spread and the two overlap, the
+  change column says `unresolved (inside the spread)` instead of a percentage. A
+  run of one (`RUNS=1`) has no spread, so every change prints as measured. A last
+  run of another shape (size, frames, or viewpoints: their count, or one that
+  looks from elsewhere under the same label, each kept with its position, yaw and
+  camera entity; within 1 mm and 0.01° it is the same one, so a float reordered
+  in transform propagation or the navmesh bake still compares) is said in one warning, and the scene gets no change column.
+  Console errors during the bench (a script failing every tick, a sidecar that
+  failed to load) are warned of with their count and the first one, since they
+  make a scene look cheaper than the game is. A scene benches as
+  it is when it lacks a bake, with a warning naming what is missing: no
+  lightmaps, light probes placed whose SH never loaded, or reflection probes
+  placed with no cube on disk (what a scene does not place is not missing). Its
+  lighting cost is then not the shipped one. The run ends with a summary table of
+  one line per scene: `cpu_ms` (the sim at the reference CPU clock), `frame_ms`,
+  `gpu_ms`, `load_ms`, `rss_peak_mb`, `gpu_mb`, and the run's `import_ms` under
+  it when asked for.
+- **a fixed baseline**: `BEFORE=<dir>` compares with the kept report in `<dir>`
+  instead of the last run: a copy of a project's report folder
+  (`out/bench/scenes/<project>-<hash>/`, holding `<scene>.json`), or of the whole
+  `out/bench/scenes/`. Copy the folder once before a batch of optimisations, and
+  every PR of the batch compares with the same numbers, where the last run moves
+  with every merge. The report names the folder it compared with.
+- **a sampling profile**: `PROFILE=1` adds, after each scene's timed run, a run of
+  its own (the profiler's overhead stays out of the timings) under the platform's
+  sampling profiler, recording only each viewpoint's measured frames, warm-up
+  excluded: `perf record` on Linux (user space only, `cycles:u`, or the
+  `cpu-clock:u` timer where there is no cycle counter, with DWARF call stacks),
+  `sample` on macOS (the bench's own thread, the main one, alone: `sample`
+  samples every thread, parked or not, and the others' waits would fill the
+  table). It is a release build with line tables (the `profiling`
+  cargo profile, its own target folder). Kept beside the report:
+  `<scene>.profile.txt`, the top 40 functions by self time (samples where the
+  function was running) and by total time (samples where it was on the stack), and
+  `<scene>.folded`, the raw folded stacks (`a;b;c count`) a flame graph reads. No
+  profiler on `PATH` stops the run before anything is benched, naming the package
+  (Debian `linux-perf`, Ubuntu `linux-tools-$(uname -r)`, Fedora and Arch `perf`).
+  The profiler is tried once before any scene too: `perf` refusing to record
+  stops the run there, saying why, and for `kernel.perf_event_paranoid` above 2
+  what to set (`sudo sysctl kernel.perf_event_paranoid=2`). A profile that fails
+  later is said on its own line, the scene's timings and summary row stand, and
+  the run exits non-zero.
+
+Like `make bench`, it is a release build and a signal, never a gate: it is not in
+`make gates` or CI.
 
 ### GPU time and the GPU clock (#862)
 A laptop GPU does not run at one speed. On Apple silicon the governor re-picks the
@@ -1196,7 +1350,7 @@ request** (#750). Two ways in:
 
 | Run | Trigger | Scope | Where it lands |
 |---|---|---|---|
-| **On request** (`mutants-on-request.yml`) | a PR's `Mutation: diff` (or globs) line, which the merge queue dispatches on `main` after the merge, two at a time (#1934); `make mutants-remote SCOPE=...`; or a dispatch with a `scope` input | `diff` (the branch against `origin/main`, or with `commit` the merged squash commit against its parent) or path globs (separated by spaces or commas; a brace such as `crates/{core,physics}/src/**` is expanded, since git's glob dialect has none), turned by `.github/scripts/mutants-scope.py` into one `--in-diff` per cargo workspace the scope reaches: the engine's, and each directory whose `Cargo.toml` opens its own `[workspace]` (`tools/lint`, run inside it with its own `cargo test`; a cargo-fuzz crate such as `fuzz/` is named as having nothing to run), in one report (#2201); one runner, a 2 h 45 budget; one run per branch, a newer dispatch cancelling the older and an unmerged close of the PR cancelling what is left, while a merged PR's run finishes (`mutants-cancel.yml`, #1530) | printed in the terminal by `make mutants-remote`; the run summary and a `mutants-report` artifact (`report.md`, `survivors.diff`); `report.md` also as one comment on the branch's open PR, or its merged one (the `pr` input for the queue's runs), edited in place by later runs (#912), except that a run with no answer adds its line below the earlier report rather than replacing it (#2201) |
+| **On request** (`mutants-on-request.yml`) | a PR's `Mutation: diff` (or globs) line, which the merge queue dispatches on `main` after the merge, two at a time (#1934); `make mutants-remote SCOPE=...`; or a dispatch with a `scope` input | `diff` (the branch against `origin/main`, or with `commit` the merged squash commit against its parent) or path globs (separated by spaces or commas; a brace such as `crates/{core,physics}/src/**` is expanded, since git's glob dialect has none), turned by `.github/scripts/mutants-scope.py` into one `--in-diff` per cargo workspace the scope reaches: the engine's, and each directory whose `Cargo.toml` opens its own `[workspace]` (`tools/lint`, run inside it with its own `cargo test`; a cargo-fuzz crate such as `fuzz/` is named as having nothing to run), in one report (#2201); one runner, or up to four for a plan too large for one (`mutants-request.py shards`, #2283), each with a 2 h 45 budget, merged into one report; one run per branch, a newer dispatch cancelling the older and an unmerged close of the PR cancelling what is left, while a merged PR's run finishes (`mutants-cancel.yml`, #1530) | printed in the terminal by `make mutants-remote`; the run summary and a `mutants-report` artifact (`report.md`, `survivors.diff`); `report.md` also as one comment on the branch's open PR, or its merged one (the `pr` input for the queue's runs), edited in place by later runs (#912), except that a run with no answer adds its line below the earlier report rather than replacing it (#2201) |
 | **Full sweep** (`mutants-sweep.yml`, sharded) | weekly `schedule` (Saturdays) + `workflow_dispatch` (`force` re-sweeps a covered commit); `main` only, a dispatch on any other ref is refused red (#972); skipped by `mutants-plan` when a finished sweep already covered `main`'s head (#506); one sweep at a time (#705) | the full `--file` sim scope over a matrix `mutants-plan` sizes each run from the mutant count (`cargo mutants --list`, `.github/scripts/mutants-shards.py`: ≈ 4 h a shard at the slowest per-shard rate the previous sweep measured (a shard under `MIN_MEASURED` mutants ignored, the slowest capped at `OUTLIER_CAP` × the mean), `MINUTES_PER_MUTANT` only when none can be read, and a `max-parallel` of at most 10 chosen to end by Sunday 23:59 UTC; red past GitHub's 256-job ceiling, #1684), each shard stopping itself at a 5 h 40 budget under GitHub's 6 h limit (#749) | `mutants-report` job: merged job summary (totals, measured of planned, the run's mean and slowest measured minutes a mutant against the sizing figure, and each shard's seconds and outcome lists under `shards/` for the next plan, unfinished shards, survivors) and the merged `mutants-report` artifact |
 
 Why this shape: mutation is a signal, and a per-PR job held runners the merge
@@ -1237,21 +1391,34 @@ process keeps its memory, which outlasts the test timeout and, a few mutants in 
 the runner; with dumps off it aborts in seconds and reads as caught
 (`test_limits.py` holds every capped `ulimit` to `-c 0`).
 
+**An on-request mutant is tested by what can see it, its own crate first** (#2283).
+Each mutant once ran the whole workspace's suite in nextest's order, the root
+package's integration binary first and then every crate alphabetically, so a mutant in
+`rusty-shell` waited 13 minutes for `rusty-shell`'s own tests and a run measured a fifth
+of its plan before its budget. `mutants-on-request.yml` now runs one cargo-mutants
+invocation per mutated package `P`: tested by nextest's `-E 'rdeps(=P)'` (P and every
+package depending on it, dev-dependencies included), with a tool config raising
+`package(=P)`'s priority so its tests run first. Before P is mutated, `cargo nextest
+list` with that filter and config must succeed and select a test: cargo-mutants counts
+any failing nextest run as a caught mutant, so a filter nextest refuses would report
+every mutant caught. A package that fails the check is reported as unmeasured. A plan
+too large for one runner (a standalone part's mutants counted in) is dealt round-robin
+over up to four shards (`mutants-request.py`), whose outcomes the `report` job merges
+into one report. A shard or package whose run broke is named there, its mutants counted
+as never reached and the run red, beside what the rest measured.
+
 **A torn-down job still answers.** A job whose runner died, or that was killed at its
-`timeout-minutes`, runs no step of its own, so `mutants-on-request.yml` has a second
-job, `no-answer`, which `needs:` it and runs only when the mutation job failed or timed
-out without reaching its comment (its `answered` output) and the run was not
-cancelled. It reads the step the job died in and GitHub's annotation from the jobs API
-(`mutants-torn-down.py`) and posts that line below any earlier report on the pull
-request, and as the `mutants-report` artifact. What the job measured is lost with its
-runner. A job that failed with its steps run and still wrote no report gets a line
-saying so, not "torn down". A runner that dies right after posting its report loses
-`answered` too, so the line can land below a real report; it says that report is the
-truth.
+`timeout-minutes`, runs no step of its own, so `mutants-on-request.yml`'s `report` job,
+which `needs:` the others and runs unless the run was cancelled, answers for it: for
+the `plan` job, or a shard that uploaded nothing, it reads the step the job died in and
+GitHub's annotation from the jobs API (`mutants-torn-down.py`). A lost plan's line is
+posted below any earlier report on the pull request; a lost shard is named in its
+part's section beside what the other shards measured, its mutants counted as never
+reached, and the run is red. What a lost job measured died with its runner.
 
 **The jobs run their own baseline** (`--baseline skip`, #2164). cargo-mutants builds
 and tests its baseline with `--package` set to the mutated packages only, whatever
-`test_workspace` says, while every mutant tests the whole workspace: a member crate's
+`test_workspace` says, while a mutant tests the whole workspace (or, on request, the part of it that depends on the mutated crate): a member crate's
 baseline timed only that crate's tests, so every mutant overran its timeout and a
 member with no `dev` feature failed the baseline outright. So each job's `Baseline`
 step runs what a mutant runs (the workspace build, then its tests, timed), and the

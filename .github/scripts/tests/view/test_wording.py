@@ -7,7 +7,7 @@ import unittest
 
 from merging.queue import outcomes
 from merging.view import events
-from merging.watch import board, ending, handbacks, kept, supervisor
+from merging.watch import board, ending, handbacks, kept, loop, supervisor
 from tests.watch.test_supervisor import fake
 
 
@@ -46,6 +46,11 @@ class Wording(unittest.TestCase):
             self.assertTrue(events.keep(last, set()), last)
             for line in carried:
                 self.assertFalse(events.keep(line, set()), line)
+
+    def test_a_take_and_its_line_do_not(self):  # #2285: the census is for a measurement, not the orchestrator
+        for census in (loop.taking_census(3, 2), loop.taking_census(1, None)):
+            self.assertFalse(events.keep(prefixed(f"watch: taking #7{census}."), set()), census)
+        self.assertFalse(events.keep(prefixed("watch: #7 is passed over this round: not green; it keeps its place."), set()))
 
     def test_a_queue_or_draft_opening_does_not(self):
         before = {1: (True, "a", False)}

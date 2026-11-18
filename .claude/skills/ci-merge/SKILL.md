@@ -208,18 +208,18 @@ of single-parent commits on `origin/main`, one per member, each the tree
 `git merge-tree` writes for that head on the chain so far. A PR rides only if it
 passes the take's first checks (ready, labelled, review recorded, description),
 **its own head's `ci-gate` and `lint-gate` are green**, and it merges cleanly onto
-the chain; otherwise it waits this round and keeps its place (`watch: #N waits …`),
-never updated for the train.
+the chain; otherwise it waits this round and keeps its place (`watch: #N waits …`).
+A manifest change rides (`board.lock_waits` keeps a second out of the line); a
+first whose own CI is still running `is passed over` unless aged or nobody can ride.
 
 These **go alone**, by the single-PR steps: the first in line when it cannot ride
-(it conflicts with `main`, even a `sorted` conflict the take resolves; its CI is
-not green; Dependabot); a Markdown-only PR as CI's `code` filter counts it; one
-touching `.github/scripts/merging/`, `.github/workflows/`, `.github/actions/`,
-`tools/lint/` (except the data tables in `train.group.RIDES`), `Makefile`,
-`merge-queue.py`, `queue-daemon.py`, `Cargo.toml` or `Cargo.lock`
-(`watch: #N goes alone: it changes …`); one whose head was in a red train; a
-train that found nobody to ride with its first. A train's take counts as one pass
-for those behind it in the aging count.
+otherwise (it conflicts with `main`, even a `sorted` conflict the take resolves;
+its own CI red or its description refused, so it is handed back; Dependabot); a Markdown-only PR as CI's `code` filter counts it; one touching
+`.github/scripts/merging/`, `.github/workflows/`, `.github/actions/`, `tools/lint/`
+(except the tables in `train.group.RIDES`), `Makefile`, `merge-queue.py` or
+`queue-daemon.py` (`watch: #N goes alone: it changes …`); one whose head was in a
+red train; a train that found nobody to ride with its first. A train's take counts
+as one pass for those behind it in the aging count.
 
 The tip is pushed to `merge-train/<main>-<a>-<b>…` (never forced) and `lint.yml`
 then `ci.yml` are dispatched on it. It is checked first as step 2 (compiled
@@ -393,7 +393,7 @@ merge or runs on a pull request.
 
 | | on request | weekly |
 |---|---|---|
-| mutation | a merged PR's `Mutation: diff` (or globs) line, dispatched by the queue after the merge; by hand, `make mutants-remote SCOPE=diff` (or globs) on `mutants-on-request.yml`: one runner, report and survivors' diffs in the terminal, posted as one comment on the branch's PR (open, or merged). One run per branch: a newer dispatch cancels the older and an unmerged close cancels what is left (`mutants-cancel.yml`); on `main` each run stands alone | `mutants-sweep.yml`, Saturdays, the sim modules in as many shards as `mutants-plan` sizes, a summary and artifact; skipped when `main` has not moved since the last sweep |
+| mutation | a merged PR's `Mutation: diff` (or globs) line, dispatched by the queue after the merge; by hand, `make mutants-remote SCOPE=diff` (or globs) on `mutants-on-request.yml`: one runner, up to four for a large plan, each mutant tested by its crate and what depends on it, report and survivors' diffs in the terminal, posted as one comment on the branch's PR (open, or merged). One run per branch: a newer dispatch cancels the older and an unmerged close cancels what is left (`mutants-cancel.yml`); on `main` each run stands alone | `mutants-sweep.yml`, Saturdays, the sim modules in as many shards as `mutants-plan` sizes, a summary and artifact; skipped when `main` has not moved since the last sweep |
 | coverage | `gh workflow run coverage.yml --ref <branch>` | `coverage.yml`, Mondays, ratchet table |
 
 **A branch that adds mechanism** (arithmetic, a state machine, a boundary) asks

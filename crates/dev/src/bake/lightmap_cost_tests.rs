@@ -17,7 +17,7 @@ use rusty_scene::lighting::settings::BakeSettings;
 
 /// The `n × n`-rooms bench level as the bake sees it, with its lamps.
 pub(in crate::bake) fn lit_level(n: usize) -> BakeScene {
-    let mut scene = BakeScene::gather(&rooms(n), &|_| None);
+    let mut scene = BakeScene::gather(&rooms(n), &|_, _| None);
     let lamp = |shape, radiance: f32| BakeLight {
         shape,
         radiance: Vec3::splat(radiance),
@@ -83,7 +83,7 @@ fn lightmap_trace_cost() {
 /// The 2 × 2-rooms level with `lamps` points spread through it, every one in range
 /// of most of it.
 fn crowded(lamps: usize) -> BakeScene {
-    let mut scene = BakeScene::gather(&rooms(2), &|_| None);
+    let mut scene = BakeScene::gather(&rooms(2), &|_, _| None);
     scene.lights = (0..lamps)
         .map(|k| {
             let f = k as f32 / lamps as f32;

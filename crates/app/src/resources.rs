@@ -252,6 +252,13 @@ impl Resources {
     pub fn play_frame(&self) -> u64 {
         self.play_frame
     }
+
+    /// Test hook: the schedule the tick runs, for a fixture system of known cost
+    /// beside the engine's (the bench's per-system rows).
+    #[doc(hidden)]
+    pub fn schedule_mut(&mut self) -> &mut super::Schedule {
+        &mut self.schedule
+    }
 }
 
 #[cfg(test)]

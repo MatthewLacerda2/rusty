@@ -57,6 +57,17 @@ impl Harness {
         settings: ProjectSettings,
     ) -> Result<Self, String> {
         rusty_edit::print_refresh(&rusty_edit::seed_project());
+        Self::on_project_scene(out_dir, scene_path, settings)
+    }
+
+    /// [`Self::in_user_workspace`] without seeding the project first: the run
+    /// writes nothing into it (`make bench-scenes` benches a project anywhere on
+    /// disk, read-only). The scene must already exist.
+    pub fn on_project_scene(
+        out_dir: impl AsRef<Path>,
+        scene_path: &str,
+        settings: ProjectSettings,
+    ) -> Result<Self, String> {
         rusty_scene::io::read_scene_file(scene_path)?;
         let mut scene = Scene::new();
         // The document parsed just above, so what fails here is the sidecar.

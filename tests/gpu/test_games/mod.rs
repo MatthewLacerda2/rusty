@@ -10,6 +10,7 @@
 )]
 
 mod budget;
+mod calibrate;
 mod failing;
 mod measure;
 
@@ -18,13 +19,26 @@ use std::process::{Command, Output};
 use std::time::Duration;
 
 /// How much CPU time (user + system) one game's `game --test` may use at its
-/// defaults (#2070, #2131). CPU time, not wall time: a busy machine (the nightly's
-/// one-process `cargo test`) slows a game's clock, not its work. A game past it
-/// fails by name, so the game whose defaults grew is the one fixed.
-const BUDGET: Duration = Duration::from_secs(90);
+/// defaults, in yardsticks: the median CPU time of `calibrate`'s fixed slice of the
+/// engine's own sim work, sampled on a test thread throughout the game's run
+/// (#2070, #2131, #2243). Not wall time, which a busy machine stretches, nor bare
+/// CPU seconds, which a loaded machine inflates too (a shared SMT core, all-core
+/// clocks, a contended cache), as it does the yardstick sampled in the same window.
+/// A game past it fails by name, so the game whose defaults grew is the one fixed.
+/// The heaviest game, `runner`, reads 209 to 228 on CI's ubuntu lavapipe, 223
+/// to 240 on its macOS Metal, 238 to 249 alone on an 8-core SMT desktop (RTX 2060)
+/// and 306 to 319 in a 4-vCPU lavapipe container; with its work doubled it reads
+/// 1.97× (612 in that container, so about 412 on ubuntu). 380 is 19% over the highest
+/// count and 8% under the lowest doubling, so a doubled game fails on every machine
+/// measured. The yardstick cancels about four fifths of a machine's load, not all:
+/// beside a full-parallel cold `cargo build` the desktop read 277 to 284 (1.15×)
+/// where CPU time rose 1.92×. So the bar catches a regression of about 1.6× on an
+/// idle machine and about 1.35× under heavy load (`docs/testing.md`, *Test games*,
+/// says how to re-measure).
+const BUDGET: f64 = 380.0;
 
-/// How many budgets of wall time a game may take before it is killed as hung.
-const HANG_FACTOR: u32 = 5;
+/// Wall time after which a game is killed as hung, whatever its budget.
+const HANG: Duration = Duration::from_secs(450);
 
 /// One `#[test]` per game, named after its folder, and a test that the list and
 /// `games/` hold the same names: a folder with no line fails, naming it.
@@ -81,18 +95,30 @@ fn mismatch(found: &[String], listed: &[&str]) -> Option<String> {
 /// `game --test` on `name` passes, proves itself deterministic and stays inside
 /// [`BUDGET`].
 fn passes_within_budget(name: &str) {
-    let run = measure::run(&mut game_command(name, None), BUDGET * HANG_FACTOR);
+    let sampler = calibrate::Sampler::start();
+    let run = measure::run(&mut game_command(name, None), HANG);
+    let samples = sampler.finish();
+    let budget = budget::Budget {
+        units: BUDGET,
+        unit: calibrate::median(&samples),
+    };
     let stdout = String::from_utf8_lossy(&run.output.stdout);
     let stderr = String::from_utf8_lossy(&run.output.stderr);
-    if let Err(message) = budget::verdict(name, &run, BUDGET) {
+    if let Err(message) = budget::verdict(name, &run, &budget) {
         panic!("{message}\n{stdout}\n{stderr}");
     }
     assert!(run.output.status.success(), "{name}:\n{stdout}\n{stderr}");
     assert!(stdout.contains("ok   generating twice writes the same files"));
     println!(
-        "{name}: game --test used {:.1} s of CPU in {:.1} s",
+        "{name}: game --test used {:.1} s of CPU in {:.1} s: {:.0} yardsticks of {:.3} s \
+         ({} slices, {:.3} to {:.3} s), budget {BUDGET}",
         run.cpu.as_secs_f64(),
-        run.wall.as_secs_f64()
+        run.wall.as_secs_f64(),
+        budget.of(run.cpu),
+        budget.unit.as_secs_f64(),
+        samples.len(),
+        samples.iter().min().unwrap().as_secs_f64(),
+        samples.iter().max().unwrap().as_secs_f64()
     );
 }
 

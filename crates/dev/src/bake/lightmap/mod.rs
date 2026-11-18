@@ -40,7 +40,7 @@ use crate::bake::denoise::{self, Oidn};
 use crate::bake::progress::{BakeLog, MeshCost, MeshTime, Step};
 use crate::bake::report::{self, lightmaps::Measured, Stages};
 use rusty_asset::MapRef;
-use rusty_lighting::lightmap::{BakeProgress, BakeScene};
+use rusty_lighting::lightmap::{BakeProgress, BakeScene, MapEncoding};
 use rusty_scene::lighting::settings::BakeSettings;
 use rusty_scene::Scene;
 
@@ -185,17 +185,28 @@ pub fn gather_bake_input(scene: &Scene) -> BakeScene {
     BakeScene::gather(scene, &texture_average)
 }
 
-/// A texture's average linear colour (its texels are sRGB), for the bake's albedo
-/// and emission. `None` when it cannot be read; the material colour then stands alone.
-fn texture_average(map: &MapRef) -> Option<Vec3> {
+/// A texture's average for the bake: a colour map's in linear light (its texels are
+/// sRGB), for the albedo and emission; a data map's raw, each channel 0–1, for the
+/// occlusion map. `None` when it cannot be read; the material's value then stands alone.
+fn texture_average(map: &MapRef, encoding: MapEncoding) -> Option<Vec3> {
     let file = map.file()?;
     let rgba = image::open(file).ok()?.to_rgba8();
-    let count = (rgba.width() * rgba.height()).max(1) as f32;
-    let to_linear = rusty_core::color::srgb_to_linear;
-    let sum = rgba.pixels().fold(Vec3::ZERO, |acc, p| {
-        acc + Vec3::new(to_linear(p[0]), to_linear(p[1]), to_linear(p[2]))
+    Some(average_texels(
+        rgba.pixels().map(|p| [p[0], p[1], p[2]]),
+        encoding,
+    ))
+}
+
+/// The average of `texels` read as `encoding` says; black for none.
+fn average_texels(texels: impl Iterator<Item = [u8; 3]>, encoding: MapEncoding) -> Vec3 {
+    let read = |b: u8| match encoding {
+        MapEncoding::Colour => rusty_core::color::srgb_to_linear(b),
+        MapEncoding::Data => f32::from(b) / 255.0,
+    };
+    let (sum, count) = texels.fold((Vec3::ZERO, 0u32), |(acc, n), [r, g, b]| {
+        (acc + Vec3::new(read(r), read(g), read(b)), n + 1)
     });
-    Some(sum / count)
+    sum / count.max(1) as f32
 }
 
 #[cfg(test)]

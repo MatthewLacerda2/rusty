@@ -208,7 +208,7 @@ fn static_solids(scene: &Scene) -> Vec<Solid> {
             triangles: t.triangles,
             convex: t.convex,
         });
-    let meshes = (BakeScene::gather(scene, &|_| None).meshes.into_iter())
+    let meshes = (BakeScene::gather(scene, &|_, _| None).meshes.into_iter())
         .filter(|m| !solid_collider(m.entity))
         .map(|m| Solid {
             triangles: opaque_triangles(&m),

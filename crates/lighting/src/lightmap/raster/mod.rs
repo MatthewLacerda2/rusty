@@ -27,11 +27,13 @@ use super::input::BakeMesh;
 /// atlas and the mips only ever copy, add and scale one.
 pub(super) use rusty_scene::lighting::page::Texel;
 
+mod areas;
 mod charts;
 #[cfg(test)]
 mod charts_tests;
 mod clip;
 
+pub(crate) use areas::{world_per_uv, Areas};
 pub(super) use charts::{chart_of_triangles, fill_within, texel_charts};
 use clip::Clipper;
 #[cfg(test)]
@@ -94,20 +96,6 @@ impl BakeMesh {
 pub fn lightmap_size(mesh: &BakeMesh, texels_per_unit: f32, max: u32) -> Option<u32> {
     let edge = world_per_uv(&mesh.surface())? * texels_per_unit;
     Some((edge.ceil() as u32).clamp(MIN_RESOLUTION, max.max(MIN_RESOLUTION)))
-}
-
-/// World units spanned by one unit of `mesh`'s UV (the square root of world area
-/// over UV area); `None` when its UVs enclose no area.
-pub(crate) fn world_per_uv(mesh: &Surface) -> Option<f32> {
-    let (mut world, mut uv) = (0.0f32, 0.0f32);
-    for t in mesh.indices.chunks_exact(3) {
-        let [a, b, c] = [t[0], t[1], t[2]].map(|i| i as usize);
-        let (pa, pb, pc) = (mesh.positions[a], mesh.positions[b], mesh.positions[c]);
-        world += (pb - pa).cross(pc - pa).length() * 0.5;
-        let (ua, ub, uc) = (mesh.uvs[a], mesh.uvs[b], mesh.uvs[c]);
-        uv += (ub - ua).perp_dot(uc - ua).abs() * 0.5;
-    }
-    (uv >= 1e-8 && world > 0.0).then(|| (world / uv).sqrt())
 }
 
 /// One triangle of a mesh in texel space: its first index's offset, its vertex
