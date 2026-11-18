@@ -935,9 +935,11 @@ where a synthetic loop met it far harder. The sampler sleeps 1.5 s between slice
 about 0.16 s (plus an untimed 0.08 s harness build), so it costs about 14% of one core
 beside the game. **The yardstick cancels about four fifths of a machine's load, not
 all**: on an 8-core SMT desktop `runner` reads 238 to 249 yardsticks alone and 277 to
-284 beside a full-parallel cold `cargo build` (1.15×), where its CPU time rose 1.92×;
-CI reads 209 to 240. So the bar of 380 catches a regression of about 1.6× on an idle
-machine and about 1.35× under heavy load.
+284 beside a full-parallel cold `cargo build` (1.15×), where its CPU time rose 1.92×
+(before its long run was halved; the heaviest game is now `showroom`, 216 on CI's
+ubuntu, and `BUDGET`'s comment has every count). So the bar of 380 catches a
+regression of about 1.6× on an idle machine and about 1.35× under heavy load; on
+macOS, where the games wait on Metal more than they compute, only a CPU-bound one.
 A game over budget fails by name with its CPU time and its yardsticks, so the game
 whose defaults grew is the one made cheaper. Wall time is only a hang guard: a game
 still running after `HANG` (450 s) is killed and fails as hung. CPU time counts every
