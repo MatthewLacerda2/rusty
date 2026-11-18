@@ -2,7 +2,8 @@
 //! *Anti-Flicker* tells a game: a one-frame flash repeated on a calm still ceiling
 //! every 6 and every 10 frames, flash by flash against URP's; and a lone flash on a
 //! ceiling of noise that blinks under the jitter, how long its end stays, at
-//! render scale 1 and at 0.67 (TAA upscaling).
+//! render scale 1 and at 0.67 (TAA upscaling), one test each. URP's run of a case
+//! is shared by both anti-flicker values it is compared at (#2350).
 
 use super::change::{dark_room, lamp};
 use super::measure::run;
@@ -11,9 +12,12 @@ use crate::Renderer;
 use rusty_components::MaterialAsset;
 use rusty_scene::Scene;
 
-/// The first flash's frame after [`WARM`], and how many come.
+/// The first flash's frame after [`WARM`], and how many come: the first two, the
+/// third (where the hold starts) and two more, which the hold keeps alike (a sixth
+/// read the same to the percent on lavapipe and an RTX 2060, and cost a period of
+/// frames in every run, #2350).
 const AT: u32 = 4;
-const FLASHES: u32 = 6;
+const FLASHES: u32 = 5;
 
 /// Each flash's lift of `tile` in `run` (its frame over the frame before), flashes
 /// `period` apart from [`AT`].
@@ -24,22 +28,43 @@ fn lifts(run: &[Vec<f32>], tile: usize, period: u32) -> Vec<f32> {
         .collect()
 }
 
-/// What of each flash survives the anti-flicker, against URP's, on the tile the
-/// first flash lit most.
-fn survival(r: &mut Renderer, period: u32, value: f32) -> Vec<f32> {
+/// The flashes every `period` frames from [`AT`], and the run's length.
+fn flashes(period: u32) -> (u32, impl Fn(&mut Scene, u32)) {
     let frames = AT + FLASHES * period + 1;
-    let flash = |s: &mut Scene, f: u32| {
+    let flash = move |s: &mut Scene, f: u32| {
         let on = f >= WARM + AT && (f - WARM - AT).is_multiple_of(period) && f < WARM + frames - 1;
         lamp(s, "Flash", on.then_some(30.0));
     };
-    let scene = &mut anti_flicker(dark_room(), value);
-    let held = run(r, scene, (frames, 1.0), &flash);
+    (frames, flash)
+}
+
+/// URP's run of flashes every `period` frames, and the tile its first flash lit most.
+fn urp_flashes(r: &mut Renderer, period: u32) -> (Vec<Vec<f32>>, usize) {
+    let (frames, flash) = flashes(period);
     let urp = run(r, &mut dark_room(), (frames, 1.0), &flash);
     let first = |t: usize| urp[AT as usize][t] - urp[AT as usize - 1][t];
     let tile = (0..urp[0].len())
         .max_by(|&a, &b| first(a).total_cmp(&first(b)))
         .unwrap();
-    let (h, u) = (lifts(&held, tile, period), lifts(&urp, tile, period));
+    (urp, tile)
+}
+
+/// What of each flash survives the anti-flicker at `value`, against URP's run
+/// (`urp_flashes`, shared by both values of a period), on its brightest tile.
+fn survival(
+    r: &mut Renderer,
+    period: u32,
+    value: f32,
+    (urp, tile): &(Vec<Vec<f32>>, usize),
+) -> Vec<f32> {
+    let (frames, flash) = flashes(period);
+    let held = run(
+        r,
+        &mut anti_flicker(dark_room(), value),
+        (frames, 1.0),
+        &flash,
+    );
+    let (h, u) = (lifts(&held, *tile, period), lifts(urp, *tile, period));
     assert!(u[0] > 20.0, "the flash lit the ceiling: {:.1}", u[0]);
     h.iter().zip(&u).map(|(h, u)| h / u).collect()
 }
@@ -63,8 +88,12 @@ const BAND: f32 = 0.1;
 #[test]
 fn gpu_a_repeated_flash_is_held_from_its_third_time_under_anti_flicker() {
     let Some(mut r) = renderer() else { return };
+    let mut urp = std::collections::BTreeMap::new();
     for (value, period, held) in HELD {
-        let kept = survival(&mut r, period, value);
+        let base = urp
+            .entry(period)
+            .or_insert_with(|| urp_flashes(&mut r, period));
+        let kept = survival(&mut r, period, value, base);
         let shown: Vec<String> = kept.iter().map(|k| format!("{:.0}%", 100.0 * k)).collect();
         eprintln!(
             "[taa] at {value}, a flash every {period} frames, kept flash by flash: {}",
@@ -94,32 +123,20 @@ pub(super) fn noise_room() -> Scene {
 }
 
 /// How long a lone flash's end stays on the noise ceiling at render `scale`: per
-/// frame after the flash, the most any tile still sits off the flash-free run,
-/// held at `value` and URP's.
-fn afterglow(r: &mut Renderer, scale: f32, value: f32) -> (Vec<f32>, Vec<f32>) {
-    let frames = AT + 48;
+/// frame after the flash, the most any tile still sits off the flash-free run at
+/// anti-flicker `value` (0 is URP's). It reads one frame past [`AFTERGLOW`], so an
+/// end held longer still shows as over it.
+fn afterglow(r: &mut Renderer, scale: f32, value: f32) -> Vec<f32> {
+    let frames = AT + 1 + AFTERGLOW as u32 + 1;
     let flash = |s: &mut Scene, f: u32| lamp(s, "Flash", (f == WARM + AT).then_some(30.0));
     let none = |_: &mut Scene, _: u32| {};
-    let mut glow = |value: f32| {
-        let lit = run(
-            r,
-            &mut anti_flicker(noise_room(), value),
-            (frames, scale),
-            &flash,
-        );
-        let dark = run(
-            r,
-            &mut anti_flicker(noise_room(), value),
-            (frames, scale),
-            &none,
-        );
-        let off = |f: usize| lit[f].iter().zip(&dark[f]).map(|(a, b)| (a - b).abs());
-        let after = AT as usize + 1..frames as usize;
-        after
-            .map(|f| off(f).fold(0.0, f32::max))
-            .collect::<Vec<f32>>()
-    };
-    (glow(value), glow(0.0))
+    let room = || anti_flicker(noise_room(), value);
+    let lit = run(r, &mut room(), (frames, scale), &flash);
+    let dark = run(r, &mut room(), (frames, scale), &none);
+    let off = |f: usize| lit[f].iter().zip(&dark[f]).map(|(a, b)| (a - b).abs());
+    (AT as usize + 1..frames as usize)
+        .map(|f| off(f).fold(0.0, f32::max))
+        .collect()
 }
 
 /// How many frames after a lone flash the noise ceiling's held tiles may still sit
@@ -131,14 +148,13 @@ fn afterglow(r: &mut Renderer, scale: f32, value: f32) -> (Vec<f32>, Vec<f32>) {
 /// bound holds both.
 const AFTERGLOW: usize = 44;
 
-#[test]
-fn gpu_a_lone_flash_on_a_blinking_ceiling_under_anti_flicker() {
+/// The lone flash at render `scale`, held at the default and at full strength,
+/// each against URP's (one run of it for both).
+fn lone_flash(scale: f32) {
     let Some(mut r) = renderer() else { return };
-    let cases = [1.0, 0.67]
-        .into_iter()
-        .flat_map(|s| [(s, DEFAULT), (s, ON)]);
-    for (scale, value) in cases {
-        let (held, urp) = afterglow(&mut r, scale, value);
+    let urp = afterglow(&mut r, scale, 0.0);
+    for value in [DEFAULT, ON] {
+        let held = afterglow(&mut r, scale, value);
         let over: Vec<f32> = held.iter().zip(&urp).map(|(h, u)| h - u).collect();
         let lasts = over.iter().rposition(|&o| o > 1.0).map_or(0, |i| i + 1);
         eprintln!(
@@ -148,4 +164,15 @@ fn gpu_a_lone_flash_on_a_blinking_ceiling_under_anti_flicker() {
         );
         assert!(lasts <= AFTERGLOW, "at scale {scale}, {value}: {over:?}");
     }
+}
+
+// One test per scale, so the two halves run side by side in the `gpu` group.
+#[test]
+fn gpu_a_lone_flash_on_a_blinking_ceiling_under_anti_flicker() {
+    lone_flash(1.0);
+}
+
+#[test]
+fn gpu_a_lone_flash_on_a_blinking_ceiling_under_anti_flicker_upscaled() {
+    lone_flash(0.67);
 }
