@@ -124,3 +124,24 @@ fn refresh_all_makes_every_image_under_a_folder() {
     assert_eq!(done.failed.len(), 1);
     assert_eq!(done.failed[0].0, broken);
 }
+
+#[test]
+fn imports_names_exactly_the_files_refresh_all_visits() {
+    let dir = rusty_test_support::temp::dir();
+    let cache = dir.join(crate::convert::IMPORT_CACHE_DIR);
+    let (a, extracted) = (dir.join("a.png"), cache.join("m").join("tex.png"));
+    for path in [&a, &extracted] {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        gradient(8, 8).save(path).unwrap();
+    }
+    assert_eq!(
+        images(&dir),
+        std::slice::from_ref(&a),
+        "the walk leaves the cache out"
+    );
+    assert!(imports(&dir, &a));
+    assert!(!imports(&dir, &extracted), "inside the import cache");
+    let elsewhere = dir.parent().unwrap().join("b.png");
+    assert!(!imports(&dir, &elsewhere), "outside the imported folder");
+    assert!(!imports(&dir, &dir.join("notes.txt")), "not an image");
+}

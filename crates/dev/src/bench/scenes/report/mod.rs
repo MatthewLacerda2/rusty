@@ -19,6 +19,11 @@ mod view_key;
 pub use compare::{delta, spread};
 pub use view_key::ViewKey;
 
+/// The note a `PROFILE=1` run's report carries: its rows come from the
+/// frame-pointer build, so a comparison with a release run says so.
+pub const PROFILING_NOTE: &str = "(timed on the profiling build: release with frame pointers \
+     forced on, for PROFILE=1; within the release build's spread where measured)";
+
 /// One row over a scene's viewpoints and runs.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Row {
@@ -178,6 +183,9 @@ impl SceneReport {
         }
         if let Some(dir) = &self.baseline {
             let _ = writeln!(out, "(compared with the kept report in {dir})");
+        }
+        if super::profile::on_profiling_build() {
+            let _ = writeln!(out, "{PROFILING_NOTE}");
         }
         out
     }

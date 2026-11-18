@@ -40,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export launcher bench bench-scenes bless-converters fuzz-lock
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export import launcher bench bench-scenes bless-converters fuzz-lock
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -466,6 +466,10 @@ export: ## Ship a project without its convertible sources. make export PROJECT=~
 		exit 1; }
 	cargo run --quiet --locked --features dev --bin export -- --project $(PROJECT) --out $(OUT)
 
+import: ## Bring a project's import cache up to date in place (models, compressed textures). make import PROJECT=~/games/horde
+	@test -n "$(PROJECT)" || { echo "import: make import PROJECT=<project dir>" >&2; exit 1; }
+	cargo run --quiet --locked --features dev --bin export -- --project $(PROJECT) --import-only
+
 # The shooter-shaped stress scene (#835): 50 skinned soldiers on the navmesh, 32
 # lights, a full decal registry, smoke. Prints frame / render / GPU ms (avg and p95),
 # GPU ms per pass, the counters, every system's and renderer stage's CPU ms
@@ -488,6 +492,11 @@ bench: ## Benchmark the stress scene (release build), with the change against th
 # sampling profile of the measured frames (perf on Linux, sample on macOS) as
 # <scene>.profile.txt and .folded, on a release build with line tables. Nothing is
 # written into the project. A signal, never a gate; docs/testing.md.
+# PROFILE=1 builds the `profiling` profile with frame pointers forced on, so perf walks
+# its stacks by frame pointer (`dev::bench::scenes::profile::perf`). That one binary runs
+# the whole run, so a PROFILE=1 run's timed rows come from it too (each report says so):
+# on a desktop GPU they measured inside the release build's spread. RUSTFLAGS only
+# reaches that profile's own target folder; a run without PROFILE=1 is the release build.
 bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/games/horde [SCENES=a,b] [RES=WxH] [RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1]
 	@test -n "$(PROJECT)" || { echo "bench-scenes: make bench-scenes PROJECT=<project dir> [SCENES=a,b] [RES=WxH] [RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1]" >&2; exit 1; }
-	cargo run $(if $(filter 1,$(PROFILE)),--profile profiling,--release) --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RES),--size $(RES)) $(if $(RUNS),--runs $(RUNS)) $(if $(BEFORE),--before $(BEFORE)) $(if $(filter 1,$(PROFILE)),--profile) $(if $(filter 1,$(IMPORT)),--import) out/bench/scenes
+	$(if $(filter 1,$(PROFILE)),RUSTFLAGS="$$RUSTFLAGS -C force-frame-pointers=yes") cargo run $(if $(filter 1,$(PROFILE)),--profile profiling,--release) --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RES),--size $(RES)) $(if $(RUNS),--runs $(RUNS)) $(if $(BEFORE),--before $(BEFORE)) $(if $(filter 1,$(PROFILE)),--profile) $(if $(filter 1,$(IMPORT)),--import) out/bench/scenes

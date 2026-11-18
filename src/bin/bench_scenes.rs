@@ -15,15 +15,14 @@
 //! change against the scene's last run, or against the kept report in
 //! `--before`'s folder; then a one-table summary (`dev::bench::scenes`).
 //!
-//! Each scene runs in child processes of this binary, so its load is cold and
-//! its memory peak its own: one benches it (`--scene`), and with `--profile` one
-//! more samples its measured frames with the platform's profiler (`--scene
-//! --profile`, `scenes::profile`), whose failure leaves the timings standing; the
-//! profiler is tried once before any scene, so a refusal ends the run at once.
-//! With `--import`, once a run, one more loads the first scene from a copy of the
-//! project without its import cache (`--import-out`, `scenes::import`) and hands
-//! that load to the first scene's timed run as `--import-ms`. The project is
-//! read, never written.
+//! Each scene runs in child processes of this binary (cold load, its own memory
+//! peak): one benches it (`--scene`), and with `--profile` one more samples its
+//! measured frames with the platform's profiler (`scenes::profile`), whose failure
+//! leaves the timings standing (a refused profile is listed at the end); the
+//! profiler is tried once before any scene, so a refusal ends the run. With
+//! `--import`, once a run, one more imports a copy of the project without its
+//! import cache and loads its first scene (`--import-out`, `scenes::import`),
+//! handing both's time to that scene's run as `--import-ms`. The project is not written.
 
 use std::ffi::OsString;
 use std::path::{absolute, Path, PathBuf};
@@ -122,15 +121,17 @@ fn bench_one(run: &Run, scene: &str, key: String, import_ms: Option<f64>) {
     }
 }
 
-/// Load `scene` of the project (a cache-cleared copy) and write the load's ms to `file`.
+/// Import the project (a cache-cleared copy), load `scene`, and write both's ms to `file`.
 fn import_one(run: &Run, scene: &str, file: &Path) {
     let opened = rusty::core::project::open(&run.project, Access::Run);
     let opened = opened.unwrap_or_else(|e| fail(&format!("cannot open the copy: {e}")));
     let scratch = file.parent().unwrap_or(Path::new("."));
+    eprintln!("{}", rusty::asset::import::notice(&opened.root));
+    let imported = import::import().unwrap_or_else(|e| fail(&format!("import failed: {e}")));
     let loaded = scenes::load(scratch, &opened.root, scene, opened.settings, run.opts.size);
     let ms = loaded.map_or_else(
         |e| fail(&format!("{scene}: cold load failed: {e}")),
-        |l| l.1,
+        |l| imported + l.1,
     );
     // lint: allow(asset-write) a number handed to the parent process, deleted after
     let wrote = std::fs::write(file, ms.to_string());
@@ -191,6 +192,10 @@ fn bench_all(run: &Run, list: Option<&str>) {
         let scenes = unprofiled.join(", ");
         eprintln!("bench-scenes: no profile (their timings stand): {scenes}");
     }
+    let fresh = |n: &&String| run.profile && !failed.contains(n) && !unprofiled.contains(n);
+    if let Some(said) = profile::refusals(&run.out, names.iter().filter(fresh)) {
+        eprintln!("bench-scenes: {said}");
+    }
     if !failed.is_empty() {
         eprintln!("bench-scenes: failed: {}", failed.join(", "));
     }
@@ -225,11 +230,8 @@ fn bench_scene(run: &Run, scene: &str, import_ms: Option<f64>) -> Benched {
         return Benched::Done;
     }
     let mut profiled = child(run, &run.project, scene);
-    if profiled
-        .arg("--profile")
-        .status()
-        .is_ok_and(|s| s.success())
-    {
+    let status = profiled.arg("--profile").status();
+    if status.is_ok_and(|s| s.success()) {
         Benched::Done
     } else {
         eprintln!("bench-scenes: {scene}: the profile failed; its timings stand");
