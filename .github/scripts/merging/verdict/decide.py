@@ -155,8 +155,11 @@ def judge(
                 "Every change here is Markdown, and one is a doc the tests read"
                 f" ({', '.join(changes.CODE_DOCS)}), which CI's `code` filter counts as code"
                 " (#525), so its build steps should have run.",
-                "Re-run `ci` on this head; locally, `make test` runs the"
-                " drift tests (one `integration` binary, `autotests = false`).",
+                "Dispatch `ci` on this head (`gh workflow run ci.yml --ref <branch>`):"
+                " a re-run of the PR's run can skip again, citing a run of the same"
+                " tree on another commit (#2333), while a dispatch always builds."
+                " Locally, `make test` runs the drift tests (one `integration`"
+                " binary, `autotests = false`).",
                 *lines,
             ]
     elif changes.markdown_only(files):

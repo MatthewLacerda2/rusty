@@ -224,16 +224,19 @@ impl World {
     /// `Core::seq` (O(k log k)) restores the insertion order hecs's
     /// per-archetype iteration doesn't provide.
     pub(crate) fn ids_with_component<T: hecs::Component>(&self) -> Vec<u32> {
-        walks::count(std::any::type_name::<T>());
-        let mut matches: Vec<(u64, u32)> = self
-            .inner
-            .query::<&Core>()
-            .with::<&T>()
-            .iter()
-            .map(|(_, core)| (core.seq, core.id))
-            .collect();
+        let mut matches: Vec<(u64, u32)> = Vec::new();
+        self.each_core_with::<T>(|core| matches.push((core.seq, core.id)));
         matches.sort_unstable_by_key(|&(seq, _)| seq);
         matches.into_iter().map(|(_, id)| id).collect()
+    }
+
+    /// Visit the [`Core`] of every entity carrying `T`, in no set order: the
+    /// narrow query under [`World::ids_with_component`], for a caller that also
+    /// filters on a core fact (layer, static) without a lookup per id.
+    pub(crate) fn each_core_with<T: hecs::Component>(&self, visit: impl FnMut(&Core)) {
+        walks::count(std::any::type_name::<T>());
+        let mut query = self.inner.query::<&Core>().with::<&T>();
+        query.iter().map(|(_, core)| core).for_each(visit);
     }
 
     /// Shared borrow of two columns of one entity under a single id lookup.
@@ -264,12 +267,12 @@ fn drop_slots(order: &mut Vec<u32>, slots: &[usize]) {
     order.truncate(write);
 }
 
-/// How many times each column was walked (`ids_with_*`) on this thread: what lets a
-/// test hold that a frame walks no column it should not (the retained render
-/// scene's idle frame, #1706). A test hook: compiled in every build, since the
-/// test that reads it is another crate's, and counting only on a thread that
-/// asked [`walks::of`] once, so a build that never asks pays one thread-local
-/// read per walk.
+/// How many times each column was walked on this thread (every query built on
+/// `World::each_core_with`: `ids_with_*` and `World::moving_bodies`): what lets a
+/// test hold that a frame walks no column it should not (#1706). A test hook:
+/// compiled in every build, since the test that reads it is another crate's, and
+/// counting only on a thread that asked [`walks::of`] once, so a build that never
+/// asks pays one thread-local read per walk.
 #[doc(hidden)]
 pub mod walks {
     use std::cell::{Cell, RefCell};
