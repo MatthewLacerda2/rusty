@@ -194,6 +194,8 @@ pub const REQUIRE_OIDN_ENV: &str = "RUSTY_REQUIRE_OIDN";
 #[cfg(test)]
 mod bake_tests;
 #[cfg(test)]
+mod budget_tests;
+#[cfg(test)]
 mod quality;
 #[cfg(test)]
 mod quality_tests;

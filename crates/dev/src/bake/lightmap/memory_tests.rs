@@ -16,7 +16,7 @@ use rusty_lighting::lightmap::{
 };
 use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 
-/// Lightmap texels per unit: each [`SIDE`]-unit plane is a 512² map.
+/// Lightmap texels per unit: each [`SIDE`]-unit plane is a 500² map.
 const DENSITY: f32 = 25.0;
 const SIDE: f32 = 20.0;
 
@@ -28,7 +28,7 @@ const WORKERS: usize = 2;
 const MARGIN: u64 = 48 << 20;
 
 /// `n` planes side by side, under a sun.
-fn planes(n: usize) -> BakeScene {
+pub(super) fn planes(n: usize) -> BakeScene {
     let plane = |i: usize| {
         let x = i as f32 * (SIDE + 1.0);
         let p = |a: f32, b: f32| Vec3::new(x + a, 0.0, b);

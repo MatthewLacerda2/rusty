@@ -7,11 +7,14 @@
 //! What a one-shot bake holds (measured in #2312's PR): every finished lightmap
 //! ([`result_bytes`]), the charts in flight (a worker's chart: its texels and
 //! their traced light, [`IN_FLIGHT_PER_TEXEL`]; the one being assembled,
-//! [`FINISH_PER_TEXEL`]), and OIDN's charts in flight, at most
-//! `denoise::budget::BUDGET`. Once traced, the maps are packed into pages: about
-//! the results again. A progressive bake (the editor's) also keeps every texel's
-//! state between passes ([`PROGRESSIVE_PER_TEXEL`]). Each texel is counted at its
-//! map's full edge², so the estimate errs high.
+//! [`FINISH_PER_TEXEL`]), or OIDN's charts in flight (at most
+//! `denoise::budget::BUDGET`) when those are more, since a chart is denoised
+//! while it is assembled. Once traced, the maps are packed into pages and
+//! encoded: about twice the results again ([`PACK`]). A progressive bake (the
+//! editor's) also keeps every texel's state between passes
+//! ([`PROGRESSIVE_PER_TEXEL`]). Each texel is counted at its map's full edge²,
+//! so the estimate errs high: on #2312's planes it read 12 to 17% over the peak
+//! measured with the Gaussian, 8 to 35% over with OIDN.
 
 use rusty_lighting::lightmap::{lightmap_size, max_map_edge, BakeScene};
 use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
@@ -26,6 +29,10 @@ pub const IN_FLIGHT_PER_TEXEL: u64 = 112;
 /// The chart being assembled into its maps: its points and light, their
 /// filtered copies, the denoise's images and the maps themselves.
 pub const FINISH_PER_TEXEL: u64 = 256;
+
+/// What packing and encoding the pages hold beside the maps, as a multiple of
+/// what the maps keep.
+pub const PACK: u64 = 2;
 
 /// A progressive bake's texel between passes (`Texel`) and its chart label.
 pub const PROGRESSIVE_PER_TEXEL: u64 = 116;
@@ -57,16 +64,19 @@ pub fn estimate(
     let largest = flying.first().copied().unwrap_or(0);
     let mut work = largest * FINISH_PER_TEXEL;
     work += flying.iter().skip(1).sum::<u64>() * IN_FLIGHT_PER_TEXEL;
+    // A chart is denoised while it is assembled, so the two overlap: the larger
+    // stands for both (measured in #2312's PR).
     if settings.denoiser == Denoiser::Oidn {
         let denoise: u64 = flying.iter().map(|&t| budget::cost(t as usize)).sum();
-        work += denoise.min(budget::BUDGET.max(budget::cost(largest as usize)));
+        work = work.max(denoise.min(budget::BUDGET.max(budget::cost(largest as usize))));
     }
-    let kept = if progressive {
-        all * PROGRESSIVE_PER_TEXEL
-    } else {
-        0
+    let kept = match progressive {
+        true => all * PROGRESSIVE_PER_TEXEL,
+        false => 0,
     };
-    kept + results + work.max(results)
+    // Packing copies the maps into pages and encodes them: about twice the
+    // results again.
+    kept + results + work.max(PACK * results)
 }
 
 /// Hold a bake estimated to add `peak` bytes to `machine` (`None` when it cannot
