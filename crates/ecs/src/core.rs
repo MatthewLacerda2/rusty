@@ -13,7 +13,8 @@
 //! from this module and `access.rs`.
 
 use rusty_components::{
-    AnimatorComponent, Entity, MaterialAsset, MeshComponent, ScriptComponent, TransformComponent,
+    AnimatorComponent, CharacterControllerComponent, ColliderComponent, Entity, MaterialAsset,
+    MeshComponent, ScriptComponent, TransformComponent,
 };
 
 use super::access::{CompMut, CompRef};
@@ -78,6 +79,32 @@ impl World {
 
     pub fn is_static(&self, id: u32) -> bool {
         self.component::<Core>(id).is_some_and(|c| c.is_static)
+    }
+
+    /// Whether `id` is a moving body: not static, with a Collider or a
+    /// CharacterController. Activity is the caller's question.
+    pub fn is_moving_body(&self, id: u32) -> bool {
+        !self.is_static(id) && (self.has_collider(id) || self.has_character_controller(id))
+    }
+
+    /// The moving bodies ([`World::is_moving_body`]) on a layer in `mask`, in
+    /// ascending id order. One narrow query per column, reading the layer and the
+    /// static flag from it: an entity on no layer of `mask` costs no lookup.
+    pub fn moving_bodies_on(&self, mask: u32) -> Vec<u32> {
+        let mut ids = Vec::new();
+        let mut keep = |c: &Core| {
+            let on = 1u32
+                .checked_shl(u32::from(c.layer))
+                .is_some_and(|b| mask & b != 0);
+            if on && !c.is_static {
+                ids.push(c.id);
+            }
+        };
+        self.each_core_with::<ColliderComponent>(&mut keep);
+        self.each_core_with::<CharacterControllerComponent>(&mut keep);
+        ids.sort_unstable();
+        ids.dedup();
+        ids
     }
 
     /// Unity's `GameObject.isStatic`, but live: physics, the shadow sweeps and probe

@@ -40,14 +40,32 @@ struct Pair {
 }
 
 /// Every perceiver's visible targets this tick (target → where it stands), in
-/// the order of `perceivers`.
+/// the order of `perceivers`. Only the layers some perceiver's `sight_mask` holds
+/// are walked: a target on none of them would fail every pair's mask test.
 pub(super) fn look(
     scene: &Scene,
     physics: Option<&PhysicsWorld>,
     perceivers: &[u32],
     rays: &mut SightRays,
 ) -> Vec<BTreeMap<u32, Vec3>> {
-    let targets = targets(scene);
+    let w = &scene.world;
+    let mask = perceivers
+        .iter()
+        .filter_map(|&p| w.ai_perception(p).map(|c| c.sight_mask))
+        .fold(0, |a, m| a | m);
+    look_on(scene, physics, perceivers, rays, mask)
+}
+
+/// [`look`] with the targets cut to the layers of `mask` (all of them with
+/// `u32::MAX`: the unfiltered list, what a test compares the prefilter to).
+pub(super) fn look_on(
+    scene: &Scene,
+    physics: Option<&PhysicsWorld>,
+    perceivers: &[u32],
+    rays: &mut SightRays,
+    mask: u32,
+) -> Vec<BTreeMap<u32, Vec3>> {
+    let targets = targets(scene, mask);
     let pairs = pairs(scene, perceivers, &targets);
     let traced = schedule(&pairs, perceivers, &targets, rays);
     let mut seen = vec![BTreeMap::new(); perceivers.len()];
@@ -72,21 +90,15 @@ pub(super) fn look(
     seen
 }
 
-/// Every entity sight may target, in id order (who qualifies: the module docs).
-fn targets(scene: &Scene) -> Vec<Target> {
+/// Every entity sight may target on a layer of `mask`, in id order (who
+/// qualifies: the module docs). "Not under another body" asks every moving body
+/// above it, whatever that body's layer: the mask only cuts the candidates.
+fn targets(scene: &Scene, mask: u32) -> Vec<Target> {
     let w = &scene.world;
-    let mut ids: Vec<u32> = w.ids_with_collider();
-    ids.extend(w.ids_with_character_controller());
-    ids.sort_unstable();
-    ids.dedup();
-    ids.retain(|&id| w.is_active_in_hierarchy(id) && !w.is_static(id));
-    let bodies: BTreeSet<u32> = ids.iter().copied().collect();
-    ids.into_iter()
-        .filter(|&id| {
-            !w.self_and_ancestors(id)
-                .skip(1)
-                .any(|a| bodies.contains(&a))
-        })
+    w.moving_bodies_on(mask)
+        .into_iter()
+        .filter(|&id| w.is_active_in_hierarchy(id))
+        .filter(|&id| !w.ancestors(id).any(|a| w.is_moving_body(a)))
         .map(|id| Target {
             id,
             layer: w.layer(id),
@@ -94,6 +106,17 @@ fn targets(scene: &Scene) -> Vec<Target> {
             position: stand::feet(scene, id),
         })
         .collect()
+}
+
+/// `p`'s own body: its outermost ancestor-or-self that is a moving body, else
+/// itself. The unfiltered rule (an active `p`'s ancestors are active), so a
+/// perceiver on a character whose layer no mask holds still ignores its capsule.
+fn body_of(scene: &Scene, p: u32) -> u32 {
+    let w = &scene.world;
+    w.self_and_ancestors(p)
+        .filter(|&a| w.is_moving_body(a))
+        .last()
+        .unwrap_or(p)
 }
 
 /// Where a sight ray aims at `id`: its collider's world bounds centre, else its
@@ -121,12 +144,7 @@ fn pairs(scene: &Scene, perceivers: &[u32], targets: &[Target]) -> Vec<Pair> {
         let forward = w.world_rotation(p) * Vec3::Z;
         let half = c.sight_angle.to_radians();
         let lineage: BTreeSet<u32> = w.self_and_ancestors(p).collect();
-        let body = targets
-            .iter()
-            .filter(|t| lineage.contains(&t.id))
-            .map(|t| t.id)
-            .next()
-            .unwrap_or(p);
+        let body = body_of(scene, p);
         for (ti, t) in targets.iter().enumerate() {
             // Its own body: under the perceiver (its hitboxes) or above it (a
             // perceiver on a `Head` child of the character).

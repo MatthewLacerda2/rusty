@@ -224,16 +224,19 @@ impl World {
     /// `Core::seq` (O(k log k)) restores the insertion order hecs's
     /// per-archetype iteration doesn't provide.
     pub(crate) fn ids_with_component<T: hecs::Component>(&self) -> Vec<u32> {
-        walks::count(std::any::type_name::<T>());
-        let mut matches: Vec<(u64, u32)> = self
-            .inner
-            .query::<&Core>()
-            .with::<&T>()
-            .iter()
-            .map(|(_, core)| (core.seq, core.id))
-            .collect();
+        let mut matches: Vec<(u64, u32)> = Vec::new();
+        self.each_core_with::<T>(|core| matches.push((core.seq, core.id)));
         matches.sort_unstable_by_key(|&(seq, _)| seq);
         matches.into_iter().map(|(_, id)| id).collect()
+    }
+
+    /// Visit the [`Core`] of every entity carrying `T`, in no set order: the
+    /// narrow query under [`World::ids_with_component`], for a caller that also
+    /// filters on a core fact (layer, static) without a lookup per id.
+    pub(crate) fn each_core_with<T: hecs::Component>(&self, visit: impl FnMut(&Core)) {
+        walks::count(std::any::type_name::<T>());
+        let mut query = self.inner.query::<&Core>().with::<&T>();
+        query.iter().map(|(_, core)| core).for_each(visit);
     }
 
     /// Shared borrow of two columns of one entity under a single id lookup.

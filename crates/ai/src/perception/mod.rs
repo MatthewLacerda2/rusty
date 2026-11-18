@@ -40,6 +40,8 @@ mod budget_tests;
 #[cfg(feature = "dev")]
 #[doc(hidden)]
 pub mod bench;
+#[cfg(test)]
+mod mask_tests;
 #[cfg(all(test, feature = "dev"))]
 mod perception_cost_tests;
 #[cfg(test)]
@@ -110,6 +112,9 @@ pub fn perceivers(scene: &Scene) -> Vec<u32> {
 /// ages by `dt` (the fixed tick's) and forgets what is past its max age.
 pub fn step(scene: &mut Scene, physics: Option<&PhysicsWorld>, rays: &mut SightRays, dt: f32) {
     let ids = perceivers(scene);
+    if ids.is_empty() {
+        return; // no memory to age, no ray to schedule: sight walks nothing
+    }
     let seen = sight::look(scene, physics, &ids, rays);
     for (id, visible) in ids.into_iter().zip(seen) {
         if let Some(mut c) = scene.world.ai_perception_mut(id) {
