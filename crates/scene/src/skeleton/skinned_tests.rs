@@ -6,7 +6,7 @@
 use glam::Quat;
 
 use super::probe;
-use super::rig::armature_owner;
+use super::rig::{armature_owner, chain_skin};
 use crate::Scene;
 use rusty_components::MeshComponent;
 use rusty_ecs::world::walks;
@@ -23,18 +23,24 @@ fn statics(scene: &mut Scene, n: usize) -> Vec<u32> {
 }
 
 #[test]
-fn a_level_of_static_meshes_walks_the_column_once_and_reads_no_skeleton() {
+fn a_level_of_static_meshes_walks_the_column_once_and_looks_up_no_mesh() {
     let mut scene = Scene::new();
     statics(&mut scene, 64);
-    let (walks_before, reads_before) = (walks::of::<MeshComponent>(), probe::reads());
+    let walks_before = walks::of::<MeshComponent>();
+    let (lookups_before, reads_before) = (walks::lookups_of::<MeshComponent>(), probe::reads());
     assert!(scene.skinned_ids().is_empty());
     assert_eq!(
         walks::of::<MeshComponent>(),
         walks_before + 1,
         "one column walk"
     );
-    assert!(scene.bone_subtrees().is_empty());
     scene.build_skin_palettes();
+    assert_eq!(
+        walks::lookups_of::<MeshComponent>(),
+        lookups_before,
+        "no Mesh looked up per entity: the skeleton test rides the walk"
+    );
+    assert!(scene.bone_subtrees().is_empty());
     assert_eq!(probe::reads(), reads_before, "no skeleton was read");
 }
 
@@ -88,4 +94,26 @@ fn a_rebuilt_palette_reuses_the_meshs_allocation() {
     assert_eq!(mesh.pose_palette.len(), held.len());
     assert_eq!(mesh.pose_palette[0], held[0], "the hips did not move");
     assert_ne!(mesh.pose_palette[2], held[2], "the head rode the spine");
+}
+
+#[test]
+fn two_rigs_of_different_lengths_each_get_their_own_palette() {
+    let mut scene = Scene::new();
+    let short = armature_owner(&mut scene);
+    let long = armature_owner(&mut scene);
+    super::rig::reimport_to(&mut scene, long, chain_skin(&["a", "b", "c", "d", "e"]));
+    scene.sync_skeletons();
+    scene.build_skin_palettes();
+    let palette = |id| scene.world.mesh(id).unwrap().pose_palette.clone();
+    assert_eq!(
+        palette(short).len(),
+        3,
+        "the short rig is not padded by the long one"
+    );
+    assert_eq!(palette(long).len(), 5);
+    let mut alone = Scene::new();
+    let only = armature_owner(&mut alone);
+    alone.sync_skeletons();
+    alone.build_skin_palettes();
+    assert_eq!(palette(short), alone.world.mesh(only).unwrap().pose_palette);
 }

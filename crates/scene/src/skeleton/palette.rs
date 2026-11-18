@@ -15,7 +15,8 @@ impl Scene {
     /// convention as the bind palette. A mesh whose skeleton is not bound keeps
     /// rendering its bind pose. Visits the skinned entities only
     /// ([`Scene::skinned_ids`]), never the scene's static meshes, and composes
-    /// every rig in one scratch, copied into the palette each mesh already holds.
+    /// every rig in one scratch per call, copied into the palette each mesh
+    /// already holds.
     pub fn build_skin_palettes(&mut self) {
         let mut palette = Vec::new();
         for owner in self.skinned_ids() {

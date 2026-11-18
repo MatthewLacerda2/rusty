@@ -23,8 +23,7 @@ use std::ops::{Deref, DerefMut};
 use rusty_components::registry::first_class;
 use rusty_components::{ImageComponent, MeshComponent, PrefabLink};
 
-use super::bundle::Core;
-use super::world::{walks, Ref, RefMut, World};
+use super::world::{Ref, RefMut, World};
 
 /// Shared borrow of one component column.
 pub struct CompRef<'w, T: ?Sized>(Ref<'w, T>);
@@ -148,24 +147,6 @@ impl World {
     /// Work whose order matters walks `ids_with_image`.
     pub fn each_image(&self, visit: impl FnMut(&ImageComponent)) {
         self.each_component(visit);
-    }
-
-    /// [`World::ids_with_component`] keeping only the carriers whose `T` passes
-    /// `keep`, tested in the same column walk: no per-id lookup afterwards.
-    pub(crate) fn ids_with_component_where<T: hecs::Component>(
-        &self,
-        keep: impl Fn(&T) -> bool,
-    ) -> Vec<u32> {
-        walks::count(std::any::type_name::<T>());
-        let mut matches: Vec<(u64, u32)> = self
-            .inner
-            .query::<(&Core, &T)>()
-            .iter()
-            .filter(|(_, (_, value))| keep(value))
-            .map(|(_, (core, _))| (core.seq, core.id))
-            .collect();
-        matches.sort_unstable_by_key(|&(seq, _)| seq);
-        matches.into_iter().map(|(_, id)| id).collect()
     }
 
     /// Stable ids of the meshes `keep` holds for, in insertion order
