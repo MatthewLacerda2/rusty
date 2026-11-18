@@ -4,8 +4,8 @@
 cargo-mutants 27 tests its baseline with `--package` set to the mutated
 packages only, whatever `test_workspace` says, while each mutant tests what
 `test_workspace` selects; and arguments after `--` reach only the test phase.
-So the workflows skip cargo-mutants' baseline (`--baseline skip`), run their
-own `Baseline` step and pass its timeout in. This holds the two together, by
+So the workflow skips cargo-mutants' baseline (`--baseline skip`), runs its
+own `Baseline` step and passes its timeout in. This holds the two together, by
 building each phase's command the way cargo-mutants 27.1's `cargo_argv` does:
 `--verbose`, the test packages (`--workspace` when `.cargo/mutants.toml`'s
 `test_workspace` or `--test-workspace=true` says so; the CLI's own
@@ -104,11 +104,10 @@ def problems(text: str, config: dict) -> list[str]:
 
 
 class Workflows(unittest.TestCase):
-    def test_both_mutation_workflows_run_their_mutants_baseline(self) -> None:
+    def test_the_mutation_workflow_runs_its_mutants_baseline(self) -> None:
         config = tomllib.loads(CONFIG.read_text())
-        for name in ("mutants-on-request.yml", "mutants-sweep.yml"):
-            with self.subTest(name):
-                self.assertEqual(problems((WORKFLOWS / name).read_text(), config), [])
+        text = (WORKFLOWS / "mutants-on-request.yml").read_text()
+        self.assertEqual(problems(text, config), [])
 
 
 GOOD = """\

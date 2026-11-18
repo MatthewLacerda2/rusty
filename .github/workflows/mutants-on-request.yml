@@ -22,8 +22,10 @@
 # `make mutants-remote` generates are in the run's name: a dispatch returns no
 # run id, so the id is how the command finds *its* run.
 #
-# Never a gate and never on a pull request. Unlike the weekly sweep it goes
-# red when it has no honest report to give — a path scope with nothing to
+# Never a gate, never on a pull request and never on a schedule: mutation runs
+# only when someone asks, over what they name (CLAUDE.md, *Gates vs.
+# signals*); a whole module is audited by asking for its glob. It goes red
+# when it has no honest report to give — a path scope with nothing to
 # mutate, a baseline that does not build — because its caller must tell "no
 # survivors" from "no answer", and the run's conclusion is what it reads.
 # Survivors are a result and never turn it red.
@@ -257,9 +259,13 @@ jobs:
       - name: Cache cargo registry + target
         uses: Swatinem/rust-cache@v2
         with:
-          # The weekly sweep saves this key from `main`; a request only reads it.
+          # Saved by a run on `main` (the merge queue's post-merge dispatch),
+          # from shard 0 alone so parallel shards do not race for one key;
+          # a branch's run only reads it. rust-cache skips the save on an
+          # exact key hit, so the key is re-saved when `Cargo.lock` or the
+          # toolchain changes it, as for every other cache here.
           shared-key: mutants
-          save-if: false
+          save-if: ${{ github.ref == 'refs/heads/main' && matrix.shard == 0 }}
       - name: System libs for winit/wgpu builds
         uses: ./.github/actions/system-libs
         with:
@@ -293,8 +299,8 @@ jobs:
       # part gets at most half of what is left (#2201): given all of it, the
       # engine's baseline then started with no budget and overran the job's
       # limit, and a job killed at its limit leaves nothing to report.
-      # The memory cap and core dumps off as in every mutation step
-      # (`mutants-sweep.yml` says why): a scanner mutant that loops pushing
+      # The memory cap and core dumps off as in every mutation step (the
+      # *Baseline* step says why): a scanner mutant that loops pushing
       # onto a `Vec` reaches the cap in seconds, and with a core to write it
       # outlived its timeout and took the runner down (#2230). The list is read
       # on fd 3, so cargo-mutants never reads the rest of it as its stdin.
@@ -329,8 +335,8 @@ jobs:
       # it outright (#2155). This step runs the same build each mutant does,
       # then the whole workspace's tests, timed, and the timeout is 3x that
       # test time: a mutant runs a subset of them (`Mutate`), so the whole
-      # suite's time bounds every one. `mutants-sweep.yml` does the same;
-      # `test_baseline.py` (`make scripts`) holds the two commands to
+      # suite's time bounds every one. `test_baseline.py` (`make scripts`)
+      # holds the two commands to
       # cargo-mutants' own arguments. A baseline that fails turns the run red:
       # there is no honest report to give.
       #
@@ -342,7 +348,25 @@ jobs:
       # independence is `cargo-test.yml`'s nightly signal, not this one's.
       # `--fail-fast` overrides the profile's `fail-fast = false` (right for the
       # gate's summary) so a caught mutant stops at its first failing test.
-      # Memory cap and test-thread bound as the sweep (`mutants-sweep.yml` says why).
+      #
+      # `ulimit -v` caps every process at 8 GiB of address space, half the
+      # runner's 16 GB (#674), here and in every step that mutates. A mutant
+      # that turns a loop infinite *and* allocating (a `Vec::push` that never
+      # stops) fills RAM in seconds, long before the per-mutant timeout, and
+      # the runner got "received a shutdown signal" with no report. Capped,
+      # the test binary dies on its own allocation and cargo-mutants counts
+      # the mutant caught, as long as core dumps are off (`-c 0`, #2230): the
+      # runner's `systemd-coredump` otherwise writes a core as large as the
+      # cap while the process holds its memory, past the test timeout, and a
+      # few in a row took a runner down. `test_limits.py` (`make scripts`)
+      # holds the two together. The cap is per process, so it holds the
+      # runner only while the processes under it cannot sum past its memory:
+      # nextest runs a process per test, `test-threads` of them at once (the
+      # CPU count, 4, by default), and four mutated tests allocating together
+      # would take the runner down at about 4 GiB each. `--test-threads 2`
+      # keeps cap times threads at the runner's 16 GB; the `gpu` group already
+      # allows only 2 renderers at once, so it costs only CPU-bound tests'
+      # overlap. `test_gpu_config.py` (`make scripts`) holds the product.
       #
       # The baseline is held to the budget too (#2201): with none left, or
       # none left once it built, no mutant can run, so the part reads as

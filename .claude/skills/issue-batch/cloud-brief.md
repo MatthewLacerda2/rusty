@@ -67,8 +67,6 @@ nothing to wait for.
 - For a proof run on a draft, dispatch the workflow on the branch instead of
   readying: `gh workflow run ci.yml --ref <branch>` (without `gh`, the GitHub MCP
   `actions_run_trigger` does the same). It runs the gates and nothing else.
-  Never dispatch `mutants-sweep.yml`: that is the full sweep, up to ten runners
-  the batch's gates need.
 - **A run you cite is one you read finished.** Its id, its conclusion, and every
   time or count you quote from it are copied from the completed run (`gh run view
   <id> --json status,conclusion,jobs`, its log), never expected or extrapolated,

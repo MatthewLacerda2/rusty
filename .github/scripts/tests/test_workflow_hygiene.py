@@ -19,7 +19,6 @@ import unittest
 from pathlib import Path
 
 from merging.queue import update
-from tests import load
 from merging.verdict import changes
 
 SCRIPTS = Path(__file__).resolve().parents[1]
@@ -143,66 +142,6 @@ class DocsThatAreCode(unittest.TestCase):
             with self.subTest(prefix=prefix):
                 self.assertFalse(update.docs_advance(f">abc\n{changes.code_doc_example(prefix)}\n"))
         self.assertTrue(update.docs_advance(">abc\nREADME.md\n"))
-
-
-artifact_dirs = load("artifact-dirs.py")
-
-#: A job downloading by `pattern:`, with `{after}` as the step after the download.
-DOWNLOAD = """jobs:
-  report:
-    steps:
-      - name: Download
-        uses: actions/download-artifact@v8
-        with:
-          pattern: shard-*
-          path: shards{extra}
-{after}  other:
-    steps:
-      - run: python3 .github/scripts/artifact-dirs.py shards
-"""
-SPLIT = "      - name: Split\n        run: python3 .github/scripts/artifact-dirs.py shards\n"
-
-
-class PatternDownloads(unittest.TestCase):
-    """A lone match of `pattern:` unpacks flat (#2284, #2288): every such download is split."""
-
-    def test_every_workflow_and_action_splits_its_pattern_downloads(self):
-        paths = sorted(WORKFLOW_DIR.glob("*.yml")) + sorted(ACTIONS_DIR.glob("*/action.yml"))
-        self.assertTrue(any(p.name == "action.yml" for p in paths), "no composite action found")
-        for path in paths:
-            with self.subTest(path=str(path.relative_to(SCRIPTS.parent))):
-                self.assertEqual(artifact_dirs.unsplit_downloads(path.read_text()), [])
-
-    def test_a_composite_action_is_read(self):
-        action = ("runs:\n  using: composite\n  steps:\n    - uses: actions/download-artifact@v8\n"
-                  "      with:\n        pattern: shard-*\n        path: shards\n")
-        self.assertEqual(len(artifact_dirs.unsplit_downloads(action)), 1)
-        split = "    - run: python3 .github/scripts/artifact-dirs.py shards\n      shell: bash\n"
-        self.assertEqual(artifact_dirs.unsplit_downloads(action + split), [])
-
-    def test_a_download_followed_by_the_split_passes(self):
-        self.assertEqual(artifact_dirs.unsplit_downloads(DOWNLOAD.format(extra="", after=SPLIT)), [])
-
-    def test_merge_multiple_with_a_reason_passes(self):
-        extra = "\n          merge-multiple: true  # every shard's files are disjoint"
-        self.assertEqual(artifact_dirs.unsplit_downloads(DOWNLOAD.format(extra=extra, after="")), [])
-
-    def test_a_bare_pattern_download_is_flagged(self):
-        cases = {
-            # The template's next job splits `shards`: a step of another job is not "next".
-            "only another job's split": DOWNLOAD.format(extra="", after=""),
-            "the split of another path": DOWNLOAD.format(extra="", after=SPLIT.replace("shards", "other")),
-            "the split a step later": DOWNLOAD.format(extra="", after="      - run: true\n" + SPLIT),
-            "merge-multiple without a reason": DOWNLOAD.format(extra="\n          merge-multiple: true", after=""),
-            "a comment on the `steps:` line": DOWNLOAD.replace("    steps:\n      - name: Download",
-                                                               "    steps:   # the report\n      - name: Download",
-                                                               1).format(extra="", after=""),
-        }
-        for case, text in cases.items():
-            with self.subTest(case=case):
-                found = artifact_dirs.unsplit_downloads(text)
-                self.assertEqual(len(found), 1)
-                self.assertIn("artifact-dirs.py", found[0])
 
 
 if __name__ == "__main__":

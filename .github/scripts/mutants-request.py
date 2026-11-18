@@ -29,8 +29,7 @@ baseline built it, so a mutant rebuilds only what depends on P.
 - **A large plan is sharded** ([`shards`]): runners enough that each one's
   share ends inside the budget at `MINUTES_PER_MUTANT`, at most `MAX_SHARDS`.
   The merge queue runs two requests at once (`merging/after/slots.CAP`), so
-  mutation holds at most eight runners, below the sweep's ten and clear of
-  the gating CI the batch waits on; a plan past the cap runs at the cap and
+  mutation holds at most eight runners, clear of the gating CI the batch waits on; a plan past the cap runs at the cap and
   its report says what it never reached. A standalone part runs on shard 0
   before the engine's share, so its mutants count toward the sizing too.
   Every shard runs the same per-package invocations with `--shard J/N

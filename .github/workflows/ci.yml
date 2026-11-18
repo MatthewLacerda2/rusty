@@ -3,9 +3,9 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
   # Gates only (#750). Mutation and coverage are signals and have their own
-  # workflows, off pull requests and off every merge: `mutants-sweep.yml` and
-  # `coverage.yml` run weekly, and `mutants-on-request.yml` mutates exactly what
-  # someone names (`make mutants-remote SCOPE=...`). A signal that ran here held
+  # workflows, off pull requests and off every merge: `coverage.yml` runs
+  # weekly, and `mutants-on-request.yml` mutates exactly what someone names
+  # (`make mutants-remote SCOPE=...`), never on a schedule. A signal that ran here held
   # runners the merge queue was waiting on, for a report that could not change
   # whether anything merged.
   push:

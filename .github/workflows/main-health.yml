@@ -5,9 +5,8 @@ name: main-health
 # lives in .github/scripts/main-health.sh.
 #
 # Watched: `ci` and `lint`, the two workflows whose gates guard `main`; the
-# two weekly signals, `mutants-sweep` and `coverage` (#750), which file only
-# when they fail to *run* — main-health.sh says how a finding is told apart;
-# and the nightly `cargo-test` signal (#981, #1338), which files when it goes
+# weekly `coverage` signal (#750), which files only when it fails to *run*
+# (main-health.sh says how a finding is told apart); and the nightly `cargo-test` signal (#981, #1338), which files when it goes
 # red, since its red *is* its finding: a red run
 # is a test that leans on nextest's process-per-test, and its `dead-pub` job's red
 # is that signal producing no report (#1205). There is no `docs` workflow: the rustdoc build is
@@ -24,7 +23,7 @@ name: main-health
 # cancelled run. An informational signal: it never fails this job.
 on:
   workflow_run:
-    workflows: [ci, lint, mutants-sweep, coverage, cargo-test]
+    workflows: [ci, lint, coverage, cargo-test]
     types: [completed]
     branches: [main]
   # Replay any past run to see what this would file. Dry-run by default, so a
@@ -41,7 +40,7 @@ on:
 
 permissions:
   contents: read
-  actions: read   # read the run's jobs and the mutation shards' artifacts
+  actions: read   # read the run's jobs
   issues: write   # open / comment on the tracking issue
 
 # One report per workflow at a time, so two runs racing on the same tracking
