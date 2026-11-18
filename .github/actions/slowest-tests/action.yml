@@ -61,7 +61,7 @@ runs:
         PREFIX: ${{ inputs.prefix }}
         SHARD: ${{ inputs.shard }}
         BASE: ${{ runner.temp }}/slowest-baseline
-        BRANCH: main  # an env value, so a local run can point it at a branch
+        BRANCH: 2350-slow-test-signal  # THROWAWAY probe: the branch's own runs, as main has no shard-named artifacts yet
         RUNS: "3"
         MAX_TRIES: "6"
         MAX_PAGES: "5"
