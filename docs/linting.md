@@ -91,6 +91,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Supply chain | cargo-deny (`make deny`) | **hard gate**: advisories, bans, sources and licenses (`deny.toml`); the license allow-list is read for every dependency and for rusty's own crates, so a member without `license.workspace = true` fails as unlicensed |
 | Tagged engine warnings | `tools/lint -- --rules` (`log-tag`) | **hard gate**: every engine warning or error in `src/` (`log::warn!` / `log::error!`, an imported bare `warn!` / `error!`, `log!` at `Level::Warn`/`Level::Error`) opens its message with its module, `[Asset] …`, since those records reach the console and the session/MCP replies (#1139); a message that is not a literal takes `// lint: allow(log-tag) <why>` |
 | Test / fixture file length | `tools/lint` | <= 150 lines (every measured file under a `tests/` or `fixtures/` directory, whatever its language, a standalone `*_test.rs` or `test_*` file, and a `*_tests.rs` with no source beside it); a `<x>_tests.rs` **sibling** of `<x>.rs` (or of a `<x>/` module directory) shares the 300-line source cap |
+| Test files named for behaviour | `tools/lint -- --rules` (`tool-named-test`) | **hard gate**: a test file whose name starts with `survivor`, `mutant` or `mutation` is renamed for what its tests prove; a module whose subject carries the word takes `// lint: allow(tool-named-test) <why>` on its first line |
 | Test source shape | `tools/lint -- --rules` (`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`) | **hard gate**: no inner `#![cfg]` in `tests/`, no user workspace in tests, a GPU only through `headless_or_skip` (#980) |
 | Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `rusty_test_support::temp::dir()` (in-crate) / `crate::temp::dir()` (`tests/`), never a bare `std::env::temp_dir()` (#999) |
 | Tests | nextest + `cargo test --doc` (`make test`) | **hard gate**: the engine's tests and doctests, both feature sets; the GPU tests run on lavapipe, in the `dev` set (`docs/testing.md`, *Which suite runs the GPU tests*). In CI, `build-test` runs as three parallel jobs, the default suite and the `dev` suite in two shards, each with the timeout to itself (#2264) |
@@ -774,6 +775,13 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   #999). Comment lines never count. The
   helper itself and Unix socket paths (which must stay short) carry an inline
   allow. `tools/` is not scanned: the lint crate's own tests are not the engine's.
+- **`tool-named-test`** — a test belongs beside the behaviour's other tests, under
+  a name that says what it proves, so a file named for the tool that found the gap
+  (`survivors.rs`, `survivor_tests.rs`, `mutants.rs`) fails on its first line: rename
+  it for its tests' subject. Only the file name is checked: whether a test's own
+  name and doc comment speak of behaviour rather than of a mutant or a line number
+  is a judgement the independent review holds, since no pattern tells the two apart
+  (`ci-merge`, *Triaging a survivor*).
 - **The ≲10-files-per-directory signal** prints after the findings: every scanned
   directory holding more than ten source files as `dir-size` counts them, most
   crowded first, leaving out what is past that rule's cap under `src/` (its
