@@ -41,7 +41,6 @@ mod textures;
 
 use std::path::{Path, PathBuf};
 
-use rusty_asset::convert::{cached_gltf, convertible_sources};
 use rusty_core::paths;
 use rusty_core::project::{create_skeleton, is_project, ASSETS_DIR, PROJECT_FILE, SHADERS_DIR};
 use rusty_edit::io::SEED_MANIFEST_PATH;
@@ -65,13 +64,9 @@ pub fn export(out: &Path) -> Result<Exported, String> {
     let out = std::path::absolute(out).map_err(|e| format!("{}: {e}", out.display()))?;
     check(&rusty_core::project::root(), &out)?;
     seed_and_refresh_audio()?;
-    let sources = convertible_sources(Path::new(ASSETS_DIR));
-    for source in &sources {
-        cached_gltf(source).map_err(|e| format!("{}: {e}", source.display()))?;
-    }
     // An image that fails is warned of and ships uncompressed, as Unity builds
-    // with an import error logged.
-    rusty_asset::texture_import::refresh_all(Path::new(ASSETS_DIR));
+    // with an import error logged; a model that fails fails the export.
+    let sources = import(Path::new(ASSETS_DIR))?.sources;
     // A baked shader stale against this engine's shaders is re-baked from its
     // recipe, so the player loads it as shipped (#1638); one that fails is
     // warned of and ships as it is.
@@ -91,6 +86,23 @@ pub fn export(out: &Path) -> Result<Exported, String> {
             }
             Err(e)
         }
+    }
+}
+
+/// Bring the import cache of every model and image under `root` up to date in
+/// place (`asset::convert::import_all`), copying nothing: an export's first step,
+/// and `make import` (`export --import-only`) on its own. A model that fails
+/// fails it, naming each; an image that fails is warned of and stays
+/// uncompressed.
+pub fn import(root: &Path) -> Result<rusty_asset::convert::Imported, String> {
+    let done = rusty_asset::convert::import_all(root)?;
+    match done.failed.as_slice() {
+        [] => Ok(done),
+        failed => Err(failed
+            .iter()
+            .map(|(source, e)| format!("{}: {e}", source.display()))
+            .collect::<Vec<_>>()
+            .join("; ")),
     }
 }
 

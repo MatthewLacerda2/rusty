@@ -5,10 +5,13 @@
 //! Asked for (`IMPORT=1`), once a run: the project is copied into a scratch
 //! folder ([`scratch`]) without its caches: the machine-local `cache/` and the
 //! import cache (`asset::convert::IMPORT_CACHE_DIR`, converted models and
-//! compressed textures), and without `.git`. The run's first scene is loaded
-//! there by the same timed load as `load_ms` (`super::load`), whose Play refresh
-//! converts every model source the project holds, so the figure is the
-//! project's, not that scene's. The project itself is only read. Files are copied,
+//! compressed textures), and without `.git`. The copy is imported there
+//! ([`import`]: every model converted, every image compressed, as `make import`
+//! does), then the run's first scene is loaded by the same timed load as
+//! `load_ms` (`super::load`), and the figure is the two together: the
+//! project's, not that scene's. A headless load compresses no texture itself
+//! (#2319), so without the import step the figure would hold no encoding. The
+//! first import of a large project encodes for minutes. The project itself is only read. Files are copied,
 //! never hard-linked: a load that rewrites a file in place (a model's hull
 //! sidecar) must not reach the original through a shared link.
 
@@ -16,6 +19,14 @@ use std::path::{Path, PathBuf};
 
 use rusty_asset::convert::IMPORT_CACHE_DIR;
 use rusty_core::project::CACHE_DIR;
+
+/// Import the open project's `assets/` (`asset::convert::import_all`), returning
+/// its wall-clock ms: the half of `import_ms` before the load.
+pub fn import() -> Result<f64, String> {
+    let start = std::time::Instant::now();
+    rusty_asset::convert::import_all(Path::new(rusty_core::project::ASSETS_DIR))?;
+    Ok(start.elapsed().as_secs_f64() * 1000.0)
+}
 
 /// What the copy leaves out, relative to the project root.
 const LEFT_OUT: [&str; 3] = [CACHE_DIR, IMPORT_CACHE_DIR, ".git"];

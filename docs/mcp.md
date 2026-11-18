@@ -49,6 +49,13 @@ the session in-process — no subprocess, no async runtime, no extra dependency.
 - `snapshot` — return a JSON snapshot of the live world (entities, components,
   transforms, play state). A convenience wrapper for `Debug.Snapshot()`; no arguments.
 
+**Importing a project** is an `eval` too: `Assets.Refresh()` in edit mode converts every
+model and compresses every image into the project's import cache, saying first that it
+writes there (`docs/api/Assets.md`; during Play it waits for Stop). A headless world
+never compresses a texture on its own, so on a project the editor never opened, run it
+once before measuring memory or load; `make import PROJECT=<dir>` does the same from the
+command line.
+
 **rusty bench** (#942) — the editor's project picker (Unity Hub's Projects page) as
 tools, so an agent manages projects without the window. They share the picker's code
 (`core::project::bench`) and the user's recent list (README § Game projects):

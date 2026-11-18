@@ -25,6 +25,11 @@ impl KindWatch {
         self.uploaded.insert(path.to_owned(), kind);
     }
 
+    /// The kind `path` was first uploaded as, if it was.
+    pub(crate) fn kind_of(&self, path: &str) -> Option<TextureKind> {
+        self.uploaded.get(path).copied()
+    }
+
     /// `path`, already uploaded, is requested as `kind` by `user`. Warns once per
     /// file when `kind` differs from the upload; returns whether it warned.
     pub(crate) fn requested(&mut self, path: &str, kind: TextureKind, user: &str) -> bool {

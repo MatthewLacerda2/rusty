@@ -11,6 +11,7 @@ mod failures;
 mod folder_tag;
 mod gate;
 mod identity;
+mod import_all;
 mod locking;
 mod looks;
 mod notes;
