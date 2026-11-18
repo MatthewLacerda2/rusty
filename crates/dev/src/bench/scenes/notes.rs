@@ -1,5 +1,6 @@
 //! What a scene's report warns of beside its rows: the console errors the bench
-//! logged (with the console kept beside the report), and the bake the scene lacks.
+//! logged (with the console kept beside the report), the bake the scene lacks, and
+//! the textures it drew uncompressed for want of an import.
 
 use std::path::Path;
 
@@ -79,3 +80,23 @@ pub fn unbaked(scene: &Scene) -> Option<String> {
         )
     })
 }
+
+/// The warning for a scene whose textures `found` (`Renderer::uncached_textures`)
+/// were uploaded uncompressed only because the project has no current import
+/// cache for them: a headless run compresses none (`asset::import::import_all`,
+/// #2319), so the scene's memory and load are not what the shipped game's are.
+pub fn uncompressed(found: rusty_render::Uploads) -> Option<String> {
+    let s = if found.count == 1 { "" } else { "s" };
+    (found.count > 0).then(|| {
+        format!(
+            "uploaded uncompressed: {} texture{s}, {:.1} MB (their memory and load cost \
+             is not the shipped one; `make import PROJECT=<dir>` makes their caches)",
+            found.count,
+            found.bytes as f64 / (1024.0 * 1024.0),
+        )
+    })
+}
+
+#[cfg(test)]
+#[path = "notes_tests.rs"]
+mod tests;
