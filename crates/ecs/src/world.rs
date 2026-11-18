@@ -224,16 +224,7 @@ impl World {
     /// `Core::seq` (O(k log k)) restores the insertion order hecs's
     /// per-archetype iteration doesn't provide.
     pub(crate) fn ids_with_component<T: hecs::Component>(&self) -> Vec<u32> {
-        walks::count(std::any::type_name::<T>());
-        let mut matches: Vec<(u64, u32)> = self
-            .inner
-            .query::<&Core>()
-            .with::<&T>()
-            .iter()
-            .map(|(_, core)| (core.seq, core.id))
-            .collect();
-        matches.sort_unstable_by_key(|&(seq, _)| seq);
-        matches.into_iter().map(|(_, id)| id).collect()
+        self.ids_with_component_where::<T>(|_| true) // in `access`
     }
 
     /// Shared borrow of two columns of one entity under a single id lookup.
