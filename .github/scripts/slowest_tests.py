@@ -35,11 +35,13 @@ the pull request that adds a slow test is the one told. Slow tests came back
 within two days of each trim, and a top N with no comparison names nobody. Each
 new one prints `new over 20 s: <test> <seconds> (main: <seconds or absent>)` and
 a `::warning::` annotation the run's checks page shows; one already over the
-budget on `main` prints once as `known`, and one `main` had within `NOISE` of
-it as `near`, unless it is now more than `NOISE` times slower (`is_new`). The
-baseline is every JUnit file under the given paths (searched recursively, so a
-download's layout does not matter), all shards of the same leg and feature set
-together: a `--partition count:` split moves tests between shards whenever the
+budget on `main` prints once as `known`, and one under it there that did not
+grow past `NOISE` times `main`'s time, at the shard's pace, as `near` (`is_new`,
+`pace`). The baseline is each test's longest time in every JUnit file under the
+given paths (searched recursively, so a download's layout does not matter): the
+caller passes `main`'s last three successful full runs, since one run cannot
+tell a slow runner from a slow test, and all shards of the same leg and feature
+set together: a `--partition count:` split moves tests between shards whenever the
 test count changes, so a test absent from one shard's report may sit in the
 other. The caller passes only reports of the job's own feature set, since one
 test runs at different speeds in `default` and `dev` builds. With no readable baseline
@@ -67,11 +69,23 @@ NEXTEST = Path(__file__).resolve().parents[2] / ".config" / "nextest.toml"
 #: over it now and not over it on `main`. 20 s is twenty times the GPU tests'
 #: median on Linux and ten times it on Metal (#2326's run 44315816576).
 BUDGET = 20.0
-#: How far under the budget `main`'s time must be for a test over it now to be
-#: new: a test `main` ran at 17.7 s read 20.2 s on a macOS shard of the same tree
-#: (run 44388240670), so a test that close is runner noise, listed as `near`, not
-#: annotated. 1.3 is the spread between runners and shards.
+#: How much slower than `main`'s longest time a test under the budget there must
+#: run now to be new: a test `main` ran at 17.7 s read 20.2 s on a macOS shard of
+#: the same tree (run 44388240670), so a test that close is runner noise, listed
+#: as `near`, not annotated. 1.3 is the spread between runners and shards once
+#: the shard's own pace is taken out (`pace`).
 NOISE = 1.3
+#: The shard's pace is read over the tests `main` ran for at least this long:
+#: shorter ones are dominated by start-up, not by the runner's speed.
+PACE_FLOOR = 5.0
+#: Fewer such tests than this and the pace is not read (taken as 1).
+PACE_MIN = 10
+#: The pace is this quantile of their now-over-main ratios: a slow runner slows
+#: GPU tests more than the rest, so the median under-reads it (run 44411815116's
+#: `dev 2/2` on an unchanged tree: median 1.46, its slowest GPU tests 2.6 times
+#: `main`'s longest), and the 90th percentile names no test on twenty-one
+#: unchanged or trimmed-only shards (#2350's PR).
+PACE_QUANTILE = 0.9
 
 #: The shape of the `gpu` group's filter: integration tests (`kind(test)`) whose
 #: path matches the first regex, and any test whose name matches the second.
@@ -102,9 +116,9 @@ def cases(xml: str) -> tuple[list[Case], float | None]:
     return found, wall
 
 
-def slowest(xml: str, count: int = 10) -> list[tuple[float, str]]:
-    """The `count` longest `testcase`s, as (seconds, `classname name`), longest first."""
-    rows = [(c.seconds, key(c)) for c in cases(xml)[0]]
+def slowest(found: list[Case], count: int = 10) -> list[tuple[float, str]]:
+    """The `count` longest of `found`, as (seconds, `classname name`), longest first."""
+    rows = [(c.seconds, key(c)) for c in found]
     return sorted(rows, key=lambda c: (-c[0], c[1]))[:count]
 
 
@@ -188,14 +202,27 @@ def baseline(paths: list[str]) -> dict[str, float]:
     return seen
 
 
-def is_new(seconds: float, main: float | None, budget: float = BUDGET) -> bool:
-    """Whether a test over `budget` at `seconds` is new against `main`'s time: absent
-    there, or under the budget there and more than `NOISE` times slower now. Under
-    `budget / NOISE` on `main`, crossing the budget is past the noise already; in
-    the band above it, the time must still grow past the noise, so a test `main`
-    ran at 17.7 s reads `near` at 20.2 s and new at 90 s. Over the budget on `main`
-    it is `known`, however it grew."""
-    return main is None or (main <= budget and seconds > NOISE * main)
+def pace(found: list[Case], main: dict[str, float]) -> float:
+    """How much slower this shard ran than `main`'s longest times: the
+    `PACE_QUANTILE` of now-over-main over the tests `main` ran for `PACE_FLOOR`
+    seconds or more, never under 1; 1 with fewer than `PACE_MIN` of them. A slow
+    runner slows every heavy test at once, so one slow test does not move it; a
+    change that slows most heavy tests is absorbed, and shows in the top N and the
+    accounting instead."""
+    ratios = sorted(c.seconds / main[key(c)] for c in found if main.get(key(c), 0.0) >= PACE_FLOOR)
+    if len(ratios) < PACE_MIN:
+        return 1.0
+    return max(1.0, quantile(ratios, PACE_QUANTILE))
+
+
+def is_new(seconds: float, main: float | None, budget: float = BUDGET, shard_pace: float = 1.0) -> bool:
+    """Whether a test over `budget` at `seconds` is new against `main`'s longest
+    time: absent there, or under the budget there and more than `NOISE` times
+    slower now than `main` at this shard's pace. A test `main` ran at 17.7 s reads
+    `near` at 20.2 s and new at 90 s; on a shard running at twice `main`'s pace,
+    one `main` ran at 8.5 s is `near` at 21.6 s. Over the budget on `main` it is
+    `known`, however it grew."""
+    return main is None or (main <= budget and seconds > NOISE * shard_pace * main)
 
 
 def signal(found: list[Case], main: dict[str, float] | None, why: str = "",
@@ -206,16 +233,19 @@ def signal(found: list[Case], main: dict[str, float] | None, why: str = "",
     b = f"{budget:g} s"
     if main is None:
         return [f"no baseline: {why}", *(f"over {b}: {key(c)} {c.seconds:.1f} s" for c in over)]
-    new = [c for c in over if is_new(c.seconds, main.get(key(c)), budget)]
+    shard_pace = pace(found, main)
+    new = [c for c in over if is_new(c.seconds, main.get(key(c)), budget, shard_pace)]
     lines = [f"new over {b}: {key(c)} {c.seconds:.1f} s (main: "
              f"{f'{main[key(c)]:.1f} s' if key(c) in main else 'absent'})" for c in new]
+    annotations = [f"::warning title=New test over {b}::{line}" for line in lines]
     if not new:
         lines.append(f"new over {b}: none (against {len(main)} tests of main)")
     for c in (c for c in over if c not in new):
         kind = "known" if main[key(c)] > budget else "near"
         lines.append(f"{kind} over {b}: {key(c)} {c.seconds:.1f} s (main: {main[key(c)]:.1f} s)")
-    lines += [f"::warning title=New test over {b}::{line}" for line in lines[:len(new)]]
-    return lines
+    lines.append(f"pace: {shard_pace:.2f} times main's longest, so new means over {NOISE * shard_pace:.2f} "
+                 f"times main (`slowest_tests.pace`)")
+    return lines + annotations
 
 
 def main(argv: list[str], config: Path = NEXTEST, cores: int | None = None) -> int:
@@ -229,7 +259,6 @@ def main(argv: list[str], config: Path = NEXTEST, cores: int | None = None) -> i
     try:
         with open(path, encoding="utf-8") as report:
             xml = report.read()
-        rows = slowest(xml, args.count)
         found, wall = cases(xml)
     except (OSError, UnicodeDecodeError, ET.ParseError) as err:
         print(f"no timings: {path}: {err}")
@@ -239,6 +268,7 @@ def main(argv: list[str], config: Path = NEXTEST, cores: int | None = None) -> i
             print(*signal(found, baseline(args.baseline)), sep="\n")
         except ValueError as err:
             print(*signal(found, None, str(err)), sep="\n")
+    rows = slowest(found, args.count)
     print(f"the {len(rows)} slowest tests in {path}:")
     for seconds, name in rows:
         print(f"{seconds:9.3f}s  {name}")

@@ -25,11 +25,11 @@ REPORT = """<?xml version="1.0" encoding="UTF-8"?>
 
 class Slowest(unittest.TestCase):
     def test_the_longest_come_first_and_the_list_is_capped(self):
-        self.assertEqual(slowest_tests.slowest(REPORT, 3),
+        self.assertEqual(slowest_tests.slowest(slowest_tests.cases(REPORT)[0], 3),
                          [(96.5, "rusty a::slow"), (12.0, "main gpu::frame"), (4.2, "rusty a::middle")])
 
     def test_a_case_without_a_time_is_skipped(self):
-        names = [name for _, name in slowest_tests.slowest(REPORT, 10)]
+        names = [name for _, name in slowest_tests.slowest(slowest_tests.cases(REPORT)[0], 10)]
         self.assertEqual(len(names), 4)
         self.assertNotIn("rusty a::untimed", names)
 

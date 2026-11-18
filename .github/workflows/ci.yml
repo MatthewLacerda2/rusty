@@ -334,6 +334,7 @@ jobs:
       # (#2350). `prefix` and the shard's name are the upload's below.
       - name: Slowest tests
         if: always() && needs.changes.outputs.code != 'false'
+        id: slowest
         continue-on-error: true
         uses: ./.github/actions/slowest-tests
         with:
@@ -343,20 +344,15 @@ jobs:
           shard: ${{ matrix.shard }}
       # The report itself, for a week, so a shard's timings can be re-read after
       # the job (#2326) and the next PR's run compares against it (#2350). Named
-      # by the shard, `1/2` as `1of2` (`/` is refused in a name), not by the
-      # entry's index, which is not the shard; a re-run job overwrites its own.
-      - name: Shard name
-        if: always() && needs.changes.outputs.code != 'false'
-        id: shard
-        env:
-          SHARD: ${{ matrix.shard }}
-        run: echo "name=${SHARD/\//of}" >> "$GITHUB_OUTPUT"
+      # by the shard (`1of2`), not by the entry's index, which is not the shard:
+      # the composite above builds the name the lookup reads, and outputs it
+      # here. A re-run job overwrites its own.
       - name: Upload the JUnit report
         if: always() && needs.changes.outputs.code != 'false'
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
-          name: junit-build-test-${{ matrix.features }}-${{ steps.shard.outputs.name }}
+          name: ${{ steps.slowest.outputs.name }}
           path: junit-*.xml
           if-no-files-found: ignore
           retention-days: 7
@@ -482,24 +478,19 @@ jobs:
       # newly over the budget against `main`'s Metal reports (#2350).
       - name: Slowest tests
         if: always()
+        id: slowest
         continue-on-error: true
         uses: ./.github/actions/slowest-tests
         with:
           report: junit-dev.xml
           prefix: junit-build-test-cross-${{ matrix.os }}
           shard: ${{ matrix.shard }}
-      - name: Shard name
-        if: always()
-        id: shard
-        env:
-          SHARD: ${{ matrix.shard }}
-        run: echo "name=${SHARD/\//of}" >> "$GITHUB_OUTPUT"
       - name: Upload the JUnit report
         if: always()
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
-          name: junit-build-test-cross-${{ matrix.os }}-${{ steps.shard.outputs.name }}
+          name: ${{ steps.slowest.outputs.name }}
           path: junit-*.xml
           if-no-files-found: ignore
           retention-days: 7

@@ -293,13 +293,16 @@ its check and its command changed to match).
   on `main` files an issue by itself (`ci_headroom.py`, `docs/linting.md`). See *The test runner* below.
 - **A pull request that adds a slow test is told** (#2350). Each suite job's *Slowest
   tests* step first compares its report with the reports of the same leg and feature
-  set from `main`'s latest successful run that kept every shard's (every shard
-  together, since a `count:` partition moves tests between shards), and names that
-  run, its date and commit: a test merged after it reads as new. A test over 20 s
-  (`slowest_tests.BUDGET`) that `main` had under it, or lacked, prints `new over 20 s:
-  <test> <seconds> (main: <seconds or absent>)` and a warning annotation on the PR's
-  checks; one over it on both sides prints once as `known`, and one `main` had within
-  runner noise of it (`NOISE`, 1.3×) as `near`, unless it is now more than 1.3× slower
+  set from `main`'s last three successful runs that kept every shard's (every shard
+  together, since a `count:` partition moves tests between shards), holds each test
+  to its longest time over them, and names those runs, their dates and commits: a
+  test merged after them reads as new. A test over 20 s (`slowest_tests.BUDGET`)
+  that `main` had under it, or lacked, prints `new over 20 s: <test> <seconds> (main:
+  <seconds or absent>)` and a warning annotation on the PR's checks when it is more
+  than 1.3× (`NOISE`) `main`'s time at the shard's pace: how much slower than
+  `main` the shard ran its heavy tests (`slowest_tests.pace`, printed as `pace:`),
+  so a runner slow across the shard does not name what it slowed; one over it on both sides prints once as `known`,
+  and one under it on `main` that did not grow that far as `near`
   (`slowest_tests.is_new`). With no baseline (expired, a renamed entry) it says `no baseline: <why>` and
   lists the tests over the budget. It informs, never gates, and exempts nothing: a test
   that needs the time says why in its PR; one that does not is trimmed against what it

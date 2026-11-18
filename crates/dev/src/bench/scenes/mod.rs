@@ -204,7 +204,7 @@ pub fn bench(
 }
 
 /// Load `scene` of the project at `root` as Play does and draw its first frame
-/// at `size` (the harness's out dir `out_dir`), returning the harness and the
+/// at `opts.size` (the harness's out dir `out_dir`), returning the harness and the
 /// load's wall-clock ms. Timed: the harness's own set-up (its Lua VM and API, the
 /// stats), the scene's document, sidecar and navmesh bake, Play's refresh of the
 /// project's converted sources (a cache check when the import cache is warm, the

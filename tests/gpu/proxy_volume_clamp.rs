@@ -9,14 +9,17 @@
 
 use glam::Vec3;
 use rusty::components::{LightProbeProxyVolumeComponent, ProxyBoundsMode, ProxyResolutionMode};
+use rusty::dev::capture::CaptureHost;
 use rusty::scene::Scene;
 
 use super::proxy_volume_screenshot::top_and_foot;
 
 /// With a `Custom` box over the top quarter of the `locker` in the baked room
 /// `scene`, its foot, outside the box, reads the lit box's bottom face, well over
-/// `single_foot`, the foot its one probe sample gives.
+/// `single_foot`, the foot its one probe sample gives; drawn through the caller's
+/// `host`.
 pub(super) fn a_foot_outside_a_custom_box_reads_the_box_s_face_not_the_single_sample(
+    host: &mut CaptureHost,
     scene: &mut Scene,
     locker: u32,
     single_foot: f64,
@@ -33,7 +36,7 @@ pub(super) fn a_foot_outside_a_custom_box_reads_the_box_s_face_not_the_single_sa
     scene
         .world
         .set_light_probe_proxy_volume(locker, Some(volume));
-    let (top, foot) = top_and_foot(scene, "clamp_box");
+    let (top, foot) = top_and_foot(host, scene, "clamp_box");
     eprintln!("[proxy clamp] single foot={single_foot:.1}; boxed top={top:.1} foot={foot:.1}");
     assert!(
         foot > single_foot + 5.0,
