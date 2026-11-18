@@ -34,6 +34,7 @@ use super::super::{EffectCx, Gpu, LdrRun, Pass};
 use crate::gpu::bind_entry as entry;
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::{texture_entry, uniform_entry};
+use crate::gpu::ops::{CountedDevice as _, CountedQueue as _};
 use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::{PfxTarget, PostFx, PostFxContext};
@@ -202,8 +203,8 @@ impl Sharpen {
             .pipeline(format)
             .expect("an RCAS pipeline for the format");
         let knobs = [rcas_sharpness(strength), 0.0, 0.0, 0.0];
-        queue.write_buffer(params, 0, bytemuck::bytes_of(&RcasParams { knobs }));
-        let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        queue.counted_write_buffer(params, 0, bytemuck::bytes_of(&RcasParams { knobs }));
+        let group = device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("RCAS Bind Group"),
             layout: &self.layout,
             entries: &[

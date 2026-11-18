@@ -21,6 +21,7 @@ mod statics;
 mod sweeps;
 mod uniform;
 
+use crate::gpu::ops::CountedQueue as _;
 use crate::gpu::pipelines::surface::SurfaceShaders;
 use crate::gpu::pipelines::winding::Facing;
 use crate::gpu::pipelines::LazyPipeline;
@@ -240,13 +241,13 @@ impl ShadowRenderer {
             time,
             ..bytemuck::Zeroable::zeroed()
         };
-        queue.write_buffer(&self.time_buffer, 0, bytemuck::bytes_of(&uniform));
+        queue.counted_write_buffer(&self.time_buffer, 0, bytemuck::bytes_of(&uniform));
     }
 
     /// Adopt this frame's `cascades` and upload their light-space matrices.
     pub fn update_cascades(&mut self, queue: &wgpu::Queue, cascades: Vec<Cascade>) {
         for (i, cascade) in cascades.iter().enumerate() {
-            queue.write_buffer(
+            queue.counted_write_buffer(
                 &self.light_space_buffer,
                 i as u64 * LIGHT_SPACE_STRIDE,
                 bytemuck::bytes_of(&cascade.light_space.to_cols_array()),

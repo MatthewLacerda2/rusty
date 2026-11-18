@@ -3,6 +3,7 @@
 
 use crate::draw::batch::OpaqueBatches;
 use crate::gpu::global_group::GlobalGroup;
+use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
 use crate::gpu::pipelines::surface::SolidPass;
 use crate::gpu::pipelines::PrimedPipelines;
 use crate::ibl::skybox::SkyTargets;
@@ -140,7 +141,7 @@ impl Renderer {
 
         // 6. Submit the scene pass (it filled the HDR target + depth). Particles +
         // post-FX run from the per-camera loop in `draw`.
-        self.queue.submit(std::iter::once(encoder.finish()));
+        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 
     /// Record the main scene pass (solids, skybox) into `encoder`.
@@ -155,7 +156,7 @@ impl Renderer {
         let velocity = view.post_fx.motion.target_view();
         let primed = self.prime_depth(view, frame);
         let targets = scene_targets(view, frame);
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let mut render_pass = encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
             multiview_mask: None,
             label: Some("Scene Render Pass"),
             color_attachments: &targets,

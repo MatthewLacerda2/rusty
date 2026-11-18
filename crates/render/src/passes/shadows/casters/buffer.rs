@@ -10,6 +10,7 @@ use crate::gpu::draw_buffers::{
     joint_array_bytes, uniform_array_bytes, JointMatrix, UNIFORM_STRIDE,
 };
 use crate::gpu::grow_buffer::GrowBuffer;
+use crate::gpu::ops::CountedDevice as _;
 use crate::gpu::uniforms::MappingUniform;
 use crate::passes::shadows::clips::{Clip, Cutout};
 use crate::passes::shadows::setup::{
@@ -186,7 +187,7 @@ fn caster_group(
             resource: buffer.buffer().as_entire_binding(),
         }
     }
-    device.create_bind_group(&wgpu::BindGroupDescriptor {
+    device.counted_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Shadow Caster Bind Group"),
         layout,
         entries: &[

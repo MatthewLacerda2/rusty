@@ -11,6 +11,14 @@ use crate::{RenderView, Renderer};
 use rusty_scene::{LightType, Scene};
 
 impl Renderer {
+    /// Start a render's clocks: the GPU timer's frame, and the GPU call counts
+    /// (`gpu::ops`) from zero, so what was counted before the render (setup, a
+    /// warm-up, the last frame's timer resolve) belongs to no frame.
+    pub(crate) fn begin_frame_clocks(&mut self) {
+        self.gpu_timer.begin_frame();
+        crate::gpu::ops::take();
+    }
+
     /// Start a frame's counters: the light counts, and an empty shadow-draw log.
     pub(crate) fn begin_counters(&mut self, scene: &Scene) {
         let (lights, lights_dropped) = count_lights(scene);
@@ -66,6 +74,18 @@ impl Renderer {
         c.uploads = std::mem::take(&mut self.uploads);
         c.uploads
             .add_all(std::mem::take(&mut self.lightmaps.uploads));
+        c.ops = crate::gpu::ops::take();
+    }
+}
+
+impl RenderCounters {
+    /// Add a set of indexed draws — `(num_indices, instances)` per draw call — to the
+    /// counts. An instanced draw is one call but submits every instance's triangles.
+    pub(crate) fn add_draws(&mut self, draws: impl IntoIterator<Item = (u32, u32)>) {
+        for (indices, instances) in draws {
+            self.draw_calls += 1;
+            self.triangles += u64::from(indices / 3) * u64::from(instances);
+        }
     }
 }
 
