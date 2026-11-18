@@ -1,4 +1,5 @@
 """GitHub over REST, the way every script here reaches it (#970).
+# Throwaway proof line for #2333: a decider change runs in full (never merged).
 
 `gh pr …`, `gh issue …` and `gh repo …` speak GraphQL, and a Claude Code cloud
 session's proxy answers GraphQL with a 403 — while cloud sessions are the
