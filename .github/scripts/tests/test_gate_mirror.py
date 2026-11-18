@@ -75,6 +75,19 @@ class Today(unittest.TestCase):
         self.assertEqual(gate_mirror.brief_misses_heavy(text, brief), [])
         self.assertEqual(gate_mirror.brief_misses_heavy(text, brief.replace("make doc fuzz-check deny", "make fuzz-check deny")), ["doc"])
 
+    def test_the_default_suites_filter_is_in_both_or_flagged(self):
+        makefile = (
+            "TEST := cargo nextest run --locked\nDEFAULT_SUITE := -E 'not group(gpu)'\n"
+            "GATES := test\n\n"
+            "test: ## [gate] test\n\t$(TEST) $(DEFAULT_SUITE)\n")
+        step = "jobs:\n  t:\n    steps:\n      - name: Test\n        run: {}\n"
+        same = "cargo nextest run --profile ci --locked -E 'not group(gpu)'"
+        self.assertEqual(gaps(makefile, step.format(same)), [])
+        self.assertEqual(gaps(makefile, step.format("cargo nextest run --profile ci --locked")),
+                         [("test", "cargo nextest run --locked -E 'not group(gpu)'")])
+        self.assertEqual(gaps(makefile.replace(" $(DEFAULT_SUITE)", ""), step.format(same)),
+                         [("test", "cargo nextest run --locked")])
+
     def test_clippy_adds_only_deny_warnings(self):
         gates, ci = gate_mirror.load()
         local = [c for cmds in gates.values() for c in cmds]

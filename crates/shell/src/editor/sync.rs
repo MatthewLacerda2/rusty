@@ -95,6 +95,7 @@ fn windowed_stats(game: &GameWorld) -> Option<rusty_core::frame_stats::FrameStat
     Some(window)
 }
 
+// lint: allow(gpu-default-only) ship stub: frame stats are dev-only; nothing is drawn
 #[cfg(not(feature = "dev"))]
 fn windowed_stats(_game: &GameWorld) -> Option<rusty_core::frame_stats::FrameStats> {
     None

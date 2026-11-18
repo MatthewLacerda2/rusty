@@ -226,6 +226,7 @@ pub(crate) fn drain_commands(shell: &mut crate::Shell, game: &GameWorld) {
 }
 
 /// No command channel in ship builds.
+// lint: allow(gpu-default-only) ship stub: no command channel to drain; nothing is drawn
 #[cfg(not(feature = "dev"))]
 pub(crate) fn drain_commands(_shell: &mut crate::Shell, _game: &GameWorld) {}
 

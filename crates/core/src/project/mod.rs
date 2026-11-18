@@ -196,6 +196,7 @@ pub(crate) fn prepare(dir: &Path, access: Access) -> Result<(Opened, Vec<String>
     let (engine, file, lines) = match access {
         Access::Edit => {
             let (engine, file, mut lines) = file::record(&root)?;
+            // lint: allow(gpu-default-only) the agent guide a project is given; nothing is drawn from it
             lines.extend(agent::write(&root, cfg!(feature = "dev")));
             (engine, file, lines)
         }
