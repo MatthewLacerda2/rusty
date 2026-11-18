@@ -281,7 +281,8 @@ its check and its command changed to match).
 - CI (`.github/workflows/ci.yml`) and `make test` run the engine suite with
   **cargo-nextest** plus `cargo test --doc`, both feature sets; the lint xtask keeps
   plain `cargo test`. On Linux, `build-test` is a matrix of three parallel jobs
-  (#2264): `build-test (default, 1/1)` runs the default suite, and `build-test (dev,
+  (#2264): `build-test (default, 1/1)` runs the default suite (all but the `gpu` group,
+  which the `dev` suite runs: *Which suite runs the GPU tests*), and `build-test (dev,
   1/2)` and `(dev, 2/2)` split the `dev` one with nextest's `--partition count:k/2`;
   each prints its twenty slowest tests and where its time went, the `gpu` group's test-seconds over its cap against the rest's over the runner's cores beside the shard's wall, per binary (step *Slowest tests*; the macOS shards print ten), keeps its JUnit report as a 7-day `junit-*` artifact, and each runs the GPU and
   OIDN canaries again on its own runner (step *Canaries*), since a partition puts each
@@ -408,7 +409,8 @@ variable, which every test process and every child it starts inherits, and which
 blanks the keys too, so a spawn the lint cannot see (`cargo run --bin`, a built path)
 holds none under nextest. Doctests stay on `cargo test --doc`, which nextest
 cannot run. CI's `ci` profile additionally writes JUnit, rendered as each
-`build-test` job's summary.
+`build-test` job's summary; the `default-features` profile, the default-feature run's
+locally and in CI, leaves the `gpu` group to the `dev` run and writes the same report.
 
 Handy forms: `cargo nextest run -E 'test(physics_)'` (filter by name),
 `cargo nextest list` (what would run), `cargo nextest show-config test-groups`
@@ -571,8 +573,24 @@ Where they actually run is not uniform, and it is worth knowing before you rely 
 
 | CI job | Adapter | GPU tests |
 |---|---|---|
-| `build-test` (ubuntu) | Mesa **lavapipe** (software Vulkan, #489) | run, on the CPU |
+| `build-test (dev, k/2)` (ubuntu) | Mesa **lavapipe** (software Vulkan, #489) | run, on the CPU |
+| `build-test (default, 1/1)` (ubuntu) | lavapipe | compiled, not run, but the canary |
 | `build-test-cross` (macos) | real Metal GPU | run, against real VRAM |
+
+### Which suite runs the GPU tests
+The `dev` suite (#2352). The default-feature suite, `make test`'s first pass and CI's
+`build-test (default, 1/1)`, runs nextest's `default-features` profile
+(`.config/nextest.toml`): it **compiles every test target** of the default build, so a
+default-only build break still fails, and runs every test except the `gpu` group.
+`--features dev` only adds to the default features, so the `dev` run builds each of
+those GPU tests too; what it cannot see is code that exists only *without* `dev`, and
+none of that reaches a rendered path (the `cfg(not(feature = "dev"))` code sits in the
+editor's and shell's UI and the script crate's namespaces; the `dev`-only render code is
+additive: test hooks, bench levels, the window's GPU timestamps). A render change that
+adds such code puts its GPU tests back in the default run. The adapter canary still runs
+in the default entry (step *Canaries*), so a runner that lost lavapipe fails there too.
+nextest refuses `group()` in a default filter, so the profile spells the group's
+filter out negated; `make scripts` fails when the two differ (`test_gpu_config.py`).
 
 **CI requires an adapter.** Every workflow job that runs the suite (nextest,
 `cargo test` other than `--doc`, `llvm-cov`, `mutants`) sets `RUSTY_REQUIRE_GPU=1`, and
@@ -638,8 +656,8 @@ seen failing on the third, by whoever runs `make test` there next.
   seam), not the code, and wants a fixture without them, not a wider bar. For a ratio
   between two renders, take it on every adapter first: its spread is what the bar must
   sit under.
-- **One adapter, one command**: `make test-gpu` runs the GPU group alone, both feature
-  sets, on lavapipe when its Vulkan driver is installed (`lvp_icd` under
+- **One adapter, one command**: `make test-gpu` runs the GPU group alone, in the `dev`
+  feature set (the suite that runs it, above), on lavapipe when its Vulkan driver is installed (`lvp_icd` under
   `/usr/share/vulkan/icd.d/`: Arch's `vulkan-swrast`, Debian's `mesa-vulkan-drivers`),
   else on the machine's own; `ADAPTER=nvidia` (any part of
   an adapter's name, case ignored) picks another. Under it sits wgpu's own

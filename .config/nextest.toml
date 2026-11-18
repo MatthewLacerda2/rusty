@@ -59,3 +59,16 @@ success-output = "final"
 [profile.ci]
 [profile.ci.junit]
 path = "junit.xml"
+
+# The default-feature suite (`make test`'s first pass, CI's `build-test (default, 1/1)`):
+# every test but the gpu group, which the `dev` suite runs. `--features dev` only adds
+# to the default features, so the dev run renders a superset of what this one would;
+# every test target is still compiled here, so a default-only build break still fails
+# (docs/testing.md, *Which suite runs the GPU tests*). `group()` is not allowed in a
+# default filter, so this is the gpu group's filter negated, and
+# `.github/scripts/tests/test_gate_mirror.py` holds the two equal. It carries the JUnit
+# report too, so `make test` and CI run the one command.
+[profile.default-features]
+default-filter = "not ((kind(test) & test(/^gpu::/)) | test(/(^|::)gpu_[^:]*$/))"
+[profile.default-features.junit]
+path = "junit.xml"

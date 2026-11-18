@@ -186,13 +186,14 @@ doc: ## [gate] Rustdoc with warnings denied, both feature sets
 
 # All four runs go on when one fails, as nextest does inside a run (fail-fast off), so
 # one `make test` reports every failure: each run under its own header, and the last
-# line names the runs that failed.
-test: ## [gate] Engine tests (nextest) and doctests, both feature sets, on the gates' proptest seed
+# line names the runs that failed. The default pass leaves the gpu group to the dev
+# pass (`.config/nextest.toml`'s `default-features` profile, as CI's default entry).
+test: ## [gate] Engine tests (nextest) and doctests, both feature sets (the GPU tests in dev's), on the gates' proptest seed
 	@command -v cargo-nextest >/dev/null 2>&1 || { \
 		echo "test: cargo-nextest is not installed — cargo install --locked cargo-nextest"; exit 1; }
 	@failed=; \
 	echo "== make test: nextest (default)"; \
-	$(TEST) || failed="$$failed, nextest (default)"; \
+	$(TEST) --profile default-features || failed="$$failed, nextest (default)"; \
 	echo "== make test: nextest (dev)"; \
 	$(TEST) --features dev || failed="$$failed, nextest (dev)"; \
 	echo "== make test: doctests (default)"; \
@@ -206,17 +207,14 @@ test: ## [gate] Engine tests (nextest) and doctests, both feature sets, on the g
 # on a real GPU is told from the change in one command, else the machine's own.
 # ADAPTER=<part of a name> picks another (`nvidia`, `llvmpipe`); RUSTY_REQUIRE_GPU
 # makes "no adapter of that name" a failure, and the canary prints which one ran.
-# Both feature sets run even when the first fails, and the exit says if either did.
+# The `dev` set only, as the gates run the group (docs/testing.md, *Which suite runs
+# the GPU tests*): `dev` adds to the default features, so it builds their GPU tests too.
 ADAPTER ?= $(if $(wildcard /usr/share/vulkan/icd.d/lvp_icd*.json),llvmpipe,)
 # `group(gpu)`: the tests .config/nextest.toml puts in its gpu group, so the naming
 # rule stays written in that one file.
 GPU_TESTS := -E 'group(gpu)'
-test-gpu: ## The GPU tests alone, both feature sets, on ADAPTER (lavapipe when installed)
-	@rc=0; \
-	export RUSTY_REQUIRE_GPU=1 WGPU_ADAPTER_NAME='$(ADAPTER)'; \
-	$(TEST) $(GPU_TESTS) || rc=1; \
-	$(TEST) --features dev $(GPU_TESTS) || rc=1; \
-	exit $$rc
+test-gpu: ## The GPU tests alone (the dev feature set's), on ADAPTER (lavapipe when installed)
+	RUSTY_REQUIRE_GPU=1 WGPU_ADAPTER_NAME='$(ADAPTER)' $(TEST) --features dev $(GPU_TESTS)
 
 # Fresh proptest seeds, as the nightly draws (#1852): a signal, never a gate. A case
 # it finds is written to proptest-regressions/ and committed with its fix

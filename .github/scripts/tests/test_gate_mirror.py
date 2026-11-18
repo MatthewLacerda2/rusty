@@ -75,6 +75,15 @@ class Today(unittest.TestCase):
         self.assertEqual(gate_mirror.brief_misses_heavy(text, brief), [])
         self.assertEqual(gate_mirror.brief_misses_heavy(text, brief.replace("make doc fuzz-check deny", "make fuzz-check deny")), ["doc"])
 
+    def test_the_default_suites_profile_is_in_both_or_flagged(self):
+        gates, ci = gate_mirror.load()
+        make = (gate_mirror.ROOT / "Makefile").read_text().replace(" --profile default-features", "", 1)
+        self.assertEqual(gate_mirror.missing(gates, ci), [])
+        self.assertIn(("test", "cargo nextest run --locked"),
+                      gate_mirror.missing(gate_mirror.makefile_gates(make), ci))
+        self.assertIn(("test", "cargo nextest run --locked --profile default-features"),
+                      gate_mirror.missing(gates, [c.replace("default-features", "ci") for c in ci]))
+
     def test_clippy_adds_only_deny_warnings(self):
         gates, ci = gate_mirror.load()
         local = [c for cmds in gates.values() for c in cmds]

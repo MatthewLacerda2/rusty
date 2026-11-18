@@ -272,12 +272,15 @@ jobs:
       # below. It does not run doctests, hence the `--doc` step. A matrix entry
       # runs one of the two test steps, under its own name: the scripts look for
       # each by name (`proved_tree.BUILT`, `verdict.changes.DRIFT_STEP_WORDS`).
+      # The default entry runs the `default-features` profile: every test target
+      # compiled, every test run but the `gpu` group, which the `dev` shards run
+      # (a superset build); its JUnit report is that profile's (#2352).
       - name: Test (engine, default)
         if: needs.changes.outputs.code != 'false' && matrix.features == 'default'
         run: |
           rc=0
-          cargo nextest run --profile ci --locked --partition "count:${{ matrix.shard }}" || rc=$?
-          cp target/nextest/ci/junit.xml junit-default.xml || true
+          cargo nextest run --profile default-features --locked --partition "count:${{ matrix.shard }}" || rc=$?
+          cp target/nextest/default-features/junit.xml junit-default.xml || true
           exit "$rc"
       - name: Test (engine, dev features)
         if: needs.changes.outputs.code != 'false' && matrix.features == 'dev'
