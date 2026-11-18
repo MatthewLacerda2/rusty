@@ -231,7 +231,10 @@ impl HitPyramids {
         pass: &PyramidPass,
         timer: &GpuTimer,
     ) {
-        let last = self.steps.len().saturating_sub(1);
+        // A pair is only taken for passes that will write it: none at one level.
+        let Some(last) = self.steps.len().checked_sub(1) else {
+            return;
+        };
         let (mut open, mut close) = match last {
             0 => (timer.writes(GpuPass::SsrPyramids), None),
             _ => timer.render_span(GpuPass::SsrPyramids),
