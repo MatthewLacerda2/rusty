@@ -10,7 +10,7 @@ use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// What each still frame after the first makes, at the default settings (measured on
-/// lavapipe): the sun's four dynamic cascade passes, Hi-Z phase one, the
+/// lavapipe, held on CI's Metal): the sun's four dynamic cascade passes, Hi-Z phase one, the
 /// scene pass and two post-FX passes; the pyramid and the cull's compute passes; and
 /// three bind groups the post chain rebuilds every frame (its IO group for each of
 /// its two passes, its effect textures for one), today's number, pinned so one
