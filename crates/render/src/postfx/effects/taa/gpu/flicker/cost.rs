@@ -70,12 +70,12 @@ fn survival(
 }
 
 /// How much of a repeated flash the anti-flicker keeps, against URP's: the first
-/// two flashes at least [`FIRST`] (no hold before a blink recurs); from the fourth
-/// on, flashes `period` frames apart under `value` keep [`HELD`]'s share, within
-/// [`BAND`]. Measured on lavapipe, flash by flash: at 1, every 6 frames 100 % 100 %
-/// 10 % 9 % 9 % 9 %, every 10 100 % 100 % 40 % 25 % 25 % 25 % (RTX 2060: the same,
-/// to the percent); at 0.5 (the default), every 6 100 % 100 % 30 % 12 % 12 % 13 %,
-/// every 10 100 % 100 % 70 % 59 % 58 % 58 % (RTX 2060: the same, to the percent).
+/// two flashes at least [`FIRST`] (no hold before a blink recurs); the fourth and
+/// fifth (`kept[3..]`), flashes `period` frames apart under `value`, keep
+/// [`HELD`]'s share, within [`BAND`]. Measured on lavapipe, flash by flash: at 1,
+/// every 6 frames 100 % 100 % 10 % 9 % 9 %, every 10 100 % 100 % 40 % 25 % 25 %;
+/// at 0.5 (the default), every 6 100 % 100 % 30 % 12 % 12 %, every 10 100 % 100 %
+/// 70 % 59 % 58 %. An RTX 2060 read the same to the percent, over six flashes.
 const FIRST: f32 = 0.95;
 const HELD: [(f32, u32, f32); 4] = [
     (DEFAULT, 6, 0.12),
@@ -125,7 +125,11 @@ pub(super) fn noise_room() -> Scene {
 /// How long a lone flash's end stays on the noise ceiling at render `scale`: per
 /// frame after the flash, the most any tile still sits off the flash-free run at
 /// anti-flicker `value` (0 is URP's). It reads one frame past [`AFTERGLOW`], so an
-/// end held longer still shows as over it.
+/// end held longer still shows as over it. That gives a longer window's verdict
+/// only while the frames over a level form one unbroken run from the flash: an
+/// end that dipped under at the window's last frame and came back over after it
+/// would pass here and fail a longer window. Nothing here checks the run is
+/// unbroken: this test bounds the cost, it does not guard the hold's shape.
 fn afterglow(r: &mut Renderer, scale: f32, value: f32) -> Vec<f32> {
     let frames = AT + 1 + AFTERGLOW as u32 + 1;
     let flash = |s: &mut Scene, f: u32| lamp(s, "Flash", (f == WARM + AT).then_some(30.0));

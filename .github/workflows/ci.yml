@@ -310,8 +310,9 @@ jobs:
       # `gpu` group against the rest, per binary), in the log where an agent
       # reads them (#1976, #2326): the job summary is not served by the REST API
       # a cloud session reads, and nextest's log names only tests past a minute.
-      # First, the tests over the budget that `main`'s Linux reports had under
-      # it, annotated, so the PR that adds a slow test is told (#2350).
+      # First, the tests over the budget that `main`'s reports of this feature
+      # set had under it, annotated, so the PR that adds a slow test is told
+      # (#2350). `prefix` and the shard's name are the upload's below.
       - name: Slowest tests
         if: always() && needs.changes.outputs.code != 'false'
         continue-on-error: true
@@ -319,7 +320,8 @@ jobs:
         with:
           report: junit-${{ matrix.features }}.xml
           count: "20"
-          patterns: ${{ matrix.features == 'default' && 'junit-no-such-artifact-*' || 'junit-build-test-default-* junit-build-test-dev-*' }}
+          prefix: ${{ matrix.features == 'default' && 'junit-no-such-artifact' || format('junit-build-test-{0}', matrix.features) }}
+          shard: ${{ matrix.shard }}
       # The report itself, for a week, so a shard's timings can be re-read after
       # the job (#2326) and the next PR's run compares against it (#2350). Named
       # by the shard, `1/2` as `1of2` (`/` is refused in a name), not by the
@@ -465,7 +467,8 @@ jobs:
         uses: ./.github/actions/slowest-tests
         with:
           report: junit-dev.xml
-          patterns: junit-build-test-cross-${{ matrix.os }}-*
+          prefix: junit-build-test-cross-${{ matrix.os }}
+          shard: ${{ matrix.shard }}
       - name: Shard name
         if: always()
         id: shard

@@ -53,8 +53,9 @@ struct SsrParams {
 };
 
 @group(0) @binding(0) var<uniform> params: SsrParams;
-// A copy of the opaque image, which the pass draws over, with its mip pyramid
-// (`render::postfx::effects::ssr::pyramid`), read through a trilinear sampler.
+// A copy of the opaque image, which the pass draws over, one level
+// (`render::postfx::effects::ssr::pyramid::colour_copy`). The sampler is trilinear:
+// the resolve reads the hit pyramids through it too.
 @group(0) @binding(1) var t_color: texture_2d<f32>;
 @group(0) @binding(2) var s_color: sampler;
 @group(0) @binding(3) var t_velocity: texture_2d<f32>;
@@ -242,10 +243,9 @@ fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
     if (hit.dist <= 0.0) {
         return missed;
     }
-    // The colour is read from the image's first level, which the pyramid's filter
-    // (`ssr_pyramid.wgsl`) never touches: an emissive past f16's range is `inf`
-    // there. Such a hit reflects nothing, as its texel is nothing to the pyramid's
-    // levels.
+    // The colour is read from the opaque image's copy, unfiltered: an emissive past
+    // f16's range is `inf` there. Such a hit reflects nothing, as a non-finite texel
+    // is nothing to the hit pyramids' filter (`ssr_pyramid.wgsl`) either.
     let w = select(0.0, hit.colour.w, numeric::finite4(hit.colour));
     // A ray that found something tells the resolve how far its hit is, as a blur
     // radius per unit cone, even where its weight faded to nothing (a long ray off a

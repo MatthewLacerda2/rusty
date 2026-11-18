@@ -1,11 +1,11 @@
 //! The SSR pass (#1526): two fullscreen passes over the base camera's opaque image,
 //! run right after its opaque pass (`render::draw::camera`'s `ssr` stage), in
-//! `postfx/ssr.wgsl`. It copies the image into the first level of its colour pyramid
-//! ([`pyramid`](super::pyramid), #1736) and builds the rest. The trace (`fs_trace`)
+//! `postfx/ssr.wgsl`, with a compute pass between them. It copies the image
+//! ([`pyramid::colour_copy`](super::pyramid::colour_copy)). The trace (`fs_trace`)
 //! then marches each smooth enough pixel's ray and writes its hit into a target of
 //! its own, and into a second where it traced and, for a ray that found something,
-//! its hit's blur radius per unit cone and how much it counts (#2158); their pyramids
-//! are built; and the resolve (`fs_resolve`, #2028) averages each pixel's hits over
+//! its hit's blur radius per unit cone and how much it counts (#2158); one compute
+//! pass builds both targets' pyramids ([`HitPyramids`]); and the resolve (`fs_resolve`, #2028) averages each pixel's hits over
 //! a disk whose radius is the pixel's own cone times the radius field those
 //! pyramids smooth (the mean of the hits' radii around it, smooth among hits as
 //! across a hit and a miss), and draws them over the image, so a rough surface's reflected
@@ -13,21 +13,27 @@
 //! The translucents, the overlay cameras and every post effect see the reflected
 //! scene, HDRP's order.
 //!
+//! A frame records the copy, the trace, the pyramids' compute pass and the resolve
+//! into one encoder: two render passes and one compute pass for a view whose shorter
+//! side is 9 px or more. At 8 px or less the hit pyramids are one level deep
+//! ([`hit_levels`](super::pyramid::hit_levels)) and no compute pass opens.
+//!
 //! The pipelines are the renderer's ([`SsrPasses`], built on first use and warmed
-//! with the rest); the pyramids and the params uniform are each view's
-//! ([`SsrTargets`]), held only while it runs SSR. The GPU timer's `ssr` pass spans
-//! the trace, the trace's pyramids and the resolve; the colour pyramid is untimed.
+//! with the rest); the copy, the pyramids, the params uniform and the two bind
+//! groups are each view's ([`SsrTargets`]), held only while it runs SSR. The GPU
+//! timer's `ssr` pass spans the trace, the trace's pyramids and the resolve; the
+//! copy is untimed.
 
-use crate::gpu::ops::{CountedDevice as _, CountedQueue as _};
+use crate::gpu::ops::CountedQueue as _;
 use glam::{Mat4, Vec3};
 
-use super::pyramid::{Pyramid, PyramidPass};
+use super::pyramid::{HitPyramids, PyramidPass};
 use super::record::{begin, opaque_target, pipeline_layout, split};
 use super::surface;
-use crate::gpu::bind_entry as entry;
+pub(crate) use super::targets::SsrTargets;
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
-use crate::gpu::pipelines::LazyPipeline;
+use crate::gpu::pipelines::{LazyCompute, LazyPipeline};
 use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::{PostFx, HDR_FORMAT};
 use crate::timing::{GpuPass, GpuTimer};
@@ -66,16 +72,15 @@ impl SsrParams {
 
 /// The SSR pipelines and their pyramids', shared by every view.
 pub(crate) struct SsrPasses {
-    layout: wgpu::BindGroupLayout,
+    pub(super) layout: wgpu::BindGroupLayout,
     /// The resolve's second group: the trace's two pyramids.
-    traced: wgpu::BindGroupLayout,
+    pub(super) traced: wgpu::BindGroupLayout,
     trace: LazyPipeline,
     resolve: LazyPipeline,
-    /// The downsample every SSR pyramid is built by: the colour's and the trace's
-    /// two (`postfx/ssr.wgsl`'s `Traced`: its hits, and where it traced, its hit's
-    /// radius per unit cone times how much it counts, and that count, #2158), all
-    /// [`HDR_FORMAT`].
-    pyramid: PyramidPass,
+    /// The downsample the trace's two pyramids are built by (`postfx/ssr.wgsl`'s
+    /// `Traced`: its hits, and where it traced, its hit's radius per unit cone times
+    /// how much it counts, and that count, #2158), both [`HDR_FORMAT`].
+    pub(super) pyramid: PyramidPass,
 }
 
 impl SsrPasses {
@@ -130,42 +135,14 @@ impl SsrPasses {
         }
     }
 
-    /// The pipelines, for warming (`Renderer::lazy_pipelines`).
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 3] {
-        [&self.trace, &self.resolve, self.pyramid.lazy_pipeline()]
+    /// The render pipelines, for warming (`Renderer::lazy_pipelines`).
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
+        [&self.trace, &self.resolve]
     }
-}
 
-/// One view's SSR state: the pyramid of the opaque image the march reads, the
-/// trace's two pyramids the resolve reads, and the params uniform, kept while the
-/// view's size holds.
-pub(crate) struct SsrTargets {
-    size: (u32, u32),
-    pyramid: Pyramid,
-    hits: Pyramid,
-    spread: Pyramid,
-    params: wgpu::Buffer,
-    /// Test-only: overwrite the image's upper half with `inf` before tracing.
-    #[cfg(test)]
-    pub(super) poisoned: bool,
-}
-
-impl SsrTargets {
-    fn new(device: &wgpu::Device, passes: &SsrPasses, size: (u32, u32)) -> Self {
-        Self {
-            size,
-            pyramid: Pyramid::new(device, &passes.pyramid, size),
-            hits: Pyramid::new(device, &passes.pyramid, size),
-            spread: Pyramid::new(device, &passes.pyramid, size),
-            params: device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("SSR Params"),
-                size: std::mem::size_of::<SsrParams>() as u64,
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            }),
-            #[cfg(test)]
-            poisoned: false,
-        }
+    /// The compute pipeline, for warming (`Renderer::lazy_computes`).
+    pub(crate) fn lazy_computes(&self) -> [&LazyCompute; 1] {
+        [self.pyramid.lazy_compute()]
     }
 }
 
@@ -191,51 +168,42 @@ impl PostFx {
         if fitted.size != size {
             *fitted = SsrTargets::new(device, passes, size);
         }
-        let t = self.targets.get::<SsrTargets>().expect("fitted above");
-        let velocity = self.motion.target_view().expect("checked above");
+        let velocity = self.motion.target_view().expect("checked above").clone();
         let [weight, applied] = surface::views(self).expect("checked above");
+        let inputs = [velocity, weight.clone(), applied.clone()];
+        let t = self.targets.get_mut::<SsrTargets>().expect("fitted above");
         queue.counted_write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
         #[cfg(test)]
         super::poison::write(t.poisoned, queue, &self.scene_hdr.texture);
-        let view = |v| wgpu::BindingResource::TextureView(v);
-        let group = device.counted_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("SSR Bind Group"),
-            layout: &passes.layout,
-            entries: &[
-                entry(0, t.params.as_entire_binding()),
-                entry(1, view(&t.pyramid.view)),
-                entry(2, wgpu::BindingResource::Sampler(&passes.pyramid.trilinear)),
-                entry(3, view(velocity)),
-                entry(4, view(weight)),
-                entry(5, view(applied)),
-            ],
-        });
-        let traced = device.counted_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("SSR Resolve Bind Group"),
-            layout: &passes.traced,
-            entries: &[entry(0, view(&t.hits.view)), entry(1, view(&t.spread.view))],
-        });
+        // A cloned handle (reference-counted, no new group), so `t` stays borrowable.
+        let group = t.group(device, passes, inputs).clone();
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("SSR Encoder"),
         });
         let extent = self.scene_hdr.texture.size();
-        let (from, to) = (&self.scene_hdr.texture, &t.pyramid.texture);
+        let (from, to) = (&self.scene_hdr.texture, &t.colour);
         encoder.copy_texture_to_texture(from.as_image_copy(), to.as_image_copy(), extent);
-        t.pyramid.build(&mut encoder, &passes.pyramid);
-        let groups = [&group, &traced];
-        trace_and_resolve(&mut encoder, passes, t, groups, &self.scene_hdr.view, timer);
+        let traced = (&t.traced, &t.resolve);
+        trace_and_resolve(
+            &mut encoder,
+            passes,
+            &group,
+            traced,
+            &self.scene_hdr.view,
+            timer,
+        );
         queue.counted_submit(std::iter::once(encoder.finish()));
     }
 }
 
-/// Record the trace into `t`'s hit targets, their pyramids, and the resolve over
-/// `scene`, with the shared group and the resolve's (`groups`).
+/// Record the trace into the hit pyramids' first levels, the pyramids, and the
+/// resolve over `scene`, with the shared `group` and the resolve's own.
 fn trace_and_resolve(
     encoder: &mut wgpu::CommandEncoder,
     passes: &SsrPasses,
-    t: &SsrTargets,
-    [group, traced]: [&wgpu::BindGroup; 2],
+    group: &wgpu::BindGroup,
+    (pyramids, traced): (&HitPyramids, &wgpu::BindGroup),
     scene: &wgpu::TextureView,
     timer: &GpuTimer,
 ) {
@@ -246,14 +214,14 @@ fn trace_and_resolve(
     {
         // Cleared: a pixel that takes no SSR is discarded, so nothing traced.
         let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
-        let targets = [(&t.hits.top, clear), (&t.spread.top, clear)];
+        let [hits, spread] = pyramids.tops();
+        let targets = [(hits, clear), (spread, clear)];
         let mut pass = begin(encoder, "SSR Trace", &targets, open);
         pass.set_pipeline(passes.trace.get());
         pass.set_bind_group(0, group, &[]);
         pass.draw(0..3, 0..1);
     }
-    t.hits.build(encoder, &passes.pyramid);
-    t.spread.build(encoder, &passes.pyramid);
+    pyramids.build(encoder, &passes.pyramid);
     {
         // Loaded: a pixel that gets no SSR is discarded, left as it was.
         let targets = [(scene, wgpu::LoadOp::Load)];
@@ -272,9 +240,10 @@ impl PostFx {
         self.targets.get::<SsrTargets>().is_some()
     }
 
-    /// The size and level count of the pyramid SSR read this frame, if it ran.
-    pub(crate) fn ssr_pyramid(&self) -> Option<((u32, u32), u32)> {
+    /// The size SSR ran at this frame, its colour copy's level count and its hit
+    /// pyramids', if it ran.
+    pub(crate) fn ssr_pyramid(&self) -> Option<((u32, u32), u32, u32)> {
         let t = self.targets.get::<SsrTargets>()?;
-        Some((t.size, t.pyramid.levels()))
+        Some((t.size, t.colour.mip_level_count(), t.traced.levels()))
     }
 }

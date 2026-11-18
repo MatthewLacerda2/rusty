@@ -292,12 +292,15 @@ its check and its command changed to match).
   xtask's tests, and the default doctests run on Linux only (#2276). A job past three quarters of its `timeout-minutes`
   on `main` files an issue by itself (`ci_headroom.py`, `docs/linting.md`). See *The test runner* below.
 - **A pull request that adds a slow test is told** (#2350). Each suite job's *Slowest
-  tests* step first compares its report with the same leg's reports from `main`'s
-  latest run that kept them (every shard together, since a `count:` partition moves
-  tests between shards): a test over 20 s (`slowest_tests.BUDGET`) that `main` had under
-  it, or lacked, prints `new over 20 s: <test> <seconds> (main: <seconds or absent>)` and
-  a warning annotation on the PR's checks; one over it on both sides prints once as
-  `known`, and one `main` had within runner noise of it (`NOISE`, 1.3×) as `near`. With no baseline (expired, a renamed entry) it says `no baseline: <why>` and
+  tests* step first compares its report with the reports of the same leg and feature
+  set from `main`'s latest successful run that kept every shard's (every shard
+  together, since a `count:` partition moves tests between shards), and names that
+  run, its date and commit: a test merged after it reads as new. A test over 20 s
+  (`slowest_tests.BUDGET`) that `main` had under it, or lacked, prints `new over 20 s:
+  <test> <seconds> (main: <seconds or absent>)` and a warning annotation on the PR's
+  checks; one over it on both sides prints once as `known`, and one `main` had within
+  runner noise of it (`NOISE`, 1.3×) as `near`, unless it is now more than 1.3× slower
+  (`slowest_tests.is_new`). With no baseline (expired, a renamed entry) it says `no baseline: <why>` and
   lists the tests over the budget. It informs, never gates, and exempts nothing: a test
   that needs the time says why in its PR; one that does not is trimmed against what it
   proves, still failing on the mutation it guards.
@@ -935,9 +938,11 @@ where a synthetic loop met it far harder. The sampler sleeps 1.5 s between slice
 about 0.16 s (plus an untimed 0.08 s harness build), so it costs about 14% of one core
 beside the game. **The yardstick cancels about four fifths of a machine's load, not
 all**: on an 8-core SMT desktop `runner` reads 238 to 249 yardsticks alone and 277 to
-284 beside a full-parallel cold `cargo build` (1.15×), where its CPU time rose 1.92×;
-CI reads 209 to 240. So the bar of 380 catches a regression of about 1.6× on an idle
-machine and about 1.35× under heavy load.
+284 beside a full-parallel cold `cargo build` (1.15×), where its CPU time rose 1.92×
+(before its long run was halved; the heaviest game is now `showroom`, 216 on CI's
+ubuntu, and `BUDGET`'s comment has every count). So the bar of 380 catches a
+regression of about 1.6× on an idle machine and about 1.35× under heavy load; on
+macOS, where the games wait on Metal more than they compute, only a CPU-bound one.
 A game over budget fails by name with its CPU time and its yardsticks, so the game
 whose defaults grew is the one made cheaper. Wall time is only a hang guard: a game
 still running after `HANG` (450 s) is killed and fails as hung. CPU time counts every

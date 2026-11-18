@@ -59,7 +59,7 @@
 pub(crate) mod clusters;
 mod counters;
 mod cull;
-mod kept;
+pub(crate) mod kept;
 pub(crate) mod pyramid;
 mod upload;
 

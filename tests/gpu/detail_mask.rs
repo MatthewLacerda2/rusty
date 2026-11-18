@@ -70,11 +70,11 @@ fn camera(grazing: bool) -> Camera {
 /// A detail layer's (map, mask), or none.
 type Detail = Option<(Option<String>, Option<String>)>;
 
-/// `material(d)` from `cam` through `h`, one renderer for every shot (one each was
-/// most of the test's time on lavapipe, #2350); `None` without an adapter.
-fn frame(h: &mut CaptureHost, cam: &Camera, d: Detail, name: &str) -> Option<image::RgbImage> {
-    let path = crate::temp::dir().join(name);
-    capture_into(h, &scene(material(d)), cam, &path, SIZE, SIZE)
+/// `material(d)` from `camera(grazing)` through `h`, one renderer for every shot (one
+/// each was most of the test's time on lavapipe, #2350); `None` without an adapter.
+fn frame(h: &mut CaptureHost, grazing: bool, d: Detail, name: &str) -> Option<image::RgbImage> {
+    let path = crate::temp::dir().join(format!("rusty_2258_{grazing}_{name}.png"));
+    capture_into(h, &scene(material(d)), &camera(grazing), &path, SIZE, SIZE)
         .expect("capture")
         .then_some(())?;
     Some(image::open(&path).expect("open").to_rgb8())
@@ -110,15 +110,7 @@ fn the_masks_black_half_draws_no_detail_and_its_white_half_the_whole_detail() {
     let missing = Some("rusty_2258_no_such_mask.png".to_string());
     let mut host = CaptureHost::new();
     for grazing in [false, true] {
-        let cam = camera(grazing);
-        let mut shot = |d, name| {
-            frame(
-                &mut host,
-                &cam,
-                d,
-                &format!("rusty_2258_{grazing}_{name}.png"),
-            )
-        };
+        let mut shot = |d, name| frame(&mut host, grazing, d, name);
         let Some(plain) = shot(None, "plain") else {
             return;
         };
