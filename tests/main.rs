@@ -145,3 +145,10 @@ mod tweens;
 // Kept under one `gpu::` path so a runner can tell them apart by name alone.
 #[cfg(feature = "dev")]
 mod gpu;
+
+// Throwaway (#2350's probe branch, never merged): a 30 s test the slow-test signal must name as new.
+#[test]
+#[allow(clippy::disallowed_methods)]
+fn a_thirty_second_probe_for_the_slow_test_signal() {
+    std::thread::sleep(std::time::Duration::from_secs(30));
+}

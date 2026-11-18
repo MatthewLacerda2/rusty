@@ -319,7 +319,7 @@ jobs:
         with:
           report: junit-${{ matrix.features }}.xml
           count: "20"
-          patterns: junit-build-test-default-* junit-build-test-dev-*
+          patterns: ${{ matrix.features == 'default' && 'junit-no-such-artifact-*' || 'junit-build-test-default-* junit-build-test-dev-*' }}
       # The report itself, for a week, so a shard's timings can be re-read after
       # the job (#2326) and the next PR's run compares against it (#2350). Named
       # by the shard, `1/2` as `1of2` (`/` is refused in a name), not by the
