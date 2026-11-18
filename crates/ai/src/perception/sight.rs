@@ -98,12 +98,23 @@ pub(super) fn look_at(
 /// above it, whatever that body's layer: the mask only cuts the candidates.
 fn targets(scene: &Scene, mask: u32) -> Vec<Target> {
     let w = &scene.world;
-    w.moving_bodies_on(mask)
-        .into_iter()
-        .filter(|&id| w.is_active_in_hierarchy(id))
-        .filter(|&id| !w.ancestors(id).any(|a| w.is_moving_body(a)))
-        .map(|id| Target::of(scene, id))
-        .collect()
+    let keep = |id: u32, moving: &dyn Fn(u32) -> bool| {
+        w.is_active_in_hierarchy(id) && !w.ancestors(id).any(moving)
+    };
+    let ids: Vec<u32> = if mask == u32::MAX {
+        // Nothing to cut (the component's default mask): every moving body is a
+        // candidate, so their sorted list answers "a moving body above it" by a
+        // binary search, cheaper than a lookup per ancestor up a bone chain.
+        let all = w.moving_bodies();
+        let moving = |a: u32| all.binary_search_by_key(&a, |&(id, _)| id).is_ok();
+        let on = |&&(id, layer): &&(u32, u8)| layer_in_mask(layer, mask) && keep(id, &moving);
+        all.iter().filter(on).map(|&(id, _)| id).collect()
+    } else {
+        let moving = |a: u32| w.is_moving_body(a);
+        let ids = w.moving_bodies_on(mask).into_iter();
+        ids.filter(|&id| keep(id, &moving)).collect()
+    };
+    ids.into_iter().map(|id| Target::of(scene, id)).collect()
 }
 
 impl Target {

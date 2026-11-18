@@ -94,20 +94,32 @@ impl World {
     /// ascending id order. One narrow query per column, reading the layer and the
     /// static flag from it: an entity on no layer of `mask` costs no lookup.
     pub fn moving_bodies_on(&self, mask: u32) -> Vec<u32> {
-        let mut ids = Vec::new();
+        let on = |layer: u8| {
+            1u32.checked_shl(layer.into())
+                .is_some_and(|b| mask & b != 0)
+        };
+        let bodies = self.moving_bodies_where(on);
+        bodies.into_iter().map(|(id, _)| id).collect()
+    }
+
+    /// Every moving body with its layer, whatever the layer, in ascending id
+    /// order: [`World::moving_bodies_on`] with nothing cut.
+    pub fn moving_bodies(&self) -> Vec<(u32, u8)> {
+        self.moving_bodies_where(|_| true)
+    }
+
+    fn moving_bodies_where(&self, on: impl Fn(u8) -> bool) -> Vec<(u32, u8)> {
+        let mut bodies = Vec::new();
         let mut keep = |c: &Core| {
-            let on = 1u32
-                .checked_shl(u32::from(c.layer))
-                .is_some_and(|b| mask & b != 0);
-            if on && !c.is_static {
-                ids.push(c.id);
+            if !c.is_static && on(c.layer) {
+                bodies.push((c.id, c.layer));
             }
         };
         self.each_core_with::<ColliderComponent>(&mut keep);
         self.each_core_with::<CharacterControllerComponent>(&mut keep);
-        ids.sort_unstable();
-        ids.dedup();
-        ids
+        bodies.sort_unstable();
+        bodies.dedup();
+        bodies
     }
 
     /// Unity's `GameObject.isStatic`, but live: physics, the shadow sweeps and probe

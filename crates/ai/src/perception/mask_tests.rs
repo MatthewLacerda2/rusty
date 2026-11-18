@@ -87,8 +87,10 @@ fn a_head_on_a_moving_seen_character_with_the_default_mask_matches_the_reference
             let mut p = s.world.ai_perception_mut(head).expect("head");
             (p.sight_mask, p.eye_height) = (u32::MAX, 0.0); // the component default
             drop(p);
-            for x in [-4.0, 0.0, 4.0] {
-                character(s, Vec3::new(x, 0.0, 9.0), PLAYER);
+            // A layer past the 32 a mask holds: never a target, and its hitboxes
+            // are still its own.
+            for (x, layer) in [(-4.0, PLAYER), (0.0, PLAYER), (4.0, PLAYER), (2.0, 40)] {
+                character(s, Vec3::new(x, 0.0, 9.0), layer);
             }
             wall(s, (-1.0, 1.0), (4.0, 4.5));
             *ids = (body, head);
