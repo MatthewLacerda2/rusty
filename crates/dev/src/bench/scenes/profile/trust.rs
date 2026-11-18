@@ -18,6 +18,9 @@ pub const COUNT_FLOOR: f64 = 0.10;
 /// The leaf symbol a sampler prints when it cannot name the function.
 pub const UNKNOWN: &str = "[unknown]";
 
+/// The line a refused profile opens its reasons with.
+pub const REFUSED: &str = "this profile is not to be trusted:";
+
 /// What a recording sampled, by where its leaves landed.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Tally {
@@ -35,6 +38,32 @@ pub struct Tally {
 /// The file name of an image path, which is how both samplers can name it.
 pub fn image_name(path: &str) -> &str {
     path.rsplit('/').next().unwrap_or(path)
+}
+
+/// What a frame is called in the tables: its symbol, or for one with none the
+/// image it ran in (`[libc.so.6]`), so an unnamed row says whose time it is;
+/// [`UNKNOWN`] only for a frame with no image either.
+pub fn frame_name(symbol: &str, image: &str) -> String {
+    if !symbol.is_empty() && symbol != UNKNOWN {
+        return symbol.to_string();
+    }
+    match image_name(image) {
+        "" => UNKNOWN.to_string(),
+        bracketed if bracketed.starts_with('[') => bracketed.to_string(),
+        name => format!("[{name}]"),
+    }
+}
+
+/// The opening of the refusal's first reason in the profile text `text`
+/// (`only 2.6% of the samples resolve ...`), when it was refused.
+pub fn refusal_gist(text: &str) -> Option<String> {
+    let (_, after) = text.split_once(REFUSED)?;
+    let first = after
+        .lines()
+        .map(str::trim)
+        .find_map(|l| l.strip_prefix("- "))?;
+    let words: Vec<&str> = first.split_whitespace().take(8).collect();
+    Some(format!("{} ...", words.join(" ")))
 }
 
 /// The file name of the running binary, the image whose functions are "own".
@@ -106,7 +135,7 @@ pub fn refusal(tally: &Tally, expected: f64) -> Option<String> {
     if why.is_empty() {
         return None;
     }
-    let mut out = String::from("this profile is not to be trusted:");
+    let mut out = String::from(REFUSED);
     for reason in why.iter().chain(&tally.warnings) {
         out.push_str(&format!("\n  - {reason}"));
     }
@@ -152,6 +181,22 @@ mod tests {
             "{said}"
         );
         assert!(!said.contains("too few"), "{said}");
+        let gist = refusal_gist(&format!("head\n{said}\n")).expect("a gist");
+        assert_eq!(gist, "only 2.6% of the samples resolve to a ...");
+        assert_eq!(refusal_gist("head\nwhere the samples landed: x"), None);
+    }
+
+    #[test]
+    fn an_unnamed_frame_is_named_by_its_image() {
+        assert_eq!(frame_name("main", "/bin/bench-scenes"), "main");
+        assert_eq!(frame_name(UNKNOWN, "/usr/lib/libc.so.6"), "[libc.so.6]");
+        assert_eq!(
+            frame_name("", "libnvidia-eglcore.so.550"),
+            "[libnvidia-eglcore.so.550]"
+        );
+        assert_eq!(frame_name(UNKNOWN, "[unknown]"), UNKNOWN);
+        assert_eq!(frame_name(UNKNOWN, "[vdso]"), "[vdso]");
+        assert_eq!(frame_name("", ""), UNKNOWN);
     }
 
     #[test]

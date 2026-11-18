@@ -20,13 +20,13 @@ fn win(start: u64, end: u64) -> Window {
 }
 
 #[test]
-fn script_blocks_fold_root_first_with_unknown_frames_kept() {
+fn script_blocks_fold_root_first_with_unknown_frames_named_by_image() {
     let render = [
         ("rusty_render::Renderer::render", BIN),
         ("rusty_dev::bench::measure_posed", BIN),
         ("main", BIN),
     ];
-    let unknown = [("[unknown]", "[unknown]"), ("main", BIN)];
+    let unknown = [("[unknown]", "/usr/lib/libc.so.6"), ("main", BIN)];
     let text = [
         sample("10.5", &render),
         sample("10.6", &unknown),
@@ -37,7 +37,7 @@ fn script_blocks_fold_root_first_with_unknown_frames_kept() {
     assert_eq!(f.samples(), 3);
     let stack = "main;rusty_dev::bench::measure_posed;rusty_render::Renderer::render";
     assert_eq!(f.0.get(stack), Some(&2));
-    assert_eq!(f.0.get("main;[unknown]"), Some(&1));
+    assert_eq!(f.0.get("main;[libc.so.6]"), Some(&1), "{:?}", f.0);
     assert_eq!((tally.samples, tally.own, tally.unknown), (3, 2, 1));
     assert_eq!(tally.images.get("bench-scenes"), Some(&2));
 }

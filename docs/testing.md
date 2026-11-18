@@ -1156,13 +1156,22 @@ every binary's open makes them.
   space only, `cycles:u`, or the `cpu-clock:u` timer where there is no cycle
   counter; every thread of the process; stamped with `CLOCK_MONOTONIC`), and its
   samples are cut to the measured windows by timestamp. Its stacks are walked by
-  frame pointer, which the build forces on: a frame in code built without them
-  (libc, a GPU driver) ends its stack early, so the self time is exact and the
-  total time is a floor. On macOS, `sample` is attached for each viewpoint's
+  frame pointer, which the build forces on (the 16 KiB DWARF stack copies used
+  before came with recordings that lost most of their samples). A walk through
+  code built without frame pointers (libc, a GPU driver) can end a stack early,
+  or add a wrong caller where that code keeps other data in the frame register:
+  the self time is exact, the total time is approximate. A frame with no symbol
+  is named by the image it ran in (`[libnvidia-eglcore.so.…]`, `[libc.so.6]`),
+  and `[unknown]` is left for a frame with no image either; `sample`'s `???` is
+  such a frame too. On macOS, `sample` is attached for each viewpoint's
   measured frames, the bench's own thread (the main one) alone: `sample` samples
   every thread, parked or not, and the others' waits would fill the table. It is
   a release build with line tables and frame pointers (the `profiling` cargo
-  profile, its own target folder; the timed build is untouched). Kept beside the
+  profile, its own target folder). That binary runs the whole `PROFILE=1` run,
+  so the run's timed rows come from it too, and each report says *timed on the
+  profiling build*: on a desktop GPU (an RTX 2060), its `cpu_ms`, `renderer_ms`
+  and `gpu_raw_ms` measured inside the release build's spread, so a `BEFORE=`
+  comparison across the two builds reads true there. Kept beside the
   report: `<scene>.profile.txt`, its header (samples, the measured seconds, and
   where the samples landed by image: the bench binary, the GPU driver, libc),
   then the top 40 functions by self time (samples where the function was
@@ -1174,7 +1183,9 @@ every binary's open makes them.
   sampling rate (lost or never taken). Then `<scene>.profile.txt` and the
   console say *this profile is not to be trusted*, with each reason, its
   numbers, what perf warned of (lost chunks) and where the samples landed, and
-  no tables or `.folded` are written. A software renderer refuses too (lavapipe
+  no tables or `.folded` are written; the run's closing lines list each refused
+  scene with the start of its first reason, and the exit status stays 0 (the
+  recording ran). A software renderer refuses too (lavapipe
   spends most of a frame in its own unnamed JIT code): its profile says where a
   CPU rasteriser spends time, not the engine. No profiler on `PATH` stops the
   run before anything is benched, naming the package (Debian `linux-perf`,

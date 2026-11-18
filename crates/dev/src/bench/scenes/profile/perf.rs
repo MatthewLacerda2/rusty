@@ -4,10 +4,14 @@
 //! unprivileged. Its samples are stamped with `CLOCK_MONOTONIC`, and [`parse`]
 //! keeps those inside the viewpoints' measured windows ([`Window`]), so the
 //! warm-ups between them never count. The call stacks are walked by frame
-//! pointer (the `profiling` build forces them on): small enough that perf's ring
-//! buffer keeps up, where 16 KiB DWARF stack copies lost most of a recording.
-//! Frames through code built without them (the system libraries, a GPU driver)
-//! end a stack early; the leaf, and so the self time, is always right.
+//! pointer (the `profiling` build forces them on), a few words a sample where
+//! the 16 KiB DWARF stack copies used before kept perf's ring buffer far busier
+//! (the recordings that held them lost most of their samples; which of their
+//! settings lost them was not isolated). A walk through code built without
+//! frame pointers (the system libraries, a GPU driver) can end a stack early,
+//! or invent a caller where that code keeps something else in the frame
+//! register; the leaf, and so the self time, is always right. An unnamed frame
+//! is named by its image ([`trust::frame_name`]).
 
 use std::path::{Path, PathBuf};
 // lint: allow(subprocess) the bench drives the platform's profiler, `perf`, attached to itself
@@ -15,7 +19,7 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
 use super::folded::Folded;
-use super::trust::Tally;
+use super::trust::{self, Tally};
 use super::window::{self, Window};
 
 /// Samples a second: a few thousand a viewpoint.
@@ -151,7 +155,9 @@ pub fn parse(text: &str, windows: &[Window], own: &str) -> (Folded, Tally) {
         if keep && !frames.is_empty() {
             let (sym, image) = &frames[0];
             tally.count(image, sym, own, 1);
-            let names: Vec<String> = frames.iter().rev().map(|(s, _)| s.clone()).collect();
+            let names: Vec<String> = (frames.iter().rev())
+                .map(|(s, image)| trust::frame_name(s, image))
+                .collect();
             folded.add(&names, 1);
         }
         frames.clear();

@@ -164,7 +164,7 @@ pub fn run(
     );
     let expected = measured * f64::from(profiler.hz());
     let refused = trust::refusal(&tally, expected);
-    let tables = out_dir.join(format!("{scene}.profile.txt"));
+    let tables = tables_path(out_dir, scene);
     let folded = out_dir.join(format!("{scene}.folded"));
     let write = |path: &Path, text: String| {
         // lint: allow(asset-write) a bench profile, not read by a path-keyed cache
@@ -186,6 +186,30 @@ pub fn run(
     write(&folded, stacks.text())?;
     println!("{head}\n  {}", tables.display());
     Ok(tables)
+}
+
+/// Where `scene`'s profile text is kept in `out_dir`.
+pub fn tables_path(out_dir: &Path, scene: &str) -> PathBuf {
+    out_dir.join(format!("{scene}.profile.txt"))
+}
+
+/// The closing lines naming each of `scenes` whose profile in `out_dir` refused
+/// itself, with the opening of its first reason; `None` when none did. Said,
+/// not failed: the recording ran, and its file says why it is not to be read.
+pub fn refusals<'a>(out_dir: &Path, scenes: impl Iterator<Item = &'a String>) -> Option<String> {
+    let refused = |scene: &String| {
+        let text = std::fs::read_to_string(tables_path(out_dir, scene)).ok()?;
+        trust::refusal_gist(&text).map(|why| format!("\n  {scene}: {why}"))
+    };
+    let lines: String = scenes.filter_map(refused).collect();
+    (!lines.is_empty()).then(|| format!("profile not to be trusted (see its .profile.txt):{lines}"))
+}
+
+/// Whether this binary is the `profiling` build (cargo puts a profile's
+/// binaries in a folder named after it), whose timings a report says it is on.
+pub fn on_profiling_build() -> bool {
+    let exe = std::env::current_exe().unwrap_or_default();
+    exe.parent().and_then(Path::file_name) == Some(OsStr::new("profiling"))
 }
 
 /// What [`record`] gives: the folded samples, their tally, the measured windows

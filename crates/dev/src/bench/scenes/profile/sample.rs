@@ -2,7 +2,8 @@
 //! attached to this process for one viewpoint's measured frames and stopped
 //! with SIGINT, which makes it write its report. The report's call graph is an
 //! indented tree of `count symbol (in image) ...` lines, which [`parse`] folds:
-//! a node's self samples are its count less its children's.
+//! a node's self samples are its count less its children's. A frame `sample`
+//! cannot name (`???`) is one with no symbol, named in the tables by its image.
 
 use std::path::{Path, PathBuf};
 // lint: allow(subprocess) the bench drives the platform's profiler, `sample`, attached to itself
@@ -10,7 +11,7 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
 use super::folded::Folded;
-use super::trust::Tally;
+use super::trust::{frame_name, Tally, UNKNOWN};
 
 /// A `sample` running on this process.
 pub struct Recording {
@@ -101,9 +102,15 @@ pub fn parse(text: &str, own: &str) -> (Folded, Tally) {
         }
         let (name, image) = symbol.split_once("  (in ").unwrap_or((symbol, ""));
         let image = image.split(')').next().unwrap_or_default();
+        // `sample` prints `???` for a frame it cannot name: no symbol, as perf's `[unknown]`.
+        let name = match name.trim() {
+            "???" => UNKNOWN,
+            named => named,
+        };
         stack.push(Node {
             col,
-            name: name.trim().to_string(),
+            label: frame_name(name, image),
+            name: name.to_string(),
             image: image.to_string(),
             count,
             children: 0,
@@ -130,7 +137,10 @@ type Thread = (String, Folded, Tally);
 /// An open node of the call graph, from the root down.
 struct Node {
     col: usize,
+    /// The symbol, [`UNKNOWN`] when `sample` could not name it.
     name: String,
+    /// What the tables call it ([`frame_name`]).
+    label: String,
     image: String,
     count: u64,
     children: u64,
@@ -139,7 +149,7 @@ struct Node {
 /// Close the deepest open node: its own samples are a stack of their own, in
 /// the thread it is under (the last one opened), with it as the leaf.
 fn pop(stack: &mut Vec<Node>, threads: &mut [Thread], own: &str) {
-    let frames: Vec<String> = (stack.iter().skip(1)).map(|n| n.name.clone()).collect();
+    let frames: Vec<String> = (stack.iter().skip(1)).map(|n| n.label.clone()).collect();
     let (Some(node), Some((_, folded, tally))) = (stack.pop(), threads.last_mut()) else {
         return;
     };
@@ -186,5 +196,24 @@ Total number in stack (recursive counted multiple times):\n";
             "a parked thread's wait: {:?}",
             f.0
         );
+    }
+
+    #[test]
+    fn an_unnamed_frame_has_no_symbol_and_is_named_by_its_image() {
+        let text = "Call graph:\n\
+    10 Thread_123   DispatchQueue_1: com.apple.main-thread  (serial)\n\
+    + 10 main  (in bench-scenes) + 50  [0x100]\n\
+    +   8 ???  (in AGXMetalG15X)  load address 0x1 + 0x2  [0x3]\n\
+    +   2 ???  (in bench-scenes)  load address 0x4 + 0x5  [0x6]\n\
+\n";
+        let (f, tally) = parse(text, "bench-scenes");
+        assert_eq!(
+            (tally.samples, tally.own, tally.unknown),
+            (10, 0, 10),
+            "{tally:?}"
+        );
+        assert_eq!(f.0.get("main;[AGXMetalG15X]"), Some(&8), "{:?}", f.0);
+        assert_eq!(f.0.get("main;[bench-scenes]"), Some(&2), "{:?}", f.0);
+        assert!(super::super::trust::refusal(&tally, 0.0).is_some());
     }
 }
