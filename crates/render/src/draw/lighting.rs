@@ -2,6 +2,7 @@
 //! builders split out of `draw.rs` to keep each file under the size cap;
 //! `Renderer::build_lighting_uniform` orchestrates them.
 
+use crate::gpu::ops::CountedQueue as _;
 use glam::Vec3;
 
 use crate::gpu::uniforms::{ProceduralSkyUniform, MAX_DIRECTIONAL_LIGHTS};
@@ -130,7 +131,7 @@ impl crate::Renderer {
     /// counters (#433) with the light counts.
     pub(super) fn upload_lighting(&mut self, scene: &Scene) {
         let lighting_uniform = self.build_lighting_uniform(scene);
-        self.queue.write_buffer(
+        self.queue.counted_write_buffer(
             &self.lighting_buffer,
             0,
             bytemuck::bytes_of(&lighting_uniform),

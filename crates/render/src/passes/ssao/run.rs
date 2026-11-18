@@ -4,6 +4,7 @@
 use super::{SsaoFrame, SsaoTargets, Stage};
 use crate::draw::pass::ScenePassFrame;
 use crate::draw::record::Solids;
+use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
 use crate::gpu::pipelines::surface::SolidPass;
 use crate::postfx::effects::ssil;
 use crate::timing::GpuPass;
@@ -31,7 +32,7 @@ impl Renderer {
         }
         let targets = view.ssao.as_ref().expect("allocated above");
         self.queue
-            .write_buffer(&targets.uniform, 0, bytemuck::bytes_of(&frame.uniform()));
+            .counted_write_buffer(&targets.uniform, 0, bytemuck::bytes_of(&frame.uniform()));
         self.record_prepass(encoder, &view.depth_view, solids);
         let (ssao, timer) = (&self.ssao, &self.gpu_timer);
         let ao = (&targets.ao_group, &targets.raw);
@@ -113,7 +114,7 @@ impl Renderer {
         solids: Solids,
         (label, timestamp_writes): (&str, Option<wgpu::RenderPassTimestampWrites>),
     ) {
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let mut pass = encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
             multiview_mask: None,
             label: Some(label),
             color_attachments: &[],

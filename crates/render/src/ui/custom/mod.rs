@@ -34,7 +34,7 @@ use uniforms::SLOT;
 
 use super::cache::UiViewCache;
 use super::pipeline::{self, UiPass};
-use crate::gpu::layout_entries::dynamic_uniform_entry;
+use crate::gpu::{layout_entries::dynamic_uniform_entry, ops::CountedDevice as _};
 use rusty_components::UiBlend;
 use rusty_core::fs::written::written_since;
 use rusty_shadergen::baked::{self, Baked};
@@ -91,7 +91,7 @@ impl UiShaders {
             label: Some("UI Empty Layout"),
             entries: &[],
         });
-        let empty = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let empty = device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("UI Empty Group"),
             layout: &empty_layout,
             entries: &[],

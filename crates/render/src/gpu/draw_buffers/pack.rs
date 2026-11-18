@@ -3,6 +3,7 @@
 //! with its shared identity at element 0, and the group-1 bind group over them.
 
 use super::{IDENTITY_JOINT, UNIFORM_STRIDE};
+use crate::gpu::ops::CountedDevice as _;
 use crate::DrawUniform;
 
 /// One joint matrix, as the storage array packs it.
@@ -57,7 +58,7 @@ pub(crate) fn group1(
             size: wgpu::BufferSize::new(size as u64),
         })
     };
-    device.create_bind_group(&wgpu::BindGroupDescriptor {
+    device.counted_bind_group(&wgpu::BindGroupDescriptor {
         label: Some(label),
         layout,
         entries: &[

@@ -17,6 +17,7 @@ use super::{
 use crate::gpu::bind_entry as entry;
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
+use crate::gpu::ops::{CountedDevice as _, CountedQueue as _};
 use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::params::Gate;
@@ -209,9 +210,9 @@ fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
         .targets
         .get::<bloom::BloomTargets>()
         .expect("checked above");
-    queue.write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
+    queue.counted_write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
     let passes = &r.post_passes.lens_flare;
-    let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+    let group = device.counted_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Lens Flare Bind Group"),
         layout: &passes.layout,
         entries: &[
@@ -225,7 +226,7 @@ fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     });
     let flare = (passes.flare.get(), r.gpu_timer.writes(GpuPass::LensFlare));
     PostFx::fullscreen(&mut encoder, flare, &[&group], &t.flare.view);
-    queue.submit(std::iter::once(encoder.finish()));
+    queue.counted_submit(std::iter::once(encoder.finish()));
 }
 
 #[cfg(test)]

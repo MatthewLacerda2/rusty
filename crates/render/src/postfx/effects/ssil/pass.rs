@@ -4,6 +4,7 @@
 use crate::gpu::bind_entry as entry;
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::{depth_entry, texture_entry, uniform_entry};
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _};
 use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::HDR_FORMAT;
@@ -141,7 +142,7 @@ impl SsilPasses {
         (targets, timer): (&[&wgpu::TextureView], &GpuTimer),
     ) {
         let view = wgpu::BindingResource::TextureView;
-        let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let group = device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("SSIL Bind Group"),
             layout: &self.layout,
             entries: &[
@@ -165,7 +166,7 @@ impl SsilPasses {
                 })
             })
             .collect();
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let mut pass = encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
             multiview_mask: None,
             label: Some(stage.label()),
             color_attachments: &attachments,

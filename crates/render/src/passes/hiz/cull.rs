@@ -11,6 +11,7 @@ use crate::draw::camera::CameraCtx;
 use crate::draw::resources::SolidResources;
 use crate::gpu::draw_buffers::GROUP1_INSTANCES;
 use crate::gpu::grow_buffer::GrowBuffer;
+use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
 use crate::{RenderView, Renderer};
 
 /// The opaque draws a camera's passes make through the GPU's verdict: the group 1
@@ -156,7 +157,7 @@ impl Renderer {
         }
         let args = (cam.args[1].buffer(), ARGS * u64::from(batches));
         cam.counter.copy(&self.device, &mut encoder, args);
-        self.queue.submit(std::iter::once(encoder.finish()));
+        self.queue.counted_submit(std::iter::once(encoder.finish()));
         cam.counter.request(n);
         cam.clusters.counter.request(plan.tested);
         let counters = &mut self.frame_counters;
@@ -242,7 +243,7 @@ impl Renderer {
         (pipeline, group): (&crate::gpu::pipelines::LazyCompute, &wgpu::BindGroup),
         count: u32,
     ) {
-        let mut pass = encoder.begin_compute_pass(&Default::default());
+        let mut pass = encoder.counted_compute_pass(&Default::default());
         pass.set_pipeline(pipeline.get());
         pass.set_bind_group(0, group, &[]);
         pass.dispatch_workgroups(count.div_ceil(64), 1, 1);

@@ -48,10 +48,10 @@ pub(crate) mod world;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::gpu::bind_layouts;
 use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::gpu::textures::ui_sampler;
+use crate::gpu::{bind_layouts, ops::CountedDevice as _};
 use crate::GpuTexture;
 use rusty_asset::sidecar::FilterMode;
 use rusty_components::UiBlend;
@@ -253,7 +253,7 @@ pub(crate) fn bind(
     view: &wgpu::TextureView,
     sampler: &wgpu::Sampler,
 ) -> wgpu::BindGroup {
-    device.create_bind_group(&wgpu::BindGroupDescriptor {
+    device.counted_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("UI Texture Bind Group"),
         layout,
         entries: &[
