@@ -16,10 +16,13 @@
 //!
 //! **GPU rows are clock-normalised** (`clock`, #862): a fixed probe timed beside
 //! every frame divides out the GPU governor's clock, so `gpu_ms` and `gpu.<pass>`
-//! move with the work, not with how idle the GPU was. `gpu_ms` is the passes' sum;
-//! `gpu.other` is what of the frame's timed span no pass holds (untimed work, and
-//! the GPU waiting on the CPU between submits: `rusty_render::GpuTimes::other_ms`). `gpu_raw_ms` is the time as
-//! measured and `gpu_clock_pct` the clock it ran at.
+//! move with the work, not with how idle the GPU was. `gpu_ms` is the passes' sum,
+//! busy time only; `gpu.other` is what of the frame's timed span no pass holds, so
+//! the `gpu.` rows sum to that span; `gpu_between_submits_ms` is the part of
+//! `gpu.other` from one submit's timed work to the next's (the GPU waiting on the
+//! CPU, and a command at a submit's edge), the rest being untimed work inside a
+//! submit (`rusty_render::GpuTimes`). `gpu_raw_ms` is the time as measured and
+//! `gpu_clock_pct` the clock it ran at.
 //!
 //! **CPU rows are clock-normalised the same way** (#1719): a fixed CPU probe timed
 //! right before and after each sim step scales `cpu_ms` and `cpu.<system>` to the
@@ -159,6 +162,7 @@ fn sample(samples: &mut Samples, stats: &FrameStats, frame: Option<&RenderedFram
             samples.push(&format!("gpu.{}", pass.name()), ms);
         }
         samples.push("gpu.other", gpu.other_ms() * speed);
+        samples.push("gpu_between_submits_ms", gpu.between_submits_ms * speed);
         samples.push("gpu_raw_ms", gpu.total_ms());
         samples.push("gpu_clock_pct", speed * 100.0);
     }
@@ -206,9 +210,10 @@ pub fn run(harness: &mut Harness, ticks: u32) -> Report {
         text.push_str("(this adapter has no timestamp queries: no GPU times)\n");
     } else {
         text.push_str(
-            "(gpu_ms, gpu.<pass>: ms at the reference clock, gpu_ms the passes' sum and \
-             gpu.other what of the frame's timed span no pass holds; gpu_raw_ms as \
-             measured, at gpu_clock_pct of it)\n",
+            "(gpu_ms, gpu.<pass>: ms at the reference clock, gpu_ms the passes' busy sum and \
+             gpu.other what of the frame's timed span no pass holds, \
+             gpu_between_submits_ms of it between submits (GPU waiting on the CPU), the rest \
+             untimed work; gpu_raw_ms as measured, at gpu_clock_pct of it)\n",
         );
     }
     text.push_str(

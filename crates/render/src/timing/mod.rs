@@ -34,13 +34,21 @@
 //! time (`gpu_ms`), and a heavy pass shows as heavy instead of smearing into the
 //! light ones queued behind it.
 //!
-//! **What no row holds.** A command outside every pair (a copy, a pass recorded
-//! without `timestamp_writes`) is in no row, so each resolved frame also keeps the
-//! span from its first timed start to its last timed end ([`GpuTimes::span_ms`]):
-//! the span less the rows ([`GpuTimes::other_ms`], the bench's `gpu.other`) is that
-//! untimed work plus any wait for the CPU between the frame's submits. A stage of
-//! several passes takes one pair across them ([`GpuTimer::compute_span`],
-//! [`GpuTimer::render_span`]): its first pass writes the start, its last the end.
+//! **No row holds a gap.** A pass is charged from its own start at the earliest,
+//! so time between timed passes is in no row: `gpu_ms` is the GPU's busy time on
+//! timed work, never its wait for the CPU. A stage of several passes takes one
+//! pair across them ([`GpuTimer::compute_span`], [`GpuTimer::render_span`]): its
+//! first pass writes the start, its last the end, and all of them go out in one
+//! submit, so what lies between is the stage's own GPU work.
+//!
+//! **What no row holds.** Each resolved frame also keeps the span from its first
+//! timed start to its last timed end ([`GpuTimes::span_ms`]); the span less the
+//! rows ([`GpuTimes::other_ms`], the bench's `gpu.other`) is the gaps. Each pair
+//! knows the submit it went out in, so the gaps split in two:
+//! [`GpuTimes::between_submits_ms`], from one submit's timed work to the next's
+//! (the GPU waiting for the CPU, and a command at a submit's head or tail), and
+//! [`GpuTimes::within_submits_ms`], inside one command buffer, where the GPU never
+//! waits for the CPU: untimed GPU work only, so a pass left untimed shows there.
 
 mod clock;
 mod frame;
@@ -53,7 +61,8 @@ use std::cell::{Cell, RefCell};
 pub use clock::ClockProbe;
 pub use frame::FrameCost;
 use readback::Ring;
-pub use times::{GpuTimes, Pair};
+pub use times::GpuTimes;
+use times::Pair;
 
 rusty_core::named_enum! {
     /// The render passes the timer reports, under the stable names the stats use
@@ -88,10 +97,10 @@ rusty_core::named_enum! {
         VolumetricFog = "volumetric_fog",
         /// The opaque scene pass: solids, skybox.
         Forward = "forward",
-        /// Screen-space reflections (#1526): the copy of the opaque image and the
-        /// trace over it, right after the base camera's opaque pass. The copy is a
-        /// command, not a pass, so the trace's pair holds the gap before it
-        /// ([`Pair::holds_gap`]).
+        /// Screen-space reflections (#1526): the trace, right after the base
+        /// camera's opaque pass. The copy of the opaque image before it is a
+        /// command at the head of SSR's submit, which no pass boundary stamps: it
+        /// is in [`GpuTimes::between_submits_ms`].
         Ssr = "ssr",
         /// SSR's two hit pyramids (#2028), built from the trace's targets.
         SsrPyramids = "ssr_pyramids",

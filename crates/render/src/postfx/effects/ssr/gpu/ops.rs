@@ -10,9 +10,9 @@ use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 
 /// What SSR adds to a still frame at 96×72: the trace and the resolve, the hit
 /// pyramids' four levels below the first (one pass each, into both), its own
-/// submit and its params write. Before #2329, 20 render passes (each pyramid's six
-/// levels below the first) and two bind groups; #2329 built the pyramids in one
-/// compute pass (2/1/1/0/1), which #2340 measures against these.
+/// submit and its params write. No compute pass: the pyramids are render targets
+/// without `STORAGE_BINDING`, measured cheaper to build and to trace into on a
+/// desktop GPU than one compute pass over storage pyramids.
 /// Measured: lavapipe 6/0/1/0/1.
 const SSR: OpCounts = OpCounts {
     render_passes: 6,

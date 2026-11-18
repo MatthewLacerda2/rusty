@@ -127,6 +127,7 @@ fn gpu_rows_are_scaled_by_the_frame_clock_speed() {
         frame: 1,
         passes: vec![(GpuPass::Shadows, 2.0), (GpuPass::Forward, 6.0)],
         span_ms: 9.0,
+        between_submits_ms: 0.6,
     };
     let frame = RenderedFrame {
         gpu: Some(gpu),
@@ -148,6 +149,14 @@ fn gpu_rows_are_scaled_by_the_frame_clock_speed() {
     assert_eq!(avg("gpu.ui"), 0.0);
     // The span's 1 ms no pass holds, scaled like the rows.
     assert_eq!(avg("gpu.other"), 0.5);
+    assert_eq!(avg("gpu_between_submits_ms"), 0.3);
+    // The `gpu.` rows, `other` included, are the frame's whole timed span.
+    let rows = report.metrics.iter().filter(|(m, _)| m.starts_with("gpu."));
+    let whole: f64 = rows.map(|(_, s)| s.avg).sum();
+    assert!(
+        (whole - 4.5).abs() < 1e-9,
+        "gpu. rows {whole} vs the span's 4.5"
+    );
     assert_eq!(avg("gpu_raw_ms"), 8.0);
     assert_eq!(avg("gpu_clock_pct"), 50.0);
     // Without timestamps (lavapipe) no GPU row, `gpu.other` included.

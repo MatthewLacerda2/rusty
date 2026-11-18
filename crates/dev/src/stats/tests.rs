@@ -67,6 +67,7 @@ fn gpu_times_fold_in_as_a_total_and_per_pass() {
             frame: 1,
             passes,
             span_ms: 0.0,
+            between_submits_ms: 0.0,
         }),
         ..Default::default()
     };

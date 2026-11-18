@@ -37,6 +37,7 @@ fn gpu(n: u64, ms: f64) -> GpuTimes {
         frame: n,
         passes: vec![(GpuPass::Shadows, ms)],
         span_ms: ms,
+        between_submits_ms: 0.0,
     }
 }
 

@@ -209,9 +209,9 @@ fn trace_and_resolve(
         let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
         let [hits, spread] = pyramids.tops();
         let targets = [(hits, clear), (spread, clear)];
-        // The colour copy recorded just before is no pass: the trace's pair holds
-        // the gap after the work ahead of it, so `ssr` counts the copy too.
-        let timed = timer.writes_holding_gap(GpuPass::Ssr);
+        // The colour copy recorded just before is no pass, and heads this submit:
+        // no pass boundary can stamp it, so it is in `gpu.other` (between submits).
+        let timed = timer.writes(GpuPass::Ssr);
         let mut pass = begin(encoder, "SSR Trace", &targets, timed);
         pass.set_pipeline(passes.trace.get());
         pass.set_bind_group(0, group, &[]);

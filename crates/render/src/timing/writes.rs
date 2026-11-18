@@ -1,82 +1,52 @@
-//! The `timestamp_writes` the timer hands a pass: a whole pair, a pair that holds
-//! the gap before it ([`Pair::holds_gap`]), or one pair spread over several passes.
+//! The `timestamp_writes` the timer hands a pass: a whole pair, or one pair
+//! spread over several passes.
 
 use super::{GpuPass, GpuTimer, Pair, PAIRS};
 
 type RenderWrites<'a> = Option<wgpu::RenderPassTimestampWrites<'a>>;
 type ComputeWrites<'a> = Option<wgpu::ComputePassTimestampWrites<'a>>;
 
+/// A pair's two write indices, split as the passes that write them take them:
+/// `(begin, end)` for one pass, or the opening and closing halves of a span.
+type Indices = (Option<u32>, Option<u32>);
+
 impl GpuTimer {
     /// The `timestamp_writes` for one render pass of kind `pass`; `None` when the
     /// timer is disabled, no frame is open, or the frame ran out of query pairs.
     pub(crate) fn writes(&self, pass: GpuPass) -> RenderWrites<'_> {
-        let (query_set, at) = self.pair(pass.into())?;
-        Some(wgpu::RenderPassTimestampWrites {
-            query_set,
-            beginning_of_pass_write_index: Some(at * 2),
-            end_of_pass_write_index: Some(at * 2 + 1),
-        })
-    }
-
-    /// [`Self::writes`] for a render pass whose pair is charged from where the
-    /// work queued ahead of it ended ([`Pair::holds_gap`]): the untimed command
-    /// recorded just before it is charged to `pass`.
-    pub(crate) fn writes_holding_gap(&self, pass: GpuPass) -> RenderWrites<'_> {
-        let holds_gap = true;
-        let (query_set, at) = self.pair(Pair { pass, holds_gap })?;
-        Some(wgpu::RenderPassTimestampWrites {
-            query_set,
-            beginning_of_pass_write_index: Some(at * 2),
-            end_of_pass_write_index: Some(at * 2 + 1),
-        })
+        let (set, at) = self.pair(pass)?;
+        Some(render(set, whole(at)))
     }
 
     /// [`Self::writes`] for a compute pass.
     pub(crate) fn compute_writes(&self, pass: GpuPass) -> ComputeWrites<'_> {
-        let (query_set, at) = self.pair(pass.into())?;
-        Some(wgpu::ComputePassTimestampWrites {
-            query_set,
-            beginning_of_pass_write_index: Some(at * 2),
-            end_of_pass_write_index: Some(at * 2 + 1),
-        })
+        let (set, at) = self.pair(pass)?;
+        Some(compute(set, whole(at)))
     }
 
     /// One pair of kind `pass` spread over several render passes: the first pass
     /// takes the opening half (its start), the last the closing half (its end), so
-    /// every pass recorded between them is charged to `pass` once.
+    /// every pass recorded between them is charged to `pass` once. All of them
+    /// must go out in one submit, or the span would hold the GPU's wait between.
     pub(crate) fn render_span(&self, pass: GpuPass) -> (RenderWrites<'_>, RenderWrites<'_>) {
-        let Some((query_set, at)) = self.pair(pass.into()) else {
+        let Some((set, at)) = self.pair(pass) else {
             return (None, None);
         };
-        let half = |begin, end| wgpu::RenderPassTimestampWrites {
-            query_set,
-            beginning_of_pass_write_index: begin,
-            end_of_pass_write_index: end,
-        };
-        (
-            Some(half(Some(at * 2), None)),
-            Some(half(None, Some(at * 2 + 1))),
-        )
+        let [open, close] = halves(at);
+        (Some(render(set, open)), Some(render(set, close)))
     }
 
     /// [`Self::render_span`] over compute passes.
     pub(crate) fn compute_span(&self, pass: GpuPass) -> (ComputeWrites<'_>, ComputeWrites<'_>) {
-        let Some((query_set, at)) = self.pair(pass.into()) else {
+        let Some((set, at)) = self.pair(pass) else {
             return (None, None);
         };
-        let half = |begin, end| wgpu::ComputePassTimestampWrites {
-            query_set,
-            beginning_of_pass_write_index: begin,
-            end_of_pass_write_index: end,
-        };
-        (
-            Some(half(Some(at * 2), None)),
-            Some(half(None, Some(at * 2 + 1))),
-        )
+        let [open, close] = halves(at);
+        (Some(compute(set, open)), Some(compute(set, close)))
     }
 
-    /// The next query pair, taken for `pair`.
-    fn pair(&self, pair: Pair) -> Option<(&wgpu::QuerySet, u32)> {
+    /// The next query pair, taken for `pass` in the submit being recorded.
+    fn pair(&self, pass: GpuPass) -> Option<(&wgpu::QuerySet, u32)> {
         #[cfg(test)]
         self.asked.set(self.asked.get() + 1);
         let q = self.queries.as_ref().filter(|q| q.open.get())?;
@@ -88,7 +58,40 @@ impl GpuTimer {
             }
             return None;
         }
-        frame.push(pair);
+        let submit = crate::gpu::ops::submit_seq();
+        frame.push(Pair { pass, submit });
         Some((&q.set, at))
+    }
+}
+
+/// Pair `at`'s both indices, for one pass.
+fn whole(at: u32) -> Indices {
+    (Some(at * 2), Some(at * 2 + 1))
+}
+
+/// Pair `at`'s opening half (its start) and closing half (its end).
+fn halves(at: u32) -> [Indices; 2] {
+    [(Some(at * 2), None), (None, Some(at * 2 + 1))]
+}
+
+fn render(
+    query_set: &wgpu::QuerySet,
+    (begin, end): Indices,
+) -> wgpu::RenderPassTimestampWrites<'_> {
+    wgpu::RenderPassTimestampWrites {
+        query_set,
+        beginning_of_pass_write_index: begin,
+        end_of_pass_write_index: end,
+    }
+}
+
+fn compute(
+    query_set: &wgpu::QuerySet,
+    (begin, end): Indices,
+) -> wgpu::ComputePassTimestampWrites<'_> {
+    wgpu::ComputePassTimestampWrites {
+        query_set,
+        beginning_of_pass_write_index: begin,
+        end_of_pass_write_index: end,
     }
 }

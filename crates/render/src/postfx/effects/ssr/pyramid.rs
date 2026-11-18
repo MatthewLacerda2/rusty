@@ -15,7 +15,8 @@
 //! eight passes, about 22 MB each. They are render targets only, never storage: a
 //! storage-capable colour image loses framebuffer compression on most desktop GPUs,
 //! and the trace's full-size writes and the resolve's reads of level 0 dwarf the
-//! mips' (a compute pass built them before, #2340 measures the two).
+//! mips'. Measured on a desktop GPU against one compute pass over storage
+//! pyramids, this render chain is cheaper both to build and to trace into.
 //!
 //! All of it is the view's, held only while it runs SSR and remade at a new size
 //! ([`super::targets::SsrTargets`]).

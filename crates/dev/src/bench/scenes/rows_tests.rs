@@ -112,10 +112,10 @@ fn resident_bytes_by_kind_are_rows_in_mib() {
     let mut report = SceneReport::default();
     push_resident(&mut report, &counters);
     let mb = |k: &str| report.row(k).map(|r| r.avg);
-    assert_eq!(mb("gpu.texture_mb"), Some(3.0));
-    assert_eq!(mb("gpu.lightmap_mb"), Some(0.5));
+    assert_eq!(mb("gpu_texture_mb"), Some(3.0));
+    assert_eq!(mb("gpu_lightmap_mb"), Some(0.5));
     assert_eq!(
-        mb("gpu.reflection_mb"),
+        mb("gpu_reflection_mb"),
         Some(0.0),
         "a kind the scene lacks reads 0"
     );
