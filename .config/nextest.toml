@@ -37,7 +37,8 @@ test-group = "gpu"
 # Printed after every run, passing too, so each log carries its adapter's values: the
 # canary names the adapter the GPU suite rendered on, and each test that holds a GPU
 # tolerance prints what it measured (docs/testing.md, *Which adapters*). A new
-# tolerance test that prints its values adds itself here.
+# tolerance test that prints its values adds itself here, as the test games do with
+# their CPU time in yardsticks (docs/testing.md, *Test games*).
 [[profile.default.overrides]]
 filter = """
 test(/(^|::)test_gpu::tests::gpu_adapter_present_when_required$/)
@@ -49,6 +50,7 @@ test(/(^|::)test_gpu::tests::gpu_adapter_present_when_required$/)
 | test(/(^|::)ssr::gpu::rough::jitter::gpu_a_still_rough_reflection_holds_under_taa_jitter$/)
 | test(/(^|::)ssr::gpu::rough::fading::gpu_a_lit_bands_fading_edge_draws_no_line$/)
 | test(/(^|::)ssr::gpu::rough::contact::dark::gpu_a_dark_cubes_contact_reflection_stays_tight_before_a_glowing_wall$/)
+| test(/^gpu::test_games::/)
 """
 success-output = "final"
 
