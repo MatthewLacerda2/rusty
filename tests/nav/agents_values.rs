@@ -1,7 +1,6 @@
-//! Value-asserting agent steering tests for #161 mutation burn-down.
-//!
-//! These tests exercise the public `tick_nav_agents` interface to kill arithmetic and comparison mutants
-//! that the coverage-only tests miss.
+//! Agent steering by its numbers, through `tick_nav_agents`: how far one tick from
+//! rest moves, that an agent inside its stopping distance holds still and slows, and
+//! that a waypoint already reached is passed, not chased.
 
 use glam::Vec3;
 use rusty::navigation::NavigationGraph;
@@ -31,9 +30,9 @@ fn spawn(scene: &mut Scene, pos: Vec3, agent: NavMeshAgentComponent) -> u32 {
     id
 }
 
-/// Kill "replace * with /" in the velocity step. Acceleration is m/s² (#742): one
-/// tick from rest reaches `a·dt` and moves `a·dt²` = 10/3600 ≈ 0.00278; with `/` the
-/// step is `a/dt` (600 m/s, capped at speed 5) and moves 5/60 ≈ 0.083.
+/// Acceleration is m/s²: one tick from rest reaches `a·dt` and moves `a·dt²` =
+/// 10/3600 ≈ 0.00278, not the `a/dt` step (600 m/s, capped at speed 5) that would
+/// move 5/60 ≈ 0.083.
 #[test]
 fn velocity_step_multiplies_not_divides() {
     let start = Vec3::new(1.0, 0.0, 1.0);
@@ -49,9 +48,8 @@ fn velocity_step_multiplies_not_divides() {
     );
 }
 
-/// Kill "replace > with <" in stopping condition (line 109).
-/// When dist < stopping_distance the agent must NOT move (decelerate branch).
-/// Mutant swaps condition: dist within stopping zone triggers steer instead.
+/// An agent already inside its stopping distance decelerates in place: it does
+/// not steer on toward the destination.
 #[test]
 fn agent_within_stopping_distance_does_not_advance() {
     let target = Vec3::new(10.0, 0.0, 0.0);
@@ -67,9 +65,9 @@ fn agent_within_stopping_distance_does_not_advance() {
     );
 }
 
-/// Kill "replace * with /" in deceleration formula (line 113).
-/// Correct: velocity -= velocity * factor (magnitude shrinks).
-/// Wrong:   velocity -= velocity / factor (inverted; amplifies and reverses sign).
+/// Inside the stopping distance the velocity shrinks by a share of itself each
+/// tick (`velocity -= velocity * factor`): it slows, keeping its sign, and never
+/// grows.
 #[test]
 fn deceleration_reduces_not_amplifies_velocity() {
     let target = Vec3::new(5.0, 0.0, 0.0);
@@ -94,9 +92,8 @@ fn deceleration_reduces_not_amplifies_velocity() {
     );
 }
 
-/// Kill "replace sqrt() distance comparison" in waypoint-reached check (line 75).
-/// A waypoint BEHIND the agent (XZ distance < 0.5) must be skipped so the agent
-/// steers to the NEXT waypoint — not reversed to chase the stale one.
+/// A waypoint the agent is already within reach of (XZ distance < 0.5), here behind
+/// it, is passed: the agent steers to the next one instead of turning back.
 #[test]
 fn waypoint_behind_agent_is_advanced_past() {
     let start = Vec3::new(5.0, 0.0, 5.0);
