@@ -272,7 +272,7 @@ impl Run<'_> {
             }
             *slot = None;
             self.orphans.fetch_add(lost, Ordering::Relaxed);
-            progress.mesh_done();
+            progress.mesh_done(c);
             // The last step frees each chart's state as it finishes.
             (Vec::new(), Some(map))
         };

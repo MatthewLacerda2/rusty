@@ -10,6 +10,7 @@ use std::sync::Arc;
 use glam::{Vec2, Vec3};
 
 use crate::bake::denoise::Oidn;
+use crate::bake::progress::MeshClocks;
 use crate::memory::rss_peak_bytes;
 use rusty_lighting::lightmap::{
     bake_on, BakeLight, BakeMesh, BakeProgress, BakeRun, BakeScene, LightShape, Lightmap,
@@ -86,11 +87,11 @@ fn kept(maps: &[Lightmap]) -> u64 {
 pub(crate) fn bake(n: usize, side: f32, denoiser: Denoiser) -> (u64, u64) {
     // As every bake does before it starts (`fits::fits`).
     crate::memory::return_large_frees();
+    // Observed as every bake is, whose observer hands freed memory back.
+    let observed = BakeProgress::observed(Arc::new(MeshClocks::default()));
     let progress = match denoiser {
-        Denoiser::Oidn => {
-            BakeProgress::default().with_denoiser(Arc::new(Oidn::with_devices(WORKERS)))
-        }
-        _ => BakeProgress::default(),
+        Denoiser::Oidn => observed.with_denoiser(Arc::new(Oidn::with_devices(WORKERS))),
+        _ => observed,
     };
     let maps = bake_on(&planes(n, side), &settings(denoiser), &progress, WORKERS).expect("ran");
     assert_eq!(maps.len(), n);

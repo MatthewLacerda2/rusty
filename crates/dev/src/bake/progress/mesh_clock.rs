@@ -64,4 +64,10 @@ impl BakeObserver for MeshClocks {
             nanos.fetch_add(from.elapsed().as_nanos() as u64, Ordering::Relaxed);
         }
     }
+
+    /// The bake's working data for the chart is freed: hand it back (#2312,
+    /// `memory::relieve`), so the next chart's does not stack on it.
+    fn chart_finished(&self, _chart: usize) {
+        crate::memory::relieve();
+    }
 }

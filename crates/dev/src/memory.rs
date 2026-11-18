@@ -38,6 +38,24 @@ pub fn return_large_frees() {
     }
 }
 
+/// Hand the blocks the allocator holds free back to the system (#2312), after a
+/// bake's chart: macOS's allocator keeps freed multi-MB blocks in its regions, so
+/// the next charts' buffers stacked beside them instead of reusing them, and a
+/// scene of four times the meshes peaked about three times its extra maps higher.
+/// On glibc, [`return_large_frees`] does it as each block is freed; elsewhere it
+/// does nothing.
+pub fn relieve() {
+    #[cfg(target_os = "macos")]
+    {
+        unsafe extern "C" {
+            fn malloc_zone_pressure_relief(zone: *mut std::ffi::c_void, goal: usize) -> usize;
+        }
+        // SAFETY: a null zone asks every zone, and a goal of 0 as much as each can
+        // give; it only returns free pages to the system.
+        unsafe { malloc_zone_pressure_relief(std::ptr::null_mut(), 0) };
+    }
+}
+
 /// The machine's memory, in bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Machine {

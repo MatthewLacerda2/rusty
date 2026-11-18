@@ -116,7 +116,7 @@ pub fn bake_on(
         let shape = layout(scene, head, &points);
         let (map, lost) = lightmap(scene, (head, &shape), points, light, settings, cleaner);
         orphans.fetch_add(lost, Ordering::Relaxed);
-        progress.mesh_done();
+        progress.mesh_done(c);
         map
     };
     let maps = pool::run_made(&counts, make, threads, progress, trace, finish)?;
