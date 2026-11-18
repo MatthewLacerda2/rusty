@@ -10,12 +10,16 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
 use super::folded::Folded;
+use super::trust::Tally;
 
 /// A `sample` running on this process.
 pub struct Recording {
     child: Child,
     report: PathBuf,
 }
+
+/// Samples a second: `sample` samples every thread each millisecond.
+pub const HZ: u32 = 1000;
 
 /// Start sampling this process (every millisecond, for up to an hour) into `report`.
 pub fn start(sample: &Path, report: &Path) -> Result<Recording, String> {
@@ -43,8 +47,9 @@ pub fn start(sample: &Path, report: &Path) -> Result<Recording, String> {
 }
 
 impl Recording {
-    /// Stop sampling and fold the report it wrote.
-    pub fn stop(mut self) -> Result<Folded, String> {
+    /// Stop sampling and fold the report it wrote; a leaf in the image named
+    /// `own` is the bench's own.
+    pub fn stop(mut self, own: &str) -> Result<(Folded, Tally), String> {
         // lint: allow(subprocess) SIGINT is how sample is told to stop and write its report
         let _ = Command::new("kill")
             .args(["-INT", &self.child.id().to_string()])
@@ -53,7 +58,7 @@ impl Recording {
         let text = std::fs::read_to_string(&self.report)
             .map_err(|e| format!("sample wrote no report ({e})"))?;
         let _ = std::fs::remove_file(&self.report);
-        Ok(parse(&text))
+        Ok(parse(&text, own))
     }
 }
 
@@ -67,11 +72,11 @@ const BENCH_THREAD: &str = "com.apple.main-thread";
 /// thread every interval, running or parked, so the others (wgpu's, the audio
 /// device's, the runtime's) would fill the table with their waits
 /// (`__psynch_cvwait`, `mach_msg2_trap`); the bench thread's own waits (on the
-/// GPU) are its time and stay.
-pub fn parse(text: &str) -> Folded {
-    let mut threads: Vec<(String, Folded)> = Vec::new();
-    // (column, name, count, children's count) from the root down.
-    let mut stack: Vec<(usize, String, u64, u64)> = Vec::new();
+/// GPU) are its time and stay. Each leaf is tallied by its image, the bench's
+/// own named `own`.
+pub fn parse(text: &str, own: &str) -> (Folded, Tally) {
+    let mut threads: Vec<Thread> = Vec::new();
+    let mut stack: Vec<Node> = Vec::new();
     let graph = text
         .lines()
         .skip_while(|l| !l.starts_with("Call graph:"))
@@ -87,39 +92,62 @@ pub fn parse(text: &str) -> Folded {
         let Ok(count) = count.parse::<u64>() else {
             continue;
         };
-        while stack.last().is_some_and(|(c, ..)| *c >= col) {
-            pop(&mut stack, &mut threads);
+        while stack.last().is_some_and(|n| n.col >= col) {
+            pop(&mut stack, &mut threads, own);
         }
         match stack.last_mut() {
-            Some(parent) => parent.3 += count,
-            None => threads.push((symbol.to_string(), Folded::default())),
+            Some(parent) => parent.children += count,
+            None => threads.push((symbol.to_string(), Folded::default(), Tally::default())),
         }
-        let name = symbol.split("  (in ").next().unwrap_or(symbol).trim();
-        stack.push((col, name.to_string(), count, 0));
+        let (name, image) = symbol.split_once("  (in ").unwrap_or((symbol, ""));
+        let image = image.split(')').next().unwrap_or_default();
+        stack.push(Node {
+            col,
+            name: name.trim().to_string(),
+            image: image.to_string(),
+            count,
+            children: 0,
+        });
     }
     while !stack.is_empty() {
-        pop(&mut stack, &mut threads);
+        pop(&mut stack, &mut threads, own);
     }
     let bench = threads
         .iter()
-        .position(|(root, _)| root.contains(BENCH_THREAD));
+        .position(|(root, ..)| root.contains(BENCH_THREAD));
     let mut threads = threads.into_iter();
     let kept = match bench {
         Some(at) => threads.nth(at),
         None => threads.next(),
     };
-    kept.map(|(_, folded)| folded).unwrap_or_default()
+    kept.map(|(_, folded, tally)| (folded, tally))
+        .unwrap_or_default()
+}
+
+/// A thread of the report: its root line, its stacks and their tally.
+type Thread = (String, Folded, Tally);
+
+/// An open node of the call graph, from the root down.
+struct Node {
+    col: usize,
+    name: String,
+    image: String,
+    count: u64,
+    children: u64,
 }
 
 /// Close the deepest open node: its own samples are a stack of their own, in
-/// the thread it is under (the last one opened).
-fn pop(stack: &mut Vec<(usize, String, u64, u64)>, threads: &mut [(String, Folded)]) {
-    let frames: Vec<String> = (stack.iter().skip(1)).map(|(_, n, ..)| n.clone()).collect();
-    let (Some((_, _, count, children)), Some((_, folded))) = (stack.pop(), threads.last_mut())
-    else {
+/// the thread it is under (the last one opened), with it as the leaf.
+fn pop(stack: &mut Vec<Node>, threads: &mut [Thread], own: &str) {
+    let frames: Vec<String> = (stack.iter().skip(1)).map(|n| n.name.clone()).collect();
+    let (Some(node), Some((_, folded, tally))) = (stack.pop(), threads.last_mut()) else {
         return;
     };
-    folded.add(&frames, count.saturating_sub(children));
+    let mine = node.count.saturating_sub(node.children);
+    if mine > 0 && !frames.is_empty() {
+        tally.count(&node.image, &node.name, own, mine);
+    }
+    folded.add(&frames, mine);
 }
 
 #[cfg(test)]
@@ -141,7 +169,7 @@ Call graph:\n\
     +   10 __psynch_cvwait  (in libsystem_kernel.dylib) + 8  [0x600]\n\
 \n\
 Total number in stack (recursive counted multiple times):\n";
-        let f = parse(text);
+        let (f, tally) = parse(text, "bench-scenes");
         assert_eq!(f.samples(), 10, "{:?}", f.0);
         let render = "start;main;rusty_render::Renderer::render";
         assert_eq!(
@@ -151,6 +179,8 @@ Total number in stack (recursive counted multiple times):\n";
         assert_eq!(f.0.get(render), Some(&2));
         assert_eq!(f.0.get("start;main;step"), Some(&3));
         assert_eq!(f.0.get("start;main"), Some(&1));
+        // Every leaf with samples of its own is in the bench's image (`start`, in dyld, has none).
+        assert_eq!((tally.samples, tally.own), (10, 10), "{tally:?}");
         assert!(
             !f.0.keys().any(|k| k.contains("__psynch_cvwait")),
             "a parked thread's wait: {:?}",

@@ -3414,6 +3414,7 @@ dependencies = [
  "bytemuck",
  "glam 0.33.12",
  "image",
+ "libc",
  "libloading",
  "log",
  "mach2",
