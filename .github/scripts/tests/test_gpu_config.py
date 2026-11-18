@@ -33,7 +33,7 @@ BUDGET = REPO / "crates" / "render" / "src" / "setup" / "budget.rs"
 
 #: A command that runs the engine's tests. `cargo test --doc` renders nothing,
 #: `tools/lint` is its own crate with no renderer, and `cargo mutants --list`
-#: only counts mutants (the sweep's `mutants-plan`, #1684).
+#: only counts mutants (`mutants-on-request.yml`'s `plan` job).
 SUITE = re.compile(r"cargo (nextest run|llvm-cov|mutants|test)\b")
 NOT_SUITE = re.compile(r"--doc\b|tools/lint/|cargo mutants --list\b")
 

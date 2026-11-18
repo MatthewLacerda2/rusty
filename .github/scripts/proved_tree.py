@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`proved_tree.py` — was this push to `main` already proved by a run of its tree? (#1784)
+"""`proved_tree.py` — was this push to `main`, or this PR run's merge, already proved by a run of its tree? (#1784)
 
 Every merge to `main` re-ran the whole of `ci` (~17 minutes of Linux and macOS
 runners) and `lint`, re-proving a tree the merge queue had just proved on the
@@ -18,14 +18,30 @@ nothing. A `pull_request` run tests the merge of its head into the base of that
 moment, not the head; when the squash's tree equals the head's, every change on
 `main` is already in the head, so that merge was the head's tree too.
 
+**A ready pull request asks too** (#2333). A coder proves a draft by
+dispatching `ci` on its branch, then readies it, and the ready run would build
+the same head again. On a `pull_request` event `--sha` is the test merge commit:
+its tree is what the run would build, so it is the tree compared, never the
+head's. A head behind `main` merges into a tree no dispatch built, and runs in
+full with no ancestry check. Only a `workflow_dispatch` or `push` run proves it
+([`PROOF_EVENTS`]): their `head_commit` is the tree they built, while a
+`pull_request` run's `head_commit` is its head and it built a merge. The key
+check reads what the merge changes against its first parent, the base it was
+made on. `superseded` is never asked: a merge commit is never `main`'s tip, so
+it would skip every PR build. A PR that changes the decider (this script, what
+it imports, either workflow) never asks: the step runs the PR's own copy, which
+must not judge its own skip, so the workflows' `decider` filter holds that
+before the script starts.
+
 **Caches keep their full run.** `Swatinem/rust-cache` keys on the toolchain,
 every `Cargo.toml` / `Cargo.lock`, `.cargo/config` and the job's `CARGO*`/`RUST*`
 env, and saves only on `main` (#482), only when that key has no cache yet. A
 push that changes any [`CACHE_KEYED`] file since the previous tip, or the
 workflow file itself, runs everything, so the new key's cache is written by
 `main` and a dependency bump is proven on `main`. So does one under
-`.github/actions/`: `install-tool` pins the CI tools and keys their cache (#1973). Any other push leaves the key,
-and so the saved cache, as it was.
+`.github/actions/`: `install-tool` pins the CI tools and keys their cache (#1973). So does a change to this
+script or what it imports ([`DECIDER`]): its own verdict never skips its own proof. Any other push
+leaves the key, and so the saved cache, as it was.
 
 **A superseded push skips** (#1785). A merge train lands its members as one
 squash each, seconds apart, so every push but the last carries a tree no run
@@ -81,6 +97,17 @@ BUILT: dict[str, dict[str, tuple[str, ...]]] = {
 CACHE_KEYED = ("Cargo.toml", "Cargo.lock", "rust-toolchain", "rust-toolchain.toml")
 # `.github/actions/install-tool` pins the tools and keys their cache (#1973).
 CACHE_KEYED_DIRS = (".cargo/", ".github/actions/")
+#: This script and what it imports: a change to what decides the skip is proved
+#: by a full run. On a pull request the workflows hold this before the script
+#: runs (their `decider` filter), since the PR's own copy is what would run.
+DECIDER = (".github/scripts/proved_tree.py", ".github/scripts/ghrest.py",
+           ".github/scripts/merging/__init__.py", ".github/scripts/merging/verdict/__init__.py",
+           ".github/scripts/merging/verdict/runlist.py")
+#: Per event, the events whose runs may prove it, `None` for any (#2333).
+PROOF_EVENTS: dict[str, tuple[str, ...] | None] = {
+    "push": None,
+    "pull_request": ("workflow_dispatch", "push"),
+}
 
 #: How many pages of successful runs to search; the proving run of a merge is
 #: the pull request's last, minutes old.
@@ -107,16 +134,17 @@ def keyed(path: str, workflow: str) -> bool:
     """Whether a changed path moves the cache key or the workflow itself."""
     name = path.rsplit("/", 1)[-1]
     return (name in CACHE_KEYED or path.startswith(CACHE_KEYED_DIRS)
-            or path == f".github/workflows/{workflow}")
+            or path == f".github/workflows/{workflow}" or path in DECIDER)
 
 
 def key_change(get: Get, repo: str, before: str, sha: str, workflow: str) -> str | None:
-    """Why this push must run in full for its caches; `None` when it need not."""
+    """Why this change must run in full for its caches; `None` when it need not.
+    `before` is the previous tip on a push, the merge's base on a pull request."""
     if not before or before == NO_COMMIT:
-        return "no previous tip to compare with"
+        return "no previous commit to compare with"
     compare = get(f"repos/{repo}/compare/{before}...{sha}")
     if not isinstance(compare, dict) or compare.get("status") != "ahead":
-        return "the push is not a plain fast-forward of the previous tip"
+        return f"{sha} is not a plain fast-forward of {before}"
     files = compare.get("files")
     if not isinstance(files, list) or len(files) >= COMPARE_CAP:
         return "the changed files could not all be read"
@@ -139,8 +167,10 @@ def built(jobs: list[dict], workflow: str) -> bool:
     return True
 
 
-def proving_run(get: Get, repo: str, tree: str, workflow: str) -> str | None:
-    """The url of a successful run of `workflow` that built `tree`, if one is recent."""
+def proving_run(get: Get, repo: str, tree: str, workflow: str,
+                events: tuple[str, ...] | None = None) -> str | None:
+    """The url of a successful run of `workflow` that built `tree`, if one is
+    recent; when `events` is given, only a run of one of those events counts."""
     for page in range(1, PAGES + 1):
         answer = get(f"repos/{repo}/actions/workflows/{workflow}/runs?status=success"
                      f"&per_page={ghrest.PER_PAGE}&page={page}")
@@ -149,6 +179,8 @@ def proving_run(get: Get, repo: str, tree: str, workflow: str) -> str | None:
         runs = answer["workflow_runs"]
         for run in runs:
             if (run.get("head_commit") or {}).get("tree_id") != tree:
+                continue
+            if events is not None and run.get("event") not in events:
                 continue
             jobs = get(f"repos/{repo}/actions/runs/{run['id']}/jobs?filter=latest&per_page=100")
             if not isinstance(jobs, dict):
@@ -167,9 +199,14 @@ def superseded(get: Get, repo: str, sha: str) -> str | None:
     return found if isinstance(found, str) and len(found) == 40 and found != sha else None
 
 
-def verdict(get: Get, repo: str, workflow: str, sha: str, before: str) -> tuple[str | None, str]:
+def verdict(get: Get, repo: str, workflow: str, sha: str, before: str,
+            event: str = "push") -> tuple[str | None, str]:
     """(what proves it: the proving run's url, or the newer tip that supersedes
-    it; `None` when nothing does) and why, failing toward running on any error."""
+    it; `None` when nothing does) and why, failing toward running on any error.
+    A `pull_request` event goes to [`merge_verdict`], so the superseded rule is
+    never asked there."""
+    if event == "pull_request":
+        return merge_verdict(get, repo, workflow, sha)
     try:
         why = key_change(get, repo, before, sha, workflow)
         if why:
@@ -181,7 +218,7 @@ def verdict(get: Get, repo: str, workflow: str, sha: str, before: str) -> tuple[
         if not isinstance(commit, dict):
             return None, "runs in full: the pushed commit could not be read"
         tree = commit["commit"]["tree"]["sha"]
-        url = proving_run(get, repo, tree, workflow)
+        url = proving_run(get, repo, tree, workflow, PROOF_EVENTS["push"])
     except (KeyError, TypeError, LookupError) as error:
         return None, f"runs in full: the lookup failed ({error!r})"
     if url is None:
@@ -189,14 +226,39 @@ def verdict(get: Get, repo: str, workflow: str, sha: str, before: str) -> tuple[
     return url, f"skips the build: tree {tree} was proved by {url}"
 
 
+def merge_verdict(get: Get, repo: str, workflow: str, sha: str) -> tuple[str | None, str]:
+    """[`verdict`] on a ready PR's test merge `sha` (#2333): its first parent is
+    the base the key check compares with, and only a [`PROOF_EVENTS`] run of
+    its tree proves it."""
+    events = PROOF_EVENTS["pull_request"]
+    try:
+        commit = get(f"repos/{repo}/commits/{sha}")
+        if not isinstance(commit, dict):
+            return None, f"runs in full: commit {sha} could not be read"
+        parents = commit["parents"]
+        if len(parents) != 2:
+            return None, f"runs in full: {sha} is not a pull request's test merge"
+        why = key_change(get, repo, parents[0]["sha"], sha, workflow)
+        if why:
+            return None, f"runs in full: {why}"
+        tree = commit["commit"]["tree"]["sha"]
+        url = proving_run(get, repo, tree, workflow, events)
+    except (KeyError, TypeError, LookupError) as error:
+        return None, f"runs in full: the lookup failed ({error!r})"
+    if url is None:
+        return None, f"runs in full: no recent successful {'/'.join(events)} {workflow} run built tree {tree}"
+    return url, f"skips the build: tree {tree} was proved by {url}"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument("--workflow", required=True, choices=sorted(BUILT))
     parser.add_argument("--sha", required=True)
-    parser.add_argument("--before", default="")
+    parser.add_argument("--before", default="", help="the previous tip, on a push")
+    parser.add_argument("--event", default="push", choices=sorted(PROOF_EVENTS))
     args = parser.parse_args()
     repo = os.environ.get("GITHUB_REPOSITORY", "")
-    url, why = verdict(gh_get, repo, args.workflow, args.sha, args.before) if repo else (
+    url, why = verdict(gh_get, repo, args.workflow, args.sha, args.before, args.event) if repo else (
         None, "runs in full: GITHUB_REPOSITORY is not set")
     print(f"{args.workflow} on {args.sha} {why}")
     out = os.environ.get("GITHUB_OUTPUT")
