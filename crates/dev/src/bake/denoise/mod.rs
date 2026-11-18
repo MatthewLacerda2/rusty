@@ -10,7 +10,9 @@
 //! says what to install.
 //!
 //! Each worker cleans its own charts on a device of its own, one thread each, so
-//! the denoise runs beside the trace with no lock between workers. On the
+//! the denoise runs beside the trace with no lock between workers on a small
+//! chart; a large one waits only while the large ones in flight fill the
+//! [`budget`] (#2312), so what they hold together stays within it. On the
 //! Dust2-sized level (`scale_tests`, #1884's review) OIDN added about a sixth to
 //! the trace's time either way on 8 threads, but one shared device of every core
 //! spent 70 s behind one lock against a 134 s trace: on a machine that traces

@@ -486,6 +486,26 @@ lighting settings (above), whose defaults are the ones listed here.
   A logged bake (`Lighting.BakeLightmaps()`, `Lighting.Generate()`) says OIDN's
   worker time and how many lightmaps it cleaned, in a line of its own in the
   summary: it runs inside the lightmaps step.
+- **Memory.** A script's bake (one-shot) peaks at what it keeps plus what is in
+  flight, never every texel's working data at once. It keeps each finished lightmap: 12 bytes a
+  texel of its square, 16 more for a directional bake and 16 more for a shadowmask
+  one (a 2048² map of a directional bake: 112 MiB). In flight are the meshes its
+  workers are tracing (about 112 bytes a texel each, one mesh per core at most) and
+  the one being assembled (about 256 a texel); a mesh's texels are rasterized only
+  when the bake reaches it. OIDN cleans each lightmap with at most 512 MB of
+  scratch (a larger one is cleaned in overlapping tiles; measured on 1016² maps, byte for
+  byte what one pass gives), and
+  the lightmaps being cleaned at once share 2 GB, so its share does not grow with
+  the cores. Packing the pages afterwards holds about twice the lightmaps again.
+  The editor's bake (progressive) also keeps every texel's sums between passes,
+  about 116 bytes a texel. So a bake's memory grows with `texelsPerUnit`² and
+  `maxLightmapSize`² (the largest map), and with the scene only by its lightmaps.
+  Before it starts, a bake estimates its peak from those (erring high) and warns,
+  naming the settings to lower, when it passes the memory the machine has free
+  (Linux `MemAvailable`; macOS free, inactive, purgeable and speculative pages); it
+  is refused with the same message when it passes all the machine has. Its last
+  console line and its report (`peakResidentMB`, below) say the process's peak
+  resident memory, which in a headless bake is the bake's.
 - **Max Lightmap Size** (`maxLightmapSize`, Unity's setting; the editor's
   **"Max Lightmap Size"** under the Generate Lighting button). The atlas page's edge in
   texels, a power of two from `32` to `4096`, default `1024`; any other value is held to
@@ -801,7 +821,9 @@ Then each kind's own:
   actualDensity }`: `seconds` is worker time over every thread, the densities are texels
   per metre asked for (texels per unit × Scale In Lightmap) and got), `zeroScaleInLightmap`
   (the meshes left out at Scale In Lightmap 0), `denoise` (`{ charts, seconds }`, `nil`
-  without OIDN) and `lights` (`{ index, kind, position, range, bakesDirect, texelsInReach }`).
+  without OIDN), `peakResidentMB` (the process's peak resident memory when the bake
+  finished, `nil` where it cannot be read: in the editor it counts the editor's own)
+  and `lights` (`{ index, kind, position, range, bakesDirect, texelsInReach }`).
   A light is in reach of a mesh when the mesh's bounds meet the sphere of its range (a
   directional light reaches every mesh): a spot light's cone is not read.
   `invalidTexels` (the backface texels the bake filled) is `nil`: only the tracer knows it.
