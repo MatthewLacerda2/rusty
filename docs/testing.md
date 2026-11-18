@@ -292,12 +292,15 @@ its check and its command changed to match).
   xtask's tests, and the default doctests run on Linux only (#2276). A job past three quarters of its `timeout-minutes`
   on `main` files an issue by itself (`ci_headroom.py`, `docs/linting.md`). See *The test runner* below.
 - **A pull request that adds a slow test is told** (#2350). Each suite job's *Slowest
-  tests* step first compares its report with the same leg's reports from `main`'s
-  latest run that kept them (every shard together, since a `count:` partition moves
-  tests between shards): a test over 20 s (`slowest_tests.BUDGET`) that `main` had under
-  it, or lacked, prints `new over 20 s: <test> <seconds> (main: <seconds or absent>)` and
-  a warning annotation on the PR's checks; one over it on both sides prints once as
-  `known`, and one `main` had within runner noise of it (`NOISE`, 1.3×) as `near`. With no baseline (expired, a renamed entry) it says `no baseline: <why>` and
+  tests* step first compares its report with the reports of the same leg and feature
+  set from `main`'s latest successful run that kept every shard's (every shard
+  together, since a `count:` partition moves tests between shards), and names that
+  run, its date and commit: a test merged after it reads as new. A test over 20 s
+  (`slowest_tests.BUDGET`) that `main` had under it, or lacked, prints `new over 20 s:
+  <test> <seconds> (main: <seconds or absent>)` and a warning annotation on the PR's
+  checks; one over it on both sides prints once as `known`, and one `main` had within
+  runner noise of it (`NOISE`, 1.3×) as `near`, unless it is now more than 1.3× slower
+  (`slowest_tests.is_new`). With no baseline (expired, a renamed entry) it says `no baseline: <why>` and
   lists the tests over the budget. It informs, never gates, and exempts nothing: a test
   that needs the time says why in its PR; one that does not is trimmed against what it
   proves, still failing on the mutation it guards.

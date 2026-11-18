@@ -36,11 +36,13 @@ within two days of each trim, and a top N with no comparison names nobody. Each
 new one prints `new over 20 s: <test> <seconds> (main: <seconds or absent>)` and
 a `::warning::` annotation the run's checks page shows; one already over the
 budget on `main` prints once as `known`, and one `main` had within `NOISE` of
-it as `near`, never as new. The baseline is every
-JUnit file under the given paths (searched recursively, so a download's layout
-does not matter), all shards of the same leg together: a `--partition count:`
-split moves tests between shards whenever the test count changes, so a test
-absent from one shard's report may sit in the other. With no readable baseline
+it as `near`, unless it is now more than `NOISE` times slower (`is_new`). The
+baseline is every JUnit file under the given paths (searched recursively, so a
+download's layout does not matter), all shards of the same leg and feature set
+together: a `--partition count:` split moves tests between shards whenever the
+test count changes, so a test absent from one shard's report may sit in the
+other. The caller passes only reports of the job's own feature set, since one
+test runs at different speeds in `default` and `dev` builds. With no readable baseline
 (an expired artifact, a renamed matrix entry, the first run) the step prints
 `no baseline: <why>` and the tests over the budget, unannotated. The signal
 informs, it never gates: a test that must be slow (a Dust2-scale proof) is not
@@ -102,7 +104,7 @@ def cases(xml: str) -> tuple[list[Case], float | None]:
 
 def slowest(xml: str, count: int = 10) -> list[tuple[float, str]]:
     """The `count` longest `testcase`s, as (seconds, `classname name`), longest first."""
-    rows = [(c.seconds, f"{c.binary} {c.name}".strip()) for c in cases(xml)[0]]
+    rows = [(c.seconds, key(c)) for c in cases(xml)[0]]
     return sorted(rows, key=lambda c: (-c[0], c[1]))[:count]
 
 
@@ -186,6 +188,16 @@ def baseline(paths: list[str]) -> dict[str, float]:
     return seen
 
 
+def is_new(seconds: float, main: float | None, budget: float = BUDGET) -> bool:
+    """Whether a test over `budget` at `seconds` is new against `main`'s time: absent
+    there, or under the budget there and more than `NOISE` times slower now. Under
+    `budget / NOISE` on `main`, crossing the budget is past the noise already; in
+    the band above it, the time must still grow past the noise, so a test `main`
+    ran at 17.7 s reads `near` at 20.2 s and new at 90 s. Over the budget on `main`
+    it is `known`, however it grew."""
+    return main is None or (main <= budget and seconds > NOISE * main)
+
+
 def signal(found: list[Case], main: dict[str, float] | None, why: str = "",
            budget: float = BUDGET) -> list[str]:
     """The over-budget lines: new ones (with their annotations) against `main`,
@@ -194,7 +206,7 @@ def signal(found: list[Case], main: dict[str, float] | None, why: str = "",
     b = f"{budget:g} s"
     if main is None:
         return [f"no baseline: {why}", *(f"over {b}: {key(c)} {c.seconds:.1f} s" for c in over)]
-    new = [c for c in over if main.get(key(c), 0.0) <= budget / NOISE]
+    new = [c for c in over if is_new(c.seconds, main.get(key(c)), budget)]
     lines = [f"new over {b}: {key(c)} {c.seconds:.1f} s (main: "
              f"{f'{main[key(c)]:.1f} s' if key(c) in main else 'absent'})" for c in new]
     if not new:

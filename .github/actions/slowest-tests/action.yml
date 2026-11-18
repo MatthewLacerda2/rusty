@@ -1,15 +1,19 @@
 # A suite job's "Slowest tests" step (#1976, #2326, #2350): where the shard's
 # time went, and the tests over `slowest_tests.BUDGET` that `main` had under it.
 #
-# The baseline is the same leg's JUnit artifacts (`patterns`, every shard: a
-# `count:` partition moves tests between shards) from the latest completed `ci`
-# run on `main` that kept them. A push to `main` whose tree a PR run proved
-# builds nothing (`changes`), so the walk goes back past those to a run that
-# tested, usually the nightly, inside the artifacts' 7-day retention. Nothing
-# found (expired, a renamed matrix entry) leaves the directory empty and the
-# script prints `no baseline: …`. Every step informs and none gates: the caller
-# is `continue-on-error`, and a `gh` failure only empties the baseline. The job
-# needs `actions: read` for the runs and their artifacts.
+# The baseline is every shard's JUnit artifact of this job's leg and feature set
+# (`<prefix>-1ofN` … `<prefix>-NofN`, N read from `shard`, so the count is the
+# matrix's own: a `count:` partition moves tests between shards) from the latest
+# `ci` run on `main` that kept all N and concluded `success`, so a nightly whose
+# shard timed out is never half a baseline. It is found by name (one artifacts
+# call per shard, then one call per candidate run, at most `MAX_TRIES`), not by
+# walking runs: a push to `main` whose tree a PR run proved builds nothing
+# (`changes`), and the artifacts list skips those. The step names the run, its
+# date and commit: a test merged after it reads as new. Nothing found (expired,
+# a renamed matrix entry) leaves the directory empty and the script prints
+# `no baseline: …`. Every step informs and none gates: the caller is
+# `continue-on-error`, and a `gh` failure only empties the baseline. The job
+# needs `actions: read` for the artifacts and runs.
 name: Slowest tests
 description: Print a nextest JUnit report's slowest tests, its group accounting, and the tests newly over the budget against main.
 inputs:
@@ -19,8 +23,11 @@ inputs:
   count:
     description: How many of the slowest tests to print.
     default: "10"
-  patterns:
-    description: Space-separated artifact-name globs of `main`'s reports of the same leg.
+  prefix:
+    description: The leg's artifact name before the shard (`junit-build-test-dev`), as the upload step names it.
+    required: true
+  shard:
+    description: This job's `matrix.shard` (`1/2`); its total is how many reports a baseline needs.
     required: true
 runs:
   using: composite
@@ -29,22 +36,42 @@ runs:
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
-        PATTERNS: ${{ inputs.patterns }}
+        PREFIX: ${{ inputs.prefix }}
+        SHARD: ${{ inputs.shard }}
         BASE: ${{ runner.temp }}/slowest-baseline
+        BRANCH: main  # an env value, so a local run can point it at a branch
+        MAX_TRIES: "5"
       run: |
-        mkdir -p "$BASE"
-        args=(); for p in $PATTERNS; do args+=(-p "$p"); done
-        runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=main&status=completed&per_page=30" \
-          --jq '.workflow_runs[] | select(.event == "push" or .event == "schedule") | .id' 2>&1) \
-          || { echo "baseline: the runs did not list: $runs"; exit 0; }
-        for id in $runs; do
-          rm -rf "$BASE" && mkdir -p "$BASE"  # a half-done download is no baseline
-          if gh run download "$id" -R "$GITHUB_REPOSITORY" -D "$BASE" "${args[@]}" >/dev/null 2>&1; then
-            echo "baseline: main's run $id ($(find "$BASE" -name '*.xml' | wc -l | tr -d ' ') reports)"; exit 0
+        rm -rf "$BASE"
+        total=${SHARD#*/}
+        names=(); for i in $(seq 1 "$total"); do names+=("$PREFIX-${i}of$total"); done
+        # The runs on main that kept every name, newest first. gh's stderr goes to the log.
+        keep=all
+        for n in "${names[@]}"; do
+          ids=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$n&per_page=100" --jq '
+            [.artifacts[] | select((.expired | not) and .workflow_run.head_branch == env.BRANCH
+              and .workflow_run.head_repository_id == .workflow_run.repository_id)
+             | .workflow_run.id] | unique | reverse | .[]') \
+            || { echo "baseline: the artifacts named $n did not list"; exit 0; }
+          if [ "$keep" = all ]; then keep=$ids; else keep=$(grep -Fxf <(echo "$ids") <<<"$keep" || true); fi
+        done
+        tries=0
+        for id in $keep; do
+          [ "$tries" -ge "$MAX_TRIES" ] && break
+          tries=$((tries + 1))
+          run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" --jq '[.conclusion, .created_at, .head_sha[:7]] | @tsv') || continue
+          read -r conclusion created sha <<<"$run"
+          [ "$conclusion" = success ] || { echo "baseline: skipping $BRANCH's run $id ($conclusion)"; continue; }
+          mkdir -p "$BASE"
+          args=(); for n in "${names[@]}"; do args+=(-n "$n"); done
+          if gh run download "$id" -R "$GITHUB_REPOSITORY" -D "$BASE" "${args[@]}" >/dev/null; then
+            echo "baseline: $BRANCH's run $id of $created at $sha, $(find "$BASE" -name '*.xml' | wc -l | tr -d ' ') of $total reports; a test merged after it reads as new"
+            exit 0
           fi
+          rm -rf "$BASE"  # a half-done download is no baseline
         done
         rm -rf "$BASE"
-        echo "baseline: no completed run on main keeps an artifact named $PATTERNS"
+        echo "baseline: no successful run on $BRANCH keeps all of ${names[*]} (tried $tries)"
     - name: Report
       shell: bash
       env:

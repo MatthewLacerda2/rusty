@@ -1,7 +1,7 @@
 """The slow-test signal (#2350): a test over the budget in a pull request's
 report that `main`'s reports have under it, or lack, is named as new and
-annotated; one over it on both sides is known, listed once; one under it is not
-named; an unreadable baseline says why, lists the tests over the budget and
+annotated, as is one `main` had just under it that grew past the noise; one
+over it on both sides is known, listed once; one under it is not named; an unreadable baseline says why, lists the tests over the budget and
 exits 0; the top N below it is unchanged."""
 
 from __future__ import annotations
@@ -70,6 +70,15 @@ class Signal(unittest.TestCase):
         self.assertEqual(out[:2], ["new over 20 s: none (against 1 tests of main)",
                                    "near over 20 s: rusty::main gpu::edge 20.2 s (main: 17.7 s)"])
         self.assertFalse(any(l.startswith("::warning") for l in out))
+
+    def test_one_in_the_band_that_grew_past_the_noise_is_new(self):
+        _, out = run(report(("gpu::regressed", 90.0)), report(("gpu::regressed", 16.0)))
+        self.assertEqual(out[0], "new over 20 s: rusty::main gpu::regressed 90.0 s (main: 16.0 s)")
+        self.assertEqual(sum(l.startswith("::warning") for l in out), 1)
+
+    def test_one_over_on_main_stays_known_however_it_grew(self):
+        _, out = run(report(("gpu::known_slow", 90.0)), MAIN_1)
+        self.assertEqual(out[1], "known over 20 s: rusty::main gpu::known_slow 90.0 s (main: 36.0 s)")
 
     def test_nothing_new_says_so(self):
         _, out = run(report(("gpu::known_slow", 30.0)), MAIN_1)
