@@ -5,6 +5,7 @@ mod blur;
 mod cover;
 mod energy;
 mod fixture;
+mod ops;
 mod packing;
 mod reach;
 mod reflect;
