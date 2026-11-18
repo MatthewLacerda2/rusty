@@ -1096,8 +1096,13 @@ every binary's open makes them.
   the worst p95 and the viewpoint it came from), then over the runs: the average,
   and the **spread**, the lowest to the highest run's average. Plus:
   - `load_ms`: the scene's own load to its first rendered frame, wall clock, with
-    the import cache as the project holds it (warm once the editor or a run
-    imported it): the harness's set-up (its Lua VM and API, the stats), the
+    the import cache as the project holds it: its converted models are warm once
+    any run converted them, its compressed textures only once the editor, an
+    export or `make import PROJECT=<dir>` made them, since a `play` or
+    `bench-scenes` run never compresses a texture. Without them every texture uploads decoded, as RGBA8,
+    and the report warns (`uploaded uncompressed: N textures, M MB`): the scene's
+    `load_ms`, `gpu_mb` and `rss_peak_mb` are then not the shipped game's. It
+    holds the harness's set-up (its Lua VM and API, the stats), the
     scene's document and lighting sidecar read, its navmesh baked and the world
     built, Play's refresh of the project's converted sources (a check of each
     cache), then its first sim step and frame (its uploads). The renderer's start-up
@@ -1105,10 +1110,12 @@ every binary's open makes them.
     the two, off the clock;
   - `import_ms`, only with `IMPORT=1`, once a run (the import is the project's,
     not a scene's: every model source is converted, with headless Blender for a
-    `.blend`, so it is slow): the first scene's load in a copy of the project (made
-    beside the reports, deleted after) without its `cache/`, its import cache
+    `.blend`, and every image compressed, so it is slow, minutes for a large
+    project): `make import` run on a copy of the project (made beside the reports,
+    deleted after) without its `cache/`, its import cache
     (`assets/generated/imported/`: converted models and compressed textures) and
-    its `.git`: what a first load costs. A row of the first scene's report, and one
+    its `.git`, then the first scene's load there: what a first import and load
+    cost, model conversion and texture encoding included. A row of the first scene's report, and one
     line under the summary. A link in the project is copied as what it points to,
     so the copy stands alone and the project is only ever read; a link looping
     back, and what is neither a file nor a folder, are left out. A copy or a load

@@ -6,6 +6,7 @@ mod load;
 pub(crate) mod mips;
 mod panorama;
 mod sampler;
+mod uncached;
 
 use crate::gpu::ops::CountedDevice as _;
 use crate::Renderer;
@@ -278,6 +279,8 @@ mod normal_variance_gpu_tests;
 mod panorama_tests;
 #[cfg(test)]
 mod soft_disc_tests;
+#[cfg(test)]
+mod uncached_gpu_tests;
 
 /// The image `map` names, decoded: a map that references a texture a conversion
 /// extracted is read where the import cache holds it ([`MapRef::file`], #1130).
