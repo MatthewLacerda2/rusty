@@ -193,8 +193,7 @@ of `target/`) and branch, and keeps one something is still using.
   (`queue: HELD #N: Dependabot edits …`, not a hand-back): its run never
   executes the workflows it edits. Read the changelog, dispatch each touched
   workflow on the branch (`gh workflow run <file> --ref <branch>`, or MCP
-  `actions_run_trigger`; `mutants-sweep.yml` only when no batch needs the
-  runners), and once green merge it by name with `make queue PRS=N`.
+  `actions_run_trigger`), and once green merge it by name with `make queue PRS=N`.
 - **By hand**, the same loop: `git merge origin/main`, `cargo check` both feature
   sets and `make size`, a plain `git push`, wait, `make mergeable PR=N`,
   squash-merge. Prefer the queue. Never rebase a pushed branch (a force-push is
@@ -393,7 +392,7 @@ merge or runs on a pull request.
 
 | | on request | weekly |
 |---|---|---|
-| mutation | a merged PR's `Mutation: diff` (or globs) line, dispatched by the queue after the merge; by hand, `make mutants-remote SCOPE=diff` (or globs) on `mutants-on-request.yml`: one runner, up to four for a large plan, each mutant tested by its crate and what depends on it, report and survivors' diffs in the terminal, posted as one comment on the branch's PR (open, or merged). One run per branch: a newer dispatch cancels the older and an unmerged close cancels what is left (`mutants-cancel.yml`); on `main` each run stands alone | `mutants-sweep.yml`, Saturdays, the sim modules in as many shards as `mutants-plan` sizes, a summary and artifact; skipped when `main` has not moved since the last sweep |
+| mutation | a merged PR's `Mutation: diff` (or globs) line, dispatched by the queue after the merge; by hand, `make mutants-remote SCOPE=diff` (or globs) on `mutants-on-request.yml`: one runner, up to four for a large plan, each mutant tested by its crate and what depends on it, report and survivors' diffs in the terminal, posted as one comment on the branch's PR (open, or merged). One run per branch: a newer dispatch cancels the older and an unmerged close cancels what is left (`mutants-cancel.yml`); on `main` each run stands alone. A whole module is the same ask with its glob, by hand | never: no workflow mutates on a schedule (`test_on_request_only.py`) |
 | coverage | `gh workflow run coverage.yml --ref <branch>` | `coverage.yml`, Mondays, ratchet table |
 
 **A branch that adds mechanism** (arithmetic, a state machine, a boundary) asks
@@ -422,8 +421,8 @@ issue, and a follow-up PR off `main` when worth fixing.
 
 How to read a clean report:
 
-- **The weekly sweep covers only `crates/app/src`, `crates/script/src/scripting`, `crates/physics/src`,
-  `crates/navigation/src`.** Elsewhere, silence means unmeasured, not clean.
+- **Nothing is measured unless a run was asked for it.** Code no run named is
+  unmeasured, not clean: silence means unmeasured.
 - **A scoped run names what it planned** (how many mutants, any from outside the
   scope). A `diff` with nothing to mutate says so; it is not a pass.
 - **A run stopped at its budget names what it never reached** and is never called

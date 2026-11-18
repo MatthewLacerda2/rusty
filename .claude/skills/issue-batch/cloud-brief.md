@@ -72,8 +72,6 @@ nothing to wait for.
   before the proof run, not after it. A branch that changes a manifest, the
   lockfile, the toolchain, `.cargo/`, `.github/actions/`, a gating workflow or
   the skip's decider still runs in full when readied, as it should.
-  Never dispatch `mutants-sweep.yml`: that is the full sweep, up to ten runners
-  the batch's gates need.
 - **A run you cite is one you read finished.** Its id, its conclusion, and every
   time or count you quote from it are copied from the completed run (`gh run view
   <id> --json status,conclusion,jobs`, its log), never expected or extrapolated,

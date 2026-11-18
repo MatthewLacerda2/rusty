@@ -13,7 +13,7 @@
 # this script.
 set -euo pipefail
 
-WATCHED='ci lint mutants-sweep coverage cargo-test'
+WATCHED='ci lint coverage cargo-test'
 LABEL=bug
 
 run=$(gh api "repos/$REPO/actions/runs/$RUN_ID")
@@ -26,19 +26,6 @@ if [[ " $WATCHED " != *" $wf "* ]] || [[ $branch != main ]] \
   echo "run $RUN_ID is '$wf' on '$branch' via '$event' — not a watched main run; nothing to do"
   exit 0
 fi
-
-# A weekly sweep shard that concluded non-success is a *finding* when
-# cargo-mutants finished (exit 2 = survivors, 3 = timeouts) — that is the
-# signal's own report, not an outage. Anything else (no artifact, a baseline
-# that did not build, the shard's time budget, a lost runner) left its mutants
-# unmeasured: file it.
-shard_had_findings() {
-  local dir rc
-  dir=$(mktemp -d)
-  gh run download "$RUN_ID" -R "$REPO" -n "mutants-shard-$1" -D "$dir" >/dev/null 2>&1 || return 1
-  rc=$(cat "$dir/exit-code" 2>/dev/null || echo none)
-  [[ $rc == 2 || $rc == 3 ]]
-}
 
 # GitHub's jobs API lags the run's own conclusion: a job of a run that concluded
 # `success` can still read `conclusion: null` a few seconds later, and filing
@@ -58,10 +45,9 @@ for ((attempt = 1; attempt < ${JOBS_RETRY_ATTEMPTS:-12}; attempt++)); do
   job_lines=$(read_jobs) || job_lines=$prev
 done
 
-# Every other non-success job files. The weekly signal jobs never fail on a
-# finding — `coverage` flags a floor drop without exiting non-zero, and
-# `mutants-report` only summarises — so their failure is always
-# infrastructural. The nightly `cargo-test` signal (#981, #1338) is the
+# Every non-success job files. The weekly `coverage` signal never fails on a
+# finding — it flags a floor drop without exiting non-zero — so its failure is
+# always infrastructural. The nightly `cargo-test` signal (#981, #1338) is the
 # exception on purpose: its red is the finding, and this issue is where it lands.
 # Its `dead-pub` job (#1205) goes red only when that signal made no report,
 # which is the breakage to file.
@@ -69,10 +55,6 @@ failed=()
 while IFS=$'\t' read -r name concl; do
   [[ -z $name ]] && continue
   case "$concl" in success | skipped | neutral) continue ;; esac
-  if [[ $name =~ ^mutants\ \(([0-9]+)\)$ ]] && shard_had_findings "${BASH_REMATCH[1]}"; then
-    echo "skip: $name ($concl) — mutation findings, surfaced by mutants-report"
-    continue
-  fi
   failed+=("$name ($concl)")
 done <<<"$job_lines"
 
@@ -131,13 +113,11 @@ if [[ $state == red && -z $issue ]]; then
     echo ''
     details
     echo ''
-    echo 'Informational signals (coverage, the weekly mutation sweep) file here only when they'
-    echo 'fail to *run* — a crash, a timeout, a cancelled shard. Their findings (surviving mutants,'
-    echo 'a coverage drop) stay in their own reports. Later red runs comment here when the set of'
-    echo 'failing jobs changes. A green run leaves a note but does not close this: green can be'
-    echo 'vacuous (a docs-only merge skips the build steps, and so does a push whose tree its PR'
-    echo 'run already built, #1784), so close'
-    echo 'it from the PR that fixes it.'
+    echo 'The weekly coverage signal files here only when it fails to *run* — a crash, a'
+    echo 'timeout. Its findings (a coverage drop) stay in its own report. Later red runs comment'
+    echo 'here when the set of failing jobs changes. A green run leaves a note but does not close'
+    echo 'this: green can be vacuous (a docs-only merge skips the build steps, and so does a push'
+    echo 'whose tree its PR run already built, #1784), so close it from the PR that fixes it.'
     echo ''
     # The `Kind:` line every bug carries (#1173): this issue is its workflow's root.
     echo 'Kind: root — one issue per red workflow; later red runs comment here'
