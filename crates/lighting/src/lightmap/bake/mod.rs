@@ -77,8 +77,10 @@ pub fn bake_with_progress(
 
 /// [`bake_with_progress`] on `threads` workers: one pool over every mesh's texels
 /// (#1656). Each texel's stream is seeded by `(seed, mesh, texel index)`, never by
-/// which worker runs it, so the thread count never shows in the result.
-pub(super) fn bake_on(
+/// which worker runs it, so the thread count never shows in the result. A test
+/// hook too (`#[doc(hidden)]` at the crate root): `dev::bake`'s memory bound is
+/// per worker, so its test pins the workers.
+pub fn bake_on(
     scene: &BakeScene,
     settings: &BakeSettings,
     progress: &BakeProgress,

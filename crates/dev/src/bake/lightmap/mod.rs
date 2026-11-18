@@ -218,6 +218,8 @@ mod limits_tests;
 #[cfg(test)]
 mod logged_tests;
 #[cfg(test)]
+mod memory_tests;
+#[cfg(test)]
 mod preview_edit_tests;
 #[cfg(test)]
 mod preview_tests;

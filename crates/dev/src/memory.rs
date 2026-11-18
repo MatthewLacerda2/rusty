@@ -16,6 +16,28 @@ pub fn rss_peak_bytes() -> Option<u64> {
     peak()
 }
 
+/// Have the allocator hand every large block it frees back to the system at once
+/// (#2312), for a bake: glibc's malloc otherwise raises its mmap threshold each
+/// time a large block is freed, so a bake's per-chart buffers (megabytes each)
+/// come from its heap, and the holes they leave between the lightmaps kept stay
+/// resident; a scene of 4 times the meshes peaked about twice its extra maps
+/// higher. Pinning the threshold at its default (128 KiB) turns the raising off.
+/// Process-wide and lasting, which costs a page fault per large block; idempotent.
+/// macOS's allocator already returns large blocks, and others are left alone.
+pub fn return_large_frees() {
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    {
+        /// `M_MMAP_THRESHOLD` in glibc's `malloc.h`.
+        const M_MMAP_THRESHOLD: std::ffi::c_int = -3;
+        unsafe extern "C" {
+            fn mallopt(param: std::ffi::c_int, value: std::ffi::c_int) -> std::ffi::c_int;
+        }
+        // SAFETY: `mallopt` only sets a malloc tunable; any value is accepted or
+        // refused (returning 0), never undefined.
+        unsafe { mallopt(M_MMAP_THRESHOLD, 128 << 10) };
+    }
+}
+
 /// The machine's memory, in bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Machine {

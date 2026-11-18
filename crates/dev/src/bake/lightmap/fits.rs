@@ -99,8 +99,11 @@ pub fn check(peak: u64, settings: &BakeSettings, machine: Option<Machine>) -> Re
     Ok(())
 }
 
-/// Hold a bake of `input` at `settings` to this machine ([`estimate`], [`check`]).
+/// Hold a bake of `input` at `settings` to this machine ([`estimate`], [`check`]),
+/// and have the allocator give back what the bake frees
+/// (`memory::return_large_frees`), which the estimate counts on.
 pub fn fits(input: &BakeScene, settings: &BakeSettings, progressive: bool) -> Result<(), String> {
+    crate::memory::return_large_frees();
     let threads = std::thread::available_parallelism().map_or(1, |n| n.get());
     let peak = estimate(input, settings, progressive, threads);
     check(peak, settings, crate::memory::machine())
