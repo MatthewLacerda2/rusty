@@ -39,11 +39,8 @@ pub fn return_large_frees() {
 }
 
 /// Hand the blocks the allocator holds free back to the system (#2312), after a
-/// bake's chart: macOS's allocator keeps freed multi-MB blocks in its regions, so
-/// the next charts' buffers stacked beside them instead of reusing them, and a
-/// scene of four times the meshes peaked about three times its extra maps higher.
-/// On glibc, [`return_large_frees`] does it as each block is freed; elsewhere it
-/// does nothing.
+/// bake's chart: macOS's allocator keeps freed multi-MB blocks in its regions. On
+/// glibc, [`return_large_frees`] does it as each block is freed; elsewhere, nothing.
 pub fn relieve() {
     #[cfg(target_os = "macos")]
     {
@@ -53,6 +50,63 @@ pub fn relieve() {
         // SAFETY: a null zone asks every zone, and a goal of 0 as much as each can
         // give; it only returns free pages to the system.
         unsafe { malloc_zone_pressure_relief(std::ptr::null_mut(), 0) };
+    }
+}
+
+/// What the allocator holds from the system and what of it is in use, in bytes
+/// (#2312): a test that finds a peak too high says which it was.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Heap {
+    pub in_use: u64,
+    pub held: u64,
+}
+
+/// The allocator's [`Heap`] now: glibc's `mallinfo2` over every arena, macOS's
+/// `malloc_zone_statistics` over every zone; `None` elsewhere.
+pub fn heap() -> Option<Heap> {
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    {
+        /// glibc's `struct mallinfo2`: ten `size_t`.
+        #[repr(C)]
+        struct Info([usize; 10]);
+        unsafe extern "C" {
+            fn mallinfo2() -> Info;
+        }
+        // SAFETY: `mallinfo2` takes nothing and returns its struct by value.
+        let Info(f) = unsafe { mallinfo2() };
+        // arena, ordblks, smblks, hblks, hblkhd, usmblks, fsmblks, uordblks, …
+        let (arena, mapped, used) = (f[0] as u64, f[4] as u64, f[7] as u64);
+        Some(Heap {
+            in_use: used + mapped,
+            held: arena + mapped,
+        })
+    }
+    #[cfg(target_os = "macos")]
+    {
+        /// libmalloc's `malloc_statistics_t`.
+        #[repr(C)]
+        #[derive(Default)]
+        #[allow(dead_code, reason = "filled by the C call; two fields are not read")]
+        struct Stats {
+            blocks_in_use: u32,
+            size_in_use: usize,
+            max_size_in_use: usize,
+            size_allocated: usize,
+        }
+        unsafe extern "C" {
+            fn malloc_zone_statistics(zone: *mut std::ffi::c_void, stats: *mut Stats);
+        }
+        let mut stats = Stats::default();
+        // SAFETY: a null zone sums every zone into `stats`, a `malloc_statistics_t`.
+        unsafe { malloc_zone_statistics(std::ptr::null_mut(), &mut stats) };
+        Some(Heap {
+            in_use: stats.size_in_use as u64,
+            held: stats.size_allocated as u64,
+        })
+    }
+    #[cfg(not(any(all(target_os = "linux", target_env = "gnu"), target_os = "macos")))]
+    {
+        None
     }
 }
 
@@ -213,6 +267,14 @@ mod tests {
         assert_eq!(kb_line("VmHWM:\tlots kB\n", "VmHWM:"), None);
         let info = "MemTotal:       16000000 kB\nMemFree: 1 kB\nMemAvailable:    9000000 kB\n";
         assert_eq!(kb_line(info, "MemAvailable:"), Some(9_000_000 * 1024));
+    }
+
+    #[test]
+    fn the_heap_in_use_is_within_what_it_holds() {
+        let held = vec![1u8; 4 << 20];
+        if let Some(h) = heap() {
+            assert!(h.in_use >= held.len() as u64 && h.in_use <= h.held, "{h:?}");
+        }
     }
 
     #[test]

@@ -95,10 +95,19 @@ pub(crate) fn bake(n: usize, side: f32, denoiser: Denoiser) -> (u64, u64) {
     };
     let maps = bake_on(&planes(n, side), &settings(denoiser), &progress, WORKERS).expect("ran");
     assert_eq!(maps.len(), n);
-    (
+    let (peak, kept) = (
         rss_peak_bytes().expect("read on Linux and macOS"),
         kept(&maps),
-    )
+    );
+    // Shown when a bound fails: whether the allocator held freed memory or the
+    // bake still used it.
+    let heap = crate::memory::heap();
+    println!(
+        "{n} × {side}: peak {} MB, maps {} MB, {heap:?}",
+        peak >> 20,
+        kept >> 20
+    );
+    (peak, kept)
 }
 
 /// The 4× bake's peak past `one`'s, against what its extra maps keep.
