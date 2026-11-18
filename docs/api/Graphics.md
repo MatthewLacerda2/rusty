@@ -489,9 +489,8 @@ wide as they are, and fades to the probe reflection with them. The average count
 same surface (the same plane), so a reflection mostly neither fades at a surface's border nor bleeds onto the
 surface beside it; it is an approximation, since each sample reads a mip texel half
 the blur's radius wide, and in a band about that wide at a corner it does
-(no history, so it is stable with no accumulation; the pyramid of the opaque image
-adds a third of an `Rgba16Float` frame to the copy SSR already held, and the hits'
-two pyramids at 1080p about 22 MB each). A `receive_ssr` transparent reads
+(no history, so it is stable with no accumulation; SSR holds a copy of the opaque
+image, an `Rgba16Float` frame, and the hits' two pyramids, at 1080p about 22 MB each). A `receive_ssr` transparent reads
 its hit sharp, with no such average. A hit fades by its
 confidence (the screen's edge, wider the blurrier it is, and the march's last fifth of
 reach) and a miss keeps the sky or probe reflection, so a weak hit falls back to it

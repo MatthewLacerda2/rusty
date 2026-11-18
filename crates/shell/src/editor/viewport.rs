@@ -169,6 +169,7 @@ impl EditorFrontend {
     pub(super) fn demo_size(&self) -> Option<(u32, u32)> {
         #[cfg(feature = "dev")]
         return self.editor_ui.demo_size();
+        // lint: allow(gpu-default-only) ship stub: no demo exists without dev, and `None` is what a dev build reads with none open
         #[cfg(not(feature = "dev"))]
         None
     }

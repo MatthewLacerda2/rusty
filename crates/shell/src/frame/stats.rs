@@ -41,6 +41,7 @@ pub fn measured(
             log.frame(game, &frame, shell.renderer.times_gpu());
         }
     }
+    // lint: allow(gpu-default-only) marks the dev-only arguments used; nothing is drawn
     #[cfg(not(feature = "dev"))]
     let _ = frames_before;
 }
@@ -58,6 +59,7 @@ pub fn started(clock: &FrameClock, game: &GameWorld) {
         let last_wall_ms = f64::from(clock.frame_ms());
         rusty_dev::stats::window_ended(&mut stats.borrow_mut(), last_wall_ms);
     }
+    // lint: allow(gpu-default-only) marks the dev-only arguments used; nothing is drawn
     #[cfg(not(feature = "dev"))]
     let _ = (clock, game);
 }
@@ -73,6 +75,7 @@ pub fn undrawn(shell: &mut Shell, game: &GameWorld) {
         let frame = window_frame(&mut shell.renderer, &shell.clock, frames);
         log.frame(game, &frame, shell.renderer.times_gpu());
     }
+    // lint: allow(gpu-default-only) marks the dev-only arguments used; nothing is drawn
     #[cfg(not(feature = "dev"))]
     let _ = (shell, game);
 }

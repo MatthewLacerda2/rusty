@@ -27,6 +27,7 @@ mod engine_spawn;
 mod entity_arg;
 mod full_literal;
 mod fullscreen_triangle;
+mod gpu_default_only;
 mod gpu_ops;
 mod ignored;
 mod key_guard;
@@ -102,6 +103,7 @@ const RULES: &[(&str, Rule, Allow)] = &[
         fullscreen_triangle::run,
         Allow::Inline,
     ),
+    (gpu_default_only::RULE, gpu_default_only::run, Allow::Inline),
     (gpu_ops::RULE, gpu_ops::run, Allow::Inline),
     (ignored::RULE, ignored::run, Allow::Never),
     (key_guard::RULE, key_guard::run, Allow::Never),

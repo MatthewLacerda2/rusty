@@ -57,6 +57,7 @@ impl EditorUi {
                 Paint::Undrawn => bake::poll_undrawn(self, ctx, scene, console, nav),
             }
         }
+        // lint: allow(gpu-default-only) marks the dev-only arguments used; nothing is drawn
         #[cfg(not(feature = "dev"))]
         let _ = (ctx, console, paint);
     }
