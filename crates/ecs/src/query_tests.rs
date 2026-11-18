@@ -122,7 +122,7 @@ fn walks_count_from_the_first_ask() {
 }
 
 #[test]
-fn moving_bodies_keep_non_static_colliders_and_controllers_on_the_mask() {
+fn moving_bodies_are_the_non_static_colliders_and_controllers_with_their_layer() {
     use glam::Vec3;
     use rusty_components::{CharacterControllerComponent as Ctl, ColliderComponent as Col};
     let mut w = World::new();
@@ -137,9 +137,6 @@ fn moving_bodies_keep_non_static_colliders_and_controllers_on_the_mask() {
     }
     w.set_static(wall, true);
     w.set_layer(off, 7);
-    assert_eq!(w.moving_bodies_on(1), vec![col, ctl, both], "sorted, once");
-    assert_eq!(w.moving_bodies_on(1 << 7), vec![off]);
-    assert!(w.moving_bodies_on(0).is_empty());
     let every = vec![(col, 0), (ctl, 0), (both, 0), (off, 7)];
     assert_eq!(w.moving_bodies(), every, "every layer, with it");
     assert!(w.is_moving_body(both) && !w.is_moving_body(wall) && !w.is_moving_body(bare));

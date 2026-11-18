@@ -1,5 +1,5 @@
-//! Sight walks only the layers some perceiver's `sight_mask` holds, and that
-//! changes nothing it sees: the engine's run matches the rules before the
+//! Sight makes targets only on the layers some perceiver's `sight_mask` holds, and
+//! that changes nothing it sees: the engine's run matches the rules before the
 //! prefilter ([`Arena::step_reference`]) tick for tick.
 
 use glam::Vec3;
@@ -86,6 +86,7 @@ fn a_head_on_a_moving_seen_character_with_the_default_mask_matches_the_reference
             s.set_parent(head, Some(body)).expect("parent");
             let mut p = s.world.ai_perception_mut(head).expect("head");
             (p.sight_mask, p.eye_height) = (u32::MAX, 0.0); // the component default
+            p.blocking_mask = 1 | 1 << PLAYER; // its own capsule would block
             drop(p);
             // A layer past the 32 a mask holds: never a target, and its hitboxes
             // are still its own.

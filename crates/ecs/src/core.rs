@@ -82,36 +82,21 @@ impl World {
     }
 
     /// Whether `id` is a moving body: not static, with a Collider or a
-    /// CharacterController (what AI sight sees, and treats as one character with
-    /// its hitboxes). Not [`World::body_carrier`]'s physics body, a Rigidbody or a
-    /// CharacterController: a non-static Collider alone is a moving body here.
-    /// Activity is the caller's question.
+    /// CharacterController. Not [`World::body_carrier`]'s physics body, a
+    /// Rigidbody or a CharacterController: a non-static Collider alone is a moving
+    /// body here. Activity is the caller's question.
     pub fn is_moving_body(&self, id: u32) -> bool {
         !self.is_static(id) && (self.has_collider(id) || self.has_character_controller(id))
     }
 
-    /// The moving bodies ([`World::is_moving_body`]) on a layer in `mask`, in
-    /// ascending id order. One narrow query per column, reading the layer and the
-    /// static flag from it: an entity on no layer of `mask` costs no lookup.
-    pub fn moving_bodies_on(&self, mask: u32) -> Vec<u32> {
-        let on = |layer: u8| {
-            1u32.checked_shl(layer.into())
-                .is_some_and(|b| mask & b != 0)
-        };
-        let bodies = self.moving_bodies_where(on);
-        bodies.into_iter().map(|(id, _)| id).collect()
-    }
-
-    /// Every moving body with its layer, whatever the layer, in ascending id
-    /// order: [`World::moving_bodies_on`] with nothing cut.
+    /// Every moving body ([`World::is_moving_body`]) with its layer, in ascending
+    /// id order, once each. One narrow query per column (Collider, then
+    /// CharacterController), reading the static flag and the layer from it: no
+    /// lookup per id.
     pub fn moving_bodies(&self) -> Vec<(u32, u8)> {
-        self.moving_bodies_where(|_| true)
-    }
-
-    fn moving_bodies_where(&self, on: impl Fn(u8) -> bool) -> Vec<(u32, u8)> {
         let mut bodies = Vec::new();
         let mut keep = |c: &Core| {
-            if !c.is_static && on(c.layer) {
+            if !c.is_static {
                 bodies.push((c.id, c.layer));
             }
         };

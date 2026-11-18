@@ -24,7 +24,8 @@
 //! perceiver's own body (under it, or above it: a perceiver on a `Head` child),
 //! and not under another active, non-static body, whatever its layer (a
 //! character's hitboxes are the character). Only the layers some perceiver's
-//! `sight_mask` holds are walked, and with no perceiver sight walks nothing.
+//! `sight_mask` holds get the per-target work (the climb, the aim, the feet), and
+//! with no perceiver, or none whose `sight_mask` holds a layer, sight walks nothing.
 //! Static entities are the level, never a target. Every last-known position is
 //! where the target **stood** ([`stand::feet`](crate::stand::feet)), so an
 //! environment query around it reads the ground, not a character's middle.

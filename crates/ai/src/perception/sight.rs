@@ -40,8 +40,9 @@ struct Pair {
 }
 
 /// Every perceiver's visible targets this tick (target → where it stands), in
-/// the order of `perceivers`. Only the layers some perceiver's `sight_mask` holds
-/// are walked: a target on none of them would fail every pair's mask test.
+/// the order of `perceivers`. Only a body on a layer some perceiver's
+/// `sight_mask` holds becomes a target (one on none would fail every pair's mask
+/// test), and with no such layer at all no body is walked.
 pub(super) fn look(
     scene: &Scene,
     physics: Option<&PhysicsWorld>,
@@ -53,6 +54,11 @@ pub(super) fn look(
         .iter()
         .filter_map(|&p| w.ai_perception(p).map(|c| c.sight_mask))
         .fold(0, |a, m| a | m);
+    if mask == 0 {
+        // Nobody looks (they only hear or take damage): no target, no ray, and
+        // `rays.last` stays, as with no perceiver at all.
+        return vec![BTreeMap::new(); perceivers.len()];
+    }
     let targets = targets(scene, mask);
     look_at(scene, physics, perceivers, rays, &targets, |p| {
         body_of(scene, p)
@@ -95,25 +101,17 @@ pub(super) fn look_at(
 
 /// Every entity sight may target on a layer of `mask`, in id order (who
 /// qualifies: the module docs). "Not under another body" asks every moving body
-/// above it, whatever that body's layer: the mask only cuts the candidates.
+/// above it, whatever that body's layer: the mask only cuts the candidates. The
+/// climb is a binary search in the sorted list of every moving body, so a wide
+/// mask costs no more than a narrow one per ancestor.
 fn targets(scene: &Scene, mask: u32) -> Vec<Target> {
     let w = &scene.world;
-    let keep = |id: u32, moving: &dyn Fn(u32) -> bool| {
-        w.is_active_in_hierarchy(id) && !w.ancestors(id).any(moving)
+    let all = w.moving_bodies();
+    let moving = |a: u32| all.binary_search_by_key(&a, |&(id, _)| id).is_ok();
+    let keep = |&&(id, layer): &&(u32, u8)| {
+        layer_in_mask(layer, mask) && w.is_active_in_hierarchy(id) && !w.ancestors(id).any(moving)
     };
-    let ids: Vec<u32> = if mask == u32::MAX {
-        // Nothing to cut (the component's default mask): every moving body is a
-        // candidate, so their sorted list answers "a moving body above it" by a
-        // binary search, cheaper than a lookup per ancestor up a bone chain.
-        let all = w.moving_bodies();
-        let moving = |a: u32| all.binary_search_by_key(&a, |&(id, _)| id).is_ok();
-        let on = |&&(id, layer): &&(u32, u8)| layer_in_mask(layer, mask) && keep(id, &moving);
-        all.iter().filter(on).map(|&(id, _)| id).collect()
-    } else {
-        let moving = |a: u32| w.is_moving_body(a);
-        let ids = w.moving_bodies_on(mask).into_iter();
-        ids.filter(|&id| keep(id, &moving)).collect()
-    };
+    let ids: Vec<u32> = all.iter().filter(keep).map(|&(id, _)| id).collect();
     ids.into_iter().map(|id| Target::of(scene, id)).collect()
 }
 

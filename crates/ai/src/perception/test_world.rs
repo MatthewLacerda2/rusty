@@ -86,9 +86,11 @@ impl Arena {
         p.memory.in_sight.contains(&target)
     }
 
-    /// Move `id` to `at`.
+    /// Move `id` to `at`, and its colliders with it: one physics step pushes the
+    /// new pose to the world the rays are cast in.
     pub fn put(&mut self, id: u32, at: Vec3) {
         self.scene.world.transform_mut(id).expect("alive").position = at;
+        self.physics.step(&mut self.scene, DT);
     }
 }
 

@@ -56,17 +56,42 @@ fn two_runs_know_the_same_things_every_tick() {
 
 #[test]
 fn a_step_with_colliders_and_no_perceiver_walks_no_collider() {
-    use rusty_components::ColliderComponent;
+    use rusty_components::{CharacterControllerComponent as Ctl, ColliderComponent as Col};
     use rusty_ecs::world::walks;
+    let walked = || (walks::of::<Col>(), walks::of::<Ctl>());
     let (mut a, bots, _) = row();
-    let armed = walks::of::<ColliderComponent>();
+    let armed = walked();
     a.step(1);
-    let walked = walks::of::<ColliderComponent>();
-    assert!(walked > armed, "a perceiver's step walks them");
-    let before = (a.rays.clone(), walked);
+    let (col, ctl) = walked();
+    assert!(
+        col > armed.0 && ctl > armed.1,
+        "a perceiver's step walks both"
+    );
+    let before = (a.rays.clone(), (col, ctl));
     for bot in bots {
         a.scene.world.set_ai_perception(bot, None);
     }
     a.step(3);
-    assert_eq!((a.rays.clone(), walks::of::<ColliderComponent>()), before);
+    assert_eq!((a.rays.clone(), walked()), before);
+}
+
+#[test]
+fn perceivers_that_look_for_no_layer_walk_no_collider_and_see_nothing() {
+    use rusty_components::{CharacterControllerComponent as Ctl, ColliderComponent as Col};
+    use rusty_ecs::world::walks;
+    let walked = || (walks::of::<Col>(), walks::of::<Ctl>());
+    let (mut a, bots, player) = row();
+    a.step(1);
+    assert!(a.sees(bots[0], player));
+    for &bot in &bots {
+        a.scene
+            .world
+            .ai_perception_mut(bot)
+            .expect("bot")
+            .sight_mask = 0;
+    }
+    let before = (a.rays.clone(), walked());
+    a.step(3);
+    assert_eq!((a.rays.clone(), walked()), before);
+    assert!(bots.iter().all(|&b| !a.sees(b, player)), "out of sight");
 }
