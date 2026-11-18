@@ -64,7 +64,9 @@ jobs:
   # of an up-to-date head has the head's tree, which its PR run just proved.
   # `proved_tree.py` checks that mechanically, keeps the full run when the push
   # moves a cache key (Cargo.toml/lock, the toolchain, `.cargo/`, this file), and
-  # fails toward running on any error. Skipped, the run's gating jobs report
+  # fails toward running on any error. A ready PR's run asks too (#2333): its test
+  # merge's tree, built green by a dispatch or push run (a head holding `main`
+  # that a coder proved before readying), skips the same way. Skipped, the run's gating jobs report
   # `skipped`/`success` exactly as on a Markdown-only merge, so `ci-gate` passes.
   changes:
     timeout-minutes: 5
