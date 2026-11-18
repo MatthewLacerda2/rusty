@@ -3,6 +3,8 @@
 //! draws them as RGBA8, four bytes a texel against BC's one or half, so its memory
 //! and load are not the shipped game's. `bench-scenes` warns with this.
 
+use std::path::Path;
+
 use super::{compressed, GpuTexture, TextureKind};
 use crate::{Renderer, Uploads};
 use rusty_asset::texture_import::{self, fits};
@@ -13,22 +15,27 @@ impl Renderer {
     /// import settings ask for compression, this GPU has BC, their Texture Type
     /// fits the slot of their first use, and an import would make them a cache
     /// (no 16-bit normal map, sides a multiple of 4): how many, and their GPU
-    /// bytes with every mip. A render texture or a file gone is not counted.
-    pub fn uncached_textures(&self) -> Uploads {
+    /// bytes with every mip. Only a file an import of `root` visits counts
+    /// (`texture_import::imports`): a render texture, a file gone, one outside
+    /// `root` (the engine's own maps) and one inside the import cache (a texture
+    /// extracted beside a converted model) are not, since no import would make
+    /// them a cache.
+    pub fn uncached_textures(&self, root: &Path) -> Uploads {
         let mut found = Uploads::default();
         for (map, tex) in &self.gpu_textures {
-            if self.wants_cache(map, tex) {
+            if self.wants_cache(root, map, tex) {
                 found.add(compressed::gpu_bytes(&tex.texture));
             }
         }
         found
     }
 
-    fn wants_cache(&self, map: &MapRef, tex: &GpuTexture) -> bool {
+    fn wants_cache(&self, root: &Path, map: &MapRef, tex: &GpuTexture) -> bool {
         if tex.texture.format().is_compressed() || tex.deep_normal {
             return false;
         }
-        let Some(file) = map.file().filter(|f| f.is_file()) else {
+        let file = map.file().filter(|f| f.is_file());
+        let Some(file) = file.filter(|f| texture_import::imports(root, f)) else {
             return false;
         };
         let import = rusty_asset::sidecar::texture(&file);

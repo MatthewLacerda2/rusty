@@ -90,20 +90,12 @@ pub fn export(out: &Path) -> Result<Exported, String> {
 }
 
 /// Bring the import cache of every model and image under `root` up to date in
-/// place (`asset::import::import_all`), copying nothing: an export's first step,
-/// and `make import` (`export --import-only`) on its own. A model that fails
-/// fails it, naming each; an image that fails is warned of and stays
-/// uncompressed.
+/// place (`asset::import::import_strict`), copying nothing: an export's first
+/// step, `make import` (`export --import-only`) on its own and `bench-scenes
+/// IMPORT=1`'s. A model that fails fails it before any image is encoded, naming
+/// each; an image that fails is warned of and stays uncompressed.
 pub fn import(root: &Path) -> Result<rusty_asset::import::Imported, String> {
-    let done = rusty_asset::import::import_all(root)?;
-    match done.failed.as_slice() {
-        [] => Ok(done),
-        failed => Err(failed
-            .iter()
-            .map(|(source, e)| format!("{}: {e}", source.display()))
-            .collect::<Vec<_>>()
-            .join("; ")),
-    }
+    rusty_asset::import::import_strict(root)
 }
 
 /// Bring the open project's seeded files and its audio up to date

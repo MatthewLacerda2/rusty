@@ -172,7 +172,8 @@ pub fn bench(
         let world = harness.world.borrow();
         report.warnings.extend(unbaked(&world.scene().borrow()));
     }
-    let uncached = harness.renderer().map(|r| r.uncached_textures());
+    let assets = std::path::Path::new(rusty_core::project::ASSETS_DIR);
+    let uncached = harness.renderer().map(|r| r.uncached_textures(assets));
     report.warnings.extend(uncached.and_then(uncompressed));
     let console = notes::keep_console(&harness, out_dir, scene);
     report.warnings.extend(console);

@@ -2,11 +2,12 @@
 //! compressed copy under a folder brought up to date in the import cache, as
 //! Unity's `AssetDatabase.Refresh` imports everything before it returns.
 //!
-//! The one routine behind `Assets.Refresh`, `make import` (`export
-//! --import-only`), an export's first step (`dev::export`) and `make bench-scenes
-//! IMPORT=1`. Play's own refresh (`convert::refresh_sources`)
+//! The one routine behind `Assets.Refresh` ([`import_all`]) and, stopping on a
+//! broken model before any image ([`import_strict`]), `make import` (`export
+//! --import-only`), an export's first step (`dev::export::import`) and `make
+//! bench-scenes IMPORT=1`. Play's own refresh (`convert::refresh_sources`)
 //! does the models part; a standalone game (the player, a dev harness) compresses
-//! no texture there, so a headless run on a project the editor never opened draws
+//! no texture there, so a `play` or `bench-scenes` run on a project the editor never opened draws
 //! every texture uncompressed until this has run on it.
 
 use std::path::{Path, PathBuf};
@@ -26,21 +27,58 @@ pub struct Imported {
 }
 
 /// Bring every converted model and every image's compressed copy under `root` up
-/// to date, writing the import cache into the project. Says so first, on the
-/// console, since a first run on a large project encodes for minutes (BC7 at
-/// about 8-11 core-seconds a 2048² map, `texture_import::encode`). Refused while
+/// to date, writing the import cache into the project, models first. A first run
+/// on a large project encodes for minutes (BC7 at about 8-11 core-seconds a 2048²
+/// map, `texture_import::encode`): a verb says so first ([`notice`]). Refused while
 /// a world plays on this thread (`convert::conversion_allowed`): nothing is written
 /// then, and the error says to stop first. A source that fails is warned of,
 /// listed, and the rest still run.
 pub fn import_all(root: &Path) -> Result<Imported, String> {
+    let (sources, failed) = models(root)?;
+    let textures = texture_import::refresh_all(root);
+    Ok(Imported {
+        sources,
+        failed,
+        textures,
+    })
+}
+
+/// [`import_all`], stopping before any image is encoded when a model fails: an
+/// export's and `make import`'s import (`dev::export::import`), which fail on a
+/// broken model, so they fail in seconds, not after minutes of encoding. The
+/// error names every model that failed.
+pub fn import_strict(root: &Path) -> Result<Imported, String> {
+    let (sources, failed) = models(root)?;
+    if !failed.is_empty() {
+        let named: Vec<String> = failed
+            .iter()
+            .map(|(source, e)| format!("{}: {e}", source.display()))
+            .collect();
+        return Err(named.join("; "));
+    }
+    Ok(Imported {
+        sources,
+        failed,
+        textures: texture_import::refresh_all(root),
+    })
+}
+
+/// What an import of `root` says before it starts (a verb that runs it prints
+/// it): that it writes into the project, and how long a first run takes.
+pub fn notice(root: &Path) -> String {
+    format!(
+        "import: writing {}'s import cache into the project; a first run \
+         compresses every image (minutes for a large project)",
+        root.display()
+    )
+}
+
+/// The first half of an import: every model source under `root` converted when
+/// stale, and the ones that failed, each warned of. Refused during Play.
+fn models(root: &Path) -> Result<(Vec<PathBuf>, Vec<(PathBuf, String)>), String> {
     if !conversion_allowed() {
         return Err("Play is running, and the import waits for Stop: stop first".into());
     }
-    log::info!(
-        "[Import] bringing {}'s import cache up to date: this writes into the project, \
-         and a first run compresses every image (minutes for a large project)",
-        root.display()
-    );
     let sources = convertible_sources(root);
     let mut failed = Vec::new();
     for source in &sources {
@@ -49,12 +87,7 @@ pub fn import_all(root: &Path) -> Result<Imported, String> {
             failed.push((source.clone(), e.to_string()));
         }
     }
-    let textures = texture_import::refresh_all(root);
-    Ok(Imported {
-        sources,
-        failed,
-        textures,
-    })
+    Ok((sources, failed))
 }
 
 #[cfg(test)]

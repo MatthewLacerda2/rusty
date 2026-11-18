@@ -1092,8 +1092,8 @@ every binary's open makes them.
   - `load_ms`: the scene's own load to its first rendered frame, wall clock, with
     the import cache as the project holds it: its converted models are warm once
     any run converted them, its compressed textures only once the editor, an
-    export or `make import PROJECT=<dir>` made them, since a headless run never
-    compresses a texture. Without them every texture uploads decoded, as RGBA8,
+    export or `make import PROJECT=<dir>` made them, since a `play` or
+    `bench-scenes` run never compresses a texture. Without them every texture uploads decoded, as RGBA8,
     and the report warns (`uploaded uncompressed: N textures, M MB`): the scene's
     `load_ms`, `gpu_mb` and `rss_peak_mb` are then not the shipped game's. It
     holds the harness's set-up (its Lua VM and API, the stats), the

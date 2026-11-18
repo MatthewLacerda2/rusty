@@ -72,10 +72,11 @@ It also brings every converted model (`.fbx`, `.blend`) up to date and makes eve
 image's compressed copy current (see `compression`, below), returning how many images
 it compressed in `compressed`; each model or image that fails (it does not decode,
 say) is warned of in the console and listed in `failed` by path, and such an image
-draws uncompressed. It waits for them, on any build, after saying in the console that
-it writes the import cache into the project (a first run on a large project encodes
-for minutes): the way to import from a script or a session in edit mode, `make
-import` from the command line. A headless `play` or `bench-scenes` run never
+draws uncompressed. It waits for them, on any build, and writes the import cache into
+the project (a first run on a large project encodes for minutes): the way to import
+from a script or a session in edit mode. `make import PROJECT=<dir>` does the models and
+images (not the audio) from the command line, and stops on a model that fails before
+compressing any image. A headless `play` or `bench-scenes` run never
 compresses an image itself, so on a project the editor never opened it draws them
 uncompressed until this has run. During Play it still imports audio, as Unity's
 `AssetDatabase.Refresh` imports in Play, but converts no model and compresses no

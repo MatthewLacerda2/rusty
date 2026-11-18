@@ -20,11 +20,13 @@ use std::path::{Path, PathBuf};
 use rusty_asset::convert::IMPORT_CACHE_DIR;
 use rusty_core::project::CACHE_DIR;
 
-/// Import the open project's `assets/` (`asset::import::import_all`), returning
-/// its wall-clock ms: the half of `import_ms` before the load.
+/// Import the open project's `assets/` as `make import` does (`dev::export::import`,
+/// the one path both take), returning its wall-clock ms: the half of `import_ms`
+/// before the load. A model that fails fails the run, naming each source, so it is
+/// never tried again inside the timed load.
 pub fn import() -> Result<f64, String> {
     let start = std::time::Instant::now();
-    rusty_asset::import::import_all(Path::new(rusty_core::project::ASSETS_DIR))?;
+    crate::export::import(Path::new(rusty_core::project::ASSETS_DIR))?;
     Ok(start.elapsed().as_secs_f64() * 1000.0)
 }
 

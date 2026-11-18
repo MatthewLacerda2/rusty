@@ -127,6 +127,7 @@ fn import_one(run: &Run, scene: &str, file: &Path) {
     let opened = rusty::core::project::open(&run.project, Access::Run);
     let opened = opened.unwrap_or_else(|e| fail(&format!("cannot open the copy: {e}")));
     let scratch = file.parent().unwrap_or(Path::new("."));
+    eprintln!("{}", rusty::asset::import::notice(&opened.root));
     let imported = import::import().unwrap_or_else(|e| fail(&format!("import failed: {e}")));
     let loaded = scenes::load(scratch, &opened.root, scene, opened.settings, run.opts.size);
     let ms = loaded.map_or_else(

@@ -87,12 +87,31 @@ fn refresh_on(source: &Path, progress: &str, cores: Cores) -> Result<bool, Strin
 pub fn images(root: &Path) -> Vec<PathBuf> {
     let mut found = Vec::new();
     crate::manifest::walk(root, &mut |path| {
-        if is_image_path(path) && !is_baked(path) {
+        if is_compressible(path) {
             found.push(path.to_path_buf());
         }
     });
     found.sort();
     found
+}
+
+/// Whether [`refresh_all`] on `root` visits `file`: an image under `root`
+/// ([`images`]' test), outside the import cache (`manifest::walk` leaves it out,
+/// so a texture extracted beside a converted model is never compressed) and not
+/// a baked page. What an audit of uploads asks (`Renderer::uncached_textures`),
+/// so the audit and the import cannot disagree on which files an import makes a
+/// cache for. Paths are compared made absolute, so `assets/a.png` and its
+/// absolute spelling are one file.
+pub fn imports(root: &Path, file: &Path) -> bool {
+    let absolute = |p: &Path| std::path::absolute(p).unwrap_or_else(|_| p.to_path_buf());
+    absolute(file).starts_with(absolute(root))
+        && !convert::is_import_cache(file)
+        && is_compressible(file)
+}
+
+/// The per-file half of [`images`] and [`imports`]: an image, not a baked page.
+fn is_compressible(path: &Path) -> bool {
+    is_image_path(path) && !is_baked(path)
 }
 
 /// What a [`refresh_all`] did: how many images it encoded, each one it could

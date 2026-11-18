@@ -1,7 +1,8 @@
 //! `import_all` (#2319): it makes an image's compressed copy where a headless
-//! load would draw it decoded, and writes nothing while a world plays.
+//! load would draw it decoded, and writes nothing while a world plays;
+//! `import_strict` stops on a broken model before encoding any image.
 
-use super::import_all;
+use super::{import_all, import_strict};
 use crate::convert::PlayHold;
 use crate::sidecar::TextureSettings;
 use crate::texture_import::{cache_file, load, Texels, TextureKind};
@@ -52,4 +53,16 @@ fn an_import_during_play_is_refused_and_writes_nothing() {
     assert!(!cache_file(&png).unwrap().is_file());
     drop(hold);
     assert_eq!(import_all(&root).unwrap().textures.encoded, 1);
+}
+
+#[test]
+fn a_broken_model_stops_the_strict_import_before_any_image() {
+    let (root, png) = folder("import_strict_broken");
+    std::fs::write(root.join("broken.fbx"), b"not an fbx").unwrap();
+    let refused = import_strict(&root).unwrap_err();
+    assert!(refused.contains("broken.fbx"), "{refused}");
+    assert!(!cache_file(&png).unwrap().is_file(), "no image encoded");
+    let done = import_all(&root).unwrap();
+    assert_eq!(done.failed.len(), 1, "listed, and the rest still ran");
+    assert_eq!(done.textures.encoded, 1);
 }

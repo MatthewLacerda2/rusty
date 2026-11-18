@@ -95,11 +95,7 @@ fn import_only(project: Option<PathBuf>) -> ! {
         eprintln!("export: cannot open the project: {e}");
         exit(2);
     }
-    eprintln!(
-        "import: writing {}'s import cache; a first run compresses every image, \
-         minutes for a large project",
-        dir.display()
-    );
+    eprintln!("{}", rusty::asset::import::notice(&dir));
     match rusty::dev::export::import(std::path::Path::new(rusty::core::project::ASSETS_DIR)) {
         Ok(done) => {
             let t = &done.textures;
