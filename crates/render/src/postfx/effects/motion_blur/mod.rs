@@ -25,6 +25,7 @@
 pub(crate) mod effect;
 mod params;
 
+use crate::gpu::ops::{CountedDevice as _, CountedQueue as _};
 pub(crate) use effect::{motion_blur_enabled, EFFECT};
 pub(crate) use params::BlurParams;
 
@@ -184,9 +185,9 @@ impl PostFx {
         BlurTargets::fit(&mut self.targets, device, self.chain_size, params.tile());
         let targets = self.targets.get::<BlurTargets>().expect("fitted above");
         let tiles = &targets.tiles;
-        queue.write_buffer(&targets.params, 0, bytemuck::bytes_of(&params));
+        queue.counted_write_buffer(&targets.params, 0, bytemuck::bytes_of(&params));
         let group = |input: &wgpu::TextureView| {
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
+            device.counted_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("Motion Blur Bind Group"),
                 layout: &passes.layout,
                 entries: &[
@@ -212,7 +213,7 @@ impl PostFx {
             let timed = (pipeline.get(), timer.writes(GpuPass::MotionBlur));
             Self::fullscreen(&mut encoder, timed, &[&group(&input.view)], &target.view);
         }
-        queue.submit(std::iter::once(encoder.finish()));
+        queue.counted_submit(std::iter::once(encoder.finish()));
     }
 }
 

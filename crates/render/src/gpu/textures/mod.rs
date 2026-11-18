@@ -8,6 +8,7 @@ mod panorama;
 mod sampler;
 mod uncached;
 
+use crate::gpu::ops::CountedDevice as _;
 use crate::Renderer;
 pub(crate) use freshness::texture_written;
 pub(crate) use load::{decode, Decoded};
@@ -123,7 +124,7 @@ impl Renderer {
             format: Some(data_format),
             ..Default::default()
         });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group = device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label,
             layout,
             entries: &[

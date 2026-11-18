@@ -147,11 +147,13 @@ impl Renderer {
 
     /// Run `draw` (a render beside the measured frame) without it counting as one:
     /// [`Renderer::frame_counters`] and [`Renderer::frame_cost`] read afterwards as
-    /// they did before, and its passes take no GPU timestamps.
+    /// they did before, and its passes take no GPU timestamps. Inside an open frame
+    /// window, the GPU calls the frame had counted so far (`gpu::ops`) are kept
+    /// whole, and the aside render's own are counted into nothing.
     pub fn aside<R>(&mut self, draw: impl FnOnce(&mut Self) -> R) -> R {
         let counters = self.frame_counters;
         let was = std::mem::replace(&mut self.gpu_timer.cpu.aside, true);
-        let out = draw(self);
+        let out = crate::gpu::ops::kept(|| draw(self));
         self.gpu_timer.cpu.aside = was;
         self.frame_counters = counters;
         out

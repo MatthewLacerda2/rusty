@@ -6,6 +6,7 @@
 //! reallocated only when it outgrows its capacity. A static HUD therefore costs no
 //! uploads per frame.
 
+use crate::gpu::ops::CountedQueue as _;
 use std::collections::HashMap;
 
 use glam::Vec2;
@@ -113,7 +114,7 @@ impl UiViewCache {
             let gpu = match old.remove(&mesh.canvas) {
                 Some(c) if c.mesh == mesh => CanvasGpu { place, ..c },
                 Some(c) if c.buffer.size() >= bytes.len() as u64 => {
-                    queue.write_buffer(&c.buffer, 0, bytes);
+                    queue.counted_write_buffer(&c.buffer, 0, bytes);
                     self.uploads += 1;
                     CanvasGpu { mesh, place, ..c }
                 }

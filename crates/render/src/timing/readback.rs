@@ -3,6 +3,7 @@
 //! frame's copy is in flight), or mapped (ready to read); the ring hands out free
 //! ones and never waits for a busy one.
 
+use crate::gpu::ops::CountedQueue as _;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
@@ -65,7 +66,7 @@ impl Ring {
 
     /// Resolve the first `passes.len()` query pairs of `set`, drawn frame `frame`'s,
     /// into a free slot and start mapping it. No free slot: the frame goes untimed.
-    pub fn submit(
+    pub fn resolve_frame(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -86,7 +87,7 @@ impl Ring {
         });
         encoder.resolve_query_set(set, 0..passes.len() as u32 * 2, &self.resolve, 0);
         encoder.copy_buffer_to_buffer(&self.resolve, 0, &slot.buffer, 0, Some(bytes));
-        queue.submit(Some(encoder.finish()));
+        queue.counted_submit(Some(encoder.finish()));
 
         slot.frame = frame;
         slot.passes = passes;

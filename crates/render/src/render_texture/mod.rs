@@ -21,6 +21,7 @@
 
 mod slots;
 
+use crate::gpu::ops::CountedQueue as _;
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -137,7 +138,7 @@ impl Renderer {
             front.as_image_copy(),
             front.size(),
         );
-        self.queue.submit(Some(encoder.finish()));
+        self.queue.counted_submit(Some(encoder.finish()));
     }
 
     /// The material-cache key of a render texture's path: the path plus its current

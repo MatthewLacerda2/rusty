@@ -61,6 +61,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | No subprocesses | `tools/lint -- --rules` (`subprocess`) | **hard gate**: no line of `src/` names `std::process::Command` — the engine starts no other program but Blender, to convert a `.blend` while authoring, and `git`, which a debug build asks for its checkout's commit; a real need takes `// lint: allow(subprocess) <why>` (#975) |
 | Nothing temporary | clippy `dbg_macro`/`todo`/`unimplemented` + `tools/lint -- --rules` (`markers`) | **hard gate**: the three are denied in `Cargo.toml`'s `[lints]` (and `tools/lint`'s); a marker word (`TODO`, `FIXME`, `XXX`, `HACK`) in a scanned `.rs` file fails — an unfinished thing is an issue (#935) |
 | One atomic write | `tools/lint -- --rules` (`atomic-write`) | **hard gate**: no line of `src/` outside `crates/core/src/fs/` names `fs::rename` — a file a reader may open is written through `core::fs::write_atomic`; a rename that moves rather than writes takes `// lint: allow(atomic-write) <why>` (#1129) |
+| One counted GPU path | `tools/lint -- --rules` (`gpu-ops`) | **hard gate**: outside `crates/render/src/gpu/ops.rs` and test code, no line of `crates/render/src/` calls wgpu's `.begin_render_pass(`, `.begin_compute_pass(`, `.submit(`, `.create_bind_group(` or `.write_buffer(` — the renderer goes through `CountedEncoder` / `CountedQueue` / `CountedDevice`'s `counted_*` helpers, which feed the frame's `render_passes`, `compute_passes`, `submits`, `bind_groups_created` and `buffer_writes` rows (#2341) |
 | One dependency graph | `make feature-split` (`.github/scripts/feature_split.py`) | **hard gate**: no dev-dependency turns on a feature the normal build lacks, so `cargo test` never rebuilds a shared crate (#552, #979; `docs/testing.md`) |
 | One fullscreen triangle | `tools/lint -- --rules` (`fullscreen-triangle`) | **hard gate**: no `.wgsl` under `engine/` but `fullscreen.wgsl` spells the triangle's `(i << 1u) & 2u`; `#import fullscreen` and call `fullscreen::triangle` / `uv` (#1370) |
 | One name table per enum | `tools/lint -- --rules` (`named-enum`) | **hard gate**: no file of `src/` hand-writes both a parse (`fn parse(_: &str) -> Option<Self>` in an `impl T`, or a free `fn parse_*(_: &str) -> Option<T>`) and a name (`fn name`/`fn as_str(self) -> &'static str`, or a free `fn *_name(_: T) -> &'static str`) for one type, nor a `const`/`static` table of `(T, &str)` pairs — a script-facing enum declares its names once with `core::named_enum!`, which writes `ALL`, `name`, a case-insensitive `parse`, `Display` and its serde (#1478); a parse that does more takes `// lint: allow(named-enum) <why>` (#1329) |
@@ -483,6 +484,18 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   like any shader, and a test fixture that must stand alone (`tests/gpu/`) is not
   scanned. A shader that must stand alone says why with
   `// lint: allow(fullscreen-triangle) <why>`.
+- **`gpu-ops`** (#2341) — every render or compute pass the renderer begins, every
+  queue submit, bind group made and buffer write goes through
+  `crates/render/src/gpu/ops.rs` (`.counted_render_pass(`, `.counted_compute_pass(`,
+  `.counted_submit(`, `.counted_bind_group(`, `.counted_write_buffer(`, from the
+  `CountedEncoder`, `CountedQueue` and `CountedDevice` traits, imported `as _`), so
+  the frame's GPU-call rows count them all. A raw wgpu call of those five anywhere
+  else in `crates/render/src/` is a finding naming its helper. Test code is not
+  scanned (it is no frame's work), nor is any other crate: the editor's egui paint
+  passes in `crates/shell/src/editor/` draw outside the renderer's frame, so they are
+  out of scope by design. A text match: a method of the renderer's own named
+  `submit` (and so on) would be flagged, so such a method takes another name. A call
+  that must stay raw says why with `// lint: allow(gpu-ops) <why>`.
 - **`ignored`** — what you push must be what CI builds. A scanned `.rs` file that
   `git check-ignore --no-index` matches fails, tracked or not, because the next
   new file beside it is the one a push silently drops

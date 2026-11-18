@@ -1,3 +1,4 @@
+use crate::gpu::ops::CountedQueue as _;
 use glam::Vec3;
 use wgpu::util::DeviceExt;
 
@@ -114,7 +115,6 @@ impl Renderer {
 
         let v_bytes: &[u8] = bytemuck::cast_slice(vertices);
         let i_bytes: &[u8] = bytemuck::cast_slice(indices);
-        let num_indices = indices.len() as u32;
         // Local-space AABB computed once here, at upload, so frustum culling never walks
         // the vertices per frame (#330). Re-derived on every re-upload so an edited mesh's
         // bounds stay correct.
@@ -127,17 +127,18 @@ impl Renderer {
         // Re-use resident buffers when the new data still fits (a newer revision
         // of geometry already resident under this id). Both buffers carry COPY_DST
         // so they can be written without reallocation.
+        let queue = &self.queue;
         if let Some(existing) = self.gpu_meshes.get_mut(&id) {
             if existing.vertex_buffer.size() >= v_bytes.len() as u64
                 && existing.index_buffer.size() >= i_bytes.len() as u64
             {
-                existing.num_indices = num_indices;
+                existing.num_indices = indices.len() as u32;
                 existing.local_aabb = local_aabb;
                 existing.skin_bounds = skin_bounds;
                 existing.revision = revision;
                 existing.clusters = None;
-                self.queue.write_buffer(&existing.vertex_buffer, 0, v_bytes);
-                self.queue.write_buffer(&existing.index_buffer, 0, i_bytes);
+                queue.counted_write_buffer(&existing.vertex_buffer, 0, v_bytes);
+                queue.counted_write_buffer(&existing.index_buffer, 0, i_bytes);
                 return;
             }
         }
@@ -163,7 +164,7 @@ impl Renderer {
             GpuMesh {
                 vertex_buffer,
                 index_buffer,
-                num_indices,
+                num_indices: indices.len() as u32,
                 local_aabb,
                 skin_bounds,
                 revision,

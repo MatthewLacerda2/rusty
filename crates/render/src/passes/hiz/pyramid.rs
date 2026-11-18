@@ -6,6 +6,7 @@
 
 use super::kept::Kept;
 use super::HiZ;
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _};
 
 /// The pyramid's format: one float, written by a compute pass.
 const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R32Float;
@@ -94,7 +95,7 @@ impl Pyramid {
                 .map(|level| level_group(device, hiz, (depth, levels), level))
                 .collect()
         });
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+        let mut pass = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("Hi-Z Pyramid"),
             timestamp_writes: None,
         });
@@ -128,7 +129,7 @@ fn level_group(
         0 => (0, depth),
         _ => (1, &levels[level - 1]),
     };
-    device.create_bind_group(&wgpu::BindGroupDescriptor {
+    device.counted_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Hi-Z Level"),
         layout: &level_pipeline(hiz, level).get_bind_group_layout(0),
         entries: &[

@@ -4,6 +4,7 @@
 use super::super::cubemap::CubemapTexture;
 use super::super::upload::block_extent;
 use super::ProbeArray;
+use crate::gpu::ops::CountedQueue as _;
 use crate::gpu::textures::compressed::gpu_bytes;
 
 impl ProbeArray {
@@ -124,7 +125,7 @@ pub(super) fn copy_into(
     for (cube, slot, shift) in copies {
         copy_cube(&mut encoder, cube, array, *slot as u32, *shift);
     }
-    queue.submit([encoder.finish()]);
+    queue.counted_submit([encoder.finish()]);
 }
 
 #[cfg(test)]
