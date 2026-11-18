@@ -31,8 +31,8 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
 fn resolve(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let gpu = (&r.device, &r.queue);
     let lenses = super::params::lenses(cx.stack.stack, view.aspect());
-    // The base camera's TAA knobs (#1847); a view with no camera keeps URP's
-    // defaults, so its resolve is unchanged.
+    // The base camera's TAA knobs (#1847); a view with no camera resolves as a
+    // default camera does (URP's blend, HDRP's anti-flicker at 0.5).
     let tune = cx
         .effect
         .post

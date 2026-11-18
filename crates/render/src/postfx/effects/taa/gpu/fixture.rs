@@ -12,11 +12,14 @@ use rusty_scene::{Camera, Scene};
 pub(crate) use crate::motion::gpu_fixture::{cube, eye, pixel, project, renderer, view};
 
 /// The fixture's scene, its camera running TAA when `taa` (FXAA on, its default)
-/// or neither anti-aliasing when `fxaa` is false too.
+/// or neither anti-aliasing when `fxaa` is false too. Its anti-flicker is 0, URP's
+/// resolve, not a camera's default (HDRP's 0.5): these tests measure URP's resolve
+/// and the rules on it, and `still`'s byte comparisons with URP's hold only there.
+/// A test of the anti-flicker or its default sets it.
 pub(crate) fn taa_scene(taa: bool, fxaa: bool) -> (Scene, u32) {
     let (mut scene, cam) = scene(false);
     let mut c = scene.world.camera_mut(cam).unwrap();
-    (c.taa_active, c.fxaa_active) = (taa, fxaa);
+    (c.taa_active, c.fxaa_active, c.taa_anti_flicker) = (taa, fxaa, 0.0);
     drop(c);
     (scene, cam)
 }

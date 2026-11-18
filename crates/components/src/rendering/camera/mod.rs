@@ -76,6 +76,9 @@ fn default_taa_variance_clamp_scale() -> f32 {
 fn default_taa_jitter_scale() -> f32 {
     1.0
 }
+fn default_taa_anti_flicker() -> f32 {
+    CameraComponent::DEFAULT_TAA_ANTI_FLICKER
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CameraComponent {
@@ -152,12 +155,12 @@ pub struct CameraComponent {
     pub taa_contrast_adaptive_sharpening: f32,
     /// TAA's *Anti-Flicker* (#2228, HDRP's): how far a still pixel whose frame keeps
     /// blinking under the jitter holds its history against the blinks, `0`..`1`.
-    /// `0` (default) is URP's resolve exactly. At `1`, a one-frame change repeated
-    /// on a still pixel (a strobe, a fast gun's flashes on a wall) shows fully its
-    /// first two times, then is nearly removed: flashes 6 frames apart keep about
-    /// 9 % of themselves from the third, 10 frames apart a quarter
-    /// (`docs/api/Graphics.md`, *Anti-Flicker*).
-    #[serde(default)]
+    /// [`Self::DEFAULT_TAA_ANTI_FLICKER`] (`0.5`, HDRP's) by default; `0` is URP's
+    /// resolve exactly. Held on, a one-frame change repeated on a still pixel (a
+    /// strobe, a fast gun's flashes on a wall) shows fully its first two times,
+    /// then is softened, more the higher the value (`docs/api/Graphics.md`,
+    /// *Anti-Flicker*, has the measured shares).
+    #[serde(default = "default_taa_anti_flicker")]
     pub taa_anti_flicker: f32,
     /// Perspective (the default) or orthographic — a top-down minimap (#430).
     #[serde(default)]
@@ -201,6 +204,8 @@ impl CameraComponent {
     pub const MAX_TAA_VARIANCE_CLAMP_SCALE: f32 = 1.2;
     /// The most negative TAA *Mip Bias* (URP's lower bound; 0 its default).
     pub const MIN_TAA_MIP_BIAS: f32 = -1.0;
+    /// TAA's *Anti-Flicker* a camera starts with: HDRP's default, `0.5`.
+    pub const DEFAULT_TAA_ANTI_FLICKER: f32 = 0.5;
 }
 
 fn default_use_occlusion_culling() -> bool {
@@ -248,7 +253,7 @@ impl Default for CameraComponent {
             taa_jitter_scale: default_taa_jitter_scale(),
             taa_mip_bias: 0.0,
             taa_contrast_adaptive_sharpening: 0.0,
-            taa_anti_flicker: 0.0,
+            taa_anti_flicker: Self::DEFAULT_TAA_ANTI_FLICKER,
             projection: Projection::Perspective,
             use_occlusion_culling: default_use_occlusion_culling(),
             target_texture: None,

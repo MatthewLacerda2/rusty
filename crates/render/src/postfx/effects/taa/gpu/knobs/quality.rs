@@ -17,7 +17,8 @@ use rusty_scene::Scene;
 /// Frames turned, 1.5° each, ending at yaw 0.
 const FRAMES: u32 = 12;
 
-/// The noise wall and a tilted cube, the camera running TAA tuned by `tune`.
+/// The noise wall and a tilted cube, the camera running TAA (URP's resolve, the
+/// fixture's) tuned by `tune`.
 fn tuned(tune: impl FnOnce(&mut CameraComponent)) -> Scene {
     let (mut scene, cam) = taa_scene(true, true);
     noisy_wall(&mut scene, -7.0);
@@ -69,9 +70,11 @@ fn gpu_each_quality_level_resolves_and_differs_from_high() {
 #[test]
 fn gpu_each_float_knob_resolves_at_its_extremes() {
     let Some(mut r) = renderer() else { return };
-    let default = turned(&mut r, &tuned(|_| {}));
+    // The fixture's own values: its anti-flicker is URP's 0, not a camera's 0.5.
+    let mut fixture = CameraComponent::default();
+    let default = turned(&mut r, &tuned(|c| fixture = c.clone()));
     for knob in TAA_KNOBS {
-        let at_default = (knob.get)(&CameraComponent::default());
+        let at_default = (knob.get)(&fixture);
         for value in [knob.range.0, knob.range.1] {
             let got = turned(&mut r, &tuned(|c| (knob.set)(c, value)));
             let what = format!("{} at {value}", knob.field);
