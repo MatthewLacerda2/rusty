@@ -59,9 +59,8 @@ pub(super) fn assemble(
     let orphans = fill_within(&mut texels, &mut filled, labels, size);
     // The square past the charts is filled when its page is composed
     // (`Lightmap::texels`, #2312): a finished map keeps only its charts' texels.
-    let kept: Vec<u32> = (0..filled.len() as u32)
-        .filter(|&i| filled[i as usize])
-        .collect();
+    let mut kept = Vec::with_capacity(filled.iter().filter(|&&f| f).count());
+    kept.extend((0..filled.len() as u32).filter(|&i| filled[i as usize]));
     let keep = |on: bool, mut map: Vec<Vec4>| {
         on.then(|| {
             let mut ring = unfilled.clone();

@@ -11,7 +11,8 @@ use std::thread;
 use super::input::BakeScene;
 use super::progress::BakeProgress;
 use super::raster::{
-    chart_of_triangles, lightmap_size, rasterize, texel_charts, world_per_uv, TexelPoint,
+    chart_of_triangles, lightmap_size, rasterize, rasterize_counted, texel_charts, world_per_uv,
+    TexelPoint,
 };
 use super::rays::{Rays, Tri};
 use super::rng::Rng;
@@ -85,7 +86,7 @@ pub fn bake_on(
     };
     // A chart's points are made when its first batch is taken (#2312) and handed
     // back to its `finish` once traced, so they live only while it is in flight.
-    let make = |c: usize| rasterize(&scene.meshes[heads[c].0], heads[c].1);
+    let make = |c: usize| rasterize_counted(&scene.meshes[heads[c].0], heads[c].1, counts[c]);
     let cleaner = Cleaner {
         denoiser: settings.denoiser,
         radius: settings.filter_radius,
@@ -216,11 +217,14 @@ fn lightmap(
     let mesh = &scene.meshes[index];
     // Texels inside other geometry are dropped here and filled from their own
     // chart's valid texels in `assemble` (#1949).
-    let (points, light): (Vec<TexelPoint>, Vec<TexelLight>) = points
-        .into_iter()
-        .zip(light)
-        .filter(|(_, l)| l.valid)
-        .unzip();
+    // Sized once (`pool`'s reason): a chart's texels are its largest buffers.
+    let valid = light.iter().filter(|l| l.valid).count();
+    let (mut kept, mut lit) = (Vec::with_capacity(valid), Vec::with_capacity(valid));
+    for (p, l) in points.into_iter().zip(light).filter(|(_, l)| l.valid) {
+        kept.push(p);
+        lit.push(l);
+    }
+    let (points, light) = (kept, lit);
     let masked = scene.shadowmask.any();
     let chart = Chart {
         points: &points,

@@ -120,12 +120,28 @@ pub(super) fn rasterize(mesh: &BakeMesh, size: u32) -> Vec<TexelPoint> {
     rasterize_surface(&mesh.surface(), size, size)
 }
 
+/// [`rasterize`] of a mesh known to give `count` texels (a bake counts them
+/// first): the list is sized once, never grown by doubling, each growth of
+/// which frees a large block that macOS's allocator keeps in the footprint
+/// (#2312).
+pub(super) fn rasterize_counted(mesh: &BakeMesh, size: u32, count: usize) -> Vec<TexelPoint> {
+    rasterize_into(&mesh.surface(), (size, size), Vec::with_capacity(count))
+}
+
 /// [`rasterize`] over any [`Surface`]: its own UV set, scaled to a `width × height`
 /// image (U across, V down), so a non-square map stretches the unit square.
 pub(crate) fn rasterize_surface(mesh: &Surface, width: u32, height: u32) -> Vec<TexelPoint> {
+    rasterize_into(mesh, (width, height), Vec::new())
+}
+
+/// [`rasterize_surface`] onto the end of `out`.
+fn rasterize_into(
+    mesh: &Surface,
+    (width, height): (u32, u32),
+    mut out: Vec<TexelPoint>,
+) -> Vec<TexelPoint> {
     let tris = uv_triangles(mesh, Vec2::new(width as f32, height as f32));
     let mut taken = vec![false; width as usize * height as usize];
-    let mut out = Vec::new();
     for conservative in [false, true] {
         for t in &tris {
             let clipper = conservative.then(|| Clipper::new(t));

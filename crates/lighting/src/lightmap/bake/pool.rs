@@ -41,6 +41,13 @@ pub(crate) fn batches<P>(items: impl IntoIterator<Item = P>) -> Vec<Vec<P>> {
     }
 }
 
+/// `batches` as one list, sized once (`Slot::finish`'s reason).
+fn flat<P>(batches: Vec<Vec<P>>) -> Vec<P> {
+    let mut all = Vec::with_capacity(batches.iter().map(Vec::len).sum());
+    batches.into_iter().for_each(|b| all.extend(b));
+    all
+}
+
 /// One chart's batches (taken by its `finish`), their results as they come back,
 /// and its result once the last one has.
 struct Slot<P, L, T> {
@@ -105,7 +112,10 @@ impl<P, L, T> Slot<P, L, T> {
     fn finish(&self, finish: impl FnOnce(Vec<Vec<P>>, Vec<L>) -> T) {
         let mut parts = std::mem::take(&mut *lock(&self.parts));
         parts.sort_unstable_by_key(|(batch, _)| *batch);
-        let all = parts.into_iter().flat_map(|(_, out)| out).collect();
+        // Sized once, never grown by doubling (#2312): each growth frees a large
+        // block, which macOS's allocator keeps in the footprint.
+        let mut all = Vec::with_capacity(parts.iter().map(|(_, out)| out.len()).sum());
+        parts.into_iter().for_each(|(_, out)| all.extend(out));
         let batches = self.batches.iter().map(|b| std::mem::take(&mut *lock(b)));
         *lock(&self.done) = Some(finish(batches.collect(), all));
     }
@@ -131,9 +141,7 @@ where
     let charts = charts.into_iter().map(batches).collect();
     let trace =
         |c: usize, b: usize, items: &mut [P]| (trace(c, b * BATCH, items), items.len() as u64);
-    let finish = |c: usize, items: Vec<Vec<P>>, out: Vec<L>| {
-        finish(c, items.into_iter().flatten().collect(), out)
-    };
+    let finish = |c: usize, items: Vec<Vec<P>>, out: Vec<L>| finish(c, flat(items), out);
     run_batched(charts, threads, progress, &|_, _| false, trace, finish)
 }
 
@@ -158,9 +166,7 @@ where
     let slots = counts.iter().map(|&n| Slot::later(n)).collect();
     let trace =
         |c: usize, b: usize, items: &mut [P]| (trace(c, b * BATCH, items), items.len() as u64);
-    let finish = |c: usize, items: Vec<Vec<P>>, out: Vec<L>| {
-        finish(c, items.into_iter().flatten().collect(), out)
-    };
+    let finish = |c: usize, items: Vec<Vec<P>>, out: Vec<L>| finish(c, flat(items), out);
     run_slots(
         (slots, &make),
         threads,
