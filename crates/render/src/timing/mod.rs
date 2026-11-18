@@ -39,7 +39,8 @@
 //! span from its first timed start to its last timed end ([`GpuTimes::span_ms`]):
 //! the span less the rows ([`GpuTimes::other_ms`], the bench's `gpu.other`) is that
 //! untimed work plus any wait for the CPU between the frame's submits. A stage of
-//! several passes takes one pair across them ([`GpuTimer::compute_span`]): its first pass writes the start, its last the end.
+//! several passes takes one pair across them ([`GpuTimer::compute_span`],
+//! [`GpuTimer::render_span`]): its first pass writes the start, its last the end.
 
 mod clock;
 mod frame;

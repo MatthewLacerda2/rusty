@@ -1,20 +1,22 @@
 //! SSR's GPU calls on a still frame (#2329, `gpu::ops`): the copy, the trace, one
-//! compute pass for both hit pyramids and the resolve (for a view whose shorter
-//! side is 9 px or more; at 8 px or less the pyramids are one level and no compute
-//! pass opens), and no bind group made once its targets exist. Pinned against the
+//! render pass per hit-pyramid level below the first (into both pyramids at
+//! once; none at 8 px or less, where they are one level) and the resolve, and no
+//! bind group made once its targets exist. Pinned against the
 //! same scene with SSR off, so what SSR alone adds shows.
 
 use super::fixture::{eye, renderer, scene, H, MIRROR, RED, W};
 use crate::gpu::ops::OpCounts;
 use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 
-/// What SSR adds to a still frame: the trace and the resolve, the pyramids'
-/// compute pass, its own submit and its params write. Before #2329, 20 render
-/// passes at 96×72 (each pyramid's six levels below the first) and two bind groups.
-/// Measured: lavapipe 2/1/1/0/1, Metal (CI) 2/1/1/0/1, RTX 2060 2/1/1/0/1.
+/// What SSR adds to a still frame at 96×72: the trace and the resolve, the hit
+/// pyramids' four levels below the first (one pass each, into both), its own
+/// submit and its params write. Before #2329, 20 render passes (each pyramid's six
+/// levels below the first) and two bind groups; #2329 built the pyramids in one
+/// compute pass (2/1/1/0/1), which #2340 measures against these.
+/// Measured: lavapipe 6/0/1/0/1.
 const SSR: OpCounts = OpCounts {
-    render_passes: 2,
-    compute_passes: 1,
+    render_passes: 6,
+    compute_passes: 0,
     submits: 1,
     bind_groups_created: 0,
     buffer_writes: 1,
@@ -42,7 +44,7 @@ fn minus(a: OpCounts, b: OpCounts) -> OpCounts {
 }
 
 #[test]
-fn gpu_a_still_ssr_frame_adds_two_render_passes_and_one_compute_pass() {
+fn gpu_a_still_ssr_frame_adds_a_render_pass_per_pyramid_level_and_no_compute_pass() {
     let Some(mut r) = renderer() else { return };
     let (on, off) = (still(&mut r, true), still(&mut r, false));
     eprintln!("[ssr] still frame: on {on:?}, off {off:?}");

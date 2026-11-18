@@ -41,10 +41,25 @@ impl GpuTimer {
         })
     }
 
-    /// One pair of kind `pass` spread over several compute passes: the first pass
+    /// One pair of kind `pass` spread over several render passes: the first pass
     /// takes the opening half (its start), the last the closing half (its end), so
-    /// every pass recorded between them, compute or render, is charged to `pass`
-    /// once.
+    /// every pass recorded between them is charged to `pass` once.
+    pub(crate) fn render_span(&self, pass: GpuPass) -> (RenderWrites<'_>, RenderWrites<'_>) {
+        let Some((query_set, at)) = self.pair(pass.into()) else {
+            return (None, None);
+        };
+        let half = |begin, end| wgpu::RenderPassTimestampWrites {
+            query_set,
+            beginning_of_pass_write_index: begin,
+            end_of_pass_write_index: end,
+        };
+        (
+            Some(half(Some(at * 2), None)),
+            Some(half(None, Some(at * 2 + 1))),
+        )
+    }
+
+    /// [`Self::render_span`] over compute passes.
     pub(crate) fn compute_span(&self, pass: GpuPass) -> (ComputeWrites<'_>, ComputeWrites<'_>) {
         let Some((query_set, at)) = self.pair(pass.into()) else {
             return (None, None);

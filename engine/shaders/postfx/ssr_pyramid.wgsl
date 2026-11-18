@@ -5,18 +5,24 @@
 // out of the average too, so one hot pixel never turns a whole block of a coarse
 // level, and every blur the resolve reads from it, into inf or NaN.
 //
-// One dispatch per level writes both pyramids' level. Each dispatch binds one-level
-// views, so the level read and written is uniform across it, never per thread
-// (crates/render/src/CLAUDE.md, *Shaders*).
+// One fullscreen pass per level writes both pyramids' level, as two colour
+// targets: the pyramids are render targets only, never storage, so a GPU keeps
+// their framebuffer compression. Each pass binds one-level views, so the level
+// read and written is uniform across it, never per pixel (crates/render/src/CLAUDE.md,
+// *Shaders*).
 
+#import fullscreen
 #import numeric
 
 // The level above, of each pyramid, as one-level views.
 @group(0) @binding(0) var hits_in: texture_2d<f32>;
 @group(0) @binding(1) var spread_in: texture_2d<f32>;
+
 // The level written, of each pyramid.
-@group(0) @binding(2) var hits_out: texture_storage_2d<rgba16float, write>;
-@group(0) @binding(3) var spread_out: texture_storage_2d<rgba16float, write>;
+struct Level {
+    @location(0) hits: vec4<f32>,
+    @location(1) spread: vec4<f32>,
+};
 
 // The mean of the finite texels among the 2×2 of `src` above texel `id`.
 fn average(src: texture_2d<f32>, id: vec2<u32>) -> vec4<f32> {
@@ -35,11 +41,13 @@ fn average(src: texture_2d<f32>, id: vec2<u32>) -> vec4<f32> {
     return sum / max(count, 1.0);
 }
 
-@compute @workgroup_size(8, 8)
-fn cs_downsample(@builtin(global_invocation_id) id: vec3<u32>) {
-    if (any(id.xy >= textureDimensions(hits_out))) {
-        return;
-    }
-    textureStore(hits_out, id.xy, average(hits_in, id.xy));
-    textureStore(spread_out, id.xy, average(spread_in, id.xy));
+@vertex
+fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4<f32> {
+    return fullscreen::triangle(vid);
+}
+
+@fragment
+fn fs_downsample(@builtin(position) pos: vec4<f32>) -> Level {
+    let id = vec2<u32>(pos.xy);
+    return Level(average(hits_in, id), average(spread_in, id));
 }

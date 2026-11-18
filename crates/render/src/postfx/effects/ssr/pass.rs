@@ -1,11 +1,12 @@
 //! The SSR pass (#1526): two fullscreen passes over the base camera's opaque image,
 //! run right after its opaque pass (`render::draw::camera`'s `ssr` stage), in
-//! `postfx/ssr.wgsl`, with a compute pass between them. It copies the image
+//! `postfx/ssr.wgsl`, with the hit pyramids' passes between them. It copies the image
 //! ([`pyramid::colour_copy`](super::pyramid::colour_copy)). The trace (`fs_trace`)
 //! then marches each smooth enough pixel's ray and writes its hit into a target of
 //! its own, and into a second where it traced and, for a ray that found something,
-//! its hit's blur radius per unit cone and how much it counts (#2158); one compute
-//! pass builds both targets' pyramids ([`HitPyramids`]); and the resolve (`fs_resolve`, #2028) averages each pixel's hits over
+//! its hit's blur radius per unit cone and how much it counts (#2158); one pass
+//! per level builds both targets' pyramids ([`HitPyramids`]); and the resolve
+//! (`fs_resolve`, #2028) averages each pixel's hits over
 //! a disk whose radius is the pixel's own cone times the radius field those
 //! pyramids smooth (the mean of the hits' radii around it, smooth among hits as
 //! across a hit and a miss), and draws them over the image, so a rough surface's reflected
@@ -13,10 +14,10 @@
 //! The translucents, the overlay cameras and every post effect see the reflected
 //! scene, HDRP's order.
 //!
-//! A frame records the copy, the trace, the pyramids' compute pass and the resolve
-//! into one encoder: two render passes and one compute pass for a view whose shorter
-//! side is 9 px or more. At 8 px or less the hit pyramids are one level deep
-//! ([`hit_levels`](super::pyramid::hit_levels)) and no compute pass opens.
+//! A frame records the copy, the trace, the pyramids' passes and the resolve into
+//! one encoder: two render passes and one per hit-pyramid level below the first
+//! ([`hit_levels`](super::pyramid::hit_levels): eight at 1080p, four at 96×72,
+//! none at 8 px or less, where the pyramids are one level deep).
 //!
 //! The pipelines are the renderer's ([`SsrPasses`], built on first use and warmed
 //! with the rest); the copy, the pyramids, the params uniform and the two bind
@@ -34,7 +35,7 @@ use super::surface;
 pub(crate) use super::targets::SsrTargets;
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
-use crate::gpu::pipelines::{LazyCompute, LazyPipeline};
+use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::{PostFx, HDR_FORMAT};
 use crate::timing::{GpuPass, GpuTimer};
@@ -137,13 +138,8 @@ impl SsrPasses {
     }
 
     /// The render pipelines, for warming (`Renderer::lazy_pipelines`).
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
-        [&self.trace, &self.resolve]
-    }
-
-    /// The compute pipeline, for warming (`Renderer::lazy_computes`).
-    pub(crate) fn lazy_computes(&self) -> [&LazyCompute; 1] {
-        [self.pyramid.lazy_compute()]
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 3] {
+        [&self.trace, &self.resolve, self.pyramid.lazy_pipeline()]
     }
 }
 

@@ -10,15 +10,21 @@
 //! Each hit pyramid's texel is the average of the finite texels among the 2×2 above
 //! it (`postfx/ssr_pyramid.wgsl`; an odd level's last row or column is left out of
 //! the one below, as a mip chain's floor halving leaves no texel for it). Both are
-//! built together, one compute dispatch per level, and only as deep as the resolve
-//! reads ([`hit_levels`]): at 1080p nine levels, about 22 MB each.
+//! built together, one fullscreen pass per level into both as two colour targets,
+//! and only as deep as the resolve reads ([`hit_levels`]): at 1080p nine levels,
+//! eight passes, about 22 MB each. They are render targets only, never storage: a
+//! storage-capable colour image loses framebuffer compression on most desktop GPUs,
+//! and the trace's full-size writes and the resolve's reads of level 0 dwarf the
+//! mips' (a compute pass built them before, #2340 measures the two).
 //!
 //! All of it is the view's, held only while it runs SSR and remade at a new size
 //! ([`super::targets::SsrTargets`]).
 
 use crate::gpu::bind_entry as entry;
+use crate::gpu::fullscreen::Fullscreen;
+use crate::gpu::layout_entries::texture_entry;
 use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _};
-use crate::gpu::pipelines::{lazy_compute, LazyCompute};
+use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::HDR_FORMAT;
 use crate::timing::{GpuPass, GpuTimer};
@@ -48,10 +54,11 @@ pub(crate) fn hit_levels((w, h): (u32, u32)) -> u32 {
     (deepest + 1).min(levels((w, h)))
 }
 
-/// The downsample pipeline and the trilinear sampler the trace and the resolve
-/// read through, shared by every view.
+/// The downsample pipeline and its layout, and the trilinear sampler the trace and
+/// the resolve read through, shared by every view.
 pub(crate) struct PyramidPass {
-    downsample: LazyCompute,
+    layout: wgpu::BindGroupLayout,
+    downsample: LazyPipeline,
     /// Linear between texels and between levels, clamped at the screen's edge.
     pub(crate) trilinear: wgpu::Sampler,
 }
@@ -59,7 +66,31 @@ pub(crate) struct PyramidPass {
 impl PyramidPass {
     pub(crate) fn new(device: &wgpu::Device, registry: &mut ShaderRegistry) -> Self {
         let shader = registry.load(device, "postfx/ssr_pyramid.wgsl", "SSR Pyramid Shader");
-        let names = ("SSR Pyramid Pipeline", "cs_downsample");
+        let d2 = wgpu::TextureViewDimension::D2;
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("SSR Pyramid Layout"),
+            entries: &[texture_entry(0, d2), texture_entry(1, d2)],
+        });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("SSR Pyramid Pipeline Layout"),
+            bind_group_layouts: &[Some(&layout)],
+            immediate_size: 0,
+        });
+        let downsample = LazyPipeline::new(device, move |device| {
+            let target = wgpu::ColorTargetState {
+                format: HDR_FORMAT,
+                blend: None,
+                write_mask: wgpu::ColorWrites::ALL,
+            };
+            Fullscreen {
+                label: "SSR Pyramid Pipeline",
+                shader: &shader,
+                layout: &pipeline_layout,
+                vs: "vs_fullscreen",
+                fs: "fs_downsample",
+            }
+            .colour(device, &[Some(target.clone()), Some(target)])
+        });
         let trilinear = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("SSR Pyramid Sampler"),
             mag_filter: wgpu::FilterMode::Linear,
@@ -68,12 +99,13 @@ impl PyramidPass {
             ..Default::default()
         });
         Self {
-            downsample: lazy_compute(device, &shader, names, None),
+            layout,
+            downsample,
             trilinear,
         }
     }
 
-    pub(crate) fn lazy_compute(&self) -> &LazyCompute {
+    pub(crate) fn lazy_pipeline(&self) -> &LazyPipeline {
         &self.downsample
     }
 }
@@ -123,8 +155,8 @@ struct Chain {
 impl Chain {
     fn new(device: &wgpu::Device, label: &str, size: (u32, u32), count: u32) -> Self {
         use wgpu::TextureUsages as U;
-        // The trace draws the first level; the downsample stores the rest.
-        let usage = U::RENDER_ATTACHMENT | U::STORAGE_BINDING | U::TEXTURE_BINDING;
+        // The trace draws the first level, the downsample the rest.
+        let usage = U::RENDER_ATTACHMENT | U::TEXTURE_BINDING;
         let texture = texture(device, label, size, count, usage);
         let levels = (0..count)
             .map(|mip| {
@@ -143,12 +175,10 @@ impl Chain {
 }
 
 /// One view's two hit pyramids, the same size and depth, and for each level below
-/// the first the group that downsamples both into it.
+/// the first the group that reads both levels above it.
 pub(crate) struct HitPyramids {
     hits: Chain,
     spread: Chain,
-    /// The full-size `(w, h)`.
-    size: (u32, u32),
     steps: Vec<wgpu::BindGroup>,
 }
 
@@ -157,18 +187,15 @@ impl HitPyramids {
         let count = hit_levels(size);
         let hits = Chain::new(device, "SSR Hits", size, count);
         let spread = Chain::new(device, "SSR Spread", size, count);
-        let layout = pass.downsample.get().get_bind_group_layout(0);
         let view = |v| wgpu::BindingResource::TextureView(v);
         let steps = (1..count as usize)
             .map(|mip| {
                 device.counted_bind_group(&wgpu::BindGroupDescriptor {
                     label: Some("SSR Pyramid Level"),
-                    layout: &layout,
+                    layout: &pass.layout,
                     entries: &[
                         entry(0, view(&hits.levels[mip - 1])),
                         entry(1, view(&spread.levels[mip - 1])),
-                        entry(2, view(&hits.levels[mip])),
-                        entry(3, view(&spread.levels[mip])),
                     ],
                 })
             })
@@ -176,7 +203,6 @@ impl HitPyramids {
         Self {
             hits,
             spread,
-            size,
             steps,
         }
     }
@@ -197,27 +223,45 @@ impl HitPyramids {
         self.hits.levels.len() as u32
     }
 
-    /// Record every level below the first of both, from the one above, in one
-    /// compute pass, timed as `ssr_pyramids`.
+    /// Record every level below the first of both, from the one above, one pass
+    /// per level into both, timed as one `ssr_pyramids` pair across them.
     pub(crate) fn build(
         &self,
         encoder: &mut wgpu::CommandEncoder,
         pass: &PyramidPass,
         timer: &GpuTimer,
     ) {
-        if self.steps.is_empty() {
-            return;
-        }
-        let mut cp = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("SSR Pyramids"),
-            timestamp_writes: timer.compute_writes(GpuPass::SsrPyramids),
-        });
-        cp.set_pipeline(pass.downsample.get());
-        let mut size = self.size;
-        for group in &self.steps {
-            size = ((size.0 / 2).max(1), (size.1 / 2).max(1));
-            cp.set_bind_group(0, group, &[]);
-            cp.dispatch_workgroups(size.0.div_ceil(8), size.1.div_ceil(8), 1);
+        let last = self.steps.len().saturating_sub(1);
+        let (mut open, mut close) = match last {
+            0 => (timer.writes(GpuPass::SsrPyramids), None),
+            _ => timer.render_span(GpuPass::SsrPyramids),
+        };
+        for (i, group) in self.steps.iter().enumerate() {
+            let mip = i + 1;
+            let targets = [&self.hits.levels[mip], &self.spread.levels[mip]].map(|view| {
+                Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })
+            });
+            let stamps = if i == 0 { open.take() } else { None };
+            let stamps = stamps.or_else(|| if i == last { close.take() } else { None });
+            let mut rp = encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("SSR Pyramid Pass"),
+                color_attachments: &targets,
+                depth_stencil_attachment: None,
+                timestamp_writes: stamps,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            rp.set_pipeline(pass.downsample.get());
+            rp.set_bind_group(0, group, &[]);
+            rp.draw(0..3, 0..1);
         }
     }
 }
