@@ -69,7 +69,9 @@ nothing to wait for.
   `actions_run_trigger` does the same). It runs the gates and nothing else.
   Dispatched on a head that already holds `main`'s tip, its green run also
   lets the ready run skip its build (`proved_tree.py`), so update from `main`
-  before the proof run, not after it.
+  before the proof run, not after it. A branch that changes a manifest, the
+  lockfile, the toolchain, `.cargo/`, `.github/actions/`, a gating workflow or
+  the skip's decider still runs in full when readied, as it should.
   Never dispatch `mutants-sweep.yml`: that is the full sweep, up to ten runners
   the batch's gates need.
 - **A run you cite is one you read finished.** Its id, its conclusion, and every

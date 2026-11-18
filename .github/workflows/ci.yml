@@ -63,10 +63,13 @@ jobs:
   # `main` whose tree a recent successful run already built (#1784): the squash
   # of an up-to-date head has the head's tree, which its PR run just proved.
   # `proved_tree.py` checks that mechanically, keeps the full run when the push
-  # moves a cache key (Cargo.toml/lock, the toolchain, `.cargo/`, this file), and
-  # fails toward running on any error. A ready PR's run asks too (#2333): its test
-  # merge's tree, built green by a dispatch or push run (a head holding `main`
-  # that a coder proved before readying), skips the same way. Skipped, the run's gating jobs report
+  # moves a cache key (Cargo.toml/lock, the toolchain, `.cargo/`,
+  # `.github/actions/`, this file) or changes the decider (the script and what it
+  # imports), and fails toward running on any error. A ready PR's run asks too
+  # (#2333): its test merge's tree, built green by a dispatch or push run (a head
+  # holding `main` that a coder proved before readying), skips the same way,
+  # under the same full-run rules; a PR that changes the decider or either
+  # gating workflow never asks (the `decider` filter). Skipped, the run's gating jobs report
   # `skipped`/`success` exactly as on a Markdown-only merge, so `ci-gate` passes.
   changes:
     timeout-minutes: 5
@@ -106,6 +109,14 @@ jobs:
               # the game CLAUDE.md template a project's edit-open embeds (#1313).
               - 'docs/game-agent.md'
               - 'crates/core/src/project/game_claude.md'
+            # What decides a skip (#2333): a PR that changes it never asks
+            # `proved_tree.py`, since the step would run the PR's own copy.
+            decider:
+              - '.github/scripts/proved_tree.py'
+              - '.github/scripts/ghrest.py'
+              - '.github/scripts/merging/verdict/**'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/lint.yml'
             # What can stop `fuzz/` compiling (`fuzz-check`): the target and its
             # manifest; the root package's manifest and re-exports (`src/lib.rs`),
             # which it imports through; every member's manifest (a feature or
@@ -132,13 +143,14 @@ jobs:
       # Markdown-only change already skips. On a PR `github.sha` is the test
       # merge, whose tree a dispatch run on a head holding `main` built. A change
       # to a cache key's inputs (`Cargo.lock`, the toolchain, `.github/actions/`,
-      # which pins the CI tools, #1973), this file or the script runs in full.
+      # which pins the CI tools, #1973), this file or the script runs in full;
+      # so does a `decider` change, held here because a PR would run its own copy.
       # A draft and the nightly never ask; a dispatch always builds. A lookup that
       # breaks (no `gh`, a hung call) must not fail `changes` and turn `main`
       # red: the step may fail or time out, and its empty output means a full run.
       - name: Was this tree already proved?
         id: proved
-        if: (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)) && steps.filter.outputs.code != 'false'
+        if: (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)) && steps.filter.outputs.code != 'false' && steps.filter.outputs.decider != 'true'
         continue-on-error: true
         timeout-minutes: 2
         env:

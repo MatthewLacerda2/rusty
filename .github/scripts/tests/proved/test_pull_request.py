@@ -13,6 +13,8 @@ import proved_tree
 from tests.proved.test_proved_tree import REPO, SHA, TREE, Fake, built_jobs, job
 
 BASE, HEAD = "a" * 40, "h" * 40
+#: The tree a behind head's dispatch run built: the head's, never its merge's.
+HEAD_TREE = "x" * 40
 
 
 def pr_fake(event: str | None = "workflow_dispatch", parents=(BASE, HEAD), **kw) -> "Asking":
@@ -63,8 +65,8 @@ class RunsInFull(unittest.TestCase):
         self.assertIsNone(url)
         self.assertTrue(why.startswith("runs in full"), why)
 
-    def test_a_behind_head_whose_merge_tree_no_run_built(self):
-        self.assert_runs(pr_fake(tree="x" * 40))
+    def test_a_behind_head_proved_on_its_own_tree_is_not_proved_on_its_merge(self):
+        self.assert_runs(pr_fake(tree=HEAD_TREE))
 
     def test_a_pull_request_run_of_the_same_tree_is_no_proof(self):
         self.assert_runs(pr_fake("pull_request"))
@@ -80,7 +82,7 @@ class RunsInFull(unittest.TestCase):
 
     def test_a_cache_key_workflow_or_decider_change_against_the_base(self):
         for path in ("Cargo.lock", ".github/workflows/ci.yml", ".github/actions/install-tool/action.yml",
-                     proved_tree.DECIDER):
+                     *proved_tree.DECIDER):
             with self.subTest(path=path):
                 self.assert_runs(pr_fake(files=("src/lib.rs", path)))
 
@@ -103,9 +105,26 @@ class NeverSuperseded(unittest.TestCase):
     """A merge commit is never `main`'s tip, so the push rule would skip every PR build."""
 
     def test_a_main_tip_other_than_the_merge_does_not_skip(self):
-        fake = pr_fake(tree="x" * 40, tip="n" * 40)
+        fake = pr_fake(tree=HEAD_TREE, tip="n" * 40)
         self.assertIsNone(verdict(fake)[0])
         self.assertNotIn(f"repos/{REPO}/commits/main", fake.seen)
+
+
+class PushPathUnchanged(unittest.TestCase):
+    """#2333 left the push path as #1784/#1785 built it: superseded before the commit read."""
+
+    def test_a_superseded_push_skips_without_reading_its_commit(self):
+        fake = Asking(Fake(tip="n" * 40, fail=(f"repos/{REPO}/commits/{SHA}",)))
+        url, _ = proved_tree.verdict(fake, REPO, "ci.yml", SHA, "b" * 40)
+        self.assertEqual(url, "n" * 40)
+        self.assertNotIn(f"repos/{REPO}/commits/{SHA}", fake.seen)
+
+    def test_the_order_is_compare_then_tip_then_commit(self):
+        fake = Asking(Fake())
+        proved_tree.verdict(fake, REPO, "ci.yml", SHA, "b" * 40)
+        firsts = [p for p in fake.seen if "/compare/" in p or "/commits/" in p]
+        self.assertEqual(firsts, [f"repos/{REPO}/compare/{'b' * 40}...{SHA}",
+                                  f"repos/{REPO}/commits/main", f"repos/{REPO}/commits/{SHA}"])
 
 
 if __name__ == "__main__":
