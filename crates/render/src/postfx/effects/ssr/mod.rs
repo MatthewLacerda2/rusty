@@ -10,8 +10,8 @@
 //! reflection it replaces, with the roughness packed in. So a surface smoother than
 //! the volume's `min_smoothness` reflects, and a hit swaps the sky or probe
 //! reflection for what is on screen (never adding to it), averaged over the disk its
-//! GGX lobe spreads a reflection across ([`pass`]'s resolve, #2028, reading mips
-//! of the hits, [`pyramid`], #1736): glossy SSR, a rough floor showing a soft
+//! GGX lobe spreads a reflection across ([`pass`]'s resolve, #2028, reading the
+//! hits' mip pyramids, [`pyramid`]): glossy SSR, a rough floor showing a soft
 //! reflection whose silhouette fades across its blur. The volume's `quality` sets the march
 //! ([`march`], #1521, #1522). A transparent surface that opts in traces its own
 //! reflection in the transparent pass ([`transparent`], #1570).
@@ -20,6 +20,7 @@ pub(crate) mod pass;
 pub(crate) mod pyramid;
 mod record;
 pub(crate) mod surface;
+mod targets;
 pub(crate) mod transparent;
 
 use super::{History, Owner, PostEffect};
@@ -36,7 +37,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "ssr",
     owner: Owner::Volume,
     gate: Gate::option(GraphicsOption::Ssr),
-    history: History::None("cone-traced from this frame's colour pyramid and depth"),
+    history: History::None("traced from this frame's opaque image and depth"),
     module: None,
     composite: &[],
     grade: &[],
