@@ -775,6 +775,11 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   #999). Comment lines never count. The
   helper itself and Unix socket paths (which must stay short) carry an inline
   allow. `tools/` is not scanned: the lint crate's own tests are not the engine's.
+- **The ≲10-files-per-directory signal** prints after the findings: every scanned
+  directory holding more than ten source files as `dir-size` counts them, most
+  crowded first, leaving out what is past that rule's cap under `src/` (its
+  finding or allow). It never fails the gate; it tells you where to cluster by
+  responsibility when you next work in that directory, before `dir-size` makes you.
 - **`tool-named-test`** — a test belongs beside the behaviour's other tests, under
   a name that says what it proves, so a file named for the tool that found the gap
   (`survivors.rs`, `survivor_tests.rs`, `mutants.rs`) fails on its first line: rename
@@ -782,11 +787,6 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   name and doc comment speak of behaviour rather than of a mutant or a line number
   is a judgement the independent review holds, since no pattern tells the two apart
   (`ci-merge`, *Triaging a survivor*).
-- **The ≲10-files-per-directory signal** prints after the findings: every scanned
-  directory holding more than ten source files as `dir-size` counts them, most
-  crowded first, leaving out what is past that rule's cap under `src/` (its
-  finding or allow). It never fails the gate; it tells you where to cluster by
-  responsibility when you next work in that directory, before `dir-size` makes you.
 - **`unwrap-deny`** — the unwrap ban covers exactly the layer table's sim rows
   (#962). Each sim row's `crates/<module>/src/lib.rs` must carry
   `#![deny(clippy::unwrap_used)]`, and no file under a sim module may `allow`,
