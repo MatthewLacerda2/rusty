@@ -21,6 +21,7 @@ use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _};
 use crate::gpu::pipelines::{lazy_compute, LazyCompute};
 use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::HDR_FORMAT;
+use crate::timing::{GpuPass, GpuTimer};
 
 /// How many levels a full `(w, h)` mip chain has: down to 1×1.
 pub(crate) fn levels((w, h): (u32, u32)) -> u32 {
@@ -197,14 +198,19 @@ impl HitPyramids {
     }
 
     /// Record every level below the first of both, from the one above, in one
-    /// compute pass.
-    pub(crate) fn build(&self, encoder: &mut wgpu::CommandEncoder, pass: &PyramidPass) {
+    /// compute pass, timed as `ssr_pyramids`.
+    pub(crate) fn build(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        pass: &PyramidPass,
+        timer: &GpuTimer,
+    ) {
         if self.steps.is_empty() {
             return;
         }
         let mut cp = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("SSR Pyramids"),
-            timestamp_writes: None,
+            timestamp_writes: timer.compute_writes(GpuPass::SsrPyramids),
         });
         cp.set_pipeline(pass.downsample.get());
         let mut size = self.size;

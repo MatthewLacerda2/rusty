@@ -1030,7 +1030,10 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   measured), `cpu_ms` (the same at a fixed reference CPU clock, below) and
   `cpu_clock_pct` (the CPU clock it ran at), `renderer_ms` (CPU time recording the
   frame, as measured), `gpu_ms` and `gpu.<pass>` (GPU time
-  at a fixed reference clock, below), `gpu_raw_ms` (GPU time as measured) and
+  at a fixed reference clock, below; `gpu_ms` is the passes' sum, and
+  `gpu.other` what of the frame's timed span no pass holds: a command recorded
+  outside every timed pass, and the GPU waiting for the CPU between submits, so
+  it reads near zero only on a GPU-bound frame), `gpu_raw_ms` (GPU time as measured) and
   `gpu_clock_pct` (the clock it ran at, % of the reference), `draw_calls`,
   `triangles`, `culled_entities`, `lights_dropped`, `cluster_lights_dropped`, `lights_culled`,
   `decals_visible`, `decal_cluster_refs`, the GPU occlusion counters `hiz_tested`,
@@ -1152,7 +1155,12 @@ every binary's open makes them.
     from the device's `currentAllocatedSize`, which also counts what the driver
     keeps for itself, so the two platforms' figures are close, not equal. The
     report names its source, and without one (GL) the row is absent and the report
-    says so.
+    says so. Beside it, `gpu.allocated_mb` (what of those blocks live
+    allocations use, where the allocator report tells it: not on Metal) and the
+    renderer's own resident bytes by kind, which follow the scene where `gpu_mb`
+    does not: `gpu.texture_mb` (image textures by path), `gpu.lightmap_mb` (the
+    lightmap page arrays) and `gpu.reflection_mb` (the reflection probes' cube
+    array), as of the last measured frame (`docs/api/Debug.md`, the `_bytes` keys).
 
   It is kept as `out/bench/scenes/<project>-<hash>/<scene>.json` (and `.txt`; the
   project folder's name and a short hash of its canonical path, so a copy and its

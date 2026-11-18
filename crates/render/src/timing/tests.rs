@@ -1,11 +1,11 @@
-use super::{GpuPass, GpuTimer, GpuTimes};
+use super::{GpuPass, GpuTimer, GpuTimes, Pair};
 
 #[test]
 fn ticks_sum_per_pass_kind_in_frame_order() {
     // Two shadow sweeps and a forward pass, back to back, at 1 ns per tick.
     let ticks = [0, 1_000_000, 1_000_000, 1_500_000, 2_000_000, 4_000_000];
     let passes = [GpuPass::Shadows, GpuPass::Shadows, GpuPass::Forward];
-    let times = GpuTimes::from_ticks(&ticks, &passes, 1.0);
+    let times = GpuTimes::from_ticks(&ticks, &passes.map(Pair::from), 1.0);
     assert_eq!(
         times.passes,
         vec![(GpuPass::Shadows, 1.5), (GpuPass::Forward, 2.0)]
@@ -19,7 +19,7 @@ fn an_overlapping_pass_is_charged_only_past_the_work_ahead_of_it() {
     // fragments before forward's, ending at 11: it costs 1, not 9, and the frame 11.
     let ticks = [0, 10, 2, 11, 12, 13];
     let passes = [GpuPass::Forward, GpuPass::PostFx, GpuPass::Ui];
-    let times = GpuTimes::from_ticks(&ticks, &passes, 1e6);
+    let times = GpuTimes::from_ticks(&ticks, &passes.map(Pair::from), 1e6);
     let want = [
         (GpuPass::Forward, 10.0),
         (GpuPass::PostFx, 1.0),
@@ -32,7 +32,8 @@ fn an_overlapping_pass_is_charged_only_past_the_work_ahead_of_it() {
 #[test]
 fn the_tick_period_scales_and_a_pass_ending_early_counts_zero() {
     // 10 ticks of 0.1 ms; the SSAO pass ends inside the UI pass queued before it.
-    let times = GpuTimes::from_ticks(&[10, 20, 12, 18], &[GpuPass::Ui, GpuPass::Ssao], 1e5);
+    let pairs = [GpuPass::Ui, GpuPass::Ssao].map(Pair::from);
+    let times = GpuTimes::from_ticks(&[10, 20, 12, 18], &pairs, 1e5);
     assert_eq!(times.passes, vec![(GpuPass::Ssao, 0.0), (GpuPass::Ui, 1.0)]);
 }
 
@@ -44,6 +45,7 @@ fn pass_names_are_stable_and_unique() {
         [
             "sky_reflection",
             "shadows",
+            "occlusion",
             "ssao_prepass",
             "ssao",
             "ssao_blur",
@@ -51,6 +53,8 @@ fn pass_names_are_stable_and_unique() {
             "volumetric_fog",
             "forward",
             "ssr",
+            "ssr_pyramids",
+            "ssr_resolve",
             "transparent",
             "ribbons",
             "particles",

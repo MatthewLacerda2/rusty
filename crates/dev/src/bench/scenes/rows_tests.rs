@@ -100,3 +100,23 @@ fn gpu_every_system_and_render_stage_is_a_row_and_together_they_are_the_whole() 
     }
     holds_whole(&report, "render.", renderer);
 }
+
+/// The renderer's own resident bytes are rows beside `gpu_mb`, in MiB (#2340).
+#[test]
+fn resident_bytes_by_kind_are_rows_in_mib() {
+    let counters = rusty_render::RenderCounters {
+        texture_bytes: 3 << 20,
+        lightmap_bytes: 1 << 19,
+        ..Default::default()
+    };
+    let mut report = SceneReport::default();
+    push_resident(&mut report, &counters);
+    let mb = |k: &str| report.row(k).map(|r| r.avg);
+    assert_eq!(mb("gpu.texture_mb"), Some(3.0));
+    assert_eq!(mb("gpu.lightmap_mb"), Some(0.5));
+    assert_eq!(
+        mb("gpu.reflection_mb"),
+        Some(0.0),
+        "a kind the scene lacks reads 0"
+    );
+}

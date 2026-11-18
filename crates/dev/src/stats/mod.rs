@@ -225,7 +225,8 @@ pub fn record_render(stats: &mut FrameStats, frame: &RenderedFrame) {
 
 /// Fold one rendered frame into the frame being recorded: its counters, the CPU ms
 /// the renderer spent recording it, and — where the adapter has timestamps — its
-/// GPU ms in total (`gpu_ms`) and per pass kind (#835). Without timestamps no GPU
+/// GPU ms in total (`gpu_ms`), per pass kind (#835) and what no pass holds
+/// (`gpu_other_ms`). Without timestamps no GPU
 /// key is written. It counts as a rendered frame (`drawn_frames`).
 pub fn record_render_into(drawn: &mut DrawnFrame<'_>, frame: &RenderedFrame) {
     for (key, value) in frame.counters.pairs() {
@@ -235,6 +236,7 @@ pub fn record_render_into(drawn: &mut DrawnFrame<'_>, frame: &RenderedFrame) {
     drawn.rendered();
     if let Some(gpu) = &frame.gpu {
         drawn.record("gpu_ms", gpu.total_ms());
+        drawn.record("gpu_other_ms", gpu.other_ms());
         for (pass, ms) in &gpu.passes {
             drawn.record_gpu_pass(pass.name(), *ms);
         }

@@ -21,14 +21,15 @@
 //! The pipelines are the renderer's ([`SsrPasses`], built on first use and warmed
 //! with the rest); the copy, the pyramids, the params uniform and the two bind
 //! groups are each view's ([`SsrTargets`]), held only while it runs SSR. The GPU
-//! timer's `ssr` pass spans the trace, the trace's pyramids and the resolve; the
-//! copy is untimed.
+//! timer's rows: `ssr` holds the copy and the trace (the copy is a command, not a
+//! pass, so the trace's pair opens where the work ahead of it ended), and
+//! `ssr_pyramids` and `ssr_resolve` the other two.
 
 use crate::gpu::ops::CountedQueue as _;
 use glam::{Mat4, Vec3};
 
 use super::pyramid::{HitPyramids, PyramidPass};
-use super::record::{begin, opaque_target, pipeline_layout, split};
+use super::record::{begin, opaque_target, pipeline_layout};
 use super::surface;
 pub(crate) use super::targets::SsrTargets;
 use crate::gpu::fullscreen::Fullscreen;
@@ -207,25 +208,25 @@ fn trace_and_resolve(
     scene: &wgpu::TextureView,
     timer: &GpuTimer,
 ) {
-    // The timer's `ssr` pair opens on the trace and closes on the resolve, so it
-    // counts the trace's pyramids too.
-    let timed = timer.writes(GpuPass::Ssr);
-    let (open, close) = split(timed);
     {
         // Cleared: a pixel that takes no SSR is discarded, so nothing traced.
         let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
         let [hits, spread] = pyramids.tops();
         let targets = [(hits, clear), (spread, clear)];
-        let mut pass = begin(encoder, "SSR Trace", &targets, open);
+        // The colour copy recorded just before is no pass: the trace's pair holds
+        // the gap after the work ahead of it, so `ssr` counts the copy too.
+        let timed = timer.writes_holding_gap(GpuPass::Ssr);
+        let mut pass = begin(encoder, "SSR Trace", &targets, timed);
         pass.set_pipeline(passes.trace.get());
         pass.set_bind_group(0, group, &[]);
         pass.draw(0..3, 0..1);
     }
-    pyramids.build(encoder, &passes.pyramid);
+    pyramids.build(encoder, &passes.pyramid, timer);
     {
         // Loaded: a pixel that gets no SSR is discarded, left as it was.
         let targets = [(scene, wgpu::LoadOp::Load)];
-        let mut pass = begin(encoder, "SSR Resolve", &targets, close);
+        let timed = timer.writes(GpuPass::SsrResolve);
+        let mut pass = begin(encoder, "SSR Resolve", &targets, timed);
         pass.set_pipeline(passes.resolve.get());
         pass.set_bind_group(0, group, &[]);
         pass.set_bind_group(1, traced, &[]);

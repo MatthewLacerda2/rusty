@@ -109,7 +109,13 @@ fn gpu_bench_reports_frame_render_and_counter_rows() {
     assert!(row("compute_passes").is_some() && row("bind_groups_created").is_some());
     let timed = h.stats.borrow().get("gpu_ms").is_some();
     assert_eq!(row("gpu_ms").is_some(), timed);
+    // What no pass holds is a GPU time too: absent without timestamps, as they are.
+    assert_eq!(row("gpu.other").is_some(), timed);
     if timed {
+        assert!(
+            row("gpu.occlusion").is_some(),
+            "a new pass kind has its row"
+        );
         assert!(row("gpu.forward").is_some_and(|s| s.avg > 0.0));
         assert!(row("gpu.ribbons").is_some(), "every pass has a row");
         assert!(row("gpu_raw_ms").is_some_and(|s| s.avg > 0.0));
@@ -126,6 +132,7 @@ fn gpu_rows_are_scaled_by_the_frame_clock_speed() {
     let gpu = GpuTimes {
         frame: 1,
         passes: vec![(GpuPass::Shadows, 2.0), (GpuPass::Forward, 6.0)],
+        span_ms: 9.0,
     };
     let frame = RenderedFrame {
         gpu: Some(gpu),
@@ -145,6 +152,8 @@ fn gpu_rows_are_scaled_by_the_frame_clock_speed() {
     assert_eq!(avg("gpu.shadows"), 1.0);
     assert_eq!(avg("gpu.forward"), 3.0);
     assert_eq!(avg("gpu.ui"), 0.0);
+    // The span's 1 ms no pass holds, scaled like the rows.
+    assert_eq!(avg("gpu.other"), 0.5);
     assert_eq!(avg("gpu_raw_ms"), 8.0);
     assert_eq!(avg("gpu_clock_pct"), 50.0);
 }
