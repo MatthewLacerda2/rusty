@@ -15,13 +15,16 @@ use std::path::{Path, PathBuf};
 use crate::convert::{cached_gltf, conversion_allowed, convertible_sources};
 use crate::texture_import::{self, Refreshed};
 
+/// The sources that failed, each with why.
+type Failed = Vec<(PathBuf, String)>;
+
 /// What [`import_all`] did.
 #[derive(Debug, Default, PartialEq)]
 pub struct Imported {
     /// Every model source looked at (each converted when its cache was stale), sorted.
     pub sources: Vec<PathBuf>,
     /// The model sources that failed to convert, with why; each was warned of.
-    pub failed: Vec<(PathBuf, String)>,
+    pub failed: Failed,
     /// What the images' refresh did (`texture_import::refresh_all`).
     pub textures: Refreshed,
 }
@@ -75,7 +78,7 @@ pub fn notice(root: &Path) -> String {
 
 /// The first half of an import: every model source under `root` converted when
 /// stale, and the ones that failed, each warned of. Refused during Play.
-fn models(root: &Path) -> Result<(Vec<PathBuf>, Vec<(PathBuf, String)>), String> {
+fn models(root: &Path) -> Result<(Vec<PathBuf>, Failed), String> {
     if !conversion_allowed() {
         return Err("Play is running, and the import waits for Stop: stop first".into());
     }

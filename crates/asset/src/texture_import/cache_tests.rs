@@ -134,7 +134,11 @@ fn imports_names_exactly_the_files_refresh_all_visits() {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         gradient(8, 8).save(path).unwrap();
     }
-    assert_eq!(images(&dir), [a.clone()], "the walk leaves the cache out");
+    assert_eq!(
+        images(&dir),
+        std::slice::from_ref(&a),
+        "the walk leaves the cache out"
+    );
     assert!(imports(&dir, &a));
     assert!(!imports(&dir, &extracted), "inside the import cache");
     let elsewhere = dir.parent().unwrap().join("b.png");
