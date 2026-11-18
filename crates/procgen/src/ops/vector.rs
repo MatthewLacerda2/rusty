@@ -110,10 +110,12 @@ pub const MIN_NORMAL_Z: f32 = 0.125;
 /// & Hill, *Blending in Detail*, 2012): `base` is rotated by the tilt `detail`
 /// carries, the result renormalized. Both decode from `[0, 1]` as
 /// [`bump_to_normal`] packs them; `strength` scales the detail's XY first (0 leaves
-/// `base`). A flat input on either side returns the other. Alpha is `base`'s. A
-/// result that would tip below [`MIN_NORMAL_Z`] (a steep base turned further the
-/// same way) is lifted to it, keeping its direction across the surface
-/// (`upper_hemisphere`); every other texel is RNM's own.
+/// `base`). A flat input on either side returns the other. Alpha is `base`'s. The
+/// floor then holds on every output texel (`upper_hemisphere`): one under
+/// [`MIN_NORMAL_Z`] is lifted to it, keeping its direction across the surface,
+/// whatever the detail or `strength`, so a base texel already under the floor is
+/// lifted even with a flat detail or `strength` 0. A texel at or above it is RNM's
+/// own.
 pub fn normal_blend(base: &Image, detail: &Image, strength: Field) -> Image {
     let mut out = base.clone();
     let w = base.width() as usize;

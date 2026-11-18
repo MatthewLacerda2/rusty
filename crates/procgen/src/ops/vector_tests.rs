@@ -149,3 +149,26 @@ fn a_lifted_normal_keeps_its_lean_and_one_straight_down_reads_flat() {
     let up = Vec3::new(0.1, 0.2, 0.9).normalize();
     assert_eq!(upper_hemisphere(up), up);
 }
+
+#[test]
+fn a_base_already_under_the_floor_is_lifted_with_a_flat_detail_or_no_strength() {
+    // A steep base (z ≈ 0.078, as a height step through `bump_to_normal` makes).
+    let steep = Vec3::new(0.6, -0.79, 0.078).normalize();
+    let pack = |n: Vec3| [n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5, 1.0];
+    let base = Image::filled(4, pack(steep));
+    let blends = [
+        normal_blend(&base, &Image::filled(4, FLAT), Field::Const(1.0)),
+        normal_blend(&base, &normals(4), Field::Const(0.0)),
+    ];
+    for out in &blends {
+        for p in out.pixels() {
+            let n = decode(*p);
+            assert!(
+                (n.z - MIN_NORMAL_Z).abs() < 1e-5,
+                "{n:?} is not at the floor"
+            );
+            assert!((n.length() - 1.0).abs() < 1e-5, "{n:?} is not unit");
+            assert!((n.y / n.x - steep.y / steep.x).abs() < 1e-4, "{n:?} turned");
+        }
+    }
+}
