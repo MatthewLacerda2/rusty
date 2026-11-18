@@ -99,18 +99,28 @@ pub fn bump_to_normal(img: &Image, strength: Field) -> Image {
     })
 }
 
+/// The lowest z [`normal_blend`] writes: a tangent-space normal stays above the
+/// surface, and far enough above it that a BC5 copy, which keeps only x and y at 8
+/// bits per endpoint and rebuilds `z = sqrt(1 - x² - y²)`, still rebuilds a positive
+/// z. At z = 1/8, x and y rounded by half an 8-bit step each (√2/255 off in length)
+/// still leave z ≈ 0.07; the bare limit is z ≈ 0.105. Blue byte 143.
+pub const MIN_NORMAL_Z: f32 = 0.125;
+
 /// Lay normal map `detail` over `base` by Reoriented Normal Mapping (Barré-Brisebois
 /// & Hill, *Blending in Detail*, 2012): `base` is rotated by the tilt `detail`
 /// carries, the result renormalized. Both decode from `[0, 1]` as
 /// [`bump_to_normal`] packs them; `strength` scales the detail's XY first (0 leaves
-/// `base`). A flat input on either side returns the other. Alpha is `base`'s.
+/// `base`). A flat input on either side returns the other. Alpha is `base`'s. A
+/// result that would tip below [`MIN_NORMAL_Z`] (a steep base turned further the
+/// same way) is lifted to it, keeping its direction across the surface
+/// ([`upper_hemisphere`]); every other texel is RNM's own.
 pub fn normal_blend(base: &Image, detail: &Image, strength: Field) -> Image {
     let mut out = base.clone();
     let w = base.width() as usize;
     out.for_each_row(|y, row| {
         for (x, (p, d)) in row.iter_mut().zip(detail.row(y)).enumerate() {
             let s = strength.at(y * w + x);
-            let n = rnm(decode(*p), decode(*d) * Vec3::new(s, s, 1.0));
+            let n = upper_hemisphere(rnm(decode(*p), decode(*d) * Vec3::new(s, s, 1.0)));
             *p = [n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5, p[3]];
         }
     });
@@ -129,6 +139,23 @@ fn rnm(base: Vec3, detail: Vec3) -> Vec3 {
     let u = detail * Vec3::new(-1.0, -1.0, 1.0);
     let r = t * t.dot(u) / t.z.max(1e-6) - u;
     r.try_normalize().unwrap_or(Vec3::Z)
+}
+
+/// `n` (unit length) with z at least [`MIN_NORMAL_Z`]: below it, z is set to the
+/// floor and x, y scaled to keep unit length, so the normal leans the same way
+/// across the surface, as far as the floor lets it. One with no x, y (straight down)
+/// reads flat. At or above the floor `n` is returned untouched, bit for bit.
+fn upper_hemisphere(n: Vec3) -> Vec3 {
+    if n.z >= MIN_NORMAL_Z {
+        return n;
+    }
+    let xy = n.truncate();
+    let len = xy.length();
+    if len <= 1e-6 {
+        return Vec3::Z;
+    }
+    let side = (1.0 - MIN_NORMAL_Z * MIN_NORMAL_Z).sqrt();
+    (xy * (side / len)).extend(MIN_NORMAL_Z)
 }
 
 /// Combine up to four single-channel inputs into one RGBA image. Each input
@@ -158,61 +185,5 @@ pub fn separate_rgb(mut img: Image, channel: u8) -> Image {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::hash;
-
-    const FLAT: Rgba = [0.5, 0.5, 1.0, 1.0];
-
-    /// A field of tilted normals: the normal map of a noisy height.
-    fn normals(seed: u64) -> Image {
-        let h = Image::fill_uv(16, |u, v| {
-            let x = hash::unit2((u * 16.0) as i64, (v * 16.0) as i64, 0, seed);
-            [x, x, x, 1.0]
-        });
-        bump_to_normal(&h, Field::Const(0.2))
-    }
-
-    fn assert_close(a: &Image, b: &Image) {
-        for (p, q) in a.pixels().iter().zip(b.pixels()) {
-            assert!((0..4).all(|c| (p[c] - q[c]).abs() < 1e-5), "{p:?} vs {q:?}");
-        }
-    }
-
-    #[test]
-    fn a_fourth_input_is_alpha_and_alpha_is_1_without_it() {
-        let gray = |v| Image::filled(2, [v, 0.9, 0.9, 0.3]);
-        let (r, g, b, a) = (gray(0.1), gray(0.2), gray(0.3), gray(0.4));
-        let out = combine_rgb(&[&r, &g, &b, &a], 2.into());
-        assert_eq!(out.pixels()[3], [0.1, 0.2, 0.3, 0.4]);
-        let out = combine_rgb(&[&r, &g], 2.into());
-        assert_eq!(out.pixels()[0], [0.1, 0.2, 0.0, 1.0]);
-    }
-
-    #[test]
-    fn a_flat_normal_on_either_side_returns_the_other() {
-        let (n, flat) = (normals(3), Image::filled(16, FLAT));
-        assert_close(&normal_blend(&n, &flat, Field::Const(1.0)), &n);
-        assert_close(&normal_blend(&flat, &n, Field::Const(1.0)), &n);
-    }
-
-    #[test]
-    fn zero_strength_keeps_the_base() {
-        let (base, detail) = (normals(3), normals(4));
-        assert_close(&normal_blend(&base, &detail, Field::Const(0.0)), &base);
-    }
-
-    #[test]
-    fn the_blend_is_unit_length_and_tilts_further_than_the_base() {
-        let tilt = |p: Rgba| ((p[0] - 0.5).powi(2) + (p[1] - 0.5).powi(2)).sqrt();
-        // Two copies of one tilt add up: RNM rotates the base by the detail's tilt.
-        let n = normals(5);
-        let out = normal_blend(&n, &n, Field::Const(1.0));
-        for (p, q) in out.pixels().iter().zip(n.pixels()) {
-            assert!((decode(*p).length() - 1.0).abs() < 1e-5);
-            if tilt(*q) > 0.05 {
-                assert!(tilt(*p) > tilt(*q), "{p:?} vs {q:?}");
-            }
-        }
-    }
-}
+#[path = "vector_tests.rs"]
+mod tests;

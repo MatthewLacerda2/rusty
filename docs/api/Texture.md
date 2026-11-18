@@ -614,8 +614,11 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   `bump_to_normal` writes them, combined by Reoriented Normal Mapping: the base is
   turned by the detail's tilt, so scratches over a panel follow the panel's bevel.
   `strength` scales the detail's tilt, 0 leaving the base; a flat normal on either
-  side returns the other. Never `mix` normal maps: adding or averaging their RGB
-  flattens them.
+  side returns the other. The result stays above the surface: where a steep base
+  turned further the same way would tip below z = 0.125 (blue byte 143), it is
+  lifted to that, still leaning the same way, so a BC5 `NormalMap` import, which
+  rebuilds z from x and y, draws the normal the PNG holds; everywhere else it is
+  RNM's own. Never `mix` normal maps: adding or averaging their RGB flattens them.
 - `path {d, fill_rule="nonzero"|"evenodd", stroke=0}` (*generator*): an outline from
   SVG path data, a mask: 1 inside, 0 outside, each edge pixel the exact share of its
   area the outline covers. `d` takes `M L H V C S Q T A Z`, absolute and relative,

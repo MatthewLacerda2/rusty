@@ -9,7 +9,7 @@ use crate::recipe::{arity, op, opt, socket, Lit, OpInfo, Param};
 
 /// Reoriented Normal Mapping (#1492): lay the second input's normal map (detail)
 /// over the first's (base). `strength` scales the detail's tilt first; 0 leaves the
-/// base.
+/// base. The result never tips under `ops::vector::MIN_NORMAL_Z`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct NormalBlend {
     #[serde(default = "one")]
