@@ -162,8 +162,7 @@ where
         finish(c, items.into_iter().flatten().collect(), out)
     };
     run_slots(
-        slots,
-        &make,
+        (slots, &make),
         threads,
         progress,
         &|_, _| false,
@@ -195,8 +194,7 @@ where
     let slots = charts.into_iter().map(Slot::new).collect();
     // Every chart is made already, so nothing is ever made.
     run_slots(
-        slots,
-        &|_| Vec::new(),
+        (slots, &|_| Vec::new()),
         threads,
         progress,
         first,
@@ -205,11 +203,13 @@ where
     )
 }
 
+/// How a chart's items are made from its index ([`run_made`]).
+type Make<'a, P> = dyn Fn(usize) -> Vec<P> + Sync + 'a;
+
 /// The pool over `slots`, each chart made by `make` when its first batch is taken
 /// (a no-op for one cut before the run): [`run_batched`]'s contract.
 fn run_slots<P, L, T>(
-    slots: Vec<Slot<P, L, T>>,
-    make: &(dyn Fn(usize) -> Vec<P> + Sync),
+    (slots, make): (Vec<Slot<P, L, T>>, &Make<P>),
     threads: usize,
     progress: &BakeProgress,
     first: &(dyn Fn(usize, usize) -> bool + Sync),
