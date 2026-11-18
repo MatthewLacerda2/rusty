@@ -22,7 +22,9 @@
 //! **Who is a sight target**: an active, non-static entity on the perceiver's
 //! `sight_mask` with a body to see (a Collider or a CharacterController), not the
 //! perceiver's own body (under it, or above it: a perceiver on a `Head` child),
-//! and not under another target (a character's hitboxes are the character).
+//! and not under another active, non-static body, whatever its layer (a
+//! character's hitboxes are the character). Only the layers some perceiver's
+//! `sight_mask` holds are walked, and with no perceiver sight walks nothing.
 //! Static entities are the level, never a target. Every last-known position is
 //! where the target **stood** ([`stand::feet`](crate::stand::feet)), so an
 //! environment query around it reads the ground, not a character's middle.

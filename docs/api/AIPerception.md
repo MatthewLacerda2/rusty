@@ -19,7 +19,8 @@ hears nothing and returns `0`, and a hit is not sensed.
   an active, non-static entity on the perceiver's `sight_mask` with a body to see (a
   `Collider` or a `CharacterController`), not the perceiver's own body (under it, or
   above it: a perceiver on a `Head` child never sees its character), and not under
-  another target (a character's hitboxes are the character). Static entities are the
+  another active, non-static body, whatever that body's layer (a character's hitboxes
+  are the character). Static entities are the
   level and are never targets. A target is **seen** when it is within `sight_range`
   (once seen, `lose_sight_range`), inside the view cone (`sight_angle` degrees either
   side of the entity's forward, +Z; 180 sees all round), and one ray from the eye
