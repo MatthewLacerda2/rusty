@@ -70,7 +70,7 @@ fn one_load_stands_as_load_ms_with_no_cold_row() {
 
 /// A project of one scene holding a model instanced twice, the file forgotten by
 /// this thread's import cache so the load parses it.
-fn project_with_a_model() -> std::path::PathBuf {
+pub(super) fn project_with_a_model() -> std::path::PathBuf {
     let root = rusty_test_support::temp::dir().join(format!("load_rows_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(root.join("assets/scenes")).unwrap();
@@ -133,36 +133,6 @@ fn gpu_a_load_runs_every_step_once_in_order_and_they_sum_to_load_ms() {
         assert_eq!(
             names[3..],
             ["textures_compressed", "textures_decoded", "upload_mb"]
-        );
-    }
-}
-
-#[test]
-fn gpu_a_second_load_of_an_unchanged_project_cooks_nothing() {
-    let root = project_with_a_model();
-    let opts = Options {
-        size: (32, 32),
-        warm: false,
-        ..Options::default()
-    };
-    let cooked = |root: &std::path::Path| {
-        let settings = rusty_core::project::ProjectSettings::default();
-        let (_, load) = load(&root.join("out"), root, "quad", settings, opts).unwrap();
-        load.counts[2].clone()
-    };
-    // The first load cooks the model, unless an earlier run left its cooked file.
-    let first = cooked(&root);
-    assert_eq!(first.0, "models_cooked");
-    assert!(first.1 <= 1.0, "{first:?}");
-    // A fresh launch: the in-memory import cache no longer holds the file.
-    let model = rusty_test_support::models::quad_file("load_rows_quad");
-    rusty_asset::import_cache::forget(std::path::Path::new(&model));
-    let second = cooked(&root);
-    if rusty_asset::cook::WRITES {
-        assert_eq!(
-            second,
-            ("models_cooked".to_string(), 0.0),
-            "read, not cooked"
         );
     }
 }

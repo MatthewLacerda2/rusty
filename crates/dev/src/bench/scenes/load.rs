@@ -218,5 +218,8 @@ fn render_counts(r: &mut rusty_render::Renderer) -> [(String, f64); 3] {
 }
 
 #[cfg(test)]
+#[path = "load_cook_tests.rs"]
+mod cook_tests;
+#[cfg(test)]
 #[path = "load_tests.rs"]
 mod tests;
