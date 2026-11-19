@@ -5,6 +5,7 @@
 use glam::Vec3;
 
 use super::gpu_tests::{drawn, offscreen, shot, H, W};
+use crate::RenderCounters;
 use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::rules::mesh::set_subdivisions;
@@ -66,10 +67,11 @@ fn gpu_a_waved_plane_behind_a_rim_still_draws_its_crests() {
     let (water, dry) = (pool(Some(&name)), pool(None));
     let mut view = offscreen(&r);
     let (empty, _) = shot(&mut r, &mut view, &dry, &cam);
-    let mut on = Vec::new();
+    let (mut on, mut on_counts) = (Vec::new(), RenderCounters::default());
     for _ in 0..3 {
-        (on, _) = shot(&mut r, &mut view, &water, &cam);
+        (on, on_counts) = shot(&mut r, &mut view, &water, &cam);
     }
+    let on_drawn = drawn(&r, &view);
     assert!(on != empty, "the crests show over the rim");
     // The same plane drawn flat is hidden: the scene does test the cull.
     let flat = pool(Some(""));
@@ -79,6 +81,56 @@ fn gpu_a_waved_plane_behind_a_rim_still_draws_its_crests() {
     assert_eq!(drawn(&r, &view).iter().sum::<u32>(), 1, "the rim alone");
     r.quality.gpu_occlusion_culling = false;
     let mut fresh = offscreen(&r);
-    let (off, _) = shot(&mut r, &mut fresh, &water, &cam);
-    assert!(on == off, "Hi-Z hid the waved surface's crests");
+    let (off, off_counts) = shot(&mut r, &mut fresh, &water, &cam);
+    let state = || mismatch(&[&empty, &on, &off], &on_drawn, [&on_counts, &off_counts]);
+    assert!(
+        on == off,
+        "Hi-Z hid the waved surface's crests: {}",
+        state()
+    );
+}
+
+/// What a mismatch of `on` and `off` (with `empty`, the rim alone) says: how many
+/// pixels differ and where, whose they are (the plane's where `on` reads the rim
+/// alone and `off` does not: crests the cull hid; else something that is not the
+/// cull), what each batch drew through the cull, and both frames' counters.
+fn mismatch(px: &[&Vec<u8>; 3], drawn: &[u32], counts: [&RenderCounters; 2]) -> String {
+    let [empty, on, off] = px;
+    fn pixel(v: &[u8], i: usize) -> &[u8] {
+        &v[i * 4..i * 4 + 4]
+    }
+    let (mut hidden, mut extra, mut other) = (0, 0, 0);
+    let (mut lo, mut hi) = ((W, H), (0, 0));
+    for i in (0..(W * H) as usize).filter(|&i| pixel(on, i) != pixel(off, i)) {
+        let (x, y) = (i as u32 % W, i as u32 / W);
+        (lo, hi) = ((lo.0.min(x), lo.1.min(y)), (hi.0.max(x), hi.1.max(y)));
+        match (
+            pixel(on, i) == pixel(empty, i),
+            pixel(off, i) == pixel(empty, i),
+        ) {
+            (true, false) => hidden += 1,
+            (false, true) => extra += 1,
+            _ => other += 1,
+        }
+    }
+    let row = |c: &RenderCounters| {
+        let (t, h, ct, cc) = (
+            c.hiz_tested,
+            c.hiz_culled,
+            c.cluster_tested,
+            c.cluster_culled,
+        );
+        format!(
+            "hiz {h}/{t} culled, clusters {cc}/{ct} culled, {} draw calls",
+            c.draw_calls
+        )
+    };
+    format!(
+        "{} px differ in {lo:?}..={hi:?}: {hidden} the plane's in `off` only (hidden by the \
+         cull), {extra} the plane's in `on` only, {other} neither (not the cull); `on` drew \
+         {drawn:?} per batch, {}; `off` {}",
+        hidden + extra + other,
+        row(counts[0]),
+        row(counts[1]),
+    )
 }
