@@ -92,8 +92,34 @@ pub(crate) fn rasterize_claims(
     walk(mesh, width, height, Some(sink))
 }
 
+/// The last (triangle, owner) pair [`walk`] asked [`in_uv`] about, and the answer:
+/// a triangle's texels over one owner come in a run, so the walk asks once a run.
+#[derive(Default)]
+pub(super) struct Asked(Option<(usize, u32, bool)>);
+
+impl Asked {
+    /// Whether triangle `t` (its first index and texel-space UVs) overlaps, in UV,
+    /// the triangle starting at index `owner`.
+    pub(super) fn overlaps(
+        &mut self,
+        mesh: &Surface,
+        t: (usize, [Vec2; 3]),
+        owner: u32,
+        scale: Vec2,
+    ) -> bool {
+        match self.0 {
+            Some((a, b, v)) if (a, b) == (t.0, owner) => v,
+            _ => {
+                let v = in_uv(t.1, uv_of(mesh, owner as usize, scale));
+                self.0 = Some((t.0, owner, v));
+                v
+            }
+        }
+    }
+}
+
 /// The UVs, scaled by `scale`, of the triangle starting at index `first`.
-pub(super) fn uv_of(mesh: &Surface, first: usize, scale: Vec2) -> [Vec2; 3] {
+fn uv_of(mesh: &Surface, first: usize, scale: Vec2) -> [Vec2; 3] {
     [0, 1, 2].map(|k| mesh.uvs[mesh.indices[first + k] as usize] * scale)
 }
 

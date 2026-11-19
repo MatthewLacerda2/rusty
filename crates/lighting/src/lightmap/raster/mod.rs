@@ -148,9 +148,7 @@ fn walk(
     let texels = width as usize * height as usize;
     let mut owners = Owners::new(texels, claims.is_some());
     let mut out: Vec<TexelPoint> = Vec::new();
-    // The last (triangle, owner) pair asked about and whether they overlap in UV:
-    // a triangle's texels over one owner come in a run, so this asks once a run.
-    let mut last: Option<(u32, u32, bool)> = None;
+    let mut asked = overlap::Asked::default();
     for conservative in [false, true] {
         let pass = out.len();
         let clip = |t| conservative.then(|| Clipper::new(t));
@@ -162,21 +160,10 @@ fn walk(
                 match owner {
                     Owner::Taken => continue,
                     Owner::At(slot, _) if (slot as usize) < pass => continue,
-                    Owner::At(_, first) => {
-                        let mine = t.first as u32;
-                        let overlaps = match last {
-                            Some((a, b, v)) if (a, b) == (mine, first) => v,
-                            _ => {
-                                let theirs = overlap::uv_of(mesh, first as usize, scale);
-                                let v = overlap::in_uv(t.uv, theirs);
-                                last = Some((mine, first, v));
-                                v
-                            }
-                        };
-                        if !overlaps {
-                            continue;
-                        }
+                    Owner::At(_, first) if !asked.overlaps(mesh, (t.first, t.uv), first, scale) => {
+                        continue
                     }
+                    Owner::At(..) => {}
                     Owner::Free => {}
                 }
                 let w = match &clipper {
