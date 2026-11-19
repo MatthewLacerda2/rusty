@@ -10,10 +10,12 @@
 //! they are packed once per frame in `prepare_ui` (uploaded only when they differ
 //! from the last upload), and the world pass reuses them for every camera. The
 //! groups are kept across frames, each rebuilt only when the uniform buffer, its
-//! mask texture or its blur level's target was replaced.
+//! mask texture or its blur level's target was replaced, and dropped once a frame
+//! no longer asks for it (a removed Mask, a blur level a quality change left).
 //!
 //! - `mask` / `backdrop` — the pure halves the mesh builder calls.
-//! - `mask_gpu` — each Mask's coverage texture, rendered before the camera stack.
+//! - `mask_gpu` — each Mask's coverage texture, rendered before the camera stack;
+//!   `mask_key` — what it is drawn from, so a still Mask is kept.
 //! - `blur` — the dual-filter chain over the finished frame, run before the
 //!   overlay pass.
 
@@ -21,9 +23,10 @@ pub(crate) mod backdrop;
 pub(crate) mod blur;
 pub(crate) mod mask;
 pub(crate) mod mask_gpu;
+mod mask_key;
 
 use crate::gpu::ops::CountedDevice as _;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use glam::Vec2;
 
@@ -62,7 +65,7 @@ impl BatchUniform {
 
 /// Which batch group a batch binds: its mask (by Mask entity) and its backdrop's
 /// blur level.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(crate) struct GroupKey {
     pub(crate) mask: Option<u32>,
     pub(crate) backdrop: Option<u32>,
@@ -100,6 +103,8 @@ pub(crate) struct UiEffects {
     pub(crate) uniform_uploads: u32,
     /// Each batch group, rebuilt only when a resource it binds was replaced.
     groups: HashMap<GroupKey, Kept<GroupInputs, wgpu::BindGroup>>,
+    /// The keys asked for since the frame began ([`Self::forget_groups`]).
+    asked: HashSet<GroupKey>,
     /// Bytes between two slots (the dynamic-offset alignment).
     stride: u32,
     /// Each synced canvas's first batch slot, then its first mask-draw slot.
@@ -130,12 +135,18 @@ impl UiEffects {
         kept.expect("batch_groups made every key's group")
     }
 
-    /// Drop the groups of Masks no longer synced, so a removed Mask's texture is
-    /// freed with it.
+    /// Begin a frame's groups: drop every group the last frame did not ask for,
+    /// so what it binds (a removed Mask's texture, an unused blur level, an
+    /// outgrown uniform buffer) is freed with it.
     pub(crate) fn forget_groups(&mut self) {
-        let masks = &self.masks;
-        let held = |k: &GroupKey| k.mask.is_none_or(|m| masks.view(m).is_some());
-        self.groups.retain(|k, _| held(k));
+        let asked = std::mem::take(&mut self.asked);
+        self.groups.retain(|k, _| asked.contains(k));
+    }
+
+    /// The batch groups held, for tests.
+    #[cfg(test)]
+    pub(crate) fn group_count(&self) -> usize {
+        self.groups.len()
     }
 }
 
@@ -212,13 +223,23 @@ impl Renderer {
         let Some(buffer) = fx.uniforms.as_ref().map(GrowBuffer::buffer) else {
             return;
         };
+        // One look a distinct key, however many batches share it.
+        let mut keys: Vec<GroupKey> = keys.into_iter().collect();
+        keys.sort_unstable();
+        keys.dedup();
         for key in keys {
-            let mask = key.mask.and_then(|m| fx.masks.view(m)).cloned();
-            let blurred = key
-                .backdrop
-                .and_then(|l| fx.blur.as_ref()?.result(l))
-                .cloned();
-            let inputs = (buffer.clone(), mask, blurred);
+            fx.asked.insert(key);
+            let mask = key.mask.and_then(|m| fx.masks.view(m));
+            let blurred = key.backdrop.and_then(|l| fx.blur.as_ref()?.result(l));
+            let kept = fx.groups.entry(key).or_default();
+            // Compared borrowed: a kept group costs no clone of what it binds.
+            let current = kept.key().is_some_and(|(b, m, r)| {
+                b == buffer && m.as_ref() == mask && r.as_ref() == blurred
+            });
+            if current {
+                continue;
+            }
+            let inputs = (buffer.clone(), mask.cloned(), blurred.cloned());
             let make = |(buffer, mask, blurred): &GroupInputs| {
                 let entries = [
                     wgpu::BindGroupEntry {
@@ -252,12 +273,15 @@ impl Renderer {
                     entries: &entries,
                 })
             };
-            let kept = fx.groups.entry(key).or_default();
-            kept.get(inputs.clone(), || make(&inputs));
+            let group = make(&inputs);
+            kept.get(inputs, || group);
         }
     }
 }
 
+#[cfg(test)]
+#[path = "chain_gpu_tests.rs"]
+mod chain_gpu_tests;
 #[cfg(test)]
 #[path = "gpu_fixture.rs"]
 mod gpu_fixture;

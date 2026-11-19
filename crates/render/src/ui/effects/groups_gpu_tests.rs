@@ -24,7 +24,7 @@ fn gpu_a_still_hud_makes_no_batch_group_and_a_replaced_resource_remakes_one() {
     made(&mut renderer, &mut empty, &Scene::new());
     let base = made(&mut renderer, &mut empty, &Scene::new());
 
-    let (mut scene, panel, _, _) = minimap();
+    let (mut scene, panel, mask, _) = minimap();
     let mut frames = Frames::new(&renderer);
     made(&mut renderer, &mut frames, &scene);
     assert_eq!(
@@ -54,4 +54,14 @@ fn gpu_a_still_hud_makes_no_batch_group_and_a_replaced_resource_remakes_one() {
         "a new mask target"
     );
     assert_eq!(made(&mut renderer, &mut frames, &scene), base, "then kept");
+
+    // A group no frame asks for any more is dropped, with what it binds.
+    let held = frames.view.ui.effects.group_count();
+    scene.world.set_mask(mask, None);
+    made(&mut renderer, &mut frames, &scene);
+    made(&mut renderer, &mut frames, &scene);
+    assert!(
+        frames.view.ui.effects.group_count() < held,
+        "the removed Mask's group"
+    );
 }

@@ -4,7 +4,7 @@
 
 use glam::{Vec2, Vec4};
 
-use super::gpu_fixture::{element, minimap, Frames, SIZE};
+use super::gpu_fixture::{element, hidden_mask, minimap, texture_file, Frames, SIZE};
 use rusty_components::{MaskComponent, RectMaskComponent};
 
 #[test]
@@ -51,6 +51,21 @@ fn gpu_a_still_mask_is_drawn_once_and_again_only_when_an_input_changes() {
     frames.view.resize(&renderer.device, SIZE / 2, SIZE / 2);
     assert_eq!(frames.frame(&mut renderer, &scene).0, 1, "the view's size");
     assert_eq!(frames.frame(&mut renderer, &scene).0, 0, "and still again");
+
+    // Its source alone: an Image Mask swapping one file for another of the same
+    // size draws the same vertices from another texture.
+    let files = [[255, 255, 255, 255], [255, 255, 255, 64]];
+    let [a, b] = [0, 1].map(|n| texture_file(&format!("{n}.png"), files[n]));
+    hidden_mask(&mut scene, map);
+    scene.world.image_mut(map).expect("map").texture = Some(a.as_str().into());
+    assert_eq!(frames.frame(&mut renderer, &scene).0, 1, "a new Mask");
+    assert_eq!(frames.frame(&mut renderer, &scene).0, 0, "kept");
+    scene.world.image_mut(map).expect("map").texture = Some(b.as_str().into());
+    assert_eq!(
+        frames.frame(&mut renderer, &scene).0,
+        1,
+        "its source texture"
+    );
 }
 
 #[test]

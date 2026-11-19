@@ -15,7 +15,9 @@
 //! **Change-driven.** A Mask's texture is re-rendered only when what its coverage
 //! depends on changed ([`MaskInputs`]): its own vertices (not its canvas's, so a
 //! minimap's turning map leaves its still frame alone), its slot of the batch
-//! uniform, its source texture, its target, and its parent Mask's last render. A
+//! uniform, its source texture, its target, and which draw of which parent Mask it
+//! sampled (a stamp no other draw of any Mask repeats, so a Mask added, removed or
+//! moved above it redraws it even when every Mask involved is still). A
 //! graphic whose source changes in place (a render texture, a glyph atlas) has no
 //! such key and is re-rendered every frame. With nothing to re-render, no encoder
 //! is made and nothing is submitted; `UiEffects::mask_passes` counts the passes run.
@@ -23,6 +25,7 @@
 use crate::gpu::ops::CountedQueue as _;
 use std::collections::HashMap;
 
+use super::mask_key::{DrawnInputs, MaskInputs};
 use super::{BatchUniform, GroupKey};
 use crate::gpu::fullscreen::color_pass;
 use crate::render_texture::is_render_texture;
@@ -34,33 +37,22 @@ use crate::{RenderView, Renderer};
 /// The coverage textures' format: one 8-bit channel.
 pub(crate) const MASK_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R8Unorm;
 
-/// Everything a Mask's coverage texture is drawn from; equal inputs draw equal
-/// texels, so a target holding the last draw's inputs needs no new one.
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct MaskInputs {
-    /// Its own triangles, as the vertex buffer holds them.
-    pub(crate) vertices: Vec<u8>,
-    /// Its slot of the batch uniform (its parents' clip).
-    pub(crate) slot: BatchUniform,
-    /// The texture its graphic samples (`None`: the white one).
-    pub(crate) source: Option<wgpu::TextureView>,
-    /// Its parent Mask's render count, whose texture it samples.
-    pub(crate) parent: Option<u64>,
-}
-
 /// One Mask's coverage texture, the inputs it was last drawn from (`None`: it
-/// holds no reusable draw) and how many times it was drawn.
+/// holds no reusable draw) and the stamp of that draw.
 struct MaskTarget {
     texture: wgpu::Texture,
     view: wgpu::TextureView,
-    drawn: Option<MaskInputs>,
-    renders: u64,
+    drawn: Option<DrawnInputs>,
+    stamp: u64,
 }
 
 /// A view's Mask textures, by Mask entity.
 #[derive(Default)]
 pub(crate) struct MaskTargets {
     targets: HashMap<u32, MaskTarget>,
+    /// The last stamp given to a draw: it only goes up, so no two draws of any
+    /// Masks share one, and a child's key names which parent draw it sampled.
+    stamps: u64,
 }
 
 impl MaskTargets {
@@ -83,23 +75,27 @@ impl MaskTargets {
     }
 
     /// Whether Mask `id` must be drawn from `inputs` (`None`: always), recording
-    /// the draw when it must. Called parents first, so a child sees its parent's
-    /// count after this frame's draw.
+    /// the draw and stamping it when it must. Called parents first, so a child
+    /// sees its parent's stamp after this frame's draw.
     fn needs_draw(&mut self, id: u32, inputs: Option<MaskInputs>) -> bool {
         let Some(target) = self.targets.get_mut(&id) else {
             return false;
         };
-        if inputs.is_some() && target.drawn == inputs {
-            return false;
+        match (&mut target.drawn, &inputs) {
+            (Some(drawn), Some(i)) if drawn.matches(i) => return false,
+            (Some(drawn), Some(i)) => drawn.hold(i),
+            (drawn, Some(i)) => drawn.get_or_insert_default().hold(i),
+            (drawn, None) => *drawn = None,
         }
-        target.drawn = inputs;
-        target.renders += 1;
+        self.stamps += 1;
+        target.stamp = self.stamps;
         true
     }
 
-    /// Mask `id`'s render count, for its children's inputs.
-    fn renders(&self, id: u32) -> Option<u64> {
-        self.targets.get(&id).map(|t| t.renders)
+    /// The stamp of Mask `id`'s last draw, for its children's inputs (0: never
+    /// drawn, which no draw is stamped).
+    fn stamp(&self, id: u32) -> Option<u64> {
+        self.targets.get(&id).map(|t| t.stamp)
     }
 }
 
@@ -123,7 +119,7 @@ fn create(device: &wgpu::Device, w: u32, h: u32) -> MaskTarget {
         texture,
         view,
         drawn: None,
-        renders: 0,
+        stamp: 0,
     }
 }
 
@@ -239,26 +235,22 @@ impl Renderer {
 
     /// What `draw`'s coverage is drawn from, or `None` when its source can change
     /// in place (a render texture, a glyph atlas) and it must be drawn each frame.
-    fn mask_inputs(
-        &self,
+    fn mask_inputs<'a>(
+        &'a self,
         masks: &MaskTargets,
-        canvas: &CanvasGpu,
+        canvas: &'a CanvasGpu,
         draw: &super::mask::MaskDraw,
-    ) -> Option<MaskInputs> {
+    ) -> Option<MaskInputs<'a>> {
         let source = match &draw.source {
             UiSource::Solid => None,
             UiSource::Font(_) => return None,
             UiSource::Texture(p) if is_render_texture(p) => return None,
-            UiSource::Texture(p) => self
-                .ui_renderer
-                .textures
-                .get(p)
-                .map(|(t, _)| t.view.clone()),
+            UiSource::Texture(p) => self.ui_renderer.textures.get(p).map(|(t, _)| &t.view),
         };
         let range = draw.range.start as usize..draw.range.end as usize;
-        let vertices = bytemuck::cast_slice(&canvas.mesh.vertices[range]).to_vec();
+        let vertices = bytemuck::cast_slice(&canvas.mesh.vertices[range]);
         let parent = match draw.clip.mask {
-            Some(id) => Some(masks.renders(id)?),
+            Some(id) => Some(masks.stamp(id)?),
             None => None,
         };
         Some(MaskInputs {

@@ -24,7 +24,8 @@
 //! which the bench reports as `render.ui.<part>` inside `render.ui`: `layout`,
 //! `textures` (loading and binding the Images' textures), `mesh` (the canvas meshes
 //! and glyph atlases), `sync`, `shades`, `uniforms`, `masks` and `mask_submit`, then
-//! `blur`, `encode` and `submit` for the overlay pass.
+//! `pipelines` (making the overlay's pipelines current), `blur` (the backdrop
+//! chain alone), `groups`, `encode` and `submit` for the overlay pass.
 
 use crate::gpu::ops::CountedQueue as _;
 use std::rc::Rc;
@@ -117,19 +118,25 @@ impl Renderer {
         view.ui.drawn += drawn;
         self.ui_renderer.ensure_pipeline(&self.device, format);
         self.ui_renderer.shaders.ensure_screen(&self.device, format);
+        self.lap("ui.pipelines");
         self.run_backdrop_blur(view);
         self.lap("ui.blur");
         self.screen_groups(&mut view.ui);
+        self.lap("ui.groups");
         self.encode_ui(&view.ui, &target, format, screen_box(view));
     }
 
     /// Make the batch group of every screen canvas's batch current.
     fn screen_groups(&self, cache: &mut UiViewCache) {
-        let divisor = Some(self.quality.backdrop_divisor());
-        let canvases = cache.canvases().iter().filter(on_screen);
-        let batches = canvases.flat_map(|c| c.mesh.batches.iter());
-        let keys: Vec<_> = batches.map(|b| GroupKey::of(b, divisor)).collect();
+        let batches = screen_canvases(cache).flat_map(|(_, c)| c.mesh.batches.iter());
+        let keys: Vec<_> = batches.map(|b| self.screen_key(b)).collect();
         self.batch_groups(&mut cache.effects, keys);
+    }
+
+    /// The batch group a screen batch binds: the one key [`Self::screen_groups`]
+    /// makes and [`Self::encode_ui`] reads.
+    fn screen_key(&self, batch: &UiBatch) -> GroupKey {
+        GroupKey::of(batch, Some(self.quality.backdrop_divisor()))
     }
 
     /// Record and submit the UI pass over `target`.
@@ -141,12 +148,6 @@ impl Renderer {
         (x, y, width, height): (u32, u32, u32, u32),
     ) {
         let ui = &self.ui_renderer;
-        let divisor = Some(self.quality.backdrop_divisor());
-        let key = |b: &UiBatch| GroupKey::of(b, divisor);
-        let screen = || {
-            let all = cache.canvases().iter().enumerate();
-            all.filter(|(_, c)| on_screen(c))
-        };
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -161,7 +162,7 @@ impl Renderer {
             );
             pass.set_viewport(x as f32, y as f32, width as f32, height as f32, 0.0, 1.0);
             let mut bound = None;
-            for (i, canvas) in screen() {
+            for (i, canvas) in screen_canvases(cache) {
                 pass.set_vertex_buffer(0, canvas.buffer.slice(..));
                 for (b, batch) in canvas.mesh.batches.iter().enumerate() {
                     let at = (cache, i, b);
@@ -170,7 +171,7 @@ impl Renderer {
                     }
                     pass.set_bind_group(0, ui.source_group(&batch.source), &[]);
                     let slot = cache.effects.batch_offset(i, b);
-                    pass.set_bind_group(1, cache.effects.group(&key(batch)), &[slot]);
+                    pass.set_bind_group(1, cache.effects.group(&self.screen_key(batch)), &[slot]);
                     let s = batch
                         .clip
                         .rect
@@ -187,9 +188,11 @@ impl Renderer {
     }
 }
 
-/// Whether `canvas` is a screen canvas (the overlay pass's).
-fn on_screen(canvas: &&CanvasGpu) -> bool {
-    canvas.place.space == CanvasSpace::Screen
+/// The screen canvases (the overlay pass's), by index in draw order: the one
+/// filter the groups and the pass share.
+fn screen_canvases(cache: &UiViewCache) -> impl Iterator<Item = (usize, &CanvasGpu)> {
+    let all = cache.canvases().iter().enumerate();
+    all.filter(|(_, c)| c.place.space == CanvasSpace::Screen)
 }
 
 /// The rect the screen canvases lay out and draw in: the view's `screen_box`,

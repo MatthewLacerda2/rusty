@@ -42,7 +42,7 @@ const STILL_CULLING: OpCounts = OpCounts {
 /// [`STILL_CULLING`] on a timed frame, the stage split into its timed parts
 /// (#2401, `GpuTimer::splits`): the pyramid and the test each their own compute
 /// pass (no prop here is drawn by cluster), one more than untimed.
-/// Measured: lavapipe 8/3/4/3/22 (the split forced, it has no timestamps).
+/// Measured: lavapipe 8/3/4/3/21 (the split forced, it has no timestamps).
 const STILL_CULLING_TIMED: OpCounts = OpCounts {
     compute_passes: 3,
     ..STILL_CULLING

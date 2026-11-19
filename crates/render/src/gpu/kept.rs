@@ -25,6 +25,12 @@ impl<K: PartialEq, V> Kept<K, V> {
         &self.held.as_ref().expect("held above").1
     }
 
+    /// The key the held value was built for, if any: a caller holding the key's
+    /// parts borrowed compares them here before building an owned key.
+    pub(crate) fn key(&self) -> Option<&K> {
+        self.held.as_ref().map(|(k, _)| k)
+    }
+
     /// The value last built, if any.
     pub(crate) fn value(&self) -> Option<&V> {
         self.held.as_ref().map(|(_, v)| v)
