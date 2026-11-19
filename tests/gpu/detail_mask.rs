@@ -7,7 +7,7 @@
 
 use glam::Vec3;
 use rusty::components::{DetailLayer, MaterialAsset};
-use rusty::dev::screenshot::capture;
+use rusty::dev::{capture::CaptureHost, screenshot::capture_into};
 use rusty::scene::Camera;
 
 use crate::gpu::linear_data_maps_screenshot::scene;
@@ -35,13 +35,11 @@ fn busy() -> String {
 
 /// The mask: red black for the first half of `u`, white after.
 fn half_mask() -> String {
-    png("rusty_2258_mask.png", |x, _| {
-        [if x < 32 { 0 } else { 255 }; 4]
-    })
+    png("rusty_2258_mask.png", |x, _| [u8::from(x >= 32) * 255; 4])
 }
 
 /// A grey, fairly glossy material with `detail` (map, mask), or none.
-fn material(detail: Option<(Option<String>, Option<String>)>) -> MaterialAsset {
+fn material(detail: Detail) -> MaterialAsset {
     MaterialAsset {
         base_color: [0.5, 0.5, 0.5],
         roughness: 0.4,
@@ -69,10 +67,14 @@ fn camera(grazing: bool) -> Camera {
     }
 }
 
-/// `m` rendered from `cam`; `None` without an adapter.
-fn frame(m: MaterialAsset, cam: &Camera, name: &str) -> Option<image::RgbImage> {
-    let path = crate::temp::dir().join(name);
-    capture(&scene(m), cam, &path, SIZE, SIZE)
+/// A detail layer's (map, mask), or none.
+type Detail = Option<(Option<String>, Option<String>)>;
+
+/// `material(d)` from `camera(grazing)` through `h`, one renderer for every shot (one
+/// each was most of the test's time on lavapipe, #2350); `None` without an adapter.
+fn frame(h: &mut CaptureHost, grazing: bool, d: Detail, name: &str) -> Option<image::RgbImage> {
+    let path = crate::temp::dir().join(format!("rusty_2258_{grazing}_{name}.png"));
+    capture_into(h, &scene(material(d)), &camera(grazing), &path, SIZE, SIZE)
         .expect("capture")
         .then_some(())?;
     Some(image::open(&path).expect("open").to_rgb8())
@@ -106,15 +108,9 @@ fn half_diff(a: &image::RgbImage, b: &image::RgbImage, rows: bool, far: bool) ->
 fn the_masks_black_half_draws_no_detail_and_its_white_half_the_whole_detail() {
     let (map, mask) = (Some(busy()), Some(half_mask()));
     let missing = Some("rusty_2258_no_such_mask.png".to_string());
+    let mut host = CaptureHost::new();
     for grazing in [false, true] {
-        let cam = camera(grazing);
-        let shot = |d, name| {
-            frame(
-                material(d),
-                &cam,
-                &format!("rusty_2258_{grazing}_{name}.png"),
-            )
-        };
+        let mut shot = |d, name| frame(&mut host, grazing, d, name);
         let Some(plain) = shot(None, "plain") else {
             return;
         };
@@ -133,18 +129,14 @@ fn the_masks_black_half_draws_no_detail_and_its_white_half_the_whole_detail() {
         // Measured: `shows` lavapipe 25.74 / 27.14 (head-on / grazing), Metal 26.30 /
         // 25.92, RTX 2060 (Vulkan) 24.76 / 22.71; every `< 0.5` value 0.00 on all three.
         assert!(shows > 4.0, "the detail shows on both halves ({shows:.2})");
-        assert!(
-            to_plain < 0.5,
-            "the black half draws no detail ({to_plain:.2})"
-        );
-        assert!(
-            to_full < 0.5,
-            "the white half draws all of it ({to_full:.2})"
-        );
-        assert!(lone < 0.5, "a mask alone draws nothing ({lone:.2})");
-        assert!(
-            unread < 0.5,
-            "a missing mask applies it everywhere ({unread:.2})"
-        );
+        let near_zero = [
+            (to_plain, "the black half draws no detail"),
+            (to_full, "the white half draws all of it"),
+            (lone, "a mask alone draws nothing"),
+            (unread, "a missing mask applies it everywhere"),
+        ];
+        for (value, what) in near_zero {
+            assert!(value < 0.5, "{what} ({value:.2})");
+        }
     }
 }

@@ -128,7 +128,7 @@ fn import_one(run: &Run, scene: &str, file: &Path) {
     let scratch = file.parent().unwrap_or(Path::new("."));
     eprintln!("{}", rusty::asset::import::notice(&opened.root));
     let imported = import::import().unwrap_or_else(|e| fail(&format!("import failed: {e}")));
-    let loaded = scenes::load(scratch, &opened.root, scene, opened.settings, run.opts.size);
+    let loaded = scenes::load(scratch, &opened.root, scene, opened.settings, run.opts);
     let ms = loaded.map_or_else(
         |e| fail(&format!("{scene}: cold load failed: {e}")),
         |l| imported + l.1,
