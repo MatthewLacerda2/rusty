@@ -25,7 +25,7 @@ pub fn names(text: &str, dep: &str) -> bool {
     let key = dep.replace('-', "_");
     let mut named = crate::layers::manifest_dependencies(text);
     named.extend(crate::layers::manifest_dev_dependencies(text));
-    named.iter().any(|k| *k == key)
+    named.contains(&key)
 }
 
 pub struct Scan {
