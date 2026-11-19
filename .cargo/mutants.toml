@@ -29,6 +29,7 @@ exclude_globs = [
   "crates/lighting/src/placement/test_level.rs",
   "crates/lighting/src/placement/test_sites.rs",
   "crates/navigation/src/test_support.rs",
+  "crates/physics/src/character/bench.rs",
   "crates/physics/src/query/convex_fixture.rs",
   "crates/render/src/test_gpu.rs",
   "crates/render/src/test_gpu/**",
