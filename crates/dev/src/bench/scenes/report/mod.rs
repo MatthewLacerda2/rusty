@@ -124,7 +124,7 @@ impl SceneReport {
         };
         let _ = writeln!(
             out,
-            "{:<26} {:>12} {:>19} {:>12}  {:<18} vs {against} avg",
+            "{:<30} {:>12} {:>19} {:>12}  {:<18} vs {against} avg",
             "metric", "avg", "spread", "worst p95", "worst at"
         );
         for row in &self.rows {
@@ -133,7 +133,7 @@ impl SceneReport {
                 .map_or(String::new(), |b| delta(b, row));
             let _ = writeln!(
                 out,
-                "{:<26} {:>12} {:>19} {:>12}  {:<18} {delta}",
+                "{:<30} {:>12} {:>19} {:>12}  {:<18} {delta}",
                 row.metric,
                 num(row.avg),
                 spread(row),

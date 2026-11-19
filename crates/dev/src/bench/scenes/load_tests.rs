@@ -102,20 +102,7 @@ fn gpu_a_load_runs_every_step_once_in_order_and_they_sum_to_load_ms() {
         ("models_parsed".to_string(), 1.0),
         "one file, parsed once"
     );
-    let row = |m: &str| {
-        super::rows(&[load.clone()])
-            .into_iter()
-            .find(|r| r.metric == m)
-    };
-    let steps: f64 = want
-        .iter()
-        .filter_map(|s| row(&format!("load.{s}")))
-        .map(|r| r.avg)
-        .sum();
-    assert!(
-        (row("load_ms").unwrap().avg - steps).abs() < 1.0,
-        "the steps tile the load"
-    );
+    tiles(&load, &want);
     // Rendered (an adapter was there): the texture and upload counts follow.
     if counts.len() > 1 {
         let names: Vec<&str> = counts.iter().map(|(c, _)| c.as_str()).collect();
@@ -124,4 +111,14 @@ fn gpu_a_load_runs_every_step_once_in_order_and_they_sum_to_load_ms() {
             ["textures_compressed", "textures_decoded", "upload_mb"]
         );
     }
+}
+
+/// The load's rows: its steps' rows sum to its `load_ms` (nothing timed twice or
+/// left out).
+fn tiles(load: &Load, steps: &[&str]) {
+    let rows = rows(std::slice::from_ref(load));
+    let row = |m: &str| rows.iter().find(|r| r.metric == m).map(|r| r.avg);
+    let sum: f64 = steps.iter().filter_map(|s| row(&format!("load.{s}"))).sum();
+    let total = row("load_ms").unwrap();
+    assert!((total - sum).abs() < 1.0, "the steps tile the load");
 }

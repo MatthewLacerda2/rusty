@@ -205,14 +205,14 @@ impl GameWorld {
     /// Enter Play, its steps under the installed entry probe (`set_entry_probe`),
     /// which is told the scene entered, or `None` when the scripts' runtime failed.
     fn enter_play(&mut self) {
-        let mut probe = self.resources.entry_probe.take();
+        let mut probe = self.resources.load_probes.entry.take();
         let entered = self.enter_play_steps(&mut probe);
         if let Some(probe) = probe.as_mut() {
             let path = self.resources.script_manager.scene_path_cell();
             let path = entered.then(|| path.borrow().clone().unwrap_or_default());
             probe.finish(path.as_deref(), &mut self.resources.console.borrow_mut());
         }
-        self.resources.entry_probe = probe;
+        self.resources.load_probes.entry = probe;
     }
 
     fn enter_play_steps(&mut self, probe: &mut Option<Box<dyn LoadProbe>>) -> bool {

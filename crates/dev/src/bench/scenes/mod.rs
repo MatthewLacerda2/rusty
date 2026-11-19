@@ -11,7 +11,7 @@
 //! its first rendered frame, wall clock, the renderer's start-up off the clock,
 //! repeated in fresh processes with its spread, the cold first load apart as
 //! `load_cold_ms`, its steps as `load.<step>` and what it did as
-//! `load.count.<what>`: [`load`]), `import_ms` (`IMPORT=1`, once a run, on its first scene: the
+//! `load.count.<what>`: [`load`](mod@load)), `import_ms` (`IMPORT=1`, once a run, on its first scene: the
 //! same load of a copy of the project without its import cache, [`import`]), `rss_peak_mb` (the process's peak resident
 //! memory, [`memory`]), `gpu_mb` (the renderer's GPU memory,
 //! `rusty_render::gpu_memory`, with `gpu_allocated_mb`, what live allocations use,
@@ -23,7 +23,7 @@
 //! The project is opened read-only and never seeded: nothing is written into it.
 //! A signal, never a gate, like `make bench`. `bench-scenes` runs each scene in a
 //! process of its own, so its memory peak is its own, and each of its loads in
-//! one too ([`load`]).
+//! one too ([`load`](mod@load)).
 
 pub mod args;
 mod fold;
@@ -95,7 +95,7 @@ pub struct Extra {
     /// The cold load an import run measured (`import_ms`), when one ran.
     pub import_ms: Option<f64>,
     /// The scene's loads before the bench's own, each in a process of its own
-    /// (`--loads`), the first the cold one ([`load`]).
+    /// (`--loads`), the first the cold one ([`load`](mod@load)).
     pub loads: Vec<Load>,
     /// The run's `--set` overrides of the running quality preset, as given
     /// (`set::Overrides::said`), which the report records.

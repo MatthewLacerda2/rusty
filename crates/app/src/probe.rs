@@ -46,6 +46,14 @@ pub trait LoadProbe {
     fn finish(&mut self, loaded: Option<&str>, console: &mut ConsoleLogs);
 }
 
+/// The installed [`LoadProbe`]s: a play-mode scene load's (the dev layer's load
+/// timer, `GameWorld::set_load_probe`) and Play entry's (`GameWorld::set_entry_probe`).
+#[derive(Default)]
+pub struct LoadProbes {
+    pub(super) scene: Option<Box<dyn LoadProbe>>,
+    pub(super) entry: Option<Box<dyn LoadProbe>>,
+}
+
 /// Run `step` under `probe` as the load step `name`, or plainly without one: the
 /// one way a step is timed, by a scene load, Play's entry and a host's boot load.
 pub fn timed<T>(
@@ -80,7 +88,7 @@ impl GameWorld {
 
     /// Install (or with `None`, remove) the scene-load probe.
     pub fn set_load_probe(&mut self, probe: Option<Box<dyn LoadProbe>>) {
-        self.resources.load_probe = probe;
+        self.resources.load_probes.scene = probe;
     }
 
     /// Install (or with `None`, remove) the probe that times entering Play: its
@@ -89,6 +97,6 @@ impl GameWorld {
     /// which ends the entry early). Apart from the scene-load probe, so a Play
     /// entry never adds steps to a scene load's report.
     pub fn set_entry_probe(&mut self, probe: Option<Box<dyn LoadProbe>>) {
-        self.resources.entry_probe = probe;
+        self.resources.load_probes.entry = probe;
     }
 }
