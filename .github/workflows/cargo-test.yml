@@ -1,45 +1,16 @@
 name: cargo-test
-# Plain `cargo test` on `main`, nightly (#981, #1338). A signal, never a gate
-# (CLAUDE.md, *Gates vs. signals*): nextest is the gate. docs/testing.md promises the
-# suite is runner-independent: nextest gives each test its own process, but
-# `cargo test` runs a whole binary in one, so a test that leans on having its
-# process to itself (`set_var`, `set_current_dir`, a `static` left set) passes
-# the gate and races here. Such a leak broke the mutation baseline of every branch
-# after it four times while cargo-mutants ran `cargo test` (#1042, #1069, #1337,
-# #1844); mutation runs use nextest now, so this nightly run is the one place a
-# runner difference shows, on the board the morning after it merges. The `dev` step runs exactly what `make test-one-process` runs on demand.
-#
-# A red run files itself on the board through `main-health.yml`: a failure here
-# is the finding. Never on pull requests (the batch brief for #981); dispatch it
-# on a branch to measure that branch: `gh workflow run cargo-test.yml --ref <branch>`.
-#
-# A second job, `make dead-pub` (#1205) below, stays weekly: it runs on the
-# Sunday schedule and on dispatch only.
-#
-# `schedule:` fires only from the default branch, and GitHub disables it after
-# 60 days without repository activity; check the Actions tab if a week passes
-# with no run.
+# TEMPORARY PROBE (#2385): reverted before the PR is ready.
 on:
-  # Nightly, 04:17 UTC: off the hour, clear of `ci.yml`'s nightly run (03:07)
-  # and of `coverage.yml` (Mondays 05:23).
-  # Two lines so the `dead-pub` job's `if:` can tell Sunday's run from the rest.
-  schedule:
-    - cron: '17 4 * * 1-6'
-    - cron: '17 4 * * 0'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  cargo-test:
-    runs-on: ubuntu-24.04
-    # Two cold builds and two runs; measured ~12 min in a 4-core container.
+  probe:
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      # A missing adapter fails the canary test instead of skipping every GPU test
-      # (#489): under `cargo test` the in-process headless budget is what bounds
-      # them, and this is the only run that exercises it on Linux.
       RUSTY_REQUIRE_GPU: "1"
     steps:
       - uses: actions/checkout@v7
@@ -48,7 +19,7 @@ jobs:
       - name: Cache cargo registry + target
         uses: Swatinem/rust-cache@v2
         with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          save-if: false
       - name: System libs for winit/wgpu builds
         uses: ./.github/actions/system-libs
         with:
@@ -57,81 +28,20 @@ jobs:
         uses: ./.github/actions/system-libs
         with:
           packages: mesa-vulkan-drivers libvulkan1
-      # Both feature sets. Each step keeps its log so the summary below can name the
-      # failing tests instead of pointing at the raw log; `--no-fail-fast` runs every
-      # binary, so every leak is named, not only the first binary's. The `dev` step is
-      # `make test-one-process` without `--quiet` (the summary reads the per-test
-      # lines), and doctests are left to `make test`, which runs them in the gate.
-      - name: cargo test (default)
-        run: cargo test --locked --no-fail-fast 2>&1 | tee test-default.log
-        shell: bash -o pipefail {0}
-      - name: cargo test (dev features)
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: Build
+        run: cargo nextest run --locked -p rusty-render --features dev --no-run
+      - name: Probe, fresh renderers
+        run: PROBE_N=150 cargo nextest run --locked -p rusty-render --features dev -E 'test(gpu_probe_shaft_stress) | test(gpu_adapter_present_when_required)' --no-capture
+      - name: Stress the real test
         if: always()
-        run: cargo test --locked --features dev --tests --no-fail-fast 2>&1 | tee test-dev.log
-        shell: bash -o pipefail {0}
-      - name: Summary
+        run: cargo nextest run --locked -p rusty-render --features dev -E 'test(gpu_a_shadowed_spot_casts_a_shaft_with_a_dark_side)' --stress-count 200
+      - name: Stress beside the fog and shadow GPU tests
         if: always()
         run: |
-          {
-            echo '### Plain `cargo test` on `main` (nightly signal, #981, #1338)'
-            echo ''
-            for fs in default dev; do
-              log="test-$fs.log"
-              if [ ! -f "$log" ]; then echo "- \`$fs\`: did not run"; continue; fi
-              failed=$(grep -E '^test .* \.\.\. FAILED$' "$log" | sed -E 's/^test (.*) \.\.\. FAILED$/\1/' || true)
-              if [ -n "$failed" ]; then
-                echo "- \`$fs\`: **failed** (if nextest passes it on this commit, suspect shared process state):"
-                echo "$failed" | sed 's/^/  - `/; s/$/`/'
-              elif grep -q '^test result: FAILED' "$log" || ! grep -q '^test result: ok' "$log"; then
-                echo "- \`$fs\`: **red before any test failed** (build or a crashed binary); see the step log"
-              else
-                echo "- \`$fs\`: green ($(grep -c '^test result: ok' "$log") binaries)"
-              fi
-            done
-          } | tee -a "$GITHUB_STEP_SUMMARY"
-
-  # `make dead-pub` (#1003), the same weekly backstop (#1205): `pub` items nothing
-  # uses, and items only tests use, printed into the job summary. Its findings
-  # never fail it; it goes red only when no report came out (the folded copy did
-  # not compile), which is the signal itself breaking: it did for weeks, unseen,
-  # when an integration test first named `CARGO_BIN_EXE_*`. That red files
-  # through `main-health` like the job above.
-  dead-pub:
-    if: github.event_name != 'schedule' || github.event.schedule == '17 4 * * 0'
-    runs-on: ubuntu-24.04
-    # A cold check of the copied crate plus tools/lint; ~3 min warm in a container.
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v7
-      - name: Toolchain (from rust-toolchain.toml)
-        run: rustup show
-      - name: Cache cargo registry + target
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: dead-pub
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: System libs for winit/wgpu builds
-        uses: ./.github/actions/system-libs
-        with:
-          packages: pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
-      - name: make dead-pub
-        run: make dead-pub 2>&1 | tee dead-pub.log
-        shell: bash -o pipefail {0}
-      - name: Summary
-        if: always()
-        run: |
-          {
-            echo '### Dead `pub` items on `main` (weekly signal, #1003)'
-            echo ''
-            if [ -s .lint/dead-pub.txt ]; then
-              echo '```'
-              cat .lint/dead-pub.txt
-              echo '```'
-            else
-              echo '**No report**: the signal itself broke. The cause, from the log:'
-              echo ''
-              echo '```'
-              grep -E ': error|^error|no report' dead-pub.log | head -n 20 || true
-              echo '```'
-            fi
-          } | tee -a "$GITHUB_STEP_SUMMARY"
+          ulimit -v 8388608 -c 0
+          for i in 1 2 3 4 5; do
+            cargo nextest run --locked -p rusty-render --features dev --test-threads 2 --no-fail-fast -E 'test(/volumetric_fog::gpu::/) | test(/shadows::.*gpu/)' || echo "ROUND $i FAILED"
+          done
