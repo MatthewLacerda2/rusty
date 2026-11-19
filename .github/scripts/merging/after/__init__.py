@@ -19,8 +19,11 @@ So the coder **asks** and the queue **dispatches, after the merge**:
 - **The run is on `main`, at the squash commit** ([`ask.inputs`]): `diff`
   becomes the commit's own Rust change against its parent (the
   `mutants-scope.py` rules, `--commit`), which is the branch's diff as it
-  landed, so the same mutants are asked about. A commit that changed no Rust
-  is not dispatched: it would plan nothing.
+  landed, so the same mutants are asked about. Globs keep that diff to the
+  files they name, never widen it to whole files (#2371), so a `Mutation:`
+  line can only make the ask smaller; globs that match no changed file plan
+  nothing and the run ends green, an answer like any other. A commit that
+  changed no Rust is not dispatched: it would plan nothing.
 - **The report goes to the merged pull request**: the run carries its
   number as the `pr` input, since a run on `main` has no branch to look the
   pull request up by.

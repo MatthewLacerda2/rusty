@@ -88,11 +88,11 @@ class Mutations:
         scope, commit = ask.requested(pull.get("body")), pull["merge_commit_sha"]
         if scope is None:
             return
-        if scope == "diff":
-            files = self.files(commit)
-            if files is not None and not ask.rust(files):
-                self.say(f"after: #{number} asked for a mutation run, but its commit changed no Rust; none dispatched.")
-                return
+        # Every scope is the commit's diff, globs only narrowing it: no Rust, nothing to plan.
+        files = self.files(commit)
+        if files is not None and not ask.rust(files):
+            self.say(f"after: #{number} asked for a mutation run, but its commit changed no Rust; none dispatched.")
+            return
         if slots.enqueue(self.state, number, scope, commit):
             self.say(f"after: #{number} asked for a mutation run ({scope}); in line.")
 

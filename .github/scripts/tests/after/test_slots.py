@@ -60,10 +60,15 @@ class Dispatch(unittest.TestCase):
         after.merged(1), after.merged(2)
         self.assertEqual((gh.dispatched, slots.load(self.path)), ([], slots.empty()))
 
-    def test_globs_are_dispatched_even_without_rust_in_the_commit(self) -> None:
-        gh = fakes.GitHub({1: fakes.merged(1, body="Mutation: src/physics/**", sha="md")}, files={"md": ["docs/x.md"]})
-        self.mutations(gh).merged(1)
-        self.assertEqual(gh.dispatched[0]["inputs"]["scope"], "src/physics/**")
+    def test_globs_narrow_the_commit_so_without_rust_they_are_not_dispatched(self) -> None:
+        bodies = {1: fakes.merged(1, body="Mutation: src/physics/**", sha="md"),
+                  2: fakes.merged(2, body="Mutation: src/physics/**", sha="rs")}
+        gh = fakes.GitHub(bodies, files={"md": ["docs/x.md"], "rs": ["src/physics/a.rs"]})
+        after = self.mutations(gh)
+        after.merged(1), after.merged(2)
+        self.assertEqual([d["inputs"]["scope"] for d in gh.dispatched], ["src/physics/**"])
+        self.assertEqual(gh.dispatched[0]["inputs"]["pr"], "2")
+        self.assertTrue(any("#1" in s and "no Rust" in s for s in self.said))
 
     def test_a_refusal_waits_first_in_line_then_is_dropped(self) -> None:
         gh = fakes.GitHub({1: fakes.merged(1), 2: fakes.merged(2)})
