@@ -118,7 +118,7 @@ jobs:
   # mutate, or one too large to measure writes why into that artifact's
   # `report/` and goes red.
   plan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     outputs:
       in_scope: ${{ steps.plan.outputs.in_scope }}
@@ -246,7 +246,7 @@ jobs:
   mutants:
     needs: plan
     if: needs.plan.result == 'success' && (needs.plan.outputs.in_scope != '0' || needs.plan.outputs.standalone != '0')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     # A shard's runner: the budget below stops every step before this limit,
@@ -303,6 +303,10 @@ jobs:
         uses: ./.github/actions/system-libs
         with:
           packages: mesa-vulkan-drivers libvulkan1
+      # The machine the Baseline renders on, as `ci.yml`'s `build-test` prints
+      # it: llvmpipe compiles shaders for this CPU (#2385).
+      - name: Runner CPU
+        run: lscpu | grep -E 'Model name|Flags'
       # nextest too: mutants run under it (`--test-tool nextest`, below).
       - name: Install cargo-mutants and cargo-nextest
         uses: ./.github/actions/install-tool
@@ -533,7 +537,7 @@ jobs:
   report:
     needs: [plan, mutants]
     if: always() && !cancelled()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read

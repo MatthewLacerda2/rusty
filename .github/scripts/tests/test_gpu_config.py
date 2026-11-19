@@ -96,7 +96,7 @@ def unguarded(text: str) -> list[str]:
             if runs_suite(body) and 'RUSTY_REQUIRE_GPU: "1"' not in body]
 
 
-#: `ubuntu-latest`'s memory in KiB, what `ulimit -v` takes: 16 GB.
+#: `ubuntu-24.04`'s memory in KiB, what `ulimit -v` takes: 16 GB.
 RUNNER_KIB = 16 * 1024 * 1024
 MUTATE = re.compile(r"cargo mutants (?!--list\b)")
 

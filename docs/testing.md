@@ -645,11 +645,16 @@ run on an image that ref (or `main`, whose cache every ref reads) has already se
 
 **Runner image.** The gating jobs run on pinned images, `ubuntu-24.04` and
 `macos-26`, never `-latest` (#930): lavapipe comes from the image's apt archive, so a
-moving image changes the driver under the GPU tests with nothing in any diff. The
-`build-test` log prints the Mesa version it rendered with (step *Driver version*).
-Moving to a new image is a one-line PR of its own. `ubuntu-26.04` is already proven
-(#868): the apt list resolves unchanged, lavapipe is Mesa 26.0.8, and a cold-cache
-build ran every GPU test there.
+moving image changes the driver under the GPU tests with nothing in any diff. Every
+other Ubuntu job (the mutation, coverage and `main`-health runs) names the same image
+as `ci.yml`'s `build-test`, the one place it is defined, so a signal tests on the
+driver the gate proves (`.github/scripts/tests/test_runner_image.py`). The
+`build-test` log prints the Mesa version it rendered with and the runner's CPU (step
+*Driver version*), as the mutation Baseline's *Runner CPU* step does.
+Moving to a new image is a one-line PR of its own, and reads #2385 first: a shadowed
+spot's fog shaft went missing twice on Mesa 26's lavapipe and never on Mesa 25, its
+cause not named. `ubuntu-26.04` is otherwise proven (#868): the apt list resolves
+unchanged, lavapipe is Mesa 26.0.8, and a cold-cache build ran every GPU test there.
 
 Linux CI's adapter is a software renderer, so a green run there proves the render
 path is correct on a conformant driver, not that it performs or behaves identically on
