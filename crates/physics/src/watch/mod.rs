@@ -75,7 +75,7 @@ mod changed;
 pub(super) mod mesh_keys;
 
 use changed::take;
-pub(super) use changed::Changed;
+pub(super) use changed::{Changed, Named};
 
 #[cfg(test)]
 mod borrow_tests;
@@ -220,7 +220,7 @@ pub(crate) struct Tracked {
     pub mesh_keys: mesh_keys::MeshKeys,
     /// What the incremental sync visited, for the cost tests.
     #[cfg(test)]
-    pub visits: super::sync::Visits,
+    pub visits: changed::Visits,
     /// Ignore the log and run the full pass every step: the reference the
     /// equivalence tests compare against.
     #[cfg(test)]

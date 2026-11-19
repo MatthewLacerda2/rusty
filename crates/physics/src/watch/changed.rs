@@ -1,9 +1,10 @@
 //! crates/physics/src/watch/changed.rs — what the change log named since the last
 //! step, kept per channel (#2344), so each sync pass reads only the channels its
-//! inputs live on (`watch`'s table).
+//! inputs live on (`watch`'s table), and the owners each pass visits for it (`Named`).
 
 use std::collections::BTreeSet;
 
+use super::Owners;
 use rusty_ecs::{Changes, Channel, Cursor, World};
 
 /// What changed since the last read, when the log could say: the ids each channel
@@ -67,5 +68,62 @@ pub(super) fn take<T: Channel>(
             ids.dedup();
             true
         }
+    }
+}
+
+/// The owners each sync pass visits, by the channels its inputs live on (`watch`'s
+/// table). The body-state pass adds the stepped bodies to `every` (`sync_to_rapier`).
+pub(crate) struct Named {
+    /// Any channel: characters, masses, body state and compound parts, which read
+    /// a world pose.
+    pub every: Owners,
+    /// `Activity`: `sync_enabled`.
+    pub activity: Owners,
+    /// Collider and CharacterController: `sync_materials`, `sync_sensors`.
+    pub collider: Owners,
+    /// `Layer`: `sync_layers`.
+    pub layer: Owners,
+    /// Collider, Rigidbody, CharacterController, StaticSet: `sync_fits`.
+    pub fits: Owners,
+}
+
+impl Named {
+    /// Every owner in every pass: the full sync.
+    pub(crate) fn all() -> Self {
+        Self {
+            every: Owners::All,
+            activity: Owners::All,
+            collider: Owners::All,
+            layer: Owners::All,
+            fits: Owners::All,
+        }
+    }
+}
+
+/// A test's count of the work the incremental sync did (`watch`'s cost tests):
+/// `compound::member` calls made by the plan check, ever, and the owners each
+/// pass was handed at the last sync, before the matrix or an asset widened one.
+#[cfg(test)]
+#[derive(Default, Debug)]
+pub(crate) struct Visits {
+    pub members: std::cell::Cell<u64>,
+    /// The ids any channel named at the last incremental sync.
+    pub changed: usize,
+    pub every: usize,
+    pub activity: usize,
+    pub collider: usize,
+    pub layer: usize,
+    pub fits: usize,
+}
+
+#[cfg(test)]
+impl Visits {
+    pub(crate) fn record(&mut self, named: &Named, plan: &crate::compound::BodyPlan) {
+        let n = |o: &Owners| o.pick(plan).count();
+        self.every = n(&named.every);
+        self.activity = n(&named.activity);
+        self.collider = n(&named.collider);
+        self.layer = n(&named.layer);
+        self.fits = n(&named.fits);
     }
 }
