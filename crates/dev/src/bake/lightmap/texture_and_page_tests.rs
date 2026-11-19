@@ -1,6 +1,5 @@
-//! What #438's mutation run left unpinned (#820): a texture's share of the bake's
-//! albedo, a page's content tag in its file name, and a cleanup that spares files
-//! the bake did not write.
+//! A texture's share of the bake's albedo, a page's content tag in its file name, and
+//! a cleanup that spares files the bake did not write.
 
 use super::tests::{quick, scene, scene_path};
 use std::path::Path;

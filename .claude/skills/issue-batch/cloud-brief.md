@@ -211,6 +211,12 @@ What cloud coders' run logs taught; each one cost a coder real time.
 - Never fall back to `cargo test`: CI runs nextest, and its per-test process
   isolation and the `gpu` test group are what the gate measures.
 - Don't run `cargo mutants` locally; ask for a scoped run (above).
+- **A survivor is a question, not a defect** (`ci-merge`, *Triaging a survivor*):
+  test the ones that show behaviour nothing asserts, through the callers'
+  interface, named for the behaviour and beside its other tests, never for a
+  mutant or a line; leave the rest (a constant or default, a message's wording,
+  bench and fixture code, speed-only code, an equivalent mutant), with no record
+  owed. No survivor count is a goal.
 - **A refactor that claims no behaviour change proves it by comparison**:
   capture the output before (a scene dump, a bake, a capture, a test's printed
   values), and show it identical after, in the PR.

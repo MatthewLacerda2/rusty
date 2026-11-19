@@ -1,5 +1,5 @@
-//! The unwrap's edges the #831 mutation run left open (#891): one triangle is enough
-//! to unwrap, and charts grow by neighbour, not by seed.
+//! How a chart starts and grows: one triangle is enough to unwrap, and a chart grows
+//! by comparing each face with its neighbour, not with the chart's seed.
 
 use glam::Vec3;
 
