@@ -26,9 +26,11 @@ fn avg(report: &Report, metric: &str) -> Option<f64> {
     row.map(|(_, s)| s.avg)
 }
 
-/// The sum of `prefix.*` rows, `other` included, and the `other` row alone.
+/// The sum of `prefix.*` rows, `other` included, and the `other` row alone. A
+/// part of a part (`render.occlusion.test`, #2401) is inside its row, not summed.
 fn parts(report: &Report, prefix: &str) -> (f64, f64) {
-    let rows = report.metrics.iter().filter(|(m, _)| m.starts_with(prefix));
+    let part = |m: &str| m.strip_prefix(prefix).is_some_and(|p| !p.contains('.'));
+    let rows = report.metrics.iter().filter(|(m, _)| part(m));
     let sum = rows.map(|(_, s)| s.avg).sum();
     (
         sum,

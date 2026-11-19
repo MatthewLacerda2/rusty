@@ -11,6 +11,7 @@ fn drawn(draw_calls: u32, gpu: Option<f64>) -> WindowFrame {
         passes: vec![(GpuPass::Forward, ms)],
         other_ms: 0.0,
         between_submits_ms: 0.0,
+        ..Default::default()
     });
     let render = RenderedFrame {
         counters,
