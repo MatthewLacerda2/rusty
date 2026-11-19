@@ -70,6 +70,38 @@ impl Samples {
             .push(value);
     }
 
+    /// Record a frame's parts of `stage` (a row pushed this frame), each named
+    /// `<stage>.<part>`. Once a frame ran the stage, every part any of its frames
+    /// lapped is sampled, zero when absent (a Mask submit on a frame with no Mask
+    /// drawn), and a part first lapped late is zero on the stage's earlier frames:
+    /// each part averages over its stage's frames, so the parts sum to it.
+    pub fn push_stage_parts(
+        &mut self,
+        stage: &str,
+        parts: impl IntoIterator<Item = (String, f64)>,
+    ) {
+        let ran = self.values(stage).len();
+        let prefix = format!("{stage}.");
+        let mut absent: Vec<String> = self
+            .order
+            .iter()
+            .filter(|m| m.starts_with(&prefix))
+            .cloned()
+            .collect();
+        for (part, ms) in parts {
+            if !self.values.contains_key(&part) {
+                for _ in 1..ran {
+                    self.push(&part, 0.0);
+                }
+            }
+            self.push(&part, ms);
+            absent.retain(|m| *m != part);
+        }
+        for part in absent {
+            self.push(&part, 0.0);
+        }
+    }
+
     /// Every frame's value of `metric`, in order (empty when never pushed).
     pub fn values(&self, metric: &str) -> &[f64] {
         self.values.get(metric).map_or(&[], Vec::as_slice)
