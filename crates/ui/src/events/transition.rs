@@ -17,8 +17,33 @@
 use glam::Vec4;
 
 use super::EventSystem;
+use rusty_asset::MapRef;
 use rusty_components::SelectableTransition;
 use rusty_ecs::World;
+
+/// Put `tint` and `sprite` on `target`'s Image, Shape and Text. Each is written only
+/// when it shows something else: a write is a change on the World's change log,
+/// which the renderer reads to keep a still canvas's mesh (#2416).
+fn show(world: &mut World, target: u32, tint: Vec4, sprite: Option<MapRef>) {
+    let image = world
+        .image(target)
+        .map(|i| (i.state_tint, i.override_texture.clone()));
+    if image.is_some_and(|i| i != (tint, sprite.clone())) {
+        if let Some(mut image) = world.image_mut(target) {
+            (image.state_tint, image.override_texture) = (tint, sprite);
+        }
+    }
+    if world.shape(target).is_some_and(|s| s.state_tint != tint) {
+        if let Some(mut shape) = world.shape_mut(target) {
+            shape.state_tint = tint;
+        }
+    }
+    if world.text(target).is_some_and(|t| t.state_tint != tint) {
+        if let Some(mut text) = world.text_mut(target) {
+            text.state_tint = tint;
+        }
+    }
+}
 
 /// A `ColorTint` fade in flight.
 #[derive(Clone, Copy, Debug)]
@@ -49,20 +74,7 @@ impl EventSystem {
                 SelectableTransition::SpriteSwap => (Vec4::ONE, sel.sprite(state)),
                 SelectableTransition::None => (Vec4::ONE, None),
             };
-            let target = sel.target(id);
-            let sprite = sprite.cloned();
-            if let Some(mut image) = world.image_mut(target) {
-                image.state_tint = tint;
-                if image.override_texture != sprite {
-                    image.override_texture = sprite;
-                }
-            }
-            if let Some(mut shape) = world.shape_mut(target) {
-                shape.state_tint = tint;
-            }
-            if let Some(mut text) = world.text_mut(target) {
-                text.state_tint = tint;
-            }
+            show(world, sel.target(id), tint, sprite.cloned());
         }
     }
 
