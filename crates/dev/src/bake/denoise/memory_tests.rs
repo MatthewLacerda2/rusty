@@ -52,5 +52,5 @@ fn four_times_the_meshes_add_only_their_lightmaps_past_oidn_s_share() {
     // Timing moves how many charts are denoised at once, so the 4× bake is held
     // to the Gaussian's peak with OIDN's whole budgeted share on top.
     let four = bake(8, SIDE, Denoiser::Oidn);
-    holds((filtered.0 + share, filtered.1), four, "OIDN");
+    holds((filtered.0 + share, filtered.1), four, 6, "OIDN");
 }

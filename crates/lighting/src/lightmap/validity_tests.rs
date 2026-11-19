@@ -101,10 +101,8 @@ fn floor_texels(map: &Lightmap) -> Vec<Vec3> {
         let (x, y) = (*i as u32 % map.size, *i as u32 / map.size);
         inside(x as f32 + 0.5, 0.05, 0.48) && inside(y as f32 + 0.5, 0.05, 0.95)
     };
-    (0..map.texels().len())
-        .filter(floor)
-        .map(|i| map.texels()[i])
-        .collect()
+    let texels = map.texels();
+    (0..texels.len()).filter(floor).map(|i| texels[i]).collect()
 }
 
 #[test]

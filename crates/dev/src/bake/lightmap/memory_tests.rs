@@ -1,10 +1,9 @@
 //! A lightmap bake's memory is bounded by its work in flight, not by its scene
-//! (#2312): a scene of four times the meshes at the same density peaks higher only
-//! by the extra lightmaps it keeps. What is in flight is per worker, so both bakes
-//! run on [`WORKERS`]. The page stage's bound, on maps that cover a sliver of
-//! their squares: `pages_memory_tests`. Each test is its own process under nextest, so the peak
-//! (`memory::rss_peak_bytes`) is this test's bakes'. The planes and bakes here
-//! are OIDN's memory tests' too (`denoise::memory_tests`).
+//! (#2312): four times the meshes at the same density peak higher only by the
+//! extra lightmaps kept, on [`WORKERS`] each (what is in flight is per worker).
+//! The page stage's bound: `pages_memory_tests`. Each test is its own process
+//! under nextest, so the peak (`memory::rss_peak_bytes`) is its bakes'; OIDN's
+//! memory tests share the planes and bakes (`denoise::memory_tests`).
 
 use std::sync::Arc;
 
@@ -27,9 +26,8 @@ pub(crate) const SIDE: f32 = 20.0;
 pub(crate) const WORKERS: usize = 2;
 
 /// The scene sizes compared, the smaller first. macOS's allocator keeps a reserve
-/// of freed large blocks in the process's footprint until it is full, which a
-/// 2-plane bake does not fill: there the pair starts at 8 planes, so the reserve
-/// is filled at 1× and only what the scene adds is compared.
+/// of freed large blocks in the footprint, which 2 planes do not fill: there the
+/// pair starts at 8, so only what the scene adds is compared.
 pub(crate) const PAIR: (usize, usize) = match cfg!(target_os = "macos") {
     true => (8, 32),
     false => (2, 8),
@@ -104,35 +102,37 @@ pub(crate) fn bake(n: usize, side: f32, denoiser: Denoiser) -> (u64, u64) {
     };
     let maps = bake_on(&planes(n, side), &settings(denoiser), &progress, WORKERS).expect("ran");
     assert_eq!(maps.len(), n);
-    let (peak, kept) = (
-        rss_peak_bytes().expect("read on Linux and macOS"),
-        kept(&maps),
-    );
+    let (peak, kept) = (rss_peak_bytes().expect("read"), kept(&maps));
     // Shown when a bound fails: whether the allocator held freed memory or the
     // bake still used it.
-    let heap = crate::memory::heap();
-    println!(
-        "{n} × {side}: peak {} MB, maps {} MB, {heap:?}",
-        peak >> 20,
-        kept >> 20
-    );
+    let (heap, peak_mb, kept_mb) = (crate::memory::heap(), peak >> 20, kept >> 20);
+    println!("{n} × {side}: peak {peak_mb} MB, maps {kept_mb} MB, {heap:?}");
     (peak, kept)
 }
 
-/// The 4× bake's peak past `one`'s, against what its extra maps keep.
-pub(crate) fn holds(one: (u64, u64), four: (u64, u64), what: &str) {
+/// What macOS's footprint may keep counted of each extra chart's freed buffers:
+/// libmalloc keeps freed blocks counted even after `memory::relieve`, though its
+/// in-use figure after each bake is the maps' (8 MB: the measured 7.9 MB a chart
+/// at 24 extra charts, rounded up; a bake that kept its charts' buffers, 20 MB a
+/// chart, still fails). Linux's freed large blocks leave (`return_large_frees`).
+pub(crate) const FREED_PER_CHART: u64 = (cfg!(target_os = "macos") as u64) * (8 << 20);
+
+/// The 4× bake's peak past `one`'s, against what its `charts` extra charts' maps
+/// keep, plus [`FREED_PER_CHART`] each.
+pub(crate) fn holds(one: (u64, u64), four: (u64, u64), charts: usize, what: &str) {
     let (grew, extra) = (four.0.saturating_sub(one.0), four.1 - one.1);
+    let freed = charts as u64 * FREED_PER_CHART;
     let mb = |b: u64| b >> 20;
+    let (heap, four_mb, one_mb) = (crate::memory::heap(), mb(four.0), mb(one.0));
     assert!(
-        grew <= extra + MARGIN,
-        "{what}: four times the meshes peaked {} MB higher ({} MB against {} MB), but \
-         their extra lightmaps keep only {} MB: something is held per texel of the whole \
-         scene (the allocator now: {:?})",
+        grew <= extra + freed + MARGIN,
+        "{what}: 4× the meshes peaked {} MB higher ({four_mb} against {one_mb} MB), past \
+         their extra maps' {} MB + {} MB for {charts} charts' freed buffers (macOS's \
+         bound; Linux's is 0) + margin: something is held per texel of the whole \
+         scene (the allocator now: {heap:?})",
         mb(grew),
-        mb(four.0),
-        mb(one.0),
         mb(extra),
-        crate::memory::heap()
+        mb(freed)
     );
 }
 
@@ -141,8 +141,8 @@ fn four_times_the_meshes_peak_higher_only_by_their_lightmaps() {
     if rss_peak_bytes().is_none() {
         return;
     }
-    let (one, four) = PAIR;
-    let one = bake(one, SIDE, Denoiser::Filter);
-    let four = bake(four, SIDE, Denoiser::Filter);
-    holds(one, four, "Gaussian");
+    let (small, large) = PAIR;
+    let one = bake(small, SIDE, Denoiser::Filter);
+    let four = bake(large, SIDE, Denoiser::Filter);
+    holds(one, four, large - small, "Gaussian");
 }

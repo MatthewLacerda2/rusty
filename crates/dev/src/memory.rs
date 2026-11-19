@@ -23,7 +23,7 @@ pub fn rss_peak_bytes() -> Option<u64> {
 /// resident; a scene of 4 times the meshes peaked about twice its extra maps
 /// higher. Pinning the threshold at its default (128 KiB) turns the raising off.
 /// Process-wide and lasting, which costs a page fault per large block; idempotent.
-/// macOS's allocator already returns large blocks, and others are left alone.
+/// On macOS, [`relieve`] asks for freed blocks back instead; others are left alone.
 pub fn return_large_frees() {
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     {

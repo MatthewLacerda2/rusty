@@ -514,7 +514,10 @@ lighting settings (above), whose defaults are the ones listed here.
   macOS free, inactive, purgeable and speculative pages); it is refused with the
   same message when it passes all the machine has. Its last console line and its
   report (`peakResidentMB`, below) say the process's peak resident memory, which
-  in a headless bake is the bake's.
+  in a headless bake is the bake's. On macOS that is the peak physical footprint,
+  which also counts memory the allocator has freed but not yet given back (a few
+  MB a mesh, even though the bake asks for it back after each mesh and page), so
+  it reads somewhat above what the bake held.
 - **Max Lightmap Size** (`maxLightmapSize`, Unity's setting; the editor's
   **"Max Lightmap Size"** under the Generate Lighting button). The atlas page's edge in
   texels, a power of two from `32` to `4096`, default `1024`; any other value is held to

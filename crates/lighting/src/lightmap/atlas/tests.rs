@@ -72,11 +72,8 @@ fn a_map_at_the_cap_is_its_whole_page_and_reads_back() {
         let (_, page, st) = atlas.placements[i];
         let (scale, at) = (cap as f32 / 256.0, PAD as f32 / 256.0);
         assert_eq!(st, [scale, scale, at, at], "map {i}'s scale/offset");
-        let texels = &atlas.pages[page as usize];
-        assert!(
-            texels.iter().all(|&t| t == m.texels()[0]),
-            "map {i} fills it"
-        );
+        let (texels, fill) = (&atlas.pages[page as usize], m.texels()[0]);
+        assert!(texels.iter().all(|&t| t == fill), "map {i} fills it");
     }
     let wider = pack(&[map(7, 300, 1.0)], 256);
     assert_eq!(
