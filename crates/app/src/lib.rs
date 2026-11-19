@@ -38,7 +38,7 @@ mod tap;
 mod world;
 
 pub use game::{GameWorld, PlayTransition};
-pub use probe::{LoadProbe, SystemProbe};
+pub use probe::{timed, LoadProbe, SystemProbe};
 pub use registry::{build, App};
 pub use resources::Resources;
 /// Test hook: the fixture project every entry point's test opens (#1652).

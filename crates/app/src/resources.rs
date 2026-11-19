@@ -125,6 +125,9 @@ pub struct Resources {
     /// The scene load's observer (#2123), the dev layer's load timer. `None` unless
     /// installed via `GameWorld::set_load_probe`; it only watches the load.
     pub(super) load_probe: Option<Box<dyn super::LoadProbe>>,
+    /// Times entering Play, step by step; absent unless installed via
+    /// `GameWorld::set_entry_probe`; it only watches the entry.
+    pub(super) entry_probe: Option<Box<dyn super::LoadProbe>>,
     /// The tick's tap (#1581) — a dev demo recorder or replay. `None` unless
     /// installed via `GameWorld::set_tap`.
     pub(super) tap: Option<Box<dyn super::TickTap>>,
@@ -211,6 +214,7 @@ impl Resources {
             sight_rays: Default::default(),
             probe: None,
             load_probe: None,
+            entry_probe: None,
             tap: None,
             loading: Default::default(),
             model_writes: Default::default(),
