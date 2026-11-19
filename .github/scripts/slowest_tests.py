@@ -43,7 +43,7 @@ grow past `NOISE` times `main`'s time, at the shard's pace, as `near` (`is_new`,
 given paths (searched recursively, so a download's layout does not matter): the
 caller passes `main`'s last three successful full runs, since one run cannot
 tell a slow runner from a slow test, and all shards of the same leg and feature
-set together: a `--partition count:` split moves tests between shards whenever the
+set together: a split moves tests between shards whenever the
 test count changes, so a test absent from one shard's report may sit in the
 other. The caller passes only reports of the job's own feature set, since one
 test runs at different speeds in `default` and `dev` builds. With no readable baseline
@@ -265,7 +265,19 @@ def signal(found: list[Case], main: dict[str, float] | None, why: str = "",
         lines.append(f"{kind} over {b}: {key(c)} {c.seconds:.1f} s (main: {main[key(c)]:.1f} s)")
     lines.append(f"pace: {shard_pace:.2f} times main's longest, so new means over {NOISE * shard_pace:.2f} "
                  f"times main (`slowest_tests.pace`)")
-    return lines + annotations
+    return lines + [weight(found, main)] + annotations
+
+
+def weight(found: list[Case], main: dict[str, float]) -> str:
+    """The shard's tests that `main` ran, weighed by `main`'s longest times (what
+    the macOS leg's time split, `shard_plan.py`, predicts each shard by) beside
+    what they took here. Shards whose predictions match but whose times do not
+    ran on runners of different speed; predictions apart mean a bad plan."""
+    known = [c for c in found if key(c) in main]
+    then, now = sum(main[key(c)] for c in known), sum(c.seconds for c in known)
+    ratio = f"{now / then:.2f}" if then else "-"
+    return (f"weight: {len(known)} tests main ran, predicted {then:.0f} test-seconds by main's longest, "
+            f"took {now:.0f} s here ({ratio} of the prediction)")
 
 
 def main(argv: list[str], config: Path = NEXTEST, cores: int | None = None) -> int:

@@ -1,0 +1,89 @@
+# `main`'s JUnit reports of one leg (#2350, #2397): the slow-test report's
+# baseline (`slowest-tests`) and the macOS leg's shard plan (`ci.yml`'s
+# `shard-plan`, `shard_plan.py`) both read them from here, into `dir`.
+#
+# The reports are `main`'s last `RUNS` (three) `ci` runs that concluded
+# `success` and kept every shard's JUnit artifact of this job's leg and feature
+# set (`<prefix>-1ofN` … `<prefix>-NofN`, N read from `shard`, so the count is the
+# matrix's own: a `count:` partition moves tests between shards), each run in its
+# own folder. A nightly whose shard timed
+# out is never part of one. The runs are found by name, not by walking runs (a
+# push to `main` whose tree a PR run proved builds nothing, `changes`, and keeps
+# no artifact): the artifacts named `<prefix>-1ofN` are paged, `per_page=100` with
+# an explicit `page=` (never `--paginate`, `.github/scripts/CLAUDE.md`), until
+# `MAX_TRIES` runs on `main` are named or `MAX_PAGES` pages are read; every branch
+# makes these, so `main`'s can sit past page 1. Then each candidate, newest
+# first, costs one runs call and one download until `RUNS` are kept. Worst case:
+# `MAX_PAGES` + 2 x `MAX_TRIES` `gh` calls (5 + 12 = 17), a download listing the
+# run's artifacts once and fetching each shard's. The step names each run, its
+# date and commit. Nothing found (expired, a renamed matrix entry, a fork) leaves
+# `dir` absent and says why; a `gh` failure only means fewer runs, never a failed
+# step, so the caller reads whatever is there. The job needs `actions: read`.
+name: Main's JUnit reports
+description: Download a leg's JUnit reports from main's last successful ci runs, every shard of each.
+inputs:
+  prefix:
+    description: The leg's artifact name before the shard (`junit-build-test-dev`), as the upload step names it.
+    required: true
+  shard:
+    description: A `matrix.shard` of the leg (`1/2`); its total is how many reports a run must keep.
+    required: true
+  dir:
+    description: Where the reports go, one folder per run; left absent when none was found.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Main's reports
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PREFIX: ${{ inputs.prefix }}
+        SHARD: ${{ inputs.shard }}
+        BASE: ${{ inputs.dir }}
+        BRANCH: main  # an env value, so a local run can point it at a branch
+        RUNS: "3"
+        MAX_TRIES: "6"
+        MAX_PAGES: "5"
+      run: |
+        rm -rf "$BASE"
+        total=${SHARD#*/}
+        names=(); for i in $(seq 1 "$total"); do names+=("$PREFIX-${i}of$total"); done
+        # Candidate runs on main, from the first shard's artifacts; gh's stderr goes to the log.
+        ids=""; page=1
+        while [ "$page" -le "$MAX_PAGES" ]; do
+          got=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=${names[0]}&per_page=100&page=$page" --jq '
+            (.artifacts | length | tostring),
+            (.artifacts[] | select((.expired | not) and .workflow_run.head_branch == env.BRANCH
+              and .workflow_run.head_repository_id == .workflow_run.repository_id)
+             | .workflow_run.id | tostring)') \
+            || { echo "baseline: page $page of the artifacts named ${names[0]} did not list"; break; }
+          listed=$(head -n1 <<<"$got")
+          ids=$(printf '%s\n%s\n' "$ids" "$(tail -n +2 <<<"$got")" | grep . | sort -rnu || true)
+          [ "$(grep -c . <<<"$ids" || true)" -ge "$MAX_TRIES" ] && break
+          [ "${listed:-0}" -lt 100 ] && break
+          page=$((page + 1))
+        done
+        tries=0; kept=()
+        for id in $ids; do
+          [ "$tries" -ge "$MAX_TRIES" ] || [ "${#kept[@]}" -ge "$RUNS" ] && break
+          tries=$((tries + 1))
+          run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" \
+            --jq '[.conclusion // "pending", .created_at, .head_sha[:7]] | @tsv') || continue
+          IFS=$'\t' read -r conclusion created sha <<<"$run"
+          [ "$conclusion" = success ] || { echo "baseline: skipping $BRANCH's run $id ($conclusion)"; continue; }
+          args=(); for n in "${names[@]}"; do args+=(-n "$n"); done
+          if gh run download "$id" -R "$GITHUB_REPOSITORY" -D "$BASE/$id" "${args[@]}" >/dev/null; then
+            kept+=("$id of $created at $sha")
+          else
+            rm -rf "${BASE:?}/$id"  # a half-done download is no baseline
+            echo "baseline: skipping $BRANCH's run $id (not every one of ${names[*]})"
+          fi
+        done
+        if [ "${#kept[@]}" -eq 0 ]; then
+          rm -rf "$BASE"
+          echo "baseline: no successful run on $BRANCH keeps all of ${names[*]} (tried $tries, $page page(s))"
+          exit 0
+        fi
+        reports=$(find "$BASE" -name '*.xml' | wc -l | tr -d ' ')
+        echo "baseline: each test's longest time over ${#kept[@]} of $RUNS runs on $BRANCH ($reports reports): $(IFS=';'; echo "${kept[*]}" | sed 's/;/; /g')"
