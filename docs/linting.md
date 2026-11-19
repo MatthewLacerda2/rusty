@@ -38,7 +38,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Converters report, never log | `tools/lint -- --rules` (`converter-log`) | **hard gate**: no code line of a converter under `crates/asset/src/convert/` (every module, folder or single file, but the cache's own `mod`, `converter`, `depends`, `fingerprint`, `gate`, `lock`, `record`, `stage`, `stale`, `texture_ref` and `tests`) names `log::` or a bare logging macro — a converter returns what it skipped in `Converted` and fails on anything else, and `convert::refresh` alone warns; each converter's root carries `#![deny(clippy::let_underscore_must_use, clippy::unused_result_ok, clippy::print_stdout, clippy::print_stderr)]`, wrapped or not, so clippy refuses a dropped `Result` and a print there (#1172) |
 | Coverage floors drop with a reason | `unittest` (`make scripts`, `.github/scripts/coverage_floors.py`) | **hard gate**: a floor in `coverage-baseline.txt` lowered from the merge base with `origin/main` needs an inline `# reason: <why>` on its line, and a removed floor passes only once its `crates/<module>/src/` is gone; the weekly coverage run stays a signal (#963) |
 | Dead `pub` items | `make dead-pub` (`tools/lint -- --dead-pub`) | **signal**, never a gate: a `pub` item across a crate boundary is never dead to rustc, and every module is a crate. On a copy under `target/dead-pub/` the fold rebuilds one crate for the check: each member crate is mounted as a `pub(crate)` module of the root's lib (its `rusty_<m>` names rewritten to `crate::<m>`, as a path or bare, its dependencies moved to the root), and every bin and the integration suite fold in too, so a use from another crate still counts. The report lists items nothing uses, items only tests use (a test seam may be fine), and unused imports apart (#940, #1003), by their real `crates/<m>/…` paths. It builds for the host only, so a finding in a file with a platform `cfg` (or in a module declared under one) is listed under *Platform-gated*: check it on that platform before narrowing (#1092). It runs weekly on `main` as `cargo-test.yml`'s `dead-pub` job, the report in its job summary; the job goes red when no report came out, including when the fold found nothing to make crate-private (a layout it does not know), and `main-health` files that (#1205) |
-| Dead-pub fold names | `tools/lint -- --rules` (`fold-names`) | **hard gate**: every file the dead-pub fold rewrites (each member's `src/`, each `[[bin]]`, `tests/`) names its sibling crates and the lib in a form the fold can rewrite, read with the fold's own tokenizer (`dead_pub::names`), so a pull request learns what the weekly job would only find on Sunday; it flags a `pub use` of a whole crate and the lib named alone (`use rusty;`); no allow (#2433) |
+| Dead-pub fold names | `tools/lint -- --rules` (`fold-names`) | **hard gate**: every file the dead-pub fold rewrites (each member's `src/`, each `[[bin]]`, `tests/`) names its sibling crates and the lib in a form the fold can rewrite, read with the fold's own tokenizer (`dead_pub::names`), so a pull request learns what the weekly job would only find on Sunday; it flags a whole crate re-exported by a `pub` item and the lib named alone (`use rusty;`, `use rusty::{self};`); a bare name outside a crate position is left alone; no allow (#2433) |
 | Dependency locks | cargo-deny (`deny.toml`) | **hard gate**: every git dependency is pinned by `rev` (`required-git-spec`); `nalgebra` only through the physics stack and no `cgmath` — glam is the one math crate (#975) |
 | Directory size | `tools/lint -- --rules` (`dir-size`) | **hard gate**: no directory under `src/` holds more than 12 source files directly in it (tests and its `mod.rs` aside); cluster by responsibility into subfolders, or a flat registry of one file per public unit says so with an inline `// lint: allow(dir-size) <why>` in its `mod.rs` (`crates/script/src/api/`). The ≲10 aim prints as a signal (#1367) |
 | Docs name what exists | `make docrefs` (`.github/scripts/docrefs.py`) | **hard gate**: every `src/`, `tests/`, `tools/`, `docs/` or `.github/` path in a tracked `*.md`'s inline code is tracked, every `` `make <verb>` `` is a target, and CLAUDE.md's namespaces each have a `docs/api/` page; placeholders pass, anything else takes `<!-- docrefs: allow <why> -->`. Runs on Markdown-only PRs too (#973) |
@@ -475,19 +475,31 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   gets past it; so does any binding outside `crates/script/src/api/`.
 - **`fold-names`** (#2433) — `make dead-pub` compiles a copy of the workspace
   folded into one crate, every name for a sibling crate or the lib rewritten to a
-  `crate::` path: `rusty_<m>::…` as a path anywhere on a line, and a bare
-  `rusty_<m>` in code (`use rusty_<m> as x;`, `use rusty_<m>;`, `extern crate`, a
-  `use` group, an attribute or macro argument). A bare name after a single `.`,
-  `$`, `'` or `r#`, or before `!`, is a field, metavariable, lifetime, raw
-  identifier or macro, not a crate, and stays. Compiling the fold is a whole
-  engine build, so it runs weekly; this rule reads the files the fold rewrites
-  (each member's `src/`, each `[[bin]]` and its module directory, `tests/`) with
-  the fold's own tokenizer (`tools/lint/src/dead_pub/names.rs`) and flags what the
-  rewrite must leave: a `pub use` of a whole crate (it would re-export a
-  crate-private module; re-export its items instead) and the lib named alone
-  (`use rusty;` would fold to `use crate;`; write a path or an `as` alias). No
-  allow: it would not make the copy compile, so the fix is the line or a new form
-  in `names.rs`.
+  `crate::` path: `rusty_<m>::…` as a path anywhere on a line (but after another
+  path's `::`, as in `Self::rusty_<m>::X`), and a bare `rusty_<m>` only in code and
+  only where a crate can stand: the head of a `use` item or of an entry in its top
+  `{…}` group (over as many lines as it spans), the name of an `extern crate`, a
+  whole attribute argument, and a whole macro argument (a member only). Anywhere
+  else (`let rusty = 1;`, `f(rusty_font)`, `Foo { rusty }`, a field, a lifetime)
+  a bare word is no crate, and the fold leaves it as written. Compiling the fold
+  is a whole engine build, so it runs weekly; this rule reads the files the fold
+  rewrites (each member's `src/`, each `[[bin]]` and its module directory,
+  `tests/`) with the fold's own tokenizer (`tools/lint/src/dead_pub/names.rs` and
+  `scope.rs`) and flags what the rewrite cannot fold: a whole crate re-exported
+  by a plain `pub` item (`pub use rusty_<m> [as x];`, in a `pub use {…}` group,
+  `pub extern crate`, `pub use rusty_<m>::{self …}`: it would re-export a
+  crate-private module; re-export its items instead), and the lib named alone
+  (`use rusty;`, `use {rusty, …}`, `use rusty::{self};`, which fold to an import
+  of a bare `crate`; write a path or an `as` alias). A workspace whose members
+  cannot be read is a finding on `Cargo.toml`. No allow: it would not make the
+  copy compile, so the fix is the line or a new form in `names.rs`.
+  **Where it misfires, and what it cannot see** (it is a token scan, not a
+  parser): a local variable spelled exactly like a member and passed whole to a
+  macro (`m!(rusty_font)`) is folded as the crate; the lib's short name passed
+  whole to a macro is never folded, so a macro that takes the crate itself
+  (`m!(rusty)`) breaks the copy unseen; a whole-crate re-export spelled through a
+  macro or a `cfg_attr` is not read; and a `use` entry split before its `;`,
+  `,` or `}` (`use rusty\n;`) is not judged alone.
 - **`full-literal`** (#976) — a test builds a first-class component (a `…Component`
   type `Entity` names, with three or more fields) through a constructor or a
   `..rest`, never a struct expression naming every field: such a literal breaks the

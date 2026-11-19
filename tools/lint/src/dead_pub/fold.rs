@@ -11,7 +11,7 @@
 //! every member's `rusty_<m>::` is `crate::<m>::` in every folded file, and so is
 //! a member named bare (`use rusty_<m> as x;`, [`super::names`]).
 
-use super::names::{rename, Left, Names};
+use super::names::{Left, Names, Renamer};
 use crate::code::{code_of, Open};
 
 /// One `[[bin]]` target of `Cargo.toml`.
@@ -153,9 +153,9 @@ fn fold_file(
     let mut paths = vec![("crate", own.as_str())];
     paths.extend(bare.iter().copied());
     let names = Names { paths, bare };
+    let mut renamer = Renamer::new(&names);
     for (i, line) in source.lines().enumerate() {
         let mut brackets = 0i32;
-        let mut at_start = open;
         let code = code_of(line, &mut open, |_, c| match c {
             '[' => brackets += 1,
             ']' => brackets -= 1,
@@ -163,12 +163,12 @@ fn fold_file(
         });
         let attribute = depth > 0 || code.trim_start().starts_with("#![");
         head &= attribute || code.trim().is_empty();
+        let (line, here) = renamer.line(line);
         if head && attribute {
             depth += brackets;
             out.push('\n');
             continue;
         }
-        let (line, here) = rename(line, &mut at_start, &names);
         left.extend(here.into_iter().map(|l| (i + 1, l)));
         let line = match line.strip_prefix("fn main(") {
             Some(rest) => format!("pub fn main({rest}"),

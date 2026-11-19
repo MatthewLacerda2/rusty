@@ -20,8 +20,25 @@ fn flags_a_spelling_the_fold_cannot_rewrite() {
 fn passes_every_spelling_the_fold_rewrites() {
     let src = "use rusty_font as font;\nuse rusty_font;\nextern crate rusty_font;\n\
                use {rusty_font as f, x};\nm!(rusty_font);\nuse rusty as r;\n\
-               pub use rusty_font::{Glyph};\nlet s = \"rusty_font\";\n";
+               pub use rusty_font::{Glyph};\nlet s = \"rusty_font\";\n\
+               let rusty = 1;\nlet v = vec![rusty, x];\nlet k = Foo { rusty, .. };\n";
     assert!(check("crates/ui/src/a.rs", src, "rusty", &members()).is_empty());
+}
+
+#[test]
+fn flags_a_workspace_it_cannot_read() {
+    let repo = Repo::new("fold-names-unreadable", true);
+    repo.file(
+        "Cargo.toml",
+        "[workspace]\nmembers = [\"crates/gone\"]\n\n[package]\nname = \"rusty\"\n",
+    );
+    repo.file("src/lib.rs", "");
+    repo.git(&["add", "-A"]);
+    let found: Vec<_> = run(&Scan::at(&repo.0))
+        .into_iter()
+        .map(|f| (f.path, f.rule))
+        .collect();
+    assert_eq!(found, [("Cargo.toml".to_string(), RULE)]);
 }
 
 /// Through the scan: a member's, a bin's and a test's file are read; the root

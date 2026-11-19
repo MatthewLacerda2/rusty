@@ -24,6 +24,7 @@ pub mod fold;
 pub mod names;
 pub mod platform;
 pub mod report;
+mod scope;
 pub mod workspace;
 
 use std::fs;

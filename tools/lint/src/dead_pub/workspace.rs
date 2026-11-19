@@ -107,8 +107,19 @@ pub fn member_dirs(root: &Path, cargo_toml: &str) -> io::Result<Vec<String>> {
     Ok(out)
 }
 
-/// The members of the workspace at `root` whose `rusty_<m>` paths the fold rewrites.
+/// The members of the workspace at `root` whose `rusty_<m>` names the fold
+/// rewrites, each with its exported macros.
 pub fn members(root: &Path, root_lib: &str) -> io::Result<Vec<Member>> {
+    let mut out = named(root, root_lib)?;
+    for m in &mut out {
+        m.macros = exported_macros(&root.join(&m.dir).join("src"))?;
+    }
+    Ok(out)
+}
+
+/// [`members`] from the manifests alone, each `macros` left empty: what a
+/// reader that only needs a member's directory, ident and module pays for.
+pub fn named(root: &Path, root_lib: &str) -> io::Result<Vec<Member>> {
     let manifest = fs::read_to_string(root.join("Cargo.toml"))?;
     let mut found = Vec::new();
     let mut named = Vec::new();
@@ -131,13 +142,12 @@ pub fn members(root: &Path, root_lib: &str) -> io::Result<Vec<Member>> {
         let ident = name.replace('-', "_");
         let module = reexport_alias(root_lib, &ident).unwrap_or_else(|| ident.clone());
         let test_only = !named.iter().any(|(n, _)| *n == name);
-        let macros = exported_macros(&root.join(&dir).join("src"))?;
         out.push(Member {
             dir,
             ident,
             module,
             test_only,
-            macros,
+            macros: Vec::new(),
         });
     }
     Ok(out)

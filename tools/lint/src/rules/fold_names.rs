@@ -7,10 +7,13 @@
 //! engine build, so it runs weekly, as a signal; a spelling it cannot rewrite
 //! would leave the signal red and silent until then. This rule reads the same
 //! files with the fold's own tokenizer (`dead_pub::names`), so it flags exactly
-//! what the rewrite leaves: a `pub use` of a whole crate, and the lib named by
-//! itself (`use rusty;`). Every other form folds: a path (`rusty_<m>::…`), and a
-//! bare name in a `use`, a `use` group, an `extern crate`, an attribute or a macro
-//! argument. Nothing excuses a finding (`Allow::Never`): an allow would not make
+//! what the rewrite cannot fold: a whole crate re-exported by a `pub use` (or
+//! `pub extern crate`, or `pub use rusty_<m>::{self …}`), and the lib named by
+//! itself (`use rusty;`, `use rusty::{self};`). Every other form folds: a path
+//! (`rusty_<m>::…`), and a bare name at a `use` head or in its top group, in an
+//! `extern crate`, or as a whole attribute or macro argument. A bare name
+//! anywhere else is no crate, and neither the fold nor the rule touches it.
+//! Nothing excuses a finding (`Allow::Never`): an allow would not make
 //! the folded copy compile, so the fix is the line, or teaching the fold the form.
 
 use super::finding::Finding;
@@ -29,7 +32,21 @@ pub fn run(scan: &Scan) -> Vec<Finding> {
     let Some(lib) = workspace::package_name(&manifest).map(|n| n.replace('-', "_")) else {
         return Vec::new();
     };
-    let members = workspace::members(scan.root(), &read("src/lib.rs")).unwrap_or_default();
+    let members = match workspace::named(scan.root(), &read("src/lib.rs")) {
+        Ok(members) => members,
+        Err(why) => {
+            return vec![Finding {
+                path: "Cargo.toml".to_string(),
+                line: 1,
+                rule: RULE,
+                message: format!(
+                    "the workspace's members cannot be read, so no file can be checked \
+                     for a name the dead-pub fold cannot rewrite: {why}; fix the manifest \
+                     (nothing excuses this finding)"
+                ),
+            }]
+        }
+    };
     let names: Vec<(String, String)> = members
         .iter()
         .map(|m| (m.ident.clone(), m.module.clone()))

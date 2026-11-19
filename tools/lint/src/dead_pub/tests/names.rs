@@ -77,3 +77,66 @@ fn a_form_the_fold_cannot_rewrite_is_left_and_reported() {
     );
     assert!(left("pub use rusty_font::{Glyph, Font};\n").is_empty());
 }
+
+/// A bare `rusty` or `rusty_<m>` outside a crate position is a variable, a
+/// field, a parameter or a later path segment: folded as written, never
+/// reported.
+#[test]
+fn a_bare_name_outside_a_crate_position_is_left_and_not_reported() {
+    let src = "let rusty = 1;\nfn f(rusty: u32, rusty_font: u8) {}\n\
+               let s = Foo { rusty: 1, rusty_font };\nf(rusty);\nlet v = rusty;\n\
+               let w = vec![rusty, x];\nlet k = Foo { rusty, .. };\n\
+               let g = Self::rusty_font;\nlet h = Self::rusty_font::X;\n\
+               g(rusty_font, rusty);\n";
+    assert_eq!(folded(src), src);
+    assert!(left(src).is_empty());
+}
+
+#[test]
+fn a_crate_position_spans_lines_and_attributes() {
+    let cases = [
+        (
+            "use {\n    rusty_font,\n    rusty_ecs::W,\n};\n",
+            "use {\n    crate::font,\n    crate::ecs::W,\n};\n",
+        ),
+        (
+            "use rusty_font::{rusty_ecs, x};\nlet y = rusty_ecs;\n",
+            "use crate::font::{rusty_ecs, x};\nlet y = rusty_ecs;\n",
+        ),
+        (
+            "#[cfg(test)] use rusty_font;\n",
+            "#[cfg(test)] use crate::font;\n",
+        ),
+        (
+            "use rusty_font::{self, X};\n",
+            "use crate::font::{self, X};\n",
+        ),
+        (
+            "pub(crate) use rusty_font as f;\n",
+            "pub(crate) use crate::font as f;\n",
+        ),
+    ];
+    for (src, want) in cases {
+        assert_eq!(folded(src), want, "{src}");
+        assert!(left(src).is_empty(), "{src}");
+    }
+}
+
+/// Every spelling of a whole-crate re-export, and the lib's `{self}`: the item,
+/// not the line, decides `pub`.
+#[test]
+fn a_whole_crate_reexport_or_the_lib_alone_is_reported_in_any_spelling() {
+    let cases = [
+        "pub use {\n    rusty_ecs::W,\n    rusty_font,\n};\n",
+        "pub extern crate rusty_font;\n",
+        "#[doc(hidden)] pub use rusty_font as f;\n",
+        "pub use rusty_font::{self as x};\n",
+        "pub use rusty_font::{\n    W,\n    self,\n};\n",
+        "use rusty::{self};\n",
+        "use rusty::{self, X};\n",
+    ];
+    for src in cases {
+        assert_eq!(left(src).len(), 1, "{src}");
+    }
+    assert_eq!(left("pub use rusty_font::{a::{self}, b};\n"), []);
+}
