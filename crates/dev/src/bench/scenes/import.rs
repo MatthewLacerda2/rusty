@@ -30,6 +30,14 @@ pub fn import() -> Result<f64, String> {
     Ok(start.elapsed().as_secs_f64() * 1000.0)
 }
 
+/// The images an import of the project at `project` would encode now
+/// (`asset::texture_import::pending`), opened to run: `--pending-imports`.
+pub fn pending(project: &Path) -> Result<Vec<PathBuf>, String> {
+    rusty_core::project::open(project, rusty_core::project::Access::Run)?;
+    let assets = Path::new(rusty_core::project::ASSETS_DIR);
+    Ok(rusty_asset::texture_import::pending(assets))
+}
+
 /// What the copy leaves out, relative to the project root.
 const LEFT_OUT: [&str; 3] = [CACHE_DIR, IMPORT_CACHE_DIR, ".git"];
 

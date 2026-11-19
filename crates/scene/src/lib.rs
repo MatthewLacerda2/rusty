@@ -77,7 +77,9 @@ pub use io::{new_scene, parse_scene_text, read_scene_file, NEW_IN_PLAY, SCENE_EX
 pub use lighting::io::{sidecar_path, LightingData};
 pub use lighting::probe::{Probe, ProbeGrid, ProbeVolume};
 pub use lighting::probe_fill::analytic_fill;
-pub use lighting::reflection_probe::{ProbeShape, ReflectionProbe, ReflectionProbeSet};
+pub use lighting::reflection_probe::{
+    PreparedProbes, ProbeShape, ReflectionProbe, ReflectionProbeSet,
+};
 pub use lighting::sh::Sh9;
 pub use runtime::despawn::Despawn;
 pub use scene::{
