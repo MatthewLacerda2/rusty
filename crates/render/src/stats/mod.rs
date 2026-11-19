@@ -9,11 +9,10 @@
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RenderCounters {
     /// Geometry draw calls: solids, transparents, shadow casters, the SSAO depth
-    /// prepass, particle batches and UI batches. Decals draw nothing of their own:
-    /// the surfaces they land on fold them in (#638). Copies of one mesh + material are one instanced draw
-    /// (#470). Fullscreen post-FX and the skybox are not counted.
+    /// prepass, particle batches and UI batches; one mesh + material is one instanced
+    /// draw (#470). Decals (folded into surfaces, #638), post-FX and the sky: none.
     pub draw_calls: u32,
-    /// Triangles submitted by the solid, transparent, shadow and SSAO-prepass draws.
+    /// Triangles of the solid, transparent, shadow and prepass draws (not the GPU cull's late set).
     pub triangles: u64,
     /// Mesh entities drawn, summed over the camera stack.
     pub visible_entities: u32,
@@ -53,6 +52,9 @@ pub struct RenderCounters {
     /// the camera views. Read back from the GPU without waiting, so it describes
     /// a frame or so before this one, and `0` on the first.
     pub hiz_culled: u32,
+    /// Of the visible ones, those phase one did not draw (#2336, the late set the
+    /// prepass adds), summed over the views: `0` held still. Read back likewise.
+    pub hiz_late: u32,
     /// Clusters of big meshes tested one by one after the Hi-Z instance test
     /// (#1968): every cluster of each instance it judged in a batch drawn by
     /// cluster, summed over the camera views.
@@ -145,8 +147,9 @@ pub struct RenderCounters {
     /// Opaque scene passes that wrote a velocity target (#1435): one per camera of
     /// each view running motion blur, `0` when none does.
     pub velocity_passes: u32,
-    /// Opaque scene passes primed with their SSAO prepass's depth (#1499): one per
-    /// camera that ran SSAO, `0` with AO off. A camera shading with a forward
+    /// Opaque scene passes primed with the depth prepass's depth (#1499): one per
+    /// camera that ran SSAO or SSIL, or that the GPU culls (#2336, its prepass
+    /// then the late set alone), `0` with neither and no GPU cull. A camera shading with a forward
     /// override of its own (the shader preview) is never primed, nor is any on Metal.
     pub primed_passes: u32,
     /// Reasons this frame read history an earlier frame left (#2092), one per
@@ -203,85 +206,9 @@ pub struct RenderCounters {
     pub ops: OpCounts,
 }
 
-impl RenderCounters {
-    /// Every counter under its `FrameStats` metric name.
-    pub fn pairs(&self) -> Vec<(&'static str, u64)> {
-        let mut pairs = vec![
-            ("draw_calls", self.draw_calls.into()),
-            ("triangles", self.triangles),
-            ("visible_entities", self.visible_entities.into()),
-            ("cull_tested", self.cull_tested.into()),
-            ("culled_entities", self.culled_entities.into()),
-            ("size_culled_entities", self.size_culled_entities.into()),
-            ("occlusion_culled", self.occlusion_culled.into()),
-            ("hiz_tested", self.hiz_tested.into()),
-            ("hiz_culled", self.hiz_culled.into()),
-            ("cluster_tested", self.cluster_tested.into()),
-            ("cluster_culled", self.cluster_culled.into()),
-            ("lod_hidden_entities", self.lod_hidden_entities.into()),
-            ("lights", self.lights.into()),
-            ("lights_dropped", self.lights_dropped.into()),
-            ("cluster_lights_dropped", self.cluster_lights_dropped.into()),
-            ("lights_visible", self.lights_visible.into()),
-            ("lights_culled", self.lights_culled.into()),
-            ("light_cluster_refs", self.light_cluster_refs),
-            ("light_bin_us", self.light_bin_us),
-            ("decals_visible", self.decals_visible.into()),
-            ("decal_cluster_refs", self.decal_cluster_refs),
-            ("decal_maps_dropped", self.decal_maps_dropped.into()),
-            ("ui_draws", self.ui_draws.into()),
-            ("ui_mask_passes", self.ui_mask_passes.into()),
-            ("ui_blur_passes", self.ui_blur_passes.into()),
-            ("ssao_samples", self.ssao_samples),
-            ("ssil_samples", self.ssil_samples),
-            ("volumetric_froxels", self.volumetric_froxels),
-            ("particles_drawn", self.particles_drawn.into()),
-            ("render_texture_draws", self.render_texture_draws.into()),
-            ("velocity_passes", self.velocity_passes.into()),
-            ("primed_passes", self.primed_passes.into()),
-            ("history_passes", self.history_passes.into()),
-            ("ssr_surface_passes", self.ssr_surface_passes.into()),
-            ("grade_lut_bakes", self.grade_lut_bakes.into()),
-            ("sky_reflection_bakes", self.sky_reflection_bakes.into()),
-            ("opaque_copies", self.opaque_copies.into()),
-            ("texture_bytes", self.texture_bytes),
-            ("lightmap_bytes", self.lightmap_bytes),
-            ("reflection_bytes", self.reflection_bytes),
-            ("render_extracted", self.render_extracted.into()),
-            ("render_posed", self.render_posed.into()),
-            ("render_extract_us", self.render_extract_us),
-            ("render_upload_bytes", self.render_upload_bytes),
-        ];
-        pairs.extend(self.shadow_pairs());
-        pairs.extend(self.uploads.pairs());
-        pairs.extend(self.ops.pairs());
-        pairs
-    }
-
-    /// The shadow views' counters, under their metric names.
-    fn shadow_pairs(&self) -> [(&'static str, u64); 12] {
-        [
-            ("shadow_cull_tested", self.shadow_cull_tested.into()),
-            ("shadow_frustum_culled", self.shadow_frustum_culled.into()),
-            ("shadow_size_culled", self.shadow_size_culled.into()),
-            (
-                "shadow_occlusion_culled",
-                self.shadow_occlusion_culled.into(),
-            ),
-            ("shadow_gather_us", self.shadow_gather_us),
-            ("shadow_draws", self.shadow_draws.into()),
-            ("shadowed_lights", self.shadowed_lights.into()),
-            ("shadow_lights_dropped", self.shadow_lights_dropped.into()),
-            ("shadow_atlas_tiles", self.shadow_atlas_tiles.into()),
-            ("shadow_atlas_texels", self.shadow_atlas_texels),
-            ("shadow_atlas_cached", self.shadow_atlas_cached.into()),
-            ("shadow_atlas_rebaked", self.shadow_atlas_rebaked.into()),
-        ]
-    }
-}
-
 mod frame;
 mod memory;
+mod pairs;
 mod uploads;
 pub use crate::gpu::ops::OpCounts;
 pub use memory::{gpu_memory, GpuMemory};

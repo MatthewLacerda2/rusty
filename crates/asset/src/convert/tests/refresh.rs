@@ -71,13 +71,16 @@ fn a_leading_dot_names_the_same_held_source() {
 
 #[test]
 fn a_conversion_is_counted_and_a_current_cache_is_not() {
-    let root = rusty_test_support::temp::dir().join("assets");
-    std::fs::create_dir_all(&root).unwrap();
-    std::fs::write(root.join("enemy.fbx"), QUAD).unwrap();
-    // The count is the process's: exact under nextest, one process a test.
-    let before = conversions();
-    refresh_sources(&root);
-    assert_eq!(conversions(), before + 1, "the stale source converted");
-    refresh_sources(&root);
-    assert_eq!(conversions(), before + 1, "its cache current: none");
+    // The count is the process's, bumped by any test that converts: alone, it is
+    // exact.
+    rusty_test_support::alone!(|| {
+        let root = rusty_test_support::temp::dir().join("assets");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("enemy.fbx"), QUAD).unwrap();
+        let before = conversions();
+        refresh_sources(&root);
+        assert_eq!(conversions(), before + 1, "the stale source converted");
+        refresh_sources(&root);
+        assert_eq!(conversions(), before + 1, "its cache current: none");
+    });
 }

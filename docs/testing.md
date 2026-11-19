@@ -484,6 +484,19 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
   In-crate tests have the same helper,
   `rusty_test_support::temp::dir()` (#999, `crates/test-support/`); the `test-temp-dir` rule fails a bare
   `std::env::temp_dir()` in test code (see `linting.md`).
+- **What is process-wide by nature gets a process of its own.** A test reading a
+  process-wide measure (the peak memory, `memory::rss_peak_bytes`), asserting an
+  exact value of a process-wide counter live code bumps
+  (`asset::convert::conversions`), or installing state nothing else may share runs its body through
+  `rusty_test_support::alone!(|| …)`, which names the test from its function:
+  under nextest it runs in place, under plain `cargo test` the binary re-runs
+  that one test in a child, and passes only once the child says the body ran.
+  A check that the machine cannot measure goes before `alone!`, so it starts no
+  child to return at once. The `log`
+  logger is one a process too: a crate that names `rusty-logging` captures its
+  tests' warnings through `rusty_logging::init_for_tests` and `forward`, never
+  `rusty_test_support::logs` (`one-logger`), and each `init` panics when the
+  other's logger is already installed.
 - **A path a test expects is spelled as the engine writes it**: a plain
   `Path::join("a/b/c")` or `"a/b/c"`, `/`-separated, with a `\` read as part of a
   name, never a separator. In-crate tests take a relative root from
@@ -1106,8 +1119,8 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   `gpu_clock_pct` (the clock it ran at, % of the reference), `draw_calls`,
   `triangles`, `culled_entities`, `lights_dropped`, `cluster_lights_dropped`, `lights_culled`,
   `decals_visible`, `decal_cluster_refs`, the GPU occlusion counters `hiz_tested`,
-  `hiz_culled`, `cluster_tested`, `cluster_culled` (the two culled ones are read back
-  without waiting, so they describe a frame or so earlier, `docs/api/Debug.md`), and
+  `hiz_culled`, `hiz_late`, `cluster_tested`, `cluster_culled` (all but the two tested
+  ones are read back without waiting, so they describe a frame or so earlier, `docs/api/Debug.md`), and
   the frame's GPU calls `render_passes`, `compute_passes`, `submits`,
   `bind_groups_created`, `buffer_writes` (counted through `render::gpu::ops`; a
   render-CPU fix whose timing moves inside the spread proves itself by these); then
