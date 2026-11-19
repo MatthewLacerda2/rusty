@@ -117,13 +117,6 @@ impl Renderer {
         let parts = after
             .into_iter()
             .chain(cluster_parts(clustered, split).iter().copied());
-        let begin = |encoder: &mut wgpu::CommandEncoder, label, writes| {
-            let desc = wgpu::ComputePassDescriptor {
-                label: Some(label),
-                timestamp_writes: writes,
-            };
-            encoder.counted_compute_pass(&desc).forget_lifetime()
-        };
         if split {
             for part in parts {
                 let writes = self.gpu_timer.part_compute_writes(part);
@@ -140,6 +133,19 @@ impl Renderer {
         }
         drawn
     }
+}
+
+/// A compute pass of `encoder`, labelled, its pair's `writes` when timed.
+fn begin(
+    encoder: &mut wgpu::CommandEncoder,
+    label: &'static str,
+    writes: Option<wgpu::ComputePassTimestampWrites<'_>>,
+) -> wgpu::ComputePass<'static> {
+    let desc = wgpu::ComputePassDescriptor {
+        label: Some(label),
+        timestamp_writes: writes,
+    };
+    encoder.counted_compute_pass(&desc).forget_lifetime()
 }
 
 /// The stage's CPU lap before its parts: making room for the camera (and the
