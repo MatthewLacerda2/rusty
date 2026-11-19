@@ -50,6 +50,11 @@ mod wire;
 mod world;
 mod writes;
 
+/// Test hook: the level a `Move`'s cost is measured on (`character::bench`),
+/// counted by `character::cost_tests` and timed by `rusty_dev`'s
+/// `bench::move_cost_tests::move_cost`.
+#[doc(hidden)]
+pub use character::bench as character_bench;
 pub use character::{can_stand, move_character, CharacterMove, ControllerHit};
 pub use events::collision::{CollisionEvents, CollisionPair, Contact};
 pub use events::trigger::TriggerEvents;
