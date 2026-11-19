@@ -1,8 +1,8 @@
 //! Which of a camera's opaque batches are drawn by cluster this frame (#1968),
 //! and the jobs `hiz_clusters.wgsl` runs for them: one per instance, each with
 //! its room in the output index list, and the dispatch groups that run them:
-//! the batches of one mesh and cluster count share a dispatch a stage (#2406). Pure CPU work
-//! over the frame's batches.
+//! the batches of one mesh share a dispatch a stage while the padding stays
+//! bounded (#2406). Pure CPU work over the frame's batches.
 
 use std::ops::Range;
 
@@ -19,6 +19,12 @@ pub(crate) const MAX_OUT_INDICES: u64 = rusty_asset::clusters::MAX_RUN_INDICES a
 /// clusters than this, or more (instance, cluster) pairs than 64 times it (the
 /// test's threads), is drawn whole.
 const MAX_DIMENSION: u32 = 65535;
+/// How many times its real (instance, cluster) pairs a group's dispatch rows may
+/// start: a group's jobs each take a test row and a copy row as wide as its
+/// widest batch, so joining batches of unequal counts pads the narrower ones.
+/// At 2, a group pads at most as much as it works: batches of 40 and 60 clusters
+/// join, a 2-cluster batch of 1,000 instances and a 500-cluster one do not.
+pub(crate) const MAX_PADDING: u64 = 2;
 
 /// `hiz_clusters.wgsl`'s `Job`.
 #[repr(C)]
@@ -31,8 +37,8 @@ pub(crate) struct Job {
     pub cluster_first: u32,
     pub state_first: u32,
     pub cone: u32,
-    /// Its batch's clusters, which every job of its group shares: the shader
-    /// skips a cluster past it.
+    /// Its batch's clusters: its group's dispatch covers the most of any job in
+    /// it, so a job of a smaller batch skips the rest.
     pub clusters: u32,
 }
 
@@ -47,14 +53,16 @@ pub(crate) struct Run {
 }
 
 /// The clustered batches one dispatch a stage covers: consecutive runs of one
-/// mesh and one cluster count, so one mesh binding (group 1) serves them all,
-/// their jobs contiguous, and no job's dispatch row is padded past its own
-/// clusters (the copy's row is 64 lanes a cluster).
+/// mesh, so one mesh binding (group 1) serves them all, their jobs contiguous;
+/// `clusters`, the most any of them has, is every job's row (the test's threads,
+/// the copy's 64-lane workgroups at most), `pairs` the rows' real work, and
+/// `jobs × clusters ≤ MAX_PADDING × pairs`.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Group {
     pub mesh: MeshHandle,
     pub jobs: Range<u32>,
     pub clusters: u32,
+    pub pairs: u64,
 }
 
 /// A camera's clustered draws this frame.
@@ -84,15 +92,17 @@ impl Plan {
         clusters_of: impl Fn(&DrawBatch) -> Option<Range<u32>>,
     ) -> Self {
         let mut plan = Self::default();
-        // By mesh and index run, so the batches of one range (copies differing in
-        // material, facing or two-sidedness) are consecutive and share a dispatch
-        // group; stable, so the order stays a function of the batches alone.
-        let mut batches: Vec<_> = batches.enumerate().collect();
-        batches.sort_by_key(|(_, b)| (b.key.mesh, b.key.indices));
-        for (b, batch) in batches {
-            let Some(clusters) = clusters_of(batch) else {
-                continue;
-            };
+        // By mesh, cluster count and index run, so a mesh's batches are
+        // consecutive, nearest counts beside each other (a greedy join then makes
+        // few groups), and copies of one range (differing in material, facing or
+        // two-sidedness) side by side; stable, so the order stays a function of
+        // the batches alone.
+        let mut batches: Vec<_> = batches
+            .enumerate()
+            .filter_map(|(b, batch)| Some((b, batch, clusters_of(batch)?)))
+            .collect();
+        batches.sort_by_key(|(_, b, c)| (b.key.mesh, c.len(), b.key.indices));
+        for (b, batch, clusters) in batches {
             let count = batch.instances.len() as u64;
             let room = count * u64::from(batch.key.indices.len());
             let n = clusters.len() as u32;
@@ -136,24 +146,44 @@ impl Plan {
     }
 
     /// Put a run of `mesh` (its `jobs`, `n` clusters each) in the last group when
-    /// that is of the same mesh and cluster count and the joined dispatches stay
-    /// in their limits, else in a group of its own. Joining unequal counts would
-    /// start every job of the group a row as wide as its largest: a 2-cluster
-    /// batch of 1,000 instances beside a 500-cluster one would start 500,000 copy
-    /// workgroups for at most 2,500 clusters.
+    /// that is of the same mesh, the joined dispatches stay in their limits and
+    /// its rows stay within `MAX_PADDING` times its real pairs, else in a group of
+    /// its own. Every job of a group starts a row as wide as its widest batch, so
+    /// an unbounded join of a 2-cluster batch of 1,000 instances and a 500-cluster
+    /// one would start 500,000 copy workgroups for at most 2,500 clusters, while
+    /// a dispatch per batch pays a fixed cost a dispatch (on a real level, the
+    /// larger one).
     fn group(&mut self, mesh: MeshHandle, jobs: Range<u32>, n: u32) {
+        let pairs = u64::from(jobs.end - jobs.start) * u64::from(n);
         let joined = self.groups.last_mut().filter(|g| {
             let count = u64::from(jobs.end - g.jobs.start);
-            g.mesh == mesh && g.clusters == n && fits_dispatch(count, n)
+            let widest = g.clusters.max(n);
+            g.mesh == mesh
+                && fits_dispatch(count, widest)
+                && count * u64::from(widest) <= MAX_PADDING * (g.pairs + pairs)
         });
         match joined {
-            Some(g) => g.jobs.end = jobs.end,
+            Some(g) => {
+                g.jobs.end = jobs.end;
+                g.clusters = g.clusters.max(n);
+                g.pairs += pairs;
+            }
             None => self.groups.push(Group {
                 mesh,
                 jobs,
                 clusters: n,
+                pairs,
             }),
         }
+    }
+
+    /// The (instance, cluster) rows the groups' dispatches start, and the real
+    /// pairs among them: the padding the join chose.
+    #[cfg(test)]
+    pub(crate) fn rows_and_pairs(&self) -> (u64, u64) {
+        let rows = |g: &Group| u64::from(g.jobs.end - g.jobs.start) * u64::from(g.clusters);
+        let rows = self.groups.iter().map(rows).sum();
+        (rows, self.groups.iter().map(|g| g.pairs).sum())
     }
 
     /// Per opaque batch (of `batches`), the jobs whose indirect draws stand for

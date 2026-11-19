@@ -53,6 +53,7 @@ fn gpu_hiz_dust2_counts() {
         let skip = if by_cluster { statue } else { 0 };
         let with = triangles(&r, &view, skip) + cluster_indices(&r, &view) / 3;
         let copies = copy_groups(&r, &view);
+        let (rows, pairs) = view.hiz.cameras[0].clusters.rows_and_pairs;
         r.quality.gpu_cluster_culling = false;
         let mut fresh = offscreen(&r);
         shot(&mut r, &mut fresh, &scene, &cam);
@@ -61,7 +62,7 @@ fn gpu_hiz_dust2_counts() {
         r.quality.gpu_cluster_culling = true;
         let same = ["PIXELS DIFFER", "same pixels"][usize::from(on == off)];
         println!(
-            "{name}: {with} triangles drawn with clusters, {without} without ({} clusters tested, {} culled, {copies} copy workgroups), {same}",
+            "{name}: {with} triangles drawn with clusters, {without} without ({} clusters tested, {} culled, {copies} copy workgroups, {rows} rows started for {pairs} pairs), {same}",
             c.cluster_tested, c.cluster_culled
         );
         assert!(on == off, "{name}: cluster culling moved pixels");

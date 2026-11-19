@@ -3,7 +3,7 @@
 //! phase one (#2327) and read after it; `record` records its three stages
 //! between: the test, a workgroup per instance's scan, and the copy, dispatched
 //! indirect from what the scan kept (#2406), a dispatch each per group, the
-//! clustered batches of one mesh and cluster count.
+//! clustered batches of one mesh (`plan::Group`).
 
 use crate::gpu::ops::CountedQueue as _;
 use std::sync::Arc;
@@ -60,6 +60,10 @@ pub(crate) struct ClusterCull {
     /// The dispatch groups its last cull recorded: dispatches a stage.
     #[cfg(test)]
     pub(crate) groups_ran: u32,
+    /// The (instance, cluster) rows its last cull's dispatches started, and the
+    /// real pairs among them (`Plan::rows_and_pairs`).
+    #[cfg(test)]
+    pub(crate) rows_and_pairs: (u64, u64),
     /// The (step, group) dispatches its last cull recorded, in order.
     #[cfg(test)]
     pub(crate) dispatched: std::cell::RefCell<Vec<(crate::timing::GpuPart, usize)>>,
@@ -98,6 +102,8 @@ impl ClusterCull {
             runs_ran: 0,
             #[cfg(test)]
             groups_ran: 0,
+            #[cfg(test)]
+            rows_and_pairs: (0, 0),
             #[cfg(test)]
             dispatched: Default::default(),
         }
@@ -139,6 +145,7 @@ impl Renderer {
             cull.ran = plan.jobs.len() as u32;
             cull.runs_ran = plan.runs.len() as u32;
             cull.groups_ran = plan.groups.len() as u32;
+            cull.rows_and_pairs = plan.rows_and_pairs();
             cull.dispatched.borrow_mut().clear();
         }
     }

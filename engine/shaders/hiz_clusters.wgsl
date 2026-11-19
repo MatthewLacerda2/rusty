@@ -45,12 +45,13 @@ struct Job {
     cluster_first: u32,
     state_first: u32,
     cone: u32,
-    // Its batch's clusters, the same for every job of its group (`run.clusters`):
-    // the plan joins only batches of one count, so no row is padded.
+    // Its batch's clusters: its group's dispatch covers `run.clusters`, the most
+    // of any job in it, and a job skips the clusters past its own (the plan
+    // bounds that padding, `plan::MAX_PADDING`).
     clusters: u32,
 };
 
-// The group a dispatch covers: its jobs, the clusters each of them has, and
+// The group a dispatch covers: its jobs, the most clusters any of them has, and
 // the word of `tally` its copy's indirect dispatch starts at.
 struct Run {
     job_first: u32,

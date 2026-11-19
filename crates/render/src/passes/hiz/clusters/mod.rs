@@ -15,8 +15,8 @@
 //!   frustum, its normal cone and the same pyramid (`hiz/hidden.wgsl`'s
 //!   `hidden`), then compacts the kept clusters' indices, in order, into the
 //!   camera's output index list, with one indirect draw per instance. Three
-//!   stages, a dispatch each per group, the clustered batches of one mesh and cluster count
-//!   (`plan::Group`), recorded stage by stage, every group's test before any
+//!   stages, a dispatch each per group, the clustered batches of one mesh whose
+//!   padding stays bounded (`plan::Group`), recorded stage by stage, every group's test before any
 //!   scan (#2406): the test, a thread per (instance, cluster); the scan, a
 //!   workgroup per instance placing its kept clusters by a parallel prefix sum
 //!   and listing them; and the copy, dispatched indirect from the scan's count
