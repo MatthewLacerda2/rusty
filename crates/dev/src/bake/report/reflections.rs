@@ -92,9 +92,10 @@ pub(super) fn picks(scene: &Scene, set: &ReflectionProbeSet) -> Value {
     let world = &scene.world;
     let mut ids = world.ids_with_mesh();
     ids.sort_unstable();
+    let prepared = set.prepared();
     let pick = |id: u32| {
         let centre = super::drawn_centre(scene, id)?;
-        let blend = set.blend(centre);
+        let blend = prepared.blend(centre);
         Some(json!({
             "entity": id,
             "name": entity_name(scene, id),

@@ -13,11 +13,14 @@
 //!
 //! **Per-frame cost.** Ordering the scene's probes by the camera's distance to their
 //! volumes is O(P log P) over P probes, then each draw tests at most
-//! [`MAX_REFLECTION_PROBES`] volumes. GPU work happens only when the set of nearest
-//! cubes changes: one texture-to-texture copy per newly resident cube, or a rebuild
-//! of the array when it cannot hold them. A scene with no baked probe (the Inspector
-//! preview, rendered every frame beside the viewport) leaves the resident cubes
-//! alone, so the next scene finds them still in place.
+//! [`MAX_REFLECTION_PROBES`] volumes: a probe's frame and reach are prepared once,
+//! when it becomes resident ([`PreparedProbes`], #2324), so a draw only measures the
+//! probes whose reach holds its centre and rejects the rest on a box test. GPU work
+//! happens only when the set of nearest cubes changes: one texture-to-texture copy
+//! per newly resident cube, or a rebuild of the array when it cannot hold them. A
+//! scene with no baked probe (the Inspector preview, rendered every frame beside the
+//! viewport) leaves the resident cubes alone, so the next scene finds them still in
+//! place.
 //!
 //! **Size and budget.** The array's face is the largest resident cube's (#1584); a
 //! smaller cube lands as many mips down as it is halved, and its `mip_base` tells the
@@ -49,7 +52,7 @@ use self::slots::SlotTable;
 pub(crate) use self::slots::{MAX_REFLECTION_PROBES, SPARE_SLOTS};
 pub(crate) use self::uniform::ReflectionProbeUniform;
 use super::cubemap::{CubeShape, CubemapTexture, CUBE_FORMAT};
-use rusty_scene::{ReflectionProbe, ReflectionProbeSet};
+use rusty_scene::{PreparedProbes, ReflectionProbe};
 
 /// The largest face a resident cube may have: the largest a probe bakes at.
 pub(crate) const MAX_FACE: u32 = *ReflectionProbe::RESOLUTION.end();
@@ -77,8 +80,9 @@ pub(crate) struct ProbeArray {
     /// The shape of every cube path the frame has looked at, from its KTX2 header;
     /// `None` for a file that is missing or that the array does not admit.
     shapes: HashMap<String, Option<CubeShape>>,
-    /// This frame's resident probes in selection form; probe `i` is uniform `i`.
-    active: ReflectionProbeSet,
+    /// This frame's resident probes in selection form, each one's frame and reach
+    /// prepared when it became resident (#2324); probe `i` is uniform `i`.
+    active: PreparedProbes,
     uniforms: [ReflectionProbeUniform; MAX_REFLECTION_PROBES],
     /// How many cubes were copied in, for tests that a frame did no GPU work.
     #[cfg(test)]
@@ -108,7 +112,7 @@ impl ProbeArray {
             format,
             table: SlotTable::default(),
             shapes: HashMap::new(),
-            active: ReflectionProbeSet::new(),
+            active: PreparedProbes::default(),
             uniforms: [ReflectionProbeUniform::default(); MAX_REFLECTION_PROBES],
             #[cfg(test)]
             copies: 0,
@@ -118,7 +122,8 @@ impl ProbeArray {
     }
 
     /// The packed blend ([`pack_blend`]) of the resident probes an object whose world
-    /// bounds centre on `centre` reflects; 0 (the sky) when none reaches it.
+    /// bounds centre on `centre` reflects; 0 (the sky) when none reaches it. Equal,
+    /// bit for bit, to `ReflectionProbeSet::blend` of the residents.
     pub(crate) fn probe_for(&self, centre: Vec3) -> u32 {
         pack_blend(self.active.blend(centre))
     }
@@ -126,7 +131,7 @@ impl ProbeArray {
     /// Where `probe` sits among this frame's resident probes (its uniform's index),
     /// or `None` when its cube is not resident: the probe-ball gizmo's lookup (#1911).
     pub(crate) fn resident(&self, probe: &ReflectionProbe) -> Option<usize> {
-        self.active.probes.iter().position(|r| r == probe)
+        self.active.probes().iter().position(|r| r == probe)
     }
 
     /// Every resident probe, as `LightingUniforms.refl_probes` holds them.
@@ -253,17 +258,11 @@ impl ProbeArray {
 
     /// Record `kept` as the frame's probes, probe `i` in layer `layers[i]`: the
     /// selection set draws query and the uniforms the shader reads. Only a probe that
-    /// changed since the last frame is cloned; a loaded scene's probes were held to
-    /// their ranges once, on load (#1584).
+    /// changed since the last frame is cloned and prepared; a loaded scene's probes
+    /// were held to their ranges once, on load (#1584).
     fn activate(&mut self, kept: &[Resident], layers: &[u32]) {
-        self.active.probes.truncate(kept.len());
+        self.active.update(kept.iter().map(|r| r.0));
         for (i, (&(probe, cube, shift), &layer)) in kept.iter().zip(layers).enumerate() {
-            match self.active.probes.get_mut(i) {
-                Some(resident) if resident == probe => {}
-                Some(resident) => resident.clone_from(probe),
-                None => self.active.probes.push(probe.clone()),
-            }
-            let probe = &self.active.probes[i];
             self.uniforms[i] = ReflectionProbeUniform::of(probe, shift, cube.mips, layer);
         }
         // The slots past the frame's probes are cleared: no draw names them, but the
