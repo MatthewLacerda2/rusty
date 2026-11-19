@@ -8,7 +8,9 @@
 //! renderer's GPU calls (passes, submits, bind groups made, buffer writes), every system's CPU ms
 //! (`cpu.<system>`, as the schedule names it) and the renderer's CPU ms by stage
 //! (`render.<stage>`, `Renderer::frame_stages`), each set with an `other` row for
-//! what none of its parts holds.
+//! what none of its parts holds. A stage timed in parts (the Hi-Z `occlusion`
+//! stage, #2401) adds `render.<stage>.<part>` and `gpu.<pass>.<part>` rows beside
+//! its own, which they sit inside: no sum of a set counts them.
 //!
 //! **Before and after is automatic.** The report is kept as `<out_dir>/bench.json`
 //! (`out/bench/` under `make bench`) and each run prints its change against the one
@@ -54,7 +56,7 @@ use super::capture::RenderedFrame;
 use super::harness::Harness;
 use report::{read, write};
 use rusty_core::frame_stats::FrameStats;
-use rusty_render::{ClockProbe, GpuPass};
+use rusty_render::{ClockProbe, GpuPart, GpuPass};
 
 /// The render counters a bench row reports, in order.
 const COUNTERS: [&str; 17] = [
@@ -153,8 +155,11 @@ fn sample(samples: &mut Samples, stats: &FrameStats, frame: Option<&RenderedFram
     }
     let Some(frame) = frame else { return };
     samples.push("renderer_ms", frame.cpu_ms);
-    let stages = frame.stages.iter().copied();
-    push_parts(samples, "render", frame.cpu_ms, stages, 1.0);
+    let (stages, parts) = stage_rows(&frame.stages);
+    push_parts(samples, "render", frame.cpu_ms, stages.into_iter(), 1.0);
+    for (part, ms) in parts {
+        samples.push(&format!("render.{part}"), ms);
+    }
     if let (Some(gpu), Some(speed)) = (&frame.gpu, speed.gpu) {
         samples.push("gpu_ms", gpu.total_ms() * speed);
         for pass in GpuPass::ALL {
@@ -162,6 +167,7 @@ fn sample(samples: &mut Samples, stats: &FrameStats, frame: Option<&RenderedFram
             let ms = ms.map_or(0.0, |m| m.1 * speed);
             samples.push(&format!("gpu.{}", pass.name()), ms);
         }
+        push_gpu_parts(samples, &gpu.parts, speed);
         samples.push("gpu.other", gpu.other_ms * speed);
         // The GPU's wait for the CPU: as measured, a clock does not shorten it.
         samples.push("gpu_between_submits_ms", gpu.between_submits_ms);
@@ -173,6 +179,49 @@ fn sample(samples: &mut Samples, stats: &FrameStats, frame: Option<&RenderedFram
             samples.push(key, value as f64);
         }
     }
+}
+
+/// A pass's parts (#2401) as `gpu.<pass>.<part>` rows, inside their pass's row,
+/// so no `gpu.<pass>` sum counts them. On a frame that timed any part of a pass,
+/// every part of it is sampled, zero when absent (the cluster cull on a frame
+/// with no clustered batch), so each part is averaged over the same frames and
+/// viewpoints as its pass and the parts sum to it after the fold. A pass no
+/// frame timed in parts (the cull off) has no part rows at all, on purpose: the
+/// rows say the stage was split, a zero would say it was split and empty.
+fn push_gpu_parts(samples: &mut Samples, parts: &[(GpuPart, f64)], speed: f64) {
+    for part in GpuPart::ALL {
+        if !parts.iter().any(|(p, _)| p.pass() == part.pass()) {
+            continue;
+        }
+        let ms = parts.iter().find(|(p, _)| *p == part);
+        samples.push(
+            &format!("gpu.{}", part.row()),
+            ms.map_or(0.0, |m| m.1 * speed),
+        );
+    }
+}
+
+/// Named CPU times, in order.
+type Laps<'a> = Vec<(&'a str, f64)>;
+
+/// The renderer's stages, each with its parts (`occlusion.select`, a lap named
+/// `<stage>.<part>`, #2401) added in, and the parts on their own: a stage's row
+/// stays its whole time, and the parts beside it sum to it but for what the
+/// stage spent outside them.
+fn stage_rows<'a>(laps: &[(&'a str, f64)]) -> (Laps<'a>, Laps<'a>) {
+    let add = |rows: &mut Laps<'a>, name, ms| match rows.iter_mut().find(|(n, _)| *n == name) {
+        Some((_, sum)) => *sum += ms,
+        None => rows.push((name, ms)),
+    };
+    let (mut stages, mut parts) = (Vec::new(), Vec::new());
+    for &(name, ms) in laps {
+        let stage = name.split_once('.').map_or(name, |(stage, _)| stage);
+        if stage != name {
+            add(&mut parts, name, ms);
+        }
+        add(&mut stages, stage, ms);
+    }
+    (stages, parts)
 }
 
 /// A parent time's parts as `<prefix>.<part>` rows, each scaled by `scale`, and
