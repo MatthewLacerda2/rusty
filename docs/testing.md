@@ -1213,6 +1213,16 @@ every binary's open makes them.
   `out/bench/scenes/`. Copy the folder once before a batch of optimisations, and
   every PR of the batch compares with the same numbers, where the last run moves
   with every merge. The report names the folder it compared with.
+- **a quality override**: `bench-scenes --set key=value` (repeatable) overrides a
+  field of the running quality preset (the project's initial one) for that run
+  only, through the path `Graphics.SetQualityPreset(name, { … })` takes:
+  `--set gpu_occlusion_culling=true` measures the GPU occlusion cull on without
+  editing `project.rusty`, which is never written. A key is a preset's field as
+  `project.rusty` names it, a nested one dotted (`ssao.high.radius`); an unknown
+  key fails before anything runs, listing the keys. The report prints the
+  overrides under its title, and a comparison with a run of other overrides
+  warns that the change is the settings' as well as the code's. `make bench-ab`
+  takes it as `SET=`.
 - **a sampling profile**: `PROFILE=1` adds, after each scene's timed run, a run of
   its own (the profiler's overhead stays out of the timings) under the platform's
   sampling profiler, keeping only the samples of each viewpoint's measured frames,
@@ -1262,6 +1272,42 @@ every binary's open makes them.
 
 Like `make bench`, it is a release build and a signal, never a gate: it is not in
 `make gates` or CI.
+
+### A pull request's measured rows: `make bench-ab` (#2381)
+A performance PR's row is measured on the operator's desktop with
+`make bench-ab PR=<n> PROJECT=<dir> [SCENES=a,b] [RUNS=n] [RES=WxH] [SET=key=value]`,
+never by hand. It runs `bench-scenes` three times back to back: on `main`, on the
+PR's head, and on `main` again, each built in a detached worktree of its own under
+`.claude/worktrees/` (`bench-main`, `pr-<n>-head`: own `target/`, kept warm, removed
+by `make reclaim` once finished), the head fetched as `pull/<n>/head`.
+
+**Why three legs.** Not every row repeats. On a desktop the GPU rows, the memory
+rows and the op counters repeat to under 1% between two takes of one binary; the
+CPU rows (`cpu_ms`, `renderer_ms`, `render.<stage>`) drift by 10 to 19% between two
+takes minutes apart (a `main` against `main` leg read +15% on one scene). A change
+is only shown when it is larger than one binary differs from itself, so the second
+`main` leg is each row's **floor**: the table prints, per scene and row, `main`'s
+average, the PR's, the change, and the floor (`main` again against `main`), and a
+change no larger than its floor reads *not shown*. Every row gets its own floor, so
+the table shows how tightly each kind of row repeated rather than assuming it.
+Legs run whole, one after another: interleaving the two binaries scene by scene
+halves the drift but doubles the scene loads.
+
+**What it refuses**, before it builds (`FORCE=1` runs anyway, and the table says
+what it ran past): another timed run (a lock under `out/bench/`), and a `cargo`,
+`rustc` or `bench-scenes` process on the machine, checked again before each leg.
+Un-imported textures (the images an import would encode now,
+`bench-scenes --pending-imports`, the engine's own check) are refused right after
+`main`'s build, before the PR's build and any leg: the check needs the engine.
+`make import PROJECT=<dir>` clears it.
+
+Each leg runs in a memory-capped scope of its own on Linux (`systemd-run --user
+--scope`, the cap a fraction of the memory available when the run starts, printed);
+without one (macOS, no user session) the legs run plain and the run says so. The
+legs' reports stay under `out/bench/ab/pr-<n>/` (`main/`, `pr/`, `main-again/`),
+and the table, printed and kept as `out/bench/ab/pr-<n>/table.md`, is the PR comment
+as it is. `make test-gpu PR=<n> [FILTER='<nextest filter>']` runs GPU tests on a
+PR's head the same way.
 
 ### GPU time and the GPU clock (#862)
 A laptop GPU does not run at one speed. On Apple silicon the governor re-picks the

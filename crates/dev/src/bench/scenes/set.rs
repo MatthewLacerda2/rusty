@@ -1,4 +1,4 @@
-//! `--set key=value` (`make bench-scenes SET=…`, `make bench-ab SET=…`): a field
+//! `bench-scenes --set key=value` (`make bench-ab SET=…`): a field
 //! of the running quality preset overridden for one run, so an on/off comparison
 //! (`SET=gpu_occlusion_culling=true`) needs no edit of the project.
 //!
