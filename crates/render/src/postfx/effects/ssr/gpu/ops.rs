@@ -13,7 +13,8 @@ use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 /// submit and its params write. No compute pass: the pyramids are render targets
 /// without `STORAGE_BINDING`, measured cheaper to build and to trace into on a
 /// desktop GPU than one compute pass over storage pyramids.
-/// Measured: lavapipe 6/0/1/0/1.
+/// Measured: lavapipe 6/0/1/0/1; Metal (CI's macOS legs, which require an adapter)
+/// 6/0/1/0/1, the pin's equality passing there.
 const SSR: OpCounts = OpCounts {
     render_passes: 6,
     compute_passes: 0,

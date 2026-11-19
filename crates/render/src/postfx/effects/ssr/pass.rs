@@ -22,9 +22,10 @@
 //! The pipelines are the renderer's ([`SsrPasses`], built on first use and warmed
 //! with the rest); the copy, the pyramids, the params uniform and the two bind
 //! groups are each view's ([`SsrTargets`]), held only while it runs SSR. The GPU
-//! timer's rows: `ssr` holds the copy and the trace (the copy is a command, not a
-//! pass, so the trace's pair opens where the work ahead of it ended), and
-//! `ssr_pyramids` and `ssr_resolve` the other two.
+//! timer's rows: `ssr` holds the trace, charged from its own start; the copy before
+//! it is a command, not a pass, so no row holds it (it heads SSR's submit, so it
+//! lands in `gpu_between_submits_ms`); `ssr_pyramids` and `ssr_resolve` hold the
+//! other two.
 
 use crate::gpu::ops::CountedQueue as _;
 use glam::{Mat4, Vec3};
@@ -210,7 +211,7 @@ fn trace_and_resolve(
         let [hits, spread] = pyramids.tops();
         let targets = [(hits, clear), (spread, clear)];
         // The colour copy recorded just before is no pass, and heads this submit:
-        // no pass boundary can stamp it, so it is in `gpu.other` (between submits).
+        // no pass boundary can stamp it, so it is in `gpu_between_submits_ms`.
         let timed = timer.writes(GpuPass::Ssr);
         let mut pass = begin(encoder, "SSR Trace", &targets, timed);
         pass.set_pipeline(passes.trace.get());

@@ -118,15 +118,16 @@ fn gpu_bench_reports_frame_render_and_counter_rows() {
 }
 
 /// GPU rows are the frame's times scaled by the clock speed the probe read; the
-/// raw total and the clock get rows of their own. A frame the probe missed has no
-/// GPU rows, so an unscaled time never mixes in.
+/// raw total and the clock get rows of their own, and the GPU's wait for the CPU
+/// stays as measured. A frame the probe missed has no GPU rows, so an unscaled time
+/// never mixes in.
 #[test]
 fn gpu_rows_are_scaled_by_the_frame_clock_speed() {
     use rusty_render::{GpuPass, GpuTimes};
     let gpu = GpuTimes {
         frame: 1,
         passes: vec![(GpuPass::Shadows, 2.0), (GpuPass::Forward, 6.0)],
-        span_ms: 9.0,
+        other_ms: 0.4,
         between_submits_ms: 0.6,
     };
     let frame = RenderedFrame {
@@ -147,16 +148,13 @@ fn gpu_rows_are_scaled_by_the_frame_clock_speed() {
     assert_eq!(avg("gpu.shadows"), 1.0);
     assert_eq!(avg("gpu.forward"), 3.0);
     assert_eq!(avg("gpu.ui"), 0.0);
-    // The span's 1 ms no pass holds, scaled like the rows.
-    assert_eq!(avg("gpu.other"), 0.5);
-    assert_eq!(avg("gpu_between_submits_ms"), 0.3);
-    // The `gpu.` rows, `other` included, are the frame's whole timed span.
+    // Untimed work is GPU work, scaled like the rows; the wait for the CPU is not.
+    assert_eq!(avg("gpu.other"), 0.2);
+    assert_eq!(avg("gpu_between_submits_ms"), 0.6, "a wait as measured");
+    // The `gpu.` rows, `other` included, are the GPU's work at the reference clock.
     let rows = report.metrics.iter().filter(|(m, _)| m.starts_with("gpu."));
-    let whole: f64 = rows.map(|(_, s)| s.avg).sum();
-    assert!(
-        (whole - 4.5).abs() < 1e-9,
-        "gpu. rows {whole} vs the span's 4.5"
-    );
+    let work: f64 = rows.map(|(_, s)| s.avg).sum();
+    assert!((work - 4.2).abs() < 1e-9, "gpu. rows {work} vs 4.2");
     assert_eq!(avg("gpu_raw_ms"), 8.0);
     assert_eq!(avg("gpu_clock_pct"), 50.0);
     // Without timestamps (lavapipe) no GPU row, `gpu.other` included.

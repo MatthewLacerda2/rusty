@@ -1,7 +1,7 @@
 //! One frame's resolved GPU times ([`GpuTimes`]) and how its ticks become them:
-//! each timed pass charged its exclusive time (the module doc), and the span the
-//! frame's pairs cover, so what no row holds shows as `gpu.other`, split by
-//! whether it lies inside one submit or between two.
+//! each timed pass charged its exclusive time (the module doc), and what of the
+//! span the frame's pairs cover no row holds, split by whether it lies inside one
+//! submit (untimed work, `gpu.other`) or between two (the wait for the CPU).
 
 use super::GpuPass;
 
@@ -13,10 +13,16 @@ pub(crate) struct Pair {
     /// The renderer's submit sequence when the pair was taken
     /// (`gpu::ops::submit_seq`): pairs taken between the same two submits are
     /// recorded into one command buffer, so a gap between them is GPU work no pair
-    /// holds, never a wait for the CPU.
+    /// holds, never a wait for the CPU. It is read when the pair is taken, not when
+    /// its buffer is submitted, so it assumes no counted submit goes out while an
+    /// encoder holding timed pairs is still open (another encoder submitted in
+    /// between would tag this one's pairs a submit early). No site does that today.
     pub submit: u64,
 }
 
+/// Test-only: a pair in submit 0, for the tests that do not tell submits apart.
+/// Live code takes its pairs from `GpuTimer::pair`, which tags the real submit.
+#[cfg(test)]
 impl From<GpuPass> for Pair {
     fn from(pass: GpuPass) -> Self {
         Self { pass, submit: 0 }
@@ -24,7 +30,9 @@ impl From<GpuPass> for Pair {
 }
 
 /// One frame's GPU milliseconds per pass kind, in [`GpuPass::ALL`] order. A kind
-/// with no pass that frame is left out.
+/// with no pass that frame is left out. The rows, [`Self::other_ms`] and
+/// [`Self::between_submits_ms`] partition the frame's timed span
+/// ([`Self::span_ms`]), split in ticks before any is turned into ms.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct GpuTimes {
     /// The drawn frame these times measure: the [`super::FrameCost::frames`] count
@@ -32,14 +40,15 @@ pub struct GpuTimes {
     /// them with a frame pairs them by this, never by arrival.
     pub frame: u64,
     pub passes: Vec<(GpuPass, f64)>,
-    /// From the frame's earliest timed start to its latest timed end, in ms: what
-    /// the rows would add up to if every command of the frame were in one.
-    pub span_ms: f64,
-    /// What of [`Self::other_ms`] lies in gaps from one submit's timed work to the
-    /// next's, in ms: the GPU waiting for the CPU to record and submit, plus any
-    /// untimed command at a submit's head or tail (SSR's copy of the opaque image,
-    /// the Hi-Z counters' copies). The rest of `other_ms` is in gaps inside one
-    /// submit: untimed GPU work, and nothing else.
+    /// Untimed GPU work, in ms: what of the span no row holds inside one submit,
+    /// where the GPU never waits for the CPU. A pass left untimed shows here. It
+    /// is GPU work, so it scales with the GPU's clock as the rows do.
+    pub other_ms: f64,
+    /// The gaps from one submit's last timed work to the next's first, in ms:
+    /// mostly the GPU waiting for the CPU to record and submit, plus any untimed
+    /// command at a submit's head or tail (SSR's copy of the opaque image, the
+    /// Hi-Z counters' copies). A wait does not follow the GPU's clock, so this is
+    /// read as measured, never scaled.
     pub between_submits_ms: f64,
 }
 
@@ -51,17 +60,10 @@ impl GpuTimes {
         self.passes.iter().map(|(_, ms)| ms).sum()
     }
 
-    /// What of [`Self::span_ms`] no row holds: work recorded outside every pair,
-    /// and the GPU waiting for the CPU between the frame's submits
-    /// ([`Self::between_submits_ms`] holds the second, with a submit's untimed
-    /// edges). A pass left untimed shows here.
-    pub fn other_ms(&self) -> f64 {
-        (self.span_ms - self.total_ms()).max(0.0)
-    }
-
-    /// What of [`Self::other_ms`] is untimed GPU work inside a submit.
-    pub fn within_submits_ms(&self) -> f64 {
-        (self.other_ms() - self.between_submits_ms).max(0.0)
+    /// From the frame's earliest timed start to its latest timed end, in ms: the
+    /// rows, [`Self::other_ms`] and [`Self::between_submits_ms`] together.
+    pub fn span_ms(&self) -> f64 {
+        self.total_ms() + self.other_ms + self.between_submits_ms
     }
 
     /// Sum resolved `ticks` — a begin/end pair per entry of `pairs`, in the order
@@ -70,37 +72,39 @@ impl GpuTimes {
     /// work queued ahead of it counts zero. A pair spread over several passes (its
     /// start written by the first, its end by the last) is one entry, charged once.
     /// A pair whose start reads 0 or past its end was not written whole: it is left
-    /// out of the span and the gaps, so it cannot stretch them to tick 0.
+    /// out of its row, the span and the gaps, so it charges nothing and cannot
+    /// stretch them to tick 0.
     pub(crate) fn from_ticks(ticks: &[u64], pairs: &[Pair], period_ns: f64) -> Self {
         let to_ms = |t: u64| t as f64 * period_ns / 1e6;
-        let mut ms = [None::<f64>; GpuPass::ALL.len()];
+        let mut charged = [None::<u64>; GpuPass::ALL.len()];
         let mut done = None::<(u64, u64)>; // where the work queued so far ended, and its submit
         let mut span = None::<(u64, u64)>;
         let mut between = 0;
         for (ends, pair) in ticks.chunks_exact(2).zip(pairs) {
             let (start, end) = (ends[0], ends[1]);
-            let begin = done.map_or(start, |(d, _)| start.max(d));
-            let slot = &mut ms[pair.pass as usize];
-            *slot = Some(slot.unwrap_or(0.0) + to_ms(end.saturating_sub(begin)));
             if start == 0 || start > end {
                 continue;
             }
+            let begin = done.map_or(start, |(d, _)| start.max(d));
+            let slot = &mut charged[pair.pass as usize];
+            *slot = Some(slot.unwrap_or(0) + end.saturating_sub(begin));
             if let Some((d, _)) = done.filter(|&(_, s)| s != pair.submit) {
                 between += start.saturating_sub(d);
             }
             done = Some((done.map_or(end, |(d, _)| d.max(end)), pair.submit));
             span = Some(span.map_or((start, end), |(a, b)| (a.min(start), b.max(end))));
         }
+        let busy: u64 = charged.iter().flatten().sum();
+        let span = span.map_or(0, |(a, b)| b.saturating_sub(a));
         let passes = GpuPass::ALL
             .iter()
-            .zip(ms)
-            .filter_map(|(pass, ms)| Some((*pass, ms?)))
+            .zip(charged)
+            .filter_map(|(pass, ticks)| Some((*pass, to_ms(ticks?))))
             .collect();
-        let span_ms = span.map_or(0.0, |(a, b)| to_ms(b.saturating_sub(a)));
         Self {
             frame: 0,
             passes,
-            span_ms,
+            other_ms: to_ms(span.saturating_sub(busy).saturating_sub(between)),
             between_submits_ms: to_ms(between),
         }
     }

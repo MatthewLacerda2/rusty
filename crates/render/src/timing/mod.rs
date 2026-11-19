@@ -41,14 +41,14 @@
 //! first pass writes the start, its last the end, and all of them go out in one
 //! submit, so what lies between is the stage's own GPU work.
 //!
-//! **What no row holds.** Each resolved frame also keeps the span from its first
-//! timed start to its last timed end ([`GpuTimes::span_ms`]); the span less the
-//! rows ([`GpuTimes::other_ms`], the bench's `gpu.other`) is the gaps. Each pair
-//! knows the submit it went out in, so the gaps split in two:
-//! [`GpuTimes::between_submits_ms`], from one submit's timed work to the next's
-//! (the GPU waiting for the CPU, and a command at a submit's head or tail), and
-//! [`GpuTimes::within_submits_ms`], inside one command buffer, where the GPU never
-//! waits for the CPU: untimed GPU work only, so a pass left untimed shows there.
+//! **What no row holds.** Each resolved frame also splits the span from its first
+//! timed start to its last timed end ([`GpuTimes::span_ms`]) into the rows and two
+//! parts no row holds, in ticks so the three add up to it. Each pair knows the
+//! submit it went out in: a gap inside one command buffer, where the GPU never
+//! waits for the CPU, is untimed GPU work ([`GpuTimes::other_ms`], the bench's
+//! `gpu.other`), so a pass left untimed shows there; a gap from one submit's timed
+//! work to the next's ([`GpuTimes::between_submits_ms`]) is the GPU waiting for
+//! the CPU, with any command at a submit's head or tail.
 
 mod clock;
 mod frame;
