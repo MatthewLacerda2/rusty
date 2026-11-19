@@ -7,7 +7,7 @@ the PR's head, `main` again, the second `main` leg each row's noise floor
 
 1. the refusals that need no build (`bench/refuse.py`): another timed run (an
    `flock` under `out/bench/`), a build or a bench on the machine;
-2. `main` and the PR's head fetched and checked out detached under
+2. `main` and the PR's head read from origin by sha, fetched and checked out detached under
    `.claude/worktrees/` (`bench/trees.py`), each tree locked before it is
    re-pointed (a live run's lock refuses first), `main` merged into the PR's
    tree so the legs differ by the PR's diff alone, `main` built;
@@ -138,7 +138,7 @@ def main(argv) -> int:
     pr_tree, pr_sha = trees.path(root, trees.pr_tree(a.pr)), None
     try:
         gate.check(refuse.busy_refusal(refuse.busy(ps(), me)))
-        main_sha, pr_sha = trees.fetch(a.pr)
+        main_sha, pr_sha = trees.fetch(a.pr, again=f"`make bench-ab PR={a.pr}`")
         # holding the timed-run flock, every bench-ab lock found is a dead run's (`trees.lock`)
         exclusive = held is not None
         main_tree = trees.take(root, trees.MAIN_TREE, main_sha, me, locked, exclusive=exclusive)

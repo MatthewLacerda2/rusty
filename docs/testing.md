@@ -1381,7 +1381,9 @@ A performance PR's row is measured on the operator's desktop with
 `make bench-ab PR=<n> PROJECT=<dir> [SCENES=a,b] [RUNS=n] [LOAD_RUNS=n] [RES=WxH] [SET=key=value]`,
 never by hand. It runs `bench-scenes` three times back to back: on `main`, on the
 PR's head, and on `main` again, each built in a detached worktree of its own under
-`.claude/worktrees/` with its own `target/`, the head fetched as `pull/<n>/head`.
+`.claude/worktrees/` with its own `target/`, both heads read from origin and fetched
+by sha (`refs/pull/<n>/head`), so no local ref sits where another git process could
+move it.
 **The PR's leg is its head with the measured `main` merged in** (locally, never
 pushed), so the legs differ by the PR's diff alone and a PR branched before a
 speed-up merged does not show it as a regression; a conflict refuses, saying to
