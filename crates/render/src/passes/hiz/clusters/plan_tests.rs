@@ -92,13 +92,16 @@ fn the_batches_of_one_mesh_share_a_dispatch_group() {
     assert_eq!(plan.draws(3), vec![Some(2..4), Some(0..1), Some(1..2)]);
 }
 
+/// A group's jobs and clusters.
+type Shape = (Range<u32>, u32);
+
 /// The groups `batches` of one mesh plan into, as (jobs, clusters), and the
 /// rows they start against their real pairs; `clusters_of` maps a batch's
 /// first index to its cluster range.
 fn shape(
     batches: &[DrawBatch],
     clusters_of: &dyn Fn(u32) -> Range<u32>,
-) -> (Vec<(Range<u32>, u32)>, (u64, u64)) {
+) -> (Vec<Shape>, (u64, u64)) {
     let all = instances(batches.iter().map(|b| b.instances.end).max().unwrap_or(0));
     let ranges = |b: &DrawBatch| Some(clusters_of(b.key.indices.start));
     let plan = Plan::of(batches.iter(), (&all, &|_| true), ranges);
