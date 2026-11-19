@@ -14,7 +14,13 @@
 //!   clustered batch `hiz_clusters.wgsl` tests each (instance, cluster) by the
 //!   frustum, its normal cone and the same pyramid (`hiz/hidden.wgsl`'s
 //!   `hidden`), then compacts the kept clusters' indices, in order, into the
-//!   camera's output index list, with one indirect draw per instance. A cluster
+//!   camera's output index list, with one indirect draw per instance. Three
+//!   dispatches a batch (#2406): the test, a thread per (instance, cluster); the
+//!   scan, a workgroup per instance placing its kept clusters by a parallel
+//!   prefix sum and listing them; and the copy, dispatched indirect from the
+//!   scan's count (the most clusters any one instance kept, by its instances),
+//!   so no workgroup starts for a cluster no instance kept. Every place is a
+//!   prefix sum, never a racing atomic: one view draws one index stream. A cluster
 //!   that came out from behind a wall is tested against this frame's pyramid, so
 //!   it is drawn this frame, as an instance is.
 //!
@@ -31,6 +37,7 @@
 //! past [`plan::MAX_OUT_INDICES`] a batch is drawn by the instance test alone.
 //! The quality preset's `gpu_cluster_culling` turns it on.
 
+mod eye;
 mod gpu;
 mod layout;
 pub(crate) mod plan;
@@ -57,6 +64,7 @@ pub(crate) struct ClusterDraws {
 /// The cluster passes' layouts and pipelines, shared by every view.
 pub(crate) struct ClusterPipelines {
     pub(crate) cull_layout: wgpu::BindGroupLayout,
+    pub(crate) copy_layout: wgpu::BindGroupLayout,
     pub(crate) mesh_layout: wgpu::BindGroupLayout,
     pub(crate) test: LazyCompute,
     pub(crate) scan: LazyCompute,
@@ -66,14 +74,18 @@ pub(crate) struct ClusterPipelines {
 impl ClusterPipelines {
     pub(crate) fn new(device: &wgpu::Device, module: &wgpu::ShaderModule) -> Self {
         let cull_layout = layout::cull_layout(device);
+        let copy_layout = layout::copy_layout(device);
         let mesh_layout = layout::mesh_layout(device);
-        let groups: &[&wgpu::BindGroupLayout] = &[&cull_layout, &mesh_layout];
-        let with = |entry| lazy_compute(device, module, (entry, entry), Some(groups));
+        let with = |entry, group0| {
+            let groups: &[&wgpu::BindGroupLayout] = &[group0, &mesh_layout];
+            lazy_compute(device, module, (entry, entry), Some(groups))
+        };
         Self {
-            test: with("cs_cluster_test"),
-            scan: with("cs_cluster_scan"),
-            copy: with("cs_cluster_copy"),
+            test: with("cs_cluster_test", &cull_layout),
+            scan: with("cs_cluster_scan", &cull_layout),
+            copy: with("cs_cluster_copy", &copy_layout),
             cull_layout,
+            copy_layout,
             mesh_layout,
         }
     }

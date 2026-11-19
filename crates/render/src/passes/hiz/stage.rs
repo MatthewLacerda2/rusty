@@ -88,7 +88,7 @@ impl Renderer {
         let clustered = !plan.runs.is_empty();
         if clustered {
             let at = (&*pyramid, cam.visible.buffer(), view_proj);
-            self.ready_clusters(encoder, (&mut cam.clusters, plan), at);
+            self.ready_clusters((&mut cam.clusters, plan), at);
             self.lap(lap_of(GpuPart::OcclusionClusters));
         }
         let groups = cam.groups.value().expect("bound by prepare_cull");

@@ -6,12 +6,16 @@
 //   1. `cs_cluster_test`: each (instance, cluster) is kept unless its instance is
 //      hidden, or it is outside the frustum, faces wholly away (its normal cone),
 //      or is behind the pyramid (`hidden`). One crossing the near plane is kept;
-//   2. `cs_cluster_scan`: each instance's kept clusters, in order, get their
-//      place in the output index list, and the instance its indirect draw;
-//   3. `cs_cluster_copy`: a workgroup per (instance, cluster) copies a kept
-//      cluster's indices there.
+//   2. `cs_cluster_scan`: a workgroup per instance gives its kept clusters, in
+//      order, their place in the output index list by a parallel prefix sum,
+//      lists them, and writes the instance's indirect draw and how many
+//      clusters the copy dispatches per instance (the most any one kept);
+//   3. `cs_cluster_copy`, dispatched indirect from that: a workgroup per kept
+//      cluster of each instance copies its indices there. No workgroup starts
+//      for a culled cluster but an instance's beyond its own count.
 // The output keeps the clusters' order, which is the mesh's own reordered index
-// order, so a frame that culls nothing draws exactly the uncull triangles.
+// order, so a frame that culls nothing draws exactly the uncull triangles, and
+// every place is a prefix sum: two frames of one view write one index stream.
 
 #import hiz::hidden::{hidden, Eye}
 
@@ -34,7 +38,8 @@ struct Job {
     object: u32,
     tested: u32,
     // Where its output indices start, its first cluster in the mesh's table,
-    // its first state word, and 1 when its batch keeps front faces only.
+    // its first state word (its region: `1 + 2 * clusters` words), and 1 when
+    // its batch keeps front faces only.
     out_first: u32,
     cluster_first: u32,
     state_first: u32,
@@ -42,12 +47,13 @@ struct Job {
     _pad: u32,
 };
 
-// The batch a dispatch covers: its jobs, and how many clusters each has.
+// The batch a dispatch covers: its jobs, how many clusters each has, and the
+// word of `tally` its copy's indirect dispatch starts at.
 struct Run {
     job_first: u32,
     jobs: u32,
     clusters: u32,
-    _pad: u32,
+    copy_at: u32,
 };
 
 // A cluster, local space: `min.w` and `max.w` are its first index and index
@@ -64,19 +70,24 @@ struct Cluster {
 @group(0) @binding(2) var<storage, read> objects: array<vec4<f32>>;
 // By instance: 1 when `cs_test` drew it this frame.
 @group(0) @binding(3) var<storage, read> visible: array<u32>;
-// Word 0: the tested clusters kept, for `Debug.Stats`. Then per (job, cluster),
-// from `job.state_first`: 1 or 0 after the test, its output offset or `NONE`
-// after the scan. Atomic for the count's sake; the rest is plain loads and stores.
-@group(0) @binding(4) var<storage, read_write> state: array<atomic<u32>>;
-@group(0) @binding(5) var<storage, read_write> out_indices: array<u32>;
+// Per job, from `job.state_first`: word 0 its kept clusters' count, written by
+// the scan; then two words per cluster. The test writes cluster `k`'s verdict
+// at `1 + 2k`; the scan lists its `m`-th kept cluster at `1 + 2m` (which) and
+// `2 + 2m` (its output offset), over verdicts it has already read.
+@group(0) @binding(4) var<storage, read_write> state: array<u32>;
+// Word 0: the tested clusters kept, for `Debug.Stats`; then per batch, at its
+// `run.copy_at`, the copy's indirect dispatch (most kept clusters, jobs, 1).
+@group(0) @binding(5) var<storage, read_write> tally: array<atomic<u32>>;
 // One `DrawIndexedIndirectArgs` (five words) per job.
 @group(0) @binding(6) var<storage, read_write> out_args: array<u32>;
 @group(0) @binding(7) var pyramid: texture_2d<f32>;
 @group(0) @binding(8) var<uniform> run: Run;
+// The copy's own group 0 binds this beside `jobs`, `state` and `run`, and not
+// `tally`, which its dispatch reads as indirect args.
+@group(0) @binding(9) var<storage, read_write> out_indices: array<u32>;
 @group(1) @binding(0) var<storage, read> clusters: array<Cluster>;
 @group(1) @binding(1) var<storage, read> mesh_indices: array<u32>;
 
-const NONE: u32 = 0xffffffffu;
 // How far past its cutoff a cone must face away before it is culled.
 const CONE_MARGIN: f32 = 1e-3;
 
@@ -140,62 +151,116 @@ fn culled(c: Cluster, world: mat4x4<f32>, cone: bool) -> bool {
     return hidden(Eye(params.view_proj, params.size, params.levels), pyramid, lo, hi);
 }
 
+var<workgroup> kept_here: atomic<u32>;
+
 @compute @workgroup_size(64)
-fn cs_cluster_test(@builtin(global_invocation_id) id: vec3<u32>) {
+fn cs_cluster_test(
+    @builtin(global_invocation_id) id: vec3<u32>,
+    @builtin(local_invocation_index) lane: u32,
+) {
     let t = id.x;
-    if t >= run.jobs * run.clusters {
-        return;
+    if t < run.jobs * run.clusters {
+        let job = jobs[run.job_first + t / run.clusters];
+        let k = t % run.clusters;
+        var keep = true;
+        if job.tested != 0u {
+            let c = clusters[job.cluster_first + k];
+            keep = visible[job.instance] != 0u && !culled(c, world_of(job.object), job.cone != 0u);
+            if keep {
+                atomicAdd(&kept_here, 1u);
+            }
+        }
+        state[job.state_first + 1u + 2u * k] = u32(keep);
     }
-    let job = jobs[run.job_first + t / run.clusters];
-    let k = t % run.clusters;
-    var keep = true;
-    if job.tested != 0u {
-        let c = clusters[job.cluster_first + k];
-        keep = visible[job.instance] != 0u && !culled(c, world_of(job.object), job.cone != 0u);
-        if keep {
-            atomicAdd(&state[0], 1u);
+    // One add to the count a workgroup, not one a kept cluster.
+    workgroupBarrier();
+    if lane == 0u {
+        let n = atomicLoad(&kept_here);
+        if n > 0u {
+            atomicAdd(&tally[0], n);
         }
     }
-    atomicStore(&state[job.state_first + k], u32(keep));
 }
 
+// Clusters a scan's chunk covers: four a lane.
+const CHUNK: u32 = 256u;
+// Per lane: its four clusters' (kept, indices) totals, then their running sum.
+var<workgroup> sums: array<vec2<u32>, 64>;
+
+// Dispatched (jobs, 1, 1): one workgroup an instance, its clusters a chunk at a
+// time, each chunk's places an inclusive scan over the lanes' totals.
 @compute @workgroup_size(64)
-fn cs_cluster_scan(@builtin(global_invocation_id) id: vec3<u32>) {
-    if id.x >= run.jobs {
-        return;
-    }
-    let j = run.job_first + id.x;
+fn cs_cluster_scan(
+    @builtin(workgroup_id) group: vec3<u32>,
+    @builtin(local_invocation_index) lane: u32,
+) {
+    let j = run.job_first + group.x;
     let job = jobs[j];
-    var n = 0u;
-    for (var k = 0u; k < run.clusters; k++) {
-        let at = job.state_first + k;
-        if atomicLoad(&state[at]) != 0u {
-            atomicStore(&state[at], job.out_first + n);
-            n += bitcast<u32>(clusters[job.cluster_first + k].max.w);
-        } else {
-            atomicStore(&state[at], NONE);
+    let base = job.state_first;
+    // Kept clusters and their indices before this chunk.
+    var before = vec2<u32>(0u);
+    for (var chunk = 0u; chunk < run.clusters; chunk += CHUNK) {
+        var keep = vec4<u32>(0u);
+        var count = vec4<u32>(0u);
+        for (var i = 0u; i < 4u; i++) {
+            let k = chunk + lane * 4u + i;
+            if k < run.clusters && state[base + 1u + 2u * k] != 0u {
+                keep[i] = 1u;
+                count[i] = bitcast<u32>(clusters[job.cluster_first + k].max.w);
+            }
         }
+        let own = vec2<u32>(keep.x + keep.y + keep.z + keep.w, count.x + count.y + count.z + count.w);
+        sums[lane] = own;
+        workgroupBarrier();
+        for (var d = 1u; d < 64u; d <<= 1u) {
+            var v = sums[lane];
+            if lane >= d {
+                v += sums[lane - d];
+            }
+            workgroupBarrier();
+            sums[lane] = v;
+            workgroupBarrier();
+        }
+        // Every verdict of the chunk was read above, and a kept cluster is listed
+        // at or before its own place: the writes overwrite only what was read.
+        var at = before + sums[lane] - own;
+        for (var i = 0u; i < 4u; i++) {
+            if keep[i] != 0u {
+                state[base + 1u + 2u * at.x] = chunk + lane * 4u + i;
+                state[base + 2u + 2u * at.x] = job.out_first + at.y;
+                at += vec2<u32>(1u, count[i]);
+            }
+        }
+        before += sums[63];
+        workgroupBarrier();
     }
-    let args = j * 5u;
-    out_args[args] = n;
-    out_args[args + 1u] = u32(n > 0u);
-    out_args[args + 2u] = job.out_first;
-    out_args[args + 3u] = 0u;
-    out_args[args + 4u] = job.instance;
+    if lane == 0u {
+        state[base] = before.x;
+        let args = j * 5u;
+        out_args[args] = before.y;
+        out_args[args + 1u] = u32(before.y > 0u);
+        out_args[args + 2u] = job.out_first;
+        out_args[args + 3u] = 0u;
+        out_args[args + 4u] = job.instance;
+        atomicMax(&tally[run.copy_at], before.x);
+    }
 }
 
-// Dispatched (clusters, jobs): one workgroup per (instance, cluster).
+// Dispatched indirect (the most kept clusters of an instance, jobs, 1): a
+// workgroup per kept cluster, its lanes over the cluster's indices.
 @compute @workgroup_size(64)
 fn cs_cluster_copy(
     @builtin(workgroup_id) group: vec3<u32>,
     @builtin(local_invocation_index) lane: u32,
 ) {
     let job = jobs[run.job_first + group.y];
-    let at = atomicLoad(&state[job.state_first + group.x]);
-    if at == NONE {
+    let base = job.state_first;
+    if group.x >= state[base] {
         return;
     }
-    let c = clusters[job.cluster_first + group.x];
+    let k = state[base + 1u + 2u * group.x];
+    let at = state[base + 2u + 2u * group.x];
+    let c = clusters[job.cluster_first + k];
     let first = bitcast<u32>(c.min.w);
     let count = bitcast<u32>(c.max.w);
     for (var i = lane; i < count; i += 64u) {

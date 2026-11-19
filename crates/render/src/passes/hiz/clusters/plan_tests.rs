@@ -44,15 +44,15 @@ fn a_clustered_batch_gets_a_job_per_instance_with_its_own_room() {
         tested: 1,
         out_first: 0,
         cluster_first: 4,
-        state_first: 1,
+        state_first: 0,
         cone: 1,
         _pad: 0,
     };
     assert_eq!(plan.jobs[0], first);
     assert_eq!(plan.jobs[1].out_first, 600, "the next instance's room");
-    assert_eq!((plan.jobs[1].tested, plan.jobs[1].state_first), (0, 6));
+    assert_eq!((plan.jobs[1].tested, plan.jobs[1].state_first), (0, 11));
     assert_eq!(plan.jobs[2].cone, 0, "a two-sided batch takes no cone test");
-    assert_eq!((plan.out_indices, plan.states, plan.tested), (1800, 16, 10));
+    assert_eq!((plan.out_indices, plan.states, plan.tested), (1800, 33, 10));
     assert_eq!(plan.draws(3), vec![None, Some(0..2), Some(2..3)]);
 }
 

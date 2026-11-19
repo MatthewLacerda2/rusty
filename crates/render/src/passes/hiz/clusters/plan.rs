@@ -47,8 +47,8 @@ pub(crate) struct Run {
 pub(crate) struct Plan {
     pub jobs: Vec<Job>,
     pub runs: Vec<Run>,
-    /// Output indices and state words the jobs need; state word 0 is the
-    /// count of clusters kept, so the jobs' start at 1.
+    /// Output indices and state words the jobs need: a job's region is
+    /// `1 + 2 * clusters` words (`hiz_clusters.wgsl`'s `state`).
     pub out_indices: u32,
     pub states: u32,
     /// The clusters of instances the per-instance test judges: `Debug.Stats`'
@@ -66,10 +66,7 @@ impl Plan {
         (instances, tested): (&[InstanceData], &dyn Fn(usize) -> bool),
         clusters_of: impl Fn(&DrawBatch) -> Option<Range<u32>>,
     ) -> Self {
-        let mut plan = Self {
-            states: 1,
-            ..Self::default()
-        };
+        let mut plan = Self::default();
         for (b, batch) in batches.enumerate() {
             let Some(clusters) = clusters_of(batch) else {
                 continue;
@@ -103,7 +100,7 @@ impl Plan {
                     _pad: 0,
                 });
                 plan.out_indices += batch.key.indices.len();
-                plan.states += n;
+                plan.states += 1 + 2 * n;
             }
             let jobs = first..plan.jobs.len() as u32;
             plan.runs.push(Run {
