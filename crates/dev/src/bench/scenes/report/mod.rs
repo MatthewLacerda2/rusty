@@ -175,18 +175,9 @@ impl SceneReport {
                 "(render.<stage>: the renderer's CPU time by stage, summing to renderer_ms; \
                  render.other is what no stage timed)",
             ),
-            (
-                self.row("render.occlusion.test").is_some(),
-                "(render.occlusion.<part>: the Hi-Z stage's CPU parts, inside its row, in no sum)",
-            ),
-            (
-                // Only with GPU timing: an untimed frame records the stage in 2.
-                self.row("gpu.occlusion.select").is_some(),
-                "(gpu.occlusion.<part>: its GPU parts, inside its row, in no sum; a timed frame \
-                 records each in a pass of its own, so 1 or 2 more compute_passes than untimed)",
-            ),
         ];
-        let notes = notes.into_iter().chain(self.comparison_notes(first));
+        let notes = notes.into_iter().chain(self.part_notes());
+        let notes = notes.chain(self.comparison_notes(first));
         for (_, note) in notes.filter(|(on, _)| *on) {
             let _ = writeln!(out, "{note}");
         }
@@ -204,21 +195,19 @@ impl SceneReport {
 }
 
 impl SceneReport {
-    /// The notes on what the change column compares: the spread, or no earlier run.
-    fn comparison_notes(&self, first: bool) -> [(bool, &'static str); 3] {
+    /// The notes on a stage timed in parts (#2401): the Hi-Z stage's CPU parts
+    /// wherever it ran, its GPU parts only with GPU timing (an untimed frame
+    /// records the stage in 2 compute passes).
+    fn part_notes(&self) -> [(bool, &'static str); 2] {
         [
             (
-                self.runs.max(1) > 1,
-                "(spread: the lowest to the highest run's average; a change inside both \
-                 runs' spreads is unresolved)",
+                self.row("render.occlusion.test").is_some(),
+                "(render.occlusion.<part>: the Hi-Z stage's CPU parts, inside its row, in no sum)",
             ),
             (
-                first && self.baseline.is_none(),
-                "(no previous report: the next run prints its change against this one)",
-            ),
-            (
-                first && self.baseline.is_some(),
-                "(the baseline holds no report of this scene: no change column)",
+                self.row("gpu.occlusion.select").is_some(),
+                "(gpu.occlusion.<part>: its GPU parts, inside its row, in no sum; a timed frame \
+                 records each in a pass of its own, so 1 or 2 more compute_passes than untimed)",
             ),
         ]
     }
