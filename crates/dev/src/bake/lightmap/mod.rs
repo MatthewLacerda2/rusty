@@ -238,6 +238,8 @@ mod report_tests;
 #[cfg(test)]
 mod shadowmask_tests;
 #[cfg(test)]
+mod spill_lock_tests;
+#[cfg(test)]
 mod spill_tests;
 #[cfg(test)]
 mod tests;

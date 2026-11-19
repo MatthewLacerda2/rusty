@@ -7,8 +7,10 @@
 //! gitignored and never exported), in [`SPILL_DIR`], one folder a bake named for
 //! its scene (`<scene file>-<digest of its path>-<pid>-<n>`). It is on the
 //! project's disk, so linking a page into the scene's folder is free; where it is
-//! not (a `cache/` on another disk) the page is copied. A scene outside any
-//! project (a test's, a loose file's) spills into the temp folder.
+//! not (a `cache/` on another disk) the page is copied. The project is the
+//! nearest folder above the scene that [`project::is_project`]; only a scene in
+//! no project at all (a test's, a loose file's) spills into the temp folder, which
+//! may be memory (a tmpfs), so its bake's page stage is not bounded.
 //!
 //! **Removed** when the bake's pages are dropped: written, cancelled, failed or
 //! unwound. A process killed mid-bake (a quit, a power cut) cannot remove its own,
@@ -16,7 +18,9 @@
 //! its life: the kernel drops the lock with the process however it ends, and a
 //! reboot leaves none held. **Any bake of the project** ([`sweep`], at its start
 //! and again when it opens its folder) removes every folder whose lock it can
-//! take, whatever scene it was for, and never touches one whose lock is held. A
+//! take, whatever scene it was for, and never touches one whose lock is held.
+//! A lock counts only while the file at `<folder>.lock` is the one locked
+//! ([`take_lock`]): a sweep may delete it between another's open and lock. A
 //! spill is only ever read by the bake that wrote it.
 
 use std::fs::{File, TryLockError};
@@ -75,13 +79,13 @@ impl Spill {
         loop {
             let n = OPENED.fetch_add(1, Ordering::Relaxed);
             let dir = root.join(format!("{}-{pid}-{n}", scene_name(scene_path)));
-            let lock = open_lock(&lock_of(&dir)).map_err(fail)?;
-            match lock.try_lock() {
-                Ok(()) => {}
-                // A sweep holds this dead name's lock: take the next.
-                Err(TryLockError::WouldBlock) => continue,
-                Err(TryLockError::Error(e)) => return Err(fail(e)),
-            }
+            let lock = match take_lock(&lock_of(&dir), || {}).map_err(fail)? {
+                Taken::Held(lock) => lock,
+                // A sweep holds this dead name's lock, or removed the file between
+                // its creation and the lock (the lock is then on no file): take
+                // the next name.
+                Taken::Busy | Taken::Replaced => continue,
+            };
             // A folder of this name is a dead process's that had this pid.
             let _ = std::fs::remove_dir_all(&dir);
             std::fs::create_dir_all(&dir).map_err(fail)?;
@@ -177,26 +181,68 @@ pub fn sweep(scene_path: &str) -> PathBuf {
             true => (path.with_extension(""), path),
             false => (path.clone(), lock_of(&path)),
         };
-        let Ok(file) = open_lock(&lock) else {
-            continue;
-        };
-        if file.try_lock().is_ok() {
-            let _ = std::fs::remove_dir_all(&dir);
-            let _ = std::fs::remove_file(&lock);
-        }
+        sweep_one(&dir, &lock, || {});
     }
     root
 }
 
-/// Where a bake of `scene_path` spills: its project's [`SPILL_DIR`], or the temp
-/// folder's for a scene in no project.
+/// Remove the scratch folder `dir` and its lock file `lock` if its bake is gone:
+/// only while holding a lock on the very file at `lock`, so a live bake's fresh
+/// lock file, made after another sweep removed the one this opened, is never
+/// taken for a dead one. `between` runs between the open and the lock (a test's
+/// interleaving).
+pub(super) fn sweep_one(dir: &Path, lock: &Path, between: impl FnOnce()) {
+    if let Ok(Taken::Held(held)) = take_lock(lock, between) {
+        let _ = std::fs::remove_dir_all(dir);
+        let _ = std::fs::remove_file(lock);
+        drop(held);
+    }
+}
+
+/// What [`take_lock`] got.
+#[derive(Debug)]
+pub(super) enum Taken {
+    /// The lock on the file now at the path.
+    Held(File),
+    /// Another holds it.
+    Busy,
+    /// Locked, but the file at the path is no longer the one opened (a sweep
+    /// removed it, and maybe another made a new one): the lock guards nothing.
+    Replaced,
+}
+
+/// Open (creating) the lock file at `path` and try its lock, then check the file
+/// still at `path` is the one locked (its device and inode): between the open and
+/// the lock, a sweep may lock, delete and release it. `between` runs between the
+/// open and the lock: nothing in a bake, a sweep in a test.
+pub(super) fn take_lock(path: &Path, between: impl FnOnce()) -> std::io::Result<Taken> {
+    use std::os::unix::fs::MetadataExt;
+    let file = open_lock(path)?;
+    between();
+    match file.try_lock() {
+        Ok(()) => {}
+        Err(TryLockError::WouldBlock) => return Ok(Taken::Busy),
+        Err(TryLockError::Error(e)) => return Err(e),
+    }
+    let (held, now) = (file.metadata()?, std::fs::metadata(path));
+    Ok(match now {
+        Ok(now) if (now.dev(), now.ino()) == (held.dev(), held.ino()) => Taken::Held(file),
+        _ => Taken::Replaced,
+    })
+}
+
+/// Where a bake of `scene_path` spills: the [`SPILL_DIR`] of the nearest folder
+/// above it that [`project::is_project`] (a `project.rusty`, or an `assets/` folder:
+/// a project only ever opened to run has no file), so the spill stays on the
+/// project's disk; the temp folder's only for a scene in no project at all, which
+/// may be memory (a tmpfs).
 fn spill_root(scene_path: &str) -> PathBuf {
     let scene = Path::new(scene_path);
     let folder = scene.parent().filter(|p| !p.as_os_str().is_empty());
     let folder = std::fs::canonicalize(folder.unwrap_or(Path::new(".")));
     let project = folder.ok().and_then(|f| {
         f.ancestors()
-            .find(|a| a.join(project::PROJECT_FILE).is_file())
+            .find(|a| project::is_project(a))
             .map(Path::to_path_buf)
     });
     match project {

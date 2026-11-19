@@ -501,7 +501,10 @@ lighting settings (above), whose defaults are the ones listed here.
   filled again, which is when a map's edge is dilated and the rest of its square
   filled), encoded and written to a scratch folder in the project's `cache/`
   (`cache/lightmap-spill/`, gitignored and never exported; on the project's disk,
-  so the final write only links the pages into `<scene>.lightmaps/`), and a
+  so the final write only links the pages into `<scene>.lightmaps/`; the project
+  is the nearest folder above the scene holding a `project.rusty` or an `assets/`
+  folder, and only a scene in no project at all spills into the system's temp
+  folder, which may be memory, where the page stage is not bounded), and a
   lightmap is let go once its page is composed; so the page stage holds one page
   (about 128 bytes a page texel) and one map's square at a time. The scratch
   folder is removed when the bake ends, written, cancelled or failed. One a bake
