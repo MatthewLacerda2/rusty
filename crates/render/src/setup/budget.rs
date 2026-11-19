@@ -60,7 +60,7 @@ use std::time::Duration;
 /// and 3 measured slower than either, because the whole suite is then near its core
 /// bound (#985). What does move the wall is a cheaper renderer per test: pipelines a
 /// frame may not draw are built on first use (`gpu::pipelines::LazyPipeline`).
-pub(crate) const MAX_CONCURRENT_HEADLESS: usize = 2;
+pub(crate) const MAX_CONCURRENT_HEADLESS: usize = 3;
 
 /// How long to wait for a permit before declaring the budget deadlocked.
 ///

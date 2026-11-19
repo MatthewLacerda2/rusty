@@ -302,16 +302,20 @@ jobs:
       - name: Test (engine, default)
         if: needs.changes.outputs.code != 'false' && matrix.features == 'default'
         run: |
+          python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
           rc=0
           cargo nextest run --profile ci --locked -E 'not group(gpu)' --partition "count:${{ matrix.shard }}" || rc=$?
           cp target/nextest/ci/junit.xml junit-default.xml || true
+          kill "$watcher" || true
           exit "$rc"
       - name: Test (engine, dev features)
         if: needs.changes.outputs.code != 'false' && matrix.features == 'dev'
         run: |
+          python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
           rc=0
           cargo nextest run --profile ci --features dev --locked --partition "count:${{ matrix.shard }}" || rc=$?
           cp target/nextest/ci/junit.xml junit-dev.xml || true
+          kill "$watcher" || true
           exit "$rc"
       # The canaries that refuse to skip (the adapter's, `render::test_gpu`, and
       # OIDN's, `bake::denoise::tests`), on every entry: each installs lavapipe
@@ -460,9 +464,11 @@ jobs:
       - name: Test (engine, dev features)
         shell: bash
         run: |
+          python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
           rc=0
           cargo nextest run --profile ci --features dev --locked --partition "count:${{ matrix.shard }}" || rc=$?
           cp target/nextest/ci/junit.xml junit-dev.xml || true
+          kill "$watcher" || true
           exit "$rc"
       # A partition puts each canary in one shard only, so every shard runs them
       # again (#2264, #2276): a shard that lost Metal or OIDN fails, never skips.

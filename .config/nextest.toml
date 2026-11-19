@@ -21,7 +21,7 @@ status-level = "slow"
 # so the in-process budget (crates/render/src/setup/budget.rs, MAX_CONCURRENT_HEADLESS)
 # cannot see its neighbours; this group is its nextest equivalent, with the same cap.
 [test-groups]
-gpu = { max-threads = 2 }
+gpu = { max-threads = 3 }
 
 # Which tests are GPU tests is a naming rule, enforced at runtime: a test that builds
 # a headless renderer without matching this filter panics and names the rule
