@@ -49,12 +49,14 @@ pub fn of<T>() -> u64 {
 /// In a build without `debug_assertions` (release, ship), where lookups are not
 /// counted: run the test in a debug or test profile.
 pub fn lookups_of<T>() -> u64 {
-    assert!(
-        cfg!(debug_assertions),
-        "walks::lookups_of: lookups are counted only with debug_assertions on; \
-         run this test in a debug or test profile, not release"
-    );
-    read::<T>(&LOOKUPS)
+    if cfg!(debug_assertions) {
+        read::<T>(&LOOKUPS)
+    } else {
+        panic!(
+            "walks::lookups_of: lookups are counted only with debug_assertions on; \
+             run this test in a debug or test profile, not release"
+        )
+    }
 }
 
 fn read<T>(map: &'static std::thread::LocalKey<RefCell<BTreeMap<&'static str, u64>>>) -> u64 {
