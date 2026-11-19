@@ -1139,7 +1139,14 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   counters), `.test` (packing the instances' bounds, and copying the verdict
   count), `.clusters` (planning, uploading and copying the cluster cull's),
   `.select` (the uploads and binds before its pass, and the pass), `.phase_one`,
-  `.pyramid` and `.submit`, summing to `render.occlusion` but for its returns. A part row sits inside its stage's row, so no sum of `gpu.` or
+  `.pyramid` and `.submit`, summing to `render.occlusion` but for its returns.
+  **The UI stage is split too**: `render.ui.layout`, `.textures` (loading and
+  binding the Images' textures), `.mesh` (the canvas meshes and glyph atlases),
+  `.sync`, `.shades`, `.uniforms`, `.masks`, `.mask_submit`, then for the overlay
+  pass `.pipelines`, `.blur` (the backdrop chain alone), `.groups`, `.encode` and
+  `.submit`. A CPU part is sampled on every frame its stage ran, zero on one that
+  did not lap it (`.mask_submit` on a frame that drew no Mask), so its row is its
+  share of the stage and the parts sum to it. A part row sits inside its stage's row, so no sum of `gpu.` or
   `render.` rows counts it. To time the parts, a frame the GPU timer times records
   the stage in a pass per part (`GpuTimer::splits`): a culling camera's stage
   records 3 or 4 compute passes (the cluster cull's when a batch is drawn by
