@@ -10,7 +10,7 @@ use super::cull::{CameraCull, ARGS};
 use super::pyramid::Pyramid;
 use crate::draw::camera::CameraCtx;
 use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
-use crate::timing::{GpuPart, GpuPass};
+use crate::timing::GpuPart;
 use crate::{RenderView, Renderer};
 
 impl Renderer {
@@ -34,15 +34,12 @@ impl Renderer {
         let batches = opaque.len() as u32;
         // Before the timer lends out its pairs: phase one draws through this group.
         self.update_global_bind_group();
-        // The stage is one encoder and one submit, and a pair spread over passes
-        // is charged only inside one submit (`timing::writes`). Untimed, its one
-        // `occlusion` pair opens on the select's pass and closes on the merged
-        // pass; on a timed frame each part is its own pass and pair (#2401).
+        // The stage is one encoder and one submit. A timed frame records each part
+        // in a pass and pair of its own (#2401), since a pair cannot open and
+        // close inside a pass; any other frame takes no pair, so it records the
+        // parts after phase one in one pass (#2327).
         let (timer, split) = (&self.gpu_timer, self.gpu_timer.splits());
-        let (open, close) = match split {
-            true => (timer.part_compute_writes(GpuPart::OcclusionSelect), None),
-            false => timer.compute_span(GpuPass::Occlusion),
-        };
+        let open = timer.part_compute_writes(GpuPart::OcclusionSelect);
         let mut encoder = self.device.create_command_encoder(&Default::default());
         let mut select = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("Hi-Z Select"),
@@ -58,7 +55,7 @@ impl Renderer {
         self.lap(lap_of(GpuPart::OcclusionPhaseOne));
         let at = (&view.depth_view, ctx.view_proj);
         let cull = (&mut *cam, &mut *pyramid, &plan);
-        last.clusters = self.record_cull(&mut encoder, cull, at, (n, batches), close);
+        last.clusters = self.record_cull(&mut encoder, cull, at, (n, batches));
         let args = (cam.args[1].buffer(), ARGS * u64::from(batches));
         cam.counter.copy(&self.device, &mut encoder, args);
         self.lap(lap_of(GpuPart::OcclusionTest));
@@ -74,10 +71,10 @@ impl Renderer {
     }
 
     /// Record everything after phase one: the pyramid over `depth`, the test,
-    /// the compaction and `plan`'s cluster cull. Untimed, in one compute pass
-    /// (#2327) whose end writes `close`, wgpu ordering the dispatches inside it,
-    /// each reading what the one before wrote; on a timed frame
-    /// (`GpuTimer::splits`), in one pass per part, each its own pair (#2401).
+    /// the compaction and `plan`'s cluster cull. On a timed frame
+    /// (`GpuTimer::splits`) in one pass per part, each its own pair (#2401);
+    /// otherwise in one compute pass (#2327), wgpu ordering the dispatches
+    /// inside it, each reading what the one before wrote.
     /// Laps the CPU's parts. Returns the clustered batches' draws.
     fn record_cull(
         &self,
@@ -85,7 +82,6 @@ impl Renderer {
         (cam, pyramid, plan): (&mut CameraCull, &mut Pyramid, &Plan),
         (depth, view_proj): (&wgpu::TextureView, glam::Mat4),
         (n, batches): (u32, u32),
-        close: Option<wgpu::ComputePassTimestampWrites>,
     ) -> Option<ClusterDraws> {
         let clustered = !plan.runs.is_empty();
         if clustered {
@@ -123,7 +119,7 @@ impl Renderer {
                 record(&mut begin(encoder, lap_of(part), writes), part);
             }
         } else {
-            let mut pass = begin(encoder, "Hi-Z Cull", close);
+            let mut pass = begin(encoder, "Hi-Z Cull", None);
             parts.for_each(|part| record(&mut pass, part));
         }
         let cull = (&mut cam.clusters, plan);

@@ -15,11 +15,11 @@ fn sent(pass: GpuPass, submit: u64) -> Pair {
 
 #[test]
 fn a_pair_spread_over_several_passes_is_one_entry_charged_once() {
-    // Hi-Z's one pair opens on its select (1) and closes on its compaction (7):
-    // whatever ran between, 6 ms, once; the prepass after it is its own.
-    let pairs = [GpuPass::Occlusion, GpuPass::SsaoPrepass].map(Pair::from);
+    // SSR's pyramids' one pair opens on its first level (1) and closes on its
+    // last (7): whatever ran between, 6 ms, once; the resolve after it is its own.
+    let pairs = [GpuPass::SsrPyramids, GpuPass::SsrResolve].map(Pair::from);
     let times = GpuTimes::from_ticks(&[1, 7, 7, 9], &pairs, MS);
-    let want = [(GpuPass::Occlusion, 6.0), (GpuPass::SsaoPrepass, 2.0)];
+    let want = [(GpuPass::SsrPyramids, 6.0), (GpuPass::SsrResolve, 2.0)];
     assert_eq!(times.passes, want);
     assert_eq!(times.span_ms(), 8.0);
     assert_eq!(times.other_ms, 0.0);

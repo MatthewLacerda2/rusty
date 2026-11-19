@@ -175,6 +175,12 @@ impl SceneReport {
                 "(render.<stage>: the renderer's CPU time by stage, summing to renderer_ms; \
                  render.other is what no stage timed)",
             ),
+            (
+                self.row("render.occlusion.test").is_some(),
+                "(gpu.occlusion.<part>, render.occlusion.<part>: the Hi-Z stage's parts, \
+                 inside its row and not in the sums; timed in passes of their own, so the \
+                 stage records one compute pass more per part than untimed)",
+            ),
         ];
         let notes = notes.into_iter().chain(self.comparison_notes(first));
         for (_, note) in notes.filter(|(on, _)| *on) {

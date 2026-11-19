@@ -37,9 +37,15 @@
 //! **No row holds a gap.** A pass is charged from its own start at the earliest,
 //! so time between timed passes is in no row: `gpu_ms` is the GPU's busy time on
 //! timed work, never its wait for the CPU. A stage of several passes takes one
-//! pair across them ([`GpuTimer::compute_span`], [`GpuTimer::render_span`]): its
-//! first pass writes the start, its last the end, and all of them go out in one
-//! submit, so what lies between is the stage's own GPU work.
+//! pair across them ([`GpuTimer::render_span`]): its first pass writes the start,
+//! its last the end, and all of them go out in one submit, so what lies between
+//! is the stage's own GPU work.
+//!
+//! **Parts of a row.** A stage the bench reads by part (the Hi-Z `occlusion`
+//! stage, #2401) takes a pair per [`GpuPart`] instead, each its own pass
+//! ([`GpuTimer::splits`]): every part adds into its kind's row, so the row is
+//! unchanged, and into [`GpuTimes::parts`]. A gap between two parts inside the
+//! stage's submit (an encoder command) is in `gpu.other`, as between any rows.
 //!
 //! **What no row holds.** Each resolved frame also splits the span from its first
 //! timed start to its last timed end ([`GpuTimes::span_ms`]) into the rows and two
@@ -80,8 +86,8 @@ rusty_core::named_enum! {
         Shadows = "shadows",
         /// GPU occlusion culling (#1963), each culling camera's whole `occlusion`
         /// stage: the select, phase one's depth draw, the Hi-Z pyramid, the test,
-        /// the compaction and the cluster cull. One pair across them all, or on a
-        /// timed frame one per [`GpuPart`], which add into this row.
+        /// the compaction and the cluster cull, a pair per [`GpuPart`], each
+        /// added into this row.
         Occlusion = "occlusion",
         /// The SSAO depth prepass (#1578), which a primed forward pass starts from.
         SsaoPrepass = "ssao_prepass",

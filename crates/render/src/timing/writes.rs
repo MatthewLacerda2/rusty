@@ -49,15 +49,6 @@ impl GpuTimer {
         (Some(render(set, open)), Some(render(set, close)))
     }
 
-    /// [`Self::render_span`] over compute passes.
-    pub(crate) fn compute_span(&self, pass: GpuPass) -> (ComputeWrites<'_>, ComputeWrites<'_>) {
-        let Some((set, at)) = self.pair(pass, None) else {
-            return (None, None);
-        };
-        let [open, close] = halves(at);
-        (Some(compute(set, open)), Some(compute(set, close)))
-    }
-
     /// The next query pair, taken for `pass` (and its `part`, if any) in the
     /// submit being recorded.
     fn pair(&self, pass: GpuPass, part: Option<GpuPart>) -> Option<(&wgpu::QuerySet, u32)> {

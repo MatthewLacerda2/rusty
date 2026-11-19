@@ -8,7 +8,9 @@
 //! renderer's GPU calls (passes, submits, bind groups made, buffer writes), every system's CPU ms
 //! (`cpu.<system>`, as the schedule names it) and the renderer's CPU ms by stage
 //! (`render.<stage>`, `Renderer::frame_stages`), each set with an `other` row for
-//! what none of its parts holds.
+//! what none of its parts holds. A stage timed in parts (the Hi-Z `occlusion`
+//! stage, #2401) adds `render.<stage>.<part>` and `gpu.<pass>.<part>` rows beside
+//! its own, which they sit inside: no sum of a set counts them.
 //!
 //! **Before and after is automatic.** The report is kept as `<out_dir>/bench.json`
 //! (`out/bench/` under `make bench`) and each run prints its change against the one

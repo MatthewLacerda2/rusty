@@ -19,7 +19,9 @@
 //!    wall this frame is drawn this frame.
 //!
 //! Steps 2 to 4 and the cluster cull below record into one compute pass, after
-//! phase one's depth draw; the select has its own pass before it (#2327).
+//! phase one's depth draw; the select has its own pass before it (#2327). On a
+//! frame the GPU timer times, each part is its own pass and timestamp pair
+//! instead (`stage`, #2401), so the bench reads the stage by part.
 //!
 //! The phase-one draw is depth only, into the view's depth that the prepass or the
 //! forward pass then clears: every pass after it draws the final set, so none of

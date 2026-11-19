@@ -256,8 +256,8 @@ if s.gpu_ms then print(s.gpu_ms.avg) end                                -- times
 
 **GPU time per pass (#835).** Each timed render or compute pass writes a GPU
 timestamp at its start and end, or a stage of several passes takes one pair across
-them (its first pass writes the start, its last the end: `occlusion`, and SSR's
-pyramids); the renderer resolves them after the frame and reads them back without
+them (its first pass writes the start, its last the end: SSR's pyramids), or one
+pair per part, all added into its key (`occlusion`); the renderer resolves them after the frame and reads them back without
 ever stalling it (the live loop gets them a frame or two later, so a window frame
 carries the newest times resolved, its own or one just before; the harness waits for
 its frames anyway, so each reports its own). The passes are grouped by kind,
@@ -267,7 +267,7 @@ each kind's passes summed, under names that never change so two reports diff:
 |---|---|
 | `sky_reflection` | the sky's reflection cube (#1553): the capture and GGX prefilter of the panorama or the procedural sky, on the frames the sky changed (counted in `sky_reflection_bakes`) |
 | `shadows` | the sun's cascades (static bake + dynamic casters) and the point/spot shadow atlas |
-| `occlusion` | GPU occlusion culling (#1963), each culling camera's whole `occlusion` stage: the select of last frame's visible set, its depth-only draw (phase one), the Hi-Z depth pyramid, the bounds test, the compaction and the per-cluster cull, as one span. All of it goes out in one submit with no readback inside, so the span is the stage's GPU work, not its wall time |
+| `occlusion` | GPU occlusion culling (#1963), each culling camera's whole `occlusion` stage: the select of last frame's visible set, its depth-only draw (phase one), the Hi-Z depth pyramid, the bounds test, the compaction and the per-cluster cull, each part its own pass and timestamp pair, summed here. All of it goes out in one submit with no readback inside, so it is the stage's GPU work, not its wall time; a gap between two parts (an encoder command) is in `gpu_other_ms`. No key holds a part: the bench reports them as `gpu.occlusion.<part>` (`docs/testing.md`, *Benchmark: `make bench`*) |
 | `ssao_prepass` | the SSAO depth prepass (#1578): every visible solid's depth into the view's depth target, which a primed forward pass starts from |
 | `ssao` | the SSAO occlusion pass, at its quality's resolution |
 | `ssao_blur` | the SSAO blur at the occlusion's resolution, and the depth-aware upsample to full resolution when that is lower |
