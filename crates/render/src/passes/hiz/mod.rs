@@ -40,7 +40,7 @@
 //! reused. Grown history keeps its verdicts: only new object slots read "drawn".
 //!
 //! **Who culls.** [`Renderer::hiz_culls`]: the quality preset's
-//! `gpu_occlusion_culling` (on in every seeded preset), the camera's
+//! `gpu_occlusion_culling` (off in every seeded preset, #2388), the camera's
 //! `use_occlusion_culling`, and never during a capture, which bakes every static
 //! mesh. An orthographic camera and one with a far near plane do cull: the test
 //! reads the depth the camera drew, so a wall its near plane clips away writes none,
@@ -49,7 +49,7 @@
 //!
 //! **By cluster.** A batch of a mesh the import split into clusters is then
 //! culled cluster by cluster against the same pyramid and drawn per instance
-//! ([`clusters`], #1968); the quality preset's `gpu_cluster_culling` turns it off.
+//! ([`clusters`], #1968); the quality preset's `gpu_cluster_culling` turns it on.
 //!
 //! **Seams.** The pyramid ([`pyramid::Pyramid`]) is built once per camera and
 //! read by mip level and texel through `hiz/hidden.wgsl`'s `hidden`, which the
