@@ -7,7 +7,7 @@ use crate::gpu::ops::CountedQueue as _;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
-use super::GpuPass;
+use super::Pair;
 
 /// Frames that may be in flight at once before one goes untimed.
 const SLOTS: usize = 3;
@@ -19,8 +19,8 @@ const MAPPED: u8 = 2;
 /// One frame's readback buffer.
 struct Slot {
     buffer: wgpu::Buffer,
-    /// The frame's timed passes, one per query pair.
-    passes: Vec<GpuPass>,
+    /// The frame's query pairs, in pair order.
+    passes: Vec<Pair>,
     /// The drawn frame it measures (`FrameCost::frames` at its end), which is also
     /// its place in submission order, so the newest finished one wins.
     frame: u64,
@@ -71,7 +71,7 @@ impl Ring {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         set: &wgpu::QuerySet,
-        passes: Vec<GpuPass>,
+        passes: Vec<Pair>,
         frame: u64,
     ) {
         let Some(slot) = self
@@ -101,7 +101,7 @@ impl Ring {
 
     /// Read every mapped slot through `read` (its ticks and passes), free them, and
     /// return the newest frame's result with that frame's index.
-    pub fn read_finished<T>(&mut self, read: impl Fn(&[u64], &[GpuPass]) -> T) -> Option<(u64, T)> {
+    pub fn read_finished<T>(&mut self, read: impl Fn(&[u64], &[Pair]) -> T) -> Option<(u64, T)> {
         let mut newest: Option<(u64, T)> = None;
         for slot in &mut self.slots {
             if slot.state.load(Ordering::Acquire) != MAPPED {

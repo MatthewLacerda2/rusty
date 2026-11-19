@@ -1048,7 +1048,12 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   measured), `cpu_ms` (the same at a fixed reference CPU clock, below) and
   `cpu_clock_pct` (the CPU clock it ran at), `renderer_ms` (CPU time recording the
   frame, as measured), `gpu_ms` and `gpu.<pass>` (GPU time
-  at a fixed reference clock, below), `gpu_raw_ms` (GPU time as measured) and
+  at a fixed reference clock, below; `gpu_ms` is the passes' sum, busy time only,
+  and `gpu.other` untimed GPU work inside a submit, where a pass left untimed
+  shows, scaled like the rows), `gpu_between_submits_ms` (the GPU waiting for the
+  CPU from one submit's timed work to the next's, with a command at a submit's
+  edge, **as measured**: a wait does not follow the GPU's clock; the `gpu.` rows
+  and it add up to the frame's timed span), `gpu_raw_ms` (GPU time as measured) and
   `gpu_clock_pct` (the clock it ran at, % of the reference), `draw_calls`,
   `triangles`, `culled_entities`, `lights_dropped`, `cluster_lights_dropped`, `lights_culled`,
   `decals_visible`, `decal_cluster_refs`, the GPU occlusion counters `hiz_tested`,
@@ -1170,7 +1175,12 @@ every binary's open makes them.
     from the device's `currentAllocatedSize`, which also counts what the driver
     keeps for itself, so the two platforms' figures are close, not equal. The
     report names its source, and without one (GL) the row is absent and the report
-    says so.
+    says so. Beside it, `gpu_allocated_mb` (what of those blocks live
+    allocations use, where the allocator report tells it: not on Metal) and the
+    renderer's own resident bytes by kind, which follow the scene where `gpu_mb`
+    does not: `gpu_texture_mb` (image textures by path), `gpu_lightmap_mb` (the
+    lightmap page arrays) and `gpu_reflection_mb` (the reflection probes' cube
+    array), as of the last measured frame (`docs/api/Debug.md`, the `_bytes` keys).
 
   It is kept as `out/bench/scenes/<project>-<hash>/<scene>.json` (and `.txt`; the
   project folder's name and a short hash of its canonical path, so a copy and its
@@ -1432,7 +1442,7 @@ SCOPE='crates/physics/src/**'`), made by hand. One way in:
 
 | Run | Trigger | Scope | Where it lands |
 |---|---|---|---|
-| **On request** (`mutants-on-request.yml`) | a PR's `Mutation: diff` (or globs) line, which the merge queue dispatches on `main` after the merge, two at a time (#1934); `make mutants-remote SCOPE=...`; or a dispatch with a `scope` input | `diff` (the branch against `origin/main`, or with `commit` the merged squash commit against its parent) or path globs (separated by spaces or commas; a brace such as `crates/{core,physics}/src/**` is expanded, since git's glob dialect has none), turned by `.github/scripts/mutants-scope.py` into one `--in-diff` per cargo workspace the scope reaches: the engine's, and each directory whose `Cargo.toml` opens its own `[workspace]` (`tools/lint`, run inside it with its own `cargo test`; a cargo-fuzz crate such as `fuzz/` is named as having nothing to run), in one report (#2201); one runner, or up to four for a plan too large for one (`mutants-request.py shards`, #2283), each with a 2 h 45 budget, merged into one report; one run per branch, a newer dispatch cancelling the older and an unmerged close of the PR cancelling what is left, while a merged PR's run finishes (`mutants-cancel.yml`, #1530) | printed in the terminal by `make mutants-remote`; the run summary and a `mutants-report` artifact (`report.md`, `survivors.diff`); `report.md` also as one comment on the branch's open PR, or its merged one (the `pr` input for the queue's runs), edited in place by later runs (#912), except that a run with no answer adds its line below the earlier report rather than replacing it (#2201) |
+| **On request** (`mutants-on-request.yml`) | a PR's `Mutation: diff` (or globs) line, which the merge queue dispatches on `main` after the merge, two at a time (#1934); `make mutants-remote SCOPE=...`; or a dispatch with a `scope` input | `diff` (the branch against `origin/main`, or with `commit` the merged squash commit against its parent) or path globs (separated by spaces or commas; with `commit`, as from a merged PR's line, globs keep that commit's diff to the files they name and never widen it, and globs matching no changed file plan nothing and say so, green; by hand, without `commit`, they mutate the named files whole; a brace such as `crates/{core,physics}/src/**` is expanded, since git's glob dialect has none), turned by `.github/scripts/mutants-scope.py` into one `--in-diff` per cargo workspace the scope reaches: the engine's, and each directory whose `Cargo.toml` opens its own `[workspace]` (`tools/lint`, run inside it with its own `cargo test`; a cargo-fuzz crate such as `fuzz/` is named as having nothing to run), in one report (#2201); one runner, or up to four for a plan too large for one (`mutants-request.py shards`, #2283), each with a 2 h 45 budget, merged into one report; a `diff` past what four measure runs at the cap and names what it never reached, while a whole-file ask planning more than 1.5 times that is refused in the `plan` job, red, before any shard starts, with each file's mutant count largest first (`mutants-request.py refuse`); one run per branch, a newer dispatch cancelling the older and an unmerged close of the PR cancelling what is left, while a merged PR's run finishes (`mutants-cancel.yml`, #1530) | printed in the terminal by `make mutants-remote`; the run summary and a `mutants-report` artifact (`report.md`, `survivors.diff`); `report.md` also as one comment on the branch's open PR, or its merged one (the `pr` input for the queue's runs), edited in place by later runs (#912), except that a run with no answer adds its line below the earlier report rather than replacing it (#2201) |
 
 Why this shape: mutation is a signal, and a per-PR job held runners the merge
 queue was waiting on for a report that could not change whether anything merged.
