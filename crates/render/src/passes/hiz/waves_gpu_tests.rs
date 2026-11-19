@@ -14,7 +14,23 @@ use rusty_shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// The variant's baked files, removed when the test ends, pass or fail.
-struct Baked(String);
+pub(super) struct Baked(pub(super) String);
+
+/// A `vertex_waves` variant swelling 6 m, baked under a name of `tag`'s.
+pub(super) fn waves(tag: &str) -> Baked {
+    let name = format!("test_hiz_{tag}_{}", std::process::id());
+    let params = [("amplitude".to_string(), ParamValue::Scalar(6.0))];
+    let recipe = ShaderRecipe {
+        pass: PassKind::Surface,
+        name: name.clone(),
+        blocks: vec![BlockSel {
+            id: "vertex_waves".into(),
+            params: params.into_iter().collect(),
+        }],
+    };
+    bake_recipe(&recipe, engine_shader_dir(), DEFAULT_OUT_DIR).expect("bakes");
+    Baked(name)
+}
 
 impl Drop for Baked {
     fn drop(&mut self) {
@@ -47,18 +63,8 @@ fn pool(water: Option<&str>) -> Scene {
 
 #[test]
 fn gpu_a_waved_plane_behind_a_rim_still_draws_its_crests() {
-    let name = format!("test_hiz_waves_{}", std::process::id());
-    let _baked = Baked(name.clone());
-    let params = [("amplitude".to_string(), ParamValue::Scalar(6.0))];
-    let recipe = ShaderRecipe {
-        pass: PassKind::Surface,
-        name: name.clone(),
-        blocks: vec![BlockSel {
-            id: "vertex_waves".into(),
-            params: params.into_iter().collect(),
-        }],
-    };
-    bake_recipe(&recipe, engine_shader_dir(), DEFAULT_OUT_DIR).expect("bakes");
+    let baked = waves("waves");
+    let name = baked.0.clone();
     let Some(mut r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
         return;
     };
