@@ -306,7 +306,9 @@ Per pull request:
    of line. File its "follow-up" notes as issues now. If it asked for a scoped
    mutation run (a `Mutation:` line, which the queue dispatches after the merge),
    read the report when it lands on the merged PR (`ci-merge`, *Triaging a
-   survivor*).
+   survivor*): each survivor is a question, so a follow-up names only the ones
+   that show behaviour nothing asserts, and leaves the rest; no brief asks for
+   zero survivors.
 2. **A hand-back** skips that PR and the watch carries on. A mechanical fix (a
    conflict where both sides are kept, a one-line red) goes to the `Agent`
    tool's `merge-fixer`, its prompt the PR, its branch and the hand-back line;
