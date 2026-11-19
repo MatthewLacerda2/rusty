@@ -86,6 +86,11 @@ impl UiViewCache {
         &self.canvases
     }
 
+    /// Every synced canvas beside the effect state, to update one reading the other.
+    pub(super) fn canvases_and_effects(&mut self) -> (&[CanvasGpu], &mut UiEffects) {
+        (&self.canvases, &mut self.effects)
+    }
+
     /// Synced canvas `i`, in draw order.
     pub(super) fn canvas(&self, i: usize) -> &CanvasGpu {
         &self.canvases[i]

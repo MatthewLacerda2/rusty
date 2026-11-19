@@ -31,9 +31,9 @@ use std::rc::Rc;
 
 use glam::Vec2;
 
-use super::cache::{CanvasPlace, UiViewCache};
+use super::cache::{CanvasGpu, CanvasPlace, UiViewCache};
 use super::effects::GroupKey;
-use super::mesh::build_canvas_meshes;
+use super::mesh::{build_canvas_meshes, UiBatch};
 use super::pipeline::UiPass;
 use crate::gpu::fullscreen::color_pass;
 use crate::timing::GpuPass;
@@ -119,26 +119,32 @@ impl Renderer {
         self.ui_renderer.shaders.ensure_screen(&self.device, format);
         self.run_backdrop_blur(view);
         self.lap("ui.blur");
-        self.encode_ui(&view.ui, &target, format, screen_box(view));
+        let at = screen_box(view);
+        self.encode_ui(&mut view.ui, &target, format, at);
     }
 
     /// Record and submit the UI pass over `target`.
     fn encode_ui(
         &self,
-        cache: &UiViewCache,
+        cache: &mut UiViewCache,
         target: &wgpu::TextureView,
         format: wgpu::TextureFormat,
         (x, y, width, height): (u32, u32, u32, u32),
     ) {
         let ui = &self.ui_renderer;
+        let divisor = Some(self.quality.backdrop_divisor());
+        let key = |b: &UiBatch| GroupKey::of(b, divisor);
+        let on_screen = |c: &&CanvasGpu| c.place.space == CanvasSpace::Screen;
+        let canvases = cache.canvases().iter().filter(on_screen);
+        let keys: Vec<_> = canvases
+            .flat_map(|c| c.mesh.batches.iter().map(key))
+            .collect();
+        self.batch_groups(&mut cache.effects, keys);
+        let cache = &*cache;
         let screen = || {
             let all = cache.canvases().iter().enumerate();
-            all.filter(|(_, c)| c.place.space == CanvasSpace::Screen)
+            all.filter(|(_, c)| on_screen(c))
         };
-        let divisor = Some(self.quality.backdrop_divisor());
-        let key = |b| GroupKey::of(b, divisor);
-        let keys = screen().flat_map(|(_, c)| c.mesh.batches.iter().map(key));
-        let groups = self.batch_groups(&cache.effects, keys);
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -162,7 +168,7 @@ impl Renderer {
                     }
                     pass.set_bind_group(0, ui.source_group(&batch.source), &[]);
                     let slot = cache.effects.batch_offset(i, b);
-                    pass.set_bind_group(1, &groups[&key(batch)], &[slot]);
+                    pass.set_bind_group(1, cache.effects.group(&key(batch)), &[slot]);
                     let s = batch
                         .clip
                         .rect

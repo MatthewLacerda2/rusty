@@ -180,16 +180,18 @@ impl Renderer {
 
     /// Record and submit the world pass: `(canvas index, placement offset)` in
     /// draw order.
-    fn encode_world_ui(&self, view: &RenderView, draws: &[(usize, u32)]) {
+    fn encode_world_ui(&self, view: &mut RenderView, draws: &[(usize, u32)]) {
         let ui = &self.ui_renderer;
+        let batches = |i| view.ui.canvas(i).mesh.batches.iter();
+        let keys: Vec<_> = draws
+            .iter()
+            .flat_map(|&(i, _)| batches(i).map(|b| GroupKey::of(b, None)))
+            .collect();
+        self.batch_groups(&mut view.ui.effects, keys);
+        let view = &*view;
         let Some(uniforms) = view.ui.world.as_ref() else {
             return;
         };
-        let batches = |i| view.ui.canvas(i).mesh.batches.iter();
-        let keys = draws
-            .iter()
-            .flat_map(|&(i, _)| batches(i).map(|b| GroupKey::of(b, None)));
-        let groups = self.batch_groups(&view.ui.effects, keys);
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -207,7 +209,11 @@ impl Renderer {
                     ui.bind_batch(&mut pass, (&view.ui, i, b), UiPass::World, &mut blend);
                     let slot = view.ui.effects.batch_offset(i, b);
                     pass.set_bind_group(0, ui.source_group(&batch.source), &[]);
-                    pass.set_bind_group(1, &groups[&GroupKey::of(batch, None)], &[slot]);
+                    pass.set_bind_group(
+                        1,
+                        view.ui.effects.group(&GroupKey::of(batch, None)),
+                        &[slot],
+                    );
                     pass.draw(batch.range.clone(), 0..1);
                 }
             }
