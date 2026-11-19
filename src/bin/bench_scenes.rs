@@ -135,7 +135,7 @@ fn import_one(run: &Run, scene: &str, file: &Path) {
     let loaded = scenes::load(scratch, &opened.root, scene, opened.settings, run.opts);
     let ms = loaded.map_or_else(
         |e| fail(&format!("{scene}: cold load failed: {e}")),
-        |l| imported + l.1,
+        |l| imported + l.1.total_ms(),
     );
     // lint: allow(asset-write) a number handed to the parent process, deleted after
     let wrote = std::fs::write(file, ms.to_string());
