@@ -23,11 +23,11 @@ use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _
 pub(crate) use effect::EFFECT;
 pub use params::{Clock, ExposureParams, Step};
 
-use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::Arc;
-
 use crate::gpu::shaders::ShaderRegistry;
 use crate::motion::HistoryKey;
+use crate::timing::{GpuPass, GpuTimer};
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::Arc;
 
 /// Histogram bins. Mirrors `BINS` in `postfx/exposure.wgsl`, and equals the
 /// histogram pass's workgroup size (8 × 8), one bin per invocation.
@@ -191,11 +191,12 @@ impl ExposureMeter {
     }
 
     /// Meter `scene` (the view's HDR target, `size` pixels) and adapt, with
-    /// `params`, then start reading the result back when no earlier read is in flight.
+    /// `params` (timed under `post_fx`), then start reading the result back when no
+    /// earlier read is in flight.
     pub fn run(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
-        passes: &ExposurePasses,
+        (passes, timer): (&ExposurePasses, &GpuTimer),
         (scene, size): (&wgpu::TextureView, [u32; 2]),
         params: &ExposureParams,
     ) {
@@ -208,7 +209,7 @@ impl ExposureMeter {
         {
             let mut pass = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("Auto Exposure"),
-                timestamp_writes: None,
+                timestamp_writes: timer.compute_writes(GpuPass::PostFx),
             });
             pass.set_bind_group(0, &bind_group, &[]);
             pass.set_pipeline(&passes.histogram);

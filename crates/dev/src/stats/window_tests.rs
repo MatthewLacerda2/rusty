@@ -9,6 +9,8 @@ fn drawn(draw_calls: u32, gpu: Option<f64>) -> WindowFrame {
     let gpu = gpu.map(|ms| GpuTimes {
         frame: 1,
         passes: vec![(GpuPass::Forward, ms)],
+        other_ms: 0.0,
+        between_submits_ms: 0.0,
     });
     let render = RenderedFrame {
         counters,

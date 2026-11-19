@@ -34,7 +34,7 @@ def requested(body: str | None) -> str | None:
 
 
 def rust(files: list[str]) -> bool:
-    """Whether any of a commit's files is Rust: `diff`'s rule, so nothing else plans a mutant."""
+    """Whether any of a commit's files is Rust: what every scope narrows, so nothing else plans a mutant."""
     return any(path.endswith(".rs") for path in files)
 
 
