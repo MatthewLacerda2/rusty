@@ -1,0 +1,71 @@
+//! How many compute passes the `occlusion` stage records (#2327): the select's
+//! own, before phase one's depth draw, then one for the pyramid, the test, the
+//! compaction and every clustered batch's cluster cull, at one batch and at three.
+
+use glam::{Quat, Vec3};
+
+use super::cluster_gpu_tests::panel;
+use super::gpu_tests::{offscreen, shot, H, W};
+use rusty_lighting::occlusion::test_level::block;
+use rusty_scene::{Camera, Scene};
+
+/// The stage's compute passes, at one clustered batch and at three.
+/// Measured: lavapipe 2, Metal 2 (CI's macOS leg); before #2327, 4 + R (7 with
+/// three batches on lavapipe).
+const PASSES: u32 = 2;
+
+/// A wall half across `n` clustered panels, each its own mesh and so its own
+/// clustered batch.
+fn panels(n: usize) -> Scene {
+    let mut scene = Scene::new();
+    scene.skybox_path = String::new();
+    let (lo, hi) = (Vec3::new(-9.0, -3.0, -0.2), Vec3::new(0.0, 12.0, 0.2));
+    block(&mut scene, "Wall", lo, hi);
+    for (i, x) in [-7.0, -2.0, 3.0].into_iter().enumerate().take(n) {
+        let at = Vec3::new(x, -2.0, -5.0 - i as f32);
+        panel(&mut scene, &format!("Panel_{i}"), (at, 4.0, Quat::IDENTITY));
+    }
+    scene
+}
+
+/// Render `n` panels with the cull on, then off: the settled cull-on frame's
+/// counts must show `n` clustered runs in [`PASSES`] compute passes, both culls
+/// at work, and the same pixels as the cull-off frame. Returns what the CPU
+/// decided, the same on any adapter: (tested, cluster-tested, draws, triangles);
+/// `None` where no culling adapter is (the test skips).
+fn stage_with(n: usize) -> Option<(u32, u32, u32, u64)> {
+    let mut r = crate::test_gpu::culling::culling_or_skip(W, H)?;
+    let scene = panels(n);
+    let cam = Camera::new(Vec3::new(0.0, 1.0, 8.0), -90.0, 0.0);
+    let mut view = offscreen(&r);
+    // A few frames, so the history and the counters' read back settle.
+    let shots: Vec<_> = (0..9)
+        .map(|_| shot(&mut r, &mut view, &scene, &cam))
+        .collect();
+    let (on, c) = shots.last().expect("nine frames");
+    let runs = view.hiz.cameras[0].clusters.runs_ran;
+    assert_eq!(runs as usize, n, "each panel its own clustered run: {c:?}");
+    assert_eq!(c.ops.compute_passes, PASSES, "{n} runs: {c:?}");
+    assert!(c.hiz_culled > 0 && c.cluster_culled > 0, "{c:?}");
+    r.quality.gpu_occlusion_culling = false;
+    let mut fresh = offscreen(&r);
+    let (off, _) = shot(&mut r, &mut fresh, &scene, &cam);
+    assert!(*on == off, "the cull moved pixels");
+    Some((c.hiz_tested, c.cluster_tested, c.draw_calls, c.triangles))
+}
+
+#[test]
+fn gpu_the_stage_records_two_compute_passes_with_one_clustered_batch() {
+    // Measured: lavapipe 2/86/2/8204.
+    if let Some(decided) = stage_with(1) {
+        assert_eq!(decided, (2, 86, 2, 8204));
+    }
+}
+
+#[test]
+fn gpu_the_stage_records_two_compute_passes_with_three_clustered_batches() {
+    // Measured: lavapipe 4/258/4/24588 (the same before #2327; it culled 1 and 122).
+    if let Some(decided) = stage_with(3) {
+        assert_eq!(decided, (4, 258, 4, 24588));
+    }
+}

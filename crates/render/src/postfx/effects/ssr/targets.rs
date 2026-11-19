@@ -5,8 +5,8 @@
 use super::pass::{SsrParams, SsrPasses};
 use super::pyramid::{colour_copy, HitPyramids};
 use crate::gpu::bind_entry as entry;
+use crate::gpu::kept::Kept;
 use crate::gpu::ops::CountedDevice as _;
-use crate::passes::hiz::kept::Kept;
 
 /// The views the shared group binds from outside the targets: the velocity target
 /// and the two SSR surface targets (weight, applied).
