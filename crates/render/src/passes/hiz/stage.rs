@@ -100,29 +100,18 @@ impl Renderer {
                     dispatch(pass, (&self.hiz.test, &groups[1]), n);
                     dispatch(pass, (&self.hiz.compact, &groups[1]), batches);
                 }
-                GpuPart::OcclusionClusters => {
-                    self.record_clusters(pass, (clusters, plan), &CLUSTER_STEPS)
-                }
-                step @ (GpuPart::OcclusionClustersTest
-                | GpuPart::OcclusionClustersScan
-                | GpuPart::OcclusionClustersCopy) => {
-                    self.record_clusters(pass, (clusters, plan), &[step])
-                }
                 GpuPart::OcclusionSelect | GpuPart::OcclusionPhaseOne => {
                     unreachable!("recorded by `cull_by_hiz` before phase one ends")
                 }
+                // The cluster cull whole, or one of its dispatch kinds.
+                cluster => self.record_clusters(pass, (clusters, plan), steps_of(cluster)),
             }
             self.lap(lap_of(part));
         };
         let after = [GpuPart::OcclusionPyramid, GpuPart::OcclusionTest];
-        // Untimed, the cluster cull is one part, each batch's dispatches in turn;
-        // timed, one pass per dispatch kind, every batch's in each (#2406).
-        let cluster_parts: &[GpuPart] = match (clustered, split) {
-            (false, _) => &[],
-            (true, false) => &[GpuPart::OcclusionClusters],
-            (true, true) => &CLUSTER_STEPS,
-        };
-        let parts = after.into_iter().chain(cluster_parts.iter().copied());
+        let parts = after
+            .into_iter()
+            .chain(cluster_parts(clustered, split).iter().copied());
         let begin = |encoder: &mut wgpu::CommandEncoder, label, writes| {
             let desc = wgpu::ComputePassDescriptor {
                 label: Some(label),
@@ -178,6 +167,24 @@ const CLUSTER_STEPS: [GpuPart; 3] = [
     GpuPart::OcclusionClustersScan,
     GpuPart::OcclusionClustersCopy,
 ];
+
+/// The cluster cull's parts: none without a clustered batch; untimed, one, each
+/// batch's dispatches in turn; timed, a pass per dispatch kind, every batch's
+/// in each (#2406).
+fn cluster_parts(clustered: bool, split: bool) -> &'static [GpuPart] {
+    match (clustered, split) {
+        (false, _) => &[],
+        (true, false) => &[GpuPart::OcclusionClusters],
+        (true, true) => &CLUSTER_STEPS,
+    }
+}
+
+/// The dispatch kinds the cluster cull's `part` records: all three for the
+/// part itself, else the one it names.
+fn steps_of(part: GpuPart) -> &'static [GpuPart] {
+    let at = CLUSTER_STEPS.iter().position(|s| *s == part);
+    at.map_or(&CLUSTER_STEPS, |i| &CLUSTER_STEPS[i..=i])
+}
 
 /// A timed part's pass label: its lap's, but a cluster cull dispatch's own.
 fn label_of(part: GpuPart) -> &'static str {
