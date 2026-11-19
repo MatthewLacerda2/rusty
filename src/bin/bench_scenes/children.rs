@@ -122,7 +122,12 @@ fn child(run: &Run, project: &Path, scene: &str) -> Command {
     for pair in &run.set.said {
         cmd.args(["--set", pair]);
     }
-    let root: OsString = run.out.parent().unwrap_or(&run.out).into();
+    // Every child of a `--script` run writes where the run reads, `script/`;
+    // only the timed one (`bench_one`) arms the timers.
+    if run.script {
+        cmd.arg("--script");
+    }
+    let root: OsString = run.root.clone().into();
     cmd.arg(root);
     cmd
 }

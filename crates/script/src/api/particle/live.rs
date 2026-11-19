@@ -51,6 +51,9 @@ const _: () = assert!(FIELDS as u32 <= SLOTS, "an edit's slot must fit its strid
 /// replaces what is live with them, as `SetParticles` replaces it with its list.
 struct Snapshot(Vec<Particle>);
 
+/// The verbs (the first three) and the Rust halves' keys in `RUST_HALVES`.
+const HALVES: [&str; 4] = ["GetParticles", "SetParticles", "ForEach", "ForEach/edit"];
+
 /// Register `GetParticles`, `SetParticles` and `ForEach` onto the `Particles` table.
 pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     let halves = (read(lua, scene), write(lua, scene), edit(lua, scene));
@@ -63,16 +66,14 @@ pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
         format!("<I4{}", "f".repeat(FIELDS)),
         NAMES.join(","),
     );
+    let halves = HALVES.into_iter().zip([&read, &write, &read, &edit]);
+    let halves = super::super::rust_halves(lua, "Particles", halves).map_err(|e| e.to_string())?;
     let (get, set, for_each): (Function, Function, Function) = lua
         .load(include_str!("live.lua"))
         .set_name("=particles_live")
-        .call((read, write, edit, layout.0, layout.1, layout.2, SLOTS))
+        .call((halves, layout.0, layout.1, layout.2, SLOTS))
         .map_err(|e| e.to_string())?;
-    for (name, f) in [
-        ("GetParticles", get),
-        ("SetParticles", set),
-        ("ForEach", for_each),
-    ] {
+    for (name, f) in HALVES.into_iter().zip([get, set, for_each]) {
         table.set(name, f).map_err(|e| e.to_string())?;
     }
     Ok(())

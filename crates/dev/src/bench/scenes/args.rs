@@ -30,6 +30,8 @@ pub struct Args {
     pub import_ms: Option<f64>,
     pub profile: bool,
     pub import: bool,
+    /// `--script`: time the scripts' engine verbs (`bench::verbs`).
+    pub script: bool,
     /// `--set key=value`, each (`super::set`).
     pub set: Overrides,
     /// `--pending-imports`: list the images an import would encode and exit.
@@ -65,6 +67,7 @@ pub fn parse(mut args: Vec<String>) -> Result<Args, String> {
         import_ms,
         profile: take_switch(&mut args, "--profile"),
         import: take_switch(&mut args, "--import"),
+        script: take_switch(&mut args, "--script"),
         set: Overrides::parse(&pairs)?,
         pending_imports: take_switch(&mut args, "--pending-imports"),
         rest: args,
