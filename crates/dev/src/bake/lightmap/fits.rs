@@ -9,7 +9,7 @@
 //! the charts in flight (a worker's chart: its covered texels and their traced
 //! light, [`IN_FLIGHT_PER_TEXEL`]; the ones being assembled, over their whole
 //! squares, [`FINISH_PER_TEXEL`]: one at a time past
-//! [`ASSEMBLE_ALONE`](rusty_lighting::lightmap::ASSEMBLE_ALONE)'s square, so the
+//! [`ASSEMBLE_ALONE`]'s square, so the
 //! largest stands for those, and any smaller one in flight beside it), or OIDN's
 //! charts in flight (at most
 //! `denoise::budget::BUDGET`) when those are more, since a chart is denoised while

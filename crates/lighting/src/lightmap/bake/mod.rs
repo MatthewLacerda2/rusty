@@ -36,7 +36,7 @@ pub use map::Lightmap;
 pub use progressive::{bake_progressive, Pass, PassSink};
 pub use view::BakeView;
 
-/// Texels of a chart's square past which it is assembled ([`assemble`]) one at a
+/// Texels of a chart's square past which it is assembled (`assemble`) one at a
 /// time, in the process: its dense maps cost about 256 bytes a texel of its square
 /// (`dev::bake::lightmap::fits`), so two large charts finishing on two workers at
 /// once would hold two of them. A worker reaching the gate while another chart
