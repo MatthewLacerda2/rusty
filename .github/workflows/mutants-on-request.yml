@@ -26,14 +26,15 @@
 # only when someone asks, over what they name (CLAUDE.md, *Gates vs.
 # signals*); a whole module is audited by asking for its glob. It goes red
 # when it has no honest report to give — a path scope with nothing to
-# mutate, a baseline that does not build — because its caller must tell "no
+# mutate, a hand ask too large to measure, a baseline that does not build — because its caller must tell "no
 # survivors" from "no answer", and the run's conclusion is what it reads.
 # Survivors are a result and never turn it red.
 #
 # The merge queue is the usual caller (#1934): a coder writes a `Mutation:`
 # line in its pull request, and after the queue merges it, it dispatches this
 # on `main` with `commit` (the squash commit, checked out and diffed against
-# its parent) and `pr` (where the report goes), at most two at a time
+# its parent; globs keep that diff to the files they name, never widen it to
+# whole files, #2371) and `pr` (where the report goes), at most two at a time
 # (`.github/scripts/merging/after/`). Dispatching at ready, as coders did
 # before, held a third of the account's runners on 2026-11-08 while the
 # gating `ci` runs waited 20-40 minutes behind them.
@@ -62,7 +63,7 @@ on:
         default: by-hand
         type: string
       commit:
-        description: Mutate this commit's own change, checked out (the merge queue's; with scope `diff`)
+        description: Mutate this commit's own change, checked out (the merge queue's; globs narrow it)
         required: false
         default: ""
         type: string
@@ -113,8 +114,9 @@ env:
 jobs:
   # Builds nothing: the scope, the plan's size (`cargo mutants --list` answers
   # in seconds) and the shard count, kept as the `mutants-plan` artifact for
-  # the other two jobs. A scope it cannot read, or a path scope with nothing to
-  # mutate, writes why into that artifact's `report/` and goes red.
+  # the other two jobs. A scope it cannot read, a path scope with nothing to
+  # mutate, or one too large to measure writes why into that artifact's
+  # `report/` and goes red.
   plan:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -129,12 +131,14 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ inputs.commit }}
-      # The tree is `inputs.commit`, which may predate a step this job calls
-      # (`install-tool`, #1973; `system-libs`, #2101): take `.github/actions`
-      # from the workflow's own commit, so a request queued before a change to
-      # them still runs. Before the first local action.
+      # The tree is `inputs.commit`, which may predate a step or a script this
+      # job calls (`install-tool`, #1973; `system-libs`, #2101; `refuse`,
+      # #2371): take `.github/actions` and `.github/scripts` from the
+      # workflow's own commit, so a request queued before a change to them
+      # still runs. The scripts only read git, so they work on an older tree.
+      # Before the first local action.
       - name: Shared steps from the workflow's commit
-        run: git checkout "$GITHUB_SHA" -- .github/actions
+        run: git checkout "$GITHUB_SHA" -- .github/actions .github/scripts
       - name: Toolchain (from rust-toolchain.toml)
         run: rustup show
       - name: Install cargo-mutants
@@ -180,6 +184,17 @@ jobs:
           echo "in_scope=$(count root)" >> "$GITHUB_OUTPUT"
           echo "standalone=$(count standalone)" >> "$GITHUB_OUTPUT"
 
+      # A hand ask naming files whole that plans far more than the cap's
+      # runners can measure starts no shard (#2371): it ends here, red, with
+      # each file's count from the plan above, so the next ask is narrower.
+      # A `diff` (or a commit's globs) is never refused: it runs at the cap.
+      - name: Whether one ask can measure it
+        id: fits
+        run: |
+          python3 .github/scripts/mutants-request.py refuse plan.json --budget-seconds "$BUDGET_SECONDS" \
+            > refused.txt 2> refuse-error.txt \
+            || { cat refused.txt refuse-error.txt; echo "::error::$(head -n1 refused.txt) $(tail -n1 refuse-error.txt)"; exit 1; }
+
       # As many runners as the engine's part needs to end inside the budget,
       # at most a handful (`mutants-request.py`'s docstring has the figures).
       # A standalone part runs on shard 0 first, so it counts toward the size.
@@ -194,17 +209,20 @@ jobs:
             --budget-seconds "$BUDGET_SECONDS" >> "$GITHUB_OUTPUT" 2> sizing.txt
           echo "Shards: $(cat sizing.txt)." | tee -a "$GITHUB_STEP_SUMMARY"
 
-      # A run with no answer says so (#2201): the scope was unreadable or
-      # named nothing to mutate. `report` posts this below the comment's
+      # A run with no answer says so (#2201): the scope was unreadable, named
+      # nothing to mutate, or was too large to measure (#2371). `report` posts this below the comment's
       # earlier report, never over it, and the run stays red.
       - name: Say why there is no answer
         if: failure()
         env:
           RESOLVE: ${{ steps.resolve.outcome }}
           PLAN: ${{ steps.plan.outcome }}
+          FITS: ${{ steps.fits.outcome }}
         run: |
           if [ "$RESOLVE" = failure ]; then why="the scope could not be read: $(cat problem.txt)"
           elif [ "$PLAN" = failure ] && [ -s scope.txt ]; then why="$(cat scope.txt)"
+          elif [ "$FITS" = failure ] && [ -s refused.txt ]; then why="$(cat refused.txt)"
+          elif [ "$FITS" = failure ]; then why="the size check broke: $(tail -n 3 refuse-error.txt 2>/dev/null | tr '\n' ' ')"
           else why="the run broke before it could plan the mutants."
           fi
           python3 .github/scripts/mutants-report.py --unanswered "$why" --out report
@@ -246,14 +264,14 @@ jobs:
     steps:
       - name: Start the clock
         run: echo "JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
-      # The same tree `plan` read, and its `.github/actions` from the
-      # workflow's commit (`plan` says why).
+      # The same tree `plan` read, and its `.github/actions` and
+      # `.github/scripts` from the workflow's commit (`plan` says why).
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ inputs.commit }}
       - name: Shared steps from the workflow's commit
-        run: git checkout "$GITHUB_SHA" -- .github/actions
+        run: git checkout "$GITHUB_SHA" -- .github/actions .github/scripts
       - name: Toolchain (from rust-toolchain.toml)
         run: rustup show
       - name: Cache cargo registry + target

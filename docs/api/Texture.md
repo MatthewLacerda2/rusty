@@ -579,7 +579,11 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
 - `map_range {from_min, from_max, to_min, to_max}` (*math*, 1 input).
 - `mapping {scale=[1,1], rotation=0, translation=[0,0], tiling=true}` (*vector*, 1
   input): bilinear, wrapped resample; `rotation` in turns; each transform left out is
-  the identity, so `mapping {rotation = 0.25}` only turns. With `tiling` the rotation
+  the identity, so `mapping {rotation = 0.25}` only turns. Each output point reads the
+  input at that point turned about the centre (0.5, 0.5), scaled about it, then offset
+  by `translation` (in tiles): a positive `rotation` turns the content
+  counter-clockwise as the image is shown (v down), and a positive `translation` moves
+  it towards −U / −V (left / up). With `tiling` the rotation
   snaps to a quarter turn (*Tiling*), so a stretched noise only ever lines up with the
   axes: `rotation = 0.125` on a `scale = {1, 12}` stretch gives vertical lines, not
   diagonal ones. For streaks at any angle, `directional_blur` a noise (or
@@ -778,7 +782,9 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   cells, so it costs about 2 s of one core at 2048², against 0.6 s for `distance`. `smoothness`
   0 is F1; a NaN reads 0.
 - `warp {strength}` (*vector*, 2 inputs): samples input 1 displaced by input 2's R/G,
-  centred on 0.5 so mid-grey moves nothing; `strength` is in tile units; feed input 2
+  centred on 0.5 so mid-grey moves nothing; `strength` is in tile units, and red above
+  0.5 reads further along +U, so the content moves towards −U (green above 0.5: −V;
+  a negative `strength` reverses both); feed input 2
   a `combine_rgb` of two different noises — a grayscale one has R = G and only pushes
   along the diagonal.
 - `wave {kind="bands"|"rings", frequency, profile="sine"|"saw"|"triangle",
@@ -1139,7 +1145,8 @@ and 2048² (iterate at a low `resolution`, ship at a high one):
   the pixel radius is `radius × resolution` (a `box` rounds it), capped at half the
   tile, and on a `size` recipe `radius × width` across and `radius × height` down. A `gaussian` reaches about `radius`, a `box` exactly its rounded radius.
 - `warp.strength` is a displacement in tiles: a channel at 1.0 pushes the read
-  `strength / 2` of a tile.
+  `strength / 2` of a tile along +U (red) or +V (green), which moves the content as
+  far the other way.
 - `bump_to_normal.strength` scales the slope measured in tile units (height change
   across one whole tile), not per pixel. On a `size` recipe the unit is a tile of the
   **longer** side on both axes, so the same height step between neighbouring pixels

@@ -52,3 +52,7 @@ fn one_vec2() -> [f32; 2] {
 fn yes() -> bool {
     true
 }
+
+#[cfg(test)]
+#[path = "mapping_tests.rs"]
+mod tests;
