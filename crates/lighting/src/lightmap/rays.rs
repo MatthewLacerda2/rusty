@@ -8,9 +8,13 @@
 //! pure function of the triangles, and the ray path walks it on one thread with
 //! scalar `f32` arithmetic (no SIMD lanes, no libm), so it gives the same bits on
 //! every machine.
+//!
+//! The BVH's node test is our own copy of parry's ([`NodeRay`]), with the
+//! per-axis reciprocal of the direction worked out once per ray instead of at
+//! every node: the same operations in the same order, so the same bits.
 
 use glam::Vec3;
-use rapier3d::parry::partitioning::TraversalAction;
+use rapier3d::parry::partitioning::{BvhNode, TraversalAction};
 use rapier3d::parry::query::details::local_ray_intersection_with_triangle;
 use rapier3d::parry::query::Ray;
 use rapier3d::parry::shape::TriMesh;
@@ -116,9 +120,10 @@ impl Rays {
         self.count();
         let mesh = self.mesh.as_ref()?;
         let ray = Ray::new(origin + dir * t_min, dir);
+        let boxes = NodeRay::new(&ray);
         let (tri, (_, weights)) = mesh.bvh().find_best(
             t_max - t_min,
-            |node, best| node.cast_ray(&ray, best),
+            |node, best| boxes.cast(node, best),
             |i, best| match self.tris[i as usize].seen {
                 true => hit(mesh, i, &ray, best),
                 false => None,
@@ -166,9 +171,10 @@ impl Rays {
         let mesh = self.mesh.as_ref()?;
         let ray = Ray::new(origin + dir * t_min, dir);
         let reach = t_max - t_min;
+        let boxes = NodeRay::new(&ray);
         let mut blocker = None;
         mesh.bvh().traverse(|node| {
-            if node.cast_ray(&ray, reach) == f32::MAX {
+            if boxes.cast(node, reach) == f32::MAX {
                 return TraversalAction::Prune;
             }
             if let Some(i) = node.leaf_data() {
@@ -196,6 +202,85 @@ impl Rays {
         if self.counting {
             self.cast.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
+    }
+}
+
+/// A ray made ready for the BVH's node test: its origin, and per axis whether
+/// its direction is zero and the direction's reciprocal.
+#[derive(Clone, Copy)]
+pub(super) struct NodeRay {
+    origin: [f32; 3],
+    zero: [bool; 3],
+    inv: [f32; 3],
+    /// The ray itself, for the test build's parry path ([`PARRY_NODES`]).
+    #[cfg(test)]
+    ray: Ray,
+}
+
+/// Test builds only: when set, [`NodeRay::cast`] answers with parry's own
+/// `BvhNode::cast_ray`, so a test can bake both ways and compare the bytes; and
+/// how many nodes it tested. Under nextest every test is its own process, so one
+/// test's switch reaches no other (and the two paths agree to the bit anyway).
+#[cfg(test)]
+pub(super) static PARRY_NODES: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+#[cfg(test)]
+pub(super) static NODES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+impl NodeRay {
+    pub(super) fn new(ray: &Ray) -> Self {
+        let d = ray.dir.to_array();
+        NodeRay {
+            origin: ray.origin.to_array(),
+            // parry's `is_zero()`: `== 0.0`, so -0.0 too, and NaN is not zero.
+            zero: d.map(|c| c == 0.0),
+            inv: d.map(|c| 1.0 / c),
+            #[cfg(test)]
+            ray: *ray,
+        }
+    }
+
+    /// Where the ray enters `node`'s box short of `max_toi`, 0 when it starts
+    /// inside, `f32::MAX` when it misses: parry 0.31's `BvhNode::cast_ray`, which
+    /// is `Aabb::cast_local_ray(ray, max_toi, true)` (`query/ray/ray_aabb.rs`)
+    /// with `1.0 / dir` hoisted out of the node loop. Copied because parry's own
+    /// inverse-ray test (`BvhNode::cast_inv_ray_simd`) is private, and it is SIMD.
+    /// Keep it parry's operations in parry's order (the zero test and slab check,
+    /// the swap, `max` then `min`, the early miss; no fused multiply-add): the
+    /// property test in `ray_box_tests` compares the two bit for bit, so a parry
+    /// upgrade that changes its test fails there rather than drifting the bake.
+    pub(super) fn cast(&self, node: &BvhNode, max_toi: f32) -> f32 {
+        #[cfg(test)]
+        {
+            use std::sync::atomic::Ordering::Relaxed;
+            NODES.fetch_add(1, Relaxed);
+            if PARRY_NODES.load(Relaxed) {
+                return node.cast_ray(&self.ray, max_toi);
+            }
+        }
+        let (mins, maxs) = (node.mins().to_array(), node.maxs().to_array());
+        let mut tmin: f32 = 0.0;
+        let mut tmax = max_toi;
+        for i in 0..3 {
+            let o = self.origin[i];
+            if self.zero[i] {
+                if o < mins[i] || o > maxs[i] {
+                    return f32::MAX;
+                }
+            } else {
+                let mut near = (mins[i] - o) * self.inv[i];
+                let mut far = (maxs[i] - o) * self.inv[i];
+                if near > far {
+                    std::mem::swap(&mut near, &mut far);
+                }
+                tmin = tmin.max(near);
+                tmax = tmax.min(far);
+                if tmin > tmax {
+                    return f32::MAX;
+                }
+            }
+        }
+        tmin
     }
 }
 
