@@ -4,9 +4,11 @@
 Each rule here protects the merge queue from a run it cannot judge: a hung job
 holding a runner for GitHub's six-hour default, a runner image (and so the
 lavapipe driver under the GPU tests) moving with nothing in any diff, or a
-`ready_for_review` run cancelling a run of the very same commit. The last one
+`ready_for_review` run cancelling a run of the very same commit. (The runner
+image's rule, every job on a pinned one, is `test_runner_image.py`'s.) The last one
 ties together the one list written in three places: which Markdown is code
 because tests parse it (`docs/api/`, #525, #587).
+
 """
 
 from __future__ import annotations
@@ -20,9 +22,9 @@ from pathlib import Path
 
 from merging.queue import update
 from merging.verdict import changes
+from tests.workflows import WORKFLOW_DIR, jobs, read
 
 SCRIPTS = Path(__file__).resolve().parents[1]
-WORKFLOW_DIR = SCRIPTS.parent / "workflows"
 GATING = ("ci.yml", "lint.yml")
 
 
@@ -33,13 +35,6 @@ PINNED = ("test", "test-one-process")
 #: Made a prerequisite of the verb, so it runs with that verb's variables and exports,
 #: prints the seed its recipe would see, and stops make before the recipe runs.
 PROBE = "{verb}: seed-probe\nseed-probe:\n\t@echo \"seed=$$PROPTEST_RNG_SEED\"; exit 3\n"
-
-
-def jobs(workflow: str) -> dict[str, str]:
-    """Each top-level job's name and its body, from the workflow's text."""
-    text = (WORKFLOW_DIR / workflow).read_text().split("\njobs:\n", 1)[1]
-    parts = re.split(r"^  ([\w-]+):\n", text, flags=re.M)
-    return dict(zip(parts[1::2], parts[2::2]))
 
 
 class ProptestSeed(unittest.TestCase):
@@ -91,15 +86,9 @@ def seen(verb: str, makefile: Path) -> str:
 class Runners(unittest.TestCase):
     def test_every_gating_job_has_a_timeout(self):
         for workflow in GATING:
-            for name, body in jobs(workflow).items():
+            for name, body in jobs(read(workflow)).items():
                 with self.subTest(workflow=workflow, job=name):
                     self.assertRegex(body, r"(?m)^    timeout-minutes: \d+$")
-
-    def test_runner_images_are_pinned(self):
-        for workflow in GATING:
-            text = (WORKFLOW_DIR / workflow).read_text()
-            with self.subTest(workflow=workflow):
-                self.assertNotIn("-latest", text)
 
     def test_no_dead_merge_group_trigger(self):
         # GitHub's native merge queue is not enabled; `make queue` is the queue.
@@ -124,7 +113,7 @@ class DocsThatAreCode(unittest.TestCase):
 
     def test_ci_path_filter_reincludes_exactly_the_code_docs(self):
         # The `code` filter alone: the filters after it (`fuzz`) list paths of their own.
-        body = jobs("ci.yml")["changes"].split("            code:\n", 1)[1]
+        body = jobs(read("ci.yml"))["changes"].split("            code:\n", 1)[1]
         body = re.split(r"^            \w+:$", body, maxsplit=1, flags=re.M)[0]
         reincluded = re.findall(r"^\s+- '([^'!][^']*)'$", body, flags=re.M)
         self.assertEqual(sorted(reincluded), sorted(map(changes.code_doc_filter, changes.CODE_DOCS)))

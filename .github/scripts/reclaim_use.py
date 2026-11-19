@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import time
 from pathlib import Path
 
 DEPTH = 4  # entries this many levels below the worktree are stat'ed; their directories are not listed
@@ -109,3 +110,19 @@ def walk(directory: Path, since: float, depth: int) -> float | None:
             if found is not None:
                 return found
     return None
+
+
+SKEW = 60  # seconds past now an mtime may read before it is "in the future": a write landing mid-probe
+
+
+def written(tree: Path, idle_minutes: int) -> str | None:
+    """What under `tree` was written inside the idle window, as `reclaim.verdict` names it; `None` if nothing."""
+    if idle_minutes <= 0:
+        return None
+    now = time.time()
+    mtime = recent_write(tree, now - idle_minutes * 60)
+    if mtime is None:
+        return None
+    if mtime > now + SKEW:
+        return "something under it has an mtime in the future (clock skew, an extracted archive?)"
+    return f"something under it was written within the last {idle_minutes} minute(s)"

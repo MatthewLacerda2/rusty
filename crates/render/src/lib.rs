@@ -52,7 +52,7 @@ pub use ibl::probe::capture::ProbeCapture;
 pub use setup::headless::{gpu_required, ADAPTER_ENV, OFFSCREEN_FORMAT, REQUIRE_GPU_ENV};
 pub use setup::SurfaceWindow;
 pub use stats::{gpu_memory, GpuMemory, OpCounts, RenderCounters, Uploads};
-pub use timing::{ClockProbe, FrameCost, GpuPass, GpuTimes};
+pub use timing::{ClockProbe, FrameCost, GpuPart, GpuPass, GpuTimes};
 pub use view::{PixelSize, RenderView};
 
 // GPU uniform memory layouts live in `gpu/uniforms/` (split out to keep files under

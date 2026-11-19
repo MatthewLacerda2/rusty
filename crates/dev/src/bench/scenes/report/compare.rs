@@ -41,11 +41,48 @@ impl SceneReport {
             )];
         }
         let clock = |r: &SceneReport| r.row("cpu_clock_pct").map(|r| r.avg);
-        clock(self)
+        let drift = clock(self)
             .zip(clock(previous))
-            .and_then(|(now, before)| clock_drift(now, before))
-            .into_iter()
-            .collect()
+            .and_then(|(now, before)| clock_drift(now, before));
+        drift.into_iter().chain(self.set_moved(previous)).collect()
+    }
+
+    /// The warning for a comparison across other `--set` overrides: the change
+    /// is the settings' as much as the code's.
+    fn set_moved(&self, previous: &SceneReport) -> Option<String> {
+        let said = |s: &[String]| match s.is_empty() {
+            true => "none".to_string(),
+            false => s.join(", "),
+        };
+        (self.set != previous.set).then(|| {
+            format!(
+                "compared with a run of other quality overrides ({} -> {}): the change \
+                 is the settings' as well as the code's",
+                said(&previous.set),
+                said(&self.set)
+            )
+        })
+    }
+}
+
+impl SceneReport {
+    /// The notes on what the change column compares: the spread, or no earlier run.
+    pub(super) fn comparison_notes(&self, first: bool) -> [(bool, &'static str); 3] {
+        [
+            (
+                self.runs.max(1) > 1,
+                "(spread: the lowest to the highest run's average; a change inside both \
+                 runs' spreads is unresolved)",
+            ),
+            (
+                first && self.baseline.is_none(),
+                "(no previous report: the next run prints its change against this one)",
+            ),
+            (
+                first && self.baseline.is_some(),
+                "(the baseline holds no report of this scene: no change column)",
+            ),
+        ]
     }
 }
 

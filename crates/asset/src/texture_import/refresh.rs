@@ -25,14 +25,23 @@ pub fn refresh(source: &Path, progress: &str) -> Result<bool, String> {
     refresh_on(source, progress, Cores::All)
 }
 
-/// [`refresh`] on `cores`. Whether the cache is current costs a `stat` of the
-/// source (its digest is remembered by length and mtime, `convert::source_digest`)
-/// and a read of the cache's head; only an encode reads either whole.
-fn refresh_on(source: &Path, progress: &str, cores: Cores) -> Result<bool, String> {
+/// What an encode of one image is to make: the found half of [`refresh_on`].
+struct Due {
+    settings: crate::sidecar::TextureSettings,
+    out: PathBuf,
+    /// The image's size on disk, before `max_size` fits it.
+    size: (u32, u32),
+}
+
+/// Whether the image at `source` is due an encode, from its sidecar, the cache's
+/// head and its own header (never decoded): `None` when the cache is current or
+/// the image is one left uncompressed (no block format, a deep normal map kept
+/// at 16 bits, a fitted size not a multiple of 4).
+fn due(source: &Path) -> Result<Option<Due>, String> {
     use image::ImageDecoder;
     let settings = sidecar::texture(source);
     if format_of(&settings).is_none() {
-        return Ok(false);
+        return Ok(None);
     }
     let named = |e: &dyn std::fmt::Display| format!("{}: {e}", source.display());
     let out = cache_file(source)?;
@@ -42,20 +51,50 @@ fn refresh_on(source: &Path, progress: &str, cores: Cores) -> Result<bool, Strin
         Seen::Unreadable => return Err(named(&"cannot be read")),
     };
     if cache::is_current(&out, cache::stamp(digest, &settings)) {
-        return Ok(false);
+        return Ok(None);
     }
     let header = open(source)
         .and_then(|r| r.into_decoder())
         .map_err(|e| named(&e))?;
     if keeps_deep(&settings, header.color_type()) {
-        return Ok(false);
+        return Ok(None);
     }
     let size = header.dimensions();
-    shrink::warn_if_shrunk(source, size, settings.max_size);
     let (w, h) = shrink::fitted_size(size.0, size.1, settings.max_size);
     if w % 4 != 0 || h % 4 != 0 {
-        return Ok(false);
+        return Ok(None);
     }
+    Ok(Some(Due {
+        settings,
+        out,
+        size,
+    }))
+}
+
+/// The images under `root` an import would encode now ([`images`] whose cache is
+/// missing or stale, the ones left uncompressed aside), read without encoding:
+/// what a timed bench refuses to start with (`make bench-ab`), since each would
+/// upload decoded and its scene's memory and load would not be the game's. An
+/// image that cannot be read is not listed: no import makes its cache either.
+pub fn pending(root: &Path) -> Vec<PathBuf> {
+    let due = |image: &PathBuf| due(image).is_ok_and(|d| d.is_some());
+    images(root).into_iter().filter(due).collect()
+}
+
+/// [`refresh`] on `cores`. Whether the cache is current costs a `stat` of the
+/// source (its digest is remembered by length and mtime, `convert::source_digest`)
+/// and a read of the cache's head; only an encode reads either whole.
+fn refresh_on(source: &Path, progress: &str, cores: Cores) -> Result<bool, String> {
+    let Some(Due {
+        settings,
+        out,
+        size,
+    }) = due(source)?
+    else {
+        return Ok(false);
+    };
+    let named = |e: &dyn std::fmt::Display| format!("{}: {e}", source.display());
+    shrink::warn_if_shrunk(source, size, settings.max_size);
     if let Some(dir) = out.parent() {
         std::fs::create_dir_all(dir).map_err(|e| named(&e))?;
     }
@@ -219,3 +258,7 @@ fn start() -> Sender<PathBuf> {
     }
     inbox
 }
+
+#[cfg(test)]
+#[path = "pending_tests.rs"]
+mod pending_tests;
