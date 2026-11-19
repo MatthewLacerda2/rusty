@@ -77,7 +77,8 @@ impl SceneReport {
             (
                 self.row("gpu.occlusion.select").is_some(),
                 "(gpu.occlusion.<part>: its GPU parts, inside its row, in no sum; a timed frame \
-                 records each in a pass of its own, so 1 or 2 more compute_passes than untimed)",
+                 records each in a pass of its own, so 3 compute_passes (6 with a clustered \
+                 batch) against 2 untimed)",
             ),
         ]
     }

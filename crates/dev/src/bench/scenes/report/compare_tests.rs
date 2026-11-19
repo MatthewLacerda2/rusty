@@ -97,5 +97,5 @@ fn the_hiz_gpu_parts_note_needs_gpu_timing() {
     assert!(notes.contains("render.occlusion.<part>"), "{notes}");
     assert!(!notes.contains("gpu.occlusion.<part>"), "{notes}");
     cpu.push_value("gpu.occlusion.select", 0.25);
-    assert!(cpu.notes(true).contains("1 or 2 more compute_passes"));
+    assert!(cpu.notes(true).contains("6 with a clustered batch"));
 }

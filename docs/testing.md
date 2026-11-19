@@ -1131,7 +1131,10 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   frames a culling camera ran it: `gpu.occlusion.select`, `.phase_one` (the visible
   set's depth draw), `.pyramid`, `.test` (the instance test and compaction) and
   `.clusters` (the cluster cull, zero on a frame that draws nothing by cluster),
-  summing to `gpu.occlusion`: on a frame that timed any part every part is
+  summing to `gpu.occlusion`, with `.clusters` split again into its dispatches
+  (#2406): `.clusters_test`, `.clusters_scan` and `.clusters_copy`, summing to it
+  and so in no sum beside it (the split adds pass boundaries only: a timed frame
+  records the same dispatches, in the same order, as an untimed one): on a frame that timed any part every part is
   sampled, zero when absent, so each is averaged over the same frames and
   viewpoints as its stage; a run that never culls (or has no GPU timing) has no
   `gpu.occlusion.<part>` row at all. And `render.occlusion.hold` (making room for
@@ -1149,8 +1152,8 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   share of the stage and the parts sum to it. A part row sits inside its stage's row, so no sum of `gpu.` or
   `render.` rows counts it. To time the parts, a frame the GPU timer times records
   the stage in a pass per part (`GpuTimer::splits`): a culling camera's stage
-  records 3 or 4 compute passes (the cluster cull's when a batch is drawn by
-  cluster) where an untimed frame (lavapipe, a shipped game) records 2, and the
+  records 3 or 6 compute passes (the cluster cull's three when a batch is drawn
+  by cluster) where an untimed frame (lavapipe, a shipped game) records 2, and the
   extra pass boundaries' cost is in the stage's own rows. Under the table come the run's warnings, if any (below).
 - **before and after** — the report is kept in `out/bench/bench.json` (and
   `bench.txt`), and each run prints every row's change against the last one. To

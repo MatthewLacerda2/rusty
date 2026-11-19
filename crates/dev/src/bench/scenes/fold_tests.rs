@@ -116,6 +116,7 @@ fn parts_on_some_frames_only_still_sum_to_their_stage() {
     assert_eq!(avg("gpu.occlusion.clusters"), Some(1.0), "its share, not 4");
     let parts: f64 = rusty_render::GpuPart::ALL
         .iter()
+        .filter(|p| p.within().is_none())
         .map(|p| avg(&format!("gpu.{}", p.row())).expect("every part has a row"))
         .sum();
     assert_eq!(parts, 2.0, "the parts sum to the stage");
