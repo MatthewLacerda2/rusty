@@ -7,7 +7,7 @@
 
 use super::clusters::plan::Plan;
 use super::clusters::ClusterDraws;
-use super::cull::{CameraCull, ARGS};
+use super::cull::{late_args, CameraCull, ARGS};
 use super::pyramid::Pyramid;
 use crate::draw::camera::CameraCtx;
 use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
@@ -51,21 +51,22 @@ impl Renderer {
         drop(select);
         self.lap(lap_of(GpuPart::OcclusionSelect));
         let phase_one = split.then(|| timer.part_writes(GpuPart::OcclusionPhaseOne));
-        let phase_one = ("Hi-Z Phase One", phase_one.flatten());
+        // Phase one clears the depth: the prepass then keeps it (#2336).
+        let phase_one = ("Hi-Z Phase One", phase_one.flatten(), CLEAR);
         let solids = (opaque, Some(&first));
         self.record_depth(&mut encoder, &view.depth_view, solids, phase_one);
         self.lap(lap_of(GpuPart::OcclusionPhaseOne));
         let at = (&view.depth_view, ctx.view_proj);
         let cull = (&mut *cam, &mut *pyramid, &plan);
         last.clusters = self.record_cull(&mut encoder, cull, at, (n, batches, split));
-        let args = (cam.args[1].buffer(), ARGS * u64::from(batches));
-        cam.counter.copy(&self.device, &mut encoder, args);
+        cam.copy_counts(&self.device, &mut encoder, batches);
         self.lap(lap_of(GpuPart::OcclusionTest));
         self.queue.counted_submit(std::iter::once(encoder.finish()));
         cam.counter.request(n);
         cam.clusters.counter.request(plan.tested);
         let counters = &mut self.frame_counters;
         counters.hiz_culled += cam.counter.culled;
+        counters.hiz_late += cam.counter.late;
         counters.cluster_tested += plan.tested;
         counters.cluster_culled += cam.clusters.counter.while_active(!plan.runs.is_empty());
         ctx.solids.culled = Some(last);
@@ -134,6 +135,25 @@ impl Renderer {
         drawn
     }
 }
+
+impl CameraCull {
+    /// Copy what its final draws and its late set (#2336) drew, `batches` args
+    /// each and adjacent ([`late_args`]), in one copy for one read back
+    /// ([`Counter::final_and_late`](super::counters::Counter::final_and_late)).
+    fn copy_counts(
+        &mut self,
+        device: &wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
+        batches: u32,
+    ) {
+        let bytes = late_args(batches as usize) + ARGS * u64::from(batches);
+        self.counter
+            .copy(device, encoder, (self.args[1].buffer(), 0, bytes));
+    }
+}
+
+/// Phase one's depth load: cleared to the far plane.
+const CLEAR: wgpu::LoadOp<f32> = wgpu::LoadOp::Clear(1.0);
 
 /// A compute pass of `encoder`, labelled, its pair's `writes` when timed.
 fn begin(

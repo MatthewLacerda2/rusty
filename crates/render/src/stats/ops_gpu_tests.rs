@@ -27,9 +27,11 @@ const STILL: OpCounts = OpCounts {
 
 /// [`STILL`] with the GPU occlusion cull on: Hi-Z phase one adds a render pass, and
 /// the stage two compute passes (the select's, then the pyramid and the cull in
-/// one, #2327), with a submit and three writes.
-/// Measured: lavapipe 8/2/4/3/21; 8/2/4/3/22 on lavapipe and Metal (CI's macOS
-/// leg) before #2354's one write fewer; before
+/// one, #2327), with a submit and three writes. Where the forward pass primes
+/// (not Metal), the late prepass over phase one's depth adds one more render pass
+/// (#2336, [`late_prepass`]).
+/// Measured: lavapipe 9/2/4/3/21 with #2336 (8/2/4/3/21 before it); 8/2/4/3/22 on
+/// lavapipe and Metal (CI's macOS leg) before #2354's one write fewer; before
 /// #2327, 8/4/4/3/22 on RTX 2060, lavapipe and Metal.
 const STILL_CULLING: OpCounts = OpCounts {
     render_passes: 8,
@@ -47,6 +49,16 @@ const STILL_CULLING_TIMED: OpCounts = OpCounts {
     compute_passes: 3,
     ..STILL_CULLING
 };
+
+/// `want` with the late prepass's render pass where the forward pass primes
+/// (#2336): SSAO is off here, so it is the only prepass.
+fn late_prepass(renderer: &Renderer, want: OpCounts) -> OpCounts {
+    let primes = renderer.depth_priming && renderer.priming_recommended;
+    OpCounts {
+        render_passes: want.render_passes + u32::from(primes),
+        ..want
+    }
+}
 
 const W: u32 = 64;
 const H: u32 = 48;
@@ -104,7 +116,13 @@ fn gpu_a_still_frame_with_the_gpu_cull_on_makes_its_stage_s_calls() {
         renderer.gpu_timer.split_override.set(Some(timed));
         let scene = still_scene();
         let (counts, tested) = frames(&mut renderer, &scene, 4);
+        let want = late_prepass(&renderer, want);
         assert_eq!(counts[1..], [want; 3], "timed {timed}: {counts:#?}");
+        let late = renderer.frame_counters.hiz_late;
+        assert_eq!(
+            late, 0,
+            "a held view's late set is empty: the prepass adds nothing"
+        );
         assert!(tested > 0, "the floor and the props are tested");
     }
 }
