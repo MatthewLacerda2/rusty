@@ -1,25 +1,28 @@
 //! crates/render/src/ui/cache.rs — a view's UI vertex buffers, one per canvas (#418).
 //!
 //! **Dirty strategy.** Each view keeps one vertex buffer per canvas plus the mesh it
-//! holds. Rebuilding the CPU mesh is a cheap walk; a canvas's buffer is re-uploaded
-//! only when its mesh differs from last frame's (a layout or graphic change), and
-//! reallocated only when it outgrows its capacity. A static HUD therefore costs no
-//! uploads per frame.
+//! holds. A canvas's mesh is rebuilt only when what it is built from changed
+//! (`kept`); its buffer is re-uploaded only when a rebuilt mesh differs from last
+//! frame's (a layout or graphic change), and reallocated only when it outgrows its
+//! capacity. A still HUD therefore meshes nothing and uploads nothing per frame.
 
 use crate::gpu::ops::CountedQueue as _;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use glam::Vec2;
 
 use super::custom::ShadeUniforms;
 use super::effects::UiEffects;
+use super::kept::KeptMeshes;
 use super::mesh::CanvasMesh;
 use super::world::WorldUniforms;
 use rusty_ui::CanvasSpace;
 
 /// One canvas's GPU copy of its mesh, and where it draws this frame.
 pub(super) struct CanvasGpu {
-    pub(super) mesh: CanvasMesh,
+    /// Shared with the view's [`KeptMeshes`] while the canvas is still.
+    pub(super) mesh: Rc<CanvasMesh>,
     pub(super) buffer: wgpu::Buffer,
     pub(super) place: CanvasPlace,
 }
@@ -29,6 +32,8 @@ pub(super) struct CanvasGpu {
 #[derive(Default)]
 pub struct UiViewCache {
     canvases: Vec<CanvasGpu>,
+    /// Each canvas's mesh and what it was built from (`kept`).
+    pub(super) kept: KeptMeshes,
     /// How many canvas buffers the last frame (re-)uploaded — the dirty signal.
     pub(super) uploads: usize,
     /// How many canvases the last frame drew (a world canvas once per camera).
@@ -57,6 +62,11 @@ impl UiViewCache {
             0 => 0,
             _ => self.canvases.iter().map(|c| c.mesh.batches.len()).sum(),
         }
+    }
+
+    /// Canvases the last render of this view meshed, each once (a kept one is not).
+    pub fn last_meshed(&self) -> usize {
+        self.kept.built()
     }
 
     /// Canvas buffers (re-)uploaded by the last render of this view.
@@ -101,12 +111,13 @@ impl UiViewCache {
         self.canvases.iter().map(|c| c.place)
     }
 
-    /// Adopt this frame's `meshes`, uploading only the ones that changed.
+    /// Adopt this frame's `meshes`, uploading only the ones that changed: a kept
+    /// mesh is the one held (`Rc::ptr_eq`), a rebuilt one is compared.
     pub(super) fn sync(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        meshes: Vec<(CanvasMesh, CanvasPlace)>,
+        meshes: Vec<(Rc<CanvasMesh>, CanvasPlace)>,
     ) {
         let mut old: HashMap<u32, CanvasGpu> = self
             .canvases
@@ -115,17 +126,21 @@ impl UiViewCache {
             .collect();
         self.uploads = 0;
         for (mesh, place) in meshes {
-            let bytes: &[u8] = bytemuck::cast_slice(&mesh.vertices);
             let gpu = match old.remove(&mesh.canvas) {
-                Some(c) if c.mesh == mesh => CanvasGpu { place, ..c },
-                Some(c) if c.buffer.size() >= bytes.len() as u64 => {
-                    queue.counted_write_buffer(&c.buffer, 0, bytes);
+                // Adopt the new `Rc` either way, so the next still frame is `ptr_eq`.
+                Some(c) if Rc::ptr_eq(&c.mesh, &mesh) || c.mesh == mesh => CanvasGpu {
+                    mesh,
+                    place,
+                    buffer: c.buffer,
+                },
+                Some(c) if c.buffer.size() >= byte_len(&mesh) => {
+                    queue.counted_write_buffer(&c.buffer, 0, bytemuck::cast_slice(&mesh.vertices));
                     self.uploads += 1;
                     CanvasGpu { mesh, place, ..c }
                 }
                 _ => {
                     self.uploads += 1;
-                    let buffer = create_buffer(device, bytes);
+                    let buffer = create_buffer(device, bytemuck::cast_slice(&mesh.vertices));
                     CanvasGpu {
                         mesh,
                         buffer,
@@ -136,6 +151,11 @@ impl UiViewCache {
             self.canvases.push(gpu);
         }
     }
+}
+
+/// The bytes `mesh`'s vertices take.
+fn byte_len(mesh: &CanvasMesh) -> u64 {
+    std::mem::size_of_val(mesh.vertices.as_slice()) as u64
 }
 
 /// A vertex buffer holding `bytes`, with room to grow (the next power of two).
