@@ -16,8 +16,14 @@
 //!
 //! **GPU rows are clock-normalised** (`clock`, #862): a fixed probe timed beside
 //! every frame divides out the GPU governor's clock, so `gpu_ms` and `gpu.<pass>`
-//! move with the work, not with how idle the GPU was. `gpu_raw_ms` is the time as
-//! measured and `gpu_clock_pct` the clock it ran at.
+//! move with the work, not with how idle the GPU was. `gpu_ms` is the passes' sum,
+//! busy time only; `gpu.other` is untimed GPU work inside a submit, scaled like
+//! the rows. `gpu_between_submits_ms` is the GPU's wait for the CPU between submits
+//! (with any command at a submit's edge), **not** scaled: a wait does not shrink
+//! when the GPU's clock rises, and scaling it would understate it most where the
+//! governor idles the GPU furthest. The three partition the frame's timed span
+//! (`rusty_render::GpuTimes`). `gpu_raw_ms` is the time as measured and
+//! `gpu_clock_pct` the clock it ran at.
 //!
 //! **CPU rows are clock-normalised the same way** (#1719): a fixed CPU probe timed
 //! right before and after each sim step scales `cpu_ms` and `cpu.<system>` to the
@@ -156,6 +162,9 @@ fn sample(samples: &mut Samples, stats: &FrameStats, frame: Option<&RenderedFram
             let ms = ms.map_or(0.0, |m| m.1 * speed);
             samples.push(&format!("gpu.{}", pass.name()), ms);
         }
+        samples.push("gpu.other", gpu.other_ms * speed);
+        // The GPU's wait for the CPU: as measured, a clock does not shorten it.
+        samples.push("gpu_between_submits_ms", gpu.between_submits_ms);
         samples.push("gpu_raw_ms", gpu.total_ms());
         samples.push("gpu_clock_pct", speed * 100.0);
     }
@@ -203,8 +212,10 @@ pub fn run(harness: &mut Harness, ticks: u32) -> Report {
         text.push_str("(this adapter has no timestamp queries: no GPU times)\n");
     } else {
         text.push_str(
-            "(gpu_ms, gpu.<pass>: ms at the reference clock; gpu_raw_ms as measured, \
-             at gpu_clock_pct of it)\n",
+            "(gpu_ms, gpu.<pass>, gpu.other: ms at the reference clock, gpu_ms the passes' \
+             busy sum and gpu.other untimed work inside a submit; gpu_between_submits_ms the \
+             GPU waiting on the CPU, as measured; gpu_raw_ms as measured, at gpu_clock_pct \
+             of the reference)\n",
         );
     }
     text.push_str(

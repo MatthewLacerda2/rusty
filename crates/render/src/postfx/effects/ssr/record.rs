@@ -1,6 +1,5 @@
 //! The render-pass and pipeline pieces the SSR pass (`super::pass`) records with:
-//! its pipeline layouts and unblended targets, a pass into several targets, and the
-//! GPU timer's pair split across the trace and the resolve (#2028).
+//! its pipeline layouts and unblended targets, and a pass into several targets.
 
 use crate::gpu::ops::CountedEncoder as _;
 
@@ -27,19 +26,6 @@ pub(super) fn opaque_target(format: wgpu::TextureFormat) -> wgpu::ColorTargetSta
 }
 
 pub(super) type Stamps<'a> = Option<wgpu::RenderPassTimestampWrites<'a>>;
-
-/// A pass's timestamp pair split in two: the first pass writes its start, the last
-/// its end.
-pub(super) fn split(timed: Stamps<'_>) -> (Stamps<'_>, Stamps<'_>) {
-    let Some(w) = timed else { return (None, None) };
-    let half = |begin, end| wgpu::RenderPassTimestampWrites {
-        query_set: w.query_set,
-        beginning_of_pass_write_index: begin,
-        end_of_pass_write_index: end,
-    };
-    let (start, end) = (w.beginning_of_pass_write_index, w.end_of_pass_write_index);
-    (Some(half(start, None)), Some(half(None, end)))
-}
 
 /// A render pass `label` into `targets`, each loaded as it says, stored.
 pub(super) fn begin<'e>(

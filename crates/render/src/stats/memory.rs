@@ -13,6 +13,10 @@ pub struct GpuMemory {
     pub bytes: u64,
     /// `"allocator report, reserved blocks"` or `"Metal currentAllocatedSize"`.
     pub source: &'static str,
+    /// What of `bytes` live allocations use (the allocator report's
+    /// `total_allocated_bytes`), where the source tells it apart: not on Metal,
+    /// whose figure is allocated bytes already.
+    pub allocated: Option<u64>,
 }
 
 /// The GPU memory `device` holds once it has caught up with the work queued, so
@@ -24,6 +28,7 @@ pub fn gpu_memory(device: &wgpu::Device) -> Option<GpuMemory> {
         return Some(GpuMemory {
             bytes: report.total_reserved_bytes,
             source: "allocator report, reserved blocks",
+            allocated: Some(report.total_allocated_bytes),
         });
     }
     metal_allocated(device)
@@ -39,6 +44,7 @@ fn metal_allocated(device: &wgpu::Device) -> Option<GpuMemory> {
     Some(GpuMemory {
         bytes,
         source: "Metal currentAllocatedSize",
+        allocated: None,
     })
 }
 

@@ -33,16 +33,36 @@
 //! start, if later) to its own end. The passes then add up to the frame's GPU busy
 //! time (`gpu_ms`), and a heavy pass shows as heavy instead of smearing into the
 //! light ones queued behind it.
+//!
+//! **No row holds a gap.** A pass is charged from its own start at the earliest,
+//! so time between timed passes is in no row: `gpu_ms` is the GPU's busy time on
+//! timed work, never its wait for the CPU. A stage of several passes takes one
+//! pair across them ([`GpuTimer::compute_span`], [`GpuTimer::render_span`]): its
+//! first pass writes the start, its last the end, and all of them go out in one
+//! submit, so what lies between is the stage's own GPU work.
+//!
+//! **What no row holds.** Each resolved frame also splits the span from its first
+//! timed start to its last timed end ([`GpuTimes::span_ms`]) into the rows and two
+//! parts no row holds, in ticks so the three add up to it. Each pair knows the
+//! submit it went out in: a gap inside one command buffer, where the GPU never
+//! waits for the CPU, is untimed GPU work ([`GpuTimes::other_ms`], the bench's
+//! `gpu.other`), so a pass left untimed shows there; a gap from one submit's timed
+//! work to the next's ([`GpuTimes::between_submits_ms`]) is the GPU waiting for
+//! the CPU, with any command at a submit's head or tail.
 
 mod clock;
 mod frame;
 mod readback;
+mod times;
+mod writes;
 
 use std::cell::{Cell, RefCell};
 
 pub use clock::ClockProbe;
 pub use frame::FrameCost;
 use readback::Ring;
+pub use times::GpuTimes;
+use times::Pair;
 
 rusty_core::named_enum! {
     /// The render passes the timer reports, under the stable names the stats use
@@ -58,6 +78,10 @@ rusty_core::named_enum! {
         SkyReflection = "sky_reflection",
         /// The sun's cascades and the point/spot shadow atlas.
         Shadows = "shadows",
+        /// GPU occlusion culling (#1963), each culling camera's whole `occlusion`
+        /// stage: the select, phase one's depth draw, the Hi-Z pyramid, the test,
+        /// the compaction and the cluster cull, one pair across them all.
+        Occlusion = "occlusion",
         /// The SSAO depth prepass (#1578), which a primed forward pass starts from.
         SsaoPrepass = "ssao_prepass",
         /// The SSAO occlusion pass, at its quality's resolution.
@@ -73,9 +97,15 @@ rusty_core::named_enum! {
         VolumetricFog = "volumetric_fog",
         /// The opaque scene pass: solids, skybox.
         Forward = "forward",
-        /// Screen-space reflections (#1526): the copy of the opaque image and the
-        /// march over it, right after the base camera's opaque pass.
+        /// Screen-space reflections (#1526): the trace, right after the base
+        /// camera's opaque pass. The copy of the opaque image before it is a
+        /// command at the head of SSR's submit, which no pass boundary stamps: it
+        /// is in [`GpuTimes::between_submits_ms`].
         Ssr = "ssr",
+        /// SSR's two hit pyramids (#2028), built from the trace's targets.
+        SsrPyramids = "ssr_pyramids",
+        /// SSR's resolve (#2028): the hits blurred and drawn over the image.
+        SsrResolve = "ssr_resolve",
         /// Translucent solids.
         Transparent = "transparent",
         /// Trails and lines.
@@ -84,7 +114,8 @@ rusty_core::named_enum! {
         Particles = "particles",
         /// Depth of field (#1445): its CoC, prefilter, blur and composite passes.
         DepthOfField = "depth_of_field",
-        /// Temporal anti-aliasing's resolve (#1702).
+        /// Temporal anti-aliasing (#1702): its resolve, its sharpen and the clear of
+        /// its reactive mask.
         Taa = "taa",
         /// Per-object motion blur (#1436): its three tile passes and the gather.
         MotionBlur = "motion_blur",
@@ -101,46 +132,6 @@ rusty_core::named_enum! {
     }
 }
 
-/// One frame's GPU milliseconds per pass kind, in [`GpuPass::ALL`] order. A kind
-/// with no pass that frame is left out.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct GpuTimes {
-    /// The drawn frame these times measure: the [`FrameCost::frames`] count that
-    /// frame ended with. They arrive a frame or two later, so a caller pairing them
-    /// with a frame pairs them by this, never by arrival.
-    pub frame: u64,
-    pub passes: Vec<(GpuPass, f64)>,
-}
-
-impl GpuTimes {
-    /// The frame's GPU time: every timed pass's, summed.
-    pub fn total_ms(&self) -> f64 {
-        self.passes.iter().map(|(_, ms)| ms).sum()
-    }
-
-    /// Sum resolved `ticks` — a begin/end pair per entry of `passes`, in the order
-    /// the passes were queued — into exclusive milliseconds per pass kind (see the
-    /// module doc). `period_ns` is nanoseconds per tick. A pass that ends before the
-    /// work queued ahead of it counts zero.
-    pub fn from_ticks(ticks: &[u64], passes: &[GpuPass], period_ns: f64) -> Self {
-        let mut ms = [None::<f64>; GpuPass::ALL.len()];
-        let mut done = 0u64; // where the work queued so far ended
-        for (pair, pass) in ticks.chunks_exact(2).zip(passes) {
-            let (begin, end) = (pair[0].max(done), pair[1]);
-            done = done.max(end);
-            let elapsed = end.saturating_sub(begin) as f64 * period_ns / 1e6;
-            let slot = &mut ms[*pass as usize];
-            *slot = Some(slot.unwrap_or(0.0) + elapsed);
-        }
-        let passes = GpuPass::ALL
-            .iter()
-            .zip(ms)
-            .filter_map(|(pass, ms)| Some((*pass, ms?)))
-            .collect();
-        Self { frame: 0, passes }
-    }
-}
-
 /// Query pairs one frame may hold: well past what the deepest camera stack issues.
 const PAIRS: u32 = 256;
 
@@ -150,6 +141,10 @@ pub struct GpuTimer {
     queries: Option<Queries>,
     /// The frame bracket's CPU side, timed whether or not the GPU is ([`FrameCost`]).
     cpu: frame::CpuFrame,
+    /// Test-only: every pair asked for, timer enabled or not, so a test on an
+    /// adapter without timestamps still counts a frame's pairs against [`PAIRS`].
+    #[cfg(test)]
+    pub(crate) asked: Cell<u32>,
 }
 
 /// The live half of an enabled timer.
@@ -159,8 +154,8 @@ struct Queries {
     period_ns: f64,
     /// Whether a frame is being recorded: passes outside `render` are not timed.
     open: Cell<bool>,
-    /// This frame's timed passes, one per query pair, in pair order.
-    frame: RefCell<Vec<GpuPass>>,
+    /// This frame's query pairs, in pair order.
+    frame: RefCell<Vec<Pair>>,
     /// Warned that a frame ran out of query pairs (once per timer).
     overflowed: Cell<bool>,
     ring: Ring,
@@ -188,14 +183,20 @@ impl GpuTimer {
             ring: Ring::new(device, u64::from(PAIRS) * 2),
             ready: None,
         };
-        let (queries, cpu) = (Some(queries), Default::default());
-        Self { queries, cpu }
+        Self {
+            queries: Some(queries),
+            ..Self::disabled()
+        }
     }
 
     /// A timer that times nothing: what a device without timestamps gets.
     pub fn disabled() -> Self {
-        let cpu = Default::default();
-        Self { queries: None, cpu }
+        Self {
+            queries: None,
+            cpu: Default::default(),
+            #[cfg(test)]
+            asked: Cell::new(0),
+        }
     }
 
     /// Start timing a frame's passes.
@@ -207,45 +208,6 @@ impl GpuTimer {
             q.frame.borrow_mut().clear();
             q.open.set(true);
         }
-    }
-
-    /// The `timestamp_writes` for one render pass of kind `pass`; `None` when the
-    /// timer is disabled, no frame is open, or the frame ran out of query pairs.
-    pub(crate) fn writes(&self, pass: GpuPass) -> Option<wgpu::RenderPassTimestampWrites<'_>> {
-        let (query_set, pair) = self.pair(pass)?;
-        Some(wgpu::RenderPassTimestampWrites {
-            query_set,
-            beginning_of_pass_write_index: Some(pair * 2),
-            end_of_pass_write_index: Some(pair * 2 + 1),
-        })
-    }
-
-    /// [`Self::writes`] for a compute pass.
-    pub(crate) fn compute_writes(
-        &self,
-        pass: GpuPass,
-    ) -> Option<wgpu::ComputePassTimestampWrites<'_>> {
-        let (query_set, pair) = self.pair(pass)?;
-        Some(wgpu::ComputePassTimestampWrites {
-            query_set,
-            beginning_of_pass_write_index: Some(pair * 2),
-            end_of_pass_write_index: Some(pair * 2 + 1),
-        })
-    }
-
-    /// The next query pair, taken for one pass of kind `pass`.
-    fn pair(&self, pass: GpuPass) -> Option<(&wgpu::QuerySet, u32)> {
-        let q = self.queries.as_ref().filter(|q| q.open.get())?;
-        let mut frame = q.frame.borrow_mut();
-        let pair = frame.len() as u32;
-        if pair >= PAIRS {
-            if !q.overflowed.replace(true) {
-                log::warn!("[GpuTimer] a frame ran past {PAIRS} timed passes; the rest go untimed");
-            }
-            return None;
-        }
-        frame.push(pass);
-        Some((&q.set, pair))
     }
 
     /// Close the frame: resolve its queries into a free readback buffer and start
@@ -291,3 +253,7 @@ impl Queries {
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "budget_gpu_tests.rs"]
+mod budget_gpu_tests;

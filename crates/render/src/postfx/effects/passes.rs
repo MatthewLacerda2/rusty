@@ -60,8 +60,6 @@ impl Passes {
 
     /// The compute pipelines built on first dispatch, for warming.
     pub(crate) fn lazy_computes(&self) -> Vec<&LazyCompute> {
-        let mut all = self.volumetric_fog.lazy_computes().to_vec();
-        all.extend(self.ssr.lazy_computes());
-        all
+        self.volumetric_fog.lazy_computes().to_vec()
     }
 }

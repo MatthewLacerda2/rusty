@@ -520,7 +520,8 @@ restyles the colour scales the reflection with it (`hit_flash` at amount 1 shows
 none); one that isn't a per-channel scale of it (`toon_ramp`, `hologram`, `desaturate`)
 gets no SSR on an opaque surface. A `receive_ssr` transparent traces its hit before
 its blocks run, so any block restyles its reflection with the rest of its colour.
-`Debug.Stats().gpu_passes.ssr` times it. Where SSR is off the forward shader reflects
+Its GPU cost is `Debug.Stats().gpu_passes` `ssr` (the trace) plus `ssr_pyramids`
+plus `ssr_resolve`. Where SSR is off the forward shader reflects
 the sky or a reflection probe. Its **quality** sets the march (see *Quality presets*):
 the seeded `Medium` preset marches 16, 32 or 64 steps at its `Low`, `Medium` and
 `High` levels, reaching at most 8, 12 or 16 m (the `Low` preset 16, 16 and 32; the
