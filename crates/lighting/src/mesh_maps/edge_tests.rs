@@ -44,30 +44,29 @@ fn a_broken_mesh_is_an_error_never_a_panic() {
 }
 
 #[test]
-fn overlapping_uvs_give_a_texel_to_the_first_triangle() {
-    // The wall drawn over the floor's UV cell: the floor (first) keeps it.
+fn overlapping_uvs_equally_open_give_a_texel_to_the_lower_triangle_index() {
+    // One lone floor quad drawn twice over one UV cell: every ray of either copy
+    // leaves (a tie), and only their shading normals tell them apart.
     let v = |x: f32, y: f32, z: f32| Vec3::new(x, y, z);
-    let mut m = MeshSource::default();
-    quad(
-        &mut m,
-        [v(0., 0., 0.), v(0., 0., 1.), v(1., 0., 1.), v(1., 0., 0.)],
-        cell(0),
-        0,
-    );
-    quad(
-        &mut m,
-        [v(0., 0., 0.), v(0., 1., 0.), v(0., 1., 1.), v(0., 0., 1.)],
-        cell(0),
-        0,
-    );
-    let n = bake_all(&m, &[MeshMap::WorldNormal], 32)
-        .unwrap()
-        .remove(0)
-        .1;
-    let (lo, hi) = cell(0);
-    let p = ((lo + hi) * 0.5 * 32.0).floor();
-    let texel = n.pixels()[p.y as usize * 32 + p.x as usize];
-    assert!((texel[1] - 1.0).abs() < 1e-3, "{texel:?}");
+    let floor = [v(0., 0., 0.), v(0., 0., 1.), v(1., 0., 1.), v(1., 0., 0.)];
+    let leans = [Vec3::new(0.6, 0.8, 0.0), Vec3::new(0.0, 0.8, 0.6)];
+    for order in [[0, 1], [1, 0]] {
+        let mut m = MeshSource::default();
+        for k in order {
+            let from = m.positions.len();
+            quad(&mut m, floor, cell(0), 0);
+            m.normals[from..].fill(leans[k]);
+        }
+        let n = bake_all(&m, &[MeshMap::WorldNormal], 32)
+            .unwrap()
+            .remove(0)
+            .1;
+        let (lo, hi) = cell(0);
+        let p = ((lo + hi) * 0.5 * 32.0).floor();
+        let texel = Vec3::from_slice(&n.pixels()[p.y as usize * 32 + p.x as usize][..3]);
+        let first = leans[order[0]] * 0.5 + 0.5;
+        assert!((texel - first).length() < 1e-3, "{order:?}: {texel}");
+    }
 }
 
 #[test]

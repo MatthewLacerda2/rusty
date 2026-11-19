@@ -32,12 +32,17 @@ mod charts;
 #[cfg(test)]
 mod charts_tests;
 mod clip;
+mod fill;
+mod overlap;
 
 pub(crate) use areas::{world_per_uv, Areas};
 pub(super) use charts::{chart_of_triangles, fill_within, texel_charts};
 use clip::Clipper;
 #[cfg(test)]
 pub(super) use clip::INSET;
+pub(super) use fill::{dilate, fill_rest};
+pub(crate) use overlap::{rasterize_claims, Claim};
+use overlap::{Owner, Owners};
 
 /// Smallest lightmap edge, in texels.
 pub const MIN_RESOLUTION: u32 = 4;
@@ -115,7 +120,8 @@ struct UvTri {
 /// texels, each traced from a point strictly inside its own surface, never on an
 /// edge where another surface may meet it. In either pass a texel two triangles
 /// share goes to the first in index order, and the first pass never yields to the
-/// second, so a centre-covered texel bakes exactly as it would without the second.
+/// second, so a centre-covered texel bakes exactly as it would without the second
+/// (and a triangle that reaches a texel only in the second is never its claimant).
 pub(super) fn rasterize(mesh: &BakeMesh, size: u32) -> Vec<TexelPoint> {
     rasterize_surface(&mesh.surface(), size, size)
 }
@@ -123,24 +129,61 @@ pub(super) fn rasterize(mesh: &BakeMesh, size: u32) -> Vec<TexelPoint> {
 /// [`rasterize`] over any [`Surface`]: its own UV set, scaled to a `width × height`
 /// image (U across, V down), so a non-square map stretches the unit square.
 pub(crate) fn rasterize_surface(mesh: &Surface, width: u32, height: u32) -> Vec<TexelPoint> {
-    let tris = uv_triangles(mesh, Vec2::new(width as f32, height as f32));
-    let mut taken = vec![false; width as usize * height as usize];
-    let mut out = Vec::new();
+    walk(mesh, width, height, None)
+}
+
+/// The walk of [`rasterize`]. With `claims`, every later triangle that reaches an
+/// owned texel in the pass that owns it, and overlaps the owner in UV, is handed
+/// to it as a [`Claim`], in walk order (by pass, then triangle index); a triangle
+/// only touching the owner along an edge is no claimant. Either way the owners
+/// are the same, and the sink may replace a texel's point, never its owner.
+fn walk(
+    mesh: &Surface,
+    width: u32,
+    height: u32,
+    mut claims: Option<&mut dyn FnMut(Claim)>,
+) -> Vec<TexelPoint> {
+    let scale = Vec2::new(width as f32, height as f32);
+    let tris = uv_triangles(mesh, scale);
+    let texels = width as usize * height as usize;
+    let mut owners = Owners::new(texels, claims.is_some());
+    let mut out: Vec<TexelPoint> = Vec::new();
+    let mut asked = overlap::Asked::default();
     for conservative in [false, true] {
+        let pass = out.len();
+        let clip = |t| conservative.then(|| Clipper::new(t));
         for t in &tris {
-            let clipper = conservative.then(|| Clipper::new(t));
+            let clipper = clip(t);
             for (x, y) in texels_under(t, width, height) {
                 let index = (y * width + x) as usize;
-                if taken[index] {
-                    continue;
+                let owner = owners.of(index);
+                match owner {
+                    Owner::Taken => continue,
+                    Owner::At(slot, _) if (slot as usize) < pass => continue,
+                    Owner::At(_, first) if !asked.overlaps(mesh, (t.first, t.uv), first, scale) => {
+                        continue
+                    }
+                    Owner::At(..) => {}
+                    Owner::Free => {}
                 }
                 let w = match &clipper {
                     None => barycentric(t.uv, t.area, Vec2::new(x as f32 + 0.5, y as f32 + 0.5)),
                     Some(c) => c.trace_weights(Vec2::new(x as f32, y as f32)),
                 };
                 let Some(w) = w else { continue };
-                taken[index] = true;
-                out.push(point(mesh, t, index as u32, w));
+                let p = point(mesh, t, index as u32, w);
+                match (owner, claims.as_deref_mut()) {
+                    (Owner::At(slot, first), Some(sink)) => sink(Claim {
+                        slot,
+                        owner: first,
+                        point: p,
+                        kept: &mut out[slot as usize],
+                    }),
+                    _ => {
+                        owners.take(index, out.len(), p.first);
+                        out.push(p);
+                    }
+                }
             }
         }
     }
@@ -202,75 +245,3 @@ fn barycentric(uv: [Vec2; 3], area: f32, p: Vec2) -> Option<Vec3> {
     const EPS: f32 = -1e-5;
     (w.x >= EPS && w.y >= EPS && w.z >= EPS).then_some(w)
 }
-
-/// Fill each empty texel bordering filled ones with their average, `passes` rings
-/// deep, so bilinear filtering at a chart's edge reads lit texels, not black.
-pub(super) fn dilate<T: Texel>(texels: &mut [T], filled: &mut [bool], size: u32, passes: u32) {
-    let size = size as i32;
-    for _ in 0..passes {
-        let snapshot = filled.to_vec();
-        let values = texels.to_vec();
-        for y in 0..size {
-            for x in 0..size {
-                let i = (y * size + x) as usize;
-                if snapshot[i] {
-                    continue;
-                }
-                let (mut sum, mut n) = (T::default(), 0.0);
-                for (dx, dy) in NEIGHBOURS {
-                    let (nx, ny) = (x + dx, y + dy);
-                    if nx < 0 || ny < 0 || nx >= size || ny >= size {
-                        continue;
-                    }
-                    let j = (ny * size + nx) as usize;
-                    if snapshot[j] {
-                        sum = sum + values[j];
-                        n += 1.0;
-                    }
-                }
-                if n > 0.0 {
-                    texels[i] = sum / n;
-                    filled[i] = true;
-                }
-            }
-        }
-    }
-}
-
-/// Fill every texel still empty with the value of its nearest filled texel (in
-/// four-neighbour steps, ties to the texel found first in row-major order), so a
-/// mip level that averages a chart's border with the map's empty background reads
-/// the chart's light, not black (#1694). A map with no filled texel stays as it is.
-pub(super) fn fill_rest<T: Texel>(texels: &mut [T], filled: &[bool], size: u32) {
-    let size = size as usize;
-    let mut done = filled.to_vec();
-    let mut queue: std::collections::VecDeque<usize> =
-        (0..done.len()).filter(|&i| done[i]).collect();
-    while let Some(i) = queue.pop_front() {
-        let (x, y) = (i % size, i / size);
-        let near = [
-            (x > 0).then(|| i - 1),
-            (x + 1 < size).then(|| i + 1),
-            (y > 0).then(|| i - size),
-            (y + 1 < size).then(|| i + size),
-        ];
-        for j in near.into_iter().flatten() {
-            if !done[j] {
-                texels[j] = texels[i];
-                done[j] = true;
-                queue.push_back(j);
-            }
-        }
-    }
-}
-
-const NEIGHBOURS: [(i32, i32); 8] = [
-    (-1, -1),
-    (0, -1),
-    (1, -1),
-    (-1, 0),
-    (1, 0),
-    (-1, 1),
-    (0, 1),
-    (1, 1),
-];
