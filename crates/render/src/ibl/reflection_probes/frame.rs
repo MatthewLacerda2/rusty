@@ -179,3 +179,7 @@ mod refuse_tests;
 #[cfg(test)]
 #[path = "fallback_tests.rs"]
 mod fallback_tests;
+
+#[cfg(test)]
+#[path = "pick_tests.rs"]
+mod pick_tests;
