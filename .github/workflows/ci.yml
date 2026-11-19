@@ -426,7 +426,7 @@ jobs:
     # stay below the merge queue's `DEADLINE_MINUTES` (45, in
     # `merging/queue/cli.py`), so a hung job is a cancelled run the queue re-runs
     # (#869), not a stall hand-back; `tests/queue/test_macos_timeout.py` holds it.
-    timeout-minutes: 35
+    timeout-minutes: 70
     runs-on: ${{ matrix.os }}
     if: >-
       github.event_name == 'schedule' ||
@@ -473,16 +473,23 @@ jobs:
       # 43947625456), past three quarters.
       - name: Test (engine, dev features)
         shell: bash
+        # THROWAWAY (#2374): stress the Hi-Z group on Metal; reverted before ready.
         run: |
-          rc=0
-          cargo nextest run --no-run --features dev --locked || rc=$?
-          python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
-          if [ "$rc" = 0 ]; then
-            cargo nextest run --profile ci --features dev --locked --partition "count:${{ matrix.shard }}" || rc=$?
+          cargo nextest run --no-run --features dev --locked -p rusty-render
+          if [ "${{ matrix.shard }}" = 1/2 ]; then
+            cargo nextest run --features dev --locked -p rusty-render --no-fail-fast \
+              -E 'test(/passes::hiz::.*gpu_/)' --stress-duration 40m 2>&1 | tee stress.log
+          else
+            for k in 1 2 3; do
+              cargo nextest run --features dev --locked -p rusty-render --no-fail-fast \
+                -E 'test(gpu_a_waved_plane_behind_a_rim_still_draws_its_crests)' \
+                --stress-duration 40m > "stress-$k.log" 2>&1 &
+            done
+            wait
+            cat stress-*.log
           fi
-          cp target/nextest/ci/junit.xml junit-dev.xml || true
-          kill "$watcher" || true
-          exit "$rc"
+          grep -n "Hi-Z hid\|panicked\|FAIL \|stress run\|iterations" stress*.log | head -200 || true
+          ! grep -q "FAIL " stress*.log
       # A partition puts each canary in one shard only, so every shard runs them
       # again (#2264, #2276): a shard that lost Metal or OIDN fails, never skips.
       - name: Canaries (this runner's GPU and OIDN)
