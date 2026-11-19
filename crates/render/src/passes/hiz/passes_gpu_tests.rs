@@ -42,8 +42,9 @@ fn panels(n: usize) -> Scene {
 /// settled cull-on frame's counts must show `n` clustered runs in [`PASSES`]
 /// (or [`TIMED_PASSES`]) compute passes, both culls at work, and the same pixels
 /// as the cull-off frame. Returns what the CPU decided, the same on any adapter
-/// and either way: (tested, cluster-tested, draws, triangles); `None` where no
-/// culling adapter is (the test skips).
+/// and either way: (tested, cluster-tested, draws, triangles), the draws without
+/// the late prepass's, which only an adapter that primes draws (not Metal, #2336);
+/// `None` where no culling adapter is (the test skips).
 fn stage_with(n: usize) -> Option<(u32, u32, u32, u64)> {
     let (untimed, order) = stage_timed(n, false)?;
     let (timed, timed_order) = stage_timed(n, true)?;
@@ -97,8 +98,15 @@ fn stage_timed(n: usize, timed: bool) -> Option<Staged> {
         "no part laps with the cull off"
     );
     assert!(*on == off, "the cull moved pixels");
+    // A primed pass's late prepass draws each batch (all lit here) once more.
+    let late = c.primed_passes * view.hiz.cameras[0].drawn_batches;
     Some((
-        (c.hiz_tested, c.cluster_tested, c.draw_calls, c.triangles),
+        (
+            c.hiz_tested,
+            c.cluster_tested,
+            c.draw_calls - late,
+            c.triangles,
+        ),
         order,
     ))
 }
@@ -121,7 +129,7 @@ fn occlusion_laps(r: &crate::Renderer) -> Vec<&'static str> {
 
 #[test]
 fn gpu_the_stage_records_two_compute_passes_with_one_clustered_batch() {
-    // Measured: lavapipe 2/86/2/8204.
+    // Measured: lavapipe 2/86/2/8204, Metal 2/86/2/8204.
     if let Some(decided) = stage_with(1) {
         assert_eq!(decided, (2, 86, 2, 8204));
     }
@@ -129,7 +137,8 @@ fn gpu_the_stage_records_two_compute_passes_with_one_clustered_batch() {
 
 #[test]
 fn gpu_the_stage_records_two_compute_passes_with_three_clustered_batches() {
-    // Measured: lavapipe 4/258/4/24588 (the same before #2327; it culled 1 and 122).
+    // Measured: lavapipe 4/258/4/24588, Metal 4/258/4/24588 (the same before
+    // #2327; it culled 1 and 122).
     if let Some(decided) = stage_with(3) {
         assert_eq!(decided, (4, 258, 4, 24588));
     }

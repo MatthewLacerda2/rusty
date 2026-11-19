@@ -1119,8 +1119,8 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   `gpu_clock_pct` (the clock it ran at, % of the reference), `draw_calls`,
   `triangles`, `culled_entities`, `lights_dropped`, `cluster_lights_dropped`, `lights_culled`,
   `decals_visible`, `decal_cluster_refs`, the GPU occlusion counters `hiz_tested`,
-  `hiz_culled`, `cluster_tested`, `cluster_culled` (the two culled ones are read back
-  without waiting, so they describe a frame or so earlier, `docs/api/Debug.md`), and
+  `hiz_culled`, `hiz_late`, `cluster_tested`, `cluster_culled` (all but the two tested
+  ones are read back without waiting, so they describe a frame or so earlier, `docs/api/Debug.md`), and
   the frame's GPU calls `render_passes`, `compute_passes`, `submits`,
   `bind_groups_created`, `buffer_writes` (counted through `render::gpu::ops`; a
   render-CPU fix whose timing moves inside the spread proves itself by these); then

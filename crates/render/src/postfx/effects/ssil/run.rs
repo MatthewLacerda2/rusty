@@ -46,9 +46,7 @@ impl Renderer {
             .counted_write_buffer(&t.uniform, 0, bytemuck::bytes_of(&uniform));
         if !prepassed {
             self.record_prepass(encoder, &view.depth_view, solids);
-            let prepass = solids.0.iter().filter(|b| b.key.in_prepass());
-            let draws = prepass.map(|b| (b.key.indices.len(), b.instances.len() as u32));
-            self.frame_counters.add_draws(draws);
+            self.count_prepass(solids);
         }
 
         self.record_stages(encoder, &view.depth_view, t);
