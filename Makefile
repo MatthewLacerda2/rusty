@@ -224,9 +224,13 @@ GPU_TESTS := -E 'group(gpu*)'
 # worktree (`.github/scripts/pr-tree.py`) and built into that tree's own target/
 # (CARGO_TARGET_DIR set to it, so neither an exported shared dir nor a cargo config
 # builds or runs another tree's tests); FILTER='<nextest filter>' runs that filter
-# instead of the gpu group.
+# instead of the gpu group. A green PR= run then deletes that tree's target/debug
+# (#2436: the dev test build is about 11 GiB a PR, and a day of them filled a disk;
+# pr-tree.py refuses a disk without room for one): a red run keeps it warm for the
+# fix's re-run, and the bench's target/release stays.
+TEST_GPU_DROP = rm -rf "$$tree/target/debug" && echo "test-gpu: green, so $$tree/target/debug (the dev test build) is deleted; a re-run rebuilds it"
 test-gpu: ## The GPU tests alone (the dev feature set's), on ADAPTER (lavapipe when installed). PR=<n> on a PR's head; FILTER='<nextest filter>'
-	$(if $(PR),tree=$$(python3 .github/scripts/pr-tree.py $(PR)) && cd "$$tree" && CARGO_TARGET_DIR="$$tree/target" )RUSTY_REQUIRE_GPU=1 WGPU_ADAPTER_NAME='$(ADAPTER)' $(TEST) --features dev $(if $(FILTER),-E '$(FILTER)',$(GPU_TESTS))
+	$(if $(PR),tree=$$(python3 .github/scripts/pr-tree.py $(PR)) && cd "$$tree" && CARGO_TARGET_DIR="$$tree/target" )RUSTY_REQUIRE_GPU=1 WGPU_ADAPTER_NAME='$(ADAPTER)' $(TEST) --features dev $(if $(FILTER),-E '$(FILTER)',$(GPU_TESTS))$(if $(PR), && $(TEST_GPU_DROP))
 
 # Fresh proptest seeds, as the nightly draws (#1852): a signal, never a gate. A case
 # it finds is written to proptest-regressions/ and committed with its fix

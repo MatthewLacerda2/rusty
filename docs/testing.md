@@ -1455,7 +1455,12 @@ warm between runs (reclaim keeps it by name: its cold build is most of a run's
 wait; `git worktree remove` it by hand for the disk); `pr-<n>-head` is put back at
 the PR's head after the run, and `make reclaim` judges it by the PR in its name,
 removing it once that PR is merged or closed, even when a power cut left it at the
-run's local merge commit.
+run's local merge commit. **Before building, the run checks the disk**: when the
+filesystem holding `.claude/worktrees/` has less free than the two release builds
+still need (a tree's warm `target/release` counts as built) plus some headroom, it
+refuses, naming the free space, the need, `make reclaim` and the trees whose
+`target/` holds the most; `FORCE=1` does not run past it. How much is free is the
+machine's: check it (`df -h`).
 
 **Why three legs.** Not every row repeats. On a desktop the GPU rows, the memory
 rows and the op counters repeat to under 1% between two takes of one binary; the
@@ -1521,8 +1526,15 @@ missing bake, textures drawn uncompressed, console errors), each once, a warning
 not every leg wrote marked with the legs that did: the table is what gets read, so
 a scene benched without its bake says so there, not only in a leg's output. `make test-gpu PR=<n> [FILTER='<nextest filter>']` runs GPU tests on a
 PR's head in the same `pr-<n>-head` tree, but as pushed: no `main` merged in, no
-timed-run lock and none of the refusals above. It only refuses a tree a live
-`make bench-ab` run holds, whose sources it would otherwise swap mid-build.
+timed-run lock and none of the refusals above. It refuses a tree a live
+`make bench-ab` run holds, whose sources it would otherwise swap mid-build, and a
+disk without room for the `dev` test build, the largest build a tree takes (the
+same check and refusal as `make bench-ab`'s). **A green run then deletes that
+tree's `target/debug`**, so each PR measured does not keep its test build; a red
+run keeps it warm for the fix's re-run, and the bench's `target/release` stays.
+`make reclaim` works on a full disk: it judges without a git write, deletes the
+build output of the trees it removes before any git command that writes, and says a
+git write refused for lack of space as a full disk, naming the largest trees.
 
 ### GPU time and the GPU clock (#862)
 A laptop GPU does not run at one speed. On Apple silicon the governor re-picks the
