@@ -43,7 +43,7 @@ use glam::{Quat, Vec3};
 use serde::{Deserialize, Serialize};
 
 use super::sh::Sh9;
-pub use blend::ProbeBlend;
+pub use blend::{PreparedProbes, ProbeBlend};
 pub use set::ReflectionProbeSet;
 pub use volume::ProbeFrame;
 

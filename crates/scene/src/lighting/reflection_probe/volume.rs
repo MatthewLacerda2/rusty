@@ -59,6 +59,14 @@ impl ProbeFrame {
         finite_or(size, MIN_RADIUS).max(MIN_RADIUS)
     }
 
+    /// Squared distance from the world `point` to the nearest point of the volume,
+    /// zero inside it: [`ReflectionProbe::volume_distance_sq`] on a frame already
+    /// built.
+    pub fn distance_sq(&self, point: Vec3) -> f32 {
+        let local = self.to_frame(point);
+        self.nearest(local).distance_squared(local)
+    }
+
     /// How far `point` (in the frame) lies outside the volume, 0 inside it.
     pub(super) fn outside(&self, point: Vec3) -> f32 {
         self.nearest(point).distance(point)
@@ -119,9 +127,7 @@ impl ReflectionProbe {
     /// ranks probes by it for its resident budget (#1238), so a big room whose
     /// capture point is far away still counts as near when the camera stands in it.
     pub fn volume_distance_sq(&self, point: Vec3) -> f32 {
-        let frame = self.frame();
-        let local = frame.to_frame(point);
-        frame.nearest(local).distance_squared(local)
+        self.frame().distance_sq(point)
     }
 
     /// Squared distance from `point` to the probe's capture position — the
