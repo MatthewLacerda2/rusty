@@ -1255,7 +1255,7 @@ every binary's open makes them.
     clusters the load computed, `asset::cook`: zero when every model's cooked
     file is current; the bench writes none, so a project an authoring build
     never imported, by `make import` or the editor, cooks every model on every
-    load), `textures_compressed` and `textures_decoded` (the textures resident
+    load, and the scene's report notes it), `textures_compressed` and `textures_decoded` (the textures resident
     after the first frame, by format, the uncompressed fallbacks a slot needs
     among the decoded) and `upload_mb` (what the first frame uploaded).
     Deterministic for a project as it stands, so no spread;
@@ -1440,13 +1440,14 @@ different code.
 header lists every refusal it ran past): another timed run (an `flock` under
 `out/bench/`, dropped by the kernel when its run dies), and a `cargo`, `rustc` or
 `bench-scenes` process on the machine, checked again before each leg, under
-`FORCE=1` too. Un-imported textures (the images an import would encode now,
-`bench-scenes --pending-imports`, the engine's own check) are asked of `main`'s
+`FORCE=1` too. Un-imported textures and models (the images an import would encode
+now and the models with no current cooked file, `bench-scenes --pending-imports`,
+the engine's own checks) are asked of `main`'s
 build and of the PR's, and refused once both are built, naming the build that
 found them: when both find them, `make import PROJECT=<dir>` clears it. **When the
 two builds disagree** (one finds the project imported, the other does not), the PR
-changes the cache's stamp, a texture default or the encoder; one `.bctex` per source
-holds one stamp, so no import satisfies both and the refusal says so instead of
+changes a cache's stamp (a texture's, or `COOKER_VERSION`), a texture default or the
+encoder; one `.bctex` or cooked file per source holds one stamp, so no import satisfies both and the refusal says so instead of
 sending you to `make import`. Measure it with `FORCE=1`: the table's header then
 says `gpu_mb` and the load rows are not comparable (one leg loaded its textures
 uncompressed), and only the other rows are read. Each binary is
