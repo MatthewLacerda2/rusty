@@ -103,6 +103,15 @@ live PID still protects, and a reused one only errs toward keeping. The
 supervisor's dead lock keeps its rule: named stale, kept, since it may be
 restarted into it.
 
+`make bench-ab` locks its two trees for a run (`bench-ab pid <n>`,
+`bench.trees.lock_pid_of`), judged like a harness lock: a dead PID protects
+nothing. Its `main` tree (`bench.trees.MAIN_TREE`) is kept by its name, never
+judged finished: it is detached at an `origin/main` commit, and its warm
+release build is most of the next run's wait. A PR's tree (`pr-<n>-head`,
+`bench.trees.pr_of_tree`) is judged by the PR its name carries, whatever commit
+it is detached at: a power cut mid-run leaves it at the run's local merge
+commit, which no PR holds, and its release `target/` would outlive the PR.
+
 `--dry-run` decides and prints the same, and deletes nothing.
 """
 
@@ -113,18 +122,17 @@ import re
 import shutil
 import subprocess
 import sys
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import ghrest
 import reclaim_branches as branches
 import reclaim_use as use
+from bench import trees as bench_trees
 from merging.watch import tenancy
 
 USAGE = "usage: reclaim.py [--dry-run] [--idle MINUTES]"
 IDLE_MINUTES = 60  # a worktree written to more recently than this is in use (#2217)
-SKEW = 60  # seconds past now an mtime may read before it is "in the future": a write landing mid-probe
 AGENT_BRANCH = "worktree-agent-"  # the harness's name for an `Agent` worktree's branch (#1510)
 REVIEWER_BRANCH = re.compile(rf"pr\d|{AGENT_BRANCH}")  # a reviewer's `pr1514…`, the harness's own (#1538)
 
@@ -149,7 +157,7 @@ class Facts:
     busy: list[tuple[int, str]] | None = field(default_factory=list)  # (pid, command) in it; None: unknown
     written: str | None = None  # what recent write keeps it (`Machine.written`); probed only for a removal
     stale: int | None = None  # a lock left by a merge-queue supervisor that no longer runs: its pid
-    dead_agent: int | None = None  # a harness agent's lock whose pid no longer runs (#1658)
+    dead_agent: int | None = None  # a harness agent's or a bench run's lock whose pid no longer runs (#1658)
     reviewer: bool = False  # a reviewer's checkout: judged by what it holds (#1538)
     on_github: bool | None = False  # GitHub has its HEAD commit; None: GitHub didn't answer
 
@@ -173,6 +181,8 @@ def parse_worktrees(porcelain: str) -> list[Worktree]:
 
 def finished(wt: Worktree, facts: Facts) -> tuple[bool, str]:
     """Is this worktree's work over, and why (or why not)."""
+    if wt.path.name == bench_trees.MAIN_TREE:
+        return False, "`make bench-ab`'s warm main tree, kept between runs (`git worktree remove` it for the disk)"
     done, why = by_pull_request(wt, facts)
     if done or not facts.reviewer or facts.prs is None or "OPEN" in facts.prs:
         return done, why
@@ -314,6 +324,12 @@ class Machine:
         repo = ghrest.slug_of(self.run("git", "remote", "get-url", "origin").stdout)
         return None if repo is None else self.rest(f"repos/{repo}/commits/{commit}/pulls?per_page=100")
 
+    def pull_number(self, number: int) -> dict | None:
+        """Pull request `number`, over REST; `None` if unknown."""
+        repo = ghrest.slug_of(self.run("git", "remote", "get-url", "origin").stdout)
+        done = None if repo is None else self.run("gh", "api", f"repos/{repo}/pulls/{number}")
+        return ghrest.pull(json.loads(done.stdout)) if done is not None and done.returncode == 0 else None
+
     def has_commit(self, commit: str) -> bool | None:
         """Does GitHub have `commit`? It answers 422 (or 404) for one it doesn't; `None` if unknown."""
         repo = ghrest.slug_of(self.run("git", "remote", "get-url", "origin").stdout)
@@ -333,16 +349,8 @@ class Machine:
         return use.processes(self.run)
 
     def written(self, tree: Path, idle_minutes: int) -> str | None:
-        """What under `tree` was written inside the idle window, as `verdict` names it; `None` if nothing."""
-        if idle_minutes <= 0:
-            return None
-        now = time.time()
-        mtime = use.recent_write(tree, now - idle_minutes * 60)
-        if mtime is None:
-            return None
-        if mtime > now + SKEW:
-            return "something under it has an mtime in the future (clock skew, an extracted archive?)"
-        return f"something under it was written within the last {idle_minutes} minute(s)"
+        """What under `tree` was written inside the idle window, as `verdict` names it (`reclaim_use.written`)."""
+        return use.written(tree, idle_minutes)
 
     def judge(self, wt: Worktree, here: Path, procs: list[tuple[int, Path, str]] | None,
               idle_minutes: int = IDLE_MINUTES) -> tuple[Facts, str, str]:
@@ -364,11 +372,16 @@ class Machine:
         if owner is not None and not self.alive(owner):
             facts.stale = owner
         agent = tenancy.agent_pid_of(wt.locked)
+        agent = bench_trees.lock_pid_of(wt.locked) if agent is None else agent
         if agent is not None and not self.alive(agent):
             facts.dead_agent = agent
         if wt.branch is None:
             facts.on_main = self.is_ancestor(wt.path, wt.head, "origin/main")
-            if not facts.on_main:  # a reviewer's checkout of a PR (#1510): any PR holding the commit counts
+            bench_pr = bench_trees.pr_of_tree(wt.path.name)
+            if not facts.on_main and bench_pr is not None:  # judged by its name's PR (#2381)
+                pull = self.pull_number(bench_pr)
+                facts.prs = None if pull is None else [pull["state"]]
+            elif not facts.on_main:  # a reviewer's checkout of a PR (#1510): any PR holding the commit counts
                 pulls = self.pulls_of(wt.head)
                 facts.prs = None if pulls is None else [p["state"] for p in pulls]
                 if facts.reviewer:
