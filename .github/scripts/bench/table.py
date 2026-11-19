@@ -28,6 +28,12 @@ load did, and `models_converted` tells a cached load from a cold import; where t
 differ between legs, [`count_changes`] says so for the run's header, as the
 texture refusals do, since the load rows then compare different loads.
 
+Above the lead, a scene's notes ([`notes`]): the warnings `bench-scenes` wrote
+into each leg's report (a bake the scene lacks, textures drawn uncompressed,
+console errors), each said once, and those not every leg wrote marked with the legs
+that did. A note is why a table's absolute numbers may not be the game's (#2420),
+so it heads the section the reader reads, not only the leg's own output.
+
 A leg's report is `bench-scenes`' `<leg>/<project>-<hash>/<scene>.json`
 (`dev::bench::scenes::report`); a leg holds one project's folder.
 """
@@ -46,6 +52,36 @@ def read(leg: Path, scene: str) -> dict | None:
         except (OSError, ValueError):
             return None
     return None
+
+
+LEGS = ("main", "PR", "main again")
+
+
+def warnings(leg: Path, report: dict | None) -> list[str]:
+    """The report's warnings, the leg's own folder spelled `<leg>` so one note
+    (the console kept beside the report) reads the same in every leg."""
+    spelled = sorted({str(leg), str(leg.resolve())}, key=len, reverse=True)
+    out = []
+    for said in (report or {}).get("warnings", []):
+        for path in spelled:
+            said = said.replace(path, "<leg>")
+        out.append(said)
+    return out
+
+
+def notes(scene: str, legs: tuple[Path, Path, Path]) -> list[str]:
+    """The lines heading `scene`'s section: each leg's warning once, in the order
+    the legs first wrote them, one not every leg wrote marked with those that did."""
+    said = [warnings(leg, read(leg, scene)) for leg in legs]
+    seen = list(dict.fromkeys(w for leg in said for w in leg))
+    if not seen:
+        return []
+    lines = []
+    for w in seen:
+        wrote = [name for name, leg in zip(LEGS, said) if w in leg]
+        only = "" if len(wrote) == len(legs) else f" (only {', '.join(wrote)}: the legs disagree)"
+        lines.append(f"- {w}{only}")
+    return ["**Warnings** (`bench-scenes`' notes; the absolute numbers may not be the game's):"] + lines + [""]
 
 
 def averages(report: dict | None) -> dict[str, float]:
@@ -145,7 +181,7 @@ def scene_table(scene: str, legs: tuple[Path, Path, Path]) -> str:
     main, pr, again = (averages(read(leg, scene)) for leg in legs)
     if not main and not pr:
         return f"**{scene}**: neither the main leg nor the PR's wrote a report\n"
-    lines = [f"**{scene}**", ""] + lead(main, pr, again) + ["", "| row | main | PR | change | floor (main again) |",
+    lines = [f"**{scene}**", ""] + notes(scene, legs) + lead(main, pr, again) + ["", "| row | main | PR | change | floor (main again) |",
                                                             "|---|---:|---:|---|---:|"]
     metrics = list(main) + [m for m in pr if m not in main]
     for metric in metrics:
