@@ -7,7 +7,10 @@ the PR's head, `main` again, the second `main` leg each row's noise floor
 
 1. the refusals that need no build (`bench/refuse.py`): another timed run (an
    `flock` under `out/bench/`), a build or a bench on the machine;
-2. `main` and the PR's head read from origin by sha, fetched and checked out detached under
+2. room on the disk for both release builds (`bench/space.py`, #2436): a tree's
+   warm `target/release` counts as built, and the refusal names `make reclaim`
+   and the largest trees; not a timing refusal, so `--force` does not run past it;
+   then `main` and the PR's head read from origin by sha, fetched and checked out detached under
    `.claude/worktrees/` (`bench/trees.py`), each tree locked before it is
    re-pointed (a live run's lock refuses first), `main` merged into the PR's
    tree so the legs differ by the PR's diff alone, `main` built;
@@ -37,7 +40,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from bench import legs, refuse, table, trees
+from bench import legs, refuse, space, table, trees
 
 
 def args(argv):
@@ -138,6 +141,10 @@ def main(argv) -> int:
     pr_tree, pr_sha = trees.path(root, trees.pr_tree(a.pr)), None
     try:
         gate.check(refuse.busy_refusal(refuse.busy(ps(), me)))
+        builds = [(trees.path(root, trees.MAIN_TREE), "release"), (pr_tree, "release")]
+        roomless = space.refusal(root, builds, f"`make bench-ab PR={a.pr}`'s two release builds", subprocess.run)
+        if roomless:
+            raise RuntimeError(f"refused: {roomless}")
         main_sha, pr_sha = trees.fetch(a.pr, again=f"`make bench-ab PR={a.pr}`")
         # holding the timed-run flock, every bench-ab lock found is a dead run's (`trees.lock`)
         exclusive = held is not None
@@ -180,7 +187,9 @@ def main(argv) -> int:
         print(text)
         return 0
     except RuntimeError as e:
-        print(f"bench-ab: {e}", file=sys.stderr)
+        said = str(e)
+        print(f"bench-ab: {space.full(said, root, subprocess.run) if space.said_full(said) else said}",
+              file=sys.stderr)
         return 1
     finally:
         if pr_tree in locked and pr_sha is not None:
