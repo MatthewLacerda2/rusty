@@ -1,26 +1,33 @@
 //! The verb timers on a bare VM: what they count, what they leave out, and that a
 //! wrapped verb behaves as the bare one. `harness_tests` runs them on a scene.
-
-use std::time::{Duration, Instant};
+//! A test about which stretch time is charged to [`drive`]s the clock and moves
+//! it by known amounts, so it asserts exact charges, never a span of real time.
 
 use mlua::{Function, Lua};
 
 use super::wrap::wrap_globals;
-use super::{take, Verb};
+use super::{advance, drive, take, Verb};
 
-/// A VM with a `Fake` namespace: `Cheap`, `Sleep(ms)`, `Fail` (a Rust error),
-/// `Reenter(f)` (calls `f` back from Rust, as `Move` raises its hits) and `Lua`
-/// (a function written in Lua); and a lowercase `fake` table with a Rust function.
+/// A VM with a `Fake` namespace: `Cheap`, `Work(ms)` (moves the driven clock),
+/// `Fail` (a Rust error), `Reenter(f)` (calls `f` back from Rust, as `Move`
+/// raises its hits) and `Lua` (a function written in Lua); a lowercase `fake`
+/// table with a Rust function; and a global `spend(ms)`: Lua's own work, which
+/// moves the driven clock outside any verb.
 pub(super) fn vm(wrapped: bool) -> Lua {
     let lua = Lua::new();
     let fake = lua.create_table().unwrap();
     let cheap = lua.create_function(|_, n: f64| Ok(n + 1.0)).unwrap();
     fake.set("Cheap", cheap.clone()).unwrap();
-    let sleep = lua.create_function(|_, ms: u64| {
-        std::thread::sleep(Duration::from_millis(ms));
+    let work = lua.create_function(|_, ms: u64| {
+        advance(ms);
         Ok(())
     });
-    fake.set("Sleep", sleep.unwrap()).unwrap();
+    fake.set("Work", work.unwrap()).unwrap();
+    let spend = lua.create_function(|_, ms: u64| {
+        advance(ms);
+        Ok(())
+    });
+    lua.globals().set("spend", spend.unwrap()).unwrap();
     let fail = lua.create_function(|_, ()| -> mlua::Result<()> {
         Err(mlua::Error::runtime("Fake.Fail: no such entity 7"))
     });
@@ -37,6 +44,11 @@ pub(super) fn vm(wrapped: bool) -> Lua {
         wrap_globals(&lua).unwrap();
     }
     lua
+}
+
+/// `got` is `want` ms, but for the float rounding of a sum of durations.
+pub(super) fn assert_ms(got: f64, want: f64, what: &str) {
+    assert!((got - want).abs() < 1e-9, "{what}: {got} ms, not {want}");
 }
 
 pub(super) fn verb<'a>(verbs: &'a [Verb], name: &str) -> Option<&'a Verb> {
@@ -71,37 +83,28 @@ fn only_the_namespaces_rust_functions_are_wrapped_and_none_is_renamed() {
         .load("local k = {} for n in pairs(Fake) do k[#k + 1] = n end table.sort(k) return k")
         .eval()
         .unwrap();
-    assert_eq!(keys, ["Cheap", "Fail", "Lua", "Reenter", "Sleep"]);
+    assert_eq!(keys, ["Cheap", "Fail", "Lua", "Reenter", "Work"]);
 }
 
 #[test]
 fn lua_a_verb_re_enters_is_not_the_verbs_time_and_a_nested_verb_is_its_own() {
     let lua = vm(true);
-    // Lua busy for a while inside `Reenter`, then a nested verb that sleeps.
-    let spin = "local x = 0 for i = 1, 3000000 do x = x + i % 7 end";
-    let started = Instant::now();
-    lua.load(format!(
-        "Fake.Reenter(function() {spin} Fake.Sleep(30) end)"
-    ))
-    .exec()
-    .unwrap();
-    let total = started.elapsed().as_secs_f64() * 1000.0;
+    drive();
+    take();
+    // 7 ms of Lua inside `Reenter`, then a nested verb's 30 ms of work.
+    lua.load("Fake.Reenter(function() spend(7) Fake.Work(30) end)")
+        .exec()
+        .unwrap();
     let frame = take();
     let outer = verb(&frame.verbs, "Fake.Reenter").expect("Reenter is timed");
-    let sleep = verb(&frame.verbs, "Fake.Sleep").expect("Sleep is timed");
-    assert!(
-        sleep.ms >= 30.0,
-        "the nested verb holds its own sleep: {sleep:?}"
+    let work = verb(&frame.verbs, "Fake.Work").expect("Work is timed");
+    assert_ms(work.ms, 30.0, "the nested verb holds its own work");
+    assert_ms(
+        outer.ms,
+        0.0,
+        "Reenter holds neither the Lua nor the nested verb",
     );
-    let lua_ms = total - sleep.ms;
-    assert!(lua_ms > 5.0, "the spin should take a while: {lua_ms} ms");
-    assert!(
-        outer.ms < lua_ms / 4.0,
-        "Reenter's own time ({} ms) holds neither the re-entered Lua ({lua_ms} ms) \
-         nor the nested verb",
-        outer.ms
-    );
-    assert_eq!((outer.calls, sleep.calls), (1, 1));
+    assert_eq!((outer.calls, work.calls), (1, 1));
 }
 
 #[test]

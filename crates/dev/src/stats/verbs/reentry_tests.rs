@@ -4,51 +4,55 @@
 use mlua::Lua;
 
 use super::super::wrap::wrap_globals;
-use super::super::{take, RECORDER};
-use super::{verb, vm};
+use super::super::{advance, drive, take, Frame, RECORDER, SYSTEM, UPDATE_SYSTEM};
+use super::{assert_ms, verb, vm};
 
-/// Spin the VM: a stretch of Lua long enough to tell from a cheap verb.
-const SPIN: &str = "local x = 0 for i = 1, 2000000 do x = x + i % 7 end";
+/// Lua's own work inside the handler: 50 ms on the driven clock.
+const SPEND: &str = "spend(50)";
 
-/// `Fake.Then(handler)`: a verb that calls `handler` back, then sleeps 20 ms on
-/// Rust's side. Its own time, which must hold the sleep and none of the spin.
-fn reenter_then_sleep(handler: &str) -> f64 {
+/// `Fake.Then(handler)`, inside `update_scripts` on the driven clock: a verb
+/// that calls `handler` back, then does 20 ms of work on Rust's side. It must be
+/// charged exactly those 20 ms and none of the handler's Lua, which is no
+/// verb's and no wrapper's either.
+fn reenter_then_work(handler: &str) {
     let lua = vm(true);
-    // A Rust verb that runs a handler, then works (sleeps) after it returns.
-    let after = lua
+    let then = lua
         .create_function(|_, f: mlua::Function| {
             f.call::<()>(())?;
-            std::thread::sleep(std::time::Duration::from_millis(20));
+            advance(20);
             Ok(())
         })
         .unwrap();
     let fake: mlua::Table = lua.globals().get("Fake").unwrap();
-    fake.set("Then", after).unwrap();
+    fake.set("Then", then).unwrap();
     wrap_globals(&lua).unwrap();
+    drive();
     take();
+    SYSTEM.with(|s| s.set(UPDATE_SYSTEM));
     lua.load(format!("Fake.Then({handler})")).exec().unwrap();
     let frame = take();
+    SYSTEM.with(|s| s.set(""));
     let then = verb(&frame.verbs, "Fake.Then").expect("Then is timed");
+    assert_ms(then.ms, 20.0, "the verb's work after the handler, alone");
+    assert_ms(
+        frame.update_ms,
+        20.0,
+        "no other verb holds the handler's Lua",
+    );
+    assert_ms(frame.overhead_ms, 0.0, "nor do the wrappers");
     RECORDER.with_borrow(|r| assert!(r.stack.is_empty(), "nothing left open"));
-    then.ms
 }
 
 #[test]
 fn an_error_a_handler_catches_still_ends_the_lua_it_re_entered() {
-    let handler = format!("function() pcall(function() error('x') end) {SPIN} end");
-    let own = reenter_then_sleep(&handler);
-    assert!(
-        own >= 20.0,
-        "the verb's work after the handler is its own: {own} ms"
-    );
-    assert!(own < 60.0, "and the handler's spin is not: {own} ms");
+    reenter_then_work(&format!(
+        "function() pcall(function() error('x') end) {SPEND} end"
+    ));
 }
 
 #[test]
 fn a_main_chunk_a_verb_calls_back_is_lua_too() {
-    let handler = format!("load([[{SPIN}]])");
-    let own = reenter_then_sleep(&handler);
-    assert!((20.0..60.0).contains(&own), "{own} ms");
+    reenter_then_work(&format!("load([[{SPEND}]])"));
 }
 
 #[test]
@@ -95,18 +99,19 @@ fn the_wrappers_own_time_is_kept_apart_and_a_bare_vm_has_none() {
     lua.load("for i = 1, 2000 do Fake.Cheap(i) end")
         .exec()
         .unwrap();
-    // Outside any system, so the overhead is not summed for update_scripts...
+    // The real clock, so only a lower bound: the wrappers cost something.
+    // Outside any system, the overhead is not summed for update_scripts...
     assert_eq!(take().overhead_ms, 0.0);
-    super::super::SYSTEM.with(|s| s.set(super::super::UPDATE_SYSTEM));
+    SYSTEM.with(|s| s.set(UPDATE_SYSTEM));
     lua.load("for i = 1, 2000 do Fake.Cheap(i) end")
         .exec()
         .unwrap();
     let frame = take();
-    super::super::SYSTEM.with(|s| s.set(""));
+    SYSTEM.with(|s| s.set(""));
     assert!(frame.overhead_ms > 0.0, "{frame:?}");
     let bare = vm(false);
     bare.load("Fake.Cheap(1)").exec().unwrap();
-    assert_eq!(take(), super::super::Frame::default());
+    assert_eq!(take(), Frame::default());
 }
 
 #[path = "particles_tests.rs"]

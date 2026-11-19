@@ -26,11 +26,9 @@
 //! until it yields closes when the verb does, so the verb's work after that
 //! resume reads as Lua.
 
-use std::collections::BTreeSet;
-use std::time::Instant;
-
 use mlua::debug::{Debug, DebugEvent, HookTriggers};
 use mlua::{Function, Lua, MultiValue, Table, VmState};
+use std::collections::BTreeSet;
 
 use rusty_script::api::{ApiCtx, Reg, RUST_HALVES};
 
@@ -95,7 +93,7 @@ fn wrap_table(lua: &Lua, namespace: &str, table: &Table) -> mlua::Result<()> {
 /// and what the wrapper spends outside the verb's own span is its overhead.
 fn timed(lua: &Lua, id: usize, f: Function) -> mlua::Result<Function> {
     lua.create_function(move |lua, args: MultiValue| {
-        let called = Instant::now();
+        let called = super::now();
         let outermost = RECORDER.with_borrow(|r| r.stack.is_empty());
         if outermost {
             lua.set_global_hook(HookTriggers::ON_CALLS | HookTriggers::ON_RETURNS, hook)?;
@@ -108,7 +106,11 @@ fn timed(lua: &Lua, id: usize, f: Function) -> mlua::Result<Function> {
             lua.remove_global_hook();
         }
         let span = left.duration_since(entered);
-        let own = called.elapsed().saturating_sub(span).as_secs_f64() * 1000.0;
+        let own = super::now()
+            .duration_since(called)
+            .saturating_sub(span)
+            .as_secs_f64()
+            * 1000.0;
         RECORDER.with_borrow_mut(|r| r.overhead(own));
         out.map_err(unwrapped)
     })

@@ -30,6 +30,8 @@
 
 use std::cell::{Cell, RefCell};
 use std::sync::Once;
+#[cfg(test)]
+use std::time::Duration;
 use std::time::Instant;
 
 mod wrap;
@@ -40,6 +42,39 @@ thread_local! {
     static RECORDER: RefCell<Recorder> = RefCell::new(Recorder::default());
     /// The system the schedule is running, set by the timing probe when armed.
     static SYSTEM: Cell<&'static str> = const { Cell::new("") };
+}
+
+#[cfg(test)]
+thread_local! {
+    /// A test's driven clock ([`drive`]): when it started and how far it moved.
+    static DRIVEN: Cell<Option<(Instant, Duration)>> = const { Cell::new(None) };
+}
+
+/// The recorder's clock: the wall clock, or in a test the one it drives.
+fn now() -> Instant {
+    #[cfg(test)]
+    if let Some((start, moved)) = DRIVEN.with(Cell::get) {
+        return start + moved;
+    }
+    Instant::now()
+}
+
+/// From now on this thread's recorder reads a clock that stands still until
+/// [`advance`]d, so a test asserts exactly what each stretch is charged.
+#[cfg(test)]
+fn drive() {
+    DRIVEN.with(|d| d.set(Some((Instant::now(), Duration::ZERO))));
+}
+
+/// Move the driven clock on by `ms`; nothing unless this thread [`drive`]s it.
+#[cfg(test)]
+fn advance(ms: u64) {
+    DRIVEN.with(|d| {
+        let moved = d
+            .get()
+            .map(|(start, at)| (start, at + Duration::from_millis(ms)));
+        d.set(moved);
+    });
 }
 
 /// The system whose verbs' time [`Frame::update_ms`] sums: `script.lua` is what
@@ -151,7 +186,7 @@ impl Recorder {
 
     /// Open verb `id`; its place on the stack, for [`Self::leave`], and when.
     fn enter(&mut self, id: usize) -> (usize, Instant) {
-        let start = Instant::now();
+        let start = now();
         let (verb, nested, level) = (Some(id), 0.0, 0);
         self.stack.push(Open {
             verb,
@@ -165,7 +200,7 @@ impl Recorder {
     /// Close the verb opened at `at`, and whatever is still open above it (Lua
     /// an error unwound, whose returns the hook never saw); when it closed.
     fn leave(&mut self, at: usize) -> Instant {
-        let now = Instant::now();
+        let now = now();
         while self.stack.len() > at {
             if let Some(open) = self.stack.pop() {
                 self.close(open, now);
@@ -204,7 +239,7 @@ impl Recorder {
     /// A Lua function a verb called back, at stack depth `level`: re-entered
     /// Lua, which lasts until that function returns.
     fn open_lua(&mut self, level: usize) {
-        let (start, nested, verb) = (Instant::now(), 0.0, None);
+        let (start, nested, verb) = (now(), 0.0, None);
         self.stack.push(Open {
             verb,
             start,
