@@ -1,7 +1,5 @@
-//! What a camera's cull keeps across frames (#1963): bind groups rebuilt only
-//! when a resource they name was replaced, and the CPU tables it refills.
-
-use glam::Vec3;
+//! A bind group or draw kept across frames: rebuilt only when a resource it names
+//! was replaced. The Hi-Z cull (#1963) and SSR's targets keep theirs this way.
 
 /// A value built from some resources, kept until one of them is replaced: the
 /// key is the resources themselves (wgpu compares them by identity), so a grown
@@ -31,18 +29,6 @@ impl<K: PartialEq, V> Kept<K, V> {
     pub(crate) fn value(&self) -> Option<&V> {
         self.held.as_ref().map(|(_, v)| v)
     }
-}
-
-/// The CPU tables a cull fills each frame, kept so a frame allocates nothing once
-/// they reached the scene's size.
-#[derive(Default)]
-pub(crate) struct Tables {
-    /// Each instance's object slot.
-    pub(crate) slots: Vec<u32>,
-    /// The tested bounds by object slot.
-    pub(crate) by_slot: Vec<Option<(Vec3, Vec3)>>,
-    /// Each instance's bounds, as `hiz.wgsl`'s `Bounds`.
-    pub(crate) bounds: Vec<[f32; 8]>,
 }
 
 #[cfg(test)]
