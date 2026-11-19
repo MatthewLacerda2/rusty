@@ -19,9 +19,14 @@ status-level = "slow"
 
 # Tests that build a headless renderer. Under nextest every test is its own process,
 # so the in-process budget (crates/render/src/setup/budget.rs, MAX_CONCURRENT_HEADLESS)
-# cannot see its neighbours; this group is its nextest equivalent, with the same cap.
+# cannot see its neighbours; these groups are its nextest equivalent, with the same
+# cap per platform. A test group has no platform key, so each platform has its own
+# group, chosen by a platform-keyed override below: `gpu` (Linux, lavapipe) and
+# `gpu-macos` (Metal). A filter selects both as `group(gpu*)`. The numbers and what
+# measured them: docs/testing.md, *Concurrency is capped*.
 [test-groups]
 gpu = { max-threads = 2 }
+gpu-macos = { max-threads = 3 }
 
 # Which tests are GPU tests is a naming rule, enforced at runtime: a test that builds
 # a headless renderer without matching this filter panics and names the rule
@@ -32,6 +37,15 @@ gpu = { max-threads = 2 }
 #     (`kind(test)`: only the integration binary, since rusty-render's own unit tests
 #     sit in a `gpu` module too and are not GPU tests by that alone);
 #   - in-crate tests:    the test function's name starts with `gpu_`.
+#
+# The macOS override comes first: nextest applies the first override that matches a
+# test, and the second matches on every platform. The two filters are one rule,
+# written twice (`.github/scripts/tests/test_gpu_config.py` holds them equal).
+[[profile.default.overrides]]
+platform = 'cfg(target_os = "macos")'
+filter = '(kind(test) & test(/^gpu::/)) | test(/(^|::)gpu_[^:]*$/)'
+test-group = "gpu-macos"
+
 [[profile.default.overrides]]
 filter = '(kind(test) & test(/^gpu::/)) | test(/(^|::)gpu_[^:]*$/)'
 test-group = "gpu"

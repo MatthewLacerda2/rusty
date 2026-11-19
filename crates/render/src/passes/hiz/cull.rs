@@ -4,14 +4,16 @@
 use super::clusters::plan::Plan;
 use super::clusters::{ClusterCull, ClusterDraws};
 use super::counters::Counter;
-use super::kept::{Kept, Tables};
 use super::pyramid::Pyramid;
+use super::tables::Tables;
 use super::upload::{pack_bounds, Frame, Params};
 use crate::draw::camera::CameraCtx;
 use crate::draw::resources::SolidResources;
 use crate::gpu::draw_buffers::GROUP1_INSTANCES;
 use crate::gpu::grow_buffer::GrowBuffer;
+use crate::gpu::kept::Kept;
 use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
+use crate::timing::GpuPass;
 use crate::{RenderView, Renderer};
 
 /// The opaque draws a camera's passes make through the GPU's verdict: the group 1
@@ -141,20 +143,25 @@ impl Renderer {
         let groups = cam.groups.value().expect("bound by prepare_cull");
         let opaque = &ctx.solids.draws.opaque;
         let batches = opaque.len() as u32;
-        let mut encoder = self.device.create_command_encoder(&Default::default());
-        self.dispatch(&mut encoder, (&self.hiz.select, &groups[0]), batches);
+        // Before the timer lends out its pair: phase one draws through this group.
         self.update_global_bind_group();
+        // The stage is one encoder and one submit: its one `occlusion` pair opens
+        // on the select's pass and closes on the merged pass, and a pair spread
+        // over passes is charged only inside one submit (`timing::writes`).
+        let mut encoder = self.device.create_command_encoder(&Default::default());
+        let (open, close) = self.gpu_timer.compute_span(GpuPass::Occlusion);
+        let mut select = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("Hi-Z Select"),
+            timestamp_writes: open,
+        });
+        dispatch(&mut select, (&self.hiz.select, &groups[0]), batches);
+        drop(select);
         let phase_one = ("Hi-Z Phase One", None);
         let solids = (opaque, Some(&first));
         self.record_depth(&mut encoder, &view.depth_view, solids, phase_one);
-        pyramid.build(&self.device, &self.hiz, &mut encoder, &view.depth_view);
-        self.dispatch(&mut encoder, (&self.hiz.test, &groups[1]), n);
-        self.dispatch(&mut encoder, (&self.hiz.compact, &groups[1]), batches);
-        if !plan.runs.is_empty() {
-            let at = (&*pyramid, cam.visible.buffer(), ctx.view_proj);
-            let cull = (&mut cam.clusters, &plan);
-            last.clusters = Some(self.cull_clusters(&mut encoder, cull, at, batches as usize));
-        }
+        let at = (&view.depth_view, ctx.view_proj);
+        let cull = (&mut *cam, &mut *pyramid, &plan);
+        last.clusters = self.record_cull(&mut encoder, cull, at, (n, batches), close);
         let args = (cam.args[1].buffer(), ARGS * u64::from(batches));
         cam.counter.copy(&self.device, &mut encoder, args);
         self.queue.counted_submit(std::iter::once(encoder.finish()));
@@ -165,6 +172,39 @@ impl Renderer {
         counters.cluster_tested += plan.tested;
         counters.cluster_culled += cam.clusters.counter.while_active(!plan.runs.is_empty());
         ctx.solids.culled = Some(last);
+    }
+
+    /// Record everything after phase one in one compute pass (#2327), whose end
+    /// writes `close`: the pyramid over `depth`, the test, the compaction and
+    /// `plan`'s cluster cull. wgpu orders the dispatches inside it, each reading
+    /// what the one before wrote. Returns the clustered batches' draws.
+    fn record_cull(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        (cam, pyramid, plan): (&mut CameraCull, &mut Pyramid, &Plan),
+        (depth, view_proj): (&wgpu::TextureView, glam::Mat4),
+        (n, batches): (u32, u32),
+        close: Option<wgpu::ComputePassTimestampWrites>,
+    ) -> Option<ClusterDraws> {
+        let clustered = !plan.runs.is_empty();
+        if clustered {
+            let at = (&*pyramid, cam.visible.buffer(), view_proj);
+            self.ready_clusters(encoder, (&mut cam.clusters, plan), at);
+        }
+        let groups = cam.groups.value().expect("bound by prepare_cull");
+        let mut pass = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("Hi-Z Cull"),
+            timestamp_writes: close,
+        });
+        pyramid.build(&self.device, &self.hiz, &mut pass, depth);
+        dispatch(&mut pass, (&self.hiz.test, &groups[1]), n);
+        dispatch(&mut pass, (&self.hiz.compact, &groups[1]), batches);
+        if clustered {
+            self.record_clusters(&mut pass, (&cam.clusters, plan));
+        }
+        drop(pass);
+        let cull = (&mut cam.clusters, plan);
+        clustered.then(|| self.clusters_drawn(encoder, cull, batches as usize))
     }
 
     /// Make room in `view` for stacked camera `idx`, and a pyramid at its depth's
@@ -235,17 +275,15 @@ impl Renderer {
         cam.culled = culled;
         (draws, plan)
     }
+}
 
-    /// One compute pass of `pipeline` over `group`, a thread per one of `count`.
-    fn dispatch(
-        &self,
-        encoder: &mut wgpu::CommandEncoder,
-        (pipeline, group): (&crate::gpu::pipelines::LazyCompute, &wgpu::BindGroup),
-        count: u32,
-    ) {
-        let mut pass = encoder.counted_compute_pass(&Default::default());
-        pass.set_pipeline(pipeline.get());
-        pass.set_bind_group(0, group, &[]);
-        pass.dispatch_workgroups(count.div_ceil(64), 1, 1);
-    }
+/// One dispatch of `pipeline` over `group` in `pass`, a thread per one of `count`.
+fn dispatch(
+    pass: &mut wgpu::ComputePass,
+    (pipeline, group): (&crate::gpu::pipelines::LazyCompute, &wgpu::BindGroup),
+    count: u32,
+) {
+    pass.set_pipeline(pipeline.get());
+    pass.set_bind_group(0, group, &[]);
+    pass.dispatch_workgroups(count.div_ceil(64), 1, 1);
 }

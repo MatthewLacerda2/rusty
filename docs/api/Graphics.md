@@ -520,7 +520,8 @@ restyles the colour scales the reflection with it (`hit_flash` at amount 1 shows
 none); one that isn't a per-channel scale of it (`toon_ramp`, `hologram`, `desaturate`)
 gets no SSR on an opaque surface. A `receive_ssr` transparent traces its hit before
 its blocks run, so any block restyles its reflection with the rest of its colour.
-`Debug.Stats().gpu_passes.ssr` times it. Where SSR is off the forward shader reflects
+Its GPU cost is `Debug.Stats().gpu_passes` `ssr` (the trace) plus `ssr_pyramids`
+plus `ssr_resolve`. Where SSR is off the forward shader reflects
 the sky or a reflection probe. Its **quality** sets the march (see *Quality presets*):
 the seeded `Medium` preset marches 16, 32 or 64 steps at its `Low`, `Medium` and
 `High` levels, reaching at most 8, 12 or 16 m (the `Low` preset 16, 16 and 32; the
@@ -1108,8 +1109,8 @@ without one, the middle preset):
     "ssil": { … }, "ssr": { … }, "bloom_resolution_divisor": { "low": 4, "medium": 4, "high": 2 },
     "depth_of_field_resolution_divisor": { … }, "motion_blur_samples": { … },
     "volumetric_fog": { "low": { "resolution": 64, "slices": 32 }, … },
-    "ui_blur_divisor": 4, "shadowmask_mode": "Shadowmask", "gpu_occlusion_culling": true,
-    "gpu_cluster_culling": true }, … ] }
+    "ui_blur_divisor": 4, "shadowmask_mode": "Shadowmask", "gpu_occlusion_culling": false,
+    "gpu_cluster_culling": false }, … ] }
 ```
 
 A new project is seeded with `Low`, `Medium` and `High` (`Medium` first); the game may
@@ -1144,15 +1145,31 @@ level, read only in a scene whose Mixed Lighting Mode is `"Shadowmask"`
 not bound yet, when every caster does; the seeded `Low` and `Medium`) or
 `"DistanceShadowmask"` (every caster, within the shadow distance; the seeded `High`).
 `Graphics.SetQualityPreset("High", { shadowmask_mode = "Shadowmask" })` sets it.
-`gpu_occlusion_culling` (#1963, `true` in every seeded preset) is Unity 6's *GPU
-Occlusion* toggle on the URP asset: whether a camera with `use_occlusion_culling`
-culls the opaque meshes its GPU depth pyramid finds hidden ([`Lighting`](Lighting.md),
-*GPU occlusion culling*); `Graphics.SetQualityPreset("Low", { gpu_occlusion_culling =
-false })` turns it off for that preset. The baked PVS does not read it.
-`gpu_cluster_culling` (#1968, `true` in every seeded preset) has that cull also test a
-big static mesh's clusters one by one, so the part of it another wall hides is not
-drawn ([`Lighting`](Lighting.md), *GPU occlusion culling*, *Per cluster*); it does
-nothing with `gpu_occlusion_culling` off. A project with no presets runs the seeded
+`gpu_occlusion_culling` (#1963, `false` in every seeded preset) is Unity 6's *GPU
+Occlusion* toggle: whether a camera with `use_occlusion_culling` culls the opaque
+meshes its GPU depth pyramid finds hidden ([`Lighting`](Lighting.md), *GPU occlusion
+culling*). `gpu_cluster_culling` (#1968, `false` in every seeded preset) has that cull
+also test a big static mesh's clusters one by one, so the part of it another wall
+hides is not drawn ([`Lighting`](Lighting.md), *GPU occlusion culling*, *Per
+cluster*). They are two switches: the first alone culls whole meshes, the second
+alone does nothing, and both on gives the whole cull. `SetQualityPreset` writes only
+the keys it names, so a preset that wants the whole cull names both:
+
+```lua
+Graphics.SetQualityPreset("High", { gpu_occlusion_culling = true, gpu_cluster_culling = true })
+```
+
+The cull is opt-in, as in Unity, because its own passes can cost more than the draws
+it saves: turn it on for a preset only once it is measured to pay on the project's
+scenes. `make bench-scenes` has no quality option and opens the project read-only;
+it plays with the project's `"default"` preset (the middle one without it). So run
+it once with that preset's two keys `false` in `project.rusty`, edit them to `true`
+and run it again: each row prints its change against the scene's last run. The cull
+pays where `gpu_ms` and `renderer_ms` drop; `hiz_culled` and `cluster_culled` say
+what it removed. The baked PVS reads neither switch. A project made before the seed went
+`false` holds `true` in its own `project.rusty` (a new project writes its presets in
+full), and keeps it: set both keys to `false` there to get the new default.
+A project with no presets runs the seeded
 `Medium` preset's values.
 
 ### Render scale

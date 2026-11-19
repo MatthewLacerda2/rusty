@@ -7,7 +7,7 @@ use rusty_components::Projection;
 
 #[test]
 fn gpu_an_orthographic_camera_culls_and_a_far_near_plane_does_not() {
-    let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {
+    let Some(mut r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
         return;
     };
     let (scene, _) = walled();

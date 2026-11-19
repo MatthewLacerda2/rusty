@@ -43,6 +43,7 @@ pub(crate) mod draw_buffers;
 pub(crate) mod fullscreen;
 pub(crate) mod global_group;
 pub(crate) mod grow_buffer;
+pub(crate) mod kept;
 pub(crate) mod layout_entries;
 pub(crate) mod lightmaps;
 pub(crate) mod material_cache;

@@ -29,7 +29,7 @@
 //! **What it costs.** A clustered batch is one draw per instance rather than one
 //! instanced draw, and its output list has room for every instance's whole run;
 //! past [`plan::MAX_OUT_INDICES`] a batch is drawn by the instance test alone.
-//! The quality preset's `gpu_cluster_culling` turns it off.
+//! The quality preset's `gpu_cluster_culling` turns it on.
 
 mod gpu;
 mod layout;
@@ -86,7 +86,7 @@ impl crate::Renderer {
     pub(crate) fn plan_clusters(
         &self,
         draws: &crate::draw::batch::FrameDraws,
-        tables: &super::kept::Tables,
+        tables: &super::tables::Tables,
     ) -> plan::Plan {
         if !self.cluster_culls() {
             return plan::Plan::default();

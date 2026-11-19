@@ -15,8 +15,9 @@
 //! The cache drops whatever the returned paths name, misses included
 //! ([`Freshness::forget_misses_where`]), so their next lookup reads the file again. Its
 //! users are the renderer's texture cache (`render::gpu::textures::freshness`,
-//! whose misses the decal atlas shares) and the UI's texture-size table
-//! (`ui::TextureSizeReader`). The resolved texture-reference cache
+//! whose misses the decal atlas shares), the UI's texture-size table
+//! (`ui::TextureSizeReader`) and the Skybox ambient's panorama memo
+//! (`scene::settings::ambient::skybox::panorama`'s `Remembered`). The resolved texture-reference cache
 //! (`asset::convert::texture_ref`) reads the write log directly and keeps no
 //! retry beat: it answers on these callers' (#1269).
 

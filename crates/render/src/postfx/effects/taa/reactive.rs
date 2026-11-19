@@ -92,8 +92,13 @@ pub(crate) fn hdr_attachments(
         .collect()
 }
 
-/// Clear the target after the resolve read it, so next frame starts from zero.
-pub(super) fn clear(encoder: &mut wgpu::CommandEncoder, target: &PfxTarget) {
+/// Clear the target after the resolve read it, so next frame starts from zero,
+/// writing `timed` (TAA's own pair).
+pub(super) fn clear(
+    encoder: &mut wgpu::CommandEncoder,
+    target: &PfxTarget,
+    timed: Option<wgpu::RenderPassTimestampWrites>,
+) {
     encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
         multiview_mask: None,
         label: Some("TAA Reactive Clear"),
@@ -107,7 +112,7 @@ pub(super) fn clear(encoder: &mut wgpu::CommandEncoder, target: &PfxTarget) {
             },
         })],
         depth_stencil_attachment: None,
-        timestamp_writes: None,
+        timestamp_writes: timed,
         occlusion_query_set: None,
     });
 }
