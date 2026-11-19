@@ -65,7 +65,7 @@
 
 mod blend;
 mod converter;
-mod depends;
+pub(crate) mod depends;
 mod fbx;
 #[cfg(test)]
 mod fingerprint;

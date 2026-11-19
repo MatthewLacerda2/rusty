@@ -66,3 +66,13 @@ fn a_broken_model_stops_the_strict_import_before_any_image() {
     assert_eq!(done.failed.len(), 1, "listed, and the rest still ran");
     assert_eq!(done.textures.encoded, 1);
 }
+
+#[test]
+fn an_import_cooks_every_model_once() {
+    let model = crate::cook::fixture::model("import_all_cooks");
+    let root = model.parent().unwrap();
+    let run = || crate::cook::with_writes(true, || import_all(root).unwrap().cooked);
+    assert_eq!(run(), 1, "the model is cooked");
+    assert!(crate::cook::cooked_path(&model).unwrap().is_file());
+    assert_eq!(run(), 0, "its cooked file is current");
+}

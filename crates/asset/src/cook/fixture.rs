@@ -22,6 +22,10 @@ pub fn model(name: &str) -> PathBuf {
         ..LightmapUvSettings::default()
     };
     crate::sidecar::set_lightmap_uvs(&path, on).unwrap();
+    // A run before this one may have cooked it into the temp folder.
+    if let Some(cooked) = super::cooked_path(&path) {
+        let _ = std::fs::remove_file(cooked);
+    }
     path
 }
 

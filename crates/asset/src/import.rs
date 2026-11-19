@@ -2,6 +2,9 @@
 //! compressed copy under a folder brought up to date in the import cache, as
 //! Unity's `AssetDatabase.Refresh` imports everything before it returns.
 //!
+//! Every model under the folder is imported too, so its cooked derived geometry
+//! (`cook`) is current: a later load reads it instead of computing it.
+//!
 //! The one routine behind `Assets.Refresh` ([`import_all`]) and, stopping on a
 //! broken model before any image ([`import_strict`]), `make import` (`export
 //! --import-only`), an export's first step (`dev::export::import`) and `make
@@ -25,6 +28,9 @@ pub struct Imported {
     pub sources: Vec<PathBuf>,
     /// The model sources that failed to convert, with why; each was warned of.
     pub failed: Failed,
+    /// How many models were cooked (`cook`): every model under the folder is
+    /// imported, so its cooked file is written; one already current cooks nothing.
+    pub cooked: usize,
     /// What the images' refresh did (`texture_import::refresh_all`).
     pub textures: Refreshed,
 }
@@ -38,10 +44,12 @@ pub struct Imported {
 /// listed, and the rest still run.
 pub fn import_all(root: &Path) -> Result<Imported, String> {
     let (sources, failed) = models(root)?;
+    let cooked = cook_models(root);
     let textures = texture_import::refresh_all(root);
     Ok(Imported {
         sources,
         failed,
+        cooked,
         textures,
     })
 }
@@ -62,6 +70,7 @@ pub fn import_strict(root: &Path) -> Result<Imported, String> {
     Ok(Imported {
         sources,
         failed,
+        cooked: cook_models(root),
         textures: texture_import::refresh_all(root),
     })
 }
@@ -91,6 +100,27 @@ fn models(root: &Path) -> Result<(Vec<PathBuf>, Failed), String> {
         }
     }
     Ok((sources, failed))
+}
+
+/// Import every model file under `root` so its cooked file is current (`cook`,
+/// written by an authoring build), returning how many were cooked. A model that
+/// will not import is warned of: its conversion, the import's real failure, was
+/// already reported.
+fn cook_models(root: &Path) -> usize {
+    let before = crate::cook::cooks();
+    let mut models = Vec::new();
+    crate::manifest::walk(root, &mut |path| {
+        if crate::is_model_path(path) {
+            models.push(path.to_path_buf());
+        }
+    });
+    models.sort();
+    for model in &models {
+        if let Err(e) = crate::import_file(model) {
+            log::warn!("[Asset] {}: {e}", model.display());
+        }
+    }
+    crate::cook::cooks() - before
 }
 
 #[cfg(test)]

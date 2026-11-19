@@ -1241,7 +1241,11 @@ every binary's open makes them.
     conversion was cached or not), `models_converted` (the sources converted,
     summed over the run's loads: the first converts what is stale, so this is
     what tells a cold import from a cached one, as after a `Converter::version`
-    bump), `textures_compressed` and `textures_decoded` (the textures resident
+    bump), `models_cooked` (the models whose tangents, lightmap UVs and
+    clusters the load computed, `asset::cook`: zero when every model's cooked
+    file is current; the bench writes none, so a project an authoring build
+    never imported, by `make import` or the editor, cooks every model on every
+    load), `textures_compressed` and `textures_decoded` (the textures resident
     after the first frame, by format, the uncompressed fallbacks a slot needs
     among the decoded) and `upload_mb` (what the first frame uploaded).
     Deterministic for a project as it stands, so no spread;

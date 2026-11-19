@@ -150,20 +150,23 @@ fn max_index(indices: &[u32]) -> usize {
 
 /// Replace `sub`'s lightmap UV with a generated unwrap, splitting its vertices along
 /// the chart seams. A skinned sub-mesh is left alone: the bake never lightmaps one.
-pub fn apply(sub: &mut SubMesh, settings: &LightmapUvSettings) {
+/// Returns, when it unwrapped, the source vertex each new vertex copies
+/// ([`Unwrap::source`]): what a cooked import (`asset::cook`) rebuilds the split
+/// vertices from.
+pub fn apply(sub: &mut SubMesh, settings: &LightmapUvSettings) -> Option<Vec<u32>> {
     if sub.skin.is_some() {
-        return;
+        return None;
     }
-    let with_uv = |v: &MeshVertex, lightmap_uv| MeshVertex { lightmap_uv, ..*v };
-    if let Some((vertices, indices)) = unwrap_vertices(
-        &sub.vertices,
-        &sub.indices,
-        |v| v.position,
-        with_uv,
-        settings,
-    ) {
-        (sub.vertices, sub.indices) = (vertices, indices);
-    }
+    let positions: Vec<[f32; 3]> = sub.vertices.iter().map(|v| v.position).collect();
+    let u = unwrap(&positions, &sub.indices, settings)?;
+    let split = u.source.iter().zip(&u.uvs);
+    let with_uv = |(&s, &lightmap_uv): (&u32, &[f32; 2])| MeshVertex {
+        lightmap_uv,
+        ..sub.vertices[s as usize]
+    };
+    sub.vertices = split.map(with_uv).collect();
+    sub.indices = u.indices;
+    Some(u.source)
 }
 
 /// [`unwrap`] any vertex type: read each vertex's position with `position`, and

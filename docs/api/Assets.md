@@ -68,8 +68,11 @@ never runs it. `make export` fails on an `.mp3` the refresh can't convert, and w
 left because a `.wav` of its name already exists (that `.wav` ships; no `.mp3` does). Each
 conversion is logged; call it yourself after writing or copying an `.mp3` into the project.
 
-It also brings every converted model (`.fbx`, `.blend`) up to date and makes every
-image's compressed copy current (see `compression`, below), returning how many images
+It also brings every converted model (`.fbx`, `.blend`) up to date, imports every
+model so what its import derives (the tangents it lacks, the generated lightmap UVs,
+the clusters of a big mesh) is kept in the import cache (`<path>.cooked.glb`, read
+by every later load instead of computed again, made again when the model or a
+setting that shapes it changes), and makes every image's compressed copy current (see `compression`, below), returning how many images
 it compressed in `compressed`; each model or image that fails (it does not decode,
 say) is warned of in the console and listed in `failed` by path, and such an image
 draws uncompressed. It waits for them, on any build, and writes the import cache into
@@ -250,7 +253,10 @@ writes the sidecar, and re-imports every mesh in the open scene instanced from t
 model, so the change shows at once — the same verb the inspector's box runs. A file
 with no sidecar yet gets one. Skinned meshes are never unwrapped (they are never
 lightmapped). The unwrap is deterministic: the same mesh and settings always give the
-same UVs, so a bake stays byte-identical across machines.
+same UVs, so a bake stays byte-identical across machines. It is made once, at the
+first import, and kept in the import cache's cooked file with the rest of what the
+import derives (`Assets.Refresh`, above); a load that reads it gets the same UVs a
+fresh unwrap gives, so a baked lightmap still fits.
 
 ```lua no-run
 Assets.SetLightmapUVSettings("project/levels/warehouse.glb", { generate = true })

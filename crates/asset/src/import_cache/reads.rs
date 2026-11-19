@@ -46,6 +46,14 @@ pub(super) fn files_of(read: &Path, borrowed: &[String]) -> Files {
         .collect()
 }
 
+/// The files a parse of `read` reads for its geometry: `read`, then the others it
+/// pulls in. What a cooked model is stamped by (`cook::stamp`).
+pub(crate) fn parsed(read: &Path) -> Vec<PathBuf> {
+    std::iter::once(read.to_path_buf())
+        .chain(reads(read))
+        .collect()
+}
+
 pub(super) fn stamp(path: &Path) -> Stamp {
     let meta = std::fs::metadata(path).ok()?;
     let modified = meta.modified().ok();
