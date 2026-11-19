@@ -52,7 +52,16 @@ fn pick(scene: &Scene, i: usize) -> u32 {
     ids[i % ids.len()]
 }
 
+/// Make `op` to `scene`, whose skinned rig is `rig`.
 pub(super) fn apply(scene: &mut Scene, rig: u32, op: &Op) {
+    match *op {
+        Op::Spawn(_) | Op::Reparent(..) | Op::Destroy(_) => hierarchy(scene, rig, op),
+        _ => components(scene, rig, op),
+    }
+}
+
+/// The edits that move an entity in, out of or around the hierarchy.
+fn hierarchy(scene: &mut Scene, rig: u32, op: &Op) {
     match *op {
         Op::Spawn(i) => {
             let parent = pick(scene, i);
@@ -71,6 +80,13 @@ pub(super) fn apply(scene: &mut Scene, rig: u32, op: &Op) {
                 scene.destroy_entity(id);
             }
         }
+        _ => {}
+    }
+}
+
+/// The edits to one entity's components.
+fn components(scene: &mut Scene, rig: u32, op: &Op) {
+    match *op {
         Op::Toggle(i) => {
             if let Some(mut c) = scene.world.collider_mut(pick(scene, i)) {
                 c.active = !c.active;
@@ -113,5 +129,6 @@ pub(super) fn apply(scene: &mut Scene, rig: u32, op: &Op) {
                 tr.rotation = Quat::from_rotation_z(f32::from(t) * 0.02);
             }
         }
+        _ => {}
     }
 }
