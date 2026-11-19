@@ -2,7 +2,8 @@
 //!
 //! The counterpart of [`World::ancestors`]: every subtree walk (prefab extract and
 //! instance membership, skeleton despawn, ragdoll bones, selection bounds, the
-//! load survivors) goes through here. Each id is visited at most once, so a
+//! load survivors) goes through here; the change log's subtree stamps walk the
+//! same way on a kept stack (`changes::stamp`). Each id is visited at most once, so a
 //! malformed `children` list — a cycle, or a child listed twice — ends the walk
 //! instead of hanging it, and a child id no longer in the world is skipped.
 //!
@@ -13,7 +14,7 @@
 //!   ordinal among same-named siblings, so five `Crate`s under one `Arena` are five
 //!   paths. It is a value, never a string, so a `/` in a name needs no escaping.
 
-use std::collections::BTreeSet;
+use rusty_core::collections::Set;
 
 use super::bundle::Core;
 use super::world::World;
@@ -23,7 +24,8 @@ use super::world::World;
 pub struct Descendants<'w, F> {
     world: &'w World,
     stack: Vec<u32>,
-    seen: BTreeSet<u32>,
+    /// Membership only, never iterated, so its order reaches no reader.
+    seen: Set<u32>,
     descend: F,
 }
 
@@ -38,7 +40,9 @@ impl<F: FnMut(u32) -> bool> Iterator for Descendants<'_, F> {
             }
             if (self.descend)(id) {
                 // Reversed onto the stack so they come off in declared order.
-                self.stack.extend(self.world.children(id).into_iter().rev());
+                let at = self.stack.len();
+                self.world.push_children(id, &mut self.stack);
+                self.stack[at..].reverse();
             }
             return Some(id);
         }
@@ -46,8 +50,9 @@ impl<F: FnMut(u32) -> bool> Iterator for Descendants<'_, F> {
 }
 
 impl World {
-    /// Push `id`'s child ids onto `out`, allocating nothing once `out` is warm: the
-    /// world store's dirty walk, which bounds itself (`world_space::store`).
+    /// Push `id`'s child ids onto `out`, allocating nothing once `out` is warm: every
+    /// downward walk (this module's, `world_space::store`, `world_space::bounds`,
+    /// the change log's stamps) reads children through it, never a cloned list.
     pub(crate) fn push_children(&self, id: u32, out: &mut Vec<u32>) {
         if let Some(core) = self.component::<Core>(id) {
             out.extend_from_slice(&core.children);
@@ -71,7 +76,7 @@ impl World {
         Descendants {
             world: self,
             stack: vec![id],
-            seen: BTreeSet::new(),
+            seen: Set::default(),
             descend,
         }
     }
