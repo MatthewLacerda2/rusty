@@ -3,8 +3,9 @@
 //! each. Four times the meshes may peak higher only by what their finished maps
 //! keep of their covered texels, through the trace and the pages: a map that
 //! kept its whole square, or a page stage that held every page it made, grows
-//! with the squares instead. Each test is its own process under nextest, so the
-//! peak (`memory::rss_peak_bytes`) is this test's bakes'.
+//! with the squares instead. Each test runs in a process of its own
+//! (`rusty_test_support::process::alone`), so the peak
+//! (`memory::rss_peak_bytes`) is this test's bakes'.
 
 use std::sync::Arc;
 
@@ -78,22 +79,28 @@ fn baked(n: usize) -> (u64, u64, usize) {
 
 #[test]
 fn four_times_the_sparse_meshes_peak_higher_only_by_their_covered_texels() {
-    if rss_peak_bytes().is_none() {
-        return;
-    }
-    let one = baked(2);
-    let four = baked(8);
-    assert_eq!((one.2, four.2), (2, 8), "a page apiece");
-    let (grew, extra) = (four.0.saturating_sub(one.0), four.1 - one.1);
-    let mb = |b: u64| b >> 20;
-    assert!(
-        grew <= extra + MARGIN,
-        "four times the sliver meshes peaked {} MB higher ({} MB against {} MB) through \
-         the trace and the pages, but their extra maps keep only {} MB of covered texels: \
-         a square or a page is held per mesh of the scene",
-        mb(grew),
-        mb(four.0),
-        mb(one.0),
-        mb(extra)
+    let test = concat!(
+        module_path!(),
+        "::four_times_the_sparse_meshes_peak_higher_only_by_their_covered_texels"
     );
+    rusty_test_support::process::alone(test, || {
+        if rss_peak_bytes().is_none() {
+            return;
+        }
+        let one = baked(2);
+        let four = baked(8);
+        assert_eq!((one.2, four.2), (2, 8), "a page apiece");
+        let (grew, extra) = (four.0.saturating_sub(one.0), four.1 - one.1);
+        let mb = |b: u64| b >> 20;
+        assert!(
+            grew <= extra + MARGIN,
+            "four times the sliver meshes peaked {} MB higher ({} MB against {} MB) through \
+             the trace and the pages, but their extra maps keep only {} MB of covered texels: \
+             a square or a page is held per mesh of the scene",
+            mb(grew),
+            mb(four.0),
+            mb(one.0),
+            mb(extra)
+        );
+    });
 }

@@ -481,6 +481,15 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
   In-crate tests have the same helper,
   `rusty_test_support::temp::dir()` (#999, `crates/test-support/`); the `test-temp-dir` rule fails a bare
   `std::env::temp_dir()` in test code (see `linting.md`).
+- **What is process-wide by nature gets a process of its own.** A test reading a
+  process-wide measure (the peak memory, `memory::rss_peak_bytes`) or installing
+  state nothing else may share runs its body through
+  `rusty_test_support::process::alone`: under nextest it runs in place, under
+  plain `cargo test` the binary re-runs that one test in a child. The `log`
+  logger is one a process too: a crate that names `rusty-logging` captures its
+  tests' warnings through `rusty_logging::init_for_tests` and `forward`, never
+  `rusty_test_support::logs` (`test-logger`), and each `init` panics when the
+  other's logger is already installed.
 - **A path a test expects is spelled as the engine writes it**: a plain
   `Path::join("a/b/c")` or `"a/b/c"`, `/`-separated, with a `\` read as part of a
   name, never a separator. In-crate tests take a relative root from

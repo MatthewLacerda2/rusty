@@ -32,6 +32,11 @@ fn one(path: &'static str, body: &str) -> Case {
     case(&[(path, body)], path)
 }
 
+/// A root manifest naming `dep` under `[section]`.
+fn package(section: &str, dep: &str) -> String {
+    format!("[package]\nname = \"t\"\n\n[{section}]\n{dep} = {{ path = \"d\" }}\n")
+}
+
 /// The must-flag case of the rule named `rule`, `None` when it has none.
 fn case_for(rule: &str) -> Option<Case> {
     let app = "crates/app/src/a.rs";
@@ -124,13 +129,7 @@ fn case_for(rule: &str) -> Option<Case> {
             "crates/app/src/secret.rs",
         ),
         "key-guard" => case(
-            &[
-                (
-                    "Cargo.toml",
-                    "[package]\nname = \"t\"\n\n[dev-dependencies]\nrusty-dev = { path = \"d\" }\n",
-                ),
-                ("src/lib.rs", ""),
-            ],
+            &[("Cargo.toml", &package("dev-dependencies", "rusty-dev")), ("src/lib.rs", "")],
             "Cargo.toml",
         ),
         "log-tag" => one(app, "fn f() {\n    log::warn!(\"no tag\");\n}\n"),
@@ -192,6 +191,13 @@ fn case_for(rule: &str) -> Option<Case> {
             "fn save(m: &M) {\n    let t = serde_json::to_vec(m).unwrap();\n    written::write(p, &t).unwrap();\n}\n",
         ),
         "subprocess" => one(app, "fn f() {\n    std::process::Command::new(\"x\");\n}\n"),
+        "test-logger" => case(
+            &[
+                ("Cargo.toml", &package("dependencies", "rusty-logging")),
+                ("src/lib.rs", "fn t() {\n    rusty_test_support::logs::init();\n}\n"),
+            ],
+            "src/lib.rs",
+        ),
         "test-inner-cfg" => one("tests/a.rs", "#![cfg(feature = \"dev\")]\n#[test]\nfn t() {}\n"),
         "test-temp-dir" => one(
             "tests/a.rs",

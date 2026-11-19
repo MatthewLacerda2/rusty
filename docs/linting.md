@@ -94,6 +94,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Test files named for behaviour | `tools/lint -- --rules` (`tool-named-test`) | **hard gate**: a test file whose name starts with `survivor`, `mutant` or `mutation` is renamed for what its tests prove; a module whose subject carries the word takes `// lint: allow(tool-named-test) <why>` on its first line |
 | Test source shape | `tools/lint -- --rules` (`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`) | **hard gate**: no inner `#![cfg]` in `tests/`, no user workspace in tests, a GPU only through `headless_or_skip` (#980) |
 | Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `rusty_test_support::temp::dir()` (in-crate) / `crate::temp::dir()` (`tests/`), never a bare `std::env::temp_dir()` (#999) |
+| One logger a test binary | `tools/lint -- --rules` | **hard gate** (`test-logger`): a package whose manifest names `rusty-logging` never names `rusty_test_support::logs`; its tests read warnings through `rusty_logging::init_for_tests` and `rusty_logging::forward` |
 | Tests | nextest + `cargo test --doc` (`make test`) | **hard gate**: the engine's tests and doctests, both feature sets; the GPU tests run on lavapipe, in the `dev` set (`docs/testing.md`, *Which suite runs the GPU tests*). In CI, `build-test` runs as three parallel jobs, the default suite and the `dev` suite in two shards, each with the timeout to itself (#2264) |
 | `tools/lint` stays std-only | `make test-lint` | its `Cargo.lock` names one package, itself (#935) |
 
@@ -775,6 +776,17 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   #999). Comment lines never count. The
   helper itself and Unix socket paths (which must stay short) carry an inline
   allow. `tools/` is not scanned: the lint crate's own tests are not the engine's.
+- **`test-logger`** — `log::set_logger` takes the first logger a process
+  installs, so a test binary holding both `rusty_logging`'s and
+  `rusty_test_support::logs`' captures nothing through whichever its tests
+  install second, under plain `cargo test`; nextest runs a test a process and
+  never sees it. A package whose `[dependencies]` or `[dev-dependencies]` name
+  `rusty-logging` (the root, `rusty-dev`, `rusty-shell`) names no
+  `test_support::logs` in a code line under its `src/` or `tests/`;
+  `rusty_test_support::logs` stays for the crates below `rusty-logging`. Each
+  `init` also panics when the other's logger got there first, so a binary the
+  rule cannot read (a crate linking `rusty-logging` only through a sibling)
+  still fails loudly instead of capturing nothing.
 - **The ≲10-files-per-directory signal** prints after the findings: every scanned
   directory holding more than ten source files as `dir-size` counts them, most
   crowded first, leaving out what is past that rule's cap under `src/` (its

@@ -1,9 +1,9 @@
 //! A lightmap bake's memory is bounded by its work in flight, not by its scene
 //! (#2312): four times the meshes at the same density peak higher only by the
 //! extra lightmaps kept, on [`WORKERS`] each (what is in flight is per worker).
-//! The page stage's bound: `pages_memory_tests`. Each test is its own process
-//! under nextest, so the peak (`memory::rss_peak_bytes`) is its bakes'; OIDN's
-//! memory tests share the planes and bakes (`denoise::memory_tests`).
+//! The page stage's bound: `pages_memory_tests`. Each test runs in a process of
+//! its own (`process::alone`), so the peak (`memory::rss_peak_bytes`) is its
+//! bakes'; OIDN's memory tests share the planes and bakes (`denoise::memory_tests`).
 
 use std::sync::Arc;
 
@@ -103,8 +103,7 @@ pub(crate) fn bake(n: usize, side: f32, denoiser: Denoiser) -> (u64, u64) {
     let maps = bake_on(&planes(n, side), &settings(denoiser), &progress, WORKERS).expect("ran");
     assert_eq!(maps.len(), n);
     let (peak, kept) = (rss_peak_bytes().expect("read"), kept(&maps));
-    // Shown when a bound fails: whether the allocator held freed memory or the
-    // bake still used it.
+    // Shown when a bound fails: did the allocator hold freed memory, or the bake?
     let (heap, peak_mb, kept_mb) = (crate::memory::heap(), peak >> 20, kept >> 20);
     println!("{n} × {side}: peak {peak_mb} MB, maps {kept_mb} MB, {heap:?}");
     (peak, kept)
@@ -138,11 +137,14 @@ pub(crate) fn holds(one: (u64, u64), four: (u64, u64), charts: usize, what: &str
 
 #[test]
 fn four_times_the_meshes_peak_higher_only_by_their_lightmaps() {
-    if rss_peak_bytes().is_none() {
-        return;
-    }
-    let (small, large) = PAIR;
-    let one = bake(small, SIDE, Denoiser::Filter);
-    let four = bake(large, SIDE, Denoiser::Filter);
-    holds(one, four, large - small, "Gaussian");
+    let test = "four_times_the_meshes_peak_higher_only_by_their_lightmaps";
+    rusty_test_support::process::alone(&format!("{}::{test}", module_path!()), || {
+        if rss_peak_bytes().is_none() {
+            return;
+        }
+        let (small, large) = PAIR;
+        let one = bake(small, SIDE, Denoiser::Filter);
+        let four = bake(large, SIDE, Denoiser::Filter);
+        holds(one, four, large - small, "Gaussian");
+    });
 }
