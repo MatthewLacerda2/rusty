@@ -1,8 +1,9 @@
 //! One camera's cluster cull (#1968): its buffers, kept per view and stack
-//! place like the instance cull's, and the three dispatches per clustered batch,
-//! recorded into the stage's one pass after phase one (#2327): the test, a
-//! workgroup per instance's scan, and the copy, dispatched indirect from what the
-//! scan kept (#2406).
+//! place like the instance cull's, readied before the stage's one pass after
+//! phase one (#2327) and read after it; `record` records its three stages
+//! between: the test, a workgroup per instance's scan, and the copy, dispatched
+//! indirect from what the scan kept (#2406), a dispatch each per group, the
+//! clustered batches of one mesh.
 
 use crate::gpu::ops::CountedQueue as _;
 use std::sync::Arc;
@@ -17,7 +18,6 @@ use crate::gpu::grow_buffer::GrowBuffer;
 use crate::gpu::kept::Kept;
 use crate::passes::hiz::counters::Counter;
 use crate::passes::hiz::pyramid::Pyramid;
-use crate::timing::GpuPart;
 use crate::Renderer;
 
 /// `hiz_clusters.wgsl`'s `Params`.
@@ -36,7 +36,7 @@ struct Params {
 type GroupKey = ([wgpu::Buffer; 8], wgpu::TextureView);
 /// What the copy's group 0 binds.
 type CopyKey = [wgpu::Buffer; 4];
-/// The words of a batch's copy dispatch in the tally (x, y, z).
+/// The words of a group's copy dispatch in the tally (x, y, z).
 const COPY_WORDS: u32 = 3;
 
 /// One stacked camera's cluster buffers.
@@ -44,19 +44,25 @@ pub(crate) struct ClusterCull {
     params: wgpu::Buffer,
     jobs: GrowBuffer,
     state: GrowBuffer,
-    tally: GrowBuffer,
+    pub(super) tally: GrowBuffer,
     out_indices: GrowBuffer,
     out_args: GrowBuffer,
     runs: GrowBuffer,
     pub(crate) counter: Counter,
-    group: Kept<GroupKey, wgpu::BindGroup>,
-    copy_group: Kept<CopyKey, wgpu::BindGroup>,
+    pub(super) group: Kept<GroupKey, wgpu::BindGroup>,
+    pub(super) copy_group: Kept<CopyKey, wgpu::BindGroup>,
     /// The jobs its last cull ran.
     #[cfg(test)]
     pub(crate) ran: u32,
     /// The clustered runs (batches) its last cull recorded.
     #[cfg(test)]
     pub(crate) runs_ran: u32,
+    /// The dispatch groups its last cull recorded: dispatches a stage.
+    #[cfg(test)]
+    pub(crate) groups_ran: u32,
+    /// The (step, group) dispatches its last cull recorded, in order.
+    #[cfg(test)]
+    pub(crate) dispatched: std::cell::RefCell<Vec<(crate::timing::GpuPart, usize)>>,
 }
 
 impl ClusterCull {
@@ -90,6 +96,10 @@ impl ClusterCull {
             ran: 0,
             #[cfg(test)]
             runs_ran: 0,
+            #[cfg(test)]
+            groups_ran: 0,
+            #[cfg(test)]
+            dispatched: Default::default(),
         }
     }
 
@@ -105,7 +115,7 @@ impl ClusterCull {
         self.out_indices.buffer()
     }
 
-    /// The count, then each batch's copy dispatch, for a test's read back.
+    /// The count, then each group's copy dispatch, for a test's read back.
     #[cfg(test)]
     pub(crate) fn tally(&self) -> &wgpu::Buffer {
         self.tally.buffer()
@@ -114,7 +124,7 @@ impl ClusterCull {
 
 impl Renderer {
     /// Ready `cull` for `plan` before the stage's merged pass opens: upload its
-    /// jobs, params and tally (a zero count, and each batch's copy dispatch at
+    /// jobs, params and tally (a zero count, and each group's copy dispatch at
     /// no cluster yet), and bind its groups against `pyramid` and `visible`
     /// (this frame's instance verdicts).
     pub(crate) fn ready_clusters(
@@ -128,53 +138,8 @@ impl Renderer {
         {
             cull.ran = plan.jobs.len() as u32;
             cull.runs_ran = plan.runs.len() as u32;
-        }
-    }
-
-    /// Record `plan`'s dispatches of `steps` (the cluster cull's sub-parts, in
-    /// order) per clustered batch into `pass`, each run's group 0 at its own
-    /// dynamic offset; `ready_clusters` ran first. A batch's dispatches read only
-    /// its own state, so a timed frame records every batch's test, then every
-    /// scan, then every copy, a pass each.
-    pub(crate) fn record_clusters(
-        &self,
-        pass: &mut wgpu::ComputePass,
-        (cull, plan): (&ClusterCull, &Plan),
-        steps: &[GpuPart],
-    ) {
-        let group = cull.group.value().expect("bound by ready_clusters");
-        let copy_group = cull.copy_group.value().expect("bound by ready_clusters");
-        let pipes = &self.hiz.clusters;
-        for (r, run) in plan.runs.iter().enumerate() {
-            let mesh = self.gpu_mesh_of(run.mesh).and_then(|m| m.clusters.as_ref());
-            let mesh = &mesh
-                .expect("planned this frame from a resident clustered mesh")
-                .group;
-            let offset = [r as u32 * RUN_STRIDE as u32];
-            let jobs = run.jobs.len() as u32;
-            pass.set_bind_group(1, mesh, &[]);
-            for step in steps {
-                match step {
-                    GpuPart::OcclusionClustersTest => {
-                        pass.set_bind_group(0, group, &offset);
-                        pass.set_pipeline(pipes.test.get());
-                        pass.dispatch_workgroups((jobs * run.clusters).div_ceil(64), 1, 1);
-                    }
-                    GpuPart::OcclusionClustersScan => {
-                        pass.set_bind_group(0, group, &offset);
-                        pass.set_pipeline(pipes.scan.get());
-                        pass.dispatch_workgroups(jobs, 1, 1);
-                    }
-                    GpuPart::OcclusionClustersCopy => {
-                        // Sized by what the scan kept: no workgroup a culled cluster.
-                        pass.set_bind_group(0, copy_group, &offset);
-                        pass.set_pipeline(pipes.copy.get());
-                        let at = 4 * u64::from(copy_at(r));
-                        pass.dispatch_workgroups_indirect(cull.tally.buffer(), at);
-                    }
-                    other => unreachable!("{other:?} is no cluster cull dispatch"),
-                }
-            }
+            cull.groups_ran = plan.groups.len() as u32;
+            cull.dispatched.borrow_mut().clear();
         }
     }
 
@@ -233,21 +198,21 @@ impl Renderer {
         queue.counted_write_buffer(&cull.params, 0, bytemuck::bytes_of(&params));
         cull.jobs
             .upload(device, queue, bytemuck::cast_slice(&plan.jobs));
-        let mut runs = vec![0u32; plan.runs.len().max(1) * RUN_STRIDE as usize / 4];
-        for (r, run) in plan.runs.iter().enumerate() {
-            let at = r * RUN_STRIDE as usize / 4;
+        let mut runs = vec![0u32; plan.groups.len().max(1) * RUN_STRIDE as usize / 4];
+        for (g, group) in plan.groups.iter().enumerate() {
+            let at = g * RUN_STRIDE as usize / 4;
             runs[at..at + 4].copy_from_slice(&[
-                run.jobs.start,
-                run.jobs.len() as u32,
-                run.clusters,
-                copy_at(r),
+                group.jobs.start,
+                group.jobs.len() as u32,
+                group.clusters,
+                copy_at(g),
             ]);
         }
         cull.runs.upload(device, queue, bytemuck::cast_slice(&runs));
         // The count, then each batch's copy dispatch: no cluster yet, its jobs.
         let mut tally = vec![0u32];
-        for run in &plan.runs {
-            tally.extend([0, run.jobs.len() as u32, 1]);
+        for group in &plan.groups {
+            tally.extend([0, group.jobs.len() as u32, 1]);
         }
         cull.tally
             .upload(device, queue, bytemuck::cast_slice(&tally));
@@ -260,9 +225,9 @@ impl Renderer {
     }
 }
 
-/// The word of the tally where batch `r`'s copy dispatch starts: after the count.
-fn copy_at(r: usize) -> u32 {
-    1 + COPY_WORDS * r as u32
+/// The word of the tally where group `g`'s copy dispatch starts: after the count.
+pub(super) fn copy_at(g: usize) -> u32 {
+    1 + COPY_WORDS * g as u32
 }
 
 /// The test's and scan's group 0 buffers, by binding, the pyramid aside.

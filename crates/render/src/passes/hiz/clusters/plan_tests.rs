@@ -2,11 +2,15 @@ use super::*;
 use crate::draw::batch::{BatchKey, RecordTraits};
 
 fn batch(instances: Range<u32>, indices: Range<u32>, facing: Facing) -> DrawBatch {
+    of_mesh(0, instances, indices, facing)
+}
+
+fn of_mesh(mesh: u32, instances: Range<u32>, indices: Range<u32>, facing: Facing) -> DrawBatch {
     DrawBatch {
         key: BatchKey {
             pipeline: 0,
             facing,
-            mesh: MeshHandle(0),
+            mesh: MeshHandle(mesh),
             indices: indices.into(),
             material: 0,
             record: 0,
@@ -46,7 +50,7 @@ fn a_clustered_batch_gets_a_job_per_instance_with_its_own_room() {
         cluster_first: 4,
         state_first: 0,
         cone: 1,
-        _pad: 0,
+        clusters: 5,
     };
     assert_eq!(plan.jobs[0], first);
     assert_eq!(plan.jobs[1].out_first, 600, "the next instance's room");
@@ -54,6 +58,46 @@ fn a_clustered_batch_gets_a_job_per_instance_with_its_own_room() {
     assert_eq!(plan.jobs[2].cone, 0, "a two-sided batch takes no cone test");
     assert_eq!((plan.out_indices, plan.states, plan.tested), (1800, 33, 10));
     assert_eq!(plan.draws(3), vec![None, Some(0..2), Some(2..3)]);
+    let one = Group {
+        mesh: MeshHandle(0),
+        jobs: 0..3,
+        clusters: 5,
+    };
+    assert_eq!(plan.groups, vec![one], "one mesh, one dispatch a stage");
+}
+
+#[test]
+fn the_batches_of_one_mesh_share_a_dispatch_group() {
+    let ccw = Facing::Ccw;
+    let batches = [
+        of_mesh(1, 0..2, 0..600, ccw),
+        of_mesh(0, 2..3, 0..600, ccw),
+        of_mesh(1, 3..4, 600..900, ccw),
+    ];
+    let all = instances(4);
+    let clusters_of = |b: &DrawBatch| Some(if b.key.indices.start == 0 { 0..5 } else { 5..7 });
+    let plan = Plan::of(batches.iter(), (&all, &|_| true), clusters_of);
+    let group = |mesh, jobs, clusters| Group {
+        mesh: MeshHandle(mesh),
+        jobs,
+        clusters,
+    };
+    let groups = vec![group(0, 0..1, 5), group(1, 1..4, 5)];
+    assert_eq!(plan.groups, groups, "by mesh, the most clusters of each");
+    let own: Vec<_> = plan.jobs.iter().map(|j| j.clusters).collect();
+    assert_eq!(own, [5, 5, 5, 2], "a job keeps its own batch's count");
+    assert_eq!(plan.draws(3), vec![Some(1..3), Some(0..1), Some(3..4)]);
+}
+
+#[test]
+fn a_group_past_a_dispatch_limit_splits() {
+    let max = MAX_DIMENSION;
+    let ccw = Facing::Ccw;
+    let batches = [batch(0..max, 0..3, ccw), batch(max..max + 1, 3..6, ccw)];
+    let all = instances(max + 1);
+    let plan = Plan::of(batches.iter(), (&all, &|_| true), |_| Some(0..1));
+    assert_eq!(plan.runs.len(), 2, "each batch fits on its own");
+    assert_eq!(plan.groups.len(), 2, "together past the scan's workgroups");
 }
 
 #[test]

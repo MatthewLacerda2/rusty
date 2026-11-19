@@ -1,8 +1,8 @@
 // Per-cluster occlusion culling (#1968): the culling half of UE5's Nanite. A mesh
 // split into clusters at import (`asset::clusters`) is drawn, per instance, as the
 // clusters this camera may see, with no mesh shaders. `render::passes::hiz`
-// dispatches it per clustered batch, after `cs_test` has its instances' verdicts
-// against this frame's pyramid:
+// dispatches it per group (the clustered batches of one mesh), stage by stage,
+// after `cs_test` has its instances' verdicts against this frame's pyramid:
 //   1. `cs_cluster_test`: each (instance, cluster) is kept unless its instance is
 //      hidden, or it is outside the frustum, faces wholly away (its normal cone),
 //      or is behind the pyramid (`hidden`). One crossing the near plane is kept;
@@ -44,11 +44,13 @@ struct Job {
     cluster_first: u32,
     state_first: u32,
     cone: u32,
-    _pad: u32,
+    // Its batch's clusters: its group's dispatch covers `run.clusters`, the most
+    // of any job in it, and a job skips the clusters past its own.
+    clusters: u32,
 };
 
-// The batch a dispatch covers: its jobs, how many clusters each has, and the
-// word of `tally` its copy's indirect dispatch starts at.
+// The group a dispatch covers: its jobs, the most clusters any of them has, and
+// the word of `tally` its copy's indirect dispatch starts at.
 struct Run {
     job_first: u32,
     jobs: u32,
@@ -75,7 +77,7 @@ struct Cluster {
 // at `1 + 2k`; the scan lists its `m`-th kept cluster at `1 + 2m` (which) and
 // `2 + 2m` (its output offset), over verdicts it has already read.
 @group(0) @binding(4) var<storage, read_write> state: array<u32>;
-// Word 0: the tested clusters kept, for `Debug.Stats`; then per batch, at its
+// Word 0: the tested clusters kept, for `Debug.Stats`; then per group, at its
 // `run.copy_at`, the copy's indirect dispatch (most kept clusters, jobs, 1).
 @group(0) @binding(5) var<storage, read_write> tally: array<atomic<u32>>;
 // One `DrawIndexedIndirectArgs` (five words) per job.
@@ -159,9 +161,10 @@ fn cs_cluster_test(
     @builtin(local_invocation_index) lane: u32,
 ) {
     let t = id.x;
-    if t < run.jobs * run.clusters {
-        let job = jobs[run.job_first + t / run.clusters];
-        let k = t % run.clusters;
+    let job = jobs[run.job_first + min(t / run.clusters, run.jobs - 1u)];
+    let k = t % run.clusters;
+    // Past the group's pairs, or a smaller batch's clusters in it: nothing to judge.
+    if t < run.jobs * run.clusters && k < job.clusters {
         var keep = true;
         if job.tested != 0u {
             let c = clusters[job.cluster_first + k];
@@ -199,12 +202,13 @@ fn cs_cluster_scan(
     let base = job.state_first;
     // Kept clusters and their indices before this chunk.
     var before = vec2<u32>(0u);
-    for (var chunk = 0u; chunk < run.clusters; chunk += CHUNK) {
+    // Uniform across the workgroup: every lane reads the same job.
+    for (var chunk = 0u; chunk < job.clusters; chunk += CHUNK) {
         var keep = vec4<u32>(0u);
         var count = vec4<u32>(0u);
         for (var i = 0u; i < 4u; i++) {
             let k = chunk + lane * 4u + i;
-            if k < run.clusters && state[base + 1u + 2u * k] != 0u {
+            if k < job.clusters && state[base + 1u + 2u * k] != 0u {
                 keep[i] = 1u;
                 count[i] = bitcast<u32>(clusters[job.cluster_first + k].max.w);
             }

@@ -160,17 +160,17 @@ pub(super) fn lap_of(part: GpuPart) -> &'static str {
     }
 }
 
-/// The cluster cull's three dispatches, in the order a batch runs them, each a
-/// sub-part of `gpu.occlusion.clusters` on a timed frame (#2406).
-const CLUSTER_STEPS: [GpuPart; 3] = [
+/// The cluster cull's three stages, in the order they run, each a sub-part of
+/// `gpu.occlusion.clusters` on a timed frame (#2406).
+pub(super) const CLUSTER_STEPS: [GpuPart; 3] = [
     GpuPart::OcclusionClustersTest,
     GpuPart::OcclusionClustersScan,
     GpuPart::OcclusionClustersCopy,
 ];
 
-/// The cluster cull's parts: none without a clustered batch; untimed, one, each
-/// batch's dispatches in turn; timed, a pass per dispatch kind, every batch's
-/// in each (#2406).
+/// The cluster cull's parts: none without a clustered batch; untimed, one, its
+/// three stages in turn; timed, a pass per stage. Either way every group's test,
+/// then every scan, then every copy (`run::dispatch_order`, #2406).
 fn cluster_parts(clustered: bool, split: bool) -> &'static [GpuPart] {
     match (clustered, split) {
         (false, _) => &[],

@@ -1111,7 +1111,8 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   `.clusters` (the cluster cull, zero on a frame that draws nothing by cluster),
   summing to `gpu.occlusion`, with `.clusters` split again into its dispatches
   (#2406): `.clusters_test`, `.clusters_scan` and `.clusters_copy`, summing to it
-  and so in no sum beside it: on a frame that timed any part every part is
+  and so in no sum beside it (the split adds pass boundaries only: a timed frame
+  records the same dispatches, in the same order, as an untimed one): on a frame that timed any part every part is
   sampled, zero when absent, so each is averaged over the same frames and
   viewpoints as its stage; a run that never culls (or has no GPU timing) has no
   `gpu.occlusion.<part>` row at all. And `render.occlusion.hold` (making room for

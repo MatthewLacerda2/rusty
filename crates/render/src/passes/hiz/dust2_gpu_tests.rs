@@ -133,11 +133,11 @@ fn triangles(r: &Renderer, view: &RenderView, clustered: u32) -> u32 {
         .sum()
 }
 
-/// Workgroups the base camera's last cluster copy started: each batch's
+/// Workgroups the base camera's last cluster copy started: each group's
 /// indirect dispatch (#2406), one per (instance, cluster) before it.
 fn copy_groups(r: &Renderer, view: &RenderView) -> u32 {
     let cull = &view.hiz.cameras[0].clusters;
     let tally = words(r, cull.tally());
-    let runs = tally[1..].chunks_exact(3).take(cull.runs_ran as usize);
+    let runs = tally[1..].chunks_exact(3).take(cull.groups_ran as usize);
     runs.map(|x| x[0] * x[1] * x[2]).sum()
 }

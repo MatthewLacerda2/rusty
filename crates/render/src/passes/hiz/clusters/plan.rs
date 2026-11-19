@@ -1,6 +1,8 @@
 //! Which of a camera's opaque batches are drawn by cluster this frame (#1968),
 //! and the jobs `hiz_clusters.wgsl` runs for them: one per instance, each with
-//! its room in the output index list. Pure CPU work over the frame's batches.
+//! its room in the output index list, and the dispatch groups that run them:
+//! the batches of one mesh share a dispatch a stage (#2406). Pure CPU work over
+//! the frame's batches.
 
 use std::ops::Range;
 
@@ -29,7 +31,9 @@ pub(crate) struct Job {
     pub cluster_first: u32,
     pub state_first: u32,
     pub cone: u32,
-    pub _pad: u32,
+    /// Its batch's clusters: its group's dispatch covers the most of any job in
+    /// it, so a job of a smaller batch skips the rest.
+    pub clusters: u32,
 }
 
 /// One clustered batch: its place among the opaque batches, its jobs, and how
@@ -42,11 +46,23 @@ pub(crate) struct Run {
     pub clusters: u32,
 }
 
+/// The clustered batches one dispatch a stage covers: consecutive runs of one
+/// mesh, so one mesh binding (group 1) serves them all, their jobs contiguous,
+/// and the most clusters any of them has.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Group {
+    pub mesh: MeshHandle,
+    pub jobs: Range<u32>,
+    pub clusters: u32,
+}
+
 /// A camera's clustered draws this frame.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Plan {
     pub jobs: Vec<Job>,
     pub runs: Vec<Run>,
+    /// The runs' dispatch groups, in order: each stage dispatches once a group.
+    pub groups: Vec<Group>,
     /// Output indices and state words the jobs need: a job's region is
     /// `1 + 2 * clusters` words (`hiz_clusters.wgsl`'s `state`).
     pub out_indices: u32,
@@ -67,7 +83,11 @@ impl Plan {
         clusters_of: impl Fn(&DrawBatch) -> Option<Range<u32>>,
     ) -> Self {
         let mut plan = Self::default();
-        for (b, batch) in batches.enumerate() {
+        // By mesh, so the batches of one mesh are consecutive and share a dispatch
+        // group; stable, so the order stays a function of the batches alone.
+        let mut batches: Vec<_> = batches.enumerate().collect();
+        batches.sort_by_key(|(_, b)| b.key.mesh);
+        for (b, batch) in batches {
             let Some(clusters) = clusters_of(batch) else {
                 continue;
             };
@@ -75,9 +95,8 @@ impl Plan {
             let room = count * u64::from(batch.key.indices.len());
             let n = clusters.len() as u32;
             let fits = u64::from(plan.out_indices) + room <= MAX_OUT_INDICES
-                && count <= u64::from(MAX_DIMENSION)
                 && n <= MAX_DIMENSION
-                && count * u64::from(n) <= 64 * u64::from(MAX_DIMENSION);
+                && fits_dispatch(count, n);
             // A batch none of whose instances is judged (mesh particles, a
             // vertex-moving material) would cull nothing by cluster but the
             // frustum and cones, at a draw per instance: one instanced draw wins.
@@ -97,12 +116,13 @@ impl Plan {
                     cluster_first: clusters.start,
                     state_first: plan.states,
                     cone: u32::from(batch.key.facing == Facing::Ccw),
-                    _pad: 0,
+                    clusters: n,
                 });
                 plan.out_indices += batch.key.indices.len();
                 plan.states += 1 + 2 * n;
             }
             let jobs = first..plan.jobs.len() as u32;
+            plan.group(batch.key.mesh, jobs.clone(), n);
             plan.runs.push(Run {
                 batch: b,
                 mesh: batch.key.mesh,
@@ -111,6 +131,27 @@ impl Plan {
             });
         }
         plan
+    }
+
+    /// Put a run of `mesh` (its `jobs`, `n` clusters each) in the last group when
+    /// that is of the same mesh and the joined dispatches stay in their limits,
+    /// else in a group of its own.
+    fn group(&mut self, mesh: MeshHandle, jobs: Range<u32>, n: u32) {
+        let joined = self.groups.last_mut().filter(|g| {
+            let count = u64::from(jobs.end - g.jobs.start);
+            g.mesh == mesh && fits_dispatch(count, g.clusters.max(n))
+        });
+        match joined {
+            Some(g) => {
+                g.jobs.end = jobs.end;
+                g.clusters = g.clusters.max(n);
+            }
+            None => self.groups.push(Group {
+                mesh,
+                jobs,
+                clusters: n,
+            }),
+        }
     }
 
     /// Per opaque batch (of `batches`), the jobs whose indirect draws stand for
@@ -122,6 +163,12 @@ impl Plan {
         }
         out
     }
+}
+
+/// Whether `jobs` instances of `clusters` each fit one dispatch a stage: the
+/// scan's and copy's workgroup a job, the test's thread an (instance, cluster).
+fn fits_dispatch(jobs: u64, clusters: u32) -> bool {
+    jobs <= u64::from(MAX_DIMENSION) && jobs * u64::from(clusters) <= 64 * u64::from(MAX_DIMENSION)
 }
 
 #[cfg(test)]

@@ -81,6 +81,8 @@ mod dust2_gpu_tests;
 #[cfg(test)]
 mod gpu_tests;
 #[cfg(test)]
+mod group_gpu_tests;
+#[cfg(test)]
 mod moving_gpu_tests;
 #[cfg(test)]
 mod passes_gpu_tests;

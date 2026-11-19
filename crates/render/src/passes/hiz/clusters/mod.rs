@@ -15,10 +15,12 @@
 //!   frustum, its normal cone and the same pyramid (`hiz/hidden.wgsl`'s
 //!   `hidden`), then compacts the kept clusters' indices, in order, into the
 //!   camera's output index list, with one indirect draw per instance. Three
-//!   dispatches a batch (#2406): the test, a thread per (instance, cluster); the
-//!   scan, a workgroup per instance placing its kept clusters by a parallel
-//!   prefix sum and listing them; and the copy, dispatched indirect from the
-//!   scan's count (the most clusters any one instance kept, by its instances),
+//!   stages, a dispatch each per group, the clustered batches of one mesh
+//!   (`plan::Group`), recorded stage by stage, every group's test before any
+//!   scan (#2406): the test, a thread per (instance, cluster); the scan, a
+//!   workgroup per instance placing its kept clusters by a parallel prefix sum
+//!   and listing them; and the copy, dispatched indirect from the scan's count
+//!   (the most clusters any one instance of the group kept, by its instances),
 //!   so no workgroup starts for a cluster no instance kept. Every place is a
 //!   prefix sum, never a racing atomic: one view draws one index stream. A cluster
 //!   that came out from behind a wall is tested against this frame's pyramid, so
@@ -41,6 +43,7 @@ mod eye;
 mod gpu;
 mod layout;
 pub(crate) mod plan;
+mod record;
 mod run;
 
 use std::ops::Range;
