@@ -2,67 +2,10 @@
 
 from __future__ import annotations
 
-import contextlib
-import io
 import json
 import unittest
-from datetime import datetime, timezone
-from unittest import mock
 
-from tests import load
-
-coder = load("coder.py")
-NOW = datetime(2026, 10, 29, 14, 3, tzinfo=timezone.utc)
-BRIEF = {"body": "Brief\n\nBranch: `9-x`.", "created_at": "2026-10-29T10:00:00Z",
-         "author_association": "OWNER", "html_url": "https://github.com/o/r/issues/9#issuecomment-501"}
-OLDER = {**BRIEF, "created_at": "2026-10-28T10:00:00Z", "html_url": "https://github.com/o/r/issues/9#issuecomment-400"}
-CHAT = {"body": "Thanks!", "created_at": "2026-10-29T11:00:00Z", "author_association": "NONE",
-        "html_url": "https://github.com/o/r/issues/9#issuecomment-600"}
-ROUTINES = {"data": [{"name": "rusty #8 earlier", "created_at": "2026-10-28T00:00:00Z",
-                      "job_config": {"ccr": {"environment_id": "env_cloud"}}}]}
-
-
-class Fake:
-    """GitHub and the routines API, answering from tables and noting the calls."""
-
-    def __init__(self, issue: dict | None = None, comments: list | None = None, create=(200, None),
-                 routines: dict | None = None, pulls: list | None = None, threads: dict | None = None,
-                 blockers: dict | None = None):
-        # a pull request's conversation (#2017) and an issue's recorded `blocked_by` (#2063), by number
-        self.threads, self.blockers = threads or {}, blockers or {}
-        self.pulls = [] if pulls is None else pulls
-        self.routines = ROUTINES if routines is None else routines
-        self.issue = {"number": 9, "title": "Do it", "state": "open", "labels": []} if issue is None else issue
-        self.comments = [BRIEF] if comments is None else comments
-        self.create = create
-        self.calls: list[dict] = []
-
-    def gh(self, path: str):
-        if "/dependencies/blocked_by" in path:
-            return self.blockers.get(int(path.split("/issues/")[1].split("/")[0]), [])
-        if "/pulls" in path:
-            return self.pulls if "page=1" in path else []
-        if "/comments" in path:
-            number = int(path.split("/issues/")[1].split("/")[0])
-            return self.threads.get(number, self.comments) if "page=1" in path else []
-        return self.issue
-
-    def call(self, arguments: dict):
-        self.calls.append(arguments)
-        if arguments["action"] == "list":
-            return 200, self.routines
-        status, answer = self.create
-        return status, answer if answer is not None else {"trigger": {"id": "trig_new"}}
-
-    def run(self, *argv: str, env: dict | None = None) -> tuple[int, str, str]:
-        out, err = io.StringIO(), io.StringIO()
-        with mock.patch.object(coder.ghrest, "slug", return_value="o/r"), \
-                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            code = coder.main(list(argv), gh=self.gh, call=self.call, now=NOW, env=env or {})
-        return code, out.getvalue(), err.getvalue()
-
-    def created(self) -> list[dict]:
-        return [c["body"] for c in self.calls if c["action"] == "create"]
+from tests.dispatch.coder_fakes import BRIEF, CHAT, OLDER, Fake, busy, drafts
 
 
 class Launch(unittest.TestCase):
@@ -86,7 +29,7 @@ class Launch(unittest.TestCase):
     def test_rusty_cloud_env_skips_the_lookup(self):
         fake = Fake()
         self.assertEqual(fake.run("9", env={"RUSTY_CLOUD_ENV": "env_set"})[0], 0)
-        self.assertEqual([c["action"] for c in fake.calls], ["list", "create"])
+        self.assertEqual([c["action"] for c in fake.calls], ["list", "list", "create"])  # the 2nd under the lock
         self.assertEqual(fake.created()[0]["job_config"]["ccr"]["environment_id"], "env_set")
 
     def test_a_dry_run_prints_the_body_and_creates_nothing(self):
@@ -97,22 +40,10 @@ class Launch(unittest.TestCase):
         self.assertEqual(json.loads(out)["name"], "rusty #9 Do it")
 
 
-def busy(*issues: int) -> dict:
-    """A routine list with a fired coder on each of `issues`; its run reads finished (#1866)."""
-    run = {"status": "ROUTINE_RUN_STATUS_SUCCEEDED", "fired_at": "2026-10-29T13:00:00Z",
-           "finished_at": "2026-10-29T13:30:00Z"}
-    return {"data": ROUTINES["data"] + [{"name": f"rusty #{n} x", "enabled": False, "ended_reason": "run_once_fired",
-                                         "last_run": run} for n in issues]}
-
-
-def drafts(*issues: int) -> list[dict]:
-    return [{"draft": True, "head": {"ref": f"{n}-x"}} for n in issues]
-
-
 class Limit(unittest.TestCase):
-    def test_a_sixth_coder_is_refused_and_names_the_five(self):
+    def test_a_sixth_coder_with_no_wait_is_refused_and_names_the_five(self):
         fake = Fake(routines=busy(1, 2, 3, 4, 5), pulls=drafts(1, 2, 3, 4, 5))
-        code, _, err = fake.run("9")
+        code, _, err = fake.run("9", "--no-wait")
         self.assertEqual(code, 1)
         self.assertIn("limit is 5", err)
         self.assertIn("rusty #5 x", err)
@@ -128,7 +59,7 @@ class Limit(unittest.TestCase):
 
     def test_a_ready_pull_request_in_review_holds_its_slot_and_is_named(self):
         pulls = drafts(1, 2, 3, 4) + [{"number": 105, "draft": False, "head": {"ref": "5-x"}}]
-        code, _, err = Fake(routines=busy(1, 2, 3, 4, 5), pulls=pulls, threads={105: [CHAT]}).run("9")
+        code, _, err = Fake(routines=busy(1, 2, 3, 4, 5), pulls=pulls, threads={105: [CHAT]}).run("9", "--no-wait")
         self.assertEqual(code, 1)
         self.assertIn("rusty #5 x (fired 2026-10-29T13:00Z, in review)", err)
 

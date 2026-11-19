@@ -40,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export import launcher bench bench-scenes bless-converters fuzz-lock
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder coders review-level rebriefs mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export import launcher bench bench-scenes bless-converters fuzz-lock
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -188,8 +188,8 @@ doc: ## [gate] Rustdoc with warnings denied, both feature sets
 # adds to the default features, so it builds and draws theirs too (docs/testing.md,
 # *Which suite runs the GPU tests*; the `gpu-default-only` lint holds the premise).
 # A crate whose render path differs without `dev` widens it in both callers, e.g.
-# `-E 'not group(gpu) | (group(gpu) & package(rusty-<crate>))'`.
-DEFAULT_SUITE := -E 'not group(gpu)'
+# `-E 'not group(gpu*) | (group(gpu*) & package(rusty-<crate>))'`.
+DEFAULT_SUITE := -E 'not group(gpu*)'
 
 # All four runs go on when one fails, as nextest does inside a run (fail-fast off), so
 # one `make test` reports every failure: each run under its own header, and the last
@@ -217,9 +217,9 @@ test: ## [gate] Engine tests (nextest) and doctests, both feature sets (the GPU 
 # The `dev` set only, as the gates run the group (docs/testing.md, *Which suite runs
 # the GPU tests*): `dev` adds to the default features, so it builds their GPU tests too.
 ADAPTER ?= $(if $(wildcard /usr/share/vulkan/icd.d/lvp_icd*.json),llvmpipe,)
-# `group(gpu)`: the tests .config/nextest.toml puts in its gpu group, so the naming
-# rule stays written in that one file.
-GPU_TESTS := -E 'group(gpu)'
+# `group(gpu*)`: the tests .config/nextest.toml puts in its GPU group (`gpu`, or
+# `gpu-macos` on macOS), so the naming rule stays written in that one file.
+GPU_TESTS := -E 'group(gpu*)'
 test-gpu: ## The GPU tests alone (the dev feature set's), on ADAPTER (lavapipe when installed)
 	RUSTY_REQUIRE_GPU=1 WGPU_ADAPTER_NAME='$(ADAPTER)' $(TEST) --features dev $(GPU_TESTS)
 
@@ -367,13 +367,18 @@ reclaim: ## Remove merged worktrees nothing is using (and their target/) and fin
 # `Brief` comment on the issue and creates the one-off routine that starts the
 # cloud coder (through `claude mcp serve`, so the
 # claude.ai token stays inside claude); running it again is the re-brief launch.
-# It refuses a closed, `planning` or `human` issue, and a sixth running coder
-# (#1856; a re-brief never counts against itself, ARGS=--over-limit overrides).
+# It refuses a closed, `planning` or `human` issue; a sixth running coder (#1856;
+# a re-brief never counts against itself) waits in a line under .git/ (#2382),
+# ARGS=--no-wait refuses instead, ARGS=--over-limit launches anyway. `coders`
+# prints who runs and who waits, and launches from the line while slots are free.
 # ARGS=--dry-run prints the routine and creates nothing. `review-level` prints
 # `high` or `medium` for an independent review, and the paths that decided it.
 coder: ## Start the cloud coder on an issue's newest Brief. make coder ISSUE=1569, ARGS=--dry-run creates nothing
 	@test -n "$(ISSUE)" || { echo "coder: which issue? e.g. make coder ISSUE=1569" >&2; exit 1; }
 	@python3 .github/scripts/coder.py $(ISSUE) $(ARGS)
+
+coders: ## Who runs, who waits for a slot, and launch from the line while slots are free. ARGS=--dry-run launches nothing
+	@python3 .github/scripts/coders.py $(ARGS)
 
 review-level: ## The independent review's level (high or medium) and why. make review-level PR=1570
 	@test -n "$(PR)" || { echo "review-level: which pull request? e.g. make review-level PR=1570" >&2; exit 1; }

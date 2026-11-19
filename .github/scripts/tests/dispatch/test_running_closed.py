@@ -11,8 +11,7 @@ from __future__ import annotations
 import unittest
 from datetime import timedelta
 
-from dispatch import running
-from tests import load
+from dispatch import launch, running
 from tests.dispatch.test_running import FIRED, SOON, WAITS, hub, placed
 
 
@@ -73,7 +72,6 @@ class Coders(unittest.TestCase):
 
 class Reader(unittest.TestCase):
     def test_coder_reads_one_page_of_closed_pull_requests_once(self):
-        coder = load("coder.py")
         calls: list[str] = []
 
         def gh(path: str):
@@ -82,14 +80,14 @@ class Reader(unittest.TestCase):
                 return [shut(2, AFTER, True), shut(3, AFTER, False)]
             return [] if "/pulls" in path else {"state": "open"}
 
-        reader = coder.github(gh, "o/r", SOON)
+        reader = launch.github(gh, "o/r", SOON)
         self.assertEqual([p["number"] for p in reader.closed(2)], [102])
         self.assertEqual(reader.closed(4), [])
         closed = [c for c in calls if "state=closed" in c]
         self.assertEqual(closed, ["repos/o/r/pulls?state=closed&sort=updated&direction=desc&per_page=100"])
 
     def test_a_failed_listing_is_unknown_not_empty(self):
-        reader = load("coder.py").github(lambda path: None if "state=closed" in path else [], "o/r", SOON)
+        reader = launch.github(lambda path: None if "state=closed" in path else [], "o/r", SOON)
         self.assertIsNone(reader.closed(2))
 
 

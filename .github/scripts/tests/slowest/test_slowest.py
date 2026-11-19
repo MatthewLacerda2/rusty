@@ -67,10 +67,21 @@ def run(xml: str, config: Path = slowest_tests.NEXTEST, cores: int = 4) -> str:
         return out.getvalue()
 
 
+try:
+    import tomllib  # 3.11+; `gpu_rule` needs it, so the accounting tests skip without it
+except ModuleNotFoundError:
+    tomllib = None
+
+NEEDS_TOML = unittest.skipUnless(tomllib, "tomllib needs Python 3.11+")
+#: This platform's cap, as the script reads it: 2 on Linux, 3 on macOS (#2363).
+CAP = slowest_tests.gpu_rule(slowest_tests.NEXTEST.read_text())[1] if tomllib else 0
+
+
+@NEEDS_TOML
 class Accounting(unittest.TestCase):
     def test_the_group_against_the_rest_with_the_repos_own_filter_and_cap(self):
         out = run(SHARD)
-        self.assertIn("gpu: 3 tests, 20 s, S/cap 2 = 10 s; rest: 3 tests, 4 s, R/cores 4 = 1 s; (S+R)/cores = 6 s; "
+        self.assertIn(f"gpu: 3 tests, 20 s, S/cap {CAP} = {20 / CAP:.0f} s; rest: 3 tests, 4 s, R/cores 4 = 1 s; (S+R)/cores = 6 s; "
                       "shard wall 40 s", out)
         self.assertIn("gpu tests: median 6.000 s, p10 4.000 s", out)
 
@@ -81,7 +92,7 @@ class Accounting(unittest.TestCase):
 
     def test_a_shard_without_gpu_tests_prints_zero_not_an_error(self):
         out = run(NO_GPU)
-        self.assertIn("gpu: 0 tests, 0 s, S/cap 2 = 0 s; rest: 1 tests, 2 s", out)
+        self.assertIn(f"gpu: 0 tests, 0 s, S/cap {CAP} = 0 s; rest: 1 tests, 2 s", out)
         self.assertNotIn("median", out)
 
     def test_kind_test_is_the_integration_binary_only(self):

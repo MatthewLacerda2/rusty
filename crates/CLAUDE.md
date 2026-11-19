@@ -159,6 +159,13 @@ manifest, the row, then the compiler names every path left to fix.
 ## Profiles
 - `[profile.dev.package."*"]` optimises dependencies only, never a member, so a
   crate keeps the edit-loop's opt-level 0.
+- A dependency no test or frame runs hot gets its own `[profile.dev.package.<name>]`
+  table back at opt-level 0, under its group's reason: the dev-only provider stack,
+  the window and clipboard protocol crates, and host-only proc macros and build
+  helpers that only dependencies use. A host-only crate a member derives through
+  stays optimised, since it runs on every rebuild of the edit loop; the comment above
+  `[profile.dev]` in the root `Cargo.toml` lists them. `make scripts`
+  (`test_dev_profile.py`) holds the tables to the lock and the members' dependencies.
 
 ## Module paths in the tools
 `tools/lint` (`tools/lint/src/modules.rs`) and the scripts (`.github/scripts/modules.py`)
