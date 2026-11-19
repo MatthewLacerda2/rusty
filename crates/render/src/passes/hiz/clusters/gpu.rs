@@ -56,8 +56,11 @@ pub(super) fn cover(runs: &[Range<u32>], run: Range<u32>) -> Option<Range<u32>> 
 impl crate::Renderer {
     /// Give the resident mesh `id` the clusters of its import (still describing
     /// its geometry, `indices`), or none. Clusters that don't end at its last
-    /// index are not its own, and are dropped; so are those the pool cannot
-    /// hold under the device's binding limit, which then draw whole as before.
+    /// index are not its own, and are dropped. So are those the pool cannot
+    /// hold: its limit is the device's binding limit over every clustered mesh
+    /// resident in the session, not this mesh's alone. A mesh refused logs it
+    /// and is drawn whole (tested as one instance), and is not retried when a
+    /// lease frees room later; releasing meshes and retrying are #2440's.
     pub(crate) fn attach_clusters(
         &mut self,
         id: &crate::MeshId,

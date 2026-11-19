@@ -49,7 +49,7 @@ mod eye;
 mod gpu;
 mod layout;
 pub(crate) mod plan;
-mod pool;
+pub(crate) mod pool;
 mod ranges;
 mod record;
 mod run;

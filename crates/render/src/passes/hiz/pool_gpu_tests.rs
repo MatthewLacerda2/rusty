@@ -1,12 +1,15 @@
 //! The cluster pool across a session (#2417): a mesh re-cut mid-session gives
 //! its rows and indices back and leases new ones (the pool growing for a bigger
 //! one), the next re-cut reuses the hole without growing, and every frame
-//! between culls by cluster and draws what it draws with the cull off.
+//! between culls by cluster and draws what it draws with the cull off. The
+//! limit is the session's: a lease past it is refused with nothing kept, a
+//! smaller one still fits, and a mesh refused is drawn whole.
 
 use glam::{Quat, Vec3};
 
-use super::cluster_gpu_tests::{cut, panel_of};
+use super::cluster_gpu_tests::{cut, panel, panel_of};
 use super::gpu_tests::{offscreen, shot, H, W};
+use crate::passes::hiz::clusters::pool::ClusterPool;
 use crate::Renderer;
 use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::{Camera, Scene};
@@ -49,6 +52,76 @@ fn gpu_a_mesh_re_cut_mid_session_frees_its_range_and_the_next_cut_reuses_it() {
         (first, grown),
         "reused, not grown"
     );
+}
+
+#[test]
+fn gpu_a_lease_past_the_pool_limit_is_refused_and_a_smaller_one_still_fits() {
+    let Some(r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
+        return;
+    };
+    let mut scene = Scene::new();
+    let at = (Vec3::ZERO, 1.0, Quat::IDENTITY);
+    let (big, small) = (
+        panel_of(&mut scene, ("Big", 64), at),
+        panel_of(&mut scene, ("Small", 48), at),
+    );
+    let mesh = |id| {
+        let m = scene.world.mesh(id).unwrap();
+        (m.clusters().unwrap().clone(), m.indices.clone())
+    };
+    let ((bc, bi), (sc, si)) = (mesh(big), mesh(small));
+    let mut pool = ClusterPool::new(&r.device, &r.hiz.clusters.pool_layout);
+    // Room for one big mesh's indices and one small one's, no more.
+    pool.limit = 4 * (bi.len() + si.len()) as u64;
+    let gpu = (&r.device, &r.queue);
+    let layout = &r.hiz.clusters.pool_layout;
+    let first = pool.lease(gpu, layout, (&bc, &bi)).expect("the first fits");
+    let held = pool.held().0;
+    assert!(
+        pool.lease(gpu, layout, (&bc, &bi)).is_none(),
+        "a second big one does not"
+    );
+    assert_eq!(pool.held().0, held, "the refusal kept nothing");
+    let second = pool
+        .lease(gpu, layout, (&sc, &si))
+        .expect("a smaller one fits");
+    assert_eq!(second.indices.start, bi.len() as u32, "after the first");
+    drop(first);
+    let again = pool
+        .lease(gpu, layout, (&bc, &bi))
+        .expect("the freed range fits it");
+    assert_eq!(
+        (again.table.start, again.indices.start),
+        (0, 0),
+        "the hole reused"
+    );
+}
+
+#[test]
+fn gpu_a_mesh_the_pool_refuses_is_drawn_whole() {
+    let Some(mut r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
+        return;
+    };
+    let mut scene = Scene::new();
+    scene.skybox_path = String::new();
+    panel(
+        &mut scene,
+        "A",
+        (Vec3::new(-2.0, -2.0, -5.0), 4.0, Quat::IDENTITY),
+    );
+    r.hiz.clusters.pool.limit = 0;
+    let cam = Camera::new(Vec3::new(0.0, 0.0, 8.0), -90.0, 0.0);
+    let mut view = offscreen(&r);
+    let frames: Vec<_> = (0..4)
+        .map(|_| shot(&mut r, &mut view, &scene, &cam))
+        .collect();
+    let (on, c) = frames.last().expect("four frames");
+    assert_eq!(c.cluster_tested, 0, "no lease, no cluster test: {c:?}");
+    r.quality.gpu_cluster_culling = false;
+    let mut fresh = offscreen(&r);
+    let (off, _) = shot(&mut r, &mut fresh, &scene, &cam);
+    assert!(*on == off, "drawn whole, as with the cull off");
+    assert!(on.iter().any(|&b| b != on[0]), "the panel is on screen");
 }
 
 /// A few frames of `scene` with the cull on, which must cull by cluster and

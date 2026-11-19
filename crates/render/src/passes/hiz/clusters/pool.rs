@@ -17,10 +17,16 @@
 //!   a submit of its own, no CPU wait), then rebuilds the one bind group: a
 //!   Dust2-sized level's first upload grows each buffer about log2(size / 4 KiB)
 //!   times, every later frame none.
-//! - **The limit**: each buffer is bound whole, so it stays within the device's
-//!   `max_storage_buffer_binding_size` (128 MiB by default: 33.5M pooled
-//!   indices, 2M clusters). A mesh that would pass it gets no lease, logs it,
-//!   and is drawn whole by the instance test, as a mesh too big to bind was.
+//! - **The limit is the session's, not a mesh's**: each buffer is bound whole,
+//!   so it stays within the device's `max_storage_buffer_binding_size` (128 MiB
+//!   by default: 33.5M pooled indices, 2M clusters), and that is the total over
+//!   every clustered mesh resident at once. Meshes stay resident across scene
+//!   loads, so a long session's meshes add up. A mesh that would pass it gets
+//!   no lease, logs `does not fit the cluster pool`, and is drawn whole by the
+//!   instance test; it is not retried when room frees later (releasing resident
+//!   meshes and retrying are #2440's). Offsets are worked in `u64` and the limit
+//!   clamped to what a `u32` index reaches, so a raised device limit cannot wrap
+//!   a row onto another mesh's.
 
 use std::ops::Range;
 use std::sync::{Arc, Mutex, PoisonError};
@@ -32,7 +38,7 @@ use crate::gpu::grow_buffer::GrowBuffer;
 use crate::gpu::ops::CountedDevice as _;
 
 /// A `Cluster` row's bytes.
-const ROW_BYTES: u32 = 64;
+const ROW_BYTES: u64 = 64;
 
 /// What each buffer has handed out, shared with the leases that free it.
 #[derive(Default)]
@@ -46,6 +52,9 @@ pub(crate) struct ClusterPool {
     table: GrowBuffer,
     indices: GrowBuffer,
     ledger: Arc<Mutex<Ledger>>,
+    /// The bytes either buffer may reach: the device's binding limit, lowered
+    /// by a test to make a refusal cheap.
+    pub(crate) limit: u64,
     pub(crate) group: wgpu::BindGroup,
 }
 
@@ -54,6 +63,23 @@ pub(crate) struct Lease {
     pub(crate) table: Range<u32>,
     pub(crate) indices: Range<u32>,
     ledger: Arc<Mutex<Ledger>>,
+}
+
+impl Ledger {
+    /// `rows` of the table and `words` of the pool, each within its capacity:
+    /// both or neither, so a table that refuses gives the pool's range back.
+    fn take(
+        &mut self,
+        (rows, words): (u32, u32),
+        (row_cap, word_cap): (u32, u32),
+    ) -> Option<(Range<u32>, Range<u32>)> {
+        let at = self.indices.take(words, word_cap)?;
+        let Some(table) = self.table.take(rows, row_cap) else {
+            self.indices.free(at);
+            return None;
+        };
+        Some((table, at))
+    }
 }
 
 impl Drop for Lease {
@@ -75,26 +101,26 @@ impl ClusterPool {
             table,
             indices,
             ledger: Arc::default(),
+            limit: device.limits().max_storage_buffer_binding_size,
             group,
         }
     }
 
     /// Rows and indices for `clusters` over the mesh's `indices`, written into
-    /// the pool: `None` when either would pass the device's binding limit.
+    /// the pool: `None` when either would pass `limit`, with nothing taken.
     pub(crate) fn lease(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
         layout: &wgpu::BindGroupLayout,
         (clusters, indices): (&Clusters, &[u32]),
     ) -> Option<Lease> {
-        let limit = device.limits().max_storage_buffer_binding_size;
-        let (rows, words) = ((limit / u64::from(ROW_BYTES)) as u32, (limit / 4) as u32);
+        let len = (
+            u32::try_from(clusters.list.len()),
+            u32::try_from(indices.len()),
+        );
+        let len = (len.0.ok()?, len.1.ok()?);
         let mut ledger = self.ledger.lock().unwrap_or_else(PoisonError::into_inner);
-        let at = ledger.indices.take(indices.len() as u32, words)?;
-        let Some(table) = ledger.table.take(clusters.list.len() as u32, rows) else {
-            ledger.indices.free(at);
-            return None;
-        };
+        let (table, at) = ledger.take(len, capacity(self.limit))?;
         let ends = (ledger.table.end, ledger.indices.end);
         drop(ledger);
         let lease = Lease {
@@ -104,7 +130,7 @@ impl ClusterPool {
         };
         let grown = [
             self.table
-                .reserve_kept(device, queue, u64::from(ends.0 * ROW_BYTES)),
+                .reserve_kept(device, queue, ROW_BYTES * u64::from(ends.0)),
             self.indices
                 .reserve_kept(device, queue, 4 * u64::from(ends.1)),
         ];
@@ -113,7 +139,7 @@ impl ClusterPool {
             self.group = bind(device, layout, buffers);
         }
         let rows = super::gpu::pack(clusters, lease.indices.start);
-        let row_at = u64::from(lease.table.start * ROW_BYTES);
+        let row_at = ROW_BYTES * u64::from(lease.table.start);
         self.table
             .write_at(queue, row_at, bytemuck::cast_slice(&rows));
         let index_at = 4 * u64::from(lease.indices.start);
@@ -132,6 +158,13 @@ impl ClusterPool {
             (self.table.buffer().size(), self.indices.buffer().size()),
         )
     }
+}
+
+/// The rows and pooled indices `limit` bytes hold, each clamped to what a `u32`
+/// offset addresses.
+fn capacity(limit: u64) -> (u32, u32) {
+    let clamp = |n: u64| u32::try_from(n).unwrap_or(u32::MAX);
+    (clamp(limit / ROW_BYTES), clamp(limit / 4))
 }
 
 /// Group 1 over the table and the pool, each bound up to the binding limit
@@ -158,4 +191,27 @@ fn bind(
         layout,
         entries: &entries,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{capacity, Ledger};
+
+    #[test]
+    fn a_table_that_refuses_gives_the_pool_range_back() {
+        let mut ledger = Ledger::default();
+        assert_eq!(ledger.take((4, 100), (5, 120)), Some((0..4, 0..100)));
+        assert_eq!(ledger.take((2, 10), (5, 120)), None, "the table is full");
+        assert_eq!(ledger.indices.used(), 100, "the pool's range given back");
+        assert_eq!(ledger.take((1, 30), (5, 120)), None, "the pool is full");
+        assert_eq!(ledger.take((1, 20), (5, 120)), Some((4..5, 100..120)));
+    }
+
+    #[test]
+    fn a_raised_limit_is_clamped_to_what_a_u32_offset_reaches() {
+        assert_eq!(capacity(128 << 20), (2 << 20, 32 << 20), "wgpu's default");
+        let words = capacity(16 << 30);
+        assert_eq!(words, (1 << 28, u32::MAX), "16 GiB: 4G words do not fit");
+        assert_eq!(capacity(u64::MAX), (u32::MAX, u32::MAX));
+    }
 }
