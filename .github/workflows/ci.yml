@@ -395,6 +395,47 @@ jobs:
         if: always() && needs.changes.outputs.code != 'false'
         run: df -h / && du -sh target 2>/dev/null || true
 
+  # The macOS leg's split by `main`'s test times (#2397): nextest's `--partition`
+  # deals by count or hash, blind to time, and `count:` left 1/2 about 1.6 times
+  # the GPU-seconds of 2/2. This job reads the leg's JUnit reports from `main`
+  # once, so both shards follow one plan (`.github/scripts/shard_plan.py` says
+  # why that matters, and how the last shard takes every test the others did
+  # not). Every step informs: with no report, or this job failing, the plan is
+  # empty and each shard splits by `count:` (`build-test-cross`'s `if` is
+  # `!cancelled()`-guarded for that). Same condition as `build-test-cross`.
+  shard-plan:
+    needs: changes
+    timeout-minutes: 5
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read  # main's runs and their JUnit artifacts (main-junit)
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      ((github.event_name == 'push' ||
+        (github.event_name == 'pull_request' && github.event.pull_request.draft == false)) &&
+       needs.changes.outputs.code != 'false')
+    outputs:
+      plan: ${{ steps.plan.outputs.plan }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github
+      - name: Main's reports
+        continue-on-error: true
+        uses: ./.github/actions/main-junit
+        with:
+          prefix: junit-build-test-cross-macos-26
+          shard: 1/2
+          dir: ${{ runner.temp }}/shard-baseline
+      - name: Plan
+        id: plan
+        continue-on-error: true
+        env:
+          BASE: ${{ runner.temp }}/shard-baseline
+        run: echo "plan=$(python3 .github/scripts/shard_plan.py plan "$BASE" --shards 2)" >> "$GITHUB_OUTPUT"
+
   # Verify the wgpu cross-platform claim (issue #121): the build and the `dev`
   # suite on macOS (Metal), the other shipped platform, so the portability premise is
   # checked, not assumed. Separate from `build-test` to avoid renaming that
@@ -404,11 +445,11 @@ jobs:
   # `(macos-26, 2/2)`, and `mergeable` reads them by their base name. The job
   # ran 30-35 min whole against its 35-minute limit; each shard pays the build
   # and half of nextest. The `dev` doctests and the lint xtask (seconds each)
-  # ride on 2/2, the shard the `count:` split leaves lighter. Two shards, not
+  # ride on 2/2 (about 25 s; the split by time, `shard-plan`, ignores it). Two shards, not
   # three: a train's run and a PR's run then hold four macOS runners, inside
   # the free plan's five concurrent macOS jobs, so no shard queues for one.
   build-test-cross:
-    needs: changes
+    needs: [changes, shard-plan]
     permissions:
       contents: read
       actions: read  # main's runs and their JUnit artifacts (slowest-tests)
@@ -428,12 +469,15 @@ jobs:
     # (#869), not a stall hand-back; `tests/queue/test_macos_timeout.py` holds it.
     timeout-minutes: 35
     runs-on: ${{ matrix.os }}
+    # `!cancelled()` and `changes` succeeding: a failed `shard-plan` is no plan,
+    # and the shards split by count, never skip.
     if: >-
+      !cancelled() && needs.changes.result == 'success' && (
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
       ((github.event_name == 'push' ||
         (github.event_name == 'pull_request' && github.event.pull_request.draft == false)) &&
-       needs.changes.outputs.code != 'false')
+       needs.changes.outputs.code != 'false'))
     env:
       # Metal is always there on macOS; require it (#489).
       RUSTY_REQUIRE_GPU: "1"
@@ -473,17 +517,21 @@ jobs:
       # 43947625456), past three quarters.
       - name: Test (engine, dev features)
         shell: bash
+        env:
+          PLAN: ${{ needs.shard-plan.outputs.plan }}
         run: |
           rc=0
           cargo nextest run --no-run --features dev --locked || rc=$?
           python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
           if [ "$rc" = 0 ]; then
-            cargo nextest run --profile ci --features dev --locked --partition "count:${{ matrix.shard }}" || rc=$?
+            # This shard's tests from `shard-plan`'s plan, or `count:` with none (#2397).
+            mapfile -t split < <(python3 .github/scripts/shard_plan.py args "${{ matrix.shard }}")
+            cargo nextest run --profile ci --features dev --locked "${split[@]}" || rc=$?
           fi
           cp target/nextest/ci/junit.xml junit-dev.xml || true
           kill "$watcher" || true
           exit "$rc"
-      # A partition puts each canary in one shard only, so every shard runs them
+      # A split puts each canary in one shard only, so every shard runs them
       # again (#2264, #2276): a shard that lost Metal or OIDN fails, never skips.
       - name: Canaries (this runner's GPU and OIDN)
         run: >-

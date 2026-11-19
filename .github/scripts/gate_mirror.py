@@ -21,8 +21,12 @@ A gate that runs locally but not in CI is a false green on every pull request, s
   `normalise` drops `--partition <value>` ([`NEUTRAL_WITH_VALUE`]) so a shard's
   command matches its gate, and in exchange every split lists each shard of
   `1..n` once, and every `--partition` reads `count:${{ matrix.shard }}` in a
-  job whose one-line `- { …, shard: k/n }` entries it read complete. A
-  `--partition` whose split it cannot read is flagged, never passed.
+  job whose one-line `- { …, shard: k/n }` entries it read complete. The macOS
+  leg's split by `main`'s times (#2397) is held the same way: its
+  `shard_plan.py args` must read `"${{ matrix.shard }}"` in such a job, and the
+  script's filters take every test once whatever the plan holds
+  (`tests/shard_plan/`). A split whose matrix it cannot read is flagged, never
+  passed.
 
 The comparison is one way: CI may run more than `make gates` (the macOS build,
 the JUnit copies), never less. Stdlib only, a text parser for the narrow YAML
@@ -199,6 +203,10 @@ SHARD_ENTRY = re.compile(r"^\s*- \{(?P<body>[^}]*\bshard: (?P<k>\d+)/(?P<n>\d+)\
 JOB = re.compile(r"^  (?P<name>[\w-]+):\s*$", re.M)
 #: The one `--partition` value that follows the matrix: each entry runs its shard.
 SHARDED = ("count:${{ matrix.shard }}", '"count:${{ matrix.shard }}"', "'count:${{ matrix.shard }}'")
+#: The time-weighted split's call (`shard_plan.py`) and the one shard argument
+#: that follows the matrix.
+PLANNED = re.compile(r"shard_plan\.py args\b[ ]?")
+PLANNED_SHARD = ('"${{ matrix.shard }}"', "'${{ matrix.shard }}'", "${{ matrix.shard }}")
 
 
 def _jobs(text: str) -> list[tuple[str, str]]:
@@ -225,13 +233,22 @@ def _split_gaps(job: str, body: str) -> tuple[bool, list[str]]:
 def shard_gaps(text: str) -> list[str]:
     """What keeps a workflow's split suites from running whole (#2264). `missing`
     drops `--partition`, so this holds instead that each split lists every shard
-    once, and that every `--partition` sits in a job whose split it saw complete
-    and reads `count:${{ matrix.shard }}`. A split it cannot read (a block-YAML
+    once, and that every `--partition` (and `shard_plan.py args`, #2397) sits
+    in a job whose split it saw complete and reads `count:${{ matrix.shard }}`
+    (`"${{ matrix.shard }}"`). A split it cannot read (a block-YAML
     matrix) is a gap, not a pass: it cannot vouch for what it did not see."""
     gaps: list[str] = []
     for job, body in _jobs(text):
         found, bad = _split_gaps(job, body)
         gaps += bad
+        for m in PLANNED.finditer(body):
+            value = body[m.end():].split("\n", 1)[0].split(")", 1)[0].strip()
+            if not found:
+                gaps.append(f"{job}: `shard_plan.py args` with no matrix split found; write each entry on one line "
+                            f"as `- {{ os: …, shard: k/n }}`")
+            elif not bad and value not in PLANNED_SHARD:
+                gaps.append(f"{job}: `shard_plan.py args {value}` does not follow the matrix; "
+                            f"write `shard_plan.py args \"${{{{ matrix.shard }}}}\"`")
         for m in re.finditer(r"--partition\b[ =]?", body):
             value = body[m.end():].split("\n", 1)[0].split(" ||", 1)[0].strip()
             if not found:

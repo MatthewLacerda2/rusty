@@ -288,7 +288,19 @@ its check and its command changed to match).
   OIDN canaries again on its own runner (step *Canaries*), since a partition puts each
   canary in one shard only. The macOS leg (`build-test-cross`) runs the nextest suite with
   `dev` only, the superset (#1976), split in two, `build-test-cross (macos-26, 1/2)` and
-  `(macos-26, 2/2)`, each with the canaries; 2/2 also runs the `dev` doctests and the lint
+  `(macos-26, 2/2)`, each with the canaries. **The macOS split is by time, not count**
+  (#2397): `count:` deals tests round-robin, and the longest Metal tests all landed in
+  1/2, which ran about 1.6 times the GPU-seconds of 2/2 and ended minutes after it;
+  nextest has no partition that weighs time (`count:`, `hash:`, `slice:`). So the
+  `shard-plan` job reads the leg's JUnit reports from `main`'s last successful runs
+  once and hands both shards one plan (`.github/scripts/shard_plan.py`): `main`'s 120
+  longest tests are dealt one by one, the rest by the last two letters of their name,
+  each to the shard with less time, and shard 2/2 runs every test 1/2 did not take,
+  so a test added since, or a plan the times got wrong, still runs exactly once. With
+  no report to weigh by (a fork, expired artifacts, a renamed leg) both shards split by
+  `count:` and the test step says so (`split: by count …`); the log's `split:` line
+  names which. Linux keeps `count:`, where the GPU tests are CPU work and its two
+  shards ran within about a third of each other on `main` (#2397). 2/2 also runs the `dev` doctests and the lint
   xtask's tests, and the default doctests run on Linux only (#2276). A job past three quarters of its `timeout-minutes`
   on `main` files an issue by itself (`ci_headroom.py`, `docs/linting.md`). See *The test runner* below.
 - **A pull request that adds a slow test is told** (#2350). Each suite job's *Slowest

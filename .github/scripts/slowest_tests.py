@@ -43,7 +43,7 @@ grow past `NOISE` times `main`'s time, at the shard's pace, as `near` (`is_new`,
 given paths (searched recursively, so a download's layout does not matter): the
 caller passes `main`'s last three successful full runs, since one run cannot
 tell a slow runner from a slow test, and all shards of the same leg and feature
-set together: a `--partition count:` split moves tests between shards whenever the
+set together: a split moves tests between shards whenever the
 test count changes, so a test absent from one shard's report may sit in the
 other. The caller passes only reports of the job's own feature set, since one
 test runs at different speeds in `default` and `dev` builds. With no readable baseline

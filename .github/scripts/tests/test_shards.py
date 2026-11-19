@@ -51,6 +51,14 @@ class Shards(unittest.TestCase):
         self.assertNotEqual(gate_mirror.shard_gaps(workflow(matrix=block)), [])
         self.assertNotEqual(gate_mirror.shard_gaps(workflow(matrix="")), [])
 
+    def test_a_split_by_mains_times_follows_the_matrix_or_is_flagged(self):
+        planned = 'mapfile -t split < <(python3 .github/scripts/shard_plan.py args "${{ matrix.shard }}")'
+        self.assertEqual(gate_mirror.shard_gaps(workflow("1/2", "2/2", run=planned)), [])
+        for shards, run in ((("1/2", "2/2"), planned.replace('"${{ matrix.shard }}"', "1/2")),
+                            (("1/2",), planned), ((), planned)):
+            with self.subTest(shards=shards, run=run):
+                self.assertNotEqual(gate_mirror.shard_gaps(workflow(*shards, run=run)), [])
+
     def test_a_partition_in_a_comment_or_a_job_without_one_passes(self):
         self.assertEqual(gate_mirror.shard_gaps(workflow("1/2", "2/2", run="cargo nextest run --locked")), [])
 
