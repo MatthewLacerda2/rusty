@@ -73,6 +73,7 @@ impl Renderer {
         c.shadow_gather_us = culls.gather_us;
         c.add_draws(self.shadow_renderer.drawn.iter().copied());
         c.ui_draws = view.ui.last_batches() as u32;
+        c.ui_meshed = view.ui.last_meshed() as u32;
         c.ui_mask_passes = view.ui.last_mask_passes();
         c.ui_blur_passes = view.ui.last_blur_passes();
         c.draw_calls += c.ui_draws;

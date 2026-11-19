@@ -119,6 +119,9 @@ pub struct RenderCounters {
     pub shadow_atlas_rebaked: u32,
     /// UI batches drawn — backdrop batches (#426) included.
     pub ui_draws: u32,
+    /// UI canvases meshed this frame (#2416), each once however many times a
+    /// growing glyph atlas rebuilt it: `0` on a still HUD (`ui::kept`).
+    pub ui_meshed: u32,
     /// UI `Mask` coverage textures rendered (#428): one pass per visible Mask.
     pub ui_mask_passes: u32,
     /// Fullscreen passes the UI backdrop blur ran (#426): the downsampled
