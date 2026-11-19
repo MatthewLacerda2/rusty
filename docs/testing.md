@@ -281,10 +281,10 @@ its check and its command changed to match).
 - CI (`.github/workflows/ci.yml`) and `make test` run the engine suite with
   **cargo-nextest** plus `cargo test --doc`, both feature sets; the lint xtask keeps
   plain `cargo test`. On Linux, `build-test` is a matrix of three parallel jobs
-  (#2264): `build-test (default, 1/1)` runs the default suite (all but the `gpu` group,
+  (#2264): `build-test (default, 1/1)` runs the default suite (all but the GPU group,
   which the `dev` suite runs: *Which suite runs the GPU tests*), and `build-test (dev,
   1/2)` and `(dev, 2/2)` split the `dev` one with nextest's `--partition count:k/2`;
-  each prints its twenty slowest tests and where its time went, the `gpu` group's test-seconds over its cap against the rest's over the runner's cores (and both over the cores, the bound on lavapipe, where the GPU tests are CPU work) beside the shard's wall, per binary (step *Slowest tests*; the macOS shards print ten), keeps its JUnit report as a 7-day artifact named by the shard (`junit-build-test-dev-1of2`, `junit-build-test-cross-macos-26-2of2`), and each runs the GPU and
+  each prints its twenty slowest tests and where its time went, the GPU group's test-seconds (`gpu`, `gpu-macos` on macOS) over its cap against the rest's over the runner's cores (and both over the cores, the bound on lavapipe, where the GPU tests are CPU work) beside the shard's wall, per binary, and the least memory the runner had free while its tests ran (after the build) (step *Slowest tests*; the macOS shards print ten), keeps its JUnit report as a 7-day artifact named by the shard (`junit-build-test-dev-1of2`, `junit-build-test-cross-macos-26-2of2`), and each runs the GPU and
   OIDN canaries again on its own runner (step *Canaries*), since a partition puts each
   canary in one shard only. The macOS leg (`build-test-cross`) runs the nextest suite with
   `dev` only, the superset (#1976), split in two, `build-test-cross (macos-26, 1/2)` and
@@ -429,7 +429,7 @@ cannot run. CI's `ci` profile additionally writes JUnit, rendered as each
 
 Handy forms: `cargo nextest run -E 'test(physics_)'` (filter by name),
 `cargo nextest list` (what would run), `cargo nextest show-config test-groups`
-(which tests the `gpu` group below holds).
+(which tests the GPU group below holds, `gpu` or `gpu-macos`).
 
 ## One integration-test binary
 Cargo's default builds **each** `tests/*.rs` as its own executable, and each one links
@@ -594,10 +594,10 @@ Where they actually run is not uniform, and it is worth knowing before you rely 
 
 ### Which suite runs the GPU tests
 The `dev` suite (#2352). The default-feature suite, `make test`'s first pass and CI's
-`build-test (default, 1/1)`, runs nextest with `-E 'not group(gpu)'` (the Makefile's
+`build-test (default, 1/1)`, runs nextest with `-E 'not group(gpu*)'` (the Makefile's
 `DEFAULT_SUITE`, `make test-explore`'s default pass too): it **compiles every test
 target** of the default build, so a default-only build break still fails, and runs
-every test except the `gpu` group. `--features dev` only adds to the default
+every test except the GPU group (`gpu`, `gpu-macos` on macOS). `--features dev` only adds to the default
 features, so the `dev` run builds and draws each of those GPU tests too; what it
 cannot see is code that exists only *without* `dev`. So the split rests on `dev`
 only *adding* code, and the `gpu-default-only` lint (`docs/linting.md`) checks the
@@ -609,7 +609,7 @@ without hiding anything; the lint cannot tell it from an addition, so it is the
 reviewer's to catch. Keep the code the same under both feature sets, or add
 that crate's GPU tests back to the default pass by widening the filter in both
 callers, `make test`'s `DEFAULT_SUITE` and ci.yml's "Test (engine, default)", e.g.
-`-E 'not group(gpu) | (group(gpu) & package(rusty-<crate>))'` (`make scripts` fails
+`-E 'not group(gpu*) | (group(gpu*) & package(rusty-<crate>))'` (`make scripts` fails
 when the two differ, `test_gate_mirror.py`). The adapter canary still runs in the
 default entry (step *Canaries*), so a runner that lost lavapipe fails there too.
 
@@ -707,12 +707,21 @@ seen failing on the third, by whoever runs `make test` there next.
 **Concurrency is capped.** A `Renderer` is a device, the full pipeline set and shadow
 maps, and a software adapter (lavapipe) allocates all of that in system RAM shared with rustc — so
 unbounded parallel renderers exhausted memory and failed *unrelated* tests with a bare
-`Queue::write_texture: Not enough memory left.` (#366). Two caps, one per runner:
+`Queue::write_texture: Not enough memory left.` (#366). Two caps, one per runner, each
+with one number per platform:
+
+| Platform | nextest group | Cap | What measured it |
+|---|---|---|---|
+| Linux (lavapipe) | `gpu` | 2 | 3 on a 4-core CI runner was no faster on the lighter `dev` shard and slower on the busier one: lavapipe renders on the CPU, so a third renderer only shares the cores (#985, #2363) |
+| macOS (Metal) | `gpu-macos` | 3 | on a 3-core CI runner the heavier shard is bound by the cap at 2 and by its cores at 3. Over four runs at 3 against two at 2, the slowest shard's test run fell from 589–604 s to 507–592 s (mean about 596 → 540 s, a tenth), and the round's last-ending job from 800–905 s to 735–885 s (mean about 852 → 815 s, about 4%): a small gain, within the runners' run-to-run spread for the whole job. At least 2.7 of 7 GiB stayed free (#2363) |
 
 - **nextest (the gate):** every test is its own process, so nothing in-process can see
-  its neighbours. The `gpu` **test group** in `.config/nextest.toml` (`max-threads = 2`)
-  bounds how many GPU tests run at once.
-- **`cargo test`:** `MAX_CONCURRENT_HEADLESS` in `crates/render/src/setup/budget.rs` bounds
+  its neighbours. The GPU **test group** in `.config/nextest.toml` bounds how many GPU
+  tests run at once. A test group has no platform key, so each platform has its own,
+  picked by a platform-keyed override with the one filter; a filter names both as
+  `group(gpu*)`.
+- **`cargo test`:** `MAX_CONCURRENT_HEADLESS` in `crates/render/src/setup/budget.rs` (one
+  per `cfg(target_os)`) bounds
   how many renderers are alive in the one process, enforced by an RAII permit the
   renderer holds for its whole life. It applies to the normal library build, not just
   `cfg(test)`, because the screenshot integration tests reach the renderer indirectly
@@ -723,10 +732,18 @@ unbounded parallel renderers exhausted memory and failed *unrelated* tests with 
   the engine builds both, as a capture host beside a bake does). Any other thread
   waiting past 180 s panics with an explanation.
 
-Keep the two numbers equal; `make scripts` fails when they differ, and holds the
+Keep each platform's two numbers equal; `make scripts` fails when they differ, and holds the
 nextest settings above (no retries, `fail-fast = false`, the timeouts) in place
 (`.github/scripts/tests/test_gpu_config.py`, #978). If a new GPU test makes CI run out
-of memory, **lower both to 1** before weakening the test.
+of memory, **lower both to 1** before weakening the test. Every suite job prints the
+least memory its runner had free while its tests ran, after the build (a `memory:` line under *Slowest
+tests*, `.github/scripts/memory_floor.py`): read it before raising a cap.
+
+**On your own machine** `make test` runs at your platform's number. A machine short on
+memory (check the machine: free memory while the suite runs, `free -g` or Activity
+Monitor) should run fewer renderers at once: lower the group's `max-threads` in
+`.config/nextest.toml` for the run and leave the edit uncommitted, or cap the whole
+run, `NEXTEST_TEST_THREADS=2 make test`.
 
 **The GPU naming rule.** A test group selects tests by name, so the name says whether
 a test renders:
@@ -1484,7 +1501,7 @@ times on a test the gate passed, each a test leaning on a process of its own (#1
 second (#1844): a runner unlike the gate's finds the next such difference in every
 branch's mutation run. Plain `cargo test` stays the nightly `cargo-test.yml` signal,
 where a runner difference is the finding. The mutation jobs render: they install
-lavapipe and set `RUSTY_REQUIRE_GPU=1` (#785), and the nextest `gpu` group bounds them.
+lavapipe and set `RUSTY_REQUIRE_GPU=1` (#785), and the nextest GPU group (`gpu`, `gpu-macos` on macOS) bounds them.
 Doctests are left out: nextest doesn't run them (`make test` does), so a mutant only a
 doctest would catch survives. The runs pass `--test-threads 2`: the jobs' `ulimit -v`
 cap (#674) is per process, so it times the test processes running at once stays within
