@@ -35,24 +35,29 @@ fn gpu_a_shadowed_spot_casts_a_shaft_with_a_dark_side() {
         "plank",
         (Vec3::new(-1.0, 2.5, -5.0), Vec3::new(2.0, 0.1, 4.0)),
     );
-    // PROBE (#2385): per-frame values and counters, removed before ready.
-    let mut v = super::fixture::view(&r);
-    let mut frame = Vec::new();
-    for f in 1..=4 {
-        frame = super::fixture::draw(&mut r, &mut v, &scene);
-        let c = r.frame_counters;
-        eprintln!(
-            "PROBE f{f} lit {} dark {} floor {} | {c:?}",
-            glow(&frame, Vec3::new(0.8, 1.2, -5.0)),
-            glow(&frame, Vec3::new(-0.8, 1.2, -5.0)),
-            glow(&frame, Vec3::new(0.8, 0.0, -5.0)),
-        );
-    }
-    let _ = settled;
+    let frame = settled(&mut r, &scene, 4);
     let lit = glow(&frame, Vec3::new(0.8, 1.2, -5.0));
     let dark = glow(&frame, Vec3::new(-0.8, 1.2, -5.0));
     eprintln!("[volumetric] shaft: {lit} lit side, {dark} shadowed side");
-    assert!(lit > 0.3, "the lit cone glows: {lit}");
+    // A lit side as dark as the shadowed one is the fog drawn with no spot at all
+    // (#2385): the floor under the cone and the frame's light and shadow counts say
+    // whether the spot was missing from the frame or from the air alone.
+    let c = r.frame_counters;
+    let floor = glow(&frame, Vec3::new(0.8, 0.0, -5.0));
+    let missing = format!(
+        "floor under the cone {floor} (~3.7 on lavapipe when lit); lights {} visible {} dropped {}, \
+         cluster refs {}; shadowed {} dropped {}, atlas tiles {} cached {} rebaked {}",
+        c.lights,
+        c.lights_visible,
+        c.lights_dropped,
+        c.light_cluster_refs,
+        c.shadowed_lights,
+        c.shadow_lights_dropped,
+        c.shadow_atlas_tiles,
+        c.shadow_atlas_cached,
+        c.shadow_atlas_rebaked,
+    );
+    assert!(lit > 0.3, "the lit cone glows: {lit}; {missing}");
     assert!(
         lit > 2.0 * dark,
         "the plank's shadow is dark: {lit} vs {dark}"
