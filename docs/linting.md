@@ -81,7 +81,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
 | Rust files are compiled | `tools/lint -- --rules` (`orphan-module`) | **hard gate**: every scanned `.rs` file is a crate root (a target's `src_path` in `cargo metadata` of the root, `fuzz/` and `tools/lint/` workspaces, so a `path =` target counts), is reached from one by `mod` as rustc resolves it (`name.rs` or `name/mod.rs`, under `a/` for a declaring `a.rs`, inline `mod a { mod b; }`, `#[path]`, a `mod` under `#[cfg]` included), or is named by `include!` / `include_str!`; rustc, clippy and rustfmt are silent about a file no `mod` names, and its tests stop running; a file built another way says why on its first line with `// lint: allow(orphan-module) <why>` |
 | Self-naming headers | `tools/lint -- --rules` (`self-path`) | **hard gate**: a source file's first `//!` line (a shader's first `//` line) that opens with a path under `src/`, `crates/`, `tests/`, `tools/`, `fuzz/`, `engine/` or `.github/` (a bare word too, when it names a directory of scanned files) names the file itself; a `mod.rs` may name its directory (`crates/edit/src/prefab/`). No header, or one opening with prose, is fine (#1654) |
-| Shared process | `make test-one-process` (`cargo test --features dev --tests`) | **signal**, never a gate: the `dev` suite with every test of a binary in one process, so a test leaking process-wide state (a moved working directory, a `static` left set), which nextest's process per test hides, is named (it broke the mutation baseline four times while cargo-mutants ran `cargo test`, #1844). Nightly on `main` in `cargo-test.yml` (both feature sets), filed by `main-health` when red; `gh workflow run cargo-test.yml --ref <branch>` runs it on a branch (#1338) |
+| Shared process | `make test-one-process` (`cargo test --features dev --tests`) | **signal**, never a gate: the `dev` suite with every test of a binary in one process, so a test leaking process-wide state (a moved working directory, a `static` left set), which nextest's process per test hides, is named; `test-static-write` (below) catches the commonest leak, a test writing a `static`, before the merge (it broke the mutation baseline four times while cargo-mutants ran `cargo test`, #1844). Nightly on `main` in `cargo-test.yml` (both feature sets), filed by `main-health` when red; `gh workflow run cargo-test.yml --ref <branch>` runs it on a branch (#1338) |
 | Shipped platforms only | `tools/lint -- --rules` (`platform-cfg`) | **hard gate**: no `cfg(…)` / `cfg!(…)` / `cfg_attr(…)` in a scanned `.rs` file names `windows` or `unix` (bare, `target_os = "windows"`, or as a `target_family` value) — rusty ships for macOS and Linux, so the code is written unconditionally and a real split names `target_os = "macos"` / `"linux"` |
 | Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
 | Sim panic-freedom | clippy `unwrap_used` + `tools/lint -- --rules` (`unwrap-deny`) | **hard gate**: every sim row of the layer table carries `#![deny(clippy::unwrap_used)]` at its `mod.rs`, and no sim file lifts it; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`, which `--determinism` keeps set); no `allow`/`expect` of `unwrap_used` anywhere (`ESCAPE`, #961) (#195, #962) |
@@ -94,6 +94,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Test files named for behaviour | `tools/lint -- --rules` (`tool-named-test`) | **hard gate**: a test file whose name starts with `survivor`, `mutant` or `mutation` is renamed for what its tests prove; a module whose subject carries the word takes `// lint: allow(tool-named-test) <why>` on its first line |
 | Test source shape | `tools/lint -- --rules` (`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`) | **hard gate**: no inner `#![cfg]` in `tests/`, no user workspace in tests, a GPU only through `headless_or_skip` (#980) |
 | Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `rusty_test_support::temp::dir()` (in-crate) / `crate::temp::dir()` (`tests/`), never a bare `std::env::temp_dir()` (#999) |
+| Tests write no process-wide static | `tools/lint -- --rules` (`test-static-write`) | **hard gate**: a test line, or a production line inside a `fn` documented as a test hook, never writes a `static` declared outside a `thread_local!` (`.store(`, `.swap(`, `.fetch_*(`, `.compare_exchange*(`, `.set(`, `.write()`, or a `.lock()` written through on the same line): the one-process run shares it between every test of the binary; keep the state on the value, in a `thread_local!` or in a child process, or take `// lint: allow(test-static-write) <why>` (#2422) |
 | Tests | nextest + `cargo test --doc` (`make test`) | **hard gate**: the engine's tests and doctests, both feature sets; the GPU tests run on lavapipe, in the `dev` set (`docs/testing.md`, *Which suite runs the GPU tests*). In CI, `build-test` runs as three parallel jobs, the default suite and the `dev` suite in two shards, each with the timeout to itself (#2264) |
 | `tools/lint` stays std-only | `make test-lint` | its `Cargo.lock` names one package, itself (#935) |
 
@@ -767,6 +768,28 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   `render::test_gpu::headless_or_skip` (or its `headless_pair_or_skip`), never
   `new_headless` or `new_headless_with` directly
   (`rules/test_shape.rs`).
+- **`test-static-write`** (#2422) — nextest gives each test a process of its own,
+  but the one-process run (`make test-one-process`, nightly in `cargo-test.yml`)
+  shares one between every test of a binary, on many threads. A test that flips a
+  `static` flag, resets a `static` counter or fills a `static` cache passes the
+  gates, then fails there at random, or worse keeps passing while the other tests
+  run with the flag flipped and test nothing. So a write to a `static` declared
+  outside a `thread_local!` (an atomic's `.store(`, `.swap(`, `.fetch_*(`,
+  `.compare_exchange*(`; a `OnceLock`'s `.set(`; an `RwLock`'s `.write()`; a
+  `.lock()` that a same-line `*… =`, `.push(`, `.insert(`, `.clear(`, … writes
+  through) fails on a test line (`test_code.rs`), and on a production line inside
+  a `fn` whose doc calls it a test hook (`crates/CLAUDE.md`, *Test hooks*), which
+  every test that arms it inherits. A name counts as process-wide unless its file,
+  or a file in its directory or the one above, declares it in a `thread_local!`.
+  The sound shapes: state on the value under test (`lighting::lightmap::Rays::counted`),
+  a `thread_local!` when the code under test runs on the test's own thread, a child
+  process when the state is truly process-wide. A write that is sound anyway (a
+  one-way idempotent switch every caller sets the same, a unique-name counter no
+  test reads back) takes `// lint: allow(test-static-write) <why>`. A line scan:
+  it does not see a guard bound on one line and written on the next, a `static`
+  reached through a function not marked as a test hook, or process-wide state
+  behind another crate's API (a registry a call appends to); those stay the
+  nightly run's to catch (`rules/static_write.rs`).
 - **`test-temp-dir`** — a path under `std::env::temp_dir()` is shared by every test
   process, every worktree and (under `cargo test`) every test
   thread, so a fixed or process-keyed name races. Test code (the *Test code* bullet)
