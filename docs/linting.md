@@ -504,7 +504,7 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   reviewer's to catch. The fix is to keep the code the same under both feature sets,
   or to put that crate's GPU tests back in the default pass by widening the `-E` in
   `make test`'s `DEFAULT_SUITE` and ci.yml's "Test (engine, default)" together
-  (`-E 'not group(gpu) | (group(gpu) & package(rusty-<m>))'`; `make scripts` holds
+  (`-E 'not group(gpu*) | (group(gpu*) & package(rusty-<m>))'`; `make scripts` holds
   the two equal). A switch no rendered path reads (the window device's GPU
   timestamps, the agent guide a project is written, the editor's and shell's ship
   stubs) takes `// lint: allow(gpu-default-only) <why>`, and so does a non-GPU test

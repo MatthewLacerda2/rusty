@@ -296,22 +296,36 @@ jobs:
       # each by name (`proved_tree.BUILT`, `verdict.changes.DRIFT_STEP_WORDS`).
       # The two steps do not run the same set: the default entry compiles every
       # test target but runs every test except the `gpu` group (`-E 'not
-      # group(gpu)'`, as `make test`'s default pass), which the `dev` shards run,
+      # group(gpu*)'`, as `make test`'s default pass), which the `dev` shards run,
       # `dev` adding to the default features (docs/testing.md, *Which suite runs
-      # the GPU tests*; the `gpu-default-only` lint holds the premise).
+      # the GPU tests*; the `gpu-default-only` lint holds the premise). Each
+      # test step builds first (`--no-run`), then samples the runner's free
+      # memory in the background while the tests alone run (`memory_floor.py`),
+      # so rustc and the linker are not in the floor; *Slowest tests* prints it
+      # beside the accounting.
       - name: Test (engine, default)
         if: needs.changes.outputs.code != 'false' && matrix.features == 'default'
         run: |
           rc=0
-          cargo nextest run --profile ci --locked -E 'not group(gpu)' --partition "count:${{ matrix.shard }}" || rc=$?
+          cargo nextest run --no-run --locked || rc=$?
+          python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
+          if [ "$rc" = 0 ]; then
+            cargo nextest run --profile ci --locked -E 'not group(gpu*)' --partition "count:${{ matrix.shard }}" || rc=$?
+          fi
           cp target/nextest/ci/junit.xml junit-default.xml || true
+          kill "$watcher" || true
           exit "$rc"
       - name: Test (engine, dev features)
         if: needs.changes.outputs.code != 'false' && matrix.features == 'dev'
         run: |
           rc=0
-          cargo nextest run --profile ci --features dev --locked --partition "count:${{ matrix.shard }}" || rc=$?
+          cargo nextest run --no-run --features dev --locked || rc=$?
+          python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
+          if [ "$rc" = 0 ]; then
+            cargo nextest run --profile ci --features dev --locked --partition "count:${{ matrix.shard }}" || rc=$?
+          fi
           cp target/nextest/ci/junit.xml junit-dev.xml || true
+          kill "$watcher" || true
           exit "$rc"
       # The canaries that refuse to skip (the adapter's, `render::test_gpu`, and
       # OIDN's, `bake::denoise::tests`), on every entry: each installs lavapipe
@@ -461,8 +475,13 @@ jobs:
         shell: bash
         run: |
           rc=0
-          cargo nextest run --profile ci --features dev --locked --partition "count:${{ matrix.shard }}" || rc=$?
+          cargo nextest run --no-run --features dev --locked || rc=$?
+          python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
+          if [ "$rc" = 0 ]; then
+            cargo nextest run --profile ci --features dev --locked --partition "count:${{ matrix.shard }}" || rc=$?
+          fi
           cp target/nextest/ci/junit.xml junit-dev.xml || true
+          kill "$watcher" || true
           exit "$rc"
       # A partition puts each canary in one shard only, so every shard runs them
       # again (#2264, #2276): a shard that lost Metal or OIDN fails, never skips.

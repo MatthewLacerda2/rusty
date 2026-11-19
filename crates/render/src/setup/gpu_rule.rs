@@ -2,8 +2,9 @@
 //!
 //! Under cargo-nextest every test runs in its own process, so the in-process
 //! [`budget`](super::budget) no longer bounds how many renderers exist at once. The
-//! nextest equivalent is the `gpu` test group in `.config/nextest.toml`, and a test
-//! group selects tests by **name** — it cannot see which tests build a renderer. So
+//! nextest equivalent is the GPU test group in `.config/nextest.toml` (`gpu`, or
+//! `gpu-macos` on macOS, both chosen by the one filter), and a test group selects
+//! tests by **name** — it cannot see which tests build a renderer. So
 //! the name carries it:
 //!
 //! - an integration test that renders lives under `tests/gpu/` (path `gpu::…`);
@@ -43,8 +44,8 @@ pub(crate) fn check_current_thread() {
     assert!(
         !name.contains("::") || is_gpu_test(name, integration),
         "test `{name}` builds a headless renderer but its name does not mark it as a \
-         GPU test, so nextest will not cap it with the others (the `gpu` test group in \
-         .config/nextest.toml). Start the test function's name with `gpu_`, or move an \
+         GPU test, so nextest will not cap it with the others (the `gpu` or `gpu-macos` \
+         test group in .config/nextest.toml). Start the test function's name with `gpu_`, or move an \
          integration test under tests/gpu/. See docs/testing.md."
     );
 }

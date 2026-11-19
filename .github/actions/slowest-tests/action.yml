@@ -114,4 +114,6 @@ runs:
         BASE: ${{ runner.temp }}/slowest-baseline
         REPORT: ${{ inputs.report }}
         COUNT: ${{ inputs.count }}
-      run: python3 .github/scripts/slowest_tests.py "$REPORT" "$COUNT" --baseline "$BASE"
+      run: |
+        python3 .github/scripts/slowest_tests.py "$REPORT" "$COUNT" --baseline "$BASE"
+        python3 .github/scripts/memory_floor.py report mem-floor.txt
