@@ -20,7 +20,7 @@ use rusty_scene::Scene;
 // lint: allow(skip) a measurement on the 6344-mesh level, run by hand, never a gate
 #[ignore = "a measurement, run by hand"]
 fn gpu_hiz_dust2_counts() {
-    let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {
+    let Some(mut r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
         return;
     };
     let scene = rooms(20);

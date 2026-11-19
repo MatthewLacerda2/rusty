@@ -96,13 +96,14 @@ pub(super) fn eye_of(view_proj: Mat4) -> Vec4 {
 impl Renderer {
     /// Record `plan`'s three dispatches per clustered batch into `encoder`,
     /// against `pyramid` and `visible` (this frame's instance verdicts), and
-    /// return the draws that stand for those batches.
+    /// return the draws that stand for those batches. The last run's pass writes
+    /// `close` (the end of the stage's `occlusion` pair).
     pub(crate) fn cull_clusters(
         &self,
         encoder: &mut wgpu::CommandEncoder,
         (cull, plan): (&mut ClusterCull, &Plan),
         (pyramid, visible, view_proj): (&Pyramid, &wgpu::Buffer, Mat4),
-        batches: usize,
+        (batches, mut close): (usize, Option<wgpu::ComputePassTimestampWrites>),
     ) -> ClusterDraws {
         self.upload_clusters(cull, plan, (pyramid, view_proj));
         self.bind_clusters(cull, (pyramid, visible));
@@ -120,7 +121,11 @@ impl Renderer {
                 .group;
             let offset = [r as u32 * RUN_STRIDE as u32];
             let jobs = run.jobs.len() as u32;
-            let mut pass = encoder.counted_compute_pass(&Default::default());
+            let last = r + 1 == plan.runs.len();
+            let mut pass = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
+                label: None,
+                timestamp_writes: if last { close.take() } else { None },
+            });
             pass.set_bind_group(0, group, &offset);
             pass.set_bind_group(1, mesh, &[]);
             pass.set_pipeline(pipes.test.get());

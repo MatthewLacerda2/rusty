@@ -59,6 +59,18 @@ thread_local! {
     }) };
 }
 
+thread_local! {
+    /// Every counted submit this thread made, never reset: the GPU timer tags
+    /// each pair with it, so pairs between the same two submits are known to
+    /// share a command buffer (`timing::times::Pair::submit`).
+    static SUBMITS: Cell<u64> = const { Cell::new(0) };
+}
+
+/// How many counted submits this thread has made, ever.
+pub(crate) fn submit_seq() -> u64 {
+    SUBMITS.with(Cell::get)
+}
+
 /// What this thread counted since the last call, and start again from zero.
 pub(crate) fn take() -> OpCounts {
     COUNTS.with(|c| c.take())
@@ -131,6 +143,7 @@ impl CountedQueue for wgpu::Queue {
         buffers: I,
     ) -> wgpu::SubmissionIndex {
         bump(|n| n.submits += 1);
+        SUBMITS.with(|s| s.set(s.get() + 1));
         self.submit(buffers)
     }
 

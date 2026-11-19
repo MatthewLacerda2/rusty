@@ -43,7 +43,7 @@ fn step(scene: &mut Scene, ids: &[u32], soldier: u32, step: u32) {
     let t = step as f32;
     scene.world.transform_mut(ids[0]).unwrap().position.y = 0.3 * t; // a mover
     let pose = Mat4::from_translation(Vec3::new(0.0, 0.2 * t, 0.0));
-    scene.world.set_pose_palette(soldier, vec![pose]); // animation's unstamped write
+    scene.world.set_pose_palette(soldier, &[pose]); // animation's unstamped write
     match step {
         1 => {
             scene.world.set_static(ids[1], true);

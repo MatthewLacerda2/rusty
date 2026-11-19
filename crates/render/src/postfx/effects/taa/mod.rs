@@ -107,7 +107,7 @@ impl PostFx {
             }
         }
         if drawn {
-            reactive::clear(&mut encoder, &h.reactive);
+            reactive::clear(&mut encoder, &h.reactive, timer.writes(GpuPass::Taa));
         }
         queue.counted_submit(std::iter::once(encoder.finish()));
         let h = self.targets.get_mut::<TaaHistory>().expect("held above");
