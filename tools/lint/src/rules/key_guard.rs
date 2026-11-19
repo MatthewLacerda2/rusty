@@ -17,7 +17,7 @@
 //! (`Allow::Never`): a manifest line takes no inline allow.
 
 use super::finding::Finding;
-use super::scan::Scan;
+use super::scan::{Package, Scan};
 use crate::code::bare_lines;
 
 pub const RULE: &str = "key-guard";
@@ -36,13 +36,20 @@ fn expands(source: &str) -> bool {
 pub fn check<'a>(
     manifest: &str,
     text: &str,
-    mut sources: impl Iterator<Item = &'a str>,
+    sources: impl Iterator<Item = &'a str>,
 ) -> Option<Finding> {
-    let mut named = crate::layers::manifest_dependencies(text);
-    named.extend(crate::layers::manifest_dev_dependencies(text));
-    let links = named.iter().any(|k| k == "rusty_dev");
-    (links && !sources.any(expands)).then(|| Finding {
-        path: manifest.to_string(),
+    let package = Package {
+        manifest: manifest.to_string(),
+        text: text.to_string(),
+        files: Vec::new(),
+    };
+    held(&package, sources)
+}
+
+/// [`check`] on a package already read.
+fn held<'a>(package: &Package, mut sources: impl Iterator<Item = &'a str>) -> Option<Finding> {
+    (package.names("rusty-dev") && !sources.any(expands)).then(|| Finding {
+        path: package.manifest.clone(),
         line: 1,
         rule: RULE,
         message: "this package depends on `rusty-dev`, so its test binary links the provider \
@@ -55,21 +62,9 @@ pub fn check<'a>(
 /// The rule over the root package and every member crate: each manifest against the
 /// code under its `src/` and `tests/`.
 pub fn run(scan: &Scan) -> Vec<Finding> {
-    let members = crate::modules::member_manifests(&scan.base);
-    let members = members
+    scan.packages()
         .iter()
-        .map(|m| m.strip_prefix(&scan.base).unwrap_or(m))
-        .map(|m| m.to_string_lossy().replace('\\', "/"));
-    std::iter::once(String::from("Cargo.toml"))
-        .chain(members)
-        .filter_map(|manifest| {
-            let root = manifest.trim_end_matches("Cargo.toml");
-            let dirs = [format!("{root}src/"), format!("{root}tests/")];
-            let text = std::fs::read_to_string(scan.base.join(&manifest)).unwrap_or_default();
-            let inside = |f: &&String| dirs.iter().any(|d| f.starts_with(d.as_str()));
-            let sources = scan.files.iter().filter(inside).map(|f| scan.source(f));
-            check(&manifest, &text, sources)
-        })
+        .filter_map(|p| held(p, p.files.iter().map(|f| scan.source(f))))
         .collect()
 }
 

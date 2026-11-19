@@ -484,8 +484,11 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
 - **What is process-wide by nature gets a process of its own.** A test reading a
   process-wide measure (the peak memory, `memory::rss_peak_bytes`) or installing
   state nothing else may share runs its body through
-  `rusty_test_support::process::alone`: under nextest it runs in place, under
-  plain `cargo test` the binary re-runs that one test in a child. The `log`
+  `rusty_test_support::alone!(|| …)`, which names the test from its function:
+  under nextest it runs in place, under plain `cargo test` the binary re-runs
+  that one test in a child, and passes only once the child says the body ran.
+  A check that the machine cannot measure goes before `alone!`, so it starts no
+  child to return at once. The `log`
   logger is one a process too: a crate that names `rusty-logging` captures its
   tests' warnings through `rusty_logging::init_for_tests` and `forward`, never
   `rusty_test_support::logs` (`one-logger`), and each `init` panics when the

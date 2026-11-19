@@ -8,6 +8,28 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// One package of the workspace: its manifest and the scanned files under its
+/// `src/` and `tests/`, for a rule that holds a package's code to its manifest.
+pub struct Package<'a> {
+    /// The manifest's path, `Cargo.toml` for the root.
+    pub manifest: String,
+    /// The manifest's text, empty when it cannot be read.
+    pub text: String,
+    /// The scanned files under the package's `src/` and `tests/`.
+    pub files: Vec<&'a str>,
+}
+
+impl Package<'_> {
+    /// Whether the manifest's `[dependencies]` or `[dev-dependencies]` (per-target
+    /// ones too) name `dep` (`rusty-dev`).
+    pub fn names(&self, dep: &str) -> bool {
+        let key = dep.replace('-', "_");
+        let mut named = crate::layers::manifest_dependencies(&self.text);
+        named.extend(crate::layers::manifest_dev_dependencies(&self.text));
+        named.iter().any(|k| *k == key)
+    }
+}
+
 pub struct Scan {
     /// The repository scanned, `""` for the working directory: what a rule
     /// reading past the scanned files (a manifest, a shader, git) reads under.
@@ -111,6 +133,36 @@ impl Scan {
         self.files
             .iter()
             .flat_map(|p| check(p, self.source(p)))
+            .collect()
+    }
+
+    /// The root package and every member crate, each with the files under its
+    /// `src/` and `tests/`.
+    pub fn packages(&self) -> Vec<Package<'_>> {
+        let members = crate::modules::member_manifests(&self.base);
+        let members = members
+            .iter()
+            .map(|m| m.strip_prefix(&self.base).unwrap_or(m))
+            .map(|m| m.to_string_lossy().replace('\\', "/"));
+        std::iter::once(String::from("Cargo.toml"))
+            .chain(members)
+            .map(|manifest| {
+                let root = manifest.trim_end_matches("Cargo.toml");
+                let dirs = [format!("{root}src/"), format!("{root}tests/")];
+                let inside = |f: &&String| dirs.iter().any(|d| f.starts_with(d.as_str()));
+                let files = self
+                    .files
+                    .iter()
+                    .filter(inside)
+                    .map(String::as_str)
+                    .collect();
+                let text = fs::read_to_string(self.base.join(&manifest)).unwrap_or_default();
+                Package {
+                    manifest,
+                    text,
+                    files,
+                }
+            })
             .collect()
     }
 

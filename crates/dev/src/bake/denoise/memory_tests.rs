@@ -1,7 +1,7 @@
 //! OIDN's share of a lightmap bake's memory (#2312): held to its budgeted cost
 //! (`budget::cost`) for one chart past the filter's scratch cap, and, with timing
 //! moving how many charts it cleans at once, never growing with the scene. Each
-//! test runs in a process of its own (`rusty_test_support::process::alone`), so
+//! test runs in a process of its own (`rusty_test_support::alone!`), so
 //! the peak is this test's bakes'.
 
 use super::{available, budget};
@@ -23,14 +23,11 @@ fn texels(side: f32) -> usize {
 
 #[test]
 fn one_chart_past_the_scratch_cap_costs_oidn_at_most_its_budgeted_cost() {
-    let test = concat!(
-        module_path!(),
-        "::one_chart_past_the_scratch_cap_costs_oidn_at_most_its_budgeted_cost"
-    );
-    rusty_test_support::process::alone(test, || {
-        if !measurable() {
-            return;
-        }
+    // Checked before `alone!`, so a machine without OIDN starts no child.
+    if !measurable() {
+        return;
+    }
+    rusty_test_support::alone!(|| {
         // A 1024² chart: untiled, OIDN's scratch alone was about 1.1 GB a filter, and
         // both filters stayed on the device for the rest of the bake.
         let side = 1024.0 / DENSITY;
@@ -51,14 +48,11 @@ fn one_chart_past_the_scratch_cap_costs_oidn_at_most_its_budgeted_cost() {
 
 #[test]
 fn four_times_the_meshes_add_only_their_lightmaps_past_oidn_s_share() {
-    let test = concat!(
-        module_path!(),
-        "::four_times_the_meshes_add_only_their_lightmaps_past_oidn_s_share"
-    );
-    rusty_test_support::process::alone(test, || {
-        if !measurable() {
-            return;
-        }
+    // Checked before `alone!`, so a machine without OIDN starts no child.
+    if !measurable() {
+        return;
+    }
+    rusty_test_support::alone!(|| {
         let filtered = bake(2, SIDE, Denoiser::Filter);
         let share = (WORKERS as u64 * budget::cost(texels(SIDE))).min(budget::BUDGET);
         // Timing moves how many charts are denoised at once, so the 4× bake is held

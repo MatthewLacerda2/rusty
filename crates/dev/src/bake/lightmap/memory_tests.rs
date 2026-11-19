@@ -2,7 +2,7 @@
 //! (#2312): four times the meshes at the same density peak higher only by the
 //! extra lightmaps kept, on [`WORKERS`] each (what is in flight is per worker).
 //! The page stage's bound: `pages_memory_tests`. Each test runs in a process of
-//! its own (`process::alone`), so the peak (`memory::rss_peak_bytes`) is its
+//! its own (`rusty_test_support::alone!`), so the peak (`memory::rss_peak_bytes`) is its
 //! bakes'; OIDN's memory tests share the planes and bakes (`denoise::memory_tests`).
 
 use std::sync::Arc;
@@ -137,11 +137,10 @@ pub(crate) fn holds(one: (u64, u64), four: (u64, u64), charts: usize, what: &str
 
 #[test]
 fn four_times_the_meshes_peak_higher_only_by_their_lightmaps() {
-    let test = "four_times_the_meshes_peak_higher_only_by_their_lightmaps";
-    rusty_test_support::process::alone(&format!("{}::{test}", module_path!()), || {
-        if rss_peak_bytes().is_none() {
-            return;
-        }
+    if rss_peak_bytes().is_none() {
+        return;
+    }
+    rusty_test_support::alone!(|| {
         let (small, large) = PAIR;
         let one = bake(small, SIDE, Denoiser::Filter);
         let four = bake(large, SIDE, Denoiser::Filter);
