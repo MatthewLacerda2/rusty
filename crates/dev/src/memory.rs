@@ -39,7 +39,8 @@ pub fn return_large_frees() {
 }
 
 /// Hand the blocks the allocator holds free back to the system (#2312), after a
-/// bake's chart: macOS's allocator keeps freed multi-MB blocks in its regions. On
+/// bake's chart and each page it encodes: macOS's allocator keeps freed multi-MB
+/// blocks in its regions. On
 /// glibc, [`return_large_frees`] does it as each block is freed; elsewhere, nothing.
 pub fn relieve() {
     #[cfg(target_os = "macos")]

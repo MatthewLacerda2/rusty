@@ -105,6 +105,9 @@ pub fn encode_pages(
         if put_page(page, (&mut encoded, &mut spill), progress, threads)?.is_none() {
             return Ok(None);
         }
+        // The page and its maps are freed: hand them back (`memory::relieve`), so
+        // the next page's do not stack on them, and the last page's end the stage.
+        crate::memory::relieve();
     }
     encoded.spill = Some(spill);
     Ok(Some(encoded))
