@@ -8,10 +8,13 @@ mechanical, so they live here, one responsibility per module:
 - [`brief`]: the newest `Brief` comment on an issue;
 - [`routine`]: the one-off routine that starts a cloud coder on that brief;
 - [`running`]: how many coders are running, against the limit of five (#1856);
+- [`launch`]: creating a coder's routine, shared by `make coder` and the line;
+- [`waiting`]: the coders waiting for a slot: the line, its order and its lock (#2382);
+- [`drain`]: launching from the line, `make coders`' pass and `make coder`'s checks against it;
 - [`remote`]: the claude.ai routines API, reached through `claude mcp serve`;
 - [`review_level`]: `high` or `medium` for a pull request, from its paths;
 - [`rebriefs`]: how many briefs issues take, and why each re-brief happened (#1724).
 
-`coder.py` (`make coder ISSUE=N`), `review-level.py` (`make review-level
+`coder.py` (`make coder ISSUE=N`), `coders.py` (`make coders`), `review-level.py` (`make review-level
 PR=N`) and `rebriefs.py` (`make rebriefs`) are only the command lines.
 """

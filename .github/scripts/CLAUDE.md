@@ -2,7 +2,7 @@
 
 This file loads when you work under `.github/scripts/`: the Python behind `make queue`,
 `make queue-status`, `make queue-events`, `make mergeable`, `make ruleset`, `make blockers`, `make reclaim`, `make checks`, `make conflicts`, `make board`,
-`make coder`, `make review-level`, `make rebriefs` and `make mutants-remote`, and the CI helpers
+`make coder`, `make coders`, `make review-level`, `make rebriefs` and `make mutants-remote`, and the CI helpers
 beside them. The root `CLAUDE.md` keeps the
 project-wide rules (merging is serialized, gates vs. signals, issues and labels); the
 `ci-merge` and `issue-batch` skills say how to *run* this tooling. This file is what a
@@ -29,8 +29,11 @@ coder *changing* it must know.
   never imports it. `mergeable.py`, `merge-queue.py` and `queue-view.py` are only the
   command lines. A new concern is a new module, not a longer one.
 - **`.github/scripts/dispatch/` is the batch's dispatch steps**: the brief, the coder's
-  routine, the routines API, the review level, the re-brief counts. `coder.py`,
-  `review-level.py` and `rebriefs.py` are only the command lines. The routines API is
+  routine, the routines API, the coders waiting for a slot (`dispatch/waiting.py`, kept in
+  `merge-queue/coders-waiting.json` through `merging/state.py`, and launched from it under
+  its lock by `dispatch/drain.py`), the review level, the
+  re-brief counts. `coder.py`, `coders.py`, `review-level.py` and `rebriefs.py` are only
+  the command lines. The routines API is
   reached through `claude mcp serve` (`dispatch/remote.py` says why), never with a
   token a script reads: the claude.ai login stays inside `claude`.
 - **GitHub over REST, so the scripts run in cloud sessions.** There GraphQL answers
