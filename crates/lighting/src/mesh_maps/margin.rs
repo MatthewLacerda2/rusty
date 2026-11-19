@@ -13,7 +13,7 @@ use rusty_procgen::image_buf::{Image, Rgba, Size};
 
 /// Points evaluated per block: the values buffer a map holds before they are
 /// written into its image (16 bytes each).
-const BLOCK: usize = 1 << 18;
+pub(super) const BLOCK: usize = 1 << 18;
 
 /// What a texel no island reaches holds: the value that says "nothing here" for
 /// each map (flat, open, no normal, the bounds' corner, thick, no material).

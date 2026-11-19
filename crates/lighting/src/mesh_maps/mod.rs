@@ -38,9 +38,9 @@
 //! points take 128 MiB and 512 MiB less). A UV layout with gutters covers less; a
 //! non-square map holds its own `width × height` texels. More rays cost time, not
 //! memory. Before the maps, the walk holds a 4-byte owner per texel, and a model
-//! whose UVs overlap holds each shared texel's claimants (32 bytes each, plus
-//! their place and openness) until `overlap` has picked: both are gone before the
-//! first map's image is made.
+//! whose UVs overlap holds every claimant of each shared texel, its owner
+//! included (40 bytes each with its place and openness), until `overlap` has
+//! picked: both are gone before the first map's image is made.
 
 mod curvature;
 mod floor;
@@ -203,7 +203,7 @@ impl<'a> Baked<'a> {
             return Ok((baked, None));
         }
         let rays = MeshRays::new(source);
-        overlap::resolve(&mut baked, &others, &rays);
+        overlap::resolve(&mut baked, others, &rays);
         Ok((baked, Some(rays)))
     }
 

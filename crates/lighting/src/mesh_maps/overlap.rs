@@ -7,42 +7,51 @@
 //! same whichever maps are asked: a bake without `ao` still traces it, on the
 //! shared texels only. A layout with no overlap has no claimant and pays nothing.
 
-use super::margin::per_texel;
+use super::margin::{per_texel, BLOCK};
 use super::rays::MeshRays;
 use super::Baked;
 use crate::lightmap::TexelPoint;
 
 /// Replace each shared texel's point in `baked` by its most open claimant's.
-/// `others` are the walk's claimants, (the texel's place in the points, a point),
-/// grouped by place in walk order; `rays` traces the model.
-pub(super) fn resolve(baked: &mut Baked, others: &[(u32, TexelPoint)], rays: &MeshRays) {
-    let mut slots: Vec<u32> = others.iter().map(|&(slot, _)| slot).collect();
+/// `claims` are the walk's claimants, (the texel's place in the points, a point);
+/// the owners join them in place, so the list is held once. Openness is traced a
+/// [`BLOCK`] of claims at a time, one `f32` each kept; `rays` traces the model.
+pub(super) fn resolve(baked: &mut Baked, mut claims: Vec<(u32, TexelPoint)>, rays: &MeshRays) {
+    let mut slots: Vec<u32> = claims.iter().map(|&(slot, _)| slot).collect();
     slots.sort_unstable();
     slots.dedup();
-    // Every claimant of every shared texel, its owner included: (place, point).
-    let mut claims: Vec<(u32, TexelPoint)> = slots
-        .iter()
-        .map(|&s| (s, baked.points[s as usize]))
-        .chain(others.iter().copied())
-        .collect();
+    claims.extend(slots.iter().map(|&s| (s, baked.points[s as usize])));
+    drop(slots);
     claims.sort_by_key(|&(slot, p)| (slot, p.first));
-    let points: Vec<TexelPoint> = claims.iter().map(|&(_, p)| p).collect();
-    let open = per_texel(&points, |k, p| rays.ao(baked, claims[k].0 as usize, p));
+    let mut open: Vec<f32> = Vec::with_capacity(claims.len());
+    for (b, block) in claims.chunks(BLOCK).enumerate() {
+        let points: Vec<TexelPoint> = block.iter().map(|&(_, p)| p).collect();
+        let slot = |k: usize| claims[b * BLOCK + k].0 as usize;
+        open.extend(
+            per_texel(&points, |k, p| rays.ao(baked, slot(k), p))
+                .iter()
+                .map(|v| v.x),
+        );
+    }
     // Sorted by triangle within a texel: only a strictly more open later claimant
     // takes it, so a tie stays with the lower index.
-    let mut best: Vec<usize> = Vec::with_capacity(slots.len());
+    let mut best: Option<usize> = None;
     for k in 0..claims.len() {
-        match best.last_mut() {
-            Some(b) if claims[*b].0 == claims[k].0 => {
-                if open[k].x > open[*b].x {
-                    *b = k;
+        match best {
+            Some(b) if claims[b].0 == claims[k].0 => {
+                if open[k] > open[b] {
+                    best = Some(k);
                 }
             }
-            _ => best.push(k),
+            _ => {
+                if let Some(b) = best {
+                    baked.points[claims[b].0 as usize] = claims[b].1;
+                }
+                best = Some(k);
+            }
         }
     }
-    for k in best {
-        let (slot, p) = claims[k];
-        baked.points[slot as usize] = p;
+    if let Some(b) = best {
+        baked.points[claims[b].0 as usize] = claims[b].1;
     }
 }
