@@ -13,17 +13,15 @@
 //! mask texture or its blur level's target was replaced, and dropped once a frame
 //! no longer asks for it (a removed Mask, a blur level a quality change left).
 //!
-//! - `mask` / `backdrop` — the pure halves the mesh builder calls.
-//! - `mask_gpu` — each Mask's coverage texture, rendered before the camera stack;
-//!   `mask_key` — what it is drawn from, so a still Mask is kept.
+//! - `mask` / `backdrop` — the pure halves the mesh builder calls; `mask::gpu`,
+//!   each Mask's coverage texture, rendered before the camera stack, and
+//!   `mask::key`, what it is drawn from, so a still Mask is kept.
 //! - `blur` — the dual-filter chain over the finished frame, run before the
 //!   overlay pass.
 
 pub(crate) mod backdrop;
 pub(crate) mod blur;
 pub(crate) mod mask;
-pub(crate) mod mask_gpu;
-mod mask_key;
 
 use crate::gpu::ops::CountedDevice as _;
 use std::collections::{HashMap, HashSet};
@@ -109,7 +107,7 @@ pub(crate) struct UiEffects {
     stride: u32,
     /// Each synced canvas's first batch slot, then its first mask-draw slot.
     slots: Vec<(u32, u32)>,
-    pub(crate) masks: mask_gpu::MaskTargets,
+    pub(crate) masks: mask::gpu::MaskTargets,
     pub(crate) blur: Option<blur::BlurTargets>,
     /// Mask textures rendered by the last frame (#428).
     pub(crate) mask_passes: u32,
@@ -219,7 +217,6 @@ impl Renderer {
         fx: &mut UiEffects,
         keys: impl IntoIterator<Item = GroupKey>,
     ) {
-        let ui = &self.ui_renderer;
         let Some(buffer) = fx.uniforms.as_ref().map(GrowBuffer::buffer) else {
             return;
         };
@@ -240,42 +237,46 @@ impl Renderer {
                 continue;
             }
             let inputs = (buffer.clone(), mask.cloned(), blurred.cloned());
-            let make = |(buffer, mask, blurred): &GroupInputs| {
-                let entries = [
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                            buffer,
-                            offset: 0,
-                            size: wgpu::BufferSize::new(SLOT),
-                        }),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::TextureView(
-                            mask.as_ref().unwrap_or(&ui.white_view),
-                        ),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: wgpu::BindingResource::TextureView(
-                            blurred.as_ref().unwrap_or(&ui.white_view),
-                        ),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 3,
-                        resource: wgpu::BindingResource::Sampler(&ui.sampler),
-                    },
-                ];
-                self.device.counted_bind_group(&wgpu::BindGroupDescriptor {
-                    label: Some("UI Batch Group"),
-                    layout: &ui.batch_layout,
-                    entries: &entries,
-                })
-            };
-            let group = make(&inputs);
+            let group = self.batch_group(&inputs);
             kept.get(inputs, || group);
         }
+    }
+
+    /// A batch group binding `inputs`: the batch uniform, a mask texture and a
+    /// blur level (the white texture where either is absent).
+    fn batch_group(&self, (buffer, mask, blurred): &GroupInputs) -> wgpu::BindGroup {
+        let ui = &self.ui_renderer;
+        let entries = [
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(SLOT),
+                }),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(
+                    mask.as_ref().unwrap_or(&ui.white_view),
+                ),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::TextureView(
+                    blurred.as_ref().unwrap_or(&ui.white_view),
+                ),
+            },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: wgpu::BindingResource::Sampler(&ui.sampler),
+            },
+        ];
+        self.device.counted_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("UI Batch Group"),
+            layout: &ui.batch_layout,
+            entries: &entries,
+        })
     }
 }
 

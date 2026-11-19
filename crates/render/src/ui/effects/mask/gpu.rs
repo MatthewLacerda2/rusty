@@ -1,4 +1,4 @@
-//! crates/render/src/ui/effects/mask_gpu.rs — each `Mask`'s coverage texture (#428).
+//! crates/render/src/ui/effects/mask/gpu.rs — each `Mask`'s coverage texture (#428).
 //!
 //! The mask-texture approach rather than stencil: a Mask's graphic is drawn into an
 //! R8 texture the size of its canvas's frame (the screen, or a world canvas's own
@@ -25,12 +25,12 @@
 use crate::gpu::ops::CountedQueue as _;
 use std::collections::HashMap;
 
-use super::mask_key::{DrawnInputs, MaskInputs};
-use super::{BatchUniform, GroupKey};
+use super::key::{DrawnInputs, MaskInputs};
 use crate::gpu::fullscreen::color_pass;
 use crate::render_texture::is_render_texture;
 use crate::timing::GpuPass;
 use crate::ui::cache::{CanvasGpu, UiViewCache};
+use crate::ui::effects::{BatchUniform, GroupKey};
 use crate::ui::mesh::UiSource;
 use crate::{RenderView, Renderer};
 
@@ -179,7 +179,7 @@ impl Renderer {
             self.lap("ui.masks");
             return;
         }
-        let key = |m: &super::mask::MaskDraw| GroupKey {
+        let key = |m: &super::MaskDraw| GroupKey {
             mask: m.clip.mask,
             backdrop: None,
         };
@@ -239,7 +239,7 @@ impl Renderer {
         &'a self,
         masks: &MaskTargets,
         canvas: &'a CanvasGpu,
-        draw: &super::mask::MaskDraw,
+        draw: &super::MaskDraw,
     ) -> Option<MaskInputs<'a>> {
         let source = match &draw.source {
             UiSource::Solid => None,
@@ -263,7 +263,7 @@ impl Renderer {
 }
 
 /// Canvas `i`'s mask draw `m`.
-fn draw_of(cache: &UiViewCache, (i, m): (usize, usize)) -> &super::mask::MaskDraw {
+fn draw_of(cache: &UiViewCache, (i, m): (usize, usize)) -> &super::MaskDraw {
     &cache.canvas(i).mesh.masks[m]
 }
 

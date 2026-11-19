@@ -1,7 +1,7 @@
-//! crates/render/src/ui/effects/mask_key.rs — what a Mask's coverage texture is
-//! drawn from (#2354): the key `mask_gpu` compares to skip a still Mask's draw.
+//! crates/render/src/ui/effects/mask/key.rs — what a Mask's coverage texture is
+//! drawn from (#2354): the key `gpu` compares to skip a still Mask's draw.
 
-use super::BatchUniform;
+use crate::ui::effects::BatchUniform;
 
 /// Everything a Mask's coverage texture is drawn from, borrowed from this frame's
 /// mesh; equal inputs draw equal texels, so a target holding the last draw's
