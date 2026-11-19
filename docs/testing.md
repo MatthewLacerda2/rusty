@@ -1302,8 +1302,10 @@ every binary's open makes them.
   failed to load) are warned of with their count and the first one, since they
   make a scene look cheaper than the game is. A scene benches as
   it is when it lacks a bake, with a warning naming what is missing: no
-  lightmaps, light probes placed whose SH never loaded, or reflection probes
-  placed with no cube on disk (what a scene does not place is not missing). Its
+  lightmaps, or lightmap pages it names that are not on disk (colour, direction
+  and shadowmask pages, counted: `lightmaps (43 of 43 pages not on disk)`), light
+  probes placed whose SH never loaded, or reflection probes placed with no cube on
+  disk (what a scene does not place is not missing). Its
   lighting cost is then not the shipped one. The run ends with a summary table of
   one line per scene: `cpu_ms` (the sim at the reference CPU clock), `frame_ms`,
   `gpu_ms`, `load_ms`, `rss_peak_mb`, `gpu_mb`, and the run's `import_ms` under
@@ -1457,7 +1459,10 @@ Each leg runs in a memory-capped scope of its own on Linux (`systemd-run --user
 without one (macOS, no user session) the legs run plain and the run says so. The
 legs' reports stay under `out/bench/ab/pr-<n>/` (`main/`, `pr/`, `main-again/`),
 and the table, printed and kept as `out/bench/ab/pr-<n>/table.md`, is the PR comment
-as it is. `make test-gpu PR=<n> [FILTER='<nextest filter>']` runs GPU tests on a
+as it is. Each scene's section opens with the warnings its legs' reports carry (a
+missing bake, textures drawn uncompressed, console errors), each once, a warning
+not every leg wrote marked with the legs that did: the table is what gets read, so
+a scene benched without its bake says so there, not only in a leg's output. `make test-gpu PR=<n> [FILTER='<nextest filter>']` runs GPU tests on a
 PR's head in the same `pr-<n>-head` tree, but as pushed: no `main` merged in, no
 timed-run lock and none of the refusals above. It only refuses a tree a live
 `make bench-ab` run holds, whose sources it would otherwise swap mid-build.
