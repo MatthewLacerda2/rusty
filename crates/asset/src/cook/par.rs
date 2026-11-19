@@ -12,16 +12,23 @@
 
 use std::cell::Cell;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Mutex, OnceLock, PoisonError};
 use std::thread;
+
+use rusty_core::quiet::{holding, say};
+
+/// The work, in triangles, below which a call stays on the caller's thread:
+/// spawning costs more than it saves.
+pub const SMALL: usize = 4096;
 
 thread_local! {
     /// The thread count [`with_threads`] pinned on this thread, if any.
     static PINNED: Cell<Option<usize>> = const { Cell::new(None) };
 }
 
-/// Run `f` with every [`each_mut`] on this thread using exactly `threads` threads
-/// (at least 1): a determinism probe, the output must not change with it.
+/// Run `f` with every [`map`] on this thread using exactly `threads` threads (at
+/// least 1), whatever the work's size: a determinism probe, the output must not
+/// change with it.
 pub fn with_threads<R>(threads: usize, f: impl FnOnce() -> R) -> R {
     /// Restores the previous pin even if `f` panics.
     struct Restore(Option<usize>);
@@ -34,30 +41,46 @@ pub fn with_threads<R>(threads: usize, f: impl FnOnce() -> R) -> R {
     f()
 }
 
-/// How many threads `items` items are spread over.
-fn threads_for(items: usize) -> usize {
-    let n = PINNED
-        .with(Cell::get)
-        .unwrap_or_else(|| thread::available_parallelism().map_or(1, |n| n.get()));
+/// The machine's cores, asked once.
+fn cores() -> usize {
+    static CORES: OnceLock<usize> = OnceLock::new();
+    *CORES.get_or_init(|| thread::available_parallelism().map_or(1, |n| n.get()))
+}
+
+/// How many threads `items` items of `work` triangles in all are spread over.
+fn threads_for(items: usize, work: usize) -> usize {
+    let n = match PINNED.with(Cell::get) {
+        Some(pinned) => pinned,
+        None if work < SMALL => 1,
+        None => cores(),
+    };
     n.clamp(1, items.max(1))
 }
 
-/// `f` of every item, in the items' order, the calls spread over threads. One item,
-/// or one thread, runs on the caller's thread.
-pub fn map<T: Send, R: Send>(items: Vec<T>, f: impl Fn(T) -> R + Sync) -> Vec<R> {
-    let threads = threads_for(items.len());
+/// `f` of every item, in the items' order, the calls spread over threads; `size`
+/// is an item's work in triangles. Little work, one item or one thread runs on
+/// the caller's thread. A warning an item raises through `rusty_core::warn_held!`
+/// is said by the caller after the join, in item order, as one thread says it
+/// (`core::quiet::holding`).
+pub fn map<T: Send, R: Send>(
+    items: Vec<T>,
+    size: impl Fn(&T) -> usize,
+    f: impl Fn(T) -> R + Sync,
+) -> Vec<R> {
+    let work = items.iter().map(size).sum();
+    let threads = threads_for(items.len(), work);
     if threads == 1 {
         return items.into_iter().map(f).collect();
     }
     let lock = |m: &Mutex<Option<T>>| m.lock().unwrap_or_else(PoisonError::into_inner).take();
     let inputs: Vec<Mutex<Option<T>>> = items.into_iter().map(|t| Mutex::new(Some(t))).collect();
-    let outputs: Vec<Mutex<Option<R>>> = inputs.iter().map(|_| Mutex::new(None)).collect();
+    let outputs: Vec<Mutex<Option<_>>> = inputs.iter().map(|_| Mutex::new(None)).collect();
     let next = AtomicUsize::new(0);
     let work = || loop {
         let i = next.fetch_add(1, Ordering::Relaxed);
         let Some(slot) = inputs.get(i) else { return };
         if let Some(item) = lock(slot) {
-            let out = f(item);
+            let out = holding(|| f(item));
             *outputs[i].lock().unwrap_or_else(PoisonError::into_inner) = Some(out);
         }
     };
@@ -67,16 +90,14 @@ pub fn map<T: Send, R: Send>(items: Vec<T>, f: impl Fn(T) -> R + Sync) -> Vec<R>
         }
     });
     let taken = outputs.into_iter().map(|m| {
-        m.into_inner()
+        let (out, held) = m
+            .into_inner()
             .unwrap_or_else(PoisonError::into_inner)
-            .expect("every item is taken by exactly one thread, which fills its slot")
+            .expect("every item is taken by exactly one thread, which fills its slot");
+        say(held);
+        out
     });
     taken.collect()
-}
-
-/// Call `f` on every item in place, the calls spread over threads as [`map`]'s.
-pub fn each_mut<T: Send>(items: &mut [T], f: impl Fn(&mut T) + Sync) {
-    map(items.iter_mut().collect(), f);
 }
 
 #[cfg(test)]
@@ -87,26 +108,40 @@ mod tests {
     fn the_results_keep_the_items_order_whatever_the_thread_count() {
         let items: Vec<u64> = (0..97).collect();
         let square = |x: u64| x * x;
-        let serial = with_threads(1, || map(items.clone(), square));
+        let serial = with_threads(1, || map(items.clone(), |_| 1, square));
         for threads in [2, 3, 8, 200] {
-            assert_eq!(with_threads(threads, || map(items.clone(), square)), serial);
+            assert_eq!(
+                with_threads(threads, || map(items.clone(), |_| 1, square)),
+                serial
+            );
         }
         assert_eq!(serial[96], 96 * 96);
-        assert!(map(Vec::<u64>::new(), square).is_empty());
+        assert!(map(Vec::<u64>::new(), |_| 1, square).is_empty());
     }
 
     #[test]
-    fn each_mut_reaches_every_item_once() {
-        let mut items = vec![1u32; 40];
-        with_threads(4, || each_mut(&mut items, |x| *x += 1));
-        assert_eq!(items, vec![2u32; 40]);
+    fn a_workers_warnings_are_said_by_the_caller_in_item_order() {
+        rusty_test_support::logs::init();
+        rusty_test_support::logs::take();
+        let items: Vec<u32> = (0..12).collect();
+        let warn = |x: u32| rusty_core::warn_held!("item {x}");
+        with_threads(4, || map(items, |_| 1, warn));
+        let want: Vec<String> = (0..12).map(|x| format!("item {x}")).collect();
+        assert_eq!(rusty_test_support::logs::take(), want);
+    }
+
+    #[test]
+    fn little_work_stays_on_the_callers_thread() {
+        assert_eq!(threads_for(8, SMALL - 1), 1);
+        assert_eq!(threads_for(1, SMALL * 10), 1);
+        assert_eq!(threads_for(2, SMALL), cores().min(2));
     }
 
     #[test]
     fn a_pin_is_undone_after_its_call() {
-        with_threads(3, || assert_eq!(threads_for(10), 3));
+        with_threads(3, || assert_eq!(threads_for(10, 0), 3));
         assert_eq!(PINNED.with(Cell::get), None);
-        assert_eq!(with_threads(0, || threads_for(10)), 1);
-        assert_eq!(with_threads(9, || threads_for(2)), 2);
+        assert_eq!(with_threads(0, || threads_for(10, 0)), 1);
+        assert_eq!(with_threads(9, || threads_for(2, 0)), 2);
     }
 }

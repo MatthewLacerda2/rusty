@@ -59,8 +59,8 @@ mod size;
 use counts::PARSES;
 #[doc(hidden)]
 pub use counts::{forget, parses};
-pub(crate) use reads::parsed;
 use reads::{files_of, stamp, Files, Stamp};
+pub(crate) use reads::{glb_json, parsed};
 pub use revision::MeshRevision;
 pub use size::approx_bytes;
 

@@ -4,7 +4,9 @@
 //! every file the parse reads for its geometry (`import_cache::parsed`: the
 //! source, or a converted source's cached glTF, and a `.gltf`'s external buffers),
 //! the import settings that change the cooked values (the Scale Factor and
-//! Generate Lightmap UVs with its knobs) and [`COOKER_VERSION`]. A source edit,
+//! Generate Lightmap UVs with its knobs) and [`COOKER_VERSION`]. A side file the
+//! parse looks for and does not find (an `.obj`'s missing `mtllib`) is in it as
+//! absent, so its model still cooks to disk, and cooks again once it appears. A source edit,
 //! a re-conversion, a ticked box and a change of cooking code each make another
 //! stamp, so a cooked file is never read for anything but the model it was cooked
 //! from: a stale unwrap would misplace every baked lightmap.
@@ -18,10 +20,11 @@ use crate::ImportSettings;
 /// The cooking code's version: bump it whenever what a cook writes changes (the
 /// tangents, the unwrap, the clusters, or this file's layout). `version::tests`
 /// fails when the output changes at the same version, naming the bump.
-pub const COOKER_VERSION: u32 = 1;
+pub const COOKER_VERSION: u32 = 2;
 
 /// The stamp of cooking the model a parse of `read` reads with `settings`, or
-/// `None` when one of its files cannot be read (nothing is then cooked to disk).
+/// `None` when one of its files is there but cannot be read (nothing is then
+/// cooked to disk).
 pub fn stamp(read: &Path, settings: &ImportSettings) -> Option<u64> {
     let mut made_by = format!("v{COOKER_VERSION}");
     for file in crate::import_cache::parsed(read) {
@@ -29,7 +32,8 @@ pub fn stamp(read: &Path, settings: &ImportSettings) -> Option<u64> {
             Seen::Read(d) => {
                 let _ = write!(made_by, " {d:016x}");
             }
-            Seen::Absent | Seen::Unreadable => return None,
+            Seen::Absent => made_by.push_str(" absent"),
+            Seen::Unreadable => return None,
         }
     }
     let lm = settings.lightmap_uvs;

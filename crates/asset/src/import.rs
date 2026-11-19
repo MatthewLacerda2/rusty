@@ -26,10 +26,11 @@ type Failed = Vec<(PathBuf, String)>;
 pub struct Imported {
     /// Every model source looked at (each converted when its cache was stale), sorted.
     pub sources: Vec<PathBuf>,
-    /// The model sources that failed to convert, with why; each was warned of.
+    /// The model files that failed to convert or import, with why; each was
+    /// warned of.
     pub failed: Failed,
-    /// How many models were cooked (`cook`): every model under the folder is
-    /// imported, so its cooked file is written; one already current cooks nothing.
+    /// How many cooked files were written (`cook`): every model under the folder
+    /// whose cooked file is not current is imported, and its cooked file written.
     pub cooked: usize,
     /// What the images' refresh did (`texture_import::refresh_all`).
     pub textures: Refreshed,
@@ -43,8 +44,8 @@ pub struct Imported {
 /// then, and the error says to stop first. A source that fails is warned of,
 /// listed, and the rest still run.
 pub fn import_all(root: &Path) -> Result<Imported, String> {
-    let (sources, failed) = models(root)?;
-    let cooked = cook_models(root);
+    let (sources, mut failed) = models(root)?;
+    let cooked = cook_models(root, &mut failed);
     let textures = texture_import::refresh_all(root);
     Ok(Imported {
         sources,
@@ -59,20 +60,28 @@ pub fn import_all(root: &Path) -> Result<Imported, String> {
 /// broken model, so they fail in seconds, not after minutes of encoding. The
 /// error names every model that failed.
 pub fn import_strict(root: &Path) -> Result<Imported, String> {
-    let (sources, failed) = models(root)?;
-    if !failed.is_empty() {
-        let named: Vec<String> = failed
-            .iter()
-            .map(|(source, e)| format!("{}: {e}", source.display()))
-            .collect();
-        return Err(named.join("; "));
-    }
+    let (sources, mut failed) = models(root)?;
+    refuse(&failed)?;
+    let cooked = cook_models(root, &mut failed);
+    refuse(&failed)?;
     Ok(Imported {
         sources,
         failed,
-        cooked: cook_models(root),
+        cooked,
         textures: texture_import::refresh_all(root),
     })
+}
+
+/// The error naming every model in `failed`, when there is one.
+fn refuse(failed: &Failed) -> Result<(), String> {
+    if failed.is_empty() {
+        return Ok(());
+    }
+    let named: Vec<String> = failed
+        .iter()
+        .map(|(source, e)| format!("{}: {e}", source.display()))
+        .collect();
+    Err(named.join("; "))
 }
 
 /// What an import of `root` says before it starts (a verb that runs it prints
@@ -102,25 +111,27 @@ fn models(root: &Path) -> Result<(Vec<PathBuf>, Failed), String> {
     Ok((sources, failed))
 }
 
-/// Import every model file under `root` so its cooked file is current (`cook`,
-/// written by an authoring build), returning how many were cooked. A model that
-/// will not import is warned of: its conversion, the import's real failure, was
-/// already reported.
-fn cook_models(root: &Path) -> usize {
-    let before = crate::cook::cooks();
+/// Import every model file under `root` whose cooked file is not current
+/// (`cook::is_current`, told without parsing it), so an authoring build writes
+/// it, returning how many were written. A source already in `failed` (its
+/// conversion, warned of) is not tried again; a model that will not import is
+/// warned of and added to it.
+fn cook_models(root: &Path, failed: &mut Failed) -> usize {
+    let before = crate::cook::written();
     let mut models = Vec::new();
     crate::manifest::walk(root, &mut |path| {
-        if crate::is_model_path(path) {
+        if crate::is_model_path(path) && !failed.iter().any(|(f, _)| f == path) {
             models.push(path.to_path_buf());
         }
     });
     models.sort();
-    for model in &models {
+    for model in models.iter().filter(|m| !crate::cook::is_current(m)) {
         if let Err(e) = crate::import_file(model) {
             log::warn!("[Asset] {}: {e}", model.display());
+            failed.push((model.clone(), e.to_string()));
         }
     }
-    crate::cook::cooks() - before
+    crate::cook::written() - before
 }
 
 #[cfg(test)]

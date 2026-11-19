@@ -10,6 +10,8 @@
 //!                   the parse against), TANGENT (VEC4 float), TEXCOORD_1 (VEC2
 //!                   float: the lightmap UV)
 //! indices           SCALAR u32, in cluster order
+//! extras.parse      "<16 hex digits>": the digest of the parse it was cooked from
+//!                   (`sub::digest`)
 //! extras.source     an accessor of one u32 per vertex, only when the unwrap split
 //!                   vertices: the parsed vertex each one copies
 //! extras.clusters   {"ranges": a, "bounds": b}: accessors of 2 u32 (start, end) and
@@ -56,7 +58,8 @@ pub fn encode(stamp: u64, subs: &[Cooked]) -> Vec<u8> {
         },
         "meshes": meshes,
     });
-    if !bin.bytes.is_empty() {
+    // Every accessor, even of count 0 (a model of empty sub-meshes), is written.
+    if !bin.views.is_empty() {
         root["buffers"] = json!([{"byteLength": bin.bytes.len()}]);
         root["bufferViews"] = Value::Array(bin.views);
         root["accessors"] = Value::Array(bin.accessors);
@@ -72,7 +75,7 @@ fn mesh(sub: &Cooked, bin: &mut Bin) -> Value {
         "TEXCOORD_1": bin.floats(&sub.lightmap_uvs, "VEC2", false),
     });
     let mut primitive = json!({"attributes": attributes, "indices": bin.indices(&sub.indices)});
-    primitive["extras"] = json!({});
+    primitive["extras"] = json!({"parse": format!("{:016x}", sub.parse)});
     if let Some(source) = &sub.source {
         primitive["extras"]["source"] = json!(bin.uints(source, false));
     }
@@ -104,6 +107,15 @@ fn bounds_of(c: &Cluster) -> [f32; BOUNDS] {
 pub fn parse(bytes: &[u8], stamp: u64) -> Result<Vec<Cooked>, String> {
     let (json, bin) = chunks(bytes)?;
     let root: Value = serde_json::from_slice(json).map_err(|e| e.to_string())?;
+    stale(&root, stamp)?;
+    let file = File { root: &root, bin };
+    let meshes = root["meshes"].as_array().ok_or("no meshes")?;
+    meshes.iter().map(|m| file.sub(m)).collect()
+}
+
+/// Why a cooked file whose JSON is `root` was not cooked under `stamp`, if it
+/// was not: a [`STALE`] refusal.
+fn stale(root: &Value, stamp: u64) -> Result<(), String> {
     let extras = &root["asset"]["extras"];
     if extras["cooker"] != json!(COOKER_VERSION) {
         return Err(format!("{STALE}cooked by version {}", extras["cooker"]));
@@ -111,9 +123,15 @@ pub fn parse(bytes: &[u8], stamp: u64) -> Result<Vec<Cooked>, String> {
     if extras["stamp"] != json!(format!("{stamp:016x}")) {
         return Err(format!("{STALE}cooked from another source or settings"));
     }
-    let file = File { root: &root, bin };
-    let meshes = root["meshes"].as_array().ok_or("no meshes")?;
-    meshes.iter().map(|m| file.sub(m)).collect()
+    Ok(())
+}
+
+/// Whether the cooked file at `path` was cooked under `stamp`, read from its JSON
+/// chunk alone: what tells a current file without reading its values.
+pub fn stamped(path: &std::path::Path, stamp: u64) -> bool {
+    let json = crate::import_cache::glb_json(path);
+    let root = json.and_then(|j| serde_json::from_slice::<Value>(&j).ok());
+    root.is_some_and(|r| stale(&r, stamp).is_ok())
 }
 
 /// The JSON and BIN chunks of a `.glb` (the BIN empty when it has none).
@@ -155,6 +173,9 @@ impl File<'_> {
         let id = mesh["name"].as_str().ok_or("a mesh with no name")?;
         let p = &mesh["primitives"][0];
         let a = &p["attributes"];
+        let parse = p["extras"]["parse"]
+            .as_str()
+            .and_then(|h| u64::from_str_radix(h, 16).ok());
         let source = match p["extras"].get("source") {
             Some(i) => Some(self.uints(i)?),
             None => None,
@@ -165,6 +186,7 @@ impl File<'_> {
         };
         Ok(Cooked {
             id: id.to_string(),
+            parse: parse.ok_or("a mesh with no parse digest")?,
             source,
             positions: self.floats(&a["POSITION"], "VEC3")?,
             tangents: self.floats(&a["TANGENT"], "VEC4")?,

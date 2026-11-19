@@ -16,7 +16,7 @@ fn a_cooked_read_is_a_fresh_cook_bit_for_bit_and_cooks_nothing() {
     let path = fixture::model("hit");
     let (fresh, cooks) = cooked(&path);
     assert_eq!(cooks, 1, "nothing cooked yet");
-    assert!(super::cooked_path(&path).unwrap().is_file());
+    assert!(super::fixture::cooked_file(&path).is_file());
     let (read, cooks) = cooked(&path);
     assert_eq!(cooks, 0, "a current cooked file is read, not cooked again");
     assert_eq!(read, fresh);
@@ -34,7 +34,7 @@ fn a_cooked_read_is_a_fresh_cook_bit_for_bit_and_cooks_nothing() {
 #[test]
 fn a_player_reads_a_cooked_file_and_never_writes_one() {
     let path = fixture::model("player");
-    let file = super::cooked_path(&path).unwrap();
+    let file = super::fixture::cooked_file(&path);
     super::with_writes(false, || import_file(&path).unwrap());
     assert!(!file.exists(), "a shipped player writes nothing");
     let (authored, _) = cooked(&path);
@@ -81,7 +81,7 @@ fn each_geometry_setting_and_a_source_edit_cook_again() {
 fn a_malformed_cooked_file_is_cooked_again() {
     let path = fixture::model("malformed");
     let (fresh, _) = cooked(&path);
-    let file = super::cooked_path(&path).unwrap();
+    let file = super::fixture::cooked_file(&path);
     let bytes = std::fs::read(&file).unwrap();
     std::fs::write(&file, &bytes[..bytes.len() / 2]).unwrap();
     let (again, cooks) = cooked(&path);
@@ -94,12 +94,12 @@ fn a_malformed_cooked_file_is_cooked_again() {
 fn a_cooked_file_of_another_model_is_not_laid_on_this_one() {
     let path = fixture::model("swapped");
     let (fresh, _) = cooked(&path);
-    let file = super::cooked_path(&path).unwrap();
+    let file = super::fixture::cooked_file(&path);
     // Another model's values under this one's stamp: its sub-mesh ids disagree.
     let read = crate::read_target(&path).unwrap();
     let settings = crate::settings_of(&path);
     let stamp = super::stamp::stamp(&read, &settings).unwrap();
-    let other = super::sub::Cooked::of(&fresh.sub_meshes[2], None);
+    let other = super::sub::Cooked::of(&fresh.sub_meshes[2], 0, None);
     std::fs::write(&file, super::file::encode(stamp, &[other])).unwrap();
     let (again, cooks) = cooked(&path);
     assert_eq!(cooks, 1);
@@ -117,9 +117,7 @@ fn a_re_converted_source_cooks_again() {
             .join(name)
     };
     std::fs::copy(fixture("skinned_cube.fbx"), &path).unwrap();
-    if let Some(file) = super::cooked_path(&path) {
-        let _ = std::fs::remove_file(file);
-    }
+    let _ = std::fs::remove_file(super::fixture::cooked_file(&path));
     let (first, cooks) = cooked(&path);
     assert_eq!(cooks, 1);
     assert_eq!(cooked(&path).1, 0);
@@ -140,7 +138,7 @@ fn a_standalone_game_writes_no_cooked_file() {
     let (_, cooks) = cooked(&path);
     assert_eq!(cooks, 1, "it cooks in memory");
     assert!(
-        !super::cooked_path(&path).unwrap().exists(),
+        !super::fixture::cooked_file(&path).exists(),
         "and writes nothing"
     );
 }

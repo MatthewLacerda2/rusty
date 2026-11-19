@@ -73,6 +73,40 @@ fn an_import_cooks_every_model_once() {
     let root = model.parent().unwrap();
     let run = || crate::cook::with_writes(true, || import_all(root).unwrap().cooked);
     assert_eq!(run(), 1, "the model is cooked");
-    assert!(crate::cook::cooked_path(&model).unwrap().is_file());
+    assert!(crate::cook::fixture::cooked_file(&model).is_file());
     assert_eq!(run(), 0, "its cooked file is current");
+}
+
+#[test]
+fn a_model_that_will_not_import_is_listed_once_and_the_rest_still_cook() {
+    let model = crate::cook::fixture::model("import_all_broken");
+    let root = model.parent().unwrap();
+    std::fs::write(root.join("broken.glb"), b"not a glb").unwrap();
+    std::fs::write(root.join("broken.fbx"), b"not an fbx").unwrap();
+    let done = crate::cook::with_writes(true, || import_all(root).unwrap());
+    let mut failed: Vec<_> = done
+        .failed
+        .iter()
+        .map(|(p, _)| p.file_name().unwrap())
+        .collect();
+    failed.sort();
+    assert_eq!(failed, ["broken.fbx", "broken.glb"], "each listed once");
+    assert_eq!(done.cooked, 1, "the good model is still cooked");
+    std::fs::remove_file(root.join("broken.fbx")).unwrap();
+    let refused = import_strict(root).unwrap_err();
+    assert!(
+        refused.contains("broken.glb"),
+        "strict fails on it: {refused}"
+    );
+}
+
+#[test]
+fn a_cooked_file_is_current_until_its_model_changes() {
+    let model = crate::cook::fixture::model("import_all_current");
+    let current = || crate::cook::with_writes(true, || crate::cook::is_current(&model));
+    assert!(!current(), "nothing cooked yet");
+    crate::cook::with_writes(true, || crate::import_file(&model).unwrap());
+    assert!(current());
+    crate::sidecar::set_scale(&model, 3.0).unwrap();
+    assert!(!current(), "a new Scale Factor");
 }

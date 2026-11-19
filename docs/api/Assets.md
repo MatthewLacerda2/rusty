@@ -72,7 +72,8 @@ It also brings every converted model (`.fbx`, `.blend`) up to date, imports ever
 model so what its import derives (the tangents it lacks, the generated lightmap UVs,
 the clusters of a big mesh) is kept in the import cache (`<path>.cooked.glb`, read
 by every later load instead of computed again, made again when the model or a
-setting that shapes it changes), and makes every image's compressed copy current (see `compression`, below), returning how many images
+setting that shapes it changes; a model whose cooked file is current is not opened,
+and a model outside the open project keeps none), and makes every image's compressed copy current (see `compression`, below), returning how many images
 it compressed in `compressed`; each model or image that fails (it does not decode,
 say) is warned of in the console and listed in `failed` by path, and such an image
 draws uncompressed. It waits for them, on any build, and writes the import cache into

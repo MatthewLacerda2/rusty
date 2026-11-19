@@ -55,7 +55,8 @@ pub fn import_as(path: &Path, missing: Missing) -> Result<ImportedAsset, ImportE
 
     // Each piece on its own thread (`cook::par`), joined in file order.
     let numbered: Vec<(usize, tobj::Model)> = models.into_iter().enumerate().collect();
-    let pieces = crate::cook::par::map(numbered, |(i, model)| {
+    let triangles = |(_, m): &(usize, tobj::Model)| m.mesh.indices.len() / 3;
+    let pieces = crate::cook::par::map(numbered, triangles, |(i, model)| {
         sub_mesh_from_model(i, model, missing)
     });
     let mut sub_meshes: Vec<SubMesh> = Vec::new();

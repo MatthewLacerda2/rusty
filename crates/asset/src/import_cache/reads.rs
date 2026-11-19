@@ -101,8 +101,8 @@ fn buffers(json: &[u8], base: &Path) -> Vec<PathBuf> {
 }
 
 /// A `.glb`'s JSON chunk: the 12-byte header, then the first chunk's length and
-/// type, then its bytes.
-fn glb_json(path: &Path) -> Option<Vec<u8>> {
+/// type, then its bytes (a cooked file's stamp is read so, `cook::is_current`).
+pub(crate) fn glb_json(path: &Path) -> Option<Vec<u8>> {
     let mut file = std::fs::File::open(path).ok()?;
     let mut head = [0u8; 20];
     file.read_exact(&mut head).ok()?;

@@ -18,6 +18,7 @@ fn subs() -> Vec<Cooked> {
     };
     let split = Cooked {
         id: "Split".into(),
+        parse: 0x0123_4567_89ab_cdef,
         source: Some(vec![0, 1, 2, 2]),
         positions: vec![
             [0.0, 0.0, 0.0],
@@ -34,6 +35,7 @@ fn subs() -> Vec<Cooked> {
     };
     let plain = Cooked {
         id: "Plain".into(),
+        parse: u64::MAX,
         source: None,
         positions: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, -0.0, 2.5]],
         tangents: vec![[0.0, 0.0, 1.0, 1.0]; 3],
@@ -43,6 +45,7 @@ fn subs() -> Vec<Cooked> {
     };
     let empty = Cooked {
         id: "Empty".into(),
+        parse: 0,
         source: None,
         positions: Vec::new(),
         tangents: Vec::new(),
@@ -64,6 +67,33 @@ fn a_cooked_file_reads_back_bit_for_bit() {
         encode(7, &back),
         bytes,
         "the same values write the same file"
+    );
+}
+
+#[test]
+fn a_model_of_only_empty_sub_meshes_reads_back() {
+    // A glTF of only lines or points, or an `.obj` object with no faces.
+    let empty = subs()[2].clone();
+    let both = [
+        empty.clone(),
+        Cooked {
+            id: "Also".into(),
+            ..empty
+        },
+    ];
+    for subs in [&both[..1], &both[..]] {
+        let bytes = encode(7, subs);
+        assert_eq!(
+            parse(&bytes, 7).as_deref(),
+            Ok(subs),
+            "{} empty",
+            subs.len()
+        );
+    }
+    assert_eq!(
+        parse(&encode(7, &[]), 7),
+        Ok(Vec::new()),
+        "no sub-mesh at all"
     );
 }
 

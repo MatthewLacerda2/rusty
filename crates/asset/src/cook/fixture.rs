@@ -23,10 +23,14 @@ pub fn model(name: &str) -> PathBuf {
     };
     crate::sidecar::set_lightmap_uvs(&path, on).unwrap();
     // A run before this one may have cooked it into the temp folder.
-    if let Some(cooked) = super::cooked_path(&path) {
-        let _ = std::fs::remove_file(cooked);
-    }
+    let _ = std::fs::remove_file(cooked_file(&path));
     path
+}
+
+/// Where a test's cooked file of `model` goes: outside a project, only a test
+/// pinning writes has one (`cook::with_writes`), in the temp folder.
+pub fn cooked_file(model: &std::path::Path) -> PathBuf {
+    super::with_writes(true, || super::cooked_path(model)).expect("a temp path")
 }
 
 /// The `.obj` text: a bumpy grid, then a box, then a lone triangle.

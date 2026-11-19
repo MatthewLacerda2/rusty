@@ -2,16 +2,20 @@
 //! (#2332), as a converter's can't without its version (`convert::fingerprint`).
 //!
 //! A stale cook keeps every cooked file made before it current, and a stale
-//! unwrap misplaces every baked lightmap, so a test holds the bump: the fixture
-//! model is cooked and its cooked file hashed, and [`BLESSED`] pins that hash at
-//! the version it was made by. The hash is Linux x86_64's (CI's suite): another
+//! unwrap misplaces every baked lightmap, so a test holds the bump: fixture
+//! models are cooked and their cooked files hashed, and [`BLESSED`] pins that
+//! hash at the version it was made by. They reach every path a cook reads: the
+//! `.obj` importer and the glTF one, a mesh with normals and one without
+//! (`flat_normals::flat_shaded`), a skinned mesh (never clustered or unwrapped),
+//! and every step (`cook::fixture`). Each cooked sub-mesh keeps its parse's
+//! digest (`sub::digest`), so a parser change moves the hash too. The hash is Linux x86_64's (CI's suite): another
 //! platform's maths library may round a float differently.
 
 use super::stamp::COOKER_VERSION;
 
 /// The version and the cooked fixture's hash at it. Re-blessed only after a bump:
 /// the failure message prints the new row.
-const BLESSED: (u32, &str) = (1, "38a0fd8f354cb27d");
+const BLESSED: (u32, &str) = (2, "e77090a767d1dbc6");
 
 /// Whether `now` (the fixture's hash at `version`) holds `blessed`, or what to do.
 fn check(blessed: (u32, &str), version: u32, now: &str) -> Result<(), String> {
@@ -34,11 +38,24 @@ fn check(blessed: (u32, &str), version: u32, now: &str) -> Result<(), String> {
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 #[test]
 fn the_cooked_output_holds_its_blessed_hash() {
-    let path = super::fixture::model("version");
-    // The file itself: its stamp names the fixture's bytes and settings, both fixed.
-    super::with_writes(true, || crate::import_file(&path).unwrap());
-    let bytes = std::fs::read(super::cooked_path(&path).unwrap()).unwrap();
-    let now = format!("{:016x}", rusty_core::hash::content(&bytes));
+    use rusty_test_support::models::{quad_file, skinned_buffer, SKINNED_GLTF, TRIANGLE_GLTF};
+    let obj = super::fixture::model("version");
+    let dir = obj.parent().unwrap().to_path_buf();
+    let flat = dir.join("flat.gltf");
+    std::fs::write(&flat, TRIANGLE_GLTF).unwrap();
+    std::fs::write(dir.join("model.bin"), skinned_buffer()).unwrap();
+    let skinned = dir.join("skinned.gltf");
+    std::fs::write(&skinned, SKINNED_GLTF).unwrap();
+    let quad = std::path::PathBuf::from(quad_file("rusty_cook_version_quad"));
+    // The files themselves: their stamps name the fixtures' bytes and settings.
+    let mut hash = rusty_core::hash::Content::default();
+    for model in [&obj, &flat, &skinned, &quad] {
+        let file = super::fixture::cooked_file(model);
+        let _ = std::fs::remove_file(&file);
+        super::with_writes(true, || crate::import_file(model).unwrap());
+        hash.write(&std::fs::read(&file).unwrap());
+    }
+    let now = format!("{:016x}", hash.finish());
     if let Err(e) = check(BLESSED, COOKER_VERSION, &now) {
         panic!("{e}");
     }

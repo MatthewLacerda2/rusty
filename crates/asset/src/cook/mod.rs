@@ -14,7 +14,9 @@
 //! **The cooked file.** What the steps computed is kept beside the model's other
 //! import-cache files, at `convert::cache_location_as(<source>, `[`SUFFIX`]`)`:
 //! in an open project `assets/generated/imported/<source>.cooked.glb` (shipped by
-//! an export), elsewhere the system temp folder. It is a glTF ([`mod@file`]) holding
+//! an export). A model outside an open project has none: it is cooked in memory
+//! each time, so nothing piles up in the system temp folder (a test opts in with
+//! [`with_writes`], which keeps it there). It is a glTF ([`mod@file`]) holding
 //! each sub-mesh's tangents, lightmap UVs, its cluster-ordered indices and its
 //! cluster table ([`sub`]), stamped by what it was made from ([`stamp`]). An
 //! import whose stamp matches parses the model without generating tangents and
@@ -51,17 +53,42 @@ pub const SUFFIX: &str = ".cooked.glb";
 /// Whether this build writes cooked files: an authoring one.
 pub const WRITES: bool = cfg!(any(feature = "editor", feature = "dev"));
 
-thread_local!(static COOKS: Cell<usize> = const { Cell::new(0) });
+thread_local! {
+    static COOKS: Cell<usize> = const { Cell::new(0) };
+    static WRITTEN: Cell<usize> = const { Cell::new(0) };
+    static PIN_WRITES: Cell<Option<bool>> = const { Cell::new(None) };
+}
 
 /// How many models this thread has cooked (run the steps for, a cooked file
-/// found current not counted): what tells a warm import from a cold one.
+/// found current not counted): what tells a warm load from a cold one.
 pub fn cooks() -> usize {
     COOKS.get()
 }
 
-/// Where the cooked file of the model source `source` lives.
+/// How many cooked files this thread has written: what `make import` reports.
+pub fn written() -> usize {
+    WRITTEN.get()
+}
+
+/// Where the cooked file of the model source `source` lives: in its project's
+/// import cache, and nowhere for a model outside an open project, unless
+/// [`with_writes`] pinned this thread (the system temp folder then).
 pub fn cooked_path(source: &Path) -> Option<PathBuf> {
-    convert::cache_location_as(source, SUFFIX).ok()
+    match PIN_WRITES.get() {
+        Some(_) => convert::cache_location_as(source, SUFFIX).ok(),
+        None => convert::project_cache_as(source, SUFFIX).ok()?,
+    }
+}
+
+/// Whether the model source `path` has a cooked file made from what it is now,
+/// told from the file's stamp without parsing the model (`Assets.Refresh` skips
+/// those). A converted source is brought up to date first.
+pub fn is_current(path: &Path) -> bool {
+    let Ok(read) = crate::read_target(path) else {
+        return false;
+    };
+    let at = cooked_path(path).zip(stamp::stamp(&read, &crate::settings_of(path)));
+    at.is_some_and(|(file, stamp)| file::stamped(&file, stamp))
 }
 
 /// The model at `path` (parsed from `read`) with its `settings`' Scale Factor and
@@ -84,20 +111,31 @@ pub(crate) fn import(
     {
         let mut asset = parse(Missing::Placeholder)?;
         scale(&mut asset);
-        match lay(&mut asset, cooked) {
+        let laid = lay(&mut asset, cooked);
+        match laid {
             Ok(()) => return Ok(asset),
             Err(why) => log::warn!("[Import] {}: {why}; cooking it again", path.display()),
         }
     }
     let mut asset = parse(Missing::Generate)?;
     scale(&mut asset);
+    let at = at.filter(|_| writes());
+    let parses: Vec<u64> = match at {
+        Some(_) => {
+            let subs: Vec<_> = asset.sub_meshes.iter().collect();
+            par::map(subs, |s| s.indices.len() / 3, sub::digest)
+        }
+        None => Vec::new(),
+    };
     let sources = derive(&mut asset, settings);
     COOKS.set(COOKS.get() + 1);
-    if let Some((file, stamp)) = at.filter(|_| writes()) {
-        let subs: Vec<Cooked> = (asset.sub_meshes.iter().zip(sources))
-            .map(|(s, source)| Cooked::of(s, source))
+    if let Some((file, stamp)) = at {
+        let subs: Vec<Cooked> = (asset.sub_meshes.iter().zip(parses).zip(sources))
+            .map(|((s, parse), source)| Cooked::of(s, parse, source))
             .collect();
-        write(&file, &file::encode(stamp, &subs));
+        if write(&file, &file::encode(stamp, &subs)) {
+            WRITTEN.set(WRITTEN.get() + 1);
+        }
     }
     Ok(asset)
 }
@@ -110,14 +148,18 @@ pub(crate) fn derive(
     settings: &ImportSettings,
 ) -> Vec<Option<Vec<u32>>> {
     let subs: Vec<_> = asset.sub_meshes.iter_mut().collect();
-    par::map(subs, |sub| {
-        let source = match settings.lightmap_uvs.generate {
-            true => lightmap_uv::apply(sub, &settings.lightmap_uvs),
-            false => None,
-        };
-        clusters::apply(sub);
-        source
-    })
+    par::map(
+        subs,
+        |sub| sub.indices.len() / 3,
+        |sub| {
+            let source = match settings.lightmap_uvs.generate {
+                true => lightmap_uv::apply(sub, &settings.lightmap_uvs),
+                false => None,
+            };
+            clusters::apply(sub);
+            source
+        },
+    )
 }
 
 /// The cooked sub-meshes in `file` when it was cooked under `stamp`: none when it
@@ -147,48 +189,45 @@ fn lay(asset: &mut ImportedAsset, cooked: Vec<Cooked>) -> Result<(), String> {
             asset.sub_meshes.len()
         ));
     }
-    asset
-        .sub_meshes
-        .iter_mut()
-        .zip(cooked)
-        .try_for_each(|(s, c)| c.apply(s))
+    let pairs: Vec<_> = asset.sub_meshes.iter_mut().zip(cooked).collect();
+    // The parse digest each check takes is spread as the cook's steps are.
+    let laid = par::map(pairs, |(s, _)| s.indices.len() / 3, |(s, c)| c.apply(s));
+    laid.into_iter().collect()
 }
 
 /// Whether a cook on this thread is written to disk ([module docs](self)).
 fn writes() -> bool {
     let authoring = convert::conversion_allowed() && !convert::gate::is_standalone();
-    pinned_writes().unwrap_or(WRITES) && authoring
+    PIN_WRITES.get().unwrap_or(WRITES) && authoring
 }
 
-fn write(file: &Path, bytes: &[u8]) {
+/// Write `bytes` to `file`, saying whether it was written (a warning if not).
+fn write(file: &Path, bytes: &[u8]) -> bool {
     let written = file
         .parent()
         .map_or(Ok(()), std::fs::create_dir_all)
         // lint: allow(asset-write) a cache of values the import just computed; read only when a model is parsed
         .and_then(|()| rusty_core::fs::write_atomic(file, bytes));
-    if let Err(e) = written {
+    if let Err(e) = &written {
         log::warn!("[Import] cannot write {}: {e}", file.display());
     }
+    written.is_ok()
 }
-
-#[cfg(test)]
-thread_local!(static PIN_WRITES: Cell<Option<bool>> = const { Cell::new(None) });
 
 /// Run `f` with cooked files written (`true`) or not on this thread, whatever the
-/// build: what a test of either kind of build needs.
-#[cfg(test)]
-pub(crate) fn with_writes<R>(on: bool, f: impl FnOnce() -> R) -> R {
-    let was = PIN_WRITES.replace(Some(on));
-    let out = f();
-    PIN_WRITES.set(was);
-    out
-}
-
-fn pinned_writes() -> Option<bool> {
-    #[cfg(test)]
-    return PIN_WRITES.get();
-    #[cfg(not(test))]
-    None
+/// build, and kept for a model outside a project too, in the system temp folder
+/// ([`cooked_path`]): what a test of either kind of build needs. A standalone
+/// game or Play still writes none.
+pub fn with_writes<R>(on: bool, f: impl FnOnce() -> R) -> R {
+    /// Restores the previous pin even if `f` panics.
+    struct Restore(Option<bool>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            PIN_WRITES.set(self.0);
+        }
+    }
+    let _restore = Restore(PIN_WRITES.replace(Some(on)));
+    f()
 }
 
 #[cfg(test)]

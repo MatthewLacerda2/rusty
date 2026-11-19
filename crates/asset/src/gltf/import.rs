@@ -57,7 +57,8 @@ pub fn import_as(
     // Each mesh on its own thread, in document order (`cook::par`): reading it
     // and generating the tangents it lacks are a function of that mesh alone.
     let meshes: Vec<gltf::Mesh> = document.meshes().collect();
-    let sub_meshes: Vec<SubMesh> = crate::cook::par::map(meshes, |mesh| {
+    let triangles = |m: &gltf::Mesh| m.primitives().map(|p| corners(&p) / 3).sum();
+    let sub_meshes: Vec<SubMesh> = crate::cook::par::map(meshes, triangles, |mesh| {
         let mut sub = sub_mesh_from_gltf(
             &mesh,
             &buffers,
@@ -221,6 +222,14 @@ fn read_primitive(
     Some((own, local, normals.is_some()))
 }
 
+/// How many corners a primitive's triangles have: its indices, or its vertices
+/// when it has none. What the thread split weighs it by.
+fn corners(primitive: &gltf::Primitive) -> usize {
+    let indices = primitive.indices();
+    let positions = || primitive.get(&gltf::Semantic::Positions);
+    indices.or_else(positions).map_or(0, |a| a.count())
+}
+
 /// Normalize a primitive's index stream to a triangle list per its topology
 /// `mode` (#317). glTF's three triangle modes carry the same kind of surface
 /// under different index conventions: `TRIANGLES` passes through untouched,
@@ -237,7 +246,9 @@ fn triangle_list(mode: Mode, indices: Option<Vec<u32>>, vertex_count: u32) -> Op
         Mode::TriangleStrip => Some(strip_triangles(&indices)),
         Mode::TriangleFan => Some(fan_triangles(&indices)),
         Mode::Points | Mode::Lines | Mode::LineLoop | Mode::LineStrip => {
-            log::warn!("[Asset] skipping glTF primitive: mode {mode:?} is not a triangle surface");
+            rusty_core::warn_held!(
+                "[Asset] skipping glTF primitive: mode {mode:?} is not a triangle surface"
+            );
             None
         }
     }
