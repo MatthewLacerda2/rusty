@@ -369,7 +369,8 @@ serde_json = { workspace = true }
 # `package.<name>` line outranks `package."*"`, and a plain name covers every version
 # in the lock. Host-only crates a member derives through (`syn`, `proc-macro2`,
 # `quote`, `serde_derive`, `bytemuck_derive`) stay at 2: they run on every rebuild
-# of the edit loop. A name that leaves the lockfile only warns; drop its table then.
+# of the edit loop; this is the one list of them. A name that leaves the lockfile
+# only warns in cargo; `make scripts` fails on it.
 [profile.dev]
 debug = "line-tables-only"
 
@@ -377,8 +378,8 @@ debug = "line-tables-only"
 opt-level = 2
 debug = false
 
-# dev only: the authoring-time provider stack (`crates/dev/src/providers/`); a test
-# only reaches its mocks, and no frame calls it.
+# dev only: the authoring-time provider stack (`crates/dev/src/providers/`); tests
+# reach it on small inputs (voice ids, speech models, hashes), and no frame calls it.
 [profile.dev.package.scorsese-core]
 opt-level = 0
 [profile.dev.package.scorsese-providers]
@@ -420,20 +421,23 @@ opt-level = 0
 opt-level = 0
 
 # host only: a proc macro or build-script helper that only dependencies use; it runs
-# while they compile, never on a member's rebuild, in a test or in a frame.
-[profile.dev.package.cc]
+# while they compile, never on a member's rebuild, in a test or in a frame. The
+# `# host-only` tag (with `via` the crate it is reached through) is what
+# `.github/scripts/tests/test_dev_profile.py` reads: it fails when a workspace member
+# depends on a tagged crate or its `via`, and when any table's crate left the lock.
+[profile.dev.package.cc]  # host-only
 opt-level = 0
-[profile.dev.package.nalgebra-macros]
+[profile.dev.package.nalgebra-macros]  # host-only, via nalgebra
 opt-level = 0
-[profile.dev.package.thiserror-impl]
+[profile.dev.package.thiserror-impl]  # host-only, via thiserror
 opt-level = 0
-[profile.dev.package.tracing-attributes]
+[profile.dev.package.tracing-attributes]  # host-only, via tracing
 opt-level = 0
-[profile.dev.package.wayland-scanner]
+[profile.dev.package.wayland-scanner]  # host-only
 opt-level = 0
-[profile.dev.package.zerocopy-derive]
+[profile.dev.package.zerocopy-derive]  # host-only, via zerocopy
 opt-level = 0
-[profile.dev.package.zeroize_derive]
+[profile.dev.package.zeroize_derive]  # host-only, via zeroize
 opt-level = 0
 
 # `make bench-scenes PROFILE=1`: a release build whose line tables let a sampling
