@@ -71,17 +71,17 @@ fn measured() -> Report {
 }
 
 /// `prefix.*` rows sum to `total`, and their `other` row is non-negative and at
-/// most `share` of it: the renderer's is timer overhead, the CPU's the tick's work
+/// most `bound` ms: the renderer's is timer overhead, the CPU's the tick's work
 /// outside its systems (the UI textures, the camera and audio sync, #2342).
-fn holds_whole(report: &Report, prefix: &str, total: f64, share: f64) {
+fn holds_whole(report: &Report, prefix: &str, total: f64, bound: f64) {
     let (sum, other) = parts(report, prefix);
     assert!(
         (sum - total).abs() <= total * 1e-9,
         "{prefix} rows {sum} vs {total}"
     );
     assert!(
-        (-total * 1e-9..=total * share).contains(&other),
-        "{prefix}other {other} of {total}"
+        (-total * 1e-9..=bound).contains(&other),
+        "{prefix}other {other} of {total}, above {bound}"
     );
 }
 
@@ -101,9 +101,10 @@ fn gpu_every_system_and_render_stage_is_a_row_and_together_they_are_the_whole() 
     );
     let scripts = avg(&report, "cpu.update_scripts");
     assert!(scripts.is_some(), "{:?}", report.metrics);
-    // `cpu.other` measured 4.4-5.3% of the tick (a container, x86_64): a bound
-    // near it, so untimed work entering the tick fails here.
-    holds_whole(&report, "cpu.", cpu, 0.10);
+    // Below three quarters of the nap's own row (same clock scaling, and a loaded
+    // runner's oversleep only widens it): untimed work the nap's size entering the
+    // tick fails here, a busy machine does not.
+    holds_whole(&report, "cpu.", cpu, 0.75 * napped);
 
     let Some(renderer) = avg(&report, "renderer_ms") else {
         return; // no adapter: nothing rendered
@@ -112,7 +113,7 @@ fn gpu_every_system_and_render_stage_is_a_row_and_together_they_are_the_whole() 
         let row = avg(&report, &format!("render.{stage}"));
         assert!(row.is_some(), "{stage}: {:?}", report.metrics);
     }
-    holds_whole(&report, "render.", renderer, 0.03);
+    holds_whole(&report, "render.", renderer, renderer * 0.03);
 }
 
 /// The renderer's own resident bytes are rows beside `gpu_mb`, in MiB (#2340).

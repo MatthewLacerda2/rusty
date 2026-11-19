@@ -118,6 +118,8 @@ fn a_kept_report_from_before_the_whole_tick_timing_is_warned_of() {
     let w = timed(true).against(Some(&timed(false)));
     assert!(w.iter().any(|w| w.contains("predates `cpu_ms`")), "{w:?}");
     assert!(timed(true).against(Some(&timed(true))).is_empty());
+    let untimed = scene(2.0).against(Some(&timed(false)));
+    assert!(untimed.is_empty(), "a run with no CPU rows: {untimed:?}");
 }
 
 #[test]

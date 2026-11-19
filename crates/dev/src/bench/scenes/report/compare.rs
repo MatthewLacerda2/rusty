@@ -7,7 +7,7 @@
 //! shape (`SceneReport::same_shape`); [`SceneReport::against`] says why not.
 
 use super::super::super::clock::clock_drift;
-use super::super::super::report::{change, num};
+use super::super::super::report::{change, num, tick_timed_since};
 use super::{Row, SceneReport, ViewKey};
 
 impl SceneReport {
@@ -56,18 +56,9 @@ impl SceneReport {
         warnings.chain(self.tick_timed_since(previous)).collect()
     }
 
-    /// The warning for a kept report from before `cpu_ms` timed the whole tick
-    /// (#2342), told by its missing `cpu.flush_bounds` row: `cpu_ms` and `cpu.other`
-    /// grew by what was hidden, so a sim change reads in its `cpu.<system>` rows.
+    /// [`tick_timed_since`] on this report's rows and `previous`'s.
     fn tick_timed_since(&self, previous: &SceneReport) -> Option<String> {
-        let old =
-            |r: &SceneReport| r.row("cpu_ms").is_some() && r.row("cpu.flush_bounds").is_none();
-        (old(previous) && !old(self)).then(|| {
-            "the kept report predates `cpu_ms` timing the whole tick (it has no \
-             cpu.flush_bounds row): cpu_ms and cpu.other now hold the tick's work outside \
-             its systems, so compare the cpu.<system> rows"
-                .to_string()
-        })
+        tick_timed_since(|k| self.row(k).is_some(), |k| previous.row(k).is_some())
     }
 
     /// The warning for a comparison across other `--set` overrides: the change

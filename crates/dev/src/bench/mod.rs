@@ -137,10 +137,10 @@ fn time_probe(probe: Option<&ClockProbe>, harness: &mut Harness) -> Option<f64> 
     probe.time(renderer)
 }
 
-/// One frame's row values: the tick's CPU time and every system's share of it
-/// (`cpu.<system>`, named by the schedule, `flush_bounds` among them), what rendering it cost and each of its
-/// stages' share (`render.<stage>`), its counters. Every GPU pass is sampled every
-/// frame (zero when it did not run), so the rows are the same from run to run.
+/// One frame's row values: the tick's CPU time, every system's share of it
+/// (`cpu.<system>`, `flush_bounds` among them), a demo's `taps_ms` beside it, what
+/// rendering cost and each stage's share (`render.<stage>`), its counters. Every GPU
+/// pass is sampled every frame (zero when it did not run), so the rows are stable.
 /// CPU and GPU times are scaled by the frame's clock `speed`s; a frame a probe
 /// missed has no rows of that side's scaled times.
 fn sample(samples: &mut Samples, stats: &FrameStats, frame: Option<&RenderedFrame>, speed: Speeds) {
@@ -151,6 +151,8 @@ fn sample(samples: &mut Samples, stats: &FrameStats, frame: Option<&RenderedFram
             samples.push("cpu_clock_pct", cpu * 100.0);
             let systems = stats.tick_systems.iter().copied();
             push_parts(samples, "cpu", s.last, systems, cpu);
+            let taps = stats.get("taps_ms"); // beside the tick, not in it
+            taps.inspect(|t| samples.push("taps_ms", t.last * cpu));
         }
     }
     let Some(frame) = frame else { return };
@@ -229,8 +231,8 @@ fn stage_rows<'a>(laps: &[(&'a str, f64)]) -> (Laps<'a>, Laps<'a>) {
 }
 
 /// A parent time's parts as `<prefix>.<part>` rows, each scaled by `scale`, and
-/// `<prefix>.other`: what of `total` no part holds (timer overhead; a stage left
-/// untimed shows here).
+/// `<prefix>.other`: what of `total` no part holds (for `render.`, timer overhead
+/// and a stage left untimed; for `cpu.`, the tick's own work outside its systems).
 fn push_parts<'a>(
     samples: &mut Samples,
     prefix: &str,
@@ -255,9 +257,10 @@ pub fn run(harness: &mut Harness, ticks: u32) -> Report {
     report.engine = Some(engine);
     let out_dir = harness.out_dir().to_path_buf();
     let previous = read(&out_dir);
-    report
-        .warnings
-        .extend(clock::cpu_drift(&report, previous.as_ref()));
+    let kept = previous.as_ref();
+    let untimed = kept.and_then(|k| report::tick_timed_since(|m| report.has(m), |m| k.has(m)));
+    let drift = clock::cpu_drift(&report, kept);
+    report.warnings.extend(drift.into_iter().chain(untimed));
     let mut text = report.render(previous.as_ref());
     if !report.metrics.iter().any(|(k, _)| k == "renderer_ms") {
         text.push_str("(no GPU or software adapter: nothing was rendered)\n");
@@ -284,17 +287,14 @@ pub fn run(harness: &mut Harness, ticks: u32) -> Report {
 }
 
 #[cfg(test)]
-#[path = "tests.rs"]
-mod tests;
-
-#[cfg(test)]
-#[path = "run_tests.rs"]
-mod run_tests;
-
+#[path = "move_cost_tests.rs"]
+mod move_cost_tests;
 #[cfg(test)]
 #[path = "query_cost_tests.rs"]
 mod query_cost_tests;
-
 #[cfg(test)]
-#[path = "move_cost_tests.rs"]
-mod move_cost_tests;
+#[path = "run_tests.rs"]
+mod run_tests;
+#[cfg(test)]
+#[path = "tests.rs"]
+mod tests;

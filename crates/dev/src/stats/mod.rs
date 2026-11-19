@@ -13,9 +13,12 @@
 //! time is the sum of its systems' times and its collider-AABB flush (`flush_bounds`).
 //! `frame_ms` is the [`GameWorld::tick`](rusty_app::GameWorld::tick), from its
 //! `begin_tick` (after the play transition) to its `end_tick`, so it holds what no
-//! system does (#2342). `end_tick` is the one place a frame closes: its system rows,
-//! each name summed over the tick (`flush_bounds` runs once a stage), `frame_ms` and
-//! the frame count; a schedule frame run outside a host's tick is never closed.
+//! system does (#2342), less its parts (`run_part`: a demo's taps, an inline load's
+//! preparation), work a shipped, windowed game does not do on its tick: each is
+//! recorded beside it as `<part>_ms` (`taps_ms`, `loads_ms`) on a tick it ran.
+//! `end_tick` is the one place a frame closes: its system rows, each name summed
+//! over the tick (`flush_bounds` runs once a stage), its parts, `frame_ms` and the
+//! frame count; a schedule frame run outside a host's tick is never closed.
 //!
 //! **Sessions.** The stats restart on each Play session's first frame, so a window
 //! reports the current run; a frame drawn outside Play reaches only the recent ring
@@ -60,6 +63,8 @@ pub struct TimingProbe {
     /// `end_frame` knows whether the frame opened a new Play session (and so must
     /// reset the stats first).
     system_ms: Vec<(&'static str, f64)>,
+    /// This tick's parts (`run_part`), timed beside `frame_ms`, not in it.
+    part_ms: Vec<(&'static str, f64)>,
     /// Each change channel's `logged` count at the last frame's end, for its delta.
     logged: BTreeMap<&'static str, u64>,
     /// The [`LoadTimer`]'s samples of a load this frame, recorded at its end.
@@ -82,6 +87,7 @@ impl TimingProbe {
             stats,
             stage_ms: [0.0; 4],
             system_ms: Vec::new(),
+            part_ms: Vec::new(),
             logged: BTreeMap::new(),
             loads: LoadSamples::default(),
             tick_start: None,
@@ -108,7 +114,7 @@ impl SystemProbe for TimingProbe {
     fn run_part(&mut self, name: &'static str, part: &mut dyn FnMut()) {
         verbs::enter_system(name);
         let ms = time_ms(part);
-        self.system_ms.push((name, ms));
+        self.part_ms.push((name, ms));
     }
 
     fn end_frame(&mut self, world: &World, res: &Resources) {
@@ -134,15 +140,18 @@ impl SystemProbe for TimingProbe {
 
     fn begin_tick(&mut self) {
         self.system_ms.clear();
-        self.tick_start = Some(Instant::now());
+        self.part_ms.clear();
+        self.tick_start = Some(verbs::now());
     }
 
     /// Closes the frame, if a schedule frame ran this tick: every system row (one
-    /// sample a name, summed over the stages it ran in), `frame_ms`, the count.
+    /// sample a name, summed over the stages it ran in), each part that ran as
+    /// `<part>_ms`, `frame_ms` (the tick less its parts), the count.
     fn end_tick(&mut self) {
         let start = self.tick_start.take();
         let ran = std::mem::take(&mut self.frame_ran);
         let systems = summed(self.system_ms.drain(..));
+        let parts = summed(self.part_ms.drain(..));
         let Some(start) = start.filter(|_| ran) else {
             return; // an edit tick: no frame stats
         };
@@ -150,16 +159,27 @@ impl SystemProbe for TimingProbe {
         for (name, ms) in systems {
             stats.record_system(name, ms);
         }
-        stats.record("frame_ms", start.elapsed().as_secs_f64() * 1000.0);
+        let mut beside = 0.0;
+        for (name, ms) in parts {
+            stats.record(&format!("{name}_ms"), ms);
+            beside += ms;
+        }
+        let tick = ms_since(start);
+        stats.record("frame_ms", (tick - beside).max(0.0));
         stats.end_tick();
     }
 }
 
 /// Run `f`, returning how long it took in milliseconds.
 fn time_ms(f: &mut dyn FnMut()) -> f64 {
-    let start = Instant::now();
+    let start = verbs::now();
     f();
-    start.elapsed().as_secs_f64() * 1000.0
+    ms_since(start)
+}
+
+/// The milliseconds from `start` to now, on the dev layer's clock.
+fn ms_since(start: Instant) -> f64 {
+    verbs::now().saturating_duration_since(start).as_secs_f64() * 1000.0
 }
 
 /// Each name's times added up, in the order the names first ran.

@@ -21,8 +21,11 @@
 //! the tick's work outside any system (publishing input and loads, the UI textures,
 //! the camera and audio sync) is in what it times, not only the systems' sum. The
 //! span opens after the tick's play transition: entering Play is a load, timed by
-//! the entry probe, not a tick. A demo's taps inside the span run through
-//! [`SystemProbe::run_part`] as `taps`, so their cost has a name of its own.
+//! the entry probe, not a tick. **What the span times is the tick a shipped,
+//! windowed game runs**: work inside it that only a dev build or a headless host
+//! does (a demo's taps, an inline `Scene.LoadAsync` preparation) runs through
+//! [`SystemProbe::run_part`] under a name of its own (`taps`, `loads`), timed
+//! beside the tick and left out of it, so a budget on the tick never reads it.
 //!
 //! No probe is installed by default, and a ship build never installs one.
 
@@ -41,7 +44,9 @@ pub trait SystemProbe {
     /// A per-frame schedule pass finished. Read-only: counters are read, never written.
     fn end_frame(&mut self, world: &World, res: &Resources);
 
-    /// Run `part`, tick work outside any stage named `name` (`taps`), exactly once.
+    /// Run `part`, exactly once: work inside the tick's span that a shipped, windowed
+    /// game does not do there, named `name` (`taps`, `loads`). A timing probe times it
+    /// beside the tick and leaves it out of the tick's own time.
     fn run_part(&mut self, _name: &'static str, part: &mut dyn FnMut()) {
         part();
     }
@@ -115,8 +120,8 @@ impl GameWorld {
         }
     }
 
-    /// The tap at `point`, inside the tick's timed span: under the probe as `taps`
-    /// when a tap is installed, so a recorder's cost is a row, not hidden tick work.
+    /// The tap at `point`, inside the tick's timed span: under the probe as the part
+    /// `taps` when a tap is installed, a dev build's work, so out of the tick's time.
     pub(super) fn tap_timed(&mut self, point: super::TapPoint) {
         if self.resources.tap.is_none() {
             return;
@@ -128,6 +133,27 @@ impl GameWorld {
         }
         if let Some(p) = probe {
             self.resources.probe.get_or_insert(p);
+        }
+    }
+
+    /// The loader's `take` of `op`: under the probe as the part `loads` when the
+    /// loader prepares inline ([`SceneLoader::prepares_inline`]), a headless host's
+    /// work the windowed shell does on a worker, so out of the tick's time.
+    ///
+    /// [`SceneLoader::prepares_inline`]: super::SceneLoader::prepares_inline
+    pub(super) fn take_load(
+        &mut self,
+        op: u32,
+    ) -> Result<rusty_edit::load::prepare::PreparedScene, String> {
+        let res = &mut self.resources;
+        let loader = &mut res.loading.loader;
+        match res.probe.as_mut().filter(|_| loader.prepares_inline()) {
+            Some(p) => {
+                let mut taken = Err(String::new());
+                p.run_part("loads", &mut || taken = loader.take(op));
+                taken
+            }
+            None => loader.take(op),
         }
     }
 
