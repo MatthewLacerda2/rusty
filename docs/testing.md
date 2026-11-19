@@ -1094,7 +1094,8 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
 - **the run** — 60 warm-up frames, then 600 measured ones, each stepped and rendered
   at 1280x720 (`Harness.LoadStress{…}` then `Harness.Bench(600)`).
 - **the report** — per row the average and p95: `frame_ms` (the CPU time of the
-  whole tick, `GameWorld::tick`, as measured: the schedule and the tick's own work
+  tick, `GameWorld::tick`, as measured, from after its play transition, so
+  entering Play, a load, is in no tick's time: the schedule and the tick's own work
   around it), `cpu_ms` (the same at a fixed reference CPU clock, below) and
   `cpu_clock_pct` (the CPU clock it ran at), `renderer_ms` (CPU time recording the
   frame, as measured), `gpu_ms` and `gpu.<pass>` (GPU time
@@ -1116,9 +1117,11 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   `cpu.<system>` for every system the schedule runs, named as it registers them
   (`update_scripts`, `step_physics`, … at the reference CPU clock), with
   `cpu.flush_bounds` (the collider-AABB flush after each stage, summed over the
-  stages) and `cpu.other` (the tick's work outside every system: the UI textures'
-  sizes, the camera, shader-time and audio sync, an async load's start, timer
-  overhead), together summing to `cpu_ms`, and `render.<stage>` for every stage of the renderer's frame, summing
+  stages), `cpu.taps` (the demo recorder's taps, `make bench` only: `bench-scenes`
+  records no demo) and `cpu.other` (the tick's work outside every system:
+  publishing input and finished async loads, the UI textures' sizes, the camera,
+  shader-time and audio sync, an async load's start, timer overhead), together
+  summing to `cpu_ms`, and `render.<stage>` for every stage of the renderer's frame, summing
   to `renderer_ms`: `setup`, `assets`, `prepare`, `extract` (the retained scene's
   update), `shadows` and `shadow_gather` (the sweeps' caster gather, cull and
   batch, a lap of its own, so absent from a frame no shadow sweep ran), `render_textures`, `ui` (its layout and its draw),
@@ -1136,7 +1139,8 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   no `cpu.flush_bounds` and a `cpu.other` of zero, and its `cpu_ms` and
   `frame_ms` are the systems' sum, lower by what those two rows now hold: compare
   its `cpu.<system>` rows with today's, and its `cpu_ms` with today's less
-  `cpu.flush_bounds` and `cpu.other`. The stages are timed only on frames the dev layer
+  `cpu.flush_bounds` and `cpu.other`; the report says so under a scene compared
+  with such a kept run. The stages are timed only on frames the dev layer
   captures (`Renderer::time_stages`): the window, the editor and the player never
   pay for them. Every GPU pass prints every run (0 when it did not run), so the
   rows are stable. **The Hi-Z stage is also split into its parts** (#2401), on

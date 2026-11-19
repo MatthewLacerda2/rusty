@@ -44,7 +44,22 @@ impl SceneReport {
         let drift = clock(self)
             .zip(clock(previous))
             .and_then(|(now, before)| clock_drift(now, before));
-        drift.into_iter().chain(self.set_moved(previous)).collect()
+        let warnings = drift.into_iter().chain(self.set_moved(previous));
+        warnings.chain(self.tick_timed_since(previous)).collect()
+    }
+
+    /// The warning for a kept report from before `cpu_ms` timed the whole tick
+    /// (#2342), told by its missing `cpu.flush_bounds` row: `cpu_ms` and `cpu.other`
+    /// grew by what was hidden, so a sim change reads in its `cpu.<system>` rows.
+    fn tick_timed_since(&self, previous: &SceneReport) -> Option<String> {
+        let old =
+            |r: &SceneReport| r.row("cpu_ms").is_some() && r.row("cpu.flush_bounds").is_none();
+        (old(previous) && !old(self)).then(|| {
+            "the kept report predates `cpu_ms` timing the whole tick (it has no \
+             cpu.flush_bounds row): cpu_ms and cpu.other now hold the tick's work outside \
+             its systems, so compare the cpu.<system> rows"
+                .to_string()
+        })
     }
 
     /// The warning for a comparison across other `--set` overrides: the change

@@ -17,9 +17,12 @@
 //! tick without a second copy of the timing. A host times its own steps through
 //! [`timed`] too.
 //!
-//! The probe also brackets each whole [`GameWorld::tick`] (`begin_tick`, `end_tick`),
-//! so the tick's work outside any system (the UI textures, the camera and audio
-//! sync) is in what it times, not only the systems' sum.
+//! The probe also brackets each [`GameWorld::tick`] (`begin_tick`, `end_tick`), so
+//! the tick's work outside any system (publishing input and loads, the UI textures,
+//! the camera and audio sync) is in what it times, not only the systems' sum. The
+//! span opens after the tick's play transition: entering Play is a load, timed by
+//! the entry probe, not a tick. A demo's taps inside the span run through
+//! [`SystemProbe::run_part`] as `taps`, so their cost has a name of its own.
 //!
 //! No probe is installed by default, and a ship build never installs one.
 
@@ -38,7 +41,13 @@ pub trait SystemProbe {
     /// A per-frame schedule pass finished. Read-only: counters are read, never written.
     fn end_frame(&mut self, world: &World, res: &Resources);
 
-    /// A host's [`GameWorld::tick`] starts: what a probe times whole begins here.
+    /// Run `part`, tick work outside any stage named `name` (`taps`), exactly once.
+    fn run_part(&mut self, _name: &'static str, part: &mut dyn FnMut()) {
+        part();
+    }
+
+    /// A host's [`GameWorld::tick`] has made its play transition: the tick's timed
+    /// span begins here.
     fn begin_tick(&mut self) {}
 
     /// That tick ended, after its schedule pass's [`end_frame`](Self::end_frame)
@@ -96,20 +105,30 @@ pub fn timed<T>(
 }
 
 impl GameWorld {
-    /// Advance the simulation by `dt` seconds; the play-state transition is returned
-    /// for the platform (cursor grab). Every tick reads the UI's texture sizes after
-    /// the transition (the schedule's in Play, the edit frame's outside), so no loop
-    /// that ticks skips them, and ends by pushing the audio mix and advancing `dt`.
-    /// An installed probe is told when the tick begins and ends, so it times it whole.
-    pub fn tick(&mut self, dt: f32) -> super::PlayTransition {
+    /// Tell the installed probe the tick's timed span begins (`true`) or ends.
+    pub(super) fn probe_tick(&mut self, begin: bool) {
         if let Some(p) = self.resources.probe.as_mut() {
-            p.begin_tick();
+            match begin {
+                true => p.begin_tick(),
+                false => p.end_tick(),
+            }
         }
-        let transition = self.run_tick(dt);
-        if let Some(p) = self.resources.probe.as_mut() {
-            p.end_tick();
+    }
+
+    /// The tap at `point`, inside the tick's timed span: under the probe as `taps`
+    /// when a tap is installed, so a recorder's cost is a row, not hidden tick work.
+    pub(super) fn tap_timed(&mut self, point: super::TapPoint) {
+        if self.resources.tap.is_none() {
+            return;
         }
-        transition
+        let mut probe = self.resources.probe.take();
+        match probe.as_mut() {
+            Some(p) => p.run_part("taps", &mut || self.tap(point)),
+            None => self.tap(point),
+        }
+        if let Some(p) = probe {
+            self.resources.probe.get_or_insert(p);
+        }
     }
 
     /// Install (or with `None`, remove) the schedule's probe.

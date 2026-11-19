@@ -101,7 +101,9 @@ fn gpu_every_system_and_render_stage_is_a_row_and_together_they_are_the_whole() 
     );
     let scripts = avg(&report, "cpu.update_scripts");
     assert!(scripts.is_some(), "{:?}", report.metrics);
-    holds_whole(&report, "cpu.", cpu, 0.5);
+    // `cpu.other` measured 4.4-5.3% of the tick (a container, x86_64): a bound
+    // near it, so untimed work entering the tick fails here.
+    holds_whole(&report, "cpu.", cpu, 0.10);
 
     let Some(renderer) = avg(&report, "renderer_ms") else {
         return; // no adapter: nothing rendered
