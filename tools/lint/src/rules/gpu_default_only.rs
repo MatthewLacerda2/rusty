@@ -51,7 +51,7 @@ pub fn check_file(path: &str, source: &str, test: &[bool], crates: &[String]) ->
                  suite leaves the gpu group to the dev one (docs/testing.md, *Which suite runs \
                  the GPU tests*). Keep it the same under both feature sets, or add rusty-{m}'s \
                  GPU tests back to the default pass in `make test` and ci.yml together \
-                 (`-E 'not group(gpu) | (group(gpu) & package(rusty-{m}))'`); a switch no \
+                 (`-E 'not group(gpu*) | (group(gpu*) & package(rusty-{m}))'`); a switch no \
                  rendered path reads, or a test that is not a GPU one, takes an inline allow \
                  saying why"
             ),
