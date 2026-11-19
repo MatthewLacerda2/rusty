@@ -7,8 +7,9 @@ spread 9%), and a run on a project whose textures were never imported (`gpu_mb`
 
 - **another timed run**: a lock file under `out/bench/` naming its PID (one
   whose PID no longer runs is stale and taken over);
-- **a build or a bench on the machine**: a `cargo`, `rustc` or `bench-scenes`
-  process ([`BUSY`]), from the process table, before any build and again
+- **a build or a bench on the machine**: a `cargo`, `cargo-<tool>` (a running
+  `cargo nextest` is `cargo-nextest`), `rustc` or `bench-scenes` process
+  ([`BUSY`]), from the process table, before any build and again
   before each leg (a build started mid-run would skew the legs after it);
 - **un-imported textures**: the images an import would encode now, which
   `bench-scenes --pending-imports` lists from the engine's own check
@@ -70,7 +71,7 @@ def busy(ps: str, me: int) -> list[str]:
         if len(parts) != 2 or not parts[0].isdigit() or int(parts[0]) == me:
             continue
         name = os.path.basename(parts[1].strip())
-        if name in BUSY:
+        if name in BUSY or name.startswith("cargo-"):
             found.append(f"{name} (PID {parts[0]})")
     return found
 
