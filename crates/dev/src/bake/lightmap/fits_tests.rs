@@ -131,3 +131,20 @@ fn a_map_whose_uvs_cover_a_sliver_of_its_square_counts_the_sliver() {
     assert!(sliver >= square / 20 && sliver < square / 10, "{sliver}");
     assert_eq!(covered(&mesh, 1), 1, "never past the square");
 }
+
+#[test]
+fn charts_past_the_gate_count_one_assembly_and_smaller_ones_each_their_own() {
+    let flying = |texels_per_unit, threads| {
+        let s = BakeSettings {
+            texels_per_unit,
+            ..Default::default()
+        };
+        let scene = crate::bake::lightmap::memory_tests::planes(2, 20.0);
+        estimate(&scene, &s, false, threads).in_flight
+    };
+    // 500² squares, under the gate: both may be assembled at once.
+    assert_eq!(flying(25.0, 2), 2 * flying(25.0, 1));
+    // 1000² squares, past it: the second only traces beside the first's assembly.
+    let (one, two) = (flying(50.0, 1), flying(50.0, 2));
+    assert!(two > one && two - one < one / 2, "{one} / {two}");
+}

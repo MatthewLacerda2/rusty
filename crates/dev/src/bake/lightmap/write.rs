@@ -85,9 +85,13 @@ pub fn apply_encoded(
         },
         bytes as f64 / (1024.0 * 1024.0),
         dir.display(),
-        // The bake's high-water mark (#2312): how close it came to the machine's.
+        // The process's high-water mark over its life (#2312): a headless bake's own,
+        // an editor session's since it started.
         crate::memory::rss_peak_bytes()
-            .map(|b| format!("; peak memory {}", crate::bake::progress::format::gb(b)))
+            .map(|b| format!(
+                "; process peak memory {}",
+                crate::bake::progress::format::gb(b)
+            ))
             .unwrap_or_default()
     );
     let keep = stems(&set);

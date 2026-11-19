@@ -492,7 +492,10 @@ lighting settings (above), whose defaults are the ones listed here.
   16 more for a directional bake and 16 more for a shadowmask one, so a mesh whose
   islands fill a tenth of its square keeps a tenth of it. In flight are the meshes
   its workers are tracing (about 112 bytes a covered texel each, one mesh per core at
-  most) and the one being assembled (about 256 a texel of its square); a mesh's
+  most) and the ones being assembled (about 256 a texel of their squares; a map
+  past 512² is assembled one at a time, so two large maps finishing together wait
+  on each other rather than both being held; smaller ones are assembled side by
+  side, and the estimate below counts each at its square); a mesh's
   texels are rasterized only when the bake reaches it. OIDN cleans each lightmap
   with at most 512 MB of scratch (a larger one is cleaned in overlapping tiles;
   measured on 1016² maps, byte for byte what one pass gives), and the lightmaps

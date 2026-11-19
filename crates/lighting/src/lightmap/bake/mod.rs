@@ -6,6 +6,7 @@
 //! stop the bake (#808) without changing a completed bake's bytes.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, PoisonError};
 use std::thread;
 
 use super::input::BakeScene;
@@ -34,6 +35,17 @@ use denoise::{Chart, Cleaner};
 pub use map::Lightmap;
 pub use progressive::{bake_progressive, Pass, PassSink};
 pub use view::BakeView;
+
+/// Texels of a chart's square past which it is assembled ([`assemble`]) one at a
+/// time, in the process: its dense maps cost about 256 bytes a texel of its square
+/// (`dev::bake::lightmap::fits`), so two large charts finishing on two workers at
+/// once would hold two of them. A worker reaching the gate while another chart
+/// is assembled waits, idle (on a bake of many large charts, up to one assembly
+/// per chart a worker queues behind); smaller charts never wait.
+pub const ASSEMBLE_ALONE: u64 = 512 * 512;
+
+/// Held while a chart past [`ASSEMBLE_ALONE`] is assembled.
+static ASSEMBLING: Mutex<()> = Mutex::new(());
 
 /// Bake every mesh in `scene` that has a usable lightmap UV and receives a lightmap
 /// ([`BakeMesh::receives_lightmap`](super::input::BakeMesh::receives_lightmap): a `ShadowsOnly` one gets none, #1571, nor one
@@ -234,6 +246,11 @@ fn lightmap(
         size,
         texel_world: layout.texel_world,
     };
+    // Past `ASSEMBLE_ALONE`, one chart at a time (its reason). Taken before the
+    // denoise's budget (`Cleaner`), never while holding it, so the two cannot wait
+    // on each other.
+    let _alone = (u64::from(size) * u64::from(size) > ASSEMBLE_ALONE)
+        .then(|| ASSEMBLING.lock().unwrap_or_else(PoisonError::into_inner));
     let maps = assemble(chart, &layout.labels, &light, settings, cleaner, masked);
     let map = Lightmap::sparse(mesh.entity, size, maps.filled, maps.kept);
     (map, maps.orphans)

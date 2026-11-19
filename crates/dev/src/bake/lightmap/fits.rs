@@ -7,8 +7,11 @@
 //! What a one-shot bake holds (measured in #2312's PR): every finished lightmap,
 //! only the texels its charts cover ([`result_bytes`] each, `lightmap::Lightmap`);
 //! the charts in flight (a worker's chart: its covered texels and their traced
-//! light, [`IN_FLIGHT_PER_TEXEL`]; the one being assembled, over its whole square,
-//! [`FINISH_PER_TEXEL`]), or OIDN's charts in flight (at most
+//! light, [`IN_FLIGHT_PER_TEXEL`]; the ones being assembled, over their whole
+//! squares, [`FINISH_PER_TEXEL`]: one at a time past
+//! [`ASSEMBLE_ALONE`](rusty_lighting::lightmap::ASSEMBLE_ALONE)'s square, so the
+//! largest stands for those, and any smaller one in flight beside it), or OIDN's
+//! charts in flight (at most
 //! `denoise::budget::BUDGET`) when those are more, since a chart is denoised while
 //! it is assembled. Once traced, the pages are composed, encoded and spilled one
 //! at a time (`pages::encode_pages`): one page in flight ([`PAGE_PER_TEXEL`] of
@@ -21,7 +24,7 @@
 use std::fmt;
 
 use glam::Vec2;
-use rusty_lighting::lightmap::{lightmap_size, max_map_edge, BakeMesh, BakeScene};
+use rusty_lighting::lightmap::{lightmap_size, max_map_edge, BakeMesh, BakeScene, ASSEMBLE_ALONE};
 use rusty_scene::lighting::settings::{page_edge, BakeSettings, Denoiser};
 
 use crate::bake::denoise::budget;
@@ -141,8 +144,14 @@ pub fn estimate(
     let all: u64 = charts.iter().map(|c| c.1).sum();
     let flying = &charts[..threads.max(1).min(charts.len())];
     let largest = flying[0].0;
-    let in_flight = largest * FINISH_PER_TEXEL
-        + flying.iter().skip(1).map(|c| c.1).sum::<u64>() * IN_FLIGHT_PER_TEXEL;
+    // One chart past `ASSEMBLE_ALONE` is assembled at a time, so the largest
+    // stands for it; a smaller one may be assembled beside it, so it is charged
+    // its square when that is more than its tracing.
+    let beside = |&(square, covered): &(u64, u64)| match square > ASSEMBLE_ALONE {
+        true => covered * IN_FLIGHT_PER_TEXEL,
+        false => (covered * IN_FLIGHT_PER_TEXEL).max(square * FINISH_PER_TEXEL),
+    };
+    let in_flight = largest * FINISH_PER_TEXEL + flying.iter().skip(1).map(beside).sum::<u64>();
     // A chart is denoised while it is assembled, so the two overlap: the larger
     // stands for both (measured in #2312's PR).
     let oidn = match settings.denoiser {

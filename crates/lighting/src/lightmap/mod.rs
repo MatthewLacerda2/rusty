@@ -64,7 +64,7 @@ pub(crate) use bake::pool::run as run_pool;
 pub use bake::bake_on;
 pub use bake::{
     bake, bake_progressive, bake_with_progress, BakeView, Lightmap, LightmapDenoiser, Pass,
-    PassSink,
+    PassSink, ASSEMBLE_ALONE,
 };
 pub use encode::{
     decode_direction, decode_mask, decode_rgbm, encode_directions, encode_masks, encode_texels,
