@@ -6,8 +6,11 @@
 //! above most members), so a test asserting "this warns once" installs this instead. It keeps
 //! what `logging`'s console copy keeps, minus its policy: every target, no repeat
 //! counting, no `core::quiet` stretch; that policy is `logging`'s, tested there.
+//! One logger a process: a crate that can name `rusty-logging` uses its capture
+//! instead, and [`init`] panics when another logger got there first.
 
 use log::{Level, LevelFilter, Log, Metadata, Record};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, Once};
 use std::thread::ThreadId;
 
@@ -34,14 +37,27 @@ impl Log for Keep {
     fn flush(&self) {}
 }
 
-/// Install the logger for this process; a second call is a no-op.
+/// Whether [`Keep`] is the process's logger: `log::set_logger` is once a process.
+static INSTALLED: AtomicBool = AtomicBool::new(false);
+
+/// What [`init`] says when another logger holds the process.
+pub const ANOTHER_LOGGER: &str = "another `log` logger holds this process (most likely \
+    `rusty_logging`'s), so `rusty_test_support::logs` would capture nothing: a crate whose \
+    manifest names `rusty-logging` reads its tests' warnings through \
+    `rusty_logging::init_for_tests` and `rusty_logging::forward`, and never calls \
+    `rusty_test_support::logs`";
+
+/// Install the logger for this process; a second call is a no-op. Panics when
+/// another logger was installed first, which would leave [`take`] empty.
 pub fn init() {
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
         if log::set_logger(&Keep).is_ok() {
             log::set_max_level(LevelFilter::Warn);
+            INSTALLED.store(true, Ordering::SeqCst);
         }
     });
+    assert!(INSTALLED.load(Ordering::SeqCst), "{ANOTHER_LOGGER}");
 }
 
 /// The warnings and errors this thread logged since the last `take`, oldest first.

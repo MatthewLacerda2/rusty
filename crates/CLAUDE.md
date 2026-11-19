@@ -105,9 +105,13 @@ manifest, the row, then the compiler names every path left to fix.
   only ever a dev-dependency: the per-test temp dir (`temp::dir`), the rebake
   contract (`rebakes::follows_rebakes`), the embedded model files (`models`,
   `models::anim`, `models::quad_file` on disk), a sky panorama on disk
-  (`panorama::fixture`), `.cube` lookups as text (`luts`) and the warnings a test logged
+  (`panorama::fixture`), `.cube` lookups as text (`luts`), the warnings a test logged
   (`logs::init`, `logs::take`, `logs::take_leveled` with each record's level:
-  `rusty-logging` needs `script`, so it sits above most members), and a path in the temp dir spelled as a
+  `rusty-logging` needs `script`, so it sits above most members; a crate that names
+  `rusty-logging` reads its warnings through `rusty_logging::init_for_tests` and
+  `forward` instead, one logger a process, `one-logger`), a test that needs its
+  process to itself under plain `cargo test` too, a process-wide measure such as
+  the peak memory or an exact count of a process-wide counter (`alone!`), and a path in the temp dir spelled as a
   script passes it (`temp::lua_path`). A crate's tests call it directly, the
   integration suite through `tests/temp.rs`; a folder spelled from the working
   directory is `temp::relative`. A fixture that is plain data moves here; one built on a

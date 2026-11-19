@@ -35,6 +35,7 @@ mod key_guard;
 mod log_tag;
 mod markers;
 mod named_enum;
+mod one_logger;
 mod orphan_module;
 mod orphan_seeds;
 mod physics_borrow;
@@ -114,6 +115,7 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (log_tag::RULE, log_tag::run, Allow::Inline),
     (markers::RULE, markers::run, Allow::Inline),
     (named_enum::RULE, named_enum::run, Allow::Inline),
+    (one_logger::RULE, one_logger::run, Allow::Inline),
     (orphan_module::RULE, orphan_module::run, Allow::Own),
     (orphan_seeds::RULE, orphan_seeds::run, Allow::Never),
     (physics_borrow::RULE, physics_borrow::run, Allow::Inline),
