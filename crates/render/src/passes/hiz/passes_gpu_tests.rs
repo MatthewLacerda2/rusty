@@ -1,6 +1,7 @@
 //! How many compute passes the `occlusion` stage records (#2327): the select's
 //! own, before phase one's depth draw, then one for the pyramid, the test, the
-//! compaction and every clustered batch's cluster cull, at one batch and at three;
+//! compaction and the cluster cull (a dispatch per group, stage by stage), at
+//! one batch and at three;
 //! on a timed frame (#2401) one each for the pyramid, the test and each of the
 //! cluster cull's three stages (#2406). Timed or not, the cluster cull records
 //! the same dispatches in the same order, stage by stage.

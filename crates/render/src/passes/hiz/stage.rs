@@ -104,7 +104,12 @@ impl Renderer {
                     unreachable!("recorded by `cull_by_hiz` before phase one ends")
                 }
                 // The cluster cull whole, or one of its dispatch kinds.
-                cluster => self.record_clusters(pass, (clusters, plan), steps_of(cluster)),
+                cluster @ (GpuPart::OcclusionClusters
+                | GpuPart::OcclusionClustersTest
+                | GpuPart::OcclusionClustersScan
+                | GpuPart::OcclusionClustersCopy) => {
+                    self.record_clusters(pass, (clusters, plan), steps_of(cluster));
+                }
             }
             self.lap(lap_of(part));
         };
@@ -170,7 +175,7 @@ pub(super) const CLUSTER_STEPS: [GpuPart; 3] = [
 
 /// The cluster cull's parts: none without a clustered batch; untimed, one, its
 /// three stages in turn; timed, a pass per stage. Either way every group's test,
-/// then every scan, then every copy (`run::dispatch_order`, #2406).
+/// then every scan, then every copy (`clusters::record::dispatch_order`, #2406).
 fn cluster_parts(clustered: bool, split: bool) -> &'static [GpuPart] {
     match (clustered, split) {
         (false, _) => &[],
@@ -180,10 +185,18 @@ fn cluster_parts(clustered: bool, split: bool) -> &'static [GpuPart] {
 }
 
 /// The dispatch kinds the cluster cull's `part` records: all three for the
-/// part itself, else the one it names.
+/// part itself, else the one it names; none for a part outside the cull.
 fn steps_of(part: GpuPart) -> &'static [GpuPart] {
-    let at = CLUSTER_STEPS.iter().position(|s| *s == part);
-    at.map_or(&CLUSTER_STEPS, |i| &CLUSTER_STEPS[i..=i])
+    match part {
+        GpuPart::OcclusionClusters => &CLUSTER_STEPS,
+        GpuPart::OcclusionClustersTest => &CLUSTER_STEPS[0..1],
+        GpuPart::OcclusionClustersScan => &CLUSTER_STEPS[1..2],
+        GpuPart::OcclusionClustersCopy => &CLUSTER_STEPS[2..3],
+        GpuPart::OcclusionSelect
+        | GpuPart::OcclusionPhaseOne
+        | GpuPart::OcclusionPyramid
+        | GpuPart::OcclusionTest => &[],
+    }
 }
 
 /// A timed part's pass label: its lap's, but a cluster cull dispatch's own.

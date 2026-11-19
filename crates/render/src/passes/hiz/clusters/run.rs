@@ -3,7 +3,7 @@
 //! phase one (#2327) and read after it; `record` records its three stages
 //! between: the test, a workgroup per instance's scan, and the copy, dispatched
 //! indirect from what the scan kept (#2406), a dispatch each per group, the
-//! clustered batches of one mesh.
+//! clustered batches of one mesh and cluster count.
 
 use crate::gpu::ops::CountedQueue as _;
 use std::sync::Arc;
@@ -209,7 +209,7 @@ impl Renderer {
             ]);
         }
         cull.runs.upload(device, queue, bytemuck::cast_slice(&runs));
-        // The count, then each batch's copy dispatch: no cluster yet, its jobs.
+        // The count, then each group's copy dispatch: no cluster yet, its jobs.
         let mut tally = vec![0u32];
         for group in &plan.groups {
             tally.extend([0, group.jobs.len() as u32, 1]);

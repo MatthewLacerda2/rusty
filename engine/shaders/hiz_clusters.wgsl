@@ -1,8 +1,9 @@
 // Per-cluster occlusion culling (#1968): the culling half of UE5's Nanite. A mesh
 // split into clusters at import (`asset::clusters`) is drawn, per instance, as the
 // clusters this camera may see, with no mesh shaders. `render::passes::hiz`
-// dispatches it per group (the clustered batches of one mesh), stage by stage,
-// after `cs_test` has its instances' verdicts against this frame's pyramid:
+// dispatches it per group (the clustered batches of one mesh and cluster
+// count), stage by stage, after `cs_test` has its instances' verdicts against
+// this frame's pyramid:
 //   1. `cs_cluster_test`: each (instance, cluster) is kept unless its instance is
 //      hidden, or it is outside the frustum, faces wholly away (its normal cone),
 //      or is behind the pyramid (`hidden`). One crossing the near plane is kept;
@@ -44,12 +45,12 @@ struct Job {
     cluster_first: u32,
     state_first: u32,
     cone: u32,
-    // Its batch's clusters: its group's dispatch covers `run.clusters`, the most
-    // of any job in it, and a job skips the clusters past its own.
+    // Its batch's clusters, the same for every job of its group (`run.clusters`):
+    // the plan joins only batches of one count, so no row is padded.
     clusters: u32,
 };
 
-// The group a dispatch covers: its jobs, the most clusters any of them has, and
+// The group a dispatch covers: its jobs, the clusters each of them has, and
 // the word of `tally` its copy's indirect dispatch starts at.
 struct Run {
     job_first: u32,
@@ -163,7 +164,7 @@ fn cs_cluster_test(
     let t = id.x;
     let job = jobs[run.job_first + min(t / run.clusters, run.jobs - 1u)];
     let k = t % run.clusters;
-    // Past the group's pairs, or a smaller batch's clusters in it: nothing to judge.
+    // Past the group's pairs, or past the job's own clusters: nothing to judge.
     if t < run.jobs * run.clusters && k < job.clusters {
         var keep = true;
         if job.tested != 0u {

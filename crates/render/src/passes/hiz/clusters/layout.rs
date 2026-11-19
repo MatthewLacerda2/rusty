@@ -1,5 +1,5 @@
 //! `hiz_clusters.wgsl`'s bind group layouts (#1968): the camera's two group 0s,
-//! each with the batch's `Run` at a dynamic offset (the test's and scan's, and
+//! each with the group's `Run` at a dynamic offset (the test's and scan's, and
 //! the copy's, which leaves out the `tally` its dispatch reads as indirect args,
 //! #2406), and a mesh's group 1.
 
@@ -23,7 +23,7 @@ fn storage(binding: u32, read_only: bool) -> wgpu::BindGroupLayoutEntry {
     }
 }
 
-/// The batch's `Run`, at a dynamic offset.
+/// The group's `Run`, at a dynamic offset.
 fn run_entry() -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry {
         binding: 8,
@@ -38,8 +38,8 @@ fn run_entry() -> wgpu::BindGroupLayoutEntry {
 }
 
 /// The test's and scan's group 0: params, jobs, objects, visible, state, the
-/// tally (the count, then each batch's copy dispatch), output args, the
-/// pyramid, and the batch's `Run`.
+/// tally (the count, then each group's copy dispatch), output args, the
+/// pyramid, and the group's `Run`.
 pub(crate) fn cull_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     let compute = wgpu::ShaderStages::COMPUTE;
     let pyramid = wgpu::BindGroupLayoutEntry {
@@ -68,7 +68,7 @@ pub(crate) fn cull_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     })
 }
 
-/// The copy's group 0: jobs, state, the batch's `Run` and the output indices.
+/// The copy's group 0: jobs, state, the group's `Run` and the output indices.
 pub(crate) fn copy_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Cluster Copy"),

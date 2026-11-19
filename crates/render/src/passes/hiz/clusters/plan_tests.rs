@@ -82,11 +82,49 @@ fn the_batches_of_one_mesh_share_a_dispatch_group() {
         jobs,
         clusters,
     };
-    let groups = vec![group(0, 0..1, 5), group(1, 1..4, 5)];
-    assert_eq!(plan.groups, groups, "by mesh, the most clusters of each");
+    let groups = vec![group(0, 0..1, 5), group(1, 1..3, 5), group(1, 3..4, 2)];
+    assert_eq!(plan.groups, groups, "by mesh, then by cluster count");
     let own: Vec<_> = plan.jobs.iter().map(|j| j.clusters).collect();
     assert_eq!(own, [5, 5, 5, 2], "a job keeps its own batch's count");
     assert_eq!(plan.draws(3), vec![Some(1..3), Some(0..1), Some(3..4)]);
+}
+
+#[test]
+fn batches_of_one_range_join_and_unequal_counts_start_no_padding() {
+    let (ccw, both) = (Facing::Ccw, Facing::Both);
+    // Two material slots of one mesh: 1,000 instances of 2 clusters, one of 500,
+    // and a two-sided copy of the small range, sorted in beside it.
+    let batches = [
+        of_mesh(0, 0..1000, 0..60, ccw),
+        of_mesh(0, 1000..1001, 60..15060, ccw),
+        of_mesh(0, 1001..1003, 0..60, both),
+    ];
+    let all = instances(1003);
+    let clusters_of = |b: &DrawBatch| {
+        Some(if b.key.indices.start == 0 {
+            0..2
+        } else {
+            2..502
+        })
+    };
+    let plan = Plan::of(batches.iter(), (&all, &|_| true), clusters_of);
+    let shape: Vec<_> = plan
+        .groups
+        .iter()
+        .map(|g| (g.jobs.clone(), g.clusters))
+        .collect();
+    assert_eq!(shape, [(0..1002, 2), (1002..1003, 500)], "one range joins");
+    // The test's threads and the copy's workgroups at most: a job's row a group.
+    let rows: u32 = plan
+        .groups
+        .iter()
+        .map(|g| g.jobs.len() as u32 * g.clusters)
+        .sum();
+    assert_eq!(
+        rows,
+        1002 * 2 + 500,
+        "no job's row padded past its clusters"
+    );
 }
 
 #[test]

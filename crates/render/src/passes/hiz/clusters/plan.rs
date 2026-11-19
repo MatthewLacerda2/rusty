@@ -1,8 +1,8 @@
 //! Which of a camera's opaque batches are drawn by cluster this frame (#1968),
 //! and the jobs `hiz_clusters.wgsl` runs for them: one per instance, each with
 //! its room in the output index list, and the dispatch groups that run them:
-//! the batches of one mesh share a dispatch a stage (#2406). Pure CPU work over
-//! the frame's batches.
+//! the batches of one mesh and cluster count share a dispatch a stage (#2406). Pure CPU work
+//! over the frame's batches.
 
 use std::ops::Range;
 
@@ -31,8 +31,8 @@ pub(crate) struct Job {
     pub cluster_first: u32,
     pub state_first: u32,
     pub cone: u32,
-    /// Its batch's clusters: its group's dispatch covers the most of any job in
-    /// it, so a job of a smaller batch skips the rest.
+    /// Its batch's clusters, which every job of its group shares: the shader
+    /// skips a cluster past it.
     pub clusters: u32,
 }
 
@@ -47,8 +47,9 @@ pub(crate) struct Run {
 }
 
 /// The clustered batches one dispatch a stage covers: consecutive runs of one
-/// mesh, so one mesh binding (group 1) serves them all, their jobs contiguous,
-/// and the most clusters any of them has.
+/// mesh and one cluster count, so one mesh binding (group 1) serves them all,
+/// their jobs contiguous, and no job's dispatch row is padded past its own
+/// clusters (the copy's row is 64 lanes a cluster).
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Group {
     pub mesh: MeshHandle,
@@ -83,10 +84,11 @@ impl Plan {
         clusters_of: impl Fn(&DrawBatch) -> Option<Range<u32>>,
     ) -> Self {
         let mut plan = Self::default();
-        // By mesh, so the batches of one mesh are consecutive and share a dispatch
+        // By mesh and index run, so the batches of one range (copies differing in
+        // material, facing or two-sidedness) are consecutive and share a dispatch
         // group; stable, so the order stays a function of the batches alone.
         let mut batches: Vec<_> = batches.enumerate().collect();
-        batches.sort_by_key(|(_, b)| b.key.mesh);
+        batches.sort_by_key(|(_, b)| (b.key.mesh, b.key.indices));
         for (b, batch) in batches {
             let Some(clusters) = clusters_of(batch) else {
                 continue;
@@ -134,18 +136,18 @@ impl Plan {
     }
 
     /// Put a run of `mesh` (its `jobs`, `n` clusters each) in the last group when
-    /// that is of the same mesh and the joined dispatches stay in their limits,
-    /// else in a group of its own.
+    /// that is of the same mesh and cluster count and the joined dispatches stay
+    /// in their limits, else in a group of its own. Joining unequal counts would
+    /// start every job of the group a row as wide as its largest: a 2-cluster
+    /// batch of 1,000 instances beside a 500-cluster one would start 500,000 copy
+    /// workgroups for at most 2,500 clusters.
     fn group(&mut self, mesh: MeshHandle, jobs: Range<u32>, n: u32) {
         let joined = self.groups.last_mut().filter(|g| {
             let count = u64::from(jobs.end - g.jobs.start);
-            g.mesh == mesh && fits_dispatch(count, g.clusters.max(n))
+            g.mesh == mesh && g.clusters == n && fits_dispatch(count, n)
         });
         match joined {
-            Some(g) => {
-                g.jobs.end = jobs.end;
-                g.clusters = g.clusters.max(n);
-            }
+            Some(g) => g.jobs.end = jobs.end,
             None => self.groups.push(Group {
                 mesh,
                 jobs,
