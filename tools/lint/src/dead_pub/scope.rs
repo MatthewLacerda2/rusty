@@ -204,14 +204,12 @@ impl Scope {
                     self.item = None;
                 }
             }
-            ';' => {
-                if self
-                    .item
-                    .as_ref()
-                    .is_some_and(|i| self.stack.len() == i.base)
-                {
-                    self.item = None;
-                }
+            ';' if self
+                .item
+                .as_ref()
+                .is_some_and(|i| self.stack.len() == i.base) =>
+            {
+                self.item = None;
             }
             ',' => {
                 let group = matches!(

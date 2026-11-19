@@ -55,6 +55,8 @@ pub struct Renamer<'a> {
     names: &'a Names<'a>,
     open: Open,
     scope: Scope,
+    /// What the line being read cannot fold.
+    left: Vec<Left>,
 }
 
 impl<'a> Renamer<'a> {
@@ -63,6 +65,7 @@ impl<'a> Renamer<'a> {
             names,
             open: Open::None,
             scope: Scope::default(),
+            left: Vec::new(),
         }
     }
 
@@ -72,12 +75,11 @@ impl<'a> Renamer<'a> {
         let mut code = Vec::new();
         code_of(line, &mut self.open, |at, _| code.push(at));
         let mut out = String::new();
-        let mut left = Vec::new();
         let mut at = 0;
         while let Some(c) = line[at..].chars().next() {
             let (before, rest) = line.split_at(at);
             let in_code = code.binary_search(&at).is_ok();
-            if !(is_ident(c) && !c.is_ascii_digit()) || before.ends_with(is_ident) {
+            if !is_ident(c) || c.is_ascii_digit() || before.ends_with(is_ident) {
                 if in_code {
                     self.scope.punct(c, before);
                 }
@@ -87,11 +89,11 @@ impl<'a> Renamer<'a> {
             }
             let word = &rest[..rest.find(|c: char| !is_ident(c)).unwrap_or(rest.len())];
             let after = &rest[word.len()..];
-            let text = self.word(word, before, after, in_code, &mut out, &mut left);
+            let text = self.word(word, before, after, in_code, &mut out);
             out.push_str(text.unwrap_or(word));
             at += word.len();
         }
-        (out, left)
+        (out, std::mem::take(&mut self.left))
     }
 
     /// What `word` is rewritten to, if it is, `out` holding the line so far.
@@ -102,7 +104,6 @@ impl<'a> Renamer<'a> {
         after: &str,
         in_code: bool,
         out: &mut String,
-        left: &mut Vec<Left>,
     ) -> Option<&'a str> {
         let path = after.starts_with("::");
         let list = if path {
@@ -138,13 +139,14 @@ impl<'a> Renamer<'a> {
             _ => (None, None),
         };
         if let Some(why) = why {
-            left.push(Left {
+            self.left.push(Left {
                 name: word.to_string(),
                 why,
             });
         }
         if in_code {
-            left.extend(self.scope.ident(word, watch));
+            let found = self.scope.ident(word, watch);
+            self.left.extend(found);
         }
         let to = found.filter(|_| why.is_none())?;
         if path {
