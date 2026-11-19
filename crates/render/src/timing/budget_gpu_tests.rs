@@ -2,9 +2,10 @@
 //! test can build: a base camera running every pass that times (the sun's
 //! cascades, a full shadow atlas, Hi-Z, SSAO, SSIL, the fog, SSR, the
 //! translucents, depth of field, TAA, motion blur, bloom, the lens flare and the
-//! exposure meter) and an overlay camera. Counted on any adapter: the timer counts
-//! the pairs it is asked for ([`super::GpuTimer::asked`]) even when it has no
-//! timestamps.
+//! exposure meter) and an overlay camera, with the Hi-Z stage timed in parts
+//! (#2401: a pair per part, not one for the stage). Counted on any adapter: the
+//! timer counts the pairs it is asked for ([`super::GpuTimer::asked`]) even when
+//! it has no timestamps.
 
 use glam::{Quat, Vec3};
 
@@ -70,9 +71,10 @@ fn deepest_stack() -> Scene {
 
 #[test]
 fn gpu_the_deepest_stack_asks_for_fewer_pairs_than_a_frame_holds() {
-    let Some(mut r) = crate::test_gpu::headless_or_skip(96, 72) else {
+    let Some(mut r) = crate::test_gpu::culling::culling_or_skip(96, 72) else {
         return;
     };
+    r.gpu_timer.split_override.set(Some(true));
     let scene = deepest_stack();
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 96, 72);
     let out = view.color_target_view().unwrap();
@@ -85,6 +87,7 @@ fn gpu_the_deepest_stack_asks_for_fewer_pairs_than_a_frame_holds() {
     }
     eprintln!("[timing] the deepest stack asked for {most} pairs a frame");
     assert!(most > 20, "the stack ran its passes: {most}");
+    assert!(r.frame_counters.hiz_tested > 0, "the Hi-Z stage ran");
     assert!(
         most < super::PAIRS,
         "{most} pairs: past the {} a frame holds",

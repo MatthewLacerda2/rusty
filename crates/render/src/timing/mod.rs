@@ -37,9 +37,15 @@
 //! **No row holds a gap.** A pass is charged from its own start at the earliest,
 //! so time between timed passes is in no row: `gpu_ms` is the GPU's busy time on
 //! timed work, never its wait for the CPU. A stage of several passes takes one
-//! pair across them ([`GpuTimer::compute_span`], [`GpuTimer::render_span`]): its
-//! first pass writes the start, its last the end, and all of them go out in one
-//! submit, so what lies between is the stage's own GPU work.
+//! pair across them ([`GpuTimer::render_span`]): its first pass writes the start,
+//! its last the end, and all of them go out in one submit, so what lies between
+//! is the stage's own GPU work.
+//!
+//! **Parts of a row.** A stage the bench reads by part (the Hi-Z `occlusion`
+//! stage, #2401) takes a pair per [`GpuPart`] instead, each its own pass
+//! ([`GpuTimer::splits`]): every part adds into its kind's row, so the row is
+//! unchanged, and into [`GpuTimes::parts`]. A gap between two parts inside the
+//! stage's submit (an encoder command) is in `gpu.other`, as between any rows.
 //!
 //! **What no row holds.** Each resolved frame also splits the span from its first
 //! timed start to its last timed end ([`GpuTimes::span_ms`]) into the rows and two
@@ -61,8 +67,8 @@ use std::cell::{Cell, RefCell};
 pub use clock::ClockProbe;
 pub use frame::FrameCost;
 use readback::Ring;
-pub use times::GpuTimes;
 use times::Pair;
+pub use times::{GpuPart, GpuTimes};
 
 rusty_core::named_enum! {
     /// The render passes the timer reports, under the stable names the stats use
@@ -80,7 +86,8 @@ rusty_core::named_enum! {
         Shadows = "shadows",
         /// GPU occlusion culling (#1963), each culling camera's whole `occlusion`
         /// stage: the select, phase one's depth draw, the Hi-Z pyramid, the test,
-        /// the compaction and the cluster cull, one pair across them all.
+        /// the compaction and the cluster cull, a pair per [`GpuPart`], each
+        /// added into this row.
         Occlusion = "occlusion",
         /// The SSAO depth prepass (#1578), which a primed forward pass starts from.
         SsaoPrepass = "ssao_prepass",
@@ -145,6 +152,11 @@ pub struct GpuTimer {
     /// adapter without timestamps still counts a frame's pairs against [`PAIRS`].
     #[cfg(test)]
     pub(crate) asked: Cell<u32>,
+    /// Test-only: whether a stage splits into its timed parts ([`Self::splits`])
+    /// whatever the adapter, so its pass counts are pinned both ways on lavapipe
+    /// (no timestamps) and Metal (timestamps) alike; `None` asks the timer.
+    #[cfg(test)]
+    pub(crate) split_override: Cell<Option<bool>>,
 }
 
 /// The live half of an enabled timer.
@@ -196,7 +208,21 @@ impl GpuTimer {
             cpu: Default::default(),
             #[cfg(test)]
             asked: Cell::new(0),
+            #[cfg(test)]
+            split_override: Cell::new(None),
         }
+    }
+
+    /// Whether a stage timed in parts records each part in passes of its own
+    /// this frame: only while a frame is being timed. Its untimed path keeps
+    /// fewer pass boundaries, and a part's pair cannot open and close inside one
+    /// pass.
+    pub(crate) fn splits(&self) -> bool {
+        #[cfg(test)]
+        if let Some(split) = self.split_override.get() {
+            return split;
+        }
+        self.queries.as_ref().is_some_and(|q| q.open.get())
     }
 
     /// Start timing a frame's passes.
@@ -253,6 +279,10 @@ impl Queries {
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "parts_tests.rs"]
+mod parts_tests;
 
 #[cfg(test)]
 #[path = "budget_gpu_tests.rs"]
