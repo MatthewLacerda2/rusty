@@ -16,30 +16,11 @@ fn gpu_two_batches_of_one_mesh_are_culled_by_one_dispatch_group() {
     let Some(mut r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
         return;
     };
-    let mut scene = Scene::new();
-    scene.skybox_path = String::new();
-    let (lo, hi) = (Vec3::new(-9.0, -3.0, -0.2), Vec3::new(0.0, 12.0, 0.2));
-    block(&mut scene, "Wall", lo, hi);
-    // One name, one mesh: the second panel's own two-sided material splits the batch.
-    panel(
-        &mut scene,
-        "Panel",
-        (Vec3::new(-7.0, -2.0, -5.0), 6.0, Quat::IDENTITY),
-    );
-    let two = panel(
-        &mut scene,
-        "Panel",
-        (Vec3::new(-3.0, -2.0, -7.0), 6.0, Quat::IDENTITY),
-    );
-    let key = scene.ensure_material_key(two).unwrap();
-    scene.materials.get_mut(&key).unwrap().render_face = RenderFace::Both;
+    let scene = two_batches_of_one_mesh();
     let cam = Camera::new(Vec3::new(0.0, 1.0, 8.0), -90.0, 0.0);
     let mut view = offscreen(&r);
-    let mut frames = Vec::new();
-    for _ in 0..6 {
-        frames.push(shot(&mut r, &mut view, &scene, &cam));
-    }
-    let (on, c) = frames.pop().expect("six frames");
+    let frames = (0..6).map(|_| shot(&mut r, &mut view, &scene, &cam));
+    let (on, c) = frames.last().expect("six frames");
     let cull = &view.hiz.cameras[0].clusters;
     assert_eq!(
         (cull.runs_ran, cull.groups_ran),
@@ -57,13 +38,35 @@ fn gpu_two_batches_of_one_mesh_are_culled_by_one_dispatch_group() {
         [2, 1],
         "the copy covers both instances: {tally:?}"
     );
+    let culled = c.cluster_culled;
     assert!(
-        c.cluster_tested > 0 && c.cluster_culled > 0,
-        "the wall culls: {c:?}"
+        culled > 0 && culled < c.cluster_tested,
+        "the wall culls some: {c:?}"
     );
-    assert!(c.cluster_culled < c.cluster_tested, "and keeps some: {c:?}");
     r.quality.gpu_cluster_culling = false;
     let mut fresh = offscreen(&r);
     let (off, _) = shot(&mut r, &mut fresh, &scene, &cam);
     assert!(on == off, "the shared group moved pixels");
+}
+
+/// A wall half across two panels of one mesh (one name), the second's own
+/// two-sided material making it a batch of its own.
+fn two_batches_of_one_mesh() -> Scene {
+    let mut scene = Scene::new();
+    scene.skybox_path = String::new();
+    let (lo, hi) = (Vec3::new(-9.0, -3.0, -0.2), Vec3::new(0.0, 12.0, 0.2));
+    block(&mut scene, "Wall", lo, hi);
+    panel(
+        &mut scene,
+        "Panel",
+        (Vec3::new(-7.0, -2.0, -5.0), 6.0, Quat::IDENTITY),
+    );
+    let two = panel(
+        &mut scene,
+        "Panel",
+        (Vec3::new(-3.0, -2.0, -7.0), 6.0, Quat::IDENTITY),
+    );
+    let key = scene.ensure_material_key(two).unwrap();
+    scene.materials.get_mut(&key).unwrap().render_face = RenderFace::Both;
+    scene
 }
