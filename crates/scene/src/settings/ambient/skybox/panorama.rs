@@ -39,10 +39,6 @@ const KEPT: usize = 4;
 /// What a projection is keyed by: the file, its bytes' digest, its import settings.
 type Key = (PathBuf, u64, TextureSettings);
 
-/// The projected panoramas, newest last: the key, and its SH (`None`: it failed to
-/// decode).
-static PROJECTED: Mutex<Vec<(Key, Option<Sh9>)>> = Mutex::new(Vec::new());
-
 /// The last answer per `skybox_path`, valid until the write log names its file,
 /// its sidecar or its source, or another project opens.
 struct Remembered {
@@ -52,7 +48,45 @@ struct Remembered {
     answers: Vec<(String, String, String, Option<Sh9>)>,
 }
 
-static REMEMBERED: Mutex<Option<Remembered>> = Mutex::new(None);
+/// The panorama memo: what was projected, and what each spelling last answered.
+/// Locked in that field order's reverse: `remembered`, then `projected`.
+struct Memo {
+    /// The projected panoramas, newest last: the key, and its SH (`None`: it
+    /// failed to decode).
+    projected: Mutex<Vec<(Key, Option<Sh9>)>>,
+    remembered: Mutex<Option<Remembered>>,
+    /// How many decodes this memo ran: a test's handle on it.
+    #[cfg(test)]
+    decodes: std::sync::atomic::AtomicUsize,
+}
+
+impl Memo {
+    const fn new() -> Self {
+        Self {
+            projected: Mutex::new(Vec::new()),
+            remembered: Mutex::new(None),
+            #[cfg(test)]
+            decodes: std::sync::atomic::AtomicUsize::new(0),
+        }
+    }
+}
+
+/// The process's memo. A test gets one per thread instead, so tests sharing a
+/// process (a plain `cargo test`) never evict each other's answers, move each
+/// other's retry beat or decode count; the renderer calls from one thread anyway.
+#[cfg(not(test))]
+static MEMO: Memo = Memo::new();
+#[cfg(test)]
+thread_local! {
+    static MEMO: Memo = const { Memo::new() };
+}
+
+fn with_memo<R>(f: impl FnOnce(&Memo) -> R) -> R {
+    #[cfg(not(test))]
+    return f(&MEMO);
+    #[cfg(test)]
+    MEMO.with(f)
+}
 
 impl Remembered {
     fn new() -> Self {
@@ -85,7 +119,11 @@ impl Remembered {
 
 /// The radiance SH of the panorama `path` names, `None` when it cannot be read.
 pub(super) fn radiance(path: &str) -> Option<Sh9> {
-    let mut remembered = REMEMBERED.lock().unwrap_or_else(|e| e.into_inner());
+    with_memo(|memo| radiance_in(memo, path))
+}
+
+fn radiance_in(memo: &Memo, path: &str) -> Option<Sh9> {
+    let mut remembered = memo.remembered.lock().unwrap_or_else(|e| e.into_inner());
     let remembered = remembered.get_or_insert_with(Remembered::new);
     remembered.refresh();
     if let Some((.., sh)) = remembered.answers.iter().find(|(p, ..)| p == path) {
@@ -94,7 +132,7 @@ pub(super) fn radiance(path: &str) -> Option<Sh9> {
     if remembered.freshness.is_miss(path) {
         return None;
     }
-    let Some((file, sh)) = projected(path) else {
+    let Some((file, sh)) = projected(memo, path) else {
         remembered.freshness.miss(path);
         return None;
     };
@@ -109,17 +147,20 @@ pub(super) fn radiance(path: &str) -> Option<Sh9> {
 
 /// The file `path` names and its projected SH (`None`: it failed to decode), keyed
 /// by the file's digest and import settings; `None` when there is no file to read.
-fn projected(path: &str) -> Option<(PathBuf, Option<Sh9>)> {
+fn projected(memo: &Memo, path: &str) -> Option<(PathBuf, Option<Sh9>)> {
     let file = MapRef::from(path).file()?;
     let Seen::Read(digest) = source_digest(&file) else {
         return None;
     };
     let settings = rusty_asset::sidecar::texture(&file);
     let key = (file, digest, settings);
-    let mut kept = PROJECTED.lock().unwrap_or_else(|e| e.into_inner());
+    let mut kept = memo.projected.lock().unwrap_or_else(|e| e.into_inner());
     if let Some((_, sh)) = kept.iter().find(|(k, _)| *k == key) {
         return Some((key.0.clone(), *sh));
     }
+    #[cfg(test)]
+    memo.decodes
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let sh = decode(&key.0, &settings);
     kept.retain(|((f, _, _), _)| *f != key.0);
     if kept.len() == KEPT {
@@ -132,8 +173,6 @@ fn projected(path: &str) -> Option<(PathBuf, Option<Sh9>)> {
 
 /// Decode `file` as the sky pass uploads it and project it; `None` when it fails.
 fn decode(file: &Path, settings: &TextureSettings) -> Option<Sh9> {
-    #[cfg(test)]
-    DECODES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let loaded = texture_import::load(file, settings, TextureKind::Colour, false)?;
     let Texels::Image(image) = loaded.texels else {
         return None;
@@ -142,13 +181,10 @@ fn decode(file: &Path, settings: &TextureSettings) -> Option<Sh9> {
     Some(project(rgba.width(), rgba.height(), rgba.as_raw()))
 }
 
-/// How many decodes this process ran: a test's handle on the memo.
-#[cfg(test)]
-static DECODES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-
+/// How many decodes this thread's memo ran.
 #[cfg(test)]
 pub(super) fn decodes() -> usize {
-    DECODES.load(std::sync::atomic::Ordering::Relaxed)
+    with_memo(|memo| memo.decodes.load(std::sync::atomic::Ordering::Relaxed))
 }
 
 /// Rows the projection keeps at most: an L2 projection needs far fewer, and a
