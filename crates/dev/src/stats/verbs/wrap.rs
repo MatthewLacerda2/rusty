@@ -8,6 +8,9 @@
 //! surface), and hands a verb's error on as the verb raised it: mlua wraps a
 //! Rust callback's error once, where it reaches Lua, so the wrapper unwraps the
 //! one its inner call added and the script sees the same message and traceback.
+//! One line differs: an error raised in Lua a verb called back (a handler
+//! `Move` ran) is traced through the bare verb as well as its wrapper, so its
+//! traceback has one more `[C]: in ?` frame, right above the verb's.
 //! Only Rust functions are wrapped: a namespace function written in Lua is the
 //! script's own time, and the verbs it calls are timed themselves. Methods on
 //! userdata (a handle's) are not wrapped; their time is `script.lua`'s.

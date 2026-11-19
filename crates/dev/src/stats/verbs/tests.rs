@@ -136,8 +136,16 @@ fn errors(lua: &Lua) -> Vec<String> {
 #[test]
 fn a_wrapped_verbs_error_reads_as_the_bare_verbs() {
     let (bare, wrapped) = (errors(&vm(false)), errors(&vm(true)));
-    assert_eq!(bare, wrapped);
     assert!(bare[0].contains("no such entity 7"), "{}", bare[0]);
+    // Raised in the verb: the same text, traceback and all.
+    assert_eq!(bare[..2], wrapped[..2]);
+    // Raised in Lua the verb called back: the same but for the bare verb's own
+    // frame, which its wrapper calls, as one `[C]: in ?` line above the verb.
+    for (bare, wrapped) in bare[2..].iter().zip(&wrapped[2..]) {
+        let wrapped = wrapped.replacen("\t[C]: in ?\n\t[C]: in field", "\t[C]: in field", 1);
+        let wrapped = wrapped.replacen("\t[C]: in ?\n\t>[C]: in field", "\t>[C]: in field", 1);
+        assert_eq!(bare, &wrapped);
+    }
 }
 
 #[test]

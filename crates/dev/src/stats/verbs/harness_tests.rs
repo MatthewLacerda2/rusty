@@ -3,9 +3,9 @@
 
 use crate::harness::Harness;
 
-use super::super::verbs::{arm, armed, take};
+use crate::stats::verbs::{arm, armed, take, Frame};
 
-fn played(dir: &str) -> (String, super::super::verbs::Frame) {
+fn played(dir: &str) -> (String, Frame) {
     let out = rusty_test_support::temp::dir().join(dir);
     let h = Harness::new(out, "assets/scripts/bot.lua");
     take();

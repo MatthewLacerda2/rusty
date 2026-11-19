@@ -111,6 +111,19 @@ impl SceneReport {
         self.rows.push(Row::value(metric.into(), value));
     }
 
+    /// What the run changed from a plain one, under the title: the `--set`
+    /// overrides, the verb timers.
+    fn run_notes(&self) -> String {
+        let mut out = String::new();
+        if !self.set.is_empty() {
+            let _ = writeln!(out, "quality preset overridden: {}", self.set.join(", "));
+        }
+        if self.script {
+            out.push_str(SCRIPT_NOTE);
+        }
+        out
+    }
+
     /// Whether `previous` benched what this run did: the same size, viewpoints
     /// (each where it looks from, [`ViewKey`]) and frames, both timing their
     /// verbs or neither (`script`). Only then do their rows compare; the number
@@ -134,12 +147,7 @@ impl SceneReport {
             self.frames,
             self.loads
         );
-        if !self.set.is_empty() {
-            let _ = writeln!(out, "quality preset overridden: {}", self.set.join(", "));
-        }
-        if self.script {
-            out.push_str(SCRIPT_NOTE);
-        }
+        out.push_str(&self.run_notes());
         let against = if self.baseline.is_some() {
             "before"
         } else {

@@ -85,12 +85,7 @@ fn main() {
         fail("bench-scenes needs one out_dir")
     };
     let key = scenes::out_key(&project);
-    let mut out = absolute(out)
-        .unwrap_or_else(|_| PathBuf::from(out))
-        .join(&key);
-    if a.script {
-        out.push("script");
-    }
+    let out = reports_dir(out, &key, a.script);
     let opts = Options {
         size: a.size.unwrap_or(scenes::DEFAULT_SIZE),
         runs: a.runs.unwrap_or(scenes::RUNS),
@@ -115,6 +110,19 @@ fn main() {
             None => bench_one(&run, &scene, key, a.import_ms, a.loads.as_deref()),
         },
         (None, _) => bench_all(&run, a.list.as_deref()),
+    }
+}
+
+/// The project's reports folder under the out dir `out`: `<out>/<key>`, and its
+/// `script/` for a `--script` run, so a plain run's history never meets one.
+fn reports_dir(out: &str, key: &str, script: bool) -> PathBuf {
+    let dir = absolute(out)
+        .unwrap_or_else(|_| PathBuf::from(out))
+        .join(key);
+    if script {
+        dir.join("script")
+    } else {
+        dir
     }
 }
 

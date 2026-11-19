@@ -4,7 +4,7 @@
 //! `cpu.update_scripts` holds the Lua VM and every engine call the scripts make.
 //! [`arm`] adds an [`api::Extension`](rusty_script::api::Extension) that wraps each
 //! function of every engine namespace (`Transform.SetPosition`,
-//! `CharacterController.Move`, …) in a timing closure ([`wrap`]), so a run can say
+//! `CharacterController.Move`, …) in a timing closure (`wrap`), so a run can say
 //! how much of the row each verb is. Here, in the dev layer, because the sim reads
 //! no clock: `rusty-script` never sees one.
 //!
