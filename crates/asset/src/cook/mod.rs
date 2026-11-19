@@ -14,7 +14,7 @@
 //! **The cooked file.** What the steps computed is kept beside the model's other
 //! import-cache files, at `convert::cache_location_as(<source>, `[`SUFFIX`]`)`:
 //! in an open project `assets/generated/imported/<source>.cooked.glb` (shipped by
-//! an export), elsewhere the system temp folder. It is a glTF ([`file`]) holding
+//! an export), elsewhere the system temp folder. It is a glTF ([`mod@file`]) holding
 //! each sub-mesh's tangents, lightmap UVs, its cluster-ordered indices and its
 //! cluster table ([`sub`]), stamped by what it was made from ([`stamp`]). An
 //! import whose stamp matches parses the model without generating tangents and

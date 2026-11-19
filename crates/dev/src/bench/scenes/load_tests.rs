@@ -125,13 +125,44 @@ fn gpu_a_load_runs_every_step_once_in_order_and_they_sum_to_load_ms() {
         (CONVERTED.to_string(), 0.0),
         "a glTF converts nothing"
     );
+    assert_eq!(counts[2].0, "models_cooked");
     tiles(&load, &want);
     // Rendered (an adapter was there): the texture and upload counts follow.
-    if counts.len() > 2 {
+    if counts.len() > 3 {
         let names: Vec<&str> = counts.iter().map(|(c, _)| c.as_str()).collect();
         assert_eq!(
-            names[2..],
+            names[3..],
             ["textures_compressed", "textures_decoded", "upload_mb"]
+        );
+    }
+}
+
+#[test]
+fn gpu_a_second_load_of_an_unchanged_project_cooks_nothing() {
+    let root = project_with_a_model();
+    let opts = Options {
+        size: (32, 32),
+        warm: false,
+        ..Options::default()
+    };
+    let cooked = |root: &std::path::Path| {
+        let settings = rusty_core::project::ProjectSettings::default();
+        let (_, load) = load(&root.join("out"), root, "quad", settings, opts).unwrap();
+        load.counts[2].clone()
+    };
+    // The first load cooks the model, unless an earlier run left its cooked file.
+    let first = cooked(&root);
+    assert_eq!(first.0, "models_cooked");
+    assert!(first.1 <= 1.0, "{first:?}");
+    // A fresh launch: the in-memory import cache no longer holds the file.
+    let model = rusty_test_support::models::quad_file("load_rows_quad");
+    rusty_asset::import_cache::forget(std::path::Path::new(&model));
+    let second = cooked(&root);
+    if rusty_asset::cook::WRITES {
+        assert_eq!(
+            second,
+            ("models_cooked".to_string(), 0.0),
+            "read, not cooked"
         );
     }
 }
