@@ -96,7 +96,9 @@ fn the_panorama_lights_by_direction_and_follows_its_file() {
     scene.skybox_path = other;
     let flipped = scene.drawn_ambient().radiance().at(Vec3::Y);
     assert!(flipped.x > flipped.z, "orange above now: {flipped}");
+    // A rewrite reaches the memo as any file change does: through the write log.
     panorama_fixture("dir.png", [10, 10, 10], [10, 10, 10], 0);
+    rusty_core::fs::written::note_written(&path);
     scene.skybox_path = path;
     let dim = scene.drawn_ambient().radiance().at(Vec3::Y);
     assert!(dim.abs_diff_eq(Vec3::splat(10.0 / 255.0), 2e-3), "{dim}");
