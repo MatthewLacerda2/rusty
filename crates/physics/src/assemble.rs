@@ -39,6 +39,7 @@ impl PhysicsWorld {
         if next == self.plan {
             return Vec::new();
         }
+        self.tracked.handles += 1;
         let stale: Vec<u32> = self
             .plan
             .iter()

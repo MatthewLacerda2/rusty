@@ -141,6 +141,7 @@ impl PhysicsWorld {
                     .insert_with_parent(built, body, &mut self.bodies);
                 self.collider_to_id.insert(handle, id);
                 self.id_to_collider.insert(id, handle);
+                self.tracked.handles += 1;
             }
             (None, Some(handle)) => {
                 self.colliders.remove(
@@ -152,6 +153,7 @@ impl PhysicsWorld {
                 );
                 self.collider_to_id.remove(&handle);
                 self.id_to_collider.remove(&id);
+                self.tracked.handles += 1;
             }
             (None, None) => {}
         }

@@ -219,6 +219,11 @@ pub(crate) struct Tracked {
     pub material_assets: Option<u64>,
     /// The library-mesh triangles each mesh collider's shape was built from.
     pub mesh_keys: mesh_keys::MeshKeys,
+    /// The bone-hung colliders `follow_bones` keeps between ticks (`follow`).
+    pub follow: Option<crate::follow::Kept>,
+    /// Bumped whenever `id_to_collider` gains or loses an entry or a handle: what
+    /// tells the kept bone list its handles moved (`follow`).
+    pub handles: u64,
     /// What the incremental sync visited, for the cost tests.
     #[cfg(test)]
     pub visits: changed::Visits,
@@ -226,6 +231,10 @@ pub(crate) struct Tracked {
     /// equivalence tests compare against.
     #[cfg(test)]
     pub always_full: bool,
+    /// Walk the skeletons on every follow instead of keeping the list: the
+    /// reference the kept list's tests compare against (`follow`).
+    #[cfg(test)]
+    pub always_walk: bool,
 }
 
 impl Tracked {
