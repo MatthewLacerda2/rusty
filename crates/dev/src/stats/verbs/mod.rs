@@ -43,7 +43,7 @@ thread_local! {
 }
 
 /// The system whose verbs' time [`Frame::update_ms`] sums: `script.lua` is what
-/// of its row no verb holds.
+/// of its row neither a verb nor the wrappers hold.
 pub const UPDATE_SYSTEM: &str = "update_scripts";
 
 /// Time every engine verb of every Lua VM this thread starts from now on.

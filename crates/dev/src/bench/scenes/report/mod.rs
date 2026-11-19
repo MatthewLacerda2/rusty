@@ -27,7 +27,8 @@ pub const PROFILING_NOTE: &str = "(timed on the profiling build: release with fr
 
 /// The line a `SCRIPT=1` run's table carries under its title.
 pub const SCRIPT_NOTE: &str = "script verbs timed (SCRIPT=1): script.<verb> is a verb's own ms, \
-     script.lua what of cpu.update_scripts no verb holds; the timers cost time, so \
+     script.lua what of cpu.update_scripts neither a verb nor the timers (script.overhead) hold; \
+     the timers cost time, so \
      cpu.update_scripts compares only with another SCRIPT=1 run\n";
 
 /// One row over a scene's viewpoints and runs.
