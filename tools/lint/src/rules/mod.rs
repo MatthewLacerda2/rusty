@@ -25,6 +25,7 @@ mod drag_range;
 mod ecs_write;
 mod engine_spawn;
 mod entity_arg;
+mod fold_names;
 mod full_literal;
 mod fullscreen_triangle;
 mod gpu_default_only;
@@ -69,8 +70,9 @@ enum Allow {
     Inline,
     /// Nothing may excuse it: `ignored` and `orphan-seeds`, whose fixes are a
     /// `.gitignore` pattern and a moved file, `key-guard`, whose finding sits on a
-    /// manifest, where no inline allow can go, and `root-tests`, whose fix is the
-    /// manifest key or a moved test.
+    /// manifest, where no inline allow can go, `root-tests`, whose fix is the
+    /// manifest key or a moved test, and `fold-names`, which an allow would not
+    /// make fold.
     Never,
     /// The rule reads its own allows, so it can report a stale one
     /// (`api-parity`, whose allow sits on the op, not on the finding's cause;
@@ -101,6 +103,7 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (ecs_write::RULE, ecs_write::run, Allow::Inline),
     (engine_spawn::RULE, engine_spawn::run, Allow::Inline),
     (entity_arg::RULE, entity_arg::run, Allow::Inline),
+    (fold_names::RULE, fold_names::run, Allow::Never),
     (full_literal::RULE, full_literal::run, Allow::Inline),
     (
         fullscreen_triangle::RULE,

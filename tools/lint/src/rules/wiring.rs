@@ -92,6 +92,10 @@ pub(super) fn case_for(rule: &str) -> Option<Case> {
             "crates/script/src/api/a.rs",
             "fn f(lua: &Lua) {\n    lua.create_function(|_, id: u32| Ok(()));\n}\n",
         ),
+        "fold-names" => case(
+            &[("Cargo.toml", "[package]\nname = \"rusty\"\n"), ("tests/a.rs", "use rusty;\n")],
+            "tests/a.rs",
+        ),
         "full-literal" => case(
             &[
                 (

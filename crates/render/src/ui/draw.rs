@@ -11,9 +11,13 @@
 //! `WorldSpace` canvases — signs and terminals are scene geometry; the game's HUD
 //! and a camera canvas glued to the editor's free-fly camera are not.
 //!
-//! **Dirty strategy.** Each view keeps one vertex buffer per canvas (`cache`);
-//! rebuilding the CPU mesh is a cheap walk, and a canvas's buffer is re-uploaded
-//! only when its mesh changed. A static HUD therefore costs no uploads per frame.
+//! **Dirty strategy.** Each view keeps every root canvas's mesh with what it was built
+//! from (`kept`): the layout is recomputed every frame, but a canvas whose rects,
+//! frame, texture sizes and glyph atlases are unchanged and whose UI components no
+//! write touched (the World's change log) keeps its mesh unbuilt. One vertex buffer
+//! per canvas (`cache`) is re-uploaded only when a rebuilt mesh differs. A still HUD
+//! therefore meshes nothing and uploads nothing per frame; a canvas that moves (a
+//! turning minimap) is rebuilt alone.
 //!
 //! **Effects.** After the sync, every batch's clip slot is written and each Mask's
 //! coverage texture rendered (`effects`, #428), before the camera stack — world
@@ -22,8 +26,8 @@
 //!
 //! **Laps.** Both halves cut their CPU time into `ui.<part>` laps (`Renderer::lap`),
 //! which the bench reports as `render.ui.<part>` inside `render.ui`: `layout`,
-//! `textures` (loading and binding the Images' textures), `mesh` (the canvas meshes
-//! and glyph atlases), `sync`, `shades`, `uniforms`, `masks` and `mask_submit`, then
+//! `textures` (loading and binding the Images' textures), `mesh` (the canvases'
+//! inputs compared, the changed ones meshed, and the glyph atlases), `sync`, `shades`, `uniforms`, `masks` and `mask_submit`, then
 //! `pipelines` (making the overlay's pipelines current), `blur` (the backdrop
 //! chain alone), `groups`, `encode` and `submit` for the overlay pass.
 
@@ -34,7 +38,7 @@ use glam::Vec2;
 
 use super::cache::{CanvasGpu, CanvasPlace, UiViewCache};
 use super::effects::GroupKey;
-use super::mesh::{build_canvas_meshes, UiBatch};
+use super::mesh::UiBatch;
 use super::pipeline::UiPass;
 use crate::gpu::fullscreen::color_pass;
 use crate::timing::GpuPass;
@@ -72,19 +76,20 @@ impl Renderer {
             let (w, h) = textures.get(p)?.source_size;
             Some(Vec2::new(w as f32, h as f32))
         };
-        let atlases = &mut self.ui_renderer.atlases;
-        let meshes = build_canvas_meshes(&scene.world, &layout, screen, &tex_size, atlases);
-        self.ui_renderer.upload_atlases(&self.device, &self.queue);
-        self.lap("ui.mesh");
         let world = &scene.world;
         let overlay = view.ui.screen_in_editor;
+        let wanted =
+            |c: u32| !editor_mode || overlay || world.canvas(c).is_some_and(|c| c.is_world_space());
+        let atlases = &mut self.ui_renderer.atlases;
+        let looked = (&tex_size as &dyn Fn(&str) -> Option<Vec2>, atlases);
+        let meshes = view
+            .ui
+            .kept
+            .update((world, &layout), screen, looked, &wanted);
+        self.ui_renderer.upload_atlases(&self.device, &self.queue);
+        self.lap("ui.mesh");
         let meshes = meshes
             .into_iter()
-            .filter(|m| {
-                !editor_mode
-                    || overlay
-                    || world.canvas(m.canvas).is_some_and(|c| c.is_world_space())
-            })
             .map(|m| {
                 let place = CanvasPlace {
                     space: layout.space(m.canvas),
