@@ -20,7 +20,7 @@ WORKFLOW = Path(__file__).resolve().parents[3] / "workflows" / "mutants-on-reque
 
 def save_if(text: str) -> str:
     """The `save-if` expression of the step under `shared-key: mutants`."""
-    found = re.search(r"shared-key: mutants\n\s+save-if: \$\{\{ (.+) \}\}\n", text)
+    found = re.search(r"shared-key: mutants-[\w.-]+\n\s+save-if: \$\{\{ (.+) \}\}\n", text)
     assert found, "no `save-if` under `shared-key: mutants` in mutants-on-request.yml"
     return found[1]
 
