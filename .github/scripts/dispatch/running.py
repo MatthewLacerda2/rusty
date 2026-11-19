@@ -218,19 +218,29 @@ def newest(routines: list[dict], launching: int) -> list[dict]:
     return list(latest.values())
 
 
+def placements(routines: list[dict], launching: int, github: GitHub) -> list[tuple[dict, str, str]]:
+    """Each issue's newest coder routine but `launching`'s, as (routine, placement, why) by [`state`]."""
+    return [(found, *state(found, github)) for found in newest(routines, launching)]
+
+
 def coders(routines: list[dict], launching: int,
            github: GitHub) -> tuple[list[tuple[dict, str]], list[tuple[dict, str, str]]]:
     """The coder routines that count, as (routine, why), and the uncounted ones worth saying,
     as (routine, placement, why): those that cannot be placed, those [`STALE`] past
     [`FIRST_PUSH`], and drafts parked on an open blocker ([`BLOCKED`])."""
     counted, noted = [], []
-    for found in newest(routines, launching):
-        placed, why = state(found, github)
+    for found, placed, why in placements(routines, launching, github):
         if placed == "running":
             counted.append((found, why))
-        elif placed == "unknown" or why == STALE or why.startswith(BLOCKED):
+        elif named(placed, why):
             noted.append((found, placed, why))
     return counted, noted
+
+
+def named(placed: str, why: str) -> bool:
+    """Whether an uncounted coder is worth saying: one that cannot be placed, one [`STALE`], one
+    parked on a blocker ([`BLOCKED`]). `make coder` and `make coders` both name these."""
+    return placed == "unknown" or why == STALE or why.startswith(BLOCKED)
 
 
 def describe(found: dict, why: str = "") -> str:
