@@ -119,14 +119,23 @@ impl Renderer {
         self.ui_renderer.shaders.ensure_screen(&self.device, format);
         self.run_backdrop_blur(view);
         self.lap("ui.blur");
-        let at = screen_box(view);
-        self.encode_ui(&mut view.ui, &target, format, at);
+        self.screen_groups(&mut view.ui);
+        self.encode_ui(&view.ui, &target, format, screen_box(view));
+    }
+
+    /// Make the batch group of every screen canvas's batch current.
+    fn screen_groups(&self, cache: &mut UiViewCache) {
+        let divisor = Some(self.quality.backdrop_divisor());
+        let canvases = cache.canvases().iter().filter(on_screen);
+        let batches = canvases.flat_map(|c| c.mesh.batches.iter());
+        let keys: Vec<_> = batches.map(|b| GroupKey::of(b, divisor)).collect();
+        self.batch_groups(&mut cache.effects, keys);
     }
 
     /// Record and submit the UI pass over `target`.
     fn encode_ui(
         &self,
-        cache: &mut UiViewCache,
+        cache: &UiViewCache,
         target: &wgpu::TextureView,
         format: wgpu::TextureFormat,
         (x, y, width, height): (u32, u32, u32, u32),
@@ -134,13 +143,6 @@ impl Renderer {
         let ui = &self.ui_renderer;
         let divisor = Some(self.quality.backdrop_divisor());
         let key = |b: &UiBatch| GroupKey::of(b, divisor);
-        let on_screen = |c: &&CanvasGpu| c.place.space == CanvasSpace::Screen;
-        let canvases = cache.canvases().iter().filter(on_screen);
-        let keys: Vec<_> = canvases
-            .flat_map(|c| c.mesh.batches.iter().map(key))
-            .collect();
-        self.batch_groups(&mut cache.effects, keys);
-        let cache = &*cache;
         let screen = || {
             let all = cache.canvases().iter().enumerate();
             all.filter(|(_, c)| on_screen(c))
@@ -183,6 +185,11 @@ impl Renderer {
         self.queue.counted_submit(Some(commands));
         self.lap("ui.submit");
     }
+}
+
+/// Whether `canvas` is a screen canvas (the overlay pass's).
+fn on_screen(canvas: &&CanvasGpu) -> bool {
+    canvas.place.space == CanvasSpace::Screen
 }
 
 /// The rect the screen canvases lay out and draw in: the view's `screen_box`,

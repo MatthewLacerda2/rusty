@@ -177,16 +177,7 @@ impl Renderer {
         let wanted = mask_sizes(cache, self.device.limits().max_texture_dimension_2d);
         cache.effects.masks.sync(&self.device, &wanted);
         cache.effects.forget_groups();
-        let mut draws = Vec::new();
-        let (canvases, effects) = cache.canvases_and_effects();
-        for (i, canvas) in canvases.iter().enumerate() {
-            for (m, draw) in canvas.mesh.masks.iter().enumerate() {
-                let inputs = self.mask_inputs(&effects.masks, canvas, draw);
-                if effects.masks.needs_draw(draw.id, inputs) {
-                    draws.push((i, m));
-                }
-            }
-        }
+        let draws = self.masks_to_draw(cache);
         cache.effects.mask_passes = draws.len() as u32;
         if draws.is_empty() {
             self.lap("ui.masks");
@@ -228,6 +219,22 @@ impl Renderer {
         self.lap("ui.masks");
         self.queue.counted_submit(Some(commands));
         self.lap("ui.mask_submit");
+    }
+
+    /// Every `(canvas, mask draw)` whose inputs changed, in order, each recorded
+    /// as drawn.
+    fn masks_to_draw(&self, cache: &mut UiViewCache) -> Vec<(usize, usize)> {
+        let mut draws = Vec::new();
+        let (canvases, effects) = cache.canvases_and_effects();
+        for (i, canvas) in canvases.iter().enumerate() {
+            for (m, draw) in canvas.mesh.masks.iter().enumerate() {
+                let inputs = self.mask_inputs(&effects.masks, canvas, draw);
+                if effects.masks.needs_draw(draw.id, inputs) {
+                    draws.push((i, m));
+                }
+            }
+        }
+        draws
     }
 
     /// What `draw`'s coverage is drawn from, or `None` when its source can change
