@@ -53,8 +53,8 @@ pub fn error(scene: &BakeScene, maps: &[Lightmap], reference: &[Lightmap]) -> Er
         assert_eq!(map.entity, truth.entity, "the same charts in order");
         let mesh = scene.meshes.iter().find(|m| m.entity == map.entity);
         let inside = interior(mesh.expect("the baked mesh"), map.size);
-        let both = map.texels.iter().zip(&truth.texels).zip(inside);
-        let luma = |(v, r): (&Vec3, &Vec3)| (luminance(*v) as f64, luminance(*r) as f64);
+        let both = map.texels().into_iter().zip(truth.texels()).zip(inside);
+        let luma = |(v, r): (Vec3, Vec3)| (luminance(v) as f64, luminance(r) as f64);
         pairs.extend(
             both.filter(|(_, inside)| *inside)
                 .map(|(pair, _)| luma(pair)),

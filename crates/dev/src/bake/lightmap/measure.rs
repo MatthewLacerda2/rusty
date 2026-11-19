@@ -54,6 +54,7 @@ impl Measure {
         let measured = Measured {
             times: self.clocks.times(),
             denoised: self.oidn.as_ref().map(|o| o.spent()),
+            peak_memory: crate::memory::rss_peak_bytes(),
         };
         let read = (input, &self.settings);
         keep_report(scene, scene_path, read, (pages, &measured), &stages);

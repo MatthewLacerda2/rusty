@@ -51,10 +51,10 @@ pub(super) fn lit() -> BakeScene {
 pub(super) fn bits(maps: &[Lightmap]) -> Vec<u32> {
     let colour = maps
         .iter()
-        .flat_map(|m| m.texels.iter().map(|t| t.to_array()));
+        .flat_map(|m| m.texels().into_iter().map(|t| t.to_array()));
     let rest = maps
         .iter()
-        .flat_map(|m| m.directions.iter().chain(&m.masks));
+        .flat_map(|m| m.directions().into_iter().chain(m.masks()));
     let colour = colour.flat_map(|t| t.map(f32::to_bits));
     colour
         .chain(rest.flat_map(|d| d.to_array().map(f32::to_bits)))
@@ -96,7 +96,7 @@ fn the_last_pass_gives_the_one_shot_bytes() {
     let one_shot = bake_on(&scene, &s, &BakeProgress::default(), 1).expect("not cancelled");
     assert!(one_shot
         .iter()
-        .all(|m| !m.masks.is_empty() && !m.directions.is_empty()));
+        .all(|m| !m.masks().is_empty() && !m.directions().is_empty()));
     let view = camera(Vec3::new(-1.0, 3.0, 4.0), Vec3::ZERO, 1.0);
     for (threads, view) in [(1, None), (3, None), (1, Some(view)), (4, Some(view))] {
         let (maps, passes) = progressive(&scene, &s, view, threads);

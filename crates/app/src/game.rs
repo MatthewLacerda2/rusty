@@ -23,6 +23,7 @@ use rusty_scene::{Camera, Scene};
 use rusty_script::scripting::{ConsoleLogs, ScriptManager};
 use rusty_time::Time;
 
+use super::probe::{timed, LoadProbe};
 use super::tap::TapPoint;
 use super::{Resources, World};
 
@@ -201,8 +202,21 @@ impl GameWorld {
         }
     }
 
+    /// Enter Play, its steps under the installed entry probe (`set_entry_probe`),
+    /// which is told the scene entered, or `None` when the scripts' runtime failed.
     fn enter_play(&mut self) {
-        self.refresh_then_hold_imports(); // #1253
+        let mut probe = self.resources.load_probes.entry.take();
+        let entered = self.enter_play_steps(&mut probe);
+        if let Some(probe) = probe.as_mut() {
+            let path = self.resources.script_manager.scene_path_cell();
+            let path = entered.then(|| path.borrow().clone().unwrap_or_default());
+            probe.finish(path.as_deref(), &mut self.resources.console.borrow_mut());
+        }
+        self.resources.load_probes.entry = probe;
+    }
+
+    fn enter_play_steps(&mut self, probe: &mut Option<Box<dyn LoadProbe>>) -> bool {
+        timed(probe, "refresh", || self.refresh_then_hold_imports()); // #1253
         self.resources.play_frame = 0;
         self.resources.time.borrow_mut().reset();
         // Reload animation graphs fresh each Play session (#316), so asset edits
@@ -227,22 +241,26 @@ impl GameWorld {
             .console
             .borrow_mut()
             .info("Capturing cursor, entering PlayMode!".to_string());
-
-        let init = self.resources.script_manager.init_runtime();
-        if !self.report_lua_init(init) {
-            return;
-        }
         // Load every scene entity's scripts, then run the two-phase init (#322):
         // ALL `Awake`s, then ALL `Start`s, actives only — a disabled-at-load
         // entity defers both until its first active tick.
-        self.resources.script_manager.init_scripts();
-
+        let started = timed(probe, "scripts", || {
+            let init = self.resources.script_manager.init_runtime();
+            let ok = self.report_lua_init(init);
+            if ok {
+                self.resources.script_manager.init_scripts();
+            }
+            ok
+        });
+        if !started {
+            return false;
+        }
         // Build the rapier world from the (post-start) scene: bodies + colliders
         // for every entity with a ColliderComponent. Stepped each frame in play.
         // Shared with the script runtime's Physics.Raycast binding.
-        self.build_physics();
-
-        self.run_startup_stage();
+        timed(probe, "physics", || self.build_physics());
+        timed(probe, "startup", || self.run_startup_stage());
+        true
     }
 
     fn exit_play(&mut self) {
@@ -269,24 +287,6 @@ impl GameWorld {
         self.restore_play_origin();
         self.apply_project_settings(); // a `SetLimits` made in Play ends with it
         self.restore_edit_runtime(); // after the restore: it binds the edit scene (#1339)
-    }
-
-    /// Run on the project file as it stands (#1517, #1522, #1749, #1715): its decal
-    /// budgets, quality presets' running values, render-scale default and speed of
-    /// sound, and an empty nav path queue (#2087). On entering Play, on Stop (Unity
-    /// reverts play-mode changes) and when the editor opens, so a hand edit to
-    /// `project.rusty` reaches the next Play.
-    pub fn apply_project_settings(&self) {
-        let mut app = self.resources.application.borrow_mut();
-        let limits = app.decal_limits();
-        self.world.scene.borrow_mut().decals.set_limits(limits);
-        let c = app.audio_settings().speed_of_sound; // reread by `decal_limits`
-        self.resources.audio.borrow_mut().set_speed_of_sound(c);
-        let graphics = self.resources.script_manager.graphics_cell();
-        let mut live = graphics.borrow_mut();
-        live.quality = app.quality_values();
-        live.render_scale.default = app.render_scale_default();
-        self.resources.nav.borrow().reset_path_queue(); // and its budget (#2087)
     }
 }
 

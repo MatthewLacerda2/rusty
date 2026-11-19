@@ -6,14 +6,14 @@
 //! stop the bake (#808) without changing a completed bake's bytes.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, PoisonError};
 use std::thread;
-
-use glam::{Vec3, Vec4};
 
 use super::input::BakeScene;
 use super::progress::BakeProgress;
 use super::raster::{
-    chart_of_triangles, lightmap_size, rasterize, texel_charts, world_per_uv, TexelPoint,
+    chart_of_triangles, lightmap_size, rasterize, rasterize_counted, texel_charts, world_per_uv,
+    TexelPoint,
 };
 use super::rays::{Rays, Tri};
 use super::rng::Rng;
@@ -24,6 +24,7 @@ use rusty_scene::lighting::settings::BakeSettings;
 mod assemble;
 mod denoise;
 pub(super) mod direction;
+mod map;
 pub(crate) mod pool;
 pub(super) mod progressive;
 pub(super) mod view;
@@ -31,27 +32,20 @@ pub(super) mod view;
 use assemble::assemble;
 pub use denoise::LightmapDenoiser;
 use denoise::{Chart, Cleaner};
+pub use map::Lightmap;
 pub use progressive::{bake_progressive, Pass, PassSink};
 pub use view::BakeView;
 
-/// One mesh's baked lightmap: `size`² linear texels, row-major, each the `E / π`
-/// value the forward shader multiplies by albedo (see `trace`).
-#[derive(Clone, Debug, PartialEq)]
-pub struct Lightmap {
-    pub entity: u32,
-    pub size: u32,
-    pub texels: Vec<Vec3>,
-    /// Per texel (#810), `xyz` the dominant direction its light arrives from, scaled
-    /// by its directionality (length 1 when it all comes from one way, 0 when it comes
-    /// evenly from everywhere), and `w` its lamp share (#1695: how much of it is
-    /// `Baked` lamps' direct light from one way, `direction::direction_texel`). Empty
-    /// when the bake was not [`BakeSettings::directional`].
-    pub directions: Vec<Vec4>,
-    /// Per texel (#1695), its shadowmask: per channel the static occlusion of the
-    /// `Mixed` light on it (`trace::Tracer::mask`). Empty unless the bake gave a
-    /// light a channel (`BakeScene::shadowmask`).
-    pub masks: Vec<Vec4>,
-}
+/// Texels of a chart's square past which it is assembled (`assemble`) one at a
+/// time, in the process: its dense maps cost about 256 bytes a texel of its square
+/// (`dev::bake::lightmap::fits`), so two large charts finishing on two workers at
+/// once would hold two of them. A worker reaching the gate while another chart
+/// is assembled waits, idle (on a bake of many large charts, up to one assembly
+/// per chart a worker queues behind); smaller charts never wait.
+pub const ASSEMBLE_ALONE: u64 = 512 * 512;
+
+/// Held while a chart past [`ASSEMBLE_ALONE`] is assembled.
+static ASSEMBLING: Mutex<()> = Mutex::new(());
 
 /// Bake every mesh in `scene` that has a usable lightmap UV and receives a lightmap
 /// ([`BakeMesh::receives_lightmap`](super::input::BakeMesh::receives_lightmap): a `ShadowsOnly` one gets none, #1571, nor one
@@ -77,8 +71,10 @@ pub fn bake_with_progress(
 
 /// [`bake_with_progress`] on `threads` workers: one pool over every mesh's texels
 /// (#1656). Each texel's stream is seeded by `(seed, mesh, texel index)`, never by
-/// which worker runs it, so the thread count never shows in the result.
-pub(super) fn bake_on(
+/// which worker runs it, so the thread count never shows in the result. A test
+/// hook too (`#[doc(hidden)]` at the crate root): `dev::bake`'s memory bound is
+/// per worker, so its test pins the workers.
+pub fn bake_on(
     scene: &BakeScene,
     settings: &BakeSettings,
     progress: &BakeProgress,
@@ -86,11 +82,11 @@ pub(super) fn bake_on(
 ) -> Option<Vec<Lightmap>> {
     let rays = Rays::build(triangles(scene));
     let tracer = Tracer::new(scene, &rays);
-    let (heads, points) = receivers(scene, settings);
-    let texels = points.iter().map(|p| p.len() as u64).sum();
+    let (heads, counts) = counted(scene, settings);
+    let texels = counts.iter().map(|&n| n as u64).sum();
     progress.set_total(texels, heads.len() as u64);
-    let sizes = heads.iter().zip(&points);
-    progress.set_meshes(sizes.map(|((i, _), p)| (scene.meshes[*i].entity, p.len() as u64)));
+    let sizes = heads.iter().zip(&counts);
+    progress.set_meshes(sizes.map(|((i, _), &n)| (scene.meshes[*i].entity, n as u64)));
     let trace = |c: usize, _: usize, batch: &[TexelPoint]| {
         let mesh = heads[c].0 as u64;
         let one = |p: &TexelPoint| texel(&tracer, settings, mesh, p);
@@ -100,7 +96,9 @@ pub(super) fn bake_on(
         progress.batch_finished(c, batch.len());
         traced
     };
-    // The pool hands each chart its points back once traced, so they die with it.
+    // A chart's points are made when its first batch is taken (#2312) and handed
+    // back to its `finish` once traced, so they live only while it is in flight.
+    let make = |c: usize| rasterize_counted(&scene.meshes[heads[c].0], heads[c].1, counts[c]);
     let cleaner = Cleaner {
         denoiser: settings.denoiser,
         radius: settings.filter_radius,
@@ -112,12 +110,43 @@ pub(super) fn bake_on(
         let shape = layout(scene, head, &points);
         let (map, lost) = lightmap(scene, (head, &shape), points, light, settings, cleaner);
         orphans.fetch_add(lost, Ordering::Relaxed);
-        progress.mesh_done();
+        // The chart's layout (its labels, size² × 4 bytes) goes before the hook
+        // hands freed memory back (`chart_finished`), so it is handed back too.
+        drop(shape);
+        progress.mesh_done(c);
         map
     };
-    let maps = pool::run(points, threads, progress, trace, finish)?;
+    let maps = pool::run_made(&counts, make, threads, progress, trace, finish)?;
     note_buried(orphans.into_inner());
     Some(maps)
+}
+
+/// [`receivers`] with each mesh's texel count instead of its texels: each is
+/// rasterized and let go at once, so a one-shot bake, which makes them again
+/// when it reaches the mesh (#2312), never holds every mesh's at once.
+fn counted(scene: &BakeScene, settings: &BakeSettings) -> (Vec<(usize, u32)>, Vec<usize>) {
+    let max = max_map_edge(settings.page());
+    lightmapped(scene, settings, max)
+        .map(|(index, size)| ((index, size), rasterize(&scene.meshes[index], size).len()))
+        .unzip()
+}
+
+/// The receiving meshes `scene` bakes at `settings`, each with its lightmap
+/// edge ([`bake`]'s rule), every lightmap fitting a `max`-edged page with its ring.
+fn lightmapped<'a>(
+    scene: &'a BakeScene,
+    settings: &'a BakeSettings,
+    max: u32,
+) -> impl Iterator<Item = (usize, u32)> + 'a {
+    scene
+        .meshes
+        .iter()
+        .enumerate()
+        .filter(|(_, mesh)| mesh.receives_lightmap())
+        .filter_map(move |(index, mesh)| {
+            let density = settings.texels_per_unit * mesh.scale_in_lightmap;
+            Some((index, lightmap_size(mesh, density, max)?))
+        })
 }
 
 /// Every receiving mesh's (index, lightmap size) and its texels, rasterized
@@ -129,16 +158,8 @@ pub(super) type Receivers = (Vec<(usize, u32)>, Vec<Vec<TexelPoint>>);
 pub(super) fn receivers(scene: &BakeScene, settings: &BakeSettings) -> Receivers {
     // Every lightmap must fit a page with its ring around it.
     let max = max_map_edge(settings.page());
-    scene
-        .meshes
-        .iter()
-        .enumerate()
-        .filter(|(_, mesh)| mesh.receives_lightmap())
-        .filter_map(|(index, mesh)| {
-            let density = settings.texels_per_unit * mesh.scale_in_lightmap;
-            let size = lightmap_size(mesh, density, max)?;
-            Some(((index, size), rasterize(mesh, size)))
-        })
+    lightmapped(scene, settings, max)
+        .map(|(index, size)| ((index, size), rasterize(&scene.meshes[index], size)))
         .unzip()
 }
 
@@ -211,25 +232,27 @@ fn lightmap(
     let mesh = &scene.meshes[index];
     // Texels inside other geometry are dropped here and filled from their own
     // chart's valid texels in `assemble` (#1949).
-    let (points, light): (Vec<TexelPoint>, Vec<TexelLight>) = points
-        .into_iter()
-        .zip(light)
-        .filter(|(_, l)| l.valid)
-        .unzip();
+    // Sized once (`pool`'s reason): a chart's texels are its largest buffers.
+    let valid = light.iter().filter(|l| l.valid).count();
+    let (mut kept, mut lit) = (Vec::with_capacity(valid), Vec::with_capacity(valid));
+    for (p, l) in points.into_iter().zip(light).filter(|(_, l)| l.valid) {
+        kept.push(p);
+        lit.push(l);
+    }
+    let (points, light) = (kept, lit);
     let masked = scene.shadowmask.any();
     let chart = Chart {
         points: &points,
         size,
         texel_world: layout.texel_world,
     };
+    // Past `ASSEMBLE_ALONE`, one chart at a time (its reason). Taken before the
+    // denoise's budget (`Cleaner`), never while holding it, so the two cannot wait
+    // on each other.
+    let _alone = (u64::from(size) * u64::from(size) > ASSEMBLE_ALONE)
+        .then(|| ASSEMBLING.lock().unwrap_or_else(PoisonError::into_inner));
     let maps = assemble(chart, &layout.labels, &light, settings, cleaner, masked);
-    let map = Lightmap {
-        entity: mesh.entity,
-        size,
-        texels: maps.texels,
-        directions: maps.directions,
-        masks: maps.masks,
-    };
+    let map = Lightmap::sparse(mesh.entity, size, maps.filled, maps.kept);
     (map, maps.orphans)
 }
 

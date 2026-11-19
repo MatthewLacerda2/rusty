@@ -89,7 +89,7 @@ pub(crate) fn rasterize_claims(
     height: u32,
     sink: &mut dyn FnMut(Claim),
 ) -> Vec<TexelPoint> {
-    walk(mesh, width, height, Some(sink))
+    walk(mesh, (width, height), Vec::new(), Some(sink))
 }
 
 /// The last (triangle, owner) pair [`walk`] asked [`in_uv`] about, and the answer:

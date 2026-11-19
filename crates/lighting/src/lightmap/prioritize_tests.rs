@@ -38,8 +38,8 @@ fn the_view_converges_before_the_rest() {
     let (pass, maps) = &shown[3];
     assert_eq!((pass.done, pass.passes), (4, 7));
     assert_eq!((pass.samples, pass.view, pass.target), (1, 4, 4));
-    assert_eq!(maps[1].texels, last[1].texels, "the wall is finished");
-    assert_ne!(maps[0].texels, last[0].texels, "the floor is not");
+    assert_eq!(maps[1].texels(), last[1].texels(), "the wall is finished");
+    assert_ne!(maps[0].texels(), last[0].texels(), "the floor is not");
 }
 
 #[test]

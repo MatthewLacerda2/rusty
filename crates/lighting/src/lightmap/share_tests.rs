@@ -12,8 +12,8 @@ use super::*;
 /// Every direction texel of `entity`'s lightmap, and their mean.
 fn texels(maps: &[Lightmap], entity: u32) -> (Vec<Vec4>, Vec4) {
     let map = maps.iter().find(|m| m.entity == entity).expect("baked");
-    let mean = map.directions.iter().sum::<Vec4>() / map.directions.len() as f32;
-    (map.directions.clone(), mean)
+    let mean = map.directions().iter().sum::<Vec4>() / map.directions().len() as f32;
+    (map.directions().clone(), mean)
 }
 
 fn scene(meshes: Vec<BakeMesh>, lights: Vec<BakeLight>, sky: f32) -> BakeScene {

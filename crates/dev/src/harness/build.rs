@@ -6,10 +6,11 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use super::{fixture_project, Harness};
-use rusty_app::{GameWorld, ProjectSource};
+use rusty_app::{timed, GameWorld, LoadProbe, ProjectSource};
 use rusty_core::input::InputState;
 use rusty_core::project::ProjectSettings;
 use rusty_navigation::NavigationGraph;
+use rusty_scene::serialize::RehydratedScene;
 use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
@@ -68,24 +69,52 @@ impl Harness {
         scene_path: &str,
         settings: ProjectSettings,
     ) -> Result<Self, String> {
-        rusty_scene::io::read_scene_file(scene_path)?;
+        Self::on_project_scene_timed(out_dir, scene_path, settings, &mut None)
+    }
+
+    /// [`Self::on_project_scene`], each step of the boot load run under `probe`
+    /// (`rusty_app::timed`, as a play-mode `Scene.Load` runs its own): `document`
+    /// (the file read and parsed, once), `import` (its meshes built, its models
+    /// through the import cache), `apply` (the World replaced, the navmesh and
+    /// lighting sidecars read), `navmesh` (the graph built or restored from the
+    /// scene) and `world` (the game world, its Lua API and stats, the project's
+    /// settings). The steps tile the call: nothing between them is left untimed.
+    pub fn on_project_scene_timed(
+        out_dir: impl AsRef<Path>,
+        scene_path: &str,
+        settings: ProjectSettings,
+        probe: &mut Option<Box<dyn LoadProbe>>,
+    ) -> Result<Self, String> {
+        let read = timed(probe, "document", || {
+            let json = rusty_scene::io::read_text(scene_path)?;
+            let data = rusty_scene::io::parse_scene_text(&json, scene_path)?;
+            Ok::<_, String>((json, data))
+        });
+        let (json, data) = read?;
+        let document = timed(probe, "import", || RehydratedScene::new(data));
         let mut scene = Scene::new();
         // The document parsed just above, so what fails here is the sidecar.
-        let sidecar = rusty_edit::load_from_file(&mut scene, scene_path);
-        let harness = Self::in_workspace(out_dir, scene, PathBuf::new());
-        if let Err(err) = sidecar {
-            let line = format!("Failed to load scene {scene_path}: {err}");
-            harness.console.borrow_mut().error(line);
-        }
-        {
-            let world = harness.world.borrow();
-            *world.script_manager().scene_path_cell().borrow_mut() = Some(scene_path.into());
-            // Unbound, as in the player: a run reads the settings, never writes
-            // them. No saved player choices in a harness (its store is pathless):
-            // the project's default options (#1438) and initial quality preset
-            // (#1522) are what it plays with.
-            world.open_project(ProjectSource::ReadOnly(settings));
-        }
+        let sidecar = timed(probe, "apply", || {
+            rusty_edit::load_rehydrated(&mut scene, scene_path, json, document)
+        });
+        let nav = timed(probe, "navmesh", || NavigationGraph::from_scene(&scene));
+        let harness = timed(probe, "world", || {
+            let harness = Self::in_workspace_with(out_dir, scene, nav, PathBuf::new());
+            if let Err(err) = sidecar {
+                let line = format!("Failed to load scene {scene_path}: {err}");
+                harness.console.borrow_mut().error(line);
+            }
+            {
+                let world = harness.world.borrow();
+                *world.script_manager().scene_path_cell().borrow_mut() = Some(scene_path.into());
+                // Unbound, as in the player: a run reads the settings, never writes
+                // them. No saved player choices in a harness (its store is pathless):
+                // the project's default options (#1438) and initial quality preset
+                // (#1522) are what it plays with.
+                world.open_project(ProjectSource::ReadOnly(settings));
+            }
+            harness
+        });
         Ok(harness)
     }
 
@@ -97,6 +126,16 @@ impl Harness {
     fn in_workspace(out_dir: impl AsRef<Path>, scene: Scene, workspace: PathBuf) -> Self {
         // Baked over the scene's own bounds (#452) — the same path the windowed game takes.
         let nav = NavigationGraph::from_scene(&scene);
+        Self::in_workspace_with(out_dir, scene, nav, workspace)
+    }
+
+    /// [`Self::in_workspace`] on the navmesh `nav` built from `scene`.
+    fn in_workspace_with(
+        out_dir: impl AsRef<Path>,
+        scene: Scene,
+        nav: NavigationGraph,
+        workspace: PathBuf,
+    ) -> Self {
         let scene = Rc::new(RefCell::new(scene));
         let input = Rc::new(RefCell::new(InputState::new()));
         let nav = Rc::new(RefCell::new(nav));

@@ -22,7 +22,10 @@ fn scene() -> BakeScene {
 fn bits(maps: &[Lightmap]) -> Vec<(u32, u32, Vec<[u32; 3]>)> {
     maps.iter()
         .map(|m| {
-            let texels = m.texels.iter().map(|t| t.to_array().map(f32::to_bits));
+            let texels = m
+                .texels()
+                .into_iter()
+                .map(|t| t.to_array().map(f32::to_bits));
             (m.entity, m.size, texels.collect())
         })
         .collect()

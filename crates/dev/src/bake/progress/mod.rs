@@ -41,7 +41,7 @@ use std::time::{Duration, Instant};
 
 use rusty_script::scripting::ConsoleLogs;
 
-mod format;
+pub(crate) mod format;
 pub mod listen;
 mod mesh_clock;
 #[cfg(test)]
@@ -108,6 +108,8 @@ pub struct BakeLog<'a> {
     meshes: Vec<MeshCost>,
     /// The lightmaps OIDN cleaned and its worker time (#1884).
     denoised: Option<(u64, Duration)>,
+    /// The process's peak resident memory, in bytes, once a bake has read it (#2312).
+    peak: Option<u64>,
 }
 
 impl<'a> BakeLog<'a> {
@@ -146,6 +148,7 @@ impl<'a> BakeLog<'a> {
             steps: Vec::new(),
             meshes: Vec::new(),
             denoised: None,
+            peak: None,
         }
     }
 
@@ -172,6 +175,14 @@ impl<'a> BakeLog<'a> {
     pub fn mesh_costs(&mut self, meshes: Vec<MeshCost>) {
         if self.is_on() {
             self.meshes = meshes;
+        }
+    }
+
+    /// Note the process's peak resident memory, `bytes`, for the last line
+    /// (#2312); the highest noted wins.
+    pub fn peak_memory(&mut self, bytes: u64) {
+        if self.is_on() {
+            self.peak = Some(self.peak.map_or(bytes, |p| p.max(bytes)));
         }
     }
 
@@ -267,8 +278,13 @@ impl<'a> BakeLog<'a> {
             });
         }
         let took = now.saturating_sub(started);
+        let peak = (self.peak.take()).map(|b| format!(", process peak {}", format::gb(b)));
         out(Line {
-            text: format!("[Lighting] done in {}", format::duration(took)),
+            text: format!(
+                "[Lighting] done in {}{}",
+                format::duration(took),
+                peak.unwrap_or_default()
+            ),
             milestone: true,
         });
         self.since = None;

@@ -79,7 +79,7 @@ pub(super) fn apply_scene_load(world: &mut World, res: &mut Resources) {
     let Some(due) = world.scene.borrow_mut().loads.take_due() else {
         return;
     };
-    let mut probe = res.load_probe.take();
+    let mut probe = res.load_probes.scene.take();
     let loaded = match due {
         Due::Sync(path) => match prepare(path, &mut probe) {
             Ok(prepared) => Some(activate(world, res, prepared, &mut probe)),
@@ -93,7 +93,7 @@ pub(super) fn apply_scene_load(world: &mut World, res: &mut Resources) {
     if let Some(probe) = probe.as_mut() {
         probe.finish(loaded.as_deref(), &mut res.console.borrow_mut());
     }
-    res.load_probe = probe;
+    res.load_probes.scene = probe;
 }
 
 /// Activate operation `op`, whose scene the tick head published ready; it ends done.
