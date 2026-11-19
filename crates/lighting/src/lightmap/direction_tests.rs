@@ -10,8 +10,8 @@ use super::*;
 /// The mean direction texel of `entity`'s lightmap.
 fn mean_dir(maps: &[Lightmap], entity: u32) -> Vec3 {
     let map = maps.iter().find(|m| m.entity == entity).expect("baked");
-    let sum: Vec3 = map.directions.iter().map(|d| d.truncate()).sum();
-    sum / map.directions.len() as f32
+    let sum: Vec3 = map.directions().iter().map(|d| d.truncate()).sum();
+    sum / map.directions().len() as f32
 }
 
 #[test]
@@ -69,7 +69,7 @@ fn the_filter_smooths_directions_and_keeps_them_unit_bounded() {
     let spread = |maps: &[Lightmap]| {
         let mean = mean_dir(maps, 1);
         let map = maps.iter().find(|m| m.entity == 1).unwrap();
-        map.directions
+        map.directions()
             .iter()
             .map(|d| (d.truncate() - mean).length())
             .sum::<f32>()
@@ -77,7 +77,7 @@ fn the_filter_smooths_directions_and_keeps_them_unit_bounded() {
     assert!(spread(&smooth) < spread(&raw), "smoother than raw");
     for map in &smooth {
         let bounded = |d: &Vec4| d.truncate().length() <= 1.0 + 1e-5 && d.w <= 1.0;
-        assert!(map.directions.iter().all(bounded));
+        assert!(map.directions().iter().all(bounded));
     }
 }
 
@@ -97,9 +97,9 @@ fn turning_it_off_drops_directions_and_keeps_the_colour() {
     };
     let off = bake(&scene, &off_settings);
     for (a, b) in on.iter().zip(&off) {
-        assert_eq!(a.texels, b.texels, "the colour lightmap is the same");
-        assert_eq!(a.directions.len(), a.texels.len());
-        assert!(b.directions.is_empty());
+        assert_eq!(a.texels(), b.texels(), "the colour lightmap is the same");
+        assert_eq!(a.directions().len(), a.texels().len());
+        assert!(b.directions().is_empty());
     }
     assert!(
         pack(&off, MAX_PAGE).directions.is_empty(),
@@ -109,12 +109,14 @@ fn turning_it_off_drops_directions_and_keeps_the_colour() {
 
 #[test]
 fn direction_pages_share_the_colour_pages_layout() {
-    let map = |entity, size: u32, value: f32| Lightmap {
-        masks: Vec::new(),
-        entity,
-        size,
-        texels: vec![Vec3::splat(value); (size * size) as usize],
-        directions: vec![Vec4::Y * value; (size * size) as usize],
+    let map = |entity, size: u32, value: f32| {
+        Lightmap::dense(
+            entity,
+            size,
+            vec![Vec3::splat(value); (size * size) as usize],
+            vec![Vec4::Y * value; (size * size) as usize],
+            Vec::new(),
+        )
     };
     let atlas = pack(&[map(1, 16, 0.25), map(2, 8, 0.75)], MAX_PAGE);
     assert_eq!(atlas.directions.len(), atlas.pages.len());

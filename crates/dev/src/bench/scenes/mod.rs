@@ -13,7 +13,7 @@
 //! `load_cold_ms`, its steps as `load.<step>` and what it did as
 //! `load.count.<what>`: [`load`](mod@load)), `import_ms` (`IMPORT=1`, once a run, on its first scene: the
 //! same load of a copy of the project without its import cache, [`import`]), `rss_peak_mb` (the process's peak resident
-//! memory, [`memory`]), `gpu_mb` (the renderer's GPU memory,
+//! memory, [`crate::memory`]), `gpu_mb` (the renderer's GPU memory,
 //! `rusty_render::gpu_memory`, with `gpu_allocated_mb`, what live allocations use,
 //! where the allocator tells it) and `gpu_texture_mb`, `gpu_lightmap_mb` and
 //! `gpu_reflection_mb` (the renderer's own resident bytes by kind), each compared with that scene's last run or a
@@ -30,7 +30,6 @@ mod fold;
 pub mod import;
 pub mod load;
 mod measure;
-pub mod memory;
 mod notes;
 pub mod profile;
 pub mod report;
@@ -187,7 +186,7 @@ pub fn bench(
     if let Some(ms) = extra.import_ms {
         report.push_value("import_ms", ms);
     }
-    if let Some(bytes) = memory::rss_peak_bytes() {
+    if let Some(bytes) = crate::memory::rss_peak_bytes() {
         report.push_value("rss_peak_mb", mb(bytes));
     }
     if let Some(r) = harness.renderer() {

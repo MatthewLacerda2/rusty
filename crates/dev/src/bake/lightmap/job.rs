@@ -86,8 +86,13 @@ impl LightmapBakeJob {
         view: Option<BakeView>,
     ) -> Result<Self, String> {
         let scene_path = scene_path.ok_or(UNSAVED)?.to_string();
+        // What bakes the machine lost left, before this one adds its own.
+        super::spill::sweep(&scene_path);
         let started = Instant::now();
         let input = gather_bake_input(scene);
+        super::fits::fits(&input, &settings, true)?;
+        // Freed chart buffers go back to the system, as the estimate counts on.
+        crate::memory::return_large_frees();
         let (progress, measure) = Measure::start(&settings, started.elapsed());
         let lights = rusty_lighting::lightmap::taken_lights(scene);
         let shadowmask = input.shadowmask.clone();
@@ -97,6 +102,7 @@ impl LightmapBakeJob {
         let watch = Arc::clone(&progress);
         let view = view.filter(|_| settings.prioritize_view);
         let (page, taken) = (settings.page(), (lights, shadowmask));
+        let spill_beside = scene_path.clone();
         let mut encoder = Encoder::start(&previews, page, taken.clone(), Arc::clone(&progress))?;
         let worker = thread::Builder::new()
             .name("lightmap-bake".into())
@@ -107,7 +113,7 @@ impl LightmapBakeJob {
                 drop(encoder);
                 let traced = Instant::now();
                 let encoded = match baked {
-                    Some(maps) => encode_pages(&maps, page, &watch).map(|pages| {
+                    Some(maps) => encode_pages(maps, page, &watch, &spill_beside).map(|pages| {
                         let times = (traced - started, traced.elapsed());
                         pages.map(|p| (labelled(p, &taken), times.0, times.1))
                     }),

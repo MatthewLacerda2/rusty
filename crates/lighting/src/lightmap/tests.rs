@@ -73,7 +73,7 @@ pub(super) fn settings() -> BakeSettings {
 /// Mean texel brightness of the lightmap baked for `entity`.
 pub(super) fn mean(maps: &[Lightmap], entity: u32) -> f32 {
     let map = maps.iter().find(|m| m.entity == entity).expect("baked");
-    map.texels.iter().map(|t| t.x).sum::<f32>() / map.texels.len() as f32
+    map.texels().iter().map(|t| t.x).sum::<f32>() / map.texels().len() as f32
 }
 
 #[test]

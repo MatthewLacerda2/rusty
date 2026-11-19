@@ -126,28 +126,40 @@ pub(super) fn rasterize(mesh: &BakeMesh, size: u32) -> Vec<TexelPoint> {
     rasterize_surface(&mesh.surface(), size, size)
 }
 
+/// [`rasterize`] of a mesh known to give `count` texels (a bake counts them
+/// first): the list is sized once, never grown by doubling, each growth of
+/// which frees a large block that macOS's allocator keeps in the footprint
+/// (#2312).
+pub(super) fn rasterize_counted(mesh: &BakeMesh, size: u32, count: usize) -> Vec<TexelPoint> {
+    walk(
+        &mesh.surface(),
+        (size, size),
+        Vec::with_capacity(count),
+        None,
+    )
+}
+
 /// [`rasterize`] over any [`Surface`]: its own UV set, scaled to a `width × height`
 /// image (U across, V down), so a non-square map stretches the unit square.
 pub(crate) fn rasterize_surface(mesh: &Surface, width: u32, height: u32) -> Vec<TexelPoint> {
-    walk(mesh, width, height, None)
+    walk(mesh, (width, height), Vec::new(), None)
 }
 
-/// The walk of [`rasterize`]. With `claims`, every later triangle that reaches an
+/// The walk of [`rasterize`], onto the end of `out`. With `claims`, every later triangle that reaches an
 /// owned texel in the pass that owns it, and overlaps the owner in UV, is handed
 /// to it as a [`Claim`], in walk order (by pass, then triangle index); a triangle
 /// only touching the owner along an edge is no claimant. Either way the owners
 /// are the same, and the sink may replace a texel's point, never its owner.
 fn walk(
     mesh: &Surface,
-    width: u32,
-    height: u32,
+    (width, height): (u32, u32),
+    mut out: Vec<TexelPoint>,
     mut claims: Option<&mut dyn FnMut(Claim)>,
 ) -> Vec<TexelPoint> {
     let scale = Vec2::new(width as f32, height as f32);
     let tris = uv_triangles(mesh, scale);
     let texels = width as usize * height as usize;
     let mut owners = Owners::new(texels, claims.is_some());
-    let mut out: Vec<TexelPoint> = Vec::new();
     let mut asked = overlap::Asked::default();
     for conservative in [false, true] {
         let pass = out.len();

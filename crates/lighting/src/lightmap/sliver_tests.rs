@@ -86,7 +86,7 @@ fn floor_halves(grating: bool) -> (f32, f32) {
     };
     let maps = bake(&scene, &settings());
     let map = maps.iter().find(|m| m.entity == 1).expect("floor baked");
-    assert!(map.texels.iter().all(|t| t.is_finite()), "a NaN texel");
+    assert!(map.texels().iter().all(|t| t.is_finite()), "a NaN texel");
     halves(map)
 }
 

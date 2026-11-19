@@ -77,7 +77,7 @@ fn sub_texel_strips_bake_lit_not_black() {
     let map = &bake(&scene, &settings)[0];
     assert_eq!(map.size, S, "the density holds the strips under a texel");
     for k in 0..STRIPS as usize {
-        let row = &map.texels[2 * k * S as usize..][..S as usize];
+        let row = &map.texels()[2 * k * S as usize..][..S as usize];
         assert!(row.iter().all(|t| t.x > 0.5), "strip {k} is dark: {row:?}");
     }
 }
