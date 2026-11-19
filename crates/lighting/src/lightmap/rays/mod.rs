@@ -212,20 +212,7 @@ pub(super) struct NodeRay {
     origin: [f32; 3],
     zero: [bool; 3],
     inv: [f32; 3],
-    /// The ray itself, for the test build's parry path ([`PARRY_NODES`]).
-    #[cfg(test)]
-    ray: Ray,
 }
-
-/// Test builds only: when set, [`NodeRay::cast`] answers with parry's own
-/// `BvhNode::cast_ray`, so a test can bake both ways and compare the bytes; and
-/// how many nodes it tested. Under nextest every test is its own process, so one
-/// test's switch reaches no other (and the two paths agree to the bit anyway).
-#[cfg(test)]
-pub(super) static PARRY_NODES: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
-#[cfg(test)]
-pub(super) static NODES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 impl NodeRay {
     pub(super) fn new(ray: &Ray) -> Self {
@@ -235,8 +222,6 @@ impl NodeRay {
             // parry's `is_zero()`: `== 0.0`, so -0.0 too, and NaN is not zero.
             zero: d.map(|c| c == 0.0),
             inv: d.map(|c| 1.0 / c),
-            #[cfg(test)]
-            ray: *ray,
         }
     }
 
@@ -247,17 +232,9 @@ impl NodeRay {
     /// inverse-ray test (`BvhNode::cast_inv_ray_simd`) is private, and it is SIMD.
     /// Keep it parry's operations in parry's order (the zero test and slab check,
     /// the swap, `max` then `min`, the early miss; no fused multiply-add): the
-    /// property test in `ray_box_tests` compares the two bit for bit, so a parry
+    /// property test in `node_tests` compares the two bit for bit, so a parry
     /// upgrade that changes its test fails there rather than drifting the bake.
     pub(super) fn cast(&self, node: &BvhNode, max_toi: f32) -> f32 {
-        #[cfg(test)]
-        {
-            use std::sync::atomic::Ordering::Relaxed;
-            NODES.fetch_add(1, Relaxed);
-            if PARRY_NODES.load(Relaxed) {
-                return node.cast_ray(&self.ray, max_toi);
-            }
-        }
         let (mins, maxs) = (node.mins().to_array(), node.maxs().to_array());
         let mut tmin: f32 = 0.0;
         let mut tmax = max_toi;
@@ -292,3 +269,8 @@ fn hit(mesh: &TriMesh, i: u32, ray: &Ray, reach: f32) -> Option<(f32, Vec3)> {
     let (inter, weights) = local_ray_intersection_with_triangle(t.a, t.b, t.c, ray)?;
     (inter.time_of_impact < reach).then_some((inter.time_of_impact, weights))
 }
+
+#[cfg(test)]
+mod node_tests;
+#[cfg(test)]
+mod tests;

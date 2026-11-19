@@ -3,7 +3,7 @@
 
 use glam::Vec3;
 
-use super::rays::{Rays, Tri};
+use super::{Rays, Tri};
 
 /// A 2×2 quad at z = 0 (triangles 0 and 1, facing +Z) and a triangle at z = -1
 /// behind it (triangle 2), each tagged with its own `first`.

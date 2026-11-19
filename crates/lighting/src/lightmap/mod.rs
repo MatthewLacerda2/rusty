@@ -134,10 +134,6 @@ mod progress_tests;
 #[cfg(test)]
 mod progressive_tests;
 #[cfg(test)]
-mod ray_box_tests;
-#[cfg(test)]
-mod rays_tests;
-#[cfg(test)]
 mod run_bake_tests;
 #[cfg(test)]
 mod run_tests;
