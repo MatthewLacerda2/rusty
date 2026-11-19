@@ -89,6 +89,11 @@ fn project_with_a_model() -> std::path::PathBuf {
 
 #[test]
 fn gpu_a_load_runs_every_step_once_in_order_and_they_sum_to_load_ms() {
+    // Alone: `converted` counts the process's conversions, any test's.
+    rusty_test_support::alone!(a_load_in_steps);
+}
+
+fn a_load_in_steps() {
     let root = project_with_a_model();
     let opts = Options {
         size: (32, 32),
@@ -103,11 +108,8 @@ fn gpu_a_load_runs_every_step_once_in_order_and_they_sum_to_load_ms() {
         "startup", "tick", "frame",
     ];
     assert_eq!(names, want);
-    assert!(
-        load.steps.iter().all(|(_, ms)| *ms >= 0.0),
-        "{:?}",
-        load.steps
-    );
+    let steps = &load.steps;
+    assert!(steps.iter().all(|(_, ms)| *ms >= 0.0), "{steps:?}");
     assert!(load.total_ms() > 0.0);
     assert_eq!(
         harness.frame(),
