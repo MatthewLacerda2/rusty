@@ -498,7 +498,9 @@ lighting settings (above), whose defaults are the ones listed here.
   side, and the estimate below counts each at its square); a mesh's
   texels are rasterized only when the bake reaches it. OIDN cleans each lightmap
   with at most 512 MB of scratch (a larger one is cleaned in overlapping tiles;
-  measured on 1016² maps, byte for byte what one pass gives), and the lightmaps
+  measured on 1016² maps, byte for byte what one pass gives; a larger map, cut
+  into more tiles, is expected to give the same picture without a seam, which
+  nothing has checked byte for byte), and the lightmaps
   being cleaned at once share 2 GB, so its share does not grow with the cores.
   Then the pages are made one at a time: each is composed (its lightmaps' squares
   filled again, which is when a map's edge is dilated and the rest of its square
