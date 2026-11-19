@@ -63,7 +63,11 @@ impl ProbeFrame {
     /// zero inside it: [`ReflectionProbe::volume_distance_sq`] on a frame already
     /// built.
     pub fn distance_sq(&self, point: Vec3) -> f32 {
-        let local = self.to_frame(point);
+        self.local_distance_sq(self.to_frame(point))
+    }
+
+    /// [`Self::distance_sq`] of a point already turned into the frame.
+    pub(super) fn local_distance_sq(&self, local: Vec3) -> f32 {
         self.nearest(local).distance_squared(local)
     }
 

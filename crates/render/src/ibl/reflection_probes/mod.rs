@@ -15,11 +15,12 @@
 //! volumes is O(P log P) over P probes, then each draw tests at most
 //! [`MAX_REFLECTION_PROBES`] volumes: a probe's frame and reach are prepared once,
 //! when it becomes resident ([`PreparedProbes`], #2324), so a draw only measures the
-//! probes whose reach holds its centre and rejects the rest on a box test. GPU work happens only when the set of nearest
-//! cubes changes: one texture-to-texture copy per newly resident cube, or a rebuild
-//! of the array when it cannot hold them. A scene with no baked probe (the Inspector
-//! preview, rendered every frame beside the viewport) leaves the resident cubes
-//! alone, so the next scene finds them still in place.
+//! probes whose reach holds its centre and rejects the rest on a box test. GPU work
+//! happens only when the set of nearest cubes changes: one texture-to-texture copy
+//! per newly resident cube, or a rebuild of the array when it cannot hold them. A
+//! scene with no baked probe (the Inspector preview, rendered every frame beside the
+//! viewport) leaves the resident cubes alone, so the next scene finds them still in
+//! place.
 //!
 //! **Size and budget.** The array's face is the largest resident cube's (#1584); a
 //! smaller cube lands as many mips down as it is halved, and its `mip_base` tells the

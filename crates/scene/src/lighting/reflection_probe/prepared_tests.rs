@@ -99,27 +99,50 @@ fn a_nan_point_and_an_empty_set_agree() {
 fn an_update_follows_the_set_it_is_given() {
     let mut set = mixed();
     let mut prepared = set.prepared();
-    assert!(
-        !prepared.update(&set.probes),
-        "the same set changes nothing"
-    );
+    prepared.update(&set.probes);
+    agrees_over(&set, Vec3::ZERO, 9.0, 12);
     set.edit(1, |p| p.rotation = Quat::from_rotation_x(0.3));
     set.move_probe(0, Vec3::new(1.0, 0.0, 0.0));
-    assert!(prepared.update(&set.probes));
+    prepared.update(&set.probes);
     agrees_over(&set, Vec3::ZERO, 9.0, 12);
     set.probes.truncate(2);
-    assert!(prepared.update(&set.probes));
+    prepared.update(&set.probes);
     assert_eq!(prepared.probes(), &set.probes[..]);
     agrees_over(&set, Vec3::ZERO, 9.0, 12);
 }
 
-/// An unnormalised rotation, which `hold` would have fixed, measures every point.
+/// A rotation of norm a hair under 1, written straight to the field (`edit` would
+/// normalise it): the frame's rotation and glam's then turn points apart, so a
+/// reach built from the world bounds stops millimetres short of where the
+/// influence does, past the box's corners. The reach is tested in the frame, so
+/// the blend agrees there too.
 #[test]
-fn an_unheld_rotation_is_never_rejected_on_its_reach() {
+fn a_nearly_unit_rotation_agrees_past_the_corners() {
     let mut set = ReflectionProbeSet::new();
-    set.add(Vec3::ZERO, Vec3::splat(2.0));
-    set.probes[0].rotation = Quat::from_xyzw(0.0, 0.6, 0.0, 1.2);
-    let probe: &ReflectionProbe = &set.probes[0];
-    assert!(super::reach(probe).is_none());
-    agrees_over(&set, Vec3::ZERO, 8.0, 12);
+    set.add(Vec3::ZERO, Vec3::splat(10.0));
+    let q = Quat::from_euler(glam::EulerRot::YXZ, 0.9, 0.3, 0.5) * (1.0 - 0.9e-4);
+    (set.probes[0].rotation, set.probes[0].blend_distance) = (q, 2.0);
+    let (probe, prepared): (&ReflectionProbe, _) = (&set.probes[0], set.prepared());
+    let frame = probe.frame();
+    let mut reached = 0;
+    for corner in 0..8 {
+        let bit = |b: usize| Vec3::splat(f32::from(u8::from(corner & b != 0)));
+        let mask = bit(1) * Vec3::X + bit(2) * Vec3::Y + bit(4) * Vec3::Z;
+        let local = frame.box_min + (frame.box_max - frame.box_min) * mask;
+        // The world point the frame turns onto this corner.
+        let mut at = q.normalize() * local;
+        for _ in 0..50 {
+            at += q.normalize() * (local - frame.to_frame(at));
+        }
+        for dir in [Vec3::X, Vec3::Y, Vec3::Z, -Vec3::X, -Vec3::Y, -Vec3::Z] {
+            // Out along `dir` in tenths of a millimetre, across the blend edge.
+            for k in 19_800..20_200 {
+                let point = at + dir * (k as f32 * 1e-4);
+                let want = set.blend(point);
+                assert_eq!(bits(prepared.blend(point)), bits(want), "at {point}");
+                reached += usize::from(want.is_some());
+            }
+        }
+    }
+    assert!(reached > 0, "the sweep crosses the edge");
 }

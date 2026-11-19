@@ -23,7 +23,7 @@
 //! [`PreparedProbes`]: the same rule over frames built once per resident set, with a
 //! probe whose reach misses the point skipped before its influence is measured.
 
-use glam::{Quat, Vec3};
+use glam::Vec3;
 
 use super::volume::ProbeFrame;
 use super::{ReflectionProbe, ReflectionProbeSet};
@@ -125,11 +125,12 @@ fn pick(
 
 /// A set of probes ready for many blends: each probe's [`ProbeFrame`], built once
 /// when the probe changes rather than on every influence, and its *reach*, the
-/// world-aligned box its influence cannot leave. [`Self::blend`] equals
-/// [`ReflectionProbeSet::blend`] over [`Self::probes`] bit for bit: a probe whose
-/// reach misses the point is skipped, where its influence would read 0, and every
-/// other one is measured with the same arithmetic. The probes are read-only, so no
-/// frame goes stale; [`Self::update`] is the one way to change them.
+/// frame-space box its influence cannot leave. [`Self::blend`] equals
+/// [`ReflectionProbeSet::blend`] over [`Self::probes`] bit for bit: the point is
+/// turned into each frame with the arithmetic `influence` uses, a probe whose reach
+/// misses the turned point is skipped, where its influence would read 0, and every
+/// other one is measured from that same turned point. The probes are read-only, so
+/// no frame goes stale; [`Self::update`] is the one way to change them.
 #[derive(Clone, Debug, Default)]
 pub struct PreparedProbes {
     probes: Vec<ReflectionProbe>,
@@ -137,10 +138,10 @@ pub struct PreparedProbes {
 }
 
 /// How much a probe's reach is grown past its blend distance, relative to that
-/// distance and to the size of its coordinates: far past the few ulps by which the
-/// frame's rotation and the world bounds' corners may round apart, so the reject
+/// distance and to the size of the frame's coordinates: far past the few ulps by
+/// which the nearest point, its distance and the square root round, so the reject
 /// stays conservative.
-const REACH_SLACK: f32 = 1e-4;
+const REACH_SLACK: f32 = 1e-5;
 
 impl PreparedProbes {
     /// The probes, in the order the blend's indices name them.
@@ -149,10 +150,9 @@ impl PreparedProbes {
     }
 
     /// Make the set `probes`, in order, preparing only the probes that differ from
-    /// the one held at their index. True when anything changed.
-    pub fn update<'a>(&mut self, probes: impl IntoIterator<Item = &'a ReflectionProbe>) -> bool {
+    /// the one held at their index.
+    pub fn update<'a>(&mut self, probes: impl IntoIterator<Item = &'a ReflectionProbe>) {
         let mut n = 0;
-        let mut changed = false;
         for (i, probe) in probes.into_iter().enumerate() {
             n = i + 1;
             match self.probes.get_mut(i) {
@@ -160,44 +160,45 @@ impl PreparedProbes {
                 Some(held) => held.clone_from(probe),
                 None => self.probes.push(probe.clone()),
             }
-            let prepared = (probe.frame(), reach(probe));
+            let frame = probe.frame();
+            let prepared = (frame, reach(&frame));
             match self.frames.get_mut(i) {
                 Some(slot) => *slot = prepared,
                 None => self.frames.push(prepared),
             }
-            changed = true;
         }
-        changed |= self.probes.len() > n;
         self.probes.truncate(n);
         self.frames.truncate(n);
-        changed
     }
 
     /// [`ReflectionProbeSet::blend`] of [`Self::probes`] at `point`.
     pub fn blend(&self, point: Vec3) -> Option<ProbeBlend> {
         pick(&self.probes, point, |i| {
             let (frame, reach) = &self.frames[i];
-            if reach.is_some_and(|(lo, hi)| !(point.cmpge(lo) & point.cmple(hi)).all()) {
+            let local = frame.to_frame(point);
+            if reach.is_some_and(|(lo, hi)| !(local.cmpge(lo) & local.cmple(hi)).all()) {
                 return 0.0;
             }
-            falloff(frame.distance_sq(point), self.probes[i].blend_distance)
+            falloff(
+                frame.local_distance_sq(local),
+                self.probes[i].blend_distance,
+            )
         })
     }
 }
 
-/// The world-aligned box outside which `probe` has no influence: its volume's
-/// bounds grown by its blend distance and [`REACH_SLACK`]. `None` (every point is
-/// measured) when it is not finite, or when an unnormalised rotation would turn
-/// the frame and the world bounds apart.
-fn reach(probe: &ReflectionProbe) -> Option<(Vec3, Vec3)> {
-    let turned = probe.rotation != Quat::IDENTITY;
-    if turned && (probe.rotation.length() - 1.0).abs() > 1e-4 {
-        return None;
-    }
-    let (lo, hi) = probe.world_bounds();
+/// The box, in `frame`'s own space, outside which the probe has no influence: the
+/// volume's box (the sphere's bounding cube) grown by the blend distance and
+/// [`REACH_SLACK`]. The test runs on the point already turned into the frame, so it
+/// holds for any stored rotation, unit or not. `None` (every point is measured)
+/// when it is not finite.
+fn reach(frame: &ProbeFrame) -> Option<(Vec3, Vec3)> {
+    let (lo, hi) = match frame.sphere {
+        Some(r) => (frame.center - r, frame.center + r),
+        None => (frame.box_min, frame.box_max),
+    };
     let scale = lo.abs().max(hi.abs()).max_element();
-    let blend = probe.blend_distance.max(0.0);
-    let grow = blend * (1.0 + REACH_SLACK) + REACH_SLACK * (1.0 + scale);
+    let grow = frame.influence * (1.0 + REACH_SLACK) + REACH_SLACK * (1.0 + scale);
     let (lo, hi) = (lo - grow, hi + grow);
     (lo.is_finite() && hi.is_finite()).then_some((lo, hi))
 }
