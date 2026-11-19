@@ -186,11 +186,23 @@ fn cpu_rows_are_scaled_by_the_cpu_clock_speed() {
     assert!(samples.values("tick_nav").is_empty(), "no raw system rows");
 }
 
+/// One frame's report rows, sampled at the reference clocks.
+fn rows_of(frame: &RenderedFrame) -> Vec<(String, f64)> {
+    let speed = Speeds {
+        gpu: Some(1.0),
+        ..Speeds::default()
+    };
+    let mut samples = Samples::default();
+    sample(&mut samples, &FrameStats::default(), Some(frame), speed);
+    let rows = samples.report().metrics.into_iter();
+    rows.map(|(m, s)| (m, s.avg)).collect()
+}
+
 /// The Hi-Z stage's parts (#2401): with the cull on, `gpu.occlusion.<part>` and
 /// `render.occlusion.<part>` sit beside their stage's row, which stays the
-/// stage's whole time; with it off, neither appears.
+/// stage's whole time.
 #[test]
-fn the_occlusion_parts_have_rows_only_with_the_cull_on() {
+fn the_occlusion_parts_have_rows_inside_their_stage_s() {
     use rusty_render::{GpuPart, GpuPass, GpuTimes};
     let parts: Vec<_> = GpuPart::ALL.iter().map(|&p| (p, 1.0)).collect();
     let gpu = GpuTimes {
@@ -212,14 +224,8 @@ fn the_occlusion_parts_have_rows_only_with_the_cull_on() {
         gpu: Some(gpu),
         ..RenderedFrame::default()
     };
-    let speed = Speeds {
-        gpu: Some(1.0),
-        ..Speeds::default()
-    };
-    let mut samples = Samples::default();
-    sample(&mut samples, &FrameStats::default(), Some(&on), speed);
-    let rows = samples.report().metrics;
-    let avg = |k: &str| rows.iter().find(|(m, _)| m == k).map(|(_, s)| s.avg);
+    let rows = rows_of(&on);
+    let avg = |k: &str| rows.iter().find(|(m, _)| m == k).map(|(_, v)| *v);
     assert_eq!(avg("gpu.occlusion"), Some(5.0));
     for part in ["select", "phase_one", "pyramid", "test", "clusters"] {
         assert_eq!(avg(&format!("gpu.occlusion.{part}")), Some(1.0), "{part}");
@@ -227,7 +233,7 @@ fn the_occlusion_parts_have_rows_only_with_the_cull_on() {
     let passes = rows.iter().filter(|(m, _)| m.matches('.').count() == 1);
     let passes: f64 = passes
         .filter(|(m, _)| m.starts_with("gpu."))
-        .map(|(_, s)| s.avg)
+        .map(|(_, v)| v)
         .sum();
     assert_eq!(passes, 7.0, "a part is in its pass's row, not beside it");
     assert_eq!(avg("render.occlusion"), Some(1.5), "the stage's whole time");
@@ -238,16 +244,19 @@ fn the_occlusion_parts_have_rows_only_with_the_cull_on() {
     );
     assert_eq!(avg("render.occlusion.select"), Some(0.25));
     assert_eq!(avg("render.other"), Some(0.0), "nothing counted twice");
-    // The cull off: the stage laps whole and no part is timed.
+}
+
+/// With the cull off the stage laps whole and no part is timed: no part rows.
+#[test]
+fn the_occlusion_parts_have_no_rows_with_the_cull_off() {
     let off = RenderedFrame {
         cpu_ms: 3.0,
         stages: vec![("occlusion", 0.0), ("scene", 3.0)],
-        gpu: Some(GpuTimes::default()),
+        gpu: Some(rusty_render::GpuTimes::default()),
         ..RenderedFrame::default()
     };
-    let mut samples = Samples::default();
-    sample(&mut samples, &FrameStats::default(), Some(&off), speed);
-    let rows = samples.report().metrics;
+    let rows = rows_of(&off);
+    assert!(rows.iter().any(|(m, _)| m == "render.occlusion"));
     assert!(!rows.iter().any(|(m, _)| m.starts_with("gpu.occlusion.")));
     assert!(!rows.iter().any(|(m, _)| m.starts_with("render.occlusion.")));
 }

@@ -185,22 +185,25 @@ fn sample(samples: &mut Samples, stats: &FrameStats, frame: Option<&RenderedFram
     }
 }
 
+/// Named CPU times, in order.
+type Laps<'a> = Vec<(&'a str, f64)>;
+
 /// The renderer's stages, each with its parts (`occlusion.select`, a lap named
 /// `<stage>.<part>`, #2401) added in, and the parts on their own: a stage's row
 /// stays its whole time, and the parts beside it sum to it but for what the
 /// stage spent outside them.
-fn stage_rows<'a>(laps: &[(&'a str, f64)]) -> (Vec<(&'a str, f64)>, Vec<(&'a str, f64)>) {
-    let mut stages: Vec<(&str, f64)> = Vec::new();
-    let mut parts = Vec::new();
+fn stage_rows<'a>(laps: &[(&'a str, f64)]) -> (Laps<'a>, Laps<'a>) {
+    let add = |rows: &mut Laps<'a>, name, ms| match rows.iter_mut().find(|(n, _)| *n == name) {
+        Some((_, sum)) => *sum += ms,
+        None => rows.push((name, ms)),
+    };
+    let (mut stages, mut parts) = (Vec::new(), Vec::new());
     for &(name, ms) in laps {
         let stage = name.split_once('.').map_or(name, |(stage, _)| stage);
         if stage != name {
-            parts.push((name, ms));
+            add(&mut parts, name, ms);
         }
-        match stages.iter_mut().find(|(s, _)| *s == stage) {
-            Some((_, sum)) => *sum += ms,
-            None => stages.push((stage, ms)),
-        }
+        add(&mut stages, stage, ms);
     }
     (stages, parts)
 }

@@ -175,12 +175,7 @@ impl SceneReport {
                 "(render.<stage>: the renderer's CPU time by stage, summing to renderer_ms; \
                  render.other is what no stage timed)",
             ),
-            (
-                self.row("render.occlusion.test").is_some(),
-                "(gpu.occlusion.<part>, render.occlusion.<part>: the Hi-Z stage's parts, \
-                 inside its row and not in the sums; timed in passes of their own, so the \
-                 stage records one compute pass more per part than untimed)",
-            ),
+            (self.row("render.occlusion.test").is_some(), OCCLUSION_PARTS),
         ];
         let notes = notes.into_iter().chain(self.comparison_notes(first));
         for (_, note) in notes.filter(|(on, _)| *on) {
@@ -222,6 +217,11 @@ impl SceneReport {
 
 /// The rows the run's summary shows for each scene, in order: `cpu_ms` is the
 /// sim's time at the reference CPU clock, `frame_ms` as measured.
+/// The note under a table whose run timed the Hi-Z stage by part (#2401).
+const OCCLUSION_PARTS: &str = "(gpu.occlusion.<part>, render.occlusion.<part>: the Hi-Z \
+     stage's parts, inside its row and in no sum; a timed frame records each in a pass of \
+     its own, so its compute_passes read one more per part than untimed)";
+
 const SUMMARY: [&str; 6] = [
     "cpu_ms",
     "frame_ms",
