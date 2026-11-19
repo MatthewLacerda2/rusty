@@ -47,6 +47,7 @@ mod sanitize_rules;
 mod self_path;
 mod skip;
 mod sorted;
+mod static_write;
 mod stored_format;
 mod subprocess;
 mod temp_dir;
@@ -124,6 +125,7 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (self_path::RULE, self_path::run, Allow::Inline),
     (skip::RULE, skip::run, Allow::Inline),
     (sorted::RULE, sorted::run, Allow::Inline),
+    (static_write::RULE, static_write::run, Allow::Inline),
     (stored_format::RULE, stored_format::run, Allow::Inline),
     (subprocess::RULE, subprocess::run, Allow::Inline),
     (temp_dir::RULE, temp_dir::run, Allow::Inline),

@@ -80,6 +80,7 @@ pub fn init() {
 /// which would leave every [`forward`] empty.
 #[doc(hidden)]
 pub fn init_for_tests() {
+    // lint: allow(test-static-write) one-way and idempotent: every caller sets the same `true`, and per-thread drains are what every test in a shared process wants
     PER_THREAD.store(true, Ordering::SeqCst);
     init();
     assert!(INSTALLED.load(Ordering::SeqCst), "{ANOTHER_LOGGER}");
