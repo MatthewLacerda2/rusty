@@ -62,6 +62,7 @@ impl Renderer {
     /// Close the frame's counters: the shadow casters drawn and the UI batches and
     /// effect passes.
     pub(crate) fn finish_counters(&mut self, view: &RenderView) {
+        let texture_bytes = self.resident_textures().map(gpu_bytes).sum();
         let c = &mut self.frame_counters;
         c.shadow_draws = self.shadow_renderer.drawn.len() as u32;
         let culls = self.shadow_renderer.culls;
@@ -75,7 +76,7 @@ impl Renderer {
         c.ui_mask_passes = view.ui.last_mask_passes();
         c.ui_blur_passes = view.ui.last_blur_passes();
         c.draw_calls += c.ui_draws;
-        c.texture_bytes = self.resident_textures().map(gpu_bytes).sum();
+        c.texture_bytes = texture_bytes;
         c.lightmap_bytes = self.lightmaps.gpu_bytes();
         c.reflection_bytes = self.reflection_probes.gpu_bytes();
         c.uploads = std::mem::take(&mut self.uploads);
