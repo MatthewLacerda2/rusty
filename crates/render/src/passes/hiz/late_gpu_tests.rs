@@ -17,8 +17,8 @@ use rusty_components::CameraComponent;
 use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::Scene;
 
-/// The wall and the box behind it, a clustered panel and a plane drawn with
-/// `water` in front of it, under a volume with AO `ssao`: the scene and the box.
+/// The wall and the box behind it, a clustered panel and an upright plane drawn
+/// with `water` in front of it (each over a thousand of its pixels), under a volume with AO `ssao`: the scene and the box.
 fn scene(water: &str, ssao: bool) -> (Scene, u32) {
     let (mut scene, boxed) = walled();
     panel(
@@ -28,7 +28,8 @@ fn scene(water: &str, ssao: bool) -> (Scene, u32) {
     );
     let id = create_entity(&mut scene, "Water", Some(Primitive::Plane));
     let mut t = scene.world.transform_mut(id).unwrap();
-    (t.position, t.scale) = (Vec3::new(-3.0, -1.0, 2.0), Vec3::splat(0.2));
+    let upright = Quat::from_rotation_x(std::f32::consts::FRAC_PI_2);
+    (t.position, t.rotation, t.scale) = (Vec3::new(-3.0, 0.5, 1.0), upright, Vec3::splat(0.2));
     drop(t);
     let key = scene.ensure_material_key(id).unwrap();
     scene.materials.get_mut(&key).unwrap().shader = Some(water.to_string());
