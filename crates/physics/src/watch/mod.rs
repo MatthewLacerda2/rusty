@@ -7,8 +7,9 @@
 //! the bodies those ids belong to (and, for pose and velocities, the bodies the
 //! last step may have changed, below). Each pass reads only its own row's
 //! channels (`Changed`), so a body that only moved costs the passes that read a
-//! pose and nothing else; a body just built goes through every pass. Unity syncs only transforms with `hasChanged`
-//! and never re-syncs statics; bevy_rapier and avian sync changed bodies only.
+//! pose and nothing else; a body just built goes through every pass. Unity syncs
+//! only transforms with `hasChanged` and never re-syncs statics; bevy_rapier and
+//! avian sync changed bodies only.
 //!
 //! **What each sync pass reads, and where its change shows up:**
 //!

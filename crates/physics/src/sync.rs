@@ -45,6 +45,10 @@ impl PhysicsWorld {
                 self.resync_topology(scene);
                 self.tracked.carriers = carriers(scene);
                 self.resync_joints_tracked(scene);
+                #[cfg(test)]
+                {
+                    self.tracked.visits.changed = 0;
+                }
                 (Named::all(), None)
             }
             Some(changed) => self.resync_changed(scene, &changed),

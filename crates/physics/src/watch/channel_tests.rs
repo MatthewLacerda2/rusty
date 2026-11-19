@@ -51,7 +51,7 @@ fn walk(scene: &mut Scene, soldiers: &[(u32, Vec<u32>)]) {
     }
 }
 
-/// The visits of one step after `edit`: (member calls, enabled, collider,
+/// The visits of one step after what the caller changed: (member calls, enabled, collider,
 /// layer, fits, every) owners.
 fn step_after(physics: &mut PhysicsWorld, scene: &mut Scene) -> [usize; 6] {
     let v = &physics.tracked.visits;

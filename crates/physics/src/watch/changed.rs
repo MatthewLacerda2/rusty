@@ -8,8 +8,8 @@ use super::Owners;
 use rusty_ecs::{Changes, Channel, Cursor, World};
 
 /// What changed since the last read, when the log could say: the ids each channel
-/// named, so each pass reads only the channels its inputs live on (the table
-/// above). Every list ascending, each id once.
+/// named, so each pass reads only the channels its inputs live on (`watch`'s
+/// table). Every list ascending, each id once.
 #[derive(Debug, Default)]
 pub(crate) struct Changed {
     /// Every id stamped on any channel: what the body-state, character, mass and
@@ -63,9 +63,9 @@ pub(super) fn take<T: Channel>(
     match world.changes(cursor) {
         Changes::Rebuild => false,
         Changes::Ids(found) => {
-            ids.extend(found);
-            ids.sort_unstable();
-            ids.dedup();
+            // `Log::since` already returns its ids ascending and each once, and
+            // every cursor reads into a list of its own.
+            *ids = found;
             true
         }
     }
@@ -107,7 +107,7 @@ impl Named {
 #[derive(Default, Debug)]
 pub(crate) struct Visits {
     pub members: std::cell::Cell<u64>,
-    /// The ids any channel named at the last incremental sync.
+    /// The ids any channel named at the last sync: zero after a full one.
     pub changed: usize,
     pub every: usize,
     pub activity: usize,
