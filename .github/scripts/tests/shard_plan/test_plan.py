@@ -5,6 +5,8 @@ that added this checked the same plan against `cargo nextest list` too."""
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import tempfile
 import unittest
@@ -81,6 +83,8 @@ class Args(unittest.TestCase):
     def test_no_plan_or_another_matrix_splits_by_count_on_every_shard(self):
         two = json.dumps(shard_plan.plan(TIMES, 2)[0])
         for raw, why in (("", "no plan"), ("{}", "no plan"), ("not json", "not JSON"),
+                         ("5", "not a mapping"), ('["1/3"]', "not a mapping"), ("null", "not a mapping"),
+                         ('{"1/3": "", "2/3": "x", "3/3": "y"}', "where the matrix"),
                          (two, "where the matrix has"), ('{"1/3": 1, "2/3": "x", "3/3": "y"}', "where the matrix")):
             for shard in ("1/3", "2/3", "3/3"):
                 with self.subTest(raw=raw[:20], shard=shard):
@@ -90,7 +94,30 @@ class Args(unittest.TestCase):
 
     def test_no_report_plans_nothing(self):
         with tempfile.TemporaryDirectory() as empty:
-            self.assertEqual(shard_plan.main(["plan", str(Path(empty) / "absent"), "--shards", "2"]), 0)
+            self.assertEqual(run_plan(str(Path(empty) / "absent")), ("{}", "plan: none"))
+
+    def test_a_report_with_no_timed_test_plans_nothing(self):
+        # The flag case: a plan from no times would give 1/2 `none()`, a shard of
+        # no test, which nextest fails.
+        self.assertEqual(shard_plan.plan({}, 2), ({}, [0.0, 0.0]))
+        self.assertEqual(shard_plan.plan({"rusty-render gpu_x": 3.0}, 2)[0], {})
+        with tempfile.TemporaryDirectory() as base:
+            (Path(base) / "junit.xml").write_text('<testsuites><testsuite name="rusty"/></testsuites>')
+            self.assertEqual(run_plan(base), ("{}", "plan: none"))
+
+    def test_a_plan_gives_every_shard_a_test(self):
+        found, _ = shard_plan.plan(TIMES, 3)
+        for shard, text in found.items():
+            with self.subTest(shard=shard):
+                self.assertTrue(any(matches(text, *t) for t in everyone()))
+
+
+def run_plan(base: str) -> tuple[str, str]:
+    """`shard_plan.py plan <base> --shards 2`'s plan and its stderr's first word pair."""
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        assert shard_plan.main(["plan", base, "--shards", "2"]) == 0
+    return out.getvalue().strip(), " ".join(err.getvalue().split()[:2]).rstrip(",")
 
 
 if __name__ == "__main__":

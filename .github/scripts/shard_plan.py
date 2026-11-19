@@ -2,9 +2,12 @@
 """Split a sharded nextest suite by `main`'s test times, not by count (#2397).
 
 nextest's `--partition` kinds (`count:`, `hash:`, `slice:`; checked on 0.9.146 and
-0.9.152) deal tests by count or by hash, blind to time. On the macOS leg the
-longest Metal tests all landed in `count:1/2`, which ran about 1.6 times the
-GPU-seconds of 2/2 and paced CI (runs 44429815128, 44435857315, 44443918958).
+0.9.152) deal tests by count or by hash, blind to time, so the macOS leg's
+balance was luck of the test list: once the longest Metal tests all landed in
+`count:1/2`, about 1.6 times the GPU-seconds of 2/2 (runs 44429815128,
+44435857315), and a later list was within 7%. A plan keeps the balance from
+moving with the list; runner speed, which varies by about a quarter, it cannot
+fix (`slowest_tests.weight` prints the prediction beside the time taken).
 
 So the `shard-plan` job of `ci.yml` reads the leg's JUnit reports from `main`'s
 last successful runs (`.github/actions/main-junit`, the same lookup the slow-test
@@ -30,7 +33,8 @@ balance, never coverage. `.github/scripts/tests/shard_plan/` evaluates the
 filters over test lists to hold that.
 
 **No plan, `count:`.** With no readable baseline (a fork, an expired artifact,
-the first run after a rename) the plan is `{}` and every shard runs
+the first run after a rename), or too few timed tests to give every shard one,
+the plan is `{}` and every shard runs
 `--partition count:k/n`, saying so in the log. The choice reads only the plan and
 the shard count, never the shard's index, so every shard of a run makes the same
 one.
@@ -128,8 +132,13 @@ def filters(selections: list[str]) -> list[str]:
 
 
 def plan(times: dict[str, float], shards: int) -> tuple[dict[str, str], list[float]]:
-    """The plan (`k/n` to filterset) and each shard's expected test-seconds."""
+    """The plan (`k/n` to filterset) and each shard's expected test-seconds; no
+    plan (`{}`, so every shard splits by count) when a shard would be dealt
+    nothing, as with no timed test: its filter would select no test, which
+    nextest fails."""
     dealt = deal(units(times), shards)
+    if not all(dealt):
+        return {}, [0.0] * shards
     heavy = exact([u[2] for d in dealt for u in d if u[1] == "test"])
     made = filters([selection(d, heavy) for d in dealt[:-1]])
     return ({f"{k}/{shards}": f for k, f in enumerate(made, 1)},
@@ -145,10 +154,12 @@ def args(raw: str, shard: str) -> tuple[list[str], str]:
         found = json.loads(raw) if raw.strip() else {}
     except json.JSONDecodeError:
         return count[0], count[1] + ": the plan is not JSON"
+    if not isinstance(found, dict):
+        return count[0], count[1] + f": the plan is a JSON {type(found).__name__}, not a mapping"
     want = {f"{i}/{n}" for i in range(1, int(n) + 1)} if n.isdigit() else set()
     if not found:
         return count[0], count[1] + ": no plan (no report of main's to weigh by)"
-    if not isinstance(found, dict) or set(found) != want or not all(isinstance(v, str) for v in found.values()):
+    if set(found) != want or not all(isinstance(v, str) and v for v in found.values()):
         return count[0], count[1] + f": the plan names {sorted(found)} where the matrix has {sorted(want)}"
     return ["-E", found[shard]], f"split: by main's test times, shard {k} of {n}, as the shard-plan job planned"
 
@@ -173,6 +184,11 @@ def main(argv: list[str]) -> int:
         print("{}")
         return 0
     found, loads = plan(times, a.shards)
+    if not found:
+        print(f"plan: none, each shard splits by count: {len(times)} timed tests of main's "
+              f"cannot fill {a.shards} shards", file=sys.stderr)
+        print("{}")
+        return 0
     print(f"plan: {len(times)} tests of main's over {a.shards} shards; expected test-seconds "
           + ", ".join(f"{k}/{a.shards} {s} s" for k, s in enumerate(loads, 1)), file=sys.stderr)
     print(json.dumps(found, separators=(",", ":")))

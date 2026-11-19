@@ -409,15 +409,19 @@ jobs:
         run: df -h / && du -sh target 2>/dev/null || true
 
   # The macOS leg's split by `main`'s test times (#2397): nextest's `--partition`
-  # deals by count or hash, blind to time, and `count:` left 1/2 about 1.6 times
-  # the GPU-seconds of 2/2. This job reads the leg's JUnit reports from `main`
+  # deals by count or hash, blind to time, so `count:`'s balance moved with the
+  # test list (1/2 once had 1.6 times 2/2's GPU-seconds, later within 7%). This job reads the leg's JUnit reports from `main`
   # once, so both shards follow one plan (`.github/scripts/shard_plan.py` says
   # why that matters, and how the last shard takes every test the others did
-  # not). Every step informs: with no report, or this job failing, the plan is
-  # empty and each shard splits by `count:` (`build-test-cross`'s `if` is
-  # `!cancelled()`-guarded for that). Same condition as `build-test-cross`.
+  # not). The whole job informs: with no report, or this job failing (a step, the
+  # checkout, the runner, its timeout), the plan is empty and each shard splits by
+  # `count:` (`build-test-cross`'s `if` is `!cancelled()`-guarded for that), and
+  # `continue-on-error` keeps a failure here from failing the run, which the merge
+  # queue would read as a red head. Same condition as `build-test-cross`. Its
+  # `--shards` and `shard:` are the matrix's count (`gate_mirror.plan_gaps`).
   shard-plan:
     needs: changes
+    continue-on-error: true
     timeout-minutes: 5
     runs-on: ubuntu-24.04
     permissions:
@@ -538,9 +542,20 @@ jobs:
           python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
           if [ "$rc" = 0 ]; then
             # This shard's tests from `shard-plan`'s plan, or `count:` with none
-            # (#2397); a loop, not `mapfile`, which macOS's bash 3.2 lacks.
+            # (#2397); a loop, not `mapfile`, which macOS's bash 3.2 lacks. The
+            # script's status is read, not dropped as a process substitution's
+            # is: a crash or no arguments splits by count, never runs the whole
+            # suite in every shard.
             split=()
-            while IFS= read -r arg; do split+=("$arg"); done < <(python3 .github/scripts/shard_plan.py args "${{ matrix.shard }}")
+            if planned=$(python3 .github/scripts/shard_plan.py args "${{ matrix.shard }}"); then
+              while IFS= read -r arg; do if [ -n "$arg" ]; then split+=("$arg"); fi; done <<< "$planned"
+            else
+              echo "split: the plan reader failed (exit $?, its error above)"
+            fi
+            if [ "${#split[@]}" = 0 ]; then
+              echo "split: by count (\`count:${{ matrix.shard }}\`): the plan gave no arguments"
+              split=(--partition "count:${{ matrix.shard }}")
+            fi
             cargo nextest run --profile ci --features dev --locked "${split[@]}" || rc=$?
           fi
           cp target/nextest/ci/junit.xml junit-dev.xml || true

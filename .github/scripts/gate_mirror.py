@@ -207,6 +207,10 @@ SHARDED = ("count:${{ matrix.shard }}", '"count:${{ matrix.shard }}"', "'count:$
 #: that follows the matrix.
 PLANNED = re.compile(r"shard_plan\.py args\b[ ]?")
 PLANNED_SHARD = ('"${{ matrix.shard }}"', "'${{ matrix.shard }}'", "${{ matrix.shard }}")
+#: The plan's own call and the shard count it plans for.
+PLAN_CALL = re.compile(r"shard_plan\.py plan\b[^\n]*?--shards[ =](\d+)")
+#: An action's `shard: k/n` input (`main-junit`'s), not a matrix entry.
+WITH_SHARD = re.compile(r"^ +shard: (\d+)/(\d+) *$", re.M)
 
 
 def _jobs(text: str) -> list[tuple[str, str]]:
@@ -257,6 +261,33 @@ def shard_gaps(text: str) -> list[str]:
             elif not bad and not value.startswith(SHARDED):
                 gaps.append(f"{job}: `--partition {value}` does not follow the matrix; "
                             f"write `--partition \"count:${{{{ matrix.shard }}}}\"`")
+    return gaps + plan_gaps(text)
+
+
+def plan_gaps(text: str) -> list[str]:
+    """Where the time split's plan is not for the matrix's shard count (#2397):
+    `shard_plan.py args` with a plan for another count falls back to `count:`
+    with one log line, so a matrix moved to three shards would quietly lose the
+    split. Each `shard_plan.py plan --shards N`, and the `shard: k/n` its job
+    reads `main`'s reports by, must equal the `n` of every job that runs
+    `shard_plan.py args`, and such a job needs a plan in the workflow."""
+    found = _jobs(text)
+    planned = {job: PLAN_CALL.findall(body) for job, body in found}
+    counts = {n for ns in planned.values() for n in ns}
+    gaps: list[str] = []
+    for job, body in found:
+        for n in planned[job]:
+            gaps += [f"{job}: reads main's reports as `shard: {m[1]}/{m[2]}` but plans `--shards {n}`; "
+                     f"make them one count" for m in WITH_SHARD.finditer(body) if m[2] != n]
+        if not PLANNED.search(body):
+            continue
+        matrix = {m["n"] for m in SHARD_ENTRY.finditer(body)}
+        if not counts:
+            gaps.append(f"{job}: `shard_plan.py args` with no `shard_plan.py plan --shards N` in the workflow")
+        elif matrix and matrix != counts:
+            gaps.append(f"{job}: the matrix has {'/'.join(sorted(matrix))} shards but the plan is for "
+                        f"`--shards {'/'.join(sorted(counts))}`; plan for the matrix's count, or every "
+                        f"shard falls back to `count:`")
     return gaps
 
 

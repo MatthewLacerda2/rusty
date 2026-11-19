@@ -53,11 +53,24 @@ class Shards(unittest.TestCase):
 
     def test_a_split_by_mains_times_follows_the_matrix_or_is_flagged(self):
         planned = 'while read -r a; do s+=("$a"); done < <(python3 .github/scripts/shard_plan.py args "${{ matrix.shard }}")'
-        self.assertEqual(gate_mirror.shard_gaps(workflow("1/2", "2/2", run=planned)), [])
+        self.assertEqual(gate_mirror.shard_gaps(workflow("1/2", "2/2", run=planned)
+                                                + "  plan:\n    steps:\n      - run: shard_plan.py plan d --shards 2\n"), [])
         for shards, run in ((("1/2", "2/2"), planned.replace('"${{ matrix.shard }}"', "1/2")),
                             (("1/2",), planned), ((), planned)):
             with self.subTest(shards=shards, run=run):
                 self.assertNotEqual(gate_mirror.shard_gaps(workflow(*shards, run=run)), [])
+
+    def test_the_plan_is_for_the_matrix_shard_count_or_is_flagged(self):
+        planned = 'while read -r a; do s+=("$a"); done <<< "$(python3 .github/scripts/shard_plan.py args "${{ matrix.shard }}")"'
+        def plan(shards: str, reads: str) -> str:
+            return (f"  shard-plan:\n    steps:\n      - uses: ./.github/actions/main-junit\n        with:\n"
+                    f"          shard: {reads}\n      - run: python3 .github/scripts/shard_plan.py plan \"$B\" --shards {shards}\n")
+        self.assertEqual(gate_mirror.shard_gaps(workflow("1/2", "2/2", run=planned) + plan("2", "1/2")), [])
+        for text in (workflow("1/3", "2/3", "3/3", run=planned) + plan("2", "1/2"),
+                     workflow("1/2", "2/2", run=planned) + plan("2", "1/3"),
+                     workflow("1/2", "2/2", run=planned)):
+            with self.subTest(text=text[-90:]):
+                self.assertNotEqual(gate_mirror.plan_gaps(text), [])
 
     def test_a_partition_in_a_comment_or_a_job_without_one_passes(self):
         self.assertEqual(gate_mirror.shard_gaps(workflow("1/2", "2/2", run="cargo nextest run --locked")), [])
