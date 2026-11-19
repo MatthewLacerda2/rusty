@@ -6,7 +6,8 @@
 //! `pub use rusty_<m> as <name>;` re-export, or the crate's own ident when the root
 //! re-exports nothing of it, behind `cfg(test)` when only `[dev-dependencies]` name
 //! it). Its sources then say `crate::<name>::` for their own `crate::`, and every
-//! source says `crate::<name>::` for a member's `rusty_<m>::`. The root package's
+//! source says `crate::<name>` for a member's `rusty_<m>`, as a path or bare
+//! (`super::names`). The root package's
 //! manifest takes every member's external dependencies, with `dev` and `editor`
 //! plain features, since each member's are the same two names forwarded.
 

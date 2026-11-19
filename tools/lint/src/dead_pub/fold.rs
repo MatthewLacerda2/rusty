@@ -8,8 +8,10 @@
 //! `#[cfg(test)] __itests`. Their sources then name the lib as `crate::` and their
 //! own root as `crate::<module>::`. A workspace member is folded the same way
 //! (`super::workspace`): its sources are a caller whose module is the member's, and
-//! every member's `rusty_<m>::` is `crate::<m>::` in every folded file.
+//! every member's `rusty_<m>::` is `crate::<m>::` in every folded file, and so is
+//! a member named bare (`use rusty_<m> as x;`, [`super::names`]).
 
+use super::names::{rename, Left, Names};
 use crate::code::{code_of, Open};
 
 /// One `[[bin]]` target of `Cargo.toml`.
@@ -100,35 +102,6 @@ pub fn lib(source: &str, bins: &[Bin], tests_root: Option<&str>) -> (String, usi
     (out, private)
 }
 
-/// `line` with every path `<from>::…` now `<to>::…`, in one pass, so a
-/// replacement is never renamed again. A `from` must start an identifier
-/// (`$crate` counts), so `trusty::` is not `rusty::`; a global `::<from>::` loses
-/// its leading `::`, since every `to` is a `crate::` path.
-pub fn renamed(line: &str, renames: &[(&str, &str)]) -> String {
-    let mut out = String::new();
-    let mut rest = line;
-    while let Some(c) = rest.chars().next() {
-        let starts = !out.ends_with(|p: char| p.is_alphanumeric() || p == '_');
-        let hit = renames.iter().find(|(from, _)| {
-            starts && rest.strip_prefix(from).is_some_and(|r| r.starts_with("::"))
-        });
-        match hit {
-            Some((from, to)) => {
-                if out.ends_with("::") && !out.ends_with(":::") {
-                    out.truncate(out.len() - 2);
-                }
-                out.push_str(to);
-                rest = &rest[from.len()..];
-            }
-            None => {
-                out.push(c);
-                rest = &rest[c.len_utf8()..];
-            }
-        }
-    }
-    out
-}
-
 /// One source file of a folded caller, now the lib's module `module`: its own
 /// root is `crate::<module>::`, the lib (`lib_name::`) is `crate::`, `main` is
 /// callable, and, in the caller's `root` file only (a bin, `tests/main.rs`), the
@@ -143,7 +116,30 @@ pub fn caller(
     root: bool,
     members: &[(String, String)],
 ) -> String {
+    fold_file(source, module, lib_name, root, members).0
+}
+
+/// Every name of a sibling crate or the lib in `source`, folded as
+/// [`caller`] folds it, that the fold must leave: (line, what was left). A
+/// folded copy holding one does not compile.
+pub fn unfoldable(
+    source: &str,
+    module: &str,
+    lib_name: &str,
+    members: &[(String, String)],
+) -> Vec<(usize, Left)> {
+    fold_file(source, module, lib_name, false, members).1
+}
+
+fn fold_file(
+    source: &str,
+    module: &str,
+    lib_name: &str,
+    root: bool,
+    members: &[(String, String)],
+) -> (String, Vec<(usize, Left)>) {
     let mut out = String::new();
+    let mut left = Vec::new();
     let mut depth = 0i32;
     let mut head = root;
     let mut open = Open::None;
@@ -152,10 +148,14 @@ pub fn caller(
         .iter()
         .map(|(ident, m)| (ident.as_str(), format!("crate::{m}")))
         .collect();
-    let mut renames = vec![("crate", own.as_str()), (lib_name, "crate")];
-    renames.extend(theirs.iter().map(|(i, m)| (*i, m.as_str())));
-    for line in source.lines() {
+    let mut bare = vec![(lib_name, "crate")];
+    bare.extend(theirs.iter().map(|(i, m)| (*i, m.as_str())));
+    let mut paths = vec![("crate", own.as_str())];
+    paths.extend(bare.iter().copied());
+    let names = Names { paths, bare };
+    for (i, line) in source.lines().enumerate() {
         let mut brackets = 0i32;
+        let mut at_start = open;
         let code = code_of(line, &mut open, |_, c| match c {
             '[' => brackets += 1,
             ']' => brackets -= 1,
@@ -168,7 +168,8 @@ pub fn caller(
             out.push('\n');
             continue;
         }
-        let line = renamed(line, &renames);
+        let (line, here) = rename(line, &mut at_start, &names);
+        left.extend(here.into_iter().map(|l| (i + 1, l)));
         let line = match line.strip_prefix("fn main(") {
             Some(rest) => format!("pub fn main({rest}"),
             None => line,
@@ -176,5 +177,5 @@ pub fn caller(
         out.push_str(&line);
         out.push('\n');
     }
-    out
+    (out, left)
 }

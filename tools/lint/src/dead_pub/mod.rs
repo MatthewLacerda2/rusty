@@ -7,19 +7,21 @@
 //! shape for the check only: [`workspace`] mounts every member crate as a
 //! crate-private module of the root's lib and gives the root their dependencies,
 //! [`fold`] folds every bin and the integration suite in as modules, and every
-//! `rusty_<m>::` path becomes `crate::<m>::`. A use from another crate is then a use
-//! rustc sees. `cargo check --lib` runs twice with `--features dev`: with `--profile
+//! `rusty_<m>` becomes `crate::<m>`, as a path or bare ([`names`]). A use from
+//! another crate is then a use rustc sees. `cargo check --lib` runs twice with `--features dev`: with `--profile
 //! test` (dead even counting tests) and without (the difference is what only tests
 //! use). Both share this worktree's `target/`, so only the copied crate compiles.
 //! Code behind `not(feature = "dev")` is not seen. A fold that made nothing
 //! crate-private is an error, not an empty report: a layout the fold does not know
 //! would otherwise read as "nothing dead". It runs weekly on `main`
 //! (`cargo-test.yml`'s `dead-pub` job), so a fold that stops compiling goes red
-//! there instead of silently.
+//! there instead of silently; a name the fold cannot rewrite is caught sooner, by
+//! the `fold-names` rule in `make rules` ([`names::Left`]).
 //!
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --dead-pub` (`make dead-pub`)
 
 pub mod fold;
+pub mod names;
 pub mod platform;
 pub mod report;
 pub mod workspace;
