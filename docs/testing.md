@@ -476,7 +476,10 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
   `temp::dir()`, which is unique to the process *and* the test (#709), and never
   `set_var` / `remove_var` / `set_current_dir`. Clippy bans those three crate-wide
   (`clippy.toml`'s `disallowed-methods`, #977): pass the value as a parameter
-  instead. Production code that really owns the process (`project::open` moving
+  instead. Nor may a test write a process-wide `static` (flip a flag, reset a
+  counter, fill a cache): keep the state on the value under test, in a
+  `thread_local!`, or in a child process; the `test-static-write` rule fails the
+  write, in a test or in a test hook (see `linting.md`). Production code that really owns the process (`project::open` moving
   the working directory) opts out inline with `#[expect(…, reason = "…")]`.
   In-crate tests have the same helper,
   `rusty_test_support::temp::dir()` (#999, `crates/test-support/`); the `test-temp-dir` rule fails a bare
@@ -1103,8 +1106,8 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   `gpu_clock_pct` (the clock it ran at, % of the reference), `draw_calls`,
   `triangles`, `culled_entities`, `lights_dropped`, `cluster_lights_dropped`, `lights_culled`,
   `decals_visible`, `decal_cluster_refs`, the GPU occlusion counters `hiz_tested`,
-  `hiz_culled`, `cluster_tested`, `cluster_culled` (the two culled ones are read back
-  without waiting, so they describe a frame or so earlier, `docs/api/Debug.md`), and
+  `hiz_culled`, `hiz_late`, `cluster_tested`, `cluster_culled` (all but the two tested
+  ones are read back without waiting, so they describe a frame or so earlier, `docs/api/Debug.md`), and
   the frame's GPU calls `render_passes`, `compute_passes`, `submits`,
   `bind_groups_created`, `buffer_writes` (counted through `render::gpu::ops`; a
   render-CPU fix whose timing moves inside the spread proves itself by these); then
@@ -1180,7 +1183,7 @@ prints the report, keeps it in the run's out dir and returns `{ frames, metrics 
 ### A project's own scenes: `make bench-scenes`
 `make bench` measures one synthetic yard; an optimisation also needs numbers from
 real levels. `make bench-scenes PROJECT=<dir> [SCENES=a,b] [RES=WxH] [RUNS=n]
-[LOAD_RUNS=n] [BEFORE=<dir>] [PROFILE=1] [IMPORT=1]` benches a game project's own scenes, wherever the
+[LOAD_RUNS=n] [BEFORE=<dir>] [PROFILE=1] [IMPORT=1] [SCRIPT=1]` benches a game project's own scenes, wherever the
 project is on disk (`bench-scenes`, `dev::bench::scenes`). `SCENES` names scenes by
 their path under `assets/scenes/` without the extension (`levels/a`); by default
 every `.scene` there, subfolders included (a folder linked twice is walked once), is
@@ -1306,8 +1309,10 @@ every binary's open makes them.
   failed to load) are warned of with their count and the first one, since they
   make a scene look cheaper than the game is. A scene benches as
   it is when it lacks a bake, with a warning naming what is missing: no
-  lightmaps, light probes placed whose SH never loaded, or reflection probes
-  placed with no cube on disk (what a scene does not place is not missing). Its
+  lightmaps, or lightmap pages it names that are not on disk (colour, direction
+  and shadowmask pages, counted: `lightmaps (43 of 43 pages not on disk)`), light
+  probes placed whose SH never loaded, or reflection probes placed with no cube on
+  disk (what a scene does not place is not missing). Its
   lighting cost is then not the shipped one. The run ends with a summary table of
   one line per scene: `cpu_ms` (the sim at the reference CPU clock), `frame_ms`,
   `gpu_ms`, `load_ms`, `rss_peak_mb`, `gpu_mb`, and the run's `import_ms` under
@@ -1356,6 +1361,45 @@ every binary's open makes them.
   then the top 40 functions by self time (samples where the function was
   running) and by total time (samples where it was on the stack), and
   `<scene>.folded`, the raw folded stacks (`a;b;c count`) a flame graph reads.
+- **script time by verb**: `SCRIPT=1` (`--script`) times every engine verb the
+  scripts call (`dev::stats::verbs`, `dev::bench::verbs`), in the timed child only
+  (the loads before it and a `PROFILE=1` profile beside it play without the
+  timers, and every child writes under the `script/` folder below). Each Rust
+  function of every namespace (`CharacterController.Move`,
+  `Transform.SetPosition`, …) runs inside a timer, installed by the dev layer
+  before the first Lua VM, on the thread that armed it only: the sim reads no
+  clock, and a run without the flag wraps nothing. A verb written in Lua
+  (`Particles.ForEach`, `GetParticles`, `SetParticles`) is timed by its Rust
+  halves, which it calls through a table the timers reach
+  (`script::api::RUST_HALVES`); its Lua loop, and the script's `fn` it calls, are
+  `script.lua`'s. A verb's time is **exclusive**: Lua it calls back (`Move`
+  raising `OnControllerColliderHit`) and the verbs that Lua calls are counted
+  where they belong, not in it, and a callback that catches its own error
+  (`pcall`) still ends where it returns. The report adds
+  `script.<Namespace.Verb>` (its own ms per frame, at the reference CPU clock) and
+  `script.<Namespace.Verb>.calls` for the 10 costliest verbs, costliest first,
+  each over every frame of the scene (a viewpoint or run that never called it
+  counts as zero), the rest summed as `script.other_verbs` (and `.calls`; its p95
+  and spread are the verbs' summed, an upper bound), `script.calls` (every verb's
+  calls per frame), `script.overhead` (the timers' own time inside
+  `cpu.update_scripts`: setting the call hook, the clock reads) and `script.lua`:
+  what of `cpu.update_scripts` neither a verb nor the timers hold, the VM running
+  `Update` and the calls the timers do not see (a handle's methods). Two limits:
+  the call hook's own work while a verb calls back into Lua lands in that verb's
+  time or that Lua's, and a coroutine a verb starts (`Timer.StartCoroutine`) that yields leaves
+  the rest of that verb's call counted as Lua. The verb rows count every system's
+  calls (`LateUpdate`, the timer phase, callbacks), so they and `script.lua` need
+  not sum to `cpu.update_scripts`. The timers cost time, so `cpu.update_scripts`
+  here is not the plain run's: the reports are kept apart, under
+  `out/bench/scenes/<project>-<hash>/script/`, and compare with another `SCRIPT=1`
+  run; `BEFORE=` looks in the baseline's `script/` folder first, and a plain
+  report, when that is all it holds, is another shape: no change column. A
+  wrapped verb takes, returns and raises what the bare one does, and the run
+  plays the same frames. The timer phase is its own system in every run,
+  `cpu.tick_script_timers` (due `Timer.Invoke`s, resumed coroutines), beside
+  `cpu.update_scripts`. A profile (`PROFILE=1`) shows where a verb spends its
+  time, by function; these rows show which verbs cost the row, how often each is
+  called, and its cost per call, without reading stacks.
 - **a profile refuses itself** when its recording was not sound: fewer than 20%
   of its samples land in a named function of the bench binary, or it holds
   fewer than a tenth of the samples its measured seconds should give at the
@@ -1383,7 +1427,9 @@ A performance PR's row is measured on the operator's desktop with
 `make bench-ab PR=<n> PROJECT=<dir> [SCENES=a,b] [RUNS=n] [LOAD_RUNS=n] [RES=WxH] [SET=key=value]`,
 never by hand. It runs `bench-scenes` three times back to back: on `main`, on the
 PR's head, and on `main` again, each built in a detached worktree of its own under
-`.claude/worktrees/` with its own `target/`, the head fetched as `pull/<n>/head`.
+`.claude/worktrees/` with its own `target/`, both heads read from origin and fetched
+by sha (`refs/pull/<n>/head`), so no local ref sits where another git process could
+move it.
 **The PR's leg is its head with the measured `main` merged in** (locally, never
 pushed), so the legs differ by the PR's diff alone and a PR branched before a
 speed-up merged does not show it as a regression; a conflict refuses, saying to
@@ -1462,7 +1508,10 @@ Each leg runs in a memory-capped scope of its own on Linux (`systemd-run --user
 without one (macOS, no user session) the legs run plain and the run says so. The
 legs' reports stay under `out/bench/ab/pr-<n>/` (`main/`, `pr/`, `main-again/`),
 and the table, printed and kept as `out/bench/ab/pr-<n>/table.md`, is the PR comment
-as it is. `make test-gpu PR=<n> [FILTER='<nextest filter>']` runs GPU tests on a
+as it is. Each scene's section opens with the warnings its legs' reports carry (a
+missing bake, textures drawn uncompressed, console errors), each once, a warning
+not every leg wrote marked with the legs that did: the table is what gets read, so
+a scene benched without its bake says so there, not only in a leg's output. `make test-gpu PR=<n> [FILTER='<nextest filter>']` runs GPU tests on a
 PR's head in the same `pr-<n>-head` tree, but as pushed: no `main` merged in, no
 timed-run lock and none of the refusals above. It only refuses a tree a live
 `make bench-ab` run holds, whose sources it would otherwise swap mid-build.

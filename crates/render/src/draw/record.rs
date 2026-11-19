@@ -33,8 +33,8 @@ impl Renderer {
 
     /// The opaque batches, as [`Self::draw_batches`] records batches, but through
     /// the GPU occlusion cull's kept instances and indirect args when it ran
-    /// (#1963), batch `i` drawing the args at `i`. The one way the prepass, the
-    /// forward and velocity pass and phase one draw them.
+    /// (#1963), batch `i` drawing the args at `i` from the draws' start. The one
+    /// way the prepass, the forward and velocity pass and phase one draw them.
     pub(crate) fn draw_solids<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
@@ -88,7 +88,9 @@ impl Renderer {
                         render_pass.draw_indexed_indirect(&c.args, ARGS * u64::from(job));
                     }
                 }
-                (Some(c), None) => render_pass.draw_indexed_indirect(&c.args, ARGS * i as u64),
+                (Some(c), None) => {
+                    render_pass.draw_indexed_indirect(&c.args, c.at + ARGS * i as u64)
+                }
                 (None, None) => {
                     render_pass.draw_indexed(batch.key.indices.range(), 0, batch.instances.clone())
                 }

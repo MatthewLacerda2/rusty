@@ -83,7 +83,8 @@ manifest, the row, then the compiler names every path left to fix.
   one `pub` says so. An item only tests use elsewhere is a *test hook*.
 - **Test hooks.** A `#[cfg(test)]` item is invisible outside its crate, so one that
   another crate's tests call is compiled in every build, `#[doc(hidden)] pub`, with a
-  line saying it is a test hook (`core::project::pin_engine`, `core::hulls::forget`,
+  line saying it is a test hook, in its doc or, for a module of hooks, the file's
+  `//!` header (`core::project::pin_engine`, `core::hulls::forget`,
   `core::wake::rings`). One that needs a crate the hook's own crate has only as a
   dev-dependency (a proptest strategy) is a `#[doc(hidden)] #[macro_export]` macro,
   expanded in the caller's test against the caller's dev-dependency
@@ -91,7 +92,11 @@ manifest, the row, then the compiler names every path left to fix.
   test reads) is compiled in too, off until a test arms it (`ecs::world::walks`,
   `logging::init_for_tests`; a `cfg!(test)` switch is false for other crates'
   tests, `cfg-test-switch`), or
-  off unless the value was built counting (`lighting::lightmap::Rays::counted`). A
+  off unless the value was built counting (`lighting::lightmap::Rays::counted`).
+  What a hook arms lives per thread (a `thread_local!`) or on the value, since
+  every test of a binary shares one process under `cargo test`; a process-wide
+  `static` only for a one-way switch every caller sets the same, allowed inline
+  (`test-static-write`). A
   whole file that is test fixture (`ecs::changes::ops`) goes in `.cargo/mutants.toml`'s
   `exclude_globs`, so mutation never asks a test of it.
   Never a `test-support` feature: a dev-dependency feature the normal build lacks

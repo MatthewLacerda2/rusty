@@ -8,9 +8,13 @@
 //! pure function of the triangles, and the ray path walks it on one thread with
 //! scalar `f32` arithmetic (no SIMD lanes, no libm), so it gives the same bits on
 //! every machine.
+//!
+//! The BVH's node test is our own copy of parry's ([`NodeRay`]), with the
+//! per-axis reciprocal of the direction worked out once per ray instead of at
+//! every node: the same operations in the same order, so the same bits.
 
 use glam::Vec3;
-use rapier3d::parry::partitioning::TraversalAction;
+use rapier3d::parry::partitioning::{BvhNode, TraversalAction};
 use rapier3d::parry::query::details::local_ray_intersection_with_triangle;
 use rapier3d::parry::query::Ray;
 use rapier3d::parry::shape::TriMesh;
@@ -116,9 +120,10 @@ impl Rays {
         self.count();
         let mesh = self.mesh.as_ref()?;
         let ray = Ray::new(origin + dir * t_min, dir);
+        let boxes = NodeRay::new(&ray);
         let (tri, (_, weights)) = mesh.bvh().find_best(
             t_max - t_min,
-            |node, best| node.cast_ray(&ray, best),
+            |node, best| boxes.cast(node, best),
             |i, best| match self.tris[i as usize].seen {
                 true => hit(mesh, i, &ray, best),
                 false => None,
@@ -166,9 +171,10 @@ impl Rays {
         let mesh = self.mesh.as_ref()?;
         let ray = Ray::new(origin + dir * t_min, dir);
         let reach = t_max - t_min;
+        let boxes = NodeRay::new(&ray);
         let mut blocker = None;
         mesh.bvh().traverse(|node| {
-            if node.cast_ray(&ray, reach) == f32::MAX {
+            if boxes.cast(node, reach) == f32::MAX {
                 return TraversalAction::Prune;
             }
             if let Some(i) = node.leaf_data() {
@@ -199,6 +205,62 @@ impl Rays {
     }
 }
 
+/// A ray made ready for the BVH's node test: its origin, and per axis whether
+/// its direction is zero and the direction's reciprocal.
+#[derive(Clone, Copy)]
+pub(super) struct NodeRay {
+    origin: [f32; 3],
+    zero: [bool; 3],
+    inv: [f32; 3],
+}
+
+impl NodeRay {
+    pub(super) fn new(ray: &Ray) -> Self {
+        let d = ray.dir.to_array();
+        NodeRay {
+            origin: ray.origin.to_array(),
+            // parry's `is_zero()`: `== 0.0`, so -0.0 too, and NaN is not zero.
+            zero: d.map(|c| c == 0.0),
+            inv: d.map(|c| 1.0 / c),
+        }
+    }
+
+    /// Where the ray enters `node`'s box short of `max_toi`, 0 when it starts
+    /// inside, `f32::MAX` when it misses: parry 0.31's `BvhNode::cast_ray`, which
+    /// is `Aabb::cast_local_ray(ray, max_toi, true)` (`query/ray/ray_aabb.rs`)
+    /// with `1.0 / dir` hoisted out of the node loop. Copied because parry's own
+    /// inverse-ray test (`BvhNode::cast_inv_ray_simd`) is private, and it is SIMD.
+    /// Keep it parry's operations in parry's order (the zero test and slab check,
+    /// the swap, `max` then `min`, the early miss; no fused multiply-add): the
+    /// property test in `node_tests` compares the two bit for bit, so a parry
+    /// upgrade that changes its test fails there rather than drifting the bake.
+    pub(super) fn cast(&self, node: &BvhNode, max_toi: f32) -> f32 {
+        let (mins, maxs) = (node.mins().to_array(), node.maxs().to_array());
+        let mut tmin: f32 = 0.0;
+        let mut tmax = max_toi;
+        for i in 0..3 {
+            let o = self.origin[i];
+            if self.zero[i] {
+                if o < mins[i] || o > maxs[i] {
+                    return f32::MAX;
+                }
+            } else {
+                let mut near = (mins[i] - o) * self.inv[i];
+                let mut far = (maxs[i] - o) * self.inv[i];
+                if near > far {
+                    std::mem::swap(&mut near, &mut far);
+                }
+                tmin = tmin.max(near);
+                tmax = tmax.min(far);
+                if tmin > tmax {
+                    return f32::MAX;
+                }
+            }
+        }
+        tmin
+    }
+}
+
 /// Where `ray` meets the mesh's triangle `i` short of `reach`, from either side: the
 /// time of impact and the barycentric weights of its corners. parry solves both from
 /// the ray, so a sliver triangle still gives finite weights at the point it was hit.
@@ -207,3 +269,8 @@ fn hit(mesh: &TriMesh, i: u32, ray: &Ray, reach: f32) -> Option<(f32, Vec3)> {
     let (inter, weights) = local_ray_intersection_with_triangle(t.a, t.b, t.c, ray)?;
     (inter.time_of_impact < reach).then_some((inter.time_of_impact, weights))
 }
+
+#[cfg(test)]
+mod node_tests;
+#[cfg(test)]
+mod tests;

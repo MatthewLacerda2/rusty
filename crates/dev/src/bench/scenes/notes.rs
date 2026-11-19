@@ -51,13 +51,31 @@ fn repeats(msg: &str) -> u64 {
 }
 
 /// The warning for a scene benched without its baked lighting, naming what is
-/// missing from what it places: no lightmaps; light probes placed whose SH never
-/// loaded (every one zero: no sidecar, or one that failed); reflection probes
-/// placed with no cube on disk. What a scene does not place is not missing.
+/// missing from what it places: no lightmaps, or lightmap pages the scene names
+/// that are not on disk (colour, direction and shadowmask pages, counted); light
+/// probes placed whose SH never loaded (every one zero: no sidecar, or one that
+/// failed); reflection probes placed with no cube on disk. What a scene does not
+/// place is not missing.
 pub fn unbaked(scene: &Scene) -> Option<String> {
     let mut missing = Vec::new();
-    if !scene.lightmaps.holds_bake() {
+    let lightmaps = &scene.lightmaps;
+    if !lightmaps.holds_bake() {
         missing.push("lightmaps".to_string());
+    }
+    let pages = [
+        ("pages", &lightmaps.pages),
+        ("direction pages", &lightmaps.directions),
+        ("shadowmask pages", &lightmaps.masks),
+    ];
+    let absent: Vec<String> = pages
+        .iter()
+        .filter_map(|(what, named)| {
+            let gone = named.iter().filter(|p| !Path::new(p).is_file()).count();
+            (gone > 0).then(|| format!("{gone} of {} {what}", named.len()))
+        })
+        .collect();
+    if !absent.is_empty() {
+        missing.push(format!("lightmaps ({} not on disk)", absent.join(", ")));
     }
     let probes = scene.probes.probes();
     if !probes.is_empty() && probes.iter().all(|p| p.sh == Sh9::zero()) {

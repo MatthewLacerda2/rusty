@@ -1,16 +1,27 @@
 """`main` and a pull request's head, each in a detached worktree of its own (#2381).
 
-A PR's head is fetched as `pull/<n>/head` into a ref of its own
-(`refs/bench/pr-<n>`), never as a named branch: a fork's PR has none here, a
-branch name can move during a run, and `FETCH_HEAD` is whatever the last fetch
-wrote. Each tree lives under the main checkout's `.claude/worktrees/` (CLAUDE.md:
-one worktree per branch, never a shared `CARGO_TARGET_DIR`) and builds into its
-own `target/`, named to cargo with `--target-dir`, so neither
+**Both heads are read by sha, never through a local ref** ([`fetch`]): one `git
+ls-remote origin` asks for `refs/heads/main` and `refs/pull/<n>/head`, and those
+two commits are fetched by sha and checked out by sha. A fork's PR has no branch
+here, a branch name can move during a run, `FETCH_HEAD` is whatever the last
+fetch wrote, and a local ref is shared with every git process in the repository
+(#2430): the head was once fetched into `refs/bench/pr-<n>` and read back in a
+second call, and twice that ref was gone in between, with the queue supervisor
+and reviewer worktrees fetching in the same repository. No script here deletes
+it; what did was not reproduced (concurrent fetches, `pack-refs --prune` and `gc
+--auto` never lost it on Linux), so nothing is written for another process to
+move. An object fetched by sha and named by no ref is safe from `gc` for
+`gc.pruneExpire` (two weeks), and once checked out, the tree's detached `HEAD`
+holds it.
+
+Each tree lives under the main checkout's `.claude/worktrees/` (CLAUDE.md: one
+worktree per branch, never a shared `CARGO_TARGET_DIR`) and builds into its own
+`target/`, named to cargo with `--target-dir`, so neither
 `CARGO_BUILD_TARGET_DIR` nor a cargo config can leave a stale binary where the
 run looks for it. A tree is re-pointed with a plain `checkout --detach`, so one
 with local changes fails rather than losing them.
 
-**The PR's leg measures the PR's head with the measured `origin/main` merged in**
+**The PR's leg measures the PR's head with the measured `main` merged in**
 ([`merge_main`]), a local merge in the detached tree, never pushed: a PR
 branched before a speed-up merged would otherwise show `main`'s speed-up as its
 own regression. So the two legs differ by the PR's diff alone; a conflict
@@ -60,9 +71,12 @@ def pr_of_tree(name: str) -> int | None:
     return int(found.group(1)) if found else None
 
 
-def pr_ref(pr: int) -> str:
-    """The local ref a PR's head is fetched into."""
-    return f"refs/bench/pr-{pr}"
+def pull_ref(pr: int) -> str:
+    """The remote ref GitHub keeps a PR's head at (a fork's PR too)."""
+    return f"refs/pull/{pr}/head"
+
+
+MAIN_REF = "refs/heads/main"
 
 
 def run(argv, cwd=None, env=None) -> str:
@@ -79,14 +93,36 @@ def main_checkout(git=run) -> Path:
     return common.parent
 
 
-def fetch(pr: int | None, git=run) -> tuple[str, str | None]:
-    """The commits of `origin/main` and of PR `pr`'s head, fetched now."""
-    git(["git", "fetch", "--quiet", "origin", "main"])
-    main = git(["git", "rev-parse", "origin/main"]).strip()
-    if pr is None:
-        return main, None
-    git(["git", "fetch", "--quiet", "origin", f"+pull/{pr}/head:{pr_ref(pr)}"])
-    return main, git(["git", "rev-parse", pr_ref(pr)]).strip()
+def heads(listing: str) -> dict[str, str]:
+    """`git ls-remote`'s output as `{ref: sha}`."""
+    found = {}
+    for line in listing.splitlines():
+        sha, _, ref = line.partition("\t")
+        if ref:
+            found[ref.strip()] = sha.strip()
+    return found
+
+
+def fetch(pr: int | None, git=run, again: str = "this") -> tuple[str, str | None]:
+    """The commits of origin's `main` and of PR `pr`'s head as origin has them now, both fetched.
+
+    Read from the remote and fetched by sha, so no local ref is written or read
+    back: another git process in the repository has nothing to move between the
+    two calls. A failure is one line naming the PR and what to run `again`."""
+    what = "main" if pr is None else f"main and PR #{pr}'s head"
+    wanted = [MAIN_REF] + ([] if pr is None else [pull_ref(pr)])
+    try:
+        found = heads(git(["git", "ls-remote", "origin", *wanted]))
+        missing = [ref for ref in wanted if ref not in found]
+        if missing:
+            raise RuntimeError(f"origin has no {', '.join(missing)}")
+        shas = [found[ref] for ref in wanted]
+        git(["git", "fetch", "--quiet", "--no-write-fetch-head", "origin", *shas])
+    except RuntimeError as e:
+        why = " ".join(str(e).split())
+        raise RuntimeError(f"could not fetch {what} ({why}): check the PR is open and origin is "
+                           f"reachable, then run {again} again") from None
+    return shas[0], (shas[1] if pr is not None else None)
 
 
 def path(root: Path, name: str) -> Path:
