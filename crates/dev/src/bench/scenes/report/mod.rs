@@ -111,6 +111,14 @@ impl SceneReport {
         self.rows.push(Row::value(metric.into(), value));
     }
 
+    /// The metric column's width: 30, or the longest row (a `script.` verb's).
+    fn metric_width(&self) -> usize {
+        self.rows
+            .iter()
+            .map(|r| r.metric.len())
+            .fold(30, usize::max)
+    }
+
     /// What the run changed from a plain one, under the title: the `--set`
     /// overrides, the verb timers.
     fn run_notes(&self) -> String {
@@ -148,17 +156,8 @@ impl SceneReport {
             self.loads
         );
         out.push_str(&self.run_notes());
-        let against = if self.baseline.is_some() {
-            "before"
-        } else {
-            "last"
-        };
-        // As wide as the longest row (a `script.` verb's runs past 30).
-        let w = self
-            .rows
-            .iter()
-            .map(|r| r.metric.len())
-            .fold(30, usize::max);
+        let against = ["last", "before"][usize::from(self.baseline.is_some())];
+        let w = self.metric_width();
         let _ = writeln!(
             out,
             "{:<w$} {:>12} {:>19} {:>12}  {:<18} vs {against} avg",
