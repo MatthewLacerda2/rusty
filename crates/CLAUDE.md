@@ -111,7 +111,7 @@ manifest, the row, then the compiler names every path left to fix.
   `rusty-logging` reads its warnings through `rusty_logging::init_for_tests` and
   `forward` instead, one logger a process, `one-logger`), a test that needs its
   process to itself under plain `cargo test` too, a process-wide measure such as
-  the peak memory (`alone!`), and a path in the temp dir spelled as a
+  the peak memory or an exact count of a process-wide counter (`alone!`), and a path in the temp dir spelled as a
   script passes it (`temp::lua_path`). A crate's tests call it directly, the
   integration suite through `tests/temp.rs`; a folder spelled from the working
   directory is `temp::relative`. A fixture that is plain data moves here; one built on a

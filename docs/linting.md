@@ -814,7 +814,13 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   another crate's API (a registry a call appends to), or `crates/test-support/`,
   whose process-wide statics (`logs.rs`' `KEPT`, `ONCE`) the shared test-line
   definition does not count as test code; those stay the
-  nightly run's to catch (`rules/static_write.rs`).
+  nightly run's to catch (`rules/static_write.rs`). Nor does it see a test that
+  only *reads* process-wide state live code writes and asserts an exact value of
+  it (`asset::convert::conversions` before and after a refresh, while the
+  binary's other tests convert): such a test runs its body in
+  `rusty_test_support::alone!`, and a "went up" compare (`core::wake::rings`)
+  needs nothing. Telling those apart would mean resolving which accessor, often
+  in another crate, reads a process-wide `static`, past what a line scan reads.
 - **`test-temp-dir`** — a path under `std::env::temp_dir()` is shared by every test
   process, every worktree and (under `cargo test`) every test
   thread, so a fixed or process-keyed name races. Test code (the *Test code* bullet)
