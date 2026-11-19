@@ -15,12 +15,9 @@ use rusty_scene::lighting::lightmap_set::LightmapEntry;
 fn page_fillers(n: usize) -> Vec<Lightmap> {
     let size = max_map_edge(32);
     (0..n as u32)
-        .map(|entity| Lightmap {
-            masks: Vec::new(),
-            entity,
-            size,
-            texels: vec![Vec3::ONE; (size * size) as usize],
-            directions: Vec::new(),
+        .map(|entity| {
+            let texels = vec![Vec3::ONE; (size * size) as usize];
+            Lightmap::dense(entity, size, texels, Vec::new(), Vec::new())
         })
         .collect()
 }
@@ -52,7 +49,7 @@ fn a_refused_bake_keeps_the_scene_s_previous_lightmaps() {
     let before = scene.lightmaps.clone();
     let path = rusty_test_support::temp::dir().join("refused_1704.scene");
     let path = path.to_string_lossy();
-    let refused = apply_lightmaps(&mut scene, &path, &page_fillers(MAX_PAGES + 1));
+    let refused = apply_lightmaps(&mut scene, &path, page_fillers(MAX_PAGES + 1));
     assert!(refused.unwrap_err().contains("257 lightmap pages"));
     assert_eq!(scene.lightmaps, before, "nothing applied");
     assert!(!lightmap_dir(&path).exists(), "nothing written");

@@ -14,8 +14,8 @@ use super::job::Taken;
 use super::preview::{lock, Previews, Shared};
 use super::write::{clear_pages, stems, write_png};
 use rusty_lighting::lightmap::{
-    check_page_count, encode_directions, encode_masks, encode_texels, pack, BakeProgress, Lightmap,
-    Pass, PassSink, MAX_PAGES,
+    check_page_count, encode_directions, encode_masks, encode_texels, packing, BakeProgress,
+    Lightmap, Pass, PassSink, MAX_PAGES,
 };
 use rusty_scene::lighting::lightmap_set::{LightmapEntry, LightmapSet};
 
@@ -172,7 +172,8 @@ impl Queue {
     }
 }
 
-/// `maps` packed into pages of at most `page` texels and written into `dir` as
+/// `maps` laid out on pages of at most `page` texels and written, a page at a
+/// time, into `dir` as
 /// preview pages named from `prefix`, each an uncompressed PNG of one level (no
 /// BC encode, no mips written), and the set that points at them. A colour or
 /// direction page uploads that one level as written, so both read the same level
@@ -185,30 +186,33 @@ fn write_preview(
     (lights, shadowmask): &Taken,
 ) -> Result<LightmapSet, String> {
     check_page_count(maps, page, MAX_PAGES)?;
-    let atlas = pack(maps, page);
-    let size = atlas.page_size;
+    // One page composed and written at a time (#2312), as the finished bake's.
+    let layout = packing(maps, page);
+    let size = layout.page_size;
     std::fs::create_dir_all(dir).map_err(|e| format!("lightmap folder: {e}"))?;
     let mut set = LightmapSet::default();
     let write =
         |kind: &str, k: usize, rgba: Vec<u8>| write_png(dir, kind, k, &raw_png(size, &rgba)?);
-    for (k, texels) in atlas.pages.iter().enumerate() {
-        set.pages.push(write(prefix, k, encode_texels(texels))?);
+    for k in 0..layout.page_count {
+        let page = layout.page(k, &|i| &maps[i]);
+        set.pages
+            .push(write(prefix, k, encode_texels(&page.texels))?);
+        if let Some(dirs) = page.directions {
+            let kind = format!("{prefix}_dir");
+            set.directions
+                .push(write(&kind, k, encode_directions(&dirs))?);
+        }
+        if let Some(mask) = page.masks {
+            let kind = format!("{prefix}_mask");
+            set.masks.push(write(&kind, k, encode_masks(&mask))?);
+        }
     }
-    for (k, dirs) in atlas.directions.iter().enumerate() {
-        let kind = format!("{prefix}_dir");
-        set.directions
-            .push(write(&kind, k, encode_directions(dirs))?);
-    }
-    for (k, mask) in atlas.masks.iter().enumerate() {
-        let kind = format!("{prefix}_mask");
-        set.masks.push(write(&kind, k, encode_masks(mask))?);
-    }
-    let entry = |&(entity, page, scale_offset): &(u32, u32, [f32; 4])| LightmapEntry {
+    let entry = |(entity, page, scale_offset): (u32, u32, [f32; 4])| LightmapEntry {
         entity,
         page,
         scale_offset,
     };
-    set.extend(atlas.placements.iter().map(entry));
+    set.extend(layout.placements(maps).into_iter().map(entry));
     set.lights = lights.clone();
     set.channels = shadowmask.channels.clone();
     set.fell_back = shadowmask.fell_back.clone();

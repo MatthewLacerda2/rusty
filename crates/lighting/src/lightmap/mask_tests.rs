@@ -52,8 +52,8 @@ fn floor_map(maps: &[Lightmap]) -> &Lightmap {
 fn a_mixed_lights_mask_is_its_static_shadow_and_the_light_stays_out() {
     let s = settings();
     let maps = bake(&masking(half_covered(vec![lamp(Some(0))])), &s);
-    let masks = &floor_map(&maps).masks;
-    assert_eq!(masks.len(), floor_map(&maps).texels.len());
+    let masks = &floor_map(&maps).masks();
+    assert_eq!(masks.len(), floor_map(&maps).texels().len());
     let shadowed = masks.iter().filter(|m| m.x == 0.0).count() as f32;
     let share = shadowed / masks.len() as f32;
     // The panel's shadow from 3 m up covers the floor's x < 0 half.
@@ -68,8 +68,11 @@ fn a_mixed_lights_mask_is_its_static_shadow_and_the_light_stays_out() {
     );
     // The lightmap holds what it held without a mask: the bounce, no direct light.
     let unmasked = bake(&half_covered(vec![lamp(None)]), &s);
-    assert_eq!(floor_map(&maps).texels, floor_map(&unmasked).texels);
-    assert!(floor_map(&unmasked).masks.is_empty(), "no mask without one");
+    assert_eq!(floor_map(&maps).texels(), floor_map(&unmasked).texels());
+    assert!(
+        floor_map(&unmasked).masks().is_empty(),
+        "no mask without one"
+    );
 }
 
 #[test]
@@ -85,8 +88,8 @@ fn masks_bake_the_same_on_any_worker_count_and_without_directions() {
         ..s
     };
     let maps = bake(&scene, &flat);
-    assert!(floor_map(&maps).directions.is_empty());
-    assert_eq!(floor_map(&maps).masks, floor_map(&one).masks);
+    assert!(floor_map(&maps).directions().is_empty());
+    assert_eq!(floor_map(&maps).masks(), floor_map(&one).masks());
 }
 
 #[test]
@@ -98,10 +101,7 @@ fn the_atlas_packs_masks_beside_the_pages_on_a_lit_background() {
     assert!(background > 0, "lit where no chart is");
     let no_masks: Vec<Lightmap> = maps
         .into_iter()
-        .map(|m| Lightmap {
-            masks: Vec::new(),
-            ..m
-        })
+        .map(|m| Lightmap::dense(m.entity, m.size, m.texels(), m.directions(), Vec::new()))
         .collect();
     assert!(pack(&no_masks, 64).masks.is_empty());
 }

@@ -15,7 +15,7 @@ use rusty_components::{MaterialComponent, MeshComponent};
 pub(super) fn halves(map: &Lightmap) -> (f32, f32) {
     let size = map.size as usize;
     let half = |right: bool| {
-        let texels = map.texels.iter().enumerate();
+        let texels = map.texels().into_iter().enumerate();
         let picked: Vec<f32> = texels
             .filter(|(i, _)| (i % size >= size / 2) == right)
             .map(|(_, t)| t.x)

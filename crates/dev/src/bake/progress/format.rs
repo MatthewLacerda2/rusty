@@ -103,3 +103,8 @@ pub(super) fn count(n: u64) -> String {
         _ => format!("{:.1}M", n as f64 / 1e6),
     }
 }
+
+/// `bytes` in GB to one place, e.g. `3.2 GB` (#2312's peak memory).
+pub(crate) fn gb(bytes: u64) -> String {
+    format!("{:.1} GB", bytes as f64 / f64::from(1u32 << 30))
+}

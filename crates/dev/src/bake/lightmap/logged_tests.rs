@@ -5,7 +5,7 @@ use std::cell::{Cell, RefCell};
 use std::time::Duration;
 
 use super::logged::{bake_logged, read, watch};
-use super::tests::{quick, scene};
+use super::tests::{quick, scene, scene_path};
 use super::*;
 use crate::bake::progress::Line;
 use rusty_lighting::lightmap::BakeProgress;
@@ -14,7 +14,8 @@ use rusty_lighting::lightmap::BakeProgress;
 fn a_logged_bake_is_byte_identical_to_an_unlogged_one() {
     let (scene, ..) = scene();
     let input = gather_bake_input(&scene);
-    let plain = bake_logged(&input, &quick(), &mut BakeLog::off()).unwrap();
+    let path = scene_path("logged_bytes");
+    let plain = bake_logged(&input, &quick(), &mut BakeLog::off(), &path).unwrap();
     let (plain, untimed) = (plain.pages, plain.measured.times);
     // A clock that jumps a minute per read, so every observation prints.
     let now = Cell::new(Duration::ZERO);
@@ -24,7 +25,7 @@ fn a_logged_bake_is_byte_identical_to_an_unlogged_one() {
         now.get()
     };
     let mut log = BakeLog::new(clock, |l| lines.borrow_mut().push(l));
-    let logged = bake_logged(&input, &quick(), &mut log).unwrap();
+    let logged = bake_logged(&input, &quick(), &mut log, &path).unwrap();
     let (logged, times) = (logged.pages, logged.measured.times);
     drop(log);
     assert!(plain.maps > 0);

@@ -98,12 +98,12 @@ fn a_lent_denoiser_cleans_the_bounce_and_its_directions() {
     assert_ne!(clean, filtered);
     // Only the bounce was flattened: no Baked lamp, so the whole chart is one value.
     let floor = &clean[0];
-    let first = floor.texels[0];
+    let first = floor.texels()[0];
     assert!(floor
-        .texels
+        .texels()
         .iter()
         .all(|t| (*t - first).abs().max_element() < 1e-5));
-    for d in &floor.directions {
+    for d in &floor.directions() {
         assert!(d.truncate().length() <= 1.0 + 1e-5, "{d}");
     }
     // A Filter bake leaves the lent denoiser alone.
@@ -117,13 +117,13 @@ fn a_lent_denoiser_cleans_the_bounce_and_its_directions() {
 fn a_denoiser_that_returns_nan_keeps_the_trace() {
     let kept = baked(&with(Denoiser::Oidn, 0), Some(Mock::Poison), 2).0;
     for (k, r) in kept.iter().zip(&baked(&with(Denoiser::None, 0), None, 2).0) {
-        assert_eq!(k.texels, r.texels, "no radius: the raw trace");
+        assert_eq!(k.texels(), r.texels(), "no radius: the raw trace");
     }
     let poisoned = baked(&with(Denoiser::Oidn, 2), Some(Mock::Poison), 2).0;
     let filtered = baked(&with(Denoiser::Filter, 2), None, 2).0;
     for (p, f) in poisoned.iter().zip(&filtered) {
-        assert_eq!(p.texels, f.texels, "the trace, then the Gaussian");
-        assert!(p.directions.iter().all(|d| d.is_finite()));
+        assert_eq!(p.texels(), f.texels(), "the trace, then the Gaussian");
+        assert!(p.directions().iter().all(|d| d.is_finite()));
     }
 }
 

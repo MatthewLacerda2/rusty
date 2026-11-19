@@ -33,10 +33,8 @@ fn every_pass_shows_the_whole_scene_converging() {
         let pairs = maps
             .iter()
             .zip(&last)
-            .flat_map(|(a, b)| a.texels.iter().zip(&b.texels));
-        pairs
-            .map(|(a, b)| (*a - *b).abs().element_sum())
-            .sum::<f32>()
+            .flat_map(|(a, b)| a.texels().into_iter().zip(b.texels()));
+        pairs.map(|(a, b)| (a - b).abs().element_sum()).sum::<f32>()
     };
     assert_eq!(shown.len(), 3);
     for maps in &shown {
@@ -46,7 +44,7 @@ fn every_pass_shows_the_whole_scene_converging() {
         );
         assert!(maps
             .iter()
-            .all(|m| m.texels.iter().all(|t| t.is_finite() && t.x > 0.0)));
+            .all(|m| m.texels().into_iter().all(|t| t.is_finite() && t.x > 0.0)));
     }
     let (first, third) = (error(&shown[0]), error(&shown[2]));
     assert!(

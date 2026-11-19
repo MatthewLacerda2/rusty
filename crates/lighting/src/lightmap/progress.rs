@@ -31,6 +31,9 @@ pub trait BakeObserver: Send + Sync {
     fn batch_started(&self, chart: usize);
     /// That batch is traced: `texels` of them.
     fn batch_finished(&self, chart: usize, texels: usize);
+    /// Chart `chart` is finished (#2312): its lightmap is made and its working
+    /// data freed, so the platform may hand freed memory back to the system here.
+    fn chart_finished(&self, _chart: usize) {}
 }
 
 /// The observer a progress was given, if any; `Debug` says only whether.
@@ -208,8 +211,12 @@ impl BakeProgress {
         }
     }
 
-    pub(super) fn mesh_done(&self) {
+    /// Chart `chart` is finished, its working data freed.
+    pub(super) fn mesh_done(&self, chart: usize) {
         self.meshes_done.fetch_add(1, Ordering::Relaxed);
+        if let Some(observer) = &self.observer.0 {
+            observer.chart_finished(chart);
+        }
     }
 
     pub(super) fn advance(&self, texels: u64) {

@@ -103,10 +103,10 @@ fn a_bake_is_byte_identical_on_one_worker_or_many() {
     let bits = |maps: &[Lightmap]| -> Vec<u32> {
         let colour = maps
             .iter()
-            .flat_map(|m| m.texels.iter().map(|t| t.to_array()));
+            .flat_map(|m| m.texels().into_iter().map(|t| t.to_array()));
         let dirs = maps
             .iter()
-            .flat_map(|m| m.directions.iter().map(|d| d.to_array()));
+            .flat_map(|m| m.directions().into_iter().map(|d| d.to_array()));
         let all = colour.flat_map(|t| t.map(f32::to_bits));
         all.chain(dirs.flat_map(|d| d.map(f32::to_bits))).collect()
     };
