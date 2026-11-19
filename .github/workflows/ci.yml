@@ -203,6 +203,15 @@ jobs:
     # are the two `dev` shards, which run the gpu group (355 s and 562 s of nextest
     # in run 44351591966); the default entry, which leaves that group to them, 73 s.
     timeout-minutes: 30
+    # The one Ubuntu image: every Ubuntu job in `.github/workflows/`, and every
+    # cache key that names an image, names this one (`test_runner_image.py` in
+    # `.github/scripts/tests/`), so the mutation,
+    # coverage and health runs test on the lavapipe the gate proves. A move is
+    # one PR changing every one of them, which that check lists. Read #2385 before
+    # moving it: a shadowed spot's shaft (`volumetric_fog::gpu::shaft`) went
+    # missing twice on the newest-Ubuntu label's Mesa 26 lavapipe and never on
+    # this image's Mesa 25, its cause not named, so a move to Mesa 26 is where it
+    # may return.
     runs-on: ubuntu-24.04
     if: >-
       github.event_name == 'push' ||
@@ -258,10 +267,14 @@ jobs:
           packages: mesa-vulkan-drivers libvulkan1
       # lavapipe comes from the image's apt archive, so the driver under the GPU
       # tests can change with nothing in any diff (#930; compare #769's black
-      # frames). The log names the one this run rendered with.
+      # frames). The log names the one this run rendered with, and the CPU
+      # llvmpipe compiled its shaders for (#2385: a miss only another image's
+      # lavapipe showed, on a machine no log named).
       - name: Driver version (Mesa / lavapipe)
         if: needs.changes.outputs.code != 'false'
-        run: dpkg-query -W mesa-vulkan-drivers libvulkan1
+        run: |
+          dpkg-query -W mesa-vulkan-drivers libvulkan1
+          lscpu | grep -E 'Model name|Flags'
       # Open Image Denoise (#1884): no apt package, so the pinned, checksummed
       # release, unpacked where RUSTY_OIDN points. rusty opens it at run time, so
       # only the tests need it; a build never links it. Cached by version, as the
