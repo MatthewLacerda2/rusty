@@ -5,7 +5,10 @@
 //! Both paths run the same passes in the same order (plan, joints, enabled,
 //! materials, layers, sensors, characters, masses, then each body's state and
 //! compound offsets), in ascending owner order, the order the full pass visits
-//! them in. The incremental one runs every pass over the named bodies, and the
+//! them in. The incremental one runs each pass over the bodies named on the
+//! channels that pass reads (`watch`'s table, [`Named`]: a body that only moved
+//! skips the enabled, material, layer, sensor and fit passes, which read no
+//! pose, #2344), every pass over a body just built, and the
 //! body-state pass also over every body the last step may have changed (rapier
 //! had it awake, `Tracked::stepped`): a step changes a body's pose, velocities
 //! and sleep, and nothing the other passes read. The solver rewrites the pose of
@@ -25,7 +28,7 @@ use std::collections::BTreeSet;
 
 use super::compound::member;
 use super::shape::build::body_state;
-use super::watch::{carriers, joint_deps, Changed, Owners, Watch};
+use super::watch::{carriers, joint_deps, Changed, Named, Owners, Watch};
 use super::world::PhysicsWorld;
 use rusty_scene::Scene;
 
@@ -37,12 +40,16 @@ impl PhysicsWorld {
     /// Returns the bodies whose state it synced.
     pub(super) fn sync_to_rapier(&mut self, scene: &mut Scene) -> Owners {
         let stepped = std::mem::take(&mut self.tracked.stepped);
-        let (owners, reshaped) = match self.read_changes(scene) {
+        let (named, reshaped) = match self.read_changes(scene) {
             None => {
                 self.resync_topology(scene);
                 self.tracked.carriers = carriers(scene);
                 self.resync_joints_tracked(scene);
-                (Owners::All, None)
+                #[cfg(test)]
+                {
+                    self.tracked.visits.changed = 0;
+                }
+                (Named::all(), None)
             }
             Some(changed) => self.resync_changed(scene, &changed),
         };
@@ -54,28 +61,43 @@ impl PhysicsWorld {
         let assets = rusty_scene::physics_material::generation();
         let assets_moved = self.tracked.material_assets != Some(assets);
         self.tracked.material_assets = Some(assets);
-        self.sync_enabled(scene, &owners);
-        self.sync_materials(scene, if assets_moved { &Owners::All } else { &owners });
+        #[cfg(test)]
+        self.tracked.visits.record(&named, &self.plan);
+        self.sync_enabled(scene, &named.activity);
+        let collider = &named.collider;
+        self.sync_materials(scene, if assets_moved { &Owners::All } else { collider });
         // The matrix is no entity's column: a change re-derives every collider's groups.
-        self.sync_layers(scene, if matrix_moved { &Owners::All } else { &owners });
-        self.sync_sensors(scene, &owners);
+        let layer = if matrix_moved {
+            &Owners::All
+        } else {
+            &named.layer
+        };
+        self.sync_layers(scene, layer);
+        self.sync_sensors(scene, collider);
         // Before the masses: a resized capsule changes its body's volume.
-        self.sync_characters(scene, &owners);
+        self.sync_characters(scene, &named.every);
         // A replaced library mesh re-shapes the colliders built from it (#2059),
         // fit to the body's class now, so the refit below finds it current.
         self.sync_mesh_shapes(scene, reshaped.as_ref());
         // A body that changed type re-fits its meshes, cylinders and capsules,
         // before the masses.
-        self.sync_fits(scene, &owners);
-        self.sync_masses(scene, &owners);
+        self.sync_fits(scene, &named.fits);
+        self.sync_masses(scene, &named.every);
         // The one pass a step's changes reach: pose, velocities, sleep.
-        let owners = match owners {
+        let owners = match named.every {
             Owners::All => Owners::All,
             Owners::Only(mut named) => {
                 named.extend(stepped.iter().filter(|o| self.plan.contains_key(o)));
                 Owners::Only(named)
             }
         };
+        self.sync_states(scene, &owners);
+        owners
+    }
+
+    /// Each of `owners`' world pose and velocities, and its compound colliders'
+    /// offsets.
+    fn sync_states(&mut self, scene: &Scene, owners: &Owners) {
         let plan = std::mem::take(&mut self.plan);
         for (&owner, ids) in owners.pick(&plan) {
             let Some(&handle) = self.id_to_body.get(&owner) else {
@@ -88,7 +110,6 @@ impl PhysicsWorld {
             self.sync_compound_parts(scene, owner, ids);
         }
         self.plan = plan;
-        owners
     }
 
     /// The owners of every body rapier has awake: the only ones a step can move.
@@ -151,46 +172,75 @@ impl PhysicsWorld {
     }
 
     /// Rebuild what `changed` may have reshaped (the plan, the joints) and return
-    /// the bodies to sync: every owner a named id is or belongs to, and every body
-    /// just built; and the colliders whose library-mesh triangles may have moved.
+    /// the bodies each pass syncs (every owner an id on the pass's channels is or
+    /// belongs to, and every body just built), and the colliders whose
+    /// library-mesh triangles may have moved.
     fn resync_changed(
         &mut self,
         scene: &Scene,
         changed: &Changed,
-    ) -> (Owners, Option<BTreeSet<u32>>) {
-        let mut owners = BTreeSet::new();
-        let reshaped: BTreeSet<u32> = changed.reshaped.iter().copied().collect();
-        let replan = self.plan_may_change(scene, changed);
-        if replan {
-            // Its colliders' triangles were just recorded (`resync_topology`).
-            owners.extend(self.resync_topology(scene));
-            self.tracked.carriers = carriers(scene);
+    ) -> (Named, Option<BTreeSet<u32>>) {
+        #[cfg(test)]
+        {
+            self.tracked.visits.changed = changed.all.len();
         }
+        let replan = self.plan_may_change(scene, changed);
+        // A body just built has nothing in rapier to compare against: every pass.
+        let built = if replan {
+            // Its colliders' triangles were just recorded (`resync_topology`).
+            let built = self.resync_topology(scene).into_iter().collect();
+            self.tracked.carriers = carriers(scene);
+            built
+        } else {
+            BTreeSet::new()
+        };
         let deps = &self.tracked.joint_deps;
         if replan || changed.joints || changed.all.iter().any(|id| deps.contains(id)) {
             self.resync_joints_tracked(scene);
         }
-        for &id in &changed.all {
-            if self.plan.contains_key(&id) {
-                owners.insert(id);
+        let owners = |ids: &mut dyn Iterator<Item = &u32>| {
+            let mut out = built.clone();
+            for id in ids {
+                if self.plan.contains_key(id) {
+                    out.insert(*id);
+                }
+                out.extend(self.tracked.member_owner.get(id));
             }
-            owners.extend(self.tracked.member_owner.get(&id));
-        }
-        (Owners::Only(owners), Some(reshaped))
+            Owners::Only(out)
+        };
+        let c = changed;
+        let named = Named {
+            every: owners(&mut c.all.iter()),
+            activity: owners(&mut c.activity.iter()),
+            collider: owners(&mut c.collider.iter().chain(&c.character)),
+            layer: owners(&mut c.layer.iter()),
+            fits: owners(&mut c.collider.iter().chain(c.carriers()).chain(&c.statics)),
+        };
+        (named, Some(c.reshaped()))
     }
 
     /// Whether a named id may have left, joined or moved between bodies: its
     /// collider membership or owner differs from the plan's, or a body carrier
     /// appeared or went (which re-homes every collider below it, named or not).
+    ///
+    /// **Only the ids that can re-home are checked** (`Changed::homes`), so a tick
+    /// where only poses moved re-derives no owner. That holds while every way a
+    /// parent link, a Collider or a carrier changes stamps one of those channels:
+    /// a re-parent, placement or removal stamps the subtree on `Activity`, a
+    /// Collider or carrier edit its own column (`ecs::changes::stamp`).
     fn plan_may_change(&self, scene: &Scene, changed: &Changed) -> bool {
         let t = &self.tracked;
         let w = &scene.world;
-        let rehomed = |&id: &u32| member(scene, id) != t.member_owner.get(&id).copied();
+        let rehomed = |&id: &u32| {
+            #[cfg(test)]
+            t.visits.members.set(t.visits.members.get() + 1);
+            member(scene, id) != t.member_owner.get(&id).copied()
+        };
         let carrier = |&id: &u32| {
             let carries = w.has_rigidbody(id) || w.has_character_controller(id);
             carries != t.carriers.contains(&id)
         };
-        changed.all.iter().any(rehomed) || changed.carriers.iter().any(carrier)
+        changed.homes().any(rehomed) || changed.carriers().any(carrier)
     }
 
     /// [`Self::resync_joints`], recording what it read for the next step's check.
