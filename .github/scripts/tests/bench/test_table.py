@@ -47,9 +47,27 @@ class Table(unittest.TestCase):
         self.assertEqual(rows["hiz_tested"][2], "0 → 5")
         self.assertEqual(rows["draw_calls"][2], "not shown (+0.0%)")
 
+    def test_a_row_only_the_pr_has_is_listed_absent_on_main(self):
+        root = Path(tempfile.mkdtemp())
+        legs = (leg(root, "main", {"cpu_ms": 10.0}), leg(root, "pr", {"cpu_ms": 10.0, "render.hiz": 0.4}),
+                leg(root, "main-again", {"cpu_ms": 10.0}))
+        rows = self.rows_of(legs)
+        self.assertEqual(rows["render.hiz"][:3], ["absent", "0.4", "absent on main"])
+
+    def test_a_row_without_a_floor_shows_its_change(self):
+        root = Path(tempfile.mkdtemp())
+        legs = (leg(root, "main", {"gpu_ms": 4.0}), leg(root, "pr", {"gpu_ms": 2.0}), leg(root, "main-again", {}))
+        gpu = self.rows_of(legs)["gpu_ms"]
+        self.assertEqual(gpu[2], "-50.0% (floor unknown)")
+        self.assertIn("unknown", gpu[3])
+
+    def rows_of(self, legs):
+        self.legs = legs
+        return self.rows()
+
     def test_scenes_and_a_missing_report(self):
         self.assertEqual(table.scenes_of(self.legs[0]), ["levels/a"])
-        self.assertIn("wrote no report", table.scene_table("other", self.legs))
+        self.assertIn("wrote a report", table.scene_table("other", self.legs))
         text = table.render(["levels/a"], self.legs, ["header line"])
         self.assertTrue(text.startswith("header line\n"))
 

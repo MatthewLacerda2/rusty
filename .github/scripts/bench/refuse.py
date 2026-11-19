@@ -5,8 +5,11 @@ refused: a baseline taken while two local agents built beside it (its CPU rows
 spread 9%), and a run on a project whose textures were never imported (`gpu_mb`
 2176 against 1216 once imported). So `make bench-ab` refuses:
 
-- **another timed run**: a lock file under `out/bench/` naming its PID (one
-  whose PID no longer runs is stale and taken over);
+- **another timed run**: an `fcntl.flock` on `out/bench/.timed-run.lock`
+  (`merging/watch/lock.hold`, the merge queue's), held for the life of the
+  process and dropped by the kernel however it dies, a power loss included, so a
+  lock is never left behind for a reused PID to keep; the file names the
+  holder's PID for the refusal;
 - **a build or a bench on the machine**: a `cargo`, `cargo-<tool>` (a running
   `cargo nextest` is `cargo-nextest`), `rustc` or `bench-scenes` process
   ([`BUSY`]), from the process table, before any build and again
@@ -14,8 +17,18 @@ spread 9%), and a run on a project whose textures were never imported (`gpu_mb`
 - **un-imported textures**: the images an import would encode now, which
   `bench-scenes --pending-imports` lists from the engine's own check
   (`asset::texture_import::pending`), so the refusal and the import never
-  disagree. It needs a built engine, so it runs on `main`'s build, before the
-  PR's build and before any leg.
+  disagree. It needs a built engine, so it runs on `main`'s build before the
+  PR's build and any leg, and again on the PR's build: a PR that changes the
+  cache's stamp, a texture default or the encoder sees every cache as stale,
+  uploads uncompressed, and its memory and load rows move for a reason that is
+  not its code (`gpu_mb` 2176 against 1216 MB);
+- **a binary that cannot do what is asked** ([`flags_refusal`]): each binary is
+  asked its `--help` first. `main`'s has no `--pending-imports` (or `--set`)
+  until the PR that adds them merges, and an unknown flag is read as the out
+  folder, benching every scene into it: a binary without `--pending-imports`
+  makes the texture check one that could not run (a refusal `FORCE=1` runs past,
+  saying so), and one without `--set` asked for one refuses outright, `FORCE=1`
+  or not, since no leg of it could run.
 
 `FORCE=1` runs anyway, and the table says what was overridden.
 """
@@ -25,42 +38,36 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from merging.watch import lock
+
 LOCK = Path("out/bench/.timed-run.lock")
 # Processes that skew a timed run: a build, or another bench.
 BUSY = ("cargo", "rustc", "bench-scenes")
 
 
-def alive(pid: int) -> bool:
-    """Whether a process `pid` runs (signal 0 checks without signalling)."""
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
+def hold(path: Path):
+    """`(handle, None)` with the timed-run lock held while `handle` stays open,
+    or `(None, refusal)` naming the run that holds it."""
+    handle, holder = lock.hold(path)
+    if handle is None:
+        return None, f"another timed run holds {path} (PID {holder}): a timed benchmark runs alone"
+    return handle, None
 
 
-def take_lock(path: Path, pid: int, is_alive=alive) -> str | None:
-    """Take the timed-run lock for `pid`; the refusal when a live run holds it."""
-    try:
-        held = int(path.read_text().split()[0])
-    except (OSError, ValueError, IndexError):
-        held = None
-    if held is not None and held != pid and is_alive(held):
-        return f"another timed run holds {path} (PID {held}): a timed benchmark runs alone"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"{pid}\n")
-    return None
+def flags_refusal(help_text: str, binary: Path, sets: tuple[str, ...]) -> tuple[str | None, str | None]:
+    """`(refusal, pending_refusal)` for a binary whose `--help` is `help_text`.
 
-
-def release(path: Path, pid: int) -> None:
-    """Drop the lock if `pid` still holds it."""
-    try:
-        if int(path.read_text().split()[0]) == pid:
-            path.unlink()
-    except (OSError, ValueError, IndexError):
-        pass
+    The first stops the run whatever `FORCE` says (a `--set` it cannot take); the
+    second is the texture check that cannot run, which `FORCE=1` runs past."""
+    hard = None
+    if sets and "--set" not in help_text:
+        hard = (f"{binary} has no --set, so SET= cannot run on it: bench a PR whose legs both take it "
+                f"(--set reaches main with the PR that adds it)")
+    soft = None
+    if "--pending-imports" not in help_text:
+        soft = (f"the un-imported textures check could not run: {binary} has no --pending-imports "
+                f"(main gains it with the PR that adds it); make import PROJECT=<dir> first, then FORCE=1")
+    return hard, soft
 
 
 def busy(ps: str, me: int) -> list[str]:

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -23,20 +24,39 @@ class Lock(unittest.TestCase):
     def setUp(self):
         self.lock = Path(tempfile.mkdtemp()) / "out" / "bench" / ".timed-run.lock"
 
-    def test_a_live_holder_refuses_and_a_dead_one_is_taken_over(self):
-        self.assertIsNone(refuse.take_lock(self.lock, 7, lambda pid: True))
-        said = refuse.take_lock(self.lock, 8, lambda pid: True)
-        self.assertIn("another timed run", said)
-        self.assertIn("PID 7", said)
-        self.assertIsNone(refuse.take_lock(self.lock, 8, lambda pid: False), "stale")
-        self.assertEqual(self.lock.read_text().strip(), "8")
+    def test_a_live_holder_refuses_naming_its_pid(self):
+        held, said = refuse.hold(self.lock)
+        self.assertIsNone(said)
+        try:
+            again, said = refuse.hold(self.lock)
+            self.assertIsNone(again)
+            self.assertIn("another timed run", said)
+            self.assertIn(f"PID {os.getpid()}", said)
+        finally:
+            held.close()
 
-    def test_release_drops_only_its_own_lock(self):
-        refuse.take_lock(self.lock, 7, lambda pid: False)
-        refuse.release(self.lock, 9)
-        self.assertTrue(self.lock.exists())
-        refuse.release(self.lock, 7)
-        self.assertFalse(self.lock.exists())
+    def test_a_lock_left_by_a_dead_holder_is_taken(self):
+        self.lock.parent.mkdir(parents=True)
+        self.lock.write_text("4194301\n")  # a holder that died (or a PID reused since a power loss)
+        held, said = refuse.hold(self.lock)
+        self.assertIsNone(said, "nothing holds the flock, whatever the file says")
+        held.close()
+        self.assertIsNone(refuse.hold(self.lock)[1], "and closing the handle drops it")
+
+
+class Flags(unittest.TestCase):
+    OLD = "usage: bench-scenes --project <dir> [--scenes <a,b>] [--before <dir>] <out_dir>"
+    NEW = OLD + " [--set <k=v>]... | --project <dir> --pending-imports"
+
+    def test_an_old_binary_cannot_check_textures_nor_take_a_set(self):
+        hard, soft = refuse.flags_refusal(self.OLD, Path("/m/bench-scenes"), ())
+        self.assertIsNone(hard)
+        self.assertIn("could not run", soft)
+        hard, _ = refuse.flags_refusal(self.OLD, Path("/m/bench-scenes"), ("a=1",))
+        self.assertIn("no --set", hard)
+
+    def test_a_new_binary_passes(self):
+        self.assertEqual(refuse.flags_refusal(self.NEW, Path("/p/bench-scenes"), ("a=1",)), (None, None))
 
 
 class Busy(unittest.TestCase):

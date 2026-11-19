@@ -1295,8 +1295,18 @@ A performance PR's row is measured on the operator's desktop with
 `make bench-ab PR=<n> PROJECT=<dir> [SCENES=a,b] [RUNS=n] [RES=WxH] [SET=key=value]`,
 never by hand. It runs `bench-scenes` three times back to back: on `main`, on the
 PR's head, and on `main` again, each built in a detached worktree of its own under
-`.claude/worktrees/` (`bench-main`, `pr-<n>-head`: own `target/`, kept warm, removed
-by `make reclaim` once finished), the head fetched as `pull/<n>/head`.
+`.claude/worktrees/` with its own `target/`, the head fetched as `pull/<n>/head`.
+**The PR's leg is its head with the measured `main` merged in** (locally, never
+pushed), so the legs differ by the PR's diff alone and a PR branched before a
+speed-up merged does not show it as a regression; a conflict refuses, saying to
+update the branch. The table's header names `main`'s commit, the PR's head and the
+merged commit. Both trees are locked (`git worktree lock`, reason `bench-ab pid
+<n>`) for the run, so `make reclaim` never removes one mid-run; a lock whose PID no
+longer runs is taken over by the next run and ignored by reclaim. `bench-main` is
+kept warm between runs (reclaim keeps it by name: its cold build is most of a run's
+wait; `git worktree remove` it by hand for the disk); `pr-<n>-head` is put back at
+the PR's head after the run and removed by `make reclaim` once the PR is merged or
+closed.
 
 **Why three legs.** Not every row repeats. On a desktop the GPU rows, the memory
 rows and the op counters repeat to under 1% between two takes of one binary; the
@@ -1305,18 +1315,26 @@ takes minutes apart (a `main` against `main` leg read +15% on one scene). A chan
 is only shown when it is larger than one binary differs from itself, so the second
 `main` leg is each row's **floor**: the table prints, per scene and row, `main`'s
 average, the PR's, the change, and the floor (`main` again against `main`), and a
-change no larger than its floor reads *not shown*. Every row gets its own floor, so
+change no larger than its floor reads *not shown*. A row only the PR reports (a new
+counter or stage) is listed, *absent on main*; a row the second `main` leg lacks
+shows its change with the floor *unknown*. Every row gets its own floor, so
 the table shows how tightly each kind of row repeated rather than assuming it.
 Legs run whole, one after another: interleaving the two binaries scene by scene
 halves the drift but doubles the scene loads.
 
 **What it refuses**, before it builds (`FORCE=1` runs anyway, and the table says
-what it ran past): another timed run (a lock under `out/bench/`), and a `cargo`,
-`rustc` or `bench-scenes` process on the machine, checked again before each leg.
-Un-imported textures (the images an import would encode now,
-`bench-scenes --pending-imports`, the engine's own check) are refused right after
-`main`'s build, before the PR's build and any leg: the check needs the engine.
-`make import PROJECT=<dir>` clears it.
+what it ran past): another timed run (an `flock` under `out/bench/`, dropped by the
+kernel when its run dies), and a `cargo`, `rustc` or `bench-scenes` process on the
+machine, checked again before each leg. Un-imported textures (the images an import
+would encode now, `bench-scenes --pending-imports`, the engine's own check) are
+refused right after `main`'s build and again after the PR's: a PR that changes the
+texture cache's stamp or encoder sees every cache as stale, and its memory and load
+rows would move for that alone. `make import PROJECT=<dir>` clears it. Each binary is
+asked its `--help` first: one without `--pending-imports` (a `main` from before it
+merged) means the check could not run, refused unless `FORCE=1`; `SET=` on a binary
+without `--set` refuses outright. `SET` takes dotted keys with plain values
+(`SET='gpu_occlusion_culling=false ssao.high.radius=1.5'`); a JSON object value
+(`{…}`) is refused: pass one key per field.
 
 Each leg runs in a memory-capped scope of its own on Linux (`systemd-run --user
 --scope`, the cap a fraction of the memory available when the run starts, printed);

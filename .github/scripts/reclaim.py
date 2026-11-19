@@ -103,6 +103,12 @@ live PID still protects, and a reused one only errs toward keeping. The
 supervisor's dead lock keeps its rule: named stale, kept, since it may be
 restarted into it.
 
+`make bench-ab` locks its two trees for a run (`bench-ab pid <n>`,
+`bench.trees.lock_pid_of`), judged like a harness lock: a dead PID protects
+nothing. Its `main` tree (`bench.trees.MAIN_TREE`) is kept by its name, never
+judged finished: it is detached at an `origin/main` commit, and its warm
+release build is most of the next run's wait.
+
 `--dry-run` decides and prints the same, and deletes nothing.
 """
 
@@ -120,6 +126,7 @@ from pathlib import Path
 import ghrest
 import reclaim_branches as branches
 import reclaim_use as use
+from bench import trees as bench_trees
 from merging.watch import tenancy
 
 USAGE = "usage: reclaim.py [--dry-run] [--idle MINUTES]"
@@ -149,7 +156,7 @@ class Facts:
     busy: list[tuple[int, str]] | None = field(default_factory=list)  # (pid, command) in it; None: unknown
     written: str | None = None  # what recent write keeps it (`Machine.written`); probed only for a removal
     stale: int | None = None  # a lock left by a merge-queue supervisor that no longer runs: its pid
-    dead_agent: int | None = None  # a harness agent's lock whose pid no longer runs (#1658)
+    dead_agent: int | None = None  # a harness agent's or a bench run's lock whose pid no longer runs (#1658)
     reviewer: bool = False  # a reviewer's checkout: judged by what it holds (#1538)
     on_github: bool | None = False  # GitHub has its HEAD commit; None: GitHub didn't answer
 
@@ -173,6 +180,8 @@ def parse_worktrees(porcelain: str) -> list[Worktree]:
 
 def finished(wt: Worktree, facts: Facts) -> tuple[bool, str]:
     """Is this worktree's work over, and why (or why not)."""
+    if wt.path.name == bench_trees.MAIN_TREE:
+        return False, "`make bench-ab`'s warm main tree, kept between runs (`git worktree remove` it for the disk)"
     done, why = by_pull_request(wt, facts)
     if done or not facts.reviewer or facts.prs is None or "OPEN" in facts.prs:
         return done, why
@@ -364,6 +373,7 @@ class Machine:
         if owner is not None and not self.alive(owner):
             facts.stale = owner
         agent = tenancy.agent_pid_of(wt.locked)
+        agent = bench_trees.lock_pid_of(wt.locked) if agent is None else agent
         if agent is not None and not self.alive(agent):
             facts.dead_agent = agent
         if wt.branch is None:

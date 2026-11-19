@@ -5,7 +5,13 @@ and the floor, the second `main` leg's change against the first. A row whose
 change is no larger than its floor reads *not shown*: the two binaries differ
 by no more than one binary differs from itself minutes later. Every row has its
 own floor: the GPU rows and the counters repeat tightly where the CPU rows
-drift, and the table shows that rather than assuming it.
+drift, and the table shows that rather than assuming it. A row the second
+`main` leg lacks has no floor: its change is shown, the floor marked *unknown*,
+never hidden behind *not shown*.
+
+The rows are the union of `main`'s and the PR's, `main`'s order first: a row
+only the PR reports (a new counter, a new `render.<stage>`) is the PR's own
+measurement and reads *absent on main*, never dropped.
 
 A leg's report is `bench-scenes`' `<leg>/<project>-<hash>/<scene>.json`
 (`dev::bench::scenes::report`); a leg holds one project's folder.
@@ -49,29 +55,38 @@ def num(x: float | None) -> str:
     return f"{x:.3f}".rstrip("0").rstrip(".") if abs(x) < 1000 else f"{x:.0f}"
 
 
-def row(metric: str, main: float, pr: float | None, again: float | None) -> list[str]:
+def row(metric: str, main: float | None, pr: float | None, again: float | None) -> list[str]:
     """One table row: metric, main, PR, change, floor."""
+    if main is None:
+        return [metric, num(main), num(pr), "absent on main", "n/a"]
     moved = None if pr is None else change(main, pr)
     floor = None if again is None else change(main, again)
     if pr is None:
         said = "absent on the PR"
     elif moved is None:
         said = f"{num(main)} → {num(pr)}"
+    elif again is None:
+        said = f"{pct(moved)} (floor unknown)"
     elif floor is None or abs(moved) <= abs(floor):
         said = f"not shown ({pct(moved)})"
     else:
         said = pct(moved)
-    return [metric, num(main), num(pr), said, pct(floor) if floor is not None else "n/a"]
+    if again is None:
+        shown = "unknown: absent on main again"
+    else:
+        shown = pct(floor) if floor is not None else f"{num(main)} → {num(again)}"
+    return [metric, num(main), num(pr), said, shown]
 
 
 def scene_table(scene: str, legs: tuple[Path, Path, Path]) -> str:
     """The markdown table of `scene` over the three legs' folders (main, PR, main again)."""
     main, pr, again = (averages(read(leg, scene)) for leg in legs)
-    if not main:
-        return f"**{scene}**: the main leg wrote no report\n"
+    if not main and not pr:
+        return f"**{scene}**: neither the main leg nor the PR's wrote a report\n"
     lines = [f"**{scene}**", "", "| row | main | PR | change | floor (main again) |", "|---|---:|---:|---|---:|"]
-    for metric, avg in main.items():
-        lines.append("| " + " | ".join(row(metric, avg, pr.get(metric), again.get(metric))) + " |")
+    metrics = list(main) + [m for m in pr if m not in main]
+    for metric in metrics:
+        lines.append("| " + " | ".join(row(metric, main.get(metric), pr.get(metric), again.get(metric))) + " |")
     return "\n".join(lines) + "\n"
 
 
@@ -83,8 +98,14 @@ def render(scenes: list[str], legs: tuple[Path, Path, Path], header: list[str]) 
 
 def scenes_of(leg: Path) -> list[str]:
     """The scenes a leg reported, by their name under `assets/scenes/`, sorted."""
+    return scenes_of_all([leg])
+
+
+def scenes_of_all(legs) -> list[str]:
+    """The scenes any of `legs` reported, sorted: a scene only the PR reports still gets its table."""
     names = []
-    for project in sorted(p for p in leg.iterdir() if p.is_dir()) if leg.is_dir() else []:
-        for path in project.rglob("*.json"):
-            names.append(path.relative_to(project).with_suffix("").as_posix())
+    for leg in legs:
+        for project in sorted(p for p in leg.iterdir() if p.is_dir()) if leg.is_dir() else []:
+            for path in project.rglob("*.json"):
+                names.append(path.relative_to(project).with_suffix("").as_posix())
     return sorted(set(names))

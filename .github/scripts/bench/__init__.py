@@ -12,9 +12,10 @@ repository, and twice in one batch a measurement was wrong for a reason a verb
 refuses (`refuse`): a baseline taken beside two local agents' builds, and a run
 on a project whose textures were never imported.
 
-- `trees`: `main` and the PR's head, each checked out detached in a worktree of
-  its own under `.claude/worktrees/` (so `make reclaim` removes them once
-  finished) and built in its own `target/`.
+- `trees`: `main` and the PR's head (with that `main` merged in), each checked
+  out detached in a worktree of its own under `.claude/worktrees/`, built in its
+  own `target/` and locked against `make reclaim` for the run; `bench-main` is
+  kept between runs, the PR's tree removed once the PR is finished.
 - `refuse`: what stops a timed run before it starts.
 - `legs`: the three legs, each in a memory-capped scope where the machine has one.
 - `table`: the three legs' reports as the table a PR comment takes.
