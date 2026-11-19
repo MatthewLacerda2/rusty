@@ -4,6 +4,11 @@
 -- (`edit`), so the per-particle work is done here, by the VM, not one Rust call
 -- per field.
 --
+-- The Rust halves come in `halves` (`api::RUST_HALVES`), each under the verb
+-- it serves (`GetParticles`, `SetParticles`, `ForEach`, `ForEach/edit`), and are
+-- looked up there at every call, never kept: the dev layer's verb timers replace
+-- them in that table.
+--
 -- `live.rs` owns the layout and passes it in: `PARTICLE`, the format of one
 -- particle read; `RECORD`, the format of one record written back (a u32 source,
 -- then the particle's fields); `names`, the fields in wire order; and `SLOTS`,
@@ -23,7 +28,7 @@
 -- back, as edits (an index-and-slot key, a value), so nothing is packed, checked
 -- or allocated per particle a rule leaves alone. The table is emptied and killed
 -- when the call ends, so one kept past it errors instead of reading on.
-local read, write, edit, PARTICLE, RECORD, names, SLOTS = ...
+local halves, PARTICLE, RECORD, names, SLOTS = ...
 local pack, unpack, concat, type, pcall, error = string.pack, string.unpack, table.concat,
     type, pcall, error
 local next, setmetatable, rawget, rawset = next, setmetatable, rawget, rawset
@@ -95,7 +100,7 @@ local function live_id(id, verb)
 end
 
 local function get(id)
-    local s, count, rev = read(id, false)
+    local s, count, rev = halves.GetParticles(id, false)
     local list, at, pos = {}, setmetatable({}, WEAK), 1
     for i = 1, count do
         local x, y, z, vx, vy, vz, age, life, size, rot, r, g, b, a, c1, c2, c3, c4, nxt =
@@ -144,7 +149,7 @@ local function set(id, list)
         error(err, 0)
     end
     reads[id] = nil
-    return write(id, "SetParticles", rev, concat(out))
+    return halves.SetParticles(id, "SetParticles", rev, concat(out))
 end
 
 -- What a view kept past its `ForEach` does on any read or write.
@@ -182,7 +187,7 @@ local function for_each(id, fn)
     if type(fn) ~= "function" then
         error("Particles.ForEach: fn is a " .. type(fn) .. ", not a function", 2)
     end
-    local s, count, _, snapshot = read(id, true)
+    local s, count, _, snapshot = halves.ForEach(id, true)
     local p, edits, ne, kills, nk, n = {}, {}, 0, {}, 0, 0
     -- Fill `p` with each particle in turn, run `fn`, and log what it changed:
     -- a field is compared with the value read, so nothing is called for one
@@ -234,7 +239,7 @@ local function for_each(id, fn)
         error(err, 0)
     end
     reads[id] = nil
-    local done, live = pcall(edit, id, snapshot, edits, kills)
+    local done, live = pcall(halves["ForEach/edit"], id, snapshot, edits, kills)
     if not done then
         local i, name, what = misfit(edits)
         if i then bad("ForEach", i, name, what, 3) end

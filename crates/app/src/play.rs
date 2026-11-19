@@ -126,6 +126,7 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, init_scripts)
         .add_system(Stage::FixedUpdate, super::systems::ui::dispatch_ui_events)
         .add_system(Stage::FixedUpdate, update_scripts)
+        .add_system(Stage::FixedUpdate, tick_script_timers)
         .add_system(Stage::FixedUpdate, serve_queries)
         .add_system(Stage::FixedUpdate, tick_nav)
         .add_system(Stage::FixedUpdate, physics::step_physics)
@@ -170,11 +171,16 @@ fn init_scripts(_world: &mut World, res: &mut Resources) {
 }
 
 /// The script phase's body: every started script's `Update`, after this tick's
-/// UI callbacks, so gameplay reads `UI.IsPointerConsumed` already settled. Then
-/// the timer phase (#444): due `Timer.Invoke`s fire and waiting coroutines resume,
-/// on the same scaled `dt` — after every `Update`, before physics and `LateUpdate`.
+/// UI callbacks, so gameplay reads `UI.IsPointerConsumed` already settled.
 fn update_scripts(_world: &mut World, res: &mut Resources) {
     res.script_manager.update_scripts(res.frame_dt);
+}
+
+/// The timer phase (#444), right after `update_scripts`: due `Timer.Invoke`s fire
+/// and waiting coroutines resume, on the same scaled `dt` — after every `Update`,
+/// before physics and `LateUpdate`. A system of its own so the bench times it
+/// apart from `Update` (`cpu.tick_script_timers`).
+fn tick_script_timers(_world: &mut World, res: &mut Resources) {
     res.script_manager.tick_timers(res.frame_dt);
 }
 
