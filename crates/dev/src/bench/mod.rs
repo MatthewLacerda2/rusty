@@ -153,14 +153,22 @@ fn sample(samples: &mut Samples, stats: &FrameStats, frame: Option<&RenderedFram
     }
     let Some(frame) = frame else { return };
     samples.push("renderer_ms", frame.cpu_ms);
-    let stages = frame.stages.iter().copied();
-    push_parts(samples, "render", frame.cpu_ms, stages, 1.0);
+    let (stages, parts) = stage_rows(&frame.stages);
+    push_parts(samples, "render", frame.cpu_ms, stages.into_iter(), 1.0);
+    for (part, ms) in parts {
+        samples.push(&format!("render.{part}"), ms);
+    }
     if let (Some(gpu), Some(speed)) = (&frame.gpu, speed.gpu) {
         samples.push("gpu_ms", gpu.total_ms() * speed);
         for pass in GpuPass::ALL {
             let ms = gpu.passes.iter().find(|(p, _)| *p == pass);
             let ms = ms.map_or(0.0, |m| m.1 * speed);
             samples.push(&format!("gpu.{}", pass.name()), ms);
+        }
+        // A row's parts (#2401), only on a frame that timed them: inside its
+        // row, so no `gpu.<pass>` sum counts them.
+        for (part, ms) in &gpu.parts {
+            samples.push(&format!("gpu.{}", part.row()), ms * speed);
         }
         samples.push("gpu.other", gpu.other_ms * speed);
         // The GPU's wait for the CPU: as measured, a clock does not shorten it.
@@ -173,6 +181,26 @@ fn sample(samples: &mut Samples, stats: &FrameStats, frame: Option<&RenderedFram
             samples.push(key, value as f64);
         }
     }
+}
+
+/// The renderer's stages, each with its parts (`occlusion.select`, a lap named
+/// `<stage>.<part>`, #2401) added in, and the parts on their own: a stage's row
+/// stays its whole time, and the parts beside it sum to it but for what the
+/// stage spent outside them.
+fn stage_rows<'a>(laps: &[(&'a str, f64)]) -> (Vec<(&'a str, f64)>, Vec<(&'a str, f64)>) {
+    let mut stages: Vec<(&str, f64)> = Vec::new();
+    let mut parts = Vec::new();
+    for &(name, ms) in laps {
+        let stage = name.split_once('.').map_or(name, |(stage, _)| stage);
+        if stage != name {
+            parts.push((name, ms));
+        }
+        match stages.iter_mut().find(|(s, _)| *s == stage) {
+            Some((_, sum)) => *sum += ms,
+            None => stages.push((stage, ms)),
+        }
+    }
+    (stages, parts)
 }
 
 /// A parent time's parts as `<prefix>.<part>` rows, each scaled by `scale`, and

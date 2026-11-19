@@ -64,6 +64,7 @@ pub(crate) mod clusters;
 mod counters;
 mod cull;
 pub(crate) mod pyramid;
+mod stage;
 mod tables;
 mod upload;
 

@@ -5,11 +5,45 @@
 
 use super::GpuPass;
 
+rusty_core::named_enum! {
+    /// The parts of a pass kind the timer reports beside it (#2401): a part's pair
+    /// adds into its kind's row ([`GpuPart::pass`]) and into its own entry of
+    /// [`GpuTimes::parts`], so the parts of a kind sum to its row. The bench
+    /// reports one as `gpu.<pass>.<part>` ([`GpuPart::row`]).
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub enum GpuPart {
+        /// The select of last frame's visible set.
+        OcclusionSelect = "select",
+        /// Phase one: the visible set's depth-only draw.
+        OcclusionPhaseOne = "phase_one",
+        /// The Hi-Z depth pyramid's reduction.
+        OcclusionPyramid = "pyramid",
+        /// The instance bounds test and the compaction of the kept instances.
+        OcclusionTest = "test",
+        /// The cluster cull (#1968), on a frame that draws a batch by cluster.
+        OcclusionClusters = "clusters",
+    }
+}
+
+impl GpuPart {
+    /// The pass kind whose row this part adds into.
+    pub fn pass(self) -> GpuPass {
+        GpuPass::Occlusion
+    }
+
+    /// Its stable name under its kind's: `occlusion.select`.
+    pub fn row(self) -> String {
+        format!("{}.{}", self.pass().name(), self.name())
+    }
+}
+
 /// One query pair of a frame: the pass kind it adds into, and the queue submit
 /// its passes go out in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Pair {
     pub pass: GpuPass,
+    /// The part of `pass` it times, when its stage is timed in parts.
+    pub part: Option<GpuPart>,
     /// The renderer's submit sequence when the pair was taken
     /// (`gpu::ops::submit_seq`): pairs taken between the same two submits are
     /// recorded into one command buffer, so a gap between them is GPU work no pair
@@ -25,7 +59,11 @@ pub(crate) struct Pair {
 #[cfg(test)]
 impl From<GpuPass> for Pair {
     fn from(pass: GpuPass) -> Self {
-        Self { pass, submit: 0 }
+        Self {
+            pass,
+            part: None,
+            submit: 0,
+        }
     }
 }
 
@@ -40,6 +78,10 @@ pub struct GpuTimes {
     /// them with a frame pairs them by this, never by arrival.
     pub frame: u64,
     pub passes: Vec<(GpuPass, f64)>,
+    /// The parts of a row timed in parts that frame, in [`GpuPart::ALL`] order,
+    /// each also in its kind's row: the parts of a kind sum to it. A part with no
+    /// pair that frame is left out, as a kind is.
+    pub parts: Vec<(GpuPart, f64)>,
     /// Untimed GPU work, in ms: what of the span no row holds inside one submit,
     /// where the GPU never waits for the CPU. A pass left untimed shows here. It
     /// is GPU work, so it scales with the GPU's clock as the rows do.
@@ -77,6 +119,7 @@ impl GpuTimes {
     pub(crate) fn from_ticks(ticks: &[u64], pairs: &[Pair], period_ns: f64) -> Self {
         let to_ms = |t: u64| t as f64 * period_ns / 1e6;
         let mut charged = [None::<u64>; GpuPass::ALL.len()];
+        let mut parts = [None::<u64>; GpuPart::ALL.len()];
         let mut done = None::<(u64, u64)>; // where the work queued so far ended, and its submit
         let mut span = None::<(u64, u64)>;
         let mut between = 0;
@@ -86,8 +129,13 @@ impl GpuTimes {
                 continue;
             }
             let begin = done.map_or(start, |(d, _)| start.max(d));
+            let own = end.saturating_sub(begin);
             let slot = &mut charged[pair.pass as usize];
-            *slot = Some(slot.unwrap_or(0) + end.saturating_sub(begin));
+            *slot = Some(slot.unwrap_or(0) + own);
+            if let Some(part) = pair.part {
+                let slot = &mut parts[part as usize];
+                *slot = Some(slot.unwrap_or(0) + own);
+            }
             if let Some((d, _)) = done.filter(|&(_, s)| s != pair.submit) {
                 between += start.saturating_sub(d);
             }
@@ -101,9 +149,15 @@ impl GpuTimes {
             .zip(charged)
             .filter_map(|(pass, ticks)| Some((*pass, to_ms(ticks?))))
             .collect();
+        let parts = GpuPart::ALL
+            .iter()
+            .zip(parts)
+            .filter_map(|(part, ticks)| Some((*part, to_ms(ticks?))))
+            .collect();
         Self {
             frame: 0,
             passes,
+            parts,
             other_ms: to_ms(span.saturating_sub(busy).saturating_sub(between)),
             between_submits_ms: to_ms(between),
         }

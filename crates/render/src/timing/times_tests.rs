@@ -6,7 +6,11 @@ const MS: f64 = 1e6;
 
 /// A pair of `pass` that went out in submit `submit`.
 fn sent(pass: GpuPass, submit: u64) -> Pair {
-    Pair { pass, submit }
+    Pair {
+        pass,
+        part: None,
+        submit,
+    }
 }
 
 #[test]

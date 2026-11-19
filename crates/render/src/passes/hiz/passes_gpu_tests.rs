@@ -1,6 +1,7 @@
 //! How many compute passes the `occlusion` stage records (#2327): the select's
 //! own, before phase one's depth draw, then one for the pyramid, the test, the
-//! compaction and every clustered batch's cluster cull, at one batch and at three.
+//! compaction and every clustered batch's cluster cull, at one batch and at three;
+//! on a timed frame (#2401) one each for the pyramid, the test and the clusters.
 
 use glam::{Quat, Vec3};
 
@@ -13,6 +14,10 @@ use rusty_scene::{Camera, Scene};
 /// Measured: lavapipe 2, Metal 2 (CI's macOS leg); before #2327, 4 + R (7 with
 /// three batches on lavapipe).
 const PASSES: u32 = 2;
+
+/// [`PASSES`] on a timed frame, each part its own pass (`GpuTimer::splits`).
+/// Measured: lavapipe 4 (the split forced, it has no timestamps).
+const TIMED_PASSES: u32 = 4;
 
 /// A wall half across `n` clustered panels, each its own mesh and so its own
 /// clustered batch.
@@ -28,13 +33,22 @@ fn panels(n: usize) -> Scene {
     scene
 }
 
-/// Render `n` panels with the cull on, then off: the settled cull-on frame's
-/// counts must show `n` clustered runs in [`PASSES`] compute passes, both culls
-/// at work, and the same pixels as the cull-off frame. Returns what the CPU
-/// decided, the same on any adapter: (tested, cluster-tested, draws, triangles);
-/// `None` where no culling adapter is (the test skips).
+/// Render `n` panels with the cull on, untimed and `timed`, then off: each
+/// settled cull-on frame's counts must show `n` clustered runs in [`PASSES`]
+/// (or [`TIMED_PASSES`]) compute passes, both culls at work, and the same pixels
+/// as the cull-off frame. Returns what the CPU decided, the same on any adapter
+/// and either way: (tested, cluster-tested, draws, triangles); `None` where no
+/// culling adapter is (the test skips).
 fn stage_with(n: usize) -> Option<(u32, u32, u32, u64)> {
+    let untimed = stage_timed(n, false)?;
+    assert_eq!(stage_timed(n, true), Some(untimed), "timing moved the cull");
+    Some(untimed)
+}
+
+fn stage_timed(n: usize, timed: bool) -> Option<(u32, u32, u32, u64)> {
     let mut r = crate::test_gpu::culling::culling_or_skip(W, H)?;
+    r.gpu_timer.split_override.set(Some(timed));
+    r.time_stages(true);
     let scene = panels(n);
     let cam = Camera::new(Vec3::new(0.0, 1.0, 8.0), -90.0, 0.0);
     let mut view = offscreen(&r);
@@ -45,13 +59,37 @@ fn stage_with(n: usize) -> Option<(u32, u32, u32, u64)> {
     let (on, c) = shots.last().expect("nine frames");
     let runs = view.hiz.cameras[0].clusters.runs_ran;
     assert_eq!(runs as usize, n, "each panel its own clustered run: {c:?}");
-    assert_eq!(c.ops.compute_passes, PASSES, "{n} runs: {c:?}");
+    let passes = if timed { TIMED_PASSES } else { PASSES };
+    assert_eq!(
+        c.ops.compute_passes, passes,
+        "{n} runs, timed {timed}: {c:?}"
+    );
     assert!(c.hiz_culled > 0 && c.cluster_culled > 0, "{c:?}");
+    assert_eq!(occlusion_laps(&r), PARTS, "the stage's CPU parts (#2401)");
     r.quality.gpu_occlusion_culling = false;
     let mut fresh = offscreen(&r);
     let (off, _) = shot(&mut r, &mut fresh, &scene, &cam);
+    assert!(
+        occlusion_laps(&r).is_empty(),
+        "no part laps with the cull off"
+    );
     assert!(*on == off, "the cull moved pixels");
     Some((c.hiz_tested, c.cluster_tested, c.draw_calls, c.triangles))
+}
+
+/// The stage's CPU laps (`render.occlusion.<part>`), in the order first lapped.
+const PARTS: [&str; 6] = [
+    "occlusion.test",
+    "occlusion.clusters",
+    "occlusion.select",
+    "occlusion.phase_one",
+    "occlusion.pyramid",
+    "occlusion.submit",
+];
+
+fn occlusion_laps(r: &crate::Renderer) -> Vec<&'static str> {
+    let laps = r.frame_stages().iter().map(|(s, _)| *s);
+    laps.filter(|s| s.starts_with("occlusion.")).collect()
 }
 
 #[test]

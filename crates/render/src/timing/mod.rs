@@ -61,8 +61,8 @@ use std::cell::{Cell, RefCell};
 pub use clock::ClockProbe;
 pub use frame::FrameCost;
 use readback::Ring;
-pub use times::GpuTimes;
 use times::Pair;
+pub use times::{GpuPart, GpuTimes};
 
 rusty_core::named_enum! {
     /// The render passes the timer reports, under the stable names the stats use
@@ -80,7 +80,8 @@ rusty_core::named_enum! {
         Shadows = "shadows",
         /// GPU occlusion culling (#1963), each culling camera's whole `occlusion`
         /// stage: the select, phase one's depth draw, the Hi-Z pyramid, the test,
-        /// the compaction and the cluster cull, one pair across them all.
+        /// the compaction and the cluster cull. One pair across them all, or on a
+        /// timed frame one per [`GpuPart`], which add into this row.
         Occlusion = "occlusion",
         /// The SSAO depth prepass (#1578), which a primed forward pass starts from.
         SsaoPrepass = "ssao_prepass",
@@ -145,6 +146,11 @@ pub struct GpuTimer {
     /// adapter without timestamps still counts a frame's pairs against [`PAIRS`].
     #[cfg(test)]
     pub(crate) asked: Cell<u32>,
+    /// Test-only: whether a stage splits into its timed parts ([`Self::splits`])
+    /// whatever the adapter, so its pass counts are pinned both ways on lavapipe
+    /// (no timestamps) and Metal (timestamps) alike; `None` asks the timer.
+    #[cfg(test)]
+    pub(crate) split_override: Cell<Option<bool>>,
 }
 
 /// The live half of an enabled timer.
@@ -196,7 +202,21 @@ impl GpuTimer {
             cpu: Default::default(),
             #[cfg(test)]
             asked: Cell::new(0),
+            #[cfg(test)]
+            split_override: Cell::new(None),
         }
+    }
+
+    /// Whether a stage timed in parts records each part in passes of its own
+    /// this frame: only while a frame is being timed. Its untimed path keeps
+    /// fewer pass boundaries, and a part's pair cannot open and close inside one
+    /// pass.
+    pub(crate) fn splits(&self) -> bool {
+        #[cfg(test)]
+        if let Some(split) = self.split_override.get() {
+            return split;
+        }
+        self.queries.as_ref().is_some_and(|q| q.open.get())
     }
 
     /// Start timing a frame's passes.
@@ -253,6 +273,10 @@ impl Queries {
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "parts_tests.rs"]
+mod parts_tests;
 
 #[cfg(test)]
 #[path = "budget_gpu_tests.rs"]
