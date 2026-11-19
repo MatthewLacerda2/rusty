@@ -54,7 +54,10 @@ pub(super) fn image(
 /// whole share, and joined back in order: which worker ran a texel never shows.
 /// The pool's items are unit placeholders (no memory); a batch's `first` and
 /// length say which points it covers.
-fn per_texel(points: &[TexelPoint], f: impl Fn(usize, &TexelPoint) -> Vec4 + Sync) -> Vec<Vec4> {
+pub(super) fn per_texel(
+    points: &[TexelPoint],
+    f: impl Fn(usize, &TexelPoint) -> Vec4 + Sync,
+) -> Vec<Vec4> {
     let threads = std::thread::available_parallelism().map_or(1, |n| n.get());
     let trace = |_, first: usize, batch: &[()]| {
         let at = first..first + batch.len();

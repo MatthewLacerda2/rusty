@@ -70,7 +70,7 @@ pub use pages::{colour_page, direction_levels, direction_page, level_count, leve
 pub use probe_direct::{baked_direct_sh, mixed_occlusion, probe_direct};
 pub use progress::{BakeObserver, BakeProgress};
 pub use raster::{lightmap_size, MIN_RESOLUTION};
-pub(crate) use raster::{rasterize_surface, world_per_uv, Areas, Surface, TexelPoint};
+pub(crate) use raster::{rasterize_overlaps, world_per_uv, Areas, Surface, TexelPoint};
 pub(crate) use rays::{Rays, Tri};
 pub(crate) use rng::Rng;
 #[cfg(feature = "dev")]

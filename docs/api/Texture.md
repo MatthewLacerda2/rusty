@@ -231,8 +231,18 @@ gap narrower than the band (between two fins, inside a slot, across a corridor
 of a level-sized mesh), so model such parts as separate surfaces or keep the gap
 wider than the band.
 
-Only the part of UV0 inside the 0..1 square is baked. Where UVs overlap, a texel
-takes the first triangle in index order. A model without UV0 (its texture UVs
+Only the part of UV0 inside the 0..1 square is baked. **Where triangles overlap
+in UV0** (a panel screwed onto a wall sharing the wall's texels, a box's hidden
+back mapped onto its front), a texel takes the **most open** of the triangles
+covering it, the one a viewer sees: the highest ambient occlusion at its own
+point, traced as the `ao` map traces it (`ao_rays` rays). Every map of the bake
+takes that same triangle, so `world_normal`, `position`, `id`, `curvature` and
+`thickness` agree with `ao` texel for texel, and the pick is the same whether or
+not `ao` is asked (a bake without it still traces the shared texels, and only
+those). Equally open triangles go to the lower index as imported, which is not
+always the file's face order: a mesh of 4096 triangles or more is reordered into
+clusters at import. Triangles that only meet along an edge do not overlap. To
+force a face onto a texel, keep it from overlapping anything in UV0. A model without UV0 (its texture UVs
 enclose no area), without triangles, or with a non-finite position is an error
 naming the verb and the model, never a black map. The bake is deterministic: the
 same model and arguments write the same bytes, however many threads ran it.

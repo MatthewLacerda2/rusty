@@ -18,9 +18,10 @@
 //! * [`MeshMap::Id`] — one colour per material slot (`margin::id_colour`).
 //!
 //! The mesh is baked in its own space, as imported: "world" is the model's frame
-//! before any scene transform, as Substance bakes an exported mesh. A texel two
-//! triangles share (overlapping UVs) takes the first in index order, as the
-//! lightmap walk gives it; a triangle outside UV 0..1 bakes only its part inside.
+//! before any scene transform, as Substance bakes an exported mesh. A texel
+//! triangles share (overlapping UVs: a panel on a wall, a box's hidden back) takes
+//! the most open of them for every map, ties to the lower index (`overlap`, #2310);
+//! a triangle outside UV 0..1 bakes only its part inside.
 //! [`Settings`] holds what a bake can be told (#2260): its size (square or not),
 //! the curvature band's reach and each ray-traced map's ray count. A band is never
 //! narrower than three of its UV island's own texels (`floor`, #2292); `bake`
@@ -36,18 +37,22 @@
 //! at 4096², 4.6 GiB at 8192² (2026-11-07, with 40-byte points; at 32 bytes the
 //! points take 128 MiB and 512 MiB less). A UV layout with gutters covers less; a
 //! non-square map holds its own `width × height` texels. More rays cost time, not
-//! memory.
+//! memory. Before the maps, the walk holds a 4-byte owner per texel, and a model
+//! whose UVs overlap holds each shared texel's claimants (32 bytes each, plus
+//! their place and openness) until `overlap` has picked: both are gone before the
+//! first map's image is made.
 
 mod curvature;
 mod floor;
 mod margin;
+mod overlap;
 mod rays;
 mod settings;
 mod source;
 
 use glam::{Vec3, Vec4};
 
-use super::lightmap::{rasterize_surface, world_per_uv, TexelPoint};
+use super::lightmap::{rasterize_overlaps, world_per_uv, TexelPoint};
 pub use floor::Raised;
 use rays::MeshRays;
 use rusty_procgen::image_buf::{Image, Size};
@@ -133,9 +138,8 @@ pub fn bake(
     settings: &Settings,
     mut sink: impl FnMut(MeshMap, Image) -> Result<(), String>,
 ) -> Result<Option<Raised>, String> {
-    let baked = Baked::new(source, settings)?;
+    let (baked, mut tracer) = Baked::new(source, settings)?;
     let mut raised = None;
-    let mut tracer = None;
     let mut done = Vec::new();
     for &map in maps {
         if done.contains(&map) {
@@ -167,12 +171,17 @@ pub fn bake(
 
 impl<'a> Baked<'a> {
     /// The covered texels and bounds of `source` at `settings`, or why they can't
-    /// be baked (the settings, the mesh, or no triangle inside UV0).
-    fn new(source: &'a MeshSource, settings: &Settings) -> Result<Self, String> {
+    /// be baked (the settings, the mesh, or no triangle inside UV0). A texel
+    /// triangles share in UV0 holds its most open one's point (`overlap`); the
+    /// model's tracer comes back when that took one, for the ray-traced maps.
+    fn new(
+        source: &'a MeshSource,
+        settings: &Settings,
+    ) -> Result<(Self, Option<MeshRays>), String> {
         settings.check()?;
         source.check()?;
         let Size { width, height } = settings.size;
-        let points = rasterize_surface(&source.surface(), width, height);
+        let (points, others) = rasterize_overlaps(&source.surface(), width, height);
         if points.is_empty() {
             return Err("has no triangle inside UV0's 0..1 square".into());
         }
@@ -182,14 +191,20 @@ impl<'a> Baked<'a> {
         );
         let diagonal = (max - min).length();
         settings.check_reach(diagonal)?;
-        Ok(Baked {
+        let mut baked = Baked {
             source,
             settings: *settings,
             points,
             min,
             extent: max - min,
             diagonal,
-        })
+        };
+        if others.is_empty() {
+            return Ok((baked, None));
+        }
+        let rays = MeshRays::new(source);
+        overlap::resolve(&mut baked, &others, &rays);
+        Ok((baked, Some(rays)))
     }
 
     /// `p` in the bounds, 0..1 per axis; a flat axis reads 0.5.
@@ -228,6 +243,8 @@ mod edge_tests;
 mod fixtures;
 #[cfg(test)]
 mod floor_tests;
+#[cfg(test)]
+mod overlap_tests;
 #[cfg(test)]
 mod settings_tests;
 #[cfg(test)]
