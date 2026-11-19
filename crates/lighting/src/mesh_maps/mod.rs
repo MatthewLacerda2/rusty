@@ -19,8 +19,9 @@
 //!
 //! The mesh is baked in its own space, as imported: "world" is the model's frame
 //! before any scene transform, as Substance bakes an exported mesh. A texel
-//! triangles share (overlapping UVs: a panel on a wall, a box's hidden back) takes
-//! the most open of them for every map, ties to the lower index (`overlap`, #2310);
+//! triangles share (overlapping UVs: a panel on a wall, a mirrored model's halves)
+//! takes the more open of them for every map, decided per pair of triangles, ties
+//! to the lower index (`overlap`, #2310);
 //! a triangle outside UV 0..1 bakes only its part inside.
 //! [`Settings`] holds what a bake can be told (#2260): its size (square or not),
 //! the curvature band's reach and each ray-traced map's ray count. A band is never
@@ -37,10 +38,13 @@
 //! at 4096², 4.6 GiB at 8192² (2026-11-07, with 40-byte points; at 32 bytes the
 //! points take 128 MiB and 512 MiB less). A UV layout with gutters covers less; a
 //! non-square map holds its own `width × height` texels. More rays cost time, not
-//! memory. Before the maps, the walk holds a 4-byte owner per texel, and a model
-//! whose UVs overlap holds every claimant of each shared texel, its owner
-//! included (40 bytes each with its place and openness), until `overlap` has
-//! picked: both are gone before the first map's image is made.
+//! memory. Before the maps, the walk holds a 4-byte owner per texel and a 4-byte
+//! owner's triangle per point; a model whose UVs overlap walks twice and adds an
+//! `f32` per point, a sum per overlapping pair of triangles and a block of claims
+//! being traced (`overlap`), never one entry per face stacked on a texel: all of it
+//! is gone before the first map's image is made. Its time is a trace per face
+//! covering each shared texel, so a level mesh tiling UV0 hundreds of times costs
+//! hundreds of traces a texel, and the bake says so ([`Stacked`]).
 
 mod curvature;
 mod floor;
@@ -52,8 +56,9 @@ mod source;
 
 use glam::{Vec3, Vec4};
 
-use super::lightmap::{rasterize_overlaps, world_per_uv, TexelPoint};
+use super::lightmap::{world_per_uv, TexelPoint};
 pub use floor::Raised;
+pub use overlap::Stacked;
 use rays::MeshRays;
 use rusty_procgen::image_buf::{Image, Size};
 pub use settings::{Settings, MAX_RAYS};
@@ -125,11 +130,20 @@ struct Baked<'a> {
     diagonal: f32,
 }
 
+/// What a bake found for its caller to tell, both `None` on most models.
+#[derive(Debug, Default, PartialEq)]
+pub struct Notes {
+    /// The UV islands whose texels were too coarse for the `curvature_radius`
+    /// named, which baked wider (`floor`).
+    pub raised: Option<Raised>,
+    /// A UV area so many faces share that its texels cost a trace each (`overlap`).
+    pub stacked: Option<Stacked>,
+}
+
 /// Bake `maps` of `source` as `settings` says, each map once, in the order asked,
 /// handing each to `sink` as it is done: one map's image is alive at a time (its
-/// peak memory is in the module docs). Returns the UV islands whose texels were
-/// too coarse for the `curvature_radius` named, which baked wider (`floor`), for
-/// the caller to tell. An error says what is wrong with the mesh or the arguments,
+/// peak memory is in the module docs). Returns what the caller should tell
+/// ([`Notes`]). An error says what is wrong with the mesh or the arguments,
 /// or is the first one `sink` returned (no later map is baked); the caller names
 /// the model.
 pub fn bake(
@@ -137,8 +151,8 @@ pub fn bake(
     maps: &[MeshMap],
     settings: &Settings,
     mut sink: impl FnMut(MeshMap, Image) -> Result<(), String>,
-) -> Result<Option<Raised>, String> {
-    let (baked, mut tracer) = Baked::new(source, settings)?;
+) -> Result<Notes, String> {
+    let (baked, mut tracer, stacked) = Baked::new(source, settings)?;
     let mut raised = None;
     let mut done = Vec::new();
     for &map in maps {
@@ -166,25 +180,21 @@ pub fn bake(
         };
         sink(map, image)?;
     }
-    Ok(raised)
+    Ok(Notes { raised, stacked })
 }
 
 impl<'a> Baked<'a> {
     /// The covered texels and bounds of `source` at `settings`, or why they can't
     /// be baked (the settings, the mesh, or no triangle inside UV0). A texel
-    /// triangles share in UV0 holds its most open one's point (`overlap`); the
-    /// model's tracer comes back when that took one, for the ray-traced maps.
+    /// triangles share in UV0 holds its pick's point (`overlap`); the
+    /// model's tracer comes back when that traced, for the ray-traced maps, and the
+    /// stack when it is deep.
     fn new(
         source: &'a MeshSource,
         settings: &Settings,
-    ) -> Result<(Self, Option<MeshRays>), String> {
+    ) -> Result<(Self, Option<MeshRays>, Option<Stacked>), String> {
         settings.check()?;
         source.check()?;
-        let Size { width, height } = settings.size;
-        let (points, others) = rasterize_overlaps(&source.surface(), width, height);
-        if points.is_empty() {
-            return Err("has no triangle inside UV0's 0..1 square".into());
-        }
         let (min, max) = source.positions.iter().fold(
             (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN)),
             |(lo, hi), &p| (lo.min(p), hi.max(p)),
@@ -194,17 +204,18 @@ impl<'a> Baked<'a> {
         let mut baked = Baked {
             source,
             settings: *settings,
-            points,
+            points: Vec::new(),
             min,
             extent: max - min,
             diagonal,
         };
-        if others.is_empty() {
-            return Ok((baked, None));
+        let mut rays = None;
+        let (points, stacked) = overlap::points(&baked, &mut rays);
+        if points.is_empty() {
+            return Err("has no triangle inside UV0's 0..1 square".into());
         }
-        let rays = MeshRays::new(source);
-        overlap::resolve(&mut baked, others, &rays);
-        Ok((baked, Some(rays)))
+        baked.points = points;
+        Ok((baked, rays, stacked))
     }
 
     /// `p` in the bounds, 0..1 per axis; a flat axis reads 0.5.
@@ -247,6 +258,8 @@ mod floor_tests;
 mod overlap_tests;
 #[cfg(test)]
 mod settings_tests;
+#[cfg(test)]
+mod stack_tests;
 #[cfg(test)]
 mod surface_tests;
 #[cfg(test)]

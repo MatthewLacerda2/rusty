@@ -232,17 +232,29 @@ of a level-sized mesh), so model such parts as separate surfaces or keep the gap
 wider than the band.
 
 Only the part of UV0 inside the 0..1 square is baked. **Where triangles overlap
-in UV0** (a panel screwed onto a wall sharing the wall's texels, a box's hidden
-back mapped onto its front), a texel takes the **most open** of the triangles
-covering it, the one a viewer sees: the highest ambient occlusion at its own
-point, traced as the `ao` map traces it (`ao_rays` rays). Every map of the bake
-takes that same triangle, so `world_normal`, `position`, `id`, `curvature` and
-`thickness` agree with `ao` texel for texel, and the pick is the same whether or
-not `ao` is asked (a bake without it still traces the shared texels, and only
-those). Equally open triangles go to the lower index as imported, which is not
-always the file's face order: a mesh of 4096 triangles or more is reordered into
-clusters at import. Triangles that only meet along an edge do not overlap. To
-force a face onto a texel, keep it from overlapping anything in UV0. A model without UV0 (its texture UVs
+in UV0** (a panel screwed onto a wall sharing the wall's texels, the two halves of
+a mirrored model), a texel takes the **more open** of the triangles covering it,
+the one a viewer sees, decided per pair of triangles: each one's ambient occlusion
+is traced on every texel the two share, as the `ao` map traces it (`ao_rays`
+rays), and the pair's means compared. A triangle takes the texels it shares with
+the first one there in index order only when its mean is more open by more than
+`1 / √ao_rays` (the noise of one texel's estimate), so a region two triangles
+share bakes one of them throughout, not a speckle of both; a tie, as between
+two mirrored halves or the faces of a closed box (all of them face out and read
+open), goes to the lower index as imported, which is not always the file's face
+order: a mesh of 4096 triangles or more is reordered into clusters at import.
+Every map of the bake takes that same triangle, so `world_normal`, `position`,
+`id`, `curvature` and `thickness` agree with `ao` texel for texel, and the pick is
+the same whether or not `ao` is asked (a bake without it still traces the shared
+texels, and only those). Two limits: rays start `1e-4` of the model's bounds
+diagonal off the surface, so a face closer than that in front of another (0.2 mm
+on a 2 m prop, 2 cm on a 200 m level mesh) is not seen to hide it, and both read
+open; and the rule holds for faces at least a texel wide, since a strip thinner
+than a texel only reaches texels another face already took. Each texel `n` faces
+cover costs `n` traces, so a mesh tiling UV0 many times over (a level's floor)
+bakes slowly, and the call warns when the faces average more than 8 a shared
+texel. Triangles that only meet along an edge do not overlap. To force a face onto
+a texel, keep it from overlapping anything in UV0. A model without UV0 (its texture UVs
 enclose no area), without triangles, or with a non-finite position is an error
 naming the verb and the model, never a black map. The bake is deterministic: the
 same model and arguments write the same bytes, however many threads ran it.

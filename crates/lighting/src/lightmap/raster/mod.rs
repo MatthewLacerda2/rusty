@@ -41,7 +41,8 @@ use clip::Clipper;
 #[cfg(test)]
 pub(super) use clip::INSET;
 pub(super) use fill::{dilate, fill_rest};
-pub(crate) use overlap::rasterize_overlaps;
+pub(crate) use overlap::{rasterize_claims, Claim};
+use overlap::{Owner, Owners};
 
 /// Smallest lightmap edge, in texels.
 pub const MIN_RESOLUTION: u32 = 4;
@@ -119,7 +120,8 @@ struct UvTri {
 /// texels, each traced from a point strictly inside its own surface, never on an
 /// edge where another surface may meet it. In either pass a texel two triangles
 /// share goes to the first in index order, and the first pass never yields to the
-/// second, so a centre-covered texel bakes exactly as it would without the second.
+/// second, so a centre-covered texel bakes exactly as it would without the second
+/// (and a triangle that reaches a texel only in the second is never its claimant).
 pub(super) fn rasterize(mesh: &BakeMesh, size: u32) -> Vec<TexelPoint> {
     rasterize_surface(&mesh.surface(), size, size)
 }
@@ -130,21 +132,21 @@ pub(crate) fn rasterize_surface(mesh: &Surface, width: u32, height: u32) -> Vec<
     walk(mesh, width, height, None)
 }
 
-/// The walk of [`rasterize`]. With `others`, every texel's later claimant whose
-/// triangle overlaps the owner's in UV ([`overlap::in_uv`]), in the pass that owns
-/// the texel, is pushed there as (the owner's place in the result, its own point);
-/// a triangle only touching the owner along an edge is no claimant. Either way the
-/// owners are the same.
+/// The walk of [`rasterize`]. With `claims`, every later triangle that reaches an
+/// owned texel in the pass that owns it, and overlaps the owner in UV, is handed
+/// to it as a [`Claim`], in walk order (by pass, then triangle index); a triangle
+/// only touching the owner along an edge is no claimant. Either way the owners
+/// are the same, and the sink may replace a texel's point, never its owner.
 fn walk(
     mesh: &Surface,
     width: u32,
     height: u32,
-    mut others: Option<&mut Vec<(u32, TexelPoint)>>,
+    mut claims: Option<&mut dyn FnMut(Claim)>,
 ) -> Vec<TexelPoint> {
     let scale = Vec2::new(width as f32, height as f32);
     let tris = uv_triangles(mesh, scale);
-    // The place in `out` of each texel's point; `u32::MAX` while it has none.
-    let mut owner = vec![u32::MAX; width as usize * height as usize];
+    let texels = width as usize * height as usize;
+    let mut owners = Owners::new(texels, claims.is_some());
     let mut out: Vec<TexelPoint> = Vec::new();
     for conservative in [false, true] {
         let pass = out.len();
@@ -153,10 +155,11 @@ fn walk(
             let clipper = clip(t);
             for (x, y) in texels_under(t, width, height) {
                 let index = (y * width + x) as usize;
-                let slot = owner[index];
-                let taken = slot != u32::MAX;
-                if taken && (others.is_none() || (slot as usize) < pass) {
-                    continue;
+                let owner = owners.of(index);
+                match owner {
+                    Owner::Taken => continue,
+                    Owner::At(slot, _) if (slot as usize) < pass => continue,
+                    _ => {}
                 }
                 let w = match &clipper {
                     None => barycentric(t.uv, t.area, Vec2::new(x as f32 + 0.5, y as f32 + 0.5)),
@@ -164,15 +167,20 @@ fn walk(
                 };
                 let Some(w) = w else { continue };
                 let p = point(mesh, t, index as u32, w);
-                match others.as_deref_mut() {
-                    Some(list) if taken => {
-                        let first = out[slot as usize].tri();
-                        if overlap::in_uv(t.uv, overlap::uv_of(mesh, first, scale)) {
-                            list.push((slot, p));
+                match (owner, claims.as_deref_mut()) {
+                    (Owner::At(slot, first), Some(sink)) => {
+                        let theirs = overlap::uv_of(mesh, first as usize, scale);
+                        if overlap::in_uv(t.uv, theirs) {
+                            sink(Claim {
+                                slot,
+                                owner: first,
+                                point: p,
+                                kept: &mut out[slot as usize],
+                            });
                         }
                     }
                     _ => {
-                        owner[index] = out.len() as u32;
+                        owners.take(index, out.len(), p.first);
                         out.push(p);
                     }
                 }

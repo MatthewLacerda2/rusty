@@ -49,7 +49,8 @@ fn curvature(mesh: &MeshSource, radius: f32) -> (Image, Option<Raised>) {
         out = Some(img);
         Ok(())
     })
-    .unwrap();
+    .unwrap()
+    .raised;
     (out.unwrap(), raised)
 }
 
@@ -130,12 +131,12 @@ fn a_bake_naming_no_radius_reports_nothing_raised() {
         &Settings::new(4),
         |_, _| Ok(()),
     );
-    assert_eq!(raised, Ok(None));
+    assert_eq!(raised.map(|n| n.raised), Ok(None));
     // A bake without the curvature map draws no band, so it raises none.
     let ao = super::bake(&packed_cube(), &[MeshMap::Ao], &settings(0.01), |_, _| {
         Ok(())
     });
-    assert_eq!(ao, Ok(None));
+    assert_eq!(ao.map(|n| n.raised), Ok(None));
 }
 
 #[test]
