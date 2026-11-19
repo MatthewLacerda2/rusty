@@ -26,6 +26,7 @@ import unittest
 from pathlib import Path
 
 import slowest_tests
+from tests.workflows import jobs
 
 try:
     import tomllib  # 3.11+; CI's runner has it, an older local python3 skips
@@ -77,13 +78,6 @@ def gpu_filters(config: dict) -> set[str]:
             if o.get("test-group", "").startswith("gpu")}
 
 
-def jobs(text: str) -> dict[str, str]:
-    """Each top-level job's name and its body, comments dropped."""
-    text = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("#"))
-    parts = re.split(r"^  ([\w-]+):\n", text.split("\njobs:\n", 1)[1], flags=re.M)
-    return dict(zip(parts[1::2], parts[2::2]))
-
-
 def runs_suite(body: str) -> bool:
     return any(SUITE.search(l) and not NOT_SUITE.search(l) for l in body.splitlines())
 
@@ -96,7 +90,7 @@ def unguarded(text: str) -> list[str]:
             if runs_suite(body) and 'RUSTY_REQUIRE_GPU: "1"' not in body]
 
 
-#: `ubuntu-latest`'s memory in KiB, what `ulimit -v` takes: 16 GB.
+#: `ubuntu-24.04`'s memory in KiB, what `ulimit -v` takes: 16 GB.
 RUNNER_KIB = 16 * 1024 * 1024
 MUTATE = re.compile(r"cargo mutants (?!--list\b)")
 

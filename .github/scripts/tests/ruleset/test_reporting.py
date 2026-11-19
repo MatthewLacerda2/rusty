@@ -18,7 +18,7 @@ import re
 import unittest
 
 import ruleset
-from tests.test_workflow_hygiene import WORKFLOW_DIR, jobs
+from tests.workflows import WORKFLOW_DIR, jobs, read
 
 GATES = {"ci-gate": "ci.yml", "lint-gate": "lint.yml"}
 GITHUB_ACTIONS = 15368
@@ -65,7 +65,7 @@ class Reporting(unittest.TestCase):
     def test_each_gate_is_a_job_that_runs_unless_cancelled(self):
         for gate, workflow in GATES.items():
             with self.subTest(gate=gate):
-                self.assertTrue(runs_unless_cancelled(jobs(workflow)[gate]))
+                self.assertTrue(runs_unless_cancelled(jobs(read(workflow))[gate]))
 
     def test_each_gating_workflow_runs_on_every_pull_request(self):
         for workflow in set(GATES.values()):

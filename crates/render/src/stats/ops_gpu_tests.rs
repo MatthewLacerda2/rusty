@@ -37,6 +37,15 @@ const STILL_CULLING: OpCounts = OpCounts {
     buffer_writes: 22,
 };
 
+/// [`STILL_CULLING`] on a timed frame, the stage split into its timed parts
+/// (#2401, `GpuTimer::splits`): the pyramid and the test each their own compute
+/// pass (no prop here is drawn by cluster), one more than untimed.
+/// Measured: lavapipe 8/3/4/3/22 (the split forced, it has no timestamps).
+const STILL_CULLING_TIMED: OpCounts = OpCounts {
+    compute_passes: 3,
+    ..STILL_CULLING
+};
+
 const W: u32 = 64;
 const H: u32 = 48;
 
@@ -86,15 +95,14 @@ fn gpu_a_still_frame_makes_the_calls_the_one_before_made() {
 
 #[test]
 fn gpu_a_still_frame_with_the_gpu_cull_on_makes_its_stage_s_calls() {
-    let Some(mut renderer) = crate::test_gpu::culling::culling_or_skip(W, H) else {
-        return;
-    };
-    let scene = still_scene();
-    let (counts, tested) = frames(&mut renderer, &scene, 4);
-    assert_eq!(
-        counts[1..],
-        [STILL_CULLING; 3],
-        "every still frame: {counts:#?}"
-    );
-    assert!(tested > 0, "the floor and the props are tested");
+    for (timed, want) in [(false, STILL_CULLING), (true, STILL_CULLING_TIMED)] {
+        let Some(mut renderer) = crate::test_gpu::culling::culling_or_skip(W, H) else {
+            return;
+        };
+        renderer.gpu_timer.split_override.set(Some(timed));
+        let scene = still_scene();
+        let (counts, tested) = frames(&mut renderer, &scene, 4);
+        assert_eq!(counts[1..], [want; 3], "timed {timed}: {counts:#?}");
+        assert!(tested > 0, "the floor and the props are tested");
+    }
 }
