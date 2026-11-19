@@ -28,7 +28,9 @@ path a glob matches ([`narrowed`]), so a line can only make the ask smaller.
 Mutating the named files whole planned 737 mutants for one such line, three
 times what a run can measure. A glob matching no file the commit changed is
 named in the scope line and plans nothing, an answer as a `diff` with nothing
-to mutate is, not a refusal. Without `--commit` (`make mutants-remote`) globs
+to mutate is, not a refusal; a matched file whose diff section cannot be
+read (a quoted path) fails the run rather than plan nothing for it. Without
+`--commit` (`make mutants-remote`) globs
 still mean whole files: that is how a module is audited on purpose.
 
 Both become one cargo-mutants argument, `--in-diff`: it keeps only mutants
@@ -153,18 +155,39 @@ def matching(globs: list[str]) -> list[str]:
 def narrowed(diff: str, keep: set[str]) -> str:
     """`diff`'s file sections whose new path is in `keep`. A section is cut
     whole, its `rename from` lines included, so a moved file's rename still
-    reads as one; a deleted file (`+++ /dev/null`) has nothing to mutate."""
+    reads as one; a deleted file (`+++ /dev/null`) has nothing to mutate.
+    A file of `keep` no section is read as dies: a path this cannot read (a
+    quoted one, a prefix other than `b/`) would plan nothing, green, for code
+    never mutated."""
     sections: list[list[str]] = []
     for line in diff.splitlines(keepends=True):
         if line.startswith("diff --git ") or not sections:
             sections.append([])
         sections[-1].append(line)
-    out = []
+    out, found = [], set()
     for section in sections:
-        new = next((ln[6:].rstrip("\n") for ln in section if ln.startswith("+++ b/")), None)
+        new = next((path(ln) for ln in section if path(ln)), None)
         if new in keep:
             out.extend(section)
+            found.add(new)
+    if missing := sorted(keep - found):
+        sys.exit(f"mutants-scope: the commit's diff has no section read as {', '.join(missing)};"
+                 " a quoted path or another prefix? Nothing was planned for it")
     return "".join(out)
+
+
+def path(line: str) -> str | None:
+    """The new path one diff line names: `+++ b/P`, `rename to P`, or the
+    header `diff --git a/P b/P` of a section with neither (a mode change)."""
+    line = line.rstrip("\n")
+    for head in ("+++ b/", "rename to "):
+        if line.startswith(head):
+            return line[len(head):]
+    rest = line.removeprefix("diff --git a/")
+    half = (len(rest) - 3) // 2
+    if rest != line and rest[half:half + 3] == " b/" and rest[:half] == rest[half + 3:]:
+        return rest[:half]
+    return None
 
 
 #: The engine's own workspace, the repository root.
@@ -236,10 +259,13 @@ def changed(fork: str, root: str, roots: list[str]) -> str:
     to the new names hides each moved file's old one from rename detection, so
     a moved file with one edited line read as wholly added and planned every
     mutant in it. The engine's part is all Rust less the standalone `roots`."""
+    # Spelled out, whatever the checkout's `diff.noprefix` or `core.quotePath`:
+    # `narrowed` and cargo-mutants read `a/` and `b/` paths, unquoted.
+    diff = ["-c", "core.quotePath=false", "diff", "-M", "--src-prefix=a/", "--dst-prefix=b/"]
     if root == ROOT:
         spec = ["*.rs", *(f":(exclude){r}/" for r in roots if r != ROOT)]
-        return git("diff", "-M", fork, "HEAD", "--", *spec)
-    return git("diff", "-M", f"--relative={root}/", fork, "HEAD", "--", f"{root}/*.rs")
+        return git(*diff, fork, "HEAD", "--", *spec)
+    return git(*diff, f"--relative={root}/", fork, "HEAD", "--", f"{root}/*.rs")
 
 
 def resolve(scope: str, base: str, commit: str | None = None) -> tuple[dict, dict[str, str]]:
@@ -281,7 +307,7 @@ def resolve(scope: str, base: str, commit: str | None = None) -> tuple[dict, dic
     if commit:
         plan["commit"] = commit
     if globs is not None:
-        plan["globs"] = sorted(globs)
+        plan["narrowed"] = True
         plan["unchanged"] = [w for w in globs if not set(files) & globs[w]]
     return plan, diffs
 
@@ -289,7 +315,7 @@ def resolve(scope: str, base: str, commit: str | None = None) -> tuple[dict, dic
 def subject(plan: dict) -> str:
     """What the scope named, for the report's first line."""
     files = plan["files"]
-    if plan.get("globs") is not None:
+    if plan.get("narrowed"):
         return (f"the Rust commit `{plan['commit'][:9]}` changed in the files `{plan['scope']}` matches"
                 f" ({len(files)} files)")
     if plan["kind"] == "diff" and plan.get("commit"):
@@ -340,6 +366,7 @@ def check(plan: dict, planned: dict[str, list[dict]]) -> tuple[str, bool]:
             continue
         listed = planned.get(part["slug"], [])
         part["planned"] = len(listed)
+        part["by_file"] = by_file(part["root"], listed)
         where = "" if part["root"] == ROOT else f"in `{part['root']}/`, its own workspace, "
         lines.append(where + counted(part, listed, paths))
     total = sum(p["planned"] for p in parts)
@@ -347,8 +374,20 @@ def check(plan: dict, planned: dict[str, list[dict]]) -> tuple[str, bool]:
     go = not (paths and runnable and total == 0)
     if len(parts) == 1:
         return f"Scoped on request to {subject(plan)}: {lines[0]}{unchanged}", go
-    return "\n".join([f"Scoped on request to {subject(plan)}, in {len(parts)} plans:{unchanged}", "",
-                      *(f"- {line}" for line in lines)]), go
+    tail = ["", unchanged.strip()] if unchanged else []
+    return "\n".join([f"Scoped on request to {subject(plan)}, in {len(parts)} plans:", "",
+                      *(f"- {line}" for line in lines), *tail]), go
+
+
+def by_file(root: str, listed: list[dict]) -> dict[str, int]:
+    """How many of a part's planned mutants each file holds, by its path from
+    the repository root, which `mutants-request.py refuse` lists."""
+    counts: dict[str, int] = {}
+    for m in listed:
+        f = m.get("file", "?")
+        f = f if root == ROOT else f"{root}/{f}"
+        counts[f] = counts.get(f, 0) + 1
+    return counts
 
 
 def listed(path: Path) -> list[dict]:

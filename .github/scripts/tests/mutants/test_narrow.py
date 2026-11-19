@@ -84,7 +84,36 @@ class Narrow(unittest.TestCase):
         plan, diffs = scope.resolve("src/physics/**", "main")
         self.assertEqual((plan["kind"], plan["files"]), ("paths", ["src/physics/a.rs", "src/physics/b.rs"]))
         self.assertIn("--- /dev/null", diffs["scope-root.diff"])
-        self.assertNotIn("globs", plan)
+        self.assertNotIn("narrowed", plan)
+
+    def test_a_checkout_without_prefixes_still_narrows(self) -> None:
+        git("config", "diff.noprefix", "true")
+        _, diffs = scope.resolve("src/physics/**", "main", commit=self.sha)
+        self.assertIn("+fn f3() -> u32 { 33 }", diffs["scope-root.diff"])
+        self.assertIn("+++ b/src/physics/a.rs", diffs["scope-root.diff"])
+
+    def test_a_matched_file_whose_section_cannot_be_read_fails_not_plans_nothing(self) -> None:
+        quoted = '+++ "b/src/physics/\\303\\251.rs"\n@@ -1 +1 @@\n+fn x() {}\n'
+        diff = 'diff --git "a/src/physics/\\303\\251.rs" "b/src/physics/\\303\\251.rs"\n' + quoted
+        with self.assertRaises(SystemExit) as died:
+            scope.narrowed(diff, {"src/physics/é.rs"})
+        self.assertIn("src/physics/é.rs", str(died.exception))
+        self.assertEqual(scope.narrowed(diff, set()), "", "nothing matched, nothing asked")
+
+    def test_a_mode_change_is_read_from_its_header(self) -> None:
+        diff = "diff --git a/src/a.rs b/src/a.rs\nold mode 100644\nnew mode 100755\n"
+        self.assertEqual(scope.narrowed(diff, {"src/a.rs"}), diff)
+
+    def test_in_several_plans_the_unchanged_globs_follow_the_list(self) -> None:
+        plan = {"kind": "diff", "narrowed": True, "commit": self.sha, "scope": "x", "files": ["a", "b"],
+                "unchanged": ["src/none/**"],
+                "parts": [{"root": ".", "slug": "root", "files": ["a"]},
+                          {"root": "tools/lint", "slug": "tools-lint", "files": ["tools/lint/b"]}]}
+        line, _ = scope.check(plan, {"root": [{"file": "a"}], "tools-lint": [{"file": "b"}] * 2})
+        self.assertTrue(line.splitlines()[0].endswith("in 2 plans:"))
+        self.assertGreater(line.index("matches no file"), line.rindex("\n- "))
+        self.assertEqual([p["by_file"] for p in plan["parts"]], [{"a": 1}, {"tools/lint/b": 2}],
+                         "counts by file from the repository root, which `refuse` lists")
 
     def test_a_commit_glob_naming_no_tracked_file_is_still_refused(self) -> None:
         with self.assertRaises(SystemExit):

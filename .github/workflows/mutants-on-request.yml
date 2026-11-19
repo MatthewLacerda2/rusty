@@ -131,12 +131,14 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ inputs.commit }}
-      # The tree is `inputs.commit`, which may predate a step this job calls
-      # (`install-tool`, #1973; `system-libs`, #2101): take `.github/actions`
-      # from the workflow's own commit, so a request queued before a change to
-      # them still runs. Before the first local action.
+      # The tree is `inputs.commit`, which may predate a step or a script this
+      # job calls (`install-tool`, #1973; `system-libs`, #2101; `refuse`,
+      # #2371): take `.github/actions` and `.github/scripts` from the
+      # workflow's own commit, so a request queued before a change to them
+      # still runs. The scripts only read git, so they work on an older tree.
+      # Before the first local action.
       - name: Shared steps from the workflow's commit
-        run: git checkout "$GITHUB_SHA" -- .github/actions
+        run: git checkout "$GITHUB_SHA" -- .github/actions .github/scripts
       - name: Toolchain (from rust-toolchain.toml)
         run: rustup show
       - name: Install cargo-mutants
@@ -189,8 +191,9 @@ jobs:
       - name: Whether one ask can measure it
         id: fits
         run: |
-          python3 .github/scripts/mutants-request.py refuse plan.json --budget-seconds "$BUDGET_SECONDS" > refused.txt \
-            || { cat refused.txt; echo "::error::$(head -n1 refused.txt)"; exit 1; }
+          python3 .github/scripts/mutants-request.py refuse plan.json --budget-seconds "$BUDGET_SECONDS" \
+            > refused.txt 2> refuse-error.txt \
+            || { cat refused.txt refuse-error.txt; echo "::error::$(head -n1 refused.txt) $(tail -n1 refuse-error.txt)"; exit 1; }
 
       # As many runners as the engine's part needs to end inside the budget,
       # at most a handful (`mutants-request.py`'s docstring has the figures).
@@ -219,6 +222,7 @@ jobs:
           if [ "$RESOLVE" = failure ]; then why="the scope could not be read: $(cat problem.txt)"
           elif [ "$PLAN" = failure ] && [ -s scope.txt ]; then why="$(cat scope.txt)"
           elif [ "$FITS" = failure ] && [ -s refused.txt ]; then why="$(cat refused.txt)"
+          elif [ "$FITS" = failure ]; then why="the size check broke: $(tail -n 3 refuse-error.txt 2>/dev/null | tr '\n' ' ')"
           else why="the run broke before it could plan the mutants."
           fi
           python3 .github/scripts/mutants-report.py --unanswered "$why" --out report
@@ -260,14 +264,14 @@ jobs:
     steps:
       - name: Start the clock
         run: echo "JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
-      # The same tree `plan` read, and its `.github/actions` from the
-      # workflow's commit (`plan` says why).
+      # The same tree `plan` read, and its `.github/actions` and
+      # `.github/scripts` from the workflow's commit (`plan` says why).
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ inputs.commit }}
       - name: Shared steps from the workflow's commit
-        run: git checkout "$GITHUB_SHA" -- .github/actions
+        run: git checkout "$GITHUB_SHA" -- .github/actions .github/scripts
       - name: Toolchain (from rust-toolchain.toml)
         run: rustup show
       - name: Cache cargo registry + target

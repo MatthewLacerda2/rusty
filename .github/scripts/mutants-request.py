@@ -79,11 +79,11 @@ from pathlib import Path
 #: Minutes a mutant costs with the per-package tests above: run 44014339190
 #: (#2269's plan re-asked) spent 282 runner-minutes on 71 mutants, 191 s a
 #: caught one and 631 s a survivor, against 7.2 min a mutant before.
+#: Checked, and kept, against the two large runs since: 44149115191 (110
+#: mutants, four shards) spent 534 runner-minutes, 454 past setup, 4.1 a
+#: mutant; 44203600903 (263 measured) 666, 586 past setup, 2.2. 4.0 sits at
+#: the slow end, so a plan sized by it ends inside its budget.
 MINUTES_PER_MUTANT = 4.0
-# Kept after #2371's check against the two large runs since: 44149115191
-# (110 mutants, four shards) spent 534 runner-minutes, 454 past setup, 4.1 a
-# mutant; 44203600903 (263 measured) 666, 586 past setup, 2.2. 4.0 sits at the
-# slow end, so a plan sized by it ends inside its budget.
 #: What a shard spends before its first mutant: setup, the workspace's build
 #: and its timed baseline (15 to 17 min in run 44014339190, 21 in #2282's),
 #: with room for a cold cache.
@@ -92,10 +92,14 @@ SETUP_MINUTES = 20
 #: gating CI of the batch's pull requests needs the rest of the account's.
 MAX_SHARDS = 4
 #: How far past what fits one ask (`MAX_SHARDS` runners at `MINUTES_PER_MUTANT`)
-#: a whole-file ask may plan before it is refused: at the measured 2.2 to 4.1
-#: minutes a mutant, 1.5 x the 145 that fit at 4.0 (217) is about what four
-#: runners finish at the fast end, so a plan the runners could still measure is
-#: never turned away, and one three times past the cap is.
+#: a whole-file ask may plan before it is refused. At 4.0 one ask fits 145;
+#: four runners measure about 141 at the slow 4.1 minutes a mutant and 263 at
+#: the fast 2.2; 1.5 x 145 = 217 sits between, and a plan past it is
+#: refused. A hand ask of 218 to 263
+#: is turned away though the fast rate would finish it: kept so, since a
+#: refusal costs the asker a narrower re-ask minutes later, while a plan the
+#: slow rate cannot finish holds four runners for their whole budget and
+#: still leaves mutants unreached.
 HEADROOM = 1.5
 #: How many files the refusal lists by count; the rest are summed.
 LISTED = 15
@@ -127,18 +131,17 @@ def fits(budget_seconds: int, minutes: float = MINUTES_PER_MUTANT) -> int:
     return max(0, int(MAX_SHARDS * (budget_seconds / 60 - SETUP_MINUTES) / minutes))
 
 
-def refusal(plan: dict, listed: dict[str, list[dict]], budget_seconds: int) -> str | None:
+def refusal(plan: dict, budget_seconds: int) -> str | None:
     """Why a whole-file ask is refused before any shard starts, or `None`.
-    `listed` is each part's `--list --json` by slug, the plan `plan` already
-    computed. A `diff`, narrowed or not, is never refused: it runs at the cap."""
+    Each part's `by_file` is what `mutants-scope.py check` counted in the
+    `--list` the `plan` job already ran. A `diff`, narrowed or not, is never
+    refused: it runs at the cap."""
     if plan.get("kind") != "paths":
         return None
     per_file: dict[str, int] = {}
     for part in plan.get("parts", []):
-        root = part["root"]
-        for m in listed.get(part["slug"], []):
-            path = m.get("file", "?") if root == "." else f"{root}/{m.get('file', '?')}"
-            per_file[path] = per_file.get(path, 0) + 1
+        for f, n in part.get("by_file", {}).items():
+            per_file[f] = per_file.get(f, 0) + n
     total, fit = sum(per_file.values()), fits(budget_seconds)
     if total <= HEADROOM * fit:
         return None
@@ -266,7 +269,7 @@ def main() -> None:
     size.add_argument("--budget-seconds", type=int, required=True)
     size.add_argument("--standalone", type=int, default=0, help="the standalone parts' planned mutants")
     ref = sub.add_parser("refuse", help="exit 1, printing why, when a whole-file plan is too large to measure")
-    ref.add_argument("plan", type=Path, help="the plan; each part's planned-SLUG.json lies beside it")
+    ref.add_argument("plan", type=Path, help="the plan, after `mutants-scope.py check` counted it")
     ref.add_argument("--budget-seconds", type=int, required=True)
     sub.add_parser("tests", help="how many tests the `cargo nextest list` JSON on stdin selects")
     pkgs = sub.add_parser("packages", help="`package offset` for each package a `--list --json` file mutates")
@@ -284,13 +287,7 @@ def main() -> None:
         print(f"shards={json.dumps(list(range(n)))}")
         print(why, file=sys.stderr)
     elif args.command == "refuse":
-        plan, here = json.loads(args.plan.read_text()), args.plan.parent
-        listed = {}
-        for part in plan.get("parts", []):
-            path = here / f"planned-{part['slug']}.json"
-            text = path.read_text().strip() if path.is_file() else ""
-            listed[part["slug"]] = json.loads(text) if text else []
-        if why := refusal(plan, listed, args.budget_seconds):
+        if why := refusal(json.loads(args.plan.read_text()), args.budget_seconds):
             print(why)
             sys.exit(1)
     elif args.command == "packages":
