@@ -66,7 +66,7 @@ class Table(unittest.TestCase):
         return self.rows()
 
     def test_scenes_and_a_missing_report(self):
-        self.assertEqual(table.scenes_of(self.legs[0]), ["levels/a"])
+        self.assertEqual(table.scenes_of_all(self.legs[:1]), ["levels/a"])
         self.assertIn("wrote a report", table.scene_table("other", self.legs))
         text = table.render(["levels/a"], self.legs, ["header line"])
         self.assertTrue(text.startswith("header line\n"))

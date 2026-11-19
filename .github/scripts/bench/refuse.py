@@ -21,7 +21,12 @@ spread 9%), and a run on a project whose textures were never imported (`gpu_mb`
   PR's build and any leg, and again on the PR's build: a PR that changes the
   cache's stamp, a texture default or the encoder sees every cache as stale,
   uploads uncompressed, and its memory and load rows move for a reason that is
-  not its code (`gpu_mb` 2176 against 1216 MB);
+  not its code (`gpu_mb` 2176 against 1216 MB). Each refusal names the build
+  that refused. One `.bctex` per source holds one stamp, so when one build finds
+  the project imported and the other does not ([`textures`]), no import
+  satisfies both and `make import` would only loop: the refusal says the builds
+  disagree, and `FORCE=1` measures anyway, the table's header saying `gpu_mb` and
+  the load rows are not comparable;
 - **a binary that cannot do what is asked** ([`flags_refusal`]): each binary is
   asked its `--help` first. `main`'s has no `--pending-imports` (or `--set`)
   until the PR that adds them merges, and an unknown flag is read as the out
@@ -55,7 +60,7 @@ def hold(path: Path):
 
 
 def flags_refusal(help_text: str, binary: Path, sets: tuple[str, ...]) -> tuple[str | None, str | None]:
-    """`(refusal, pending_refusal)` for a binary whose `--help` is `help_text`.
+    """`(refusal, cannot_check)` for a binary whose `--help` is `help_text`.
 
     The first stops the run whatever `FORCE` says (a `--set` it cannot take); the
     second is the texture check that cannot run, which `FORCE=1` runs past."""
@@ -90,10 +95,39 @@ def busy_refusal(found: list[str]) -> str | None:
     return f"a build or a bench runs on the machine ({', '.join(found)}): a timed benchmark runs alone"
 
 
-def pending_refusal(code: int, said: str) -> str | None:
-    """The refusal for `bench-scenes --pending-imports`' answer: exit 1 lists the images."""
+def pending_answer(build: str, code: int, said: str) -> tuple[str, str | None]:
+    """`bench-scenes --pending-imports`' answer (its stdout) as `(kind, text)`: `"clean"`,
+    `"pending"` (exit 1, the images listed) or `"failed"`, the text naming `build`."""
     if code == 0:
-        return None
+        return "clean", None
     if code == 1:
-        return f"the project has un-imported textures (make import PROJECT=<dir>):\n{said.strip()}"
-    return f"bench-scenes --pending-imports failed (exit {code}): {said.strip()}"
+        return "pending", f"{build}'s build finds un-imported textures in the project:\n{said.strip()}"
+    return "failed", f"{build}'s bench-scenes --pending-imports failed (exit {code}): {said.strip()}"
+
+
+DISAGREE = ("the two builds disagree on the texture cache: {clean}'s finds the project imported, "
+            "{pending}'s does not, so the PR changes the cache's stamp, a texture default or the encoder and no "
+            "import satisfies both (one .bctex per source holds one stamp). Measure with FORCE=1 and read "
+            "gpu_mb and the load rows as not comparable; the table's header says so")
+IMPORT = "make import PROJECT=<dir>, then run again"
+
+
+def textures(main: tuple[str, str | None], pr: tuple[str, str | None], names=("main", "the PR")
+             ) -> tuple[list[str], bool]:
+    """The texture refusals from both builds' answers, and whether `gpu_mb` and the load rows compare.
+
+    An answer is [`pending_answer`]'s, or `("cannot", text)` for a build that
+    could not be asked ([`flags_refusal`])."""
+    kinds = (main[0], pr[0])
+    if sorted(kinds) == ["clean", "pending"]:
+        pending = kinds.index("pending")
+        listed = (main, pr)[pending][1].partition("\n")[2]
+        said = DISAGREE.format(clean=names[1 - pending], pending=names[pending])
+        return [f"{said}:\n{listed}" if listed else said], False
+    refusals = []
+    for kind, text in (main, pr):
+        if kind == "pending":
+            refusals.append(f"{text}\n({IMPORT})")
+        elif kind != "clean":
+            refusals.append(text)
+    return refusals, True

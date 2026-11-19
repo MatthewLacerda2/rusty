@@ -96,11 +96,6 @@ def render(scenes: list[str], legs: tuple[Path, Path, Path], header: list[str]) 
     return "\n".join(parts)
 
 
-def scenes_of(leg: Path) -> list[str]:
-    """The scenes a leg reported, by their name under `assets/scenes/`, sorted."""
-    return scenes_of_all([leg])
-
-
 def scenes_of_all(legs) -> list[str]:
     """The scenes any of `legs` reported, sorted: a scene only the PR reports still gets its table."""
     names = []

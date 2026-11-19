@@ -4,8 +4,11 @@
 `make test-gpu PR=<n>` runs its tests there: the head fetched as
 `pull/<n>/head` into `.claude/worktrees/pr-<n>-head` (`bench/trees.py`, the
 tree `make bench-ab` measures), built in that tree's own `target/`, and
-removed by `make reclaim` once the PR is closed. Exits 1 when the fetch or the
-checkout fails, printing nothing on stdout, so the recipe stops there.
+removed by `make reclaim` once the PR is closed. It is the PR's head as pushed:
+no `main` merged in, no timed-run lock. It refuses a tree a live `make bench-ab`
+run holds (`trees.held_by_run`): re-pointing it would swap that run's sources
+mid-build. Exits 1 on that refusal or when the fetch or the checkout fails,
+printing nothing on stdout, so the recipe stops there.
 """
 
 from __future__ import annotations
@@ -21,8 +24,13 @@ def main(argv) -> int:
         return 2
     pr = int(argv[0])
     try:
+        root = trees.main_checkout()
+        owner = trees.held_by_run(root, trees.path(root, trees.pr_tree(pr)))
+        if owner is not None:
+            raise RuntimeError(f"{trees.path(root, trees.pr_tree(pr))} is locked by a live `make bench-ab` "
+                               f"run ({trees.LOCK_REASON} {owner}): wait for it to end")
         _, sha = trees.fetch(pr)
-        tree = trees.checkout(trees.main_checkout(), trees.pr_tree(pr), sha)
+        tree = trees.checkout(root, trees.pr_tree(pr), sha)
     except RuntimeError as e:
         print(f"pr-tree: {e}", file=sys.stderr)
         return 1

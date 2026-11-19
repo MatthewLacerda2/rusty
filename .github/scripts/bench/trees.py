@@ -46,11 +46,18 @@ MAIN_TREE = "bench-main"
 # How a run's worktree lock reads; the PID follows.
 LOCK_REASON = "bench-ab pid"
 _LOCK = re.compile(rf"^{re.escape(LOCK_REASON)} (\d+)$")
+_PR_TREE = re.compile(r"^pr-(\d+)-head$")
 
 
 def pr_tree(pr: int) -> str:
     """The worktree folder a PR's head is checked out in."""
     return f"pr-{pr}-head"
+
+
+def pr_of_tree(name: str) -> int | None:
+    """The PR a tree folder named by [`pr_tree`] is for, `None` for any other name."""
+    found = _PR_TREE.match(name)
+    return int(found.group(1)) if found else None
 
 
 def pr_ref(pr: int) -> str:
@@ -82,9 +89,14 @@ def fetch(pr: int | None, git=run) -> tuple[str, str | None]:
     return main, git(["git", "rev-parse", pr_ref(pr)]).strip()
 
 
+def path(root: Path, name: str) -> Path:
+    """Where the tree `name` lives: `<root>/.claude/worktrees/<name>`."""
+    return root / ".claude" / "worktrees" / name
+
+
 def checkout(root: Path, name: str, sha: str, git=run) -> Path:
-    """`sha` checked out detached in `<root>/.claude/worktrees/<name>`."""
-    tree = root / ".claude" / "worktrees" / name
+    """`sha` checked out detached in `<root>/.claude/worktrees/<name>`, unlocked (`pr-tree.py`)."""
+    tree = path(root, name)
     if (tree / ".git").exists():
         git(["git", "-C", str(tree), "checkout", "--quiet", "--detach", sha])
     else:
@@ -131,15 +143,49 @@ def locked_reason(root: Path, tree: Path, git=run) -> str | None:
     return None
 
 
-def lock(root: Path, tree: Path, pid: int, git=run, alive=tenancy.alive) -> None:
-    """Lock `tree` for run `pid`, taking over a lock a dead run left; any other lock raises."""
+def lock(root: Path, tree: Path, pid: int, git=run, alive=tenancy.alive, exclusive: bool = False) -> None:
+    """Lock `tree` for run `pid`, taking over a lock a dead run left; any other lock raises.
+
+    `exclusive`: this run holds the timed-run `flock`, so every `bench-ab pid`
+    lock it finds is stale, whatever `alive` says of a reused PID."""
     held = locked_reason(root, tree, git)
     if held is not None:
         owner = lock_pid_of(held)
-        if owner is None or (owner != pid and alive(owner)):
+        if owner is None:
             raise RuntimeError(f"{tree} is locked ({held or 'no reason given'}): not ours to take")
+        if owner != pid and alive(owner) and not exclusive:
+            raise RuntimeError(f"{tree} is locked ({held}), and PID {owner} runs: not ours to take. If no "
+                               f"`make bench-ab` runs (a power cut left the lock, its PID reused), "
+                               f"`git worktree unlock {tree}` and run again")
         git(["git", "-C", str(root), "worktree", "unlock", str(tree)])
     git(["git", "-C", str(root), "worktree", "lock", "--reason", f"{LOCK_REASON} {pid}", str(tree)])
+
+
+def take(root: Path, name: str, sha: str, pid: int, locked: list, git=run, alive=tenancy.alive,
+         exclusive: bool = False) -> Path:
+    """`sha` checked out detached in the tree `name`, locked for run `pid`; the tree is
+    appended to `locked` the moment it is locked, so the caller unlocks only its own.
+
+    An existing tree is locked first and re-pointed after: a live run's lock
+    refuses before its sources move."""
+    tree = path(root, name)
+    if (tree / ".git").exists():
+        lock(root, tree, pid, git, alive, exclusive)
+        locked.append(tree)
+        git(["git", "-C", str(tree), "checkout", "--quiet", "--detach", sha])
+    else:
+        git(["git", "-C", str(root), "worktree", "add", "--quiet", "--detach", str(tree), sha])
+        lock(root, tree, pid, git, alive, exclusive)
+        locked.append(tree)
+    return tree
+
+
+def held_by_run(root: Path, tree: Path, git=run, alive=tenancy.alive) -> int | None:
+    """The PID of the live `make bench-ab` run that locks `tree`, if one does."""
+    if not (tree / ".git").exists():
+        return None
+    owner = lock_pid_of(locked_reason(root, tree, git))
+    return owner if owner is not None and alive(owner) else None
 
 
 def unlock(root: Path, tree: Path, pid: int, git=run) -> None:

@@ -68,11 +68,12 @@ class Busy(unittest.TestCase):
 
 class Imports(unittest.TestCase):
     def test_pending_textures_refuse_naming_them(self):
-        self.assertIsNone(refuse.pending_refusal(0, ""))
-        said = refuse.pending_refusal(1, "assets/a.png\nassets/b.png\n")
-        self.assertIn("un-imported textures", said)
+        self.assertEqual(refuse.pending_answer("main", 0, ""), ("clean", None))
+        kind, said = refuse.pending_answer("main", 1, "assets/a.png\nassets/b.png\n")
+        self.assertEqual(kind, "pending")
+        self.assertIn("main's build finds un-imported textures", said)
         self.assertIn("assets/b.png", said)
-        self.assertIn("failed (exit 2)", refuse.pending_refusal(2, "cannot open"))
+        self.assertIn("failed (exit 2)", refuse.pending_answer("main", 2, "cannot open")[1])
 
 
 if __name__ == "__main__":

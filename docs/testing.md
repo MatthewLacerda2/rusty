@@ -1301,12 +1301,18 @@ pushed), so the legs differ by the PR's diff alone and a PR branched before a
 speed-up merged does not show it as a regression; a conflict refuses, saying to
 update the branch. The table's header names `main`'s commit, the PR's head and the
 merged commit. Both trees are locked (`git worktree lock`, reason `bench-ab pid
-<n>`) for the run, so `make reclaim` never removes one mid-run; a lock whose PID no
-longer runs is taken over by the next run and ignored by reclaim. `bench-main` is
-kept warm between runs (reclaim keeps it by name: its cold build is most of a run's
+<n>`) for the run, so `make reclaim` never removes one mid-run, and an existing
+tree is locked *before* it is re-pointed: a second run that `FORCE=1` took past the
+timed-run lock refuses there, leaving the first run's sources alone. A lock whose
+PID no longer runs is taken over by the next run and ignored by reclaim; a run that
+holds the timed-run lock takes over any `bench-ab pid` lock it finds, since a power
+cut can leave one behind with its PID reused (a `FORCE=1` run without the timed-run
+lock refuses instead, naming `git worktree unlock <path>`). `bench-main` is kept
+warm between runs (reclaim keeps it by name: its cold build is most of a run's
 wait; `git worktree remove` it by hand for the disk); `pr-<n>-head` is put back at
-the PR's head after the run and removed by `make reclaim` once the PR is merged or
-closed.
+the PR's head after the run, and `make reclaim` judges it by the PR in its name,
+removing it once that PR is merged or closed, even when a power cut left it at the
+run's local merge commit.
 
 **Why three legs.** Not every row repeats. On a desktop the GPU rows, the memory
 rows and the op counters repeat to under 1% between two takes of one binary; the
@@ -1322,14 +1328,20 @@ the table shows how tightly each kind of row repeated rather than assuming it.
 Legs run whole, one after another: interleaving the two binaries scene by scene
 halves the drift but doubles the scene loads.
 
-**What it refuses**, before it builds (`FORCE=1` runs anyway, and the table says
-what it ran past): another timed run (an `flock` under `out/bench/`, dropped by the
-kernel when its run dies), and a `cargo`, `rustc` or `bench-scenes` process on the
-machine, checked again before each leg. Un-imported textures (the images an import
-would encode now, `bench-scenes --pending-imports`, the engine's own check) are
-refused right after `main`'s build and again after the PR's: a PR that changes the
-texture cache's stamp or encoder sees every cache as stale, and its memory and load
-rows would move for that alone. `make import PROJECT=<dir>` clears it. Each binary is
+**What it refuses**, before it builds (`FORCE=1` runs anyway, and the table's
+header lists every refusal it ran past): another timed run (an `flock` under
+`out/bench/`, dropped by the kernel when its run dies), and a `cargo`, `rustc` or
+`bench-scenes` process on the machine, checked again before each leg, under
+`FORCE=1` too. Un-imported textures (the images an import would encode now,
+`bench-scenes --pending-imports`, the engine's own check) are asked of `main`'s
+build and of the PR's, and refused once both are built, naming the build that
+found them: when both find them, `make import PROJECT=<dir>` clears it. **When the
+two builds disagree** (one finds the project imported, the other does not), the PR
+changes the cache's stamp, a texture default or the encoder; one `.bctex` per source
+holds one stamp, so no import satisfies both and the refusal says so instead of
+sending you to `make import`. Measure it with `FORCE=1`: the table's header then
+says `gpu_mb` and the load rows are not comparable (one leg loaded its textures
+uncompressed), and only the other rows are read. Each binary is
 asked its `--help` first: one without `--pending-imports` (a `main` from before it
 merged) means the check could not run, refused unless `FORCE=1`; `SET=` on a binary
 without `--set` refuses outright. `SET` takes dotted keys with plain values
@@ -1342,7 +1354,9 @@ without one (macOS, no user session) the legs run plain and the run says so. The
 legs' reports stay under `out/bench/ab/pr-<n>/` (`main/`, `pr/`, `main-again/`),
 and the table, printed and kept as `out/bench/ab/pr-<n>/table.md`, is the PR comment
 as it is. `make test-gpu PR=<n> [FILTER='<nextest filter>']` runs GPU tests on a
-PR's head the same way.
+PR's head in the same `pr-<n>-head` tree, but as pushed: no `main` merged in, no
+timed-run lock and none of the refusals above. It only refuses a tree a live
+`make bench-ab` run holds, whose sources it would otherwise swap mid-build.
 
 ### GPU time and the GPU clock (#862)
 A laptop GPU does not run at one speed. On Apple silicon the governor re-picks the
