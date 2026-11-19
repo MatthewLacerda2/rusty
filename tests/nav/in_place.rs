@@ -41,7 +41,12 @@ fn a_walking_agent_keeps_its_archetype_across_ticks() {
     for _ in 0..30 {
         graph.tick_nav_agents(&mut scene, DT);
     }
-    assert_eq!(walks::moves(), before, "a tick moved an entity's archetype");
+    assert_eq!(
+        walks::moves(),
+        before,
+        "a nav tick moved an entity's archetype: anything it calls that attaches \
+         or detaches a component of any entity trips this"
+    );
     assert!(
         scene.world.transform(id).unwrap().position.x > 1.5,
         "it walked"
@@ -60,7 +65,12 @@ fn a_root_motion_step_keeps_the_archetype() {
     scene.world.nav_agent_mut(id).unwrap().velocity = Vec3::new(0.0, 0.0, 2.0);
     let before = walks::moves();
     graph.move_agent(&mut scene, id, Vec3::new(0.5, 0.0, 0.0));
-    assert_eq!(walks::moves(), before);
+    assert_eq!(
+        walks::moves(),
+        before,
+        "the step moved an entity's archetype: anything it calls that attaches \
+         or detaches a component of any entity trips this"
+    );
     let x = scene.world.transform(id).unwrap().position.x;
     assert!((x - 1.5).abs() < 1e-5, "moved by the motion: {x}");
     let v = scene.world.nav_agent(id).unwrap().velocity;

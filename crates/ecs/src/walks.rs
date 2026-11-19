@@ -5,8 +5,8 @@
 //! `World::each_core_with` or `World::ids_with_component_where` (`ids_with_*`,
 //! `World::moving_bodies`); lookups by `World::component`, under every typed
 //! getter. A test hook: compiled in every build, since the test that reads it is
-//! another crate's, and counting only on a thread that asked [`of`] or
-//! [`lookups_of`] once. A walk happens a few times a frame, so a build that never
+//! another crate's, and counting only on a thread that asked [`of`],
+//! [`lookups_of`] or [`moves`] once. A walk happens a few times a frame, so a build that never
 //! asks pays one thread-local read per walk. A lookup is the hottest call the sim
 //! makes, so lookups are counted only where `debug_assertions` holds (every test
 //! profile): a release or ship build compiles the call away, and [`lookups_of`]
@@ -15,7 +15,9 @@
 //! (`World::set_component`) or detached from one (`World::take_component`), each
 //! of which copies every column the entity has into another hecs archetype; an
 //! overwrite of a held column, and whole-entity placement (spawn, despawn,
-//! restore), move no column and are not counted. Re-exported as `world::walks`.
+//! restore), move no column and are not counted. On a thread that never asked,
+//! an attach or detach pays one thread-local read; whether it moves a column is
+//! asked only once armed. Re-exported as `world::walks`.
 
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
@@ -27,8 +29,12 @@ thread_local! {
     static MOVES: Cell<u64> = const { Cell::new(0) };
 }
 
-pub(crate) fn moved() {
-    if ARMED.with(Cell::get) {
+/// Counts one archetype move when this thread is armed and `moving()` holds;
+/// `moving` runs only on an armed thread, so an unarmed one (every ship and
+/// game build) pays one thread-local read and a branch per attach or detach.
+#[inline]
+pub(crate) fn moved_if(moving: impl FnOnce() -> bool) {
+    if ARMED.with(Cell::get) && moving() {
         MOVES.with(|m| m.set(m.get() + 1));
     }
 }
@@ -55,14 +61,14 @@ pub(crate) fn lookup(column: &'static str) {
 }
 
 /// Walks of `T`'s column on this thread since the first call of this function
-/// (or another reader here) on it, which starts the count.
+/// (or [`lookups_of`] or [`moves`]) on it, which starts the count.
 pub fn of<T>() -> u64 {
     read::<T>(&WALKS)
 }
 
 /// One-entity lookups of `T`'s column (`World::component`, under `World::mesh`
 /// and every typed getter) on this thread since the first call of this function
-/// (or [`of`]) on it, which starts the count.
+/// (or [`of`] or [`moves`]) on it, which starts the count.
 ///
 /// # Panics
 /// In a build without `debug_assertions` (release, ship), where lookups are not

@@ -36,7 +36,12 @@ fn an_emitter_keeps_its_archetype_across_ticks() {
     for _ in 0..20 {
         world.tick(1.0 / 60.0);
     }
-    assert_eq!(walks::moves(), before, "a tick moved an entity's archetype");
+    assert_eq!(
+        walks::moves(),
+        before,
+        "a tick moved an entity's archetype: any system attaching or detaching \
+         a component in Play trips this, not only the one under test"
+    );
     let scene = world.scene().borrow();
     assert!(
         scene.world.particles(id).unwrap().live_count() > 0,
