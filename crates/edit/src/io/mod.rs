@@ -33,9 +33,9 @@ pub use seed::{
     seed_workspace, DEFAULT_SCENE_PATH, DEFAULT_SCRIPTS_DEST_DIR,
 };
 
-use crate::serialize::{apply_scene_data, to_scene_data};
+use crate::serialize::{apply_rehydrated, to_scene_data};
 use rusty_scene::io::{parse_scene_text, read_text};
-use rusty_scene::serialize::SceneData;
+use rusty_scene::serialize::{RehydratedScene, SceneData};
 use rusty_scene::Scene;
 
 /// Serialize the live scene's component VALUES to `path` (pretty JSON, no GPU
@@ -121,7 +121,19 @@ pub fn load_parsed(
     json: String,
     data: SceneData,
 ) -> Result<(), LoadError> {
-    apply_scene_data(scene, data);
+    load_rehydrated(scene, path, json, RehydratedScene::new(data))
+}
+
+/// [`load_parsed`] for a document already rehydrated (its meshes built, its models
+/// imported through the import cache): a caller that times the import apart from
+/// the rest of the load (`make bench-scenes`' boot load).
+pub fn load_rehydrated(
+    scene: &mut Scene,
+    path: &str,
+    json: String,
+    document: RehydratedScene,
+) -> Result<(), LoadError> {
+    apply_rehydrated(scene, document);
     scene.renew_id();
     // The World is now this document, so it is "what the engine read" whether or not
     // the sidecar loads: a sidecar changing alone never triggers the follow, so

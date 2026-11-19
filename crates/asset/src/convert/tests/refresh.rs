@@ -1,8 +1,9 @@
 //! Play's refresh (#1253): every converted source under the root is brought up to
 //! date before Play holds conversion off, at the cost of one `stat` per unchanged
-//! source, walking the tree once and never round a symlink loop.
+//! source, walking the tree once and never round a symlink loop, and counting
+//! each conversion it runs (`conversions`).
 
-use super::super::{cache_location, depends, gate, refresh_sources, PlayHold};
+use super::super::{cache_location, conversions, depends, gate, refresh_sources, PlayHold};
 use super::gate::{indices, stamp, QUAD};
 
 #[test]
@@ -66,4 +67,17 @@ fn a_leading_dot_names_the_same_held_source() {
     let plain = gate::key(std::path::Path::new("assets/x.fbx"));
     assert_eq!(gate::key(std::path::Path::new("./assets/x.fbx")), plain);
     assert_eq!(gate::key(std::path::Path::new("assets/./x.fbx")), plain);
+}
+
+#[test]
+fn a_conversion_is_counted_and_a_current_cache_is_not() {
+    let root = rusty_test_support::temp::dir().join("assets");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join("enemy.fbx"), QUAD).unwrap();
+    // The count is the process's: exact under nextest, one process a test.
+    let before = conversions();
+    refresh_sources(&root);
+    assert_eq!(conversions(), before + 1, "the stale source converted");
+    refresh_sources(&root);
+    assert_eq!(conversions(), before + 1, "its cache current: none");
 }

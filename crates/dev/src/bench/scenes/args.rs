@@ -18,6 +18,12 @@ pub struct Args {
     pub one: Option<String>,
     pub size: Option<(u32, u32)>,
     pub runs: Option<u32>,
+    /// `--load-runs n`: how many times each scene is loaded (`scenes::load`).
+    pub load_runs: Option<u32>,
+    /// A child's `--load-out <file>`: load the scene, keep the load there, exit.
+    pub load_out: Option<PathBuf>,
+    /// A child's `--loads <dir>`: the scene's loads before its bench's own.
+    pub loads: Option<PathBuf>,
     pub before: Option<PathBuf>,
     /// A child's `--import-out` and `--import-ms` (`scenes::import`).
     pub import_out: Option<PathBuf>,
@@ -38,10 +44,8 @@ pub fn parse(mut args: Vec<String>) -> Result<Args, String> {
     let size = take_value(&mut args, "--size")?
         .map(|s| parse_size(&s))
         .transpose()?;
-    let runs = take_value(&mut args, "--runs")?.map(|r| match r.parse::<u32>() {
-        Ok(n) if n > 0 => Ok(n),
-        _ => Err(format!("--runs wants a whole number above 0, not {r}")),
-    });
+    let runs = whole(take_value(&mut args, "--runs")?, "--runs");
+    let load_runs = whole(take_value(&mut args, "--load-runs")?, "--load-runs");
     let mut pairs = Vec::new();
     while let Some(pair) = take_value(&mut args, "--set")? {
         pairs.push(pair);
@@ -53,6 +57,9 @@ pub fn parse(mut args: Vec<String>) -> Result<Args, String> {
         one: take_value(&mut args, "--scene")?,
         size,
         runs: runs.transpose()?,
+        load_runs: load_runs.transpose()?,
+        load_out: take_value(&mut args, "--load-out")?.map(PathBuf::from),
+        loads: take_value(&mut args, "--loads")?.map(PathBuf::from),
         before: take_value(&mut args, "--before")?.map(PathBuf::from),
         import_out: take_value(&mut args, "--import-out")?.map(PathBuf::from),
         import_ms,
@@ -64,8 +71,20 @@ pub fn parse(mut args: Vec<String>) -> Result<Args, String> {
     })
 }
 
+/// `value` of `flag` read as a whole number above 0.
+fn whole(value: Option<String>, flag: &str) -> Option<Result<u32, String>> {
+    value.map(|r| match r.parse::<u32>() {
+        Ok(n) if n > 0 => Ok(n),
+        _ => Err(format!("{flag} wants a whole number above 0, not {r}")),
+    })
+}
+
 /// Remove `flag` from `args`, saying whether it was there.
 fn take_switch(args: &mut Vec<String>, flag: &str) -> bool {
     let at = args.iter().position(|a| a == flag);
     at.map(|i| args.remove(i)).is_some()
 }
+
+#[cfg(test)]
+#[path = "args_tests.rs"]
+mod tests;

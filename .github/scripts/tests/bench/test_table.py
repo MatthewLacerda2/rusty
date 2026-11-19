@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""#2381: the floor column from legs one and three, a row inside it read as not shown."""
+"""#2381: the floor column from legs one and three, a row inside it read as inside the floor; the lead; the load counts."""
 
 from __future__ import annotations
 
@@ -32,9 +32,9 @@ class Table(unittest.TestCase):
         cells = [line.strip("|").split(" | ") for line in text.splitlines() if line.startswith("| ")]
         return {c[0].strip(): [x.strip() for x in c[1:]] for c in cells[1:]}
 
-    def test_a_change_inside_the_floor_is_not_shown(self):
+    def test_a_change_inside_the_floor_says_so_beside_its_number(self):
         cpu = self.rows()["cpu_ms"]
-        self.assertEqual(cpu[2], "not shown (+10.0%)")
+        self.assertEqual(cpu[2], "inside the floor (+10.0%)")
         self.assertEqual(cpu[3], "+15.0%", "the floor: main again against main")
 
     def test_a_change_past_its_own_floor_is_shown(self):
@@ -45,7 +45,7 @@ class Table(unittest.TestCase):
     def test_a_row_from_zero_shows_both_values(self):
         rows = self.rows()
         self.assertEqual(rows["hiz_tested"][2], "0 → 5")
-        self.assertEqual(rows["draw_calls"][2], "not shown (+0.0%)")
+        self.assertEqual(rows["draw_calls"][2], "inside the floor (+0.0%)")
 
     def test_a_row_only_the_pr_has_is_listed_absent_on_main(self):
         root = Path(tempfile.mkdtemp())
@@ -64,6 +64,45 @@ class Table(unittest.TestCase):
     def rows_of(self, legs):
         self.legs = legs
         return self.rows()
+
+    def test_the_lead_lists_moves_outside_the_floor_largest_first_above_its_size(self):
+        root = Path(tempfile.mkdtemp())
+        legs = (leg(root, "main", {"cpu_ms": 10.0, "gpu_ms": 4.0, "tiny_ms": 0.001, "draw_calls": 0.0, "hiz": 2.0}),
+                leg(root, "pr", {"cpu_ms": 11.0, "gpu_ms": 3.0, "tiny_ms": 0.002, "draw_calls": 3.0, "hiz": 3.0}),
+                leg(root, "main-again", {"cpu_ms": 11.5, "gpu_ms": 4.01, "tiny_ms": 0.001, "draw_calls": 0.0,
+                                         "hiz": 2.0}))
+        text = table.scene_table("levels/a", legs)
+        lead = text.split("| row |")[0].splitlines()
+        moved = [line.split("`")[1] for line in lead if line.startswith("- ")]
+        self.assertEqual(moved, ["draw_calls", "hiz", "gpu_ms"], "from zero first, then by size; "
+                         "cpu_ms inside its floor, tiny_ms below the size")
+        self.assertIn("0 → 3", text.split("\n- `draw_calls`")[1].splitlines()[0])
+        self.assertIn("| cpu_ms |", text, "the full table is kept below")
+
+    def test_the_lead_says_when_nothing_moved(self):
+        root = Path(tempfile.mkdtemp())
+        legs = tuple(leg(root, n, {"cpu_ms": 10.0}) for n in ("main", "pr", "main-again"))
+        self.assertIn("Nothing moved outside the floor", table.scene_table("levels/a", legs))
+
+    def test_the_lead_lists_rows_with_no_floor_and_rows_only_the_pr_has(self):
+        root = Path(tempfile.mkdtemp())
+        legs = (leg(root, "main", {"cpu_ms": 10.0, "load_ms": 100.0}),
+                leg(root, "pr", {"cpu_ms": 10.0, "load_ms": 140.0, "load.count.models_converted": 2.0}),
+                leg(root, "main-again", {"cpu_ms": 10.0}))
+        lead = table.scene_table("levels/a", legs).split("| row |")[0]
+        self.assertNotIn("Nothing moved", lead)
+        self.assertIn("- `load_ms` 100 → 140, +40.0% (floor unknown)", lead)
+        self.assertIn("- `load.count.models_converted` 2 (absent on main)", lead)
+
+    def test_load_counts_that_differ_between_legs_are_said(self):
+        root = Path(tempfile.mkdtemp())
+        counts = {"load.count.models_parsed": 3.0, "load_ms": 900.0}
+        legs = (leg(root, "main", counts), leg(root, "pr", {**counts, "load.count.models_parsed": 0.0}),
+                leg(root, "main-again", counts))
+        said = table.count_changes(["levels/a"], legs)
+        self.assertEqual(len(said), 1)
+        self.assertIn("load.count.models_parsed main 3, PR 0, main again 3", said[0])
+        self.assertEqual(table.count_changes(["levels/a"], (legs[0], legs[2], legs[2])), [])
 
     def test_scenes_and_a_missing_report(self):
         self.assertEqual(table.scenes_of_all(self.legs[:1]), ["levels/a"])

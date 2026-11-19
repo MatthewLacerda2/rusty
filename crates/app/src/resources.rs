@@ -122,9 +122,9 @@ pub struct Resources {
     /// The schedule's observer (#433) — the dev layer's frame-stats timer. `None`
     /// unless installed via `GameWorld::set_probe`; it only watches the frame.
     pub(super) probe: Option<Box<dyn super::SystemProbe>>,
-    /// The scene load's observer (#2123), the dev layer's load timer. `None` unless
-    /// installed via `GameWorld::set_load_probe`; it only watches the load.
-    pub(super) load_probe: Option<Box<dyn super::LoadProbe>>,
+    /// The scene load's and Play entry's observers (#2123), each absent unless
+    /// installed; they only watch.
+    pub(super) load_probes: super::probe::LoadProbes,
     /// The tick's tap (#1581) — a dev demo recorder or replay. `None` unless
     /// installed via `GameWorld::set_tap`.
     pub(super) tap: Option<Box<dyn super::TickTap>>,
@@ -210,7 +210,7 @@ impl Resources {
             controller_hits: Vec::new(),
             sight_rays: Default::default(),
             probe: None,
-            load_probe: None,
+            load_probes: Default::default(),
             tap: None,
             loading: Default::default(),
             model_writes: Default::default(),

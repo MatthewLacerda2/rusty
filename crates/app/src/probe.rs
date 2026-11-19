@@ -10,7 +10,12 @@
 //!
 //! A play-mode scene load is timed the same way, step by step, by an installed
 //! [`LoadProbe`] (#2123): the load hands it each step to run and tells it when the
-//! load finished, and nothing the probe measures reaches the sim.
+//! load finished, and nothing the probe measures reaches the sim. Entering Play
+//! is timed by a probe of the same kind installed apart ([`GameWorld::set_entry_probe`]):
+//! the import refresh, the scripts' init, physics and the `Startup` stage, each a
+//! step, then one `finish`, so a boot load (`make bench-scenes`) splits its first
+//! tick without a second copy of the timing. A host times its own steps through
+//! [`timed`] too.
 //!
 //! No probe is installed by default, and a ship build never installs one.
 
@@ -30,19 +35,32 @@ pub trait SystemProbe {
     fn end_frame(&mut self, world: &World, res: &Resources);
 }
 
-/// Observes a play-mode scene load (`app::scene_load`), step by step. Must run
-/// `step` exactly once per call — the load is unchanged by a probe, only watched.
+/// Observes a load step by step: a play-mode scene load (`app::scene_load`),
+/// entering Play ([`GameWorld::set_entry_probe`]), or a host's own boot load run
+/// through [`timed`] (`make bench-scenes`). Must run `step` exactly once per
+/// call — the load is unchanged by a probe, only watched.
 pub trait LoadProbe {
-    /// Run `step`, the load step named `name` (`read`, `meshes`, `physics`, …).
+    /// Run `step`, the load step named `name` (`read`, `meshes`, `refresh`, …).
     fn step(&mut self, name: &'static str, step: &mut dyn FnMut());
 
     /// The load the steps since the last call belong to finished: `loaded` names
-    /// the scene swapped in, or is `None` when the load failed and nothing was.
+    /// the scene swapped in or Play entered, or is `None` when nothing was: the
+    /// scene load failed, or the scripts' runtime failed to start, which ends
+    /// Play's entry early.
     fn finish(&mut self, loaded: Option<&str>, console: &mut ConsoleLogs);
 }
 
-/// Run `step` under `probe` as the load step `name`, or plainly without one.
-pub(super) fn timed<T>(
+/// The installed [`LoadProbe`]s: a play-mode scene load's (the dev layer's load
+/// timer, `GameWorld::set_load_probe`) and Play entry's (`GameWorld::set_entry_probe`).
+#[derive(Default)]
+pub struct LoadProbes {
+    pub(super) scene: Option<Box<dyn LoadProbe>>,
+    pub(super) entry: Option<Box<dyn LoadProbe>>,
+}
+
+/// Run `step` under `probe` as the load step `name`, or plainly without one: the
+/// one way a step is timed, by a scene load, Play's entry and a host's boot load.
+pub fn timed<T>(
     probe: &mut Option<Box<dyn LoadProbe>>,
     name: &'static str,
     step: impl FnOnce() -> T,
@@ -74,6 +92,15 @@ impl GameWorld {
 
     /// Install (or with `None`, remove) the scene-load probe.
     pub fn set_load_probe(&mut self, probe: Option<Box<dyn LoadProbe>>) {
-        self.resources.load_probe = probe;
+        self.resources.load_probes.scene = probe;
+    }
+
+    /// Install (or with `None`, remove) the probe that times entering Play: its
+    /// steps `refresh`, `scripts`, `physics` and `startup`, then a `finish` naming
+    /// the scene Play entered (`None` when the scripts' runtime failed to start,
+    /// which ends the entry early). Apart from the scene-load probe, so a Play
+    /// entry never adds steps to a scene load's report.
+    pub fn set_entry_probe(&mut self, probe: Option<Box<dyn LoadProbe>>) {
+        self.resources.load_probes.entry = probe;
     }
 }
