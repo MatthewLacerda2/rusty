@@ -83,10 +83,17 @@ impl Renderer {
     }
 
     /// Count the prepass's draws of `solids`: a draw per batch it draws, with
-    /// every batched instance's triangles (as the forward pass's count).
+    /// every batched instance's triangles (as the forward pass's count), or none
+    /// when the GPU culls the camera: the prepass then draws its late set, which
+    /// the CPU never sees (`hiz_late` counts it, #2336).
     pub(crate) fn count_prepass(&mut self, solids: Solids) {
+        let late = solids.1.is_some();
         let prepass = solids.0.iter().filter(|b| b.key.in_prepass());
-        let draws = prepass.map(|b| (b.key.indices.len(), b.instances.len() as u32));
+        let instances = |b: &crate::draw::batch::DrawBatch| match late {
+            true => 0,
+            false => b.instances.len() as u32,
+        };
+        let draws = prepass.map(|b| (b.key.indices.len(), instances(b)));
         self.frame_counters.add_draws(draws);
     }
 

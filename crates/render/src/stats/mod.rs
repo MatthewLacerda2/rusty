@@ -12,7 +12,7 @@ pub struct RenderCounters {
     /// prepass, particle batches and UI batches; one mesh + material is one instanced
     /// draw (#470). Decals (folded into surfaces, #638), post-FX and the sky: none.
     pub draw_calls: u32,
-    /// Triangles submitted by the solid, transparent, shadow and SSAO-prepass draws.
+    /// Triangles of the solid, transparent, shadow and prepass draws (not the GPU cull's late set).
     pub triangles: u64,
     /// Mesh entities drawn, summed over the camera stack.
     pub visible_entities: u32,
