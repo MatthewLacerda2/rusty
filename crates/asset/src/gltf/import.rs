@@ -44,19 +44,19 @@ pub fn import_from(path: &Path, source: Option<&str>) -> Result<ImportedAsset, I
         .collect();
     let skins = skin::skins_by_mesh(&document, &buffers);
 
-    let sub_meshes: Vec<SubMesh> = document
-        .meshes()
-        .map(|mesh| {
-            let mut sub = sub_mesh_from_gltf(
-                &mesh,
-                &buffers,
-                skins.get(&mesh.index()).cloned(),
-                &document,
-            );
-            sub.node_name = node_name(&document, mesh.index());
-            sub
-        })
-        .collect();
+    // Each mesh on its own thread, in document order (`cook::par`): reading it
+    // and generating the tangents it lacks are a function of that mesh alone.
+    let meshes: Vec<gltf::Mesh> = document.meshes().collect();
+    let sub_meshes: Vec<SubMesh> = crate::cook::par::map(meshes, |mesh| {
+        let mut sub = sub_mesh_from_gltf(
+            &mesh,
+            &buffers,
+            skins.get(&mesh.index()).cloned(),
+            &document,
+        );
+        sub.node_name = node_name(&document, mesh.index());
+        sub
+    });
 
     let ids: Vec<&str> = sub_meshes.iter().map(|s| s.id.as_str()).collect();
     let nodes = nodes::model_nodes(&document, &ids);

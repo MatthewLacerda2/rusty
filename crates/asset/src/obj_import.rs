@@ -47,9 +47,11 @@ pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
         })
         .collect();
 
+    // Each piece on its own thread (`cook::par`), joined in file order.
+    let numbered: Vec<(usize, tobj::Model)> = models.into_iter().enumerate().collect();
+    let pieces = crate::cook::par::map(numbered, |(i, model)| sub_mesh_from_model(i, model));
     let mut sub_meshes: Vec<SubMesh> = Vec::new();
-    for (i, model) in models.into_iter().enumerate() {
-        let piece = sub_mesh_from_model(i, model);
+    for piece in pieces {
         match sub_meshes.iter_mut().find(|s| s.id == piece.id) {
             Some(sub) => append_piece(sub, piece),
             None => sub_meshes.push(piece),

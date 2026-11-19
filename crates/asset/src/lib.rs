@@ -29,6 +29,7 @@ pub mod animation_graph;
 pub mod audio;
 pub mod clusters;
 pub mod convert;
+pub mod cook;
 pub mod flat_normals;
 pub mod gltf;
 pub mod humanoid;
@@ -180,15 +181,7 @@ fn import_own(
 ) -> Result<ImportedAsset, ImportError> {
     let mut asset = parse_file(path, read)?;
     scale_factor::apply(&mut asset, scale_factor::sanitize(settings.scale, 1.0));
-    if settings.lightmap_uvs.generate {
-        for sub in &mut asset.sub_meshes {
-            lightmap_uv::apply(sub, &settings.lightmap_uvs);
-        }
-    }
-    // Last: the clusters reorder the indices every step above settled.
-    for sub in &mut asset.sub_meshes {
-        clusters::apply(sub);
-    }
+    cook::derive(&mut asset, settings);
     Ok(asset)
 }
 
