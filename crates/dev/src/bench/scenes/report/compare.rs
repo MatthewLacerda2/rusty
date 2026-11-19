@@ -30,6 +30,14 @@ impl SceneReport {
             if self.frames != previous.frames {
                 what.push(format!("frames {} -> {}", previous.frames, self.frames));
             }
+            if self.script != previous.script {
+                let timed = |on: bool| if on { "verbs timed" } else { "plain" };
+                what.push(format!(
+                    "{} -> {}",
+                    timed(previous.script),
+                    timed(self.script)
+                ));
+            }
             let other = if self.baseline.is_some() {
                 "baseline"
             } else {

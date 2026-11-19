@@ -17,14 +17,12 @@
 //! each name summed over the tick (`flush_bounds` runs once a stage), `frame_ms` and
 //! the frame count; a schedule frame run outside a host's tick is never closed.
 //!
-//! **Sessions.** The stats restart on the first frame of every Play session, so a
-//! windowed editor reports the current run, not every run since launch; a window
-//! frame drawn outside Play reaches only the recent ring a window reads
+//! **Sessions.** The stats restart on each Play session's first frame, so a window
+//! reports the current run; a frame drawn outside Play reaches only the recent ring
 //! ([`record_window`]), so after Stop the session holds until the next Play.
 //!
-//! Render counters come from the renderer when it draws: a harness screenshot, or a
-//! frame of the window (`window`, #2205); [`record_render_into`] folds them in. Headless
-//! runs without a screenshot report timings and world counters only.
+//! Render counters come from the renderer when it draws (a harness screenshot, a
+//! window frame, #2205; [`record_render_into`]). [`verbs`] splits script time by verb.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -37,6 +35,7 @@ use rusty_core::frame_stats::{DrawnFrame, FrameStats, Series};
 
 mod counters;
 mod load;
+pub mod verbs;
 mod window;
 pub use load::LoadTimer;
 pub use window::{known_keys, record_window, whole_count, window_ended, window_opt, WindowFrame};
@@ -98,6 +97,7 @@ impl TimingProbe {
 
 impl SystemProbe for TimingProbe {
     fn run(&mut self, stage: Stage, name: &'static str, system: &mut dyn FnMut()) {
+        verbs::enter_system(name);
         let ms = time_ms(system);
         if let Some(slot) = Stage::FRAME_ORDER.iter().position(|s| *s == stage) {
             self.stage_ms[slot] += ms;
@@ -106,6 +106,7 @@ impl SystemProbe for TimingProbe {
     }
 
     fn run_part(&mut self, name: &'static str, part: &mut dyn FnMut()) {
+        verbs::enter_system(name);
         let ms = time_ms(part);
         self.system_ms.push((name, ms));
     }

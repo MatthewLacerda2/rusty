@@ -25,6 +25,12 @@ pub use view_key::ViewKey;
 pub const PROFILING_NOTE: &str = "(timed on the profiling build: release with frame pointers \
      forced on, for PROFILE=1; within the release build's spread where measured)";
 
+/// The line a `SCRIPT=1` run's table carries under its title.
+pub const SCRIPT_NOTE: &str = "script verbs timed (SCRIPT=1): script.<verb> is a verb's own ms, \
+     script.lua what of cpu.update_scripts neither a verb nor the timers (script.overhead) hold; \
+     the timers cost time, so \
+     cpu.update_scripts compares only with another SCRIPT=1 run\n";
+
 /// One row over a scene's viewpoints and runs.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Row {
@@ -84,6 +90,10 @@ pub struct SceneReport {
     /// The running quality preset's overrides for this run (`--set key=value`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub set: Vec<String>,
+    /// A `SCRIPT=1` run (`bench::verbs`): its verbs were timed, which costs time,
+    /// so it compares only with another such run.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub script: bool,
     pub rows: Vec<Row>,
     /// Which source `gpu_mb` came from (`rusty_render::GpuMemory::source`), if any.
     pub gpu_mb_source: Option<String>,
@@ -102,11 +112,34 @@ impl SceneReport {
         self.rows.push(Row::value(metric.into(), value));
     }
 
+    /// The metric column's width: 30, or the longest row (a `script.` verb's).
+    fn metric_width(&self) -> usize {
+        self.rows
+            .iter()
+            .map(|r| r.metric.len())
+            .fold(30, usize::max)
+    }
+
+    /// What the run changed from a plain one, under the title: the `--set`
+    /// overrides, the verb timers.
+    fn run_notes(&self) -> String {
+        let mut out = String::new();
+        if !self.set.is_empty() {
+            let _ = writeln!(out, "quality preset overridden: {}", self.set.join(", "));
+        }
+        if self.script {
+            out.push_str(SCRIPT_NOTE);
+        }
+        out
+    }
+
     /// Whether `previous` benched what this run did: the same size, viewpoints
-    /// (each where it looks from, [`ViewKey`]) and frames. Only then do their
-    /// rows compare; the number of runs may differ.
+    /// (each where it looks from, [`ViewKey`]) and frames, both timing their
+    /// verbs or neither (`script`). Only then do their rows compare; the number
+    /// of runs may differ.
     pub fn same_shape(&self, previous: &SceneReport) -> bool {
-        (self.size, &self.views, self.frames) == (previous.size, &previous.views, previous.frames)
+        let shape = |r: &SceneReport| (r.size, r.views.clone(), r.frames, r.script);
+        shape(self) == shape(previous)
     }
 
     /// The table the terminal shows, with each row's average against `previous`
@@ -123,17 +156,12 @@ impl SceneReport {
             self.frames,
             self.loads
         );
-        if !self.set.is_empty() {
-            let _ = writeln!(out, "quality preset overridden: {}", self.set.join(", "));
-        }
-        let against = if self.baseline.is_some() {
-            "before"
-        } else {
-            "last"
-        };
+        out.push_str(&self.run_notes());
+        let against = ["last", "before"][usize::from(self.baseline.is_some())];
+        let w = self.metric_width();
         let _ = writeln!(
             out,
-            "{:<30} {:>12} {:>19} {:>12}  {:<18} vs {against} avg",
+            "{:<w$} {:>12} {:>19} {:>12}  {:<18} vs {against} avg",
             "metric", "avg", "spread", "worst p95", "worst at"
         );
         for row in &self.rows {
@@ -142,7 +170,7 @@ impl SceneReport {
                 .map_or(String::new(), |b| delta(b, row));
             let _ = writeln!(
                 out,
-                "{:<30} {:>12} {:>19} {:>12}  {:<18} {delta}",
+                "{:<w$} {:>12} {:>19} {:>12}  {:<18} {delta}",
                 row.metric,
                 num(row.avg),
                 spread(row),
@@ -217,9 +245,16 @@ pub fn read(out_dir: &Path, scene: &str) -> Option<SceneReport> {
 
 /// The scene's report in a kept baseline `dir` (`BEFORE=<dir>`): a copy of a
 /// project's report folder (`<dir>/<scene>.json`), or a copy of the whole
-/// `out/bench/scenes/` holding it under its project's key (`<dir>/<key>/`).
-pub fn read_baseline(dir: &Path, key: &str, scene: &str) -> Option<SceneReport> {
-    read(dir, scene).or_else(|| read(&dir.join(key), scene))
+/// `out/bench/scenes/` holding it under its project's key (`<dir>/<key>/`); for
+/// a `SCRIPT=1` run (`script`), in either one's `script/` folder first. A report
+/// of the run's own kind wins; one of the other kind is returned only when the
+/// baseline holds no other, and the comparison then says so.
+pub fn read_baseline(dir: &Path, key: &str, scene: &str, script: bool) -> Option<SceneReport> {
+    let keyed = dir.join(key);
+    let folders = [dir.join("script"), keyed.join("script"), dir.into(), keyed];
+    let found: Vec<SceneReport> = folders.iter().filter_map(|d| read(d, scene)).collect();
+    let own = found.iter().position(|r| r.script == script);
+    found.into_iter().nth(own.unwrap_or(0))
 }
 
 /// Keep `report` (and the table printed for it) in `out_dir`, in the subfolders

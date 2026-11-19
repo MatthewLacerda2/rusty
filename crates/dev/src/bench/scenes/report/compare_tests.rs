@@ -72,11 +72,14 @@ fn a_baseline_is_read_from_a_project_folder_or_the_whole_out_dir() {
     let report = scene(2.0);
     write(&dir.join("game-0011"), &report, "t").unwrap();
     assert_eq!(
-        read_baseline(&dir, "game-0011", "pool"),
+        read_baseline(&dir, "game-0011", "pool", false),
         Some(report.clone())
     );
     let project = dir.join("game-0011");
-    assert_eq!(read_baseline(&project, "game-0011", "pool"), Some(report));
+    assert_eq!(
+        read_baseline(&project, "game-0011", "pool", false),
+        Some(report)
+    );
     let mut now = scene(3.0);
     now.baseline = Some(project.display().to_string());
     let text = now.render(None);
@@ -115,4 +118,28 @@ fn a_kept_report_from_before_the_whole_tick_timing_is_warned_of() {
     let w = timed(true).against(Some(&timed(false)));
     assert!(w.iter().any(|w| w.contains("predates `cpu_ms`")), "{w:?}");
     assert!(timed(true).against(Some(&timed(true))).is_empty());
+}
+
+#[test]
+fn a_script_runs_baseline_is_the_script_report_beside_the_plain_one() {
+    let dir = rusty_test_support::temp::dir().join(format!("scenes_sbase_{}", std::process::id()));
+    let project = dir.join("game-0011");
+    let plain = scene(2.0);
+    let mut timed = scene(2.5);
+    timed.script = true;
+    write(&project, &plain, "t").unwrap();
+    write(&project.join("script"), &timed, "t").unwrap();
+    for at in [&dir, &project] {
+        let base = |script| read_baseline(at, "game-0011", "pool", script);
+        assert_eq!(base(true), Some(timed.clone()), "{}", at.display());
+        assert_eq!(base(false), Some(plain.clone()), "{}", at.display());
+    }
+    let only_plain = dir.join("plain");
+    write(&only_plain, &plain, "t").unwrap();
+    let fallback = read_baseline(&only_plain, "game-0011", "pool", true);
+    assert_eq!(
+        fallback,
+        Some(plain),
+        "the other kind, when it is all there is"
+    );
 }

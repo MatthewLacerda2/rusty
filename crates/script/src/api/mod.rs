@@ -198,6 +198,44 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     Ok(())
 }
 
+/// The named registry value holding the Rust halves of the namespace functions
+/// written in Lua, `{ <Namespace> = { <Verb> = f, ["<Verb>/<part>"] = f } }`: the
+/// Lua half calls each through this table at call time, never through a copy it
+/// kept, so a layer above (the dev layer's verb timers, `dev::stats::verbs`) can
+/// replace one, and a key's `/<part>` names one of a verb's several halves.
+pub const RUST_HALVES: &str = "rusty.rust_halves";
+
+/// The `namespace` table of [`RUST_HALVES`] on `lua`, made if missing, with
+/// `halves` set in it (a slot each, so one can be replaced without another).
+pub(crate) fn rust_halves<'f>(
+    lua: &Lua,
+    namespace: &str,
+    halves: impl IntoIterator<Item = (&'static str, &'f Function)>,
+) -> mlua::Result<Table> {
+    let table = rust_halves_table(lua, namespace)?;
+    for (key, f) in halves {
+        table.set(key, f)?;
+    }
+    Ok(table)
+}
+
+fn rust_halves_table(lua: &Lua, namespace: &str) -> mlua::Result<Table> {
+    let all: Table = match lua.named_registry_value(RUST_HALVES)? {
+        Some(all) => all,
+        None => {
+            let all = lua.create_table()?;
+            lua.set_named_registry_value(RUST_HALVES, &all)?;
+            all
+        }
+    };
+    if let Some(table) = all.get::<Option<Table>>(namespace)? {
+        return Ok(table);
+    }
+    let table = lua.create_table()?;
+    all.set(namespace, &table)?;
+    Ok(table)
+}
+
 /// A registrar a layer above the sim adds to the surface: the same shape as
 /// [`register`], run after every built-in namespace on every VM.
 pub type Extension = fn(&Lua, &ApiCtx) -> Reg;
