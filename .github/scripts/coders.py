@@ -5,12 +5,14 @@
 [`running.LIMIT`] and why (the status the orchestrator had only inside a
 refusal), the ones not counted and why, and the waiting line
 (`dispatch/waiting.py`) in launch order; then it launches from the line while
-slots are free, each launch the one `make coder` makes (`dispatch/launch.py`).
-The orchestrator's watch calls it once a minute; nothing launches without that
-call.
+slots are free, each launch the one `make coder` makes (`dispatch/launch.py`),
+under the hold and the rules `dispatch/drain.py` keeps. The orchestrator's watch
+calls it once a minute; nothing launches without that call.
 
-`--dry-run` says what it would launch, creates nothing and writes nothing.
-Exits 0, or 2 when GitHub or claude.ai failed.
+`--dry-run` says what it would drop and launch, creates nothing, writes
+nothing and takes no lock. Exits 0; 1 on a usage error; 2 when GitHub or
+claude.ai failed, the line could not be written or another session held it
+past `waiting.WAIT_SECONDS`.
 """
 
 from __future__ import annotations
@@ -22,7 +24,7 @@ from pathlib import Path
 
 import ghrest
 from coder import gh_json
-from dispatch import launch, remote, running, waiting
+from dispatch import drain, launch, remote, running, waiting
 
 
 def say(message: str) -> None:
@@ -35,7 +37,7 @@ def show(places: list[tuple[dict, str, str]], entries: list[dict]) -> None:
     for found, why in holding:
         print(f"  {running.describe(found)}: {why}")
     for found, placed, why in places:
-        if placed == "unknown" or why == running.STALE or why.startswith(running.BLOCKED):
+        if placed != "running" and running.named(placed, why):
             print(f"  not counted: {found.get('name', '?')}: {why}")
     say(f"waiting {len(entries)}" + (":" if entries else ""))
     for place, entry in enumerate(waiting.ordered(entries), 1):
@@ -59,7 +61,6 @@ def main(argv: list[str], gh=gh_json, call=remote.call, now: datetime | None = N
                 ghrest.pages(gh, f"repos/{repository}/issues/{number}/comments"))
 
     def start(number: int, issue: dict, found: dict) -> int:
-        say(f"{'would launch' if dry else 'launching'} #{number} from the line")
         try:
             return launch.create(number, issue, found, listed, call, repository, now, env, dry, say)
         except ValueError as refused:
@@ -67,20 +68,15 @@ def main(argv: list[str], gh=gh_json, call=remote.call, now: datetime | None = N
             return 2
 
     try:
-        with waiting.held(line):
-            listed = launch.routines(call)
-            places = running.placements(listed, 0, launch.github(gh, repository, now))
-            entries = waiting.load(line)
-            show(places, entries)
-            left, status = waiting.fill(entries, places, read, start, say)
-            failed = None if dry else waiting.save(line, left)
-    except remote.RemoteError as down:
+        listed = launch.routines(call)
+        places = running.placements(listed, 0, launch.github(gh, repository, now))
+        show(places, waiting.load(line))
+        holders = {running.issue(found) for found, placed, _ in places if placed == "running"}
+        return drain.run(drain.Pass(line=line, listed=listed, holders=holders, read=read,
+                                    relist=lambda: launch.routines(call), start=start, say=say, dry=dry))
+    except remote.RemoteError as down:  # waiting.Busy too
         say(str(down))
         return 2
-    if failed:
-        say(f"could not write the waiting line {line}: {failed}")
-        return 2
-    return status
 
 
 if __name__ == "__main__":

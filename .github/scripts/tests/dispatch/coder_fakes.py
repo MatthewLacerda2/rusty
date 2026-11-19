@@ -57,7 +57,16 @@ class Fake:
         self.calls.append(arguments)
         if arguments["action"] == "list":
             return 200, self.routines
-        status, answer = self.create
+        if isinstance(self.create, list):  # one answer per create, in turn; an exception is raised
+            answer = self.create.pop(0)
+            if isinstance(answer, Exception):
+                raise answer
+            status, answer = answer
+        else:
+            status, answer = self.create
+        if status in (200, 201):  # the next listing has it, not fired, made after the ask
+            made = {**arguments["body"], "enabled": True, "created_at": f"2026-10-29T15:{len(self.created()):02d}:00Z"}
+            self.routines = {**self.routines, "data": [*self.routines["data"], made]}
         return status, answer if answer is not None else {"trigger": {"id": "trig_new"}}
 
     def run(self, *argv: str, env: dict | None = None) -> tuple[int, str, str]:

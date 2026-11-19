@@ -15,7 +15,12 @@ It refuses, and starts nothing, when the issue is closed, is labelled
 (`dispatch/brief.py`). When [`running.LIMIT`] coders on other issues are
 already waiting to fire or running, it puts the issue in the waiting line
 (`dispatch/waiting.py`, #2382) and says how many are ahead; `make coders`
-launches it when a slot frees, and `--no-wait` refuses instead (#1856; a fired one is placed from its pull
+launches it when a slot frees, and `--no-wait` refuses instead. A free slot is
+not enough while the line holds others: an issue that is not within the free
+slots in the line's order waits too, and says who is ahead, so a hand launch
+never jumps a round that has waited an hour. The decision and the create hold
+the line's lock and re-list the routines first, as a `make coders` launch does
+(`dispatch/drain.py`) (#1856; a fired one is placed from its pull
 request and briefs on GitHub, #1866, `dispatch/running.py` says why; a ready pull
 request with no review record yet still holds its slot, named `in review`, #2017, and a draft whose issue has an open
 recorded blocker frees it, named `draft blocked by #M`, #2063): a re-brief of an issue is never counted against
@@ -27,15 +32,19 @@ issue, so spawning one is no work: before it, the orchestrator assembled the
 could not launch one without a Claude session.
 
 `--dry-run` prints the routine it would create and creates nothing; at the
-limit it says where the issue would wait, and writes nothing to the line. Needs the
+limit it says where the issue would wait, writes nothing and takes no lock. Needs the
 `claude` CLI signed in to claude.ai (the routines API is reached through
 `claude mcp serve`, `dispatch/remote.py`) and `gh`. `RUSTY_CLOUD_ENV` names the
 `anthropic_cloud` environment's id when no coder routine exists yet to read it
-from. Exits 0 on a launch or a place in the line, 1 on a refusal, 2 when GitHub or claude.ai failed.
+from. Exits 0 on a launch or a place in the line, 1 on a refusal or a usage
+error, 2 when GitHub or claude.ai failed, the line could not be written (after
+a launch too: the next `make coders` then drops the entry by its routine) or
+another session held the line past `waiting.WAIT_SECONDS`.
 """
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import subprocess
@@ -44,7 +53,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import ghrest
-from dispatch import brief, launch, remote, running, waiting
+from dispatch import brief, drain, launch, remote, running, waiting
 
 USAGE = "usage: coder.py ISSUE [--dry-run] [--no-wait] [--over-limit]"
 FLAGS = ("--dry-run", "--no-wait", "--over-limit")
@@ -76,18 +85,52 @@ def full(found: list[tuple[dict, str]]) -> str:
     return f"{len(found)} cloud coders already waiting or running, the limit is {running.LIMIT} (CLAUDE.md): {names}"
 
 
-def wait(line: Path, number: int, found: dict, now: datetime, dry: bool, why: str) -> int:
-    """Put #`number` in the waiting line (or, `dry`, say where it would go)."""
-    with waiting.held(line):
-        entries, added = waiting.enqueue(waiting.load(line), number, found, now)
-        failed = None if dry else waiting.save(line, entries)
-    if failed:
+def wait(line: Path, entries: list[dict], number: int, found: dict, now: datetime, dry: bool, why: str) -> int:
+    """Put #`number` in the waiting line `entries` (or, `dry`, say where it would go)."""
+    entries, added = waiting.enqueue(entries, number, found, now)
+    if not dry and (failed := waiting.save(line, entries)):
         say(f"could not write the waiting line {line}: {failed}")
         return 2
     verb = "would wait" if dry else ("waiting" if added else "already waiting")
     say(f"{why}. #{number} {verb} for a slot, {waiting.ahead(entries, number)} ahead: `make coders` "
         "launches it when one frees (ARGS=--no-wait refuses instead, --over-limit launches now)")
     return 0
+
+
+def turn(entries: list[dict], number: int, found: dict, now: datetime, free: int) -> str | None:
+    """Why #`number` must wait behind the line for one of `free` slots, or `None` when it fits:
+    a hand launch never jumps ahead of an entry asked before it in the line's order."""
+    placed, _ = waiting.enqueue([dict(e) for e in entries], number, found, now)
+    ahead = waiting.ordered(placed)[:waiting.ahead(placed, number)]
+    if len(ahead) < free:
+        return None
+    names = ", ".join(f"#{e['issue']}" + (" (round)" if e.get("round") else "") for e in ahead)
+    return f"{free} free slot(s) and {len(ahead)} ahead in the waiting line: {names}"
+
+
+def decide(argv: list[str], number: int, issue: dict, found: dict, listed: list[dict],
+           holding: list[tuple[dict, str]], call, now: datetime, env: dict, line: Path) -> int:
+    """Launch or queue #`number` on what is true now: the line and the routines read again."""
+    dry = "--dry-run" in argv
+    entries = waiting.load(line)
+    taken = {running.issue(found) for found, _ in holding}
+    if not dry:
+        taken |= drain.fresh(launch.routines(call), listed) - {number}
+    free = running.LIMIT - len(taken)
+    behind = full(holding) if free <= 0 else turn(entries, number, found, now, free)
+    if behind and "--over-limit" in argv:
+        say(f"--over-limit: launching past {behind}")
+    elif behind and "--no-wait" in argv:
+        raise brief.Refused(behind + ". Launch when one is ready and reviewed, or pass --over-limit")
+    elif behind:
+        return wait(line, entries, number, found, now, dry, behind)
+    status = launch.create(number, issue, found, listed, call, ghrest.slug(), now, env, dry, say)
+    if status == 0 and not dry and any(e["issue"] == number for e in entries):
+        if failed := waiting.save(line, waiting.without(entries, number)):
+            say(f"launched, but could not take #{number} out of the waiting line {line}: {failed}; "
+                "the next `make coders` drops it by its routine")
+            return 2
+    return status
 
 
 def main(argv: list[str], gh=gh_json, call=remote.call, now: datetime | None = None,
@@ -109,26 +152,16 @@ def main(argv: list[str], gh=gh_json, call=remote.call, now: datetime | None = N
         found = brief.read(issue, comments)
         listed = launch.routines(call)
         holding = counted(listed, number, launch.github(gh, repository, now))
-        if len(holding) >= running.LIMIT:
-            if "--no-wait" in argv:
-                raise brief.Refused(full(holding) + ". Launch when one is ready and reviewed, or pass --over-limit")
-            if "--over-limit" not in argv:
-                return wait(line, number, found, now, dry, full(holding))
-            say(f"--over-limit: launching past {full(holding)}")
-        status = launch.create(number, issue, found, listed, call, repository, now,
-                               os.environ if env is None else env, dry, say)
+        # the decision and the create under the line's lock, as `make coders` launches (dispatch/drain.py)
+        with contextlib.nullcontext() if dry else waiting.held(line, say):
+            return decide(argv, number, issue, found, listed, holding, call, now,
+                          os.environ if env is None else env, line)
     except ValueError as refused:  # brief.Refused, or a brief URL that is not this issue's
         say(f"refused: {refused}")
         return 1
-    except remote.RemoteError as failed:
+    except remote.RemoteError as failed:  # waiting.Busy too
         say(str(failed))
         return 2
-    if status == 0 and not dry:
-        with waiting.held(line):
-            entries = waiting.load(line)
-            if any(e["issue"] == number for e in entries):
-                waiting.save(line, waiting.without(entries, number))
-    return status
 
 
 if __name__ == "__main__":

@@ -30,7 +30,8 @@ coder *changing* it must know.
   command lines. A new concern is a new module, not a longer one.
 - **`.github/scripts/dispatch/` is the batch's dispatch steps**: the brief, the coder's
   routine, the routines API, the coders waiting for a slot (`dispatch/waiting.py`, kept in
-  `merge-queue/coders-waiting.json` through `merging/state.py`), the review level, the
+  `merge-queue/coders-waiting.json` through `merging/state.py`, and launched from it under
+  its lock by `dispatch/drain.py`), the review level, the
   re-brief counts. `coder.py`, `coders.py`, `review-level.py` and `rebriefs.py` are only
   the command lines. The routines API is
   reached through `claude mcp serve` (`dispatch/remote.py` says why), never with a

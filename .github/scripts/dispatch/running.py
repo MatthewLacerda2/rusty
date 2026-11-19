@@ -232,9 +232,15 @@ def coders(routines: list[dict], launching: int,
     for found, placed, why in placements(routines, launching, github):
         if placed == "running":
             counted.append((found, why))
-        elif placed == "unknown" or why == STALE or why.startswith(BLOCKED):
+        elif named(placed, why):
             noted.append((found, placed, why))
     return counted, noted
+
+
+def named(placed: str, why: str) -> bool:
+    """Whether an uncounted coder is worth saying: one that cannot be placed, one [`STALE`], one
+    parked on a blocker ([`BLOCKED`]). `make coder` and `make coders` both name these."""
+    return placed == "unknown" or why == STALE or why.startswith(BLOCKED)
 
 
 def describe(found: dict, why: str = "") -> str:

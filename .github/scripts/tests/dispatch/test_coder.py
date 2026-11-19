@@ -29,7 +29,7 @@ class Launch(unittest.TestCase):
     def test_rusty_cloud_env_skips_the_lookup(self):
         fake = Fake()
         self.assertEqual(fake.run("9", env={"RUSTY_CLOUD_ENV": "env_set"})[0], 0)
-        self.assertEqual([c["action"] for c in fake.calls], ["list", "create"])
+        self.assertEqual([c["action"] for c in fake.calls], ["list", "list", "create"])  # the 2nd under the lock
         self.assertEqual(fake.created()[0]["job_config"]["ccr"]["environment_id"], "env_set")
 
     def test_a_dry_run_prints_the_body_and_creates_nothing(self):

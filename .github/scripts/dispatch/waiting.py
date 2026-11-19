@@ -15,29 +15,37 @@ a tool can hold.
   `Brief`, `rebriefs.ROUND`) ahead of a first launch, since a draft with
   findings open is nearly done and CLAUDE.md's merge order favours finishing;
   then the order asked.
-- **Nothing launches by itself**: [`fill`] runs only when `make coders` is
+- **Nothing launches by itself**: `dispatch/drain.py` runs only when `make coders` is
   called (the orchestrator's watch, once a minute), never from a daemon, so
   there is no process to keep alive across a reboot.
 - **The line is a file in the common git directory** ([`FILE`], beside the merge
   queue's state), written whole through `merging/state.py`, so a reboot keeps it
-  and every session on the machine sees one line. A read-modify-write holds
-  [`held`]'s `flock`, so two sessions never launch one entry twice.
+  and every session on the machine sees one line. Every write, and every launch
+  that writes, holds [`held`]'s `flock`; `dispatch/drain.py` says what it covers.
+- **The lock is waited on for [`WAIT_SECONDS`], not forever** (the review of
+  #2393: a `make coder` during a slow pass hung silently): past that it raises
+  [`Busy`] naming who holds it, from the note the holder writes in the lock
+  file, and the command exits 2. A dry run never takes it, so it creates no
+  directory and no file.
 - **Every entry is re-read before it launches** ([`refresh`]): one whose issue
   closed or took a stage label, or whose newest brief is refused, is dropped
-  and said; one whose newest `Brief` changed since it was queued launches on the
-  newer one, once, and says so. Nothing is launched stale.
+  and said; one whose newest `Brief` changed since it was queued takes the
+  newer one, and says so. Nothing is launched stale.
 """
 
 from __future__ import annotations
 
 import contextlib
 import fcntl
+import os
 import subprocess
-from datetime import datetime
+import sys
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from dispatch import brief, rebriefs, running
+from dispatch import brief, rebriefs, remote
 from merging import state as files
 
 #: Where the line lives, under the common git directory.
@@ -51,13 +59,48 @@ def path(root: str = ".") -> Path:
     return Path(root, done.stdout.strip() or ".git", FILE)
 
 
+#: How long a command waits for another session's hold on the line: one hold covers a routines
+#: listing and a create, each up to `remote.TIMEOUT_SECONDS`.
+WAIT_SECONDS = 2 * remote.TIMEOUT_SECONDS + 20
+
+
+class Busy(remote.RemoteError):
+    """The line stayed held past [`WAIT_SECONDS`]; the message names the holder."""
+
+
 @contextlib.contextmanager
-def held(line: Path):
-    """An exclusive `flock` beside `line` for a read-modify-write; the kernel drops it on any exit."""
+def held(line: Path, say: Callable[[str], None] | None = None, wait: float | None = None,
+         clock=time.monotonic, sleep=time.sleep):
+    """An exclusive `flock` beside `line` for a read-modify-write, waited on for `wait` seconds
+    (said once if it must wait), then [`Busy`]. The kernel drops it on any exit."""
+    wait = WAIT_SECONDS if wait is None else wait
     line.parent.mkdir(parents=True, exist_ok=True)
-    with open(line.with_suffix(".lock"), "a") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with open(line.with_suffix(".lock"), "a+") as lock:
+        deadline, told = clock() + wait, False
+        while True:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if clock() >= deadline:
+                    raise Busy(f"the waiting line {line} is still held by {holder(lock)} "
+                               f"after {wait:.0f} s; nothing done") from None
+                if say and not told:
+                    say(f"waiting for the line, held by {holder(lock)}")
+                    told = True
+                sleep(0.5)
+        lock.seek(0)
+        lock.truncate()
+        lock.write(f"pid {os.getpid()} ({' '.join(sys.argv) or '?'}), "
+                   f"since {datetime.now(timezone.utc):%Y-%m-%dT%H:%M:%S}Z\n")
+        lock.flush()
         yield
+
+
+def holder(lock) -> str:
+    """The note the session holding `lock` wrote, or `another session`."""
+    lock.seek(0)
+    return lock.read().strip() or "another session"
 
 
 def readable(entry: object) -> bool:
@@ -106,7 +149,8 @@ def without(entries: list[dict], number: int) -> list[dict]:
     return [e for e in entries if e["issue"] != number]
 
 
-def refresh(entry: dict, issue: dict | None, comments: list | None, say: Callable[[str], None]) -> dict | None:
+def refresh(entry: dict, issue: dict | None, comments: list | None, say: Callable[[str], None],
+            dry: bool = False) -> dict | None:
     """The newest brief `entry` would launch on, `None` to drop it, or `{}` to keep it
     unlaunched because GitHub could not be read. Updates the entry's brief and round."""
     number = entry["issue"]
@@ -116,38 +160,11 @@ def refresh(entry: dict, issue: dict | None, comments: list | None, say: Callabl
     try:
         found = brief.read(issue, comments)
     except brief.Refused as refused:
-        say(f"#{number}: dropped from the line: {refused}")
+        say(f"#{number}: {'would be dropped' if dry else 'dropped'} from the line: {refused}")
         return None
     if found.get("html_url", "") != entry["brief"]:
-        say(f"#{number}: a newer brief since it was queued ({found.get('html_url', '')}); that one goes")
+        say(f"#{number}: a newer brief since it was queued ({found.get('html_url', '')}); "
+            "a launch from the line takes it")
         entry["brief"] = found.get("html_url", "")
     entry["round"] = is_round(found)
     return found
-
-
-def fill(entries: list[dict], places: list[tuple[dict, str, str]], read: Callable[[int], tuple],
-         launch: Callable[[int, dict, dict], int], say: Callable[[str], None]) -> tuple[list[dict], int]:
-    """Launch from the line while slots are free; the line left, and 2 if a launch failed.
-
-    `places` is [`running.placements`] with nobody left out; `read(n)` answers (issue, comments);
-    `launch(n, issue, brief)` is `launch.create`'s status. A queued issue's own coder never counts
-    against it (the re-brief rule), and each launch takes a slot for the rest of the pass."""
-    holders = {running.issue(found) for found, placed, _ in places if placed == "running"}
-    read_back = {}
-    for entry in entries:
-        issue, comments = read(entry["issue"])
-        found = refresh(entry, issue, comments, say)
-        if found is not None:
-            read_back[entry["issue"]] = (entry, issue, found)
-    left, launched, status = [], set(), 0
-    for entry in ordered([e for e, _, _ in read_back.values()]):
-        number = entry["issue"]
-        _, issue, found = read_back[number]
-        if status or not found or len((holders | launched) - {number}) >= running.LIMIT:
-            left.append(entry)
-        elif launch(number, issue, found) == 0:
-            launched.add(number)
-        else:
-            status = 2
-            left.append(entry)
-    return left, status

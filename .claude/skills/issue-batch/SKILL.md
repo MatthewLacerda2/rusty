@@ -151,7 +151,9 @@ script keeps, and why:
   newest `Brief`) goes ahead of first launches, then the order asked. How a fired
   routine is placed (a ready PR holds its slot until its review record exists, so
   its re-brief has one) is `dispatch/running.py`'s docstring; a re-brief is never
-  counted against its own issue. `ARGS=--no-wait` refuses instead of queueing,
+  counted against its own issue. While the line holds others, a free slot goes
+  to them first: a hand launch not within the free slots in line order waits
+  too and names who is ahead. `ARGS=--no-wait` refuses instead of queueing,
   `ARGS=--over-limit` launches anyway (a stalled draft counts until dealt with).
 - **`make coders` reads who runs and who waits, and launches from the line**
   while slots are free: every counted coder and why it counts, the uncounted ones
@@ -159,8 +161,11 @@ script keeps, and why:
   call, so while the line holds anyone run it on every event `make queue-events`
   passes and at least once a minute. Before it launches an entry it re-reads the
   issue: one closed, given a stage label or whose brief is refused is dropped and
-  said; one with a newer `Brief` than it was queued on launches on that one.
-  `ARGS=--dry-run` launches and writes nothing.
+  said; one with a newer `Brief` than it was queued on launches on that one;
+  one whose issue already has a routine made after its ask and its brief was
+  launched (a pass cut short) and is dropped, never launched twice. A command
+  that finds another session holding the line waits a few minutes, then exits 2
+  naming the holder. `ARGS=--dry-run` launches, writes and locks nothing.
 - `run_once_at` computed, `allowed_tools` with `ToolSearch` (the GitHub MCP tools
   load through it without being listed), and the prompt below.
 - **The prompt names the brief's URL**, the exact comment the script checked,
