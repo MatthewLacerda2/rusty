@@ -19,15 +19,13 @@ pub struct Package<'a> {
     pub files: Vec<&'a str>,
 }
 
-impl Package<'_> {
-    /// Whether the manifest's `[dependencies]` or `[dev-dependencies]` (per-target
-    /// ones too) name `dep` (`rusty-dev`).
-    pub fn names(&self, dep: &str) -> bool {
-        let key = dep.replace('-', "_");
-        let mut named = crate::layers::manifest_dependencies(&self.text);
-        named.extend(crate::layers::manifest_dev_dependencies(&self.text));
-        named.iter().any(|k| *k == key)
-    }
+/// Whether the manifest `text`'s `[dependencies]` or `[dev-dependencies]`
+/// (per-target ones too) name `dep` (`rusty-dev`).
+pub fn names(text: &str, dep: &str) -> bool {
+    let key = dep.replace('-', "_");
+    let mut named = crate::layers::manifest_dependencies(text);
+    named.extend(crate::layers::manifest_dev_dependencies(text));
+    named.iter().any(|k| *k == key)
 }
 
 pub struct Scan {

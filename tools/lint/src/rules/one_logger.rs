@@ -13,7 +13,7 @@
 //! by another crate.
 
 use super::finding::Finding;
-use super::scan::Scan;
+use super::scan::{names, Scan};
 use crate::code::{bare_lines, is_ident};
 use crate::layers::flatten_use;
 
@@ -29,12 +29,7 @@ const GLOB: &str = "__glob__";
 /// Findings on the lines of `source` (at `path`) that name test-support's capture,
 /// when its package's `manifest` text names `rusty-logging`.
 pub fn check(path: &str, manifest: &str, source: &str) -> Vec<Finding> {
-    let package = super::scan::Package {
-        manifest: String::new(),
-        text: manifest.to_string(),
-        files: Vec::new(),
-    };
-    match package.names("rusty-logging") {
+    match names(manifest, "rusty-logging") {
         true => found(path, source),
         false => Vec::new(),
     }
@@ -60,7 +55,7 @@ fn found(path: &str, source: &str) -> Vec<Finding> {
         .filter(|(_, tree)| {
             flatten_use(&tree.replace('*', GLOB))
                 .iter()
-                .any(|(p, _)| names(p, &roots))
+                .any(|(p, _)| brings_logs(p, &roots))
         })
         .map(|&(at, _)| line(at))
         .collect();
@@ -73,7 +68,7 @@ fn found(path: &str, source: &str) -> Vec<Finding> {
 }
 
 /// Whether a flattened `use` path brings in `logs` through one of `roots`.
-fn names(path: &[String], roots: &[String]) -> bool {
+fn brings_logs(path: &[String], roots: &[String]) -> bool {
     matches!(path, [root, next, ..] if roots.contains(root) && (next == "logs" || next == GLOB))
 }
 
@@ -120,8 +115,12 @@ fn finding(path: &str, line: usize) -> Finding {
 pub fn run(scan: &Scan) -> Vec<Finding> {
     scan.packages()
         .iter()
-        .filter(|p| p.names("rusty-logging"))
-        .flat_map(|p| p.files.iter().flat_map(|f| found(f, scan.source(f))))
+        .flat_map(|p| {
+            p.files
+                .iter()
+                .flat_map(|f| check(f, &p.text, scan.source(f)))
+                .collect::<Vec<_>>()
+        })
         .collect()
 }
 

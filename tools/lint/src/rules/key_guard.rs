@@ -17,7 +17,7 @@
 //! (`Allow::Never`): a manifest line takes no inline allow.
 
 use super::finding::Finding;
-use super::scan::{Package, Scan};
+use super::scan::{names, Scan};
 use crate::code::bare_lines;
 
 pub const RULE: &str = "key-guard";
@@ -36,20 +36,10 @@ fn expands(source: &str) -> bool {
 pub fn check<'a>(
     manifest: &str,
     text: &str,
-    sources: impl Iterator<Item = &'a str>,
+    mut sources: impl Iterator<Item = &'a str>,
 ) -> Option<Finding> {
-    let package = Package {
-        manifest: manifest.to_string(),
-        text: text.to_string(),
-        files: Vec::new(),
-    };
-    held(&package, sources)
-}
-
-/// [`check`] on a package already read.
-fn held<'a>(package: &Package, mut sources: impl Iterator<Item = &'a str>) -> Option<Finding> {
-    (package.names("rusty-dev") && !sources.any(expands)).then(|| Finding {
-        path: package.manifest.clone(),
+    (names(text, "rusty-dev") && !sources.any(expands)).then(|| Finding {
+        path: manifest.to_string(),
         line: 1,
         rule: RULE,
         message: "this package depends on `rusty-dev`, so its test binary links the provider \
@@ -64,7 +54,7 @@ fn held<'a>(package: &Package, mut sources: impl Iterator<Item = &'a str>) -> Op
 pub fn run(scan: &Scan) -> Vec<Finding> {
     scan.packages()
         .iter()
-        .filter_map(|p| held(p, p.files.iter().map(|f| scan.source(f))))
+        .filter_map(|p| check(&p.manifest, &p.text, p.files.iter().map(|f| scan.source(f))))
         .collect()
 }
 
