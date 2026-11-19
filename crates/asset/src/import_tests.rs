@@ -108,7 +108,7 @@ fn a_cooked_file_is_stamped_until_its_model_changes() {
     let pending =
         || crate::cook::with_writes(true, || crate::cook::pending(model.parent().unwrap()));
     assert!(!stamped(), "nothing cooked yet");
-    assert_eq!(pending(), [model.clone()]);
+    assert_eq!(pending(), std::slice::from_ref(&model));
     crate::cook::with_writes(true, || crate::import_file(&model).unwrap());
     assert!(stamped());
     assert!(pending().is_empty());
