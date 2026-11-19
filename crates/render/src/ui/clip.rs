@@ -12,7 +12,7 @@
 //!   at the list's own edges. The shader fades coverage over that many pixels
 //!   inside the edge.
 //! - **`Mask`** (#428) — the nearest graphic mask above, by entity id. Its graphic
-//!   is rendered into a coverage texture (`effects::mask_gpu`) that already
+//!   is rendered into a coverage texture (`effects::mask::gpu`) that already
 //!   includes every mask above it, so nesting composes by construction and a batch
 //!   samples only one texture. Its rect also joins the bounds, hard.
 
