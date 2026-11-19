@@ -4,10 +4,9 @@
 //! shooter-shaped stress scene ([`stress`]) onto the default yard, warms up, then
 //! `Harness.Bench(n)` steps and renders `n` frames, sampling each one, and prints
 //! a short report — frame, render and GPU ms (average and p95), GPU ms per pass,
-//! draw calls, triangles, dropped and culled counts, the Hi-Z culls and the
-//! renderer's GPU calls (passes, submits, bind groups made, buffer writes), every system's CPU ms
-//! (`cpu.<system>`, as the schedule names it) and the renderer's CPU ms by stage
-//! (`render.<stage>`, `Renderer::frame_stages`), each set with an `other` row for
+//! draw calls, triangles, dropped and culled counts, the Hi-Z culls, the GPU calls
+//! (passes, submits, bind groups made, buffer writes), each system's CPU ms
+//! (`cpu.<system>`) and the renderer's by stage (`render.<stage>`), each set with an `other` row for
 //! what none of its parts holds. A stage timed in parts (the Hi-Z `occlusion`
 //! stage, #2401) adds `render.<stage>.<part>` and `gpu.<pass>.<part>` rows beside
 //! its own, which they sit inside: no sum of a set counts them.
@@ -17,29 +16,28 @@
 //! before, so measuring an optimisation is: run, change, run.
 //!
 //! **GPU rows are clock-normalised** (`clock`, #862): a fixed probe timed beside
-//! every frame divides out the GPU governor's clock, so `gpu_ms` and `gpu.<pass>`
-//! move with the work, not with how idle the GPU was. `gpu_ms` is the passes' sum,
-//! busy time only; `gpu.other` is untimed GPU work inside a submit, scaled like
-//! the rows. `gpu_between_submits_ms` is the GPU's wait for the CPU between submits
-//! (with any command at a submit's edge), **not** scaled: a wait does not shrink
-//! when the GPU's clock rises, and scaling it would understate it most where the
-//! governor idles the GPU furthest. The three partition the frame's timed span
-//! (`rusty_render::GpuTimes`). `gpu_raw_ms` is the time as measured and
-//! `gpu_clock_pct` the clock it ran at.
+//! every frame divides out the GPU governor's clock, so `gpu_ms` (the passes' busy
+//! sum) and `gpu.<pass>` move with the work, not with how idle the GPU was;
+//! `gpu.other`, untimed work inside a submit, is scaled like them.
+//! `gpu_between_submits_ms`, the GPU's wait for the CPU between submits (with any
+//! command at a submit's edge), is **not**: a wait does not shrink when the clock
+//! rises, and scaling it would understate it most where the GPU idles furthest.
+//! The three partition the frame's timed span (`rusty_render::GpuTimes`);
+//! `gpu_raw_ms` is the time as measured, `gpu_clock_pct` the clock it ran at.
 //!
 //! **CPU rows are clock-normalised the same way** (#1719): a fixed CPU probe timed
 //! right before and after each sim step scales `cpu_ms` and `cpu.<system>` to the
 //! reference CPU clock; `frame_ms` is the sim's time as measured and
-//! `cpu_clock_pct` the clock it ran at. When that clock or the CPU time spreads
-//! across the window, or the clock moved since the last run, the report says so.
+//! `cpu_clock_pct` the clock it ran at; the report says when either spreads across
+//! the window, or the clock moved since the last run.
 //!
-//! It is an informational signal, never a gate: timings are this machine's, and a
-//! CI runner's software GPU makes them meaningless. Only the counts are portable.
-//! The scene is deterministic (fixed dt, seeded scripts, no RNG in placement), so
-//! two runs on one machine measure the same frames.
+//! A signal, never a gate: timings are this machine's (a CI runner's software GPU
+//! makes them meaningless), only the counts portable. The scene is deterministic
+//! (fixed dt, seeded scripts, no RNG in placement): one machine, the same frames.
 //!
 //! `make bench-scenes` ([`scenes`]) measures a game project's own scenes the same
-//! way, from deterministic viewpoints, with load time and memory beside.
+//! way, from deterministic viewpoints, with load time and memory beside; its
+//! `SCRIPT=1` adds the `script.` rows ([`verbs`]).
 
 mod clock;
 mod lua;
@@ -47,6 +45,7 @@ mod report;
 mod rig;
 pub mod scenes;
 pub mod stress;
+pub mod verbs;
 
 pub use lua::register;
 pub(crate) use lua::spec_from_lua;
@@ -103,6 +102,7 @@ pub(crate) fn measure_posed(
     // The first dispatch pays for setting the pipeline up: not a reading.
     time_probe(probe, harness);
     clock::cpu_probe_ms();
+    let mut verbs = verbs::Window::start();
     for _ in 0..ticks {
         if harness.world.borrow().quit_requested() {
             break;
@@ -114,11 +114,10 @@ pub(crate) fn measure_posed(
         let before = time_probe(probe, harness);
         let frame = harness.render_frame();
         let after = time_probe(probe, harness);
-        let speed = Speeds {
-            cpu,
-            gpu: clock::speed(before, after),
-        };
+        let gpu = clock::speed(before, after);
+        let speed = Speeds { cpu, gpu };
         sample(&mut samples, &harness.stats.borrow(), frame.as_ref(), speed);
+        verbs.sample(&mut samples, &harness.stats.borrow(), speed.cpu);
         samples.end_frame();
     }
     (samples.report(), samples)
