@@ -6,7 +6,7 @@ use super::clusters::plan::Plan;
 use super::clusters::{ClusterCull, ClusterDraws};
 use super::counters::Counter;
 use super::pyramid::Pyramid;
-use super::stage::lap_of;
+use super::stage::{lap_of, HOLD_LAP};
 use super::tables::Tables;
 use super::upload::{pack_bounds, Frame, Params};
 use crate::draw::resources::SolidResources;
@@ -155,6 +155,7 @@ impl Renderer {
         cam.clusters
             .counter
             .collect(&self.device, Counter::first_word);
+        self.lap(HOLD_LAP);
         let instances = &solids.draws.instances[..n as usize];
         let tested = pack_bounds(&mut cam.tables, instances, &solids.tested);
         self.lap(lap_of(GpuPart::OcclusionTest));

@@ -56,7 +56,7 @@ use super::capture::RenderedFrame;
 use super::harness::Harness;
 use report::{read, write};
 use rusty_core::frame_stats::FrameStats;
-use rusty_render::{ClockProbe, GpuPass};
+use rusty_render::{ClockProbe, GpuPart, GpuPass};
 
 /// The render counters a bench row reports, in order.
 const COUNTERS: [&str; 17] = [
@@ -167,11 +167,7 @@ fn sample(samples: &mut Samples, stats: &FrameStats, frame: Option<&RenderedFram
             let ms = ms.map_or(0.0, |m| m.1 * speed);
             samples.push(&format!("gpu.{}", pass.name()), ms);
         }
-        // A row's parts (#2401), only on a frame that timed them: inside its
-        // row, so no `gpu.<pass>` sum counts them.
-        for (part, ms) in &gpu.parts {
-            samples.push(&format!("gpu.{}", part.row()), ms * speed);
-        }
+        push_gpu_parts(samples, &gpu.parts, speed);
         samples.push("gpu.other", gpu.other_ms * speed);
         // The GPU's wait for the CPU: as measured, a clock does not shorten it.
         samples.push("gpu_between_submits_ms", gpu.between_submits_ms);
@@ -182,6 +178,26 @@ fn sample(samples: &mut Samples, stats: &FrameStats, frame: Option<&RenderedFram
         if COUNTERS.contains(&key) {
             samples.push(key, value as f64);
         }
+    }
+}
+
+/// A pass's parts (#2401) as `gpu.<pass>.<part>` rows, inside their pass's row,
+/// so no `gpu.<pass>` sum counts them. On a frame that timed any part of a pass,
+/// every part of it is sampled, zero when absent (the cluster cull on a frame
+/// with no clustered batch), so each part is averaged over the same frames and
+/// viewpoints as its pass and the parts sum to it after the fold. A pass no
+/// frame timed in parts (the cull off) has no part rows at all, on purpose: the
+/// rows say the stage was split, a zero would say it was split and empty.
+fn push_gpu_parts(samples: &mut Samples, parts: &[(GpuPart, f64)], speed: f64) {
+    for part in GpuPart::ALL {
+        if !parts.iter().any(|(p, _)| p.pass() == part.pass()) {
+            continue;
+        }
+        let ms = parts.iter().find(|(p, _)| *p == part);
+        samples.push(
+            &format!("gpu.{}", part.row()),
+            ms.map_or(0.0, |m| m.1 * speed),
+        );
     }
 }
 

@@ -78,7 +78,8 @@ fn stage_timed(n: usize, timed: bool) -> Option<(u32, u32, u32, u64)> {
 }
 
 /// The stage's CPU laps (`render.occlusion.<part>`), in the order first lapped.
-const PARTS: [&str; 6] = [
+const PARTS: [&str; 7] = [
+    "occlusion.hold",
     "occlusion.test",
     "occlusion.clusters",
     "occlusion.select",

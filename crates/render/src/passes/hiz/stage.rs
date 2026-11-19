@@ -39,7 +39,8 @@ impl Renderer {
         // close inside a pass; any other frame takes no pair, so it records the
         // parts after phase one in one pass (#2327).
         let (timer, split) = (&self.gpu_timer, self.gpu_timer.splits());
-        let open = timer.part_compute_writes(GpuPart::OcclusionSelect);
+        let pair = |part| split.then(|| timer.part_compute_writes(part)).flatten();
+        let open = pair(GpuPart::OcclusionSelect);
         let mut encoder = self.device.create_command_encoder(&Default::default());
         let mut select = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("Hi-Z Select"),
@@ -55,7 +56,7 @@ impl Renderer {
         self.lap(lap_of(GpuPart::OcclusionPhaseOne));
         let at = (&view.depth_view, ctx.view_proj);
         let cull = (&mut *cam, &mut *pyramid, &plan);
-        last.clusters = self.record_cull(&mut encoder, cull, at, (n, batches));
+        last.clusters = self.record_cull(&mut encoder, cull, at, (n, batches, split));
         let args = (cam.args[1].buffer(), ARGS * u64::from(batches));
         cam.counter.copy(&self.device, &mut encoder, args);
         self.lap(lap_of(GpuPart::OcclusionTest));
@@ -71,8 +72,8 @@ impl Renderer {
     }
 
     /// Record everything after phase one: the pyramid over `depth`, the test,
-    /// the compaction and `plan`'s cluster cull. On a timed frame
-    /// (`GpuTimer::splits`) in one pass per part, each its own pair (#2401);
+    /// the compaction and `plan`'s cluster cull. When `split` (the stage's one
+    /// read of `GpuTimer::splits`) in one pass per part, each its own pair (#2401);
     /// otherwise in one compute pass (#2327), wgpu ordering the dispatches
     /// inside it, each reading what the one before wrote.
     /// Laps the CPU's parts. Returns the clustered batches' draws.
@@ -81,7 +82,7 @@ impl Renderer {
         encoder: &mut wgpu::CommandEncoder,
         (cam, pyramid, plan): (&mut CameraCull, &mut Pyramid, &Plan),
         (depth, view_proj): (&wgpu::TextureView, glam::Mat4),
-        (n, batches): (u32, u32),
+        (n, batches, split): (u32, u32, bool),
     ) -> Option<ClusterDraws> {
         let clustered = !plan.runs.is_empty();
         if clustered {
@@ -98,7 +99,10 @@ impl Renderer {
                     dispatch(pass, (&self.hiz.test, &groups[1]), n);
                     dispatch(pass, (&self.hiz.compact, &groups[1]), batches);
                 }
-                _ => self.record_clusters(pass, (clusters, plan)),
+                GpuPart::OcclusionClusters => self.record_clusters(pass, (clusters, plan)),
+                GpuPart::OcclusionSelect | GpuPart::OcclusionPhaseOne => {
+                    unreachable!("recorded by `cull_by_hiz` before phase one ends")
+                }
             }
             self.lap(lap_of(part));
         };
@@ -113,7 +117,7 @@ impl Renderer {
             };
             encoder.counted_compute_pass(&desc).forget_lifetime()
         };
-        if self.gpu_timer.splits() {
+        if split {
             for part in parts {
                 let writes = self.gpu_timer.part_compute_writes(part);
                 record(&mut begin(encoder, lap_of(part), writes), part);
@@ -130,6 +134,11 @@ impl Renderer {
         drawn
     }
 }
+
+/// The stage's CPU lap before its parts: making room for the camera (and the
+/// pyramid's allocation on a resize) and collecting last frame's counters, kept
+/// apart so a resize spike is never read as a part's.
+pub(super) const HOLD_LAP: &str = "occlusion.hold";
 
 /// The CPU lap a part of the stage is timed in, and its pass's label when it
 /// is a pass of its own: `render.occlusion.<part>` in the bench (#2401). The
