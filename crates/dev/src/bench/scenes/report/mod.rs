@@ -244,9 +244,16 @@ pub fn read(out_dir: &Path, scene: &str) -> Option<SceneReport> {
 
 /// The scene's report in a kept baseline `dir` (`BEFORE=<dir>`): a copy of a
 /// project's report folder (`<dir>/<scene>.json`), or a copy of the whole
-/// `out/bench/scenes/` holding it under its project's key (`<dir>/<key>/`).
-pub fn read_baseline(dir: &Path, key: &str, scene: &str) -> Option<SceneReport> {
-    read(dir, scene).or_else(|| read(&dir.join(key), scene))
+/// `out/bench/scenes/` holding it under its project's key (`<dir>/<key>/`); for
+/// a `SCRIPT=1` run (`script`), in either one's `script/` folder first. A report
+/// of the run's own kind wins; one of the other kind is returned only when the
+/// baseline holds no other, and the comparison then says so.
+pub fn read_baseline(dir: &Path, key: &str, scene: &str, script: bool) -> Option<SceneReport> {
+    let keyed = dir.join(key);
+    let folders = [dir.join("script"), keyed.join("script"), dir.into(), keyed];
+    let found: Vec<SceneReport> = folders.iter().filter_map(|d| read(d, scene)).collect();
+    let own = found.iter().position(|r| r.script == script);
+    found.into_iter().nth(own.unwrap_or(0))
 }
 
 /// Keep `report` (and the table printed for it) in `out_dir`, in the subfolders

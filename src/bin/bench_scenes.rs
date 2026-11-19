@@ -29,9 +29,10 @@
 //! import cache and loads its first scene (`--import-out`, `scenes::import`),
 //! handing both's time to that scene's run as `--import-ms`. `--set` overrides the
 //! running quality preset in every child (`scenes::set`). `--script` times the
-//! scripts' engine verbs in the timed child (`bench::verbs`), its reports kept apart
-//! under `<out_dir>/<project>-<hash>/script/`, so a plain run's history is never
-//! compared with one; `--pending-imports` lists
+//! scripts' engine verbs in the timed child (`bench::verbs`), and every child of
+//! the run writes under `<out_dir>/<project>-<hash>/script/`, so a plain run's
+//! history is never compared with one and a `--profile` beside it (played without
+//! the timers) is kept and checked there; `--pending-imports` lists
 //! the images an import would encode, exiting 1 if any. The project is not written.
 
 use std::path::{absolute, Path, PathBuf};
@@ -50,7 +51,9 @@ const USAGE: &str = "usage: bench-scenes --project <dir> [--scenes <a,b>] [--siz
 /// What one invocation was asked for.
 struct Run {
     project: PathBuf,
-    /// The project's reports folder under the out dir.
+    /// The out dir as given, absolute: what each child is handed.
+    root: PathBuf,
+    /// The project's reports folder under it ([`reports_dir`]).
     out: PathBuf,
     opts: Options,
     /// How many times each scene is loaded, each in a process of its own.
@@ -59,7 +62,8 @@ struct Run {
     profile: bool,
     /// `--import`: measure `import_ms` once this run.
     import: bool,
-    /// `--script`: time the scripts' engine verbs in the timed child.
+    /// `--script`: time the scripts' engine verbs in the timed child; every
+    /// child writes under the `script/` folder.
     script: bool,
     set: Overrides,
 }
@@ -85,7 +89,8 @@ fn main() {
         fail("bench-scenes needs one out_dir")
     };
     let key = scenes::out_key(&project);
-    let out = reports_dir(out, &key, a.script);
+    let root = absolute(out).unwrap_or_else(|_| PathBuf::from(out));
+    let out = reports_dir(&root, &key, a.script);
     let opts = Options {
         size: a.size.unwrap_or(scenes::DEFAULT_SIZE),
         runs: a.runs.unwrap_or(scenes::RUNS),
@@ -93,6 +98,7 @@ fn main() {
     };
     let run = Run {
         project,
+        root,
         out,
         opts,
         load_runs: a.load_runs.unwrap_or(scenes::LOAD_RUNS),
@@ -113,12 +119,10 @@ fn main() {
     }
 }
 
-/// The project's reports folder under the out dir `out`: `<out>/<key>`, and its
-/// `script/` for a `--script` run, so a plain run's history never meets one.
-fn reports_dir(out: &str, key: &str, script: bool) -> PathBuf {
-    let dir = absolute(out)
-        .unwrap_or_else(|_| PathBuf::from(out))
-        .join(key);
+/// The project's reports folder under the out dir `root`: `<root>/<key>`, and
+/// its `script/` for a `--script` run, so a plain run's history never meets one.
+fn reports_dir(root: &Path, key: &str, script: bool) -> PathBuf {
+    let dir = root.join(key);
     if script {
         dir.join("script")
     } else {

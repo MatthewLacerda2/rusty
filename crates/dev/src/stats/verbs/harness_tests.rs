@@ -1,5 +1,5 @@
-//! The verb timers on a played scene: off unless armed, and an armed run plays
-//! the same frames as a plain one.
+//! The verb timers on a played scene: off unless armed, armed per thread, and
+//! an armed run plays the same frames as a plain one.
 
 use crate::harness::Harness;
 
@@ -24,8 +24,18 @@ fn a_plain_run_wraps_nothing() {
 #[test]
 fn an_armed_run_times_the_bots_verbs_and_plays_the_same_frames() {
     let (plain, _) = played("verbs_before");
-    arm();
-    let (timed, frame) = played("verbs_after");
+    // Armed on a thread of its own: the arm dies with it, and this thread's VMs
+    // (every other test's, in one process) stay bare.
+    let armed_run = std::thread::spawn(|| {
+        arm();
+        played("verbs_after")
+    });
+    let (timed, frame) = armed_run.join().expect("the armed run");
+    let (_, after) = played("verbs_plain_again");
+    assert!(
+        !armed() && after.verbs.is_empty(),
+        "the arm stayed on its thread"
+    );
     assert_eq!(plain, timed, "the wrappers change nothing a frame shows");
     assert!(!frame.verbs.is_empty(), "the bot calls verbs every tick");
     assert!(frame

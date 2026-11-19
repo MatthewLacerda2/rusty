@@ -11,7 +11,7 @@ use super::{take, Verb};
 /// A VM with a `Fake` namespace: `Cheap`, `Sleep(ms)`, `Fail` (a Rust error),
 /// `Reenter(f)` (calls `f` back from Rust, as `Move` raises its hits) and `Lua`
 /// (a function written in Lua); and a lowercase `fake` table with a Rust function.
-fn vm(wrapped: bool) -> Lua {
+pub(super) fn vm(wrapped: bool) -> Lua {
     let lua = Lua::new();
     let fake = lua.create_table().unwrap();
     let cheap = lua.create_function(|_, n: f64| Ok(n + 1.0)).unwrap();
@@ -39,7 +39,7 @@ fn vm(wrapped: bool) -> Lua {
     lua
 }
 
-fn verb<'a>(verbs: &'a [Verb], name: &str) -> Option<&'a Verb> {
+pub(super) fn verb<'a>(verbs: &'a [Verb], name: &str) -> Option<&'a Verb> {
     verbs.iter().find(|v| v.name == name)
 }
 
@@ -164,3 +164,6 @@ fn a_verb_left_by_an_error_closes_and_the_next_call_counts() {
 
 #[path = "harness_tests.rs"]
 mod harness_tests;
+
+#[path = "reentry_tests.rs"]
+mod reentry_tests;

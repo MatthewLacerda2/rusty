@@ -13,22 +13,30 @@
 //! A per-thread stack of open calls subtracts what ran nested: a verb's time is
 //! its own engine work, the re-entered Lua is Lua's, and a nested verb is its own.
 //! While a verb is open a call hook watches for Lua being re-entered, the only
-//! time one is set, so Lua that runs outside any verb pays nothing for it.
+//! time one is set, so Lua that runs outside any verb pays nothing for it. A
+//! re-entered stretch ends when the function that opened it returns, found by its
+//! depth on the Lua stack, so an error a handler catches itself (`pcall`), whose
+//! unwound frames run no return hook, still closes it where it ends.
 //!
-//! **Off unless armed.** Extensions are process-wide and a running VM keeps the
-//! surface it started with, so a run arms before its first VM and never disarms:
-//! a plain run never wraps a thing, and its rows are what they always were.
+//! **The wrappers' own cost** (setting the hook, the clock reads) is kept apart
+//! as [`Frame::overhead_ms`], outside every verb's time and out of `script.lua`,
+//! so the remainder is the VM running scripts and not the timers.
+//!
+//! **Off unless armed, per thread.** Extensions are process-wide and a running VM
+//! keeps the surface it started with, so a run arms before its first VM. The
+//! extension is installed once a process but wraps only the VMs a thread that
+//! [`arm`]ed creates: a test that arms leaves every other thread's VMs bare, and a
+//! plain run never wraps a thing, so its rows are what they always were.
 
 use std::cell::{Cell, RefCell};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 use std::time::Instant;
 
 mod wrap;
 
-static ARMED: AtomicBool = AtomicBool::new(false);
-
 thread_local! {
+    /// Whether this thread [`arm`]ed: the VMs it creates from then on are timed.
+    static ARMED: Cell<bool> = const { Cell::new(false) };
     static RECORDER: RefCell<Recorder> = RefCell::new(Recorder::default());
     /// The system the schedule is running, set by the timing probe when armed.
     static SYSTEM: Cell<&'static str> = const { Cell::new("") };
@@ -38,21 +46,22 @@ thread_local! {
 /// of its row no verb holds.
 pub const UPDATE_SYSTEM: &str = "update_scripts";
 
-/// Time every engine verb of every Lua VM started from now on, in this process.
+/// Time every engine verb of every Lua VM this thread starts from now on.
 /// Installs the dev surface first ([`install_api`](crate::lua_surface::install_api)),
-/// so its verbs are wrapped too. Idempotent; there is no disarming.
+/// so its verbs are wrapped too. Idempotent; a thread never disarms, and the arm
+/// ends with it.
 pub fn arm() {
-    static ARM: Once = Once::new();
-    ARM.call_once(|| {
+    static INSTALL: Once = Once::new();
+    INSTALL.call_once(|| {
         crate::lua_surface::install_api();
         rusty_script::api::extend(wrap::register);
-        ARMED.store(true, Ordering::Relaxed);
     });
+    ARMED.with(|a| a.set(true));
 }
 
-/// Whether [`arm`] ran in this process.
+/// Whether this thread [`arm`]ed.
 pub fn armed() -> bool {
-    ARMED.load(Ordering::Relaxed)
+    ARMED.with(Cell::get)
 }
 
 /// The schedule is about to run the system `name` (the timing probe calls it).
@@ -79,6 +88,8 @@ pub struct Frame {
     pub verbs: Vec<Verb>,
     /// The verbs' exclusive time inside [`UPDATE_SYSTEM`].
     pub update_ms: f64,
+    /// The wrappers' own time inside [`UPDATE_SYSTEM`]: neither a verb's nor Lua's.
+    pub overhead_ms: f64,
 }
 
 /// The verbs' time and calls since the last call, and start afresh. Empty when
@@ -94,8 +105,9 @@ struct Open {
     start: Instant,
     /// The time of what ran nested in it, in ms.
     nested: f64,
-    /// For re-entered Lua: the calls open in it, counted by the hook.
-    depth: u32,
+    /// For re-entered Lua: the Lua stack's depth when the function that opened
+    /// it was called; the stretch ends when that function returns or is gone.
+    level: usize,
 }
 
 #[derive(Default)]
@@ -104,37 +116,72 @@ struct Recorder {
     /// Per verb id: exclusive ms and calls since the last take.
     totals: Vec<(f64, u32)>,
     update_ms: f64,
+    overhead_ms: f64,
     stack: Vec<Open>,
 }
 
+/// What is on top of the recorder's stack, as the call hook needs it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Top {
+    Nothing,
+    Verb,
+    /// Re-entered Lua, opened at this stack depth.
+    Lua(usize),
+}
+
 impl Recorder {
+    /// The id of verb `name`: one id a name, however many VMs wrap it, so a
+    /// window spanning two VMs sums both.
     fn intern(&mut self, name: String) -> usize {
+        if let Some(id) = self.names.iter().position(|n| *n == name) {
+            return id;
+        }
         self.names.push(name);
         self.totals.push((0.0, 0));
         self.names.len() - 1
     }
 
-    /// Open verb `id`; its place on the stack, for [`Self::leave`].
-    fn enter(&mut self, id: usize) -> usize {
+    fn top(&self) -> Top {
+        match self.stack.last() {
+            None => Top::Nothing,
+            Some(Open { verb: Some(_), .. }) => Top::Verb,
+            Some(open) => Top::Lua(open.level),
+        }
+    }
+
+    /// Open verb `id`; its place on the stack, for [`Self::leave`], and when.
+    fn enter(&mut self, id: usize) -> (usize, Instant) {
         let start = Instant::now();
-        let (verb, nested, depth) = (Some(id), 0.0, 0);
+        let (verb, nested, level) = (Some(id), 0.0, 0);
         self.stack.push(Open {
             verb,
             start,
             nested,
-            depth,
+            level,
         });
-        self.stack.len() - 1
+        (self.stack.len() - 1, start)
     }
 
     /// Close the verb opened at `at`, and whatever is still open above it (Lua
-    /// an error unwound, whose returns the hook never saw).
-    fn leave(&mut self, at: usize) {
+    /// an error unwound, whose returns the hook never saw); when it closed.
+    fn leave(&mut self, at: usize) -> Instant {
         let now = Instant::now();
         while self.stack.len() > at {
             if let Some(open) = self.stack.pop() {
                 self.close(open, now);
             }
+        }
+        now
+    }
+
+    /// A wrapper spent `ms` of its own around its verb: kept apart, and out of
+    /// the time of the verb it ran nested in.
+    fn overhead(&mut self, ms: f64) {
+        if SYSTEM.with(Cell::get) == UPDATE_SYSTEM {
+            self.overhead_ms += ms;
+        }
+        if let Some(parent) = self.stack.last_mut() {
+            parent.nested += ms;
         }
     }
 
@@ -154,33 +201,33 @@ impl Recorder {
         }
     }
 
-    /// A call hook's event while a verb is open: a Lua function called with a
-    /// verb on top is Lua re-entered, which then lasts until its calls return.
-    fn event(&mut self, event: Event) {
-        let Some(top) = self.stack.last_mut() else {
-            return;
+    /// A Lua function a verb called back, at stack depth `level`: re-entered
+    /// Lua, which lasts until that function returns.
+    fn open_lua(&mut self, level: usize) {
+        let (start, nested, verb) = (Instant::now(), 0.0, None);
+        self.stack.push(Open {
+            verb,
+            start,
+            nested,
+            level,
+        });
+    }
+
+    /// A hook event at stack depth `depth`, with re-entered Lua on top: the
+    /// stretch ends at its opener's return, or at a call no deeper than it (the
+    /// opener is gone: an error unwound it and the verb went on), and the hook
+    /// then opens the next one if that call re-enters. Whether it ended, with a
+    /// verb on top now.
+    fn lua_event(&mut self, depth: usize) -> bool {
+        let Top::Lua(level) = self.top() else {
+            return false;
         };
-        match (top.verb, event) {
-            (Some(_), Event::Call { lua: true }) => {
-                let (start, nested, depth) = (Instant::now(), 0.0, 1);
-                let verb = None;
-                self.stack.push(Open {
-                    verb,
-                    start,
-                    nested,
-                    depth,
-                });
-            }
-            (None, Event::Call { .. }) => top.depth += 1,
-            (None, Event::Return) => {
-                top.depth = top.depth.saturating_sub(1);
-                if top.depth == 0 {
-                    let at = self.stack.len() - 1;
-                    self.leave(at);
-                }
-            }
-            _ => {}
+        if depth > level {
+            return false;
         }
+        let at = self.stack.len() - 1;
+        self.leave(at);
+        self.top() == Top::Verb
     }
 
     fn take(&mut self) -> Frame {
@@ -196,15 +243,20 @@ impl Recorder {
             })
             .collect();
         let update_ms = std::mem::take(&mut self.update_ms);
-        Frame { verbs, update_ms }
+        let overhead_ms = std::mem::take(&mut self.overhead_ms);
+        Frame {
+            verbs,
+            update_ms,
+            overhead_ms,
+        }
     }
 }
 
 /// What the call hook saw, as the recorder needs it. A tail call replaces the
-/// frame it leaves, so it opens nothing and is not passed.
-#[derive(Clone, Copy, Debug)]
+/// frame it leaves at the same depth, so it opens nothing and is not passed.
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum Event {
-    Call { lua: bool },
+    Call,
     Return,
 }
 

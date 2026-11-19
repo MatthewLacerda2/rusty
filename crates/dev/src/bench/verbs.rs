@@ -5,9 +5,10 @@
 //! at the reference CPU clock) and `script.<Namespace.Verb>.calls` for every verb
 //! called so far in the window, zero on a frame it was not, so each is averaged
 //! over the same frames as `cpu.update_scripts`; `script.calls`, every verb's
-//! calls; and `script.lua`, what of `cpu.update_scripts` no verb holds: the VM
-//! running the scripts, and the calls the wrappers do not see (a handle's
-//! methods). The verb rows count every system's calls (`LateUpdate`, timers,
+//! calls; `script.overhead`, the wrappers' own time inside `cpu.update_scripts`;
+//! and `script.lua`, what of `cpu.update_scripts` neither a verb nor the
+//! wrappers hold: the VM running the scripts, and the calls the wrappers do not
+//! see (a handle's methods). The verb rows count every system's calls (`LateUpdate`, timers,
 //! callbacks), so they and `script.lua` need not sum to `cpu.update_scripts`.
 //! [`keep_top`] then keeps a scene's [`TOP`] costliest verbs and sums the rest.
 
@@ -16,6 +17,12 @@ use rusty_core::frame_stats::FrameStats;
 use super::scenes::report::Row;
 use super::Samples;
 use crate::stats::verbs::{self, UPDATE_SYSTEM};
+
+/// Whether `metric` is a script row, which a viewpoint or run without it holds
+/// at zero: a verb it never called (`scenes::fold`).
+pub fn absent_is_zero(metric: &str) -> bool {
+    metric.starts_with("script.")
+}
 
 /// The verbs a scene's report lists by name; the rest are `script.other_verbs`.
 pub const TOP: usize = 10;
@@ -66,21 +73,22 @@ impl Window {
         }
         let calls: u32 = frame.verbs.iter().map(|v| v.calls).sum();
         samples.push("script.calls", f64::from(calls));
-        let lua = (update_ms - frame.update_ms).max(0.0);
+        let lua = (update_ms - frame.update_ms - frame.overhead_ms).max(0.0);
         samples.push("script.lua", lua * speed);
+        samples.push("script.overhead", frame.overhead_ms * speed);
         self.frames += 1;
     }
 }
 
 /// Keep the [`TOP`] verbs by average time, costliest first, each beside its
-/// `.calls` row, after `script.calls` and `script.lua`; sum the rest into
+/// `.calls` row, after `script.calls`, `script.lua` and `script.overhead`; sum the rest into
 /// `script.other_verbs` and `script.other_verbs.calls` (their p95 and spread the
 /// sums of the verbs', an upper bound). The other rows keep their order.
 pub fn keep_top(rows: &mut Vec<Row>) {
     let is_script = |r: &Row| r.metric.starts_with("script.");
     let (script, other): (Vec<Row>, Vec<Row>) = rows.drain(..).partition(is_script);
     *rows = other;
-    let named = |m: &str| m == "script.calls" || m == "script.lua";
+    let named = |m: &str| ["script.calls", "script.lua", "script.overhead"].contains(&m);
     rows.extend(script.iter().filter(|r| named(&r.metric)).cloned());
     let calls_of = |verb: &Row| {
         let metric = format!("{}.calls", verb.metric);

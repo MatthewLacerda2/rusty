@@ -212,7 +212,7 @@ pub fn bench(
     let previous = match &extra.baseline {
         Some(dir) => {
             report.baseline = Some(dir.display().to_string());
-            report::read_baseline(dir, &extra.key, scene)
+            report::read_baseline(dir, &extra.key, scene, report.script)
         }
         None => report::read(out_dir, scene),
     };

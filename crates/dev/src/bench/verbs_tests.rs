@@ -15,7 +15,12 @@ fn frame(verbs: &[(&str, f64, u32)], update_ms: f64) -> Frame {
             calls,
         })
         .collect();
-    Frame { verbs, update_ms }
+    let overhead_ms = 0.0;
+    Frame {
+        verbs,
+        update_ms,
+        overhead_ms,
+    }
 }
 
 #[test]
@@ -76,4 +81,16 @@ fn a_scene_with_few_verbs_has_no_other_row() {
     let mut rows = vec![row("script.A.f", 0.2), row("script.A.f.calls", 1.0)];
     keep_top(&mut rows);
     assert_eq!(rows.len(), 2);
+}
+
+#[test]
+fn the_wrappers_own_time_is_a_row_of_its_own_and_not_luas() {
+    let (mut window, mut samples) = (Window::default(), Samples::default());
+    let mut timed = frame(&[("A.f", 0.2, 2)], 0.2);
+    timed.overhead_ms = 0.05;
+    window.push(&mut samples, &timed, 0.5, 1.0);
+    samples.end_frame();
+    assert_eq!(samples.values("script.overhead"), [0.05]);
+    let lua = samples.values("script.lua");
+    assert!((lua[0] - 0.25).abs() < 1e-9, "{lua:?}");
 }
