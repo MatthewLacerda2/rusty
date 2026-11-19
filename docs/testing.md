@@ -476,7 +476,10 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
   `temp::dir()`, which is unique to the process *and* the test (#709), and never
   `set_var` / `remove_var` / `set_current_dir`. Clippy bans those three crate-wide
   (`clippy.toml`'s `disallowed-methods`, #977): pass the value as a parameter
-  instead. Production code that really owns the process (`project::open` moving
+  instead. Nor may a test write a process-wide `static` (flip a flag, reset a
+  counter, fill a cache): keep the state on the value under test, in a
+  `thread_local!`, or in a child process; the `test-static-write` rule fails the
+  write, in a test or in a test hook (see `linting.md`). Production code that really owns the process (`project::open` moving
   the working directory) opts out inline with `#[expect(…, reason = "…")]`.
   In-crate tests have the same helper,
   `rusty_test_support::temp::dir()` (#999, `crates/test-support/`); the `test-temp-dir` rule fails a bare
