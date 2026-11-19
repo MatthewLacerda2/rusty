@@ -60,11 +60,16 @@ impl SceneReport {
 }
 
 impl SceneReport {
-    /// The notes on a stage timed in parts (#2401): the Hi-Z stage's CPU parts
+    /// The notes on a stage timed in parts (#2401): the UI stage's CPU parts
+    /// wherever a UI was prepared, the Hi-Z stage's CPU parts
     /// wherever it ran, its GPU parts only with GPU timing (an untimed frame
     /// records the stage in 2 compute passes).
-    fn part_notes(&self) -> [(bool, &'static str); 2] {
+    fn part_notes(&self) -> [(bool, &'static str); 3] {
         [
+            (
+                self.row("render.ui.layout").is_some(),
+                "(render.ui.<part>: the UI stage's CPU parts, inside its row, in no sum)",
+            ),
             (
                 self.row("render.occlusion.test").is_some(),
                 "(render.occlusion.<part>: the Hi-Z stage's CPU parts, inside its row, in no sum)",
@@ -72,7 +77,8 @@ impl SceneReport {
             (
                 self.row("gpu.occlusion.select").is_some(),
                 "(gpu.occlusion.<part>: its GPU parts, inside its row, in no sum; a timed frame \
-                 records each in a pass of its own, so 1 or 2 more compute_passes than untimed)",
+                 records each in a pass of its own, so 3 compute_passes (6 with a clustered \
+                 batch) against 2 untimed)",
             ),
         ]
     }

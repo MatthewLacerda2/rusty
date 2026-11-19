@@ -114,7 +114,7 @@ impl UiRenderer {
             bind_group_layouts: &[Some(&layout), Some(&batch_layout)],
             immediate_size: 0,
         });
-        let mask_pipeline = effects::mask_gpu::mask_pipeline(device, &shader, &pipeline_layout);
+        let mask_pipeline = effects::mask::gpu::mask_pipeline(device, &shader, &pipeline_layout);
         let blur_shader = registry.load(device, "ui_blur.wgsl", "UI Blur Shader");
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("UI Sampler"),

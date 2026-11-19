@@ -160,9 +160,13 @@ fn sample(samples: &mut Samples, stats: &FrameStats, frame: Option<&RenderedFram
     let Some(frame) = frame else { return };
     samples.push("renderer_ms", frame.cpu_ms);
     let (stages, parts) = stage_rows(&frame.stages);
-    push_parts(samples, "render", frame.cpu_ms, stages.into_iter(), 1.0);
-    for (part, ms) in parts {
-        samples.push(&format!("render.{part}"), ms);
+    push_parts(samples, "render", frame.cpu_ms, stages.iter().copied(), 1.0);
+    for &(stage, _) in &stages {
+        let of = parts
+            .iter()
+            .filter(|(p, _)| p.split_once('.').is_some_and(|(s, _)| s == stage));
+        let rows = of.map(|&(p, ms)| (format!("render.{p}"), ms));
+        samples.push_stage_parts(&format!("render.{stage}"), rows.collect::<Vec<_>>());
     }
     if let (Some(gpu), Some(speed)) = (&frame.gpu, speed.gpu) {
         samples.push("gpu_ms", gpu.total_ms() * speed);

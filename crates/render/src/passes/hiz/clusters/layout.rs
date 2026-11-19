@@ -1,5 +1,7 @@
-//! `hiz_clusters.wgsl`'s two bind group layouts (#1968): the camera's (group 0,
-//! with each batch's `Run` at a dynamic offset) and a mesh's (group 1).
+//! `hiz_clusters.wgsl`'s bind group layouts (#1968): the camera's two group 0s,
+//! each with the group's `Run` at a dynamic offset (the test's and scan's, and
+//! the copy's, which leaves out the `tally` its dispatch reads as indirect args,
+//! #2406), and a mesh's group 1.
 
 use crate::gpu::layout_entries::{storage_entry, uniform_entry};
 use crate::gpu::ops::CountedDevice as _;
@@ -21,8 +23,23 @@ fn storage(binding: u32, read_only: bool) -> wgpu::BindGroupLayoutEntry {
     }
 }
 
-/// Group 0: params, jobs, objects, visible, state (its first word the count),
-/// output indices and args, the pyramid, and the batch's `Run`.
+/// The group's `Run`, at a dynamic offset.
+fn run_entry() -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding: 8,
+        visibility: wgpu::ShaderStages::COMPUTE,
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Uniform,
+            has_dynamic_offset: true,
+            min_binding_size: wgpu::BufferSize::new(RUN_BYTES),
+        },
+        count: None,
+    }
+}
+
+/// The test's and scan's group 0: params, jobs, objects, visible, state, the
+/// tally (the count, then each group's copy dispatch), output args, the
+/// pyramid, and the group's `Run`.
 pub(crate) fn cull_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     let compute = wgpu::ShaderStages::COMPUTE;
     let pyramid = wgpu::BindGroupLayoutEntry {
@@ -32,16 +49,6 @@ pub(crate) fn cull_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
             sample_type: wgpu::TextureSampleType::Float { filterable: false },
             view_dimension: wgpu::TextureViewDimension::D2,
             multisampled: false,
-        },
-        count: None,
-    };
-    let run = wgpu::BindGroupLayoutEntry {
-        binding: 8,
-        visibility: compute,
-        ty: wgpu::BindingType::Buffer {
-            ty: wgpu::BufferBindingType::Uniform,
-            has_dynamic_offset: true,
-            min_binding_size: wgpu::BufferSize::new(RUN_BYTES),
         },
         count: None,
     };
@@ -56,7 +63,20 @@ pub(crate) fn cull_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
             storage(5, false),
             storage(6, false),
             pyramid,
-            run,
+            run_entry(),
+        ],
+    })
+}
+
+/// The copy's group 0: jobs, state, the group's `Run` and the output indices.
+pub(crate) fn copy_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("Cluster Copy"),
+        entries: &[
+            storage(1, true),
+            storage(4, false),
+            run_entry(),
+            storage(9, false),
         ],
     })
 }
@@ -69,14 +89,14 @@ pub(crate) fn mesh_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     })
 }
 
-/// Group 0 over `buffers` (bindings 0 to 6 and 8) and `pyramid` (7).
+/// A group 0 over `buffers` at `bindings` (the `Run` at 8) and, for the
+/// test's and scan's, `pyramid` (7).
 pub(super) fn cull_group(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
-    buffers: &[&wgpu::Buffer; 8],
-    pyramid: &wgpu::TextureView,
+    (bindings, buffers): (&[u32], &[&wgpu::Buffer]),
+    pyramid: Option<&wgpu::TextureView>,
 ) -> wgpu::BindGroup {
-    let bindings = [0, 1, 2, 3, 4, 5, 6, 8];
     let mut entries: Vec<_> = bindings
         .iter()
         .zip(buffers)
@@ -92,10 +112,10 @@ pub(super) fn cull_group(
             },
         })
         .collect();
-    entries.push(wgpu::BindGroupEntry {
+    entries.extend(pyramid.map(|view| wgpu::BindGroupEntry {
         binding: 7,
-        resource: wgpu::BindingResource::TextureView(pyramid),
-    });
+        resource: wgpu::BindingResource::TextureView(view),
+    }));
     device.counted_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Cluster Cull"),
         layout,
