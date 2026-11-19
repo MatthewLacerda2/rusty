@@ -11,8 +11,11 @@
 //! per-texel pick would speckle between two equally open halves at random. Every
 //! map then bakes from that one point, so the maps of a bake agree texel for
 //! texel, and the pick is the same whichever maps are asked: a bake without `ao`
-//! still traces the shared texels, and only those. A layout with no overlap has no
-//! claimant, walks once and traces nothing.
+//! still traces the shared texels, and only those, and drops the tracer after the
+//! pick. A layout with no overlap has no claimant, walks once and traces nothing
+//! (its walk still asks, per run of a triangle's texels over another's, whether
+//! the two overlap in UV); one whose every pair tied (a mirrored model) keeps the
+//! first walk's points and never walks a second time.
 //!
 //! Memory is bounded by the shared texels and the pairs, never by how many faces
 //! stack on one: an `f32` per point (its owner's openness, traced once), the pair
@@ -88,7 +91,6 @@ pub(super) fn points(
         return (first, None);
     };
     gather.flush(baked, rays);
-    drop(first);
     let texels = gather.open.iter().filter(|v| !v.is_nan()).count() as u64;
     let stacked = Stacked {
         texels,
@@ -96,11 +98,14 @@ pub(super) fn points(
     };
     let deep = (stacked.faces as f64 > DEEP * texels as f64).then_some(stacked);
     let (pairs, tie) = (gather.pairs, tie(baked.settings.ao_rays));
-    let margin = |owner: u32, claimant: u32| {
-        pairs
-            .get(&(owner, claimant))
-            .map_or(0.0, |p| (p.claimant - p.owner) / p.texels as f64)
-    };
+    let mean = |p: &Pair| (p.claimant - p.owner) / p.texels as f64;
+    if pairs.values().all(|p| mean(p) <= tie) {
+        // Every pair tied (a mirrored model): the owners keep every texel, as the
+        // first walk already holds them.
+        return (first, deep);
+    }
+    drop(first);
+    let margin = |owner: u32, claimant: u32| pairs.get(&(owner, claimant)).map_or(0.0, mean);
     let points = rasterize_claims(&surface, size.width, size.height, &mut |c: Claim| {
         let held = match c.kept.first == c.owner {
             true => tie,

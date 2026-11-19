@@ -148,6 +148,9 @@ fn walk(
     let texels = width as usize * height as usize;
     let mut owners = Owners::new(texels, claims.is_some());
     let mut out: Vec<TexelPoint> = Vec::new();
+    // The last (triangle, owner) pair asked about and whether they overlap in UV:
+    // a triangle's texels over one owner come in a run, so this asks once a run.
+    let mut last: Option<(u32, u32, bool)> = None;
     for conservative in [false, true] {
         let pass = out.len();
         let clip = |t| conservative.then(|| Clipper::new(t));
@@ -159,7 +162,22 @@ fn walk(
                 match owner {
                     Owner::Taken => continue,
                     Owner::At(slot, _) if (slot as usize) < pass => continue,
-                    _ => {}
+                    Owner::At(_, first) => {
+                        let mine = t.first as u32;
+                        let overlaps = match last {
+                            Some((a, b, v)) if (a, b) == (mine, first) => v,
+                            _ => {
+                                let theirs = overlap::uv_of(mesh, first as usize, scale);
+                                let v = overlap::in_uv(t.uv, theirs);
+                                last = Some((mine, first, v));
+                                v
+                            }
+                        };
+                        if !overlaps {
+                            continue;
+                        }
+                    }
+                    Owner::Free => {}
                 }
                 let w = match &clipper {
                     None => barycentric(t.uv, t.area, Vec2::new(x as f32 + 0.5, y as f32 + 0.5)),
@@ -168,17 +186,12 @@ fn walk(
                 let Some(w) = w else { continue };
                 let p = point(mesh, t, index as u32, w);
                 match (owner, claims.as_deref_mut()) {
-                    (Owner::At(slot, first), Some(sink)) => {
-                        let theirs = overlap::uv_of(mesh, first as usize, scale);
-                        if overlap::in_uv(t.uv, theirs) {
-                            sink(Claim {
-                                slot,
-                                owner: first,
-                                point: p,
-                                kept: &mut out[slot as usize],
-                            });
-                        }
-                    }
+                    (Owner::At(slot, first), Some(sink)) => sink(Claim {
+                        slot,
+                        owner: first,
+                        point: p,
+                        kept: &mut out[slot as usize],
+                    }),
                     _ => {
                         owners.take(index, out.len(), p.first);
                         out.push(p);

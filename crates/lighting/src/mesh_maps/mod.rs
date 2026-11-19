@@ -3,8 +3,9 @@
 //! can read it (`Texture.BakeMeshMaps`, the `image` op). Edge wear follows the
 //! model's real edges, grime its real cavities, dust its up-facing faces.
 //!
-//! Every map walks the model the way the lightmap bake walks a lightmap
-//! (`lightmap::rasterize_surface`): each texel a triangle covers becomes a point on
+//! Every map bakes from one walk of the model, the lightmap bake's own walk asked
+//! for every triangle sharing a texel (`lightmap::rasterize_claims`, through
+//! `overlap`): each texel a triangle covers becomes a point on
 //! the mesh, inset from the triangle's edges, and the empty texels around a UV
 //! island are filled [`MARGIN`] texels deep so a filtered or mipped read never
 //! seams. Rays go through the lightmapper's `Rays`. Per map:
@@ -39,10 +40,12 @@
 //! points take 128 MiB and 512 MiB less). A UV layout with gutters covers less; a
 //! non-square map holds its own `width × height` texels. More rays cost time, not
 //! memory. Before the maps, the walk holds a 4-byte owner per texel and a 4-byte
-//! owner's triangle per point; a model whose UVs overlap walks twice and adds an
-//! `f32` per point, a sum per overlapping pair of triangles and a block of claims
-//! being traced (`overlap`), never one entry per face stacked on a texel: all of it
-//! is gone before the first map's image is made. Its time is a trace per face
+//! owner's triangle per point; a model whose UVs overlap adds an `f32` per
+//! point, a sum per overlapping pair of triangles and a block of claims being
+//! traced (`overlap`), never one entry per face stacked on a texel, and walks a
+//! second time unless every pair tied: all of it is gone before the first map's
+//! image is made, and so is the model's tracer when no `ao` or `thickness` is
+//! asked. Its time is a trace per face
 //! covering each shared texel, so a level mesh tiling UV0 hundreds of times costs
 //! hundreds of traces a texel, and the bake says so ([`Stacked`]).
 
@@ -153,6 +156,13 @@ pub fn bake(
     mut sink: impl FnMut(MeshMap, Image) -> Result<(), String>,
 ) -> Result<Notes, String> {
     let (baked, mut tracer, stacked) = Baked::new(source, settings)?;
+    if !maps
+        .iter()
+        .any(|m| matches!(m, MeshMap::Ao | MeshMap::Thickness))
+    {
+        // The pick's tracer only serves the ray-traced maps: free its BVH now.
+        tracer = None;
+    }
     let mut raised = None;
     let mut done = Vec::new();
     for &map in maps {
