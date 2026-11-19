@@ -1,5 +1,4 @@
-//! crates/render/src/stats/pairs.rs — every [`RenderCounters`] counter under its
-//! `FrameStats` metric name.
+//! [`RenderCounters`] under their `FrameStats` metric names.
 
 use super::RenderCounters;
 
@@ -13,11 +12,9 @@ impl RenderCounters {
             ("cull_tested", self.cull_tested.into()),
             ("culled_entities", self.culled_entities.into()),
             ("size_culled_entities", self.size_culled_entities.into()),
-            ("occlusion_culled", self.occlusion_culled.into()),
-            ("hiz_tested", self.hiz_tested.into()),
-            ("hiz_culled", self.hiz_culled.into()),
-            ("cluster_tested", self.cluster_tested.into()),
-            ("cluster_culled", self.cluster_culled.into()),
+        ];
+        pairs.extend(self.occlusion_pairs());
+        pairs.extend([
             ("lod_hidden_entities", self.lod_hidden_entities.into()),
             ("lights", self.lights.into()),
             ("lights_dropped", self.lights_dropped.into()),
@@ -48,12 +45,25 @@ impl RenderCounters {
             ("render_posed", self.render_posed.into()),
             ("render_extract_us", self.render_extract_us),
             ("render_upload_bytes", self.render_upload_bytes),
-        ];
+        ]);
         pairs.extend(self.shadow_pairs());
         pairs.extend(self.ui_pairs());
         pairs.extend(self.uploads.pairs());
         pairs.extend(self.ops.pairs());
         pairs
+    }
+
+    /// The camera views' occlusion counters (the PVS's, Hi-Z's and the cluster
+    /// cull's), under their metric names.
+    fn occlusion_pairs(&self) -> [(&'static str, u64); 6] {
+        [
+            ("occlusion_culled", self.occlusion_culled.into()),
+            ("hiz_tested", self.hiz_tested.into()),
+            ("hiz_culled", self.hiz_culled.into()),
+            ("hiz_late", self.hiz_late.into()),
+            ("cluster_tested", self.cluster_tested.into()),
+            ("cluster_culled", self.cluster_culled.into()),
+        ]
     }
 
     /// The shadow views' counters, under their metric names.

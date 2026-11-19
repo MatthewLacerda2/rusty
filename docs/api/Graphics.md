@@ -1082,8 +1082,11 @@ view's own depth, which the forward pass starts from where depth priming runs), 
 depth-aware upsample to it (4 taps a pixel), as HDRP does (#1578): everything but the
 prepass and the upsample scales with the divisor. The frame stats report it
 (`ssao_samples`, the prepass inside `draw_calls` / `triangles`, and GPU time as
-`ssao_prepass`, `ssao` and `ssao_blur`; see `Debug`). `SetSsaoActive(false)` —
-or intensity `0` — skips every one of those passes.
+`depth_prepass`, `ssao` and `ssao_blur`; see `Debug`). `SetSsaoActive(false)` —
+or intensity `0` — skips the occlusion, blur and upsample, and the prepass unless
+something else still needs it: SSIL, or a camera the GPU culls where depth priming
+runs (not on macOS), which then draws only its late set (`Lighting.md`, *GPU
+occlusion culling*).
 
 ### Quality presets
 

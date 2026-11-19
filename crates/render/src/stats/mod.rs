@@ -9,11 +9,10 @@
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RenderCounters {
     /// Geometry draw calls: solids, transparents, shadow casters, the SSAO depth
-    /// prepass, particle batches and UI batches. Decals draw nothing of their own:
-    /// the surfaces they land on fold them in (#638). Copies of one mesh + material are one instanced draw
-    /// (#470). Fullscreen post-FX and the skybox are not counted.
+    /// prepass, particle batches and UI batches; one mesh + material is one instanced
+    /// draw (#470). Decals (folded into surfaces, #638), post-FX and the sky: none.
     pub draw_calls: u32,
-    /// Triangles submitted by the solid, transparent, shadow and SSAO-prepass draws.
+    /// Triangles of the solid, transparent, shadow and prepass draws (not the GPU cull's late set).
     pub triangles: u64,
     /// Mesh entities drawn, summed over the camera stack.
     pub visible_entities: u32,
@@ -53,6 +52,9 @@ pub struct RenderCounters {
     /// the camera views. Read back from the GPU without waiting, so it describes
     /// a frame or so before this one, and `0` on the first.
     pub hiz_culled: u32,
+    /// Of the visible ones, those phase one did not draw (#2336, the late set the
+    /// prepass adds), summed over the views: `0` held still. Read back likewise.
+    pub hiz_late: u32,
     /// Clusters of big meshes tested one by one after the Hi-Z instance test
     /// (#1968): every cluster of each instance it judged in a batch drawn by
     /// cluster, summed over the camera views.
@@ -148,8 +150,9 @@ pub struct RenderCounters {
     /// Opaque scene passes that wrote a velocity target (#1435): one per camera of
     /// each view running motion blur, `0` when none does.
     pub velocity_passes: u32,
-    /// Opaque scene passes primed with their SSAO prepass's depth (#1499): one per
-    /// camera that ran SSAO, `0` with AO off. A camera shading with a forward
+    /// Opaque scene passes primed with the depth prepass's depth (#1499): one per
+    /// camera that ran SSAO or SSIL, or that the GPU culls (#2336, its prepass
+    /// then the late set alone), `0` with neither and no GPU cull. A camera shading with a forward
     /// override of its own (the shader preview) is never primed, nor is any on Metal.
     pub primed_passes: u32,
     /// Reasons this frame read history an earlier frame left (#2092), one per

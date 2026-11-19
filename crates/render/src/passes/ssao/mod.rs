@@ -26,7 +26,7 @@
 //! for the blur and 4 per pixel for the upsample, so all but the upsample scale
 //! with the resolution divisor. The frame stats count the draws
 //! (`draw_calls`/`triangles` include the prepass) and the occlusion taps
-//! (`ssao_samples`); `Debug.Stats().gpu_passes` times the prepass (`ssao_prepass`),
+//! (`ssao_samples`); `Debug.Stats().gpu_passes` times the prepass (`depth_prepass`),
 //! the occlusion (`ssao`) and the blur with its upsample (`ssao_blur`) apart.
 
 mod run;
