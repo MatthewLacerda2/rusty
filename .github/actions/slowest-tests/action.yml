@@ -1,0 +1,117 @@
+# A suite job's "Slowest tests" step (#1976, #2326, #2350): where the shard's
+# time went, and the tests over `slowest_tests.BUDGET` that `main` had under it.
+#
+# The baseline is `main`'s last `RUNS` (three) `ci` runs that concluded
+# `success` and kept every shard's JUnit artifact of this job's leg and feature
+# set (`<prefix>-1ofN` … `<prefix>-NofN`, N read from `shard`, so the count is the
+# matrix's own: a `count:` partition moves tests between shards), each run in its
+# own folder; the script holds a test to its longest time over all of them, since
+# one run cannot tell a slow runner from a slow test. A nightly whose shard timed
+# out is never part of one. The runs are found by name, not by walking runs (a
+# push to `main` whose tree a PR run proved builds nothing, `changes`, and keeps
+# no artifact): the artifacts named `<prefix>-1ofN` are paged, `per_page=100` with
+# an explicit `page=` (never `--paginate`, `.github/scripts/CLAUDE.md`), until
+# `MAX_TRIES` runs on `main` are named or `MAX_PAGES` pages are read; every branch
+# makes these, so `main`'s can sit past page 1. Then each candidate, newest
+# first, costs one runs call and one download until `RUNS` are kept. Worst case:
+# `MAX_PAGES` + 2 x `MAX_TRIES` `gh` calls (5 + 12 = 17), a download listing the
+# run's artifacts once and fetching each shard's. The step names each run, its
+# date and commit: a test merged after them reads as new. Nothing found (expired,
+# a renamed matrix entry) leaves the directory empty and the script prints
+# `no baseline: …`. Every step informs and none gates: the caller is
+# `continue-on-error`, a `gh` failure only shortens the baseline, and the report
+# prints whatever the lookup did. The job needs `actions: read`.
+#
+# Output `name`: this shard's artifact name (`<prefix>-1of2`), which the job's
+# upload step uses, so the name the lookup reads is built in this one file.
+name: Slowest tests
+description: Print a nextest JUnit report's slowest tests, its group accounting, and the tests newly over the budget against main.
+inputs:
+  report:
+    description: The JUnit report this job wrote.
+    required: true
+  count:
+    description: How many of the slowest tests to print.
+    default: "10"
+  prefix:
+    description: The leg's artifact name before the shard (`junit-build-test-dev`), as the upload step names it.
+    required: true
+  shard:
+    description: This job's `matrix.shard` (`1/2`); its total is how many reports a baseline needs.
+    required: true
+outputs:
+  name:
+    description: This shard's JUnit artifact name, for the job's upload step.
+    value: ${{ steps.name.outputs.name }}
+runs:
+  using: composite
+  steps:
+    - name: Shard's artifact name
+      id: name
+      shell: bash
+      env:
+        PREFIX: ${{ inputs.prefix }}
+        SHARD: ${{ inputs.shard }}
+      # `1/2` as `1of2`: `/` is refused in an artifact name.
+      run: echo "name=$PREFIX-${SHARD/\//of}" >> "$GITHUB_OUTPUT"
+    - name: Main's reports
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PREFIX: ${{ inputs.prefix }}
+        SHARD: ${{ inputs.shard }}
+        BASE: ${{ runner.temp }}/slowest-baseline
+        BRANCH: main  # an env value, so a local run can point it at a branch
+        RUNS: "3"
+        MAX_TRIES: "6"
+        MAX_PAGES: "5"
+      run: |
+        rm -rf "$BASE"
+        total=${SHARD#*/}
+        names=(); for i in $(seq 1 "$total"); do names+=("$PREFIX-${i}of$total"); done
+        # Candidate runs on main, from the first shard's artifacts; gh's stderr goes to the log.
+        ids=""; page=1
+        while [ "$page" -le "$MAX_PAGES" ]; do
+          got=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=${names[0]}&per_page=100&page=$page" --jq '
+            (.artifacts | length | tostring),
+            (.artifacts[] | select((.expired | not) and .workflow_run.head_branch == env.BRANCH
+              and .workflow_run.head_repository_id == .workflow_run.repository_id)
+             | .workflow_run.id | tostring)') \
+            || { echo "baseline: page $page of the artifacts named ${names[0]} did not list"; break; }
+          listed=$(head -n1 <<<"$got")
+          ids=$(printf '%s\n%s\n' "$ids" "$(tail -n +2 <<<"$got")" | grep . | sort -rnu || true)
+          [ "$(grep -c . <<<"$ids" || true)" -ge "$MAX_TRIES" ] && break
+          [ "${listed:-0}" -lt 100 ] && break
+          page=$((page + 1))
+        done
+        tries=0; kept=()
+        for id in $ids; do
+          [ "$tries" -ge "$MAX_TRIES" ] || [ "${#kept[@]}" -ge "$RUNS" ] && break
+          tries=$((tries + 1))
+          run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" \
+            --jq '[.conclusion // "pending", .created_at, .head_sha[:7]] | @tsv') || continue
+          IFS=$'\t' read -r conclusion created sha <<<"$run"
+          [ "$conclusion" = success ] || { echo "baseline: skipping $BRANCH's run $id ($conclusion)"; continue; }
+          args=(); for n in "${names[@]}"; do args+=(-n "$n"); done
+          if gh run download "$id" -R "$GITHUB_REPOSITORY" -D "$BASE/$id" "${args[@]}" >/dev/null; then
+            kept+=("$id of $created at $sha")
+          else
+            rm -rf "${BASE:?}/$id"  # a half-done download is no baseline
+            echo "baseline: skipping $BRANCH's run $id (not every one of ${names[*]})"
+          fi
+        done
+        if [ "${#kept[@]}" -eq 0 ]; then
+          rm -rf "$BASE"
+          echo "baseline: no successful run on $BRANCH keeps all of ${names[*]} (tried $tries, $page page(s))"
+          exit 0
+        fi
+        reports=$(find "$BASE" -name '*.xml' | wc -l | tr -d ' ')
+        echo "baseline: each test's longest time over ${#kept[@]} of $RUNS runs on $BRANCH ($reports reports): $(IFS=';'; echo "${kept[*]}" | sed 's/;/; /g'); a test merged after them reads as new"
+    - name: Report
+      if: always()  # the top N and the accounting print whatever the lookup did
+      shell: bash
+      env:
+        BASE: ${{ runner.temp }}/slowest-baseline
+        REPORT: ${{ inputs.report }}
+        COUNT: ${{ inputs.count }}
+      run: python3 .github/scripts/slowest_tests.py "$REPORT" "$COUNT" --baseline "$BASE"
