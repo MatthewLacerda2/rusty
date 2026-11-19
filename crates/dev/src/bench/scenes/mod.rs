@@ -7,9 +7,11 @@
 //! [`FRAMES`] by `bench::measure_posed`, at 1920x1080 unless told otherwise, and
 //! the whole round is run [`Options::runs`] times (`measure`). The report
 //! ([`report`]) folds the viewpoints' rows, then the runs', into one (`fold`),
-//! each row with its run-to-run spread, and adds `load_ms` (the scene's own load
-//! to its first rendered frame, wall clock, the renderer's start-up off the
-//! clock: `load`), `import_ms` (`IMPORT=1`, once a run, on its first scene: the
+//! each row with its run-to-run spread, and adds `load_ms` (the scene's load to
+//! its first rendered frame, wall clock, the renderer's start-up off the clock,
+//! repeated in fresh processes with its spread, the run's first load apart as
+//! `load_cold_ms`, its steps as `load.<step>` and what it did as
+//! `load.count.<what>`: [`load`](mod@load)), `import_ms` (`IMPORT=1`, once a run, on its first scene: the
 //! same load of a copy of the project without its import cache, [`import`]), `rss_peak_mb` (the process's peak resident
 //! memory, [`crate::memory`]), `gpu_mb` (the renderer's GPU memory,
 //! `rusty_render::gpu_memory`, with `gpu_allocated_mb`, what live allocations use,
@@ -20,12 +22,13 @@
 //!
 //! The project is opened read-only and never seeded: nothing is written into it.
 //! A signal, never a gate, like `make bench`. `bench-scenes` runs each scene in a
-//! process of its own, so a scene's load time is a cold one and its memory peak
-//! its own.
+//! process of its own, so its memory peak is its own, and each of its loads in
+//! one too ([`load`](mod@load)).
 
 pub mod args;
 mod fold;
 pub mod import;
+pub mod load;
 mod measure;
 mod notes;
 pub mod profile;
@@ -35,12 +38,11 @@ pub mod views;
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use std::time::Instant;
 
 use rusty_core::project::ProjectSettings;
 use rusty_render::ClockProbe;
 
-use super::super::harness::Harness;
+pub use load::{load, Load, LOAD_RUNS};
 pub use notes::{unbaked, uncompressed};
 pub use report::SceneReport;
 
@@ -91,6 +93,9 @@ pub struct Extra {
     pub key: String,
     /// The cold load an import run measured (`import_ms`), when one ran.
     pub import_ms: Option<f64>,
+    /// The scene's loads before the bench's own, each in a process of its own
+    /// (`--loads`), the first the cold one ([`load`](mod@load)).
+    pub loads: Vec<Load>,
     /// The run's `--set` overrides of the running quality preset, as given
     /// (`set::Overrides::said`), which the report records.
     pub set: Vec<String>,
@@ -167,7 +172,7 @@ pub fn bench(
     opts: Options,
     extra: &Extra,
 ) -> Result<SceneReport, String> {
-    let (mut harness, load_ms) = load(out_dir, root, scene, settings, opts)?;
+    let (mut harness, own) = load(out_dir, root, scene, settings, opts)?;
 
     let probe = harness.renderer().and_then(|r| ClockProbe::new(r));
     let mut report = measure::all(&mut harness, probe.as_ref(), opts);
@@ -175,7 +180,9 @@ pub fn bench(
     report.scene = scene.to_string();
     report.size = opts.size;
     report.set.clone_from(&extra.set);
-    report.push_value("load_ms", load_ms);
+    let loads: Vec<Load> = extra.loads.iter().cloned().chain([own]).collect();
+    report.loads = loads.len() as u32;
+    report.rows.extend(load::rows(&loads));
     if let Some(ms) = extra.import_ms {
         report.push_value("import_ms", ms);
     }
@@ -211,37 +218,6 @@ pub fn bench(
     println!("{text}");
     report::write(out_dir, &report, &text).map_err(|e| format!("bench-scenes: {e}"))?;
     Ok(report)
-}
-
-/// Load `scene` of the project at `root` as Play does and draw its first frame
-/// at `opts.size` (the harness's out dir `out_dir`), returning the harness and the
-/// load's wall-clock ms. Timed: the harness's own set-up (its Lua VM and API, the
-/// stats), the scene's document, sidecar and navmesh bake, Play's refresh of the
-/// project's converted sources (a cache check when the import cache is warm, the
-/// conversions when it is not: `import_ms`), then its first frame (uploads, the
-/// first sim step) at `opts.size`. The renderer starts (its device and, with
-/// `opts.warm`, every pipeline, warm as a game's) between the load and the first
-/// frame, off the clock.
-pub fn load(
-    out_dir: &Path,
-    root: &Path,
-    scene: &str,
-    settings: ProjectSettings,
-    opts: Options,
-) -> Result<(Harness, f64), String> {
-    let path = root.join(format!("assets/scenes/{scene}.scene"));
-    let start = Instant::now();
-    let mut harness = Harness::on_project_scene(out_dir, &path.to_string_lossy(), settings)?;
-    let loaded = start.elapsed();
-    harness.set_size(opts.size.0, opts.size.1);
-    if let Some(renderer) = harness.renderer().filter(|_| opts.warm) {
-        renderer.warm_pipelines(false);
-    }
-    let start = Instant::now();
-    harness.step(1);
-    harness.render_frame();
-    let load = loaded + start.elapsed();
-    Ok((harness, load.as_secs_f64() * 1000.0))
 }
 
 /// `gpu_mb` (and `gpu_allocated_mb` where the source tells it) with its source,

@@ -94,6 +94,18 @@ use record::{record, stamp_path};
 use rusty_core::{hash, paths, project};
 use stale::{stale, Tool};
 use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+/// Conversions run in this process, on any thread ([`conversions`]).
+static CONVERSIONS: AtomicUsize = AtomicUsize::new(0);
+
+/// How many sources this process has converted (run a converter for, a cache
+/// found current not counted): what tells a cold import from a cached one, since
+/// a fresh process parses every model file once either way
+/// (`import_cache::parses`).
+pub fn conversions() -> usize {
+    CONVERSIONS.load(Ordering::Relaxed)
+}
 
 /// Where an open project keeps converted sources, relative to its root: a folder
 /// of [`project::GENERATED_DIR`].
@@ -168,6 +180,7 @@ pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), I
     let tag = record::folder_tag(out, &stamp);
     match stage::convert(converter, source, out, (&stamp, &tag)) {
         Ok(converted) => {
+            CONVERSIONS.fetch_add(1, Ordering::Relaxed);
             let stored = record::Stored::written(&stamp, &tag, &converted);
             record::report(source, out, &stored);
         }

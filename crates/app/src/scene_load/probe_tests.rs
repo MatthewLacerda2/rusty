@@ -88,3 +88,28 @@ fn a_probe_that_calls_a_step_twice_runs_it_once() {
         .count();
     assert_eq!(disables, 1, "the teardown ran once");
 }
+
+#[test]
+fn entering_play_runs_each_step_once_under_its_own_probe() {
+    let (menu, _) = write_scenes("probe_entry");
+    let (mut gw, _) = world_at(&menu);
+    *gw.script_manager().scene_path_cell().borrow_mut() = Some(menu.clone());
+    let (entry, load) = (Seen::default(), Seen::default());
+    gw.set_entry_probe(Some(Box::new(entry.clone())));
+    gw.set_load_probe(Some(Box::new(load.clone())));
+    gw.set_playing(true);
+    gw.tick(DT);
+    let want = [
+        "refresh",
+        "scripts",
+        "physics",
+        "startup",
+        "finish:menu.scene",
+    ];
+    assert_eq!(*entry.0.borrow(), want);
+    assert_eq!(
+        load.0.borrow()[0],
+        "read",
+        "the scene load saw none of Play's entry"
+    );
+}

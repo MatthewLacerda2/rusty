@@ -1170,12 +1170,12 @@ prints the report, keeps it in the run's out dir and returns `{ frames, metrics 
 ### A project's own scenes: `make bench-scenes`
 `make bench` measures one synthetic yard; an optimisation also needs numbers from
 real levels. `make bench-scenes PROJECT=<dir> [SCENES=a,b] [RES=WxH] [RUNS=n]
-[BEFORE=<dir>] [PROFILE=1] [IMPORT=1]` benches a game project's own scenes, wherever the
+[LOAD_RUNS=n] [BEFORE=<dir>] [PROFILE=1] [IMPORT=1]` benches a game project's own scenes, wherever the
 project is on disk (`bench-scenes`, `dev::bench::scenes`). `SCENES` names scenes by
 their path under `assets/scenes/` without the extension (`levels/a`); by default
 every `.scene` there, subfolders included (a folder linked twice is walked once), is
-benched, in sorted order. Each scene runs in processes of its own, so its load is a
-cold one and its peak memory is its own. The project is opened read-only
+benched, in sorted order. Each scene runs in processes of its own, so its peak
+memory is its own, and each of its loads runs in a fresh process. The project is opened read-only
 (`Access::Run`, as `play` and the player open one) and never seeded, so nothing is
 written into it; a folder missing the project skeleton gets its empty folders, as
 every binary's open makes them.
@@ -1193,7 +1193,9 @@ every binary's open makes them.
   +Z from the centre of its entities' positions. The report warns in both cases,
   naming the viewpoints it used. A pose is held
   after every sim step, whatever the scripts move.
-- **the run**: the scene loads, steps once and draws once (`load_ms`). Then each
+- **the run**: the scene loads, steps once and draws once (`load_ms`), `LOAD_RUNS`
+  times in all (default 3), each in a fresh process: the first `LOAD_RUNS` less one
+  only load it, then the bench's own load is the last. Then each
   viewpoint warms up 60 frames and measures 300, at 1920x1080 unless `RES` says
   otherwise, and the round over every viewpoint is run `RUNS` times (default 3).
   The scene's scripts run as in Play, with no input. One GPU clock probe serves
@@ -1204,19 +1206,45 @@ every binary's open makes them.
   included, *Benchmark*, above) over the viewpoints (the average of their averages,
   the worst p95 and the viewpoint it came from), then over the runs: the average,
   and the **spread**, the lowest to the highest run's average. Plus:
-  - `load_ms`: the scene's own load to its first rendered frame, wall clock, with
-    the import cache as the project holds it: its converted models are warm once
-    any run converted them, its compressed textures only once the editor, an
-    export or `make import PROJECT=<dir>` made them, since a `play` or
-    `bench-scenes` run never compresses a texture. Without them every texture uploads decoded, as RGBA8,
-    and the report warns (`uploaded uncompressed: N textures, M MB`): the scene's
-    `load_ms`, `gpu_mb` and `rss_peak_mb` are then not the shipped game's. It
-    holds the harness's set-up (its Lua VM and API, the stats), the
-    scene's document and lighting sidecar read, its navmesh baked and the world
-    built, Play's refresh of the project's converted sources (a check of each
-    cache), then its first sim step and frame (its uploads). The renderer's start-up
-    (the device and every pipeline, warmed as a game's renderer is) happens between
-    the two, off the clock;
+  - `load_ms`: the scene's load to its first rendered frame, wall clock, the
+    average of the later loads (the second on), with their spread; the scene's
+    first load in this run is reported apart as `load_cold_ms`. It is cold in the
+    page cache only when nothing read the scene's files before it: after a scene
+    sharing its assets, or in `bench-ab`'s second and third legs, it is one more
+    warm sample. A report from before these rows holds its one first load under
+    `load_ms`, so it compares with `load_cold_ms`, not with today's `load_ms`.
+    With `LOAD_RUNS=1` the one load stands as `load_ms`, the first, and
+    with no spread. The import cache is as the project holds it: its converted
+    models are warm once any run converted them, its compressed textures only once
+    the editor, an export or `make import PROJECT=<dir>` made them, since a `play` or
+    `bench-scenes` run never compresses a texture. Without them every texture
+    uploads decoded, as RGBA8, and the report warns (`uploaded uncompressed: N
+    textures, M MB`): the scene's `load_ms`, `gpu_mb` and `rss_peak_mb` are then
+    not the shipped game's. The renderer's start-up (the device and every
+    pipeline, warmed as a game's renderer is) happens before the first tick, off
+    the clock;
+  - `load.<step>`: the load in steps, each the warm loads' average with its
+    spread, which sum to `load_ms` (they tile it; `dev::bench::scenes::load`), timed
+    through `rusty_app::timed` as a play-mode `Scene.Load` times its own:
+    `load.document` (the scene file read and parsed, once), `load.import` (its
+    meshes built, its models through the import cache), `load.apply` (the World
+    replaced, its navmesh and lighting sidecars read), `load.navmesh` (the graph
+    restored from the saved navmesh or baked), `load.world` (the game world, its
+    Lua VM and API, the stats, the project's settings), then the first tick's Play
+    entry, `load.refresh` (Play's refresh of the project's converted sources: a
+    check of each cache when warm), `load.scripts` (the Lua runtime, every
+    `Awake` and `Start`), `load.physics` (the rapier world) and `load.startup` (the
+    `Startup` stage), `load.tick` (the rest of that tick: the first sim step) and
+    `load.frame` (the first frame: its uploads and draw);
+  - `load.count.<what>`: what the load did: `models_parsed` (the model files the
+    scene uses: each load is a fresh process, so each is parsed once whether its
+    conversion was cached or not), `models_converted` (the sources converted,
+    summed over the run's loads: the first converts what is stale, so this is
+    what tells a cold import from a cached one, as after a `Converter::version`
+    bump), `textures_compressed` and `textures_decoded` (the textures resident
+    after the first frame, by format, the uncompressed fallbacks a slot needs
+    among the decoded) and `upload_mb` (what the first frame uploaded).
+    Deterministic for a project as it stands, so no spread;
   - `import_ms`, only with `IMPORT=1`, once a run (the import is the project's,
     not a scene's: every model source is converted, with headless Blender for a
     `.blend`, and every image compressed, so it is slow, minutes for a large
@@ -1338,7 +1366,7 @@ Like `make bench`, it is a release build and a signal, never a gate: it is not i
 
 ### A pull request's measured rows: `make bench-ab` (#2381)
 A performance PR's row is measured on the operator's desktop with
-`make bench-ab PR=<n> PROJECT=<dir> [SCENES=a,b] [RUNS=n] [RES=WxH] [SET=key=value]`,
+`make bench-ab PR=<n> PROJECT=<dir> [SCENES=a,b] [RUNS=n] [LOAD_RUNS=n] [RES=WxH] [SET=key=value]`,
 never by hand. It runs `bench-scenes` three times back to back: on `main`, on the
 PR's head, and on `main` again, each built in a detached worktree of its own under
 `.claude/worktrees/` with its own `target/`, the head fetched as `pull/<n>/head`.
@@ -1367,12 +1395,32 @@ takes minutes apart (a `main` against `main` leg read +15% on one scene). A chan
 is only shown when it is larger than one binary differs from itself, so the second
 `main` leg is each row's **floor**: the table prints, per scene and row, `main`'s
 average, the PR's, the change, and the floor (`main` again against `main`), and a
-change no larger than its floor reads *not shown*. A row only the PR reports (a new
+change no larger than its floor reads *inside the floor*, beside the change it
+measured. A row only the PR reports (a new
 counter or stage) is listed, *absent on main*; a row the second `main` leg lacks
 shows its change with the floor *unknown*. Every row gets its own floor, so
 the table shows how tightly each kind of row repeated rather than assuming it.
 Legs run whole, one after another: interleaving the two binaries scene by scene
 halves the drift but doubles the scene loads.
+
+**The lead.** Each scene's table opens with the rows whose change is outside the
+floor, largest change first (a row from zero first), and only those that moved by
+at least 0.05 (a ms row, 0.3% of a 60 Hz frame, or a count, which moves by whole
+units), 50 for a µs row, or 1 for an MB or % row: the size is absolute because a
+ratio is not, and a row at 0.001 ms moving 20% is nothing. After them come the
+rows of that size the second `main` leg lacks, marked *floor unknown*, and every
+row only the PR has, marked *absent on main*: the lead never reads "nothing
+moved" above a move the table cannot judge. The full table follows.
+
+**A load claim** reads `load_ms` and the `load.<step>` row the PR is about, never
+`load_cold_ms` alone (the page cache and what ran before it decide it). It needs a spread on both sides,
+so at least two warm loads a leg: the default `LOAD_RUNS=3` gives two, and a
+load step of a few percent wants `LOAD_RUNS=5` or more (`make bench-ab ...
+LOAD_RUNS=5`). The change must sit outside the floor and the spreads must not
+overlap. The load's counts (`load.count.<what>`) are compared too: where they
+differ between legs, the table's header says so, since the load rows then
+compare a different load (a cold import against a cached one), not only
+different code.
 
 **What it refuses**, before it builds (`FORCE=1` runs anyway, and the table's
 header lists every refusal it ran past): another timed run (an `flock` under
