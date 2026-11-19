@@ -18,13 +18,12 @@ fn a_failed_write_leaves_the_old_pages_and_the_scene_on_them() {
     let before = (*scene.lightmaps).clone();
     let other = BakeSettings { seed: 7, ..quick() };
     let maps = rusty_lighting::lightmap::bake(&gather_bake_input(&scene), &other);
-    let encoded = encode_pages(&maps, other.page(), &BakeProgress::default())
+    let encoded = encode_pages(maps, other.page(), &BakeProgress::default(), &path)
         .unwrap()
         .unwrap();
     // A folder where the new page's PNG goes (named by its KTX2's tag), so
     // writing it fails.
-    let ktx2 = rusty_asset::lightmap_page::write(&encoded.colour[0].0);
-    let name = format!("lightmap_0_{:08x}.png", content_tag(&ktx2));
+    let name = format!("lightmap_0_{:08x}.png", encoded.colour[0].0.tag());
     let blocker = lightmap_dir(&path).join(name);
     std::fs::create_dir_all(&blocker).unwrap();
     assert!(apply_encoded(&mut scene, &path, &encoded).is_err());
@@ -62,13 +61,7 @@ fn pass(k: u32) -> rusty_lighting::lightmap::Pass {
 fn pass_maps(value: f32) -> Vec<Lightmap> {
     let texels = vec![glam::Vec3::splat(value); 16];
     let (directions, masks) = (Vec::new(), Vec::new());
-    vec![Lightmap {
-        entity: 1,
-        size: 4,
-        texels,
-        directions,
-        masks,
-    }]
+    vec![Lightmap::dense(1, 4, texels, directions, masks)]
 }
 
 #[test]

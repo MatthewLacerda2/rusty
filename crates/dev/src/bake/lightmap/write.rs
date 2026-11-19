@@ -8,11 +8,11 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use rusty_asset::lightmap_page::{self, Page};
 use rusty_lighting::lightmap::{BakeProgress, Lightmap};
 use rusty_scene::lighting::lightmap_set::LightmapSet;
 use rusty_scene::Scene;
 
+use super::spill::Spilled;
 use super::{encode_pages, lightmap_dir, EncodedPages};
 
 /// The file names a finished bake's pages start with.
@@ -20,34 +20,21 @@ pub(super) const FINAL: &str = "lightmap";
 /// The file names a progressive bake's preview pages start with (#1970).
 pub(super) const PREVIEW: &str = "lightmap_preview";
 
-/// What `encoded`'s pages take on the GPU, every mip: its colour and direction
-/// pages as stored, and each shadowmask page as RGBA8 with the mips made on load.
-fn gpu_bytes(encoded: &EncodedPages) -> usize {
-    let size = encoded.page_size;
-    let levels = rusty_lighting::lightmap::level_count(size);
-    let mask: usize = (0..levels).map(|l| ((size >> l) as usize).pow(2) * 4).sum();
-    let stored = encoded
-        .colour
-        .iter()
-        .map(|(p, _)| p)
-        .chain(&encoded.directions);
-    stored.map(Page::gpu_bytes).sum::<usize>() + encoded.masks.len() * mask
-}
-
 /// [`encode_pages`] then [`apply_encoded`]: write `maps` beside `scene_path`, on
 /// pages of the scene's Max Lightmap Size.
 pub fn apply_lightmaps(
     scene: &mut Scene,
     scene_path: &str,
-    maps: &[Lightmap],
+    maps: Vec<Lightmap>,
 ) -> Result<usize, String> {
     let page = scene.lighting_settings.lightmaps.page();
-    let encoded = encode_pages(maps, page, &BakeProgress::default())?;
+    let encoded = encode_pages(maps, page, &BakeProgress::default(), scene_path)?;
     apply_encoded(scene, scene_path, &encoded.ok_or("never cancelled")?)
 }
 
-/// Write `encoded` beside `scene_path` and point the scene at it, replacing the
-/// previous bake's pages. Returns how many lightmaps were written. The old pages
+/// Write `encoded` beside `scene_path` (its spilled files linked into the
+/// scene's lightmap folder) and point the scene at it, replacing the previous
+/// bake's pages. Returns how many lightmaps were written. The old pages
 /// are removed only once the new ones are all written and shown, so a write that
 /// fails leaves the scene on its old pages, still on disk.
 pub fn apply_encoded(
@@ -85,9 +72,9 @@ pub fn apply_encoded(
         }
     };
     warn_fell_back(&set);
-    let bytes = gpu_bytes(encoded);
+    let bytes = encoded.gpu_bytes;
     log::info!(
-        "[LightmapBake] {} lightmaps in {} page(s) of {size}²{}, {:.1} MiB on the GPU, in {}",
+        "[LightmapBake] {} lightmaps in {} page(s) of {size}²{}, {:.1} MiB on the GPU, in {}{}",
         encoded.maps,
         set.pages.len(),
         match (set.directions.is_empty(), set.masks.is_empty()) {
@@ -97,7 +84,11 @@ pub fn apply_encoded(
             (false, false) => " (directional, shadowmask)",
         },
         bytes as f64 / (1024.0 * 1024.0),
-        dir.display()
+        dir.display(),
+        // The process's lifetime high-water mark (#2312): a headless bake's own.
+        crate::memory::rss_peak_bytes()
+            .map(|b| format!("; process peak {}", crate::bake::progress::format::gb(b)))
+            .unwrap_or_default()
     );
     let keep = stems(&set);
     scene.lightmaps = set.into();
@@ -131,16 +122,19 @@ pub(super) fn write_set(
 ) -> Result<LightmapSet, String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("lightmap folder: {e}"))?;
     let mut set = LightmapSet::default();
-    for (k, (page, png)) in encoded.colour.iter().enumerate() {
-        set.pages.push(write_page(dir, prefix, k, page, png)?);
+    for (k, (ktx2, png)) in encoded.colour.iter().enumerate() {
+        let stem = dir.join(format!("{prefix}_{k}_{:08x}", ktx2.tag()));
+        // The PNG first: the scene stores the KTX2's path.
+        link(png, &stem.with_extension("png"))?;
+        set.pages.push(link(ktx2, &stem.with_extension("ktx2"))?);
     }
     for (k, page) in encoded.directions.iter().enumerate() {
-        set.directions
-            .push(write_ktx2(dir, &format!("{prefix}_dir"), k, page)?);
+        let path = dir.join(format!("{prefix}_dir_{k}_{:08x}.ktx2", page.tag()));
+        set.directions.push(link(page, &path)?);
     }
     for (k, png) in encoded.masks.iter().enumerate() {
-        set.masks
-            .push(write_png(dir, &format!("{prefix}_mask"), k, png)?);
+        let path = dir.join(format!("{prefix}_mask_{k}_{:08x}.png", png.tag()));
+        set.masks.push(link(png, &path)?);
     }
     set.extend(encoded.entries.iter().cloned());
     set.lights = encoded.lights.clone();
@@ -149,35 +143,17 @@ pub(super) fn write_set(
     Ok(set)
 }
 
-/// Write one page as `<dir>/<prefix>_<k>_<tag>.ktx2` and its PNG fallback beside
-/// it, and return the KTX2 path the scene stores.
-fn write_page(
-    dir: &Path,
-    prefix: &str,
-    k: usize,
-    page: &Page,
-    png: &[u8],
-) -> Result<String, String> {
-    let ktx2 = lightmap_page::write(page);
-    let stem = dir.join(format!("{prefix}_{k}_{:08x}", content_tag(&ktx2)));
-    let (ktx2_path, png_path) = (stem.with_extension("ktx2"), stem.with_extension("png"));
-    std::fs::write(&png_path, png).map_err(|e| format!("write {}: {e}", png_path.display()))?;
-    std::fs::write(&ktx2_path, &ktx2).map_err(|e| format!("write {}: {e}", ktx2_path.display()))?;
-    for path in [&png_path, &ktx2_path] {
+/// Put the spilled `file` at `path` and return the path the scene stores. A
+/// page already there under that name and size (its content tag) is left as it
+/// is, as [`write_png`] leaves one, so a page the bake made again byte for byte
+/// is neither rewritten nor reloaded.
+fn link(file: &Spilled, path: &Path) -> Result<String, String> {
+    if !there(path, file.len()) {
+        file.link(path)?;
         rusty_core::fs::written::note_written(&path.to_string_lossy());
     }
     // The scene document stores `/` paths, like its other assets (#819).
-    Ok(rusty_core::paths::to_slash(&ktx2_path))
-}
-
-/// Write one page as `<dir>/<prefix>_<k>_<tag>.ktx2`, alone, and return its path:
-/// a direction page (#1996), whose RGBA8 levels the loader uploads as they are.
-fn write_ktx2(dir: &Path, prefix: &str, k: usize, page: &Page) -> Result<String, String> {
-    let ktx2 = lightmap_page::write(page);
-    let path = dir.join(format!("{prefix}_{k}_{:08x}.ktx2", content_tag(&ktx2)));
-    rusty_core::fs::written::write(&path, &ktx2)
-        .map_err(|e| format!("write {}: {e}", path.display()))?;
-    Ok(rusty_core::paths::to_slash(&path))
+    Ok(rusty_core::paths::to_slash(path))
 }
 
 /// Write one page as `<dir>/<prefix>_<k>_<tag>.png` and return its path: a
@@ -187,8 +163,7 @@ fn write_ktx2(dir: &Path, prefix: &str, k: usize, page: &Page) -> Result<String,
 /// neither rewritten nor reloaded.
 pub(super) fn write_png(dir: &Path, prefix: &str, k: usize, png: &[u8]) -> Result<String, String> {
     let path = dir.join(format!("{prefix}_{k}_{:08x}.png", content_tag(png)));
-    let there = std::fs::metadata(&path).is_ok_and(|m| m.is_file() && m.len() == png.len() as u64);
-    if !there {
+    if !there(&path, png.len() as u64) {
         std::fs::write(&path, png).map_err(|e| format!("write {}: {e}", path.display()))?;
         rusty_core::fs::written::note_written(&path.to_string_lossy());
     }
@@ -210,9 +185,19 @@ fn warn_fell_back(set: &LightmapSet) {
     );
 }
 
+/// Whether a file of `len` bytes is at `path`: under a name carrying its content
+/// tag, the page already written.
+fn there(path: &Path, len: u64) -> bool {
+    std::fs::metadata(path).is_ok_and(|m| m.is_file() && m.len() == len)
+}
+
 /// The page's content hash, folded to 32 bits: the file name's content tag.
 pub(super) fn content_tag(bytes: &[u8]) -> u32 {
-    let hash = rusty_core::hash::content(bytes);
+    fold_tag(rusty_core::hash::content(bytes))
+}
+
+/// A content hash folded to the 32-bit tag a page's file name carries.
+pub(super) fn fold_tag(hash: u64) -> u32 {
     (hash ^ (hash >> 32)) as u32
 }
 

@@ -108,13 +108,9 @@ fn a_floor_border_at_a_single_sided_wall_reads_its_shadow_not_the_sun_behind() {
     };
     let map = &bake(&scene, &settings)[0];
     assert_eq!(map.size, S);
+    let texels = map.texels();
     // Mean of column `x` over the rows clear of the floor's other borders.
-    let column = |x: usize| {
-        (2..12)
-            .map(|y| map.texels[y * S as usize + x].x)
-            .sum::<f32>()
-            / 10.0
-    };
+    let column = |x: usize| (2..12).map(|y| texels[y * S as usize + x].x).sum::<f32>() / 10.0;
     let (border, shade, sun) = (column(0), column(2), column(12));
     assert!(
         sun > 2.0 * shade,

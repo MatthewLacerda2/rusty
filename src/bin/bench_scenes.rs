@@ -3,7 +3,8 @@
 //! ```text
 //! Usage:
 //!   cargo run --release --features dev --bin bench-scenes -- --project <dir> [--scenes <a,b>]
-//!       [--size <W>x<H>] [--runs <n>] [--before <dir>] [--set <k=v>]... [--profile] [--import]
+//!       [--size <W>x<H>] [--runs <n>] [--load-runs <n>] [--before <dir>] [--set <k=v>]...
+//!       [--profile] [--import]
 //!       <out_dir>  |  --project <dir> --pending-imports
 //! ```
 //!
@@ -16,8 +17,11 @@
 //! change against the scene's last run, or against the kept report in
 //! `--before`'s folder; then a one-table summary (`dev::bench::scenes`).
 //!
-//! Each scene runs in child processes of this binary (cold load, its own memory
-//! peak): one benches it (`--scene`), and with `--profile` one more samples its
+//! Each scene runs in child processes of this binary (its own memory peak): first
+//! `--load-runs` less one (3 loads in all by default) only load it (`--load-out`,
+//! the first `load_cold_ms`), each in a fresh process, then one benches it
+//! (`--scene`, handed those loads with `--loads`, its own load the last of them:
+//! `scenes::load`), and with `--profile` one more samples its
 //! measured frames with the platform's profiler (`scenes::profile`), whose failure
 //! leaves the timings standing (a refused profile is listed at the end); the
 //! profiler is tried once before any scene, so a refusal ends the run. With
@@ -27,17 +31,18 @@
 //! running quality preset in every child (`scenes::set`); `--pending-imports` lists
 //! the images an import would encode, exiting 1 if any. The project is not written.
 
-use std::ffi::OsString;
 use std::path::{absolute, Path, PathBuf};
 use std::process::exit;
-// lint: allow(subprocess) each scene benches in children of this binary, so its load is cold and its memory peak its own
-use std::process::Command;
+
+#[path = "bench_scenes/children.rs"]
+mod children;
+use children::{bench_scene, cold_import, Benched};
 
 use rusty::core::project::Opened;
 use rusty::dev::bench::scenes::{self, import, profile, report, set::Overrides, Extra, Options};
 
 const USAGE: &str = "usage: bench-scenes --project <dir> [--scenes <a,b>] [--size <W>x<H>] [--runs <n>] \
-     [--before <dir>] [--set <k=v>]... [--profile] [--import] <out_dir> | --project <dir> --pending-imports";
+     [--load-runs <n>] [--before <dir>] [--set <k=v>]... [--profile] [--import] <out_dir> | --project <dir> --pending-imports";
 
 /// What one invocation was asked for.
 struct Run {
@@ -45,6 +50,8 @@ struct Run {
     /// The project's reports folder under the out dir.
     out: PathBuf,
     opts: Options,
+    /// How many times each scene is loaded, each in a process of its own.
+    load_runs: u32,
     before: Option<PathBuf>,
     profile: bool,
     /// `--import`: measure `import_ms` once this run.
@@ -85,6 +92,7 @@ fn main() {
         project,
         out,
         opts,
+        load_runs: a.load_runs.unwrap_or(scenes::LOAD_RUNS),
         before: a.before.map(|b| absolute(&b).unwrap_or(b)),
         profile: a.profile,
         import: a.import,
@@ -93,7 +101,10 @@ fn main() {
     match (a.one, a.import_out) {
         (Some(scene), Some(file)) => import_one(&run, &scene, &file),
         (Some(scene), None) if run.profile => profile_one(&run, &scene),
-        (Some(scene), None) => bench_one(&run, &scene, key, a.import_ms),
+        (Some(scene), None) => match a.load_out {
+            Some(file) => load_one(&run, &scene, &file),
+            None => bench_one(&run, &scene, key, a.import_ms, a.loads.as_deref()),
+        },
         (None, _) => bench_all(&run, a.list.as_deref()),
     }
 }
@@ -103,13 +114,15 @@ fn open(run: &Run, path: &Path, what: &str) -> Opened {
     scenes::open(path, &run.set).unwrap_or_else(|e| fail(&format!("cannot open {what}: {e}")))
 }
 
-/// Bench `scene` in this process.
-fn bench_one(run: &Run, scene: &str, key: String, import_ms: Option<f64>) {
+/// Bench `scene` in this process, after the loads kept in `loads`.
+fn bench_one(run: &Run, scene: &str, key: String, import_ms: Option<f64>, loads: Option<&Path>) {
     let opened = open(run, &run.project, "the project");
+    let loads = loads.map(scenes::load::read_all).transpose();
     let extra = Extra {
         baseline: run.before.clone(),
         key,
         import_ms,
+        loads: loads.unwrap_or_else(|e| fail(&e)).unwrap_or_default(),
         set: run.set.said.clone(),
     };
     let done = scenes::bench(
@@ -126,6 +139,15 @@ fn bench_one(run: &Run, scene: &str, key: String, import_ms: Option<f64>) {
     }
 }
 
+/// Load `scene` in this process and keep the load at `file`.
+fn load_one(run: &Run, scene: &str, file: &Path) {
+    let opened = open(run, &run.project, "the project");
+    let scratch = file.parent().unwrap_or(Path::new("."));
+    let loaded = scenes::load(scratch, &opened.root, scene, opened.settings, run.opts);
+    let (_, load) = loaded.unwrap_or_else(|e| fail(&format!("{scene}: load failed: {e}")));
+    scenes::load::write(file, &load).unwrap_or_else(|e| fail(&e));
+}
+
 /// Import the project (a cache-cleared copy), load `scene`, and write both's ms to `file`.
 fn import_one(run: &Run, scene: &str, file: &Path) {
     let opened = open(run, &run.project, "the copy");
@@ -135,7 +157,7 @@ fn import_one(run: &Run, scene: &str, file: &Path) {
     let loaded = scenes::load(scratch, &opened.root, scene, opened.settings, run.opts);
     let ms = loaded.map_or_else(
         |e| fail(&format!("{scene}: cold load failed: {e}")),
-        |l| imported + l.1,
+        |l| imported + l.1.total_ms(),
     );
     // lint: allow(asset-write) a number handed to the parent process, deleted after
     let wrote = std::fs::write(file, ms.to_string());
@@ -205,87 +227,6 @@ fn bench_all(run: &Run, list: Option<&str>) {
     if !failed.is_empty() || !unprofiled.is_empty() {
         exit(1);
     }
-}
-
-/// How one scene's children went.
-enum Benched {
-    Done,
-    /// The timed run failed: the scene has no report this run.
-    Failed,
-    /// The timed run stands; its profile failed.
-    Unprofiled,
-}
-
-/// Bench `scene` in its children: the timed run (given the run's `import_ms`),
-/// then the profile when asked for, whose failure leaves the timings standing.
-fn bench_scene(run: &Run, scene: &str, import_ms: Option<f64>) -> Benched {
-    let mut timed = child(run, &run.project, scene);
-    if let Some(ms) = import_ms {
-        timed.args(["--import-ms", &ms.to_string()]);
-    }
-    if let Some(before) = &run.before {
-        timed.arg("--before").arg(before);
-    }
-    if !timed.status().is_ok_and(|s| s.success()) {
-        return Benched::Failed;
-    }
-    if !run.profile {
-        return Benched::Done;
-    }
-    let mut profiled = child(run, &run.project, scene);
-    let status = profiled.arg("--profile").status();
-    if status.is_ok_and(|s| s.success()) {
-        Benched::Done
-    } else {
-        eprintln!("bench-scenes: {scene}: the profile failed; its timings stand");
-        Benched::Unprofiled
-    }
-}
-
-/// `import_ms`: `scene`'s load in a cache-less copy of the project, in a child;
-/// `None` (said) when the copy or the load failed, and the bench goes on.
-fn cold_import(run: &Run, scene: &str) -> Option<f64> {
-    let copy = run.out.join(".import-copy");
-    let file = copy.join(".import_ms");
-    let loaded = import::scratch(&run.project, &copy).map(|()| {
-        let mut cold = child(run, &copy, scene);
-        cold.arg("--import-out").arg(&file).status()
-    });
-    let ms = match loaded {
-        Ok(Ok(s)) if s.success() => std::fs::read_to_string(&file).ok(),
-        Ok(_) => None,
-        Err(e) => {
-            eprintln!("bench-scenes: cannot copy the project, no import_ms: {e}");
-            let _ = std::fs::remove_dir_all(&copy);
-            return None;
-        }
-    };
-    let _ = std::fs::remove_dir_all(&copy);
-    let ms = ms.and_then(|t| t.trim().parse().ok());
-    if ms.is_none() {
-        eprintln!("bench-scenes: {scene}: the cold load failed: no import_ms");
-    }
-    ms
-}
-
-/// This binary on `scene` of the project at `project`, with the run's size and runs.
-fn child(run: &Run, project: &Path, scene: &str) -> Command {
-    let me = std::env::current_exe().unwrap_or_else(|e| fail(&e.to_string()));
-    let (w, h) = run.opts.size;
-    let mut cmd = Command::new(me);
-    cmd.arg("--project").arg(project).args(["--scene", scene]);
-    cmd.args([
-        "--size",
-        &format!("{w}x{h}"),
-        "--runs",
-        &run.opts.runs.to_string(),
-    ]);
-    for pair in &run.set.said {
-        cmd.args(["--set", pair]);
-    }
-    let root: OsString = run.out.parent().unwrap_or(&run.out).into();
-    cmd.arg(root);
-    cmd
 }
 
 /// The profiler would not record here: what it said, and what to set; no usage.

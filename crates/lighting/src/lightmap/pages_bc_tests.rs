@@ -13,13 +13,13 @@ use rusty_asset::lightmap_page::decode_bc6h;
 use rusty_scene::lighting::settings::MAX_PAGE;
 
 fn map(entity: u32, size: u32, light: Vec3) -> Lightmap {
-    Lightmap {
-        masks: Vec::new(),
+    Lightmap::dense(
         entity,
         size,
-        texels: vec![light; (size * size) as usize],
-        directions: Vec::new(),
-    }
+        vec![light; (size * size) as usize],
+        Vec::new(),
+        Vec::new(),
+    )
 }
 
 #[test]
@@ -52,7 +52,7 @@ fn every_compressed_level_of_a_map_reads_its_own_light() {
             );
             for y in y0 / scale..(y0 + m.size).div_ceil(scale) {
                 for x in x0 / scale..(x0 + m.size).div_ceil(scale) {
-                    let (want, got) = (m.texels[0], level[(y * side + x) as usize]);
+                    let (want, got) = (m.texels()[0], level[(y * side + x) as usize]);
                     let err = (want - got).abs().max_element() / want.max_element();
                     assert!(
                         err <= 0.05,

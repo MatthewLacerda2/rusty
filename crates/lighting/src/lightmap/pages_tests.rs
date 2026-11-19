@@ -12,13 +12,13 @@ use rusty_scene::lighting::page::MIP_LEVELS;
 use rusty_scene::lighting::settings::MAX_PAGE;
 
 fn map(entity: u32, size: u32, value: f32) -> Lightmap {
-    Lightmap {
-        masks: Vec::new(),
+    Lightmap::dense(
         entity,
         size,
-        texels: vec![Vec3::splat(value); (size * size) as usize],
-        directions: Vec::new(),
-    }
+        vec![Vec3::splat(value); (size * size) as usize],
+        Vec::new(),
+        Vec::new(),
+    )
 }
 
 #[test]
@@ -41,7 +41,7 @@ fn every_kept_level_of_a_map_reads_only_its_own_light() {
             for y in y0..y1 {
                 for x in x0..x1 {
                     let texel = level[(y * side + x) as usize];
-                    assert_eq!(texel, m.texels[0], "map {i}, level {l}, ({x}, {y})");
+                    assert_eq!(texel, m.texels()[0], "map {i}, level {l}, ({x}, {y})");
                 }
             }
         }

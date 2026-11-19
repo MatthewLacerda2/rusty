@@ -75,6 +75,26 @@ impl GameWorld {
     }
 }
 
+impl GameWorld {
+    /// Run on the project file as it stands (#1517, #1522, #1749, #1715): its decal
+    /// budgets, quality presets' running values, render-scale default and speed of
+    /// sound, and an empty nav path queue (#2087). On entering Play, on Stop (Unity
+    /// reverts play-mode changes) and when the editor opens, so a hand edit to
+    /// `project.rusty` reaches the next Play.
+    pub fn apply_project_settings(&self) {
+        let mut app = self.resources.application.borrow_mut();
+        let limits = app.decal_limits();
+        self.world.scene.borrow_mut().decals.set_limits(limits);
+        let c = app.audio_settings().speed_of_sound; // reread by `decal_limits`
+        self.resources.audio.borrow_mut().set_speed_of_sound(c);
+        let graphics = self.resources.script_manager.graphics_cell();
+        let mut live = graphics.borrow_mut();
+        live.quality = app.quality_values();
+        live.render_scale.default = app.render_scale_default();
+        self.resources.nav.borrow().reset_path_queue(); // and its budget (#2087)
+    }
+}
+
 /// Load the first of `plan`'s scenes that loads into `scene`, logging the plan's
 /// warnings and every failure to `console` (`announce` also logs each attempt).
 /// Returns the path loaded; `None` leaves `scene` empty, an Untitled scene. A scene

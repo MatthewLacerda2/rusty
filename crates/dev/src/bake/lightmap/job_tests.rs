@@ -75,7 +75,8 @@ fn a_cancel_during_the_encode_keeps_the_previous_lightmaps() {
     let maps = rusty_lighting::lightmap::bake(&input, &quick());
     let cancelled = BakeProgress::default();
     cancelled.cancel();
-    assert_eq!(encode_pages(&maps, 1024, &cancelled), Ok(None));
+    let path = scene_path("cancel_encode");
+    assert_eq!(encode_pages(maps, 1024, &cancelled, &path), Ok(None));
     let (made, pages) = cancelled.pages().expect("it began");
     assert!(pages > 0 && made == 0, "and made no page");
 

@@ -1,8 +1,8 @@
 //! The lightmap bake's report (#1980): per mesh its lightmap edge and texels, UV
 //! charts, worker seconds and texels per second, the lights in reach, and the
 //! texel density it asked for beside the one it got; per page how full it is;
-//! the meshes at Scale In Lightmap 0; what OIDN took; per light the texels in its
-//! reach. A light is in reach of a mesh when the mesh's bounds meet the sphere of
+//! the meshes at Scale In Lightmap 0; what OIDN took; the process's peak resident
+//! memory (#2312); per light the texels in its reach. A light is in reach of a mesh when the mesh's bounds meet the sphere of
 //! its range (a directional light reaches every mesh), so a spot light's cone is
 //! not read. What only the tracer knows (the backface texels it filled) is not in
 //! it.
@@ -26,6 +26,9 @@ pub struct Measured {
     pub times: Vec<MeshTime>,
     /// The lightmaps OIDN cleaned and its worker time.
     pub denoised: Option<(u64, Duration)>,
+    /// The process's peak resident memory once the bake was done, in bytes
+    /// (#2312, `memory::rss_peak_bytes`); `None` where it cannot be read.
+    pub peak_memory: Option<u64>,
 }
 
 /// The report of a bake of `scene` that read `input` with `settings`, ran
@@ -59,6 +62,7 @@ pub fn report(
         "meshes": meshes,
         "zeroScaleInLightmap": zero,
         "denoise": denoise,
+        "peakResidentMB": measured.peak_memory.map(|b| b / (1 << 20)),
         "lights": lights.collect::<Vec<_>>(),
         "invalidTexels": Value::Null,
     }))

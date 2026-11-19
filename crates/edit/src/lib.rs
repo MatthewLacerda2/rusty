@@ -44,10 +44,10 @@ pub mod snapshot;
 mod base_tests;
 
 pub use io::{
-    build_default_scene, bundled, has_unsaved_edits, load_from_file, load_parsed, print_refresh,
-    save_lighting, save_to_file, seed_default_scene, seed_default_scripts, seed_project,
-    seed_workspace, LightingSave, LoadError, DEFAULT_SCENE_PATH, DEFAULT_SCRIPTS_DEST_DIR,
-    LIGHTING_IN_PLAY,
+    build_default_scene, bundled, has_unsaved_edits, load_from_file, load_parsed, load_rehydrated,
+    print_refresh, save_lighting, save_to_file, seed_default_scene, seed_default_scripts,
+    seed_project, seed_workspace, LightingSave, LoadError, DEFAULT_SCENE_PATH,
+    DEFAULT_SCRIPTS_DEST_DIR, LIGHTING_IN_PLAY,
 };
 pub use prefab::link::{list_instance_overrides, reimport_instance, revert_instance_overrides};
 pub use prefab::{

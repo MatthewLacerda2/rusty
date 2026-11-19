@@ -486,6 +486,57 @@ lighting settings (above), whose defaults are the ones listed here.
   A logged bake (`Lighting.BakeLightmaps()`, `Lighting.Generate()`) says OIDN's
   worker time and how many lightmaps it cleaned, in a line of its own in the
   summary: it runs inside the lightmaps step.
+- **Memory.** A script's bake (one-shot) peaks at what it keeps plus what is in
+  flight, never every texel's working data at once. It keeps each finished lightmap
+  as the texels its UV islands cover, not its whole square: 16 bytes a covered texel,
+  16 more for a directional bake and 16 more for a shadowmask one, so a mesh whose
+  islands fill a tenth of its square keeps a tenth of it. In flight are the meshes
+  its workers are tracing (about 112 bytes a covered texel each, one mesh per core at
+  most) and the ones being assembled (about 256 a texel of their squares; a map
+  past 512² is assembled one at a time, so two large maps finishing together wait
+  on each other rather than both being held; smaller ones are assembled side by
+  side, and the estimate below counts each at its square); a mesh's
+  texels are rasterized only when the bake reaches it. OIDN cleans each lightmap
+  with at most 512 MB of scratch (a larger one is cleaned in overlapping tiles;
+  measured on 1016² maps, byte for byte what one pass gives; a larger map, cut
+  into more tiles, is expected to give the same picture without a seam, which
+  nothing has checked byte for byte), and the lightmaps
+  being cleaned at once share 2 GB, so its share does not grow with the cores.
+  Then the pages are made one at a time: each is composed (its lightmaps' squares
+  filled again, which is when a map's edge is dilated and the rest of its square
+  filled), encoded and written to a scratch folder in the project's `cache/`
+  (`cache/lightmap-spill/`, gitignored and never exported; on the project's disk,
+  so the final write only links the pages into `<scene>.lightmaps/`; the project
+  is the nearest folder above the scene holding a `project.rusty` or an `assets/`
+  folder, and only a scene in no project at all spills into the system's temp
+  folder, which may be memory, where the page stage is not bounded), and a
+  lightmap is let go once its page is composed; so the page stage holds one page
+  (about 128 bytes a page texel) and one map's square at a time. The scratch
+  folder is removed when the bake ends, written, cancelled or failed. One a bake
+  killed by a quit or a power cut left is removed by the next bake of any scene
+  of the project: each bake holds a file lock on its own folder, which the system
+  drops with the process, so a folder whose lock is free is a dead bake's. The editor's bake (progressive) also keeps every
+  texel's sums between passes, about 116 bytes a covered texel. So a bake's memory
+  grows with `texelsPerUnit`² and `maxLightmapSize`² (the largest map and the
+  page), and with the scene only by its lightmaps' covered texels. Before it
+  starts, a bake estimates its peak from those (erring high) and warns, naming
+  what holds the peak (finished maps, in flight, OIDN, pages) and the settings to
+  lower, when it passes the memory the machine has free (Linux `MemAvailable`;
+  macOS free and inactive pages); it is refused with the same message when it
+  passes all the machine has. On Linux both are held to the process's memory
+  cgroup (v2) when one caps it (`systemd-run -p MemoryMax=…`, a container's
+  limit): the cap is the total, and what is free is the cap less what the cgroup
+  uses (its inactive file cache counted free). Its last console line and its
+  report (`peakResidentMB`, below) say the process's peak resident memory, which
+  in a headless bake is the bake's. On macOS that is the peak physical footprint,
+  which also counts memory the allocator has freed but not yet given back (a few
+  MB a mesh, even though the bake asks for it back after each mesh and page), so
+  it reads somewhat above what the bake held. On Linux (glibc), a bake also pins
+  the allocator's mmap threshold at its default (128 KiB), so every large block
+  the bake frees goes back to the system at once; glibc has no way back to its
+  adaptive threshold, so this lasts for the rest of the process (an editor
+  session after its first bake), at the cost of a page fault per large
+  allocation.
 - **Max Lightmap Size** (`maxLightmapSize`, Unity's setting; the editor's
   **"Max Lightmap Size"** under the Generate Lighting button). The atlas page's edge in
   texels, a power of two from `32` to `4096`, default `1024`; any other value is held to
@@ -805,7 +856,9 @@ Then each kind's own:
   actualDensity }`: `seconds` is worker time over every thread, the densities are texels
   per metre asked for (texels per unit × Scale In Lightmap) and got), `zeroScaleInLightmap`
   (the meshes left out at Scale In Lightmap 0), `denoise` (`{ charts, seconds }`, `nil`
-  without OIDN) and `lights` (`{ index, kind, position, range, bakesDirect, texelsInReach }`).
+  without OIDN), `peakResidentMB` (the process's peak resident memory when the bake
+  finished, `nil` where it cannot be read: in the editor it counts the editor's own)
+  and `lights` (`{ index, kind, position, range, bakesDirect, texelsInReach }`).
   A light is in reach of a mesh when the mesh's bounds meet the sphere of its range (a
   directional light reaches every mesh): a spot light's cone is not read.
   `invalidTexels` (the backface texels the bake filled) is `nil`: only the tracer knows it.
