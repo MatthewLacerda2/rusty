@@ -42,7 +42,9 @@
 //! is the stage's own GPU work.
 //!
 //! **Parts of a row.** A stage the bench reads by part (the Hi-Z `occlusion`
-//! stage, #2401) takes a pair per [`GpuPart`] instead, each its own pass
+//! stage, #2401) takes a pair per recorded [`GpuPart`] instead (a timed frame
+//! records the cluster cull's three steps, not `OcclusionClusters` itself, whose
+//! row is their sum, #2406), each its own pass
 //! ([`GpuTimer::splits`]): every part adds into its kind's row, so the row is
 //! unchanged, and into [`GpuTimes::parts`]. A gap between two parts inside the
 //! stage's submit (an encoder command) is in `gpu.other`, as between any rows.
@@ -86,8 +88,8 @@ rusty_core::named_enum! {
         Shadows = "shadows",
         /// GPU occlusion culling (#1963), each culling camera's whole `occlusion`
         /// stage: the select, phase one's depth draw, the Hi-Z pyramid, the test,
-        /// the compaction and the cluster cull, a pair per [`GpuPart`], each
-        /// added into this row.
+        /// the compaction and the cluster cull, a pair per recorded [`GpuPart`]
+        /// (the cluster cull's per step), each added into this row.
         Occlusion = "occlusion",
         /// The SSAO depth prepass (#1578), which a primed forward pass starts from.
         SsaoPrepass = "ssao_prepass",

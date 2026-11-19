@@ -74,10 +74,14 @@ mod upload;
 mod args_gpu_tests;
 #[cfg(test)]
 mod cluster_gpu_tests;
+#[cfg(test)]
+mod copy_gpu_tests;
 #[cfg(all(test, feature = "dev"))]
 mod dust2_gpu_tests;
 #[cfg(test)]
 mod gpu_tests;
+#[cfg(test)]
+mod group_gpu_tests;
 #[cfg(test)]
 mod moving_gpu_tests;
 #[cfg(test)]
