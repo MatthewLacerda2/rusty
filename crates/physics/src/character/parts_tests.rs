@@ -1,5 +1,5 @@
 use rapier3d::parry::query::{DefaultQueryDispatcher, ShapeCastOptions};
-use rapier3d::parry::shape::{Capsule, CompositeShape, TriMesh};
+use rapier3d::parry::shape::{Capsule, TriMesh};
 use rapier3d::prelude::*;
 
 use super::cast_parts;
@@ -38,14 +38,7 @@ fn walk(mesh: &TriMesh, constrained: bool) -> Option<ShapeCastHit> {
     };
     let (vel, d) = (Vector::X, &DefaultQueryDispatcher);
     if constrained {
-        cast_parts(
-            d,
-            mesh as &dyn CompositeShape,
-            &pose,
-            vel,
-            &capsule,
-            options,
-        )
+        cast_parts(d, mesh, &pose, vel, &capsule, options)
     } else {
         let parts = rapier3d::parry::shape::CompositeShapeRef(mesh);
         parts

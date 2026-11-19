@@ -50,6 +50,15 @@ class Pace(unittest.TestCase):
         lines = signal(shard(2.0), HEAVY)
         self.assertIn("pace: 2.00 times main's longest", next(l for l in lines if l.startswith("pace:")))
 
+    def test_the_prediction_is_printed_beside_what_the_shard_took(self):
+        # A runner at 0.78 of main is told apart from a plan that weighed wrong:
+        # the prediction is main's, the ratio is this runner's. A test main never
+        # ran is in neither.
+        lines = signal(shard(0.78, **{"gpu::added": 50.0}), HEAVY)
+        self.assertIn("weight: 12 tests main ran, predicted 120 test-seconds by main's longest, "
+                      "took 94 s here (0.78 of the prediction)", lines)
+        self.assertIn("(- of the prediction)", slowest_tests.weight(shard(1.0), {}))
+
 
 class Baseline(unittest.TestCase):
     def test_a_test_is_held_to_its_longest_time_over_mains_runs(self):
