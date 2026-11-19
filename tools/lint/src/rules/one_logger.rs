@@ -1,4 +1,4 @@
-//! `test-logger`: one `log` logger a test binary. A package whose manifest names
+//! `one-logger`: one `log` logger a test binary. A package whose manifest names
 //! `rusty-logging` reads its tests' warnings through it
 //! (`rusty_logging::init_for_tests` and `rusty_logging::forward`), never through
 //! `rusty_test_support::logs`: `log::set_logger` takes the first logger a process
@@ -11,7 +11,7 @@ use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::bare_lines;
 
-pub const RULE: &str = "test-logger";
+pub const RULE: &str = "one-logger";
 
 /// Whether a line of code names test-support's capture (a path or a `use` list).
 fn names_capture(code: &str) -> bool {
@@ -69,5 +69,5 @@ pub fn run(scan: &Scan) -> Vec<Finding> {
 }
 
 #[cfg(test)]
-#[path = "test_logger_tests.rs"]
+#[path = "one_logger_tests.rs"]
 mod tests;

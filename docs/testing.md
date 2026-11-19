@@ -488,7 +488,7 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
   plain `cargo test` the binary re-runs that one test in a child. The `log`
   logger is one a process too: a crate that names `rusty-logging` captures its
   tests' warnings through `rusty_logging::init_for_tests` and `forward`, never
-  `rusty_test_support::logs` (`test-logger`), and each `init` panics when the
+  `rusty_test_support::logs` (`one-logger`), and each `init` panics when the
   other's logger is already installed.
 - **A path a test expects is spelled as the engine writes it**: a plain
   `Path::join("a/b/c")` or `"a/b/c"`, `/`-separated, with a `\` read as part of a

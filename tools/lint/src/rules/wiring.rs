@@ -191,7 +191,7 @@ fn case_for(rule: &str) -> Option<Case> {
             "fn save(m: &M) {\n    let t = serde_json::to_vec(m).unwrap();\n    written::write(p, &t).unwrap();\n}\n",
         ),
         "subprocess" => one(app, "fn f() {\n    std::process::Command::new(\"x\");\n}\n"),
-        "test-logger" => case(
+        "one-logger" => case(
             &[
                 ("Cargo.toml", &package("dependencies", "rusty-logging")),
                 ("src/lib.rs", "fn t() {\n    rusty_test_support::logs::init();\n}\n"),

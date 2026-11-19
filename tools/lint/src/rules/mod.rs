@@ -34,6 +34,7 @@ mod key_guard;
 mod log_tag;
 mod markers;
 mod named_enum;
+mod one_logger;
 mod orphan_module;
 mod orphan_seeds;
 mod physics_borrow;
@@ -49,7 +50,6 @@ mod sorted;
 mod stored_format;
 mod subprocess;
 mod temp_dir;
-mod test_logger;
 mod test_shape;
 mod tool_named_test;
 mod unwrap;
@@ -112,6 +112,7 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (log_tag::RULE, log_tag::run, Allow::Inline),
     (markers::RULE, markers::run, Allow::Inline),
     (named_enum::RULE, named_enum::run, Allow::Inline),
+    (one_logger::RULE, one_logger::run, Allow::Inline),
     (orphan_module::RULE, orphan_module::run, Allow::Own),
     (orphan_seeds::RULE, orphan_seeds::run, Allow::Never),
     (physics_borrow::RULE, physics_borrow::run, Allow::Inline),
@@ -126,7 +127,6 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (stored_format::RULE, stored_format::run, Allow::Inline),
     (subprocess::RULE, subprocess::run, Allow::Inline),
     (temp_dir::RULE, temp_dir::run, Allow::Inline),
-    (test_logger::RULE, test_logger::run, Allow::Inline),
     (test_shape::INNER_CFG, test_shape::run, Allow::Inline),
     (tool_named_test::RULE, tool_named_test::run, Allow::Inline),
     (unwrap::RULE, unwrap::run, Allow::Inline),
