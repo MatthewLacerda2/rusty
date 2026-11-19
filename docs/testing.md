@@ -1183,7 +1183,7 @@ prints the report, keeps it in the run's out dir and returns `{ frames, metrics 
 ### A project's own scenes: `make bench-scenes`
 `make bench` measures one synthetic yard; an optimisation also needs numbers from
 real levels. `make bench-scenes PROJECT=<dir> [SCENES=a,b] [RES=WxH] [RUNS=n]
-[LOAD_RUNS=n] [BEFORE=<dir>] [PROFILE=1] [IMPORT=1]` benches a game project's own scenes, wherever the
+[LOAD_RUNS=n] [BEFORE=<dir>] [PROFILE=1] [IMPORT=1] [SCRIPT=1]` benches a game project's own scenes, wherever the
 project is on disk (`bench-scenes`, `dev::bench::scenes`). `SCENES` names scenes by
 their path under `assets/scenes/` without the extension (`levels/a`); by default
 every `.scene` there, subfolders included (a folder linked twice is walked once), is
@@ -1357,6 +1357,45 @@ every binary's open makes them.
   then the top 40 functions by self time (samples where the function was
   running) and by total time (samples where it was on the stack), and
   `<scene>.folded`, the raw folded stacks (`a;b;c count`) a flame graph reads.
+- **script time by verb**: `SCRIPT=1` (`--script`) times every engine verb the
+  scripts call (`dev::stats::verbs`, `dev::bench::verbs`), in the timed child only
+  (the loads before it and a `PROFILE=1` profile beside it play without the
+  timers, and every child writes under the `script/` folder below). Each Rust
+  function of every namespace (`CharacterController.Move`,
+  `Transform.SetPosition`, …) runs inside a timer, installed by the dev layer
+  before the first Lua VM, on the thread that armed it only: the sim reads no
+  clock, and a run without the flag wraps nothing. A verb written in Lua
+  (`Particles.ForEach`, `GetParticles`, `SetParticles`) is timed by its Rust
+  halves, which it calls through a table the timers reach
+  (`script::api::RUST_HALVES`); its Lua loop, and the script's `fn` it calls, are
+  `script.lua`'s. A verb's time is **exclusive**: Lua it calls back (`Move`
+  raising `OnControllerColliderHit`) and the verbs that Lua calls are counted
+  where they belong, not in it, and a callback that catches its own error
+  (`pcall`) still ends where it returns. The report adds
+  `script.<Namespace.Verb>` (its own ms per frame, at the reference CPU clock) and
+  `script.<Namespace.Verb>.calls` for the 10 costliest verbs, costliest first,
+  each over every frame of the scene (a viewpoint or run that never called it
+  counts as zero), the rest summed as `script.other_verbs` (and `.calls`; its p95
+  and spread are the verbs' summed, an upper bound), `script.calls` (every verb's
+  calls per frame), `script.overhead` (the timers' own time inside
+  `cpu.update_scripts`: setting the call hook, the clock reads) and `script.lua`:
+  what of `cpu.update_scripts` neither a verb nor the timers hold, the VM running
+  `Update` and the calls the timers do not see (a handle's methods). Two limits:
+  the call hook's own work while a verb calls back into Lua lands in that verb's
+  time or that Lua's, and a coroutine a verb starts (`Timer.StartCoroutine`) that yields leaves
+  the rest of that verb's call counted as Lua. The verb rows count every system's
+  calls (`LateUpdate`, the timer phase, callbacks), so they and `script.lua` need
+  not sum to `cpu.update_scripts`. The timers cost time, so `cpu.update_scripts`
+  here is not the plain run's: the reports are kept apart, under
+  `out/bench/scenes/<project>-<hash>/script/`, and compare with another `SCRIPT=1`
+  run; `BEFORE=` looks in the baseline's `script/` folder first, and a plain
+  report, when that is all it holds, is another shape: no change column. A
+  wrapped verb takes, returns and raises what the bare one does, and the run
+  plays the same frames. The timer phase is its own system in every run,
+  `cpu.tick_script_timers` (due `Timer.Invoke`s, resumed coroutines), beside
+  `cpu.update_scripts`. A profile (`PROFILE=1`) shows where a verb spends its
+  time, by function; these rows show which verbs cost the row, how often each is
+  called, and its cost per call, without reading stacks.
 - **a profile refuses itself** when its recording was not sound: fewer than 20%
   of its samples land in a named function of the bench binary, or it holds
   fewer than a tenth of the samples its measured seconds should give at the

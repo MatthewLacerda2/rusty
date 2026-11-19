@@ -2,11 +2,14 @@
 //! average of their averages, the worst p95 and the viewpoint that gave it), then
 //! over the runs (the average of the runs', the worst p95, and the lowest and
 //! highest run as the row's spread), and one warning per kind of CPU spread their
-//! windows showed.
+//! windows showed. A `script.` row (`bench::verbs`) a viewpoint or run lacks is
+//! a verb it never called, so it counts there as zero: each verb's row is over the
+//! same frames as `cpu.update_scripts`.
 
 use super::super::clock::Spread;
 use super::super::{Report, Summary};
 use super::report::Row;
+use crate::bench::verbs::absent_is_zero;
 
 /// Fold the viewpoints' reports, labelled, into rows: metrics in the order they
 /// were first seen, each the average of the averages and the worst p95.
@@ -29,8 +32,10 @@ pub fn aggregate(reports: &[(String, Report)]) -> Vec<Row> {
             }
         }
     }
+    let all = u32::try_from(reports.len()).unwrap_or(u32::MAX);
     rows.into_iter()
         .map(|(mut row, n)| {
+            let n = if absent_is_zero(&row.metric) { all } else { n };
             row.avg /= f64::from(n.max(1));
             (row.lo, row.hi) = (row.avg, row.avg);
             row
@@ -59,9 +64,16 @@ pub fn over_runs(runs: &[Vec<Row>]) -> Vec<Row> {
             }
         }
     }
+    let all = u32::try_from(runs.len()).unwrap_or(u32::MAX);
     rows.into_iter()
         .map(|(mut row, n)| {
-            row.avg /= f64::from(n);
+            if absent_is_zero(&row.metric) && n < all {
+                // The runs without it called it no time: one of them is the lowest.
+                row.lo = row.lo.min(0.0);
+                row.avg /= f64::from(all);
+            } else {
+                row.avg /= f64::from(n);
+            }
             row
         })
         .collect()
@@ -107,3 +119,7 @@ pub fn spread_warnings(spreads: &[(String, Vec<(Spread, f64)>)]) -> Vec<String> 
 #[cfg(test)]
 #[path = "fold_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "fold_script_tests.rs"]
+mod script_tests;

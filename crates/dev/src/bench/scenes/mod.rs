@@ -180,6 +180,10 @@ pub fn bench(
     report.scene = scene.to_string();
     report.size = opts.size;
     report.set.clone_from(&extra.set);
+    if crate::stats::verbs::armed() {
+        report.script = true;
+        super::verbs::keep_top(&mut report.rows);
+    }
     let loads: Vec<Load> = extra.loads.iter().cloned().chain([own]).collect();
     report.loads = loads.len() as u32;
     report.rows.extend(load::rows(&loads));
@@ -208,7 +212,7 @@ pub fn bench(
     let previous = match &extra.baseline {
         Some(dir) => {
             report.baseline = Some(dir.display().to_string());
-            report::read_baseline(dir, &extra.key, scene)
+            report::read_baseline(dir, &extra.key, scene, report.script)
         }
         None => report::read(out_dir, scene),
     };
