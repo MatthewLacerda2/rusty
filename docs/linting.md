@@ -94,7 +94,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Test files named for behaviour | `tools/lint -- --rules` (`tool-named-test`) | **hard gate**: a test file whose name starts with `survivor`, `mutant` or `mutation` is renamed for what its tests prove; a module whose subject carries the word takes `// lint: allow(tool-named-test) <why>` on its first line |
 | Test source shape | `tools/lint -- --rules` (`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`) | **hard gate**: no inner `#![cfg]` in `tests/`, no user workspace in tests, a GPU only through `headless_or_skip` (#980) |
 | Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `rusty_test_support::temp::dir()` (in-crate) / `crate::temp::dir()` (`tests/`), never a bare `std::env::temp_dir()` (#999) |
-| Tests write no process-wide static | `tools/lint -- --rules` (`test-static-write`) | **hard gate**: a test line, or a production line inside a `fn` documented as a test hook, never writes a `static` declared outside a `thread_local!` (`.store(`, `.swap(`, `.fetch_*(`, `.compare_exchange*(`, `.set(`, `.write()`, or a `.lock()` written through on the same line): the one-process run shares it between every test of the binary; keep the state on the value, in a `thread_local!` or in a child process, or take `// lint: allow(test-static-write) <why>` (#2422) |
+| Tests write no process-wide static | `tools/lint -- --rules` (`test-static-write`) | **hard gate**: a test line, or a production line inside a `fn` documented as a test hook, never writes a `static` declared outside a `thread_local!` (`.store(`, `.swap(`, `.fetch_*(`, `.compare_exchange*(`, `.set(`, `.get_or_init(`, `.write()`, or a `.lock()` guard written through, a rustfmt-split chain included): the one-process run shares it between every test of the binary; keep the state on the value, in a `thread_local!` or in a child process, or take `// lint: allow(test-static-write) <why>` (#2422) |
 | Tests | nextest + `cargo test --doc` (`make test`) | **hard gate**: the engine's tests and doctests, both feature sets; the GPU tests run on lavapipe, in the `dev` set (`docs/testing.md`, *Which suite runs the GPU tests*). In CI, `build-test` runs as three parallel jobs, the default suite and the `dev` suite in two shards, each with the timeout to itself (#2264) |
 | `tools/lint` stays std-only | `make test-lint` | its `Cargo.lock` names one package, itself (#935) |
 
@@ -775,20 +775,30 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   gates, then fails there at random, or worse keeps passing while the other tests
   run with the flag flipped and test nothing. So a write to a `static` declared
   outside a `thread_local!` (an atomic's `.store(`, `.swap(`, `.fetch_*(`,
-  `.compare_exchange*(`; a `OnceLock`'s `.set(`; an `RwLock`'s `.write()`; a
-  `.lock()` that a same-line `*… =`, `.push(`, `.insert(`, `.clear(`, … writes
-  through) fails on a test line (`test_code.rs`), and on a production line inside
-  a `fn` whose doc calls it a test hook (`crates/CLAUDE.md`, *Test hooks*), which
-  every test that arms it inherits. A name counts as process-wide unless its file,
-  or a file in its directory or the one above, declares it in a `thread_local!`.
+  `.compare_exchange*(`; a `OnceLock`'s `.set(` or `.get_or_init(`; an `RwLock`'s
+  `.write()`; a `.lock()` whose guard, past one `.unwrap()`, `.unwrap_or_else(..)`
+  or `.expect(..)`, is assigned (`*… =`), has a field or index assigned
+  (`.count += 1`), or takes a mutating first call: `.push*(`, `.pop*(`,
+  `.insert(`, `.clear(`, `.remove*(`, `.retain(`, `.extend*(`, `.append(`,
+  `.sort*(`, `.dedup*(`, `.drain(`, `.entry(`, `.get_mut(`, a one-argument
+  `.replace(`, …) fails on a test line (`test_code.rs`), and on a production line
+  inside a `fn` whose doc calls it a test hook, or anywhere in a file whose `//!`
+  header does (`crates/CLAUDE.md`, *Test hooks*), which every test that arms it
+  inherits. A chain rustfmt split onto `.`-led lines is read as one. A read through
+  a guard (`.len()`, `.iter()`, `str`'s two-argument `.replace(`) passes. A name a
+  file declares is what that file says; another counts as process-wide unless a
+  file in its directory or the one above declares it in a `thread_local!`.
   The sound shapes: state on the value under test (`lighting::lightmap::Rays::counted`),
   a `thread_local!` when the code under test runs on the test's own thread, a child
   process when the state is truly process-wide. A write that is sound anyway (a
   one-way idempotent switch every caller sets the same, a unique-name counter no
   test reads back) takes `// lint: allow(test-static-write) <why>`. A line scan:
-  it does not see a guard bound on one line and written on the next, a `static`
-  reached through a function not marked as a test hook, or process-wide state
-  behind another crate's API (a registry a call appends to); those stay the
+  it does not see a guard bound on one line and written on the next, a guard call
+  whose argument spans lines, a `LazyLock` filled by being read, a `static`
+  reached through a function not marked as a test hook, process-wide state behind
+  another crate's API (a registry a call appends to), or `crates/test-support/`,
+  whose process-wide statics (`logs.rs`' `KEPT`, `ONCE`) the shared test-line
+  definition does not count as test code; those stay the
   nightly run's to catch (`rules/static_write.rs`).
 - **`test-temp-dir`** — a path under `std::env::temp_dir()` is shared by every test
   process, every worktree and (under `cargo test`) every test

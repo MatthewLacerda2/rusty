@@ -9,11 +9,17 @@
 //!
 //! - a **test line** writing a `static` declared outside a `thread_local!`: an
 //!   atomic's `.store(`, `.swap(`, `.fetch_*(` or `.compare_exchange*(`, a
-//!   `OnceLock`'s `.set(`, an `RwLock`'s `.write()`, or a `.lock()` that mutates on
-//!   the same line (`*X.lock().unwrap() = …`, `X.lock().unwrap().push(…)`);
+//!   `OnceLock`'s `.set(` or `.get_or_init(` (a cache filled), an `RwLock`'s
+//!   `.write()`, or a `.lock()` whose guard (past one `.unwrap()`,
+//!   `.unwrap_or_else(..)` or `.expect(..)`) is written through: assigned
+//!   (`*X.lock().unwrap() = …`), a field or index of it assigned (`.count += 1`),
+//!   or a mutating first call (`.push*(`, `.pop*(`, `.insert(`, `.sort*(`, …, a
+//!   one-argument `.replace(`). A chain rustfmt split onto `.`-led lines is read
+//!   as one line;
 //! - a **test hook** writing one: the same write on a production line inside a
-//!   `fn` whose doc says it is a test hook (`crates/CLAUDE.md`, *Test hooks*), which
-//!   every test that arms it inherits.
+//!   `fn` whose doc says it is a test hook, or anywhere in a file whose `//!`
+//!   header says so (`crates/CLAUDE.md`, *Test hooks*), which every test that
+//!   arms it inherits.
 //!
 //! The sound shapes are state owned by the value under test
 //! (`lighting::lightmap::Rays::counted`), a `thread_local!` when the code under
@@ -22,35 +28,21 @@
 //! says why with `// lint: allow(test-static-write) <why>`.
 //!
 //! A line scan, not a type checker. It cannot see a guard bound on one line and
-//! written through on the next, a static reached through a function that is not
-//! marked as a test hook, nor process-wide state behind another crate's API (a
-//! registry a call appends to): those stay the nightly one-process run's to catch.
-
+//! written through on the next (`let mut g = X.lock()…; g.push(…)`), a guard
+//! call whose argument spans lines, a `LazyLock` filled by being read, a static
+//! reached through a function that is not marked as a test hook, process-wide
+//! state behind another crate's API (a registry a call appends to), nor
+//! `crates/test-support/`, which holds process-wide statics (`logs.rs`' `KEPT`,
+//! `ONCE`) that the shared test-line definition does not count as test code: those stay the nightly one-process run's to catch.
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::bare_lines;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+
+mod writes;
+pub use writes::writes;
 
 pub const RULE: &str = "test-static-write";
-
-/// The methods that write an atomic or a `OnceLock` in place.
-const WRITES: &[&str] = &[".store(", ".swap(", ".fetch_", ".compare_exchange", ".set("];
-
-/// What a guard from `.lock()` is written through on the same line.
-const MUTATES: &[&str] = &[
-    ".push(",
-    ".insert(",
-    ".clear(",
-    ".remove(",
-    ".retain(",
-    ".extend(",
-    ".take(",
-    ".replace(",
-    ".truncate(",
-    ".drain(",
-    ".entry(",
-    ".get_mut(",
-];
 
 /// The `static` names one file declares: process-wide, and inside a `thread_local!`.
 #[derive(Default)]
@@ -107,35 +99,6 @@ fn declared(line: &str) -> Option<String> {
     (upper && rest.trim_start().starts_with(':')).then(|| name.to_string())
 }
 
-/// Does `line` write one of `names`, by [`WRITES`], `.write()`, or a `.lock()` it
-/// mutates through? The name must stand alone (a path's last segment counts).
-pub fn writes(line: &str, names: &BTreeSet<String>) -> bool {
-    names.iter().any(|name| {
-        line.match_indices(name.as_str()).any(|(at, _)| {
-            let before = line[..at].chars().next_back();
-            if before.is_some_and(|c| c.is_alphanumeric() || c == '_') {
-                return false;
-            }
-            let after = &line[at + name.len()..];
-            if WRITES.iter().any(|w| after.starts_with(w)) || after.starts_with(".write()") {
-                return true;
-            }
-            after.starts_with(".lock()")
-                && (MUTATES.iter().any(|m| after.contains(m))
-                    || (line[..at].trim_start().starts_with('*') && assigns(after)))
-        })
-    })
-}
-
-/// Does `rest` assign (` = `, ` += `, …), not compare?
-fn assigns(rest: &str) -> bool {
-    rest.match_indices('=').any(|(i, _)| {
-        let prev = rest[..i].chars().next_back();
-        let next = rest[i + 1..].chars().next();
-        next != Some('=') && !matches!(prev, Some('=' | '!' | '<' | '>'))
-    })
-}
-
 /// Is the production line `at` of `bare` inside a `fn` whose doc (`raw`'s comment
 /// and attribute lines right above it) calls it a test hook?
 pub fn in_test_hook(bare: &[String], raw: &[&str], at: usize) -> bool {
@@ -155,26 +118,51 @@ pub fn in_test_hook(bare: &[String], raw: &[&str], at: usize) -> bool {
         .any(|l| l.to_lowercase().contains("test hook"))
 }
 
-/// The findings of one file, given the process-wide statics it can name.
+/// Does the file's `//!` header call the whole module a test hook?
+fn hook_module(raw: &[&str]) -> bool {
+    raw.iter()
+        .take_while(|l| l.trim_start().starts_with("//!"))
+        .any(|l| l.to_lowercase().contains("test hook"))
+}
+
+/// Line `i` of `bare`, with the `.`-led lines rustfmt split its chain onto.
+fn chained(bare: &[String], i: usize) -> std::borrow::Cow<'_, str> {
+    let next = bare[i + 1..]
+        .iter()
+        .take_while(|l| l.trim_start().starts_with('.'));
+    let mut lines = next.peekable();
+    if lines.peek().is_none() {
+        return bare[i].as_str().into();
+    }
+    let mut joined = bare[i].trim_end().to_string();
+    lines.for_each(|l| joined.push_str(l.trim()));
+    joined.into()
+}
+
+/// The findings of one file (`bare`, its [`bare_lines`]), given which `static`
+/// names are process-wide for it.
 pub fn check_file(
     path: &str,
     source: &str,
+    bare: &[String],
     test: &[bool],
-    names: &BTreeSet<String>,
+    is_process: &dyn Fn(&str) -> bool,
 ) -> Vec<Finding> {
     let at = crate::modules::module_path(path);
     if !(at.starts_with("src/") || at.starts_with("tests/")) {
         return Vec::new();
     }
-    let bare = bare_lines(source);
     let raw: Vec<&str> = source.lines().collect();
+    let module = hook_module(&raw);
+    let hooks = module || source.to_lowercase().contains("test hook");
     (0..bare.len())
-        .filter(|&i| writes(&bare[i], names))
+        .filter(|&i| test.get(i).copied().unwrap_or(false) || hooks)
+        .filter(|&i| writes(&chained(bare, i), is_process))
         .filter_map(|i| {
             let message = if test.get(i).copied().unwrap_or(false) {
                 "a test writes a process-wide `static`: in the one-process run (`make \
                  test-one-process`) every test of the binary shares it"
-            } else if in_test_hook(&bare, &raw, i) {
+            } else if module || in_test_hook(bare, &raw, i) {
                 "a test hook writes a process-wide `static`: every test that arms it \
                  shares it in the one-process run (`make test-one-process`)"
             } else {
@@ -195,30 +183,48 @@ pub fn check_file(
         .collect()
 }
 
-/// The rule over every scanned file. A name counts as process-wide unless the
-/// file, or a file in its directory or the one above, declares it thread-local:
-/// the same name is a `static` in one module and a `thread_local!` in another.
+/// The directory `path` sits in, `""` at the root.
+fn dir(path: &str) -> &str {
+    path.rsplit_once('/').map_or("", |(d, _)| d)
+}
+
+/// The rule over every scanned file. A name a file declares is what that file
+/// says; any other is process-wide when some file declares it so, unless a file
+/// in its directory or the one above declares it thread-local: the same name is
+/// a `static` in one module and a `thread_local!` in another.
 pub fn run(scan: &Scan) -> Vec<Finding> {
-    let all: Vec<(&str, Decls)> = scan
+    let bare: BTreeMap<&str, Vec<String>> = scan
         .files
         .iter()
-        .map(|p| (p.as_str(), decls(&bare_lines(scan.source(p)))))
+        .map(|p| (p.as_str(), bare_lines(scan.source(p))))
         .collect();
-    let process: BTreeSet<String> = all.iter().flat_map(|(_, d)| d.process.clone()).collect();
-    let dir = |p: &str| p.rsplit_once('/').map_or("", |(d, _)| d).to_string();
+    let all: BTreeMap<&str, Decls> = bare.iter().map(|(p, b)| (*p, decls(b))).collect();
+    let process: BTreeSet<&str> = all
+        .values()
+        .flat_map(|d| &d.process)
+        .map(String::as_str)
+        .collect();
+    let mut local: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    for (p, d) in &all {
+        local
+            .entry(dir(p))
+            .or_default()
+            .extend(d.local.iter().map(String::as_str));
+    }
+    let none = BTreeSet::new();
     scan.each_file(|p, s| {
-        let near = [dir(p), dir(&dir(p))];
-        let local: BTreeSet<&String> = all
-            .iter()
-            .filter(|(q, _)| near.contains(&dir(q)))
-            .flat_map(|(_, d)| &d.local)
-            .collect();
-        let names = process
-            .iter()
-            .filter(|n| !local.contains(n))
-            .cloned()
-            .collect();
-        check_file(p, s, scan.test_lines(p), &names)
+        let own = &all[p];
+        let near = [
+            local.get(dir(p)).unwrap_or(&none),
+            local.get(dir(dir(p))).unwrap_or(&none),
+        ];
+        let is_process = |n: &str| {
+            own.process.contains(n)
+                || (!own.local.contains(n)
+                    && process.contains(n)
+                    && !near.iter().any(|l| l.contains(n)))
+        };
+        check_file(p, s, &bare[p], scan.test_lines(p), &is_process)
     })
 }
 

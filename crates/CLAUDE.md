@@ -83,7 +83,8 @@ manifest, the row, then the compiler names every path left to fix.
   one `pub` says so. An item only tests use elsewhere is a *test hook*.
 - **Test hooks.** A `#[cfg(test)]` item is invisible outside its crate, so one that
   another crate's tests call is compiled in every build, `#[doc(hidden)] pub`, with a
-  line saying it is a test hook (`core::project::pin_engine`, `core::hulls::forget`,
+  line saying it is a test hook, in its doc or, for a module of hooks, the file's
+  `//!` header (`core::project::pin_engine`, `core::hulls::forget`,
   `core::wake::rings`). One that needs a crate the hook's own crate has only as a
   dev-dependency (a proptest strategy) is a `#[doc(hidden)] #[macro_export]` macro,
   expanded in the caller's test against the caller's dev-dependency

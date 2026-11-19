@@ -193,13 +193,13 @@ fn case_for(rule: &str) -> Option<Case> {
         ),
         "subprocess" => one(app, "fn f() {\n    std::process::Command::new(\"x\");\n}\n"),
         "test-inner-cfg" => one("tests/a.rs", "#![cfg(feature = \"dev\")]\n#[test]\nfn t() {}\n"),
-        "test-temp-dir" => one(
-            "tests/a.rs",
-            "#[test]\nfn t() {\n    let p = std::env::temp_dir().join(\"x\");\n}\n",
-        ),
         "test-static-write" => one(
             "crates/app/src/a_tests.rs",
             "static ON: AtomicBool = AtomicBool::new(false);\n#[test]\nfn t() {\n    ON.store(true, Relaxed);\n}\n",
+        ),
+        "test-temp-dir" => one(
+            "tests/a.rs",
+            "#[test]\nfn t() {\n    let p = std::env::temp_dir().join(\"x\");\n}\n",
         ),
         "tool-named-test" => one("tests/nav/survivors.rs", "#[test]\nfn t() {}\n"),
         "unwrap-deny" => one("crates/physics/src/lib.rs", "//! A sim crate.\n"),
