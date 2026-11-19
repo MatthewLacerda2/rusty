@@ -1,4 +1,5 @@
 mod fold;
+mod names;
 mod workspace;
 
 use super::report;

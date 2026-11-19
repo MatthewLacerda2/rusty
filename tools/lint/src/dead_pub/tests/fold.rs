@@ -75,7 +75,7 @@ fn a_member_path_names_its_module_once_and_drops_a_global_prefix() {
         "use crate::ecs::a;\nfn f(_: &crate::ecs::World) { crate::ecs::g(); trusty_ecs::h(); }\n"
     );
     assert_eq!(
-        fold::renamed("$crate::x::y", &[("crate", "crate::m")]),
-        "$crate::m::x::y"
+        fold::caller("$crate::x::y\n", "m", "rusty", false, &[]),
+        "$crate::m::x::y\n"
     );
 }

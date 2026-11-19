@@ -26,9 +26,6 @@ impl RenderCounters {
             ("decals_visible", self.decals_visible.into()),
             ("decal_cluster_refs", self.decal_cluster_refs),
             ("decal_maps_dropped", self.decal_maps_dropped.into()),
-            ("ui_draws", self.ui_draws.into()),
-            ("ui_mask_passes", self.ui_mask_passes.into()),
-            ("ui_blur_passes", self.ui_blur_passes.into()),
             ("ssao_samples", self.ssao_samples),
             ("ssil_samples", self.ssil_samples),
             ("volumetric_froxels", self.volumetric_froxels),
@@ -50,6 +47,7 @@ impl RenderCounters {
             ("render_upload_bytes", self.render_upload_bytes),
         ]);
         pairs.extend(self.shadow_pairs());
+        pairs.extend(self.ui_pairs());
         pairs.extend(self.uploads.pairs());
         pairs.extend(self.ops.pairs());
         pairs
@@ -86,6 +84,16 @@ impl RenderCounters {
             ("shadow_atlas_texels", self.shadow_atlas_texels),
             ("shadow_atlas_cached", self.shadow_atlas_cached.into()),
             ("shadow_atlas_rebaked", self.shadow_atlas_rebaked.into()),
+        ]
+    }
+
+    /// The UI pass's counters, under their metric names.
+    fn ui_pairs(&self) -> [(&'static str, u64); 4] {
+        [
+            ("ui_draws", self.ui_draws.into()),
+            ("ui_meshed", self.ui_meshed.into()),
+            ("ui_mask_passes", self.ui_mask_passes.into()),
+            ("ui_blur_passes", self.ui_blur_passes.into()),
         ]
     }
 }
