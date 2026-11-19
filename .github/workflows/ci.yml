@@ -203,13 +203,15 @@ jobs:
     # are the two `dev` shards, which run the gpu group (355 s and 562 s of nextest
     # in run 44351591966); the default entry, which leaves that group to them, 73 s.
     timeout-minutes: 30
-    # The one Ubuntu image: every Ubuntu job in `.github/workflows/` names
-    # this one (`.github/scripts/tests/test_runner_image.py`), so the mutation,
-    # coverage and health runs test on the lavapipe the gate proves, and a move
-    # happens here, for all of them at once. Read #2385 before moving it: a
-    # shadowed spot's shaft (`volumetric_fog::gpu::shaft`) went missing twice on
-    # the newest-Ubuntu label's Mesa 26 lavapipe and never on this image's
-    # Mesa 25, its cause not named, so a move to Mesa 26 is where it may return.
+    # The one Ubuntu image: every Ubuntu job in `.github/workflows/`, and every
+    # cache key that names an image, names this one (`test_runner_image.py` in
+    # `.github/scripts/tests/`), so the mutation,
+    # coverage and health runs test on the lavapipe the gate proves. A move is
+    # one PR changing every one of them, which that check lists. Read #2385 before
+    # moving it: a shadowed spot's shaft (`volumetric_fog::gpu::shaft`) went
+    # missing twice on the newest-Ubuntu label's Mesa 26 lavapipe and never on
+    # this image's Mesa 25, its cause not named, so a move to Mesa 26 is where it
+    # may return.
     runs-on: ubuntu-24.04
     if: >-
       github.event_name == 'push' ||

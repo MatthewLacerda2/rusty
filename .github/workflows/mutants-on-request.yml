@@ -288,7 +288,10 @@ jobs:
           # exactly and build cold. `save-if` is read when this step starts,
           # so it tests the plan's count rather than waiting for Baseline
           # (`test_cache_save.py` holds the expression).
-          shared-key: mutants
+          # The image is in the key: rust-cache's own names the OS and the
+          # architecture, not the image, so a `target/` built on another image
+          # (another glibc and GCC) would restore here (`test_runner_image.py`).
+          shared-key: mutants-ubuntu-24.04
           save-if: ${{ github.ref == 'refs/heads/main' && matrix.shard == 0 && needs.plan.outputs.in_scope != '0' }}
       - name: System libs for winit/wgpu builds
         uses: ./.github/actions/system-libs

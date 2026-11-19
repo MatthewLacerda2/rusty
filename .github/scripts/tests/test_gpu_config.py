@@ -26,6 +26,7 @@ import unittest
 from pathlib import Path
 
 import slowest_tests
+from tests.workflows import jobs
 
 try:
     import tomllib  # 3.11+; CI's runner has it, an older local python3 skips
@@ -75,13 +76,6 @@ def nextest_caps(config: str) -> dict[str, int]:
 def gpu_filters(config: dict) -> set[str]:
     return {o["filter"] for o in config["profile"]["default"]["overrides"]
             if o.get("test-group", "").startswith("gpu")}
-
-
-def jobs(text: str) -> dict[str, str]:
-    """Each top-level job's name and its body, comments dropped."""
-    text = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("#"))
-    parts = re.split(r"^  ([\w-]+):\n", text.split("\njobs:\n", 1)[1], flags=re.M)
-    return dict(zip(parts[1::2], parts[2::2]))
 
 
 def runs_suite(body: str) -> bool:

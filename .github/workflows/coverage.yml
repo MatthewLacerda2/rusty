@@ -46,7 +46,10 @@ jobs:
         with:
           # Its own key: instrumented builds carry different RUSTFLAGS. Read
           # weekly, inside GitHub's seven-day eviction, so it stays warm.
-          shared-key: coverage
+          # The image is in the key: rust-cache's own names the OS and the
+          # architecture, not the image, so a `target/` built on another image
+          # (another glibc and GCC) would restore here (`test_runner_image.py`).
+          shared-key: coverage-ubuntu-24.04
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: System libs for winit/wgpu builds
         uses: ./.github/actions/system-libs
