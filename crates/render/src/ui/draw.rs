@@ -11,7 +11,7 @@
 //! `WorldSpace` canvases — signs and terminals are scene geometry; the game's HUD
 //! and a camera canvas glued to the editor's free-fly camera are not.
 //!
-//! **Dirty strategy.** Each view keeps every canvas's mesh with what it was built
+//! **Dirty strategy.** Each view keeps every root canvas's mesh with what it was built
 //! from (`kept`): the layout is recomputed every frame, but a canvas whose rects,
 //! frame, texture sizes and glyph atlases are unchanged and whose UI components no
 //! write touched (the World's change log) keeps its mesh unbuilt. One vertex buffer

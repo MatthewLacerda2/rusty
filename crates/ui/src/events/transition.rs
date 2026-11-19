@@ -21,14 +21,12 @@ use rusty_asset::MapRef;
 use rusty_components::SelectableTransition;
 use rusty_ecs::World;
 
-/// Put `tint` and `sprite` on `target`'s Image, Shape and Text. Each is written only
+/// Put `tint` on `target`'s Image, Shape and Text, and `image`'s sprite on its
+/// Image when [`EventSystem::target_state`] found it differs. Each is written only
 /// when it shows something else: a write is a change on the World's change log,
 /// which the renderer reads to keep a still canvas's mesh (#2416).
-fn show(world: &mut World, target: u32, tint: Vec4, sprite: Option<MapRef>) {
-    let image = world
-        .image(target)
-        .map(|i| (i.state_tint, i.override_texture.clone()));
-    if image.is_some_and(|i| i != (tint, sprite.clone())) {
+fn show(world: &mut World, target: u32, tint: Vec4, image: Option<Option<MapRef>>) {
+    if let Some(sprite) = image {
         if let Some(mut image) = world.image_mut(target) {
             (image.state_tint, image.override_texture) = (tint, sprite);
         }
@@ -62,20 +60,38 @@ impl EventSystem {
         ids.sort_unstable();
         self.fades.retain(|id, _| ids.binary_search(id).is_ok());
         for id in ids {
-            let Some(sel) = world.selectable(id).map(|s| s.clone()) else {
-                continue;
-            };
-            let state = self.state_of(world, id);
-            let (tint, sprite) = match sel.transition {
-                SelectableTransition::ColorTint => {
-                    let to = sel.color(state);
-                    (self.fade(id, to, sel.fade_duration, dt), None)
-                }
-                SelectableTransition::SpriteSwap => (Vec4::ONE, sel.sprite(state)),
-                SelectableTransition::None => (Vec4::ONE, None),
-            };
-            show(world, sel.target(id), tint, sprite.cloned());
+            if let Some((target, tint, image)) = self.target_state(world, id, dt) {
+                show(world, target, tint, image);
+            }
         }
+    }
+
+    /// Selectable `id`'s target, the tint its state shows, and the sprite to put on
+    /// the target's Image when that Image shows another tint or sprite (`None`: no
+    /// Image write). The sprite is compared by reference and cloned only for a
+    /// write, so a settled Selectable allocates nothing.
+    fn target_state(
+        &mut self,
+        world: &World,
+        id: u32,
+        dt: f32,
+    ) -> Option<(u32, Vec4, Option<Option<MapRef>>)> {
+        let sel = world.selectable(id)?;
+        let state = self.state_of(world, id);
+        let (tint, sprite) = match sel.transition {
+            SelectableTransition::ColorTint => {
+                let to = sel.color(state);
+                (self.fade(id, to, sel.fade_duration, dt), None)
+            }
+            SelectableTransition::SpriteSwap => (Vec4::ONE, sel.sprite(state)),
+            SelectableTransition::None => (Vec4::ONE, None),
+        };
+        let target = sel.target(id);
+        let image = world
+            .image(target)
+            .filter(|i| i.state_tint != tint || i.override_texture.as_ref() != sprite)
+            .map(|_| sprite.cloned());
+        Some((target, tint, image))
     }
 
     /// Advance `id`'s fade toward `to` by `dt`; returns the colour to show now.

@@ -415,17 +415,25 @@ batch together as `Normal` solid geometry; the scan line's `Additive` is a new b
   alternating `Normal` and `Additive` graphics pays a draw per switch: keep additive
   elements adjacent in hierarchy order (`RenderCounters::ui_draws` reports the count).
   An entity with several graphics draws its `Image`, then its `Shape`, then its `Text`.
-- **Dirty.** Each view keeps every canvas's mesh beside its buffer, with what it was
-  built from: the canvas's laid-out rects, the frame it is meshed into, the size of
-  every texture it read and the glyph atlases' generation. The layout is recomputed
-  every frame; a canvas is meshed again only when one of those differs or a write
-  touched one of its elements' UI components (`Image`, `Text`, `Shape`, `Mask`,
-  `RectMask`, `CanvasGroup`, `BackdropFilter`, `Canvas`) or active flags, which the
-  World's change log reports. Its buffer is re-uploaded only when the rebuilt mesh
-  differs, and reallocated only when it outgrows its capacity. So a still HUD meshes
-  and uploads nothing per frame, and a HUD whose minimap turns meshes only the
-  minimap's canvas: a canvas that changes every frame is worth its own `Canvas`
+- **Dirty.** Each view keeps every root canvas's mesh beside its buffer, with what
+  it was built from: the canvas's laid-out rects, the frame it is meshed into, the
+  size of every texture it read and the glyph atlases' generation. The layout is
+  recomputed every frame; a canvas is meshed again only when one of those differs or
+  a write touched one of its elements' UI components (`Image`, `Text`, `Shape`,
+  `Mask`, `RectMask`, `CanvasGroup`, `BackdropFilter`) or active flags, which the
+  World's change log reports. The `Canvas` component's own placement (`sway` and its
+  lag, `tilt`, `plane_distance`, `pixels_per_unit`) moves the finished mesh and never
+  re-meshes it, so a visor HUD swaying with the camera keeps its mesh. Its buffer is
+  re-uploaded only when the rebuilt mesh differs, and reallocated only when it
+  outgrows its capacity. So a still HUD meshes and uploads nothing per frame, and a
+  HUD whose minimap turns meshes only the minimap's canvas
   (`RenderCounters::ui_meshed` counts the canvases meshed).
+  **Only a root Canvas (one with no Canvas above it) is meshed on its own**: a
+  Canvas nested inside another lays out as part of its root and is meshed with it,
+  so a turning minimap nested in the HUD's Canvas still re-meshes the whole HUD
+  every frame. Give what changes every frame its own root Canvas instead: a
+  GameObject with a `Canvas` that is not under the HUD's (a sibling of it, or under
+  a plain GameObject), with a higher `sort_order` to draw on top.
 
 ### Masks and backdrops
 

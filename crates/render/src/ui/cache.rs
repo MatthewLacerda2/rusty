@@ -64,9 +64,9 @@ impl UiViewCache {
         }
     }
 
-    /// Canvas meshes the last render of this view built (a kept one is not built).
+    /// Canvases the last render of this view meshed, each once (a kept one is not).
     pub fn last_meshed(&self) -> usize {
-        self.kept.built
+        self.kept.built()
     }
 
     /// Canvas buffers (re-)uploaded by the last render of this view.

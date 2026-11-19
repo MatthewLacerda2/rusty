@@ -1,4 +1,4 @@
-//! crates/render/src/ui/kept.rs — each view's canvas meshes, kept until what they
+//! crates/render/src/ui/kept/ — each view's canvas meshes, kept until what they
 //! are built from changes (#2416). GPU-free.
 //!
 //! A canvas's mesh is a function of its [`CanvasInputs`]: its run of the layout
@@ -7,9 +7,17 @@
 //! looked up, and the glyph atlases' generation (a grown atlas moves every uv); and
 //! of its elements' UI components. The inputs are compared, not hashed: equality is
 //! exact. The components are not copied to be compared: the World's change log says
-//! which ones were written ([`Watch`]: one cursor per UI component column, and
-//! `Activity` for the active flags and re-parenting, descendants included), and a
-//! written element dirties the canvas it lays out under. A canvas whose inputs
+//! which ones were written ([`Watch`]: one cursor per UI component column the mesh
+//! reads, and `Activity` for the active flags and re-parenting, descendants
+//! included), and a written element dirties the canvas it lays out under.
+//!
+//! **The Canvas component is not watched**: what the mesh reads of it is compared
+//! instead. `render_mode` reaches the mesh only through the frame and the overlay
+//! flag, `reference_resolution` and `match_width_or_height` through the rects'
+//! `scale_factor` and size and a `WorldSpace` canvas's frame, and `sort_order` only
+//! orders the runs; `pixels_per_unit`, `plane_distance`, `tilt`, `sway` and the
+//! `sway_state` place the finished mesh (`ui::space`). Watching it would rebuild a
+//! `ScreenSpaceCamera` canvas on every tick the camera turns (`ui::sway`). A canvas whose inputs
 //! equal the held ones and which no write touched keeps its mesh, by `Rc`, so the
 //! sync sees the same mesh and uploads nothing.
 //!
@@ -30,7 +38,7 @@ use super::mesh::{build_canvas, canvas_frame, CanvasMesh, Sources, TexSize};
 #[cfg(test)]
 use super::text::atlas::FontAtlases;
 use rusty_components::{
-    BackdropFilterComponent, CanvasComponent, CanvasGroupComponent, ImageComponent, MaskComponent,
+    BackdropFilterComponent, CanvasGroupComponent, ImageComponent, MaskComponent,
     RectMaskComponent, ShapeComponent, TextComponent,
 };
 use rusty_ecs::{Activity, Changes, Cursor, World};
@@ -100,7 +108,8 @@ impl CanvasInputs {
 /// The texture-size lookup and the atlases' generation.
 type Lookups<'a> = (TexSize<'a>, u64);
 
-/// One cursor per channel a canvas's mesh reads from the World.
+/// One cursor per channel a canvas's mesh reads from the World (the Canvas
+/// component excepted: the module docs).
 struct Watch {
     image: Cursor<ImageComponent>,
     shape: Cursor<ShapeComponent>,
@@ -109,7 +118,6 @@ struct Watch {
     rect_mask: Cursor<RectMaskComponent>,
     group: Cursor<CanvasGroupComponent>,
     backdrop: Cursor<BackdropFilterComponent>,
-    canvas: Cursor<CanvasComponent>,
     activity: Cursor<Activity>,
 }
 
@@ -123,7 +131,6 @@ impl Watch {
             rect_mask: w.change_cursor(),
             group: w.change_cursor(),
             backdrop: w.change_cursor(),
-            canvas: w.change_cursor(),
             activity: w.change_cursor(),
         }
     }
@@ -139,7 +146,6 @@ impl Watch {
             w.changes(&mut self.rect_mask),
             w.changes(&mut self.group),
             w.changes(&mut self.backdrop),
-            w.changes(&mut self.canvas),
             w.changes(&mut self.activity),
         ];
         let mut ids = BTreeSet::new();
@@ -158,8 +164,9 @@ impl Watch {
 pub(crate) struct KeptMeshes {
     watch: Option<Watch>,
     held: HashMap<u32, (CanvasInputs, Rc<CanvasMesh>)>,
-    /// Canvases the last [`Self::update`] meshed (built rather than kept).
-    pub(crate) built: usize,
+    /// The distinct canvases the last [`Self::update`] meshed (built rather than
+    /// kept), however many passes an atlas growth took.
+    built: BTreeSet<u32>,
 }
 
 impl KeptMeshes {
@@ -175,7 +182,7 @@ impl KeptMeshes {
         (tex_size, atlases): Sources,
         wanted: &dyn Fn(u32) -> bool,
     ) -> Vec<Rc<CanvasMesh>> {
-        self.built = 0;
+        self.built.clear();
         let mut dirty = self.dirty(world, layout);
         let entries: Vec<_> = layout.iter().collect();
         loop {
@@ -194,6 +201,11 @@ impl KeptMeshes {
         }
     }
 
+    /// How many distinct canvases the last [`Self::update`] meshed.
+    pub(crate) fn built(&self) -> usize {
+        self.built.len()
+    }
+
     /// One pass of [`Self::update`] over the layout's `entries`.
     fn pass(
         &mut self,
@@ -208,10 +220,11 @@ impl KeptMeshes {
         for run in canvas_runs(entries) {
             let run = &entries[run];
             let canvas = run[0].1.canvas;
-            // A canvas's run is contiguous (`canvas_runs`), so `drawn` never refuses one.
-            if !wanted(canvas) || !drawn.insert(canvas) {
+            if !wanted(canvas) {
                 continue;
             }
+            let first = drawn.insert(canvas);
+            debug_assert!(first, "canvas {canvas}: a canvas's run is contiguous");
             let now = canvas_frame(world, layout, canvas, screen);
             let keep = (tex_size, atlases.generation);
             let held = self
@@ -258,7 +271,7 @@ impl KeptMeshes {
         screen: Vec2,
         (tex_size, atlases): Sources,
     ) -> Rc<CanvasMesh> {
-        self.built += 1;
+        self.built.insert(run[0].1.canvas);
         let generation = atlases.generation;
         let seen = RefCell::new(Vec::<(String, Option<Vec2>)>::new());
         let looked = |p: &str| {
@@ -283,5 +296,4 @@ impl KeptMeshes {
 }
 
 #[cfg(test)]
-#[path = "kept_tests.rs"]
-mod kept_tests;
+mod tests;

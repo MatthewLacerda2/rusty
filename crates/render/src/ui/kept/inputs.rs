@@ -108,8 +108,8 @@ fn a_texture_size_the_screen_an_atlas_and_a_new_world_rebuild() {
     let generation = rig.atlases.generation;
     assert_eq!(
         rig.frame(&hud.scene),
-        3,
-        "B, then A and B again for their moved uvs"
+        2,
+        "B, then A and B again for their moved uvs: two canvases, each once"
     );
     assert!(rig.atlases.generation > generation, "the atlas grew");
     assert_eq!(rig.frame(&hud.scene), 0);

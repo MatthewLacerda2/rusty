@@ -5,10 +5,12 @@
 use glam::{Vec2, Vec4};
 
 use super::*;
-use rusty_components::{ImageType, RectTransformComponent};
+use rusty_components::{CanvasComponent, ImageType, RectTransformComponent};
 use rusty_scene::Scene;
 
-#[path = "kept_inputs_tests.rs"]
+#[path = "canvas.rs"]
+mod canvas;
+#[path = "inputs.rs"]
 mod inputs;
 
 /// Two canvases: `a` holds a sliced, textured panel with a label under it, `b` one
@@ -73,6 +75,8 @@ pub(super) struct Rig {
     /// A canvas this view does not draw (an editor-mode view's filter).
     pub(super) skip: Option<u32>,
     pub(super) atlases: FontAtlases,
+    /// The camera the view looks through (`None`: overlay layout only).
+    pub(super) camera: Option<rusty_scene::Camera>,
 }
 
 impl Rig {
@@ -85,6 +89,7 @@ impl Rig {
             screen,
             texture,
             skip: None,
+            camera: None,
         }
     }
 
@@ -92,10 +97,13 @@ impl Rig {
     /// many canvases were built.
     pub(super) fn frame(&mut self, scene: &Scene) -> usize {
         let world = &scene.world;
-        let layout = UiLayout::compute_in(
-            world,
-            &rusty_ui::UiView::screen(self.screen, Default::default()),
-        );
+        let view = match &self.camera {
+            Some(cam) => {
+                rusty_ui::UiView::with_camera(self.screen, cam.clone(), Default::default())
+            }
+            None => rusty_ui::UiView::screen(self.screen, Default::default()),
+        };
+        let layout = UiLayout::compute_in(world, &view);
         let (texture, skip) = (self.texture, self.skip);
         let tex = |_: &str| Some(texture);
         let kept = self.kept.update(
@@ -115,7 +123,7 @@ impl Rig {
             assert_eq!(bytes(k), bytes(f), "canvas {}: stale vertices", f.canvas);
             assert_eq!(**k, *f, "canvas {}: stale batches or masks", f.canvas);
         }
-        self.kept.built
+        self.kept.built()
     }
 }
 
