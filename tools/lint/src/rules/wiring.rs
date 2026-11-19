@@ -32,6 +32,12 @@ fn one(path: &'static str, body: &str) -> Case {
     case(&[(path, body)], path)
 }
 
+/// A root package naming `dep` under `[section]`, `lib` its `src/lib.rs`.
+fn package(section: &str, dep: &str, lib: &str, flags: &'static str) -> Case {
+    let manifest = format!("[package]\nname = \"t\"\n\n[{section}]\n{dep} = {{ path = \"d\" }}\n");
+    case(&[("Cargo.toml", &manifest), ("src/lib.rs", lib)], flags)
+}
+
 /// The must-flag case of the rule named `rule`, `None` when it has none.
 pub(super) fn case_for(rule: &str) -> Option<Case> {
     let app = "crates/app/src/a.rs";
@@ -127,16 +133,7 @@ pub(super) fn case_for(rule: &str) -> Option<Case> {
             &[(".gitignore", "secret.rs\n"), ("crates/app/src/secret.rs", "")],
             "crates/app/src/secret.rs",
         ),
-        "key-guard" => case(
-            &[
-                (
-                    "Cargo.toml",
-                    "[package]\nname = \"t\"\n\n[dev-dependencies]\nrusty-dev = { path = \"d\" }\n",
-                ),
-                ("src/lib.rs", ""),
-            ],
-            "Cargo.toml",
-        ),
+        "key-guard" => package("dev-dependencies", "rusty-dev", "", "Cargo.toml"),
         "log-tag" => one(app, "fn f() {\n    log::warn!(\"no tag\");\n}\n"),
         "markers" => one(app, concat!("// TO", "DO: later\n")),
         "named-enum" => one(
@@ -196,6 +193,10 @@ pub(super) fn case_for(rule: &str) -> Option<Case> {
             "fn save(m: &M) {\n    let t = serde_json::to_vec(m).unwrap();\n    written::write(p, &t).unwrap();\n}\n",
         ),
         "subprocess" => one(app, "fn f() {\n    std::process::Command::new(\"x\");\n}\n"),
+        "one-logger" => {
+            let lib = "use rusty_test_support::logs;\n";
+            package("dependencies", "rusty-logging", lib, "src/lib.rs")
+        }
         "test-inner-cfg" => one("tests/a.rs", "#![cfg(feature = \"dev\")]\n#[test]\nfn t() {}\n"),
         "test-static-write" => one(
             "crates/app/src/a_tests.rs",

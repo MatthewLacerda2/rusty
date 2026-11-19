@@ -29,6 +29,8 @@ use rusty_script::scripting::{ConsoleLogs, LogLevel};
 #[cfg(test)]
 mod filter_tests;
 #[cfg(test)]
+mod one_logger_tests;
+#[cfg(test)]
 mod tests;
 
 /// Records kept for the console between drains; past this the oldest are dropped,
@@ -49,6 +51,9 @@ static PENDING: Mutex<Vec<Kept>> = Mutex::new(Vec::new());
 /// binary, on once a test calls [`init_for_tests`].
 static PER_THREAD: AtomicBool = AtomicBool::new(false);
 
+/// Whether [`init`] installed [`Forward`]: `log::set_logger` is once a process.
+static INSTALLED: AtomicBool = AtomicBool::new(false);
+
 /// Start logging for this process: stderr at `RUST_LOG` (default `warn`), plus the
 /// console copy of engine warnings and errors. Every binary calls it first thing; a
 /// second call is a no-op.
@@ -61,6 +66,7 @@ pub fn init() {
         let max = stderr.filter().max(LevelFilter::Warn);
         if log::set_boxed_logger(Box::new(Forward { stderr })).is_ok() {
             log::set_max_level(max);
+            INSTALLED.store(true, Ordering::SeqCst);
         }
     });
 }
@@ -70,12 +76,23 @@ pub fn init() {
 /// process (plain `cargo test`) never drain each other's warnings. A test hook:
 /// compiled in every build, since most of its callers are other crates' tests,
 /// and off until one calls it. Records logged before it are drained whole.
+/// Panics when another logger was installed first (`rusty_test_support::logs`'),
+/// which would leave every [`forward`] empty.
 #[doc(hidden)]
 pub fn init_for_tests() {
     // lint: allow(test-static-write) one-way and idempotent: every caller sets the same `true`, and per-thread drains are what every test in a shared process wants
     PER_THREAD.store(true, Ordering::SeqCst);
     init();
+    assert!(INSTALLED.load(Ordering::SeqCst), "{ANOTHER_LOGGER}");
 }
+
+/// What [`init_for_tests`] says when another logger holds the process.
+#[doc(hidden)]
+pub const ANOTHER_LOGGER: &str = "another `log` logger holds this process (most likely \
+    `rusty_test_support::logs`'), so `rusty_logging::forward` would drain nothing: a \
+    crate whose manifest names `rusty-logging` reads its tests' warnings through \
+    `rusty_logging::init_for_tests` and `rusty_logging::forward`, and never calls \
+    `rusty_test_support::logs::init`";
 
 /// Move the engine records logged since the last drain into `console` (as warnings
 /// or errors) and return their text, oldest first, a repeat shown with its count.

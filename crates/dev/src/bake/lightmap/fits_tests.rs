@@ -2,12 +2,15 @@
 //! what is free, silent otherwise, each saying what holds the peak; the estimate
 //! grows with what the bake keeps, its maps' covered texels.
 
+use std::cell::RefCell;
+
 use glam::Vec2;
 
 use super::fits::{check, covered, estimate, result_bytes, Estimate};
 use crate::memory::Machine;
 use rusty_lighting::lightmap::{BakeMesh, BakeScene};
 use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
+use rusty_script::scripting::ConsoleLogs;
 
 const GB: u64 = 1 << 30;
 
@@ -42,14 +45,16 @@ fn a_bake_past_the_machine_is_refused_naming_what_holds_it_and_what_to_lower() {
 
 #[test]
 fn a_bake_past_what_is_free_warns_and_runs() {
-    rusty_test_support::logs::init();
-    rusty_test_support::logs::take();
+    // This crate names `rusty-logging`, so its tests read warnings through it.
+    rusty_logging::init_for_tests();
+    let console = RefCell::new(ConsoleLogs::new());
+    rusty_logging::forward(&console);
     let s = BakeSettings::default();
     assert_eq!(
         check(held(12 * GB, 0), &s, machine(10 * GB, 16 * GB)),
         Ok(())
     );
-    let said = rusty_test_support::logs::take();
+    let said = rusty_logging::forward(&console);
     assert!(
         said.iter().any(|l| l.contains("10.0 GB it has free")),
         "{said:?}"
@@ -60,7 +65,7 @@ fn a_bake_past_what_is_free_warns_and_runs() {
         Ok(()),
         "an unread machine holds nothing back"
     );
-    let quiet = rusty_test_support::logs::take();
+    let quiet = rusty_logging::forward(&console);
     assert!(
         !quiet.iter().any(|l| l.contains("LightmapBake")),
         "{quiet:?}"
