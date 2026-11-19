@@ -231,8 +231,30 @@ gap narrower than the band (between two fins, inside a slot, across a corridor
 of a level-sized mesh), so model such parts as separate surfaces or keep the gap
 wider than the band.
 
-Only the part of UV0 inside the 0..1 square is baked. Where UVs overlap, a texel
-takes the first triangle in index order. A model without UV0 (its texture UVs
+Only the part of UV0 inside the 0..1 square is baked. **Where triangles overlap
+in UV0** (a panel screwed onto a wall sharing the wall's texels, the two halves of
+a mirrored model), a texel takes the **more open** of the triangles covering it,
+the one a viewer sees, decided per pair of triangles: each one's ambient occlusion
+is traced on every texel the two share, as the `ao` map traces it (`ao_rays`
+rays), and the pair's means compared. A triangle takes the texels it shares with
+the first one there in index order only when its mean is more open by more than
+`1 / √ao_rays` (the noise of one texel's estimate), so a region two triangles
+share bakes one of them throughout, not a speckle of both; a tie, as between
+two mirrored halves or the faces of a closed box (all of them face out and read
+open), goes to the lower index as imported, which is not always the file's face
+order: a mesh of 4096 triangles or more is reordered into clusters at import.
+Every map of the bake takes that same triangle, so `world_normal`, `position`,
+`id`, `curvature` and `thickness` agree with `ao` texel for texel, and the pick is
+the same whether or not `ao` is asked (a bake without it still traces the shared
+texels, and only those). Two limits: rays start `1e-4` of the model's bounds
+diagonal off the surface, so a face closer than that in front of another (0.2 mm
+on a 2 m prop, 2 cm on a 200 m level mesh) is not seen to hide it, and both read
+open; and the rule holds for faces at least a texel wide, since a strip thinner
+than a texel only reaches texels another face already took. Each texel `n` faces
+cover costs `n` traces, so a mesh tiling UV0 many times over (a level's floor)
+bakes slowly, and the call warns when the faces average more than 8 a shared
+texel. Triangles that only meet along an edge do not overlap. To force a face onto
+a texel, keep it from overlapping anything in UV0. A model without UV0 (its texture UVs
 enclose no area), without triangles, or with a non-finite position is an error
 naming the verb and the model, never a black map. The bake is deterministic: the
 same model and arguments write the same bytes, however many threads ran it.
@@ -579,7 +601,11 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
 - `map_range {from_min, from_max, to_min, to_max}` (*math*, 1 input).
 - `mapping {scale=[1,1], rotation=0, translation=[0,0], tiling=true}` (*vector*, 1
   input): bilinear, wrapped resample; `rotation` in turns; each transform left out is
-  the identity, so `mapping {rotation = 0.25}` only turns. With `tiling` the rotation
+  the identity, so `mapping {rotation = 0.25}` only turns. Each output point reads the
+  input at that point turned about the centre (0.5, 0.5), scaled about it, then offset
+  by `translation` (in tiles): a positive `rotation` turns the content
+  counter-clockwise as the image is shown (v down), and a positive `translation` moves
+  it towards −U / −V (left / up). With `tiling` the rotation
   snaps to a quarter turn (*Tiling*), so a stretched noise only ever lines up with the
   axes: `rotation = 0.125` on a `scale = {1, 12}` stretch gives vertical lines, not
   diagonal ones. For streaks at any angle, `directional_blur` a noise (or
@@ -614,8 +640,13 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   `bump_to_normal` writes them, combined by Reoriented Normal Mapping: the base is
   turned by the detail's tilt, so scratches over a panel follow the panel's bevel.
   `strength` scales the detail's tilt, 0 leaving the base; a flat normal on either
-  side returns the other. Never `mix` normal maps: adding or averaging their RGB
-  flattens them.
+  side returns the other. The result stays above the surface: every output texel
+  whose z would be under 0.125 (blue byte 143) is lifted to that, still leaning the
+  same way, so a BC5 `NormalMap` import, which rebuilds z from x and y, draws the
+  normal the PNG holds. That holds whatever the detail or `strength`: a base texel
+  already under 0.125 (a steep `bump_to_normal`, an imported map) is lifted too,
+  even with a flat detail or `strength` 0. A texel at or above 0.125 is RNM's own.
+  Never `mix` normal maps: adding or averaging their RGB flattens them.
 - `path {d, fill_rule="nonzero"|"evenodd", stroke=0}` (*generator*): an outline from
   SVG path data, a mask: 1 inside, 0 outside, each edge pixel the exact share of its
   area the outline covers. `d` takes `M L H V C S Q T A Z`, absolute and relative,
@@ -773,7 +804,9 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   cells, so it costs about 2 s of one core at 2048², against 0.6 s for `distance`. `smoothness`
   0 is F1; a NaN reads 0.
 - `warp {strength}` (*vector*, 2 inputs): samples input 1 displaced by input 2's R/G,
-  centred on 0.5 so mid-grey moves nothing; `strength` is in tile units; feed input 2
+  centred on 0.5 so mid-grey moves nothing; `strength` is in tile units, and red above
+  0.5 reads further along +U, so the content moves towards −U (green above 0.5: −V;
+  a negative `strength` reverses both); feed input 2
   a `combine_rgb` of two different noises — a grayscale one has R = G and only pushes
   along the diagonal.
 - `wave {kind="bands"|"rings", frequency, profile="sine"|"saw"|"triangle",
@@ -1134,7 +1167,8 @@ and 2048² (iterate at a low `resolution`, ship at a high one):
   the pixel radius is `radius × resolution` (a `box` rounds it), capped at half the
   tile, and on a `size` recipe `radius × width` across and `radius × height` down. A `gaussian` reaches about `radius`, a `box` exactly its rounded radius.
 - `warp.strength` is a displacement in tiles: a channel at 1.0 pushes the read
-  `strength / 2` of a tile.
+  `strength / 2` of a tile along +U (red) or +V (green), which moves the content as
+  far the other way.
 - `bump_to_normal.strength` scales the slope measured in tile units (height change
   across one whole tile), not per pixel. On a `size` recipe the unit is a tile of the
   **longer** side on both axes, so the same height step between neighbouring pixels

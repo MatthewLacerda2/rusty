@@ -32,7 +32,7 @@ answer. A conversation that plans issues doesn't wait: ask its questions right a
 The limits are CLAUDE.md's; the reasons are here, so they are kept, not re-argued.
 
 - **Cloud coders ≤5**, paced by how many diffs one orchestrator can read: review,
-  not coder count, is the bottleneck. `make coder` refuses a sixth.
+  not coder count, is the bottleneck. A sixth `make coder` waits its turn in a line.
 - **Local coders ≤2**: the queue lands one tested tree per CI run, so a third
   finishes nothing sooner.
 - **Read-only agents** (research, review, planning) **without limit**: they build
@@ -143,13 +143,30 @@ script keeps, and why:
   `isolation: "remote"` falls back to a local worktree here. The API cannot list
   environments, so the script takes the one the newest `rusty #…` routine ran in;
   `RUSTY_CLOUD_ENV` names it on an account with none yet.
-- **What it refuses:** a closed issue, a `planning` or `human` one, a brief by
-  someone who cannot push, and a coder past CLAUDE.md's limit. Its refusal names
-  every coder it counted; how a fired routine is placed (a ready PR holds its slot
-  until its review record exists, so its re-brief has one) is
-  `dispatch/running.py`'s docstring. A re-brief is never counted against its own
-  issue; `ARGS=--over-limit` launches anyway (a stalled draft counts until dealt
-  with).
+- **What it refuses:** a closed issue, a `planning` or `human` one, and a brief by
+  someone who cannot push. A refused launch is never queued.
+- **A launch at CLAUDE.md's limit waits its turn**: it joins the waiting line
+  (exit 0, "waiting for a slot, N ahead", naming every coder it counted), and a
+  second ask for the same issue keeps its place. A round (a `Round:` line in the
+  newest `Brief`) goes ahead of first launches, then the order asked. How a fired
+  routine is placed (a ready PR holds its slot until its review record exists, so
+  its re-brief has one) is `dispatch/running.py`'s docstring; a re-brief is never
+  counted against its own issue. While the line holds others, a free slot goes
+  to them first: a hand launch not within the free slots in line order waits
+  too and names who is ahead. `ARGS=--no-wait` refuses instead of queueing,
+  `ARGS=--over-limit` launches anyway (a stalled draft counts until dealt with).
+- **`make coders` reads who runs and who waits, and launches from the line**
+  while slots are free: every counted coder and why it counts, the uncounted ones
+  worth naming, then the line in launch order. Nothing launches without that
+  call, so while the line holds anyone run it on every event `make queue-events`
+  passes and at least once a minute. Before it launches an entry it re-reads the
+  issue: one closed, given a stage label or whose brief is refused is dropped and
+  said; one with a newer `Brief` than it was queued on launches on that one;
+  one whose issue already has a routine made after its ask and its brief was
+  launched (a pass cut short) and is dropped, never launched twice, slot free or
+  not, and `make coder` for it drops it the same way. A command
+  that finds another session holding the line waits a few minutes, then exits 2
+  naming the holder. `ARGS=--dry-run` launches, writes and locks nothing.
 - `run_once_at` computed, `allowed_tools` with `ToolSearch` (the GitHub MCP tools
   load through it without being listed), and the prompt below.
 - **The prompt names the brief's URL**, the exact comment the script checked,
@@ -306,7 +323,9 @@ Per pull request:
    of line. File its "follow-up" notes as issues now. If it asked for a scoped
    mutation run (a `Mutation:` line, which the queue dispatches after the merge),
    read the report when it lands on the merged PR (`ci-merge`, *Triaging a
-   survivor*).
+   survivor*): each survivor is a question, so a follow-up names only the ones
+   that show behaviour nothing asserts, and leaves the rest; no brief asks for
+   zero survivors.
 2. **A hand-back** skips that PR and the watch carries on. A mechanical fix (a
    conflict where both sides are kept, a one-line red) goes to the `Agent`
    tool's `merge-fixer`, its prompt the PR, its branch and the hand-back line;

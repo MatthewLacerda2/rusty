@@ -40,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export launcher bench bench-scenes bless-converters fuzz-lock
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder coders review-level rebriefs mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export import launcher bench bench-scenes bless-converters fuzz-lock
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -184,15 +184,23 @@ doc: ## [gate] Rustdoc with warnings denied, both feature sets
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked --features dev
 
+# The default feature set's tests but the gpu group, which the dev set runs: `dev`
+# adds to the default features, so it builds and draws theirs too (docs/testing.md,
+# *Which suite runs the GPU tests*; the `gpu-default-only` lint holds the premise).
+# A crate whose render path differs without `dev` widens it in both callers, e.g.
+# `-E 'not group(gpu*) | (group(gpu*) & package(rusty-<crate>))'`.
+DEFAULT_SUITE := -E 'not group(gpu*)'
+
 # All four runs go on when one fails, as nextest does inside a run (fail-fast off), so
 # one `make test` reports every failure: each run under its own header, and the last
-# line names the runs that failed.
-test: ## [gate] Engine tests (nextest) and doctests, both feature sets, on the gates' proptest seed
+# line names the runs that failed. The default pass is `DEFAULT_SUITE`, as CI's
+# default entry runs it.
+test: ## [gate] Engine tests (nextest) and doctests, both feature sets (the GPU tests in dev's), on the gates' proptest seed
 	@command -v cargo-nextest >/dev/null 2>&1 || { \
 		echo "test: cargo-nextest is not installed — cargo install --locked cargo-nextest"; exit 1; }
 	@failed=; \
 	echo "== make test: nextest (default)"; \
-	$(TEST) || failed="$$failed, nextest (default)"; \
+	$(TEST) $(DEFAULT_SUITE) || failed="$$failed, nextest (default)"; \
 	echo "== make test: nextest (dev)"; \
 	$(TEST) --features dev || failed="$$failed, nextest (dev)"; \
 	echo "== make test: doctests (default)"; \
@@ -206,17 +214,14 @@ test: ## [gate] Engine tests (nextest) and doctests, both feature sets, on the g
 # on a real GPU is told from the change in one command, else the machine's own.
 # ADAPTER=<part of a name> picks another (`nvidia`, `llvmpipe`); RUSTY_REQUIRE_GPU
 # makes "no adapter of that name" a failure, and the canary prints which one ran.
-# Both feature sets run even when the first fails, and the exit says if either did.
+# The `dev` set only, as the gates run the group (docs/testing.md, *Which suite runs
+# the GPU tests*): `dev` adds to the default features, so it builds their GPU tests too.
 ADAPTER ?= $(if $(wildcard /usr/share/vulkan/icd.d/lvp_icd*.json),llvmpipe,)
-# `group(gpu)`: the tests .config/nextest.toml puts in its gpu group, so the naming
-# rule stays written in that one file.
-GPU_TESTS := -E 'group(gpu)'
-test-gpu: ## The GPU tests alone, both feature sets, on ADAPTER (lavapipe when installed)
-	@rc=0; \
-	export RUSTY_REQUIRE_GPU=1 WGPU_ADAPTER_NAME='$(ADAPTER)'; \
-	$(TEST) $(GPU_TESTS) || rc=1; \
-	$(TEST) --features dev $(GPU_TESTS) || rc=1; \
-	exit $$rc
+# `group(gpu*)`: the tests .config/nextest.toml puts in its GPU group (`gpu`, or
+# `gpu-macos` on macOS), so the naming rule stays written in that one file.
+GPU_TESTS := -E 'group(gpu*)'
+test-gpu: ## The GPU tests alone (the dev feature set's), on ADAPTER (lavapipe when installed)
+	RUSTY_REQUIRE_GPU=1 WGPU_ADAPTER_NAME='$(ADAPTER)' $(TEST) --features dev $(GPU_TESTS)
 
 # Fresh proptest seeds, as the nightly draws (#1852): a signal, never a gate. A case
 # it finds is written to proptest-regressions/ and committed with its fix
@@ -226,7 +231,7 @@ test-explore: ## Signal: the nextest suite, both feature sets, on random proptes
 	@command -v cargo-nextest >/dev/null 2>&1 || { \
 		echo "test-explore: cargo-nextest is not installed — cargo install --locked cargo-nextest"; exit 1; }
 	@rc=0; \
-	env -u PROPTEST_RNG_SEED $(TEST) || rc=1; \
+	env -u PROPTEST_RNG_SEED $(TEST) $(DEFAULT_SUITE) || rc=1; \
 	env -u PROPTEST_RNG_SEED $(TEST) --features dev || rc=1; \
 	exit $$rc
 
@@ -362,13 +367,18 @@ reclaim: ## Remove merged worktrees nothing is using (and their target/) and fin
 # `Brief` comment on the issue and creates the one-off routine that starts the
 # cloud coder (through `claude mcp serve`, so the
 # claude.ai token stays inside claude); running it again is the re-brief launch.
-# It refuses a closed, `planning` or `human` issue, and a sixth running coder
-# (#1856; a re-brief never counts against itself, ARGS=--over-limit overrides).
+# It refuses a closed, `planning` or `human` issue; a sixth running coder (#1856;
+# a re-brief never counts against itself) waits in a line under .git/ (#2382),
+# ARGS=--no-wait refuses instead, ARGS=--over-limit launches anyway. `coders`
+# prints who runs and who waits, and launches from the line while slots are free.
 # ARGS=--dry-run prints the routine and creates nothing. `review-level` prints
 # `high` or `medium` for an independent review, and the paths that decided it.
 coder: ## Start the cloud coder on an issue's newest Brief. make coder ISSUE=1569, ARGS=--dry-run creates nothing
 	@test -n "$(ISSUE)" || { echo "coder: which issue? e.g. make coder ISSUE=1569" >&2; exit 1; }
 	@python3 .github/scripts/coder.py $(ISSUE) $(ARGS)
+
+coders: ## Who runs, who waits for a slot, and launch from the line while slots are free. ARGS=--dry-run launches nothing
+	@python3 .github/scripts/coders.py $(ARGS)
 
 review-level: ## The independent review's level (high or medium) and why. make review-level PR=1570
 	@test -n "$(PR)" || { echo "review-level: which pull request? e.g. make review-level PR=1570" >&2; exit 1; }
@@ -466,6 +476,10 @@ export: ## Ship a project without its convertible sources. make export PROJECT=~
 		exit 1; }
 	cargo run --quiet --locked --features dev --bin export -- --project $(PROJECT) --out $(OUT)
 
+import: ## Bring a project's import cache up to date in place (models, compressed textures). make import PROJECT=~/games/horde
+	@test -n "$(PROJECT)" || { echo "import: make import PROJECT=<project dir>" >&2; exit 1; }
+	cargo run --quiet --locked --features dev --bin export -- --project $(PROJECT) --import-only
+
 # The shooter-shaped stress scene (#835): 50 skinned soldiers on the navmesh, 32
 # lights, a full decal registry, smoke. Prints frame / render / GPU ms (avg and p95),
 # GPU ms per pass, the counters, every system's and renderer stage's CPU ms
@@ -488,6 +502,11 @@ bench: ## Benchmark the stress scene (release build), with the change against th
 # sampling profile of the measured frames (perf on Linux, sample on macOS) as
 # <scene>.profile.txt and .folded, on a release build with line tables. Nothing is
 # written into the project. A signal, never a gate; docs/testing.md.
+# PROFILE=1 builds the `profiling` profile with frame pointers forced on, so perf walks
+# its stacks by frame pointer (`dev::bench::scenes::profile::perf`). That one binary runs
+# the whole run, so a PROFILE=1 run's timed rows come from it too (each report says so):
+# on a desktop GPU they measured inside the release build's spread. RUSTFLAGS only
+# reaches that profile's own target folder; a run without PROFILE=1 is the release build.
 bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/games/horde [SCENES=a,b] [RES=WxH] [RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1]
 	@test -n "$(PROJECT)" || { echo "bench-scenes: make bench-scenes PROJECT=<project dir> [SCENES=a,b] [RES=WxH] [RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1]" >&2; exit 1; }
-	cargo run $(if $(filter 1,$(PROFILE)),--profile profiling,--release) --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RES),--size $(RES)) $(if $(RUNS),--runs $(RUNS)) $(if $(BEFORE),--before $(BEFORE)) $(if $(filter 1,$(PROFILE)),--profile) $(if $(filter 1,$(IMPORT)),--import) out/bench/scenes
+	$(if $(filter 1,$(PROFILE)),RUSTFLAGS="$$RUSTFLAGS -C force-frame-pointers=yes") cargo run $(if $(filter 1,$(PROFILE)),--profile profiling,--release) --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RES),--size $(RES)) $(if $(RUNS),--runs $(RUNS)) $(if $(BEFORE),--before $(BEFORE)) $(if $(filter 1,$(PROFILE)),--profile) $(if $(filter 1,$(IMPORT)),--import) out/bench/scenes

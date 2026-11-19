@@ -124,9 +124,9 @@ wins.
 - **Gates vs. signals — block on correctness, inform on quality.** A check proving
   **correctness** (build, test, clippy, the determinism guard, the size gate) is a
   **hard gate**, green-to-merge. One *auditing quality* (mutation, coverage) is an
-  **informational signal**: it runs **weekly** on `main` or **on request** over what
-  someone names, never on a pull request, **never blocks a merge**, and is **surfaced
-  where the agent acts on it** (terminal, job summary); no hard gate where a signal does.
+  **informational signal**: coverage runs **weekly** on `main` or on request, mutation
+  **only on request** over what someone names, never on a schedule. Neither runs on a pull
+  request or **blocks a merge**; each is **surfaced where the agent acts on it** (terminal, job summary); no hard gate where a signal does.
 
 ## Issues, labels & priority
 - **Issues come before PRs.** The unit of work is an issue a future Claude can read cold

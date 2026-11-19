@@ -6,6 +6,7 @@
 
 use super::effects::{self, EffectCx, Gpu, LdrRun, Pass};
 use super::{PostFx, PostFxContext, PostParams};
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use crate::timing::GpuPass;
 
 impl PostFx {
@@ -21,9 +22,9 @@ impl PostFx {
         params: PostParams,
     ) {
         let (device, queue) = gpu;
-        queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
+        queue.counted_write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
         let slots = effects::composite_slots(cx);
-        queue.write_buffer(&self.fx_buffer, 0, bytemuck::cast_slice(&slots));
+        queue.counted_write_buffer(&self.fx_buffer, 0, bytemuck::cast_slice(&slots));
         let ldr: Vec<&LdrRun> = effects::ldr_passes()
             .iter()
             .filter_map(|pass| {
@@ -79,7 +80,7 @@ impl PostFx {
             Self::fullscreen(&mut encoder, last, &[&bg], ctx.output);
         }
 
-        queue.submit(std::iter::once(encoder.finish()));
+        queue.counted_submit(std::iter::once(encoder.finish()));
     }
 
     /// Composite this frame's scene once more into `ctx.output` — graded,
@@ -128,7 +129,7 @@ impl PostFx {
         depth: &wgpu::TextureView,
         (skybox, skybox_sampler): (&wgpu::TextureView, &wgpu::Sampler),
     ) -> wgpu::BindGroup {
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
+        device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("PostFX IO Bind Group"),
             layout: &self.io_layout,
             entries: &[
@@ -206,7 +207,7 @@ impl PostFx {
                 },
             })
         });
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let mut pass = encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
             multiview_mask: None,
             label: Some("PostFX Pass"),
             color_attachments: &attachments,

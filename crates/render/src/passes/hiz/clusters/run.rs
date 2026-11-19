@@ -1,6 +1,8 @@
 //! One camera's cluster cull (#1968): its buffers, kept per view and stack
-//! place like the instance cull's, and the three dispatches per clustered batch.
+//! place like the instance cull's, and the three dispatches per clustered batch,
+//! recorded into the stage's one pass after phase one (#2327).
 
+use crate::gpu::ops::CountedQueue as _;
 use std::sync::Arc;
 
 use glam::{Mat4, Vec4};
@@ -9,8 +11,8 @@ use super::layout::RUN_STRIDE;
 use super::plan::Plan;
 use super::ClusterDraws;
 use crate::gpu::grow_buffer::GrowBuffer;
+use crate::gpu::kept::Kept;
 use crate::passes::hiz::counters::Counter;
-use crate::passes::hiz::kept::Kept;
 use crate::passes::hiz::pyramid::Pyramid;
 use crate::Renderer;
 
@@ -41,6 +43,9 @@ pub(crate) struct ClusterCull {
     /// The jobs its last cull ran.
     #[cfg(test)]
     pub(crate) ran: u32,
+    /// The clustered runs (batches) its last cull recorded.
+    #[cfg(test)]
+    pub(crate) runs_ran: u32,
 }
 
 impl ClusterCull {
@@ -70,6 +75,8 @@ impl ClusterCull {
             group: Kept::default(),
             #[cfg(test)]
             ran: 0,
+            #[cfg(test)]
+            runs_ran: 0,
         }
     }
 
@@ -93,24 +100,34 @@ pub(super) fn eye_of(view_proj: Mat4) -> Vec4 {
 }
 
 impl Renderer {
-    /// Record `plan`'s three dispatches per clustered batch into `encoder`,
-    /// against `pyramid` and `visible` (this frame's instance verdicts), and
-    /// return the draws that stand for those batches.
-    pub(crate) fn cull_clusters(
+    /// Ready `cull` for `plan` before the stage's merged pass opens: upload its
+    /// jobs and params, bind its group against `pyramid` and `visible` (this
+    /// frame's instance verdicts), and clear its count, an encoder command a
+    /// compute pass cannot hold.
+    pub(crate) fn ready_clusters(
         &self,
         encoder: &mut wgpu::CommandEncoder,
         (cull, plan): (&mut ClusterCull, &Plan),
         (pyramid, visible, view_proj): (&Pyramid, &wgpu::Buffer, Mat4),
-        batches: usize,
-    ) -> ClusterDraws {
+    ) {
         self.upload_clusters(cull, plan, (pyramid, view_proj));
         self.bind_clusters(cull, (pyramid, visible));
-        let group = cull.group.value().expect("made above");
         encoder.clear_buffer(cull.state.buffer(), 0, Some(4));
         #[cfg(test)]
         {
             cull.ran = plan.jobs.len() as u32;
+            cull.runs_ran = plan.runs.len() as u32;
         }
+    }
+
+    /// Record `plan`'s three dispatches per clustered batch into `pass`, each
+    /// run's group 0 at its own dynamic offset; `ready_clusters` ran first.
+    pub(crate) fn record_clusters(
+        &self,
+        pass: &mut wgpu::ComputePass,
+        (cull, plan): (&ClusterCull, &Plan),
+    ) {
+        let group = cull.group.value().expect("bound by ready_clusters");
         let pipes = &self.hiz.clusters;
         for (r, run) in plan.runs.iter().enumerate() {
             let mesh = self.gpu_mesh_of(run.mesh).and_then(|m| m.clusters.as_ref());
@@ -119,7 +136,6 @@ impl Renderer {
                 .group;
             let offset = [r as u32 * RUN_STRIDE as u32];
             let jobs = run.jobs.len() as u32;
-            let mut pass = encoder.begin_compute_pass(&Default::default());
             pass.set_bind_group(0, group, &offset);
             pass.set_bind_group(1, mesh, &[]);
             pass.set_pipeline(pipes.test.get());
@@ -129,6 +145,16 @@ impl Renderer {
             pass.set_pipeline(pipes.copy.get());
             pass.dispatch_workgroups(run.clusters, jobs, 1);
         }
+    }
+
+    /// After the merged pass ends: copy `cull`'s count for its read back, and
+    /// return the draws that stand for `plan`'s batches among `batches`.
+    pub(crate) fn clusters_drawn(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        (cull, plan): (&mut ClusterCull, &Plan),
+        batches: usize,
+    ) -> ClusterDraws {
         cull.counter
             .copy(&self.device, encoder, (cull.state.buffer(), 4));
         ClusterDraws {
@@ -180,7 +206,7 @@ impl Renderer {
             levels: pyramid.levels(),
             object_stride: stride as u32,
         };
-        queue.write_buffer(&cull.params, 0, bytemuck::bytes_of(&params));
+        queue.counted_write_buffer(&cull.params, 0, bytemuck::bytes_of(&params));
         cull.jobs
             .upload(device, queue, bytemuck::cast_slice(&plan.jobs));
         let mut runs = vec![0u32; plan.runs.len().max(1) * RUN_STRIDE as usize / 4];

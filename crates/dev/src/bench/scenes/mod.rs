@@ -11,8 +11,10 @@
 //! to its first rendered frame, wall clock, the renderer's start-up off the
 //! clock: `load`), `import_ms` (`IMPORT=1`, once a run, on its first scene: the
 //! same load of a copy of the project without its import cache, [`import`]), `rss_peak_mb` (the process's peak resident
-//! memory, [`crate::memory`]) and `gpu_mb` (the renderer's GPU memory,
-//! `rusty_render::gpu_memory`), each compared with that scene's last run or a
+//! memory, [`crate::memory`]), `gpu_mb` (the renderer's GPU memory,
+//! `rusty_render::gpu_memory`, with `gpu_allocated_mb`, what live allocations use,
+//! where the allocator tells it) and `gpu_texture_mb`, `gpu_lightmap_mb` and
+//! `gpu_reflection_mb` (the renderer's own resident bytes by kind), each compared with that scene's last run or a
 //! kept baseline (`Extra::baseline`). A run with `PROFILE=1` adds a sampling
 //! profile of the measured frames ([`profile`]), in a run of its own.
 //!
@@ -37,7 +39,7 @@ use rusty_core::project::ProjectSettings;
 use rusty_render::ClockProbe;
 
 use super::super::harness::Harness;
-pub use notes::unbaked;
+pub use notes::{unbaked, uncompressed};
 pub use report::SceneReport;
 
 /// The size a scene is benched at unless told otherwise.
@@ -57,6 +59,12 @@ pub struct Options {
     pub frames: u32,
     /// Rounds over every viewpoint, each one's averages a point of the spread.
     pub runs: u32,
+    /// Build every lazy pipeline before the first frame, off the clock, as a
+    /// game's window does (`Renderer::warm_pipelines`): on unless the frames'
+    /// costs are not what is read. Off, a pipeline compiles on its first draw
+    /// inside the load or a warm-up frame; on lavapipe the warm-up is most of a
+    /// small bench's time (#2350).
+    pub warm: bool,
 }
 
 impl Default for Options {
@@ -66,6 +74,7 @@ impl Default for Options {
             warmup: WARMUP,
             frames: FRAMES,
             runs: RUNS,
+            warm: true,
         }
     }
 }
@@ -146,7 +155,7 @@ pub fn bench(
     opts: Options,
     extra: &Extra,
 ) -> Result<SceneReport, String> {
-    let (mut harness, load_ms) = load(out_dir, root, scene, settings, opts.size)?;
+    let (mut harness, load_ms) = load(out_dir, root, scene, settings, opts)?;
 
     let probe = harness.renderer().and_then(|r| ClockProbe::new(r));
     let mut report = measure::all(&mut harness, probe.as_ref(), opts);
@@ -160,17 +169,16 @@ pub fn bench(
     if let Some(bytes) = crate::memory::rss_peak_bytes() {
         report.push_value("rss_peak_mb", mb(bytes));
     }
-    if let Some(gpu) = harness
-        .renderer()
-        .and_then(|r| rusty_render::gpu_memory(&r.device))
-    {
-        report.push_value("gpu_mb", mb(gpu.bytes));
-        report.gpu_mb_source = Some(gpu.source.to_string());
+    if let Some(r) = harness.renderer() {
+        push_gpu_memory(&mut report, r);
     }
     {
         let world = harness.world.borrow();
         report.warnings.extend(unbaked(&world.scene().borrow()));
     }
+    let assets = std::path::Path::new(rusty_core::project::ASSETS_DIR);
+    let uncached = harness.renderer().map(|r| r.uncached_textures(assets));
+    report.warnings.extend(uncached.and_then(uncompressed));
     let console = notes::keep_console(&harness, out_dir, scene);
     report.warnings.extend(console);
     let engine = rusty_core::project::engine_content::stamp();
@@ -193,26 +201,27 @@ pub fn bench(
 }
 
 /// Load `scene` of the project at `root` as Play does and draw its first frame
-/// at `size` (the harness's out dir `out_dir`), returning the harness and the
+/// at `opts.size` (the harness's out dir `out_dir`), returning the harness and the
 /// load's wall-clock ms. Timed: the harness's own set-up (its Lua VM and API, the
 /// stats), the scene's document, sidecar and navmesh bake, Play's refresh of the
 /// project's converted sources (a cache check when the import cache is warm, the
 /// conversions when it is not: `import_ms`), then its first frame (uploads, the
-/// first sim step). The renderer starts (its device and every pipeline, warm as a
-/// game's) between the load and the first frame, off the clock.
+/// first sim step) at `opts.size`. The renderer starts (its device and, with
+/// `opts.warm`, every pipeline, warm as a game's) between the load and the first
+/// frame, off the clock.
 pub fn load(
     out_dir: &Path,
     root: &Path,
     scene: &str,
     settings: ProjectSettings,
-    size: (u32, u32),
+    opts: Options,
 ) -> Result<(Harness, f64), String> {
     let path = root.join(format!("assets/scenes/{scene}.scene"));
     let start = Instant::now();
     let mut harness = Harness::on_project_scene(out_dir, &path.to_string_lossy(), settings)?;
     let loaded = start.elapsed();
-    harness.set_size(size.0, size.1);
-    if let Some(renderer) = harness.renderer() {
+    harness.set_size(opts.size.0, opts.size.1);
+    if let Some(renderer) = harness.renderer().filter(|_| opts.warm) {
         renderer.warm_pipelines(false);
     }
     let start = Instant::now();
@@ -220,6 +229,32 @@ pub fn load(
     harness.render_frame();
     let load = loaded + start.elapsed();
     Ok((harness, load.as_secs_f64() * 1000.0))
+}
+
+/// `gpu_mb` (and `gpu_allocated_mb` where the source tells it) with its source,
+/// then the renderer's own resident bytes by kind.
+fn push_gpu_memory(report: &mut SceneReport, r: &rusty_render::Renderer) {
+    if let Some(gpu) = rusty_render::gpu_memory(&r.device) {
+        report.push_value("gpu_mb", mb(gpu.bytes));
+        if let Some(bytes) = gpu.allocated {
+            report.push_value("gpu_allocated_mb", mb(bytes));
+        }
+        report.gpu_mb_source = Some(gpu.source.to_string());
+    }
+    push_resident(report, &r.frame_counters);
+}
+
+/// The renderer's own resident GPU bytes by kind, as of the last measured frame,
+/// beside `gpu_mb` (which no scene's size moves, being the allocator's blocks).
+fn push_resident(report: &mut SceneReport, counters: &rusty_render::RenderCounters) {
+    let kinds = [
+        ("gpu_texture_mb", counters.texture_bytes),
+        ("gpu_lightmap_mb", counters.lightmap_bytes),
+        ("gpu_reflection_mb", counters.reflection_bytes),
+    ];
+    for (row, bytes) in kinds {
+        report.push_value(row, mb(bytes));
+    }
 }
 
 fn mb(bytes: u64) -> f64 {

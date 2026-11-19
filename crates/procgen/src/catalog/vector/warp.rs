@@ -32,3 +32,7 @@ impl Op for Warp {
         vec![("strength", &self.strength)]
     }
 }
+
+#[cfg(test)]
+#[path = "warp_tests.rs"]
+mod tests;

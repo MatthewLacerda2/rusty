@@ -19,14 +19,15 @@
 mod effect;
 mod params;
 
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 pub(crate) use effect::EFFECT;
 pub use params::{Clock, ExposureParams, Step};
 
-use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::Arc;
-
 use crate::gpu::shaders::ShaderRegistry;
 use crate::motion::HistoryKey;
+use crate::timing::{GpuPass, GpuTimer};
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::Arc;
 
 /// Histogram bins. Mirrors `BINS` in `postfx/exposure.wgsl`, and equals the
 /// histogram pass's workgroup size (8 × 8), one bin per invocation.
@@ -190,24 +191,25 @@ impl ExposureMeter {
     }
 
     /// Meter `scene` (the view's HDR target, `size` pixels) and adapt, with
-    /// `params`, then start reading the result back when no earlier read is in flight.
+    /// `params` (timed under `post_fx`), then start reading the result back when no
+    /// earlier read is in flight.
     pub fn run(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
-        passes: &ExposurePasses,
+        (passes, timer): (&ExposurePasses, &GpuTimer),
         (scene, size): (&wgpu::TextureView, [u32; 2]),
         params: &ExposureParams,
     ) {
         self.collect();
-        queue.write_buffer(&self.params, 0, bytemuck::bytes_of(params));
+        queue.counted_write_buffer(&self.params, 0, bytemuck::bytes_of(params));
         let bind_group = self.bind_group(device, passes, scene);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Auto Exposure"),
         });
         {
-            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            let mut pass = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("Auto Exposure"),
-                timestamp_writes: None,
+                timestamp_writes: timer.compute_writes(GpuPass::PostFx),
             });
             pass.set_bind_group(0, &bind_group, &[]);
             pass.set_pipeline(&passes.histogram);
@@ -221,7 +223,7 @@ impl ExposureMeter {
         if read {
             encoder.copy_buffer_to_buffer(&self.state, 0, &self.staging, 0, Some(STATE_BYTES));
         }
-        queue.submit(std::iter::once(encoder.finish()));
+        queue.counted_submit(std::iter::once(encoder.finish()));
         if read {
             self.mapping.store(MAPPING, Ordering::Release);
             let mapping = Arc::clone(&self.mapping);
@@ -238,7 +240,7 @@ impl ExposureMeter {
         passes: &ExposurePasses,
         scene: &wgpu::TextureView,
     ) -> wgpu::BindGroup {
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
+        device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Auto Exposure"),
             layout: &passes.layout,
             entries: &[

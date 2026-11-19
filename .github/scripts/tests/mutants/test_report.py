@@ -63,6 +63,13 @@ class Render(unittest.TestCase):
         self.assertLess(text.index("a.rs:1:5"), text.index("a.rs:9:5"))
         self.assertNotIn("replace f -> u32", text, "a caught mutant is not a survivor")
 
+    def test_survivors_are_questions_and_leaving_one_is_an_answer(self) -> None:
+        text = render("Scoped.", RUN, 4, 2)
+        self.assertIn("Each is a question", text)
+        self.assertIn("leave the rest", text)
+        self.assertIn("Triaging a survivor", text)
+        self.assertNotIn("Strengthen the tests", text, "a survivor is not a defect to kill")
+
     def test_a_run_stopped_at_its_budget_names_the_gap(self) -> None:
         text = render("Scoped.", RUN, 10, 124)
         self.assertIn("4 of 10 planned mutants measured, 6 never reached", text)

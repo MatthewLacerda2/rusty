@@ -298,6 +298,9 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std"
 # brings into the tree.
 objc2-metal = { version = "0.3.2", default-features = false, features = ["std", "MTLDevice"] }
 mach2 = "0.6.0"
+# `make bench-scenes PROFILE=1` on Linux: the CLOCK_MONOTONIC reading that cuts the
+# measured frames out of a perf recording (`-k CLOCK_MONOTONIC`); already in the tree.
+libc = "0.2.191"
 # The Wayland half of the clipboard (#612), on the window's own `wl_display`; also
 # already in the tree through egui-winit. Pinned to 0.7.2: 0.7.3 only moves to SCTK 0.20,
 # which duplicates winit 0.30's SCTK 0.19 stack (5 crates). Remove the pin when winit moves
@@ -360,12 +363,82 @@ serde_json = { workspace = true }
 # and debug runs execute them at near-release speed, and `target/` loses the debuginfo
 # that was most of its size and link time. The price is a slower cold build of the
 # dependencies, paid once per fresh `target/`. PR #523 has the measurements.
+#
+# The exceptions below go back to cargo's opt-level 0: dependencies no test or frame
+# runs hot, whose opt-level-2 codegen was about a fifth of a clean build. A
+# `package.<name>` line outranks `package."*"`, and a plain name covers every version
+# in the lock. Host-only crates a member derives through (`syn`, `proc-macro2`,
+# `quote`, `serde_derive`, `bytemuck_derive`) stay at 2: they run on every rebuild
+# of the edit loop; this is the one list of them. A name that leaves the lockfile
+# only warns in cargo; `make scripts` fails on it.
 [profile.dev]
 debug = "line-tables-only"
 
 [profile.dev.package."*"]
 opt-level = 2
 debug = false
+
+# dev only: the authoring-time provider stack (`crates/dev/src/providers/`); tests
+# reach it on small inputs (voice ids, speech models, hashes), and no frame calls it.
+[profile.dev.package.scorsese-core]
+opt-level = 0
+[profile.dev.package.scorsese-providers]
+opt-level = 0
+[profile.dev.package.rustls]
+opt-level = 0
+[profile.dev.package.ureq]
+opt-level = 0
+[profile.dev.package.ureq-proto]
+opt-level = 0
+[profile.dev.package.zip]
+opt-level = 0
+
+# window and clipboard protocol: only `crates/shell` opens an event loop, which no
+# test does, and it marshals events; no draw runs through it.
+[profile.dev.package.winit]
+opt-level = 0
+[profile.dev.package.x11rb]
+opt-level = 0
+[profile.dev.package.x11rb-protocol]
+opt-level = 0
+[profile.dev.package.x11-dl]
+opt-level = 0
+[profile.dev.package.wayland-backend]
+opt-level = 0
+[profile.dev.package.wayland-client]
+opt-level = 0
+[profile.dev.package.wayland-protocols]
+opt-level = 0
+[profile.dev.package.wayland-protocols-plasma]
+opt-level = 0
+[profile.dev.package.wayland-protocols-wlr]
+opt-level = 0
+[profile.dev.package.smithay-client-toolkit]
+opt-level = 0
+[profile.dev.package.smithay-clipboard]
+opt-level = 0
+[profile.dev.package.arboard]
+opt-level = 0
+
+# host only: a proc macro or build-script helper that only dependencies use; it runs
+# while they compile, never on a member's rebuild, in a test or in a frame. The
+# `# host-only` tag (with `via` the crate it is reached through) is what
+# `.github/scripts/tests/test_dev_profile.py` reads: it fails when a workspace member
+# depends on a tagged crate or its `via`, and when any table's crate left the lock.
+[profile.dev.package.cc]  # host-only
+opt-level = 0
+[profile.dev.package.nalgebra-macros]  # host-only, via nalgebra
+opt-level = 0
+[profile.dev.package.thiserror-impl]  # host-only, via thiserror
+opt-level = 0
+[profile.dev.package.tracing-attributes]  # host-only, via tracing
+opt-level = 0
+[profile.dev.package.wayland-scanner]  # host-only
+opt-level = 0
+[profile.dev.package.zerocopy-derive]  # host-only, via zerocopy
+opt-level = 0
+[profile.dev.package.zeroize_derive]  # host-only, via zeroize
+opt-level = 0
 
 # `make bench-scenes PROFILE=1`: a release build whose line tables let a sampling
 # profiler name each function and line (`dev::bench::scenes::profile`). Its own

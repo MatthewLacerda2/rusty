@@ -17,6 +17,7 @@
 mod depth_postpass;
 pub(crate) mod opaque_copy;
 
+use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
 pub(crate) use opaque_copy::{OpaqueCopyPass, OpaqueViews};
 
 use crate::draw::batch::DrawBatch;
@@ -42,7 +43,7 @@ impl Renderer {
         let reactive = view.post_fx.taa_reactive();
         let targets = taa::reactive::hdr_attachments(view);
         {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut pass = encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
                 multiview_mask: None,
                 label: Some("Transparent Pass"),
                 color_attachments: &targets,
@@ -63,7 +64,7 @@ impl Renderer {
             let group3 = self.transparent_group3(view);
             self.record_transparent(&mut pass, group3, items, reactive.is_some());
         }
-        self.queue.submit(std::iter::once(encoder.finish()));
+        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 
     /// Record the sorted (priority, then back-to-front) transparent draws into `pass`: the global bind group

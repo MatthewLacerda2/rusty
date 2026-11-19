@@ -4,8 +4,9 @@
 //! pixels `t << (l + 1)` up to the next texel's; texels past the depth's edge
 //! repeat it. Kept per view and made again when the depth's size changes.
 
-use super::kept::Kept;
 use super::HiZ;
+use crate::gpu::kept::Kept;
+use crate::gpu::ops::CountedDevice as _;
 
 /// The pyramid's format: one float, written by a compute pass.
 const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R32Float;
@@ -80,12 +81,13 @@ impl Pyramid {
         self.texture.mip_level_count()
     }
 
-    /// Record the reduction of `depth` into every level.
+    /// Record the reduction of `depth` into every level, in `pass` (the stage's
+    /// one pass after phase one, #2327).
     pub(crate) fn build(
         &mut self,
         device: &wgpu::Device,
         hiz: &HiZ,
-        encoder: &mut wgpu::CommandEncoder,
+        pass: &mut wgpu::ComputePass,
         depth: &wgpu::TextureView,
     ) {
         let levels = &self.levels;
@@ -93,10 +95,6 @@ impl Pyramid {
             (0..levels.len())
                 .map(|level| level_group(device, hiz, (depth, levels), level))
                 .collect()
-        });
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("Hi-Z Pyramid"),
-            timestamp_writes: None,
         });
         let mut size = base(self.depth.0, self.depth.1);
         for (level, group) in groups.iter().enumerate() {
@@ -128,7 +126,7 @@ fn level_group(
         0 => (0, depth),
         _ => (1, &levels[level - 1]),
     };
-    device.create_bind_group(&wgpu::BindGroupDescriptor {
+    device.counted_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Hi-Z Level"),
         layout: &level_pipeline(hiz, level).get_bind_group_layout(0),
         entries: &[

@@ -59,3 +59,33 @@ fn gpu_frame_stages_are_off_by_default_and_sum_to_the_frame_when_on() {
     let whole = r.frame_cost().cpu_ms;
     assert!(sum <= whole && sum > whole * 0.97, "{sum} of {whole}");
 }
+
+/// An aside render inside an open frame window keeps what the frame had counted
+/// (`gpu::ops`) before it, and adds none of its own calls.
+#[test]
+fn gpu_an_aside_render_inside_a_frame_keeps_the_frames_gpu_call_counts() {
+    use crate::gpu::ops::{self, CountedQueue as _};
+    let Some(mut r) = crate::test_gpu::headless_or_skip(16, 16) else {
+        return;
+    };
+    let mut scene = Scene::new();
+    scene.skybox_path = String::new();
+    create_entity(&mut scene, "Box", Some(Primitive::Box));
+    let camera = Camera::new(glam::Vec3::new(0.0, 0.0, 4.0), -90.0, 0.0);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 16, 16);
+    let out = view.color_target_view().unwrap();
+    r.begin_frame_clocks();
+    r.queue.counted_submit(std::iter::empty());
+    let drew = r.aside(|r| {
+        r.render(&mut view, &scene, &camera, &out, false);
+        r.frame_counters.ops
+    });
+    assert!(
+        drew.render_passes > 0,
+        "the aside render counted its own: {drew:?}"
+    );
+    r.queue.counted_submit(std::iter::empty());
+    let frame = ops::take();
+    assert_eq!(frame.submits, 2, "the frame's two calls, whole: {frame:?}");
+    assert_eq!(frame.render_passes, 0, "and none of the aside's: {frame:?}");
+}

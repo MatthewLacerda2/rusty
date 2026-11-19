@@ -9,7 +9,8 @@
 
 use std::collections::BTreeMap;
 
-use super::{Surface, Texel, TexelPoint, NEIGHBOURS};
+use super::fill::NEIGHBOURS;
+use super::{Surface, Texel, TexelPoint};
 
 /// The label of a texel no triangle covers.
 pub(in crate::lightmap) const NO_CHART: u32 = u32::MAX;

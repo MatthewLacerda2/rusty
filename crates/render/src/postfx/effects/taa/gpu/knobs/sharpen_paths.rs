@@ -4,6 +4,7 @@
 
 use super::super::fixture::{eye, renderer, settle, view};
 use super::sharpen::sharpen_scene;
+use crate::gpu::ops::CountedQueue as _;
 use crate::motion::gpu_fixture::{H, W};
 use crate::postfx::effects::taa::sharpen::{run, SharpenTargets};
 use crate::postfx::effects::EffectCx;
@@ -52,7 +53,7 @@ fn gpu_sharpen_through_a_target_matches_writing_the_output() {
     let gpu = (&r.device, &r.queue);
     let mut encoder = r.device.create_command_encoder(&Default::default());
     let ended = run(&mut v.post_fx, gpu, &mut encoder, &ctx, &cx, false);
-    r.queue.submit(Some(encoder.finish()));
+    r.queue.counted_submit(Some(encoder.finish()));
     assert!(!ended, "a sharpen ahead of another pass wrote the output");
     let held = v.post_fx.targets.get::<SharpenTargets>();
     assert!(held.unwrap().has_target(), "not last, it needs its target");

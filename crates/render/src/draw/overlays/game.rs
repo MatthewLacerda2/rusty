@@ -18,6 +18,7 @@
 //! upscaling).
 
 use crate::draw::camera::CameraCtx;
+use crate::gpu::ops::CountedQueue as _;
 use crate::gpu::DEPTH_FORMAT;
 use crate::postfx::effects::taa;
 use crate::{RenderView, Renderer};
@@ -55,7 +56,7 @@ impl Renderer {
             });
         let from = view.depth_texture.as_image_copy();
         encoder.copy_texture_to_texture(from, kept.as_image_copy(), size);
-        self.queue.submit(std::iter::once(encoder.finish()));
+        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 
     /// Whether TAA upscales this stack's view, where the game gizmos are not drawn
@@ -94,12 +95,12 @@ impl Renderer {
         uniform.camera_pos = base.position.to_array();
         let camera = &self.camera_buffer;
         self.queue
-            .write_buffer(camera, 0, bytemuck::bytes_of(&uniform));
+            .counted_write_buffer(camera, 0, bytemuck::bytes_of(&uniform));
         let overlays = self.precreate_game_overlays(ctx.scene, base.position);
         self.draw_overlay_pass(&overlays, stack.output, depth);
         // Back to this camera's own, for anything after the stack that reads it.
         self.queue
-            .write_buffer(camera, 0, bytemuck::bytes_of(&ctx.uniform));
+            .counted_write_buffer(camera, 0, bytemuck::bytes_of(&ctx.uniform));
     }
 }
 

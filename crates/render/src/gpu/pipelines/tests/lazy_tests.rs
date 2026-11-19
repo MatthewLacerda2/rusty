@@ -87,8 +87,8 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
     // the 2 depth postpass (#1523) and its motion-only one (#1845) + the
     // motion-vector forward and 2 sky (#1435) + the same into the SSR surface target
     // too (#1526) + the 2 primed forward ones (#1499) and the primed SSR one + the
-    // opaque pass's and the prepass's mirrored and two-sided ones (#1615) + SSR's trace
-    // and resolve (#2028) and the one downsample all its pyramids share (#1736) + SSAO's occlusion, blur and upsample (#1578) + SSIL's 5 (#1750) + the motion blur's 3 tile
+    // opaque pass's and the prepass's mirrored and two-sided ones (#1615) + SSR's trace,
+    // resolve (#2028) and its hit pyramids' downsample (#2340) + SSAO's occlusion, blur and upsample (#1578) + SSIL's 5 (#1750) + the motion blur's 3 tile
     // passes and gather (#1436) + TAA's resolve, its upscale (#1702) and its
     // sharpen (#1847; one output format headless) + both resolves held, the
     // camera's anti-flicker on (#2228) + the depth of field's 9 (#1445) + bloom's prefilter,

@@ -61,7 +61,7 @@ fn meter(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let step = meter.step(key, cx.stack.editor_mode, cx.scene.shader_time);
     let params = ExposureParams::new(ae, step);
     let gpu = (&r.device, &r.queue);
-    meter.run(gpu, &r.post_passes.exposure, scene, &params);
+    meter.run(gpu, (&r.post_passes.exposure, &r.gpu_timer), scene, &params);
 }
 
 /// The view's side of the readout: what a frontend publishes.

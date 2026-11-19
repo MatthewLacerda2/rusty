@@ -57,10 +57,12 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Local gate = CI gate | `unittest` (`make scripts`, `test_gate_mirror.py`) | **hard gate**: every command a `GATES` recipe runs appears in a step of `ci.yml`/`lint.yml`, and every clippy run passes nothing after `--` but `-D warnings` (#964); a suite CI splits with `--partition` across a matrix names every shard of the split once, each `--partition` reads `count:${{ matrix.shard }}` in a job whose one-line split it read, and every shard runs the GPU and OIDN canaries (`test_shards.py`, #2264) |
 | Merge helpers | `unittest` (`make scripts`) | **hard gate**: `.github/scripts/tests` pass — `make mergeable` judges every merge, and the ruleset's required checks (`make ruleset`, #491) cannot tell a draft's run from a ready one (#486) |
 | Module layering | `tools/lint -- --layers` | **hard gate**: the declared table (`tools/lint/src/layers/table.rs`) equals the workspace's manifests (each row's `deps` and `uses` are its crate's `[dependencies]`), rows run bottom-up, no sim crate depends on a platform one or names a display crate (the `wgpu` and `egui` families: `wgpu`, `wgpu_*`, `egui`, `egui_*`), not even as a dev-dependency, no sim crate's dev-dependency is a platform sibling, no dev-dependency reaches up, `test-support` names no sibling and no display crate, and nothing declared is unused (#724, #938, #494) |
+| No render code only without `dev` | `tools/lint -- --rules` (`gpu-default-only`) | **hard gate**: in `rusty-render`, every crate its `dev` turns on (transitively, from the manifests) and every crate with an in-crate `gpu_` test, no production line holds a `cfg!(…)` naming `feature = "dev"`, and no line, test code included, starts a `cfg`/`cfg_attr` attribute (wrapped or not) whose `not(…)` names it — the default suite leaves the GPU tests to the `dev` one, so such code would be drawn by none (#2352) |
 | No shared process state | clippy `disallowed_methods` + `tools/lint -- --determinism` | **hard gate**: `std::env::{set_var, remove_var, set_current_dir}` are banned crate-wide in `clippy.toml`, tests included, since `cargo test` runs every in-crate test in one process; production opts out inline with a reason (`project::open`), and `--determinism` keeps the three on the list (#977) |
 | No subprocesses | `tools/lint -- --rules` (`subprocess`) | **hard gate**: no line of `src/` names `std::process::Command` — the engine starts no other program but Blender, to convert a `.blend` while authoring, and `git`, which a debug build asks for its checkout's commit; a real need takes `// lint: allow(subprocess) <why>` (#975) |
 | Nothing temporary | clippy `dbg_macro`/`todo`/`unimplemented` + `tools/lint -- --rules` (`markers`) | **hard gate**: the three are denied in `Cargo.toml`'s `[lints]` (and `tools/lint`'s); a marker word (`TODO`, `FIXME`, `XXX`, `HACK`) in a scanned `.rs` file fails — an unfinished thing is an issue (#935) |
 | One atomic write | `tools/lint -- --rules` (`atomic-write`) | **hard gate**: no line of `src/` outside `crates/core/src/fs/` names `fs::rename` — a file a reader may open is written through `core::fs::write_atomic`; a rename that moves rather than writes takes `// lint: allow(atomic-write) <why>` (#1129) |
+| One counted GPU path | `tools/lint -- --rules` (`gpu-ops`) | **hard gate**: outside `crates/render/src/gpu/ops.rs` and test code, no line of `crates/render/src/` calls wgpu's `.begin_render_pass(`, `.begin_compute_pass(`, `.submit(`, `.create_bind_group(` or `.write_buffer(` — the renderer goes through `CountedEncoder` / `CountedQueue` / `CountedDevice`'s `counted_*` helpers, which feed the frame's `render_passes`, `compute_passes`, `submits`, `bind_groups_created` and `buffer_writes` rows (#2341) |
 | One dependency graph | `make feature-split` (`.github/scripts/feature_split.py`) | **hard gate**: no dev-dependency turns on a feature the normal build lacks, so `cargo test` never rebuilds a shared crate (#552, #979; `docs/testing.md`) |
 | One fullscreen triangle | `tools/lint -- --rules` (`fullscreen-triangle`) | **hard gate**: no `.wgsl` under `engine/` but `fullscreen.wgsl` spells the triangle's `(i << 1u) & 2u`; `#import fullscreen` and call `fullscreen::triangle` / `uv` (#1370) |
 | One name table per enum | `tools/lint -- --rules` (`named-enum`) | **hard gate**: no file of `src/` hand-writes both a parse (`fn parse(_: &str) -> Option<Self>` in an `impl T`, or a free `fn parse_*(_: &str) -> Option<T>`) and a name (`fn name`/`fn as_str(self) -> &'static str`, or a free `fn *_name(_: T) -> &'static str`) for one type, nor a `const`/`static` table of `(T, &str)` pairs — a script-facing enum declares its names once with `core::named_enum!`, which writes `ALL`, `name`, a case-insensitive `parse`, `Display` and its serde (#1478); a parse that does more takes `// lint: allow(named-enum) <why>` (#1329) |
@@ -89,9 +91,10 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Supply chain | cargo-deny (`make deny`) | **hard gate**: advisories, bans, sources and licenses (`deny.toml`); the license allow-list is read for every dependency and for rusty's own crates, so a member without `license.workspace = true` fails as unlicensed |
 | Tagged engine warnings | `tools/lint -- --rules` (`log-tag`) | **hard gate**: every engine warning or error in `src/` (`log::warn!` / `log::error!`, an imported bare `warn!` / `error!`, `log!` at `Level::Warn`/`Level::Error`) opens its message with its module, `[Asset] …`, since those records reach the console and the session/MCP replies (#1139); a message that is not a literal takes `// lint: allow(log-tag) <why>` |
 | Test / fixture file length | `tools/lint` | <= 150 lines (every measured file under a `tests/` or `fixtures/` directory, whatever its language, a standalone `*_test.rs` or `test_*` file, and a `*_tests.rs` with no source beside it); a `<x>_tests.rs` **sibling** of `<x>.rs` (or of a `<x>/` module directory) shares the 300-line source cap |
+| Test files named for behaviour | `tools/lint -- --rules` (`tool-named-test`) | **hard gate**: a test file whose name starts with `survivor`, `mutant` or `mutation` is renamed for what its tests prove; a module whose subject carries the word takes `// lint: allow(tool-named-test) <why>` on its first line |
 | Test source shape | `tools/lint -- --rules` (`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`) | **hard gate**: no inner `#![cfg]` in `tests/`, no user workspace in tests, a GPU only through `headless_or_skip` (#980) |
 | Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `rusty_test_support::temp::dir()` (in-crate) / `crate::temp::dir()` (`tests/`), never a bare `std::env::temp_dir()` (#999) |
-| Tests | nextest + `cargo test --doc` (`make test`) | **hard gate**: the engine's tests and doctests, both feature sets; the GPU tests run on lavapipe (`docs/testing.md`). In CI, `build-test` runs as three parallel jobs, the default suite and the `dev` suite in two shards, each with the timeout to itself (#2264) |
+| Tests | nextest + `cargo test --doc` (`make test`) | **hard gate**: the engine's tests and doctests, both feature sets; the GPU tests run on lavapipe, in the `dev` set (`docs/testing.md`, *Which suite runs the GPU tests*). In CI, `build-test` runs as three parallel jobs, the default suite and the `dev` suite in two shards, each with the timeout to itself (#2264) |
 | `tools/lint` stays std-only | `make test-lint` | its `Cargo.lock` names one package, itself (#935) |
 
 ## The `*_tests.rs` sibling rule
@@ -483,6 +486,41 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   like any shader, and a test fixture that must stand alone (`tests/gpu/`) is not
   scanned. A shader that must stand alone says why with
   `// lint: allow(fullscreen-triangle) <why>`.
+- **`gpu-default-only`** (#2352) — the default-feature suite runs every test but
+  the `gpu` group, which the `dev` suite runs (`docs/testing.md`, *Which suite runs
+  the GPU tests*). That rests on `dev` only *adding* code, so the rule checks the
+  side where it would take some away: in a crate in scope (`rusty-render`, each crate
+  its `dev` feature turns on, followed through every manifest, and each crate with an
+  in-crate `gpu_` test, all computed, none listed), a production line holding a
+  `cfg!(…)` that names `feature = "dev"` fails, and so does a `#[cfg(…)]` /
+  `#[cfg_attr(…)]` whose `not(…)` names it on any line, test code included, its lines
+  joined first when rustfmt wraps it: that code, or that GPU test, exists only without
+  `dev`, and no GPU test draws it any more. A test's own `cfg!` passes: it reads the
+  feature set, it hides nothing. A `#[cfg(feature = "dev")]` only adds and passes, and
+  so does `any(feature = "dev", feature = "editor")`, true in both suites since
+  `editor` is a default feature. **What it cannot see** is a `dev`-only *override*
+  (`#[cfg(feature = "dev")] let samples = 1;`, `#[cfg_attr(feature = "dev", path =
+  …)]`): it changes what the GPU tests draw without hiding anything, and is the
+  reviewer's to catch. The fix is to keep the code the same under both feature sets,
+  or to put that crate's GPU tests back in the default pass by widening the `-E` in
+  `make test`'s `DEFAULT_SUITE` and ci.yml's "Test (engine, default)" together
+  (`-E 'not group(gpu*) | (group(gpu*) & package(rusty-<m>))'`; `make scripts` holds
+  the two equal). A switch no rendered path reads (the window device's GPU
+  timestamps, the agent guide a project is written, the editor's and shell's ship
+  stubs) takes `// lint: allow(gpu-default-only) <why>`, and so does a non-GPU test
+  compiled only without `dev` (`rules/gpu_default_only.rs`).
+- **`gpu-ops`** (#2341) — every render or compute pass the renderer begins, every
+  queue submit, bind group made and buffer write goes through
+  `crates/render/src/gpu/ops.rs` (`.counted_render_pass(`, `.counted_compute_pass(`,
+  `.counted_submit(`, `.counted_bind_group(`, `.counted_write_buffer(`, from the
+  `CountedEncoder`, `CountedQueue` and `CountedDevice` traits, imported `as _`), so
+  the frame's GPU-call rows count them all. A raw wgpu call of those five anywhere
+  else in `crates/render/src/` is a finding naming its helper. Test code is not
+  scanned (it is no frame's work), nor is any other crate: the editor's egui paint
+  passes in `crates/shell/src/editor/` draw outside the renderer's frame, so they are
+  out of scope by design. A text match: a method of the renderer's own named
+  `submit` (and so on) would be flagged, so such a method takes another name. A call
+  that must stay raw says why with `// lint: allow(gpu-ops) <why>`.
 - **`ignored`** — what you push must be what CI builds. A scanned `.rs` file that
   `git check-ignore --no-index` matches fails, tracked or not, because the next
   new file beside it is the one a push silently drops
@@ -742,6 +780,13 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   crowded first, leaving out what is past that rule's cap under `src/` (its
   finding or allow). It never fails the gate; it tells you where to cluster by
   responsibility when you next work in that directory, before `dir-size` makes you.
+- **`tool-named-test`** — a test belongs beside the behaviour's other tests, under
+  a name that says what it proves, so a file named for the tool that found the gap
+  (`survivors.rs`, `survivor_tests.rs`, `mutants.rs`) fails on its first line: rename
+  it for its tests' subject. Only the file name is checked: whether a test's own
+  name and doc comment speak of behaviour rather than of a mutant or a line number
+  is a judgement the independent review holds, since no pattern tells the two apart
+  (`ci-merge`, *Triaging a survivor*).
 - **`unwrap-deny`** — the unwrap ban covers exactly the layer table's sim rows
   (#962). Each sim row's `crates/<module>/src/lib.rs` must carry
   `#![deny(clippy::unwrap_used)]`, and no file under a sim module may `allow`,

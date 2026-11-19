@@ -236,8 +236,8 @@ mod shadowmask_tests;
 #[cfg(test)]
 mod spill_tests;
 #[cfg(test)]
-mod survivor_tests;
-#[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod texture_and_page_tests;
 #[cfg(test)]
 mod write_tests;

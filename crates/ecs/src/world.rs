@@ -12,9 +12,11 @@
 //! the one mandatory component. Iteration is in insertion order so the former
 //! `Vec<Entity>` semantics (physics pair ordering, render order) are preserved.
 //!
-//! The generic helpers (`component`, `each_component`, here; `component_mut`,
-//! `set_component`, … in `funnel.rs`) are the ONLY place raw hecs column access
-//! happens; `access.rs` and `core.rs` build the typed surface on them. Every raw
+//! The generic helpers (`component`, `each_component` and the narrow walks
+//! `each_core_with`, `ids_with_component_where`, here; `component_mut`,
+//! `set_component`, … in `funnel.rs`) and `placement.rs`'s whole-row spawn and
+//! despawn are the ONLY place raw hecs access happens; `access.rs` and `core.rs`
+//! build the typed surface on them. Every raw
 //! write carries the `ecs-write` lint's inline allow (`docs/linting.md`), since a
 //! write that skips `World::touch` stamps no change. `Entity` stays the on-disk *document* shape:
 //! `bundle::build_bundle` turns one into a single `EntityBuilder` placement (one
@@ -33,6 +35,8 @@ use super::journal::Journal;
 use super::names::Names;
 use super::world_space::{BoundsQueue, WorldStore};
 
+#[doc(hidden)]
+pub use super::walks;
 pub(crate) use hecs::{Ref, RefMut};
 
 pub struct World {
@@ -205,6 +209,7 @@ impl World {
 
     /// Shared borrow of one component column, by stable id.
     pub(crate) fn component<T: hecs::Component>(&self, id: u32) -> Option<Ref<'_, T>> {
+        walks::lookup(std::any::type_name::<T>());
         let handle = self.handles.get(id)?;
         self.inner.get::<&T>(handle).ok()
     }
@@ -224,16 +229,37 @@ impl World {
     /// `Core::seq` (O(k log k)) restores the insertion order hecs's
     /// per-archetype iteration doesn't provide.
     pub(crate) fn ids_with_component<T: hecs::Component>(&self) -> Vec<u32> {
+        let mut matches: Vec<(u64, u32)> = Vec::new();
+        self.each_core_with::<T>(|core| matches.push((core.seq, core.id)));
+        matches.sort_unstable_by_key(|&(seq, _)| seq);
+        matches.into_iter().map(|(_, id)| id).collect()
+    }
+
+    /// [`World::ids_with_component`] keeping only the carriers whose `T` passes
+    /// `keep`, tested in the same column walk: no per-id lookup afterwards.
+    pub(crate) fn ids_with_component_where<T: hecs::Component>(
+        &self,
+        keep: impl Fn(&T) -> bool,
+    ) -> Vec<u32> {
         walks::count(std::any::type_name::<T>());
         let mut matches: Vec<(u64, u32)> = self
             .inner
-            .query::<&Core>()
-            .with::<&T>()
+            .query::<(&Core, &T)>()
             .iter()
-            .map(|(_, core)| (core.seq, core.id))
+            .filter(|(_, (_, value))| keep(value))
+            .map(|(_, (core, _))| (core.seq, core.id))
             .collect();
         matches.sort_unstable_by_key(|&(seq, _)| seq);
         matches.into_iter().map(|(_, id)| id).collect()
+    }
+
+    /// Visit the [`Core`] of every entity carrying `T`, in no set order: the
+    /// narrow query under [`World::ids_with_component`], for a caller that also
+    /// filters on a core fact (layer, static) without a lookup per id.
+    pub(crate) fn each_core_with<T: hecs::Component>(&self, visit: impl FnMut(&Core)) {
+        walks::count(std::any::type_name::<T>());
+        let mut query = self.inner.query::<&Core>().with::<&T>();
+        query.iter().map(|(_, core)| core).for_each(visit);
     }
 
     /// Shared borrow of two columns of one entity under a single id lookup.
@@ -262,35 +288,4 @@ fn drop_slots(order: &mut Vec<u32>, slots: &[usize]) {
         write += end - slot - 1;
     }
     order.truncate(write);
-}
-
-/// How many times each column was walked (`ids_with_*`) on this thread: what lets a
-/// test hold that a frame walks no column it should not (the retained render
-/// scene's idle frame, #1706). A test hook: compiled in every build, since the
-/// test that reads it is another crate's, and counting only on a thread that
-/// asked [`walks::of`] once, so a build that never asks pays one thread-local
-/// read per walk.
-#[doc(hidden)]
-pub mod walks {
-    use std::cell::{Cell, RefCell};
-    use std::collections::BTreeMap;
-
-    thread_local! {
-        static ARMED: Cell<bool> = const { Cell::new(false) };
-        static WALKS: RefCell<BTreeMap<&'static str, u64>> = RefCell::default();
-    }
-
-    pub(crate) fn count(column: &'static str) {
-        if ARMED.with(Cell::get) {
-            WALKS.with(|w| *w.borrow_mut().entry(column).or_default() += 1);
-        }
-    }
-
-    /// Walks of `T`'s column on this thread since the first call of this function
-    /// on it, which starts the count.
-    pub fn of<T>() -> u64 {
-        ARMED.with(|a| a.set(true));
-        let column = std::any::type_name::<T>();
-        WALKS.with(|w| w.borrow().get(column).copied().unwrap_or(0))
-    }
 }

@@ -67,8 +67,11 @@ nothing to wait for.
 - For a proof run on a draft, dispatch the workflow on the branch instead of
   readying: `gh workflow run ci.yml --ref <branch>` (without `gh`, the GitHub MCP
   `actions_run_trigger` does the same). It runs the gates and nothing else.
-  Never dispatch `mutants-sweep.yml`: that is the full sweep, up to ten runners
-  the batch's gates need.
+  Dispatched on a head that already holds `main`'s tip, its green run also
+  lets the ready run skip its build (`proved_tree.py`), so update from `main`
+  before the proof run, not after it. A branch that changes a manifest, the
+  lockfile, the toolchain, `.cargo/`, `.github/actions/`, a gating workflow or
+  the skip's decider still runs in full when readied, as it should.
 - **A run you cite is one you read finished.** Its id, its conclusion, and every
   time or count you quote from it are copied from the completed run (`gh run view
   <id> --json status,conclusion,jobs`, its log), never expected or extrapolated,
@@ -76,8 +79,10 @@ nothing to wait for.
   figure. If the run is still going when you would end, say so in the
   description and leave the PR a draft naming the run.
 - **A branch that adds mechanism asks for a scoped mutation run** with a line of
-  its own in the PR description: `Mutation: diff` (or path globs, `Mutation:
-  crates/physics/src/**`). **Never dispatch `mutants-on-request.yml` yourself**: runs
+  its own in the PR description: `Mutation: diff` by default. Globs
+  (`Mutation: crates/physics/src/**`) only keep a large diff to its mechanism
+  files: they narrow what the branch changed, never widen it to whole files.
+  **Never dispatch `mutants-on-request.yml` yourself**: runs
   dispatched at ready hold runners the gating CI that merges PRs waits behind.
   The merge queue dispatches the run after it merges your PR, on `main` at the
   squash commit, two at a time, and the report lands as a comment on your merged
@@ -206,6 +211,12 @@ What cloud coders' run logs taught; each one cost a coder real time.
 - Never fall back to `cargo test`: CI runs nextest, and its per-test process
   isolation and the `gpu` test group are what the gate measures.
 - Don't run `cargo mutants` locally; ask for a scoped run (above).
+- **A survivor is a question, not a defect** (`ci-merge`, *Triaging a survivor*):
+  test the ones that show behaviour nothing asserts, through the callers'
+  interface, named for the behaviour and beside its other tests, never for a
+  mutant or a line; leave the rest (a constant or default, a message's wording,
+  bench and fixture code, speed-only code, an equivalent mutant), with no record
+  owed. No survivor count is a goal.
 - **A refactor that claims no behaviour change proves it by comparison**:
   capture the output before (a scene dump, a bake, a capture, a test's printed
   values), and show it identical after, in the PR.

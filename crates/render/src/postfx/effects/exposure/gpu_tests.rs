@@ -25,7 +25,7 @@ fn meter(chain: &mut Chain, ae: &AutoExposure, step: Step) -> f32 {
     let gpu = (&r.device, &r.queue);
     pfx.exposure.run(
         gpu,
-        &r.post_passes.exposure,
+        (&r.post_passes.exposure, &r.gpu_timer),
         (&pfx.scene_hdr.view, [W, 1]),
         &params,
     );
@@ -97,7 +97,7 @@ fn gpu_a_cut_snaps_and_darkening_runs_at_its_own_speed() {
     let params = ExposureParams::new(&ae, SNAP);
     pfx.exposure.run(
         (&r.device, &r.queue),
-        &r.post_passes.exposure,
+        (&r.post_passes.exposure, &r.gpu_timer),
         (&pfx.scene_hdr.view, [W, 1]),
         &params,
     );

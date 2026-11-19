@@ -27,6 +27,8 @@ mod engine_spawn;
 mod entity_arg;
 mod full_literal;
 mod fullscreen_triangle;
+mod gpu_default_only;
+mod gpu_ops;
 mod ignored;
 mod key_guard;
 mod log_tag;
@@ -48,6 +50,7 @@ mod stored_format;
 mod subprocess;
 mod temp_dir;
 mod test_shape;
+mod tool_named_test;
 mod unwrap;
 mod world_space;
 
@@ -101,6 +104,8 @@ const RULES: &[(&str, Rule, Allow)] = &[
         fullscreen_triangle::run,
         Allow::Inline,
     ),
+    (gpu_default_only::RULE, gpu_default_only::run, Allow::Inline),
+    (gpu_ops::RULE, gpu_ops::run, Allow::Inline),
     (ignored::RULE, ignored::run, Allow::Never),
     (key_guard::RULE, key_guard::run, Allow::Never),
     (log_tag::RULE, log_tag::run, Allow::Inline),
@@ -121,6 +126,7 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (subprocess::RULE, subprocess::run, Allow::Inline),
     (temp_dir::RULE, temp_dir::run, Allow::Inline),
     (test_shape::INNER_CFG, test_shape::run, Allow::Inline),
+    (tool_named_test::RULE, tool_named_test::run, Allow::Inline),
     (unwrap::RULE, unwrap::run, Allow::Inline),
     (world_space::RULE, world_space::run, Allow::Inline),
 ];

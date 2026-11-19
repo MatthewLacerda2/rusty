@@ -56,7 +56,11 @@ fn measured() -> Report {
     let path = root.join("assets/scenes/a.scene");
     rusty_edit::save_to_file(&scene, &path.to_string_lossy()).unwrap();
     let settings = ProjectSettings::default();
-    let (mut harness, _) = load(&root.join("out"), &root, "a", settings, (64, 64)).unwrap();
+    let opts = Options {
+        size: (64, 64),
+        ..Options::default()
+    };
+    let (mut harness, _) = load(&root.join("out"), &root, "a", settings, opts).unwrap();
     let mut world = harness.world.borrow_mut();
     let schedule = world.resources.schedule_mut();
     schedule.add_system(Stage::FixedUpdate, napper);
@@ -99,4 +103,24 @@ fn gpu_every_system_and_render_stage_is_a_row_and_together_they_are_the_whole() 
         assert!(row.is_some(), "{stage}: {:?}", report.metrics);
     }
     holds_whole(&report, "render.", renderer);
+}
+
+/// The renderer's own resident bytes are rows beside `gpu_mb`, in MiB (#2340).
+#[test]
+fn resident_bytes_by_kind_are_rows_in_mib() {
+    let counters = rusty_render::RenderCounters {
+        texture_bytes: 3 << 20,
+        lightmap_bytes: 1 << 19,
+        ..Default::default()
+    };
+    let mut report = SceneReport::default();
+    push_resident(&mut report, &counters);
+    let mb = |k: &str| report.row(k).map(|r| r.avg);
+    assert_eq!(mb("gpu_texture_mb"), Some(3.0));
+    assert_eq!(mb("gpu_lightmap_mb"), Some(0.5));
+    assert_eq!(
+        mb("gpu_reflection_mb"),
+        Some(0.0),
+        "a kind the scene lacks reads 0"
+    );
 }

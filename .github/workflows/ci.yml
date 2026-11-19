@@ -3,9 +3,9 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
   # Gates only (#750). Mutation and coverage are signals and have their own
-  # workflows, off pull requests and off every merge: `mutants-sweep.yml` and
-  # `coverage.yml` run weekly, and `mutants-on-request.yml` mutates exactly what
-  # someone names (`make mutants-remote SCOPE=...`). A signal that ran here held
+  # workflows, off pull requests and off every merge: `coverage.yml` runs
+  # weekly, and `mutants-on-request.yml` mutates exactly what someone names
+  # (`make mutants-remote SCOPE=...`), never on a schedule. A signal that ran here held
   # runners the merge queue was waiting on, for a report that could not change
   # whether anything merged.
   push:
@@ -63,8 +63,13 @@ jobs:
   # `main` whose tree a recent successful run already built (#1784): the squash
   # of an up-to-date head has the head's tree, which its PR run just proved.
   # `proved_tree.py` checks that mechanically, keeps the full run when the push
-  # moves a cache key (Cargo.toml/lock, the toolchain, `.cargo/`, this file), and
-  # fails toward running on any error. Skipped, the run's gating jobs report
+  # moves a cache key (Cargo.toml/lock, the toolchain, `.cargo/`,
+  # `.github/actions/`, this file) or changes the decider (the script and what it
+  # imports), and fails toward running on any error. A ready PR's run asks too
+  # (#2333): its test merge's tree, built green by a dispatch or push run (a head
+  # holding `main` that a coder proved before readying), skips the same way,
+  # under the same full-run rules; a PR that changes the decider or either
+  # gating workflow never asks (the `decider` filter). Skipped, the run's gating jobs report
   # `skipped`/`success` exactly as on a Markdown-only merge, so `ci-gate` passes.
   changes:
     timeout-minutes: 5
@@ -84,8 +89,9 @@ jobs:
       # repo, so without this checkout it dies with git exit 128 — which failed
       # every post-merge run (#480).
       # paths-filter fetches `before` itself if the shallow clone lacks it.
+      # A ready PR checks out for `proved_tree.py` alone (#2333).
       - uses: actions/checkout@v7
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)
       - uses: dorny/paths-filter@v4
         id: filter
         # Runs on PRs (diff vs. base) and on push to main (diff of the merge
@@ -103,6 +109,15 @@ jobs:
               # the game CLAUDE.md template a project's edit-open embeds (#1313).
               - 'docs/game-agent.md'
               - 'crates/core/src/project/game_claude.md'
+            # What decides a skip (#2333): a PR that changes it never asks
+            # `proved_tree.py`, since the step would run the PR's own copy.
+            decider:
+              - '.github/scripts/proved_tree.py'
+              - '.github/scripts/ghrest.py'
+              - '.github/scripts/merging/__init__.py'
+              - '.github/scripts/merging/verdict/**'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/lint.yml'
             # What can stop `fuzz/` compiling (`fuzz-check`): the target and its
             # manifest; the root package's manifest and re-exports (`src/lib.rs`),
             # which it imports through; every member's manifest (a feature or
@@ -125,22 +140,26 @@ jobs:
               - 'rust-toolchain.toml'
               - '.cargo/**'
               - '.github/workflows/ci.yml'
-      # Only a push asks, and only when it changes code: a Markdown-only merge
-      # already skips. A push that changes a cache key's inputs (`Cargo.lock`,
-      # the toolchain, `.github/actions/`, which pins the CI tools, #1973) runs
-      # in full. The nightly and a dispatch always build. A lookup that
+      # A push and a ready PR ask (#2333), and only when they change code: a
+      # Markdown-only change already skips. On a PR `github.sha` is the test
+      # merge, whose tree a dispatch run on a head holding `main` built. A change
+      # to a cache key's inputs (`Cargo.lock`, the toolchain, `.github/actions/`,
+      # which pins the CI tools, #1973), this file or the script runs in full;
+      # so does a PR's `decider` change, held here because the PR would run its
+      # own copy (a push runs `main`'s, whose key check already holds `DECIDER`).
+      # A draft and the nightly never ask; a dispatch always builds. A lookup that
       # breaks (no `gh`, a hung call) must not fail `changes` and turn `main`
       # red: the step may fail or time out, and its empty output means a full run.
       - name: Was this tree already proved?
         id: proved
-        if: github.event_name == 'push' && steps.filter.outputs.code != 'false'
+        if: (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)) && steps.filter.outputs.code != 'false' && (github.event_name != 'pull_request' || steps.filter.outputs.decider != 'true')
         continue-on-error: true
         timeout-minutes: 2
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
           python3 .github/scripts/proved_tree.py --workflow ci.yml
-          --sha "${{ github.sha }}" --before "${{ github.event.before }}"
+          --event "${{ github.event_name }}" --sha "${{ github.sha }}" --before "${{ github.event.before }}"
 
   # The Linux build+test. Kept as its own job (not folded into the OS matrix
   # below) so the `build-test` name `mergeable.py` and `ci-gate`'s `needs:` read
@@ -168,6 +187,9 @@ jobs:
   # already built that very tree (`changes`, #1784).
   build-test:
     needs: changes
+    permissions:
+      contents: read
+      actions: read  # main's runs and their JUnit artifacts (slowest-tests)
     strategy:
       # One shard failing must not cancel the others: each one's verdict is
       # what tells a real red from a cancelled run.
@@ -177,9 +199,9 @@ jobs:
           - { features: default, shard: 1/1 }
           - { features: dev, shard: 1/2 }
           - { features: dev, shard: 2/2 }
-    # A guard against a hang, not a budget a shard must fit: the slowest share,
-    # the default suite (one fewer split than `dev`), measured 303-411 s of
-    # nextest once split, on a fast runner and a slow one.
+    # A guard against a hang, not a budget a shard must fit: the slowest shares
+    # are the two `dev` shards, which run the gpu group (355 s and 562 s of nextest
+    # in run 44351591966); the default entry, which leaves that group to them, 73 s.
     timeout-minutes: 30
     runs-on: ubuntu-24.04
     if: >-
@@ -272,19 +294,38 @@ jobs:
       # below. It does not run doctests, hence the `--doc` step. A matrix entry
       # runs one of the two test steps, under its own name: the scripts look for
       # each by name (`proved_tree.BUILT`, `verdict.changes.DRIFT_STEP_WORDS`).
+      # The two steps do not run the same set: the default entry compiles every
+      # test target but runs every test except the `gpu` group (`-E 'not
+      # group(gpu*)'`, as `make test`'s default pass), which the `dev` shards run,
+      # `dev` adding to the default features (docs/testing.md, *Which suite runs
+      # the GPU tests*; the `gpu-default-only` lint holds the premise). Each
+      # test step builds first (`--no-run`), then samples the runner's free
+      # memory in the background while the tests alone run (`memory_floor.py`),
+      # so rustc and the linker are not in the floor; *Slowest tests* prints it
+      # beside the accounting.
       - name: Test (engine, default)
         if: needs.changes.outputs.code != 'false' && matrix.features == 'default'
         run: |
           rc=0
-          cargo nextest run --profile ci --locked --partition "count:${{ matrix.shard }}" || rc=$?
+          cargo nextest run --no-run --locked || rc=$?
+          python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
+          if [ "$rc" = 0 ]; then
+            cargo nextest run --profile ci --locked -E 'not group(gpu*)' --partition "count:${{ matrix.shard }}" || rc=$?
+          fi
           cp target/nextest/ci/junit.xml junit-default.xml || true
+          kill "$watcher" || true
           exit "$rc"
       - name: Test (engine, dev features)
         if: needs.changes.outputs.code != 'false' && matrix.features == 'dev'
         run: |
           rc=0
-          cargo nextest run --profile ci --features dev --locked --partition "count:${{ matrix.shard }}" || rc=$?
+          cargo nextest run --no-run --features dev --locked || rc=$?
+          python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
+          if [ "$rc" = 0 ]; then
+            cargo nextest run --profile ci --features dev --locked --partition "count:${{ matrix.shard }}" || rc=$?
+          fi
           cp target/nextest/ci/junit.xml junit-dev.xml || true
+          kill "$watcher" || true
           exit "$rc"
       # The canaries that refuse to skip (the adapter's, `render::test_gpu`, and
       # OIDN's, `bake::denoise::tests`), on every entry: each installs lavapipe
@@ -298,13 +339,38 @@ jobs:
           cargo nextest run --locked ${{ matrix.features == 'dev' && '--features dev' || '' }}
           -E 'test(=test_gpu::tests::gpu_adapter_present_when_required)
           | test(=bake::denoise::tests::oidn_is_present_where_ci_requires_it)'
-      # The twenty slowest tests of this share, in the log where an agent reads
-      # them (#1976): the job summary is not served by the REST API a cloud
-      # session reads, and nextest's log names only tests past a minute.
+      # The twenty slowest tests of this share and where its time went (the
+      # `gpu` group against the rest, per binary), in the log where an agent
+      # reads them (#1976, #2326): the job summary is not served by the REST API
+      # a cloud session reads, and nextest's log names only tests past a minute.
+      # First, the tests over the budget that `main`'s reports of this feature
+      # set had under it, annotated, so the PR that adds a slow test is told
+      # (#2350). `prefix` and the shard's name are the upload's below.
       - name: Slowest tests
         if: always() && needs.changes.outputs.code != 'false'
+        id: slowest
         continue-on-error: true
-        run: python3 .github/scripts/slowest_tests.py "junit-${{ matrix.features }}.xml" 20
+        uses: ./.github/actions/slowest-tests
+        with:
+          report: junit-${{ matrix.features }}.xml
+          count: "20"
+          prefix: junit-build-test-${{ matrix.features }}
+          shard: ${{ matrix.shard }}
+      # The report itself, for a week, so a shard's timings can be re-read after
+      # the job (#2326) and the next PR's run compares against it (#2350). Named
+      # by the shard (`1of2`), not by the entry's index, which is not the shard:
+      # the composite above builds the name the lookup reads, and outputs it
+      # here. A re-run job overwrites its own.
+      - name: Upload the JUnit report
+        if: always() && needs.changes.outputs.code != 'false'
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.slowest.outputs.name }}
+          path: junit-*.xml
+          if-no-files-found: ignore
+          retention-days: 7
+          overwrite: true
       - name: Doctests (this feature set)
         if: needs.changes.outputs.code != 'false' && startsWith(matrix.shard, '1/')
         run: |
@@ -343,6 +409,9 @@ jobs:
   # the free plan's five concurrent macOS jobs, so no shard queues for one.
   build-test-cross:
     needs: changes
+    permissions:
+      contents: read
+      actions: read  # main's runs and their JUnit artifacts (slowest-tests)
     strategy:
       fail-fast: false
       matrix:
@@ -406,8 +475,13 @@ jobs:
         shell: bash
         run: |
           rc=0
-          cargo nextest run --profile ci --features dev --locked --partition "count:${{ matrix.shard }}" || rc=$?
+          cargo nextest run --no-run --features dev --locked || rc=$?
+          python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
+          if [ "$rc" = 0 ]; then
+            cargo nextest run --profile ci --features dev --locked --partition "count:${{ matrix.shard }}" || rc=$?
+          fi
           cp target/nextest/ci/junit.xml junit-dev.xml || true
+          kill "$watcher" || true
           exit "$rc"
       # A partition puts each canary in one shard only, so every shard runs them
       # again (#2264, #2276): a shard that lost Metal or OIDN fails, never skips.
@@ -416,12 +490,30 @@ jobs:
           cargo nextest run --locked --features dev
           -E 'test(=test_gpu::tests::gpu_adapter_present_when_required)
           | test(=bake::denoise::tests::oidn_is_present_where_ci_requires_it)'
-      # The ten slowest tests, in the log where an agent reads them (#1976): the
-      # job summary is not served by the REST API a cloud session reads.
+      # The ten slowest tests and where the shard's time went, in the log where
+      # an agent reads them (#1976, #2326): the job summary is not served by the
+      # REST API a cloud session reads. The cores are the runner's own, so the
+      # Metal leg's GPU-or-cores balance reads beside Linux's. First, the tests
+      # newly over the budget against `main`'s Metal reports (#2350).
       - name: Slowest tests
         if: always()
+        id: slowest
         continue-on-error: true
-        run: python3 .github/scripts/slowest_tests.py junit-dev.xml
+        uses: ./.github/actions/slowest-tests
+        with:
+          report: junit-dev.xml
+          prefix: junit-build-test-cross-${{ matrix.os }}
+          shard: ${{ matrix.shard }}
+      - name: Upload the JUnit report
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.slowest.outputs.name }}
+          path: junit-*.xml
+          if-no-files-found: ignore
+          retention-days: 7
+          overwrite: true
       - name: Doctests (dev features)
         if: matrix.shard == '2/2'
         run: cargo test --doc --features dev --locked

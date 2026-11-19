@@ -281,15 +281,32 @@ its check and its command changed to match).
 - CI (`.github/workflows/ci.yml`) and `make test` run the engine suite with
   **cargo-nextest** plus `cargo test --doc`, both feature sets; the lint xtask keeps
   plain `cargo test`. On Linux, `build-test` is a matrix of three parallel jobs
-  (#2264): `build-test (default, 1/1)` runs the default suite, and `build-test (dev,
+  (#2264): `build-test (default, 1/1)` runs the default suite (all but the GPU group,
+  which the `dev` suite runs: *Which suite runs the GPU tests*), and `build-test (dev,
   1/2)` and `(dev, 2/2)` split the `dev` one with nextest's `--partition count:k/2`;
-  each prints its twenty slowest tests (step *Slowest tests*), and each runs the GPU and
+  each prints its twenty slowest tests and where its time went, the GPU group's test-seconds (`gpu`, `gpu-macos` on macOS) over its cap against the rest's over the runner's cores (and both over the cores, the bound on lavapipe, where the GPU tests are CPU work) beside the shard's wall, per binary, and the least memory the runner had free while its tests ran (after the build) (step *Slowest tests*; the macOS shards print ten), keeps its JUnit report as a 7-day artifact named by the shard (`junit-build-test-dev-1of2`, `junit-build-test-cross-macos-26-2of2`), and each runs the GPU and
   OIDN canaries again on its own runner (step *Canaries*), since a partition puts each
   canary in one shard only. The macOS leg (`build-test-cross`) runs the nextest suite with
   `dev` only, the superset (#1976), split in two, `build-test-cross (macos-26, 1/2)` and
   `(macos-26, 2/2)`, each with the canaries; 2/2 also runs the `dev` doctests and the lint
   xtask's tests, and the default doctests run on Linux only (#2276). A job past three quarters of its `timeout-minutes`
   on `main` files an issue by itself (`ci_headroom.py`, `docs/linting.md`). See *The test runner* below.
+- **A pull request that adds a slow test is told** (#2350). Each suite job's *Slowest
+  tests* step first compares its report with the reports of the same leg and feature
+  set from `main`'s last three successful runs that kept every shard's (every shard
+  together, since a `count:` partition moves tests between shards), holds each test
+  to its longest time over them, and names those runs, their dates and commits: a
+  test merged after them reads as new. A test over 20 s (`slowest_tests.BUDGET`)
+  that `main` had under it, or lacked, prints `new over 20 s: <test> <seconds> (main:
+  <seconds or absent>)` and a warning annotation on the PR's checks when it is more
+  than 1.3× (`NOISE`) `main`'s time at the shard's pace: how much slower than
+  `main` the shard ran its heavy tests (`slowest_tests.pace`, printed as `pace:`),
+  so a runner slow across the shard does not name what it slowed; one over it on both sides prints once as `known`,
+  and one under it on `main` that did not grow that far as `near`
+  (`slowest_tests.is_new`). With no baseline (expired, a renamed entry) it says `no baseline: <why>` and
+  lists the tests over the budget. It informs, never gates, and exempts nothing: a test
+  that needs the time says why in its PR; one that does not is trimmed against what it
+  proves, still failing on the mutation it guards.
 - A test never reads a developer's game project (#782). `Harness::new` runs in a
   workspace of its own, `<out_dir>/workspace`, seeded fresh from the test-fixture
   project's scripts and the bundled ones, and the scene's relative script paths
@@ -412,7 +429,7 @@ cannot run. CI's `ci` profile additionally writes JUnit, rendered as each
 
 Handy forms: `cargo nextest run -E 'test(physics_)'` (filter by name),
 `cargo nextest list` (what would run), `cargo nextest show-config test-groups`
-(which tests the `gpu` group below holds).
+(which tests the GPU group below holds, `gpu` or `gpu-macos`).
 
 ## One integration-test binary
 Cargo's default builds **each** `tests/*.rs` as its own executable, and each one links
@@ -571,8 +588,30 @@ Where they actually run is not uniform, and it is worth knowing before you rely 
 
 | CI job | Adapter | GPU tests |
 |---|---|---|
-| `build-test` (ubuntu) | Mesa **lavapipe** (software Vulkan, #489) | run, on the CPU |
+| `build-test (dev, k/2)` (ubuntu) | Mesa **lavapipe** (software Vulkan, #489) | run, on the CPU |
+| `build-test (default, 1/1)` (ubuntu) | lavapipe | compiled, not run, but the canary |
 | `build-test-cross` (macos) | real Metal GPU | run, against real VRAM |
+
+### Which suite runs the GPU tests
+The `dev` suite (#2352). The default-feature suite, `make test`'s first pass and CI's
+`build-test (default, 1/1)`, runs nextest with `-E 'not group(gpu*)'` (the Makefile's
+`DEFAULT_SUITE`, `make test-explore`'s default pass too): it **compiles every test
+target** of the default build, so a default-only build break still fails, and runs
+every test except the GPU group (`gpu`, `gpu-macos` on macOS). `--features dev` only adds to the default
+features, so the `dev` run builds and draws each of those GPU tests too; what it
+cannot see is code that exists only *without* `dev`. So the split rests on `dev`
+only *adding* code, and the `gpu-default-only` lint (`docs/linting.md`) checks the
+other side: in `rusty-render`, every crate its `dev` turns on and every crate with an
+in-crate `gpu_` test, a `cfg!` naming `feature = "dev"` or a `cfg` whose `not(…)`
+names it fails, a GPU test hidden that way included. A `dev`-only *override* (a value
+or a module `path` set under `feature = "dev"`) changes what the GPU tests draw
+without hiding anything; the lint cannot tell it from an addition, so it is the
+reviewer's to catch. Keep the code the same under both feature sets, or add
+that crate's GPU tests back to the default pass by widening the filter in both
+callers, `make test`'s `DEFAULT_SUITE` and ci.yml's "Test (engine, default)", e.g.
+`-E 'not group(gpu*) | (group(gpu*) & package(rusty-<crate>))'` (`make scripts` fails
+when the two differ, `test_gate_mirror.py`). The adapter canary still runs in the
+default entry (step *Canaries*), so a runner that lost lavapipe fails there too.
 
 **CI requires an adapter.** Every workflow job that runs the suite (nextest,
 `cargo test` other than `--doc`, `llvm-cov`, `mutants`) sets `RUSTY_REQUIRE_GPU=1`, and
@@ -638,8 +677,8 @@ seen failing on the third, by whoever runs `make test` there next.
   seam), not the code, and wants a fixture without them, not a wider bar. For a ratio
   between two renders, take it on every adapter first: its spread is what the bar must
   sit under.
-- **One adapter, one command**: `make test-gpu` runs the GPU group alone, both feature
-  sets, on lavapipe when its Vulkan driver is installed (`lvp_icd` under
+- **One adapter, one command**: `make test-gpu` runs the GPU group alone, in the `dev`
+  feature set (the suite that runs it, above), on lavapipe when its Vulkan driver is installed (`lvp_icd` under
   `/usr/share/vulkan/icd.d/`: Arch's `vulkan-swrast`, Debian's `mesa-vulkan-drivers`),
   else on the machine's own; `ADAPTER=nvidia` (any part of
   an adapter's name, case ignored) picks another. Under it sits wgpu's own
@@ -668,12 +707,21 @@ seen failing on the third, by whoever runs `make test` there next.
 **Concurrency is capped.** A `Renderer` is a device, the full pipeline set and shadow
 maps, and a software adapter (lavapipe) allocates all of that in system RAM shared with rustc — so
 unbounded parallel renderers exhausted memory and failed *unrelated* tests with a bare
-`Queue::write_texture: Not enough memory left.` (#366). Two caps, one per runner:
+`Queue::write_texture: Not enough memory left.` (#366). Two caps, one per runner, each
+with one number per platform:
+
+| Platform | nextest group | Cap | What measured it |
+|---|---|---|---|
+| Linux (lavapipe) | `gpu` | 2 | 3 on a 4-core CI runner was no faster on the lighter `dev` shard and slower on the busier one: lavapipe renders on the CPU, so a third renderer only shares the cores (#985, #2363) |
+| macOS (Metal) | `gpu-macos` | 3 | on a 3-core CI runner the heavier shard is bound by the cap at 2 and by its cores at 3. Over four runs at 3 against two at 2, the slowest shard's test run fell from 589–604 s to 507–592 s (mean about 596 → 540 s, a tenth), and the round's last-ending job from 800–905 s to 735–885 s (mean about 852 → 815 s, about 4%): a small gain, within the runners' run-to-run spread for the whole job. At least 2.7 of 7 GiB stayed free (#2363) |
 
 - **nextest (the gate):** every test is its own process, so nothing in-process can see
-  its neighbours. The `gpu` **test group** in `.config/nextest.toml` (`max-threads = 2`)
-  bounds how many GPU tests run at once.
-- **`cargo test`:** `MAX_CONCURRENT_HEADLESS` in `crates/render/src/setup/budget.rs` bounds
+  its neighbours. The GPU **test group** in `.config/nextest.toml` bounds how many GPU
+  tests run at once. A test group has no platform key, so each platform has its own,
+  picked by a platform-keyed override with the one filter; a filter names both as
+  `group(gpu*)`.
+- **`cargo test`:** `MAX_CONCURRENT_HEADLESS` in `crates/render/src/setup/budget.rs` (one
+  per `cfg(target_os)`) bounds
   how many renderers are alive in the one process, enforced by an RAII permit the
   renderer holds for its whole life. It applies to the normal library build, not just
   `cfg(test)`, because the screenshot integration tests reach the renderer indirectly
@@ -684,10 +732,18 @@ unbounded parallel renderers exhausted memory and failed *unrelated* tests with 
   the engine builds both, as a capture host beside a bake does). Any other thread
   waiting past 180 s panics with an explanation.
 
-Keep the two numbers equal; `make scripts` fails when they differ, and holds the
+Keep each platform's two numbers equal; `make scripts` fails when they differ, and holds the
 nextest settings above (no retries, `fail-fast = false`, the timeouts) in place
 (`.github/scripts/tests/test_gpu_config.py`, #978). If a new GPU test makes CI run out
-of memory, **lower both to 1** before weakening the test.
+of memory, **lower both to 1** before weakening the test. Every suite job prints the
+least memory its runner had free while its tests ran, after the build (a `memory:` line under *Slowest
+tests*, `.github/scripts/memory_floor.py`): read it before raising a cap.
+
+**On your own machine** `make test` runs at your platform's number. A machine short on
+memory (check the machine: free memory while the suite runs, `free -g` or Activity
+Monitor) should run fewer renderers at once: lower the group's `max-threads` in
+`.config/nextest.toml` for the run and leave the edit uncommitted, or cap the whole
+run, `NEXTEST_TEST_THREADS=2 make test`.
 
 **The GPU naming rule.** A test group selects tests by name, so the name says whether
 a test renders:
@@ -902,9 +958,11 @@ where a synthetic loop met it far harder. The sampler sleeps 1.5 s between slice
 about 0.16 s (plus an untimed 0.08 s harness build), so it costs about 14% of one core
 beside the game. **The yardstick cancels about four fifths of a machine's load, not
 all**: on an 8-core SMT desktop `runner` reads 238 to 249 yardsticks alone and 277 to
-284 beside a full-parallel cold `cargo build` (1.15×), where its CPU time rose 1.92×;
-CI reads 209 to 240. So the bar of 380 catches a regression of about 1.6× on an idle
-machine and about 1.35× under heavy load.
+284 beside a full-parallel cold `cargo build` (1.15×), where its CPU time rose 1.92×
+(before its long run was halved; the heaviest game is now `showroom`, 216 on CI's
+ubuntu, and `BUDGET`'s comment has every count). So the bar of 380 catches a
+regression of about 1.6× on an idle machine and about 1.35× under heavy load; on
+macOS, where the games wait on Metal more than they compute, only a CPU-bound one.
 A game over budget fails by name with its CPU time and its yardsticks, so the game
 whose defaults grew is the one made cheaper. Wall time is only a hang guard: a game
 still running after `HANG` (450 s) is killed and fails as hung. CPU time counts every
@@ -1007,10 +1065,21 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   measured), `cpu_ms` (the same at a fixed reference CPU clock, below) and
   `cpu_clock_pct` (the CPU clock it ran at), `renderer_ms` (CPU time recording the
   frame, as measured), `gpu_ms` and `gpu.<pass>` (GPU time
-  at a fixed reference clock, below), `gpu_raw_ms` (GPU time as measured) and
+  at a fixed reference clock, below; `gpu_ms` is the passes' sum, busy time only,
+  and `gpu.other` untimed GPU work inside a submit, where a pass left untimed
+  shows, scaled like the rows), `gpu_between_submits_ms` (the GPU waiting for the
+  CPU from one submit's timed work to the next's, with a command at a submit's
+  edge, **as measured**: a wait does not follow the GPU's clock; the `gpu.` rows
+  and it add up to the frame's timed span), `gpu_raw_ms` (GPU time as measured) and
   `gpu_clock_pct` (the clock it ran at, % of the reference), `draw_calls`,
   `triangles`, `culled_entities`, `lights_dropped`, `cluster_lights_dropped`, `lights_culled`,
-  `decals_visible`, `decal_cluster_refs`; then where the CPU time went, by name:
+  `decals_visible`, `decal_cluster_refs`, the GPU occlusion counters `hiz_tested`,
+  `hiz_culled`, `cluster_tested`, `cluster_culled` (the two culled ones are read back
+  without waiting, so they describe a frame or so earlier, `docs/api/Debug.md`), and
+  the frame's GPU calls `render_passes`, `compute_passes`, `submits`,
+  `bind_groups_created`, `buffer_writes` (counted through `render::gpu::ops`; a
+  render-CPU fix whose timing moves inside the spread proves itself by these); then
+  where the CPU time went, by name:
   `cpu.<system>` for every system the schedule runs, named as it registers them
   (`update_scripts`, `step_physics`, … at the reference CPU clock, summing to
   `cpu_ms`), and `render.<stage>` for every stage of the renderer's frame, summing
@@ -1090,8 +1159,13 @@ every binary's open makes them.
   the worst p95 and the viewpoint it came from), then over the runs: the average,
   and the **spread**, the lowest to the highest run's average. Plus:
   - `load_ms`: the scene's own load to its first rendered frame, wall clock, with
-    the import cache as the project holds it (warm once the editor or a run
-    imported it): the harness's set-up (its Lua VM and API, the stats), the
+    the import cache as the project holds it: its converted models are warm once
+    any run converted them, its compressed textures only once the editor, an
+    export or `make import PROJECT=<dir>` made them, since a `play` or
+    `bench-scenes` run never compresses a texture. Without them every texture uploads decoded, as RGBA8,
+    and the report warns (`uploaded uncompressed: N textures, M MB`): the scene's
+    `load_ms`, `gpu_mb` and `rss_peak_mb` are then not the shipped game's. It
+    holds the harness's set-up (its Lua VM and API, the stats), the
     scene's document and lighting sidecar read, its navmesh baked and the world
     built, Play's refresh of the project's converted sources (a check of each
     cache), then its first sim step and frame (its uploads). The renderer's start-up
@@ -1099,10 +1173,12 @@ every binary's open makes them.
     the two, off the clock;
   - `import_ms`, only with `IMPORT=1`, once a run (the import is the project's,
     not a scene's: every model source is converted, with headless Blender for a
-    `.blend`, so it is slow): the first scene's load in a copy of the project (made
-    beside the reports, deleted after) without its `cache/`, its import cache
+    `.blend`, and every image compressed, so it is slow, minutes for a large
+    project): `make import` run on a copy of the project (made beside the reports,
+    deleted after) without its `cache/`, its import cache
     (`assets/generated/imported/`: converted models and compressed textures) and
-    its `.git`: what a first load costs. A row of the first scene's report, and one
+    its `.git`, then the first scene's load there: what a first import and load
+    cost, model conversion and texture encoding included. A row of the first scene's report, and one
     line under the summary. A link in the project is copied as what it points to,
     so the copy stands alone and the project is only ever read; a link looping
     back, and what is neither a file nor a folder, are left out. A copy or a load
@@ -1116,7 +1192,12 @@ every binary's open makes them.
     from the device's `currentAllocatedSize`, which also counts what the driver
     keeps for itself, so the two platforms' figures are close, not equal. The
     report names its source, and without one (GL) the row is absent and the report
-    says so.
+    says so. Beside it, `gpu_allocated_mb` (what of those blocks live
+    allocations use, where the allocator report tells it: not on Metal) and the
+    renderer's own resident bytes by kind, which follow the scene where `gpu_mb`
+    does not: `gpu_texture_mb` (image textures by path), `gpu_lightmap_mb` (the
+    lightmap page arrays) and `gpu_reflection_mb` (the reflection probes' cube
+    array), as of the last measured frame (`docs/api/Debug.md`, the `_bytes` keys).
 
   It is kept as `out/bench/scenes/<project>-<hash>/<scene>.json` (and `.txt`; the
   project folder's name and a short hash of its canonical path, so a copy and its
@@ -1151,18 +1232,45 @@ every binary's open makes them.
   with every merge. The report names the folder it compared with.
 - **a sampling profile**: `PROFILE=1` adds, after each scene's timed run, a run of
   its own (the profiler's overhead stays out of the timings) under the platform's
-  sampling profiler, recording only each viewpoint's measured frames, warm-up
-  excluded: `perf record` on Linux (user space only, `cycles:u`, or the
-  `cpu-clock:u` timer where there is no cycle counter, with DWARF call stacks),
-  `sample` on macOS (the bench's own thread, the main one, alone: `sample`
-  samples every thread, parked or not, and the others' waits would fill the
-  table). It is a release build with line tables (the `profiling`
-  cargo profile, its own target folder). Kept beside the report:
-  `<scene>.profile.txt`, the top 40 functions by self time (samples where the
-  function was running) and by total time (samples where it was on the stack), and
-  `<scene>.folded`, the raw folded stacks (`a;b;c count`) a flame graph reads. No
-  profiler on `PATH` stops the run before anything is benched, naming the package
-  (Debian `linux-perf`, Ubuntu `linux-tools-$(uname -r)`, Fedora and Arch `perf`).
+  sampling profiler, keeping only the samples of each viewpoint's measured frames,
+  warm-up excluded. On Linux, one `perf record` covers the whole scene (user
+  space only, `cycles:u`, or the `cpu-clock:u` timer where there is no cycle
+  counter; every thread of the process; stamped with `CLOCK_MONOTONIC`), and its
+  samples are cut to the measured windows by timestamp. Its stacks are walked by
+  frame pointer, which the build forces on (the 16 KiB DWARF stack copies used
+  before came with recordings that lost most of their samples). A walk through
+  code built without frame pointers (libc, a GPU driver) can end a stack early,
+  or add a wrong caller where that code keeps other data in the frame register:
+  the self time is exact, the total time is approximate. A frame with no symbol
+  is named by the image it ran in (`[libnvidia-eglcore.so.…]`, `[libc.so.6]`),
+  and `[unknown]` is left for a frame with no image either; `sample`'s `???` is
+  such a frame too. On macOS, `sample` is attached for each viewpoint's
+  measured frames, the bench's own thread (the main one) alone: `sample` samples
+  every thread, parked or not, and the others' waits would fill the table. It is
+  a release build with line tables and frame pointers (the `profiling` cargo
+  profile, its own target folder). That binary runs the whole `PROFILE=1` run,
+  so the run's timed rows come from it too, and each report says *timed on the
+  profiling build*: on a desktop GPU (an RTX 2060), its `cpu_ms`, `renderer_ms`
+  and `gpu_raw_ms` measured inside the release build's spread, so a `BEFORE=`
+  comparison across the two builds reads true there. Kept beside the
+  report: `<scene>.profile.txt`, its header (samples, the measured seconds, and
+  where the samples landed by image: the bench binary, the GPU driver, libc),
+  then the top 40 functions by self time (samples where the function was
+  running) and by total time (samples where it was on the stack), and
+  `<scene>.folded`, the raw folded stacks (`a;b;c count`) a flame graph reads.
+- **a profile refuses itself** when its recording was not sound: fewer than 20%
+  of its samples land in a named function of the bench binary, or it holds
+  fewer than a tenth of the samples its measured seconds should give at the
+  sampling rate (lost or never taken). Then `<scene>.profile.txt` and the
+  console say *this profile is not to be trusted*, with each reason, its
+  numbers, what perf warned of (lost chunks) and where the samples landed, and
+  no tables or `.folded` are written; the run's closing lines list each refused
+  scene with the start of its first reason, and the exit status stays 0 (the
+  recording ran). A software renderer refuses too (lavapipe
+  spends most of a frame in its own unnamed JIT code): its profile says where a
+  CPU rasteriser spends time, not the engine. No profiler on `PATH` stops the
+  run before anything is benched, naming the package (Debian `linux-perf`,
+  Ubuntu `linux-tools-$(uname -r)`, Fedora and Arch `perf`).
   The profiler is tried once before any scene too: `perf` refusing to record
   stops the run there, saying why, and for `kernel.perf_event_paranoid` above 2
   what to set (`sudo sysctl kernel.perf_event_paranoid=2`). A profile that fails
@@ -1341,35 +1449,48 @@ dev-only surface); for the lines a branch changed, `cargo llvm-cov report --cobe
 ## Mutation testing
 [`cargo-mutants`](https://github.com/sourcefrog/cargo-mutants) audits whether the
 suite actually *catches* bugs — the headline guardrail against green-but-vacuous
-agent-written tests. It mutates the core of the deterministic sim (`app`,
-`scripting` (the VM half of the `script` row; `api` is left out), `physics`,
-`navigation`; a deliberate subset of the layer table's sim rows), the pure-logic part where a silent bug hurts most, and
-reports the **surviving** mutants (a change no test failed on). It is
-**non-blocking** — mutation never gates a merge — and it runs on **no pull
-request** (#750). Two ways in:
+agent-written tests. It mutates exactly the code someone names, usually what a
+branch just wrote, and reports the **surviving** mutants (a change no test failed
+on). It is **non-blocking** — mutation never gates a merge — and it runs on **no
+pull request** (#750) and **on no schedule** (#2369): a run exists only because
+someone asked for it, so code nobody asked about is unmeasured, not clean. Auditing
+a whole module is the same ask with its glob (`make mutants-remote
+SCOPE='crates/physics/src/**'`), made by hand. One way in:
 
 | Run | Trigger | Scope | Where it lands |
 |---|---|---|---|
-| **On request** (`mutants-on-request.yml`) | a PR's `Mutation: diff` (or globs) line, which the merge queue dispatches on `main` after the merge, two at a time (#1934); `make mutants-remote SCOPE=...`; or a dispatch with a `scope` input | `diff` (the branch against `origin/main`, or with `commit` the merged squash commit against its parent) or path globs (separated by spaces or commas; a brace such as `crates/{core,physics}/src/**` is expanded, since git's glob dialect has none), turned by `.github/scripts/mutants-scope.py` into one `--in-diff` per cargo workspace the scope reaches: the engine's, and each directory whose `Cargo.toml` opens its own `[workspace]` (`tools/lint`, run inside it with its own `cargo test`; a cargo-fuzz crate such as `fuzz/` is named as having nothing to run), in one report (#2201); one runner, or up to four for a plan too large for one (`mutants-request.py shards`, #2283), each with a 2 h 45 budget, merged into one report; one run per branch, a newer dispatch cancelling the older and an unmerged close of the PR cancelling what is left, while a merged PR's run finishes (`mutants-cancel.yml`, #1530) | printed in the terminal by `make mutants-remote`; the run summary and a `mutants-report` artifact (`report.md`, `survivors.diff`); `report.md` also as one comment on the branch's open PR, or its merged one (the `pr` input for the queue's runs), edited in place by later runs (#912), except that a run with no answer adds its line below the earlier report rather than replacing it (#2201) |
-| **Full sweep** (`mutants-sweep.yml`, sharded) | weekly `schedule` (Saturdays) + `workflow_dispatch` (`force` re-sweeps a covered commit); `main` only, a dispatch on any other ref is refused red (#972); skipped by `mutants-plan` when a finished sweep already covered `main`'s head (#506); one sweep at a time (#705) | the full `--file` sim scope over a matrix `mutants-plan` sizes each run from the mutant count (`cargo mutants --list`, `.github/scripts/mutants-shards.py`: ≈ 4 h a shard at the slowest per-shard rate the previous sweep measured (a shard under `MIN_MEASURED` mutants ignored, the slowest capped at `OUTLIER_CAP` × the mean), `MINUTES_PER_MUTANT` only when none can be read, and a `max-parallel` of at most 10 chosen to end by Sunday 23:59 UTC; red past GitHub's 256-job ceiling, #1684), each shard stopping itself at a 5 h 40 budget under GitHub's 6 h limit (#749) | `mutants-report` job: merged job summary (totals, measured of planned, the run's mean and slowest measured minutes a mutant against the sizing figure, and each shard's seconds and outcome lists under `shards/` for the next plan, unfinished shards, survivors) and the merged `mutants-report` artifact |
+| **On request** (`mutants-on-request.yml`) | a PR's `Mutation: diff` (or globs) line, which the merge queue dispatches on `main` after the merge, two at a time (#1934); `make mutants-remote SCOPE=...`; or a dispatch with a `scope` input | `diff` (the branch against `origin/main`, or with `commit` the merged squash commit against its parent) or path globs (separated by spaces or commas; with `commit`, as from a merged PR's line, globs keep that commit's diff to the files they name and never widen it, and globs matching no changed file plan nothing and say so, green; by hand, without `commit`, they mutate the named files whole; a brace such as `crates/{core,physics}/src/**` is expanded, since git's glob dialect has none), turned by `.github/scripts/mutants-scope.py` into one `--in-diff` per cargo workspace the scope reaches: the engine's, and each directory whose `Cargo.toml` opens its own `[workspace]` (`tools/lint`, run inside it with its own `cargo test`; a cargo-fuzz crate such as `fuzz/` is named as having nothing to run), in one report (#2201); one runner, or up to four for a plan too large for one (`mutants-request.py shards`, #2283), each with a 2 h 45 budget, merged into one report; a `diff` past what four measure runs at the cap and names what it never reached, while a whole-file ask planning more than 1.5 times that is refused in the `plan` job, red, before any shard starts, with each file's mutant count largest first (`mutants-request.py refuse`); one run per branch, a newer dispatch cancelling the older and an unmerged close of the PR cancelling what is left, while a merged PR's run finishes (`mutants-cancel.yml`, #1530) | printed in the terminal by `make mutants-remote`; the run summary and a `mutants-report` artifact (`report.md`, `survivors.diff`); `report.md` also as one comment on the branch's open PR, or its merged one (the `pr` input for the queue's runs), edited in place by later runs (#912), except that a run with no answer adds its line below the earlier report rather than replacing it (#2201) |
 
 Why this shape: mutation is a signal, and a per-PR job held runners the merge
 queue was waiting on for a report that could not change whether anything merged.
-Whoever writes tricky mechanism asks for exactly that code to be mutated before
-readying it, and reads the answer; the weekly sweep re-examines everything else and
-tracks the survivor backlog. An on-request run goes red only when it has no honest
-answer (a path with nothing to mutate, a baseline that does not build, a part whose
-cargo-mutants broke, reported beside the parts that finished), and then still says
-why on the pull request and in `make mutants-remote`'s output, so an unanswered ask is
-visible where it was made (#2201); survivors are a result. **The sweep never reaches
-`tools/lint`**: it mutates the engine's sim modules in the root workspace, so the lint
-tool is audited only by scoped runs, which is why a branch adding a lint rule asks for
-one. A run stopped at its budget says how many planned mutants it never
-reached and is never called clean, however its measured mutants fared; a mutant that
-timed out is unmeasured too: the report never calls a run with a timeout clean, and
-says a run where most viable mutants timed out is not a result. In the sweep, a shard
-whose mutants mostly timed out is not finished (`mutants-shards.py unfinished`), so
-that sweep does not mark its commit covered.
+Whoever writes tricky mechanism asks for exactly that code to be mutated, on the
+pull request that wrote it, where someone will act on the answer. A scheduled sweep
+of the whole sim held hundreds of runner-hours a week on the runners the gating CI
+needs, never finished, and no survivor follow-up ever came from its report, so it
+was retired (`test_on_request_only.py`, in `make scripts`, fails on any workflow
+that runs `cargo mutants` on a schedule). An on-request run goes red only when it
+has no honest answer (a path with nothing to mutate, a baseline that does not build,
+a part whose cargo-mutants broke, reported beside the parts that finished), and then
+still says why on the pull request and in `make mutants-remote`'s output, so an
+unanswered ask is visible where it was made (#2201); survivors are a result. A run
+stopped at its budget says how many planned mutants it never reached and is never
+called clean, however its measured mutants fared; a mutant that timed out is
+unmeasured too: the report never calls a run with a timeout clean, and says a run
+where most viable mutants timed out is not a result.
+
+**What a survivor means.** A survivor is a question, not a defect: is there
+behaviour here that nothing asserts? Where there is (a branch, a boundary, a sign, a
+formula, a state transition), a test asserts that behaviour through the callers'
+interface, named for it and beside its other tests, never for the mutant or a line,
+and one test holding a whole class beats a pin per instance. Where a test could only
+restate the code (a constant or default, a message's wording, bench and fixture
+code, code whose only effect is speed, an equivalent mutant), the survivor is left,
+with no record owed. A kind that keeps coming back is excluded at the source in
+`.cargo/mutants.toml`, with its reason: fixture files in `exclude_globs`, and the
+`#[serde(default = "…")]` functions in `exclude_re` lines generated by
+`.github/scripts/mutants_serde_defaults.py` (their value is a design choice, and
+`components::registry::default_drift` holds that a dropped key loads `Default`).
+No survivor count is a goal. The triage itself: `ci-merge`, *Triaging a survivor*.
 
 **The mutation jobs run under nextest** (`cargo mutants --test-tool nextest`, #1844),
 the gate's runner, with `--fail-fast` so a caught mutant stops at its first failing
@@ -1380,7 +1501,7 @@ times on a test the gate passed, each a test leaning on a process of its own (#1
 second (#1844): a runner unlike the gate's finds the next such difference in every
 branch's mutation run. Plain `cargo test` stays the nightly `cargo-test.yml` signal,
 where a runner difference is the finding. The mutation jobs render: they install
-lavapipe and set `RUSTY_REQUIRE_GPU=1` (#785), and the nextest `gpu` group bounds them.
+lavapipe and set `RUSTY_REQUIRE_GPU=1` (#785), and the nextest GPU group (`gpu`, `gpu-macos` on macOS) bounds them.
 Doctests are left out: nextest doesn't run them (`make test` does), so a mutant only a
 doctest would catch survives. The runs pass `--test-threads 2`: the jobs' `ulimit -v`
 cap (#674) is per process, so it times the test processes running at once stays within

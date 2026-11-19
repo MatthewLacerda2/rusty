@@ -6,7 +6,9 @@ mod load;
 pub(crate) mod mips;
 mod panorama;
 mod sampler;
+mod uncached;
 
+use crate::gpu::ops::CountedDevice as _;
 use crate::Renderer;
 pub(crate) use freshness::texture_written;
 pub(crate) use load::{decode, Decoded};
@@ -122,7 +124,7 @@ impl Renderer {
             format: Some(data_format),
             ..Default::default()
         });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group = device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label,
             layout,
             entries: &[
@@ -277,6 +279,8 @@ mod normal_variance_gpu_tests;
 mod panorama_tests;
 #[cfg(test)]
 mod soft_disc_tests;
+#[cfg(test)]
+mod uncached_gpu_tests;
 
 /// The image `map` names, decoded: a map that references a texture a conversion
 /// extracted is read where the import cache holds it ([`MapRef::file`], #1130).

@@ -17,16 +17,16 @@ The steps and the traps. `CLAUDE.md` says why merging is serialized; this is how
   user: a decision you can't make, another PR or issue that must land first, human
   or hardware help. Say why in the description. **Ready for review** once the work
   is done and nothing more is needed from the user; flip between the two as the
-  work moves. CI's gating jobs skip drafts, so readying is when anything is checked.
+  work moves. CI's gating jobs skip drafts, so readying is when anything is checked
+  (unless a dispatch already did: *Verify the run happened on the head commit*).
 - **The description** says what changed, why it belongs in rusty (the project-level
   value its label classifies, not how you got there; process only when the diff
   needs it) and the effect, and carries the PR↔issue link. Check the number in a
   closing keyword: a typo silently closes the wrong issue.
 - **Why one tree at a time:** two PRs can each be green alone and break `main`
   together (a rename, a changed signature, a moved module) with no textual
-  conflict. A branch is updated by merging `main` in: nothing is rewritten, no push
-  is forced, a conflict is resolved once. PRs are squash-merged, so the branch's
-  own history never reaches `main`.
+  conflict. A branch takes `main` by a merge: nothing rewritten or forced, a
+  conflict resolved once; the squash keeps the branch's history off `main`.
 
 ## Before marking a pull request ready
 
@@ -193,8 +193,7 @@ of `target/`) and branch, and keeps one something is still using.
   (`queue: HELD #N: Dependabot edits …`, not a hand-back): its run never
   executes the workflows it edits. Read the changelog, dispatch each touched
   workflow on the branch (`gh workflow run <file> --ref <branch>`, or MCP
-  `actions_run_trigger`; `mutants-sweep.yml` only when no batch needs the
-  runners), and once green merge it by name with `make queue PRS=N`.
+  `actions_run_trigger`), and once green merge it by name with `make queue PRS=N`.
 - **By hand**, the same loop: `git merge origin/main`, `cargo check` both feature
   sets and `make size`, a plain `git push`, wait, `make mergeable PR=N`,
   squash-merge. Prefer the queue. Never rebase a pushed branch (a force-push is
@@ -271,10 +270,8 @@ why. It is the last thing before any merge, and the queue asks it too.
 `ci-gate` and `lint-gate` required on the head from GitHub Actions, not strict.
 `make ruleset` reports drift from the live ruleset; `make ruleset ARGS=--apply`
 writes it, which the orchestrator does between merges, never a coder, after a PR
-changing the file. **The ruleset does not replace `make mergeable`:** a draft's
-run leaves both gates green with nothing built, and a draft readied without a
-push shows that run's gates until the new one's finish; nor does it read the
-description.
+changing the file. **The ruleset does not replace `make mergeable`:** it passes
+skipped jobs (below) and a readied draft's old run, and never reads the description.
 
 What `make mergeable` asks:
 
@@ -289,7 +286,9 @@ What `make mergeable` asks:
   description, a label or a relationship, and an image by a commit that deletes it. No **Gates** line passes with a warning.
 - **Both workflows on the head SHA**, `ci-gate` and `lint-gate`.
 - **A gated job itself succeeded.** The gates pass over skipped jobs, so a draft's
-  run is gate-green with nothing compiled; `changes` succeeding proves nothing.
+  run is gate-green with nothing compiled; `changes` succeeding proves nothing. A
+  ready run builds nothing either when a dispatch or push run built its test merge
+  tree (`changes` names it; it makes the head checked: no re-run, no empty commit).
 - **Every run on the commit.** A red run beside a green one refuses. A cancelled
   run is ignored only when a non-cancelled run of the same workflow on the commit
   is still going (wait) or was created no earlier; otherwise it refuses.
@@ -393,7 +392,7 @@ merge or runs on a pull request.
 
 | | on request | weekly |
 |---|---|---|
-| mutation | a merged PR's `Mutation: diff` (or globs) line, dispatched by the queue after the merge; by hand, `make mutants-remote SCOPE=diff` (or globs) on `mutants-on-request.yml`: one runner, up to four for a large plan, each mutant tested by its crate and what depends on it, report and survivors' diffs in the terminal, posted as one comment on the branch's PR (open, or merged). One run per branch: a newer dispatch cancels the older and an unmerged close cancels what is left (`mutants-cancel.yml`); on `main` each run stands alone | `mutants-sweep.yml`, Saturdays, the sim modules in as many shards as `mutants-plan` sizes, a summary and artifact; skipped when `main` has not moved since the last sweep |
+| mutation | a merged PR's `Mutation: diff` (or globs) line, dispatched by the queue after the merge; by hand, `make mutants-remote SCOPE=diff` (or globs) on `mutants-on-request.yml`: one runner, up to four for a large plan, each mutant tested by its crate and what depends on it, report and survivors' diffs in the terminal, posted as one comment on the branch's PR (open, or merged). One run per branch: a newer dispatch cancels the older and an unmerged close cancels what is left (`mutants-cancel.yml`); on `main` each run stands alone. A whole module is the same ask with its glob, by hand | never: no workflow mutates on a schedule (`test_on_request_only.py`) |
 | coverage | `gh workflow run coverage.yml --ref <branch>` | `coverage.yml`, Mondays, ratchet table |
 
 **A branch that adds mechanism** (arithmetic, a state machine, a boundary) asks
@@ -402,10 +401,10 @@ for a scoped run with a line in its description, `Mutation: diff` or
 (`merging/after/`), never the coder, so a signal never slows the gating CI:
 
 - **What runs:** `mutants-on-request.yml` on `main` at the squash commit (input
-  `commit`); `diff` is that commit's Rust change against its parent
-  (`mutants-scope.py --commit`). A `diff` ask whose commit changed no Rust is not
-  dispatched; globs (spaces or commas) pass as written, one plan per cargo
-  workspace (`tools/lint` is its own); an unreadable line asks for nothing.
+  `commit`); `diff` is that commit's Rust change against its parent, globs only
+  narrowing it (none changed: nothing planned, green); no Rust, no dispatch; an
+  unreadable line asks for nothing. By hand globs mean whole files, refused red in
+  `plan` past `HEADROOM` × what four runners measure; a `diff` runs at the cap.
 - **The cap:** two at once (`merging/after/slots.CAP`); the rest wait in
   `merge-queue/mutants.json`, surviving a relaunch, and are dispatched as slots
   free (also by `make queue PRS=N`).
@@ -422,8 +421,8 @@ issue, and a follow-up PR off `main` when worth fixing.
 
 How to read a clean report:
 
-- **The weekly sweep covers only `crates/app/src`, `crates/script/src/scripting`, `crates/physics/src`,
-  `crates/navigation/src`.** Elsewhere, silence means unmeasured, not clean.
+- **Nothing is measured unless a run was asked for it.** Code no run named is
+  unmeasured, not clean: silence means unmeasured.
 - **A scoped run names what it planned** (how many mutants, any from outside the
   scope). A `diff` with nothing to mutate says so; it is not a pass.
 - **A run stopped at its budget names what it never reached** and is never called
@@ -433,29 +432,31 @@ How to read a clean report:
 
 ### Triaging a survivor
 
-Read the report when it lists survivors in code **this branch wrote**; survivors in
-untouched code need no reading.
-
-**Code behind GPU timestamps is never measured on CI.** Lavapipe has no
+Read the report when it lists survivors in code **this branch wrote**; others need
+no reading. **Code behind GPU timestamps is never measured on CI**: lavapipe has no
 `TIMESTAMP_QUERY`, so the `gpu_ms` / `gpu_passes` path and the bench's clock
-normalisation run only on a real GPU, and their mutants read `MISSED` on every
-runner. Pin the pure arithmetic with ordinary tests, re-measure the rest on the
-operator's Mac (`make bench`, alternating before and after) when it changes, and
-don't file its survivors as gaps. Everything else GPU is measured: the mutation
-workflows install lavapipe and set `RUSTY_REQUIRE_GPU=1`, so a lost driver or a
-capture wrongly reporting "no adapter" fails the run instead of skipping.
+normalisation run only on a real GPU and their mutants read `MISSED` everywhere.
+Test its pure arithmetic with ordinary tests, re-measure the rest on the operator's
+Mac (`make bench`, alternating before and after) when it changes, and don't file its
+survivors as gaps. Everything else GPU is measured: the mutation workflows install
+lavapipe and set `RUSTY_REQUIRE_GPU=1`, so a lost driver fails the run.
 
-Sort by cost:
+**A survivor is a question, not a defect**: is there behaviour here nothing asserts?
 
-- **Fix what is cheap** while the code is in hand.
-- **File a real bug** and fix it after the current branch merges.
-- **File an architectural or foundational crack**, and don't start it without the
-  user's judgement.
-- Or **exclude it** with a written reason, **line-qualified**, so it cannot
-  swallow a real gap next door.
+- **Test it** when it shows mechanism a game would notice wrong (a branch, a
+  boundary, a sign, a formula, a state transition): through the callers' interface,
+  named for the behaviour, beside its other tests, naming no mutant or line
+  (`tool-named-test`). One test holding the class (`registry::default_drift`) beats
+  a pin per instance. A real bug or a crack is filed, as any finding.
+- **Leave it**, no record owed, when a test could only restate the code: a constant
+  or default, a message's wording, bench, fixture and diagnostic code, speed-only
+  code, an equivalent mutant. Spend no run on equivalence unless it changes what
+  gets written.
+- **Exclude it at the source** when a kind keeps coming back: `.cargo/mutants.toml`,
+  its reason beside it, narrow enough to swallow no real gap next door.
 
-Stop the queue only for a report saying a **module** has nothing asserting its
-mechanism at all.
+**No survivor count is a goal**: no issue, PR or brief asks for zero survivors or a
+score. Stop the queue only for a report saying a **module** asserts nothing at all.
 
 **Establish equivalence by applying the mutation and running the suite**, never by
 reasoning about symmetry. Re-ask narrower (`make mutants-remote
@@ -470,8 +471,7 @@ own baseline, because cargo-mutants' tests only the mutated package; `docs/testi
     cargo mutants --workspace --test-tool nextest --baseline skip --timeout <3x secs> \
       --features dev --in-diff branch.diff -- --fail-fast --test-threads 2
 
-`cargo mutants --list` names the functions and builds nothing: reach for it before
-believing a structural explanation of a bad report.
+`cargo mutants --list` names the functions and builds nothing: reach for it first.
 
 Two shapes to recognise:
 

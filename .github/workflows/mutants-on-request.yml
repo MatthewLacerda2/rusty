@@ -22,16 +22,19 @@
 # `make mutants-remote` generates are in the run's name: a dispatch returns no
 # run id, so the id is how the command finds *its* run.
 #
-# Never a gate and never on a pull request. Unlike the weekly sweep it goes
-# red when it has no honest report to give — a path scope with nothing to
-# mutate, a baseline that does not build — because its caller must tell "no
+# Never a gate, never on a pull request and never on a schedule: mutation runs
+# only when someone asks, over what they name (CLAUDE.md, *Gates vs.
+# signals*); a whole module is audited by asking for its glob. It goes red
+# when it has no honest report to give — a path scope with nothing to
+# mutate, a hand ask too large to measure, a baseline that does not build — because its caller must tell "no
 # survivors" from "no answer", and the run's conclusion is what it reads.
 # Survivors are a result and never turn it red.
 #
 # The merge queue is the usual caller (#1934): a coder writes a `Mutation:`
 # line in its pull request, and after the queue merges it, it dispatches this
 # on `main` with `commit` (the squash commit, checked out and diffed against
-# its parent) and `pr` (where the report goes), at most two at a time
+# its parent; globs keep that diff to the files they name, never widen it to
+# whole files, #2371) and `pr` (where the report goes), at most two at a time
 # (`.github/scripts/merging/after/`). Dispatching at ready, as coders did
 # before, held a third of the account's runners on 2026-11-08 while the
 # gating `ci` runs waited 20-40 minutes behind them.
@@ -60,7 +63,7 @@ on:
         default: by-hand
         type: string
       commit:
-        description: Mutate this commit's own change, checked out (the merge queue's; with scope `diff`)
+        description: Mutate this commit's own change, checked out (the merge queue's; globs narrow it)
         required: false
         default: ""
         type: string
@@ -111,8 +114,9 @@ env:
 jobs:
   # Builds nothing: the scope, the plan's size (`cargo mutants --list` answers
   # in seconds) and the shard count, kept as the `mutants-plan` artifact for
-  # the other two jobs. A scope it cannot read, or a path scope with nothing to
-  # mutate, writes why into that artifact's `report/` and goes red.
+  # the other two jobs. A scope it cannot read, a path scope with nothing to
+  # mutate, or one too large to measure writes why into that artifact's
+  # `report/` and goes red.
   plan:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -127,12 +131,14 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ inputs.commit }}
-      # The tree is `inputs.commit`, which may predate a step this job calls
-      # (`install-tool`, #1973; `system-libs`, #2101): take `.github/actions`
-      # from the workflow's own commit, so a request queued before a change to
-      # them still runs. Before the first local action.
+      # The tree is `inputs.commit`, which may predate a step or a script this
+      # job calls (`install-tool`, #1973; `system-libs`, #2101; `refuse`,
+      # #2371): take `.github/actions` and `.github/scripts` from the
+      # workflow's own commit, so a request queued before a change to them
+      # still runs. The scripts only read git, so they work on an older tree.
+      # Before the first local action.
       - name: Shared steps from the workflow's commit
-        run: git checkout "$GITHUB_SHA" -- .github/actions
+        run: git checkout "$GITHUB_SHA" -- .github/actions .github/scripts
       - name: Toolchain (from rust-toolchain.toml)
         run: rustup show
       - name: Install cargo-mutants
@@ -178,6 +184,17 @@ jobs:
           echo "in_scope=$(count root)" >> "$GITHUB_OUTPUT"
           echo "standalone=$(count standalone)" >> "$GITHUB_OUTPUT"
 
+      # A hand ask naming files whole that plans far more than the cap's
+      # runners can measure starts no shard (#2371): it ends here, red, with
+      # each file's count from the plan above, so the next ask is narrower.
+      # A `diff` (or a commit's globs) is never refused: it runs at the cap.
+      - name: Whether one ask can measure it
+        id: fits
+        run: |
+          python3 .github/scripts/mutants-request.py refuse plan.json --budget-seconds "$BUDGET_SECONDS" \
+            > refused.txt 2> refuse-error.txt \
+            || { cat refused.txt refuse-error.txt; echo "::error::$(head -n1 refused.txt) $(tail -n1 refuse-error.txt)"; exit 1; }
+
       # As many runners as the engine's part needs to end inside the budget,
       # at most a handful (`mutants-request.py`'s docstring has the figures).
       # A standalone part runs on shard 0 first, so it counts toward the size.
@@ -192,17 +209,20 @@ jobs:
             --budget-seconds "$BUDGET_SECONDS" >> "$GITHUB_OUTPUT" 2> sizing.txt
           echo "Shards: $(cat sizing.txt)." | tee -a "$GITHUB_STEP_SUMMARY"
 
-      # A run with no answer says so (#2201): the scope was unreadable or
-      # named nothing to mutate. `report` posts this below the comment's
+      # A run with no answer says so (#2201): the scope was unreadable, named
+      # nothing to mutate, or was too large to measure (#2371). `report` posts this below the comment's
       # earlier report, never over it, and the run stays red.
       - name: Say why there is no answer
         if: failure()
         env:
           RESOLVE: ${{ steps.resolve.outcome }}
           PLAN: ${{ steps.plan.outcome }}
+          FITS: ${{ steps.fits.outcome }}
         run: |
           if [ "$RESOLVE" = failure ]; then why="the scope could not be read: $(cat problem.txt)"
           elif [ "$PLAN" = failure ] && [ -s scope.txt ]; then why="$(cat scope.txt)"
+          elif [ "$FITS" = failure ] && [ -s refused.txt ]; then why="$(cat refused.txt)"
+          elif [ "$FITS" = failure ]; then why="the size check broke: $(tail -n 3 refuse-error.txt 2>/dev/null | tr '\n' ' ')"
           else why="the run broke before it could plan the mutants."
           fi
           python3 .github/scripts/mutants-report.py --unanswered "$why" --out report
@@ -244,22 +264,32 @@ jobs:
     steps:
       - name: Start the clock
         run: echo "JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
-      # The same tree `plan` read, and its `.github/actions` from the
-      # workflow's commit (`plan` says why).
+      # The same tree `plan` read, and its `.github/actions` and
+      # `.github/scripts` from the workflow's commit (`plan` says why).
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ inputs.commit }}
       - name: Shared steps from the workflow's commit
-        run: git checkout "$GITHUB_SHA" -- .github/actions
+        run: git checkout "$GITHUB_SHA" -- .github/actions .github/scripts
       - name: Toolchain (from rust-toolchain.toml)
         run: rustup show
       - name: Cache cargo registry + target
         uses: Swatinem/rust-cache@v2
         with:
-          # The weekly sweep saves this key from `main`; a request only reads it.
+          # Saved by a run on `main` (the merge queue's post-merge dispatch),
+          # from shard 0 alone so parallel shards do not race for one key;
+          # a branch's run only reads it. rust-cache skips the save on an
+          # exact key hit, so the key is re-saved when `Cargo.lock` or the
+          # toolchain changes it, as for every other cache here. So only a
+          # run that builds the engine's `target/` saves it: a standalone-only
+          # plan (`in_scope` 0, Baseline and Mutate skipped) would save
+          # `~/.cargo` alone under the key, and every later run would hit it
+          # exactly and build cold. `save-if` is read when this step starts,
+          # so it tests the plan's count rather than waiting for Baseline
+          # (`test_cache_save.py` holds the expression).
           shared-key: mutants
-          save-if: false
+          save-if: ${{ github.ref == 'refs/heads/main' && matrix.shard == 0 && needs.plan.outputs.in_scope != '0' }}
       - name: System libs for winit/wgpu builds
         uses: ./.github/actions/system-libs
         with:
@@ -293,8 +323,8 @@ jobs:
       # part gets at most half of what is left (#2201): given all of it, the
       # engine's baseline then started with no budget and overran the job's
       # limit, and a job killed at its limit leaves nothing to report.
-      # The memory cap and core dumps off as in every mutation step
-      # (`mutants-sweep.yml` says why): a scanner mutant that loops pushing
+      # The memory cap and core dumps off as in every mutation step (the
+      # *Baseline* step says why): a scanner mutant that loops pushing
       # onto a `Vec` reaches the cap in seconds, and with a core to write it
       # outlived its timeout and took the runner down (#2230). The list is read
       # on fd 3, so cargo-mutants never reads the rest of it as its stdin.
@@ -329,8 +359,8 @@ jobs:
       # it outright (#2155). This step runs the same build each mutant does,
       # then the whole workspace's tests, timed, and the timeout is 3x that
       # test time: a mutant runs a subset of them (`Mutate`), so the whole
-      # suite's time bounds every one. `mutants-sweep.yml` does the same;
-      # `test_baseline.py` (`make scripts`) holds the two commands to
+      # suite's time bounds every one. `test_baseline.py` (`make scripts`)
+      # holds the two commands to
       # cargo-mutants' own arguments. A baseline that fails turns the run red:
       # there is no honest report to give.
       #
@@ -342,7 +372,25 @@ jobs:
       # independence is `cargo-test.yml`'s nightly signal, not this one's.
       # `--fail-fast` overrides the profile's `fail-fast = false` (right for the
       # gate's summary) so a caught mutant stops at its first failing test.
-      # Memory cap and test-thread bound as the sweep (`mutants-sweep.yml` says why).
+      #
+      # `ulimit -v` caps every process at 8 GiB of address space, half the
+      # runner's 16 GB (#674), here and in every step that mutates. A mutant
+      # that turns a loop infinite *and* allocating (a `Vec::push` that never
+      # stops) fills RAM in seconds, long before the per-mutant timeout, and
+      # the runner got "received a shutdown signal" with no report. Capped,
+      # the test binary dies on its own allocation and cargo-mutants counts
+      # the mutant caught, as long as core dumps are off (`-c 0`, #2230): the
+      # runner's `systemd-coredump` otherwise writes a core as large as the
+      # cap while the process holds its memory, past the test timeout, and a
+      # few in a row took a runner down. `test_limits.py` (`make scripts`)
+      # holds the two together. The cap is per process, so it holds the
+      # runner only while the processes under it cannot sum past its memory:
+      # nextest runs a process per test, `test-threads` of them at once (the
+      # CPU count, 4, by default), and four mutated tests allocating together
+      # would take the runner down at about 4 GiB each. `--test-threads 2`
+      # keeps cap times threads at the runner's 16 GB; the `gpu` group already
+      # allows only 2 renderers at once, so it costs only CPU-bound tests'
+      # overlap. `test_gpu_config.py` (`make scripts`) holds the product.
       #
       # The baseline is held to the budget too (#2201): with none left, or
       # none left once it built, no mutant can run, so the part reads as

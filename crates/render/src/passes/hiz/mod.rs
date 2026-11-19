@@ -18,6 +18,9 @@
 //!    through indirect args ([`Culled`]), so an object that came out from behind a
 //!    wall this frame is drawn this frame.
 //!
+//! Steps 2 to 4 and the cluster cull below record into one compute pass, after
+//! phase one's depth draw; the select has its own pass before it (#2327).
+//!
 //! The phase-one draw is depth only, into the view's depth that the prepass or the
 //! forward pass then clears: every pass after it draws the final set, so none of
 //! them was split in two. Order within a batch is kept, so a frame where nothing is
@@ -35,12 +38,13 @@
 //!
 //! **What it keeps.** Its bind groups (the cull's, the pyramid's levels, the
 //! kept instances' group 1) and the draws holding them are rebuilt only when a
-//! buffer they bind or draw from grew or the depth was resized ([`kept::Kept`]):
-//! a `Kept`'s key names every resource its value holds (#2021). Its CPU tables are
-//! reused. Grown history keeps its verdicts: only new object slots read "drawn".
+//! buffer they bind or draw from grew or the depth was resized
+//! ([`Kept`](crate::gpu::kept::Kept)): a `Kept`'s key names every resource its
+//! value holds (#2021). Its CPU tables are reused. Grown history keeps its
+//! verdicts: only new object slots read "drawn".
 //!
 //! **Who culls.** [`Renderer::hiz_culls`]: the quality preset's
-//! `gpu_occlusion_culling` (on in every seeded preset), the camera's
+//! `gpu_occlusion_culling` (off in every seeded preset, #2388), the camera's
 //! `use_occlusion_culling`, and never during a capture, which bakes every static
 //! mesh. An orthographic camera and one with a far near plane do cull: the test
 //! reads the depth the camera drew, so a wall its near plane clips away writes none,
@@ -49,7 +53,7 @@
 //!
 //! **By cluster.** A batch of a mesh the import split into clusters is then
 //! culled cluster by cluster against the same pyramid and drawn per instance
-//! ([`clusters`], #1968); the quality preset's `gpu_cluster_culling` turns it off.
+//! ([`clusters`], #1968); the quality preset's `gpu_cluster_culling` turns it on.
 //!
 //! **Seams.** The pyramid ([`pyramid::Pyramid`]) is built once per camera and
 //! read by mip level and texel through `hiz/hidden.wgsl`'s `hidden`, which the
@@ -59,8 +63,8 @@
 pub(crate) mod clusters;
 mod counters;
 mod cull;
-mod kept;
 pub(crate) mod pyramid;
+mod tables;
 mod upload;
 
 #[cfg(test)]
@@ -73,6 +77,8 @@ mod dust2_gpu_tests;
 mod gpu_tests;
 #[cfg(test)]
 mod moving_gpu_tests;
+#[cfg(test)]
+mod passes_gpu_tests;
 #[cfg(test)]
 mod projection_gpu_tests;
 #[cfg(test)]

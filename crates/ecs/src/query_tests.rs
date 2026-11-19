@@ -120,3 +120,24 @@ fn walks_count_from_the_first_ask() {
     .join()
     .expect("the walks thread");
 }
+
+#[test]
+fn moving_bodies_are_the_non_static_colliders_and_controllers_with_their_layer() {
+    use glam::Vec3;
+    use rusty_components::{CharacterControllerComponent as Ctl, ColliderComponent as Col};
+    let mut w = World::new();
+    let [col, ctl, both, wall, off, bare] =
+        ["c", "k", "b", "w", "o", "n"].map(|n| w.spawn(n.into()));
+    let collider = Col::from_mesh_bounds(false, Vec3::ZERO, Vec3::ZERO);
+    for id in [col, both, wall, off] {
+        w.set_collider(id, Some(collider.clone()));
+    }
+    for id in [ctl, both] {
+        w.set_character_controller(id, Some(Ctl::default()));
+    }
+    w.set_static(wall, true);
+    w.set_layer(off, 7);
+    let every = vec![(col, 0), (ctl, 0), (both, 0), (off, 7)];
+    assert_eq!(w.moving_bodies(), every, "every layer, with it");
+    assert!(w.is_moving_body(both) && !w.is_moving_body(wall) && !w.is_moving_body(bare));
+}

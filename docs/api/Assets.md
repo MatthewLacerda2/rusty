@@ -24,7 +24,7 @@ one by its source path still works.
 |---|---|---|
 | `Assets.Manifest` | `()` | array of asset tables (see shape below) |
 | `Assets.List` | `()` | alias for `Assets.Manifest` |
-| `Assets.Refresh` | `()` | `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... }, compressed, failed = { path, ... } }` — imports what arrived (below); images wait for Stop |
+| `Assets.Refresh` | `()` | `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... }, compressed, failed = { path, ... } }` — imports what arrived (below); models and images wait for Stop |
 | `Assets.GetLightmapUVSettings` | `(path)` | `{ generate, hardAngle, packMargin }` — a model's Generate Lightmap UVs setting (below) |
 | `Assets.SetLightmapUVSettings` | `(path, { generate?, hardAngle?, packMargin? })` | how many of the scene's meshes it re-imported |
 | `Assets.GetModelImportSettings` | `(path)` | `{ scaleFactor, colliders }` — a model's Scale Factor and its sub-objects' mesh colliders (below) |
@@ -68,13 +68,19 @@ never runs it. `make export` fails on an `.mp3` the refresh can't convert, and w
 left because a `.wav` of its name already exists (that `.wav` ships; no `.mp3` does). Each
 conversion is logged; call it yourself after writing or copying an `.mp3` into the project.
 
-It also makes every image's compressed copy current (see `compression`, below) and
-returns how many it made in `compressed`; each image that fails (it does not decode,
-say) is warned of in the console, listed in `failed` by path, and draws
-uncompressed. It waits for them, on any build: the way to compress textures from a
-script or a session in edit mode. During Play it still imports audio, as Unity's
-`AssetDatabase.Refresh` imports in Play, but compresses no image (`compressed` is
-`0`): images wait for Stop, as a model's conversion does.
+It also brings every converted model (`.fbx`, `.blend`) up to date and makes every
+image's compressed copy current (see `compression`, below), returning how many images
+it compressed in `compressed`; each model or image that fails (it does not decode,
+say) is warned of in the console and listed in `failed` by path, and such an image
+draws uncompressed. It waits for them, on any build, and writes the import cache into
+the project (a first run on a large project encodes for minutes): the way to import
+from a script or a session in edit mode. `make import PROJECT=<dir>` does the models and
+images (not the audio) from the command line, and stops on a model that fails before
+compressing any image. A headless `play` or `bench-scenes` run never
+compresses an image itself, so on a project the editor never opened it draws them
+uncompressed until this has run. During Play it still imports audio, as Unity's
+`AssetDatabase.Refresh` imports in Play, but converts no model and compresses no
+image (`compressed` is `0`, `failed` empty): they wait for Stop.
 
 An MP3 is left in place, and listed in `skipped` with the reason, when its `.wav`
 sibling already exists (a refresh never overwrites a file) or when it does not decode

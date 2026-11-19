@@ -1,11 +1,11 @@
 # cargo-mutants' configuration, read from here by every run (mutants-on-request.yml,
-# mutants-sweep.yml). The engine is a workspace being split one crate per module
+# and `cargo mutants` run by hand). The engine is a workspace being split one crate per module
 # (crates/CLAUDE.md), and the tests that would catch a mutant in a moved crate are
 # mostly the root package's, so every mutant runs the whole workspace's tests, as it
 # did when the engine was one crate; an on-request run narrows that to the packages
-# that depend on the mutated one (`mutants-request.py`). The workflows pass `--workspace` so mutants are
+# that depend on the mutated one (`mutants-request.py`). The workflow passes `--workspace` so mutants are
 # drawn from every member, not only the root package. cargo-mutants' own baseline
-# ignores this and tests only the mutated packages, so the workflows run their own
+# ignores this and tests only the mutated packages, so the workflow runs its own
 # (`--baseline skip`; docs/testing.md, *Mutation testing*).
 test_workspace = true
 
@@ -20,6 +20,7 @@ exclude_globs = [
   "crates/app/src/animation/posed.rs",
   "crates/app/src/scene_load/project_fixture.rs",
   "crates/audio/src/recording.rs",
+  "crates/dev/src/bench/rig.rs",
   "crates/ecs/src/changes/ops.rs",
   "crates/lighting/src/lightmap/trace/bench.rs",
   "crates/lighting/src/occlusion/bench/**",
@@ -35,4 +36,61 @@ exclude_globs = [
   "crates/edit/src/asset_instance/humanoid_fixture.rs",
   "crates/scene/src/skeleton/rig.rs",
   "crates/scene/src/state/marks.rs",
+]
+
+# A `#[serde(default = "f")]` function returns the value a dropped stored key loads:
+# a design choice a test could only repeat, while `components::registry::default_drift`
+# holds, for every component, that a dropped key loads the component's `Default`. So
+# these are never mutated. cargo-mutants matches each regex against a mutant's name as
+# `--list` prints it (file, line, function), so there is one line per file naming its
+# default functions. Generated: `python3 .github/scripts/mutants_serde_defaults.py`
+# prints them, and `make scripts` fails when this list drifts from it.
+exclude_re = [
+  '^crates/asset/src/animation_graph/layer\.rs:\d+:\d+: replace (full_weight) -> ',
+  '^crates/asset/src/animation_graph/montage\.rs:\d+:\d+: replace (default_blend|default_slot) -> ',
+  '^crates/asset/src/sidecar/mod\.rs:\d+:\d+: replace (default_scale) -> ',
+  '^crates/components/src/animator\.rs:\d+:\d+: replace (default_true) -> ',
+  '^crates/components/src/animator/ik\.rs:\d+:\d+: replace (forward|full|half_turn) -> ',
+  '^crates/components/src/animator/playback\.rs:\d+:\d+: replace (default_node_speed) -> ',
+  '^crates/components/src/audio/source\.rs:\d+:\d+: replace (doppler_default|occlusion_default) -> ',
+  '^crates/components/src/material/decal\.rs:\d+:\d+: replace (default_angle_fade|one) -> ',
+  '^crates/components/src/material/defaults\.rs:\d+:\d+: replace (default_alpha|default_alpha_cutoff|default_base_color|default_roughness|default_true) -> ',
+  '^crates/components/src/material/height\.rs:\d+:\d+: replace (default_height_scale) -> ',
+  '^crates/components/src/material/mapping\.rs:\d+:\d+: replace (default_blend_sharpness|default_tiling) -> ',
+  '^crates/components/src/material/surface\.rs:\d+:\d+: replace (default_ior|default_one|white) -> ',
+  '^crates/components/src/mesh/mod\.rs:\d+:\d+: replace (one|one_f32) -> ',
+  '^crates/components/src/nav/agent\.rs:\d+:\d+: replace (default_angular_acceleration|default_angular_speed|default_area_mask|default_avoidance_priority|default_true) -> ',
+  '^crates/components/src/particle/mod\.rs:\d+:\d+: replace (zero_curve|zero_range) -> ',
+  '^crates/components/src/physics/character_controller\.rs:\d+:\d+: replace (up) -> ',
+  '^crates/components/src/physics/collider/shared_mesh\.rs:\d+:\d+: replace (one) -> ',
+  '^crates/components/src/physics/rigidbody\.rs:\d+:\d+: replace (default_angular_drag) -> ',
+  '^crates/components/src/rendering/camera/mod\.rs:\d+:\d+: replace (default_clear_flags|default_culling_mask|default_fxaa_active|default_motion_blur_intensity|default_motion_blur_max_length|default_taa_anti_flicker|default_taa_base_blend_factor|default_taa_jitter_scale|default_taa_variance_clamp_scale|default_use_occlusion_culling) -> ',
+  '^crates/components/src/rendering/camera/target\.rs:\d+:\d+: replace (default_every|default_true) -> ',
+  '^crates/components/src/rendering/light/mod\.rs:\d+:\d+: replace (unit_area) -> ',
+  '^crates/components/src/rendering/post_processing/mod\.rs:\d+:\d+: replace (on) -> ',
+  '^crates/procgen/src/catalog/color/levels\.rs:\d+:\d+: replace (one) -> ',
+  '^crates/procgen/src/catalog/color/mix\.rs:\d+:\d+: replace (one) -> ',
+  '^crates/procgen/src/catalog/filter/blurs/sharpen\.rs:\d+:\d+: replace (one|radius) -> ',
+  '^crates/procgen/src/catalog/filter/blurs/slope_blur\.rs:\d+:\d+: replace (samples) -> ',
+  '^crates/procgen/src/catalog/filter/flood/fill\.rs:\d+:\d+: replace (half) -> ',
+  '^crates/procgen/src/catalog/filter/relief/ambient_occlusion\.rs:\d+:\d+: replace (depth|quality) -> ',
+  '^crates/procgen/src/catalog/filter/relief/curvature\.rs:\d+:\d+: replace (one) -> ',
+  '^crates/procgen/src/catalog/generators/anisotropic_noise\.rs:\d+:\d+: replace (eight) -> ',
+  '^crates/procgen/src/catalog/generators/brick\.rs:\d+:\d+: replace (default_mortar) -> ',
+  '^crates/procgen/src/catalog/generators/noise\.rs:\d+:\d+: replace (half|one|square|two) -> ',
+  '^crates/procgen/src/catalog/generators/outline/text\.rs:\d+:\d+: replace (line_spacing|size) -> ',
+  '^crates/procgen/src/catalog/generators/shape\.rs:\d+:\d+: replace (five|half|quarter|six) -> ',
+  '^crates/procgen/src/catalog/generators/voronoi\.rs:\d+:\d+: replace (one|one_f32|square) -> ',
+  '^crates/procgen/src/catalog/generators/wave\.rs:\d+:\d+: replace (two) -> ',
+  '^crates/procgen/src/catalog/math/arithmetic\.rs:\d+:\d+: replace (half) -> ',
+  '^crates/procgen/src/catalog/vector/mapping\.rs:\d+:\d+: replace (one_vec2|yes) -> ',
+  '^crates/procgen/src/catalog/vector/normal_blend\.rs:\d+:\d+: replace (one) -> ',
+  '^crates/procgen/src/catalog/vector/scatter\.rs:\d+:\d+: replace (always|amount|scale) -> ',
+  '^crates/procgen/src/catalog/vector/tile\.rs:\d+:\d+: replace (always|square) -> ',
+  '^crates/procgen/src/recipe/param\.rs:\d+:\d+: replace (one) -> ',
+  '^crates/scene/src/lighting/probe/mod\.rs:\d+:\d+: replace (unoccluded) -> ',
+  '^crates/scene/src/nav_settings/area\.rs:\d+:\d+: replace (default_areas) -> ',
+  '^crates/scene/src/nav_settings/mod\.rs:\d+:\d+: replace (default_agent_height|default_agent_radius|default_grid_spacing|default_link_spacing|default_max_slope|default_max_step) -> ',
+  '^crates/scene/src/serialize\.rs:\d+:\d+: replace (default_ambient_color|default_ambient_intensity|default_skybox_path) -> ',
+
 ]

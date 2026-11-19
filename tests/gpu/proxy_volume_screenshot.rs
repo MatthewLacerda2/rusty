@@ -2,7 +2,8 @@
 //! box stands against a wall beside a `Baked` lamp at 2.2 m, lit only by baked
 //! light probes (no ambient, black sky, and a `Baked` lamp is never drawn live).
 //! With its one probe sample it is one colour top to bottom; with a volume its top,
-//! by the lamp, is lit and its foot dark.
+//! by the lamp, is lit and its foot dark; with a `Custom` box over its top quarter,
+//! its foot reads the box's face (`proxy_volume_clamp`, on the same bake).
 //!
 //! Skips (passes without asserting) when no GPU / software adapter is present.
 
@@ -12,7 +13,7 @@ use rusty::components::{
 };
 use rusty::dev::bake::probe::bake_scene_probes;
 use rusty::dev::bake::progress::BakeLog;
-use rusty::dev::screenshot::capture;
+use rusty::dev::{capture::CaptureHost, screenshot::capture_into};
 use rusty::edit::authoring::{primitive_mesh_component, Primitive};
 use rusty::scene::{Camera, Scene};
 
@@ -72,11 +73,12 @@ pub(super) fn baked_room() -> Option<(Scene, u32)> {
 }
 
 /// Mean red level of the locker's top and foot, seen from the lamp's side (+X):
-/// the face whose top looks at the lamp.
-pub(super) fn top_and_foot(scene: &Scene, name: &str) -> (f64, f64) {
+/// the face whose top looks at the lamp, drawn through `host` so the test's three
+/// shots share one renderer (one each was a third of its time on Metal, #2350).
+pub(super) fn top_and_foot(host: &mut CaptureHost, scene: &Scene, name: &str) -> (f64, f64) {
     let camera = Camera::new(Vec3::new(3.0, 1.0, 0.0), 180.0, 0.0);
     let path = crate::temp::dir().join(format!("rusty_gpu_1672_proxy_{name}.png"));
-    assert!(capture(scene, &camera, &path, SIZE, SIZE).expect("capture"));
+    assert!(capture_into(host, scene, &camera, &path, SIZE, SIZE).expect("capture"));
     let img = image::open(&path).unwrap().to_rgb8();
     let level = |rows: std::ops::Range<u32>| {
         let px: Vec<f64> = rows
@@ -89,12 +91,13 @@ pub(super) fn top_and_foot(scene: &Scene, name: &str) -> (f64, f64) {
 }
 
 #[test]
-fn a_tall_locker_goes_from_a_lit_top_to_a_dark_foot_with_a_volume() {
+fn a_tall_locker_goes_from_a_lit_top_to_a_dark_foot_with_a_volume_and_clamps_to_a_box() {
     let Some((mut scene, locker)) = baked_room() else {
         eprintln!("[proxy volume] no GPU/software adapter — skipping");
         return;
     };
-    let (top, foot) = top_and_foot(&scene, "single");
+    let mut host = CaptureHost::new();
+    let (top, foot) = top_and_foot(&mut host, &scene, "single");
     let volume = LightProbeProxyVolumeComponent {
         resolution_mode: ProxyResolutionMode::Custom,
         grid_resolution: [1, 8, 1],
@@ -103,7 +106,7 @@ fn a_tall_locker_goes_from_a_lit_top_to_a_dark_foot_with_a_volume() {
     scene
         .world
         .set_light_probe_proxy_volume(locker, Some(volume));
-    let (v_top, v_foot) = top_and_foot(&scene, "volume");
+    let (v_top, v_foot) = top_and_foot(&mut host, &scene, "volume");
     eprintln!(
         "[proxy volume] single top={top:.1} foot={foot:.1}; volume top={v_top:.1} foot={v_foot:.1}"
     );
@@ -118,5 +121,8 @@ fn a_tall_locker_goes_from_a_lit_top_to_a_dark_foot_with_a_volume() {
     assert!(
         v_top > top && v_foot < foot,
         "the grid spreads the one sample apart"
+    );
+    super::proxy_volume_clamp::a_foot_outside_a_custom_box_reads_the_box_s_face_not_the_single_sample(
+        &mut host, &mut scene, locker, foot,
     );
 }

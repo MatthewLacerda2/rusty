@@ -14,6 +14,7 @@
 //! field move them as solids. A view with no velocity target draws none of them.
 
 use crate::draw::batch::DrawBatch;
+use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
 use crate::gpu::pipelines::surface::SolidPass;
 use crate::timing::GpuPass;
 use crate::{RenderView, Renderer};
@@ -73,7 +74,7 @@ impl Renderer {
             });
         {
             let targets = targets(velocity);
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut pass = encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
                 multiview_mask: None,
                 label: Some("Depth Postpass"),
                 color_attachments: &targets,
@@ -95,6 +96,6 @@ impl Renderer {
             self.draw_batches(&mut pass, &depth, solid_pass);
             self.draw_batches(&mut pass, &motion, SolidPass::MotionPostpass(pipelines));
         }
-        self.queue.submit(std::iter::once(encoder.finish()));
+        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 }

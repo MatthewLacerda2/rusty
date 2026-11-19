@@ -248,11 +248,16 @@ if s.gpu_ms then print(s.gpu_ms.avg) end                                -- times
 | `render_extracted` / `render_posed` / `render_extract_us` | the retained render scene's update this frame (#1706): objects re-derived whole (every mesh entity on a first frame, a load, an Undo, a Play restore, a lightmap or light probe change, or a renderer-side one such as a re-written texture; otherwise only the meshes whose mesh, material, activity, layer, static flag, light or shader overrides changed, those naming a library material that was added, removed or edited in what a draw's key reads (render mode, shader, a map path, face, a Cutout's test), those overriding the runtime params of a material whose params were edited, and those sharing a re-uploaded geometry; an edit of a material's colour, scalars or params alone rewrites its record in place and re-derives no other object, unless it flips a term a pass is chosen by, which re-derives every user: a glass's roughness crossing the SSR threshold, `depth_postpass`, `writes_motion`, `blend_mode`) / objects only re-placed because they moved / CPU µs the update took, inside `renderer_ms` (wall-clock). `0` / `0` on a frame that changed nothing |
 | `render_upload_bytes` | bytes the frame wrote into the forward pass's per-draw arrays (#1706), every camera summed: per-draw uniforms, joint palettes (and a motion-blurred view's last-frame poses), 16 bytes per drawn instance, proxy volumes, the 192-byte record of each material (per scene and variant) that changed, and the 240-byte record of each object that moved or changed, with the unchanged records between two changed ones fewer than 32 slots apart, rewritten so the two go in one write (a static, unchanged object costs only its instance). A shadow sweep's casters are not counted |
 | `asset_uploads` / `asset_upload_bytes` | scene assets the frame uploaded (#2123), and their bytes: mesh buffers (a mesh's vertex and index data, rewritten in place or new), texture files (a material map, a UI image, a particle texture, the sky's panorama: its GPU size, every mip) and lightmap page arrays. What a windowed `Scene.LoadAsync`'s GPU warm-up made before its scene was swapped in is counted on no frame, so the new scene's first frame reads `0` for what it warmed (`Scene.md`, *Loading in the background*) |
-| `gpu_ms` | GPU ms the frame's render passes kept the GPU busy (#835): the sum of `gpu_passes` below. **Only where the adapter has timestamp queries** (Metal, most Vulkan GPUs; not lavapipe) — elsewhere the key is absent, never `0` |
-| `gpu_passes.<pass>` | GPU ms per kind of render pass, in the same `{ last, min, avg, max, samples }` shape, under stable names (below). Absent as a whole without timestamps |
+| `render_passes` / `compute_passes` / `submits` / `bind_groups_created` / `buffer_writes` | the GPU calls the renderer made for the frame (#2341): render passes and compute passes begun, queue submits, bind groups created and `write_buffer` calls, every camera, shadow view, post effect and the UI included, counted from the start of the render to its counters' close. What happens outside a render is counted on no frame: setup, a load's warm-up, a bake's readback between frames, and the GPU timer's resolve after the counters close. The editor's own egui paint passes are not the renderer's and are not counted |
+| `gpu_ms` | GPU ms the frame's timed passes kept the GPU busy (#835): the sum of `gpu_passes` below. No pass is charged a gap before it, so the GPU waiting for the CPU between submits is never in it, and `gpu_ms`, `gpu_other_ms` and `gpu_between_submits_ms` together are the span from the frame's first timed start to its last timed end. **Only where the adapter has timestamp queries** (Metal, most Vulkan GPUs; not lavapipe) — elsewhere the key is absent, never `0` |
+| `gpu_other_ms` | untimed GPU work: GPU ms inside one of the frame's command buffers that no pass holds, where the GPU never waits for the CPU, so a pass left untimed shows here. Present exactly when `gpu_ms` is |
+| `gpu_between_submits_ms` | the GPU waiting for the CPU: GPU ms from one submit's last timed work to the next's first, while the CPU records and submits, plus an untimed command at a submit's head or tail (SSR's copy of the opaque image, the Hi-Z counters' copies). Not in `gpu_other_ms`. Present exactly when `gpu_ms` is |
+| `gpu_passes.<pass>` | GPU ms per kind of timed GPU work (render or compute passes), in the same `{ last, min, avg, max, samples }` shape, under stable names (below). Absent as a whole without timestamps |
 
-**GPU time per pass (#835).** Each render pass writes a GPU timestamp at its start
-and end; the renderer resolves them after the frame and reads them back without
+**GPU time per pass (#835).** Each timed render or compute pass writes a GPU
+timestamp at its start and end, or a stage of several passes takes one pair across
+them (its first pass writes the start, its last the end: `occlusion`, and SSR's
+pyramids); the renderer resolves them after the frame and reads them back without
 ever stalling it (the live loop gets them a frame or two later, so a window frame
 carries the newest times resolved, its own or one just before; the harness waits for
 its frames anyway, so each reports its own). The passes are grouped by kind,
@@ -262,21 +267,24 @@ each kind's passes summed, under names that never change so two reports diff:
 |---|---|
 | `sky_reflection` | the sky's reflection cube (#1553): the capture and GGX prefilter of the panorama or the procedural sky, on the frames the sky changed (counted in `sky_reflection_bakes`) |
 | `shadows` | the sun's cascades (static bake + dynamic casters) and the point/spot shadow atlas |
+| `occlusion` | GPU occlusion culling (#1963), each culling camera's whole `occlusion` stage: the select of last frame's visible set, its depth-only draw (phase one), the Hi-Z depth pyramid, the bounds test, the compaction and the per-cluster cull, as one span. All of it goes out in one submit with no readback inside, so the span is the stage's GPU work, not its wall time |
 | `ssao_prepass` | the SSAO depth prepass (#1578): every visible solid's depth into the view's depth target, which a primed forward pass starts from |
 | `ssao` | the SSAO occlusion pass, at its quality's resolution |
 | `ssao_blur` | the SSAO blur at the occlusion's resolution, and the depth-aware upsample to full resolution when that is lower |
 | `ssil` | screen-space indirect lighting (#1750): its gather, blur, accumulate and upsample before the base camera's opaque pass, and the source it keeps after it; the depth prepass it draws on a camera without SSAO is under `ssao_prepass` |
 | `volumetric_fog` | volumetric fog (#1703): its froxels' scatter and integrate, before the base camera draws |
 | `forward` | the opaque scene pass: solids, decals folded in, skybox — every camera's, render-texture cameras included |
-| `ssr` | screen-space reflections (#1526): from the march over the base camera's opaque image to the resolve that averages its hits and draws them (#2028), the hits' pyramids between them included; the copy of the opaque image the march reads and its mip pyramid (#1736) are recorded before, untimed, so they aren't counted |
+| `ssr` | screen-space reflections (#1526): the trace over the base camera's opaque image, which writes each pixel's hit. The copy of that image before it is a command at the head of SSR's submit, not a pass, so it is in `gpu_between_submits_ms` |
+| `ssr_pyramids` | SSR's hit and spread pyramids (#2028, #2158), built from the trace's targets; absent on a view whose shorter side is 8 px or less, which has one level |
+| `ssr_resolve` | SSR's resolve (#2028): each pixel's hits averaged over its blur and drawn over the image |
 | `transparent` | translucent solids |
 | `ribbons` | trails and lines |
 | `particles` | particle systems |
 | `depth_of_field` | depth of field (#1445): its circle-of-confusion, prefilter, blur and composite passes |
-| `taa` | temporal anti-aliasing's resolve (#1702): one fullscreen pass over the scene, its history and the velocity target; on a view upscaling through it (a render scale below 1), the same pass reconstructing the output-size image from the scaled scene |
+| `taa` | temporal anti-aliasing (#1702): its resolve, one fullscreen pass over the scene, its history and the velocity target (on a view upscaling through it, a render scale below 1, the same pass reconstructing the output-size image from the scaled scene), its sharpen (#1847) and the clear of its reactive mask |
 | `motion_blur` | per-object motion blur (#1436): its TileMax and NeighborMax tile passes and the gather |
 | `lens_flare` | the screen-space lens flare (#1443): its flare pass (the composite adds it, under `post_fx`) |
-| `post_fx` | bloom, the composite, authored effects, FXAA |
+| `post_fx` | bloom, the composite, authored effects, FXAA, and the automatic-exposure meter (#1444) |
 | `outline` | the editor's selection outline (its mask, dilation and ring) and the gizmos drawn over it after post-FX: grid, the occlusion view's boxes, axis arrows, probes (editor only) |
 | `ui` | world and screen UI, Mask textures and the backdrop blur |
 

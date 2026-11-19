@@ -5,6 +5,7 @@
 //! uploads a count of 0, which the forward shader's `calculate_shadow` skips on
 //! (#1713): a `Baked` sun costs no shadow work, as in Unity.
 
+use crate::gpu::ops::CountedQueue as _;
 use glam::Vec3;
 
 use super::cascades::Cascade;
@@ -34,8 +35,11 @@ impl Renderer {
         // A probe captured without shadows (#1584) samples no cascade.
         let sampled: &[_] = if self.capture.shadows { &fitted } else { &[] };
         let uniform = CascadeUniform::new(sampled, camera.position, camera.forward());
-        self.queue
-            .write_buffer(&self.shadow_uniform_buffer, 0, bytemuck::bytes_of(&uniform));
+        self.queue.counted_write_buffer(
+            &self.shadow_uniform_buffer,
+            0,
+            bytemuck::bytes_of(&uniform),
+        );
         self.shadow_renderer.instancing = self.instancing;
         let masking = self.masking_statics(scene);
         let sun = live_sun_id(scene, false);
@@ -79,7 +83,7 @@ impl Renderer {
                 .render_cascades(&mut encoder, &frame, lod);
         }
         let bake = self.shadow_renderer.render_atlas(&mut encoder, &frame, lod);
-        self.queue.submit(std::iter::once(encoder.finish()));
+        self.queue.counted_submit(std::iter::once(encoder.finish()));
         self.frame_counters.shadow_atlas_cached = bake.cached;
         self.frame_counters.shadow_atlas_rebaked = bake.rebaked;
     }

@@ -159,6 +159,13 @@ manifest, the row, then the compiler names every path left to fix.
 ## Profiles
 - `[profile.dev.package."*"]` optimises dependencies only, never a member, so a
   crate keeps the edit-loop's opt-level 0.
+- A dependency no test or frame runs hot gets its own `[profile.dev.package.<name>]`
+  table back at opt-level 0, under its group's reason: the dev-only provider stack,
+  the window and clipboard protocol crates, and host-only proc macros and build
+  helpers that only dependencies use. A host-only crate a member derives through
+  stays optimised, since it runs on every rebuild of the edit loop; the comment above
+  `[profile.dev]` in the root `Cargo.toml` lists them. `make scripts`
+  (`test_dev_profile.py`) holds the tables to the lock and the members' dependencies.
 
 ## Module paths in the tools
 `tools/lint` (`tools/lint/src/modules.rs`) and the scripts (`.github/scripts/modules.py`)
@@ -167,8 +174,8 @@ read a crate's file at its **module path**, `src/<m>/…` (`lib.rs` read as
 sets, the determinism gate, `make review-level`'s table, the `stored-format`
 markers, coverage isolation and a `SCOPE=diff` mutation run share. Write a scope
 there as a module path; a finding still names the real `crates/<m>/src/…` path.
-**A path glob does not** go through it: `mutants-sweep.yml`'s `SWEEP_FILES`, `make
-mutants-remote SCOPE='crates/<m>/src/**'` and a string path in code name the file
+**A path glob does not** go through it: `make mutants-remote
+SCOPE='crates/<m>/src/**'` and a string path in code name the file
 where it lies; `mutants-scope.py` refuses any one glob that matches nothing. Keep
 the two mirrors in step.
 

@@ -1,12 +1,13 @@
 //! Writing one camera's GPU occlusion cull (#1963) into its buffers, and the bind
 //! groups `hiz.wgsl` reads them through.
 
+use crate::gpu::ops::{CountedDevice as _, CountedQueue as _};
 use std::ops::Range;
 
 use glam::{Mat4, Vec3};
 
 use super::cull::{CameraCull, ARGS};
-use super::kept::Tables;
+use super::tables::Tables;
 use crate::draw::batch::{DrawBatch, OpaqueBatches};
 use crate::gpu::layout_entries::{storage_entry, uniform_entry};
 use crate::{InstanceData, Renderer};
@@ -94,7 +95,7 @@ impl Renderer {
             batches: frame.batches.len() as u32,
             _pad: [0; 3],
         };
-        queue.write_buffer(&cam.params, 0, bytemuck::bytes_of(&params));
+        queue.counted_write_buffer(&cam.params, 0, bytemuck::bytes_of(&params));
         let bounds = bytemuck::cast_slice(&cam.tables.bounds);
         cam.bounds.upload(device, queue, bounds);
         let batches = pack_batches(frame.batches, frame.clustered);
@@ -149,7 +150,7 @@ impl Renderer {
             binding: 8,
             resource: wgpu::BindingResource::TextureView(pyramid),
         });
-        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+        self.device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Hi-Z Cull"),
             layout: &self.hiz.cull_layout,
             entries: &entries,

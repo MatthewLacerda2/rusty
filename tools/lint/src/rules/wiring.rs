@@ -111,6 +111,14 @@ fn case_for(rule: &str) -> Option<Case> {
             "engine/shaders/a.wgsl",
             "fn vs(i: u32) -> f32 {\n    let x = f32((i << 1u) & 2u);\n    return x;\n}\n",
         ),
+        "gpu-default-only" => one(
+            "crates/render/src/a.rs",
+            "#[cfg(not(feature = \"dev\"))]\nfn f() {}\n",
+        ),
+        "gpu-ops" => one(
+            "crates/render/src/passes/a.rs",
+            "fn f(q: &wgpu::Queue) {\n    q.submit([]);\n}\n",
+        ),
         "ignored" => case(
             &[(".gitignore", "secret.rs\n"), ("crates/app/src/secret.rs", "")],
             "crates/app/src/secret.rs",
@@ -189,6 +197,7 @@ fn case_for(rule: &str) -> Option<Case> {
             "tests/a.rs",
             "#[test]\nfn t() {\n    let p = std::env::temp_dir().join(\"x\");\n}\n",
         ),
+        "tool-named-test" => one("tests/nav/survivors.rs", "#[test]\nfn t() {}\n"),
         "unwrap-deny" => one("crates/physics/src/lib.rs", "//! A sim crate.\n"),
         "world-space" => one(app, "fn f(m: Mat4) {\n    m.to_scale_rotation_translation();\n}\n"),
         _ => return None,

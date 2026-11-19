@@ -83,15 +83,11 @@ impl Scene {
     }
 
     /// Every skinned entity: one whose mesh lists a skeleton, in insertion order
-    /// (`World::ids_with_mesh`'s).
+    /// (`World::ids_with_mesh`'s). One walk of the Mesh column that tests each
+    /// mesh as it passes, so a level of static meshes costs no lookup per mesh.
     pub fn skinned_ids(&self) -> Vec<u32> {
-        let ids = self.world.ids_with_mesh().into_iter();
-        ids.filter(|&id| {
-            self.world
-                .mesh(id)
-                .is_some_and(|m| !m.skeleton.bones.is_empty())
-        })
-        .collect()
+        self.world
+            .ids_with_mesh_where(|m| !m.skeleton.bones.is_empty())
     }
 
     /// Every live bone and everything under one (its hitbox, the gun in a hand),
@@ -213,3 +209,5 @@ impl Scene {
 mod drop_warn_tests;
 #[doc(hidden)]
 pub mod rig;
+#[cfg(test)]
+mod skinned_tests;

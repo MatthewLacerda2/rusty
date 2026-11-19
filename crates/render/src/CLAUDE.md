@@ -131,6 +131,8 @@ Before building a layout or pipeline by hand, use these:
 - `render::gpu::layout_entries`: one uniform, texture, sampler, depth or storage entry.
 - `render::gpu::DEPTH_FORMAT`: every view depth target and every pipeline drawing into
   one; shadow maps keep their own format in `passes::shadows`.
+- `render::gpu::kept::Kept`: a bind group or draw kept across frames, rebuilt only
+  when a resource its key names was replaced (the Hi-Z cull's, SSR's targets).
 - `render::gpu::fullscreen::Fullscreen`: any fullscreen-triangle pass (post-FX, SSAO,
   the UI blur, the shadow-atlas blit).
 - `render::passes::blended`: the globals uniform and the alpha and additive pipelines
@@ -220,7 +222,7 @@ in every layer. The vignette, the smallest real effect, is the worked example: g
 
 ## GPU tests
 - **The name says it renders**: in-crate tests are named `gpu_*`, integration tests
-  live under `tests/gpu/`. nextest's `gpu` group selects them by name (a `gpu::`
+  live under `tests/gpu/`. nextest's GPU group (`gpu`, `gpu-macos` on macOS) selects them by name (a `gpu::`
   path only in the integration binary: this crate's `gpu` module is no GPU mark), and a test that
   builds a renderer without such a name panics in debug (`render::setup::gpu_rule`).
 - A test reaches a GPU only through `render::test_gpu::headless_or_skip`
@@ -237,8 +239,8 @@ in every layer. The vignette, the smallest real effect, is the worked example: g
   what it was measured on; one added or moved runs on a desktop GPU before it merges
   (`make test-gpu ADAPTER=<gpu>`, `docs/testing.md`, *Which adapters a GPU tolerance
   holds on*).
-- A new GPU test that runs CI out of memory lowers both caps to 1 (the nextest `gpu`
-  group and `MAX_CONCURRENT_HEADLESS`) before the test is weakened.
+- A new GPU test that runs CI out of memory lowers both caps to 1 on its platform (the
+  nextest `gpu` or `gpu-macos` group and `MAX_CONCURRENT_HEADLESS`) before the test is weakened.
 
 ## Pixels
 - **Bless by name, and look.** Re-bless a capture or snapshot by its test name, never
