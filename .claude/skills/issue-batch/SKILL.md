@@ -163,7 +163,8 @@ script keeps, and why:
   issue: one closed, given a stage label or whose brief is refused is dropped and
   said; one with a newer `Brief` than it was queued on launches on that one;
   one whose issue already has a routine made after its ask and its brief was
-  launched (a pass cut short) and is dropped, never launched twice. A command
+  launched (a pass cut short) and is dropped, never launched twice, slot free or
+  not, and `make coder` for it drops it the same way. A command
   that finds another session holding the line waits a few minutes, then exits 2
   naming the holder. `ARGS=--dry-run` launches, writes and locks nothing.
 - `run_once_at` computed, `allowed_tools` with `ToolSearch` (the GitHub MCP tools

@@ -23,8 +23,24 @@ an ordinary case:
   routine another session created since this pass's listing ([`fresh`]) holds a
   slot. So two sessions never launch one entry twice, and never pass the limit
   between them.
-- **No free slot reads nothing**: the pass reads the issues in line only when at
-  least one could launch.
+- **A launched entry is dropped whether or not a slot is free** ([`launched`]):
+  with none free, a pass that only said "no free slot" kept a launched issue
+  listed as waiting, and the operator, believing the list, ran `make coder` for
+  it and started a second coder. `make coder` drops its own entry the same way.
+- **No free slot reads no more than that**: the issues in line are read only
+  for an entry [`launched_since`] may match or, with a slot free, in line order
+  until no entry left could take one ([`fill`]). The order is the one stored: a
+  brief that turns an entry into a round moves it up from the next pass.
+
+`launched_since` has two limits not closed here, which a reader deciding
+whether to trust the line needs:
+
+- **It compares the server's `created_at` with a local `asked`.** A local clock
+  ahead by more than the time from ask to create (right after a reboot, before
+  the clock syncs) stamps the ask after the routine it led to, and the launch is
+  not seen.
+- **The routines API lists only the account's 20 newest routines.** A launch
+  pushed out of that list by 20 newer ones is not seen.
 - **A dry run takes no lock and writes nothing**, and says "would" for each
   drop and launch.
 
@@ -87,33 +103,62 @@ def run(go: Pass) -> int:
     """Launch from the line while slots are free: 0, or 2 when a launch or a write failed.
     `remote.RemoteError` (and `waiting.Busy`) propagate, with every launch before them written."""
     entries = waiting.load(go.line)
+    read: dict[int, tuple] = {}
+    dropped = launched(go, entries, read)
+    entries = [e for e in entries if e not in dropped]
+    status = 0
     if not any(room(go.holders, e["issue"]) for e in entries):
         if entries:
             go.say("no free slot: nothing launched")
-        return 0
-    queued = {e["issue"]: e["brief"] for e in entries}  # `refresh` moves an entry to a newer brief
-    ready, dropped = [], []
+    else:
+        status = fill(go, entries, read, dropped)
+    return forget(go, dropped) or status
+
+
+def launched(go: Pass, entries: list[dict], read: dict[int, tuple]) -> list[dict]:
+    """The entries already launched, said and to drop, slot free or not, so the line printed
+    is true: GitHub is read only for an entry with a routine made after its ask."""
+    gone = []
     for entry in entries:
-        issue, comments = go.read(entry["issue"])
+        if not launched_since(go.listed, entry, {}):
+            continue
+        issue, comments = read.setdefault(entry["issue"], go.read(entry["issue"]))
+        found = waiting.refresh(entry, issue, comments, go.say, go.dry)
+        if found is None:
+            gone.append(entry)
+        elif found and (made := launched_since(go.listed, entry, found)):
+            go.say(f"#{entry['issue']}: already launched ({made.get('name', '?')}, created "
+                   f"{made.get('created_at')}); {'would be ' if go.dry else ''}dropped from the line, "
+                   "not launched again")
+            gone.append(entry)
+    return gone
+
+
+def fill(go: Pass, entries: list[dict], read: dict[int, tuple], dropped: list[dict]) -> int:
+    """Read the entries in line order and launch each that fits, stopping once no entry left
+    could take a slot: an issue that already holds one still can, a new one cannot."""
+    queued = {e["issue"]: e["brief"] for e in entries}  # `refresh` moves an entry to a newer brief
+    for entry in waiting.ordered(entries):
+        if not room(go.holders, entry["issue"]):
+            continue
+        issue, comments = read[entry["issue"]] if entry["issue"] in read else go.read(entry["issue"])
         found = waiting.refresh(entry, issue, comments, go.say, go.dry)
         if found is None:
             dropped.append(entry)
-        elif found:
-            ready.append((entry, issue, found))
-    order = waiting.ordered(entries)  # after `refresh`, which re-reads each entry's round
-    status = 0
-    for entry, issue, found in sorted(ready, key=lambda got: order.index(got[0])):
-        if room(go.holders, entry["issue"]):
-            status = launch(go, entry, issue, found, queued[entry["issue"]])
-            if status:
-                break
+        elif found and (status := launch(go, entry, issue, found, queued[entry["issue"]])):
+            return status
+    return 0
+
+
+def forget(go: Pass, dropped: list[dict]) -> int:
+    """Write the line without `dropped`, under the lock; a re-ask on a newer brief stays. 0 or 2."""
     if go.dry or not dropped:
-        return status
+        return 0
     with waiting.held(go.line, go.say):
         on_disk = waiting.load(go.line)
-        gone = {(e["issue"], e["brief"]) for e in dropped}  # a re-ask on a newer brief stays
+        gone = {(e["issue"], e["brief"]) for e in dropped}
         failed = waiting.save(go.line, [e for e in on_disk if (e["issue"], e["brief"]) not in gone])
-    return wrote(go, failed) or status
+    return wrote(go, failed)
 
 
 def launch(go: Pass, entry: dict, issue: dict, found: dict, queued: str) -> int:

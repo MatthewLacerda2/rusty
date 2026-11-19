@@ -67,12 +67,17 @@ def trigger_id(answer: object) -> str | None:
     return (answer.get("trigger") or answer).get("id")
 
 
-def create(number: int, issue: dict, found: dict, listed: list[dict], call, repository: str, now: datetime,
-           env: dict, dry: bool, say: Callable[[str], None]) -> int:
+def create(number: int, issue: dict, found: dict, listed: list[dict], call, repository: str,
+           clock: Callable[[], datetime], env: dict, dry: bool, say: Callable[[str], None]) -> int:
     """Create (or, `dry`, print) the routine for #`number` on the brief `found`: 0 when made or
-    printed, 2 when claude.ai failed. Raises `brief.Refused` when no environment is known."""
+    printed, 2 when claude.ai failed. Raises `brief.Refused` when no environment is known.
+
+    The fire time is taken from `clock` here, as the create is made, never from a time the
+    command read at its start (the review of #2393): `routine.fire_time` leaves as little as a
+    minute, and a wait on the line's lock, a re-listing or the creates before this one in a pass
+    can spend it, and the API refuses a fire time already past."""
     env_id = environment_id(env, listed)
-    made = routine.body(number, issue.get("title", ""), found.get("html_url", ""), env_id, repository, now)
+    made = routine.body(number, issue.get("title", ""), found.get("html_url", ""), env_id, repository, clock())
     if dry:
         print(json.dumps(made, indent=2))
         say(f"dry run: nothing created (brief {found.get('html_url', '')})")

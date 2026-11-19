@@ -11,7 +11,7 @@ calls it once a minute; nothing launches without that call.
 
 `--dry-run` says what it would drop and launch, creates nothing, writes
 nothing and takes no lock. Exits 0; 1 on a usage error; 2 when GitHub or
-claude.ai failed, the line could not be written or another session held it
+claude.ai failed, the line could not be written or its lock opened, or another session held it
 past `waiting.WAIT_SECONDS`.
 """
 
@@ -46,12 +46,13 @@ def show(places: list[tuple[dict, str, str]], entries: list[dict]) -> None:
 
 
 def main(argv: list[str], gh=gh_json, call=remote.call, now: datetime | None = None,
-         env: dict | None = None, line: Path | None = None) -> int:
+         env: dict | None = None, line: Path | None = None, clock=None) -> int:
     if any(a != "--dry-run" for a in argv):
         print("usage: coders.py [--dry-run]", file=sys.stderr)
         return 1
     dry = "--dry-run" in argv
-    now = now or datetime.now(timezone.utc)
+    clock = clock or ((lambda: now) if now else (lambda: datetime.now(timezone.utc)))
+    now = clock()
     line = line or waiting.path()
     env = os.environ if env is None else env
     repository = ghrest.slug()
@@ -62,7 +63,7 @@ def main(argv: list[str], gh=gh_json, call=remote.call, now: datetime | None = N
 
     def start(number: int, issue: dict, found: dict) -> int:
         try:
-            return launch.create(number, issue, found, listed, call, repository, now, env, dry, say)
+            return launch.create(number, issue, found, listed, call, repository, clock, env, dry, say)
         except ValueError as refused:
             say(f"#{number} not launched: {refused}")
             return 2
@@ -74,7 +75,7 @@ def main(argv: list[str], gh=gh_json, call=remote.call, now: datetime | None = N
         holders = {running.issue(found) for found, placed, _ in places if placed == "running"}
         return drain.run(drain.Pass(line=line, listed=listed, holders=holders, read=read,
                                     relist=lambda: launch.routines(call), start=start, say=say, dry=dry))
-    except remote.RemoteError as down:  # waiting.Busy too
+    except remote.RemoteError as down:  # waiting.Busy and waiting.Unwritable too
         say(str(down))
         return 2
 

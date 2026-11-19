@@ -18,7 +18,11 @@ already waiting to fire or running, it puts the issue in the waiting line
 launches it when a slot frees, and `--no-wait` refuses instead. A free slot is
 not enough while the line holds others: an issue that is not within the free
 slots in the line's order waits too, and says who is ahead, so a hand launch
-never jumps a round that has waited an hour. The decision and the create hold
+never jumps a round that has waited an hour (an entry ahead whose issue already
+holds a slot, a round replacing its coder, takes none). An entry of its own the
+line still holds though its routine was made (`drain.launched_since`: a pass that
+died before its write) is dropped, said, and not launched again unless
+`--over-limit`. The decision and the create hold
 the line's lock and re-list the routines first, as a `make coders` launch does
 (`dispatch/drain.py`) (#1856; a fired one is placed from its pull
 request and briefs on GitHub, #1866, `dispatch/running.py` says why; a ready pull
@@ -37,7 +41,9 @@ limit it says where the issue would wait, writes nothing and takes no lock. Need
 `claude mcp serve`, `dispatch/remote.py`) and `gh`. `RUSTY_CLOUD_ENV` names the
 `anthropic_cloud` environment's id when no coder routine exists yet to read it
 from. Exits 0 on a launch or a place in the line, 1 on a refusal or a usage
-error, 2 when GitHub or claude.ai failed, the line could not be written (after
+error, 2 when GitHub or claude.ai failed, the line could not be written or its
+lock opened (with an empty line and a slot free, a launch goes ahead without the
+lock, saying so) (after
 a launch too: the next `make coders` then drops the entry by its routine) or
 another session held the line past `waiting.WAIT_SECONDS`.
 """
@@ -97,34 +103,53 @@ def wait(line: Path, entries: list[dict], number: int, found: dict, now: datetim
     return 0
 
 
-def turn(entries: list[dict], number: int, found: dict, now: datetime, free: int) -> str | None:
+def turn(entries: list[dict], number: int, found: dict, now: datetime, free: int, taken: set[int]) -> str | None:
     """Why #`number` must wait behind the line for one of `free` slots, or `None` when it fits:
-    a hand launch never jumps ahead of an entry asked before it in the line's order."""
+    a hand launch never jumps ahead of an entry asked before it in the line's order. An entry
+    ahead whose issue already holds a slot (`taken`, a round replacing its coder) takes none."""
     placed, _ = waiting.enqueue([dict(e) for e in entries], number, found, now)
-    ahead = waiting.ordered(placed)[:waiting.ahead(placed, number)]
+    ahead = [e for e in waiting.ordered(placed)[:waiting.ahead(placed, number)] if e["issue"] not in taken]
     if len(ahead) < free:
         return None
     names = ", ".join(f"#{e['issue']}" + (" (round)" if e.get("round") else "") for e in ahead)
     return f"{free} free slot(s) and {len(ahead)} ahead in the waiting line: {names}"
 
 
+def already(entries: list[dict], number: int, found: dict, current: list[dict], dry: bool, line: Path) -> int | None:
+    """When #`number`'s entry in the line was launched already (a pass that died before its write),
+    drop it, say so and return the status; `None` when it was not."""
+    entry = next((e for e in entries if e["issue"] == number), None)
+    made = entry and drain.launched_since(current, entry, found)
+    if not made:
+        return None
+    say(f"#{number} was launched from the line already ({made.get('name', '?')}, created "
+        f"{made.get('created_at')}); {'would be ' if dry else ''}dropped from the line, not launched "
+        "again (--over-limit launches anyway)")
+    if not dry and (failed := waiting.save(line, waiting.without(entries, number))):
+        say(f"could not write the waiting line {line}: {failed}")
+        return 2
+    return 0
+
+
 def decide(argv: list[str], number: int, issue: dict, found: dict, listed: list[dict],
-           holding: list[tuple[dict, str]], call, now: datetime, env: dict, line: Path) -> int:
+           holding: list[tuple[dict, str]], call, clock, env: dict, line: Path) -> int:
     """Launch or queue #`number` on what is true now: the line and the routines read again."""
-    dry = "--dry-run" in argv
+    dry, now = "--dry-run" in argv, clock()
     entries = waiting.load(line)
     taken = {running.issue(found) for found, _ in holding}
-    if not dry:
-        taken |= drain.fresh(launch.routines(call), listed) - {number}
+    current = listed if dry else launch.routines(call)
+    taken |= drain.fresh(current, listed) - {number}
+    if "--over-limit" not in argv and (status := already(entries, number, found, current, dry, line)) is not None:
+        return status
     free = running.LIMIT - len(taken)
-    behind = full(holding) if free <= 0 else turn(entries, number, found, now, free)
+    behind = full(holding) if free <= 0 else turn(entries, number, found, now, free, taken)
     if behind and "--over-limit" in argv:
         say(f"--over-limit: launching past {behind}")
     elif behind and "--no-wait" in argv:
         raise brief.Refused(behind + ". Launch when one is ready and reviewed, or pass --over-limit")
     elif behind:
         return wait(line, entries, number, found, now, dry, behind)
-    status = launch.create(number, issue, found, listed, call, ghrest.slug(), now, env, dry, say)
+    status = launch.create(number, issue, found, listed, call, ghrest.slug(), clock, env, dry, say)
     if status == 0 and not dry and any(e["issue"] == number for e in entries):
         if failed := waiting.save(line, waiting.without(entries, number)):
             say(f"launched, but could not take #{number} out of the waiting line {line}: {failed}; "
@@ -133,14 +158,28 @@ def decide(argv: list[str], number: int, issue: dict, found: dict, listed: list[
     return status
 
 
+def hold(stack: contextlib.ExitStack, line: Path, number: int, dry: bool) -> None:
+    """Take the line's lock in `stack`; with an empty line, a lock that cannot be opened is said
+    and gone past, since nothing is queued that could launch twice."""
+    if dry:
+        return
+    try:
+        stack.enter_context(waiting.held(line, say))
+    except waiting.Unwritable as failed:
+        if waiting.load(line):
+            raise
+        say(f"{failed}; the line is empty, so #{number} goes ahead without its lock")
+
+
 def main(argv: list[str], gh=gh_json, call=remote.call, now: datetime | None = None,
-         env: dict | None = None, line: Path | None = None) -> int:
+         env: dict | None = None, line: Path | None = None, clock=None) -> int:
     args = [a for a in argv if a not in FLAGS]
     if len(args) != 1 or not args[0].lstrip("#").isdigit():
         say(USAGE)
         return 1
     number, dry = int(args[0].lstrip("#")), "--dry-run" in argv
-    now = now or datetime.now(timezone.utc)
+    clock = clock or ((lambda: now) if now else (lambda: datetime.now(timezone.utc)))
+    now = clock()
     line = line or waiting.path()
     repository = ghrest.slug()
     issue = gh(f"repos/{repository}/issues/{number}")
@@ -153,13 +192,14 @@ def main(argv: list[str], gh=gh_json, call=remote.call, now: datetime | None = N
         listed = launch.routines(call)
         holding = counted(listed, number, launch.github(gh, repository, now))
         # the decision and the create under the line's lock, as `make coders` launches (dispatch/drain.py)
-        with contextlib.nullcontext() if dry else waiting.held(line, say):
-            return decide(argv, number, issue, found, listed, holding, call, now,
+        with contextlib.ExitStack() as stack:
+            hold(stack, line, number, dry)
+            return decide(argv, number, issue, found, listed, holding, call, clock,
                           os.environ if env is None else env, line)
     except ValueError as refused:  # brief.Refused, or a brief URL that is not this issue's
         say(f"refused: {refused}")
         return 1
-    except remote.RemoteError as failed:  # waiting.Busy too
+    except remote.RemoteError as failed:  # waiting.Busy and waiting.Unwritable too
         say(str(failed))
         return 2
 

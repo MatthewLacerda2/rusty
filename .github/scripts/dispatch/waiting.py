@@ -25,7 +25,11 @@ a tool can hold.
 - **The lock is waited on for [`WAIT_SECONDS`], not forever** (the review of
   #2393: a `make coder` during a slow pass hung silently): past that it raises
   [`Busy`] naming who holds it, from the note the holder writes in the lock
-  file, and the command exits 2. A dry run never takes it, so it creates no
+  file (cleared on release, so it never names a past holder), and the command
+  exits 2. A lock that cannot be opened (a read-only checkout, a file where the
+  directory goes) raises [`Unwritable`], said with the path, exit 2, never a
+  traceback; `make coder` with an empty line launches without it, since nothing
+  is queued that could launch twice. A dry run never takes it, so it creates no
   directory and no file.
 - **Every entry is re-read before it launches** ([`refresh`]): one whose issue
   closed or took a stage label, or whose newest brief is refused, is dropped
@@ -68,14 +72,25 @@ class Busy(remote.RemoteError):
     """The line stayed held past [`WAIT_SECONDS`]; the message names the holder."""
 
 
+class Unwritable(remote.RemoteError):
+    """The line's directory or lock file cannot be made or opened (a read-only checkout, a file
+    where the directory goes); the message names the path and why."""
+
+
 @contextlib.contextmanager
 def held(line: Path, say: Callable[[str], None] | None = None, wait: float | None = None,
          clock=time.monotonic, sleep=time.sleep):
     """An exclusive `flock` beside `line` for a read-modify-write, waited on for `wait` seconds
-    (said once if it must wait), then [`Busy`]. The kernel drops it on any exit."""
+    (said once if it must wait), then [`Busy`]; [`Unwritable`] when the lock file cannot be
+    opened. The kernel drops it on any exit; the holder's note is cleared on release, so a
+    note read is always the current holder's."""
     wait = WAIT_SECONDS if wait is None else wait
-    line.parent.mkdir(parents=True, exist_ok=True)
-    with open(line.with_suffix(".lock"), "a+") as lock:
+    try:
+        line.parent.mkdir(parents=True, exist_ok=True)
+        lock = open(line.with_suffix(".lock"), "a+")
+    except OSError as failed:
+        raise Unwritable(f"cannot write the waiting line {line}: {failed}") from None
+    with lock:
         deadline, told = clock() + wait, False
         while True:
             try:
@@ -89,12 +104,20 @@ def held(line: Path, say: Callable[[str], None] | None = None, wait: float | Non
                     say(f"waiting for the line, held by {holder(lock)}")
                     told = True
                 sleep(0.5)
-        lock.seek(0)
-        lock.truncate()
-        lock.write(f"pid {os.getpid()} ({' '.join(sys.argv) or '?'}), "
+        note(lock, f"pid {os.getpid()} ({' '.join(sys.argv) or '?'}), "
                    f"since {datetime.now(timezone.utc):%Y-%m-%dT%H:%M:%S}Z\n")
-        lock.flush()
-        yield
+        try:
+            yield
+        finally:
+            note(lock, "")
+
+
+def note(lock, text: str) -> None:
+    """Replace the holder's note in `lock` with `text`."""
+    lock.seek(0)
+    lock.truncate()
+    lock.write(text)
+    lock.flush()
 
 
 def holder(lock) -> str:
