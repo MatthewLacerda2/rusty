@@ -912,8 +912,10 @@ during Play goes back on Stop, as every scene edit does.
   (Unity's *ambient probe*), so an HDRI's blue zenith and warm horizon light up-
   and sideways-facing surfaces with their own colours. The intensity scales it; the
   sky on screen stays as drawn. The projection is made once per change of the sky
-  (a different panorama path, the panorama file's bytes or its import settings, a
-  procedural setting) and never saved; a scripted ambient colour tinting the procedural sky re-projects
+  (a different panorama path, the panorama file or its import settings rewritten, a
+  procedural setting) and never saved; a rewrite is seen as a texture's is: one the
+  engine makes, or one the editor's file watch sees, while a shipped game re-reads
+  nothing; a scripted ambient colour tinting the procedural sky re-projects
   nothing. A panorama is read as the sky pass draws it (8-bit, no sRGB decode), and
   one that cannot be read lights as the procedural sky does. A scene in `Color` mode
   with default colours leaves the `ambient` block out of its file. Lightmaps and light probes, both Generate Lighting's (`Probe.Bake`)

@@ -4,9 +4,10 @@
 //! The SH is the sky's **radiance**, at intensity 1, from the same source the sky
 //! cube is built from: the panorama's texels ([`panorama`]) when `skybox_path` names
 //! one, else the procedural sky evaluated here ([`procedural`]). It is derived state,
-//! never saved: each source is projected once per change (the panorama's path or
-//! file bytes, the procedural `SkySettings`) and memoised, so a frame or a bake reads
-//! it for the price of a lookup. A scripted ambient colour (a day cycle tinting the
+//! never saved: each source is projected once per change (the panorama's path, its
+//! file or sidecar rewritten as the write log tells, the procedural `SkySettings`)
+//! and memoised, so a frame or a bake reads it for the price of a lookup, with no
+//! file access. A scripted ambient colour (a day cycle tinting the
 //! procedural sky) re-projects nothing: the procedural sky is affine in that colour,
 //! so its SH is two fixed terms combined per call, as the sky cube does.
 
