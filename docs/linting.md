@@ -65,6 +65,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | One counted GPU path | `tools/lint -- --rules` (`gpu-ops`) | **hard gate**: outside `crates/render/src/gpu/ops.rs` and test code, no line of `crates/render/src/` calls wgpu's `.begin_render_pass(`, `.begin_compute_pass(`, `.submit(`, `.create_bind_group(` or `.write_buffer(` — the renderer goes through `CountedEncoder` / `CountedQueue` / `CountedDevice`'s `counted_*` helpers, which feed the frame's `render_passes`, `compute_passes`, `submits`, `bind_groups_created` and `buffer_writes` rows (#2341) |
 | One dependency graph | `make feature-split` (`.github/scripts/feature_split.py`) | **hard gate**: no dev-dependency turns on a feature the normal build lacks, so `cargo test` never rebuilds a shared crate (#552, #979; `docs/testing.md`) |
 | One fullscreen triangle | `tools/lint -- --rules` (`fullscreen-triangle`) | **hard gate**: no `.wgsl` under `engine/` but `fullscreen.wgsl` spells the triangle's `(i << 1u) & 2u`; `#import fullscreen` and call `fullscreen::triangle` / `uv` (#1370) |
+| One logger a test binary | `tools/lint -- --rules` (`one-logger`) | **hard gate**: a package whose manifest names `rusty-logging` never names `rusty_test_support::logs`; its tests read warnings through `rusty_logging::init_for_tests` and `rusty_logging::forward` |
 | One name table per enum | `tools/lint -- --rules` (`named-enum`) | **hard gate**: no file of `src/` hand-writes both a parse (`fn parse(_: &str) -> Option<Self>` in an `impl T`, or a free `fn parse_*(_: &str) -> Option<T>`) and a name (`fn name`/`fn as_str(self) -> &'static str`, or a free `fn *_name(_: T) -> &'static str`) for one type, nor a `const`/`static` table of `(T, &str)` pairs — a script-facing enum declares its names once with `core::named_enum!`, which writes `ALL`, `name`, a case-insensitive `parse`, `Display` and its serde (#1478); a parse that does more takes `// lint: allow(named-enum) <why>` (#1329) |
 | One player tree | `make player-tree` (`.github/scripts/player_tree.py`) | **hard gate**: the shipped player's resolution (`cargo tree -p rusty --no-default-features -e normal`) reaches no `egui*`, no `rusty-editor`, no `rusty-dev`, no `scorsese-providers` and no `ureq`; clippy on that feature set only proves the code never names them, while a manifest can still link one (a member's dependency without `optional`, `crates/CLAUDE.md`) |
 | One world space | `tools/lint -- --rules` (`world-space`) | **hard gate**: outside `ecs::world_space` and `components::transform`, no engine code line decomposes a matrix (`to_scale_rotation_translation`), names the retired `compute_world_matrix` / `world_matrix(` / `parent_world_matrix`, or folds a Transform over `ancestors(` — world space is read from `ecs::World`'s world API; test code is not scanned, and converting file data takes `// lint: allow(world-space) <why>` (#1196) |
@@ -557,6 +558,20 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   as winit's `KeyCode`) takes the allow. A parse that does more than read one name per variant (separators
   ignored, a name built from parts, a `Result` with its own listing) is left alone
   or takes `// lint: allow(named-enum) <why>`. Test code is not scanned.
+- **`one-logger`** — `log::set_logger` takes the first logger a process
+  installs, so a test binary holding both `rusty_logging`'s and
+  `rusty_test_support::logs`' captures nothing through whichever its tests
+  install second, under plain `cargo test`; nextest runs a test a process and
+  never sees it. A package whose `[dependencies]` or `[dev-dependencies]` name
+  `rusty-logging` (read from each manifest, the root's and every member's) never
+  names `rusty_test_support::logs` in the code under its `src/` or `tests/`: a
+  path through the crate or an alias of it, or a `use` item bringing `logs` or a
+  glob of the crate in, read whole however rustfmt splits it.
+  `rusty_test_support::logs` stays for the crates below `rusty-logging`. The rule
+  cannot see a path a macro builds, `logs` re-exported through another crate, or
+  a crate that links `rusty-logging` only through a sibling; for those, each
+  `init` also panics when the other's logger got there first, so the binary fails
+  loudly under plain `cargo test` instead of capturing nothing.
 - **`orphan-module`** — every scanned `.rs` file is one cargo compiles. rustc
   builds only what a crate root reaches through `mod`: a file no `mod` names gives
   no error, clippy and rustfmt skip it, and its tests stop running while a count of
@@ -799,7 +814,13 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   another crate's API (a registry a call appends to), or `crates/test-support/`,
   whose process-wide statics (`logs.rs`' `KEPT`, `ONCE`) the shared test-line
   definition does not count as test code; those stay the
-  nightly run's to catch (`rules/static_write.rs`).
+  nightly run's to catch (`rules/static_write.rs`). Nor does it see a test that
+  only *reads* process-wide state live code writes and asserts an exact value of
+  it (`asset::convert::conversions` before and after a refresh, while the
+  binary's other tests convert): such a test runs its body in
+  `rusty_test_support::alone!`, and a "went up" compare (`core::wake::rings`)
+  needs nothing. Telling those apart would mean resolving which accessor, often
+  in another crate, reads a process-wide `static`, past what a line scan reads.
 - **`test-temp-dir`** — a path under `std::env::temp_dir()` is shared by every test
   process, every worktree and (under `cargo test`) every test
   thread, so a fixed or process-keyed name races. Test code (the *Test code* bullet)

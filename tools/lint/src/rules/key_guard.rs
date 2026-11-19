@@ -17,7 +17,7 @@
 //! (`Allow::Never`): a manifest line takes no inline allow.
 
 use super::finding::Finding;
-use super::scan::Scan;
+use super::scan::{names, Scan};
 use crate::code::bare_lines;
 
 pub const RULE: &str = "key-guard";
@@ -38,10 +38,7 @@ pub fn check<'a>(
     text: &str,
     mut sources: impl Iterator<Item = &'a str>,
 ) -> Option<Finding> {
-    let mut named = crate::layers::manifest_dependencies(text);
-    named.extend(crate::layers::manifest_dev_dependencies(text));
-    let links = named.iter().any(|k| k == "rusty_dev");
-    (links && !sources.any(expands)).then(|| Finding {
+    (names(text, "rusty-dev") && !sources.any(expands)).then(|| Finding {
         path: manifest.to_string(),
         line: 1,
         rule: RULE,
@@ -55,21 +52,9 @@ pub fn check<'a>(
 /// The rule over the root package and every member crate: each manifest against the
 /// code under its `src/` and `tests/`.
 pub fn run(scan: &Scan) -> Vec<Finding> {
-    let members = crate::modules::member_manifests(&scan.base);
-    let members = members
+    scan.packages()
         .iter()
-        .map(|m| m.strip_prefix(&scan.base).unwrap_or(m))
-        .map(|m| m.to_string_lossy().replace('\\', "/"));
-    std::iter::once(String::from("Cargo.toml"))
-        .chain(members)
-        .filter_map(|manifest| {
-            let root = manifest.trim_end_matches("Cargo.toml");
-            let dirs = [format!("{root}src/"), format!("{root}tests/")];
-            let text = std::fs::read_to_string(scan.base.join(&manifest)).unwrap_or_default();
-            let inside = |f: &&String| dirs.iter().any(|d| f.starts_with(d.as_str()));
-            let sources = scan.files.iter().filter(inside).map(|f| scan.source(f));
-            check(&manifest, &text, sources)
-        })
+        .filter_map(|p| check(&p.manifest, &p.text, p.files.iter().map(|f| scan.source(f))))
         .collect()
 }
 
