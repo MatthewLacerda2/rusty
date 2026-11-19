@@ -110,7 +110,7 @@ pub fn mark_standalone() {
 /// Whether this thread runs a standalone game ([`mark_standalone`]): its refresh
 /// before Play compresses no texture ([`refresh_sources`]), so it never writes
 /// into its install.
-fn is_standalone() -> bool {
+pub(crate) fn is_standalone() -> bool {
     with_gate(|gate| gate.standalone)
 }
 

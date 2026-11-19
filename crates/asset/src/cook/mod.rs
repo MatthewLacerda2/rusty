@@ -24,9 +24,11 @@
 //! cooked as before ([`cooks`] counts those).
 //!
 //! **Written** on a miss by an authoring build ([`WRITES`]: the editor or `dev`)
-//! while conversion is allowed (edit mode, never Play or a standalone game); a
-//! shipped player reads cooked files, never writes one, and cooks in memory on a
-//! miss.
+//! while conversion is allowed (edit mode, never Play) and never by a standalone
+//! game (`convert::mark_standalone`: the player, or a dev harness such as
+//! `bench-scenes`, which reads a project and writes nothing into it), as it
+//! compresses no texture. Those read cooked files, never write one, and cook in
+//! memory on a miss; `make import`, `Assets.Refresh` and the editor write them.
 //!
 //! stored-format: the `<source>.cooked.glb` file of the import cache
 
@@ -154,7 +156,8 @@ fn lay(asset: &mut ImportedAsset, cooked: Vec<Cooked>) -> Result<(), String> {
 
 /// Whether a cook on this thread is written to disk ([module docs](self)).
 fn writes() -> bool {
-    pinned_writes().unwrap_or(WRITES) && convert::conversion_allowed()
+    let authoring = convert::conversion_allowed() && !convert::gate::is_standalone();
+    pinned_writes().unwrap_or(WRITES) && authoring
 }
 
 fn write(file: &Path, bytes: &[u8]) {
@@ -188,6 +191,8 @@ fn pinned_writes() -> Option<bool> {
     None
 }
 
+#[cfg(test)]
+mod cache_tests;
 #[cfg(test)]
 mod file_tests;
 #[cfg(test)]

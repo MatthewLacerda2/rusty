@@ -69,7 +69,7 @@ pub(crate) mod depends;
 mod fbx;
 #[cfg(test)]
 mod fingerprint;
-mod gate;
+pub(crate) mod gate;
 pub mod glb;
 mod lock;
 mod record;
