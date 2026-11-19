@@ -6,8 +6,11 @@
 //! `World::moving_bodies`); lookups by `World::component`, under every typed
 //! getter. A test hook: compiled in every build, since the test that reads it is
 //! another crate's, and counting only on a thread that asked [`of`] or
-//! [`lookups_of`] once, so a build that never asks pays one thread-local read
-//! per walk or lookup. Re-exported as `world::walks`.
+//! [`lookups_of`] once. A walk happens a few times a frame, so a build that never
+//! asks pays one thread-local read per walk. A lookup is the hottest call the sim
+//! makes, so lookups are counted only where `debug_assertions` holds (every test
+//! profile): a release or ship build compiles the call away, and [`lookups_of`]
+//! panics there rather than answer a silent 0. Re-exported as `world::walks`.
 
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
@@ -24,8 +27,10 @@ pub(crate) fn count(column: &'static str) {
     }
 }
 
+/// Counts nothing, and compiles to nothing, without `debug_assertions`.
+#[inline(always)]
 pub(crate) fn lookup(column: &'static str) {
-    if ARMED.with(Cell::get) {
+    if cfg!(debug_assertions) && ARMED.with(Cell::get) {
         LOOKUPS.with(|l| *l.borrow_mut().entry(column).or_default() += 1);
     }
 }
@@ -39,7 +44,16 @@ pub fn of<T>() -> u64 {
 /// One-entity lookups of `T`'s column (`World::component`, under `World::mesh`
 /// and every typed getter) on this thread since the first call of this function
 /// (or [`of`]) on it, which starts the count.
+///
+/// # Panics
+/// In a build without `debug_assertions` (release, ship), where lookups are not
+/// counted: run the test in a debug or test profile.
 pub fn lookups_of<T>() -> u64 {
+    assert!(
+        cfg!(debug_assertions),
+        "walks::lookups_of: lookups are counted only with debug_assertions on; \
+         run this test in a debug or test profile, not release"
+    );
     read::<T>(&LOOKUPS)
 }
 
