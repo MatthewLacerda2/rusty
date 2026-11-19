@@ -82,7 +82,7 @@ impl crate::Renderer {
             .lease(at, &pipes.pool_layout, (clusters, indices));
         if lease.is_none() {
             log::warn!(
-                "{}: its {} clusters do not fit the cluster pool under the device's \
+                "[Render] {}: its {} clusters do not fit the cluster pool under the device's \
                  storage binding limit; it is drawn whole",
                 id.0,
                 clusters.list.len()
