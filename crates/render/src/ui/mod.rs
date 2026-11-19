@@ -8,8 +8,7 @@
 //! reverse.
 //!
 //! - `geometry` — one `Image`'s triangles per image type (pure).
-//! - `clip` — what clips a graphic: RectMask bounds and feather, the nearest Mask
-//!   (pure).
+//! - `clip` — what clips a graphic: RectMask bounds and feather, the nearest Mask.
 //! - `mesh` — the layout → one vertex list per canvas, split into batches on
 //!   texture / clip changes, with CanvasGroup alpha and the clips (pure).
 //! - `effects` — the batch group every batch binds: soft clips, Mask coverage
@@ -21,11 +20,11 @@
 //! - `custom` — custom ui shaders (#427): a graphic's shade as its batch carries it
 //!   (pure), the variant cache and the per-graphic uniforms.
 //! - `text` — SDF glyph generation, the per-font atlases and text quads.
-//! - `cache` — the per-view vertex buffers (re-upload only a canvas whose
-//!   geometry changed).
+//! - `kept` — each view's canvas meshes, rebuilt only when their inputs change.
+//! - `cache` — the per-view vertex buffers (re-upload only changed geometry).
 //! - `draw` — preparing a view's UI and the screen pass itself.
-//! - `world` — world canvases (`WorldSpace`, `ScreenSpaceCamera`) drawn in the
-//!   scene, inside each camera's pass (#429).
+//! - `world` — world canvases (`WorldSpace`, `ScreenSpaceCamera`) drawn inside
+//!   each camera's pass (#429).
 //!
 //! **Colour space.** UI blends in display (sRGB-encoded) space with premultiplied
 //! alpha: the pass draws through a non-sRGB *view* of the frame's sRGB colour
@@ -38,6 +37,7 @@ pub(crate) mod custom;
 pub(crate) mod draw;
 pub(crate) mod effects;
 pub(crate) mod geometry;
+pub(crate) mod kept;
 pub(crate) mod mesh;
 pub(crate) mod pipeline;
 pub(crate) mod shape;

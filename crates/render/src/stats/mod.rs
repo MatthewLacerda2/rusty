@@ -117,6 +117,8 @@ pub struct RenderCounters {
     pub shadow_atlas_rebaked: u32,
     /// UI batches drawn — backdrop batches (#426) included.
     pub ui_draws: u32,
+    /// UI canvas meshes built this frame (#2416): `0` on a still HUD (`ui::kept`).
+    pub ui_meshed: u32,
     /// UI `Mask` coverage textures rendered (#428): one pass per visible Mask.
     pub ui_mask_passes: u32,
     /// Fullscreen passes the UI backdrop blur ran (#426): the downsampled
@@ -230,6 +232,7 @@ impl RenderCounters {
             ("decal_cluster_refs", self.decal_cluster_refs),
             ("decal_maps_dropped", self.decal_maps_dropped.into()),
             ("ui_draws", self.ui_draws.into()),
+            ("ui_meshed", self.ui_meshed.into()),
             ("ui_mask_passes", self.ui_mask_passes.into()),
             ("ui_blur_passes", self.ui_blur_passes.into()),
             ("ssao_samples", self.ssao_samples),

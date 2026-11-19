@@ -1,7 +1,7 @@
 //! crates/render/src/ui/mesh.rs — the laid-out UI → one vertex list + batches per canvas (#418).
 //!
-//! GPU-free: [`build_canvas_meshes`] walks the layout in draw order (canvas
-//! `sort_order`, then hierarchy pre-order) and emits every visible `Image` and
+//! GPU-free: [`build_canvas`] walks one canvas's run of the layout in draw order
+//! (hierarchy pre-order; canvases follow `sort_order`, `kept`) and emits every visible `Image` and
 //! `Shape` and `Text` (an entity with several draws them in that order) as triangles in
 //! normalized device coordinates, tagged with what it samples and how it is
 //! clipped. Consecutive graphics sharing a source (solid, a texture, a font's
@@ -37,6 +37,8 @@ use super::custom::shaded::{shade, UiShade};
 use super::effects::backdrop::{push_backdrop, UiBackdrop};
 use super::effects::mask::{push_mask, MaskDraw};
 use super::geometry::image_triangles;
+#[cfg(test)]
+pub(crate) use super::kept::build_canvas_meshes;
 use super::shape::{push_shape, push_shape_body};
 use super::text::atlas::FontAtlases;
 use super::text::emit::push_text;
@@ -99,26 +101,41 @@ pub(super) struct Frame<'a> {
     pub(super) overlay: bool,
 }
 
-/// Build every canvas's mesh on a `screen`-pixel target. `tex_size` reports a
-/// texture's size in texels (`None` when not loaded); text glyphs are packed into
-/// `atlases` as they are first drawn.
-pub(crate) fn build_canvas_meshes(
+/// The pixel frame canvas `canvas` is meshed into on a `screen`-pixel target, and
+/// whether it is a screen overlay.
+pub(super) fn canvas_frame(
     world: &World,
     layout: &UiLayout,
+    canvas: u32,
     screen: Vec2,
-    tex_size: &dyn Fn(&str) -> Option<Vec2>,
-    atlases: &mut FontAtlases,
-) -> Vec<CanvasMesh> {
-    let screen = screen.max(Vec2::ONE);
-    let mut frame = Frame {
+) -> (Vec2, bool) {
+    let frame = canvas_screen(world, canvas, screen.max(Vec2::ONE));
+    (frame, layout.space(canvas) == CanvasSpace::Screen)
+}
+
+/// One canvas's mesh from its `run` of laid-out elements (non-empty, draw order).
+pub(super) fn build_canvas(
+    world: &World,
+    layout: &UiLayout,
+    run: &[(u32, &UiRect)],
+    screen: Vec2,
+    (tex_size, atlases): (&dyn Fn(&str) -> Option<Vec2>, &mut FontAtlases),
+) -> CanvasMesh {
+    let canvas = run.first().map_or(0, |(_, r)| r.canvas);
+    let (screen, overlay) = canvas_frame(world, layout, canvas, screen);
+    let frame = Frame {
         world,
         screen,
         tex_size,
-        overlay: true,
+        overlay,
     };
-    let mut meshes: Vec<CanvasMesh> = Vec::new();
+    let mut mesh = CanvasMesh {
+        canvas,
+        frame: screen,
+        ..Default::default()
+    };
     let mut state: HashMap<u32, Inherited> = HashMap::new();
-    for (id, rect) in layout.iter() {
+    for &(id, rect) in run {
         let parent = world
             .parent_id(id)
             .and_then(|p| state.get(&p).copied())
@@ -126,27 +143,15 @@ pub(crate) fn build_canvas_meshes(
             .unwrap_or_else(|| Inherited::root(world, id));
         let (here, down) = parent.child(world, id, rect);
         state.insert(id, down);
-        if meshes.last().map(|m| m.canvas) != Some(rect.canvas) {
-            frame.screen = canvas_screen(world, rect.canvas, screen);
-            frame.overlay = layout.space(rect.canvas) == CanvasSpace::Screen;
-            meshes.push(CanvasMesh {
-                canvas: rect.canvas,
-                frame: frame.screen,
-                ..Default::default()
-            });
+        push_backdrop(&mut mesh, &frame, id, rect, here);
+        if world.mask(id).is_none_or(|m| m.show_mask_graphic) {
+            push_image(&mut mesh, &frame, id, rect, here);
+            push_shape(&mut mesh, &frame, id, rect, here);
         }
-        if let Some(mesh) = meshes.last_mut() {
-            push_backdrop(mesh, &frame, id, rect, here);
-            if world.mask(id).is_none_or(|m| m.show_mask_graphic) {
-                push_image(mesh, &frame, id, rect, here);
-                push_shape(mesh, &frame, id, rect, here);
-            }
-            push_mask(mesh, &frame, id, rect, here);
-            push_text(mesh, &frame, id, rect, here, atlases);
-        }
+        push_mask(&mut mesh, &frame, id, rect, here);
+        push_text(&mut mesh, &frame, id, rect, here, atlases);
     }
-    meshes.retain(|m| !m.batches.is_empty());
-    meshes
+    mesh
 }
 
 /// The pixel frame canvas `id` draws into: the screen, or a `WorldSpace` canvas's
