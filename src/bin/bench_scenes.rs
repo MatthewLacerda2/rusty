@@ -19,7 +19,7 @@
 //!
 //! Each scene runs in child processes of this binary (its own memory peak): first
 //! `--load-runs` less one (3 loads in all by default) only load it (`--load-out`,
-//! the first the cold load), each in a fresh process, then one benches it
+//! the first `load_cold_ms`), each in a fresh process, then one benches it
 //! (`--scene`, handed those loads with `--loads`, its own load the last of them:
 //! `scenes::load`), and with `--profile` one more samples its
 //! measured frames with the platform's profiler (`scenes::profile`), whose failure

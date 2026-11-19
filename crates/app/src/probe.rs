@@ -35,14 +35,18 @@ pub trait SystemProbe {
     fn end_frame(&mut self, world: &World, res: &Resources);
 }
 
-/// Observes a play-mode scene load (`app::scene_load`), step by step. Must run
-/// `step` exactly once per call — the load is unchanged by a probe, only watched.
+/// Observes a load step by step: a play-mode scene load (`app::scene_load`),
+/// entering Play ([`GameWorld::set_entry_probe`]), or a host's own boot load run
+/// through [`timed`] (`make bench-scenes`). Must run `step` exactly once per
+/// call — the load is unchanged by a probe, only watched.
 pub trait LoadProbe {
-    /// Run `step`, the load step named `name` (`read`, `meshes`, `physics`, …).
+    /// Run `step`, the load step named `name` (`read`, `meshes`, `refresh`, …).
     fn step(&mut self, name: &'static str, step: &mut dyn FnMut());
 
     /// The load the steps since the last call belong to finished: `loaded` names
-    /// the scene swapped in, or is `None` when the load failed and nothing was.
+    /// the scene swapped in or Play entered, or is `None` when nothing was: the
+    /// scene load failed, or the scripts' runtime failed to start, which ends
+    /// Play's entry early.
     fn finish(&mut self, loaded: Option<&str>, console: &mut ConsoleLogs);
 }
 

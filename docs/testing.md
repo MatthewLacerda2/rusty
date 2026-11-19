@@ -1207,9 +1207,13 @@ every binary's open makes them.
   the worst p95 and the viewpoint it came from), then over the runs: the average,
   and the **spread**, the lowest to the highest run's average. Plus:
   - `load_ms`: the scene's load to its first rendered frame, wall clock, the
-    average of the **warm** loads (the second on), with their spread; the first
-    load, the scene's files not yet in the page cache, is reported apart as
-    `load_cold_ms`. With `LOAD_RUNS=1` the one load stands as `load_ms`, cold and
+    average of the later loads (the second on), with their spread; the scene's
+    first load in this run is reported apart as `load_cold_ms`. It is cold in the
+    page cache only when nothing read the scene's files before it: after a scene
+    sharing its assets, or in `bench-ab`'s second and third legs, it is one more
+    warm sample. A report from before these rows holds its one first load under
+    `load_ms`, so it compares with `load_cold_ms`, not with today's `load_ms`.
+    With `LOAD_RUNS=1` the one load stands as `load_ms`, the first, and
     with no spread. The import cache is as the project holds it: its converted
     models are warm once any run converted them, its compressed textures only once
     the editor, an export or `make import PROJECT=<dir>` made them, since a `play` or
@@ -1232,11 +1236,15 @@ every binary's open makes them.
     `Awake` and `Start`), `load.physics` (the rapier world) and `load.startup` (the
     `Startup` stage), `load.tick` (the rest of that tick: the first sim step) and
     `load.frame` (the first frame: its uploads and draw);
-  - `load.count.<what>`: what the bench's own load did, which tells a cached load
-    from a cold import: `models_parsed` (model files parsed into the import
-    cache), `textures_compressed` and `textures_decoded` (the textures resident
-    after the first frame, by format) and `upload_mb` (what the first frame
-    uploaded). Deterministic for a project as it stands, so no spread;
+  - `load.count.<what>`: what the load did: `models_parsed` (the model files the
+    scene uses: each load is a fresh process, so each is parsed once whether its
+    conversion was cached or not), `models_converted` (the sources converted,
+    summed over the run's loads: the first converts what is stale, so this is
+    what tells a cold import from a cached one, as after a `Converter::version`
+    bump), `textures_compressed` and `textures_decoded` (the textures resident
+    after the first frame, by format, the uncompressed fallbacks a slot needs
+    among the decoded) and `upload_mb` (what the first frame uploaded).
+    Deterministic for a project as it stands, so no spread;
   - `import_ms`, only with `IMPORT=1`, once a run (the import is the project's,
     not a scene's: every model source is converted, with headless Blender for a
     `.blend`, and every image compressed, so it is slow, minutes for a large
@@ -1399,10 +1407,13 @@ halves the drift but doubles the scene loads.
 floor, largest change first (a row from zero first), and only those that moved by
 at least 0.05 (a ms row, 0.3% of a 60 Hz frame, or a count, which moves by whole
 units), 50 for a µs row, or 1 for an MB or % row: the size is absolute because a
-ratio is not, and a row at 0.001 ms moving 20% is nothing. The full table follows.
+ratio is not, and a row at 0.001 ms moving 20% is nothing. After them come the
+rows of that size the second `main` leg lacks, marked *floor unknown*, and every
+row only the PR has, marked *absent on main*: the lead never reads "nothing
+moved" above a move the table cannot judge. The full table follows.
 
 **A load claim** reads `load_ms` and the `load.<step>` row the PR is about, never
-`load_cold_ms` alone (the page cache decides it). It needs a spread on both sides,
+`load_cold_ms` alone (the page cache and what ran before it decide it). It needs a spread on both sides,
 so at least two warm loads a leg: the default `LOAD_RUNS=3` gives two, and a
 load step of a few percent wants `LOAD_RUNS=5` or more (`make bench-ab ...
 LOAD_RUNS=5`). The change must sit outside the floor and the spreads must not

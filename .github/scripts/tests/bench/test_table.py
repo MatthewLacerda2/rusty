@@ -84,6 +84,16 @@ class Table(unittest.TestCase):
         legs = tuple(leg(root, n, {"cpu_ms": 10.0}) for n in ("main", "pr", "main-again"))
         self.assertIn("Nothing moved outside the floor", table.scene_table("levels/a", legs))
 
+    def test_the_lead_lists_rows_with_no_floor_and_rows_only_the_pr_has(self):
+        root = Path(tempfile.mkdtemp())
+        legs = (leg(root, "main", {"cpu_ms": 10.0, "load_ms": 100.0}),
+                leg(root, "pr", {"cpu_ms": 10.0, "load_ms": 140.0, "load.count.models_converted": 2.0}),
+                leg(root, "main-again", {"cpu_ms": 10.0}))
+        lead = table.scene_table("levels/a", legs).split("| row |")[0]
+        self.assertNotIn("Nothing moved", lead)
+        self.assertIn("- `load_ms` 100 → 140, +40.0% (floor unknown)", lead)
+        self.assertIn("- `load.count.models_converted` 2 (absent on main)", lead)
+
     def test_load_counts_that_differ_between_legs_are_said(self):
         root = Path(tempfile.mkdtemp())
         counts = {"load.count.models_parsed": 3.0, "load_ms": 900.0}

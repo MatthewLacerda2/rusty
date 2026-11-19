@@ -9,7 +9,7 @@
 //! ([`report`]) folds the viewpoints' rows, then the runs', into one (`fold`),
 //! each row with its run-to-run spread, and adds `load_ms` (the scene's load to
 //! its first rendered frame, wall clock, the renderer's start-up off the clock,
-//! repeated in fresh processes with its spread, the cold first load apart as
+//! repeated in fresh processes with its spread, the run's first load apart as
 //! `load_cold_ms`, its steps as `load.<step>` and what it did as
 //! `load.count.<what>`: [`load`](mod@load)), `import_ms` (`IMPORT=1`, once a run, on its first scene: the
 //! same load of a copy of the project without its import cache, [`import`]), `rss_peak_mb` (the process's peak resident

@@ -13,15 +13,21 @@
 //!
 //! **Repeats.** Each load runs in a fresh process (`bench-scenes` spawns
 //! `--load-out` children before the bench's own, `--load-runs` in all). The
-//! first is the cold one, the scene's files not yet in the page cache, and is
-//! reported apart as `load_cold_ms`; `load_ms` and the steps are the warm loads'
+//! first is the scene's first load in this run, reported apart as `load_cold_ms`
+//! (cold in the page cache only when nothing earlier read its files: a scene
+//! sharing its assets, or a later leg of `bench-ab`, makes it another warm
+//! sample); `load_ms` and the steps are the later loads'
 //! average with their spread ([`rows`]), so a load change can leave the noise.
 //! A run of one load has no warm load: its one load stands as `load_ms`, as cold.
 //!
-//! **Counts.** What the bench's own load did, which tells a cached load from a
-//! cold import: model files parsed into the import cache, the textures resident
-//! after the first frame compressed and decoded, and the MB the first frame
-//! uploaded. Deterministic for a project as it stands, so no spread.
+//! **Counts.** What the bench's own load did: the model files the scene uses
+//! (parsed once each, since every load is a fresh process), the sources it
+//! converted (`convert::conversions`: what tells a cold import from a cached
+//! one), the textures resident after the first frame compressed and decoded
+//! (uncompressed fallbacks included), and the MB the first frame uploaded. The
+//! last load's, deterministic for a project as it stands, so no spread; but the
+//! conversions are the run's sum, since the first load converts what is stale
+//! and the later ones find the cache current.
 //!
 //! Wall-clock timing in the dev bench: nothing here reaches the sim.
 //!
@@ -45,6 +51,9 @@ use super::{mb, Options};
 /// How many times a scene is loaded unless told otherwise (`LOAD_RUNS`).
 pub const LOAD_RUNS: u32 = 3;
 
+/// The count of sources converted, summed over a run's loads.
+const CONVERTED: &str = "models_converted";
+
 /// One load of a scene: its steps' ms in the order they ran, then its counts.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Load {
@@ -58,18 +67,23 @@ impl Load {
         self.steps.iter().map(|(_, ms)| ms).sum()
     }
 
+    fn count(&self, what: &str) -> Option<f64> {
+        self.counts.iter().find(|(c, _)| c == what).map(|(_, n)| *n)
+    }
+
     /// `load_ms` then each step's `load.<step>`, as one run's rows.
     fn timed_rows(&self) -> Vec<Row> {
         let steps = self.steps.iter().map(|(s, ms)| (format!("load.{s}"), *ms));
         let all = std::iter::once(("load_ms".to_string(), self.total_ms())).chain(steps);
-        all.map(|(metric, ms)| one(metric, ms)).collect()
+        all.map(|(metric, ms)| Row::value(metric, ms)).collect()
     }
 }
 
 /// The load rows of `loads`, in the order they ran (the bench's own last):
 /// `load_ms` and the `load.<step>` rows over the warm loads with their spread,
 /// `load_cold_ms` (the first) when there were two or more, then the last load's
-/// `load.count.<what>` rows.
+/// `load.count.<what>` rows, `models_converted` summed over every load (the
+/// module's *Counts*).
 pub fn rows(loads: &[Load]) -> Vec<Row> {
     let Some(last) = loads.last() else {
         return Vec::new();
@@ -77,10 +91,15 @@ pub fn rows(loads: &[Load]) -> Vec<Row> {
     let warm = if loads.len() > 1 { &loads[1..] } else { loads };
     let mut rows = over_runs(&warm.iter().map(Load::timed_rows).collect::<Vec<_>>());
     if loads.len() > 1 {
-        rows.insert(1, one("load_cold_ms".into(), loads[0].total_ms()));
+        rows.insert(1, Row::value("load_cold_ms".into(), loads[0].total_ms()));
     }
-    let counts = last.counts.iter();
-    rows.extend(counts.map(|(c, n)| one(format!("load.count.{c}"), *n)));
+    for (c, n) in &last.counts {
+        let n = match c.as_str() {
+            CONVERTED => loads.iter().filter_map(|l| l.count(CONVERTED)).sum(),
+            _ => *n,
+        };
+        rows.push(Row::value(format!("load.count.{c}"), n));
+    }
     rows
 }
 
@@ -99,20 +118,6 @@ pub fn read_all(dir: &Path) -> Result<Vec<Load>, String> {
         loads.push(load);
     }
     Ok(loads)
-}
-
-/// A one-off row of `value`.
-fn one(metric: String, value: f64) -> Row {
-    let (avg, p95, lo, hi) = (value, value, value, value);
-    let worst = String::new();
-    Row {
-        metric,
-        avg,
-        p95,
-        worst,
-        lo,
-        hi,
-    }
 }
 
 /// Records each step it runs, in order, with its wall-clock ms.
@@ -159,6 +164,7 @@ pub fn load(
     let path = root.join(format!("assets/scenes/{scene}.scene"));
     let clock = StepClock::default();
     let parsed = rusty_asset::import_cache::parses();
+    let converted = rusty_asset::convert::conversions();
     let mut probe: Option<Box<dyn LoadProbe>> = Some(Box::new(clock.clone()));
     let path = path.to_string_lossy();
     let mut harness = Harness::on_project_scene_timed(out_dir, &path, settings, &mut probe)?;
@@ -177,20 +183,28 @@ pub fn load(
     harness.render_frame();
     clock.push("frame", ms_since(start));
     let parsed = rusty_asset::import_cache::parses().saturating_sub(parsed);
-    let mut counts = vec![("models_parsed".to_string(), parsed as f64)];
+    let converted = rusty_asset::convert::conversions().saturating_sub(converted);
+    let mut counts = vec![
+        ("models_parsed".to_string(), parsed as f64),
+        (CONVERTED.to_string(), converted as f64),
+    ];
     counts.extend(harness.renderer().map(render_counts).into_iter().flatten());
     let steps = clock.0.take();
     Ok((harness, Load { steps, counts }))
 }
 
-/// The textures resident after the first frame, compressed and decoded, and the
-/// MB that frame uploaded.
+/// The textures resident after the first frame (the uncompressed fallbacks among
+/// them, `Renderer::resident_textures`), compressed and decoded, and the MB that
+/// frame uploaded.
 fn render_counts(r: &mut rusty_render::Renderer) -> [(String, f64); 3] {
-    let textures = r.gpu_textures.values();
-    let compressed = textures
-        .filter(|t| t.texture.format().is_compressed())
-        .count();
-    let decoded = r.gpu_textures.len() - compressed;
+    let (mut compressed, mut decoded) = (0, 0);
+    for t in r.resident_textures() {
+        *(if t.format().is_compressed() {
+            &mut compressed
+        } else {
+            &mut decoded
+        }) += 1;
+    }
     [
         ("textures_compressed".into(), compressed as f64),
         ("textures_decoded".into(), decoded as f64),

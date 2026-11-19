@@ -14,13 +14,17 @@ only the PR reports (a new counter, a new `render.<stage>`) is the PR's own
 measurement and reads *absent on main*, never dropped.
 
 Each scene's table opens with a lead ([`lead`]): the rows whose change is
-outside the floor and at least [`least`] in size, largest change first. The
+outside the floor and at least [`least`] in size, largest change first, then
+those of that size with no floor to judge them by (*floor unknown*) and every
+row only the PR has (*absent on main*), so the lead never says nothing moved
+above a table that shows a move it cannot judge. The
 first real use's table ran about 120 rows a scene, most inside the floor or
 zero, and the row a PR is about had to be searched for (#2323). The size is
 absolute because a ratio is not: a row at 0.001 ms moving 20% is nothing.
 
-The load rows' counts (`load.count.<what>`: models parsed, textures compressed
-and decoded, MB uploaded) tell a cached load from a cold import; where they
+The load rows' counts (`load.count.<what>`: model files the scene uses, sources
+converted, textures compressed and decoded, MB uploaded) say what each leg's
+load did, and `models_converted` tells a cached load from a cold import; where they
 differ between legs, [`count_changes`] says so for the run's header, as the
 texture refusals do, since the load rows then compare different loads.
 
@@ -111,22 +115,29 @@ def outside(a: float, b: float, again: float) -> float | None:
 
 
 def lead(main: dict, pr: dict, again: dict) -> list[str]:
-    """The lines above a scene's table: its rows outside the floor, largest change first."""
-    found = []
+    """The lines above a scene's table: its rows outside the floor, largest change
+    first, then the rows that have no floor (the second `main` leg lacks them) and
+    the rows only the PR has, each marked so, as the table marks them."""
+    found, unfloored = [], []
     for metric, a in main.items():
         b, f = pr.get(metric), again.get(metric)
-        if b is None or f is None or abs(b - a) < least(metric):
+        if b is None or abs(b - a) < least(metric):
+            continue
+        moved = change(a, b)
+        said = f"{num(a)} → {num(b)}" + ("" if moved is None else f", {pct(moved)}")
+        if f is None:
+            unfloored.append(f"- `{metric}` {said} (floor unknown)")
             continue
         size = outside(a, b, f)
         if size is not None:
-            moved = change(a, b)
-            said = f"{num(a)} → {num(b)}" + ("" if moved is None else f", {pct(moved)}")
             floor = change(a, f)
             found.append((size, f"- `{metric}` {said} (floor {pct(floor) if floor is not None else num(f)})"))
-    if not found:
-        return [f"Nothing moved outside the floor by at least the lead's size ({LEAST})."]
+    new = [f"- `{m}` {num(b)} (absent on main)" for m, b in pr.items() if m not in main]
     found.sort(key=lambda x: -x[0])
-    return [f"Outside the floor, largest change first ({LEAST}):"] + [line for _, line in found]
+    lines = [line for _, line in found] + unfloored + new
+    if not lines:
+        return [f"Nothing moved outside the floor by at least the lead's size ({LEAST})."]
+    return [f"Outside the floor, largest change first, then rows with no floor ({LEAST}):"] + lines
 
 
 def scene_table(scene: str, legs: tuple[Path, Path, Path]) -> str:

@@ -87,7 +87,7 @@ impl SceneReport {
             (
                 timed && self.row("load_cold_ms").is_some(),
                 "(load_ms: the warm loads' average, each in a fresh process, its spread theirs; \
-                 load_cold_ms the first load, apart: the files not yet in the page cache)",
+                 load_cold_ms the scene's first load in this run, apart)",
             ),
             (
                 timed && self.row("load_cold_ms").is_none(),
@@ -96,8 +96,9 @@ impl SceneReport {
             (
                 timed,
                 "(load.<step>: the load's steps, summing to load_ms; load.count.<what>: what the \
-                 bench's own load did: model files parsed, textures resident after the first \
-                 frame compressed and decoded, MB that frame uploaded)",
+                 load did: model files the scene uses, sources converted over the run's loads, \
+                 textures resident after the first frame compressed and decoded, MB that \
+                 frame uploaded)",
             ),
         ]
     }

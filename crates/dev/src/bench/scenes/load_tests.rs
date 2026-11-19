@@ -12,6 +12,24 @@ fn of(steps: &[(&str, f64)], parsed: f64) -> Load {
     Load { steps, counts }
 }
 
+fn converting(converted: f64) -> Load {
+    let mut load = of(&[("document", 1.0)], 1.0);
+    load.counts.push((CONVERTED.to_string(), converted));
+    load
+}
+
+#[test]
+fn the_conversions_are_the_runs_sum_the_other_counts_the_last_loads() {
+    let rows = rows(&[converting(2.0), converting(0.0), converting(0.0)]);
+    let at = |m: &str| rows.iter().find(|r| r.metric == m).unwrap().avg;
+    assert_eq!(
+        at("load.count.models_converted"),
+        2.0,
+        "the first load converted"
+    );
+    assert_eq!(at("load.count.models_parsed"), 1.0);
+}
+
 #[test]
 fn the_warm_loads_give_the_rows_and_their_spread_the_cold_one_apart() {
     let loads = [
@@ -102,12 +120,17 @@ fn gpu_a_load_runs_every_step_once_in_order_and_they_sum_to_load_ms() {
         ("models_parsed".to_string(), 1.0),
         "one file, parsed once"
     );
+    assert_eq!(
+        counts[1],
+        (CONVERTED.to_string(), 0.0),
+        "a glTF converts nothing"
+    );
     tiles(&load, &want);
     // Rendered (an adapter was there): the texture and upload counts follow.
-    if counts.len() > 1 {
+    if counts.len() > 2 {
         let names: Vec<&str> = counts.iter().map(|(c, _)| c.as_str()).collect();
         assert_eq!(
-            names[1..],
+            names[2..],
             ["textures_compressed", "textures_decoded", "upload_mb"]
         );
     }

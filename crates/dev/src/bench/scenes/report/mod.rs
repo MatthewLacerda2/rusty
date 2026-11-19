@@ -42,6 +42,22 @@ pub struct Row {
     pub hi: f64,
 }
 
+impl Row {
+    /// A one-off row of `value`: no viewpoint, no spread.
+    pub fn value(metric: String, value: f64) -> Row {
+        let (avg, p95, lo, hi) = (value, value, value, value);
+        let worst = String::new();
+        Row {
+            metric,
+            avg,
+            p95,
+            worst,
+            lo,
+            hi,
+        }
+    }
+}
+
 /// A scene's finished bench.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct SceneReport {
@@ -83,14 +99,7 @@ impl SceneReport {
 
     /// Add a one-off row (load time, memory): avg and p95 are the value.
     pub fn push_value(&mut self, metric: &str, value: f64) {
-        self.rows.push(Row {
-            metric: metric.into(),
-            avg: value,
-            p95: value,
-            worst: String::new(),
-            lo: value,
-            hi: value,
-        });
+        self.rows.push(Row::value(metric.into(), value));
     }
 
     /// Whether `previous` benched what this run did: the same size, viewpoints
