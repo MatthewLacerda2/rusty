@@ -43,6 +43,12 @@ pub struct Activity;
 /// overwritten or removed.
 pub struct Layer;
 
+/// The derived channel of child order: an id whose `children` list changed (a child
+/// added or removed, so a re-parent stamps both parents, and a re-parent under the
+/// same parent, which moves the child to the end, stamps that parent), or that was
+/// placed, overwritten or removed. What the UI layout's sibling order is read from.
+pub struct Children;
+
 macro_rules! channels {
     ($column:literal: $($ty:ty => $name:expr,)*) => {
         $(
@@ -60,6 +66,7 @@ channels! { false:
     WorldPose => "world_pose",
     Activity => "activity",
     Layer => "layer",
+    Children => "children",
 }
 
 channels! { true:

@@ -15,7 +15,7 @@
 //! hot: a Transform landing its old value and a collider's derived world box stamp
 //! nothing. A *derived* channel is a marker stamped at the source of its fact, its
 //! descendants included, so a consumer never expands ids itself: [`WorldPose`],
-//! [`Activity`], [`Layer`] and [`StaticSet`].
+//! [`Activity`], [`Layer`], [`Children`] and [`StaticSet`].
 //!
 //! **Cursors.** A consumer opens a [`Cursor`] once ([`World::change_cursor`]) and
 //! asks [`World::changes`] each time it runs: [`Changes::Ids`], the ids stamped
@@ -41,6 +41,8 @@
 
 mod channel;
 #[cfg(test)]
+mod derived_case_tests;
+#[cfg(test)]
 mod derived_tests;
 #[cfg(test)]
 mod epoch_tests;
@@ -62,7 +64,7 @@ use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-pub use channel::{Activity, Channel, Layer, StaticSet, WorldPose};
+pub use channel::{Activity, Channel, Children, Layer, StaticSet, WorldPose};
 use log::Log;
 
 use super::world::World;

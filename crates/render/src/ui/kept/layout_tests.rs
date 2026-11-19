@@ -1,6 +1,7 @@
 //! A kept layout is never stale (#2412): every frame's equals a fresh
 //! `UiLayout::compute_in` (`Rig::frame` compares), an element joining or leaving
-//! the UI lays it out again, and the inputs one by one (`inputs`).
+//! the UI lays it out again, the inputs one by one (`inputs`) and the hierarchy's
+//! (`hierarchy`).
 
 use glam::{Vec2, Vec3};
 
@@ -8,8 +9,10 @@ use super::*;
 use rusty_components::{
     CanvasComponent, LayoutAxisFit, LayoutElementComponent, LayoutGroupComponent,
 };
-use rusty_scene::Scene;
+use rusty_scene::{Camera, Scene};
 
+#[path = "layout_hierarchy_tests.rs"]
+mod hierarchy;
 #[path = "layout_inputs_tests.rs"]
 mod inputs;
 

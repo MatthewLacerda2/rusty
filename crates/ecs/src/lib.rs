@@ -55,7 +55,9 @@ pub mod world;
 mod world_space;
 
 pub use access::{CompMut, CompRef};
-pub use changes::{Activity, ChangeStat, Changes, Channel, Cursor, Layer, StaticSet, WorldPose};
+pub use changes::{
+    Activity, ChangeStat, Changes, Channel, Children, Cursor, Layer, StaticSet, WorldPose,
+};
 pub use descendants::{Descendants, HierarchyPath};
 pub use journal::{Journaled, Recorded};
 pub use world::World;

@@ -421,13 +421,16 @@ batch together as `Normal` solid geometry; the scan line's `Additive` is a new b
   size of every texture it read and the glyph atlases' generation. The view keeps
   its layout too, and lays out again only when something the layout reads changed:
   an element's `RectTransform`, `LayoutGroup` or `LayoutElement`, a non-root
-  element's `Transform`, the hierarchy or active flags, the `Image` or `Text` of an
-  element its content sizes (one with a `LayoutElement`, or under a `LayoutGroup`),
-  a root Canvas's sort order, mode or size, the screen size or the texture sizes,
-  and, while a `WorldAnchor` marker exists, the camera or a marker's target moving
-  (`RenderCounters::ui_laid_out`). A label's changing string outside a group, a
-  Canvas's sway and tilt, and a world canvas carried around only move where the rects
-  land, so they lay nothing out. A canvas is meshed again only when one of those differs or
+  element's `Transform` rotation and scale, the hierarchy (a parent, the order of
+  siblings) or active flags, the `Image` or `Text` of an element its content sizes
+  (one with a `LayoutElement`, or under a `LayoutGroup`), a Canvas's sort order,
+  mode, size or whether it is a root, the screen size or the texture sizes, and,
+  while a `WorldAnchor` marker is placed (under a screen-space canvas seen through a
+  camera), the camera or a marker's target moving (`RenderCounters::ui_laid_out`). A
+  label's changing string outside a group, a Canvas's sway and tilt, and a world
+  canvas carried around only move where the rects land, so they lay nothing out. A
+  canvas is meshed again only when its rects, its frame, a texture size it read or
+  the glyph atlases' generation differ, or
   a write touched one of its elements' UI components (`Image`, `Text`, `Shape`,
   `Mask`, `RectMask`, `CanvasGroup`, `BackdropFilter`) or active flags, which the
   World's change log reports. The `Canvas` component's own placement (`sway` and its

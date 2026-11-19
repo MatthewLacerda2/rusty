@@ -203,16 +203,28 @@ impl World {
             .unwrap_or_default()
     }
 
+    /// Append `child` to `parent`'s children (stamped on [`crate::Children`]).
     pub fn add_child(&mut self, parent: u32, child: u32) -> bool {
-        self.component_mut::<Core>(parent)
+        let added = self
+            .component_mut::<Core>(parent)
             .map(|mut c| c.children.push(child))
-            .is_some()
+            .is_some();
+        if added {
+            self.stamp_children(parent);
+        }
+        added
     }
 
+    /// Drop `child` from `parent`'s children (stamped on [`crate::Children`]).
     pub fn remove_child(&mut self, parent: u32, child: u32) -> bool {
-        self.component_mut::<Core>(parent)
+        let removed = self
+            .component_mut::<Core>(parent)
             .map(|mut c| c.children.retain(|&c| c != child))
-            .is_some()
+            .is_some();
+        if removed {
+            self.stamp_children(parent);
+        }
+        removed
     }
 
     /// Take the material staged for the scene's library, if one is staged.
