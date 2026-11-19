@@ -99,10 +99,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 /// Conversions run in this process, on any thread ([`conversions`]).
 static CONVERSIONS: AtomicUsize = AtomicUsize::new(0);
 
-/// How many sources this process has converted (run a converter for, a cache
-/// found current not counted): what tells a cold import from a cached one, since
-/// a fresh process parses every model file once either way
-/// (`import_cache::parses`).
+/// How many sources this process has converted (a current cache not counted):
+/// what tells a cold import from a cached one, since a fresh process parses every
+/// model once either way (`import_cache::parses`). Any thread's, so a test asserting
+/// an exact count runs alone (`rusty_test_support::alone!`).
 pub fn conversions() -> usize {
     CONVERSIONS.load(Ordering::Relaxed)
 }
