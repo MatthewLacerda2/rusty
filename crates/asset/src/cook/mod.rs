@@ -80,15 +80,45 @@ pub fn cooked_path(source: &Path) -> Option<PathBuf> {
     }
 }
 
-/// Whether the model source `path` has a cooked file made from what it is now,
-/// told from the file's stamp without parsing the model (`Assets.Refresh` skips
-/// those). A converted source is brought up to date first.
-pub fn is_current(path: &Path) -> bool {
-    let Ok(read) = crate::read_target(path) else {
+/// Whether the model source `path` has a cooked file stamped with what it is now
+/// ([`stamp`]), told without parsing the model or converting a converted source
+/// (the cached glTF as it stands is what a standalone load reads): what a bench
+/// asks before it runs (`bench-scenes --pending-imports`). Only the stamp is
+/// read, so a file it calls stamped may still be refused by the read a load
+/// makes (a parser change without a version bump, a cut-short BIN): the import
+/// pass decides by that read (`import::cook_models`), and a bench notes a scene
+/// whose load cooked anyway.
+pub fn is_stamped(path: &Path) -> bool {
+    let read = match convert::converter_for(path) {
+        Some(_) => convert::cache_location(path).ok().filter(|r| r.is_file()),
+        None => Some(path.to_path_buf()),
+    };
+    let Some(read) = read else {
         return false;
     };
-    let at = cooked_path(path).zip(stamp::stamp(&read, &crate::settings_of(path)));
+    let at = stamped_at(path, &read, &crate::settings_of(path));
     at.is_some_and(|(file, stamp)| file::stamped(&file, stamp))
+}
+
+/// The model files under `root`, sorted, with no cooked file [`is_stamped`] with
+/// what they are now: what an import would cook, told without parsing any. A
+/// model outside an open project (no place for a cooked file) is not listed.
+pub fn pending(root: &Path) -> Vec<PathBuf> {
+    let mut models = Vec::new();
+    crate::manifest::walk(root, &mut |path| {
+        let placed = crate::is_model_path(path) && cooked_path(path).is_some();
+        if placed && !is_stamped(path) {
+            models.push(path.to_path_buf());
+        }
+    });
+    models.sort();
+    models
+}
+
+/// The cooked file of the model at `path` (parsed from `read`) and the stamp it
+/// must carry, when it has one: the files are hashed only then.
+fn stamped_at(path: &Path, read: &Path, settings: &ImportSettings) -> Option<(PathBuf, u64)> {
+    cooked_path(path).and_then(|file| Some((file, stamp::stamp(read, settings)?)))
 }
 
 /// The model at `path` (parsed from `read`) with its `settings`' Scale Factor and
@@ -104,7 +134,7 @@ pub(crate) fn import(
     let scale = |asset: &mut ImportedAsset| {
         scale_factor::apply(asset, scale_factor::sanitize(settings.scale, 1.0));
     };
-    let at = cooked_path(path).zip(stamp::stamp(read, settings));
+    let at = stamped_at(path, read, settings);
     if let Some(cooked) = at
         .as_ref()
         .and_then(|(file, stamp)| read_cooked(file, *stamp))
@@ -196,7 +226,7 @@ fn lay(asset: &mut ImportedAsset, cooked: Vec<Cooked>) -> Result<(), String> {
 }
 
 /// Whether a cook on this thread is written to disk ([module docs](self)).
-fn writes() -> bool {
+pub(crate) fn writes() -> bool {
     let authoring = convert::conversion_allowed() && !convert::gate::is_standalone();
     PIN_WRITES.get().unwrap_or(WRITES) && authoring
 }
@@ -217,7 +247,9 @@ fn write(file: &Path, bytes: &[u8]) -> bool {
 /// Run `f` with cooked files written (`true`) or not on this thread, whatever the
 /// build, and kept for a model outside a project too, in the system temp folder
 /// ([`cooked_path`]): what a test of either kind of build needs. A standalone
-/// game or Play still writes none.
+/// game or Play still writes none. A test hook (`crates/CLAUDE.md`, *Test
+/// hooks*): public only for the `dev` crate's tests, never called by the engine.
+#[doc(hidden)]
 pub fn with_writes<R>(on: bool, f: impl FnOnce() -> R) -> R {
     /// Restores the previous pin even if `f` panics.
     struct Restore(Option<bool>);

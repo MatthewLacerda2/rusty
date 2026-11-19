@@ -20,7 +20,7 @@ use crate::ImportSettings;
 /// The cooking code's version: bump it whenever what a cook writes changes (the
 /// tangents, the unwrap, the clusters, or this file's layout). `version::tests`
 /// fails when the output changes at the same version, naming the bump.
-pub const COOKER_VERSION: u32 = 2;
+pub const COOKER_VERSION: u32 = 3;
 
 /// The stamp of cooking the model a parse of `read` reads with `settings`, or
 /// `None` when one of its files is there but cannot be read (nothing is then

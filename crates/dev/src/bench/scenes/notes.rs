@@ -1,6 +1,7 @@
 //! What a scene's report warns of beside its rows: the console errors the bench
-//! logged (with the console kept beside the report), the bake the scene lacks, and
-//! the textures it drew uncompressed for want of an import.
+//! logged (with the console kept beside the report), the bake the scene lacks, the
+//! textures it drew uncompressed for want of an import, and the models its loads
+//! cooked for want of one.
 
 use std::path::Path;
 
@@ -93,6 +94,24 @@ pub fn uncompressed(found: rusty_render::Uploads) -> Option<String> {
              is not the shipped one; `make import PROJECT=<dir>` makes their caches)",
             found.count,
             found.bytes as f64 / (1024.0 * 1024.0),
+        )
+    })
+}
+
+/// The warning for a scene whose timed loads cooked models (`models_cooked` > 0,
+/// the most of any load): the project has no cooked file the read takes for them
+/// (`asset::cook`: none made yet, or one made from another parse), so each load ran
+/// the unwrap, the tangents and the clusters a cooked project reads from disk, and
+/// `load.import` is not the shipped one.
+pub fn cooked_at_load(loads: &[super::load::Load]) -> Option<String> {
+    let cooked = |l: &super::load::Load| {
+        let count = l.counts.iter().find(|(k, _)| k == "models_cooked");
+        count.map_or(0.0, |(_, n)| *n)
+    };
+    let most = loads.iter().map(cooked).fold(0.0, f64::max);
+    (most > 0.0).then(|| {
+        format!(
+            "its models were cooked at load ({most} in a load): `load.import` holds the              cooking a cooked project skips; `make import PROJECT=<dir>` writes their              cooked files"
         )
     })
 }

@@ -21,9 +21,34 @@ use rusty_core::quiet::{holding, say};
 /// spawning costs more than it saves.
 pub const SMALL: usize = 4096;
 
+/// The cores [`beside_play`] leaves free: the main thread's, which ticks and
+/// draws, and one more for what serves it (the audio mixer, the GPU driver's own
+/// threads), so a background load never takes a core a frame waits on.
+pub const KEPT_FOR_PLAY: usize = 2;
+
 thread_local! {
     /// The thread count [`with_threads`] pinned on this thread, if any.
     static PINNED: Cell<Option<usize>> = const { Cell::new(None) };
+    /// The most threads a [`map`] on this thread spreads over ([`beside_play`]).
+    static CAP: Cell<Option<usize>> = const { Cell::new(None) };
+}
+
+/// Run `f` with every [`map`] on this thread spread over at most the machine's
+/// cores less [`KEPT_FOR_PLAY`] (at least one, the caller's): an import that runs
+/// on a worker while a game ticks and draws (a `Scene.LoadAsync`), as Unity's
+/// async loads run at background priority. The output is the same value whatever
+/// the count; only the time moves.
+pub fn beside_play<R>(f: impl FnOnce() -> R) -> R {
+    /// Restores the previous cap even if `f` panics.
+    struct Restore(Option<usize>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            CAP.set(self.0);
+        }
+    }
+    let cap = cores().saturating_sub(KEPT_FOR_PLAY).max(1);
+    let _restore = Restore(CAP.replace(Some(cap)));
+    f()
 }
 
 /// Run `f` with every [`map`] on this thread using exactly `threads` threads (at
@@ -52,7 +77,7 @@ fn threads_for(items: usize, work: usize) -> usize {
     let n = match PINNED.with(Cell::get) {
         Some(pinned) => pinned,
         None if work < SMALL => 1,
-        None => cores(),
+        None => CAP.get().map_or(cores(), |cap| cores().min(cap)),
     };
     n.clamp(1, items.max(1))
 }
@@ -135,6 +160,20 @@ mod tests {
         assert_eq!(threads_for(8, SMALL - 1), 1);
         assert_eq!(threads_for(1, SMALL * 10), 1);
         assert_eq!(threads_for(2, SMALL), cores().min(2));
+    }
+
+    #[test]
+    fn beside_play_leaves_cores_free_and_is_undone_after() {
+        let free = cores().saturating_sub(KEPT_FOR_PLAY).max(1);
+        assert_eq!(beside_play(|| threads_for(1000, SMALL * 10)), free);
+        assert_eq!(threads_for(1000, SMALL * 10), cores(), "undone");
+        assert_eq!(
+            beside_play(|| threads_for(8, SMALL - 1)),
+            1,
+            "small stays put"
+        );
+        let pinned = beside_play(|| with_threads(5, || threads_for(10, 0)));
+        assert_eq!(pinned, 5, "a determinism probe's pin wins");
     }
 
     #[test]

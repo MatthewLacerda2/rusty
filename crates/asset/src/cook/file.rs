@@ -12,8 +12,8 @@
 //! indices           SCALAR u32, in cluster order
 //! extras.parse      "<16 hex digits>": the digest of the parse it was cooked from
 //!                   (`sub::digest`)
-//! extras.source     an accessor of one u32 per vertex, only when the unwrap split
-//!                   vertices: the parsed vertex each one copies
+//! extras.source     an accessor of one u32 per vertex, only when the unwrap ran
+//!                   (it may split vertices): the parsed vertex each one copies
 //! extras.clusters   {"ranges": a, "bounds": b}: accessors of 2 u32 (start, end) and
 //!                   13 floats (min, max, apex, axis, cutoff) per cluster
 //! ```
@@ -77,7 +77,7 @@ fn mesh(sub: &Cooked, bin: &mut Bin) -> Value {
     let mut primitive = json!({"attributes": attributes, "indices": bin.indices(&sub.indices)});
     primitive["extras"] = json!({"parse": format!("{:016x}", sub.parse)});
     if let Some(source) = &sub.source {
-        primitive["extras"]["source"] = json!(bin.uints(source, false));
+        primitive["extras"]["source"] = json!(bin.uints(source));
     }
     if let Some(clusters) = &sub.clusters {
         let ranges: Vec<u32> = (clusters.list.iter())
@@ -87,7 +87,7 @@ fn mesh(sub: &Cooked, bin: &mut Bin) -> Value {
             .flat_map(|c| bounds_of(c).map(|f| [f]))
             .collect();
         primitive["extras"]["clusters"] = json!({
-            "ranges": bin.uints(&ranges, false),
+            "ranges": bin.uints(&ranges),
             "bounds": bin.data(&bounds, "SCALAR"),
         });
     }

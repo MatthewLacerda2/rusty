@@ -3,7 +3,7 @@
 //!
 //! What a cook computes per sub-mesh is kept: every final vertex's tangent and
 //! lightmap UV, the vertex of the parse each final vertex copies (only when the
-//! unwrap split vertices; otherwise vertex `i` is parsed vertex `i`), the indices
+//! unwrap ran, which may split vertices; otherwise vertex `i` is parsed vertex `i`), the indices
 //! in cluster order and the cluster table. Everything else a vertex holds
 //! (position, normal, UV, skin binding) is read from the parse itself, after the
 //! Scale Factor, so a cooked import is the same value a fresh one is.
@@ -108,7 +108,8 @@ impl Cooked {
 }
 
 /// The digest of what a parse gave `sub` (after the Scale Factor) that cooking
-/// reads: every vertex's position, normal, UV, lightmap UV and skin binding, the
+/// reads: every vertex's position, normal, UV, lightmap UV and skin binding,
+/// whether it has a skin (the unwrap and the clusters skip a skinned mesh), the
 /// indices and the material runs. Not the tangents ([module docs](self)).
 pub fn digest(sub: &SubMesh) -> u64 {
     let mut hash = rusty_core::hash::Content::default();
@@ -126,6 +127,7 @@ pub fn digest(sub: &SubMesh) -> u64 {
         }
         hash.write(&buf);
     }
+    hash.write(&[u8::from(sub.skin.is_some())]);
     for n in [sub.vertices.len(), sub.indices.len(), sub.ranges.len()] {
         hash.write(&(n as u64).to_le_bytes());
     }

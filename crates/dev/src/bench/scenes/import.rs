@@ -30,12 +30,18 @@ pub fn import() -> Result<f64, String> {
     Ok(start.elapsed().as_secs_f64() * 1000.0)
 }
 
-/// The images an import of the project at `project` would encode now
-/// (`asset::texture_import::pending`), opened to run: `--pending-imports`.
+/// What an import of the project at `project` would make now, opened to run:
+/// `--pending-imports`. The images it would encode
+/// (`asset::texture_import::pending`), then the models whose cooked file is
+/// missing or stamped from something else (`asset::cook::pending`), each
+/// sorted. A cooked file the stamp passes and a load still refuses (made from
+/// another parse) is not listed: the scene's report notes the load that cooked.
 pub fn pending(project: &Path) -> Result<Vec<PathBuf>, String> {
     rusty_core::project::open(project, rusty_core::project::Access::Run)?;
     let assets = Path::new(rusty_core::project::ASSETS_DIR);
-    Ok(rusty_asset::texture_import::pending(assets))
+    let mut found = rusty_asset::texture_import::pending(assets);
+    found.extend(rusty_asset::cook::pending(assets));
+    Ok(found)
 }
 
 /// What the copy leaves out, relative to the project root.

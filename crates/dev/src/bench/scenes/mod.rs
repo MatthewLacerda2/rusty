@@ -183,6 +183,7 @@ pub fn bench(
     let loads: Vec<Load> = extra.loads.iter().cloned().chain([own]).collect();
     report.loads = loads.len() as u32;
     report.rows.extend(load::rows(&loads));
+    report.warnings.extend(notes::cooked_at_load(&loads));
     if let Some(ms) = extra.import_ms {
         report.push_value("import_ms", ms);
     }

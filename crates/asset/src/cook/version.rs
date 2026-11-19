@@ -15,7 +15,7 @@ use super::stamp::COOKER_VERSION;
 
 /// The version and the cooked fixture's hash at it. Re-blessed only after a bump:
 /// the failure message prints the new row.
-const BLESSED: (u32, &str) = (2, "e77090a767d1dbc6");
+const BLESSED: (u32, &str) = (3, "179dd9e0ef11c74d");
 
 /// Whether `now` (the fixture's hash at `version`) holds `blessed`, or what to do.
 fn check(blessed: (u32, &str), version: u32, now: &str) -> Result<(), String> {

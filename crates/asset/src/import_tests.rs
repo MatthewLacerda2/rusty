@@ -93,7 +93,8 @@ fn a_model_that_will_not_import_is_listed_once_and_the_rest_still_cook() {
     assert_eq!(failed, ["broken.fbx", "broken.glb"], "each listed once");
     assert_eq!(done.cooked, 1, "the good model is still cooked");
     std::fs::remove_file(root.join("broken.fbx")).unwrap();
-    let refused = import_strict(root).unwrap_err();
+    // A pass that can write cooked files imports every model, so it finds it.
+    let refused = crate::cook::with_writes(true, || import_strict(root)).unwrap_err();
     assert!(
         refused.contains("broken.glb"),
         "strict fails on it: {refused}"
@@ -101,12 +102,16 @@ fn a_model_that_will_not_import_is_listed_once_and_the_rest_still_cook() {
 }
 
 #[test]
-fn a_cooked_file_is_current_until_its_model_changes() {
+fn a_cooked_file_is_stamped_until_its_model_changes() {
     let model = crate::cook::fixture::model("import_all_current");
-    let current = || crate::cook::with_writes(true, || crate::cook::is_current(&model));
-    assert!(!current(), "nothing cooked yet");
+    let stamped = || crate::cook::with_writes(true, || crate::cook::is_stamped(&model));
+    let pending =
+        || crate::cook::with_writes(true, || crate::cook::pending(model.parent().unwrap()));
+    assert!(!stamped(), "nothing cooked yet");
+    assert_eq!(pending(), [model.clone()]);
     crate::cook::with_writes(true, || crate::import_file(&model).unwrap());
-    assert!(current());
+    assert!(stamped());
+    assert!(pending().is_empty());
     crate::sidecar::set_scale(&model, 3.0).unwrap();
-    assert!(!current(), "a new Scale Factor");
+    assert!(!stamped(), "a new Scale Factor");
 }

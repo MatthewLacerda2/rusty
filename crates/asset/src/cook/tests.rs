@@ -86,3 +86,15 @@ fn an_obj_whose_mtllib_is_missing_cooks_to_disk_once() {
     std::fs::write(mtl, "newmtl M\nKd 1 0 0\n").unwrap();
     assert_eq!(written(), 1, "the side file appearing cooks it again");
 }
+
+#[test]
+fn a_parse_digest_tells_a_skinned_sub_mesh_from_a_static_one() {
+    // The unwrap and the clusters skip a skinned mesh, so values cooked from one
+    // never fit the other, however alike their vertices.
+    let path = fixture::model("digest_skin");
+    let parsed = import_file(&path).unwrap();
+    let mut sub = parsed.sub_meshes[1].clone();
+    let bare = super::sub::digest(&sub);
+    sub.skin = Some(crate::mesh_data::SkinData::default());
+    assert_ne!(super::sub::digest(&sub), bare);
+}

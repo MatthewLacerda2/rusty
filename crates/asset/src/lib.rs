@@ -173,6 +173,12 @@ fn import_with(
     Ok(asset)
 }
 
+/// [`import_own`] of the file at `path`, its read target and settings found:
+/// what the import pass cooks a model through (`import::cook_models`).
+pub(crate) fn import_own_file(path: &Path) -> Result<ImportedAsset, ImportError> {
+    import_own(path, &read_target(path)?, &settings_of(path))
+}
+
 /// [`import_with`] without the clips borrowed from other models (#1747): the
 /// file's own data with its settings applied.
 fn import_own(

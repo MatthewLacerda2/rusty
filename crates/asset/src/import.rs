@@ -30,7 +30,8 @@ pub struct Imported {
     /// warned of.
     pub failed: Failed,
     /// How many cooked files were written (`cook`): every model under the folder
-    /// whose cooked file is not current is imported, and its cooked file written.
+    /// is imported as a load imports it, and a cooked file that read refuses
+    /// (missing, stale, malformed) is written again.
     pub cooked: usize,
     /// What the images' refresh did (`texture_import::refresh_all`).
     pub textures: Refreshed,
@@ -111,12 +112,22 @@ fn models(root: &Path) -> Result<(Vec<PathBuf>, Failed), String> {
     Ok((sources, failed))
 }
 
-/// Import every model file under `root` whose cooked file is not current
-/// (`cook::is_current`, told without parsing it), so an authoring build writes
-/// it, returning how many were written. A source already in `failed` (its
-/// conversion, warned of) is not tried again; a model that will not import is
-/// warned of and added to it.
+/// Bring the cooked file of every model file under `root` up to date, returning
+/// how many were written. Each model is imported its own (`import_own`, no
+/// borrowed clips retargeted) as a load imports it: a cooked file the read takes
+/// (its stamp, every sub-mesh's parse digest, counts and positions) is left as it
+/// is; one it refuses, stale or not, is cooked and written again. So currency is
+/// the load's own test, not the stamp alone (`cook::is_stamped`), and an export
+/// never ships a file every launch would refuse. A model that has a current file
+/// is parsed for it, never cooked. Nothing is imported when this thread writes
+/// no cooked file (`cook::writes`: a standalone game, a build without authoring)
+/// or the model has no place for one (outside an open project). A source
+/// already in `failed` (its conversion, warned of) is not tried again; a model
+/// that will not import is warned of and added to it.
 fn cook_models(root: &Path, failed: &mut Failed) -> usize {
+    if !crate::cook::writes() {
+        return 0;
+    }
     let before = crate::cook::written();
     let mut models = Vec::new();
     crate::manifest::walk(root, &mut |path| {
@@ -125,8 +136,11 @@ fn cook_models(root: &Path, failed: &mut Failed) -> usize {
         }
     });
     models.sort();
-    for model in models.iter().filter(|m| !crate::cook::is_current(m)) {
-        if let Err(e) = crate::import_file(model) {
+    let placed = models
+        .iter()
+        .filter(|m| crate::cook::cooked_path(m).is_some());
+    for model in placed {
+        if let Err(e) = crate::import_own_file(model) {
             log::warn!("[Asset] {}: {e}", model.display());
             failed.push((model.clone(), e.to_string()));
         }
@@ -134,6 +148,9 @@ fn cook_models(root: &Path, failed: &mut Failed) -> usize {
     crate::cook::written() - before
 }
 
+#[cfg(test)]
+#[path = "import_cook_tests.rs"]
+mod cook_tests;
 #[cfg(test)]
 #[path = "import_tests.rs"]
 mod tests;

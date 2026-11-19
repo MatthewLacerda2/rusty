@@ -94,16 +94,13 @@ impl Bin {
         self.push(data, ARRAY_BUFFER, accessor)
     }
 
-    /// Unsigned ints that are a vertex stream (`vertex`) or plain data.
-    pub fn uints(&mut self, items: &[u32], vertex: bool) -> usize {
+    /// Unsigned ints that are not a vertex or index stream (a cooked model's
+    /// tables, `cook::file`).
+    pub fn uints(&mut self, items: &[u32]) -> usize {
         let data = items.iter().flat_map(|i| i.to_le_bytes()).collect();
         let accessor =
             json!({"componentType": UNSIGNED_INT, "count": items.len(), "type": "SCALAR"});
-        self.push(
-            data,
-            if vertex { ARRAY_BUFFER } else { NO_TARGET },
-            accessor,
-        )
+        self.push(data, NO_TARGET, accessor)
     }
 
     pub fn indices(&mut self, indices: &[u32]) -> usize {
