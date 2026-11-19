@@ -53,11 +53,9 @@ fn a_spill_lies_in_the_project_s_cache_and_holds_its_files_until_dropped() {
     let mut spill = Spill::open(&path).unwrap();
     let file = spill.put(b"page").unwrap();
     assert_eq!(file.read().unwrap(), b"page");
-    assert!(
-        spill.dir().starts_with(root.join("cache")),
-        "{:?}",
-        spill.dir()
-    );
+    // Canonical, as macOS's temp folder lies behind a symlink.
+    let cache = std::fs::canonicalize(&root).unwrap().join("cache");
+    assert!(spill.dir().starts_with(cache), "{:?}", spill.dir());
     let linked = Path::new(&path).with_extension("linked");
     file.link(&linked).unwrap();
     drop(spill);
