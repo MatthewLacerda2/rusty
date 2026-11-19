@@ -26,7 +26,8 @@ use std::rc::Rc;
 
 use glam::Vec2;
 
-use super::mesh::{build_canvas, canvas_frame, CanvasMesh};
+use super::mesh::{build_canvas, canvas_frame, CanvasMesh, Sources, TexSize};
+#[cfg(test)]
 use super::text::atlas::FontAtlases;
 use rusty_components::{
     BackdropFilterComponent, CanvasComponent, CanvasGroupComponent, ImageComponent, MaskComponent,
@@ -97,7 +98,7 @@ impl CanvasInputs {
 }
 
 /// The texture-size lookup and the atlases' generation.
-type Lookups<'a> = (&'a dyn Fn(&str) -> Option<Vec2>, u64);
+type Lookups<'a> = (TexSize<'a>, u64);
 
 /// One cursor per channel a canvas's mesh reads from the World.
 struct Watch {
@@ -171,7 +172,7 @@ impl KeptMeshes {
         &mut self,
         (world, layout): (&World, &UiLayout),
         screen: Vec2,
-        (tex_size, atlases): (&dyn Fn(&str) -> Option<Vec2>, &mut FontAtlases),
+        (tex_size, atlases): Sources,
         wanted: &dyn Fn(u32) -> bool,
     ) -> Vec<Rc<CanvasMesh>> {
         self.built = 0;
@@ -198,7 +199,7 @@ impl KeptMeshes {
         &mut self,
         entries: &[(u32, &UiRect)],
         (world, layout, screen): (&World, &UiLayout, Vec2),
-        (tex_size, atlases): (&dyn Fn(&str) -> Option<Vec2>, &mut FontAtlases),
+        (tex_size, atlases): Sources,
         wanted: &dyn Fn(u32) -> bool,
         dirty: &BTreeSet<u32>,
     ) -> Vec<Rc<CanvasMesh>> {
@@ -255,7 +256,7 @@ impl KeptMeshes {
         layout: &UiLayout,
         run: &[(u32, &UiRect)],
         screen: Vec2,
-        (tex_size, atlases): (&dyn Fn(&str) -> Option<Vec2>, &mut FontAtlases),
+        (tex_size, atlases): Sources,
     ) -> Rc<CanvasMesh> {
         self.built += 1;
         let generation = atlases.generation;

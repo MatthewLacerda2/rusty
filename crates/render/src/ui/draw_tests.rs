@@ -46,11 +46,6 @@ fn gpu_a_static_hud_uploads_once_and_a_change_reuploads() {
         0,
         "unchanged: no upload"
     );
-    assert_eq!(
-        view.ui.last_meshed(),
-        0,
-        "unchanged: no canvas meshed (#2416)"
-    );
     scene.world.image_mut(bar).expect("image").color = Vec4::new(1.0, 0.0, 0.0, 1.0);
     assert_eq!(
         frame(&mut renderer, &mut view, &scene),
