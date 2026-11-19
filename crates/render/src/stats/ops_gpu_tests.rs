@@ -14,33 +14,35 @@ use rusty_scene::{Camera, Scene};
 /// dynamic cascade passes, the scene pass and two post-FX passes; no compute pass;
 /// and three bind groups the post chain rebuilds every frame (its IO group for each
 /// of its two passes, its effect textures for one), today's number, pinned so one
-/// more shows and one fewer is a fix to re-pin.
-/// Measured: lavapipe 7/0/3/3/19, Metal 7/0/3/3/19.
+/// more shows and one fewer is a fix to re-pin. The UI's empty batch uniform is
+/// written once, not every frame (#2354).
+/// Measured: lavapipe 7/0/3/3/18; Metal 7/0/3/3/19 before #2354's one write fewer.
 const STILL: OpCounts = OpCounts {
     render_passes: 7,
     compute_passes: 0,
     submits: 3,
     bind_groups_created: 3,
-    buffer_writes: 19,
+    buffer_writes: 18,
 };
 
 /// [`STILL`] with the GPU occlusion cull on: Hi-Z phase one adds a render pass, and
 /// the stage two compute passes (the select's, then the pyramid and the cull in
 /// one, #2327), with a submit and three writes.
-/// Measured: lavapipe 8/2/4/3/22, Metal 8/2/4/3/22 (CI's macOS leg); before
+/// Measured: lavapipe 8/2/4/3/21; 8/2/4/3/22 on lavapipe and Metal (CI's macOS
+/// leg) before #2354's one write fewer; before
 /// #2327, 8/4/4/3/22 on RTX 2060, lavapipe and Metal.
 const STILL_CULLING: OpCounts = OpCounts {
     render_passes: 8,
     compute_passes: 2,
     submits: 4,
     bind_groups_created: 3,
-    buffer_writes: 22,
+    buffer_writes: 21,
 };
 
 /// [`STILL_CULLING`] on a timed frame, the stage split into its timed parts
 /// (#2401, `GpuTimer::splits`): the pyramid and the test each their own compute
 /// pass (no prop here is drawn by cluster), one more than untimed.
-/// Measured: lavapipe 8/3/4/3/22 (the split forced, it has no timestamps).
+/// Measured: lavapipe 8/3/4/3/21 (the split forced, it has no timestamps).
 const STILL_CULLING_TIMED: OpCounts = OpCounts {
     compute_passes: 3,
     ..STILL_CULLING

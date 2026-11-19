@@ -440,8 +440,10 @@ change of clip.
   texture is already the product of its whole chain, a masked batch samples exactly
   one texture, and nesting has no depth limit — a stencil's increment/decrement
   scheme (Unity's) runs out of bits and can only cut hard, while the texture carries
-  soft coverage. The cost is one R8 target and one small pass per visible Mask
-  (`ui_mask_passes`). Being addressed in canvas NDC, the same texture serves overlay
+  soft coverage. The cost is one R8 target per visible Mask, and one small pass on
+  a frame where its graphic, its clip, its texture or a Mask above it changed
+  (`ui_mask_passes`; a still Mask costs no pass, while one whose graphic shows a
+  render texture or text is redrawn every frame). Being addressed in canvas NDC, the same texture serves overlay
   and world canvases: **masks work on world canvases too**.
 - **Backdrop: re-composited, not copied.** The overlay pass draws onto the finished
   frame — often a swapchain image, which can be neither copied nor sampled. So right

@@ -121,3 +121,34 @@ fn parts_on_some_frames_only_still_sum_to_their_stage() {
         .sum();
     assert_eq!(parts, 2.0, "the parts sum to the stage");
 }
+
+/// A CPU part lapped on some frames only (a Mask submitted on one of them), first
+/// or last: each part is averaged over its stage's frames, so the parts sum to it.
+#[test]
+fn cpu_parts_on_some_frames_only_still_sum_to_their_stage() {
+    use super::super::super::{sample, Samples, Speeds};
+    let viewpoint = |frames: &[&[(&'static str, f64)]]| {
+        let mut samples = Samples::default();
+        for stages in frames {
+            let frame = crate::capture::RenderedFrame {
+                cpu_ms: stages.iter().map(|s| s.1).sum(),
+                stages: stages.to_vec(),
+                ..Default::default()
+            };
+            let stats = rusty_core::frame_stats::FrameStats::default();
+            sample(&mut samples, &stats, Some(&frame), Speeds::default());
+        }
+        samples.report()
+    };
+    let masked: &[_] = &[("ui.layout", 1.0), ("ui.mask_submit", 2.0)];
+    let plain: &[_] = &[("ui.layout", 1.0)];
+    let reports = [
+        ("late".to_string(), viewpoint(&[plain, masked])),
+        ("early".to_string(), viewpoint(&[masked, plain])),
+    ];
+    let rows = aggregate(&reports);
+    let avg = |k: &str| rows.iter().find(|r| r.metric == k).map(|r| r.avg);
+    assert_eq!(avg("render.ui"), Some(2.0));
+    assert_eq!(avg("render.ui.mask_submit"), Some(1.0), "its share, not 2");
+    assert_eq!(avg("render.ui.layout"), Some(1.0));
+}
