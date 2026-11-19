@@ -39,28 +39,37 @@ use std::sync::{Condvar, Mutex};
 use std::thread::ThreadId;
 use std::time::Duration;
 
-/// How many headless renderers may be alive at once, process-wide.
+/// How many headless renderers may be alive at once, process-wide: 3 on macOS
+/// (Metal), 2 elsewhere (Linux, where CI renders on lavapipe). nextest's `gpu-macos`
+/// and `gpu` test groups (`.config/nextest.toml`) hold the same two numbers.
 ///
-/// **Two, not one:** one test can build its renderer while another is still tearing
+/// **Two at least:** one test can build its renderer while another is still tearing
 /// its own down, so the common case never blocks, while peak memory stays bounded at
-/// two devices instead of one-per-core. Two is also what a test comparing two
+/// a few devices instead of one-per-core. Two is also what a test comparing two
 /// renderers takes, as one pair (#1844); at a cap of one it can never be granted.
 ///
 /// **If a software adapter (lavapipe) runs out of memory, lower this to 1 before
 /// anything else.** That fully serializes headless renderers and makes the suite's
 /// GPU memory deterministic.
 /// The cost is real: the GPU tests are under a tenth of the suite by count, but under
-/// nextest this cap (the `gpu` group's `max-threads`) makes them its critical path, so
+/// nextest this cap (the group's `max-threads`) makes them its critical path, so
 /// their time ÷ the cap *is* the suite's wall time (#985), and lowering it to 1
 /// stretches the run by as much as those tests then take one at a time. The tests
 /// that take a pair would then have to go too.
 ///
-/// Raising it is the move that needs justification, and was measured not to have one:
-/// on a 4-core lavapipe container, 4 instead of 2 won ~6%, within run-to-run noise,
-/// and 3 measured slower than either, because the whole suite is then near its core
-/// bound (#985). What does move the wall is a cheaper renderer per test: pipelines a
-/// frame may not draw are built on first use (`gpu::pipelines::LazyPipeline`).
+/// **Each number is measured, per platform** (#2363, docs/testing.md, *Concurrency
+/// is capped*). On lavapipe the GPU tests are CPU work, so a third renderer only
+/// shares the same cores: on a 4-core Linux runner 3 measured no faster than 2, and
+/// slower on the busier shard (#985 found the same). On a 3-core macOS runner the
+/// heavier shard was bound by the cap at 2 and by its cores at 3, and its wall fell
+/// by about a tenth, with over a third of the runner's memory still free. What
+/// moves the wall on both is a cheaper renderer per test: pipelines a frame may not
+/// draw are built on first use (`gpu::pipelines::LazyPipeline`).
+#[cfg(target_os = "macos")]
 pub(crate) const MAX_CONCURRENT_HEADLESS: usize = 3;
+/// The cap off macOS: see the macOS one above.
+#[cfg(not(target_os = "macos"))]
+pub(crate) const MAX_CONCURRENT_HEADLESS: usize = 2;
 
 /// How long to wait for a permit before declaring the budget deadlocked.
 ///

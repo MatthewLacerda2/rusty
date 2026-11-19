@@ -237,8 +237,8 @@ in every layer. The vignette, the smallest real effect, is the worked example: g
   what it was measured on; one added or moved runs on a desktop GPU before it merges
   (`make test-gpu ADAPTER=<gpu>`, `docs/testing.md`, *Which adapters a GPU tolerance
   holds on*).
-- A new GPU test that runs CI out of memory lowers both caps to 1 (the nextest `gpu`
-  group and `MAX_CONCURRENT_HEADLESS`) before the test is weakened.
+- A new GPU test that runs CI out of memory lowers both caps to 1 on its platform (the
+  nextest `gpu` or `gpu-macos` group and `MAX_CONCURRENT_HEADLESS`) before the test is weakened.
 
 ## Pixels
 - **Bless by name, and look.** Re-bless a capture or snapshot by its test name, never

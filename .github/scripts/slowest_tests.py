@@ -8,14 +8,15 @@ and nextest's log names only tests past a minute. So each suite job prints, from
 the report it already writes, in the log where an agent reads it:
 
 - its slowest tests (the count is the step's argument; ten when none is given);
-- the shard's accounting: the `gpu` test group against the rest, each as tests
-  and test-seconds, the group's seconds over its cap (`max-threads`), the
+- the shard's accounting: the GPU test group against the rest, each as tests
+  and test-seconds, the group's seconds over its cap (`max-threads` of the
+  group this platform's override picks, `gpu` or `gpu-macos`), the
   rest's over the runner's cores, and both over the cores, beside the shard's
-  wall time. Whichever bound is near the wall paces the shard. On a real GPU
-  (Metal) a shard whose `S/cap` is near the wall can get shorter with a higher
-  cap; on lavapipe the GPU tests are CPU work too, so `(S+R)/cores` bounds the
-  wall whatever the cap (3 measured slower than 2 there,
-  `render::setup::budget::MAX_CONCURRENT_HEADLESS`);
+  wall time. Whichever bound is near the wall paces the shard: a shard whose
+  `S/cap` is near the wall gets shorter with a higher cap until `(S+R)/cores`
+  is the wall (macOS went from 2 to 3 that way); on lavapipe the GPU tests are
+  CPU work too, so a higher cap only stretches each test (3 measured no faster
+  than 2 there, `render::setup::budget::MAX_CONCURRENT_HEADLESS`);
 - the GPU tests' median and p10 (the floor one headless renderer costs), and
   test-seconds per test binary.
 
@@ -128,23 +129,37 @@ def is_integration(binary: str) -> bool:
     return "::" in binary and "/" not in binary.split("::", 1)[1]
 
 
-def gpu_rule(config: str) -> tuple[Callable[[Case], bool], int]:
-    """The `gpu` group's membership test and cap, from nextest.toml's text.
+#: The one platform key a GPU override may carry, and the `sys.platform` it means.
+PLATFORMS = {'cfg(target_os = "macos")': "darwin"}
+
+
+def gpu_rule(config: str, platform: str = sys.platform) -> tuple[Callable[[Case], bool], int]:
+    """The GPU group's membership test and cap on `platform` (a `sys.platform`),
+    from nextest.toml's text: the first override putting tests in a `gpu*` group
+    whose `platform` matches, as nextest picks it (#2363).
     Raises `ValueError` naming what it could not read."""
     import tomllib  # 3.11+, as CI's runners have; imported here so the top N still prints without it
 
     data = tomllib.loads(config)
+    gpu = [o for o in data.get("profile", {}).get("default", {}).get("overrides", [])
+           if str(o.get("test-group", "")).startswith("gpu")]
+    unknown = {o["platform"] for o in gpu if "platform" in o} - PLATFORMS.keys()
+    if unknown:
+        raise ValueError(f"a GPU override's platform {sorted(unknown)} is not one of {sorted(PLATFORMS)}")
+    here = [o for o in gpu if PLATFORMS.get(o.get("platform"), platform) == platform]
+    if not here:
+        raise ValueError(f"no override puts tests in a `gpu*` group on {platform}")
+    group, filters = here[0]["test-group"], {o.get("filter", "") for o in gpu}
     try:
-        cap = int(data["test-groups"]["gpu"]["max-threads"])
+        cap = int(data["test-groups"][group]["max-threads"])
     except (KeyError, TypeError, ValueError) as err:
-        raise ValueError(f"no `[test-groups] gpu.max-threads` ({err})") from None
-    filters = [o.get("filter", "") for o in data.get("profile", {}).get("default", {}).get("overrides", [])
-               if o.get("test-group") == "gpu"]
+        raise ValueError(f"no `[test-groups] {group}.max-threads` ({err})") from None
     if len(filters) != 1:
-        raise ValueError(f"{len(filters)} overrides put tests in the `gpu` group, expected one")
-    shape = FILTER_SHAPE.fullmatch(filters[0].strip())
+        raise ValueError(f"the GPU overrides hold {len(filters)} filters, expected one")
+    only = filters.pop()
+    shape = FILTER_SHAPE.fullmatch(only.strip())
     if not shape:
-        raise ValueError(f"the `gpu` filter {filters[0]!r} is not the shape this script reads; "
+        raise ValueError(f"the `gpu` filter {only!r} is not the shape this script reads; "
                          "update `FILTER_SHAPE` in slowest_tests.py")
     try:
         integration, anywhere = re.compile(shape["integration"]), re.compile(shape["any"])

@@ -296,15 +296,17 @@ jobs:
       # each by name (`proved_tree.BUILT`, `verdict.changes.DRIFT_STEP_WORDS`).
       # The two steps do not run the same set: the default entry compiles every
       # test target but runs every test except the `gpu` group (`-E 'not
-      # group(gpu)'`, as `make test`'s default pass), which the `dev` shards run,
+      # group(gpu*)'`, as `make test`'s default pass), which the `dev` shards run,
       # `dev` adding to the default features (docs/testing.md, *Which suite runs
-      # the GPU tests*; the `gpu-default-only` lint holds the premise).
+      # the GPU tests*; the `gpu-default-only` lint holds the premise). Each
+      # test step samples the runner's free memory in the background
+      # (`memory_floor.py`), which *Slowest tests* prints beside the accounting.
       - name: Test (engine, default)
         if: needs.changes.outputs.code != 'false' && matrix.features == 'default'
         run: |
           python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
           rc=0
-          cargo nextest run --profile ci --locked -E 'not group(gpu)' --partition "count:${{ matrix.shard }}" || rc=$?
+          cargo nextest run --profile ci --locked -E 'not group(gpu*)' --partition "count:${{ matrix.shard }}" || rc=$?
           cp target/nextest/ci/junit.xml junit-default.xml || true
           kill "$watcher" || true
           exit "$rc"
