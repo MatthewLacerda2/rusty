@@ -18,6 +18,9 @@
 //!    through indirect args ([`Culled`]), so an object that came out from behind a
 //!    wall this frame is drawn this frame.
 //!
+//! Steps 2 to 4 and the cluster cull below record into one compute pass, after
+//! phase one's depth draw; the select has its own pass before it (#2327).
+//!
 //! The phase-one draw is depth only, into the view's depth that the prepass or the
 //! forward pass then clears: every pass after it draws the final set, so none of
 //! them was split in two. Order within a batch is kept, so a frame where nothing is
@@ -35,9 +38,10 @@
 //!
 //! **What it keeps.** Its bind groups (the cull's, the pyramid's levels, the
 //! kept instances' group 1) and the draws holding them are rebuilt only when a
-//! buffer they bind or draw from grew or the depth was resized ([`kept::Kept`]):
-//! a `Kept`'s key names every resource its value holds (#2021). Its CPU tables are
-//! reused. Grown history keeps its verdicts: only new object slots read "drawn".
+//! buffer they bind or draw from grew or the depth was resized
+//! ([`Kept`](crate::gpu::kept::Kept)): a `Kept`'s key names every resource its
+//! value holds (#2021). Its CPU tables are reused. Grown history keeps its
+//! verdicts: only new object slots read "drawn".
 //!
 //! **Who culls.** [`Renderer::hiz_culls`]: the quality preset's
 //! `gpu_occlusion_culling` (off in every seeded preset, #2388), the camera's
@@ -59,8 +63,8 @@
 pub(crate) mod clusters;
 mod counters;
 mod cull;
-pub(crate) mod kept;
 pub(crate) mod pyramid;
+mod tables;
 mod upload;
 
 #[cfg(test)]
@@ -73,6 +77,8 @@ mod dust2_gpu_tests;
 mod gpu_tests;
 #[cfg(test)]
 mod moving_gpu_tests;
+#[cfg(test)]
+mod passes_gpu_tests;
 #[cfg(test)]
 mod projection_gpu_tests;
 #[cfg(test)]

@@ -86,7 +86,7 @@ impl crate::Renderer {
     pub(crate) fn plan_clusters(
         &self,
         draws: &crate::draw::batch::FrameDraws,
-        tables: &super::kept::Tables,
+        tables: &super::tables::Tables,
     ) -> plan::Plan {
         if !self.cluster_culls() {
             return plan::Plan::default();
