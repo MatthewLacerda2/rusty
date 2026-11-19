@@ -78,7 +78,7 @@ pub(super) fn words(r: &Renderer, buffer: &wgpu::Buffer) -> Vec<u32> {
 
 #[test]
 fn gpu_a_wall_leaves_the_box_behind_it_undrawn_with_no_bake() {
-    let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {
+    let Some(mut r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
         return;
     };
     let (scene, _) = walled();
@@ -99,7 +99,7 @@ fn gpu_a_wall_leaves_the_box_behind_it_undrawn_with_no_bake() {
 
 #[test]
 fn gpu_a_camera_outside_every_baked_cell_still_culls() {
-    let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {
+    let Some(mut r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
         return;
     };
     let (mut scene, _) = walled();
@@ -118,7 +118,7 @@ fn gpu_a_camera_outside_every_baked_cell_still_culls() {
 
 #[test]
 fn gpu_where_nothing_is_hidden_a_frame_is_the_same_on_and_off() {
-    let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {
+    let Some(mut r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
         return;
     };
     let mut scene = Scene::new();
