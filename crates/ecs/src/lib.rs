@@ -46,7 +46,11 @@ mod placement_tests;
 #[cfg(test)]
 mod query_tests;
 #[cfg(test)]
+mod query_where_tests;
+#[cfg(test)]
 mod static_revision_tests;
+#[doc(hidden)]
+pub mod walks;
 pub mod world;
 mod world_space;
 

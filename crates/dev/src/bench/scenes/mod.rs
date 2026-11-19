@@ -60,6 +60,12 @@ pub struct Options {
     pub frames: u32,
     /// Rounds over every viewpoint, each one's averages a point of the spread.
     pub runs: u32,
+    /// Build every lazy pipeline before the first frame, off the clock, as a
+    /// game's window does (`Renderer::warm_pipelines`): on unless the frames'
+    /// costs are not what is read. Off, a pipeline compiles on its first draw
+    /// inside the load or a warm-up frame; on lavapipe the warm-up is most of a
+    /// small bench's time (#2350).
+    pub warm: bool,
 }
 
 impl Default for Options {
@@ -69,6 +75,7 @@ impl Default for Options {
             warmup: WARMUP,
             frames: FRAMES,
             runs: RUNS,
+            warm: true,
         }
     }
 }
@@ -149,7 +156,7 @@ pub fn bench(
     opts: Options,
     extra: &Extra,
 ) -> Result<SceneReport, String> {
-    let (mut harness, load_ms) = load(out_dir, root, scene, settings, opts.size)?;
+    let (mut harness, load_ms) = load(out_dir, root, scene, settings, opts)?;
 
     let probe = harness.renderer().and_then(|r| ClockProbe::new(r));
     let mut report = measure::all(&mut harness, probe.as_ref(), opts);
@@ -195,26 +202,27 @@ pub fn bench(
 }
 
 /// Load `scene` of the project at `root` as Play does and draw its first frame
-/// at `size` (the harness's out dir `out_dir`), returning the harness and the
+/// at `opts.size` (the harness's out dir `out_dir`), returning the harness and the
 /// load's wall-clock ms. Timed: the harness's own set-up (its Lua VM and API, the
 /// stats), the scene's document, sidecar and navmesh bake, Play's refresh of the
 /// project's converted sources (a cache check when the import cache is warm, the
 /// conversions when it is not: `import_ms`), then its first frame (uploads, the
-/// first sim step). The renderer starts (its device and every pipeline, warm as a
-/// game's) between the load and the first frame, off the clock.
+/// first sim step) at `opts.size`. The renderer starts (its device and, with
+/// `opts.warm`, every pipeline, warm as a game's) between the load and the first
+/// frame, off the clock.
 pub fn load(
     out_dir: &Path,
     root: &Path,
     scene: &str,
     settings: ProjectSettings,
-    size: (u32, u32),
+    opts: Options,
 ) -> Result<(Harness, f64), String> {
     let path = root.join(format!("assets/scenes/{scene}.scene"));
     let start = Instant::now();
     let mut harness = Harness::on_project_scene(out_dir, &path.to_string_lossy(), settings)?;
     let loaded = start.elapsed();
-    harness.set_size(size.0, size.1);
-    if let Some(renderer) = harness.renderer() {
+    harness.set_size(opts.size.0, opts.size.1);
+    if let Some(renderer) = harness.renderer().filter(|_| opts.warm) {
         renderer.warm_pipelines(false);
     }
     let start = Instant::now();

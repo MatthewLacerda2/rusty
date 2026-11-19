@@ -37,6 +37,7 @@ const OPTS: Options = Options {
     warmup: 1,
     frames: 2,
     runs: 2,
+    warm: false, // the views, rows and files are proved, not a frame's cost (#2350)
 };
 
 fn labels(report: &SceneReport) -> Vec<&str> {
