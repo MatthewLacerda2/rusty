@@ -4,7 +4,8 @@
 Two rules written in several files and held equal by hand until now:
 
 - **The cap, per platform** (#2363). nextest's GPU test group for a platform
-  (`gpu`, or `gpu-macos` on macOS, picked by a platform-keyed override) and that
+  (`gpu`, or `gpu-macos` on macOS, picked by the first platform-matching
+  override, read by `slowest_tests.gpu_rule` as nextest reads it) and that
   platform's `MAX_CONCURRENT_HEADLESS` (`crates/render/src/setup/budget.rs`, one
   per `cfg(target_os)`) bound the same thing for the two runners; one edited alone
   is the #366 out-of-memory red. Every GPU override keeps the one filter. Beside
@@ -24,6 +25,8 @@ import re
 import unittest
 from pathlib import Path
 
+import slowest_tests
+
 try:
     import tomllib  # 3.11+; CI's runner has it, an older local python3 skips
 except ModuleNotFoundError:
@@ -31,7 +34,8 @@ except ModuleNotFoundError:
 
 REPO = Path(__file__).resolve().parents[3]
 WORKFLOWS = REPO / ".github" / "workflows"
-NEXTEST = tomllib.loads((REPO / ".config" / "nextest.toml").read_text()) if tomllib else {}
+NEXTEST_TEXT = (REPO / ".config" / "nextest.toml").read_text()
+NEXTEST = tomllib.loads(NEXTEST_TEXT) if tomllib else {}
 BUDGET = REPO / "crates" / "render" / "src" / "setup" / "budget.rs"
 
 #: A command that runs the engine's tests. `cargo test --doc` renders nothing,
@@ -41,31 +45,31 @@ SUITE = re.compile(r"cargo (nextest run|llvm-cov|mutants|test)\b")
 NOT_SUITE = re.compile(r"--doc\b|tools/lint/|cargo mutants --list\b")
 
 
-#: The platforms a cap is written for: a `cfg(target_os = …)` predicate's name, or
-#: `None` for every other platform (no `platform` key, `cfg(not(…))`).
-MACOS = 'cfg(target_os = "macos")'
+#: `MAX_CONCURRENT_HEADLESS`'s platforms, as `slowest_tests.gpu_rule` names them
+#: (a `sys.platform`): `darwin` under `cfg(target_os = "macos")`, `linux` for the
+#: rest (`cfg(not(…))`, or one constant for every platform).
+PLATFORMS = ("darwin", "linux")
 
 
-def headless_caps(source: str) -> dict[str | None, int]:
-    """`MAX_CONCURRENT_HEADLESS` per platform: `MACOS` under its `cfg`, `None`
-    under `cfg(not(…))` or none."""
+def headless_caps(source: str) -> dict[str, int]:
+    """`MAX_CONCURRENT_HEADLESS` per platform in `PLATFORMS`, from budget.rs's text."""
     found = re.findall(r'(?:#\[cfg\((not\()?target_os = "macos"\)?\)\]\n)?'
                        r"pub\(crate\) const MAX_CONCURRENT_HEADLESS: usize = (\d+);", source)
     assert found, "MAX_CONCURRENT_HEADLESS not found in budget.rs"
-    caps: dict[str | None, int] = {}
+    caps: dict[str, int] = {}
     for negated, value in found:
-        macos_only = not negated and len(found) > 1
-        caps[MACOS if macos_only else None] = int(value)
+        if negated or len(found) == 1:
+            caps["linux"] = int(value)
+        if not negated:
+            caps["darwin"] = int(value)
     return caps
 
 
-def nextest_caps(config: dict) -> dict[str | None, int]:
-    """Each platform's GPU group cap: the group a GPU override (one whose group's
-    name starts `gpu`) puts its tests in, by the override's `platform`."""
-    groups = config["test-groups"]
-    return {o.get("platform"): groups[o["test-group"]]["max-threads"]
-            for o in config["profile"]["default"]["overrides"]
-            if o.get("test-group", "").startswith("gpu")}
+def nextest_caps(config: str) -> dict[str, int]:
+    """Each platform's GPU group cap, read as nextest picks the group: the first
+    matching override (`slowest_tests.gpu_rule`, the one reader of that rule), so
+    an override's order counts as nextest counts it."""
+    return {p: slowest_tests.gpu_rule(config, p)[1] for p in PLATFORMS}
 
 
 def gpu_filters(config: dict) -> set[str]:
@@ -114,32 +118,49 @@ def overcommitted(text: str) -> list[str]:
 NEEDS_TOML = unittest.skipUnless(tomllib, "tomllib needs Python 3.11+")
 
 
+#: Two GPU overrides, each with its `platform` line (`MAC_KEY` or none) and group:
+#: the shipped order, the unkeyed one moved first, or both unkeyed.
+TWO = ('[test-groups]\ngpu = {{ max-threads = 2 }}\ngpu-macos = {{ max-threads = 3 }}\n'
+       "[[profile.default.overrides]]\n{first}filter = 'a'\ntest-group = \"{g1}\"\n"
+       "[[profile.default.overrides]]\n{second}filter = 'a'\ntest-group = \"{g2}\"\n")
+MAC_KEY = "platform = 'cfg(target_os = \"macos\")'\n"
+SPLIT = ('#[cfg(target_os = "macos")]\npub(crate) const MAX_CONCURRENT_HEADLESS: usize = 3;\n'
+         '#[cfg(not(target_os = "macos"))]\npub(crate) const MAX_CONCURRENT_HEADLESS: usize = 2;\n')
+FILTER = "(kind(test) & test(/^gpu::/)) | test(/(^|::)gpu_[^:]*$/)"
+
+
+def two(first: str, g1: str, second: str, g2: str) -> str:
+    return TWO.format(first=first, g1=g1, second=second, g2=g2).replace("'a'", f"'{FILTER}'")
+
+
 @NEEDS_TOML
 class Cap(unittest.TestCase):
     def test_each_platforms_two_caps_are_equal(self):
-        self.assertEqual(nextest_caps(NEXTEST), headless_caps(BUDGET.read_text()))
+        self.assertEqual(nextest_caps(NEXTEST_TEXT), headless_caps(BUDGET.read_text()))
 
     def test_every_gpu_override_keeps_the_one_filter(self):
         self.assertEqual(len(gpu_filters(NEXTEST)), 1)
 
-    def test_flags_a_platform_whose_caps_differ(self):
-        config = tomllib.loads(
-            '[test-groups]\ngpu = { max-threads = 2 }\ngpu-macos = { max-threads = 3 }\n'
-            f"[[profile.default.overrides]]\nplatform = '{MACOS}'\nfilter = 'a'\n"
-            'test-group = "gpu-macos"\n[[profile.default.overrides]]\nfilter = \'a\'\ntest-group = "gpu"\n')
-        budget = (f'#[cfg(target_os = "macos")]\npub(crate) const MAX_CONCURRENT_HEADLESS: usize = {{}};\n'
-                  '#[cfg(not(target_os = "macos"))]\npub(crate) const MAX_CONCURRENT_HEADLESS: usize = 2;\n')
-        self.assertEqual(nextest_caps(config), headless_caps(budget.format(3)))
-        self.assertNotEqual(nextest_caps(config), headless_caps(budget.format(2)))
+    def test_the_shipped_order_reads_as_split(self):
+        self.assertEqual(nextest_caps(two(MAC_KEY, "gpu-macos", "", "gpu")), {"darwin": 3, "linux": 2})
+        self.assertEqual(headless_caps(SPLIT), {"darwin": 3, "linux": 2})
+
+    def test_flags_the_unkeyed_override_moved_first(self):
+        # nextest gives every macOS GPU test `gpu` (cap 2) while budget.rs says 3.
+        self.assertNotEqual(nextest_caps(two("", "gpu", MAC_KEY, "gpu-macos")), headless_caps(SPLIT))
+
+    def test_flags_two_unkeyed_overrides(self):
+        # The first wins everywhere, as nextest has it: cap 3 on Linux too.
+        self.assertEqual(nextest_caps(two("", "gpu-macos", "", "gpu")), {"darwin": 3, "linux": 3})
+        self.assertNotEqual(nextest_caps(two("", "gpu-macos", "", "gpu")), headless_caps(SPLIT))
 
     def test_one_cap_for_every_platform_reads_as_one(self):
-        config = tomllib.loads('[test-groups]\ngpu = { max-threads = 2 }\n'
-                               '[[profile.default.overrides]]\nfilter = \'a\'\ntest-group = "gpu"\n')
-        self.assertEqual(nextest_caps(config), {None: 2})
-        self.assertEqual(headless_caps("pub(crate) const MAX_CONCURRENT_HEADLESS: usize = 2;\n"), {None: 2})
-        self.assertNotEqual(nextest_caps(config), headless_caps(
-            '#[cfg(target_os = "macos")]\npub(crate) const MAX_CONCURRENT_HEADLESS: usize = 3;\n'
-            '#[cfg(not(target_os = "macos"))]\npub(crate) const MAX_CONCURRENT_HEADLESS: usize = 2;\n'))
+        one = ('[test-groups]\ngpu = { max-threads = 2 }\n'
+               f"[[profile.default.overrides]]\nfilter = '{FILTER}'\ntest-group = \"gpu\"\n")
+        self.assertEqual(nextest_caps(one), {"darwin": 2, "linux": 2})
+        self.assertEqual(headless_caps("pub(crate) const MAX_CONCURRENT_HEADLESS: usize = 2;\n"),
+                         {"darwin": 2, "linux": 2})
+        self.assertNotEqual(nextest_caps(one), headless_caps(SPLIT))
 
 
 @NEEDS_TOML

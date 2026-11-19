@@ -67,10 +67,17 @@ def run(xml: str, config: Path = slowest_tests.NEXTEST, cores: int = 4) -> str:
         return out.getvalue()
 
 
+try:
+    import tomllib  # 3.11+; `gpu_rule` needs it, so the accounting tests skip without it
+except ModuleNotFoundError:
+    tomllib = None
+
+NEEDS_TOML = unittest.skipUnless(tomllib, "tomllib needs Python 3.11+")
 #: This platform's cap, as the script reads it: 2 on Linux, 3 on macOS (#2363).
-CAP = slowest_tests.gpu_rule(slowest_tests.NEXTEST.read_text())[1]
+CAP = slowest_tests.gpu_rule(slowest_tests.NEXTEST.read_text())[1] if tomllib else 0
 
 
+@NEEDS_TOML
 class Accounting(unittest.TestCase):
     def test_the_group_against_the_rest_with_the_repos_own_filter_and_cap(self):
         out = run(SHARD)

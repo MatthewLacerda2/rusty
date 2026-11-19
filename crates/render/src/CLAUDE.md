@@ -220,7 +220,7 @@ in every layer. The vignette, the smallest real effect, is the worked example: g
 
 ## GPU tests
 - **The name says it renders**: in-crate tests are named `gpu_*`, integration tests
-  live under `tests/gpu/`. nextest's `gpu` group selects them by name (a `gpu::`
+  live under `tests/gpu/`. nextest's GPU group (`gpu`, `gpu-macos` on macOS) selects them by name (a `gpu::`
   path only in the integration binary: this crate's `gpu` module is no GPU mark), and a test that
   builds a renderer without such a name panics in debug (`render::setup::gpu_rule`).
 - A test reaches a GPU only through `render::test_gpu::headless_or_skip`

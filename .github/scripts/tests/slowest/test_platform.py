@@ -25,6 +25,13 @@ def config(platform: str = 'cfg(target_os = "macos")', macos: str = FILTER) -> s
     return MACOS.format(platform=platform, macos=macos, filter=FILTER)
 
 
+try:
+    import tomllib  # 3.11+, which `gpu_rule` needs
+except ModuleNotFoundError:
+    tomllib = None
+
+
+@unittest.skipUnless(tomllib, "tomllib needs Python 3.11+")
 class Platform(unittest.TestCase):
     def test_macos_reads_its_own_group_and_linux_the_other(self):
         self.assertEqual(slowest_tests.gpu_rule(config(), "darwin")[1], 3)
@@ -42,6 +49,12 @@ class Platform(unittest.TestCase):
     def test_a_platform_it_cannot_read_is_named(self):
         with self.assertRaisesRegex(ValueError, "not one of"):
             slowest_tests.gpu_rule(config(platform='cfg(target_os = "linux")'), "linux")
+
+    def test_a_platform_table_is_named_not_a_traceback(self):
+        table = config().replace("platform = 'cfg(target_os = \"macos\")'",
+                                 "platform = { host = 'cfg(target_os = \"macos\")' }")
+        with self.assertRaisesRegex(ValueError, "not a `cfg"):
+            slowest_tests.gpu_rule(table, "darwin")
 
 
 if __name__ == "__main__":

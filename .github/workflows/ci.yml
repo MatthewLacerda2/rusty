@@ -299,23 +299,31 @@ jobs:
       # group(gpu*)'`, as `make test`'s default pass), which the `dev` shards run,
       # `dev` adding to the default features (docs/testing.md, *Which suite runs
       # the GPU tests*; the `gpu-default-only` lint holds the premise). Each
-      # test step samples the runner's free memory in the background
-      # (`memory_floor.py`), which *Slowest tests* prints beside the accounting.
+      # test step builds first (`--no-run`), then samples the runner's free
+      # memory in the background while the tests alone run (`memory_floor.py`),
+      # so rustc and the linker are not in the floor; *Slowest tests* prints it
+      # beside the accounting.
       - name: Test (engine, default)
         if: needs.changes.outputs.code != 'false' && matrix.features == 'default'
         run: |
-          python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
           rc=0
-          cargo nextest run --profile ci --locked -E 'not group(gpu*)' --partition "count:${{ matrix.shard }}" || rc=$?
+          cargo nextest run --no-run --locked || rc=$?
+          python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
+          if [ "$rc" = 0 ]; then
+            cargo nextest run --profile ci --locked -E 'not group(gpu*)' --partition "count:${{ matrix.shard }}" || rc=$?
+          fi
           cp target/nextest/ci/junit.xml junit-default.xml || true
           kill "$watcher" || true
           exit "$rc"
       - name: Test (engine, dev features)
         if: needs.changes.outputs.code != 'false' && matrix.features == 'dev'
         run: |
-          python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
           rc=0
-          cargo nextest run --profile ci --features dev --locked --partition "count:${{ matrix.shard }}" || rc=$?
+          cargo nextest run --no-run --features dev --locked || rc=$?
+          python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
+          if [ "$rc" = 0 ]; then
+            cargo nextest run --profile ci --features dev --locked --partition "count:${{ matrix.shard }}" || rc=$?
+          fi
           cp target/nextest/ci/junit.xml junit-dev.xml || true
           kill "$watcher" || true
           exit "$rc"
@@ -466,9 +474,12 @@ jobs:
       - name: Test (engine, dev features)
         shell: bash
         run: |
-          python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
           rc=0
-          cargo nextest run --profile ci --features dev --locked --partition "count:${{ matrix.shard }}" || rc=$?
+          cargo nextest run --no-run --features dev --locked || rc=$?
+          python3 .github/scripts/memory_floor.py watch mem-floor.txt & watcher=$!
+          if [ "$rc" = 0 ]; then
+            cargo nextest run --profile ci --features dev --locked --partition "count:${{ matrix.shard }}" || rc=$?
+          fi
           cp target/nextest/ci/junit.xml junit-dev.xml || true
           kill "$watcher" || true
           exit "$rc"

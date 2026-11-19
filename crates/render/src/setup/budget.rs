@@ -61,8 +61,9 @@ use std::time::Duration;
 /// is capped*). On lavapipe the GPU tests are CPU work, so a third renderer only
 /// shares the same cores: on a 4-core Linux runner 3 measured no faster than 2, and
 /// slower on the busier shard (#985 found the same). On a 3-core macOS runner the
-/// heavier shard was bound by the cap at 2 and by its cores at 3, and its wall fell
-/// by about a tenth, with over a third of the runner's memory still free. What
+/// heavier shard was bound by the cap at 2 and by its cores at 3: its test run fell
+/// by about a tenth on average, the whole CI round by about 4%, within the runners'
+/// spread, with over a third of the runner's memory still free. What
 /// moves the wall on both is a cheaper renderer per test: pipelines a frame may not
 /// draw are built on first use (`gpu::pipelines::LazyPipeline`).
 #[cfg(target_os = "macos")]

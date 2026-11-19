@@ -3,31 +3,40 @@
 
 The `gpu` test group's cap (`.config/nextest.toml`) is how many headless renderers
 exist at once, and a software adapter (lavapipe) allocates each in system RAM, so
-raising the cap is only safe with the runner's memory in view. A suite job starts
-this in the background before its test step and the "Slowest tests" step prints
-the result beside the shard's accounting:
+raising the cap is only safe with the runner's memory in view. A suite job builds
+its tests first (`cargo nextest run --no-run`), so rustc and the linker are not
+sampled, starts this in the background for the run itself, and the "Slowest
+tests" step prints the result beside the shard's accounting:
 
-    python3 .github/scripts/memory_floor.py watch mem-floor.txt &   # before the suite
-    python3 .github/scripts/memory_floor.py report mem-floor.txt    # after it
+    python3 .github/scripts/memory_floor.py watch mem-floor.txt &   # after the build
+    python3 .github/scripts/memory_floor.py report mem-floor.txt    # after the suite
 
 `watch` samples every second and rewrites the file with the lowest available
-memory seen, the total and the sample count; `report` prints one `memory:` line.
-Available memory is Linux's `MemAvailable` (`/proc/meminfo`) and, on macOS,
-`vm_stat`'s free, inactive, speculative and purgeable pages: what the kernel can
-hand out without swapping. A sampler that could not read the memory, or never
-ran, prints why and exits 0: this informs, it never gates.
+memory seen, the total, the sample count and the samples it could not read;
+`report` prints one `memory:` line. A sample that fails keeps the floor already
+collected and the watch goes on. Each rewrite goes to a temporary file renamed
+over the last, so the `kill` that ends the watch never leaves a half-written one.
+Available memory is Linux's `MemAvailable` (`/proc/meminfo`) and, on macOS, the
+sum of `vm_stat`'s free, inactive and speculative pages: what the kernel can hand
+out without swapping. Purgeable pages are left out, since macOS may count them
+inside those queues as well, so the figure errs low rather than counting a page
+twice. A sampler that could not read the memory, or never ran, prints why and
+exits 0: this informs, it never gates.
 """
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-#: `vm_stat`'s pages that can be handed out without swapping.
-MAC_AVAILABLE = ("Pages free", "Pages inactive", "Pages speculative", "Pages purgeable")
+#: `vm_stat`'s pages that can be handed out without swapping, summed. Not
+#: `Pages purgeable`: those may sit on the inactive or speculative queue already,
+#: and a floor that errs low is the safe side for raising a cap.
+MAC_AVAILABLE = ("Pages free", "Pages inactive", "Pages speculative")
 
 
 def linux(meminfo: str) -> tuple[int, int]:
@@ -61,23 +70,41 @@ def lower(floor: tuple[int, int, int] | None, now: tuple[int, int]) -> tuple[int
 def line(text: str) -> str:
     """The `memory:` line for a floor file's text."""
     try:
-        least, total, samples = (int(v) for v in text.split())
+        least, total, samples, failed = (int(v) for v in text.split())
     except ValueError:
-        return f"memory: no floor ({text.strip()!r} is not `<least KiB> <total KiB> <samples>`)"
+        return (f"memory: no floor ({text.strip()!r} is not "
+                "`<least KiB> <total KiB> <samples> <unreadable samples>`)")
     gib = 1024 * 1024
+    missed = f", {failed} unreadable" if failed else ""
     return (f"memory: at least {least / gib:.1f} GiB of {total / gib:.1f} GiB available "
-            f"({100 * least / total:.0f}%) over {samples} one-second samples during the suite")
+            f"({100 * least / total:.0f}%) over {samples} one-second samples during the tests{missed}")
 
 
-def watch(path: Path, interval: float = 1.0) -> None:
-    floor = None
-    while True:
+def write(path: Path, text: str) -> None:
+    """Replace `path` with `text` whole: a temporary file, then a rename."""
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text)
+    os.replace(tmp, path)
+
+
+def record(floor: tuple[int, int, int] | None, failed: int, err: str) -> str:
+    """The floor file's text: the floor and the failed count, or why there is none."""
+    if floor is None:
+        return f"unreadable: {err}\n"
+    return " ".join(map(str, (*floor, failed))) + "\n"
+
+
+def watch(path: Path, interval: float = 1.0, read=sample, samples: int | None = None) -> None:
+    """Sample until killed (or `samples` times, for a test), keeping the floor
+    across a sample that fails."""
+    floor, failed, err = None, 0, ""
+    while samples is None or samples > 0:
         try:
-            floor = lower(floor, sample())
-        except (OSError, KeyError, TypeError, ValueError, subprocess.SubprocessError) as err:
-            path.write_text(f"unreadable: {err}\n")
-            return
-        path.write_text(" ".join(map(str, floor)) + "\n")
+            floor = lower(floor, read())
+        except (OSError, KeyError, TypeError, ValueError, subprocess.SubprocessError) as e:
+            failed, err = failed + 1, str(e)
+        write(path, record(floor, failed, err))
+        samples = None if samples is None else samples - 1
         time.sleep(interval)
 
 

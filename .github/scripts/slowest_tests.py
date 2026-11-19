@@ -14,13 +14,14 @@ the report it already writes, in the log where an agent reads it:
   rest's over the runner's cores, and both over the cores, beside the shard's
   wall time. Whichever bound is near the wall paces the shard: a shard whose
   `S/cap` is near the wall gets shorter with a higher cap until `(S+R)/cores`
-  is the wall (macOS went from 2 to 3 that way); on lavapipe the GPU tests are
+  is the wall (macOS went from 2 to 3 that way, its slowest shard about a tenth
+  shorter on average); on lavapipe the GPU tests are
   CPU work too, so a higher cap only stretches each test (3 measured no faster
   than 2 there, `render::setup::budget::MAX_CONCURRENT_HEADLESS`);
 - the GPU tests' median and p10 (the floor one headless renderer costs), and
   test-seconds per test binary.
 
-Which tests are GPU tests is the `gpu` group's own filter, read from
+Which tests are GPU tests is the GPU groups' one filter, read from
 `.config/nextest.toml` with its cap, so the two never drift: the filter's regexes
 are taken from the file, and a filter of another shape prints that it cannot be
 read (and fails this script's test) instead of a wrong split.
@@ -88,7 +89,7 @@ PACE_MIN = 10
 #: unchanged or trimmed-only shards (#2350's PR).
 PACE_QUANTILE = 0.9
 
-#: The shape of the `gpu` group's filter: integration tests (`kind(test)`) whose
+#: The shape of the GPU groups' filter: integration tests (`kind(test)`) whose
 #: path matches the first regex, and any test whose name matches the second.
 FILTER_SHAPE = re.compile(r"\(kind\(test\) & test\(/(?P<integration>[^/]+)/\)\) \| test\(/(?P<any>[^/]+)/\)")
 
@@ -143,6 +144,10 @@ def gpu_rule(config: str, platform: str = sys.platform) -> tuple[Callable[[Case]
     data = tomllib.loads(config)
     gpu = [o for o in data.get("profile", {}).get("default", {}).get("overrides", [])
            if str(o.get("test-group", "")).startswith("gpu")]
+    tables = [o["platform"] for o in gpu if not isinstance(o.get("platform", ""), str)]
+    if tables:
+        raise ValueError(f"a GPU override's platform {tables[0]!r} is not a `cfg(…)` string; "
+                         "this script reads only the string form")
     unknown = {o["platform"] for o in gpu if "platform" in o} - PLATFORMS.keys()
     if unknown:
         raise ValueError(f"a GPU override's platform {sorted(unknown)} is not one of {sorted(PLATFORMS)}")
