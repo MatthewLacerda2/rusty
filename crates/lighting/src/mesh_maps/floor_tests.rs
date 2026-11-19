@@ -49,7 +49,8 @@ fn curvature(mesh: &MeshSource, radius: f32) -> (Image, Option<Raised>) {
         out = Some(img);
         Ok(())
     })
-    .unwrap();
+    .unwrap()
+    .raised;
     (out.unwrap(), raised)
 }
 
@@ -104,7 +105,7 @@ fn a_radius_between_two_islands_floors_holds_on_the_roomy_one() {
 fn a_radius_above_every_floor_is_used_as_asked_and_says_nothing() {
     let mesh = packed_cube();
     let r = cell_floor(0.25) * 1.5;
-    let baked = Baked::new(&mesh, &settings(r)).unwrap();
+    let baked = Baked::new(&mesh, &settings(r)).unwrap().0;
     // The single radius the bake had before was `max(r, 3 × the mesh's average
     // texel)`: r here too, so this bake is the same, texel for texel.
     assert!(MIN_TEXELS * baked.texel_world() < r);
@@ -118,7 +119,7 @@ fn a_radius_above_every_floor_is_used_as_asked_and_says_nothing() {
 #[test]
 fn a_bake_naming_no_radius_reports_nothing_raised() {
     // At 4² every island's floor is past 2 % of the diagonal: wider, but not asked.
-    let radii = Radii::new(&Baked::new(&packed_cube(), &Settings::new(4)).unwrap());
+    let radii = Radii::new(&Baked::new(&packed_cube(), &Settings::new(4)).unwrap().0);
     assert!(
         radii.per_tri.iter().all(|&r| r > radii.reach),
         "{:?}",
@@ -130,19 +131,19 @@ fn a_bake_naming_no_radius_reports_nothing_raised() {
         &Settings::new(4),
         |_, _| Ok(()),
     );
-    assert_eq!(raised, Ok(None));
+    assert_eq!(raised.map(|n| n.raised), Ok(None));
     // A bake without the curvature map draws no band, so it raises none.
     let ao = super::bake(&packed_cube(), &[MeshMap::Ao], &settings(0.01), |_, _| {
         Ok(())
     });
-    assert_eq!(ao, Ok(None));
+    assert_eq!(ao.map(|n| n.raised), Ok(None));
 }
 
 #[test]
 fn an_island_packed_to_nearly_nothing_keeps_the_grid_at_the_reach() {
     let mesh = packed(1e-3);
     let r = cell_floor(1.0) * 1.5;
-    let baked = Baked::new(&mesh, &settings(r)).unwrap();
+    let baked = Baked::new(&mesh, &settings(r)).unwrap().0;
     let (c, raised) = Curvature::new(&baked);
     assert_eq!(c.cell(), r);
     let raised = raised.expect("the packed island was raised");
