@@ -5,14 +5,16 @@
 //! from every entity, every tick, to find that nothing changed. It now asks the
 //! World which ids were stamped on the channels its inputs live on, and syncs only
 //! the bodies those ids belong to (and, for pose and velocities, the bodies the
-//! last step may have changed, below). Unity syncs only transforms with `hasChanged`
+//! last step may have changed, below). Each pass reads only its own row's
+//! channels (`Changed`), so a body that only moved costs the passes that read a
+//! pose and nothing else; a body just built goes through every pass. Unity syncs only transforms with `hasChanged`
 //! and never re-syncs statics; bevy_rapier and avian sync changed bodies only.
 //!
 //! **What each sync pass reads, and where its change shows up:**
 //!
 //! | Pass | Reads | Seen on |
 //! |---|---|---|
-//! | body plan (`resync_topology`) | a Collider's presence and `active`, a CharacterController's presence, a Rigidbody's presence, the parent chain (`body_carrier`) | `ColliderComponent`, `CharacterControllerComponent`, `RigidBodyComponent`; a re-parent on `WorldPose` (subtree) |
+//! | body plan (`resync_topology`) | a Collider's presence and `active`, a CharacterController's presence, a Rigidbody's presence, the parent chain (`body_carrier`) | `ColliderComponent`, `CharacterControllerComponent`, `RigidBodyComponent`; a re-parent, placement or removal on `Activity` (subtree) |
 //! | joints (`resync_joints`) | every `Joint`, the joint entity's `activeInHierarchy`, both bodies' owners, handles and `activeInHierarchy` (a disabled body's joint is inert) | `JointComponent`; the joint and connected ids and the connected body's owner on `Activity`, `WorldPose`; a plan change |
 //! | `sync_enabled` | `activeInHierarchy` of the owner and each collider | `Activity` |
 //! | `sync_materials`, `sync_sensors` | the Collider's material (inline, or its asset's) and `is_trigger`, a CharacterController's presence | `ColliderComponent`, `CharacterControllerComponent`; an asset is not an entity column, so a move of the assets' `generation` re-runs the material pass over every collider |
@@ -66,13 +68,19 @@ use rusty_components::{
     RigidBodyComponent,
 };
 use rusty_core::collections::Map;
-use rusty_ecs::{Activity, Changes, Channel, Cursor, Layer, StaticSet, World, WorldPose};
+use rusty_ecs::{Activity, Cursor, Layer, StaticSet, World, WorldPose};
 use rusty_scene::{CollisionMatrix, Scene};
 
+mod changed;
 pub(super) mod mesh_keys;
+
+use changed::take;
+pub(super) use changed::Changed;
 
 #[cfg(test)]
 mod borrow_tests;
+#[cfg(test)]
+mod channel_tests;
 #[cfg(test)]
 mod edit_tests;
 #[cfg(test)]
@@ -103,32 +111,6 @@ pub(super) struct Watch {
     mesh: Cursor<MeshComponent>,
 }
 
-/// What changed since the last read, when the log could say.
-#[derive(Debug, Default)]
-pub(super) struct Changed {
-    /// Every id stamped on any channel, ascending, each once.
-    pub all: Vec<u32>,
-    /// The ids whose Rigidbody or CharacterController was edited, attached or
-    /// detached: a body carrier may have appeared or gone.
-    pub carriers: Vec<u32>,
-    /// A `Joint` was edited, attached, detached or broken.
-    pub joints: bool,
-    /// The ids whose Collider or Mesh was stamped: a mesh collider's triangles may
-    /// have moved (`mesh_keys`). Ascending, each once.
-    pub reshaped: Vec<u32>,
-}
-
-/// Read `cursor` into `ids`; `false` when it reads `Rebuild`.
-fn take<T: Channel>(world: &mut World, cursor: &mut Cursor<T>, ids: &mut Vec<u32>) -> bool {
-    match world.changes(cursor) {
-        Changes::Rebuild => false,
-        Changes::Ids(found) => {
-            ids.extend(found);
-            true
-        }
-    }
-}
-
 impl Watch {
     /// Open every cursor: they have read everything up to now.
     pub(super) fn open(world: &mut World) -> Self {
@@ -148,40 +130,39 @@ impl Watch {
     /// What changed since the last read; `None` when any cursor reads `Rebuild`.
     /// Every cursor is read either way, so each has read everything after this.
     pub(super) fn read(&mut self, world: &mut World) -> Option<Changed> {
-        let mut carriers = Vec::new();
-        let mut joints = Vec::new();
-        let mut rest = Vec::new();
-        let mut reshaped = Vec::new();
+        let mut c = Changed::default();
+        let (mut joints, mut pose) = (Vec::new(), Vec::new());
         let known = [
-            take(world, &mut self.rigidbody, &mut carriers),
-            take(world, &mut self.character, &mut carriers),
+            take(world, &mut self.rigidbody, &mut c.rigidbody),
+            take(world, &mut self.character, &mut c.character),
             take(world, &mut self.joint, &mut joints),
-            take(world, &mut self.collider, &mut reshaped),
-            take(world, &mut self.mesh, &mut reshaped),
-            take(world, &mut self.pose, &mut rest),
-            take(world, &mut self.activity, &mut rest),
-            take(world, &mut self.layer, &mut rest),
-            take(world, &mut self.statics, &mut rest),
+            take(world, &mut self.collider, &mut c.collider),
+            take(world, &mut self.mesh, &mut c.mesh),
+            take(world, &mut self.pose, &mut pose),
+            take(world, &mut self.activity, &mut c.activity),
+            take(world, &mut self.layer, &mut c.layer),
+            take(world, &mut self.statics, &mut c.statics),
         ];
         if known.contains(&false) {
             return None;
         }
-        carriers.sort_unstable();
-        carriers.dedup();
-        reshaped.sort_unstable();
-        reshaped.dedup();
-        let mut all = rest;
-        all.extend(&reshaped);
-        all.extend(&carriers);
+        let channels = [
+            &c.collider,
+            &c.rigidbody,
+            &c.character,
+            &c.activity,
+            &c.layer,
+            &c.statics,
+            &c.mesh,
+        ];
+        let mut all = pose;
         all.extend(&joints);
+        channels.into_iter().for_each(|ids| all.extend(ids));
         all.sort_unstable();
         all.dedup();
-        Some(Changed {
-            all,
-            carriers,
-            joints: !joints.is_empty(),
-            reshaped,
-        })
+        c.all = all;
+        c.joints = !joints.is_empty();
+        Some(c)
     }
 }
 
@@ -237,6 +218,9 @@ pub(crate) struct Tracked {
     pub material_assets: Option<u64>,
     /// The library-mesh triangles each mesh collider's shape was built from.
     pub mesh_keys: mesh_keys::MeshKeys,
+    /// What the incremental sync visited, for the cost tests.
+    #[cfg(test)]
+    pub visits: super::sync::Visits,
     /// Ignore the log and run the full pass every step: the reference the
     /// equivalence tests compare against.
     #[cfg(test)]
