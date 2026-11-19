@@ -8,6 +8,7 @@ use rapier3d::parry::query::ShapeCastOptions;
 use rapier3d::parry::shape::Capsule;
 use rapier3d::prelude::*;
 
+use super::cost::{self, Work};
 use super::pass::{off_slope, stalled, Pass};
 use super::{capsule, CharacterMove};
 use crate::query::is_live;
@@ -120,6 +121,7 @@ impl PhysicsWorld {
         let mut ground = None;
         let mut flat_hit = false;
         let mut collisions = Vec::new();
+        cost::count(Work::Run);
         let view = self.controller_view();
         let movement = m.controller.move_shape(
             FIXED_DELTA_TIME,

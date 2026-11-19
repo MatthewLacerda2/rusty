@@ -14,6 +14,7 @@ use rapier3d::parry::query::{
 use rapier3d::parry::shape::Shape;
 use rapier3d::prelude::*;
 
+use super::cost::{self, Work};
 use super::parts::cast_parts;
 
 /// How far past the cast's target distance the contact query at the pose of
@@ -93,6 +94,7 @@ impl QueryDispatcher for ExactNormals<'_> {
             let mut at = *pos12;
             at.translation += local_vel12 * hit.time_of_impact;
             let reach = options.target_distance + CONTACT_MARGIN;
+            cost::count(Work::Contact);
             // A pair `contact` finds out of reach keeps the cast's own normal.
             if let Ok(Some(contact)) = self.0.contact(&at, g1, g2, reach) {
                 hit.normal1 = contact.normal1;

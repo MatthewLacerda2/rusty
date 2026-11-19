@@ -30,8 +30,12 @@
 //! Determinism: the controller is a pure query over the pipeline state at the
 //! fixed dt; no wall-clock or RNG.
 
+pub mod bench;
 mod bodies;
 mod body;
+mod cost;
+#[cfg(test)]
+mod cost_tests;
 mod hits;
 mod normals;
 mod parts;

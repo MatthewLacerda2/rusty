@@ -15,6 +15,8 @@ use rapier3d::parry::query::{QueryDispatcher, Ray, RayCast, ShapeCastHit, ShapeC
 use rapier3d::parry::shape::{CompositeShape, Shape};
 use rapier3d::prelude::*;
 
+use super::cost::{self, Work};
+
 /// Under this time of impact parry decides a support-map cast by the contact
 /// normal at the start pose (`cast_shapes_support_map_support_map`'s fallback,
 /// taken with `compute_impact_geometry_on_penetration`, which rapier's
@@ -33,6 +35,7 @@ pub(super) fn cast_parts(
     g2: &dyn Shape,
     options: ShapeCastOptions,
 ) -> Option<ShapeCastHit> {
+    cost::count(Work::MeshCast);
     let aabb2 = g2.compute_aabb(pos12);
     let ray = Ray::new(Vector::ZERO, vel12);
     let shift = -aabb2.center();
@@ -50,8 +53,12 @@ pub(super) fn cast_parts(
             max_time_of_impact: best,
             ..options
         };
+        cost::count(Work::Part);
         let mut found = None;
         parts.map_part_at(id, &mut |pose, part, constraints| {
+            if constraints.is_some() {
+                cost::count(Work::Constraints);
+            }
             let local = pose.map_or(*pos12, |p| p.inv_mul(pos12));
             let vel = pose.map_or(vel12, |p| p.rotation.inverse() * vel12);
             let hit = dispatcher.cast_shapes(&local, vel, part, g2, options);
