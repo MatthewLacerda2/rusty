@@ -8,15 +8,13 @@
 //! };
 //! ```
 //!
-//! Sixteen copies of a decision that has to be identical everywhere — *what counts as
-//! "no GPU here", and what a test does about it* — is a rule with sixteen chances to
-//! drift. It lives here instead.
+//! Sixteen copies of one decision (*what counts as "no GPU here", and what a test
+//! does about it*) are sixteen chances to drift, so it lives here instead.
 //!
 //! Integration tests (`tests/*.rs`) do not use this: they reach the renderer through
 //! the dev layer (`screenshot::capture`, `Debug.Preview`, the probe bakes), which owns
 //! its own skip handling (`dev::capture::no_adapter`, failing under the same variable,
-//! #885). The budget in `setup::budget` covers both, because
-//! it sits inside the constructor rather than in this helper.
+//! #885). The budget in `setup::budget` covers both: it sits in the constructor.
 
 use crate::Renderer;
 
@@ -36,6 +34,8 @@ pub fn headless_or_skip(width: u32, height: u32) -> Option<Renderer> {
     pollster::block_on(Renderer::new_headless(width, height))
 }
 
+#[cfg(any(test, feature = "dev"))]
+pub mod culling;
 pub mod pair;
 #[cfg(any(test, feature = "dev"))]
 pub mod ssil;

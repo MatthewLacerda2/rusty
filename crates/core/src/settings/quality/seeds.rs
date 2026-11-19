@@ -54,8 +54,8 @@ pub(super) fn low() -> QualityValues {
         volumetric_fog: levels(froxels(64, 32), froxels(80, 48), froxels(120, 64)),
         ui_blur_divisor: 4,
         shadowmask_mode: ShadowmaskMode::Shadowmask,
-        gpu_occlusion_culling: true,
-        gpu_cluster_culling: true,
+        gpu_occlusion_culling: false,
+        gpu_cluster_culling: false,
     }
 }
 
@@ -72,8 +72,8 @@ pub(super) fn medium() -> QualityValues {
         volumetric_fog: levels(froxels(80, 48), froxels(120, 64), froxels(160, 64)),
         ui_blur_divisor: 2,
         shadowmask_mode: ShadowmaskMode::Shadowmask,
-        gpu_occlusion_culling: true,
-        gpu_cluster_culling: true,
+        gpu_occlusion_culling: false,
+        gpu_cluster_culling: false,
     }
 }
 
@@ -89,7 +89,7 @@ pub(super) fn high() -> QualityValues {
         volumetric_fog: levels(froxels(120, 64), froxels(160, 64), froxels(160, 128)),
         ui_blur_divisor: 2,
         shadowmask_mode: ShadowmaskMode::DistanceShadowmask,
-        gpu_occlusion_culling: true,
-        gpu_cluster_culling: true,
+        gpu_occlusion_culling: false,
+        gpu_cluster_culling: false,
     }
 }

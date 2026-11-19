@@ -36,7 +36,7 @@ fn boxes() -> Scene {
 
 #[test]
 fn gpu_more_batches_in_the_same_instance_room_draw_from_the_grown_args() {
-    let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {
+    let Some(mut r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
         return;
     };
     let scene = boxes();
