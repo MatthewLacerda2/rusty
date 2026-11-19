@@ -50,9 +50,9 @@ impl<F: FnMut(u32) -> bool> Iterator for Descendants<'_, F> {
 }
 
 impl World {
-    /// Push `id`'s child ids onto `out`, allocating nothing once `out` is warm: every
-    /// downward walk (this module's, `world_space::store`, `world_space::bounds`,
-    /// the change log's stamps) reads children through it, never a cloned list.
+    /// Push `id`'s child ids onto `out`, allocating nothing once `out` is warm. This
+    /// module's walk, `world_space::store`, `world_space::bounds` and the change
+    /// log's stamps read children through it; [`World::children`] clones the list.
     pub(crate) fn push_children(&self, id: u32, out: &mut Vec<u32>) {
         if let Some(core) = self.component::<Core>(id) {
             out.extend_from_slice(&core.children);

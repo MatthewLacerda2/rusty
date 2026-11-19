@@ -1,7 +1,8 @@
 //! crates/ecs/src/descendants_tests.rs — `World::self_and_descendants` (#991): pre-order in
-//! declared order, and a malformed `children` list ends the walk.
+//! declared order, and a malformed `children` list ends the walk; the change log's
+//! subtree stamps reach the same ids.
 
-use crate::World;
+use crate::{Changes, World, WorldPose};
 
 fn walk(w: &World, id: u32) -> Vec<u32> {
     w.self_and_descendants(id).collect()
@@ -104,11 +105,17 @@ proptest::proptest! {
         lists in proptest::collection::vec(proptest::collection::vec(0usize..11, 0..4), 1..9),
         prune in 1u32..5,
     ) {
-        let (w, ids) = malformed(&lists);
+        let (mut w, ids) = malformed(&lists);
+        let mut poses = w.change_cursor::<WorldPose>();
         for &id in &ids {
             proptest::prop_assert_eq!(walk(&w, id), reference(&w, id, |_| true));
             let pruned: Vec<u32> = w.self_and_descendants_while(id, |e| e % prune != 0).collect();
             proptest::prop_assert_eq!(pruned, reference(&w, id, |e| e % prune != 0));
+            // The stamps' kept walk (`changes::stamp`) reaches the same ids; the log reads them sorted.
+            w.stamp_pose_below(id);
+            let mut sorted = reference(&w, id, |_| true);
+            sorted.sort_unstable();
+            proptest::prop_assert_eq!(w.changes(&mut poses), Changes::Ids(sorted));
         }
     }
 }

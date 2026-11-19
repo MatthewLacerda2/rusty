@@ -159,6 +159,11 @@ impl ChangeLogs {
         self.rewinds += 1;
         self.logs.iter_mut().for_each(Log::reset);
     }
+
+    /// Drop the subtree stamps' kept walk state, sized for the World just emptied.
+    pub(crate) fn reset_scratch(&mut self) {
+        self.scratch = Default::default();
+    }
 }
 
 impl World {
