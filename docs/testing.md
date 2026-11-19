@@ -492,7 +492,11 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
   under nextest it runs in place, under plain `cargo test` the binary re-runs
   that one test in a child, and passes only once the child says the body ran.
   A check that the machine cannot measure goes before `alone!`, so it starts no
-  child to return at once. The `log`
+  child to return at once. The write log (`core::fs::written`) is process-wide
+  too, and every test that writes a file notes into it: a cache or reader
+  draining it acts only on the notes naming its own keys, so its "nothing
+  happened" (`ui::TextureSizeReader`'s idle refresh sweeps nothing) holds while
+  other tests write, and a test of it keys by its own `temp::dir()` paths. The `log`
   logger is one a process too: a crate that names `rusty-logging` captures its
   tests' warnings through `rusty_logging::init_for_tests` and `forward`, never
   `rusty_test_support::logs` (`one-logger`), and each `init` panics when the
