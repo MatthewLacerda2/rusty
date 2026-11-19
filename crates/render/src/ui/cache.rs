@@ -14,7 +14,7 @@ use glam::Vec2;
 
 use super::custom::ShadeUniforms;
 use super::effects::UiEffects;
-use super::kept::KeptMeshes;
+use super::kept::{KeptLayout, KeptMeshes};
 use super::mesh::CanvasMesh;
 use super::world::WorldUniforms;
 use rusty_ui::CanvasSpace;
@@ -32,6 +32,8 @@ pub(super) struct CanvasGpu {
 #[derive(Default)]
 pub struct UiViewCache {
     canvases: Vec<CanvasGpu>,
+    /// The UI layout and what it was computed from (`kept::layout`).
+    pub(super) layout: KeptLayout,
     /// Each canvas's mesh and what it was built from (`kept`).
     pub(super) kept: KeptMeshes,
     /// How many canvas buffers the last frame (re-)uploaded — the dirty signal.
@@ -67,6 +69,12 @@ impl UiViewCache {
     /// Canvases the last render of this view meshed, each once (a kept one is not).
     pub fn last_meshed(&self) -> usize {
         self.kept.built()
+    }
+
+    /// Whether the last render of this view computed its UI layout (a kept one
+    /// was not).
+    pub fn last_laid_out(&self) -> bool {
+        self.layout.computed()
     }
 
     /// Canvas buffers (re-)uploaded by the last render of this view.

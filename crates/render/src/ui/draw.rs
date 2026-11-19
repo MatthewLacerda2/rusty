@@ -1,18 +1,20 @@
 //! crates/render/src/ui/draw.rs — the UI pass: per-view vertex buffers + the draw (#418).
 //!
 //! [`Renderer::prepare_ui`] runs inside `Renderer::render` before the camera stack:
-//! the layout is recomputed for the view's own pixel size through its camera (the
+//! the view lays its UI out at its own pixel size through its camera (the
 //! same pure `UiLayout::compute_in` the sim's `LateUpdate` system runs, with the
 //! sim's own texture-size table ([`Renderer::set_ui_textures`]) — so in Play it
 //! equals `Resources::ui_layout` whenever the view is the game view) and turned
-//! into per-canvas meshes. World canvases then draw inside the stack (`world`,
+//! into per-canvas meshes, each kept while its inputs hold. World canvases then draw inside the stack (`world`,
 //! #429); [`Renderer::draw_ui`] draws the screen canvases right after post-FX, with
 //! `LoadOp::Load` over the finished frame. The Scene view (editor mode) keeps only
 //! `WorldSpace` canvases — signs and terminals are scene geometry; the game's HUD
 //! and a camera canvas glued to the editor's free-fly camera are not.
 //!
-//! **Dirty strategy.** Each view keeps every root canvas's mesh with what it was built
-//! from (`kept`): the layout is recomputed every frame, but a canvas whose rects,
+//! **Dirty strategy.** Each view keeps its layout with what it was computed from
+//! (`kept::layout`): a frame where nothing the layout reads changed places the held
+//! rects' canvas spaces again and lays out nothing. It keeps every root canvas's mesh
+//! with what it was built from too (`kept`): a canvas whose rects,
 //! frame, texture sizes and glyph atlases are unchanged and whose UI components no
 //! write touched (the World's change log) keeps its mesh unbuilt. One vertex buffer
 //! per canvas (`cache`) is re-uploaded only when a rebuilt mesh differs. A still HUD
@@ -62,7 +64,7 @@ impl Renderer {
         let screen = Vec2::new(w as f32, h as f32);
         let textures = Rc::clone(&self.ui_renderer.texture_sizes);
         let ui_view = UiView::with_camera(screen, camera.clone(), textures);
-        let layout = UiLayout::compute_in(&scene.world, &ui_view);
+        let layout = view.ui.layout.update(&scene.world, &ui_view);
         self.lap("ui.layout");
         for path in texture_paths(scene, &layout) {
             let tex = self.load_texture(&path);
@@ -85,7 +87,7 @@ impl Renderer {
         let meshes = view
             .ui
             .kept
-            .update((world, &layout), screen, looked, &wanted);
+            .update((world, &*layout), screen, looked, &wanted);
         self.ui_renderer.upload_atlases(&self.device, &self.queue);
         self.lap("ui.mesh");
         let meshes = meshes

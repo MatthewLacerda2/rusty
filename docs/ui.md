@@ -393,8 +393,9 @@ batch together as `Normal` solid geometry; the scan line's `Additive` is a new b
   draws the game's screen UI only while its **UI** overlay toggle is on (see
   *Authoring in the editor*); a targetless view given no output (the
   reflection-probe cubemap capture) never does.
-- **What.** The layout is recomputed for the view's pixel size with the same pure
-  `UiLayout::compute` the sim runs, then walked in draw order. A graphic draws when it
+- **What.** The view lays out at its own pixel size with the same pure
+  `UiLayout::compute_in` the sim runs (kept while its inputs hold, *Dirty*), then
+  walked in draw order. A graphic draws when it
   and every ancestor are `active`.
 - **Colour space.** UI blends in **display (sRGB-encoded) space with premultiplied
   alpha**, the way designers author it: 50% white over black is mid-grey `128`, as in
@@ -417,8 +418,16 @@ batch together as `Normal` solid geometry; the scan line's `Additive` is a new b
   An entity with several graphics draws its `Image`, then its `Shape`, then its `Text`.
 - **Dirty.** Each view keeps every root canvas's mesh beside its buffer, with what
   it was built from: the canvas's laid-out rects, the frame it is meshed into, the
-  size of every texture it read and the glyph atlases' generation. The layout is
-  recomputed every frame; a canvas is meshed again only when one of those differs or
+  size of every texture it read and the glyph atlases' generation. The view keeps
+  its layout too, and lays out again only when something the layout reads changed:
+  an element's `RectTransform`, `LayoutGroup` or `LayoutElement`, a non-root
+  element's `Transform`, the hierarchy or active flags, the `Image` or `Text` of an
+  element its content sizes (one with a `LayoutElement`, or under a `LayoutGroup`),
+  a root Canvas's sort order, mode or size, the screen size or the texture sizes,
+  and, while a `WorldAnchor` marker exists, the camera or a marker's target moving
+  (`RenderCounters::ui_laid_out`). A label's changing string outside a group, a
+  Canvas's sway and tilt, and a world canvas carried around only move where the rects
+  land, so they lay nothing out. A canvas is meshed again only when one of those differs or
   a write touched one of its elements' UI components (`Image`, `Text`, `Shape`,
   `Mask`, `RectMask`, `CanvasGroup`, `BackdropFilter`) or active flags, which the
   World's change log reports. The `Canvas` component's own placement (`sway` and its

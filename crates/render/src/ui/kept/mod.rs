@@ -1,6 +1,5 @@
-//! crates/render/src/ui/kept/ — each view's canvas meshes, kept until what they
-//! are built from changes (#2416). GPU-free.
-//!
+//! crates/render/src/ui/kept/ — each view's canvas meshes (and, `layout`, its UI
+//! layout), kept until what they are built from changes (#2416). GPU-free.
 //! A canvas's mesh is a function of its [`CanvasInputs`]: its run of the layout
 //! (every element's id and laid-out rect, in draw order), the pixel frame it is
 //! meshed into and whether it is an overlay, the source size of every texture it
@@ -27,6 +26,9 @@
 //! canvas this frame does not draw (gone from the layout, or filtered out of an
 //! editor-mode view) loses its held mesh too, so a write missed while it was not
 //! drawn cannot leave it stale.
+
+mod layout;
+pub(crate) use layout::KeptLayout;
 
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
@@ -105,8 +107,7 @@ impl CanvasInputs {
     }
 }
 
-/// The texture-size lookup and the atlases' generation.
-type Lookups<'a> = (TexSize<'a>, u64);
+type Lookups<'a> = (TexSize<'a>, u64); // the texture-size lookup, the atlases' generation
 
 /// One cursor per channel a canvas's mesh reads from the World (the Canvas
 /// component excepted: the module docs).

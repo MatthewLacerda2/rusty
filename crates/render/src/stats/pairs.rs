@@ -88,10 +88,11 @@ impl RenderCounters {
     }
 
     /// The UI pass's counters, under their metric names.
-    fn ui_pairs(&self) -> [(&'static str, u64); 4] {
+    fn ui_pairs(&self) -> [(&'static str, u64); 5] {
         [
             ("ui_draws", self.ui_draws.into()),
             ("ui_meshed", self.ui_meshed.into()),
+            ("ui_laid_out", self.ui_laid_out.into()),
             ("ui_mask_passes", self.ui_mask_passes.into()),
             ("ui_blur_passes", self.ui_blur_passes.into()),
         ]
