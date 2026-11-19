@@ -43,6 +43,9 @@ pub(crate) struct ClusterCull {
     /// The jobs its last cull ran.
     #[cfg(test)]
     pub(crate) ran: u32,
+    /// The clustered runs (batches) its last cull recorded.
+    #[cfg(test)]
+    pub(crate) runs_ran: u32,
 }
 
 impl ClusterCull {
@@ -72,6 +75,8 @@ impl ClusterCull {
             group: Kept::default(),
             #[cfg(test)]
             ran: 0,
+            #[cfg(test)]
+            runs_ran: 0,
         }
     }
 
@@ -111,6 +116,7 @@ impl Renderer {
         #[cfg(test)]
         {
             cull.ran = plan.jobs.len() as u32;
+            cull.runs_ran = plan.runs.len() as u32;
         }
     }
 
