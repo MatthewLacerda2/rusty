@@ -1,6 +1,7 @@
-//! What a refresh may skip (#1256): an idle one sweeps nothing, a hand edit is
-//! seen whatever it does to the count, and a file that cannot be read copies
-//! nothing when it is retried.
+//! What a refresh may skip (#1256): an idle one sweeps nothing, even while
+//! something else writes other files (the write log is the process's, #2442), a
+//! hand edit is seen whatever it does to the count, and a file that cannot be
+//! read copies nothing when it is retried.
 
 use std::rc::Rc;
 
@@ -32,6 +33,26 @@ fn an_idle_refresh_sweeps_nothing() {
         state.0.sweeps, 1,
         "no write, no retry, same Images: no sweep"
     );
+}
+
+#[test]
+fn a_write_of_another_file_sweeps_nothing() {
+    let path = temp_png("measured");
+    bake_to_png(&Image::new(4), Slot::BaseColor, &path).expect("bake");
+    let (scene, id) = fitted_image(&path);
+    let mut state = fresh();
+    tick(&scene, id, &mut state);
+    let other = rusty_test_support::temp::dir().join("other.bin");
+    for n in 0..3u8 {
+        // What another test of the binary, or a background bake, does.
+        let other = other.clone();
+        std::thread::spawn(move || rusty_core::fs::written::write(&other, &[n]))
+            .join()
+            .expect("the writer ran")
+            .expect("write");
+        tick(&scene, id, &mut state);
+    }
+    assert_eq!(state.0.sweeps, 1, "the write log named no measured file");
 }
 
 #[test]
