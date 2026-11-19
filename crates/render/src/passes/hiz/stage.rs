@@ -2,7 +2,8 @@
 //! phases recorded into one encoder and one submit, and timed whole or, on a
 //! timed frame, by part (#2401): the select, phase one's depth draw, the
 //! pyramid, the instance test and compaction, and the cluster cull, each its own
-//! GPU pair (`gpu.occlusion.<part>`) and CPU lap (`render.occlusion.<part>`).
+//! GPU pair (`gpu.occlusion.<part>`) and CPU lap (`render.occlusion.<part>`); the
+//! cluster cull's GPU pair is three, one per dispatch kind (#2406).
 
 use super::clusters::plan::Plan;
 use super::clusters::ClusterDraws;
@@ -99,7 +100,14 @@ impl Renderer {
                     dispatch(pass, (&self.hiz.test, &groups[1]), n);
                     dispatch(pass, (&self.hiz.compact, &groups[1]), batches);
                 }
-                GpuPart::OcclusionClusters => self.record_clusters(pass, (clusters, plan)),
+                GpuPart::OcclusionClusters => {
+                    self.record_clusters(pass, (clusters, plan), &CLUSTER_STEPS)
+                }
+                step @ (GpuPart::OcclusionClustersTest
+                | GpuPart::OcclusionClustersScan
+                | GpuPart::OcclusionClustersCopy) => {
+                    self.record_clusters(pass, (clusters, plan), &[step])
+                }
                 GpuPart::OcclusionSelect | GpuPart::OcclusionPhaseOne => {
                     unreachable!("recorded by `cull_by_hiz` before phase one ends")
                 }
@@ -107,9 +115,14 @@ impl Renderer {
             self.lap(lap_of(part));
         };
         let after = [GpuPart::OcclusionPyramid, GpuPart::OcclusionTest];
-        let parts = after
-            .into_iter()
-            .chain(clustered.then_some(GpuPart::OcclusionClusters));
+        // Untimed, the cluster cull is one part, each batch's dispatches in turn;
+        // timed, one pass per dispatch kind, every batch's in each (#2406).
+        let cluster_parts: &[GpuPart] = match (clustered, split) {
+            (false, _) => &[],
+            (true, false) => &[GpuPart::OcclusionClusters],
+            (true, true) => &CLUSTER_STEPS,
+        };
+        let parts = after.into_iter().chain(cluster_parts.iter().copied());
         let begin = |encoder: &mut wgpu::CommandEncoder, label, writes| {
             let desc = wgpu::ComputePassDescriptor {
                 label: Some(label),
@@ -120,7 +133,7 @@ impl Renderer {
         if split {
             for part in parts {
                 let writes = self.gpu_timer.part_compute_writes(part);
-                record(&mut begin(encoder, lap_of(part), writes), part);
+                record(&mut begin(encoder, label_of(part), writes), part);
             }
         } else {
             let mut pass = begin(encoder, "Hi-Z Cull", None);
@@ -151,7 +164,28 @@ pub(super) fn lap_of(part: GpuPart) -> &'static str {
         GpuPart::OcclusionPhaseOne => "occlusion.phase_one",
         GpuPart::OcclusionPyramid => "occlusion.pyramid",
         GpuPart::OcclusionTest => "occlusion.test",
-        GpuPart::OcclusionClusters => "occlusion.clusters",
+        GpuPart::OcclusionClusters
+        | GpuPart::OcclusionClustersTest
+        | GpuPart::OcclusionClustersScan
+        | GpuPart::OcclusionClustersCopy => "occlusion.clusters",
+    }
+}
+
+/// The cluster cull's three dispatches, in the order a batch runs them, each a
+/// sub-part of `gpu.occlusion.clusters` on a timed frame (#2406).
+const CLUSTER_STEPS: [GpuPart; 3] = [
+    GpuPart::OcclusionClustersTest,
+    GpuPart::OcclusionClustersScan,
+    GpuPart::OcclusionClustersCopy,
+];
+
+/// A timed part's pass label: its lap's, but a cluster cull dispatch's own.
+fn label_of(part: GpuPart) -> &'static str {
+    match part {
+        GpuPart::OcclusionClustersTest => "occlusion.clusters_test",
+        GpuPart::OcclusionClustersScan => "occlusion.clusters_scan",
+        GpuPart::OcclusionClustersCopy => "occlusion.clusters_copy",
+        _ => lap_of(part),
     }
 }
 

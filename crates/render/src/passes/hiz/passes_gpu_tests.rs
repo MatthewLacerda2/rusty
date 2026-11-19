@@ -1,7 +1,8 @@
 //! How many compute passes the `occlusion` stage records (#2327): the select's
 //! own, before phase one's depth draw, then one for the pyramid, the test, the
 //! compaction and every clustered batch's cluster cull, at one batch and at three;
-//! on a timed frame (#2401) one each for the pyramid, the test and the clusters.
+//! on a timed frame (#2401) one each for the pyramid, the test and each of the
+//! cluster cull's three dispatch kinds (#2406).
 
 use glam::{Quat, Vec3};
 
@@ -16,8 +17,9 @@ use rusty_scene::{Camera, Scene};
 const PASSES: u32 = 2;
 
 /// [`PASSES`] on a timed frame, each part its own pass (`GpuTimer::splits`).
-/// Measured: lavapipe 4 (the split forced, it has no timestamps).
-const TIMED_PASSES: u32 = 4;
+/// Measured: lavapipe 6 (the split forced, it has no timestamps): the select,
+/// the pyramid, the test and the cluster cull's three dispatch kinds (#2406).
+const TIMED_PASSES: u32 = 6;
 
 /// A wall half across `n` clustered panels, each its own mesh and so its own
 /// clustered batch.

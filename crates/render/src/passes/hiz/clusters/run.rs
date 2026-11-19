@@ -14,6 +14,7 @@ use crate::gpu::grow_buffer::GrowBuffer;
 use crate::gpu::kept::Kept;
 use crate::passes::hiz::counters::Counter;
 use crate::passes::hiz::pyramid::Pyramid;
+use crate::timing::GpuPart;
 use crate::Renderer;
 
 /// `hiz_clusters.wgsl`'s `Params`.
@@ -120,12 +121,16 @@ impl Renderer {
         }
     }
 
-    /// Record `plan`'s three dispatches per clustered batch into `pass`, each
-    /// run's group 0 at its own dynamic offset; `ready_clusters` ran first.
+    /// Record `plan`'s dispatches of `steps` (the cluster cull's sub-parts, in
+    /// order) per clustered batch into `pass`, each run's group 0 at its own
+    /// dynamic offset; `ready_clusters` ran first. A batch's dispatches read only
+    /// its own state, so a timed frame records every batch's test, then every
+    /// scan, then every copy, a pass each.
     pub(crate) fn record_clusters(
         &self,
         pass: &mut wgpu::ComputePass,
         (cull, plan): (&ClusterCull, &Plan),
+        steps: &[GpuPart],
     ) {
         let group = cull.group.value().expect("bound by ready_clusters");
         let pipes = &self.hiz.clusters;
@@ -138,12 +143,23 @@ impl Renderer {
             let jobs = run.jobs.len() as u32;
             pass.set_bind_group(0, group, &offset);
             pass.set_bind_group(1, mesh, &[]);
-            pass.set_pipeline(pipes.test.get());
-            pass.dispatch_workgroups((jobs * run.clusters).div_ceil(64), 1, 1);
-            pass.set_pipeline(pipes.scan.get());
-            pass.dispatch_workgroups(jobs.div_ceil(64), 1, 1);
-            pass.set_pipeline(pipes.copy.get());
-            pass.dispatch_workgroups(run.clusters, jobs, 1);
+            for step in steps {
+                match step {
+                    GpuPart::OcclusionClustersTest => {
+                        pass.set_pipeline(pipes.test.get());
+                        pass.dispatch_workgroups((jobs * run.clusters).div_ceil(64), 1, 1);
+                    }
+                    GpuPart::OcclusionClustersScan => {
+                        pass.set_pipeline(pipes.scan.get());
+                        pass.dispatch_workgroups(jobs.div_ceil(64), 1, 1);
+                    }
+                    GpuPart::OcclusionClustersCopy => {
+                        pass.set_pipeline(pipes.copy.get());
+                        pass.dispatch_workgroups(run.clusters, jobs, 1);
+                    }
+                    other => unreachable!("{other:?} is no cluster cull dispatch"),
+                }
+            }
         }
     }
 
