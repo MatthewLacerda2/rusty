@@ -4,17 +4,17 @@
 //! shooter-shaped stress scene ([`stress`]) onto the default yard, warms up, then
 //! `Harness.Bench(n)` steps and renders `n` frames, sampling each one, and prints
 //! a short report — frame, render and GPU ms (average and p95), GPU ms per pass,
-//! draw calls, triangles, dropped and culled counts, the Hi-Z culls and the
-//! renderer's GPU calls (passes, submits, bind groups made, buffer writes), every system's CPU ms
-//! (`cpu.<system>`, as the schedule names it) and the renderer's CPU ms by stage
+//! draw calls, triangles, dropped and culled counts, the Hi-Z culls and late set,
+//! the renderer's GPU calls (passes, submits, bind groups made, buffer writes),
+//! every system's CPU ms (`cpu.<system>`) and the renderer's CPU ms by stage
 //! (`render.<stage>`, `Renderer::frame_stages`), each set with an `other` row for
 //! what none of its parts holds. A stage timed in parts (the Hi-Z `occlusion`
 //! stage, #2401) adds `render.<stage>.<part>` and `gpu.<pass>.<part>` rows beside
 //! its own, which they sit inside: no sum of a set counts them.
 //!
 //! **Before and after is automatic.** The report is kept as `<out_dir>/bench.json`
-//! (`out/bench/` under `make bench`) and each run prints its change against the one
-//! before, so measuring an optimisation is: run, change, run.
+//! (`out/bench/` under `make bench`) and each run prints its change against the
+//! last: measuring an optimisation is run, change, run.
 //!
 //! **GPU rows are clock-normalised** (`clock`, #862): a fixed probe timed beside
 //! every frame divides out the GPU governor's clock, so `gpu_ms` and `gpu.<pass>`
@@ -33,10 +33,9 @@
 //! `cpu_clock_pct` the clock it ran at. When that clock or the CPU time spreads
 //! across the window, or the clock moved since the last run, the report says so.
 //!
-//! It is an informational signal, never a gate: timings are this machine's, and a
-//! CI runner's software GPU makes them meaningless. Only the counts are portable.
-//! The scene is deterministic (fixed dt, seeded scripts, no RNG in placement), so
-//! two runs on one machine measure the same frames.
+//! An informational signal, never a gate: timings are this machine's (a CI runner's
+//! software GPU makes them meaningless); only the counts are portable. The scene is
+//! deterministic (fixed dt, seeded scripts, no RNG in placement): two runs measure the same frames.
 //!
 //! `make bench-scenes` ([`scenes`]) measures a game project's own scenes the same
 //! way, from deterministic viewpoints, with load time and memory beside.
@@ -157,9 +156,13 @@ fn sample(samples: &mut Samples, stats: &FrameStats, frame: Option<&RenderedFram
     let Some(frame) = frame else { return };
     samples.push("renderer_ms", frame.cpu_ms);
     let (stages, parts) = stage_rows(&frame.stages);
-    push_parts(samples, "render", frame.cpu_ms, stages.into_iter(), 1.0);
-    for (part, ms) in parts {
-        samples.push(&format!("render.{part}"), ms);
+    push_parts(samples, "render", frame.cpu_ms, stages.iter().copied(), 1.0);
+    for &(stage, _) in &stages {
+        let of = parts
+            .iter()
+            .filter(|(p, _)| p.split_once('.').is_some_and(|(s, _)| s == stage));
+        let rows = of.map(|&(p, ms)| (format!("render.{p}"), ms));
+        samples.push_stage_parts(&format!("render.{stage}"), rows.collect::<Vec<_>>());
     }
     if let (Some(gpu), Some(speed)) = (&frame.gpu, speed.gpu) {
         samples.push("gpu_ms", gpu.total_ms() * speed);

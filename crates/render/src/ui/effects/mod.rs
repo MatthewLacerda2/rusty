@@ -7,21 +7,24 @@
 //! coverage texture of its nearest `Mask`, the blurred frame a backdrop shows, and
 //! a sampler. Batches with no mask or backdrop bind the white texture there, so one
 //! shader path serves them all. The slots are camera-independent — canvas NDC — so
-//! they are written once per frame in `prepare_ui`, and the world pass reuses them
-//! for every camera.
+//! they are packed once per frame in `prepare_ui` (uploaded only when they differ
+//! from the last upload), and the world pass reuses them for every camera. The
+//! groups are kept across frames, each rebuilt only when the uniform buffer, its
+//! mask texture or its blur level's target was replaced, and dropped once a frame
+//! no longer asks for it (a removed Mask, a blur level a quality change left).
 //!
-//! - `mask` / `backdrop` — the pure halves the mesh builder calls.
-//! - `mask_gpu` — each Mask's coverage texture, rendered before the camera stack.
+//! - `mask` / `backdrop` — the pure halves the mesh builder calls; `mask::gpu`,
+//!   each Mask's coverage texture, rendered before the camera stack, and
+//!   `mask::key`, what it is drawn from, so a still Mask is kept.
 //! - `blur` — the dual-filter chain over the finished frame, run before the
 //!   overlay pass.
 
 pub(crate) mod backdrop;
 pub(crate) mod blur;
 pub(crate) mod mask;
-pub(crate) mod mask_gpu;
 
 use crate::gpu::ops::CountedDevice as _;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use glam::Vec2;
 
@@ -29,6 +32,7 @@ use self::backdrop::UiBackdrop;
 use super::cache::UiViewCache;
 use super::mesh::{UiBatch, UiClip};
 use crate::gpu::grow_buffer::GrowBuffer;
+use crate::gpu::kept::Kept;
 use crate::gpu::layout_entries::{dynamic_uniform_entry, sampler_entry, texture_entry};
 use crate::Renderer;
 
@@ -59,7 +63,7 @@ impl BatchUniform {
 
 /// Which batch group a batch binds: its mask (by Mask entity) and its backdrop's
 /// blur level.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(crate) struct GroupKey {
     pub(crate) mask: Option<u32>,
     pub(crate) backdrop: Option<u32>,
@@ -77,16 +81,33 @@ impl GroupKey {
     }
 }
 
+/// What a batch group binds: the batch uniform, its mask's texture and its
+/// backdrop's blur level, each compared by identity (`Kept`).
+type GroupInputs = (
+    wgpu::Buffer,
+    Option<wgpu::TextureView>,
+    Option<wgpu::TextureView>,
+);
+
 /// A view's effect state: the batch uniform and where each canvas's slots start,
-/// the Mask textures, the blur chain, and the last frame's pass counts.
+/// the batch groups kept across frames, the Mask textures, the blur chain, and the
+/// last frame's pass counts.
 #[derive(Default)]
 pub(crate) struct UiEffects {
     uniforms: Option<GrowBuffer>,
+    /// The bytes last uploaded to `uniforms`: an equal frame uploads nothing.
+    uploaded: Vec<u8>,
+    /// Batch-uniform uploads by the last frame (0 or 1).
+    pub(crate) uniform_uploads: u32,
+    /// Each batch group, rebuilt only when a resource it binds was replaced.
+    groups: HashMap<GroupKey, Kept<GroupInputs, wgpu::BindGroup>>,
+    /// The keys asked for since the frame began ([`Self::forget_groups`]).
+    asked: HashSet<GroupKey>,
     /// Bytes between two slots (the dynamic-offset alignment).
     stride: u32,
     /// Each synced canvas's first batch slot, then its first mask-draw slot.
     slots: Vec<(u32, u32)>,
-    pub(crate) masks: mask_gpu::MaskTargets,
+    pub(crate) masks: mask::gpu::MaskTargets,
     pub(crate) blur: Option<blur::BlurTargets>,
     /// Mask textures rendered by the last frame (#428).
     pub(crate) mask_passes: u32,
@@ -104,6 +125,26 @@ impl UiEffects {
     /// The dynamic offset of canvas `i`'s mask draw `m`.
     pub(crate) fn mask_offset(&self, i: usize, m: usize) -> u32 {
         (self.slots[i].1 + m as u32) * self.stride
+    }
+
+    /// `key`'s batch group, made by [`Renderer::batch_groups`] this frame.
+    pub(crate) fn group(&self, key: &GroupKey) -> &wgpu::BindGroup {
+        let kept = self.groups.get(key).and_then(Kept::value);
+        kept.expect("batch_groups made every key's group")
+    }
+
+    /// Begin a frame's groups: drop every group the last frame did not ask for,
+    /// so what it binds (a removed Mask's texture, an unused blur level, an
+    /// outgrown uniform buffer) is freed with it.
+    pub(crate) fn forget_groups(&mut self) {
+        let asked = std::mem::take(&mut self.asked);
+        self.groups.retain(|k, _| asked.contains(k));
+    }
+
+    /// The batch groups held, for tests.
+    #[cfg(test)]
+    pub(crate) fn group_count(&self) -> usize {
+        self.groups.len()
     }
 }
 
@@ -154,64 +195,103 @@ impl Renderer {
         // An empty view still binds a slot (a zero-sized binding is invalid).
         bytes.resize(bytes.len().max(stride as usize), 0);
         let fx = &mut cache.effects;
+        (fx.stride, fx.slots) = (stride, slots);
+        // A still HUD's slots equal the last upload's: the buffer already holds them.
+        fx.uniform_uploads = 0;
+        if fx.uniforms.is_some() && fx.uploaded == bytes {
+            return;
+        }
         let usage = wgpu::BufferUsages::UNIFORM;
         let buffer = fx
             .uniforms
             .get_or_insert_with(|| GrowBuffer::new(&self.device, "UI Batch Uniforms", usage));
         buffer.upload(&self.device, &self.queue, &bytes);
-        (fx.stride, fx.slots) = (stride, slots);
+        (fx.uploaded, fx.uniform_uploads) = (bytes, 1);
     }
 
-    /// The batch group of every key in `keys`, against `fx`'s current uniform buffer.
+    /// Make the batch group of every key in `keys` current against `fx`'s uniform
+    /// buffer, mask textures and blur targets ([`UiEffects::group`] reads them):
+    /// a group is rebuilt only when one of those was replaced since it was made.
     pub(crate) fn batch_groups(
         &self,
-        fx: &UiEffects,
+        fx: &mut UiEffects,
         keys: impl IntoIterator<Item = GroupKey>,
-    ) -> HashMap<GroupKey, wgpu::BindGroup> {
-        let ui = &self.ui_renderer;
-        let mut groups = HashMap::new();
-        let Some(buffer) = fx.uniforms.as_ref() else {
-            return groups;
+    ) {
+        let Some(buffer) = fx.uniforms.as_ref().map(GrowBuffer::buffer) else {
+            return;
         };
+        // One look a distinct key, however many batches share it.
+        let mut keys: Vec<GroupKey> = keys.into_iter().collect();
+        keys.sort_unstable();
+        keys.dedup();
         for key in keys {
-            if groups.contains_key(&key) {
-                continue;
-            }
+            fx.asked.insert(key);
             let mask = key.mask.and_then(|m| fx.masks.view(m));
             let blurred = key.backdrop.and_then(|l| fx.blur.as_ref()?.result(l));
-            let entries = [
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer: buffer.buffer(),
-                        offset: 0,
-                        size: wgpu::BufferSize::new(SLOT),
-                    }),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(mask.unwrap_or(&ui.white_view)),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::TextureView(blurred.unwrap_or(&ui.white_view)),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: wgpu::BindingResource::Sampler(&ui.sampler),
-                },
-            ];
-            let group = self.device.counted_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("UI Batch Group"),
-                layout: &ui.batch_layout,
-                entries: &entries,
+            let kept = fx.groups.entry(key).or_default();
+            // Compared borrowed: a kept group costs no clone of what it binds.
+            let current = kept.key().is_some_and(|(b, m, r)| {
+                b == buffer && m.as_ref() == mask && r.as_ref() == blurred
             });
-            groups.insert(key, group);
+            if current {
+                continue;
+            }
+            let inputs = (buffer.clone(), mask.cloned(), blurred.cloned());
+            let group = self.batch_group(&inputs);
+            kept.get(inputs, || group);
         }
-        groups
+    }
+
+    /// A batch group binding `inputs`: the batch uniform, a mask texture and a
+    /// blur level (the white texture where either is absent).
+    fn batch_group(&self, (buffer, mask, blurred): &GroupInputs) -> wgpu::BindGroup {
+        let ui = &self.ui_renderer;
+        let entries = [
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(SLOT),
+                }),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(
+                    mask.as_ref().unwrap_or(&ui.white_view),
+                ),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::TextureView(
+                    blurred.as_ref().unwrap_or(&ui.white_view),
+                ),
+            },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: wgpu::BindingResource::Sampler(&ui.sampler),
+            },
+        ];
+        self.device.counted_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("UI Batch Group"),
+            layout: &ui.batch_layout,
+            entries: &entries,
+        })
     }
 }
 
+#[cfg(test)]
+#[path = "chain_gpu_tests.rs"]
+mod chain_gpu_tests;
+#[cfg(test)]
+#[path = "gpu_fixture.rs"]
+mod gpu_fixture;
+#[cfg(test)]
+#[path = "gpu_tests.rs"]
+mod gpu_tests;
+#[cfg(test)]
+#[path = "groups_gpu_tests.rs"]
+mod groups_gpu_tests;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
