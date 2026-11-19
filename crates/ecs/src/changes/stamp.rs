@@ -16,6 +16,38 @@
 use super::{Activity, Channel, Layer, WorldPose, STATIC};
 use crate::World;
 
+/// A subtree stamp's walk state, kept on the change log between walks so a warm
+/// walk allocates nothing (`world_space::bounds`' flush walks the same way). A
+/// walk started inside another's visit finds it taken and starts cold: correct,
+/// only not allocation-free.
+#[derive(Debug, Default)]
+pub(super) struct Scratch {
+    stack: Vec<u32>,
+    /// The walk that last reached each id, so a walk yields it once.
+    seen: Vec<u32>,
+    walk: u32,
+}
+
+impl Scratch {
+    /// Start a walk: a new stamp, which no id carries yet.
+    fn begin(&mut self) {
+        self.walk = self.walk.wrapping_add(1);
+        if self.walk == 0 {
+            self.seen.fill(0);
+            self.walk = 1;
+        }
+    }
+
+    /// Whether `id` is first reached in this walk (and mark it reached).
+    fn first_visit(&mut self, id: u32) -> bool {
+        let at = id as usize;
+        if at >= self.seen.len() {
+            self.seen.resize(at + 1, 0);
+        }
+        std::mem::replace(&mut self.seen[at], self.walk) != self.walk
+    }
+}
+
 impl World {
     /// A write to column `T` of `id`: noted for the journal and stamped on `T`.
     pub(crate) fn touch<T: Channel>(&mut self, id: u32) {
@@ -83,15 +115,14 @@ impl World {
             }
             return;
         }
-        let below: Vec<u32> = self.self_and_descendants(id).collect();
-        for e in below {
+        self.each_below(id, |w, e| {
             if let Some(at) = activity {
-                self.stamp_at(at, e);
+                w.stamp_at(at, e);
             }
-            if self.is_static(e) {
-                self.stamp_static(e);
+            if w.is_static(e) {
+                w.stamp_static(e);
             }
-        }
+        });
     }
 
     /// `id`'s world pose and every descendant's may have changed ([`WorldPose`]).
@@ -105,7 +136,25 @@ impl World {
         if self.changes.get_mut().logs[at].pending(id) {
             return;
         }
-        let below: Vec<u32> = self.self_and_descendants(id).collect();
-        below.into_iter().for_each(|e| self.stamp_at(at, e));
+        self.each_below(id, |w, e| w.stamp_at(at, e));
+    }
+
+    /// `visit` each id [`World::self_and_descendants`] yields, in its order, with the
+    /// World writable: the walk keeps its stack and seen set on the change log
+    /// instead of collecting the subtree first.
+    fn each_below(&mut self, id: u32, mut visit: impl FnMut(&mut World, u32)) {
+        let mut s = std::mem::take(&mut self.changes.get_mut().scratch);
+        s.begin();
+        s.stack.push(id);
+        while let Some(e) = s.stack.pop() {
+            if !self.contains(e) || !s.first_visit(e) {
+                continue;
+            }
+            visit(self, e);
+            let at = s.stack.len();
+            self.push_children(e, &mut s.stack);
+            s.stack[at..].reverse();
+        }
+        self.changes.get_mut().scratch = s;
     }
 }

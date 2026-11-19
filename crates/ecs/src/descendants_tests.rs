@@ -1,7 +1,8 @@
 //! crates/ecs/src/descendants_tests.rs — `World::self_and_descendants` (#991): pre-order in
-//! declared order, and a malformed `children` list ends the walk.
+//! declared order, and a malformed `children` list ends the walk; the change log's
+//! subtree stamps reach the same ids.
 
-use crate::World;
+use crate::{Changes, World, WorldPose};
 
 fn walk(w: &World, id: u32) -> Vec<u32> {
     w.self_and_descendants(id).collect()
@@ -64,4 +65,69 @@ fn a_hierarchy_path_reads_back_to_its_entity_among_same_names() {
     }
     assert_eq!(w.find_child(arena, "Crate"), Some(crates[0]));
     assert_eq!(w.path_of(99), None);
+}
+
+/// The walk as first written (#991): a cloned child list and a `BTreeSet` per walk.
+/// The kept reference the allocation-free walk must match id for id.
+fn reference(w: &World, id: u32, descend: impl Fn(u32) -> bool) -> Vec<u32> {
+    let (mut stack, mut seen, mut out) = (vec![id], std::collections::BTreeSet::new(), vec![]);
+    while let Some(id) = stack.pop() {
+        if !w.contains(id) || !seen.insert(id) {
+            continue;
+        }
+        if descend(id) {
+            stack.extend(w.children(id).into_iter().rev());
+        }
+        out.push(id);
+    }
+    out
+}
+
+/// `n` entities, each given the listed children by index (cycles and repeats
+/// allowed, taken modulo `n + 3`); the last three are spawned then despawned.
+fn malformed(lists: &[Vec<usize>]) -> (World, Vec<u32>) {
+    let mut w = World::new();
+    let ids: Vec<u32> = (0..lists.len() + 3)
+        .map(|i| w.spawn(format!("e{i}")))
+        .collect();
+    for (parent, children) in lists.iter().enumerate() {
+        for &c in children {
+            w.add_child(ids[parent], ids[c % ids.len()]);
+        }
+    }
+    ids[lists.len()..].iter().for_each(|&gone| w.despawn(gone));
+    (w, ids)
+}
+
+proptest::proptest! {
+    #[test]
+    fn the_walk_yields_what_the_reference_walk_yields(
+        lists in proptest::collection::vec(proptest::collection::vec(0usize..11, 0..4), 1..9),
+        prune in 1u32..5,
+    ) {
+        let (mut w, ids) = malformed(&lists);
+        let mut poses = w.change_cursor::<WorldPose>();
+        for &id in &ids {
+            proptest::prop_assert_eq!(walk(&w, id), reference(&w, id, |_| true));
+            let pruned: Vec<u32> = w.self_and_descendants_while(id, |e| e % prune != 0).collect();
+            proptest::prop_assert_eq!(pruned, reference(&w, id, |e| e % prune != 0));
+            // The stamps' kept walk (`changes::stamp`) reaches the same ids; the log reads them sorted.
+            w.stamp_pose_below(id);
+            let mut sorted = reference(&w, id, |_| true);
+            sorted.sort_unstable();
+            proptest::prop_assert_eq!(w.changes(&mut poses), Changes::Ids(sorted));
+        }
+    }
+}
+
+#[test]
+fn two_walks_alive_at_once_each_yield_their_whole_subtree() {
+    let (w, ids) = malformed(&[vec![1, 2], vec![2, 0], vec![1]]);
+    let (mut outer, mut inner) = (vec![], vec![]);
+    for e in w.self_and_descendants(ids[0]) {
+        outer.push(e);
+        inner.push(walk(&w, ids[1]));
+    }
+    assert_eq!(outer, reference(&w, ids[0], |_| true));
+    assert!(inner.iter().all(|v| *v == reference(&w, ids[1], |_| true)));
 }
