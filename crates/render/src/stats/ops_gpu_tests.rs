@@ -24,12 +24,14 @@ const STILL: OpCounts = OpCounts {
     buffer_writes: 19,
 };
 
-/// [`STILL`] with the GPU occlusion cull on: Hi-Z phase one adds a render pass, the
-/// pyramid and the cull their compute passes, with a submit and three writes.
-/// Measured: RTX 2060 8/4/4/3/22, lavapipe 8/4/4/3/22, Metal 8/4/4/3/22.
+/// [`STILL`] with the GPU occlusion cull on: Hi-Z phase one adds a render pass, and
+/// the stage two compute passes (the select's, then the pyramid and the cull in
+/// one, #2327), with a submit and three writes.
+/// Measured: lavapipe 8/2/4/3/22, Metal 8/2/4/3/22 (CI's macOS leg); before
+/// #2327, 8/4/4/3/22 on RTX 2060, lavapipe and Metal.
 const STILL_CULLING: OpCounts = OpCounts {
     render_passes: 8,
-    compute_passes: 4,
+    compute_passes: 2,
     submits: 4,
     bind_groups_created: 3,
     buffer_writes: 22,
