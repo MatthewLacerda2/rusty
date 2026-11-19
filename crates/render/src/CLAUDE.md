@@ -131,6 +131,8 @@ Before building a layout or pipeline by hand, use these:
 - `render::gpu::layout_entries`: one uniform, texture, sampler, depth or storage entry.
 - `render::gpu::DEPTH_FORMAT`: every view depth target and every pipeline drawing into
   one; shadow maps keep their own format in `passes::shadows`.
+- `render::gpu::kept::Kept`: a bind group or draw kept across frames, rebuilt only
+  when a resource its key names was replaced (the Hi-Z cull's, SSR's targets).
 - `render::gpu::fullscreen::Fullscreen`: any fullscreen-triangle pass (post-FX, SSAO,
   the UI blur, the shadow-atlas blit).
 - `render::passes::blended`: the globals uniform and the alpha and additive pipelines

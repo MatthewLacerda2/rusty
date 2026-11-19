@@ -7,7 +7,7 @@ use std::ops::Range;
 use glam::{Mat4, Vec3};
 
 use super::cull::{CameraCull, ARGS};
-use super::kept::Tables;
+use super::tables::Tables;
 use crate::draw::batch::{DrawBatch, OpaqueBatches};
 use crate::gpu::layout_entries::{storage_entry, uniform_entry};
 use crate::{InstanceData, Renderer};
