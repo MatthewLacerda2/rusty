@@ -2,7 +2,8 @@
 
 This file loads when you work under `.github/scripts/`: the Python behind `make queue`,
 `make queue-status`, `make queue-events`, `make mergeable`, `make ruleset`, `make blockers`, `make reclaim`, `make checks`, `make conflicts`, `make board`,
-`make coder`, `make coders`, `make review-level`, `make rebriefs` and `make mutants-remote`, and the CI helpers
+`make coder`, `make coders`, `make review-level`, `make rebriefs`, `make mutants-remote`, `make bench-ab` and
+`make test-gpu PR=`, and the CI helpers
 beside them. The root `CLAUDE.md` keeps the
 project-wide rules (merging is serialized, gates vs. signals, issues and labels); the
 `ci-merge` and `issue-batch` skills say how to *run* this tooling. This file is what a
@@ -36,6 +37,10 @@ coder *changing* it must know.
   the command lines. The routines API is
   reached through `claude mcp serve` (`dispatch/remote.py` says why), never with a
   token a script reads: the claude.ai login stays inside `claude`.
+- **`.github/scripts/bench/` is a PR's measured rows**: its trees (`main` and the
+  PR's head, detached under `.claude/worktrees/`), the refusals, the three legs and
+  the table. `bench-ab.py` and `pr-tree.py` are only the command lines. A test never
+  builds or benches: the legs take a stub runner.
 - **GitHub over REST, so the scripts run in cloud sessions.** There GraphQL answers
   403, and `gh pr view/list`, `gh issue list` and `gh repo view` with `--json` are
   GraphQL. New calls go through `gh api repos/{owner}/{repo}/…`, paging with an

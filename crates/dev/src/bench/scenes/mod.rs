@@ -23,12 +23,14 @@
 //! process of its own, so a scene's load time is a cold one and its memory peak
 //! its own.
 
+pub mod args;
 mod fold;
 pub mod import;
 mod measure;
 mod notes;
 pub mod profile;
 pub mod report;
+pub mod set;
 pub mod views;
 
 use std::collections::BTreeSet;
@@ -89,6 +91,16 @@ pub struct Extra {
     pub key: String,
     /// The cold load an import run measured (`import_ms`), when one ran.
     pub import_ms: Option<f64>,
+    /// The run's `--set` overrides of the running quality preset, as given
+    /// (`set::Overrides::said`), which the report records.
+    pub set: Vec<String>,
+}
+
+/// The project at `path` opened to run, `set` written over its running preset.
+pub fn open(path: &Path, set: &set::Overrides) -> Result<rusty_core::project::Opened, String> {
+    let mut opened = rusty_core::project::open(path, rusty_core::project::Access::Run)?;
+    set.apply(&mut opened.settings.quality)?;
+    Ok(opened)
 }
 
 /// Every scene the project at `root` holds: each `.scene` under its
@@ -162,6 +174,7 @@ pub fn bench(
     drop(probe);
     report.scene = scene.to_string();
     report.size = opts.size;
+    report.set.clone_from(&extra.set);
     report.push_value("load_ms", load_ms);
     if let Some(ms) = extra.import_ms {
         report.push_value("import_ms", ms);
@@ -268,3 +281,7 @@ mod run_tests;
 #[cfg(test)]
 #[path = "rows_tests.rs"]
 mod rows_tests;
+
+#[cfg(test)]
+#[path = "set_gpu_tests.rs"]
+mod set_gpu_tests;
