@@ -60,6 +60,9 @@ pub struct SceneReport {
     pub baseline: Option<String>,
     /// The run's render size.
     pub size: (u32, u32),
+    /// The running quality preset's overrides for this run (`--set key=value`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub set: Vec<String>,
     pub rows: Vec<Row>,
     /// Which source `gpu_mb` came from (`rusty_render::GpuMemory::source`), if any.
     pub gpu_mb_source: Option<String>,
@@ -105,6 +108,9 @@ impl SceneReport {
             self.views.len(),
             self.frames
         );
+        if !self.set.is_empty() {
+            let _ = writeln!(out, "quality preset overridden: {}", self.set.join(", "));
+        }
         let against = if self.baseline.is_some() {
             "before"
         } else {

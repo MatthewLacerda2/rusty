@@ -356,11 +356,11 @@ this branch moves>` (never a blanket `cargo update`), then `cargo check --locked
 --all-targets` and `make deny` before pushing. Under `--no-check` such an update
 goes back to a coder, never a quick orchestrator fix.
 
-After an update, re-check any claim **about the base** the branch measured (the
-Gates line, a survivor count, a coverage number, a byte-identical proof): a
-measurement against an older `main` is stale. The queue dates the Gates line on
-each update it pushes (`updated by the queue to main at <main>; local gates not
-re-run; CI judged <head>`).
+After an update, re-check any claim **about the base** the branch measured (the Gates line, a
+survivor count, a coverage number, a byte-identical proof): a measurement against an older `main`
+is stale. The queue dates the Gates line on each update it pushes (`updated by the queue to main at
+<main>; local gates not re-run; CI judged <head>`). A performance PR's **measured row**, owed before
+it queues, is `make bench-ab PR=<n> PROJECT=<dir>`'s table (`docs/testing.md`, *measured rows*).
 
 ## The same-commit obligations
 

@@ -3,7 +3,8 @@
 //! ```text
 //! Usage:
 //!   cargo run --release --features dev --bin bench-scenes -- --project <dir> [--scenes <a,b>]
-//!       [--size <W>x<H>] [--runs <n>] [--before <dir>] [--profile] [--import] <out_dir>
+//!       [--size <W>x<H>] [--runs <n>] [--before <dir>] [--set <k=v>]... [--profile] [--import]
+//!       <out_dir>  |  --project <dir> --pending-imports
 //! ```
 //!
 //! Benches each scene (`--scenes` names them by their path under
@@ -22,7 +23,9 @@
 //! profiler is tried once before any scene, so a refusal ends the run. With
 //! `--import`, once a run, one more imports a copy of the project without its
 //! import cache and loads its first scene (`--import-out`, `scenes::import`),
-//! handing both's time to that scene's run as `--import-ms`. The project is not written.
+//! handing both's time to that scene's run as `--import-ms`. `--set` overrides the
+//! running quality preset in every child (`scenes::set`); `--pending-imports` lists
+//! the images an import would encode, exiting 1 if any. The project is not written.
 
 use std::ffi::OsString;
 use std::path::{absolute, Path, PathBuf};
@@ -30,12 +33,11 @@ use std::process::exit;
 // lint: allow(subprocess) each scene benches in children of this binary, so its load is cold and its memory peak its own
 use std::process::Command;
 
-use rusty::core::project::{take_flag, take_value, Access};
-use rusty::core::settings::video::parse_size;
-use rusty::dev::bench::scenes::{self, import, profile, report, Extra, Options};
+use rusty::core::project::Opened;
+use rusty::dev::bench::scenes::{self, import, profile, report, set::Overrides, Extra, Options};
 
-const USAGE: &str = "usage: bench-scenes --project <dir> [--scenes <a,b>] [--size <W>x<H>] \
-                     [--runs <n>] [--before <dir>] [--profile] [--import] <out_dir>";
+const USAGE: &str = "usage: bench-scenes --project <dir> [--scenes <a,b>] [--size <W>x<H>] [--runs <n>] \
+     [--before <dir>] [--set <k=v>]... [--profile] [--import] <out_dir> | --project <dir> --pending-imports";
 
 /// What one invocation was asked for.
 struct Run {
@@ -47,65 +49,68 @@ struct Run {
     profile: bool,
     /// `--import`: measure `import_ms` once this run.
     import: bool,
+    set: Overrides,
 }
 
 fn main() {
     rusty::init();
-    let mut args: Vec<String> = std::env::args().skip(1).collect();
+    let args: Vec<String> = std::env::args().skip(1).collect();
     rusty::core::project::answer_help(&args, USAGE);
-    let value = |args: &mut Vec<String>, flag| take_value(args, flag).unwrap_or_else(|e| fail(&e));
-    let project = take_flag(&mut args).unwrap_or_else(|e| fail(&e));
-    let list = value(&mut args, "--scenes");
-    let one = value(&mut args, "--scene");
-    let size = value(&mut args, "--size").map(|s| parse_size(&s).unwrap_or_else(|e| fail(&e)));
-    let runs = value(&mut args, "--runs").map(|r| match r.parse::<u32>() {
-        Ok(n) if n > 0 => n,
-        _ => fail(&format!("--runs wants a whole number above 0, not {r}")),
-    });
-    let before = value(&mut args, "--before").map(PathBuf::from);
-    let import_out = value(&mut args, "--import-out").map(PathBuf::from);
-    let import_ms = value(&mut args, "--import-ms").and_then(|v| v.parse::<f64>().ok());
-    let profile = take_switch(&mut args, "--profile");
-    let import = take_switch(&mut args, "--import");
-    let (Some(project), [out]) = (project, args.as_slice()) else {
-        fail("bench-scenes needs --project and one out_dir")
+    let a = scenes::args::parse(args).unwrap_or_else(|e| fail(&e));
+    let Some(project) = a.project else {
+        fail("bench-scenes needs --project")
     };
     let project = std::fs::canonicalize(&project)
         .unwrap_or_else(|e| fail(&format!("{}: {e}", project.display())));
+    if a.pending_imports {
+        let found = import::pending(&project).unwrap_or_else(|e| fail(&e));
+        found
+            .iter()
+            .for_each(|image| println!("{}", image.display()));
+        exit(i32::from(!found.is_empty()));
+    }
+    let [out] = a.rest.as_slice() else {
+        fail("bench-scenes needs one out_dir")
+    };
     let key = scenes::out_key(&project);
     let out = absolute(out)
         .unwrap_or_else(|_| PathBuf::from(out))
         .join(&key);
     let opts = Options {
-        size: size.unwrap_or(scenes::DEFAULT_SIZE),
-        runs: runs.unwrap_or(scenes::RUNS),
+        size: a.size.unwrap_or(scenes::DEFAULT_SIZE),
+        runs: a.runs.unwrap_or(scenes::RUNS),
         ..Options::default()
     };
-    let before = before.map(|b| absolute(&b).unwrap_or(b));
     let run = Run {
         project,
         out,
         opts,
-        before,
-        profile,
-        import,
+        before: a.before.map(|b| absolute(&b).unwrap_or(b)),
+        profile: a.profile,
+        import: a.import,
+        set: a.set,
     };
-    match (one, import_out) {
+    match (a.one, a.import_out) {
         (Some(scene), Some(file)) => import_one(&run, &scene, &file),
         (Some(scene), None) if run.profile => profile_one(&run, &scene),
-        (Some(scene), None) => bench_one(&run, &scene, key, import_ms),
-        (None, _) => bench_all(&run, list.as_deref()),
+        (Some(scene), None) => bench_one(&run, &scene, key, a.import_ms),
+        (None, _) => bench_all(&run, a.list.as_deref()),
     }
+}
+
+/// The project at `path` opened to run, the run's `--set` over its running preset.
+fn open(run: &Run, path: &Path, what: &str) -> Opened {
+    scenes::open(path, &run.set).unwrap_or_else(|e| fail(&format!("cannot open {what}: {e}")))
 }
 
 /// Bench `scene` in this process.
 fn bench_one(run: &Run, scene: &str, key: String, import_ms: Option<f64>) {
-    let opened = rusty::core::project::open(&run.project, Access::Run);
-    let opened = opened.unwrap_or_else(|e| fail(&format!("cannot open the project: {e}")));
+    let opened = open(run, &run.project, "the project");
     let extra = Extra {
         baseline: run.before.clone(),
         key,
         import_ms,
+        set: run.set.said.clone(),
     };
     let done = scenes::bench(
         &opened.root,
@@ -123,8 +128,7 @@ fn bench_one(run: &Run, scene: &str, key: String, import_ms: Option<f64>) {
 
 /// Import the project (a cache-cleared copy), load `scene`, and write both's ms to `file`.
 fn import_one(run: &Run, scene: &str, file: &Path) {
-    let opened = rusty::core::project::open(&run.project, Access::Run);
-    let opened = opened.unwrap_or_else(|e| fail(&format!("cannot open the copy: {e}")));
+    let opened = open(run, &run.project, "the copy");
     let scratch = file.parent().unwrap_or(Path::new("."));
     eprintln!("{}", rusty::asset::import::notice(&opened.root));
     let imported = import::import().unwrap_or_else(|e| fail(&format!("import failed: {e}")));
@@ -141,8 +145,7 @@ fn import_one(run: &Run, scene: &str, file: &Path) {
 /// Profile `scene` in this process.
 fn profile_one(run: &Run, scene: &str) {
     let profiler = profile::find(std::env::var_os("PATH").as_deref()).unwrap_or_else(|e| fail(&e));
-    let opened = rusty::core::project::open(&run.project, Access::Run);
-    let opened = opened.unwrap_or_else(|e| fail(&format!("cannot open the project: {e}")));
+    let opened = open(run, &run.project, "the project");
     let at = (opened.root.as_path(), scene);
     if let Err(e) = profile::run(&profiler, at, opened.settings, &run.out, run.opts) {
         eprintln!("bench-scenes: {scene}: profile: {e}");
@@ -277,15 +280,12 @@ fn child(run: &Run, project: &Path, scene: &str) -> Command {
         "--runs",
         &run.opts.runs.to_string(),
     ]);
+    for pair in &run.set.said {
+        cmd.args(["--set", pair]);
+    }
     let root: OsString = run.out.parent().unwrap_or(&run.out).into();
     cmd.arg(root);
     cmd
-}
-
-/// Remove `flag` from `args`, saying whether it was there.
-fn take_switch(args: &mut Vec<String>, flag: &str) -> bool {
-    let at = args.iter().position(|a| a == flag);
-    at.map(|i| args.remove(i)).is_some()
 }
 
 /// The profiler would not record here: what it said, and what to set; no usage.
