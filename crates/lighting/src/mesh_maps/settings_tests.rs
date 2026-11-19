@@ -180,7 +180,9 @@ fn a_texel_is_measured_by_its_area_so_a_strip_floors_at_three_real_texels() {
     // band's three-texel floor (`3 × texel_world`) is three of them, not 3/64 of
     // the strip's height (which the shorter side would give: 24 texels along it).
     let strip = sheet(64.0, 1.0, Vec3::Z);
-    let baked = Baked::new(&strip, &Settings::new(Size::new(4096, 64))).unwrap();
+    let baked = Baked::new(&strip, &Settings::new(Size::new(4096, 64)))
+        .unwrap()
+        .0;
     assert!(
         (baked.texel_world() * 64.0 - 1.0).abs() < 1e-5,
         "{}",
@@ -188,7 +190,7 @@ fn a_texel_is_measured_by_its_area_so_a_strip_floors_at_three_real_texels() {
     );
     // A square map divides by its edge exactly, as before it could be non-square.
     let cube = cube();
-    let baked = Baked::new(&cube, &Settings::new(48)).unwrap();
+    let baked = Baked::new(&cube, &Settings::new(48)).unwrap().0;
     let per_uv = crate::lightmap::world_per_uv(&cube.surface()).unwrap();
     assert_eq!(baked.texel_world(), per_uv / 48.0);
 }
