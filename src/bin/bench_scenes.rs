@@ -4,7 +4,7 @@
 //! Usage:
 //!   cargo run --release --features dev --bin bench-scenes -- --project <dir> [--scenes <a,b>]
 //!       [--size <W>x<H>] [--runs <n>] [--load-runs <n>] [--before <dir>] [--set <k=v>]...
-//!       [--profile] [--import]
+//!       [--profile] [--import] [--script]
 //!       <out_dir>  |  --project <dir> --pending-imports
 //! ```
 //!
@@ -28,7 +28,10 @@
 //! `--import`, once a run, one more imports a copy of the project without its
 //! import cache and loads its first scene (`--import-out`, `scenes::import`),
 //! handing both's time to that scene's run as `--import-ms`. `--set` overrides the
-//! running quality preset in every child (`scenes::set`); `--pending-imports` lists
+//! running quality preset in every child (`scenes::set`). `--script` times the
+//! scripts' engine verbs in the timed child (`bench::verbs`), its reports kept apart
+//! under `<out_dir>/<project>-<hash>/script/`, so a plain run's history is never
+//! compared with one; `--pending-imports` lists
 //! the images an import would encode, exiting 1 if any. The project is not written.
 
 use std::path::{absolute, Path, PathBuf};
@@ -42,7 +45,7 @@ use rusty::core::project::Opened;
 use rusty::dev::bench::scenes::{self, import, profile, report, set::Overrides, Extra, Options};
 
 const USAGE: &str = "usage: bench-scenes --project <dir> [--scenes <a,b>] [--size <W>x<H>] [--runs <n>] \
-     [--load-runs <n>] [--before <dir>] [--set <k=v>]... [--profile] [--import] <out_dir> | --project <dir> --pending-imports";
+     [--load-runs <n>] [--before <dir>] [--set <k=v>]... [--profile] [--import] [--script] <out_dir> | --project <dir> --pending-imports";
 
 /// What one invocation was asked for.
 struct Run {
@@ -56,6 +59,8 @@ struct Run {
     profile: bool,
     /// `--import`: measure `import_ms` once this run.
     import: bool,
+    /// `--script`: time the scripts' engine verbs in the timed child.
+    script: bool,
     set: Overrides,
 }
 
@@ -80,9 +85,12 @@ fn main() {
         fail("bench-scenes needs one out_dir")
     };
     let key = scenes::out_key(&project);
-    let out = absolute(out)
+    let mut out = absolute(out)
         .unwrap_or_else(|_| PathBuf::from(out))
         .join(&key);
+    if a.script {
+        out.push("script");
+    }
     let opts = Options {
         size: a.size.unwrap_or(scenes::DEFAULT_SIZE),
         runs: a.runs.unwrap_or(scenes::RUNS),
@@ -96,6 +104,7 @@ fn main() {
         before: a.before.map(|b| absolute(&b).unwrap_or(b)),
         profile: a.profile,
         import: a.import,
+        script: a.script,
         set: a.set,
     };
     match (a.one, a.import_out) {
@@ -116,6 +125,10 @@ fn open(run: &Run, path: &Path, what: &str) -> Opened {
 
 /// Bench `scene` in this process, after the loads kept in `loads`.
 fn bench_one(run: &Run, scene: &str, key: String, import_ms: Option<f64>, loads: Option<&Path>) {
+    if run.script {
+        // Before the first VM: one started earlier keeps the surface it has.
+        rusty::dev::stats::verbs::arm();
+    }
     let opened = open(run, &run.project, "the project");
     let loads = loads.map(scenes::load::read_all).transpose();
     let extra = Extra {

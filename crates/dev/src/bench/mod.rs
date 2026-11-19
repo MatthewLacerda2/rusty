@@ -10,7 +10,8 @@
 //! (`render.<stage>`, `Renderer::frame_stages`), each set with an `other` row for
 //! what none of its parts holds. A stage timed in parts (the Hi-Z `occlusion`
 //! stage, #2401) adds `render.<stage>.<part>` and `gpu.<pass>.<part>` rows beside
-//! its own, which they sit inside: no sum of a set counts them.
+//! its own, which they sit inside: no sum of a set counts them. A run that armed
+//! the verb timers (`make bench-scenes SCRIPT=1`) adds the `script.` rows ([`verbs`]).
 //!
 //! **Before and after is automatic.** The report is kept as `<out_dir>/bench.json`
 //! (`out/bench/` under `make bench`) and each run prints its change against the one
@@ -47,6 +48,7 @@ mod report;
 mod rig;
 pub mod scenes;
 pub mod stress;
+pub mod verbs;
 
 pub use lua::register;
 pub(crate) use lua::spec_from_lua;
@@ -103,6 +105,7 @@ pub(crate) fn measure_posed(
     // The first dispatch pays for setting the pipeline up: not a reading.
     time_probe(probe, harness);
     clock::cpu_probe_ms();
+    let mut verbs = verbs::Window::start();
     for _ in 0..ticks {
         if harness.world.borrow().quit_requested() {
             break;
@@ -119,6 +122,7 @@ pub(crate) fn measure_posed(
             gpu: clock::speed(before, after),
         };
         sample(&mut samples, &harness.stats.borrow(), frame.as_ref(), speed);
+        verbs.sample(&mut samples, &harness.stats.borrow(), speed.cpu);
         samples.end_frame();
     }
     (samples.report(), samples)

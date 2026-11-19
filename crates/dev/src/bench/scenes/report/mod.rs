@@ -25,6 +25,11 @@ pub use view_key::ViewKey;
 pub const PROFILING_NOTE: &str = "(timed on the profiling build: release with frame pointers \
      forced on, for PROFILE=1; within the release build's spread where measured)";
 
+/// The line a `SCRIPT=1` run's table carries under its title.
+pub const SCRIPT_NOTE: &str = "script verbs timed (SCRIPT=1): script.<verb> is a verb's own ms, \
+     script.lua what of cpu.update_scripts no verb holds; the timers cost time, so \
+     cpu.update_scripts compares only with another SCRIPT=1 run\n";
+
 /// One row over a scene's viewpoints and runs.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Row {
@@ -84,6 +89,10 @@ pub struct SceneReport {
     /// The running quality preset's overrides for this run (`--set key=value`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub set: Vec<String>,
+    /// A `SCRIPT=1` run (`bench::verbs`): its verbs were timed, which costs time,
+    /// so it compares only with another such run.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub script: bool,
     pub rows: Vec<Row>,
     /// Which source `gpu_mb` came from (`rusty_render::GpuMemory::source`), if any.
     pub gpu_mb_source: Option<String>,
@@ -103,10 +112,12 @@ impl SceneReport {
     }
 
     /// Whether `previous` benched what this run did: the same size, viewpoints
-    /// (each where it looks from, [`ViewKey`]) and frames. Only then do their
-    /// rows compare; the number of runs may differ.
+    /// (each where it looks from, [`ViewKey`]) and frames, both timing their
+    /// verbs or neither (`script`). Only then do their rows compare; the number
+    /// of runs may differ.
     pub fn same_shape(&self, previous: &SceneReport) -> bool {
-        (self.size, &self.views, self.frames) == (previous.size, &previous.views, previous.frames)
+        let shape = |r: &SceneReport| (r.size, r.views.clone(), r.frames, r.script);
+        shape(self) == shape(previous)
     }
 
     /// The table the terminal shows, with each row's average against `previous`
@@ -125,6 +136,9 @@ impl SceneReport {
         );
         if !self.set.is_empty() {
             let _ = writeln!(out, "quality preset overridden: {}", self.set.join(", "));
+        }
+        if self.script {
+            out.push_str(SCRIPT_NOTE);
         }
         let against = if self.baseline.is_some() {
             "before"

@@ -38,6 +38,9 @@ pub fn bench_scene(run: &Run, scene: &str, import_ms: Option<f64>) -> Benched {
     if let Some(before) = &run.before {
         timed.arg("--before").arg(before);
     }
+    if run.script {
+        timed.arg("--script");
+    }
     let benched = timed.status().is_ok_and(|s| s.success());
     let _ = std::fs::remove_dir_all(&loads);
     if !benched {
@@ -122,7 +125,13 @@ fn child(run: &Run, project: &Path, scene: &str) -> Command {
     for pair in &run.set.said {
         cmd.args(["--set", pair]);
     }
-    let root: OsString = run.out.parent().unwrap_or(&run.out).into();
+    // The out dir as given: `run.out` less the project's key (and `script/`).
+    let key = if run.script { up(&run.out) } else { &run.out };
+    let root: OsString = up(key).into();
     cmd.arg(root);
     cmd
+}
+
+fn up(path: &Path) -> &Path {
+    path.parent().unwrap_or(path)
 }

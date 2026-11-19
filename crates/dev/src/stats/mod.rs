@@ -12,14 +12,12 @@
 //! slow" is only actionable once it names `update_scripts` or `step_physics`. A stage's
 //! time is the sum of its systems' times.
 //!
-//! **Sessions.** The stats restart on the first frame of every Play session, so a
-//! windowed editor reports the current run, not every run since launch; a window
-//! frame drawn outside Play reaches only the recent ring a window reads
+//! **Sessions.** The stats restart on each Play session's first frame, so a window
+//! reports the current run; a frame drawn outside Play reaches only the recent ring
 //! ([`record_window`]), so after Stop the session holds until the next Play.
 //!
-//! Render counters come from the renderer when it draws: a harness screenshot, or a
-//! frame of the window (`window`, #2205); [`record_render_into`] folds them in. Headless
-//! runs without a screenshot report timings and world counters only.
+//! Render counters come from the renderer when it draws (a harness screenshot, a
+//! window frame, #2205; [`record_render_into`]). [`verbs`] splits script time by verb.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -31,6 +29,7 @@ use rusty_app::{GameWorld, LoadProbe, Resources, Stage, SystemProbe, World};
 use rusty_core::frame_stats::{DrawnFrame, FrameStats, Series};
 use rusty_script::scripting::ConsoleLogs;
 
+pub mod verbs;
 mod window;
 pub use window::{known_keys, record_window, whole_count, window_ended, window_opt, WindowFrame};
 
@@ -83,6 +82,7 @@ impl TimingProbe {
 
 impl SystemProbe for TimingProbe {
     fn run(&mut self, stage: Stage, name: &'static str, system: &mut dyn FnMut()) {
+        verbs::enter_system(name);
         let start = Instant::now();
         system();
         let ms = start.elapsed().as_secs_f64() * 1000.0;
