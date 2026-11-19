@@ -14,51 +14,60 @@ impl Scene {
     /// transforms: `bone_in_mesh_space * inverse_bind` per joint, the same
     /// convention as the bind palette. A mesh whose skeleton is not bound keeps
     /// rendering its bind pose. Visits the skinned entities only
-    /// ([`Scene::skinned_ids`]), never the scene's static meshes.
+    /// ([`Scene::skinned_ids`]), never the scene's static meshes, and composes
+    /// every rig in one scratch per call, copied into the palette each mesh
+    /// already holds.
     pub fn build_skin_palettes(&mut self) {
+        let mut palette = Vec::new();
         for owner in self.skinned_ids() {
-            let Some(palette) = self.skin_palette(owner) else {
-                continue;
-            };
-            self.world.set_pose_palette(owner, palette);
+            if self.skin_palette(owner, &mut palette) {
+                self.world.set_pose_palette(owner, &palette);
+            }
         }
     }
 
-    /// One mesh's palette. Each bone's mesh-space matrix is composed down the
+    /// One mesh's palette, into `out` (cleared first); `false` when the mesh has
+    /// no bound skeleton. Each bone's mesh-space matrix is composed down the
     /// skeleton (parents first, so every parent is already resolved); a bone a
     /// script re-parented elsewhere falls back to its live world matrix, and a
     /// destroyed (missing) bone rides with its parent ([`missing_in_mesh`]).
-    fn skin_palette(&self, owner: u32) -> Option<Vec<Mat4>> {
-        let mesh = self.world.mesh(owner)?;
-        let skin = mesh.skin.as_ref()?;
+    fn skin_palette(&self, owner: u32, out: &mut Vec<Mat4>) -> bool {
+        out.clear();
+        let Some(mesh) = self.world.mesh(owner) else {
+            return false;
+        };
+        let Some(skin) = mesh.skin.as_ref() else {
+            return false;
+        };
         let bones = &mesh.skeleton.bones;
         if bones.is_empty() || bones.len() != skin.inverse_bind.len() {
-            return None;
+            return false;
         }
         let owner_inverse = self.world.local_to_world(owner).inverse();
-        let mut in_mesh: Vec<Mat4> = Vec::with_capacity(bones.len());
         for (slot, &bone) in bones.iter().enumerate() {
             let parent_slot = skin.parents.get(slot).copied().flatten();
             let Some((bone, (local, parent))) =
                 bone.and_then(|b| Some((b, self.world.local_and_parent(b)?)))
             else {
-                in_mesh.push(missing_in_mesh(skin, slot, parent_slot, &in_mesh)?);
+                let Some(m) = missing_in_mesh(skin, slot, parent_slot, out) else {
+                    return false;
+                };
+                out.push(m);
                 continue;
             };
             let m = match (parent, parent_slot) {
                 (Some(p), _) if p == owner => local,
-                (Some(p), Some(ps)) if ps < slot && bones[ps] == Some(p) => in_mesh[ps] * local,
+                (Some(p), Some(ps)) if ps < slot && bones[ps] == Some(p) => out[ps] * local,
                 _ => owner_inverse * self.world.local_to_world(bone),
             };
-            in_mesh.push(m);
+            out.push(m);
         }
-        Some(
-            in_mesh
-                .iter()
-                .zip(skin.inverse_bind.iter())
-                .map(|(g, ib)| *g * *ib)
-                .collect(),
-        )
+        // Every mesh-space matrix is composed; only now fold in the inverse binds,
+        // since a child above read its parent's mesh-space matrix from `out`.
+        for (g, ib) in out.iter_mut().zip(skin.inverse_bind.iter()) {
+            *g *= *ib;
+        }
+        true
     }
 }
 
