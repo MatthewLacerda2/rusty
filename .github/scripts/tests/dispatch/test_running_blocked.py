@@ -11,7 +11,7 @@ import unittest
 
 import ghrest
 from dispatch import running
-from tests.dispatch.test_coder import Fake, busy, drafts
+from tests.dispatch.coder_fakes import Fake, busy, drafts
 from tests.dispatch.test_running import FIRED, hub, placed, pr
 
 

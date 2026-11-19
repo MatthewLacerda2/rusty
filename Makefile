@@ -40,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export import launcher bench bench-scenes bless-converters fuzz-lock
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder coders review-level rebriefs mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export import launcher bench bench-scenes bless-converters fuzz-lock
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -367,13 +367,18 @@ reclaim: ## Remove merged worktrees nothing is using (and their target/) and fin
 # `Brief` comment on the issue and creates the one-off routine that starts the
 # cloud coder (through `claude mcp serve`, so the
 # claude.ai token stays inside claude); running it again is the re-brief launch.
-# It refuses a closed, `planning` or `human` issue, and a sixth running coder
-# (#1856; a re-brief never counts against itself, ARGS=--over-limit overrides).
+# It refuses a closed, `planning` or `human` issue; a sixth running coder (#1856;
+# a re-brief never counts against itself) waits in a line under .git/ (#2382),
+# ARGS=--no-wait refuses instead, ARGS=--over-limit launches anyway. `coders`
+# prints who runs and who waits, and launches from the line while slots are free.
 # ARGS=--dry-run prints the routine and creates nothing. `review-level` prints
 # `high` or `medium` for an independent review, and the paths that decided it.
 coder: ## Start the cloud coder on an issue's newest Brief. make coder ISSUE=1569, ARGS=--dry-run creates nothing
 	@test -n "$(ISSUE)" || { echo "coder: which issue? e.g. make coder ISSUE=1569" >&2; exit 1; }
 	@python3 .github/scripts/coder.py $(ISSUE) $(ARGS)
+
+coders: ## Who runs, who waits for a slot, and launch from the line while slots are free. ARGS=--dry-run launches nothing
+	@python3 .github/scripts/coders.py $(ARGS)
 
 review-level: ## The independent review's level (high or medium) and why. make review-level PR=1570
 	@test -n "$(PR)" || { echo "review-level: which pull request? e.g. make review-level PR=1570" >&2; exit 1; }
