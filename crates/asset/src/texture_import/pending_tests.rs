@@ -19,7 +19,7 @@ fn pending_lists_what_an_import_would_encode_and_nothing_else() {
     flat(10, 6).save(&odd).unwrap();
     assert_eq!(
         pending(&dir),
-        [floor.clone()],
+        std::slice::from_ref(&floor),
         "uncached, the odd one aside"
     );
     assert!(!cache_file(&floor).unwrap().exists(), "nothing was encoded");
