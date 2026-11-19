@@ -199,9 +199,9 @@ if s.gpu_ms then print(s.gpu_ms.avg) end                                -- times
 
 | Metric | What it counts |
 |---|---|
-| `frame_ms` | CPU ms of the whole per-frame schedule (the four stages below) |
+| `frame_ms` | CPU ms of the whole play-mode tick: the four stages below and the tick's own work around them (the UI textures' sizes, the camera, shader-time and audio sync) |
 | `fixed_update_ms` / `update_ms` / `late_update_ms` / `render_stage_ms` | CPU ms per schedule stage. `render_stage_ms` is the `Render` *stage* (draw-data prep), not the GPU |
-| `systems.<name>` | CPU ms per registered system (`update_scripts`, `step_physics`, `tick_nav`, …) |
+| `systems.<name>` | CPU ms per registered system (`update_scripts`, `step_physics`, `tick_nav`, …), and `flush_bounds`, the collider-AABB flush after each stage, summed over the stages |
 | `entities` / `rigid_bodies` / `nav_agents` / `particles` / `scripts` | world counters: live entities, RigidBody components, NavMeshAgents, live particles, loaded script instances |
 | `skeletons` / `bones` | skinned meshes with a skeleton, and their bound bone slots summed per skeleton (#1617; a bone two skeletons list counts twice): what a scene's characters cost the bone systems (`animate`, `pose_ragdolls`, `follow_bones`, `build_skin_palettes`) each tick |
 | `changes_<channel>` | per change channel the World keeps a log for (`ecs::changes`, #1705), the entities its log took in this frame: with a system reading it every tick, the distinct entities dirtied on it (one already waiting unread is not counted again). Channels: `world_pose`, `activity`, `layer`, `static_set` and the component columns (`transform`, `collider`, `scripts`, …). `changes_static_set` is always present (`0` until something reads it); the others appear once a system opens a cursor on them |

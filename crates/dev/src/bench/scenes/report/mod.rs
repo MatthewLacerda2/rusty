@@ -165,7 +165,7 @@ impl SceneReport {
 }
 
 /// The rows the run's summary shows for each scene, in order: `cpu_ms` is the
-/// sim's time at the reference CPU clock, `frame_ms` as measured.
+/// tick's time at the reference CPU clock, `frame_ms` as measured.
 const SUMMARY: [&str; 6] = [
     "cpu_ms",
     "frame_ms",

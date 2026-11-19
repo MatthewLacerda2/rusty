@@ -29,7 +29,7 @@
 //!
 //! **CPU rows are clock-normalised the same way** (#1719): a fixed CPU probe timed
 //! right before and after each sim step scales `cpu_ms` and `cpu.<system>` to the
-//! reference CPU clock; `frame_ms` is the sim's time as measured and
+//! reference CPU clock; `frame_ms` is the whole tick's time as measured and
 //! `cpu_clock_pct` the clock it ran at. When that clock or the CPU time spreads
 //! across the window, or the clock moved since the last run, the report says so.
 //!
@@ -137,8 +137,8 @@ fn time_probe(probe: Option<&ClockProbe>, harness: &mut Harness) -> Option<f64> 
     probe.time(renderer)
 }
 
-/// One frame's row values: the sim's CPU time and every system's share of it
-/// (`cpu.<system>`, named by the schedule), what rendering it cost and each of its
+/// One frame's row values: the tick's CPU time and every system's share of it
+/// (`cpu.<system>`, named by the schedule, `flush_bounds` among them), what rendering it cost and each of its
 /// stages' share (`render.<stage>`), its counters. Every GPU pass is sampled every
 /// frame (zero when it did not run), so the rows are the same from run to run.
 /// CPU and GPU times are scaled by the frame's clock `speed`s; a frame a probe

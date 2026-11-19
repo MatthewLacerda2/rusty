@@ -2,10 +2,12 @@
 //! session's first tick survives the stats reset that tick ends with.
 
 use super::*;
+use rusty_app::LoadProbe;
 use rusty_core::input::InputState;
 use rusty_core::paths;
 use rusty_navigation::NavigationGraph;
 use rusty_scene::Scene;
+use rusty_script::scripting::ConsoleLogs;
 
 #[test]
 fn a_load_timer_reports_a_swapped_in_load_and_drops_a_failed_one() {
@@ -30,7 +32,7 @@ fn a_load_timer_reports_a_swapped_in_load_and_drops_a_failed_one() {
 }
 
 /// A world on an empty scene with the frame stats installed, and a saved level.
-fn world_with_level(tag: &str) -> (GameWorld, Rc<RefCell<FrameStats>>, String) {
+pub(super) fn world_with_level(tag: &str) -> (GameWorld, Rc<RefCell<FrameStats>>, String) {
     let dir = rusty_test_support::temp::dir().join(format!("rusty_2123_{tag}"));
     std::fs::create_dir_all(&dir).unwrap();
     let level = paths::to_slash(&dir.join("level.scene"));

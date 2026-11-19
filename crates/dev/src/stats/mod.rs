@@ -10,7 +10,10 @@
 //! **Granularity.** Per-system *and* per-stage. The schedule is ~a dozen systems, so a
 //! clock read around each costs well under a microsecond a frame, and "FixedUpdate is
 //! slow" is only actionable once it names `update_scripts` or `step_physics`. A stage's
-//! time is the sum of its systems' times.
+//! time is the sum of its systems' times and its collider-AABB flush (`flush_bounds`).
+//! `frame_ms` is the whole [`GameWorld::tick`](rusty_app::GameWorld::tick), from its
+//! `begin_tick` to its `end_tick`, so it holds what no system does (#2342); a frame run
+//! outside a host's tick (a bare schedule) falls back to its stages' sum.
 //!
 //! **Sessions.** The stats restart on the first frame of every Play session, so a
 //! windowed editor reports the current run, not every run since launch; a window
@@ -27,11 +30,12 @@ use std::rc::Rc;
 use std::time::Instant;
 
 use super::capture::RenderedFrame;
-use rusty_app::{GameWorld, LoadProbe, Resources, Stage, SystemProbe, World};
+use rusty_app::{GameWorld, Resources, Stage, SystemProbe, World};
 use rusty_core::frame_stats::{DrawnFrame, FrameStats, Series};
-use rusty_script::scripting::ConsoleLogs;
 
+mod load;
 mod window;
+pub use load::LoadTimer;
 pub use window::{known_keys, record_window, whole_count, window_ended, window_opt, WindowFrame};
 
 /// The metric each per-frame stage's CPU time is recorded under.
@@ -57,6 +61,11 @@ pub struct TimingProbe {
     logged: BTreeMap<&'static str, u64>,
     /// The [`LoadTimer`]'s samples of a load this frame, recorded at its end.
     loads: LoadSamples,
+    /// When the host's tick began (`begin_tick`), for `frame_ms` at its end.
+    tick_start: Option<Instant>,
+    /// This tick's schedule frame ended and its stats await `frame_ms`: the
+    /// stages' sum, the fallback should the tick not end through `end_tick`.
+    open: Option<f64>,
 }
 
 /// A finished load's `load_*` samples (#2123), held until the frame's end: a load in
@@ -72,6 +81,8 @@ impl TimingProbe {
             system_ms: Vec::new(),
             logged: BTreeMap::new(),
             loads: LoadSamples::default(),
+            tick_start: None,
+            open: None,
         }
     }
 
@@ -110,12 +121,34 @@ impl SystemProbe for TimingProbe {
             stats.record(stage_key(*stage), ms);
             total += ms;
         }
-        stats.record("frame_ms", total);
         self.stage_ms = [0.0; 4];
         record_world(&mut stats, world, res);
         let changes = world.scene.borrow().world.change_stats();
         let changes = changes.into_iter().map(|s| (s.name, s.logged));
         record_changes(&mut stats, changes, &mut self.logged);
+        drop(stats);
+        self.open = Some(total);
+        if self.tick_start.is_none() {
+            self.end_tick(); // no host tick around this frame: close it now
+        }
+    }
+
+    fn begin_tick(&mut self) {
+        self.tick_start = Some(Instant::now());
+    }
+
+    /// Records `frame_ms` and closes the frame, if a schedule frame ran this tick:
+    /// an edit tick has no frame stats.
+    fn end_tick(&mut self) {
+        let whole = self
+            .tick_start
+            .take()
+            .map(|t| t.elapsed().as_secs_f64() * 1000.0);
+        let Some(stages) = self.open.take() else {
+            return;
+        };
+        let mut stats = self.stats.borrow_mut();
+        stats.record("frame_ms", whole.unwrap_or(stages));
         stats.end_tick();
     }
 }
@@ -158,52 +191,6 @@ fn record_changes(
         let before = last.insert(name, logged).unwrap_or(0);
         let key = format!("changes_{name}");
         stats.record(&key, logged.saturating_sub(before) as f64);
-    }
-}
-
-/// Times each step of a play-mode scene load (#2123) and, once it swapped in,
-/// reports them: one console line at once, and `load_<step>_ms` plus `load_ms`
-/// (their sum) into `loads`, which the [`TimingProbe`] records at the frame's end
-/// into the stats `Debug.Stats()` reads, so a series spans every load of the session.
-pub struct LoadTimer {
-    loads: LoadSamples,
-    steps: Vec<(&'static str, f64)>,
-}
-
-impl LoadTimer {
-    pub fn new(loads: LoadSamples) -> Self {
-        let steps = Vec::new();
-        Self { loads, steps }
-    }
-}
-
-impl LoadProbe for LoadTimer {
-    fn step(&mut self, name: &'static str, step: &mut dyn FnMut()) {
-        let start = Instant::now();
-        step();
-        self.steps
-            .push((name, start.elapsed().as_secs_f64() * 1000.0));
-    }
-
-    fn finish(&mut self, loaded: Option<&str>, console: &mut ConsoleLogs) {
-        let steps = std::mem::take(&mut self.steps);
-        let Some(path) = loaded else {
-            return; // a failed load swapped nothing in: nothing to compare against
-        };
-        let total: f64 = steps.iter().map(|(_, ms)| ms).sum();
-        let mut loads = self.loads.borrow_mut();
-        let parts: Vec<String> = steps
-            .iter()
-            .map(|(name, ms)| {
-                loads.push((format!("load_{name}_ms"), *ms));
-                format!("{name} {ms:.1}")
-            })
-            .collect();
-        loads.push(("load_ms".to_string(), total));
-        console.info(format!(
-            "Scene load {path}: {total:.1} ms ({})",
-            parts.join(", ")
-        ));
     }
 }
 

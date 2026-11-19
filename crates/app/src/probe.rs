@@ -17,6 +17,10 @@
 //! tick without a second copy of the timing. A host times its own steps through
 //! [`timed`] too.
 //!
+//! The probe also brackets each whole [`GameWorld::tick`] (`begin_tick`, `end_tick`),
+//! so the tick's work outside any system (the UI textures, the camera and audio
+//! sync) is in what it times, not only the systems' sum.
+//!
 //! No probe is installed by default, and a ship build never installs one.
 
 use super::game::GameWorld;
@@ -33,6 +37,13 @@ pub trait SystemProbe {
 
     /// A per-frame schedule pass finished. Read-only: counters are read, never written.
     fn end_frame(&mut self, world: &World, res: &Resources);
+
+    /// A host's [`GameWorld::tick`] starts: what a probe times whole begins here.
+    fn begin_tick(&mut self) {}
+
+    /// That tick ended, after its schedule pass's [`end_frame`](Self::end_frame)
+    /// when it ran one (in Play) and after the tick's own work around the schedule.
+    fn end_tick(&mut self) {}
 }
 
 /// Observes a load step by step: a play-mode scene load (`app::scene_load`),
@@ -85,6 +96,20 @@ pub fn timed<T>(
 }
 
 impl GameWorld {
+    /// Advance the simulation by `dt` seconds ([`run_tick`](Self::run_tick)), the
+    /// installed probe told when the tick begins and ends. Returns the play-state
+    /// transition for the platform (cursor grab).
+    pub fn tick(&mut self, dt: f32) -> super::PlayTransition {
+        if let Some(p) = self.resources.probe.as_mut() {
+            p.begin_tick();
+        }
+        let transition = self.run_tick(dt);
+        if let Some(p) = self.resources.probe.as_mut() {
+            p.end_tick();
+        }
+        transition
+    }
+
     /// Install (or with `None`, remove) the schedule's probe.
     pub fn set_probe(&mut self, probe: Option<Box<dyn SystemProbe>>) {
         self.resources.probe = probe;

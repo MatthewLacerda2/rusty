@@ -11,7 +11,7 @@ use super::{build, Resources, Stage, SystemProbe, World};
 
 type Log = Rc<RefCell<Vec<String>>>;
 
-/// Records what it saw instead of timing it.
+/// Records what it saw instead of timing it; its tick hooks are the defaults.
 struct Recorder(Log);
 
 impl SystemProbe for Recorder {
@@ -44,7 +44,11 @@ fn probe_sees_each_system_once_by_name_then_the_frame_end() {
         "{log:?}"
     );
     assert!(log.contains(&"LateUpdate:layout_ui".to_string()), "{log:?}");
-    let systems = log.iter().filter(|l| !l.starts_with("end@")).count();
+    let flushes = log.iter().filter(|l| l.ends_with(":flush_bounds"));
+    let flushed: Vec<_> = flushes.map(String::as_str).collect();
+    let stages = Stage::FRAME_ORDER.map(|s| format!("{s:?}:flush_bounds"));
+    assert_eq!(flushed, stages, "the AABB flush once per stage, by name");
+    let systems = log.iter().filter(|l| !l.starts_with("end@")).count() - flushed.len();
     let registered: usize = Stage::FRAME_ORDER
         .iter()
         .map(|s| build().into_schedule().system_names(*s).len())
