@@ -112,6 +112,18 @@ release build is most of the next run's wait. A PR's tree (`pr-<n>-head`,
 it is detached at: a power cut mid-run leaves it at the run's local merge
 commit, which no PR holds, and its release `target/` would outlive the PR.
 
+Reclaim runs on a full disk (#2436): a day of `make test-gpu PR=` trees (11
+GiB each) ran the operator's disk to 0 bytes free, and reclaim then died on its
+first `git status --porcelain` in a worktree (`index.lock write error. Out of
+diskspace`): plain `status` refreshes the index, a write. So it judges with
+`git --no-optional-locks status`, which writes nothing; it deletes the `target/`
+of every worktree it has decided to remove, a write-free `rmtree`, before any
+git command that writes (`worktree remove`, `branch -D`, `prune`); and a git
+command that still fails for lack of space is said as that, with `make reclaim`'s
+advice (`bench.space.full`: the trees whose `target/` holds the most), never as a
+bare git error. A `target/` is never deleted any other way: one in a kept tree may
+be a live build's.
+
 `--dry-run` decides and prints the same, and deletes nothing.
 """
 
@@ -128,6 +140,7 @@ from pathlib import Path
 import ghrest
 import reclaim_branches as branches
 import reclaim_use as use
+from bench import space
 from bench import trees as bench_trees
 from merging.watch import tenancy
 
@@ -272,10 +285,6 @@ def inside(path: Path, tree: Path) -> bool:
     return path == tree or tree in path.parents
 
 
-def gib(n_bytes: int) -> str:
-    return f"{n_bytes / 2**30:.1f} GiB"
-
-
 def describe(wt: Worktree) -> str:
     return wt.branch or "detached " + wt.head[:8]
 
@@ -286,6 +295,7 @@ class Machine:
     def __init__(self, runner=subprocess.run):
         self.runner = runner
         self.old_git = False  # git < 2.38 has no `merge-tree --write-tree`: noted once in main
+        self.root: Path | None = None  # the main checkout, once known: a full disk's advice names its trees
 
     def run(self, *argv: str, cwd: Path | None = None) -> subprocess.CompletedProcess:
         return self.runner(list(argv), capture_output=True, text=True, check=False, cwd=cwd)
@@ -293,7 +303,8 @@ class Machine:
     def git(self, cwd: Path, *args: str) -> str:
         done = self.run("git", "-C", str(cwd), *args)
         if done.returncode != 0:
-            sys.exit(f"reclaim: git {' '.join(args)}: {done.stderr.strip()}")
+            said = f"git {' '.join(args)}: {done.stderr.strip()}"  # a full disk is said as that (#2436)
+            sys.exit(f"reclaim: {space.full(said, self.root or cwd, self.runner) if space.said_full(said) else said}")
         return done.stdout.strip()
 
     def is_ancestor(self, cwd: Path, commit: str, of: str) -> bool:
@@ -367,7 +378,7 @@ class Machine:
         facts = Facts(current=inside(here, wt.path), reviewer=reviewer_tree(wt))
         facts.busy = None if procs is None else list(dict.fromkeys(
             (pid, command) for pid, path, command in procs if inside(path, wt.path)))
-        facts.dirty = bool(self.git(wt.path, "status", "--porcelain"))
+        facts.dirty = bool(self.git(wt.path, "--no-optional-locks", "status", "--porcelain"))  # no write (#2436)
         owner = tenancy.pid_of(wt.locked)
         if owner is not None and not self.alive(owner):
             facts.stale = owner
@@ -409,17 +420,16 @@ class Machine:
         return tenancy.alive(pid)
 
     def target_size(self, wt: Path) -> int | None:
-        target = wt / "target"
-        if not target.is_dir():
-            return None
-        done = self.run("du", "-sk", str(target))
-        return int(done.stdout.split()[0]) * 1024 if done.returncode == 0 else None
+        return space.du(wt / "target", self.runner) if (wt / "target").is_dir() else None
 
     def free(self, path: Path) -> int:
         return shutil.disk_usage(path).free
 
-    def remove(self, main: Path, wt: Path) -> None:
+    def drop_target(self, wt: Path) -> None:
+        """A removed worktree's build output, deleted with no git write (#2436)."""
         shutil.rmtree(wt / "target", ignore_errors=True)
+
+    def remove(self, main: Path, wt: Path) -> None:
         self.git(main, "worktree", "remove", str(wt))
 
     def delete_branch(self, main: Path, branch: str) -> str | None:
@@ -430,7 +440,7 @@ class Machine:
 
 def shown_target(machine: Machine, wt: Path) -> str:
     size = machine.target_size(wt)
-    return f"target/ {gib(size)}" if size is not None else "no target/"
+    return f"target/ {space.gib(size)}" if size is not None else "no target/"
 
 
 def parse_args(argv: list[str]) -> tuple[bool, int]:
@@ -453,6 +463,7 @@ def main(argv: list[str], machine: Machine | None = None, here: Path | None = No
     here = (here or Path.cwd()).resolve()
     common = Path(machine.git(here, "rev-parse", "--path-format=absolute", "--git-common-dir"))
     main_checkout = common.parent
+    machine.root = main_checkout
     root = main_checkout / ".claude" / "worktrees"
     before = machine.free(main_checkout)
     machine.run("git", "-C", str(main_checkout), "fetch", "--quiet", "origin")
@@ -462,8 +473,11 @@ def main(argv: list[str], machine: Machine | None = None, here: Path | None = No
     outside = [wt for wt in listed if root not in wt.path.parents and wt.path != main_checkout]
     procs = machine.processes()
     removed, deleted = 0, 0
-    for wt in worktrees:
-        facts, action, why = machine.judge(wt, here, procs, idle)
+    judged = [(wt, *machine.judge(wt, here, procs, idle)) for wt in worktrees]
+    if not dry:  # build output first: it frees the disk with no git write (#2436)
+        for wt in (wt for wt, _, action, _ in judged if action == "remove"):
+            machine.drop_target(wt.path)
+    for wt, facts, action, why in judged:
         name = f"{wt.path.name} ({describe(wt)})"
         if action == "remove":
             if not dry:
@@ -493,7 +507,7 @@ def main(argv: list[str], machine: Machine | None = None, here: Path | None = No
               "merged branches squashed or rebased by the queue stay PROTECTED")
     verb = "would remove" if dry else "removed"
     print(f"reclaim: {verb} {removed} of {len(worktrees)} worktree(s) and {deleted} branch(es); "
-          f"free disk {gib(before)} -> {gib(after)}")
+          f"free disk {space.gib(before)} -> {space.gib(after)}")
     return 0
 
 
