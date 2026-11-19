@@ -72,6 +72,7 @@ pub fn init() {
 /// and off until one calls it. Records logged before it are drained whole.
 #[doc(hidden)]
 pub fn init_for_tests() {
+    // lint: allow(test-static-write) one-way and idempotent: every caller sets the same `true`, and per-thread drains are what every test in a shared process wants
     PER_THREAD.store(true, Ordering::SeqCst);
     init();
 }
