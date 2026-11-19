@@ -117,3 +117,28 @@ fn a_settled_level_names_nothing() {
     }
     panic!("a body at rest still names itself every step");
 }
+
+/// Edits on moving bodies, each on one channel the narrowed passes read (#2344):
+/// a hitbox re-parented from one falling body to another, a falling collider
+/// switched off and on, and a falling collider's layer and material changed.
+#[test]
+fn edits_on_moving_bodies_sync_alike() {
+    use rusty_ecs::changes::ops::{Edit, Op as W};
+    agree(&[
+        Op::Step,
+        Op::On(4, Phys::NoBody),
+        Op::World(W::On(4, Edit::Reparent(Some(1)))),
+        Op::Step,
+        Op::World(W::On(4, Edit::Reparent(Some(2)))),
+        Op::Step,
+        Op::On(3, Phys::ColliderActive(false)),
+        Op::Step,
+        Op::On(3, Phys::ColliderActive(true)),
+        Op::Step,
+        Op::World(W::On(2, Edit::SetLayer(1))),
+        Op::On(2, Phys::Friction(2)),
+        Op::Step,
+        Op::On(1, Phys::Trigger(true)),
+    ])
+    .unwrap();
+}
