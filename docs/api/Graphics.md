@@ -1147,15 +1147,28 @@ not bound yet, when every caster does; the seeded `Low` and `Medium`) or
 `gpu_occlusion_culling` (#1963, `false` in every seeded preset) is Unity 6's *GPU
 Occlusion* toggle: whether a camera with `use_occlusion_culling` culls the opaque
 meshes its GPU depth pyramid finds hidden ([`Lighting`](Lighting.md), *GPU occlusion
-culling*). It is opt-in, as in Unity, because the cull's own passes can cost more
-than the draws it saves: turn it on for a preset only once it is measured to pay on
-the project's scenes, by running `make bench-scenes` with it on and off and comparing
-`gpu_ms`, `renderer_ms` and `hiz_culled`. `Graphics.SetQualityPreset("High", {
-gpu_occlusion_culling = true })` turns it on for that preset. The baked PVS does not
-read it. `gpu_cluster_culling` (#1968, `false` in every seeded preset) has that cull also test a
-big static mesh's clusters one by one, so the part of it another wall hides is not
-drawn ([`Lighting`](Lighting.md), *GPU occlusion culling*, *Per cluster*); it does
-nothing with `gpu_occlusion_culling` off. A project with no presets runs the seeded
+culling*). `gpu_cluster_culling` (#1968, `false` in every seeded preset) has that cull
+also test a big static mesh's clusters one by one, so the part of it another wall
+hides is not drawn ([`Lighting`](Lighting.md), *GPU occlusion culling*, *Per
+cluster*). They are two switches: the first alone culls whole meshes, the second
+alone does nothing, and both on gives the whole cull. `SetQualityPreset` writes only
+the keys it names, so a preset that wants the whole cull names both:
+
+```lua
+Graphics.SetQualityPreset("High", { gpu_occlusion_culling = true, gpu_cluster_culling = true })
+```
+
+The cull is opt-in, as in Unity, because its own passes can cost more than the draws
+it saves: turn it on for a preset only once it is measured to pay on the project's
+scenes. `make bench-scenes` has no quality option and opens the project read-only;
+it plays with the project's `"default"` preset (the middle one without it). So run
+it once with that preset's two keys `false` in `project.rusty`, edit them to `true`
+and run it again: each row prints its change against the scene's last run. The cull
+pays where `gpu_ms` and `renderer_ms` drop; `hiz_culled` and `cluster_culled` say
+what it removed. The baked PVS reads neither switch. A project made before the seed went
+`false` holds `true` in its own `project.rusty` (a new project writes its presets in
+full), and keeps it: set both keys to `false` there to get the new default.
+A project with no presets runs the seeded
 `Medium` preset's values.
 
 ### Render scale

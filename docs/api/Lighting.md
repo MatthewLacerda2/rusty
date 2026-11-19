@@ -759,8 +759,10 @@ is wholly behind depth the camera drew this frame.
   facing test; a skinned mesh is never split. A mesh whose custom shader moves
   its vertices is split and reordered at import like any other, but the instance
   test never judges it, so its clusters are never tested and it keeps one
-  instanced draw; mesh particles likewise. It changes no pixel either, and the preset's
-  `gpu_cluster_culling` (off in every seeded preset) turns it on. A split mesh is
+  instanced draw; mesh particles likewise. It changes no pixel either. It is its own switch, the
+  preset's `gpu_cluster_culling` (off in every seeded preset), and does nothing
+  without `gpu_occlusion_culling`: a preset that wants it names both
+  ([`Graphics`](Graphics.md), *Quality presets*). A split mesh is
   drawn once per instance, not instanced, so many copies of one big mesh cost a
   draw each; past a per-camera budget (8M indices) a batch is tested whole.
 - **Measure** with `Debug.Stats().hiz_tested` and `hiz_culled` (read back a frame

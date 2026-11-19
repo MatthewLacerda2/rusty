@@ -15,7 +15,7 @@ use rusty_scene::{Camera, Scene};
 /// and three bind groups the post chain rebuilds every frame (its IO group for each
 /// of its two passes, its effect textures for one), today's number, pinned so one
 /// more shows and one fewer is a fix to re-pin.
-/// Measured: lavapipe 7/0/3/3/19.
+/// Measured: lavapipe 7/0/3/3/19, Metal 7/0/3/3/19.
 const STILL: OpCounts = OpCounts {
     render_passes: 7,
     compute_passes: 0,
