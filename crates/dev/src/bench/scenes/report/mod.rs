@@ -153,9 +153,15 @@ impl SceneReport {
         } else {
             "last"
         };
+        // As wide as the longest row (a `script.` verb's runs past 30).
+        let w = self
+            .rows
+            .iter()
+            .map(|r| r.metric.len())
+            .fold(30, usize::max);
         let _ = writeln!(
             out,
-            "{:<30} {:>12} {:>19} {:>12}  {:<18} vs {against} avg",
+            "{:<w$} {:>12} {:>19} {:>12}  {:<18} vs {against} avg",
             "metric", "avg", "spread", "worst p95", "worst at"
         );
         for row in &self.rows {
@@ -164,7 +170,7 @@ impl SceneReport {
                 .map_or(String::new(), |b| delta(b, row));
             let _ = writeln!(
                 out,
-                "{:<30} {:>12} {:>19} {:>12}  {:<18} {delta}",
+                "{:<w$} {:>12} {:>19} {:>12}  {:<18} {delta}",
                 row.metric,
                 num(row.avg),
                 spread(row),
