@@ -54,7 +54,7 @@ impl World {
         match value {
             Some(v) => {
                 if !self.holds::<T>(id) {
-                    super::moves::note();
+                    super::walks::moved();
                 }
                 self.touch::<T>(id);
                 let _ = self.inner.insert_one(handle, v); // lint: allow(ecs-write) the funnel: touched above
@@ -73,7 +73,7 @@ impl World {
             return None;
         }
         self.touch::<T>(id);
-        super::moves::note();
+        super::walks::moved();
         let handle = self.handles.get(id)?;
         self.inner.remove_one::<T>(handle).ok() // lint: allow(ecs-write) the funnel: touched above
     }

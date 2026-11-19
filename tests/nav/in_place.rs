@@ -3,7 +3,7 @@
 //! in the insertion order, and no column is detached and attached again a tick.
 
 use glam::Vec3;
-use rusty::ecs::moves;
+use rusty::ecs::walks;
 use rusty::navigation::NavigationGraph;
 use rusty::scene::{NavMeshAgentComponent, Scene};
 
@@ -37,11 +37,11 @@ fn a_walking_agent_keeps_its_archetype_across_ticks() {
     let (mut scene, id, graph) = walker();
     let seq = scene.world.seq(id);
     let ids = scene.world.ids_with_nav_agent();
-    let before = moves::count();
+    let before = walks::moves();
     for _ in 0..30 {
         graph.tick_nav_agents(&mut scene, DT);
     }
-    assert_eq!(moves::count(), before, "a tick moved an entity's archetype");
+    assert_eq!(walks::moves(), before, "a tick moved an entity's archetype");
     assert!(
         scene.world.transform(id).unwrap().position.x > 1.5,
         "it walked"
@@ -58,9 +58,9 @@ fn a_walking_agent_keeps_its_archetype_across_ticks() {
 fn a_root_motion_step_keeps_the_archetype() {
     let (mut scene, id, graph) = walker();
     scene.world.nav_agent_mut(id).unwrap().velocity = Vec3::new(0.0, 0.0, 2.0);
-    let before = moves::count();
+    let before = walks::moves();
     graph.move_agent(&mut scene, id, Vec3::new(0.5, 0.0, 0.0));
-    assert_eq!(moves::count(), before);
+    assert_eq!(walks::moves(), before);
     let x = scene.world.transform(id).unwrap().position.x;
     assert!((x - 1.5).abs() < 1e-5, "moved by the motion: {x}");
     let v = scene.world.nav_agent(id).unwrap().velocity;
@@ -71,10 +71,10 @@ fn a_root_motion_step_keeps_the_archetype() {
 #[test]
 fn detach_and_attach_count_as_moves() {
     let (mut scene, id, _) = walker();
-    let before = moves::count();
+    let before = walks::moves();
     let agent = scene.world.take_nav_agent(id).unwrap();
     scene.world.set_nav_agent(id, Some(agent.clone()));
-    assert_eq!(moves::count(), before + 2);
+    assert_eq!(walks::moves(), before + 2);
     scene.world.set_nav_agent(id, Some(agent));
-    assert_eq!(moves::count(), before + 2, "an overwrite moves nothing");
+    assert_eq!(walks::moves(), before + 2, "an overwrite moves nothing");
 }

@@ -10,7 +10,12 @@
 //! asks pays one thread-local read per walk. A lookup is the hottest call the sim
 //! makes, so lookups are counted only where `debug_assertions` holds (every test
 //! profile): a release or ship build compiles the call away, and [`lookups_of`]
-//! panics there rather than answer a silent 0. Re-exported as `world::walks`.
+//! panics there rather than answer a silent 0. Archetype moves are counted too
+//! ([`moves`]): a column attached to a live entity that lacked it
+//! (`World::set_component`) or detached from one (`World::take_component`), each
+//! of which copies every column the entity has into another hecs archetype; an
+//! overwrite of a held column, and whole-entity placement (spawn, despawn,
+//! restore), move no column and are not counted. Re-exported as `world::walks`.
 
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
@@ -19,6 +24,20 @@ thread_local! {
     static ARMED: Cell<bool> = const { Cell::new(false) };
     static WALKS: RefCell<BTreeMap<&'static str, u64>> = RefCell::default();
     static LOOKUPS: RefCell<BTreeMap<&'static str, u64>> = RefCell::default();
+    static MOVES: Cell<u64> = const { Cell::new(0) };
+}
+
+pub(crate) fn moved() {
+    if ARMED.with(Cell::get) {
+        MOVES.with(|m| m.set(m.get() + 1));
+    }
+}
+
+/// Archetype moves (a column attached to or detached from a live entity) on this
+/// thread since the first call of a reader here on it, which starts the count.
+pub fn moves() -> u64 {
+    ARMED.with(|a| a.set(true));
+    MOVES.with(Cell::get)
 }
 
 pub(crate) fn count(column: &'static str) {
@@ -36,7 +55,7 @@ pub(crate) fn lookup(column: &'static str) {
 }
 
 /// Walks of `T`'s column on this thread since the first call of this function
-/// (or [`lookups_of`]) on it, which starts the count.
+/// (or another reader here) on it, which starts the count.
 pub fn of<T>() -> u64 {
     read::<T>(&WALKS)
 }

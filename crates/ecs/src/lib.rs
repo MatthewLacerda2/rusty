@@ -37,8 +37,6 @@ mod handles;
 pub mod journal;
 #[cfg(test)]
 mod journal_tests;
-#[doc(hidden)]
-pub mod moves;
 mod names;
 #[cfg(test)]
 mod names_tests;

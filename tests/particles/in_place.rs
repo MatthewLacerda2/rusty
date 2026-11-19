@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use rusty::components::particle::ParticleEmitterComponent;
-use rusty::ecs::moves;
+use rusty::ecs::walks;
 use rusty::scene::Scene;
 use rusty::script::scripting::ConsoleLogs;
 
@@ -32,11 +32,11 @@ fn an_emitter_keeps_its_archetype_across_ticks() {
     world.set_playing(true);
     world.tick(1.0 / 60.0); // Play's first tick builds what it builds
     let seq = world.scene().borrow().world.seq(id);
-    let before = moves::count();
+    let before = walks::moves();
     for _ in 0..20 {
         world.tick(1.0 / 60.0);
     }
-    assert_eq!(moves::count(), before, "a tick moved an entity's archetype");
+    assert_eq!(walks::moves(), before, "a tick moved an entity's archetype");
     let scene = world.scene().borrow();
     assert!(
         scene.world.particles(id).unwrap().live_count() > 0,
