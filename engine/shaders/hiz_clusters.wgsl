@@ -72,7 +72,7 @@ struct Cluster {
 @group(0) @binding(0) var<uniform> params: Params;
 @group(0) @binding(1) var<storage, read> jobs: array<Job>;
 @group(0) @binding(2) var<storage, read> objects: array<vec4<f32>>;
-// By instance: 1 when `cs_test` drew it this frame.
+// By instance: bit 0 when `cs_test` drew it this frame (bit 1: phase one did).
 @group(0) @binding(3) var<storage, read> visible: array<u32>;
 // Per job, from `job.state_first`: word 0 its kept clusters' count, written by
 // the scan; then two words per cluster. The test writes cluster `k`'s verdict
@@ -170,7 +170,7 @@ fn cs_cluster_test(
         var keep = true;
         if job.tested != 0u {
             let c = clusters[job.cluster_first + k];
-            keep = visible[job.instance] != 0u && !culled(c, world_of(job.object), job.cone != 0u);
+            keep = (visible[job.instance] & 1u) != 0u && !culled(c, world_of(job.object), job.cone != 0u);
             if keep {
                 atomicAdd(&kept_here, 1u);
             }

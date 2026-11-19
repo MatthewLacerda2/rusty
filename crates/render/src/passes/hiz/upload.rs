@@ -104,9 +104,10 @@ impl Renderer {
         cam.hold(device, queue, frame.slots);
         cam.visible.reserve(device, 4 * u64::from(n));
         let args = ARGS * frame.batches.len() as u64;
-        for k in 0..2 {
-            cam.kept[k].reserve(device, 16 * u64::from(n));
-            cam.args[k].reserve(device, args);
+        // The final draws' buffers hold the late set's after them (#2336).
+        for (k, lists) in [1, 2].into_iter().enumerate() {
+            cam.kept[k].reserve(device, lists * 16 * u64::from(n));
+            cam.args[k].reserve(device, lists * args);
         }
         let key = [0, 1].map(|k| self.cull_buffers(cam, k).map(Clone::clone));
         let mut groups = std::mem::take(&mut cam.groups);
