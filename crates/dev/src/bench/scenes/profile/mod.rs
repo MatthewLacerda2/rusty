@@ -136,7 +136,7 @@ pub fn run(
     out_dir: &Path,
     opts: Options,
 ) -> Result<PathBuf, String> {
-    let (mut harness, _) = load(out_dir, root, scene, settings, opts.size)?;
+    let (mut harness, _) = load(out_dir, root, scene, settings, opts)?;
     let picked = {
         let world = harness.world.borrow();
         let scene = world.scene().borrow();
