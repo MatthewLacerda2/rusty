@@ -28,7 +28,14 @@ rusty_core::named_enum! {
 impl GpuPart {
     /// The pass kind whose row this part adds into.
     pub fn pass(self) -> GpuPass {
-        GpuPass::Occlusion
+        // Exhaustive, so a new part names its kind.
+        match self {
+            Self::OcclusionSelect
+            | Self::OcclusionPhaseOne
+            | Self::OcclusionPyramid
+            | Self::OcclusionTest
+            | Self::OcclusionClusters => GpuPass::Occlusion,
+        }
     }
 
     /// Its stable name under its kind's: `occlusion.select`.
