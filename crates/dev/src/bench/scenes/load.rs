@@ -24,6 +24,8 @@
 //! uploaded. Deterministic for a project as it stands, so no spread.
 //!
 //! Wall-clock timing in the dev bench: nothing here reaches the sim.
+//!
+//! stored-format: `<out>/<project>-<hash>/.loads/<n>.json`, a scene's earlier loads handed to its bench process, deleted after
 
 use std::cell::RefCell;
 use std::path::Path;
@@ -80,6 +82,23 @@ pub fn rows(loads: &[Load]) -> Vec<Row> {
     let counts = last.counts.iter();
     rows.extend(counts.map(|(c, n)| one(format!("load.count.{c}"), *n)));
     rows
+}
+
+/// Keep `load` at `file`, for the bench that folds it (`--load-out`).
+pub fn write(file: &Path, load: &Load) -> Result<(), String> {
+    let json = serde_json::to_string(load).map_err(|e| e.to_string())?;
+    // lint: allow(asset-write) a load handed to the scene's bench process, deleted after
+    std::fs::write(file, json).map_err(|e| format!("{}: {e}", file.display()))
+}
+
+/// The loads kept in `dir` (`--loads`), in the order they ran: `0.json`, `1.json`, …
+pub fn read_all(dir: &Path) -> Result<Vec<Load>, String> {
+    let mut loads = Vec::new();
+    while let Ok(json) = std::fs::read_to_string(dir.join(format!("{}.json", loads.len()))) {
+        let load = serde_json::from_str(&json).map_err(|e| format!("{}: {e}", dir.display()))?;
+        loads.push(load);
+    }
+    Ok(loads)
 }
 
 /// A one-off row of `value`.

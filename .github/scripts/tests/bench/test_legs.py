@@ -33,6 +33,12 @@ class Legs(unittest.TestCase):
             self.assertEqual(argv[argv.index("--set") + 1], "gpu_occlusion_culling=true")
             self.assertEqual(argv[argv.index("--scenes") + 1], "a,b")
 
+    def test_load_runs_pass_through_only_when_asked(self):
+        self.assertNotIn("--load-runs", legs.command(self.plan[0], self.ask))
+        ask = legs.Ask(Path("/games/yard"), load_runs=5)
+        argv = legs.command(self.plan[0], ask)
+        self.assertEqual(argv[argv.index("--load-runs") + 1], "5")
+
     def test_a_failed_leg_stops_the_run_and_a_stale_leg_folder_is_emptied(self):
         stale = self.root / "pr" / "old.json"
         stale.parent.mkdir(parents=True)

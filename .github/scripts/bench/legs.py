@@ -51,6 +51,7 @@ class Ask:
     runs: int | None = None
     size: str | None = None
     sets: tuple[str, ...] = ()
+    load_runs: int | None = None
 
 
 def command(leg: Leg, ask: Ask) -> list[str]:
@@ -60,6 +61,8 @@ def command(leg: Leg, ask: Ask) -> list[str]:
         argv += ["--scenes", ask.scenes]
     if ask.runs:
         argv += ["--runs", str(ask.runs)]
+    if ask.load_runs:  # only when asked: a `main` from before `--load-runs` has no such flag
+        argv += ["--load-runs", str(ask.load_runs)]
     if ask.size:
         argv += ["--size", ask.size]
     for pair in ask.sets:

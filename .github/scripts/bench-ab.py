@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`bench-ab.py --pr N --project DIR [--scenes a,b] [--runs n] [--size WxH] [--set k=v]... [--force]` (#2381).
+"""`bench-ab.py --pr N --project DIR [--scenes a,b] [--runs n] [--load-runs n] [--size WxH] [--set k=v]... [--force]` (#2381).
 
 `make bench-ab` is this: a pull request's measured rows in three legs, `main`,
 the PR's head, `main` again, the second `main` leg each row's noise floor
@@ -46,6 +46,7 @@ def args(argv):
     p.add_argument("--project", type=Path, required=True)
     p.add_argument("--scenes")
     p.add_argument("--runs", type=int)
+    p.add_argument("--load-runs", type=int, dest="load_runs")
     p.add_argument("--size")
     p.add_argument("--set", action="append", default=[], dest="sets")
     p.add_argument("--force", action="store_true")
@@ -154,7 +155,7 @@ def main(argv) -> int:
         plan = legs.plan(main_bin, pr_bin, out)
         prefix, said = capped_scope()
         print(f"bench-ab: {said}", file=sys.stderr)
-        ask = legs.Ask(project, a.scenes, a.runs, a.size, tuple(a.sets))
+        ask = legs.Ask(project, a.scenes, a.runs, a.size, tuple(a.sets), a.load_runs)
 
         def before_each(leg):
             return gate.leg(leg.name, refuse.busy_refusal(refuse.busy(ps(), me)))
@@ -172,7 +173,9 @@ def main(argv) -> int:
         header += [f"- quality preset overridden: {', '.join(a.sets)}"] if a.sets else []
         header += [f"- FORCE=1 ran past: {o}" for o in gate.overridden]
         legs_dirs = tuple(leg.out for leg in plan)
-        text = table.render(table.scenes_of_all(legs_dirs[:2]), legs_dirs, header)
+        scenes = table.scenes_of_all(legs_dirs[:2])
+        header += table.count_changes(scenes, legs_dirs)
+        text = table.render(scenes, legs_dirs, header)
         (out / "table.md").write_text(text)
         print(text)
         return 0
