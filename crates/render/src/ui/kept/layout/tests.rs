@@ -11,9 +11,9 @@ use rusty_components::{
 };
 use rusty_scene::{Camera, Scene};
 
-#[path = "layout_hierarchy_tests.rs"]
+#[path = "hierarchy_tests.rs"]
 mod hierarchy;
-#[path = "layout_inputs_tests.rs"]
+#[path = "inputs_tests.rs"]
 mod inputs;
 
 /// A canvas holding a group with a sized label, a plain label, and an Image fitted

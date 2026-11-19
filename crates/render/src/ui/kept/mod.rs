@@ -32,7 +32,6 @@
 //! drawn cannot leave it stale.
 
 mod layout;
-mod markers;
 mod meshes;
 pub(crate) use layout::KeptLayout;
 pub(crate) use meshes::KeptMeshes;

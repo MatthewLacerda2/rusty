@@ -1,4 +1,4 @@
-//! crates/render/src/ui/kept/markers.rs — what a kept layout's `WorldAnchor` markers
+//! crates/render/src/ui/kept/layout/markers.rs — what a kept layout's `WorldAnchor` markers
 //! were placed from: their targets and the camera (`layout`'s module docs).
 
 use glam::{Mat4, Vec3};

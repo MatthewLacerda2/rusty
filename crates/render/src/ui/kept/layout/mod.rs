@@ -1,4 +1,4 @@
-//! crates/render/src/ui/kept/layout.rs — each view's UI layout, kept until what
+//! crates/render/src/ui/kept/layout/ — each view's UI layout, kept until what
 //! `UiLayout::compute_in` reads changes (#2412). GPU-free.
 //!
 //! The layout's rects are a function of the screen size, the texture-size table,
@@ -29,11 +29,13 @@
 //! World, Play and Stop, a load, an Undo or Redo, a dropped log), or any compared
 //! value moved.
 
+mod markers;
+
 use std::rc::Rc;
 
 use glam::{Quat, Vec2, Vec3};
 
-use super::markers::{eye, marker_targets, Eye};
+use markers::{eye, marker_targets, Eye};
 use rusty_components::{
     ImageComponent, LayoutElementComponent, LayoutGroupComponent, RectTransformComponent,
     TextComponent,
@@ -269,5 +271,4 @@ fn spins(world: &World, layout: &UiLayout) -> Vec<(u32, Quat, Vec3)> {
 }
 
 #[cfg(test)]
-#[path = "layout_tests.rs"]
-mod layout_tests;
+mod tests;
