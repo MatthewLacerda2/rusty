@@ -9,7 +9,7 @@ use rusty_script::scripting::ConsoleLogs;
 
 /// Times each step of a play-mode scene load (#2123) and, once it swapped in,
 /// reports them: one console line at once, and `load_<step>_ms` plus `load_ms`
-/// (their sum) into `loads`, which the [`TimingProbe`] records at the frame's end
+/// (their sum) into `loads`, which the [`TimingProbe`](super::TimingProbe) records at the frame's end
 /// into the stats `Debug.Stats()` reads, so a series spans every load of the session.
 pub struct LoadTimer {
     loads: LoadSamples,

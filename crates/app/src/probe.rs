@@ -96,9 +96,11 @@ pub fn timed<T>(
 }
 
 impl GameWorld {
-    /// Advance the simulation by `dt` seconds ([`run_tick`](Self::run_tick)), the
-    /// installed probe told when the tick begins and ends. Returns the play-state
-    /// transition for the platform (cursor grab).
+    /// Advance the simulation by `dt` seconds; the play-state transition is returned
+    /// for the platform (cursor grab). Every tick reads the UI's texture sizes after
+    /// the transition (the schedule's in Play, the edit frame's outside), so no loop
+    /// that ticks skips them, and ends by pushing the audio mix and advancing `dt`.
+    /// An installed probe is told when the tick begins and ends, so it times it whole.
     pub fn tick(&mut self, dt: f32) -> super::PlayTransition {
         if let Some(p) = self.resources.probe.as_mut() {
             p.begin_tick();

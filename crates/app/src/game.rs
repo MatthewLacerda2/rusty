@@ -118,11 +118,8 @@ impl GameWorld {
         app.set_host_play(playing);
     }
 
-    /// Advance the simulation by `dt` seconds; the play-state transition is returned
-    /// for the platform (cursor grab). Every tick reads the UI's texture sizes after
-    /// the transition (the schedule's in Play, the edit frame's outside), so no loop
-    /// that ticks skips them, and ends by pushing the audio mix and advancing `dt`.
-    /// Hosts call it as [`tick`](Self::tick), which an installed probe times whole.
+    /// The tick itself, which hosts call as [`tick`](Self::tick): that brackets it
+    /// with the installed probe's `begin_tick` and `end_tick`.
     pub(super) fn run_tick(&mut self, dt: f32) -> PlayTransition {
         self.tap(TapPoint::BeforeTick); // a demo's tap (#1581)
         let transition = self.transition_tapped();
