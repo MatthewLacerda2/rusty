@@ -26,6 +26,8 @@ pub(crate) struct Counter {
     copied: bool,
     /// Items the last read found hidden.
     pub(crate) culled: u32,
+    /// Items the last read found drawn.
+    pub(crate) drawn: u32,
 }
 
 impl Counter {
@@ -61,6 +63,7 @@ impl Counter {
         staging.unmap();
         if let Ok(drawn) = read {
             self.culled = tested.saturating_sub(drawn);
+            self.drawn = drawn;
         }
         self.in_flight = None;
     }
@@ -89,13 +92,13 @@ impl Counter {
         self.culled
     }
 
-    /// Record a copy of `source`'s first `bytes` (a multiple of 4), when no read
-    /// is in flight.
+    /// Record a copy of `bytes` (a multiple of 4) of `source` from byte `at`, when
+    /// no read is in flight.
     pub(crate) fn copy(
         &mut self,
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
-        (source, bytes): (&wgpu::Buffer, u64),
+        (source, at, bytes): (&wgpu::Buffer, u64, u64),
     ) {
         self.copied = false;
         if self.in_flight.is_some() {
@@ -111,8 +114,8 @@ impl Counter {
             }));
         }
         let staging = self.staging.as_ref().expect("made above");
-        let copied = bytes.min(source.size());
-        encoder.copy_buffer_to_buffer(source, 0, staging, 0, copied);
+        let copied = bytes.min(source.size().saturating_sub(at));
+        encoder.copy_buffer_to_buffer(source, at, staging, 0, copied);
         self.copied = true;
         self.in_flight = Some((0, bytes));
     }

@@ -6,8 +6,9 @@
 //! usable: what that drops is never tested here), its `occlusion` stage
 //! ([`Renderer::cull_by_hiz`]) runs:
 //! 1. **phase one**: each opaque batch keeps, in order, the instances whose object
-//!    was drawn last frame (`hiz.wgsl`'s `cs_select`), and the SSAO prepass's
-//!    pipelines draw them into the view's depth through indirect args;
+//!    was drawn last frame (`hiz.wgsl`'s `cs_select`, marking each drawn early),
+//!    and the SSAO prepass's pipelines draw them into the view's depth through
+//!    indirect args;
 //! 2. the depth is max-reduced into a pyramid ([`pyramid`]);
 //! 3. every opaque instance's world bounds are tested against it (`cs_test`): the
 //!    level where its screen rect spans at most 2x2 texels, hidden only when its
@@ -16,17 +17,31 @@
 //! 4. each batch keeps its visible instances, in order (`cs_compact`): the opaque
 //!    passes (the SSAO and SSIL prepass, the forward and velocity pass) draw those
 //!    through indirect args ([`Culled`]), so an object that came out from behind a
-//!    wall this frame is drawn this frame.
+//!    wall this frame is drawn this frame. The same loop lists the **late set**, the
+//!    visible instances phase one did not draw ([`Culled::late`], #2336).
 //!
 //! Steps 2 to 4 and the cluster cull below record into one compute pass, after
 //! phase one's depth draw; the select has its own pass before it (#2327). On a
 //! frame the GPU timer times, each part is its own pass and timestamp pair
 //! instead (`stage`, #2401), so the bench reads the stage by part.
 //!
-//! The phase-one draw is depth only, into the view's depth that the prepass or the
-//! forward pass then clears: every pass after it draws the final set, so none of
-//! them was split in two. Order within a batch is kept, so a frame where nothing is
-//! hidden draws exactly what the CPU batched.
+//! The phase-one draw is depth only, into the view's depth, and it is kept: the
+//! depth prepass (SSAO's or SSIL's, or with neither the one that primes the forward
+//! pass, where priming runs) loads it and draws only the late set, so a held view
+//! draws its depth once (#2336). That leaves the depth a full prepass of the final
+//! set would, byte for byte: an instance phase one drew and the test now hides is
+//! behind phase one's own depth, so it wins no texel, and phase one draws through
+//! the prepass's pipelines. A clustered batch's late instances are drawn whole,
+//! the clusters their cull leaves out (hidden, out of the frustum, facing away)
+//! winning no texel either. A camera that does not cull clears and draws all. The
+//! forward and velocity pass draw the final set, primed or clearing depth as
+//! before (on Metal nothing primes, so it clears). Order within a batch is kept,
+//! so a frame where nothing is hidden draws exactly what the CPU batched.
+//!
+//! **First frames.** A camera's first culled frame has no history: every slot
+//! reads "drawn", so phase one draws every instance and the late set is empty.
+//! So does a slot new to its history (a spawn, a scene load). A resize keeps the
+//! history; phase one draws into the resized depth.
 //!
 //! **What is tested.** Opaque and cutout batches only: a translucent is never an
 //! occluder and always drawn. Phase one draws through the prepass's own pipelines,

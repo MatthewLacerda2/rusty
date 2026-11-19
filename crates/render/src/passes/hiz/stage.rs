@@ -7,7 +7,7 @@
 
 use super::clusters::plan::Plan;
 use super::clusters::ClusterDraws;
-use super::cull::{CameraCull, ARGS};
+use super::cull::{late_args, CameraCull, ARGS};
 use super::pyramid::Pyramid;
 use crate::draw::camera::CameraCtx;
 use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
@@ -51,21 +51,31 @@ impl Renderer {
         drop(select);
         self.lap(lap_of(GpuPart::OcclusionSelect));
         let phase_one = split.then(|| timer.part_writes(GpuPart::OcclusionPhaseOne));
-        let phase_one = ("Hi-Z Phase One", phase_one.flatten());
+        let phase_one = (
+            "Hi-Z Phase One",
+            phase_one.flatten(),
+            wgpu::LoadOp::Clear(1.0),
+        );
         let solids = (opaque, Some(&first));
         self.record_depth(&mut encoder, &view.depth_view, solids, phase_one);
         self.lap(lap_of(GpuPart::OcclusionPhaseOne));
         let at = (&view.depth_view, ctx.view_proj);
         let cull = (&mut *cam, &mut *pyramid, &plan);
         last.clusters = self.record_cull(&mut encoder, cull, at, (n, batches, split));
-        let args = (cam.args[1].buffer(), ARGS * u64::from(batches));
-        cam.counter.copy(&self.device, &mut encoder, args);
+        let (args, bytes) = (cam.args[1].buffer(), ARGS * u64::from(batches));
+        cam.counter
+            .copy(&self.device, &mut encoder, (args, 0, bytes));
+        let late = late_args(batches as usize);
+        cam.late
+            .copy(&self.device, &mut encoder, (args, late, bytes));
         self.lap(lap_of(GpuPart::OcclusionTest));
         self.queue.counted_submit(std::iter::once(encoder.finish()));
         cam.counter.request(n);
+        cam.late.request(n);
         cam.clusters.counter.request(plan.tested);
         let counters = &mut self.frame_counters;
         counters.hiz_culled += cam.counter.culled;
+        counters.hiz_late += cam.late.drawn;
         counters.cluster_tested += plan.tested;
         counters.cluster_culled += cam.clusters.counter.while_active(!plan.runs.is_empty());
         ctx.solids.culled = Some(last);

@@ -18,21 +18,50 @@ use crate::timing::GpuPart;
 use crate::{RenderView, Renderer};
 
 /// The opaque draws a camera's passes make through the GPU's verdict: the group 1
-/// naming the kept instances, and one indirect draw per batch, in batch order.
+/// naming the kept instances, and one indirect draw per batch, in batch order,
+/// from byte `at` of `args`.
 #[derive(Clone)]
 pub(crate) struct Culled {
     pub group: wgpu::BindGroup,
     pub args: wgpu::Buffer,
+    pub at: u64,
     /// The draws standing for the clustered batches (#1968): the final draws'
     /// only, and only when a batch is drawn by cluster.
     pub clusters: Option<ClusterDraws>,
+    /// The final draws' only: where in `args` the late set's draws start
+    /// (#2336, [`Self::late`]).
+    late: Option<u64>,
+}
+
+impl Culled {
+    /// The final draws' late set (#2336): the instances visible this frame that
+    /// phase one did not draw, each batch drawn whole, clustered or not (its
+    /// depth is its kept clusters', the clusters culled adding no nearer texel).
+    /// Drawn over phase one's depth it leaves the depth the final set's prepass
+    /// would. `None` for phase one's draws.
+    pub(crate) fn late(&self) -> Option<Culled> {
+        let at = self.late?;
+        Some(Culled {
+            at,
+            clusters: None,
+            late: None,
+            ..self.clone()
+        })
+    }
 }
 
 /// `DrawIndexedIndirectArgs`' size: five words.
 pub(crate) const ARGS: u64 = 20;
 
+/// Where the late set's args start in the final args, for `batches` batches:
+/// after the final draws' (`hiz.wgsl`'s `compact`).
+pub(super) fn late_args(batches: usize) -> u64 {
+    ARGS * batches as u64
+}
+
 /// One stacked camera's buffers: what it tests, last frame's verdict by object
-/// slot, and the two phases' kept instances and args.
+/// slot, and the two phases' kept instances and args (the final ones followed by
+/// the late set's, #2336).
 pub(crate) struct CameraCull {
     pub(super) params: wgpu::Buffer,
     pub(super) bounds: GrowBuffer,
@@ -44,6 +73,8 @@ pub(crate) struct CameraCull {
     pub(super) kept: [GrowBuffer; 2],
     pub(super) args: [GrowBuffer; 2],
     pub(super) counter: Counter,
+    /// How many instances its late set drew (#2336), read back as `counter` is.
+    pub(super) late: Counter,
     /// Its per-cluster cull (#1968).
     pub(crate) clusters: ClusterCull,
     /// The two `hiz.wgsl` groups (phase one's, then the test's and final), kept
@@ -86,6 +117,7 @@ impl CameraCull {
             kept: [0, 1].map(|_| buffer("Hi-Z Kept Instances", U::empty())),
             args: [0, 1].map(|_| buffer("Hi-Z Indirect Args", indirect)),
             counter: Counter::default(),
+            late: Counter::default(),
             clusters: ClusterCull::new(device),
             groups: Kept::default(),
             culled: Kept::default(),
@@ -152,6 +184,7 @@ impl Renderer {
         let cam = &mut view.hiz.cameras[idx];
         let pyramid = view.hiz.pyramid.as_ref().expect("held");
         cam.counter.collect(&self.device, Counter::drawn_instances);
+        cam.late.collect(&self.device, Counter::drawn_instances);
         cam.clusters
             .counter
             .collect(&self.device, Counter::first_word);
@@ -190,11 +223,14 @@ impl Renderer {
                 &group1[GROUP1_INSTANCES],
             ),
             args: args.clone(),
+            at: 0,
             clusters: None,
+            late: None,
         };
         let mut culled = std::mem::take(&mut cam.culled);
-        let draws = culled.get(key.clone(), || key.each_ref().map(make)).clone();
+        let mut draws = culled.get(key.clone(), || key.each_ref().map(make)).clone();
         cam.culled = culled;
+        draws[1].late = Some(late_args(solids.draws.opaque.len()));
         (draws, plan)
     }
 }

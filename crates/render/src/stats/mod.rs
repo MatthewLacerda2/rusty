@@ -9,9 +9,8 @@
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RenderCounters {
     /// Geometry draw calls: solids, transparents, shadow casters, the SSAO depth
-    /// prepass, particle batches and UI batches. Decals draw nothing of their own:
-    /// the surfaces they land on fold them in (#638). Copies of one mesh + material are one instanced draw
-    /// (#470). Fullscreen post-FX and the skybox are not counted.
+    /// prepass, particle batches and UI batches; one mesh + material is one instanced
+    /// draw (#470). Decals (folded into surfaces, #638), post-FX and the sky: none.
     pub draw_calls: u32,
     /// Triangles submitted by the solid, transparent, shadow and SSAO-prepass draws.
     pub triangles: u64,
@@ -53,6 +52,9 @@ pub struct RenderCounters {
     /// the camera views. Read back from the GPU without waiting, so it describes
     /// a frame or so before this one, and `0` on the first.
     pub hiz_culled: u32,
+    /// Of the visible ones, those phase one did not draw (#2336, the late set the
+    /// prepass adds), summed over the views: `0` held still. Read back likewise.
+    pub hiz_late: u32,
     /// Clusters of big meshes tested one by one after the Hi-Z instance test
     /// (#1968): every cluster of each instance it judged in a batch drawn by
     /// cluster, summed over the camera views.
@@ -216,6 +218,7 @@ impl RenderCounters {
             ("occlusion_culled", self.occlusion_culled.into()),
             ("hiz_tested", self.hiz_tested.into()),
             ("hiz_culled", self.hiz_culled.into()),
+            ("hiz_late", self.hiz_late.into()),
             ("cluster_tested", self.cluster_tested.into()),
             ("cluster_culled", self.cluster_culled.into()),
             ("lod_hidden_entities", self.lod_hidden_entities.into()),

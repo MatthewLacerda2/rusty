@@ -1,8 +1,9 @@
 // GPU occlusion culling (#1963): Unity 6's GPU occlusion culling, two-phase Hi-Z
 // per instance. `render::hiz` drives it, once per camera:
 //   1. `cs_select`: each opaque batch keeps the instances visible last frame (by
-//      object slot, `history`), in order, and writes its indirect args;
-//   2. the prepass draws those into the view's depth;
+//      object slot, `history`), in order, and writes its indirect args, marking
+//      each it keeps as drawn early (`visible`'s bit 1);
+//   2. phase one draws those into the view's depth, which the prepass keeps;
 //   3. `hiz_pyramid.wgsl`: a max-reduced pyramid of it;
 //   4. `cs_test`: each instance's world bounds against the pyramid, into
 //      `visible` and next frame's `history`;
@@ -10,6 +11,11 @@
 //      the indirect args every opaque pass then draws with. A batch whose mesh is
 //      split into clusters (#1968) keeps every instance at its own place instead:
 //      `hiz_clusters.wgsl` then draws each instance's visible clusters on its own.
+//      The same loop writes the late set (#2336): the visible instances phase one
+//      did not draw, which is all the prepass adds to phase one's depth. Its kept
+//      instances follow the final ones (from `params.instances`), its args the
+//      final args (from batch `params.batches`); a clustered batch's late
+//      instances are drawn whole, whose depth equals its kept clusters'.
 // The depth is ordinary Z (cleared to 1, compared `Less`), so the pyramid keeps the
 // farthest depth under each texel, and an instance is hidden only when its nearest
 // point is behind it.
@@ -56,30 +62,58 @@ struct Batch {
 @group(0) @binding(3) var<storage, read> instances: array<vec4<u32>>;
 // By object slot: 1 when it was drawn last frame.
 @group(0) @binding(4) var<storage, read_write> history: array<u32>;
-// By instance: 1 when this frame draws it.
+// By instance: bit 0 when this frame draws it (`cs_test`), bit 1 when phase one
+// drew it (`cs_select`).
 @group(0) @binding(5) var<storage, read_write> visible: array<u32>;
 // The kept instances at their batch's run, and one `DrawIndexedIndirectArgs`
-// (five words) per batch.
+// (five words) per batch; the final group's hold the late set's after them.
 @group(0) @binding(6) var<storage, read_write> kept: array<vec4<u32>>;
 @group(0) @binding(7) var<storage, read_write> args: array<u32>;
 @group(0) @binding(8) var pyramid: texture_2d<f32>;
 
-// Keep batch `b`'s instances `keep` admits, in order, and write its draw. A
-// clustered batch's final pass keeps every instance at its own place (its draws
-// are per instance), counting the visible ones.
-fn compact(b: u32, phase_one: bool) {
+// Write batch `b`'s draw of `n` instances from `first`, at args `at`.
+fn write_args(at: u32, b: u32, n: u32, first: u32) {
     let batch = batches[b];
-    let in_place = !phase_one && batch.clustered != 0u;
+    args[at] = batch.index_count;
+    args[at + 1u] = n;
+    args[at + 2u] = batch.first_index;
+    args[at + 3u] = 0u;
+    args[at + 4u] = first;
+}
+
+// Keep batch `b`'s instances phase one draws (always-drawn, or drawn last frame),
+// in order, mark them drawn early, and write its draw.
+fn keep_early(b: u32) {
+    let batch = batches[b];
     var n = 0u;
     for (var k = 0u; k < batch.count; k++) {
         let i = batch.first + k;
         let instance = instances[i];
-        var keep: bool;
-        if phase_one {
-            keep = bounds[i].min.w < 0.5 || history[instance.x] != 0u;
-        } else {
-            keep = visible[i] != 0u;
+        let keep = bounds[i].min.w < 0.5 || history[instance.x] != 0u;
+        visible[i] = select(0u, 2u, keep);
+        if keep {
+            kept[batch.first + n] = instance;
+            n++;
         }
+    }
+    write_args(b * 5u, b, n, batch.first);
+}
+
+// Keep batch `b`'s visible instances, in order, and write its draw; and its late
+// set, the visible ones phase one did not draw, after the final lists. A
+// clustered batch's final pass keeps every instance at its own place (its draws
+// are per instance), counting the visible ones.
+fn compact(b: u32) {
+    let batch = batches[b];
+    let in_place = batch.clustered != 0u;
+    let late_first = params.instances + batch.first;
+    var n = 0u;
+    var late = 0u;
+    for (var k = 0u; k < batch.count; k++) {
+        let i = batch.first + k;
+        let instance = instances[i];
+        let flags = visible[i];
+        let keep = (flags & 1u) != 0u;
         if in_place {
             kept[i] = instance;
         } else if keep {
@@ -88,26 +122,26 @@ fn compact(b: u32, phase_one: bool) {
         if keep {
             n++;
         }
+        if keep && (flags & 2u) == 0u {
+            kept[late_first + late] = instance;
+            late++;
+        }
     }
-    let at = b * 5u;
-    args[at] = batch.index_count;
-    args[at + 1u] = n;
-    args[at + 2u] = batch.first_index;
-    args[at + 3u] = 0u;
-    args[at + 4u] = batch.first;
+    write_args(b * 5u, b, n, batch.first);
+    write_args((params.batches + b) * 5u, b, late, late_first);
 }
 
 @compute @workgroup_size(64)
 fn cs_select(@builtin(global_invocation_id) id: vec3<u32>) {
     if id.x < params.batches {
-        compact(id.x, true);
+        keep_early(id.x);
     }
 }
 
 @compute @workgroup_size(64)
 fn cs_compact(@builtin(global_invocation_id) id: vec3<u32>) {
     if id.x < params.batches {
-        compact(id.x, false);
+        compact(id.x);
     }
 }
 
@@ -123,6 +157,6 @@ fn cs_test(@builtin(global_invocation_id) id: vec3<u32>) {
         let eye = Eye(params.view_proj, params.size, params.levels);
         drawn = !hidden(eye, pyramid, b.min.xyz, b.max.xyz);
     }
-    visible[i] = u32(drawn);
+    visible[i] = (visible[i] & 2u) | u32(drawn);
     history[instances[i].x] = u32(drawn);
 }

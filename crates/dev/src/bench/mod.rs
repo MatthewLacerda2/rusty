@@ -59,7 +59,7 @@ use rusty_core::frame_stats::FrameStats;
 use rusty_render::{ClockProbe, GpuPart, GpuPass};
 
 /// The render counters a bench row reports, in order.
-const COUNTERS: [&str; 17] = [
+const COUNTERS: [&str; 18] = [
     "draw_calls",
     "triangles",
     "lights_dropped",
@@ -70,6 +70,7 @@ const COUNTERS: [&str; 17] = [
     "decal_cluster_refs",
     "hiz_tested",
     "hiz_culled",
+    "hiz_late",
     "cluster_tested",
     "cluster_culled",
     "render_passes",
