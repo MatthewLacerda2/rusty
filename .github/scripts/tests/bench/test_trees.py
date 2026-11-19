@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""#2381: a PR's head is fetched as pull/<n>/head and checked out detached under .claude/worktrees/."""
+"""#2381: a PR's head is checked out detached under .claude/worktrees/ (its fetch: test_fetch.py)."""
 
 from __future__ import annotations
 
@@ -11,14 +11,6 @@ from bench import trees
 
 
 class Trees(unittest.TestCase):
-    def test_the_head_is_fetched_by_pull_ref_never_a_branch(self):
-        calls = []
-        answers = {"origin/main": "aaa\n", "refs/bench/pr-42": "bbb\n"}
-        git = lambda argv, **_: calls.append(argv) or answers.get(argv[-1], "")
-        self.assertEqual(trees.fetch(42, git), ("aaa", "bbb"))
-        self.assertIn(["git", "fetch", "--quiet", "origin", "+pull/42/head:refs/bench/pr-42"], calls)
-        self.assertNotIn("FETCH_HEAD", [argv[-1] for argv in calls])
-
     def test_a_new_tree_is_added_detached_and_an_old_one_re_pointed(self):
         root, calls = Path(tempfile.mkdtemp()), []
         git = lambda argv, **_: calls.append(argv) or ""
