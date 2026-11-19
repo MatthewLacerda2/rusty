@@ -149,12 +149,21 @@ impl World {
         self.each_component(visit);
     }
 
-    /// Store skinned mesh `id`'s posed bone palette. Derived from the bones' poses
-    /// every tick, so it stamps no change and notes nothing for Undo (`derived_mut`):
-    /// a Mesh change cursor (the despawn index's) sees no write (#1708).
-    pub fn set_pose_palette(&mut self, id: u32, palette: Vec<glam::Mat4>) {
+    /// Stable ids of the meshes `keep` holds for, in insertion order
+    /// ([`World::ids_with_mesh`]'s), tested in the one walk of the Mesh column:
+    /// `Scene::skinned_ids` keeps the skinned ones of a level's hundreds.
+    pub fn ids_with_mesh_where(&self, keep: impl Fn(&MeshComponent) -> bool) -> Vec<u32> {
+        self.ids_with_component_where(keep)
+    }
+
+    /// Store skinned mesh `id`'s posed bone palette, copied into the one it
+    /// holds, so a rig re-posed every tick reuses its allocation. Derived from the
+    /// bones' poses every tick, so it stamps no change and notes nothing for Undo
+    /// (`derived_mut`): a Mesh change cursor (the despawn index's) sees no write (#1708).
+    pub fn set_pose_palette(&mut self, id: u32, palette: &[glam::Mat4]) {
         if let Some(mut mesh) = self.derived_mut::<MeshComponent>(id) {
-            mesh.pose_palette = palette;
+            mesh.pose_palette.clear();
+            mesh.pose_palette.extend_from_slice(palette);
         }
     }
 }
