@@ -33,6 +33,7 @@
 pub mod bench;
 mod bodies;
 mod body;
+mod composite;
 mod cost;
 #[cfg(test)]
 mod cost_tests;

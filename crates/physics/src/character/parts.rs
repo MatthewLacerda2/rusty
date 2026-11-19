@@ -20,9 +20,10 @@ use rapier3d::parry::bounding_volume::Aabb;
 use rapier3d::parry::partitioning::{BvhLeafCost, BvhNode};
 use rapier3d::parry::query::details::NormalConstraints;
 use rapier3d::parry::query::{QueryDispatcher, Ray, RayCast, ShapeCastHit, ShapeCastOptions};
-use rapier3d::parry::shape::{CompositeShape, Shape, TriMesh};
+use rapier3d::parry::shape::Shape;
 use rapier3d::prelude::*;
 
+use super::composite::{AtPart, Constraints, Parts};
 use super::cost::{self, Work};
 use super::normals::exact_normal;
 
@@ -69,11 +70,9 @@ pub(super) fn cast_parts(
         // A part can win only by a hit before the best so far.
         let cast = cast.until(best);
         let mut found = None;
-        parts.with_part(id, &mut |pose, part, constraints| {
-            let local = pose.map_or(*pos12, |p| p.inv_mul(pos12));
-            let vel = pose.map_or(vel12, |p| p.rotation.inverse() * vel12);
-            found = cast.part(&local, vel, part, constraints).map(|h| match h {
-                PartHit::Done(h) => PartHit::Done(pose.map_or(h, |p| h.transform1_by(p))),
+        parts.with_part(id, pos12, vel12, &mut |at, part, constraints| {
+            found = cast.part(&at, part, constraints).map(|h| match h {
+                PartHit::Done(h) => PartHit::Done(at.back(h)),
                 late => late,
             });
         });
@@ -86,75 +85,14 @@ pub(super) fn cast_parts(
         PartHit::Done(hit) => hit,
         PartHit::Late(raw) => {
             let mut done = raw;
-            parts.with_part(id, &mut |pose, part, constraints| {
-                let local = pose.map_or(*pos12, |p| p.inv_mul(pos12));
-                let vel = pose.map_or(vel12, |p| p.rotation.inverse() * vel12);
-                let h = cast.finish(raw, &local, vel, part, constraints);
-                done = pose.map_or(h, |p| h.transform1_by(p));
+            parts.with_part(id, pos12, vel12, &mut |at, part, constraints| {
+                done = at.back(cast.finish(raw, &at, part, constraints));
             });
             done
         }
     };
     hit.subshape1 = id;
     Some(hit)
-}
-
-/// A composite shape's parts, read straight from the trimesh when it is one,
-/// so a triangle's normal constraints are built only when asked for
-/// (parry's `map_part_at` builds them up front).
-#[derive(Clone, Copy)]
-struct Parts<'a> {
-    shape: &'a dyn CompositeShape,
-    mesh: Option<&'a TriMesh>,
-}
-
-impl<'a> Parts<'a> {
-    fn of(g1: &'a dyn Shape) -> Option<Self> {
-        let shape = g1.as_composite_shape()?;
-        Some(Parts {
-            shape,
-            mesh: g1.as_trimesh(),
-        })
-    }
-
-    fn bvh(&self) -> &rapier3d::parry::partitioning::Bvh {
-        self.shape.bvh()
-    }
-
-    /// Part `id`, its pose in the composite's frame (`None`: the identity)
-    /// and its normal constraints, handed to `f`.
-    fn with_part(&self, id: u32, f: &mut PartFn) {
-        match self.mesh {
-            Some(mesh) => f(None, &mesh.triangle(id), Constraints::Mesh(mesh, id)),
-            None => self.shape.map_part_at(id, &mut |pose, part, c| {
-                f(pose, part, Constraints::Given(c))
-            }),
-        }
-    }
-}
-
-/// What [`Parts::with_part`] hands a part to: its pose, shape and constraints.
-type PartFn<'f> = dyn FnMut(Option<&Pose>, &dyn Shape, Constraints) + 'f;
-
-/// A part's normal constraints: a trimesh triangle's, built on demand, or
-/// what parry handed over.
-#[derive(Clone, Copy)]
-enum Constraints<'a> {
-    Mesh(&'a TriMesh, u32),
-    Given(Option<&'a dyn NormalConstraints>),
-}
-
-impl Constraints<'_> {
-    fn with<R>(self, f: impl FnOnce(Option<&dyn NormalConstraints>) -> R) -> R {
-        match self {
-            Constraints::Mesh(mesh, id) => {
-                cost::count(Work::Constraints);
-                let built = mesh.triangle_normal_constraints(id);
-                f(built.as_ref().map(|c| c as &dyn NormalConstraints))
-            }
-            Constraints::Given(c) => f(c),
-        }
-    }
 }
 
 /// One part's hit as the search holds it: finished (its normal exact and
@@ -194,8 +132,9 @@ impl Cast<'_> {
 
     /// `part`'s hit, if any: a composite part cast part by part, a convex
     /// pair's hit left [`PartHit::Late`] where no normal can drop it.
-    fn part(&self, local: &Pose, vel: Vector, part: &dyn Shape, c: Constraints) -> Option<PartHit> {
+    fn part(&self, at: &AtPart, part: &dyn Shape, c: Constraints) -> Option<PartHit> {
         let (g2, options) = (self.g2, self.options);
+        let (local, vel) = (&at.pos12, at.vel12);
         let exact = part.as_support_map().is_some() && g2.as_support_map().is_some();
         let hit = if part.as_composite_shape().is_some() {
             cast_parts(self.dispatcher, part, local, vel, g2, options)?
@@ -213,16 +152,16 @@ impl Cast<'_> {
     }
 
     /// A late hit that won, finished as [`Self::part`] would have at once:
-    /// its exact normal, then its constraints (which, past [`NEAR_TOI`],
-    /// never drop it).
+    /// its exact normal, then [`constrained`], which past [`NEAR_TOI`] never
+    /// drops it (a debug build checks; a release one keeps the hit).
     fn finish(
         &self,
         raw: ShapeCastHit,
-        local: &Pose,
-        vel: Vector,
+        at: &AtPart,
         part: &dyn Shape,
         c: Constraints,
     ) -> ShapeCastHit {
+        let (local, vel) = (&at.pos12, at.vel12);
         let hit = exact_normal(
             self.dispatcher,
             raw,
@@ -231,10 +170,12 @@ impl Cast<'_> {
             [part, self.g2],
             self.options,
         );
-        c.with(|c| match corrected(&hit, c) {
-            Some(normal) => with_normal(hit, normal, local),
-            None => hit,
-        })
+        let kept = c.with(|c| constrained(hit, c, local, vel, self.options));
+        debug_assert!(
+            kept.is_some(),
+            "a hit past NEAR_TOI was dropped by its normal"
+        );
+        kept.unwrap_or(hit)
     }
 }
 
