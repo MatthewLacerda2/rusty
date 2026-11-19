@@ -278,7 +278,7 @@ impl<'a> BakeLog<'a> {
             });
         }
         let took = now.saturating_sub(started);
-        let peak = (self.peak.take()).map(|b| format!(", process peak memory {}", format::gb(b)));
+        let peak = (self.peak.take()).map(|b| format!(", process peak {}", format::gb(b)));
         out(Line {
             text: format!(
                 "[Lighting] done in {}{}",
