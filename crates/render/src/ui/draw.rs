@@ -19,6 +19,12 @@
 //! coverage texture rendered (`effects`, #428), before the camera stack — world
 //! canvases need them too. Right before the overlay pass, the backdrop blur runs
 //! over the finished frame (`effects::blur`, #426), only when a backdrop shows.
+//!
+//! **Laps.** Both halves cut their CPU time into `ui.<part>` laps (`Renderer::lap`),
+//! which the bench reports as `render.ui.<part>` inside `render.ui`: `layout`,
+//! `textures` (loading and binding the Images' textures), `mesh` (the canvas meshes
+//! and glyph atlases), `sync`, `shades`, `uniforms`, `masks` and `mask_submit`, then
+//! `blur`, `encode` and `submit` for the overlay pass.
 
 use crate::gpu::ops::CountedQueue as _;
 use std::rc::Rc;
@@ -52,11 +58,13 @@ impl Renderer {
         let textures = Rc::clone(&self.ui_renderer.texture_sizes);
         let ui_view = UiView::with_camera(screen, camera.clone(), textures);
         let layout = UiLayout::compute_in(&scene.world, &ui_view);
+        self.lap("ui.layout");
         for path in texture_paths(scene, &layout) {
             let tex = self.load_texture(&path);
             self.ui_renderer
                 .bind_group(&self.device, Some((path.as_str(), Rc::clone(&tex))));
         }
+        self.lap("ui.textures");
         let textures = &self.gpu_textures;
         // Source pixels, not the upload's, which *Max Size* may have shrunk (#1574).
         let tex_size = |p: &str| {
@@ -66,6 +74,7 @@ impl Renderer {
         let atlases = &mut self.ui_renderer.atlases;
         let meshes = build_canvas_meshes(&scene.world, &layout, screen, &tex_size, atlases);
         self.ui_renderer.upload_atlases(&self.device, &self.queue);
+        self.lap("ui.mesh");
         let world = &scene.world;
         let overlay = view.ui.screen_in_editor;
         let meshes = meshes
@@ -85,8 +94,11 @@ impl Renderer {
             })
             .collect();
         view.ui.sync(&self.device, &self.queue, meshes);
+        self.lap("ui.sync");
         self.prepare_ui_shades(view, scene.ui_time);
+        self.lap("ui.shades");
         self.upload_batch_uniforms(&mut view.ui);
+        self.lap("ui.uniforms");
         self.render_masks(view);
     }
 
@@ -106,6 +118,7 @@ impl Renderer {
         self.ui_renderer.ensure_pipeline(&self.device, format);
         self.ui_renderer.shaders.ensure_screen(&self.device, format);
         self.run_backdrop_blur(view);
+        self.lap("ui.blur");
         self.encode_ui(&view.ui, &target, format, screen_box(view));
     }
 
@@ -159,7 +172,10 @@ impl Renderer {
                 }
             }
         }
-        self.queue.counted_submit(Some(encoder.finish()));
+        let commands = encoder.finish();
+        self.lap("ui.encode");
+        self.queue.counted_submit(Some(commands));
+        self.lap("ui.submit");
     }
 }
 

@@ -119,6 +119,7 @@ impl Renderer {
         cache.effects.mask_passes = wanted.len() as u32;
         cache.effects.masks.sync(&self.device, &wanted);
         if wanted.is_empty() {
+            self.lap("ui.masks");
             return;
         }
         let key = |m: &super::mask::MaskDraw| GroupKey {
@@ -156,7 +157,10 @@ impl Renderer {
                 pass.draw(draw.range.clone(), 0..1);
             }
         }
-        self.queue.counted_submit(Some(encoder.finish()));
+        let commands = encoder.finish();
+        self.lap("ui.masks");
+        self.queue.counted_submit(Some(commands));
+        self.lap("ui.mask_submit");
     }
 }
 
