@@ -8,8 +8,10 @@ use super::GpuPass;
 rusty_core::named_enum! {
     /// The parts of a pass kind the timer reports beside it (#2401): a part's pair
     /// adds into its kind's row ([`GpuPart::pass`]) and into its own entry of
-    /// [`GpuTimes::parts`], so the parts of a kind sum to its row. The bench
-    /// reports one as `gpu.<pass>.<part>` ([`GpuPart::row`]).
+    /// [`GpuTimes::parts`], so the parts of a kind sum to its row. A sub-part
+    /// ([`GpuPart::within`]) adds into its part's entry too, so a part's
+    /// sub-parts sum to it, and only parts that sit within none sum to the row.
+    /// The bench reports one as `gpu.<pass>.<part>` ([`GpuPart::row`]).
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub enum GpuPart {
         /// The select of last frame's visible set.
@@ -20,8 +22,16 @@ rusty_core::named_enum! {
         OcclusionPyramid = "pyramid",
         /// The instance bounds test and the compaction of the kept instances.
         OcclusionTest = "test",
-        /// The cluster cull (#1968), on a frame that draws a batch by cluster.
+        /// The cluster cull (#1968), on a frame that draws a batch by cluster:
+        /// its three dispatches' sub-parts, summed, and no pair of its own.
         OcclusionClusters = "clusters",
+        /// The cluster cull's test of every (instance, cluster).
+        OcclusionClustersTest = "clusters_test",
+        /// The cluster cull's scan: each instance's kept clusters, given their
+        /// place in the output index list.
+        OcclusionClustersScan = "clusters_scan",
+        /// The cluster cull's copy of the kept clusters' indices.
+        OcclusionClustersCopy = "clusters_copy",
     }
 }
 
@@ -34,7 +44,25 @@ impl GpuPart {
             | Self::OcclusionPhaseOne
             | Self::OcclusionPyramid
             | Self::OcclusionTest
-            | Self::OcclusionClusters => GpuPass::Occlusion,
+            | Self::OcclusionClusters
+            | Self::OcclusionClustersTest
+            | Self::OcclusionClustersScan
+            | Self::OcclusionClustersCopy => GpuPass::Occlusion,
+        }
+    }
+
+    /// The part this one is a sub-part of: its time adds into that part's entry
+    /// too. `None` for a part of its kind's row alone.
+    pub fn within(self) -> Option<GpuPart> {
+        match self {
+            Self::OcclusionClustersTest
+            | Self::OcclusionClustersScan
+            | Self::OcclusionClustersCopy => Some(Self::OcclusionClusters),
+            Self::OcclusionSelect
+            | Self::OcclusionPhaseOne
+            | Self::OcclusionPyramid
+            | Self::OcclusionTest
+            | Self::OcclusionClusters => None,
         }
     }
 
@@ -86,8 +114,9 @@ pub struct GpuTimes {
     pub frame: u64,
     pub passes: Vec<(GpuPass, f64)>,
     /// The parts of a row timed in parts that frame, in [`GpuPart::ALL`] order,
-    /// each also in its kind's row: the parts of a kind sum to it. A part with no
-    /// pair that frame is left out, as a kind is.
+    /// each also in its kind's row: the parts of a kind within no other part sum
+    /// to it, and a part's sub-parts to it. A part with no pair that frame is
+    /// left out, as a kind is.
     pub parts: Vec<(GpuPart, f64)>,
     /// Untimed GPU work, in ms: what of the span no row holds inside one submit,
     /// where the GPU never waits for the CPU. A pass left untimed shows here. It
@@ -139,7 +168,8 @@ impl GpuTimes {
             let own = end.saturating_sub(begin);
             let slot = &mut charged[pair.pass as usize];
             *slot = Some(slot.unwrap_or(0) + own);
-            if let Some(part) = pair.part {
+            let within = pair.part.and_then(GpuPart::within);
+            for part in pair.part.into_iter().chain(within) {
                 let slot = &mut parts[part as usize];
                 *slot = Some(slot.unwrap_or(0) + own);
             }

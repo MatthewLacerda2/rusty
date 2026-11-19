@@ -1,12 +1,16 @@
 //! How many compute passes the `occlusion` stage records (#2327): the select's
 //! own, before phase one's depth draw, then one for the pyramid, the test, the
-//! compaction and every clustered batch's cluster cull, at one batch and at three;
-//! on a timed frame (#2401) one each for the pyramid, the test and the clusters.
+//! compaction and the cluster cull (a dispatch per group, stage by stage), at
+//! one batch and at three;
+//! on a timed frame (#2401) one each for the pyramid, the test and each of the
+//! cluster cull's three stages (#2406). Timed or not, the cluster cull records
+//! the same dispatches in the same order, stage by stage.
 
 use glam::{Quat, Vec3};
 
 use super::cluster_gpu_tests::panel;
 use super::gpu_tests::{offscreen, shot, H, W};
+use crate::timing::GpuPart;
 use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::{Camera, Scene};
 
@@ -16,8 +20,9 @@ use rusty_scene::{Camera, Scene};
 const PASSES: u32 = 2;
 
 /// [`PASSES`] on a timed frame, each part its own pass (`GpuTimer::splits`).
-/// Measured: lavapipe 4 (the split forced, it has no timestamps).
-const TIMED_PASSES: u32 = 4;
+/// Measured: lavapipe 6 (the split forced, it has no timestamps): the select,
+/// the pyramid, the test and the cluster cull's three dispatch kinds (#2406).
+const TIMED_PASSES: u32 = 6;
 
 /// A wall half across `n` clustered panels, each its own mesh and so its own
 /// clustered batch.
@@ -40,12 +45,22 @@ fn panels(n: usize) -> Scene {
 /// and either way: (tested, cluster-tested, draws, triangles); `None` where no
 /// culling adapter is (the test skips).
 fn stage_with(n: usize) -> Option<(u32, u32, u32, u64)> {
-    let untimed = stage_timed(n, false)?;
-    assert_eq!(stage_timed(n, true), Some(untimed), "timing moved the cull");
+    let (untimed, order) = stage_timed(n, false)?;
+    let (timed, timed_order) = stage_timed(n, true)?;
+    assert_eq!(timed, untimed, "timing moved the cull");
+    // Every group's test, then every scan, then every copy, timed or not: the
+    // untimed path runs what the bench times.
+    let steps = super::stage::CLUSTER_STEPS.iter();
+    let staged: Vec<_> = steps.flat_map(|s| (0..n).map(move |g| (*s, g))).collect();
+    assert_eq!((&order, &timed_order), (&staged, &staged), "untimed, timed");
     Some(untimed)
 }
 
-fn stage_timed(n: usize, timed: bool) -> Option<(u32, u32, u32, u64)> {
+/// The settled frame's counts, and the (stage, group) dispatches its cluster
+/// cull recorded, in order.
+type Staged = ((u32, u32, u32, u64), Vec<(GpuPart, usize)>);
+
+fn stage_timed(n: usize, timed: bool) -> Option<Staged> {
     let mut r = crate::test_gpu::culling::culling_or_skip(W, H)?;
     r.gpu_timer.split_override.set(Some(timed));
     r.time_stages(true);
@@ -57,8 +72,16 @@ fn stage_timed(n: usize, timed: bool) -> Option<(u32, u32, u32, u64)> {
         .map(|_| shot(&mut r, &mut view, &scene, &cam))
         .collect();
     let (on, c) = shots.last().expect("nine frames");
-    let runs = view.hiz.cameras[0].clusters.runs_ran;
-    assert_eq!(runs as usize, n, "each panel its own clustered run: {c:?}");
+    let clusters = &view.hiz.cameras[0].clusters;
+    assert_eq!(
+        clusters.runs_ran as usize, n,
+        "each panel its own clustered run: {c:?}"
+    );
+    assert_eq!(
+        clusters.groups_ran as usize, n,
+        "each its own mesh: a group each"
+    );
+    let order = clusters.dispatched.borrow().clone();
     let passes = if timed { TIMED_PASSES } else { PASSES };
     assert_eq!(
         c.ops.compute_passes, passes,
@@ -74,7 +97,10 @@ fn stage_timed(n: usize, timed: bool) -> Option<(u32, u32, u32, u64)> {
         "no part laps with the cull off"
     );
     assert!(*on == off, "the cull moved pixels");
-    Some((c.hiz_tested, c.cluster_tested, c.draw_calls, c.triangles))
+    Some((
+        (c.hiz_tested, c.cluster_tested, c.draw_calls, c.triangles),
+        order,
+    ))
 }
 
 /// The stage's CPU laps (`render.occlusion.<part>`), in the order first lapped.
