@@ -81,7 +81,7 @@ const ALL: u32 = 6 * N * N;
 
 #[test]
 fn gpu_a_wall_hides_half_a_panel_and_only_the_visible_half_is_drawn() {
-    let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {
+    let Some(mut r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
         return;
     };
     let mut scene = Scene::new();
@@ -129,7 +129,7 @@ fn gpu_a_wall_hides_half_a_panel_and_only_the_visible_half_is_drawn() {
 
 #[test]
 fn gpu_a_panel_facing_away_is_dropped_by_its_cones_unless_two_sided() {
-    let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {
+    let Some(mut r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
         return;
     };
     let mut scene = Scene::new();

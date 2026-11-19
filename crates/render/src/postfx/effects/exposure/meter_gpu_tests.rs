@@ -80,7 +80,7 @@ fn spread(size: [u32; 2], ae: &AutoExposure, step: [f32; 2]) -> f32 {
                 },
                 scene.size(),
             );
-            let passes = &r.post_passes.exposure;
+            let passes = (&r.post_passes.exposure, &r.gpu_timer);
             meter.run((&r.device, &r.queue), passes, (&view, size), &params);
             meter.settle(&r.device);
             meter.readout().expect("the meter read back")

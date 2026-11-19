@@ -11,8 +11,10 @@
 //! to its first rendered frame, wall clock, the renderer's start-up off the
 //! clock: `load`), `import_ms` (`IMPORT=1`, once a run, on its first scene: the
 //! same load of a copy of the project without its import cache, [`import`]), `rss_peak_mb` (the process's peak resident
-//! memory, [`memory`]) and `gpu_mb` (the renderer's GPU memory,
-//! `rusty_render::gpu_memory`), each compared with that scene's last run or a
+//! memory, [`memory`]), `gpu_mb` (the renderer's GPU memory,
+//! `rusty_render::gpu_memory`, with `gpu_allocated_mb`, what live allocations use,
+//! where the allocator tells it) and `gpu_texture_mb`, `gpu_lightmap_mb` and
+//! `gpu_reflection_mb` (the renderer's own resident bytes by kind), each compared with that scene's last run or a
 //! kept baseline (`Extra::baseline`). A run with `PROFILE=1` adds a sampling
 //! profile of the measured frames ([`profile`]), in a run of its own.
 //!
@@ -168,12 +170,8 @@ pub fn bench(
     if let Some(bytes) = memory::rss_peak_bytes() {
         report.push_value("rss_peak_mb", mb(bytes));
     }
-    if let Some(gpu) = harness
-        .renderer()
-        .and_then(|r| rusty_render::gpu_memory(&r.device))
-    {
-        report.push_value("gpu_mb", mb(gpu.bytes));
-        report.gpu_mb_source = Some(gpu.source.to_string());
+    if let Some(r) = harness.renderer() {
+        push_gpu_memory(&mut report, r);
     }
     {
         let world = harness.world.borrow();
@@ -232,6 +230,32 @@ pub fn load(
     harness.render_frame();
     let load = loaded + start.elapsed();
     Ok((harness, load.as_secs_f64() * 1000.0))
+}
+
+/// `gpu_mb` (and `gpu_allocated_mb` where the source tells it) with its source,
+/// then the renderer's own resident bytes by kind.
+fn push_gpu_memory(report: &mut SceneReport, r: &rusty_render::Renderer) {
+    if let Some(gpu) = rusty_render::gpu_memory(&r.device) {
+        report.push_value("gpu_mb", mb(gpu.bytes));
+        if let Some(bytes) = gpu.allocated {
+            report.push_value("gpu_allocated_mb", mb(bytes));
+        }
+        report.gpu_mb_source = Some(gpu.source.to_string());
+    }
+    push_resident(report, &r.frame_counters);
+}
+
+/// The renderer's own resident GPU bytes by kind, as of the last measured frame,
+/// beside `gpu_mb` (which no scene's size moves, being the allocator's blocks).
+fn push_resident(report: &mut SceneReport, counters: &rusty_render::RenderCounters) {
+    let kinds = [
+        ("gpu_texture_mb", counters.texture_bytes),
+        ("gpu_lightmap_mb", counters.lightmap_bytes),
+        ("gpu_reflection_mb", counters.reflection_bytes),
+    ];
+    for (row, bytes) in kinds {
+        report.push_value(row, mb(bytes));
+    }
 }
 
 fn mb(bytes: u64) -> f64 {

@@ -10,7 +10,7 @@ use rusty_scene::{Camera, Scene};
 
 #[test]
 fn gpu_an_empty_scene_and_a_lone_box_cull_nothing() {
-    let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {
+    let Some(mut r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
         return;
     };
     let cam = Camera::new(Vec3::new(0.0, 1.0, 6.0), -90.0, 0.0);
@@ -27,7 +27,7 @@ fn gpu_an_empty_scene_and_a_lone_box_cull_nothing() {
 
 #[test]
 fn gpu_a_growing_history_keeps_its_verdicts_and_marks_only_new_slots_drawn() {
-    let Some(r) = crate::test_gpu::headless_or_skip(W, H) else {
+    let Some(r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
         return;
     };
     let mut cam = CameraCull::new(&r.device);

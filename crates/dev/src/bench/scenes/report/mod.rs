@@ -156,8 +156,10 @@ impl SceneReport {
             ),
             (
                 self.row("gpu_ms").is_some(),
-                "(gpu_ms, gpu.<pass>: ms at the reference clock; gpu_raw_ms as measured, \
-                 at gpu_clock_pct of it)",
+                "(gpu_ms, gpu.<pass>, gpu.other: ms at the reference clock, gpu_ms the passes' \
+                 busy sum and gpu.other untimed work inside a submit; gpu_between_submits_ms \
+                 the GPU waiting on the CPU, as measured; gpu_raw_ms as measured, at \
+                 gpu_clock_pct of the reference)",
             ),
             (
                 self.row("cpu_ms").is_some(),
