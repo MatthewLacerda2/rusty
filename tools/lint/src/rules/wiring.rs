@@ -197,6 +197,10 @@ fn case_for(rule: &str) -> Option<Case> {
             "tests/a.rs",
             "#[test]\nfn t() {\n    let p = std::env::temp_dir().join(\"x\");\n}\n",
         ),
+        "test-static-write" => one(
+            "crates/app/src/a_tests.rs",
+            "static ON: AtomicBool = AtomicBool::new(false);\n#[test]\nfn t() {\n    ON.store(true, Relaxed);\n}\n",
+        ),
         "tool-named-test" => one("tests/nav/survivors.rs", "#[test]\nfn t() {}\n"),
         "unwrap-deny" => one("crates/physics/src/lib.rs", "//! A sim crate.\n"),
         "world-space" => one(app, "fn f(m: Mat4) {\n    m.to_scale_rotation_translation();\n}\n"),

@@ -44,6 +44,7 @@ pub(super) fn fake_engine() -> String {
     // Cargo runs the tests in one process, so a process-id path would collide between
     // tests; a per-bind counter keeps each fake engine's socket distinct.
     static NEXT: AtomicU32 = AtomicU32::new(0);
+    // lint: allow(test-static-write) a unique-name counter: no test reads its value back, so sharing it is the point
     let n = NEXT.fetch_add(1, Ordering::Relaxed);
     let path =
         // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is ~104 bytes)
