@@ -91,8 +91,12 @@ pub fn bake_scene_lightmaps_logged(
 ) -> Result<usize, String> {
     let scene_path = scene_path.ok_or(UNSAVED)?;
     let mut stages = Stages::start();
+    // What bakes the machine lost left, before this one adds its own.
+    spill::sweep(scene_path);
     let input = gather_bake_input(scene);
     fits::fits(&input, settings, false)?;
+    // Freed chart buffers go back to the system, as the estimate counts on.
+    crate::memory::return_large_frees();
     stages.lap("gather");
     let run = logged::bake_logged(&input, settings, log, scene_path)?;
     stages.push("trace", run.trace);

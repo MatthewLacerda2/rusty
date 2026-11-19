@@ -72,8 +72,8 @@ pub(super) fn bake_logged(
 }
 
 /// Bake and encode `input` on this thread, counting into `progress`, its pages
-/// spilled beside `scene_path`: the pages, and how long the trace and the
-/// encode took. `Ok(None)` when it was cancelled.
+/// spilled into the scratch folder of `scene_path`'s project: the pages, and how
+/// long the trace and the encode took. `Ok(None)` when it was cancelled.
 pub(super) fn timed(
     (input, settings): (&BakeScene, &BakeSettings),
     progress: &BakeProgress,

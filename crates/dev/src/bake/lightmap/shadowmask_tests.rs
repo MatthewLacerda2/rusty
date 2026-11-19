@@ -103,3 +103,23 @@ fn a_bake_with_four_lamps_or_on_baked_indirect_bakes_the_same_pages() {
     );
     assert!(plain.masks.is_empty() && !masked.masks.is_empty());
 }
+
+#[test]
+fn a_rebake_that_makes_the_same_pages_leaves_their_files_alone() {
+    use std::os::unix::fs::MetadataExt;
+    let (mut scene, _, _) = scene();
+    scene.lighting_settings.mixed_lighting_mode = MixedLightingMode::Shadowmask;
+    lamps(&mut scene, 2);
+    let path = scene_path("rebake_same");
+    bake_scene_lightmaps(&mut scene, Some(&path), &quick()).unwrap();
+    let files = |set: &rusty_scene::lighting::lightmap_set::LightmapSet| {
+        let paths = set.pages.iter().chain(&set.masks);
+        let inode = |p: &String| (p.clone(), std::fs::metadata(p).unwrap().ino());
+        paths.map(inode).collect::<Vec<_>>()
+    };
+    let first = files(&scene.lightmaps);
+    assert!(!scene.lightmaps.masks.is_empty());
+    bake_scene_lightmaps(&mut scene, Some(&path), &quick()).unwrap();
+    // The same names, and the same files: neither relinked nor reloaded.
+    assert_eq!(files(&scene.lightmaps), first);
+}

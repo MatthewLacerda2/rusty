@@ -200,11 +200,10 @@ pub fn check(
     Ok(())
 }
 
-/// Hold a bake of `input` at `settings` to this machine ([`estimate`], [`check`]),
-/// and have the allocator give back what the bake frees
-/// (`memory::return_large_frees`), which the estimate counts on.
+/// Hold a bake of `input` at `settings` to this machine ([`estimate`], [`check`]).
+/// The estimate counts on the allocator giving back what the bake frees, which
+/// the bake's entry points ask for (`memory::return_large_frees`).
 pub fn fits(input: &BakeScene, settings: &BakeSettings, progressive: bool) -> Result<(), String> {
-    crate::memory::return_large_frees();
     let threads = std::thread::available_parallelism().map_or(1, |n| n.get());
     let estimate = estimate(input, settings, progressive, threads);
     check(estimate, settings, crate::memory::machine())

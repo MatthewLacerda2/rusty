@@ -46,7 +46,7 @@ fn settings() -> BakeSettings {
     }
 }
 
-/// Bake and encode `n` slivers, spilled beside a scene of its own: the process's
+/// Bake and encode `n` slivers, spilled for a scene of its own: the process's
 /// peak after, what the maps kept, and the pages made.
 fn baked(n: usize) -> (u64, u64, usize) {
     crate::memory::return_large_frees();

@@ -98,6 +98,9 @@ pub fn bake_on(
         let shape = layout(scene, head, &points);
         let (map, lost) = lightmap(scene, (head, &shape), points, light, settings, cleaner);
         orphans.fetch_add(lost, Ordering::Relaxed);
+        // The chart's layout (its labels, size² × 4 bytes) goes before the hook
+        // hands freed memory back (`chart_finished`), so it is handed back too.
+        drop(shape);
         progress.mesh_done(c);
         map
     };

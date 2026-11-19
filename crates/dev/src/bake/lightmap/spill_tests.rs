@@ -1,41 +1,70 @@
-//! A bake's scratch folder (#2312): gone when its pages are, on every exit; a
-//! killed bake's removed by the next bake of the scene, a live one's never.
+//! A bake's scratch folder (#2312): in the project's `cache/`, never its
+//! `assets/`; gone when its pages are, on every exit; a killed bake's removed by
+//! the next bake of any scene of the project, a live one's never.
 
 use std::path::{Path, PathBuf};
 
-use super::spill::Spill;
-use super::tests::{quick, scene, scene_path};
+use super::spill::{Spill, SPILL_DIR};
+use super::tests::{quick, scene};
 use super::*;
-use rusty_asset::lightmap_page::DIR_SUFFIX;
 
-/// The spill folders beside `scene_path`.
-fn spills(scene_path: &str) -> Vec<PathBuf> {
-    let path = Path::new(scene_path);
-    let prefix = format!("{}.spill-", path.file_name().unwrap().to_string_lossy());
-    let entries = std::fs::read_dir(path.parent().unwrap()).unwrap();
-    let mut found: Vec<PathBuf> = entries
+/// A project folder holding `assets/scenes/`; the path of its scene `name`.
+fn project(dir: &str) -> (PathBuf, impl Fn(&str) -> String) {
+    let root = rusty_test_support::temp::dir().join(format!("rusty_spill_{dir}"));
+    let _ = std::fs::remove_dir_all(&root);
+    let scenes = root.join(rusty_core::project::ASSETS_DIR).join("scenes");
+    std::fs::create_dir_all(&scenes).unwrap();
+    std::fs::write(root.join(rusty_core::project::PROJECT_FILE), "{}").unwrap();
+    let scene = move |name: &str| scenes.join(name).to_string_lossy().into_owned();
+    (root, scene)
+}
+
+/// What lies in the project's scratch folders' folder, by name.
+fn spills(root: &Path) -> Vec<String> {
+    let dir = root.join(rusty_core::project::CACHE_DIR).join(SPILL_DIR);
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut found: Vec<String> = entries
         .flatten()
-        .map(|e| e.path())
-        .filter(|p| {
-            let name = p.file_name().unwrap().to_string_lossy();
-            name.starts_with(&prefix) && name.ends_with(DIR_SUFFIX)
-        })
+        .map(|e| e.file_name().to_string_lossy().into_owned())
         .collect();
     found.sort();
     found
 }
 
+/// Every file under `dir`, recursively.
+fn files_under(dir: &Path) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    for entry in std::fs::read_dir(dir).unwrap().flatten() {
+        let path = entry.path();
+        match path.is_dir() {
+            true => found.extend(files_under(&path)),
+            false => found.push(path),
+        }
+    }
+    found
+}
+
 #[test]
-fn a_spill_holds_its_files_until_dropped() {
-    let path = scene_path("spill_dropped");
+fn a_spill_lies_in_the_project_s_cache_and_holds_its_files_until_dropped() {
+    let (root, scene_path) = project("dropped");
+    let path = scene_path("level.scene");
     let mut spill = Spill::open(&path).unwrap();
     let file = spill.put(b"page").unwrap();
     assert_eq!(file.read().unwrap(), b"page");
+    assert!(
+        spill.dir().starts_with(root.join("cache")),
+        "{:?}",
+        spill.dir()
+    );
     let linked = Path::new(&path).with_extension("linked");
     file.link(&linked).unwrap();
-    assert!(spill.dir().is_dir());
     drop(spill);
-    assert!(spills(&path).is_empty(), "removed with its pages");
+    assert!(
+        spills(&root).is_empty(),
+        "removed with its pages, lock and all"
+    );
     assert_eq!(
         std::fs::read(&linked).unwrap(),
         b"page",
@@ -44,30 +73,44 @@ fn a_spill_holds_its_files_until_dropped() {
 }
 
 #[test]
-fn a_killed_bake_s_spill_is_removed_by_the_next_and_a_live_one_kept() {
-    let path = scene_path("spill_orphans");
-    // Past any pid a machine hands out: that process is gone.
-    let dead = format!("{path}.spill-4000000000-0{DIR_SUFFIX}");
-    // Pid 1 always runs.
-    let live = format!("{path}.spill-1-0{DIR_SUFFIX}");
-    for dir in [&dead, &live] {
-        std::fs::create_dir_all(dir).unwrap();
-        std::fs::write(Path::new(dir).join("0"), b"stale").unwrap();
-    }
-    let spill = Spill::open(&path).unwrap();
-    assert!(
-        !Path::new(&dead).exists(),
-        "a killed bake's spill is removed"
+fn a_killed_bake_leaves_nothing_in_assets_and_any_scene_s_bake_clears_it() {
+    let (root, scene_path) = project("killed");
+    let (killed, other) = (scene_path("cafe.scene"), scene_path("level.scene"));
+    // A bake of the project still running, then one killed mid-pages: a page
+    // spilled, then the kernel drops its lock.
+    let live = Spill::open(&killed).unwrap();
+    let mut dead = Spill::open(&killed).unwrap();
+    dead.put(b"a page").unwrap();
+    dead.abandon();
+    let assets = root.join(rusty_core::project::ASSETS_DIR);
+    assert_eq!(
+        files_under(&assets),
+        Vec::<PathBuf>::new(),
+        "nothing in assets/"
     );
-    assert!(Path::new(&live).exists(), "another running bake's is kept");
-    assert_eq!(spills(&path).len(), 2, "the live one and this one");
-    drop(spill);
-    std::fs::remove_dir_all(&live).unwrap();
+    assert_eq!(spills(&root).len(), 4, "two folders, two locks");
+    let (mut scene, ..) = scene();
+    assert!(bake_scene_lightmaps(&mut scene, Some(&other), &quick()).unwrap() > 0);
+    let left = spills(&root);
+    let live_name = live
+        .dir()
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
+    assert_eq!(
+        left,
+        [live_name.clone(), format!("{live_name}.lock")],
+        "{left:?}"
+    );
+    drop(live);
+    assert!(spills(&root).is_empty());
 }
 
 #[test]
 fn a_bake_cancelled_during_its_pages_or_written_leaves_no_spill() {
-    let path = scene_path("spill_exits");
+    let (root, scene_path) = project("exits");
+    let path = scene_path("level.scene");
     let input = gather_bake_input(&scene().0);
     let maps = rusty_lighting::lightmap::bake(&input, &quick());
     let cancelled = BakeProgress::default();
@@ -76,9 +119,19 @@ fn a_bake_cancelled_during_its_pages_or_written_leaves_no_spill() {
         encode_pages(maps.clone(), 1024, &cancelled, &path),
         Ok(None)
     );
-    assert!(spills(&path).is_empty(), "a cancel removes it");
+    assert!(spills(&root).is_empty(), "a cancel removes it");
     let (mut scene, ..) = scene();
     assert!(bake_scene_lightmaps(&mut scene, Some(&path), &quick()).unwrap() > 0);
-    assert!(spills(&path).is_empty(), "a written bake removes it");
+    assert!(spills(&root).is_empty(), "a written bake removes it");
     assert!(scene.lightmaps.pages.iter().all(|p| Path::new(p).is_file()));
+}
+
+#[test]
+fn a_scene_in_no_project_spills_in_a_folder_of_spills_not_beside_it() {
+    let dir = rusty_test_support::temp::dir().join("rusty_spill_loose");
+    std::fs::create_dir_all(&dir).unwrap();
+    let spill = Spill::open(&dir.join("loose.scene").to_string_lossy()).unwrap();
+    let parent = spill.dir().parent().unwrap();
+    assert!(parent.ends_with(SPILL_DIR), "{:?}", spill.dir());
+    assert!(!spill.dir().starts_with(&dir), "{:?}", spill.dir());
 }

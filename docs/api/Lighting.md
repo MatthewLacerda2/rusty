@@ -499,25 +499,36 @@ lighting settings (above), whose defaults are the ones listed here.
   being cleaned at once share 2 GB, so its share does not grow with the cores.
   Then the pages are made one at a time: each is composed (its lightmaps' squares
   filled again, which is when a map's edge is dilated and the rest of its square
-  filled), encoded and written to a scratch folder beside the scene
-  (`<scene>.spill-<process>-<n>.lightmaps`), and a lightmap is let go once its page
-  is composed; so the page stage holds one page (about 128 bytes a page texel)
-  and one map's square at a time. The scratch folder is removed when the bake
-  ends, written, cancelled or failed; one a killed bake left is removed by the
-  next bake of the scene. The editor's bake (progressive) also keeps every
+  filled), encoded and written to a scratch folder in the project's `cache/`
+  (`cache/lightmap-spill/`, gitignored and never exported; on the project's disk,
+  so the final write only links the pages into `<scene>.lightmaps/`), and a
+  lightmap is let go once its page is composed; so the page stage holds one page
+  (about 128 bytes a page texel) and one map's square at a time. The scratch
+  folder is removed when the bake ends, written, cancelled or failed. One a bake
+  killed by a quit or a power cut left is removed by the next bake of any scene
+  of the project: each bake holds a file lock on its own folder, which the system
+  drops with the process, so a folder whose lock is free is a dead bake's. The editor's bake (progressive) also keeps every
   texel's sums between passes, about 116 bytes a covered texel. So a bake's memory
   grows with `texelsPerUnit`² and `maxLightmapSize`² (the largest map and the
   page), and with the scene only by its lightmaps' covered texels. Before it
   starts, a bake estimates its peak from those (erring high) and warns, naming
   what holds the peak (finished maps, in flight, OIDN, pages) and the settings to
   lower, when it passes the memory the machine has free (Linux `MemAvailable`;
-  macOS free, inactive, purgeable and speculative pages); it is refused with the
-  same message when it passes all the machine has. Its last console line and its
+  macOS free and inactive pages); it is refused with the same message when it
+  passes all the machine has. On Linux both are held to the process's memory
+  cgroup (v2) when one caps it (`systemd-run -p MemoryMax=…`, a container's
+  limit): the cap is the total, and what is free is the cap less what the cgroup
+  uses (its inactive file cache counted free). Its last console line and its
   report (`peakResidentMB`, below) say the process's peak resident memory, which
   in a headless bake is the bake's. On macOS that is the peak physical footprint,
   which also counts memory the allocator has freed but not yet given back (a few
   MB a mesh, even though the bake asks for it back after each mesh and page), so
-  it reads somewhat above what the bake held.
+  it reads somewhat above what the bake held. On Linux (glibc), a bake also pins
+  the allocator's mmap threshold at its default (128 KiB), so every large block
+  the bake frees goes back to the system at once; glibc has no way back to its
+  adaptive threshold, so this lasts for the rest of the process (an editor
+  session after its first bake), at the cost of a page fault per large
+  allocation.
 - **Max Lightmap Size** (`maxLightmapSize`, Unity's setting; the editor's
   **"Max Lightmap Size"** under the Generate Lighting button). The atlas page's edge in
   texels, a power of two from `32` to `4096`, default `1024`; any other value is held to

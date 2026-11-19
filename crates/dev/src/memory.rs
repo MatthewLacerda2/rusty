@@ -5,11 +5,13 @@
 //! (`bake::lightmap::fits`).
 //!
 //! Linux reads `VmHWM` from `/proc/self/status` and `MemAvailable` / `MemTotal`
-//! from `/proc/meminfo`; macOS reads the peak physical footprint
+//! from `/proc/meminfo`, each held to the process's memory cgroup (v2) when one
+//! caps it (`cgroup`): a bake run under `systemd-run -p MemoryMax=…` is killed at
+//! the cap, not at the host's memory. macOS reads the peak physical footprint
 //! `task_info(TASK_VM_INFO)` reports (`ledger_phys_footprint_peak`, what Activity
-//! Monitor's Memory column counts), the free, inactive, purgeable and speculative
-//! pages `host_statistics64` counts (what a process can have without swapping),
-//! and `hw.memsize`.
+//! Monitor's Memory column counts), the free and inactive pages
+//! `host_statistics64` counts (what a process can have without swapping), and
+//! `hw.memsize`.
 
 /// The process's peak resident memory in bytes; `None` where it cannot be read.
 pub fn rss_peak_bytes() -> Option<u64> {
@@ -54,62 +56,8 @@ pub fn relieve() {
     }
 }
 
-/// What the allocator holds from the system and what of it is in use, in bytes
-/// (#2312): a test that finds a peak too high says which it was.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Heap {
-    pub in_use: u64,
-    pub held: u64,
-}
-
-/// The allocator's [`Heap`] now: glibc's `mallinfo2` over every arena, macOS's
-/// `malloc_zone_statistics` over every zone; `None` elsewhere.
-pub fn heap() -> Option<Heap> {
-    #[cfg(all(target_os = "linux", target_env = "gnu"))]
-    {
-        /// glibc's `struct mallinfo2`: ten `size_t`.
-        #[repr(C)]
-        struct Info([usize; 10]);
-        unsafe extern "C" {
-            fn mallinfo2() -> Info;
-        }
-        // SAFETY: `mallinfo2` takes nothing and returns its struct by value.
-        let Info(f) = unsafe { mallinfo2() };
-        // arena, ordblks, smblks, hblks, hblkhd, usmblks, fsmblks, uordblks, …
-        let (arena, mapped, used) = (f[0] as u64, f[4] as u64, f[7] as u64);
-        Some(Heap {
-            in_use: used + mapped,
-            held: arena + mapped,
-        })
-    }
-    #[cfg(target_os = "macos")]
-    {
-        /// libmalloc's `malloc_statistics_t`.
-        #[repr(C)]
-        #[derive(Default)]
-        #[allow(dead_code, reason = "filled by the C call; two fields are not read")]
-        struct Stats {
-            blocks_in_use: u32,
-            size_in_use: usize,
-            max_size_in_use: usize,
-            size_allocated: usize,
-        }
-        unsafe extern "C" {
-            fn malloc_zone_statistics(zone: *mut std::ffi::c_void, stats: *mut Stats);
-        }
-        let mut stats = Stats::default();
-        // SAFETY: a null zone sums every zone into `stats`, a `malloc_statistics_t`.
-        unsafe { malloc_zone_statistics(std::ptr::null_mut(), &mut stats) };
-        Some(Heap {
-            in_use: stats.size_in_use as u64,
-            held: stats.size_allocated as u64,
-        })
-    }
-    #[cfg(not(any(all(target_os = "linux", target_env = "gnu"), target_os = "macos")))]
-    {
-        None
-    }
-}
+mod heap;
+pub use heap::{heap, Heap};
 
 /// The machine's memory, in bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -134,10 +82,23 @@ fn peak() -> Option<u64> {
 #[cfg(target_os = "linux")]
 fn machine_now() -> Option<Machine> {
     let info = std::fs::read_to_string("/proc/meminfo").ok()?;
-    Some(Machine {
+    let host = Machine {
         available: kb_line(&info, "MemAvailable:")?,
         total: kb_line(&info, "MemTotal:")?,
-    })
+    };
+    let own = std::fs::read_to_string("/proc/self/cgroup").unwrap_or_default();
+    let capped = cgroup::own_path(&own).and_then(|p| cgroup::bound(cgroup::ROOT.as_ref(), p));
+    Some(capped.map_or(host, |cap| host.within(cap)))
+}
+
+impl Machine {
+    /// This machine held to `cap` (a memory cgroup's): the smaller of each.
+    pub fn within(self, cap: Machine) -> Machine {
+        Machine {
+            available: self.available.min(cap.available),
+            total: self.total.min(cap.total),
+        }
+    }
 }
 
 /// The `<key>   123456 kB` line of a `/proc` text (`VmHWM:` in `status`,
@@ -236,15 +197,15 @@ fn machine_now() -> Option<Machine> {
     }
     // SAFETY: `vm_page_size` is set by the system before `main`, never written after.
     let page = unsafe { mach2::vm_page_size::vm_page_size } as u64;
-    let pages = [
-        stats.free_count,
-        stats.inactive_count,
-        stats.purgeable_count,
-        stats.speculative_count,
-    ];
-    let available = pages.iter().map(|&n| u64::from(n) * page).sum();
+    // Free (which counts the speculative pages already) and inactive: purgeable
+    // pages sit on those queues too, so adding either would count a page twice.
+    // CI's memory floor reads the same (`.github/scripts/memory_floor.py`).
+    let available = (u64::from(stats.free_count) + u64::from(stats.inactive_count)) * page;
     Some(Machine { available, total })
 }
+
+#[cfg(any(target_os = "linux", test))]
+mod cgroup;
 
 #[cfg(not(any(target_os = "linux", target_os = "macos")))]
 fn peak() -> Option<u64> {

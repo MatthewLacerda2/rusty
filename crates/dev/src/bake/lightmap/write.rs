@@ -143,10 +143,15 @@ pub(super) fn write_set(
     Ok(set)
 }
 
-/// Put the spilled `file` at `path` and return the path the scene stores.
+/// Put the spilled `file` at `path` and return the path the scene stores. A
+/// page already there under that name and size (its content tag) is left as it
+/// is, as [`write_png`] leaves one, so a page the bake made again byte for byte
+/// is neither rewritten nor reloaded.
 fn link(file: &Spilled, path: &Path) -> Result<String, String> {
-    file.link(path)?;
-    rusty_core::fs::written::note_written(&path.to_string_lossy());
+    if !there(path, file.len()) {
+        file.link(path)?;
+        rusty_core::fs::written::note_written(&path.to_string_lossy());
+    }
     // The scene document stores `/` paths, like its other assets (#819).
     Ok(rusty_core::paths::to_slash(path))
 }
@@ -158,8 +163,7 @@ fn link(file: &Spilled, path: &Path) -> Result<String, String> {
 /// neither rewritten nor reloaded.
 pub(super) fn write_png(dir: &Path, prefix: &str, k: usize, png: &[u8]) -> Result<String, String> {
     let path = dir.join(format!("{prefix}_{k}_{:08x}.png", content_tag(png)));
-    let there = std::fs::metadata(&path).is_ok_and(|m| m.is_file() && m.len() == png.len() as u64);
-    if !there {
+    if !there(&path, png.len() as u64) {
         std::fs::write(&path, png).map_err(|e| format!("write {}: {e}", path.display()))?;
         rusty_core::fs::written::note_written(&path.to_string_lossy());
     }
@@ -181,9 +185,19 @@ fn warn_fell_back(set: &LightmapSet) {
     );
 }
 
+/// Whether a file of `len` bytes is at `path`: under a name carrying its content
+/// tag, the page already written.
+fn there(path: &Path, len: u64) -> bool {
+    std::fs::metadata(path).is_ok_and(|m| m.is_file() && m.len() == len)
+}
+
 /// The page's content hash, folded to 32 bits: the file name's content tag.
 pub(super) fn content_tag(bytes: &[u8]) -> u32 {
-    let hash = rusty_core::hash::content(bytes);
+    fold_tag(rusty_core::hash::content(bytes))
+}
+
+/// A content hash folded to the 32-bit tag a page's file name carries.
+pub(super) fn fold_tag(hash: u64) -> u32 {
     (hash ^ (hash >> 32)) as u32
 }
 

@@ -52,8 +52,8 @@ pub struct EncodedPages {
 }
 
 /// Lay `maps` out on pages of at most `max_page` texels a side (the bake's
-/// `BakeSettings::page`, #1704) and encode them, spilled beside `scene_path`
-/// (`spill`), every page on every core (the bands of a level are split over
+/// `BakeSettings::page`, #1704) and encode them, spilled into the scratch
+/// folder of `scene_path`'s project (`spill`), every page on every core (the bands of a level are split over
 /// them, so the blocks never depend on the machine), counting each finished page
 /// into `progress`. One page is composed at a time, and each map is dropped once
 /// its page is. `Ok(None)` when `progress` is cancelled first: it is asked before
