@@ -79,8 +79,8 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   depth, builds the Hi-Z pyramid and tests every opaque instance's bounds, leaving
   `SolidResources::culled`: the kept instances and one indirect draw per opaque
   batch. Every pass that draws the opaque batches goes through
-  `Renderer::draw_solids` with it (the forward and velocity pass; the SSAO/SSIL
-  prepass draws only its late set, `Culled::late`, over phase one's kept depth, so a
+  `Renderer::draw_solids` with it (the forward and velocity pass; the depth
+  prepass (SSAO's, SSIL's or the priming one) draws only its late set, `Culled::late`, over phase one's kept depth, so a
   new pass that draws depth before the forward pass loads that depth too); the batches are an `OpaqueBatches`, which hands out no slice, so the
   compiler refuses them to `draw_batches` (the translucents' path), which would draw
   what the cull hid. A transparent batch is never culled. `Renderer::hiz_culls` says which camera culls (the preset's

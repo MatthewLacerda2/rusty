@@ -28,22 +28,33 @@ pub(crate) struct Counter {
     pub(crate) culled: u32,
     /// Items the last read found drawn.
     pub(crate) drawn: u32,
+    /// The second count the last read's words carried: the late set's drawn
+    /// instances for an instance cull's (#2336), `0` for a cluster cull's.
+    pub(crate) late: u32,
 }
 
+/// Reads what a copy's words drew: the items drawn, and a second count beside
+/// them ([`Counter::late`]).
+pub(crate) type Reader = fn(&[u32]) -> (u32, u32);
+
 impl Counter {
-    /// How many instances final args (five words a batch) draw.
-    pub(crate) fn drawn_instances(words: &[u32]) -> u32 {
-        words.chunks_exact(5).map(|args| args[1]).sum()
+    /// How many instances the final args and, after them, the late set's draw
+    /// (five words a batch, as many batches each): one copy of both (#2336), so
+    /// the two counts describe the same frame.
+    pub(crate) fn final_and_late(words: &[u32]) -> (u32, u32) {
+        let instances = |args: &[u32]| args.chunks_exact(5).map(|a| a[1]).sum();
+        let (last, late) = words.split_at(words.len() / 10 * 5);
+        (instances(last), instances(late))
     }
 
     /// The count in a buffer's first word.
-    pub(crate) fn first_word(words: &[u32]) -> u32 {
-        words.first().copied().unwrap_or(0)
+    pub(crate) fn first_word(words: &[u32]) -> (u32, u32) {
+        (words.first().copied().unwrap_or(0), 0)
     }
 
-    /// Take a finished read's count, if one came back: `drawn` reads how many
-    /// tested items were drawn from the copied words.
-    pub(crate) fn collect(&mut self, device: &wgpu::Device, drawn: fn(&[u32]) -> u32) {
+    /// Take a finished read's counts, if one came back: `read` reads how many
+    /// tested items were drawn, and its second count, from the copied words.
+    pub(crate) fn collect(&mut self, device: &wgpu::Device, read: Reader) {
         let Some((tested, bytes)) = self.in_flight else {
             return;
         };
@@ -59,11 +70,12 @@ impl Counter {
         let read = staging
             .slice(..bytes)
             .get_mapped_range()
-            .map(|view| drawn(bytemuck::cast_slice(&view)));
+            .map(|view| read(bytemuck::cast_slice(&view)));
         staging.unmap();
-        if let Ok(drawn) = read {
+        if let Ok((drawn, late)) = read {
             self.culled = tested.saturating_sub(drawn);
             self.drawn = drawn;
+            self.late = late;
         }
         self.in_flight = None;
     }
@@ -183,5 +195,14 @@ mod tests {
         let mut mapped = reading(MAPPED);
         assert!(mapped.settle());
         assert_eq!(mapped.mapped.load(Ordering::Acquire), PENDING);
+    }
+
+    #[test]
+    fn one_copy_of_both_args_counts_the_final_and_the_late_draws_apart() {
+        // Two batches: final args drawing 3 and 4, then late args drawing 1 and 0.
+        let words = [6, 3, 0, 0, 0, 6, 4, 0, 0, 3, 6, 1, 0, 0, 3, 6, 0, 0, 0, 7];
+        assert_eq!(Counter::final_and_late(&words), (7, 1));
+        assert_eq!(Counter::final_and_late(&words[..10]), (3, 4), "one batch");
+        assert_eq!(Counter::final_and_late(&[]), (0, 0));
     }
 }

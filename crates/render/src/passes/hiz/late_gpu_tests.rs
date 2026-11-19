@@ -2,7 +2,8 @@
 //! what the test found visible that phase one left out. Its depth is the depth a
 //! full prepass of the final set leaves, byte for byte, held still and on the
 //! frame a box comes out from behind the wall, with a moving material and a
-//! clustered mesh in view, with SSAO on (its prepass) and off (the priming one).
+//! clustered mesh in view, with SSAO on (its prepass) and off (the priming one),
+//! and with motion blur on, whose velocity pass is primed from that depth too.
 //! Where priming runs (not Metal) the forward pass writes no depth, so the view's
 //! depth after the frame is the prepass's; on Metal it is the forward pass's own.
 
@@ -12,14 +13,15 @@ use super::cluster_gpu_tests::panel;
 use super::gpu_tests::{facing_the_wall, offscreen, shot, walled, words, H, W};
 use super::waves_gpu_tests::waves;
 use crate::readback::read_texture_bytes;
-use crate::{RenderView, Renderer};
+use crate::{RenderCounters, RenderView, Renderer};
 use rusty_components::CameraComponent;
 use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::Scene;
 
 /// The wall and the box behind it, a clustered panel and an upright plane drawn
-/// with `water` in front of it (each over a thousand of its pixels), under a volume with AO `ssao`: the scene and the box.
-fn scene(water: &str, ssao: bool) -> (Scene, u32) {
+/// with `water` in front of it (each over a thousand of its pixels), under a
+/// volume with AO `ssao` whose camera has motion blur `blur`: the scene and the box.
+fn scene(water: &str, (ssao, blur): (bool, bool)) -> (Scene, u32) {
     let (mut scene, boxed) = walled();
     panel(
         &mut scene,
@@ -37,7 +39,10 @@ fn scene(water: &str, ssao: bool) -> (Scene, u32) {
     let mut vc = default_post_processing();
     vc.ssao.active = ssao;
     scene.world.set_post_processing(volume, Some(vc));
-    let camera = Some(CameraComponent::default());
+    let camera = Some(CameraComponent {
+        motion_blur_active: blur,
+        ..CameraComponent::default()
+    });
     scene.world.set_camera(volume, camera);
     (scene, boxed)
 }
@@ -51,60 +56,60 @@ fn late(r: &Renderer, view: &RenderView) -> u32 {
     late.map(|a| a[1]).sum()
 }
 
-/// One frame's pixels and the depth the view holds after it.
-fn frame(r: &mut Renderer, view: &mut RenderView, scene: &Scene) -> (Vec<u8>, Vec<u8>) {
-    let (px, _) = shot(r, view, scene, &facing_the_wall());
+/// One frame's pixels and the depth the view holds after it, with the cull `on`
+/// (it is back on after): `view` keeps its history, so a culled view and an
+/// unculled one rendered in step blur the same motion.
+fn frame(r: &mut Renderer, view: &mut RenderView, scene: &Scene, on: bool) -> Frame {
+    r.quality.gpu_occlusion_culling = on;
+    let (px, counters) = shot(r, view, scene, &facing_the_wall());
+    r.quality.gpu_occlusion_culling = true;
     let depth = read_texture_bytes(&r.device, &r.queue, &view.depth_texture, (W, H), 4);
-    (px, depth)
+    (px, depth, counters)
 }
 
-/// `scene`'s frame with the cull off, in a fresh view, then the cull back on.
-fn uncull(r: &mut Renderer, scene: &Scene) -> (Vec<u8>, Vec<u8>) {
-    r.quality.gpu_occlusion_culling = false;
-    let mut fresh = offscreen(r);
-    let out = frame(r, &mut fresh, scene);
-    r.quality.gpu_occlusion_culling = true;
-    out
-}
+/// A frame's pixels, its view's depth and its counters.
+type Frame = (Vec<u8>, Vec<u8>, RenderCounters);
 
 #[test]
 fn gpu_the_late_set_leaves_the_full_prepass_s_depth() {
     let water = waves("late");
-    for ssao in [true, false] {
+    // SSAO's prepass, the priming one, and the priming one under a velocity pass.
+    for case in [(true, false), (false, false), (false, true)] {
         let Some(mut r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
             return;
         };
-        let (mut scene, boxed) = scene(&water.0, ssao);
-        let mut view = offscreen(&r);
+        let (mut scene, boxed) = scene(&water.0, case);
+        let (mut view, mut off) = (offscreen(&r), offscreen(&r));
+        // Both views step every frame, culled and not, so their history agrees.
+        let mut step = |r: &mut Renderer, scene: &Scene| {
+            let on = frame(r, &mut view, scene, true);
+            let late = late(r, &view);
+            (on, frame(r, &mut off, scene, false), late)
+        };
         // The first frame has no history: phase one draws everything.
-        frame(&mut r, &mut view, &scene);
-        assert_eq!(
-            late(&r, &view),
-            0,
-            "ssao {ssao}: the first frame's late set"
-        );
-        let held = frame(&mut r, &mut view, &scene);
-        assert_eq!(late(&r, &view), 0, "ssao {ssao}: a held view's late set");
+        let (_, _, first) = step(&mut r, &scene);
+        assert_eq!(first, 0, "{case:?}: the first frame's late set");
+        let (held, uncut, late_held) = step(&mut r, &scene);
+        assert_eq!(late_held, 0, "{case:?}: a held view's late set");
+        let primes = u32::from(r.depth_priming && r.priming_recommended);
+        assert_eq!(held.2.primed_passes, primes, "{case:?}: primed");
+        let velocity = held.2.velocity_passes;
         assert!(
-            view.hiz.cameras[0].clusters.ran > 0,
-            "the panel is drawn by cluster"
+            velocity >= u32::from(case.1),
+            "{case:?}: blur writes velocity"
         );
-        let off = uncull(&mut r, &scene);
-        assert!(held.1 == off.1, "ssao {ssao}: held, the depth moved");
-        assert!(held.0 == off.0, "ssao {ssao}: held, the pixels moved");
+        assert!(held.1 == uncut.1, "{case:?}: held, the depth moved");
+        assert!(held.0 == uncut.0, "{case:?}: held, the pixels moved");
         // Out in front of the wall: the late set holds it alone.
         scene.world.transform_mut(boxed).unwrap().position += Vec3::new(0.0, -1.0, 8.0);
-        let out = frame(&mut r, &mut view, &scene);
-        assert_eq!(
-            late(&r, &view),
-            1,
-            "ssao {ssao}: the box out from behind the wall"
-        );
-        let off = uncull(&mut r, &scene);
-        assert!(out.1 == off.1, "ssao {ssao}: out, the depth moved");
-        assert!(out.0 == off.0, "ssao {ssao}: out, the pixels moved");
+        let (out, uncut, late_out) = step(&mut r, &scene);
+        assert_eq!(late_out, 1, "{case:?}: the box out from behind the wall");
+        assert!(out.1 == uncut.1, "{case:?}: out, the depth moved");
+        assert!(out.0 == uncut.0, "{case:?}: out, the pixels moved");
         // The frame after, it is in phase one's set.
-        frame(&mut r, &mut view, &scene);
-        assert_eq!(late(&r, &view), 0, "ssao {ssao}: the box held in view");
+        let (_, _, after) = step(&mut r, &scene);
+        assert_eq!(after, 0, "{case:?}: the box held in view");
+        let ran = view.hiz.cameras[0].clusters.ran;
+        assert!(ran > 0, "the panel is drawn by cluster");
     }
 }

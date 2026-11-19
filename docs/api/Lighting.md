@@ -799,7 +799,8 @@ is wholly behind depth the camera drew this frame.
 - **Cost.** Per camera, a depth-only draw of last frame's set, a compute reduction
   of the depth, and one compute test per opaque mesh; the draw calls stay the same
   (indirect). That first depth is kept: the depth prepass (SSAO's or SSIL's, or,
-  with neither and outside macOS, the one that primes the forward pass) then draws
+  with neither, the one that primes the forward pass where depth priming runs,
+  never on macOS) then draws
   only the late set, what the test found visible that the first draw left out, so
   a still view pays for its depth once (#2336). The meshes still go through the CPU's frustum and size culls first.
 - **Per cluster** (#1968), the culling half of UE5's Nanite: a static mesh of at

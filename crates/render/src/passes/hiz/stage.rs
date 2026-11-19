@@ -63,11 +63,10 @@ impl Renderer {
         self.lap(lap_of(GpuPart::OcclusionTest));
         self.queue.counted_submit(std::iter::once(encoder.finish()));
         cam.counter.request(n);
-        cam.late.request(n);
         cam.clusters.counter.request(plan.tested);
         let counters = &mut self.frame_counters;
         counters.hiz_culled += cam.counter.culled;
-        counters.hiz_late += cam.late.drawn;
+        counters.hiz_late += cam.counter.late;
         counters.cluster_tested += plan.tested;
         counters.cluster_culled += cam.clusters.counter.while_active(!plan.runs.is_empty());
         ctx.solids.culled = Some(last);
@@ -139,17 +138,17 @@ impl Renderer {
 
 impl CameraCull {
     /// Copy what its final draws and its late set (#2336) drew, `batches` args
-    /// each, for their read backs ([`Counter`](super::counters::Counter)).
+    /// each and adjacent ([`late_args`]), in one copy for one read back
+    /// ([`Counter::final_and_late`](super::counters::Counter::final_and_late)).
     fn copy_counts(
         &mut self,
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
         batches: u32,
     ) {
-        let (args, bytes) = (self.args[1].buffer(), ARGS * u64::from(batches));
-        self.counter.copy(device, encoder, (args, 0, bytes));
-        let late = late_args(batches as usize);
-        self.late.copy(device, encoder, (args, late, bytes));
+        let bytes = late_args(batches as usize) + ARGS * u64::from(batches);
+        self.counter
+            .copy(device, encoder, (self.args[1].buffer(), 0, bytes));
     }
 }
 

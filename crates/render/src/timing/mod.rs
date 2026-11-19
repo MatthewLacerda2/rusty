@@ -91,8 +91,10 @@ rusty_core::named_enum! {
         /// the compaction and the cluster cull, a pair per recorded [`GpuPart`]
         /// (the cluster cull's per step), each added into this row.
         Occlusion = "occlusion",
-        /// The SSAO depth prepass (#1578), which a primed forward pass starts from.
-        SsaoPrepass = "ssao_prepass",
+        /// The depth prepass (#1578): SSAO's and SSIL's, and a GPU-culled camera's
+        /// late set where the forward pass primes (#2336), which a primed forward
+        /// pass starts from.
+        DepthPrepass = "depth_prepass",
         /// The SSAO occlusion pass, at its quality's resolution.
         Ssao = "ssao",
         /// The SSAO blur at the occlusion's resolution and its upsample to full.

@@ -72,9 +72,9 @@ pub(crate) struct CameraCull {
     pub(super) visible: GrowBuffer,
     pub(super) kept: [GrowBuffer; 2],
     pub(super) args: [GrowBuffer; 2],
+    /// How many instances its final draws and its late set (#2336) drew, one
+    /// read back of both ([`Counter::final_and_late`]).
     pub(super) counter: Counter,
-    /// How many instances its late set drew (#2336), read back as `counter` is.
-    pub(super) late: Counter,
     /// Its per-cluster cull (#1968).
     pub(crate) clusters: ClusterCull,
     /// The two `hiz.wgsl` groups (phase one's, then the test's and final), kept
@@ -117,7 +117,6 @@ impl CameraCull {
             kept: [0, 1].map(|_| buffer("Hi-Z Kept Instances", U::empty())),
             args: [0, 1].map(|_| buffer("Hi-Z Indirect Args", indirect)),
             counter: Counter::default(),
-            late: Counter::default(),
             clusters: ClusterCull::new(device),
             groups: Kept::default(),
             culled: Kept::default(),
@@ -183,8 +182,7 @@ impl Renderer {
     ) -> ([Culled; 2], Plan) {
         let cam = &mut view.hiz.cameras[idx];
         let pyramid = view.hiz.pyramid.as_ref().expect("held");
-        cam.counter.collect(&self.device, Counter::drawn_instances);
-        cam.late.collect(&self.device, Counter::drawn_instances);
+        cam.counter.collect(&self.device, Counter::final_and_late);
         cam.clusters
             .counter
             .collect(&self.device, Counter::first_word);

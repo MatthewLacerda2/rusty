@@ -147,8 +147,9 @@ pub struct RenderCounters {
     /// Opaque scene passes that wrote a velocity target (#1435): one per camera of
     /// each view running motion blur, `0` when none does.
     pub velocity_passes: u32,
-    /// Opaque scene passes primed with their SSAO prepass's depth (#1499): one per
-    /// camera that ran SSAO, `0` with AO off. A camera shading with a forward
+    /// Opaque scene passes primed with the depth prepass's depth (#1499): one per
+    /// camera that ran SSAO or SSIL, or that the GPU culls (#2336, its prepass
+    /// then the late set alone), `0` with neither and no GPU cull. A camera shading with a forward
     /// override of its own (the shader preview) is never primed, nor is any on Metal.
     pub primed_passes: u32,
     /// Reasons this frame read history an earlier frame left (#2092), one per
