@@ -111,7 +111,8 @@ fn side(n: i64) -> Result<u32, String> {
 /// as it is baked, the folders above the first made before the bake when inside
 /// `root`. Returns map → path; a `curvature_radius` some UV island's texels are too
 /// coarse to hold is said once, as a console warning naming the radius each baked
-/// at. An error names the verb and the model; a map that
+/// at, and so is a UV area so many faces stack on that it costs a trace per face
+/// per texel. An error names the verb and the model; a map that
 /// failed to write stops the bake, the maps before it stay written.
 pub(super) fn bake_mesh_maps(
     model: &str,
@@ -137,7 +138,7 @@ pub(super) fn bake_mesh_maps(
     check_bake_size((width, height)).map_err(fail)?;
     folder::make_parents(&paths[0], root).map_err(fail)?;
     let mut out = BTreeMap::new();
-    let raised = bake(&source, &maps, settings, |map, image| {
+    let notes = bake(&source, &maps, settings, |map, image| {
         // Readied once the baker has checked the settings and the mesh, before
         // the first map is written.
         if out.is_empty() {
@@ -154,8 +155,11 @@ pub(super) fn bake_mesh_maps(
         Ok(())
     })
     .map_err(fail)?;
-    if let Some(raised) = raised {
+    if let Some(raised) = notes.raised {
         log::warn!("[Texture] BakeMeshMaps: {model}: {raised}");
+    }
+    if let Some(stacked) = notes.stacked {
+        log::warn!("[Texture] BakeMeshMaps: {model}: {stacked}");
     }
     Ok(out)
 }
