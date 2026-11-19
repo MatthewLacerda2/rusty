@@ -32,7 +32,7 @@ use crate::lightmap::{rasterize_claims, Claim, TexelPoint};
 /// what the stack costs.
 const DEEP: f64 = 8.0;
 
-/// A shared UV area deep enough to tell (more than [`DEEP`] faces a texel, on
+/// A shared UV area deep enough to tell (more than 8 faces a texel, on
 /// average): its texels and the faces covering them, owners included.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Stacked {
