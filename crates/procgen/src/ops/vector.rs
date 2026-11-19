@@ -13,8 +13,11 @@ use super::super::image_buf::{Image, Rgba, Size};
 use super::field::Field;
 use super::generators::count;
 
-/// Resample `img` under an affine domain transform: translate, rotate (turns) about
-/// the domain center, then scale; a `scale > 1` packs more repeats into the canvas.
+/// Resample `img` under an affine domain transform: each output point reads `img` at
+/// that point turned `rotation` turns about the domain center (0.5, 0.5), scaled
+/// about it, then offset by `translation` in tile units. As shown (v down), a positive
+/// turn turns the content counter-clockwise, a `scale > 1` packs more repeats into
+/// the canvas, and a positive translation moves the content towards −U / −V.
 /// Sampling is bilinear and wraps. With `tiling`, `scale` rounds to whole repeats and
 /// `rotation` snaps to quarter turns — the only transforms that map the unit tile's
 /// lattice onto itself, so the output still tiles (#392).
@@ -45,7 +48,8 @@ pub fn mapping(
 }
 
 /// Domain warp: sample `a` at each point displaced by `by`'s red/green (centred on
-/// 0.5, so mid-grey moves nothing) times `strength` in tile units. Both reads are
+/// 0.5, so mid-grey moves nothing) times `strength` in tile units: red above 0.5
+/// reads further along +U, so the content moves towards −U (green: −V). Both reads are
 /// bilinear and wrapped, so two tiling inputs give a tiling, resolution-independent
 /// result (#406). A grayscale `by` (R = G) can only push along the diagonal: feed it
 /// `combine_rgb` of two independent noises for an isotropic warp. A linked
