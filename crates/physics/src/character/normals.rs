@@ -24,6 +24,29 @@ use super::parts::cast_parts;
 /// rather than one taken from a pose the cast never reached.
 const CONTACT_MARGIN: Real = 0.01;
 
+/// `hit`, a cast of the convex pair `g1`, `g2` through `dispatcher`, with its
+/// normal made exact: the closest-points normal of a `contact` query at the
+/// pose of impact. A pair `contact` finds out of reach keeps the cast's own
+/// normal.
+pub(super) fn exact_normal(
+    dispatcher: &dyn QueryDispatcher,
+    mut hit: ShapeCastHit,
+    pos12: &Pose,
+    vel12: Vector,
+    [g1, g2]: [&dyn Shape; 2],
+    options: ShapeCastOptions,
+) -> ShapeCastHit {
+    let mut at = *pos12;
+    at.translation += vel12 * hit.time_of_impact;
+    let reach = options.target_distance + CONTACT_MARGIN;
+    cost::count(Work::Contact);
+    if let Ok(Some(contact)) = dispatcher.contact(&at, g1, g2, reach) {
+        hit.normal1 = contact.normal1;
+        hit.normal2 = contact.normal2;
+    }
+    hit
+}
+
 /// A query dispatcher whose shape casts report the closest-points normal at
 /// the time of impact (what parry's own cast falls back on near contact),
 /// everything else forwarded unchanged.
@@ -71,7 +94,7 @@ impl QueryDispatcher for ExactNormals<'_> {
     /// The cast's hit with its normal made exact: the closest-points normal
     /// at the pose of impact. A convex pair (a box, sphere, cylinder, capsule
     /// or hull against the capsule) takes it from the pair. A triangle mesh or
-    /// compound is cast part by part through this dispatcher ([`cast_parts`]),
+    /// compound is cast part by part ([`cast_parts`]),
     /// so the one part a hit struck gives its normal (against the whole mesh
     /// the face under the capsule would hide the edge of the triangle the walk
     /// met), corrected by the part's internal-edge constraint. A heightfield
@@ -84,22 +107,21 @@ impl QueryDispatcher for ExactNormals<'_> {
         g2: &dyn Shape,
         options: ShapeCastOptions,
     ) -> Result<Option<ShapeCastHit>, Unsupported> {
-        if let Some(parts) = g1.as_composite_shape() {
-            return Ok(cast_parts(self, parts, pos12, local_vel12, g2, options));
+        if g1.as_composite_shape().is_some() {
+            return Ok(cast_parts(self.0, g1, pos12, local_vel12, g2, options));
         }
-        let Some(mut hit) = self.0.cast_shapes(pos12, local_vel12, g1, g2, options)? else {
+        let Some(hit) = self.0.cast_shapes(pos12, local_vel12, g1, g2, options)? else {
             return Ok(None);
         };
         if g1.as_support_map().is_some() && g2.as_support_map().is_some() {
-            let mut at = *pos12;
-            at.translation += local_vel12 * hit.time_of_impact;
-            let reach = options.target_distance + CONTACT_MARGIN;
-            cost::count(Work::Contact);
-            // A pair `contact` finds out of reach keeps the cast's own normal.
-            if let Ok(Some(contact)) = self.0.contact(&at, g1, g2, reach) {
-                hit.normal1 = contact.normal1;
-                hit.normal2 = contact.normal2;
-            }
+            return Ok(Some(exact_normal(
+                self.0,
+                hit,
+                pos12,
+                local_vel12,
+                [g1, g2],
+                options,
+            )));
         }
         Ok(Some(hit))
     }

@@ -241,3 +241,7 @@ mod run_tests;
 #[cfg(test)]
 #[path = "query_cost_tests.rs"]
 mod query_cost_tests;
+
+#[cfg(test)]
+#[path = "move_cost_tests.rs"]
+mod move_cost_tests;

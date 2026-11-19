@@ -74,10 +74,9 @@ pub(super) fn count(work: Work) {
 /// test in a debug or test profile.
 #[cfg(test)]
 pub(super) fn take() -> Counts {
-    assert!(
-        cfg!(debug_assertions),
-        "character::cost counts only with debug_assertions on; run this test in a debug or test profile"
-    );
+    if !cfg!(debug_assertions) {
+        panic!("character::cost counts only with debug_assertions on; run this test in a debug or test profile");
+    }
     ARMED.with(|a| a.set(true));
     COUNTS.with(|c| c.replace(Counts::default()))
 }
