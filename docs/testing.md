@@ -1117,7 +1117,24 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   untimed would show there. The stages are timed only on frames the dev layer
   captures (`Renderer::time_stages`): the window, the editor and the player never
   pay for them. Every GPU pass prints every run (0 when it did not run), so the
-  rows are stable. Under the table come the run's warnings, if any (below).
+  rows are stable. **The Hi-Z stage is also split into its parts** (#2401), on
+  frames a culling camera ran it: `gpu.occlusion.select`, `.phase_one` (the visible
+  set's depth draw), `.pyramid`, `.test` (the instance test and compaction) and
+  `.clusters` (the cluster cull, zero on a frame that draws nothing by cluster),
+  summing to `gpu.occlusion`: on a frame that timed any part every part is
+  sampled, zero when absent, so each is averaged over the same frames and
+  viewpoints as its stage; a run that never culls (or has no GPU timing) has no
+  `gpu.occlusion.<part>` row at all. And `render.occlusion.hold` (making room for
+  the camera, the pyramid's allocation on a resize, and collecting last frame's
+  counters), `.test` (packing the instances' bounds, and copying the verdict
+  count), `.clusters` (planning, uploading and copying the cluster cull's),
+  `.select` (the uploads and binds before its pass, and the pass), `.phase_one`,
+  `.pyramid` and `.submit`, summing to `render.occlusion` but for its returns. A part row sits inside its stage's row, so no sum of `gpu.` or
+  `render.` rows counts it. To time the parts, a frame the GPU timer times records
+  the stage in a pass per part (`GpuTimer::splits`): a culling camera's stage
+  records 3 or 4 compute passes (the cluster cull's when a batch is drawn by
+  cluster) where an untimed frame (lavapipe, a shipped game) records 2, and the
+  extra pass boundaries' cost is in the stage's own rows. Under the table come the run's warnings, if any (below).
 - **before and after** — the report is kept in `out/bench/bench.json` (and
   `bench.txt`), and each run prints every row's change against the last one. To
   measure an optimisation: `make bench`, change, `make bench`. The report names the
