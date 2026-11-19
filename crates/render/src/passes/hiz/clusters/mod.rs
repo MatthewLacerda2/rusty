@@ -8,7 +8,9 @@
 //!
 //! - **Phase one** is unchanged: last frame's visible instances draw whole into
 //!   the depth the pyramid is built from. No cluster history is kept, so phase one
-//!   draws a little more than it must, never less.
+//!   draws a little more than it must, never less. Its depth is kept (#2336):
+//!   the prepass adds the late set over it, a clustered batch's late instances
+//!   drawn whole.
 //! - **Phase two**, after `cs_test` judged every instance against this frame's
 //!   pyramid: `cs_compact` keeps a clustered batch's instances in place, and per
 //!   clustered batch `hiz_clusters.wgsl` tests each (instance, cluster) by the

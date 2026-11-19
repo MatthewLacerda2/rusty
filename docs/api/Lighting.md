@@ -798,7 +798,11 @@ is wholly behind depth the camera drew this frame.
   draws, cull nothing this way.
 - **Cost.** Per camera, a depth-only draw of last frame's set, a compute reduction
   of the depth, and one compute test per opaque mesh; the draw calls stay the same
-  (indirect). The meshes still go through the CPU's frustum and size culls first.
+  (indirect). That first depth is kept: the depth prepass (SSAO's or SSIL's, or,
+  with neither, the one that primes the forward pass where depth priming runs,
+  never on macOS) then draws
+  only the late set, what the test found visible that the first draw left out, so
+  a still view pays for its depth once (#2336). The meshes still go through the CPU's frustum and size culls first.
 - **Per cluster** (#1968), the culling half of UE5's Nanite: a static mesh of at
   least 4096 triangles is split at import into clusters of up to 124 triangles,
   each with its bounds and normal cone, kept with the model. After its whole mesh
@@ -816,8 +820,8 @@ is wholly behind depth the camera drew this frame.
   ([`Graphics`](Graphics.md), *Quality presets*). A split mesh is
   drawn once per instance, not instanced, so many copies of one big mesh cost a
   draw each; past a per-camera budget (8M indices) a batch is tested whole.
-- **Measure** with `Debug.Stats().hiz_tested` and `hiz_culled` (read back a frame
-  or so late), and `cluster_tested` / `cluster_culled` for the clusters. What it
+- **Measure** with `Debug.Stats().hiz_tested`, `hiz_culled` and `hiz_late` (read
+  back a frame or so late), and `cluster_tested` / `cluster_culled` for the clusters. What it
   costs is `gpu_passes.occlusion` and, in a bench, its parts' rows
   (`gpu.occlusion.<part>`, `render.occlusion.<part>`, [`docs/testing.md`](../testing.md)).
 

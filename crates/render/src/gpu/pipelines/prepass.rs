@@ -32,7 +32,7 @@ fn make_prepass(
     facing: Facing,
 ) -> wgpu::RenderPipeline {
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("SSAO Depth Prepass Pipeline"),
+        label: Some("Depth Prepass Pipeline"),
         layout: Some(layout),
         vertex: wgpu::VertexState {
             module: shader,

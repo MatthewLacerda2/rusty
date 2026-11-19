@@ -159,7 +159,7 @@ impl Renderer {
         batches: usize,
     ) -> ClusterDraws {
         cull.counter
-            .copy(&self.device, encoder, (cull.tally.buffer(), 4));
+            .copy(&self.device, encoder, (cull.tally.buffer(), 0, 4));
         ClusterDraws {
             indices: cull.out_indices.buffer().clone(),
             args: cull.out_args.buffer().clone(),

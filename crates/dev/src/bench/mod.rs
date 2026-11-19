@@ -4,7 +4,7 @@
 //! shooter-shaped stress scene ([`stress`]) onto the default yard, warms up, then
 //! `Harness.Bench(n)` steps and renders `n` frames, sampling each one, and prints
 //! a short report — frame, render and GPU ms (average and p95), GPU ms per pass,
-//! draw calls, triangles, dropped and culled counts, the Hi-Z culls, the GPU calls
+//! draw calls, triangles, dropped and culled counts, the Hi-Z culls and late set, the GPU calls
 //! (passes, submits, bind groups made, buffer writes), each system's CPU ms
 //! (`cpu.<system>`) and the renderer's by stage (`render.<stage>`), each set with an `other` row for
 //! what none of its parts holds. A stage timed in parts (the Hi-Z `occlusion`
@@ -12,8 +12,8 @@
 //! its own, which they sit inside: no sum of a set counts them.
 //!
 //! **Before and after is automatic.** The report is kept as `<out_dir>/bench.json`
-//! (`out/bench/` under `make bench`) and each run prints its change against the one
-//! before, so measuring an optimisation is: run, change, run.
+//! (`out/bench/` under `make bench`) and each run prints its change against the
+//! last: measuring an optimisation is run, change, run.
 //!
 //! **GPU rows are clock-normalised** (`clock`, #862): a fixed probe timed beside
 //! every frame divides out the GPU governor's clock, so `gpu_ms` (the passes' busy
@@ -58,7 +58,7 @@ use rusty_core::frame_stats::FrameStats;
 use rusty_render::{ClockProbe, GpuPart, GpuPass};
 
 /// The render counters a bench row reports, in order.
-const COUNTERS: [&str; 17] = [
+const COUNTERS: [&str; 18] = [
     "draw_calls",
     "triangles",
     "lights_dropped",
@@ -69,6 +69,7 @@ const COUNTERS: [&str; 17] = [
     "decal_cluster_refs",
     "hiz_tested",
     "hiz_culled",
+    "hiz_late",
     "cluster_tested",
     "cluster_culled",
     "render_passes",

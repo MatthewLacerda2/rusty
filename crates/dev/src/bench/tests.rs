@@ -101,6 +101,7 @@ fn gpu_bench_reports_frame_render_and_counter_rows() {
     for k in [
         "hiz_tested",
         "hiz_culled",
+        "hiz_late",
         "cluster_tested",
         "cluster_culled",
     ] {
