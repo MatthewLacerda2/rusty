@@ -512,9 +512,9 @@ bench: ## Benchmark the stress scene (release build), with the change against th
 # the whole run, so a PROFILE=1 run's timed rows come from it too (each report says so):
 # on a desktop GPU they measured inside the release build's spread. RUSTFLAGS only
 # reaches that profile's own target folder; a run without PROFILE=1 is the release build.
-bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/games/horde [SCENES=a,b] [RES=WxH] [RUNS=n] [LOAD_RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1]
-	@test -n "$(PROJECT)" || { echo "bench-scenes: make bench-scenes PROJECT=<project dir> [SCENES=a,b] [RES=WxH] [RUNS=n] [LOAD_RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1]" >&2; exit 1; }
-	$(if $(filter 1,$(PROFILE)),RUSTFLAGS="$$RUSTFLAGS -C force-frame-pointers=yes") cargo run $(if $(filter 1,$(PROFILE)),--profile profiling,--release) --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RES),--size $(RES)) $(if $(RUNS),--runs $(RUNS)) $(if $(LOAD_RUNS),--load-runs $(LOAD_RUNS)) $(if $(BEFORE),--before $(BEFORE)) $(if $(filter 1,$(PROFILE)),--profile) $(if $(filter 1,$(IMPORT)),--import) out/bench/scenes
+bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/games/horde [SCENES=a,b] [RES=WxH] [RUNS=n] [LOAD_RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1] [SCRIPT=1]
+	@test -n "$(PROJECT)" || { echo "bench-scenes: make bench-scenes PROJECT=<project dir> [SCENES=a,b] [RES=WxH] [RUNS=n] [LOAD_RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1] [SCRIPT=1]" >&2; exit 1; }
+	$(if $(filter 1,$(PROFILE)),RUSTFLAGS="$$RUSTFLAGS -C force-frame-pointers=yes") cargo run $(if $(filter 1,$(PROFILE)),--profile profiling,--release) --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RES),--size $(RES)) $(if $(RUNS),--runs $(RUNS)) $(if $(LOAD_RUNS),--load-runs $(LOAD_RUNS)) $(if $(BEFORE),--before $(BEFORE)) $(if $(filter 1,$(PROFILE)),--profile) $(if $(filter 1,$(IMPORT)),--import) $(if $(filter 1,$(SCRIPT)),--script) out/bench/scenes
 
 # A pull request's measured rows (#2381): `main`, the PR's head, `main` again, back to
 # back, each built in a detached worktree of its own; the second `main` leg is each
