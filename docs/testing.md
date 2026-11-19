@@ -643,13 +643,20 @@ the `.deb`s in the Actions cache per runner image and ref, so a mirror outage fa
 run on an image that ref (or `main`, whose cache every ref reads) has already served
 (#2101).
 
-**Runner image.** The gating jobs run on pinned images, `ubuntu-24.04` and
-`macos-26`, never `-latest` (#930): lavapipe comes from the image's apt archive, so a
-moving image changes the driver under the GPU tests with nothing in any diff. The
-`build-test` log prints the Mesa version it rendered with (step *Driver version*).
-Moving to a new image is a one-line PR of its own. `ubuntu-26.04` is already proven
-(#868): the apt list resolves unchanged, lavapipe is Mesa 26.0.8, and a cold-cache
-build ran every GPU test there.
+**Runner image.** Every job runs on a pinned image, never `-latest` (#930): lavapipe
+comes from the image's apt archive, so a moving image changes the driver under the GPU
+tests with nothing in any diff. Every Ubuntu job (the gates, and the mutation, coverage
+and `main`-health runs) names the image `ci.yml`'s `build-test` names, the one it is
+defined by, so a signal tests on the driver the gate proves; a cache key that names an
+image names that one too, so no `target/` built on another image's glibc restores. A
+`runs-on` the check cannot read fails rather than passes (`make scripts`,
+`.github/scripts/tests/test_runner_image.py`). The
+`build-test` log prints the Mesa version it rendered with and the runner's CPU (step
+*Driver version*), as the mutation Baseline's *Runner CPU* step does.
+Moving to a new image is a PR of its own (the check lists every line to change), and reads #2385 first: a shadowed
+spot's fog shaft went missing twice on Mesa 26's lavapipe and never on Mesa 25, its
+cause not named. `ubuntu-26.04` is otherwise proven (#868): the apt list resolves
+unchanged, lavapipe is Mesa 26.0.8, and a cold-cache build ran every GPU test there.
 
 Linux CI's adapter is a software renderer, so a green run there proves the render
 path is correct on a conformant driver, not that it performs or behaves identically on
@@ -1098,7 +1105,24 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   untimed would show there. The stages are timed only on frames the dev layer
   captures (`Renderer::time_stages`): the window, the editor and the player never
   pay for them. Every GPU pass prints every run (0 when it did not run), so the
-  rows are stable. Under the table come the run's warnings, if any (below).
+  rows are stable. **The Hi-Z stage is also split into its parts** (#2401), on
+  frames a culling camera ran it: `gpu.occlusion.select`, `.phase_one` (the visible
+  set's depth draw), `.pyramid`, `.test` (the instance test and compaction) and
+  `.clusters` (the cluster cull, zero on a frame that draws nothing by cluster),
+  summing to `gpu.occlusion`: on a frame that timed any part every part is
+  sampled, zero when absent, so each is averaged over the same frames and
+  viewpoints as its stage; a run that never culls (or has no GPU timing) has no
+  `gpu.occlusion.<part>` row at all. And `render.occlusion.hold` (making room for
+  the camera, the pyramid's allocation on a resize, and collecting last frame's
+  counters), `.test` (packing the instances' bounds, and copying the verdict
+  count), `.clusters` (planning, uploading and copying the cluster cull's),
+  `.select` (the uploads and binds before its pass, and the pass), `.phase_one`,
+  `.pyramid` and `.submit`, summing to `render.occlusion` but for its returns. A part row sits inside its stage's row, so no sum of `gpu.` or
+  `render.` rows counts it. To time the parts, a frame the GPU timer times records
+  the stage in a pass per part (`GpuTimer::splits`): a culling camera's stage
+  records 3 or 4 compute passes (the cluster cull's when a batch is drawn by
+  cluster) where an untimed frame (lavapipe, a shipped game) records 2, and the
+  extra pass boundaries' cost is in the stage's own rows. Under the table come the run's warnings, if any (below).
 - **before and after** — the report is kept in `out/bench/bench.json` (and
   `bench.txt`), and each run prints every row's change against the last one. To
   measure an optimisation: `make bench`, change, `make bench`. The report names the

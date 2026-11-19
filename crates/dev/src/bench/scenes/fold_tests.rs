@@ -73,3 +73,50 @@ fn runs_fold_into_their_average_with_the_lowest_and_highest_as_the_spread() {
     let one = over_runs(&[run(2.0, 3.0)]);
     assert_eq!((one[0].lo, one[0].hi), (2.0, 2.0));
 }
+
+/// One viewpoint's report over its frames, each frame's Hi-Z parts as given.
+fn sampled(frames: &[&[(rusty_render::GpuPart, f64)]]) -> Report {
+    use super::super::super::{sample, Samples, Speeds};
+    use rusty_render::{GpuPass, GpuTimes};
+    let mut samples = Samples::default();
+    for parts in frames {
+        let gpu = GpuTimes {
+            passes: vec![(GpuPass::Occlusion, parts.iter().map(|p| p.1).sum())],
+            parts: parts.to_vec(),
+            ..GpuTimes::default()
+        };
+        let frame = crate::capture::RenderedFrame {
+            gpu: Some(gpu),
+            ..Default::default()
+        };
+        let speed = Speeds {
+            gpu: Some(1.0),
+            ..Speeds::default()
+        };
+        let stats = rusty_core::frame_stats::FrameStats::default();
+        sample(&mut samples, &stats, Some(&frame), speed);
+    }
+    samples.report()
+}
+
+/// The cluster cull on one frame of one viewpoint only (#2401): its row is its
+/// share of the stage, so the parts still sum to `gpu.occlusion` after the fold.
+#[test]
+fn parts_on_some_frames_only_still_sum_to_their_stage() {
+    use rusty_render::GpuPart::{OcclusionClusters as Clusters, OcclusionTest as Test};
+    let culls: &[_] = &[(Test, 1.0), (Clusters, 4.0)];
+    let plain: &[_] = &[(Test, 1.0)];
+    let reports = [
+        ("a".to_string(), sampled(&[culls, plain])),
+        ("b".to_string(), sampled(&[plain, plain])),
+    ];
+    let rows = aggregate(&reports);
+    let avg = |k: &str| rows.iter().find(|r| r.metric == k).map(|r| r.avg);
+    assert_eq!(avg("gpu.occlusion"), Some(2.0));
+    assert_eq!(avg("gpu.occlusion.clusters"), Some(1.0), "its share, not 4");
+    let parts: f64 = rusty_render::GpuPart::ALL
+        .iter()
+        .map(|p| avg(&format!("gpu.{}", p.row())).expect("every part has a row"))
+        .sum();
+    assert_eq!(parts, 2.0, "the parts sum to the stage");
+}

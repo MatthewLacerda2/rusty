@@ -65,6 +65,27 @@ impl SceneReport {
     }
 }
 
+impl SceneReport {
+    /// The notes on what the change column compares: the spread, or no earlier run.
+    pub(super) fn comparison_notes(&self, first: bool) -> [(bool, &'static str); 3] {
+        [
+            (
+                self.runs.max(1) > 1,
+                "(spread: the lowest to the highest run's average; a change inside both \
+                 runs' spreads is unresolved)",
+            ),
+            (
+                first && self.baseline.is_none(),
+                "(no previous report: the next run prints its change against this one)",
+            ),
+            (
+                first && self.baseline.is_some(),
+                "(the baseline holds no report of this scene: no change column)",
+            ),
+        ]
+    }
+}
+
 /// What moved between two runs' viewpoints: their count, or the first one that
 /// looks from elsewhere (a navmesh point that moved, another camera of one name).
 fn views_moved(before: &[ViewKey], now: &[ViewKey]) -> String {

@@ -86,3 +86,16 @@ fn a_baseline_is_read_from_a_project_folder_or_the_whole_out_dir() {
         "{text}"
     );
 }
+
+/// The Hi-Z parts' notes (#2401): the CPU one wherever the stage ran, the GPU
+/// one (and its pass count) only with GPU timing, which lavapipe lacks.
+#[test]
+fn the_hiz_gpu_parts_note_needs_gpu_timing() {
+    let mut cpu = scene(2.0);
+    cpu.push_value("render.occlusion.test", 0.5);
+    let notes = cpu.notes(true);
+    assert!(notes.contains("render.occlusion.<part>"), "{notes}");
+    assert!(!notes.contains("gpu.occlusion.<part>"), "{notes}");
+    cpu.push_value("gpu.occlusion.select", 0.25);
+    assert!(cpu.notes(true).contains("1 or 2 more compute_passes"));
+}

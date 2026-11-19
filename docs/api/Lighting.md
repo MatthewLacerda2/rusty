@@ -766,7 +766,9 @@ is wholly behind depth the camera drew this frame.
   drawn once per instance, not instanced, so many copies of one big mesh cost a
   draw each; past a per-camera budget (8M indices) a batch is tested whole.
 - **Measure** with `Debug.Stats().hiz_tested` and `hiz_culled` (read back a frame
-  or so late), and `cluster_tested` / `cluster_culled` for the clusters.
+  or so late), and `cluster_tested` / `cluster_culled` for the clusters. What it
+  costs is `gpu_passes.occlusion` and, in a bench, its parts' rows
+  (`gpu.occlusion.<part>`, `render.occlusion.<part>`, [`docs/testing.md`](../testing.md)).
 
 ### Bake reports
 
