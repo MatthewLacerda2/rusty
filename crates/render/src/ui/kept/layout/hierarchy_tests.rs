@@ -1,6 +1,8 @@
 //! What the hierarchy gives the layout besides its elements' columns: the order of
 //! siblings, which canvas is a root, and which `WorldAnchor` is a marker.
 
+use glam::Vec2;
+
 use super::{element, ui, Rig};
 use rusty_components::{CanvasComponent, CanvasRenderMode, WorldAnchor};
 
@@ -37,6 +39,27 @@ fn a_nested_canvas_becoming_a_root_is_laid_out_and_back() {
     assert!(rig.frame(&ui.scene.world), "a root now: its HUD appears");
     ui.scene.set_parent(inner, Some(deeper)).expect("parent");
     assert!(rig.frame(&ui.scene.world), "nested again: its HUD goes");
+}
+
+#[test]
+fn a_nested_canvas_s_own_fields_lay_nothing_out() {
+    let (mut ui, mut rig) = (ui(), Rig::new());
+    let inner = element(&mut ui.scene, ui.canvas);
+    ui.scene
+        .world
+        .set_canvas(inner, Some(CanvasComponent::default()));
+    element(&mut ui.scene, inner);
+    assert!(rig.frame(&ui.scene.world));
+    let mut c = ui.scene.world.canvas_mut(inner).expect("canvas");
+    c.reference_resolution = Vec2::new(1280.0, 720.0);
+    (c.match_width_or_height, c.sort_order) = (1.0, 7);
+    c.render_mode = CanvasRenderMode::WorldSpace;
+    drop(c);
+    assert!(!rig.frame(&ui.scene.world), "its root lays it out");
+    ui.scene.set_parent(inner, None).expect("unparent");
+    assert!(rig.frame(&ui.scene.world), "a root now: its fields count");
+    ui.scene.world.canvas_mut(inner).expect("canvas").sort_order = 3;
+    assert!(rig.frame(&ui.scene.world), "a root's sort order");
 }
 
 #[test]

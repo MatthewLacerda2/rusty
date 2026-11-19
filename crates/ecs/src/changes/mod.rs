@@ -13,9 +13,11 @@
 //! a change, as in Bevy: a write that changed nothing is over-reported, which is
 //! safe; a missed one would be the bug. Two writes compare first because they are
 //! hot: a Transform landing its old value and a collider's derived world box stamp
-//! nothing. A *derived* channel is a marker stamped at the source of its fact, its
-//! descendants included, so a consumer never expands ids itself: [`WorldPose`],
-//! [`Activity`], [`Layer`], [`Children`] and [`StaticSet`].
+//! nothing. A *derived* channel is a marker stamped at the source of its fact, so a
+//! consumer never expands ids itself. [`WorldPose`], [`Activity`] and [`StaticSet`]
+//! cover a subtree (a move, an activation or a re-parent stamps every descendant
+//! it reaches); [`Layer`] (an entity's own layer) and [`Children`] (an entity's
+//! own child list, the parent alone) are per id.
 //!
 //! **Cursors.** A consumer opens a [`Cursor`] once ([`World::change_cursor`]) and
 //! asks [`World::changes`] each time it runs: [`Changes::Ids`], the ids stamped

@@ -2,8 +2,9 @@
 //! `UiLayout::compute_in` reads changes (#2412). GPU-free.
 //!
 //! The layout's rects are a function of the screen size, the texture-size table,
-//! what each Canvas gives its root (presence, `sort_order`, world space or not, its
-//! size and scale factor on this screen), the hierarchy and active flags, the
+//! which Canvases are roots and what each root's Canvas gives it (`sort_order`,
+//! world space or not, its size and scale factor on this screen; a nested Canvas's
+//! fields are never read), the hierarchy and active flags, the
 //! elements' `RectTransform`, `LayoutGroup` and `LayoutElement`, the rotation and
 //! scale of every non-root element's `Transform`, the child order, the `Image` and
 //! `Text` of an element its content sizes (it has a `LayoutElement` or its parent a
@@ -19,7 +20,7 @@
 //!
 //! **What the layout does not read never recomputes it**: the Canvas's placement
 //! (`sway` and its lag, `tilt`, `plane_distance`, `pixels_per_unit`), a root's own
-//! Transform, and the camera while no marker exists only move where the finished
+//! Transform, and the camera while no marker is placed only move where the finished
 //! rects land, the canvas *spaces*, which are placed again every frame
 //! ([`UiLayout::respace`]). So a visor HUD swaying with a turning camera, or a world
 //! canvas carried through the level, lays out nothing; a marker HUD lays out on every
@@ -43,10 +44,11 @@ use rusty_components::{
 use rusty_ecs::{Activity, Changes, Children, Cursor, World, WorldPose};
 use rusty_ui::{TextureSizes, UiLayout, UiView};
 
-/// What a Canvas gives the layout: id, whether it is a root (no Canvas above it,
-/// which `compute_in` lays out), `sort_order`, world space, size and scale factor
-/// on this screen.
-type CanvasKey = (u32, bool, i32, bool, Vec2, f32);
+/// What a Canvas gives the layout: its id and, for a root (no Canvas above it,
+/// which `compute_in` lays out), its `sort_order`, world space, size and scale
+/// factor on this screen. A nested canvas lays out as part of its root, which
+/// reads none of its fields: only its id and that it is no root are compared.
+type CanvasKey = (u32, Option<(i32, bool, Vec2, f32)>);
 
 /// The cursors of every column the layout reads (the module docs).
 struct Watch {
@@ -246,16 +248,12 @@ fn canvas_keys(world: &World, screen: Vec2) -> Vec<CanvasKey> {
     let ids = world.ids_with_canvas().into_iter();
     let key = |id: u32| {
         let c = world.canvas(id)?;
-        let root = !world.ancestors(id).any(|a| world.has_canvas(a));
-        let s = c.is_world_space();
-        Some((
-            id,
-            root,
-            c.sort_order,
-            s,
-            c.size(screen),
-            c.scale_factor(screen),
-        ))
+        if world.ancestors(id).any(|a| world.has_canvas(a)) {
+            return Some((id, None));
+        }
+        let space = c.is_world_space();
+        let fields = (c.sort_order, space, c.size(screen), c.scale_factor(screen));
+        Some((id, Some(fields)))
     };
     ids.filter_map(key).collect()
 }

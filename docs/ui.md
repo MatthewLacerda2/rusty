@@ -423,9 +423,9 @@ batch together as `Normal` solid geometry; the scan line's `Additive` is a new b
   an element's `RectTransform`, `LayoutGroup` or `LayoutElement`, a non-root
   element's `Transform` rotation and scale, the hierarchy (a parent, the order of
   siblings) or active flags, the `Image` or `Text` of an element its content sizes
-  (one with a `LayoutElement`, or under a `LayoutGroup`), a Canvas's sort order,
-  mode, size or whether it is a root, the screen size or the texture sizes, and,
-  while a `WorldAnchor` marker is placed (under a screen-space canvas seen through a
+  (one with a `LayoutElement`, or under a `LayoutGroup`), a root Canvas's sort
+  order, mode or size, whether a Canvas is a root, the screen size or the texture
+  sizes, and, while a `WorldAnchor` marker is placed (under a screen-space canvas seen through a
   camera), the camera or a marker's target moving (`RenderCounters::ui_laid_out`). A
   label's changing string outside a group, a Canvas's sway and tilt, and a world
   canvas carried around only move where the rects land, so they lay nothing out. A

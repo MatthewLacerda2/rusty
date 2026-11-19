@@ -4,13 +4,13 @@
 //! What the layout keeps and when it lays out again is `layout`'s; the rest of
 //! these docs are the meshes'.
 //!
-//! A canvas's mesh is a function of its [`CanvasInputs`]: its run of the layout
+//! A canvas's mesh is a function of its `meshes::CanvasInputs`: its run of the layout
 //! (every element's id and laid-out rect, in draw order), the pixel frame it is
 //! meshed into and whether it is an overlay, the source size of every texture it
 //! looked up, and the glyph atlases' generation (a grown atlas moves every uv); and
 //! of its elements' UI components. The inputs are compared, not hashed: equality is
 //! exact. The components are not copied to be compared: the World's change log says
-//! which ones were written ([`Watch`]: one cursor per UI component column the mesh
+//! which ones were written (`meshes::Watch`: one cursor per UI component column the mesh
 //! reads, and `Activity` for the active flags and re-parenting, descendants
 //! included), and a written element dirties the canvas it lays out under.
 //!
