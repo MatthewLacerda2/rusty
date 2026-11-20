@@ -21,8 +21,10 @@ use rusty_scene::Scene;
 pub fn to_scene_data(scene: &Scene) -> SceneData {
     SceneData {
         entities: {
-            // Bones are rebuilt from the model on load, never saved (#453).
-            let mut entities = scene.world.collect_entities();
+            // Without geometry: every reader drops it (a save skips the fields, a
+            // restore rebuilds or adopts it). Bones are rebuilt from the model on
+            // load, never saved (#453).
+            let mut entities = scene.world.collect_documents();
             // A linked instance's edits are overrides the moment they are made (#1527).
             crate::prefab::live::write_overrides(&mut entities);
             rusty_scene::skeleton::strip_bones(&mut entities);
@@ -72,12 +74,17 @@ pub fn apply_rehydrated(scene: &mut Scene, document: RehydratedScene) {
 }
 
 /// [`apply_scene_data`] for a document the World itself wrote (a Play snapshot):
-/// its values were held when they came in, so they are not held again. Linked prefab
+/// its values were held when they came in, so they are not held again, and each
+/// mesh Play left as it was takes the live World's geometry before that World is
+/// cleared, instead of being imported again (`RehydratedScene::adopting`), unless
+/// its model was written since `read_at`, the write-log generation the snapshot
+/// was taken at. Linked prefab
 /// instances re-read their source and re-apply the overrides the snapshot took, so
 /// the World comes back as captured, with any change made to a source during Play
 /// (#1527).
-pub fn apply_world_data(scene: &mut Scene, data: SceneData) {
-    apply(scene, RehydratedScene::new(data), false);
+pub fn apply_world_data(scene: &mut Scene, data: SceneData, read_at: u64) {
+    let document = RehydratedScene::adopting(data, &mut scene.world, read_at);
+    apply(scene, document, false);
 }
 
 /// Start from the document's library, then fold in any material an entity still
@@ -203,3 +210,7 @@ fn apply(scene: &mut Scene, document: RehydratedScene, from_disk: bool) {
 #[cfg(test)]
 #[path = "serialize_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "geometry_tests.rs"]
+mod geometry_tests;

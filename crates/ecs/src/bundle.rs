@@ -136,6 +136,27 @@ impl World {
         self.document(id, MeshComponent::clone, ColliderComponent::clone)
     }
 
+    /// [`World::entity_document`] with every saved field of the mesh and of a
+    /// collider's own meshes and none of their geometry
+    /// ([`MeshComponent::without_geometry`], [`ColliderComponent::without_geometry`]),
+    /// the Undo record's form: a saved document is byte-equal either way, since the
+    /// geometry is never written.
+    pub fn saved_document(&self, id: u32) -> Option<Entity> {
+        self.document(
+            id,
+            MeshComponent::without_geometry,
+            ColliderComponent::without_geometry,
+        )
+    }
+
+    /// [`World::collect_entities`] without the meshes' geometry
+    /// ([`World::saved_document`]): what a save, a Play snapshot and the
+    /// unsaved-edits check read, none of which keeps the vertices a load rebuilds.
+    pub fn collect_documents(&self) -> Vec<Entity> {
+        let ids = self.ids().iter();
+        ids.filter_map(|&id| self.saved_document(id)).collect()
+    }
+
     /// [`World::entity_document`] with the mesh's reference and none of its
     /// geometry ([`MeshComponent::reference_only`]), and a collider's shared mesh
     /// without its geometry either: what a prefab diff reads.

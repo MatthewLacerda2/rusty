@@ -8,21 +8,25 @@
 //! Rebuilding what a written model changed (`reimport`, `model_writes`) is the edit
 //! side's (`rusty_edit::rehydrate`): it re-baselines prefab instances.
 
+mod adopt;
 mod collider;
+mod imports;
+mod rebuilt;
 mod warned;
 
-pub(crate) use collider::rebuild as rebuild_collider_mesh;
+pub(crate) use adopt::take_live;
 pub use collider::{refit_collider, Which};
+pub(crate) use imports::Imports;
+use rebuilt::RehydratedMesh;
 use warned::warn_once;
 pub use warned::warn_once_of;
 #[doc(hidden)]
 pub use warned::warned_of;
 
-use glam::{Mat4, Vec3};
+use glam::Vec3;
 
 use crate::create::{primitive_revision, subdivided_geometry, Primitive};
-use rusty_asset::{MeshRevision, MeshVertex, SubMesh};
-use rusty_components::mesh::Vertex;
+use rusty_asset::{MeshRevision, SubMesh};
 use rusty_components::Entity;
 
 /// A document with every mesh rebuilt from its reference, and the write-log stamp
@@ -43,8 +47,12 @@ impl RehydratedScene {
 
     /// [`Self::new`] stamped `read_at`, taken before the document was read: a load
     /// off the ticking thread (#2123) still follows a model written while it ran.
+    /// Each model file is looked up once for the whole document ([`Imports`]).
     pub fn read_since(mut data: crate::serialize::SceneData, read_at: u64) -> Self {
-        data.entities.iter_mut().for_each(rehydrate_entity_mesh);
+        let mut imports = Imports::default();
+        for entity in &mut data.entities {
+            rehydrate_in(entity, &mut imports);
+        }
         Self { data, read_at }
     }
 
@@ -65,80 +73,14 @@ impl RehydratedScene {
     }
 }
 
-/// Convert one imported `MeshVertex` (pure data) into the renderer's `Vertex`,
-/// carrying the skin binding (`joint_indices`/`joint_weights`) through to the GPU
-/// vertex; static meshes keep the unskinned identity binding (#79).
-fn vertex_from_imported(v: &MeshVertex) -> Vertex {
-    Vertex {
-        position: v.position,
-        normal: v.normal,
-        tex_coords: v.tex_coords,
-        joint_indices: v.joint_indices,
-        joint_weights: v.joint_weights,
-        tangent: v.tangent,
-        lightmap_uv: v.lightmap_uv,
-    }
-}
-
-/// The non-serialized data a mesh component is rebuilt with on load: GPU-ready
-/// geometry plus the imported rig (bind palette, skeleton, clips). A primitive or a
-/// failed import yields the empty default — no skin, no clips, GPU bones at identity.
-#[derive(Default)]
-struct RehydratedMesh {
-    vertices: Vec<Vertex>,
-    indices: Vec<u32>,
-    ranges: Vec<std::ops::Range<u32>>,
-    bind_palette: Vec<Mat4>,
-    skin: Option<rusty_asset::SkinData>,
-    clips: Vec<rusty_asset::AnimationClip>,
-    /// The revision of the import (#857) or primitive it came from: every instance
-    /// of one shares it. `None` (a failed import) takes a fresh one.
-    revision: Option<MeshRevision>,
-    /// The import's clusters (#1968), which describe `revision`'s geometry.
-    clusters: Option<std::sync::Arc<rusty_asset::clusters::Clusters>>,
-}
-
-impl RehydratedMesh {
-    /// A primitive's geometry with no rig — primitives are never skinned/animated —
-    /// at its one revision (`create::primitive_revision`).
-    fn primitive(geometry: (Vec<Vertex>, Vec<u32>), revision: MeshRevision) -> Self {
-        Self {
-            vertices: geometry.0,
-            indices: geometry.1,
-            revision: Some(revision),
-            ..Self::default()
-        }
-    }
-
-    /// Pull geometry + the full rig (bind palette, skeleton, clips) out of an
-    /// imported sub-mesh, which carries `revision`, its import's.
-    fn from_sub_mesh(sub: &SubMesh, revision: MeshRevision) -> Self {
-        let bind_palette = sub
-            .skin
-            .as_ref()
-            .map(|s| s.bind_palette())
-            .unwrap_or_default();
-        Self {
-            vertices: sub.vertices.iter().map(vertex_from_imported).collect(),
-            indices: sub.indices.clone(),
-            ranges: sub.ranges.iter().map(|r| r.indices.clone()).collect(),
-            bind_palette,
-            skin: sub.skin.clone(),
-            clips: sub.clips.clone(),
-            revision: Some(revision),
-            clusters: sub.clusters.clone(),
-        }
-    }
-}
-
 /// Re-import an `"Asset"` mesh's geometry + rig from its path-based `asset_ref`
 /// (`path::sub_object`), through the file's shared import (`rusty_asset::imported`, #857),
 /// so a load instancing one file many times parses it once. On failure
 /// (missing/renamed source — the accepted path-based trade-off) the mesh
 /// rehydrates empty rather than aborting the load.
-fn rehydrate_asset_mesh(asset_ref: &Option<String>) -> RehydratedMesh {
+fn rehydrate_asset_mesh(asset_ref: &Option<String>, imports: &mut Imports) -> RehydratedMesh {
     match asset_ref {
-        Some(reference) => match shared_sub_mesh(reference) {
+        Some(reference) => match shared_sub_mesh(reference, imports) {
             Ok(rebuilt) => rebuilt,
             Err(e) => {
                 warn_once(reference, &e);
@@ -150,9 +92,12 @@ fn rehydrate_asset_mesh(asset_ref: &Option<String>) -> RehydratedMesh {
 }
 
 /// The sub-mesh `reference` names, out of its file's shared import.
-fn shared_sub_mesh(reference: &str) -> Result<RehydratedMesh, rusty_asset::ImportError> {
+fn shared_sub_mesh(
+    reference: &str,
+    imports: &mut Imports,
+) -> Result<RehydratedMesh, rusty_asset::ImportError> {
     let asset_ref = rusty_asset::AssetRef::parse(reference)?;
-    let import = rusty_asset::imported(std::path::Path::new(&asset_ref.path))?;
+    let import = imports.of(&asset_ref.path)?;
     let sub = import.sub_mesh(&asset_ref.sub_object).ok_or_else(|| {
         rusty_asset::ImportError::BadReference(format!(
             "'{reference}': the file has no such sub-object"
@@ -164,9 +109,9 @@ fn shared_sub_mesh(reference: &str) -> Result<RehydratedMesh, rusty_asset::Impor
 /// Rebuild one mesh's vertex/index data + rig from its on-disk REFERENCE: a
 /// primitive from `primitive_type`, or an imported sub-mesh from `asset_ref` when
 /// the type is `"Asset"`. GPU buffers are never stored on disk, only rebuilt here.
-fn rehydrate_one(mesh: &crate::MeshComponent) -> RehydratedMesh {
+fn rehydrate_one(mesh: &crate::MeshComponent, imports: &mut Imports) -> RehydratedMesh {
     if mesh.primitive_type == "Asset" {
-        return rehydrate_asset_mesh(&mesh.asset_ref);
+        return rehydrate_asset_mesh(&mesh.asset_ref, imports);
     }
     // Primitive geometry is owned by `scene::create` so a created primitive and
     // a loaded one are byte-identical.
@@ -191,18 +136,23 @@ fn rehydrate_one(mesh: &crate::MeshComponent) -> RehydratedMesh {
 /// what it builds from (`collider::refit_collider`), so an import setting changed
 /// since the save (the Scale Factor, #1398) reaches it.
 pub fn rehydrate_entity_mesh(entity: &mut Entity) {
+    rehydrate_in(entity, &mut Imports::default());
+}
+
+/// [`rehydrate_entity_mesh`] within a pass that looks each file up once.
+pub(crate) fn rehydrate_in(entity: &mut Entity, imports: &mut Imports) {
     if let Some(mesh) = &mut entity.mesh {
         hold_fields(entity.id, mesh);
-        let rebuilt = rehydrate_one(mesh);
+        let rebuilt = rehydrate_one(mesh, imports);
         install(mesh, rebuilt);
     }
     let Some(collider) = &mut entity.collider else {
         return;
     };
     if entity.mesh.is_none() {
-        collider::rebuild(entity.id, collider, collider::Which::Kept);
+        collider::rebuild(entity.id, collider, collider::Which::Kept, imports);
     }
-    collider::rebuild(entity.id, collider, collider::Which::Collision);
+    collider::rebuild(entity.id, collider, collider::Which::Collision, imports);
     let own = entity.mesh.as_ref();
     refit_collider(
         collider,
@@ -260,7 +210,7 @@ fn install(mesh: &mut crate::MeshComponent, rebuilt: RehydratedMesh) {
 pub fn asset_mesh_component(reference: &str) -> crate::MeshComponent {
     built(
         reference,
-        rehydrate_asset_mesh(&Some(reference.to_string())),
+        rehydrate_asset_mesh(&Some(reference.to_string()), &mut Imports::default()),
     )
 }
 

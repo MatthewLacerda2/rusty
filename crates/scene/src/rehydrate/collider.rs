@@ -10,7 +10,7 @@
 
 use glam::Vec3;
 
-use super::{bounds_of, hold_fields, install, rehydrate_one};
+use super::{bounds_of, hold_fields, install, rehydrate_one, Imports};
 use rusty_components::{ColliderComponent, ColliderShape, SharedMesh};
 
 /// Which of a collider's own meshes to rebuild.
@@ -45,7 +45,12 @@ impl Which {
 /// loads comes back empty, warned once (`rehydrate::warn_once_of`): an empty
 /// collision mesh is not built from, so the collider falls back to its entity's Mesh.
 /// The box is left as it is: refit it ([`refit_collider`]) once every mesh is back.
-pub(crate) fn rebuild(id: u32, collider: &mut ColliderComponent, which: Which) {
+pub(crate) fn rebuild(
+    id: u32,
+    collider: &mut ColliderComponent,
+    which: Which,
+    imports: &mut Imports,
+) {
     if !matches!(collider.shape, ColliderShape::Mesh { .. }) {
         return;
     }
@@ -55,7 +60,7 @@ pub(crate) fn rebuild(id: u32, collider: &mut ColliderComponent, which: Which) {
     let mut mesh = shared.reference();
     hold_fields(id, &mut mesh);
     shared.subdivisions = mesh.subdivisions;
-    let rebuilt = rehydrate_one(&mesh);
+    let rebuilt = rehydrate_one(&mesh, imports);
     install(&mut mesh, rebuilt);
     shared.take_geometry(&mesh);
 }

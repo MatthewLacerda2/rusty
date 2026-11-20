@@ -199,8 +199,8 @@ impl World {
         &self.order
     }
 
-    /// Collect all entities (assembled as documents) in insertion order — used
-    /// for serialization snapshots.
+    /// Collect all entities (assembled as documents, geometry included) in
+    /// insertion order: for a caller that reads the copied vertices.
     pub fn collect_entities(&self) -> Vec<Entity> {
         self.order
             .iter()
