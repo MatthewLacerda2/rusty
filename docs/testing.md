@@ -1149,7 +1149,28 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   ones are read back without waiting, so they describe a frame or so earlier, `docs/api/Debug.md`), and
   the frame's GPU calls `render_passes`, `compute_passes`, `submits`,
   `bind_groups_created`, `buffer_writes` (counted through `render::gpu::ops`; a
-  render-CPU fix whose timing moves inside the spread proves itself by these); then
+  render-CPU fix whose timing moves inside the spread proves itself by these).
+  **Those are the counters every table prints; the bench reports every counter.**
+  The rows are derived, not listed: every `Debug.Stats` key
+  `core::frame_stats::is_counter` classes as a count (every key not a timing) is a
+  row, the frame's render counters and then the tick's (`entities`, `bones`,
+  `changes_<channel>`, …), so a counter is in the bench the moment it is recorded.
+  Each is the window's average: a 0/1 counter's is the share of frames it was set
+  on (0.0015 is one frame in 660; the table prints three decimals), and one first
+  recorded partway through (a change channel that opens late) counts as zero on
+  the window's frames before it. Each window samples on its own, so a counter
+  first recorded in the firefight window averages over that window's frames and
+  has no row in the quiet window (absent there, not zero). Beyond the
+  ones named above a counter is **quiet**, in every window: the report file
+  (`bench.json`, its `firefight.<row>` rows too, and `<scene>.json`, its rows
+  marked `"quiet": true`) holds it always, the printed table only when its average
+  changed against the run it is compared with, a window's against that window's
+  rows (or that run lacks it: *absent on the last run* under `make bench`, *absent
+  in last* or *in before* under `bench-scenes`), and one line a table counts the
+  rest, naming that run; against a run that never measured the window (the
+  firefight's, the first time) no quiet counter prints. `bench-ab`'s table
+  prints a quiet counter only where `main` and the PR differ, and counts the
+  identical ones. Then
   where the CPU time went, by name:
   `cpu.<system>` for every system the schedule runs, named as it registers them
   (`update_scripts`, `step_physics`, … at the reference CPU clock), with
@@ -1584,7 +1605,8 @@ is only shown when it is larger than one binary differs from itself, so the seco
 `main` leg is each row's **floor**: the table prints, per scene and row, `main`'s
 average, the PR's, the change, and the floor (`main` again against `main`), and a
 change no larger than its floor reads *inside the floor*, beside the change it
-measured. A row only the PR reports (a new
+measured. A quiet counter (above) gets a row only where `main`'s and the PR's
+averages differ, and a line under the table counts the identical ones. A row only the PR reports (a new
 counter or stage) is listed, *absent on main*; a row the second `main` leg lacks
 shows its change with the floor *unknown*. Every row gets its own floor, so
 the table shows how tightly each kind of row repeated rather than assuming it.

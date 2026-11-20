@@ -19,12 +19,15 @@
 //! dev layer (`dev::stats`) around each system and written in, and the sim never reads
 //! them back, so the determinism rule is untouched. A key [`is_timing`] names (one
 //! ending in `_ms` or `_us`, and `fps`) is wall-clock and differs run to run; every
-//! other key is a count and is deterministic for a deterministic run —
-//! [`FrameStats::to_json`] can split the two.
+//! other key is a count ([`is_counter`]) and is deterministic for a deterministic
+//! run — [`FrameStats::to_json`] can split the two.
 
 use std::collections::{BTreeMap, VecDeque};
 
+mod keys;
 mod recent;
+
+pub use keys::{is_counter, is_timing};
 
 use recent::{bounded, fold_recent, push, Recent, Stamp};
 use serde::Serialize;
@@ -90,13 +93,6 @@ pub struct FrameStats {
     pub gpu_passes: BTreeMap<String, Series>,
     /// Each series' newest samples, stamped, oldest first, at most [`RECENT`].
     recent: Recent,
-}
-
-/// Whether `key` names a wall-clock timing (non-deterministic) rather than a count:
-/// a key ending in `_ms` or `_us` (`render_extract_us`, `shadow_gather_us`), or the
-/// window's frame rate, `fps`.
-pub fn is_timing(key: &str) -> bool {
-    key.ends_with("_ms") || key.ends_with("_us") || key == "fps"
 }
 
 /// One drawn frame being recorded ([`FrameStats::record_frame`]).

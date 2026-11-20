@@ -75,6 +75,13 @@ pub const LIGHTING_IN_PLAY: &str = "lighting cannot be generated during Play: st
 /// workspace (the working directory) is written relative to it, `/`-separated, so
 /// the file never embeds this machine's paths (#783).
 pub(crate) fn scene_json(scene: &Scene) -> Result<String, String> {
+    serde_json::to_string_pretty(&saved_data(scene))
+        .map_err(|e| format!("Failed to serialize scene: {}", e))
+}
+
+/// The document [`scene_json`] writes, before it is text: the scripts' paths made
+/// relative to the workspace.
+fn saved_data(scene: &Scene) -> SceneData {
     let mut data = to_scene_data(scene);
     if let Ok(root) = std::env::current_dir() {
         let scripts = data.entities.iter_mut().flat_map(|e| e.scripts.iter_mut());
@@ -82,24 +89,26 @@ pub(crate) fn scene_json(scene: &Scene) -> Result<String, String> {
             script.path = rusty_core::paths::relativize(&script.path, &root);
         }
     }
-    serde_json::to_string_pretty(&data).map_err(|e| format!("Failed to serialize scene: {}", e))
+    data
 }
 
 /// Whether the live scene has edits the document last read or written at `path`
-/// lacks. Computed, never a flag: both sides are read as a `SceneData` and
-/// compared without the selection, which the editor copies into the scene every
-/// frame and is not an edit. No record for `path` counts as unsaved.
+/// lacks. Computed, never a flag: both sides are compared as compact `SceneData`
+/// text without the selection, which the editor copies into the scene every
+/// frame and is not an edit. The live side is serialised once, never parsed back:
+/// a document's text reads back to the value it was written from. No record for
+/// `path` counts as unsaved.
 pub fn has_unsaved_edits(scene: &Scene, path: &str) -> bool {
     let Some(on_disk) = scene.disk_text_at(path) else {
         return true;
     };
-    let live = scene_json(scene);
-    let canon = |text: &str| {
-        let mut data = parse_scene_text(text, path).ok()?;
+    let compact = |mut data: SceneData| {
         data.selected_entity_id = None;
         serde_json::to_string(&data).ok()
     };
-    live.ok().as_deref().and_then(canon) != canon(&on_disk)
+    let live = compact(saved_data(scene));
+    let disk = parse_scene_text(&on_disk, path).ok().and_then(compact);
+    live != disk
 }
 
 /// Load `path` into `scene`, REPLACING the current World (single active scene).

@@ -22,6 +22,14 @@ first real use's table ran about 120 rows a scene, most inside the floor or
 zero, and the row a PR is about had to be searched for (#2323). The size is
 absolute because a ratio is not: a row at 0.001 ms moving 20% is nothing.
 
+A quiet counter (a row the report marks `quiet`: every `Debug.Stats` counter
+but the bench's usual few, `dev::bench::sample`) gets a table row only when
+`main`'s and the PR's averages differ, or one leg lacks it; one line under the
+table counts the rest as identical, so the table holds the counters a PR moved
+and not the eighty it did not. The bench once reported a hand-kept list of
+counters, and a PR that kept the UI layout between frames could not show the
+counter proving it (#2449): every counter is now a row, quiet unless it moved.
+
 The load rows' counts (`load.count.<what>`: model files the scene uses, sources
 converted, textures compressed and decoded, MB uploaded) say what each leg's
 load did, and `models_converted` tells a cached load from a cold import; where they
@@ -107,6 +115,11 @@ def notes_of(said: list[list[str]], whose: str) -> list[str]:
 def averages(report: dict | None) -> dict[str, float]:
     """Each row's average, in the report's order."""
     return {r["metric"]: r["avg"] for r in (report or {}).get("rows", [])}
+
+
+def quiet(report: dict | None) -> set[str]:
+    """The rows the report marks quiet: counters a table shows only when they moved."""
+    return {r["metric"] for r in (report or {}).get("rows", []) if r.get("quiet")}
 
 
 def change(a: float, b: float) -> float | None:
@@ -198,21 +211,30 @@ def lead(main: dict, pr: dict, again: dict) -> list[str]:
 
 def scene_table(scene: str, legs: tuple[Path, Path, Path]) -> str:
     """The markdown table of `scene` over the three legs' folders (main, PR, main again)."""
-    main, pr, again = (averages(read(leg, scene)) for leg in legs)
-    return section(f"**{scene}**", (main, pr, again), notes(scene, legs))
+    reports = [read(leg, scene) for leg in legs]
+    main, pr, again = (averages(r) for r in reports)
+    hushed = quiet(reports[0]) | quiet(reports[1])
+    return section(f"**{scene}**", (main, pr, again), notes(scene, legs), hushed)
 
 
-def section(title: str, rows: tuple[dict, dict, dict], heading: list[str]) -> str:
+def section(title: str, rows: tuple[dict, dict, dict], heading: list[str], hushed: frozenset | set = frozenset()) -> str:
     """One section: `title`, the `heading` lines (its notes), the lead and the table of the
-    three legs' averages (`rows`: main, PR, main again)."""
+    three legs' averages (`rows`: main, PR, main again). A row in `hushed` (the quiet
+    counters) is left out when main and the PR agree, and counted in one line."""
     main, pr, again = rows
     if not main and not pr:
         return f"{title}: neither the main leg nor the PR's wrote a report\n"
     lines = [title, ""] + heading + lead(main, pr, again) + ["", "| row | main | PR | change | floor (main again) |",
                                                              "|---|---:|---:|---|---:|"]
     metrics = list(main) + [m for m in pr if m not in main]
+    identical = 0
     for metric in metrics:
+        if metric in hushed and metric in main and main.get(metric) == pr.get(metric):
+            identical += 1
+            continue
         lines.append("| " + " | ".join(row(metric, main.get(metric), pr.get(metric), again.get(metric))) + " |")
+    if identical:
+        lines += ["", f"The other {identical} counters are identical between main and the PR (in each leg's report)."]
     return "\n".join(lines) + "\n"
 
 
