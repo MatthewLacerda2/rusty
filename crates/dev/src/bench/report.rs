@@ -4,11 +4,14 @@
 //!
 //! stored-format: `bench.json`, the last run's report the next one compares against
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 use std::path::Path;
 
 use rusty_core::project::EngineStamp;
+
+use super::engine::engine_line;
+use super::quiet::{quiet_moved, unshown_line};
 use serde::{Deserialize, Serialize};
 
 /// One metric over the measured frames.
@@ -16,9 +19,22 @@ use serde::{Deserialize, Serialize};
 pub struct Summary {
     pub avg: f64,
     pub p95: f64,
+    /// A counter the printed report shows only when it changed against the last
+    /// run ([`Samples::push_quiet`]); the report file holds it always.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub quiet: bool,
 }
 
 impl Summary {
+    /// A loud row's summary: `avg` and `p95`, not [`quiet`](Self::quiet).
+    pub fn new(avg: f64, p95: f64) -> Self {
+        Self {
+            avg,
+            p95,
+            quiet: false,
+        }
+    }
+
     /// The mean and the nearest-rank 95th percentile of `values` (zero when empty).
     pub fn of(values: &[f64]) -> Self {
         if values.is_empty() {
@@ -30,6 +46,7 @@ impl Summary {
         Self {
             avg: values.iter().sum::<f64>() / values.len() as f64,
             p95: sorted[rank.clamp(1, sorted.len()) - 1],
+            quiet: false,
         }
     }
 }
@@ -59,6 +76,8 @@ pub struct Report {
 pub struct Samples {
     order: Vec<String>,
     values: BTreeMap<String, Vec<f64>>,
+    /// The metrics pushed by [`Samples::push_quiet`].
+    quiet: BTreeSet<String>,
     frames: u32,
 }
 
@@ -72,6 +91,15 @@ impl Samples {
             .entry(metric.to_string())
             .or_default()
             .push(value);
+    }
+
+    /// Record one frame's `value` of a counter the printed report shows only when
+    /// it changed (`bench::sample`): its row is [`Summary::quiet`].
+    pub fn push_quiet(&mut self, metric: &str, value: f64) {
+        self.push(metric, value);
+        if !self.quiet.contains(metric) {
+            self.quiet.insert(metric.to_string());
+        }
     }
 
     /// Record a frame's parts of `stage` (a row pushed this frame), each named
@@ -120,7 +148,16 @@ impl Samples {
         let metrics = self
             .order
             .iter()
-            .map(|m| (m.clone(), Summary::of(&self.values[m])))
+            .map(|m| {
+                let quiet = self.quiet.contains(m);
+                (
+                    m.clone(),
+                    Summary {
+                        quiet,
+                        ..Summary::of(&self.values[m])
+                    },
+                )
+            })
             .collect();
         Report {
             frames: self.frames,
@@ -165,7 +202,9 @@ impl Report {
 
     /// The table the terminal shows: one row per metric, with the change in its
     /// average against `previous` where that run measured it too, and "absent on
-    /// the last run" where it did not.
+    /// the last run" where it did not. A quiet counter ([`Summary::quiet`]) prints
+    /// only when it changed or `previous` lacks it, one line counting the rest; none
+    /// does against a `previous` with no rows (a window the last run never measured).
     pub fn render(&self, previous: Option<&Report>) -> String {
         let before: BTreeMap<&str, &Summary> = previous
             .map(|p| p.metrics.iter().map(|(k, s)| (k.as_str(), s)).collect())
@@ -176,8 +215,15 @@ impl Report {
             "{:<22} {:>12} {:>12}  vs last avg",
             "metric", "avg", "p95"
         );
+        let compared = previous.is_some_and(|p| !p.metrics.is_empty());
+        let mut unshown = 0;
         for (metric, s) in &self.metrics {
-            let delta = match (previous, before.get(metric.as_str())) {
+            let last = before.get(metric.as_str());
+            if s.quiet && !quiet_moved(compared, last.map(|b| b.avg), s.avg) {
+                unshown += 1;
+                continue;
+            }
+            let delta = match (previous, last) {
                 (_, Some(b)) => change(b.avg, s.avg),
                 (Some(_), None) => "absent on the last run".to_string(),
                 (None, None) => String::new(),
@@ -189,6 +235,8 @@ impl Report {
                 num(s.p95)
             );
         }
+        let against = compared.then_some("last");
+        out.push_str(&unshown_line(unshown, against, "bench.json"));
         if let Some(engine) = &self.engine {
             out.push_str(&engine_line(
                 engine,
@@ -203,41 +251,6 @@ impl Report {
         }
         out
     }
-}
-
-/// `engine <commit> content <digest>`, the content the binary was built with when
-/// it differs, and the last run's when either moved; then a warning when the last
-/// run itself mixed a build with another tree's files, since every change above is
-/// measured against that run. A before-and-after pair says which trees it compared.
-pub(super) fn engine_line(engine: &EngineStamp, previous: Option<&EngineStamp>) -> String {
-    let mut line = format!("engine {} {}", engine.commit, trees(engine));
-    let moved = |p: &&EngineStamp| {
-        (&p.content_found, &p.content_built) != (&engine.content_found, &engine.content_built)
-    };
-    if let Some(before) = previous.filter(moved) {
-        let _ = write!(line, " (last run: {})", trees(before));
-    }
-    line.push('\n');
-    if let Some(before) = previous.filter(|p| p.content_matches == Some(false)) {
-        let _ = writeln!(
-            line,
-            "warning: the last run was not built with the engine content it read ({}): \
-             its numbers paired one build's code with another tree's files, and the \
-             changes above are measured against them",
-            trees(before)
-        );
-    }
-    line
-}
-
-/// `content <found>`, plus `, built <built>` when the binary was built with other content.
-fn trees(e: &EngineStamp) -> String {
-    let digest = |d: &Option<String>| d.clone().unwrap_or_else(|| "unknown".into());
-    let mut out = format!("content {}", digest(&e.content_found));
-    if e.content_matches == Some(false) {
-        let _ = write!(out, ", built {}", digest(&e.content_built));
-    }
-    out
 }
 
 /// A value at a precision that suits its size: ms to the microsecond, counts whole.
@@ -278,6 +291,9 @@ pub(super) fn write(out_dir: &Path, report: &Report, text: &str) -> std::io::Res
     std::fs::write(out_dir.join("bench.txt"), text)
 }
 
+#[cfg(test)]
+#[path = "quiet_tests.rs"]
+mod quiet_tests;
 #[cfg(test)]
 #[path = "report_tests.rs"]
 mod report_tests;

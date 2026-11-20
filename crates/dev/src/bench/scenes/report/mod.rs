@@ -13,7 +13,9 @@ use std::path::{Path, PathBuf};
 use rusty_core::project::EngineStamp;
 use serde::{Deserialize, Serialize};
 
-use super::super::report::{engine_line, num};
+use super::super::engine::engine_line;
+use super::super::quiet::{quiet_moved, unshown_line};
+use super::super::report::num;
 mod compare;
 mod notes;
 mod view_key;
@@ -46,6 +48,9 @@ pub struct Row {
     /// one-off row, or a run of one.
     pub lo: f64,
     pub hi: f64,
+    /// A quiet counter (`bench::Summary::quiet`): printed only when it changed.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub quiet: bool,
 }
 
 impl Row {
@@ -60,6 +65,7 @@ impl Row {
             worst,
             lo,
             hi,
+            quiet: false,
         }
     }
 }
@@ -164,20 +170,7 @@ impl SceneReport {
             "{:<w$} {:>12} {:>19} {:>12}  {:<18} vs {against} avg",
             "metric", "avg", "spread", "worst p95", "worst at"
         );
-        for row in &self.rows {
-            let delta = comparable
-                .and_then(|p| p.row(&row.metric))
-                .map_or(String::new(), |b| delta(b, row));
-            let _ = writeln!(
-                out,
-                "{:<w$} {:>12} {:>19} {:>12}  {:<18} {delta}",
-                row.metric,
-                num(row.avg),
-                spread(row),
-                num(row.p95),
-                row.worst
-            );
-        }
+        out.push_str(&self.rows_table(comparable, against, w));
         if let Some(engine) = &self.engine {
             out.push_str(&engine_line(
                 engine,
@@ -188,6 +181,35 @@ impl SceneReport {
             let _ = writeln!(out, "warning: {warning}");
         }
         out.push_str(&self.notes(previous.is_none()));
+        out
+    }
+
+    /// The rows, `w` wide, against `comparable`: a quiet one only when it moved.
+    fn rows_table(&self, comparable: Option<&SceneReport>, against: &str, w: usize) -> String {
+        let (mut out, mut unshown) = (String::new(), 0);
+        for row in &self.rows {
+            let last = comparable.and_then(|p| p.row(&row.metric));
+            if row.quiet && !quiet_moved(comparable.is_some(), last.map(|b| b.avg), row.avg) {
+                unshown += 1;
+                continue;
+            }
+            let delta = match last {
+                Some(b) => delta(b, row),
+                None if row.quiet => format!("absent in {against}"),
+                None => String::new(),
+            };
+            let _ = writeln!(
+                out,
+                "{:<w$} {:>12} {:>19} {:>12}  {:<18} {delta}",
+                row.metric,
+                num(row.avg),
+                spread(row),
+                num(row.p95),
+                row.worst
+            );
+        }
+        let file = format!("{}.json", self.scene);
+        out.push_str(&unshown_line(unshown, comparable.map(|_| against), &file));
         out
     }
 }
@@ -270,6 +292,9 @@ pub fn write(out_dir: &Path, report: &SceneReport, text: &str) -> std::io::Resul
     std::fs::write(txt, text)
 }
 
+#[cfg(test)]
+#[path = "quiet_tests.rs"]
+mod quiet_tests;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;

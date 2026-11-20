@@ -25,6 +25,7 @@ fn row(avg: f64, lo: f64, hi: f64) -> Row {
         worst: String::new(),
         lo,
         hi,
+        quiet: false,
     }
 }
 
