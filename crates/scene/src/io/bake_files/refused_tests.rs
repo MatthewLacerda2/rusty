@@ -89,18 +89,35 @@ fn pathdiff(path: &Path, base: &Path) -> PathBuf {
 }
 
 #[test]
-fn a_refusal_is_listed_with_why_until_the_path_is_read_again() {
-    let path = file("listed.occlusion", b"trunc");
-    let files = BakeFiles::default();
-    files.loaded(&file("fine.navmesh", b"ok"), Some(b"ok"), Some(b"ok"));
-    files.refused(&path, b"trunc", "occluder flag 30");
-    let listed = files.refusals();
-    assert_eq!(listed.len(), 1, "a file read and kept is no refusal");
-    assert!(listed[0].0.ends_with("listed.occlusion"));
-    assert_eq!(listed[0].1, "occluder flag 30");
-    files.loaded(&path, Some(b"good"), Some(b"good"));
-    assert!(
-        files.refusals().is_empty(),
-        "read afresh: no longer refused"
+fn a_file_not_used_says_why_until_the_path_is_read_again() {
+    let (path, fine) = (
+        file("listed.occlusion", b"trunc"),
+        file("fine.navmesh", b"ok"),
     );
+    let files = BakeFiles::default();
+    files.loaded(&fine, Some(b"ok"), Some(b"ok"));
+    files.refused(&path, b"trunc", "occluder flag 30");
+    assert_eq!(files.not_used(&fine), None, "a file read and kept was used");
+    let why = files.not_used(&path);
+    assert_eq!(why.as_deref(), Some("refused (occluder flag 30)"));
+    files.loaded(&path, Some(b"good"), Some(b"good"));
+    assert_eq!(files.not_used(&path), None, "read afresh: used");
+    files.unreadable(&path, "permission denied");
+    let why = files.not_used(&path);
+    assert_eq!(
+        why.as_deref(),
+        Some("could not be read (permission denied)")
+    );
+}
+
+#[test]
+fn a_bake_or_a_copy_carries_no_reason_a_file_was_not_used() {
+    let path = file("baked_over.occlusion", b"trunc");
+    let files = BakeFiles::default();
+    files.refused(&path, b"trunc", "truncated");
+    let to = file("copied.occlusion", b"trunc");
+    files.copied(&path, &to);
+    assert_eq!(files.not_used(&to), None, "the copy was never read");
+    files.baked(".occlusion");
+    assert_eq!(files.not_used(&path), None, "this world's bake replaces it");
 }

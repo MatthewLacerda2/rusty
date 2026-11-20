@@ -150,7 +150,7 @@ impl NavigationGraph {
             Err(why) => {
                 log::warn!("[Navigation] the saved navmesh was refused ({why}): baking it");
                 self.bake(scene);
-                Start::Refused
+                Start::Refused(why)
             }
         }
     }
@@ -173,7 +173,7 @@ impl NavigationGraph {
             _ => self.restore_or_bake(scene),
         };
         self.static_watch = Some(watch);
-        self.tracked_scene = Some((scene.id(), start));
+        self.tracked_scene = Some((scene.id(), start.clone()));
         start
     }
 
@@ -188,24 +188,27 @@ impl NavigationGraph {
     /// Whether [`Self::start_tracked`] last started on `scene` (a play-mode
     /// `Scene.Load` swaps in another, which starts afresh).
     pub fn tracks(&self, scene: &Scene) -> bool {
-        self.tracked_scene.is_some_and(|(id, _)| id == scene.id())
+        self.tracked_scene
+            .as_ref()
+            .is_some_and(|(id, _)| *id == scene.id())
     }
 
     /// How the last [`Self::start_tracked`] made the navmesh: restored, so no bake
-    /// ran on that tick, or baked; `None` before the first.
+    /// ran on that tick, baked, or baked because the saved one was refused
+    /// ([`Start::Refused`], with why); `None` before the first.
     pub fn last_start(&self) -> Option<Start> {
-        self.tracked_scene.map(|(_, start)| start)
+        self.tracked_scene.as_ref().map(|(_, start)| start.clone())
     }
 }
 
 /// How [`NavigationGraph::start_tracked`] made the navmesh.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Start {
     /// From the scene's saved navmesh: no bake ran.
     Restored,
     /// By a full bake: the scene saved no navmesh.
     Baked,
-    /// By a full bake, the scene's saved navmesh refused (stale or malformed, the
-    /// warning says which): the navmesh on disk was not used.
-    Refused,
+    /// By a full bake, the scene's saved navmesh refused for the reason it holds
+    /// (stale, or the decoder's words): the navmesh on disk was not used.
+    Refused(String),
 }

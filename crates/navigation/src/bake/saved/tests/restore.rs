@@ -96,7 +96,7 @@ fn start_tracked_restores_a_matching_file_and_bakes_a_stale_one() {
     assert!(g.tracks(&scene));
     move_to(&mut scene, crate_id, Vec3::new(1.0, 0.5, 6.0));
     let mut fresh = NavigationGraph::from_scene(&scene);
-    assert_eq!(fresh.start_tracked(&mut scene), Start::Refused);
+    assert!(matches!(fresh.start_tracked(&mut scene), Start::Refused(_)));
     assert_same_mesh(&fresh, &baked(&scene));
 }
 

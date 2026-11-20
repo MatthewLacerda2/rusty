@@ -85,7 +85,7 @@ impl BakeFiles {
             _ => held.map(content),
         };
         let disk = stamp.map_or(Disk::Missing, Disk::File);
-        self.record(path, disk, held, None, Mark::Loaded);
+        self.record(path, disk, held, None, Mark::Loaded, None);
     }
 
     /// Record that `path` held `bytes` (`None`: no file), which this world now
@@ -94,13 +94,14 @@ impl BakeFiles {
         let stamp = bytes.map(|b| Stamp::of(b));
         let disk = stamp.map_or(Disk::Missing, Disk::File);
         let held = stamp.map(|s| s.hash);
-        self.record(path, disk, held, bytes.cloned(), Mark::Loaded);
+        self.record(path, disk, held, bytes.cloned(), Mark::Loaded, None);
     }
 
-    /// Record that the file at `path` is there but could not be read: a save keeps
-    /// it until this world bakes.
-    pub fn unreadable(&self, path: &Path) {
-        self.record(path, Disk::Unreadable, None, None, Mark::Loaded);
+    /// Record that the file at `path` is there but could not be read (the I/O
+    /// error `why`): a save keeps it until this world bakes.
+    pub fn unreadable(&self, path: &Path, why: &str) {
+        let why = Some(format!("could not be read ({why})"));
+        self.record(path, Disk::Unreadable, None, None, Mark::Loaded, why);
     }
 
     /// This world just baked the sidecar ending in `suffix` (`".occlusion"`): every
@@ -113,6 +114,8 @@ impl BakeFiles {
             .filter(|(p, _)| p.as_os_str().to_string_lossy().ends_with(suffix));
         ours.for_each(|(_, s)| {
             s.mark = Mark::Baked;
+            // This world's own bake replaces the file it could not use.
+            s.why = None;
             // The bake replaced the buffer: holding the old one would only keep it alive.
             s.buffer = None;
         });
@@ -125,13 +128,14 @@ impl BakeFiles {
         held: Option<u64>,
         buffer: Option<Arc<[u8]>>,
         mark: Mark,
+        why: Option<String>,
     ) {
         let seen = Seen {
             disk,
             held,
             buffer,
             mark,
-            why: None,
+            why,
         };
         let path = key(path);
         self.warned.borrow_mut().remove(&path);

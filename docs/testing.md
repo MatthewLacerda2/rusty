@@ -1469,14 +1469,17 @@ every binary's open makes them.
   probes placed whose SH never loaded, or reflection probes placed with no cube on
   disk (what a scene does not place is not missing). Its
   lighting cost is then not the shipped one. Baked data the scene has on disk
-  but ran without gets a line a kind, read from where the load and the run decide
-  it, never from the log: a `.occlusion` its load refused, with why (`baked
-  occlusion not used: refused (…)`); a PVS older than the scene's statics, as the
-  renderer bound it (`stale`: an occluder changed, so nothing is PVS-culled, or
-  only other baked meshes did, which are always drawn); a navmesh Play's start
-  refused and baked in full. The scene is measured all the same, as another scene:
-  its `render.occlusion`, draw calls, triangles and `gpu_ms` are not the game's,
-  and `make bench-ab`'s table repeats the line above the scene's rows, naming the
+  but ran without gets a line a kind naming its file, read from where the load and
+  the run decide it, never from the log: a sidecar its load refused or could not
+  read, with why (`baked occlusion not used: <scene>.scene.occlusion refused (…)`); a PVS
+  older than the scene's statics at its first frame, as the renderer bound it
+  (`stale`: an occluder changed, so nothing is PVS-culled, or only other baked
+  meshes did, which are always drawn; a static the game moves later is the game's,
+  not a stale bake); a navmesh Play's start refused, with why, and baked in full.
+  Only the live scene's files are read: a play-mode `Scene.Load` does not carry the
+  scene before's into its report. The scene is measured all the same, as another
+  scene: its `render.occlusion`, draw calls, triangles and `gpu_ms` are not the
+  game's, and `make bench-ab`'s table repeats the line above the scene's rows, naming the
   legs when only some wrote it. The run ends with a summary table of
   one line per scene: `cpu_ms` (the tick at the reference CPU clock), `frame_ms`,
   `gpu_ms`, `load_ms`, `rss_peak_mb`, `gpu_mb`, and the run's `import_ms` under

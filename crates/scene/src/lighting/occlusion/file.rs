@@ -160,7 +160,7 @@ pub fn apply_sidecar(scene: &mut Scene, file: OcclusionFile) {
                  the file is kept",
                 path.display()
             );
-            scene.bake_files.unreadable(&path)
+            scene.bake_files.unreadable(&path, &e.to_string())
         }
         Read::Refused(bytes, e) => {
             log::warn!(

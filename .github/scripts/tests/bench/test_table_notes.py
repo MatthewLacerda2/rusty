@@ -49,7 +49,7 @@ class Notes(unittest.TestCase):
         self.assertNotIn("disagree", text)
 
     def test_baked_data_one_leg_ran_without_names_that_leg(self):
-        refused = "baked occlusion not used: refused (occluder flag 30)"
+        refused = "baked occlusion not used: a.scene.occlusion refused (occluder flag 30)"
         text = self.section([[], [refused], []])
         self.assertIn(f"- {refused} (only PR: the legs disagree)\n", text.split("Nothing moved")[0])
 

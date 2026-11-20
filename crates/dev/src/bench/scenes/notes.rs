@@ -138,51 +138,83 @@ pub fn cooked_at_load(loads: &[super::load::Load]) -> Option<String> {
     })
 }
 
-/// The warnings for baked data a scene has on disk that its run did not use, one a
-/// kind: a sidecar its load refused (`BakeFiles::refusals`, why included), a PVS
-/// its statics moved away from (`stale`, `Renderer::stale_occlusion`), a navmesh
-/// Play's start refused (`nav`, `NavigationGraph::last_start`). The scene was
-/// measured as another one: nothing PVS-culled, or a navmesh baked at Play. A
-/// scene that never had the artefact gets no line.
+/// The bake warnings of the scene live in `harness` after its run: what it lacks
+/// ([`unbaked`]) and what it has on disk and ran without ([`bakes_unused`]), read
+/// from the live scene's own path (`own`, the bench's, unless a play-mode
+/// `Scene.Load` swapped another in). `stale` was judged at the first frame of the
+/// scene `loaded`, so a scene swapped in since is not given it.
+pub fn scene_bakes(
+    harness: &Harness,
+    own: &Path,
+    loaded: rusty_scene::SceneId,
+    stale: Option<StaleOcclusion>,
+) -> Vec<String> {
+    let world = harness.world.borrow();
+    let live = world.scene().borrow();
+    let mut out: Vec<String> = unbaked(&live).into_iter().collect();
+    let nav = world.nav().borrow();
+    let nav = nav.tracks(&live).then(|| nav.last_start()).flatten();
+    let path = world.script_manager().scene_path_cell().borrow().clone();
+    let path = path.unwrap_or_else(|| own.to_string_lossy().into_owned());
+    let stale = stale.filter(|_| live.id() == loaded);
+    out.extend(bakes_unused(&live, &path, stale, nav));
+    out
+}
+
+/// The warnings for baked data the live scene, loaded from `path`, has on disk and
+/// its run did not use, one a kind: a sidecar its load refused or could not read
+/// (`BakeFiles::not_used`, why included), a PVS its statics no longer matched when
+/// it loaded (`stale`, `Renderer::stale_occlusion` at the first frame), a navmesh
+/// Play's start refused (`nav`, `NavigationGraph::last_start`, with why). The scene
+/// was measured as another one: nothing PVS-culled, or a navmesh baked at Play. A
+/// scene that never had the artefact gets no line, and the records of a scene
+/// loaded before it in the same world (a play-mode `Scene.Load`) are not read.
 pub fn bakes_unused(
     scene: &Scene,
+    path: &str,
     stale: Option<StaleOcclusion>,
     nav: Option<Start>,
 ) -> Vec<String> {
-    let mut out: Vec<String> = scene
-        .bake_files()
-        .refusals()
-        .into_iter()
-        .map(|(path, why)| {
-            let kind = path
-                .extension()
-                .map_or("data".into(), |e| e.to_string_lossy());
-            format!("baked {kind} not used: refused ({why})")
+    let name = |p: &Path| {
+        p.file_name().map_or(p.display().to_string(), |n| {
+            n.to_string_lossy().into_owned()
         })
-        .collect();
+    };
+    let occlusion = rusty_scene::lighting::occlusion::occlusion_path(path);
+    let navmesh = rusty_scene::nav_settings::navmesh_path(path);
+    let mut out = Vec::new();
+    for (kind, file) in [("occlusion", &occlusion), ("navmesh", &navmesh)] {
+        if let Some(why) = scene.bake_files().not_used(file) {
+            out.push(format!("baked {kind} not used: {} {why}", name(file)));
+        }
+    }
+    let pvs = name(&occlusion);
     match stale {
         Some(s) if s.occluders > 0 => out.push(format!(
-            "baked occlusion not used: stale ({} of the {} baked meshes changed since the \
-             bake are occluders, so nothing is occlusion-culled; re-bake it)",
+            "baked occlusion not used: {pvs} stale ({} of the {} baked meshes changed \
+             since the bake are occluders, so nothing is occlusion-culled; re-bake it)",
             s.occluders, s.changed
         )),
         Some(s) => out.push(format!(
-            "baked occlusion partly used: stale ({} baked meshes changed since the bake are \
-             always drawn; re-bake it)",
+            "baked occlusion partly used: {pvs} stale ({} baked meshes changed since the \
+             bake are always drawn; re-bake it)",
             s.changed
         )),
         None => {}
     }
-    if nav == Some(Start::Refused) {
-        out.push(
-            "baked navmesh not used: refused at Play's start (stale or malformed; the console \
-             says why), so Play baked it in full"
-                .into(),
-        );
+    if let Some(Start::Refused(why)) = nav {
+        out.push(format!(
+            "baked navmesh not used: {} refused at Play's start ({why}), so Play baked it \
+             in full",
+            name(&navmesh)
+        ));
     }
     out
 }
 
+#[cfg(test)]
+#[path = "notes_baked_tests.rs"]
+mod baked_tests;
 #[cfg(test)]
 #[path = "notes_tests.rs"]
 mod tests;
