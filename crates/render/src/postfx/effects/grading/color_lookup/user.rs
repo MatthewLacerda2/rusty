@@ -8,6 +8,7 @@
 //! one is retried once it appears, and a malformed one is logged once, naming the
 //! file and line, and grades neutral until it is written.
 
+use crate::gpu::ops::{CountedQueue as _, Writes};
 use std::collections::BTreeMap;
 
 use rusty_asset::lut::{self, Lut};
@@ -55,17 +56,17 @@ impl UserLuts {
     /// The upload of the LUT at `path`, reading it on first use or after it was
     /// written ([`refresh`](Self::refresh)); `None` (logged once) when it is
     /// missing or malformed.
-    pub fn get(
+    pub(crate) fn get(
         &mut self,
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        writes: Writes,
         path: &str,
     ) -> Option<&UserLut> {
         if !self.loaded.contains_key(path) {
             let upload = match lut::load(std::path::Path::new(path)) {
                 Ok(lut) => {
                     self.uploads += 1;
-                    Some(upload(device, queue, &lut, self.uploads))
+                    Some(upload(device, writes, &lut, self.uploads))
                 }
                 Err(e) => {
                     log::warn!("[Render] Color Lookup `{path}` ignored: {e}");
@@ -97,10 +98,11 @@ impl UserLuts {
 
 /// `lut` as an `Rgba32Float` 3D texture: read with `textureLoad` and filtered by
 /// the bake itself, so its values stay exact (an identity LUT stays identity).
-fn upload(device: &wgpu::Device, queue: &wgpu::Queue, lut: &Lut, id: u64) -> UserLut {
+fn upload(device: &wgpu::Device, (queue, staging): Writes, lut: &Lut, id: u64) -> UserLut {
     let n = lut.size;
     let texture = texture(device, n);
-    queue.write_texture(
+    queue.counted_write_texture(
+        staging,
         texture.as_image_copy(),
         bytemuck::cast_slice(&lut.texels),
         wgpu::TexelCopyBufferLayout {

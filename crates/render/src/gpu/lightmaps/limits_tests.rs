@@ -46,7 +46,7 @@ fn gpu_too_many_pages_leave_the_scene_unlit_instead_of_panicking() {
     let Some(renderer) = headless_or_skip(4, 4) else {
         return;
     };
-    let (device, queue) = (&renderer.device, &renderer.queue);
+    let (device, writes) = (&renderer.device, (&renderer.queue, &renderer.staging));
     let layers = device.limits().max_texture_array_layers as usize + 1;
     let loaded = Loaded {
         format: wgpu::TextureFormat::Rgba8Unorm,
@@ -54,5 +54,5 @@ fn gpu_too_many_pages_leave_the_scene_unlit_instead_of_panicking() {
         layers: vec![vec![vec![0; 4]]; layers],
     };
     let list = vec!["too_many.ktx2".to_string()];
-    assert!(finish(device, queue, &list, Ok(loaded)).is_none());
+    assert!(finish(device, writes, &list, Ok(loaded)).is_none());
 }

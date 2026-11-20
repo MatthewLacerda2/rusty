@@ -99,7 +99,7 @@ fn gpu_the_bake_follows_the_contribution_the_path_and_the_file() {
     std::fs::write(&b, identity_cube(2)).unwrap();
     let (a, b) = (a.to_string_lossy(), b.to_string_lossy());
     let bake = |c: &mut Chain, vc: PostProcessingComponent| {
-        let gpu = (&c.r.device, &c.r.queue);
+        let gpu = (&c.r.device, (&c.r.queue, &c.r.staging));
         c.pfx.grade.prepare(gpu, &mut c.r.grade_bake, Some(&vc))
     };
     assert!(bake(&mut c, lookup(&a, 1.0)), "the first bake");
@@ -137,7 +137,8 @@ fn gpu_the_lut_cache_follows_rebakes() {
         |p| {
             let luts = &mut c.r.grade_bake.luts;
             luts.refresh();
-            luts.get(&c.r.device, &c.r.queue, p).map(|l| l.domain[1][0])
+            luts.get(&c.r.device, (&c.r.queue, &c.r.staging), p)
+                .map(|l| l.domain[1][0])
         },
         |max, bake| *max == Some(domain(bake)),
     );

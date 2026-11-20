@@ -12,6 +12,7 @@
 //! a landing from the scene still drawing (a baked splash that loads the next level
 //! from `Start`).
 
+use crate::gpu::ops::Writes;
 use std::rc::Rc;
 use std::sync::mpsc::TryRecvError;
 
@@ -28,16 +29,16 @@ impl Lightmaps {
     pub(crate) fn warm(
         &mut self,
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        writes: Writes,
         lists: [&[String]; 3],
     ) -> bool {
-        self.land(device, queue, lists);
+        self.land(device, writes, lists);
         let bc = device
             .features()
             .contains(wgpu::Features::TEXTURE_COMPRESSION_BC);
         let kinds = [Kind::Colour, Kind::Direction, Kind::Mask];
         for (list, kind) in lists.into_iter().zip(kinds) {
-            self.array(device, queue, list, kind, bc);
+            self.array(device, writes, list, kind, bc);
         }
         let pending = |list: &[String]| matches!(self.cache.get(list), Some(Entry::Pending(_)));
         !lists.into_iter().any(pending)
@@ -46,12 +47,7 @@ impl Lightmaps {
     /// Upload each of `lists` whose worker finished, counting it in `uploads` and
     /// marking the cache fresh. A list no caller names stays pending, uploaded by
     /// the first that does.
-    pub(super) fn land(
-        &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        lists: [&[String]; 3],
-    ) {
+    pub(super) fn land(&mut self, device: &wgpu::Device, writes: Writes, lists: [&[String]; 3]) {
         for list in lists.into_iter().filter(|l| !l.is_empty()) {
             let Some(entry) = self.cache.get_mut(list) else {
                 continue;
@@ -65,7 +61,7 @@ impl Lightmaps {
                 // The loader died without an answer (it panicked): a failed load.
                 Err(TryRecvError::Disconnected) => Err("the page loader stopped".into()),
             };
-            let array = finish(device, queue, list, result);
+            let array = finish(device, writes, list, result);
             *entry = Entry::Ready(counted(&mut self.uploads, array));
             self.fresh = true;
         }

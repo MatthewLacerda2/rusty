@@ -217,7 +217,7 @@ impl Renderer {
                 let set = &data.lightmaps;
                 let lists = [&set.pages[..], &set.directions[..], &set.masks[..]];
                 (self.retained.residency).warmed_lightmaps(&warming.token, lists);
-                self.lightmaps.warm(&self.device, &self.queue, lists)
+                (self.lightmaps).warm(&self.device, (&self.queue, &self.staging), lists)
             }
         }
     }

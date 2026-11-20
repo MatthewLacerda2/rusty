@@ -48,6 +48,7 @@ mod upload;
 mod warm;
 mod worker;
 
+use crate::gpu::ops::Writes;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::mpsc::Receiver;
@@ -113,14 +114,14 @@ impl Lightmaps {
     pub(crate) fn bind(
         &mut self,
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        writes: Writes,
         pages: &[String],
         directions: &[String],
         masks: &[String],
     ) -> bool {
         let rewritten = self.drop_rewritten();
         let lists = [pages, directions, masks];
-        self.land(device, queue, lists);
+        self.land(device, writes, lists);
         let fresh = std::mem::take(&mut self.fresh);
         let same = self.bound.iter().zip(lists).all(|(b, l)| b == l);
         if same && !rewritten && !fresh {
@@ -130,13 +131,13 @@ impl Lightmaps {
         let bc = device
             .features()
             .contains(wgpu::Features::TEXTURE_COMPRESSION_BC);
-        let current = self.array(device, queue, pages, Kind::Colour, bc);
+        let current = self.array(device, writes, pages, Kind::Colour, bc);
         let shape = current.as_ref().map(|a| a.shape);
         let directions = self
-            .array(device, queue, directions, Kind::Direction, bc)
+            .array(device, writes, directions, Kind::Direction, bc)
             .filter(|d| Some(d.shape) == shape);
         let masks = self
-            .array(device, queue, masks, Kind::Mask, bc)
+            .array(device, writes, masks, Kind::Mask, bc)
             .filter(|m| Some(m.shape) == shape);
         let changed = !same_array(&current, &self.current)
             || !same_array(&directions, &self.directions)
@@ -165,7 +166,7 @@ impl Lightmaps {
     fn array(
         &mut self,
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        writes: Writes,
         pages: &[String],
         kind: Kind,
         bc: bool,
@@ -179,7 +180,7 @@ impl Lightmaps {
             match in_line {
                 true => Entry::Ready(warm::counted(
                     uploads,
-                    finish(device, queue, &list, load::load(&list, kind, bc)),
+                    finish(device, writes, &list, load::load(&list, kind, bc)),
                 )),
                 false => Entry::Pending(start(list, kind, bc)),
             }
