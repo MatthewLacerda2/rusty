@@ -3,15 +3,13 @@
 
 use super::CameraCtx;
 use crate::draw::pass::{PassClear, ScenePassFrame};
-use crate::gpu::ops::CountedQueue as _;
 use crate::passes::ssao::SsaoFrame;
 use crate::postfx::effects::ssr;
 use crate::{RenderView, Renderer};
 use rusty_scene::ClearFlags;
 
 pub(super) fn upload_camera(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
-    r.queue
-        .counted_write_buffer(&r.camera_buffer, 0, bytemuck::bytes_of(&ctx.uniform));
+    r.camera_buffer.upload(&r.queue, &ctx.uniform);
 }
 
 /// Bin the frame's point and spot lights (#434) and its decals (#638) into this
@@ -66,7 +64,8 @@ pub(super) fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut Came
         culled: ctx.solids.culled.clone(),
         floored: ctx.solids.floored,
     };
-    r.execute_scene_pass(view, frame, &ctx.solids.draws.opaque);
+    let encoder = ctx.commands.encoder();
+    r.execute_scene_pass(encoder, view, frame, &ctx.solids.draws.opaque);
 }
 
 /// SSIL's source (#1750), kept after the base camera's opaque pass (`ssil::run`).
@@ -84,7 +83,8 @@ pub(super) fn ssr(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) 
             r.graphics(stack.editor_mode),
             stack.full_post_fx,
         );
-        ssr::run(r, view, settings, (ctx.view_proj, ctx.cam.position));
+        let at = (ctx.view_proj, ctx.cam.position);
+        ssr::run((r, &mut ctx.commands), view, settings, at);
     }
 }
 
@@ -92,31 +92,35 @@ pub(super) fn ssr(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) 
 /// the translucents that refract or absorb, or trace SSR (#1570); skipped when none
 /// of them does.
 pub(super) fn opaque_copy(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    r.copy_opaque(view, &ctx.solids.draws.transparent, ctx.traces);
+    let encoder = ctx.commands.encoder();
+    r.copy_opaque(encoder, view, &ctx.solids.draws.transparent, ctx.traces);
 }
 
 /// Translucent solids (#242) over the opaque ones, by sorting priority, then
 /// back-to-front (#2039).
 pub(super) fn transparent(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    r.draw_transparent(view, &ctx.solids.draws.transparent);
+    r.draw_transparent(ctx.commands.encoder(), view, &ctx.solids.draws.transparent);
 }
 
 /// HDRP's transparent depth postpass (#1523): the translucents that ask for it
 /// write their depth (and velocity texel) over what they drew over.
 pub(super) fn depth_postpass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    r.draw_depth_postpass(view, &ctx.solids.draws.transparent);
+    let encoder = ctx.commands.encoder();
+    r.draw_depth_postpass(encoder, view, &ctx.solids.draws.transparent);
 }
 
 /// World canvases (#429): scene geometry, occluded by it, before particles.
 pub(super) fn world_ui(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    r.draw_world_ui(view, ctx.cam, ctx.view_proj, ctx.fog);
+    let encoder = ctx.commands.encoder();
+    r.draw_world_ui(encoder, view, ctx.cam, ctx.view_proj, ctx.fog);
 }
 
 /// Ribbons (#441) then sprite particles, each back to front; mesh particles drew
 /// with the solids.
 pub(super) fn effects(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
     let camera = (ctx.cam, ctx.uniform.stack[0]);
-    ctx.effects = r.draw_effects(view, ctx.scene, camera, ctx.view_proj);
+    let encoder = ctx.commands.encoder();
+    ctx.effects = r.draw_effects(encoder, view, ctx.scene, camera, ctx.view_proj);
 }
 
 pub(super) fn count(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
@@ -134,7 +138,8 @@ pub(super) fn post_fx(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraC
 /// Only an editor camera marked any solid for it (`batch_solids`).
 pub(super) fn outline(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
     if ctx.is_last {
-        r.draw_outline(view, &ctx.solids, ctx.view_proj, ctx.stack.output);
+        let encoder = ctx.commands.encoder();
+        r.draw_outline(encoder, view, &ctx.solids, ctx.view_proj, ctx.stack.output);
     }
 }
 
@@ -149,7 +154,7 @@ pub(super) fn gizmo_depth(r: &mut Renderer, view: &mut RenderView, ctx: &mut Cam
     if !game_gizmos(view, ctx) || r.gizmos_upscaled(view, ctx) {
         view.gizmo_depth = None;
     } else if !ctx.is_last {
-        r.keep_gizmo_depth(view);
+        r.keep_gizmo_depth(view, ctx);
     }
 }
 
@@ -167,7 +172,8 @@ pub(super) fn handles(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraC
         return;
     }
     if ctx.stack.editor_mode {
-        r.draw_handles(view, ctx.scene, ctx.stack.output, ctx.cam.position);
+        let encoder = ctx.commands.encoder();
+        r.draw_handles(encoder, view, ctx.scene, ctx.stack.output, ctx.cam.position);
     } else if game_gizmos(view, ctx) {
         r.draw_game_gizmos(view, ctx);
     }

@@ -21,11 +21,13 @@
 //! base camera's screen-space work: no decals in its clusters, no SSAO (#1497),
 //! no transparent SSR ([`ssr_march`], #1570).
 
+pub(crate) mod buffer;
 mod stages;
 
 use super::resources::SolidResources;
 use super::stack::StackPass;
 use crate::clusters::ClusterGrid;
+use crate::gpu::commands::Commands;
 use crate::gpu::uniforms::FogUniform;
 use crate::lod::LodSelection;
 use crate::passes::particles::ParticleDraws;
@@ -98,6 +100,8 @@ pub(crate) struct CameraCtx<'a> {
     pub solids: SolidResources,
     /// Filled by the `effects` stage, for the counters.
     pub effects: ParticleDraws,
+    /// What every stage records into, sent once at the camera's end (#2353).
+    pub commands: Commands,
 }
 
 /// The per-stack values every camera's context reads.
@@ -128,7 +132,7 @@ impl<'a> CameraCtx<'a> {
         scene: &'a Scene,
         stack: &'a StackPass<'a>,
         shared: &StackShared,
-        idx: usize,
+        (idx, commands): (usize, Commands),
     ) -> Self {
         let cam = &stack.stack[idx];
         // Drawn jittered (TAA, #1702); culled through the unjittered matrix.
@@ -178,6 +182,7 @@ impl<'a> CameraCtx<'a> {
             clusters,
             solids: SolidResources::default(),
             effects: ParticleDraws::default(),
+            commands,
         }
     }
 }

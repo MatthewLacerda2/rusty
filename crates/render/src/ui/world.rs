@@ -19,7 +19,7 @@
 //! falls outside — the same space the hit-test checks masks in, so what draws is
 //! what is hit. A `BackdropFilter` is not drawn here (`effects::backdrop`).
 
-use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _};
 use glam::Mat4;
 
 use super::cache::UiViewCache;
@@ -112,6 +112,7 @@ impl Renderer {
     /// is depth-tested against them. A no-op without any.
     pub(crate) fn draw_world_ui(
         &mut self,
+        encoder: &mut wgpu::CommandEncoder,
         view: &mut RenderView,
         cam: &Camera,
         view_proj: Mat4,
@@ -140,7 +141,7 @@ impl Renderer {
         }
         self.upload_world_uniforms(view, &bytes);
         view.ui.drawn += items.len();
-        self.encode_world_ui(view, &draws);
+        self.encode_world_ui(encoder, view, &draws);
     }
 
     /// Write `bytes` into the view's uniform buffer, (re)building its bind group
@@ -180,7 +181,12 @@ impl Renderer {
 
     /// Record and submit the world pass: `(canvas index, placement offset)` in
     /// draw order.
-    fn encode_world_ui(&self, view: &mut RenderView, draws: &[(usize, u32)]) {
+    fn encode_world_ui(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &mut RenderView,
+        draws: &[(usize, u32)],
+    ) {
         let ui = &self.ui_renderer;
         let batches = |i| view.ui.canvas(i).mesh.batches.iter();
         let keys: Vec<_> = draws
@@ -192,13 +198,8 @@ impl Renderer {
         let Some(uniforms) = view.ui.world.as_ref() else {
             return;
         };
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("World UI Encoder"),
-            });
         {
-            let mut pass = world_pass(&mut encoder, view, &self.gpu_timer);
+            let mut pass = world_pass(encoder, view, &self.gpu_timer);
             let mut blend = None;
             for &(i, offset) in draws {
                 let canvas = view.ui.canvas(i);
@@ -218,7 +219,6 @@ impl Renderer {
                 }
             }
         }
-        self.queue.counted_submit(Some(encoder.finish()));
     }
 }
 

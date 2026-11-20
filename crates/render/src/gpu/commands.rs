@@ -54,10 +54,13 @@ impl Commands {
         self.after.push(Box::new(step));
     }
 
-    /// Submit what was recorded so far and keep recording into a fresh encoder:
-    /// for a stage that must rewrite a buffer an earlier command reads.
+    /// Submit what was recorded so far and keep recording into a fresh encoder,
+    /// a new recording: at a camera's end, or for a stage that must rewrite a
+    /// buffer an earlier command reads.
     pub(crate) fn flush(&mut self) {
         self.submit();
+        ops::end_recording(self.outer);
+        self.outer = ops::begin_recording();
         self.encoder = Some(encoder(&self.device, self.label));
     }
 

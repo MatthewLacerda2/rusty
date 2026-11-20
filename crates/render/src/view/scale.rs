@@ -13,7 +13,6 @@
 //! no upscale target exists and the frame is the one it was before scaling existed.
 
 use super::{PixelSize, RenderView};
-use crate::gpu::ops::CountedQueue as _;
 use crate::postfx::PostFxContext;
 use crate::timing::GpuPass;
 use crate::Renderer;
@@ -100,6 +99,7 @@ impl Renderer {
     /// before the UI.
     pub(crate) fn upscale_scene(
         &self,
+        encoder: &mut wgpu::CommandEncoder,
         view: &RenderView,
         scaled: &wgpu::TextureView,
         output: &wgpu::TextureView,
@@ -122,14 +122,8 @@ impl Renderer {
             ctx.depth_view,
             ctx.skybox,
         );
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Scale Upscale"),
-            });
         let copy = (&pfx.copy_pipeline, ctx.timer.writes(GpuPass::PostFx));
-        crate::postfx::PostFx::fullscreen(&mut encoder, copy, &[&io], output);
-        self.queue.counted_submit(Some(encoder.finish()));
+        crate::postfx::PostFx::fullscreen(encoder, copy, &[&io], output);
     }
 }
 

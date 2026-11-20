@@ -27,6 +27,7 @@
 //! lands in `gpu_between_submits_ms`); `ssr_pyramids` and `ssr_resolve` hold the
 //! other two.
 
+use crate::gpu::commands::Commands;
 use crate::gpu::ops::CountedQueue as _;
 use glam::{Mat4, Vec3};
 
@@ -150,6 +151,7 @@ impl PostFx {
     pub(crate) fn run_ssr(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
+        commands: &mut Commands,
         passes: &SsrPasses,
         params: Option<SsrParams>,
         timer: &GpuTimer,
@@ -172,26 +174,16 @@ impl PostFx {
         let t = self.targets.get_mut::<SsrTargets>().expect("fitted above");
         queue.counted_write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
         #[cfg(test)]
-        super::poison::write(t.poisoned, queue, &self.scene_hdr.texture);
+        super::poison::write(t.poisoned, (queue, commands), &self.scene_hdr.texture);
         // A cloned handle (reference-counted, no new group), so `t` stays borrowable.
         let group = t.group(device, passes, inputs).clone();
 
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("SSR Encoder"),
-        });
+        let encoder = commands.encoder();
         let extent = self.scene_hdr.texture.size();
         let (from, to) = (&self.scene_hdr.texture, &t.colour);
         encoder.copy_texture_to_texture(from.as_image_copy(), to.as_image_copy(), extent);
         let traced = (&t.traced, &t.resolve);
-        trace_and_resolve(
-            &mut encoder,
-            passes,
-            &group,
-            traced,
-            &self.scene_hdr.view,
-            timer,
-        );
-        queue.counted_submit(std::iter::once(encoder.finish()));
+        trace_and_resolve(encoder, passes, &group, traced, &self.scene_hdr.view, timer);
     }
 }
 

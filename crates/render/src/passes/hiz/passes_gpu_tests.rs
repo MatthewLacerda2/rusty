@@ -115,7 +115,7 @@ const PARTS: [&str; 7] = [
     "occlusion.select",
     "occlusion.phase_one",
     "occlusion.pyramid",
-    "occlusion.submit",
+    "occlusion.record",
 ];
 
 fn occlusion_laps(r: &crate::Renderer) -> Vec<&'static str> {

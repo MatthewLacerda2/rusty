@@ -6,6 +6,8 @@
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
+use crate::gpu::commands::Commands;
+
 /// A read whose map has not answered yet.
 const PENDING: u8 = 0;
 /// A read whose copy is mapped and readable.
@@ -145,8 +147,9 @@ impl Counter {
         self.in_flight = Some((0, bytes));
     }
 
-    /// After the copy's submit: map it, for `tested` items.
-    pub(crate) fn request(&mut self, tested: u32) {
+    /// Map the copy once `commands`, which recorded it, are submitted, for
+    /// `tested` items.
+    pub(crate) fn request(&mut self, tested: u32, commands: &mut Commands) {
         if !std::mem::take(&mut self.copied) {
             return;
         }
@@ -154,14 +157,16 @@ impl Counter {
             return;
         };
         self.in_flight = Some((tested, bytes));
-        let staging = self.staging.as_ref().expect("copied into it");
+        let staging = self.staging.clone().expect("copied into it");
         let mapped = Arc::clone(&self.mapped);
-        staging
-            .slice(..bytes)
-            .map_async(wgpu::MapMode::Read, move |result| {
-                let state = if result.is_ok() { MAPPED } else { FAILED };
-                mapped.store(state, Ordering::Release);
-            });
+        commands.after_send(move || {
+            staging
+                .slice(..bytes)
+                .map_async(wgpu::MapMode::Read, move |result| {
+                    let state = if result.is_ok() { MAPPED } else { FAILED };
+                    mapped.store(state, Ordering::Release);
+                });
+        });
     }
 }
 

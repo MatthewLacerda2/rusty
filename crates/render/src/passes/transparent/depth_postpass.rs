@@ -14,7 +14,7 @@
 //! field move them as solids. A view with no velocity target draws none of them.
 
 use crate::draw::batch::DrawBatch;
-use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
+use crate::gpu::ops::CountedEncoder as _;
 use crate::gpu::pipelines::surface::SolidPass;
 use crate::timing::GpuPass;
 use crate::{RenderView, Renderer};
@@ -57,7 +57,12 @@ fn targets(
 impl Renderer {
     /// Draw the depth postpass of `translucents` into `view`, then the motion
     /// writers'; nothing when none asks.
-    pub(crate) fn draw_depth_postpass(&self, view: &RenderView, translucents: &[DrawBatch]) {
+    pub(crate) fn draw_depth_postpass(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &RenderView,
+        translucents: &[DrawBatch],
+    ) {
         let velocity = view.post_fx.motion.target_view();
         let depth: Vec<DrawBatch> = writers(translucents).cloned().collect();
         let motion: Vec<DrawBatch> = match velocity {
@@ -67,11 +72,6 @@ impl Renderer {
         if depth.is_empty() && motion.is_empty() {
             return;
         }
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Depth Postpass Encoder"),
-            });
         {
             let targets = targets(velocity);
             let mut pass = encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
@@ -96,6 +96,5 @@ impl Renderer {
             self.draw_batches(&mut pass, &depth, solid_pass);
             self.draw_batches(&mut pass, &motion, SolidPass::MotionPostpass(pipelines));
         }
-        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 }

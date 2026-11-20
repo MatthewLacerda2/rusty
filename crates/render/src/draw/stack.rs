@@ -73,8 +73,18 @@ pub(crate) struct StackPass<'a> {
 impl Renderer {
     /// Draw `pass.stack` into `view` and post-process it to `pass.output`. Shadows and
     /// the frame's shared uploads are the caller's (see `Renderer::render`). Each
-    /// camera runs the [`CAMERA_PASSES`] table in order.
-    pub(crate) fn draw_stack(&mut self, view: &mut RenderView, scene: &Scene, pass: StackPass) {
+    /// camera runs the [`CAMERA_PASSES`] table in order, recording into one encoder
+    /// (#2353): the first camera into `commands` (holding what the caller recorded
+    /// before it, the shadow sweep), each later one into its own, the one before it
+    /// sent first. Returns the last camera's, unsent: the caller records what
+    /// follows the stack into it (the upscale, the UI) and sends it before the next
+    /// stack's camera rewrites the camera uniform.
+    pub(crate) fn draw_stack(
+        &mut self,
+        view: &mut RenderView,
+        scene: &Scene,
+        (pass, commands): (StackPass, Commands),
+    ) -> Commands {
         let aspect = view.aspect();
         let (view_projs, cameras) = matrices(&pass, aspect);
         // Motion vectors (#1435): last frame's cameras, and the velocity target when
@@ -126,8 +136,9 @@ impl Renderer {
         };
         let history = reads_history(view, (&pass, graphics, taa_on), &shared);
         self.frame_counters.history_passes += u32::from(history);
-        self.draw_cameras(view, scene, &pass, &shared);
+        let commands = self.draw_cameras(view, scene, (&pass, &shared), commands);
         view.post_fx.motion.history.end();
+        commands
     }
 
     /// Run every camera of `pass` through [`CAMERA_PASSES`]. Each pass's CPU time
@@ -137,17 +148,25 @@ impl Renderer {
         &mut self,
         view: &mut RenderView,
         scene: &Scene,
-        pass: &StackPass,
-        shared: &StackShared,
-    ) {
+        (pass, shared): (&StackPass, &StackShared),
+        mut commands: Commands,
+    ) -> Commands {
         for idx in 0..pass.stack.len() {
-            let mut ctx = CameraCtx::new(scene, pass, shared, idx);
+            if idx > 0 {
+                // This camera rewrites the camera uniform and the draw buffers the
+                // last one's passes read: those go out first.
+                commands.flush();
+                self.lap("camera.submit");
+            }
+            let mut ctx = CameraCtx::new(scene, pass, shared, (idx, commands));
             self.lap("stack");
             for (name, stage) in CAMERA_PASSES {
                 stage(self, view, &mut ctx);
                 self.lap(name);
             }
+            commands = ctx.commands;
         }
+        commands
     }
 
     /// Run the post-process chain over the view's composited HDR target: every
@@ -157,7 +176,7 @@ impl Renderer {
     /// `StackPass::output`. When TAA upscales the view (TAAU, #1702), everything
     /// after it runs at the output's size and `output` is the real output, so the
     /// caller has no scaled target to upscale.
-    pub(super) fn run_post_fx(&mut self, view: &mut RenderView, ctx: &CameraCtx) {
+    pub(super) fn run_post_fx(&mut self, view: &mut RenderView, ctx: &mut CameraCtx) {
         use crate::postfx::PostFxContext;
 
         let (scene, stack) = (ctx.scene, ctx.stack);
@@ -171,10 +190,9 @@ impl Renderer {
             stack,
             effect,
         };
-        // The chain is one encoder and one submit (#2353).
-        let mut commands = Commands::new(&self.device, &self.queue, "PostFX Encoder");
+        let commands = &mut ctx.commands;
         for run in effects::scene_passes() {
-            run(self, view, &pass, &mut commands);
+            run(self, view, &pass, commands);
         }
 
         // The grade + tonemap and the Color Lookup (#1440, #1441): rebaked only when
@@ -198,11 +216,10 @@ impl Renderer {
         };
         view.post_fx.run(
             (&self.device, &self.queue),
-            &mut commands,
+            commands,
             chain,
             (&effect, params),
         );
-        commands.send();
     }
 }
 

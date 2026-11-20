@@ -47,13 +47,14 @@ impl Renderer {
     /// depth-faded effect lines up with the depth it reads.
     pub(crate) fn draw_effects(
         &mut self,
+        encoder: &mut wgpu::CommandEncoder,
         view: &mut RenderView,
         scene: &Scene,
         (camera, stack_index): (&Camera, f32),
         view_proj: Mat4,
     ) -> ParticleDraws {
-        let ribbons = self.draw_ribbons(view, scene, (camera, stack_index), view_proj);
-        let mut draws = self.draw_particles(view, scene, camera, view_proj);
+        let ribbons = self.draw_ribbons(encoder, view, scene, (camera, stack_index), view_proj);
+        let mut draws = self.draw_particles(encoder, view, scene, camera, view_proj);
         draws.draw_calls += ribbons;
         draws
     }
@@ -63,6 +64,7 @@ impl Renderer {
     /// Returns the draw calls issued (one per ribbon) for the frame counters.
     pub(crate) fn draw_ribbons(
         &mut self,
+        encoder: &mut wgpu::CommandEncoder,
         view: &RenderView,
         scene: &Scene,
         (camera, stack_index): (&Camera, f32),
@@ -95,13 +97,14 @@ impl Renderer {
             .iter()
             .map(|d| d.texture.as_ref().map(|p| self.load_texture(p)))
             .collect();
-        self.encode_ribbon_pass(view, &ribbons, &textures);
+        self.encode_ribbon_pass(encoder, view, &ribbons, &textures);
         ribbons.draws.len() as u32
     }
 
     /// Record the pass: load the HDR colour + depth, then each ribbon in order.
     fn encode_ribbon_pass(
         &self,
+        encoder: &mut wgpu::CommandEncoder,
         view: &RenderView,
         ribbons: &Ribbons,
         textures: &[Option<Rc<GpuTexture>>],
@@ -125,14 +128,9 @@ impl Renderer {
             wgpu::BufferUsages::INDEX,
         );
         let rr = &self.ribbon_renderer;
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Ribbon Encoder"),
-            });
         {
             let reactive = view.post_fx.taa_reactive().is_some();
-            let mut pass = effect_pass(&mut encoder, view, self.gpu_timer.writes(GpuPass::Ribbons));
+            let mut pass = effect_pass(encoder, view, self.gpu_timer.writes(GpuPass::Ribbons));
             pass.set_bind_group(0, &rr.globals_bind_group, &[]);
             pass.set_vertex_buffer(0, vertices.slice(..));
             pass.set_index_buffer(indices.slice(..), wgpu::IndexFormat::Uint32);
@@ -143,7 +141,6 @@ impl Renderer {
                 pass.draw_indexed(draw.first..draw.first + draw.count, 0, 0..1);
             }
         }
-        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 }
 

@@ -20,7 +20,7 @@ const INTEGRATE_GROUP: u32 = 8;
 impl Renderer {
     /// The `volumetric_fog` stage: on a camera whose context carries a plan (the
     /// base camera of a view running it), fill the renderer's volume for it.
-    pub(crate) fn run_volumetric_fog(&mut self, view: &mut RenderView, ctx: &CameraCtx) {
+    pub(crate) fn run_volumetric_fog(&mut self, view: &mut RenderView, ctx: &mut CameraCtx) {
         let Some((plan, key)) = ctx.volumetric else {
             return;
         };
@@ -58,7 +58,7 @@ impl Renderer {
             .targets
             .get::<VolumetricTargets>()
             .expect("fitted above");
-        self.dispatch_froxels(t, plan.grid);
+        self.dispatch_froxels(ctx.commands.encoder(), t, plan.grid);
         let t = view
             .post_fx
             .targets
@@ -68,9 +68,14 @@ impl Renderer {
         self.frame_counters.volumetric_froxels += plan.froxels();
     }
 
-    /// Record and submit `t`'s scatter into this frame's grid and the integrate
-    /// into the renderer's volume.
-    fn dispatch_froxels(&self, t: &VolumetricTargets, [w, h, d]: [u32; 3]) {
+    /// Record `t`'s scatter into this frame's grid and the integrate into the
+    /// renderer's volume, in the camera's encoder.
+    fn dispatch_froxels(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        t: &VolumetricTargets,
+        [w, h, d]: [u32; 3],
+    ) {
         let passes = &self.post_passes.volumetric_fog;
         let (out, history) = (&t.scatter[t.current], &t.scatter[1 - t.current]);
         let scatter = self.scatter_group(t, (out, history));
@@ -79,7 +84,7 @@ impl Renderer {
             layout: &passes.integrate_layouts[0],
             entries: &[
                 entry(0, t.uniform.as_entire_binding()),
-                entry(1, self.camera_buffer.as_entire_binding()),
+                entry(1, self.camera_buffer.uniform.as_entire_binding()),
             ],
         });
         let grids = self.device.counted_bind_group(&wgpu::BindGroupDescriptor {
@@ -93,11 +98,6 @@ impl Renderer {
                 ),
             ],
         });
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Volumetric Fog Encoder"),
-            });
         {
             let timestamp_writes = self.gpu_timer.compute_writes(GpuPass::VolumetricFog);
             let mut pass = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
@@ -114,7 +114,6 @@ impl Renderer {
             let n = INTEGRATE_GROUP;
             pass.dispatch_workgroups(w.div_ceil(n), h.div_ceil(n), 1);
         }
-        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 
     /// `cs_scatter`'s group: the uniforms, this camera's lights and the `Baked`
@@ -135,7 +134,7 @@ impl Renderer {
             layout: &passes.scatter_layout,
             entries: &[
                 entry(0, t.uniform.as_entire_binding()),
-                entry(1, self.camera_buffer.as_entire_binding()),
+                entry(1, self.camera_buffer.uniform.as_entire_binding()),
                 entry(2, self.lighting_buffer.as_entire_binding()),
                 entry(3, lights.as_entire_binding()),
                 entry(4, ranges.as_entire_binding()),

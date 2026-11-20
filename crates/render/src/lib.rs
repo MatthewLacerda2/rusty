@@ -142,7 +142,7 @@ pub struct Renderer {
     pub material_layout: wgpu::BindGroupLayout,
 
     // Buffers and Bind Groups (Global)
-    camera_buffer: wgpu::Buffer,
+    camera_buffer: draw::camera::buffer::CameraBuffer,
     lighting_buffer: wgpu::Buffer,
     pub global_bind_group: wgpu::BindGroup,
     /// Rebuild the group-0 bind group only when something it binds changed (the sky
