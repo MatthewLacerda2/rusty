@@ -6,8 +6,8 @@ use super::{apply_occlusion, write_lighting};
 use super::{bake_occlusion_only, OcclusionOnlyReport, UNSAVED_OCCLUSION};
 use crate::bake::progress::BakeLog;
 use crate::session::Session;
-use rusty_lighting::occlusion::OcclusionBakeReport;
 use rusty_lighting::occlusion::{fingerprint, test_level::corridors};
+use rusty_lighting::occlusion::{OcclusionBakeReport, Reach};
 use rusty_scene::lighting::occlusion::occlusion_path;
 use rusty_scene::{MaterialComponent, Scene};
 use rusty_script::scripting::LogLevel;
@@ -27,7 +27,7 @@ fn it_writes_only_the_pvs_and_a_fresh_load_matches_it() {
     let scene_text = std::fs::read(&path).unwrap();
     let mut scene = Scene::new();
     rusty_edit::load_from_file(&mut scene, &path).unwrap();
-    let report = bake_occlusion_only(&mut scene, Some(&path), &mut BakeLog::off()).unwrap();
+    let report = bake_occlusion_only(&mut scene, Some(&path), None, &mut BakeLog::off()).unwrap();
     assert!(report.occlusion.cells > 0 && report.occlusion.occluders > 0);
     assert!(report
         .summary()
@@ -46,7 +46,7 @@ fn it_writes_only_the_pvs_and_a_fresh_load_matches_it() {
     for baked in &data.objects {
         assert_eq!(fingerprint(&back, baked.entity), Some(baked.fingerprint));
     }
-    bake_occlusion_only(&mut back, Some(&path), &mut BakeLog::off()).unwrap();
+    bake_occlusion_only(&mut back, Some(&path), None, &mut BakeLog::off()).unwrap();
     let again = std::fs::read(occlusion_path(&path)).unwrap();
     assert_eq!(again, pvs, "a re-bake of the unchanged scene");
 }
@@ -54,11 +54,11 @@ fn it_writes_only_the_pvs_and_a_fresh_load_matches_it() {
 #[test]
 fn it_is_refused_unsaved_and_while_the_editor_bakes() {
     let mut scene = corridors();
-    let unsaved = bake_occlusion_only(&mut scene, None, &mut BakeLog::off());
+    let unsaved = bake_occlusion_only(&mut scene, None, None, &mut BakeLog::off());
     assert_eq!(unsaved.unwrap_err(), UNSAVED_OCCLUSION);
     scene.lighting_bake_running = true;
     let path = saved("refused");
-    let busy = bake_occlusion_only(&mut scene, Some(&path), &mut BakeLog::off());
+    let busy = bake_occlusion_only(&mut scene, Some(&path), None, &mut BakeLog::off());
     assert!(busy.is_err() && scene.occlusion.is_none());
 }
 
@@ -131,7 +131,11 @@ fn the_lighting_save_keeps_a_newer_pvs_and_a_failed_pvs_step_loses_nothing() {
     assert_eq!(std::fs::read(&pvs).unwrap(), b"theirs", "a save after");
     assert!(editor.bake_files().warned(&pvs), "the save says it kept it");
     // A PVS step that ends writes this world's bake (the last write wins).
-    let baked = super::super::occlusion::bake_occlusion_logged(&editor, &mut BakeLog::off());
+    let baked = super::super::occlusion::bake_occlusion_logged(
+        &editor,
+        Reach::everywhere(),
+        &mut BakeLog::off(),
+    );
     apply_occlusion(&mut editor, &path, baked.unwrap()).unwrap();
     let ours = std::fs::read(&pvs).unwrap();
     assert!(

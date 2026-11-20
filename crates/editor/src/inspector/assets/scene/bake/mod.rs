@@ -42,11 +42,9 @@ use egui_phosphor::regular as icon;
 use crate::EditorUi;
 use rusty_dev::bake::lighting::LightingBakeReport;
 use rusty_dev::bake::lightmap::LightmapBakeJob;
-use rusty_dev::bake::occlusion::unsaved_materials_warning;
 use rusty_dev::bake::occlusion::OcclusionBakeJob;
 use rusty_dev::bake::steps::LightingBake;
-use rusty_lighting::lightmap::BakeView;
-use rusty_scene::lighting::bake_status::{BakeProgress, BakeStatus};
+use rusty_navigation::NavigationGraph;
 use rusty_scene::{Scene, SceneId};
 use rusty_script::scripting::ConsoleLogs;
 
@@ -54,9 +52,11 @@ mod outcome;
 mod poll;
 mod progress;
 mod settings;
+mod start;
 pub use poll::{poll, poll_undrawn};
 use progress::draw_progress;
 use settings::{draw_diffuse_model, draw_mixed_mode, draw_settings};
+use start::{start, start_occlusion, take_request};
 
 /// A background Generate Lighting and the scene it belongs to: the scene's runtime
 /// identity and the editor's open scene file when it started. A result for a scene
@@ -110,7 +110,7 @@ pub fn draw(
     editor: &mut EditorUi,
     scene: &mut Scene,
     console: &mut ConsoleLogs,
-    path: &str,
+    (path, nav): (&str, &NavigationGraph),
 ) {
     ui.add_space(8.0);
     let idle = editor.dev.lightmap_bake.is_none();
@@ -157,7 +157,7 @@ pub fn draw(
         start(editor, scene, console);
     }
     if occlusion.clicked() {
-        start_occlusion(editor, scene, console);
+        start_occlusion(editor, scene, console, nav);
     }
     draw_progress(ui, editor);
 }
@@ -181,104 +181,6 @@ pub(super) fn is_open_scene(editor: &EditorUi, card: &str) -> bool {
             ),
             (Ok(a), Ok(b)) if a == b
         )
-}
-
-/// Start the lightmap step of the live scene in the background. It writes to the
-/// open scene's file, never to whichever scene asset the card shows.
-fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
-    let Some(path) = editor.current_scene_path() else {
-        return not_started(
-            scene,
-            console,
-            "Generate Lighting failed: save the scene first".into(),
-        );
-    };
-    let settings = scene.lighting_settings.lightmaps;
-    match LightmapBakeJob::start(scene, Some(&path), settings, Some(scene_view(editor))) {
-        Ok(job) => {
-            console.info("Generating lighting in the background…".into());
-            warn_unsaved(scene, &path, console);
-            editor.dev.lightmap_bake = Some(ActiveBake {
-                step: Step::Lightmaps(job),
-                scene: scene.id(),
-                path: Some(path),
-            });
-            scene.lighting_bake_running = true; // a script's bake waits from now on
-            scene.lighting_bake_status = BakeStatus::Running(BakeProgress::starting("lighting"));
-        }
-        Err(e) => not_started(scene, console, format!("Generate Lighting failed: {e}")),
-    }
-}
-
-/// Say a bake never started because `line`, in the console and as the scene's
-/// status (`Lighting.GetBakeStatus`, #1999).
-fn not_started(scene: &mut Scene, console: &mut ConsoleLogs, line: String) {
-    console.error(line.clone());
-    scene.lighting_bake_status = BakeStatus::Refused(line);
-}
-
-/// A script's `Lighting.GenerateAsync()` (#1999): press the button for it, once.
-/// The verb refused what the button refuses when it was called, Play is refused
-/// while it waits (`Scene::play_refusal`, #2042), and File ▸ New and a load drop
-/// it (`Scene::drop_bake_request`); a button pressed since refuses it here.
-fn take_request(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
-    if !std::mem::take(&mut scene.lighting_bake_requested) {
-        return;
-    }
-    if editor.dev.lightmap_bake.is_none() {
-        return start(editor, scene, console);
-    }
-    let line = "Lighting.GenerateAsync: a bake was already running".to_string();
-    console.error(line.clone());
-    scene.lighting_bake_status = BakeStatus::Refused(line);
-}
-
-/// What the Scene view's camera sees, for the bake's Prioritize View (#1970). The
-/// lens at a 16:9 aspect: a little wider or narrower than the panel only moves
-/// which texels go first.
-fn scene_view(editor: &EditorUi) -> BakeView {
-    let camera = editor.scene_view.camera.camera();
-    BakeView {
-        eye: camera.position,
-        view_proj: camera.projection_matrix(16.0 / 9.0) * camera.view_matrix(),
-    }
-}
-
-/// Start Bake Occlusion (#1958) of the live scene on a worker: only Generate
-/// Lighting's last step, written beside the open scene's file.
-fn start_occlusion(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
-    let Some(path) = editor.current_scene_path() else {
-        return not_started(
-            scene,
-            console,
-            "Bake Occlusion failed: save the scene first".into(),
-        );
-    };
-    match OcclusionBakeJob::start(scene) {
-        Ok(job) => {
-            console.info("Baking occlusion culling in the background…".into());
-            warn_unsaved(scene, &path, console);
-            editor.dev.lightmap_bake = Some(ActiveBake {
-                step: Step::OcclusionOnly {
-                    job,
-                    path: path.clone(),
-                },
-                scene: scene.id(),
-                path: Some(path),
-            });
-            scene.lighting_bake_running = true;
-            scene.lighting_bake_status = BakeStatus::Running(BakeProgress::starting("occlusion"));
-        }
-        Err(e) => not_started(scene, console, format!("Bake Occlusion failed: {e}")),
-    }
-}
-
-/// Say when the scene file lacks a material the PVS will read (#1958): the next
-/// load of the file would read the bake as stale until the scene is saved.
-fn warn_unsaved(scene: &Scene, path: &str, console: &mut ConsoleLogs) {
-    if let Some(line) = unsaved_materials_warning(scene, path) {
-        console.warn(line);
-    }
 }
 
 #[cfg(test)]

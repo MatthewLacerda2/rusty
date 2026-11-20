@@ -18,12 +18,16 @@
 //! line (Unity's `Lightmapping.Bake`). Same path, so the two never drift.
 //!
 //! Both keep the PVS the scene holds when no input of its bake changed (#2348):
-//! a lamp moved, a probe added, an intensity changed re-bake no PVS. Bake
+//! a lamp moved (a shadow-casting one within its PVS cell, #2328), a probe added,
+//! an intensity changed re-bake no PVS. Bake
 //! Occlusion ([`bake_occlusion_only`]) always re-bakes.
 
 use crate::bake::lighting::{run_to_end, start_lighting, LightingBakeParams, LightingBakeReport};
 use crate::bake::lightmap::bake_scene_lightmaps_logged;
-use crate::bake::occlusion::{bake_occlusion_logged, generate_occlusion_logged, BakedOcclusion};
+use crate::bake::occlusion::summary::occlusion_summary;
+use crate::bake::occlusion::{
+    bake_occlusion_logged, generate_occlusion_logged, reach, BakedOcclusion,
+};
 use crate::bake::progress::{BakeLog, Step};
 use crate::bake::steps::LightingBake;
 use rusty_edit::{save_lighting, LightingSave, LIGHTING_IN_PLAY};
@@ -76,27 +80,6 @@ impl GenerateReport {
     }
 }
 
-/// The occlusion bake's part of the summary line: empty when nothing occludes.
-fn occlusion_summary(o: &OcclusionBakeReport, ms: u64) -> String {
-    let never = match o.never_culled {
-        0 => String::new(),
-        n => format!(", {n} never culled (too large to sample)"),
-    };
-    if o.too_large {
-        let max = rusty_scene::lighting::occlusion::MAX_CELL;
-        return format!(", no occlusion culling: the level needs cells over {max} m");
-    }
-    match o.cells {
-        0 => String::new(),
-        cells => format!(
-            ", occlusion over {cells} cell(s) of {:.1} m, {} object(s){never} ({} KiB, {ms} ms)",
-            o.cell_size,
-            o.objects,
-            o.bytes.div_ceil(1024),
-        ),
-    }
-}
-
 /// Bake lightmaps then probes with the scene's settings, and write the result.
 /// Errors when the scene was never saved, during Play (the bakes write the scene
 /// file, as a save does, #1340), or when a bake's own contract fails. The probes'
@@ -126,7 +109,7 @@ pub fn generate_lighting(
         let saved = write_lighting(scene, path)?;
         // The PVS file `finish` writes is occlusion's own output, and counts there.
         // An unchanged PVS is kept, not re-baked (#2348).
-        let occlusion = generate_occlusion_logged(scene, log)?;
+        let occlusion = generate_occlusion_logged(scene, reach(scene, nav), log)?;
         let lighting = (lightmaps, probes.report(), saved);
         let report = finish(scene, path, lighting, occlusion)?;
         log.finish();
@@ -180,8 +163,9 @@ pub fn finish(
             // The next save writes it ([`Scene::put_baked_occlusion`]); the bake is
             // reported now. A kept PVS is already the scene's, and owns its file.
             let (kept, cells) = (occlusion.kept, std::mem::take(&mut occlusion.cells));
+            let standable = occlusion.standable.take();
             occlusion.put_on(scene);
-            let measured = (&report, ms, &cells[..]);
+            let measured = (&report, ms, (&cells[..], standable.as_deref()));
             let written = (None, kept);
             super::report::occlusion::keep(scene, path, measured, written);
             (report, ms)
@@ -201,17 +185,19 @@ pub fn finish(
 /// occlusion from its own window. Bakes the open scene's PVS in line, applies it
 /// and writes it beside the scene at `scene_path`, touching no lightmap or probe.
 /// Refused as Generate Lighting is: during Play, while the editor's bake runs, and
-/// for a scene never saved.
+/// for a scene never saved. It samples the cells a camera can be in over `nav`
+/// (`occlusion::reach`).
 pub fn bake_occlusion_only(
     scene: &mut Scene,
     scene_path: Option<&str>,
+    nav: Option<&NavigationGraph>,
     log: &mut BakeLog,
 ) -> Result<OcclusionOnlyReport, String> {
     refuse_in_play(scene)?;
     refuse_while_baking(scene)?;
     let path = scene_path.ok_or(UNSAVED_OCCLUSION)?;
     log.plan(&[Step::Occlusion]);
-    let baked = bake_occlusion_logged(scene, log)?;
+    let baked = bake_occlusion_logged(scene, reach(scene, nav), log)?;
     let report = scene.unrecorded(|scene| apply_occlusion(scene, path, baked))?;
     log.finish();
     Ok(report)
@@ -253,11 +239,16 @@ pub fn apply_occlusion(
         ms: baked.ms,
     };
     let (kept, cells) = (baked.kept, std::mem::take(&mut baked.cells));
+    let standable = baked.standable.take();
     baked.put_on(scene);
     let saving = std::time::Instant::now();
     rusty_scene::lighting::occlusion::save_sidecar(scene, path)?;
     let saved = Some(saving.elapsed());
-    let measured = (&report.occlusion, report.ms, &cells[..]);
+    let measured = (
+        &report.occlusion,
+        report.ms,
+        (&cells[..], standable.as_deref()),
+    );
     super::report::occlusion::keep(scene, path, measured, (saved, kept));
     Ok(report)
 }

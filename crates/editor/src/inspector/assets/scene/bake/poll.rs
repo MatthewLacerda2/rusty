@@ -13,7 +13,7 @@ use super::Step;
 use crate::EditorUi;
 use rusty_dev::bake::generate_lighting::{apply_occlusion, finish, start_probes, write_lighting};
 use rusty_dev::bake::lightmap::BakeOutcome;
-use rusty_dev::bake::occlusion::OcclusionBakeJob;
+use rusty_dev::bake::occlusion::{reach, OcclusionBakeJob};
 use rusty_dev::bake::steps::PROBES_CHANGED;
 use rusty_edit::LightingSave;
 use rusty_navigation::NavigationGraph;
@@ -149,7 +149,7 @@ fn advance(
 ) -> Option<bool> {
     let job = match step {
         Step::Lightmaps(job) => job,
-        Step::Probes { .. } => return advance_probes(step, scene, log),
+        Step::Probes { .. } => return advance_probes(step, scene, log, nav),
         Step::Occlusion { .. } => return advance_occlusion(step, scene, log),
         Step::OcclusionOnly { .. } => return advance_occlusion_only(step, scene, log),
     };
@@ -197,9 +197,13 @@ fn land_lightmaps(
     }
 }
 
-/// One probe step; at the end, commit the probes, write the lighting and start the
-/// occlusion bake.
-fn advance_probes(step: &mut Step, scene: &mut Scene, log: &mut ConsoleLogs) -> Option<bool> {
+/// One probe step; at the end commit the probes, write the lighting, start the PVS.
+fn advance_probes(
+    step: &mut Step,
+    scene: &mut Scene,
+    log: &mut ConsoleLogs,
+    nav: &NavigationGraph,
+) -> Option<bool> {
     let Step::Probes {
         job,
         lightmaps,
@@ -222,7 +226,7 @@ fn advance_probes(step: &mut Step, scene: &mut Scene, log: &mut ConsoleLogs) -> 
             };
             let needs_save = saved == LightingSave::NeedsSceneSave;
             // An unchanged PVS is kept, not re-baked (#2348).
-            match OcclusionBakeJob::generate(scene) {
+            match OcclusionBakeJob::generate(scene, reach(scene, Some(nav))) {
                 Ok(occlusion) => {
                     *step = Step::Occlusion {
                         job: occlusion,
