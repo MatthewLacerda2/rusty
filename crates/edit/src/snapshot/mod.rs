@@ -1,4 +1,4 @@
-//! crates/edit/src/snapshot.rs — edit-mode snapshot / restore around Play
+//! crates/edit/src/snapshot/mod.rs — edit-mode snapshot / restore around Play
 //!
 //! "Save as-is in EDIT mode" guarantee: edit-mode is authoritative.
 //! - Entering Play -> snapshot the edit scene (clone); run Play on the live one.
@@ -87,11 +87,8 @@ impl SceneSnapshot {
 }
 
 #[cfg(test)]
-#[path = "snapshot_held_tests.rs"]
 mod held_tests;
 #[cfg(test)]
-#[path = "snapshot_linked_tests.rs"]
 mod linked_tests;
 #[cfg(test)]
-#[path = "snapshot_tests.rs"]
 mod tests;

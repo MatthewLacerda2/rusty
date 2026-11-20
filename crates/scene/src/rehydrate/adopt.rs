@@ -82,7 +82,7 @@ fn unbind(doc: &mut Entity) {
 /// ([`rehydrate_in`]). Either way its Mesh fields are held to range first, as a
 /// load holds them (`hold_fields`: an override or a hand-written file can set
 /// them out of range). An adopted mesh under [`Keep::Current`] then ends as a
-/// rebuilt one does ([`settle`]); under [`Keep::SameSource`] (Undo) it keeps its
+/// rebuilt one does (`settle`); under [`Keep::SameSource`] (Undo) it keeps its
 /// live bones and its recorded box. Whether its Mesh was rebuilt, so the caller
 /// binds its skeleton.
 pub fn adopt_or_rehydrate(
