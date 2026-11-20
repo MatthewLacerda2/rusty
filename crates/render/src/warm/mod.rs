@@ -22,13 +22,12 @@
 //! it; a step that meets one still being read, or lightmap pages still being read,
 //! makes nothing, and the host tries again on a later frame. What one step costs the
 //! frame is then one GPU upload: a mesh's buffers, a texture's levels and its mips
-//! drawn, or a page array. Nothing here releases, and a mesh a warm-up made stays
-//! resident while its `Warming` lives, through any release meanwhile (a scene that
+//! drawn, or a page array. Nothing here releases, and a mesh, texture or page list
+//! a warm-up made stays resident while its `Warming` lives, through any release meanwhile (a scene that
 //! opens the next load in its first tick): the old scene's meshes go at the end of
 //! the activated scene's first frame (`scene::residency`), so neither the scene
-//! still drawing nor the one warming loses one. A warmed mesh the activated scene
-//! does not use, or an abandoned warm-up's, goes at the next release. A warmed
-//! texture stays in its cache as any unused entry does.
+//! still drawing nor the one warming loses one. What a warm-up made that the
+//! activated scene does not use, or an abandoned warm-up's, goes at the next release.
 //!
 //! What it does not warm, and the new scene's first frame still makes: the material
 //! bind groups and object records (kept per scene, and the scene's identity is new
@@ -211,11 +210,13 @@ impl Renderer {
             }
             Item::Texture(map, kind) => {
                 let (map, kind) = (map.clone(), *kind);
+                self.retained.residency.warmed_map(&warming.token, &map);
                 self.warm_texture(warming, index, &map, kind)
             }
             Item::Lightmaps => {
                 let set = &data.lightmaps;
                 let lists = [&set.pages[..], &set.directions[..], &set.masks[..]];
+                (self.retained.residency).warmed_lightmaps(&warming.token, lists);
                 self.lightmaps.warm(&self.device, &self.queue, lists)
             }
         }

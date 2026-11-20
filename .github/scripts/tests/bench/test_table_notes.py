@@ -54,5 +54,14 @@ class Notes(unittest.TestCase):
         self.assertTrue(text.startswith("**levels/a**\n\nNothing moved"))
 
 
+class NoFloorLead(unittest.TestCase):
+    def test_with_no_floor_the_lead_lists_the_rows_largest_change_first(self):
+        main, pr = {"cpu_ms": 4.0, "gpu_ms": 2.0, "draws": 0.0}, {"cpu_ms": 4.4, "gpu_ms": 1.0, "draws": 3.0}
+        lines = table.lead(main, pr, {})
+        self.assertTrue(lines[0].startswith("No floor"))
+        self.assertEqual([line.split("`")[1] for line in lines[2:]], ["draws", "gpu_ms", "cpu_ms"],
+                         "from zero first, then -50%, then +10%")
+
+
 if __name__ == "__main__":
     unittest.main()

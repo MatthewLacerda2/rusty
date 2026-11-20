@@ -1,4 +1,4 @@
-//! crates/edit/src/snapshot.rs — edit-mode snapshot / restore around Play
+//! crates/edit/src/snapshot/mod.rs — edit-mode snapshot / restore around Play
 //!
 //! "Save as-is in EDIT mode" guarantee: edit-mode is authoritative.
 //! - Entering Play -> snapshot the edit scene (clone); run Play on the live one.
@@ -50,7 +50,9 @@ pub struct SceneSnapshot {
 
 impl SceneSnapshot {
     /// Snapshot the current (edit-mode) scene. Captures component VALUES only —
-    /// no GPU buffers — exactly like a save, but kept in memory.
+    /// no GPU buffers and no mesh geometry — exactly like a save, but kept in
+    /// memory: Stop takes the geometry back from the World Play leaves, or
+    /// rebuilds it from the reference.
     pub fn capture(scene: &Scene) -> Self {
         Self {
             data: to_scene_data(scene),
@@ -85,5 +87,8 @@ impl SceneSnapshot {
 }
 
 #[cfg(test)]
-#[path = "snapshot_tests.rs"]
+mod held_tests;
+#[cfg(test)]
+mod linked_tests;
+#[cfg(test)]
 mod tests;

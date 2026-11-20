@@ -50,7 +50,6 @@ use std::rc::Rc;
 
 use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
-use crate::gpu::textures::ui_sampler;
 use crate::gpu::{bind_layouts, ops::CountedDevice as _};
 use crate::GpuTexture;
 use rusty_asset::sidecar::FilterMode;
@@ -194,24 +193,6 @@ impl UiRenderer {
             mesh::UiSource::Font(f) => self.fonts.get(f).map(|a| &a.group),
         };
         group.unwrap_or(&self.white)
-    }
-
-    /// The bind group sampling `texture` (the white one for `None`), creating and
-    /// caching it on first use or when the texture behind the path changed.
-    fn bind_group(&mut self, device: &wgpu::Device, texture: Option<(&str, Rc<GpuTexture>)>) {
-        let Some((path, tex)) = texture else { return };
-        let fresh = self
-            .textures
-            .get(path)
-            .is_some_and(|(cached, _)| Rc::ptr_eq(cached, &tex));
-        if !fresh {
-            let sampler = self
-                .image_samplers
-                .entry(tex.filter)
-                .or_insert_with(|| ui_sampler(device, tex.filter));
-            let group = bind(device, &self.layout, &tex.view, sampler);
-            self.textures.insert(path.to_string(), (tex, group));
-        }
     }
 }
 

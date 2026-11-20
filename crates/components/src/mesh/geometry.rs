@@ -4,8 +4,50 @@
 //! vertices are megabytes the edit almost never touched. So a record keeps the
 //! mesh's saved fields and drops the heavy rehydrated ones; restoring takes the
 //! geometry back from the live mesh when it still comes from the same source.
+//!
+//! [`copies`] is a test hook (crates/CLAUDE.md): it counts the meshes this thread
+//! cloned with their geometry, for a restore's tests to hold its copies to,
+//! compiled in every build since those tests are `rusty-edit`'s, and counting
+//! only on a thread that asked once.
+
+use std::cell::Cell;
 
 use super::MeshComponent;
+
+thread_local! {
+    static ARMED: Cell<bool> = const { Cell::new(false) };
+    static COPIES: Cell<usize> = const { Cell::new(0) };
+}
+
+/// Meshes this thread cloned with geometry (a vertex or more) since the first
+/// call of this function on it, which starts the count.
+#[doc(hidden)]
+pub fn copies() -> usize {
+    ARMED.set(true);
+    COPIES.get()
+}
+
+/// A full copy: [`MeshComponent::without_geometry`]'s fields (every one named
+/// there) with the heavy ones cloned too, counted by [`copies`] when it has a
+/// vertex.
+impl Clone for MeshComponent {
+    fn clone(&self) -> Self {
+        if !self.vertices.is_empty() && ARMED.get() {
+            COPIES.set(COPIES.get() + 1);
+        }
+        Self {
+            vertices: self.vertices.clone(),
+            indices: self.indices.clone(),
+            ranges: self.ranges.clone(),
+            bind_palette: self.bind_palette.clone(),
+            skin: self.skin.clone(),
+            clips: self.clips.clone(),
+            pose_palette: self.pose_palette.clone(),
+            clusters: self.clusters.clone(),
+            ..self.without_geometry()
+        }
+    }
+}
 
 impl MeshComponent {
     /// This mesh with every saved field and every light runtime one copied, and its

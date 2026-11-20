@@ -7,8 +7,9 @@ use super::PrefabData;
 use rusty_components::{Entity, EntityRefs};
 use rusty_scene::Scene;
 
-/// Walk `root_id` + its descendants, deep-clone their bundles, remap to local
-/// (0-based) ids — rewriting `parent_id`/`children` through the map and detaching
+/// Walk `root_id` + its descendants, copy their saved documents (references
+/// only: a prefab never carries mesh geometry, which every stamp rebuilds from
+/// the reference, `World::saved_document`), remap to local (0-based) ids — rewriting `parent_id`/`children` through the map and detaching
 /// the root's own parent — and slice out every material the subtree names.
 /// Returns `None` if `root_id` is not a live entity.
 pub fn extract_prefab(scene: &Scene, root_id: u32) -> Option<PrefabData> {
@@ -19,7 +20,7 @@ pub fn extract_prefab(scene: &Scene, root_id: u32) -> Option<PrefabData> {
     // on them (#453) — the same strip a scene save does.
     let mut docs = collect_subtree(scene, root_id)
         .into_iter()
-        .map(|id| scene.world.entity_document(id))
+        .map(|id| scene.world.saved_document(id))
         .collect::<Option<Vec<_>>>()?;
     rusty_scene::skeleton::strip_bones(&mut docs);
 
