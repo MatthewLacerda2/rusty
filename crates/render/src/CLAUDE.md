@@ -93,7 +93,9 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   import splits a static mesh of at least `asset::clusters::MIN_TRIANGLES` into
   clusters and reorders its indices to match (`MeshComponent::clusters`, valid
   only at the revision it was built for, so an edit drops it), and its GPU mesh
-  carries a cluster table (`GpuMesh::clusters`). In phase two a batch of such a
+  leases rows of the renderer's one cluster table and a copy of its indices in one
+  pool (`GpuMesh::clusters`, `clusters::pool`), so each cluster stage is one
+  dispatch for the frame. In phase two a batch of such a
   mesh is drawn per instance from the camera's compacted cluster indices
   (`Culled::clusters`, `ClusterDraws`): `Renderer::draw_solids` does that for
   every opaque pass, so a new opaque pass gets it for free. Phase one still draws

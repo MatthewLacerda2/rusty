@@ -118,13 +118,14 @@ impl GameWorld {
         app.set_host_play(playing);
     }
 
-    /// Advance the simulation by `dt` seconds; the play-state transition is returned
-    /// for the platform (cursor grab). Every tick reads the UI's texture sizes after
-    /// the transition (the schedule's in Play, the edit frame's outside), so no loop
-    /// that ticks skips them, and ends by pushing the audio mix and advancing `dt`.
+    /// Advance the sim by `dt` seconds, returning the play transition for the platform
+    /// (cursor grab). Every tick reads the UI's texture sizes after the transition, so
+    /// no loop that ticks skips them, and ends by pushing the audio mix. An installed
+    /// probe times it from after the transition to its end.
     pub fn tick(&mut self, dt: f32) -> PlayTransition {
         self.tap(TapPoint::BeforeTick); // a demo's tap (#1581)
         let transition = self.transition_tapped();
+        self.probe_tick(true);
         let dt = self.tap_input(dt);
         // Publish input written since the last tick as this tick's edges (#416).
         self.resources.input.borrow_mut().begin_tick();
@@ -135,8 +136,7 @@ impl GameWorld {
             time.delta_time
         };
         if self.world.scene.borrow().is_playing() {
-            // The per-frame stages ([`Self::run_schedule_frame`]); `Startup` runs
-            // once, in `enter_play`.
+            // The per-frame stages; `Startup` runs once, in `enter_play`.
             self.resources.frame_dt = scaled_dt;
             self.refresh_ui_textures();
             self.run_schedule_frame();
@@ -147,7 +147,8 @@ impl GameWorld {
         self.sync_shader_time();
         self.push_audio(dt);
         self.start_loads(); // a `Scene.LoadAsync` this tick opened: prepared meanwhile
-        self.tap(TapPoint::AfterTick);
+        self.tap_timed(TapPoint::AfterTick);
+        self.probe_tick(false);
         transition
     }
 

@@ -1,7 +1,7 @@
 //! How many compute passes the `occlusion` stage records (#2327): the select's
 //! own, before phase one's depth draw, then one for the pyramid, the test, the
-//! compaction and the cluster cull (a dispatch per group, stage by stage), at
-//! one batch and at three;
+//! compaction and the cluster cull (one dispatch a stage for the frame,
+//! #2417), at one batch and at three;
 //! on a timed frame (#2401) one each for the pyramid, the test and each of the
 //! cluster cull's three stages (#2406). Timed or not, the cluster cull records
 //! the same dispatches in the same order, stage by stage.
@@ -49,17 +49,17 @@ fn stage_with(n: usize) -> Option<(u32, u32, u32, u64)> {
     let (untimed, order) = stage_timed(n, false)?;
     let (timed, timed_order) = stage_timed(n, true)?;
     assert_eq!(timed, untimed, "timing moved the cull");
-    // Every group's test, then every scan, then every copy, timed or not: the
-    // untimed path runs what the bench times.
-    let steps = super::stage::CLUSTER_STEPS.iter();
-    let staged: Vec<_> = steps.flat_map(|s| (0..n).map(move |g| (*s, g))).collect();
-    assert_eq!((&order, &timed_order), (&staged, &staged), "untimed, timed");
+    // One test, then one scan, then one copy, the same workgroups timed or
+    // not: the untimed path runs what the bench times.
+    let steps: Vec<_> = order.iter().map(|d| d.0).collect();
+    assert_eq!(steps, super::stage::CLUSTER_STEPS, "one dispatch a stage");
+    assert_eq!(order, timed_order, "untimed, timed");
     Some(untimed)
 }
 
-/// The settled frame's counts, and the (stage, group) dispatches its cluster
-/// cull recorded, in order.
-type Staged = ((u32, u32, u32, u64), Vec<(GpuPart, usize)>);
+/// The settled frame's counts, and the dispatches its cluster cull recorded, in
+/// order, each with its workgroups.
+type Staged = ((u32, u32, u32, u64), Vec<(GpuPart, (u32, u32))>);
 
 fn stage_timed(n: usize, timed: bool) -> Option<Staged> {
     let mut r = crate::test_gpu::culling::culling_or_skip(W, H)?;
@@ -77,10 +77,6 @@ fn stage_timed(n: usize, timed: bool) -> Option<Staged> {
     assert_eq!(
         clusters.runs_ran as usize, n,
         "each panel its own clustered run: {c:?}"
-    );
-    assert_eq!(
-        clusters.groups_ran as usize, n,
-        "each its own mesh: a group each"
     );
     let order = clusters.dispatched.borrow().clone();
     let passes = if timed { TIMED_PASSES } else { PASSES };
