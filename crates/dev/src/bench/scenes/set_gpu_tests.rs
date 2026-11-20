@@ -36,12 +36,16 @@ fn project() -> PathBuf {
         let mut t = yard.world.transform_mut(id).unwrap();
         (t.position, t.scale) = (at, size);
     }
-    // Crates before the wall: the cull skips a camera drawing fewer than
-    // `MIN_INSTANCES` (32) opaque instances (#2338).
+    // Crates in the camera's view (down -Z): the cull skips a camera drawing
+    // fewer than `MIN_INSTANCES` (32) opaque instances (#2338).
     for k in 0..32 {
         let id = create_entity(&mut yard, "Crate", Some(Primitive::Box));
         let mut t = yard.world.transform_mut(id).unwrap();
-        let at = Vec3::new((k % 8) as f32 * 0.5 - 1.75, 0.3 + (k / 8) as f32 * 0.5, 0.5);
+        let at = Vec3::new(
+            (k % 8) as f32 * 0.5 - 1.75,
+            0.5 + (k / 8) as f32 * 0.5,
+            -7.0,
+        );
         (t.position, t.scale) = (at, Vec3::splat(0.3));
     }
     let cam = yard.add_entity("Cam".into());
