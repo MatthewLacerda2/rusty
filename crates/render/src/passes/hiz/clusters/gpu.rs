@@ -1,28 +1,27 @@
-//! A mesh's clusters on the GPU (#1968): the table `hiz_clusters.wgsl` reads,
-//! made with the mesh's buffers at upload, and the CPU's copy of where each
-//! cluster's indices start, which a batch's run is matched against.
+//! A mesh's clusters on the GPU (#1968): its rows of the renderer's one cluster
+//! table and its indices in the pool (`pool`, #2417), leased at upload, and the
+//! CPU's copy of where each cluster's indices start, which a batch's run is
+//! matched against.
 
-use crate::gpu::ops::CountedDevice as _;
 use std::ops::Range;
-
-use wgpu::util::DeviceExt;
 
 use rusty_asset::clusters::Clusters;
 
-/// A resident mesh's clusters: their GPU table and the group 1 the cluster
-/// passes bind it and the mesh's indices through.
+use super::pool::Lease;
+
+/// A resident mesh's clusters: where they sit in the shared table and pool.
 pub(crate) struct GpuClusters {
-    /// Each cluster's index range, in order.
+    /// Each cluster's index range in the mesh's own indices, in order.
     pub(crate) runs: Vec<Range<u32>>,
-    /// The table `group` binds.
-    _table: wgpu::Buffer,
-    pub(crate) group: wgpu::BindGroup,
+    /// Its rows and pooled indices, given back when this is dropped.
+    pub(crate) lease: Lease,
 }
 
-/// `clusters` as `hiz_clusters.wgsl`'s `Cluster` rows (16 words each).
-pub(super) fn pack(clusters: &Clusters) -> Vec<[f32; 16]> {
+/// `clusters` as `hiz_clusters.wgsl`'s `Cluster` rows (16 words each), their
+/// first index moved by `base`, where the mesh's indices start in the pool.
+pub(super) fn pack(clusters: &Clusters, base: u32) -> Vec<[f32; 16]> {
     let one = |c: &rusty_asset::clusters::Cluster| {
-        let (first, count) = (c.indices.start, c.indices.len() as u32);
+        let (first, count) = (base + c.indices.start, c.indices.len() as u32);
         let [a, b, d] = c.min;
         let [e, f, g] = c.max;
         let [h, i, j] = c.apex;
@@ -36,50 +35,17 @@ pub(super) fn pack(clusters: &Clusters) -> Vec<[f32; 16]> {
 }
 
 impl GpuClusters {
-    /// The table of `clusters` over `indices` (the mesh's index buffer, which
-    /// they reordered), bound by `layout`.
-    pub(crate) fn new(
-        device: &wgpu::Device,
-        layout: &wgpu::BindGroupLayout,
-        clusters: &Clusters,
-        indices: &wgpu::Buffer,
-    ) -> Self {
-        let rows = pack(clusters);
-        let table = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Mesh Clusters"),
-            contents: bytemuck::cast_slice(&rows),
-            usage: wgpu::BufferUsages::STORAGE,
-        });
-        let group = device.counted_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Mesh Clusters"),
-            layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: table.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: indices.as_entire_binding(),
-                },
-            ],
-        });
-        let runs = clusters.list.iter().map(|c| c.indices.clone()).collect();
-        Self {
-            runs,
-            _table: table,
-            group,
-        }
-    }
-
     /// The clusters making up exactly the index run `run`, by their place in the
-    /// table: `None` when the run does not start and end on a cluster's edge.
+    /// shared table: `None` when the run does not start and end on a cluster's
+    /// edge.
     pub(crate) fn covering(&self, run: Range<u32>) -> Option<Range<u32>> {
-        cover(&self.runs, run)
+        let local = cover(&self.runs, run)?;
+        let first = self.lease.table.start;
+        Some(first + local.start..first + local.end)
     }
 }
 
-/// [`GpuClusters::covering`] over the cluster `runs`.
+/// The clusters of `runs` making up exactly the index run `run`, by their place.
 pub(super) fn cover(runs: &[Range<u32>], run: Range<u32>) -> Option<Range<u32>> {
     let lo = runs.partition_point(|c| c.start < run.start);
     let hi = runs.partition_point(|c| c.end <= run.end);
@@ -87,45 +53,54 @@ pub(super) fn cover(runs: &[Range<u32>], run: Range<u32>) -> Option<Range<u32>> 
     whole.then_some(lo as u32..hi as u32)
 }
 
-/// Whether an index buffer of `bytes` can be bound whole as storage under a
-/// device's `max_storage_buffer_binding_size` of `limit` (128 MiB by default,
-/// about 33.5M indices): past it, binding it is a validation panic.
-pub(super) fn binds(bytes: u64, limit: u64) -> bool {
-    bytes <= limit
-}
-
 impl crate::Renderer {
-    /// Give the resident mesh `id` the table of `clusters` (its import's, still
-    /// describing its geometry), or none. Clusters that don't end at its last
-    /// index are not its own, and are dropped; so are those of a mesh whose index
-    /// buffer is past the device's storage binding limit ([`binds`]), which the
-    /// cluster passes could not bind, and which then draws whole as before.
-    pub(crate) fn attach_clusters(&mut self, id: &crate::MeshId, clusters: Option<&Clusters>) {
-        let layout = &self.hiz.clusters.mesh_layout;
+    /// Give the resident mesh `id` the clusters of its import (still describing
+    /// its geometry, `indices`), or none. Clusters that don't end at its last
+    /// index are not its own, and are dropped. So are those the pool cannot
+    /// hold: its limit is the device's binding limit over every clustered mesh
+    /// resident in the session, not this mesh's alone. A mesh refused logs it
+    /// and is drawn whole (tested as one instance), and is not retried when a
+    /// lease frees room later; releasing meshes and retrying are #2440's.
+    pub(crate) fn attach_clusters(
+        &mut self,
+        id: &crate::MeshId,
+        (clusters, indices): (Option<&Clusters>, &[u32]),
+    ) {
         let Some(mesh) = self.gpu_meshes.get_mut(id) else {
             return;
         };
-        let limit = self.device.limits().max_storage_buffer_binding_size;
-        let fits = |c: &&Clusters| {
-            let own = c.list.last().map(|l| l.indices.end) == Some(mesh.num_indices);
-            own && binds(mesh.index_buffer.size(), limit)
+        // The old lease goes first, so its range is free for the new one.
+        mesh.clusters = None;
+        let own = |c: &&Clusters| {
+            let end = c.list.last().map(|l| l.indices.end);
+            end == Some(mesh.num_indices) && indices.len() as u32 == mesh.num_indices
         };
-        mesh.clusters = clusters
-            .filter(fits)
-            .map(|c| GpuClusters::new(&self.device, layout, c, &mesh.index_buffer));
+        let Some(clusters) = clusters.filter(own) else {
+            return;
+        };
+        let pipes = &mut self.hiz.clusters;
+        let at = (&self.device, &self.queue);
+        let lease = pipes
+            .pool
+            .lease(at, &pipes.pool_layout, (clusters, indices));
+        if lease.is_none() {
+            log::warn!(
+                "[Render] {}: its {} clusters do not fit the cluster pool under the device's \
+                 storage binding limit; it is drawn whole",
+                id.0,
+                clusters.list.len()
+            );
+        }
+        mesh.clusters = lease.map(|lease| GpuClusters {
+            runs: clusters.list.iter().map(|c| c.indices.clone()).collect(),
+            lease,
+        });
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{binds, cover};
-
-    #[test]
-    fn a_mesh_past_the_storage_binding_limit_gets_no_cluster_table() {
-        let limit = 128 << 20;
-        assert!(binds(limit, limit), "exactly the limit binds");
-        assert!(!binds(limit + 4, limit), "34M indices do not");
-    }
+    use super::cover;
 
     #[test]
     fn a_run_is_covered_only_when_it_starts_and_ends_on_cluster_edges() {

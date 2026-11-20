@@ -1,7 +1,7 @@
-//! The cluster cull's copy runs for kept clusters only (#2406): on a panel half
-//! behind a wall, the copy's indirect dispatch starts one workgroup per cluster
-//! kept, not one per cluster tested, and the index stream it writes is the
-//! mesh's own triangles in order, the same on two frames of one view.
+//! The cluster cull's copy (#2406, #2417): on a panel half behind a wall, it
+//! starts a workgroup per 64-cluster chunk, not one per cluster tested, and the
+//! index stream it writes from the shared pool is the mesh's own triangles in
+//! order, the same on two frames of one view.
 
 use glam::{Quat, Vec3};
 
@@ -11,7 +11,7 @@ use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::{Camera, Scene};
 
 #[test]
-fn gpu_the_copy_starts_a_workgroup_per_kept_cluster_and_writes_the_mesh_s_order() {
+fn gpu_the_copy_starts_a_workgroup_per_chunk_and_writes_the_mesh_s_order() {
     let Some(mut r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
         return;
     };
@@ -31,14 +31,13 @@ fn gpu_the_copy_starts_a_workgroup_per_kept_cluster_and_writes_the_mesh_s_order(
         let tally = words(&r, cull.tally());
         let drawn = words(&r, cull.args())[0] as usize;
         let indices = words(&r, cull.indices())[..drawn].to_vec();
-        (c.expect("four frames").cluster_tested, tally, indices)
+        let copy = cull.dispatched.borrow().last().map(|d| d.1);
+        let tested = c.expect("four frames").cluster_tested;
+        (tested, (tally[0], copy), indices)
     };
-    let (tested, tally, first) = stream();
-    let [kept, x, y, z] = tally[..4] else {
-        panic!("a count and one batch's copy dispatch: {tally:?}");
-    };
-    assert_eq!((y, z), (1, 1), "one instance's copy");
-    assert_eq!(x, kept, "a workgroup per kept cluster, of {tested} tested");
+    let (tested, (kept, copy), first) = stream();
+    let chunks = tested.div_ceil(crate::passes::hiz::clusters::plan::CHUNK);
+    assert_eq!(copy, Some((chunks, 1)), "a workgroup a chunk of {tested}");
     assert!(
         kept > 0 && kept < tested * 3 / 4,
         "the wall culls: {kept}/{tested}"

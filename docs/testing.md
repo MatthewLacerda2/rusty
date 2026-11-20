@@ -1106,8 +1106,10 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   Player stands 3 m in from its spawn, so the camera looks down the whole yard.
 - **the run** — 60 warm-up frames, then 600 measured ones, each stepped and rendered
   at 1280x720 (`Harness.LoadStress{…}` then `Harness.Bench(600)`).
-- **the report** — per row the average and p95: `frame_ms` (the sim's CPU time as
-  measured), `cpu_ms` (the same at a fixed reference CPU clock, below) and
+- **the report** — per row the average and p95: `frame_ms` (the CPU time of the
+  tick, `GameWorld::tick`, as measured, from after its play transition, so
+  entering Play, a load, is in no tick's time: the schedule and the tick's own work
+  around it), `cpu_ms` (the same at a fixed reference CPU clock, below) and
   `cpu_clock_pct` (the CPU clock it ran at), `renderer_ms` (CPU time recording the
   frame, as measured), `gpu_ms` and `gpu.<pass>` (GPU time
   at a fixed reference clock, below; `gpu_ms` is the passes' sum, busy time only,
@@ -1126,8 +1128,15 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   render-CPU fix whose timing moves inside the spread proves itself by these); then
   where the CPU time went, by name:
   `cpu.<system>` for every system the schedule runs, named as it registers them
-  (`update_scripts`, `step_physics`, … at the reference CPU clock, summing to
-  `cpu_ms`), and `render.<stage>` for every stage of the renderer's frame, summing
+  (`update_scripts`, `step_physics`, … at the reference CPU clock), with
+  `cpu.flush_bounds` (the collider-AABB flush after each stage, summed over the
+  stages) and `cpu.other` (the tick's work outside every system: publishing
+  input and finished async loads, the UI textures' sizes, the camera, shader-time
+  and audio sync, an async load's start, timer overhead), together summing to
+  `cpu_ms`; beside them, in no sum, `taps_ms` (the demo recorder's taps, `make
+  bench` only: `bench-scenes` records no demo), since `frame_ms` and `cpu_ms`
+  time only what a shipped, windowed game does on its tick (`docs/api/Debug.md`,
+  `frame_ms`); and `render.<stage>` for every stage of the renderer's frame, summing
   to `renderer_ms`: `setup`, `assets`, `prepare`, `extract` (the retained scene's
   update), `shadows` and `shadow_gather` (the sweeps' caster gather, cull and
   batch, a lap of its own, so absent from a frame no shadow sweep ran), `render_textures`, `ui` (its layout and its draw),
@@ -1139,8 +1148,14 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   land in `scene`, `solids` and the other pass rows, beside the screen cameras'.
   Last, `finish` (the
   frame's counters and its GPU timestamps' resolve). Each set ends with an `other`
-  row, what no part held: timer overhead, a few microseconds; a stage left
-  untimed would show there. The stages are timed only on frames the dev layer
+  row, what no part held: for `render.` and `gpu.` timer overhead, a few
+  microseconds, where a stage left untimed would show; for `cpu.` the tick's own
+  work above. A report from before `frame_ms` timed the whole tick (#2342) has
+  no `cpu.flush_bounds` and a `cpu.other` of zero, and its `cpu_ms` and
+  `frame_ms` are the systems' sum, lower by what those two rows now hold: compare
+  its `cpu.<system>` rows with today's, and its `cpu_ms` with today's less
+  `cpu.flush_bounds` and `cpu.other`; both `make bench` and `make bench-scenes`
+  warn when the kept run they compare with is such a report. The stages are timed only on frames the dev layer
   captures (`Renderer::time_stages`): the window, the editor and the player never
   pay for them. Every GPU pass prints every run (0 when it did not run), so the
   rows are stable. **The Hi-Z stage is also split into its parts** (#2401), on
@@ -1323,7 +1338,7 @@ every binary's open makes them.
   probes placed whose SH never loaded, or reflection probes placed with no cube on
   disk (what a scene does not place is not missing). Its
   lighting cost is then not the shipped one. The run ends with a summary table of
-  one line per scene: `cpu_ms` (the sim at the reference CPU clock), `frame_ms`,
+  one line per scene: `cpu_ms` (the tick at the reference CPU clock), `frame_ms`,
   `gpu_ms`, `load_ms`, `rss_peak_mb`, `gpu_mb`, and the run's `import_ms` under
   it when asked for.
 - **a fixed baseline**: `BEFORE=<dir>` compares with the kept report in `<dir>`

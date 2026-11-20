@@ -11,7 +11,7 @@ use super::{build, Resources, Stage, SystemProbe, World};
 
 type Log = Rc<RefCell<Vec<String>>>;
 
-/// Records what it saw instead of timing it.
+/// Records what it saw instead of timing it; its tick hooks are the defaults.
 struct Recorder(Log);
 
 impl SystemProbe for Recorder {
@@ -44,7 +44,11 @@ fn probe_sees_each_system_once_by_name_then_the_frame_end() {
         "{log:?}"
     );
     assert!(log.contains(&"LateUpdate:layout_ui".to_string()), "{log:?}");
-    let systems = log.iter().filter(|l| !l.starts_with("end@")).count();
+    let flushes = log.iter().filter(|l| l.ends_with(":flush_bounds"));
+    let flushed: Vec<_> = flushes.map(String::as_str).collect();
+    let stages = Stage::FRAME_ORDER.map(|s| format!("{s:?}:flush_bounds"));
+    assert_eq!(flushed, stages, "the AABB flush once per stage, by name");
+    let systems = log.iter().filter(|l| !l.starts_with("end@")).count() - flushed.len();
     let registered: usize = Stage::FRAME_ORDER
         .iter()
         .map(|s| build().into_schedule().system_names(*s).len())
@@ -75,4 +79,35 @@ fn a_closure_system_reports_a_generic_name() {
     let mut sched = super::Schedule::new();
     sched.add_system(Stage::Update, |_: &mut World, _: &mut Resources| {});
     assert_eq!(sched.system_names(Stage::Update), ["system"]);
+}
+
+/// The frame's AABB flush runs on both paths (#2342): a collider moved before the
+/// frame has its stored box at its new pose after it, probe or no probe.
+#[test]
+fn the_flush_stores_the_moved_box_with_and_without_a_probe() {
+    use glam::Vec3;
+    use rusty_components::{ColliderComponent, ColliderShape};
+    let stored = |probe: bool| {
+        let (mut w, mut r) = bare();
+        if probe {
+            r.probe = Some(Box::new(Recorder(Log::default())));
+        }
+        let id = {
+            let mut scene = w.scene.borrow_mut();
+            let world = &mut scene.world;
+            let id = world.spawn("box".into());
+            let mut col = ColliderComponent::from_mesh_bounds(false, Vec3::ZERO, Vec3::ZERO);
+            col.shape = ColliderShape::Box { size: Vec3::ONE };
+            world.set_collider(id, Some(col));
+            world.transform_mut(id).unwrap().position = Vec3::new(4.0, 0.0, 0.0);
+            id
+        };
+        build().into_schedule().run_frame(&mut w, &mut r);
+        let scene = w.scene.borrow();
+        let c = scene.world.collider(id).unwrap();
+        (c.aabb_min, c.aabb_max)
+    };
+    let moved = (Vec3::new(3.5, -0.5, -0.5), Vec3::new(4.5, 0.5, 0.5));
+    assert_eq!(stored(false), moved, "flushed with no probe");
+    assert_eq!(stored(true), moved, "flushed under the probe");
 }

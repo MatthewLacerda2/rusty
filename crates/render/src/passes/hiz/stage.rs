@@ -200,8 +200,8 @@ pub(super) const CLUSTER_STEPS: [GpuPart; 3] = [
 ];
 
 /// The cluster cull's parts: none without a clustered batch; untimed, one, its
-/// three stages in turn; timed, a pass per stage. Either way every group's test,
-/// then every scan, then every copy (`clusters::record::dispatch_order`, #2406).
+/// three stages in turn; timed, a pass per stage. Either way one test, one scan
+/// and one copy dispatch for the frame (`clusters::record`, #2417).
 fn cluster_parts(clustered: bool, split: bool) -> &'static [GpuPart] {
     match (clustered, split) {
         (false, _) => &[],

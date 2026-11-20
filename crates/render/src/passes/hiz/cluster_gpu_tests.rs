@@ -18,18 +18,33 @@ const N: u32 = 64;
 
 /// A clustered `N`×`N` panel, `size` metres square, its corner at `at`, facing
 /// +Z turned by `turn`.
-pub(super) fn panel(scene: &mut Scene, name: &str, (at, size, turn): (Vec3, f32, Quat)) -> u32 {
+pub(super) fn panel(scene: &mut Scene, name: &str, at: (Vec3, f32, Quat)) -> u32 {
+    panel_of(scene, (name, N), at)
+}
+
+/// [`panel`] cut `n`×`n` (at least 46, for the import's `MIN_TRIANGLES`).
+pub(super) fn panel_of(
+    scene: &mut Scene,
+    (name, n): (&str, u32),
+    (at, size, turn): (Vec3, f32, Quat),
+) -> u32 {
     let id = create_entity(scene, name, Some(Primitive::Plane));
-    let mut positions = Vec::new();
-    for y in 0..=N {
-        for x in 0..=N {
-            positions.push([x as f32, y as f32, 0.0]);
-        }
-    }
-    let at_ = |x: u32, y: u32| y * (N + 1) + x;
+    cut(scene, id, (name, n));
+    let mut t = scene.world.transform_mut(id).unwrap();
+    (t.position, t.rotation, t.scale) = (at, turn, Vec3::splat(size / n as f32));
+    drop(t);
+    id
+}
+
+/// Give `id` the geometry and clusters of an `n`×`n` unit-spaced grid at a new
+/// revision, as an import of the model `name` would.
+pub(super) fn cut(scene: &mut Scene, id: u32, (name, n): (&str, u32)) {
+    let row = |y| (0..=n).map(move |x| [x as f32, y as f32, 0.0]);
+    let positions: Vec<_> = (0..=n).flat_map(row).collect();
+    let at_ = |x: u32, y: u32| y * (n + 1) + x;
     let mut indices = Vec::new();
-    for y in 0..N {
-        for x in 0..N {
+    for y in 0..n {
+        for x in 0..n {
             let (a, b, c, d) = (at_(x, y), at_(x + 1, y), at_(x + 1, y + 1), at_(x, y + 1));
             indices.extend([a, b, c, a, c, d]);
         }
@@ -45,11 +60,6 @@ pub(super) fn panel(scene: &mut Scene, name: &str, (at, size, turn): (Vec3, f32,
     mesh.indices = indices;
     mesh.revision = MeshRevision::next();
     mesh.clusters = Some((mesh.revision, Arc::new(clusters)));
-    drop(mesh);
-    let mut t = scene.world.transform_mut(id).unwrap();
-    (t.position, t.rotation, t.scale) = (at, turn, Vec3::splat(size / N as f32));
-    drop(t);
-    id
 }
 
 /// Indices the base camera's last frame drew by cluster, summed over its jobs.
@@ -86,17 +96,10 @@ fn gpu_a_wall_hides_half_a_panel_and_only_the_visible_half_is_drawn() {
     };
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    block(
-        &mut scene,
-        "Wall",
-        Vec3::new(-9.0, -3.0, -0.2),
-        Vec3::new(0.0, 12.0, 0.2),
-    );
-    panel(
-        &mut scene,
-        "Panel",
-        (Vec3::new(-6.0, -2.0, -5.0), 12.0, Quat::IDENTITY),
-    );
+    let (lo, hi) = (Vec3::new(-9.0, -3.0, -0.2), Vec3::new(0.0, 12.0, 0.2));
+    block(&mut scene, "Wall", lo, hi);
+    let at = (Vec3::new(-6.0, -2.0, -5.0), 12.0, Quat::IDENTITY);
+    panel(&mut scene, "Panel", at);
     let cam = Camera::new(Vec3::new(0.0, 1.0, 8.0), -90.0, 0.0);
     let (_, half, same) = on_and_off(&mut r, &scene, &cam);
     assert!(same, "cluster culling moved pixels");
@@ -116,11 +119,7 @@ fn gpu_a_wall_hides_half_a_panel_and_only_the_visible_half_is_drawn() {
     // With nothing in front and all of it on screen, every cluster is drawn.
     let mut open = Scene::new();
     open.skybox_path = String::new();
-    panel(
-        &mut open,
-        "Panel",
-        (Vec3::new(-6.0, -2.0, -5.0), 12.0, Quat::IDENTITY),
-    );
+    panel(&mut open, "Panel", at);
     let far = Camera::new(Vec3::new(0.0, 4.0, 30.0), -90.0, 0.0);
     let (_, drawn, same) = on_and_off(&mut r, &open, &far);
     assert!(same, "cluster culling moved pixels with nothing hidden");

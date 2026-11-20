@@ -819,7 +819,14 @@ is wholly behind depth the camera drew this frame.
   without `gpu_occlusion_culling`: a preset that wants it names both
   ([`Graphics`](Graphics.md), *Quality presets*). A split mesh is
   drawn once per instance, not instanced, so many copies of one big mesh cost a
-  draw each; past a per-camera budget (8M indices) a batch is tested whole.
+  draw each; past a per-camera budget (8M indices) a batch is tested whole. Every split
+  mesh resident in the session shares one cluster table and one index pool, each
+  held under the GPU's storage-binding limit (128 MiB on most devices: about 33.5M
+  indices or 2M clusters in all), and loaded meshes stay resident across scene
+  loads. So the limit is on the total, not on one mesh: a mesh that would pass it
+  logs `does not fit the cluster pool under the device's storage binding limit; it
+  is drawn whole` and is culled only as a whole instance, and it is not retried
+  when room frees later (releasing meshes across loads, and retrying, are #2440).
 - **Measure** with `Debug.Stats().hiz_tested`, `hiz_culled` and `hiz_late` (read
   back a frame or so late), and `cluster_tested` / `cluster_culled` for the clusters. What it
   costs is `gpu_passes.occlusion` and, in a bench, its parts' rows
