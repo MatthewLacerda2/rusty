@@ -221,7 +221,7 @@ impl NavigationGraph {
         // A bake that re-shapes the grid during Play is still the play loop's navmesh.
         *self = Self {
             bake_generation: self.bake_generation,
-            tracked_scene: self.tracked_scene,
+            tracked_scene: self.tracked_scene.clone(),
             static_watch: self.static_watch.take(),
             requests: std::mem::take(&mut self.requests),
             ..Self::new(b.min_x, b.max_x, b.min_z, b.max_z, spacing)

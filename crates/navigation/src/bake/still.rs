@@ -136,9 +136,10 @@ impl NavigationGraph {
 
     /// The navmesh of a scene as it is loaded (#1887): its saved navmesh
     /// (`Scene::navmesh`) when it still matches the scene ([`Self::restore`]), else
-    /// a full [`Self::bake`], with one warning when a saved one was refused. The one
-    /// way a loaded scene gets its navmesh: boot ([`Self::from_scene`]), Play's first
-    /// tick and a play-mode `Scene.Load` ([`Self::start_tracked`]), and Stop.
+    /// a full [`Self::bake`], with one warning when a saved one was refused
+    /// ([`Start::Refused`]). The one way a loaded scene gets its navmesh: boot
+    /// ([`Self::from_scene`]), Play's first tick and a play-mode `Scene.Load`
+    /// ([`Self::start_tracked`]), and Stop.
     pub fn restore_or_bake(&mut self, scene: &Scene) -> Start {
         let Some(bytes) = scene.navmesh.bytes.clone() else {
             self.bake(scene);
@@ -149,7 +150,7 @@ impl NavigationGraph {
             Err(why) => {
                 log::warn!("[Navigation] the saved navmesh was refused ({why}): baking it");
                 self.bake(scene);
-                Start::Baked
+                Start::Refused(why)
             }
         }
     }
@@ -172,7 +173,7 @@ impl NavigationGraph {
             _ => self.restore_or_bake(scene),
         };
         self.static_watch = Some(watch);
-        self.tracked_scene = Some((scene.id(), start));
+        self.tracked_scene = Some((scene.id(), start.clone()));
         start
     }
 
@@ -187,21 +188,27 @@ impl NavigationGraph {
     /// Whether [`Self::start_tracked`] last started on `scene` (a play-mode
     /// `Scene.Load` swaps in another, which starts afresh).
     pub fn tracks(&self, scene: &Scene) -> bool {
-        self.tracked_scene.is_some_and(|(id, _)| id == scene.id())
+        self.tracked_scene
+            .as_ref()
+            .is_some_and(|(id, _)| *id == scene.id())
     }
 
     /// How the last [`Self::start_tracked`] made the navmesh: restored, so no bake
-    /// ran on that tick, or baked; `None` before the first.
+    /// ran on that tick, baked, or baked because the saved one was refused
+    /// ([`Start::Refused`], with why); `None` before the first.
     pub fn last_start(&self) -> Option<Start> {
-        self.tracked_scene.map(|(_, start)| start)
+        self.tracked_scene.as_ref().map(|(_, start)| start.clone())
     }
 }
 
 /// How [`NavigationGraph::start_tracked`] made the navmesh.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Start {
     /// From the scene's saved navmesh: no bake ran.
     Restored,
-    /// By a full bake.
+    /// By a full bake: the scene saved no navmesh.
     Baked,
+    /// By a full bake, the scene's saved navmesh refused for the reason it holds
+    /// (stale, or the decoder's words): the navmesh on disk was not used.
+    Refused(String),
 }
