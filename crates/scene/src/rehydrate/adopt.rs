@@ -80,7 +80,7 @@ pub fn unbind(doc: &mut Entity) {
 }
 
 /// Give `doc` (recorded without geometry) its live entity's geometry where `keep`
-/// holds ([`take_live`]), and rebuild it from its reference otherwise. Whether its
+/// holds (`take_live`), and rebuild it from its reference otherwise. Whether its
 /// Mesh was rebuilt, so the caller binds its skeleton.
 pub fn adopt_or_rehydrate(
     world: &mut World,
@@ -100,7 +100,7 @@ pub fn adopt_or_rehydrate(
 /// `keep` holds for the two, and its collider's own meshes by
 /// [`restore_collider_meshes`]. `false` when `doc`'s Mesh must be rebuilt instead
 /// (with its collider, by `rehydrate_entity_mesh`).
-pub fn take_live(world: &mut World, doc: &mut Entity, keep: Keep, imports: &mut Imports) -> bool {
+fn take_live(world: &mut World, doc: &mut Entity, keep: Keep, imports: &mut Imports) -> bool {
     if let Some(mesh) = &mut doc.mesh {
         let Some(mut live) = world.mesh_mut(doc.id) else {
             return false;

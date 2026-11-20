@@ -97,14 +97,14 @@ pub(super) fn propagate_roots(
     applying: bool,
     imports: &mut Imports,
 ) {
-    let mut pass = Pass::new(imports);
+    let mut pass = Pass::new(imports, applying);
     let mut rebuilt = false;
     for root in roots {
         let Ok(source) = link_source(scene, root) else {
             continue;
         };
         if let Some(prefab) = pass.source(&source) {
-            let done = rebuild_instance(scene, root, &source, &prefab, true, applying, &mut pass);
+            let done = rebuild_instance(scene, root, &source, &prefab, true, &mut pass);
             rebuilt |= done.is_ok();
         }
     }

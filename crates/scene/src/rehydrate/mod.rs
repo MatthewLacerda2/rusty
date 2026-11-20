@@ -15,7 +15,7 @@ mod imports;
 mod rebuilt;
 mod warned;
 
-pub use adopt::{adopt_or_rehydrate, take_live, unbind, Keep};
+pub use adopt::{adopt_or_rehydrate, unbind, Keep};
 pub use collider::{refit_collider, Which};
 #[doc(hidden)]
 pub use counts::rebuilds;

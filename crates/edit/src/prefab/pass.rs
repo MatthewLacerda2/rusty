@@ -24,6 +24,9 @@ use rusty_scene::Scene;
 /// One pass's sources, baselines and lookups.
 pub(super) struct Pass<'a> {
     pub(super) imports: &'a mut Imports,
+    /// Whether a document is being applied (a load, a Play snapshot:
+    /// `structure::reshape`).
+    pub(super) applying: bool,
     sources: BTreeMap<String, Option<PrefabData>>,
     baselines: BTreeMap<String, BTreeMap<u32, Entity>>,
     /// The material keys the baselines' merges added, dropped at [`Self::finish`]
@@ -32,9 +35,10 @@ pub(super) struct Pass<'a> {
 }
 
 impl<'a> Pass<'a> {
-    pub(super) fn new(imports: &'a mut Imports) -> Self {
+    pub(super) fn new(imports: &'a mut Imports, applying: bool) -> Self {
         Self {
             imports,
+            applying,
             sources: BTreeMap::new(),
             baselines: BTreeMap::new(),
             added: Vec::new(),

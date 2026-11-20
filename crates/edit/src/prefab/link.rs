@@ -82,8 +82,8 @@ pub(super) fn propagate_from(
     prefab: &PrefabData,
 ) -> Result<(), String> {
     let mut imports = Imports::default();
-    let mut pass = Pass::new(&mut imports);
-    rebuild_instance(scene, root_id, source, prefab, true, false, &mut pass)?;
+    let mut pass = Pass::new(&mut imports, false);
+    rebuild_instance(scene, root_id, source, prefab, true, &mut pass)?;
     pass.finish(scene);
     finish_rebuild(scene);
     Ok(())
@@ -91,9 +91,9 @@ pub(super) fn propagate_from(
 
 /// Rebuild every entity of the instance at `root_id` from `prefab` (its `source` as
 /// already read), re-applying its overrides when `keep` and dropping them
-/// otherwise (a removed part's among them, so it comes back). `applying` says a
-/// document is being applied (`structure::reshape`). The baselines and lookups
-/// come from `pass`. Leaves out the whole-scene passes ([`finish_rebuild`],
+/// otherwise (a removed part's among them, so it comes back). The baselines and
+/// lookups come from `pass`, and whether a document is being applied
+/// (`structure::reshape`). Leaves out the whole-scene passes ([`finish_rebuild`],
 /// [`Pass::finish`]), which a caller rebuilding many instances runs once after
 /// them (`restamp::propagate_roots`).
 pub(super) fn rebuild_instance(
@@ -102,7 +102,6 @@ pub(super) fn rebuild_instance(
     source: &str,
     prefab: &PrefabData,
     keep: bool,
-    applying: bool,
     pass: &mut Pass,
 ) -> Result<(), String> {
     let mut ids = require_instance(scene, root_id)?;
@@ -115,7 +114,7 @@ pub(super) fn rebuild_instance(
     }
     rekey(&mut scene.world, &ids, prefab);
     if is_model_source(source) {
-        ids = reshape(scene, root_id, &ids, source, prefab, applying);
+        ids = reshape(scene, root_id, &ids, source, prefab, pass.applying);
     }
     let baselines = pass.baselines(scene, source, prefab);
     let baselines = in_instance_space(scene, &ids, baselines);
@@ -143,8 +142,8 @@ pub fn revert_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<(), 
     let source = link_source(scene, root_id)?;
     let prefab = read_source(&source)?;
     let mut imports = Imports::default();
-    let mut pass = Pass::new(&mut imports);
-    rebuild_instance(scene, root_id, &source, &prefab, false, false, &mut pass)?;
+    let mut pass = Pass::new(&mut imports, false);
+    rebuild_instance(scene, root_id, &source, &prefab, false, &mut pass)?;
     pass.finish(scene);
     finish_rebuild(scene);
     Ok(())
