@@ -1,7 +1,8 @@
 //! crates/render/src/scene/residency/mod.rs — which GPU meshes stay resident (#2440): a
 //! mesh is released once no loaded scene references it, on a load that replaced
 //! the World, as Unity's non-additive `SceneManager.LoadScene` unloads what the
-//! scene before it alone used.
+//! scene before it alone used. Textures and lightmap page arrays are released at
+//! the same moment under the same rule (`maps`).
 //!
 //! - **When**: at the end of a main-view frame (`Renderer::render`, outside
 //!   `aside`, so no preview or capture) that drew a scene identity the last one
@@ -34,10 +35,11 @@
 //!   upload.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 use super::MeshHandle;
 use crate::{MeshId, Renderer};
+use rusty_asset::MapRef;
 use rusty_scene::{Scene, SceneId};
 
 /// What decides the next release.
@@ -51,9 +53,15 @@ pub(crate) struct Residency {
     particles: BTreeMap<SceneId, BTreeSet<MeshHandle>>,
     /// Meshes resident without clusters because the pool was full.
     pub(crate) refused: BTreeSet<MeshId>,
-    /// Per pending `Scene.LoadAsync` warm-up (alive while its `Warming` is), the
-    /// meshes it made: used until its load swaps in or is abandoned.
-    warmed: Vec<(Weak<()>, BTreeSet<MeshId>)>,
+    /// Per pending `Scene.LoadAsync` warm-up (alive while its `Warming` is), what
+    /// it made: used until its load swaps in or is abandoned.
+    warmed: Vec<maps::Warmed>,
+    /// Per kept scene, the maps its UI, particles, ribbons and sky loaded (`maps`).
+    maps: BTreeMap<SceneId, BTreeSet<MapRef>>,
+    /// Per kept scene, the lightmap page lists it last bound (`maps`).
+    lightmaps: BTreeMap<SceneId, [Vec<String>; 3]>,
+    /// Whether this render's holders note what they bind (`notes`).
+    notes: notes::Gate,
 }
 
 impl Residency {
@@ -71,25 +79,39 @@ impl Residency {
         Some(left)
     }
 
+    /// Whether the main view's frame of `scene` steps into Play on the scene it
+    /// drew last: the scene the step holds, with its content still in the World.
+    fn enters_play(&self, scene: &Scene) -> bool {
+        scene.is_playing() && self.main == Some((scene.id(), false))
+    }
+
     /// The warm-up alive as `token` made mesh `id`.
     pub(crate) fn warmed(&mut self, token: &Arc<()>, id: MeshId) {
-        let at = (self.warmed.iter()).position(|(w, _)| w.as_ptr() == Arc::as_ptr(token));
+        self.warmup(token).meshes.insert(id);
+    }
+
+    /// The notes of the warm-up alive as `token`, made on its first.
+    fn warmup(&mut self, token: &Arc<()>) -> &mut maps::Warmed {
+        let at = (self.warmed.iter()).position(|w| w.token.as_ptr() == Arc::as_ptr(token));
         let at = at.unwrap_or_else(|| {
-            self.warmed.push((Arc::downgrade(token), BTreeSet::new()));
+            self.warmed.push(maps::Warmed::new(token));
             self.warmed.len() - 1
         });
-        self.warmed[at].1.insert(id);
+        &mut self.warmed[at]
     }
 
-    /// What the warm-ups still alive made; a dropped one's notes go.
-    fn warming(&mut self) -> impl Iterator<Item = &MeshId> {
-        self.warmed.retain(|(token, _)| token.strong_count() > 0);
-        self.warmed.iter().flat_map(|(_, ids)| ids)
+    /// The warm-ups still alive; a dropped one's notes go.
+    fn warming(&mut self) -> &[maps::Warmed] {
+        self.warmed.retain(|w| w.token.strong_count() > 0);
+        &self.warmed
     }
 
-    /// Scene `id`'s objects are gone: so are its particles' notes.
+    /// Scene `id`'s objects are gone: so are its particles', maps' and lightmaps'
+    /// notes.
     pub(super) fn forget(&mut self, id: SceneId) {
         self.particles.remove(&id);
+        self.maps.remove(&id);
+        self.lightmaps.remove(&id);
     }
 }
 
@@ -120,6 +142,9 @@ impl Renderer {
         if self.is_aside() {
             return;
         }
+        if self.retained.residency.enters_play(scene) {
+            self.note_held_maps(scene);
+        }
         let residency = &mut self.retained.residency;
         let Some(left) = residency.drew(scene.id(), scene.is_playing()) else {
             return;
@@ -131,6 +156,8 @@ impl Renderer {
         if released.clustered {
             self.retry_refused(scene);
         }
+        self.release_unused_textures(scene);
+        self.release_unused_lightmaps();
     }
 
     /// Drop scene `id`'s retained objects, records and param buffers.
@@ -152,7 +179,8 @@ impl Renderer {
         let mut used: BTreeSet<MeshId> = (used.into_iter())
             .map(|h| retained.meshes.id(h).clone())
             .collect();
-        used.extend(retained.residency.warming().cloned());
+        let warming = retained.residency.warming().iter();
+        used.extend(warming.flat_map(|w| &w.meshes).cloned());
         let gone: Vec<MeshId> = (self.gpu_meshes.keys())
             .filter(|id| !used.contains(id))
             .cloned()
@@ -234,8 +262,23 @@ mod tests {
     }
 }
 
+mod maps;
+pub(crate) mod notes;
+
 #[cfg(test)]
 mod gpu_tests;
 
 #[cfg(test)]
 mod edges_gpu_tests;
+
+#[cfg(test)]
+mod maps_gpu_tests;
+
+#[cfg(test)]
+mod holders_gpu_tests;
+
+#[cfg(test)]
+mod held_gpu_tests;
+
+#[cfg(test)]
+mod notes_gpu_tests;
