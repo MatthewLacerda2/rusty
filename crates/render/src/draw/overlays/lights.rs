@@ -11,8 +11,8 @@ use rusty_scene::lighting::area::AreaShape;
 use rusty_scene::{LightType, Scene};
 
 /// An Area light's gizmo tint: a pale yellow, brighter when selected.
-const AREA_TINT: [f32; 4] = [1.0, 0.95, 0.5, 0.6];
-const AREA_SELECTED_TINT: [f32; 4] = [1.0, 0.95, 0.5, 1.0];
+pub(super) const AREA_TINT: [f32; 4] = [1.0, 0.95, 0.5, 0.6];
+pub(super) const AREA_SELECTED_TINT: [f32; 4] = [1.0, 0.95, 0.5, 1.0];
 /// Length of the facing arrow, in world units.
 const ARROW: f32 = 0.5;
 
