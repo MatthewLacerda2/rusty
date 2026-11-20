@@ -63,28 +63,7 @@ pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
         version: r.u32()?,
         never_culled: r.u32()?,
     };
-    let count = r.u32()? as usize;
-    let mut objects = Vec::with_capacity(count.min(bytes.len() / 13));
-    for _ in 0..count {
-        let entity = r.u32()?;
-        let fingerprint = u64::from_le_bytes(r.array()?);
-        let occluder = match r.take(1)?[0] {
-            0 => false,
-            1 => true,
-            other => return Err(format!("occluder flag {other}")),
-        };
-        objects.push(BakedObject {
-            entity,
-            fingerprint,
-            occluder,
-        });
-    }
-    if stamp.never_culled as usize > objects.len() {
-        return Err(format!(
-            "{} never culled of {count} objects",
-            stamp.never_culled
-        ));
-    }
+    let objects = read_objects(&mut r, bytes.len(), stamp)?;
     let origin = Vec3::new(r.f32()?, r.f32()?, r.f32()?);
     let cell = r.f32()?;
     let dims = UVec3::new(r.u32()?, r.u32()?, r.u32()?);
@@ -199,6 +178,34 @@ impl Scene {
         self.bake_files.baked(SUFFIX);
         *self.occlusion = data.map(Arc::new);
     }
+}
+
+/// The baked objects after the stamp, refused when `stamp` counts more never
+/// culled than there are; `len` the file's, to bound what a bad count reserves.
+fn read_objects(r: &mut Reader, len: usize, stamp: BakeStamp) -> Result<Vec<BakedObject>, String> {
+    let count = r.u32()? as usize;
+    let mut objects = Vec::with_capacity(count.min(len / 13));
+    for _ in 0..count {
+        let entity = r.u32()?;
+        let fingerprint = u64::from_le_bytes(r.array()?);
+        let occluder = match r.take(1)?[0] {
+            0 => false,
+            1 => true,
+            other => return Err(format!("occluder flag {other}")),
+        };
+        objects.push(BakedObject {
+            entity,
+            fingerprint,
+            occluder,
+        });
+    }
+    if stamp.never_culled as usize > objects.len() {
+        return Err(format!(
+            "{} never culled of {count} objects",
+            stamp.never_culled
+        ));
+    }
+    Ok(objects)
 }
 
 fn put(out: &mut Vec<u8>, v: u32) {
