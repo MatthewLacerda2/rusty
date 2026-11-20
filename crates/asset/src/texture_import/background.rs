@@ -22,7 +22,7 @@ thread_local! {
 }
 
 /// From now on, a model this thread converts has its extracted textures queued
-/// ([`queue_extracted`]): the editor's, whose scene loads, instancing and API
+/// (`queue_extracted`): the editor's, whose scene loads, instancing and API
 /// imports convert on its main thread. Elsewhere (`make import`, an export, a
 /// test) the caller makes them itself with `refresh_all`, on its own thread; the
 /// editor's Play refresh does too, and the cache's lock keeps it and the worker
@@ -55,7 +55,7 @@ pub(super) fn take_queued() -> Vec<PathBuf> {
 /// it names: the editor watch's refresh (`convert::refresh_changed`). Only the
 /// files the watch sees (`refresh::files`): a texture a model extracted lies in
 /// the import cache the watch ignores, and is queued by its conversion instead
-/// ([`queue_extracted`]).
+/// (`queue_extracted`).
 pub fn queue_changed(root: &Path, changed: &Stale) {
     if changed.is_empty() {
         return;
