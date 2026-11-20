@@ -50,20 +50,25 @@ fn the_stamp_serialises_with_every_field_named() {
 
 #[test]
 fn registering_another_build_warns_once_and_keeps_the_first() {
-    let other = "0000000000000000";
-    let logged = rusty_test_support::logs::during(|| {
-        register_built(other);
-        register_built(on_disk().unwrap());
+    // Alone: `BUILT` is the process's, set once by whoever registers first.
+    rusty_test_support::alone!(|| {
+        let other = "0000000000000000";
+        let logged = rusty_test_support::logs::during(|| {
+            register_built(other);
+            register_built(on_disk().unwrap());
+        });
+        assert_eq!(stamp().content_built.as_deref(), Some(other));
+        assert_eq!(stamp().content_matches, Some(false));
+        let warnings: Vec<_> = logged.iter().filter(|l| l.contains(other)).collect();
+        assert_eq!(warnings.len(), 1, "{logged:?}");
     });
-    assert_eq!(stamp().content_built.as_deref(), Some(other));
-    assert_eq!(stamp().content_matches, Some(false));
-    let warnings: Vec<_> = logged.iter().filter(|l| l.contains(other)).collect();
-    assert_eq!(warnings.len(), 1, "{logged:?}");
 }
 
 #[test]
 fn an_unstamped_process_never_reads_the_folder() {
-    // No `register_built` in this process: nothing to compare, so nothing hashed.
-    assert_eq!(stamp(), EngineStamp::of(None, None));
-    assert!(FOUND.get().is_none(), "the folder was hashed");
+    // Alone: a sibling hashing the folder or registering a build sets `FOUND`.
+    rusty_test_support::alone!(|| {
+        assert_eq!(stamp(), EngineStamp::of(None, None));
+        assert!(FOUND.get().is_none(), "the folder was hashed");
+    });
 }

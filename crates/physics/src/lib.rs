@@ -17,6 +17,7 @@ mod assemble;
 #[cfg(test)]
 mod ccd_tests;
 mod character;
+mod collider_ids;
 mod compound;
 #[cfg(test)]
 mod compound_tests;
@@ -58,6 +59,7 @@ pub use character::bench as character_bench;
 pub use character::{can_stand, move_character, CharacterMove, ControllerHit};
 pub use events::collision::{CollisionEvents, CollisionPair, Contact};
 pub use events::trigger::TriggerEvents;
+pub use follow::check_kept_bones;
 pub use joints::JointBreak;
 #[doc(hidden)]
 pub use query::convex_fixture::turned_hull;
