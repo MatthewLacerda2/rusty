@@ -9,11 +9,17 @@ fn bytes() -> Vec<u8> {
     encode(&bake_occlusion(&corridors(), 2).0.expect("occluders"))
 }
 
-/// Where the objects start: the magic, the stamp's two words, the count.
-const OBJECTS_AT: usize = 16;
+/// Where the objects start: the magic, the stamp (version, never culled, floor
+/// source, baked cells, reach hash, bounds), the count.
+const OBJECTS_AT: usize = 56;
+/// Where the stamp's floor source, baked cells and bounds are.
+const FLOOR_AT: usize = 12;
+const BAKED_AT: usize = 16;
+const REACH_AT: usize = 20;
+const BOUNDS_AT: usize = 28;
 
 fn object_count(bytes: &[u8]) -> usize {
-    u32::from_le_bytes(bytes[12..16].try_into().unwrap()) as usize
+    u32::from_le_bytes(bytes[52..56].try_into().unwrap()) as usize
 }
 
 #[test]
@@ -29,6 +35,35 @@ fn a_never_culled_count_past_the_objects_is_refused() {
     let past = object_count(&bytes) as u32 + 1;
     bytes[8..12].copy_from_slice(&past.to_le_bytes());
     assert!(decode(&bytes).unwrap_err().contains("never culled"));
+}
+
+#[test]
+fn a_stamp_out_of_range_is_refused() {
+    let bytes = bytes();
+    let mut floor = bytes.clone();
+    floor[FLOOR_AT..FLOOR_AT + 4].copy_from_slice(&2u32.to_le_bytes());
+    assert_eq!(decode(&floor), Err("floor source out of range".into()));
+    let mut baked = bytes.clone();
+    baked[BAKED_AT..BAKED_AT + 4].copy_from_slice(&u32::MAX.to_le_bytes());
+    let err = decode(&baked).unwrap_err();
+    assert!(err.contains("more cells baked"), "{err}");
+    let mut nan = bytes;
+    nan[BOUNDS_AT + 4..BOUNDS_AT + 8].copy_from_slice(&f32::NAN.to_le_bytes());
+    assert_eq!(decode(&nan), Err("bounds not finite".into()));
+}
+
+#[test]
+fn a_stamp_sampling_every_cell_with_a_reach_or_fewer_cells_is_refused() {
+    let bytes = bytes();
+    let mut reach = bytes.clone();
+    reach[REACH_AT..REACH_AT + 8].copy_from_slice(&7u64.to_le_bytes());
+    let mut fewer = bytes.clone();
+    let baked = u32::from_le_bytes(bytes[BAKED_AT..BAKED_AT + 4].try_into().unwrap());
+    fewer[BAKED_AT..BAKED_AT + 4].copy_from_slice(&(baked - 1).to_le_bytes());
+    for refused in [reach, fewer] {
+        let err = decode(&refused).unwrap_err();
+        assert!(err.contains("sampling every cell"), "{err}");
+    }
 }
 
 #[test]
@@ -67,4 +102,31 @@ fn dims_whose_product_overflows_are_refused_not_a_panic() {
         bytes[at..at + 4].copy_from_slice(&u32::MAX.to_le_bytes());
     }
     assert_eq!(decode(&bytes), Err("grid out of range".into()));
+}
+
+#[test]
+fn another_versions_file_is_refused_by_its_version_first() {
+    let version = rusty_scene::lighting::occlusion::OCCLUSION_VERSION;
+    let mut older = bytes();
+    older[4..8].copy_from_slice(&(version - 1).to_le_bytes());
+    older[FLOOR_AT..FLOOR_AT + 4].copy_from_slice(&9u32.to_le_bytes()); // unread
+    let err = decode(&older).unwrap_err();
+    let want = format!(
+        "an older occlusion bake (version {}, this build writes {version})",
+        version - 1
+    );
+    assert!(err.starts_with(&want), "{err}");
+    assert!(
+        err.contains("re-baked (Generate Lighting or Bake Occlusion)"),
+        "{err}"
+    );
+    let mut newer = bytes();
+    newer[4..8].copy_from_slice(&(version + 1).to_le_bytes());
+    assert!(decode(&newer)
+        .unwrap_err()
+        .starts_with("a newer occlusion bake"));
+    assert_eq!(
+        rusty_scene::lighting::occlusion::version_of(&older),
+        Some(version - 1)
+    );
 }

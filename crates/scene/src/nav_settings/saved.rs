@@ -92,7 +92,7 @@ pub fn apply_navmesh(scene: &mut Scene, file: NavmeshFile) {
                 "[Navigation] could not read {} ({e}): Play bakes the navmesh in full",
                 path.display()
             );
-            scene.bake_files.unreadable(&path);
+            scene.bake_files.unreadable(&path, &e.to_string());
             scene.navmesh = SavedNavmesh::default();
             return;
         }

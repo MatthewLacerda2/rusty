@@ -24,8 +24,9 @@ use super::super::object_modifier::bake_as;
 use super::super::obstacle::{carving_volumes, ObstacleVolume};
 use super::super::offmesh::AuthoredKey;
 use super::super::NavMeshSettings;
-use super::modifiers::ModifierVolume;
+use super::modifiers::{modifier_keys, ModifierVolume};
 use super::region::CellRect;
+use crate::offmesh::authored_keys;
 use rusty_components::ColliderShape;
 use rusty_scene::Scene;
 
@@ -78,6 +79,59 @@ impl BakeInputs {
     pub fn modifiers_in(&self, region: CellRect) -> Vec<&ModifierVolume> {
         touching(&self.modifiers, region).map(|s| &s.key).collect()
     }
+}
+
+/// Every input a bake reads beside its settings, as the scene holds it now: what
+/// a sync diffs against the records (`sync`) and [`BakeInputs::are`] compares
+/// them with, each through one destructuring, so an input added here is one
+/// neither can miss: the navmesh is never current for one reader and stale for
+/// the other. All by ascending id.
+pub(super) struct InputKeys {
+    /// `None` when the change log saw no static entity change since the last
+    /// sync (`still`): the colliders are known unchanged and left unread.
+    pub colliders: Option<Vec<(u32, ColliderKey)>>,
+    pub obstacles: Vec<(u32, ObstacleVolume)>,
+    pub modifiers: Vec<(u32, ModifierVolume)>,
+    pub links: Vec<(u32, AuthoredKey)>,
+}
+
+impl InputKeys {
+    /// `scene`'s inputs now; with `statics_still`, the colliders left unread.
+    pub fn of(scene: &Scene, statics_still: bool) -> Self {
+        Self {
+            colliders: (!statics_still).then(|| collider_keys(scene)),
+            obstacles: obstacle_keys(scene),
+            modifiers: modifier_keys(scene),
+            links: authored_keys(scene),
+        }
+    }
+}
+
+impl BakeInputs {
+    /// Whether the records are `keys`, every input the same and unchanged (an
+    /// unread `colliders` counts as unchanged).
+    pub fn are(&self, keys: InputKeys) -> bool {
+        let InputKeys {
+            colliders,
+            obstacles,
+            modifiers,
+            links,
+        } = keys;
+        colliders.is_none_or(|c| same(&self.colliders, c))
+            && same(&self.obstacles, obstacles)
+            && same(&self.modifiers, modifiers)
+            && same(&self.links, links)
+    }
+}
+
+/// Whether the records `old` are the keys `new` (both by ascending id), each the
+/// same input unchanged.
+fn same<K: PartialEq>(old: &[Source<K>], new: Vec<(u32, K)>) -> bool {
+    old.len() == new.len()
+        && old
+            .iter()
+            .zip(new)
+            .all(|(s, (id, k))| s.id == id && s.key == k)
 }
 
 fn touching<K>(sources: &[Source<K>], region: CellRect) -> impl Iterator<Item = &Source<K>> {
