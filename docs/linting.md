@@ -63,7 +63,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | No shared process state | clippy `disallowed_methods` + `tools/lint -- --determinism` | **hard gate**: `std::env::{set_var, remove_var, set_current_dir}` are banned crate-wide in `clippy.toml`, tests included, since `cargo test` runs every in-crate test in one process; production opts out inline with a reason (`project::open`), and `--determinism` keeps the three on the list (#977) |
 | No subprocesses | `tools/lint -- --rules` (`subprocess`) | **hard gate**: no line of `src/` names `std::process::Command` — the engine starts no other program but Blender, to convert a `.blend` while authoring, and `git`, which a debug build asks for its checkout's commit; a real need takes `// lint: allow(subprocess) <why>` (#975) |
 | Nothing temporary | clippy `dbg_macro`/`todo`/`unimplemented` + `tools/lint -- --rules` (`markers`) | **hard gate**: the three are denied in `Cargo.toml`'s `[lints]` (and `tools/lint`'s); a marker word (`TODO`, `FIXME`, `XXX`, `HACK`) in a scanned `.rs` file fails — an unfinished thing is an issue (#935) |
-| One atomic write | `tools/lint -- --rules` (`atomic-write`) | **hard gate**: no line of `src/` outside `crates/core/src/fs/` names `fs::rename` — a file a reader may open is written through `core::fs::write_atomic`; a rename that moves rather than writes takes `// lint: allow(atomic-write) <why>` (#1129) |
+| One atomic write | `tools/lint -- --rules` (`atomic-write`) | **hard gate**: no line of `src/` outside `crates/core/src/fs/` names `fs::rename` — a file a reader may open is written through `core::fs::write_atomic` (or its unsynced twin `write_cache`, for a cache the engine re-makes); a rename that moves rather than writes takes `// lint: allow(atomic-write) <why>` (#1129) |
 | One counted GPU path | `tools/lint -- --rules` (`gpu-ops`) | **hard gate**: outside `crates/render/src/gpu/ops.rs` and test code, no line of `crates/render/src/` calls wgpu's `.begin_render_pass(`, `.begin_compute_pass(`, `.submit(`, `.create_bind_group(` or `.write_buffer(` — the renderer goes through `CountedEncoder` / `CountedQueue` / `CountedDevice`'s `counted_*` helpers, which feed the frame's `render_passes`, `compute_passes`, `submits`, `bind_groups_created` and `buffer_writes` rows (#2341) |
 | One dependency graph | `make feature-split` (`.github/scripts/feature_split.py`) | **hard gate**: no dev-dependency turns on a feature the normal build lacks, so `cargo test` never rebuilds a shared crate (#552, #979; `docs/testing.md`) |
 | One fullscreen triangle | `tools/lint -- --rules` (`fullscreen-triangle`) | **hard gate**: no `.wgsl` under `engine/` but `fullscreen.wgsl` spells the triangle's `(i << 1u) & 2u`; `#import fullscreen` and call `fullscreen::triangle` / `uv` (#1370) |
@@ -358,7 +358,8 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   text heuristic: `.save(path)` also matches a project type's own saver, so its
   callers carry the allow too (`rules/asset_write.rs`).
 - **`atomic-write`** (#1129) — a file another process (or thread) may read is
-  written through `core::fs::write_atomic`: a temp name unique to the process and
+  written through `core::fs::write_atomic` (or `write_cache`, the same without
+  the syncs, for a cache the engine re-makes): a temp name unique to the process and
   the call, renamed into place, the temp removed on any failure. Hand-rolled copies
   drifted (a fixed `.part` name, a pid-only one, litter on failure), so a line of
   `src/` outside `crates/core/src/fs/` whose code names `fs::rename` fails. A rename that

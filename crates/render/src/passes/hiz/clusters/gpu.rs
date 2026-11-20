@@ -58,14 +58,16 @@ impl crate::Renderer {
     /// its geometry, `indices`), or none. Clusters that don't end at its last
     /// index are not its own, and are dropped. So are those the pool cannot
     /// hold: its limit is the device's binding limit over every clustered mesh
-    /// resident in the session, not this mesh's alone. A mesh refused logs it
-    /// and is drawn whole (tested as one instance), and is not retried when a
-    /// lease frees room later; releasing meshes and retrying are #2440's.
+    /// resident at once, not this mesh's alone. A mesh refused logs it, is drawn
+    /// whole (tested as one instance) and is noted in `Residency::refused`, so
+    /// a release that frees ranges retries it (`scene::residency`).
     pub(crate) fn attach_clusters(
         &mut self,
         id: &crate::MeshId,
         (clusters, indices): (Option<&Clusters>, &[u32]),
     ) {
+        // Noted again below only if the pool refuses it this time.
+        self.retained.residency.refused.remove(id);
         let Some(mesh) = self.gpu_meshes.get_mut(id) else {
             return;
         };
@@ -84,6 +86,7 @@ impl crate::Renderer {
             .pool
             .lease(at, &pipes.pool_layout, (clusters, indices));
         if lease.is_none() {
+            self.retained.residency.refused.insert(id.clone());
             log::warn!(
                 "[Render] {}: its {} clusters do not fit the cluster pool under the device's \
                  storage binding limit; it is drawn whole",

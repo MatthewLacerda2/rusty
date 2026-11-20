@@ -199,6 +199,14 @@ pub struct RenderCounters {
     /// GPU bytes of the reflection probes' cube array (#2085): every allocated
     /// layer, spares included, every mip. The resident total at the frame's end.
     pub reflection_bytes: u64,
+    /// GPU meshes resident (#2440): one per mesh identity some loaded scene, or
+    /// a mesh particle of one, uses since the last load released the rest.
+    pub mesh_count: u32,
+    /// GPU bytes of their vertex and index buffers. The resident total.
+    pub mesh_bytes: u64,
+    /// GPU bytes the clustered meshes' leases hold of the cluster table and the
+    /// index pool (`passes::hiz::clusters::pool`). The resident total.
+    pub cluster_pool_bytes: u64,
     /// Retained render objects re-derived whole this frame (#1706): every mesh entity
     /// on a rebuild (a first frame, a load, an Undo, a renderer-side input), else the
     /// ones whose mesh, material, activity, layer, static flag or overrides changed.
