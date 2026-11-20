@@ -1,10 +1,19 @@
-//! A cached load of a scene's textures holds no more beside its GPU copies than
-//! the same textures decoded from their PNGs (#2372); the fixture and measure:
-//! `textures_gpu_tests`.
+//! A direction check: a cached load of a scene's textures holds no more beside
+//! its GPU copies than the same textures decoded from their PNGs. The fixture
+//! and measure: `textures_gpu_tests`.
+//!
+//! It cannot single out the cached path's staging bound on the adapters CI runs,
+//! so it does not fail when that bound is switched off. With mips, each decoded
+//! texture keeps resident memory the device's report leaves out (the mip pass's
+//! render-attachment memory), more than the unbounded cached staging adds; without
+//! mips, the decoded side's single-level writes go through the same bound, so
+//! switching it off raises both sides. The test that fails for an unbounded cached
+//! upload is `textures_gpu_tests::gpu_four_times_the_cached_textures_peak_higher_only_by_their_gpu_copies`.
 
 use super::textures_gpu_tests::{compresses, images, load, mb, set_up, N};
 use crate::memory::rss_peak_bytes;
 
+/// A cached load never peaks above the same textures decoded, GPU copies aside.
 #[test]
 fn gpu_cached_textures_peak_no_higher_than_the_same_decoded() {
     rusty_test_support::alone!(|| {
