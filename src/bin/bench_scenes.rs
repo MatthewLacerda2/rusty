@@ -78,8 +78,8 @@ fn main() {
     rusty::init();
     let args: Vec<String> = std::env::args().skip(1).collect();
     rusty::core::project::answer_help(&args, USAGE);
-    let a = scenes::args::parse(args).unwrap_or_else(|e| fail(&e));
-    let Some(project) = a.project else {
+    let mut a = scenes::args::parse(args).unwrap_or_else(|e| fail(&e));
+    let Some(project) = a.project.take() else {
         fail("bench-scenes needs --project")
     };
     let project = std::fs::canonicalize(&project)
@@ -108,31 +108,36 @@ fn main() {
         out,
         opts,
         load_runs: a.load_runs.unwrap_or(scenes::LOAD_RUNS),
-        before: a.before.map(|b| absolute(&b).unwrap_or(b)),
+        before: a.before.take().map(|b| absolute(&b).unwrap_or(b)),
         profile: a.profile,
         import: a.import,
         script: a.script,
         editor: !a.no_editor,
-        set: a.set,
+        set: std::mem::take(&mut a.set),
     };
+    dispatch(&run, a, key);
+}
+
+/// Do what the invocation `a` asks of `run`: one child's job, or every scene.
+fn dispatch(run: &Run, a: scenes::args::Args, key: String) {
     if let (Some(scene), Some(file)) = (&a.one, &a.editor_out) {
-        return editor_one(&run, scene, file);
+        return editor_one(run, scene, file);
     }
     match (a.one, a.import_out) {
-        (Some(scene), Some(file)) => import_one(&run, &scene, &file),
-        (Some(scene), None) if run.profile => profile_one(&run, &scene),
+        (Some(scene), Some(file)) => import_one(run, &scene, &file),
+        (Some(scene), None) if run.profile => profile_one(run, &scene),
         (Some(scene), None) => match a.load_out {
-            Some(file) => load_one(&run, &scene, &file),
+            Some(file) => load_one(run, &scene, &file),
             None => {
                 let kept = Kept {
                     import_ms: a.import_ms,
                     loads: a.loads,
                     editor: a.editor,
                 };
-                bench_one(&run, &scene, key, kept);
+                bench_one(run, &scene, key, kept);
             }
         },
-        (None, _) => bench_all(&run, a.list.as_deref()),
+        (None, _) => bench_all(run, a.list.as_deref()),
     }
 }
 

@@ -26,7 +26,7 @@ use std::time::Instant;
 use rusty_app::{GameWorld, ProjectSource};
 use rusty_core::input::InputState;
 use rusty_core::project::{BootPlan, ProjectSettings};
-use rusty_dev::bench::scenes::editor::{gpu_speed, EditorRound, Meter, UiTimer};
+use rusty_dev::bench::scenes::editor::{gpu_speed, EditorRound, Meter, UiTime, UiTimer};
 use rusty_dev::capture::{CaptureHost, RenderedFrame};
 use rusty_editor::viewport::scene_camera::SceneCamera;
 use rusty_editor::{EditorUi, ViewportTab};
@@ -199,14 +199,7 @@ impl Editor {
 
     /// Draw one editor frame and wait for it: its UI time, the viewport frame
     /// when one rendered, and the GPU's speed over the frame.
-    fn frame(
-        &mut self,
-        game: &GameWorld,
-    ) -> (
-        rusty_dev::bench::scenes::editor::UiTime,
-        Option<RenderedFrame>,
-        Option<f64>,
-    ) {
+    fn frame(&mut self, game: &GameWorld) -> (UiTime, Option<RenderedFrame>, Option<f64>) {
         let (w, h) = self.size;
         let timer = UiTimer::start();
         self.ctx.begin_pass(super::raw_input(w, h, self.drawn));
@@ -218,37 +211,19 @@ impl Editor {
         let ui = timer.stop();
         let before = self.probed();
         let host = &mut self.host;
-        let rendered = super::viewport::render_viewport(
-            host,
-            &mut self.egui,
-            game,
-            &self.ui,
-            drawn,
-            &mut self.texture,
-        );
+        let (egui, texture) = (&mut self.egui, &mut self.texture);
+        let rendered = super::viewport::render_viewport(host, egui, game, &self.ui, drawn, texture);
         let renderer = host.renderer(w, h).expect("built in new");
         let cost = rendered.then(|| {
+            let cpu_ms = renderer.frame_cost().cpu_ms;
             (
-                renderer.frame_cost().cpu_ms,
+                cpu_ms,
                 renderer.frame_stages().to_vec(),
                 renderer.frame_counters,
             )
         });
-        for (id, deltas) in &output.textures_delta.set {
-            for delta in deltas {
-                self.egui
-                    .update_texture(&renderer.device, &renderer.queue, *id, delta);
-            }
-        }
-        let painted = Painted {
-            jobs: &jobs,
-            pixels_per_point: output.pixels_per_point,
-        };
-        paint_jobs(renderer, &mut self.egui, &painted, &self.target, self.size);
-        for id in &output.textures_delta.free {
-            self.egui.free_texture(id);
-        }
-        output.textures_delta.clear(); // egui asserts every delta is consumed
+        self.paint(output, &jobs);
+        let renderer = self.host.renderer(w, h).expect("built in new");
         renderer.wait_idle();
         let gpu = renderer.take_gpu_times();
         let frame = cost.map(|(cpu_ms, stages, counters)| RenderedFrame {
@@ -259,6 +234,28 @@ impl Editor {
         });
         let after = self.probed();
         (ui, frame, gpu_speed(before, after))
+    }
+
+    /// Upload the frame's egui textures and paint its tessellated `jobs` over the
+    /// editor's target, as the window paints its surface.
+    fn paint(&mut self, mut output: egui::FullOutput, jobs: &[egui::ClippedPrimitive]) {
+        let (w, h) = self.size;
+        let renderer = self.host.renderer(w, h).expect("built in new");
+        for (id, deltas) in &output.textures_delta.set {
+            for delta in deltas {
+                let (device, queue) = (&renderer.device, &renderer.queue);
+                self.egui.update_texture(device, queue, *id, delta);
+            }
+        }
+        let painted = Painted {
+            jobs,
+            pixels_per_point: output.pixels_per_point,
+        };
+        paint_jobs(renderer, &mut self.egui, &painted, &self.target, self.size);
+        for id in &output.textures_delta.free {
+            self.egui.free_texture(id);
+        }
+        output.textures_delta.clear(); // egui asserts every delta is consumed
     }
 
     /// The GPU clock probe's time, `None` without one.

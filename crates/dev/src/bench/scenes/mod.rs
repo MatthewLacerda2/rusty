@@ -191,17 +191,7 @@ pub fn bench(
         report.script = true;
         super::verbs::keep_top(&mut report.rows);
     }
-    let loads: Vec<Load> = extra.loads.iter().cloned().chain([own]).collect();
-    report.loads = loads.len() as u32;
-    report.rows.extend(load::rows(&loads));
-    report.warnings.extend(notes::cooked_at_load(&loads));
-    if let Some(ms) = extra.import_ms {
-        report.push_value("import_ms", ms);
-    }
-    if let Some(round) = &extra.editor {
-        report.rows.extend(round.rows.iter().cloned());
-        report.warnings.extend(round.warnings.iter().cloned());
-    }
+    handed(&mut report, extra, own);
     if let Some(bytes) = crate::memory::rss_peak_bytes() {
         report.push_value("rss_peak_mb", mb(bytes));
     }
@@ -234,6 +224,22 @@ pub fn bench(
     println!("{text}");
     report::write(out_dir, &report, &text).map_err(|e| format!("bench-scenes: {e}"))?;
     Ok(report)
+}
+
+/// What the scene's other children measured, into its report: its loads (`own`
+/// the bench's, the last), the run's `import_ms` and the editor round.
+fn handed(report: &mut SceneReport, extra: &Extra, own: Load) {
+    let loads: Vec<Load> = extra.loads.iter().cloned().chain([own]).collect();
+    report.loads = loads.len() as u32;
+    report.rows.extend(load::rows(&loads));
+    report.warnings.extend(notes::cooked_at_load(&loads));
+    if let Some(ms) = extra.import_ms {
+        report.push_value("import_ms", ms);
+    }
+    if let Some(round) = &extra.editor {
+        report.rows.extend(round.rows.iter().cloned());
+        report.warnings.extend(round.warnings.iter().cloned());
+    }
 }
 
 /// `gpu_mb` (and `gpu_allocated_mb` where the source tells it) with its source,
