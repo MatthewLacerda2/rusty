@@ -3,16 +3,10 @@ use super::*;
 #[test]
 fn the_summary_is_the_mean_and_the_nearest_rank_p95() {
     let values: Vec<f64> = (1..=100).map(f64::from).collect();
-    assert_eq!(
-        Summary::of(&values),
-        Summary {
-            avg: 50.5,
-            p95: 95.0
-        }
-    );
+    assert_eq!(Summary::of(&values), Summary::new(50.5, 95.0));
     // Order does not matter, and one frame is its own p95.
     assert_eq!(Summary::of(&[3.0, 1.0, 2.0]).p95, 3.0);
-    assert_eq!(Summary::of(&[7.0]), Summary { avg: 7.0, p95: 7.0 });
+    assert_eq!(Summary::of(&[7.0]), Summary::new(7.0, 7.0));
     assert_eq!(Summary::of(&[]), Summary::default());
 }
 
@@ -36,14 +30,8 @@ fn the_table_shows_the_change_against_the_last_run() {
     let run = |ms: f64| Report {
         frames: 10,
         metrics: vec![
-            ("gpu_ms".to_string(), Summary { avg: ms, p95: ms }),
-            (
-                "draw_calls".to_string(),
-                Summary {
-                    avg: 120.0,
-                    p95: 120.0,
-                },
-            ),
+            ("gpu_ms".to_string(), Summary::new(ms, ms)),
+            ("draw_calls".to_string(), Summary::new(120.0, 120.0)),
         ],
         ..Report::default()
     };
@@ -75,13 +63,7 @@ fn the_table_shows_the_change_against_the_last_run() {
 fn a_report_round_trips_through_json() {
     let report = Report {
         frames: 2,
-        metrics: vec![(
-            "frame_ms".to_string(),
-            Summary {
-                avg: 1.25,
-                p95: 2.0,
-            },
-        )],
+        metrics: vec![("frame_ms".to_string(), Summary::new(1.25, 2.0))],
         warnings: vec!["noisy".to_string()],
         engine: Some(EngineStamp::of(Some("a"), Some("b"))),
         windows: vec!["firefight".to_string()],

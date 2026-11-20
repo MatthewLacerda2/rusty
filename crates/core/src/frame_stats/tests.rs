@@ -129,3 +129,15 @@ fn tick_systems_hold_the_newest_tick_summed_by_name() {
     let got = &stats.tick_systems;
     assert_eq!(*got, [("b", 1.5), ("a", 2.0)]);
 }
+
+/// Every key is exactly one of a timing and a counter: a 0/1 flag and a byte
+/// size count, a `_ms`, a `_us` and `fps` time.
+#[test]
+fn every_key_is_a_timing_or_a_counter_never_both() {
+    let counters = ["draw_calls", "ui_meshed", "texture_bytes", "changes_mesh"];
+    let timings = ["frame_ms", "render_extract_us", "fps", "load_scene_ms"];
+    for key in counters.iter().chain(&timings) {
+        assert_ne!(is_timing(key), is_counter(key), "{key} in one class");
+    }
+    assert!(counters.iter().all(|k| is_counter(k)));
+}

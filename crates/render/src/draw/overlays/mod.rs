@@ -78,13 +78,15 @@ impl Renderer {
                 render_pass.draw(0..self.axis_count, 0..1);
             }
         }
-        // D. Light- & reflection-probe gizmos (#284) and Area lights (#1674).
-        self.draw_probe_overlays(render_pass, bindings, &overlays.probes);
-        // E. Collider shapes and `Debug.Draw*` lines (#1882): one draw, each vertex
-        // its own colour, so through the vertex-colour line pipeline. Last: it
-        // leaves that pipeline set.
-        if let Some((buffer, slot, count)) = &overlays.wires {
+        // D. The vertex-coloured line lists, each one draw through the vertex-colour
+        // line pipeline: the probe family (#284) and Area lights (#1674), then the
+        // collider shapes and `Debug.Draw*` lines (#1882). Last: they leave that
+        // pipeline set.
+        let lists = [&overlays.probes, &overlays.wires];
+        if lists.iter().any(|list| list.is_some()) {
             render_pass.set_pipeline(self.vertex_line_pipeline.get());
+        }
+        for (buffer, slot, count) in lists.into_iter().flatten() {
             render_pass.set_vertex_buffer(0, buffer.slice(..));
             bindings.bind(render_pass, *slot);
             render_pass.draw(0..*count, 0..1);
