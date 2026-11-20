@@ -166,7 +166,7 @@ fn fs_shadow(in: VertexOutput) {
     shadow_clip(in);
 }
 
-// The editor's line gizmos (grid, collider boxes, axis arrows, probes): drawn on the
+// The editor's flat-colour line gizmos (grid, occlusion boxes, axis arrows): drawn on the
 // finished image after post-FX (#1224), so the authored colour as is, unlit and
 // unfogged, as Unity draws its gizmos. Fog is a scene effect; a gizmo is not scene.
 @fragment
@@ -174,9 +174,10 @@ fn fs_gizmo(in: VertexOutput) -> @location(0) vec4<f32> {
     return material().color_tint;
 }
 
-// The collider and debug-line gizmos (#1882): `fs_gizmo`'s lines, each vertex its own
-// colour, carried in the vertex's `tangent` (lines have no tangent basis) and passed
-// through untransformed, so one draw holds lines of every colour.
+// The probe-family, Area-light, collider and debug-line gizmos (#1882): `fs_gizmo`'s
+// lines, each vertex its own colour, carried in the vertex's `tangent` (lines have no
+// tangent basis) and passed through untransformed, so one draw holds lines of every
+// colour.
 @vertex
 fn vs_gizmo_vertex(model: VertexInput, @builtin(instance_index) instance: u32) -> VertexOutput {
     var out = forward_vertex(model, instance);

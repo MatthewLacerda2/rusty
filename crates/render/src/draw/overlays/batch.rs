@@ -26,6 +26,12 @@ impl OverlayDraws {
         (self.gizmos.len() - 1) as u32
     }
 
+    /// How many gizmo slots were taken.
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
+        self.gizmos.len()
+    }
+
     /// Every gizmo's per-draw uniform, in slot order, and the records they index
     /// ([`RecordTable`]: one per distinct tint).
     fn pack(&self) -> (Vec<DrawUniform>, Vec<MaterialData>) {
