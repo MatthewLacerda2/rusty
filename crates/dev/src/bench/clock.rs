@@ -128,8 +128,13 @@ impl Spread {
 /// How one window's CPU samples spread past their limits: a clock that moved
 /// during it, and CPU times that spread past [`CPU_SPREAD`], each with its spread.
 pub fn cpu_spreads(samples: &Samples) -> Vec<(Spread, f64)> {
-    let clock = spread(samples.values("cpu_clock_pct"));
-    let cpu = spread(samples.values("cpu_ms"));
+    spreads_of(samples.values("cpu_clock_pct"), samples.values("cpu_ms"))
+}
+
+/// [`cpu_spreads`] over a window's clock readings (in %) and its CPU times,
+/// whatever rows hold them (the editor round's `ui_ms`, #2314).
+pub fn spreads_of(clock: &[f64], cpu: &[f64]) -> Vec<(Spread, f64)> {
+    let (clock, cpu) = (spread(clock), spread(cpu));
     [
         (Spread::Clock, clock, CLOCK_SPREAD),
         (Spread::Cpu, cpu, CPU_SPREAD),

@@ -48,11 +48,17 @@ impl SceneReport {
                 what.join(", ")
             )];
         }
-        let clock = |r: &SceneReport| r.row("cpu_clock_pct").map(|r| r.avg);
-        let drift = clock(self)
-            .zip(clock(previous))
-            .and_then(|(now, before)| clock_drift(now, before));
-        let warnings = drift.into_iter().chain(self.set_moved(previous));
+        // The game rows' clock, and the editor round's (#2314), each on its own.
+        let drift = ["cpu_clock_pct", "editor.cpu_clock_pct"].map(|row| {
+            let clock = |r: &SceneReport| r.row(row).map(|r| r.avg);
+            let moved = clock(self).zip(clock(previous));
+            let said = moved.and_then(|(now, before)| clock_drift(now, before));
+            said.map(|w| match row {
+                "cpu_clock_pct" => w,
+                _ => super::super::editor::reworded(&w),
+            })
+        });
+        let warnings = drift.into_iter().flatten().chain(self.set_moved(previous));
         warnings.chain(self.tick_timed_since(previous)).collect()
     }
 

@@ -42,6 +42,7 @@ impl SceneReport {
         ];
         let notes = notes.into_iter().chain(self.part_notes());
         let notes = notes.chain(self.load_notes());
+        let notes = notes.chain(self.editor_notes());
         let notes = notes.chain(self.comparison_notes(first));
         for (_, note) in notes.filter(|(on, _)| *on) {
             let _ = writeln!(out, "{note}");
@@ -105,6 +106,35 @@ impl SceneReport {
                  load did: model files the scene uses, sources converted over the run's loads, \
                  textures resident after the first frame compressed and decoded, MB that \
                  frame uploaded)",
+            ),
+        ]
+    }
+}
+
+impl SceneReport {
+    /// What the editor round's rows are (#2314), and what of them this adapter
+    /// could not measure.
+    fn editor_notes(&self) -> [(bool, &'static str); 3] {
+        let round = self.row("editor.ui_ms").is_some();
+        let rendered = self.row("editor.renderer_ms").is_some();
+        [
+            (
+                round,
+                "(editor.<row>: the editor round, in a process of its own: the Scene view with \
+                 its default gizmos and the scene's first camera selected; editor.ui_ms the \
+                 editor's UI draw and egui's tessellation at the reference CPU clock, \
+                 editor.render.<stage> and editor.gpu.<pass> its viewport frame; play_enter_ms \
+                 edit mode to the first Play tick, play_stop_ms Stop to the first edit frame \
+                 drawn, save_ms a save beside the reports, wall clock, one a run; play_rss_mb \
+                 the resident memory Play entry added)",
+            ),
+            (
+                round && !rendered,
+                "(editor round: no GPU or software adapter: no editor.render or editor.gpu rows)",
+            ),
+            (
+                rendered && self.row("editor.gpu_ms").is_none(),
+                "(editor round: this adapter has no timestamp queries: no editor.gpu rows)",
             ),
         ]
     }

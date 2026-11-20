@@ -4,7 +4,7 @@
 //! Usage:
 //!   cargo run --release --features dev --bin bench-scenes -- --project <dir> [--scenes <a,b>]
 //!       [--size <W>x<H>] [--runs <n>] [--load-runs <n>] [--before <dir>] [--set <k=v>]...
-//!       [--profile] [--import] [--script]
+//!       [--profile] [--import] [--script] [--no-editor]
 //!       <out_dir>  |  --project <dir> --pending-imports
 //! ```
 //!
@@ -41,12 +41,16 @@ use std::process::exit;
 #[path = "bench_scenes/children.rs"]
 mod children;
 use children::{bench_scene, cold_import, Benched};
+#[path = "bench_scenes/solo.rs"]
+mod solo;
+use solo::{editor_one, import_one, load_one, profile_one};
 
 use rusty::core::project::Opened;
 use rusty::dev::bench::scenes::{self, import, profile, report, set::Overrides, Extra, Options};
 
 const USAGE: &str = "usage: bench-scenes --project <dir> [--scenes <a,b>] [--size <W>x<H>] [--runs <n>] \
-     [--load-runs <n>] [--before <dir>] [--set <k=v>]... [--profile] [--import] [--script] <out_dir> | --project <dir> --pending-imports";
+     [--load-runs <n>] [--before <dir>] [--set <k=v>]... [--profile] [--import] [--script] [--no-editor] \
+     <out_dir> | --project <dir> --pending-imports";
 
 /// What one invocation was asked for.
 struct Run {
@@ -65,6 +69,8 @@ struct Run {
     /// `--script`: time the scripts' engine verbs in the timed child; every
     /// child writes under the `script/` folder.
     script: bool,
+    /// Run the editor round on each scene (off with `--no-editor`).
+    editor: bool,
     set: Overrides,
 }
 
@@ -106,14 +112,25 @@ fn main() {
         profile: a.profile,
         import: a.import,
         script: a.script,
+        editor: !a.no_editor,
         set: a.set,
     };
+    if let (Some(scene), Some(file)) = (&a.one, &a.editor_out) {
+        return editor_one(&run, scene, file);
+    }
     match (a.one, a.import_out) {
         (Some(scene), Some(file)) => import_one(&run, &scene, &file),
         (Some(scene), None) if run.profile => profile_one(&run, &scene),
         (Some(scene), None) => match a.load_out {
             Some(file) => load_one(&run, &scene, &file),
-            None => bench_one(&run, &scene, key, a.import_ms, a.loads.as_deref()),
+            None => {
+                let kept = Kept {
+                    import_ms: a.import_ms,
+                    loads: a.loads,
+                    editor: a.editor,
+                };
+                bench_one(&run, &scene, key, kept);
+            }
         },
         (None, _) => bench_all(&run, a.list.as_deref()),
     }
@@ -135,20 +152,35 @@ fn open(run: &Run, path: &Path, what: &str) -> Opened {
     scenes::open(path, &run.set).unwrap_or_else(|e| fail(&format!("cannot open {what}: {e}")))
 }
 
-/// Bench `scene` in this process, after the loads kept in `loads`.
-fn bench_one(run: &Run, scene: &str, key: String, import_ms: Option<f64>, loads: Option<&Path>) {
+/// What the scene's earlier children handed its bench.
+struct Kept {
+    import_ms: Option<f64>,
+    /// The loads' folder (`--loads`).
+    loads: Option<PathBuf>,
+    /// The editor round's file (`--editor`).
+    editor: Option<PathBuf>,
+}
+
+/// Bench `scene` in this process, after the loads and the editor round `kept` names.
+fn bench_one(run: &Run, scene: &str, key: String, kept: Kept) {
     if run.script {
         // Before the first VM: one started earlier keeps the surface it has.
         rusty::dev::stats::verbs::arm();
     }
     let opened = open(run, &run.project, "the project");
-    let loads = loads.map(scenes::load::read_all).transpose();
+    let loads = kept
+        .loads
+        .as_deref()
+        .map(scenes::load::read_all)
+        .transpose();
+    let editor = kept.editor.as_deref().map(scenes::editor::read).transpose();
     let extra = Extra {
         baseline: run.before.clone(),
         key,
-        import_ms,
+        import_ms: kept.import_ms,
         loads: loads.unwrap_or_else(|e| fail(&e)).unwrap_or_default(),
         set: run.set.said.clone(),
+        editor: editor.unwrap_or_else(|e| fail(&e)),
     };
     let done = scenes::bench(
         &opened.root,
@@ -160,42 +192,6 @@ fn bench_one(run: &Run, scene: &str, key: String, import_ms: Option<f64>, loads:
     );
     if let Err(e) = done {
         eprintln!("bench-scenes: {scene}: {e}");
-        exit(1);
-    }
-}
-
-/// Load `scene` in this process and keep the load at `file`.
-fn load_one(run: &Run, scene: &str, file: &Path) {
-    let opened = open(run, &run.project, "the project");
-    let scratch = file.parent().unwrap_or(Path::new("."));
-    let loaded = scenes::load(scratch, &opened.root, scene, opened.settings, run.opts);
-    let (_, load) = loaded.unwrap_or_else(|e| fail(&format!("{scene}: load failed: {e}")));
-    scenes::load::write(file, &load).unwrap_or_else(|e| fail(&e));
-}
-
-/// Import the project (a cache-cleared copy), load `scene`, and write both's ms to `file`.
-fn import_one(run: &Run, scene: &str, file: &Path) {
-    let opened = open(run, &run.project, "the copy");
-    let scratch = file.parent().unwrap_or(Path::new("."));
-    eprintln!("{}", rusty::asset::import::notice(&opened.root));
-    let imported = import::import().unwrap_or_else(|e| fail(&format!("import failed: {e}")));
-    let loaded = scenes::load(scratch, &opened.root, scene, opened.settings, run.opts);
-    let ms = loaded.map_or_else(
-        |e| fail(&format!("{scene}: cold load failed: {e}")),
-        |l| imported + l.1.total_ms(),
-    );
-    // lint: allow(asset-write) a number handed to the parent process, deleted after
-    let wrote = std::fs::write(file, ms.to_string());
-    wrote.unwrap_or_else(|e| fail(&e.to_string()));
-}
-
-/// Profile `scene` in this process.
-fn profile_one(run: &Run, scene: &str) {
-    let profiler = profile::find(std::env::var_os("PATH").as_deref()).unwrap_or_else(|e| fail(&e));
-    let opened = open(run, &run.project, "the project");
-    let at = (opened.root.as_path(), scene);
-    if let Err(e) = profile::run(&profiler, at, opened.settings, &run.out, run.opts) {
-        eprintln!("bench-scenes: {scene}: profile: {e}");
         exit(1);
     }
 }
