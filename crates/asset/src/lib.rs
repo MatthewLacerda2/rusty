@@ -29,6 +29,7 @@ pub mod animation_graph;
 pub mod audio;
 pub mod clusters;
 pub mod convert;
+pub mod cook;
 pub mod flat_normals;
 pub mod gltf;
 pub mod humanoid;
@@ -66,6 +67,7 @@ pub use sidecar::{import_and_sync_sidecar, ImportSettings, MeshColliderKind, Sub
 
 use rusty_core::paths;
 use std::path::Path;
+use tangents::Missing;
 
 /// Anything that can go wrong importing a source file. Kept small and string-y:
 /// the importer is a leaf, and callers only ever surface these to a log/console.
@@ -171,6 +173,12 @@ fn import_with(
     Ok(asset)
 }
 
+/// [`import_own`] of the file at `path`, its read target and settings found:
+/// what the import pass cooks a model through (`import::cook_models`).
+pub(crate) fn import_own_file(path: &Path) -> Result<ImportedAsset, ImportError> {
+    import_own(path, &read_target(path)?, &settings_of(path))
+}
+
 /// [`import_with`] without the clips borrowed from other models (#1747): the
 /// file's own data with its settings applied.
 fn import_own(
@@ -178,18 +186,9 @@ fn import_own(
     read: &Path,
     settings: &ImportSettings,
 ) -> Result<ImportedAsset, ImportError> {
-    let mut asset = parse_file(path, read)?;
-    scale_factor::apply(&mut asset, scale_factor::sanitize(settings.scale, 1.0));
-    if settings.lightmap_uvs.generate {
-        for sub in &mut asset.sub_meshes {
-            lightmap_uv::apply(sub, &settings.lightmap_uvs);
-        }
-    }
-    // Last: the clusters reorder the indices every step above settled.
-    for sub in &mut asset.sub_meshes {
-        clusters::apply(sub);
-    }
-    Ok(asset)
+    cook::import(path, read, settings, |missing| {
+        parse_file(path, read, missing)
+    })
 }
 
 /// The model at `from` as a clip source (#1747): its own import, with its
@@ -206,14 +205,15 @@ fn borrowed_source(from: &str) -> Result<Option<humanoid::borrow::Source>, Impor
 }
 
 /// Parse a source file into sub-meshes + materials by its extension, as authored,
-/// reading `read` ([`read_target`]).
-fn parse_file(path: &Path, read: &Path) -> Result<ImportedAsset, ImportError> {
+/// reading `read` ([`read_target`]), doing for a missing tangent what `missing`
+/// says.
+fn parse_file(path: &Path, read: &Path, missing: Missing) -> Result<ImportedAsset, ImportError> {
     match paths::extension(path).as_str() {
-        "gltf" | "glb" => gltf::import::import(read),
-        "obj" => obj_import::import(read),
+        "gltf" | "glb" => gltf::import::import_as(read, None, missing),
+        "obj" => obj_import::import_as(read, missing),
         _ if convert::converter_for(path).is_some() => {
             let source = path.to_string_lossy();
-            gltf::import::import_from(read, Some(&source))
+            gltf::import::import_as(read, Some(&source), missing)
         }
         other => Err(ImportError::UnsupportedFormat(other.to_string())),
     }

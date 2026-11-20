@@ -14,10 +14,12 @@ spread 9%), and a run on a project whose textures were never imported (`gpu_mb`
   `cargo nextest` is `cargo-nextest`), `rustc` or `bench-scenes` process
   ([`BUSY`]), from the process table, before any build and again
   before each leg (a build started mid-run would skew the legs after it);
-- **un-imported textures**: the images an import would encode now, which
-  `bench-scenes --pending-imports` lists from the engine's own check
-  (`asset::texture_import::pending`), so the refusal and the import never
-  disagree. It needs a built engine, so it runs on `main`'s build before the
+- **un-imported textures and models**: the images an import would encode now,
+  and the models whose cooked file is missing or stale, which
+  `bench-scenes --pending-imports` lists from the engine's own checks
+  (`asset::texture_import::pending`, `asset::cook::pending`), so the refusal and
+  the import never disagree (a model cooked at load anyway is noted in its scene's
+  report). It needs a built engine, so it runs on `main`'s build before the
   PR's build and any leg, and again on the PR's build: a PR that changes the
   cache's stamp, a texture default or the encoder sees every cache as stale,
   uploads uncompressed, and its memory and load rows move for a reason that is
@@ -101,13 +103,14 @@ def pending_answer(build: str, code: int, said: str) -> tuple[str, str | None]:
     if code == 0:
         return "clean", None
     if code == 1:
-        return "pending", f"{build}'s build finds un-imported textures in the project:\n{said.strip()}"
+        return "pending", f"{build}'s build finds un-imported textures or models in the project:\n{said.strip()}"
     return "failed", f"{build}'s bench-scenes --pending-imports failed (exit {code}): {said.strip()}"
 
 
-DISAGREE = ("the two builds disagree on the texture cache: {clean}'s finds the project imported, "
-            "{pending}'s does not, so the PR changes the cache's stamp, a texture default or the encoder and no "
-            "import satisfies both (one .bctex per source holds one stamp). Measure with FORCE=1 and read "
+DISAGREE = ("the two builds disagree on the import cache: {clean}'s finds the project imported, "
+            "{pending}'s does not, so the PR changes a cache's stamp (a texture's, or the cooked models' "
+            "COOKER_VERSION), a texture default or the encoder and no import satisfies both (one .bctex or "
+            "cooked file per source holds one stamp). Measure with FORCE=1 and read "
             "gpu_mb and the load rows as not comparable; the table's header says so")
 IMPORT = "make import PROJECT=<dir>, then run again"
 

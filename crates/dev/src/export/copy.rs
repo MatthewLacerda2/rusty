@@ -140,10 +140,11 @@ pub(super) fn texture_caches(
     Ok(())
 }
 
-/// Copy the hull sidecar (`.hulls`, #1940) of each model under the project's
-/// assets that has one: the exported game builds its dynamic concave props from
-/// it and never runs V-HACD for them.
-pub(super) fn hull_caches(
+/// Copy the hull sidecar (`.hulls`, #1940) and the cooked file (`.cooked.glb`,
+/// `asset::cook`) of each model under the project's assets that has them: the
+/// exported game builds its dynamic concave props from the one and never runs
+/// V-HACD for them, and reads its models' derived geometry from the other.
+pub(super) fn model_caches(
     root: &Path,
     out: &Path,
     written: &mut Vec<String>,
@@ -155,8 +156,14 @@ pub(super) fn hull_caches(
         }
     });
     models.sort();
-    for model in models {
-        let cache = cache_path_as(root, &model, rusty_asset::import_cache::hulls::SUFFIX);
+    let suffixes = [
+        rusty_asset::import_cache::hulls::SUFFIX,
+        rusty_asset::cook::SUFFIX,
+    ];
+    let caches = models
+        .iter()
+        .flat_map(|m| suffixes.map(|s| cache_path_as(root, m, s)));
+    for cache in caches {
         if cache.is_file() {
             file(
                 root,

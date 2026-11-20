@@ -23,7 +23,9 @@
 //! **Counts.** What the bench's own load did: the model files the scene uses
 //! (parsed once each, since every load is a fresh process), the sources it
 //! converted (`convert::conversions`: what tells a cold import from a cached
-//! one), the textures resident after the first frame compressed and decoded
+//! one), the models it cooked (`cook::cooks`: zero when every model's cooked
+//! file is current, since the bench reads the project and writes nothing into
+//! it), the textures resident after the first frame compressed and decoded
 //! (uncompressed fallbacks included), and the MB the first frame uploaded. The
 //! last load's, deterministic for a project as it stands, so no spread; but the
 //! conversions are the run's sum, since the first load converts what is stale
@@ -164,7 +166,10 @@ pub fn load(
     let path = root.join(format!("assets/scenes/{scene}.scene"));
     let clock = StepClock::default();
     let parsed = rusty_asset::import_cache::parses();
+    // The process's count: a bench process converts nothing but its loads, and a
+    // conversion may run on any thread, so a per-thread count could miss one.
     let converted = rusty_asset::convert::conversions();
+    let cooked = rusty_asset::cook::cooks();
     let mut probe: Option<Box<dyn LoadProbe>> = Some(Box::new(clock.clone()));
     let path = path.to_string_lossy();
     let mut harness = Harness::on_project_scene_timed(out_dir, &path, settings, &mut probe)?;
@@ -184,9 +189,11 @@ pub fn load(
     clock.push("frame", ms_since(start));
     let parsed = rusty_asset::import_cache::parses().saturating_sub(parsed);
     let converted = rusty_asset::convert::conversions().saturating_sub(converted);
+    let cooked = rusty_asset::cook::cooks().saturating_sub(cooked);
     let mut counts = vec![
         ("models_parsed".to_string(), parsed as f64),
         (CONVERTED.to_string(), converted as f64),
+        ("models_cooked".to_string(), cooked as f64),
     ];
     counts.extend(harness.renderer().map(render_counts).into_iter().flatten());
     let steps = clock.0.take();
@@ -212,6 +219,9 @@ fn render_counts(r: &mut rusty_render::Renderer) -> [(String, f64); 3] {
     ]
 }
 
+#[cfg(test)]
+#[path = "load_cook_tests.rs"]
+mod cook_tests;
 #[cfg(test)]
 #[path = "load_tests.rs"]
 mod tests;
