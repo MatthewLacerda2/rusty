@@ -46,7 +46,7 @@ fn gpu_a_range_written_twice_while_one_encoder_records_is_refused() {
         message.contains("Commands::flush"),
         "says what to do: {message}"
     );
-    assert!(!ops::recording(), "the dropped recording closed");
+    assert!(!super::recording(), "the dropped recording closed");
 }
 
 #[test]
@@ -65,7 +65,7 @@ fn gpu_a_write_after_a_flush_or_to_another_range_or_outside_a_recording_passes()
     write(0); // a new submit: the first write went out with the last one
     commands.send();
     write(0);
-    assert!(!ops::recording());
+    assert!(!super::recording());
 }
 
 #[test]
@@ -78,18 +78,18 @@ fn gpu_one_recording_is_one_submit_and_its_maps_wait_for_it() {
     let mut commands = Commands::new(&r.device, &r.queue, "Maps");
     let seen = Rc::clone(&ran);
     commands.after_send(move || seen.set(true));
-    let tag = ops::submit_seq();
+    let tag = super::pair_tag();
     commands
         .encoder()
         .clear_buffer(&uniform(&r.device), 0, None);
     assert!(!ran.get(), "a map before its copy is submitted");
     assert_eq!(
-        ops::submit_seq(),
+        super::pair_tag(),
         tag,
         "every pair taken meanwhile shares one tag"
     );
     commands.send();
     assert!(ran.get());
-    assert_ne!(ops::submit_seq(), tag, "the recording's tag ends with it");
+    assert_ne!(super::pair_tag(), tag, "the recording's tag ends with it");
     assert_eq!(ops::take().submits, 1);
 }

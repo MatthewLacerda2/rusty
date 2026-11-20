@@ -65,7 +65,7 @@ impl Renderer {
         let set = &scene.lightmaps;
         if self.lightmaps.bind(
             &self.device,
-            &self.queue,
+            (&self.queue, &self.staging),
             &set.pages,
             &set.directions,
             &set.masks,

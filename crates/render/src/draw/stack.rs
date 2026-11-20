@@ -201,7 +201,8 @@ impl Renderer {
 
         // The grade + tonemap and the Color Lookup (#1440, #1441): rebaked only when
         // this view's inputs changed.
-        let (gpu, bake) = ((&self.device, &self.queue), &mut self.grade_bake);
+        let gpu = (&self.device, (&self.queue, &self.staging));
+        let bake = &mut self.grade_bake;
         let baked = view.post_fx.grade.prepare(gpu, bake, effect.volume());
         self.frame_counters.grade_lut_bakes += u32::from(baked);
 

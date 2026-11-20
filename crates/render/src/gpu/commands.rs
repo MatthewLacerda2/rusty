@@ -11,6 +11,9 @@
 //! with [`Commands::after_send`], which runs it once the commands are sent.
 
 use super::ops::{self, CountedQueue as _};
+use std::cell::Cell;
+use std::ops::Range;
+use std::panic::Location;
 
 /// A map (or any step) that must wait for the recorded commands' submit.
 type AfterSend = Box<dyn FnOnce()>;
@@ -30,7 +33,7 @@ pub(crate) struct Commands {
 impl Commands {
     /// Open a recording labelled `label`.
     pub(crate) fn new(device: &wgpu::Device, queue: &wgpu::Queue, label: &'static str) -> Self {
-        let outer = ops::begin_recording();
+        let outer = begin_recording();
         Self {
             encoder: Some(encoder(device, label)),
             device: device.clone(),
@@ -59,8 +62,8 @@ impl Commands {
     /// buffer an earlier command reads.
     pub(crate) fn flush(&mut self) {
         self.submit_recorded();
-        ops::end_recording(self.outer);
-        self.outer = ops::begin_recording();
+        end_recording(self.outer);
+        self.outer = begin_recording();
         self.encoder = Some(encoder(&self.device, self.label));
     }
 
@@ -75,7 +78,7 @@ impl Commands {
         };
         self.queue.counted_submit(std::iter::once(encoder.finish()));
         if self.outer.is_none() {
-            ops::forget_writes(); // they went out with it
+            forget_writes(); // they went out with it
         }
         for step in std::mem::take(&mut self.after) {
             step();
@@ -86,8 +89,109 @@ impl Commands {
 impl Drop for Commands {
     fn drop(&mut self) {
         self.submit_recorded();
-        ops::end_recording(self.outer);
+        end_recording(self.outer);
     }
+}
+
+thread_local! {
+    /// The tag of the [`super::commands::Commands`] recording on this thread, if
+    /// one is: every pair the GPU timer takes while it records goes out in its one
+    /// submit, whatever other submit happens meanwhile (a buffer's growth copy).
+    static RECORDING: Cell<Option<u64>> = const { Cell::new(None) };
+    /// How many recordings this thread has begun, ever: each one's tag.
+    static RECORDINGS: Cell<u64> = const { Cell::new(0) };
+}
+
+/// Tags a recording's pairs apart from any submit count.
+const RECORDING_TAG: u64 = 1 << 63;
+
+/// The submit a GPU timer pair taken now goes out in: the open recording's tag
+/// while one records, else [`ops::submit_seq`].
+pub(crate) fn pair_tag() -> u64 {
+    RECORDING.with(Cell::get).unwrap_or_else(ops::submit_seq)
+}
+
+/// Start a recording on this thread, returning the one it nests in (restored by
+/// [`end_recording`]). Its writes are checked from here to its end.
+pub(crate) fn begin_recording() -> Option<u64> {
+    let tag = RECORDING_TAG | RECORDINGS.with(|n| n.replace(n.get() + 1));
+    let outer = RECORDING.with(|r| r.replace(Some(tag)));
+    if outer.is_none() {
+        forget_writes();
+    }
+    outer
+}
+
+/// End the recording [`begin_recording`] started, back to `outer`.
+pub(crate) fn end_recording(outer: Option<u64>) {
+    RECORDING.with(|r| r.set(outer));
+    if outer.is_none() {
+        forget_writes();
+    }
+}
+
+/// Whether a recording is open on this thread.
+pub(crate) fn recording() -> bool {
+    RECORDING.with(Cell::get).is_some()
+}
+
+/// One buffer range written while a recording is open, and where.
+#[cfg(debug_assertions)]
+struct Written {
+    buffer: wgpu::Buffer,
+    range: Range<u64>,
+    at: &'static Location<'static>,
+}
+
+#[cfg(debug_assertions)]
+thread_local! {
+    static WRITTEN: std::cell::RefCell<Vec<Written>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Forget the writes checked so far: the recording went out ([`Commands::flush`]).
+pub(crate) fn forget_writes() {
+    #[cfg(debug_assertions)]
+    WRITTEN.with(|w| w.borrow_mut().clear());
+}
+
+/// Debug builds: panic when `range` of `buffer` was already written while the
+/// open recording records (none open: nothing is checked). Release: nothing.
+pub(crate) fn check_write(
+    buffer: &wgpu::Buffer,
+    range: Range<u64>,
+    at: &'static Location<'static>,
+) {
+    #[cfg(debug_assertions)]
+    if recording() {
+        WRITTEN.with(|w| {
+            let mut w = w.borrow_mut();
+            let overlaps = |o: &&Written| {
+                &o.buffer == buffer && o.range.start < range.end && range.start < o.range.end
+            };
+            if let Some(first) = w.iter().find(overlaps) {
+                panic!("{}", twice_message(buffer.size(), &range, (first.at, at)));
+            }
+            w.push(Written {
+                buffer: buffer.clone(),
+                range,
+                at,
+            });
+        });
+    }
+    #[cfg(not(debug_assertions))]
+    let _ = (buffer, range, at);
+}
+
+/// [`check_write`]'s failure: which buffer, which writes, and what to do.
+fn twice_message(size: u64, range: &Range<u64>, (first, again): (&Location, &Location)) -> String {
+    format!(
+        "a {size}-byte buffer's bytes {}..{} were written twice while one encoder \
+         records (first at {first}, again at {again}): both writes land at its one \
+         submit, so every command recorded between them reads the second. Give the \
+         stage a buffer of its own, or send the open `Commands` first \
+         (`gpu::commands::Commands::flush`)",
+        range.start, range.end
+    )
 }
 
 fn encoder(device: &wgpu::Device, label: &'static str) -> wgpu::CommandEncoder {

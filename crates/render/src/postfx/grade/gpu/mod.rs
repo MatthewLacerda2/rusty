@@ -61,9 +61,9 @@ impl Chain {
         grade: Option<&PostProcessingComponent>,
     ) -> Vec<[u8; 4]> {
         self.write_row(row);
-        let (device, queue) = (&self.r.device, &self.r.queue);
+        let gpu = (&self.r.device, (&self.r.queue, &self.r.staging));
         let bake = &mut self.r.grade_bake;
-        self.pfx.grade.prepare((device, queue), bake, grade);
+        self.pfx.grade.prepare(gpu, bake, grade);
         self.composite(&exposure(ev, ExposureMode::Fixed))
     }
 

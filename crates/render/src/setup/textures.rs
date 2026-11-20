@@ -3,6 +3,7 @@
 //! material bind group. A cohesive unit ([`Textures`]) that `setup_build` builds and
 //! `Renderer::from_parts` flattens into the renderer.
 
+use crate::gpu::ops::Writes;
 use std::rc::Rc;
 
 use crate::draw::materials::material_group;
@@ -32,20 +33,19 @@ pub(crate) struct Textures {
 /// checker texture, and the all-default material bind group (#202).
 pub(crate) fn create_textures(
     device: &wgpu::Device,
-    queue: &wgpu::Queue,
+    writes: Writes,
     registry: &mut ShaderRegistry,
 ) -> Textures {
     let texture_layout = bind_layouts::create_texture_layout(device);
     let material_layout = bind_layouts::create_material_layout(device);
     let mip_generator = MipGenerator::new(device, registry);
-    let gpu = (device, queue, &mip_generator);
+    let gpu = (device, writes, &mip_generator);
     let default_texture = Rc::new(Renderer::create_default_checkerboard_texture(
         gpu,
         &texture_layout,
     ));
     let white_texture = Rc::new(Renderer::create_white_texture(
-        device,
-        queue,
+        (device, writes),
         &texture_layout,
     ));
     let zero_params = device.create_buffer(&wgpu::BufferDescriptor {

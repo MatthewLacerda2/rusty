@@ -79,7 +79,7 @@ pub(crate) struct Pair {
     pub pass: GpuPass,
     /// The part of `pass` it times, when its stage is timed in parts.
     pub part: Option<GpuPart>,
-    /// The submit the pair goes out in when it was taken (`gpu::ops::submit_seq`):
+    /// The submit the pair goes out in when it was taken (`gpu::commands::pair_tag`):
     /// the open recording's tag while a `gpu::commands::Commands` records, else
     /// the renderer's submit count. Pairs with one tag are recorded into one
     /// command buffer, so a gap between them is GPU work no pair holds, never a

@@ -20,13 +20,16 @@
 //! `write_buffer` lands at its one submit, ahead of every command it recorded, so
 //! a range written twice in that window leaves the commands recorded between the
 //! two writes reading the second. In debug builds [`CountedQueue::counted_write_buffer`]
-//! panics on it ([`recording`], [`check_write`]).
+//! panics on it (`gpu::commands::check_write`).
+//!
+//! A texture write is the one call counted into something else: its bytes go to
+//! the renderer's [`Staging`], which bounds what wgpu holds of them until a
+//! submit (#2372).
 //!
 //! `make rules`' `gpu-ops` rule holds that no file under `crates/render/src/` but
 //! this one calls the raw wgpu methods outside test code.
 
 use std::cell::Cell;
-use std::ops::Range;
 use std::panic::Location;
 
 /// How many of each counted GPU call a frame made.
@@ -74,107 +77,9 @@ thread_local! {
     static SUBMITS: Cell<u64> = const { Cell::new(0) };
 }
 
-thread_local! {
-    /// The tag of the [`super::commands::Commands`] recording on this thread, if
-    /// one is: every pair the GPU timer takes while it records goes out in its one
-    /// submit, whatever other submit happens meanwhile (a buffer's growth copy).
-    static RECORDING: Cell<Option<u64>> = const { Cell::new(None) };
-    /// How many recordings this thread has begun, ever: each one's tag.
-    static RECORDINGS: Cell<u64> = const { Cell::new(0) };
-}
-
-/// Tags a recording's pairs apart from any submit count.
-const RECORDING_TAG: u64 = 1 << 63;
-
-/// The submit the GPU timer's pair taken now goes out in: the open recording's
-/// tag while one records, else how many counted submits this thread has made.
+/// How many counted submits this thread has made, ever.
 pub(crate) fn submit_seq() -> u64 {
-    RECORDING
-        .with(Cell::get)
-        .unwrap_or_else(|| SUBMITS.with(Cell::get))
-}
-
-/// Start a recording on this thread, returning the one it nests in (restored by
-/// [`end_recording`]). Its writes are checked from here to its end.
-pub(crate) fn begin_recording() -> Option<u64> {
-    let tag = RECORDING_TAG | RECORDINGS.with(|n| n.replace(n.get() + 1));
-    let outer = RECORDING.with(|r| r.replace(Some(tag)));
-    if outer.is_none() {
-        forget_writes();
-    }
-    outer
-}
-
-/// End the recording [`begin_recording`] started, back to `outer`.
-pub(crate) fn end_recording(outer: Option<u64>) {
-    RECORDING.with(|r| r.set(outer));
-    if outer.is_none() {
-        forget_writes();
-    }
-}
-
-/// Whether a recording is open on this thread.
-pub(crate) fn recording() -> bool {
-    RECORDING.with(Cell::get).is_some()
-}
-
-/// One buffer range written while a recording is open, and where.
-#[cfg(debug_assertions)]
-struct Written {
-    buffer: wgpu::Buffer,
-    range: Range<u64>,
-    at: &'static Location<'static>,
-}
-
-#[cfg(debug_assertions)]
-thread_local! {
-    static WRITTEN: std::cell::RefCell<Vec<Written>> = const { std::cell::RefCell::new(Vec::new()) };
-}
-
-/// Forget the writes checked so far: the recording went out (`Commands::flush`).
-pub(crate) fn forget_writes() {
-    #[cfg(debug_assertions)]
-    WRITTEN.with(|w| w.borrow_mut().clear());
-}
-
-/// Debug builds: panic when `range` of `buffer` was already written while the
-/// open recording records (none open: nothing is checked). Release: nothing.
-pub(crate) fn check_write(
-    buffer: &wgpu::Buffer,
-    range: Range<u64>,
-    at: &'static Location<'static>,
-) {
-    #[cfg(debug_assertions)]
-    if recording() {
-        WRITTEN.with(|w| {
-            let mut w = w.borrow_mut();
-            let overlaps = |o: &&Written| {
-                &o.buffer == buffer && o.range.start < range.end && range.start < o.range.end
-            };
-            if let Some(first) = w.iter().find(overlaps) {
-                panic!("{}", twice_message(buffer.size(), &range, (first.at, at)));
-            }
-            w.push(Written {
-                buffer: buffer.clone(),
-                range,
-                at,
-            });
-        });
-    }
-    #[cfg(not(debug_assertions))]
-    let _ = (buffer, range, at);
-}
-
-/// [`check_write`]'s failure: which buffer, which writes, and what to do.
-fn twice_message(size: u64, range: &Range<u64>, (first, again): (&Location, &Location)) -> String {
-    format!(
-        "a {size}-byte buffer's bytes {}..{} were written twice while one encoder \
-         records (first at {first}, again at {again}): both writes land at its one \
-         submit, so every command recorded between them reads the second. Give the \
-         stage a buffer of its own, or send the open `Commands` first \
-         (`gpu::commands::Commands::flush`)",
-        range.start, range.end
-    )
+    SUBMITS.with(Cell::get)
 }
 
 /// What this thread counted since the last call, and start again from zero.
@@ -240,9 +145,19 @@ pub(crate) trait CountedQueue {
         buffers: I,
     ) -> wgpu::SubmissionIndex;
     /// `write_buffer`, counted, and checked against the open recording's other
-    /// writes ([`check_write`]).
+    /// writes (`gpu::commands::check_write`).
     #[track_caller]
     fn counted_write_buffer(&self, buffer: &wgpu::Buffer, offset: wgpu::BufferAddress, data: &[u8]);
+    /// `write_texture`, its bytes counted into `staging`, the renderer's for
+    /// this queue ([`Staging`]).
+    fn counted_write_texture(
+        &self,
+        staging: &Staging,
+        to: wgpu::TexelCopyTextureInfo<'_>,
+        data: &[u8],
+        layout: wgpu::TexelCopyBufferLayout,
+        size: wgpu::Extent3d,
+    );
 }
 
 impl CountedQueue for wgpu::Queue {
@@ -263,12 +178,97 @@ impl CountedQueue for wgpu::Queue {
         data: &[u8],
     ) {
         bump(|n| n.buffer_writes += 1);
-        check_write(
+        super::commands::check_write(
             buffer,
             offset..offset + data.len() as u64,
             Location::caller(),
         );
         self.write_buffer(buffer, offset, data);
+    }
+
+    fn counted_write_texture(
+        &self,
+        staging: &Staging,
+        to: wgpu::TexelCopyTextureInfo<'_>,
+        data: &[u8],
+        layout: wgpu::TexelCopyBufferLayout,
+        size: wgpu::Extent3d,
+    ) {
+        let staged = staging.make_room(self);
+        self.write_texture(to, data, layout, size);
+        staging.since.set(staged + data.len() as u64);
+        staging.seq.set(submit_seq());
+    }
+}
+
+/// A queue and its [`Staging`]: what a counted texture write needs.
+pub(crate) type Writes<'a> = (&'a wgpu::Queue, &'a Staging);
+
+/// The texture bytes written between two of `Staging`'s own submits: two 2048²
+/// BC7 textures with their mips (5.6 MB each), or one 2048² RGBA8 base level.
+pub const STAGING_BUDGET: u64 = 16 << 20;
+
+/// What one queue's texture writes hold in staging, bounded.
+///
+/// `queue.write_texture` copies its bytes into a staging buffer that wgpu keeps
+/// until the next submit and frees once the GPU has run it. That buffer is host
+/// memory, counted in the process's resident memory on every GPU. A write that a
+/// submit follows soon (an image upload with mips, whose mip pass submits) holds
+/// it briefly; one that nothing submits after (a compressed texture's levels, a
+/// lightmap's pages, a single-level image) holds it until the frame's own submit,
+/// so a load of many piled up until then (#2372).
+///
+/// The bytes written since the last submit on this thread are what is still
+/// staged: any counted submit (a mip pass, a frame) takes them with it. Before a
+/// write that would find [`STAGING_BUDGET`] or more staged, `Staging` waits for
+/// its own previous submit and submits what is pending. So its own submits keep
+/// at most two batches, each the budget plus the one write that crossed it, in
+/// staging at once, however many textures a scene has; a write a submit already
+/// follows pays no wait and no submit. A submit made elsewhere is not waited
+/// for. Like the frame's counts, the submits are counted per thread, so two
+/// renderers on one thread (a test's pair, a bake beside the editor) reset each
+/// other's count.
+pub(crate) struct Staging {
+    device: wgpu::Device,
+    since: Cell<u64>,
+    /// [`submit_seq`] when `since` was last counted: a submit since took it.
+    seq: Cell<u64>,
+    submitted: Cell<Option<wgpu::SubmissionIndex>>,
+}
+
+impl Staging {
+    /// An empty count for the queue of `device`.
+    pub(crate) fn new(device: &wgpu::Device) -> Self {
+        Self {
+            device: device.clone(),
+            since: Cell::new(0),
+            seq: Cell::new(submit_seq()),
+            submitted: Cell::new(None),
+        }
+    }
+
+    /// The bytes still staged before a write: none when a submit took them, and
+    /// none once at the budget, after waiting for the last submit made here and
+    /// submitting what is pending on `queue`.
+    fn make_room(&self, queue: &wgpu::Queue) -> u64 {
+        if submit_seq() != self.seq.get() {
+            return 0;
+        }
+        let staged = self.since.get();
+        if staged < STAGING_BUDGET {
+            return staged;
+        }
+        if let Some(last) = self.submitted.take() {
+            let wait = wgpu::PollType::Wait {
+                submission_index: Some(last),
+                timeout: None,
+            };
+            if let Err(e) = self.device.poll(wait) {
+                log::warn!("[Render] waiting for a texture upload failed: {e}");
+            }
+        }
+        self.submitted.set(Some(queue.counted_submit([])));
+        0
     }
 }
 

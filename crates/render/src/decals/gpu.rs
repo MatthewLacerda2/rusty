@@ -67,7 +67,11 @@ impl Renderer {
             .flat_map(|(decal, _)| record::kinded(d.kept.of(decal.id)))
             .collect();
         let misses = &mut self.texture_freshness;
-        let gpu = (&self.device, &self.queue, &self.mip_generator);
+        let gpu = (
+            &self.device,
+            (&self.queue, &self.staging),
+            &self.mip_generator,
+        );
         self.global_bind_group_dirty |= d.atlas.prepare(gpu, &maps, misses);
 
         let mut dropped = 0;
