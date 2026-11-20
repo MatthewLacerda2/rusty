@@ -64,8 +64,8 @@ pub mod gather;
 mod grid;
 
 pub use file::{
-    apply_sidecar, decode, encode, load_sidecar, occlusion_path, read_sidecar, save_sidecar,
-    OcclusionFile, SUFFIX as OCCLUSION_SUFFIX,
+    apply_sidecar, decode, encode, encoded_len, load_sidecar, occlusion_path, read_sidecar,
+    save_sidecar, OcclusionFile, SUFFIX as OCCLUSION_SUFFIX,
 };
 pub use grid::{Grid, CELL_SIZE, MAX_CELL, MAX_CELLS};
 

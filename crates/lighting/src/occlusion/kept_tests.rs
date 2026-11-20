@@ -1,10 +1,10 @@
 //! Whether a held PVS is what a bake of the scene would write (#2348,
-//! [`OcclusionInput::baked_as`]): Generate Lighting keeps it only then.
+//! [`is_current`](crate::occlusion::is_current)): Generate Lighting keeps it only then.
 
 use glam::Vec3;
 
 use crate::occlusion::test_level::{block, corridors};
-use crate::occlusion::{bake_occlusion, gather_occlusion, OcclusionBakeReport};
+use crate::occlusion::{bake_occlusion, is_current, OcclusionBakeReport};
 use rusty_components::RenderMode;
 use rusty_scene::lighting::occlusion::OcclusionData;
 use rusty_scene::{MaterialAsset, MaterialComponent, Scene};
@@ -14,7 +14,7 @@ fn baked(scene: &Scene) -> OcclusionData {
 }
 
 fn kept(scene: &Scene, held: &OcclusionData) -> bool {
-    gather_occlusion(scene).baked_as(held)
+    is_current(scene, held)
 }
 
 /// The first prop: a static box that occludes.
@@ -86,4 +86,6 @@ fn a_kept_pvs_reports_what_its_bake_reported() {
     let (data, report) = bake_occlusion(&scene, 2);
     let data = data.expect("occluders");
     assert_eq!(OcclusionBakeReport::of_kept(&data), report);
+    let encoded = rusty_scene::lighting::occlusion::encode(&data);
+    assert_eq!(report.bytes, encoded.len(), "the length without encoding");
 }

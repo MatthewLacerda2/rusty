@@ -104,3 +104,17 @@ fn the_summary_counts_the_never_culled_and_says_a_level_too_large() {
         "{line}"
     );
 }
+
+/// The editor's Generate (#2348): a scene holding its own bake hands it back kept,
+/// on the job's first poll, with nothing to apply and no worker to wait on.
+#[test]
+fn the_editors_generate_keeps_a_current_pvs_on_its_first_poll() {
+    let mut scene = corridors();
+    let (data, report) = bake_occlusion(&scene, 2);
+    scene.put_baked_occlusion(data);
+    let mut job = OcclusionBakeJob::generate(&scene).unwrap();
+    let kept = job.poll().expect("finished at once").unwrap();
+    assert!(kept.kept && kept.data.is_none());
+    assert_eq!(kept.report, report, "the held PVS's counts");
+    assert!(job.poll().is_none(), "the job is spent");
+}

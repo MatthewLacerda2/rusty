@@ -22,7 +22,8 @@ pub const OCCLUSION_SEED: u64 = 0x5056_5321;
 /// whenever the bake would write other bytes for the same objects (its sampling,
 /// the dilation, [`OCCLUSION_SEED`], the grid's `CELL_SIZE` or `MAX_CELL`, the
 /// targets' constants), so Generate Lighting re-bakes a PVS an older engine made
-/// instead of keeping it ([`OcclusionInput::baked_as`]).
+/// instead of keeping it ([`is_current`]). `version_tests` holds the rule:
+/// it pins this version beside the bytes a small fixed scene bakes to.
 pub const OCCLUSION_VERSION: u32 = 1;
 
 /// What one occlusion bake found. All zero when it baked nothing.
@@ -77,6 +78,44 @@ pub fn bake_occlusion(
         .expect("nobody cancels it")
 }
 
+/// Whether `held` is what a bake of `scene` would write (#2348): stamped by this
+/// [`OCCLUSION_VERSION`] and baked from these very objects, in order, each its
+/// entity, fingerprint and occluder flag. The bake reads nothing else: the
+/// fingerprint hashes all it reads of an object (`gather::Fingerprints::read`),
+/// the grid is laid over the objects' bounds, and its constants and the seed are
+/// the version's. So a match is byte for byte a re-bake's PVS ([`OCCLUSION_SEED`]).
+/// Reads the fingerprints alone, never a triangle: what Generate Lighting pays to
+/// keep an unchanged PVS.
+pub fn is_current(scene: &Scene, held: &OcclusionData) -> bool {
+    if held.stamp.version != OCCLUSION_VERSION {
+        return false;
+    }
+    let prints = Fingerprints::of_scene(scene);
+    let mut ids = scene.world.ids_with_mesh();
+    ids.sort_unstable();
+    let mut now = ids.iter().filter_map(|&id| {
+        prints
+            .of(scene, id)
+            .map(|(print, occluder)| (id, print, occluder))
+    });
+    let mut was = held
+        .objects
+        .iter()
+        .map(|h| (h.entity, h.fingerprint, h.occluder));
+    loop {
+        match (now.next(), was.next()) {
+            (None, None) => return true,
+            (a, b) if a != b => return false,
+            _ => {}
+        }
+    }
+}
+
+/// The PVS `scene` holds when it is what a bake would write ([`is_current`]).
+pub fn current_pvs(scene: &Scene) -> Option<&OcclusionData> {
+    scene.occlusion.as_deref().filter(|h| is_current(scene, h))
+}
+
 impl OcclusionBakeReport {
     /// The report of the bake that made `data`, read back from the PVS alone: what
     /// Generate Lighting says of a PVS it kept unchanged (#2348).
@@ -89,29 +128,12 @@ impl OcclusionBakeReport {
             cell_size: data.grid.cell,
             too_large: false,
             rows: data.row_count(),
-            bytes: rusty_scene::lighting::occlusion::encode(data).len(),
+            bytes: rusty_scene::lighting::occlusion::encoded_len(data),
         }
     }
 }
 
 impl OcclusionInput {
-    /// Whether `held` is what baking this input would write (#2348): stamped by
-    /// this [`OCCLUSION_VERSION`] and baked from these very objects, in order, each
-    /// its entity, fingerprint and occluder flag. The bake reads nothing else: the
-    /// fingerprint hashes all it reads of an object (`gather::Fingerprints::read`),
-    /// the grid is laid over the objects' bounds, and its constants and the seed
-    /// are the version's. So a match is byte for byte a re-bake's PVS
-    /// ([`OCCLUSION_SEED`]).
-    pub fn baked_as(&self, held: &OcclusionData) -> bool {
-        let same = |(o, h): (&Object, &BakedObject)| {
-            (o.entity, o.fingerprint, !o.occluding.is_empty())
-                == (h.entity, h.fingerprint, h.occluder)
-        };
-        held.stamp.version == OCCLUSION_VERSION
-            && held.objects.len() == self.objects.len()
-            && self.objects.iter().zip(&held.objects).all(same)
-    }
-
     /// The scene ready to sample and its grid, for a measurement that times or
     /// counts cells one by one, counting its rays; `None` when no grid is laid.
     /// A test hook, as [`Sampler`] is.
@@ -190,7 +212,7 @@ impl OcclusionInput {
             cells: grid.cell_count(),
             cell_size: grid.cell,
             rows: data.row_count(),
-            bytes: rusty_scene::lighting::occlusion::encode(&data).len(),
+            bytes: rusty_scene::lighting::occlusion::encoded_len(&data),
             ..report
         };
         Some((Some(data), report))

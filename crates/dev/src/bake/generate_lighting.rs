@@ -166,7 +166,7 @@ pub fn finish(
     scene: &mut Scene,
     path: &str,
     (lightmaps, probes, saved): (usize, LightingBakeReport, LightingSave),
-    occlusion: BakedOcclusion,
+    mut occlusion: BakedOcclusion,
 ) -> Result<GenerateReport, String> {
     refuse_in_play(scene)?;
     let occlusion_kept = occlusion.kept;
@@ -178,12 +178,11 @@ pub fn finish(
         LightingSave::NeedsSceneSave => {
             let (report, ms) = (occlusion.report, occlusion.ms);
             // The next save writes it ([`Scene::put_baked_occlusion`]); the bake is
-            // reported now. A kept PVS is already the scene's.
-            if !occlusion.kept {
-                scene.put_baked_occlusion(occlusion.data);
-            }
-            let measured = (&report, ms, &occlusion.cells[..]);
-            let written = (None, occlusion.kept);
+            // reported now. A kept PVS is already the scene's, and owns its file.
+            let (kept, cells) = (occlusion.kept, std::mem::take(&mut occlusion.cells));
+            occlusion.put_on(scene);
+            let measured = (&report, ms, &cells[..]);
+            let written = (None, kept);
             super::report::occlusion::keep(scene, path, measured, written);
             (report, ms)
         }
@@ -241,26 +240,25 @@ impl OcclusionOnlyReport {
 
 /// Apply a finished occlusion bake to `scene` and write it beside the scene file
 /// at `path`: Bake Occlusion's last step, the script's and the editor's worker's.
-/// A kept one (#2348) is the scene's already: the file is brought to it, as a
-/// save would, and it reports its one stage.
+/// A kept one (#2348) is the scene's already: the file is brought to it as to a
+/// bake's ([`BakedOcclusion::put_on`]), even over one another process wrote.
 pub fn apply_occlusion(
     scene: &mut Scene,
     path: &str,
-    baked: BakedOcclusion,
+    mut baked: BakedOcclusion,
 ) -> Result<OcclusionOnlyReport, String> {
     refuse_in_play(scene)?;
     let report = OcclusionOnlyReport {
         occlusion: baked.report,
         ms: baked.ms,
     };
-    if !baked.kept {
-        scene.put_baked_occlusion(baked.data);
-    }
+    let (kept, cells) = (baked.kept, std::mem::take(&mut baked.cells));
+    baked.put_on(scene);
     let saving = std::time::Instant::now();
     rusty_scene::lighting::occlusion::save_sidecar(scene, path)?;
     let saved = Some(saving.elapsed());
-    let measured = (&report.occlusion, report.ms, &baked.cells[..]);
-    super::report::occlusion::keep(scene, path, measured, (saved, baked.kept));
+    let measured = (&report.occlusion, report.ms, &cells[..]);
+    super::report::occlusion::keep(scene, path, measured, (saved, kept));
     Ok(report)
 }
 

@@ -10,8 +10,10 @@
 //! occluder changed (`render::scene::occlusion`).
 //!
 //! Generate Lighting keeps the PVS the scene holds when it is what the bake would
-//! write (#2348, `OcclusionInput::baked_as`): [`OcclusionBakeJob::generate`] and
-//! [`generate_occlusion_logged`] then bake nothing. Bake Occlusion always bakes.
+//! write (#2348, `rusty_lighting::occlusion::is_current`, read from the
+//! fingerprints alone): [`OcclusionBakeJob::generate`] and
+//! [`generate_occlusion_logged`] then gather and bake nothing, both through
+//! [`BakedOcclusion::kept`]. Bake Occlusion always bakes.
 //!
 //! Both runs lend the bake [`CellClocks`], so each cell's sampling time reaches
 //! the bake report's `slowestCells` (#1987) without a clock inside the sim.
@@ -23,7 +25,7 @@ use std::time::{Duration, Instant};
 use crate::bake::lightmap::logged::watch;
 use crate::bake::progress::{BakeLog, Progress, Step};
 use rusty_lighting::occlusion::{
-    gather_occlusion, OcclusionBakeReport, OcclusionInput, OcclusionProgress,
+    current_pvs, gather_occlusion, OcclusionBakeReport, OcclusionInput, OcclusionProgress,
 };
 use rusty_scene::lighting::occlusion::OcclusionData;
 use rusty_scene::Scene;
@@ -47,10 +49,12 @@ pub struct BakedOcclusion {
 }
 
 impl BakedOcclusion {
-    /// The scene's held PVS kept, when `input` is what it was baked from
-    /// (`OcclusionInput::baked_as`), found since `started`.
-    fn kept(scene: &Scene, input: &OcclusionInput, started: Instant) -> Option<Self> {
-        let held = scene.occlusion.as_deref().filter(|h| input.baked_as(h))?;
+    /// The PVS `scene` holds, kept, when it is what a bake would write
+    /// ([`current_pvs`]): Generate Lighting's one keep-or-bake decision, the
+    /// editor's and the script's. `None`: bake.
+    pub fn kept(scene: &Scene) -> Option<Self> {
+        let started = Instant::now();
+        let held = current_pvs(scene)?;
         Some(Self {
             data: None,
             report: OcclusionBakeReport::of_kept(held),
@@ -58,6 +62,16 @@ impl BakedOcclusion {
             cells: Vec::new(),
             kept: true,
         })
+    }
+
+    /// Put this bake on `scene`: its PVS, or, when kept, the file's ownership
+    /// alone ([`Scene::keep_baked_occlusion`]), so the next save writes the kept
+    /// PVS as a bake's would.
+    pub fn put_on(self, scene: &mut Scene) {
+        match self.kept {
+            true => scene.keep_baked_occlusion(),
+            false => scene.put_baked_occlusion(self.data),
+        }
     }
 }
 
@@ -81,20 +95,19 @@ impl OcclusionBakeJob {
     }
 
     /// Generate Lighting's occlusion step: [`Self::start`], unless the scene holds
-    /// the PVS that bake would write, which the job then hands back finished.
+    /// the PVS that bake would write ([`BakedOcclusion::kept`]), which the job then
+    /// hands back finished, on its first [`Self::poll`].
     pub fn generate(scene: &Scene) -> Result<Self, String> {
-        let started = Instant::now();
-        let input = gather_occlusion(scene);
-        match BakedOcclusion::kept(scene, &input, started) {
-            Some(kept) => Ok(Self {
-                progress: Arc::default(),
-                clocks: Arc::default(),
-                worker: None,
-                started,
-                kept: Some(kept),
-            }),
-            None => Self::bake(input),
-        }
+        let Some(kept) = BakedOcclusion::kept(scene) else {
+            return Self::start(scene);
+        };
+        Ok(Self {
+            progress: Arc::default(),
+            clocks: Arc::default(),
+            worker: None,
+            started: Instant::now(),
+            kept: Some(kept),
+        })
     }
 
     fn bake(input: OcclusionInput) -> Result<Self, String> {
@@ -154,31 +167,8 @@ impl Drop for OcclusionBakeJob {
 /// Bake `scene`'s PVS in line, saying its cells to `log` (a script's
 /// `Lighting.BakeOcclusion()`). An off log bakes on this thread's workers with no watcher.
 pub fn bake_occlusion_logged(scene: &Scene, log: &mut BakeLog) -> Result<BakedOcclusion, String> {
-    bake_input_logged(gather_occlusion(scene), Instant::now(), log)
-}
-
-/// A script's `Lighting.Generate()`'s occlusion step: [`bake_occlusion_logged`],
-/// unless the scene holds the PVS it would write, which is kept and said to `log`.
-pub fn generate_occlusion_logged(
-    scene: &Scene,
-    log: &mut BakeLog,
-) -> Result<BakedOcclusion, String> {
     let started = Instant::now();
     let input = gather_occlusion(scene);
-    match BakedOcclusion::kept(scene, &input, started) {
-        Some(kept) => {
-            log.kept(Step::Occlusion);
-            Ok(kept)
-        }
-        None => bake_input_logged(input, started, log),
-    }
-}
-
-fn bake_input_logged(
-    input: OcclusionInput,
-    started: Instant,
-    log: &mut BakeLog,
-) -> Result<BakedOcclusion, String> {
     let clocks = Arc::new(CellClocks::default());
     let progress = OcclusionProgress::observed(clocks.clone());
     let run = |p: &OcclusionProgress| bake(&input, p);
@@ -195,6 +185,20 @@ fn bake_input_logged(
         cells,
         kept: false,
     })
+}
+
+/// A script's `Lighting.Generate()`'s occlusion step: [`bake_occlusion_logged`],
+/// unless the scene holds the PVS it would write ([`BakedOcclusion::kept`]), which
+/// is kept and said to `log`.
+pub fn generate_occlusion_logged(
+    scene: &Scene,
+    log: &mut BakeLog,
+) -> Result<BakedOcclusion, String> {
+    let Some(kept) = BakedOcclusion::kept(scene) else {
+        return bake_occlusion_logged(scene, log);
+    };
+    log.kept(Step::Occlusion);
+    Ok(kept)
 }
 
 fn bake(

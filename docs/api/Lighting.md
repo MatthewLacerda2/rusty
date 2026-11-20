@@ -710,10 +710,16 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   scene*, below) and occluder flag, baked by the same version of the bake. A lamp
   moved, a light's intensity changed or a probe added keeps it, and so does the file,
   byte for byte: it is exactly what a re-bake would write (the bake is seeded). The
-  step then takes about the time to gather the static meshes, its console line reads
-  `[Lighting] 9:41 occlusion unchanged, kept` (the editor's summary `…, occlusion
-  unchanged, kept`), the `occlusion` bake report keeps the PVS's counts with one stage,
-  `skipped: unchanged`, and `Lighting.Generate()` returns the kept PVS's counts. A scene
+  kept PVS owns its file as a bake does: one another process wrote there since is
+  overwritten with it, and the warning says so. The step then takes about the time to
+  fingerprint the static meshes (no triangle is gathered); `Lighting.Generate()` logs
+  `[Lighting] 9:41 occlusion unchanged, kept` as its step line, and the editor's
+  Generate Lighting ends its summary line with `…, occlusion unchanged, kept`. The
+  `occlusion` bake report keeps the PVS's counts, its stages `skipped: unchanged` and
+  then `write` (when the file is written beside the scene), and `Lighting.Generate()`
+  returns the kept PVS's counts. The report's `settings` carry the bake's `version`,
+  bumped whenever the bake would write other bytes for the same objects, so an engine
+  update re-bakes. A scene
   with no PVS, one baked from anything else, or a level too large to cull bakes as
   before. **`Lighting.BakeOcclusion()` and the "Bake Occlusion" button always re-bake.**
 - **Runs** as Generate Lighting's last step, after the lightmaps and probes are
@@ -929,7 +935,7 @@ Then each kind's own:
   the platform's clock: the sampling itself never reads one, and a timed bake writes the
   same PVS as an untimed one. Both are `nil` when no PVS was kept, or when the bake was
   not timed cell by cell, as for a PVS Generate Lighting kept unchanged, whose
-  `stages` are the one `skipped: unchanged`.
+  bake stage is `skipped: unchanged`.
 
 A stage baked in the editor a step a frame (the probes) counts the frames between its
 steps too. Lists of "heaviest first" keep the top 20; the counts hold them all.

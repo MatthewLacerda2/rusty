@@ -1,7 +1,8 @@
 //! Generate Lighting keeps an unchanged PVS (#2348): a lamp moved between two
-//! Generates re-bakes no occlusion and leaves its file byte for byte, a static box
-//! moved re-bakes it (Generate's occlusion step alone: the two Generates before it
-//! are the test's cost), and Bake Occlusion always re-bakes.
+//! Generates, with a save and load between them, re-bakes no occlusion, and the
+//! kept PVS owns its file over one another writer put there; a static box moved
+//! re-bakes it (Generate's occlusion step alone: the two Generates before it are
+//! the test's cost), and Bake Occlusion always re-bakes.
 
 use glam::Vec3;
 use serde_json::Value;
@@ -10,8 +11,9 @@ use super::{apply_occlusion, bake_occlusion_only, generate_lighting, GenerateRep
 use crate::bake::occlusion::generate_occlusion_logged;
 use crate::bake::progress::{BakeLog, Line};
 use crate::bake::report::{read, Kind};
-use rusty_lighting::occlusion::test_level::corridors;
-use rusty_scene::lighting::occlusion::occlusion_path;
+use rusty_lighting::occlusion::bake_occlusion;
+use rusty_lighting::occlusion::test_level::{block, corridors};
+use rusty_scene::lighting::occlusion::{encode, occlusion_path};
 use rusty_scene::Scene;
 
 /// The corridors level saved at a fresh path with cheap bakes, and loaded back.
@@ -19,16 +21,33 @@ fn saved() -> (Scene, String) {
     let dir = rusty_test_support::temp::dir().join("generate_kept");
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("level.scene").to_string_lossy().into_owned();
-    let mut level = corridors();
+    let level = cheap(corridors());
+    rusty_edit::save_to_file(&level, &path).unwrap();
+    (reloaded(&path), path)
+}
+
+/// `level` with bakes cheap enough for a test.
+fn cheap(mut level: Scene) -> Scene {
     let s = &mut level.lighting_settings.lightmaps;
     (s.texels_per_unit, s.samples, s.bounces, s.max_lightmap_size) = (0.5, 1, 1, 16);
     // The probes are most of a Generate's time on a software adapter.
     let r = &mut level.lighting_settings.reflections;
     (r.resolution, r.max_probes) = (16, 1);
-    rusty_edit::save_to_file(&level, &path).unwrap();
+    level
+}
+
+/// The scene at `path`, loaded afresh.
+fn reloaded(path: &str) -> Scene {
     let mut scene = Scene::new();
-    rusty_edit::load_from_file(&mut scene, &path).unwrap();
-    (scene, path)
+    rusty_edit::load_from_file(&mut scene, path).unwrap();
+    scene
+}
+
+/// Another scene's PVS bytes: what another process baking a level there writes.
+fn another_writers_pvs() -> Vec<u8> {
+    let mut other = corridors();
+    block(&mut other, "Extra", Vec3::splat(3.0), Vec3::splat(3.5));
+    encode(&bake_occlusion(&other, 2).0.expect("occluders"))
 }
 
 /// One Generate, with the lines its log said.
@@ -62,6 +81,10 @@ fn gpu_an_unchanged_pvs_is_kept_and_a_moved_static_box_re_bakes_it() {
     let (first, _) = generate(&mut scene, &path);
     assert!(!first.occlusion_kept && first.occlusion.cells > 0);
     let pvs = std::fs::read(occlusion_path(&path)).unwrap();
+    rusty_edit::save_to_file(&scene, &path).unwrap();
+    let mut scene = reloaded(&path);
+    assert!(scene.occlusion.is_some(), "the PVS read from disk");
+    std::fs::write(occlusion_path(&path), another_writers_pvs()).unwrap();
 
     moved(&mut scene, "Lamp");
     let (second, lines) = generate(&mut scene, &path);
@@ -72,10 +95,11 @@ fn gpu_an_unchanged_pvs_is_kept_and_a_moved_static_box_re_bakes_it() {
         .iter()
         .any(|l| l.ends_with("occlusion unchanged, kept"));
     assert!(said, "{lines:?}");
-    assert_eq!(stages(&path), ["skipped: unchanged"]);
+    assert_eq!(stages(&path), ["skipped: unchanged", "write"]);
     let report = read(&path, Kind::Occlusion).unwrap();
     assert_eq!(report["cells"], Value::from(first.occlusion.cells));
-    assert_eq!(std::fs::read(occlusion_path(&path)).unwrap(), pvs);
+    let file = std::fs::read(occlusion_path(&path)).unwrap();
+    assert_eq!(file, pvs, "the kept PVS's file, over another writer's");
 
     moved(&mut scene, "Crate");
     let third = generate_occlusion_logged(&scene, &mut BakeLog::off()).unwrap();

@@ -53,6 +53,13 @@ pub fn encode(data: &OcclusionData) -> Vec<u8> {
     out
 }
 
+/// The length of [`encode`]'s bytes for `data`, without encoding it: the header,
+/// stamp and counts (52 bytes), then 13 per object, 8 per row word, 4 per cell.
+pub fn encoded_len(data: &OcclusionData) -> usize {
+    let (rows, cells) = data.parts();
+    52 + data.objects.len() * 13 + rows.len() * 8 + cells.len() * 4
+}
+
 /// The data `bytes` hold, or why they are refused.
 pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
     let mut r = Reader(bytes);
@@ -177,6 +184,14 @@ impl Scene {
     pub fn put_baked_occlusion(&mut self, data: Option<OcclusionData>) {
         self.bake_files.baked(SUFFIX);
         *self.occlusion = data.map(Arc::new);
+    }
+
+    /// A bake found the PVS the scene holds already current and kept it (#2348):
+    /// it owns its file as a bake's output does, so the next save writes it there,
+    /// even over a newer file another process wrote (the bytes a re-bake would
+    /// write).
+    pub fn keep_baked_occlusion(&mut self) {
+        self.bake_files.baked(SUFFIX);
     }
 }
 

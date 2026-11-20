@@ -13,7 +13,7 @@ use std::time::Duration;
 use serde_json::{json, Value};
 
 use super::{entity_name, point, Kind, Report, Stages, TOP};
-use rusty_lighting::occlusion::{OcclusionBakeReport, OCCLUSION_SEED};
+use rusty_lighting::occlusion::{OcclusionBakeReport, OCCLUSION_SEED, OCCLUSION_VERSION};
 use rusty_scene::lighting::occlusion::{OcclusionData, CELL_SIZE, MAX_CELL};
 use rusty_scene::Scene;
 
@@ -26,6 +26,7 @@ pub fn report(
     output_bytes: u64,
 ) -> Report {
     let settings = json!({
+        "version": OCCLUSION_VERSION,
         "seed": OCCLUSION_SEED,
         "cellSize": CELL_SIZE,
         "maxCell": MAX_CELL,
@@ -56,7 +57,7 @@ pub const SKIPPED: &str = "skipped: unchanged";
 /// Write the report of an occlusion bake now on `scene` (#1980): it reported `r`,
 /// took `ms` and `cells` per cell, and writing its file beside `path` took `saved`
 /// (`None` when the file waits for a scene save, so nothing is written yet). A
-/// `kept` PVS (#2348) has one stage, [`SKIPPED`], its `ms`, and no write.
+/// `kept` PVS (#2348) has [`SKIPPED`] for its bake stage, its `ms` the comparison's.
 pub fn keep(
     scene: &Scene,
     path: &str,
@@ -68,9 +69,7 @@ pub fn keep(
     stages.push(name, std::time::Duration::from_millis(ms));
     let mut written = 0;
     if let Some(took) = saved {
-        if !kept {
-            stages.push("write", took);
-        }
+        stages.push("write", took);
         written = super::bytes_under(&rusty_scene::lighting::occlusion::occlusion_path(path));
     }
     let data = scene.occlusion.as_deref();
