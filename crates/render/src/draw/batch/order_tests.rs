@@ -61,10 +61,11 @@ fn near_equal_depths_keep_the_key_order() {
 }
 
 #[test]
-fn one_materials_batches_sit_together_inside_a_bucket() {
-    // `material` sorts before `mesh` in the key: wgpu re-flushes the material group
-    // each time it changes, so one material's meshes draw back to back, not
-    // interleaved with another's by mesh name.
+fn the_material_never_reorders_meshes_inside_a_bucket() {
+    // Inside a depth bucket the mesh orders the draws, then the material: a key
+    // field moved ahead of the mesh (the material, to bind its group less often)
+    // changes which solid draws first in every bucket, and so what a forward pass
+    // that is not primed, or an unlit solid that writes its own depth, shades.
     let with = |mesh, material, tag| {
         let mut it = at(mesh, tag, 10.0);
         it.key.material = material;
@@ -75,9 +76,9 @@ fn one_materials_batches_sit_together_inside_a_bucket() {
     let order: Vec<_> = draws
         .opaque
         .iter()
-        .map(|b| (b.key.material, name(b.key.mesh)))
+        .map(|b| (name(b.key.mesh), b.key.material))
         .collect();
-    assert_eq!(order, [(0, "A"), (0, "B"), (1, "A")]);
+    assert_eq!(order, [("A", 0), ("A", 1), ("B", 0)]);
 }
 
 #[test]
