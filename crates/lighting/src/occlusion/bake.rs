@@ -10,8 +10,11 @@ use std::collections::BTreeMap;
 
 use super::gather::{Fingerprints, Object};
 use super::progress::OcclusionProgress;
+use super::reach::Reach;
 use super::sample::Baking;
-use rusty_scene::lighting::occlusion::{BakeStamp, BakedObject, Grid, OcclusionData};
+#[cfg(feature = "dev")]
+use super::sampler::Sampler;
+use rusty_scene::lighting::occlusion::{BakeStamp, BakedObject, FloorSource, Grid, OcclusionData};
 use rusty_scene::Scene;
 
 /// The bake's seed: one fixed stream, so a re-bake of an unchanged scene writes
@@ -20,14 +23,15 @@ pub const OCCLUSION_SEED: u64 = 0x5056_5321;
 
 /// The bake's version, stamped on every PVS it makes ([`BakeStamp`]): bump it
 /// whenever the bake would write other bytes for the same objects (its sampling,
-/// the dilation, [`OCCLUSION_SEED`], the grid's `CELL_SIZE`, `MAX_CELL` and
-/// `MAX_CELLS`, the step `Grid::over` grows a cell by, the sampling of a large
+/// the dilation, [`OCCLUSION_SEED`], the grid's `CELL_SIZE`, `MAX_CELL`,
+/// `MAX_CELLS` and `MAX_GRID_CELLS`, which cells it samples (`reach`, its
+/// `PLAY_HEIGHT`), the step `Grid::over` grows a cell by, the sampling of a large
 /// cell as `CELL_SIZE` sub-cubes (`Grid::subdivisions`), the targets' constants), so Generate Lighting
 /// re-bakes a PVS an older engine made instead of keeping it ([`is_current`]).
 /// `version_tests` holds the rule only in part: it pins this version beside the
 /// bytes a small fixed scene bakes to, so it covers the small-level path alone
 /// (2 m cells, no growth, no sub-cubes), and a change to the rest is bumped by hand.
-pub const OCCLUSION_VERSION: u32 = 1;
+pub const OCCLUSION_VERSION: u32 = 2;
 
 /// What one occlusion bake found. All zero when it baked nothing.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -40,6 +44,10 @@ pub struct OcclusionBakeReport {
     /// corner that is not finite, kept in sight of every cell.
     pub never_culled: usize,
     pub cells: usize,
+    /// Of them, the cells sampled (#2328); every other one sees every object.
+    pub baked_cells: usize,
+    /// Where the bake found the floor that decided which cells it sampled.
+    pub floor: FloorSource,
     /// The cells' edge, metres (0 when no grid was laid).
     pub cell_size: f32,
     /// Whether the level needs cells over `grid::MAX_CELL`, so nothing was baked
@@ -55,20 +63,23 @@ pub struct OcclusionBakeReport {
 /// while the scene goes on ([`gather_occlusion`]).
 pub struct OcclusionInput {
     objects: Vec<Object>,
+    reach: Reach,
 }
 
-/// What `scene`'s occlusion bake reads, gathered on the caller's thread.
+/// What `scene`'s occlusion bake reads, gathered on the caller's thread, to
+/// sample every cell ([`Reach::everywhere`]).
 pub fn gather_occlusion(scene: &Scene) -> OcclusionInput {
-    gather_with(scene, &Fingerprints::of_scene(scene))
+    gather_with(scene, &Fingerprints::of_scene(scene), Reach::everywhere())
 }
 
-/// [`gather_occlusion`] through `prints`, whose geometry hashes it reuses: a
-/// Generate that compared the held PVS ([`current_pvs`]) and goes on to bake
-/// hashes no mesh twice.
-pub fn gather_with(scene: &Scene, prints: &Fingerprints) -> OcclusionInput {
+/// What `scene`'s occlusion bake reads, sampling the cells `reach` can be in,
+/// through `prints`, whose geometry hashes it reuses: a Generate that compared
+/// the held PVS ([`current_pvs`]) and goes on to bake hashes no mesh twice.
+pub fn gather_with(scene: &Scene, prints: &Fingerprints, reach: Reach) -> OcclusionInput {
     let objects = walk(scene, |id| prints.object(scene, id));
     OcclusionInput {
         objects: objects.collect(),
+        reach,
     }
 }
 
@@ -85,7 +96,7 @@ fn walk<'a, T: 'a>(
     ids.into_iter().filter_map(read)
 }
 
-/// Bake `scene`'s PVS on `threads` workers, in line. `None` when there is nothing
+/// Bake `scene`'s PVS on `threads` workers, in line, sampling every cell. `None` when there is nothing
 /// to cull (no static mesh, none that occludes, none small and finite enough to
 /// sample) or the level needs cells over `MAX_CELL`.
 pub fn bake_occlusion(
@@ -98,21 +109,27 @@ pub fn bake_occlusion(
         .expect("nobody cancels it")
 }
 
-/// Whether `held` is what a bake of `scene` would write (#2348): stamped by this
-/// [`OCCLUSION_VERSION`] and baked from these very objects, in order, each its
-/// entity, fingerprint and occluder flag. The bake reads nothing else: the
-/// fingerprint hashes all it reads of an object (`gather::Fingerprints::read`),
-/// the grid is laid over the objects' bounds, and its constants and the seed are
-/// the version's. So a match is byte for byte a re-bake's PVS ([`OCCLUSION_SEED`]).
-/// Reads the fingerprints alone, never a triangle: what Generate Lighting pays to
+/// Whether `held` is what a bake of `scene` sampling the cells `reach` can be in
+/// would write (#2348): stamped by this [`OCCLUSION_VERSION`], baked from these
+/// very objects, in order, each its entity, fingerprint and occluder flag, and
+/// seeded from the same cells (#2328: the grid laid again over the held bounds,
+/// and the hash of `reach`'s cells on it, [`Reach::key`]). The bake reads nothing
+/// else: the fingerprint hashes all it reads of an object
+/// (`gather::Fingerprints::read`), the grid is laid over the objects' bounds and
+/// the cells sampled, and its constants and the seed are the version's. So a
+/// match is byte for byte a re-bake's PVS ([`OCCLUSION_SEED`]). Reads the
+/// fingerprints and the floor, never a triangle: what Generate Lighting pays to
 /// keep an unchanged PVS.
-pub fn is_current(scene: &Scene, held: &OcclusionData) -> bool {
-    matches(scene, held, &Fingerprints::of_scene(scene))
+pub fn is_current(scene: &Scene, held: &OcclusionData, reach: &Reach) -> bool {
+    matches(scene, held, &Fingerprints::of_scene(scene), reach)
 }
 
 /// [`is_current`] through `prints`.
-fn matches(scene: &Scene, held: &OcclusionData, prints: &Fingerprints) -> bool {
-    if held.stamp.version != OCCLUSION_VERSION {
+fn matches(scene: &Scene, held: &OcclusionData, prints: &Fingerprints, reach: &Reach) -> bool {
+    let (lo, hi) = held.stamp.bounds;
+    let regrid = || reach.grid(lo, hi).map(|(grid, _)| grid);
+    let seeded = || regrid().is_some_and(|g| g == held.grid && reach.key(&g) == held.stamp.reach);
+    if held.stamp.version != OCCLUSION_VERSION || !seeded() {
         return false;
     }
     let mut now = walk(scene, |id| {
@@ -132,13 +149,13 @@ fn matches(scene: &Scene, held: &OcclusionData, prints: &Fingerprints) -> bool {
     }
 }
 
-/// The PVS `scene` holds when it is what a bake would write ([`is_current`]);
-/// otherwise the fingerprints the comparison read, for the bake to gather with
-/// ([`gather_with`]).
-pub fn current_pvs(scene: &Scene) -> Result<&OcclusionData, Fingerprints> {
+/// The PVS `scene` holds when it is what a bake sampling `reach` would write
+/// ([`is_current`]); otherwise the fingerprints the comparison read, for the bake
+/// to gather with ([`gather_with`]).
+pub fn current_pvs<'a>(scene: &'a Scene, reach: &Reach) -> Result<&'a OcclusionData, Fingerprints> {
     let prints = Fingerprints::of_scene(scene);
     match scene.occlusion.as_deref() {
-        Some(held) if matches(scene, held, &prints) => Ok(held),
+        Some(held) if matches(scene, held, &prints, reach) => Ok(held),
         _ => Err(prints),
     }
 }
@@ -152,6 +169,8 @@ impl OcclusionBakeReport {
             occluders: data.objects.iter().filter(|o| o.occluder).count(),
             never_culled: data.stamp.never_culled as usize,
             cells: data.grid.cell_count(),
+            baked_cells: data.stamp.baked as usize,
+            floor: data.stamp.floor,
             cell_size: data.grid.cell,
             too_large: false,
             rows: data.row_count(),
@@ -169,7 +188,7 @@ impl OcclusionInput {
     pub fn sampler(&self) -> Option<Sampler> {
         let baking = Baking::of(&self.objects).counted();
         let (min, max) = baking.bounds?;
-        let grid = Grid::over(min, max)?;
+        let (grid, _) = self.reach.grid(min, max)?;
         Some(Sampler { baking, grid })
     }
 
@@ -217,64 +236,41 @@ impl OcclusionInput {
         let Some((min, max)) = scene.bounds else {
             return Some((None, report));
         };
-        let Some(grid) = Grid::over(min, max) else {
+        let Some((grid, sampled)) = self.reach.grid(min, max) else {
             report.too_large = true;
             return Some((None, report));
         };
-        progress.start(grid.cell_count());
-        let seen = scene.cells(&grid, threads.max(1), progress)?;
+        let baked = sampled
+            .as_ref()
+            .map_or(grid.cell_count(), |s| s.iter().filter(|&&b| b).count());
+        progress.start(grid.cell_count(), baked);
+        let seen = scene.cells(&grid, threads.max(1), progress, sampled.as_deref())?;
         let (rows, cells) = fold_rows(&grid, &seen, objects.len().div_ceil(64));
-        let baked = objects.iter().map(|o| BakedObject {
+        let held = objects.iter().map(|o| BakedObject {
             entity: o.entity,
             fingerprint: o.fingerprint,
             occluder: !o.occluding.is_empty(),
         });
-        let data = OcclusionData::new(grid, baked.collect(), rows, cells);
+        let data = OcclusionData::new(grid, held.collect(), rows, cells);
         let stamp = BakeStamp {
             version: OCCLUSION_VERSION,
             never_culled: report.never_culled as u32,
+            floor: self.reach.source,
+            baked: baked as u32,
+            reach: self.reach.key(&grid),
+            bounds: (min, max),
         };
         let data = data.expect("rows fit the grid").stamped(stamp);
         let report = OcclusionBakeReport {
             cells: grid.cell_count(),
+            baked_cells: baked,
+            floor: self.reach.source,
             cell_size: grid.cell,
             rows: data.row_count(),
             bytes: rusty_scene::lighting::occlusion::encoded_len(&data),
             ..report
         };
         Some((Some(data), report))
-    }
-}
-
-/// One bake's sampling, a cell at a time ([`OcclusionInput::sampler`]). A test
-/// hook: `dev::bake`'s cost tests measure through it, from another crate.
-#[cfg(feature = "dev")]
-#[doc(hidden)]
-pub struct Sampler {
-    baking: Baking,
-    pub grid: Grid,
-}
-
-#[cfg(feature = "dev")]
-impl Sampler {
-    /// What cell `index` sees on its own, as the bake samples it.
-    pub fn cell(&self, index: usize) -> Vec<u64> {
-        self.baking.cell(&self.grid, index)
-    }
-
-    /// Bake `count` cells spread over the grid, one after another, on this
-    /// thread: the same cells for the same level and count.
-    pub fn spread(&self, count: u64) {
-        let cells = self.grid.cell_count() as u64;
-        for k in 0..count {
-            let cell = k.wrapping_mul(0x9E37_79B9_7F4A_7C15) % cells;
-            std::hint::black_box(self.cell(cell as usize));
-        }
-    }
-
-    /// Rays cast so far, either kind.
-    pub fn rays_cast(&self) -> u64 {
-        self.baking.rays_cast()
     }
 }
 

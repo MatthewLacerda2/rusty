@@ -15,6 +15,10 @@
 //! [`generate_occlusion_logged`] then gather and bake nothing, both through
 //! [`BakedOcclusion::kept`]. Bake Occlusion always bakes.
 //!
+//! Both sample only the cells a camera can be in (#2328, [`reach`]): over the
+//! live navmesh's walkable spans when it is baked, else the static colliders'
+//! floor plan, else every cell.
+//!
 //! Both runs lend the bake [`CellClocks`], so each cell's sampling time reaches
 //! the bake report's `slowestCells` (#1987) without a clock inside the sim.
 
@@ -25,15 +29,26 @@ use std::time::{Duration, Instant};
 use crate::bake::lightmap::logged::watch;
 use crate::bake::progress::{BakeLog, Progress, Step};
 use rusty_lighting::occlusion::{
-    current_pvs, gather_occlusion, gather_with, Fingerprints, OcclusionBakeReport, OcclusionInput,
-    OcclusionProgress,
+    current_pvs, gather_with, Fingerprints, OcclusionBakeReport, OcclusionInput, OcclusionProgress,
+    Reach,
 };
+use rusty_navigation::NavigationGraph;
 use rusty_scene::lighting::occlusion::OcclusionData;
 use rusty_scene::Scene;
 
 mod clocks;
+pub(crate) mod summary;
 
 pub use clocks::CellClocks;
+
+/// Where a camera can be in `scene` (#2328), which decides the cells its PVS
+/// bake samples: over `nav`'s every walkable span when it is baked (the live
+/// navmesh, kept in step with the scene), else over the static colliders' floor
+/// plan, else everywhere.
+pub fn reach(scene: &Scene, nav: Option<&NavigationGraph>) -> Reach {
+    let floor = nav.and_then(|n| n.floor_grid(scene.nav_settings.agent_radius, None));
+    Reach::survey(scene, floor)
+}
 
 /// A finished occlusion bake: its PVS (`None` when nothing occludes or the level is too large to cull), its report,
 /// the wall-clock milliseconds it took, and each cell's sampling time by cell
@@ -45,18 +60,19 @@ pub struct BakedOcclusion {
     pub data: Option<OcclusionData>,
     pub report: OcclusionBakeReport,
     pub ms: u64,
-    pub cells: Vec<Duration>,
+    pub cells: Vec<Option<Duration>>,
     pub kept: bool,
 }
 
 impl BakedOcclusion {
-    /// The PVS `scene` holds, kept, when it is what a bake would write
-    /// ([`current_pvs`]): Generate Lighting's one keep-or-bake decision, the
-    /// editor's and the script's. Otherwise the fingerprints it compared with,
-    /// for the bake to gather through ([`gather_with`]): no mesh is hashed twice.
-    pub fn kept(scene: &Scene) -> Result<Self, Fingerprints> {
+    /// The PVS `scene` holds, kept, when it is what a bake sampling `reach`
+    /// would write ([`current_pvs`]): Generate Lighting's one keep-or-bake
+    /// decision, the editor's and the script's. Otherwise the fingerprints it
+    /// compared with, for the bake to gather through ([`gather_with`]): no mesh is
+    /// hashed twice.
+    pub fn kept(scene: &Scene, reach: &Reach) -> Result<Self, Fingerprints> {
         let started = Instant::now();
-        let held = current_pvs(scene)?;
+        let held = current_pvs(scene, reach)?;
         Ok(Self {
             data: None,
             report: OcclusionBakeReport::of_kept(held),
@@ -90,20 +106,20 @@ pub struct OcclusionBakeJob {
 }
 
 impl OcclusionBakeJob {
-    /// Gather `scene`'s statics and start baking them on a worker: Bake Occlusion,
-    /// which always bakes.
-    pub fn start(scene: &Scene) -> Result<Self, String> {
-        Self::bake(gather_occlusion(scene))
+    /// Gather `scene`'s statics and start baking them on a worker, sampling the
+    /// cells `reach` can be in: Bake Occlusion, which always bakes.
+    pub fn start(scene: &Scene, reach: Reach) -> Result<Self, String> {
+        Self::bake(gather_with(scene, &Fingerprints::of_scene(scene), reach))
     }
 
     /// Generate Lighting's occlusion step: [`Self::start`] through the fingerprints
     /// the comparison read, unless the scene holds the PVS that bake would write
     /// ([`BakedOcclusion::kept`]), which the job then hands back finished, on its
     /// first [`Self::poll`].
-    pub fn generate(scene: &Scene) -> Result<Self, String> {
-        let kept = match BakedOcclusion::kept(scene) {
+    pub fn generate(scene: &Scene, reach: Reach) -> Result<Self, String> {
+        let kept = match BakedOcclusion::kept(scene, &reach) {
             Ok(kept) => kept,
-            Err(prints) => return Self::bake(gather_with(scene, &prints)),
+            Err(prints) => return Self::bake(gather_with(scene, &prints, reach)),
         };
         Ok(Self {
             progress: Arc::default(),
@@ -131,7 +147,7 @@ impl OcclusionBakeJob {
         })
     }
 
-    /// Cells baked and the grid's (0 until it laid its grid).
+    /// Cells baked and the cells the bake samples (0 until it laid its grid).
     pub fn cells(&self) -> (usize, usize) {
         self.progress.cells()
     }
@@ -168,11 +184,17 @@ impl Drop for OcclusionBakeJob {
     }
 }
 
-/// Bake `scene`'s PVS in line, saying its cells to `log` (a script's
-/// `Lighting.BakeOcclusion()`). An off log bakes on this thread's workers with no watcher.
-pub fn bake_occlusion_logged(scene: &Scene, log: &mut BakeLog) -> Result<BakedOcclusion, String> {
+/// Bake `scene`'s PVS in line, sampling the cells `reach` can be in, saying its
+/// cells to `log` (a script's `Lighting.BakeOcclusion()`). An off log bakes on
+/// this thread's workers with no watcher.
+pub fn bake_occlusion_logged(
+    scene: &Scene,
+    reach: Reach,
+    log: &mut BakeLog,
+) -> Result<BakedOcclusion, String> {
     let started = Instant::now();
-    bake_logged(gather_occlusion(scene), started, log)
+    let input = gather_with(scene, &Fingerprints::of_scene(scene), reach);
+    bake_logged(input, started, log)
 }
 
 /// Bake `input`, gathered from the clock `started` at, saying its cells to `log`.
@@ -204,15 +226,16 @@ fn bake_logged(
 /// is kept and said to `log`.
 pub fn generate_occlusion_logged(
     scene: &Scene,
+    reach: Reach,
     log: &mut BakeLog,
 ) -> Result<BakedOcclusion, String> {
     let started = Instant::now();
-    match BakedOcclusion::kept(scene) {
+    match BakedOcclusion::kept(scene, &reach) {
         Ok(kept) => {
             log.kept(Step::Occlusion);
             Ok(kept)
         }
-        Err(prints) => bake_logged(gather_with(scene, &prints), started, log),
+        Err(prints) => bake_logged(gather_with(scene, &prints, reach), started, log),
     }
 }
 

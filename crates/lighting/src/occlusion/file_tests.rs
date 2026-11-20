@@ -9,11 +9,16 @@ fn bytes() -> Vec<u8> {
     encode(&bake_occlusion(&corridors(), 2).0.expect("occluders"))
 }
 
-/// Where the objects start: the magic, the stamp's two words, the count.
-const OBJECTS_AT: usize = 16;
+/// Where the objects start: the magic, the stamp (version, never culled, floor
+/// source, baked cells, reach hash, bounds), the count.
+const OBJECTS_AT: usize = 56;
+/// Where the stamp's floor source, baked cells and bounds are.
+const FLOOR_AT: usize = 12;
+const BAKED_AT: usize = 16;
+const BOUNDS_AT: usize = 28;
 
 fn object_count(bytes: &[u8]) -> usize {
-    u32::from_le_bytes(bytes[12..16].try_into().unwrap()) as usize
+    u32::from_le_bytes(bytes[52..56].try_into().unwrap()) as usize
 }
 
 #[test]
@@ -29,6 +34,21 @@ fn a_never_culled_count_past_the_objects_is_refused() {
     let past = object_count(&bytes) as u32 + 1;
     bytes[8..12].copy_from_slice(&past.to_le_bytes());
     assert!(decode(&bytes).unwrap_err().contains("never culled"));
+}
+
+#[test]
+fn a_stamp_out_of_range_is_refused() {
+    let bytes = bytes();
+    let mut floor = bytes.clone();
+    floor[FLOOR_AT..FLOOR_AT + 4].copy_from_slice(&3u32.to_le_bytes());
+    assert_eq!(decode(&floor), Err("floor source out of range".into()));
+    let mut baked = bytes.clone();
+    baked[BAKED_AT..BAKED_AT + 4].copy_from_slice(&u32::MAX.to_le_bytes());
+    let err = decode(&baked).unwrap_err();
+    assert!(err.contains("more cells baked"), "{err}");
+    let mut nan = bytes;
+    nan[BOUNDS_AT + 4..BOUNDS_AT + 8].copy_from_slice(&f32::NAN.to_le_bytes());
+    assert_eq!(decode(&nan), Err("bounds not finite".into()));
 }
 
 #[test]

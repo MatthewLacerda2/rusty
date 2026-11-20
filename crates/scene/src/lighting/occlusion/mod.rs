@@ -18,7 +18,9 @@
 //! ([`Grid`]), up to [`MAX_CELL`] a side (past it nothing is culled), not the room
 //! finder's rooms: rooms are found on one floor's plan (`placement::rooms`), while a
 //! Dust2-sized level has storeys, stairs, drops and open yards a camera moves
-//! through. A uniform grid holds all of them. Cells that see the same set share one
+//! through. A uniform grid holds all of them. The bake samples only the cells a
+//! camera can be in, over walkable floor and at shadow-casting lights, and their
+//! ring (#2328, `reach`); every other cell sees every object. Cells that see the same set share one
 //! row (`rows`); after the dilation few do, so the data is about one bit per cell
 //! per object (11.8 MB for a Dust2-sized level of 6344 meshes, `docs/api/Lighting.md`).
 //!
@@ -67,7 +69,7 @@ pub use file::{
     apply_sidecar, decode, encode, encoded_len, load_sidecar, occlusion_path, read_sidecar,
     save_sidecar, OcclusionFile, SUFFIX as OCCLUSION_SUFFIX,
 };
-pub use grid::{Grid, CELL_SIZE, MAX_CELL, MAX_CELLS};
+pub use grid::{Grid, CELL_SIZE, MAX_CELL, MAX_CELLS, MAX_GRID_CELLS};
 
 #[cfg(test)]
 mod grid_tests;
@@ -105,13 +107,62 @@ pub struct BakedObject {
 
 /// What a PVS was baked by, beside what it was baked against: the occlusion bake's
 /// version (`rusty_lighting::occlusion::OCCLUSION_VERSION`), so Generate Lighting
-/// keeps a PVS only an unchanged bake made (#2348), and the objects the bake kept
-/// in sight of every cell, too large or not finite to sample, which only the bake
-/// can count. Zero on a PVS no bake stamped.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// keeps a PVS only an unchanged bake made (#2348); the objects the bake kept in
+/// sight of every cell, too large or not finite to sample, which only the bake
+/// can count; and which cells it sampled (#2328): where it found the floor, how
+/// many cells, a hash of the cells it was seeded from, and the bounds its grid
+/// was laid over, so a keep can lay the grid again. Zero on a PVS no bake stamped.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct BakeStamp {
     pub version: u32,
     pub never_culled: u32,
+    /// Where the bake found the floor a camera stands on.
+    pub floor: FloorSource,
+    /// The cells it sampled; every other cell sees every object.
+    pub baked: u32,
+    /// A hash of the cells it was seeded from (`rusty_lighting::occlusion::Reach`),
+    /// 0 when it sampled every cell.
+    pub reach: u64,
+    /// The bounds its grid was laid over (`Grid::fitting`).
+    pub bounds: (glam::Vec3, glam::Vec3),
+}
+
+/// Where an occlusion bake found the floor a camera can stand on (#2328), which
+/// decides the cells it samples: the scene's baked navmesh (every walkable span),
+/// else a floor plan rasterized from the static colliders, else none, and then it
+/// samples every cell.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum FloorSource {
+    /// No floor: every cell is sampled.
+    #[default]
+    Everywhere,
+    /// The navmesh's walkable spans.
+    Navmesh,
+    /// The static colliders' floor plan (`floor::FloorGrid::from_static`).
+    Colliders,
+}
+
+impl FloorSource {
+    /// Its name in a bake report.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Everywhere => "everywhere",
+            Self::Navmesh => "navmesh",
+            Self::Colliders => "colliders",
+        }
+    }
+
+    /// Its number in the file.
+    pub fn code(self) -> u32 {
+        self as u32
+    }
+
+    /// The source numbered `code`, `None` past the last.
+    pub fn of_code(code: u32) -> Option<Self> {
+        [Self::Everywhere, Self::Navmesh, Self::Colliders]
+            .get(code as usize)
+            .copied()
+    }
 }
 
 /// A scene's baked PVS: the cells, the objects, and per cell one row of bits, bit

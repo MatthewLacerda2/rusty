@@ -636,10 +636,26 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   only** (what draws of them changes, or a view passes through them). Dynamic,
   skinned, shadows-only and inactive meshes take no part and are always drawn.
 - **Cells.** A uniform grid of 2 m cubes over the bounds of the static meshes it can
-  cull, one cell of margin round them, coarser cubes past 16384 cells, up to 4 m (a
-  Dust2-sized level, 200 × 200 m on two storeys, takes 3.9 m). A level that needs
-  larger cells is **not occlusion-culled**: Generate Lighting's console line says so,
-  and bakes no PVS. A camera outside every cell culls nothing. Each cell keeps what any
+  cull, one cell of margin round them, coarser cubes past 16384 cells sampled (or 65536
+  in all), up to 4 m (a Dust2-sized level, 200 × 200 m on two storeys, takes 3.9 m when
+  every cell is sampled). A level that needs larger cells is **not occlusion-culled**:
+  Generate Lighting's console line says so, and bakes no PVS. A camera outside every
+  cell culls nothing.
+- **Which cells are sampled** (#2328, as Unreal places its precomputed-visibility
+  cells): only those a camera can be in. A cell is *standable* when it reaches the
+  air within the **play height**, 3 m (`PLAY_HEIGHT`: the navmesh's 2 m agent and a
+  1 m jump), over a walkable floor; the cell holding a shadow-casting point, spot or
+  area light is sampled too, since its shadows cull by that cell's row; and so is the
+  ring of cells round each, which the dilation (below) reads. The floor is the scene's
+  baked navmesh, every walkable span; without one, a floor plan rasterized from the
+  static colliders at 0.5 m; with neither, every cell is sampled, as for a level with
+  no floor. Every other cell (the air under a high roof, over a courtyard, under the
+  ground floor) **sees every object**: a camera there, a spectator or a cutscene
+  camera above the play height, is culled by nothing from the PVS, as outside the
+  grid, and the GPU's Hi-Z test still culls. A standable cell keeps exactly what it
+  would with every cell sampled. A light a script moves at runtime into an unsampled
+  cell culls no shadow caster by the PVS there. Unity's authored Occlusion Areas, the
+  developer's override of the play height, are not built yet. Each cell keeps what any
   point in it may see: rays from seeded points to points on each mesh. A cell larger
   than 2 m is sampled as 2 m cubes, six points each, so the eye's density is the same
   at every cell size. The points on a mesh are its extremes and a lattice laid on its
@@ -682,8 +698,10 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   cells of 3.9 m, each sampled as eight 2 m cubes) in about 12 minutes into 11.8 MB,
   with the process peaking under 0.6 GB, about what the occluders' BVH alone takes
   (part 2 took some 8 hours on that level). Fewer cores take longer in proportion.
-  What costs is the cells under the ground floor and across a storey's slab, where
-  only many faces together hide what is past them.
+  These figures sample every cell. What costs is the cells under the ground floor
+  and across a storey's slab, where only many faces together hide what is past them;
+  a level with a floor samples only the cells over it, and the bake report's
+  `layerSeconds` says what each layer of the grid took.
   A level of imported meshes costs about what one of boxes does: a 6 × 6 town of
   tessellated one-mesh buildings on bumpy ground (5120 cells of 2 m) bakes at
   about 700 cells a second, its box-built twin at about 550 (#1981; it was 78
@@ -707,8 +725,12 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
 - **Kept when unchanged** (#2348): Generate Lighting re-bakes no PVS when nothing
   its bake reads changed since the PVS the scene holds was baked: the same static
   meshes, in the same order, each with the same fingerprint (*A bake older than the
-  scene*, below) and occluder flag, baked by the same version of the bake. A lamp
-  moved, a light's intensity changed or a probe added keeps it, and so does the file,
+  scene*, below) and occluder flag, baked by the same version of the bake, from the
+  same sampled cells (#2328: the same floor source, and the same cells over its floor
+  and holding a shadow-casting light). A lamp moved (a shadow-casting one within its
+  cell), a light's intensity changed or a probe added keeps it; a shadow-casting light
+  moved to another cell, or a navmesh re-baked so a camera reaches other cells,
+  re-bakes it. A kept PVS's file stays too,
   byte for byte: it is exactly what a re-bake would write (the bake is seeded). The
   kept PVS owns its file as a bake does: one another process wrote there since is
   overwritten with it, and the warning says so. The step then takes about the time to
@@ -923,7 +945,10 @@ Then each kind's own:
   it (the mesh's local bounds under its world matrix) (`{ entity, name, centre, probe, weight,
   second, secondWeight }`, `probe` `nil` for the sky). The picks rank the scene's whole
   set: a probe the memory budget leaves out at runtime is not skipped here.
-- **`occlusion`:** `cells`, `cellSize`, `tooLarge`, `rows`, `dataBytes`, `objects`,
+- **`occlusion`:** `cells`, `bakedCells` and `unbakedCells` (of them, the cells
+  sampled and the cells left seeing every object), `floorSource` (`"navmesh"`,
+  `"colliders"` or `"everywhere"`: where the bake found the floor, *Occlusion culling*),
+  `cellSize`, `tooLarge`, `rows`, `dataBytes`, `objects`,
   `occluders`, `neverCulled`, `occluderTriangles`, `biggestOccluders` (`{ entity, name,
   triangles }`, at most 20) and `visibility`: `meanVisible` and `maxVisible` (objects a
   cell sees), `culledFraction` (the share of the objects a cell culls, on average),

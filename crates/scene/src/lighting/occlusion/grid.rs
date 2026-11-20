@@ -1,8 +1,10 @@
 //! The PVS's cells (#1714): a uniform 3D grid of cubes over the static bounds, one
 //! cell of margin on every side, so a camera standing at a wall's outer face is
-//! still in a cell. A level too big for [`MAX_CELLS`] cells of [`CELL_SIZE`] is cut
-//! into fewer, larger ones, up to [`MAX_CELL`]; one that needs larger still is not
-//! culled at all.
+//! still in a cell. A level that would bake more than [`MAX_CELLS`] cells of
+//! [`CELL_SIZE`] (or hold more than [`MAX_GRID_CELLS`]) is cut into fewer, larger
+//! ones, up to [`MAX_CELL`]; one that needs larger still is not culled at all. The
+//! bake samples only the cells a camera can be in (#2328,
+//! `rusty_lighting::occlusion::Reach`), so the cap counts those.
 
 use glam::{UVec3, Vec3};
 
@@ -10,10 +12,14 @@ use glam::{UVec3, Vec3};
 /// width, so a cell rarely sees both sides of a wall it straddles.
 pub const CELL_SIZE: f32 = 2.0;
 
-/// The most cells a grid holds: a Kolvik-sized interior (52 × 42 × 6 m) takes 2 m
+/// The most cells a bake samples: a Kolvik-sized interior (52 × 42 × 6 m) takes 2 m
 /// cells, a Dust2-sized level larger ones. It bounds the bake's work (cells times
-/// objects) and the file.
+/// objects); the cells it skips cost one shared row.
 pub const MAX_CELLS: usize = 16_384;
+
+/// The most cells a grid holds, sampled or not: it bounds the file and the cell
+/// table, whatever share of them a bake samples.
+pub const MAX_GRID_CELLS: usize = 4 * MAX_CELLS;
 
 /// The largest cell edge the bake lays, metres: a Dust2-sized level takes 3.9 m
 /// cells. Each cell is sampled as [`CELL_SIZE`] cubes, so a larger cell costs the
@@ -29,17 +35,26 @@ pub struct Grid {
 }
 
 impl Grid {
-    /// The grid over `(min, max)`: cubes of [`CELL_SIZE`], or larger until at most
-    /// [`MAX_CELLS`] cover the bounds and their margin. `None` when that needs cells
-    /// over [`MAX_CELL`], or the bounds are not finite.
+    /// The grid over `(min, max)` whose every cell is sampled: cubes of
+    /// [`CELL_SIZE`], or larger until at most [`MAX_CELLS`] cover the bounds and
+    /// their margin. `None` when that needs cells over [`MAX_CELL`], or the bounds
+    /// are not finite.
     pub fn over(min: Vec3, max: Vec3) -> Option<Self> {
+        Self::fitting(min, max, Self::cell_count)
+    }
+
+    /// The grid over `(min, max)` of the smallest cell, from [`CELL_SIZE`] and
+    /// growing by a quarter, that holds at most [`MAX_GRID_CELLS`] and of which
+    /// `sampled` counts at most [`MAX_CELLS`]. `None` when that needs cells over
+    /// [`MAX_CELL`], or the bounds are not finite.
+    pub fn fitting(min: Vec3, max: Vec3, mut sampled: impl FnMut(&Self) -> usize) -> Option<Self> {
         if !(min.is_finite() && max.is_finite()) {
             return None;
         }
         let mut cell = CELL_SIZE;
         while cell <= MAX_CELL {
             let grid = Self::with_cell(min, max, cell);
-            if grid.cell_count() <= MAX_CELLS {
+            if grid.cell_count() <= MAX_GRID_CELLS && sampled(&grid) <= MAX_CELLS {
                 return Some(grid);
             }
             cell *= 1.25;

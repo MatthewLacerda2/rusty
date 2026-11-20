@@ -14,7 +14,8 @@ use std::sync::Arc;
 /// Every call returns nothing, so an observer can watch the bake but never steer
 /// it. A cell starts and ends on the same thread, with no other cell between.
 pub trait OcclusionObserver: Send + Sync {
-    /// The bake laid a grid of `total` cells; once, before the first cell.
+    /// The bake laid a grid of `total` cells; once, before the first cell. Only
+    /// the cells it samples start and finish (#2328).
     fn cells(&self, total: usize);
     /// Cell `cell` begins sampling on this thread.
     fn cell_started(&self, cell: usize);
@@ -59,7 +60,7 @@ impl OcclusionProgress {
         }
     }
 
-    /// Cells baked, and the cells the bake has (0 until it laid its grid).
+    /// Cells baked, and the cells the bake samples (0 until it laid its grid).
     pub fn cells(&self) -> (usize, usize) {
         let (done, total) = (&self.done, &self.total);
         (done.load(Ordering::Relaxed), total.load(Ordering::Relaxed))
@@ -74,9 +75,10 @@ impl OcclusionProgress {
         self.cancelled.load(Ordering::Relaxed)
     }
 
-    /// The bake laid a grid of `total` cells.
-    pub(super) fn start(&self, total: usize) {
-        self.total.store(total, Ordering::Relaxed);
+    /// The bake laid a grid of `total` cells, of which it samples `sampled`
+    /// (#2328): the bar counts those, the observer is told the grid's.
+    pub(super) fn start(&self, total: usize, sampled: usize) {
+        self.total.store(sampled, Ordering::Relaxed);
         if let Some(o) = &self.observer.0 {
             o.cells(total);
         }

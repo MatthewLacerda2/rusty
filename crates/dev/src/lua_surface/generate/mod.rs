@@ -119,20 +119,21 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
 /// `BakeOcclusion()` (#1958): only the occlusion step of `Generate`, written
 /// beside the scene, as Unity bakes occlusion from its own window.
 fn register_bake_occlusion(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Reg {
-    let (scene, scene_path, console) = (ctx.scene, ctx.scene_path, ctx.console);
+    let (scene, scene_path, nav, console) = (ctx.scene, ctx.scene_path, ctx.nav, ctx.console);
     put(
         table,
         "BakeOcclusion",
         lua.create_function(move |lua, ()| {
             let (scene, scene_path) = (scene.get(lua)?, scene_path.get(lua)?);
-            let console = console.get(lua)?;
-            let path = scene_path.borrow();
+            let (nav, console) = (nav.get(lua)?, console.get(lua)?);
+            let (path, nav) = (scene_path.borrow(), nav.borrow());
             let mut log = BakeLog::to_console(&console);
             let mut scene = scene.borrow_mut();
-            let report = bake_occlusion_only(&mut scene, path.as_deref(), &mut log)
+            let (path, nav) = (path.as_deref(), Some(&*nav));
+            let report = bake_occlusion_only(&mut scene, path, nav, &mut log)
                 .map_err(mlua::Error::external)?;
             console.borrow_mut().info(report.summary());
-            warn_unsaved(&console, &scene, path.as_deref());
+            warn_unsaved(&console, &scene, path);
             let (o, out) = (report.occlusion, lua.create_table()?);
             out.set("cells", o.cells)?;
             out.set("objects", o.objects)?;

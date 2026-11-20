@@ -4,7 +4,7 @@
 use glam::Vec3;
 
 use crate::occlusion::test_level::{block, corridors};
-use crate::occlusion::{bake_occlusion, is_current, OcclusionBakeReport};
+use crate::occlusion::{bake_occlusion, is_current, OcclusionBakeReport, Reach};
 use rusty_components::RenderMode;
 use rusty_scene::lighting::occlusion::OcclusionData;
 use rusty_scene::{MaterialAsset, MaterialComponent, Scene};
@@ -14,7 +14,7 @@ fn baked(scene: &Scene) -> OcclusionData {
 }
 
 fn kept(scene: &Scene, held: &OcclusionData) -> bool {
-    is_current(scene, held)
+    is_current(scene, held, &Reach::everywhere())
 }
 
 /// The first prop: a static box that occludes.

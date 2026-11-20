@@ -10,14 +10,14 @@ use std::sync::Arc;
 use super::{bake_occlusion_logged, CellClocks, OcclusionBakeJob};
 use crate::bake::progress::{BakeLog, Line};
 use rusty_lighting::occlusion::test_level::corridors;
-use rusty_lighting::occlusion::{bake_occlusion, gather_occlusion, OcclusionProgress};
+use rusty_lighting::occlusion::{bake_occlusion, gather_occlusion, OcclusionProgress, Reach};
 use rusty_scene::lighting::occlusion::encode;
 
 #[test]
 fn the_worker_and_the_logged_run_bake_what_the_inline_bake_does() {
     let scene = corridors();
     let inline = encode(&bake_occlusion(&scene, 2).0.expect("occluders"));
-    let mut job = OcclusionBakeJob::start(&scene).unwrap();
+    let mut job = OcclusionBakeJob::start(&scene, Reach::everywhere()).unwrap();
     let baked = loop {
         if let Some(done) = job.poll() {
             break done.unwrap();
@@ -31,7 +31,7 @@ fn the_worker_and_the_logged_run_bake_what_the_inline_bake_does() {
 
     let lines: RefCell<Vec<Line>> = RefCell::default();
     let mut log = BakeLog::new(|| Duration::ZERO, |l| lines.borrow_mut().push(l));
-    let logged = bake_occlusion_logged(&scene, &mut log).unwrap();
+    let logged = bake_occlusion_logged(&scene, Reach::everywhere(), &mut log).unwrap();
     drop(log);
     assert_eq!(encode(logged.data.as_ref().unwrap()), inline);
     assert_eq!(logged.cells.len(), logged.report.cells);
@@ -52,7 +52,7 @@ fn an_observed_bake_writes_the_bytes_an_unobserved_one_does() {
     let times = clocks.times();
     assert_eq!(times.len(), plain.1.cells);
     assert!(
-        times.iter().sum::<Duration>() > Duration::ZERO,
+        times.iter().flatten().sum::<Duration>() > Duration::ZERO,
         "the cells ran"
     );
 }
@@ -112,7 +112,7 @@ fn the_editors_generate_keeps_a_current_pvs_on_its_first_poll() {
     let mut scene = corridors();
     let (data, report) = bake_occlusion(&scene, 2);
     scene.put_baked_occlusion(data);
-    let mut job = OcclusionBakeJob::generate(&scene).unwrap();
+    let mut job = OcclusionBakeJob::generate(&scene, Reach::everywhere()).unwrap();
     let kept = job.poll().expect("finished at once").unwrap();
     assert!(kept.kept && kept.data.is_none());
     assert_eq!(kept.report, report, "the held PVS's counts");

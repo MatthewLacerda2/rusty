@@ -3,13 +3,17 @@
 //! module doc says what a cell holds and how it is sampled), baked from the static
 //! scene. `gather` (the base's, `rusty_scene::lighting::occlusion::gather`) reads what
 //! the bake is against (each object's [`fingerprint`]),
+//! `reach` says which cells a camera can be in, the only ones sampled (#2328),
 //! `sample` casts the seeded rays and proves the ones it can skip, `bake` drives it
 //! and dilates the cells, watched and stopped through `progress`.
 
 mod bake;
 use rusty_scene::lighting::occlusion::gather;
 mod progress;
+mod reach;
 mod sample;
+#[cfg(feature = "dev")]
+mod sampler;
 mod unsaved;
 
 pub use bake::{
@@ -19,7 +23,11 @@ pub use bake::{
 pub use gather::{fingerprint, Fingerprints};
 pub use progress::OcclusionObserver;
 pub use progress::OcclusionProgress;
+pub use reach::{Reach, COLLIDER_FLOOR_CELL, PLAY_HEIGHT};
 pub use sample::{MAX_TARGETS, TARGET_SPACING, VOXEL};
+#[cfg(feature = "dev")]
+#[doc(hidden)]
+pub use sampler::Sampler;
 pub use unsaved::unsaved_materials;
 
 #[cfg(test)]
@@ -38,6 +46,10 @@ mod kept_tests;
 mod opening_tests;
 #[cfg(test)]
 mod print_tests;
+#[cfg(test)]
+mod reach_kept_tests;
+#[cfg(test)]
+mod reach_tests;
 #[cfg(test)]
 mod sampling_tests;
 #[cfg(all(test, feature = "dev"))]

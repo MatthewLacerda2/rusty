@@ -114,23 +114,39 @@ impl Baking {
     }
 
     /// Each cell's own visible bits, `words` per cell, baked on `threads` workers;
-    /// `None` when `progress` was cancelled.
+    /// `None` when `progress` was cancelled. Only the cells `sampled` marks are
+    /// sampled (all of them when `None`): every other cell sees every object
+    /// (#2328), so the dilation needs no special case.
     pub fn cells(
         &self,
         grid: &Grid,
         threads: usize,
         progress: &OcclusionProgress,
+        sampled: Option<&[bool]>,
     ) -> Option<Vec<Vec<u64>>> {
         let count = grid.cell_count();
+        let objects = self.targets.len();
+        let mut every = vec![u64::MAX; objects / 64];
+        if objects % 64 != 0 {
+            every.push((1u64 << (objects % 64)) - 1);
+        }
+        let todo: Vec<usize> = match sampled {
+            Some(s) => (0..count).filter(|&c| s[c]).collect(),
+            None => (0..count).collect(),
+        };
         let next = AtomicUsize::new(0);
-        let out = Mutex::new(vec![Vec::new(); count]);
+        let out = Mutex::new(match sampled {
+            Some(_) => vec![every; count],
+            None => vec![Vec::new(); count],
+        });
         std::thread::scope(|s| {
-            for _ in 0..threads.min(count) {
+            for _ in 0..threads.min(todo.len()) {
                 s.spawn(|| loop {
-                    let cell = next.fetch_add(1, Ordering::Relaxed);
-                    if cell >= count || progress.is_cancelled() {
+                    let at = next.fetch_add(1, Ordering::Relaxed);
+                    if at >= todo.len() || progress.is_cancelled() {
                         break;
                     }
+                    let cell = todo[at];
                     progress.cell_started(cell);
                     let bits = self.cell(grid, cell);
                     progress.cell_done(cell);

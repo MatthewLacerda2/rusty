@@ -3,7 +3,9 @@
 //! the mean and most objects a cell sees, the share culled, the objects every
 //! cell sees, and the time each cell took with the slowest cells (#1987) and
 //! each grid layer's sum and mean (#2328). The
-//! times come from the cell clocks the bake was lent (`dev::bake::occlusion::
+//! bake samples only the cells a camera can be in (#2328): `bakedCells` and
+//! `unbakedCells` count them, `floorSource` says where it found the floor, and
+//! the times are the sampled cells'. The times come from the cell clocks the bake was lent (`dev::bake::occlusion::
 //! CellClocks`), the rest from the bake's report and its PVS, outside the bake.
 //! Being read outside, `neverCulled` is a count with no names: the objects too large or not finite
 //! to sample are only known inside the bake. Every cell sees them, so they are among
@@ -14,15 +16,20 @@ use std::time::Duration;
 use serde_json::{json, Value};
 
 use super::{entity_name, point, Kind, Report, Stages, TOP};
-use rusty_lighting::occlusion::{OcclusionBakeReport, OCCLUSION_SEED, OCCLUSION_VERSION};
+use rusty_lighting::occlusion::{
+    OcclusionBakeReport, OCCLUSION_SEED, OCCLUSION_VERSION, PLAY_HEIGHT,
+};
 use rusty_scene::lighting::occlusion::{OcclusionData, CELL_SIZE, MAX_CELL};
 use rusty_scene::Scene;
+
+/// A cell's sampling time, `None` when it was not sampled.
+pub type CellTime = Option<Duration>;
 
 /// The report of a bake of `scene` that reported `r`, baked `data`, took `cells`
 /// per cell (by cell index; empty when it was not timed) and wrote `output_bytes`.
 pub fn report(
     scene: &Scene,
-    (r, data, cells): (&OcclusionBakeReport, Option<&OcclusionData>, &[Duration]),
+    (r, data, cells): (&OcclusionBakeReport, Option<&OcclusionData>, &[CellTime]),
     stages: &Stages,
     output_bytes: u64,
 ) -> Report {
@@ -31,11 +38,15 @@ pub fn report(
         "seed": OCCLUSION_SEED,
         "cellSize": CELL_SIZE,
         "maxCell": MAX_CELL,
+        "playHeight": PLAY_HEIGHT,
     });
     let fingerprint = data.map_or(0, fingerprint);
     let (triangles, biggest) = data.map_or((0, json!([])), |d| occluder_triangles(scene, d));
     Report::new(Kind::Occlusion, stages, settings, fingerprint, output_bytes).with(json!({
         "cells": r.cells,
+        "bakedCells": r.baked_cells,
+        "unbakedCells": r.cells - r.baked_cells.min(r.cells),
+        "floorSource": r.floor.name(),
         "cellSize": r.cell_size,
         "tooLarge": r.too_large,
         "rows": r.rows,
@@ -63,7 +74,7 @@ pub const SKIPPED: &str = "skipped: unchanged";
 pub fn keep(
     scene: &Scene,
     path: &str,
-    (r, ms, cells): (&OcclusionBakeReport, u64, &[Duration]),
+    (r, ms, cells): (&OcclusionBakeReport, u64, &[CellTime]),
     (saved, kept): (Option<std::time::Duration>, bool),
 ) {
     let mut stages = Stages::start();
@@ -164,42 +175,50 @@ fn cell_secs(d: Duration) -> f64 {
 
 /// The times of `data`'s cells, `None` when they were not timed (or not for this
 /// grid).
-fn timed<'a>(data: &OcclusionData, cells: &'a [Duration]) -> Option<&'a [Duration]> {
+fn timed<'a>(data: &OcclusionData, cells: &'a [CellTime]) -> Option<&'a [CellTime]> {
     (!cells.is_empty() && cells.len() == data.grid.cell_count()).then_some(cells)
 }
 
-/// The mean and the most time a cell took.
-fn cell_seconds(data: &OcclusionData, cells: &[Duration]) -> Value {
+/// The sum, mean and most of the sampled cells' times, and how many there were.
+fn summed(cells: &[CellTime]) -> (Duration, Duration, Duration, usize) {
+    let times = cells.iter().flatten();
+    let (total, n): (Duration, usize) = (times.clone().sum(), times.clone().count());
+    let max = times.max().copied().unwrap_or_default();
+    (total, total / n.max(1) as u32, max, n)
+}
+
+/// The mean and the most time a sampled cell took.
+fn cell_seconds(data: &OcclusionData, cells: &[CellTime]) -> Value {
     let Some(cells) = timed(data, cells) else {
         return Value::Null;
     };
-    let total: Duration = cells.iter().sum();
-    let max = cells.iter().max().copied().unwrap_or_default();
+    let (_, mean, max, _) = summed(cells);
     json!({
-        "mean": cell_secs(total / cells.len() as u32),
+        "mean": cell_secs(mean),
         "max": cell_secs(max),
     })
 }
 
 /// The time the cells of each grid layer took, bottom layer first (#2328): its
 /// index, the heights it spans, its cells, and the sum and mean of their times, so
-/// the cost of the air over a floor is read apart from the floor's own.
-fn layer_seconds(data: &OcclusionData, cells: &[Duration]) -> Value {
+/// the cost of the air over a floor is read apart from the floor's own. `cells`
+/// counts the layer's sampled cells, and the mean is theirs.
+fn layer_seconds(data: &OcclusionData, cells: &[CellTime]) -> Value {
     let Some(cells) = timed(data, cells) else {
         return Value::Null;
     };
     let grid = &data.grid;
     let per_layer = (grid.dims.x * grid.dims.z) as usize;
-    let layer = |(y, times): (usize, &[Duration])| {
-        let total: Duration = times.iter().sum();
+    let layer = |(y, times): (usize, &[CellTime])| {
+        let (total, mean, _, sampled) = summed(times);
         let bottom = grid.origin.y + y as f32 * grid.cell;
         json!({
             "layer": y,
             "minY": (bottom * 100.0).round() / 100.0,
             "maxY": ((bottom + grid.cell) * 100.0).round() / 100.0,
-            "cells": times.len(),
+            "cells": sampled,
             "seconds": cell_secs(total),
-            "mean": cell_secs(total / times.len().max(1) as u32),
+            "mean": cell_secs(mean),
         })
     };
     let layers = cells.chunks(per_layer.max(1)).enumerate().map(layer);
@@ -208,11 +227,11 @@ fn layer_seconds(data: &OcclusionData, cells: &[Duration]) -> Value {
 
 /// The [`TOP`] slowest cells, slowest first (ties to the lower index): each its
 /// index, centre, time and how many objects its PVS row sees.
-fn slowest_cells(data: &OcclusionData, cells: &[Duration]) -> Value {
+fn slowest_cells(data: &OcclusionData, cells: &[CellTime]) -> Value {
     let Some(cells) = timed(data, cells) else {
         return Value::Null;
     };
-    let mut order: Vec<usize> = (0..cells.len()).collect();
+    let mut order: Vec<usize> = (0..cells.len()).filter(|&i| cells[i].is_some()).collect();
     order.sort_by_key(|&i| (std::cmp::Reverse(cells[i]), i));
     let (rows, rows_of) = data.parts();
     let words = data.objects.len().div_ceil(64);
@@ -225,7 +244,7 @@ fn slowest_cells(data: &OcclusionData, cells: &[Duration]) -> Value {
         json!({
             "cell": cell,
             "centre": point((min + max) * 0.5),
-            "seconds": cell_secs(cells[cell]),
+            "seconds": cell_secs(cells[cell].unwrap_or_default()),
             "visible": visible(cell),
         })
     };

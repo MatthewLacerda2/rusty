@@ -43,8 +43,11 @@ fn the_slowest_cells_come_first_and_ties_go_to_the_lower_cell() {
     let data = data.expect("the corridors occlude");
     assert!(r.cells > TOP + 2, "enough cells to cut: {}", r.cells);
     // Cell 3 slowest, cell 1 next, then every other cell tied at 1 ms.
-    let mut cells = vec![Duration::from_millis(1); r.cells];
-    (cells[3], cells[1]) = (Duration::from_millis(9), Duration::from_millis(5));
+    let mut cells = vec![Some(Duration::from_millis(1)); r.cells];
+    (cells[3], cells[1]) = (
+        Some(Duration::from_millis(9)),
+        Some(Duration::from_millis(5)),
+    );
     let report = occlusion::report(&scene, (&r, Some(&data), &cells), &Stages::start(), 0);
     let report = report.to_json();
     let slowest = report["slowestCells"].as_array().unwrap();
@@ -82,7 +85,7 @@ fn each_grid_layer_sums_its_cells_times() {
     let per_layer = (g.dims.x * g.dims.z) as usize;
     // Every cell of layer `y` takes `y + 1` ms.
     let cells: Vec<_> = (0..r.cells)
-        .map(|i| Duration::from_millis((i / per_layer) as u64 + 1))
+        .map(|i| Some(Duration::from_millis((i / per_layer) as u64 + 1)))
         .collect();
     let report = occlusion::report(&scene, (&r, Some(&data), &cells), &Stages::start(), 0);
     let layers = report.to_json()["layerSeconds"].clone();
@@ -103,10 +106,29 @@ fn each_grid_layer_sums_its_cells_times() {
 fn bake_occlusion_writes_its_report() {
     let path = scene_path("occlusion");
     let mut scene = corridors();
-    let baked = bake_occlusion_only(&mut scene, Some(&path), &mut BakeLog::off()).unwrap();
+    let baked = bake_occlusion_only(&mut scene, Some(&path), None, &mut BakeLog::off()).unwrap();
     let report = read(&path, Kind::Occlusion).expect("the bake wrote its report");
     assert_common(&report, Kind::Occlusion);
     assert_eq!(report["cells"].as_u64(), Some(baked.occlusion.cells as u64));
+    assert_eq!(
+        report["floorSource"], "colliders",
+        "no navmesh: the colliders"
+    );
+    let (sampled, skipped) = (
+        report["bakedCells"].as_u64(),
+        report["unbakedCells"].as_u64(),
+    );
+    assert_eq!(
+        sampled.unwrap() + skipped.unwrap(),
+        baked.occlusion.cells as u64
+    );
+    let layers = report["layerSeconds"].as_array().expect("timed");
+    let per_layer: u64 = layers.iter().map(|l| l["cells"].as_u64().unwrap()).sum();
+    assert_eq!(
+        Some(per_layer),
+        sampled,
+        "the layers count the sampled cells"
+    );
     let size = std::fs::metadata(format!("{path}.occlusion"))
         .unwrap()
         .len();

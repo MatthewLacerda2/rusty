@@ -3,7 +3,7 @@
 
 use glam::{UVec3, Vec3};
 
-use super::{Grid, CELL_SIZE, MAX_CELL, MAX_CELLS};
+use super::{Grid, CELL_SIZE, MAX_CELL, MAX_CELLS, MAX_GRID_CELLS};
 
 #[test]
 fn a_small_level_takes_two_metre_cells_and_a_margin() {
@@ -58,4 +58,18 @@ fn a_level_past_the_largest_cell_or_not_finite_lays_no_grid() {
     assert_eq!(Grid::over(Vec3::ZERO, Vec3::splat(f32::MAX)), None);
     assert_eq!(Grid::over(Vec3::ZERO, Vec3::INFINITY), None);
     assert_eq!(Grid::over(Vec3::NAN, Vec3::ONE), None);
+}
+
+#[test]
+fn the_cap_counts_the_sampled_cells_and_the_grid_has_its_own() {
+    // 100 × 30 × 100 m: too many 2 m cells to sample all, few enough to hold.
+    let (lo, hi) = (Vec3::ZERO, Vec3::new(100.0, 30.0, 100.0));
+    let all = Grid::over(lo, hi).expect("culled");
+    assert!(all.cell > CELL_SIZE, "every cell sampled: {all:?}");
+    let tenth = Grid::fitting(lo, hi, |g| g.cell_count() / 10).expect("culled");
+    assert_eq!(tenth.cell, CELL_SIZE, "a tenth sampled keeps 2 m cells");
+    assert!(tenth.cell_count() > MAX_CELLS && tenth.cell_count() <= MAX_GRID_CELLS);
+    // Wider still: no cell is sampled, but 2 m cells would hold too many.
+    let wide = Grid::fitting(lo, Vec3::new(200.0, 30.0, 200.0), |_| 0).expect("culled");
+    assert!(wide.cell > CELL_SIZE && wide.cell_count() <= MAX_GRID_CELLS);
 }

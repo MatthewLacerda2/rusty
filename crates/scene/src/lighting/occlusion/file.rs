@@ -1,7 +1,8 @@
 //! The `<scene>.occlusion` file (#1714): the baked PVS beside the scene, as the
 //! lightmap pages and the SH sidecar sit beside it. Binary and little-endian, read
 //! whole: `RPVS`, the bake's stamp (its version `u32`, its never-culled count
-//! `u32`), the objects (entity `u32`, fingerprint `u64`, occluder `u8`), the
+//! `u32`, its floor source `u32`, its baked cells `u32`, its reach hash `u64`, the
+//! bounds its grid was laid over `6 × f32`), the objects (entity `u32`, fingerprint `u64`, occluder `u8`), the
 //! grid (origin `3 × f32`, cell `f32`, dims `3 × u32`), the rows' words (a `u32`
 //! count, then `u64`s) and the cells' rows (a `u32` count, then `u32`s).
 //!
@@ -13,7 +14,7 @@ use std::sync::Arc;
 
 use glam::{UVec3, Vec3};
 
-use super::{BakeStamp, BakedObject, Grid, OcclusionData, MAX_CELLS};
+use super::{BakeStamp, BakedObject, FloorSource, Grid, OcclusionData, MAX_GRID_CELLS};
 use crate::io::Saved;
 use crate::Scene;
 
@@ -33,6 +34,13 @@ pub fn encode(data: &OcclusionData) -> Vec<u8> {
     out.extend_from_slice(MAGIC);
     put(&mut out, data.stamp.version);
     put(&mut out, data.stamp.never_culled);
+    put(&mut out, data.stamp.floor.code());
+    put(&mut out, data.stamp.baked);
+    out.extend(data.stamp.reach.to_le_bytes());
+    let (lo, hi) = data.stamp.bounds;
+    for f in [lo.x, lo.y, lo.z, hi.x, hi.y, hi.z] {
+        out.extend(f.to_le_bytes());
+    }
     put(&mut out, data.objects.len() as u32);
     for o in &data.objects {
         put(&mut out, o.entity);
@@ -54,10 +62,10 @@ pub fn encode(data: &OcclusionData) -> Vec<u8> {
 }
 
 /// The length of [`encode`]'s bytes for `data`, without encoding it: the header,
-/// stamp and counts (52 bytes), then 13 per object, 8 per row word, 4 per cell.
+/// stamp and counts (92 bytes), then 13 per object, 8 per row word, 4 per cell.
 pub fn encoded_len(data: &OcclusionData) -> usize {
     let (rows, cells) = data.parts();
-    52 + data.objects.len() * 13 + rows.len() * 8 + cells.len() * 4
+    92 + data.objects.len() * 13 + rows.len() * 8 + cells.len() * 4
 }
 
 /// The data `bytes` hold, or why they are refused.
@@ -66,9 +74,21 @@ pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
     if r.take(4)? != MAGIC {
         return Err("not an occlusion file".into());
     }
+    let (version, never_culled) = (r.u32()?, r.u32()?);
+    let floor = FloorSource::of_code(r.u32()?).ok_or("floor source out of range")?;
+    let (baked, reach) = (r.u32()?, u64::from_le_bytes(r.array()?));
+    let lo = Vec3::new(r.f32()?, r.f32()?, r.f32()?);
+    let hi = Vec3::new(r.f32()?, r.f32()?, r.f32()?);
+    if !(lo.is_finite() && hi.is_finite()) {
+        return Err("bounds not finite".into());
+    }
     let stamp = BakeStamp {
-        version: r.u32()?,
-        never_culled: r.u32()?,
+        version,
+        never_culled,
+        floor,
+        baked,
+        reach,
+        bounds: (lo, hi),
     };
     let objects = read_objects(&mut r, bytes.len(), stamp)?;
     let origin = Vec3::new(r.f32()?, r.f32()?, r.f32()?);
@@ -80,8 +100,11 @@ pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
         .checked_mul(u64::from(dims.y))
         .and_then(|n| n.checked_mul(u64::from(dims.z)));
     let finite = origin.is_finite() && cell.is_finite() && cell > 0.0;
-    if !finite || cells_in.is_none_or(|n| n > MAX_CELLS as u64) {
+    if !finite || cells_in.is_none_or(|n| n > MAX_GRID_CELLS as u64) {
         return Err("grid out of range".into());
+    }
+    if cells_in.is_some_and(|n| u64::from(stamp.baked) > n) {
+        return Err("more cells baked than the grid holds".into());
     }
     let words = r.u32()? as usize;
     let rows = (0..words).map(|_| r.array().map(u64::from_le_bytes));
