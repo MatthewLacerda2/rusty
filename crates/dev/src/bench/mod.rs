@@ -11,6 +11,11 @@
 //! stage, #2401) adds `render.<stage>.<part>` and `gpu.<pass>.<part>` rows beside
 //! its own, which they sit inside: no sum of a set counts them.
 //!
+//! The run has two windows (`window`, #2448): the quiet one above, then a
+//! firefight (`bench/firefight.lua` spawning, destroying, toggling, stamping and
+//! re-parenting every tick) measured as `Harness.Bench(n, "firefight")`, its rows
+//! the same names prefixed `firefight.`.
+//!
 //! **Before and after is automatic.** The report is kept as `<out_dir>/bench.json`
 //! (`out/bench/` under `make bench`) and each run prints its change against the
 //! last: measuring an optimisation is run, change, run.
@@ -46,6 +51,7 @@ mod rig;
 pub mod scenes;
 pub mod stress;
 pub mod verbs;
+mod window;
 
 pub use lua::register;
 pub(crate) use lua::spec_from_lua;
@@ -53,7 +59,6 @@ pub use report::{Report, Samples, Summary};
 
 use super::capture::RenderedFrame;
 use super::harness::Harness;
-use report::{read, write};
 use rusty_core::frame_stats::FrameStats;
 use rusty_render::{ClockProbe, GpuPart, GpuPass};
 
@@ -249,43 +254,15 @@ fn push_parts<'a>(
 }
 
 /// Measure `ticks` frames, print the report with its change against the last one
-/// kept in `out_dir`, and keep this one there instead. Returns the report.
+/// kept in `out_dir`, and keep this one there instead: a run of one window
+/// ([`window::Run`]). Returns the report.
 pub fn run(harness: &mut Harness, ticks: u32) -> Report {
-    let mut report = measure(harness, ticks);
-    let engine = rusty_core::project::engine_content::stamp();
-    report.warnings.extend(engine.warning());
-    report.engine = Some(engine);
-    let out_dir = harness.out_dir().to_path_buf();
-    let previous = read(&out_dir);
-    let kept = previous.as_ref();
-    let untimed = kept.and_then(|k| report::tick_timed_since(|m| report.has(m), |m| k.has(m)));
-    let drift = clock::cpu_drift(&report, kept);
-    report.warnings.extend(drift.into_iter().chain(untimed));
-    let mut text = report.render(previous.as_ref());
-    if !report.metrics.iter().any(|(k, _)| k == "renderer_ms") {
-        text.push_str("(no GPU or software adapter: nothing was rendered)\n");
-    } else if !report.metrics.iter().any(|(k, _)| k == "gpu_ms") {
-        text.push_str("(this adapter has no timestamp queries: no GPU times)\n");
-    } else {
-        text.push_str(
-            "(gpu_ms, gpu.<pass>, gpu.other: ms at the reference clock, gpu_ms the passes' \
-             busy sum and gpu.other untimed work inside a submit; gpu_between_submits_ms the \
-             GPU waiting on the CPU, as measured; gpu_raw_ms as measured, at gpu_clock_pct \
-             of the reference)\n",
-        );
-    }
-    text.push_str(
-        "(cpu_ms, cpu.<system>: ms at the reference CPU clock; frame_ms as measured, \
-         at cpu_clock_pct of it)\n",
-    );
-    println!("{text}");
-    if let Err(e) = write(&out_dir, &report, &text) {
-        harness.console.borrow_mut().error(format!("[Bench] {e}"));
-    }
-    harness.log(format!("bench: {} frames measured", report.frames));
-    report
+    window::Run::default().first(harness, ticks)
 }
 
+#[cfg(test)]
+#[path = "firefight_tests.rs"]
+mod firefight_tests;
 #[cfg(test)]
 #[path = "move_cost_tests.rs"]
 mod move_cost_tests;

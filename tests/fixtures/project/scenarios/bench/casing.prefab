@@ -1,0 +1,110 @@
+{
+  "root": 0,
+  "entities": [
+    {
+      "id": 0,
+      "name": "Casing",
+      "active": true,
+      "is_static": false,
+      "layer": 0,
+      "transform": {
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          0.03,
+          0.03,
+          0.08
+        ]
+      },
+      "scripts": [],
+      "ai_perception": null,
+      "animator": null,
+      "audio": null,
+      "backdrop_filter": null,
+      "camera": null,
+      "canvas": null,
+      "canvas_group": null,
+      "character_controller": null,
+      "collider": {
+        "active": true,
+        "shape": {
+          "Box": {
+            "size": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          }
+        },
+        "is_trigger": false,
+        "material": {
+          "friction": 0.5,
+          "bounciness": 0.0,
+          "friction_combine": "Average",
+          "bounce_combine": "Average"
+        }
+      },
+      "image": null,
+      "joint": null,
+      "layout_element": null,
+      "layout_group": null,
+      "light": null,
+      "light_probe_proxy_volume": null,
+      "line": null,
+      "lod_group": null,
+      "mask": null,
+      "material": null,
+      "mesh": {
+        "primitive_type": "Box",
+        "cast_shadows": "On",
+        "scale_in_lightmap": 1.0
+      },
+      "nav_agent": null,
+      "nav_mesh_modifier": null,
+      "nav_modifier": null,
+      "nav_obstacle": null,
+      "offmesh_link": null,
+      "particles": null,
+      "post_processing": null,
+      "rect_mask": null,
+      "rect_transform": null,
+      "reverb_zone": null,
+      "rigidbody": {
+        "active": true,
+        "is_kinematic": false,
+        "mass": 1.0,
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "angular_velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "use_gravity": true,
+        "collision_detection": "Discrete",
+        "drag": 0.0,
+        "angular_drag": 0.05
+      },
+      "selectable": null,
+      "shape": null,
+      "text": null,
+      "trail": null,
+      "prefab_link": null,
+      "parent_id": null,
+      "children": []
+    }
+  ],
+  "materials": {}
+}

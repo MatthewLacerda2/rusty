@@ -57,7 +57,7 @@ fn the_table_shows_the_change_against_the_last_run() {
         .find(|l| l.starts_with("draw_calls"))
         .unwrap();
     assert!(draws.trim_end().ends_with('='), "{draws}");
-    // A metric the last run never measured shows no change.
+    // A metric the last run never measured says so.
     let only_now = Report {
         frames: 1,
         metrics: vec![("tick_nav".to_string(), Summary::of(&[0.5]))],
@@ -67,7 +67,7 @@ fn the_table_shows_the_change_against_the_last_run() {
     let line = only_now.render(Some(&run(4.0)));
     assert!(line
         .lines()
-        .any(|l| l.starts_with("tick_nav") && l.trim_end().ends_with("0.500")));
+        .any(|l| l.starts_with("tick_nav") && l.trim_end().ends_with("absent on the last run")));
     assert!(line.contains("warning: the CPU clock moved"), "{line}");
 }
 

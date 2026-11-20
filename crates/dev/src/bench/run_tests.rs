@@ -3,6 +3,7 @@
 //! there (hence `gpu_`), but every assertion holds without one: `frame_ms` and the
 //! system rows are the sim's.
 
+use super::report::read;
 use super::*;
 
 /// The `frame_ms` row of a printed report, split into its columns.
