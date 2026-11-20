@@ -262,6 +262,8 @@ fn push_resident(report: &mut SceneReport, counters: &rusty_render::RenderCounte
         ("gpu_texture_mb", counters.texture_bytes),
         ("gpu_lightmap_mb", counters.lightmap_bytes),
         ("gpu_reflection_mb", counters.reflection_bytes),
+        ("gpu_mesh_mb", counters.mesh_bytes),
+        ("gpu_cluster_pool_mb", counters.cluster_pool_bytes),
     ];
     for (row, bytes) in kinds {
         report.push_value(row, mb(bytes));

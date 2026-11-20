@@ -2,6 +2,17 @@
 
 use super::RenderCounters;
 
+/// [`RenderCounters::ui_relaid`]'s metric names, in its order.
+const UI_RELAID: [&str; 7] = [
+    "ui_relaid_rebuild",
+    "ui_relaid_screen",
+    "ui_relaid_textures",
+    "ui_relaid_structure",
+    "ui_relaid_content",
+    "ui_relaid_transform",
+    "ui_relaid_marker",
+];
+
 impl RenderCounters {
     /// Every counter under its `FrameStats` metric name.
     pub fn pairs(&self) -> Vec<(&'static str, u64)> {
@@ -41,6 +52,9 @@ impl RenderCounters {
             ("texture_bytes", self.texture_bytes),
             ("lightmap_bytes", self.lightmap_bytes),
             ("reflection_bytes", self.reflection_bytes),
+            ("mesh_count", self.mesh_count.into()),
+            ("mesh_bytes", self.mesh_bytes),
+            ("cluster_pool_bytes", self.cluster_pool_bytes),
             ("render_extracted", self.render_extracted.into()),
             ("render_posed", self.render_posed.into()),
             ("render_extract_us", self.render_extract_us),
@@ -48,6 +62,7 @@ impl RenderCounters {
         ]);
         pairs.extend(self.shadow_pairs());
         pairs.extend(self.ui_pairs());
+        pairs.extend(UI_RELAID.into_iter().zip(self.ui_relaid.map(u64::from)));
         pairs.extend(self.uploads.pairs());
         pairs.extend(self.ops.pairs());
         pairs
@@ -88,10 +103,11 @@ impl RenderCounters {
     }
 
     /// The UI pass's counters, under their metric names.
-    fn ui_pairs(&self) -> [(&'static str, u64); 4] {
+    fn ui_pairs(&self) -> [(&'static str, u64); 5] {
         [
             ("ui_draws", self.ui_draws.into()),
             ("ui_meshed", self.ui_meshed.into()),
+            ("ui_laid_out", self.ui_laid_out.into()),
             ("ui_mask_passes", self.ui_mask_passes.into()),
             ("ui_blur_passes", self.ui_blur_passes.into()),
         ]

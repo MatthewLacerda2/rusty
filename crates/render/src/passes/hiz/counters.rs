@@ -80,6 +80,19 @@ impl Counter {
         self.in_flight = None;
     }
 
+    /// Drop the read in flight and its counts, for a frame that tests nothing:
+    /// a later [`Self::collect`] reads none of it. The staging buffer goes with
+    /// it, since a map still pending would refuse the next copy into it, and so
+    /// does the flag its callback sets.
+    pub(crate) fn forget(&mut self) {
+        if self.in_flight.take().is_some() {
+            self.staging = None;
+            self.mapped = Arc::default();
+        }
+        self.copied = false;
+        (self.culled, self.drawn, self.late) = (0, 0, 0);
+    }
+
     /// Whether the read in flight is mapped and readable now. A refused map
     /// leaves nothing to read: the read is dropped, so the next frame copies
     /// afresh rather than waiting on it for ever and `culled` keeps moving.
@@ -182,6 +195,17 @@ mod tests {
             0,
             "the stale 7 does not come back"
         );
+    }
+
+    #[test]
+    fn a_forgotten_read_is_never_collected_and_frees_the_next_copy() {
+        let mut counter = reading(MAPPED);
+        counter.culled = 7;
+        counter.forget();
+        assert_eq!(counter.in_flight, None, "the next copy may go");
+        assert_eq!(counter.culled, 0, "no count from before the skip");
+        assert!(counter.staging.is_none(), "a pending map keeps no buffer");
+        assert_eq!(counter.mapped.load(Ordering::Acquire), PENDING);
     }
 
     #[test]
