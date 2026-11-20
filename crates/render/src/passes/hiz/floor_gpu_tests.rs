@@ -1,7 +1,7 @@
 //! The cull's instance floor (#2338): a stacked camera drawing a few cubes, a
 //! viewmodel's shape, skips the Hi-Z stage and draws as it does with its
 //! `use_occlusion_culling` off, through SSAO's prepass, the priming one and a
-//! velocity pass, while the base camera under it, drawing more, still culls. A
+//! velocity pass, its forward pass still primed, while the base camera under it, drawing more, still culls. A
 //! stacked camera whose count crosses the floor, up and back down, draws the
 //! same pixels on every frame as with its flag off.
 
@@ -70,18 +70,19 @@ fn scene((ssao, blur): (bool, bool)) -> (Scene, u32, Vec<u32>) {
 }
 
 /// One frame with the stacked camera's flag `on` (it is back on after): its
-/// pixels, the Hi-Z instances tested and the stack places the view holds.
+/// pixels, the Hi-Z instances tested, the stack places the view holds and the
+/// forward passes primed.
 fn frame(
     r: &mut Renderer,
     view: &mut RenderView,
     (scene, gun): (&mut Scene, u32),
     on: bool,
-) -> (Vec<u8>, u32, usize) {
+) -> (Vec<u8>, u32, usize, u32) {
     scene.world.camera_mut(gun).unwrap().use_occlusion_culling = on;
     let eye = Camera::new(Vec3::ZERO, -90.0, 0.0);
     let (px, c) = shot(r, view, scene, &eye);
     scene.world.camera_mut(gun).unwrap().use_occlusion_culling = true;
-    (px, c.hiz_tested, view.hiz.cameras.len())
+    (px, c.hiz_tested, view.hiz.cameras.len(), c.primed_passes)
 }
 
 #[test]
@@ -103,8 +104,16 @@ fn gpu_a_stacked_camera_under_the_floor_draws_as_with_its_flag_off() {
             for &id in &parked {
                 scene.world.set_layer(id, layer);
             }
-            let (px, tested, held) = frame(&mut r, &mut view, (&mut scene, gun), true);
-            let (px_off, tested_off, _) = frame(&mut r, &mut off, (&mut scene, gun), false);
+            let (px, tested, held, primed) = frame(&mut r, &mut view, (&mut scene, gun), true);
+            let (px_off, tested_off, _, primed_off) =
+                frame(&mut r, &mut off, (&mut scene, gun), false);
+            // Culling or under the floor, it is primed as the base is; off, not.
+            let primes = u32::from(r.depth_priming && r.priming_recommended);
+            assert_eq!(
+                (primed, primed_off),
+                (2 * primes, primes),
+                "{case:?} {step}"
+            );
             assert!(
                 px == px_off,
                 "{case:?} step {step}: the stacked camera's pixels moved"

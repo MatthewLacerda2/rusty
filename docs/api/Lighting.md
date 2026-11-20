@@ -799,7 +799,9 @@ is wholly behind depth the camera drew this frame.
   entities this frame (a viewmodel camera drawing a gun), unless it draws a
   clustered mesh (*Per cluster*, below) with `gpu_cluster_culling` on: culling so
   few costs more than it could hide, so it draws them all, as with its
-  `use_occlusion_culling` off. The floor counts the mesh entities the cull tests
+  `use_occlusion_culling` off, except that where depth priming runs (never on
+  macOS) a depth prepass of those few still primes its forward pass, as it did
+  while it culled, so overlapping arms and gun shade each pixel once. The floor counts the mesh entities the cull tests
   (mesh particles, a vertex-moving material and an outlined object are never
   tested, so they do not count), not whether the camera is stacked, so an
   overlay showing the whole level still culls.

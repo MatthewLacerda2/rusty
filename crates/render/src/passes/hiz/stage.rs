@@ -18,13 +18,17 @@ impl Renderer {
     /// The `occlusion` stage: cull this camera's opaque instances by the GPU's
     /// depth pyramid, leaving the draws its passes make in `ctx.solids.culled`.
     pub(crate) fn cull_by_hiz(&mut self, view: &mut RenderView, ctx: &mut CameraCtx) {
-        ctx.solids.culled = None;
+        (ctx.solids.culled, ctx.solids.floored) = (None, false);
         let idx = ctx.uniform.stack[0] as usize;
         // Under the instance floor, or with its flag off, a camera is drawn
         // whole, holding nothing new here (#2338), and a read it left in flight
-        // is dropped: its first frame back must not report it.
+        // is dropped: its first frame back must not report it. Under the floor
+        // its forward pass is still primed, by a prepass of its few batches.
         let n = ctx.solids.draws.opaque.last().map(|b| b.instances.end);
-        let Some(n) = n.filter(|_| self.hiz_culls_draws(ctx.cam, &ctx.solids)) else {
+        let culls = n.is_some() && self.hiz_culls(ctx.cam);
+        let enough = culls && self.hiz_draws_enough(&ctx.solids);
+        let Some(n) = n.filter(|_| enough) else {
+            ctx.solids.floored = culls;
             if let Some(cam) = view.hiz.cameras.get_mut(idx) {
                 cam.forget_reads();
             }

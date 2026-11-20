@@ -3,29 +3,43 @@
 
 use super::{culls, draws_enough, MIN_INSTANCES};
 
+/// No batch drawn by cluster, or one.
+fn no() -> bool {
+    false
+}
+fn yes() -> bool {
+    true
+}
+
 #[test]
 fn a_camera_culls_from_the_floor_up() {
     let floor = MIN_INSTANCES as usize;
-    assert!(!draws_enough((floor - 1, false), MIN_INSTANCES));
-    assert!(draws_enough((floor, false), MIN_INSTANCES));
-    assert!(draws_enough((floor + 1, false), MIN_INSTANCES));
+    assert!(!draws_enough((floor - 1, no), MIN_INSTANCES));
+    assert!(draws_enough((floor, no), MIN_INSTANCES));
+    assert!(draws_enough((floor + 1, no), MIN_INSTANCES));
     assert!(
-        !draws_enough((0, false), MIN_INSTANCES),
+        !draws_enough((0, no), MIN_INSTANCES),
         "a camera testing nothing"
     );
     assert!(
-        draws_enough((1, false), 0),
+        draws_enough((1, no), 0),
         "a lowered floor culls a single box"
     );
 }
 
 #[test]
 fn a_camera_drawing_by_cluster_culls_under_the_floor() {
-    assert!(
-        draws_enough((1, true), MIN_INSTANCES),
-        "one clustered shell"
-    );
-    assert!(draws_enough((0, true), MIN_INSTANCES));
+    assert!(draws_enough((1, yes), MIN_INSTANCES), "one clustered shell");
+    assert!(draws_enough((0, yes), MIN_INSTANCES));
+}
+
+#[test]
+fn a_camera_at_the_floor_never_walks_its_batches_for_clusters() {
+    let walked = || -> bool { panic!("asked for clusters above the floor") };
+    assert!(draws_enough(
+        (MIN_INSTANCES as usize, walked),
+        MIN_INSTANCES
+    ));
 }
 
 #[test]

@@ -67,7 +67,9 @@
 //! [`MIN_INSTANCES`] objects (`CameraSolids::tested`: a viewmodel camera
 //! drawing a gun, #2338) and draws none of its opaque batches by cluster: it
 //! holds no buffers or pyramid for it and leaves it drawn as a camera with the
-//! flag off is, since a cull of so few cannot hide what it costs. A camera with a
+//! flag off is, since a cull of so few cannot hide what it costs, but for its
+//! forward pass: that stays primed, by a depth prepass of its few batches
+//! (`SolidResources::floored`), as it was while phase one's depth sat under it. A camera with a
 //! clustered mesh in view keeps the cull under the floor while the preset's
 //! cluster cull is on: one million-triangle shell gains by cluster whatever the
 //! instance count. The floor counts what the cull tests, not whether the camera
@@ -156,11 +158,12 @@ fn culls(supported: bool, (preset, camera): (bool, bool), capturing: bool) -> bo
     supported && preset && camera && !capturing
 }
 
-/// Whether a camera whose cull would test `tested` objects, drawing a batch by
-/// cluster when `clustered`, has enough for the cull to pay, against the
-/// renderer's `floor` ([`MIN_INSTANCES`]).
-fn draws_enough((tested, clustered): (usize, bool), floor: u32) -> bool {
-    clustered || tested >= floor as usize
+/// Whether a camera whose cull would test `tested` objects has enough for the
+/// cull to pay, against the renderer's `floor` ([`MIN_INSTANCES`]), or draws a
+/// batch by cluster (`clustered`, a walk of its batches, asked only under the
+/// floor).
+fn draws_enough((tested, clustered): (usize, impl FnOnce() -> bool), floor: u32) -> bool {
+    tested >= floor as usize || clustered()
 }
 
 /// The compute pipelines, shared by every view, built on their first dispatch.
@@ -236,7 +239,7 @@ impl HiZ {
 
 impl Renderer {
     /// Whether `cam` is culled by the GPU's depth pyramid ([module docs](self)).
-    /// The stage then skips one with too few instances ([`Self::hiz_culls_draws`]).
+    /// The stage then skips one with too few instances ([`Self::hiz_draws_enough`]).
     pub(crate) fn hiz_culls(&self, cam: &rusty_scene::Camera) -> bool {
         let supported = self.device.features().contains(FEATURE);
         let on = (
@@ -246,17 +249,12 @@ impl Renderer {
         culls(supported, on, self.capture.static_only)
     }
 
-    /// Whether `cam`, drawing `solids`, is culled this frame: [`Self::hiz_culls`],
-    /// and at least [`MIN_INSTANCES`] objects its cull tests or a batch it draws
-    /// by cluster ([`Self::draws_clustered`]).
-    pub(crate) fn hiz_culls_draws(
-        &self,
-        cam: &rusty_scene::Camera,
-        solids: &crate::draw::resources::SolidResources,
-    ) -> bool {
-        let floor = self.hiz.min_instances;
+    /// Whether a camera [`Self::hiz_culls`] draws enough in `solids` for the
+    /// stage to run: at least [`MIN_INSTANCES`] objects its cull tests, or a
+    /// batch it draws by cluster ([`Self::draws_clustered`]).
+    pub(crate) fn hiz_draws_enough(&self, solids: &crate::draw::resources::SolidResources) -> bool {
         let clustered = || self.draws_clustered(&solids.draws);
-        self.hiz_culls(cam) && draws_enough((solids.tested.len(), clustered()), floor)
+        draws_enough((solids.tested.len(), clustered), self.hiz.min_instances)
     }
 
     /// Whether a camera that culls by Hi-Z also culls its clustered meshes by
