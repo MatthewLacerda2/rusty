@@ -1636,7 +1636,16 @@ different code.
 header lists every refusal it ran past): another timed run (an `flock` under
 `out/bench/`, dropped by the kernel when its run dies), and a `cargo`, `rustc`,
 `bench-scenes` or `play` process on the machine, checked again before each leg and
-each yard run, under `FORCE=1` too. Un-imported textures and models (the images an import would encode
+each yard run, under `FORCE=1` too. A process found there is **waited out first**:
+the run says what it found, polls every 5 s for up to 10 minutes, says how long it
+waited when the machine is quiet and goes on (a `cargo fmt` the merge queue runs
+for a second costs a few seconds, not the run); only a process still there after
+the wait is refused (under `FORCE=1`, noted), and a leg never starts beside one.
+Another timed run's lock is refused at once. **A run that stops** (that refusal
+before a leg, or a failed leg) still writes its table, from the legs that finished,
+and exits 1: its header names the legs that did not finish, and a section without
+its second `main` leg says *no floor* first, every change reading *floor unknown*.
+A later run measures every leg afresh. Un-imported textures and models (the images an import would encode
 now and the models with no current cooked file, `bench-scenes --pending-imports`,
 the engine's own checks) are asked of `main`'s
 build and of the PR's, and refused once both are built, naming the build that

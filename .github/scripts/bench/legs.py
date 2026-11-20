@@ -25,6 +25,15 @@ from pathlib import Path
 CAP_FRACTION = 0.75
 
 
+class Stopped(RuntimeError):
+    """A refusal before a leg (or a yard run) stopped the run; `done` is what had run by then,
+    `(leg, code)` per leg finished, so its table can still be written (#2463)."""
+
+    def __init__(self, said: str, done: list):
+        super().__init__(said)
+        self.done = done
+
+
 @dataclass(frozen=True)
 class Leg:
     name: str
@@ -97,13 +106,14 @@ def scope(cap: int | None, has_systemd: bool) -> tuple[list[str], str]:
 def run(legs: list[Leg], ask: Ask, prefix: list[str], runner, before_each=None) -> list[tuple[Leg, int]]:
     """Run each leg in order through `runner(argv) -> exit code`, stopping at a failed one.
 
-    `before_each(leg)` returns a refusal to stop on (a build started mid-run), or `None`.
+    `before_each(leg)` returns a refusal to stop on (a build started mid-run), or `None`:
+    [`Stopped`] is raised with the legs run so far.
     """
     done = []
     for leg in legs:
         said = before_each(leg) if before_each else None
         if said:
-            raise RuntimeError(f"before the {leg.name} leg: {said}")
+            raise Stopped(f"before the {leg.name} leg: {said}", done)
         if leg.out.exists():
             shutil.rmtree(leg.out)
         code = runner(prefix + command(leg, ask))

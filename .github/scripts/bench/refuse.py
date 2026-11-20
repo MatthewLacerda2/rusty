@@ -15,7 +15,14 @@ spread 9%), and a run on a project whose textures were never imported (`gpu_mb`
   ([`BUSY`]; `play` since `STRESS=1` benches the yard with it, #2450: another
   `make bench` beside a yard run skews both), from the process table, before any
   build and again before each leg and each yard run (a build started mid-run
-  would skew the legs after it);
+  would skew the legs after it). What it finds is **waited out first**
+  ([`settle`]: polled every [`POLL`] s for up to [`LIMIT`] s, one line when the
+  wait starts and one when it ends), and refused only if still there: on
+  2026-11-20 two runs were lost to a `cargo-fmt` gone within seconds (#2463),
+  the merge queue's `make resolved` after merging `main` into a queued branch,
+  one refused in its first second and one after 19 minutes of finished legs.
+  A leg still never starts beside a build; the lock between two timed runs is
+  not a transient tool and still refuses at once;
 - **un-imported textures and models**: the images an import would encode now,
   and the models whose cooked file is missing or stale, which
   `bench-scenes --pending-imports` lists from the engine's own checks
@@ -45,6 +52,7 @@ spread 9%), and a run on a project whose textures were never imported (`gpu_mb`
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 
 from merging.watch import lock
@@ -52,6 +60,13 @@ from merging.watch import lock
 LOCK = Path("out/bench/.timed-run.lock")
 # Processes that skew a timed run: a build, or another bench.
 BUSY = ("cargo", "rustc", "bench-scenes", "play")
+# How often, and for how long, [`settle`] waits for what [`busy`] found to end (#2463):
+# a formatter or a `make resolved` is seconds, a build minutes; past the limit it refuses.
+POLL = 5.0
+LIMIT = 600.0
+# The clock and the sleep [`settle`] waits with, so a test drives a fake one.
+CLOCK = time.monotonic
+SLEEP = time.sleep
 
 
 def hold(path: Path):
@@ -89,6 +104,27 @@ def busy(ps: str, me: int) -> list[str]:
         name = os.path.basename(parts[1].strip())
         if name in BUSY or name.startswith("cargo-"):
             found.append(f"{name} (PID {parts[0]})")
+    return found
+
+
+def settle(find, say) -> list[str]:
+    """Wait while `find()` (a [`busy`] read) finds something, polling every [`POLL`] s for up
+    to [`LIMIT`] s; what it still finds then (`[]` once the machine is quiet). `say(line)` is
+    told once when a wait starts (what was found) and once when it ends (how long)."""
+    found = find()
+    if not found:
+        return []
+    say(f"bench-ab: waiting for {', '.join(found)} to end (polled every {POLL:.0f} s, "
+        f"up to {LIMIT / 60:.0f} min): a timed benchmark runs alone")
+    start = CLOCK()
+    while found and CLOCK() - start < LIMIT:
+        SLEEP(POLL)
+        found = find()
+    took = CLOCK() - start
+    if found:
+        say(f"bench-ab: waited {took:.0f} s and still found {', '.join(found)}")
+    else:
+        say(f"bench-ab: the machine is quiet after {took:.0f} s of waiting; going on")
     return found
 
 

@@ -39,9 +39,11 @@ coder *changing* it must know.
   reached through `claude mcp serve` (`dispatch/remote.py` says why), never with a
   token a script reads: the claude.ai login stays inside `claude`.
 - **`.github/scripts/bench/` is a PR's measured rows**: its trees (`main` and the
-  PR's head, detached under `.claude/worktrees/`), the refusals, the three legs,
+  PR's head, detached under `.claude/worktrees/`), the refusals (a build on the
+  machine waited out first, `refuse.settle`, then refused), the three legs,
   the stress yard's three legs (`STRESS=1`, `bench/stress.py`, run before the PR's
-  tree is put back at its bare head) and the table. `bench-ab.py` and `pr-tree.py` are only the command lines. A test never
+  tree is put back at its bare head) and the table, written from the legs that
+  finished when a run stops (`legs.Stopped`). `bench-ab.py` and `pr-tree.py` are only the command lines. A test never
   builds or benches: the legs take a stub runner.
 - **GitHub over REST, so the scripts run in cloud sessions.** There GraphQL answers
   403, and `gh pr view/list`, `gh issue list` and `gh repo view` with `--json` are

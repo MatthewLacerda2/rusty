@@ -6,7 +6,8 @@ the PR's head, `main` again, the second `main` leg each row's noise floor
 (`bench/__init__.py` says why). In order:
 
 1. the refusals that need no build (`bench/refuse.py`): another timed run (an
-   `flock` under `out/bench/`), a build or a bench on the machine;
+   `flock` under `out/bench/`, refused at once), a build or a bench on the machine
+   (waited out first, up to `refuse.LIMIT`, and refused only if still there, #2463);
 2. room on the disk for both release builds (`bench/space.py`, #2436): a tree's
    warm `target/release` counts as built, and the refusal names `make reclaim`
    and the largest trees; not a timing refusal, so `--force` does not run past it;
@@ -21,7 +22,7 @@ the PR's head, `main` again, the second `main` leg each row's noise floor
    together (`refuse.textures`: two builds that disagree are told apart from a
    project never imported), then the three legs (`bench/legs.py`), each in a
    memory-capped scope where the machine has one, the machine checked again
-   before each, under `--force` too;
+   (and waited out) before each, under `--force` too;
    `--stress` (#2450) then runs the fixture's stress yard in its own three legs
    (`bench/stress.py`), `play` built beside `bench-scenes` in the same cargo
    invocation, **while the PR's tree still holds `main` merged in**; without
@@ -30,9 +31,15 @@ the PR's head, `main` again, the second `main` leg each row's noise floor
 5. the table (`bench/table.py`), printed and kept as
    `out/bench/ab/pr-<n>/table.md`, beside each leg's reports; the PR's tree
    put back at its head and the trees unlocked, each only if this run locked it.
+   A run stopped by a refusal before a leg, or by a failed leg, still writes the
+   table from the legs that finished ([`stopped_header`]; #2463: PR #2439's run
+   lost 19 minutes of measured legs to a `cargo-fmt` before its third), its
+   header naming the legs that did not; a later run never reuses them (each leg's
+   folder is emptied before it runs).
 
 `--force` runs past a refusal and the table lists each one it ran past. Exits 0 when the table
-was made, 1 on a refusal or a failed leg, 2 on a usage error.
+was made from every leg, 1 on a refusal or a failed leg (with a table when any leg finished),
+2 on a usage error.
 """
 
 from __future__ import annotations
@@ -106,6 +113,25 @@ class Gate:
         return said
 
 
+def quiet(me: int) -> str | None:
+    """The busy refusal once `refuse.settle` has waited for the machine, or `None` when it went quiet."""
+    return refuse.busy_refusal(refuse.settle(lambda: refuse.busy(ps(), me), lambda line: print(line, file=sys.stderr)))
+
+
+def stopped_header(why: str, plan: list, yard: list, finished: list) -> list[str]:
+    """The header lines of a table written from a stopped run: why, which legs did not
+    finish, and whether either section is left without its floor."""
+    lost = [leg.name for leg in plan if leg not in finished]
+    lost += ["stress " + leg.name for leg in yard if leg not in finished]
+    floorless = [what for what, legs_of in (("the scenes", plan), ("the stress yard", yard))
+                 if legs_of and legs_of[-1] not in finished]
+    lines = [f"- **this run stopped** ({why}): the {', '.join(lost)} leg{'s' if len(lost) != 1 else ''} "
+             "did not finish, so their columns are empty"]
+    if floorless:
+        lines.append(f"- **no floor** for {' and '.join(floorless)}: no change there is judged")
+    return lines
+
+
 def capped_scope() -> tuple[list[str], str]:
     """The scope prefix the legs run under, probed once."""
     if platform.system() != "Linux" or not shutil.which("systemd-run"):
@@ -160,7 +186,7 @@ def main(argv) -> int:
     locked: list[Path] = []
     pr_tree, pr_sha = trees.path(root, trees.pr_tree(a.pr)), None
     try:
-        gate.check(refuse.busy_refusal(refuse.busy(ps(), me)))
+        gate.check(quiet(me))
         # every binary the invocation links, the first included: a yard-only run's `play` in a
         # profile folder an earlier `bench-scenes` build filled is still counted (`space.EXTRA`)
         builds = [(trees.path(root, trees.MAIN_TREE), "release", bins), (pr_tree, "release", bins)]
@@ -190,19 +216,28 @@ def main(argv) -> int:
         ask = legs.Ask(project, a.scenes, a.runs, a.size, tuple(a.sets), a.load_runs, a.no_editor)
 
         def before(label):
-            return lambda leg: gate.leg(label + leg.name, refuse.busy_refusal(refuse.busy(ps(), me)))
+            return lambda leg: gate.leg(label + leg.name, quiet(me))
 
         def runner(argv):
             return subprocess.run(argv).returncode
 
-        done = legs.run(plan, ask, prefix, runner, before(""))
-        if len(done) == len(plan) and all(code == 0 for _, code in done):
-            # the PR's tree still holds main merged in: `finally` puts it back only after this
-            done += stress.run(yard, prefix, runner, before("stress "))
+        done, why = [], None
+        try:
+            done = legs.run(plan, ask, prefix, runner, before(""))
+            if len(done) == len(plan) and all(code == 0 for _, code in done):
+                # the PR's tree still holds main merged in: `finally` puts it back only after this
+                done += stress.run(yard, prefix, runner, before("stress "))
+        except legs.Stopped as e:
+            done, why = done + e.done, str(e)
+        finished = [leg for leg, code in done if code == 0]
         failed = [("stress " if isinstance(leg, stress.Leg) else "") + leg.name for leg, code in done if code != 0]
-        if failed or len(done) != len(plan) + len(yard):
-            print(f"bench-ab: the {', '.join(failed) or 'last'} leg failed: no table", file=sys.stderr)
-            return 1
+        if why is None and (failed or len(done) != len(plan) + len(yard)):
+            why = f"the {', '.join(failed) or 'last'} leg failed"
+        if why is not None:
+            print(f"bench-ab: stopped: {why}", file=sys.stderr)
+            if not finished:
+                print("bench-ab: no leg finished: no table", file=sys.stderr)
+                return 1
         what = f"project `{project.name}`" if project else "the stress yard alone"
         header = [f"`make bench-ab` PR #{a.pr}, {what}; floor = main again against main",
                   f"- main: {main_sha[:9]}; PR head: {pr_sha[:9]}, measured with main merged in ({merged[:9]})",
@@ -212,14 +247,16 @@ def main(argv) -> int:
         header += [f"- quality preset overridden: {', '.join(a.sets)}"
                    + (" (the scenes only: the stress yard runs at its own)" if yard else "")] if a.sets else []
         header += [f"- FORCE=1 ran past: {o}" for o in gate.overridden]
-        legs_dirs = tuple(leg.out for leg in plan)
+        header += stopped_header(why, plan, yard, finished) if why else []
+        legs_dirs = tuple(leg.out if leg in finished else None for leg in plan)
         scenes = table.scenes_of_all(legs_dirs[:2]) if plan else []
         header += table.count_changes(scenes, legs_dirs)
-        text = table.render(scenes, legs_dirs, header, (stress.section(yard),) if yard else ())
+        lost = frozenset(leg.name for leg in yard if leg not in finished)
+        text = table.render(scenes, legs_dirs, header, (stress.section(yard, lost),) if yard else ())
         out.mkdir(parents=True, exist_ok=True)
         (out / "table.md").write_text(text)
         print(text)
-        return 0
+        return 1 if why else 0
     except RuntimeError as e:
         said = str(e)
         print(f"bench-ab: {space.full(said, root, subprocess.run) if space.said_full(said) else said}",

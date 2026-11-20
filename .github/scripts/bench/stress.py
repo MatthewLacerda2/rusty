@@ -41,6 +41,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from bench import table
+from bench.legs import Stopped
 
 RUNS = 3
 PROJECT = Path("tests/fixtures/project")
@@ -73,14 +74,15 @@ def run(legs: list[Leg], prefix: list[str], runner, before_each=None) -> list[tu
     """Every run of each leg in order through `runner(argv) -> exit code`, stopping at a
     failed one; `(leg, code)` per leg begun, its last run's code.
 
-    `before_each(leg)` is asked before every run and returns a refusal to stop on, or `None`."""
+    `before_each(leg)` is asked before every run and returns a refusal to stop on, or `None`:
+    [`Stopped`] is raised with the legs finished so far, a leg stopped inside its runs not among them."""
     done = []
     for leg in legs:
         code = 0
         for out in leg.runs:
             said = before_each(leg) if before_each else None
             if said:
-                raise RuntimeError(f"before a run of the stress {leg.name} leg: {said}")
+                raise Stopped(f"before a run of the stress {leg.name} leg: {said}", done)
             if out.exists():
                 shutil.rmtree(out)
             code = runner(prefix + command(leg, out))
@@ -129,15 +131,19 @@ def split(rows: dict[str, float], names: list[str]) -> list[dict[str, float]]:
     return [{m: v for m, v in rows.items() if window_of(m) == w} for w in [None, *names]]
 
 
-def section(legs: list[Leg]) -> str:
+def section(legs: list[Leg], missing: frozenset[str] = frozenset()) -> str:
     """The table's stress section over the three legs (main, PR, main again): the first
-    window's rows, then each later window's under its own heading, each with its own lead."""
-    names = windows(legs)
-    per_leg = [split(averages(leg), names) for leg in legs]
-    said = [list(dict.fromkeys(w for out in leg.runs for w in report(out).get("warnings", []))) for leg in legs]
+    window's rows, then each later window's under its own heading, each with its own lead.
+    A leg named in `missing` (it did not finish, #2463) reads as no report, its runs unread."""
+    present = [leg for leg in legs if leg.name not in missing]
+    names = windows(present)
+    per_leg = [split({} if leg.name in missing else averages(leg), names) for leg in legs]
+    said = [list(dict.fromkeys(w for out in leg.runs for w in report(out).get("warnings", []))) for leg in present]
+    leg_names = [n for n, leg in zip(table.LEGS, legs) if leg.name not in missing]
     runs = len(legs[0].runs)
     title = f"**stress yard** (`make bench`'s scenario, {runs} run{'s' if runs != 1 else ''} a leg, averaged)"
-    parts = [table.section(title, tuple(rows[0] for rows in per_leg), table.notes_of(said, "`play`'s notes"))]
+    parts = [table.section(title, tuple(rows[0] for rows in per_leg),
+                           table.notes_of(said, "`play`'s notes", leg_names))]
     for i, name in enumerate(names, start=1):
         parts.append(table.section(f"**stress yard, `{name}` window**", tuple(rows[i] for rows in per_leg), []))
     return "\n".join(parts)
