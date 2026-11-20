@@ -53,6 +53,20 @@ pub(super) struct Seen {
     pub(super) why: Option<String>,
 }
 
+impl Seen {
+    /// A read that this world used, or found nothing at: no reason to give.
+    pub(super) fn loaded(disk: Disk, held: Option<u64>, buffer: Option<Arc<[u8]>>) -> Self {
+        let (mark, why) = (Mark::Loaded, None);
+        Self {
+            disk,
+            held,
+            buffer,
+            mark,
+            why,
+        }
+    }
+}
+
 /// What a save would bring a path to: bytes, maybe in a shared buffer.
 #[derive(Clone, Copy)]
 pub(super) enum Want<'a> {

@@ -6,7 +6,7 @@
 use std::path::Path;
 
 use super::disk::{Disk, Stamp};
-use super::record::Mark;
+use super::record::{Mark, Seen};
 use super::BakeFiles;
 
 impl BakeFiles {
@@ -16,7 +16,9 @@ impl BakeFiles {
     pub fn refused(&self, path: &Path, bytes: &[u8], why: &str) {
         let disk = Disk::File(Stamp::of(bytes));
         let why = Some(format!("refused ({why})"));
-        self.record(path, disk, None, None, Mark::Refused, why);
+        let seen = Seen::loaded(disk, None, None);
+        let mark = Mark::Refused;
+        self.record(path, Seen { mark, why, ..seen });
     }
 
     /// Why this world's last read of the file at `path` did not use it (`"refused
