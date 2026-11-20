@@ -87,6 +87,7 @@ fn first(metric: &str, label: &str, s: &Summary) -> Row {
         worst: label.into(),
         lo: 0.0,
         hi: 0.0,
+        quiet: s.quiet,
     }
 }
 

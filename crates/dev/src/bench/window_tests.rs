@@ -11,7 +11,7 @@ use super::super::report::{read, Report, Summary};
 use super::*;
 
 fn row(name: &str, avg: f64) -> (String, Summary) {
-    (name.to_string(), Summary { avg, p95: avg })
+    (name.to_string(), Summary::new(avg, avg))
 }
 
 #[test]
