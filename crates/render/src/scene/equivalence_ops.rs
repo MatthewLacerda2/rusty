@@ -111,10 +111,7 @@ pub(super) fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
         }),
         R::Reshape(i) => on(scene, pick(scene, i), |s, id| {
             if let Some(mut mesh) = s.world.mesh_mut(id) {
-                // A new revision (`vertices_mut`): every sharer's buffers change.
-                mesh.vertices_mut()
-                    .iter_mut()
-                    .for_each(|v| v.position[1] *= 1.5);
+                (mesh.vertices_mut().iter_mut()).for_each(|v| v.position[1] *= 1.5);
             }
         }),
     }
