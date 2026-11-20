@@ -6,6 +6,7 @@
 //! costs one atlas upload.
 
 use super::atlas::{GlyphAtlas, WIDTH};
+use crate::gpu::ops::{CountedQueue as _, Writes};
 use crate::ui::{bind, UiRenderer};
 
 /// One atlas on the GPU.
@@ -16,7 +17,7 @@ pub(crate) struct AtlasGpu {
 
 impl UiRenderer {
     /// Upload every dirty atlas.
-    pub(crate) fn upload_atlases(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+    pub(crate) fn upload_atlases(&mut self, device: &wgpu::Device, writes: Writes) {
         for (path, atlas) in self.atlases.atlases.iter_mut().filter(|(_, a)| a.dirty) {
             let fits = self
                 .fonts
@@ -29,7 +30,7 @@ impl UiRenderer {
                 self.fonts.insert(path.clone(), AtlasGpu { texture, group });
             }
             if let Some(gpu) = self.fonts.get(path) {
-                write(queue, &gpu.texture, atlas);
+                write(writes, &gpu.texture, atlas);
             }
             atlas.dirty = false;
         }
@@ -53,8 +54,9 @@ fn create(device: &wgpu::Device, height: u32) -> wgpu::Texture {
     })
 }
 
-fn write(queue: &wgpu::Queue, texture: &wgpu::Texture, atlas: &GlyphAtlas) {
-    queue.write_texture(
+fn write((queue, staging): Writes, texture: &wgpu::Texture, atlas: &GlyphAtlas) {
+    queue.counted_write_texture(
+        staging,
         texture.as_image_copy(),
         &atlas.pixels,
         wgpu::TexelCopyBufferLayout {
