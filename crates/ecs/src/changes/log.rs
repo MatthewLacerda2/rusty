@@ -99,8 +99,17 @@ impl Log {
         let mut ids: Vec<u32> = self.entries[start..].iter().map(|&(_, id)| id).collect();
         ids.sort_unstable();
         ids.dedup();
+        crate::walks::collected(ids.len());
         self.high_water = self.high_water.max(self.revision);
         Some(ids)
+    }
+
+    /// [`Self::since`] without the ids: whether the log still holds everything after
+    /// `seen`, and the read is noted all the same, so the cursor counts as caught up.
+    pub fn skip(&mut self, seen: u64) -> bool {
+        let held = self.recording && seen >= self.floor;
+        self.high_water = self.high_water.max(self.revision);
+        held
     }
 
     /// The World was replaced: forget every entry, keep the revision moving. `last`
