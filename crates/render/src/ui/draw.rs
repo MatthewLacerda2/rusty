@@ -85,7 +85,8 @@ impl Renderer {
             .ui
             .kept
             .update((world, &*layout), screen, looked, &wanted);
-        self.ui_renderer.upload_atlases(&self.device, &self.queue);
+        self.ui_renderer
+            .upload_atlases(&self.device, (&self.queue, &self.staging));
         self.lap("ui.mesh");
         let meshes = meshes
             .into_iter()

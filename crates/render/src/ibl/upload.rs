@@ -7,6 +7,7 @@ use super::cubemap::{
     parse_ktx2_cubemap_mips, CubeShape, CubemapMips, CubemapTexture, Refusal, CUBE_FORMAT,
 };
 use super::reflection_prefilter::TEXEL_BYTES;
+use crate::gpu::ops::CountedQueue as _;
 use crate::Renderer;
 
 impl Renderer {
@@ -69,7 +70,8 @@ impl Renderer {
             size.div_ceil(block_edge(format)),
         );
         let row_bytes = rows * format.block_copy_size(None).unwrap_or(TEXEL_BYTES as u32);
-        self.queue.write_texture(
+        self.queue.counted_write_texture(
+            &self.staging,
             wgpu::TexelCopyTextureInfo {
                 texture,
                 mip_level: level,

@@ -46,7 +46,11 @@ fn gpu_an_albedo_layer_averages_in_linear_light_and_a_data_layer_its_bytes() {
     };
     let (data, colour) = (checker("data"), checker("colour"));
     let mut atlas = DecalAtlas::new(&renderer.device);
-    let gpu = (&renderer.device, &renderer.queue, &renderer.mip_generator);
+    let gpu = (
+        &renderer.device,
+        (&renderer.queue, &renderer.staging),
+        &renderer.mip_generator,
+    );
     // The data map first, so the albedo lands on layer 1: the pass draws one layer
     // of the array, not its first.
     let maps = [(&data, TextureKind::Data), (&colour, TextureKind::Colour)];

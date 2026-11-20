@@ -25,25 +25,25 @@ fn gpu_lightmaps_rebind_on_colour_pages_and_match_direction_shapes() {
     let Some(renderer) = headless_or_skip(4, 4) else {
         return;
     };
-    let (device, queue) = (&renderer.device, &renderer.queue);
+    let (device, writes) = (&renderer.device, (&renderer.queue, &renderer.staging));
     let (a, b) = (vec![page("a.png", 2)], vec![page("b.png", 2)]);
     let mismatched = vec![page("wide_dir.png", 4)];
     let matching = vec![page("b_dir.png", 2)];
     let mut maps = Lightmaps::new(device, true);
 
-    assert!(maps.bind(device, queue, &a, &[], &[]));
+    assert!(maps.bind(device, writes, &a, &[], &[]));
     assert!(maps.resident() && !maps.directional(), "no direction pages");
     assert!(
-        maps.bind(device, queue, &b, &[], &[]),
+        maps.bind(device, writes, &b, &[], &[]),
         "new colour pages rebind"
     );
     assert!(
-        !maps.bind(device, queue, &b, &[], &[]),
+        !maps.bind(device, writes, &b, &[], &[]),
         "the same lists do not"
     );
-    assert!(maps.bind(device, queue, &b, &mismatched, &[]));
+    assert!(maps.bind(device, writes, &b, &mismatched, &[]));
     assert!(!maps.directional(), "direction pages of another size");
-    assert!(maps.bind(device, queue, &b, &matching, &[]));
+    assert!(maps.bind(device, writes, &b, &matching, &[]));
     assert!(maps.directional());
 
     let mut scene = Scene::new();
@@ -78,7 +78,7 @@ fn gpu_lightmaps_follow_bakes_at_one_path() {
     let Some(renderer) = headless_or_skip(4, 4) else {
         return;
     };
-    let (device, queue) = (&renderer.device, &renderer.queue);
+    let (device, writes) = (&renderer.device, (&renderer.queue, &renderer.staging));
     let mut maps = Lightmaps::new(device, true);
     let edge = |bake| if bake == Bake::A { 2 } else { 4 };
     let path = rusty_test_support::temp::dir().join("rebaked.png");
@@ -91,7 +91,7 @@ fn gpu_lightmaps_follow_bakes_at_one_path() {
             written::note_written(p);
         },
         |p| {
-            maps.bind(device, queue, &[p.to_string()], &[], &[]);
+            maps.bind(device, writes, &[p.to_string()], &[], &[]);
             maps.bound_edge()
         },
         |loaded, bake| *loaded == Some(edge(bake)),
