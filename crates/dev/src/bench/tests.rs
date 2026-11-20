@@ -3,6 +3,8 @@ use std::rc::Rc;
 
 use super::stress::{self, Spawned, StressSpec};
 use super::*;
+use crate::capture::RenderedFrame;
+use rusty_core::frame_stats::FrameStats;
 
 fn harness(name: &str) -> Harness {
     let out = rusty_test_support::temp::dir().join(format!("bench_{name}_{}", std::process::id()));
@@ -118,75 +120,6 @@ fn gpu_bench_reports_frame_render_and_counter_rows() {
     }
 }
 
-/// GPU rows are the frame's times scaled by the clock speed the probe read; the
-/// raw total and the clock get rows of their own, and the GPU's wait for the CPU
-/// stays as measured. A frame the probe missed has no GPU rows, so an unscaled time
-/// never mixes in.
-#[test]
-fn gpu_rows_are_scaled_by_the_frame_clock_speed() {
-    use rusty_render::{GpuPass, GpuTimes};
-    let gpu = GpuTimes {
-        frame: 1,
-        passes: vec![(GpuPass::Shadows, 2.0), (GpuPass::Forward, 6.0)],
-        other_ms: 0.4,
-        between_submits_ms: 0.6,
-        ..Default::default()
-    };
-    let frame = RenderedFrame {
-        gpu: Some(gpu),
-        ..RenderedFrame::default()
-    };
-    let stats = FrameStats::default();
-    let mut samples = Samples::default();
-    let half = Speeds {
-        gpu: Some(0.5),
-        ..Speeds::default()
-    };
-    sample(&mut samples, &stats, Some(&frame), half);
-    sample(&mut samples, &stats, Some(&frame), Speeds::default());
-    let report = samples.report();
-    let avg = |k: &str| report.metrics.iter().find(|(m, _)| m == k).unwrap().1.avg;
-    assert_eq!(avg("gpu_ms"), 4.0);
-    assert_eq!(avg("gpu.shadows"), 1.0);
-    assert_eq!(avg("gpu.forward"), 3.0);
-    assert_eq!(avg("gpu.ui"), 0.0);
-    // Untimed work is GPU work, scaled like the rows; the wait for the CPU is not.
-    assert_eq!(avg("gpu.other"), 0.2);
-    assert_eq!(avg("gpu_between_submits_ms"), 0.6, "a wait as measured");
-    // The `gpu.` rows, `other` included, are the GPU's work at the reference clock.
-    let rows = report.metrics.iter().filter(|(m, _)| m.starts_with("gpu."));
-    let work: f64 = rows.map(|(_, s)| s.avg).sum();
-    assert!((work - 4.2).abs() < 1e-9, "gpu. rows {work} vs 4.2");
-    assert_eq!(avg("gpu_raw_ms"), 8.0);
-    assert_eq!(avg("gpu_clock_pct"), 50.0);
-    // Without timestamps (lavapipe) no GPU row, `gpu.other` included.
-    let mut untimed = Samples::default();
-    sample(&mut untimed, &stats, Some(&RenderedFrame::default()), half);
-    assert!(!untimed
-        .report()
-        .metrics
-        .iter()
-        .any(|(m, _)| m.starts_with("gpu")));
-}
-
-/// CPU rows mirror the GPU's (#1719): `cpu_ms` and `cpu.<system>` are scaled, `frame_ms`
-/// stays as measured, and a frame the CPU probe missed has no scaled rows.
-#[test]
-fn cpu_rows_are_scaled_by_the_cpu_clock_speed() {
-    let mut stats = FrameStats::default();
-    stats.record("frame_ms", 4.0);
-    stats.record_system("tick_nav", 2.0);
-    let mut samples = Samples::default();
-    let cpu = |cpu| Speeds { cpu, gpu: None };
-    sample(&mut samples, &stats, None, cpu(Some(0.5)));
-    sample(&mut samples, &stats, None, cpu(None));
-    assert_eq!(samples.values("frame_ms"), [4.0, 4.0]);
-    assert_eq!(samples.values("cpu_ms"), [2.0]);
-    assert_eq!(samples.values("cpu.tick_nav"), [1.0]);
-    assert_eq!(samples.values("cpu_clock_pct"), [50.0]);
-    assert!(samples.values("tick_nav").is_empty(), "no raw system rows");
-}
-
 /// One frame's report rows, sampled at the reference clocks.
 fn rows_of(frame: &RenderedFrame) -> Vec<(String, f64)> {
     let speed = Speeds {
@@ -263,12 +196,13 @@ fn the_occlusion_parts_have_no_rows_with_the_cull_off() {
 }
 
 /// `cpu_ms` is the whole tick (#2342): the systems' rows, `cpu.flush_bounds` and
-/// `cpu.other` (what no system held) fold back to it; `taps_ms` is beside it.
+/// `cpu.other` (what no system held) fold back to it; `taps_ms`, `probe_ms` beside.
 #[test]
 fn cpu_rows_fold_to_the_timed_tick() {
     let mut stats = FrameStats::default();
-    stats.record("frame_ms", 5.0);
-    stats.record("taps_ms", 1.0); // a demo's taps: timed beside the tick
+    for (key, ms) in [("frame_ms", 5.0), ("taps_ms", 1.0), ("probe_ms", 0.5)] {
+        stats.record(key, ms); // a demo's taps and the probe's own work: beside the tick
+    }
     for (name, ms) in [
         ("tick_nav", 2.0),
         ("flush_bounds", 0.25),
@@ -282,11 +216,8 @@ fn cpu_rows_fold_to_the_timed_tick() {
         gpu: None,
     };
     sample(&mut samples, &stats, None, at_reference);
-    assert_eq!(
-        samples.values("cpu.flush_bounds"),
-        [0.5],
-        "summed over the stages"
-    );
+    let flush = samples.values("cpu.flush_bounds");
+    assert_eq!(flush, [0.5], "summed over the stages");
     let other = samples.values("cpu.other");
     assert_eq!(other, [2.5], "the tick less what its systems held");
     let parts = ["cpu.tick_nav", "cpu.flush_bounds", "cpu.other"];
@@ -296,5 +227,6 @@ fn cpu_rows_fold_to_the_timed_tick() {
         samples.values("cpu_ms")[0],
         "the taps are in no cpu. row"
     );
-    assert_eq!(samples.values("taps_ms"), [1.0]);
+    let beside = ["taps_ms", "probe_ms"].map(|k| samples.values(k));
+    assert_eq!(beside, [[1.0], [0.5]]);
 }

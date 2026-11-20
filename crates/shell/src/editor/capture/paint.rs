@@ -1,5 +1,6 @@
 //! Painting the captured egui frame into an offscreen target (#731), shared with the
-//! project picker's capture.
+//! project picker's capture and the bench's editor round (`bench`), which paints
+//! every frame into one target.
 
 use rusty_render::OFFSCREEN_FORMAT;
 
@@ -12,8 +13,25 @@ pub(in crate::editor) fn paint(
     width: u32,
     height: u32,
 ) -> wgpu::Texture {
-    let (device, queue) = (&renderer.device, &renderer.queue);
-    let target = device.create_texture(&wgpu::TextureDescriptor {
+    let target = target(&renderer.device, width, height);
+    let jobs = ctx.tessellate(output.shapes, output.pixels_per_point);
+    let painted = Painted {
+        jobs: &jobs,
+        pixels_per_point: output.pixels_per_point,
+    };
+    paint_jobs(renderer, egui_renderer, &painted, &target, (width, height));
+    target
+}
+
+/// A tessellated egui frame.
+pub(super) struct Painted<'a> {
+    pub jobs: &'a [egui::ClippedPrimitive],
+    pub pixels_per_point: f32,
+}
+
+/// A `width × height` offscreen target egui paints into.
+pub(super) fn target(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Texture {
+    device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Editor Capture Target"),
         size: wgpu::Extent3d {
             width,
@@ -26,15 +44,26 @@ pub(in crate::editor) fn paint(
         format: OFFSCREEN_FORMAT,
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
         view_formats: &[],
-    });
+    })
+}
+
+/// Paint `painted` over `target`, cleared first, and submit it.
+pub(super) fn paint_jobs(
+    renderer: &rusty_render::Renderer,
+    egui_renderer: &mut egui_wgpu::Renderer,
+    painted: &Painted,
+    target: &wgpu::Texture,
+    (width, height): (u32, u32),
+) {
+    let (device, queue) = (&renderer.device, &renderer.queue);
     let target_view = target.create_view(&Default::default());
-    let jobs = ctx.tessellate(output.shapes, output.pixels_per_point);
+    let jobs = painted.jobs;
     let screen = egui_wgpu::ScreenDescriptor {
         size_in_pixels: [width, height],
-        pixels_per_point: output.pixels_per_point,
+        pixels_per_point: painted.pixels_per_point,
     };
     let mut encoder = device.create_command_encoder(&Default::default());
-    egui_renderer.update_buffers(device, queue, &mut encoder, &jobs, &screen);
+    egui_renderer.update_buffers(device, queue, &mut encoder, jobs, &screen);
     {
         let mut pass = encoder
             .begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -54,8 +83,7 @@ pub(in crate::editor) fn paint(
                 occlusion_query_set: None,
             })
             .forget_lifetime();
-        egui_renderer.render(&mut pass, &jobs, &screen);
+        egui_renderer.render(&mut pass, jobs, &screen);
     }
     queue.submit(std::iter::once(encoder.finish()));
-    target
 }
