@@ -320,10 +320,15 @@ namespaces hand out ids, not objects, so Unity's `AsyncOperation` is polled thro
   the scene was saved, and the textures of its particles, ribbons, decals and UI.
   Headless hosts warm nothing; their first frame uploads it all.
 - **What the old scene leaves:** after the new scene's first frame, the renderer
-  releases the meshes no loaded scene still uses (Unity's unload of unused assets on
-  a non-additive load), so a session of many levels holds one level's meshes, not
-  all of them; a mesh both levels use stays, and so does what a `LoadAsync` still
-  pending has warmed (`Debug.Stats()`'s `mesh_count` and `mesh_bytes`). Textures and lightmaps are not released yet.
+  releases the meshes, textures and lightmap page arrays no loaded scene still uses
+  (Unity's unload of unused assets on a non-additive load), so a session of many
+  levels holds one level's assets, not all of them; one both levels use stays, and
+  so does what a `LoadAsync` still pending has warmed (`Debug.Stats()`'s
+  `mesh_count`, `mesh_bytes`, `texture_bytes` and `lightmap_bytes`). A texture is
+  kept while a loaded scene can draw it: a material map of any of its entities
+  (inactive ones included), and its UI images (hidden ones and `SpriteSwap` sprites
+  included), particles', ribbons' and mesh emitters' textures and its sky. Decal maps
+  live in their own atlas and are not released.
 - **What stays on the tick:** the swap itself — the outgoing scene's teardown, the
   World replaced, the physics world built and the navmesh restored.
 - **Loading screens:** a `DontDestroyOnLoad` canvas, shown before the call and

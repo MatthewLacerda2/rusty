@@ -111,3 +111,32 @@ fn gpu_a_hidden_image_of_the_scene_a_load_drew_keeps_its_map() {
     let (_, shown) = frame(&mut r, &next);
     assert_eq!(shown.uploads.count, 0, "showing it reads nothing again");
 }
+
+#[test]
+fn gpu_a_load_drops_the_lightmap_lists_no_kept_scene_binds() {
+    let Some(mut r) = crate::test_gpu::headless_or_skip(32, 32) else {
+        return;
+    };
+    // Pages that fail to load are cached all the same: one list each.
+    let lit = |page: &str| {
+        let mut scene = textured(&[]);
+        scene.lightmaps.pages = vec![format!("{page}.png")];
+        scene
+    };
+    let names = |r: &crate::Renderer| r.lightmaps.cached_lists().concat();
+    let mut edit = lit("edit");
+    frame(&mut r, &edit);
+    edit.set_playing(true);
+    frame(&mut r, &edit);
+    let mut level = lit("level");
+    level.set_playing(true);
+    frame(&mut r, &level);
+    assert_eq!(
+        names(&r),
+        ["edit.png", "level.png"],
+        "the held scene's stays"
+    );
+    edit.set_playing(false);
+    frame(&mut r, &edit);
+    assert_eq!(names(&r), ["edit.png"], "the level's list is dropped");
+}

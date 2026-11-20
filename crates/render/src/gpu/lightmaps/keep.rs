@@ -15,6 +15,14 @@ impl Lightmaps {
             .retain(|list, _| kept(list) || bound.iter().any(|b| b == list));
         before - self.cache.len()
     }
+
+    /// The page lists cached now, sorted.
+    #[cfg(test)]
+    pub(crate) fn cached_lists(&self) -> Vec<Vec<String>> {
+        let mut lists: Vec<Vec<String>> = self.cache.keys().cloned().collect();
+        lists.sort();
+        lists
+    }
 }
 
 #[cfg(test)]

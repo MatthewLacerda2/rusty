@@ -1,7 +1,8 @@
 //! crates/render/src/scene/residency/mod.rs — which GPU meshes stay resident (#2440): a
 //! mesh is released once no loaded scene references it, on a load that replaced
 //! the World, as Unity's non-additive `SceneManager.LoadScene` unloads what the
-//! scene before it alone used.
+//! scene before it alone used. Textures and lightmap page arrays are released at
+//! the same moment under the same rule (`maps`).
 //!
 //! - **When**: at the end of a main-view frame (`Renderer::render`, outside
 //!   `aside`, so no preview or capture) that drew a scene identity the last one

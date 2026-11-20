@@ -9,9 +9,10 @@
 //!
 //! The key is the *resolved* signature (a map's path only once its texture is
 //! resident, else empty for the default), so a late-loading texture gets a fresh group
-//! rather than a stale one (#207). Entries are evicted only when a texture file is
+//! rather than a stale one (#207). Entries are evicted when a texture file is
 //! re-written (#689): then every group is dropped and rebuilt on next use, since a
-//! group holds the old upload. There is one per material look in use, a small set,
+//! group holds the old upload; and on a load, the groups binding a texture the
+//! residency released (`scene::residency::maps`), which no kept object names. There is one per material look in use, a small set,
 //! and each is only a bind group over shared textures.
 //!
 //! **Runtime params (#399).** A material whose surface shader exposes runtime params
