@@ -133,15 +133,7 @@ pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
     if !finite || cells_in.is_none_or(|n| n > MAX_GRID_CELLS as u64) {
         return Err("grid out of range".into());
     }
-    let all = cells_in.unwrap_or(0);
-    if u64::from(stamp.baked) > all {
-        return Err("more cells baked than the grid holds".into());
-    }
-    // A bake that sampled every cell has no reach to hash and baked them all.
-    if stamp.floor == FloorSource::Everywhere && (stamp.reach != 0 || u64::from(stamp.baked) != all)
-    {
-        return Err("a stamp sampling every cell with a reach or fewer cells baked".into());
-    }
+    stamp_fits(&stamp, cells_in.unwrap_or(0))?;
     let words = r.u32()? as usize;
     let rows = (0..words).map(|_| r.array().map(u64::from_le_bytes));
     let rows = rows.collect::<Result<Vec<_>, _>>()?;
@@ -154,6 +146,20 @@ pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
     let data = OcclusionData::new(grid, objects, rows, cells);
     let data = data.ok_or("rows disagree with the grid")?;
     Ok(data.stamped(stamp))
+}
+
+/// Refuse a stamp that disagrees with its grid of `all` cells or with itself:
+/// more cells baked than there are, or one that sampled every cell
+/// ([`FloorSource::Everywhere`]) with a reach hash or fewer cells baked.
+fn stamp_fits(stamp: &BakeStamp, all: u64) -> Result<(), String> {
+    let baked = u64::from(stamp.baked);
+    if baked > all {
+        return Err("more cells baked than the grid holds".into());
+    }
+    if stamp.floor == FloorSource::Everywhere && (stamp.reach != 0 || baked != all) {
+        return Err("a stamp sampling every cell with a reach or fewer cells baked".into());
+    }
+    Ok(())
 }
 
 /// The baked objects after the stamp, refused when `stamp` counts more never

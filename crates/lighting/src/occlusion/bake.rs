@@ -204,19 +204,16 @@ impl OcclusionInput {
         progress.start(grid.cell_count(), baked);
         let seen = scene.cells(&grid, threads.max(1), progress, laid.sampled.as_deref())?;
         let data = self.assemble(&laid, &seen, (min, max), report.never_culled);
-        let floor_coverage = match laid.source {
-            FloorSource::Everywhere => None,
-            FloorSource::Navmesh => self.reach.coverage((min, max)),
+        let (floor_coverage, play_height) = match laid.source {
+            FloorSource::Everywhere => (None, 0.0),
+            FloorSource::Navmesh => (self.reach.coverage((min, max)), self.reach.play_height),
         };
         let report = OcclusionBakeReport {
             cells: grid.cell_count(),
             baked_cells: baked,
             floor: laid.source,
             navmesh_missed,
-            play_height: match laid.source {
-                FloorSource::Everywhere => 0.0,
-                FloorSource::Navmesh => self.reach.play_height,
-            },
+            play_height,
             floor_coverage,
             cell_size: grid.cell,
             rows: data.row_count(),

@@ -95,14 +95,8 @@ impl NavigationGraph {
             self.bake(scene);
             return Rebake::Full;
         };
-        let InputKeys {
-            colliders,
-            obstacles,
-            modifiers,
-            links,
-        } = InputKeys::of(scene, statics_still);
-        let dirty = st.update_inputs(scene, colliders, (obstacles, modifiers));
-        let link_dirty = st.update_links(links, self);
+        let keys = InputKeys::of(scene, statics_still);
+        let (dirty, link_dirty) = st.update_inputs(scene, keys, self);
         if dirty.is_empty() && link_dirty.is_empty() {
             self.bake_state = Some(st);
             self.islands.still(); // a carried island map rebuilds after a quiet spell (#2111)
@@ -173,15 +167,22 @@ impl NavigationGraph {
 }
 
 impl BakeState {
-    /// Diff the recorded inputs against `scene`'s keys, record the current ones,
-    /// and return the cells whose inputs changed. With no `colliders` (unread:
+    /// Diff the recorded inputs against `keys` (`scene`'s now), record them, and
+    /// return the cells whose spans' inputs changed and those a changed authored
+    /// link spanned (before or after). With no `colliders` (unread:
     /// `InputKeys::of`) the static colliders keep their records undiffed.
     fn update_inputs(
         &mut self,
         scene: &Scene,
-        colliders: Option<Vec<(u32, super::inputs::ColliderKey)>>,
-        (obstacles, modifiers): (Vec<(u32, ObstacleVolume)>, Vec<(u32, ModifierVolume)>),
-    ) -> Vec<CellRect> {
+        keys: InputKeys,
+        g: &NavigationGraph,
+    ) -> (Vec<CellRect>, Vec<CellRect>) {
+        let InputKeys {
+            colliders,
+            obstacles,
+            modifiers,
+            links,
+        } = keys;
         let mut dirty = Vec::new();
         let raw = &self.raw;
         if let Some(colliders) = colliders {
@@ -201,7 +202,7 @@ impl BakeState {
         let modifiers = diff(&self.inputs.modifiers, modifiers, modifier_rect, &mut dirty);
         self.inputs.obstacles = obstacles;
         self.inputs.modifiers = modifiers;
-        dirty
+        (dirty, self.update_links(links, g))
     }
 
     /// Diff the recorded authored links against `links` (the scene's now), record

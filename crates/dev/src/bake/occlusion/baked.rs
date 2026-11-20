@@ -28,7 +28,7 @@ impl BakedOcclusion {
     /// The PVS `scene` holds, kept, when it is what a bake sampling `reach`
     /// would write ([`current_pvs`]): Generate Lighting's one keep-or-bake
     /// decision, the editor's and the script's. Otherwise the fingerprints it
-    /// compared with, for the bake to gather through ([`gather_with`]): no mesh is
+    /// compared with, for the bake to gather through ([`gather_with`](rusty_lighting::occlusion::gather_with)): no mesh is
     /// hashed twice.
     pub fn kept(scene: &Scene, reach: &Reach) -> Result<Self, Fingerprints> {
         let started = Instant::now();
