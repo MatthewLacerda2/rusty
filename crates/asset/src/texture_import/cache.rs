@@ -12,6 +12,7 @@
 use std::path::Path;
 
 use super::encode::{full_chain_len, BlockFormat, Compressed};
+use super::refresh::Uncached;
 use super::variance::{VarianceTable, VARIANCE_LEVELS};
 use super::{TextureSettings, ENCODER_VERSION};
 use crate::convert::{source_digest, Seen};
@@ -151,21 +152,19 @@ pub(super) fn write(path: &Path, stamp: u64, texture: &Compressed) -> std::io::R
 /// A test hook (#2372): cache the image at `source` as an import with `settings`
 /// would, stamped the same, but with every block zero and nothing encoded: a
 /// memory test's fixture, whose peak an encode's would hide. `Err` where an import
-/// would make no cache (compression off, a side not a multiple of 4), so a
+/// would make no cache, by the encode's own check (`refresh::cached_as`), so a
 /// fixture never measures the decode path thinking it cached.
 #[doc(hidden)]
 pub fn write_blank(source: &Path, settings: &TextureSettings) -> Result<(), String> {
     let Seen::Read(digest) = source_digest(source) else {
         return Err(format!("{} cannot be read", source.display()));
     };
-    let format = super::format_of(settings).ok_or("compression is off")?;
+    let format = match super::refresh::cached_as(source, settings) {
+        Ok(cached) => cached.format,
+        Err(Uncached::Left(why)) => return Err(format!("an import makes no cache: {why}")),
+        Err(Uncached::Unreadable(e)) => return Err(e),
+    };
     let (_, (width, height)) = super::imported_size(source, settings).ok_or("no size")?;
-    if width % 4 != 0 || height % 4 != 0 {
-        // The encoder leaves such a size uncompressed, and the cache refuses it.
-        return Err(format!(
-            "{width}x{height} is not a multiple of 4: never compressed"
-        ));
-    }
     let count = match settings.generate_mipmaps {
         true => full_chain_len(width, height),
         false => 1,

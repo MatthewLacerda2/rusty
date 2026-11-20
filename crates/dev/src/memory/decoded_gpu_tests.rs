@@ -1,5 +1,6 @@
-//! A cached load of a scene's textures peaks no higher than the same textures
-//! decoded from their PNGs (#2372); the fixture and measure: `textures_gpu_tests`.
+//! A cached load of a scene's textures holds no more beside its GPU copies than
+//! the same textures decoded from their PNGs (#2372); the fixture and measure:
+//! `textures_gpu_tests`.
 
 use super::textures_gpu_tests::{compresses, images, load, mb, set_up, N};
 use crate::memory::rss_peak_bytes;
@@ -18,19 +19,28 @@ fn gpu_cached_textures_peak_no_higher_than_the_same_decoded() {
         let start = rss_peak_bytes().expect("read");
         // The cached load first: the decoded one may reuse what it freed, never
         // the other way round.
-        let (after_cached, _) = load(&mut renderer, &cached[1..]);
-        let (after_decoded, _) = load(&mut renderer, &decoded);
-        let (cached_b, decoded_b) = (after_cached - start, after_decoded - after_cached);
+        let (after_cached, cached_gpu) = load(&mut renderer, &cached[1..]);
+        let (after_decoded, decoded_gpu) = load(&mut renderer, &decoded);
+        // Each side's growth less what its GPU copies hold (the decoded ones are
+        // RGBA8, four times the blocks): what the load held beside them, its
+        // staging and any CPU copy, which is what the cache must not raise.
+        let beside = |grew: u64, gpu: u64| grew.saturating_sub(gpu);
+        let cached_b = beside(after_cached - start, cached_gpu);
+        let decoded_b = beside(after_decoded - after_cached, decoded_gpu);
         println!(
-            "{} textures: cached +{} MB, decoded +{} MB",
+            "{} textures, beside their GPU copies: cached +{} MB ({} MB on the GPU), \
+             decoded +{} MB ({} MB on the GPU)",
             4 * N,
             mb(cached_b),
-            mb(decoded_b)
+            mb(cached_gpu),
+            mb(decoded_b),
+            mb(decoded_gpu)
         );
         assert!(
             cached_b <= decoded_b,
-            "{} textures loaded from their caches peaked {} MB higher, the same decoded \
-             from their PNGs {} MB: a cached load holds more than a decode",
+            "{} textures loaded from their caches peaked {} MB past their GPU copies, \
+             the same decoded from their PNGs {} MB: a cached load holds more beside \
+             the GPU than a decode (staging unbounded, or a CPU copy kept)",
             4 * N,
             mb(cached_b),
             mb(decoded_b)
