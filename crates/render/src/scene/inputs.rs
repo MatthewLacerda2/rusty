@@ -189,8 +189,7 @@ impl Inputs {
         };
         let meshes = w.changes(&mut self.mesh);
         let groups = w.changes(&mut self.lod_groups);
-        let none = |c: &Changes| matches!(c, Changes::Ids(ids) if ids.is_empty());
-        self.regroup = !(none(&meshes) && none(&groups));
+        self.regroup = !(meshes.is_empty() && groups.is_empty());
         take(meshes, &mut whole);
         take(groups, &mut BTreeSet::new());
         take(w.changes(&mut self.material), &mut whole);

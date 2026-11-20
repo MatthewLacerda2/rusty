@@ -3,45 +3,43 @@
 //!
 //! The bake's colliders are the static ones (`bounds::static_collider_ids`): an
 //! entity static and active in the hierarchy, with an active, solid Collider, at
-//! its world pose. Each of those facts has a channel: a pose on `WorldPose`, the
-//! Collider on `ColliderComponent`, `activeInHierarchy` on `Activity`, and static
-//! membership on `StaticSet`, which also names a static entity that was removed.
+//! its world pose. The World answers each of those facts without a list of ids:
+//! - a static entity's pose or Collider: a [`StaticGeometry`] watch, a revision the
+//!   `WorldPose` walk and a Collider write bump when the entity is static, held
+//!   with the `WorldPose` cursor it catches up on every ask (so the walk runs, and
+//!   the skip that spares a subtree already stamped never spares one this watch
+//!   has not seen);
+//! - `activeInHierarchy` and static membership: `StaticSet`, which every Activity
+//!   stamp also stamps for each static entity it reaches (an `active` flag flipped,
+//!   a re-parent, a placement or removal), and which names a removed static entity.
+//!
 //! A `NavMeshModifier` (#1959) changes how they bake from anywhere above them, so
 //! any write on its channel counts as a change.
-//! When no id on the first three is static now and `StaticSet` named nothing, the
-//! collider diff, the bounds' geometry extent and the reshape check would all find
-//! what they found last tick, so [`NavigationGraph::sync_changes`] skips them. A
-//! dynamic entity moving names no static id, so it never costs the static diff.
+//! When the watch saw nothing, `StaticSet` named nothing and no cursor read
+//! `Rebuild` (a clear, a scene load, Play's snapshot restored, an Undo or a
+//! rewind), the collider diff, the bounds' geometry extent and the reshape check
+//! would all find what they found last tick, so [`NavigationGraph::sync_changes`]
+//! skips them. A dynamic entity moving costs the watch no id list and no `is_static`
+//! lookup per id; its move still walks its subtree and appends its `WorldPose`
+//! entries, which the open cursor keeps recording.
 
 use super::super::NavigationGraph;
 use super::sync::Rebake;
-use rusty_components::{ColliderComponent, NavMeshModifierComponent};
-use rusty_ecs::{Activity, Changes, Channel, Cursor, StaticSet, World, WorldPose};
+use rusty_components::NavMeshModifierComponent;
+use rusty_ecs::{Cursor, StaticGeometry, StaticSet, World};
 use rusty_scene::Scene;
 
-/// The cursors a play-mode navmesh reads its static geometry's changes from.
+/// What a play-mode navmesh reads its static geometry's changes from.
 pub(crate) struct StaticWatch {
-    pose: Cursor<WorldPose>,
-    collider: Cursor<ColliderComponent>,
-    activity: Cursor<Activity>,
+    geometry: StaticGeometry,
     statics: Cursor<StaticSet>,
     modifiers: Cursor<NavMeshModifierComponent>,
-}
-
-/// Whether `cursor` named no static entity (`false` on `Rebuild`).
-fn none_static<T: Channel>(w: &mut World, cursor: &mut Cursor<T>) -> bool {
-    match w.changes(cursor) {
-        Changes::Rebuild => false,
-        Changes::Ids(ids) => !ids.iter().any(|&id| w.is_static(id)),
-    }
 }
 
 impl StaticWatch {
     fn open(w: &mut World) -> Self {
         Self {
-            pose: w.change_cursor(),
-            collider: w.change_cursor(),
-            activity: w.change_cursor(),
+            geometry: w.static_geometry(),
             statics: w.change_cursor(),
             modifiers: w.change_cursor(),
         }
@@ -50,17 +48,12 @@ impl StaticWatch {
     /// Whether the static geometry is as it was at the last read. Reads every
     /// cursor, so each has read everything after this.
     pub(crate) fn still(&mut self, w: &mut World) -> bool {
-        let unchanged = |c: Changes| matches!(c, Changes::Ids(ids) if ids.is_empty());
-        let membership = unchanged(w.changes(&mut self.statics));
+        let membership = w.changes(&mut self.statics).is_empty();
         // Any `NavMeshModifier` write counts: one on a non-static parent changes
         // how its static children bake (#1959). They are rare.
-        let modifiers = unchanged(w.changes(&mut self.modifiers));
-        let reads = [
-            none_static(w, &mut self.pose),
-            none_static(w, &mut self.collider),
-            none_static(w, &mut self.activity),
-        ];
-        membership && modifiers && !reads.contains(&false)
+        let modifiers = w.changes(&mut self.modifiers).is_empty();
+        let geometry = self.geometry.changed(w);
+        membership && modifiers && !geometry
     }
 }
 
