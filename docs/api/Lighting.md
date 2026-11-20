@@ -444,21 +444,25 @@ lighting settings (above), whose defaults are the ones listed here.
   light's (#1674) are soft, its rectangle integrated over `directSamples` or more jittered
   points per texel. `directSamples` (#2355, Unity's *Direct Samples* beside `samples`,
   its *Indirect Samples*) defaults to `0`, which follows `samples`; lower it to bake a
-  floor under many Area panels faster, at the cost of noisier penumbrae. Past 16
-  points, each panel is first probed with 20 shadow rays: one to each corner and one to
-  a point picked in each of 4 × 4 blocks of the full set. All seen, its light is summed
-  over the full set unshadowed; all hidden, two more rounds of a point per block (52 rays
-  in all) must be hidden too before it gives none; otherwise (a penumbra) the rest of
+  floor under many Area panels faster, at the cost of noisier penumbrae. From 64
+  points up, each panel is first probed with 20 shadow rays: one to each corner (aimed
+  just inside it, so a recess's walls meeting its edge don't block them) and one to a
+  point picked in each of 4 × 4 blocks of the full set. Mixed (a penumbra), the rest of
   the set casts its rays, the probe's points counting among them, so a penumbra costs
-  only the four corners more. An occluder's straight edge across the panel always hides
-  a corner, so shadow edges are kept, but one that hides no corner can slip between the
-  20 rays and cast no shadow of that panel on that texel, by chance well above a quarter
-  of the panel's width: measured straight under a 1.2 × 0.6 m panel, a rod across it
-  1/8 of its width is missed 10% of the time and 1/16 34%, a centred blob 0.3 of its
-  width and height 18% and 0.2 50%. The dark side is held: a floor seeing the panel only
-  through a slit 1/4, 1/8 or 1/16 of its width stays within a second exhaustive bake's
-  own noise at 256 direct samples. A texel buried inside other geometry (floor
-  under a crate) is filled from its neighbours rather than baked black (*Backface
+  only the four corners more. All seen, the rest of the set is taken as unshadowed, and
+  about 4 of its points cast their rays anyway (24 rays a panel); all hidden, it is taken
+  as giving nothing, and about 32 of its points are checked (52 rays). A check that finds
+  the verdict wrong corrects it by its point's light over its chance of being checked, so
+  the bake shows no missing shadow and no missing light on average: a thin occluder that
+  all 20 probe rays miss (a pipe under a panel) still casts its shadow, and a slit the
+  probe misses still lets its light through. Where the verdict was wrong, the texel is
+  noisier instead, by an amount set by the checks, not by `directSamples` (baked direct
+  light is never denoised): measured straight under a 1.2 × 0.6 m panel, a rod across it
+  1/8 of its width leaves the texel's light varying by about 8% from seed to seed, where
+  the exhaustive set varies by under 1%; through a slit 1/8 of the panel's width, about
+  15% against 7%. On a floor that shows as dark specks across a thin occluder's faint
+  shadow. A fully seen or fully hidden panel is as quiet as the exhaustive set.
+  A texel buried inside other geometry (floor under a crate) is filled from its neighbours rather than baked black (*Backface
   Tolerance*, below). No GPU is needed; it runs headless.
 - **Backface Tolerance** (`backfaceTolerance`, #1949, Unity's setting of that name,
   default `0.9`, `0`–`1`). Each texel shoots 32 probe rays of its own; it is

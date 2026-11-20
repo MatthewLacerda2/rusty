@@ -31,7 +31,7 @@ pub use rusty_scene::lighting::area::{AreaShape, EMIT_OFFSET};
 /// cells are split into `PROBE × PROBE` blocks ([`block_span`]), and the probe
 /// casts the ray of one cell picked in each, plus one per corner. Its stratified
 /// rays are points of the full set, so where the set follows they count toward
-/// it. A set of `PROBE` cells a side or fewer (16 direct samples) skips the probe.
+/// it. A set too small for the probe to pay (`trace::own`'s `probes`) skips it.
 pub const PROBE: u32 = 4;
 
 /// The side of the smallest square grid with at least `n` cells: [`cell_point`]
