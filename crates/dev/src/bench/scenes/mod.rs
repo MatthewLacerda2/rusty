@@ -198,9 +198,16 @@ pub fn bench(
     if let Some(r) = harness.renderer() {
         push_gpu_memory(&mut report, r);
     }
+    let id = harness.world.borrow().scene().borrow().id();
+    let stale = harness.renderer().and_then(|r| r.stale_occlusion(id));
     {
         let world = harness.world.borrow();
-        report.warnings.extend(unbaked(&world.scene().borrow()));
+        let scene = world.scene().borrow();
+        report.warnings.extend(unbaked(&scene));
+        let nav = world.nav().borrow().last_start();
+        report
+            .warnings
+            .extend(notes::bakes_unused(&scene, stale, nav));
     }
     let assets = std::path::Path::new(rusty_core::project::ASSETS_DIR);
     let uncached = harness.renderer().map(|r| r.uncached_textures(assets));

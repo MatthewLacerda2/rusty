@@ -1,10 +1,12 @@
 //! What a scene's report warns of beside its rows: the console errors the bench
 //! logged (with the console kept beside the report), the bake the scene lacks, the
-//! textures it drew uncompressed for want of an import, and the models its loads
-//! cooked for want of one.
+//! baked data on disk it ran without, the textures it drew uncompressed for want
+//! of an import, and the models its loads cooked for want of one.
 
 use std::path::Path;
 
+use rusty_navigation::Start;
+use rusty_render::StaleOcclusion;
 use rusty_scene::{Scene, Sh9};
 use rusty_script::scripting::LogLevel;
 
@@ -129,9 +131,56 @@ pub fn cooked_at_load(loads: &[super::load::Load]) -> Option<String> {
     let most = loads.iter().map(cooked).fold(0.0, f64::max);
     (most > 0.0).then(|| {
         format!(
-            "its models were cooked at load ({most} in a load): `load.import` holds the              cooking a cooked project skips; `make import PROJECT=<dir>` writes their              cooked files"
+            "its models were cooked at load ({most} in a load): `load.import` holds the \
+             cooking a cooked project skips; `make import PROJECT=<dir>` writes their \
+             cooked files"
         )
     })
+}
+
+/// The warnings for baked data a scene has on disk that its run did not use, one a
+/// kind: a sidecar its load refused (`BakeFiles::refusals`, why included), a PVS
+/// its statics moved away from (`stale`, `Renderer::stale_occlusion`), a navmesh
+/// Play's start refused (`nav`, `NavigationGraph::last_start`). The scene was
+/// measured as another one: nothing PVS-culled, or a navmesh baked at Play. A
+/// scene that never had the artefact gets no line.
+pub fn bakes_unused(
+    scene: &Scene,
+    stale: Option<StaleOcclusion>,
+    nav: Option<Start>,
+) -> Vec<String> {
+    let mut out: Vec<String> = scene
+        .bake_files()
+        .refusals()
+        .into_iter()
+        .map(|(path, why)| {
+            let kind = path
+                .extension()
+                .map_or("data".into(), |e| e.to_string_lossy());
+            format!("baked {kind} not used: refused ({why})")
+        })
+        .collect();
+    match stale {
+        Some(s) if s.occluders > 0 => out.push(format!(
+            "baked occlusion not used: stale ({} of the {} baked meshes changed since the \
+             bake are occluders, so nothing is occlusion-culled; re-bake it)",
+            s.occluders, s.changed
+        )),
+        Some(s) => out.push(format!(
+            "baked occlusion partly used: stale ({} baked meshes changed since the bake are \
+             always drawn; re-bake it)",
+            s.changed
+        )),
+        None => {}
+    }
+    if nav == Some(Start::Refused) {
+        out.push(
+            "baked navmesh not used: refused at Play's start (stale or malformed; the console \
+             says why), so Play baked it in full"
+                .into(),
+        );
+    }
+    out
 }
 
 #[cfg(test)]

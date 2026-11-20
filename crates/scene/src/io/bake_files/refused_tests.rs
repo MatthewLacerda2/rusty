@@ -19,7 +19,7 @@ fn file(name: &str, bytes: &[u8]) -> PathBuf {
 fn a_refused_file_is_removed_while_it_is_still_that_file() {
     let path = file("refused.occlusion", b"trunc");
     let files = BakeFiles::default();
-    files.refused(&path, b"trunc");
+    files.refused(&path, b"trunc", "test");
     let saved = files.store(&path, None, "T").unwrap();
     assert_eq!((saved.action, saved.warning), (Action::Removed, None));
     assert!(!path.exists());
@@ -29,7 +29,7 @@ fn a_refused_file_is_removed_while_it_is_still_that_file() {
 fn a_valid_file_baked_over_a_refused_one_is_kept_without_a_false_overwrite() {
     let path = file("refused_then_baked.occlusion", b"trunc");
     let files = BakeFiles::default();
-    files.refused(&path, b"trunc");
+    files.refused(&path, b"trunc", "test");
     // Another process bakes a valid PVS there.
     std::fs::write(&path, b"a valid bake").unwrap();
     let saved = files.store(&path, None, "T").unwrap();
@@ -86,4 +86,21 @@ fn pathdiff(path: &Path, base: &Path) -> PathBuf {
     let shared = p.iter().zip(&b).take_while(|(x, y)| x == y).count();
     let ups = (shared..b.len()).map(|_| std::path::Component::ParentDir);
     ups.chain(p[shared..].iter().copied()).collect()
+}
+
+#[test]
+fn a_refusal_is_listed_with_why_until_the_path_is_read_again() {
+    let path = file("listed.occlusion", b"trunc");
+    let files = BakeFiles::default();
+    files.loaded(&file("fine.navmesh", b"ok"), Some(b"ok"), Some(b"ok"));
+    files.refused(&path, b"trunc", "occluder flag 30");
+    let listed = files.refusals();
+    assert_eq!(listed.len(), 1, "a file read and kept is no refusal");
+    assert!(listed[0].0.ends_with("listed.occlusion"));
+    assert_eq!(listed[0].1, "occluder flag 30");
+    files.loaded(&path, Some(b"good"), Some(b"good"));
+    assert!(
+        files.refusals().is_empty(),
+        "read afresh: no longer refused"
+    );
 }

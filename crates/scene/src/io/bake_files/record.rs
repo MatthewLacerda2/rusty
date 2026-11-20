@@ -45,6 +45,8 @@ pub(super) struct Seen {
     /// a save of the same `Arc` is not hashed again.
     pub(super) buffer: Option<Arc<[u8]>>,
     pub(super) mark: Mark,
+    /// Why the file was refused, while [`Mark::Refused`] holds.
+    pub(super) why: Option<String>,
 }
 
 /// What a save would bring a path to: bytes, maybe in a shared buffer.

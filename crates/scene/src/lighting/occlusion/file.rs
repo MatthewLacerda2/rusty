@@ -168,7 +168,7 @@ pub fn apply_sidecar(scene: &mut Scene, file: OcclusionFile) {
                  save removes it",
                 path.display()
             );
-            scene.bake_files.refused(&path, &bytes)
+            scene.bake_files.refused(&path, &bytes, &e)
         }
         Read::Decoded(bytes, held, data) => {
             scene.bake_files.loaded(&path, Some(&bytes), Some(&held));

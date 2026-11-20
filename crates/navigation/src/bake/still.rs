@@ -136,9 +136,10 @@ impl NavigationGraph {
 
     /// The navmesh of a scene as it is loaded (#1887): its saved navmesh
     /// (`Scene::navmesh`) when it still matches the scene ([`Self::restore`]), else
-    /// a full [`Self::bake`], with one warning when a saved one was refused. The one
-    /// way a loaded scene gets its navmesh: boot ([`Self::from_scene`]), Play's first
-    /// tick and a play-mode `Scene.Load` ([`Self::start_tracked`]), and Stop.
+    /// a full [`Self::bake`], with one warning when a saved one was refused
+    /// ([`Start::Refused`]). The one way a loaded scene gets its navmesh: boot
+    /// ([`Self::from_scene`]), Play's first tick and a play-mode `Scene.Load`
+    /// ([`Self::start_tracked`]), and Stop.
     pub fn restore_or_bake(&mut self, scene: &Scene) -> Start {
         let Some(bytes) = scene.navmesh.bytes.clone() else {
             self.bake(scene);
@@ -149,7 +150,7 @@ impl NavigationGraph {
             Err(why) => {
                 log::warn!("[Navigation] the saved navmesh was refused ({why}): baking it");
                 self.bake(scene);
-                Start::Baked
+                Start::Refused
             }
         }
     }
@@ -202,6 +203,9 @@ impl NavigationGraph {
 pub enum Start {
     /// From the scene's saved navmesh: no bake ran.
     Restored,
-    /// By a full bake.
+    /// By a full bake: the scene saved no navmesh.
     Baked,
+    /// By a full bake, the scene's saved navmesh refused (stale or malformed, the
+    /// warning says which): the navmesh on disk was not used.
+    Refused,
 }

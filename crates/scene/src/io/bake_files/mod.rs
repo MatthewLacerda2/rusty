@@ -36,6 +36,7 @@
 
 mod disk;
 mod record;
+mod refusals;
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
@@ -96,19 +97,6 @@ impl BakeFiles {
         self.record(path, disk, held, bytes.cloned(), Mark::Loaded);
     }
 
-    /// Record that the file at `path` was read and refused (`bytes` did not
-    /// decode): the next save rewrites it with this world's bake or removes it,
-    /// while it is still that file.
-    pub fn refused(&self, path: &Path, bytes: &[u8]) {
-        self.record(
-            path,
-            Disk::File(Stamp::of(bytes)),
-            None,
-            None,
-            Mark::Refused,
-        );
-    }
-
     /// Record that the file at `path` is there but could not be read: a save keeps
     /// it until this world bakes.
     pub fn unreadable(&self, path: &Path) {
@@ -143,6 +131,7 @@ impl BakeFiles {
             held,
             buffer,
             mark,
+            why: None,
         };
         let path = key(path);
         self.warned.borrow_mut().remove(&path);
