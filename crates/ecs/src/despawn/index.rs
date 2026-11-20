@@ -14,7 +14,8 @@
 //! **Exact, not a superset.** After a refresh, a target's holders are exactly the
 //! live entities whose components name it: every write to a holding column goes
 //! through the funnel, which stamps that column's channel (`ecs::changes`), and a
-//! placement, overwrite or removal stamps every column. `index_tests` compares it
+//! placement, overwrite or removal stamps every column the entity carries or
+//! carried, the holding ones among them. `index_tests` compares it
 //! with the full scan over random edit and despawn sequences.
 //!
 //! **Determinism.** Ordered maps only; a despawn hands the holders over ascending,
