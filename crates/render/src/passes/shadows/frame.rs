@@ -33,7 +33,7 @@ impl Renderer {
     ) {
         let fitted = frame_cascades(scene, self.capture.static_only, camera, aspect, settings);
         // A probe captured without shadows (#1584) samples no cascade.
-        let sampled: &[_] = if self.capture.shadows { &fitted } else { &[] };
+        let sampled: &[_] = if self.casts_shadows() { &fitted } else { &[] };
         let uniform = CascadeUniform::new(sampled, camera.position, camera.forward());
         self.queue.counted_write_buffer(
             &self.shadow_uniform_buffer,
@@ -76,7 +76,7 @@ impl Renderer {
             statics: objects.statics_key(scene),
             small,
         };
-        if self.capture.shadows {
+        if self.casts_shadows() {
             // a probe captured without shadows samples no cascade, so draws none;
             // without a live sun there is no cascade to draw (#1713)
             self.shadow_renderer
@@ -99,7 +99,7 @@ impl Renderer {
         let view_proj = camera.build_view_projection(aspect);
         let grid = ClusterGrid::new(camera, aspect);
         let mut requests = clusters::shadow_requests(&grid, &self.clusters.staged());
-        if !self.capture.shadows {
+        if !self.casts_shadows() {
             requests.clear(); // a probe captured without shadows plans no tile
         }
         let plan = if self.capture.static_only {
@@ -137,6 +137,12 @@ impl Renderer {
 }
 
 impl Renderer {
+    /// Whether the frame's lights cast shadows: not in a reflection probe captured
+    /// without them (#1584), nor with the `shadows` measurement switch off.
+    fn casts_shadows(&self) -> bool {
+        self.capture.shadows && self.switches.on(crate::RenderSwitch::Shadows)
+    }
+
     /// Whether this frame's realtime shadows leave a masked light's static casters
     /// out (#1695): the frame (never a bake capture, which draws `Mixed` lights as
     /// `BakedIndirect` does) of a scene on `Shadowmask` under the plain

@@ -27,8 +27,9 @@
 //! profiler is tried once before any scene, so a refusal ends the run. With
 //! `--import`, once a run, one more imports a copy of the project without its
 //! import cache and loads its first scene (`--import-out`, `scenes::import`),
-//! handing both's time to that scene's run as `--import-ms`. `--set` overrides the
-//! running quality preset in every child (`scenes::set`). `--script` times the
+//! handing both's time to that scene's run as `--import-ms`. `--set` overrides a
+//! quality field, a graphics option (`option.<name>`) or a renderer switch
+//! (`render.<switch>`) in every child, the editor round's too (`scenes::set`). `--script` times the
 //! scripts' engine verbs in the timed child (`bench::verbs`), and every child of
 //! the run writes under `<out_dir>/<project>-<hash>/script/`, so a plain run's
 //! history is never compared with one and a `--profile` beside it (played without
@@ -100,6 +101,7 @@ fn main() {
     let opts = Options {
         size: a.size.unwrap_or(scenes::DEFAULT_SIZE),
         runs: a.runs.unwrap_or(scenes::RUNS),
+        switches: a.set.switches(),
         ..Options::default()
     };
     let run = Run {

@@ -37,7 +37,14 @@ impl Renderer {
     /// One pass of [`Self::update_reflection_probes`]: false when a cube it had to
     /// load was refused.
     fn place_reflection_probes(&mut self, scene: &Scene, camera_pos: Vec3) -> bool {
-        let probes = &scene.reflection_probes.probes;
+        // The `reflection_probes` measurement switch places none: every object
+        // reads the sky's cube, as in a scene with no baked probe.
+        let on = self.switches.on(crate::RenderSwitch::ReflectionProbes);
+        let probes: &[_] = if on {
+            &scene.reflection_probes.probes
+        } else {
+            &[]
+        };
         let budget = scene.lighting_settings.reflections.budget_bytes();
         let format = self.reflection_probes.format();
         let mut wanted: Vec<(usize, CubeShape)> = Vec::new();

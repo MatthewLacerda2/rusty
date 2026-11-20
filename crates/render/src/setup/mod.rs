@@ -8,10 +8,9 @@ mod shadow_system;
 pub(crate) mod textures;
 mod warm;
 
-use std::collections::HashMap;
-
 use self::build::GpuResources;
-use crate::{PixelSize, Renderer};
+use crate::{PixelSize, RenderSwitches, Renderer};
+use std::collections::HashMap;
 
 /// What [`Renderer::new`] presents to: a window wgpu can build a surface from, whose
 /// display handle also goes to the instance. `shell` hands in its `Arc` of the OS
@@ -260,6 +259,7 @@ impl Renderer {
             sky_reflection: global.sky_reflection,
             probe_prefilter: Default::default(),
             capture: Default::default(),
+            switches: RenderSwitches::ON,
             retained: Default::default(),
             draw_poses: Default::default(),
             frame_counters: Default::default(),

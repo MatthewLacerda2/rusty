@@ -31,6 +31,7 @@ pub fn editor_one(run: &Run, scene: &str, file: &Path) {
         frames: run.opts.frames,
         runs: run.opts.runs,
         warm: run.opts.warm,
+        switches: run.opts.switches,
         save_dir: file.with_extension("save"),
     };
     let round = bench::round(&mut game, &opts);

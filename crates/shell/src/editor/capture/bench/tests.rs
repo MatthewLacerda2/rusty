@@ -68,6 +68,7 @@ fn gpu_the_editor_round_measures_frames_play_stop_and_save_and_writes_nothing() 
         frames: 2,
         runs: 2,
         warm: false,
+        switches: rusty_render::RenderSwitches::ON,
         save_dir: save_dir.clone(),
     };
     let mut game = editor_world(&scene, ProjectSettings::default()).unwrap();

@@ -82,7 +82,10 @@ impl Renderer {
     pub(crate) fn bin_clusters(&mut self, grid: &ClusterGrid, decals: bool) {
         let started = Instant::now();
         let c = &mut self.clusters;
-        let lights = bin(grid, &c.frame_lights, &mut c.aabbs);
+        // The `clustered_lights` measurement switch bins none: every range empty.
+        let on = self.switches.on(crate::RenderSwitch::ClusteredLights);
+        let frame: &[LocalLight] = if on { &c.frame_lights } else { &[] };
+        let lights = bin(grid, frame, &mut c.aabbs);
         let spheres: &[_] = if decals { &self.decals.spheres } else { &[] };
         let stamps = bin_spheres(grid, spheres, &Budget::nearest(spheres.len()), &mut c.aabbs);
         let (ranges, indices) = concat(&lights, &stamps);

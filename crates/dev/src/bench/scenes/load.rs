@@ -174,8 +174,11 @@ pub fn load(
     let path = path.to_string_lossy();
     let mut harness = Harness::on_project_scene_timed(out_dir, &path, settings, &mut probe)?;
     harness.set_size(opts.size.0, opts.size.1);
-    if let Some(renderer) = harness.renderer().filter(|_| opts.warm) {
-        renderer.warm_pipelines(false);
+    if let Some(renderer) = harness.renderer() {
+        renderer.set_switches(opts.switches);
+        if opts.warm {
+            renderer.warm_pipelines(false);
+        }
     }
     let entry = clock.0.borrow().len();
     harness.world.borrow_mut().set_entry_probe(probe);
