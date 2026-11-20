@@ -24,8 +24,13 @@ goes through the legs' memory-capped scope prefix and the busy check before it
 (`bench-ab.py`). The section ([`section`]) is the scenes' shape
 (`table.section`): each row the average of the leg's runs, the lead largest
 change first, the floor from the second `main` leg, a row absent on `main` said
-so, and a row whose `main` value is zero shown as its two values. A window
-prefix such as `firefight.` is part of a row's name.
+so, and a row whose `main` value is zero shown as its two values. The rows are
+read from each run's kept `bench.json`, never its printed tables, where the
+windows share row names: the first window's rows make the section, and each
+later window the report declares (its `windows`, `dev::bench::window`) follows
+under its own heading, with its own lead and the same floor rule, its rows
+keeping their `<window>.` prefix (`firefight.cpu_ms`) so a lead line names the
+window it moved in. A prefix no run declares stays among the first window's rows.
 """
 
 from __future__ import annotations
@@ -109,10 +114,30 @@ def averages(leg: Leg) -> dict[str, float]:
     return {m: sum(v) / len(v) for m, v in sums.items()}
 
 
+def windows(legs: list[Leg]) -> list[str]:
+    """The later windows any run of `legs` declares (`bench.json`'s `windows`,
+    `dev::bench::window`), in the order first declared."""
+    named = (w for leg in legs for out in leg.runs for w in report(out).get("windows", []))
+    return list(dict.fromkeys(w for w in named if isinstance(w, str) and w))
+
+
+def split(rows: dict[str, float], names: list[str]) -> list[dict[str, float]]:
+    """`rows` as the first window's, then each of `names`' (`<window>.<row>`, the name kept
+    whole so a lead line names the window it moved in)."""
+    def window_of(metric: str) -> str | None:
+        return next((w for w in names if metric.startswith(f"{w}.")), None)
+    return [{m: v for m, v in rows.items() if window_of(m) == w} for w in [None, *names]]
+
+
 def section(legs: list[Leg]) -> str:
-    """The table's stress section over the three legs (main, PR, main again)."""
-    rows = tuple(averages(leg) for leg in legs)
+    """The table's stress section over the three legs (main, PR, main again): the first
+    window's rows, then each later window's under its own heading, each with its own lead."""
+    names = windows(legs)
+    per_leg = [split(averages(leg), names) for leg in legs]
     said = [list(dict.fromkeys(w for out in leg.runs for w in report(out).get("warnings", []))) for leg in legs]
     runs = len(legs[0].runs)
     title = f"**stress yard** (`make bench`'s scenario, {runs} run{'s' if runs != 1 else ''} a leg, averaged)"
-    return table.section(title, rows, table.notes_of(said, "`play`'s notes"))
+    parts = [table.section(title, tuple(rows[0] for rows in per_leg), table.notes_of(said, "`play`'s notes"))]
+    for i, name in enumerate(names, start=1):
+        parts.append(table.section(f"**stress yard, `{name}` window**", tuple(rows[i] for rows in per_leg), []))
+    return "\n".join(parts)

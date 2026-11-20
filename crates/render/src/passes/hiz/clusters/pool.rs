@@ -12,7 +12,8 @@
 //!   dropped, with its `GpuClusters`: a re-upload, a mesh replaced by a bigger
 //!   one, clusters dropped by an edit. The next lease reuses the hole (first
 //!   fit, `ranges`); nothing is ever moved, so a range's offsets hold for life.
-//!   A scene load frees nothing by itself: meshes stay resident across scenes.
+//!   A load that replaced the World releases the meshes no kept scene uses
+//!   (`scene::residency`, #2440), and their leases with them.
 //! - **Growth** doubles a buffer and copies what it held on the GPU (one copy in
 //!   a submit of its own, no CPU wait), then rebuilds the one bind group: a
 //!   Dust2-sized level's first upload grows each buffer about log2(size / 4 KiB)
@@ -20,11 +21,10 @@
 //! - **The limit is the session's, not a mesh's**: each buffer is bound whole,
 //!   so it stays within the device's `max_storage_buffer_binding_size` (128 MiB
 //!   by default: 33.5M pooled indices, 2M clusters), and that is the total over
-//!   every clustered mesh resident at once. Meshes stay resident across scene
-//!   loads, so a long session's meshes add up. A mesh that would pass it gets
-//!   no lease, logs `does not fit the cluster pool`, and is drawn whole by the
-//!   instance test; it is not retried when room frees later (releasing resident
-//!   meshes and retrying are #2440's). Offsets are worked in `u64` and the limit
+//!   every clustered mesh resident at once: the loaded scenes' meshes. A mesh
+//!   that would pass it gets no lease, logs `does not fit the cluster pool`, and
+//!   is drawn whole by the instance test until a release frees room and retries
+//!   it (`scene::residency`). Offsets are worked in `u64` and the limit
 //!   clamped to what a `u32` index reaches, so a raised device limit cannot wrap
 //!   a row onto another mesh's.
 
@@ -146,6 +146,12 @@ impl ClusterPool {
         self.indices
             .write_at(queue, index_at, bytemuck::cast_slice(indices));
         Some(lease)
+    }
+
+    /// The bytes live leases hold of the table and the pool together.
+    pub(crate) fn leased_bytes(&self) -> u64 {
+        let ledger = self.ledger.lock().unwrap_or_else(PoisonError::into_inner);
+        ROW_BYTES * u64::from(ledger.table.used()) + 4 * u64::from(ledger.indices.used())
     }
 
     /// The rows and indices held by live leases, and the buffers' bytes.
