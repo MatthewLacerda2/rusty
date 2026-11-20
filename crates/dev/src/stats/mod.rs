@@ -16,9 +16,18 @@
 //! system does (#2342), less its parts (`run_part`: a demo's taps, an inline load's
 //! preparation), work a shipped, windowed game does not do on its tick: each is
 //! recorded beside it as `<part>_ms` (`taps_ms`, `loads_ms`) on a tick it ran.
+//! The probe's own work inside the span is left out the same way, as `probe_ms`:
+//! `end_frame`'s counter read and the recording at the tick's end (the span closes
+//! as `end_tick` is entered). A shipped game runs no probe, and on a small level
+//! that work is most of what no system holds (#2445). What stays in the span is
+//! the timing itself: each system's and part's two clock reads, its
+//! `verbs::enter_system`, stage lookup and row push in [`TimingProbe::run`] and
+//! `run_part`, a few µs a tick over ~45 systems, inside `cpu.other` with the
+//! schedule's dispatch. They cannot be taken out of a span they bracket.
 //! `end_tick` is the one place a frame closes: its system rows, each name summed
-//! over the tick (`flush_bounds` runs once a stage), its parts, `frame_ms` and the
-//! frame count; a schedule frame run outside a host's tick is never closed.
+//! over the tick (`flush_bounds` runs once a stage), its parts, `frame_ms`,
+//! `probe_ms` and the frame count; a schedule frame run outside a host's tick is
+//! never closed.
 //!
 //! **Sessions.** The stats restart on each Play session's first frame, so a window
 //! reports the current run; a frame drawn outside Play reaches only the recent ring
@@ -74,6 +83,9 @@ pub struct TimingProbe {
     /// This tick ran a schedule frame (`end_frame`), so `end_tick` closes one: an
     /// edit tick records nothing.
     frame_ran: bool,
+    /// This tick's `end_frame`, the probe's own counter read inside the tick's span:
+    /// left out of `frame_ms`, and part of `probe_ms`.
+    end_frame_ms: f64,
 }
 
 /// A finished load's `load_*` samples (#2123), held until the frame's end: a load in
@@ -92,6 +104,7 @@ impl TimingProbe {
             loads: LoadSamples::default(),
             tick_start: None,
             frame_ran: false,
+            end_frame_ms: 0.0,
         }
     }
 
@@ -118,37 +131,26 @@ impl SystemProbe for TimingProbe {
     }
 
     fn end_frame(&mut self, world: &World, res: &Resources) {
-        let mut stats = self.stats.borrow_mut();
-        // The first frame of a Play session (`advance_frame` has just made it 1)
-        // starts the stats afresh.
-        if res.play_frame() == 1 {
-            *stats = FrameStats::default();
-        }
-        for (key, ms) in self.loads.borrow_mut().drain(..) {
-            stats.record(&key, ms);
-        }
-        for (stage, ms) in Stage::FRAME_ORDER.iter().zip(self.stage_ms) {
-            stats.record(stage_key(*stage), ms);
-        }
-        self.stage_ms = [0.0; 4];
-        counters::record_world(&mut stats, world, res);
-        let changes = world.scene.borrow().world.change_stats();
-        let changes = changes.into_iter().map(|s| (s.name, s.logged));
-        counters::record_changes(&mut stats, changes, &mut self.logged);
-        self.frame_ran = true;
+        let start = verbs::now();
+        self.record_frame(world, res);
+        self.end_frame_ms += ms_since(start);
     }
 
     fn begin_tick(&mut self) {
         self.system_ms.clear();
         self.part_ms.clear();
+        self.end_frame_ms = 0.0;
         self.tick_start = Some(verbs::now());
     }
 
     /// Closes the frame, if a schedule frame ran this tick: every system row (one
     /// sample a name, summed over the stages it ran in), each part that ran as
-    /// `<part>_ms`, `frame_ms` (the tick less its parts), the count.
+    /// `<part>_ms`, `frame_ms` (the tick less its parts and the probe's own work),
+    /// `probe_ms`, the count. The tick's span ends on entry, so this recording is
+    /// in `probe_ms`, never in `frame_ms`.
     fn end_tick(&mut self) {
         let start = self.tick_start.take();
+        let tick_end = verbs::now();
         let ran = std::mem::take(&mut self.frame_ran);
         let systems = summed(self.system_ms.drain(..));
         let parts = summed(self.part_ms.drain(..));
@@ -156,6 +158,8 @@ impl SystemProbe for TimingProbe {
             return; // an edit tick: no frame stats
         };
         let mut stats = self.stats.borrow_mut();
+        #[cfg(test)]
+        verbs::advance(counters::END_COST.with(std::cell::Cell::get));
         for (name, ms) in systems {
             stats.record_system(name, ms);
         }
@@ -164,8 +168,9 @@ impl SystemProbe for TimingProbe {
             stats.record(&format!("{name}_ms"), ms);
             beside += ms;
         }
-        let tick = ms_since(start);
-        stats.record("frame_ms", (tick - beside).max(0.0));
+        let tick = tick_end.saturating_duration_since(start).as_secs_f64() * 1000.0;
+        stats.record("frame_ms", (tick - beside - self.end_frame_ms).max(0.0));
+        stats.record("probe_ms", self.end_frame_ms + ms_since(tick_end));
         stats.end_tick();
     }
 }
@@ -279,6 +284,9 @@ pub fn budgets_from_lua(table: mlua::Table) -> mlua::Result<Vec<(String, f64)>> 
 #[cfg(test)]
 #[path = "load_tests.rs"]
 mod stats_load_tests;
+#[cfg(test)]
+#[path = "probe_cost_tests.rs"]
+mod stats_probe_cost_tests;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod stats_tests;

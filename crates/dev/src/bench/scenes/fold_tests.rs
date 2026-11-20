@@ -1,4 +1,5 @@
 use super::*;
+use crate::bench::clock::GAME_ROWS;
 
 fn view(rows: &[(&str, f64, f64)]) -> Report {
     Report {
@@ -43,7 +44,7 @@ fn a_spread_warns_once_per_kind_naming_the_worst_viewpoint_and_how_many_had_it()
             vec![(Spread::Clock, 0.4), (Spread::Cpu, 0.6)],
         ),
     ];
-    let w = spread_warnings(&spreads);
+    let w = spread_warnings(&spreads, GAME_ROWS);
     assert_eq!(w.len(), 2, "{w:?}");
     assert!(w[0].starts_with("the CPU clock moved 40%"), "{}", w[0]);
     assert!(
@@ -57,7 +58,7 @@ fn a_spread_warns_once_per_kind_naming_the_worst_viewpoint_and_how_many_had_it()
         "{}",
         w[1]
     );
-    assert!(spread_warnings(&spreads[1..2]).is_empty());
+    assert!(spread_warnings(&spreads[1..2], GAME_ROWS).is_empty());
 }
 
 #[test]

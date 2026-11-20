@@ -63,7 +63,7 @@ impl TickTap for Recorder {
 
 /// `ticks` play ticks on a fresh world, `setup` run before Play, `playing` after
 /// its first tick (which enters Play).
-fn play(
+pub(super) fn play(
     world: &str,
     ticks: u32,
     setup: impl FnOnce(&mut GameWorld),

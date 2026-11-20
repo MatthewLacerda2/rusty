@@ -77,7 +77,7 @@ required-features = ["dev"]
 name = "bench-scenes"
 path = "src/bin/bench_scenes.rs"
 test = false
-required-features = ["dev"]
+required-features = ["dev", "editor"]
 
 # Ship a project (#1267): refresh the import cache, copy the runtime files, leave the
 # convertible sources behind. Dev-only, since it may run Blender.
