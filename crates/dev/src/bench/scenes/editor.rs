@@ -138,7 +138,7 @@ pub fn gpu_speed(before: Option<f64>, after: Option<f64>) -> Option<f64> {
 
 /// The Scene view's frame as the round drew it: the renderer's costs, and the
 /// size in pixels of the colour target it drew into.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Drawn {
     pub frame: RenderedFrame,
     pub view: (u32, u32),

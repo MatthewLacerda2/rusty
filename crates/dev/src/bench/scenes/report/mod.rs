@@ -150,8 +150,8 @@ impl SceneReport {
             self.loads
         );
         out.push_str(&self.run_notes());
-        let against = ["last", "before"][usize::from(self.baseline.is_some())];
-        out.push_str(&self.view_line(comparable));
+        let against = self.compared_with().0;
+        out.push_str(&self.view_size_line(comparable));
         let w = self.metric_width();
         let _ = writeln!(
             out,
@@ -182,7 +182,7 @@ impl SceneReport {
                 continue;
             }
             let delta = match last {
-                Some(b) => delta(b, row),
+                Some(b) => notes::view_size_delta(b, row).unwrap_or_else(|| delta(b, row)),
                 None if row.quiet => format!("absent in {against}"),
                 None => String::new(),
             };

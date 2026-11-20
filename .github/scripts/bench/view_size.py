@@ -8,8 +8,10 @@ Hierarchy's visible-rows change, `editor.gpu_ms` read +6.3% on one level and eve
 rose with it, and only the PR's description said the view had grown. The editor round
 reports the view's size (`editor.view_w`, `editor.view_h`,
 `dev::bench::scenes::editor::VIEW_ROWS`), and the section says when the legs differ, in
-the words the printed report uses (`SceneReport::view_moved`). A report from before
-those rows reads as absent: no line.
+the words the printed report uses (`SceneReport::view_size_moved`), comparing the sizes
+in whole pixels as both print them. The line is the one place a view change is said: the
+two rows stay out of the lead (`table.lead`) and their change reads `=` or the two sizes,
+never a percentage. A report from before those rows reads as absent: no line.
 """
 
 from __future__ import annotations
@@ -17,9 +19,9 @@ from __future__ import annotations
 ROWS = ("editor.view_w", "editor.view_h")
 
 
-def size(report: dict | None) -> tuple[float, float] | None:
-    """The Scene view's width and height in the report, `None` when it lacks either."""
-    found = {r["metric"]: r["avg"] for r in (report or {}).get("rows", []) if r["metric"] in ROWS}
+def size(report: dict | None) -> tuple[int, int] | None:
+    """The Scene view's width and height in the report in whole pixels, `None` when it lacks either."""
+    found = {r["metric"]: round(r["avg"]) for r in (report or {}).get("rows", []) if r["metric"] in ROWS}
     if len(found) < len(ROWS):
         return None
     return found[ROWS[0]], found[ROWS[1]]
@@ -35,6 +37,11 @@ def moved(main: dict | None, pr: dict | None) -> list[str]:
             "the editor's GPU rows are not comparable pixel for pixel", ""]
 
 
-def px(view: tuple[float, float]) -> str:
+def px(view: tuple[int, int]) -> str:
     """A view's size as the report prints it: `1416x963`."""
-    return f"{view[0]:.0f}x{view[1]:.0f}"
+    return f"{view[0]}x{view[1]}"
+
+
+def plain(main: float, other: float) -> str:
+    """A size row's change against `main`: `=` in whole pixels, else the two sizes."""
+    return "=" if round(main) == round(other) else f"{round(main)} → {round(other)}"

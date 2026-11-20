@@ -115,8 +115,20 @@ fn a_scene_view_of_another_size_is_said_once_above_the_table() {
     let same = viewed((1306.0, 963.0)).render(Some(&viewed((1306.0, 963.0))));
     assert!(!same.contains("the Scene view is"), "{same}");
     assert!(
-        line(&same, "editor.view_w").contains('='),
+        line(&same, "editor.view_w").trim_end().ends_with('='),
         "always printed: {same}"
+    );
+    let row = line(&table, "editor.view_w");
+    assert!(
+        row.trim_end().ends_with("was 1306") && !row.contains('%'),
+        "a size, not a percentage: {table}"
+    );
+    // Averages that print as one size are one size.
+    let near = viewed((1416.4, 963.0)).render(Some(&viewed((1416.0, 963.0))));
+    assert!(!near.contains("the Scene view is"), "{near}");
+    assert!(
+        line(&near, "editor.view_w").trim_end().ends_with('='),
+        "{near}"
     );
     // A report from before the rows: the size reads as absent, and no line.
     let mut older = viewed((1306.0, 963.0));

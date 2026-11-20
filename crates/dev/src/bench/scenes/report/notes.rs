@@ -5,7 +5,7 @@
 use std::fmt::Write;
 
 use super::super::editor;
-use super::{SceneReport, PROFILING_NOTE, SCRIPT_NOTE};
+use super::{Row, SceneReport, PROFILING_NOTE, SCRIPT_NOTE};
 
 impl SceneReport {
     /// The lines under the table that say what the run could not measure.
@@ -160,33 +160,60 @@ impl SceneReport {
         out
     }
 
+    /// What the table compares with, as its change column and its lines name
+    /// it: the last run, or the kept `BEFORE=` baseline.
+    pub(super) fn compared_with(&self) -> (&'static str, &'static str) {
+        if self.baseline.is_some() {
+            ("before", "the baseline")
+        } else {
+            ("last", "the last run")
+        }
+    }
+
+    /// The Scene view's size in the report (`editor::VIEW_ROWS`), in whole
+    /// pixels as printed; `None` without a round, or from before the rows.
+    fn view_size(&self) -> Option<(f64, f64)> {
+        let [w, h] = editor::VIEW_ROWS.map(|m| self.row(m).map(|row| row.avg.round()));
+        w.zip(h)
+    }
+
     /// The line heading the table when the editor round's Scene view was drawn at
-    /// another size than `previous`'s (`editor::VIEW_ROWS`): a panel's width
-    /// moves every per-pixel pass, so its GPU rows then compare other pixels.
-    /// `None` when the sizes agree or either report lacks them (one from before
-    /// the rows, or with no round).
-    pub(super) fn view_moved(&self, previous: &SceneReport) -> Option<String> {
-        let against = ["the last run", "the baseline"][usize::from(self.baseline.is_some())];
-        let view = |r: &SceneReport| {
-            let [w, h] = editor::VIEW_ROWS.map(|m| r.row(m).map(|row| row.avg));
-            w.zip(h)
-        };
-        let (now, before) = (view(self)?, view(previous)?);
+    /// another size than `previous`'s, in whole pixels: a panel's width moves
+    /// every per-pixel pass, so its GPU rows then compare other pixels. `None`
+    /// when the sizes agree or either report lacks them.
+    pub(super) fn view_size_moved(&self, previous: &SceneReport) -> Option<String> {
+        let (now, before) = (self.view_size()?, previous.view_size()?);
         (now != before).then(|| {
-            let px = |(w, h): (f64, f64)| format!("{w:.0}x{h:.0}");
+            let px = |(w, h): (f64, f64)| format!("{w}x{h}");
             format!(
-                "{}the Scene view is {} against {} in {against}: the editor's GPU rows \
+                "{}the Scene view is {} against {} in {}: the editor's GPU rows \
                  are not comparable pixel for pixel",
                 editor::SAID,
                 px(now),
-                px(before)
+                px(before),
+                self.compared_with().1
             )
         })
     }
 
-    /// [`Self::view_moved`] against `comparable` as the table's line, or nothing.
-    pub(super) fn view_line(&self, comparable: Option<&SceneReport>) -> String {
-        let moved = comparable.and_then(|p| self.view_moved(p));
+    /// [`Self::view_size_moved`] against `comparable` as the table's line, or nothing.
+    pub(super) fn view_size_line(&self, comparable: Option<&SceneReport>) -> String {
+        let moved = comparable.and_then(|p| self.view_size_moved(p));
         moved.map_or_else(String::new, |m| format!("warning: {m}\n"))
     }
+}
+
+/// A Scene view size row's change column (`editor::VIEW_ROWS`): `=` or the
+/// other size in whole pixels, never a percentage that reads as a slowdown;
+/// `None` for any other row. The line above the table says what it means.
+pub(super) fn view_size_delta(before: &Row, now: &Row) -> Option<String> {
+    if !editor::VIEW_ROWS.contains(&now.metric.as_str()) {
+        return None;
+    }
+    let was = before.avg.round();
+    Some(if was == now.avg.round() {
+        "=".into()
+    } else {
+        format!("was {was}")
+    })
 }

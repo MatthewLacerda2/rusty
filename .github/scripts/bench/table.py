@@ -36,7 +36,8 @@ load did, and `models_converted` tells a cached load from a cold import; where t
 differ between legs, [`count_changes`] says so for the run's header, as the
 texture refusals do, since the load rows then compare different loads.
 
-Above the lead, a scene's notes ([`notes`]): the warnings `bench-scenes` wrote
+Above the lead, the line saying `main`'s and the PR's editor rounds drew the Scene view at
+other sizes (`view_size`), then a scene's notes ([`notes`]): the warnings `bench-scenes` wrote
 into each leg's report (a bake the scene lacks, textures drawn uncompressed,
 console errors), each said once, and those not every leg wrote marked with the legs
 that did. A note is why a table's absolute numbers may not be the game's (#2420),
@@ -54,7 +55,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from bench import views
+from bench import view_size
 
 
 # The folder under a leg holding the stress runs (`<leg>/stress/<i>/`, `bench/stress.py`):
@@ -145,6 +146,9 @@ def row(metric: str, main: float | None, pr: float | None, again: float | None) 
     """One table row: metric, main, PR, change, floor."""
     if main is None:
         return [metric, num(main), num(pr), "absent on main", "n/a"]
+    if metric in view_size.ROWS:  # a size, not a time: said above the lead when it moved
+        return [metric, num(main), num(pr), "absent on the PR" if pr is None else view_size.plain(main, pr),
+                "unknown: absent on main again" if again is None else view_size.plain(main, again)]
     moved = None if pr is None else change(main, pr)
     floor = None if again is None else change(main, again)
     if pr is None:
@@ -188,11 +192,12 @@ def outside(a: float, b: float, again: float) -> float | None:
 def lead(main: dict, pr: dict, again: dict) -> list[str]:
     """The lines above a scene's table: its rows outside the floor, largest change
     first, then the rows that have no floor (the second `main` leg lacks them) and
-    the rows only the PR has, each marked so, as the table marks them."""
+    the rows only the PR has, each marked so, as the table marks them. The Scene view's
+    size rows are left out: a size, not a time, said once above the lead (`view_size`)."""
     found, unfloored = [], []
     for metric, a in main.items():
         b, f = pr.get(metric), again.get(metric)
-        if b is None or abs(b - a) < least(metric):
+        if b is None or metric in view_size.ROWS or abs(b - a) < least(metric):
             continue
         moved = change(a, b)
         said = f"{num(a)} → {num(b)}" + ("" if moved is None else f", {pct(moved)}")
@@ -203,7 +208,7 @@ def lead(main: dict, pr: dict, again: dict) -> list[str]:
         if size is not None:
             floor = change(a, f)
             found.append((size, f"- `{metric}` {said} (floor {pct(floor) if floor is not None else num(f)})"))
-    new = [f"- `{m}` {num(b)} (absent on main)" for m, b in pr.items() if m not in main]
+    new = [f"- `{m}` {num(b)} (absent on main)" for m, b in pr.items() if m not in main and m not in view_size.ROWS]
     found.sort(key=lambda x: -x[0])
     lines = [line for _, line in found] + unfloored + new
     if not lines:
@@ -216,7 +221,7 @@ def scene_table(scene: str, legs: tuple[Path, Path, Path]) -> str:
     reports = [read(leg, scene) for leg in legs]
     main, pr, again = (averages(r) for r in reports)
     hushed = quiet(reports[0]) | quiet(reports[1])
-    return section(f"**{scene}**", (main, pr, again), views.moved(*reports[:2]) + notes(scene, legs), hushed)
+    return section(f"**{scene}**", (main, pr, again), view_size.moved(*reports[:2]) + notes(scene, legs), hushed)
 
 
 def section(title: str, rows: tuple[dict, dict, dict], heading: list[str], hushed: frozenset | set = frozenset()) -> str:
