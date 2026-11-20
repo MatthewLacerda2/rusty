@@ -17,7 +17,9 @@
 //! overwrite of a held column, and whole-entity placement (spawn, despawn,
 //! restore), move no column and are not counted. On a thread that never asked,
 //! an attach or detach pays one thread-local read; whether it moves a column is
-//! asked only once armed. Re-exported as `world::walks`.
+//! asked only once armed. The ids change-log reads collect are counted too
+//! ([`ids_collected`]): what a test holds a reader that wants only a yes or no to.
+//! Re-exported as `world::walks`.
 
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
@@ -27,6 +29,22 @@ thread_local! {
     static WALKS: RefCell<BTreeMap<&'static str, u64>> = RefCell::default();
     static LOOKUPS: RefCell<BTreeMap<&'static str, u64>> = RefCell::default();
     static MOVES: Cell<u64> = const { Cell::new(0) };
+    static COLLECTED: Cell<u64> = const { Cell::new(0) };
+}
+
+/// Counts the ids a change-log read handed back, when this thread is armed.
+#[inline]
+pub(crate) fn collected(ids: usize) {
+    if ARMED.with(Cell::get) {
+        COLLECTED.with(|c| c.set(c.get() + ids as u64));
+    }
+}
+
+/// Ids every change-log read (`World::changes`) collected on this thread since the
+/// first call of a reader here on it, which starts the count.
+pub fn ids_collected() -> u64 {
+    ARMED.with(|a| a.set(true));
+    COLLECTED.with(Cell::get)
 }
 
 /// Counts one archetype move when this thread is armed and `moving()` holds;

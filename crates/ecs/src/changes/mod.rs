@@ -108,6 +108,8 @@ pub(crate) struct ChangeLogs {
     rewinds: u64,
     /// The subtree stamps' kept stack and seen set (`stamp.rs`).
     scratch: stamp::Scratch,
+    /// [`World::static_geometry_revision`].
+    static_geometry: u64,
 }
 
 /// One opened channel's counters ([`World::change_stats`]).
@@ -130,6 +132,7 @@ impl Default for ChangeLogs {
             names: Vec::new(),
             rewinds: 0,
             scratch: Default::default(),
+            static_geometry: 0,
         };
         logs.slot::<StaticSet>(); // index `STATIC`; its revision is `static_revision`, read unopened
         logs
@@ -157,6 +160,7 @@ impl ChangeLogs {
     pub(crate) fn new_epoch(&mut self) {
         self.epoch = fresh_epoch();
         self.rewinds += 1;
+        self.static_geometry += 1;
         self.logs.iter_mut().for_each(Log::reset);
     }
 
@@ -210,6 +214,33 @@ impl World {
             _channel: PhantomData,
         };
         ids.map_or(Changes::Rebuild, Changes::Ids)
+    }
+
+    /// [`World::changes`] without the ids: the cursor has read everything after this,
+    /// and `false` when the read would have been [`Changes::Rebuild`]. For a reader
+    /// that wants only a yes or no from another source but keeps the channel's walks
+    /// stamping (`World::static_geometry_revision` rides on `WorldPose`'s).
+    pub fn catch_up<T: Channel>(&self, cursor: &mut Cursor<T>) -> bool {
+        let mut changes = self.changes.borrow_mut();
+        let epoch = changes.epoch;
+        let log = changes.slot::<T>();
+        let held = cursor.epoch == epoch && log.skip(cursor.seen);
+        *cursor = Cursor {
+            epoch,
+            seen: log.open(),
+            _channel: PhantomData,
+        };
+        held
+    }
+
+    /// A revision that moves whenever a static entity's world pose or Collider may
+    /// have changed (and on every clear or rewind), so a cache of static geometry
+    /// compares it instead of reading ids. A pose counts only while a cursor is open on
+    /// [`WorldPose`]: it is bumped by that channel's subtree walk, at each static node
+    /// it stamps (`stamp.rs`). Not [`World::static_revision`], whose readers (the
+    /// shadow sweeps, probe lighting) must not re-run on a static entity's move.
+    pub fn static_geometry_revision(&self) -> u64 {
+        self.changes.borrow().static_geometry
     }
 
     /// [`StaticSet`]'s revision, which moves on every stamp: `World::static_revision`.

@@ -11,7 +11,12 @@
 //! [`World::stamp_pose_below`] from `World::moved`, [`World::stamp_hierarchy_below`]
 //! wherever an `active` flag or a parent link changes. A walk is taken only while a
 //! cursor is open on the channel it feeds; with none, an `any` and one stamp keep
-//! [`World::static_revision`] moving.
+//! [`World::static_revision`] moving. The pose walk and a Collider write on a
+//! static entity also move [`World::static_geometry_revision`].
+
+use std::any::TypeId;
+
+use rusty_components::ColliderComponent;
 
 use super::{Activity, Channel, Layer, WorldPose, STATIC};
 use crate::World;
@@ -53,6 +58,9 @@ impl World {
     pub(crate) fn touch<T: Channel>(&mut self, id: u32) {
         const { assert!(T::COLUMN, "a derived channel is stamped at its source") };
         self.note(id);
+        if TypeId::of::<T>() == TypeId::of::<ColliderComponent>() && self.is_static(id) {
+            self.changes.get_mut().static_geometry += 1; // `static_geometry_revision`
+        }
         if self.changes.get_mut().logs.len() == 1 {
             return; // only `StaticSet` exists: no column was ever opened
         }
@@ -115,20 +123,22 @@ impl World {
             }
             return;
         }
-        self.each_below(id, |w, e| {
+        self.each_below(id, |w, e, is_static| {
             if let Some(at) = activity {
                 w.stamp_at(at, e);
             }
-            if w.is_static(e) {
+            if is_static {
                 w.stamp_static(e);
             }
         });
     }
 
-    /// `id`'s world pose and every descendant's may have changed ([`WorldPose`]).
+    /// `id`'s world pose and every descendant's may have changed ([`WorldPose`]); a
+    /// static node among them moves [`World::static_geometry_revision`].
     /// Skipped when `id` is still unread in the log: every stamp on this channel is
     /// a subtree walk, so its subtree was stamped with it (an entity joining it
-    /// since was moved, and walked, itself).
+    /// since was moved, and walked, itself), and its static nodes bumped the
+    /// revision after every cursor's last read.
     pub(crate) fn stamp_pose_below(&mut self, id: u32) {
         let Some(at) = self.changes.get_mut().find::<WorldPose>() else {
             return;
@@ -136,13 +146,19 @@ impl World {
         if self.changes.get_mut().logs[at].pending(id) {
             return;
         }
-        self.each_below(id, |w, e| w.stamp_at(at, e));
+        self.each_below(id, |w, e, is_static| {
+            w.stamp_at(at, e);
+            if is_static {
+                w.changes.get_mut().static_geometry += 1;
+            }
+        });
     }
 
     /// `visit` each id [`World::self_and_descendants`] yields, in its order, with the
-    /// World writable: the walk keeps its stack and seen set on the change log
-    /// instead of collecting the subtree first.
-    fn each_below(&mut self, id: u32, mut visit: impl FnMut(&mut World, u32)) {
+    /// World writable and the id's static flag, read from the `Core` its children
+    /// come from: the walk keeps its stack and seen set on the change log instead of
+    /// collecting the subtree first, and looks each node up once.
+    fn each_below(&mut self, id: u32, mut visit: impl FnMut(&mut World, u32, bool)) {
         let mut s = std::mem::take(&mut self.changes.get_mut().scratch);
         s.begin();
         s.stack.push(id);
@@ -150,10 +166,10 @@ impl World {
             if !self.contains(e) || !s.first_visit(e) {
                 continue;
             }
-            visit(self, e);
             let at = s.stack.len();
-            self.push_children(e, &mut s.stack);
+            let is_static = self.push_children(e, &mut s.stack);
             s.stack[at..].reverse();
+            visit(self, e, is_static);
         }
         self.changes.get_mut().scratch = s;
     }
