@@ -265,6 +265,7 @@ impl Renderer {
     pub(super) fn keep_scene(&mut self, id: SceneId, rs: RenderScene) {
         if let Some(gone) = self.retained.put(id, rs) {
             self.materials.release_scene(gone);
+            self.retained.residency.forget(gone);
         }
     }
 }

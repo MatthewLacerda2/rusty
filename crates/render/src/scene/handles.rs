@@ -2,8 +2,9 @@
 //! the renderer meets gets a [`MeshHandle`] once, so a draw key compares and copies a
 //! `u32` instead of hashing, cloning and comparing the id's string.
 //!
-//! Handles are the renderer's, shared by every scene it draws, and never freed: like
-//! `gpu_meshes`, the set grows with the distinct geometry a session uploads. Each also
+//! Handles are the renderer's, shared by every scene it draws, and never freed: the
+//! set grows with the distinct geometry a session uploads (an id's string each), while
+//! `gpu_meshes` releases buffers no loaded scene uses (`residency.rs`). Each also
 //! records the upload revision its buffers last changed at, so a retained scene can
 //! find the objects a re-upload re-shaped without walking for it every frame.
 

@@ -80,11 +80,19 @@ impl Renderer {
         c.texture_bytes = texture_bytes;
         c.lightmap_bytes = self.lightmaps.gpu_bytes();
         c.reflection_bytes = self.reflection_probes.gpu_bytes();
+        c.mesh_count = self.gpu_meshes.len() as u32;
+        c.mesh_bytes = self.gpu_meshes.values().map(mesh_bytes).sum();
+        c.cluster_pool_bytes = self.hiz.clusters.pool.leased_bytes();
         c.uploads = std::mem::take(&mut self.uploads);
         c.uploads
             .add_all(std::mem::take(&mut self.lightmaps.uploads));
         c.ops = crate::gpu::ops::take();
     }
+}
+
+/// A GPU mesh's vertex and index buffers' bytes.
+fn mesh_bytes(mesh: &crate::GpuMesh) -> u64 {
+    mesh.vertex_buffer.size() + mesh.index_buffer.size()
 }
 
 impl RenderCounters {

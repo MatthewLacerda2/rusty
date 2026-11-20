@@ -131,10 +131,12 @@ impl Renderer {
         // Debris flies through decal boxes; it never takes their stamp (#638).
         let (record, traits) = self.material_record(scene.id(), entry, Variant::Debris);
         // Particles are placed unmirrored: the material's face alone picks the cull.
+        let handle = self.retained.meshes.intern(&mesh);
+        self.note_particle_mesh(scene.id(), handle);
         let key = BatchKey {
             pipeline,
             facing: Facing::of_material(Mat4::IDENTITY, material),
-            mesh: self.retained.meshes.intern(&mesh),
+            mesh: handle,
             // The emitter names one material: the whole mesh is one run.
             indices: (0..num_indices).into(),
             material: self.material_index(scene.id(), entry, pipeline, None),

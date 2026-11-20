@@ -25,19 +25,13 @@
 //! depth, outline, motion history, the reflection probe pick, the proxy volume, a
 //! skinned palette) is computed there.
 //!
-//! **A new per-object input** joins in one of two ways: kept on the object (derive it
-//! in `extract_object` or `pose_object`, and make sure whatever changes it makes the
-//! extract re-derive the object: a change channel, a scene value's revision in
-//! `inputs.rs` (`scene::revision`), or
-//! [`Retained::touch`] at the renderer-side write), or read per camera in `draw.rs`.
+//! **A new per-object input** is kept on the object (re-derived on a change channel,
+//! a revision in `inputs.rs` or [`Retained::touch`]), or read per camera in `draw.rs`.
 //! The equivalence tests (`equivalence_tests.rs`) hold that an incrementally updated
 //! scene equals one built from scratch; a new input gets a case there.
 //!
 //! **Occlusion** (#1714): the scene's baked PVS is bound to the objects
-//! ([`OcclusionBinding`]): bound whole when the PVS was replaced, the objects rebuilt
-//! or the `LODGroup`s' renderers moved, and otherwise re-checked only for the static
-//! objects re-derived or moved; a camera then culls an unchanged static object its
-//! cell cannot see.
+//! ([`OcclusionBinding`]), re-checked only for the static objects re-derived or moved.
 //!
 //! **Shadows** (part 2): the cascades' and the atlas's sweeps gather their casters
 //! from the objects (`passes::shadows::casters`), each slot carrying its shadow
@@ -88,6 +82,7 @@ mod priority_gpu_tests;
 pub(crate) mod records;
 #[cfg(test)]
 mod records_gpu_tests;
+pub(crate) mod residency;
 #[cfg(test)]
 mod shadow_ops;
 #[cfg(test)]
@@ -137,6 +132,8 @@ pub(crate) struct Retained {
     pub render_textures: u64,
     /// The scenes, least recently drawn first.
     scenes: Vec<(SceneId, RenderScene)>,
+    /// Which loaded scenes keep their GPU meshes (`residency.rs`).
+    pub residency: residency::Residency,
 }
 
 impl Retained {
@@ -159,13 +156,20 @@ impl Retained {
     /// returned.
     fn put(&mut self, id: SceneId, scene: RenderScene) -> Option<SceneId> {
         self.scenes.push((id, scene));
-        if self.scenes.len() <= MAX_SCENES {
-            return None;
-        }
-        let (gone, mut evicted) = self.scenes.remove(0);
-        evicted.release(&mut self.objects);
-        self.records.release_scene(gone);
+        let gone = (self.scenes.len() > MAX_SCENES).then(|| self.scenes[0].0)?;
+        self.drop_scene(gone);
         Some(gone)
+    }
+
+    /// Drop scene `id`'s objects and records, giving their slots back; whether
+    /// it was kept.
+    fn drop_scene(&mut self, id: SceneId) -> bool {
+        let Some(at) = self.scenes.iter().position(|(s, _)| *s == id) else {
+            return false;
+        };
+        self.scenes.remove(at).1.release(&mut self.objects);
+        self.records.release_scene(id);
+        true
     }
 
     /// Objects kept across every scene: with the identity, the object table's live
