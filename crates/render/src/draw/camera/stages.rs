@@ -30,13 +30,16 @@ pub(super) fn volumetric_fog(r: &mut Renderer, view: &mut RenderView, ctx: &mut 
 /// This camera's solids (the culling mask differs per camera) as instanced draws
 /// (#470), split opaque/cutout vs transparent (#242).
 /// A view writing motion vectors gives each solid its last-frame pose (#1435).
+/// The opaque runs are ranked for the priming its scene pass will draw with (#2484).
 pub(super) fn batch_solids(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
     let outline = ctx.stack.editor_mode;
+    let screen_space = ctx.ssao.is_some() || ctx.ssil.is_some();
+    let order = r.opaque_order(view, ctx.cam, screen_space);
     let motion = &mut view.post_fx.motion;
     let history = motion.active().then_some(&mut motion.history);
     let (scene, cam) = (ctx.scene, ctx.cam);
-    ctx.solids =
-        r.precreate_solid_resources(scene, cam, &ctx.frustum, &ctx.lod, (outline, history));
+    let culled = (&ctx.frustum, &ctx.lod);
+    ctx.solids = r.precreate_solid_resources(scene, cam, culled, (outline, history, order));
 }
 
 /// GPU occlusion culling (#1963): this camera's opaque instances against the

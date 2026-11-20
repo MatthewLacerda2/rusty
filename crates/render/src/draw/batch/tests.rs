@@ -46,6 +46,13 @@ pub(super) fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem 
     }
 }
 
+/// `items` (opaque, transparent) batched with no material classes, the opaque
+/// runs front to back, instanced when `instancing`.
+pub(super) fn batched(items: (Vec<DrawItem>, Vec<DrawItem>), instancing: bool) -> FrameDraws {
+    let order = super::OpaqueOrder::FrontToBack;
+    FrameDraws::build(items, &MaterialRecords::default(), (instancing, order))
+}
+
 /// The tag [`item`] gave `instance`.
 pub(super) fn tag_of(instance: &InstanceData) -> f32 {
     f32::from_bits(instance.object)
@@ -63,7 +70,7 @@ fn copies_of_one_mesh_and_material_become_one_draw() {
         item("Box", 0, 1.0, 2.0),
         item("Box", 0, 1.0, 3.0),
     ];
-    let draws = FrameDraws::build((opaque, Vec::new()), &MaterialRecords::default(), true);
+    let draws = batched((opaque, Vec::new()), true);
     let runs: Vec<_> = draws
         .opaque
         .iter()
@@ -82,7 +89,7 @@ fn a_different_uniform_or_skinned_palette_splits_the_batch() {
         item("Box", 1, 1.0, 2.0),
         item("Box", 2, 1.0, 3.0),
     ];
-    let draws = FrameDraws::build((opaque, Vec::new()), &MaterialRecords::default(), true);
+    let draws = batched((opaque, Vec::new()), true);
     assert_eq!(
         draws.opaque.len(),
         4,
@@ -109,11 +116,7 @@ fn transparent_order_is_kept_and_only_neighbours_merge() {
         item("B", 0, 1.0, 2.0),
         item("A", 0, 1.0, 3.0),
     ];
-    let draws = FrameDraws::build(
-        (vec![item("Box", 0, 1.0, 9.0)], transparent),
-        &MaterialRecords::default(),
-        true,
-    );
+    let draws = batched((vec![item("Box", 0, 1.0, 9.0)], transparent), true);
     let runs: Vec<_> = draws
         .transparent
         .iter()
@@ -132,7 +135,7 @@ fn instancing_off_is_one_draw_per_entity_in_scene_order() {
         item("Barrel", 0, 1.0, 1.0),
         item("Box", 0, 1.0, 2.0),
     ];
-    let draws = FrameDraws::build((opaque, Vec::new()), &MaterialRecords::default(), false);
+    let draws = batched((opaque, Vec::new()), false);
     assert_eq!(draws.opaque.len(), 3);
     assert_eq!(tags(&draws), [0.0, 1.0, 2.0]);
     assert!(draws.opaque.iter().all(|b| b.instances.len() == 1));
