@@ -15,7 +15,7 @@ use super::*;
 use rusty_dev::bench::scenes::editor::EditorRound;
 
 /// The project's root and its one scene's path.
-fn project() -> (PathBuf, String) {
+pub(super) fn project() -> (PathBuf, String) {
     let root = rusty_test_support::temp::dir().join(format!("editor_round_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     let scenes = root.join("assets/scenes");
@@ -54,7 +54,7 @@ fn files(dir: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
 
 /// A size at which the editor's panels leave the Scene view room, as they do
 /// on a desktop window (at 320x180 they leave none).
-const SIZE: (u32, u32) = (640, 360);
+pub(super) const SIZE: (u32, u32) = (640, 360);
 
 #[test]
 fn gpu_the_editor_round_measures_frames_play_stop_and_save_and_writes_nothing() {
@@ -106,7 +106,11 @@ fn has_its_rows(round: &EditorRound) {
             round.rows
         );
     }
-    for metric in ["editor.render.handles", "editor.render.outline"] {
+    let views = ["editor.render.handles", "editor.render.outline"];
+    for metric in views
+        .into_iter()
+        .chain(rusty_dev::bench::scenes::editor::VIEW_ROWS)
+    {
         assert!(row(metric).is_some(), "{metric}: {:?}", round.rows);
     }
     if cfg!(any(target_os = "linux", target_os = "macos")) {
