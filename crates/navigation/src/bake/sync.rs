@@ -29,6 +29,13 @@ use crate::offmesh::{authored_keys, sort_generated, AuthoredKey, LinkEnd, LinkPa
 use rusty_physics::collider_world_triangles;
 use rusty_scene::Scene;
 
+#[cfg(test)]
+thread_local! {
+    /// The static collider diffs `update_inputs` ran on this thread: what a test
+    /// counts a skipped diff by.
+    pub(crate) static STATIC_DIFFS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
 /// What a [`NavigationGraph::sync`] did.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Rebake {
@@ -146,6 +153,8 @@ impl BakeState {
         let mut dirty = Vec::new();
         let raw = &self.raw;
         if !statics_still {
+            #[cfg(test)]
+            STATIC_DIFFS.with(|n| n.set(n.get() + 1));
             let collider_rect = |id: u32, _: &_| {
                 let mesh = collider_world_triangles(scene, id)?;
                 raster::footprint(raw, &mesh.vertices)

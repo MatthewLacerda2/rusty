@@ -13,10 +13,11 @@ mod sealed {
 }
 
 /// A channel a [`super::Cursor`] reads.
-pub trait Channel: sealed::Sealed + 'static {
+pub trait Channel: sealed::Sealed + Send + Sync + 'static {
     /// A component column: stamped by every write to it and by every whole-entity
-    /// write (placed, overwritten, removed). A derived channel (`false`) is stamped
-    /// only where the code that knows its fact says so.
+    /// write (placed, overwritten, removed) of an entity that carries or carried it.
+    /// A derived channel (`false`) is stamped only where the code that knows its
+    /// fact says so.
     const COLUMN: bool;
     /// Its name in [`super::World::change_stats`] and `Debug.Stats` (`changes_<name>`).
     const NAME: &'static str;
