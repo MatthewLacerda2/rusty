@@ -29,6 +29,9 @@ for line in sys.stdin:
         arguments = message["params"]["arguments"]
         if mode == "refuse":
             result = {"content": [{"type": "text", "text": "create requires body"}], "isError": True}
+        elif mode == "log":
+            told = {"status": 200, "json": json.dumps({"next_cursor": None}), "summary": "[t] init: x"}
+            result = {"content": [{"type": "text", "text": json.dumps(told)}]}
         elif mode == "garbage":
             result = {"content": [{"type": "text", "text": "not json"}]}
         else:
@@ -48,6 +51,11 @@ class Call(unittest.TestCase):
         status, body = remote.call({"action": "list"}, command=serve("ok"))
         self.assertEqual(status, 201)
         self.assertEqual(body, {"echo": {"action": "list"}, "tool": "RemoteTrigger"})
+
+    def test_a_run_log_answers_its_summary_too(self):
+        self.assertEqual(remote.answer({"action": "get_run_log"}, command=serve("log")),
+                         (200, {"next_cursor": None}, "[t] init: x"))
+        self.assertEqual(remote.answer({"action": "list"}, command=serve("ok"))[2], "")
 
     def test_a_refused_call_raises_with_the_reason(self):
         with self.assertRaisesRegex(remote.RemoteError, "create requires body"):

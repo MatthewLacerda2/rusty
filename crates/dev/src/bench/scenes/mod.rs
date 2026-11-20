@@ -18,7 +18,10 @@
 //! where the allocator tells it) and `gpu_texture_mb`, `gpu_lightmap_mb` and
 //! `gpu_reflection_mb` (the renderer's own resident bytes by kind), each compared with that scene's last run or a
 //! kept baseline (`Extra::baseline`). A run with `PROFILE=1` adds a sampling
-//! profile of the measured frames ([`profile`]), in a run of its own.
+//! profile of the measured frames ([`profile`]), in a run of its own. The editor
+//! round ([`editor`], on unless `EDITOR=0`) adds the `editor.` frame rows and
+//! `play_enter_ms`, `play_stop_ms`, `play_rss_mb` and `save_ms`, measured in a
+//! process of their own.
 //!
 //! The project is opened read-only and never seeded: nothing is written into it.
 //! A signal, never a gate, like `make bench`. `bench-scenes` runs each scene in a
@@ -26,6 +29,7 @@
 //! one too ([`load`](mod@load)).
 
 pub mod args;
+pub mod editor;
 mod fold;
 pub mod import;
 pub mod load;
@@ -99,6 +103,9 @@ pub struct Extra {
     /// The run's `--set` overrides of the running quality preset, as given
     /// (`set::Overrides::said`), which the report records.
     pub set: Vec<String>,
+    /// The editor round's rows, measured in a process of its own (`--editor`,
+    /// [`editor`]), when one ran.
+    pub editor: Option<editor::EditorRound>,
 }
 
 /// The project at `path` opened to run, `set` written over its running preset.
@@ -184,13 +191,7 @@ pub fn bench(
         report.script = true;
         super::verbs::keep_top(&mut report.rows);
     }
-    let loads: Vec<Load> = extra.loads.iter().cloned().chain([own]).collect();
-    report.loads = loads.len() as u32;
-    report.rows.extend(load::rows(&loads));
-    report.warnings.extend(notes::cooked_at_load(&loads));
-    if let Some(ms) = extra.import_ms {
-        report.push_value("import_ms", ms);
-    }
+    handed(&mut report, extra, own);
     if let Some(bytes) = crate::memory::rss_peak_bytes() {
         report.push_value("rss_peak_mb", mb(bytes));
     }
@@ -223,6 +224,22 @@ pub fn bench(
     println!("{text}");
     report::write(out_dir, &report, &text).map_err(|e| format!("bench-scenes: {e}"))?;
     Ok(report)
+}
+
+/// What the scene's other children measured, into its report: its loads (`own`
+/// the bench's, the last), the run's `import_ms` and the editor round.
+fn handed(report: &mut SceneReport, extra: &Extra, own: Load) {
+    let loads: Vec<Load> = extra.loads.iter().cloned().chain([own]).collect();
+    report.loads = loads.len() as u32;
+    report.rows.extend(load::rows(&loads));
+    report.warnings.extend(notes::cooked_at_load(&loads));
+    if let Some(ms) = extra.import_ms {
+        report.push_value("import_ms", ms);
+    }
+    if let Some(round) = &extra.editor {
+        report.rows.extend(round.rows.iter().cloned());
+        report.warnings.extend(round.warnings.iter().cloned());
+    }
 }
 
 /// `gpu_mb` (and `gpu_allocated_mb` where the source tells it) with its source,

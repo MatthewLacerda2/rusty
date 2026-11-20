@@ -52,6 +52,9 @@ class Ask:
     size: str | None = None
     sets: tuple[str, ...] = ()
     load_runs: int | None = None
+    # `--no-editor`: skip each scene's editor round (`EDITOR=0`), a third of
+    # the legs' scene children
+    no_editor: bool = False
 
 
 def command(leg: Leg, ask: Ask) -> list[str]:
@@ -67,6 +70,8 @@ def command(leg: Leg, ask: Ask) -> list[str]:
         argv += ["--size", ask.size]
     for pair in ask.sets:
         argv += ["--set", pair]
+    if ask.no_editor:  # only when asked: a `main` from before the editor round has no such flag
+        argv += ["--no-editor"]
     if leg.before is not None:
         argv += ["--before", str(leg.before)]
     return argv + [str(leg.out)]

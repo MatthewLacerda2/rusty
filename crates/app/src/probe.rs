@@ -25,7 +25,9 @@
 //! windowed game runs**: work inside it that only a dev build or a headless host
 //! does (a demo's taps, an inline `Scene.LoadAsync` preparation) runs through
 //! [`SystemProbe::run_part`] under a name of its own (`taps`, `loads`), timed
-//! beside the tick and left out of it, so a budget on the tick never reads it.
+//! beside the tick and left out of it, so a budget on the tick never reads it. The
+//! probe's own work inside the span ([`SystemProbe::end_frame`]) is its to time
+//! and leave out the same way.
 //!
 //! No probe is installed by default, and a ship build never installs one.
 
@@ -42,6 +44,8 @@ pub trait SystemProbe {
     fn run(&mut self, stage: Stage, name: &'static str, system: &mut dyn FnMut());
 
     /// A per-frame schedule pass finished. Read-only: counters are read, never written.
+    /// It runs inside the tick's span, so a timing probe leaves its own time here
+    /// out of the tick's.
     fn end_frame(&mut self, world: &World, res: &Resources);
 
     /// Run `part`, exactly once: work inside the tick's span that a shipped, windowed
