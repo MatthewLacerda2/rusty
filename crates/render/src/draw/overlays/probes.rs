@@ -5,7 +5,9 @@
 //! grid/AABB/axis overlays, in the handles pass an editor camera runs after post-FX
 //! (`overlays::handles`, #1224), never in a shipped game render.
 //!
-//! Two families, line-list geometry on the `line_pipeline`:
+//! Two families of lines, drawn with the Area lights' (`lights`) as one
+//! vertex-coloured line list: one buffer and one draw for the whole family, each
+//! vertex carrying its gizmo's tint, as the collider wires are (`wires`):
 //!   * Light probes — a small 3-axis cross marker at each probe position, TINTED by the
 //!     probe's baked SH irradiance (sampled toward world-up), so dead/dark or
 //!     mis-bounced probes read at a glance.
@@ -16,16 +18,15 @@
 //!     (`probe_ball`, #1911), drawn before these lines through its own pipeline.
 //!
 //! The pure helpers (`sh_marker_tint`, `probe_marker_verts`) are GPU-free and unit
-//! tested; the GPU pre-creation builds per-probe vertex + uniform buffers per frame,
-//! like the occlusion view's boxes. Each family draws only while the Scene view's
+//! tested, as is [`probe_lines`], the merged list; the GPU pre-creation uploads it
+//! into one vertex buffer per frame. Each family draws only while the Scene view's
 //! gizmo set has it on (`Gizmo::LightProbes`, `Gizmo::ReflectionProbes`, #1909);
 //! Area lights are not probes and always draw.
 
-use glam::{Mat4, Quat, Vec3};
-use wgpu::util::DeviceExt;
+use glam::{Quat, Vec3};
 
-use super::{aabb_wireframe, OverlayBindings, OverlayDraws};
-use crate::draw::resources::ProbeResource;
+use super::{aabb_wireframe, OverlayDraws};
+use crate::draw::resources::LineResource;
 use crate::Renderer;
 use rusty_components::mesh::Vertex;
 use rusty_core::application::{Gizmo, SceneGizmos};
@@ -39,76 +40,51 @@ const MARKER_HALF: f32 = 0.15;
 const REFLECTION_TINT: [f32; 4] = [1.0, 0.65, 0.1, 0.9];
 
 impl Renderer {
-    /// Pre-create the light- and reflection-probe gizmo resources for one editor pass,
-    /// and the Area lights' (`lights`, #1674).
-    /// Each entry owns its line-list vertex buffer and a slot of `draws` (its flat
-    /// tint). Empty when `gizmos` leaves both probe kinds off (or there are none)
-    /// and no Area light is active.
+    /// Pre-create the probe-family gizmos for one editor pass: the light- and
+    /// reflection-probe lines and the Area lights' (`lights`, #1674), as one
+    /// vertex-coloured line list in one buffer at one slot of `draws`, drawn in one
+    /// draw ([`probe_lines`]). `None` when `gizmos` leaves both probe kinds off (or
+    /// there are none) and no Area light is active.
     pub(crate) fn precreate_probes(
         &self,
         scene: &Scene,
         gizmos: &SceneGizmos,
         draws: &mut OverlayDraws,
-    ) -> Vec<ProbeResource> {
-        let mut resources = Vec::new();
-        // Light probes: a marker per probe, tinted by its baked SH irradiance.
-        if gizmos.on(Gizmo::LightProbes) {
-            for probe in scene.probes.probes() {
-                let verts = probe_marker_verts(probe.position, MARKER_HALF);
-                let tint = sh_marker_tint(&probe.sh);
-                resources.push(self.build_probe_resource(draws, &verts, tint));
-            }
-        }
-        // Reflection probes: a parallax-box wireframe; the capture point is a mirror
-        // ball (`probe_ball`, #1911).
-        if gizmos.on(Gizmo::ReflectionProbes) {
-            for probe in &scene.reflection_probes.probes {
-                let verts = reflection_volume_verts(probe);
-                resources.push(self.build_probe_resource(draws, &verts, REFLECTION_TINT));
-            }
-        }
-        // Area lights (#1674), baked only, ride the same line path.
-        for (verts, tint) in super::lights::area_light_gizmos(scene) {
-            resources.push(self.build_probe_resource(draws, &verts, tint));
-        }
-        resources
+    ) -> Option<LineResource> {
+        let verts = probe_lines(scene, gizmos);
+        self.vertex_lines(draws, &verts, "Probe & Area Light Gizmo Vertices")
     }
+}
 
-    /// Build one probe (or Area light) gizmo's GPU resources: a vertex buffer for its line-list geometry
-    /// (already in world space) and its slot of `draws`, drawn flat in `tint`.
-    fn build_probe_resource(
-        &self,
-        draws: &mut OverlayDraws,
-        verts: &[Vertex],
-        tint: [f32; 4],
-    ) -> ProbeResource {
-        let vertex_buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Probe & Area Light Gizmo Vertices"),
-                contents: bytemuck::cast_slice(verts),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
-        let slot = draws.push(Mat4::IDENTITY, tint);
-        (vertex_buffer, slot, verts.len() as u32)
-    }
-
-    /// Draw the probe gizmos into the handles pass. Caller has already bound the
-    /// `line_pipeline`, group 0 (camera/lighting) and group 3 (shadow); this binds each
-    /// probe's slot of `bindings` + group-2 default material (line draws never sample it).
-    pub(super) fn draw_probe_overlays<'a>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        bindings: &'a OverlayBindings,
-        probe_resources: &'a [ProbeResource],
-    ) {
-        render_pass.set_bind_group(2, &self.default_material_bind_group, &[]);
-        for (vertex_buffer, slot, count) in probe_resources {
-            render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-            bindings.bind(render_pass, *slot);
-            render_pass.draw(0..*count, 0..1);
+/// Every probe-family segment, both ends in order, each end carrying its gizmo's
+/// tint in its `tangent` (as the vertex-colour line pipeline reads it, `wires`):
+/// a cross per light probe in its baked SH tint, a volume per reflection probe in
+/// [`REFLECTION_TINT`], then the Area lights. Each probe family only while its
+/// gizmo is on; Area lights always.
+pub(crate) fn probe_lines(scene: &Scene, gizmos: &SceneGizmos) -> Vec<Vertex> {
+    let mut out = Vec::new();
+    let mut add = |verts: Vec<Vertex>, tint: [f32; 4]| {
+        out.extend(verts.into_iter().map(|v| Vertex { tangent: tint, ..v }));
+    };
+    // Light probes: a marker per probe, tinted by its baked SH irradiance.
+    if gizmos.on(Gizmo::LightProbes) {
+        for probe in scene.probes.probes() {
+            let tint = sh_marker_tint(&probe.sh);
+            add(probe_marker_verts(probe.position, MARKER_HALF), tint);
         }
     }
+    // Reflection probes: a parallax-volume wireframe; the capture point is a mirror
+    // ball (`probe_ball`, #1911).
+    if gizmos.on(Gizmo::ReflectionProbes) {
+        for probe in &scene.reflection_probes.probes {
+            add(reflection_volume_verts(probe), REFLECTION_TINT);
+        }
+    }
+    // Area lights (#1674), baked only, ride the same line list.
+    for (verts, tint) in super::lights::area_light_gizmos(scene) {
+        add(verts, tint);
+    }
+    out
 }
 
 /// The representative marker colour for a light probe, derived from its baked SH. We
@@ -250,3 +226,7 @@ mod tests {
         assert_eq!(verts[5].position, [1.0, 2.0, 3.25]);
     }
 }
+
+#[cfg(test)]
+#[path = "probes_tests.rs"]
+mod lines_tests;
