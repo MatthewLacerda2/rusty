@@ -10,16 +10,29 @@ that over every coder routine the routines API still lists.
   `session_id` and `fired_at`) and the run log (`dispatch/runlog.py`, paged back
   to its start, at most [`MOST_PAGES`] pages): seconds from the fire to `init`
   (the sandbox), from `init` to the first edit (the reading), from the first edit
-  to the last `result:` (the work), the turns, and the gates' wall-clock, split
-  at the first edit.
+  to the last `result:` (the work), the turns, and the gates' wall-clock inside
+  `init`…end, split at the first edit. With no edit the whole session is
+  reading, so every gate is the reading's: the four parts ([`split`]) sum to the
+  total for every record, whatever it lacks.
 - **First brief or round** is read from GitHub: the routine's prompt names its
   brief by URL (`routine.PROMPT`); its place among the issue's trusted briefs
   (`rebriefs.briefs_by_issue`) says which, and a round's `Round:` line its cause.
+  An issue thread GitHub did not answer is not kept as unknown: the session is
+  named among the skipped and read again next time (#2456's review).
 - **The listing holds only the account's 20 newest routines** (`routine.py`,
   `ENVIRONMENT_FROM`), so what each run measured is kept in [`FILE`] under the
   common git directory, by session id, through `merging/state.py`; a later run
-  adds to it, and a session already kept is not read again. A session still
-  running is not kept: it is named and read again next time.
+  adds to it. A session still running is not kept: it is named and read again
+  next time.
+- **A kept record is the finished session's.** A coder that ends its turn while
+  a dispatched run works (`dispatch/running.py`'s docstring) has a `result:`
+  last and reads as finished, then wakes and works on. So a record keeps the
+  listing's `last_run` status and `finished_at` ([`run_end`]); a session whose
+  listing moved since is read again, and its old record dropped ([`Read.stale`])
+  whether or not the new read is kept (#2456's review).
+- **A kept record that lacks a field or holds a non-number reads that field as
+  absent** ([`number`]), the scripts' rule for state that cannot be read: a time
+  it lacks makes the row `times unreadable`, never a traceback.
 - **Tokens are not in the run log**, so none are counted or estimated.
 - Nothing from a log's text is printed: the report is numbers, issue numbers and
   session ids, and a session id is used only when it is a plain id ([`SESSION`]).
@@ -46,10 +59,23 @@ LISTED = 20
 
 @dataclass
 class Read:
-    """One pass: the records it measured, and the sessions it skipped with why."""
+    """One pass: the records it measured, the sessions it skipped with why, and the
+    kept sessions whose listing moved, whose old record is no longer theirs."""
 
     records: dict[str, dict] = field(default_factory=dict)
     skipped: list[str] = field(default_factory=list)
+    stale: list[str] = field(default_factory=list)
+
+
+def number(record: dict, key: str) -> float | None:
+    """`record[key]` when it is a number, else `None`."""
+    got = record.get(key)
+    return got if isinstance(got, (int, float)) and not isinstance(got, bool) else None
+
+
+def run_end(run: dict) -> dict:
+    """What the listing says of a run's end: it moves when the session ends another turn."""
+    return {"status": run.get("status"), "finished_at": run.get("finished_at")}
 
 
 def prompt(found: dict) -> str:
@@ -76,14 +102,17 @@ def pages(session: str, ask) -> list[str] | None:
     return None
 
 
-def kind(found: dict, comments: Callable[[int], list | None]) -> tuple[str, str]:
-    """`first` or `round` and the round's cause (`""` for a first brief), or `?` and why."""
+def kind(found: dict, comments: Callable[[int], list | None]) -> tuple[str, str] | None:
+    """`first` or `round` and the round's cause (`""` for a first brief), or `?` and why;
+    `None` when GitHub did not answer the issue's thread."""
     match = BRIEF.search(prompt(found))
-    number = running.issue(found)
-    thread = comments(number) if match and number else None
+    issue = running.issue(found)
+    if not match or not issue:
+        return "?", "no brief named"
+    thread = comments(issue)
     if thread is None:
-        return "?", "brief unread"
-    briefs = rebriefs.briefs_by_issue(thread).get(number, [])
+        return None
+    briefs = rebriefs.briefs_by_issue(thread).get(issue, [])
     for position, comment in enumerate(briefs):
         if str(comment.get("id")) == match.group(1):
             return ("first", "") if position == 0 else ("round", rebriefs.round_of(comment.get("body", "")))
@@ -91,18 +120,21 @@ def kind(found: dict, comments: Callable[[int], list | None]) -> tuple[str, str]
 
 
 def measure(found: dict, times: runlog.Times, briefed: tuple[str, str]) -> dict:
-    """One session's record: seconds, from its fire."""
+    """One session's record: seconds, from its fire; gates inside `init`…end, and the
+    reading's share of them up to the first edit, or all of them with no edit."""
     fired = running.fired_at(found)
+    run = found.get("last_run") if isinstance(found.get("last_run"), dict) else {}
 
     def since(at):
         return round((at - fired).total_seconds()) if at and fired else None
 
-    edit = times.first_edit
+    start, end = times.init, times.end
     return {"issue": running.issue(found), "kind": briefed[0], "cause": briefed[1],
             "fired": fired.strftime("%Y-%m-%dT%H:%M:%SZ") if fired else None,
-            "init": since(times.init), "first_edit": since(edit), "end": since(times.end),
-            "turns": times.turns, "gates_reading": round(times.gate_seconds(stop=edit)) if edit else 0,
-            "gates": round(times.gate_seconds())}
+            "init": since(start), "first_edit": since(times.first_edit), "end": since(end),
+            "turns": times.turns, "listed": run_end(run),
+            "gates_reading": round(times.gate_seconds(start, times.first_edit or end)),
+            "gates": round(times.gate_seconds(start, end))}
 
 
 def read(listed: list[dict], kept: dict, ask, comments: Callable[[int], list | None]) -> Read:
@@ -118,7 +150,9 @@ def read(listed: list[dict], kept: dict, ask, comments: Callable[[int], list | N
             done.skipped.append(f"#{number}: no plain session id listed")
             continue
         if session in kept:
-            continue
+            if kept[session].get("listed") == run_end(run):
+                continue
+            done.stale.append(session)
         if running.fired_at(found) is None:
             done.skipped.append(f"#{number} {session}: no fire time listed")
             continue
@@ -132,7 +166,11 @@ def read(listed: list[dict], kept: dict, ask, comments: Callable[[int], list | N
             why = "log longer than the pages read" if log is None else "still running" if times.running else "no init line"
             done.skipped.append(f"#{number} {session}: {why}")
             continue
-        done.records[session] = measure(found, times, kind(found, comments))
+        briefed = kind(found, comments)
+        if briefed is None:
+            done.skipped.append(f"#{number} {session}: the issue's comments unread")
+            continue
+        done.records[session] = measure(found, times, briefed)
     return done
 
 
@@ -142,23 +180,26 @@ def load(path) -> dict:
 
 
 def split(record: dict) -> dict[str, float] | None:
-    """A record's seconds as sandbox, reading, gates and the rest; `None` when it lacks a time."""
-    init, edit, end = record.get("init"), record.get("first_edit"), record.get("end")
-    if init is None or end is None or end <= 0:
+    """A record's seconds as sandbox, reading, gates and the rest, which sum to its `end`;
+    `None` when it lacks a time. With no first edit, every gate is inside the reading."""
+    init, edit, end = number(record, "init"), number(record, "first_edit"), number(record, "end")
+    if init is None or end is None or not 0 <= init <= end or end <= 0:
         return None
-    edit = end if edit is None else edit
-    gates = record.get("gates") or 0
-    reading = max(0, edit - init - (record.get("gates_reading") or 0))
-    return {"sandbox": init, "reading": reading, "gates": gates, "rest": max(0, end - init - reading - gates)}
+    edit = end if edit is None else min(max(edit, init), end)
+    gates = max(0, number(record, "gates") or 0)
+    before = gates if number(record, "first_edit") is None else number(record, "gates_reading") or 0
+    before = min(max(0, before), gates, edit - init)
+    after = min(gates - before, end - edit)
+    return {"sandbox": init, "reading": edit - init - before, "gates": before + after, "rest": end - edit - after}
 
 
 def row(session: str, record: dict) -> str:
-    told = record["kind"] + (f" ({record['cause']})" if record.get("cause") else "")
+    told = str(record.get("kind") or "?") + (f" ({record['cause']})" if record.get("cause") else "")
     parts = split(record)
     if parts is None:
         return f"  #{record.get('issue')} {told} {session}: times unreadable"
     return (f"  #{record.get('issue')} {told} fired {record.get('fired')} {session}: "
-            f"total {record['end']}s, sandbox {parts['sandbox']}s, reading {parts['reading']}s, "
+            f"total {sum(parts.values())}s, sandbox {parts['sandbox']}s, reading {parts['reading']}s, "
             f"gates {parts['gates']}s, rest {parts['rest']}s, turns {record.get('turns')}")
 
 
@@ -180,7 +221,7 @@ def report(records: dict[str, dict], fresh: int, skipped: list[str]) -> str:
              f" the routines API lists only the account's {LISTED} newest routines",
              "coder-cost: tokens are not in the run log: not counted"]
     lines += [f"  skipped {why}" for why in skipped]
-    ordered = sorted(records.items(), key=lambda item: item[1].get("fired") or "")
+    ordered = sorted(records.items(), key=lambda item: str(item[1].get("fired") or ""))
     lines += [row(session, record) for session, record in ordered]
     lines += summary("first briefs", [r for r in records.values() if r.get("kind") == "first"])
     lines += summary("rounds", [r for r in records.values() if r.get("kind") == "round"])

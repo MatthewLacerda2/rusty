@@ -15,15 +15,23 @@ gate, does it write a file), and never prints, stores or acts on any of its text
 The rules, each tested on recorded lines (`tests/dispatch/test_runlog.py`):
 
 - **The first edit** ([`edits`]) is the first `Edit`, `Write`, `MultiEdit` or
-  `NotebookEdit` tool use, or a `Bash` command that commits (`git commit`),
-  edits in place (`sed -i`, `perl -i`), or redirects or `tee`s into a file other
-  than scratch: `/dev/…`, `/tmp/…`, anything under a `target/` directory, and a
-  `.log` file are scratch (`make test > target/test.log` is a gate, not an
-  edit). A `>` inside a quoted string can read as a redirect; the cost of that is
-  an early first edit, which only shortens the reading.
+  `NotebookEdit` tool use, or a `Bash` command that changes the tree: `git
+  commit`, `git apply`, `git mv` or `git rm`, `patch`, an in-place `sed -i` or
+  `perl -i`, a `cp` or `mv` whose target is not scratch, or a redirect (`>`,
+  `>>`, `&>`) or `tee` into a file that is not scratch. `/dev/…`, `/tmp/…`,
+  anything under a `target/` directory, and a `.log` file are scratch (`make
+  test > target/test.log` is a gate, not an edit). `git merge` is not an edit:
+  a round starts with one, and what follows it is still reading (#2456's review).
+  **The first edit can read late as well as early.** Early: a `>` inside a
+  quoted string reads as a redirect. Late: a tree changed by a script the
+  session wrote to scratch and ran (`python3 /tmp/fix.py`), or by a tool this
+  list does not name, is not seen until the next edit it does name.
 - **A gate** ([`gate`]) is a `Bash` command one of whose commands (split at
   `&&`, `||`, `;`, `|`, `(`, a newline) starts with `cargo` or `make`, past any
-  `VAR=value`, `env`, `time` or `timeout N` in front.
+  `VAR=value` (its value plain or quoted whole, `RUSTFLAGS="-D warnings"`),
+  `env`, `time` or `timeout N` in front. Other quoting is not parsed: a
+  separator inside quotes still splits, and a quoted or escaped command word
+  (`"make" test`, `\cargo`) is not a gate.
 - **A tool's wall-clock** is from its `tool_use` to its `tool_result`. The
   condensed log carries no tool ids, so uses and results pair in order, oldest
   use first, as Claude Code returns them; a use with no result ends at the
@@ -40,6 +48,8 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from dispatch.running import when
+
 LINE = re.compile(r"^\[(?P<at>[0-9][^\]]*)\] (?P<text>.*)$")
 TOOL = re.compile(r"^tool_use (?P<name>[\w.:-]+): (?P<input>.*)$")
 RESULT = re.compile(r"^result: \S+ .*?\bturns=(?P<turns>\d+|\?)")
@@ -49,17 +59,12 @@ TURN = ("tool_use ", "user:", "assistant:")
 EDIT_TOOLS = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit"})
 GATE_WORDS = frozenset({"cargo", "make"})
 SEGMENT = re.compile(r"&&|\|\||[;|(\n]")
-PREFIX = re.compile(r"^(?:(?:[A-Za-z_][A-Za-z0-9_]*=\S*|env|time|timeout\s+\S+)\s+)*")
-COMMITS = re.compile(r"\bgit\s+(?:-C\s+\S+\s+)?commit\b|\bsed\s+(?:-\w*\s+)*-i|\bperl\s+-\w*i")
-REDIRECT = re.compile(r"(?<![0-9&<>])(?:[12]?>>?|\btee\s+(?:-a\s+)?)\s*(?P<target>[^\s&|;<>()]+)")
+PREFIX = re.compile(r"""^(?:(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)|env|time|timeout\s+\S+)\s+)*""")
+IN_PLACE = re.compile(r"\bsed\s+(?:-\w*\s+)*-i|\bperl\s+-\w*i")
+#: `git` subcommands that change the tree; `merge` is left out on purpose (module rules).
+GIT_EDITS = frozenset({"commit", "apply", "mv", "rm"})
+REDIRECT = re.compile(r"(?<![0-9&<>])(?:&>>?|[12]?>>?|\btee\s+(?:-a\s+)?)\s*(?P<target>[^\s&|;<>()]+)")
 COMMAND = re.compile(r'"command"\s*:\s*"(?P<text>(?:[^"\\]|\\.)*)')
-
-
-def when(stamp: str) -> datetime | None:
-    try:
-        return datetime.fromisoformat(stamp.strip().replace("Z", "+00:00"))
-    except ValueError:
-        return None
 
 
 def lines(pages: list[str]) -> list[tuple[datetime, str]]:
@@ -69,7 +74,7 @@ def lines(pages: list[str]) -> list[tuple[datetime, str]]:
     for page in reversed(pages):
         for raw in page.splitlines():
             match = LINE.match(raw)
-            at = when(match.group("at")) if match else None
+            at = when(match.group("at").strip()) if match else None
             if at is not None:
                 found.append((at, match.group("text")))
     return found
@@ -93,13 +98,14 @@ def command(tool_input: str) -> str:
         return text
 
 
+def commands(shell: str) -> list[list[str]]:
+    """Each command of a `Bash` command line as its words, past the prefixes ([module rules])."""
+    return [words for part in SEGMENT.split(shell) if (words := PREFIX.sub("", part.strip()).split())]
+
+
 def gate(shell: str) -> bool:
     """Whether a `Bash` command runs `cargo` or `make` as one of its commands."""
-    for part in SEGMENT.split(shell):
-        words = PREFIX.sub("", part.strip()).split()
-        if words and words[0] in GATE_WORDS:
-            return True
-    return False
+    return any(words[0] in GATE_WORDS for words in commands(shell))
 
 
 def scratch(target: str) -> bool:
@@ -108,9 +114,22 @@ def scratch(target: str) -> bool:
             or target.endswith(".log") or not target)
 
 
+def changes(words: list[str]) -> bool:
+    """Whether one command changes the tree: a `git` edit, `patch`, or a `cp`/`mv` out of scratch."""
+    if words[0] == "git":
+        rest = words[1:]
+        while len(rest) > 1 and rest[0] in ("-C", "-c"):
+            rest = rest[2:]
+        return bool(rest) and rest[0] in GIT_EDITS
+    if words[0] == "patch":
+        return True
+    targets = [w for w in words[1:] if not w.startswith("-")]
+    return words[0] in ("cp", "mv") and len(targets) > 1 and not scratch(targets[-1])
+
+
 def writes(shell: str) -> bool:
-    """Whether a `Bash` command commits, edits in place, or writes a file that is not scratch."""
-    if COMMITS.search(shell):
+    """Whether a `Bash` command changes the tree or writes a file that is not scratch."""
+    if IN_PLACE.search(shell) or any(changes(words) for words in commands(shell)):
         return True
     return any(not scratch(m.group("target")) for m in REDIRECT.finditer(shell))
 

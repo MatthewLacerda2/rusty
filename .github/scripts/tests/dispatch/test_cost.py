@@ -31,6 +31,7 @@ def brief(ident: int, body: str, when: str, who: str = "OWNER") -> dict:
 THREAD = [brief(10, "Brief\n\nBranch: `7-x`.", "2026-11-19T00:00:00Z"),
           brief(11, "Brief\n\nRound: anything", "2026-11-19T06:00:00Z", who="NONE"),  # untrusted: no brief
           brief(12, "Brief\n\nRound: review\nBranch: `7-x`.", "2026-11-20T02:00:00Z")]
+UNMOVED = {"status": "SUCCEEDED", "finished_at": None}
 LOGS = {"cse_round": [NEWER, OLDER], "cse_busy": [STILL]}
 
 
@@ -75,7 +76,7 @@ class Measure(unittest.TestCase):
         other = {**routine(7, "cse_x", 10), "name": "scorsese #7 theirs"}
         listed = [routine(7, "cse_busy", 12), routine(8, "cse_gone", 12), routine(7, "cse_round", 12),
                   routine(7, "bad id!", 12), unfired, other]
-        done, api = self.run_read(listed, kept={"cse_round": {"kind": "first"}})
+        done, api = self.run_read(listed, kept={"cse_round": {"kind": "first", "listed": UNMOVED}})
         self.assertEqual(done.records, {})
         self.assertEqual(done.skipped, ["#7 cse_busy: still running", "#8 cse_gone: get_run_log answered HTTP 404",
                                         "#7: no plain session id listed"])
@@ -83,7 +84,7 @@ class Measure(unittest.TestCase):
 
     def test_a_brief_the_thread_does_not_hold_is_unknown(self):
         self.assertEqual(cost.kind(routine(7, "s", 99), lambda n: THREAD), ("?", "brief not found"))
-        self.assertEqual(cost.kind(routine(7, "s", 12), lambda n: None), ("?", "brief unread"))
+        self.assertIsNone(cost.kind(routine(7, "s", 12), lambda n: None))  # GitHub did not answer
 
 
 class Report(unittest.TestCase):

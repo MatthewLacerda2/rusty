@@ -29,6 +29,18 @@ class FirstEdit(unittest.TestCase):
                       "cargo build &> /tmp/b", "ls | head", "git status", "echo hi > out.log"):
             self.assertFalse(runlog.writes(shell), shell)
 
+    def test_a_bash_that_moves_patches_or_copies_into_the_tree_is_an_edit(self):
+        for shell in ("git apply /tmp/p.diff", "git mv a.rs b.rs", "cd /w && git rm -q a.rs", "patch -p1 < x",
+                      "git -C /w apply x", "cp /tmp/a.rs src/a.rs", "mv -f a b/c.rs", "cargo fmt &> src/x.rs",
+                      "echo x &>> docs/a.md"):
+            self.assertTrue(runlog.writes(shell), shell)
+
+    def test_a_merge_a_copy_into_scratch_and_a_format_patch_are_not(self):
+        for shell in ("git merge origin/main --no-edit", "git fetch origin main && git merge origin/main",
+                      "cp src/a.rs /tmp/a.rs", "mv target/a target/b", "git format-patch -1", "cp -r src",
+                      "make test &> target/test.log"):
+            self.assertFalse(runlog.writes(shell), shell)
+
     def test_a_command_cut_short_by_the_log_is_still_read(self):
         cut = '{"command":"cat > src/a.rs <<\'EOF\'\\nfn a() {}\\n… [+900 chars]'
         self.assertTrue(runlog.edits("Bash", cut))
@@ -37,7 +49,8 @@ class FirstEdit(unittest.TestCase):
 class Gate(unittest.TestCase):
     def test_cargo_and_make_are_gates_anywhere_in_a_compound_command(self):
         for shell in ("make gates", "cd /w && make clippy", "CARGO_BUILD_JOBS=2 cargo nextest run",
-                      "timeout 600 make test > target/t.log", "git status; cargo check", "(cargo doc)"):
+                      "timeout 600 make test > target/t.log", "git status; cargo check", "(cargo doc)",
+                      'RUSTFLAGS="-D warnings" cargo clippy', "A='x y' B=1 make gates"):
             self.assertTrue(runlog.gate(shell), shell)
 
     def test_a_word_that_only_mentions_them_is_not(self):

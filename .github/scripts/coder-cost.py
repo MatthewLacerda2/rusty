@@ -8,7 +8,8 @@ the seconds of sandbox, reading (to the first edit), gates and the rest, and its
 turns; then, for first briefs and for rounds, the cold start's median share and
 its spread, and the pooled split. `dispatch/cost.py` and `dispatch/runlog.py` have
 the rules. What it measured is kept in `.git/coder-cost.json`, so a later run adds
-to it (the listing holds only the 20 newest routines).
+to it (the listing holds only the 20 newest routines), and a kept session whose
+listing moved since is read again, its old record dropped.
 
 Its own verb rather than `make rebriefs ARGS=--cost`: `rebriefs` counts comments
 on GitHub and needs nothing else, this one needs the claude.ai login behind
@@ -56,8 +57,8 @@ def main(argv: list[str], gh=gh_json, ask=remote.answer, path: Path | None = Non
         return 2
     kept = cost.load(path)
     done = cost.read(listed, kept, ask, comments)
-    records = {**kept, **done.records}
-    if done.records and (failed := state.write(path, records)):
+    records = {**{k: v for k, v in kept.items() if k not in done.stale}, **done.records}
+    if (done.records or done.stale) and (failed := state.write(path, records)):
         print(f"coder-cost: could not keep the measurements in {path}: {failed}", file=sys.stderr)
         print(cost.report(records, len(done.records), done.skipped))
         return 2
