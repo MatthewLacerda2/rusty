@@ -47,9 +47,8 @@ pub struct RibbonRenderer {
 impl RibbonRenderer {
     /// Build the pass: the globals bind group, the white fallback texture and the
     /// two blend pipelines, reusing the renderer's `texture_layout` (group 1).
-    pub fn new(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
+    pub(crate) fn new(
+        (device, writes): (&wgpu::Device, crate::gpu::ops::Writes),
         texture_layout: &wgpu::BindGroupLayout,
         registry: &mut ShaderRegistry,
     ) -> Self {
@@ -73,7 +72,7 @@ impl RibbonRenderer {
             ),
             globals_buffer: globals.buffer,
             globals_bind_group: globals.bind_group,
-            white: Renderer::create_white_texture(device, queue, texture_layout),
+            white: Renderer::create_white_texture((device, writes), texture_layout),
         }
     }
 

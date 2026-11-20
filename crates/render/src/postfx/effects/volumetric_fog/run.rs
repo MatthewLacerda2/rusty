@@ -48,7 +48,7 @@ impl Renderer {
         let probes = self.post_passes.volumetric_fog.probes.refresh(
             ctx.scene,
             (eye, plan.depth_extent),
-            &self.queue,
+            (&self.queue, &self.staging),
         );
         let params = VolumetricParams::new(&plan, (t.index, probes), prev);
         self.queue

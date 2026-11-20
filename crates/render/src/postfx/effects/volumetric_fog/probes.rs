@@ -13,6 +13,7 @@
 //! upload); every other frame it costs nothing. Beyond it the froxels read its
 //! nearest face. With no probes the froxels take the scene ambient as before.
 
+use crate::gpu::ops::{CountedQueue as _, Writes};
 use glam::{IVec3, Vec3};
 
 use super::volume::froxel_grid;
@@ -61,7 +62,7 @@ impl AirProbes {
         &mut self,
         scene: &Scene,
         (eye, extent): (Vec3, f32),
-        queue: &wgpu::Queue,
+        writes: Writes,
     ) -> [[f32; 4]; 2] {
         if scene.probes.is_empty() {
             self.key = None;
@@ -78,7 +79,7 @@ impl AirProbes {
         };
         let min = origin.as_vec3() * cell;
         if self.key != Some(key) {
-            self.fill(scene, (min, cell), queue);
+            self.fill(scene, (min, cell), writes);
             self.key = Some(key);
             self.fills += 1;
         }
@@ -87,7 +88,7 @@ impl AirProbes {
     }
 
     /// Sample the probe field at every cell's centre and upload it.
-    fn fill(&self, scene: &Scene, (min, cell): (Vec3, f32), queue: &wgpu::Queue) {
+    fn fill(&self, scene: &Scene, (min, cell): (Vec3, f32), (queue, staging): Writes) {
         let [w, h, d] = GRID;
         let mut texels = Vec::with_capacity((w * h * d * 4) as usize);
         for z in 0..d {
@@ -101,7 +102,8 @@ impl AirProbes {
                 }
             }
         }
-        queue.write_texture(
+        queue.counted_write_texture(
+            staging,
             self.texture.as_image_copy(),
             bytemuck::cast_slice(&texels),
             wgpu::TexelCopyBufferLayout {

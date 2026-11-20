@@ -4,7 +4,7 @@
 use super::{SsaoRenderer, Stage, AO_FORMAT};
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::{depth_entry, texture_entry, uniform_entry};
-use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _};
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::timing::GpuTimer;
@@ -12,7 +12,7 @@ use crate::timing::GpuTimer;
 impl SsaoRenderer {
     pub(crate) fn new(
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        writes: crate::gpu::ops::Writes,
         registry: &mut ShaderRegistry,
     ) -> Self {
         let layout = create_layout(device);
@@ -36,7 +36,7 @@ impl SsaoRenderer {
                 pass.colour(device, &[Some(AO_FORMAT.into())])
             })
         };
-        let (no_ao_texture, no_ao) = white_texture(device, queue);
+        let (no_ao_texture, no_ao) = white_texture(device, writes);
         Self {
             pipelines: Stage::ALL.map(pipeline),
             layout,
@@ -124,7 +124,10 @@ fn create_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
 }
 
 /// The 1x1 white AO texture: "nothing occluded".
-fn white_texture(device: &wgpu::Device, queue: &wgpu::Queue) -> (wgpu::Texture, wgpu::TextureView) {
+fn white_texture(
+    device: &wgpu::Device,
+    (queue, staging): crate::gpu::ops::Writes,
+) -> (wgpu::Texture, wgpu::TextureView) {
     let size = wgpu::Extent3d {
         width: 1,
         height: 1,
@@ -140,7 +143,8 @@ fn white_texture(device: &wgpu::Device, queue: &wgpu::Queue) -> (wgpu::Texture, 
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     });
-    queue.write_texture(
+    queue.counted_write_texture(
+        staging,
         texture.as_image_copy(),
         &[255],
         wgpu::TexelCopyBufferLayout {

@@ -108,14 +108,15 @@ impl GradeLut {
     /// Color Lookup when that loads, through `bake`, baking only when they differ
     /// from what it holds: a changed knob, contribution, file or re-read file.
     /// Returns whether it baked.
-    pub fn prepare(
+    pub(crate) fn prepare(
         &mut self,
-        (device, queue): (&wgpu::Device, &wgpu::Queue),
+        (device, writes): (&wgpu::Device, crate::gpu::ops::Writes),
         bake: &mut GradeBake,
         volume: Option<&PostProcessingComponent>,
     ) -> bool {
+        let queue = writes.0;
         let lookup = Lookup::of(volume);
-        let user = lookup.and_then(|l| Some((bake.luts.get(device, queue, l.path)?, l)));
+        let user = lookup.and_then(|l| Some((bake.luts.get(device, writes, l.path)?, l)));
         let (cx, view, id) = match user {
             Some((lut, l)) => {
                 let lookup = Some((lut.domain, l.contribution));

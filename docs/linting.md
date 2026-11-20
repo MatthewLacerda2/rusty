@@ -66,7 +66,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | No subprocesses | `tools/lint -- --rules` (`subprocess`) | **hard gate**: no line of `src/` names `std::process::Command` — the engine starts no other program but Blender, to convert a `.blend` while authoring, and `git`, which a debug build asks for its checkout's commit; a real need takes `// lint: allow(subprocess) <why>` (#975) |
 | Nothing temporary | clippy `dbg_macro`/`todo`/`unimplemented` + `tools/lint -- --rules` (`markers`) | **hard gate**: the three are denied in `Cargo.toml`'s `[lints]` (and `tools/lint`'s); a marker word (`TODO`, `FIXME`, `XXX`, `HACK`) in a scanned `.rs` file fails — an unfinished thing is an issue (#935) |
 | One atomic write | `tools/lint -- --rules` (`atomic-write`) | **hard gate**: no line of `src/` outside `crates/core/src/fs/` names `fs::rename` — a file a reader may open is written through `core::fs::write_atomic` (or its unsynced twin `write_cache`, for a cache the engine re-makes); a rename that moves rather than writes takes `// lint: allow(atomic-write) <why>` (#1129) |
-| One counted GPU path | `tools/lint -- --rules` (`gpu-ops`) | **hard gate**: outside `crates/render/src/gpu/ops.rs` and test code, no line of `crates/render/src/` calls wgpu's `.begin_render_pass(`, `.begin_compute_pass(`, `.submit(`, `.create_bind_group(` or `.write_buffer(` — the renderer goes through `CountedEncoder` / `CountedQueue` / `CountedDevice`'s `counted_*` helpers, which feed the frame's `render_passes`, `compute_passes`, `submits`, `bind_groups_created` and `buffer_writes` rows (#2341) |
+| One counted GPU path | `tools/lint -- --rules` (`gpu-ops`) | **hard gate**: outside `crates/render/src/gpu/ops.rs` and test code, no line of `crates/render/src/` calls wgpu's `.begin_render_pass(`, `.begin_compute_pass(`, `.submit(`, `.create_bind_group(`, `.write_buffer(` or `.write_texture(` — the renderer goes through `CountedEncoder` / `CountedQueue` / `CountedDevice`'s `counted_*` helpers, which feed the frame's `render_passes`, `compute_passes`, `submits`, `bind_groups_created` and `buffer_writes` rows (#2341), and a texture write's bytes to the staging bound, `Staging` (#2372) |
 | One dependency graph | `make feature-split` (`.github/scripts/feature_split.py`) | **hard gate**: no dev-dependency turns on a feature the normal build lacks, so `cargo test` never rebuilds a shared crate (#552, #979; `docs/testing.md`) |
 | One fullscreen triangle | `tools/lint -- --rules` (`fullscreen-triangle`) | **hard gate**: no `.wgsl` under `engine/` but `fullscreen.wgsl` spells the triangle's `(i << 1u) & 2u`; `#import fullscreen` and call `fullscreen::triangle` / `uv` (#1370) |
 | One logger a test binary | `tools/lint -- --rules` (`one-logger`) | **hard gate**: a package whose manifest names `rusty-logging` never names `rusty_test_support::logs`; its tests read warnings through `rusty_logging::init_for_tests` and `rusty_logging::forward` |
@@ -551,11 +551,14 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   stubs) takes `// lint: allow(gpu-default-only) <why>`, and so does a non-GPU test
   compiled only without `dev` (`rules/gpu_default_only.rs`).
 - **`gpu-ops`** (#2341) — every render or compute pass the renderer begins, every
-  queue submit, bind group made and buffer write goes through
+  queue submit, bind group made, buffer write and texture write goes through
   `crates/render/src/gpu/ops.rs` (`.counted_render_pass(`, `.counted_compute_pass(`,
-  `.counted_submit(`, `.counted_bind_group(`, `.counted_write_buffer(`, from the
-  `CountedEncoder`, `CountedQueue` and `CountedDevice` traits, imported `as _`), so
-  the frame's GPU-call rows count them all. A raw wgpu call of those five anywhere
+  `.counted_submit(`, `.counted_bind_group(`, `.counted_write_buffer(`,
+  `.counted_write_texture(`, from the `CountedEncoder`, `CountedQueue` and
+  `CountedDevice` traits, imported `as _`), so the frame's GPU-call rows count them
+  all, and a texture write's bytes feed the renderer's `Staging`, which submits
+  once what wgpu holds of them in staging reaches `STAGING_BUDGET` (#2372). A
+  raw wgpu call of those six anywhere
   else in `crates/render/src/` is a finding naming its helper. Test code is not
   scanned (it is no frame's work), nor is any other crate: the editor's egui paint
   passes in `crates/shell/src/editor/` draw outside the renderer's frame, so they are

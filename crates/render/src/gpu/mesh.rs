@@ -61,3 +61,18 @@ impl crate::Renderer {
         self.attach_clusters(&id, (mesh.clusters(), &mesh.indices));
     }
 }
+
+impl crate::GpuMesh {
+    /// The draws of `mesh` under `material` (#1285): each material slot with the
+    /// index run it draws ([`rusty_components::mesh::material_runs`]), clipped to this
+    /// geometry's indices so a mesh edited ahead of its upload never reads past the
+    /// buffer ([`rusty_components::mesh::clip_runs`]).
+    pub(crate) fn runs(
+        &self,
+        mesh: &rusty_scene::MeshComponent,
+        material: Option<&rusty_components::MaterialComponent>,
+    ) -> Vec<(usize, std::ops::Range<u32>)> {
+        let runs = rusty_components::mesh::clip_runs(mesh.index_ranges(), self.num_indices);
+        rusty_components::mesh::material_runs(runs, material.map(|m| m.materials.len()))
+    }
+}

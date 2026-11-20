@@ -6,11 +6,10 @@
 use crate::clusters::ClusterBuffers;
 use crate::decals::DecalBuffers;
 use crate::draw::{ball_pipeline, NavMeshGizmo};
-use crate::gpu::bind_layouts;
 use crate::gpu::global_group::GlobalGroup;
 use crate::gpu::lightmaps::Lightmaps;
-use crate::gpu::pipelines;
 use crate::gpu::shaders::ShaderRegistry;
+use crate::gpu::{bind_layouts, ops::Writes, pipelines};
 use crate::ibl::reflection_probes::ProbeArray;
 use crate::ibl::sky_cube::SkyReflection;
 use crate::passes::outline::OutlinePasses;
@@ -100,15 +99,15 @@ impl GpuResources {
     /// post-FX writes, which the editor's outline ring and gizmos draw over (#1224).
     pub(crate) fn build(
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        gpu: Writes,
         output_format: wgpu::TextureFormat,
     ) -> Self {
         let mut registry = ShaderRegistry::new(rusty_shadergen::engine_shader_dir());
         let camera_lighting_layout = bind_layouts::create_camera_lighting_layout(device);
         let entity_bones_layout = bind_layouts::create_entity_bones_layout(device);
-        let textures = create_textures(device, queue, &mut registry);
+        let textures = create_textures(device, gpu, &mut registry);
         let global = create_global_bindings(device, &camera_lighting_layout, &mut registry);
-        let ssao = ssao::SsaoRenderer::new(device, queue, &mut registry);
+        let ssao = ssao::SsaoRenderer::new(device, gpu, &mut registry);
         // One module draws the solids and their shadows (#648).
         let shader = registry.load(device, "shader.wgsl", "Forward Lit Shader");
         let atlas_shader = registry.load(device, "shadow_atlas.wgsl", "Shadow Atlas Shader");
@@ -134,12 +133,12 @@ impl GpuResources {
         );
         let billboards = create_billboard_passes(
             device,
-            queue,
+            gpu,
             &textures,
             &camera_lighting_layout,
             &mut registry,
         );
-        let ui = crate::ui::UiRenderer::new(device, queue, &mut registry);
+        let ui = crate::ui::UiRenderer::new(device, gpu, &mut registry);
         Self {
             camera_lighting_layout,
             entity_bones_layout,
@@ -164,7 +163,7 @@ impl GpuResources {
 /// lighting group 0 (#440), and own their default sprite (#2052).
 fn create_billboard_passes(
     device: &wgpu::Device,
-    queue: &wgpu::Queue,
+    writes: crate::gpu::ops::Writes,
     textures: &Textures,
     camera_lighting_layout: &wgpu::BindGroupLayout,
     registry: &mut ShaderRegistry,
@@ -175,7 +174,7 @@ fn create_billboard_passes(
     use std::rc::Rc;
     let texture_layout = &textures.texture_layout;
     let scene_depth_layout = bind_layouts::create_scene_depth_layout(device);
-    let uploader = (device, queue, &textures.mip_generator);
+    let uploader = (device, writes, &textures.mip_generator);
     let sprite = Rc::new(Renderer::create_soft_disc_texture(uploader, texture_layout));
     let layouts = SharedLayouts {
         texture: texture_layout,
@@ -184,7 +183,7 @@ fn create_billboard_passes(
     };
     BillboardPasses {
         particle_renderer: ParticleRenderer::new(device, layouts, sprite, registry),
-        ribbon_renderer: RibbonRenderer::new(device, queue, texture_layout, registry),
+        ribbon_renderer: RibbonRenderer::new((device, writes), texture_layout, registry),
         scene_depth_layout,
     }
 }

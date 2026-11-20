@@ -16,6 +16,10 @@
 //! window on the same renderer goes through `Renderer::aside`, which keeps the
 //! outer frame's counts ([`kept`]).
 //!
+//! A texture write is the one call counted into something else: its bytes go to
+//! the renderer's [`Staging`], which bounds what wgpu holds of them until a
+//! submit (#2372).
+//!
 //! `make rules`' `gpu-ops` rule holds that no file under `crates/render/src/` but
 //! this one calls the raw wgpu methods outside test code.
 
@@ -135,6 +139,16 @@ pub(crate) trait CountedQueue {
     ) -> wgpu::SubmissionIndex;
     /// `write_buffer`, counted.
     fn counted_write_buffer(&self, buffer: &wgpu::Buffer, offset: wgpu::BufferAddress, data: &[u8]);
+    /// `write_texture`, its bytes counted into `staging`, the renderer's for
+    /// this queue ([`Staging`]).
+    fn counted_write_texture(
+        &self,
+        staging: &Staging,
+        to: wgpu::TexelCopyTextureInfo<'_>,
+        data: &[u8],
+        layout: wgpu::TexelCopyBufferLayout,
+        size: wgpu::Extent3d,
+    );
 }
 
 impl CountedQueue for wgpu::Queue {
@@ -155,6 +169,91 @@ impl CountedQueue for wgpu::Queue {
     ) {
         bump(|n| n.buffer_writes += 1);
         self.write_buffer(buffer, offset, data);
+    }
+
+    fn counted_write_texture(
+        &self,
+        staging: &Staging,
+        to: wgpu::TexelCopyTextureInfo<'_>,
+        data: &[u8],
+        layout: wgpu::TexelCopyBufferLayout,
+        size: wgpu::Extent3d,
+    ) {
+        let staged = staging.make_room(self);
+        self.write_texture(to, data, layout, size);
+        staging.since.set(staged + data.len() as u64);
+        staging.seq.set(submit_seq());
+    }
+}
+
+/// A queue and its [`Staging`]: what a counted texture write needs.
+pub(crate) type Writes<'a> = (&'a wgpu::Queue, &'a Staging);
+
+/// The texture bytes written between two of `Staging`'s own submits: two 2048²
+/// BC7 textures with their mips (5.6 MB each), or one 2048² RGBA8 base level.
+pub const STAGING_BUDGET: u64 = 16 << 20;
+
+/// What one queue's texture writes hold in staging, bounded.
+///
+/// `queue.write_texture` copies its bytes into a staging buffer that wgpu keeps
+/// until the next submit and frees once the GPU has run it. That buffer is host
+/// memory, counted in the process's resident memory on every GPU. A write that a
+/// submit follows soon (an image upload with mips, whose mip pass submits) holds
+/// it briefly; one that nothing submits after (a compressed texture's levels, a
+/// lightmap's pages, a single-level image) holds it until the frame's own submit,
+/// so a load of many piled up until then (#2372).
+///
+/// The bytes written since the last submit on this thread are what is still
+/// staged: any counted submit (a mip pass, a frame) takes them with it. Before a
+/// write that would find [`STAGING_BUDGET`] or more staged, `Staging` waits for
+/// its own previous submit and submits what is pending. So its own submits keep
+/// at most two batches, each the budget plus the one write that crossed it, in
+/// staging at once, however many textures a scene has; a write a submit already
+/// follows pays no wait and no submit. A submit made elsewhere is not waited
+/// for. Like the frame's counts, the submits are counted per thread, so two
+/// renderers on one thread (a test's pair, a bake beside the editor) reset each
+/// other's count.
+pub(crate) struct Staging {
+    device: wgpu::Device,
+    since: Cell<u64>,
+    /// [`submit_seq`] when `since` was last counted: a submit since took it.
+    seq: Cell<u64>,
+    submitted: Cell<Option<wgpu::SubmissionIndex>>,
+}
+
+impl Staging {
+    /// An empty count for the queue of `device`.
+    pub(crate) fn new(device: &wgpu::Device) -> Self {
+        Self {
+            device: device.clone(),
+            since: Cell::new(0),
+            seq: Cell::new(submit_seq()),
+            submitted: Cell::new(None),
+        }
+    }
+
+    /// The bytes still staged before a write: none when a submit took them, and
+    /// none once at the budget, after waiting for the last submit made here and
+    /// submitting what is pending on `queue`.
+    fn make_room(&self, queue: &wgpu::Queue) -> u64 {
+        if submit_seq() != self.seq.get() {
+            return 0;
+        }
+        let staged = self.since.get();
+        if staged < STAGING_BUDGET {
+            return staged;
+        }
+        if let Some(last) = self.submitted.take() {
+            let wait = wgpu::PollType::Wait {
+                submission_index: Some(last),
+                timeout: None,
+            };
+            if let Err(e) = self.device.poll(wait) {
+                log::warn!("[Render] waiting for a texture upload failed: {e}");
+            }
+        }
+        self.submitted.set(Some(queue.counted_submit([])));
+        0
     }
 }
 

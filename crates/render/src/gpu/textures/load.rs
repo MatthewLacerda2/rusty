@@ -144,7 +144,7 @@ impl Renderer {
         let srgb = !texture_import::is_linear(&import);
         let mut texture = match &loaded.texels {
             Texels::Blocks(blocks) => {
-                let gpu = (&self.device, &self.queue);
+                let gpu = (&self.device, (&self.queue, &self.staging));
                 let texture = compressed::upload(gpu, map.as_str(), blocks, srgb);
                 Self::finalize_texture(
                     &self.device,
@@ -179,7 +179,7 @@ impl Renderer {
         let settings = MipSettings::for_map(import, kind);
         let (width, height) = img.dimensions();
         let levels = settings.levels(width, height);
-        let gpu = (&self.device, &self.queue);
+        let gpu = (&self.device, (&self.queue, &self.staging));
         let srgb = !texture_import::is_linear(import);
         let (texture, data_format) = match deep::wanted(import, img, kind) {
             true => {
