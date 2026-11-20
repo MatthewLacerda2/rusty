@@ -91,6 +91,16 @@ impl UiLayout {
         layout
     }
 
+    /// Place every root's space again through `view`, its rects kept: what a
+    /// layout kept across frames whose rects still hold does when the camera or a
+    /// Canvas's placement (sway, tilt, plane distance) moved. Equals
+    /// [`Self::compute_in`] whenever the rects do.
+    pub fn respace(&mut self, world: &World, view: &UiView) {
+        for (&root, space) in &mut self.spaces {
+            *space = crate::space::space_of(world, root, view);
+        }
+    }
+
     /// Where root canvas `canvas`'s reference units end up (the screen for an
     /// unknown id).
     pub fn space(&self, canvas: u32) -> CanvasSpace {
