@@ -52,6 +52,10 @@ impl Rows<'_> {
     /// One row in `rect`, laid out as `ui.horizontal` lays it out: a branch's
     /// twisty or a leaf's matching space, then the glyph and the name. The name
     /// is borrowed from the World for the row's draw, never copied.
+    ///
+    /// The row is a child ui that never grows its parent, so no row (a long
+    /// name, a deep indent) widens the scroll area or the panel: what does not
+    /// fit is clipped to the panel's width.
     fn draw_row(&mut self, ui: &mut egui::Ui, scene: &Scene, row: &Row, rect: egui::Rect) {
         let Some(name) = scene.world.name(row.id) else {
             return;
@@ -61,14 +65,13 @@ impl Rows<'_> {
             .id_salt(("hierarchy_row", row.id))
             .max_rect(rect)
             .layout(layout);
-        ui.scope_builder(builder, |ui| {
-            if row.open.is_some() {
-                twisty(ui, scene, row.id);
-            } else {
-                ui.add_space(ui.spacing().icon_width);
-            }
-            self.row(ui, scene, row.id, &name);
-        });
+        let ui = &mut ui.new_child(builder);
+        if row.open.is_some() {
+            twisty(ui, scene, row.id);
+        } else {
+            ui.add_space(ui.spacing().icon_width);
+        }
+        self.row(ui, scene, row.id, &name);
     }
 
     /// The clickable row: type glyph + name. Selecting toggles off to None (which
@@ -79,7 +82,8 @@ impl Rows<'_> {
         let (glyph, glyph_color) = node_glyph(scene, entity_id, self.theme);
         let is_selected = *self.sel_entity == Some(entity_id);
         ui.colored_label(glyph_color, glyph);
-        let label = ui.selectable_label(is_selected, name);
+        let label = ui.add(egui::Button::selectable(is_selected, name).truncate());
+        let label = full_name_on_hover(ui, label, name);
         if label.clicked() {
             if is_selected {
                 *self.sel_entity = None;
@@ -99,6 +103,23 @@ impl Rows<'_> {
                 ui.close();
             }
         });
+    }
+}
+
+/// A truncated name's tooltip: the full name, measured only while hovered, so
+/// a row that is not under the pointer costs nothing for it.
+fn full_name_on_hover(ui: &egui::Ui, label: egui::Response, name: &str) -> egui::Response {
+    if !label.hovered() {
+        return label;
+    }
+    let font = egui::TextStyle::Button.resolve(ui.style());
+    let color = egui::Color32::PLACEHOLDER;
+    let width = ui.fonts_mut(|f| f.layout_no_wrap(name.to_owned(), font, color).size().x);
+    let room = label.rect.width() - 2.0 * ui.spacing().button_padding.x;
+    if width > room + 0.5 {
+        label.on_hover_text(name)
+    } else {
+        label
     }
 }
 

@@ -14,8 +14,16 @@ mod glyph;
 #[cfg(test)]
 mod tests;
 mod tree;
+#[cfg(test)]
+mod width_tests;
 
 use flat::Flattener;
+
+/// The panel's egui id, under which egui keeps the width the user dragged.
+const PANEL_ID: &str = "Hierarchy Panel";
+
+/// The panel's width, margins included, until the user drags its edge.
+const DEFAULT_WIDTH: f32 = 220.0;
 
 /// Draw the Hierarchy panel, or its collapsed rail.
 pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
@@ -26,9 +34,13 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     }
     let mut doomed = None;
     let frame = chrome::panel_frame(&t);
-    egui::Panel::left("Hierarchy Panel")
+    // Unity's Hierarchy: as wide as the user dragged it, never as its content.
+    // Rows clip to it (`tree`), so a long name scrolling into view cannot widen
+    // the panel and resize the Scene view beside it.
+    egui::Panel::left(PANEL_ID)
         .resizable(true)
         .size_range((154.0 + frame.inner_margin.sum().x)..=340.0)
+        .default_size(DEFAULT_WIDTH)
         .frame(frame)
         .show(ui, |ui| {
             let title = (icon::TREE_STRUCTURE, "Hierarchy");
