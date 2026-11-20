@@ -58,7 +58,7 @@ impl Commands {
     /// a new recording: at a camera's end, or for a stage that must rewrite a
     /// buffer an earlier command reads.
     pub(crate) fn flush(&mut self) {
-        self.submit();
+        self.submit_recorded();
         ops::end_recording(self.outer);
         self.outer = ops::begin_recording();
         self.encoder = Some(encoder(&self.device, self.label));
@@ -66,10 +66,10 @@ impl Commands {
 
     /// Submit the recorded commands, then run what waited for them.
     pub(crate) fn send(mut self) {
-        self.submit();
+        self.submit_recorded();
     }
 
-    fn submit(&mut self) {
+    fn submit_recorded(&mut self) {
         let Some(encoder) = self.encoder.take() else {
             return;
         };
@@ -85,7 +85,7 @@ impl Commands {
 
 impl Drop for Commands {
     fn drop(&mut self) {
-        self.submit();
+        self.submit_recorded();
         ops::end_recording(self.outer);
     }
 }

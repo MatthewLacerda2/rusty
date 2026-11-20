@@ -156,11 +156,10 @@ impl Renderer {
         let lights = (&shadows, &base_lod);
         self.run_shadow_passes(&mut commands, scene, (&stack[0], view.aspect()), lights);
         self.lap("shadows");
-        let commands = self.draw_render_textures(view, scene, &textures, commands);
+        let mut commands = self.draw_render_textures(view, scene, &textures, commands);
         self.lap("render_textures");
         // Lay out and mesh the UI through the base camera (#418, #429): world
         // canvases draw inside each camera's pass below, screen canvases after it.
-        let mut commands = commands;
         self.prepare_ui(&mut commands, view, scene, &stack[0], editor_mode);
         self.lap("ui");
         // A scaled view composites into its own scene-sized target and upscales it to
@@ -180,24 +179,32 @@ impl Renderer {
             full_post_fx: true,
             motion_frames: 1,
         };
-        // The screen's last camera's encoder takes the upscale and the UI too.
-        let mut commands = self.draw_stack(view, scene, (pass, commands));
-        if let Some(scaled) = scaled.as_ref() {
+        let commands = self.draw_stack(view, scene, (pass, commands));
+        self.finish_screen(commands, view, (scaled.as_ref(), output), editor_mode);
+        self.finish_main_frame(view, scene);
+        self.gpu_timer.end_frame(&self.device, &self.queue);
+    }
+
+    /// Into the screen's last camera's `commands`, then sent: a scaled view's upscale
+    /// onto `output`, then the in-game UI (#418), after post-FX so a HUD is never
+    /// tonemapped, bloomed or FXAA-softened; in the Scene view only with its UI overlay (#423).
+    fn finish_screen(
+        &mut self,
+        mut commands: Commands,
+        view: &mut RenderView,
+        (scaled, output): (Option<&wgpu::TextureView>, &wgpu::TextureView),
+        editor_mode: bool,
+    ) {
+        if let Some(scaled) = scaled {
             self.upscale_scene(commands.encoder(), view, scaled, output);
             self.lap("upscale");
         }
-
-        // The in-game UI over the finished frame (#418): after post-FX, so a HUD
-        // is never tonemapped, bloomed or FXAA-softened. Not in the Scene view
-        // unless its UI overlay is on (#423).
         if !editor_mode || view.ui.screen_in_editor {
             self.draw_ui(&mut commands, view);
             self.lap("ui");
         }
         commands.send();
         self.lap("submit");
-        self.finish_main_frame(view, scene);
-        self.gpu_timer.end_frame(&self.device, &self.queue);
     }
 
     /// Render one face of a static cubemap capture (#243, #1615): `camera` alone,
