@@ -22,7 +22,8 @@
 //! is lit and a capture never depends on how fast a disk is.
 //!
 //! An array is built once per distinct page list and cached, so two scenes
-//! alternating in one frame cost a lookup, not a reload. A rebake writes changed
+//! alternating in one frame cost a lookup, not a reload; a load drops the lists no
+//! kept scene binds (`keep`). A rebake writes changed
 //! pages under new names (their file name hashes the page), so the cache rarely
 //! meets a stale page; when the engine does re-write one (or writes one a page
 //! list failed on), the write log (`core::fs::written`, #1207) drops every array
@@ -41,6 +42,7 @@
 //! beside a matching colour array; the shader reads it only while the lighting
 //! uniform's `masks_bound` says so ([`Lightmaps::masked`]).
 
+mod keep;
 mod load;
 mod upload;
 mod warm;
