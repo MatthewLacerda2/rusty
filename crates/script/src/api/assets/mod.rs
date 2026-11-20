@@ -79,8 +79,7 @@ pub fn register(lua: &Lua) -> Reg {
         "GetTextureImportSettings",
         lua.create_function(|lua, path: String| {
             let file = texture::file(&path)?;
-            sidecar::load(&file).map_err(runtime)?;
-            texture::table(lua, &sidecar::texture(&file))
+            texture::table(lua, &sidecar::read_texture(&file).map_err(runtime)?)
         }),
     )?;
     put(

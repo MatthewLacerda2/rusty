@@ -373,7 +373,7 @@ error naming the known ones. A texture extracted from a converted model
 sidecar of its own: it imports with the defaults, typed by the slots the model's
 materials use it in, and is compressed like any image. Used only as a normal map it
 is a `"NormalMap"` (BC5); only as occlusion, a `"SingleChannel"` (BC4); only as a
-packed metallic/roughness or specular map, a `"Default"` with `srgb` off; as a colour
+packed metallic/roughness or specular map, a `"Default"` with `sRGB` off; as a colour
 map (albedo, emissive), or in two kinds of slot at once, a `"Default"` (BC7), which
 every slot reads whole. Its copy lives beside the model's cache
 (`<model's cache>.glb.bctex/<image>.bctex`), so a re-import of the model re-encodes

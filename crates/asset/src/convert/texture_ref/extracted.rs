@@ -17,7 +17,7 @@
 //! sidecar someone wrote beside it wins, as for any image, until the next
 //! conversion replaces its folder.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -42,13 +42,16 @@ fn temp_cache() -> PathBuf {
     std::env::temp_dir().join("rusty-import")
 }
 
-/// The images extracted beside the cached glTF at `glb` that it names, sorted:
-/// what an import compresses for the model. Empty when it has none or is absent.
+/// The images extracted beside the cached glTF at `glb` that one of its
+/// materials samples in a slot the engine reads (`glb::image_slots`), sorted:
+/// what an import compresses for the model. An image only a slot the engine does
+/// not read names (`specularColorTexture`) is never uploaded, so never encoded.
+/// Empty when it has none or is absent.
 pub fn images(glb: &Path) -> Vec<PathBuf> {
     let base = glb.parent().unwrap_or(Path::new(""));
-    let mut found: Vec<PathBuf> = glb::image_files(glb)
+    let mut found: Vec<PathBuf> = glb::image_slots(glb)
         .unwrap_or_default()
-        .iter()
+        .keys()
         .filter(|u| !u.starts_with("data:"))
         .filter_map(|u| uri::file(base, u))
         .filter(|f| crate::is_image_path(f) && f.is_file())
@@ -84,8 +87,10 @@ pub fn model_source(image: &Path) -> Option<PathBuf> {
 /// model's glTF samples it in (the module doc): `None` when it is not one. Each
 /// glTF's table is read once and kept until the write log names the `.glb` (a
 /// conversion notes it, `stage::note`), as `resolved` keeps its tables. An image
-/// the table does not hold re-reads it once (another process may have written
-/// the `.glb`); still absent, it takes the defaults, warned of once.
+/// a held table lacks re-reads it once (another process may have written the
+/// `.glb`); still absent, it takes the defaults, warned of once and remembered in
+/// the table, so later reads neither re-parse nor warn until the `.glb` is
+/// written again.
 pub fn settings(image: &Path) -> Option<TextureSettings> {
     let glb = absolute(&glb_of(image)?);
     let image = absolute(image);
@@ -95,27 +100,28 @@ pub fn settings(image: &Path) -> Option<TextureSettings> {
     if let Some(found) = held(&tables) {
         return Some(found);
     }
-    tables.by_glb.insert(glb.clone(), read(&glb));
-    if let Some(found) = held(&tables) {
-        return Some(found);
+    // Held without it, or not held: either way one parse of the `.glb`.
+    let table = tables.by_glb.entry(glb.clone()).or_default();
+    *table = read(&glb);
+    if let Some(found) = table.get(&image) {
+        return Some(*found);
     }
-    if tables.warned.insert(image.clone()) {
-        log::warn!(
-            "[Import] {}: {} samples it in no material slot; it imports with the default settings",
-            image.display(),
-            glb.display()
-        );
-    }
+    log::warn!(
+        "[Import] {}: {} uses it only in a material slot the engine does not read, or in none; \
+         it imports with the default settings",
+        image.display(),
+        glb.display()
+    );
+    table.insert(image, TextureSettings::default());
     Some(TextureSettings::default())
 }
 
-/// Each glTF's settings by extracted image (both absolute), and the images
-/// warned of as in none of its slots.
+/// Each glTF's settings by extracted image (both absolute); an image in none of
+/// its read slots holds the defaults once warned of.
 struct Tables {
     /// The write generation already seen (`core::fs::written`).
     seen: u64,
     by_glb: BTreeMap<PathBuf, BTreeMap<PathBuf, TextureSettings>>,
-    warned: BTreeSet<PathBuf>,
 }
 
 impl Tables {
@@ -135,7 +141,6 @@ impl Tables {
 static TABLES: Mutex<Tables> = Mutex::new(Tables {
     seen: 0,
     by_glb: BTreeMap::new(),
-    warned: BTreeSet::new(),
 });
 
 fn read(glb: &Path) -> BTreeMap<PathBuf, TextureSettings> {

@@ -12,8 +12,9 @@
 //! never one of those, so it costs a `stat` and the cache's head, never the
 //! source's header. A texture extracted beside a model's cache has its copy beside
 //! that cache (`super::extracted_cache`, #2365), and is gone once the textures
-//! folder the model's glTF names holds no image of its name: the model gone, or
-//! re-converted without it. A source that exists but cannot be read is not gone, and nothing
+//! folder the model's glTF names holds no image of its name: re-converted without
+//! it, or the cached glTF gone. Since a model's cache is never removed (below), a
+//! deleted model's copies stay for as long as its cached `.glb` does. A source that exists but cannot be read is not gone, and nothing
 //! outside the import cache (the system temp folder a non-project caches in) is
 //! ever walked. A model's cache is never touched: an exported project ships it
 //! without its source, on purpose (`convert::served_from_cache`).

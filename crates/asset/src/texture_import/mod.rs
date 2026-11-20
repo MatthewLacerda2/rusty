@@ -53,7 +53,7 @@
 //! A file it shrinks is warned of once (`shrink::warn_if_shrunk`); a bake raises
 //! a Max Size the engine chose to its own size instead (`sidecar::prepare_bake`).
 
-mod background;
+pub(crate) mod background;
 mod cache;
 mod encode;
 mod location;

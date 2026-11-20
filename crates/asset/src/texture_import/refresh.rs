@@ -159,14 +159,15 @@ pub(super) fn files(root: &Path) -> Vec<PathBuf> {
 /// audit of uploads asks (`Renderer::uncached_textures`), so the audit and the
 /// import cannot disagree on which files an import makes a cache for. Paths are
 /// compared made absolute, so `assets/a.png` and its absolute spelling are one
-/// file. An extracted texture's model is read from its project cache's path, or
+/// file. An extracted texture counts only while its model exists, as [`images`]
+/// walks the models on disk. Its model is read from its project cache's path, or
 /// found among the models under `root` outside a project (the temp folder's cache).
 pub fn imports(root: &Path, file: &Path) -> bool {
     let absolute = |p: &Path| std::path::absolute(p).unwrap_or_else(|_| p.to_path_buf());
     let under = |p: &Path| absolute(p).starts_with(absolute(root));
     let visited = match extracted::glb_of(file) {
         Some(glb) => match extracted::model_source(file) {
-            Some(model) => under(&model),
+            Some(model) => under(&model) && model.is_file(),
             None => convert::convertible_sources(root).iter().any(|model| {
                 convert::cache_location(model).is_ok_and(|g| absolute(&g) == absolute(&glb))
             }),

@@ -94,23 +94,28 @@ pub fn parse_max_size(size: u32) -> Result<u32, String> {
 }
 
 /// The import settings of the image at `source`: its sidecar's, or the defaults
-/// when it has none or the sidecar does not parse. A texture a conversion
-/// extracted with no sidecar takes the defaults typed by the slots its model
-/// samples it in (`convert::texture_ref::extracted`, #2365).
+/// when it has none or the sidecar does not parse ([`read_texture`] says which).
+pub fn texture(source: &Path) -> TextureSettings {
+    read_texture(source).unwrap_or_default()
+}
+
+/// [`texture`] from one read of the sidecar, with an error when it exists and
+/// does not parse: what `Assets.GetTextureImportSettings` reports. A texture a
+/// conversion extracted with no sidecar takes the defaults typed by the slots its
+/// model samples it in (`convert::texture_ref::extracted`, #2365).
 /// A *Max Size* outside [`MAX_SIZES`] (a hand-edited sidecar) is warned of once
 /// per file and read as [`DEFAULT_MAX_SIZE`], as the setter would refuse it.
-pub fn texture(source: &Path) -> TextureSettings {
+pub fn read_texture(source: &Path) -> Result<TextureSettings, ImportError> {
     let extracted = || crate::convert::texture_ref::extracted::settings(source);
-    let mut settings = match super::stored(source) {
-        Ok(Some(stored)) => stored.texture,
-        Ok(None) => extracted().unwrap_or_default(),
-        Err(_) => TextureSettings::default(),
+    let mut settings = match super::stored(source)? {
+        Some(stored) => stored.texture,
+        None => extracted().unwrap_or_default(),
     };
     if let Err(why) = parse_max_size(settings.max_size) {
         warn_once(source, &why);
         settings.max_size = DEFAULT_MAX_SIZE;
     }
-    settings
+    Ok(settings)
 }
 
 /// Files whose sidecar has been warned of.

@@ -22,8 +22,8 @@ pub use collider::{closes_loop, looped, MeshColliderKind, SubObjectCollider};
 
 pub use texture::{
     check_bake_size, fit_data_slot, fit_normal_slot, fit_single_channel_slot, parse_max_size,
-    prepare_bake, set_texture, texture, Compression, FilterMode, TextureSettings, TextureType,
-    WrapMode, DEFAULT_MAX_SIZE, MAX_SIZES,
+    prepare_bake, read_texture, set_texture, texture, Compression, FilterMode, TextureSettings,
+    TextureType, WrapMode, DEFAULT_MAX_SIZE, MAX_SIZES,
 };
 
 use super::humanoid::HumanoidSettings;

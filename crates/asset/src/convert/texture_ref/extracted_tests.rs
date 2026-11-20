@@ -1,7 +1,7 @@
 //! An extracted texture's import settings by the slots its glTF samples it in,
 //! and which images count as extracted (#2365).
 
-use super::extracted::{glb_of, model_source, of_slots, settings};
+use super::extracted::{glb_of, images, model_source, of_slots, settings};
 use crate::convert::glb::{container, image_slots, Slot};
 use crate::convert::textures_owner;
 use crate::sidecar::TextureType;
@@ -88,21 +88,41 @@ fn only_an_image_in_a_cached_models_textures_folder_is_extracted() {
 }
 
 #[test]
-fn a_packed_specular_map_is_data_and_its_colour_twin_no_slot() {
+fn a_packed_specular_map_is_data_and_its_colour_twin_is_never_encoded() {
     let dir = rusty_test_support::temp::dir();
+    let folder = dir
+        .join(crate::convert::IMPORT_CACHE_DIR)
+        .join("m.fbx.glb.textures");
+    std::fs::create_dir_all(&folder).unwrap();
     let gltf = r#"{"asset":{"version":"2.0"},
-     "images":[{"uri":"spec.png"},{"uri":"tint.png"}],
+     "images":[{"uri":"m.fbx.glb.textures/spec.png"},{"uri":"m.fbx.glb.textures/tint.png"}],
      "textures":[{"source":0},{"source":1}],
      "materials":[{"extensions":{"KHR_materials_specular":
         {"specularTexture":{"index":0},"specularColorTexture":{"index":1}}}}]}"#;
-    let glb = dir.join("m.glb");
+    let glb = folder.with_file_name("m.fbx.glb");
     std::fs::write(&glb, container(gltf.as_bytes().to_vec(), Vec::new())).unwrap();
-    let slots = image_slots(&glb).unwrap();
-    assert_eq!(slots["spec.png"], [Slot::Data], "its alpha, raw");
-    assert!(
-        !slots.contains_key("tint.png"),
-        "no material slot reads specularColorTexture"
+    for name in ["spec.png", "tint.png"] {
+        std::fs::write(folder.join(name), rusty_test_support::models::png(4, 0)).unwrap();
+    }
+    assert_eq!(image_slots(&glb).unwrap().len(), 1, "only spec.png is read");
+    assert_eq!(
+        images(&glb),
+        [folder.join("spec.png")],
+        "tint.png is not encoded"
     );
+    crate::texture_import::import_in_background();
+    crate::texture_import::queue_extracted(&glb);
+    assert_eq!(
+        crate::texture_import::background::take_queued(),
+        [folder.join("spec.png")]
+    );
+    let warned = rusty_test_support::logs::during(|| {
+        for _ in 0..2 {
+            assert_eq!(settings(&folder.join("tint.png")), Some(Default::default()));
+        }
+    });
+    assert_eq!(warned.len(), 1, "once, then remembered: {warned:?}");
+    assert!(warned[0].contains("does not read"), "{warned:?}");
 }
 
 #[test]

@@ -47,7 +47,7 @@ thread_local! {
 
 /// What this thread has sent the worker since the last call (tests).
 #[cfg(test)]
-pub(super) fn take_queued() -> Vec<PathBuf> {
+pub(crate) fn take_queued() -> Vec<PathBuf> {
     QUEUED.take()
 }
 
@@ -93,6 +93,31 @@ pub fn queue(sources: Vec<PathBuf>) {
     }
 }
 
+/// The worker's work on one queued `source`. A source gone since it was queued
+/// is passed over without an error: a second conversion of its model removed its
+/// folder and queued the new one's images in its place.
+pub(super) fn import_queued(source: &Path) {
+    // Checked first too, so its settings (an extracted image's slots) are not
+    // asked of a folder already gone; the match below covers a removal after it.
+    if !source.exists() {
+        return;
+    }
+    match refresh_on(source, "", Cores::Half) {
+        Ok(true) => {
+            let path = source.to_string_lossy();
+            rusty_core::fs::written::note_written(&path);
+            log::info!("[Import] compressed {path}");
+        }
+        Ok(false) => {}
+        Err(_) if !source.exists() => {}
+        Err(e) => {
+            log::warn!("[Import] {e}");
+            // The console only shows it on a frame (#1721).
+            rusty_core::wake::frame();
+        }
+    }
+}
+
 /// Start the worker: it refreshes what it is sent until the process ends.
 fn start() -> Sender<PathBuf> {
     let (inbox, sent) = channel::<PathBuf>();
@@ -100,19 +125,7 @@ fn start() -> Sender<PathBuf> {
         .name("texture-import".into())
         .spawn(move || {
             for source in sent {
-                match refresh_on(&source, "", Cores::Half) {
-                    Ok(true) => {
-                        let path = source.to_string_lossy();
-                        rusty_core::fs::written::note_written(&path);
-                        log::info!("[Import] compressed {path}");
-                    }
-                    Ok(false) => {}
-                    Err(e) => {
-                        log::warn!("[Import] {e}");
-                        // The console only shows it on a frame (#1721).
-                        rusty_core::wake::frame();
-                    }
-                }
+                import_queued(&source);
             }
         });
     if let Err(e) = spawned {

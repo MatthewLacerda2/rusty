@@ -110,6 +110,9 @@ fn imports_counts_an_extracted_texture_of_a_model_under_the_root() {
     let tex = folder.join("skin.png");
     std::fs::create_dir_all(&folder).unwrap();
     std::fs::write(&tex, png(8, 0)).unwrap();
+    assert!(!imports(&dir.join("models"), &tex), "its model is gone");
+    std::fs::create_dir_all(dir.join("models")).unwrap();
+    std::fs::write(dir.join("models/m.fbx"), b"").unwrap();
     assert!(
         imports(&dir.join("models"), &tex),
         "its model is under the root"
@@ -130,4 +133,15 @@ fn an_editor_side_conversion_queues_its_extracted_textures() {
         "a model with no cache, converted"
     );
     assert_eq!(queued.len(), 2);
+}
+
+#[test]
+fn a_queued_texture_a_later_conversion_removed_is_passed_over() {
+    let dir = rusty_test_support::temp::dir();
+    let first = extracted::images(&model(&dir, 1, false));
+    model(&dir, 2, false);
+    let gone = &first[0];
+    assert!(!gone.exists(), "the second conversion removed its folder");
+    let logged = rusty_test_support::logs::during(|| super::background::import_queued(gone));
+    assert!(logged.iter().all(|l| !l.contains("[Import]")), "{logged:?}");
 }
