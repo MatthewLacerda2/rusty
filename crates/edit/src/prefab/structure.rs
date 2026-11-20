@@ -17,19 +17,22 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::prefab::instance::instance_members;
+use crate::prefab::pass::Pass;
 use crate::prefab::source::{node_paths, GONE};
 use crate::prefab::stamp_entity;
 use crate::PrefabData;
 use rusty_components::{PrefabLink, TransformComponent};
 use rusty_scene::prefab_link::removed::is_removed;
+use rusty_scene::rehydrate::Imports;
 use rusty_scene::runtime::despawn::Despawn;
 use rusty_scene::{Entity, Scene};
 
 /// Give the instance at `root` (its members `ids`, already rekeyed against
-/// `prefab`, the model at `source` as it imports now) the model's node tree.
-/// `applying` says a document is being applied (a load, a Play snapshot): what
+/// `prefab`, the model at `source` as it imports now) the model's node tree,
+/// within `pass`: when it is applying a document (a load, a Play snapshot), what
 /// it removes has no script instance yet and goes at once; otherwise it goes the
-/// way the mode allows (`Scene::destroy`). Returns the instance's members
+/// way the mode allows (`Scene::destroy`). What it adds is rebuilt through the
+/// pass's lookups. Returns the instance's members
 /// afterwards: `ids` itself when the tree already matches.
 pub(super) fn reshape(
     scene: &mut Scene,
@@ -37,7 +40,7 @@ pub(super) fn reshape(
     ids: &[u32],
     source: &str,
     prefab: &PrefabData,
-    applying: bool,
+    pass: &mut Pass,
 ) -> Vec<u32> {
     let local = |id: &u32| scene.world.prefab_link(*id).map(|l| l.local_id);
     let gone: BTreeSet<u32> = ids
@@ -61,9 +64,9 @@ pub(super) fn reshape(
     if gone.is_empty() && missing.is_empty() {
         return ids.to_vec();
     }
-    remove_gone(scene, &gone, applying);
+    remove_gone(scene, &gone, pass.applying);
     let mut members = instance_members(scene, root).unwrap_or_default();
-    add_missing(scene, &mut members, source, &missing, &nodes);
+    add_missing(scene, &mut members, source, &missing, &nodes, pass.imports);
     members
 }
 
@@ -133,6 +136,7 @@ fn add_missing(
     source: &str,
     missing: &[&Entity],
     nodes: &BTreeMap<u32, String>,
+    imports: &mut Imports,
 ) {
     let mut instance: BTreeMap<u32, u32> = members
         .iter()
@@ -154,7 +158,7 @@ fn add_missing(
         // A reference to a node not stamped yet has no id: the rebuild that
         // follows sets every reference from the baseline anyway.
         let id_of = |l: u32| instance.get(&l).copied().unwrap_or(GONE);
-        let mut stamped = stamp_entity(entity, id_of, &BTreeMap::new(), Some(link));
+        let mut stamped = stamp_entity(entity, id_of, &BTreeMap::new(), Some(link), imports);
         // Linked through `set_parent`, so the parent's children list has it.
         (stamped.entity.parent_id, stamped.entity.children) = (None, Vec::new());
         hung.extend(stamped.hung);

@@ -9,8 +9,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::prefab::instance::instance_members;
 use crate::prefab::link::{finish_rebuild, link_source, rebuild_instance};
 use crate::prefab::live::sync_overrides;
+use crate::prefab::pass::Pass;
 use crate::prefab::source::{is_model_source, node_paths, read_source};
-use crate::PrefabData;
+use rusty_scene::rehydrate::Imports;
 use rusty_scene::Scene;
 
 /// Run `refit` (a re-import of the models `names` accepts, #1637) as those models'
@@ -62,7 +63,7 @@ pub fn restamp_models<R>(
             skip.extend(ids.iter().copied().filter(rebuilt));
         }
         let out = refit(scene, &skip);
-        propagate_roots(scene, roots, false);
+        propagate_roots(scene, roots, false, &mut Imports::default());
         out
     })
 }
@@ -85,23 +86,29 @@ pub(super) fn instance_roots(scene: &Scene, pick: impl Fn(&str) -> bool) -> Vec<
     ids.filter(|&id| is_root(id)).collect()
 }
 
-/// Propagate each of `roots`, reading each source once; a root whose source can't
-/// be read is skipped. The whole-scene passes run once, after the last instance.
-/// `applying` says a document is being applied (`structure::reshape`).
-pub(super) fn propagate_roots(scene: &mut Scene, roots: Vec<u32>, applying: bool) {
-    let mut sources: BTreeMap<String, Option<PrefabData>> = BTreeMap::new();
+/// Propagate each of `roots` in one [`Pass`]: each source read and its baselines
+/// built once, each model file looked up once through `imports`; a root whose
+/// source can't be read is skipped. The whole-scene passes run once, after the
+/// last instance. `applying` says a document is being applied
+/// (`structure::reshape`).
+pub(super) fn propagate_roots(
+    scene: &mut Scene,
+    roots: Vec<u32>,
+    applying: bool,
+    imports: &mut Imports,
+) {
+    let mut pass = Pass::new(imports, applying);
     let mut rebuilt = false;
     for root in roots {
         let Ok(source) = link_source(scene, root) else {
             continue;
         };
-        let prefab = sources
-            .entry(source.clone())
-            .or_insert_with_key(|s| read_source(s).ok());
-        if let Some(prefab) = prefab.as_ref() {
-            rebuilt |= rebuild_instance(scene, root, &source, prefab, true, applying).is_ok();
+        if let Some(prefab) = pass.source(&source) {
+            let done = rebuild_instance(scene, root, &source, &prefab, true, &mut pass);
+            rebuilt |= done.is_ok();
         }
     }
+    pass.finish(scene);
     if rebuilt {
         finish_rebuild(scene);
     }

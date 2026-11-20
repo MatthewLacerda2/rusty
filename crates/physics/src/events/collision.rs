@@ -95,8 +95,9 @@ impl CollisionEvents {
     /// above zero): rapier finds a new contact after the tick's solve, so the
     /// impact lands a tick later, and entering then gives `OnCollisionEnter` the
     /// real impact impulse. It is also Unity's rule that a collision needs a
-    /// dynamic body — two bodies the solver never pushes (kinematic against
-    /// static) raise none. Once in, a pair stays while it touches.
+    /// dynamic body. A pair with no dynamic side is not in rapier's contact
+    /// graph at all (`assemble::ACTIVE_TYPES`), so it never reaches here; the
+    /// impulse check covers what remains. Once in, a pair stays while it touches.
     pub fn from_contact_sets(prev: &[(u32, u32)], current: Vec<CollisionPair>) -> Self {
         let was_in = |k: &(u32, u32)| prev.binary_search(k).is_ok();
         let current: Vec<CollisionPair> = current

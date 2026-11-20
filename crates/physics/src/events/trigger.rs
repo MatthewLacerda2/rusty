@@ -27,8 +27,12 @@ impl PhysicsWorld {
     /// query tree (refreshed at the end of every step) what it overlaps now,
     /// under the same layer groups and liveness rule (#521) as its pairs. A
     /// collider never pairs with its own body, so that body is excluded. Two
-    /// static colliders never pair, the contacts' rule (#1779): a static trigger
-    /// reports only colliders whose body is not fixed.
+    /// static colliders never pair, as with contacts (#1779): a static trigger
+    /// reports only colliders whose body is not fixed. Unlike contacts, which
+    /// need a dynamic side, triggers still pair kinematic with static and
+    /// kinematic with kinematic, on purpose: a kinematic mover or a static zone
+    /// must see a CharacterController or kinematic enemy walk in.
+    /// Do not align this with `assemble::ACTIVE_TYPES`.
     pub(crate) fn overlap_pairs(&self) -> Vec<(u32, u32)> {
         let fixed = |c: &Collider| {
             let body = c.parent().and_then(|h| self.bodies.get(h));

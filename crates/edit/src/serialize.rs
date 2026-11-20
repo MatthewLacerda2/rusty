@@ -21,8 +21,10 @@ use rusty_scene::Scene;
 pub fn to_scene_data(scene: &Scene) -> SceneData {
     SceneData {
         entities: {
-            // Bones are rebuilt from the model on load, never saved (#453).
-            let mut entities = scene.world.collect_entities();
+            // Without geometry: every reader drops it (a save skips the fields, a
+            // restore rebuilds or adopts it). Bones are rebuilt from the model on
+            // load, never saved (#453).
+            let mut entities = scene.world.collect_documents();
             // A linked instance's edits are overrides the moment they are made (#1527).
             crate::prefab::live::write_overrides(&mut entities);
             rusty_scene::skeleton::strip_bones(&mut entities);
@@ -72,12 +74,16 @@ pub fn apply_rehydrated(scene: &mut Scene, document: RehydratedScene) {
 }
 
 /// [`apply_scene_data`] for a document the World itself wrote (a Play snapshot):
-/// its values were held when they came in, so they are not held again. Linked prefab
+/// its values were held when they came in, so they are not held again, and each
+/// mesh Play left as it was (the same source and revision, current against the
+/// import cache) takes the live World's geometry before that World is cleared,
+/// instead of being imported again (`RehydratedScene::adopting`). Linked prefab
 /// instances re-read their source and re-apply the overrides the snapshot took, so
 /// the World comes back as captured, with any change made to a source during Play
-/// (#1527).
+/// (#1527); an instance part whose geometry is still current keeps it there too.
 pub fn apply_world_data(scene: &mut Scene, data: SceneData) {
-    apply(scene, RehydratedScene::new(data), false);
+    let document = RehydratedScene::adopting(data, &mut scene.world);
+    apply(scene, document, false);
 }
 
 /// Start from the document's library, then fold in any material an entity still
@@ -123,7 +129,7 @@ fn drop_old_world(scene: &mut Scene) {
 /// `from_disk`: the document came from a file, so its values are held; a World
 /// snapshot's already were.
 fn apply(scene: &mut Scene, document: RehydratedScene, from_disk: bool) {
-    let (mut data, read_at) = document.into_parts();
+    let (mut data, read_at, mut imports) = document.into_parts();
     scene.meshes_read_at = read_at;
 
     take_materials(scene, &mut data);
@@ -182,7 +188,7 @@ fn apply(scene: &mut Scene, document: RehydratedScene, from_disk: bool) {
     // top. A Play snapshot is propagated too (#1527): its bones came back with fresh
     // ids, and a source applied to during Play reaches the edit-mode instances. A
     // missing/renamed source is skipped per instance, so this never aborts the load.
-    crate::prefab::link::propagate_all_linked_instances(scene);
+    crate::prefab::link::propagate_linked_instances_in(scene, &mut imports);
     // The entities drawing a library mesh (#2059) take its geometry.
     scene.sync_scene_meshes();
 
@@ -203,3 +209,7 @@ fn apply(scene: &mut Scene, document: RehydratedScene, from_disk: bool) {
 #[cfg(test)]
 #[path = "serialize_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "geometry_tests.rs"]
+mod geometry_tests;
