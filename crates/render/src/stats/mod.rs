@@ -122,6 +122,15 @@ pub struct RenderCounters {
     /// UI canvases meshed this frame (#2416), each once however many times a
     /// growing glyph atlas rebuilt it: `0` on a still HUD (`ui::kept`).
     pub ui_meshed: u32,
+    /// Views whose UI layout was computed this frame (#2412): `0` while nothing
+    /// the layout reads changed (`ui::kept::layout`).
+    pub ui_laid_out: u32,
+    /// Why it was (#2412), one per reason, in this order: a rebuild (a first frame,
+    /// another World, an Undo, a dropped log), the screen or a Canvas, the texture
+    /// sizes, the structure (a RectTransform, LayoutGroup, LayoutElement, parent,
+    /// child order or active flag), the content (a sized Image or Text), a Transform,
+    /// a marker (`ui::kept::layout::Why`). All `0` when the layout was kept.
+    pub ui_relaid: [u32; 7],
     /// UI `Mask` coverage textures rendered (#428): one pass per visible Mask.
     pub ui_mask_passes: u32,
     /// Fullscreen passes the UI backdrop blur ran (#426): the downsampled
@@ -190,6 +199,14 @@ pub struct RenderCounters {
     /// GPU bytes of the reflection probes' cube array (#2085): every allocated
     /// layer, spares included, every mip. The resident total at the frame's end.
     pub reflection_bytes: u64,
+    /// GPU meshes resident (#2440): one per mesh identity some loaded scene, or
+    /// a mesh particle of one, uses since the last load released the rest.
+    pub mesh_count: u32,
+    /// GPU bytes of their vertex and index buffers. The resident total.
+    pub mesh_bytes: u64,
+    /// GPU bytes the clustered meshes' leases hold of the cluster table and the
+    /// index pool (`passes::hiz::clusters::pool`). The resident total.
+    pub cluster_pool_bytes: u64,
     /// Retained render objects re-derived whole this frame (#1706): every mesh entity
     /// on a rebuild (a first frame, a load, an Undo, a renderer-side input), else the
     /// ones whose mesh, material, activity, layer, static flag or overrides changed.

@@ -53,7 +53,6 @@ impl Ranges {
     }
 
     /// The elements held by ranges handed out and not freed.
-    #[cfg(test)]
     pub(super) fn used(&self) -> u32 {
         self.end - self.holes.iter().map(|h| h.len() as u32).sum::<u32>()
     }

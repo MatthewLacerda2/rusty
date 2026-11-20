@@ -91,6 +91,16 @@ impl UiLayout {
         layout
     }
 
+    /// Place every root's space again through `view`, its rects kept: what a
+    /// layout kept across frames whose rects still hold does when the camera or a
+    /// Canvas's placement (sway, tilt, plane distance) moved. Equals
+    /// [`Self::compute_in`] whenever the rects do.
+    pub fn respace(&mut self, world: &World, view: &UiView) {
+        for (&root, space) in &mut self.spaces {
+            *space = crate::space::space_of(world, root, view);
+        }
+    }
+
     /// Where root canvas `canvas`'s reference units end up (the screen for an
     /// unknown id).
     pub fn space(&self, canvas: u32) -> CanvasSpace {
@@ -103,6 +113,15 @@ impl UiLayout {
             .iter()
             .filter(|(id, r)| *id == r.canvas)
             .map(|(id, _)| (*id, self.space(*id)))
+    }
+
+    /// Whether any laid-out root canvas lies on a plane in the world: a
+    /// `WorldSpace` canvas, or a `ScreenSpaceCamera` canvas seen through a camera
+    /// ([`crate::space::canvas_space`]). Reads the root spaces only, not the rects.
+    pub fn has_world_canvas(&self) -> bool {
+        self.spaces
+            .values()
+            .any(|s| matches!(s, CanvasSpace::World(_)))
     }
 
     /// The rect of `id`, when it was laid out.

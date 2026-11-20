@@ -85,7 +85,9 @@ impl EventSystem {
         };
         self.pointer = position;
         let mut pointer = f.view.pointer(position);
-        if let Some((origin, dir)) = pointer.ray {
+        // The wall ray only bounds world-canvas hits; with none laid out the limit
+        // stays unbounded and the physics query is skipped.
+        if let Some((origin, dir)) = pointer.ray.filter(|_| f.layout.has_world_canvas()) {
             pointer.ray_limit = (f.walls)(origin, dir);
         }
         let hit = raycast_pointer(f.world, f.layout, &pointer);

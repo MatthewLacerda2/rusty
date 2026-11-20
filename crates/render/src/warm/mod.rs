@@ -22,8 +22,13 @@
 //! it; a step that meets one still being read, or lightmap pages still being read,
 //! makes nothing, and the host tries again on a later frame. What one step costs the
 //! frame is then one GPU upload: a mesh's buffers, a texture's levels and its mips
-//! drawn, or a page array. A warmed resource the activated scene does not use (a
-//! load replaced) stays in its cache as any unused entry does.
+//! drawn, or a page array. Nothing here releases, and a mesh a warm-up made stays
+//! resident while its `Warming` lives, through any release meanwhile (a scene that
+//! opens the next load in its first tick): the old scene's meshes go at the end of
+//! the activated scene's first frame (`scene::residency`), so neither the scene
+//! still drawing nor the one warming loses one. A warmed mesh the activated scene
+//! does not use, or an abandoned warm-up's, goes at the next release. A warmed
+//! texture stays in its cache as any unused entry does.
 //!
 //! What it does not warm, and the new scene's first frame still makes: the material
 //! bind groups and object records (kept per scene, and the scene's identity is new
@@ -40,6 +45,7 @@
 mod decode;
 
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 use crate::debug_meshes::{has_geometry, stale_uploads, UploadCandidate};
 use crate::draw::map_slots::material_maps;
@@ -68,6 +74,9 @@ pub struct Warming {
     decoding: Option<decode::Decoding>,
     /// What the steps so far uploaded.
     pub uploads: Uploads,
+    /// Alive while the warm-up is: the meshes it made stay resident until then
+    /// (`scene::residency`).
+    token: Arc<()>,
 }
 
 impl std::fmt::Debug for Warming {
@@ -112,6 +121,7 @@ impl Warming {
             next: 0,
             decoding: None,
             uploads: Uploads::default(),
+            token: Arc::new(()),
         }
     }
 
@@ -194,8 +204,9 @@ impl Renderer {
                     has_geometry: true,
                 };
                 if !stale_uploads([candidate], resident).is_empty() {
-                    self.upload_geometry(id, mesh.revision, mesh);
+                    self.upload_geometry(id.clone(), mesh.revision, mesh);
                 }
+                self.retained.residency.warmed(&warming.token, id);
                 true
             }
             Item::Texture(map, kind) => {

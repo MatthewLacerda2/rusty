@@ -27,6 +27,7 @@ pub(super) fn search(explicit: Option<&Path>, path: Option<&Path>) -> Search {
         path: path.map(Into::into),
         places: Vec::new(),
         timeout: None,
+        known: None,
     }
 }
 
