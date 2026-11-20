@@ -76,5 +76,5 @@ fn the_rank_splits_no_run() {
     assert_eq!(primed.opaque.len(), unprimed.opaque.len());
     assert_eq!(meshes(&primed), ["Box", "Crate", "Wall"]);
     assert_eq!(meshes(&unprimed), ["Crate", "Wall", "Box"]);
-    assert_eq!(primed.opaque.order(), OpaqueOrder::OwnDepthFirst);
+    assert!(primed.opaque.ranked_for(true) && !primed.opaque.ranked_for(false));
 }

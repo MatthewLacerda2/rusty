@@ -20,11 +20,6 @@ impl OpaqueBatches {
         Self(batches, order)
     }
 
-    /// The order they were sorted in.
-    pub(crate) fn order(&self) -> OpaqueOrder {
-        self.1
-    }
-
     /// Whether they were sorted for a forward pass `primed` or not: none to order
     /// is either.
     pub(crate) fn ranked_for(&self, primed: bool) -> bool {
