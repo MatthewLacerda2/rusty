@@ -37,7 +37,7 @@ fn project() -> PathBuf {
         (t.position, t.scale) = (at, size);
     }
     // Crates in the camera's view (down -Z): the cull skips a camera drawing
-    // fewer than `MIN_INSTANCES` (32) opaque instances (#2338).
+    // fewer than `MIN_INSTANCES` (32) objects it tests (#2338).
     for k in 0..32 {
         let id = create_entity(&mut yard, "Crate", Some(Primitive::Box));
         let mut t = yard.world.transform_mut(id).unwrap();

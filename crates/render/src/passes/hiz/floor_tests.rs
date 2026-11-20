@@ -5,11 +5,27 @@ use super::{culls, draws_enough, MIN_INSTANCES};
 
 #[test]
 fn a_camera_culls_from_the_floor_up() {
-    assert!(!draws_enough(MIN_INSTANCES - 1, MIN_INSTANCES));
-    assert!(draws_enough(MIN_INSTANCES, MIN_INSTANCES));
-    assert!(draws_enough(MIN_INSTANCES + 1, MIN_INSTANCES));
-    assert!(!draws_enough(0, MIN_INSTANCES), "a camera drawing nothing");
-    assert!(draws_enough(1, 0), "a lowered floor culls a single box");
+    let floor = MIN_INSTANCES as usize;
+    assert!(!draws_enough((floor - 1, false), MIN_INSTANCES));
+    assert!(draws_enough((floor, false), MIN_INSTANCES));
+    assert!(draws_enough((floor + 1, false), MIN_INSTANCES));
+    assert!(
+        !draws_enough((0, false), MIN_INSTANCES),
+        "a camera testing nothing"
+    );
+    assert!(
+        draws_enough((1, false), 0),
+        "a lowered floor culls a single box"
+    );
+}
+
+#[test]
+fn a_camera_drawing_by_cluster_culls_under_the_floor() {
+    assert!(
+        draws_enough((1, true), MIN_INSTANCES),
+        "one clustered shell"
+    );
+    assert!(draws_enough((0, true), MIN_INSTANCES));
 }
 
 #[test]

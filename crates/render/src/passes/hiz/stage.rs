@@ -19,13 +19,17 @@ impl Renderer {
     /// depth pyramid, leaving the draws its passes make in `ctx.solids.culled`.
     pub(crate) fn cull_by_hiz(&mut self, view: &mut RenderView, ctx: &mut CameraCtx) {
         ctx.solids.culled = None;
-        // The camera's opaque instance count: under the floor it is drawn whole,
-        // as with its flag off, holding nothing here (#2338).
+        let idx = ctx.uniform.stack[0] as usize;
+        // Under the instance floor, or with its flag off, a camera is drawn
+        // whole, holding nothing new here (#2338), and a read it left in flight
+        // is dropped: its first frame back must not report it.
         let n = ctx.solids.draws.opaque.last().map(|b| b.instances.end);
-        let Some(n) = n.filter(|&n| self.hiz_culls_draws(ctx.cam, n)) else {
+        let Some(n) = n.filter(|_| self.hiz_culls_draws(ctx.cam, &ctx.solids)) else {
+            if let Some(cam) = view.hiz.cameras.get_mut(idx) {
+                cam.forget_reads();
+            }
             return;
         };
-        let idx = ctx.uniform.stack[0] as usize;
         self.hold_hiz(view, idx);
         let ([first, mut last], plan) =
             self.prepare_cull(view, idx, (&ctx.solids, ctx.view_proj), n);
@@ -138,6 +142,12 @@ impl Renderer {
 }
 
 impl CameraCull {
+    /// Drop both counters' reads in flight, for a frame this camera skips.
+    fn forget_reads(&mut self) {
+        self.counter.forget();
+        self.clusters.counter.forget();
+    }
+
     /// Copy what its final draws and its late set (#2336) drew, `batches` args
     /// each and adjacent ([`late_args`]), in one copy for one read back
     /// ([`Counter::final_and_late`](super::counters::Counter::final_and_late)).

@@ -63,14 +63,22 @@
 //! **Who culls.** [`Renderer::hiz_culls`]: the quality preset's
 //! `gpu_occlusion_culling` (off in every seeded preset, #2388), the camera's
 //! `use_occlusion_culling`, and never during a capture, which bakes every static
-//! mesh. Then the stage itself skips a camera with fewer than [`MIN_INSTANCES`]
-//! opaque instances (a viewmodel camera drawing a gun, #2338): it holds no
-//! buffers or pyramid for it and leaves it drawn as a camera with the flag off
-//! is, since a cull of so few cannot hide what it costs. The floor counts
-//! instances, not whether the camera is an overlay, so a stacked camera showing
-//! the level still culls. A camera that crosses it culls on its first frame above
-//! from the history it kept (every slot "drawn" when it never culled), and
-//! correctness never rests on that history: the late set draws what it missed. An orthographic camera and one with a far near plane do cull: the test
+//! mesh. Then the stage itself skips a camera that tests fewer than
+//! [`MIN_INSTANCES`] objects (`CameraSolids::tested`: a viewmodel camera
+//! drawing a gun, #2338) and draws none of its opaque batches by cluster: it
+//! holds no buffers or pyramid for it and leaves it drawn as a camera with the
+//! flag off is, since a cull of so few cannot hide what it costs. A camera with a
+//! clustered mesh in view keeps the cull under the floor while the preset's
+//! cluster cull is on: one million-triangle shell gains by cluster whatever the
+//! instance count. The floor counts what the cull tests, not whether the camera
+//! is an overlay, so a stacked camera showing the level still culls. A camera
+//! that drops under it, or whose flag goes off, drops its counters' read in
+//! flight, so its first frame back never reports a count from before it; one
+//! that crosses back culls on its first frame above from the history it kept
+//! (every slot "drawn" when it never culled), and correctness never rests on
+//! that history: the late set draws what it missed.
+//!
+//! An orthographic camera and one with a far near plane do cull: the test
 //! reads the depth the camera drew, so a wall its near plane clips away writes none,
 //! and the projected rect is exact for an orthographic projection. An adapter
 //! without `INDIRECT_FIRST_INSTANCE` culls nothing this way.
@@ -103,6 +111,8 @@ mod dispatch_gpu_tests;
 #[cfg(all(test, feature = "dev"))]
 mod dust2_gpu_tests;
 #[cfg(test)]
+mod floor_cluster_gpu_tests;
+#[cfg(test)]
 mod floor_gpu_tests;
 #[cfg(test)]
 mod floor_tests;
@@ -133,8 +143,8 @@ pub(crate) use cull::{CameraCull, Culled, ARGS};
 /// at its own run of the array, so its args name a first instance.
 pub(crate) const FEATURE: wgpu::Features = wgpu::Features::INDIRECT_FIRST_INSTANCE;
 
-/// The fewest opaque instances a camera culls by Hi-Z ([module docs](self),
-/// *Who culls*): below it the stage's select, depth pass, pyramid, test, submit
+/// The fewest objects a camera's Hi-Z cull tests for it to run ([module
+/// docs](self), *Who culls*; a camera drawing by cluster runs under it): below it the stage's select, depth pass, pyramid, test, submit
 /// and read-backs cost more than the few draws they could hide. A renderer
 /// constant, not a preset row: it changes no pixel.
 pub(crate) const MIN_INSTANCES: u32 = 32;
@@ -146,10 +156,11 @@ fn culls(supported: bool, (preset, camera): (bool, bool), capturing: bool) -> bo
     supported && preset && camera && !capturing
 }
 
-/// Whether a camera drawing `instances` opaque instances has enough for the cull
-/// to pay, against the renderer's `floor` ([`MIN_INSTANCES`]).
-fn draws_enough(instances: u32, floor: u32) -> bool {
-    instances >= floor
+/// Whether a camera whose cull would test `tested` objects, drawing a batch by
+/// cluster when `clustered`, has enough for the cull to pay, against the
+/// renderer's `floor` ([`MIN_INSTANCES`]).
+fn draws_enough((tested, clustered): (usize, bool), floor: u32) -> bool {
+    clustered || tested >= floor as usize
 }
 
 /// The compute pipelines, shared by every view, built on their first dispatch.
@@ -162,7 +173,7 @@ pub(crate) struct HiZ {
     pub(super) reduce: LazyCompute,
     /// The per-cluster passes (#1968).
     pub(crate) clusters: clusters::ClusterPipelines,
-    /// The fewest opaque instances a camera culls: [`MIN_INSTANCES`]. The tests
+    /// The fewest objects a camera's cull tests: [`MIN_INSTANCES`]. The tests
     /// of the cull's mechanism lower it to 0 (`test_gpu::culling`), so their
     /// primitive scenes of a few boxes still cull.
     pub(crate) min_instances: u32,
@@ -235,10 +246,17 @@ impl Renderer {
         culls(supported, on, self.capture.static_only)
     }
 
-    /// Whether `cam`, drawing `instances` opaque instances, is culled this frame:
-    /// [`Self::hiz_culls`] and at least [`MIN_INSTANCES`] of them.
-    pub(crate) fn hiz_culls_draws(&self, cam: &rusty_scene::Camera, instances: u32) -> bool {
-        self.hiz_culls(cam) && draws_enough(instances, self.hiz.min_instances)
+    /// Whether `cam`, drawing `solids`, is culled this frame: [`Self::hiz_culls`],
+    /// and at least [`MIN_INSTANCES`] objects its cull tests or a batch it draws
+    /// by cluster ([`Self::draws_clustered`]).
+    pub(crate) fn hiz_culls_draws(
+        &self,
+        cam: &rusty_scene::Camera,
+        solids: &crate::draw::resources::SolidResources,
+    ) -> bool {
+        let floor = self.hiz.min_instances;
+        let clustered = || self.draws_clustered(&solids.draws);
+        self.hiz_culls(cam) && draws_enough((solids.tested.len(), clustered()), floor)
     }
 
     /// Whether a camera that culls by Hi-Z also culls its clustered meshes by

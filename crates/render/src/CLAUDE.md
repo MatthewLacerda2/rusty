@@ -85,8 +85,8 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   compiler refuses them to `draw_batches` (the translucents' path), which would draw
   what the cull hid. A transparent batch is never culled. `Renderer::hiz_culls` says which camera culls (the preset's
   `gpu_occlusion_culling`, the camera's flag, no capture), and the stage skips one
-  with fewer than `passes::hiz::MIN_INSTANCES` opaque instances
-  (`Renderer::hiz_culls_draws`), leaving it drawn as with the flag off; an object is tested
+  testing fewer than `passes::hiz::MIN_INSTANCES` objects and drawing no batch by
+  cluster (`Renderer::hiz_culls_draws`), leaving it drawn as with the flag off; an object is tested
   only when `camera_solids` lists it in `CameraSolids::tested`, so a new kind of
   instance (a particle, a ringed object) stays drawn unless it adds itself there.
   A material whose vertices move past the mesh's bounds (`RenderObject::moving`)

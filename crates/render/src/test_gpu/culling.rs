@@ -5,7 +5,7 @@ use crate::Renderer;
 
 /// [`headless_or_skip`] with the GPU occlusion cull and its cluster cull on: the
 /// seeded presets ship both off (#2388), so a test about the cull turns it on here.
-/// It also lowers the cull's instance floor to 0 (`passes::hiz::MIN_INSTANCES`), so
+/// It also lowers the cull's floor to 0 (`passes::hiz::MIN_INSTANCES`), so
 /// a primitive scene of a few boxes still culls; [`floored_or_skip`] keeps it.
 pub fn culling_or_skip(width: u32, height: u32) -> Option<Renderer> {
     let mut r = floored_or_skip(width, height)?;
