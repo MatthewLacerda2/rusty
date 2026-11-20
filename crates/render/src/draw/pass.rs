@@ -3,6 +3,7 @@
 
 use crate::draw::batch::OpaqueBatches;
 use crate::gpu::global_group::GlobalGroup;
+use crate::gpu::groups;
 use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
 use crate::gpu::pipelines::surface::SolidPass;
 use crate::gpu::pipelines::PrimedPipelines;
@@ -187,8 +188,8 @@ impl Renderer {
             Some(_) => SolidPass::Velocity(&self.velocity_pipeline, primed, surface),
             None => SolidPass::Opaque(view.forward_pipeline(&self.render_pipeline), primed),
         };
-        render_pass.set_bind_group(0, &self.global_bind_group, &[]);
-        render_pass.set_bind_group(3, self.scene_group3(view, frame), &[]);
+        render_pass.set_bind_group(groups::GLOBAL, &self.global_bind_group, &[]);
+        render_pass.set_bind_group(groups::SCENE, self.scene_group(view, frame), &[]);
         // Solid entities (each batch binds its shader's pipeline).
         let solids = (solid_batches, frame.culled.as_ref());
         self.draw_solids(&mut render_pass, solids, solid_pass);

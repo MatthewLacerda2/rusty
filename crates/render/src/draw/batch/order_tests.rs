@@ -61,6 +61,26 @@ fn near_equal_depths_keep_the_key_order() {
 }
 
 #[test]
+fn one_materials_batches_sit_together_inside_a_bucket() {
+    // `material` sorts before `mesh` in the key: wgpu re-flushes the material group
+    // each time it changes, so one material's meshes draw back to back, not
+    // interleaved with another's by mesh name.
+    let with = |mesh, material, tag| {
+        let mut it = at(mesh, tag, 10.0);
+        it.key.material = material;
+        it
+    };
+    let opaque = vec![with("A", 1, 0.0), with("B", 0, 1.0), with("A", 0, 2.0)];
+    let draws = FrameDraws::build((opaque, Vec::new()), &MaterialRecords::default(), true);
+    let order: Vec<_> = draws
+        .opaque
+        .iter()
+        .map(|b| (b.key.material, name(b.key.mesh)))
+        .collect();
+    assert_eq!(order, [(0, "A"), (0, "B"), (1, "A")]);
+}
+
+#[test]
 fn buckets_grow_with_distance_and_clamp_at_the_camera() {
     assert!(depth_bucket(1.0) < depth_bucket(2.0));
     assert!(depth_bucket(100.0) < depth_bucket(200.0));

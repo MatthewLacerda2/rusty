@@ -8,7 +8,7 @@
 //!   hemisphere gather at the quality's resolution reads **last frame's** light,
 //!   reprojected through last frame's view-projection, then a depth-aware blur, a
 //!   temporal accumulate and an upsample to full resolution. The forward pass reads
-//!   the result at its group 3, in the opaque copy's slot (`t_opaque`, which that
+//!   the result at its scene group, in the opaque copy's slot (`t_opaque`, which that
 //!   pass never reads, so the stage binds no texture more than
 //!   `render::setup::limits` allows) while the
 //!   camera uniform's `ssil.x` says it runs; adds it to the ambient irradiance
@@ -31,7 +31,7 @@
 //! object's `in_bake`). Not the indirect term (lightmap, probes, flat ambient, SSIL
 //! itself), not the environment reflection. So a lightmapped scene whose lights were
 //! all baked gathers nothing; a light spawned after the bake bounces. Unlit
-//! surfaces and the sky feed nothing. A transparent surface reads none (its group 3
+//! surfaces and the sky feed nothing. A transparent surface reads none (its scene group
 //! is the no-AO one, as for `t_ao`), and an overlay camera reads none.
 //!
 //! **History.** A cut (a scene load, Play or Stop, a camera switch: `motion`'s
@@ -63,7 +63,7 @@ mod targets;
 pub(crate) use pass::SsilPasses;
 pub(crate) use targets::SsilTargets;
 
-/// The forward group 3 SSIL built for this frame, when the view holds its state.
+/// The forward scene group SSIL built for this frame, when the view holds its state.
 pub(crate) fn forward_group(post_fx: &crate::postfx::PostFx) -> Option<&wgpu::BindGroup> {
     post_fx.targets.get::<SsilTargets>()?.forward_group.as_ref()
 }

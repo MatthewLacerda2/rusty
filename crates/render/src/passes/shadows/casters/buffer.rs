@@ -13,7 +13,7 @@ use crate::gpu::grow_buffer::GrowBuffer;
 use crate::gpu::ops::CountedDevice as _;
 use crate::gpu::uniforms::MappingUniform;
 use crate::passes::shadows::clips::{Clip, Cutout};
-use crate::passes::shadows::setup::{
+use crate::passes::shadows::layouts::{
     CASTERS_BINDING, DRAW_BINDING, JOINTS_BINDING, MATERIALS_BINDING,
 };
 use crate::scene::SlotTable;

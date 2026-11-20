@@ -10,14 +10,14 @@ use super::stage::{lap_of, HOLD_LAP};
 use super::tables::Tables;
 use super::upload::{pack_bounds, Frame, Params};
 use crate::draw::resources::SolidResources;
-use crate::gpu::draw_buffers::GROUP1_INSTANCES;
+use crate::gpu::draw_buffers::DRAW_GROUP_INSTANCES;
 use crate::gpu::grow_buffer::GrowBuffer;
 use crate::gpu::kept::Kept;
 use crate::timing::GpuPart;
 
 use crate::{RenderView, Renderer};
 
-/// The opaque draws a camera's passes make through the GPU's verdict: the group 1
+/// The opaque draws a camera's passes make through the GPU's verdict: the per-draw group
 /// naming the kept instances, and one indirect draw per batch, in batch order,
 /// from byte `at` of `args`.
 #[derive(Clone)]
@@ -80,7 +80,7 @@ pub(crate) struct CameraCull {
     /// The two `hiz.wgsl` groups (phase one's, then the test's and final), kept
     /// while the buffers and pyramid they bind are.
     pub(super) groups: Kept<CullKey, [wgpu::BindGroup; 2]>,
-    /// The two phases' draws, kept while the group-1 buffers they bind and the
+    /// The two phases' draws, kept while the per-draw group's buffers they bind and the
     /// args they draw from are.
     culled: Kept<[CulledKey; 2], [Culled; 2]>,
     /// The CPU tables it fills each frame.
@@ -90,7 +90,7 @@ pub(crate) struct CameraCull {
     pub(crate) drawn_batches: u32,
 }
 
-/// What a phase's [`Culled`] names: its group 1's buffers, by binding, and its
+/// What a phase's [`Culled`] names: its per-draw group's buffers, by binding, and its
 /// indirect args.
 type CulledKey = ([wgpu::Buffer; 6], wgpu::Buffer);
 
@@ -208,17 +208,17 @@ impl Renderer {
         self.frame_counters.hiz_tested += tested;
         let key = [0, 1].map(|k| {
             let kept = cam.kept[k].buffer();
-            let group1 = self.draw_buffers.group1_buffers(kept).map(Clone::clone);
-            (group1, cam.args[k].buffer().clone())
+            let draw_group = self.draw_buffers.draw_group_buffers(kept).map(Clone::clone);
+            (draw_group, cam.args[k].buffer().clone())
         });
         // Its instances and args come from the key (#2021: the args grow on their
-        // own, by batch, not by instance); the other group-1 buffers are read from
+        // own, by batch, not by instance); the other per-draw group's buffers are read from
         // `draw_buffers` again, the same ones the key was built from just above.
-        let make = |(group1, args): &CulledKey| Culled {
+        let make = |(draw_group, args): &CulledKey| Culled {
             group: self.draw_buffers.group_with_instances(
                 &self.device,
                 &self.entity_bones_layout,
-                &group1[GROUP1_INSTANCES],
+                &draw_group[DRAW_GROUP_INSTANCES],
             ),
             args: args.clone(),
             at: 0,

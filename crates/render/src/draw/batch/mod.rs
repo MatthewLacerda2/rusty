@@ -40,6 +40,12 @@ pub(crate) struct BatchKey {
     /// (a mirrored instance's flips, #1134). Second, so each shader's runs group by
     /// cull state.
     pub facing: Facing,
+    /// The material bind group (the resolved texture maps), by cache index. Before
+    /// the mesh, so one material's batches sit side by side inside a depth bucket
+    /// (`sort::front_to_back` keeps key order there) and the material group, bound
+    /// below the per-draw one (`gpu::groups`), changes once per run of them, not
+    /// almost every draw.
+    pub material: usize,
     /// The geometry (vertex + index buffers), by asset identity (#127), interned
     /// (#1706): resolved to its `MeshId` once per batch, never compared as a string.
     pub mesh: MeshHandle,
@@ -47,8 +53,6 @@ pub(crate) struct BatchKey {
     /// its own, and two entities whose runs of one mesh are joined differently never
     /// share a draw.
     pub indices: IndexRun,
-    /// The group-2 material bind group (the resolved texture maps), by cache index.
-    pub material: usize,
     /// The material record's slot in the renderer's material table (tint, PBR
     /// scalars, map and cutout flags, the surface and mapping terms, #1616): one per
     /// scene, library material and variant (`render::scene::MaterialRecords`, #1706).

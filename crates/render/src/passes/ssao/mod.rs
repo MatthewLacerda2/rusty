@@ -15,10 +15,10 @@
 //! 4. below full resolution, one depth-aware (bilateral) **upsample** to it
 //!    (`fs_upsample`), HDRP's shape (#1578);
 //!
-//! and the forward pass reads the result at its group 3 (`t_ao`) to scale its
+//! and the forward pass reads the result at its scene group (`t_ao`) to scale its
 //! ambient term, and the environment reflection through its specular occlusion
 //! (`forward::reflection::specular_occlusion`, #1697). With AO off none of this runs, and
-//! group 3 carries a 1x1 white texture instead.
+//! scene group carries a 1x1 white texture instead.
 //!
 //! Cost, per camera that runs it: one more depth-only draw of every visible solid, plus
 //! `samples` depth taps per occlusion texel (the seeded Medium preset's Medium

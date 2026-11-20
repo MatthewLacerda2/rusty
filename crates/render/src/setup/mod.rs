@@ -168,12 +168,12 @@ impl Renderer {
         let surface_shaders = crate::gpu::pipelines::surface::SurfaceShaders::new(
             crate::gpu::pipelines::forward_layout(
                 &device,
-                [
+                crate::gpu::pipelines::forward_groups(
                     &camera_lighting_layout,
                     &entity_bones_layout,
                     &textures.material_layout,
                     &shadows.layout,
-                ],
+                ),
             ),
             shadows
                 .renderer

@@ -7,6 +7,7 @@
 
 use crate::draw::batch::{DrawBatch, OpaqueBatches};
 use crate::gpu::draw_buffers::DrawBuffers;
+use crate::gpu::groups;
 use crate::gpu::pipelines::surface::SolidPass;
 use crate::passes::hiz::{Culled, ARGS};
 use crate::Renderer;
@@ -17,7 +18,7 @@ pub(crate) type Solids<'a> = (&'a OpaqueBatches, Option<&'a Culled>);
 
 impl Renderer {
     /// Record `batches` into `pass`: per batch, its pipeline when it differs from the
-    /// last one (see [`SolidPass`]), the mesh buffers, the frame's group-1 bind group
+    /// last one (see [`SolidPass`]), the mesh buffers, the frame's per-draw bind group
     /// at the batch's uniform offset, the shared material group, and one instanced
     /// draw over its instance range (#470). The translucent passes' path: the
     /// opaque batches are an [`OpaqueBatches`], which this cannot take, and draw
@@ -75,8 +76,12 @@ impl Renderer {
             render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
             render_pass
                 .set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-            render_pass.set_bind_group(1, group, &offsets);
-            render_pass.set_bind_group(2, self.materials.group(batch.key.material), &[]);
+            render_pass.set_bind_group(groups::DRAW, group, &offsets);
+            render_pass.set_bind_group(
+                groups::MATERIAL,
+                self.materials.group(batch.key.material),
+                &[],
+            );
             let by_cluster = culled
                 .and_then(|c| c.clusters.as_ref())
                 .and_then(|c| Some((c, c.draws.get(i)?.clone()?)));

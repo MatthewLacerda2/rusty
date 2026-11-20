@@ -3,7 +3,7 @@
 //! (alpha), drawn after its opaque pass and SSR (so a refracting surface sees the
 //! reflected floor) by `opaque_copy.wgsl`. One texture, so the forward pass stays
 //! inside its sampled-texture budget (`render::setup::limits`, 17 per stage). The transparent pass reads it
-//! through its group 3. Made only on a camera whose visible translucents ask for it
+//! through its scene group. Made only on a camera whose visible translucents ask for it
 //! (a material that refracts or absorbs, `MaterialAsset::reads_opaque`, or traces
 //! SSR, `postfx::effects::ssr::transparent`) and counted
 //! in `Debug.Stats().opaque_copies`; every other pass binds a 1x1 stand-in.
@@ -23,14 +23,14 @@ use crate::postfx::{PfxTarget, PostFx, HDR_FORMAT};
 use crate::timing::GpuPass;
 use crate::{RenderView, Renderer};
 
-/// The opaque copy a forward pass's group 3 binds, and its sampler.
+/// The opaque copy a forward pass's scene group binds, and its sampler.
 #[derive(Clone, Copy)]
 pub(crate) struct OpaqueViews<'a> {
     pub texture: &'a wgpu::TextureView,
     pub sampler: &'a wgpu::Sampler,
 }
 
-/// The copy's pipeline, the 1x1 stand-in every group 3 binds outside a transparent
+/// The copy's pipeline, the 1x1 stand-in every scene group binds outside a transparent
 /// pass that copied, and the copy's sampler: linear, clamped, so a lookup bent off
 /// screen reads the edge.
 pub(crate) struct OpaqueCopyPass {
@@ -99,7 +99,7 @@ impl OpaqueCopyPass {
     }
 }
 
-/// One view's opaque copy, and the group 3 its transparent pass binds this camera
+/// One view's opaque copy, and the scene group its transparent pass binds this camera
 /// (`None` on a camera that made no copy).
 pub(crate) struct OpaqueCopy {
     size: (u32, u32),
@@ -199,9 +199,12 @@ impl Renderer {
         self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 
-    /// The group 3 `view`'s transparent pass binds: its copy's this camera, else the
+    /// The scene group `view`'s transparent pass binds: its copy's this camera, else the
     /// no-AO group with the stand-in.
-    pub(crate) fn transparent_group3<'a>(&'a self, view: &'a RenderView) -> &'a wgpu::BindGroup {
+    pub(crate) fn transparent_scene_group<'a>(
+        &'a self,
+        view: &'a RenderView,
+    ) -> &'a wgpu::BindGroup {
         let copy = view.post_fx.targets.get::<OpaqueCopy>();
         copy.and_then(|c| c.group.as_ref())
             .unwrap_or(&self.shadow_bind_group)

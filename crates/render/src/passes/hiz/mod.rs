@@ -54,7 +54,7 @@
 //! `Renderer::draw_solids` draws, so no opaque pass can skip the verdict.
 //!
 //! **What it keeps.** Its bind groups (the cull's, the pyramid's levels, the
-//! kept instances' group 1) and the draws holding them are rebuilt only when a
+//! kept instances' per-draw group) and the draws holding them are rebuilt only when a
 //! buffer they bind or draw from grew or the depth was resized
 //! ([`Kept`](crate::gpu::kept::Kept)): a `Kept`'s key names every resource its
 //! value holds (#2021). Its CPU tables are reused. Grown history keeps its

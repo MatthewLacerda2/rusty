@@ -9,6 +9,7 @@
 //! (`game`).
 
 use crate::draw::resources::Overlays;
+use crate::gpu::groups;
 use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
 use crate::timing::GpuPass;
 use crate::{RenderView, Renderer};
@@ -69,11 +70,11 @@ impl Renderer {
                 occlusion_query_set: None,
             });
             pass.set_pipeline(self.line_pipeline.get());
-            pass.set_bind_group(0, &self.global_bind_group, &[]);
+            pass.set_bind_group(groups::GLOBAL, &self.global_bind_group, &[]);
             // The lines never sample a material; the grid rebinds this same group.
-            pass.set_bind_group(2, &self.default_material_bind_group, &[]);
-            // Group 3 is in the forward layout; unlit lines read nothing from it.
-            pass.set_bind_group(3, &self.shadow_bind_group, &[]);
+            pass.set_bind_group(groups::MATERIAL, &self.default_material_bind_group, &[]);
+            // The scene group is in the forward layout; unlit lines read nothing from it.
+            pass.set_bind_group(groups::SCENE, &self.shadow_bind_group, &[]);
             self.draw_editor_overlays(&mut pass, overlays);
         }
         self.queue.counted_submit(std::iter::once(encoder.finish()));

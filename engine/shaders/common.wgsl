@@ -147,7 +147,7 @@ struct LightingUniforms {
 };
 
 // One point or spot light of the frame (#434), in the storage array at group 0
-// binding 7 (group 3 in the particle pass). Mirrors the Rust `LocalLight`.
+// binding 7 (the particle pass's too). Mirrors the Rust `LocalLight`.
 struct LocalLight {
     position: vec3<f32>,
     range: f32,

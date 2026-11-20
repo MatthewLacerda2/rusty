@@ -3,6 +3,7 @@
 //! and before the editor's handles. The last two are scissored to the selection's
 //! bounds on screen.
 
+use crate::gpu::groups;
 use crate::gpu::ops::CountedQueue as _;
 use glam::Mat4;
 
@@ -75,7 +76,7 @@ impl Renderer {
     }
 
     /// The outlined draws into the cleared `mask`: each with the forward pass's own
-    /// mesh, group-1 slot, material group and instance.
+    /// mesh, per-draw slot, material group and instance.
     fn record_mask(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -85,9 +86,9 @@ impl Renderer {
         let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
         let timed = ("Selection Mask Pass", &self.gpu_timer, GpuPass::Outline);
         let mut pass = color_pass(encoder, timed, mask, clear);
-        pass.set_bind_group(0, &self.global_bind_group, &[]);
-        // Group 3 is in the forward layout; the mask reads nothing from it.
-        pass.set_bind_group(3, &self.shadow_bind_group, &[]);
+        pass.set_bind_group(groups::GLOBAL, &self.global_bind_group, &[]);
+        // The scene group is in the forward layout; the mask reads nothing from it.
+        pass.set_bind_group(groups::SCENE, &self.shadow_bind_group, &[]);
         let mut bound = None;
         for draw in &draws.outline {
             let Some(gpu_mesh) = self.gpu_mesh_of(draw.mesh) else {
@@ -100,8 +101,8 @@ impl Renderer {
             pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
             pass.set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
             let offsets = DrawBuffers::offsets(draw.uniform_slot);
-            pass.set_bind_group(1, self.draw_buffers.bind_group(), &offsets);
-            pass.set_bind_group(2, self.materials.group(draw.material), &[]);
+            pass.set_bind_group(groups::DRAW, self.draw_buffers.bind_group(), &offsets);
+            pass.set_bind_group(groups::MATERIAL, self.materials.group(draw.material), &[]);
             pass.draw_indexed(draw.indices.clone(), 0, draw.instance..draw.instance + 1);
         }
     }

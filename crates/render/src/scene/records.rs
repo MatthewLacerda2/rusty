@@ -1,6 +1,6 @@
 //! crates/render/src/scene/records.rs — the renderer's material table (#1706): one
 //! [`MaterialData`] per (scene, library material, [`Variant`]), at a slot of a
-//! [`SlotTable`] mirrored on the GPU (group 1 binding 4), which a draw's uniform names.
+//! [`SlotTable`] mirrored on the GPU (the per-draw group, binding 4), which a draw's uniform names.
 //!
 //! **Why a variant.** A record is the material's, but two inputs of it are not:
 //! a light's own mesh draws its material unlit (`is_lit`, and the decal, preserve

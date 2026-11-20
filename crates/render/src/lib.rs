@@ -155,7 +155,7 @@ pub struct Renderer {
     clusters: clusters::ClusterBuffers,
     /// The baked lightmap pages group 0 binds (#438), rebound when the scene's change.
     pub(crate) lightmaps: gpu::lightmaps::Lightmaps,
-    /// What every solid draw binds as group 1 (#470): per-draw uniforms, palettes and
+    /// What every solid draw binds as its per-draw group (#470): per-draw uniforms, palettes and
     /// instances per camera, and the object and material tables (#1706).
     draw_buffers: gpu::draw_buffers::DrawBuffers,
     /// GPU occlusion culling's compute pipelines (#1963).
@@ -218,11 +218,11 @@ pub struct Renderer {
     probe_prefilter: std::sync::OnceLock<ibl::reflection_prefilter::gpu::ProbePrefilter>,
     pub shadow_layout: wgpu::BindGroupLayout,
     pub shadow_uniform_buffer: wgpu::Buffer,
-    /// The forward pass's group 3 with the white no-AO fallback: every pass that
+    /// The forward pass's scene group with the white no-AO fallback: every pass that
     /// draws without SSAO (the transparent pass, SSAO off, a stacked DepthOnly camera)
     /// binds this.
     pub shadow_bind_group: wgpu::BindGroup,
-    /// The opaque copy's pass, stand-in and sampler (#1523): every group 3 binds the
+    /// The opaque copy's pass, stand-in and sampler (#1523): every scene group binds the
     /// stand-in but a transparent pass whose camera copied
     /// (`passes::transparent::opaque_copy`).
     pub(crate) opaque_copy: passes::transparent::OpaqueCopyPass,

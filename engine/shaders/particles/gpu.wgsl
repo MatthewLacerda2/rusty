@@ -53,9 +53,9 @@ struct GpuEmitter {
 };
 
 // The emitter and its lookup table, at the bindings both its step's group and its
-// draw's group 0 give them.
-@group(0) @binding(1) var<uniform> gpu_emitter: GpuEmitter;
-@group(0) @binding(3) var<storage, read> gpu_lut: array<vec4<f32>>;
+// draw's group give them (both at the per-draw index, `groups::DRAW`).
+@group(3) @binding(1) var<uniform> gpu_emitter: GpuEmitter;
+@group(3) @binding(3) var<storage, read> gpu_lut: array<vec4<f32>>;
 
 // Normalised life in [0, 1], as `Particle::life_t`.
 fn life_t(p: GpuParticle) -> f32 {

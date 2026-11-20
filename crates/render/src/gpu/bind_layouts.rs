@@ -77,7 +77,7 @@ pub(crate) fn create_scene_depth_layout(device: &wgpu::Device) -> wgpu::BindGrou
     })
 }
 
-/// Group 1 (#470): the per-draw uniform (0) at a dynamic offset into the frame's
+/// The per-draw group (#470): the per-draw uniform (0) at a dynamic offset into the frame's
 /// packed uniforms, the joint-matrix array (1) the vertex shader indexes from the
 /// uniform's `bone_base` (#455), the instance array (2) it indexes by
 /// `instance_index`, the material records (4) the uniform's `material` indexes
@@ -89,7 +89,7 @@ pub(crate) fn create_scene_depth_layout(device: &wgpu::Device) -> wgpu::BindGrou
 /// The instances are the vertex stage's alone: it hands the fragment stage the
 /// object, reflection probe and proxy volume it needs as a flat varying, which keeps
 /// the fragment stage at `wgpu::Limits::default()`'s 8 storage buffers (4 in group 0,
-/// materials, proxies and objects here, the shadow tiles in group 3), the limit the
+/// materials, proxies and objects here, the shadow tiles in the scene group), the limit the
 /// renderer requests on every backend. The vertex stage binds 7.
 pub(crate) fn create_entity_bones_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -206,7 +206,7 @@ pub(crate) fn material_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
 /// comparison sampler (#435), the view's ambient-occlusion texture (#436), and the
 /// point/spot shadow atlas with its tiles (#468), and the opaque copy a refracting
 /// or absorbing surface reads (#1523: colour and eye distance, and its sampler) — the
-/// forward pass's group 3, everything it reads that a per-frame pass produced.
+/// forward pass's scene group, everything it reads that a per-frame pass produced.
 pub(crate) fn create_shadow_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Main Shadow Bind Group Layout"),
@@ -234,7 +234,7 @@ pub(crate) fn shadow_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
     ]
 }
 
-/// The forward pass's group 3 over [`create_shadow_layout`]: the cascade `uniform`,
+/// The forward pass's scene group over [`create_shadow_layout`]: the cascade `uniform`,
 /// the shadow renderer's active cascade array + sampler, `ao` — a view's SSAO
 /// result, or the 1x1 white fallback where no AO ran — and `opaque`, the view's
 /// opaque copy in its transparent pass or the 1x1 fallback everywhere else (#1523).

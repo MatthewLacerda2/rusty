@@ -119,9 +119,10 @@ fn fs_prepass(in: VertexOutput) {
 // ---- The shadow pass (#435, #648) ----
 // The cascades' depth is drawn from this module too, so a surface variant carries
 // its own shadow entry points. Its resources sit at bindings the forward pass leaves
-// free — group 0 binding 6, group 1 binding 3 — and share `bones`, `draw` and
-// `materials` (group 1 bindings 1, 0, 4; #1616: `material()` reads the clip's record). Group 2 is the material's, as
-// in the forward pass: only the clipping pipelines bind it.
+// free — the global group's binding 6, the per-draw group's binding 3 — and share
+// `bones`, `draw` and `materials` (the per-draw group's bindings 1, 0, 4; #1616:
+// `material()` reads the clip's record). The material group is the material's, as in
+// the forward pass: only the clipping pipelines bind it; the scene group is a gap.
 
 // The cascade's matrix and the casters: `forward/shadow_caster.wgsl`.
 

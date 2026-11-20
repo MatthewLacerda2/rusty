@@ -237,22 +237,22 @@ var s_linear_clamp: sampler;
 @group(0) @binding(19)
 var t_lightmap_masks: texture_2d_array<f32>;
 
-@group(1) @binding(0)
+@group(3) @binding(0)
 var<uniform> draw: DrawUniforms;
 
 // Every skinned draw's joint matrices back to back (#455), sized per skin — no joint
 // cap. A draw reads its run from `draw.bone_base`; element 0 is the identity.
-@group(1) @binding(1)
+@group(3) @binding(1)
 var<storage, read> bones: array<mat4x4<f32>>;
 
 // The camera's instances, packed in draw order; the vertex stage alone reads them
 // and hands the fragment stage what it needs (`VertexOutput::instance`).
-@group(1) @binding(2)
+@group(3) @binding(2)
 var<storage, read> instances: array<InstanceData>;
 
 // Every kept object's record (#1706), by slot, persistent across frames and cameras;
 // an instance names its own (`InstanceData::object`).
-@group(1) @binding(6)
+@group(3) @binding(6)
 var<storage, read> objects: array<ObjectData>;
 
 // The object instance `instance` draws.
@@ -262,13 +262,13 @@ fn object_of(instance: u32) -> u32 {
 
 // The frame's Light Probe Proxy Volumes (#1672), back to back; an instance reads
 // its own from `proxy_volume` (layout: `forward/proxy_volume.wgsl`).
-@group(1) @binding(5)
+@group(3) @binding(5)
 var<storage, read> proxy_volumes: array<vec4<f32>>;
 
 // The frame's distinct material records (#1616), one per material look in use; a
 // draw reads its own through `material()`. Binding 3 is the shadow casters'
 // (`shader.wgsl`).
-@group(1) @binding(4)
+@group(3) @binding(4)
 var<storage, read> materials: array<MaterialData>;
 
 // The draw's material record. Its index is the draw's uniform, so whatever a shader
@@ -390,21 +390,21 @@ var t_detail_mask: texture_2d<f32>;
 var s_detail_mask: sampler;
 
 // The sun's cascaded shadow maps (#435): `lighting::cascades`.
-@group(3) @binding(0)
+@group(1) @binding(0)
 var<uniform> shadow: ShadowCascades;
-@group(3) @binding(1)
+@group(1) @binding(1)
 var t_shadow: texture_depth_2d_array;
-@group(3) @binding(2)
+@group(1) @binding(2)
 var s_shadow: sampler_comparison;
 // Screen-space ambient occlusion (#436), one texel per pixel; a 1x1 white texture
 // wherever the SSAO pass did not run (off, a stacked DepthOnly camera, the
 // transparent pass).
-@group(3) @binding(3)
+@group(1) @binding(3)
 var t_ao: texture_2d<f32>;
 // The point/spot shadow atlas (#468) and its tiles; a light's `shadow` indexes them.
-@group(3) @binding(4)
+@group(1) @binding(4)
 var t_shadow_atlas: texture_depth_2d;
-@group(3) @binding(5)
+@group(1) @binding(5)
 var<storage, read> shadow_tiles: array<ShadowTile>;
 // The camera's opaque copy (#1523, `opaque_copy.wgsl`), Unity's *Opaque Texture*
 // and *Depth Texture* in one: rgb its colour after the opaque pass and SSR, alpha
@@ -413,7 +413,7 @@ var<storage, read> shadow_tiles: array<ShadowTile>;
 // In the opaque pass of a base camera running SSIL (`camera.ssil.x`, #1750), which
 // reads no opaque copy, it holds SSIL's bounce instead, one texel per pixel, so
 // the stage binds no texture more than `render::setup::limits` allows (23).
-@group(3) @binding(6)
+@group(1) @binding(6)
 var t_opaque: texture_2d<f32>;
-@group(3) @binding(7)
+@group(1) @binding(7)
 var s_opaque: sampler;

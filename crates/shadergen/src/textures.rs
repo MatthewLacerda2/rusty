@@ -3,7 +3,7 @@
 //!
 //! The slot list is curated, like the block catalog: v1 has **one**, `mask`, and a
 //! slot is added only when a real block needs a second. Each slot has a fixed
-//! group-2 binding after the param uniform, so every material bind group carries it
+//! material-group binding after the param uniform, so every material bind group carries it
 //! (the renderer binds a 1×1 white fallback when a material names none, or its file
 //! is missing). A surface variant *declares* a slot only when one of its blocks reads
 //! it ([`Block::textures`](super::blocks::Block)), so a variant without one keeps the
@@ -13,14 +13,14 @@
 //! slot it names that is not in [`SLOTS`] is refused by name (#395).
 
 /// One extra texture slot: its name (the material key and the block's reference)
-/// and its group-2 binding.
+/// and its material-group binding.
 #[derive(Clone, Copy, Debug)]
 pub struct Slot {
     pub name: &'static str,
     pub binding: u32,
 }
 
-/// The `mask` slot's group-2 binding (after the param uniform at 6).
+/// The `mask` slot's material-group binding (after the param uniform at 6).
 const MASK_BINDING: u32 = 7;
 
 /// Every extra texture slot, in binding order.
@@ -45,7 +45,7 @@ pub fn slot(name: &str) -> Result<&'static Slot, String> {
 /// one exception, its sampler `s_diffuse` staying at binding 1.
 pub const SAMPLER_OFFSET: u32 = 16;
 
-/// The group-2 binding of the sampler paired with the texture at `texture_binding`.
+/// The material group's binding of the sampler paired with the texture at `texture_binding`.
 pub const fn sampler_binding(texture_binding: u32) -> u32 {
     texture_binding + SAMPLER_OFFSET
 }
@@ -54,11 +54,12 @@ pub const fn sampler_binding(texture_binding: u32) -> u32 {
 /// its sampler `s_<name>` at [`sampler_binding`].
 pub fn decl(slot: &Slot) -> String {
     format!(
-        "@group(2) @binding({}) var t_{name}: texture_2d<f32>;\n\
-         @group(2) @binding({}) var s_{name}: sampler;\n",
+        "@group({group}) @binding({}) var t_{name}: texture_2d<f32>;\n\
+         @group({group}) @binding({}) var s_{name}: sampler;\n",
         slot.binding,
         sampler_binding(slot.binding),
-        name = slot.name
+        name = slot.name,
+        group = super::groups::MATERIAL,
     )
 }
 

@@ -16,6 +16,7 @@ pub(crate) mod cascades;
 mod casters;
 mod clips;
 mod frame;
+mod layouts;
 mod setup;
 mod statics;
 mod sweeps;
@@ -34,6 +35,8 @@ use glam::Mat4;
 
 pub(crate) use casters::{shadow_runs, ShadowRun};
 pub(crate) use clips::{moves, slot_clip, CasterClip, Cutout};
+#[cfg(test)]
+pub(crate) use layouts::{caster_entries, caster_groups, light_entries};
 pub(crate) use setup::{depth_pipeline, lazy_depth_pipeline};
 #[cfg(test)]
 pub(crate) use statics::statics_key;
@@ -110,7 +113,7 @@ impl ShadowRenderer {
     pub const CASCADE_SIZE: u32 = 1024;
 
     /// The pass and its pipelines, over the forward `shader`'s shadow stage;
-    /// `material_layout` is the forward pass's group 2, which a clipped caster binds
+    /// `material_layout` is the forward pass's material group, which a clipped caster binds
     /// (#648); `atlas_shader` is `shadow_atlas.wgsl`, the atlas's tile blits (#694).
     pub fn new(
         device: &wgpu::Device,
@@ -177,8 +180,8 @@ impl ShadowRenderer {
         device: &wgpu::Device,
         material_layout: &wgpu::BindGroupLayout,
     ) -> wgpu::PipelineLayout {
-        let layouts = [&self.global_layout, &self.entity_layout, material_layout];
-        setup::clip_layout(device, layouts)
+        let groups = [&self.global_layout, &self.entity_layout, material_layout];
+        layouts::clip_layout(device, groups)
     }
 
     /// The pipeline a run of casters draws with: plain depth, the cutout clip, or a

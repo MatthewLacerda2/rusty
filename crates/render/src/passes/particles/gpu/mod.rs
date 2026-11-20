@@ -29,6 +29,7 @@ pub(crate) mod record;
 #[cfg(test)]
 mod twin;
 
+use crate::gpu::groups;
 use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use std::collections::{HashMap, HashSet};
 
@@ -52,7 +53,7 @@ const IDLE_RENDERS: u32 = 600;
 pub(crate) struct GpuParticles {
     /// The step's group: the emitter, particles (read-write), curves, `dt`s, births.
     step_layout: wgpu::BindGroupLayout,
-    /// The draw's group 0: the pass globals, the emitter, particles, curves.
+    /// The draw's per-draw group: the pass globals, the emitter, particles, curves.
     pub(crate) draw_layout: wgpu::BindGroupLayout,
     birth: LazyCompute,
     step: LazyCompute,
@@ -65,7 +66,9 @@ impl GpuParticles {
         let shader = registry.load(device, "particles_step.wgsl", "GPU Particle Step Shader");
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("GPU Particle Step Pipeline Layout"),
-            bind_group_layouts: &[Some(&step_layout)],
+            // At the per-draw index, where its draw binds the emitter's group too: the
+            // two share `particles::gpu`'s declarations.
+            bind_group_layouts: &groups::draw_only(&step_layout),
             immediate_size: 0,
         });
         let pipeline = |entry: &'static str| {
@@ -181,7 +184,7 @@ impl Renderer {
                 let Some((group, _)) = gpu.emitters.get(key).and_then(|e| e.groups.as_ref()) else {
                     continue;
                 };
-                pass.set_bind_group(0, group, &[]);
+                pass.set_bind_group(groups::DRAW, group, &[]);
                 if work.births > 0 {
                     pass.set_pipeline(gpu.birth.get());
                     pass.dispatch_workgroups(work.births.div_ceil(64), 1, 1);
